@@ -640,7 +640,7 @@
       ]
     },
     {
-      "group": "AI & integrations",
+      "group": "AI & Integrations",
       "items": [
         {
           "name": "MCP servers",
@@ -655,7 +655,7 @@
       ]
     },
     {
-      "group": "Games & graphics",
+      "group": "Gamedev",
       "items": [
         {
           "name": "Godot",
@@ -685,12 +685,27 @@
         {
           "name": "Adobe Creative Suite",
           "glyph": "AD",
-          "flavor": "The painter’s old kit, from design school onward."
+          "flavor": "A vast array of tools and weapons for a designer in photo, video, motion graphics, and illustration"
+        },
+        {
+          "name": "Procreate",
+          "glyph": "PC",
+          "flavor": "A tool used for tablet etching"
+        },
+        {
+          "name": "Clip Studio Paint",
+          "glyph": "CSP",
+          "flavor": "For a designer specializing in illustration"
+        },
+        {
+          "name": "Blender, Maya, ZBrush",
+          "glyph": "3D",
+          "flavor": "A sculptor's tools"
         }
       ]
     },
     {
-      "group": "IT & workplace",
+      "group": "IT & Workplace",
       "items": [
         {
           "name": "Google Workspace",
