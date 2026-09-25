@@ -149,7 +149,8 @@
         "alt": "Gamex editing a top-down stone puzzle room",
         "caption": "Top-down puzzle scene"
       }
-    ]
+    ],
+    "hidden": true
   },
   "projects": [
     {
@@ -205,7 +206,8 @@
           "pixel": true
         }
       ],
-      "todo": "Confirm your role."
+      "todo": "Confirm your role.",
+      "hidden": true
     },
     {
       "id": "spirits",
@@ -242,7 +244,8 @@
           "caption": "Shop"
         }
       ],
-      "todo": "Confirm your role."
+      "todo": "Confirm your role.",
+      "hidden": true
     },
     {
       "id": "pixel3d",
@@ -325,7 +328,8 @@
           "caption": "Market"
         }
       ],
-      "todo": "Confirm your role."
+      "todo": "Confirm your role.",
+      "hidden": true
     },
     {
       "id": "extracted",
