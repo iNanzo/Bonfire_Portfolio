@@ -1,0 +1,31 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# AI assistants, instructions, and scratch resources
+.claude/
+.codex/
+.agents/
+.cursor/
+.github/copilot-instructions.md
+.github/instructions/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.scratch/
+review/
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+
+# Generated caches, logs, and editor/OS files
+__pycache__/
+*.py[cod]
+*.log
+*.blend[0-9]
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
