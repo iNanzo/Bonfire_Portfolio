@@ -154,6 +154,48 @@
   },
   "projects": [
     {
+      "id": "pixel3d",
+      "name": "Pixel3D",
+      "kind": "Technical art & tooling",
+      "year": "2026",
+      "status": "World & rendering studies",
+      "summary": "A look-development sandbox for low-poly worlds with pixel palettes, lighting, weather, and stacked screen effects.",
+      "problem": "How far can a real-time 3D scene be pushed toward a hand-made pixel-art look?",
+      "built": "Three explorable scenes — a forest, a woodland kingdom, and a Japanese school — plus an overlay editor for palettes, ordered effect stacks, vegetation, shadows, weather, undo/redo, and saved looks.",
+      "role": "Technical art & tooling",
+      "tech": [
+        "Godot",
+        "Shaders",
+        "Compositor effects"
+      ],
+      "flavor": "Three small worlds, and one lantern to see them all by.",
+      "note": "Rendering work adapts supplied compositor effects alongside original environment and interaction work. These are studies, not released games.",
+      "links": [],
+      "images": [
+        {
+          "src": "assets/projects/pixel3d/forest",
+          "alt": "Top-down pixel-art forest clearing lit by a small fire",
+          "caption": "Reference Forest"
+        },
+        {
+          "src": "assets/projects/pixel3d/kingdom",
+          "alt": "Woodland Kingdom market village with the effects editor open",
+          "caption": "Woodland Kingdom + editor"
+        },
+        {
+          "src": "assets/projects/pixel3d/classroom",
+          "alt": "Cutaway isometric classroom in the Aoba School scene",
+          "caption": "Aoba School"
+        },
+        {
+          "src": "assets/projects/pixel3d/editor",
+          "alt": "Pixel3D effect library and scene-look panels around a forest preview",
+          "caption": "Look editor"
+        }
+      ],
+      "todo": "Confirm your role."
+    },
+    {
       "id": "reliquary",
       "name": "Reliquary of Ash",
       "kind": "Action roguelite",
@@ -246,48 +288,6 @@
       ],
       "todo": "Confirm your role.",
       "hidden": true
-    },
-    {
-      "id": "pixel3d",
-      "name": "Pixel3D",
-      "kind": "Technical art & tooling",
-      "year": "2026",
-      "status": "World & rendering studies",
-      "summary": "A look-development sandbox for low-poly worlds with pixel palettes, lighting, weather, and stacked screen effects.",
-      "problem": "How far can a real-time 3D scene be pushed toward a hand-made pixel-art look?",
-      "built": "Three explorable scenes — a forest, a woodland kingdom, and a Japanese school — plus an overlay editor for palettes, ordered effect stacks, vegetation, shadows, weather, undo/redo, and saved looks.",
-      "role": "Technical art & tooling",
-      "tech": [
-        "Godot",
-        "Shaders",
-        "Compositor effects"
-      ],
-      "flavor": "Three small worlds, and one lantern to see them all by.",
-      "note": "Rendering work adapts supplied compositor effects alongside original environment and interaction work. These are studies, not released games.",
-      "links": [],
-      "images": [
-        {
-          "src": "assets/projects/pixel3d/forest",
-          "alt": "Top-down pixel-art forest clearing lit by a small fire",
-          "caption": "Reference Forest"
-        },
-        {
-          "src": "assets/projects/pixel3d/kingdom",
-          "alt": "Woodland Kingdom market village with the effects editor open",
-          "caption": "Woodland Kingdom + editor"
-        },
-        {
-          "src": "assets/projects/pixel3d/classroom",
-          "alt": "Cutaway isometric classroom in the Aoba School scene",
-          "caption": "Aoba School"
-        },
-        {
-          "src": "assets/projects/pixel3d/editor",
-          "alt": "Pixel3D effect library and scene-look panels around a forest preview",
-          "caption": "Look editor"
-        }
-      ],
-      "todo": "Confirm your role."
     },
     {
       "id": "sandwich",
@@ -610,7 +610,7 @@
       ]
     },
     {
-      "group": "Web & back end",
+      "group": "Web & Backend",
       "items": [
         {
           "name": "React",
