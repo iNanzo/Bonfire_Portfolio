@@ -8,6 +8,8 @@
 //                 pass 2's depth
 //   4. pixel    — outlines, + fx, vignette, Bayer dither, palette → canvas
 import * as THREE from 'three';
+import { createResourceScope } from './resources.js';
+import { weapons as weaponNames } from '../content.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { createPixelPass } from './pixelPass.js';
@@ -38,10 +40,16 @@ const MATRIX_SIZES = [4, 8];
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
 
-export function createBonfire(container, { reducedMotion = false, onImpact, onRamp } = {}) {
+export function createBonfire(container, { reducedMotion = false, onImpact, onRamp, onError } = {}) {
+  const scope = createResourceScope();
+  const events = new AbortController();
+  scope.cleanup(() => events.abort());
+  try {
   const coarse = matchMedia('(pointer: coarse)').matches;
 
   const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
+  scope.own(renderer);
+  scope.cleanup(() => renderer.setAnimationLoop(null));
   renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = !coarse;
@@ -51,8 +59,14 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   canvas.className = 'bonfire-canvas';
   canvas.setAttribute('aria-hidden', 'true');
   container.appendChild(canvas);
+  scope.cleanup(() => canvas.remove());
+  canvas.addEventListener('webglcontextlost', (event) => {
+    event.preventDefault();
+    scope.dispose();
+    onError?.(new Error('WebGL context lost'));
+  }, { signal: events.signal });
 
-  const scene = new THREE.Scene();
+  const scene = scope.trackTree(new THREE.Scene());
   const voidColor = new THREE.Color(base.void);
   scene.fog = new THREE.Fog(voidColor, 5, 9.5);
 
@@ -83,6 +97,8 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   const fxRT = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, type: THREE.HalfFloatType, depthBuffer: false });
   const normalMaterial = new THREE.MeshNormalMaterial({ flatShading: true });
   const pass = createPixelPass();
+  [colorRT, normalRT, fxRT, normalMaterial].forEach((r) => scope.own(r));
+  scope.trackTree(pass.scene);
   pass.uniforms.tColor.value = colorRT.texture;
   pass.uniforms.tDepth.value = colorRT.depthTexture;
   pass.uniforms.tNormal.value = normalRT.texture;
@@ -94,6 +110,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   // --- Fire particles
   const particleMaterial = createParticleMaterial(colorRT.depthTexture, pass.uniforms.resolution.value);
   const effectMaterial = createEffectMaterial(particleMaterial);
+  scope.own(particleMaterial); scope.own(effectMaterial);
   const field = createCurlField();
   const fire = createFlame({
     field,
@@ -109,7 +126,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   scene.add(fire.flame, fire.spark);
   let fireflies = null; // created once the model (and the firefly model) loads
   let fx = null;        // ground flames, smoke and ash for weapon impacts
-  const smokeMaterial = createSmokeMaterial();
+  const smokeMaterial = scope.own(createSmokeMaterial());
   const interaction = createInteraction({ reducedMotion });
 
   let weapons = null; // set once the model loads
@@ -154,10 +171,23 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   let targetLevel = 1;
   let shake = 0;
 
-  const draco = new DRACOLoader();
+  const draco = scope.own(new DRACOLoader());
   const loader = new GLTFLoader().setDRACOLoader(draco);
-  const loaded = loader.loadAsync(`${BASE}models/bonfire.glb`).then((gltf) => {
+  const modelLoaded = loader.loadAsync(`${BASE}models/bonfire.glb`).then((gltf) => {
     const root = gltf.scene;
+    if (scope.disposed) {
+      const late = createResourceScope();
+      late.trackTree(root); late.dispose();
+      return;
+    }
+    scope.trackTree(root);
+    const required = ['Firefly', ...Object.keys(weaponNames).map((key) => 'Weapon_' + key)];
+    for (const name of required) {
+      if (!root.getObjectByName(name)) throw new Error('Model is missing required node: ' + name);
+    }
+    for (const name of ['Firefly_Lantern', 'Firefly_Wings']) {
+      if (!root.getObjectByName(name)) throw new Error('Model is missing required node: ' + name);
+    }
     root.updateMatrixWorld(true);
     weapons = createWeapons(root, {
       anchor: WEAPON_ANCHOR,
@@ -166,12 +196,13 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       layerFx: LAYER_FX,
       particleMaterial: effectMaterial,
       field,
-      particles: coarse ? 240 : 420,
+      particles: coarse ? 320 : 640,
       castShadows: renderer.shadowMap.enabled,
       reducedMotion,
       hooks: {
         // The fire sinks while the weapon is forged, and every firefly lights up.
-        onSwapStart: (nextFlame) => {
+        onSwapStart: (selection) => {
+          const nextFlame = selection.flame;
           targetLevel = 0.6;
           forgeFlame = nextFlame;
           // A blend still running from the last swap finishes quickly, so the
@@ -179,10 +210,18 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
           if (blend) blend.fast = true;
           applyColors({ ramp: currentRamp, shade: currentShade }, currentMix);
         },
+        // The new weapon finishing its form lands like a hit: a jolt and a flare.
+        onFormed: () => {
+          if (!reducedMotion) shake = Math.max(shake, 0.14);
+          fire.burst(0.45);
+        },
         onImpact: impact,
       },
     });
 
+    scope.trackTree(weapons.holder); scope.trackTree(weapons.forge);
+    if (weapons.lines) { scope.trackTree(weapons.lines); scene.add(weapons.lines); }
+    scope.cleanup(() => weapons.cancel());
     const flyTemplate = root.getObjectByName('Firefly');
     flyTemplate.removeFromParent();
     // Solid scenery: fireflies steer around it with a height map and land on its
@@ -211,6 +250,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       raycast,
       reducedMotion,
     });
+    scope.trackTree(fireflies.group);
     fireflies.setRamp(currentRamp);
     scene.add(fireflies.group);
 
@@ -272,20 +312,22 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       lights: coarse ? 4 : 6,
       reducedMotion,
     });
+    for (const object of [fx.ring, fx.embers, fx.wave, fx.haze, fx.puff, fx.flecks]) scope.trackTree(object);
     for (const l of fx.lights) scene.add(l);
     fx.ring.layers.set(LAYER_FX);
     fx.embers.layers.set(LAYER_FX);
+    fx.wave.layers.set(LAYER_FX);
     fx.haze.layers.set(LAYER_GHOST);
     fx.puff.layers.set(LAYER_GHOST);
     fx.flecks.layers.set(LAYER_GHOST);
     fx.setRamp(currentRamp);
-    scene.add(fx.ring, fx.embers, fx.haze, fx.puff, fx.flecks, weapons.forge);
+    scene.add(fx.ring, fx.embers, fx.wave, fx.haze, fx.puff, fx.flecks, weapons.forge);
 
     scene.add(root, weapons.holder);
     weapons.setRim(currentRamp[2]);
     weapons.set('longsword');
     ready = true;
-    draco.dispose();
+
   });
 
   // --- Fire level (stoking, UI puffs, weapon impacts)
@@ -302,7 +344,8 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     fire.params.level = Math.min(2, fire.params.level + amount);
     fire.burst(amount * 0.5);
   }
-  function impact(nextFlame) {
+  function impact(selection, weaponKey, stationary = false) {
+    const nextFlame = selection.flame;
     const old = flameKey;
     flameKey = nextFlame ?? flameKey;
     blend = { from: old, to: flameKey, t: 0 };
@@ -311,18 +354,21 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     weapons.setRim(flames[flameKey].ramp[2]); // the new weapon arrives rimmed in its new color
     // The fire erupts, a ring of flame races across the ground with a puff of
     // smoke and ash, and the fireflies scatter.
-    fire.params.level = reducedMotion ? 2 : 3.2;
+    fire.params.level = reducedMotion || stationary ? 2 : 3.2;
     targetLevel = 1;
     fire.burst(reducedMotion ? 0.8 : 1.7);
     fx.burst();
     fireflies.burst(flames[flameKey].ramp);
     if (!reducedMotion) shake = 0.3;
-    onImpact?.(flameKey, old);
+    onImpact?.(flameKey, old, stationary, { ...selection, weapon: weaponKey });
   }
 
   /** Swap weapon + flame color. Resolves at impact. */
-  function equip(weaponKey, key, { instant = false } = {}) {
+  function equip(weaponKey, key, { instant = false, item = null } = {}) {
     return loaded.then(() => {
+      if (scope.disposed) return { status: 'cancelled' };
+      if (!Object.hasOwn(flames, key)) throw new Error('Unknown flame: ' + key);
+      const selection = { weapon: weaponKey, flame: key, item };
       if (instant) {
         weapons.set(weaponKey);
         flameKey = key;
@@ -331,10 +377,11 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
         applyColors(flames[key], lightMix(key));
         weapons.setRim(flames[key].ramp[2]);
         fireflies?.setRamp(flames[key].ramp);
-        onImpact?.(key, key, true);
-        return undefined;
+        targetLevel = 1;
+        onImpact?.(key, key, true, selection);
+        return { status: 'applied' };
       }
-      return weapons.swap(weaponKey, flames[flameKey].ramp, flames[key].ramp, key);
+      return weapons.swap(weaponKey, flames[flameKey].ramp, flames[key].ramp, selection);
     });
   }
 
@@ -370,8 +417,8 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     ptr.sy = (e.clientY / window.innerHeight - 0.5) * 2;
     ptr.lastMove = clock.elapsedTime;
     ptr.inside = true;
-  }, { passive: true });
-  document.documentElement.addEventListener('pointerleave', () => { ptr.inside = false; });
+  }, { passive: true, signal: events.signal });
+  document.documentElement.addEventListener('pointerleave', () => { ptr.inside = false; }, { signal: events.signal });
 
   const cursor = { ax: 0, ay: 0, bx: 0, by: 0, vx: 0, vy: 0, moving: false, present: false, width: 1, height: 1 };
   function updateCursor(dt, t) {
@@ -399,6 +446,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   let size = { w: 1, h: 1, pd: 4 };
   const isSmall = () => container.clientWidth < 700;
   function resize() {
+    if (scope.disposed) return;
     const dpr = window.devicePixelRatio || 1;
     const cssPx = settings.pixelSize ?? (isSmall() ? 3 : 4);
     const pd = Math.max(1, Math.round(cssPx * dpr));
@@ -419,7 +467,9 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       setView(view.name, { instant: true });
     }
   }
-  new ResizeObserver(resize).observe(container);
+  const observer = new ResizeObserver(resize);
+  observer.observe(container);
+  scope.cleanup(() => observer.disconnect());
 
   // --- Per-frame update
   let flameStep = -1;
@@ -551,14 +601,21 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
 
   let running = false;
   function syncRunning() {
-    const should = !document.hidden;
+    const should = ready && !scope.disposed && !document.hidden;
     if (should === running) return;
     running = should;
     if (running) clock.getDelta();
-    renderer.setAnimationLoop(running ? () => renderFrame(Math.min(clock.getDelta(), 0.1)) : null);
+    renderer.setAnimationLoop(running ? () => {
+      try { renderFrame(Math.min(clock.getDelta(), 0.1)); }
+      catch (error) { scope.dispose(); onError?.(error); }
+    } : null);
   }
-  document.addEventListener('visibilitychange', syncRunning);
-  loaded.then(() => { resize(); syncRunning(); });
+  document.addEventListener('visibilitychange', syncRunning, { signal: events.signal });
+  // Only one readiness promise owns startup failures; callers handle its rejection.
+  const loaded = modelLoaded.then(() => { resize(); syncRunning(); }).catch((error) => {
+    scope.dispose();
+    throw error;
+  });
 
   // --- Debug HUD
   function cycle(what) {
@@ -603,6 +660,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
 
   return {
     stoke, puff, equip, setView, cycle, describe, flash, ready: loaded,
+    dispose: () => scope.dispose(),
     get flame() { return flameKey; },
     get fireflies() { return fireflies; },
     /** Internals for debugging (dev builds expose this as window.__fire). */
@@ -610,4 +668,8 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     get interaction() { return interaction.mode; },
     set interaction(m) { interaction.mode = m; },
   };
+  } catch (error) {
+    scope.dispose();
+    throw error;
+  }
 }

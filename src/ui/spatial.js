@@ -40,7 +40,7 @@ export function gridNav(container, focusSelector, itemOf = (el) => el, onMove) {
     if (best) {
       e.preventDefault();
       best.focus();
-      best.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+      best.scrollIntoView?.({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
       onMove?.();
     }
   });

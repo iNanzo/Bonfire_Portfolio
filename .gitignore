@@ -2,23 +2,45 @@
 node_modules/
 dist/
 
-# AI assistants, instructions, and scratch resources
+# AI assistants: settings, instructions, memory, and scratch/review resources
 .claude/
 .codex/
 .agents/
 .cursor/
+.cursorrules
+.cursorignore
+.windsurf/
+.windsurfrules
+.aider*
+.continue/
+.cline/
+.clinerules
+.roo/
+.roomodes
+.kiro/
+.gemini/
 .github/copilot-instructions.md
 .github/instructions/
+.github/prompts/
+.github/chatmodes/
 AGENTS.md
 CLAUDE.md
+CLAUDE.local.md
 GEMINI.md
 .scratch/
 review/
+
+# Reference and inspiration material (not part of the site)
+reference/
+references/
+inspiration/
 
 # Local secrets and environment overrides
 .env
 .env.*
 !.env.example
+.dev.vars
+.wrangler/
 
 # Generated caches, logs, and editor/OS files
 __pycache__/

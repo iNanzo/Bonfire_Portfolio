@@ -45,7 +45,6 @@ function startAmbience() {
   src.connect(filter).connect(gain).connect(master);
   src.start();
   ambience = { src, gain };
-  scheduleCrackle();
 }
 
 function scheduleCrackle() {
@@ -89,17 +88,22 @@ function tone(freq, start, dur, vol, type = 'square') {
 export function setSound(on) {
   enabled = on;
   if (on) {
-    if (!ensureContext()) return;
-    ctx.resume();
+    if (!ensureContext()) { enabled = false; return false; }
+    // The loop is reusable, but muting cancels its timer. Restart scheduling on
+    // every enable; scheduleCrackle first clears the previous timer.
+    ctx.resume().catch(() => { /* A later user gesture can retry suspended audio. */ });
     startAmbience();
+    scheduleCrackle();
     master.gain.setTargetAtTime(0.6, ctx.currentTime, 0.1);
   } else if (ctx) {
     master.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
     clearTimeout(crackleTimer);
+    crackleTimer = null;
   }
+  return enabled;
 }
 
-/** 0..1 — fades the fire ambience as the hero scrolls away. */
+/** Set the ambience mix independently of the master sound toggle. */
 export function setAmbienceLevel(level) {
   ambienceLevel = level;
   if (ambience) ambience.gain.gain.setTargetAtTime(0.16 * level, ctx.currentTime, 0.2);

@@ -12,6 +12,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # outputs dist/
 npm run preview    # serve the production build locally
+npm run admin      # the admin panel, editing your local files: http://127.0.0.1:5175
 ```
 
 ## How it plays
@@ -40,14 +41,74 @@ npm run preview    # serve the production build locally
   away) — both can go past 9. A click makes them flash. When a new weapon slams down,
   each pops on in the new flame color on its own beat and darts off; the extras fade out
   quickly once the color change is done.
-- **Weapon swap:** the old weapon ripple-dissolves into flame particles that swirl above the
-  fire through the bonfire's curl noise, turning from the current flame's color to the
-  next; they assemble into the new weapon's silhouette, the solid weapon forms inside it
-  as they fade, and it glows in its new color before striking down (the glow fading on
-  the strike). On impact the bonfire and fireflies take the new color, the fire erupts,
-  and a ring of fire in the new color races across the ground — flaring and climbing where
-  it meets the pillar, wall, logs and rubble — trailed by a ring of smoke, with a billow of
-  fine smoke, fluttering ash flakes and embers that cool as they fall.
+- **Weapon swap** (`src/bonfire/weapons.js`), in order:
+  1. **Rise + ripple-dissolve (1.4 s):** the old weapon floats up out of the fire to the
+     forge height, where the new one will appear, while it ripple-dissolves from the point
+     up to the pommel. The dissolve is local-space noise plus a screen-locked Bayer
+     dither, with a two-tone glowing edge (hot `hi` band, then `mid` band) and a faint echo
+     contour ahead of it, all in the old flame's colors. Particles are shed from the
+     dissolving edge as it passes, so they peel off bottom-up.
+  2. **Helix: swirl (0.3 s) → gather (0.6 s):** shed particles drift out only a little
+     before a rotating double helix around the new weapon's axis takes them over
+     (1.5 turns, a spindle that's widest mid-blade). Each particle keeps its eventual
+     target's height, so the helix spans the blade. Curl noise keeps a shimmer on it,
+     and the color turns from the current flame's to the next. In the gather the helix
+     tightens and spins faster as it collapses onto the new weapon's surface.
+  3. **Double helix + ripple-form (0.9 s):**
+     - **Helix:** once the particles' color has swapped (halfway through the color turn),
+       two lines wrap the new weapon as a double helix with no rungs. They span exactly
+       the blade's length and taper out toward both ends. One grows from the point up
+       and one from the pommel down, each led by a bright core-colored head, and they
+       meet as the form completes. They start on the particle helix. From the gather
+       on, as the blade completes, they close in on the weapon itself. The helix
+       becomes an oval about 2 texels (0.02) outside the weapon's real cross-section at
+       every height (its width one way, its thickness the other), so the strands wrap
+       the blade like a ribbon and pass behind it. A slow noise drifting along the
+       strands thins them in patches (subtle dithered transparency), with a faint
+       faster flicker on top.
+     - **Form:** the ripple in reverse, pommel down to the point, edged in the new
+       colors. Each particle fades out (dithered transparency, never dimming) as the edge
+       reaches the spot it's holding, so the swarm melts into the solid weapon. The new
+       color's glow comes in only after most of the blade has formed.
+  4. **Formed → hold (0.25 s) → strike (0.13 s):** the form completing lands like a hit.
+     One echo of the new weapon's own silhouette grows outward from it in its plane, to
+     1.55× its size over 0.6 s. It's mostly scaled, so the outline keeps the weapon's
+     exact shape, with only a slight outward push and a noise wobble, and it fades as
+     it spreads. The helix fades, the camera jolts, the bonfire flares, and the weapon
+     flashes before settling to its glow. Then it drives down (glow fading on the
+     strike).
+  - **Weapon profile raster:** built once per weapon on its first forge (about 3 ms).
+    Its triangles are projected onto the blade's face plane and scan-filled into a
+    grid. Marching squares traces the echo's contour. The same scan also records the
+    exact cross-section at every row (width across the blade, thickness through it).
+    Sampled at 64 heights and lightly blurred, that sets the helix's length and the
+    oval it closes to.
+- **Forge particles:** many fine specks, fewer mid-size ones, and rare large wisps (about
+  60 / 30 / 10). Size and transparency vary with the fire's own simplex noise sampled
+  where each particle is, so they vary in coherent pockets rather than per-particle
+  static. Hot flickers are small and solid; cooler wisps are larger and fainter. They
+  bloom when shed, tighten to fine points as they gather, and fade into the form.
+  Transparency is ordered dither (`alpha` attribute → Bayer discard) because dimming a
+  color walks it down the palette into other entries.
+- **Impact:** the bonfire and fireflies take the new color and the fire erupts. A ring of
+  fire in the new color races across the ground (`src/bonfire/impact.js`):
+  - **Flame tongues** use the same size and transparency variation: young, hot tongues
+    are small and solid, and older ones grow into larger, fainter wisps, with the curl
+    turbulence swelling them in pockets.
+  - **Shock ring:** a crisp two-strand line (a bright leading edge in `hi`, a dimmer
+    trailing edge in `mid`) rides the fire front and fades as it spreads. It's never
+    a clean circle: the front runs out in smooth lobes (emitter speed follows noise
+    around the ring, different every impact), crawls in and out, licks up and down,
+    the gap between strands breathes, and hot spots flicker along it in the core color.
+    All of this uses the fire's own simplex noise (`src/bonfire/rings.js`).
+  - **Collisions:** where the ring meets the pillar, wall, logs or rubble it stops just
+    short of the surface, flares to the core color, throws a splash of embers up the
+    obstacle and burns out, climbing a little up the surface while it flares. The line
+    splits around the obstacle instead of passing through it, and the open arcs keep
+    going until they fade at the clearing's edge.
+    The tongues flare and climb there too.
+  - It's trailed by a ring of smoke, with a billow of fine smoke, fluttering ash flakes
+    and embers that cool as they fall.
 - **Equipment:** the fire starts with the **longsword** and **ember flame**. Inspecting a
   project, or clicking the fire on any screen except the inventory, draws a random weapon
   and flame color (never the current pair). Home links and reloading put the longsword
@@ -60,18 +121,188 @@ npm run preview    # serve the production build locally
   purples, pinks and yellows out to white). Only the bonfire's own dense heart burns
   white-hot, in the flame's pale core color — the same two-tone look for every flame.
 
+## Brand
+
+- **Logo:** an N and an H sharing one long crossbar, with the two inner stems rising high
+  like a blade over its guard. It's line art only: no box or container, a transparent
+  background, and strokes in `currentColor`, so it takes the flame's color and eases
+  through every color change. Geometry and markup live in `src/ui/logo.js`: one path
+  of separate butt-capped strokes, so the diagonal meets its stems in a fine wedge as
+  in the drawn original. The viewBox is 58 × 80 around the crossbar's center.
+- **Header mark** (top left): the inline SVG at 40 px tall. Strokes are fine and
+  antialiased (2.4 of 80 units, about 1.2 px), never pixel-snapped: the mark is the one
+  thing that isn't pixel art. It's drawn in `--accent-hi` with a soft `--accent` glow,
+  and brightens to `--accent-core` on hover. There's no border around it.
+- **Favicon:** `public/favicon.svg` is the static fallback (for the 404 page and before
+  JS runs). After each color change the page redraws the icon in the current flame's
+  `hi` color (debounced so a 1.2 s blend is one update). In a light browser theme it
+  uses the flame's deep `lo` tone so it stays visible on a pale tab strip.
+
+## UI motion
+
+- **Inventory cursor:** one selection cursor made of four pixel corner brackets. It glides
+  from slot to slot with a short overshoot, clamps onto the slot as it lands (a stepped
+  squeeze in and back), then breathes 1 px while idle. The slot it lands on flashes its
+  frame (core → accent), sheens once across the icon, pops the icon slightly and clears
+  its dither veil. Hover, keyboard focus and inspecting all move the same cursor, and it
+  rests on the first item by default. The inspected item keeps its bright frame and `E`
+  badge.
+- **Equip badge:** the `E` moves to the clicked item right away with a stepped pop. The
+  weapon and flame labels ("Wields …") change when the weapon lands.
+- **Accent sync:** nothing that uses an accent color transitions `color`. The flame blend
+  updates the accents every frame, and a restarted stepped transition would hold the old
+  color until the blend ends.
+- **Skill slots:** the same corner brackets snap in on hover and focus, then breathe.
+- **Reduced motion:** the cursor jumps without gliding; no breathing, sheen or pop.
+
+## Roadmap & decisions
+
+- **Hosting (live):** GitHub Pages via `.github/workflows/deploy.yml`, which builds on every
+  push to `main`. The custom domain is `nhoang.dev` (`public/CNAME`); Porkbun DNS has four
+  apex `A` records to GitHub Pages and a `www` `CNAME` to `iNanzo.github.io`, with HTTPS
+  enforced.
+- **Admin panel (built):** see [Admin panel](#admin-panel). It's a Cloudflare Worker
+  behind Cloudflare Access (Google sign-in, limited to an allowlist of Gmail accounts),
+  committing to this repo with a short-lived GitHub App token. Git stays the content
+  database and the audit trail, and every save redeploys.
+- **Inventory categories (planned):** a `category` on each item (Code, Photography, Art,
+  Music), with tabs over the inventory grid.
+- **Adaptive quality (planned):** quality tiers currently key off `pointer: coarse`. Add a
+  frame-time monitor that drops slow, mouse-driven machines to the touch tier.
+
 ## Editing content
 
-All text lives in **`src/content.js`**: screens, hero copy, projects (`featured`,
-`projects`, `archive`), experience, skills, contact and the 404 page. Items marked
-`TODO` need confirming before you publish.
+All text lives in **`src/content.json`**: screens, hero copy, projects (`featured`,
+`projects`, `archive`), experience, skills, contact and the 404 page. The easy way to
+edit it is the [admin panel](#admin-panel); editing the file by hand works too.
+`src/content.js` re-exports it for the site (field notes are there), and
+`src/contentRules.js` defines what a valid edit is. Entries with a `todo` note need
+confirming before you publish.
 
-- **Add a project:** add an object to `projects` in `src/content.js`. Put its images in
+- **Add a project:** add an object to `projects`. Put its images in
   `public/assets/projects/<id>/` as `name.webp` (full size) and `name-card.webp` (~720px),
-  then list them in `images` (the first is the inventory icon). To pull more captures from
-  the old portfolio, add lines to `tools/import-screenshots.mjs` and run `npm run screenshots`.
+  then list them in `images` (the first is the inventory icon). The admin panel does all
+  of this for you, converting uploads. To pull more captures from the old portfolio, add
+  lines to `tools/import-screenshots.mjs` and run `npm run screenshots`.
+- **Hide something without deleting it:** add `hidden: true` to the entry (any project,
+  archive item, experience org or role, leadership item, education row, skill group or
+  skill, or contact link).
+- **Reorder:** move the entry within its list; the site shows everything in file order.
 - **Resume link:** drop a PDF in `public/` and set `site.resumeUrl`.
-- **Weapons:** display names are in `weapons` in `src/content.js`.
+- **"Embers Kindled" banner:** edit `hero.kindled`:
+  - `title` and `subtitle`
+  - `show`: `'first'` (first stoke of a visit), `'always'` or `'never'`
+  - `duration`: milliseconds on screen, fades included
+
+  Its look is the "Checkpoint beat" block in `src/styles.css`. Open the site with
+  `?kindled` (e.g. `http://localhost:5173/?kindled`) to hold the banner on screen while
+  you edit it; click it or press Esc to dismiss.
+- **Weapons:** display names are in `weapons` (the list itself is fixed by the 3D model).
+
+## Admin panel
+
+A form-based editor for everything in `src/content.json`, at `/admin`.
+
+**What it does**
+
+- **Text:** every section: projects, home, about, journey, skills, contact, screen
+  headings and interface text.
+- **Projects:**
+  - Add, edit or delete projects; **★ Feature this** swaps a project into the flagship
+    slot.
+  - Move items between Projects and Earlier explorations.
+  - Upload images. They're converted to WebP in the browser (full size up to 1600 px, a
+    720 px card, and small captures doubled with nearest-neighbor, like
+    `tools/import-screenshots.mjs`). Reorder them (the first is the inventory icon) and
+    set alt text, caption and pixel art.
+- **Hide / show** any entry (◉), and **reorder** any list by dragging ⋮⋮ or with ↑/↓.
+- **Live checks:** each field is checked as you type against `src/contentRules.js`: unsafe
+  links, bad ids, missing alt text, glyphs that won't fit and so on. Save is refused
+  until they're fixed; the sidebar counts problems per page.
+- **One save = one commit:** content plus new images, and images nothing uses anymore
+  are removed. The commit message summarizes the edit. The panel then follows the
+  GitHub Pages deploy until it reports **Live on the site** (about a minute).
+- **Safety nets:**
+  - Unsaved edits survive a closed tab: they're kept in this browser, and the panel
+    offers them back.
+  - If the content changed elsewhere since you opened it, it asks before overwriting.
+  - Ctrl/⌘+S saves.
+
+**How it's built** (`admin/`)
+
+| Piece | File |
+| --- | --- |
+| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `schema.js` labels/help/grouping, `images.js` WebP conversion) |
+| API: session, content, save, deploy status, image thumbnails | `admin/server/api.js` |
+| Sign-in check (Cloudflare Access JWT) | `admin/server/auth.js` |
+| Content store on GitHub (one commit per save, Git Data API) | `admin/server/github.js` |
+| Content store on disk (local mode) | `admin/server/fsStore.js` |
+| Worker entry + security headers | `admin/worker.js`, `admin/wrangler.toml` |
+| Local server + build | `admin/vite.config.js` |
+| Tests (sign-in, GitHub store, API) | `admin/test/` (`npm run admin:test`) |
+
+The editor is generic: it renders whatever is in `content.json`, so a new field shows
+up without code. `admin/ui/schema.js` only adds labels, help text and grouping.
+
+**Security**
+
+- **At the edge:** Cloudflare Access turns away everyone but your allowlisted Google
+  accounts before a request reaches the Worker.
+- **In the Worker:** it still verifies every request, the page included (Access
+  signature, team, audience, expiry, email allowlist), so a misconfigured policy
+  doesn't open it up.
+- **GitHub:** the GitHub App token is minted per hour, limited to this repo (contents
+  write, actions read), and never reaches the browser.
+- **Requests:** saves must be same-origin JSON.
+- **Every save is re-checked server-side:** content rules, WebP-only uploads, image paths
+  locked to `public/assets/projects/<id>/`, and no path traversal.
+- **Page hardening:** it ships a strict CSP and can't be framed.
+
+**Use it locally (no setup)**
+
+```bash
+npm run admin        # http://127.0.0.1:5175
+```
+
+Local mode edits your working copy directly. Nothing is committed or deployed; commit
+and push yourself. It has no sign-in, so it only listens on 127.0.0.1. Run `npm run
+dev` alongside it to see changes live.
+
+**Put it online (one-time setup)**
+
+1. **GitHub App**
+   - Go to GitHub → Settings → Developer settings → GitHub Apps → **New GitHub App**.
+   - Name it (e.g. `nhoang-admin`), set the homepage to `https://nhoang.dev`, and
+     untick Webhook → Active.
+   - Repository permissions: **Contents: Read and write** and **Actions: Read-only**.
+     Choose "Only on this account", then create it.
+   - Note the **App ID** and **Generate a private key** (it downloads a `.pem`).
+   - **Install App** → Only select repositories → `Bonfire_Portfolio`. The number at
+     the end of the installation page's URL is the **installation id**.
+2. **Deploy the Worker:** run `npx wrangler login`, then `npm run admin:deploy`. This
+   creates `https://nhoang-admin.<your-subdomain>.workers.dev`.
+3. **Cloudflare Access** (free Zero Trust plan):
+   - Zero Trust → Settings → Authentication → add **Google** as a login method.
+   - Protect the Worker's hostname: Workers → `nhoang-admin` → Settings → Domains &
+     Routes → workers.dev → **Enable Cloudflare Access**. Or add a self-hosted Access
+     application for that hostname.
+   - Set its policy to **Allow**, Include **Emails**: your Gmail addresses.
+   - Copy the application's **Audience (AUD) tag** and your **team domain**
+     (`https://<team>.cloudflareaccess.com`) into `ACCESS_AUD` / `ACCESS_TEAM_DOMAIN`
+     in `admin/wrangler.toml`.
+4. **Secrets** (stored in Cloudflare, never in the repo):
+   ```bash
+   npx wrangler secret put ALLOWED_EMAILS --config admin/wrangler.toml          # you@gmail.com,other@gmail.com
+   npx wrangler secret put GITHUB_APP_ID --config admin/wrangler.toml
+   npx wrangler secret put GITHUB_APP_INSTALLATION_ID --config admin/wrangler.toml
+   npx wrangler secret put GITHUB_APP_PRIVATE_KEY --config admin/wrangler.toml < path/to/key.pem
+   ```
+   A fine-grained token for this repo (Contents read/write, Actions read) set as
+   `GITHUB_TOKEN` also works instead of the app, but a leaked token lives longer.
+5. Run `npm run admin:deploy` again. Then set the Worker's URL in the `admin-url` meta
+   tag of `public/admin/index.html`, so `nhoang.dev/admin` forwards to it. If you ever
+   move `nhoang.dev`'s DNS to Cloudflare, you can route the Worker at
+   `nhoang.dev/admin*` directly instead.
 
 ## Colors
 
@@ -97,8 +328,11 @@ every pixel to base + current ramp; the UI reads the same ramp as CSS variables
 | Cursor → fire interaction models | `src/bonfire/interaction.js` |
 | Fireflies (navigation, landing, lit rotation, halos, lights) | `src/bonfire/fireflies.js` |
 | Height map of the clearing (firefly steering, collision, wall spots) | `src/bonfire/terrain.js` |
-| Impact effects: ring of fire, smoke ring, smoke, ash, embers | `src/bonfire/impact.js` |
-| Weapon swap (dissolve → swirl → gather → form → glow → strike) + rim light | `src/bonfire/weapons.js` |
+| Impact effects: ring of fire, shock ring, smoke ring, smoke, ash, embers, collision splashes | `src/bonfire/impact.js` |
+| Weapon swap (rise + dissolve → swirl → gather → ripple-form → glow → strike) + rim light | `src/bonfire/weapons.js` |
+| Particle shader: size by distance, dithered `alpha`, manual depth test | `src/bonfire/flame.js` |
+| Line material for the shock ring and forge lines (dithered, depth-tested) + ring noise | `src/bonfire/rings.js` |
+| Forge lines: double helix, weapon silhouette tracing + echo burst | `src/bonfire/forgeFx.js` |
 | Pixel pass: outlines → fire → vignette → Bayer dither → palette | `src/bonfire/pixelPass.js` |
 
 Rebuild the model after editing the Python files:

@@ -365,6 +365,6 @@ export function createInteraction({ reducedMotion = false } = {}) {
     update,
     flowWorld,
     get mode() { return mode; },
-    set mode(m) { if (MODES[m]) mode = m; },
+    set mode(m) { if (Object.hasOwn(MODES, m)) mode = m; },
   };
 }

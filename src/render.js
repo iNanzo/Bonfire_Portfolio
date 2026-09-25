@@ -1,19 +1,24 @@
 // HTML templates. All text comes from content.js.
 import {
   site, screens, hero, sections, items, archive, about,
-  experience, leadership, education, skills, contact, ui,
+  experience, leadership, education, skills, contact, ui, shown,
 } from './content.js';
 
 const BASE = import.meta.env.BASE_URL;
 
-export const esc = (s = '') =>
-  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-
-export const isExternal = (href) => /^(https?:|mailto:)/.test(href);
-export const url = (href) => (isExternal(href) ? href : `${BASE}${href}`);
+export { esc } from './html.js';
+import { esc, isSafeUrl, assetUrl } from './html.js';
+import { parseRoute, routePath } from './routes.js';
+import { logoMark } from './ui/logo.js';
+export const routeHref = (hash) => routePath(parseRoute(hash), BASE);
+export const isExternal = (href) => /^(https?:|mailto:)/i.test(href);
+export const url = (href) => {
+  if (!isSafeUrl(href)) throw new Error('Invalid link: ' + href);
+  return isExternal(href) ? href : BASE + href;
+};
 export const linkAttrs = (href) =>
-  `href="${esc(url(href))}"${/^https?:/.test(href) ? ' target="_blank" rel="noreferrer"' : ''}`;
-export const img = (src, card = false) => `${BASE}${src}${card ? '-card' : ''}.webp`;
+  `href="${esc(url(href))}"${/^https?:/i.test(href) ? ' target="_blank" rel="noopener noreferrer"' : ''}`;
+export const img = (src, card = false) => assetUrl(src, BASE, card);
 
 export const corners = '<span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>';
 const screenMeta = Object.fromEntries(screens.map((s) => [s.id, s]));
@@ -41,7 +46,7 @@ export function renderChrome() {
     <div class="stage" data-stage></div>
     <header class="site-header" data-header>
       <a class="brand" href="#/" aria-label="${esc(site.name)}, home">
-        <span class="brand-mark" aria-hidden="true">NH</span><span class="brand-name">${esc(site.name)}</span>
+        ${logoMark('brand-mark')}<span class="brand-name">${esc(site.name)}</span>
       </a>
       <nav class="tabs" aria-label="Main">
         <kbd class="tab-key" aria-hidden="true">Q</kbd>
@@ -73,7 +78,7 @@ export function renderChrome() {
       ${ui.prompts.map(([a, b, label]) => `<span class="prompt" data-prompt="${esc(label)}"><kbd>${esc(a)}</kbd>${b ? `<kbd>${esc(b)}</kbd>` : ''}${esc(label)}</span>`).join('')}
       <span class="prompt prompt-stoke">${esc(ui.stokePrompt)}</span>
     </div>
-    <div class="kindled" data-kindled hidden>
+    <div class="kindled" data-kindled hidden style="--kindle-time: ${Number(hero.kindled.duration) || 2600}ms">
       <div class="kindled-band">
         <p class="kindled-title">${esc(hero.kindled.title)}</p>
         <p class="kindled-sub">${esc(hero.kindled.subtitle)}</p>
@@ -125,7 +130,7 @@ function slot(p, i) {
       <a class="slot-item" href="#/projects/${esc(p.id)}" data-item="${esc(p.id)}" data-index="${i}"
          aria-label="${esc(`${p.name}, ${p.kind}, ${p.year}`)}">
         <span class="slot-frame">
-          <img src="${img(cover.src, true)}" alt="" width="720" height="450" loading="lazy" decoding="async"${cover.pixel ? ' class="pixel"' : ''}>
+          <img src="${esc(img(cover.src, true))}" alt="" width="720" height="450" loading="lazy" decoding="async"${cover.pixel ? ' class="pixel"' : ''}>
           <span class="veil" aria-hidden="true"></span>
           <span class="slot-badge" data-equipped-badge hidden aria-hidden="true">E</span>
         </span>
@@ -137,7 +142,7 @@ function slot(p, i) {
 export function renderProjects() {
   const list = items();
   const empty = Math.max(0, GRID_SLOTS - list.length);
-  const tabletop = archive.find((a) => a.href);
+  const tabletop = shown(archive).find((a) => a.href);
   return `
     <section class="screen screen-projects" data-screen="projects" data-mode="browse" aria-labelledby="projects-title" hidden>
       <div class="inv-layout">
@@ -186,6 +191,7 @@ export function renderProjects() {
         ${panel('inv-panel', `
           ${screenHead('projects')}
           <div class="inv-box">
+            <span class="inv-cursor" data-inv-cursor aria-hidden="true" hidden></span>
             <ul class="inv-grid" role="list" data-inv-grid>
               ${list.map(slot).join('')}
               ${'<li class="slot-cell is-empty" aria-hidden="true"><span class="slot-frame"></span></li>'.repeat(empty)}
@@ -209,11 +215,11 @@ export function renderExperience() {
     <section class="screen screen-experience side-right" data-screen="experience" aria-labelledby="experience-title" hidden>
       ${panel('page-panel', `
         ${screenHead('experience')}
-        ${experience.map((org) => `
+        ${shown(experience).filter((org) => shown(org.roles).length).map((org) => `
           <div class="org">
             <div class="org-head"><h2>${esc(org.org)}</h2><span>${esc(org.location)}</span></div>
             <ol class="roles" role="list">
-              ${org.roles.map((r) => `
+              ${shown(org.roles).map((r) => `
                 <li class="role">
                   <p class="role-dates">${esc(r.dates)}</p>
                   <h3 class="role-title">${esc(r.title)}</h3>
@@ -224,7 +230,7 @@ export function renderExperience() {
         <div class="leadership">
           <div class="subhead"><h2>${esc(leadership.title)}</h2><p>${esc(leadership.flavor)}</p></div>
           <div class="lead-grid">
-            ${leadership.items.map((l) => `
+            ${shown(leadership.items).map((l) => `
               <article class="lead-item">
                 <h3>${esc(l.org)}</h3>
                 <p class="lead-role">${esc(l.role)}</p>
@@ -236,7 +242,7 @@ export function renderExperience() {
         <div class="education">
           <div class="subhead"><h2>Education & certificates</h2></div>
           <ul class="edu-list" role="list">
-            ${education.map((e) => `<li class="edu-row"><strong>${esc(e.name)}</strong><span class="edu-dates">${esc(e.dates)}</span><span>${esc(e.org)}</span></li>`).join('')}
+            ${shown(education).map((e) => `<li class="edu-row"><strong>${esc(e.name)}</strong><span class="edu-dates">${esc(e.dates)}</span><span>${esc(e.org)}</span></li>`).join('')}
           </ul>
         </div>
       `)}
@@ -251,11 +257,11 @@ export function renderSkills() {
       ${panel('page-panel', `
         ${screenHead('skills')}
         <div class="skill-groups" data-skill-grid>
-          ${skills.map((g) => `
+          ${shown(skills).filter((g) => shown(g.items).length).map((g) => `
             <div class="skill-group">
               <h2>${esc(g.group)}</h2>
               <ul class="slots" role="list">
-                ${g.items.map((s) => `
+                ${shown(g.items).map((s) => `
                   <li data-nav-item>
                     <button class="slot" type="button" data-skill="${esc(s.name)}" data-flavor="${esc(s.flavor)}">
                       <span class="slot-glyph" aria-hidden="true">${esc(s.glyph)}</span>
@@ -299,7 +305,7 @@ export function renderContact() {
         <p class="contact-heading">${esc(contact.heading)}</p>
         <p class="contact-body">${esc(contact.body)}</p>
         <ul class="contact-links" role="list">
-          ${contact.links.map((l) => `
+          ${shown(contact.links).map((l) => `
             <li><a class="contact-link" ${linkAttrs(l.href)}>
               <span class="contact-label">${esc(l.label)}</span>
               <span class="contact-value">${esc(l.value)}</span>

@@ -6,7 +6,7 @@ import { blip } from './audio.js';
 
 export function setupInventory(root, { reducedMotion }) {
   const list = items();
-  const byId = Object.fromEntries(list.map((p) => [p.id, p]));
+  const byId = new Map(list.map((p) => [p.id, p]));
   const glance = root.querySelector('[data-glance]');
   const detail = root.querySelector('[data-detail]');
   const g = (k) => glance.querySelector(`[data-g="${k}"]`);
@@ -19,11 +19,33 @@ export function setupInventory(root, { reducedMotion }) {
   let current = null;
   let imageIndex = 0;
 
+  // --- Selection cursor: glides to the glanced slot and locks on -------------------
+  const box = root.querySelector('.inv-box');
+  const cursor = root.querySelector('[data-inv-cursor]');
+  function placeCursor({ glide }) {
+    const frame = slots.find((s) => s.dataset.item === glanced)?.querySelector('.slot-frame');
+    if (!frame || !box.offsetWidth) return;
+    const b = box.getBoundingClientRect();
+    const f = frame.getBoundingClientRect();
+    cursor.classList.toggle('is-snapping', !glide || cursor.hidden);
+    cursor.hidden = false;
+    cursor.style.setProperty('--x', `${f.left - b.left}px`);
+    cursor.style.setProperty('--y', `${f.top - b.top}px`);
+    cursor.style.setProperty('--s', `${f.width}px`);
+    if (glide && !reducedMotion) {
+      cursor.classList.remove('is-locking');
+      void cursor.offsetWidth;
+      cursor.classList.add('is-locking');
+    }
+  }
+  new ResizeObserver(() => placeCursor({ glide: false })).observe(box);
+
   // --- At a glance ---------------------------------------------------------------
   function showGlance(id) {
-    const p = byId[id];
+    const p = byId.get(id);
     if (!p || glanced === id) return;
     glanced = id;
+    placeCursor({ glide: true });
     const cover = p.images[0];
     g('img').src = img(cover.src, true);
     g('img').classList.toggle('pixel', !!cover.pixel);
@@ -43,7 +65,7 @@ export function setupInventory(root, { reducedMotion }) {
     s.addEventListener('mouseenter', () => showGlance(s.dataset.item));
     s.addEventListener('focus', () => showGlance(s.dataset.item));
   }
-  showGlance(list[0].id);
+  if (list.length) showGlance(list[0].id);
 
   // --- Item details ----------------------------------------------------------------
   function showImage(i) {
@@ -65,7 +87,7 @@ export function setupInventory(root, { reducedMotion }) {
   }
 
   function open(id) {
-    const p = byId[id];
+    const p = byId.get(id);
     if (!p) return false;
     current = p;
     const i = list.indexOf(p);
@@ -89,10 +111,13 @@ export function setupInventory(root, { reducedMotion }) {
     d('controls').hidden = !multi;
     d('thumbs').hidden = !multi;
     d('thumbs').innerHTML = multi
-      ? p.images.map((im, n) => `<button class="thumb" type="button" data-thumb="${n}" aria-label="Show image ${n + 1}: ${esc(im.caption ?? '')}"><img src="${img(im.src, true)}" alt="" loading="lazy"></button>`).join('')
+      ? p.images.map((im, n) => `<button class="thumb" type="button" data-thumb="${n}" aria-label="Show image ${n + 1}: ${esc(im.caption ?? '')}"><img src="${esc(img(im.src, true))}" alt="" loading="lazy"></button>`).join('')
       : '';
     showImage(0);
-    for (const s of slots) s.toggleAttribute('aria-current', s.dataset.item === id);
+    for (const s of slots) {
+      if (s.dataset.item === id) s.setAttribute('aria-current', 'page');
+      else s.removeAttribute('aria-current');
+    }
     detail.classList.remove('is-opening');
     void detail.offsetWidth;
     detail.classList.add('is-opening');
@@ -114,24 +139,28 @@ export function setupInventory(root, { reducedMotion }) {
     if (e.key === 'ArrowRight') { e.preventDefault(); showImage(imageIndex + 1); blip('move'); }
   });
 
-  /** Mark the slot whose weapon is in the fire. */
-  function markEquipped(id, label) {
+  /** Mark the slot whose item holds the fire (moves on click, before the weapon lands). */
+  function markEquipped(id) {
     for (const s of slots) s.querySelector('[data-equipped-badge]').hidden = s.dataset.item !== id;
     const line = root.querySelector('[data-equipped-line]');
-    line.textContent = id ? `${ui.equipped}: ${byId[id].name}` : '';
+    line.textContent = id ? `${ui.equipped}: ${byId.get(id).name}` : '';
+  }
+  /** What the inspected item wields (changes when its weapon lands). */
+  function setWield(label) {
     d('wield-text').textContent = label;
   }
 
   // Leaving the grid returns the readout to the selected (or first) item.
   root.querySelector('[data-inv-grid]').addEventListener('mouseleave', () => {
-    if (!root.querySelector('[data-inv-grid]').contains(document.activeElement)) showGlance(current?.id ?? list[0].id);
+    if (!root.querySelector('[data-inv-grid]').contains(document.activeElement)) showGlance(current?.id ?? list[0]?.id);
   });
 
   return {
     open,
     showGlance,
     markEquipped,
-    has: (id) => !!byId[id],
+    setWield,
+    has: (id) => byId.has(id),
     slotFor: (id) => slots.find((s) => s.dataset.item === id),
     get current() { return current; },
   };

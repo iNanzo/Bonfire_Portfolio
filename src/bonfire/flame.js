@@ -23,10 +23,13 @@ import * as THREE from 'three';
 const vertexShader = /* glsl */ `
   attribute float size;
   attribute vec3 color;
+  attribute float alpha;
   uniform float sizeScale;
   varying vec3 vColor;
+  varying float vAlpha;
   void main() {
     vColor = color;
+    vAlpha = alpha;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = size <= 0.0 ? vec4(2.0, 2.0, 2.0, 1.0) : projectionMatrix * mv;
     gl_PointSize = size <= 0.0 ? 1.0 : clamp(floor(size * sqrt(sizeScale / -mv.z) + 0.5), 1.0, 4.0);
@@ -38,14 +41,23 @@ const vertexShader = /* glsl */ `
 // pixel holds (uHot = 1 for the bonfire, 0 for other effects): the pixel pass
 // lets only the bonfire's dense heart burn white-hot, while other effects keep
 // their hue however densely they pile up.
+// Transparency is ordered dither against a screen-locked Bayer matrix: dimming
+// a particle instead would walk its color down the palette into other entries.
+export const DITHER_GLSL = /* glsl */ `
+  float pBayer2(vec2 a) { a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
+  float pBayer4(vec2 a) { return pBayer2(0.5 * a) * 0.25 + pBayer2(a); }
+`;
 const fragmentShader = /* glsl */ `
   uniform sampler2D tDepth;
   uniform vec2 resolution;
   uniform float uHot;
   varying vec3 vColor;
+  varying float vAlpha;
+  ${DITHER_GLSL}
   void main() {
     float sceneDepth = texture2D(tDepth, gl_FragCoord.xy / resolution).x;
     if (gl_FragCoord.z > sceneDepth + 0.00002) discard;
+    if (vAlpha < 0.999 && vAlpha <= pBayer4(gl_FragCoord.xy)) discard;
     gl_FragColor = vec4(vColor, uHot * max(vColor.r, max(vColor.g, vColor.b)));
   }
 `;
@@ -53,6 +65,8 @@ const fragmentShader = /* glsl */ `
 export function createParticleMaterial(depthTexture, resolution) {
   return new THREE.ShaderMaterial({
     uniforms: { tDepth: { value: depthTexture }, resolution: { value: resolution }, sizeScale: { value: 6 }, uHot: { value: 1 } },
+    // Point sets without an `alpha` attribute (the bonfire, sparks) draw fully opaque.
+    defaultAttributeValues: { color: [1, 1, 1], uv: [0, 0], uv1: [0, 0], alpha: [1] },
     vertexShader,
     fragmentShader,
     // Purely additive in color and alpha (alpha carries the bonfire's heat).

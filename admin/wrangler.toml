@@ -1,0 +1,29 @@
+# The admin panel Worker. Deploy with `npm run admin:deploy` (builds the page first).
+# One-time setup (Cloudflare Access, GitHub App, secrets): see "Admin panel" in README.md.
+name = "nhoang-admin"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+# The built admin page (npm run admin:build). run_worker_first: the Worker checks
+# the Access sign-in before serving anything, the page included.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+run_worker_first = true
+
+[vars]
+SITE_URL = "https://nhoang.dev/"
+GITHUB_OWNER = "iNanzo"
+GITHUB_REPO = "Bonfire_Portfolio"
+GITHUB_BRANCH = "main"
+# From Cloudflare Zero Trust → Access → Applications → (the admin app):
+ACCESS_TEAM_DOMAIN = "https://YOUR-TEAM.cloudflareaccess.com"
+ACCESS_AUD = "PASTE-THE-APPLICATION-AUDIENCE-TAG"
+
+# Secrets (set with `npx wrangler secret put NAME --config admin/wrangler.toml`, never committed):
+#   ALLOWED_EMAILS            comma-separated Gmail addresses that may edit
+#   GITHUB_APP_ID             the GitHub App's id
+#   GITHUB_APP_INSTALLATION_ID
+#   GITHUB_APP_PRIVATE_KEY    the app's .pem private key (paste the whole file)
+#   (or GITHUB_TOKEN          a fine-grained token for this repo: Contents read/write, Actions read)

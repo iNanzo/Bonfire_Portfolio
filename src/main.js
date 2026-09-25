@@ -10,6 +10,9 @@ import { setSound, blip } from './ui/audio.js';
 import { gridNav, listNav } from './ui/spatial.js';
 import { setupInventory } from './ui/inventory.js';
 import { applyFlame, setAccentRamp } from './ui/theme.js';
+import { parseRoute, readRoute, routePath, isEditing } from './routes.js';
+import { updateMetadata } from './seo.js';
+const BASE = import.meta.env.BASE_URL;
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const touch = matchMedia('(hover: none)').matches;
@@ -49,31 +52,34 @@ if (touch) q('[data-stoke-hint]').textContent = hero.stokeHint.touch;
 // --- Equipment (weapon + flame in the fire) -----------------------------------------------
 const weaponKeys = Object.keys(weapons);
 const flameKeys = Object.keys(flames);
+// Requested state drives future choices; displayed state changes only at impact.
 let equipment = { ...startingEquipment, item: null };
+let displayedEquipment = { ...equipment };
 let fire = null; // set once the 3D scene module loads
-const equipLabel = () => `${weapons[equipment.weapon]} · ${flames[equipment.flame].name}`;
+const equipLabel = () => `${weapons[displayedEquipment.weapon]} · ${flames[displayedEquipment.flame].name}`;
 
+// The E badge follows the latest request (it moves on click); the weapon and
+// flame labels follow what's actually in the fire (they change at impact).
 function refreshEquipLabels() {
-  inventory.markEquipped(equipment.item, equipLabel());
+  inventory.markEquipped(equipment.item);
+  inventory.setWield(equipLabel());
   qa('[data-equip-label]').forEach((el) => { el.textContent = equipLabel(); });
 }
 refreshEquipLabels();
 
 function equip(weapon, flame, item, { instant = false } = {}) {
-  if (equipment.weapon === weapon && equipment.flame === flame) {
-    equipment.item = item;
-    refreshEquipLabels();
-    return;
-  }
+  const same = equipment.weapon === weapon && equipment.flame === flame;
   equipment = { weapon, flame, item };
+  inventory.markEquipped(item);
   if (!fire) {
     // Scene not loaded yet (or no WebGL): theme now; the scene catches up on load.
-    applyFlame(flame);
+    displayedEquipment = { ...equipment };
+    if (!same) applyFlame(flame);
     refreshEquipLabels();
     return;
   }
-  if (!instant) blip('pull');
-  fire.equip(weapon, flame, { instant });
+  if (!same && !instant) blip('pull');
+  fire.equip(weapon, flame, { instant, item }).catch(failScene);
 }
 
 /** Inspecting a project draws a random weapon and flame (never the same as now). */
@@ -85,13 +91,14 @@ function rollFor(item) {
   );
 }
 
-function onImpact(flame, from, instant) {
+function onImpact(flame, _from, instant, selection) {
+  displayedEquipment = { ...selection };
   document.documentElement.dataset.flame = flame;
   if (instant) applyFlame(flame); // otherwise the scene eases the accents via onRamp
   refreshEquipLabels();
   if (!instant) {
     blip('stab');
-    live.textContent = `The fire takes the ${weapons[equipment.weapon]}. ${flames[flame].name}.`;
+    live.textContent = `The fire takes the ${weapons[displayedEquipment.weapon]}. ${flames[flame].name}.`;
   }
 }
 
@@ -99,18 +106,13 @@ function onImpact(flame, from, instant) {
 const order = screens.map((s) => s.id);
 let route = { screen: null, item: null };
 
-function parseHash() {
-  const h = location.hash.replace(/^#\/?/, '');
-  const [screen = '', item = null] = h.split('/');
-  if (!screen) return { screen: 'home', item: null };
-  if (!screenEls[screen]) return { screen: 'home', item: null };
-  if (screen === 'projects' && item && !inventory.has(item)) return { screen, item: null };
-  return { screen, item: screen === 'projects' ? item : null };
-}
+const parseHash = () => readRoute(location, BASE);
 
 function go(hash) {
-  if (location.hash === hash || (hash === '#/' && !location.hash)) render(parseHash(), true);
-  else location.hash = hash;
+  const next = parseRoute(hash);
+  const pathname = routePath(next, BASE);
+  if (location.pathname !== pathname || location.hash) history.pushState(null, '', pathname + location.search);
+  render(next, true);
 }
 
 function render(next, user) {
@@ -130,6 +132,8 @@ function render(next, user) {
   document.body.dataset.screen = next.screen;
   qa('[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === next.screen));
   qa('[data-tab][aria-current]').forEach((a) => a.setAttribute('aria-current', 'page'));
+
+  document.body.classList.toggle('is-inspecting', next.screen === 'projects' && !!next.item);
 
   // Inventory browse / inspect.
   if (next.screen === 'projects') {
@@ -151,8 +155,7 @@ function render(next, user) {
   // Title + focus for keyboard and screen reader users.
   const meta = screens.find((s) => s.id === next.screen);
   const itemName = next.item ? items().find((p) => p.id === next.item)?.name : null;
-  document.title = next.screen === 'home' ? 'Newton Hoang — Full-stack developer & game maker'
-    : `${itemName ?? meta.label} — Newton Hoang`;
+  updateMetadata(next, BASE);
   if (user && prev.screen) {
     live.textContent = itemName ? `${itemName}, item details` : `${meta.label}`;
     let target = next.item ? q('#detail-title') : q(`#${next.screen === 'home' ? 'home' : next.screen}-title`);
@@ -161,16 +164,38 @@ function render(next, user) {
   }
 }
 
-window.addEventListener('hashchange', () => { render(parseHash(), true); blip('select'); });
-// Old in-page anchors (#projects) still work.
-if (/^#[a-z]+$/.test(location.hash) && screenEls[location.hash.slice(1)]) {
-  history.replaceState(null, '', `#/${location.hash.slice(1)}`);
+// Native links remain crawlable and open correctly in new tabs. Only ordinary
+// same-origin route clicks are enhanced into in-place navigation.
+function syncRoute(user = true) {
+  const next = parseHash();
+  history.replaceState(null, '', routePath(next, BASE) + location.search);
+  render(next, user);
 }
-render(parseHash(), false);
+window.addEventListener('popstate', () => syncRoute());
+window.addEventListener('hashchange', () => syncRoute());
+document.addEventListener('click', (event) => {
+  const a = event.target.closest('a');
+  if (!a || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || a.target || a.hasAttribute('download')) return;
+  if (a.classList.contains('skip-link')) {
+    event.preventDefault();
+    q('#main').focus();
+    return;
+  }
+  const destination = new URL(a.href);
+  if (destination.origin !== location.origin || !destination.pathname.startsWith(BASE)) return;
+  const legacy = destination.hash.startsWith('#/');
+  const relative = destination.pathname.slice(BASE.length);
+  const next = parseRoute(legacy ? destination.hash : relative);
+  if (!legacy && routePath(next, BASE) !== destination.pathname) return;
+  event.preventDefault();
+  go(legacy ? destination.hash : relative);
+  blip('select');
+});
+syncRoute(false);
 
 // --- Keyboard: Q/E switch screens, Esc goes back ------------------------------------------
 window.addEventListener('keydown', (e) => {
-  if (e.altKey || e.ctrlKey || e.metaKey || document.querySelector('dialog[open]')) return;
+  if (e.altKey || e.ctrlKey || e.metaKey || isEditing(e.target) || document.querySelector('dialog[open]')) return;
   const k = e.key.toLowerCase();
   if (k === 'q' || k === 'e') {
     const i = order.indexOf(route.screen);
@@ -206,7 +231,7 @@ listNav(menu, '[data-menu-item]', { onMove: () => blip('move') });
 
 const soundButtons = qa('[data-sound]');
 function applySound(on) {
-  setSound(on);
+  on = setSound(on);
   soundButtons.forEach((b) => {
     b.setAttribute('aria-pressed', String(on));
     q('[data-sound-label]', b).textContent = on ? ui.soundOn : ui.soundOff;
@@ -253,13 +278,19 @@ window.addEventListener('scroll', hideTip, { passive: true });
 // --- Clicks: UI "hit" feedback, and the fire answers ----------------------------------------
 const kindled = q('[data-kindled]');
 let kindleTimer = null;
-function hideKindled() { kindled.hidden = true; clearTimeout(kindleTimer); }
-function showKindled() {
+function hideKindled() { kindled.hidden = true; kindled.classList.remove('is-preview'); clearTimeout(kindleTimer); }
+function showKindled({ hold = false } = {}) {
+  clearTimeout(kindleTimer);
+  // Re-show restarts the fade even if it's already up.
+  kindled.hidden = true;
+  void kindled.offsetWidth;
   kindled.hidden = false;
+  kindled.classList.toggle('is-preview', hold);
   live.textContent = `${hero.kindled.title}. ${hero.kindled.subtitle}`;
   blip('kindle');
-  kindleTimer = setTimeout(hideKindled, 2600);
+  if (!hold) kindleTimer = setTimeout(hideKindled, Number(hero.kindled.duration) || 2600);
 }
+if (new URLSearchParams(location.search).has('kindled')) showKindled({ hold: true });
 window.addEventListener('keydown', (e) => { if (!kindled.hidden && e.key === 'Escape') hideKindled(); });
 kindled.addEventListener('click', hideKindled);
 
@@ -268,7 +299,8 @@ function stoke() {
   hideKindled();
   const first = fire.stoke();
   blip('stoke');
-  if (first) showKindled();
+  const { show } = hero.kindled;
+  if (show === 'always' || (show === 'first' && first)) showKindled();
 }
 
 document.addEventListener('click', (e) => {
@@ -281,7 +313,7 @@ document.addEventListener('click', (e) => {
     return;
   }
   // Home links reset the fire even when you're already home.
-  if (e.target.closest('a[href="#/"]') && route.screen === 'home') {
+  if (e.target.closest('a[data-home]') && route.screen === 'home') {
     equip(startingEquipment.weapon, startingEquipment.flame, null);
   }
   const hit = e.target.closest('a, button');
@@ -295,23 +327,30 @@ document.addEventListener('click', (e) => {
 });
 
 // --- The bonfire --------------------------------------------------------------------------
-function webglAvailable() {
-  try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; }
+function failScene(error) {
+  fire?.dispose();
+  fire = null;
+  delete window.__fire;
+  document.documentElement.classList.add('no-webgl');
+  q('[data-stage]').classList.remove('is-ready');
+  q('[data-debug]').hidden = true;
+  displayedEquipment = { ...equipment };
+  applyFlame(equipment.flame);
+  refreshEquipLabels();
+  console.warn('Bonfire unavailable; showing the static portfolio.', error);
 }
 
-if (webglAvailable()) {
-  import('./bonfire/scene.js').then(({ createBonfire }) => {
+// Construct the real renderer once instead of probing with a second WebGL context.
+import('./bonfire/scene.js').then(async ({ createBonfire }) => {
     const stage = q('[data-stage]');
-    fire = createBonfire(stage, { reducedMotion, onImpact, onRamp: setAccentRamp });
-    if (import.meta.env.DEV) window.__fire = fire; // for local debugging
+    const candidate = createBonfire(stage, { reducedMotion, onImpact, onRamp: setAccentRamp, onError: failScene });
+    await candidate.ready;
+    fire = candidate;
+    if (import.meta.env.DEV) window.__fire = fire;
     fire.setView(route.screen === 'projects' && route.item ? 'inspect' : route.screen, { instant: true });
-    fire.ready.then(() => {
-      stage.classList.add('is-ready');
-      // Deep link straight to an item: equip its roll without the animation.
-      if (equipment.weapon !== startingEquipment.weapon || equipment.flame !== startingEquipment.flame) {
-        fire.equip(equipment.weapon, equipment.flame, { instant: true });
-      }
-    });
+    // Navigation during loading only changes requested state; initialize with its latest value.
+    await fire.equip(equipment.weapon, equipment.flame, { instant: true, item: equipment.item });
+    stage.classList.add('is-ready');
 
     // Render debug HUD: P toggles, 1–5 cycle settings.
     const hud = q('[data-debug]');
@@ -324,7 +363,7 @@ if (webglAvailable()) {
     if (new URLSearchParams(location.search).has('lab')) {
       const saved = store.get('fireInteraction');
       if (saved) fire.interaction = saved;
-      import('./bonfire/interaction.js').then(({ MODES }) => {
+      await import('./bonfire/interaction.js').then(({ MODES }) => {
         const lab = document.createElement('aside');
         lab.className = 'lab';
         lab.setAttribute('aria-label', 'Fire interaction prototypes');
@@ -341,11 +380,10 @@ if (webglAvailable()) {
       });
     }
     window.addEventListener('keydown', (e) => {
-      if (e.altKey || e.ctrlKey || e.metaKey || document.querySelector('dialog[open]')) return;
+      if (!fire) return;
+      if (e.altKey || e.ctrlKey || e.metaKey || isEditing(e.target) || document.querySelector('dialog[open]')) return;
       if (e.key === 'p' || e.key === 'P') { hud.hidden = !hud.hidden; drawHud(fire.describe()); }
       else if (!hud.hidden && keys[e.key]) drawHud(fire.cycle(keys[e.key]));
     });
-  });
-} else {
-  document.documentElement.classList.add('no-webgl');
-}
+  }).catch(failScene);
+
