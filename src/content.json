@@ -82,7 +82,7 @@
       "intro": "Games, engines, and tools I’ve built, newest first. Select an item to inspect it."
     },
     "archive": {
-      "title": "Earlier explorations",
+      "title": "Earlier Explorations",
       "intro": "Paper prototypes exploring evolution mechanics and competitive strategy."
     },
     "about": {
@@ -764,7 +764,7 @@
     "role": "My role",
     "tech": "Attributes",
     "wields": "Wields",
-    "menuFlavor": "Rest here. Choose a path.",
+    "menuFlavor": "Safe travels, friend.",
     "keysHint": "Arrows / WASD to move · Enter to select · Esc to close",
     "prompts": [
       [
