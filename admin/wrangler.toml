@@ -18,8 +18,8 @@ GITHUB_OWNER = "iNanzo"
 GITHUB_REPO = "Bonfire_Portfolio"
 GITHUB_BRANCH = "main"
 # From Cloudflare Zero Trust → Access → Applications → (the admin app):
-ACCESS_TEAM_DOMAIN = "https://YOUR-TEAM.cloudflareaccess.com"
-ACCESS_AUD = "PASTE-THE-APPLICATION-AUDIENCE-TAG"
+ACCESS_TEAM_DOMAIN = "https://delicate-hall-8962.cloudflareaccess.com"
+ACCESS_AUD = "89ec24618d6074cdc937e0b778b2c3d18bd2ae2aabd4e9757c8fe6105ebd8492"
 
 # Secrets (set with `npx wrangler secret put NAME --config admin/wrangler.toml`, never committed):
 #   ALLOWED_EMAILS            comma-separated Gmail addresses that may edit
