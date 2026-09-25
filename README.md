@@ -282,7 +282,14 @@ dev` alongside it to see changes live.
 2. **Deploy the Worker:** run `npx wrangler login`, then `npm run admin:deploy`. This
    creates `https://nhoang-admin.<your-subdomain>.workers.dev`.
 3. **Cloudflare Access** (free Zero Trust plan):
-   - Zero Trust → Settings → Authentication → add **Google** as a login method.
+   - Zero Trust → Integrations → Identity providers → add **Google** as a login method.
+     Google requires an OAuth client: in Google Cloud, create a project, configure
+     Google Auth Platform with an **External** audience for personal Gmail accounts,
+     and create a **Web application** client. Set its authorized redirect URI to
+     `https://<team>.cloudflareaccess.com/cdn-cgi/access/callback` (copy the exact
+     callback shown by Cloudflare). Store the client ID and client secret in the
+     Cloudflare Google login configuration, never in the repository. If the OAuth
+     app is in **Testing**, add both permitted accounts under Audience → Test users.
    - Protect the Worker's hostname: Workers → `nhoang-admin` → Settings → Domains &
      Routes → workers.dev → **Enable Cloudflare Access**. Or add a self-hosted Access
      application for that hostname.
