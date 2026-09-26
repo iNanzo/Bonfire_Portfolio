@@ -828,7 +828,7 @@
         "hi": "#ffc76a",
         "core": "#fff1d0",
         "shade": "#5b4535",
-        "light": 0.25
+        "light": 0.3
       },
       {
         "id": "verdant",
@@ -838,7 +838,7 @@
         "hi": "#b8f06a",
         "core": "#effce0",
         "shade": "#24382a",
-        "light": 0.34
+        "light": 0.3
       },
       {
         "id": "blood",
@@ -848,7 +848,7 @@
         "hi": "#ff7474",
         "core": "#ffd9d2",
         "shade": "#3d2027",
-        "light": 0.34
+        "light": 0.3
       },
       {
         "id": "spirit",
@@ -858,7 +858,7 @@
         "hi": "#7ff0e0",
         "core": "#e6fffb",
         "shade": "#1d3a3f",
-        "light": 0.34
+        "light": 0.3
       },
       {
         "id": "arcane",
@@ -868,7 +868,7 @@
         "hi": "#d09bff",
         "core": "#f6e8ff",
         "shade": "#2e2447",
-        "light": 0.34
+        "light": 0.3
       },
       {
         "id": "gilded",
@@ -878,7 +878,7 @@
         "hi": "#ffe066",
         "core": "#fffbe0",
         "shade": "#40331f",
-        "light": 0.34
+        "light": 0.4
       },
       {
         "id": "rose",
@@ -888,7 +888,7 @@
         "hi": "#ff9ccf",
         "core": "#ffe6f3",
         "shade": "#3d2033",
-        "light": 0.34
+        "light": 0.3
       },
       {
         "id": "azure",
@@ -898,7 +898,7 @@
         "hi": "#8cc8ff",
         "core": "#e8f4ff",
         "shade": "#1d2b45",
-        "light": 0.34
+        "light": 0.3
       },
       {
         "id": "phosphor",
@@ -908,7 +908,7 @@
         "hi": "#fffaf0",
         "core": "#ffffff",
         "shade": "#35332d",
-        "light": 0.34
+        "light": 1
       },
       {
         "id": "umbral",
@@ -918,7 +918,7 @@
         "hi": "#b0afff",
         "core": "#ecebff",
         "shade": "#24233f",
-        "light": 0.34
+        "light": 0.3
       }
     ],
     "fire": {
@@ -949,7 +949,7 @@
     },
     "cursor": {
       "mode": "slash",
-      "strength": 0.35
+      "strength": 0.25
     },
     "render": {
       "pixelSize": 3,
