@@ -922,22 +922,22 @@
       }
     ],
     "fire": {
-      "brightness": 0.3,
-      "size": 0.27,
-      "height": 0.62,
+      "brightness": 0.23,
+      "size": 0.36,
+      "height": 0.45,
       "turbulence": 0.42,
       "swirl": 2.6,
-      "lifeMin": 0.55,
-      "lifeMax": 1.25,
+      "lifeMin": 0.4,
+      "lifeMax": 1.9,
       "glow": 9,
       "fps": 12,
       "stoke": 0.9
     },
     "particles": {
-      "fire": 2200,
-      "sparks": 48,
-      "forge": 640,
-      "impact": 1,
+      "fire": 2000,
+      "sparks": 120,
+      "forge": 800,
+      "impact": 2,
       "touchScale": 0.5
     },
     "fireflies": {
@@ -948,18 +948,18 @@
       "touchScale": 0.67
     },
     "cursor": {
-      "mode": "ember",
-      "strength": 1
+      "mode": "slash",
+      "strength": 0.35
     },
     "render": {
-      "pixelSize": 4,
+      "pixelSize": 3,
       "pixelSizeSmall": 3,
-      "dither": 0.16,
+      "dither": 0.08,
       "ditherMatrix": 4,
       "outlines": true,
       "vignette": 0.85,
-      "exposure": 1,
-      "colorChange": 1.25,
+      "exposure": 1.45,
+      "colorChange": 0.34,
       "shake": true
     }
   }
