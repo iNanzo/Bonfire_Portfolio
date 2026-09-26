@@ -810,5 +810,157 @@
     "flavor": "A page, long since burned away. Only its address remains.",
     "body": "This path doesn’t lead anywhere. The page may have moved, or it never existed.",
     "cta": "Return to the fire"
+  },
+  "effects": {
+    "colors": {
+      "void": "#07070b",
+      "shadow": "#15131d",
+      "stone": "#2c2a3a",
+      "wood": "#5b4535",
+      "bone": "#e9e3d2"
+    },
+    "flames": [
+      {
+        "id": "ember",
+        "name": "Ember Flame",
+        "lo": "#8c1d2f",
+        "mid": "#e0582a",
+        "hi": "#ffc76a",
+        "core": "#fff1d0",
+        "shade": "#5b4535",
+        "light": 0.25
+      },
+      {
+        "id": "verdant",
+        "name": "Verdant Flame",
+        "lo": "#1f5e2c",
+        "mid": "#4fbf3a",
+        "hi": "#b8f06a",
+        "core": "#effce0",
+        "shade": "#24382a",
+        "light": 0.34
+      },
+      {
+        "id": "blood",
+        "name": "Blood Flame",
+        "lo": "#4a0a1a",
+        "mid": "#c21d3b",
+        "hi": "#ff7474",
+        "core": "#ffd9d2",
+        "shade": "#3d2027",
+        "light": 0.34
+      },
+      {
+        "id": "spirit",
+        "name": "Spirit Flame",
+        "lo": "#124a55",
+        "mid": "#2fb8b0",
+        "hi": "#7ff0e0",
+        "core": "#e6fffb",
+        "shade": "#1d3a3f",
+        "light": 0.34
+      },
+      {
+        "id": "arcane",
+        "name": "Arcane Flame",
+        "lo": "#3a1566",
+        "mid": "#8a4ce0",
+        "hi": "#d09bff",
+        "core": "#f6e8ff",
+        "shade": "#2e2447",
+        "light": 0.34
+      },
+      {
+        "id": "gilded",
+        "name": "Gilded Flame",
+        "lo": "#6b3a0e",
+        "mid": "#e0a020",
+        "hi": "#ffe066",
+        "core": "#fffbe0",
+        "shade": "#40331f",
+        "light": 0.34
+      },
+      {
+        "id": "rose",
+        "name": "Rose Flame",
+        "lo": "#5c1240",
+        "mid": "#d83a8c",
+        "hi": "#ff9ccf",
+        "core": "#ffe6f3",
+        "shade": "#3d2033",
+        "light": 0.34
+      },
+      {
+        "id": "azure",
+        "name": "Azure Flame",
+        "lo": "#0f2f66",
+        "mid": "#2f7fe0",
+        "hi": "#8cc8ff",
+        "core": "#e8f4ff",
+        "shade": "#1d2b45",
+        "light": 0.34
+      },
+      {
+        "id": "phosphor",
+        "name": "Phosphor Flame",
+        "lo": "#4a4538",
+        "mid": "#bdb49c",
+        "hi": "#fffaf0",
+        "core": "#ffffff",
+        "shade": "#35332d",
+        "light": 0.34
+      },
+      {
+        "id": "umbral",
+        "name": "Umbral Flame",
+        "lo": "#1c1a4a",
+        "mid": "#5b5bd6",
+        "hi": "#b0afff",
+        "core": "#ecebff",
+        "shade": "#24233f",
+        "light": 0.34
+      }
+    ],
+    "fire": {
+      "brightness": 0.3,
+      "size": 0.27,
+      "height": 0.62,
+      "turbulence": 0.42,
+      "swirl": 2.6,
+      "lifeMin": 0.55,
+      "lifeMax": 1.25,
+      "glow": 9,
+      "fps": 12,
+      "stoke": 0.9
+    },
+    "particles": {
+      "fire": 2200,
+      "sparks": 48,
+      "forge": 640,
+      "impact": 1,
+      "touchScale": 0.5
+    },
+    "fireflies": {
+      "count": 18,
+      "lit": 9,
+      "lights": 9,
+      "speed": 1,
+      "touchScale": 0.67
+    },
+    "cursor": {
+      "mode": "ember",
+      "strength": 1
+    },
+    "render": {
+      "pixelSize": 4,
+      "pixelSizeSmall": 3,
+      "dither": 0.16,
+      "ditherMatrix": 4,
+      "outlines": true,
+      "vignette": 0.85,
+      "exposure": 1,
+      "colorChange": 1.25,
+      "shake": true
+    }
   }
 }

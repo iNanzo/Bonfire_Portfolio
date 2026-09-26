@@ -9,7 +9,8 @@
 //   4. pixel    — outlines, + fx, vignette, Bayer dither, palette → canvas
 import * as THREE from 'three';
 import { createResourceScope } from './resources.js';
-import { weapons as weaponNames } from '../content.js';
+import { weapons as weaponNames, startingEquipment } from '../content.js';
+import { effects } from '../effects.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { createPixelPass } from './pixelPass.js';
@@ -21,13 +22,12 @@ import { createImpactFx, createSmokeMaterial } from './impact.js';
 import { createCurlField } from './curl.js';
 import { createWeapons } from './weapons.js';
 import { getPov } from './povs.js';
-import { base, flames, defaultFlame, scenePalette, debugPalettes, mixFlame, flameEase } from '../palette.js';
+import { base, flames, flameOr, scenePalette, debugPalettes, mixFlame, flameEase } from '../palette.js';
 
 const BASE = import.meta.env.BASE_URL;
 const LAYER_SOLID = 0;
 const LAYER_FX = 1;
 const LAYER_GHOST = 2;
-const FLAME_FPS = 12;
 const LIGHT_FPS = 12;
 const FIRE_ORIGIN = new THREE.Vector3(0.02, 0.12, 0.02);
 const WEAPON_ANCHOR = new THREE.Vector3(0.04, 0, 0.03);
@@ -46,6 +46,12 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   scope.cleanup(() => events.abort());
   try {
   const coarse = matchMedia('(pointer: coarse)').matches;
+  // Counts from the effects settings; touch devices get the scaled-down tier.
+  const { particles: P, fireflies: F } = effects;
+  const pCount = (n) => Math.max(1, Math.round(n * (coarse ? P.touchScale : 1)));
+  const fCount = (n) => Math.round(n * (coarse ? F.touchScale : 1));
+  const impactCount = (n) => Math.max(1, Math.round(n * P.impact * (coarse ? P.touchScale : 1)));
+  const jolt = (v) => { if (!reducedMotion && effects.render.shake) shake = Math.max(shake, v); };
 
   const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
   scope.own(renderer);
@@ -114,13 +120,20 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   const field = createCurlField();
   const fire = createFlame({
     field,
-    count: coarse ? 1000 : 2200,
-    sparks: coarse ? 24 : 48,
+    count: pCount(P.fire),
+    sparks: Math.round(P.sparks * (coarse ? P.touchScale : 1)),
     material: particleMaterial,
     origin: FIRE_ORIGIN,
     reducedMotion,
   });
-  if (reducedMotion) Object.assign(fire.params, { rise: 0.6, curlAmp: 0.35 });
+  function applyFireParams() {
+    const f = effects.fire;
+    Object.assign(fire.params, {
+      brightness: f.brightness, radius: f.size, rise: f.height, curlAmp: f.turbulence * (reducedMotion ? 0.83 : 1),
+      curlFreq: f.swirl, lifeMin: Math.min(f.lifeMin, f.lifeMax), lifeMax: f.lifeMax,
+    });
+  }
+  applyFireParams();
   fire.flame.layers.set(LAYER_FX);
   fire.spark.layers.set(LAYER_FX);
   scene.add(fire.flame, fire.spark);
@@ -128,20 +141,22 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   let fx = null;        // ground flames, smoke and ash for weapon impacts
   const smokeMaterial = scope.own(createSmokeMaterial());
   const interaction = createInteraction({ reducedMotion });
+  interaction.mode = effects.cursor.mode;
+  interaction.strength = effects.cursor.strength;
 
   let weapons = null; // set once the model loads
 
   // --- Flame color state: eased blends between flames (see flameEase)
-  let flameKey = defaultFlame;
+  let flameKey = flameOr(startingEquipment.flame);
   let blend = null; // { from, to, t }
   let blendMul = 1;
   let debugPaletteIndex = 0;
   let currentRamp = flames[flameKey].ramp;
-  const BLEND_TIME = reducedMotion ? 0.4 : 1.25;
+  const blendTime = () => (reducedMotion ? 0.4 : effects.render.colorChange);
   const white = new THREE.Color('#ffffff');
   // Keep the cast light less saturated than the flame so lit stone lands on the
   // dark tinted shade, with the ramp's mid tone only in hot spots.
-  const lightMix = (key) => (key === 'ember' ? 0.25 : 0.34);
+  const lightMix = (key) => flames[key]?.light ?? 0.34;
   // While a weapon is being forged, the next flame's colors join the palette so
   // the forge particles and the new weapon's glow can actually show them; after
   // the impact, the flame being blended to stays in until the blend is done.
@@ -196,7 +211,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       layerFx: LAYER_FX,
       particleMaterial: effectMaterial,
       field,
-      particles: coarse ? 320 : 640,
+      particles: pCount(P.forge),
       castShadows: renderer.shadowMap.enabled,
       reducedMotion,
       hooks: {
@@ -212,7 +227,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
         },
         // The new weapon finishing its form lands like a hit: a jolt and a flare.
         onFormed: () => {
-          if (!reducedMotion) shake = Math.max(shake, 0.14);
+          jolt(0.14);
           fire.burst(0.45);
         },
         onImpact: impact,
@@ -241,9 +256,10 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       return { point: hit.point.clone(), normal };
     };
     fireflies = createFireflies(flyTemplate, {
-      count: coarse ? 12 : 18,
-      litCount: coarse ? 6 : 9,
-      lightCount: coarse ? 5 : 9,
+      count: fCount(F.count),
+      litCount: fCount(F.lit),
+      lightCount: fCount(F.lights),
+      speed: F.speed,
       center: new THREE.Vector3(FIRE_ORIGIN.x, 0, FIRE_ORIGIN.z),
       layer: LAYER_GHOST,
       terrain,
@@ -304,11 +320,11 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       reach,
       field,
       emitters: coarse ? 90 : 144,
-      flames: coarse ? 1500 : 3200,
-      haze: coarse ? 700 : 1500,
-      smoke: coarse ? 260 : 520,
-      ash: coarse ? 110 : 220,
-      embers: coarse ? 80 : 160,
+      flames: impactCount(3200),
+      haze: impactCount(1500),
+      smoke: impactCount(520),
+      ash: impactCount(220),
+      embers: impactCount(160),
       lights: coarse ? 4 : 6,
       reducedMotion,
     });
@@ -325,7 +341,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
 
     scene.add(root, weapons.holder);
     weapons.setRim(currentRamp[2]);
-    weapons.set('longsword');
+    weapons.set(startingEquipment.weapon);
     ready = true;
 
   });
@@ -333,9 +349,9 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   // --- Fire level (stoking, UI puffs, weapon impacts)
   let firstStoke = true;
   function stoke() {
-    fire.params.level = Math.min(2.4, fire.params.level + 0.9);
-    fire.burst(1);
-    if (!reducedMotion) shake = 0.18;
+    fire.params.level = Math.min(2.4, fire.params.level + effects.fire.stoke);
+    fire.burst(Math.min(1.5, effects.fire.stoke / 0.9));
+    jolt(0.18);
     const wasFirst = firstStoke;
     firstStoke = false;
     return wasFirst;
@@ -359,7 +375,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     fire.burst(reducedMotion ? 0.8 : 1.7);
     fx.burst();
     fireflies.burst(flames[flameKey].ramp);
-    if (!reducedMotion) shake = 0.3;
+    jolt(0.3);
     onImpact?.(flameKey, old, stationary, { ...selection, weapon: weaponKey });
   }
 
@@ -445,10 +461,20 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   const settings = { pixelSize: null, ditherIndex: 0, matrixIndex: 0 };
   let size = { w: 1, h: 1, pd: 4 };
   const isSmall = () => container.clientWidth < 700;
+  const pixelSize = () => settings.pixelSize ?? (isSmall() ? effects.render.pixelSizeSmall : effects.render.pixelSize);
+  function applyRender() {
+    const r = effects.render;
+    pass.uniforms.ditherStrength.value = r.dither;
+    pass.uniforms.ditherScale.value = r.ditherMatrix;
+    pass.uniforms.outlines.value = r.outlines ? 1 : 0;
+    pass.uniforms.vignette.value = r.vignette;
+    pass.uniforms.exposure.value = r.exposure;
+  }
+  applyRender();
   function resize() {
     if (scope.disposed) return;
     const dpr = window.devicePixelRatio || 1;
-    const cssPx = settings.pixelSize ?? (isSmall() ? 3 : 4);
+    const cssPx = pixelSize();
     const pd = Math.max(1, Math.round(cssPx * dpr));
     const w = Math.max(1, Math.ceil((container.clientWidth * dpr) / pd));
     const h = Math.max(1, Math.ceil((container.clientHeight * dpr) / pd));
@@ -486,11 +512,12 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     updateCursor(dt, t);
 
     // Stepped simulation for a hand-animated look.
-    const fs = Math.floor(t * FLAME_FPS);
+    const fps = effects.fire.fps;
+    const fs = Math.floor(t * fps);
     if (fs !== flameStep) {
-      const steps = flameStep < 0 ? 1 : Math.min(3, fs - flameStep);
+      const steps = flameStep < 0 || fs < flameStep ? 1 : Math.min(3, fs - flameStep);
       flameStep = fs;
-      for (let i = 0; i < steps; i++) fire.stepFlame(1 / FLAME_FPS, t);
+      for (let i = 0; i < steps; i++) fire.stepFlame(1 / fps, t);
       candleFlames.forEach((c, i) => c.mesh.scale.set(c.scale.x, c.scale.y * (0.8 + hash(fs * 1.7 + i * 9.1) * 0.4), c.scale.z));
       // Coals in the ash pulse between the flame's deep, body and bright tones.
       glows.forEach((g, i) => {
@@ -505,7 +532,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     // After a weapon lands: ease from the old flame into the new one, with the
     // light swelling and settling as the color turns over.
     if (blend) {
-      blend.t = Math.min(1, blend.t + (dt / BLEND_TIME) * (blend.fast ? 4 : 1));
+      blend.t = Math.min(1, blend.t + (dt / blendTime()) * (blend.fast ? 4 : 1));
       const k = flameEase(blend.t);
       applyColors(mixFlame(flames[blend.from], flames[blend.to], k),
         THREE.MathUtils.lerp(lightMix(blend.from), lightMix(blend.to), k));
@@ -524,7 +551,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       lightFlicker = 0.82 + Math.random() * 0.3;
       candleLight.intensity = 0.28 + Math.random() * 0.12;
     }
-    fireLight.intensity = 9 * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * lightFlicker * blendMul;
+    fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * lightFlicker * blendMul;
 
     weapons.update(dt);
 
@@ -620,7 +647,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   // --- Debug HUD
   function cycle(what) {
     if (what === 'pixel') {
-      const cur = settings.pixelSize ?? (isSmall() ? 3 : 4);
+      const cur = pixelSize();
       settings.pixelSize = PIXEL_SIZES[(PIXEL_SIZES.indexOf(cur) + 1) % PIXEL_SIZES.length];
       resize();
     } else if (what === 'palette') {
@@ -642,7 +669,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   }
   function describe() {
     return {
-      pixel: `${settings.pixelSize ?? (isSmall() ? 3 : 4)}px (${size.w}×${size.h})`,
+      pixel: `${pixelSize()}px (${size.w}×${size.h})`,
       palette: debugPaletteIndex === 0 ? flames[flameKey].name : DEBUG_PALETTES[debugPaletteIndex],
       dither: pass.uniforms.ditherStrength.value ? pass.uniforms.ditherStrength.value.toFixed(2) : 'off',
       matrix: `${pass.uniforms.ditherScale.value}×${pass.uniforms.ditherScale.value}`,
@@ -658,8 +685,36 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     fireflies.flash(clientX - r.left, clientY - r.top, camera, r.width, r.height);
   }
 
+  /**
+   * Re-read the live effects settings (admin preview). Counts are fixed at
+   * creation; the caller rebuilds the scene when those change.
+   */
+  function applyEffects() {
+    applyFireParams();
+    applyRender();
+    interaction.mode = effects.cursor.mode;
+    interaction.strength = effects.cursor.strength;
+    settings.pixelSize = null;
+    voidColor.set(base.void);
+    scene.fog.color.set(base.void);
+    resize();
+    if (!ready) return;
+    fireflies.setLit(fCount(effects.fireflies.lit));
+    fireflies.speed = effects.fireflies.speed;
+    // Colors: a flame may have been edited or deleted mid-blend, so settle on the current one.
+    flameKey = flameOr(flameKey);
+    blend = null;
+    blendMul = 1;
+    forgeFlame = null;
+    debugPaletteIndex = 0;
+    applyColors(flames[flameKey], lightMix(flameKey));
+    fireflies.setRamp(currentRamp);
+    fx.setRamp(currentRamp);
+    weapons.setRim(currentRamp[2]);
+  }
+
   return {
-    stoke, puff, equip, setView, cycle, describe, flash, ready: loaded,
+    stoke, puff, equip, setView, cycle, describe, flash, applyEffects, ready: loaded,
     dispose: () => scope.dispose(),
     get flame() { return flameKey; },
     get fireflies() { return fireflies; },

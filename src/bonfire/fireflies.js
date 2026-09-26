@@ -47,12 +47,12 @@ const smooth = (s) => s * s * (3 - 2 * s);
  * @param {(origin:THREE.Vector3, dir:THREE.Vector3, far:number)=>{point:THREE.Vector3, normal:THREE.Vector3}|null} o.raycast
  */
 export function createFireflies(template, {
-  count = 18, litCount = 9, lightCount = 9, center, layer, terrain, raycast, reducedMotion = false,
+  count = 18, litCount = 9, lightCount = 9, speed = 1, center, layer, terrain, raycast, reducedMotion = false,
 }) {
   const noise = new SimplexNoise();
   const group = new THREE.Group();
   const flies = [];
-  const pace = reducedMotion ? 0.5 : 1;
+  let pace = (reducedMotion ? 0.5 : 1) * speed;
 
   const sphere = new THREE.IcosahedronGeometry(1, 1);
   const UP = new THREE.Vector3(0, 1, 0);
@@ -616,6 +616,9 @@ export function createFireflies(template, {
       rampOld = rampNew;
       for (const f of flies) { f.mix = 1; f.mixing = false; }
     },
+    /** How many fly lit at rest; the lit set rebalances toward it. */
+    setLit(n) { litCount = Math.min(n, flies.length); },
+    set speed(s) { pace = (reducedMotion ? 0.5 : 1) * s; },
     terrain,
     /** Counts for debugging/tests. */
     stats() {

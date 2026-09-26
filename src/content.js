@@ -24,20 +24,29 @@
 //     public/<src>.webp plus a ~720px public/<src>-card.webp. Archive items with no
 //     images appear as the inventory's "Also:" line (via `href`) instead of a slot.
 //   - weapons: display names for the models in the fire (the keys are fixed by the
-//     model). Flame colors live in src/palette.js.
+//     model). Flame colors and every other look setting live in `effects`
+//     (read through src/effects.js; see src/effectsDefaults.js).
 //   - hero.kindled: the "Embers Kindled" banner. show: 'first' | 'always' | 'never';
 //     duration in ms. Preview with ?kindled.
 //   - skills[].items[].glyph: the 2–3 letter mark drawn in the slot.
 //   - about.stats: [label, value] rows of the stat sheet.
+//   - images[].hidden keeps an image in the repo but off the site; the first
+//     *visible* image is the icon. Hidden images are stripped here, so the rest
+//     of the site never sees them.
 import content from './content.json' with { type: 'json' };
 
 export const {
-  site, screens, weapons, startingEquipment, hero, sections, featured, projects, archive,
+  site, screens, weapons, startingEquipment, hero, sections,
   about, experience, leadership, education, skills, contact, ui, notFound,
 } = content;
+
+const withShownImages = (p) => (Array.isArray(p.images) ? { ...p, images: p.images.filter((im) => !im.hidden) } : p);
+export const featured = withShownImages(content.featured);
+export const projects = content.projects.map(withShownImages);
+export const archive = content.archive.map(withShownImages);
 
 /** Entries of a list that aren't hidden. */
 export const shown = (list) => list.filter((entry) => !entry.hidden);
 
 // Inventory order: flagship first, then projects, then earlier explorations (hidden ones left out).
-export const items = () => shown([featured, ...projects, ...archive.filter((a) => a.images)]);
+export const items = () => shown([featured, ...projects, ...archive.filter((a) => a.images?.length)]);

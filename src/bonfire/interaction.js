@@ -36,7 +36,7 @@ const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b
 
 export function createInteraction({ reducedMotion = false } = {}) {
   let mode = 'ember';
-  const gain = reducedMotion ? 0.5 : 1;
+  let gain = reducedMotion ? 0.5 : 1;
 
   // --- camera projection ------------------------------------------------------------
   const vp = new THREE.Matrix4();
@@ -366,5 +366,7 @@ export function createInteraction({ reducedMotion = false } = {}) {
     flowWorld,
     get mode() { return mode; },
     set mode(m) { if (Object.hasOwn(MODES, m)) mode = m; },
+    /** How hard the cursor pushes the fire (1 = as tuned). */
+    set strength(s) { gain = (reducedMotion ? 0.5 : 1) * s; },
   };
 }

@@ -1,18 +1,26 @@
 // How the editor presents content.json. The editor itself is generic (any field
 // you add to content.json shows up); this file only adds labels, help, grouping
 // and the few special cases. Patterns: `projects[].images[].alt` (index → []).
-import { FLAME_KEYS, KINDLED_SHOW, WEAPON_KEYS } from '../../src/contentRules.js';
+// Labels are run through titleCase(), so write them in any case.
+import { KINDLED_SHOW, WEAPON_KEYS } from '../../src/contentRules.js';
+import { CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, RANGES } from '../../src/effectsDefaults.js';
+import { titleCase } from './text.js';
 
-/** Sidebar pages and the top-level content sections each one edits. */
+/** Sidebar pages, grouped, and the content sections (dotted paths allowed) each one edits. */
 export const PAGES = [
-  { id: 'projects', label: 'Projects', keys: ['featured', 'projects', 'archive'] },
-  { id: 'home', label: 'Home & site', keys: ['hero', 'site'] },
-  { id: 'about', label: 'About', keys: ['about'] },
-  { id: 'journey', label: 'Journey', keys: ['experience', 'leadership', 'education'] },
-  { id: 'skills', label: 'Skills', keys: ['skills'] },
-  { id: 'contact', label: 'Contact', keys: ['contact'] },
-  { id: 'headings', label: 'Screen headings', keys: ['sections'] },
-  { id: 'interface', label: 'Interface', keys: ['screens', 'ui', 'weapons', 'startingEquipment', 'notFound'] },
+  { id: 'projects', group: 'Content', label: 'Projects', keys: ['featured', 'projects', 'archive'], blurb: 'The inventory: the flagship first, then projects, then earlier explorations.' },
+  { id: 'home', group: 'Content', label: 'Home & site', keys: ['hero', 'site'], blurb: 'The title screen, the “Embers Kindled” banner, and what search engines see.' },
+  { id: 'about', group: 'Content', label: 'About', keys: ['about'], blurb: 'Paragraphs and the stat sheet.' },
+  { id: 'journey', group: 'Content', label: 'Journey', keys: ['experience', 'leadership', 'education'], blurb: 'Work history, leadership and certificates.' },
+  { id: 'skills', group: 'Content', label: 'Skills', keys: ['skills'], blurb: 'Skill groups and the glyphs drawn in their slots.' },
+  { id: 'contact', group: 'Content', label: 'Contact', keys: ['contact'], blurb: 'The contact screen and its links.' },
+  {
+    id: 'effects', group: 'Look & feel', label: 'Effects', preview: true,
+    keys: ['effects.flames', 'effects.fire', 'effects.fireflies', 'effects.cursor', 'effects.particles', 'effects.render', 'effects.colors'],
+    blurb: 'Flame colors, the fire, fireflies, the cursor and the pixel-art look. The preview updates as you edit; nothing is published until you save.',
+  },
+  { id: 'headings', group: 'Settings', label: 'Screen headings', keys: ['sections'], blurb: 'The title, flavor line and intro at the top of each screen.' },
+  { id: 'interface', group: 'Settings', label: 'Interface', keys: ['screens', 'ui', 'weapons', 'startingEquipment', 'notFound'], blurb: 'Tab names, button text, weapon names, the starting equipment and the 404 page.' },
 ];
 
 export const LABELS = {
@@ -41,7 +49,7 @@ export const LABELS = {
   'site.description': 'Search / share description',
   'site.url': 'Site address',
   'site.links': 'Profile links',
-  'sections.projects': 'Project Inventory screen',
+  'sections.projects': 'Project inventory screen',
   'sections.archive': 'Earlier explorations',
   'sections.about': 'About screen',
   'sections.experience': 'Journey screen',
@@ -57,6 +65,7 @@ export const LABELS = {
   'contact.links': 'Links',
   'contact.backToTop': 'Back-to-top link',
   'ui.prompts': 'Key prompts',
+  '[].id': 'ID',
   '[].built': 'What I built',
   '[].problem': 'The problem',
   '[].role': 'My role',
@@ -66,41 +75,117 @@ export const LABELS = {
   '[].href': 'Link',
   '[].glyph': 'Glyph',
   '[].todo': 'To confirm',
+  // effects
+  'effects.flames': 'Flame colors',
+  'effects.colors': 'Scene colors',
+  'effects.fire': 'Fire',
+  'effects.particles': 'Particles',
+  'effects.fireflies': 'Fireflies',
+  'effects.cursor': 'Cursor effect',
+  'effects.render': 'Rendering',
+  'effects.colors.void': 'Background (void)',
+  'effects.colors.bone': 'Light (bone)',
+  'effects.flames[].lo': 'Embers (lo)',
+  'effects.flames[].mid': 'Body (mid)',
+  'effects.flames[].hi': 'Tips & text (hi)',
+  'effects.flames[].core': 'Core',
+  'effects.flames[].shade': 'Firelit stone',
+  'effects.flames[].light': 'Cast light whiteness',
+  'effects.fire.brightness': 'Intensity',
+  'effects.fire.size': 'Size',
+  'effects.fire.height': 'Height',
+  'effects.fire.turbulence': 'Turbulence',
+  'effects.fire.swirl': 'Swirl scale',
+  'effects.fire.lifeMin': 'Shortest flame life',
+  'effects.fire.lifeMax': 'Longest flame life',
+  'effects.fire.glow': 'Cast light',
+  'effects.fire.fps': 'Animation frame rate',
+  'effects.fire.stoke': 'Stoke flare',
+  'effects.particles.fire': 'Fire particles',
+  'effects.particles.sparks': 'Sparks',
+  'effects.particles.forge': 'Forge particles (weapon swap)',
+  'effects.particles.impact': 'Impact density',
+  'effects.particles.touchScale': 'Touch device scale',
+  'effects.fireflies.count': 'Fireflies',
+  'effects.fireflies.lit': 'Lit at rest',
+  'effects.fireflies.lights': 'Real lights',
+  'effects.fireflies.speed': 'Flight speed',
+  'effects.fireflies.touchScale': 'Touch device scale',
+  'effects.cursor.mode': 'Effect',
+  'effects.cursor.strength': 'Strength',
+  'effects.render.pixelSize': 'Pixel size',
+  'effects.render.pixelSizeSmall': 'Pixel size (small screens)',
+  'effects.render.dither': 'Dither strength',
+  'effects.render.ditherMatrix': 'Dither pattern',
+  'effects.render.colorChange': 'Color change time',
+  'effects.render.shake': 'Screen shake',
 };
 
 export const HELP = {
-  featured: 'Always first in the inventory — the flagship. “Feature this” on any project swaps it in.',
+  featured: 'Always first in the inventory — the flagship. “Move to…” on any project can swap it in.',
   projects: 'Shown after the featured project, in this order.',
   archive: 'Older work, after the projects. Items without images appear as the inventory’s “Also:” line (using their link) instead of a slot.',
   'hero.kindled': 'The checkpoint banner when the fire is stoked. Preview it on the site with ?kindled.',
   'hero.kindled.duration': 'Milliseconds on screen, fades included.',
   'hero.kindled.show': '“first”: the first stoke of a visit · “always”: every stoke · “never”.',
-  screens: 'Labels only — the screens themselves are fixed.',
+  screens: 'The site’s own menu. Labels only — the screens themselves are fixed.',
   weapons: 'Display names for the weapons in the fire (the models themselves are fixed).',
   startingEquipment: 'What’s in the fire when the site opens (and after Home).',
   'about.stats': 'Label and value rows of the stat sheet.',
   'ui.prompts': 'The key hints along the bottom: key, optional second key, label.',
   'skills[].items[].glyph': '2–3 characters drawn in the slot.',
   '[].id': 'The page address: /projects/<id>/. Lowercase letters, numbers and dashes.',
-  '[].images': 'The first image is the inventory icon. Uploads are converted to WebP (full size + a 720 px card).',
+  '[].images': 'The first visible image is the inventory icon. Uploads are converted to WebP (full size + a 720 px card). ◉ hides an image from the site without deleting it.',
   '[].summary': 'One or two lines for the inventory’s at-a-glance panel.',
   '[].href': 'https://…, mailto:…, or a path on this site like games/x.html.',
+  // effects
+  'effects.flames': 'Each flame is a color set the fire can take; inspecting a project or clicking the fire draws one at random. Hidden flames stay out of the draw (one can still be the starting flame). Keep at least 3 in rotation.',
+  'effects.flames[].id': 'Internal name. Lowercase letters, numbers and dashes.',
+  'effects.flames[].hi': 'Also the color of accent text, so it must stay readable on the background (4.5:1).',
+  'effects.flames[].shade': 'A dark, tinted neutral for stone lit by this fire.',
+  'effects.flames[].light': '0 = the fire casts its full color on the scene, 1 = plain white light.',
+  'effects.colors': 'The neutral colors every frame is built from, plus the current flame. The background also colors the page behind the text.',
+  'effects.fire': 'How the bonfire burns at rest. Stoking and weapon swaps flare it from here.',
+  'effects.fire.fps': 'The fire moves in steps for a hand-animated look. Higher is smoother, less pixel-art.',
+  'effects.fire.glow': 'How strongly the fire lights the scene.',
+  'effects.particles': 'How many particles each effect uses. More looks richer but costs speed on slow machines. Changing these briefly reloads the preview.',
+  'effects.particles.touchScale': 'Phones and tablets use this fraction of every particle count.',
+  'effects.particles.impact': 'The ring of fire, smoke, ash and embers when a new weapon lands.',
+  'effects.fireflies': 'The fireflies roaming the clearing.',
+  'effects.fireflies.lit': 'How many glow at once while resting. Landing or hovering can light more for a moment.',
+  'effects.fireflies.lights': 'Fireflies that cast real light on the scene (the costliest part).',
+  'effects.cursor': 'How moving the cursor through the fire pushes it around.',
+  'effects.cursor.mode': 'Ember mixes the others: stir + a soft part + a lean, with a slash on fast swings. Stir, Wake, Part, Draw and Slash are the ingredients alone.',
+  'effects.render': 'The pixel-art pass over the whole scene.',
+  'effects.render.pixelSize': 'Screen pixels per scene pixel. Bigger = chunkier and faster.',
+  'effects.render.dither': 'How much ordered dithering blends colors. 0 = flat bands.',
+  'effects.render.colorChange': 'How long the fire takes to ease into a new flame color.',
 };
 
 /** Long text: a textarea. */
 export const MULTILINE = new Set(['value', 'summary', 'problem', 'built', 'flavor', 'note', 'body', 'text', 'description',
   'intro', 'sceneLabel', 'alt', 'subtitle', 'footer', 'todo']);
 export const MULTILINE_LISTS = new Set(['about.paragraphs', 'experience[].roles[].bullets']);
+/** Short text fields that sit side by side instead of full width. */
+export const SHORT = new Set(['id', 'year', 'kind', 'status', 'dates', 'location', 'glyph', 'label', 'name', 'title', 'org', 'role',
+  'heading', 'eyebrow', 'menuLabel', 'stokeLabel', 'pointer', 'touch', 'cta', 'caption', 'email', 'url', 'weapon', 'flame', 'show', 'duration']);
 
 /** Lists you can edit but not add to, remove from, reorder or hide. */
 export const FIXED = new Set(['screens']);
 export const READONLY = new Set(['screens[].id']);
 
+const opts = (list, label = (v) => titleCase(String(v))) => list.map((v) => ({ value: v, label: label(v) }));
+/** Dropdowns: (draft) → [{ value, label }]. */
 export const SELECTS = {
-  'hero.kindled.show': () => KINDLED_SHOW,
-  'startingEquipment.weapon': () => WEAPON_KEYS,
-  'startingEquipment.flame': () => FLAME_KEYS,
+  'hero.kindled.show': () => opts(KINDLED_SHOW),
+  'startingEquipment.weapon': (d) => opts(WEAPON_KEYS, (k) => d.weapons?.[k] ?? k),
+  'startingEquipment.flame': (d) => (d.effects?.flames ?? []).map((f) => ({ value: f.id, label: f.name || f.id })),
+  'effects.cursor.mode': () => opts(CURSOR_MODES),
+  'effects.render.ditherMatrix': () => opts(DITHER_MATRICES, (n) => `Bayer ${n}×${n}${n === 4 ? ' (coarse)' : ' (fine)'}`),
 };
+
+/** A slider for a number: [min, max, step, unit?]. */
+export const rangeFor = (pattern) => (pattern.startsWith('effects.') ? RANGES[pattern.slice(8)] : undefined);
 
 /** Empty text in these becomes null (not ''). */
 export const NULLABLE = new Set(['ui.prompts[][1]', 'site.resumeUrl']);
@@ -125,6 +210,7 @@ export const TEMPLATES = {
   '[].links': () => ({ label: 'New link', href: 'https://' }),
   'about.stats': () => ['', ''],
   'ui.prompts': () => ['', null, ''],
+  'effects.flames': () => ({ ...structuredClone(DEFAULT_EFFECTS.flames[0]), id: '', name: 'New flame' }),
 };
 
 /** “+ Add …” button wording per list. */
@@ -144,10 +230,13 @@ export const ADD_LABELS = {
   'about.paragraphs': 'paragraph',
   'about.stats': 'stat',
   'ui.prompts': 'prompt',
+  'effects.flames': 'flame',
 };
 
 /** The field a list entry is titled by. */
 export const TITLE_KEYS = ['name', 'title', 'org', 'group', 'label', 'heading'];
+/** Flame color fields, in ramp order (shown as a swatch strip on each flame card). */
+export const SWATCH_KEYS = ['lo', 'mid', 'hi', 'core', 'shade'];
 
 /** A lookup that tries the exact pattern, then the same pattern from any list (`[].key`). */
 export function hint(table, pattern) {

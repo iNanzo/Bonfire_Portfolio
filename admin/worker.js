@@ -6,11 +6,17 @@ import { verifyAccess } from './server/auth.js';
 import { createGitHubStore } from './server/github.js';
 import { HttpError } from './server/errors.js';
 
-const SECURITY_HEADERS = {
-  'Content-Security-Policy': [
+/** The Effects page frames the public site as a live preview; nothing else may be framed. */
+const csp = (siteUrl) => {
+  let frame = "'none'";
+  try { if (siteUrl) frame = new URL(siteUrl).origin; } catch { /* bad SITE_URL: no preview */ }
+  return [
     "default-src 'self'", "img-src 'self' blob: data:", "style-src 'self' https://fonts.googleapis.com",
-    'font-src https://fonts.gstatic.com', "connect-src 'self'", "frame-ancestors 'none'", "base-uri 'none'", "form-action 'none'",
-  ].join('; '),
+    'font-src https://fonts.gstatic.com', "connect-src 'self'", `frame-src ${frame}`, "frame-ancestors 'none'", "base-uri 'none'", "form-action 'none'",
+  ].join('; ');
+};
+const SECURITY_HEADERS = {
+  'Content-Security-Policy': csp(''),
   'X-Frame-Options': 'DENY',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
@@ -49,6 +55,7 @@ export default {
     }
     const out = new Response(res.body, res);
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) out.headers.set(k, v);
+    out.headers.set('Content-Security-Policy', csp(env.SITE_URL));
     return out;
   },
 };

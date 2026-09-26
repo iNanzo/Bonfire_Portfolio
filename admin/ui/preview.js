@@ -1,0 +1,75 @@
+// The live preview: the real site in a frame, opened as ?preview, with the
+// draft's effects streamed in over postMessage (see "Admin live preview" in
+// src/main.js). The frame renders at a real desktop or phone size and is scaled
+// to fit the pane, so the layout matches what visitors see.
+import { el } from './form.js';
+
+const VIEWPORTS = { desktop: [1280, 800], phone: [390, 780] };
+const SCREENS = [['home', 'Home'], ['projects', 'Projects'], ['experience', 'Journey'], ['skills', 'Skills'], ['about', 'About'], ['contact', 'Contact']];
+
+export function createPreview(siteUrl) {
+  const url = new URL(siteUrl || '/', location.href);
+  url.searchParams.set('preview', '1');
+  const origin = url.origin;
+  let ready = false;
+  let effects = null;
+  let frameQueued = false;
+  let viewport = 'desktop';
+
+  const frame = el('iframe', { title: 'Live preview of the site', class: 'preview-frame', loading: 'lazy' });
+  const stage = el('div', { class: 'preview-stage' }, frame);
+  const state = el('span', { class: 'preview-state', text: 'Loading…' });
+
+  const send = (msg) => { if (ready) frame.contentWindow?.postMessage(msg, origin); };
+  const flush = () => { frameQueued = false; if (effects) send({ type: 'nh:effects', effects }); };
+
+  window.addEventListener('message', (e) => {
+    if (e.source !== frame.contentWindow || e.origin !== origin || e.data?.type !== 'nh:ready') return;
+    ready = true;
+    state.textContent = 'Live';
+    state.dataset.tone = 'ok';
+    flush();
+  });
+
+  function fit() {
+    const [w, h] = VIEWPORTS[viewport];
+    const scale = Math.min(stage.clientWidth / w, 1);
+    frame.style.width = `${w}px`;
+    frame.style.height = `${h}px`;
+    frame.style.transform = `scale(${scale})`;
+    stage.style.height = `${Math.round(h * scale)}px`;
+  }
+  new ResizeObserver(fit).observe(stage);
+
+  const screen = el('select', { 'aria-label': 'Screen', onchange: () => send({ type: 'nh:screen', screen: screen.value }) },
+    SCREENS.map(([value, label]) => el('option', { value, text: label })));
+  const size = el('select', { 'aria-label': 'Viewport', onchange: () => { viewport = size.value; fit(); } },
+    el('option', { value: 'desktop', text: 'Desktop' }), el('option', { value: 'phone', text: 'Phone' }));
+  const reload = () => { ready = false; state.textContent = 'Loading…'; delete state.dataset.tone; frame.src = url.href; };
+
+  const pane = el('aside', { class: 'preview', 'aria-label': 'Live preview' },
+    el('div', { class: 'preview-head' },
+      el('h2', { text: 'Live Preview' }), state,
+      el('a', { class: 'link-button', href: url.href.replace(/[?&]preview=1/, ''), target: '_blank', rel: 'noopener', text: 'Open Site ↗' })),
+    stage,
+    el('div', { class: 'preview-tools' },
+      screen, size,
+      el('button', { type: 'button', class: 'button small', text: 'Stoke', onclick: () => send({ type: 'nh:stoke' }) }),
+      el('button', { type: 'button', class: 'button small', text: 'Random Swap', onclick: () => send({ type: 'nh:roll' }) }),
+      el('button', { type: 'button', class: 'button small ghost', text: 'Reload', onclick: reload })),
+    el('p', { class: 'help', text: 'Move your cursor through the fire to try the cursor effect. Unsaved — visitors see the saved version.' }));
+
+  return {
+    pane,
+    /** Start loading the site (first time the pane is shown). */
+    open() { if (!frame.src) reload(); requestAnimationFrame(fit); },
+    /** Push the draft's effects, at most once per frame. */
+    update(next, { valid = true } = {}) {
+      if (!valid) { state.textContent = 'Paused — fix the flagged fields'; state.dataset.tone = 'bad'; return; }
+      if (ready) { state.textContent = 'Live'; state.dataset.tone = 'ok'; }
+      effects = next;
+      if (!frameQueued) { frameQueued = true; requestAnimationFrame(flush); }
+    },
+    flame(id) { send({ type: 'nh:flame', id }); },
+  };
+}

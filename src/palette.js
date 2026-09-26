@@ -1,35 +1,39 @@
 // Single source of truth for color — used by the 3D renderer (palette
 // quantization) and the site UI (CSS custom properties).
 //
-// The scene palette = the neutral base below + the current flame's 4-color
-// ramp. Swapping weapons swaps the ramp, which recolors the fire, the light it
-// casts, and every accent color in the UI.
+// The scene palette = the neutral base + the current flame's 4-color ramp.
+// Swapping weapons swaps the ramp, which recolors the fire, the light it casts,
+// and every accent color in the UI.
+//
+// Both come from content.json's `effects` (edited in the admin). `base` and
+// `flames` are updated in place when the admin preview changes them, so importers
+// always see the current values.
+import { effects, onEffects } from './effects.js';
 
-export const base = {
-  void: '#07070b',
-  shadow: '#15131d',
-  stone: '#2c2a3a',
-  wood: '#5b4535',
-  bone: '#e9e3d2',
-};
+export const base = {};
 
 // Ramp order: lo (embers, deep glow) → mid (flame body) → hi (tips, UI text) → core.
-// `hi` is used for colored text, so every `hi` must stay ≥ 4.5:1 on the void.
-// `shade` is a dark tinted neutral for firelit stone (the ember flame uses wood).
-export const flames = {
-  ember: { name: 'Ember Flame', ramp: ['#8c1d2f', '#e0582a', '#ffc76a', '#fff1d0'], shade: '#5b4535' },
-  verdant: { name: 'Verdant Flame', ramp: ['#1f5e2c', '#4fbf3a', '#b8f06a', '#effce0'], shade: '#24382a' },
-  blood: { name: 'Blood Flame', ramp: ['#4a0a1a', '#c21d3b', '#ff7474', '#ffd9d2'], shade: '#3d2027' },
-  spirit: { name: 'Spirit Flame', ramp: ['#124a55', '#2fb8b0', '#7ff0e0', '#e6fffb'], shade: '#1d3a3f' },
-  arcane: { name: 'Arcane Flame', ramp: ['#3a1566', '#8a4ce0', '#d09bff', '#f6e8ff'], shade: '#2e2447' },
-  gilded: { name: 'Gilded Flame', ramp: ['#6b3a0e', '#e0a020', '#ffe066', '#fffbe0'], shade: '#40331f' },
-  rose: { name: 'Rose Flame', ramp: ['#5c1240', '#d83a8c', '#ff9ccf', '#ffe6f3'], shade: '#3d2033' },
-  azure: { name: 'Azure Flame', ramp: ['#0f2f66', '#2f7fe0', '#8cc8ff', '#e8f4ff'], shade: '#1d2b45' },
-  phosphor: { name: 'Phosphor Flame', ramp: ['#4a4538', '#bdb49c', '#fffaf0', '#ffffff'], shade: '#35332d' },
-  umbral: { name: 'Umbral Flame', ramp: ['#1c1a4a', '#5b5bd6', '#b0afff', '#ecebff'], shade: '#24233f' },
-};
+// `hi` is used for colored text, so every `hi` must stay ≥ 4.5:1 on the void
+// (contentRules enforces it). `shade` is a dark tinted neutral for firelit stone.
+// `light` is how far the cast light is washed toward white. `hidden` flames are
+// never drawn at random.
+export const flames = {};
 
-export const defaultFlame = 'ember';
+function load(e) {
+  Object.assign(base, e.colors);
+  for (const k of Object.keys(flames)) delete flames[k];
+  for (const f of e.flames) {
+    flames[f.id] = { name: f.name, ramp: [f.lo, f.mid, f.hi, f.core], shade: f.shade, light: f.light ?? 0.34, hidden: !!f.hidden };
+  }
+}
+load(effects);
+onEffects(load);
+
+/** Flames a random draw can pick. */
+export const rotation = () => Object.keys(flames).filter((k) => !flames[k].hidden);
+
+/** `key` if it still exists (the preview can delete flames), else the first one. */
+export const flameOr = (key) => (Object.hasOwn(flames, key) ? key : Object.keys(flames)[0]);
 
 /** Scene quantization palette for a flame: index 0 must be the darkest (outline) color. */
 export function scenePalette(flame) {

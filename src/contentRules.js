@@ -3,17 +3,20 @@
 // the site would choke on: an unsafe link (the renderer throws on those), a bad
 // image path, a duplicate project id, a weapon the 3D model doesn't have.
 import { isSafeUrl } from './html.js';
-import { flames } from './palette.js';
+import { BASE_COLORS, CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, RANGES } from './effectsDefaults.js';
 
 export const CONTENT_PATH = 'src/content.json';
 export const SECTIONS = ['site', 'screens', 'weapons', 'startingEquipment', 'hero', 'sections', 'featured', 'projects',
-  'archive', 'about', 'experience', 'leadership', 'education', 'skills', 'contact', 'ui', 'notFound'];
+  'archive', 'about', 'experience', 'leadership', 'education', 'skills', 'contact', 'ui', 'notFound', 'effects'];
 /** Screens are wired into the layout and camera; their ids can't change. */
 export const SCREEN_IDS = ['home', 'projects', 'experience', 'skills', 'about', 'contact'];
 /** Weapons are nodes in public/models/bonfire.glb; their keys can't change. */
 export const WEAPON_KEYS = ['longsword', 'broadsword', 'bastard', 'claymore', 'katana', 'uchigatana', 'sabre', 'rapier',
   'estoc', 'spear', 'greatsword', 'glaive', 'naginata', 'zweihander', 'flamberge', 'flambergezwei'];
-export const FLAME_KEYS = Object.keys(flames);
+export const flameIds = (c) => (Array.isArray(c?.effects?.flames) ? c.effects.flames.map((f) => f?.id) : []);
+export const HEX_RE = /^#[0-9a-f]{6}$/i;
+/** Flames a random draw can pick from: it skips the current and the starting flame. */
+export const MIN_ROTATION = 3;
 export const KINDLED_SHOW = ['first', 'always', 'never'];
 export const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 /** An image's `src`: public/<src>.webp and public/<src>-card.webp. */
@@ -28,6 +31,9 @@ export const slugify = (text) =>
 /** Every project-like entry, in inventory order. */
 export const inventoryEntries = (c) => [c.featured, ...(c.projects ?? []), ...(c.archive ?? [])].filter(Boolean);
 
+/** A project's images the site shows (hidden ones stay in the repo, off the site). */
+export const shownImages = (p) => (Array.isArray(p?.images) ? p.images.filter((im) => !im?.hidden) : []);
+
 /** Every image src the content references. */
 export function imageRefs(c) {
   const refs = new Set();
@@ -36,6 +42,83 @@ export function imageRefs(c) {
 }
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+const luminance = (hex) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+/** WCAG contrast ratio of two #rrggbb colors. */
+export function contrast(a, b) {
+  const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+}
+
+/**
+ * Check the `effects` section. `err(path, message)` gets paths like
+ * `effects.flames[2].hi`. Every number must sit inside RANGES.
+ */
+export function validateEffects(e, err, base = 'effects') {
+  if (!isObj(e)) return err(base, 'Must be a group of fields.');
+  const at = (p) => `${base}.${p}`;
+  const color = (v, p) => { if (typeof v !== 'string' || !HEX_RE.test(v)) err(at(p), 'Use a color like #ff8800.'); };
+  const num = (v, p, pattern = p) => {
+    const [min, max] = RANGES[pattern];
+    if (typeof v !== 'number' || !Number.isFinite(v)) err(at(p), 'Must be a number.');
+    else if (v < min || v > max) err(at(p), `Between ${min} and ${max}.`);
+  };
+  const group = (key, check) => {
+    if (e[key] === undefined) return;
+    if (!isObj(e[key])) return err(at(key), 'Must be a group of fields.');
+    for (const [k, v] of Object.entries(e[key])) {
+      if (!(k in DEFAULT_EFFECTS[key])) err(at(`${key}.${k}`), 'Unknown setting.');
+      else check(k, v, `${key}.${k}`);
+    }
+  };
+  const bool = (v, p) => { if (typeof v !== 'boolean') err(at(p), 'Must be on or off.'); };
+
+  group('colors', (k, v, p) => color(v, p));
+  const voidColor = HEX_RE.test(e.colors?.void ?? '') ? e.colors.void : DEFAULT_EFFECTS.colors.void;
+
+  if (e.flames !== undefined) {
+    if (!Array.isArray(e.flames)) err(at('flames'), 'Must be a list.');
+    else {
+      const seen = new Set();
+      e.flames.forEach((f, i) => {
+        const p = `flames[${i}]`;
+        if (!isObj(f)) return err(at(p), 'Must be a group of fields.');
+        if (typeof f.id !== 'string' || !ID_RE.test(f.id)) err(at(`${p}.id`), 'Use lowercase letters, numbers and single dashes.');
+        else if (seen.has(f.id)) err(at(`${p}.id`), `“${f.id}” is already used by another flame.`);
+        else seen.add(f.id);
+        if (typeof f.name !== 'string' || !f.name.trim()) err(at(`${p}.name`), 'Can’t be empty.');
+        for (const k of ['lo', 'mid', 'hi', 'core', 'shade']) color(f[k], `${p}.${k}`);
+        if (HEX_RE.test(f.hi ?? '') && contrast(f.hi, voidColor) < 4.5) {
+          err(at(`${p}.hi`), `Too dark for text on the background (${contrast(f.hi, voidColor).toFixed(1)}:1, needs 4.5:1). Lighten it.`);
+        }
+        if (f.light !== undefined) num(f.light, `${p}.light`, 'flames[].light');
+        if (f.hidden !== undefined) bool(f.hidden, `${p}.hidden`);
+      });
+      const inRotation = e.flames.filter((f) => isObj(f) && !f.hidden).length;
+      if (inRotation < MIN_ROTATION) err(at('flames'), `Keep at least ${MIN_ROTATION} flames in rotation (not hidden), so a new one can always be drawn.`);
+    }
+  }
+
+  const numbers = (k, v, p) => num(v, p);
+  group('fire', numbers);
+  if (isObj(e.fire) && e.fire.lifeMin > e.fire.lifeMax) err(at('fire.lifeMax'), 'Must be at least the shortest life.');
+  group('particles', numbers);
+  group('fireflies', numbers);
+  if (isObj(e.fireflies) && e.fireflies.lit > e.fireflies.count) err(at('fireflies.lit'), 'Can’t be more than the number of fireflies.');
+  group('cursor', (k, v, p) => {
+    if (k === 'mode') { if (!CURSOR_MODES.includes(v)) err(at(p), `One of: ${CURSOR_MODES.join(', ')}.`); } else num(v, p);
+  });
+  group('render', (k, v, p) => {
+    if (k === 'outlines' || k === 'shake') bool(v, p);
+    else if (k === 'ditherMatrix') { if (!DITHER_MATRICES.includes(v)) err(at(p), `One of: ${DITHER_MATRICES.join(', ')}.`); } else num(v, p);
+  });
+  for (const k of Object.keys(e)) if (!(k in DEFAULT_EFFECTS)) err(at(k), 'Unknown section.');
+  if (isObj(e.colors)) for (const k of BASE_COLORS) if (!(k in e.colors)) err(at(`colors.${k}`), 'Missing color.');
+}
 
 /**
  * Check a whole content object. Returns [{ path, message }] (empty when it's fine);
@@ -94,7 +177,16 @@ export function validateContent(c) {
   }
   if (obj(c.startingEquipment, 'startingEquipment')) {
     if (!WEAPON_KEYS.includes(c.startingEquipment.weapon)) err('startingEquipment.weapon', 'Pick one of the weapons.');
-    if (!FLAME_KEYS.includes(c.startingEquipment.flame)) err('startingEquipment.flame', 'Pick one of the flames.');
+    if (!flameIds(c).includes(c.startingEquipment.flame)) err('startingEquipment.flame', 'Pick one of the flames.');
+  }
+
+  validateEffects(c.effects, err);
+
+  // admin panel's own label overrides (the site ignores them)
+  if (c.admin !== undefined && obj(c.admin, 'admin') && c.admin.labels !== undefined && obj(c.admin.labels, 'admin.labels')) {
+    for (const [k, v] of Object.entries(c.admin.labels)) {
+      if (typeof v !== 'string' || v.length > 60) err(`admin.labels.${k}`, 'Text up to 60 characters.');
+    }
   }
 
   // hero
@@ -136,16 +228,17 @@ export function validateContent(c) {
         text(im.alt, `${ip}.alt`, true);
         if (im.caption !== undefined) text(im.caption, `${ip}.caption`);
         flag(im.pixel, `${ip}.pixel`);
+        flag(im.hidden, `${ip}.hidden`);
       });
     }
-    const imageCount = Array.isArray(p.images) ? p.images.length : 0;
-    if (needsImages && !imageCount) err(`${path}.images`, 'Add at least one image (the first is the inventory icon).');
+    const imageCount = shownImages(p).length;
+    if (needsImages && !imageCount) err(`${path}.images`, 'Add at least one visible image (the first visible one is the inventory icon).');
     if (!needsImages && !imageCount && !p.href) warn(path, 'With no images and no link, this won’t appear anywhere.');
   };
   project(c.featured, 'featured', { needsImages: true });
   list(c.projects, 'projects', (p, path) => project(p, path, { needsImages: true }));
   list(c.archive, 'archive', (p, path) => project(p, path, { needsImages: false }));
-  const slots = inventoryEntries(c).filter((p) => isObj(p) && !p.hidden && Array.isArray(p.images) && p.images.length).length;
+  const slots = inventoryEntries(c).filter((p) => isObj(p) && !p.hidden && shownImages(p).length).length;
   if (slots > GRID_SLOTS) warn('projects', `${slots} visible items; the inventory grid holds ${GRID_SLOTS} before it grows past its box.`);
 
   // about

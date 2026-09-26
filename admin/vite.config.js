@@ -1,7 +1,8 @@
 // The admin page: built into admin/dist for the Worker (`npm run admin:build`), or
 // served locally with the same API writing straight to this repo's files
 // (`npm run admin` → http://127.0.0.1:5175). Local mode has no sign-in, so it only
-// listens on 127.0.0.1. ADMIN_CONTENT_ROOT points it at another copy of the site.
+// listens on 127.0.0.1. ADMIN_CONTENT_ROOT points it at another copy of the site;
+// ADMIN_SITE_URL is the dev site the Effects preview loads (default :5173).
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 import { handleApi } from './server/api.js';
@@ -27,7 +28,7 @@ function localApi() {
             headers,
             body: req.method === 'GET' || req.method === 'HEAD' ? undefined : Buffer.concat(chunks),
           });
-          const response = await handleApi(request, { store, user: { email: 'local' }, siteUrl: 'http://localhost:5173/' });
+          const response = await handleApi(request, { store, user: { email: 'local' }, siteUrl: process.env.ADMIN_SITE_URL ?? 'http://localhost:5173/' });
           res.statusCode = response.status;
           response.headers.forEach((value, key) => res.setHeader(key, value));
           res.end(Buffer.from(await response.arrayBuffer()));

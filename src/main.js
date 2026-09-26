@@ -1,6 +1,9 @@
 import './styles.css';
-import { applyCssPalette, base, flames } from './palette.js';
+import { applyCssPalette, base, flames, flameOr, rotation } from './palette.js';
 import { screens, hero, ui, weapons, startingEquipment, items } from './content.js';
+import { onEffects, setEffects } from './effects.js';
+import { STRUCTURAL } from './effectsDefaults.js';
+import { validateEffects } from './contentRules.js';
 import {
   renderChrome, renderHome, renderProjects, renderExperience,
   renderSkills, renderAbout, renderContact,
@@ -51,12 +54,11 @@ if (touch) q('[data-stoke-hint]').textContent = hero.stokeHint.touch;
 
 // --- Equipment (weapon + flame in the fire) -----------------------------------------------
 const weaponKeys = Object.keys(weapons);
-const flameKeys = Object.keys(flames);
 // Requested state drives future choices; displayed state changes only at impact.
 let equipment = { ...startingEquipment, item: null };
 let displayedEquipment = { ...equipment };
 let fire = null; // set once the 3D scene module loads
-const equipLabel = () => `${weapons[displayedEquipment.weapon]} · ${flames[displayedEquipment.flame].name}`;
+const equipLabel = () => `${weapons[displayedEquipment.weapon]} · ${flames[displayedEquipment.flame]?.name ?? ''}`;
 
 // The E badge follows the latest request (it moves on click); the weapon and
 // flame labels follow what's actually in the fire (they change at impact).
@@ -84,9 +86,10 @@ function equip(weapon, flame, item, { instant = false } = {}) {
 
 /** Inspecting a project draws a random weapon and flame (never the same as now). */
 function rollFor(item) {
+  const fresh = rotation().filter((k) => k !== equipment.flame && k !== startingEquipment.flame);
   equip(
     pick(weaponKeys.filter((k) => k !== equipment.weapon && k !== startingEquipment.weapon)),
-    pick(flameKeys.filter((k) => k !== equipment.flame && k !== startingEquipment.flame)),
+    pick(fresh.length ? fresh : Object.keys(flames)),
     item,
   );
 }
@@ -341,17 +344,25 @@ function failScene(error) {
 }
 
 // Construct the real renderer once instead of probing with a second WebGL context.
-import('./bonfire/scene.js').then(async ({ createBonfire }) => {
+let sceneGeneration = 0;
+function startScene() {
+  const generation = ++sceneGeneration;
+  return import('./bonfire/scene.js').then(async ({ createBonfire }) => {
     const stage = q('[data-stage]');
     const candidate = createBonfire(stage, { reducedMotion, onImpact, onRamp: setAccentRamp, onError: failScene });
     await candidate.ready;
+    if (generation !== sceneGeneration) { candidate.dispose(); return; } // superseded by a newer rebuild
     fire = candidate;
     if (import.meta.env.DEV) window.__fire = fire;
     fire.setView(route.screen === 'projects' && route.item ? 'inspect' : route.screen, { instant: true });
     // Navigation during loading only changes requested state; initialize with its latest value.
     await fire.equip(equipment.weapon, equipment.flame, { instant: true, item: equipment.item });
     stage.classList.add('is-ready');
+  }).catch(failScene);
+}
 
+startScene().then(async () => {
+    if (!fire) return;
     // Render debug HUD: P toggles, 1–5 cycle settings.
     const hud = q('[data-debug]');
     const drawHud = (dsc) => {
@@ -385,5 +396,51 @@ import('./bonfire/scene.js').then(async ({ createBonfire }) => {
       if (e.key === 'p' || e.key === 'P') { hud.hidden = !hud.hidden; drawHud(fire.describe()); }
       else if (!hud.hidden && keys[e.key]) drawHud(fire.cycle(keys[e.key]));
     });
-  }).catch(failScene);
+  });
+
+// --- Admin live preview ------------------------------------------------------------------
+// The admin's Effects page embeds this site as ?preview and streams its draft in.
+// Only the parent frame is listened to, and every payload is validated first; the
+// changes live in this page only (nothing is saved from here).
+const changedAt = (a, b, path) => JSON.stringify(path.split('.').reduce((o, k) => o?.[k], a)) !== JSON.stringify(path.split('.').reduce((o, k) => o?.[k], b));
+let rebuildTimer = 0;
+onEffects((next, prev) => {
+  if (changedAt(next, prev, 'colors')) { applyCssPalette(); installDitherPatterns(base); }
+  for (const eq of [equipment, displayedEquipment]) eq.flame = flameOr(eq.flame);
+  applyFlame(displayedEquipment.flame);
+  refreshEquipLabels();
+  if (STRUCTURAL.some((p) => changedAt(next, prev, p))) {
+    // Counts size GPU buffers: rebuild the scene once the slider settles.
+    clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(() => {
+      fire?.dispose();
+      fire = null;
+      q('[data-stage]').classList.remove('is-ready');
+      startScene();
+    }, 300);
+  }
+  fire?.applyEffects();
+});
+
+if (new URLSearchParams(location.search).has('preview') && window.parent !== window) {
+  document.documentElement.classList.add('is-preview');
+  window.addEventListener('message', (e) => {
+    if (e.source !== window.parent || typeof e.data?.type !== 'string') return;
+    const msg = e.data;
+    if (msg.type === 'nh:effects') {
+      let ok = true;
+      validateEffects(msg.effects, () => { ok = false; });
+      if (ok) setEffects(msg.effects);
+    } else if (msg.type === 'nh:flame' && Object.hasOwn(flames, msg.id)) {
+      equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), msg.id, equipment.item);
+    } else if (msg.type === 'nh:stoke') {
+      stoke();
+    } else if (msg.type === 'nh:roll') {
+      rollFor(equipment.item);
+    } else if (msg.type === 'nh:screen' && order.includes(msg.screen)) {
+      go(msg.screen === 'home' ? '#/' : `#/${msg.screen}`);
+    }
+  });
+  window.parent.postMessage({ type: 'nh:ready' }, '*');
+}
 

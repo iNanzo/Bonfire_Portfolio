@@ -208,14 +208,28 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
 - **Text:** every section: projects, home, about, journey, skills, contact, screen
   headings and interface text.
 - **Projects:**
-  - Add, edit or delete projects; **★ Feature this** swaps a project into the flagship
-    slot.
-  - Move items between Projects and Earlier explorations.
+  - Add, edit or delete projects. **Move To…** on any project card moves it between
+    Featured, Projects and Earlier Explorations (moving one into Featured swaps the old
+    flagship out; moving the flagship out promotes the first visible project).
   - Upload images. They're converted to WebP in the browser (full size up to 1600 px, a
     720 px card, and small captures doubled with nearest-neighbor, like
-    `tools/import-screenshots.mjs`). Reorder them (the first is the inventory icon) and
-    set alt text, caption and pixel art.
+    `tools/import-screenshots.mjs`). Reorder them (the first *visible* one is the
+    inventory icon), hide one with ◉ (kept in the repo, off the site), and set alt text,
+    caption and pixel art.
+- **Effects** (the Look & Feel page), with a **live preview** of the real site beside it:
+  - Flame colors: add, edit, reorder or delete flames; ◉ takes one out of the random
+    draw. Each flame's `hi` must stay readable as text (≥ 4.5:1), and at least 3 stay in
+    rotation.
+  - Fire (intensity, size, height, turbulence, flame life, cast light, frame rate, stoke
+    flare), fireflies (count, lit at rest, real lights, speed), the cursor effect and its
+    strength, particle counts (plus the touch-device scale), rendering (pixel size,
+    dither, outlines, vignette, exposure, color-change time, screen shake) and the scene's
+    base colors. Every section has **Reset to Defaults**.
+  - The preview updates as you drag. "Forge It" on a flame, **Stoke** and **Random
+    Swap** play the effects. Nothing reaches visitors until you save.
 - **Hide / show** any entry (◉), and **reorder** any list by dragging ⋮⋮ or with ↑/↓.
+- **Rename** any sidebar page or section heading with ✎ (empty resets it). Renames are
+  stored in `content.admin.labels`, which the site ignores.
 - **Live checks:** each field is checked as you type against `src/contentRules.js`: unsafe
   links, bad ids, missing alt text, glyphs that won't fit and so on. Save is refused
   until they're fixed; the sidebar counts problems per page.
@@ -232,7 +246,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
 
 | Piece | File |
 | --- | --- |
-| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `schema.js` labels/help/grouping, `images.js` WebP conversion) |
+| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `schema.js` labels/help/grouping, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case) |
+| Effects defaults, ranges, runtime | `src/effectsDefaults.js`, `src/effects.js` (design notes: `docs/admin-v2.md`) |
 | API: session, content, save, deploy status, image thumbnails | `admin/server/api.js` |
 | Sign-in check (Cloudflare Access JWT) | `admin/server/auth.js` |
 | Content store on GitHub (one commit per save, Git Data API) | `admin/server/github.js` |
@@ -266,7 +281,13 @@ npm run admin        # http://127.0.0.1:5175
 
 Local mode edits your working copy directly. Nothing is committed or deployed; commit
 and push yourself. It has no sign-in, so it only listens on 127.0.0.1. Run `npm run
-dev` alongside it to see changes live.
+dev` alongside it to see changes live; the Effects preview loads that dev site
+(`http://localhost:5173/`, or set `ADMIN_SITE_URL`).
+
+The deployed admin's preview frames `SITE_URL` (its CSP allows only that origin), so it
+shows the effects editor's changes once this version of the site is deployed. The site
+only accepts preview messages when opened as `?preview` inside a frame, from its parent,
+and validates them first; nothing is stored.
 
 **Put it online (one-time setup)**
 
@@ -313,10 +334,12 @@ dev` alongside it to see changes live.
 
 ## Colors
 
-`src/palette.js` holds the neutral base palette and the ten flame ramps
-(`[lo, mid, hi, core]` + a dark `shade` for firelit stone). The 3D renderer quantizes
-every pixel to base + current ramp; the UI reads the same ramp as CSS variables
-(`--accent-hi` for text — every `hi` is ≥ 4.5:1 on the background).
+The neutral base palette and the flame ramps (`[lo, mid, hi, core]` + a dark `shade` for
+firelit stone) live in `src/content.json` under `effects` (edit them on the admin's
+Effects page); `src/palette.js` turns them into `base` and `flames`. The 3D renderer
+quantizes every pixel to base + current ramp; the UI reads the same ramp as CSS
+variables (`--accent-hi` for text — every `hi` must be ≥ 4.5:1 on the background, and
+`src/contentRules.js` enforces it).
 
 ## The bonfire
 

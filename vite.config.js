@@ -20,7 +20,7 @@ function routePages() {
     apply: 'build',
     configResolved(config) { outDir = resolve(config.root, config.build.outDir); },
     closeBundle() {
-      const ids = [featured, ...projects, ...archive.filter((a) => a.images)].map((p) => p.id);
+      const ids = [featured, ...projects, ...archive.filter((a) => a.images?.length)].map((p) => p.id);
       const routes = [...screens.filter((s) => s.id !== 'home').map((s) => s.id), ...ids.map((id) => `projects/${id}`)];
       for (const route of routes) {
         mkdirSync(resolve(outDir, route), { recursive: true });

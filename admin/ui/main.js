@@ -2,12 +2,15 @@
 // it live against src/contentRules.js, and saves it (with any new images) as one
 // change. On GitHub that's a commit that redeploys the site; this page follows the
 // deploy until it's live. Unsaved edits are kept in this browser until you save or
-// discard them.
+// discard them. The Effects page streams the draft into a live preview of the site.
 import './admin.css';
 import { imageRefs, SECTIONS, validateContent } from '../../src/contentRules.js';
+import { DEFAULT_EFFECTS } from '../../src/effectsDefaults.js';
 import { logoMark } from '../../src/ui/logo.js';
 import { HELP, LABELS, PAGES } from './schema.js';
-import { el, keyOf, renderFeatured, renderValue, showErrors } from './form.js';
+import { el, getAt, renderFeatured, renderValue, showErrors } from './form.js';
+import { createPreview } from './preview.js';
+import { titleCase } from './text.js';
 
 const DRAFT_KEY = 'nh-admin-draft';
 const local = {
@@ -19,7 +22,8 @@ const q = (s, r = document) => r.querySelector(s);
 /** replaceChildren, skipping empty slots (the DOM would print them as "null"). */
 const fill = (node, ...kids) => node.replaceChildren(...kids.flat().filter((k) => k !== null && k !== undefined && k !== false));
 const parsePath = (s) => [...s.matchAll(/([^.[\]]+)|\[(\d+)\]/g)].map((m) => (m[2] !== undefined ? Number(m[2]) : m[1]));
-const pageOf = (topKey) => PAGES.find((p) => p.keys.includes(topKey)) ?? PAGES[0];
+const within = (path, key) => path === key || path.startsWith(`${key}.`) || path.startsWith(`${key}[`);
+const pageOf = (path) => PAGES.find((p) => p.keys.some((k) => within(path, k))) ?? PAGES[0];
 
 const state = { session: null, original: null, sha: null, errors: [], warnings: [], saving: false, deploy: null, deployTimer: 0 };
 const ctx = {
@@ -30,6 +34,7 @@ const ctx = {
   drag: null,
   focus: null,
   siteUrl: '',
+  preview: null,
   changed,
   thumb: (src) => ctx.uploads.get(src)?.preview ?? `/api/image?src=${encodeURIComponent(src)}&card=1`,
   toast,
@@ -49,11 +54,66 @@ async function api(path, init) {
   return data;
 }
 
+// ---- labels (defaults in Title Case; any of them can be renamed) -----------------------
+const defaultLabel = (key) => titleCase(key.startsWith('page:') ? PAGES.find((p) => `page:${p.id}` === key)?.label ?? key : LABELS[key] ?? key);
+const labelOf = (key) => ctx.draft?.admin?.labels?.[key] || defaultLabel(key);
+
+function setLabel(key, value) {
+  const labels = { ...(ctx.draft.admin?.labels ?? {}) };
+  if (!value || value === defaultLabel(key)) delete labels[key]; else labels[key] = value.slice(0, 60);
+  if (Object.keys(labels).length) ctx.draft.admin = { ...(ctx.draft.admin ?? {}), labels };
+  else if (ctx.draft.admin) {
+    delete ctx.draft.admin.labels;
+    if (!Object.keys(ctx.draft.admin).length) delete ctx.draft.admin;
+  }
+  renderNav();
+  changed({ rerender: true });
+}
+
+/** A heading with a ✎ button that turns it into a text box (Enter saves, Esc cancels, empty resets). */
+function renameable(tag, cls, key, id) {
+  const heading = el(tag, { class: cls, id, text: labelOf(key) });
+  const row = el('div', { class: 'title-row' }, heading);
+  const button = el('button', {
+    type: 'button', class: 'rename', title: 'Rename', 'aria-label': `Rename “${labelOf(key)}”`, text: '✎',
+    onclick: () => {
+      const input = el('input', { type: 'text', class: `rename-input ${cls}`, maxlength: 60, 'aria-label': 'New name (empty resets it)', placeholder: defaultLabel(key) });
+      input.value = labelOf(key);
+      let done = false;
+      const finish = (commit) => {
+        if (done) return;
+        done = true;
+        if (commit) setLabel(key, input.value.trim());
+        else row.replaceChildren(heading, button);
+      };
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+        if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+      });
+      input.addEventListener('blur', () => finish(true));
+      row.replaceChildren(input);
+      input.focus();
+      input.select();
+    },
+  });
+  row.append(button);
+  return row;
+}
+
 // ---- shell ----------------------------------------------------------------------------
+function renderNav() {
+  const groups = [...new Set(PAGES.map((p) => p.group))];
+  fill(q('[data-nav-list]'), groups.map((g) => el('li', { class: 'nav-group' },
+    el('p', { class: 'nav-group-label', text: titleCase(g) }),
+    el('ul', { role: 'list' }, PAGES.filter((p) => p.group === g).map((p) => el('li', {},
+      el('a', { href: `#${p.id}`, 'data-nav': p.id, 'aria-current': currentPage() === p ? 'page' : null },
+        el('span', { text: labelOf(`page:${p.id}`) }),
+        el('span', { class: 'nav-count', 'data-count': p.id }))))))));
+  countErrors();
+}
+
 function shell() {
   const app = q('#app');
-  const nav = el('ul', { role: 'list' }, PAGES.map((p) => el('li', {},
-    el('a', { href: `#${p.id}`, 'data-nav': p.id }, el('span', { text: p.label }), el('span', { class: 'nav-count', 'data-count': p.id })))));
   const brand = el('a', { class: 'brand', href: '#projects', 'aria-label': 'Admin home' });
   brand.innerHTML = logoMark('brand-mark'); // static markup from src/ui/logo.js, no user data
   brand.append(el('span', { class: 'brand-text', text: 'Admin' }));
@@ -62,13 +122,14 @@ function shell() {
       brand,
       el('p', { class: 'status', 'data-status': true, role: 'status', 'aria-live': 'polite' }),
       el('div', { class: 'top-actions' },
-        el('a', { class: 'button ghost', 'data-view-site': true, target: '_blank', rel: 'noopener', text: 'View site ↗' }),
+        el('a', { class: 'button ghost', 'data-view-site': true, target: '_blank', rel: 'noopener', text: 'View Site ↗' }),
         el('button', { type: 'button', class: 'button ghost', 'data-discard': true, text: 'Discard', onclick: discard }),
         el('button', { type: 'button', class: 'button primary', 'data-save': true, onclick: save }, 'Save', el('kbd', { text: 'Ctrl S' })))),
     el('div', { class: 'notice', 'data-notice': true, hidden: true }),
-    el('div', { class: 'layout' },
-      el('nav', { class: 'sidebar', 'aria-label': 'Sections' }, nav, el('div', { class: 'who', 'data-who': true })),
-      el('main', { class: 'page', 'data-page': true, tabindex: '-1' }, el('p', { class: 'loading', text: 'Loading content…' }))),
+    el('div', { class: 'layout', 'data-layout': true },
+      el('nav', { class: 'sidebar', 'aria-label': 'Sections' }, el('ul', { role: 'list', class: 'nav', 'data-nav-list': true }), el('div', { class: 'who', 'data-who': true })),
+      el('main', { class: 'page', 'data-page': true, tabindex: '-1' }, el('p', { class: 'loading', text: 'Loading content…' })),
+      el('div', { class: 'preview-slot', 'data-preview-slot': true, hidden: true })),
     el('div', { class: 'toasts', 'data-toasts': true, 'aria-live': 'polite' }),
     el('div', { class: 'busy', 'data-busy': true, hidden: true }, el('div', { class: 'busy-box' }, el('span', { class: 'spinner', 'aria-hidden': 'true' }), el('span', { 'data-busy-text': true }))));
 }
@@ -93,26 +154,45 @@ function notice(message, actions = []) {
 
 // ---- pages ----------------------------------------------------------------------------
 const currentPage = () => PAGES.find((p) => `#${p.id}` === location.hash) ?? PAGES[0];
+const anchorOf = (key) => `s-${key.replace(/\./g, '-')}`;
 
 function block(key) {
-  return el('section', { class: 'block', 'data-path': key, id: `s-${key}` },
-    el('h2', { text: LABELS[key] ?? key }),
+  const path = parsePath(key);
+  const value = getAt(ctx.draft, path);
+  const effectsKey = key.startsWith('effects.') ? key.slice(8) : null;
+  const reset = effectsKey && el('button', {
+    type: 'button', class: 'link-button', text: 'Reset to Defaults',
+    onclick: () => {
+      if (!confirm(`Reset “${labelOf(key)}” to the original settings? (Discard still brings back your saved values until you save.)`)) return;
+      ctx.draft.effects[effectsKey] = structuredClone(DEFAULT_EFFECTS[effectsKey]);
+      changed({ rerender: true });
+    },
+  });
+  return el('section', { class: 'block', 'data-path': key, id: anchorOf(key) },
+    el('div', { class: 'block-head' }, renameable('h2', 'block-title', key), reset),
     HELP[key] ? el('p', { class: 'help', text: HELP[key] }) : null,
     el('p', { class: 'error', role: 'alert' }),
-    key === 'featured' ? renderFeatured(ctx) : renderValue(ctx.draft[key], [key], ctx));
+    key === 'featured' ? renderFeatured(ctx) : value === undefined ? el('p', { class: 'help', text: 'Missing from content.json.' }) : renderValue(value, path, ctx));
 }
 
 function renderPage({ keepScroll = true } = {}) {
   const page = currentPage();
   const main = q('[data-page]');
   const y = window.scrollY;
-  const warnings = state.warnings.filter((w) => page.keys.includes(parsePath(w.path)[0]));
+  const warnings = state.warnings.filter((w) => pageOf(w.path) === page);
   fill(main,
-    el('h1', { class: 'page-title', text: page.label }),
+    el('header', { class: 'page-head' },
+      renameable('h1', 'page-title', `page:${page.id}`),
+      el('p', { class: 'page-blurb', text: page.blurb }),
+      page.keys.length > 1 ? el('nav', { class: 'jump', 'aria-label': 'On this page' },
+        page.keys.map((k) => el('a', { href: `#${anchorOf(k)}`, text: labelOf(k), onclick: (e) => { e.preventDefault(); q(`#${anchorOf(k)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }))) : null),
     warnings.length ? el('ul', { class: 'warnings', role: 'list' }, warnings.map((w) => el('li', { text: w.message }))) : null,
     ...page.keys.map(block));
   showErrors(main, state.errors);
-  for (const a of document.querySelectorAll('[data-nav]')) a.toggleAttribute('aria-current', a.dataset.nav === page.id);
+  for (const a of document.querySelectorAll('[data-nav]')) {
+    if (a.dataset.nav === page.id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  }
+  showPreview(!!page.preview);
   if (ctx.focus) {
     let path = ctx.focus;
     let target = main.querySelector(`[data-path="${CSS.escape(path)}"]`);
@@ -123,11 +203,31 @@ function renderPage({ keepScroll = true } = {}) {
     ctx.focus = null;
     if (target) {
       target.scrollIntoView({ block: 'center' });
-      target.querySelector('input:not([type=file]), textarea, select')?.focus({ preventScroll: true });
+      target.querySelector('input:not([type=file]):not([type=color]), textarea, select')?.focus({ preventScroll: true });
     }
   } else if (keepScroll) {
     window.scrollTo(0, y);
   }
+}
+
+// ---- live preview (Effects page) ---------------------------------------------------------
+function showPreview(on) {
+  const slot = q('[data-preview-slot]');
+  slot.hidden = !on;
+  q('[data-layout]').classList.toggle('has-preview', on);
+  if (!on) return;
+  if (!ctx.preview) {
+    ctx.preview = createPreview(state.session?.siteUrl);
+    slot.append(ctx.preview.pane);
+  }
+  ctx.preview.open();
+  pushPreview();
+}
+
+function pushPreview() {
+  if (!ctx.preview || q('[data-preview-slot]').hidden) return;
+  const valid = !state.errors.some((e) => within(e.path, 'effects'));
+  ctx.preview.update(structuredClone(ctx.draft.effects), { valid });
 }
 
 // ---- state -----------------------------------------------------------------------------
@@ -138,10 +238,16 @@ let draftTimer = 0;
 function changed({ rerender = false } = {}) {
   if (rerender) renderPage();
   clearTimeout(validateTimer);
-  validateTimer = setTimeout(validate, rerender ? 0 : 200);
+  validateTimer = setTimeout(validate, rerender ? 0 : 120);
   clearTimeout(draftTimer);
   draftTimer = setTimeout(keepDraft, 600);
   updateStatus();
+}
+
+function countErrors() {
+  const counts = {};
+  for (const e of state.errors) { const id = pageOf(e.path).id; counts[id] = (counts[id] ?? 0) + 1; }
+  for (const c of document.querySelectorAll('[data-count]')) c.textContent = counts[c.dataset.count] ? String(counts[c.dataset.count]) : '';
 }
 
 function validate() {
@@ -158,10 +264,9 @@ function validate() {
   state.errors = errors;
   state.warnings = warnings;
   showErrors(q('[data-page]'), errors);
-  const counts = {};
-  for (const e of errors) { const id = pageOf(parsePath(e.path)[0]).id; counts[id] = (counts[id] ?? 0) + 1; }
-  for (const c of document.querySelectorAll('[data-count]')) c.textContent = counts[c.dataset.count] ? String(counts[c.dataset.count]) : '';
+  countErrors();
   updateStatus();
+  pushPreview();
 }
 
 function keepDraft() {
@@ -194,9 +299,11 @@ function updateStatus() {
 
 // ---- save --------------------------------------------------------------------------------
 function summarize(uploadCount) {
-  const changedKeys = SECTIONS.filter((k) => JSON.stringify(ctx.draft[k]) !== JSON.stringify(state.original[k]));
+  const differs = (k) => JSON.stringify(ctx.draft[k]) !== JSON.stringify(state.original[k]);
+  const changedKeys = SECTIONS.filter(differs);
   const parts = [];
-  if (changedKeys.length) parts.push(`edit ${changedKeys.map((k) => (LABELS[k] ?? k).toLowerCase()).join(', ')}`);
+  if (changedKeys.length) parts.push(`edit ${changedKeys.map((k) => (k === 'effects' ? 'effects' : (LABELS[k] ?? k).toLowerCase())).join(', ')}`);
+  if (differs('admin')) parts.push('rename admin labels');
   if (uploadCount) parts.push(`add ${uploadCount} image${uploadCount > 1 ? 's' : ''}`);
   const removed = [...imageRefs(state.original)].filter((src) => !imageRefs(ctx.draft).has(src)).length;
   if (removed) parts.push(`remove ${removed} image${removed > 1 ? 's' : ''}`);
@@ -211,7 +318,7 @@ function goToError(error) {
     node = node?.[k];
     if (node && typeof node === 'object' && !Array.isArray(node)) ctx.open.add(node);
   }
-  const page = pageOf(path[0]);
+  const page = pageOf(error.path);
   ctx.focus = error.path;
   if (currentPage() !== page) location.hash = page.id; // hashchange renders
   else renderPage();
@@ -290,6 +397,7 @@ function conflict(message) {
       ctx.uploads.clear();
       local.clear();
       validate();
+      renderNav();
       renderPage({ keepScroll: false });
     }],
     ['Save mine over it', async () => {
@@ -308,6 +416,7 @@ function discard() {
   ctx.uploads.clear();
   local.clear();
   validate();
+  renderNav();
   renderPage();
 }
 
@@ -320,6 +429,7 @@ function offerDraft() {
     ctx.draft = saved.content;
     notice(null);
     validate();
+    renderNav();
     renderPage();
     toast('Draft restored. New images from that session need adding again.');
   };
@@ -343,16 +453,22 @@ async function boot() {
   const s = state.session;
   q('[data-view-site]').href = s.siteUrl || '/';
   fill(q('[data-who]'),
-    el('p', { text: s.mode === 'local' ? 'Local mode' : s.email }),
+    el('p', { text: s.mode === 'local' ? 'Local Mode' : s.email }),
     el('p', { class: 'muted', text: s.mode === 'local' ? 'Saves write to your files; nothing is committed.' : `Saves to ${s.store}` }),
-    s.mode === 'local' ? null : el('a', { href: '/cdn-cgi/access/logout', text: 'Sign out' }));
+    s.mode === 'local' ? null : el('a', { href: '/cdn-cgi/access/logout', text: 'Sign Out' }));
   if (!location.hash) history.replaceState(null, '', `#${PAGES[0].id}`);
+  renderNav();
   validate();
   renderPage({ keepScroll: false });
   offerDraft();
   updateStatus();
 
-  window.addEventListener('hashchange', () => renderPage({ keepScroll: !!ctx.focus }));
+  window.addEventListener('hashchange', () => {
+    if (!PAGES.some((p) => `#${p.id}` === location.hash)) return; // in-page jump links
+    const focusing = !!ctx.focus;
+    renderPage({ keepScroll: focusing });
+    if (!focusing) window.scrollTo(0, 0);
+  });
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
   });
