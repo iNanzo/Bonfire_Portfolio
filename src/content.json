@@ -59,7 +59,7 @@
     "flame": "ember"
   },
   "hero": {
-    "eyebrow": "Full-stack developer · Seattle, WA",
+    "eyebrow": "Creative Developer · Seattle, WA",
     "value": "I build internal tools and AI integrations for the people at Lyft — and game engines and pixel-art worlds on my own time.",
     "menuLabel": "Main menu",
     "stokeLabel": "Stoke the fire",
@@ -473,19 +473,19 @@
       ],
       [
         "Class",
-        "Full-stack developer"
+        "Application Support Specialist"
       ],
       [
-        "Current guild",
+        "Current Guild",
         "Lyft · Connected Experience"
       ],
       [
-        "Side quest",
+        "Side Quest",
         "Gamex, a 2D engine & studio"
       ],
       [
         "Background",
-        "Digital media arts & design"
+        "Digital Media Arts"
       ]
     ]
   },
