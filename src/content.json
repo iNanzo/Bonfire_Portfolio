@@ -105,95 +105,95 @@
     }
   },
   "featured": {
-    "id": "gamex",
-    "name": "Gamex",
-    "kind": "Game engine & creation studio",
-    "year": "2026 — now",
-    "status": "Alpha",
-    "summary": "A TypeScript 2D engine with a browser studio where scenes, sprites, UI, and effects are built in one place.",
-    "problem": "Making a game means jumping between separate tools for assets, scenes, behavior, and UI.",
-    "built": "A 2D engine and browser-based studio with scene, sprite, and UI editors, WebGL2 effects, a shared command API, and an embedded AI agent — tested by building a real game in it.",
-    "role": "Creator & developer",
+    "id": "pixel3d",
+    "name": "Pixel3D",
+    "kind": "Technical art & tooling",
+    "year": "2026",
+    "status": "World & rendering studies",
+    "summary": "A look-development sandbox for low-poly worlds with pixel palettes, lighting, weather, and stacked screen effects.",
+    "problem": "How far can a real-time 3D scene be pushed toward a hand-made pixel-art look?",
+    "built": "Three explorable scenes — a forest, a woodland kingdom, and a Japanese school — plus an overlay editor for palettes, ordered effect stacks, vegetation, shadows, weather, undo/redo, and saved looks.",
+    "role": "Technical art & tooling",
     "tech": [
-      "TypeScript",
-      "WebGL2",
-      "Browser",
-      "MCP"
+      "Godot",
+      "Shaders",
+      "Compositor effects"
     ],
-    "flavor": "A forge for small worlds. Every tool it holds was made to build the next.",
-    "note": "Private repository — case study and captures only. Alpha software; usability hasn’t been measured with outside users yet.",
-    "links": [
-      {
-        "label": "Play a game made with it",
-        "href": "games/reliquary.html"
-      }
-    ],
+    "flavor": "Three small worlds, and one lantern to see them all by.",
+    "note": "Rendering work adapts supplied compositor effects alongside original environment and interaction work. These are studies, not released games.",
+    "links": [],
     "images": [
       {
-        "src": "assets/projects/gamex/scene",
-        "alt": "Gamex scene editor: a forest level with an asset browser on the left and a property inspector on the right",
-        "caption": "Scene editor"
+        "src": "assets/projects/pixel3d/forest",
+        "alt": "Top-down pixel-art forest clearing lit by a small fire",
+        "caption": "Reference Forest"
       },
       {
-        "src": "assets/projects/gamex/effects",
-        "alt": "Gamex effects lab showing a glowing garden level with lighting and particle controls",
-        "caption": "Effects lab"
+        "src": "assets/projects/pixel3d/kingdom",
+        "alt": "Woodland Kingdom market village with the effects editor open",
+        "caption": "Woodland Kingdom + editor"
       },
       {
-        "src": "assets/projects/gamex/sprites",
-        "alt": "Gamex sprite editor with a pixel-art ranger character and a color palette",
-        "caption": "Sprite editor"
+        "src": "assets/projects/pixel3d/classroom",
+        "alt": "Cutaway isometric classroom in the Aoba School scene",
+        "caption": "Aoba School"
       },
       {
-        "src": "assets/projects/gamex/puzzle",
-        "alt": "Gamex editing a top-down stone puzzle room",
-        "caption": "Top-down puzzle scene"
+        "src": "assets/projects/pixel3d/editor",
+        "alt": "Pixel3D effect library and scene-look panels around a forest preview",
+        "caption": "Look editor"
       }
     ],
-    "hidden": true
+    "todo": "Confirm your role."
   },
   "projects": [
     {
-      "id": "pixel3d",
-      "name": "Pixel3D",
-      "kind": "Technical art & tooling",
-      "year": "2026",
-      "status": "World & rendering studies",
-      "summary": "A look-development sandbox for low-poly worlds with pixel palettes, lighting, weather, and stacked screen effects.",
-      "problem": "How far can a real-time 3D scene be pushed toward a hand-made pixel-art look?",
-      "built": "Three explorable scenes — a forest, a woodland kingdom, and a Japanese school — plus an overlay editor for palettes, ordered effect stacks, vegetation, shadows, weather, undo/redo, and saved looks.",
-      "role": "Technical art & tooling",
+      "id": "gamex",
+      "name": "Gamex",
+      "kind": "Game engine & creation studio",
+      "year": "2026 — now",
+      "status": "Alpha",
+      "summary": "A TypeScript 2D engine with a browser studio where scenes, sprites, UI, and effects are built in one place.",
+      "problem": "Making a game means jumping between separate tools for assets, scenes, behavior, and UI.",
+      "built": "A 2D engine and browser-based studio with scene, sprite, and UI editors, WebGL2 effects, a shared command API, and an embedded AI agent — tested by building a real game in it.",
+      "role": "Creator & developer",
       "tech": [
-        "Godot",
-        "Shaders",
-        "Compositor effects"
+        "TypeScript",
+        "WebGL2",
+        "Browser",
+        "MCP"
       ],
-      "flavor": "Three small worlds, and one lantern to see them all by.",
-      "note": "Rendering work adapts supplied compositor effects alongside original environment and interaction work. These are studies, not released games.",
-      "links": [],
-      "images": [
+      "flavor": "A forge for small worlds. Every tool it holds was made to build the next.",
+      "note": "Private repository — case study and captures only. Alpha software; usability hasn’t been measured with outside users yet.",
+      "links": [
         {
-          "src": "assets/projects/pixel3d/forest",
-          "alt": "Top-down pixel-art forest clearing lit by a small fire",
-          "caption": "Reference Forest"
-        },
-        {
-          "src": "assets/projects/pixel3d/kingdom",
-          "alt": "Woodland Kingdom market village with the effects editor open",
-          "caption": "Woodland Kingdom + editor"
-        },
-        {
-          "src": "assets/projects/pixel3d/classroom",
-          "alt": "Cutaway isometric classroom in the Aoba School scene",
-          "caption": "Aoba School"
-        },
-        {
-          "src": "assets/projects/pixel3d/editor",
-          "alt": "Pixel3D effect library and scene-look panels around a forest preview",
-          "caption": "Look editor"
+          "label": "Play a game made with it",
+          "href": "games/reliquary.html"
         }
       ],
-      "todo": "Confirm your role."
+      "images": [
+        {
+          "src": "assets/projects/gamex/scene",
+          "alt": "Gamex scene editor: a forest level with an asset browser on the left and a property inspector on the right",
+          "caption": "Scene editor"
+        },
+        {
+          "src": "assets/projects/gamex/effects",
+          "alt": "Gamex effects lab showing a glowing garden level with lighting and particle controls",
+          "caption": "Effects lab"
+        },
+        {
+          "src": "assets/projects/gamex/sprites",
+          "alt": "Gamex sprite editor with a pixel-art ranger character and a color palette",
+          "caption": "Sprite editor"
+        },
+        {
+          "src": "assets/projects/gamex/puzzle",
+          "alt": "Gamex editing a top-down stone puzzle room",
+          "caption": "Top-down puzzle scene"
+        }
+      ],
+      "hidden": true
     },
     {
       "id": "reliquary",
@@ -922,13 +922,13 @@
       }
     ],
     "fire": {
-      "brightness": 0.23,
-      "size": 0.36,
-      "height": 0.45,
+      "brightness": 0.34,
+      "size": 0.31,
+      "height": 0.46,
       "turbulence": 0.42,
       "swirl": 2.6,
       "lifeMin": 0.4,
-      "lifeMax": 1.9,
+      "lifeMax": 1.65,
       "glow": 9,
       "fps": 12,
       "stoke": 0.9
@@ -953,7 +953,7 @@
     },
     "render": {
       "pixelSize": 3,
-      "pixelSizeSmall": 3,
+      "pixelSizeSmall": 2,
       "dither": 0.08,
       "ditherMatrix": 4,
       "outlines": true,
