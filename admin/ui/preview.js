@@ -70,6 +70,11 @@ export function createPreview(siteUrl) {
       effects = next;
       if (!frameQueued) { frameQueued = true; requestAnimationFrame(flush); }
     },
+    /** Forge a flame (a new weapon, the full swap). */
     flame(id) { send({ type: 'nh:flame', id }); },
+    /** Recolor the fire to a flame in place (no swap), e.g. while trying palettes. */
+    show(id) { send({ type: 'nh:flame', id, instant: true }); },
+    /** Forge a new weapon into the fire as this element. */
+    element(id) { send({ type: 'nh:element', id }); },
   };
 }

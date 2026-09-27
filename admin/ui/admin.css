@@ -239,6 +239,37 @@ input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
 .swatch { width: 14px; height: 32px; }
 .swatch:last-child { margin-left: 3px; }
 
+/* Palette tools (flame cards, Flame Colors and Scene Colors blocks) */
+.flame-foot { display: grid; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.flame-foot > .card-foot { margin-top: 0; padding-top: 0; border-top: 0; }
+.palette-tools { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: color-mix(in srgb, var(--shadow) 55%, transparent); }
+.palette-tools.is-block { margin: 6px 0 16px; }
+.palette-tools > .help { max-width: 72ch; }
+.pt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pt-label { min-width: 104px; font: 600 12px var(--body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+.pt-scheme { width: auto; padding: 4px 8px; font-size: 13px; }
+.pt-seeds { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pt-seed { width: 40px; height: 30px; padding: 2px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--field); cursor: pointer; }
+.pt-seed::-webkit-color-swatch-wrapper { padding: 0; }
+.pt-seed::-webkit-color-swatch { border: 0; border-radius: 3px; }
+.pt-seed::-moz-color-swatch { border: 0; border-radius: 3px; }
+.pt-or { font-size: 13px; color: var(--faint); }
+.pt-dot { width: 22px; height: 22px; padding: 0; border: 2px solid var(--void); border-radius: 50%; box-shadow: 0 0 0 1px var(--line-strong); cursor: pointer; }
+.pt-dot:hover, .pt-dot:focus-visible { box-shadow: 0 0 0 2px var(--hi); }
+.pt-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.pt-chip { display: grid; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--field); color: var(--dim); font-size: 12px; text-align: left; cursor: pointer; transition: border-color 120ms, color 120ms; }
+.pt-chip:hover, .pt-chip:focus-visible { border-color: var(--hi); color: var(--hi); }
+.pt-strip { display: flex; height: 22px; border-radius: 3px; overflow: hidden; }
+.pt-strip i { flex: 1; }
+.pt-strip i:last-child { flex: 0.7; margin-left: 3px; }
+.pt-suggest > .help { margin: 0; }
+
+/* Elements: the three side by side, each with its share of the draws */
+.block[data-path='effects.elements'] > .fields { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.block[data-path='effects.elements'] > .fields > .group { grid-column: auto; display: grid; align-content: start; }
+.block[data-path='effects.elements'] .group > .card-foot { justify-content: space-between; gap: 10px; }
+.chance { font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
+
 .icon {
   display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0;
   border: 1px solid transparent; border-radius: var(--radius); background: none; color: var(--dim); cursor: pointer; font-size: 15px;
@@ -355,6 +386,8 @@ input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
   .card-actions .icon { width: 26px; }
   .swatch { width: 7px; height: 26px; }
   .swatch:last-child { margin-left: 2px; }
+  .pt-label { min-width: 0; width: 100%; }
+  .pt-chips { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
   .rename { opacity: 1; }
   .slider { grid-template-columns: minmax(0, 1fr) 70px; }
   .slider .unit { display: none; }

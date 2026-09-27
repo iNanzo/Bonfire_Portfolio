@@ -3,7 +3,8 @@
 // and the few special cases. Patterns: `projects[].images[].alt` (index → []).
 // Labels are run through titleCase(), so write them in any case.
 import { KINDLED_SHOW, WEAPON_KEYS } from '../../src/contentRules.js';
-import { CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, RANGES } from '../../src/effectsDefaults.js';
+import { CURSOR_MODES, DITHER_MATRICES, ELEMENT_IDS, RANGES } from '../../src/effectsDefaults.js';
+import { harmoniousFlame, hexToOklch } from './palettes.js';
 import { titleCase } from './text.js';
 
 /** Sidebar pages, grouped, and the content sections (dotted paths allowed) each one edits. */
@@ -16,8 +17,8 @@ export const PAGES = [
   { id: 'contact', group: 'Content', label: 'Contact', keys: ['contact'], blurb: 'The contact screen and its links.' },
   {
     id: 'effects', group: 'Look & feel', label: 'Effects', preview: true,
-    keys: ['effects.flames', 'effects.fire', 'effects.fireflies', 'effects.cursor', 'effects.particles', 'effects.render', 'effects.colors'],
-    blurb: 'Flame colors, the fire, fireflies, the cursor and the pixel-art look. The preview updates as you edit; nothing is published until you save.',
+    keys: ['effects.flames', 'effects.elements', 'effects.fire', 'effects.lightning', 'effects.ice', 'effects.fireflies', 'effects.cursor', 'effects.particles', 'effects.render', 'effects.colors'],
+    blurb: 'Flame colors, the bonfire’s elements (fire, lightning, ice), fireflies, the cursor and the pixel-art look. The preview updates as you edit; nothing is published until you save.',
   },
   { id: 'headings', group: 'Settings', label: 'Screen headings', keys: ['sections'], blurb: 'The title, flavor line and intro at the top of each screen.' },
   { id: 'interface', group: 'Settings', label: 'Interface', keys: ['screens', 'ui', 'weapons', 'startingEquipment', 'notFound'], blurb: 'Tab names, button text, weapon names, the starting equipment and the 404 page.' },
@@ -119,6 +120,43 @@ export const LABELS = {
   'effects.render.ditherMatrix': 'Dither pattern',
   'effects.render.colorChange': 'Color change time',
   'effects.render.shake': 'Screen shake',
+  'effects.elements': 'Elements',
+  ...Object.fromEntries(ELEMENT_IDS.flatMap((id) => [
+    [`effects.elements.${id}`, id],
+    [`effects.elements.${id}.name`, 'Name on the site'],
+    [`effects.elements.${id}.rotation`, 'In rotation'],
+    [`effects.elements.${id}.weight`, 'Relative chance'],
+  ])),
+  'effects.lightning': 'Lightning',
+  'effects.lightning.size': 'Ball size',
+  'effects.lightning.height': 'Ball height',
+  'effects.lightning.filaments': 'Filaments',
+  'effects.lightning.strikes': 'Ground strikes',
+  'effects.lightning.boltWidth': 'Bolt thickness',
+  'effects.lightning.jag': 'Jaggedness',
+  'effects.lightning.branches': 'Forking',
+  'effects.lightning.crackle': 'Crackle rate',
+  'effects.lightning.drift': 'Drift speed',
+  'effects.lightning.brightness': 'Brightness',
+  'effects.lightning.cursorPull': 'Reach for the cursor',
+  'effects.lightning.flicker': 'Light strobe',
+  'effects.lightning.ringSpeed': 'Ring speed',
+  'effects.lightning.ringArcs': 'Ring arcs & forks',
+  'effects.ice': 'Ice',
+  'effects.ice.shards': 'Crystals',
+  'effects.ice.clarity': 'Translucency',
+  'effects.ice.height': 'Tallest crystal',
+  'effects.ice.spread': 'Spread',
+  'effects.ice.thickness': 'Thickness',
+  'effects.ice.glow': 'Glow',
+  'effects.ice.shimmer': 'Shimmer',
+  'effects.ice.innerFire': 'Fire inside',
+  'effects.ice.frost': 'Frost motes',
+  'effects.ice.growTime': 'Freeze time',
+  'effects.ice.ringSpeed': 'Ring speed',
+  'effects.ice.ringHeight': 'Ring shard height',
+  'effects.ice.ringHold': 'Ring shard hold',
+  'startingEquipment.element': 'Element',
 };
 
 export const HELP = {
@@ -160,6 +198,26 @@ export const HELP = {
   'effects.render.pixelSize': 'Screen pixels per scene pixel. Bigger = chunkier and faster.',
   'effects.render.dither': 'How much ordered dithering blends colors. 0 = flat bands.',
   'effects.render.colorChange': 'How long the fire takes to ease into a new flame color.',
+  'effects.elements': 'What the bonfire is made of. Every draw (inspecting a project, clicking the fire) picks an element from the ones in rotation — weighted by chance — along with a new flame color, and every element burns in that flame’s colors. Home brings back the starting element (Interface → Starting Equipment).',
+  ...Object.fromEntries(ELEMENT_IDS.flatMap((id) => [
+    [`effects.elements.${id}.name`, id === 'fire'
+      ? 'The word after the color in the fire’s name on the site: Azure Flame.'
+      : `Takes the place of “Flame” in the fire’s name: Azure Flame → Azure ${titleCase(id)}.`],
+    [`effects.elements.${id}.weight`, 'How often it’s drawn compared to the others.'],
+  ])),
+  'effects.lightning': 'The bonfire as a tesla ball with no glass: filaments crackle out from a white-hot core around the blade and heavy bolts strike the ground around it, lighting it where they land. When a weapon lands, lightning crackles out of the fire and a ring of lightning races across the ground instead of fire.',
+  'effects.lightning.crackle': 'How many times a second the bolts re-strike into a new shape.',
+  'effects.lightning.strikes': 'Heavy bolts the ball keeps throwing at the ground, logs and stones around it. Each one lands with a flash of light, crawls along the ground, then jumps somewhere new.',
+  'effects.lightning.boltWidth': 'How thick the heavy bolts are, in scene pixels (they taper as they go). Filaments are a little thinner.',
+  'effects.lightning.cursorPull': 'Like a plasma globe: the filaments nearest the cursor reach toward it. 0 = off.',
+  'effects.lightning.flicker': 'How hard the light it casts strobes with the crackle.',
+  'effects.lightning.ringArcs': 'Forks skittering off the ring and arcs leaping up from it.',
+  'effects.ice': 'The bonfire encased in a glowing crystal cluster that grows up out of the ground around the blade, with a low fire still burning inside. When a weapon lands, a ring of ice shards spikes up as it expands outward and sinks back behind itself, and a tuft of chill rolls off.',
+  'effects.ice.clarity': 'How much you can see through the ice (the blade, logs and fire inside). 0 = solid.',
+  'effects.ice.innerFire': 'How much of the fire keeps burning inside the ice. 0 = none.',
+  'effects.ice.shimmer': 'A slow breathing of the shards’ glow.',
+  'effects.ice.growTime': 'How long the shards take to grow in (they sink back a little faster).',
+  'effects.ice.ringHold': 'How long each ring shard stays up before sinking. Longer = a wider band of spikes.',
 };
 
 /** Long text: a textarea. */
@@ -182,6 +240,10 @@ export const SELECTS = {
   'startingEquipment.flame': (d) => (d.effects?.flames ?? []).map((f) => ({ value: f.id, label: f.name || f.id })),
   'effects.cursor.mode': () => opts(CURSOR_MODES),
   'effects.render.ditherMatrix': () => opts(DITHER_MATRICES, (n) => `Bayer ${n}×${n}${n === 4 ? ' (coarse)' : ' (fine)'}`),
+  'startingEquipment.element': (d) => ELEMENT_IDS.map((id) => {
+    const name = d.effects?.elements?.[id]?.name?.trim();
+    return { value: id, label: titleCase(name && name.toLowerCase() !== id ? `${id} (${name})` : id) };
+  }),
 };
 
 /** A slider for a number: [min, max, step, unit?]. */
@@ -194,7 +256,22 @@ export const COLUMNS = {
   'ui.prompts': ['Key', 'Second key', 'Label'],
 };
 
-/** What “Add” creates in each list (anything else copies the shape of the first entry). */
+/** A new flame: harmonious colors, its hue in the widest gap between the existing flames'. */
+function newFlame(d) {
+  const hues = (d?.effects?.flames ?? []).filter((f) => /^#[0-9a-f]{6}$/i.test(f?.mid ?? '')).map((f) => hexToOklch(f.mid).h).sort((a, b) => a - b);
+  let hue = Math.random() * 360;
+  if (hues.length) {
+    let best = -1;
+    hues.forEach((h, i) => {
+      const next = i + 1 < hues.length ? hues[i + 1] : hues[0] + 360;
+      if (next - h > best) { best = next - h; hue = h + best / 2; }
+    });
+  }
+  const { colors } = harmoniousFlame(Math.random, { voidHex: d?.effects?.colors?.void ?? '#07070b', hue });
+  return { id: '', name: 'New flame', ...colors, light: 0.34 };
+}
+
+/** What “Add” creates in each list (anything else copies the shape of the first entry). Gets the draft. */
 export const TEMPLATES = {
   projects: () => ({ id: '', name: 'New project', kind: '', year: String(new Date().getFullYear()), status: '', summary: '',
     problem: '', built: '', role: '', tech: [], flavor: '', note: '', links: [], images: [] }),
@@ -210,7 +287,7 @@ export const TEMPLATES = {
   '[].links': () => ({ label: 'New link', href: 'https://' }),
   'about.stats': () => ['', ''],
   'ui.prompts': () => ['', null, ''],
-  'effects.flames': () => ({ ...structuredClone(DEFAULT_EFFECTS.flames[0]), id: '', name: 'New flame' }),
+  'effects.flames': newFlame,
 };
 
 /** “+ Add …” button wording per list. */

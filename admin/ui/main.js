@@ -10,6 +10,7 @@ import { logoMark } from '../../src/ui/logo.js';
 import { HELP, LABELS, PAGES } from './schema.js';
 import { el, getAt, renderFeatured, renderValue, showErrors } from './form.js';
 import { createPreview } from './preview.js';
+import { flamesBlockTools, sceneBlockTools } from './paletteTools.js';
 import { titleCase } from './text.js';
 
 const DRAFT_KEY = 'nh-admin-draft';
@@ -171,6 +172,7 @@ function block(key) {
   return el('section', { class: 'block', 'data-path': key, id: anchorOf(key) },
     el('div', { class: 'block-head' }, renameable('h2', 'block-title', key), reset),
     HELP[key] ? el('p', { class: 'help', text: HELP[key] }) : null,
+    key === 'effects.flames' ? flamesBlockTools(ctx) : key === 'effects.colors' ? sceneBlockTools(ctx) : null,
     el('p', { class: 'error', role: 'alert' }),
     key === 'featured' ? renderFeatured(ctx) : value === undefined ? el('p', { class: 'help', text: 'Missing from content.json.' }) : renderValue(value, path, ctx));
 }

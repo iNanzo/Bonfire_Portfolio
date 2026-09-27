@@ -12,7 +12,9 @@ import {
 } from './schema.js';
 import { HEX_RE, ID_RE, shownImages, slugify } from '../../src/contentRules.js';
 import { newImageSrc, processImage } from './images.js';
+import { flameQuickRoll, flameTools } from './paletteTools.js';
 import { titleCase } from './text.js';
+import { ELEMENT_IDS } from '../../src/effectsDefaults.js';
 
 // ---- paths ------------------------------------------------------------------------
 export const keyOf = (path) => path.map((k, i) => (typeof k === 'number' ? `[${k}]` : (i ? '.' : '') + k)).join('');
@@ -102,7 +104,30 @@ export function renderField(value, path, ctx, label = labelFor(path)) {
   const control = renderValue(value, path, ctx);
   if (!group) (control.querySelector?.('[data-main]') ?? control).id = id;
   wrap.append(control, el('p', { class: 'error', role: 'alert' }));
+  if (isElementPath(path)) wrap.append(elementFoot(path.at(-1), ctx));
   return wrap;
+}
+
+// ---- elements ------------------------------------------------------------------------
+const isElementPath = (path) => path.length === 3 && path[0] === 'effects' && path[1] === 'elements' && ELEMENT_IDS.includes(path[2]);
+
+/** Each element's share of the draws, from the draft's weights (only elements in rotation count). */
+function chances(draft) {
+  const els = draft.effects?.elements ?? {};
+  const w = (id) => (els[id]?.rotation !== false && typeof els[id]?.weight === 'number' ? Math.max(0, els[id].weight) : 0);
+  const total = ELEMENT_IDS.reduce((sum, id) => sum + w(id), 0);
+  return Object.fromEntries(ELEMENT_IDS.map((id) => [id, total ? w(id) / total : 0]));
+}
+const chanceText = (p) => (p > 0 ? `≈ ${Math.round(p * 100)}% of draws` : 'Never drawn');
+function refreshChances(ctx) {
+  const c = chances(ctx.draft);
+  for (const n of document.querySelectorAll('[data-chance]')) n.textContent = chanceText(c[n.dataset.chance]);
+}
+
+function elementFoot(id, ctx) {
+  return el('div', { class: 'card-foot' },
+    el('span', { class: 'chance', 'data-chance': id, text: chanceText(chances(ctx.draft)[id]) }),
+    el('button', { type: 'button', class: 'button small', text: '▶ Try It in the Preview', onclick: () => ctx.preview?.element(id) }));
 }
 
 function renderScalar(value, path, ctx, { nullable = hint(NULLABLE, patternOf(path)), multiline } = {}) {
@@ -206,6 +231,7 @@ function update(path, value, ctx) {
   if (TITLE_KEYS.includes(key)) {
     for (const t of document.querySelectorAll(`[data-title-for="${CSS.escape(keyOf(parentPath))}"]`)) t.textContent = titleOf(parent, 0);
   }
+  if (path[0] === 'effects' && path[1] === 'elements' && (key === 'weight' || key === 'rotation')) refreshChances(ctx);
   if (SWATCH_KEYS.includes(key) && HEX_RE.test(value)) {
     const sw = document.querySelector(`[data-swatch="${CSS.escape(keyOf(path))}"]`);
     if (sw) sw.style.background = value;
@@ -278,7 +304,7 @@ const blank = (sample) => {
 
 function addEntry(list, path, ctx) {
   const make = hint(TEMPLATES, patternOf(path));
-  const entry = make ? make() : blank(list[0]);
+  const entry = make ? make(ctx.draft) : blank(list[0]);
   list.push(entry);
   if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
     ctx.open.add(entry);
@@ -359,6 +385,7 @@ function renderCard(list, i, path, ctx, fixed) {
   const isFlame = isFlamePath(path);
   const cover = isProject ? shownImages(item)[0] : null;
   const actions = fixed ? [] : [
+    isFlame ? flameQuickRoll(item, ctx) : null,
     ...orderButtons(list, i, ctx),
     eyeButton(item, () => ctx.changed({ rerender: true }), isFlame ? { on: 'Put back in rotation', off: 'Take out of rotation' } : undefined),
     iconButton('Delete', '✕', () => {
@@ -422,8 +449,11 @@ function projectActions(item, where, i, ctx) {
 }
 
 function flameActions(item, ctx) {
-  return el('div', { class: 'card-foot' },
-    el('button', { type: 'button', class: 'button small', text: '▶ Forge It in the Preview', onclick: () => ctx.preview?.flame(item.id) }));
+  return el('div', { class: 'flame-foot' },
+    flameTools(item, ctx),
+    el('div', { class: 'card-foot' },
+      el('button', { type: 'button', class: 'button small', text: '▶ Forge It in the Preview', onclick: () => ctx.preview?.flame(item.id) }),
+      el('button', { type: 'button', class: 'link-button', text: 'Just Show Its Colors', onclick: () => ctx.preview?.show(item.id) })));
 }
 
 /** The featured project: one collapsible card (closed by default). */
