@@ -2,6 +2,7 @@ import './styles.css';
 import { applyCssPalette, base, flames, flameOr, rotation } from './palette.js';
 import { screens, hero, ui, weapons, startingEquipment, items } from './content.js';
 import { onEffects, setEffects } from './effects.js';
+import { drawElement, elementOr, flameTitle } from './elements.js';
 import { STRUCTURAL } from './effectsDefaults.js';
 import { validateEffects } from './contentRules.js';
 import {
@@ -52,13 +53,15 @@ const header = q('[data-header]');
 const inventory = setupInventory(screenEls.projects, { reducedMotion });
 if (touch) q('[data-stoke-hint]').textContent = hero.stokeHint.touch;
 
-// --- Equipment (weapon + flame in the fire) -----------------------------------------------
+// --- Equipment (weapon + flame + element in the fire) ---------------------------------------
 const weaponKeys = Object.keys(weapons);
+const startElement = () => elementOr(startingEquipment.element);
 // Requested state drives future choices; displayed state changes only at impact.
-let equipment = { ...startingEquipment, item: null };
+let equipment = { ...startingEquipment, element: startElement(), item: null };
 let displayedEquipment = { ...equipment };
 let fire = null; // set once the 3D scene module loads
-const equipLabel = () => `${weapons[displayedEquipment.weapon]} · ${flames[displayedEquipment.flame]?.name ?? ''}`;
+const fireName = (eq) => flameTitle(flames[eq.flame]?.name, eq.element);
+const equipLabel = () => `${weapons[displayedEquipment.weapon]} · ${fireName(displayedEquipment)}`;
 
 // The E badge follows the latest request (it moves on click); the weapon and
 // flame labels follow what's actually in the fire (they change at impact).
@@ -69,9 +72,9 @@ function refreshEquipLabels() {
 }
 refreshEquipLabels();
 
-function equip(weapon, flame, item, { instant = false } = {}) {
-  const same = equipment.weapon === weapon && equipment.flame === flame;
-  equipment = { weapon, flame, item };
+function equip(weapon, flame, item, { instant = false, element = equipment.element } = {}) {
+  const same = equipment.weapon === weapon && equipment.flame === flame && equipment.element === element;
+  equipment = { weapon, flame, element, item };
   inventory.markEquipped(item);
   if (!fire) {
     // Scene not loaded yet (or no WebGL): theme now; the scene catches up on load.
@@ -81,27 +84,30 @@ function equip(weapon, flame, item, { instant = false } = {}) {
     return;
   }
   if (!same && !instant) blip('pull');
-  fire.equip(weapon, flame, { instant, item }).catch(failScene);
+  fire.equip(weapon, flame, { instant, item, element }).catch(failScene);
 }
 
-/** Inspecting a project draws a random weapon and flame (never the same as now). */
+/** Inspecting a project draws a random weapon and flame (never the same as now), and an element by weight. */
 function rollFor(item) {
   const fresh = rotation().filter((k) => k !== equipment.flame && k !== startingEquipment.flame);
   equip(
     pick(weaponKeys.filter((k) => k !== equipment.weapon && k !== startingEquipment.weapon)),
     pick(fresh.length ? fresh : Object.keys(flames)),
     item,
+    { element: drawElement(startElement()) },
   );
 }
+const goHome = () => equip(startingEquipment.weapon, startingEquipment.flame, null, { element: startElement() });
 
 function onImpact(flame, _from, instant, selection) {
   displayedEquipment = { ...selection };
   document.documentElement.dataset.flame = flame;
+  document.documentElement.dataset.element = selection.element ?? 'fire';
   if (instant) applyFlame(flame); // otherwise the scene eases the accents via onRamp
   refreshEquipLabels();
   if (!instant) {
     blip('stab');
-    live.textContent = `The fire takes the ${weapons[displayedEquipment.weapon]}. ${flames[flame].name}.`;
+    live.textContent = `The fire takes the ${weapons[displayedEquipment.weapon]}. ${fireName(displayedEquipment)}.`;
   }
 }
 
@@ -150,7 +156,7 @@ function render(next, user) {
   }
 
   // Home puts the base longsword and ember flame back.
-  if (next.screen === 'home') equip(startingEquipment.weapon, startingEquipment.flame, null);
+  if (next.screen === 'home') goHome();
 
   // Camera.
   fire?.setView(next.screen === 'projects' && next.item ? 'inspect' : next.screen, { instant: !user && !prev.screen });
@@ -316,9 +322,7 @@ document.addEventListener('click', (e) => {
     return;
   }
   // Home links reset the fire even when you're already home.
-  if (e.target.closest('a[data-home]') && route.screen === 'home') {
-    equip(startingEquipment.weapon, startingEquipment.flame, null);
-  }
+  if (e.target.closest('a[data-home]') && route.screen === 'home') goHome();
   const hit = e.target.closest('a, button');
   if (!hit) return;
   const fx = hit.closest('.pix-btn, .slot, .slot-item, .title-item, .contact-link, .menu-item, [data-tab]') ?? hit;
@@ -356,7 +360,7 @@ function startScene() {
     if (import.meta.env.DEV) window.__fire = fire;
     fire.setView(route.screen === 'projects' && route.item ? 'inspect' : route.screen, { instant: true });
     // Navigation during loading only changes requested state; initialize with its latest value.
-    await fire.equip(equipment.weapon, equipment.flame, { instant: true, item: equipment.item });
+    await fire.equip(equipment.weapon, equipment.flame, { instant: true, item: equipment.item, element: equipment.element });
     stage.classList.add('is-ready');
   }).catch(failScene);
 }
@@ -406,7 +410,7 @@ const changedAt = (a, b, path) => JSON.stringify(path.split('.').reduce((o, k) =
 let rebuildTimer = 0;
 onEffects((next, prev) => {
   if (changedAt(next, prev, 'colors')) { applyCssPalette(); installDitherPatterns(base); }
-  for (const eq of [equipment, displayedEquipment]) eq.flame = flameOr(eq.flame);
+  for (const eq of [equipment, displayedEquipment]) { eq.flame = flameOr(eq.flame); eq.element = elementOr(eq.element); }
   applyFlame(displayedEquipment.flame);
   refreshEquipLabels();
   if (STRUCTURAL.some((p) => changedAt(next, prev, p))) {
@@ -432,7 +436,11 @@ if (new URLSearchParams(location.search).has('preview') && window.parent !== win
       validateEffects(msg.effects, () => { ok = false; });
       if (ok) setEffects(msg.effects);
     } else if (msg.type === 'nh:flame' && Object.hasOwn(flames, msg.id)) {
-      equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), msg.id, equipment.item);
+      // Forge it (a new weapon, the full swap), or just show it: recolor in place.
+      if (msg.instant) { if (equipment.flame !== msg.id) equip(equipment.weapon, msg.id, equipment.item, { instant: true }); }
+      else equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), msg.id, equipment.item);
+    } else if (msg.type === 'nh:element' && elementOr(msg.id) === msg.id) {
+      equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, { element: msg.id });
     } else if (msg.type === 'nh:stoke') {
       stoke();
     } else if (msg.type === 'nh:roll') {

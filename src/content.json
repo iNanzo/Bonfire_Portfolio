@@ -56,7 +56,8 @@
   },
   "startingEquipment": {
     "weapon": "longsword",
-    "flame": "ember"
+    "flame": "ember",
+    "element": "fire"
   },
   "hero": {
     "eyebrow": "Creative Developer · Seattle, WA",
@@ -950,6 +951,54 @@
     "cursor": {
       "mode": "slash",
       "strength": 0.25
+    },
+    "elements": {
+      "fire": {
+        "name": "Flame",
+        "rotation": true,
+        "weight": 1
+      },
+      "lightning": {
+        "name": "Lightning",
+        "rotation": true,
+        "weight": 1
+      },
+      "ice": {
+        "name": "Ice",
+        "rotation": true,
+        "weight": 1
+      }
+    },
+    "lightning": {
+      "size": 0.44,
+      "height": 0.66,
+      "filaments": 12,
+      "strikes": 4,
+      "boltWidth": 3,
+      "jag": 0.45,
+      "branches": 0.5,
+      "crackle": 20,
+      "drift": 1,
+      "brightness": 1.1,
+      "cursorPull": 0.8,
+      "flicker": 0.6,
+      "ringSpeed": 1,
+      "ringArcs": 0.6
+    },
+    "ice": {
+      "shards": 28,
+      "height": 1.05,
+      "spread": 0.36,
+      "thickness": 1,
+      "clarity": 0.28,
+      "glow": 1,
+      "shimmer": 0.5,
+      "innerFire": 0.45,
+      "frost": 60,
+      "growTime": 1.4,
+      "ringSpeed": 1,
+      "ringHeight": 1,
+      "ringHold": 0.08
     },
     "render": {
       "pixelSize": 3,

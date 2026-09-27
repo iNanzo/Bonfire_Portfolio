@@ -3,7 +3,7 @@
 // the site would choke on: an unsafe link (the renderer throws on those), a bad
 // image path, a duplicate project id, a weapon the 3D model doesn't have.
 import { isSafeUrl } from './html.js';
-import { BASE_COLORS, CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, RANGES } from './effectsDefaults.js';
+import { BASE_COLORS, CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, ELEMENT_IDS, RANGES } from './effectsDefaults.js';
 
 export const CONTENT_PATH = 'src/content.json';
 export const SECTIONS = ['site', 'screens', 'weapons', 'startingEquipment', 'hero', 'sections', 'featured', 'projects',
@@ -116,6 +116,20 @@ export function validateEffects(e, err, base = 'effects') {
     if (k === 'outlines' || k === 'shake') bool(v, p);
     else if (k === 'ditherMatrix') { if (!DITHER_MATRICES.includes(v)) err(at(p), `One of: ${DITHER_MATRICES.join(', ')}.`); } else num(v, p);
   });
+  group('elements', (id, el, p) => {
+    if (!isObj(el)) return err(at(p), 'Must be a group of fields.');
+    for (const [k, v] of Object.entries(el)) {
+      if (k === 'name') { if (typeof v !== 'string' || !v.trim() || v.length > 24) err(at(`${p}.name`), 'A name up to 24 characters.'); }
+      else if (k === 'rotation') bool(v, `${p}.rotation`);
+      else if (k === 'weight') num(v, `${p}.weight`);
+      else err(at(`${p}.${k}`), 'Unknown setting.');
+    }
+  });
+  if (isObj(e.elements) && ELEMENT_IDS.every((id) => e.elements[id]?.rotation === false)) {
+    err(at('elements'), 'Keep at least one element in rotation.');
+  }
+  group('lightning', numbers);
+  group('ice', numbers);
   for (const k of Object.keys(e)) if (!(k in DEFAULT_EFFECTS)) err(at(k), 'Unknown section.');
   if (isObj(e.colors)) for (const k of BASE_COLORS) if (!(k in e.colors)) err(at(`colors.${k}`), 'Missing color.');
 }
@@ -178,6 +192,7 @@ export function validateContent(c) {
   if (obj(c.startingEquipment, 'startingEquipment')) {
     if (!WEAPON_KEYS.includes(c.startingEquipment.weapon)) err('startingEquipment.weapon', 'Pick one of the weapons.');
     if (!flameIds(c).includes(c.startingEquipment.flame)) err('startingEquipment.flame', 'Pick one of the flames.');
+    if (c.startingEquipment.element !== undefined && !ELEMENT_IDS.includes(c.startingEquipment.element)) err('startingEquipment.element', 'Pick one of the elements.');
   }
 
   validateEffects(c.effects, err);

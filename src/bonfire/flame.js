@@ -14,6 +14,10 @@
 // Like real fire, flame that gets pushed around lifts (hot gas rises harder when
 // stirred) and cools faster, so torn-off tongues rise and fade instead of
 // sliding sideways.
+//
+// `params.spawn` / `params.sparks` (0..1) are the chance a burnt-out particle is
+// reborn: other elements turn them down so the fire dies out (lightning) or banks
+// low inside the ice, and back up to relight it.
 import * as THREE from 'three';
 
 // Point size is in render-target texels, scaled with distance so close-up
@@ -138,6 +142,8 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
     lifeMin: 0.55,
     lifeMax: 1.25,
     brightness: 0.3,
+    spawn: 1,          // chance a dead flame particle is reborn
+    sparks: 1,         // same, for sparks
   };
 
   const wind = new THREE.Vector3();
@@ -192,7 +198,10 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
       const ix = i * 3;
       const push = Math.hypot(EXT[ix], EXT[ix + 2]);
       age[i] += dt * (1 + Math.min(1.5, push * 0.5)); // stirred flame burns out sooner
-      if (age[i] >= life[i]) spawn(i);
+      if (age[i] >= life[i]) {
+        if (Math.random() >= params.spawn) { S[i] = 0; continue; }
+        spawn(i);
+      }
       const x = P[ix], y = P[ix + 1], z = P[ix + 2];
       const lx = x - origin.x, ly = y - origin.y, lz = z - origin.z;
       const k = age[i] / life[i];
@@ -234,8 +243,11 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
   function stepSparks(dt, t) {
     for (let i = 0; i < sparkCount; i++) {
       sAge[i] += dt;
-      if (sAge[i] >= sLife[i]) spawnSpark(i);
       const ix = i * 3;
+      if (sAge[i] >= sLife[i]) {
+        if (Math.random() >= params.sparks) { SS[i] = 0; continue; }
+        spawnSpark(i);
+      }
       const sdrag = 1 - dt * 0.9; // sparks slow as they rise
       SV[ix] *= sdrag; SV[ix + 1] *= sdrag; SV[ix + 2] *= sdrag;
       const c = curlAt(SP[ix] * 1.2, SP[ix + 1] * 1.2 - t * 0.6, SP[ix + 2] * 1.2);
@@ -285,10 +297,15 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
       ramp = hexes.map((h) => new THREE.Color(h));
     },
     burst(amount = 1) {
-      const n = Math.floor(count * 0.35 * amount);
+      const n = Math.floor(count * 0.35 * amount * params.spawn);
       for (let j = 0; j < n; j++) spawn(Math.floor(Math.random() * count), amount);
-      const s = Math.floor(sparkCount * 0.7 * Math.min(1, amount));
+      const s = Math.floor(sparkCount * 0.7 * Math.min(1, amount) * params.sparks);
       for (let j = 0; j < s; j++) spawnSpark(Math.floor(Math.random() * sparkCount), 1);
+    },
+    /** Put every particle out at once (an instant switch to another element). */
+    extinguish() {
+      age.set(life);
+      sAge.set(sLife);
     },
   };
 }

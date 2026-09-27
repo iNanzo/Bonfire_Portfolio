@@ -4,15 +4,20 @@ import { readFileSync } from 'node:fs';
 import { contrast, validateContent } from '../../src/contentRules.js';
 import { DEFAULT_EFFECTS, RANGES } from '../../src/effectsDefaults.js';
 import { resolveEffects } from '../../src/effects.js';
+import { drawElement, elements, flameTitle } from '../../src/elements.js';
 import { titleCase } from '../ui/text.js';
 
 const content = () => JSON.parse(readFileSync(new URL('../../src/content.json', import.meta.url), 'utf8'));
 const paths = (c) => validateContent(c).errors.map((e) => e.path);
 
-test('the saved content passes, and its effects are the defaults', () => {
+/** Every setting's path in an effects object (flames count as one list). */
+const shape = (o, at = '') => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? shape(v, `${at}${k}.`) : [`${at}${k}`])).sort();
+
+test('the saved content passes, and its effects spell out every setting', () => {
   const c = content();
   assert.deepEqual(validateContent(c).errors, []);
-  assert.deepEqual(resolveEffects(c.effects), DEFAULT_EFFECTS);
+  // Tuned in the admin, so the values differ from the defaults, but nothing is missing.
+  assert.deepEqual(shape(c.effects), shape(DEFAULT_EFFECTS));
 });
 
 test('every default flame keeps its text color readable', () => {
@@ -55,6 +60,58 @@ test('missing effect settings fall back to the defaults', () => {
   assert.equal(e.fire.size, 0.4);
   assert.equal(e.fire.height, DEFAULT_EFFECTS.fire.height);
   assert.deepEqual(e.flames, DEFAULT_EFFECTS.flames);
+});
+
+test('element rules: known elements, names, chances, at least one in rotation, a real starting element', () => {
+  const c = content();
+  c.effects.elements.plasma = { name: 'Plasma', rotation: true, weight: 1 };
+  c.effects.elements.ice.weight = 9;
+  c.effects.elements.lightning.name = '';
+  c.effects.ice.clarity = 2;
+  c.startingEquipment.element = 'wind';
+  assert.deepEqual(paths(c).sort(), ['effects.elements.ice.weight', 'effects.elements.lightning.name', 'effects.elements.plasma', 'effects.ice.clarity', 'startingEquipment.element'].sort());
+
+  const d = content();
+  for (const el of Object.values(d.effects.elements)) el.rotation = false;
+  assert.deepEqual(paths(d), ['effects.elements']);
+
+  const e = content();
+  delete e.startingEquipment.element; // older content: fire
+  assert.deepEqual(paths(e), []);
+});
+
+test('a partial element setting keeps the rest of its defaults', () => {
+  const e = resolveEffects({ elements: { ice: { weight: 3 } }, lightning: { size: 0.5 } });
+  assert.equal(e.elements.ice.weight, 3);
+  assert.equal(e.elements.ice.name, DEFAULT_EFFECTS.elements.ice.name);
+  assert.deepEqual(e.elements.fire, DEFAULT_EFFECTS.elements.fire);
+  assert.equal(e.lightning.size, 0.5);
+  assert.equal(e.lightning.filaments, DEFAULT_EFFECTS.lightning.filaments);
+});
+
+test('the fire is named for its flame color and element', () => {
+  assert.equal(flameTitle('Azure Flame', 'fire'), 'Azure Flame');
+  assert.equal(flameTitle('Azure Flame', 'lightning'), 'Azure Lightning');
+  assert.equal(flameTitle('Ember Flame', 'ice'), 'Ember Ice');
+  assert.equal(flameTitle('Moonlight', 'fire'), 'Moonlight');
+  assert.equal(flameTitle('Moonlight', 'ice'), 'Moonlight Ice');
+  assert.equal(flameTitle('Azure Flame', 'nope'), 'Azure Flame');
+});
+
+test('element draws follow the weights and skip elements out of rotation', () => {
+  const saved = structuredClone(elements);
+  try {
+    Object.assign(elements.fire, { rotation: true, weight: 1 });
+    Object.assign(elements.lightning, { rotation: true, weight: 3 });
+    Object.assign(elements.ice, { rotation: false, weight: 5 });
+    const counts = { fire: 0, lightning: 0, ice: 0 };
+    for (let i = 0; i < 400; i++) counts[drawElement('fire', () => (i + 0.5) / 400)]++;
+    assert.deepEqual(counts, { fire: 100, lightning: 300, ice: 0 });
+    for (const id of ['fire', 'lightning']) elements[id].rotation = false;
+    assert.equal(drawElement('ice'), 'ice'); // nothing in rotation: the fallback
+  } finally {
+    for (const id of Object.keys(saved)) elements[id] = saved[id];
+  }
 });
 
 test('hidden images: a project needs at least one visible image', () => {

@@ -7,10 +7,17 @@
 //   3. fx       — particle fire + sparks, additive, depth-tested by hand against
 //                 pass 2's depth
 //   4. pixel    — outlines, + fx, vignette, Bayer dither, palette → canvas
+//
+// The bonfire has an element — fire, lightning (a tesla ball, plasma.js) or ice
+// (glowing shards, ice.js) — that changes when a weapon lands, like the flame
+// color. Every element burns in the current flame's colors, and each has its own
+// impact: a ring of fire, a ring of lightning, or a ring of ice shards.
 import * as THREE from 'three';
 import { createResourceScope } from './resources.js';
 import { weapons as weaponNames, startingEquipment } from '../content.js';
 import { effects } from '../effects.js';
+import { ELEMENT_IDS } from '../effectsDefaults.js';
+import { elementOr } from '../elements.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { createPixelPass } from './pixelPass.js';
@@ -21,6 +28,10 @@ import { createTerrain } from './terrain.js';
 import { createImpactFx, createSmokeMaterial } from './impact.js';
 import { createCurlField } from './curl.js';
 import { createWeapons } from './weapons.js';
+import { createPlasma } from './plasma.js';
+import { createLightningRing } from './lightningRing.js';
+import { createCrystals, createIceRing } from './ice.js';
+import { createChill } from './chill.js';
 import { getPov } from './povs.js';
 import { base, flames, flameOr, scenePalette, debugPalettes, mixFlame, flameEase } from '../palette.js';
 
@@ -85,7 +96,9 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   scene.add(moon);
 
   const fireLight = new THREE.PointLight(0xff8a3c, 9, 0, 1.6);
-  fireLight.position.set(0, 0.95, 0.28); // slightly in front, so the weapon's face catches light
+  const FIRE_LIGHT_AT = new THREE.Vector3(0, 0.95, 0.28); // slightly in front, so the weapon's face catches light
+  const ballLightAt = new THREE.Vector3();
+  fireLight.position.copy(FIRE_LIGHT_AT);
   fireLight.castShadow = renderer.shadowMap.enabled;
   fireLight.shadow.mapSize.set(512, 512);
   fireLight.shadow.bias = -0.004;
@@ -126,19 +139,51 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     origin: FIRE_ORIGIN,
     reducedMotion,
   });
+  // --- Elements. `presence` eases each element in (1) and out (0) over a moment;
+  // the flame reads it to die out (lightning) or bank low and slow inside the ice.
+  const plasma = createPlasma({ fxMaterial: effectMaterial, hotMaterial: particleMaterial, field, origin: FIRE_ORIGIN, reducedMotion });
+  const chill = createChill({ material: scope.own(createSmokeMaterial()), field, origin: FIRE_ORIGIN, reducedMotion });
+  const crystals = createCrystals({ fxMaterial: effectMaterial, origin: new THREE.Vector3(FIRE_ORIGIN.x, 0, FIRE_ORIGIN.z), field, chill, reducedMotion });
+  for (const o of [...plasma.objects, ...crystals.objects]) { scope.trackTree(o); o.layers.set(LAYER_FX); scene.add(o); }
+  for (const l of plasma.lights) scene.add(l);
+  crystals.solid.layers.set(LAYER_SOLID); // outlined like the rest of the scenery
+  scope.trackTree(chill.points);
+  chill.points.layers.set(LAYER_GHOST); // cold mist veils what's behind it, like smoke
+  scene.add(chill.points);
+  let elementKey = elementOr(startingEquipment.element);
+  const presence = Object.fromEntries(ELEMENT_IDS.map((id) => [id, 0]));
+  function setElement(key, instant = false) {
+    elementKey = elementOr(key);
+    plasma.setActive(elementKey === 'lightning', instant);
+    crystals.setActive(elementKey === 'ice', instant);
+    if (!instant) return;
+    for (const id of ELEMENT_IDS) presence[id] = id === elementKey ? 1 : 0;
+    if (elementKey !== 'fire') fire.extinguish();
+  }
+  /** How much of the fire burns for an element: all of it, a banked glow in the ice, none in the ball. */
+  const flameShare = (key) => (key === 'fire' ? 1 : key === 'ice' ? effects.ice.innerFire : 0);
+
   function applyFireParams() {
     const f = effects.fire;
+    // Inside the ice the fire burns low, narrow and slow.
+    const banked = presence.ice / Math.max(1e-3, presence.fire + presence.ice);
     Object.assign(fire.params, {
-      brightness: f.brightness, radius: f.size, rise: f.height, curlAmp: f.turbulence * (reducedMotion ? 0.83 : 1),
+      brightness: f.brightness * (1 - 0.25 * banked), radius: f.size * (1 - 0.3 * banked), rise: f.height * (1 - 0.5 * banked),
+      curlAmp: f.turbulence * (1 - 0.55 * banked) * (reducedMotion ? 0.83 : 1),
       curlFreq: f.swirl, lifeMin: Math.min(f.lifeMin, f.lifeMax), lifeMax: f.lifeMax,
+      spawn: Math.min(1, presence.fire + presence.ice * effects.ice.innerFire),
+      sparks: presence.fire,
     });
   }
+  setElement(elementKey, true);
   applyFireParams();
   fire.flame.layers.set(LAYER_FX);
   fire.spark.layers.set(LAYER_FX);
   scene.add(fire.flame, fire.spark);
   let fireflies = null; // created once the model (and the firefly model) loads
   let fx = null;        // ground flames, smoke and ash for weapon impacts
+  let zap = null;       // the lightning ring (lightning impacts)
+  let frostRing = null; // the ring of ice shards (ice impacts)
   const smokeMaterial = scope.own(createSmokeMaterial());
   const interaction = createInteraction({ reducedMotion });
   interaction.mode = effects.cursor.mode;
@@ -169,6 +214,9 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     currentShade = f.shade;
     currentMix = mix;
     fire.setRamp(f.ramp);
+    plasma.setRamp(f.ramp);
+    crystals.setRamp(f.ramp);
+    chill.setRamp(f.ramp);
     pass.uniforms.uCore.value.set(f.ramp[3]);
     if (debugPaletteIndex === 0) {
       const extra = paletteExtra();
@@ -338,6 +386,18 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     fx.flecks.layers.set(LAYER_GHOST);
     fx.setRamp(currentRamp);
     scene.add(fx.ring, fx.embers, fx.wave, fx.haze, fx.puff, fx.flecks, weapons.forge);
+    const ground = new THREE.Vector3(FIRE_ORIGIN.x, 0, FIRE_ORIGIN.z);
+    // Lightning strikes and cold mist follow the scenery's surface (the fireflies' height map).
+    plasma.setGround(terrain.top);
+    chill.setGround(terrain.top);
+    zap = createLightningRing({ fxMaterial: effectMaterial, origin: ground, field, reach, ground: terrain.top, emitters: coarse ? 72 : 96, sparks: impactCount(260), lights: coarse ? 4 : 6, reducedMotion });
+    frostRing = createIceRing({ fxMaterial: effectMaterial, origin: ground, field, reach, chill, chips: impactCount(320), lights: coarse ? 4 : 6, reducedMotion });
+    for (const o of [...zap.objects, ...frostRing.objects]) { scope.trackTree(o); o.layers.set(LAYER_FX); scene.add(o); }
+    frostRing.solid.layers.set(LAYER_SOLID);
+    for (const l of [...zap.lights, ...frostRing.lights]) scene.add(l);
+    zap.setRamp(currentRamp);
+    frostRing.setRamp(currentRamp);
+    sets = [...fire.sets, ...plasma.sets, ...crystals.sets, ...chill.sets, ...fx.sets, ...zap.sets, ...frostRing.sets];
 
     scene.add(root, weapons.holder);
     weapons.setRim(currentRamp[2]);
@@ -351,6 +411,8 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   function stoke() {
     fire.params.level = Math.min(2.4, fire.params.level + effects.fire.stoke);
     fire.burst(Math.min(1.5, effects.fire.stoke / 0.9));
+    if (elementKey === 'lightning') { plasma.discharge(0.5); zap?.crackle(0.35, 3); }
+    if (elementKey === 'ice') crystals.burst(0.6);
     jolt(0.18);
     const wasFirst = firstStoke;
     firstStoke = false;
@@ -366,27 +428,33 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     flameKey = nextFlame ?? flameKey;
     blend = { from: old, to: flameKey, t: 0 };
     forgeFlame = null;
-    fx.setRamp(flames[flameKey].ramp);
-    weapons.setRim(flames[flameKey].ramp[2]); // the new weapon arrives rimmed in its new color
-    // The fire erupts, a ring of flame races across the ground with a puff of
-    // smoke and ash, and the fireflies scatter.
+    const ramp = flames[flameKey].ramp;
+    for (const r of [fx, zap, frostRing]) r.setRamp(ramp);
+    weapons.setRim(ramp[2]); // the new weapon arrives rimmed in its new color
+    // The bonfire takes the new element. The fire erupts (or the ball discharges,
+    // or the ice flashes), a ring races across the ground — flame with a puff of
+    // smoke and ash, lightning, or ice shards — and the fireflies scatter.
+    setElement(selection.element ?? elementKey);
     fire.params.level = reducedMotion || stationary ? 2 : 3.2;
     targetLevel = 1;
-    fire.burst(reducedMotion ? 0.8 : 1.7);
-    fx.burst();
+    fire.burst((reducedMotion ? 0.8 : 1.7) * flameShare(elementKey));
+    if (elementKey === 'lightning') { zap.burst(effects.lightning.height); plasma.discharge(1); }
+    else if (elementKey === 'ice') { frostRing.burst(); crystals.burst(1); }
+    else fx.burst();
     fireflies.burst(flames[flameKey].ramp);
     jolt(0.3);
     onImpact?.(flameKey, old, stationary, { ...selection, weapon: weaponKey });
   }
 
   /** Swap weapon + flame color. Resolves at impact. */
-  function equip(weaponKey, key, { instant = false, item = null } = {}) {
+  function equip(weaponKey, key, { instant = false, item = null, element = elementKey } = {}) {
     return loaded.then(() => {
       if (scope.disposed) return { status: 'cancelled' };
       if (!Object.hasOwn(flames, key)) throw new Error('Unknown flame: ' + key);
-      const selection = { weapon: weaponKey, flame: key, item };
+      const selection = { weapon: weaponKey, flame: key, item, element: elementOr(element) };
       if (instant) {
         weapons.set(weaponKey);
+        setElement(selection.element, true);
         flameKey = key;
         blend = null;
         forgeFlame = null;
@@ -453,8 +521,19 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     });
     ptr.px = ptr.x;
     ptr.py = ptr.y;
-    const sparks = interaction.update(camera, cursor, fx ? [...fire.sets, ...fx.sets] : fire.sets, dt);
+    const sparks = interaction.update(camera, cursor, sets, dt);
     if (sparks.length) fire.emitSparks(sparks);
+  }
+  let sets = [...fire.sets, ...plasma.sets, ...crystals.sets, ...chill.sets]; // particle sets the cursor moves (the rings join on load)
+
+  /** The cursor's ray into the scene, or null while it's away (the tesla ball reaches for it). */
+  const ndc = new THREE.Vector2();
+  const raycaster = new THREE.Raycaster();
+  function pointerRay() {
+    if (!cursor.present || cursor.width < 1) return null;
+    ndc.set((cursor.bx / cursor.width) * 2 - 1, 1 - (cursor.by / cursor.height) * 2);
+    raycaster.setFromCamera(ndc, camera);
+    return raycaster.ray;
   }
 
   // --- Sizing (fixed on-screen pixel size; the render target scales instead)
@@ -508,6 +587,11 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
 
   function update(dt, t) {
     fire.params.level += (targetLevel - fire.params.level) * Math.min(1, dt * 1.1);
+    for (const id of ELEMENT_IDS) {
+      const d = (id === elementKey ? 1 : 0) - presence[id];
+      presence[id] += Math.sign(d) * Math.min(Math.abs(d), dt / 0.6);
+    }
+    applyFireParams();
 
     updateCursor(dt, t);
 
@@ -526,7 +610,12 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       });
     }
     fire.stepSparks(dt, t);
+    plasma.step(dt, t, fire.params.level, { ray: pointerRay(), flow: interaction.flowWorld });
+    crystals.step(dt, t, fire.params.level);
+    chill.step(dt, t);
     fx.step(dt, t);
+    zap.step(dt, t);
+    frostRing.step(dt, t);
     fireflies.update(dt, t, camera, cursor, interaction.flowWorld);
 
     // After a weapon lands: ease from the old flame into the new one, with the
@@ -551,7 +640,17 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       lightFlicker = 0.82 + Math.random() * 0.3;
       candleLight.intensity = 0.28 + Math.random() * 0.12;
     }
-    fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * lightFlicker * blendMul;
+    // Each element lights the scene its own way: fire flickers, the ball strobes
+    // with its crackle, ice glows steadily and breathes.
+    const iceLight = (0.88 + 0.07 * Math.sin(t * 1.3) * effects.ice.shimmer) * effects.ice.glow * 0.8;
+    const lit = presence.fire * lightFlicker + presence.lightning * plasma.lightFlicker * effects.lightning.brightness + presence.ice * iceLight;
+    const flicker = lit / Math.max(1e-3, presence.fire + presence.lightning + presence.ice);
+    // The ball lights the scene from where it hangs, not from above the flames.
+    fireLight.position.lerpVectors(FIRE_LIGHT_AT, ballLightAt.set(FIRE_ORIGIN.x, effects.lightning.height, FIRE_ORIGIN.z + 0.12), presence.lightning);
+    // A discharge (weapon impact, stoke) flashes the whole scene for an instant.
+    const flash = reducedMotion ? 0 : plasma.flash;
+    pass.uniforms.exposure.value = effects.render.exposure * (1 + flash * 0.45);
+    fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * flicker * blendMul * (1 + flash * 1.5);
 
     weapons.update(dt);
 
@@ -709,7 +808,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     debugPaletteIndex = 0;
     applyColors(flames[flameKey], lightMix(flameKey));
     fireflies.setRamp(currentRamp);
-    fx.setRamp(currentRamp);
+    for (const r of [fx, zap, frostRing]) r.setRamp(currentRamp);
     weapons.setRim(currentRamp[2]);
   }
 
@@ -717,9 +816,10 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     stoke, puff, equip, setView, cycle, describe, flash, applyEffects, ready: loaded,
     dispose: () => scope.dispose(),
     get flame() { return flameKey; },
+    get element() { return elementKey; },
     get fireflies() { return fireflies; },
     /** Internals for debugging (dev builds expose this as window.__fire). */
-    get debug() { return { weapons, fx }; },
+    get debug() { return { weapons, fx, plasma, zap, frostRing, crystals, chill }; },
     get interaction() { return interaction.mode; },
     set interaction(m) { interaction.mode = m; },
   };

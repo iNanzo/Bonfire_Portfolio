@@ -43,7 +43,7 @@ test('session and content', async () => {
   const store = memoryStore();
   assert.deepEqual((await call(store, 'GET', '/api/session')).data, { email: 'me@gmail.com', mode: 'test', store: 'memory', siteUrl: 'https://site.test/' });
   const { content, sha } = await load(store);
-  assert.equal(content.featured.id, 'gamex');
+  assert.deepEqual(content, JSON.parse(CONTENT));
   assert.match(sha, /^[0-9a-f]{40}$/);
 });
 

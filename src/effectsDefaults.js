@@ -4,6 +4,8 @@
 // `RANGES` bounds every number: validation and the admin's sliders both read it.
 
 export const CURSOR_MODES = ['ember', 'stir', 'wake', 'part', 'draw', 'slash'];
+/** What the bonfire is made of. Each one reuses the flame colors; the visuals are code (src/bonfire/). */
+export const ELEMENT_IDS = ['fire', 'lightning', 'ice'];
 export const DITHER_MATRICES = [4, 8];
 export const BASE_COLORS = ['void', 'shadow', 'stone', 'wood', 'bone'];
 
@@ -27,6 +29,18 @@ export const DEFAULT_EFFECTS = {
   particles: { fire: 2200, sparks: 48, forge: 640, impact: 1, touchScale: 0.5 },
   fireflies: { count: 18, lit: 9, lights: 9, speed: 1, touchScale: 0.67 },
   cursor: { mode: 'ember', strength: 1 },
+  // Which elements a random draw can pick, and how often (weights are relative).
+  elements: {
+    fire: { name: 'Flame', rotation: true, weight: 1 },
+    lightning: { name: 'Lightning', rotation: true, weight: 1 },
+    ice: { name: 'Ice', rotation: true, weight: 1 },
+  },
+  // Lightning: a tesla ball with no glass, lashing strikes at the ground around it
+  // (src/bonfire/plasma.js); impacts crackle a lightning ring across the ground (lightningRing.js).
+  lightning: { size: 0.44, height: 0.66, filaments: 12, strikes: 4, boltWidth: 3, jag: 0.45, branches: 0.5, crackle: 20, drift: 1, brightness: 1.1, cursorPull: 0.8, flicker: 0.6, ringSpeed: 1, ringArcs: 0.6 },
+  // Ice: a translucent crystal cluster grows out of the ground around a banked fire
+  // (ice.js); impacts send a ring of shards out that spike up and sink back, with chill.
+  ice: { shards: 28, height: 1.05, spread: 0.36, thickness: 1, clarity: 0.28, glow: 1, shimmer: 0.5, innerFire: 0.45, frost: 60, growTime: 1.4, ringSpeed: 1, ringHeight: 1, ringHold: 0.08 },
   render: { pixelSize: 4, pixelSizeSmall: 3, dither: 0.16, ditherMatrix: 4, outlines: true, vignette: 0.85, exposure: 1, colorChange: 1.25, shake: true },
 };
 
@@ -60,6 +74,34 @@ export const RANGES = {
   'render.vignette': [0, 1.5, 0.05],
   'render.exposure': [0.3, 2, 0.05],
   'render.colorChange': [0.2, 4, 0.05, 's'],
+  ...Object.fromEntries(ELEMENT_IDS.map((id) => [`elements.${id}.weight`, [0.1, 5, 0.1, '×']])),
+  'lightning.size': [0.2, 0.8, 0.01, 'm'],
+  'lightning.height': [0.3, 1.2, 0.01, 'm'],
+  'lightning.filaments': [2, 32, 1],
+  'lightning.strikes': [0, 8, 1],
+  'lightning.boltWidth': [1, 6, 0.5, 'px'],
+  'lightning.jag': [0, 1, 0.01],
+  'lightning.branches': [0, 1, 0.01],
+  'lightning.crackle': [4, 40, 1, 'Hz'],
+  'lightning.drift': [0, 3, 0.05, '×'],
+  'lightning.brightness': [0.2, 2, 0.05, '×'],
+  'lightning.cursorPull': [0, 1, 0.05],
+  'lightning.flicker': [0, 1, 0.05],
+  'lightning.ringSpeed': [0.4, 2, 0.05, '×'],
+  'lightning.ringArcs': [0, 1, 0.05],
+  'ice.shards': [6, 40, 1],
+  'ice.height': [0.3, 1.4, 0.01, 'm'],
+  'ice.spread': [0.1, 0.6, 0.01, 'm'],
+  'ice.thickness': [0.5, 2, 0.05, '×'],
+  'ice.clarity': [0, 0.8, 0.05],
+  'ice.glow': [0.2, 2, 0.05, '×'],
+  'ice.shimmer': [0, 1, 0.05],
+  'ice.innerFire': [0, 1, 0.05],
+  'ice.frost': [0, 200, 5],
+  'ice.growTime': [0.2, 3, 0.05, 's'],
+  'ice.ringSpeed': [0.4, 2, 0.05, '×'],
+  'ice.ringHeight': [0.3, 2, 0.05, '×'],
+  'ice.ringHold': [0, 1.5, 0.05, 's'],
 };
 
 /** Changing these resizes GPU buffers or light pools, so the scene is rebuilt. */
