@@ -109,10 +109,38 @@ npm run admin      # the admin panel, editing your local files: http://127.0.0.1
     The tongues flare and climb there too.
   - It's trailed by a ring of smoke, with a billow of fine smoke, fluttering ash flakes
     and embers that cool as they fall.
-- **Equipment:** the fire starts with the **longsword** and **ember flame**. Inspecting a
-  project, or clicking the fire on any screen except the inventory, draws a random weapon
-  and flame color (never the current pair). Home links and reloading put the longsword
-  and ember flame back.
+- **Elements:** the bonfire can also be **lightning** or **ice**, in the current flame's
+  colors (design notes: `docs/elements.md`). The element changes when a weapon lands.
+  - **Lightning** (`src/bonfire/plasma.js`): a tesla ball with no glass that keeps
+    lashing out. Heavy bolts strike the ground, logs and stones around the fire, hold
+    for a moment, then jump somewhere new. They're drawn as glowing ribbons with
+    white-hot centers that taper as they go (`bolts.js`). Where one lands it flashes,
+    throws sparks, lights the spot with its own point light and crawls away along the
+    ground. Around the white-hot core, thinner filaments drift on the fire's noise: a
+    filament whose path meets something strikes it, and one that meets nothing thins
+    into fading dendrites. A few arcs crawl around the ball's surface, the filaments
+    nearest the cursor reach for it, and the fire's cast light moves into the ball and
+    strobes with the crackle. On impact (`lightningRing.js`) the whole scene flashes,
+    heavy bolts crackle out of the bonfire into the scenery around it, and a thick ring
+    of lightning tears across the ground in place of the fire ring. It splits around
+    obstacles and climbs them, throwing forks, arcs and sparks, with strobing lights
+    riding it. Whole-scene flashes happen only on an impact or a stoke, at most a
+    couple a second, and reduced motion turns them off.
+  - **Ice** (`src/bonfire/ice.js`): a crystal cluster grows up out of the ground around
+    the blade, the way a druse grows from one seed. One dominant crystal forms first,
+    then medium ones fanning out, then a spray of small ones low over the ash, with loose
+    shards drifting above. The ice is a little translucent (a screen-door dither shows the
+    blade, logs and a low banked fire inside) with a subtle glow. Frost motes twinkle up
+    and chill seeps off. On impact, a ring of small crystal clusters spikes up as it
+    expands and sinks back behind itself, behind a frost line. A tuft of chill
+    (`chill.js`: cold mist that sinks and rolls along the ground) rolls off the slam and
+    trails the ring.
+- **Equipment:** the fire starts with the **longsword**, **ember flame** and **fire**
+  element. Inspecting a project, or clicking the fire on any screen except the
+  inventory, draws a random weapon and flame color (never the current pair) and an
+  element, weighted by each element's chance. Home links and reloading put the starting
+  equipment back. The fire's name follows the element: Azure Flame, Azure Lightning,
+  Azure Ice.
 - **Color changes** ease over ~1.2 s (`flameEase` in `src/palette.js`: an ease-in-out
   crossfade with a small damped wobble). The fire, the scene palette, the cast light and
   the UI's `--accent-*` colors all follow the same blend.
@@ -220,6 +248,20 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
   - Flame colors: add, edit, reorder or delete flames; ◉ takes one out of the random
     draw. Each flame's `hi` must stay readable as text (≥ 4.5:1), and at least 3 stay in
     rotation.
+  - **Palette tools** (`admin/ui/palettes.js`): 🎲 a harmonious palette for one flame
+    (any scheme, or one you pick: hue shift, analogous, monochrome, complementary, split
+    complementary, triadic), a fully random one, or **suggestions built around a color**
+    you pick (or one of the flame's own). There's also a set for every flame at once,
+    with hues spread around the wheel, and the same tools for the scene colors. Each one
+    has Undo. The harmonies work in OKLCH. Each ramp step has its own lightness band,
+    chroma is a share of what the gamut allows at that hue, and hues come from the
+    scheme. Tips are lightened until they read as text.
+  - Elements: each one's name on the site, whether it's in rotation and its relative
+    chance (with its share of the draws). **Try It** forges it in the preview.
+  - Lightning (ball size and height, filaments, ground strikes, bolt thickness, jaggedness, forking, crackle rate,
+    drift, brightness, reach for the cursor, light strobe, ring speed and arcs) and Ice
+    (crystals, height, spread, thickness, translucency, glow, shimmer, fire inside,
+    frost, freeze time, ring speed, shard height and hold).
   - Fire (intensity, size, height, turbulence, flame life, cast light, frame rate, stoke
     flare), fireflies (count, lit at rest, real lights, speed), the cursor effect and its
     strength, particle counts (plus the touch-device scale), rendering (pixel size,
@@ -246,8 +288,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
 
 | Piece | File |
 | --- | --- |
-| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `schema.js` labels/help/grouping, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case) |
-| Effects defaults, ranges, runtime | `src/effectsDefaults.js`, `src/effects.js` (design notes: `docs/admin-v2.md`) |
+| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `schema.js` labels/help/grouping, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case, `palettes.js` palette generators, `paletteTools.js` their buttons) |
+| Effects defaults, ranges, runtime | `src/effectsDefaults.js`, `src/effects.js`, `src/elements.js` (design notes: `docs/admin-v2.md`, `docs/elements.md`) |
 | API: session, content, save, deploy status, image thumbnails | `admin/server/api.js` |
 | Sign-in check (Cloudflare Access JWT) | `admin/server/auth.js` |
 | Content store on GitHub (one commit per save, Git Data API) | `admin/server/github.js` |
