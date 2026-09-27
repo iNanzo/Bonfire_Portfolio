@@ -920,6 +920,37 @@
         "core": "#ecebff",
         "shade": "#24233f",
         "light": 0.3
+      },
+      {
+        "id": "king",
+        "name": "King’s Flame",
+        "lo": "#5dcfad",
+        "mid": "#6e2e9b",
+        "hi": "#aed3cb",
+        "core": "#3e3aef",
+        "shade": "#4424b7",
+        "light": 0.34,
+        "hidden": true
+      },
+      {
+        "id": "cobalt-flame",
+        "name": "Cobalt flame",
+        "lo": "#450d59",
+        "mid": "#aa5563",
+        "hi": "#547eff",
+        "core": "#fda388",
+        "shade": "#ce8e59",
+        "light": 0.51
+      },
+      {
+        "id": "lilac-flame",
+        "name": "Lilac flame",
+        "lo": "#4b5432",
+        "mid": "#a88cd9",
+        "hi": "#e3d0ef",
+        "core": "#f8f6f9",
+        "shade": "#282c1c",
+        "light": 0.34
       }
     ],
     "fire": {
