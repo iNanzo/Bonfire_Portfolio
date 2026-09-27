@@ -964,14 +964,14 @@
         "weight": 1
       },
       "ice": {
-        "name": "Ice",
+        "name": "Frost",
         "rotation": true,
         "weight": 1
       }
     },
     "lightning": {
       "size": 0.44,
-      "height": 0.66,
+      "height": 0.3,
       "filaments": 12,
       "strikes": 4,
       "boltWidth": 3,

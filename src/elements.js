@@ -32,7 +32,7 @@ export function drawElement(fallback = 'fire', random = Math.random) {
 /**
  * The fire's display name: the flame's color word + the element.
  * "Azure Flame" → "Azure Lightning"; a flame named without "Flame" keeps its name
- * as fire and gets the element appended otherwise ("Moonlight Ice").
+ * as fire and gets the element appended otherwise ("Moonlight Frost").
  */
 export function flameTitle(flameName, elementKey) {
   const name = String(flameName ?? '').trim();

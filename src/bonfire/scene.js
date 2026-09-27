@@ -98,6 +98,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   const fireLight = new THREE.PointLight(0xff8a3c, 9, 0, 1.6);
   const FIRE_LIGHT_AT = new THREE.Vector3(0, 0.95, 0.28); // slightly in front, so the weapon's face catches light
   const ballLightAt = new THREE.Vector3();
+  const BALL_LIGHT_MIN_Y = 0.62; // just above the logs' teepee
   fireLight.position.copy(FIRE_LIGHT_AT);
   fireLight.castShadow = renderer.shadowMap.enabled;
   fireLight.shadow.mapSize.set(512, 512);
@@ -645,8 +646,10 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     const iceLight = (0.88 + 0.07 * Math.sin(t * 1.3) * effects.ice.shimmer) * effects.ice.glow * 0.8;
     const lit = presence.fire * lightFlicker + presence.lightning * plasma.lightFlicker * effects.lightning.brightness + presence.ice * iceLight;
     const flicker = lit / Math.max(1e-3, presence.fire + presence.lightning + presence.ice);
-    // The ball lights the scene from where it hangs, not from above the flames.
-    fireLight.position.lerpVectors(FIRE_LIGHT_AT, ballLightAt.set(FIRE_ORIGIN.x, effects.lightning.height, FIRE_ORIGIN.z + 0.12), presence.lightning);
+    // The ball lights the scene from where it hangs — but no lower than the top of the
+    // logs, so a ball set down in the core still lights the clearing instead of being
+    // shadowed by the logs around it.
+    fireLight.position.lerpVectors(FIRE_LIGHT_AT, ballLightAt.set(FIRE_ORIGIN.x, Math.max(effects.lightning.height, BALL_LIGHT_MIN_Y), FIRE_ORIGIN.z + 0.12), presence.lightning);
     // A discharge (weapon impact, stoke) flashes the whole scene for an instant.
     const flash = reducedMotion ? 0 : plasma.flash;
     pass.uniforms.exposure.value = effects.render.exposure * (1 + flash * 0.45);

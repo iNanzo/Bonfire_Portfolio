@@ -92,9 +92,9 @@ test('a partial element setting keeps the rest of its defaults', () => {
 test('the fire is named for its flame color and element', () => {
   assert.equal(flameTitle('Azure Flame', 'fire'), 'Azure Flame');
   assert.equal(flameTitle('Azure Flame', 'lightning'), 'Azure Lightning');
-  assert.equal(flameTitle('Ember Flame', 'ice'), 'Ember Ice');
+  assert.equal(flameTitle('Ember Flame', 'ice'), 'Ember Frost');
   assert.equal(flameTitle('Moonlight', 'fire'), 'Moonlight');
-  assert.equal(flameTitle('Moonlight', 'ice'), 'Moonlight Ice');
+  assert.equal(flameTitle('Moonlight', 'ice'), 'Moonlight Frost');
   assert.equal(flameTitle('Azure Flame', 'nope'), 'Azure Flame');
 });
 
