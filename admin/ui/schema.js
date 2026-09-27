@@ -3,7 +3,7 @@
 // and the few special cases. Patterns: `projects[].images[].alt` (index → []).
 // Labels are run through titleCase(), so write them in any case.
 import { KINDLED_SHOW, WEAPON_KEYS } from '../../src/contentRules.js';
-import { CURSOR_MODES, DITHER_MATRICES, ELEMENT_IDS, RANGES } from '../../src/effectsDefaults.js';
+import { CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, ELEMENT_IDS, RANGES } from '../../src/effectsDefaults.js';
 import { harmoniousFlame, hexToOklch } from './palettes.js';
 import { titleCase } from './text.js';
 
@@ -18,7 +18,7 @@ export const PAGES = [
   {
     id: 'effects', group: 'Look & feel', label: 'Effects', preview: true,
     keys: ['effects.flames', 'effects.elements', 'effects.fire', 'effects.lightning', 'effects.ice', 'effects.fireflies', 'effects.cursor', 'effects.particles', 'effects.render', 'effects.colors'],
-    blurb: 'Flame colors, the bonfire’s elements (fire, lightning, ice), fireflies, the cursor and the pixel-art look. The preview updates as you edit; nothing is published until you save.',
+    blurb: 'Bonfire colors, its elements (fire, lightning, ice), fireflies, the cursor and the pixel-art look. The preview updates as you edit; nothing is published until you save.',
   },
   { id: 'headings', group: 'Settings', label: 'Screen headings', keys: ['sections'], blurb: 'The title, flavor line and intro at the top of each screen.' },
   { id: 'interface', group: 'Settings', label: 'Interface', keys: ['screens', 'ui', 'weapons', 'startingEquipment', 'notFound'], blurb: 'Tab names, button text, weapon names, the starting equipment and the 404 page.' },
@@ -77,7 +77,7 @@ export const LABELS = {
   '[].glyph': 'Glyph',
   '[].todo': 'To confirm',
   // effects
-  'effects.flames': 'Flame colors',
+  'effects.flames': 'Bonfire colors',
   'effects.colors': 'Scene colors',
   'effects.fire': 'Fire',
   'effects.particles': 'Particles',
@@ -157,6 +157,7 @@ export const LABELS = {
   'effects.ice.ringHeight': 'Ring shard height',
   'effects.ice.ringHold': 'Ring shard hold',
   'startingEquipment.element': 'Element',
+  'startingEquipment.flame': 'Bonfire colors',
 };
 
 export const HELP = {
@@ -177,7 +178,7 @@ export const HELP = {
   '[].summary': 'One or two lines for the inventory’s at-a-glance panel.',
   '[].href': 'https://…, mailto:…, or a path on this site like games/x.html.',
   // effects
-  'effects.flames': 'Each flame is a color set the fire can take; inspecting a project or clicking the fire draws one at random. Hidden flames stay out of the draw (one can still be the starting flame). Keep at least 3 in rotation.',
+  'effects.flames': 'The color sets the bonfire can take. Fire, lightning and ice all burn in them, and the site’s accent colors follow along. Inspecting a project or clicking the fire draws one at random; hidden ones stay out of the draw (one can still be the starting colors). Keep at least 3 in rotation.',
   'effects.flames[].id': 'Internal name. Lowercase letters, numbers and dashes.',
   'effects.flames[].hi': 'Also the color of accent text, so it must stay readable on the background (4.5:1).',
   'effects.flames[].shade': 'A dark, tinted neutral for stone lit by this fire.',
@@ -197,15 +198,16 @@ export const HELP = {
   'effects.render': 'The pixel-art pass over the whole scene.',
   'effects.render.pixelSize': 'Screen pixels per scene pixel. Bigger = chunkier and faster.',
   'effects.render.dither': 'How much ordered dithering blends colors. 0 = flat bands.',
-  'effects.render.colorChange': 'How long the fire takes to ease into a new flame color.',
-  'effects.elements': 'What the bonfire is made of. Every draw (inspecting a project, clicking the fire) picks an element from the ones in rotation — weighted by chance — along with a new flame color, and every element burns in that flame’s colors. Home brings back the starting element (Interface → Starting Equipment).',
+  'effects.render.colorChange': 'How long the bonfire takes to ease into new colors.',
+  'effects.elements': 'What the bonfire is made of. Every draw (inspecting a project, clicking the fire) picks an element from the ones in rotation — weighted by chance — along with new bonfire colors, and every element burns in them. Home brings back the starting element (Interface → Starting Equipment).',
   ...Object.fromEntries(ELEMENT_IDS.flatMap((id) => [
     [`effects.elements.${id}.name`, id === 'fire'
       ? 'The word after the color in the fire’s name on the site: Azure Flame.'
-      : `Takes the place of “Flame” in the fire’s name: Azure Flame → Azure ${titleCase(id)}.`],
+      : `Takes the place of “Flame” in the fire’s name: Azure Flame → Azure ${DEFAULT_EFFECTS.elements[id].name}.`],
     [`effects.elements.${id}.weight`, 'How often it’s drawn compared to the others.'],
   ])),
   'effects.lightning': 'The bonfire as a tesla ball with no glass: filaments crackle out from a white-hot core around the blade and heavy bolts strike the ground around it, lighting it where they land. When a weapon lands, lightning crackles out of the fire and a ring of lightning races across the ground instead of fire.',
+  'effects.lightning.height': 'Where the ball sits: about 0.3 m is down in the core of the bonfire, between the logs; about 0.66 m floats above them.',
   'effects.lightning.crackle': 'How many times a second the bolts re-strike into a new shape.',
   'effects.lightning.strikes': 'Heavy bolts the ball keeps throwing at the ground, logs and stones around it. Each one lands with a flash of light, crawls along the ground, then jumps somewhere new.',
   'effects.lightning.boltWidth': 'How thick the heavy bolts are, in scene pixels (they taper as they go). Filaments are a little thinner.',
@@ -307,7 +309,7 @@ export const ADD_LABELS = {
   'about.paragraphs': 'paragraph',
   'about.stats': 'stat',
   'ui.prompts': 'prompt',
-  'effects.flames': 'flame',
+  'effects.flames': 'palette',
 };
 
 /** The field a list entry is titled by. */

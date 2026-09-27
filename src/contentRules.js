@@ -88,7 +88,7 @@ export function validateEffects(e, err, base = 'effects') {
         const p = `flames[${i}]`;
         if (!isObj(f)) return err(at(p), 'Must be a group of fields.');
         if (typeof f.id !== 'string' || !ID_RE.test(f.id)) err(at(`${p}.id`), 'Use lowercase letters, numbers and single dashes.');
-        else if (seen.has(f.id)) err(at(`${p}.id`), `“${f.id}” is already used by another flame.`);
+        else if (seen.has(f.id)) err(at(`${p}.id`), `“${f.id}” is already used by another palette.`);
         else seen.add(f.id);
         if (typeof f.name !== 'string' || !f.name.trim()) err(at(`${p}.name`), 'Can’t be empty.');
         for (const k of ['lo', 'mid', 'hi', 'core', 'shade']) color(f[k], `${p}.${k}`);
@@ -99,7 +99,7 @@ export function validateEffects(e, err, base = 'effects') {
         if (f.hidden !== undefined) bool(f.hidden, `${p}.hidden`);
       });
       const inRotation = e.flames.filter((f) => isObj(f) && !f.hidden).length;
-      if (inRotation < MIN_ROTATION) err(at('flames'), `Keep at least ${MIN_ROTATION} flames in rotation (not hidden), so a new one can always be drawn.`);
+      if (inRotation < MIN_ROTATION) err(at('flames'), `Keep at least ${MIN_ROTATION} palettes in rotation (not hidden), so a new one can always be drawn.`);
     }
   }
 
@@ -191,7 +191,7 @@ export function validateContent(c) {
   }
   if (obj(c.startingEquipment, 'startingEquipment')) {
     if (!WEAPON_KEYS.includes(c.startingEquipment.weapon)) err('startingEquipment.weapon', 'Pick one of the weapons.');
-    if (!flameIds(c).includes(c.startingEquipment.flame)) err('startingEquipment.flame', 'Pick one of the flames.');
+    if (!flameIds(c).includes(c.startingEquipment.flame)) err('startingEquipment.flame', 'Pick one of the bonfire palettes.');
     if (c.startingEquipment.element !== undefined && !ELEMENT_IDS.includes(c.startingEquipment.element)) err('startingEquipment.element', 'Pick one of the elements.');
   }
 

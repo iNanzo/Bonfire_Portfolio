@@ -1,7 +1,7 @@
 // Palette tools on the Effects page (the color math lives in palettes.js):
 //   • each flame card: 🎲 a harmonious palette (any scheme, or one you pick), a fully
 //     random one, suggestions built from a color, and Undo;
-//   • the Flame Colors block: re-roll every flame at once, hues spread apart;
+//   • the Bonfire Colors block: re-roll every palette at once, hues spread apart;
 //   • the Scene Colors block: harmonious / random neutrals, or suggestions from a color.
 // A change is an ordinary edit (Discard still brings back the saved colors), and the
 // preview switches to the flame you're working on so you see it in the fire at once.
@@ -81,7 +81,7 @@ export function flameTools(item, ctx) {
   const showSuggestions = () => {
     suggestions.replaceChildren(st.suggestions?.length
       ? chips(st.suggestions, FLAME_KEYS, apply)
-      : el('p', { class: 'help', text: 'Pick a color (or one of this flame’s own) to see palettes built around it.' }));
+      : el('p', { class: 'help', text: 'Pick a color (or one of this palette’s own) to see palettes built around it.' }));
   };
   showSuggestions();
   const onSeed = (hex) => {
@@ -135,16 +135,16 @@ export function flamesBlockTools(ctx) {
   };
   return el('div', { class: 'palette-tools is-block' },
     el('div', { class: 'pt-row' },
-      el('span', { class: 'pt-label', text: 'All Flames' }),
-      toolButton('🎲 Harmonious Set', 'New harmonious colors for every flame, their hues spread around the wheel so each looks different', () => roll(false)),
-      toolButton('🎲 Fully Random Set', 'Random colors for every flame', () => roll(true)),
-      toolButton('↶ Undo', 'Put back every flame’s colors from before the last set', () => {
+      el('span', { class: 'pt-label', text: 'All Palettes' }),
+      toolButton('🎲 Harmonious Set', 'New harmonious colors for every palette, their hues spread around the wheel so each looks different', () => roll(false)),
+      toolButton('🎲 Fully Random Set', 'Random colors for every palette', () => roll(true)),
+      toolButton('↶ Undo', 'Put back every palette’s colors from before the last set', () => {
         const prev = st.history.pop();
         if (!prev) return;
         prev.forEach((colors, i) => { if (flames[i]) Object.assign(flames[i], colors); });
         ctx.changed({ rerender: true });
       }, { class: 'button small ghost', disabled: !st.history.length })),
-    el('p', { class: 'help', text: 'Names, IDs, rotation and cast light stay as they are. Each flame card has its own palette tools too.' }));
+    el('p', { class: 'help', text: 'Names, IDs, rotation and cast light stay as they are. Each palette card has its own tools too.' }));
 }
 
 // ---- scene colors --------------------------------------------------------------------------
@@ -180,5 +180,5 @@ export function sceneBlockTools(ctx) {
         showSuggestions();
       })),
     suggestions,
-    el('p', { class: 'help', text: 'The background is kept dark enough for every flame’s text color to stay readable on it.' }));
+    el('p', { class: 'help', text: 'The background is kept dark enough for every palette’s text color to stay readable on it.' }));
 }

@@ -111,8 +111,9 @@ npm run admin      # the admin panel, editing your local files: http://127.0.0.1
     and embers that cool as they fall.
 - **Elements:** the bonfire can also be **lightning** or **ice**, in the current flame's
   colors (design notes: `docs/elements.md`). The element changes when a weapon lands.
-  - **Lightning** (`src/bonfire/plasma.js`): a tesla ball with no glass that keeps
-    lashing out. Heavy bolts strike the ground, logs and stones around the fire, hold
+  - **Lightning** (`src/bonfire/plasma.js`): a tesla ball with no glass, set down in the
+    core of the bonfire (Ball Height moves it up above the logs), that keeps lashing out
+    between the logs. Its cast light stays at the top of the logs so the clearing stays lit. Heavy bolts strike the ground, logs and stones around the fire, hold
     for a moment, then jump somewhere new. They're drawn as glowing ribbons with
     white-hot centers that taper as they go (`bolts.js`). Where one lands it flashes,
     throws sparks, lights the spot with its own point light and crawls away along the
@@ -140,7 +141,7 @@ npm run admin      # the admin panel, editing your local files: http://127.0.0.1
   inventory, draws a random weapon and flame color (never the current pair) and an
   element, weighted by each element's chance. Home links and reloading put the starting
   equipment back. The fire's name follows the element: Azure Flame, Azure Lightning,
-  Azure Ice.
+  Azure Frost.
 - **Color changes** ease over ~1.2 s (`flameEase` in `src/palette.js`: an ease-in-out
   crossfade with a small damped wobble). The fire, the scene palette, the cast light and
   the UI's `--accent-*` colors all follow the same blend.
@@ -245,9 +246,9 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     inventory icon), hide one with ◉ (kept in the repo, off the site), and set alt text,
     caption and pixel art.
 - **Effects** (the Look & Feel page), with a **live preview** of the real site beside it:
-  - Flame colors: add, edit, reorder or delete flames; ◉ takes one out of the random
-    draw. Each flame's `hi` must stay readable as text (≥ 4.5:1), and at least 3 stay in
-    rotation.
+  - Bonfire colors (the palettes every element burns in, stored as `effects.flames`):
+    add, edit, reorder or delete them; ◉ takes one out of the random draw. Each
+    palette's `hi` must stay readable as text (≥ 4.5:1), and at least 3 stay in rotation.
   - **Palette tools** (`admin/ui/palettes.js`): 🎲 a harmonious palette for one flame
     (any scheme, or one you pick: hue shift, analogous, monochrome, complementary, split
     complementary, triadic), a fully random one, or **suggestions built around a color**
