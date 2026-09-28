@@ -16,12 +16,11 @@
 //   bars      a beat counter: count 0 is a downbeat. anchor() pins it (a drop, a
 //             tap, the music starting); otherwise the beat position with the most
 //             spectral change (crashes, chord changes) wins as the downbeat.
+import { wrap } from '../math.js';
 
 export const RATE = 100; // envelope samples per second
 const WINDOW = 8; // seconds analysed
 const BUFFER = RATE * 10;
-
-const wrap = (x, m) => ((x % m) + m) % m;
 
 /** Score the tempo lags; returns { period (s), strength (0..1) } or null. `x` is oldest → newest. */
 export function estimateTempo(x, { min = 70, max = 185, center = 125, width = 0.75 } = {}) {

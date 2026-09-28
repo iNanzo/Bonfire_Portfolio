@@ -15,9 +15,9 @@
 //             (sections.js). A drop re-anchors the bar count: it's beat 1.
 import { createTempoTracker } from './tempo.js';
 import { createSections } from './sections.js';
+import { approach } from '../math.js';
 
 const FFT = 2048;
-const ease = (cur, target, tau, dt) => cur + (target - cur) * (1 - Math.exp(-dt / tau));
 
 export const BAND_NAMES = ['bass', 'lowMid', 'mid', 'highMid', 'high'];
 
@@ -155,11 +155,11 @@ export function createFeatures({ sampleRate, fftSize = FFT }) {
     // Bands: envelope over a decaying peak.
     for (const b of BAND_NAMES) {
       const amp = Math.sqrt(power[b] / (BANDS[b][1] - BANDS[b][0]));
-      env[b] = ease(env[b], amp, amp > env[b] ? 0.015 : 0.16, dt);
+      env[b] = approach(env[b], amp, amp > env[b] ? 0.015 : 0.16, dt);
       peak[b] = Math.max(env[b], peak[b] * Math.exp(-dt / 14), 1e-5);
       features.bands[b] = Math.min(1, env[b] / peak[b]) ** 1.3;
     }
-    levelEnv = ease(levelEnv, rms, rms > levelEnv ? 0.03 : 0.3, dt);
+    levelEnv = approach(levelEnv, rms, rms > levelEnv ? 0.03 : 0.3, dt);
     levelPeak = Math.max(levelEnv, levelPeak * Math.exp(-dt / 20), 1e-4);
     features.level = Math.min(1, levelEnv / levelPeak);
     features.rms = rms;

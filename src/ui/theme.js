@@ -26,12 +26,31 @@ function updateFavicon(ramp) {
   if (!faviconTimer) faviconTimer = setTimeout(drawFavicon, Math.max(0, 120 - (performance.now() - faviconLast)));
 }
 
-export function setAccentRamp(ramp, root = document.documentElement) {
-  ramp.forEach((hex, i) => root.style.setProperty(VARS[i], hex));
+// During a color blend the scene calls setAccentRamp() every frame. Each write restyles
+// the whole page, so the colors are written at most every 50 ms (the blend still reads
+// as smooth), always ending on the latest ramp; `now` writes at once (a flame set outright).
+let accentRamp = null;
+let accentRoot = null;
+let accentTimer = 0;
+let accentLast = -Infinity;
+function writeAccents() {
+  accentTimer = 0;
+  accentLast = performance.now();
+  accentRamp.forEach((hex, i) => accentRoot.style.setProperty(VARS[i], hex));
+}
+
+export function setAccentRamp(ramp, root = document.documentElement, { now = false } = {}) {
+  accentRamp = ramp;
+  accentRoot = root;
+  const wait = 50 - (performance.now() - accentLast);
+  if (now || wait <= 0) {
+    clearTimeout(accentTimer);
+    writeAccents();
+  } else if (!accentTimer) accentTimer = setTimeout(writeAccents, wait);
   updateFavicon(ramp);
 }
 
 export function applyFlame(key, root = document.documentElement) {
-  setAccentRamp(flames[key].ramp, root);
+  setAccentRamp(flames[key].ramp, root, { now: true });
   root.dataset.flame = key;
 }

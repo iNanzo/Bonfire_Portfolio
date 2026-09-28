@@ -9,8 +9,8 @@
 // once per weapon: the contour for the echo, a width profile for the helix.
 import * as THREE from 'three';
 import { createRingLines } from './rings.js';
+import { smoothstep, TAU } from '../math.js';
 
-const TAU = Math.PI * 2;
 const HELIX_SEGS = 96;
 const MAX_OUTLINE = 1200; // contour segments
 const HELIX_VERTS = 2 * 2 * HELIX_SEGS * 2; // strands × (lead, trail) × segments × 2
@@ -164,8 +164,6 @@ export function profileAt(table, s) {
   return table[i] + (table[i + 1] - table[i]) * (x - i);
 }
 
-const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-
 const P = new THREE.Vector3();
 const C = new THREE.Color();
 
@@ -209,7 +207,7 @@ export function createForgeFx(fxMaterial, noise) {
           else { if (s1 <= 1 - growth) continue; s0 = Math.max(s0, 1 - growth); }
           for (const s of [s0, s1]) {
             const nearHead = Math.abs(s - headS) < 0.05 && growth < 1;
-            const taper = smooth(0, 0.16, s) * smooth(0, 0.16, 1 - s);
+            const taper = smoothstep(0, 0.16, s) * smoothstep(0, 0.16, 1 - s);
             const drift = 0.5 + 0.5 * noise.noise3d(s * 6 - t * 1.8, strand * 4.1 + sub * 1.3, t * 0.9);
             const flick = noise.noise3d(s * 9 + strand * 3, 1.7, t * 6);
             const body = (sub ? 0.55 : 1) * (0.55 + 0.45 * drift) * (0.88 + 0.12 * flick);

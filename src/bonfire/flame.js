@@ -19,6 +19,7 @@
 // reborn: other elements turn them down so the fire dies out (lightning) or banks
 // low inside the ice, and back up to relight it.
 import * as THREE from 'three';
+import { createPoints, rampColors, setRampColors } from './points.js';
 
 // Point size is in render-target texels, scaled with distance so close-up
 // camera angles keep the fire dense, and rounded to whole texels. Dead particles
@@ -93,15 +94,6 @@ export function createEffectMaterial(fireMaterial) {
   return m;
 }
 
-function makePoints(count, material) {
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
-  geo.setAttribute('size', new THREE.BufferAttribute(new Float32Array(count), 1));
-  const points = new THREE.Points(geo, material);
-  points.frustumCulled = false;
-  return points;
-}
 
 /**
  * @param {object} o
@@ -111,8 +103,8 @@ function makePoints(count, material) {
  * @param {THREE.Vector3} o.origin  base of the fire (world)
  */
 export function createFlame({ count, sparks: sparkCount, material, origin, field, reducedMotion }) {
-  const flame = makePoints(count, material);
-  const spark = makePoints(sparkCount, material);
+  const flame = createPoints(count, material, { alpha: false });
+  const spark = createPoints(sparkCount, material, { alpha: false });
 
   const P = flame.geometry.attributes.position.array;
   const C = flame.geometry.attributes.color.array;
@@ -130,7 +122,7 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
   const sLife = new Float32Array(sparkCount);
 
   // Ramp in linear space: [lo, mid, hi, core].
-  let ramp = [new THREE.Color(), new THREE.Color(), new THREE.Color(), new THREE.Color()];
+  const ramp = rampColors(['#000000', '#000000', '#000000', '#000000']);
   const tmp = new THREE.Color();
 
   const params = {
@@ -294,7 +286,7 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
 
     /** hexes: [lo, mid, hi, core] (sRGB) */
     setRamp(hexes) {
-      ramp = hexes.map((h) => new THREE.Color(h));
+      setRampColors(ramp, hexes);
     },
     burst(amount = 1) {
       const n = Math.floor(count * 0.35 * amount * params.spawn);

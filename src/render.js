@@ -4,13 +4,11 @@ import {
   experience, leadership, education, skills, contact, ui, shown,
 } from './content.js';
 
-const BASE = import.meta.env.BASE_URL;
+const BASE = import.meta.env?.BASE_URL ?? '/'; // (outside Vite, e.g. under node --test: the root)
 
 export { esc } from './html.js';
 import { esc, isSafeUrl, assetUrl } from './html.js';
-import { parseRoute, routePath } from './routes.js';
 import { logoMark } from './ui/logo.js';
-export const routeHref = (hash) => routePath(parseRoute(hash), BASE);
 export const isExternal = (href) => /^(https?:|mailto:)/i.test(href);
 export const url = (href) => {
   if (!isSafeUrl(href)) throw new Error('Invalid link: ' + href);

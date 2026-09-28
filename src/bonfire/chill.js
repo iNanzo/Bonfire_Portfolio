@@ -5,12 +5,11 @@
 // Pale specks in the flame's lightest colors, normal-blended in the color pass like
 // the fire's smoke, so they veil what's behind them before the palette dither.
 import * as THREE from 'three';
+import { createPoints, rampColors } from './points.js';
 
 export function createChill({ material, field, origin, count = 1400, reducedMotion = false }) {
-  const g = new THREE.BufferGeometry();
-  for (const [k, n] of [['position', 3], ['color', 3], ['size', 1], ['alpha', 1]]) g.setAttribute(k, new THREE.BufferAttribute(new Float32Array(count * n), n));
-  const pts = new THREE.Points(g, material);
-  pts.frustumCulled = false;
+  const pts = createPoints(count, material);
+  const g = pts.geometry;
   const P = g.attributes.position.array;
   const Cl = g.attributes.color.array;
   const Sz = g.attributes.size.array;
@@ -26,7 +25,8 @@ export function createChill({ material, field, origin, count = 1400, reducedMoti
   let live = false;
   let ground = () => 0;
 
-  let cols = ['#e8f4ff', '#8cc8ff', '#2f7fe0'].map((h) => new THREE.Color(h));
+  const cols = rampColors(['#e8f4ff', '#8cc8ff', '#2f7fe0']);
+  const tint = new THREE.Color();
 
   /** One wisp at (x, y, z) moving (vx, vy, vz), for `span` seconds, at most `alpha` opaque. */
   function emit(x, y, z, vx, vy, vz, span = 2, alpha = 0.5) {
@@ -95,7 +95,9 @@ export function createChill({ material, field, origin, count = 1400, reducedMoti
     setGround(fn) { ground = fn; },
     /** Pale mist in the flame's lightest colors. */
     setRamp(hexes) {
-      cols = [new THREE.Color(hexes[2]).lerp(new THREE.Color(hexes[3]), 0.6), new THREE.Color(hexes[2]), new THREE.Color(hexes[1]).lerp(new THREE.Color(hexes[2]), 0.5)];
+      cols[0].set(hexes[2]).lerp(tint.set(hexes[3]), 0.6);
+      cols[1].set(hexes[2]);
+      cols[2].set(hexes[1]).lerp(tint.set(hexes[2]), 0.5);
     },
   };
 }

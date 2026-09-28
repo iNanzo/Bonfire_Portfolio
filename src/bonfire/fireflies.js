@@ -18,8 +18,9 @@
 // fold their wings, and take off the same way.
 import * as THREE from 'three';
 import { SimplexNoise } from 'three/examples/jsm/math/SimplexNoise.js';
+import { smooth, TAU } from '../math.js';
+import { createPoints, markDirty } from './points.js';
 
-const TAU = Math.PI * 2;
 const HOVER = 0.15;  // hover distance off a surface before settling onto it
 const REST = 0.014;  // resting distance off a surface
 const CLEAR = 0.2;   // preferred flight clearance above the scenery
@@ -35,8 +36,6 @@ const POIS = [
   [1.15, 0.35, -0.45],   // spare logs
   [-0.75, 0.45, -0.95],  // fallen pillar drum
 ];
-
-const smooth = (s) => s * s * (3 - 2 * s);
 
 /**
  * @param {THREE.Object3D} template  the "Firefly" node from the model
@@ -233,6 +232,7 @@ export function createFireflies(template, {
     group.add(l);
     return l;
   });
+  const byGlow = flies.slice(); // (re-sorted in place each frame, brightest first)
 
   const hexes = (h) => h.map((c) => new THREE.Color(c));
   let rampOld = hexes(['#8c1d2f', '#e0582a', '#ffc76a', '#fff1d0']);
@@ -490,14 +490,15 @@ export function createFireflies(template, {
     if (trails) stepTrails(dt);
 
     // Point lights follow the brightest fireflies.
-    const ranked = flies.slice().sort((a, b) => b.glow - a.glow);
-    lights.forEach((l, j) => {
-      const f = ranked[j];
+    byGlow.sort((a, b) => b.glow - a.glow);
+    for (let j = 0; j < lights.length; j++) {
+      const l = lights[j];
+      const f = byGlow[j];
       f.lantern.getWorldPosition(lanternWorld);
       l.position.copy(lanternWorld);
       tone(f, 1, l.color).lerp(tone(f, 2, colB), 0.5);
       l.intensity = Math.min(1.3, f.glow) * 1.2;
-    });
+    }
   }
 
   /**
@@ -530,13 +531,7 @@ export function createFireflies(template, {
   const trails = trailMaterial && !reducedMotion ? makeTrails(trailMaterial, Math.max(64, count * 14)) : null;
   const lanternNow = new THREE.Vector3();
   function makeTrails(material, n) {
-    const geo = new THREE.BufferGeometry();
-    for (const [name, size] of [['position', 3], ['color', 3], ['size', 1], ['alpha', 1]]) {
-      geo.setAttribute(name, new THREE.BufferAttribute(new Float32Array(n * size), size));
-    }
-    const points = new THREE.Points(geo, material);
-    points.frustumCulled = false;
-    return { points, n, age: new Float32Array(n).fill(1e3), life: new Float32Array(n).fill(1), base: new Float32Array(n * 3), next: 0 };
+    return { points: createPoints(n, material), n, age: new Float32Array(n).fill(1e3), life: new Float32Array(n).fill(1), base: new Float32Array(n * 3), next: 0 };
   }
   function stepTrails(dt) {
     const T = trails;
@@ -571,7 +566,7 @@ export function createFireflies(template, {
       S[j] = k < 0.3 ? 1.4 : 1;
       A[j] = 1 - k;
     }
-    for (const name of ['position', 'color', 'size', 'alpha']) T.points.geometry.attributes[name].needsUpdate = true;
+    markDirty(T.points);
   }
 
   /**

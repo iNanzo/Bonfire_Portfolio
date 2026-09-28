@@ -31,5 +31,3 @@ export function getPov(name, layout) {
     sy: 0.27,
   };
 }
-
-export const POV_NAMES = Object.keys(wide);

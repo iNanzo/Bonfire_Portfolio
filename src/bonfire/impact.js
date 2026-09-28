@@ -24,6 +24,8 @@
 // solid; cooling ones swell into fainter wisps, more so in turbulent pockets.
 import * as THREE from 'three';
 import { createRingLines, ringNoise } from './rings.js';
+import { TAU } from '../math.js';
+import { createPoints, rampColors, setRampColors } from './points.js';
 
 const smokeVertex = /* glsl */ `
   attribute float size;
@@ -58,18 +60,6 @@ export function createSmokeMaterial() {
   });
 }
 
-function points(n, material, withAlpha) {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-  g.setAttribute('size', new THREE.BufferAttribute(new Float32Array(n), 1));
-  if (withAlpha) g.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(n), 1));
-  const p = new THREE.Points(g, material);
-  p.frustumCulled = false;
-  return p;
-}
-
-const TAU = Math.PI * 2;
 const SPLASH = 120; // extra ember slots for collision splashes (recycled)
 // Shock ring strands: radial offset, height, brightness.
 const STRANDS = [{ dr: 0, y: 0.05, lead: true }, { dr: -0.045, y: 0.09, lead: false }];
@@ -88,12 +78,12 @@ export function createImpactFx({
   emitters = 144, flames = 3200, haze = 1500, smoke = 520, ash = 220, embers = 160,
   lights: lightCount = 6, reducedMotion = false,
 }) {
-  const ring = points(flames, fireMaterial, true);
-  const hazePts = points(haze, smokeMaterial, true);
-  const puff = points(smoke, smokeMaterial, true);
-  const flecks = points(ash, smokeMaterial, true);
+  const ring = createPoints(flames, fireMaterial);
+  const hazePts = createPoints(haze, smokeMaterial);
+  const puff = createPoints(smoke, smokeMaterial);
+  const flecks = createPoints(ash, smokeMaterial);
   const emberCount = embers + (reducedMotion ? 0 : SPLASH);
-  const sparks = points(emberCount, fireMaterial, true);
+  const sparks = createPoints(emberCount, fireMaterial);
 
   // Shock ring: per strand, one segment from each emitter to the next.
   const W = createRingLines(fireMaterial, STRANDS.length * emitters * 2);
@@ -102,7 +92,7 @@ export function createImpactFx({
   let waveSeed = 0;
   let waveLive = false;
 
-  let ramp = ['#8c1d2f', '#e0582a', '#ffc76a', '#fff1d0'].map((h) => new THREE.Color(h));
+  const ramp = rampColors(['#8c1d2f', '#e0582a', '#ffc76a', '#fff1d0']);
   const smokeCols = ['#15131d', '#1d1a26', '#221f2b', '#2c2a3a'].map((h) => new THREE.Color(h));
   const hazeCols = ['#2c2a3a', '#35323f', '#403c4a', '#4a4658'].map((h) => new THREE.Color(h));
   const ashCols = ['#8e8a98', '#a9a4b0', '#77737f', '#c4beb4'].map((h) => new THREE.Color(h));
@@ -552,6 +542,6 @@ export function createImpactFx({
       { pos: A.pos, vel: aVel, n: ash, geo: flecks.geometry, maxV: 1.6 },
       { pos: E.pos, vel: kVel, n: emberCount, geo: sparks.geometry, maxV: 2 },
     ],
-    setRamp(hexes) { ramp = hexes.map((h) => new THREE.Color(h)); },
+    setRamp(hexes) { setRampColors(ramp, hexes); },
   };
 }

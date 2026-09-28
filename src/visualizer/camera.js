@@ -18,12 +18,11 @@
 // Every framing stays in the clearing: above the ground, out of the fire, in front of the
 // ruins.
 import * as THREE from 'three';
+import { approach, clamp, pick, TAU } from '../math.js';
 
-const TAU = Math.PI * 2;
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const ease = (cur, target, tau, dt) => cur + (target - cur) * (1 - Math.exp(-dt / tau));
-const easeVec = (v, target, tau, dt) => v.lerp(target, 1 - Math.exp(-dt / tau));
-const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+/** approach() for a vector, in place. */
+const approachVec = (v, target, tau, dt) => v.lerp(target, 1 - Math.exp(-dt / tau));
+
 const FIRE = new THREE.Vector3(0.02, 0, 0.02);
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -173,10 +172,10 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         st.raw = a;
         st.acc += d;
         const before = st.ang;
-        st.ang = ease(st.ang, st.acc, 0.14, dt);
-        st.lean = ease(st.lean, clamp(-(st.ang - before) / Math.max(dt, 1e-3) * 0.012, -0.35, 0.35), 0.1, dt);
-        easeVec(st.c, b.mid, 0.2, dt);
-        easeVec(st.look, w.lerpVectors(b.mid, b.tip, 0.45), 0.07, dt);
+        st.ang = approach(st.ang, st.acc, 0.14, dt);
+        st.lean = approach(st.lean, clamp(-(st.ang - before) / Math.max(dt, 1e-3) * 0.012, -0.35, 0.35), 0.1, dt);
+        approachVec(st.c, b.mid, 0.2, dt);
+        approachVec(st.look, w.lerpVectors(b.mid, b.tip, 0.45), 0.07, dt);
         o.pos.copy(st.c).addScaledVector(st.toCam, st.r)
           .addScaledVector(st.right, Math.cos(st.ang) * 0.4 * st.r).addScaledVector(st.up, Math.sin(st.ang) * 0.4 * st.r);
         o.target.copy(st.look);
@@ -197,7 +196,7 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         o.target.set(0, -0.25 * b.len, 0).applyQuaternion(st.q).add(b.mid);
         // The pommel stays up on screen, so the world turns instead of the blade.
         const r = clamp(rollFor(o.pos, o.target, w.set(0, 1, 0).applyQuaternion(st.q)), -1.4, 1.4);
-        st.roll = ease(st.roll, r, 0.12, dt);
+        st.roll = approach(st.roll, r, 0.12, dt);
         o.fov = 54;
         o.roll = st.roll;
       },
@@ -211,7 +210,7 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         st.fov = 44;
       },
       pose(st, b, dt, o) {
-        easeVec(st.look, w.lerpVectors(b.mid, b.tip, 0.3), 0.09, dt);
+        approachVec(st.look, w.lerpVectors(b.mid, b.tip, 0.3), 0.09, dt);
         o.pos.copy(st.pos);
         o.pos.x += Math.sin(st.t * 0.9) * 0.04; // a hand-held drift
         o.pos.y += Math.sin(st.t * 1.3 + 1) * 0.03;
@@ -220,7 +219,7 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         v.subVectors(o.target, o.pos).normalize();
         let half = 0;
         for (const p of [b.tip, b.grip, b.mid]) half = Math.max(half, v.angleTo(w.subVectors(p, o.pos)));
-        st.fov = ease(st.fov, clamp((half * 2 * 1.35 * 180) / Math.PI + 6, 28, 72), 0.25, dt);
+        st.fov = approach(st.fov, clamp((half * 2 * 1.35 * 180) / Math.PI + 6, 28, 72), 0.25, dt);
         o.fov = st.fov;
         o.roll = 0;
       },
@@ -238,7 +237,7 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         const a = st.a0 + st.dir * 0.95 * Math.sin((TAU * st.t) / (beat * 16));
         const h = 1.2 + 0.4 * Math.sin((TAU * st.t) / (beat * 8));
         o.pos.set(FIRE.x + Math.sin(a) * st.r, h, FIRE.z + Math.cos(a) * st.r);
-        easeVec(st.look, b.mid, 0.12, dt);
+        approachVec(st.look, b.mid, 0.12, dt);
         o.target.copy(st.look);
         o.fov = 42;
         o.roll = 0.05 * Math.sin((TAU * st.t) / (beat * 8));
@@ -254,10 +253,10 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         st.k = 0;
       },
       pose(st, b, dt, o, c) {
-        st.k = ease(st.k, Math.max(c.build, Math.min(0.8, st.t / 12)), 0.5, dt);
+        st.k = approach(st.k, Math.max(c.build, Math.min(0.8, st.t / 12)), 0.5, dt);
         const d0 = 3.6;
         const d = d0 * (1 - 0.55 * st.k);
-        easeVec(st.look, b.mid, 0.15, dt);
+        approachVec(st.look, b.mid, 0.15, dt);
         o.pos.copy(st.look).addScaledVector(st.dir, d);
         o.target.copy(st.look);
         o.fov = (2 * Math.atan((Math.tan((32 * Math.PI) / 360) * d0) / d) * 180) / Math.PI;
@@ -310,8 +309,8 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
   function update(dt, c) {
     if (c.period) lastPeriod = c.period;
     if (settings.camera !== 'still' && !reducedMotion) { driftT += dt; shotT += dt; }
-    holdEase = ease(holdEase, c.holding ? 1 : 0, 0.6, dt);
-    trackEase = ease(trackEase, fire.blade?.free ? 1 : 0, 0.3, dt);
+    holdEase = approach(holdEase, c.holding ? 1 : 0, 0.6, dt);
+    trackEase = approach(trackEase, fire.blade?.free ? 1 : 0, 0.3, dt);
     frameWanted(dt, c);
     copyPose(want, shown);
     if (trans) {
@@ -325,8 +324,8 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
       if (u >= 1) trans = null;
     }
     started = true;
-    framing.sx = ease(framing.sx, framing.toX, 0.5, dt);
-    framing.sy = ease(framing.sy, framing.toY, 0.5, dt);
+    framing.sx = approach(framing.sx, framing.toX, 0.5, dt);
+    framing.sy = approach(framing.sy, framing.toY, 0.5, dt);
     shown.pos.toArray(out.pos);
     shown.target.toArray(out.target);
     // The zoom punch narrows the view for a moment on each kick.

@@ -27,6 +27,8 @@ import * as THREE from 'three';
 import { effects } from '../effects.js';
 import { createBoltLines, hashSeed, seeded } from './bolts.js';
 import { DITHER_GLSL } from './flame.js';
+import { smoothstep, TAU } from '../math.js';
+import { createPoints, rampColors, setRampColors } from './points.js';
 
 const MAX_FILAMENTS = 32;
 const MAX_STRIKES = 8;
@@ -36,20 +38,7 @@ const FLASH = MAX_FILAMENTS * 3;
 const CONTACT_LIGHTS = 4;
 const IMPACT_GLOWS = 6;
 const UP = new THREE.Vector3(0, 1, 0);
-const TAU = Math.PI * 2;
 const easeOutBack = (t) => { const c = 1.6; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; };
-const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-
-function points(n, material, withAlpha) {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-  g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-  g.setAttribute('size', new THREE.BufferAttribute(new Float32Array(n), 1));
-  if (withAlpha) g.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(n), 1));
-  const p = new THREE.Points(g, material);
-  p.frustumCulled = false;
-  return p;
-}
 
 // A glow: a camera-facing disc, depth-tested like the particles, stepping inner → mid
 // → outer with a dithered falloff. Its middle carries "heat" so the pixel pass burns
@@ -110,9 +99,9 @@ function glowSprite(fxMaterial) {
  */
 export function createPlasma({ fxMaterial, hotMaterial, field, origin, reducedMotion = false }) {
   const bolts = createBoltLines(fxMaterial, MAX_FILAMENTS * 70 + 400, 1600);
-  const core = points(CORE, hotMaterial, false);
-  const sparks = points(SPARKS, fxMaterial, true);
-  const flashes = points(FLASH, fxMaterial, true);
+  const core = createPoints(CORE, hotMaterial, { alpha: false });
+  const sparks = createPoints(SPARKS, fxMaterial);
+  const flashes = createPoints(FLASH, fxMaterial);
   const C = { pos: core.geometry.attributes.position.array, col: core.geometry.attributes.color.array, size: core.geometry.attributes.size.array };
   const S = { pos: sparks.geometry.attributes.position.array, col: sparks.geometry.attributes.color.array, size: sparks.geometry.attributes.size.array, alpha: sparks.geometry.attributes.alpha.array };
   const Fl = { pos: flashes.geometry.attributes.position.array, col: flashes.geometry.attributes.color.array, size: flashes.geometry.attributes.size.array, alpha: flashes.geometry.attributes.alpha.array };
@@ -126,7 +115,7 @@ export function createPlasma({ fxMaterial, hotMaterial, field, origin, reducedMo
   for (const g of impacts) g.u.uHeat.value = 1.8;
   const lights = Array.from({ length: reducedMotion ? 0 : CONTACT_LIGHTS }, () => new THREE.PointLight(0x8cc8ff, 0, 2.4, 2));
 
-  let ramp = ['#8c1d2f', '#e0582a', '#ffc76a', '#fff1d0'].map((h) => new THREE.Color(h));
+  const ramp = rampColors(['#8c1d2f', '#e0582a', '#ffc76a', '#fff1d0']);
   const white = new THREE.Color('#ffffff');
   const tmp = new THREE.Color();
   const sample = (h, out) => {
@@ -552,6 +541,6 @@ export function createPlasma({ fxMaterial, hotMaterial, field, origin, reducedMo
     /** 0..1: the ball just discharged (decays fast); the scene flashes with it. */
     get flash() { return flash; },
     sets: [{ pos: S.pos, vel: sVel, n: SPARKS, geo: sparks.geometry, maxV: 2 }],
-    setRamp(hexes) { ramp = hexes.map((h) => new THREE.Color(h)); },
+    setRamp(hexes) { setRampColors(ramp, hexes); },
   };
 }

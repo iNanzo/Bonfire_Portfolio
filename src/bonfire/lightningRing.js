@@ -19,18 +19,17 @@ import * as THREE from 'three';
 import { effects } from '../effects.js';
 import { createBoltLines, hashSeed, seeded } from './bolts.js';
 import { ringNoise } from './rings.js';
+import { TAU } from '../math.js';
+import { createPoints, rampColors, setRampColors } from './points.js';
 
-const TAU = Math.PI * 2;
 const UP = new THREE.Vector3(0, 1, 0);
 const STRIKE_LIGHTS = 4;
 
 /** @param {(x:number, z:number)=>number} [o.ground]  height of the scenery at (x, z), for where strikes land */
 export function createLightningRing({ fxMaterial, origin, field, reach, ground = () => 0, emitters = 96, sparks = 260, lights: lightCount = 6, reducedMotion = false }) {
   const bolts = createBoltLines(fxMaterial, emitters * 22 + 420, emitters * 8 + 900);
-  const g = new THREE.BufferGeometry();
-  for (const [k, n] of [['position', 3], ['color', 3], ['size', 1], ['alpha', 1]]) g.setAttribute(k, new THREE.BufferAttribute(new Float32Array(sparks * n), n));
-  const sparkPts = new THREE.Points(g, fxMaterial);
-  sparkPts.frustumCulled = false;
+  const sparkPts = createPoints(sparks, fxMaterial);
+  const g = sparkPts.geometry;
   const K = { pos: g.attributes.position.array, col: g.attributes.color.array, size: g.attributes.size.array, alpha: g.attributes.alpha.array };
   const kVel = new Float32Array(sparks * 3);
   const kAge = new Float32Array(sparks).fill(1);
@@ -48,7 +47,6 @@ export function createLightningRing({ fxMaterial, origin, field, reach, ground =
   const eAcc = new Float32Array(emitters);
   let active = false;
   let live = false;
-  let since = 1e3;
   let seed = 0;
   let ballHeight = 0.58;
   // The crackle out of the bonfire: how long it lasts, how many bolts at a time.
@@ -63,7 +61,7 @@ export function createLightningRing({ fxMaterial, origin, field, reach, ground =
   const strobe = new Float32Array(lightCount).fill(1);
   let strobeStep = -1;
 
-  let ramp = ['#0f2f66', '#2f7fe0', '#8cc8ff', '#e8f4ff'].map((h) => new THREE.Color(h));
+  const ramp = rampColors(['#0f2f66', '#2f7fe0', '#8cc8ff', '#e8f4ff']);
   const white = new THREE.Color('#ffffff');
   const tmp = new THREE.Color();
   const sample = (h, out) => {
@@ -92,7 +90,6 @@ export function createLightningRing({ fxMaterial, origin, field, reach, ground =
     ballHeight = height;
     crackle(0.85, 8, height);
     active = true;
-    since = 0;
     seed = Math.random() * 100;
     for (let i = 0; i < emitters; i++) {
       const a = (i / emitters) * TAU + (Math.random() - 0.5) * 0.03;
@@ -124,7 +121,6 @@ export function createLightningRing({ fxMaterial, origin, field, reach, ground =
 
   function step(dt, t) {
     const L = effects.lightning;
-    since += dt;
     crackleT += dt;
     const crackling = crackleT < crackleFor;
     let anySpark = false;
@@ -324,6 +320,6 @@ export function createLightningRing({ fxMaterial, origin, field, reach, ground =
     crackle,
     step,
     sets: [{ pos: K.pos, vel: kVel, n: sparks, geo: g, maxV: 2 }],
-    setRamp(hexes) { ramp = hexes.map((h) => new THREE.Color(h)); },
+    setRamp(hexes) { setRampColors(ramp, hexes); },
   };
 }

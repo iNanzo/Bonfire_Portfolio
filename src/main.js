@@ -16,6 +16,7 @@ import { setupInventory } from './ui/inventory.js';
 import { applyFlame, setAccentRamp } from './ui/theme.js';
 import { parseRoute, readRoute, routePath, isEditing } from './routes.js';
 import { updateMetadata } from './seo.js';
+import { pick } from './math.js';
 const BASE = import.meta.env.BASE_URL;
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -26,7 +27,6 @@ const store = {
 };
 const q = (s, r = document) => r.querySelector(s);
 const qa = (s, r = document) => [...r.querySelectorAll(s)];
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 document.documentElement.classList.add('js');
 if (touch) document.documentElement.classList.add('touch');

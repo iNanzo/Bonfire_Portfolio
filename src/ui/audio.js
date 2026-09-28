@@ -7,7 +7,6 @@ let master = null;
 let ambience = null;
 let enabled = false;
 let crackleTimer = null;
-let ambienceLevel = 1;
 
 function ensureContext() {
   if (ctx) return ctx;
@@ -41,7 +40,7 @@ function startAmbience() {
   filter.type = 'lowpass';
   filter.frequency.value = 700;
   const gain = ctx.createGain();
-  gain.gain.value = 0.16 * ambienceLevel;
+  gain.gain.value = 0.16;
   src.connect(filter).connect(gain).connect(master);
   src.start();
   ambience = { src, gain };
@@ -51,7 +50,7 @@ function scheduleCrackle() {
   clearTimeout(crackleTimer);
   crackleTimer = setTimeout(() => {
     if (!enabled) return;
-    if (ambienceLevel > 0.05) pop(0.02 + Math.random() * 0.05);
+    pop(0.02 + Math.random() * 0.05);
     scheduleCrackle();
   }, 60 + Math.random() * 420);
 }
@@ -68,7 +67,7 @@ function pop(vol) {
   hp.type = 'highpass';
   hp.frequency.value = 1400 + Math.random() * 2400;
   const g = ctx.createGain();
-  g.gain.value = vol * ambienceLevel;
+  g.gain.value = vol;
   src.connect(hp).connect(g).connect(master);
   src.start(t);
 }
@@ -101,12 +100,6 @@ export function setSound(on) {
     crackleTimer = null;
   }
   return enabled;
-}
-
-/** Set the ambience mix independently of the master sound toggle. */
-export function setAmbienceLevel(level) {
-  ambienceLevel = level;
-  if (ambience) ambience.gain.gain.setTargetAtTime(0.16 * level, ctx.currentTime, 0.2);
 }
 
 export function blip(kind = 'move') {

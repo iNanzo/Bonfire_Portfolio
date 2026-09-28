@@ -16,16 +16,14 @@
 // soft leash keeps them from drifting to the edges of the clearing. In a breakdown a
 // random few (sometimes three, sometimes nearly half) swirl around a held blade, a few
 // more gather in a loose ring, and the rest carry on roaming, different every time.
+import { shuffle, TAU, wrap } from '../math.js';
 
-const TAU = Math.PI * 2;
 const SPECIES = [
   [0],
   [0, 0.35],
   [0, 0.28, 0.56],
   [0, 4],
 ];
-const wrap = (x, m) => ((x % m) + m) % m;
-const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 export function createFireflyShow({ reducedMotion = false } = {}) {
   let pattern = 'blink';

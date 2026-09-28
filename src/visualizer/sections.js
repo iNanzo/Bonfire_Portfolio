@@ -23,11 +23,10 @@
 //              doesn't count). A short cut makes a small drop; a long
 //              breakdown or a real build, a big one. If the energy creeps back without
 //              a jump, the section just returns to the groove.
+import { approach, clamp01 } from '../math.js';
 
 const SILENT_RMS = 10 ** (-64 / 20);
 const dB = (a) => 20 * Math.log10(Math.max(a, 1e-7));
-const clamp01 = (x) => Math.min(1, Math.max(0, x));
-const ease = (cur, target, tau, dt) => cur + (target - cur) * (1 - Math.exp(-dt / tau));
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
 
 /** Least-squares slope of ys over their index (units per window). */
@@ -177,9 +176,9 @@ export function createSections() {
       enter('silent', now, events, 'silence');
     }
 
-    lowFast = ease(lowFast, m.low, m.low > lowFast ? 0.008 : 0.12, dt);
-    totFast = ease(totFast, m.rms, m.rms > totFast ? 0.015 : 0.15, dt);
-    highFast = ease(highFast, m.high, m.high > highFast ? 0.015 : 0.15, dt);
+    lowFast = approach(lowFast, m.low, m.low > lowFast ? 0.008 : 0.12, dt);
+    totFast = approach(totFast, m.rms, m.rms > totFast ? 0.015 : 0.15, dt);
+    highFast = approach(highFast, m.high, m.high > highFast ? 0.015 : 0.15, dt);
     const kickNow = m.kick > 0;
     if (kickNow && hist.length >= 6 && hist.slice(-6).every((x) => x.kicks === 0) && win.kicks === 0) returnUntil = now + 0.15;
     const kickReturn = now < returnUntil;

@@ -11,13 +11,12 @@
 // half beat, beat or two beats, on the beat or off it, and a dash takes a quarter to most
 // of that, so its speed follows the tempo; how far it goes varies too, further when the
 // music is loud.
+import { pick } from '../math.js';
 
 export const FLY_MOVES = { swing: 'Swing', bounce: 'Bounce', dart: 'Dart', compass: 'Compass', zigzag: 'Zigzag', scatter: 'Scatter' };
 const CARDINAL = ['up', 'down', 'left', 'right', 'toward', 'away'];
 const COMPASS = ['right', 'up', 'left', 'down'];
 const MAX_SPEED = 4; // m/s at the start of a dash
-
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 export function createFireflyMoves({ reducedMotion = false } = {}) {
   let move = 'swing';
