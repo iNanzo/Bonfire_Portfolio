@@ -285,8 +285,9 @@ function showCard(n, { ms = 3600 } = {}) {
   titleCard.hidden = true;
   void titleCard.offsetWidth;
   titleCard.hidden = false;
+  mirrorCard();
   clearTimeout(titleTimer);
-  titleTimer = setTimeout(() => { titleCard.hidden = true; }, ms);
+  titleTimer = setTimeout(() => { titleCard.hidden = true; mirrorCard(); }, ms);
 }
 
 // --- Audio ---------------------------------------------------------------------------------
@@ -709,22 +710,41 @@ function streamInto(win) {
   video.srcObject = canvas.captureStream(60);
   return true;
 }
+/** Copies the title card (and the flame colors and dither tiles it draws with) into the output window. */
+function mirrorCard() {
+  if (!output || output.closed) return;
+  const doc = output.document;
+  Object.assign(doc.documentElement.dataset, document.documentElement.dataset);
+  doc.documentElement.style.cssText = document.documentElement.style.cssText;
+  const copy = doc.importNode(titleCard, true); // a fresh node restarts the fade-in
+  const old = doc.querySelector('[data-title-card]');
+  if (old) old.replaceWith(copy); else doc.body.append(copy);
+}
 function openOutput() {
   if (output && !output.closed) { output.focus(); return; }
   if (!stage.querySelector('canvas')?.captureStream) { note('This browser can’t send the picture to another window', 3); return; }
   output = window.open('', 'bonfire-output', 'popup,width=1280,height=720');
   if (!output) { note('The window was blocked: allow pop-ups for this page', 3); return; }
   output.document.title = 'Bonfire Live — Output';
+  // The page's styles come along so the title card (HTML over the canvas, not in the stream)
+  // looks the same there.
+  output.document.head.replaceChildren(...[...document.querySelectorAll('link[rel="stylesheet"], style')].map((el) => {
+    if (el.tagName !== 'LINK') return el.cloneNode(true);
+    const link = output.document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = el.href;
+    return link;
+  }));
   output.document.body.innerHTML = `
     <style>
       html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
       video { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
-      p { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); margin: 0; padding: 6px 12px;
+      .viz-out-hint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); margin: 0; padding: 6px 12px;
           font: 14px system-ui, sans-serif; color: #e9e3d2; background: #07070bcc; transition: opacity 600ms; }
-      body.quiet p { opacity: 0; } body.quiet { cursor: none; }
+      body.quiet .viz-out-hint { opacity: 0; } body.quiet { cursor: none; }
     </style>
     <video autoplay muted playsinline></video>
-    <p>Drag this window to the projector, then double-click for full screen.</p>`;
+    <p class="viz-out-hint">Drag this window to the projector, then double-click for full screen.</p>`;
   const doc = output.document;
   doc.addEventListener('dblclick', () => (doc.fullscreenElement ? doc.exitFullscreen() : doc.documentElement.requestFullscreen?.()));
   let quiet = 0;
@@ -732,6 +752,7 @@ function openOutput() {
   doc.addEventListener('pointermove', wakeOut);
   wakeOut();
   streamInto(output);
+  mirrorCard();
   output.addEventListener('pagehide', () => { q('[data-output-label]').textContent = 'Output'; });
   q('[data-output-label]').textContent = 'Output (open)';
   note('Output window open', 2);
