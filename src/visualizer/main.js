@@ -18,8 +18,12 @@ import { installDitherPatterns } from '../ui/dither.js';
 import { applyFlame, setAccentRamp } from '../ui/theme.js';
 import { esc } from '../html.js';
 import { createAnalyser, BAND_NAMES } from './analyser.js';
-import { createDirector, DEFAULT_SETTINGS, SHOTS } from './director.js';
-import { LOOKS } from './looks.js';
+import { createDirector, DEFAULT_SETTINGS } from './director.js';
+import { SHOTS, SWING_CAMS, HOLD_CAMS, TRANSITIONS } from './camera.js';
+import { LOOKS, DROP_FX, MODIFIER_MODES } from './looks.js';
+import { FLY_MOVES } from './fireflyMoves.js';
+import { COLOR_MODES, COLOR_SCHEMES } from './colors.js';
+import { MOVES } from '../bonfire/bladeMotion.js';
 import { createDemo, DEMO_BPM } from './demo.js';
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -29,13 +33,18 @@ const corners = '<span class="corner tl"></span><span class="corner tr"></span><
 
 // --- Settings (this browser only) ---------------------------------------------------------
 const STORE = 'bonfire-live';
+// Switch groups (one checkbox each): a saved group keeps only the switches that still exist.
+const GROUPS = ['elements', 'looks', 'moves', 'flyMoves', 'dropFx'];
+const AT_LEAST_ONE = new Set(['elements', 'looks', 'moves', 'flyMoves']);
 function loadSettings() {
   const out = structuredClone({ ...DEFAULT_SETTINGS, volume: 0.8, deviceId: '' });
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) ?? '{}');
-    for (const [k, v] of Object.entries(saved)) {
+    for (let [k, v] of Object.entries(saved)) {
       if (!(k in out)) continue;
-      if (k === 'elements' || k === 'looks') Object.assign(out[k], v);
+      // (Scanlines and the mirror were on/off switches before they joined the looks' mix.)
+      if ((k === 'scanlines' || k === 'mirror') && typeof v === 'boolean') v = v ? 'on' : 'mix';
+      if (GROUPS.includes(k)) { for (const id of Object.keys(out[k])) if (typeof v?.[id] === 'boolean') out[k][id] = v[id]; }
       else if (typeof v === typeof out[k]) out[k] = v;
     }
   } catch { /* private mode or bad JSON: defaults */ }
@@ -63,10 +72,11 @@ const KEYS = [
   ['A', 'Forge a blade and hold it for the drop'],
   ['B', 'Swap on the beat (lands on a downbeat)'],
   ['R', 'A ring out of the fire'],
-  ['X', 'A sword combo (slashes on the next beats)'],
+  ['X', 'The blade leaves the fire (moves on the next beats)'],
   ['G', 'A burst in the current look'],
   ['L', 'Next look'],
-  ['M', 'Mirror on or off'],
+  ['M', 'Mirror: in the mix, always, off'],
+  ['P', 'Colors: the site’s, harmonious, fully random, a mix'],
   ['1 2 3', 'Hit with flame, lightning or frost'],
   ['← →', 'Hit with the previous or next colors'],
   ['T', 'Tap the tempo (first tap is beat 1)'],
@@ -82,6 +92,11 @@ const range = (key, label, min, max, step, help, unit = '') => `
     ${help ? `<span class="viz-help">${help}</span>` : ''}
   </label>`;
 const check = (key, label) => `<label class="viz-check"><input type="checkbox" data-set="${key}"><span>${label}</span></label>`;
+/** A row of checkboxes, one per entry of `names` ({ id: label }), for settings[group]. */
+const checks = (group, label, names) => `
+  <p class="viz-field-label">${label}</p>
+  <div class="viz-checks">${Object.entries(names).map(([id, name]) => check(`${group}.${id}`, esc(name))).join('')}</div>`;
+const options = (names, first = null) => [...(first ? [first] : []), ...Object.entries(names)];
 const select = (key, label, options) => `
   <label class="viz-field">
     <span class="viz-field-label">${label}</span>
@@ -170,7 +185,6 @@ app.innerHTML = `
           ${range('reactivity', 'Reactivity', 0, 2, 0.05, 'How hard the fire answers the music.', '×')}
           ${select('particles', 'Particles', [['normal', 'As on the site'], ['more', 'More'], ['max', 'Most (a strong GPU)']])}
           ${check('sparks', 'Hi-hats throw sparks')}
-          ${check('blink', 'Fireflies blink and dance on the beat')}
         </fieldset>
         <fieldset>
           <legend>Weapons</legend>
@@ -178,14 +192,36 @@ app.innerHTML = `
           ${select('phraseBars', 'New Weapon Every', [['0', 'Only on drops'], ['8', '8 bars'], ['16', '16 bars'], ['32', '32 bars'], ['64', '64 bars']])}
           ${select('ringBars', 'Extra Ring Every', [['0', 'Never'], ['1', 'Bar'], ['2', '2 bars'], ['4', '4 bars'], ['8', '8 bars']])}
           ${check('echo', 'The blade’s silhouette echoes out on the bar')}
-          ${select('combos', 'Sword Combos', [['-1', 'Never'], ['0', 'After drops'], ['16', 'Every 16 bars'], ['8', 'Every 8 bars'], ['4', 'Every 4 bars']])}
-          <p class="viz-field-label">Elements</p>
-          <div class="viz-checks">${Object.keys(settings.elements).map((id) => check(`elements.${id}`, esc(elements[id]?.name ?? id))).join('')}</div>
+          ${checks('elements', 'Elements', Object.fromEntries(Object.keys(settings.elements).map((id) => [id, elements[id]?.name ?? id])))}
+        </fieldset>
+        <fieldset>
+          <legend>Living Blade</legend>
+          ${select('combos', 'Leaves the Fire', [['-1', 'Never'], ['0', 'After drops'], ['16', 'Every 16 bars'], ['8', 'Every 8 bars'], ['4', 'Every 4 bars']])}
+          ${select('comboBars', 'For', [['0', '1, 2 or 4 bars (random)'], ['1', '1 bar'], ['2', '2 bars'], ['4', '4 bars']])}
+          ${checks('moves', 'Moves', MOVES)}
+          ${select('rhythm', 'Rhythm', [['varied', 'Varied (rests, doubles)'], ['beats', 'Every beat']])}
+          ${check('alive', 'Alive: twirls, flips, a shudder on hard beats, a held blade’s sway')}
+        </fieldset>
+        <fieldset>
+          <legend>Colors</legend>
+          ${select('colors', 'New Colors', options(COLOR_MODES))}
+          ${select('scheme', 'Harmony', options(COLOR_SCHEMES))}
+          ${check('sceneColors', 'Recolor the scenery with made palettes')}
+          <p class="viz-help">Made palettes come from the admin’s palette generator: harmonious in the scheme picked, or fully random. <kbd>P</kbd> switches modes live.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Fireflies</legend>
+          ${check('blink', 'Blink and move on the beat')}
+          ${checks('flyMoves', 'Moves', FLY_MOVES)}
+          ${select('flyBars', 'New Move Every', [['4', '4 bars'], ['8', '8 bars'], ['16', '16 bars'], ['32', '32 bars']])}
         </fieldset>
         <fieldset>
           <legend>Camera</legend>
           ${select('camera', 'Camera', [['still', 'Still'], ['drift', 'Slow drift'], ['cuts', 'Drift and cut on phrases']])}
           ${select('cutBars', 'Cut Every', [['1', 'Bar'], ['2', '2 bars'], ['4', '4 bars'], ['8', '8 bars'], ['16', '16 bars']])}
+          ${select('transition', 'Between Shots', options(TRANSITIONS, ['mix', 'A mix']))}
+          ${select('swingCam', 'The Blade Out', options(SWING_CAMS, ['mix', 'A mix, changing mid-move']))}
+          ${select('holdCam', 'A Held Blade', options(HOLD_CAMS, ['mix', 'A mix']))}
           ${check('punch', 'Zoom punch on kicks, shake on the big hits')}
           ${select('shot', 'Shot', Object.entries(SHOTS).map(([k, s]) => [k, s.name]))}
           ${select('pixelSize', 'Pixel Size', [['2', '2 px (fine)'], ['3', '3 px'], ['4', '4 px (the site)'], ['6', '6 px (chunky)'], ['8', '8 px']])}
@@ -193,12 +229,13 @@ app.innerHTML = `
         <fieldset>
           <legend>Rave FX</legend>
           ${range('glitch', 'Effects', 0, 2, 0.05, 'How strong the looks are. They take turns: a new one every few bars and after each drop.', '×')}
-          <p class="viz-field-label">Looks</p>
-          <div class="viz-checks">${Object.entries(LOOKS).map(([k, name]) => check(`looks.${k}`, name)).join('')}</div>
+          ${checks('looks', 'Looks', LOOKS)}
           ${select('lookBars', 'New Look Every', [['0', 'Only after drops'], ['8', '8 bars'], ['16', '16 bars'], ['32', '32 bars']])}
-          ${check('scanlines', 'Scanlines')}
-          ${check('mirror', 'Mirror the picture')}
+          ${select('scanlines', 'Scanlines', MODIFIER_MODES)}
+          ${select('mirror', 'Mirror', MODIFIER_MODES)}
           ${check('flash', 'Negative flash on drops (at most one every 2 seconds)')}
+          ${checks('dropFx', 'Drop Hits', DROP_FX)}
+          ${select('dropCount', 'Per Drop', [['1', 'One'], ['2', 'Up to two'], ['3', 'Up to three']])}
         </fieldset>
         <fieldset class="viz-span">
           <legend>Title Card</legend>
@@ -247,6 +284,7 @@ function onImpact(flameKey, _from, instant, selection) {
   document.documentElement.dataset.element = elementOr(selection.element);
   q('[data-wield]').textContent = wieldLabel({ ...selection, flame: flameKey });
   if (instant) applyFlame(flameKey);
+  director?.landed(flameKey);
 }
 
 function onFrame(dt) {
@@ -632,6 +670,18 @@ const actions = {
   ring: () => director?.ring(1),
   combo: () => { if (!director?.combo()) note('The blade is busy (or no beat yet)', 1.5); },
   cut: () => { director?.cut(); note(`Shot: ${SHOTS[director?.shot]?.name ?? ''}`, 1.5); },
+  colors: () => {
+    const modes = Object.keys(COLOR_MODES);
+    settings.colors = modes[(modes.indexOf(settings.colors) + 1) % modes.length];
+    saveSettings();
+    note(`Colors: ${COLOR_MODES[settings.colors]}`, 1.5);
+  },
+  mirror: () => {
+    const modes = ['mix', 'on', 'off'];
+    settings.mirror = modes[(modes.indexOf(settings.mirror) + 1) % modes.length];
+    saveSettings();
+    note(`Mirror: ${Object.fromEntries(MODIFIER_MODES)[settings.mirror]}`, 1.2);
+  },
   settings: () => openSettings(),
   fullscreen: toggleFullscreen,
   play: () => {
@@ -645,8 +695,6 @@ const actions = {
   'reset-settings': () => {
     const keep = { deviceId: settings.deviceId, title: settings.title, subtitle: settings.subtitle };
     Object.assign(settings, structuredClone(DEFAULT_SETTINGS), { volume: 0.8 }, keep);
-    settings.elements = structuredClone(DEFAULT_SETTINGS.elements);
-    settings.looks = structuredClone(DEFAULT_SETTINGS.looks);
     applySettings();
     fillSettings();
   },
@@ -680,7 +728,8 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'x') actions.combo();
   else if (k === 'g') director.glitchHit();
   else if (k === 'l') note(`Look: ${director.nextLook()}`, 1.5);
-  else if (k === 'm') { settings.mirror = !settings.mirror; saveSettings(); note(settings.mirror ? 'Mirror on' : 'Mirror off', 1.2); }
+  else if (k === 'm') actions.mirror();
+  else if (k === 'p') actions.colors();
   else if (k === 'escape') { document.body.classList.remove('hud-off'); wake(); }
   else if (['1', '2', '3'].includes(e.key)) director.hit({ element: ['fire', 'lightning', 'ice'][Number(e.key) - 1] });
   else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') director.hit({ step: e.key === 'ArrowRight' ? 1 : -1, element: fire.element });
@@ -693,7 +742,7 @@ function setPath(key, value) {
   const last = parts.pop();
   parts.reduce((o, k) => o[k], settings)[last] = value;
 }
-const NUMERIC = new Set(['sensitivity', 'offset', 'volume', 'reactivity', 'phraseBars', 'ringBars', 'cutBars', 'pixelSize', 'glitch', 'combos', 'lookBars']);
+const NUMERIC = new Set(['sensitivity', 'offset', 'volume', 'reactivity', 'phraseBars', 'ringBars', 'cutBars', 'pixelSize', 'glitch', 'combos', 'comboBars', 'lookBars', 'flyBars', 'dropCount']);
 function showOutput(key) {
   const out = q(`[data-out="${key}"]`);
   if (!out) return;
@@ -727,9 +776,9 @@ settingsDialog.addEventListener('input', (e) => {
   const key = el.dataset.set;
   let v = el.type === 'checkbox' ? el.checked : el.value;
   if (NUMERIC.has(key)) v = Number(v);
-  // At least one element (and one look) stays on.
-  if (key.startsWith('elements.') && !v && Object.values(settings.elements).filter(Boolean).length <= 1) { el.checked = true; return; }
-  if (key.startsWith('looks.') && !v && Object.values(settings.looks).filter(Boolean).length <= 1) { el.checked = true; return; }
+  // At least one element, look, blade move and firefly move stays on.
+  const group = key.split('.')[0];
+  if (AT_LEAST_ONE.has(group) && key.includes('.') && !v && Object.values(settings[group]).filter(Boolean).length <= 1) { el.checked = true; return; }
   setPath(key, v);
   showOutput(key);
   applySettings();
