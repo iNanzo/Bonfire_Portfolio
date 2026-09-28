@@ -13,6 +13,7 @@ npm run dev        # http://localhost:5173
 npm run build      # outputs dist/
 npm run preview    # serve the production build locally
 npm run admin      # the admin panel, editing your local files: http://127.0.0.1:5175
+npm test           # the visualizer's audio analysis tests
 ```
 
 ## How it plays
@@ -374,6 +375,109 @@ and validates them first; nothing is stored.
    tag of `public/admin/index.html`, so `nhoang.dev/admin` forwards to it. If you ever
    move `nhoang.dev`'s DNS to Cloudflare, you can route the Worker at
    `nhoang.dev/admin*` directly instead.
+
+## Bonfire Live (audio visualizer)
+
+The bonfire as an audio-reactive visualizer for DJ sets, at **`/visualizer/`**
+(`npm run dev`, then `http://localhost:5173/visualizer/`). It's the same scene, colors,
+weapons and elements as the site, driven by the music instead of the cursor. Nothing on
+the site links to it. Design notes: `docs/visualizer.md`.
+
+**Sound sources** (the start screen):
+
+- **Line In or Microphone:** an audio interface or the mixer's record/booth out works
+  best. Pick the device in the list; echo cancelling, noise suppression and auto gain
+  are off.
+- **Tab or System Audio:** share a browser tab, or (Chrome/Edge on Windows) the whole
+  screen with *Share system audio* ticked, to catch rekordbox, Serato or Traktor
+  playing on the same computer.
+- **Play an Audio File:** a mix from disk (or drop a file anywhere on the page).
+- **Demo Track:** a synthesized 126 BPM loop with a breakdown and a drop.
+
+**What the music does**
+
+- **Kicks and bass:**
+  - The fire swells and kicks on every beat, as hard as the kicks land. The ball
+    crackles, the ice pulses, and the wind throws the flames one way, then the other.
+  - The planted blade glows, and each bar its silhouette echoes out.
+  - Hi-hats throw sparks. Every few bars the element's ring races out on its own.
+- **Fireflies:** a light show. They sit dark and blink hard on and off with the music,
+  hop and swing around the fire on the beat, and stay close to it. The pattern changes
+  every 8 bars:
+  - a random few on each beat;
+  - each firefly's own flash signature;
+  - a spark chasing around the fire;
+  - twinkles on the hats.
+  - In a breakdown a slow wave passes through them, and a random few swirl around a
+    held blade.
+  - Right after a drop they all strobe together.
+- **Sword combos:** every 8 bars (and two bars after a big drop) the blade pulls up out
+  of the fire and slashes on beats 2, 3 and 4, then plunges back in on the next
+  downbeat, throwing the ring. Each slash leaves a trail in the element's style: rising
+  embers, crackling sparks and bolts, or falling frost glints. It knocks the flames
+  along with it, and the camera cuts to close angles between slashes.
+- **Phrases:** every 16 bars (a setting) the fire takes a new weapon, flame and element.
+  The swap is paced so its impact lands exactly on the next phrase's first beat.
+- **Breakdowns, builds and drops** (`sections.js`):
+  - A breakdown is the kick gone for a bar and a half. A build is rising tension:
+    risers, rolls speeding up, the bass thinned. Either forges a new blade that hangs
+    over the fire in a vortex of particles. The vortex tightens with the build and
+    takes after the blade's element.
+  - The drop is scored on every frame, from four things:
+    - the jump in bass, loudness and bass-over-highs balance;
+    - the kick coming back;
+    - landing on a downbeat or phrase;
+    - the tension before it, or a silence gap.
+  - Where a drop is expected it fires at once. Otherwise it's confirmed by the next
+    beat's kick, so a lone boom doesn't count.
+  - On the drop the blade strikes: the vortex is flung out, the ring races across the
+    ground, and the camera punches, shakes and bursts in the current look. A short cut
+    coming back (a small drop) throws a ring instead.
+- **Camera:** ten shots, each with its own move (sway, push in, spin, tilt). It cuts
+  every 2 bars, every bar right after a drop, and closes in while a blade is forged.
+- **Looks** (`looks.js`): the picture's effects take turns, a new one every 16 bars and
+  after each drop, each with its own burst for the big hits:
+  - **Ember:** clean.
+  - **Glitch:** torn rows, RGB split, crunch and static.
+  - **Echo:** frames streaming out of the fire like a tunnel, with the flame's palette
+    cycling on downbeats.
+  - **Ripple:** shockwave rings out of the fire on each kick.
+  - **Kaleido:** a kaleidoscope around the fire.
+  - **Ink:** 1-bit flashes on downbeats.
+
+  Breakdowns letterbox and close an iris around the fire as the build rises; the drop
+  snaps it open. It's all in the pixel pass before the palette, so every effect stays in
+  the scene's colors. Optional scanlines, mirror, and a negative flash on drops (at most
+  one every 2 s). Reduced motion turns the moving ones off.
+
+**Keys:** `Space` drop (strike the held blade, or recolor now) · `A` forge and hold ·
+`B` swap on the beat · `R` ring · `X` sword combo · `G` burst the look · `L` next look ·
+`M` mirror · `1` `2` `3` hit with
+flame, lightning or frost · `←` `→` previous/next colors · `T` tap tempo (first tap is
+beat 1) · `C` cut · `H` hide the controls · `F` full screen · `S` settings. The
+controls and cursor hide when the mouse rests.
+
+**Settings** (kept in the browser): sensitivity, visual lead (to make up for projector
+lag), reactivity, particle density, sparks, fireflies, auto drops, how often weapons
+change, rings fire and combos swing, camera mode and cut length, zoom punch, effects
+amount, which looks take turns and how often, scanlines, mirror, the negative flash,
+which elements are drawn, pixel size and a
+title card (a DJ name in the site's checkpoint band, shown when the music starts and
+on drops).
+
+| Piece | File |
+| --- | --- |
+| Page, sources, HUD, settings, keys | `visualizer/index.html`, `src/visualizer/main.js`, `src/visualizer/visualizer.css` |
+| Bands, onsets | `src/visualizer/analyser.js` |
+| Sections: groove, breakdown, build, drop, silence | `src/visualizer/sections.js` |
+| Tempo, beat grid, bars, tap tempo | `src/visualizer/tempo.js` |
+| Music → fire, camera, combos | `src/visualizer/director.js` |
+| Firefly light show | `src/visualizer/fireflyShow.js` |
+| Looks (effects that take turns) | `src/visualizer/looks.js` |
+| Sword swing trail (per element) | `src/bonfire/swingTrail.js` |
+| Demo track (synthesized) | `src/visualizer/demo.js` |
+| Scene hooks: `drive`, `glitch`, `pulse`, `ring`, `echo`, `swing`, `setPose`, held swaps | `src/bonfire/scene.js`, `weapons.js`, `pixelPass.js`, `flame.js`, `fireflies.js` |
+| Tests: the tracker on synthetic onsets; the analysis and ten drop shapes (and non-drops) on synthesized tracks | `test/` (`npm test`) |
 
 ## Colors
 
