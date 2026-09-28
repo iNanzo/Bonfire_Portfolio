@@ -206,9 +206,10 @@ npm test           # the site's and the visualizer's tests (npm run admin:test: 
 - **Search and sharing:** each page is built with its own title, description, social
   image (1200×630, made from the cover) and structured data, plus `sitemap.xml` and
   `robots.txt` (`src/seoPages.js`, the build plugin in `vite.config.js`).
-- **Hover hints (round 6):** over the planted weapon its rim glows and a label says
-  *Wake the blade*; over the fire it rises a little and says *Stoke the fire* (or *Skip
-  ahead* during a swap). The ice pulses slowly on its own (`effects.ice.pulse`).
+- **Hover effects (round 6):** no labels, the scene answers: over the planted weapon its
+  rim glows (a click wakes it); over the fire it flares up — taller, brighter, throwing
+  sparks and more light (a click stokes it, or skips ahead during a swap). The cursor
+  turns to a pointer over both. The ice pulses slowly on its own (`effects.ice.pulse`).
 - **Ableton Link:** `npm run link` with Carabiner running, then *Settings → Sound →
   Beat From: Ableton Link* in Bonfire Live (details in `tools/link-bridge.mjs`).
 

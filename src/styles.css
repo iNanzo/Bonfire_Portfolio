@@ -1286,22 +1286,5 @@ button.viewer-stage { display: block; width: 100%; padding: 0; border: 0; cursor
 .breakdown-stats dt { color: var(--text-dim); }
 .breakdown-stats dd { font-variant-numeric: tabular-nums; }
 
-/* ---------- Hover hints on the scene: what a click will do ---------- */
+/* ---------- Hover on the scene: the effects are in the scene; the cursor says it's clickable ---------- */
 .stage[data-hover='weapon'], .stage[data-hover='fire'], .stage[data-hover='skip'] { cursor: pointer; }
-.hover-label {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 40;
-  padding: 3px 8px;
-  font-family: var(--font-pixel);
-  font-size: 0.8125rem;
-  letter-spacing: 0.04em;
-  color: var(--accent-hi);
-  background: color-mix(in srgb, var(--c-void) 85%, transparent);
-  box-shadow: 0 0 0 1px var(--accent-lo);
-  pointer-events: none;
-  white-space: nowrap;
-}
-.hover-label[hidden] { display: none; }
-.is-photo .hover-label, .is-breakdown .hover-label { display: none; }

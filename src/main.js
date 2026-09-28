@@ -447,39 +447,30 @@ document.addEventListener('click', (e) => {
   fire?.puff(0.3);
 });
 
-// --- Hover hints: what a click on the scene will do -----------------------------------------
-// Over the planted weapon its rim glows and the label says "Wake the blade"; over the fire it
-// rises a little and the label says "Stoke the fire" (or "Skip ahead" while a new weapon is
-// being forged). Mouse and pen only; checked at most ~12 times a second.
-const hoverLabel = document.createElement('div');
-hoverLabel.className = 'hover-label';
-hoverLabel.hidden = true;
-hoverLabel.setAttribute('aria-hidden', 'true');
-document.body.appendChild(hoverLabel);
+// --- Hover effects: what a click on the scene will do ----------------------------------------
+// Over the planted weapon its rim glows (a click wakes it); over the fire it flares up (a
+// click stokes it, or skips ahead while a new weapon is being forged). The effects are in
+// the scene itself (scene.js hoverAt); here the cursor turns to a pointer. Mouse and pen
+// only; checked at most ~12 times a second.
 let hoverAt = 0;
 let hoverWhat = null;
 const stageEl = q('[data-stage]');
-function setHover(what, x, y) {
-  if (what !== hoverWhat) {
-    hoverWhat = what;
-    stageEl.dataset.hover = what ?? '';
-    hoverLabel.textContent = what === 'weapon' ? ui.hoverWeapon : what === 'skip' ? ui.hoverSkip : what === 'fire' ? ui.hoverFire : '';
-    hoverLabel.hidden = !what;
-  }
-  if (what) hoverLabel.style.transform = `translate(${Math.round(x + 16)}px, ${Math.round(y + 18)}px)`;
+function setHover(what) {
+  if (what === hoverWhat) return;
+  hoverWhat = what;
+  stageEl.dataset.hover = what ?? '';
 }
 window.addEventListener('pointermove', (e) => {
   if (e.pointerType === 'touch' || !fire) return;
   const onStage = e.target.closest?.('[data-stage]') && !photo.active && !breakdown.active;
   if (!onStage) { if (hoverWhat) { fire.hoverOff(); setHover(null); } return; }
-  if (hoverWhat) setHover(hoverWhat, e.clientX, e.clientY); // (the label follows every move)
   const now = performance.now();
   if (now - hoverAt < 80) return;
   hoverAt = now;
   let what = fire.hoverAt(e.clientX, e.clientY);
   if (what === 'weapon' && (reducedMotion || fire.forging)) what = 'fire'; // (no flourish then)
   if (fire.forging && !fire.swinging && what) what = 'skip';
-  setHover(what, e.clientX, e.clientY);
+  setHover(what);
 }, { passive: true });
 document.documentElement.addEventListener('pointerleave', () => { fire?.hoverOff(); setHover(null); });
 

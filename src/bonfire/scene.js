@@ -273,13 +273,17 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   const STILL = new Set(['mirror', 'scan', 'scanMode', 'block', 'letterbox', 'iris', 'zoom', 'temp']);
   const OFF = { iris: 2, zoom: 1, block: 1 };
   const boost = (v) => Math.max(0.1, 1 + v);
+  // The site's hover on the fire (hoverAt, below): 1 while the cursor is on it, and eased,
+  // how far the fire has risen, brightened and started sparking to meet it (update).
+  let hoverFlare = 0;
+  let hoverGlow = 0;
 
   function applyFireParams() {
     const f = effects.fire;
     // Inside the ice the fire burns low, narrow and slow.
     const banked = presence.ice / Math.max(1e-3, presence.fire + presence.ice);
     Object.assign(fire.params, {
-      brightness: f.brightness * (1 - 0.25 * banked) * boost(drive.brightness),
+      brightness: f.brightness * (1 - 0.25 * banked) * boost(drive.brightness) * (1 + 0.45 * hoverGlow),
       radius: f.size * (1 - 0.3 * banked) * boost(drive.size),
       rise: f.height * (1 - 0.5 * banked) * boost(drive.height),
       curlAmp: f.turbulence * (1 - 0.55 * banked) * (reducedMotion ? 0.83 : 1) * boost(drive.turbulence),
@@ -853,7 +857,10 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   function update(dt, t, realDt) {
     busy = Math.max(0, busy - realDt * 0.8);
     flashAmt *= Math.exp(-realDt / 0.05);
-    fire.params.level += (targetLevel + drive.level + 0.25 * hoverFlare - fire.params.level) * Math.min(1, dt * 1.1);
+    // Hovered (the site), the fire eases up to meet the cursor: taller, brighter, a trickle of sparks.
+    hoverGlow += ((hoverFlare ? 1 : 0) - hoverGlow) * Math.min(1, realDt * 6);
+    if (hoverGlow > 0.3 && Math.random() < realDt * 30 * hoverGlow) fire.sparkle(2);
+    fire.params.level += (targetLevel + drive.level + 1.1 * hoverGlow - fire.params.level) * Math.min(1, dt * 1.1);
     fire.wind.set(drive.windX, 0, drive.windZ);
     for (const id of ELEMENT_IDS) {
       const d = (id === elementKey ? 1 : 0) - presence[id];
@@ -938,7 +945,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     fireLight.color.copy(lightBase);
     if (temp > 0) fireLight.color.lerp(white, temp * 0.45);
     else if (temp < 0) fireLight.color.lerp(lightWarm, -temp * 0.35);
-    fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * flicker * blendMul * (1 + flash * 1.5) * boost(drive.glow);
+    fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * flicker * blendMul * (1 + flash * 1.5) * boost(drive.glow) * (1 + 0.6 * hoverGlow);
 
     weapons.update(dt);
 
@@ -1113,11 +1120,10 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   }
   // The fire, for hover: a sphere around the flames (world).
   const fireBounds = new THREE.Sphere(new THREE.Vector3(FIRE_ORIGIN.x, 0.45, FIRE_ORIGIN.z), 0.55);
-  let hoverFlare = 0; // 0..1: the cursor is on the fire, which rises a little to meet it
   /**
-   * What's under the point (client px), for the site's hover hints: 'weapon' (the planted
-   * weapon: a click wakes it), 'fire' (a click stokes it) or null. Also lights the hint in
-   * the scene: the weapon's rim glows, the fire rises a touch.
+   * What's under the point (client px), for the site's hover effects: 'weapon' (the planted
+   * weapon: a click wakes it), 'fire' (a click stokes it) or null. The effect shows in the
+   * scene itself: the weapon's rim glows, the fire flares.
    */
   function hoverAt(clientX, clientY) {
     const onWeapon = weaponAt(clientX, clientY);
