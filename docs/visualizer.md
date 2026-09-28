@@ -1,10 +1,11 @@
 # Bonfire Live (audio visualizer): design notes
 
-Status: **implemented and verified locally** (2026-09-27): unit and end-to-end analysis
-tests pass (`npm test`), and the demo track was run in the browser through a full
-groove → breakdown → drop cycle.
+Status: **implemented and verified locally** (2026-09-27, all three rounds): unit and
+end-to-end tests pass (`npm test`), and the demo track was run in the browser through
+full groove → breakdown → drop cycles, with every camera rig, look, drop hit, color
+mode and firefly move exercised.
 Source: Newton's request for an audio-reactive visualizer for a DJ set built from the
-bonfire's design, assets and code, then two rounds of feedback:
+bonfire's design, assets and code, then three rounds of feedback:
 
 1. More impact and movement (bonfire particles, sword particles, the blade waiting for
    the drop, fireflies), more camera switching, glitch and rave effects, extra ring
@@ -14,6 +15,13 @@ bonfire's design, assets and code, then two rounds of feedback:
    staying lit. Mid-round they added:
    - Fireflies stay near the fire and a random few swirl around the blade.
    - Trails match the element.
+3. Additions, with the code kept well factored: weapons that move like floating,
+   enchanted living weapons, with procedurally sound swings and stabs (keeping the
+   strike); cinematic cameras that follow the blade; a lighter lightning trail; random
+   colors from the admin's palette tools, fully random included; a new firefly movement
+   (bouncing and darting, in every direction, at tempo-based speeds); settings for all
+   of it; "endless variations". Mid-round: scanlines and mirror join the looks'
+   variations, and drops get varied effects (the negative flash kept).
 
 ## Requirements
 
@@ -33,6 +41,14 @@ bonfire's design, assets and code, then two rounds of feedback:
 | W4 | Fireflies flicker on and off with the music, dance, glow and light effects | `fireflyShow.js`, `fireflies.js` (`show`, `heat`, `orbit`, `leash`, `dance`, trails) |
 | W5 | Fireflies not pushed to the edges; a random number swirl around the blade | a leash, a dance with no outward push, no scatter on extra rings; roles dealt randomly each breakdown |
 | W6 | Trails match the element | `swingTrail.js` (embers, sparks and bolts, frost glints) and the held-blade vortex |
+| X1 | Floating, enchanted living weapons with procedurally sound swings and stabs | `bladeMotion.js`: slashes, thrusts, spins, glides, hovers, flourishes, the plunge (`test/bladeMotion.test.mjs`); the held blade's sway and trembling, a planted blade's shudder (`weapons.js`) |
+| X2 | Keep the strike | The hold and strike are unchanged; the plunge home keeps the straight drive, now sometimes after a flip or corkscrew |
+| X3 | Cinematic cameras that follow the blade, a shot following the swing | `camera.js`: follow, ride, track, orbit, vertigo; close angles that track the blade; whip and glide transitions; new shots (crane, dolly zoom, long lens, sweep) |
+| X4 | The lightning swing: only the lightning and the tip's particles | `swingTrail.js`: the bolt along the point's path, sparks off the point only, no mid-blade ribbon |
+| X5 | Random colors from the admin's palette tools, fully random included | `colors.js` over `src/paletteGen.js` (moved from `admin/ui/palettes.js`): site, harmonious (any scheme), fully random, a mix; scenery colors optional |
+| X6 | Fireflies that bounce or dart, in every direction, at tempo-based speeds | `fireflyMoves.js` + `fireflies.dart()`: bounce, dart, compass, zigzag, scatter, alongside the swing |
+| X7 | Endless variation, settings for all of it | Random shapes and rolls everywhere (moves, camera rigs, look details, drop hits, palettes, firefly timing); Living Blade, Colors, Fireflies, Camera and Rave FX settings |
+| X8 | Scanlines and mirror in the looks' variations; varied drop effects | `looks.js`: off / in the mix / always, four mirror modes and three scanline styles; twelve drop hits, one to three per drop |
 
 ## Key decisions
 
@@ -105,14 +121,57 @@ bonfire's design, assets and code, then two rounds of feedback:
     A leash pulls roamers back within 2.1 m, and extra rings don't scatter them.
   - **Breakdown roles** are dealt at random each time: two to about 40% swirl around a
     held blade, some ring the fire, the rest roam.
-- **Swings are poses, not animations.** A combo is keyframes built from beat times:
-  - **Each slash** is an arc of the blade's direction in a plane taken from the camera
-    as that slash begins. The flat faces the viewer (local Z is the flat's normal) and
-    the edge leads. It accelerates into the hit (fastest on the beat) and eases out.
-  - **The grip** hangs over the fire, high enough for the tip to clear the ground. The
-    world pose is converted into the holder's space each frame.
-  - **The fire reacts:** flames and sparks within 30 cm of the blade get its velocity.
-  - **The plunge** restores the rest pose and throws the ring.
+- **The living blade is closed-form motion, not keyframes or physics** (`bladeMotion.js`).
+  A routine is planned from the beat times; its pose at any time is a pure function, so
+  hits land exactly on the beat whatever the frame rate, and it's unit-tested at 480 Hz.
+  - **Rest to rest.** Every segment (the rise, each move, each glide, the plunge) starts
+    and ends still, so they join without a jolt; glides ease with a C2 smootherstep, and
+    anything added on top (a bulge in the path, a twirl, a hover's bob) is zero with zero
+    slope at both ends.
+  - **Wind-up, strike, follow-through.** A slash cocks back (smootherstep), strikes with
+    θ ∝ uᵖ (fastest at the hit), and follows through on a Hermite curve that leaves at
+    the strike's speed and stops, overshooting when its slope is above 3. A thrust's
+    follow-through lasts a few hundredths of a second and carries as far as its speed
+    takes it, then it quivers (a damped 16 Hz rotation from the grip).
+  - **Shapes are random, then filtered.** A move's plane, side, sweep, pivot and lunge
+    are drawn from the camera when its glide begins; a dozen candidates are sampled, those
+    whose tip dips under 0.22 m, strays from the clearing or comes within 0.8 m of the
+    camera are dropped, and the one whose wind-up is nearest the blade's current pose
+    wins, so moves flow like a combo. A big turn still needed takes time from the
+    wind-up.
+  - **Timing fits the tempo.** Durations are fractions of the beat, clamped; when a beat
+    is too short, a move's durations shrink together (so its speed through the hit
+    still matches) until each glide has room. Spins need a rest before them.
+  - **Cuts land before planes.** `onMove` fires before a move takes its plane, and the
+    plane comes from where the camera is headed (`camera.axes()`), so a whip pan or a
+    cut to a new angle is already accounted for.
+  - The world pose is converted into the holder's space each frame; flames and sparks
+    within 30 cm of the blade get its velocity; the plunge restores the rest pose and
+    throws the ring.
+- **Cameras are rigs over a shot list** (`camera.js`, moved out of the director). Each
+  frame a shot or a rig makes the framing it wants; a transition (cut, a 0.24 s whip with
+  a lean, a 0.9 s glide) blends from what was on screen; then every framing is kept in
+  the clearing (above 0.25 m, out of the fire, in front of the ruins). Rigs follow the
+  blade through `fire.blade` (its middle, point, grip and rotation), with springs so they
+  lag and whip. The dolly zoom keeps the subject's size by widening the lens as
+  `tan(fov/2) · distance` stays constant.
+- **Made palettes are ordinary flames.** `colors.js` adds them to `palette.js`'s flames
+  as hidden `live-N` entries (the scene needs no change), keeps the last six (at most
+  three can be in use: burning, blending out, forging), and names them for their hue
+  (`flameTitle` then says "Cobalt Lightning"). The generator moved to `src/paletteGen.js`
+  so the site and the admin share one copy; its text-contrast rule still holds. Scenery
+  colors blend in `base` and the scene re-reads them (`refreshScene`).
+- **Firefly moves are dashes on the flight model.** `fireflies.dart()` overrides a
+  firefly's steering for a moment with the velocity of a closed-form path, a dart
+  x = 1 − (1 − u)³ (fast start, dead stop) or a bounce x = 4u(1 − u) (a thrown ball),
+  still sliding along the scenery. Each firefly has its own period (a half, one or two
+  beats), offset and length, so a move is a texture, not a drill (the compass is the
+  exception: all together).
+- **Looks roll their details.** Mirror (four modes), scanlines (three styles), the echo's
+  direction and the spiral's turn are rolled each time a look comes round; *in the mix*
+  gives a look a 30% chance of each. Drop hits are timers layered over whatever look is
+  on (each parameter takes the larger of the look's and the hit's), drawn one to three
+  at a time, never the same set twice running.
 - **Looks are one pass.** Kaleidoscope, ripple, feedback, iris, letterbox, ink and color
   cycling all live in the existing pixel pass. Feedback is a ping-pong pair of low-res
   targets plus a copy, used only while an echo is on. Its echoes lose a little each

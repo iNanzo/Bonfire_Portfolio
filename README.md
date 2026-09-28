@@ -250,7 +250,7 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
   - Bonfire colors (the palettes every element burns in, stored as `effects.flames`):
     add, edit, reorder or delete them; ◉ takes one out of the random draw. Each
     palette's `hi` must stay readable as text (≥ 4.5:1), and at least 3 stay in rotation.
-  - **Palette tools** (`admin/ui/palettes.js`): 🎲 a harmonious palette for one flame
+  - **Palette tools** (`src/paletteGen.js`, shared with the visualizer): 🎲 a harmonious palette for one flame
     (any scheme, or one you pick: hue shift, analogous, monochrome, complementary, split
     complementary, triadic), a fully random one, or **suggestions built around a color**
     you pick (or one of the flame's own). There's also a set for every flame at once,
@@ -290,7 +290,7 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
 
 | Piece | File |
 | --- | --- |
-| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `schema.js` labels/help/grouping, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case, `palettes.js` palette generators, `paletteTools.js` their buttons) |
+| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `schema.js` labels/help/grouping, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case, `paletteTools.js` the palette buttons; the generators are `src/paletteGen.js`) |
 | Effects defaults, ranges, runtime | `src/effectsDefaults.js`, `src/effects.js`, `src/elements.js` (design notes: `docs/admin-v2.md`, `docs/elements.md`) |
 | API: session, content, save, deploy status, image thumbnails | `admin/server/api.js` |
 | Sign-in check (Cloudflare Access JWT) | `admin/server/auth.js` |
@@ -399,7 +399,8 @@ the site links to it. Design notes: `docs/visualizer.md`.
 - **Kicks and bass:**
   - The fire swells and kicks on every beat, as hard as the kicks land. The ball
     crackles, the ice pulses, and the wind throws the flames one way, then the other.
-  - The planted blade glows, and each bar its silhouette echoes out.
+  - The planted blade glows (and shudders on the hard ones), and each bar its
+    silhouette echoes out.
   - Hi-hats throw sparks. Every few bars the element's ring races out on its own.
 - **Fireflies:** a light show. They sit dark and blink hard on and off with the music,
   hop and swing around the fire on the beat, and stay close to it. The pattern changes
@@ -411,11 +412,29 @@ the site links to it. Design notes: `docs/visualizer.md`.
   - In a breakdown a slow wave passes through them, and a random few swirl around a
     held blade.
   - Right after a drop they all strobe together.
-- **Sword combos:** every 8 bars (and two bars after a big drop) the blade pulls up out
-  of the fire and slashes on beats 2, 3 and 4, then plunges back in on the next
-  downbeat, throwing the ring. Each slash leaves a trail in the element's style: rising
-  embers, crackling sparks and bolts, or falling frost glints. It knocks the flames
-  along with it, and the camera cuts to close angles between slashes.
+  - They move to the beat too, a new move every 8 bars (`fireflyMoves.js`): swing
+    around the fire, bounce like balls, dart and stop dead (up, down, left, right,
+    toward, away), step round the compass together, zigzag, or scatter. Each keeps its
+    own time (every half beat, beat or two, on or off the beat), so their speed follows
+    the tempo.
+- **The living blade** (`bladeMotion.js`): every 8 bars (and two bars after a big drop)
+  the blade works itself loose, pulls out of the fire and fights on its own for 1, 2 or
+  4 bars, like an enchanted weapon, then plunges back in on a downbeat, throwing the ring.
+  - **Moves**, one landing on each beat: slashes (any angle, from the grip or flung from
+    mid-blade, lunging through the hit), thrusts (drawn back trembling, driven along the
+    blade, stopping dead and quivering, sometimes corkscrewing) and spins (a full turn
+    or more, as a wheel or a flat whirl, after a rest).
+  - **Procedurally sound:** each move winds up, accelerates into the hit (fastest right
+    on the beat) and follows through at the same speed, overshooting a touch. The moves
+    are chosen so each one's wind-up is near the last one's finish, like a combo, with
+    glides, twirls and hovers between them and a flip or corkscrew on the way home.
+    Nothing goes through the ground or the camera.
+  - **Rhythm:** a move on every beat, or varied with rests and (at slow tempos) doubles.
+  - **Trails:** rising embers, a lightning bolt with sparks off the point only, or
+    falling frost glints; each hit throws a spray off the point. It knocks the flames
+    along with it.
+  - A blade held for the drop sways and turns as if looking about, trembling harder as
+    the build rises.
 - **Phrases:** every 16 bars (a setting) the fire takes a new weapon, flame and element.
   The swap is paced so its impact lands exactly on the next phrase's first beat.
 - **Breakdowns, builds and drops** (`sections.js`):
@@ -433,8 +452,20 @@ the site links to it. Design notes: `docs/visualizer.md`.
   - On the drop the blade strikes: the vortex is flung out, the ring races across the
     ground, and the camera punches, shakes and bursts in the current look. A short cut
     coming back (a small drop) throws a ring instead.
-- **Camera:** ten shots, each with its own move (sway, push in, spin, tilt). It cuts
-  every 2 bars, every bar right after a drop, and closes in while a blade is forged.
+- **Camera** (`camera.js`): fourteen shots, each with its own move (sway, push in, spin,
+  tilt, a crane up, a dolly zoom, a long lens). It cuts every 2 bars and every bar right
+  after a drop, by a cut, a whip pan or a glide.
+  - **The blade out of the fire:** close angles cut between moves, or rigs that follow
+    it: *Follow* swings after the point with a lag, leaning into the swing; *Ride* is
+    mounted off the blade's flat, so the world wheels behind it; *Track* stays put and
+    turns and zooms to keep it framed; *Orbit* circles the fire. In the mix it changes
+    rig mid-routine now and then.
+  - **A held blade:** a close shot, a vertigo dolly zoom that deepens with the build,
+    or an orbit.
+- **Colors** (`colors.js`): each new flame is one of the site's palettes, or one made on
+  the spot with the admin's palette generator (`src/paletteGen.js`): harmonious (any
+  scheme, or the one picked) or fully random, named for its hue ("Cobalt Lightning").
+  Made palettes can recolor the scenery too, blending in as the flame lands.
 - **Looks** (`looks.js`): the picture's effects take turns, a new one every 16 bars and
   after each drop, each with its own burst for the big hits:
   - **Ember:** clean.
@@ -444,24 +475,38 @@ the site links to it. Design notes: `docs/visualizer.md`.
   - **Ripple:** shockwave rings out of the fire on each kick.
   - **Kaleido:** a kaleidoscope around the fire.
   - **Ink:** 1-bit flashes on downbeats.
+  - **Vortex:** echoes turning as they stream out, a spiral flung faster on the kicks.
+  - **Mosaic:** kicks crunch the picture into big pixels.
+  - **Haze:** rows shimmering like heat over the fire.
+  - **Prism:** the colors splitting apart on every beat.
 
+  Each time a look comes round it rolls its own details (the echo's direction, the
+  spiral's turn) and, when they're *in the mix*, a mirror (left, right, a pool
+  reflection or four ways) and scanlines (thin, thick or columns); set to *always*, they
+  stay on and change style with the look. Every drop also throws one to three **drop
+  hits**, never the same set twice running: shatter, shockwaves, an echo burst, a spiral,
+  a kaleidoscope, mirror flips, a color cycle, an RGB burst, a crunch, an iris snap, a
+  letterbox slam, an ink flash. Plus the negative flash on drops (at most one every 2 s).
   Breakdowns letterbox and close an iris around the fire as the build rises; the drop
   snaps it open. It's all in the pixel pass before the palette, so every effect stays in
-  the scene's colors. Optional scanlines, mirror, and a negative flash on drops (at most
-  one every 2 s). Reduced motion turns the moving ones off.
+  the scene's colors. Reduced motion turns the moving ones off.
 
 **Keys:** `Space` drop (strike the held blade, or recolor now) · `A` forge and hold ·
-`B` swap on the beat · `R` ring · `X` sword combo · `G` burst the look · `L` next look ·
-`M` mirror · `1` `2` `3` hit with
+`B` swap on the beat · `R` ring · `X` the blade leaves the fire · `G` burst the look ·
+`L` next look · `M` mirror (in the mix, always, off) · `P` colors (site, harmonious,
+fully random, a mix) · `1` `2` `3` hit with
 flame, lightning or frost · `←` `→` previous/next colors · `T` tap tempo (first tap is
 beat 1) · `C` cut · `H` hide the controls · `F` full screen · `S` settings. The
 controls and cursor hide when the mouse rests.
 
 **Settings** (kept in the browser): sensitivity, visual lead (to make up for projector
-lag), reactivity, particle density, sparks, fireflies, auto drops, how often weapons
-change, rings fire and combos swing, camera mode and cut length, zoom punch, effects
-amount, which looks take turns and how often, scanlines, mirror, the negative flash,
-which elements are drawn, pixel size and a
+lag), reactivity, particle density, sparks, auto drops, how often weapons change and
+rings fire, which elements are drawn; the living blade (how often and how long it's out,
+its moves, rhythm, and whether it's alive); colors (the mode, the harmony scheme, the
+scenery); fireflies (their moves and how often they change); the camera (mode, cut
+length, transitions, how it covers the blade out and held, zoom punch, shot, pixel
+size); effects amount, which looks take turns and how often, scanlines and mirror (off,
+in the mix, always), the negative flash, which drop hits and how many; and a
 title card (a DJ name in the site's checkpoint band, shown when the music starts and
 on drops).
 
@@ -471,13 +516,16 @@ on drops).
 | Bands, onsets | `src/visualizer/analyser.js` |
 | Sections: groove, breakdown, build, drop, silence | `src/visualizer/sections.js` |
 | Tempo, beat grid, bars, tap tempo | `src/visualizer/tempo.js` |
-| Music → fire, camera, combos | `src/visualizer/director.js` |
-| Firefly light show | `src/visualizer/fireflyShow.js` |
-| Looks (effects that take turns) | `src/visualizer/looks.js` |
-| Sword swing trail (per element) | `src/bonfire/swingTrail.js` |
+| Music → fire, the blade, looks, colors | `src/visualizer/director.js` |
+| Camera shots, blade rigs, transitions | `src/visualizer/camera.js` |
+| Colors: site or made palettes, scenery | `src/visualizer/colors.js` (the generator: `src/paletteGen.js`) |
+| Firefly light show; firefly moves | `src/visualizer/fireflyShow.js`, `src/visualizer/fireflyMoves.js` |
+| Looks (effects that take turns), drop hits | `src/visualizer/looks.js` |
+| The living blade's moves | `src/bonfire/bladeMotion.js` |
+| Blade trail and hits (per element) | `src/bonfire/swingTrail.js` |
 | Demo track (synthesized) | `src/visualizer/demo.js` |
 | Scene hooks: `drive`, `glitch`, `pulse`, `ring`, `echo`, `swing`, `setPose`, held swaps | `src/bonfire/scene.js`, `weapons.js`, `pixelPass.js`, `flame.js`, `fireflies.js` |
-| Tests: the tracker on synthetic onsets; the analysis and ten drop shapes (and non-drops) on synthesized tracks | `test/` (`npm test`) |
+| Tests: the tracker on synthetic onsets; the analysis and ten drop shapes (and non-drops) on synthesized tracks; the blade's moves (smooth, on the beat, clear of the ground and camera); made palettes, drop hits, mirror and scanline mixes, firefly moves | `test/` (`npm test`) |
 
 ## Colors
 
