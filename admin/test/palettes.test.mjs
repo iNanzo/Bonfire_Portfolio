@@ -4,7 +4,7 @@ import { contrast, HEX_RE } from '../../src/contentRules.js';
 import {
   FLAME_KEYS, SCENE_KEYS, SCHEMES, flameSet, harmoniousFlame, harmoniousScene, hexToOklch, makeFlame, oklchToHex, slotFor,
   suggestFlames, suggestScenes, wildFlame, wildScene,
-} from '../ui/palettes.js';
+} from '../../src/paletteGen.js';
 
 const VOID = '#07070b';
 /** A repeatable random stream, so failures reproduce. */

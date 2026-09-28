@@ -1,6 +1,7 @@
-// Palette generators for the Effects page: harmonious random flames, fully random
-// ones, and suggestions built around a color you pick. Pure functions (no DOM), so
-// they're unit-tested (admin/test/palettes.test.mjs).
+// Palette generators, shared by the admin's Effects page and the visualizer's random
+// colors: harmonious random flames, fully random ones, and suggestions built around a
+// color you pick. Pure functions (no DOM), so they're unit-tested
+// (admin/test/palettes.test.mjs).
 //
 // The harmony rules work in OKLCH — perceptual lightness, chroma and hue — so a
 // "lighter" or "more saturated" step looks like one to the eye at every hue:
@@ -20,7 +21,7 @@
 //   • It must still work on the site: the tips (`hi`) double as accent text, so they
 //     are lightened until they reach 4.5:1 contrast on the background, and `shade`
 //     is a dark, barely tinted neutral for firelit stone.
-import { contrast, HEX_RE } from '../../src/contentRules.js';
+import { contrast, HEX_RE } from './contentRules.js';
 
 // ---- color math ---------------------------------------------------------------------------
 const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);

@@ -4,7 +4,7 @@
 // Labels are run through titleCase(), so write them in any case.
 import { KINDLED_SHOW, WEAPON_KEYS } from '../../src/contentRules.js';
 import { CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, ELEMENT_IDS, RANGES } from '../../src/effectsDefaults.js';
-import { harmoniousFlame, hexToOklch } from './palettes.js';
+import { harmoniousFlame, hexToOklch } from '../../src/paletteGen.js';
 import { titleCase } from './text.js';
 
 /** Sidebar pages, grouped, and the content sections (dotted paths allowed) each one edits. */

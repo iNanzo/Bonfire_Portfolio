@@ -1,4 +1,4 @@
-// Palette tools on the Effects page (the color math lives in palettes.js):
+// Palette tools on the Effects page (the color math lives in src/paletteGen.js):
 //   • each flame card: 🎲 a harmonious palette (any scheme, or one you pick), a fully
 //     random one, suggestions built from a color, and Undo;
 //   • the Bonfire Colors block: re-roll every palette at once, hues spread apart;
@@ -8,7 +8,7 @@
 import { el } from './form.js';
 import {
   FLAME_KEYS, SCENE_KEYS, SCHEMES, flameSet, harmoniousFlame, harmoniousScene, suggestFlames, suggestScenes, wildFlame, wildScene,
-} from './palettes.js';
+} from '../../src/paletteGen.js';
 import { HEX_RE } from '../../src/contentRules.js';
 
 const HISTORY = 20;

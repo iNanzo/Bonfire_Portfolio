@@ -15,7 +15,7 @@ lightning arcs around an energy sphere).
 | E4 | Ice: encased in glowing ice shards that form from the ground | `src/bonfire/ice.js` (`createCrystals`) |
 | E5 | …and a ring of shards that expands and retracts outward | `src/bonfire/ice.js` (`createIceRing`) |
 | E6 | Update the admin | Elements, Lightning and Ice sections, starting element, "Try It" |
-| E7 | Palette randomizer that picks colors that work together, a fully random option, suggestions from a picked color | `admin/ui/palettes.js`, `admin/ui/paletteTools.js` |
+| E7 | Palette randomizer that picks colors that work together, a fully random option, suggestions from a picked color | `src/paletteGen.js`, `admin/ui/paletteTools.js` |
 | F1 | Filaments end naturally: dissipate, or strike what they hit | Contact test against the height map; free ends fade into dendrites |
 | F2 | Lightning light behaves as expected | Cast light moves into the ball and strobes; lights at strikes |
 | F3 | Ice: natural formation, a little translucent, subtle glow | Druse layout, irregular faceted crystals, screen-door translucency |
