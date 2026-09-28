@@ -72,3 +72,25 @@ test('templates: every screen renders, with only safe links and escaped text', (
   for (const p of items()) assert.ok(inventory.includes(esc(p.name)), `the inventory shows ${p.name}`);
   assert.ok(render.renderHome().includes(esc(featured.name)) || inventory.includes(esc(featured.name)), 'the featured project appears');
 });
+
+test('seo: every page has its own title, description, preview and structured data; hidden ones stay out of the sitemap', async () => {
+  const { pageMeta, withMeta, publicRoutes, sitemap } = await import('../src/seoPages.js');
+  const template = '<html><head><title>x</title><meta name="description" content="x" /><meta property="og:title" content="x" /><meta property="og:description" content="x" /><meta property="og:type" content="website" /></head><body></body></html>';
+  const titles = new Set();
+  for (const route of publicRoutes()) {
+    const meta = pageMeta(route);
+    assert.ok(meta, `${route} has metadata`);
+    assert.ok(meta.title && meta.description, `${route}: title and description`);
+    titles.add(meta.title);
+    const html = withMeta(template, meta);
+    assert.match(html, /<link rel="canonical" href="https:\/\//, `${route}: canonical`);
+    assert.match(html, /og:image" content="https:\/\/[^"]+\.jpg"/, `${route}: social image`);
+    for (const [, json] of html.matchAll(/<script type="application\/ld\+json">([^<]*)<\/script>/g)) JSON.parse(json);
+    assert.doesNotMatch(html.replace(/<script type="application\/ld\+json">[^<]*<\/script>/g, ''), /<script/);
+  }
+  assert.equal(titles.size, publicRoutes().length, 'no two pages share a title');
+  const xml = sitemap(publicRoutes());
+  for (const p of projects.filter((x) => x.hidden)) assert.ok(!xml.includes(`/projects/${p.id}/`), `${p.id} is hidden`);
+  for (const p of items()) assert.ok(xml.includes(`/projects/${p.id}/`), `${p.id} is listed`);
+  assert.equal(pageMeta('projects/not-a-project'), null);
+});

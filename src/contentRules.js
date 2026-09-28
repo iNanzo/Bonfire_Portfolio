@@ -128,6 +128,7 @@ export function validateEffects(e, err, base = 'effects') {
   if (isObj(e.elements) && ELEMENT_IDS.every((id) => e.elements[id]?.rotation === false)) {
     err(at('elements'), 'Keep at least one element in rotation.');
   }
+  group('impact', (k, v, p) => (k === 'marks' ? bool(v, p) : num(v, p)));
   group('lightning', numbers);
   group('ice', numbers);
   for (const k of Object.keys(e)) if (!(k in DEFAULT_EFFECTS)) err(at(k), 'Unknown section.');
@@ -231,7 +232,7 @@ export function validateContent(c) {
     else if (seen.has(p.id)) err(`${path}.id`, `“${p.id}” is already used by ${seen.get(p.id)}.`);
     else seen.set(p.id, p.name || p.id);
     text(p.name, `${path}.name`, true);
-    optional(p, path, ['kind', 'year', 'status', 'summary', 'problem', 'built', 'role', 'flavor', 'note', 'todo']);
+    optional(p, path, ['kind', 'year', 'status', 'summary', 'outcome', 'problem', 'built', 'role', 'flavor', 'note', 'todo']);
     flag(p.hidden, `${path}.hidden`);
     if (p.tech !== undefined) list(p.tech, `${path}.tech`, (t, tp) => text(t, tp, true));
     if (p.links !== undefined) links(p.links, `${path}.links`);
@@ -241,6 +242,13 @@ export function validateContent(c) {
         if (!obj(im, ip)) return;
         if (typeof im.src !== 'string' || !IMAGE_RE.test(im.src)) err(`${ip}.src`, 'Image path must look like assets/projects/<folder>/<name>.');
         text(im.alt, `${ip}.alt`, true);
+        // Alt text is read aloud in place of the screenshot: it should say what's in it.
+        if (typeof im.alt === 'string' && im.alt.trim()) {
+          const alt = im.alt.trim();
+          if (alt.length < 15 || /^(image|screenshot|picture|photo|img)\b/i.test(alt) || alt === im.caption) {
+            warn(`${ip}.alt`, 'Describe what the screenshot shows (what’s on screen, not “screenshot of…”), in a sentence.');
+          }
+        }
         if (im.caption !== undefined) text(im.caption, `${ip}.caption`);
         flag(im.pixel, `${ip}.pixel`);
         flag(im.hidden, `${ip}.hidden`);

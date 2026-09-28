@@ -7,7 +7,13 @@
 //             bonfire's own render loop; the director (director.js) turns it into the
 //             fire's drive, beats, swaps and camera. The HUD shows what it hears and
 //             hides itself (and the cursor) when the mouse rests.
-//   settings  kept in this browser (settings.js).
+//   settings  kept in this browser (settings.js), in tabs, with presets and saved setups.
+//   beat      from the music, or set by hand (a BPM, nudges, "this is beat 1"), or from an
+//             Ableton Link session through the bridge (tools/link-bridge.mjs).
+//   output    a second window with just the picture, for a projector (the canvas is
+//             streamed into it), while this one keeps the controls.
+//   cards     title cards: the main one as an intro and on drops, more that take turns on
+//             drops, show every 32 bars, or on a key (Shift+1…9).
 import '../styles.css';
 import './visualizer.css';
 import { applyCssPalette, base, flames } from '../palette.js';
@@ -24,6 +30,11 @@ import { MODIFIER_MODES } from './looks.js';
 import { COLOR_MODES } from './colors.js';
 import { createDemo, DEMO_BPM } from './demo.js';
 import { bindSettings, loadSettings, resetSettings, saveSettings, settingsMarkup } from './settings.js';
+import { createLinkClient } from './link.js';
+import { createDiscoveries } from '../ui/discoveries.js';
+
+// Finding this page is one of the site's discoveries (counted when you're back on the site).
+createDiscoveries().discover('visualizer');
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const q = (s, r = document) => r.querySelector(s);
@@ -57,6 +68,10 @@ const KEYS = [
   ['1 2 3', 'Hit with flame, lightning or frost'],
   ['← →', 'Hit with the previous or next colors'],
   ['T', 'Tap the tempo (first tap is beat 1)'],
+  ['D', 'This beat is beat 1 (fix the bar)'],
+  ['[ ]', 'Nudge the beat 10 ms earlier or later'],
+  ['Shift+1…9', 'Show a title card (1 = the main one)'],
+  ['O', 'Open the output window (for a projector)'],
   ['C', 'Cut to another shot'],
   ['H', 'Hide or show the controls'],
   ['F', 'Full screen'],
@@ -78,9 +93,10 @@ app.innerHTML = `
       <p class="hero-value">Feed it a DJ set. Kicks stoke the fire, breakdowns forge a new blade over it, and the drop drives it into the ashes.</p>
       <nav class="title-menu viz-sources" aria-label="Sound source">
         <ul role="list" data-sources>
-          ${SOURCES.map(([id, label]) => `
-            <li><button class="title-item" type="button" data-source="${id}" aria-describedby="viz-source-hint">
-              <span class="cursor" aria-hidden="true"></span><span>${esc(label)}</span>
+          ${SOURCES.map(([id, label, hint]) => `
+            <li><button class="title-item viz-source" type="button" data-source="${id}">
+              <span class="cursor" aria-hidden="true"></span>
+              <span class="viz-source-text"><span class="viz-source-name">${esc(label)}</span><span class="viz-source-desc">${esc(hint)}</span></span>
             </button></li>`).join('')}
         </ul>
       </nav>
@@ -88,7 +104,6 @@ app.innerHTML = `
         <span class="viz-field-label">Input Device</span>
         <select data-device></select>
       </label>
-      <p class="viz-hint" id="viz-source-hint" data-source-hint>${esc(SOURCES[0][2])}</p>
       <button class="pix-btn viz-start-settings" type="button" data-act="settings"><kbd>S</kbd>Settings</button>
       <p class="viz-error" role="alert" data-error hidden></p>
       <input type="file" accept="audio/*" data-file hidden>
@@ -96,33 +111,43 @@ app.innerHTML = `
   </section>
 
   <footer class="viz-hud" data-hud hidden>
-    <div class="viz-readout">
-      <div class="viz-meter" aria-hidden="true">
+    <div class="viz-group viz-readout" role="group" aria-label="What it hears">
+      <div class="viz-meter" aria-hidden="true" title="The sound in five bands, lows to highs">
         ${BAND_NAMES.map((b) => `<span class="viz-band" data-band="${b}"><i></i></span>`).join('')}
-      </div>
-      <div class="viz-tempo">
-        <span class="viz-pips" aria-hidden="true" data-pips><i></i><i></i><i></i><i></i></span>
-        <span class="viz-bpm" data-bpm>--- BPM</span>
       </div>
       <div class="viz-status">
         <p class="viz-wield" data-wield></p>
         <p class="viz-state" data-state>Waiting for sound…</p>
       </div>
     </div>
+    <div class="viz-group viz-beat" role="group" aria-label="Beat">
+      <span class="viz-group-label">Beat</span>
+      <span class="viz-pips" aria-hidden="true" data-pips title="The bar: beat 1 is outlined"><i></i><i></i><i></i><i></i></span>
+      <span class="viz-bpm" data-bpm>--- BPM</span>
+      <input class="viz-bpm-set" type="number" min="60" max="220" step="0.1" placeholder="Auto" data-bpm-set aria-label="Set the BPM" title="Type a BPM to lock the tempo. Empty: follow the music.">
+      <button class="pix-btn" type="button" data-act="nudge-early" title="Beats 10 ms earlier ([)" aria-label="Nudge the beat earlier">‹</button>
+      <button class="pix-btn" type="button" data-act="nudge-late" title="Beats 10 ms later (])" aria-label="Nudge the beat later">›</button>
+      <button class="pix-btn" type="button" data-act="downbeat" title="Make this beat beat 1 of the bar (D)"><kbd>D</kbd>1</button>
+      <button class="pix-btn" type="button" data-act="tap" title="Tap along 4 times or more to set the tempo; the first tap is beat 1"><kbd>T</kbd>Tap</button>
+    </div>
     <div class="viz-transport" data-transport hidden>
       <button class="pix-btn" type="button" data-act="play">Pause</button>
       <span class="viz-track" data-track></span>
       <span class="viz-progress" data-progress><i></i></span>
     </div>
-    <div class="viz-actions">
-      <button class="pix-btn" type="button" data-act="drop"><kbd>Space</kbd>Drop</button>
-      <button class="pix-btn" type="button" data-act="arm"><kbd>A</kbd><span data-arm-label>Forge</span></button>
-      <button class="pix-btn" type="button" data-act="ring"><kbd>R</kbd>Ring</button>
-      <button class="pix-btn" type="button" data-act="combo"><kbd>X</kbd>Swing</button>
-      <button class="pix-btn" type="button" data-act="tap"><kbd>T</kbd>Tap</button>
-      <button class="pix-btn" type="button" data-act="cut"><kbd>C</kbd>Shot</button>
-      <button class="pix-btn" type="button" data-act="settings"><kbd>S</kbd>Settings</button>
-      <button class="pix-btn" type="button" data-act="fullscreen"><kbd>F</kbd><span data-fs-label>Full Screen</span></button>
+    <div class="viz-group viz-actions" role="group" aria-label="Moments">
+      <span class="viz-group-label">Moments</span>
+      <button class="pix-btn" type="button" data-act="drop" title="The drop: strike the held blade, or recolor the fire now"><kbd>Space</kbd>Drop</button>
+      <button class="pix-btn" type="button" data-act="arm" title="Forge a new blade and hold it over the fire until the drop"><kbd>A</kbd><span data-arm-label>Forge</span></button>
+      <button class="pix-btn" type="button" data-act="ring" title="The element’s ring races out across the ground"><kbd>R</kbd>Ring</button>
+      <button class="pix-btn" type="button" data-act="combo" title="The blade leaves the fire and fights on the next beats"><kbd>X</kbd>Swing</button>
+    </div>
+    <div class="viz-group viz-actions" role="group" aria-label="View">
+      <span class="viz-group-label">View</span>
+      <button class="pix-btn" type="button" data-act="cut" title="Cut to another camera shot"><kbd>C</kbd>Shot</button>
+      <button class="pix-btn" type="button" data-act="output" title="Open a window with just the picture, to drag onto a projector"><kbd>O</kbd><span data-output-label>Output</span></button>
+      <button class="pix-btn" type="button" data-act="settings" title="Settings, presets, title cards"><kbd>S</kbd>Settings</button>
+      <button class="pix-btn" type="button" data-act="fullscreen" title="Full screen"><kbd>F</kbd><span data-fs-label>Full Screen</span></button>
     </div>
   </footer>
 
@@ -155,8 +180,12 @@ function onImpact(flameKey, _from, instant, selection) {
   director?.landed(flameKey);
 }
 
+// Ableton Link (link.js): while it's the beat's source, the session sets the grid.
+const link = createLinkClient({ port: () => settings.linkPort, onStatus: (text) => { if (settingsPanel) settingsPanel.linkStatus = text; } });
 function onFrame(dt) {
   const now = performance.now() / 1000;
+  if (settings.beatFrom === 'link' && engine?.source) link.update(now, engine.analyser.tempo);
+  else link.close();
   const f = engine?.source ? engine.analyser.update(now, dt, { sensitivity: settings.sensitivity, lead: settings.offset / 1000 }) : IDLE;
   lastFeatures = f;
   director.update(f, dt);
@@ -204,7 +233,9 @@ function startScene() {
     const eq = prev ? { weapon: prev.weapon, flame: prev.flame, element: prev.element } : { weapon: startingEquipment.weapon, flame: startingEquipment.flame, element: elementOr(startingEquipment.element) };
     prev?.dispose();
     await fire.equip(eq.weapon, eq.flame, { instant: true, element: eq.element });
+    fire.setScenery(settings.scenery === 'mix' ? prev?.scenery ?? 'ruins' : settings.scenery);
     stage.classList.add('is-ready');
+    if (output && !output.closed) streamInto(output);
   }).catch(failScene);
 }
 startScene();
@@ -215,23 +246,41 @@ function onEvent(type, data = {}) {
   if (type === 'drop') {
     note('Drop!');
     live.textContent = 'Drop.';
-    if (data.title) showTitle();
+    if (data.title !== false) nextCard('drops');
   } else if (type === 'arm') {
     note('Forging a blade for the drop…', 4);
   } else if (type === 'start') {
-    if (data.title && settings.titleOnDrop) showTitle();
+    if (settings.intro) showCard(0);
+  } else if (type === 'bar') {
+    if (data.bar > 0 && data.bar % 32 === 0) nextCard('phrases');
+  } else if (type === 'stage') {
+    note(['', 'Building…', 'Building… halfway', 'Building… three quarters', 'Here it comes'][data.stage] ?? '', 2);
   }
 }
 function note(text, seconds = 2) { stateNote = { text, until: performance.now() / 1000 + seconds }; }
 
-// --- Title card -----------------------------------------------------------------------------
+// --- Title cards ----------------------------------------------------------------------------
+// Card 0 is the main one (settings.title/subtitle); 1… are settings.cards. `show` says when
+// each of the others comes up: on drops (taking turns with the main one, if it shows on
+// drops), every 32 bars, or only on its key.
 const titleCard = q('[data-title-card]');
 let titleTimer = 0;
-function showTitle({ ms = 3600 } = {}) {
-  if (!settings.title.trim()) return;
-  q('[data-title-main]').textContent = settings.title;
-  q('[data-title-sub]').textContent = settings.subtitle;
-  q('[data-title-sub]').hidden = !settings.subtitle.trim();
+const cardAt = (n) => (n === 0 ? { title: settings.title, subtitle: settings.subtitle } : settings.cards[n - 1]);
+const turns = { drops: 0, phrases: 0 };
+/** The next card whose turn it is for `when` (drops | phrases), if any. */
+function nextCard(when) {
+  const pool = [];
+  if (when === 'drops' && settings.titleOnDrop && settings.title.trim()) pool.push(0);
+  settings.cards.forEach((c, i) => { if (c.show === when && c.title.trim()) pool.push(i + 1); });
+  if (!pool.length) return;
+  showCard(pool[turns[when]++ % pool.length]);
+}
+function showCard(n, { ms = 3600 } = {}) {
+  const card = cardAt(n);
+  if (!card?.title?.trim()) return;
+  q('[data-title-main]').textContent = card.title;
+  q('[data-title-sub]').textContent = card.subtitle ?? '';
+  q('[data-title-sub]').hidden = !card.subtitle?.trim();
   titleCard.style.setProperty('--kindle-time', `${ms}ms`);
   titleCard.hidden = true;
   void titleCard.offsetWidth;
@@ -393,10 +442,6 @@ q('[data-device]').addEventListener('change', (e) => {
 // --- Start screen ----------------------------------------------------------------------------
 const fileInput = q('[data-file]');
 qa('[data-source]').forEach((btn) => {
-  const hint = SOURCES.find(([id]) => id === btn.dataset.source)[2];
-  const showHint = () => { q('[data-source-hint]').textContent = hint; };
-  btn.addEventListener('mouseenter', showHint);
-  btn.addEventListener('focus', showHint);
   btn.addEventListener('click', () => {
     if (btn.dataset.source === 'file') fileInput.click();
     else useSource(btn.dataset.source);
@@ -417,12 +462,13 @@ window.addEventListener('drop', (e) => {
 });
 if (navigator.mediaDevices?.enumerateDevices) listDevices();
 
-// On the start screen the fire moves aside for the menu (right of it when wide, above it when tall).
+// On the start screen the fire moves aside for the menu: to its right on a landscape
+// screen (further on a narrower one, where the menu takes more of it), above it on a tall one.
 function frameFire() {
   if (!director) return;
   const menu = document.body.dataset.mode === 'start';
-  const wide = innerWidth >= 1100;
-  director.frame(menu && wide ? 0.2 : 0, menu && !wide ? 0.24 : 0);
+  const side = innerWidth >= 760 && innerWidth > innerHeight;
+  director.frame(menu && side ? (innerWidth >= 1100 ? 0.2 : 0.36) : 0, menu && !side ? 0.24 : 0);
 }
 window.addEventListener('resize', frameFire);
 
@@ -475,8 +521,9 @@ function drawHud(f, dt) {
   hudClock += dt;
   if (hudClock < 0.1) return;
   hudClock = 0;
-  const tapped = engine.analyser.tempo.manual;
-  bpmEl.textContent = f.bpm ? `${f.locked ? '' : '~'}${Math.round(f.bpm)} BPM${tapped ? ' · Tap' : ''}` : '--- BPM';
+  const by = engine.analyser.tempo.manual; // tap | manual | link | null (heard)
+  const tag = { tap: ' · Tap', manual: ' · Set', link: ' · Link' }[by] ?? '';
+  bpmEl.textContent = f.bpm ? `${f.locked ? '' : '~'}${by === 'link' || by === 'manual' ? f.bpm.toFixed(1) : Math.round(f.bpm)} BPM${tag}` : '--- BPM';
   bpmEl.classList.toggle('is-locked', f.locked);
   const now = performance.now() / 1000;
   let text;
@@ -559,7 +606,15 @@ const actions = {
     q('[data-act="play"]').textContent = m.paused ? 'Play' : 'Pause';
   },
   'change-source': () => { stopSource(); showStart(); },
-  'show-title': () => { if (!settings.title.trim()) q('[data-set="title"]').focus(); else { settingsDialog.close(); showTitle(); } },
+  'show-title': () => { if (!settings.title.trim()) q('[data-set="title"]').focus(); else { settingsDialog.close(); showCard(0); } },
+  output: () => openOutput(),
+  'nudge-early': () => nudge(-0.01),
+  'nudge-late': () => nudge(0.01),
+  downbeat: () => {
+    if (!engine?.source) return;
+    engine.analyser.tempo.anchor(performance.now() / 1000);
+    note('This beat is beat 1', 1.2);
+  },
   'reset-settings': () => {
     resetSettings(settings);
     applySettings();
@@ -590,6 +645,11 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'a') actions.arm();
   else if (k === 'b') actions.beat();
   else if (k === 't') tap();
+  else if (k === 'd') actions.downbeat();
+  else if (e.key === '[') nudge(-0.01);
+  else if (e.key === ']') nudge(0.01);
+  else if (k === 'o') openOutput();
+  else if (e.shiftKey && /^Digit[1-9]$/.test(e.code)) showCard(Number(e.code.slice(5)) - 1);
   else if (k === 'c') actions.cut();
   else if (k === 'r') director.ring(1);
   else if (k === 'x') actions.combo();
@@ -614,10 +674,68 @@ function applySettings() {
   }
   if (engine) engine.monitor.gain.value = settings.volume;
   fire?.setPixelSize(settings.pixelSize);
+  if (settings.scenery !== 'mix') fire?.setScenery(settings.scenery);
   director?.setShot(settings.shot);
   saveSettings(settings);
 }
-const settingsPanel = bindSettings(settingsDialog, settings, { onChange: applySettings });
+const settingsPanel = bindSettings(settingsDialog, settings, { onChange: applySettings, onNote: (text) => note(text, 1.5) });
+settingsDialog.addEventListener('show-card', (e) => { settingsDialog.close(); showCard(e.detail); });
+
+// --- Beat by hand: a typed BPM, nudges -----------------------------------------------------
+const bpmInput = q('[data-bpm-set]');
+bpmInput.addEventListener('change', () => {
+  if (!engine?.source) return;
+  const v = Number(bpmInput.value);
+  const tempo = engine.analyser.tempo;
+  if (bpmInput.value && v >= 60 && v <= 220) { tempo.setManual(v, performance.now() / 1000); note(`Tempo set to ${v} BPM`, 1.5); }
+  else { bpmInput.value = ''; tempo.clearManual(); note('Following the music’s tempo', 1.5); }
+});
+bpmInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') bpmInput.blur(); });
+function nudge(seconds) {
+  if (!engine?.source) return;
+  engine.analyser.tempo.nudge(seconds);
+  note(`Beat ${seconds < 0 ? 'earlier' : 'later'} by ${Math.abs(seconds * 1000)} ms`, 1);
+}
+
+// --- The output window: just the picture, for a projector ----------------------------------
+// The canvas is streamed into a second window (so it can go full screen on another display)
+// while this one keeps the controls. A rebuilt scene (new particle counts) streams again.
+let output = null;
+function streamInto(win) {
+  const canvas = stage.querySelector('canvas');
+  const video = win.document.querySelector('video');
+  if (!canvas?.captureStream || !video) return false;
+  video.srcObject?.getTracks().forEach((t) => t.stop());
+  video.srcObject = canvas.captureStream(60);
+  return true;
+}
+function openOutput() {
+  if (output && !output.closed) { output.focus(); return; }
+  if (!stage.querySelector('canvas')?.captureStream) { note('This browser can’t send the picture to another window', 3); return; }
+  output = window.open('', 'bonfire-output', 'popup,width=1280,height=720');
+  if (!output) { note('The window was blocked: allow pop-ups for this page', 3); return; }
+  output.document.title = 'Bonfire Live — Output';
+  output.document.body.innerHTML = `
+    <style>
+      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+      video { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+      p { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); margin: 0; padding: 6px 12px;
+          font: 14px system-ui, sans-serif; color: #e9e3d2; background: #07070bcc; transition: opacity 600ms; }
+      body.quiet p { opacity: 0; } body.quiet { cursor: none; }
+    </style>
+    <video autoplay muted playsinline></video>
+    <p>Drag this window to the projector, then double-click for full screen.</p>`;
+  const doc = output.document;
+  doc.addEventListener('dblclick', () => (doc.fullscreenElement ? doc.exitFullscreen() : doc.documentElement.requestFullscreen?.()));
+  let quiet = 0;
+  const wakeOut = () => { doc.body.classList.remove('quiet'); clearTimeout(quiet); quiet = setTimeout(() => doc.body.classList.add('quiet'), 2500); };
+  doc.addEventListener('pointermove', wakeOut);
+  wakeOut();
+  streamInto(output);
+  output.addEventListener('pagehide', () => { q('[data-output-label]').textContent = 'Output'; });
+  q('[data-output-label]').textContent = 'Output (open)';
+  note('Output window open', 2);
+}
 function openSettings() {
   settingsPanel.open();
   wake();

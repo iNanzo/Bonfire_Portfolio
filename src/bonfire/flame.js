@@ -25,19 +25,49 @@ import { createPoints, rampColors, setRampColors } from './points.js';
 // camera angles keep the fire dense, and rounded to whole texels. Dead particles
 // (size 0) are moved outside the clip volume: a point size of 0 isn't enough —
 // some GPUs (Direct3D via ANGLE) still draw it as a single pixel.
+//
+// Motion streaks: a point set with a `vel` attribute (world m/s) is drawn as a streak
+// from where the particle is back to where it was `uStretch` seconds ago, so fast
+// sparks read as sparks rather than dots. The point grows to cover the whole streak
+// (centered on its middle) and the fragment shader keeps only the texels along the
+// line, dithering the tail away. Sets without `vel` read (0, 0, 0): a plain point.
 const vertexShader = /* glsl */ `
   attribute float size;
   attribute vec3 color;
   attribute float alpha;
+  attribute vec3 vel;
   uniform float sizeScale;
+  uniform float uStretch;
+  uniform vec2 resolution;
   varying vec3 vColor;
   varying float vAlpha;
+  varying float vSize;
+  varying vec2 vStreak; // half the streak in texels, head side (0: no streak)
   void main() {
     vColor = color;
     vAlpha = alpha;
+    vStreak = vec2(0.0);
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = size <= 0.0 ? vec4(2.0, 2.0, 2.0, 1.0) : projectionMatrix * mv;
-    gl_PointSize = size <= 0.0 ? 1.0 : clamp(floor(size * sqrt(sizeScale / -mv.z) + 0.5), 1.0, 4.0);
+    float ps = size <= 0.0 ? 1.0 : clamp(floor(size * sqrt(sizeScale / -mv.z) + 0.5), 1.0, 4.0);
+    if (size > 0.0 && uStretch > 0.0 && dot(vel, vel) > 0.01) {
+      vec4 tail = projectionMatrix * (modelViewMatrix * vec4(position - vel * uStretch, 1.0));
+      if (tail.w > 0.0 && gl_Position.w > 0.0) {
+        vec2 head = gl_Position.xy / gl_Position.w;
+        vec2 back = tail.xy / tail.w;
+        vec2 d = (head - back) * 0.5 * resolution; // texels
+        float len = length(d);
+        if (len > 1.0) {
+          d *= min(len, 12.0) / len;
+          back = head - d / (0.5 * resolution);
+          gl_Position.xy = (head + back) * 0.5 * gl_Position.w;
+          vStreak = d * 0.5;
+          ps = min(ps + ceil(length(d)), 16.0);
+        }
+      }
+    }
+    vSize = ps;
+    gl_PointSize = ps;
   }
 `;
 
@@ -52,26 +82,54 @@ export const DITHER_GLSL = /* glsl */ `
   float pBayer2(vec2 a) { a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
   float pBayer4(vec2 a) { return pBayer2(0.5 * a) * 0.25 + pBayer2(a); }
 `;
+// Shapes (uShape), for points 3 texels or bigger: 0 a square, 1 a cross (a lightning
+// glint), 2 a diamond (an ice glint). Smaller points are always squares.
 const fragmentShader = /* glsl */ `
   uniform sampler2D tDepth;
   uniform vec2 resolution;
   uniform float uHot;
+  uniform float uShape;
   varying vec3 vColor;
   varying float vAlpha;
+  varying float vSize;
+  varying vec2 vStreak;
   ${DITHER_GLSL}
   void main() {
     float sceneDepth = texture2D(tDepth, gl_FragCoord.xy / resolution).x;
     if (gl_FragCoord.z > sceneDepth + 0.00002) discard;
-    if (vAlpha < 0.999 && vAlpha <= pBayer4(gl_FragCoord.xy)) discard;
+    float a = vAlpha;
+    // Where this texel is inside the point, in texels from its center (y up).
+    vec2 p = (gl_PointCoord - 0.5) * vSize * vec2(1.0, -1.0);
+    if (vStreak != vec2(0.0)) {
+      // Keep the texels on the line from the tail (-vStreak) to the head (+vStreak);
+      // the tail thins out to nothing.
+      vec2 ab = vStreak * 2.0;
+      float s = clamp(dot(p + vStreak, ab) / dot(ab, ab), 0.0, 1.0);
+      if (length(p + vStreak - ab * s) > 0.6) discard;
+      a *= 0.25 + 0.75 * s;
+    } else if (vSize >= 3.0 && uShape > 0.5) {
+      vec2 q = abs(p);
+      if (uShape < 1.5 ? min(q.x, q.y) > 0.5 : q.x + q.y > vSize * 0.5) discard;
+    }
+    if (a < 0.999 && a <= pBayer4(gl_FragCoord.xy)) discard;
     gl_FragColor = vec4(vColor, uHot * max(vColor.r, max(vColor.g, vColor.b)));
   }
 `;
 
+/** Particle shapes (see the fragment shader). */
+export const SHAPE = { square: 0, cross: 1, diamond: 2 };
+/** Seconds of motion a streak shows (a set streaks only if it has a `vel` attribute). */
+export const STRETCH = 0.045;
+
 export function createParticleMaterial(depthTexture, resolution) {
   return new THREE.ShaderMaterial({
-    uniforms: { tDepth: { value: depthTexture }, resolution: { value: resolution }, sizeScale: { value: 6 }, uHot: { value: 1 } },
-    // Point sets without an `alpha` attribute (the bonfire, sparks) draw fully opaque.
-    defaultAttributeValues: { color: [1, 1, 1], uv: [0, 0], uv1: [0, 0], alpha: [1] },
+    uniforms: {
+      tDepth: { value: depthTexture }, resolution: { value: resolution }, sizeScale: { value: 6 }, uHot: { value: 1 },
+      uShape: { value: SHAPE.square }, uStretch: { value: STRETCH },
+    },
+    // Point sets without an `alpha` attribute (the bonfire, sparks) draw fully opaque;
+    // without `vel`, they don't streak.
+    defaultAttributeValues: { color: [1, 1, 1], uv: [0, 0], uv1: [0, 0], alpha: [1], vel: [0, 0, 0] },
     vertexShader,
     fragmentShader,
     // Purely additive in color and alpha (alpha carries the bonfire's heat).
@@ -87,10 +145,14 @@ export function createParticleMaterial(depthTexture, resolution) {
   });
 }
 
-/** The same particles for effects other than the bonfire (forge, ring of fire, embers): no heat. */
-export function createEffectMaterial(fireMaterial) {
+/**
+ * The same particles for effects other than the bonfire (forge, ring of fire, embers): no
+ * heat. `shape` draws big points as crosses or diamonds (SHAPE); the rest of the uniforms
+ * (depth, resolution, streak length) stay shared with the fire's material.
+ */
+export function createEffectMaterial(fireMaterial, { shape = SHAPE.square } = {}) {
   const m = fireMaterial.clone();
-  m.uniforms = { ...fireMaterial.uniforms, uHot: { value: 0 } };
+  m.uniforms = { ...fireMaterial.uniforms, uHot: { value: 0 }, uShape: { value: shape } };
   return m;
 }
 
@@ -104,7 +166,8 @@ export function createEffectMaterial(fireMaterial) {
  */
 export function createFlame({ count, sparks: sparkCount, material, origin, field, reducedMotion }) {
   const flame = createPoints(count, material, { alpha: false });
-  const spark = createPoints(sparkCount, material, { alpha: false });
+  const SV = new Float32Array(sparkCount * 3);
+  const spark = createPoints(sparkCount, material, { alpha: false, vel: SV }); // sparks streak
 
   const P = flame.geometry.attributes.position.array;
   const C = flame.geometry.attributes.color.array;
@@ -117,7 +180,6 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
   const SP = spark.geometry.attributes.position.array;
   const SC = spark.geometry.attributes.color.array;
   const SS = spark.geometry.attributes.size.array;
-  const SV = new Float32Array(sparkCount * 3);
   const sAge = new Float32Array(sparkCount);
   const sLife = new Float32Array(sparkCount);
 
@@ -247,13 +309,16 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
       SP[ix + 1] += SV[ix + 1] * dt;
       SP[ix + 2] += (SV[ix + 2] + c.z * 0.25 + wind.z * 0.6) * dt;
       const k = sAge[i] / sLife[i];
-      tmp.copy(ramp[k < 0.3 ? 3 : k < 0.6 ? 2 : k < 0.85 ? 1 : 0]).multiplyScalar(Math.min(1, (1 - k) * 4));
+      // Fire's signature: embers cool core → lo as they rise, and twinkle as they tumble.
+      const twinkle = 0.7 + 0.3 * Math.sin(sAge[i] * 23 + i * 2.3);
+      tmp.copy(ramp[k < 0.3 ? 3 : k < 0.6 ? 2 : k < 0.85 ? 1 : 0]).multiplyScalar(Math.min(1, (1 - k) * 4) * twinkle);
       SC[ix] = tmp.r; SC[ix + 1] = tmp.g; SC[ix + 2] = tmp.b;
       SS[i] = sLife[i] < 0.01 ? 0 : k < 0.15 ? 2 : 1;
     }
     spark.geometry.attributes.position.needsUpdate = true;
     spark.geometry.attributes.color.needsUpdate = true;
     spark.geometry.attributes.size.needsUpdate = true;
+    spark.geometry.attributes.vel.needsUpdate = true;
   }
 
   /** Particle sets the cursor interaction acts on. */

@@ -2,6 +2,11 @@
 // of the visualizer's own, eased from one to the next; then, each frame, the camera
 // placed there with a sway toward the cursor and any shake, snapped to whole texels at
 // the focal distance so the image never swims between pixels.
+//
+// Shake is "trauma": each hit adds to it (capped at 1), it drains away steadily, and the
+// camera shakes by trauma² — so small hits barely register while big ones stack into a
+// real jolt that settles smoothly. The motion is smooth noise (a few sines per axis at
+// odd frequencies), not per-frame random jumps, with a little roll at the peak.
 import * as THREE from 'three';
 import { getPov } from './povs.js';
 import { easeInOut } from '../math.js';
@@ -15,7 +20,8 @@ const clonePose = (p) => ({ pos: p.pos.clone(), target: p.target.clone(), fov: p
 export function createView(camera, { reducedMotion = false, sway: swayAmount = 1 } = {}) {
   let layout = 'wide';
   const view = { name: 'home', cur: toPose(getPov('home', layout)), from: null, to: null, t: 1, dur: 1.25 };
-  let shake = 0;
+  let trauma = 0;   // 0..1, see above
+  let shakeT = 0;   // time along the shake's noise
   const sway = { x: 0, y: 0 };
   const right = new THREE.Vector3();
   const up = new THREE.Vector3();
@@ -80,8 +86,10 @@ export function createView(camera, { reducedMotion = false, sway: swayAmount = 1
       layout = next;
       if (view.name) setView(view.name, { instant: true });
     },
-    /** A jolt (0..~0.3 s of shaking). */
-    shake(amount) { shake = Math.max(shake, amount); },
+    /** A jolt: `amount` (about 0.04 for a flick, 0.3 for a slam) adds trauma. */
+    shake(amount) { trauma = Math.min(1, trauma + amount * 1.6); },
+    /** 0..1: how much trauma the camera is carrying (for tests and debugging). */
+    get trauma() { return trauma; },
     /** Ease toward the pose it's headed for. */
     step(dt) {
       if (view.t >= 1) return;
@@ -112,16 +120,21 @@ export function createView(camera, { reducedMotion = false, sway: swayAmount = 1
       const texel = (2 * dist * Math.tan(THREE.MathUtils.degToRad(fov / 2))) / size.h;
       let ox = sway.x * 0.14;
       let oy = -sway.y * 0.08;
-      if (shake > 0) {
-        shake -= dt;
-        ox += (Math.random() - 0.5) * texel * 4;
-        oy += (Math.random() - 0.5) * texel * 4;
+      let shakeRoll = 0;
+      if (trauma > 0) {
+        trauma = Math.max(0, trauma - dt * 1.4);
+        shakeT += dt;
+        const k = trauma * trauma;
+        const n = (a, b, c) => (Math.sin(shakeT * a) + Math.sin(shakeT * b + 1.3) * 0.6 + Math.sin(shakeT * c + 2.1) * 0.3) / 1.9;
+        ox += n(37, 59, 83) * k * texel * 7;
+        oy += n(43, 67, 97) * k * texel * 7;
+        shakeRoll = n(29, 53, 71) * k * 0.035;
       }
       ox = Math.round(ox / texel) * texel;
       oy = Math.round(oy / texel) * texel;
       camera.position.copy(pos);
       camera.quaternion.setFromRotationMatrix(m4.lookAt(pos, target, camera.up));
-      if (roll) camera.quaternion.multiply(rollQ.setFromAxisAngle(VIEW_AXIS, roll));
+      if (roll || shakeRoll) camera.quaternion.multiply(rollQ.setFromAxisAngle(VIEW_AXIS, roll + shakeRoll));
       right.set(1, 0, 0).applyQuaternion(camera.quaternion);
       up.set(0, 1, 0).applyQuaternion(camera.quaternion);
       camera.position.addScaledVector(right, ox).addScaledVector(up, oy);

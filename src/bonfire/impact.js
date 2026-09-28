@@ -83,7 +83,8 @@ export function createImpactFx({
   const puff = createPoints(smoke, smokeMaterial);
   const flecks = createPoints(ash, smokeMaterial);
   const emberCount = embers + (reducedMotion ? 0 : SPLASH);
-  const sparks = createPoints(emberCount, fireMaterial);
+  const kVel = new Float32Array(emberCount * 3);
+  const sparks = createPoints(emberCount, fireMaterial, { vel: kVel }); // embers streak as they fly
 
   // Shock ring: per strand, one segment from each emitter to the next.
   const W = createRingLines(fireMaterial, STRANDS.length * emitters * 2);
@@ -158,7 +159,6 @@ export function createImpactFx({
   const aLife = new Float32Array(ash).fill(1);
   const aPhase = new Float32Array(ash);
   const E = { pos: sparks.geometry.attributes.position.array, col: sparks.geometry.attributes.color.array, size: sparks.geometry.attributes.size.array, alpha: sparks.geometry.attributes.alpha.array };
-  const kVel = new Float32Array(emberCount * 3);
   const kAge = new Float32Array(emberCount).fill(1e3);
   const kLife = new Float32Array(emberCount).fill(1);
   const kGrain = new Float32Array(emberCount);
@@ -480,7 +480,7 @@ export function createImpactFx({
       E.alpha[i] = Math.min(1, heat * 2.5) * (0.65 + 0.35 * Math.sin(kAge[i] * 21 + i * 2.3));
     }
     if (anyEmber) {
-      for (const a of ['position', 'color', 'size', 'alpha']) sparks.geometry.attributes[a].needsUpdate = true;
+      for (const a of ['position', 'color', 'size', 'alpha', 'vel']) sparks.geometry.attributes[a].needsUpdate = true;
     }
   }
 

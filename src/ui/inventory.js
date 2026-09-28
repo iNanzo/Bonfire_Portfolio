@@ -1,5 +1,6 @@
 // Projects inventory: at-a-glance panel (hover/focus), expanded item details
-// (route #/projects/<id>), screenshot viewer, and "equipped" markers.
+// (route #/projects/<id>), screenshot viewer and full-size gallery, and "equipped"
+// markers. The grid shows just enough empty slots to finish its last row.
 import { items, ui } from '../content.js';
 import { esc, img, linkAttrs } from '../render.js';
 import { blip } from './audio.js';
@@ -38,7 +39,16 @@ export function setupInventory(root, { reducedMotion }) {
       cursor.classList.add('is-locking');
     }
   }
-  new ResizeObserver(() => placeCursor({ glide: false })).observe(box);
+  // Empty slots: only enough to finish the last row (how many fit a row depends on the width).
+  const grid = root.querySelector('[data-inv-grid]');
+  const empties = [...grid.querySelectorAll('.is-empty')];
+  function fitEmpties() {
+    const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length || 4;
+    const need = (cols - (slots.length % cols)) % cols;
+    empties.forEach((e, i) => { e.hidden = i >= need; });
+  }
+  new ResizeObserver(() => { fitEmpties(); placeCursor({ glide: false }); }).observe(box);
+  fitEmpties();
 
   // --- At a glance ---------------------------------------------------------------
   function showGlance(id) {
@@ -98,6 +108,8 @@ export function setupInventory(root, { reducedMotion }) {
     d('count').textContent = `${i + 1} / ${list.length}`;
     d('meta').textContent = [p.kind, p.year, p.status].filter(Boolean).join(' · ');
     d('title').textContent = p.name;
+    d('outcome').textContent = p.outcome ?? '';
+    d('outcome').hidden = !p.outcome;
     d('flavor').textContent = p.flavor ?? '';
     d('flavor').hidden = !p.flavor;
     d('problem').textContent = p.problem;
@@ -106,7 +118,8 @@ export function setupInventory(root, { reducedMotion }) {
     d('role').textContent = p.role;
     d('note').textContent = p.note ?? '';
     d('note').hidden = !p.note;
-    d('links').innerHTML = (p.links ?? []).map((l) => `<a class="pix-btn" ${linkAttrs(l.href)}>${esc(l.label)} &gt;</a>`).join('');
+    d('links').innerHTML = (p.links ?? []).map((l) => `<a class="pix-btn detail-link" ${linkAttrs(l.href)}>${esc(l.label)} &gt;</a>`).join('');
+    d('links').hidden = !p.links?.length;
     const multi = p.images.length > 1;
     d('controls').hidden = !multi;
     d('thumbs').hidden = !multi;
@@ -125,8 +138,37 @@ export function setupInventory(root, { reducedMotion }) {
     return true;
   }
 
+  // --- Gallery: the screenshots full size, one at a time -------------------------------
+  const gallery = root.querySelector('[data-gallery]');
+  const gl = (k) => gallery.querySelector(`[data-gl="${k}"]`);
+  function showGallery(i) {
+    showImage(i);
+    const im = current.images[imageIndex];
+    gl('img').src = img(im.src);
+    gl('img').alt = im.alt;
+    gl('img').classList.toggle('pixel', !!im.pixel);
+    gl('caption').textContent = im.caption ?? '';
+    gl('count').textContent = `${imageIndex + 1} / ${current.images.length}`;
+    gallery.querySelectorAll('[data-gl-prev], [data-gl-next]').forEach((b) => { b.hidden = current.images.length < 2; });
+  }
+  gallery.addEventListener('click', (e) => {
+    if (e.target === gallery || e.target.closest('[data-gl-close]')) gallery.close();
+    else if (e.target.closest('[data-gl-prev]')) { showGallery(imageIndex - 1); blip('move'); }
+    else if (e.target.closest('[data-gl-next]')) { showGallery(imageIndex + 1); blip('move'); }
+  });
+  gallery.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); showGallery(imageIndex - 1); blip('move'); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); showGallery(imageIndex + 1); blip('move'); }
+  });
+  gallery.addEventListener('close', () => blip('back'));
+
   detail.addEventListener('click', (e) => {
-    if (e.target.closest('[data-prev-img]')) { showImage(imageIndex - 1); blip('move'); }
+    if (e.target.closest('[data-open-gallery]')) {
+      showGallery(imageIndex);
+      gallery.showModal();
+      gallery.querySelector('[data-gl-close]').focus();
+      blip('select');
+    } else if (e.target.closest('[data-prev-img]')) { showImage(imageIndex - 1); blip('move'); }
     else if (e.target.closest('[data-next-img]')) { showImage(imageIndex + 1); blip('move'); }
     else {
       const t = e.target.closest('[data-thumb]');

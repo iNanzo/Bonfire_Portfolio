@@ -152,3 +152,35 @@ test('estimateTempo prefers the beat over its double and half', () => {
   assert.ok(Math.abs(60 / est.period - 126) < 1.2, `${60 / est.period}`);
   assert.ok(est.strength > 0.3);
 });
+
+test('manual tempo, phase nudges and an outside beat (Link) own the grid', async () => {
+  const { createTempoTracker } = await import('../src/visualizer/tempo.js');
+  const t = createTempoTracker();
+  // A typed-in 128 BPM: beats every 60/128 s from the first.
+  t.setManual(128, 10);
+  let beats = [];
+  for (let now = 10; now < 14; now += 1 / 60) { t.push(now, 0); beats.push(...t.tick(now)); }
+  const gaps = beats.slice(1).map((b, i) => b.time - beats[i].time);
+  assert.ok(gaps.every((g) => Math.abs(g - 60 / 128) < 1e-6), 'steady at the typed tempo');
+  assert.equal(t.manual, 'manual');
+  // A nudge moves the next beats later by exactly that much.
+  const last = beats.at(-1).time;
+  t.nudge(0.02);
+  beats = [];
+  for (let now = 14; now < 15; now += 1 / 60) beats.push(...t.tick(now));
+  assert.ok(Math.abs(beats[0].time - (last + 60 / 128 + 0.02)) < 1e-6, 'nudged later');
+  t.clearManual();
+  assert.equal(t.manual, null);
+
+  // Link: 120 BPM, the session at beat 7.5 at t = 20 → the next beat (8, a downbeat) at 20.25.
+  const l = createTempoTracker();
+  l.push(20, 0);
+  l.external(120, 7.5, 20);
+  const next = l.tick(20.3);
+  assert.equal(next.length, 1);
+  assert.ok(Math.abs(next[0].time - 20.25) < 1e-6, `on the session's beat (${next[0].time})`);
+  assert.equal(next[0].beat, 0, 'beat 8 is a downbeat');
+  assert.equal(l.manual, 'link');
+  l.push(23, 0);
+  assert.equal(l.manual, null, 'a silent bridge lets go after 2 s');
+});

@@ -222,3 +222,151 @@ body.hud-off .viz-hud { display: none; }
 .viz-keys dt { flex: none; min-width: 4.5em; }
 
 .viz-settings-foot { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+
+/* ---------- Round 5: sources with their descriptions, the start panel off the fire ---------- */
+
+.viz-source { display: flex; align-items: flex-start; gap: 10px; padding-block: 6px; }
+.viz-source-text { display: grid; gap: 2px; }
+.viz-source-desc {
+  max-width: 34rem;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  letter-spacing: 0;
+  color: var(--text-dim);
+}
+.viz-sources .title-item:hover .viz-source-desc,
+.viz-sources .title-item:focus-visible .viz-source-desc { color: var(--c-bone); }
+@media (max-width: 1099px) {
+  /* A compact panel along the bottom-left, so the fire (framed aside) stays in view; each
+     source's description shows while it's pointed at or focused. */
+  .viz-start { align-items: flex-end; justify-content: flex-start; }
+  .viz-start-copy { width: min(100%, 520px); margin-inline: 0; }
+  .viz-source-desc { display: none; }
+  .viz-source:hover .viz-source-desc,
+  .viz-source:focus-visible .viz-source-desc { display: block; }
+  .viz-start .hero-name { font-size: clamp(1.75rem, 6vw, 2.5rem); }
+  .viz-start .hero-value { font-size: 0.9375rem; }
+}
+
+/* ---------- The HUD in groups ---------- */
+
+.viz-hud { gap: 10px 18px; }
+.viz-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.viz-group-label {
+  font-family: var(--font-pixel);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-right: 2px;
+}
+.viz-group + .viz-group { padding-left: 16px; box-shadow: -1px 0 0 var(--line); }
+.viz-readout { flex: 1 1 280px; }
+.viz-beat .viz-bpm { min-width: 7.5em; }
+.viz-bpm-set {
+  width: 5.2em;
+  padding: 4px 6px;
+  border: 0;
+  background: var(--c-shadow);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  font: 400 0.875rem/1.2 var(--font-body);
+  color: var(--c-bone);
+}
+.viz-bpm-set:focus-visible { outline: 2px solid var(--accent); }
+.viz-beat .pix-btn { padding: 4px 8px; font-size: 0.875rem; }
+.viz-beat kbd { min-width: 0; font-size: 0.625rem; }
+@media (max-width: 760px) {
+  .viz-group + .viz-group { padding-left: 0; box-shadow: none; }
+  .viz-group-label { width: 100%; }
+}
+
+/* ---------- Settings: tabs, simple / all, hints, cards, presets, setups ---------- */
+
+.viz-settings-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 10px 24px; }
+.viz-view-switch { display: flex; gap: 14px; font-family: var(--font-pixel); font-size: 0.875rem; color: var(--text-dim); }
+.viz-view-switch label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.viz-view-switch input { accent-color: var(--accent); }
+.viz-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 20px; box-shadow: 0 1px 0 var(--line); }
+.viz-tab {
+  padding: 7px 12px;
+  border: 0;
+  background: none;
+  font-family: var(--font-pixel);
+  font-size: 0.9375rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  box-shadow: inset 0 -2px 0 transparent;
+}
+.viz-tab:hover { color: var(--c-bone); }
+.viz-tab[aria-selected='true'] { color: var(--accent-hi); box-shadow: inset 0 -2px 0 var(--accent); }
+.viz-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.viz-tab-panel[hidden] { display: none; }
+/* Simple view: only the settings that matter most. */
+[data-view='simple'] [data-adv] { display: none !important; }
+
+.viz-tip {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 1.15em;
+  height: 1.15em;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--text-dim);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  cursor: help;
+}
+.viz-tip:hover, .viz-tip:focus-visible { color: var(--c-bone); box-shadow: 0 0 0 1px var(--accent); outline: none; }
+.viz-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: -10px; /* (anchored at its left: centered, one near the dialog's edge would be cut off) */
+  bottom: calc(100% + 8px);
+  z-index: 5;
+  width: max-content;
+  max-width: min(270px, 64vw);
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: left;
+  white-space: normal;
+  color: var(--c-bone);
+  background: var(--c-void);
+  box-shadow: 0 0 0 1px var(--accent);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.viz-tip:hover::after, .viz-tip:focus-visible::after { opacity: 1; visibility: visible; }
+.viz-check .viz-tip { margin-top: 3px; flex: none; }
+
+.viz-link-help { font-size: 0.875rem; color: var(--text-dim); }
+.viz-link-help summary { cursor: pointer; font-family: var(--font-pixel); color: var(--c-bone); }
+.viz-link-help ol { margin: 8px 0 0 18px; display: grid; gap: 4px; list-style: decimal; }
+.viz-link-help a { color: var(--accent-hi); }
+.viz-link-help code { font-size: 0.8125rem; color: var(--c-bone); }
+
+.viz-cards { display: grid; gap: 8px; margin: 10px 0; }
+.viz-card { display: grid; grid-template-columns: auto 1fr 1.3fr auto auto auto; gap: 8px; align-items: center; }
+.viz-card-key { font-family: var(--font-pixel); font-size: 0.875rem; color: var(--accent-hi); min-width: 2em; }
+.viz-card .pix-btn { padding: 5px 9px; font-size: 0.875rem; }
+@media (max-width: 720px) { .viz-card { grid-template-columns: auto 1fr; } }
+
+.viz-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.viz-preset { display: grid; gap: 4px; padding: 12px; text-align: left; }
+.viz-preset b { font-family: var(--font-pixel); font-weight: 400; font-size: 1rem; color: var(--accent-hi); }
+.viz-preset span { font-family: var(--font-body); font-size: 0.8125rem; line-height: 1.4; color: var(--text-dim); letter-spacing: 0; text-transform: none; }
+.viz-setup-save input { flex: 1; min-width: 200px; }
+.viz-setups { display: grid; gap: 6px; margin: 10px 0; }
+.viz-setups li { display: flex; align-items: center; gap: 8px; }
+.viz-setups li > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viz-setups .pix-btn { padding: 4px 9px; font-size: 0.875rem; }
+@media (min-width: 1100px) {
+  /* A soft shade behind the start menu's text, so it reads over the scenery. */
+  .viz-start { background: linear-gradient(90deg, color-mix(in srgb, var(--c-void) 78%, transparent) 0, transparent 52%); }
+}

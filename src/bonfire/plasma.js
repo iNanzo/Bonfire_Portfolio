@@ -29,6 +29,7 @@ import { createBoltLines, hashSeed, seeded } from './bolts.js';
 import { DITHER_GLSL } from './flame.js';
 import { smoothstep, TAU } from '../math.js';
 import { createPoints, rampColors, setRampColors } from './points.js';
+import { arcJitter, arcHeat, ARC_FLASH } from './signatures.js';
 
 const MAX_FILAMENTS = 32;
 const MAX_STRIKES = 8;
@@ -97,15 +98,15 @@ function glowSprite(fxMaterial) {
  * @param {object} o.field                shared noise (curl.js)
  * @param {THREE.Vector3} o.origin        fire center on the ground
  */
-export function createPlasma({ fxMaterial, hotMaterial, field, origin, reducedMotion = false }) {
-  const bolts = createBoltLines(fxMaterial, MAX_FILAMENTS * 70 + 400, 1600);
+export function createPlasma({ fxMaterial, hotMaterial, sparkMaterial = fxMaterial, field, origin, reducedMotion = false }) {
+  const bolts = createBoltLines(fxMaterial, MAX_FILAMENTS * 70 + 400, 1600, { afterimage: () => (reducedMotion ? 0 : effects.impact.afterimages) });
   const core = createPoints(CORE, hotMaterial, { alpha: false });
-  const sparks = createPoints(SPARKS, fxMaterial);
+  const sVel = new Float32Array(SPARKS * 3);
+  const sparks = createPoints(SPARKS, sparkMaterial, { vel: sVel }); // cross-shaped flashes that streak (signatures.js)
   const flashes = createPoints(FLASH, fxMaterial);
   const C = { pos: core.geometry.attributes.position.array, col: core.geometry.attributes.color.array, size: core.geometry.attributes.size.array };
   const S = { pos: sparks.geometry.attributes.position.array, col: sparks.geometry.attributes.color.array, size: sparks.geometry.attributes.size.array, alpha: sparks.geometry.attributes.alpha.array };
   const Fl = { pos: flashes.geometry.attributes.position.array, col: flashes.geometry.attributes.color.array, size: flashes.geometry.attributes.size.array, alpha: flashes.geometry.attributes.alpha.array };
-  const sVel = new Float32Array(SPARKS * 3);
   const sAge = new Float32Array(SPARKS).fill(1);
   const sLife = new Float32Array(SPARKS).fill(0);
   let sNext = 0;
@@ -133,6 +134,10 @@ export function createPlasma({ fxMaterial, hotMaterial, field, origin, reducedMo
   let flash = 0;      // a discharge: the scene swells its light with this
   let lastFlash = -1e3;
   let ground = null;  // (x, z) → height of the scenery there, once the model has loaded
+  // Bolts jumping to things in the air (fireflies): { to (a live position), until, seed }.
+  const jumps = [];
+  let clock = 0;
+  let ambientShare = 1; // 0..1: how many idle sparks to keep (the scene's density budget)
   const groundAt = (x, z) => (ground ? ground(x, z) : 0);
 
   // --- filament layout: even directions on a sphere, nudged upward -------------------
@@ -230,6 +235,7 @@ export function createPlasma({ fxMaterial, hotMaterial, field, origin, reducedMo
    */
   function step(dt, t, level, { ray = null, flow = null } = {}) {
     const L = effects.lightning;
+    clock = t;
     amount = Math.min(1, Math.max(0, amount + (active ? dt / 0.55 : -dt / 0.35)));
     flash *= Math.exp(-dt * 10);
     let anySpark = false;
@@ -394,7 +400,7 @@ export function createPlasma({ fxMaterial, hotMaterial, field, origin, reducedMo
           struck[i] = cs;
           if (rng() < 0.5 + stoked * 0.3) for (let j = 0; j < 2; j++) emitSpark(b.x, b.y + 0.01, b.z, -dirs[i].x * 0.4, 0.6, -dirs[i].z * 0.4, stoked * 0.3);
         }
-      } else if (!reducedMotion && active && Math.random() < dt * (0.8 + stoked * 6 + touch[i] * 8)) {
+      } else if (!reducedMotion && active && Math.random() < dt * (0.8 * ambientShare + stoked * 6 + touch[i] * 8)) {
         emitSpark(b.x, b.y, b.z, dirs[i].x, dirs[i].y, dirs[i].z, stoked * 0.4);
       }
     }
@@ -421,6 +427,20 @@ export function createPlasma({ fxMaterial, hotMaterial, field, origin, reducedMo
         }
         px0 = x; py0 = y; pz0 = z; pa = al;
       }
+    }
+    // --- jumps: a bolt from the ball to a firefly, flickering for its moment
+    for (let j = jumps.length - 1; j >= 0; j--) {
+      const jp = jumps[j];
+      if (t >= jp.until || amount < 0.2) { jumps.splice(j, 1); continue; }
+      const rng = seeded(hashSeed(1300 + jp.seed, cs));
+      v.subVectors(jp.to, center).normalize();
+      a.copy(center).addScaledVector(v, R * 0.15);
+      const k = bright * 1.2;
+      bolts.bolt(a.x, a.y, a.z, jp.to.x, jp.to.y, jp.to.z, {
+        rng, depth: 4, jag: 0.22, width: (tt) => Math.max(1, W * 0.7 * (1 - tt)), heat: 1.6,
+        color: (tt, out) => sample(0.95 - tt * 0.2, out).multiplyScalar(k),
+      });
+      contacts.push({ x: jp.to.x, y: jp.to.y, z: jp.to.z, k, glow: 0.1 });
     }
     bolts.end();
 
@@ -492,17 +512,18 @@ export function createPlasma({ fxMaterial, hotMaterial, field, origin, reducedMo
       sAge[i] += dt;
       const ix = i * 3;
       const drag = Math.exp(-dt * 2.2);
+      if (!reducedMotion) arcJitter(sVel, ix, dt);
       sVel[ix] *= drag; sVel[ix + 1] = sVel[ix + 1] * drag - 2.4 * dt; sVel[ix + 2] *= drag;
       S.pos[ix] += sVel[ix] * dt; S.pos[ix + 1] += sVel[ix + 1] * dt; S.pos[ix + 2] += sVel[ix + 2] * dt;
       const floor = groundAt(S.pos[ix], S.pos[ix + 2]) + 0.015;
       if (S.pos[ix + 1] < floor) { S.pos[ix + 1] = floor; sVel[ix + 1] *= -0.35; sVel[ix] *= 0.6; sVel[ix + 2] *= 0.6; }
       const k = Math.min(1, sAge[i] / sLife[i]);
-      sample(0.95 - k * 0.6, tmp).multiplyScalar(0.9);
+      sample(0.95 - k * 0.6, tmp).multiplyScalar(0.9).lerp(white, arcHeat(sAge[i]));
       S.col[ix] = tmp.r; S.col[ix + 1] = tmp.g; S.col[ix + 2] = tmp.b;
-      S.size[i] = k < 0.25 ? 2 : 1;
+      S.size[i] = sAge[i] < ARC_FLASH ? 3 : k < 0.25 ? 2 : 1;
       S.alpha[i] = Math.min(1, (1 - k) * 2.5);
     }
-    for (const k of ['position', 'color', 'size', 'alpha']) sparks.geometry.attributes[k].needsUpdate = true;
+    for (const k of ['position', 'color', 'size', 'alpha', 'vel']) sparks.geometry.attributes[k].needsUpdate = true;
   }
 
   /** A jolt of sparks off every filament, and every strike jumps at once (weapon impacts, stokes). */
@@ -528,6 +549,15 @@ export function createPlasma({ fxMaterial, hotMaterial, field, origin, reducedMo
     lights,
     step,
     discharge,
+    /** Where the ball hangs (world), and its radius now. */
+    center,
+    get radius() { return effects.lightning.size * easeOutBack(amount); },
+    /** A bolt jumps from the ball to `to` (a position it follows, e.g. a firefly's) for `duration` s. */
+    jump(to, duration = 0.16) {
+      if (reducedMotion || amount < 0.3 || jumps.length >= 3) return false;
+      jumps.push({ to, until: clock + duration, seed: Math.floor(Math.random() * 1e6) });
+      return true;
+    },
     /** Turn the ball on (grows in) or off (collapses); `instant` skips the ease. */
     setActive(on, instant = false) {
       active = on;
@@ -541,6 +571,8 @@ export function createPlasma({ fxMaterial, hotMaterial, field, origin, reducedMo
     /** 0..1: the ball just discharged (decays fast); the scene flashes with it. */
     get flash() { return flash; },
     sets: [{ pos: S.pos, vel: sVel, n: SPARKS, geo: sparks.geometry, maxV: 2 }],
+    /** 0..1: how many idle sparks to keep (the scene thins them during big hits). */
+    set ambient(v) { ambientShare = v; },
     setRamp(hexes) { setRampColors(ramp, hexes); },
   };
 }

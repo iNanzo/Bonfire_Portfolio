@@ -47,12 +47,12 @@ export function renderChrome() {
         ${logoMark('brand-mark')}<span class="brand-name">${esc(site.name)}</span>
       </a>
       <nav class="tabs" aria-label="Main">
-        <kbd class="tab-key" aria-hidden="true">Q</kbd>
+        <button class="tab-key" type="button" data-step="-1" title="${esc(ui.prevScreen)} (Q)" aria-label="${esc(ui.prevScreen)}">Q</button>
         <ul role="list">${tabs.map((s) => `<li><a href="#/${s.id}" data-tab="${s.id}">${esc(s.label)}</a></li>`).join('')}</ul>
-        <kbd class="tab-key" aria-hidden="true">E</kbd>
+        <button class="tab-key" type="button" data-step="1" title="${esc(ui.nextScreen)} (E)" aria-label="${esc(ui.nextScreen)}">E</button>
       </nav>
       <div class="header-actions">
-        <button class="pix-btn sound-toggle" type="button" data-sound aria-pressed="false">
+        <button class="pix-btn sound-toggle" type="button" data-sound aria-pressed="false" title="${esc(ui.soundHint)}">
           <span class="sound-icon" aria-hidden="true"></span><span data-sound-label>${esc(ui.soundOff)}</span>
         </button>
         <button class="pix-btn menu-toggle" type="button" data-menu-open aria-haspopup="dialog">${esc(ui.menu)}</button>
@@ -66,6 +66,9 @@ export function renderChrome() {
         <ul role="list" data-menu-list>
           ${screens.map((s) => `<li><a class="menu-item" href="#/${s.id === 'home' ? '' : s.id}" data-menu-item>${esc(s.label)}</a></li>`).join('')}
           <li class="menu-sep" aria-hidden="true"></li>
+          <li><button class="menu-item" type="button" data-menu-item data-menu-action="photo" title="${esc(ui.photoHint)}">${esc(ui.photo)} <kbd>F</kbd></button></li>
+          <li><button class="menu-item" type="button" data-menu-item data-menu-action="breakdown" title="${esc(ui.breakdownHint)}">${esc(ui.breakdown)} <kbd>B</kbd></button></li>
+          <li><button class="menu-item" type="button" data-menu-item data-menu-action="discoveries">${esc(ui.discoveries)} <span class="menu-count" data-discovery-count></span></button></li>
           <li><button class="menu-item" type="button" data-menu-item data-sound><span data-sound-label>${esc(ui.soundOff)}</span></button></li>
           <li><button class="menu-item" type="button" data-menu-item data-menu-close>${esc(ui.close)}</button></li>
         </ul>
@@ -82,6 +85,16 @@ export function renderChrome() {
         <p class="kindled-sub">${esc(hero.kindled.subtitle)}</p>
       </div>
     </div>
+    <dialog class="rest-menu" data-discoveries aria-labelledby="discoveries-title">
+      <div class="rest-menu-inner frame discoveries-inner">
+        ${corners}
+        <p class="rest-menu-title" id="discoveries-title">${esc(ui.discoveries)} <span data-discovery-count></span></p>
+        <p class="rest-menu-flavor">${esc(ui.discoveriesFlavor)}</p>
+        <ul class="discovery-list" role="list" data-discovery-list></ul>
+        <button class="pix-btn" type="button" data-discoveries-close>${esc(ui.close)} <kbd>Esc</kbd></button>
+      </div>
+    </dialog>
+    <div class="toast" data-toast hidden role="status"><span class="toast-kicker" data-toast-kicker></span><span class="toast-text" data-toast-text></span></div>
     <p class="visually-hidden" aria-live="polite" data-live></p>
     <div class="debug-hud" data-debug hidden></div>
     <div class="tooltip" data-tooltip hidden aria-hidden="true"><p class="tooltip-name"></p><p class="tooltip-flavor"></p></div>`;
@@ -117,9 +130,10 @@ export function renderHome() {
 
 // --- Projects (inventory) -------------------------------------------------------------
 // Left: the selected item (at-a-glance, or full details when inspecting).
-// Right: the inventory grid — square slots, empty ones included.
+// Right: the inventory grid: square slots, then just enough empty ones to finish the last
+// row (inventory.js hides the rest, since how many fit a row depends on the width).
 
-const GRID_SLOTS = 16;
+const MAX_EMPTY = 7; // the most a row can need (the widest grid is 8 across)
 
 function slot(p, i) {
   const cover = p.images[0];
@@ -139,7 +153,7 @@ function slot(p, i) {
 
 export function renderProjects() {
   const list = items();
-  const empty = Math.max(0, GRID_SLOTS - list.length);
+  const empty = MAX_EMPTY;
   const tabletop = shown(archive).find((a) => a.href);
   return `
     <section class="screen screen-projects" data-screen="projects" data-mode="browse" aria-labelledby="projects-title" hidden>
@@ -162,7 +176,7 @@ export function renderProjects() {
             </div>
           </div>
           <figure class="viewer">
-            <div class="viewer-stage"><img data-d="img" alt=""><span class="veil" aria-hidden="true"></span></div>
+            <button class="viewer-stage" type="button" data-open-gallery aria-label="${esc(ui.openGallery)}"><img data-d="img" alt=""><span class="veil" aria-hidden="true"></span><span class="viewer-zoom" aria-hidden="true">${esc(ui.openGallery)}</span></button>
             <div class="viewer-bar">
               <figcaption class="viewer-caption" data-d="caption"></figcaption>
               <div class="viewer-controls" data-d="controls">
@@ -175,6 +189,8 @@ export function renderProjects() {
           </figure>
           <p class="detail-meta" data-d="meta"></p>
           <h2 class="detail-title" id="detail-title" tabindex="-1" data-d="title"></h2>
+          <p class="detail-outcome" data-d="outcome"></p>
+          <div class="detail-links" data-d="links"></div>
           <p class="detail-wield" data-d="wield"><span class="gem" aria-hidden="true"></span><span data-d="wield-text"></span></p>
           <p class="detail-flavor" data-d="flavor"></p>
           <dl class="detail-facts">
@@ -184,8 +200,19 @@ export function renderProjects() {
             <div><dt>${esc(ui.role)}</dt><dd data-d="role"></dd></div>
           </dl>
           <p class="detail-note" data-d="note"></p>
-          <div class="detail-links" data-d="links"></div>
         `, 'data-detail role="region" aria-labelledby="detail-title"')}
+        <dialog class="gallery" data-gallery aria-label="${esc(ui.gallery)}">
+          <figure class="gallery-figure">
+            <img data-gl="img" alt="">
+            <figcaption data-gl="caption"></figcaption>
+          </figure>
+          <div class="gallery-bar">
+            <button class="pix-btn" type="button" data-gl-prev aria-label="${esc(ui.prevImage)}">&lt;</button>
+            <span data-gl="count" aria-live="polite"></span>
+            <button class="pix-btn" type="button" data-gl-next aria-label="${esc(ui.nextImage)}">&gt;</button>
+            <button class="pix-btn" type="button" data-gl-close>${esc(ui.close)} <kbd>Esc</kbd></button>
+          </div>
+        </dialog>
         ${panel('inv-panel', `
           ${screenHead('projects')}
           <div class="inv-box">
@@ -199,7 +226,7 @@ export function renderProjects() {
             <p class="readout-name" data-r="name"></p>
             <p class="readout-meta" data-r="meta"></p>
           </div>
-          <p class="inv-count"><span>${list.length} / ${GRID_SLOTS}</span><span data-equipped-line></span></p>
+          <p class="inv-count"><span>${list.length} ${esc(list.length === 1 ? ui.item : ui.items)}</span><span data-equipped-line></span></p>
           ${tabletop ? `<p class="inv-also">Also: <a ${linkAttrs(tabletop.href)}>${esc(tabletop.name)}</a> — ${esc(tabletop.summary)}</p>` : ''}
         `)}
       </div>

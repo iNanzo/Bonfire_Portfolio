@@ -58,6 +58,12 @@ const fragmentShader = /* glsl */ `
   uniform float uScanMode;         // 0: every other row; 1: thick rows; 2: columns
   uniform float uNoise;            // 0..1: static
   uniform float uInvert;           // 0..1: the negative
+  uniform float uFlash;            // 0..1: an impact flash, washing toward the flame's core color
+  uniform float uTemp;             // -1..1: color temperature, warm (reds up) to cool (blues up)
+  uniform float uBlackout;         // 0..1: the frame goes dark (the silent beat before a drop)
+  uniform float uView;             // breakdown mode: 0 the final image, 1 normals + depth
+                                   // (what the outlines are found from), 2 the lit color pass
+                                   // alone, 3 the particle (fx) pass alone
   uniform sampler2D tPrev;         // the last frame (feedback)
   uniform float uFeedback;         // 0..1: how much of it echoes (0: off)
   uniform float uZoom;             // the echo zooms out of the fire by this much a frame (< 1: into it)
@@ -164,6 +170,20 @@ const fragmentShader = /* glsl */ `
   void main() {
     vec2 px = floor(gl_FragCoord.xy);
 
+    // Breakdown mode: one of the passes the final image is built from, as it is.
+    if (uView > 0.5) {
+      vec2 uv = (px + 0.5) / resolution;
+      vec3 v;
+      if (uView < 1.5) {
+        vec4 nrm = texture2D(tNormal, uv);
+        float d = linDepth(tNormalDepth, uv) / cameraFar;
+        v = nrm.a > 0.5 ? mix(nrm.rgb, vec3(1.0 - d), 0.25) : vec3(0.02);
+      } else if (uView < 2.5) v = toSRGB(texture2D(tColor, uv).rgb * exposure);
+      else v = toSRGB(min(texture2D(tFx, uv).rgb * exposure, vec3(1.0)));
+      gl_FragColor = vec4(v, 1.0);
+      return;
+    }
+
     // Where this pixel reads the scene from.
     vec2 src = px;
     if (uKaleido > 0.5) {
@@ -237,6 +257,13 @@ const fragmentShader = /* glsl */ `
     }
     if (uNoise > 0.0) col += (h21(px + floor(uTime * 24.0) * 17.0) - 0.5) * uNoise;
     col = mix(col, vec3(1.0) - col, uInvert);
+    // Impact flash: the whole frame lifts toward the core color for a frame or two, still
+    // quantized to the palette below so it reads as a pixel-art flash, not a white-out.
+    if (uFlash > 0.0) col = mix(col, max(col, toSRGB(uCore)), uFlash);
+    // Temperature: a gentle tilt before the palette snap, so bright music reads cooler
+    // and dark music warmer by landing on neighboring palette colors.
+    col *= vec3(1.0 - 0.07 * uTemp, 1.0 - 0.01 * abs(uTemp), 1.0 + 0.09 * uTemp);
+    col *= 1.0 - uBlackout;
 
     float threshold = (ditherScale > 6.0 ? bayer8(px) : bayer4(px)) - 0.5;
     col += threshold * ditherStrength;
@@ -273,6 +300,10 @@ export function createPixelPass() {
     uScanMode: { value: 0 },
     uNoise: { value: 0 },
     uInvert: { value: 0 },
+    uFlash: { value: 0 },
+    uTemp: { value: 0 },
+    uBlackout: { value: 0 },
+    uView: { value: 0 },
     tPrev: { value: null },
     uFeedback: { value: 0 },
     uZoom: { value: 1 },

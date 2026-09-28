@@ -57,8 +57,33 @@ bonfire's design, assets and code, then three rounds of feedback:
 | Y2 | The weapon disappeared after a slam | `weapons.js` restores the planted Euler angles, not the quaternion (see below); `test/weapons.test.mjs` |
 | Y3 | Ice: a pulsing glow and outline emission | `ice.js`: a beat's glow rising through the crystals (and their light), wireframe echoes of the bigger crystals on bars and rings |
 | Y4 | Lightning over the whole blade, a slash trail strongest at the tip | `swingTrail.js`: edge bolts along the blade, a five-band sheet of trails and cross bolts fading toward the guard |
+| Z1 | More ways for the swing camera to ease, as variations per combo and per move | `cameraEase.js`: smooth (the original lag), spring, bouncy, heavy, snappy; rigs chase with a lag or a damped spring, moves between framings use the feel's curve; *Blade Camera Feel* (a mix re-rolls between moves); `test/cameraEase.test.mjs` |
+| Z2 | A randomizer for the "every N bars" settings | `bars.js`: *Random* picks one of the setting's own intervals and rolls again each time it fires (still on multiples, so on phrase lines); `test/bars.test.mjs` |
+| Z3 | An intro title card, and more title cards | *Title Cards* tab: the main card as the intro and on drops; up to 8 more, each on drops (taking turns), every 32 bars, or on its key (Shift+1…9) |
+| Z4 | Brightness → color temperature; sub-bass breathing | `director.js` → `glitch.temp` (a pre-palette tilt in `pixelPass.js` and the cast light) and `breath` (fire size, the camera's field of view) |
+| Z5 | Staged build-ups, a silent frame before the drop | four stages (pulses, look bursts, a ring, sparks and tremors); after a build a 90 ms blackout, then the drop lands out of it |
+| Z6 | A section-based effects budget | `budget` in `director.js`: calm intros and breakdowns, busy grooves, everything in the 8 bars after a drop; scales look strength, drop hits, sparks, extra rings |
+| Z7 | The start panel off the fire; each source explained | descriptions under each source; the fire framed to the side on landscape screens, above the panel on tall ones |
+| Z8 | Settings in tabs, presets, simple / all | `settings.js`: eight tabs, a *Simple* view of the key settings, a hint (?) on every one; presets Chill, Club, Rave, Low Flash |
+| Z9 | A grouped HUD | What it hears · Beat (BPM, set BPM, nudges, beat 1, tap) · Moments · View |
+| Z10 | Saved setups | named snapshots in this browser, load / delete, export to and import from a file |
+| Z11 | A separate output window for a projector | the canvas streamed (`captureStream`) into a pop-up that can go full screen on another display |
+| Z12 | More scenes: a forge, a shrine | `src/bonfire/scenery.js`, built from primitives in the model's materials where the ruins stand; *Scene* setting, or a new place every other drop |
+| Z13 | An Ableton Link helper | `tools/link-bridge.mjs` (`npm run link`): Carabiner → a local WebSocket → `link.js` → `tempo.external()`; *Beat From: Ableton Link*; `test/link.test.mjs` |
+| Z14 | Manual BPM and a phase nudge | a BPM field (holds until cleared), `[` `]` nudge 10 ms, `D` makes this beat beat 1; `tempo.js` `setManual`, `nudge`, `clearManual` |
 
 ## Key decisions
+
+- **Link through a bridge, not in the browser.** Link is UDP multicast, which pages can't
+  do. Carabiner (a small free app) joins the session and speaks plain text over TCP; the
+  bridge turns that into a WebSocket on 127.0.0.1 and stamps each message with the beat
+  *now*, so the page places it on its own clock. The tracker lets go after 2 s without
+  word, so a closed bridge falls back to listening.
+- **Hit-stop repays its time.** A freeze holds most of its time back from the simulation
+  and pays it back a little faster afterwards, so a blade routine timed to the beat still
+  plunges on the beat.
+- **The output window streams the canvas** instead of running a second renderer: one
+  simulation, one set of decisions, pixel-exact on both screens.
 
 - **A page of its own, same scene.** `visualizer/index.html` is a second Vite entry
   (deployed as `/visualizer/`, unlinked). It creates the bonfire with `createBonfire`

@@ -205,7 +205,7 @@ export function createFeatures({ sampleRate, fftSize = FFT }) {
     features.beats = beats;
     features.bpm = tempo.bpm;
     features.strength = tempo.strength;
-    features.locked = tempo.bpm > 0 && tempo.strength > 0.18;
+    features.locked = tempo.bpm > 0 && (tempo.strength > 0.18 || !!tempo.manual); // (a set tempo counts as locked)
 
     // Sections.
     const bassAmp = kickAmp;

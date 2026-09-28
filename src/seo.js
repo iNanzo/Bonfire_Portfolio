@@ -1,4 +1,5 @@
-// Per-route document metadata: title, description and canonical URL.
+// Per-route document metadata: title, description and canonical URL, kept current as the
+// app moves between screens (each route's page is built with its own too: seoPages.js).
 import { site, screens, items } from './content.js';
 import { routePath } from './routes.js';
 

@@ -5,13 +5,17 @@ import * as THREE from 'three';
 /**
  * `n` particles (all size 0, so hidden, until written). Always drawn: particles fly far
  * from where they start, so frustum culling by the initial bounds would drop them.
+ * `vel`: the simulation's own velocity array (n × 3, world m/s), shared as the `vel`
+ * attribute so the particles draw as motion streaks (see flame.js); flag it with
+ * `markDirty` or `streaks(points)` each frame it changes.
  */
-export function createPoints(n, material, { alpha = true } = {}) {
+export function createPoints(n, material, { alpha = true, vel = null } = {}) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
   geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
   geo.setAttribute('size', new THREE.BufferAttribute(new Float32Array(n), 1));
   if (alpha) geo.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(n), 1));
+  if (vel) geo.setAttribute('vel', new THREE.BufferAttribute(vel, 3));
   const points = new THREE.Points(geo, material);
   points.frustumCulled = false;
   return points;

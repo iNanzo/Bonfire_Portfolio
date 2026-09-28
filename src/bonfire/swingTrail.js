@@ -20,6 +20,7 @@
 //   hits       each move's hit throws a spray off the point, along the blade's motion.
 import * as THREE from 'three';
 import { createBoltLines, seeded } from './bolts.js';
+import { effects } from '../effects.js';
 import { createPoints, rampColors, setRampColors } from './points.js';
 
 const HISTORY = 24;
@@ -41,7 +42,7 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
   let live = 0;
 
   // Lightning's sheet: five trails of up to four segments a step, plus the bolts.
-  const arcs = createBoltLines(fxMaterial, HISTORY * 20 + 96, HISTORY * 8 + 48);
+  const arcs = createBoltLines(fxMaterial, HISTORY * 20 + 96, HISTORY * 8 + 48, { afterimage: () => (reducedMotion ? 0 : effects.impact.afterimages) });
   const rng = seeded(7);
   // The blade's recent path: [grip x, y, z, tip x, y, z, time]. A point partway up the
   // blade (0 at the grip, 1 at the point) is read off it.

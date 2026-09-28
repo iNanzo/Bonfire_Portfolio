@@ -187,6 +187,28 @@ npm test           # the site's and the visualizer's tests (npm run admin:test: 
 - **Skill slots:** the same corner brackets snap in on hover and focus, then breathe.
 - **Reduced motion:** the cursor jumps without gliding; no breathing, sheen or pop.
 
+## Round 5 additions (at a glance)
+
+- **Hits have weight** (`effects.impact`, *Hits & impacts* in the admin): a freeze frame
+  (hit-stop), an impact flash, camera trauma, debris that bounces off the scenery
+  (`debris.js`), and marks on the ground — scorch, frost or branching burns — that fade
+  (`marks.js`). Lightning leaves afterimages and strikes nearby fireflies; a fast blade
+  leaves smear frames. Busy moments thin out the background extras.
+- **Each element reads as itself** (`signatures.js`): fire's embers streak and twinkle,
+  lightning's sparks flash as crosses and zig-zag, ice glints as diamonds. The particle
+  shader draws shapes and motion streaks (`flame.js`).
+- **The site:** a click on the planted weapon wakes it for a flourish; a click during a
+  swap skips ahead; stoking throws the element's ring. *How it's made* (`B`) shows the
+  render passes, the flow field and every particle system; *Photo mode* (`F`) frames the
+  fire and saves a PNG; *Discoveries* counts the little secrets. Sounds per element and a
+  forge hum through each swap. Projects get a *Result* line, links by the title and a
+  full-size gallery.
+- **Search and sharing:** each page is built with its own title, description, social
+  image (1200×630, made from the cover) and structured data, plus `sitemap.xml` and
+  `robots.txt` (`src/seoPages.js`, the build plugin in `vite.config.js`).
+- **Ableton Link:** `npm run link` with Carabiner running, then *Settings → Sound →
+  Beat From: Ableton Link* in Bonfire Live (details in `tools/link-bridge.mjs`).
+
 ## Roadmap & decisions
 
 - **Hosting (live):** GitHub Pages via `.github/workflows/deploy.yml`, which lints, runs
@@ -383,7 +405,7 @@ and validates them first; nothing is stored.
 The bonfire as an audio-reactive visualizer for DJ sets, at **`/visualizer/`**
 (`npm run dev`, then `http://localhost:5173/visualizer/`). It's the same scene, colors,
 weapons and elements as the site, driven by the music instead of the cursor. Nothing on
-the site links to it. Design notes: `docs/visualizer.md`.
+the site links to it from its *Bonfire Live* project. Design notes: `docs/visualizer.md`.
 
 **Sound sources** (the start screen):
 

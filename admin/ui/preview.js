@@ -54,8 +54,9 @@ export function createPreview(siteUrl) {
     stage,
     el('div', { class: 'preview-tools' },
       screen, size,
-      el('button', { type: 'button', class: 'button small', text: 'Stoke', onclick: () => send({ type: 'nh:stoke' }) }),
-      el('button', { type: 'button', class: 'button small', text: 'Random Swap', onclick: () => send({ type: 'nh:roll' }) }),
+      el('button', { type: 'button', class: 'button small', text: 'Stoke', title: 'Stoke the fire: a flare, the element’s ring, a ground mark', onclick: () => send({ type: 'nh:stoke' }) }),
+      el('button', { type: 'button', class: 'button small', text: 'Random Swap', title: 'Forge a random new weapon, colors and element: the full swap and its impact', onclick: () => send({ type: 'nh:roll' }) }),
+      el('button', { type: 'button', class: 'button small', text: 'Wake the Blade', title: 'The planted weapon pulls free for a flourish and plunges back in (hit-stop, flash, shake, debris)', onclick: () => send({ type: 'nh:flourish' }) }),
       el('button', { type: 'button', class: 'button small ghost', text: 'Reload', onclick: reload })),
     el('p', { class: 'help', text: 'Move your cursor through the fire to try the cursor effect. Unsaved — visitors see the saved version.' }));
 

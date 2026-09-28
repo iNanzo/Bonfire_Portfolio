@@ -10,13 +10,17 @@ import {
   renderSkills, renderAbout, renderContact,
 } from './render.js';
 import { installDitherPatterns } from './ui/dither.js';
-import { setSound, blip } from './ui/audio.js';
+import { setSound, blip, forgeHum } from './ui/audio.js';
 import { gridNav, listNav } from './ui/spatial.js';
 import { setupInventory } from './ui/inventory.js';
+import { createDiscoveries } from './ui/discoveries.js';
+import { createPhotoMode } from './ui/photo.js';
+import { createBreakdown } from './ui/breakdown.js';
 import { applyFlame, setAccentRamp } from './ui/theme.js';
 import { parseRoute, readRoute, routePath, isEditing } from './routes.js';
 import { updateMetadata } from './seo.js';
 import { pick } from './math.js';
+import { esc } from './html.js';
 const BASE = import.meta.env.BASE_URL;
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -53,6 +57,67 @@ const header = q('[data-header]');
 const inventory = setupInventory(screenEls.projects, { reducedMotion });
 if (touch) q('[data-stoke-hint]').textContent = hero.stokeHint.touch;
 
+// --- Discoveries (ui/discoveries.js): a toast for each new one, the count in the menu ------
+const toast = q('[data-toast]');
+let toastTimer = 0;
+function showToast(kicker, text) {
+  q('[data-toast-kicker]', toast).textContent = kicker;
+  q('[data-toast-text]', toast).textContent = text;
+  toast.hidden = true;
+  void toast.offsetWidth; // (restart the entrance)
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, 3200);
+}
+const discoveries = createDiscoveries({
+  onNew: (d, n, total) => {
+    showToast(`${ui.discovery} ${n} / ${total}`, d.name);
+    blip('kindle');
+    drawDiscoveryCount();
+  },
+});
+const discover = (id) => discoveries.discover(id);
+function drawDiscoveryCount() {
+  qa('[data-discovery-count]').forEach((el) => { el.textContent = `${discoveries.count} / ${discoveries.total}`; });
+}
+drawDiscoveryCount();
+const discoveriesDialog = q('[data-discoveries]');
+function openDiscoveries() {
+  q('[data-discovery-list]', discoveriesDialog).innerHTML = discoveries.list.map((d) => {
+    const found = discoveries.has(d.id);
+    return `<li class="discovery${found ? ' is-found' : ''}"><span class="discovery-mark" aria-hidden="true">${found ? '&#9670;' : '&#9671;'}</span>
+      <span><b>${found ? esc(d.name) : '???'}</b>${found ? '' : `<span class="discovery-hint">${esc(d.hint)}</span>`}</span>
+      <span class="visually-hidden">${found ? 'found' : 'not found yet'}</span></li>`;
+  }).join('');
+  discoveriesDialog.showModal();
+  q('[data-discoveries-close]', discoveriesDialog).focus();
+}
+discoveriesDialog.addEventListener('click', (e) => {
+  if (e.target === discoveriesDialog || e.target.closest('[data-discoveries-close]')) discoveriesDialog.close();
+});
+// Every flame palette seen counts toward one discovery.
+const flamesSeen = new Set((store.get('flamesSeen') ?? '').split(',').filter(Boolean));
+function sawFlame(key) {
+  if (flamesSeen.has(key)) return;
+  flamesSeen.add(key);
+  store.set('flamesSeen', [...flamesSeen].join(','));
+  if (rotation().every((k) => flamesSeen.has(k))) discover('palettes');
+}
+
+// --- Photo mode and "How it's made" (ui/photo.js, ui/breakdown.js). Created before the
+// page's own keys, so their Esc closes them without also going back a screen.
+const photo = createPhotoMode({
+  getFire: () => fire,
+  onExit: () => fire?.setView(route.screen === 'projects' && route.item ? 'inspect' : route.screen),
+  onColors: () => { const fresh = rotation().filter((k) => k !== equipment.flame); equip(equipment.weapon, pick(fresh), equipment.item, { instant: true }); },
+  onElement: () => {
+    const next = ['fire', 'lightning', 'ice'][(['fire', 'lightning', 'ice'].indexOf(equipment.element) + 1) % 3];
+    equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, { element: next });
+  },
+  onEnter: () => { breakdown.exit(); discover('photo'); },
+});
+const breakdown = createBreakdown({ getFire: () => fire, onEnter: () => { photo.exit(); discover('breakdown'); } });
+
 // --- Equipment (weapon + flame + element in the fire) ---------------------------------------
 const weaponKeys = Object.keys(weapons);
 const startElement = () => elementOr(startingEquipment.element);
@@ -72,6 +137,7 @@ function refreshEquipLabels() {
 }
 refreshEquipLabels();
 
+let stopHum = () => {}; // the forge hum of the swap under way (ui/audio.js)
 function equip(weapon, flame, item, { instant = false, element = equipment.element } = {}) {
   const same = equipment.weapon === weapon && equipment.flame === flame && equipment.element === element;
   equipment = { weapon, flame, element, item };
@@ -83,8 +149,12 @@ function equip(weapon, flame, item, { instant = false, element = equipment.eleme
     refreshEquipLabels();
     return;
   }
-  if (!same && !instant) blip('pull');
-  fire.equip(weapon, flame, { instant, item, element }).catch(failScene);
+  if (!same && !instant) {
+    blip('pull');
+    stopHum();
+    stopHum = forgeHum(fire.swapTime);
+  }
+  fire.equip(weapon, flame, { instant, item, element, rush: true }).catch(failScene);
 }
 
 /** Inspecting a project draws a random weapon and flame (never the same as now), and an element by weight. */
@@ -101,12 +171,16 @@ const goHome = () => equip(startingEquipment.weapon, startingEquipment.flame, nu
 
 function onImpact(flame, _from, instant, selection) {
   displayedEquipment = { ...selection };
+  if (!instant) { discover(selection.element ?? 'fire'); sawFlame(flame); } // (not the page's own first setup)
   document.documentElement.dataset.flame = flame;
   document.documentElement.dataset.element = selection.element ?? 'fire';
   if (instant) applyFlame(flame); // otherwise the scene eases the accents via onRamp
   refreshEquipLabels();
   if (!instant) {
-    blip('stab');
+    // Each element lands with its own sound.
+    stopHum();
+    const el = selection.element ?? 'fire';
+    blip(el === 'fire' ? 'stab' : `stab-${el}`);
     live.textContent = `The fire takes the ${weapons[displayedEquipment.weapon]}. ${fireName(displayedEquipment)}.`;
   }
 }
@@ -151,6 +225,7 @@ function render(next, user) {
     document.body.classList.toggle('is-inspecting', inspect);
     if (inspect) {
       inventory.open(next.item);
+      discover(`project:${next.item}`);
       if (user || prev.item !== next.item) rollFor(next.item);
     }
   }
@@ -206,11 +281,11 @@ syncRoute(false);
 window.addEventListener('keydown', (e) => {
   if (e.altKey || e.ctrlKey || e.metaKey || isEditing(e.target) || document.querySelector('dialog[open]')) return;
   const k = e.key.toLowerCase();
-  if (k === 'q' || k === 'e') {
-    const i = order.indexOf(route.screen);
-    const nextId = order[(i + (k === 'e' ? 1 : -1) + order.length) % order.length];
-    go(nextId === 'home' ? '#/' : `#/${nextId}`);
-  } else if (e.key === 'Escape') {
+  if (k === 'f') { photo.toggle(); return; }
+  if (k === 'b') { breakdown.toggle(); return; }
+  if (photo.active || breakdown.active) return;
+  if (k === 'q' || k === 'e') step(k === 'e' ? 1 : -1);
+  else if (e.key === 'Escape') {
     if (!q('[data-kindled]').hidden) return;
     if (route.screen === 'projects' && route.item) go('#/projects');
     else if (route.screen !== 'home') go('#/');
@@ -233,16 +308,34 @@ q('[data-menu-open]').addEventListener('click', () => {
 });
 menu.addEventListener('click', (e) => {
   if (e.target === menu || e.target.closest('[data-menu-close]')) return menu.close();
+  const action = e.target.closest('[data-menu-action]')?.dataset.menuAction;
+  if (action) {
+    menu.close();
+    if (action === 'photo') photo.enter();
+    else if (action === 'breakdown') breakdown.enter();
+    else if (action === 'discoveries') openDiscoveries();
+    return;
+  }
   if (e.target.closest('a[data-menu-item]')) menu.close();
 });
 menu.addEventListener('close', () => blip('back'));
 listNav(menu, '[data-menu-item]', { onMove: () => blip('move') });
 
+// The Q / E keys are buttons too (the same step through the screens).
+function step(dir) {
+  const i = order.indexOf(route.screen);
+  const nextId = order[(i + dir + order.length) % order.length];
+  go(nextId === 'home' ? '#/' : `#/${nextId}`);
+}
+qa('[data-step]').forEach((b) => b.addEventListener('click', () => { step(Number(b.dataset.step)); blip('select'); }));
+
+// Sound: the label says what it is now ("Sound: off"), the tooltip what a click does.
 const soundButtons = qa('[data-sound]');
 function applySound(on) {
   on = setSound(on);
   soundButtons.forEach((b) => {
     b.setAttribute('aria-pressed', String(on));
+    b.title = ui.soundHint ?? '';
     q('[data-sound-label]', b).textContent = on ? ui.soundOn : ui.soundOff;
   });
   store.set('sound', on ? '1' : '0');
@@ -250,9 +343,16 @@ function applySound(on) {
 soundButtons.forEach((b) => b.addEventListener('click', () => {
   const on = b.getAttribute('aria-pressed') !== 'true';
   applySound(on);
-  if (on) blip('select');
+  if (on) { blip('select'); discover('sound'); }
 }));
 if (store.get('sound') === '1') {
+  // Remembered as on: the switch says so at once; browsers only let the audio itself start
+  // with the first click or key press.
+  soundButtons.forEach((b) => {
+    b.setAttribute('aria-pressed', 'true');
+    b.title = ui.soundHint ?? '';
+    q('[data-sound-label]', b).textContent = ui.soundOn;
+  });
   const resume = () => { applySound(true); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
   window.addEventListener('pointerdown', resume, { once: true });
   window.addEventListener('keydown', resume, { once: true });
@@ -308,15 +408,29 @@ function stoke() {
   hideKindled();
   const first = fire.stoke();
   blip('stoke');
+  if (fire.element === 'lightning') blip('zap');
+  else if (fire.element === 'ice') blip('chime');
+  discover('stoke');
   const { show } = hero.kindled;
   if (show === 'always' || (show === 'first' && first)) showKindled();
 }
 
 document.addEventListener('click', (e) => {
+  if (photo.active && photo.wasDrag()) return; // (the end of an orbit, not a click)
+  if (e.target.closest('[data-open-gallery]')) discover('gallery');
   fire?.flash(e.clientX, e.clientY);
   // Clicking the fire draws a new weapon and flame — except in the inventory,
   // where the fire holds the inspected project's weapon (there it just stokes).
   if (e.target.closest('[data-stage], [data-stoke]')) {
+    // A click while a new weapon is being forged skips ahead to its impact.
+    if (fire?.forging && !fire.swinging && fire.hurry()) { blip('select'); discover('hurry'); return; }
+    // A click on the planted weapon wakes it: it pulls free for a flourish and plunges back.
+    if (fire && !fire.forging && !reducedMotion && fire.weaponAt(e.clientX, e.clientY)) {
+      blip('pull');
+      fire.flourish().then((ok) => { if (ok) blip('stab'); });
+      discover('flourish');
+      return;
+    }
     stoke();
     if (route.screen !== 'projects') rollFor(null);
     return;
@@ -353,7 +467,7 @@ function startScene() {
   const generation = ++sceneGeneration;
   return import('./bonfire/scene.js').then(async ({ createBonfire }) => {
     const stage = q('[data-stage]');
-    const candidate = createBonfire(stage, { reducedMotion, onImpact, onRamp: setAccentRamp, onError: failScene });
+    const candidate = createBonfire(stage, { reducedMotion, onImpact, onFormed: () => blip('form'), onRamp: setAccentRamp, onError: failScene });
     await candidate.ready;
     if (generation !== sceneGeneration) { candidate.dispose(); return; } // superseded by a newer rebuild
     fire = candidate;
@@ -445,6 +559,8 @@ if (new URLSearchParams(location.search).has('preview') && window.parent !== win
       stoke();
     } else if (msg.type === 'nh:roll') {
       rollFor(equipment.item);
+    } else if (msg.type === 'nh:flourish') {
+      if (fire && !fire.forging) fire.flourish();
     } else if (msg.type === 'nh:screen' && order.includes(msg.screen)) {
       go(msg.screen === 'home' ? '#/' : `#/${msg.screen}`);
     }

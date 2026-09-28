@@ -197,6 +197,14 @@ export function createWeapons(gltfRoot, {
   const lineLead = new THREE.Color();
   const lineTrail = new THREE.Color();
   const lineHot = new THREE.Color();
+  // Smear frames: a fast swing leaves outlines of the blade at the poses it just passed
+  // through (the last SMEAR frames), fading with age — the pixel-art way to sell speed.
+  const SMEAR = 3;
+  const smearMats = Array.from({ length: SMEAR }, () => new THREE.Matrix4());
+  let smearCount = 0;
+  let smearSpeed = 0;
+  const smearLead = new THREE.Color();
+  const smearTrail = new THREE.Color();
 
   function setLayer(obj, layer) {
     obj.traverse((o) => { if (o.isMesh) { o.layers.set(layer); o.castShadow = castShadows && layer === layerSolid; } });
@@ -277,8 +285,10 @@ export function createWeapons(gltfRoot, {
   }
   // `pace` plays the whole choreography faster or slower (the visualizer fits it to a
   // whole number of beats); `hold` keeps the new weapon hovering, formed, until
-  // release() (the visualizer forges in a breakdown and strikes on the drop).
-  function swap(key, fromRamp, toRamp, payload, { pace: swapPace = 1, hold = false } = {}) {
+  // release() (the visualizer forges in a breakdown and strikes on the drop). `rush`
+  // (the site): asked for while another swap is running, that one speeds up and this
+  // one plays quicker too, so clicking through projects never feels like waiting.
+  function swap(key, fromRamp, toRamp, payload, { pace: swapPace = 1, hold = false, rush = false } = {}) {
     if (!Object.hasOwn(items, key)) return Promise.reject(new Error('Unknown weapon: ' + key));
     // A new swap may cut the previous one's settle short.
     if (phase === 'settle') {
@@ -289,6 +299,7 @@ export function createWeapons(gltfRoot, {
     }
     if (phase !== 'idle') {
       cancelQueued();
+      if (rush) { hurry(2.2); swapPace = Math.max(swapPace, 1.6); }
       queued = { key, fromRamp, toRamp, payload, opts: { pace: swapPace, hold } };
       return new Promise((r) => { queued.resolve = r; });
     }
@@ -325,6 +336,17 @@ export function createWeapons(gltfRoot, {
     helixSpin = Math.random() * Math.PI * 2;
     hooks.onSwapStart?.(payload);
     return new Promise((r) => { resolveSwap = r; });
+  }
+
+  /**
+   * Play the running swap faster (at least `factor` × its pace) up to the impact: a click
+   * on the fire skips ahead. A held weapon and a swinging blade aren't hurried. True if
+   * there was a swap to hurry.
+   */
+  function hurry(factor = 4) {
+    if (phase === 'idle' || phase === 'settle' || phase === 'swing' || holding) return false;
+    pace = Math.max(pace, factor);
+    return true;
   }
 
   let helixSpin = 0; // the forge helix's turn (the particles and the lines share it)
@@ -403,6 +425,17 @@ export function createWeapons(gltfRoot, {
           wobble: 0.01 + 0.025 * k, alpha: (1 - k) ** 1.2, lead: lineLead, trail: lineTrail, hot: lineHot, t: totalT, seed: 3,
         });
       } else burstT = -1;
+    }
+    if (phase === 'swing' && current?.userData.silhouette && smearSpeed > 3) {
+      const k = Math.min(1, (smearSpeed - 3) / 6);
+      smearLead.copy(current.userData.uniforms.uRim.value);
+      smearTrail.copy(smearLead).multiplyScalar(0.5);
+      for (let j = 0; j < smearCount; j++) {
+        fx.outline({
+          sil: current.userData.silhouette, matrix: smearMats[j], dilate: 0, scale: 1, wobble: 0.004,
+          alpha: k * (1 - (j + 1) / (smearCount + 1)) * 0.8, lead: smearLead, trail: smearTrail, hot: smearLead, t: totalT, seed: 7 + j,
+        });
+      }
     }
     fx.end();
   }
@@ -589,6 +622,9 @@ export function createWeapons(gltfRoot, {
     });
     swingPlan = plan;
     hitIndex = 0;
+    smearCount = 0;
+    smearSpeed = 0;
+    if (fx) current.userData.silhouette ??= weaponSilhouette(current.userData.toRoot); // (for the smear, ready before it's needed)
     lastGrip.copy(gripL).applyMatrix4(current.matrixWorld);
     lastTip.copy(tipL).applyMatrix4(current.matrixWorld);
     pace = 1;
@@ -608,6 +644,11 @@ export function createWeapons(gltfRoot, {
     nowGrip.copy(gripL).applyMatrix4(current.matrixWorld);
     nowTip.copy(tipL).applyMatrix4(current.matrixWorld);
     const tipSpeed = nowTip.distanceTo(lastTip) / Math.max(dt, 1e-3);
+    // Remember this pose for the smear (newest first).
+    for (let j = SMEAR - 1; j > 0; j--) smearMats[j].copy(smearMats[j - 1]);
+    smearMats[0].copy(current.matrixWorld);
+    smearCount = Math.min(SMEAR, smearCount + 1);
+    smearSpeed = tipSpeed;
     current.userData.uniforms.uGlow.value = 0.35 + Math.min(1.1, tipSpeed / 7);
     hooks.onSwingFrame?.(lastGrip, lastTip, nowGrip, nowTip, dt, tipSpeed);
     while (hitIndex < routine.hits.length && t >= routine.hits[hitIndex].t) {
@@ -674,6 +715,9 @@ export function createWeapons(gltfRoot, {
     setRim,
     cancel,
     swing,
+    hurry,
+    /** The planted weapon (for picking it with the cursor), or null mid-swap. */
+    get planted() { return phase === 'idle' ? current : null; },
     get swinging() { return phase === 'swing'; },
     /** (The visualizer) the blade moves as if alive: flourishes, a shudder on hard beats, a held one's sway. */
     set alive(v) { alive = !!v; },

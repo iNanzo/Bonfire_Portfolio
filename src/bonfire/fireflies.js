@@ -218,6 +218,7 @@ export function createFireflies(template, {
       // Set from outside (the visualizer's light show), null on the site:
       show: null,           // target glow, in place of the lit set's (hover and flashes still add)
       heat: 0,              // 0..1: color toward the flame's pale core
+      zapT: 0,              // seconds left of flickering after a lightning strike
       orbit: null,          // { x, y, z, r, w, h }: circle this point (radius, rad/s, height band)
       leash: null,          // { x, z, r }: roam, but drift back inside this radius
       dart: null,           // { dir, dist, dur, t, bounce }: a dash (see dart())
@@ -465,17 +466,23 @@ export function createFireflies(template, {
         f.lit = target > f.lit ? Math.min(target, f.lit + d) : Math.max(target, f.lit - d);
       }
       let g = f.show ?? f.lit * (0.88 + 0.12 * Math.sin(t * 3.1 + f.seed));
+      // Struck by lightning: a hot, erratic strobe that burns out over the zap.
+      if (f.zapT > 0) {
+        f.zapT = Math.max(0, f.zapT - dt);
+        g = Math.random() < 0.55 ? 1.5 * Math.min(1, f.zapT * 2 + 0.3) : 0.1;
+      }
       if (f.hovered || f.flicker > 0) g = (fs + i) % 3 === 0 ? Math.max(0.05, g * 0.3) : Math.max(g, 0.9);
       if (f.flash > 0) {
         f.flash = Math.max(0, f.flash - dt);
         g = Math.max(g, Math.sqrt(f.flash / 0.5) * f.flashPower);
       }
-      f.glow += (g - f.glow) * Math.min(1, dt * (f.flicker > 0 || f.flash > 0 || f.show != null ? 40 : 20));
+      f.glow += (g - f.glow) * Math.min(1, dt * (f.zapT > 0 || f.flicker > 0 || f.flash > 0 || f.show != null ? 40 : 20));
 
       // Saturated flame colors (mid → hi), never washed out to white; a hot one leans to the core.
       const k = Math.min(1, f.glow);
       tone(f, 1, col).lerp(tone(f, 2, colB), smooth(k));
-      if (f.heat > 0) col.lerp(tone(f, 3, colB), f.heat * 0.6);
+      const heat = Math.max(f.heat, Math.min(1, f.zapT * 1.5));
+      if (heat > 0) col.lerp(tone(f, 3, colB), heat * 0.6);
       col.multiplyScalar(0.45 + f.glow * 0.7);
       f.lantern.material.color.copy(UNLIT).lerp(col, smooth(Math.min(1, k * 4)));
       tone(f, 2, f.halos[0].material.color);
@@ -739,6 +746,31 @@ export function createFireflies(template, {
     }
   }
 
+  /**
+   * Lightning jumps to a firefly (the tesla ball): it flickers white-hot for a moment and
+   * is knocked away from `from` (world). Returns the firefly struck, or null.
+   */
+  function zap(f, from, power = 1) {
+    if (!f) return null;
+    f.zapT = 0.5 + 0.5 * power;
+    if (!reducedMotion) {
+      const kick = tmp.copy(f.pos).sub(from).setY(0.25).normalize().multiplyScalar(0.8 * power);
+      if (f.mode === 'fly') f.startle.add(kick);
+      else if (f.mode === 'rest' || f.mode === 'settle') { f.kick = kick.clone(); beginLift(f, true); }
+    }
+    return f;
+  }
+  /** The firefly nearest `p` (world) within `radius`, not already flickering from a strike. */
+  function nearest(p, radius) {
+    let best = null, bd = radius * radius;
+    for (const f of flies) {
+      if (f.zapT > 0) continue;
+      const d = f.pos.distanceToSquared(p);
+      if (d < bd) { bd = d; best = f; }
+    }
+    return best;
+  }
+
   /** Click: every firefly flashes; ones near the click flash hardest and dart off. */
   function flash(x, y, camera, width, height) {
     for (const f of flies) {
@@ -767,6 +799,8 @@ export function createFireflies(template, {
     center,
     update,
     flash,
+    zap,
+    nearest,
     pulse,
     dance,
     dart,

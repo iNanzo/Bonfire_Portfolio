@@ -15,13 +15,14 @@
 //              orbit    circling the fire, looking at the blade
 //              vertigo  a dolly zoom on a held blade, deeper as the build rises
 //   moves    cut, whip (a fast swing to the new framing, leaning as it goes) or glide.
+//   feels    how rigs chase the blade and moves ease between framings (cameraEase.js):
+//            smooth (the original lag), spring, bouncy, heavy or snappy.
 // Every framing stays in the clearing: above the ground, out of the fire, in front of the
 // ruins.
 import * as THREE from 'three';
 import { approach, clamp, pick, TAU } from '../math.js';
+import { createFollower, curveFor, SWING_EASES, easeOr } from './cameraEase.js';
 
-/** approach() for a vector, in place. */
-const approachVec = (v, target, tau, dt) => v.lerp(target, 1 - Math.exp(-dt / tau));
 
 const FIRE = new THREE.Vector3(0.02, 0, 0.02);
 const UP = new THREE.Vector3(0, 1, 0);
@@ -120,23 +121,25 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
     const r = Math.random();
     return r < 0.5 ? 'cut' : r < 0.85 ? 'whip' : 'glide';
   }
-  function begin(kind) {
+  function begin(kind, ease) {
     const k = moveFor(kind);
-    trans = k === 'cut' ? null : { from: copyPose(shown, from), t: 0, dur: k === 'whip' ? 0.24 : 0.9, kind: k, lean: (Math.random() < 0.5 ? -1 : 1) * 0.14 };
+    const dur = (k === 'whip' ? 0.24 : 0.9) * SWING_EASES[easeOr(ease)].dur;
+    trans = k === 'cut' ? null : { from: copyPose(shown, from), t: 0, dur, kind: k, curve: curveFor(ease), lean: (Math.random() < 0.5 ? -1 : 1) * 0.14 };
   }
 
   /**
    * Go to a shot (SHOTS or COMBO_SHOTS; none: another of SHOTS) or a rig (follow, ride,
    * track, orbit, vertigo). `bars`: how long it's expected to run. `move`: cut, whip or
-   * glide (default: the setting).
+   * glide (default: the setting). `ease`: the feel (SWING_EASES; default smooth) of the
+   * move there and of a rig's chase.
    */
-  function cut(name, { bars = settings.cutBars || 8, move } = {}) {
-    begin(move);
+  function cut(name, { bars = (typeof settings.cutBars === 'number' && settings.cutBars) || 8, move, ease } = {}) {
+    begin(move, ease);
     shotT = 0;
     shotLen = Math.max(2, bars * 4 * lastPeriod);
     driftT = Math.random() * 100;
     if (RIGS[name]) {
-      rig = { name, t: 0 };
+      rig = { name, t: 0, f: createFollower(ease) };
       RIGS[name].start(rig, blade());
       onShot(RIGS[name].name);
       return name;
@@ -172,10 +175,10 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         st.raw = a;
         st.acc += d;
         const before = st.ang;
-        st.ang = approach(st.ang, st.acc, 0.14, dt);
+        st.f.num(st, 'ang', st.acc, 0.14, dt);
         st.lean = approach(st.lean, clamp(-(st.ang - before) / Math.max(dt, 1e-3) * 0.012, -0.35, 0.35), 0.1, dt);
-        approachVec(st.c, b.mid, 0.2, dt);
-        approachVec(st.look, w.lerpVectors(b.mid, b.tip, 0.45), 0.07, dt);
+        st.f.vec(st.c, b.mid, 0.2, dt);
+        st.f.vec(st.look, w.lerpVectors(b.mid, b.tip, 0.45), 0.07, dt);
         o.pos.copy(st.c).addScaledVector(st.toCam, st.r)
           .addScaledVector(st.right, Math.cos(st.ang) * 0.4 * st.r).addScaledVector(st.up, Math.sin(st.ang) * 0.4 * st.r);
         o.target.copy(st.look);
@@ -191,7 +194,7 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         st.roll = 0;
       },
       pose(st, b, dt, o) {
-        st.q.slerp(b.quat, 1 - Math.exp(-dt / 0.16));
+        st.q.slerp(b.quat, 1 - Math.exp(-dt / (0.16 * SWING_EASES[st.f.key].lag)));
         o.pos.set(0.12, 0.3 * b.len, st.side * 1.05).applyQuaternion(st.q).add(b.mid);
         o.target.set(0, -0.25 * b.len, 0).applyQuaternion(st.q).add(b.mid);
         // The pommel stays up on screen, so the world turns instead of the blade.
@@ -210,7 +213,7 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         st.fov = 44;
       },
       pose(st, b, dt, o) {
-        approachVec(st.look, w.lerpVectors(b.mid, b.tip, 0.3), 0.09, dt);
+        st.f.vec(st.look, w.lerpVectors(b.mid, b.tip, 0.3), 0.09, dt);
         o.pos.copy(st.pos);
         o.pos.x += Math.sin(st.t * 0.9) * 0.04; // a hand-held drift
         o.pos.y += Math.sin(st.t * 1.3 + 1) * 0.03;
@@ -237,7 +240,7 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         const a = st.a0 + st.dir * 0.95 * Math.sin((TAU * st.t) / (beat * 16));
         const h = 1.2 + 0.4 * Math.sin((TAU * st.t) / (beat * 8));
         o.pos.set(FIRE.x + Math.sin(a) * st.r, h, FIRE.z + Math.cos(a) * st.r);
-        approachVec(st.look, b.mid, 0.12, dt);
+        st.f.vec(st.look, b.mid, 0.12, dt);
         o.target.copy(st.look);
         o.fov = 42;
         o.roll = 0.05 * Math.sin((TAU * st.t) / (beat * 8));
@@ -256,7 +259,7 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         st.k = approach(st.k, Math.max(c.build, Math.min(0.8, st.t / 12)), 0.5, dt);
         const d0 = 3.6;
         const d = d0 * (1 - 0.55 * st.k);
-        approachVec(st.look, b.mid, 0.15, dt);
+        st.f.vec(st.look, b.mid, 0.15, dt);
         o.pos.copy(st.look).addScaledVector(st.dir, d);
         o.target.copy(st.look);
         o.fov = (2 * Math.atan((Math.tan((32 * Math.PI) / 360) * d0) / d) * 180) / Math.PI;
@@ -316,7 +319,7 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
     if (trans) {
       trans.t += dt;
       const u = Math.min(1, trans.t / trans.dur);
-      const e = u < 0.5 ? 4 * u * u * u : 1 - (-2 * u + 2) ** 3 / 2;
+      const e = trans.curve(u);
       shown.pos.lerpVectors(trans.from.pos, want.pos, e);
       shown.target.lerpVectors(trans.from.target, want.target, e);
       shown.fov = trans.from.fov + (want.fov - trans.from.fov) * e;
@@ -330,6 +333,8 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
     shown.target.toArray(out.target);
     // The zoom punch narrows the view for a moment on each kick.
     out.fov = shown.fov * (1 - (settings.punch && !reducedMotion ? 0.09 * c.punch : 0));
+    // Sub-bass breathing: the view swells in and out with the low end, slowly.
+    if (!reducedMotion && c.breath) out.fov *= 1 - 0.035 * c.breath;
     out.roll = shown.roll;
     out.sx = framing.sx;
     out.sy = framing.sy;

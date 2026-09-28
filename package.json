@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "model": "node tools/build-model.mjs",
     "screenshots": "node tools/import-screenshots.mjs",
+    "link": "node tools/link-bridge.mjs",
     "admin": "vite --config admin/vite.config.js",
     "admin:build": "vite build --config admin/vite.config.js",
     "admin:deploy": "npm run admin:build && npx --yes wrangler@4 deploy --config admin/wrangler.toml",

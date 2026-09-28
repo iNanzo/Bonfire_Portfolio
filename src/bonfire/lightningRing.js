@@ -21,17 +21,18 @@ import { createBoltLines, hashSeed, seeded } from './bolts.js';
 import { ringNoise } from './rings.js';
 import { TAU } from '../math.js';
 import { createPoints, rampColors, setRampColors } from './points.js';
+import { arcJitter, arcHeat, ARC_FLASH } from './signatures.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const STRIKE_LIGHTS = 4;
 
 /** @param {(x:number, z:number)=>number} [o.ground]  height of the scenery at (x, z), for where strikes land */
-export function createLightningRing({ fxMaterial, origin, field, reach, ground = () => 0, emitters = 96, sparks = 260, lights: lightCount = 6, reducedMotion = false }) {
-  const bolts = createBoltLines(fxMaterial, emitters * 22 + 420, emitters * 8 + 900);
-  const sparkPts = createPoints(sparks, fxMaterial);
+export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, origin, field, reach, ground = () => 0, emitters = 96, sparks = 260, lights: lightCount = 6, reducedMotion = false }) {
+  const bolts = createBoltLines(fxMaterial, emitters * 22 + 420, emitters * 8 + 900, { afterimage: () => (reducedMotion ? 0 : effects.impact.afterimages) });
+  const kVel = new Float32Array(sparks * 3);
+  const sparkPts = createPoints(sparks, sparkMaterial, { vel: kVel }); // cross-shaped flashes that streak (signatures.js)
   const g = sparkPts.geometry;
   const K = { pos: g.attributes.position.array, col: g.attributes.color.array, size: g.attributes.size.array, alpha: g.attributes.alpha.array };
-  const kVel = new Float32Array(sparks * 3);
   const kAge = new Float32Array(sparks).fill(1);
   const kLife = new Float32Array(sparks).fill(0);
   let kNext = 0;
@@ -301,16 +302,17 @@ export function createLightningRing({ fxMaterial, origin, field, reach, ground =
       kAge[i] += dt;
       const ix = i * 3;
       const drag = Math.exp(-dt * 1.6);
+      if (!reducedMotion) arcJitter(kVel, ix, dt);
       kVel[ix] *= drag; kVel[ix + 1] = kVel[ix + 1] * drag - 3.2 * dt; kVel[ix + 2] *= drag;
       K.pos[ix] += kVel[ix] * dt; K.pos[ix + 1] += kVel[ix + 1] * dt; K.pos[ix + 2] += kVel[ix + 2] * dt;
       if (K.pos[ix + 1] < 0.02) { K.pos[ix + 1] = 0.02; kVel[ix + 1] *= -0.35; kVel[ix] *= 0.6; kVel[ix + 2] *= 0.6; }
       const k = Math.min(1, kAge[i] / kLife[i]);
-      sample(0.9 - k * 0.6, tmp).multiplyScalar(0.8);
+      sample(0.9 - k * 0.6, tmp).multiplyScalar(0.8).lerp(white, arcHeat(kAge[i]));
       K.col[ix] = tmp.r; K.col[ix + 1] = tmp.g; K.col[ix + 2] = tmp.b;
-      K.size[i] = 1;
+      K.size[i] = kAge[i] < ARC_FLASH ? 3 : 1;
       K.alpha[i] = Math.min(1, (1 - k) * 2) * (0.6 + 0.4 * Math.sin(kAge[i] * 40 + i));
     }
-    if (anySpark || active) for (const k of ['position', 'color', 'size', 'alpha']) g.attributes[k].needsUpdate = true;
+    if (anySpark || active) for (const k of ['position', 'color', 'size', 'alpha', 'vel']) g.attributes[k].needsUpdate = true;
   }
 
   return {

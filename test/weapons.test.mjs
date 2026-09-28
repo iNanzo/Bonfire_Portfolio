@@ -79,3 +79,41 @@ test('after a routine, the blade is planted exactly as before, however it was tu
     assert.ok(pointsDown(), `run ${i}: point down in the ashes, not upside down`);
   }
 });
+
+test('a click skips ahead: a hurried swap lands sooner, and a rushed repeat plays quicker', () => {
+  const fxMaterial = new THREE.ShaderMaterial({ uniforms: { tDepth: { value: null }, resolution: { value: new THREE.Vector2(1, 1) } } });
+  const make = () => {
+    const impacts = [];
+    const w = createWeapons(standInModel(), {
+      anchor: new THREE.Vector3(0.04, 0, 0.03), layerSolid: 0, layerGhost: 2, layerFx: 1,
+      particleMaterial: fxMaterial, field: { fire: () => ({ x: 0, y: 0, z: 0 }), noise: { noise3d: () => 0 } },
+      particles: 50, castShadows: false, reducedMotion: false,
+      hooks: { onImpact: (payload, key) => impacts.push({ key, at: w.t }) },
+    });
+    w.set('alpha');
+    w.holder.updateMatrixWorld(true);
+    w.t = 0;
+    return { w, impacts };
+  };
+  const ramp = ['#8c1d2f', '#e0582a', '#ffc76a', '#fff1d0'];
+  const run = (w, seconds) => { for (let f = 0; f < seconds * 60; f++) { w.update(1 / 60); w.t += 1 / 60; } };
+
+  const plain = make();
+  plain.w.swap('beta', ramp, ramp, {});
+  run(plain.w, 6);
+  const hurried = make();
+  hurried.w.swap('beta', ramp, ramp, {});
+  run(hurried.w, 0.5);
+  assert.ok(hurried.w.hurry(), 'there was a swap to hurry');
+  run(hurried.w, 6);
+  assert.ok(hurried.impacts[0].at < plain.impacts[0].at - 1, `sooner (${hurried.impacts[0].at.toFixed(2)} s vs ${plain.impacts[0].at.toFixed(2)} s)`);
+
+  const rushed = make();
+  rushed.w.swap('beta', ramp, ramp, {});
+  run(rushed.w, 0.5);
+  rushed.w.swap('alpha', ramp, ramp, {}, { rush: true });
+  run(rushed.w, 10);
+  assert.deepEqual(rushed.impacts.map((i) => i.key), ['beta', 'alpha'], 'both land, in order');
+  assert.ok(rushed.impacts[1].at < plain.impacts[0].at * 2, 'the pair takes less than two plain swaps');
+  assert.equal(rushed.w.hurry(), false, 'nothing left to hurry');
+});

@@ -167,13 +167,54 @@ function createRibbons(fxMaterial, maxSegments) {
 /**
  * A buffer of bolts. Call begin(), add bolts / segments, then end(): whatever
  * wasn't drawn this frame is blanked. `maxRibbons` segments can be thick.
+ *
+ * `afterimage` (a function returning 0..1, read every frame): bolts leave a dim trace of
+ * themselves that lingers for a moment after they've jumped elsewhere, like the glare a
+ * real flash leaves in the eye. Every frame's bolts are traced as thin lines; when the
+ * last trace has mostly faded, the current one is kept and fades over ~0.12 s.
  */
-export function createBoltLines(fxMaterial, maxSegments, maxRibbons = 0) {
+export function createBoltLines(fxMaterial, maxSegments, maxRibbons = 0, { afterimage = null } = {}) {
   const L = createRingLines(fxMaterial, maxSegments * 2);
   const R = maxRibbons ? createRibbons(fxMaterial, maxRibbons) : null;
   const cap = maxSegments * 2;
   let v = 0;
   let drawn = 0;
+  // Afterimage: this frame's trace (positions, colors) and the lingering copy (G).
+  const G = afterimage ? createRingLines(fxMaterial, cap) : null;
+  const tPos = G ? new Float32Array(cap * 3) : null;
+  const tCol = G ? new Float32Array(cap * 3) : null;
+  let tv = 0;
+  let ghostCount = 0;
+  let ghostFade = 0;
+  let ghostDrawn = 0;
+  let lastEnd = 0;
+  function trace(ax, ay, az, bx, by, bz, ca, cb) {
+    if (!G || tv + 2 > cap) return;
+    const i = tv * 3;
+    tPos[i] = ax; tPos[i + 1] = ay; tPos[i + 2] = az; tPos[i + 3] = bx; tPos[i + 4] = by; tPos[i + 5] = bz;
+    tCol[i] = ca.r; tCol[i + 1] = ca.g; tCol[i + 2] = ca.b; tCol[i + 3] = cb.r; tCol[i + 4] = cb.g; tCol[i + 5] = cb.b;
+    tv += 2;
+  }
+  function stepGhost() {
+    const now = performance.now() / 1000;
+    const dt = Math.min(0.1, Math.max(0, now - lastEnd));
+    lastEnd = now;
+    const strength = afterimage();
+    ghostFade *= Math.exp(-dt / 0.12);
+    if (strength > 0 && tv > 0 && ghostFade < 0.3) {
+      // Keep this frame's bolts as the new trace, dimmed.
+      for (let i = 0; i < tv * 3; i++) { G.pos[i] = tPos[i]; G.col[i] = tCol[i] * 0.55; }
+      ghostCount = tv;
+      ghostFade = 1;
+    }
+    const a = ghostFade * strength * 0.85;
+    const n = a > 0.02 ? ghostCount : 0;
+    if (!n && !ghostDrawn) return;
+    for (let i = 0; i < n; i++) G.alpha[i] = a;
+    for (let i = n; i < ghostDrawn; i++) G.alpha[i] = 0;
+    ghostDrawn = n;
+    G.commit();
+  }
   const px = new Float32Array(MAX_POINTS);
   const py = new Float32Array(MAX_POINTS);
   const pz = new Float32Array(MAX_POINTS);
@@ -197,6 +238,7 @@ export function createBoltLines(fxMaterial, maxSegments, maxRibbons = 0) {
     if (v + 2 > cap) return false;
     vertex(ax, ay, az, colorA, alphaA);
     vertex(bx, by, bz, colorB, alphaB);
+    trace(ax, ay, az, bx, by, bz, colorA, colorB);
     return true;
   }
 
@@ -250,7 +292,9 @@ export function createBoltLines(fxMaterial, maxSegments, maxRibbons = 0) {
       color(t, cb);
       const ab = fade ? alpha(t) : alpha;
       const wb = taper ? width(t) : width;
-      const ok = R && (wa > 1 || wb > 1)
+      const ribbon = R && (wa > 1 || wb > 1);
+      if (ribbon) trace(px[i], py[i], pz[i], px[i + 1], py[i + 1], pz[i + 1], ca, cb);
+      const ok = ribbon
         ? R.add(px[i], py[i], pz[i], px[i + 1], py[i + 1], pz[i + 1], ca, cb, aa, ab, Math.max(1, wa), Math.max(1, wb), heat)
         : segment(px[i], py[i], pz[i], px[i + 1], py[i + 1], pz[i + 1], ca, cb, aa, ab);
       if (!ok) return;
@@ -265,8 +309,8 @@ export function createBoltLines(fxMaterial, maxSegments, maxRibbons = 0) {
 
   return {
     /** Everything to add to the scene (fx layer). */
-    objects: R ? [L.lines, R.mesh] : [L.lines],
-    begin() { v = 0; R?.begin(); },
+    objects: [L.lines, ...(R ? [R.mesh] : []), ...(G ? [G.lines] : [])],
+    begin() { v = 0; tv = 0; R?.begin(); },
     segment,
     bolt,
     /** Blank what the last frame drew beyond this one, and upload. */
@@ -275,9 +319,12 @@ export function createBoltLines(fxMaterial, maxSegments, maxRibbons = 0) {
       drawn = v;
       L.commit();
       R?.commit();
+      if (G) stepGhost();
     },
     clear() {
       v = 0;
+      tv = 0;
+      if (G && ghostDrawn) { G.clear(); ghostDrawn = 0; ghostFade = 0; }
       if (drawn) { L.clear(); drawn = 0; }
       if (R) { R.begin(); R.commit(); }
     },

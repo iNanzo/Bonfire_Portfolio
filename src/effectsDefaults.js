@@ -41,6 +41,10 @@ export const DEFAULT_EFFECTS = {
   // Ice: a translucent crystal cluster grows out of the ground around a banked fire
   // (ice.js); impacts send a ring of shards out that spike up and sink back, with chill.
   ice: { shards: 28, height: 1.05, spread: 0.36, thickness: 1, clarity: 0.28, glow: 1, shimmer: 0.5, innerFire: 0.45, frost: 60, growTime: 1.4, ringSpeed: 1, ringHeight: 1, ringHold: 0.08 },
+  // How hits land (src/bonfire/scene.js, marks.js, debris.js): a freeze frame, a flash, the
+  // ground scorched / frosted / scarred where they struck (fading away), debris, lightning's
+  // afterimages and strikes on fireflies, and how much busy moments thin the extras out.
+  impact: { hitStop: 0.06, flash: 0.5, marks: true, markLife: 20, debris: 1, afterimages: 0.6, fireflyStrikes: 0.5, budget: 0.6 },
   render: { pixelSize: 4, pixelSizeSmall: 3, dither: 0.16, ditherMatrix: 4, outlines: true, vignette: 0.85, exposure: 1, colorChange: 1.25, shake: true },
 };
 
@@ -74,6 +78,13 @@ export const RANGES = {
   'render.vignette': [0, 1.5, 0.05],
   'render.exposure': [0.3, 2, 0.05],
   'render.colorChange': [0.2, 4, 0.05, 's'],
+  'impact.hitStop': [0, 0.15, 0.01, 's'],
+  'impact.flash': [0, 1, 0.05],
+  'impact.markLife': [3, 60, 1, 's'],
+  'impact.debris': [0, 2, 0.05, '×'],
+  'impact.afterimages': [0, 1, 0.05],
+  'impact.fireflyStrikes': [0, 1, 0.05],
+  'impact.budget': [0, 1, 0.05],
   ...Object.fromEntries(ELEMENT_IDS.map((id) => [`elements.${id}.weight`, [0.1, 5, 0.1, '×']])),
   'lightning.size': [0.2, 0.8, 0.01, 'm'],
   'lightning.height': [0.15, 1.2, 0.01, 'm'],

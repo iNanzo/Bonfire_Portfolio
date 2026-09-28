@@ -107,6 +107,7 @@ export function createTempoTracker({ min = 70, max = 185 } = {}) {
   let anchoredAt = -Infinity;
   let anchorPending = false; // anchored before the tempo was known: count from it once it is
   let manualUntil = -Infinity;
+  let mode = null; // who set the tempo while manualUntil holds: 'tap', 'manual' (typed in) or 'link'
   const slotChange = new Float32Array(4); // spectral change per bar position, decaying
 
   function push(time, value) {
@@ -149,6 +150,7 @@ export function createTempoTracker({ min = 70, max = 185 } = {}) {
     strength += (est.strength - strength) * 0.3;
     if (est.strength < 0.08) return; // nothing periodic to follow
     const manual = now < manualUntil;
+    if (manual && mode !== 'tap') return; // a typed-in tempo or Link owns the grid (phase included)
     // A clear pulse (a groove) may retune the grid; a faint one (a groove thinning out,
     // a breakdown) may only nudge its phase — or, in a breakdown, not even that.
     const clear = est.strength >= 0.25;
@@ -257,23 +259,69 @@ export function createTempoTracker({ min = 70, max = 185 } = {}) {
     anchoredAt = time;
     slotChange.fill(0);
     manualUntil = time + 30;
+    mode = 'tap';
     return 60 / p;
+  }
+
+  /**
+   * A tempo set by hand (the BPM field): it holds until cleared. The beat keeps its phase
+   * (the grid runs on from the last beat) unless there was none yet: then `time` is a beat.
+   */
+  function setManual(bpm, time) {
+    const p = 60 / Math.min(220, Math.max(60, bpm));
+    const at = lastBeat > -Infinity ? lastBeat : time;
+    setGrid(p, at);
+    if (lastBeat === -Infinity) lastBeat = at - p * 0.5;
+    manualUntil = Infinity;
+    mode = 'manual';
+    taps = [];
+  }
+  /** Back to following the music. */
+  function clearManual() { manualUntil = -Infinity; mode = null; taps = []; }
+  /** Shift the beat grid by `seconds` (a phase nudge: positive = beats land later). */
+  function nudge(seconds) {
+    if (!period) return;
+    grid += seconds;
+    lastBeat += seconds;
+  }
+  /**
+   * The beat from outside (an Ableton Link bridge): `bpm`, and `beat`, the session's beat
+   * position (beat 0, 4, 8… are downbeats) at `time` on this clock. Holds for 2 s after
+   * the last update, so a dropped bridge falls back to listening.
+   */
+  function external(bpm, beat, time, quantum = 4) {
+    const p = 60 / bpm;
+    const whole = Math.floor(beat);
+    const beatTime = time - (beat - whole) * p; // when the current whole beat fell
+    setGrid(p, beatTime);
+    if (mode !== 'link' || Math.abs(lastBeat - beatTime) > p * 0.6) {
+      lastBeat = beatTime; // (so the next emitted beat is whole + 1)
+      count = whole + 1;
+      anchoredAt = time;
+    }
+    // Keep the bar where the session has it.
+    const want = ((whole + 1) % quantum + quantum) % quantum;
+    const have = ((count % 4) + 4) % 4;
+    if (want !== have) count += ((want - have) % 4 + 4) % 4;
+    manualUntil = time + 2;
+    mode = 'link';
   }
 
   function reset() {
     env.fill(0); head = 0; filled = 0; slotTime = -1; acc = 0; lastEstimate = -1;
     period = 0; grid = 0; strength = 0; tempoMiss = 0; phaseMiss = 0; pendingPeriod = 0;
-    lastBeat = -Infinity; count = 0; anchoredAt = -Infinity; anchorPending = false; manualUntil = -Infinity; taps = [];
+    lastBeat = -Infinity; count = 0; anchoredAt = -Infinity; anchorPending = false; manualUntil = -Infinity; taps = []; mode = null;
     slotChange.fill(0);
   }
 
   return {
-    push, estimate, tick, anchor, tap, reset,
+    push, estimate, tick, anchor, tap, reset, setManual, clearManual, nudge, external,
     get bpm() { return period ? 60 / period : 0; },
     get period() { return period; },
     /** 0..1: how periodic the onsets are (≥ ~0.2 reads as a steady beat). */
     get strength() { return strength; },
-    get manual() { return taps.length >= 3 && slotTime < manualUntil; },
+    /** Who's setting the tempo instead of the music ('tap', 'manual', 'link'), or null. */
+    get manual() { return mode && slotTime < manualUntil ? mode : null; },
     get count() { return count; },
   };
 }

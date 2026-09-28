@@ -12,6 +12,12 @@
 // (glowing shards, ice.js) — that changes when a weapon lands, like the flame
 // color. Every element burns in the current flame's colors, and each has its own
 // impact: a ring of fire, a ring of lightning, or a ring of ice shards.
+//
+// Hits have weight (effects.impact): a big one freezes the simulation for a few frames
+// (hit-stop, repaid afterwards so the music's timing holds), flashes the frame toward the
+// core color, adds camera trauma (view.js), throws debris that bounces off the scenery
+// (debris.js) and leaves a mark on the ground that fades (marks.js). While lots is going
+// on, the background extras thin out (`busy`) so the main hit reads.
 import * as THREE from 'three';
 import { createResourceScope } from './resources.js';
 import { weapons as weaponNames, startingEquipment } from '../content.js';
@@ -21,7 +27,7 @@ import { elementOr } from '../elements.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { createPixelPass } from './pixelPass.js';
-import { createFlame, createParticleMaterial, createEffectMaterial } from './flame.js';
+import { createFlame, createParticleMaterial, createEffectMaterial, SHAPE } from './flame.js';
 import { createInteraction, MODES } from './interaction.js';
 import { createFireflies } from './fireflies.js';
 import { createTerrain } from './terrain.js';
@@ -35,6 +41,10 @@ import { createChill } from './chill.js';
 import { createSwingTrail } from './swingTrail.js';
 import { createView } from './view.js';
 import { createPointer } from './pointer.js';
+import { createGroundMarks } from './marks.js';
+import { createDebris } from './debris.js';
+import { createFlowView } from './flowView.js';
+import { buildScenery, SCENERIES } from './scenery.js';
 import { base, flames, flameOr, scenePalette, debugPalettes, mixFlame, flameEase } from '../palette.js';
 
 const BASE = import.meta.env.BASE_URL;
@@ -52,7 +62,7 @@ const MATRIX_SIZES = [4, 8];
 
 const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
 
-export function createBonfire(container, { reducedMotion = false, sway: swayAmount = 1, lightTrails = false, onImpact, onRamp, onError, onFrame } = {}) {
+export function createBonfire(container, { reducedMotion = false, sway: swayAmount = 1, lightTrails = false, onImpact, onFormed, onRamp, onError, onFrame } = {}) {
   const scope = createResourceScope();
   const events = new AbortController();
   scope.cleanup(() => events.abort());
@@ -77,6 +87,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   // renderFrame asks for it once, and only when a weapon or the light has moved.
   renderer.shadowMap.autoUpdate = false;
   renderer.autoClear = false;
+  renderer.info.autoReset = false; // (counted over the whole frame, all passes: see stats())
   const canvas = renderer.domElement;
   canvas.className = 'bonfire-canvas';
   canvas.setAttribute('aria-hidden', 'true');
@@ -150,7 +161,11 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   // --- Fire particles
   const particleMaterial = createParticleMaterial(colorRT.depthTexture, pass.uniforms.resolution.value);
   const effectMaterial = createEffectMaterial(particleMaterial);
-  scope.own(particleMaterial); scope.own(effectMaterial);
+  // Each element's loose particles have a shape of their own (signatures.js): lightning's
+  // sparks flash as crosses, ice glints as diamonds.
+  const crossMaterial = createEffectMaterial(particleMaterial, { shape: SHAPE.cross });
+  const diamondMaterial = createEffectMaterial(particleMaterial, { shape: SHAPE.diamond });
+  for (const m of [particleMaterial, effectMaterial, crossMaterial, diamondMaterial]) scope.own(m);
   const field = createCurlField();
   const fire = createFlame({
     field,
@@ -162,9 +177,9 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   });
   // --- Elements. `presence` eases each element in (1) and out (0) over a moment;
   // the flame reads it to die out (lightning) or bank low and slow inside the ice.
-  const plasma = createPlasma({ fxMaterial: effectMaterial, hotMaterial: particleMaterial, field, origin: FIRE_ORIGIN, reducedMotion });
+  const plasma = createPlasma({ fxMaterial: effectMaterial, hotMaterial: particleMaterial, sparkMaterial: crossMaterial, field, origin: FIRE_ORIGIN, reducedMotion });
   const chill = createChill({ material: scope.own(createSmokeMaterial()), field, origin: FIRE_ORIGIN, reducedMotion });
-  const crystals = createCrystals({ fxMaterial: effectMaterial, origin: new THREE.Vector3(FIRE_ORIGIN.x, 0, FIRE_ORIGIN.z), field, chill, reducedMotion });
+  const crystals = createCrystals({ fxMaterial: effectMaterial, glintMaterial: diamondMaterial, origin: new THREE.Vector3(FIRE_ORIGIN.x, 0, FIRE_ORIGIN.z), field, chill, reducedMotion });
   for (const o of [...plasma.objects, ...crystals.objects]) { scope.trackTree(o); o.layers.set(LAYER_FX); scene.add(o); }
   for (const l of plasma.lights) scene.add(l);
   crystals.solid.layers.set(LAYER_SOLID); // outlined like the rest of the scenery
@@ -174,6 +189,55 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   // A swinging blade's trail of fire (the visualizer's sword combos).
   const swingTrail = createSwingTrail({ fxMaterial: effectMaterial, field, count: pCount(1600), reducedMotion });
   for (const o of swingTrail.objects) { scope.trackTree(o); o.layers.set(LAYER_FX); scene.add(o); }
+  // Ground marks and bouncing debris (one pool per element, in its particle shape).
+  const marks = createGroundMarks({ center: new THREE.Vector3(FIRE_ORIGIN.x, 0, FIRE_ORIGIN.z) });
+  scope.cleanup(() => marks.dispose());
+  const debris = {
+    fire: createDebris({ kind: 'fire', material: effectMaterial, count: pCount(140), reducedMotion }),
+    ice: createDebris({ kind: 'ice', material: diamondMaterial, count: pCount(140), reducedMotion }),
+    lightning: createDebris({ kind: 'lightning', material: crossMaterial, count: pCount(160), reducedMotion }),
+  };
+  for (const d of Object.values(debris)) { scope.trackTree(d.points); d.points.layers.set(LAYER_FX); scene.add(d.points); }
+  let terrainTop = null; // the scenery's height at (x, z), once the model has loaded
+
+  // --- Hit feel. `busy` (0..1) rises with every big moment and drains over a second or
+  // so; `ambient()` is how much of the background extras to keep (see the header).
+  let busy = 0;
+  let hitStop = 0;   // seconds of freeze left
+  let timeDebt = 0;  // frozen time still to be repaid
+  let simT = 0;      // the simulation's clock (real time minus the freezes still owed)
+  let flashAmt = 0;  // the impact flash, 0..1
+  let lastFlash = -1;
+  let strikeAt = -1; // (simulation time) a firefly strike waiting for the ball to grow in
+  const ambient = () => 1 - busy * effects.impact.budget;
+  /**
+   * A hit: `weight` 0..1 (a flick ... a weapon landing). Freezes, flashes (at most a couple
+   * a second), adds camera trauma and makes the scene busy.
+   */
+  function hit(weight, { freeze = true, flash = true, shake = true } = {}) {
+    const I = effects.impact;
+    busy = Math.min(1, busy + weight * 0.8);
+    if (shake) jolt(0.3 * weight);
+    if (reducedMotion) return;
+    if (freeze && I.hitStop > 0) hitStop = Math.max(hitStop, I.hitStop * weight);
+    const now = performance.now() / 1000;
+    if (flash && I.flash > 0 && weight >= 0.5 && now - lastFlash > 0.45) { flashAmt = Math.max(flashAmt, I.flash * weight); lastFlash = now; }
+  }
+  const rampNow = () => currentRamp.map((h) => new THREE.Color(h));
+  /** Mark the ground and throw debris for the current element at (x, z). `size` 0..1+. */
+  function scar(x, z, size = 1, { ring = false } = {}) {
+    if (!ready) return;
+    const kind = elementKey;
+    const colors = rampNow();
+    marks.stamp(kind, x, z, ring ? 1.5 : 0.22 + 0.18 * size, colors, { strength: Math.min(1, 0.6 + 0.4 * size), ring });
+    const n = Math.round((kind === 'lightning' ? 16 : 10) * size * effects.impact.debris);
+    if (n > 0 && !ring) {
+      const d = debris[kind];
+      d.setRamp(colors);
+      d.throw(x, (terrainTop?.(x, z) ?? 0) + 0.08, z, n, { power: 0.6 + 0.5 * size });
+    }
+  }
+
   let elementKey = elementOr(startingEquipment.element);
   const presence = Object.fromEntries(ELEMENT_IDS.map((id) => [id, 0]));
   function setElement(key, instant = false) {
@@ -197,14 +261,16 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   const glitch = {
     slice: 0, sliceSeed: 0, split: 0, block: 1, wave: 0, mirror: 0, scan: 0, scanMode: 0, noise: 0, invert: 0,
     feedback: 0, zoom: 1, feedRot: 0, kaleido: 0, kaleidoRot: 0, rippleR: 0, rippleAmp: 0, iris: 2, letterbox: 0, ink: 0, cycle: 0,
+    temp: 0, blackout: 0,
   };
   const GLITCH_UNIFORMS = {
     slice: 'uSlice', sliceSeed: 'uSliceSeed', split: 'uSplit', block: 'uBlock', wave: 'uWave', mirror: 'uMirror', scan: 'uScan', scanMode: 'uScanMode', noise: 'uNoise', invert: 'uInvert',
     feedback: 'uFeedback', zoom: 'uZoom', feedRot: 'uFeedRot', kaleido: 'uKaleido', kaleidoRot: 'uKaleidoRot', rippleR: 'uRippleR', rippleAmp: 'uRippleAmp', iris: 'uIris', letterbox: 'uLetterbox', ink: 'uInk', cycle: 'uCycle',
+    temp: 'uTemp', blackout: 'uBlackout',
   };
   const GLITCH_ENTRIES = Object.entries(GLITCH_UNIFORMS);
   // Effects that are a still look rather than motion or flashing (kept under reduced motion).
-  const STILL = new Set(['mirror', 'scan', 'scanMode', 'block', 'letterbox', 'iris', 'zoom']);
+  const STILL = new Set(['mirror', 'scan', 'scanMode', 'block', 'letterbox', 'iris', 'zoom', 'temp']);
   const OFF = { iris: 2, zoom: 1, block: 1 };
   const boost = (v) => Math.max(0.1, 1 + v);
 
@@ -227,6 +293,11 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   fire.flame.layers.set(LAYER_FX);
   fire.spark.layers.set(LAYER_FX);
   scene.add(fire.flame, fire.spark);
+  // Breakdown mode's flow field (hidden until asked for).
+  const flowView = createFlowView({ fxMaterial: effectMaterial, field, origin: FIRE_ORIGIN, params: fire.params });
+  scope.trackTree(flowView.object);
+  flowView.object.layers.set(LAYER_FX);
+  scene.add(flowView.object);
   let fireflies = null; // created once the model (and the firefly model) loads
   let fx = null;        // ground flames, smoke and ash for weapon impacts
   let zap = null;       // the lightning ring (lightning impacts)
@@ -246,6 +317,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   let currentRamp = flames[flameKey].ramp;
   const blendTime = () => (reducedMotion ? 0.4 : effects.render.colorChange);
   const white = new THREE.Color('#ffffff');
+  const lightBase = new THREE.Color(); // the cast light's color before the temperature
+  const lightWarm = new THREE.Color(); // ...and what a warm temperature leans it toward
   // Keep the cast light less saturated than the flame so lit stone lands on the
   // dark tinted shade, with the ramp's mid tone only in hot spots.
   const lightMix = (key) => flames[key]?.light ?? 0.34;
@@ -261,6 +334,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     currentShade = f.shade;
     currentMix = mix;
     fire.setRamp(f.ramp);
+    flowView.setRamp(f.ramp);
     plasma.setRamp(f.ramp);
     crystals.setRamp(f.ramp);
     chill.setRamp(f.ramp);
@@ -271,6 +345,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
       pass.setPalette(extra ? [...scenePalette(f), ...extra.ramp, extra.shade] : scenePalette(f));
     }
     fireLight.color.set(f.ramp[1]).lerp(white, mix);
+    lightBase.copy(fireLight.color);
+    lightWarm.set(f.ramp[0]);
     onRamp?.(f.ramp);
   }
   applyColors(flames[flameKey], lightMix(flameKey));
@@ -323,8 +399,9 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
         },
         // The new weapon finishing its form lands like a hit: a jolt and a flare.
         onFormed: () => {
-          jolt(0.14);
+          hit(0.45, { freeze: false });
           fire.burst(0.45);
+          onFormed?.();
         },
         onImpact: impact,
         // A sword combo: the blade sheds fire and knocks the flames along its swing,
@@ -336,12 +413,15 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
         // Each move's hit throws a spray off the point.
         onSwingHit: (kind, tip, dir) => {
           swingTrail.hit(tip, dir, kind === 'thrust' ? 1 : 0.6);
-          jolt(kind === 'slash' ? 0.04 : 0.07);
+          hit(kind === 'slash' ? 0.15 : 0.3, { flash: false });
+          // A blow that reaches the ground marks it and kicks up debris.
+          if (tip.y - (terrainTop?.(tip.x, tip.z) ?? 0) < 0.3) scar(tip.x, tip.z, 0.5);
         },
         onSwingImpact: () => {
           ring(1.2);
           fire.burst(1.1 * flameShare(elementKey));
-          jolt(0.3);
+          hit(1);
+          scar(FIRE_ORIGIN.x, FIRE_ORIGIN.z, 1);
           swingDone?.();
           swingDone = null;
         },
@@ -357,13 +437,27 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     // tops and walls (exact contact points and normals come from raycasts).
     const statics = [];
     root.traverse((o) => { if (o.isMesh && o.name.startsWith('Static_')) statics.push(o); });
-    const terrain = createTerrain(renderer, statics);
+    // The ruins' own pieces (hidden in the other sceneries: scenery.js).
+    ruinsOnly = statics.filter((o) => /Static_(Pillar|Mortar|Wax)/.test(o.name));
+    baseStatics = statics.filter((o) => !ruinsOnly.includes(o));
+    liveStatics = statics;
+    terrains.ruins = createTerrain(renderer, statics);
+    // The fireflies (and the strikes, mist and debris) read whichever scenery's height map is current.
+    const now = () => terrains[sceneryKey];
+    const terrain = {
+      height: (x, z) => now().height(x, z),
+      top: (x, z) => now().top(x, z),
+      solid: (x, z) => now().solid(x, z),
+      slope: (x, z, out) => now().slope(x, z, out),
+      get wallSpots() { return now().wallSpots; },
+      get cell() { return now().cell; },
+    };
     const ray = new THREE.Raycaster();
     const normalMatrix = new THREE.Matrix3();
     const raycast = (origin, dir, far) => {
       ray.set(origin, dir);
       ray.far = far;
-      const hit = ray.intersectObjects(statics, false)[0];
+      const hit = ray.intersectObjects(liveStatics, false)[0];
       if (!hit?.face) return null;
       const normal = hit.face.normal.clone().applyMatrix3(normalMatrix.getNormalMatrix(hit.object.matrixWorld)).normalize();
       if (normal.dot(dir) > 0) normal.negate();
@@ -401,11 +495,17 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
         }
       } else {
         o.material = new THREE.MeshLambertMaterial({ color, flatShading: true });
+        if (/Ground|Flagstone|Ash/.test(o.name)) marks.patch(o.material); // hits mark the floor
         o.castShadow = !/Ground|Flagstone/.test(o.name);
         o.receiveShadow = true;
       }
     });
     candleLight.position.copy(candlePos).add(new THREE.Vector3(0.1, 0.25, 0.3));
+    ruinsOnly.push(...candleFlames.map((c) => c.mesh));
+    // The model's materials, for the other sceneries.
+    for (const [key, name] of [['stone', 'Stone'], ['pillar', 'Pillar'], ['wood', 'Wood'], ['char', 'Charred'], ['wax', 'Wax'], ['mortar', 'Mortar']]) {
+      sceneryMaterials[key] = root.getObjectByName(`Static_${name}`)?.material;
+    }
 
     // How far a ground flame can run in each direction before it hits something.
     const blockers = [];
@@ -458,14 +558,24 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     // Lightning strikes and cold mist follow the scenery's surface (the fireflies' height map).
     plasma.setGround(terrain.top);
     chill.setGround(terrain.top);
-    zap = createLightningRing({ fxMaterial: effectMaterial, origin: ground, field, reach, ground: terrain.top, emitters: coarse ? 72 : 96, sparks: impactCount(260), lights: coarse ? 4 : 6, reducedMotion });
-    frostRing = createIceRing({ fxMaterial: effectMaterial, origin: ground, field, reach, chill, chips: impactCount(320), lights: coarse ? 4 : 6, reducedMotion });
+    terrainTop = terrain.top;
+    for (const d of Object.values(debris)) d.setGround(terrain.top);
+    zap = createLightningRing({ fxMaterial: effectMaterial, sparkMaterial: crossMaterial, origin: ground, field, reach, ground: terrain.top, emitters: coarse ? 72 : 96, sparks: impactCount(260), lights: coarse ? 4 : 6, reducedMotion });
+    frostRing = createIceRing({ fxMaterial: effectMaterial, glintMaterial: diamondMaterial, origin: ground, field, reach, chill, chips: impactCount(320), lights: coarse ? 4 : 6, reducedMotion });
     for (const o of [...zap.objects, ...frostRing.objects]) { scope.trackTree(o); o.layers.set(LAYER_FX); scene.add(o); }
     frostRing.solid.layers.set(LAYER_SOLID);
     for (const l of [...zap.lights, ...frostRing.lights]) scene.add(l);
     zap.setRamp(currentRamp);
     frostRing.setRamp(currentRamp);
     sets = [...fire.sets, ...plasma.sets, ...crystals.sets, ...chill.sets, ...fx.sets, ...zap.sets, ...frostRing.sets];
+    named([fx.ring], 'Ring of fire');
+    named([fx.embers], 'Embers');
+    named([fx.haze, fx.puff], 'Smoke');
+    named([fx.flecks], 'Ash');
+    named(zap.objects, 'Lightning ring');
+    named(frostRing.objects, 'Ice ring');
+    named([weapons.forge], 'Forge (weapon swap)');
+    if (fireflies.trails) named([fireflies.trails], 'Firefly trails');
 
     scene.add(root, weapons.holder);
     weapons.setRim(currentRamp[2]);
@@ -474,14 +584,62 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
 
   });
 
+  // --- Scenery (scenery.js): the ruins, the forge or the shrine around the fire. Built on
+  // first use; each has its own height map for the fireflies.
+  let sceneryKey = 'ruins';
+  let ruinsOnly = [];
+  let baseStatics = [];
+  let liveStatics = [];
+  const terrains = {};
+  const sceneryMaterials = {};
+  const sceneries = {};
+  function setScenery(name) {
+    if (!ready || !SCENERIES[name] || name === sceneryKey) return false;
+    const show = (key, on) => {
+      if (key === 'ruins') { for (const o of ruinsOnly) o.visible = on; candleLight.visible = on; return; }
+      const s = sceneries[key];
+      s.group.visible = on;
+      for (const l of s.lights) l.visible = on;
+    };
+    if (name !== 'ruins' && !sceneries[name]) {
+      const s = buildScenery(name, sceneryMaterials, () => new THREE.MeshBasicMaterial({ color: currentRamp[1], fog: false }));
+      s.group.traverse((o) => { if (o.isMesh) { o.layers.set(s.glows.includes(o) ? LAYER_GHOST : LAYER_SOLID); scope.trackTree(o); } });
+      s.lights = s.lights.map((l) => {
+        const light = new THREE.PointLight(0xffb25a, l.intensity, l.distance, 1.8);
+        light.position.copy(l.at);
+        light.userData.base = l.intensity;
+        scene.add(light);
+        return light;
+      });
+      glows.push(...s.glows);
+      scene.add(s.group);
+      s.group.updateMatrixWorld(true);
+      s.solids = [];
+      s.group.traverse((o) => { if (o.isMesh && !s.glows.includes(o)) s.solids.push(o); });
+      sceneries[name] = s;
+    }
+    show(sceneryKey, false);
+    show(name, true);
+    sceneryKey = name;
+    liveStatics = name === 'ruins' ? [...baseStatics, ...ruinsOnly.filter((o) => o.name.startsWith('Static_'))] : [...baseStatics, ...sceneries[name].solids];
+    terrains[name] ??= createTerrain(renderer, liveStatics);
+    shadowFrames = 2;
+    return true;
+  }
+
   // --- Fire level (stoking, UI puffs, weapon impacts)
   let firstStoke = true;
   function stoke() {
     fire.params.level = Math.min(2.4, fire.params.level + effects.fire.stoke);
     fire.burst(Math.min(1.5, effects.fire.stoke / 0.9));
     if (elementKey === 'lightning') { plasma.discharge(0.5); zap?.crackle(0.35, 3); }
-    if (elementKey === 'ice') crystals.burst(0.6);
-    jolt(0.18);
+    if (elementKey === 'ice') { crystals.burst(0.6); crystals.beat(0.8); crystals.echo(); }
+    // Every stoke throws a smaller ring of the element too (skipped under reduced motion).
+    ring(0.6, { quiet: true });
+    weapons?.beat(1); // the planted weapon shudders
+    hit(0.4, { freeze: false });
+    // Lightning reaches for the nearest firefly.
+    if (elementKey === 'lightning') strikeFirefly(1);
     const wasFirst = firstStoke;
     firstStoke = false;
     return wasFirst;
@@ -510,7 +668,10 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     else if (elementKey === 'ice') { frostRing.burst(); crystals.burst(1); }
     else fx.burst();
     fireflies.burst(flames[flameKey].ramp);
-    jolt(0.3);
+    hit(stationary ? 0.5 : 1);
+    scar(FIRE_ORIGIN.x, FIRE_ORIGIN.z, 1.2);
+    // The new ball needs a moment to grow in before it can reach for a firefly.
+    if (elementKey === 'lightning') strikeAt = simT + 0.5;
     onImpact?.(flameKey, old, stationary, { ...selection, weapon: weaponKey });
   }
 
@@ -519,7 +680,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
    * (see weapons.js): the visualizer times the impact to the beat, or holds the new
    * weapon over the fire until release().
    */
-  function equip(weaponKey, key, { instant = false, item = null, element = elementKey, pace = 1, hold = false } = {}) {
+  function equip(weaponKey, key, { instant = false, item = null, element = elementKey, pace = 1, hold = false, rush = false } = {}) {
     return loaded.then(() => {
       if (scope.disposed) return { status: 'cancelled' };
       if (!Object.hasOwn(flames, key)) throw new Error('Unknown flame: ' + key);
@@ -537,7 +698,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
         onImpact?.(key, key, true, selection);
         return { status: 'applied' };
       }
-      return weapons.swap(weaponKey, flames[flameKey].ramp, flames[key].ramp, selection, { pace, hold });
+      return weapons.swap(weaponKey, flames[flameKey].ramp, flames[key].ramp, selection, { pace, hold, rush });
     });
   }
 
@@ -552,7 +713,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     fire.burst(0.45 * s * (accent ? 1.5 : 1) * flameShare(elementKey));
     if (elementKey === 'lightning') {
       zap.crackle(0.12 + 0.15 * s, Math.round(2 + 3 * s + (accent ? 3 : 0)));
-      if (accent) plasma.discharge(0.35 * s);
+      if (accent) { plasma.discharge(0.35 * s); if (Math.random() < effects.impact.fireflyStrikes) strikeFirefly(s); }
     } else if (elementKey === 'ice') {
       crystals.burst(0.4 * s * (accent ? 1.5 : 1));
       crystals.beat(s * (accent ? 1 : 0.7));
@@ -564,14 +725,24 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
    * The current element's ring, without a new weapon or colors: a ring of fire, of
    * lightning or of ice shards races out across the ground (the visualizer's extra hits).
    */
-  function ring(strength = 1) {
+  function ring(strength = 1, { quiet = false } = {}) {
     if (!ready || reducedMotion) return;
     const s = Math.min(1.5, Math.max(0, strength));
+    if (!quiet) hit(0.35 * s, { freeze: false, flash: false, shake: false });
+    scar(FIRE_ORIGIN.x, FIRE_ORIGIN.z, s, { ring: true });
     if (elementKey === 'lightning') { zap.burst(effects.lightning.height); plasma.discharge(0.6 * s); }
     else if (elementKey === 'ice') { frostRing.burst(); crystals.burst(0.8 * s); crystals.beat(1); crystals.echo(); }
     else { fx.burst(); fire.burst(0.9 * s); }
     fire.params.level = Math.max(fire.params.level, 1.6 + s);
     jolt(0.12 * s);
+  }
+  /** Lightning jumps from the ball to the nearest firefly within reach, which flickers hot. */
+  function strikeFirefly(power = 1) {
+    if (!fireflies || elementKey !== 'lightning' || reducedMotion || effects.impact.fireflyStrikes <= 0) return false;
+    const f = fireflies.nearest(plasma.center, 1.4 + effects.lightning.size * 2);
+    if (!f || !plasma.jump(f.pos)) return false;
+    fireflies.zap(f, plasma.center, power);
+    return true;
   }
   /** An echo of the planted weapon's silhouette bursts out of it (and in ice, the crystals' outlines). */
   function echo() {
@@ -622,7 +793,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   /** A few sparks off the flame (hi-hats). */
   function sparkle(n = 3) {
     if (!ready || reducedMotion) return;
-    fire.sparkle(n);
+    fire.sparkle(Math.round(n * ambient()));
   }
 
   // --- Camera (view.js) and cursor (pointer.js). Each frame the path the cursor traced
@@ -677,7 +848,11 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   let lightFlicker = 1;
   const fireOnScreen = new THREE.Vector3();
 
-  function update(dt, t) {
+  // `dt`, `t`: the simulation's step and clock (they stop during a hit-stop); `realDt`:
+  // the frame's own step (the camera, the cursor and the fades of the hit itself).
+  function update(dt, t, realDt) {
+    busy = Math.max(0, busy - realDt * 0.8);
+    flashAmt *= Math.exp(-realDt / 0.05);
     fire.params.level += (targetLevel + drive.level - fire.params.level) * Math.min(1, dt * 1.1);
     fire.wind.set(drive.windX, 0, drive.windZ);
     for (const id of ELEMENT_IDS) {
@@ -686,7 +861,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     }
     applyFireParams();
 
-    const sparks = interaction.update(camera, pointer.update(dt, t), sets, dt);
+    const sparks = interaction.update(camera, pointer.update(realDt, timer.getElapsed()), sets, dt);
     if (sparks.length) fire.emitSparks(sparks);
 
     // Stepped simulation for a hand-animated look.
@@ -704,6 +879,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
       });
     }
     fire.stepSparks(dt, t);
+    // The density budget: background extras thin out while a big hit is on screen.
+    crystals.ambient = plasma.ambient = ambient();
     plasma.step(dt, t, fire.params.level, { ray: pointer.ray(camera), flow: interaction.flowWorld });
     crystals.step(dt, t, fire.params.level);
     chill.step(dt, t);
@@ -711,7 +888,13 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     fx.step(dt, t);
     zap.step(dt, t);
     frostRing.step(dt, t);
+    for (const d of Object.values(debris)) d.step(dt);
+    flowView.step(t);
+    marks.step(realDt);
     fireflies.update(dt, t, camera, pointer.cursor, interaction.flowWorld);
+    if (strikeAt >= 0 && t >= strikeAt) { strikeAt = -1; strikeFirefly(1); }
+    // Now and then the ball reaches for a firefly on its own (more when stoked).
+    if (elementKey === 'lightning' && Math.random() < dt * effects.impact.fireflyStrikes * 0.25 * ambient() * Math.max(0.5, fire.params.level)) strikeFirefly(0.6);
 
     // After a weapon lands: ease from the old flame into the new one, with the
     // light swelling and settling as the color turns over.
@@ -734,6 +917,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
       lightStep = ls;
       lightFlicker = 0.82 + Math.random() * 0.3;
       candleLight.intensity = 0.28 + Math.random() * 0.12;
+      const s = sceneries[sceneryKey];
+      if (s) for (const l of s.lights) { l.intensity = l.userData.base * (0.8 + Math.random() * 0.3); l.color.set(currentRamp[1]).lerp(white, 0.3); }
     }
     // Each element lights the scene its own way: fire flickers, the ball strobes
     // with its crackle, ice glows steadily and breathes.
@@ -747,11 +932,17 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     // A discharge (weapon impact, stoke) flashes the whole scene for an instant.
     const flash = reducedMotion ? 0 : plasma.flash;
     pass.uniforms.exposure.value = effects.render.exposure * (1 + flash * 0.45) * boost(drive.exposure);
+    pass.uniforms.uFlash.value = reducedMotion ? 0 : flashAmt;
+    // The music's color temperature (the visualizer) tints the cast light too.
+    const temp = glitch.temp;
+    fireLight.color.copy(lightBase);
+    if (temp > 0) fireLight.color.lerp(white, temp * 0.45);
+    else if (temp < 0) fireLight.color.lerp(lightWarm, -temp * 0.35);
     fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * flicker * blendMul * (1 + flash * 1.5) * boost(drive.glow);
 
     weapons.update(dt);
 
-    view.step(dt);
+    view.step(realDt);
   }
 
   // The shadow is redrawn while a weapon moves (and a frame after), when the light moves
@@ -767,10 +958,25 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   }
 
   function renderFrame(dt) {
+    renderer.info.reset();
     const t = timer.getElapsed();
     // The visualizer drives the fire from here, so its changes land in this frame.
     if (ready) onFrame?.(dt, t);
-    if (ready) update(dt, t);
+    // Hit-stop: most of a freeze's time is held back from the simulation, then repaid a
+    // little faster than real time, so everything ends up where the music expects it.
+    let simDt = dt;
+    if (hitStop > 0) {
+      const frozen = Math.min(hitStop, dt);
+      hitStop -= frozen;
+      simDt = dt - frozen * 0.92;
+      timeDebt += frozen * 0.92;
+    } else if (timeDebt > 0) {
+      const pay = Math.min(timeDebt, dt * 0.5);
+      timeDebt -= pay;
+      simDt = dt + pay;
+    }
+    simT += simDt;
+    if (ready) update(simDt, simT, dt);
     view.apply(dt, size, pointer);
     for (const [k, u] of GLITCH_ENTRIES) {
       pass.uniforms[u].value = reducedMotion && !STILL.has(k) ? OFF[k] ?? 0 : glitch[k];
@@ -826,7 +1032,19 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
       renderer.clear();
       renderer.render(pass.scene, pass.camera);
     }
+    // A picture was asked for (photo mode): copy this frame now, while the canvas still
+    // holds it, scaled up with hard pixel edges.
+    if (captures.length) {
+      const out = document.createElement('canvas');
+      out.width = size.w * size.pd;
+      out.height = size.h * size.pd;
+      const ctx = out.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(canvas, 0, 0, out.width, out.height);
+      for (const done of captures.splice(0)) out.toBlob(done, 'image/png');
+    }
   }
+  const captures = [];
 
   let running = false;
   function syncRunning() {
@@ -881,6 +1099,59 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     };
   }
 
+  /** Whether the planted weapon is under the point (client px): the site's flourish on click. */
+  const pickRay = new THREE.Raycaster();
+  const pickNdc = new THREE.Vector2();
+  function weaponAt(clientX, clientY) {
+    const w = weapons?.planted;
+    if (!w) return false;
+    const r = canvas.getBoundingClientRect();
+    pickNdc.set(((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
+    pickRay.setFromCamera(pickNdc, camera);
+    pickRay.params.Mesh = { threshold: 0 };
+    return pickRay.intersectObject(w, true).length > 0;
+  }
+  /**
+   * The living blade's flourish (the site): the planted weapon pulls free, cuts a couple of
+   * moves in the air and plunges back in. Resolves when it's back (false if it can't).
+   */
+  function flourish() {
+    const moves = 2 + Math.floor(Math.random() * 2);
+    const hits = Array.from({ length: moves }, (_, i) => 0.55 + i * 0.42);
+    return swing({ hits, plunge: hits[hits.length - 1] + 0.6 });
+  }
+
+  // --- Breakdown mode (the site's "How it's made"): the final image, or one of the passes
+  // it's built from, and the flow field drawn over the fire.
+  const VIEWS = { final: 0, normals: 1, color: 2, particles: 3, flow: 0 };
+  function breakdown(view = 'final') {
+    pass.uniforms.uView.value = VIEWS[view] ?? 0;
+    flowView.visible = view === 'flow';
+  }
+  // Particle systems, for the breakdown's counts: the scene's point sets grouped by name.
+  const named = (objects, name) => { for (const o of objects) if (o?.isPoints) o.name = name; };
+  named([fire.flame], 'Bonfire flames');
+  named([fire.spark], 'Bonfire sparks');
+  named(plasma.objects, 'Lightning ball');
+  named(crystals.objects, 'Frost motes');
+  named([chill.points], 'Cold mist');
+  named(swingTrail.objects, 'Blade trail');
+  named(Object.values(debris).map((d) => d.points), 'Debris');
+  function stats() {
+    const systems = new Map();
+    scene.traverse((o) => {
+      if (!o.isPoints || !o.name) return;
+      const size = o.geometry.attributes.size.array;
+      let live = 0;
+      for (let i = 0; i < size.length; i++) if (size[i] > 0) live++;
+      const s = systems.get(o.name) ?? { name: o.name, live: 0, total: 0 };
+      s.live += live;
+      s.total += size.length;
+      systems.set(o.name, s);
+    });
+    return { drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, texels: `${size.w}×${size.h}`, systems: [...systems.values()] };
+  }
+
   /** A click anywhere makes the fireflies flash (brightest near the click). */
   function flash(clientX, clientY) {
     if (!fireflies) return;
@@ -925,9 +1196,14 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   }
 
   return {
-    stoke, puff, equip, setView: view.setView, setPose: view.setPose, viewAxes: view.axes, cycle, describe, flash, applyEffects, refreshScene, pulse, sparkle, ring, echo, swing, drive, glitch, ready: loaded,
+    stoke, puff, equip, weaponAt, flourish, breakdown, stats, setScenery,
+    get scenery() { return sceneryKey; },
+    /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
+    capture: () => new Promise((resolve) => captures.push(resolve)), setView: view.setView, setPose: view.setPose, viewAxes: view.axes, cycle, describe, flash, applyEffects, refreshScene, pulse, sparkle, ring, echo, swing, drive, glitch, ready: loaded,
     /** A jolt of the camera (0..~0.3), if screen shake is on. */
     shake: (amount) => jolt(amount),
+    /** Skip ahead: a running weapon swap plays fast up to its impact. False if none is running. */
+    hurry: (factor = 4) => weapons?.hurry(factor) ?? false,
     dispose: () => scope.dispose(),
     /** Let a weapon held over the fire strike (equip with `hold`). False if none is held. */
     release: (strikePace = 1) => weapons?.release(strikePace) ?? false,
@@ -950,7 +1226,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     get swapTime() { return weapons?.impactTime ?? 3.58; },
     get fireflies() { return fireflies; },
     /** Internals for debugging (dev builds expose this as window.__fire). */
-    get debug() { return { weapons, fx, plasma, zap, frostRing, crystals, chill }; },
+    get debug() { return { weapons, fx, plasma, zap, frostRing, crystals, chill, marks, debris, view, hit: { get busy() { return busy; }, get flash() { return flashAmt; }, get debt() { return timeDebt; } } }; },
     get interaction() { return interaction.mode; },
     set interaction(m) { interaction.mode = m; },
   };

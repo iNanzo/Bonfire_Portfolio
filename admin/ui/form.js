@@ -98,8 +98,9 @@ export function renderField(value, path, ctx, label = labelFor(path)) {
   const group = value !== null && typeof value === 'object';
   const wrap = el('div', { class: `${group ? 'group' : 'field'}${!group && isShort(value, path) ? ' is-short' : ''}`, 'data-path': keyOf(path) });
   const id = `f${++uid}`;
-  wrap.append(group ? el('h4', { class: 'group-label', text: label }) : el('label', { for: id, text: label }));
+  // The help is written under the field and is also the label's hover tooltip.
   const help = hint(HELP, patternOf(path));
+  wrap.append(group ? el('h4', { class: 'group-label', text: label, ...(help ? { title: help } : {}) }) : el('label', { for: id, text: label, ...(help ? { title: help } : {}) }));
   if (help) wrap.append(el('p', { class: 'help', text: help }));
   const control = renderValue(value, path, ctx);
   if (!group) (control.querySelector?.('[data-main]') ?? control).id = id;

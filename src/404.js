@@ -1,3 +1,5 @@
+// The "page not found" screen (404.html): the site's look, a flickering pixel flame, and a
+// way back to the title screen. Its words come from content.json's `notFound`.
 import './styles.css';
 import { applyCssPalette } from './palette.js';
 import { notFound } from './content.js';

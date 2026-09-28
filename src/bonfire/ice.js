@@ -32,6 +32,7 @@ import { createBoltLines, seeded } from './bolts.js';
 import { ringNoise } from './rings.js';
 import { clamp01, TAU } from '../math.js';
 import { createPoints, rampColors, setRampColors } from './points.js';
+import { iceGlint } from './signatures.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const easeOutBack = (t) => { const c = 1.9; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; };
@@ -179,12 +180,12 @@ function place(mesh, slot, x, y, z, ang, tilt, twist, width, depth, height) {
  * @param {object} o.field               shared curl noise (curl.js)
  * @param {object} o.chill               cold mist (chill.js)
  */
-export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion = false }) {
+export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin, field, chill, reducedMotion = false }) {
   const MAX = 40;
   const FLOATERS = 5;
   const MOTES = 200;
   const { mesh, glow, glowAttr } = crystalMesh(MAX + FLOATERS);
-  const motes = createPoints(MOTES, fxMaterial);
+  const motes = createPoints(MOTES, glintMaterial); // diamond glints (signatures.js)
   const M = { pos: motes.geometry.attributes.position.array, col: motes.geometry.attributes.color.array, size: motes.geometry.attributes.size.array, alpha: motes.geometry.attributes.alpha.array };
   const mVel = new Float32Array(MOTES * 3);
   const mAge = new Float32Array(MOTES).fill(1);
@@ -193,6 +194,7 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
 
   const ramp = rampColors(['#0f2f66', '#2f7fe0', '#8cc8ff', '#e8f4ff']);
   const tmp = new THREE.Color();
+  let ambientShare = 1; // 0..1: how many frost motes to keep (the scene's density budget)
 
   // Layout: seeded, so the same settings always grow the same cluster.
   const N = MAX + FLOATERS;
@@ -381,7 +383,7 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
     }
 
     // --- frost motes: a slow twinkling drift, thrown up by a stoke
-    const want = Math.round(I.frost * grow);
+    const want = Math.round(I.frost * grow * ambientShare); // (fewer while a big hit is on screen)
     for (let i = 0; i < MOTES; i++) {
       const ix = i * 3;
       if (mAge[i] >= mLife[i]) {
@@ -399,10 +401,12 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
       M.pos[ix + 1] += (mVel[ix + 1] + 0.04) * dt;
       M.pos[ix + 2] += (mVel[ix + 2] + c.z * 0.03) * dt;
       const tw = 0.5 + 0.5 * Math.sin(mAge[i] * 7 + i * 1.7);
-      tmp.copy(i % 3 ? ramp[3] : ramp[2]).multiplyScalar(0.75);
+      // Ice's signature: now and then a mote catches the light as a bright diamond.
+      const glint = reducedMotion ? 0 : iceGlint(t, i);
+      tmp.copy(i % 3 || glint ? ramp[3] : ramp[2]).multiplyScalar(glint ? 1.1 : 0.75);
       M.col[ix] = tmp.r; M.col[ix + 1] = tmp.g; M.col[ix + 2] = tmp.b;
-      M.size[i] = tw > 0.97 ? 2 : 1; // the odd glint
-      M.alpha[i] = Math.min(1, k * 5, (1 - k) * 3) * (0.35 + 0.65 * tw);
+      M.size[i] = glint ? 3 : tw > 0.97 ? 2 : 1;
+      M.alpha[i] = glint ? 1 : Math.min(1, k * 5, (1 - k) * 3) * (0.35 + 0.65 * tw);
     }
     for (const k of ['position', 'color', 'size', 'alpha']) motes.geometry.attributes[k].needsUpdate = true;
   }
@@ -456,6 +460,8 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
     },
     get amount() { return grow; },
     sets: [{ pos: M.pos, vel: mVel, n: MOTES, geo: motes.geometry, maxV: 1.2 }],
+    /** 0..1: how much of the background frost to keep (the scene thins it during big hits). */
+    set ambient(v) { ambientShare = v; },
     setRamp(hexes) {
       setRampColors(ramp, hexes);
       setRampUniforms(mesh.material, hexes);
@@ -470,13 +476,13 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
  * @param {(angle:number)=>number} o.reach  distance to the first obstacle along a heading
  * @param {object} o.chill                  cold mist (chill.js)
  */
-export function createIceRing({ fxMaterial, origin, field, reach, chill, maxSites = 900, chips = 320, bins = 96, lights: lightCount = 6, reducedMotion = false }) {
+export function createIceRing({ fxMaterial, glintMaterial = fxMaterial, origin, field, reach, chill, maxSites = 900, chips = 320, bins = 96, lights: lightCount = 6, reducedMotion = false }) {
   const PER = 3; // crystals per cluster, at most
   const { mesh, glow, glowAttr } = crystalMesh(maxSites * PER);
   const frost = createBoltLines(fxMaterial, bins * 2);
-  const chipPts = createPoints(chips, fxMaterial);
-  const K = { pos: chipPts.geometry.attributes.position.array, col: chipPts.geometry.attributes.color.array, size: chipPts.geometry.attributes.size.array, alpha: chipPts.geometry.attributes.alpha.array };
   const kVel = new Float32Array(chips * 3);
+  const chipPts = createPoints(chips, glintMaterial, { vel: kVel }); // shards that streak and glint as diamonds
+  const K = { pos: chipPts.geometry.attributes.position.array, col: chipPts.geometry.attributes.color.array, size: chipPts.geometry.attributes.size.array, alpha: chipPts.geometry.attributes.alpha.array };
   const kAge = new Float32Array(chips).fill(1);
   const kLife = new Float32Array(chips).fill(0);
   let kNext = 0;
@@ -667,14 +673,15 @@ export function createIceRing({ fxMaterial, origin, field, reach, chill, maxSite
       const drag = Math.exp(-dt * 1.2);
       kVel[ix] *= drag; kVel[ix + 1] = kVel[ix + 1] * drag - 3.5 * dt; kVel[ix + 2] *= drag;
       K.pos[ix] += kVel[ix] * dt; K.pos[ix + 1] += kVel[ix + 1] * dt; K.pos[ix + 2] += kVel[ix + 2] * dt;
-      if (K.pos[ix + 1] < 0.02) { K.pos[ix + 1] = 0.02; kVel[ix + 1] *= -0.25; kVel[ix] *= 0.5; kVel[ix + 2] *= 0.5; }
+      let bounced = false;
+      if (K.pos[ix + 1] < 0.02) { K.pos[ix + 1] = 0.02; bounced = kVel[ix + 1] < -0.4; kVel[ix + 1] *= -0.25; kVel[ix] *= 0.5; kVel[ix + 2] *= 0.5; }
       const k = kAge[i] / kLife[i];
-      tmp.copy(i & 1 ? ramp[3] : ramp[2]).multiplyScalar(0.8);
+      tmp.copy(i & 1 || bounced ? ramp[3] : ramp[2]).multiplyScalar(bounced ? 1.1 : 0.8);
       K.col[ix] = tmp.r; K.col[ix + 1] = tmp.g; K.col[ix + 2] = tmp.b;
-      K.size[i] = 1;
+      K.size[i] = bounced ? 3 : 1; // a shard glints as it hits the ground
       K.alpha[i] = Math.min(1, (1 - k) * 2.5) * (0.55 + 0.45 * Math.sin(kAge[i] * 30 + i));
     }
-    if (anyChip || active) for (const k of ['position', 'color', 'size', 'alpha']) chipPts.geometry.attributes[k].needsUpdate = true;
+    if (anyChip || active) for (const k of ['position', 'color', 'size', 'alpha', 'vel']) chipPts.geometry.attributes[k].needsUpdate = true;
   }
 
   return {
