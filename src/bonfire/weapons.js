@@ -25,6 +25,8 @@
 import * as THREE from 'three';
 import { createForgeFx, weaponSilhouette, profileAt } from './forgeFx.js';
 import { createRoutine } from './bladeMotion.js';
+import { createForgeParticles, HELIX_TURNS, helixWide } from './forgeParticles.js';
+import { smoothstep } from '../math.js';
 
 const DISSOLVE_CHUNK = /* glsl */ `
   float wBayer2(vec2 a) { a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
@@ -81,7 +83,6 @@ const ease = {
   outCubic: (t) => 1 - (1 - t) ** 3,
   inOut: (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2),
 };
-const smooth = (a, b, x) => { const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
 /** Mesh → weapon-root transforms, in the root's own space (the root has no parent yet). */
 function rootTransforms(root) {
@@ -184,29 +185,8 @@ export function createWeapons(gltfRoot, {
     holder.add(obj);
   }
 
-  // --- forge particles (the soul of the old weapon becoming the new one) ----------
-  const M = Math.max(1, N);
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(M * 3), 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(M * 3), 3));
-  geo.setAttribute('size', new THREE.BufferAttribute(new Float32Array(M), 1));
-  geo.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(M), 1));
-  const forge = new THREE.Points(geo, particleMaterial);
-  forge.frustumCulled = false;
-  forge.layers.set(layerFx);
-  const FP = geo.attributes.position.array;
-  const FC = geo.attributes.color.array;
-  const FS = geo.attributes.size.array;
-  const FA = geo.attributes.alpha.array;
-  const FV = new Float32Array(M * 3);
-  const release = new Float32Array(M); // when the dissolving edge sheds it
-  const fadeAt = new Float32Array(M);  // uDissolve at which the forming edge reaches its target
-  const born = new Float32Array(M);
-  const state = new Uint8Array(M);     // 0 idle, 1 free, 2 absorbed
-  const heat = new Float32Array(M);    // flicker phase
-  const grain = new Float32Array(M);   // base size: many fine specks, some mid, rare wisps
-  const hAng = new Float32Array(M);    // helix: strand angle + jitter
-  const hRad = new Float32Array(M);    // helix: radial jitter (strand thickness)
+  // --- forge particles (forgeParticles.js): the soul of the old weapon becoming the new one
+  const forge = createForgeParticles({ count: N, material: particleMaterial, layer: layerFx, field, anchor });
 
   // --- forge lines: the double helix, then the silhouette burst ---------------------
   const fx = N ? createForgeFx(particleMaterial, field.noise) : null;
@@ -249,11 +229,6 @@ export function createWeapons(gltfRoot, {
     obj.rotation.set(0, (Math.random() < 0.5 ? 0 : Math.PI) + (Math.random() * 2 - 1) * 0.85, 0);
   }
 
-  function clearForge() {
-    FS.fill(0);
-    state.fill(2);
-    geo.attributes.size.needsUpdate = true;
-  }
   function clearLines() {
     burstT = -1;
     fx?.clear();
@@ -274,7 +249,6 @@ export function createWeapons(gltfRoot, {
     if (!Object.hasOwn(items, key)) throw new Error('Unknown weapon: ' + key);
     cancel();
     phase = 'idle';
-    clearForge();
     show(key);
   }
 
@@ -297,10 +271,8 @@ export function createWeapons(gltfRoot, {
     phase = 'idle';
     pace = 1;
     holding = false;
-    auraOn = false;
-    flingT = -1;
     endSwing();
-    clearForge();
+    forge.clear();
     clearLines();
   }
   // `pace` plays the whole choreography faster or slower (the visualizer fits it to a
@@ -324,8 +296,7 @@ export function createWeapons(gltfRoot, {
     holding = hold;
     quiver = 0;
     if (current) current.rotation.z = 0;
-    auraOn = false;
-    flingT = -1; // the forge particles are needed again
+    forge.clear(); // (they're needed again, even mid-fling)
     if (current && current.userData.key === key) {
       // The geometry can stay put while the scene applies a new flame or item.
       hooks.onImpact?.(payload, key, true);
@@ -350,230 +321,32 @@ export function createWeapons(gltfRoot, {
     elapsed = 0;
     clearLines();
     if (current) setLayer(current, layerGhost);
-    const hOld = current?.userData.heights;
-    const hNew = incoming.userData.heights;
-    for (let i = 0; i < N; i++) {
-      state[i] = 0;
-      const u = edgeAt(hOld ? hOld[i] : Math.random(), (Math.random() - 0.5) * 0.4);
-      release[i] = D.dissolve * (0.08 + 0.92 * u);
-      fadeAt[i] = edgeAt(hNew[i], (Math.random() - 0.5) * 0.4);
-      heat[i] = Math.random();
-      const g = Math.random();
-      grain[i] = g < 0.6 ? 0.72 : g < 0.9 ? 1.25 : 1.85;
-      hAng[i] = (i & 1) * Math.PI + (Math.random() - 0.5) * 0.35;
-      hRad[i] = (Math.random() - 0.5) * 0.08;
-      FS[i] = 0;
-    }
+    forge.begin(current?.userData.heights, incoming.userData.heights, D.dissolve, edgeAt);
     helixSpin = Math.random() * Math.PI * 2;
     hooks.onSwapStart?.(payload);
     return new Promise((r) => { resolveSwap = r; });
   }
 
-  const vA = new THREE.Vector3();
-  const vH = new THREE.Vector3();
-  const vT = new THREE.Vector3();
-  const col = new THREE.Color();
-  const HELIX_TURNS = 1.5;
-  const helixWide = (s) => 0.19 + 0.15 * Math.sin(Math.PI * s); // the particle helix: a spindle, widest mid-blade
-  let helixSpin = 0;
-
-  function worldSample(obj, i, out) {
-    const s = obj.userData.samples;
-    return out.set(s[i * 3], s[i * 3 + 1], s[i * 3 + 2]).applyMatrix4(obj.matrixWorld);
-  }
-
-  /** Particle i's slot on the double helix around the new weapon's axis (world). */
-  function helixSlot(i, shrink, out) {
-    const span = incoming.userData.uniforms.uSpan.value;
-    const s = incoming.userData.heights[i];
-    const len = span.y - span.x;
-    const a = hAng[i] + s * HELIX_TURNS * Math.PI * 2 + helixSpin;
-    const r = (helixWide(s) + hRad[i]) * (1 - shrink);
-    return out.set(Math.cos(a) * r, span.x + s * len, Math.sin(a) * r).applyMatrix4(incoming.matrixWorld);
-  }
-
-  // Forge particles: shed by the old weapon's dissolving edge, they drift out a
-  // little, then a rotating double helix around the new weapon's axis takes them
-  // over (each particle keeps its target's height, so the helix spans the blade).
-  // In the gather the helix tightens and spins faster as it collapses onto the new
-  // weapon's surface; in the form each particle dither-fades as the forming edge
-  // reaches it. Curl noise from the bonfire keeps a shimmer on all of it.
-  // Size and transparency follow the fire's own simplex noise where each particle
-  // is (coherent pockets, not per-particle static): hot flickers are small and
-  // solid, cooler wisps larger and fainter.
+  let helixSpin = 0; // the forge helix's turn (the particles and the lines share it)
+  /** A step of the forge particles through the dissolve, swirl, gather and form. */
   function stepForge(dt) {
-    if (!N) return;
     holder.updateMatrixWorld(true);
     const k = phase === 'gather' ? Math.min(1, t / D.gather) : phase === 'form' ? 1 : 0;
-    const formU = phase === 'form' ? incoming.userData.uniforms.uDissolve.value : 1;
-    const p = Math.min(1, elapsed / FORGE);
-    const blend = p * p * (3 - 2 * p); // current color → next color
-    const shrink = 0.85 * smooth(0, 1, k);
     helixSpin += dt * 3.2 * (1 + 2.2 * k);
-    const onSurface = smooth(0.25, 1, k);
-    const rate = phase === 'gather' || phase === 'form' ? 4 + 14 * k * k : 5;
-    const shimmer = 0.015 + 0.04 * (1 - k);
-    for (let i = 0; i < N; i++) {
-      const ix = i * 3;
-      if (state[i] === 0) {
-        if (phase === 'dissolve' && t >= release[i] && current) {
-          worldSample(current, i, vA);
-          FP[ix] = vA.x; FP[ix + 1] = vA.y; FP[ix + 2] = vA.z;
-          FV[ix] = (Math.random() - 0.5) * 0.5;
-          FV[ix + 1] = 0.2 + Math.random() * 0.3;
-          FV[ix + 2] = (Math.random() - 0.5) * 0.5;
-          born[i] = totalT;
-          state[i] = 1;
-        } else { FS[i] = 0; continue; }
-      }
-      if (state[i] === 2) { FS[i] = 0; continue; }
-      const fade = phase === 'form' ? smooth(fadeAt[i] - 0.06, fadeAt[i] + 0.1, formU) : 1;
-      if (fade <= 0.01) { state[i] = 2; FS[i] = 0; continue; }
-      const c = field.fire(FP[ix] - anchor.x, FP[ix + 1], FP[ix + 2] - anchor.z, totalT);
-      // A subtle drift from where it was shed...
-      const drag = Math.exp(-dt * 2.2);
-      FV[ix] = (FV[ix] + c.x * 0.5 * dt) * drag;
-      FV[ix + 1] = (FV[ix + 1] + c.y * 0.3 * dt) * drag;
-      FV[ix + 2] = (FV[ix + 2] + c.z * 0.5 * dt) * drag;
-      FP[ix] += FV[ix] * dt; FP[ix + 1] += FV[ix + 1] * dt; FP[ix + 2] += FV[ix + 2] * dt;
-      // ...until the helix takes it (fully by ~0.65 s after it was shed), collapsing
-      // onto the new weapon's surface through the gather.
-      helixSlot(i, shrink, vH);
-      if (onSurface > 0) vH.lerp(worldSample(incoming, i, vT), onSurface);
-      vH.x += c.x * shimmer; vH.y += c.y * shimmer; vH.z += c.z * shimmer;
-      const grip = k > 0 ? 1 : smooth(0.12, 0.65, totalT - born[i]);
-      const pull = (1 - Math.exp(-dt * rate)) * grip;
-      FP[ix] += (vH.x - FP[ix]) * pull;
-      FP[ix + 1] += (vH.y - FP[ix + 1]) * pull;
-      FP[ix + 2] += (vH.z - FP[ix + 2]) * pull;
-      // Vibrant, flickering flame colors turning from the current flame to the next:
-      // mostly the saturated body tone, with bright flickers.
-      const flick = (Math.sin(totalT * 23 + heat[i] * 40) + 1) * 0.5;
-      const hot = flick > 0.72;
-      col.copy(rampOld[hot ? 2 : 1]).lerp(rampNew[hot ? 2 : 1], blend).multiplyScalar(0.75 + flick * 0.25);
-      FC[ix] = col.r; FC[ix + 1] = col.g; FC[ix + 2] = col.b;
-
-      const age = totalT - born[i];
-      const pocket = 0.5 + 0.5 * field.noise.noise3d(FP[ix] * 2.8, FP[ix + 1] * 2.8 - totalT * 1.1, FP[ix + 2] * 2.8 + heat[i] * 5);
-      // Blooms as it's shed, tightens to fine points as the silhouette gathers.
-      let size = grain[i] * (0.7 + 0.6 * pocket) * Math.min(1, 0.4 + age * 2.5) * (1 - 0.35 * k) * (0.75 + 0.25 * fade);
-      let alpha = (0.35 + 0.65 * pocket) * Math.min(1, age * 6) * (0.75 + 0.25 * k);
-      if (hot) { size *= 0.75; alpha = Math.max(alpha, 0.9); }
-      FS[i] = size;
-      FA[i] = alpha * fade;
-    }
-    geo.attributes.position.needsUpdate = true;
-    geo.attributes.color.needsUpdate = true;
-    geo.attributes.size.needsUpdate = true;
-    geo.attributes.alpha.needsUpdate = true;
+    const p = Math.min(1, elapsed / FORGE);
+    forge.step(dt, {
+      shedUntil: phase === 'dissolve' ? t : -1,
+      gather: k,
+      forming: phase === 'form',
+      formU: phase === 'form' ? incoming.userData.uniforms.uDissolve.value : 1,
+      pulling: phase === 'gather' || phase === 'form',
+      blend: p * p * (3 - 2 * p), // current color → next color
+      spin: helixSpin, from: current, to: incoming, time: totalT, colorsFrom: rampOld, colorsTo: rampNew,
+    });
   }
 
-  // The aura (the visualizer): while a formed weapon is held over the fire waiting for
-  // the drop, the forge particles become a vortex around it: three strands winding up
-  // the blade and turning together (a structure reads at pixel scale where a cloud
-  // wouldn't), with sparks falling in from further out, as if it's drawing the fire's
-  // energy in. `charge` tightens and speeds it; a beat pushes it out for a moment. On
-  // release the whole vortex is flung outward as the blade strikes.
-  let auraOn = false;
-  let auraKick = 0;
-  let flingT = -1;
-  const auraS = new Float32Array(M);   // height along the blade, 0..1
-  const auraR = new Float32Array(M);   // radius
-  let auraSpin = 0;
-  let auraElement = 'fire'; // the element the held blade will strike with: the vortex takes after it
-  const AURA_TURNS = 2.2;
-  const infalling = (i) => i % 4 === 0;
-  function startAura() {
-    auraOn = true;
-    for (let i = 0; i < N; i++) {
-      auraS[i] = Math.random();
-      auraR[i] = infalling(i) ? 0.35 + Math.random() * 0.4 : 0.1 + Math.random() * 0.05;
-      // Orbiters: which of the three strands (plus a little spread); infallers: anywhere.
-      hAng[i] = infalling(i) ? Math.random() * Math.PI * 2 : ((i % 3) * Math.PI * 2) / 3 + (Math.random() - 0.5) * 0.4;
-      heat[i] = Math.random();
-      born[i] = totalT - Math.random();
-      state[i] = 1;
-    }
-  }
-  function stepAura(dt) {
-    if (!N || !incoming) return;
-    holder.updateMatrixWorld(true);
-    const span = incoming.userData.uniforms.uSpan.value;
-    const len = span.y - span.x;
-    auraKick *= Math.exp(-dt / 0.16);
-    const c0 = charge;
-    const zap = auraElement === 'lightning';
-    const ice = auraElement === 'ice';
-    auraSpin += dt * (2 + 6 * c0 + 10 * auraKick) * (ice ? 0.45 : 1);
-    for (let i = 0; i < N; i++) {
-      const ix = i * 3;
-      const infall = infalling(i);
-      if (infall) {
-        // Falling in from further out, faster the harder it charges.
-        auraR[i] -= dt * (0.12 + 0.5 * c0) * (0.5 + heat[i]);
-        auraS[i] += (0.5 - auraS[i]) * dt * 0.3;
-        if (auraR[i] < 0.04) { auraR[i] = 0.4 + Math.random() * 0.4; auraS[i] = Math.random(); born[i] = totalT; }
-      } else {
-        // Spiraling up the blade from the point, starting over when it reaches the top.
-        auraS[i] += dt * (0.12 + 0.45 * c0) * (0.6 + heat[i] * 0.8);
-        if (auraS[i] > 1) { auraS[i] -= 1; born[i] = totalT; }
-      }
-      if (infall) hAng[i] += (dt * (1.5 + 4 * c0)) / Math.max(0.3, auraR[i] * 6);
-      const s = auraS[i];
-      const a = infall ? hAng[i] : hAng[i] + s * AURA_TURNS * Math.PI * 2 + auraSpin;
-      let r = (infall ? auraR[i] : auraR[i] * (1 - 0.35 * c0) * (0.75 + 0.45 * Math.sin(Math.PI * s))) + auraKick * (infall ? 0.05 : 0.2);
-      if (zap) r += (Math.random() - 0.5) * 0.05; // lightning: the strands crackle
-      vH.set(Math.cos(a) * r, span.x + s * len + (zap ? (Math.random() - 0.5) * 0.03 : 0), Math.sin(a) * r).applyMatrix4(incoming.matrixWorld);
-      const c = field.fire(vH.x - anchor.x, vH.y, vH.z - anchor.z, totalT);
-      FP[ix] = vH.x + c.x * 0.03; FP[ix + 1] = vH.y + c.y * 0.03; FP[ix + 2] = vH.z + c.z * 0.03;
-      const flick = (Math.sin(totalT * 23 + heat[i] * 40) + 1) * 0.5;
-      const hot = flick > 0.7 || auraKick > 0.5 * heat[i] + 0.3;
-      // Fire: flickering body and bright tones. Lightning: white-hot, blinking. Frost: pale glints.
-      const tone = zap ? (hot || flick > 0.4 ? 3 : 2) : ice ? (flick > 0.8 ? 3 : 2) : hot ? 3 : flick > 0.35 ? 2 : 1;
-      col.copy(rampNew[tone]).multiplyScalar((ice ? 0.45 + 0.4 * flick : 0.6 + 0.4 * flick) + 0.4 * auraKick);
-      FC[ix] = col.r; FC[ix + 1] = col.g; FC[ix + 2] = col.b;
-      const ends = Math.min(1, s * 6, (1 - s) * 5) * Math.min(1, (totalT - born[i]) * 4);
-      FS[i] = zap && Math.random() < 0.3 ? 0 : grain[i] * (hot ? 0.8 : 1.1) * (1 + auraKick * 0.6) * (ice && flick > 0.8 ? 1.4 : 1);
-      FA[i] = (0.45 + 0.55 * flick) * (infall ? 0.7 : 1) * Math.max(0, ends);
-    }
-    geo.attributes.position.needsUpdate = true;
-    geo.attributes.color.needsUpdate = true;
-    geo.attributes.size.needsUpdate = true;
-    geo.attributes.alpha.needsUpdate = true;
-  }
-  // Release: every aura particle flies outward from the blade and burns out.
-  function startFling() {
-    auraOn = false;
-    flingT = 0;
-    holder.updateMatrixWorld(true);
-    const frame = (incoming ?? holder).matrixWorld;
-    const axis = vT.set(0, 1, 0).transformDirection(frame);
-    const center = vA.setFromMatrixPosition(frame);
-    for (let i = 0; i < N; i++) {
-      const ix = i * 3;
-      vH.set(FP[ix] - center.x, FP[ix + 1] - center.y, FP[ix + 2] - center.z);
-      vH.addScaledVector(axis, -vH.dot(axis)); // away from the blade's axis
-      if (vH.lengthSq() < 1e-6) vH.set(Math.random() - 0.5, 0, Math.random() - 0.5);
-      vH.normalize().multiplyScalar(1.6 + Math.random() * 2.6);
-      FV[ix] = vH.x; FV[ix + 1] = vH.y + (Math.random() - 0.2) * 1.2; FV[ix + 2] = vH.z;
-    }
-  }
-  function stepFling(dt) {
-    flingT += dt;
-    const k = flingT / 0.7;
-    if (k >= 1 || !N) { flingT = -1; FS.fill(0); geo.attributes.size.needsUpdate = true; return; }
-    const drag = Math.exp(-dt * 3);
-    for (let i = 0; i < N; i++) {
-      const ix = i * 3;
-      FV[ix] *= drag; FV[ix + 1] = FV[ix + 1] * drag - dt * 1.5; FV[ix + 2] *= drag;
-      FP[ix] += FV[ix] * dt; FP[ix + 1] += FV[ix + 1] * dt; FP[ix + 2] += FV[ix + 2] * dt;
-      FA[i] = (1 - k) * (0.5 + 0.5 * heat[i]);
-      FS[i] = grain[i] * (1.3 - 0.5 * k);
-    }
-    geo.attributes.position.needsUpdate = true;
-    geo.attributes.size.needsUpdate = true;
-    geo.attributes.alpha.needsUpdate = true;
-  }
+  let auraKick = 0; // a beat's push on a held weapon's aura (and its glow and lines)
+  let auraElement = 'fire'; // the element the held blade will strike with: the aura takes after it
 
   // The double helix: from the moment the particles' color has swapped, two lines
   // trace the particle helix around the new weapon, one growing from the point up
@@ -597,17 +370,17 @@ export function createWeapons(gltfRoot, {
   // The lines fade through the hold, unless the weapon is held: then they come back
   // and pulse with the beat and the build-up.
   const heldLineAlpha = () => Math.max(1 - Math.min(1, t / D.hold),
-    holding ? (0.3 + 0.4 * charge + 0.5 * auraKick) * smooth(D.hold, D.hold + 0.8, t) : 0);
+    holding ? (0.3 + 0.4 * charge + 0.5 * auraKick) * smoothstep(D.hold, D.hold + 0.8, t) : 0);
   const lineRZ = (s) => closeIn(lineProfile.rz, s);
   function stepLines(dt) {
     if (!fx) return;
     fx.begin();
     if (incoming && (phase === 'dissolve' || phase === 'swirl' || phase === 'gather' || phase === 'form' || phase === 'hold')) {
-      const growth = smooth(0, 1, (elapsed - TURNED) / (FORMED - TURNED));
+      const growth = smoothstep(0, 1, (elapsed - TURNED) / (FORMED - TURNED));
       if (growth > 0) {
         if (phase === 'hold') helixSpin += dt * (holding ? 4 + 9 * charge + 20 * auraKick : 10);
         lineProfile = incoming.userData.silhouette.profile;
-        tighten = smooth(0.2, 1, (elapsed - TIGHTEN_FROM) / (FORMED - TIGHTEN_FROM));
+        tighten = smoothstep(0.2, 1, (elapsed - TIGHTEN_FROM) / (FORMED - TIGHTEN_FROM));
         lineLead.copy(rampNew[2]);
         lineTrail.copy(rampNew[1]).multiplyScalar(0.65);
         lineHot.copy(rampNew[3]);
@@ -644,7 +417,7 @@ export function createWeapons(gltfRoot, {
   let alive = true; // (the visualizer) the blade moves as if alive: it shudders, sways, trembles
   function update(dt) {
     totalT += dt;
-    if (flingT >= 0) stepFling(dt);
+    forge.stepFling(dt);
     // A beat's glow on the planted weapon (the visualizer).
     if (glowKick > 0.005) {
       glowKick *= Math.exp(-dt / 0.2);
@@ -689,12 +462,12 @@ export function createWeapons(gltfRoot, {
       const k = Math.min(1, t / D.form);
       const u = incoming.userData.uniforms;
       u.uDissolve.value = 1 - ease.inOut(k);
-      u.uGlow.value = smooth(0.55, 1, k);
+      u.uGlow.value = smoothstep(0.55, 1, k);
       stepForge(dt);
       if (k >= 1) {
         u.uDissolve.value = 0;
         u.uGlow.value = 1;
-        clearForge();
+        forge.clear();
         if (fx) { burstT = 0; burstSil = incoming.userData.silhouette; burstMatrix.copy(incoming.matrixWorld); }
         hooks.onFormed?.(swapPayload);
         next('hold', t - D.form);
@@ -705,17 +478,22 @@ export function createWeapons(gltfRoot, {
       const bob = holding && !reducedMotion ? Math.sin((t - D.hold) * 2.4) * 0.012 * k : 0;
       if (!reducedMotion) incoming.position.y = HOVER + ease.outCubic(k) * 0.06 + bob;
       incoming.userData.uniforms.uGlow.value = 1 + 0.6 * (1 - k) ** 2 + (holding ? (0.5 * charge + 0.6 * auraKick) * k : 0); // the flash as it forms, settling to the glow
-      if (holding && t >= D.hold * 0.5) { if (!auraOn) startAura(); stepAura(dt); }
+      if (holding && t >= D.hold * 0.5) {
+        if (!forge.aura) forge.startAura(totalT);
+        holder.updateMatrixWorld(true);
+        auraKick *= Math.exp(-dt / 0.16);
+        forge.stepAura(dt, { blade: incoming, time: totalT, charge, kick: auraKick, element: auraElement, colors: rampNew });
+      }
       // Alive (the visualizer): it sways and turns as if looking about, and trembles harder
       // as the build rises, straining to strike.
       if (holding && alive && !reducedMotion) {
-        const on = smooth(D.hold, D.hold + 1.5, t);
+        const on = smoothstep(D.hold, D.hold + 1.5, t);
         const tremble = (0.003 + 0.03 * charge * charge) * on;
         incoming.rotation.x = Math.sin(totalT * 0.9) * 0.05 * on + Math.sin(totalT * 71) * tremble;
         incoming.rotation.z = Math.sin(totalT * 0.7 + 1.3) * 0.06 * on + Math.sin(totalT * 83 + 2) * tremble;
       }
       if (t >= D.hold && !holding) {
-        if (auraOn) startFling();
+        if (forge.aura) { holder.updateMatrixWorld(true); forge.fling(incoming.matrixWorld); }
         next('stab', Math.min(t - D.hold, 0.05)); // (a released hold starts the strike fresh)
       }
     } else if (phase === 'stab') {
@@ -753,7 +531,6 @@ export function createWeapons(gltfRoot, {
     }
   }
 
-
   // --- The living blade (the visualizer) ----------------------------------------------
   // The planted weapon pulls itself out of the fire and fights on its own: a routine of
   // slashes, thrusts and spins on the beat (bladeMotion.js), then it plunges back in.
@@ -764,7 +541,11 @@ export function createWeapons(gltfRoot, {
   let swingPlan = null;
   let hitIndex = 0;
   const restPos = new THREE.Vector3();
-  const restQuat = new THREE.Quaternion();
+  // The planted rotation, kept as the Euler angles spin() set: the shudder and the settle
+  // write rotation.z, which is only a wobble while x and z are 0. (Restoring the
+  // quaternion instead lets three.js re-derive the angles, and for a blade turned more
+  // than 90° it can come back as (π, π − y, π): writing z then plants it upside down.)
+  const restRot = new THREE.Euler();
   const gripL = new THREE.Vector3();
   const tipL = new THREE.Vector3();
   const sP = new THREE.Vector3();
@@ -788,7 +569,7 @@ export function createWeapons(gltfRoot, {
 
   /**
    * Start a routine. plan: { hits: [s, …] and plunge (s from now), basis: () => the camera's
-   * { right, up, toCam, pos }, moves, alive, onMove(k, kind), onHit(k, kind) }.
+   * { right, up, toCam, pos }, moves, alive, onMove(k, kind), onHit(k, kind), rng }.
    */
   function swing(plan) {
     if (phase !== 'idle' || !current || reducedMotion || !plan.hits.length) return false;
@@ -797,14 +578,14 @@ export function createWeapons(gltfRoot, {
     current.rotation.z = 0;
     current.updateMatrixWorld(true);
     restPos.copy(current.position);
-    restQuat.copy(current.quaternion);
+    restRot.copy(current.rotation);
     holder.updateMatrixWorld(true);
     const center = holder.getWorldPosition(new THREE.Vector3());
     center.y = Math.max(1.05, 0.35 + 0.6 * len);
     routine = createRoutine({
       blade: { grip: gripL, tip: tipL, len },
       home: { pos: current.getWorldPosition(new THREE.Vector3()), quat: current.getWorldQuaternion(new THREE.Quaternion()) },
-      center, basis: plan.basis, hits: plan.hits, plunge: plan.plunge, moves: plan.moves, alive: plan.alive ?? alive, onMove: plan.onMove,
+      center, basis: plan.basis, hits: plan.hits, plunge: plan.plunge, moves: plan.moves, alive: plan.alive ?? alive, onMove: plan.onMove, rng: plan.rng,
     });
     swingPlan = plan;
     hitIndex = 0;
@@ -841,7 +622,7 @@ export function createWeapons(gltfRoot, {
     lastTip.copy(nowTip);
     if (t >= routine.end) {
       current.position.copy(restPos);
-      current.quaternion.copy(restQuat);
+      current.rotation.copy(restRot);
       routine = null;
       swingPlan = null;
       next('settle');
@@ -851,7 +632,7 @@ export function createWeapons(gltfRoot, {
   function endSwing() {
     if (!routine || !current) return;
     current.position.copy(restPos);
-    current.quaternion.copy(restQuat);
+    current.rotation.copy(restRot);
     current.userData.uniforms.uGlow.value = 0;
     routine = null;
     swingPlan = null;
@@ -885,7 +666,7 @@ export function createWeapons(gltfRoot, {
 
   return {
     holder,
-    forge,
+    forge: forge.points,
     lines: fx?.lines ?? null,
     set,
     swap,
@@ -924,6 +705,8 @@ export function createWeapons(gltfRoot, {
       return true;
     },
     get currentKey() { return current?.userData.key ?? null; },
+    /** A weapon is moving this frame (so its shadow needs redrawing). */
+    get moving() { return phase !== 'idle' || quiver > 0.002; },
     keys: Object.keys(items),
     get busy() { return phase !== 'idle'; },
     get holding() { return holding; },

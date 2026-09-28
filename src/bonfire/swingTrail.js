@@ -1,4 +1,4 @@
-// The trail a swinging blade leaves (the visualizer's sword combos), in the bonfire's
+// The trail a swinging blade leaves (the visualizer's living blade), in the bonfire's
 // element and colors.
 //
 //   particles  shed along the swept blade each frame (more toward the tip, more the
@@ -11,23 +11,23 @@
 //                frost      pale glints that drift down and twinkle as they fall.
 //   arc        a glowing ribbon along the tip's last fifth of a second, widest and hottest
 //              at the blade, so each slash draws a crescent. Fire and frost add a fainter
-//              band halfway up the blade; frost's is thinner and pale. Lightning's is just
-//              the bolt: jagged, re-striking every frame, with branches crackling between
-//              points along the path the tip just drew.
+//              band halfway up the blade; frost's is thinner and pale.
+//   lightning  the whole blade is electric: a bolt re-strikes along it every frame, from
+//              the guard to the point, with small arcs leaping off near the tip. Its slash
+//              leaves a sheet of lightning: jagged trails from five points along the
+//              blade, and bolts crackling across them, all strongest at the tip and fading
+//              toward the guard (fainter, thinner and shorter-lived the nearer the hilt).
 //   hits       each move's hit throws a spray off the point, along the blade's motion.
 import * as THREE from 'three';
 import { createBoltLines, seeded } from './bolts.js';
+import { createPoints, rampColors, setRampColors } from './points.js';
 
 const HISTORY = 24;
 
 export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotion = false }) {
   const N = reducedMotion ? 1 : count;
-  const geo = new THREE.BufferGeometry();
-  for (const [name, size] of [['position', 3], ['color', 3], ['size', 1], ['alpha', 1]]) {
-    geo.setAttribute(name, new THREE.BufferAttribute(new Float32Array(N * size), size));
-  }
-  const points = new THREE.Points(geo, fxMaterial);
-  points.frustumCulled = false;
+  const points = createPoints(N, fxMaterial);
+  const geo = points.geometry;
   const P = geo.attributes.position.array;
   const C = geo.attributes.color.array;
   const S = geo.attributes.size.array;
@@ -40,15 +40,16 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
   let next = 0;
   let live = 0;
 
-  const arcs = createBoltLines(fxMaterial, HISTORY * 4, HISTORY * 4 + 8); // two arcs, two segments per step
+  // Lightning's sheet: five trails of up to four segments a step, plus the bolts.
+  const arcs = createBoltLines(fxMaterial, HISTORY * 20 + 96, HISTORY * 8 + 48);
   const rng = seeded(7);
-  // The tip's recent path (and a point halfway up the blade): [x, y, z, time].
-  const tipHist = [];
-  const midHist = [];
+  // The blade's recent path: [grip x, y, z, tip x, y, z, time]. A point partway up the
+  // blade (0 at the grip, 1 at the point) is read off it.
+  const hist = [];
   let clock = 0;
   let element = 'fire';
 
-  let ramp = [new THREE.Color(), new THREE.Color(), new THREE.Color(), new THREE.Color()];
+  const ramp = rampColors(['#000000', '#000000', '#000000', '#000000']);
   const tmp = new THREE.Color();
   const sampleRamp = (h, out) => {
     const x = Math.min(0.999, Math.max(0, h)) * 3;
@@ -105,21 +106,27 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
       grain[i] = g < 0.6 ? 1 : g < 0.9 ? 1.5 : 2.2;
     }
     live = Math.max(live, n);
-    tipHist.push([t1.x, t1.y, t1.z, clock]);
-    midHist.push([g1.x + (t1.x - g1.x) * 0.55, g1.y + (t1.y - g1.y) * 0.55, g1.z + (t1.z - g1.z) * 0.55, clock]);
-    if (tipHist.length > HISTORY) { tipHist.shift(); midHist.shift(); }
+    hist.push([g1.x, g1.y, g1.z, t1.x, t1.y, t1.z, clock]);
+    if (hist.length > HISTORY) hist.shift();
   }
 
-  function drawArc(hist, width, alpha, hot) {
-    const keep = element === 'lightning' ? 0.14 : 0.2;
+  /** The point `s` of the way from the grip to the tip in history entry h. */
+  const along = (h, s, out) => out.set(h[0] + (h[3] - h[0]) * s, h[1] + (h[4] - h[1]) * s, h[2] + (h[5] - h[2]) * s);
+  const pa = new THREE.Vector3();
+  const pb = new THREE.Vector3();
+  const toEye = new THREE.Vector3(); // (the blade's own lightning is drawn a little toward the camera, over the blade)
+  const side = new THREE.Vector3();
+
+  /** The trail of the point `s` up the blade over the last `keep` seconds. */
+  function drawArc(s, width, alpha, hot, keep) {
     const zap = element === 'lightning';
     for (let j = hist.length - 1; j > 0; j--) {
-      const a = hist[j];
-      const b = hist[j - 1];
-      const ka = (clock - a[3]) / keep;
-      const kb = (clock - b[3]) / keep;
+      const ka = (clock - hist[j][6]) / keep;
+      const kb = (clock - hist[j - 1][6]) / keep;
       if (kb >= 1) break;
-      arcs.bolt(a[0], a[1], a[2], b[0], b[1], b[2], {
+      along(hist[j], s, pa);
+      along(hist[j - 1], s, pb);
+      arcs.bolt(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, {
         rng, depth: zap ? 2 : 1, jag: zap ? 0.35 : 0,
         color: (t, out) => sampleRamp(hot - (ka + (kb - ka) * t) * 0.8, out),
         alpha: (t) => alpha * Math.max(0, 1 - (ka + (kb - ka) * t)),
@@ -129,7 +136,55 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
     }
   }
 
-  function step(dt, t) {
+  // Lightning: points up the blade the sheet is drawn from, guard to tip.
+  const SHEET = [0.25, 0.45, 0.65, 0.83, 1];
+  /** The electric blade and its sheet of lightning, strongest at the tip. `eye`: the camera's position. */
+  function drawLightning(eye) {
+    const now = hist.at(-1);
+    along(now, 0.5, pa);
+    if (eye) toEye.copy(eye).sub(pa).setLength(0.05); else toEye.set(0, 0, 0);
+    // Bolts running up both edges of the blade (just outside them, as seen from the
+    // camera), re-striking each frame, brighter and wider toward the point.
+    side.set(now[3] - now[0], now[4] - now[1], now[5] - now[2]).cross(toEye);
+    if (side.lengthSq() > 1e-8) side.setLength(0.05);
+    for (const k of [1, -1]) {
+      if (k < 0 && Math.random() < 0.4) continue; // (the far edge flickers)
+      along(now, 0.1, pa).add(toEye).addScaledVector(side, k * 0.6);
+      along(now, 1, pb).add(toEye).addScaledVector(side, k * 0.2);
+      arcs.bolt(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, {
+        rng, depth: 4, jag: 0.08, heat: 1.3,
+        color: (t, out) => sampleRamp(0.5 + 0.45 * t, out),
+        alpha: (t) => (0.25 + 0.75 * t) * (k > 0 ? 1 : 0.7),
+        width: (t) => 1 + 1.4 * t * t,
+      });
+    }
+    // Small arcs leaping off the blade near the point.
+    for (let k = 0; k < 2; k++) {
+      if (Math.random() < 0.4) continue;
+      const s = 0.55 + 0.45 * Math.random();
+      along(now, s, pa).add(toEye);
+      pb.set(pa.x + (Math.random() - 0.5) * 0.22 * s, pa.y + (Math.random() - 0.5) * 0.22 * s, pa.z + (Math.random() - 0.5) * 0.22 * s);
+      arcs.bolt(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, { rng, depth: 2, jag: 0.5, width: 1, heat: 1.2, color: (t, out) => sampleRamp(0.95, out), alpha: (t) => s * (1 - t) });
+    }
+    // The sheet: trails from points up the blade, fainter, thinner and shorter-lived toward the guard.
+    for (const s of SHEET) drawArc(s, 3 * s * s, s ** 1.6, 0.6 + 0.4 * s, 0.07 + 0.09 * s);
+    // Bolts crackling across the sheet, from near the point toward the guard, fading as they go.
+    if (hist.length > 3) {
+      for (let k = 0; k < 2; k++) {
+        if (Math.random() < 0.35) continue;
+        const h = hist[hist.length - 1 - Math.floor(Math.random() * Math.min(5, hist.length))];
+        along(h, 0.9 + 0.1 * Math.random(), pa);
+        along(h, 0.2 + 0.35 * Math.random(), pb);
+        arcs.bolt(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, {
+          rng, depth: 3, jag: 0.4, width: 1, heat: 1.2,
+          color: (t, out) => sampleRamp(0.95 - 0.35 * t, out), alpha: (t) => 0.9 * (1 - 0.8 * t),
+        });
+      }
+    }
+  }
+
+  /** `eye` (optional): the camera's position, so the blade's own lightning draws over it. */
+  function step(dt, t, eye) {
     clock += dt;
     // Embers: rise and curl through the fire's field, cooling.
     if (live) {
@@ -183,20 +238,13 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
     }
     // The arcs.
     arcs.begin();
-    if (tipHist.length > 1 && clock - tipHist.at(-1)[3] < 0.25) {
-      const ice = element === 'ice';
-      const zap = element === 'lightning';
-      if (!zap) drawArc(midHist, 1.5, 0.45, ice ? 0.95 : 0.7);
-      drawArc(tipHist, ice ? 2.5 : zap ? 3 : 4, 1, 1);
-      if (zap && tipHist.length > 4 && Math.random() < 0.6) {
-        // A branch crackling between two points of the path the tip just drew.
-        const n = Math.min(8, tipHist.length);
-        const p = tipHist[tipHist.length - 1 - Math.floor(Math.random() * 2)];
-        const q = tipHist[tipHist.length - 3 - Math.floor(Math.random() * (n - 3))];
-        arcs.bolt(p[0], p[1], p[2], q[0], q[1], q[2], {
-          rng, depth: 3, jag: 0.5, width: 1, heat: 1.2,
-          color: (u, out) => sampleRamp(0.95 - 0.3 * u, out), alpha: 0.85,
-        });
+    if (hist.length > 1 && clock - hist.at(-1)[6] < 0.25) {
+      if (element === 'lightning') {
+        if (clock - hist.at(-1)[6] < 0.05) drawLightning(eye);
+      } else {
+        const ice = element === 'ice';
+        drawArc(0.55, 1.5, 0.45, ice ? 0.95 : 0.7, 0.2);
+        drawArc(1, ice ? 2.5 : 4, 1, 1, 0.2);
       }
     }
     arcs.end();
@@ -230,15 +278,14 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
     emit,
     step,
     hit,
-    setRamp(hexes) { ramp = hexes.map((h) => new THREE.Color(h)); },
+    setRamp(hexes) { setRampColors(ramp, hexes); },
     /** fire | lightning | ice */
     setElement(key) { element = key; },
     clear() {
       age.fill(1e3);
       S.fill(0);
       geo.attributes.size.needsUpdate = true;
-      tipHist.length = 0;
-      midHist.length = 0;
+      hist.length = 0;
       arcs.clear();
     },
   };

@@ -9,6 +9,10 @@
 //              low banked fire still burns inside (the scene turns the flame down),
 //              frost motes twinkle up through the cold air and a little chill seeps off
 //              and rolls away along the ground. Leaving ice, it all sinks back.
+//              For the visualizer, a beat sends a glow up through the crystals (and
+//              brightens the light they cast), and an echo throws their outlines out:
+//              crisp wireframes of the bigger crystals growing away and fading, like
+//              the blade's silhouette echo.
 //   ring     — a weapon landing sends a ring of ice out across the ground: as the front
 //              passes each spot a small cluster of shards spikes up, holds and sinks
 //              back, so a ring of spikes expands outward and retracts behind itself. It
@@ -26,19 +30,26 @@ import * as THREE from 'three';
 import { effects } from '../effects.js';
 import { createBoltLines, seeded } from './bolts.js';
 import { ringNoise } from './rings.js';
+import { clamp01, TAU } from '../math.js';
+import { createPoints, rampColors, setRampColors } from './points.js';
 
-const TAU = Math.PI * 2;
 const UP = new THREE.Vector3(0, 1, 0);
 const easeOutBack = (t) => { const c = 1.9; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; };
-const clamp01 = (x) => Math.min(1, Math.max(0, x));
 
-/** A crystal: hexagonal prism, slightly irregular and tapering, with an off-center point. Radius ~1, base at y = −0.15, tip at y = 1. */
+// A crystal: hexagonal prism, slightly irregular and tapering, with an off-center point.
+// Radius ~1, base at y = −0.15, tip at y = 1.
+const R6 = [1, 0.84, 1.06, 0.9, 1.02, 0.88];
+const ring6 = (y, s) => R6.map((r, i) => { const a = (i / 6) * TAU + 0.3; return new THREE.Vector3(Math.cos(a) * r * s, y, Math.sin(a) * r * s); });
+const CRYSTAL = { lo: ring6(-0.15, 1), hi: ring6(0.72, 0.86), apex: new THREE.Vector3(0.16, 1, -0.1) };
+// Its outline: the six side edges, the shoulder and the point.
+const EDGES = [];
+for (let i = 0; i < 6; i++) {
+  const j = (i + 1) % 6;
+  EDGES.push([CRYSTAL.lo[i], CRYSTAL.hi[i]], [CRYSTAL.hi[i], CRYSTAL.hi[j]], [CRYSTAL.hi[i], CRYSTAL.apex]);
+}
+
 function crystalGeometry() {
-  const R = [1, 0.84, 1.06, 0.9, 1.02, 0.88];
-  const ring = (y, s) => R.map((r, i) => { const a = (i / 6) * TAU + 0.3; return new THREE.Vector3(Math.cos(a) * r * s, y, Math.sin(a) * r * s); });
-  const lo = ring(-0.15, 1);
-  const hi = ring(0.72, 0.86);
-  const apex = new THREE.Vector3(0.16, 1, -0.1);
+  const { lo, hi, apex } = CRYSTAL;
   const pos = [];
   const tri = (a, b, c) => pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
   for (let i = 0; i < 6; i++) {
@@ -78,6 +89,8 @@ const fragmentShader = /* glsl */ `
   uniform float uTime;
   uniform float uShimmer;
   uniform float uClarity;
+  uniform float uBeat;             // a beat's glow (the visualizer), decaying
+  uniform float uWave;             // ...rising through the crystals: 0 at the root, 1 at the tips
   varying vec3 vWorld;
   varying float vH;
   varying float vGlow;
@@ -101,9 +114,11 @@ const fragmentShader = /* glsl */ `
     if (alpha < 0.999 && alpha <= iBayer4(gl_FragCoord.xy)) discard;
     float key = max(0.0, dot(n, normalize(vec3(-0.35, 0.85, 0.4))));
     float breathe = sin(uTime * 1.3 + vGlow * 6.2831) * 0.5 + 0.5;
-    float h = 0.34 + 0.22 * key + 0.3 * rim + 0.14 * y + 0.08 * vGlow + uShimmer * 0.08 * breathe;
-    vec3 col = mix(rampAt(h), rampAt(0.22), (1.0 - y) * (1.0 - y) * 0.45); // the root glows deeper
-    gl_FragColor = vec4(col * uGlow * (0.7 + 0.2 * vGlow + 0.15 * uShimmer * breathe), 1.0);
+    // A beat: the whole crystal brightens, most in a band sweeping up from the root.
+    float wave = uBeat * exp(-pow((y - uWave + 0.2 * vGlow) * 5.0, 2.0));
+    float h = 0.34 + 0.22 * key + 0.3 * rim + 0.14 * y + 0.08 * vGlow + uShimmer * 0.08 * breathe + 0.12 * uBeat + 0.3 * wave;
+    vec3 col = mix(rampAt(h), rampAt(0.22), (1.0 - y) * (1.0 - y) * 0.45 * (1.0 - wave)); // the root glows deeper
+    gl_FragColor = vec4(col * uGlow * (0.7 + 0.2 * vGlow + 0.15 * uShimmer * breathe) * (1.0 + 0.45 * uBeat + 0.8 * wave), 1.0);
   }
 `;
 
@@ -111,7 +126,7 @@ function crystalMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: {
       uLo: { value: new THREE.Color() }, uMid: { value: new THREE.Color() }, uHi: { value: new THREE.Color() }, uCore: { value: new THREE.Color() },
-      uGlow: { value: 1 }, uTime: { value: 0 }, uShimmer: { value: 0.5 }, uClarity: { value: 0.35 },
+      uGlow: { value: 1 }, uTime: { value: 0 }, uShimmer: { value: 0.5 }, uClarity: { value: 0.35 }, uBeat: { value: 0 }, uWave: { value: 0 },
     },
     vertexShader,
     fragmentShader,
@@ -135,14 +150,6 @@ function crystalMesh(max) {
 function setRampUniforms(material, hexes) {
   const u = material.uniforms;
   u.uLo.value.set(hexes[0]); u.uMid.value.set(hexes[1]); u.uHi.value.set(hexes[2]); u.uCore.value.set(hexes[3]);
-}
-
-function points(n, material) {
-  const g = new THREE.BufferGeometry();
-  for (const [k, s] of [['position', 3], ['color', 3], ['size', 1], ['alpha', 1]]) g.setAttribute(k, new THREE.BufferAttribute(new Float32Array(n * s), s));
-  const p = new THREE.Points(g, material);
-  p.frustumCulled = false;
-  return p;
 }
 
 // Composing instance matrices.
@@ -177,14 +184,14 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
   const FLOATERS = 5;
   const MOTES = 200;
   const { mesh, glow, glowAttr } = crystalMesh(MAX + FLOATERS);
-  const motes = points(MOTES, fxMaterial);
+  const motes = createPoints(MOTES, fxMaterial);
   const M = { pos: motes.geometry.attributes.position.array, col: motes.geometry.attributes.color.array, size: motes.geometry.attributes.size.array, alpha: motes.geometry.attributes.alpha.array };
   const mVel = new Float32Array(MOTES * 3);
   const mAge = new Float32Array(MOTES).fill(1);
   const mLife = new Float32Array(MOTES).fill(0);
   let mNext = 0;
 
-  let ramp = ['#0f2f66', '#2f7fe0', '#8cc8ff', '#e8f4ff'].map((h) => new THREE.Color(h));
+  const ramp = rampColors(['#0f2f66', '#2f7fe0', '#8cc8ff', '#e8f4ff']);
   const tmp = new THREE.Color();
 
   // Layout: seeded, so the same settings always grow the same cluster.
@@ -249,6 +256,49 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
   let pulse = 0;      // a stoke's flash, decaying
   let live = false;
   let seep = 0;       // chill seeping off at rest
+  let beatGlow = 0;   // a beat's glow (the visualizer), decaying...
+  let wave = 1;       // ...and how far up the crystals it has risen
+  const slotOf = new Int16Array(N).fill(-1); // each crystal's instance this frame
+
+  // Echoes: outlines of the bigger crystals growing away and fading.
+  const outlines = reducedMotion ? null : createBoltLines(fxMaterial, 720);
+  const echoes = []; // { t, frames: [Matrix4 per crystal], out: [Vector3 per crystal] }
+  const ECHO_TIME = 0.7;
+  const ea = new THREE.Vector3();
+  const eb = new THREE.Vector3();
+  const colA = new THREE.Color();
+  const colB = new THREE.Color();
+  const CENTER = new THREE.Vector3(0, 0.4, 0);
+  /** A point of crystal outline k of an echo, grown by `s` about the crystal's middle and pushed outward. */
+  function echoPoint(e, k, v, s, push, out) {
+    out.copy(v).sub(CENTER).multiplyScalar(s).add(CENTER).applyMatrix4(e.frames[k]);
+    return out.addScaledVector(e.out[k], push);
+  }
+  function stepEchoes(dt) {
+    if (!outlines) return;
+    outlines.begin();
+    for (let j = echoes.length - 1; j >= 0; j--) {
+      const e = echoes[j];
+      e.t += dt;
+      const k = e.t / ECHO_TIME;
+      if (k >= 1) { echoes.splice(j, 1); continue; }
+      const grown = 1 - (1 - k) ** 3;
+      const s = 1 + 0.6 * grown;
+      const push = 0.12 * grown;
+      const alpha = (1 - k) ** 1.3;
+      colA.copy(ramp[1]).lerp(ramp[2], 0.5 * (1 - k));
+      colB.copy(ramp[3]).lerp(ramp[2], k);
+      for (let c = 0; c < e.frames.length; c++) {
+        for (const [a, b] of EDGES) {
+          echoPoint(e, c, a, s, push, ea);
+          echoPoint(e, c, b, s, push, eb);
+          // Cooler toward the root, the ice's pale core at the shoulders and point.
+          outlines.segment(ea.x, ea.y, ea.z, eb.x, eb.y, eb.z, a.y < 0.5 ? colA : colB, colB, alpha, alpha);
+        }
+      }
+    }
+    outlines.end();
+  }
 
   function spawnMote(i, I, fast = 0) {
     const ix = i * 3;
@@ -271,6 +321,9 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
     grow = clamp01(grow + (active ? dt / time : -dt / (time * 0.6)));
     const stoked = Math.max(0, Math.min(2.2, level - 1));
     pulse = Math.max(pulse * Math.exp(-dt * 3), stoked * 0.5);
+    beatGlow *= Math.exp(-dt / 0.28);
+    wave += dt / 0.35;
+    stepEchoes(dt);
     let anyMote = false;
     for (let i = 0; i < MOTES; i++) if (mAge[i] < mLife[i]) { anyMote = true; break; }
     if (grow <= 0 && !anyMote) {
@@ -286,8 +339,10 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
     // --- crystals: each pops up out of the ground in turn (and sinks back in reverse)
     let n = 0;
     for (let i = 0; i < crystals + FLOATERS; i++) {
+      slotOf[i] = -1;
       const p = clamp01((grow - sDelay[i] * 0.6) / 0.45);
       if (p <= 0) continue;
+      slotOf[i] = n;
       const g = active ? easeOutBack(p) : p * p * (3 - 2 * p);
       if (i < crystals) {
         const h = sH[i] * g * (1 + pulse * 0.05);
@@ -310,6 +365,8 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
     u.uShimmer.value = reducedMotion ? 0 : I.shimmer;
     u.uGlow.value = I.glow * (0.55 + 0.45 * grow) * (1 + pulse * 0.5);
     u.uClarity.value = I.clarity;
+    u.uBeat.value = beatGlow;
+    u.uWave.value = Math.min(wave, 1.6);
 
     // --- chill seeping off the cluster and rolling away low
     if (active && grow > 0.6 && chill) {
@@ -360,11 +417,39 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
     pulse = Math.max(pulse, 0.6 * amount);
   }
 
+  /** A beat (the visualizer): a glow rising up through the crystals. `strength` 0..1. */
+  function beat(strength = 1) {
+    if (reducedMotion) return;
+    beatGlow = Math.max(beatGlow, strength);
+    wave = 0;
+  }
+  /** An echo (the visualizer): the bigger crystals' outlines grow away and fade. */
+  function echo() {
+    if (!outlines || grow < 0.5 || echoes.length >= 3) return;
+    mesh.updateMatrixWorld();
+    const frames = [];
+    const out = [];
+    // The dominant crystal and the medium ones (the small spray would only clutter).
+    const outlined = Math.min(crystals, 1 + Math.max(2, Math.round(Math.min(MAX, effects.ice.shards) * 0.3)));
+    for (let i = 0; i < outlined; i++) {
+      if (slotOf[i] < 0) continue;
+      const m = new THREE.Matrix4();
+      mesh.getMatrixAt(slotOf[i], m);
+      frames.push(m.premultiply(mesh.matrixWorld));
+      out.push(new THREE.Vector3(sx[i] - origin.x, 0.4, sz[i] - origin.z).normalize());
+    }
+    if (frames.length) echoes.push({ t: 0, frames, out });
+  }
+
   return {
-    objects: [mesh, motes],
+    objects: outlines ? [mesh, motes, ...outlines.objects] : [mesh, motes],
     solid: mesh,
     step,
     burst,
+    beat,
+    echo,
+    /** 0..1: the latest beat's glow (the scene brightens the ice's light with it). */
+    get beatGlow() { return beatGlow; },
     setActive(on, instant = false) {
       active = on;
       if (instant) grow = on ? 1 : 0;
@@ -372,7 +457,7 @@ export function createCrystals({ fxMaterial, origin, field, chill, reducedMotion
     get amount() { return grow; },
     sets: [{ pos: M.pos, vel: mVel, n: MOTES, geo: motes.geometry, maxV: 1.2 }],
     setRamp(hexes) {
-      ramp = hexes.map((h) => new THREE.Color(h));
+      setRampColors(ramp, hexes);
       setRampUniforms(mesh.material, hexes);
     },
   };
@@ -389,14 +474,14 @@ export function createIceRing({ fxMaterial, origin, field, reach, chill, maxSite
   const PER = 3; // crystals per cluster, at most
   const { mesh, glow, glowAttr } = crystalMesh(maxSites * PER);
   const frost = createBoltLines(fxMaterial, bins * 2);
-  const chipPts = points(chips, fxMaterial);
+  const chipPts = createPoints(chips, fxMaterial);
   const K = { pos: chipPts.geometry.attributes.position.array, col: chipPts.geometry.attributes.color.array, size: chipPts.geometry.attributes.size.array, alpha: chipPts.geometry.attributes.alpha.array };
   const kVel = new Float32Array(chips * 3);
   const kAge = new Float32Array(chips).fill(1);
   const kLife = new Float32Array(chips).fill(0);
   let kNext = 0;
 
-  let ramp = ['#0f2f66', '#2f7fe0', '#8cc8ff', '#e8f4ff'].map((h) => new THREE.Color(h));
+  const ramp = rampColors(['#0f2f66', '#2f7fe0', '#8cc8ff', '#e8f4ff']);
   const white = new THREE.Color('#ffffff');
   const tmp = new THREE.Color();
   const lights = Array.from({ length: reducedMotion ? 0 : lightCount }, () => new THREE.PointLight(0x8cc8ff, 0, 2.4, 2));
@@ -600,7 +685,7 @@ export function createIceRing({ fxMaterial, origin, field, reach, chill, maxSite
     step,
     sets: [{ pos: K.pos, vel: kVel, n: chips, geo: chipPts.geometry, maxV: 1.6 }],
     setRamp(hexes) {
-      ramp = hexes.map((h) => new THREE.Color(h));
+      setRampColors(ramp, hexes);
       setRampUniforms(mesh.material, hexes);
     },
   };

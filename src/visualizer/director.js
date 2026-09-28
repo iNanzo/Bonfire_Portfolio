@@ -45,13 +45,11 @@ import { effects } from '../effects.js';
 import { MOVES } from '../bonfire/bladeMotion.js';
 import { createFireflyShow } from './fireflyShow.js';
 import { createFireflyMoves, FLY_MOVES } from './fireflyMoves.js';
-import { createLooks, LOOKS, DROP_FX } from './looks.js';
+import { createLooks, LOOKS, DROP_FX, MIRRORS } from './looks.js';
 import { createCamera, CLOSE, WIDE, COMBO_SHOTS, SWING_CAMS, HOLD_CAMS } from './camera.js';
 import { createColors } from './colors.js';
+import { approach, pick, TAU } from '../math.js';
 
-const TAU = Math.PI * 2;
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const ease = (cur, target, tau, dt) => cur + (target - cur) * (1 - Math.exp(-dt / tau));
 const all = (names) => Object.fromEntries(Object.keys(names).map((k) => [k, true]));
 
 export const DEFAULT_SETTINGS = {
@@ -87,6 +85,7 @@ export const DEFAULT_SETTINGS = {
   lookBars: 16,         // a new look every N bars (0: only after drops)
   scanlines: 'mix',     // off | mix (some looks) | on
   mirror: 'mix',
+  mirrors: all(MIRRORS), // which kinds of mirror (horizontal, vertical, quarter)
   flash: true,          // a negative flash on drops
   dropFx: all(DROP_FX),
   dropCount: 2,         // up to this many drop hits at once
@@ -295,7 +294,7 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
   // --- per frame ------------------------------------------------------------------------
   function update(f, dt) {
     const live = f.state !== 'silent';
-    presence = ease(presence, live ? 1 : 0, live ? 0.4 : 1.5, dt);
+    presence = approach(presence, live ? 1 : 0, live ? 0.4 : 1.5, dt);
     const r = settings.reactivity * presence;
     const b = f.bands;
     const hi = Math.max(b.highMid, b.high);
@@ -408,7 +407,7 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
 
     // The look: its effects, and a breakdown's framing.
     if (!settings.looks[looks.look]) looks.next(settings.looks);
-    looks.update(dt, { amt: reducedMotion ? 0 : settings.glitch * presence, build, low, energy: f.level * presence, scanlines: settings.scanlines, mirror: settings.mirror });
+    looks.update(dt, { amt: reducedMotion ? 0 : settings.glitch * presence, build, low, energy: f.level * presence, scanlines: settings.scanlines, mirror: settings.mirror, mirrors: settings.mirrors });
     // The scenery's colors, blending to a new palette's.
     if (colors.update(dt)) fire.refreshScene();
 

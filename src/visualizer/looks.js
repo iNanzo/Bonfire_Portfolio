@@ -19,8 +19,10 @@
 //   prism    the colors split apart on every beat.
 // Each time a look comes round it rolls its own details (the echo's direction, the
 // spiral's turn, the kaleidoscope's segments) and, when they're "in the mix", a mirror
-// (left to right, right to left, a pool reflection or four ways) and scanlines (thin,
-// thick or columns). Set to "always", they stay on and still change style with the look.
+// and scanlines (thin, thick or columns). Set to "always", they stay on and still change
+// style with the look. Mirrors come in three kinds (MIRRORS), each picked from those
+// switched on: horizontal (either half copied onto the other), vertical (the top
+// reflected down like a pool, or the bottom up) and quarter (one quarter, four ways).
 // In any look a breakdown frames itself: letterbox bars slide in and an iris closes
 // around the fire as the build rises; the drop snaps it open.
 //
@@ -31,6 +33,7 @@
 // an ink flash.
 // Full-screen flashes (the ink flash, the negative on drops) stay on downbeats and big
 // hits, well under three a second.
+import { approach, pick } from '../math.js';
 
 export const LOOKS = {
   ember: 'Ember', glitch: 'Glitch', echo: 'Echo', ripple: 'Ripple', kaleido: 'Kaleido', ink: 'Ink',
@@ -42,9 +45,16 @@ export const DROP_FX = {
 };
 /** Off, in the mix (some looks), always. */
 export const MODIFIER_MODES = [['off', 'Off'], ['mix', 'In the mix'], ['on', 'Always']];
+export const MIRRORS = { horizontal: 'Horizontal', vertical: 'Vertical', quarter: 'Quarter' };
+// The pixel pass's mirror modes (x + 3y) for each kind; quarters mostly keep the top.
+const MIRROR_MODES = { horizontal: [1, 2], vertical: [3, 6], quarter: [4, 5, 4, 5, 7, 8] };
+/** A mirror mode from the kinds switched on, picked by two rolls in 0..1. */
+function mirrorMode(kinds, r1, r2) {
+  const on = Object.keys(MIRRORS).filter((k) => !kinds || kinds[k]);
+  const modes = MIRROR_MODES[on[Math.floor(r1 * on.length)] ?? 'horizontal'];
+  return modes[Math.floor(r2 * modes.length)];
+}
 
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const ease = (cur, target, tau, dt) => cur + (target - cur) * (1 - Math.exp(-dt / tau));
 const MIX_CHANCE = 0.3;
 
 export function createLooks(g) {
@@ -67,11 +77,11 @@ export function createLooks(g) {
   let iris = 2;
   let clock = 0;
   // Rolled each time a look comes round.
-  const roll = { zoomIn: false, turn: 1, mirror: 1, mirrorOn: false, scan: 0, scanOn: false, crunch: 1 };
+  const roll = { zoomIn: false, turn: 1, mirror: [0, 0], mirrorOn: false, scan: 0, scanOn: false, crunch: 1 };
   // Drop hits: seconds left of each (and their envelopes).
   const FX_TIME = { shatter: 0.5, burst: 0.9, spiral: 1.2, kaleido: 1.6, flips: 2, split: 0.6, crunch: 0.5, iris: 0.45, slam: 0.6, ink: 0.2 };
   const fx = Object.fromEntries(Object.keys(FX_TIME).map((k) => [k, 0]));
-  let flipMode = 0;
+  let flip = [0, 0]; // the mirror flips' current rolls
   let lastDrop = '';
 
   function reseed() { g.sliceSeed = Math.random() * 100; }
@@ -82,7 +92,7 @@ export function createLooks(g) {
     if (name === 'kaleido') kaleSeg = pick([4, 6, 8]);
     roll.zoomIn = Math.random() < 0.35;
     roll.turn = (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random());
-    roll.mirror = 1 + Math.floor(Math.random() * 4);
+    roll.mirror = [Math.random(), Math.random()];
     roll.mirrorOn = Math.random() < MIX_CHANCE;
     roll.scan = Math.floor(Math.random() * 3);
     roll.scanOn = Math.random() < MIX_CHANCE;
@@ -99,7 +109,7 @@ export function createLooks(g) {
     },
     beat(s, accent, period = 0.5) {
       kick = Math.max(kick, s);
-      if (fx.flips > 0) flipMode = (flipMode % 4) + 1;
+      if (fx.flips > 0) flip = [Math.random(), Math.random()];
       if (s < 0.05) return;
       if (look === 'ripple' && s > 0.2) ripples.push({ t: 0, s: accent ? 1 : 0.6 * s });
       if (look === 'echo' && accent && s > 0.3) { cycleFor = period * 0.5; cycleStep = 1 + Math.floor(Math.random() * 3); }
@@ -141,13 +151,13 @@ export function createLooks(g) {
           fx[name] = FX_TIME[name];
           if (name === 'shatter') { slice = 1; block = 1; reseed(); }
           if (name === 'kaleido') kaleSeg = pick([6, 8, 10]);
-          if (name === 'flips') flipMode = 1 + Math.floor(Math.random() * 4);
+          if (name === 'flips') flip = [Math.random(), Math.random()];
         }
       }
       return chosen.map((k) => DROP_FX[k]);
     },
     /** The look's effects, the drop hits, the mirror and scanlines, and every look's framing. */
-    update(dt, { amt, build, low, energy, scanlines = 'mix', mirror = 'mix' }) {
+    update(dt, { amt, build, low, energy, scanlines = 'mix', mirror = 'mix', mirrors }) {
       clock += dt;
       kick *= Math.exp(-dt / 0.14);
       hitEnv *= Math.exp(-dt / 0.5);
@@ -206,15 +216,15 @@ export function createLooks(g) {
 
       // The mirror and scanlines: off, in the mix (this look rolled one), or always.
       const mirrored = mirror === 'on' || (mirror === 'mix' && roll.mirrorOn);
-      g.mirror = fx.flips > 0 && on ? flipMode : mirrored ? roll.mirror : 0;
+      g.mirror = fx.flips > 0 && on ? mirrorMode(mirrors, ...flip) : mirrored ? mirrorMode(mirrors, ...roll.mirror) : 0;
       const scanned = scanlines === 'on' || (scanlines === 'mix' && roll.scanOn) || L === 'ink';
       g.scan = scanned ? 0.22 : 0;
       g.scanMode = L === 'ink' ? 0 : roll.scan;
 
       // Framing in breakdowns: bars in, the iris closing with the build; snapping open.
       // A drop's iris snap opens from a pinhole; its letterbox slam shuts and springs back.
-      letterbox = ease(letterbox, low ? 0.09 : 0, low ? 0.8 : 0.15, dt);
-      iris = low ? ease(Math.min(iris, 1.3), 0.95 - 0.5 * build, 0.6, dt) : ease(iris, 2, 0.12, dt);
+      letterbox = approach(letterbox, low ? 0.09 : 0, low ? 0.8 : 0.15, dt);
+      iris = low ? approach(Math.min(iris, 1.3), 0.95 - 0.5 * build, 0.6, dt) : approach(iris, 2, 0.12, dt);
       const x = 1 - env('slam');
       const lb = Math.max(letterbox, fx.slam > 0 ? on * 0.24 * (x < 0.15 ? x / 0.15 : (1 - x) / 0.85) : 0);
       g.letterbox = lb < 0.004 ? 0 : lb;

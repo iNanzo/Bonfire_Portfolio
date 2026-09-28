@@ -24,15 +24,11 @@
 // and the thickness along Z (Z is the flat's normal). Poses are { c, q }: the world
 // position of the blade's middle and its world rotation.
 import * as THREE from 'three';
+import { clamp, clamp01, smoother, TAU } from '../math.js';
 
 export const MOVES = { slash: 'Slash', thrust: 'Thrust', spin: 'Spin' };
 
-const TAU = Math.PI * 2;
 const DEG = Math.PI / 180;
-const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-const clamp01 = (x) => clamp(x, 0, 1);
-/** Rest to rest, C2. */
-const smoother = (u) => u * u * u * (u * (u * 6 - 15) + 10);
 /** 0 at both ends (value and slope), 1 in the middle. */
 const bump = (u) => 16 * u * u * (1 - u) * (1 - u);
 /** A follow-through: leaves at slope m, stops at 1 (overshooting a touch when m > 3). */
@@ -373,7 +369,7 @@ export function createRoutine({
         if (y < low) { low = y; at = i / 16; }
       }
       if (low >= ground + 0.05) break;
-      gl.bulge.y += (ground + 0.05 - low) / Math.max(0.3, bump(at));
+      gl.bulge.y = Math.min(1, gl.bulge.y + (ground + 0.05 - low) / Math.max(0.3, bump(at))); // (at most a metre higher)
     }
     return gl;
   }

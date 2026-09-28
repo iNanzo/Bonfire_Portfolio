@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { base, flames } from '../src/palette.js';
 import { contrast } from '../src/contentRules.js';
 import { createColors, colorName } from '../src/visualizer/colors.js';
-import { createLooks, DROP_FX } from '../src/visualizer/looks.js';
+import { createLooks, DROP_FX, MIRRORS } from '../src/visualizer/looks.js';
 import { createFireflyMoves, FLY_MOVES } from '../src/visualizer/fireflyMoves.js';
 
 // colors.update() writes the page's CSS palette when a scenery blend ends.
@@ -109,13 +109,39 @@ test('mirror and scanlines: off, in the mix, always', () => {
     for (const mode of ['off', 'mix', 'on']) {
       looks.update(0, { amt: 1, build: 0, low: false, energy: 0, mirror: mode, scanlines: mode });
       if (g.mirror > 0) counts[mode]++;
-      if (mode === 'on') assert.ok(g.mirror >= 1 && g.mirror <= 4 && g.scan > 0);
+      if (mode === 'on') assert.ok(g.mirror >= 1 && g.mirror <= 8 && g.scan > 0);
       if (mode === 'off') assert.equal(g.scan, 0);
     }
   }
   assert.equal(counts.off, 0);
   assert.equal(counts.on, 200);
   assert.ok(counts.mix > 30 && counts.mix < 100, `some looks roll a mirror (${counts.mix}/200)`);
+});
+
+test('mirror kinds: horizontal, vertical and quarter, only those switched on', () => {
+  const g = {};
+  const looks = createLooks(g);
+  const MODES = { horizontal: [1, 2], vertical: [3, 6], quarter: [4, 5, 7, 8] };
+  const seenAll = new Set();
+  for (const kind of Object.keys(MIRRORS)) {
+    const mirrors = Object.fromEntries(Object.keys(MIRRORS).map((k) => [k, k === kind]));
+    const seen = new Set();
+    for (let i = 0; i < 200; i++) {
+      looks.next({ ember: true, glitch: true, haze: true });
+      looks.update(0, { amt: 1, build: 0, low: false, energy: 0, mirror: 'on', mirrors });
+      seen.add(g.mirror);
+      seenAll.add(g.mirror);
+    }
+    assert.deepEqual([...seen].sort(), MODES[kind], `${kind} mirrors`);
+  }
+  assert.equal(seenAll.size, 8);
+  // The drop's mirror flips keep to the kinds switched on too.
+  looks.drop({ flips: true }, 1);
+  for (let i = 0; i < 40; i++) {
+    looks.beat(1, false, 0.5);
+    looks.update(0.01, { amt: 1, build: 0, low: false, energy: 0, mirror: 'off', mirrors: { vertical: true } });
+    assert.ok([3, 6].includes(g.mirror));
+  }
 });
 
 test('firefly moves: each keeps its own time, on the beat grid', () => {

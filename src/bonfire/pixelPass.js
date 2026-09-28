@@ -5,8 +5,9 @@
 //
 // Effects layer (the visualizer; all off on the site), all before the palette so every
 // effect comes out in the scene's own colors:
-//   where a pixel reads the scene from — a kaleidoscope, a mirror (left to right, right
-//     to left, the top reflected in the bottom like a pool, or four ways), block crunch, a row
+//   where a pixel reads the scene from — a kaleidoscope, a mirror (horizontal: either
+//     half copied onto the other; vertical: the top reflected down like a pool, or the
+//     bottom up; or both, one quarter copied four ways), block crunch, a row
 //     wave, a shockwave ripple out of the fire, rows torn sideways;
 //   what's mixed in — an RGB split, echoes of the previous frame zooming out of (or into)
 //     the fire, turning as they go for a spiral (feedback: they step down the palette as
@@ -52,7 +53,7 @@ const fragmentShader = /* glsl */ `
   uniform float uSplit;            // RGB split, in texels
   uniform float uBlock;            // >= 1: pixels this many texels wide
   uniform float uWave;             // a sideways wave through the rows, in texels
-  uniform float uMirror;           // 1: the right half mirrors the left; 2: the left the right; 3: the bottom reflects the top; 4: four ways
+  uniform float uMirror;           // x + 3y (0: off). x: 1 the left half copied right, 2 the right half left; y: 1 the top copied down, 2 the bottom up
   uniform float uScan;             // 0..1: how dark the scanlines are
   uniform float uScanMode;         // 0: every other row; 1: thick rows; 2: columns
   uniform float uNoise;            // 0..1: static
@@ -175,9 +176,10 @@ const fragmentShader = /* glsl */ `
     }
     if (uMirror > 0.5) {
       float m = floor(uMirror + 0.5);
-      if ((m == 1.0 || m == 4.0) && src.x >= resolution.x * 0.5) src.x = resolution.x - 1.0 - src.x;
-      if (m == 2.0 && src.x < resolution.x * 0.5) src.x = resolution.x - 1.0 - src.x;
-      if ((m == 3.0 || m == 4.0) && src.y < resolution.y * 0.5) src.y = resolution.y - 1.0 - src.y;
+      float mx = mod(m, 3.0);
+      float my = floor(m / 3.0);
+      if ((mx == 1.0 && src.x >= resolution.x * 0.5) || (mx == 2.0 && src.x < resolution.x * 0.5)) src.x = resolution.x - 1.0 - src.x;
+      if ((my == 1.0 && src.y < resolution.y * 0.5) || (my == 2.0 && src.y >= resolution.y * 0.5)) src.y = resolution.y - 1.0 - src.y;
     }
     if (uBlock > 1.0) src = floor(src / uBlock) * uBlock + floor(uBlock * 0.5);
     if (uWave > 0.0) src.x += floor(sin(src.y * 0.11 + uTime * 7.0) * uWave + 0.5);
