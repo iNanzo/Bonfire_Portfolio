@@ -22,6 +22,10 @@ bonfire's design, assets and code, then three rounds of feedback:
    (bouncing and darting, in every direction, at tempo-based speeds); settings for all
    of it; "endless variations". Mid-round: scanlines and mirror join the looks'
    variations, and drops get varied effects (the negative flash kept).
+4. After round 3 went live: vertical mirroring alongside horizontal and quarter; a bug
+   (the weapon sometimes disappeared after a slam); a pulsing glow for the ice, with
+   outline echoes; lightning over the whole blade with a slashing trail, strongest at
+   the tip and fading near the guard.
 
 ## Requirements
 
@@ -48,7 +52,11 @@ bonfire's design, assets and code, then three rounds of feedback:
 | X5 | Random colors from the admin's palette tools, fully random included | `colors.js` over `src/paletteGen.js` (moved from `admin/ui/palettes.js`): site, harmonious (any scheme), fully random, a mix; scenery colors optional |
 | X6 | Fireflies that bounce or dart, in every direction, at tempo-based speeds | `fireflyMoves.js` + `fireflies.dart()`: bounce, dart, compass, zigzag, scatter, alongside the swing |
 | X7 | Endless variation, settings for all of it | Random shapes and rolls everywhere (moves, camera rigs, look details, drop hits, palettes, firefly timing); Living Blade, Colors, Fireflies, Camera and Rave FX settings |
-| X8 | Scanlines and mirror in the looks' variations; varied drop effects | `looks.js`: off / in the mix / always, four mirror modes and three scanline styles; twelve drop hits, one to three per drop |
+| X8 | Scanlines and mirror in the looks' variations; varied drop effects | `looks.js`: off / in the mix / always, three scanline styles; twelve drop hits, one to three per drop |
+| Y1 | Vertical mirroring alongside horizontal and quarter | `pixelPass.js` mirrors x and y independently (eight modes); `looks.js` MIRRORS kinds, a *Mirror Kinds* setting |
+| Y2 | The weapon disappeared after a slam | `weapons.js` restores the planted Euler angles, not the quaternion (see below); `test/weapons.test.mjs` |
+| Y3 | Ice: a pulsing glow and outline emission | `ice.js`: a beat's glow rising through the crystals (and their light), wireframe echoes of the bigger crystals on bars and rings |
+| Y4 | Lightning over the whole blade, a slash trail strongest at the tip | `swingTrail.js`: edge bolts along the blade, a five-band sheet of trails and cross bolts fading toward the guard |
 
 ## Key decisions
 
@@ -148,6 +156,13 @@ bonfire's design, assets and code, then three rounds of feedback:
   - The world pose is converted into the holder's space each frame; flames and sparks
     within 30 cm of the blade get its velocity; the plunge restores the rest pose and
     throws the ring.
+- **The planted angle is kept as Euler angles.** The shudder and the settle wobble write
+  `rotation.z`, a wobble only while x and z are 0. A routine used to put the weapon back
+  by copying its quaternion, which makes three.js re-derive the angles: for a blade
+  turned past 90° (either face is shown at random) they can come back as (π, π − y, π),
+  and writing z then planted it upside down, underground. The next routine started
+  from that pose and flung the blade metres up. Now the Euler angles are restored, and
+  a glide's safety arc is capped at a metre.
 - **Cameras are rigs over a shot list** (`camera.js`, moved out of the director). Each
   frame a shot or a rig makes the framing it wants; a transition (cut, a 0.24 s whip with
   a lean, a 0.9 s glide) blends from what was on screen; then every framing is kept in

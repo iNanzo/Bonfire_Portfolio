@@ -5,7 +5,7 @@ every screen, the camera moves to a new point of view for each one, and projects
 live in an inventory. Inspecting a project pulls the weapon out of the fire and
 stabs in a new one, and the fire relights in a new color that also recolors the UI.
 
-Vite + vanilla JS, Three.js, and a Blender-built model.
+Vite + vanilla JS, Three.js, and a Blender-built model. Needs Node 22.12 or later.
 
 ```bash
 npm install
@@ -13,7 +13,9 @@ npm run dev        # http://localhost:5173
 npm run build      # outputs dist/
 npm run preview    # serve the production build locally
 npm run admin      # the admin panel, editing your local files: http://127.0.0.1:5175
-npm test           # the visualizer's audio analysis tests
+npm run check      # lint + every test (the site, the bonfire, the visualizer, the admin)
+npm run lint       # ESLint only (eslint.config.js)
+npm test           # the site's and the visualizer's tests (npm run admin:test: the admin's)
 ```
 
 ## How it plays
@@ -187,8 +189,8 @@ npm test           # the visualizer's audio analysis tests
 
 ## Roadmap & decisions
 
-- **Hosting (live):** GitHub Pages via `.github/workflows/deploy.yml`, which builds on every
-  push to `main`. The custom domain is `nhoang.dev` (`public/CNAME`); Porkbun DNS has four
+- **Hosting (live):** GitHub Pages via `.github/workflows/deploy.yml`, which lints, runs
+  every test and builds on each push to `main` (nothing deploys if any of that fails). The custom domain is `nhoang.dev` (`public/CNAME`); Porkbun DNS has four
   apex `A` records to GitHub Pages and a `www` `CNAME` to `iNanzo.github.io`, with HTTPS
   enforced.
 - **Admin panel (built):** see [Admin panel](#admin-panel). It's a Cloudflare Worker
@@ -400,7 +402,8 @@ the site links to it. Design notes: `docs/visualizer.md`.
   - The fire swells and kicks on every beat, as hard as the kicks land. The ball
     crackles, the ice pulses, and the wind throws the flames one way, then the other.
   - The planted blade glows (and shudders on the hard ones), and each bar its
-    silhouette echoes out.
+    silhouette echoes out. In ice, each beat sends a glow up through the crystals, and
+    on bars and rings the bigger crystals' outlines burst out as crisp wireframes.
   - Hi-hats throw sparks. Every few bars the element's ring races out on its own.
 - **Fireflies:** a light show. They sit dark and blink hard on and off with the music,
   hop and swing around the fire on the beat, and stay close to it. The pattern changes
@@ -430,9 +433,11 @@ the site links to it. Design notes: `docs/visualizer.md`.
     glides, twirls and hovers between them and a flip or corkscrew on the way home.
     Nothing goes through the ground or the camera.
   - **Rhythm:** a move on every beat, or varied with rests and (at slow tempos) doubles.
-  - **Trails:** rising embers, a lightning bolt with sparks off the point only, or
-    falling frost glints; each hit throws a spray off the point. It knocks the flames
-    along with it.
+  - **Trails:** rising embers, or falling frost glints; each hit throws a spray off
+    the point. It knocks the flames along with it. In lightning the whole blade is
+    electric (bolts crackling up both edges, arcs leaping off near the point) and each
+    slash leaves a sheet of lightning, strongest at the tip and fading toward the guard,
+    with sparks off the point only.
   - A blade held for the drop sways and turns as if looking about, trembling harder as
     the build rises.
 - **Phrases:** every 16 bars (a setting) the fire takes a new weapon, flame and element.
@@ -481,9 +486,11 @@ the site links to it. Design notes: `docs/visualizer.md`.
   - **Prism:** the colors splitting apart on every beat.
 
   Each time a look comes round it rolls its own details (the echo's direction, the
-  spiral's turn) and, when they're *in the mix*, a mirror (left, right, a pool
-  reflection or four ways) and scanlines (thin, thick or columns); set to *always*, they
-  stay on and change style with the look. Every drop also throws one to three **drop
+  spiral's turn) and, when they're *in the mix*, a mirror and scanlines (thin, thick or
+  columns); set to *always*, they stay on and change style with the look. Mirrors come
+  in three kinds, each switchable: horizontal (either half copied onto the other),
+  vertical (the top reflected down like a pool, or the bottom up) and quarter (one
+  quarter, four ways). Every drop also throws one to three **drop
   hits**, never the same set twice running: shatter, shockwaves, an echo burst, a spiral,
   a kaleidoscope, mirror flips, a color cycle, an RGB burst, a crunch, an iris snap, a
   letterbox slam, an ink flash. Plus the negative flash on drops (at most one every 2 s).
@@ -506,13 +513,15 @@ its moves, rhythm, and whether it's alive); colors (the mode, the harmony scheme
 scenery); fireflies (their moves and how often they change); the camera (mode, cut
 length, transitions, how it covers the blade out and held, zoom punch, shot, pixel
 size); effects amount, which looks take turns and how often, scanlines and mirror (off,
-in the mix, always), the negative flash, which drop hits and how many; and a
+in the mix, always) and which kinds of mirror, the negative flash, which drop hits and
+how many; and a
 title card (a DJ name in the site's checkpoint band, shown when the music starts and
 on drops).
 
 | Piece | File |
 | --- | --- |
-| Page, sources, HUD, settings, keys | `visualizer/index.html`, `src/visualizer/main.js`, `src/visualizer/visualizer.css` |
+| Page, sources, HUD, keys | `visualizer/index.html`, `src/visualizer/main.js`, `src/visualizer/visualizer.css` |
+| Settings: stored in the browser, the dialog | `src/visualizer/settings.js` |
 | Bands, onsets | `src/visualizer/analyser.js` |
 | Sections: groove, breakdown, build, drop, silence | `src/visualizer/sections.js` |
 | Tempo, beat grid, bars, tap tempo | `src/visualizer/tempo.js` |
@@ -525,7 +534,7 @@ on drops).
 | Blade trail and hits (per element) | `src/bonfire/swingTrail.js` |
 | Demo track (synthesized) | `src/visualizer/demo.js` |
 | Scene hooks: `drive`, `glitch`, `pulse`, `ring`, `echo`, `swing`, `setPose`, held swaps | `src/bonfire/scene.js`, `weapons.js`, `pixelPass.js`, `flame.js`, `fireflies.js` |
-| Tests: the tracker on synthetic onsets; the analysis and ten drop shapes (and non-drops) on synthesized tracks; the blade's moves (smooth, on the beat, clear of the ground and camera); made palettes, drop hits, mirror and scanline mixes, firefly moves | `test/` (`npm test`) |
+| Tests: the tracker on synthetic onsets; the analysis and ten drop shapes (and non-drops) on synthesized tracks; the blade's moves (smooth, on the beat, clear of the ground and camera) and its return to the fire (`weapons.js` on a stand-in model); made palettes, drop hits, mirror kinds and mixes, firefly moves; a held swap's forge particles; the site's routes, links and templates | `test/` (`npm test`) |
 
 ## Colors
 
@@ -546,8 +555,9 @@ variables (`--accent-hi` for text — every `hi` must be ≥ 4.5:1 on the backgr
 | Editable source | `assets/source/bonfire.blend` |
 | Preview renders | `assets/source/bonfire-preview.png`, `assets/source/weapons-lineup.png` |
 | Web model (Draco-compressed) | `public/models/bonfire.glb` |
-| Scene, lights, passes, camera, interaction | `src/bonfire/scene.js` |
-| Camera points of view per screen | `src/bonfire/povs.js` |
+| Scene, lights, passes, elements, the per-frame loop | `src/bonfire/scene.js` |
+| Camera: points of view per screen, eased moves, sway, shake | `src/bonfire/povs.js`, `src/bonfire/view.js` |
+| The cursor as the fire sees it (path, speed, ray) | `src/bonfire/pointer.js` |
 | Curl-noise particle fire, sparks | `src/bonfire/flame.js` |
 | Shared curl-noise field (bonfire, ring of fire, forge particles) | `src/bonfire/curl.js` |
 | Cursor → fire interaction models | `src/bonfire/interaction.js` |
@@ -555,6 +565,8 @@ variables (`--accent-hi` for text — every `hi` must be ≥ 4.5:1 on the backgr
 | Height map of the clearing (firefly steering, collision, wall spots) | `src/bonfire/terrain.js` |
 | Impact effects: ring of fire, shock ring, smoke ring, smoke, ash, embers, collision splashes | `src/bonfire/impact.js` |
 | Weapon swap (rise + dissolve → swirl → gather → ripple-form → glow → strike) + rim light | `src/bonfire/weapons.js` |
+| Forge particles (shed, helix, gather; a held blade's aura and its fling) | `src/bonfire/forgeParticles.js` |
+| Particle buffers and flame ramps as colors; shared math | `src/bonfire/points.js`, `src/math.js` |
 | Particle shader: size by distance, dithered `alpha`, manual depth test | `src/bonfire/flame.js` |
 | Line material for the shock ring and forge lines (dithered, depth-tested) + ring noise | `src/bonfire/rings.js` |
 | Forge lines: double helix, weapon silhouette tracing + echo burst | `src/bonfire/forgeFx.js` |
@@ -614,8 +626,9 @@ throw sparks. The individual ingredients can be compared with `?lab` (e.g.
    GitHub Actions workflow with `actions/upload-pages-artifact` + `actions/deploy-pages`.
 4. In **Settings → Pages**, pick that branch or "GitHub Actions" as the source.
 
-Routes use the URL hash (`#/projects`), so deep links work on GitHub Pages without
-server rewrites. `404.html` is built alongside and served automatically.
+Routes are real paths (`/projects/`, `/projects/<id>/`). GitHub Pages has no rewrites, so
+the build copies `index.html` to every route, and deep links and reloads work; old
+`#/projects` links still resolve. `404.html` is built alongside and served automatically.
 
 ## Accessibility & performance
 
@@ -626,4 +639,8 @@ server rewrites. `404.html` is built alongside and served automatically.
 - The scene renders at low resolution (one texel = 3–4 CSS pixels), pauses when the tab
   is hidden, uses fewer particles and no shadows on touch devices, and Three.js is only
   loaded after the page content.
+- The fire's shadow (a cube map: six renders of the scenery) is redrawn only when the
+  weapon or the light moves, once per frame at most; idle, a frame is about 130 draw
+  calls. Per-frame code doesn't allocate, and a color change restyles the page at most
+  every 50 ms.
 - Sound is off by default and fully synthesized (no audio files).
