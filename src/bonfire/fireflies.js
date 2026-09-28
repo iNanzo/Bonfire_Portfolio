@@ -48,6 +48,7 @@ const smooth = (s) => s * s * (3 - 2 * s);
  */
 export function createFireflies(template, {
   count = 18, litCount = 9, lightCount = 9, speed = 1, center, layer, terrain, raycast, reducedMotion = false,
+  trailMaterial = null, // particle material for light trails (the visualizer); none on the site
 }) {
   const noise = new SimplexNoise();
   const group = new THREE.Group();
@@ -215,6 +216,12 @@ export function createFireflies(template, {
       glow: lit,
       mix: 1,               // color: 0 = previous flame, 1 = current
       mixing: false,
+      // Set from outside (the visualizer's light show), null on the site:
+      show: null,           // target glow, in place of the lit set's (hover and flashes still add)
+      heat: 0,              // 0..1: color toward the flame's pale core
+      orbit: null,          // { x, y, z, r, w, h }: circle this point (radius, rad/s, height band)
+      leash: null,          // { x, z, r }: roam, but drift back inside this radius
+      trailAt: 0,
     });
   }
   for (const f of flies) f.wp = pickWaypoint(f.pos);
@@ -456,17 +463,18 @@ export function createFireflies(template, {
         const d = dt * f.fadeRate;
         f.lit = target > f.lit ? Math.min(target, f.lit + d) : Math.max(target, f.lit - d);
       }
-      let g = f.lit * (0.88 + 0.12 * Math.sin(t * 3.1 + f.seed));
+      let g = f.show ?? f.lit * (0.88 + 0.12 * Math.sin(t * 3.1 + f.seed));
       if (f.hovered || f.flicker > 0) g = (fs + i) % 3 === 0 ? Math.max(0.05, g * 0.3) : Math.max(g, 0.9);
       if (f.flash > 0) {
         f.flash = Math.max(0, f.flash - dt);
         g = Math.max(g, Math.sqrt(f.flash / 0.5) * f.flashPower);
       }
-      f.glow += (g - f.glow) * Math.min(1, dt * (f.flicker > 0 || f.flash > 0 ? 40 : 20));
+      f.glow += (g - f.glow) * Math.min(1, dt * (f.flicker > 0 || f.flash > 0 || f.show != null ? 40 : 20));
 
-      // Saturated flame colors (mid → hi), never washed out to white.
+      // Saturated flame colors (mid → hi), never washed out to white; a hot one leans to the core.
       const k = Math.min(1, f.glow);
       tone(f, 1, col).lerp(tone(f, 2, colB), smooth(k));
+      if (f.heat > 0) col.lerp(tone(f, 3, colB), f.heat * 0.6);
       col.multiplyScalar(0.45 + f.glow * 0.7);
       f.lantern.material.color.copy(UNLIT).lerp(col, smooth(Math.min(1, k * 4)));
       tone(f, 2, f.halos[0].material.color);
@@ -477,6 +485,8 @@ export function createFireflies(template, {
       f.halos[0].visible = on;
       f.halos[1].visible = on;
     });
+
+    if (trails) stepTrails(dt);
 
     // Point lights follow the brightest fireflies.
     const ranked = flies.slice().sort((a, b) => b.glow - a.glow);
@@ -489,8 +499,83 @@ export function createFireflies(template, {
     });
   }
 
+  /**
+   * Orbiting (the visualizer): circle a point at a radius and height band, steering
+   * like flight (so it eases in and out), never through the scenery.
+   */
+  const orbitTo = new THREE.Vector3();
+  function orbitStep(f, dt, t) {
+    const o = f.orbit;
+    const dx = f.pos.x - o.x;
+    const dz = f.pos.z - o.z;
+    const a = Math.atan2(dz, dx) + o.w * 0.35; // aim a little ahead along the circle
+    const y = o.y + Math.sin(t * 1.3 + f.seed) * o.h;
+    orbitTo.set(o.x + Math.cos(a) * o.r, y, o.z + Math.sin(a) * o.r);
+    desired.copy(orbitTo).sub(f.pos).multiplyScalar(2.2);
+    const sp = desired.length();
+    const max = (0.6 + Math.abs(o.w) * o.r * 1.2) * pace;
+    if (sp > max) desired.multiplyScalar(max / sp);
+    desired.add(f.startle);
+    f.vel.lerp(desired, 1 - Math.exp(-dt * 3));
+    f.pos.addScaledVector(f.vel, dt);
+    const fl = terrain.solid(f.pos.x, f.pos.z) + MARGIN;
+    if (f.pos.y < fl) { f.pos.y = fl; f.vel.y = Math.max(0, f.vel.y); }
+    f.pos.y = Math.min(f.pos.y, 2.5);
+    f.wpAge = 0;
+  }
+
+  // Light trails (the visualizer): a lit firefly moving fast leaves specks of its light
+  // that fade behind it, so darting and orbiting draw streaks.
+  const trails = trailMaterial && !reducedMotion ? makeTrails(trailMaterial, Math.max(64, count * 14)) : null;
+  const lanternNow = new THREE.Vector3();
+  function makeTrails(material, n) {
+    const geo = new THREE.BufferGeometry();
+    for (const [name, size] of [['position', 3], ['color', 3], ['size', 1], ['alpha', 1]]) {
+      geo.setAttribute(name, new THREE.BufferAttribute(new Float32Array(n * size), size));
+    }
+    const points = new THREE.Points(geo, material);
+    points.frustumCulled = false;
+    return { points, n, age: new Float32Array(n).fill(1e3), life: new Float32Array(n).fill(1), base: new Float32Array(n * 3), next: 0 };
+  }
+  function stepTrails(dt) {
+    const T = trails;
+    const P = T.points.geometry.attributes.position.array;
+    const C = T.points.geometry.attributes.color.array;
+    const S = T.points.geometry.attributes.size.array;
+    const A = T.points.geometry.attributes.alpha.array;
+    for (const f of flies) {
+      const speed = f.vel.length();
+      if (f.glow < 0.35 || speed < 0.4) { f.trailAt = 0; continue; }
+      f.trailAt += dt * speed * 22 * Math.min(1.2, f.glow); // specks per metre, brighter = denser
+      f.lantern.getWorldPosition(lanternNow);
+      while (f.trailAt >= 1) {
+        f.trailAt -= 1;
+        const j = T.next++ % T.n;
+        P[j * 3] = lanternNow.x + (Math.random() - 0.5) * 0.02;
+        P[j * 3 + 1] = lanternNow.y + (Math.random() - 0.5) * 0.02;
+        P[j * 3 + 2] = lanternNow.z + (Math.random() - 0.5) * 0.02;
+        tone(f, f.heat > 0.5 ? 3 : 2, col).lerp(tone(f, 1, colB), Math.random() * 0.5);
+        T.base[j * 3] = col.r; T.base[j * 3 + 1] = col.g; T.base[j * 3 + 2] = col.b;
+        T.age[j] = 0;
+        T.life[j] = 0.3 + Math.random() * 0.35;
+      }
+    }
+    for (let j = 0; j < T.n; j++) {
+      T.age[j] += dt;
+      const k = T.age[j] / T.life[j];
+      if (k >= 1) { S[j] = 0; continue; }
+      P[j * 3 + 1] -= dt * 0.05; // light specks sink a little as they fade
+      const fade = (1 - k) * 0.9;
+      C[j * 3] = T.base[j * 3] * fade; C[j * 3 + 1] = T.base[j * 3 + 1] * fade; C[j * 3 + 2] = T.base[j * 3 + 2] * fade;
+      S[j] = k < 0.3 ? 1.4 : 1;
+      A[j] = 1 - k;
+    }
+    for (const name of ['position', 'color', 'size', 'alpha']) T.points.geometry.attributes[name].needsUpdate = true;
+  }
+
   /** Flight: toward the waypoint, meandering, clear of the fire and the scenery. */
   function flyStep(f, dt, t, flowAt) {
+    if (f.orbit) { orbitStep(f, dt, t); return; }
     const land = f.wp.land;
     const toWp = tmp.copy(f.wp.pos).sub(f.pos);
     const dist = toWp.length();
@@ -535,6 +620,13 @@ export function createFireflies(template, {
       }
     }
     desired.add(f.startle);
+    // Leashed (the visualizer): drift back in when roaming too far from the fire.
+    if (f.leash) {
+      const lx = f.pos.x - f.leash.x, lz = f.pos.z - f.leash.z;
+      const ld = Math.hypot(lx, lz);
+      if (ld > f.leash.r) { desired.x -= (lx / ld) * (ld - f.leash.r) * 1.5; desired.z -= (lz / ld) * (ld - f.leash.r) * 1.5; }
+      if (land && Math.hypot(f.wp.pos.x - f.leash.x, f.wp.pos.z - f.leash.z) > f.leash.r + 0.6) { f.wp = pickWaypoint(f.pos); f.wpAge = 0; }
+    }
     if (flowAt) desired.add(flowAt(f.pos.x, f.pos.y, f.pos.z, flow).multiplyScalar(0.35));
     f.vel.lerp(desired, 1 - Math.exp(-dt * (final ? 4 : 1.8)));
 
@@ -583,6 +675,37 @@ export function createFireflies(template, {
     }
   }
 
+  /** A beat: every firefly blinks together, like synchronous fireflies (no startle). `power` 0..1. */
+  function pulse(power = 1) {
+    for (const f of flies) {
+      const busy = f.flash > 0.3;
+      f.flash = Math.max(f.flash, 0.3);
+      f.flashPower = Math.max(busy ? f.flashPower : 0, 0.6 + 0.6 * power);
+    }
+  }
+
+  /**
+   * A beat to dance to (the visualizer): flying fireflies hop and swing around the fire,
+   * one way then the other (`dir`), never out toward the edges; a strong beat (`lift`
+   * 0..1) takes a few resting ones off their perches.
+   */
+  function dance(power = 1, { dir = 1, lift = 0 } = {}) {
+    if (reducedMotion) return;
+    for (const f of flies) {
+      if (f.mode === 'fly' && !f.orbit) {
+        const hx = f.pos.x - center.x;
+        const hz = f.pos.z - center.z;
+        const hr = Math.hypot(hx, hz) || 1;
+        const inward = hr > 1.8 ? -0.35 : 0; // those out wide swing back in
+        f.startle.x += ((-hz / hr) * dir * 0.7 + (hx / hr) * inward) * power;
+        f.startle.z += ((hx / hr) * dir * 0.7 + (hz / hr) * inward) * power;
+        f.startle.y += power * (0.55 + 0.25 * Math.random()); // the hop
+      } else if ((f.mode === 'rest' || f.mode === 'settle') && Math.random() < lift * 0.2) {
+        beginLift(f, true);
+      }
+    }
+  }
+
   /** Click: every firefly flashes; ones near the click flash hardest and dart off. */
   function flash(x, y, camera, width, height) {
     for (const f of flies) {
@@ -609,7 +732,12 @@ export function createFireflies(template, {
     flies,
     update,
     flash,
+    pulse,
+    dance,
     burst,
+    trails: trails?.points ?? null,
+    /** Send resting ones (those `which` picks) up into the air. */
+    lift(which = () => true) { for (const f of flies) if ((f.mode === 'rest' || f.mode === 'settle') && which(f)) beginLift(f, true); },
     /** Switch colors at once (initial load, instant equips). hexes: [lo, mid, hi, core] */
     setRamp(h) {
       rampNew = hexes(h);

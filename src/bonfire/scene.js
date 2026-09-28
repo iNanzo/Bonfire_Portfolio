@@ -32,6 +32,7 @@ import { createPlasma } from './plasma.js';
 import { createLightningRing } from './lightningRing.js';
 import { createCrystals, createIceRing } from './ice.js';
 import { createChill } from './chill.js';
+import { createSwingTrail } from './swingTrail.js';
 import { getPov } from './povs.js';
 import { base, flames, flameOr, scenePalette, debugPalettes, mixFlame, flameEase } from '../palette.js';
 
@@ -51,7 +52,7 @@ const MATRIX_SIZES = [4, 8];
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
 
-export function createBonfire(container, { reducedMotion = false, onImpact, onRamp, onError } = {}) {
+export function createBonfire(container, { reducedMotion = false, sway: swayAmount = 1, lightTrails = false, onImpact, onRamp, onError, onFrame } = {}) {
   const scope = createResourceScope();
   const events = new AbortController();
   scope.cleanup(() => events.abort());
@@ -117,6 +118,21 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   const fxRT = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, type: THREE.HalfFloatType, depthBuffer: false });
   const normalMaterial = new THREE.MeshNormalMaterial({ flatShading: true });
   const pass = createPixelPass();
+  // Frame feedback for the echo effect (the visualizer): the pass renders into one buffer
+  // reading the last frame from the other, then a copy puts it on screen.
+  const feedbackRT = [0, 1].map(() => new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, depthBuffer: false }));
+  let feedbackFlip = 0;
+  let feedbackLive = false;
+  const copyScene = new THREE.Scene();
+  const copyMaterial = new THREE.ShaderMaterial({
+    uniforms: { map: { value: null }, resolution: pass.uniforms.resolution },
+    vertexShader: 'void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: 'uniform sampler2D map; uniform vec2 resolution; void main() { gl_FragColor = texture2D(map, gl_FragCoord.xy / resolution); }',
+    depthTest: false, depthWrite: false,
+  });
+  copyScene.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), copyMaterial), { frustumCulled: false }));
+  [...feedbackRT, copyMaterial].forEach((r) => scope.own(r));
+  scope.trackTree(copyScene);
   [colorRT, normalRT, fxRT, normalMaterial].forEach((r) => scope.own(r));
   scope.trackTree(pass.scene);
   pass.uniforms.tColor.value = colorRT.texture;
@@ -151,12 +167,16 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   scope.trackTree(chill.points);
   chill.points.layers.set(LAYER_GHOST); // cold mist veils what's behind it, like smoke
   scene.add(chill.points);
+  // A swinging blade's trail of fire (the visualizer's sword combos).
+  const swingTrail = createSwingTrail({ fxMaterial: effectMaterial, field, count: pCount(1600), reducedMotion });
+  for (const o of swingTrail.objects) { scope.trackTree(o); o.layers.set(LAYER_FX); scene.add(o); }
   let elementKey = elementOr(startingEquipment.element);
   const presence = Object.fromEntries(ELEMENT_IDS.map((id) => [id, 0]));
   function setElement(key, instant = false) {
     elementKey = elementOr(key);
     plasma.setActive(elementKey === 'lightning', instant);
     crystals.setActive(elementKey === 'ice', instant);
+    swingTrail.setElement(elementKey);
     if (!instant) return;
     for (const id of ELEMENT_IDS) presence[id] = id === elementKey ? 1 : 0;
     if (elementKey !== 'fire') fire.extinguish();
@@ -164,13 +184,34 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   /** How much of the fire burns for an element: all of it, a banked glow in the ice, none in the ball. */
   const flameShare = (key) => (key === 'fire' ? 1 : key === 'ice' ? effects.ice.innerFire : 0);
 
+  // Live modulation from outside (the audio visualizer writes it every frame). All
+  // zeros is the fire as the settings describe it; each value is a fraction added
+  // (level: stoke levels added to the resting level; wind: world m/s).
+  const drive = { level: 0, brightness: 0, size: 0, height: 0, turbulence: 0, glow: 0, exposure: 0, windX: 0, windZ: 0 };
+  // The pixel pass's effects layer (see pixelPass.js), all off on the site. `sliceSeed`
+  // picks a tear pattern; the visualizer changes it with each hit.
+  const glitch = {
+    slice: 0, sliceSeed: 0, split: 0, block: 1, wave: 0, mirror: 0, scan: 0, noise: 0, invert: 0,
+    feedback: 0, zoom: 1, kaleido: 0, kaleidoRot: 0, rippleR: 0, rippleAmp: 0, iris: 2, letterbox: 0, ink: 0, cycle: 0,
+  };
+  const GLITCH_UNIFORMS = {
+    slice: 'uSlice', sliceSeed: 'uSliceSeed', split: 'uSplit', block: 'uBlock', wave: 'uWave', mirror: 'uMirror', scan: 'uScan', noise: 'uNoise', invert: 'uInvert',
+    feedback: 'uFeedback', zoom: 'uZoom', kaleido: 'uKaleido', kaleidoRot: 'uKaleidoRot', rippleR: 'uRippleR', rippleAmp: 'uRippleAmp', iris: 'uIris', letterbox: 'uLetterbox', ink: 'uInk', cycle: 'uCycle',
+  };
+  // Effects that are a still look rather than motion or flashing (kept under reduced motion).
+  const STILL = new Set(['mirror', 'scan', 'block', 'letterbox', 'iris', 'zoom']);
+  const OFF = { iris: 2, zoom: 1, block: 1 };
+  const boost = (v) => Math.max(0.1, 1 + v);
+
   function applyFireParams() {
     const f = effects.fire;
     // Inside the ice the fire burns low, narrow and slow.
     const banked = presence.ice / Math.max(1e-3, presence.fire + presence.ice);
     Object.assign(fire.params, {
-      brightness: f.brightness * (1 - 0.25 * banked), radius: f.size * (1 - 0.3 * banked), rise: f.height * (1 - 0.5 * banked),
-      curlAmp: f.turbulence * (1 - 0.55 * banked) * (reducedMotion ? 0.83 : 1),
+      brightness: f.brightness * (1 - 0.25 * banked) * boost(drive.brightness),
+      radius: f.size * (1 - 0.3 * banked) * boost(drive.size),
+      rise: f.height * (1 - 0.5 * banked) * boost(drive.height),
+      curlAmp: f.turbulence * (1 - 0.55 * banked) * (reducedMotion ? 0.83 : 1) * boost(drive.turbulence),
       curlFreq: f.swirl, lifeMin: Math.min(f.lifeMin, f.lifeMax), lifeMax: f.lifeMax,
       spawn: Math.min(1, presence.fire + presence.ice * effects.ice.innerFire),
       sparks: presence.fire,
@@ -218,6 +259,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     plasma.setRamp(f.ramp);
     crystals.setRamp(f.ramp);
     chill.setRamp(f.ramp);
+    swingTrail.setRamp(f.ramp);
     pass.uniforms.uCore.value.set(f.ramp[3]);
     if (debugPaletteIndex === 0) {
       const extra = paletteExtra();
@@ -267,6 +309,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
         // The fire sinks while the weapon is forged, and every firefly lights up.
         onSwapStart: (selection) => {
           const nextFlame = selection.flame;
+          weapons.auraElement = selection.element ?? elementKey;
           targetLevel = 0.6;
           forgeFlame = nextFlame;
           // A blend still running from the last swap finishes quickly, so the
@@ -280,6 +323,19 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
           fire.burst(0.45);
         },
         onImpact: impact,
+        // A sword combo: the blade sheds fire and knocks the flames along its swing,
+        // and plunging back in throws the element's ring.
+        onSwingFrame: (g0, t0, g1, t1, dt) => {
+          swingTrail.emit(g0, t0, g1, t1, dt);
+          bladeWake(g0, t0, g1, t1, dt);
+        },
+        onSwingImpact: () => {
+          ring(1.2);
+          fire.burst(1.1 * flameShare(elementKey));
+          jolt(0.3);
+          swingDone?.();
+          swingDone = null;
+        },
       },
     });
 
@@ -314,8 +370,10 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       terrain,
       raycast,
       reducedMotion,
+      trailMaterial: lightTrails ? effectMaterial : null,
     });
     scope.trackTree(fireflies.group);
+    if (fireflies.trails) { scope.trackTree(fireflies.trails); fireflies.trails.layers.set(LAYER_FX); scene.add(fireflies.trails); }
     fireflies.setRamp(currentRamp);
     scene.add(fireflies.group);
 
@@ -447,8 +505,12 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     onImpact?.(flameKey, old, stationary, { ...selection, weapon: weaponKey });
   }
 
-  /** Swap weapon + flame color. Resolves at impact. */
-  function equip(weaponKey, key, { instant = false, item = null, element = elementKey } = {}) {
+  /**
+   * Swap weapon + flame color. Resolves at impact. `pace` and `hold` go to the swap
+   * (see weapons.js): the visualizer times the impact to the beat, or holds the new
+   * weapon over the fire until release().
+   */
+  function equip(weaponKey, key, { instant = false, item = null, element = elementKey, pace = 1, hold = false } = {}) {
     return loaded.then(() => {
       if (scope.disposed) return { status: 'cancelled' };
       if (!Object.hasOwn(flames, key)) throw new Error('Unknown flame: ' + key);
@@ -466,18 +528,113 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
         onImpact?.(key, key, true, selection);
         return { status: 'applied' };
       }
-      return weapons.swap(weaponKey, flames[flameKey].ramp, flames[key].ramp, selection);
+      return weapons.swap(weaponKey, flames[flameKey].ramp, flames[key].ramp, selection, { pace, hold });
     });
+  }
+
+  /**
+   * A beat (the visualizer): the fire kicks up, the ball crackles, the ice pulses.
+   * `strength` 0..1; `accent` marks a downbeat (a bigger hit); the fireflies blink along
+   * unless `blink` is off.
+   */
+  function pulse(strength = 1, { accent = false, blink = true } = {}) {
+    if (!ready || reducedMotion) return;
+    const s = Math.min(1, Math.max(0, strength));
+    fire.burst(0.45 * s * (accent ? 1.5 : 1) * flameShare(elementKey));
+    if (elementKey === 'lightning') {
+      zap.crackle(0.12 + 0.15 * s, Math.round(2 + 3 * s + (accent ? 3 : 0)));
+      if (accent) plasma.discharge(0.35 * s);
+    } else if (elementKey === 'ice') {
+      crystals.burst(0.4 * s * (accent ? 1.5 : 1));
+    }
+    if (blink) fireflies.pulse(accent ? s : s * 0.45);
+    weapons.beat(s * (accent ? 1 : 0.6));
+  }
+  /**
+   * The current element's ring, without a new weapon or colors: a ring of fire, of
+   * lightning or of ice shards races out across the ground (the visualizer's extra hits).
+   */
+  function ring(strength = 1) {
+    if (!ready || reducedMotion) return;
+    const s = Math.min(1.5, Math.max(0, strength));
+    if (elementKey === 'lightning') { zap.burst(effects.lightning.height); plasma.discharge(0.6 * s); }
+    else if (elementKey === 'ice') { frostRing.burst(); crystals.burst(0.8 * s); }
+    else { fx.burst(); fire.burst(0.9 * s); }
+    fire.params.level = Math.max(fire.params.level, 1.6 + s);
+    jolt(0.12 * s);
+  }
+  /** An echo of the planted weapon's silhouette bursts out of it. */
+  function echo() {
+    if (ready) weapons.echo(currentRamp);
+  }
+  /**
+   * A sword combo (the visualizer): plan { hits: [s, …], plunge: s } in seconds from
+   * now. Resolves when the blade plunges back into the fire (false if it can't swing).
+   * Each slash is framed for the camera as it begins.
+   */
+  let swingDone = null;
+  const camAxes = () => {
+    camera.updateMatrixWorld();
+    return {
+      right: new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0),
+      up: new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1),
+      toCam: new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 2),
+    };
+  };
+  function swing(plan) {
+    if (!ready || reducedMotion) return Promise.resolve(false);
+    if (!weapons.swing({ ...plan, basis: camAxes })) return Promise.resolve(false);
+    return new Promise((resolve) => { swingDone = () => resolve(true); });
+  }
+  /** Flames and sparks near the moving blade get knocked along with it. */
+  function bladeWake(g0, t0, g1, t1, dt) {
+    const inv = 1 / Math.max(dt, 1e-3);
+    const vgx = (g1.x - g0.x) * inv, vgy = (g1.y - g0.y) * inv, vgz = (g1.z - g0.z) * inv;
+    const vtx = (t1.x - t0.x) * inv, vty = (t1.y - t0.y) * inv, vtz = (t1.z - t0.z) * inv;
+    const abx = t1.x - g1.x, aby = t1.y - g1.y, abz = t1.z - g1.z;
+    const len2 = abx * abx + aby * aby + abz * abz || 1;
+    const R = 0.3;
+    for (const set of fire.sets) {
+      const P = set.pos;
+      const V = set.vel;
+      for (let i = 0; i < set.n; i++) {
+        const ix = i * 3;
+        const px = P[ix] - g1.x, py = P[ix + 1] - g1.y, pz = P[ix + 2] - g1.z;
+        const s = Math.min(1, Math.max(0, (px * abx + py * aby + pz * abz) / len2));
+        const dx = px - abx * s, dy = py - aby * s, dz = pz - abz * s;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 > R * R) continue;
+        const k = 0.45 * (1 - Math.sqrt(d2) / R);
+        V[ix] = Math.max(-4, Math.min(4, V[ix] + (vgx + (vtx - vgx) * s) * k));
+        V[ix + 1] = Math.max(-4, Math.min(4, V[ix + 1] + (vgy + (vty - vgy) * s) * k));
+        V[ix + 2] = Math.max(-4, Math.min(4, V[ix + 2] + (vgz + (vtz - vgz) * s) * k));
+      }
+    }
+  }
+  /** A few sparks off the flame (hi-hats). */
+  function sparkle(n = 3) {
+    if (!ready || reducedMotion) return;
+    fire.sparkle(n);
   }
 
   // --- Camera: point-of-view tweening + snapped sway
   let layout = 'wide';
-  const toPose = (p) => ({ pos: new THREE.Vector3(...p.pos), target: new THREE.Vector3(...p.target), fov: p.fov, sx: p.sx, sy: p.sy });
-  const clonePose = (p) => ({ pos: p.pos.clone(), target: p.target.clone(), fov: p.fov, sx: p.sx, sy: p.sy });
+  const toPose = (p) => ({ pos: new THREE.Vector3(...p.pos), target: new THREE.Vector3(...p.target), fov: p.fov, sx: p.sx, sy: p.sy, roll: p.roll ?? 0 });
+  const clonePose = (p) => ({ pos: p.pos.clone(), target: p.target.clone(), fov: p.fov, sx: p.sx, sy: p.sy, roll: p.roll });
   const view = { name: 'home', cur: toPose(getPov('home', layout)), from: null, to: null, t: 1, dur: 1.25 };
   function setView(name, { instant = false } = {}) {
     view.name = name;
-    const to = toPose(getPov(name, layout));
+    moveTo(toPose(getPov(name, layout)), instant, 1.25);
+  }
+  /**
+   * A camera pose of your own ({ pos, target, fov, sx, sy }, arrays for the vectors),
+   * outside the site's per-screen points of view. It's kept through layout changes.
+   */
+  function setPose(p, { instant = false, duration = 1.25 } = {}) {
+    view.name = null;
+    moveTo(toPose({ sx: 0, sy: 0, ...p }), instant, duration);
+  }
+  function moveTo(to, instant, duration) {
     if (instant || reducedMotion) {
       view.cur = to;
       view.t = 1;
@@ -485,6 +642,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       view.from = clonePose(view.cur);
       view.to = to;
       view.t = 0;
+      view.dur = duration;
     }
   }
 
@@ -563,6 +721,8 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     colorRT.setSize(w, h);
     normalRT.setSize(w, h);
     fxRT.setSize(w, h);
+    for (const rt of feedbackRT) rt.setSize(w, h);
+    feedbackLive = false;
     pass.uniforms.resolution.value.set(w, h);
     canvas.style.width = `${(w * pd) / dpr}px`;
     canvas.style.height = `${(h * pd) / dpr}px`;
@@ -570,7 +730,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     const next = container.clientWidth >= 1100 && w / h > 1.15 ? 'wide' : 'tall';
     if (next !== layout) {
       layout = next;
-      setView(view.name, { instant: true });
+      if (view.name) setView(view.name, { instant: true });
     }
   }
   const observer = new ResizeObserver(resize);
@@ -584,10 +744,14 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   const right = new THREE.Vector3();
   const up = new THREE.Vector3();
   const m4 = new THREE.Matrix4();
+  const rollQ = new THREE.Quaternion();
+  const fireOnScreen = new THREE.Vector3();
+  const VIEW_AXIS = new THREE.Vector3(0, 0, 1);
   const sway = { x: 0, y: 0 };
 
   function update(dt, t) {
-    fire.params.level += (targetLevel - fire.params.level) * Math.min(1, dt * 1.1);
+    fire.params.level += (targetLevel + drive.level - fire.params.level) * Math.min(1, dt * 1.1);
+    fire.wind.set(drive.windX, 0, drive.windZ);
     for (const id of ELEMENT_IDS) {
       const d = (id === elementKey ? 1 : 0) - presence[id];
       presence[id] += Math.sign(d) * Math.min(Math.abs(d), dt / 0.6);
@@ -614,6 +778,7 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     plasma.step(dt, t, fire.params.level, { ray: pointerRay(), flow: interaction.flowWorld });
     crystals.step(dt, t, fire.params.level);
     chill.step(dt, t);
+    swingTrail.step(dt, t);
     fx.step(dt, t);
     zap.step(dt, t);
     frostRing.step(dt, t);
@@ -652,8 +817,8 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     fireLight.position.lerpVectors(FIRE_LIGHT_AT, ballLightAt.set(FIRE_ORIGIN.x, Math.max(effects.lightning.height, BALL_LIGHT_MIN_Y), FIRE_ORIGIN.z + 0.12), presence.lightning);
     // A discharge (weapon impact, stoke) flashes the whole scene for an instant.
     const flash = reducedMotion ? 0 : plasma.flash;
-    pass.uniforms.exposure.value = effects.render.exposure * (1 + flash * 0.45);
-    fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * flicker * blendMul * (1 + flash * 1.5);
+    pass.uniforms.exposure.value = effects.render.exposure * (1 + flash * 0.45) * boost(drive.exposure);
+    fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * flicker * blendMul * (1 + flash * 1.5) * boost(drive.glow);
 
     weapons.update(dt);
 
@@ -665,11 +830,12 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
       view.cur.fov = THREE.MathUtils.lerp(view.from.fov, view.to.fov, k);
       view.cur.sx = THREE.MathUtils.lerp(view.from.sx, view.to.sx, k);
       view.cur.sy = THREE.MathUtils.lerp(view.from.sy, view.to.sy, k);
+      view.cur.roll = THREE.MathUtils.lerp(view.from.roll, view.to.roll, k);
     }
   }
 
   function applyCamera(dt) {
-    const { pos, target, fov, sx, sy } = view.cur;
+    const { pos, target, fov, sx, sy, roll } = view.cur;
     camera.fov = fov;
     camera.setViewOffset(size.w, size.h, -Math.round(sx * size.w), Math.round(sy * size.h), size.w, size.h);
     camera.updateProjectionMatrix();
@@ -677,8 +843,8 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     // Sway toward the cursor, snapped to whole texels at the focal distance so
     // the image never swims between pixels.
     if (!reducedMotion) {
-      sway.x += (ptr.sx - sway.x) * Math.min(1, dt * 2.5);
-      sway.y += (ptr.sy - sway.y) * Math.min(1, dt * 2.5);
+      sway.x += (ptr.sx * swayAmount - sway.x) * Math.min(1, dt * 2.5);
+      sway.y += (ptr.sy * swayAmount - sway.y) * Math.min(1, dt * 2.5);
     }
     const dist = pos.distanceTo(target);
     const texel = (2 * dist * Math.tan(THREE.MathUtils.degToRad(fov / 2))) / size.h;
@@ -693,14 +859,27 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     oy = Math.round(oy / texel) * texel;
     camera.position.copy(pos);
     camera.quaternion.setFromRotationMatrix(m4.lookAt(pos, target, camera.up));
+    if (roll) camera.quaternion.multiply(rollQ.setFromAxisAngle(VIEW_AXIS, roll));
     right.set(1, 0, 0).applyQuaternion(camera.quaternion);
     up.set(0, 1, 0).applyQuaternion(camera.quaternion);
     camera.position.addScaledVector(right, ox).addScaledVector(up, oy);
   }
 
   function renderFrame(dt) {
+    // The visualizer drives the fire from here, so its changes land in this frame.
+    if (ready) onFrame?.(dt, clock.elapsedTime);
     if (ready) update(dt, clock.elapsedTime);
     applyCamera(dt);
+    for (const [k, u] of Object.entries(GLITCH_UNIFORMS)) {
+      pass.uniforms[u].value = reducedMotion && !STILL.has(k) ? OFF[k] ?? 0 : glitch[k];
+    }
+    pass.uniforms.uTime.value = clock.elapsedTime;
+    // The ripple is sized to the screen: radius as a fraction of the height, push per 270 rows.
+    pass.uniforms.uRippleR.value = glitch.rippleR * size.h;
+    pass.uniforms.uRippleAmp.value = reducedMotion ? 0 : (glitch.rippleAmp * size.h) / 270;
+    // Where the fire is on screen (texels): the ripple, the iris and the echoes center on it.
+    fireOnScreen.set(FIRE_ORIGIN.x, 0.55, FIRE_ORIGIN.z).project(camera);
+    pass.uniforms.uCenter.value.set((fireOnScreen.x * 0.5 + 0.5) * size.w, (fireOnScreen.y * 0.5 + 0.5) * size.h);
 
     scene.overrideMaterial = normalMaterial;
     camera.layers.set(LAYER_SOLID);
@@ -723,9 +902,27 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
     renderer.clear();
     renderer.render(scene, camera);
 
-    renderer.setRenderTarget(null);
-    renderer.clear();
-    renderer.render(pass.scene, pass.camera);
+    if (pass.uniforms.uFeedback.value > 0) {
+      if (!feedbackLive) {
+        for (const rt of feedbackRT) { renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 1); renderer.clear(); }
+        feedbackLive = true;
+      }
+      const write = feedbackRT[feedbackFlip];
+      pass.uniforms.tPrev.value = feedbackRT[1 - feedbackFlip].texture;
+      feedbackFlip = 1 - feedbackFlip;
+      renderer.setRenderTarget(write);
+      renderer.clear();
+      renderer.render(pass.scene, pass.camera);
+      copyMaterial.uniforms.map.value = write.texture;
+      renderer.setRenderTarget(null);
+      renderer.clear();
+      renderer.render(copyScene, pass.camera);
+    } else {
+      feedbackLive = false;
+      renderer.setRenderTarget(null);
+      renderer.clear();
+      renderer.render(pass.scene, pass.camera);
+    }
   }
 
   let running = false;
@@ -816,10 +1013,25 @@ export function createBonfire(container, { reducedMotion = false, onImpact, onRa
   }
 
   return {
-    stoke, puff, equip, setView, cycle, describe, flash, applyEffects, ready: loaded,
+    stoke, puff, equip, setView, setPose, cycle, describe, flash, applyEffects, pulse, sparkle, ring, echo, swing, drive, glitch, ready: loaded,
+    /** A jolt of the camera (0..~0.3), if screen shake is on. */
+    shake: (amount) => jolt(amount),
     dispose: () => scope.dispose(),
+    /** Let a weapon held over the fire strike (equip with `hold`). False if none is held. */
+    release: (strikePace = 1) => weapons?.release(strikePace) ?? false,
+    /** 0..1: how hard a held weapon glows. */
+    set charge(v) { if (weapons) weapons.charge = v; },
+    /** Render pixel size in CSS px (null: the settings' size). */
+    setPixelSize(px) { settings.pixelSize = px; resize(); },
     get flame() { return flameKey; },
     get element() { return elementKey; },
+    get weapon() { return weapons?.currentKey ?? null; },
+    /** A weapon swap is running (or a weapon is held, waiting to strike, or swinging). */
+    get forging() { return weapons?.busy ?? false; },
+    get swinging() { return weapons?.swinging ?? false; },
+    get holding() { return weapons?.holding ?? false; },
+    /** Seconds from equip() to impact at pace 1. */
+    get swapTime() { return weapons?.impactTime ?? 3.58; },
     get fireflies() { return fireflies; },
     /** Internals for debugging (dev builds expose this as window.__fire). */
     get debug() { return { weapons, fx, plasma, zap, frostRing, crystals, chill }; },

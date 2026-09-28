@@ -291,10 +291,18 @@ export function createWeapons(gltfRoot, {
     resolveSwap = null;
     incoming = null;
     phase = 'idle';
+    pace = 1;
+    holding = false;
+    auraOn = false;
+    flingT = -1;
+    endSwing();
     clearForge();
     clearLines();
   }
-  function swap(key, fromRamp, toRamp, payload) {
+  // `pace` plays the whole choreography faster or slower (the visualizer fits it to a
+  // whole number of beats); `hold` keeps the new weapon hovering, formed, until
+  // release() (the visualizer forges in a breakdown and strikes on the drop).
+  function swap(key, fromRamp, toRamp, payload, { pace: swapPace = 1, hold = false } = {}) {
     if (!Object.hasOwn(items, key)) return Promise.reject(new Error('Unknown weapon: ' + key));
     // A new swap may cut the previous one's settle short.
     if (phase === 'settle') {
@@ -305,9 +313,13 @@ export function createWeapons(gltfRoot, {
     }
     if (phase !== 'idle') {
       cancelQueued();
-      queued = { key, fromRamp, toRamp, payload };
+      queued = { key, fromRamp, toRamp, payload, opts: { pace: swapPace, hold } };
       return new Promise((r) => { queued.resolve = r; });
     }
+    pace = swapPace;
+    holding = hold;
+    auraOn = false;
+    flingT = -1; // the forge particles are needed again
     if (current && current.userData.key === key) {
       // The geometry can stay put while the scene applies a new flame or item.
       hooks.onImpact?.(payload, key, true);
@@ -450,6 +462,113 @@ export function createWeapons(gltfRoot, {
     geo.attributes.alpha.needsUpdate = true;
   }
 
+  // The aura (the visualizer): while a formed weapon is held over the fire waiting for
+  // the drop, the forge particles become a vortex around it: three strands winding up
+  // the blade and turning together (a structure reads at pixel scale where a cloud
+  // wouldn't), with sparks falling in from further out, as if it's drawing the fire's
+  // energy in. `charge` tightens and speeds it; a beat pushes it out for a moment. On
+  // release the whole vortex is flung outward as the blade strikes.
+  let auraOn = false;
+  let auraKick = 0;
+  let flingT = -1;
+  const auraS = new Float32Array(M);   // height along the blade, 0..1
+  const auraR = new Float32Array(M);   // radius
+  let auraSpin = 0;
+  let auraElement = 'fire'; // the element the held blade will strike with: the vortex takes after it
+  const AURA_TURNS = 2.2;
+  const infalling = (i) => i % 4 === 0;
+  function startAura() {
+    auraOn = true;
+    for (let i = 0; i < N; i++) {
+      auraS[i] = Math.random();
+      auraR[i] = infalling(i) ? 0.35 + Math.random() * 0.4 : 0.1 + Math.random() * 0.05;
+      // Orbiters: which of the three strands (plus a little spread); infallers: anywhere.
+      hAng[i] = infalling(i) ? Math.random() * Math.PI * 2 : ((i % 3) * Math.PI * 2) / 3 + (Math.random() - 0.5) * 0.4;
+      heat[i] = Math.random();
+      born[i] = totalT - Math.random();
+      state[i] = 1;
+    }
+  }
+  function stepAura(dt) {
+    if (!N || !incoming) return;
+    holder.updateMatrixWorld(true);
+    const span = incoming.userData.uniforms.uSpan.value;
+    const len = span.y - span.x;
+    auraKick *= Math.exp(-dt / 0.16);
+    const c0 = charge;
+    const zap = auraElement === 'lightning';
+    const ice = auraElement === 'ice';
+    auraSpin += dt * (2 + 6 * c0 + 10 * auraKick) * (ice ? 0.45 : 1);
+    for (let i = 0; i < N; i++) {
+      const ix = i * 3;
+      const infall = infalling(i);
+      if (infall) {
+        // Falling in from further out, faster the harder it charges.
+        auraR[i] -= dt * (0.12 + 0.5 * c0) * (0.5 + heat[i]);
+        auraS[i] += (0.5 - auraS[i]) * dt * 0.3;
+        if (auraR[i] < 0.04) { auraR[i] = 0.4 + Math.random() * 0.4; auraS[i] = Math.random(); born[i] = totalT; }
+      } else {
+        // Spiraling up the blade from the point, starting over when it reaches the top.
+        auraS[i] += dt * (0.12 + 0.45 * c0) * (0.6 + heat[i] * 0.8);
+        if (auraS[i] > 1) { auraS[i] -= 1; born[i] = totalT; }
+      }
+      if (infall) hAng[i] += (dt * (1.5 + 4 * c0)) / Math.max(0.3, auraR[i] * 6);
+      const s = auraS[i];
+      const a = infall ? hAng[i] : hAng[i] + s * AURA_TURNS * Math.PI * 2 + auraSpin;
+      let r = (infall ? auraR[i] : auraR[i] * (1 - 0.35 * c0) * (0.75 + 0.45 * Math.sin(Math.PI * s))) + auraKick * (infall ? 0.05 : 0.2);
+      if (zap) r += (Math.random() - 0.5) * 0.05; // lightning: the strands crackle
+      vH.set(Math.cos(a) * r, span.x + s * len + (zap ? (Math.random() - 0.5) * 0.03 : 0), Math.sin(a) * r).applyMatrix4(incoming.matrixWorld);
+      const c = field.fire(vH.x - anchor.x, vH.y, vH.z - anchor.z, totalT);
+      FP[ix] = vH.x + c.x * 0.03; FP[ix + 1] = vH.y + c.y * 0.03; FP[ix + 2] = vH.z + c.z * 0.03;
+      const flick = (Math.sin(totalT * 23 + heat[i] * 40) + 1) * 0.5;
+      const hot = flick > 0.7 || auraKick > 0.5 * heat[i] + 0.3;
+      // Fire: flickering body and bright tones. Lightning: white-hot, blinking. Frost: pale glints.
+      const tone = zap ? (hot || flick > 0.4 ? 3 : 2) : ice ? (flick > 0.8 ? 3 : 2) : hot ? 3 : flick > 0.35 ? 2 : 1;
+      col.copy(rampNew[tone]).multiplyScalar((ice ? 0.45 + 0.4 * flick : 0.6 + 0.4 * flick) + 0.4 * auraKick);
+      FC[ix] = col.r; FC[ix + 1] = col.g; FC[ix + 2] = col.b;
+      const ends = Math.min(1, s * 6, (1 - s) * 5) * Math.min(1, (totalT - born[i]) * 4);
+      FS[i] = zap && Math.random() < 0.3 ? 0 : grain[i] * (hot ? 0.8 : 1.1) * (1 + auraKick * 0.6) * (ice && flick > 0.8 ? 1.4 : 1);
+      FA[i] = (0.45 + 0.55 * flick) * (infall ? 0.7 : 1) * Math.max(0, ends);
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.color.needsUpdate = true;
+    geo.attributes.size.needsUpdate = true;
+    geo.attributes.alpha.needsUpdate = true;
+  }
+  // Release: every aura particle flies outward from the blade and burns out.
+  function startFling() {
+    auraOn = false;
+    flingT = 0;
+    holder.updateMatrixWorld(true);
+    const frame = (incoming ?? holder).matrixWorld;
+    const axis = vT.set(0, 1, 0).transformDirection(frame);
+    const center = vA.setFromMatrixPosition(frame);
+    for (let i = 0; i < N; i++) {
+      const ix = i * 3;
+      vH.set(FP[ix] - center.x, FP[ix + 1] - center.y, FP[ix + 2] - center.z);
+      vH.addScaledVector(axis, -vH.dot(axis)); // away from the blade's axis
+      if (vH.lengthSq() < 1e-6) vH.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+      vH.normalize().multiplyScalar(1.6 + Math.random() * 2.6);
+      FV[ix] = vH.x; FV[ix + 1] = vH.y + (Math.random() - 0.2) * 1.2; FV[ix + 2] = vH.z;
+    }
+  }
+  function stepFling(dt) {
+    flingT += dt;
+    const k = flingT / 0.7;
+    if (k >= 1 || !N) { flingT = -1; FS.fill(0); geo.attributes.size.needsUpdate = true; return; }
+    const drag = Math.exp(-dt * 3);
+    for (let i = 0; i < N; i++) {
+      const ix = i * 3;
+      FV[ix] *= drag; FV[ix + 1] = FV[ix + 1] * drag - dt * 1.5; FV[ix + 2] *= drag;
+      FP[ix] += FV[ix] * dt; FP[ix + 1] += FV[ix + 1] * dt; FP[ix + 2] += FV[ix + 2] * dt;
+      FA[i] = (1 - k) * (0.5 + 0.5 * heat[i]);
+      FS[i] = grain[i] * (1.3 - 0.5 * k);
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.attributes.size.needsUpdate = true;
+    geo.attributes.alpha.needsUpdate = true;
+  }
+
   // The double helix: from the moment the particles' color has swapped, two lines
   // trace the particle helix around the new weapon, one growing from the point up
   // and one from the pommel down. They span exactly the blade's length and, as the
@@ -469,6 +588,10 @@ export function createWeapons(gltfRoot, {
     return wide + (snug - wide) * tighten;
   };
   const lineRX = (s) => closeIn(lineProfile.rx, s);
+  // The lines fade through the hold, unless the weapon is held: then they come back
+  // and pulse with the beat and the build-up.
+  const heldLineAlpha = () => Math.max(1 - Math.min(1, t / D.hold),
+    holding ? (0.3 + 0.4 * charge + 0.5 * auraKick) * smooth(D.hold, D.hold + 0.8, t) : 0);
   const lineRZ = (s) => closeIn(lineProfile.rz, s);
   function stepLines(dt) {
     if (!fx) return;
@@ -476,7 +599,7 @@ export function createWeapons(gltfRoot, {
     if (incoming && (phase === 'dissolve' || phase === 'swirl' || phase === 'gather' || phase === 'form' || phase === 'hold')) {
       const growth = smooth(0, 1, (elapsed - TURNED) / (FORMED - TURNED));
       if (growth > 0) {
-        if (phase === 'hold') helixSpin += dt * 10;
+        if (phase === 'hold') helixSpin += dt * (holding ? 4 + 9 * charge + 20 * auraKick : 10);
         lineProfile = incoming.userData.silhouette.profile;
         tighten = smooth(0.2, 1, (elapsed - TIGHTEN_FROM) / (FORMED - TIGHTEN_FROM));
         lineLead.copy(rampNew[2]);
@@ -484,7 +607,7 @@ export function createWeapons(gltfRoot, {
         lineHot.copy(rampNew[3]);
         fx.helix({
           matrix: incoming.matrixWorld, y0: lineProfile.y0, y1: lineProfile.y1, spin: helixSpin, turns: HELIX_TURNS,
-          growth, alpha: phase === 'hold' ? 1 - Math.min(1, t / D.hold) : 1, radiusX: lineRX, radiusZ: lineRZ,
+          growth, alpha: phase === 'hold' ? heldLineAlpha() : 1, radiusX: lineRX, radiusZ: lineRZ,
           lead: lineLead, trail: lineTrail, head: lineHot, t: totalT,
         });
       }
@@ -507,13 +630,27 @@ export function createWeapons(gltfRoot, {
 
   let totalT = 0;
   let elapsed = 0;
+  let pace = 1;
+  let holding = false;
+  let charge = 0; // 0..1: how hard a held weapon glows (the visualizer feeds it the build-up)
+  let glowKick = 0; // a beat's glow on the planted weapon
   function update(dt) {
     totalT += dt;
+    if (flingT >= 0) stepFling(dt);
+    // A beat's glow on the planted weapon (the visualizer).
+    if (glowKick > 0.005) {
+      glowKick *= Math.exp(-dt / 0.2);
+      if (current && phase === 'idle') current.userData.uniforms.uGlow.value = glowKick > 0.005 ? glowKick * 0.8 : 0;
+      else if (current && phase === 'settle') current.userData.uniforms.uGlow.value = Math.max(current.userData.uniforms.uGlow.value, glowKick * 0.8);
+    }
+    if (phase !== 'idle' && phase !== 'settle') dt *= pace;
     stepLines(dt);
     if (phase === 'idle') return;
     t += dt;
     elapsed += dt;
-    if (phase === 'dissolve') {
+    if (phase === 'swing') {
+      stepSwing(dt);
+    } else if (phase === 'dissolve') {
       const k = Math.min(1, t / D.dissolve);
       if (current) {
         current.position.y = ease.inOut(k) * HOVER;
@@ -525,14 +662,14 @@ export function createWeapons(gltfRoot, {
       stepForge(dt);
       if (k >= 1) {
         if (current) current.visible = false;
-        next(D.swirl > 0 ? 'swirl' : D.gather > 0 ? 'gather' : 'form');
+        next(D.swirl > 0 ? 'swirl' : D.gather > 0 ? 'gather' : 'form', t - D.dissolve);
       }
     } else if (phase === 'swirl') {
       stepForge(dt);
-      if (t >= D.swirl) next('gather');
+      if (t >= D.swirl) next('gather', t - D.swirl);
     } else if (phase === 'gather') {
       stepForge(dt);
-      if (t >= D.gather) next('form');
+      if (t >= D.gather) next('form', t - D.gather);
     } else if (phase === 'form') {
       // The ripple runs in reverse; the new color's glow comes in once most of
       // the blade has formed, so it doesn't wash the edge out.
@@ -547,13 +684,19 @@ export function createWeapons(gltfRoot, {
         clearForge();
         if (fx) { burstT = 0; burstSil = incoming.userData.silhouette; burstMatrix.copy(incoming.matrixWorld); }
         hooks.onFormed?.(swapPayload);
-        next('hold');
+        next('hold', t - D.form);
       }
     } else if (phase === 'hold') {
       const k = Math.min(1, t / D.hold);
-      if (!reducedMotion) incoming.position.y = HOVER + ease.outCubic(k) * 0.06;
-      incoming.userData.uniforms.uGlow.value = 1 + 0.6 * (1 - k) ** 2; // the flash as it forms, settling to the glow
-      if (t >= D.hold) next('stab');
+      // A held weapon hangs there, bobbing a little and glowing with the build-up.
+      const bob = holding && !reducedMotion ? Math.sin((t - D.hold) * 2.4) * 0.012 * k : 0;
+      if (!reducedMotion) incoming.position.y = HOVER + ease.outCubic(k) * 0.06 + bob;
+      incoming.userData.uniforms.uGlow.value = 1 + 0.6 * (1 - k) ** 2 + (holding ? (0.5 * charge + 0.6 * auraKick) * k : 0); // the flash as it forms, settling to the glow
+      if (holding && t >= D.hold * 0.5) { if (!auraOn) startAura(); stepAura(dt); }
+      if (t >= D.hold && !holding) {
+        if (auraOn) startFling();
+        next('stab', Math.min(t - D.hold, 0.05)); // (a released hold starts the strike fresh)
+      }
     } else if (phase === 'stab') {
       const k = Math.min(1, t / D.stab);
       if (!reducedMotion) incoming.position.y = (HOVER + 0.06) * (1 - ease.inQuad(k));
@@ -563,7 +706,7 @@ export function createWeapons(gltfRoot, {
         current = incoming;
         incoming = null;
         setLayer(current, layerSolid);
-        next('settle');
+        next('settle', t - D.stab);
         hooks.onImpact?.(swapPayload, current.userData.key, false);
         resolveSwap?.({ status: 'applied' });
         resolveSwap = null;
@@ -579,15 +722,209 @@ export function createWeapons(gltfRoot, {
         if (queued) {
           const q = queued;
           queued = null;
-          swap(q.key, q.fromRamp, q.toRamp, q.payload).then(q.resolve);
+          swap(q.key, q.fromRamp, q.toRamp, q.payload, q.opts).then(q.resolve);
         }
       }
     }
   }
 
-  function next(p) {
-    phase = p;
+
+  // --- Sword combos (the visualizer) -------------------------------------------------
+  // The planted weapon pulls up out of the fire, slashes on the given beats and plunges
+  // back into the ashes on the last one. Each slash is an arc of the blade's direction
+  // in a plane facing the camera (captured as that slash begins, so it reads even if the
+  // camera moved), the flat of the blade toward the viewer and its edge leading. It
+  // accelerates into the hit (fastest exactly on the beat) and eases out after. The grip
+  // hangs over the fire, high enough that the tip clears the ground.
+  // Local frame: the blade runs along Y (point at uSpan.x, pommel at uSpan.y), width
+  // along X, thickness along Z (so Z is the flat's normal).
+  const SLASHES = [
+    { from: 150, hit: 62, to: -35 },               // a diagonal cut down to the right
+    { from: -35, hit: 78, to: 200 },               // rising back up over to the left
+    { from: 205, hit: 115, to: 5, flat: true },    // a flatter sweep through the fire
+    { from: 30, hit: 118, to: 215 },               // up and over from the right
+  ];
+  let combo = null;
+  const restPos = new THREE.Vector3();
+  const restQuat = new THREE.Quaternion();
+  const gripL = new THREE.Vector3();
+  const tipL = new THREE.Vector3();
+  const sG = new THREE.Vector3();
+  const sQ = new THREE.Quaternion();
+  const sQ2 = new THREE.Quaternion();
+  const sD = new THREE.Vector3();
+  const sN = new THREE.Vector3();
+  const sX = new THREE.Vector3();
+  const sY = new THREE.Vector3();
+  const sM = new THREE.Matrix4();
+  const sInv = new THREE.Matrix4();
+  const sScale = new THREE.Vector3();
+  const lastGrip = new THREE.Vector3();
+  const lastTip = new THREE.Vector3();
+  const nowGrip = new THREE.Vector3();
+  const nowTip = new THREE.Vector3();
+  const easeIO = (k) => k * k * (3 - 2 * k);
+
+  /** World orientation for blade direction d (grip → tip) with its flat facing n. */
+  function orient(d, n, out) {
+    sY.copy(d).negate();
+    sN.copy(n).addScaledVector(d, -n.dot(d)).normalize();
+    sX.crossVectors(sY, sN);
+    sM.makeBasis(sX, sY, sN);
+    return out.setFromRotationMatrix(sM);
+  }
+  /** A slash's plane from the camera: `right` and a tilted `up` (flatter for sweeps). */
+  function slashBasis(s) {
+    const b = combo.basis();
+    const a = b.right.clone();
+    const u = s.flat ? b.up.clone().multiplyScalar(0.35).addScaledVector(b.toCam, 1) : b.up.clone().addScaledVector(b.toCam, 0.3);
+    u.addScaledVector(a, -u.dot(a)).normalize();
+    return { a, u, n: new THREE.Vector3().crossVectors(a, u) };
+  }
+  function slashPose(k, deg, outG, outQ) {
+    const s = combo.slashes[k];
+    s.basis ??= slashBasis(SLASHES[k % SLASHES.length]);
+    const r = (deg * Math.PI) / 180;
+    sD.copy(s.basis.a).multiplyScalar(Math.cos(r)).addScaledVector(s.basis.u, Math.sin(r));
+    // The grip leans a little against the blade, like arms throwing the swing.
+    outG.copy(combo.center).addScaledVector(sD, -0.07);
+    orient(sD, s.basis.n, outQ);
+  }
+  function raisedPose(outG, outQ) {
+    const b = combo.basis();
+    outG.copy(combo.center).add(sY.set(0, 0.35, 0));
+    orient(sD.set(0, -1, 0), b.toCam, outQ);
+  }
+
+  /** Start a combo. plan: { hits: [s, …] (from now), plunge: s, basis: () => ({ right, up, toCam }) }. */
+  function swing(plan) {
+    if (phase !== 'idle' || !current || reducedMotion || !plan.hits.length) return false;
+    const span = current.userData.uniforms.uSpan.value;
+    const len = span.y - span.x;
+    gripL.set(0, span.y - 0.12 * len, 0);
+    tipL.set(0, span.x, 0);
+    restPos.copy(current.position);
+    restQuat.copy(current.quaternion);
+    holder.updateMatrixWorld(true);
+    const plantedG = gripL.clone().applyMatrix4(current.matrixWorld);
+    const plantedQ = current.getWorldQuaternion(new THREE.Quaternion());
+    const reach = len * 0.88;
+    const center = holder.getWorldPosition(new THREE.Vector3());
+    center.y = Math.max(1.05, 0.3 + 0.66 * reach);
+    combo = {
+      hits: plan.hits.slice(),
+      plunge: plan.plunge,
+      basis: plan.basis,
+      slashes: plan.hits.map(() => ({ basis: null })),
+      plantedG, plantedQ, center,
+      beat: plan.hits.length > 1 ? plan.hits[1] - plan.hits[0] : 0.5,
+      impacted: false,
+    };
+    lastGrip.copy(plantedG);
+    lastTip.copy(tipL).applyMatrix4(current.matrixWorld);
+    pace = 1;
+    phase = 'swing';
     t = 0;
+    return true;
+  }
+
+  /** Where the blade is at time `tt` into the combo: grip (world) and orientation (world). */
+  function comboPose(tt, outG, outQ) {
+    const c = combo;
+    const beat = Math.max(0.2, c.beat);
+    const pre = Math.max(0.12, beat * 0.3);
+    const post = Math.max(0.1, beat * 0.24);
+    const n = c.hits.length;
+    const start = (k) => c.hits[k] - pre;
+    const end = (k) => c.hits[k] + post;
+    const S = (k) => SLASHES[k % SLASHES.length];
+    // Rise: planted → the first wind-up.
+    if (tt < start(0)) {
+      const k = easeIO(Math.min(1, tt / Math.max(0.05, start(0))));
+      slashPose(0, S(0).from, sG, sQ2);
+      outG.copy(c.plantedG).lerp(sG, k);
+      outQ.copy(c.plantedQ).slerp(sQ2, k);
+      return;
+    }
+    for (let k = 0; k < n; k++) {
+      if (tt < end(k)) {
+        if (tt < start(k)) {
+          // Recover from the last slash into this one's wind-up.
+          const u = easeIO((tt - end(k - 1)) / Math.max(0.05, start(k) - end(k - 1)));
+          slashPose(k - 1, S(k - 1).to, outG, outQ);
+          slashPose(k, S(k).from, sG, sQ2);
+          outG.lerp(sG, u);
+          outQ.slerp(sQ2, u);
+          return;
+        }
+        const s = S(k);
+        let deg;
+        if (tt < c.hits[k]) {
+          const u = (tt - start(k)) / pre;
+          deg = s.from + (s.hit - s.from) * u * u; // accelerating into the hit
+        } else {
+          const v = (tt - c.hits[k]) / post;
+          deg = s.hit + (s.to - s.hit) * (1 - (1 - v) ** 2); // easing out after it
+        }
+        slashPose(k, deg, outG, outQ);
+        return;
+      }
+    }
+    // After the last slash: raise the blade point-down over the fire, then drive it in.
+    const stab = Math.min(0.14, (c.plunge - end(n - 1)) * 0.4);
+    const raiseEnd = c.plunge - stab;
+    if (tt < raiseEnd) {
+      const u = easeIO((tt - end(n - 1)) / Math.max(0.05, raiseEnd - end(n - 1)));
+      slashPose(n - 1, S(n - 1).to, outG, outQ);
+      raisedPose(sG, sQ2);
+      outG.lerp(sG, u);
+      outQ.slerp(sQ2, u);
+      return;
+    }
+    const u = Math.min(1, (tt - raiseEnd) / Math.max(0.02, stab));
+    raisedPose(outG, outQ);
+    outG.lerp(c.plantedG, u * u);
+    outQ.slerp(c.plantedQ, u * u);
+  }
+
+  function stepSwing(dt) {
+    const c = combo;
+    comboPose(t, sG, sQ);
+    // World pose → the weapon's transform under the holder: position = grip − R·gripLocal.
+    sM.compose(sG.clone().sub(gripL.clone().applyQuaternion(sQ)), sQ, sScale.set(1, 1, 1));
+    sInv.copy(holder.matrixWorld).invert();
+    sM.premultiply(sInv);
+    sM.decompose(current.position, current.quaternion, sScale);
+    current.updateMatrixWorld(true);
+    nowGrip.copy(gripL).applyMatrix4(current.matrixWorld);
+    nowTip.copy(tipL).applyMatrix4(current.matrixWorld);
+    const tipSpeed = nowTip.distanceTo(lastTip) / Math.max(dt, 1e-3);
+    current.userData.uniforms.uGlow.value = 0.35 + Math.min(1.1, tipSpeed / 7);
+    hooks.onSwingFrame?.(lastGrip, lastTip, nowGrip, nowTip, dt, tipSpeed);
+    lastGrip.copy(nowGrip);
+    lastTip.copy(nowTip);
+    if (t >= c.plunge && !c.impacted) {
+      c.impacted = true;
+      current.position.copy(restPos);
+      current.quaternion.copy(restQuat);
+      combo = null;
+      next('settle');
+      hooks.onSwingImpact?.();
+    }
+  }
+  function endSwing() {
+    if (!combo || !current) return;
+    current.position.copy(restPos);
+    current.quaternion.copy(restQuat);
+    current.userData.uniforms.uGlow.value = 0;
+    combo = null;
+  }
+
+  // Each phase starts with the time the last one overran by, so the impact lands
+  // exactly impactTime after the swap began (the visualizer puts it on a beat).
+  function next(p, carry = 0) {
+    phase = p;
+    t = Math.max(0, carry);
     if (p === 'form') beginForm();
   }
 
@@ -618,8 +955,40 @@ export function createWeapons(gltfRoot, {
     update,
     setRim,
     cancel,
+    swing,
+    get swinging() { return phase === 'swing'; },
+    /** The element a held blade will strike with (its vortex takes after it). */
+    set auraElement(key) { auraElement = key; },
+    /** Let a held weapon strike, at `strikePace` × the usual speed. False if nothing is held. */
+    release(strikePace = 1) {
+      if (!holding) return false;
+      holding = false;
+      pace = strikePace;
+      return true;
+    },
     get currentKey() { return current?.userData.key ?? null; },
     keys: Object.keys(items),
     get busy() { return phase !== 'idle'; },
+    get holding() { return holding; },
+    /** A beat (the visualizer): a held weapon's aura kicks out; a planted one glows. 0..1. */
+    beat(strength = 1) {
+      if (reducedMotion) return;
+      auraKick = Math.max(auraKick, strength);
+      glowKick = Math.max(glowKick, strength);
+    },
+    /** An echo of the planted weapon's silhouette bursts out of it, in `ramp`'s colors. */
+    echo(ramp) {
+      if (!fx || !current || (phase !== 'idle' && phase !== 'settle')) return;
+      current.userData.silhouette ??= weaponSilhouette(current.userData.toRoot);
+      rampNew.length = 0;
+      ramp.forEach((h) => rampNew.push(new THREE.Color(h)));
+      holder.updateMatrixWorld(true);
+      burstT = 0;
+      burstSil = current.userData.silhouette;
+      burstMatrix.copy(current.matrixWorld);
+    },
+    set charge(v) { charge = Math.min(1, Math.max(0, v)); },
+    /** Seconds from swap() to impact at pace 1 (not counting a hold). */
+    impactTime: D.dissolve + D.swirl + D.gather + D.form + D.hold + D.stab,
   };
 }

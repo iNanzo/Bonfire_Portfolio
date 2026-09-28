@@ -302,6 +302,11 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
       const s = Math.floor(sparkCount * 0.7 * Math.min(1, amount) * params.sparks);
       for (let j = 0; j < s; j++) spawnSpark(Math.floor(Math.random() * sparkCount), 1);
     },
+    /** A few sparks thrown up out of the flame (the visualizer's hi-hats). */
+    sparkle(n = 4) {
+      const s = Math.round(n * params.sparks);
+      for (let j = 0; j < s; j++) spawnSpark(Math.floor(Math.random() * sparkCount), 0.5);
+    },
     /** Put every particle out at once (an instant switch to another element). */
     extinguish() {
       age.set(life);
