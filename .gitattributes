@@ -1,0 +1,11 @@
+# Text files are stored and checked out with LF endings on every platform (so a
+# Windows checkout with core.autocrlf doesn't flip them, or warn on every commit).
+* text=auto eol=lf
+
+# Binary assets: never touched.
+*.png binary
+*.jpg binary
+*.webp binary
+*.glb binary
+*.blend binary
+*.wasm binary

@@ -21,8 +21,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
       - run: npm ci
+      # Nothing deploys unless the code lints and every test passes.
+      - run: npm run lint
+      - run: npm test
+      - run: npm run admin:test
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:

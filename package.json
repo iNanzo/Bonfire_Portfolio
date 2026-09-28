@@ -3,27 +3,30 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "lint": "eslint .",
     "model": "node tools/build-model.mjs",
     "screenshots": "node tools/import-screenshots.mjs",
     "admin": "vite --config admin/vite.config.js",
     "admin:build": "vite build --config admin/vite.config.js",
     "admin:deploy": "npm run admin:build && npx --yes wrangler@4 deploy --config admin/wrangler.toml",
     "admin:test": "node --test \"admin/test/*.test.mjs\"",
-    "test": "node --test \"test/*.test.mjs\""
+    "test": "node --test \"test/*.test.mjs\"",
+    "check": "npm run lint && npm test && npm run admin:test"
   },
   "dependencies": {
     "three": "^0.186.1"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@playwright/test": "1.63.0",
     "eslint": "10.11.0",
     "globals": "17.12.0",
-    "prettier": "3.9.9",
     "sharp": "^0.35.4",
     "vite": "^8.3.1"
   }
