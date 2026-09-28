@@ -12,7 +12,8 @@
     "admin": "vite --config admin/vite.config.js",
     "admin:build": "vite build --config admin/vite.config.js",
     "admin:deploy": "npm run admin:build && npx --yes wrangler@4 deploy --config admin/wrangler.toml",
-    "admin:test": "node --test \"admin/test/*.test.mjs\""
+    "admin:test": "node --test \"admin/test/*.test.mjs\"",
+    "test": "node --test \"test/*.test.mjs\""
   },
   "dependencies": {
     "three": "^0.186.1"

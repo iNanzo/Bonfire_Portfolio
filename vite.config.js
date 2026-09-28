@@ -40,6 +40,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
         notFound: resolve(import.meta.dirname, '404.html'),
+        visualizer: resolve(import.meta.dirname, 'visualizer/index.html'),
       },
     },
   },
