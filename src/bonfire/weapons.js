@@ -448,8 +448,13 @@ export function createWeapons(gltfRoot, {
   let glowKick = 0; // a beat's glow on the planted weapon
   let quiver = 0;   // a hard beat's shudder through the planted weapon
   let alive = true; // (the visualizer) the blade moves as if alive: it shudders, sways, trembles
+  let hovered = false; // the cursor is on the planted weapon (the site): its rim glows
+  let hoverGlow = 0;
   function update(dt) {
     totalT += dt;
+    // Hovered, the planted weapon's rim brightens: a click will wake it.
+    hoverGlow += ((hovered && phase === 'idle' ? 1 : 0) - hoverGlow) * Math.min(1, dt * 10);
+    if (current && phase === 'idle' && glowKick <= 0.005) current.userData.uniforms.uGlow.value = hoverGlow * 0.55;
     forge.stepFling(dt);
     // A beat's glow on the planted weapon (the visualizer).
     if (glowKick > 0.005) {
@@ -716,6 +721,8 @@ export function createWeapons(gltfRoot, {
     cancel,
     swing,
     hurry,
+    /** The cursor is on the planted weapon: its rim glows (the site's hover hint). */
+    set hovered(v) { hovered = !!v; },
     /** The planted weapon (for picking it with the cursor), or null mid-swap. */
     get planted() { return phase === 'idle' ? current : null; },
     get swinging() { return phase === 'swing'; },

@@ -1,4 +1,6 @@
-# Sixteen weapons for the bonfire, built procedurally with bmesh.
+# Twenty-three weapons for the bonfire, built procedurally with bmesh: swords, polearms
+# and (round 6) hafted weapons — an axe, a mace, a hammer, a morning star — which are
+# planted head-down like the rest, so the same forge, swing and silhouette code serves all.
 #
 # Style: dark and worn but simple — blackened fittings, leather-wrapped grips,
 # chipped edges, dark fullers. Blades are shaded like pixel sprites with three
@@ -22,6 +24,7 @@ WEAPON_KEYS = [
     "longsword", "broadsword", "bastard", "claymore", "katana", "uchigatana",
     "sabre", "rapier", "estoc", "spear", "greatsword", "glaive", "naginata",
     "zweihander", "flamberge", "flambergezwei",
+    "wingedspear", "battleaxe", "mace", "warhammer", "morningstar", "halberd", "lance",
 ]
 
 # Blade tones → material keys (see bonfire.py).
@@ -121,6 +124,39 @@ class Builder:
         for k in range(rings):
             z = z0 + (z1 - z0) * (k + 0.5) / rings
             self.cyl(ring_mat, r * 1.16, r * 1.16, z - 0.006, z + 0.006, segs)
+
+    def spike(self, mat, base, direction, length, r, segs=5):
+        """A cone from `base` (x, y, z) pointing along `direction` (a morning star's spikes)."""
+        bm = bmesh.new()
+        bmesh.ops.create_cone(bm, cap_ends=True, segments=segs, radius1=r, radius2=0.0, depth=length)
+        bmesh.ops.translate(bm, vec=(0, 0, length / 2), verts=bm.verts)
+        d = Vector(direction).normalized()
+        R = Vector((0, 0, 1)).rotation_difference(d).to_matrix()
+        bmesh.ops.rotate(bm, cent=(0, 0, 0), matrix=R, verts=bm.verts)
+        bmesh.ops.translate(bm, vec=base, verts=bm.verts)
+        return self._add(bm, mat)
+
+    def striped(self, mats, r0, r1, z0, z1, turns, segs=8, rows=48):
+        """A shaft wrapped in a spiral stripe (the lance): faces alternate between two
+        materials along a helix, `turns` times round from z0 to z1."""
+        bm = bmesh.new()
+        rings = []
+        for i in range(rows + 1):
+            s = i / rows
+            r = r0 + (r1 - r0) * s
+            z = z0 + (z1 - z0) * s
+            rings.append([bm.verts.new((r * math.cos(k / segs * math.tau), r * math.sin(k / segs * math.tau), z)) for k in range(segs)])
+        for i in range(rows):
+            for k in range(segs):
+                k2 = (k + 1) % segs
+                f = bm.faces.new((rings[i][k], rings[i][k2], rings[i + 1][k2], rings[i + 1][k]))
+                # Which side of the helix this face is on: the stripe covers half the round.
+                phase = (k / segs - turns * i / rows) % 1.0
+                f.material_index = 0 if phase < 0.5 else 1
+        bm.faces.new(list(reversed(rings[0])))
+        bm.faces.new(rings[-1])
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        return self._add(bm, mats)
 
     def fuller(self, z0, z1, w, t, x=0.0):
         """Dark groove down the blade's center, on both faces."""
@@ -250,27 +286,35 @@ def tsuba(b, r, z, square=False, mat="w_iron"):
 # --- the weapons ------------------------------------------------------------------------
 
 def build_longsword(b):
-    b.disc("w_iron", 0.036, 0.026, 0.03)
-    b.grip("w_leather", 0.019, 0.05, 0.25, rings=3)
-    crossguard(b, 0.27, 0.12, drop=0.028)
-    b.blade(straight(0.29, 1.3, [0.05, 0.049, 0.046, 0.042, 0.036, 0.026], 0.01), (0, 1.42), chips=0.15)
-    b.fuller(0.32, 0.95, 0.012, 0.01)
-    return plant((0, 1.42), 0.14)
+    # A round ball pommel, a long hand-and-a-half grip, long straight quillons whose tips
+    # turn a little toward the blade, and a long tapering blade with a deep fuller.
+    b.ball("w_iron", 0.04, (0, 0, 0.025), squash=(1, 0.85, 1))
+    b.cyl("w_iron", 0.02, 0.024, 0.055, 0.075)
+    b.grip("w_leather", 0.019, 0.075, 0.32, rings=4)
+    b.box("w_iron", (0, 0, 0.335), (0.34, 0.034, 0.03))
+    for sx in (1, -1):
+        b.box("w_iron", (sx * 0.16, 0, 0.35), (0.03, 0.034, 0.05))
+    b.box("w_iron", (0, 0, 0.345), (0.05, 0.04, 0.05))
+    b.blade(straight(0.36, 1.46, [0.052, 0.05, 0.047, 0.043, 0.037, 0.027], 0.01), (0, 1.6), chips=0.15)
+    b.fuller(0.38, 1.12, 0.013, 0.01)
+    return plant((0, 1.6), 0.14)
 
 
 def build_broadsword(b):
-    b.ball("w_iron", 0.033, (0, 0, 0.03), squash=(1, 0.8, 1.1))
-    b.grip("w_leather", 0.02, 0.05, 0.22, rings=2)
-    b.box("w_iron", (0.01, 0, 0.235), (0.2, 0.04, 0.03))
-    outer = [(-0.03, 0.245), (-0.085, 0.2), (-0.1, 0.12), (-0.08, 0.05), (-0.03, 0.02)]
-    b.band("w_iron", outer, [(x + 0.014, z) for x, z in outer], 0.012)
-    side = [(-0.02, 0.245), (-0.07, 0.2), (-0.075, 0.14)]
-    for y in (0.028, -0.028):
-        b.band("w_iron", side, [(x + 0.01, z) for x, z in side], 0.008, y=y)
-    st = [((0.0, 0.25 + 1.0 * s), (1.0, 0.0), 0.042 - 0.012 * s, 0.022 - 0.01 * s, 0.011)
-          for s in [i / 14 for i in range(15)]]
-    b.blade(st, (0.012, 1.37), single=True, chips=0.22)
-    return plant((0.012, 1.37), 0.14)
+    # A long, flared pommel; a cord-wrapped grip; a crossguard whose arms sweep out and
+    # curl up toward the blade; a broad straight blade with a fuller.
+    b.ball("w_iron", 0.026, (0, 0, 0.0), squash=(0.9, 0.9, 1.1))
+    b.cyl("w_iron", 0.034, 0.018, 0.02, 0.07, segs=8)
+    b.grip("w_wrap", 0.019, 0.07, 0.29, rings=6, ring_mat="w_brass")
+    b.box("w_iron", (0, 0, 0.31), (0.07, 0.042, 0.045))
+    for sx in (1, -1):
+        arm = [(sx * 0.03, 0.3), (sx * 0.09, 0.305), (sx * 0.15, 0.33), (sx * 0.185, 0.38), (sx * 0.19, 0.43)]
+        inner = [(x, z + 0.024) for x, z in arm[:-1]] + [(arm[-1][0] - sx * 0.018, arm[-1][1])]
+        b.band("w_iron", arm, inner, 0.026)
+        b.ball("w_iron", 0.013, (arm[-1][0], 0, arm[-1][1] + 0.005))
+    b.blade(straight(0.33, 1.4, [0.066, 0.064, 0.06, 0.055, 0.046, 0.032], 0.011), (0, 1.55), chips=0.12)
+    b.fuller(0.35, 1.0, 0.02, 0.011)
+    return plant((0, 1.55), 0.14)
 
 
 def build_bastard(b):
@@ -446,6 +490,132 @@ def build_flambergezwei(b):
           for s in [i / 44 for i in range(45)]]
     b.blade(st, (0, 1.92), chips=0.05)
     return plant((0, 1.92), 0.15)
+
+
+
+
+# --- round 6: from the reference chart (and the lance) ------------------------------------
+# Hafted weapons are modeled like the rest: handle at z=0, the head at the top, and
+# planted head-down (the top of the head goes into the ash).
+
+def build_wingedspear(b):
+    # The chart's spear: a long dark shaft, and under a long leaf head, two short wings.
+    b.cyl("w_iron", 0.018, 0.024, -0.05, 0.0)
+    b.cyl("w_wood", 0.021, 0.021, 0.0, 1.55)
+    for z in (0.55, 1.05):
+        b.cyl("w_iron", 0.025, 0.025, z - 0.012, z + 0.012)
+    b.cyl("w_iron", 0.03, 0.022, 1.55, 1.66)                                        # socket
+    for sx in (1, -1):                                                              # the wings
+        b.plate("w_iron", [(sx * 0.02, 1.62), (sx * 0.1, 1.6), (sx * 0.12, 1.63), (sx * 0.02, 1.66)], 0.016)
+    b.blade(straight(1.66, 1.98, [0.016, 0.046, 0.056, 0.05, 0.034], 0.012, count=10), (0, 2.12), chips=0.08)
+    b.fuller(1.7, 1.95, 0.01, 0.012)
+    return plant((0, 2.12), 0.16, scale=0.9)
+
+
+def build_battleaxe(b):
+    # A long haft with a leather grip, iron langets up to the head; a bearded crescent blade,
+    # a back spike and a short top spike.
+    b.cyl("w_iron", 0.026, 0.03, -0.44, -0.4)
+    b.cyl("w_wood", 0.024, 0.022, -0.4, 1.02)
+    b.grip("w_leather", 0.027, -0.36, -0.02, rings=3)
+    for sx in (1, -1):
+        b.box("w_iron", (sx * 0.024, 0, 0.84), (0.01, 0.03, 0.26))                  # langets
+    b.box("w_iron", (0, 0, 0.99), (0.07, 0.056, 0.17))                             # the eye
+    edge = [(0.26, 0.86), (0.285, 0.93), (0.29, 1.0), (0.285, 1.07), (0.26, 1.14)]
+    b.plate("w_steel", [(0.035, 0.94), (0.12, 0.9), (0.2, 0.83), (0.26, 0.86)] + edge[1:-1] +
+            [(0.26, 1.14), (0.2, 1.16), (0.12, 1.1), (0.035, 1.05)], 0.014)
+    b.band("w_edge", edge, [(x - 0.024, z) for x, z in edge], 0.018)
+    b.plate("w_iron", [(-0.035, 0.96), (-0.17, 0.99), (-0.035, 1.03)], 0.028)       # back spike
+    b.cyl("w_iron", 0.014, 0.0, 1.075, 1.18)                                       # top spike
+    return plant((0, 1.18), 0.14)
+
+
+def build_mace(b):
+    # A flanged mace: a braided iron haft, a leather grip, seven flanges round a core.
+    b.cyl("w_iron", 0.024, 0.02, -0.43, -0.4)
+    b.cyl("w_iron", 0.019, 0.019, -0.4, 0.74, segs=6)
+    for k in range(14):
+        z = 0.0 + k * 0.05
+        b.cyl("w_steel", 0.022, 0.022, z, z + 0.022, segs=6)                         # the braid
+    b.grip("w_leather", 0.023, -0.37, -0.05, rings=2)
+    b.cyl("w_iron", 0.026, 0.026, 0.72, 0.99, segs=7)
+    for k in range(7):
+        b.plate("w_steel", [(0.02, 0.72), (0.07, 0.76), (0.088, 0.85), (0.07, 0.94), (0.02, 0.99)], 0.012,
+                rot_z=k / 7 * math.tau)
+    b.ball("w_iron", 0.024, (0, 0, 1.0))
+    b.cyl("w_iron", 0.012, 0.0, 1.01, 1.07)
+    return plant((0, 1.07), 0.13)
+
+
+def build_warhammer(b):
+    # A long steel-sheathed haft with a leather grip; a hammer face on one side, a curved
+    # beak on the other, and a top spike.
+    b.cyl("w_iron", 0.024, 0.03, -0.39, -0.35)
+    b.cyl("w_steel", 0.018, 0.018, -0.35, 1.14, segs=6)
+    b.grip("w_leather", 0.024, -0.32, -0.05, rings=4)
+    b.cyl("w_iron", 0.026, 0.026, -0.05, -0.02)
+    b.box("w_iron", (0, 0, 1.12), (0.08, 0.05, 0.1))                               # the head
+    b.box("w_iron", (-0.08, 0, 1.12), (0.1, 0.06, 0.07))                           # hammer face
+    b.box("w_steel", (-0.13, 0, 1.12), (0.012, 0.07, 0.08))
+    b.plate("w_steel", [(0.04, 1.1), (0.04, 1.15), (0.14, 1.14), (0.24, 1.09), (0.3, 1.0), (0.22, 1.06), (0.12, 1.09)], 0.022)
+    b.cyl("w_iron", 0.016, 0.0, 1.17, 1.3)
+    return plant((0, 1.3), 0.14)
+
+
+def build_morningstar(b):
+    # A wooden haft banded in iron; a ball studded with spikes all round, a long one on top.
+    b.cyl("w_iron", 0.028, 0.03, -0.44, -0.4)
+    b.cyl("w_wood", 0.026, 0.024, -0.4, 0.78)
+    b.grip("w_leather", 0.029, -0.36, -0.06, rings=3)
+    for z in (0.12, 0.36):
+        b.cyl("w_iron", 0.03, 0.03, z - 0.012, z + 0.012)
+    b.cyl("w_iron", 0.03, 0.03, 0.62, 0.8)
+    c = (0, 0, 0.88)
+    b.ball("w_iron", 0.085, c)
+    rng = random.Random(7)
+    for i in range(14):
+        # Spread over the ball: a golden-angle spiral, a little jittered.
+        y = 1 - (i + 0.5) / 14 * 2
+        r = math.sqrt(1 - y * y)
+        a = i * 2.39996 + rng.uniform(-0.2, 0.2)
+        d = Vector((math.cos(a) * r, math.sin(a) * r, y))
+        b.spike("w_steel", Vector(c) + d * 0.07, d, 0.07, 0.018)
+    b.spike("w_steel", (0, 0, 0.95), (0, 0, 1), 0.1, 0.02)
+    return plant((0, 1.05), 0.14)
+
+
+def build_halberd(b):
+    # A tall shaft with a tassel; an axe blade, a back hook and a long top spike.
+    b.cyl("w_iron", 0.016, 0.022, -0.06, 0.0)
+    b.cyl("w_wood", 0.021, 0.021, 0.0, 1.62)
+    b.plate("w_cloth", [(0.018, 1.28), (0.045, 1.26), (0.06, 1.1), (0.04, 1.08), (0.03, 1.24)], 0.006, y=0.024)
+    b.cyl("w_iron", 0.026, 0.026, 1.26, 1.3)
+    b.cyl("w_iron", 0.028, 0.024, 1.58, 1.74)                                        # socket
+    blade = [(0.02, 1.6), (0.09, 1.58), (0.16, 1.54), (0.2, 1.62), (0.2, 1.7), (0.17, 1.78), (0.1, 1.73), (0.02, 1.72)]
+    b.plate("w_steel", blade, 0.012)
+    b.band("w_edge", blade[2:6], [(x - 0.02, z) for x, z in blade[2:6]], 0.014)
+    b.plate("w_iron", [(-0.02, 1.63), (-0.1, 1.61), (-0.18, 1.55), (-0.12, 1.64), (-0.02, 1.7)], 0.02)  # back hook
+    b.blade(straight(1.74, 2.0, [0.014, 0.026, 0.022, 0.012], 0.01, count=8), (0, 2.12))
+    return plant((0, 2.12), 0.16, scale=0.9)
+
+
+def build_lance(b):
+    # The jousting lance: a small bell pommel, a dark grip between two flares, a wide
+    # vamplate over the hand, and a long tapering shaft wrapped in a pale spiral stripe,
+    # banded in steel, to a slim point.
+    b.cyl("w_steel", 0.036, 0.018, -0.04, 0.0, segs=8)                               # bell pommel
+    b.striped(["w_paint", "w_dark"], 0.022, 0.022, 0.0, 0.2, 0.6)
+    b.cyl("w_steel", 0.05, 0.02, 0.2, 0.28, segs=8)                                  # small flare
+    b.cyl("w_wood", 0.02, 0.02, 0.28, 0.34, segs=8)
+    b.cyl("w_wrap", 0.022, 0.022, 0.34, 0.62, segs=8)                                # the grip
+    b.cyl("w_wood", 0.024, 0.03, 0.62, 0.68, segs=8)
+    b.cyl("w_steel", 0.13, 0.035, 0.66, 0.84, segs=10)                               # vamplate
+    b.striped(["w_paint", "w_dark"], 0.036, 0.016, 0.84, 2.3, 3.2)
+    for z, r in ((1.2, 0.031), (1.6, 0.026), (2.0, 0.021)):
+        b.cyl("w_steel", r + 0.006, r + 0.006, z - 0.012, z + 0.012, segs=8)
+    b.cyl("w_steel", 0.02, 0.014, 2.3, 2.36, segs=6)
+    b.blade(straight(2.36, 2.52, [0.012, 0.022, 0.018, 0.01], 0.01, count=6), (0, 2.62))
+    return plant((0, 2.62), 0.16, scale=0.7)
 
 
 BUILDERS = {k: globals()[f"build_{k}"] for k in WEAPON_KEYS}

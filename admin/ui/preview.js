@@ -3,6 +3,8 @@
 // src/main.js). The frame renders at a real desktop or phone size and is scaled
 // to fit the pane, so the layout matches what visitors see.
 import { el } from './form.js';
+import { WEAPON_KEYS } from '../../src/contentRules.js';
+import content from '../../src/content.json' with { type: 'json' };
 
 const VIEWPORTS = { desktop: [1280, 800], phone: [390, 780] };
 const SCREENS = [['home', 'Home'], ['projects', 'Projects'], ['experience', 'Journey'], ['skills', 'Skills'], ['about', 'About'], ['contact', 'Contact']];
@@ -45,6 +47,14 @@ export function createPreview(siteUrl) {
     SCREENS.map(([value, label]) => el('option', { value, text: label })));
   const size = el('select', { 'aria-label': 'Viewport', onchange: () => { viewport = size.value; fit(); } },
     el('option', { value: 'desktop', text: 'Desktop' }), el('option', { value: 'phone', text: 'Phone' }));
+  // Forge a chosen weapon in the preview (the full swap), in the fire's current colors.
+  const weapon = el('select', {
+    'aria-label': 'Preview a weapon',
+    title: 'Forge this weapon in the preview: the whole swap, then it stands in the fire',
+    onchange: () => { if (weapon.value) send({ type: 'nh:weapon', key: weapon.value }); weapon.value = ''; },
+  },
+  el('option', { value: '', text: 'Weapon…' }),
+  WEAPON_KEYS.map((k) => el('option', { value: k, text: content.weapons?.[k] ?? k })));
   const reload = () => { ready = false; state.textContent = 'Loading…'; delete state.dataset.tone; frame.src = url.href; };
 
   const pane = el('aside', { class: 'preview', 'aria-label': 'Live preview' },
@@ -53,7 +63,7 @@ export function createPreview(siteUrl) {
       el('a', { class: 'link-button', href: url.href.replace(/[?&]preview=1/, ''), target: '_blank', rel: 'noopener', text: 'Open Site ↗' })),
     stage,
     el('div', { class: 'preview-tools' },
-      screen, size,
+      screen, size, weapon,
       el('button', { type: 'button', class: 'button small', text: 'Stoke', title: 'Stoke the fire: a flare, the element’s ring, a ground mark', onclick: () => send({ type: 'nh:stoke' }) }),
       el('button', { type: 'button', class: 'button small', text: 'Random Swap', title: 'Forge a random new weapon, colors and element: the full swap and its impact', onclick: () => send({ type: 'nh:roll' }) }),
       el('button', { type: 'button', class: 'button small', text: 'Wake the Blade', title: 'The planted weapon pulls free for a flourish and plunges back in (hit-stop, flash, shake, debris)', onclick: () => send({ type: 'nh:flourish' }) }),

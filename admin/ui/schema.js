@@ -3,6 +3,7 @@
 // and the few special cases. Patterns: `projects[].images[].alt` (index → []).
 // Labels are run through titleCase(), so write them in any case.
 import { KINDLED_SHOW, WEAPON_KEYS } from '../../src/contentRules.js';
+import content from '../../src/content.json' with { type: 'json' };
 import { CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, ELEMENT_IDS, RANGES } from '../../src/effectsDefaults.js';
 import { harmoniousFlame, hexToOklch } from '../../src/paletteGen.js';
 import { titleCase } from './text.js';
@@ -21,7 +22,7 @@ export const PAGES = [
     blurb: 'Bonfire colors, its elements (fire, lightning, ice), fireflies, the cursor and the pixel-art look. The preview updates as you edit; nothing is published until you save.',
   },
   { id: 'headings', group: 'Settings', label: 'Screen headings', keys: ['sections'], blurb: 'The title, flavor line and intro at the top of each screen.' },
-  { id: 'interface', group: 'Settings', label: 'Interface', keys: ['screens', 'ui', 'weapons', 'startingEquipment', 'notFound'], blurb: 'Tab names, button text, weapon names, the starting equipment and the 404 page.' },
+  { id: 'interface', group: 'Settings', label: 'Interface', keys: ['screens', 'ui', 'weapons', 'weaponDraw', 'startingEquipment', 'notFound'], blurb: 'Tab names, button text, weapon names and which weapons can be drawn, the starting equipment and the 404 page.' },
 ];
 
 export const LABELS = {
@@ -40,6 +41,9 @@ export const LABELS = {
   screens: 'Screens (tab names)',
   ui: 'Interface text',
   weapons: 'Weapon names',
+  weaponDraw: 'Weapons in the draw',
+  // (The switches are labelled with the weapons' names as the site ships them.)
+  ...Object.fromEntries(WEAPON_KEYS.map((k) => [`weaponDraw.${k}`, content.weapons?.[k] ?? k])),
   startingEquipment: 'Starting equipment',
   notFound: '404 page',
   'hero.kindled': '“Embers Kindled” banner',
@@ -160,6 +164,7 @@ export const LABELS = {
   'effects.lightning.ringArcs': 'Ring arcs & forks',
   'effects.ice': 'Ice',
   'effects.ice.shards': 'Crystals',
+  'effects.ice.pulse': 'Glow pulse every',
   'effects.ice.clarity': 'Translucency',
   'effects.ice.height': 'Tallest crystal',
   'effects.ice.spread': 'Spread',
@@ -185,6 +190,7 @@ export const HELP = {
   'hero.kindled.show': '“first”: the first stoke of a visit · “always”: every stoke · “never”.',
   screens: 'The site’s own menu. Labels only — the screens themselves are fixed.',
   weapons: 'Display names for the weapons in the fire (the models themselves are fixed).',
+  weaponDraw: 'Which weapons a random draw can pick (inspecting a project, clicking the fire, the visualizer’s swaps). A weapon switched off never comes up, but can still be the starting weapon. Keep at least 3 on.',
   startingEquipment: 'What’s in the fire when the site opens (and after Home).',
   'about.stats': 'Label and value rows of the stat sheet.',
   'ui.prompts': 'The key hints along the bottom: key, optional second key, label.',
@@ -242,6 +248,7 @@ export const HELP = {
   'effects.lightning.brightness': 'How bright the arcs and the light they cast are.',
   'effects.lightning.ringSpeed': 'How fast the ring of lightning races out when a weapon lands.',
   'effects.ice.shards': 'How many crystals grow around the fire.',
+  'effects.ice.pulse': 'Every few seconds a slow glow rises through the ice and the crystals’ outlines drift out. 0 = off.',
   'effects.ice.height': 'The tallest crystal’s height (m); the rest are shorter.',
   'effects.ice.spread': 'How far out from the fire the crystals grow (m).',
   'effects.ice.thickness': 'How chunky the crystals are.',

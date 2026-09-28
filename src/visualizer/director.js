@@ -46,7 +46,7 @@
 //             before the drop hits, the screen goes black for a beat of silence.
 //   budget    how much is going on follows the song's shape: calm in an intro or a
 //             breakdown, busy in the groove, everything in the bars after a drop.
-import { weapons } from '../content.js';
+import { drawnWeapons } from '../content.js';
 import { elements } from '../elements.js';
 import { effects } from '../effects.js';
 import { MOVES } from '../bonfire/bladeMotion.js';
@@ -152,7 +152,7 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
   const moving = () => settings.camera !== 'still';
 
   // --- choosing the next fire -----------------------------------------------------------
-  const weaponKeys = Object.keys(weapons);
+  const weaponKeys = drawnWeapons();
   function nextElement(prefer) {
     const on = Object.keys(settings.elements).filter((id) => settings.elements[id]);
     if (prefer && on.includes(prefer)) return prefer;

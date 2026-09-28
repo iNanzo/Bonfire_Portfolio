@@ -94,9 +94,9 @@ app.innerHTML = `
       <nav class="title-menu viz-sources" aria-label="Sound source">
         <ul role="list" data-sources>
           ${SOURCES.map(([id, label, hint]) => `
-            <li><button class="title-item viz-source" type="button" data-source="${id}">
-              <span class="cursor" aria-hidden="true"></span>
-              <span class="viz-source-text"><span class="viz-source-name">${esc(label)}</span><span class="viz-source-desc">${esc(hint)}</span></span>
+            <li><button class="title-item viz-source" type="button" data-source="${id}" data-tip="${esc(hint)}" aria-describedby="viz-src-${id}">
+              <span class="cursor" aria-hidden="true"></span><span>${esc(label)}</span>
+              <span class="visually-hidden" id="viz-src-${id}">${esc(hint)}</span>
             </button></li>`).join('')}
         </ul>
       </nav>

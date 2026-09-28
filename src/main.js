@@ -1,6 +1,6 @@
 import './styles.css';
 import { applyCssPalette, base, flames, flameOr, rotation } from './palette.js';
-import { screens, hero, ui, weapons, startingEquipment, items } from './content.js';
+import { screens, hero, ui, weapons, startingEquipment, items, drawnWeapons } from './content.js';
 import { onEffects, setEffects } from './effects.js';
 import { drawElement, elementOr, flameTitle } from './elements.js';
 import { STRUCTURAL } from './effectsDefaults.js';
@@ -119,7 +119,7 @@ const photo = createPhotoMode({
 const breakdown = createBreakdown({ getFire: () => fire, onEnter: () => { photo.exit(); discover('breakdown'); } });
 
 // --- Equipment (weapon + flame + element in the fire) ---------------------------------------
-const weaponKeys = Object.keys(weapons);
+const weaponKeys = drawnWeapons(); // (the ones in the random draw: the admin can switch some off)
 const startElement = () => elementOr(startingEquipment.element);
 // Requested state drives future choices; displayed state changes only at impact.
 let equipment = { ...startingEquipment, element: startElement(), item: null };
@@ -447,6 +447,42 @@ document.addEventListener('click', (e) => {
   fire?.puff(0.3);
 });
 
+// --- Hover hints: what a click on the scene will do -----------------------------------------
+// Over the planted weapon its rim glows and the label says "Wake the blade"; over the fire it
+// rises a little and the label says "Stoke the fire" (or "Skip ahead" while a new weapon is
+// being forged). Mouse and pen only; checked at most ~12 times a second.
+const hoverLabel = document.createElement('div');
+hoverLabel.className = 'hover-label';
+hoverLabel.hidden = true;
+hoverLabel.setAttribute('aria-hidden', 'true');
+document.body.appendChild(hoverLabel);
+let hoverAt = 0;
+let hoverWhat = null;
+const stageEl = q('[data-stage]');
+function setHover(what, x, y) {
+  if (what !== hoverWhat) {
+    hoverWhat = what;
+    stageEl.dataset.hover = what ?? '';
+    hoverLabel.textContent = what === 'weapon' ? ui.hoverWeapon : what === 'skip' ? ui.hoverSkip : what === 'fire' ? ui.hoverFire : '';
+    hoverLabel.hidden = !what;
+  }
+  if (what) hoverLabel.style.transform = `translate(${Math.round(x + 16)}px, ${Math.round(y + 18)}px)`;
+}
+window.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'touch' || !fire) return;
+  const onStage = e.target.closest?.('[data-stage]') && !photo.active && !breakdown.active;
+  if (!onStage) { if (hoverWhat) { fire.hoverOff(); setHover(null); } return; }
+  if (hoverWhat) setHover(hoverWhat, e.clientX, e.clientY); // (the label follows every move)
+  const now = performance.now();
+  if (now - hoverAt < 80) return;
+  hoverAt = now;
+  let what = fire.hoverAt(e.clientX, e.clientY);
+  if (what === 'weapon' && (reducedMotion || fire.forging)) what = 'fire'; // (no flourish then)
+  if (fire.forging && !fire.swinging && what) what = 'skip';
+  setHover(what, e.clientX, e.clientY);
+}, { passive: true });
+document.documentElement.addEventListener('pointerleave', () => { fire?.hoverOff(); setHover(null); });
+
 // --- The bonfire --------------------------------------------------------------------------
 function failScene(error) {
   fire?.dispose();
@@ -559,6 +595,9 @@ if (new URLSearchParams(location.search).has('preview') && window.parent !== win
       stoke();
     } else if (msg.type === 'nh:roll') {
       rollFor(equipment.item);
+    } else if (msg.type === 'nh:weapon' && Object.hasOwn(weapons, msg.key)) {
+      // (Any weapon, even one switched out of the draw: the admin is previewing it.)
+      if (msg.key !== equipment.weapon) equip(msg.key, equipment.flame, equipment.item);
     } else if (msg.type === 'nh:flourish') {
       if (fire && !fire.forging) fire.flourish();
     } else if (msg.type === 'nh:screen' && order.includes(msg.screen)) {

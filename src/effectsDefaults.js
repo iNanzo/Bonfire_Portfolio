@@ -40,7 +40,7 @@ export const DEFAULT_EFFECTS = {
   lightning: { size: 0.44, height: 0.3, filaments: 12, strikes: 4, boltWidth: 3, jag: 0.45, branches: 0.5, crackle: 20, drift: 1, brightness: 1.1, cursorPull: 0.8, flicker: 0.6, ringSpeed: 1, ringArcs: 0.6 },
   // Ice: a translucent crystal cluster grows out of the ground around a banked fire
   // (ice.js); impacts send a ring of shards out that spike up and sink back, with chill.
-  ice: { shards: 28, height: 1.05, spread: 0.36, thickness: 1, clarity: 0.28, glow: 1, shimmer: 0.5, innerFire: 0.45, frost: 60, growTime: 1.4, ringSpeed: 1, ringHeight: 1, ringHold: 0.08 },
+  ice: { pulse: 3.5, shards: 28, height: 1.05, spread: 0.36, thickness: 1, clarity: 0.28, glow: 1, shimmer: 0.5, innerFire: 0.45, frost: 60, growTime: 1.4, ringSpeed: 1, ringHeight: 1, ringHold: 0.08 },
   // How hits land (src/bonfire/scene.js, marks.js, debris.js): a freeze frame, a flash, the
   // ground scorched / frosted / scarred where they struck (fading away), debris, lightning's
   // afterimages and strikes on fireflies, and how much busy moments thin the extras out.
@@ -100,6 +100,7 @@ export const RANGES = {
   'lightning.flicker': [0, 1, 0.05],
   'lightning.ringSpeed': [0.4, 2, 0.05, '×'],
   'lightning.ringArcs': [0, 1, 0.05],
+  'ice.pulse': [0, 12, 0.5, 's'],
   'ice.shards': [6, 40, 1],
   'ice.height': [0.3, 1.4, 0.01, 'm'],
   'ice.spread': [0.1, 0.6, 0.01, 'm'],

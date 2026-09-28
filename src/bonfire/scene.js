@@ -853,7 +853,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   function update(dt, t, realDt) {
     busy = Math.max(0, busy - realDt * 0.8);
     flashAmt *= Math.exp(-realDt / 0.05);
-    fire.params.level += (targetLevel + drive.level - fire.params.level) * Math.min(1, dt * 1.1);
+    fire.params.level += (targetLevel + drive.level + 0.25 * hoverFlare - fire.params.level) * Math.min(1, dt * 1.1);
     fire.wind.set(drive.windX, 0, drive.windZ);
     for (const id of ELEMENT_IDS) {
       const d = (id === elementKey ? 1 : 0) - presence[id];
@@ -1111,6 +1111,30 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     pickRay.params.Mesh = { threshold: 0 };
     return pickRay.intersectObject(w, true).length > 0;
   }
+  // The fire, for hover: a sphere around the flames (world).
+  const fireBounds = new THREE.Sphere(new THREE.Vector3(FIRE_ORIGIN.x, 0.45, FIRE_ORIGIN.z), 0.55);
+  let hoverFlare = 0; // 0..1: the cursor is on the fire, which rises a little to meet it
+  /**
+   * What's under the point (client px), for the site's hover hints: 'weapon' (the planted
+   * weapon: a click wakes it), 'fire' (a click stokes it) or null. Also lights the hint in
+   * the scene: the weapon's rim glows, the fire rises a touch.
+   */
+  function hoverAt(clientX, clientY) {
+    const onWeapon = weaponAt(clientX, clientY);
+    let onFire = false;
+    if (!onWeapon) {
+      const r = canvas.getBoundingClientRect();
+      pickNdc.set(((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
+      pickRay.setFromCamera(pickNdc, camera);
+      onFire = pickRay.ray.intersectsSphere(fireBounds);
+    }
+    if (weapons) weapons.hovered = onWeapon;
+    hoverFlare = onFire ? 1 : 0;
+    return onWeapon ? 'weapon' : onFire ? 'fire' : null;
+  }
+  /** The cursor left the scene: no hint. */
+  function hoverOff() { if (weapons) weapons.hovered = false; hoverFlare = 0; }
+
   /**
    * The living blade's flourish (the site): the planted weapon pulls free, cuts a couple of
    * moves in the air and plunges back in. Resolves when it's back (false if it can't).
@@ -1196,7 +1220,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   }
 
   return {
-    stoke, puff, equip, weaponAt, flourish, breakdown, stats, setScenery,
+    stoke, puff, equip, weaponAt, hoverAt, hoverOff, flourish, breakdown, stats, setScenery,
     get scenery() { return sceneryKey; },
     /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
     capture: () => new Promise((resolve) => captures.push(resolve)), setView: view.setView, setPose: view.setPose, viewAxes: view.axes, cycle, describe, flash, applyEffects, refreshScene, pulse, sparkle, ring, echo, swing, drive, glitch, ready: loaded,

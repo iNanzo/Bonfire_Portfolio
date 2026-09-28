@@ -206,6 +206,9 @@ npm test           # the site's and the visualizer's tests (npm run admin:test: 
 - **Search and sharing:** each page is built with its own title, description, social
   image (1200×630, made from the cover) and structured data, plus `sitemap.xml` and
   `robots.txt` (`src/seoPages.js`, the build plugin in `vite.config.js`).
+- **Hover hints (round 6):** over the planted weapon its rim glows and a label says
+  *Wake the blade*; over the fire it rises a little and says *Stoke the fire* (or *Skip
+  ahead* during a swap). The ice pulses slowly on its own (`effects.ice.pulse`).
 - **Ableton Link:** `npm run link` with Carabiner running, then *Settings → Sound →
   Beat From: Ableton Link* in Bonfire Live (details in `tools/link-bridge.mjs`).
 
@@ -612,9 +615,14 @@ strength · **4** Bayer 4×4/8×8 · **5** outlines · **6** cursor interaction.
 
 ### Weapons
 
-Longsword, Broad Sword (backsword), Bastard Sword, Claymore, Katana, Uchigatana, Sabre,
-Rapier, Estoc, Spear, Greatsword, Glaive, Naginata, Zweihander, Flamberge, Flamberge
-Zweihander. Each keeps the same planted lean; every time one lands it spins to a random
+Longsword, Broad Sword, Bastard Sword, Claymore, Katana, Uchigatana, Sabre, Rapier,
+Estoc, Spear, Greatsword, Glaive, Naginata, Zweihander, Flamberge, Flamberge Zweihander,
+and (round 6, after a reference chart) Winged Spear, Battle Axe, Flanged Mace, War Hammer,
+Morning Star, Halberd and Lance; the longsword and broadsword were redone to the chart.
+The hafted weapons are planted head-down like the swords, with long enough handles to
+rise above the flames. The admin names them (*Weapon names*) and picks which ones a
+random draw can pick (*Weapons in the draw*, at least 3); its Effects preview can forge
+any one of them. Each keeps the same planted lean; every time one lands it spins to a random
 angle about its own axis. Dark, worn and simple: blackened fittings, wrapped grips,
 chipped edges; blades use three flat tones (edge / steel / fuller) for a sprite-like read.
 Each is modeled at final size and planted by `plant()` in `tools/weapons.py`.

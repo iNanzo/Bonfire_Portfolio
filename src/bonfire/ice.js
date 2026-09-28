@@ -260,6 +260,10 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
   let seep = 0;       // chill seeping off at rest
   let beatGlow = 0;   // a beat's glow (the visualizer), decaying...
   let wave = 1;       // ...and how far up the crystals it has risen
+  let pulseIn = 1.5;  // seconds to the next slow ambient pulse (effects.ice.pulse)
+  let pulseT = 9;     // seconds into the current slow pulse (it swells and fades over SLOW)
+  const SLOW = 1.6;
+  const slowGlow = () => (pulseT < SLOW ? Math.sin((Math.PI * pulseT) / SLOW) * 0.45 : 0);
   const slotOf = new Int16Array(N).fill(-1); // each crystal's instance this frame
 
   // Echoes: outlines of the bigger crystals growing away and fading.
@@ -282,7 +286,7 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
     for (let j = echoes.length - 1; j >= 0; j--) {
       const e = echoes[j];
       e.t += dt;
-      const k = e.t / ECHO_TIME;
+      const k = e.t / e.time;
       if (k >= 1) { echoes.splice(j, 1); continue; }
       const grown = 1 - (1 - k) ** 3;
       const s = 1 + 0.6 * grown;
@@ -326,6 +330,18 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
     beatGlow *= Math.exp(-dt / 0.28);
     wave += dt / 0.35;
     stepEchoes(dt);
+    pulseT += dt;
+    // The slow ambient pulse: every few seconds the glow swells up through the crystals and
+    // their outlines drift out, gently (on the site too, not only on a beat).
+    if (active && grow > 0.9 && I.pulse > 0 && !reducedMotion) {
+      pulseIn -= dt;
+      if (pulseIn <= 0) {
+        pulseIn = I.pulse * (0.85 + Math.random() * 0.3);
+        pulseT = 0;
+        wave = 0;
+        echo(2.2);
+      }
+    }
     let anyMote = false;
     for (let i = 0; i < MOTES; i++) if (mAge[i] < mLife[i]) { anyMote = true; break; }
     if (grow <= 0 && !anyMote) {
@@ -367,7 +383,7 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
     u.uShimmer.value = reducedMotion ? 0 : I.shimmer;
     u.uGlow.value = I.glow * (0.55 + 0.45 * grow) * (1 + pulse * 0.5);
     u.uClarity.value = I.clarity;
-    u.uBeat.value = beatGlow;
+    u.uBeat.value = Math.max(beatGlow, slowGlow());
     u.uWave.value = Math.min(wave, 1.6);
 
     // --- chill seeping off the cluster and rolling away low
@@ -427,8 +443,11 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
     beatGlow = Math.max(beatGlow, strength);
     wave = 0;
   }
-  /** An echo (the visualizer): the bigger crystals' outlines grow away and fade. */
-  function echo() {
+  /**
+   * An echo: the bigger crystals' outlines grow away and fade, over `time` seconds (a quick
+   * one on the visualizer's beats and rings; the slow ambient pulse takes longer).
+   */
+  function echo(time = ECHO_TIME) {
     if (!outlines || grow < 0.5 || echoes.length >= 3) return;
     mesh.updateMatrixWorld();
     const frames = [];
@@ -442,7 +461,7 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
       frames.push(m.premultiply(mesh.matrixWorld));
       out.push(new THREE.Vector3(sx[i] - origin.x, 0.4, sz[i] - origin.z).normalize());
     }
-    if (frames.length) echoes.push({ t: 0, frames, out });
+    if (frames.length) echoes.push({ t: 0, time, frames, out });
   }
 
   return {
@@ -453,7 +472,7 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
     beat,
     echo,
     /** 0..1: the latest beat's glow (the scene brightens the ice's light with it). */
-    get beatGlow() { return beatGlow; },
+    get beatGlow() { return Math.max(beatGlow, slowGlow()); },
     setActive(on, instant = false) {
       active = on;
       if (instant) grow = on ? 1 : 0;

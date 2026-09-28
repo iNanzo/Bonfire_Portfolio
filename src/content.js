@@ -36,7 +36,7 @@
 import content from './content.json' with { type: 'json' };
 
 export const {
-  site, screens, weapons, startingEquipment, hero, sections,
+  site, screens, weapons, weaponDraw = {}, startingEquipment, hero, sections,
   about, experience, leadership, education, skills, contact, ui, notFound,
 } = content;
 
@@ -44,6 +44,9 @@ const withShownImages = (p) => (Array.isArray(p.images) ? { ...p, images: p.imag
 export const featured = withShownImages(content.featured);
 export const projects = content.projects.map(withShownImages);
 export const archive = content.archive.map(withShownImages);
+
+/** The weapons a random draw can pick (the admin's switches; all of them unless switched off). */
+export const drawnWeapons = () => Object.keys(weapons).filter((k) => weaponDraw[k] !== false);
 
 /** Entries of a list that aren't hidden. */
 export const shown = (list) => list.filter((entry) => !entry.hidden);

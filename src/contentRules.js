@@ -6,13 +6,16 @@ import { isSafeUrl } from './html.js';
 import { BASE_COLORS, CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, ELEMENT_IDS, RANGES } from './effectsDefaults.js';
 
 export const CONTENT_PATH = 'src/content.json';
-export const SECTIONS = ['site', 'screens', 'weapons', 'startingEquipment', 'hero', 'sections', 'featured', 'projects',
+export const SECTIONS = ['site', 'screens', 'weapons', 'weaponDraw', 'startingEquipment', 'hero', 'sections', 'featured', 'projects',
   'archive', 'about', 'experience', 'leadership', 'education', 'skills', 'contact', 'ui', 'notFound', 'effects'];
 /** Screens are wired into the layout and camera; their ids can't change. */
 export const SCREEN_IDS = ['home', 'projects', 'experience', 'skills', 'about', 'contact'];
 /** Weapons are nodes in public/models/bonfire.glb; their keys can't change. */
 export const WEAPON_KEYS = ['longsword', 'broadsword', 'bastard', 'claymore', 'katana', 'uchigatana', 'sabre', 'rapier',
-  'estoc', 'spear', 'greatsword', 'glaive', 'naginata', 'zweihander', 'flamberge', 'flambergezwei'];
+  'estoc', 'spear', 'greatsword', 'glaive', 'naginata', 'zweihander', 'flamberge', 'flambergezwei',
+  'wingedspear', 'battleaxe', 'mace', 'warhammer', 'morningstar', 'halberd', 'lance'];
+/** The fewest weapons a random draw may pick from. */
+export const MIN_WEAPONS = 3;
 export const flameIds = (c) => (Array.isArray(c?.effects?.flames) ? c.effects.flames.map((f) => f?.id) : []);
 export const HEX_RE = /^#[0-9a-f]{6}$/i;
 /** Flames a random draw can pick from: it skips the current and the starting flame. */
@@ -189,6 +192,15 @@ export function validateContent(c) {
     const keys = Object.keys(c.weapons);
     if (keys.length !== WEAPON_KEYS.length || WEAPON_KEYS.some((k) => !keys.includes(k))) err('weapons', 'The weapon list is fixed by the 3D model; only names can change.');
     for (const k of keys) text(c.weapons[k], `weapons.${k}`, true);
+  }
+  // Which weapons a random draw can pick (a missing one counts as on).
+  if (c.weaponDraw !== undefined && obj(c.weaponDraw, 'weaponDraw')) {
+    for (const [k, v] of Object.entries(c.weaponDraw)) {
+      if (!WEAPON_KEYS.includes(k)) err(`weaponDraw.${k}`, 'Not one of the weapons.');
+      else flag(v, `weaponDraw.${k}`);
+    }
+    const on = WEAPON_KEYS.filter((k) => c.weaponDraw[k] !== false).length;
+    if (on < MIN_WEAPONS) err('weaponDraw', `Keep at least ${MIN_WEAPONS} weapons in the draw, so a new one can always be picked.`);
   }
   if (obj(c.startingEquipment, 'startingEquipment')) {
     if (!WEAPON_KEYS.includes(c.startingEquipment.weapon)) err('startingEquipment.weapon', 'Pick one of the weapons.');

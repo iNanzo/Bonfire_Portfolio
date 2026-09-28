@@ -223,28 +223,41 @@ body.hud-off .viz-hud { display: none; }
 
 .viz-settings-foot { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
 
-/* ---------- Round 5: sources with their descriptions, the start panel off the fire ---------- */
+/* ---------- Sources: each one's description is a tooltip (hover or focus) ---------- */
 
-.viz-source { display: flex; align-items: flex-start; gap: 10px; padding-block: 6px; }
-.viz-source-text { display: grid; gap: 2px; }
-.viz-source-desc {
-  max-width: 34rem;
+.viz-source { position: relative; }
+.viz-source::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+  z-index: 5;
+  width: max-content;
+  max-width: min(320px, 50vw);
+  padding: 8px 10px;
+  transform: translateY(-50%);
   font-family: var(--font-body);
   font-size: 0.875rem;
   line-height: 1.45;
   letter-spacing: 0;
-  color: var(--text-dim);
+  text-transform: none;
+  white-space: normal;
+  color: var(--c-bone);
+  background: var(--c-void);
+  box-shadow: 0 0 0 1px var(--accent);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
-.viz-sources .title-item:hover .viz-source-desc,
-.viz-sources .title-item:focus-visible .viz-source-desc { color: var(--c-bone); }
+.viz-source:hover::after,
+.viz-source:focus-visible::after { opacity: 1; visibility: visible; }
 @media (max-width: 1099px) {
   /* A compact panel along the bottom-left, so the fire (framed aside) stays in view; each
      source's description shows while it's pointed at or focused. */
   .viz-start { align-items: flex-end; justify-content: flex-start; }
   .viz-start-copy { width: min(100%, 520px); margin-inline: 0; }
-  .viz-source-desc { display: none; }
-  .viz-source:hover .viz-source-desc,
-  .viz-source:focus-visible .viz-source-desc { display: block; }
+  /* (No room beside the menu: the tooltip sits under the source instead.) */
+  .viz-source::after { left: 24px; top: calc(100% + 4px); transform: none; max-width: min(320px, 80vw); }
   .viz-start .hero-name { font-size: clamp(1.75rem, 6vw, 2.5rem); }
   .viz-start .hero-value { font-size: 0.9375rem; }
 }

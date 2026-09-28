@@ -86,6 +86,7 @@ M = {
     "w_wood": material("W_Wood", "#4a3629"),
     "w_brass": material("W_Brass", "#6f5a2e"),
     "w_cloth": material("W_Cloth", "#5a1e24"),
+    "w_paint": material("W_Paint", "#b9b3a4"),   # the lance's pale stripes
     "dark": material("DarkIron", "#4d4a5e"),
     "brass": material("Brass", "#b08a3a"),
     "leather": material("Leather", "#5a3a2a"),
@@ -424,15 +425,15 @@ for o in scene_objs:
 for i, key in enumerate(weapons.WEAPON_KEYS):
     w = WEAPONS[key]
     w.hide_render = False
-    w.location = ((i - 7.5) * 0.52, -3.5, 0.3)  # in front of the scene in the .blend
+    w.location = ((i - (len(weapons.WEAPON_KEYS) - 1) / 2) * 0.52, -3.5, 0.3)  # in front of the scene in the .blend
     w.rotation_euler = (0, 0, 0)
 cam.data.type = "ORTHO"
-cam.data.ortho_scale = 9.4
+cam.data.ortho_scale = len(weapons.WEAPON_KEYS) * 0.52 + 1.2
 cam.location = (0, -9.5, 1.2)
 cam.rotation_euler = (math.radians(90), 0, 0)
 scene.world.color = (0.02, 0.02, 0.03)
-scene.render.resolution_x = 2400
-scene.render.resolution_y = 620
+scene.render.resolution_x = 3400
+scene.render.resolution_y = 640
 scene.render.filepath = os.path.join(ROOT, "assets", "source", "weapons-lineup.png")
 bpy.ops.render.render(write_still=True)
 for o in scene_objs:
