@@ -5,11 +5,14 @@
 //
 // Effects layer (the visualizer; all off on the site), all before the palette so every
 // effect comes out in the scene's own colors:
-//   where a pixel reads the scene from — a kaleidoscope, a mirror, block crunch, a row
+//   where a pixel reads the scene from — a kaleidoscope, a mirror (left to right, right
+//     to left, the top reflected in the bottom like a pool, or four ways), block crunch, a row
 //     wave, a shockwave ripple out of the fire, rows torn sideways;
-//   what's mixed in — an RGB split, echoes of the previous frame zooming out of the fire
-//     (feedback: they step down the palette as they fade);
-//   how it's framed — an iris around the fire, letterbox bars, scanlines, static;
+//   what's mixed in — an RGB split, echoes of the previous frame zooming out of (or into)
+//     the fire, turning as they go for a spiral (feedback: they step down the palette as
+//     they fade);
+//   how it's framed — an iris around the fire, letterbox bars, scanlines (thin rows, thick
+//     rows or columns), static;
 //   how it's colored — a 1-bit ink flash (dithered to void and the flame's core), a
 //     negative, and color cycling (the flame's ramp colors rotate, like old pixel-art
 //     palette animation).
@@ -49,13 +52,15 @@ const fragmentShader = /* glsl */ `
   uniform float uSplit;            // RGB split, in texels
   uniform float uBlock;            // >= 1: pixels this many texels wide
   uniform float uWave;             // a sideways wave through the rows, in texels
-  uniform float uMirror;           // 1: the right half mirrors the left
-  uniform float uScan;             // 0..1: darken every other row
+  uniform float uMirror;           // 1: the right half mirrors the left; 2: the left the right; 3: the bottom reflects the top; 4: four ways
+  uniform float uScan;             // 0..1: how dark the scanlines are
+  uniform float uScanMode;         // 0: every other row; 1: thick rows; 2: columns
   uniform float uNoise;            // 0..1: static
   uniform float uInvert;           // 0..1: the negative
   uniform sampler2D tPrev;         // the last frame (feedback)
   uniform float uFeedback;         // 0..1: how much of it echoes (0: off)
-  uniform float uZoom;             // the echo zooms out of the fire by this much a frame
+  uniform float uZoom;             // the echo zooms out of the fire by this much a frame (< 1: into it)
+  uniform float uFeedRot;          // ...and turns by this much (radians a frame)
   uniform float uKaleido;          // mirrored segments (0: off)
   uniform float uKaleidoRot;
   uniform vec2 uCenter;            // the fire on screen, in texels
@@ -168,7 +173,12 @@ const fragmentShader = /* glsl */ `
       a = min(a, seg - a) + 1.5707963 - seg * 0.25;
       src = floor(uCenter + length(p) * 0.75 * vec2(cos(a), sin(a)));
     }
-    if (uMirror > 0.5 && src.x >= resolution.x * 0.5) src.x = resolution.x - 1.0 - src.x;
+    if (uMirror > 0.5) {
+      float m = floor(uMirror + 0.5);
+      if ((m == 1.0 || m == 4.0) && src.x >= resolution.x * 0.5) src.x = resolution.x - 1.0 - src.x;
+      if (m == 2.0 && src.x < resolution.x * 0.5) src.x = resolution.x - 1.0 - src.x;
+      if ((m == 3.0 || m == 4.0) && src.y < resolution.y * 0.5) src.y = resolution.y - 1.0 - src.y;
+    }
     if (uBlock > 1.0) src = floor(src / uBlock) * uBlock + floor(uBlock * 0.5);
     if (uWave > 0.0) src.x += floor(sin(src.y * 0.11 + uTime * 7.0) * uWave + 0.5);
     float shock = 0.0;
@@ -198,7 +208,9 @@ const fragmentShader = /* glsl */ `
     if (shock > 0.0) col = mix(col, toSRGB(uCore), shock * min(0.35, uRippleAmp * 0.04));
     if (uFeedback > 0.0) {
       // Last frame, zoomed a touch out of the fire: echoes stream outward and fade.
-      vec2 f = (px + 0.5 - uCenter) / uZoom + uCenter;
+      vec2 d = (px + 0.5 - uCenter) / uZoom;
+      float cr = cos(uFeedRot), sr = sin(uFeedRot);
+      vec2 f = vec2(cr * d.x + sr * d.y, -sr * d.x + cr * d.y) + uCenter;
       // (Minus a little each frame: dithering would otherwise hold dim echoes at the same
       // palette color forever. Only bright things streak.)
       vec3 prev = texture2D(tPrev, f / resolution).rgb;
@@ -217,7 +229,10 @@ const fragmentShader = /* glsl */ `
       vec3 ink = l > 0.18 + (bayer4(px) - 0.5) * 0.3 ? toSRGB(uCore) : vec3(0.0);
       col = mix(col, ink, uInk);
     }
-    if (uScan > 0.0) col *= 1.0 - uScan * step(1.0, mod(px.y, 2.0));
+    if (uScan > 0.0) {
+      float line = uScanMode > 1.5 ? step(1.0, mod(px.x, 2.0)) : uScanMode > 0.5 ? step(2.0, mod(px.y, 4.0)) : step(1.0, mod(px.y, 2.0));
+      col *= 1.0 - uScan * line;
+    }
     if (uNoise > 0.0) col += (h21(px + floor(uTime * 24.0) * 17.0) - 0.5) * uNoise;
     col = mix(col, vec3(1.0) - col, uInvert);
 
@@ -253,11 +268,13 @@ export function createPixelPass() {
     uWave: { value: 0 },
     uMirror: { value: 0 },
     uScan: { value: 0 },
+    uScanMode: { value: 0 },
     uNoise: { value: 0 },
     uInvert: { value: 0 },
     tPrev: { value: null },
     uFeedback: { value: 0 },
     uZoom: { value: 1 },
+    uFeedRot: { value: 0 },
     uKaleido: { value: 0 },
     uKaleidoRot: { value: 0 },
     uCenter: { value: new THREE.Vector2() },

@@ -19,8 +19,12 @@
 //   stab     — it drives down into the ashes, the glow fading as it strikes
 //   impact   — callback (flame color, fire growth, ground flames, fireflies)
 //   settle   — a short decaying wobble while the last of the glow fades
+// The visualizer adds a hold (the new weapon hangs over the fire until the drop), a
+// swing (the planted weapon leaves the fire for a routine of moves, bladeMotion.js) and
+// signs of life: a shudder on hard beats, a held blade's sway and trembling.
 import * as THREE from 'three';
 import { createForgeFx, weaponSilhouette, profileAt } from './forgeFx.js';
+import { createRoutine } from './bladeMotion.js';
 
 const DISSOLVE_CHUNK = /* glsl */ `
   float wBayer2(vec2 a) { a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
@@ -318,6 +322,8 @@ export function createWeapons(gltfRoot, {
     }
     pace = swapPace;
     holding = hold;
+    quiver = 0;
+    if (current) current.rotation.z = 0;
     auraOn = false;
     flingT = -1; // the forge particles are needed again
     if (current && current.userData.key === key) {
@@ -634,6 +640,8 @@ export function createWeapons(gltfRoot, {
   let holding = false;
   let charge = 0; // 0..1: how hard a held weapon glows (the visualizer feeds it the build-up)
   let glowKick = 0; // a beat's glow on the planted weapon
+  let quiver = 0;   // a hard beat's shudder through the planted weapon
+  let alive = true; // (the visualizer) the blade moves as if alive: it shudders, sways, trembles
   function update(dt) {
     totalT += dt;
     if (flingT >= 0) stepFling(dt);
@@ -642,6 +650,11 @@ export function createWeapons(gltfRoot, {
       glowKick *= Math.exp(-dt / 0.2);
       if (current && phase === 'idle') current.userData.uniforms.uGlow.value = glowKick > 0.005 ? glowKick * 0.8 : 0;
       else if (current && phase === 'settle') current.userData.uniforms.uGlow.value = Math.max(current.userData.uniforms.uGlow.value, glowKick * 0.8);
+    }
+    // ...and a hard one shudders through it.
+    if (quiver > 0.002 && current && phase === 'idle') {
+      quiver *= Math.exp(-dt / 0.16);
+      current.rotation.z = quiver > 0.002 ? Math.sin(totalT * 55) * 0.03 * quiver : 0;
     }
     if (phase !== 'idle' && phase !== 'settle') dt *= pace;
     stepLines(dt);
@@ -693,6 +706,14 @@ export function createWeapons(gltfRoot, {
       if (!reducedMotion) incoming.position.y = HOVER + ease.outCubic(k) * 0.06 + bob;
       incoming.userData.uniforms.uGlow.value = 1 + 0.6 * (1 - k) ** 2 + (holding ? (0.5 * charge + 0.6 * auraKick) * k : 0); // the flash as it forms, settling to the glow
       if (holding && t >= D.hold * 0.5) { if (!auraOn) startAura(); stepAura(dt); }
+      // Alive (the visualizer): it sways and turns as if looking about, and trembles harder
+      // as the build rises, straining to strike.
+      if (holding && alive && !reducedMotion) {
+        const on = smooth(D.hold, D.hold + 1.5, t);
+        const tremble = (0.003 + 0.03 * charge * charge) * on;
+        incoming.rotation.x = Math.sin(totalT * 0.9) * 0.05 * on + Math.sin(totalT * 71) * tremble;
+        incoming.rotation.z = Math.sin(totalT * 0.7 + 1.3) * 0.06 * on + Math.sin(totalT * 83 + 2) * tremble;
+      }
       if (t >= D.hold && !holding) {
         if (auraOn) startFling();
         next('stab', Math.min(t - D.hold, 0.05)); // (a released hold starts the strike fresh)
@@ -700,9 +721,13 @@ export function createWeapons(gltfRoot, {
     } else if (phase === 'stab') {
       const k = Math.min(1, t / D.stab);
       if (!reducedMotion) incoming.position.y = (HOVER + 0.06) * (1 - ease.inQuad(k));
+      incoming.rotation.x *= 1 - k; // (straightening from any sway as it drives in)
+      incoming.rotation.z *= 1 - k;
       incoming.userData.uniforms.uGlow.value = 1 - k * 0.35; // the glow starts fading on the strike
       if (k >= 1) {
         incoming.position.y = 0;
+        incoming.rotation.x = 0;
+        incoming.rotation.z = 0;
         current = incoming;
         incoming = null;
         setLayer(current, layerSolid);
@@ -729,33 +754,21 @@ export function createWeapons(gltfRoot, {
   }
 
 
-  // --- Sword combos (the visualizer) -------------------------------------------------
-  // The planted weapon pulls up out of the fire, slashes on the given beats and plunges
-  // back into the ashes on the last one. Each slash is an arc of the blade's direction
-  // in a plane facing the camera (captured as that slash begins, so it reads even if the
-  // camera moved), the flat of the blade toward the viewer and its edge leading. It
-  // accelerates into the hit (fastest exactly on the beat) and eases out after. The grip
-  // hangs over the fire, high enough that the tip clears the ground.
-  // Local frame: the blade runs along Y (point at uSpan.x, pommel at uSpan.y), width
-  // along X, thickness along Z (so Z is the flat's normal).
-  const SLASHES = [
-    { from: 150, hit: 62, to: -35 },               // a diagonal cut down to the right
-    { from: -35, hit: 78, to: 200 },               // rising back up over to the left
-    { from: 205, hit: 115, to: 5, flat: true },    // a flatter sweep through the fire
-    { from: 30, hit: 118, to: 215 },               // up and over from the right
-  ];
-  let combo = null;
+  // --- The living blade (the visualizer) ----------------------------------------------
+  // The planted weapon pulls itself out of the fire and fights on its own: a routine of
+  // slashes, thrusts and spins on the beat (bladeMotion.js), then it plunges back in.
+  // The routine gives the weapon's world pose each frame; it's converted into the
+  // holder's space. The fire reacts through the hooks: a trail and a wake every frame,
+  // a burst at each hit, the ring when it plunges.
+  let routine = null;
+  let swingPlan = null;
+  let hitIndex = 0;
   const restPos = new THREE.Vector3();
   const restQuat = new THREE.Quaternion();
   const gripL = new THREE.Vector3();
   const tipL = new THREE.Vector3();
-  const sG = new THREE.Vector3();
+  const sP = new THREE.Vector3();
   const sQ = new THREE.Quaternion();
-  const sQ2 = new THREE.Quaternion();
-  const sD = new THREE.Vector3();
-  const sN = new THREE.Vector3();
-  const sX = new THREE.Vector3();
-  const sY = new THREE.Vector3();
   const sM = new THREE.Matrix4();
   const sInv = new THREE.Matrix4();
   const sScale = new THREE.Vector3();
@@ -763,64 +776,39 @@ export function createWeapons(gltfRoot, {
   const lastTip = new THREE.Vector3();
   const nowGrip = new THREE.Vector3();
   const nowTip = new THREE.Vector3();
-  const easeIO = (k) => k * k * (3 - 2 * k);
-
-  /** World orientation for blade direction d (grip → tip) with its flat facing n. */
-  function orient(d, n, out) {
-    sY.copy(d).negate();
-    sN.copy(n).addScaledVector(d, -n.dot(d)).normalize();
-    sX.crossVectors(sY, sN);
-    sM.makeBasis(sX, sY, sN);
-    return out.setFromRotationMatrix(sM);
-  }
-  /** A slash's plane from the camera: `right` and a tilted `up` (flatter for sweeps). */
-  function slashBasis(s) {
-    const b = combo.basis();
-    const a = b.right.clone();
-    const u = s.flat ? b.up.clone().multiplyScalar(0.35).addScaledVector(b.toCam, 1) : b.up.clone().addScaledVector(b.toCam, 0.3);
-    u.addScaledVector(a, -u.dot(a)).normalize();
-    return { a, u, n: new THREE.Vector3().crossVectors(a, u) };
-  }
-  function slashPose(k, deg, outG, outQ) {
-    const s = combo.slashes[k];
-    s.basis ??= slashBasis(SLASHES[k % SLASHES.length]);
-    const r = (deg * Math.PI) / 180;
-    sD.copy(s.basis.a).multiplyScalar(Math.cos(r)).addScaledVector(s.basis.u, Math.sin(r));
-    // The grip leans a little against the blade, like arms throwing the swing.
-    outG.copy(combo.center).addScaledVector(sD, -0.07);
-    orient(sD, s.basis.n, outQ);
-  }
-  function raisedPose(outG, outQ) {
-    const b = combo.basis();
-    outG.copy(combo.center).add(sY.set(0, 0.35, 0));
-    orient(sD.set(0, -1, 0), b.toCam, outQ);
+  const hitDir = new THREE.Vector3();
+  /** A weapon's grip and point, in its own space. */
+  function bladeLocal(obj, grip, tip) {
+    const span = obj.userData.uniforms.uSpan.value;
+    const len = span.y - span.x;
+    grip.set(0, span.y - 0.12 * len, 0);
+    tip.set(0, span.x, 0);
+    return len;
   }
 
-  /** Start a combo. plan: { hits: [s, …] (from now), plunge: s, basis: () => ({ right, up, toCam }) }. */
+  /**
+   * Start a routine. plan: { hits: [s, …] and plunge (s from now), basis: () => the camera's
+   * { right, up, toCam, pos }, moves, alive, onMove(k, kind), onHit(k, kind) }.
+   */
   function swing(plan) {
     if (phase !== 'idle' || !current || reducedMotion || !plan.hits.length) return false;
-    const span = current.userData.uniforms.uSpan.value;
-    const len = span.y - span.x;
-    gripL.set(0, span.y - 0.12 * len, 0);
-    tipL.set(0, span.x, 0);
+    const len = bladeLocal(current, gripL, tipL);
+    quiver = 0;
+    current.rotation.z = 0;
+    current.updateMatrixWorld(true);
     restPos.copy(current.position);
     restQuat.copy(current.quaternion);
     holder.updateMatrixWorld(true);
-    const plantedG = gripL.clone().applyMatrix4(current.matrixWorld);
-    const plantedQ = current.getWorldQuaternion(new THREE.Quaternion());
-    const reach = len * 0.88;
     const center = holder.getWorldPosition(new THREE.Vector3());
-    center.y = Math.max(1.05, 0.3 + 0.66 * reach);
-    combo = {
-      hits: plan.hits.slice(),
-      plunge: plan.plunge,
-      basis: plan.basis,
-      slashes: plan.hits.map(() => ({ basis: null })),
-      plantedG, plantedQ, center,
-      beat: plan.hits.length > 1 ? plan.hits[1] - plan.hits[0] : 0.5,
-      impacted: false,
-    };
-    lastGrip.copy(plantedG);
+    center.y = Math.max(1.05, 0.35 + 0.6 * len);
+    routine = createRoutine({
+      blade: { grip: gripL, tip: tipL, len },
+      home: { pos: current.getWorldPosition(new THREE.Vector3()), quat: current.getWorldQuaternion(new THREE.Quaternion()) },
+      center, basis: plan.basis, hits: plan.hits, plunge: plan.plunge, moves: plan.moves, alive: plan.alive ?? alive, onMove: plan.onMove,
+    });
+    swingPlan = plan;
+    hitIndex = 0;
+    lastGrip.copy(gripL).applyMatrix4(current.matrixWorld);
     lastTip.copy(tipL).applyMatrix4(current.matrixWorld);
     pace = 1;
     phase = 'swing';
@@ -828,70 +816,10 @@ export function createWeapons(gltfRoot, {
     return true;
   }
 
-  /** Where the blade is at time `tt` into the combo: grip (world) and orientation (world). */
-  function comboPose(tt, outG, outQ) {
-    const c = combo;
-    const beat = Math.max(0.2, c.beat);
-    const pre = Math.max(0.12, beat * 0.3);
-    const post = Math.max(0.1, beat * 0.24);
-    const n = c.hits.length;
-    const start = (k) => c.hits[k] - pre;
-    const end = (k) => c.hits[k] + post;
-    const S = (k) => SLASHES[k % SLASHES.length];
-    // Rise: planted → the first wind-up.
-    if (tt < start(0)) {
-      const k = easeIO(Math.min(1, tt / Math.max(0.05, start(0))));
-      slashPose(0, S(0).from, sG, sQ2);
-      outG.copy(c.plantedG).lerp(sG, k);
-      outQ.copy(c.plantedQ).slerp(sQ2, k);
-      return;
-    }
-    for (let k = 0; k < n; k++) {
-      if (tt < end(k)) {
-        if (tt < start(k)) {
-          // Recover from the last slash into this one's wind-up.
-          const u = easeIO((tt - end(k - 1)) / Math.max(0.05, start(k) - end(k - 1)));
-          slashPose(k - 1, S(k - 1).to, outG, outQ);
-          slashPose(k, S(k).from, sG, sQ2);
-          outG.lerp(sG, u);
-          outQ.slerp(sQ2, u);
-          return;
-        }
-        const s = S(k);
-        let deg;
-        if (tt < c.hits[k]) {
-          const u = (tt - start(k)) / pre;
-          deg = s.from + (s.hit - s.from) * u * u; // accelerating into the hit
-        } else {
-          const v = (tt - c.hits[k]) / post;
-          deg = s.hit + (s.to - s.hit) * (1 - (1 - v) ** 2); // easing out after it
-        }
-        slashPose(k, deg, outG, outQ);
-        return;
-      }
-    }
-    // After the last slash: raise the blade point-down over the fire, then drive it in.
-    const stab = Math.min(0.14, (c.plunge - end(n - 1)) * 0.4);
-    const raiseEnd = c.plunge - stab;
-    if (tt < raiseEnd) {
-      const u = easeIO((tt - end(n - 1)) / Math.max(0.05, raiseEnd - end(n - 1)));
-      slashPose(n - 1, S(n - 1).to, outG, outQ);
-      raisedPose(sG, sQ2);
-      outG.lerp(sG, u);
-      outQ.slerp(sQ2, u);
-      return;
-    }
-    const u = Math.min(1, (tt - raiseEnd) / Math.max(0.02, stab));
-    raisedPose(outG, outQ);
-    outG.lerp(c.plantedG, u * u);
-    outQ.slerp(c.plantedQ, u * u);
-  }
-
   function stepSwing(dt) {
-    const c = combo;
-    comboPose(t, sG, sQ);
-    // World pose → the weapon's transform under the holder: position = grip − R·gripLocal.
-    sM.compose(sG.clone().sub(gripL.clone().applyQuaternion(sQ)), sQ, sScale.set(1, 1, 1));
+    routine.pose(t, sP, sQ);
+    // World pose → the weapon's transform under the holder.
+    sM.compose(sP, sQ, sScale.set(1, 1, 1));
     sInv.copy(holder.matrixWorld).invert();
     sM.premultiply(sInv);
     sM.decompose(current.position, current.quaternion, sScale);
@@ -901,23 +829,32 @@ export function createWeapons(gltfRoot, {
     const tipSpeed = nowTip.distanceTo(lastTip) / Math.max(dt, 1e-3);
     current.userData.uniforms.uGlow.value = 0.35 + Math.min(1.1, tipSpeed / 7);
     hooks.onSwingFrame?.(lastGrip, lastTip, nowGrip, nowTip, dt, tipSpeed);
+    while (hitIndex < routine.hits.length && t >= routine.hits[hitIndex].t) {
+      const { kind } = routine.hits[hitIndex];
+      hitDir.subVectors(nowTip, lastTip);
+      if (hitDir.lengthSq() < 1e-8) hitDir.subVectors(nowTip, nowGrip);
+      hooks.onSwingHit?.(kind, nowTip, hitDir.normalize());
+      swingPlan.onHit?.(hitIndex, kind);
+      hitIndex++;
+    }
     lastGrip.copy(nowGrip);
     lastTip.copy(nowTip);
-    if (t >= c.plunge && !c.impacted) {
-      c.impacted = true;
+    if (t >= routine.end) {
       current.position.copy(restPos);
       current.quaternion.copy(restQuat);
-      combo = null;
+      routine = null;
+      swingPlan = null;
       next('settle');
       hooks.onSwingImpact?.();
     }
   }
   function endSwing() {
-    if (!combo || !current) return;
+    if (!routine || !current) return;
     current.position.copy(restPos);
     current.quaternion.copy(restQuat);
     current.userData.uniforms.uGlow.value = 0;
-    combo = null;
+    routine = null;
+    swingPlan = null;
   }
 
   // Each phase starts with the time the last one overran by, so the impact lands
@@ -957,6 +894,26 @@ export function createWeapons(gltfRoot, {
     cancel,
     swing,
     get swinging() { return phase === 'swing'; },
+    /** (The visualizer) the blade moves as if alive: flourishes, a shudder on hard beats, a held one's sway. */
+    set alive(v) { alive = !!v; },
+    /**
+     * Where the blade is (world, as of the last frame): its middle, point and grip, the
+     * flat's normal and its rotation, and whether it's out of the fire (swinging or held).
+     * For cameras that follow it.
+     */
+    blade(out) {
+      const obj = incoming && (phase === 'form' || phase === 'hold' || phase === 'stab') ? incoming : current;
+      if (!obj) return null;
+      out.len = bladeLocal(obj, out.grip, out.tip);
+      out.grip.applyMatrix4(obj.matrixWorld);
+      out.tip.applyMatrix4(obj.matrixWorld);
+      out.mid.lerpVectors(out.grip, out.tip, 0.5);
+      out.normal.set(0, 0, 1).transformDirection(obj.matrixWorld);
+      obj.matrixWorld.decompose(sP, out.quat, sScale);
+      out.swinging = phase === 'swing';
+      out.free = phase === 'swing' || obj === incoming;
+      return out;
+    },
     /** The element a held blade will strike with (its vortex takes after it). */
     set auraElement(key) { auraElement = key; },
     /** Let a held weapon strike, at `strikePace` × the usual speed. False if nothing is held. */
@@ -975,6 +932,7 @@ export function createWeapons(gltfRoot, {
       if (reducedMotion) return;
       auraKick = Math.max(auraKick, strength);
       glowKick = Math.max(glowKick, strength);
+      if (alive) quiver = Math.max(quiver, (strength - 0.5) * 2);
     },
     /** An echo of the planted weapon's silhouette bursts out of it, in `ramp`'s colors. */
     echo(ramp) {

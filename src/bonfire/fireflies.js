@@ -221,6 +221,7 @@ export function createFireflies(template, {
       heat: 0,              // 0..1: color toward the flame's pale core
       orbit: null,          // { x, y, z, r, w, h }: circle this point (radius, rad/s, height band)
       leash: null,          // { x, z, r }: roam, but drift back inside this radius
+      dart: null,           // { dir, dist, dur, t, bounce }: a dash (see dart())
       trailAt: 0,
     });
   }
@@ -573,14 +574,48 @@ export function createFireflies(template, {
     for (const name of ['position', 'color', 'size', 'alpha']) T.points.geometry.attributes[name].needsUpdate = true;
   }
 
+  /**
+   * A dash (the visualizer): `dist` metres along `dir` over `dur` seconds, starting fast
+   * and stopping dead; or with `bounce`, up and back down like a ball (the path of a
+   * throw). The move is its velocity, steered hard, so the scenery still stops it.
+   */
+  const DIRS = { up: [0, 1, 0], down: [0, -1, 0] };
+  function dart(f, dir, { dist = 0.3, dur = 0.25, bounce = false } = {}) {
+    if (reducedMotion || f.orbit || f.mode !== 'fly') return false;
+    const d = new THREE.Vector3();
+    if (dir === 'left' || dir === 'right') d.copy(right).setY(0).normalize().multiplyScalar(dir === 'left' ? -1 : 1);
+    else if (dir === 'toward' || dir === 'away') d.copy(right).cross(UP).normalize().multiplyScalar(dir === 'away' ? -1 : 1);
+    else if (dir === 'in' || dir === 'out') d.set(f.pos.x - center.x, 0, f.pos.z - center.z).normalize().multiplyScalar(dir === 'in' ? -1 : 1);
+    else if (DIRS[dir]) d.fromArray(DIRS[dir]);
+    else d.copy(dir).normalize();
+    f.dart = { dir: d, dist, dur: Math.max(0.05, dur), t: 0, bounce };
+    f.loiter = 0;
+    return true;
+  }
+  /** A dash's velocity: x(u) = 1 − (1 − u)³ (a dart), or 4u(1 − u) (a bounce). */
+  function dartStep(f, dt) {
+    const D = f.dart;
+    D.t += dt;
+    const u = Math.min(1, D.t / D.dur);
+    const rate = D.bounce ? 4 - 8 * u : 3 * (1 - u) * (1 - u);
+    desired.copy(D.dir).multiplyScalar((rate * D.dist) / D.dur);
+    if (u >= 1) f.dart = null;
+  }
+
   /** Flight: toward the waypoint, meandering, clear of the fire and the scenery. */
   function flyStep(f, dt, t, flowAt) {
-    if (f.orbit) { orbitStep(f, dt, t); return; }
+    if (f.orbit) { f.dart = null; orbitStep(f, dt, t); return; }
     const land = f.wp.land;
     const toWp = tmp.copy(f.wp.pos).sub(f.pos);
     const dist = toWp.length();
-    const final = land && dist < 0.45;
+    const final = land && !f.dart && dist < 0.45;
     f.wpAge += dt;
+    if (f.dart) {
+      dartStep(f, dt);
+      f.vel.lerp(desired, 1 - Math.exp(-dt * 30));
+      moveThrough(f, dt, false);
+      return;
+    }
     if (f.wpAge > 10 && f.loiter <= 0) { f.wp = pickWaypoint(f.pos); f.wpAge = 0; return; }
     if (f.loiter > 0) {
       f.loiter -= dt;
@@ -629,8 +664,11 @@ export function createFireflies(template, {
     }
     if (flowAt) desired.add(flowAt(f.pos.x, f.pos.y, f.pos.z, flow).multiplyScalar(0.35));
     f.vel.lerp(desired, 1 - Math.exp(-dt * (final ? 4 : 1.8)));
+    moveThrough(f, dt, final);
+  }
 
-    // Move, never into the scenery: slide along what's in the way.
+  /** Move, never into the scenery: slide along what's in the way. */
+  function moveThrough(f, dt, final) {
     const floor = (x, z) => (final ? terrain.top(x, z) : terrain.solid(x, z)) + MARGIN;
     const here = floor(f.pos.x, f.pos.z);
     const inside = f.pos.y < here;
@@ -730,10 +768,13 @@ export function createFireflies(template, {
   return {
     group,
     flies,
+    /** The fire on the ground (world): what they circle, and what a leash or a dart 'in' pulls toward. */
+    center,
     update,
     flash,
     pulse,
     dance,
+    dart,
     burst,
     trails: trails?.points ?? null,
     /** Send resting ones (those `which` picks) up into the air. */

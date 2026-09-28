@@ -191,15 +191,15 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   // The pixel pass's effects layer (see pixelPass.js), all off on the site. `sliceSeed`
   // picks a tear pattern; the visualizer changes it with each hit.
   const glitch = {
-    slice: 0, sliceSeed: 0, split: 0, block: 1, wave: 0, mirror: 0, scan: 0, noise: 0, invert: 0,
-    feedback: 0, zoom: 1, kaleido: 0, kaleidoRot: 0, rippleR: 0, rippleAmp: 0, iris: 2, letterbox: 0, ink: 0, cycle: 0,
+    slice: 0, sliceSeed: 0, split: 0, block: 1, wave: 0, mirror: 0, scan: 0, scanMode: 0, noise: 0, invert: 0,
+    feedback: 0, zoom: 1, feedRot: 0, kaleido: 0, kaleidoRot: 0, rippleR: 0, rippleAmp: 0, iris: 2, letterbox: 0, ink: 0, cycle: 0,
   };
   const GLITCH_UNIFORMS = {
-    slice: 'uSlice', sliceSeed: 'uSliceSeed', split: 'uSplit', block: 'uBlock', wave: 'uWave', mirror: 'uMirror', scan: 'uScan', noise: 'uNoise', invert: 'uInvert',
-    feedback: 'uFeedback', zoom: 'uZoom', kaleido: 'uKaleido', kaleidoRot: 'uKaleidoRot', rippleR: 'uRippleR', rippleAmp: 'uRippleAmp', iris: 'uIris', letterbox: 'uLetterbox', ink: 'uInk', cycle: 'uCycle',
+    slice: 'uSlice', sliceSeed: 'uSliceSeed', split: 'uSplit', block: 'uBlock', wave: 'uWave', mirror: 'uMirror', scan: 'uScan', scanMode: 'uScanMode', noise: 'uNoise', invert: 'uInvert',
+    feedback: 'uFeedback', zoom: 'uZoom', feedRot: 'uFeedRot', kaleido: 'uKaleido', kaleidoRot: 'uKaleidoRot', rippleR: 'uRippleR', rippleAmp: 'uRippleAmp', iris: 'uIris', letterbox: 'uLetterbox', ink: 'uInk', cycle: 'uCycle',
   };
   // Effects that are a still look rather than motion or flashing (kept under reduced motion).
-  const STILL = new Set(['mirror', 'scan', 'block', 'letterbox', 'iris', 'zoom']);
+  const STILL = new Set(['mirror', 'scan', 'scanMode', 'block', 'letterbox', 'iris', 'zoom']);
   const OFF = { iris: 2, zoom: 1, block: 1 };
   const boost = (v) => Math.max(0.1, 1 + v);
 
@@ -328,6 +328,11 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
         onSwingFrame: (g0, t0, g1, t1, dt) => {
           swingTrail.emit(g0, t0, g1, t1, dt);
           bladeWake(g0, t0, g1, t1, dt);
+        },
+        // Each move's hit throws a spray off the point.
+        onSwingHit: (kind, tip, dir) => {
+          swingTrail.hit(tip, dir, kind === 'thrust' ? 1 : 0.6);
+          jolt(kind === 'slash' ? 0.04 : 0.07);
         },
         onSwingImpact: () => {
           ring(1.2);
@@ -568,24 +573,20 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     if (ready) weapons.echo(currentRamp);
   }
   /**
-   * A sword combo (the visualizer): plan { hits: [s, …], plunge: s } in seconds from
-   * now. Resolves when the blade plunges back into the fire (false if it can't swing).
-   * Each slash is framed for the camera as it begins.
+   * The living blade (the visualizer): the planted weapon leaves the fire for a routine of
+   * moves and plunges back in. plan { hits: [s, …], plunge: s } in seconds from now, and
+   * optionally { moves, alive, basis, onMove, onHit } (see weapons.swing). Each move takes
+   * its plane from the camera (`basis`, by default where the camera is headed) as it
+   * begins. Resolves when the blade is back in the fire (false if it can't swing).
    */
   let swingDone = null;
-  const camAxes = () => {
-    camera.updateMatrixWorld();
-    return {
-      right: new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0),
-      up: new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1),
-      toCam: new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 2),
-    };
-  };
   function swing(plan) {
     if (!ready || reducedMotion) return Promise.resolve(false);
-    if (!weapons.swing({ ...plan, basis: camAxes })) return Promise.resolve(false);
+    if (!weapons.swing({ basis: viewAxes, ...plan })) return Promise.resolve(false);
     return new Promise((resolve) => { swingDone = () => resolve(true); });
   }
+  /** Where the blade is (world): { mid, tip, grip, normal, quat, len, swinging, free }, or null. */
+  const bladeState = { mid: new THREE.Vector3(), tip: new THREE.Vector3(), grip: new THREE.Vector3(), normal: new THREE.Vector3(), quat: new THREE.Quaternion(), len: 1, swinging: false, free: false };
   /** Flames and sparks near the moving blade get knocked along with it. */
   function bladeWake(g0, t0, g1, t1, dt) {
     const inv = 1 / Math.max(dt, 1e-3);
@@ -633,6 +634,23 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   function setPose(p, { instant = false, duration = 1.25 } = {}) {
     view.name = null;
     moveTo(toPose({ sx: 0, sy: 0, ...p }), instant, duration);
+  }
+  /** The camera's axes and position where it's headed (world): { right, up, toCam, pos }. */
+  function viewAxes() {
+    const { pos, target, roll } = view.to && view.t < 1 ? view.to : view.cur;
+    const toCam = pos.clone().sub(target).normalize();
+    const right = new THREE.Vector3(0, 1, 0).cross(toCam);
+    if (right.lengthSq() < 1e-6) right.set(1, 0, 0);
+    right.normalize();
+    const up = new THREE.Vector3().crossVectors(toCam, right);
+    if (roll) {
+      const c = Math.cos(roll);
+      const s = Math.sin(roll);
+      const r = right.clone();
+      right.multiplyScalar(c).addScaledVector(up, s);
+      up.multiplyScalar(c).addScaledVector(r, -s);
+    }
+    return { right, up, toCam, pos: pos.clone() };
   }
   function moveTo(to, instant, duration) {
     if (instant || reducedMotion) {
@@ -984,6 +1002,13 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     fireflies.flash(clientX - r.left, clientY - r.top, camera, r.width, r.height);
   }
 
+  /** The scenery colors (palette.js `base`) changed: take them up (the visualizer's random palettes). */
+  function refreshScene() {
+    voidColor.set(base.void);
+    scene.fog.color.set(base.void);
+    applyColors({ ramp: currentRamp, shade: currentShade }, currentMix);
+  }
+
   /**
    * Re-read the live effects settings (admin preview). Counts are fixed at
    * creation; the caller rebuilds the scene when those change.
@@ -1013,7 +1038,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   }
 
   return {
-    stoke, puff, equip, setView, setPose, cycle, describe, flash, applyEffects, pulse, sparkle, ring, echo, swing, drive, glitch, ready: loaded,
+    stoke, puff, equip, setView, setPose, viewAxes, cycle, describe, flash, applyEffects, refreshScene, pulse, sparkle, ring, echo, swing, drive, glitch, ready: loaded,
     /** A jolt of the camera (0..~0.3), if screen shake is on. */
     shake: (amount) => jolt(amount),
     dispose: () => scope.dispose(),
@@ -1021,6 +1046,10 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     release: (strikePace = 1) => weapons?.release(strikePace) ?? false,
     /** 0..1: how hard a held weapon glows. */
     set charge(v) { if (weapons) weapons.charge = v; },
+    /** The blade moves as if alive (the visualizer): flourishes, shudders, a held one's sway. */
+    set alive(v) { if (weapons) weapons.alive = v; },
+    /** Where the blade is (see bladeState), or null before the model loads. */
+    get blade() { return weapons?.blade(bladeState) ?? null; },
     /** Render pixel size in CSS px (null: the settings' size). */
     setPixelSize(px) { settings.pixelSize = px; resize(); },
     get flame() { return flameKey; },

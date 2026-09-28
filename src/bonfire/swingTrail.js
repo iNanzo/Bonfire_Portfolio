@@ -6,12 +6,15 @@
 //                fire       embers carried a little by the blade, then rising and curling
 //                           through the fire's flow field, cooling down the ramp; hot ones
 //                           small and solid, cooling ones swelling into dithered wisps.
-//                lightning  white-hot sparks that snap outward, jitter and die fast.
+//                lightning  white-hot sparks off the point only, that snap outward, jitter
+//                           and die fast.
 //                frost      pale glints that drift down and twinkle as they fall.
 //   arc        a glowing ribbon along the tip's last fifth of a second, widest and hottest
-//              at the blade, with a fainter band halfway up it, so each slash draws a
-//              crescent. Lightning's is jagged and re-strikes every frame, with bolts
-//              crackling across the swept area; frost's is thinner and pale.
+//              at the blade, so each slash draws a crescent. Fire and frost add a fainter
+//              band halfway up the blade; frost's is thinner and pale. Lightning's is just
+//              the bolt: jagged, re-striking every frame, with branches crackling between
+//              points along the path the tip just drew.
+//   hits       each move's hit throws a spray off the point, along the blade's motion.
 import * as THREE from 'three';
 import { createBoltLines, seeded } from './bolts.js';
 
@@ -60,9 +63,10 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
   function emit(g0, t0, g1, t1, dt) {
     if (reducedMotion) return;
     const speed = t1.distanceTo(t0) / Math.max(dt, 1e-3);
-    const n = Math.min(90, Math.round(speed * dt * (element === 'fire' ? 230 : 140)));
+    const zap = element === 'lightning';
+    const n = Math.min(zap ? 8 : 90, Math.round(speed * dt * (element === 'fire' ? 230 : zap ? 20 : 140)));
     for (let k = 0; k < n; k++) {
-      const s = Math.random() ** 0.55; // toward the tip
+      const s = zap ? 0.93 + Math.random() * 0.07 : Math.random() ** 0.55; // toward the tip (lightning: only off the point)
       const lam = Math.random();
       const ax = g0.x + (t0.x - g0.x) * s, ay = g0.y + (t0.y - g0.y) * s, az = g0.z + (t0.z - g0.z) * s;
       const bx = g1.x + (t1.x - g1.x) * s, by = g1.y + (t1.y - g1.y) * s, bz = g1.z + (t1.z - g1.z) * s;
@@ -73,12 +77,13 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
       P[i * 3 + 2] = az + (bz - az) * lam;
       age[i] = 0;
       if (element === 'lightning') {
-        // Sparks snap out in any direction, fast, and die in a blink.
+        // Sparks off the point: they snap out a hand's width and die in a blink, so they
+        // stay on the path the point draws.
         const u = Math.random() * 2 - 1;
         const a = Math.random() * Math.PI * 2;
-        const r = Math.sqrt(1 - u * u) * (1.5 + Math.random() * 2.5);
-        V[i * 3] = Math.cos(a) * r; V[i * 3 + 1] = u * 2; V[i * 3 + 2] = Math.sin(a) * r;
-        life[i] = 0.1 + Math.random() * 0.2;
+        const r = Math.sqrt(1 - u * u) * (0.5 + Math.random());
+        V[i * 3] = Math.cos(a) * r; V[i * 3 + 1] = u; V[i * 3 + 2] = Math.sin(a) * r;
+        life[i] = 0.06 + Math.random() * 0.1;
         heat0[i] = 1;
       } else if (element === 'ice') {
         // Glints barely carried by the blade, left hanging to drift down.
@@ -180,27 +185,51 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
     arcs.begin();
     if (tipHist.length > 1 && clock - tipHist.at(-1)[3] < 0.25) {
       const ice = element === 'ice';
-      drawArc(midHist, 1.5, 0.45, ice ? 0.95 : 0.7);
-      drawArc(tipHist, ice ? 2.5 : 4, 1, 1);
-      if (element === 'lightning' && tipHist.length > 3) {
-        // Bolts crackling across what the blade just swept.
-        for (let b = 0; b < 3; b++) {
-          const p = tipHist[tipHist.length - 1 - Math.floor(Math.random() * Math.min(6, tipHist.length))];
-          const q = midHist[midHist.length - 1 - Math.floor(Math.random() * Math.min(6, midHist.length))];
-          arcs.bolt(p[0], p[1], p[2], q[0], q[1], q[2], {
-            rng, depth: 3, jag: 0.4, width: 1, heat: 1.2,
-            color: (u, out) => sampleRamp(0.95 - 0.3 * u, out), alpha: 0.9,
-          });
-        }
+      const zap = element === 'lightning';
+      if (!zap) drawArc(midHist, 1.5, 0.45, ice ? 0.95 : 0.7);
+      drawArc(tipHist, ice ? 2.5 : zap ? 3 : 4, 1, 1);
+      if (zap && tipHist.length > 4 && Math.random() < 0.6) {
+        // A branch crackling between two points of the path the tip just drew.
+        const n = Math.min(8, tipHist.length);
+        const p = tipHist[tipHist.length - 1 - Math.floor(Math.random() * 2)];
+        const q = tipHist[tipHist.length - 3 - Math.floor(Math.random() * (n - 3))];
+        arcs.bolt(p[0], p[1], p[2], q[0], q[1], q[2], {
+          rng, depth: 3, jag: 0.5, width: 1, heat: 1.2,
+          color: (u, out) => sampleRamp(0.95 - 0.3 * u, out), alpha: 0.85,
+        });
       }
     }
     arcs.end();
+  }
+
+  /** A hit: a spray off the point along `dir` (a unit vector), `strength` 0..1. */
+  function hit(tipPos, dir, strength = 1) {
+    if (reducedMotion) return;
+    const zap = element === 'lightning';
+    const ice = element === 'ice';
+    const n = Math.round((zap ? 12 : 40) * strength);
+    for (let k = 0; k < n; k++) {
+      const i = next;
+      next = (next + 1) % N;
+      P[i * 3] = tipPos.x; P[i * 3 + 1] = tipPos.y; P[i * 3 + 2] = tipPos.z;
+      // Mostly along the motion, fanning out.
+      const sp = (zap ? 1.4 : ice ? 1.2 : 2.2) * (0.4 + Math.random());
+      V[i * 3] = (dir.x + (Math.random() - 0.5) * 1.2) * sp;
+      V[i * 3 + 1] = (dir.y + (Math.random() - 0.3) * 1.2) * sp;
+      V[i * 3 + 2] = (dir.z + (Math.random() - 0.5) * 1.2) * sp;
+      age[i] = 0;
+      life[i] = zap ? 0.08 + Math.random() * 0.12 : ice ? 0.5 + Math.random() * 0.5 : 0.25 + Math.random() * 0.35;
+      heat0[i] = 1;
+      grain[i] = Math.random() < 0.7 ? 1.2 : 2;
+    }
+    live = Math.max(live, n);
   }
 
   return {
     objects: [points, ...arcs.objects],
     emit,
     step,
+    hit,
     setRamp(hexes) { ramp = hexes.map((h) => new THREE.Color(h)); },
     /** fire | lightning | ice */
     setElement(key) { element = key; },
