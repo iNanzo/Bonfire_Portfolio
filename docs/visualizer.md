@@ -77,6 +77,13 @@ bonfire's design, assets and code, then three rounds of feedback:
 | AA4 | Painterly and watercolor | `pixelPass.js` `styleShader`: brush strokes (the main brightness band in a rotated, stretched brush) or a Kuwahara wash with pigment pooling at edges; brush size, angle and length rolled each time |
 | AA5 | Glow and a gradient map | glow from the scene image's mipmaps, swelling on kicks; the gradient map recolors by brightness through three palette slots, rolled |
 | AA6 | Recolored scenery that works, with more variety | `colors.js` + `paletteGen.js` `vividScene`: any flame (the site's too), two to four times the tint, around the flame's hue or any hue, sometimes fully random, a new set every landing; off / with some flames / with every flame |
+| AB1 | Fireflies that dart in ANY direction | `fireflyMoves.js` `anyDirection`: a new move, *Dart Any Way*, dashing along a uniform direction on the sphere (every heading, every tilt), leaned back in past 1.9 m from the fire and upward near the ground; `test/variety.test.mjs` |
+| AB2 | Ice tufts when the ice emits | `ice.js` `sprout`: every echo (the slow pulse, a stoke, a ring, a beat) sends up tufts of three to five crystals from one root around the cluster, with a glint and a breath of chill, in the cluster's own instanced mesh |
+| AB3 | Weapon swaps that take after their element, uncluttered | `weapons.js`, `forgeParticles.js`, `forgeFx.js`: one habit per step. Lightning: a flickering white-hot edge with an arc crawling along it, crossed sparks that snap and blink, a broken jagged helix, a bolt striking the pommel as it forms. Ice: a frost edge, chips that fall before a slower helix gathers them and glint as they freeze on, a hexagonal helix, a crystal echo growing in steps. Fire: unchanged |
+| AB4 | The pack, in the visualizer too | `src/ui/pack.js` (shared with the site): Map (scene), Hammer (weapon, forged in the current colors), Spell Tome (the element's ring, the living blade, a new element at once); I opens it; it sits above the HUD and fades with it |
+| AB5 | A way back to the portfolio | the name and mark top left on the start screen (hidden while live) |
+| AB6 | Clips of a set | `record.js`: V records the picture (scaled up by a whole number to about 1080 lines, hard edges) with the sound it hears, saved as MP4 (WebM where MP4 can't be recorded); `test/record.test.mjs` |
+| AB7 | The site doesn't carry the visualizer's weight | `frame.js`: the effects layer and its six extra buffers exist only with `createBonfire({ effects: true })` |
 
 ## Key decisions
 
