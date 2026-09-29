@@ -323,7 +323,7 @@ export function settingsMarkup(settings, keys) {
       ${panel('look', `
         <fieldset>
           <legend>Place</legend>
-          ${select('scenery', 'Scene', options(SCENERIES, ['mix', 'A new place every other drop']), { hint: 'What stands around the fire: the Gothic ruins, a blacksmith’s forge, or a hillside shrine with a torii gate and stone lanterns.' })}
+          ${select('scenery', 'Scene', options(SCENERIES, ['mix', 'A new place every other drop']), { hint: 'What stands around the fire: the Gothic ruins, a blacksmith’s forge, a hillside shrine with a torii gate and stone lanterns, a cathedral’s altar under stained glass, or a cult’s altar among hooded figures and rune stones.' })}
         </fieldset>
         <fieldset>
           <legend>Colors</legend>

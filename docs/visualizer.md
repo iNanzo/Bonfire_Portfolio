@@ -85,6 +85,7 @@ bonfire's design, assets and code, then three rounds of feedback:
 | AB6 | Clips of a set | `record.js`: V records the picture (scaled up by a whole number to about 1080 lines, hard edges) with the sound it hears, saved as MP4 (WebM where MP4 can't be recorded); `test/record.test.mjs` |
 | AB7 | The site doesn't carry the visualizer's weight | `frame.js`: the effects layer and its six extra buffers exist only with `createBonfire({ effects: true })` |
 | AB8 | Presets as the main controls | `settings.js` `presetButtons`, `presetOf`: the presets lead the settings dialog (above the tabs) and the start screen (*Feel*), the one in use marked; the per-effect switches stay in the tabs |
+| AB10 | Altar scenes, and the forge and shrine without artifacts | `scenery.js`: *Cathedral Altar* and *Cult Altar* join the Scene setting and the mix; every scenery is built flat-faced, gap-free and non-coplanar, with glows by kind (`scene.js`) |
 | AB9 | Manual control for live shows | `midi.js`: Web MIDI with learn (Settings → Sound → MIDI Controller): drop, forge/strike, ring, swing, next shot, next look, a look burst, a hit per element, record; the mapping is kept per computer; `test/midi.test.mjs` |
 
 ## Key decisions

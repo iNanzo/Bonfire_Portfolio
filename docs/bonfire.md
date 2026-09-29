@@ -295,6 +295,17 @@ throw sparks. The individual ingredients can be compared with `?lab` (e.g.
   hexagonal helix, a cut-crystal echo growing in steps). Fire is as before.
 - **Ice tufts** (`ice.js`): whenever the ice emits, little fans of crystals sprout from
   the ash around it, flick off a glint and sink back.
+- **Two altars** (`scenery.js`): a cathedral's chancel (an altar on a stepped dais, a
+  lancet window of stained glass under a pointed arch, candle stands, a nave column pair,
+  a pew) and a cult's (a rune-carved slab on a round dais, ember bowls, black candles,
+  hooded stone figures with glowing eyes, standing stones, a half ring of candles behind
+  the fire). The forge and the shrine were rebuilt on the same rules, which removed their
+  artifacts: faces stay flat (pieces lean as a whole instead of per-vertex jitter), block
+  joints have a recessed core behind them (no dashed outlines), nothing is left open to
+  see through, nothing is coplanar (glows draw a hair in front), nothing is sub-texel
+  thin, and glows have kinds (a lamp's windows share one steady light instead of each
+  flickering to its own color). The fire's shadow has a normal bias against acne on thin
+  posts.
 - **The pack** (`src/ui/pack.js`, `src/ui/pixelArt.js`): a backpack in the bottom-right
   corner. Hover it, tap it or press I; its items rise out of it and each one's options
   fly out as a text list: the Map (swap the scene), the Hammer (swap the weapon), the

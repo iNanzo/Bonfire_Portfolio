@@ -116,6 +116,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   fireLight.castShadow = renderer.shadowMap.enabled;
   fireLight.shadow.mapSize.set(512, 512);
   fireLight.shadow.bias = -0.004;
+  fireLight.shadow.normalBias = 0.02; // (no acne on thin, faceted pieces: posts, cylinders)
   fireLight.shadow.camera.near = 0.05;
   fireLight.shadow.camera.far = 10;
   scene.add(fireLight);
@@ -876,10 +877,25 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
       flameStep = fs;
       for (let i = 0; i < steps; i++) fire.stepFlame(1 / fps, t);
       candleFlames.forEach((c, i) => c.mesh.scale.set(c.scale.x, c.scale.y * (0.8 + hash(fs * 1.7 + i * 9.1) * 0.4), c.scale.z));
-      // Coals in the ash pulse between the flame's deep, body and bright tones.
+      // Coals in the ash pulse between the flame's deep, body and bright tones. The scenery's
+      // glows go by their kind (scenery.js): embers like the coals; lamps hold a steady light
+      // with a rare dip, every window of one lamp together; candle flames flicker bright and
+      // waver; stained glass and runes keep their own tone, a step brighter now and then.
       glows.forEach((g, i) => {
-        const h = hash(fs * 3.3 + i * 5.7);
-        g.material.color.set(currentRamp[h > 0.8 ? 2 : h > 0.3 ? 1 : 0]);
+        const k = g.userData.glow;
+        if (!k || k.kind === 'ember') {
+          const h = hash(fs * 3.3 + i * 5.7);
+          g.material.color.set(currentRamp[h > 0.8 ? 2 : h > 0.3 ? 1 : 0]);
+        } else if (k.kind === 'lamp') {
+          g.material.color.set(currentRamp[hash(fs * 1.9 + k.id * 13.1) > 0.92 ? 1 : 2]);
+        } else if (k.kind === 'flame') {
+          g.material.color.set(currentRamp[hash(fs * 2.3 + k.id * 7.3) > 0.7 ? 3 : 2]);
+          g.userData.baseY ??= g.scale.y;
+          g.scale.y = g.userData.baseY * (0.8 + hash(fs * 1.7 + i * 9.1) * 0.4);
+        } else {
+          const up = hash(Math.floor(fs / 6) * 2.1 + i * 3.7) > 0.8 ? 1 : 0;
+          g.material.color.set(currentRamp[Math.min(3, k.tone + up)]);
+        }
       });
     }
     fire.stepSparks(dt, t);
