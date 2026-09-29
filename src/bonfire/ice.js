@@ -13,6 +13,10 @@
 //              brightens the light they cast), and an echo throws their outlines out:
 //              crisp wireframes of the bigger crystals growing away and fading, like
 //              the blade's silhouette echo.
+//   tufts    — whenever the ice emits (an echo: its slow pulse, a stoke, a ring, a beat),
+//              a few tufts of ice sprout from the ash around the cluster: each a little
+//              fan of three to five crystals from one root, popping up with an overshoot,
+//              flicking off a glint or two and a breath of chill, then sinking back.
 //   ring     — a weapon landing sends a ring of ice out across the ground: as the front
 //              passes each spot a small cluster of shards spikes up, holds and sinks
 //              back, so a ring of spikes expands outward and retracts behind itself. It
@@ -184,7 +188,9 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
   const MAX = 40;
   const FLOATERS = 5;
   const MOTES = 200;
-  const { mesh, glow, glowAttr } = crystalMesh(MAX + FLOATERS);
+  const TUFTS = reducedMotion ? 0 : 10; // at once, at most
+  const PER_TUFT = 5;
+  const { mesh, glow, glowAttr } = crystalMesh(MAX + FLOATERS + TUFTS * PER_TUFT);
   const motes = createPoints(MOTES, glintMaterial); // diamond glints (signatures.js)
   const M = { pos: motes.geometry.attributes.position.array, col: motes.geometry.attributes.color.array, size: motes.geometry.attributes.size.array, alpha: motes.geometry.attributes.alpha.array };
   const mVel = new Float32Array(MOTES * 3);
@@ -265,6 +271,69 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
   const SLOW = 1.6;
   const slowGlow = () => (pulseT < SLOW ? Math.sin((Math.PI * pulseT) / SLOW) * 0.45 : 0);
   const slotOf = new Int16Array(N).fill(-1); // each crystal's instance this frame
+
+  // Tufts: { x, z, t, rise, hold, sink, kids: [{ ang, tilt, twist, h, w }], chipped }
+  const tufts = [];
+  const TUFT_RISE = 0.12;
+  const TUFT_SINK = 0.3;
+  /** `n` tufts sprout from the ash just beyond the cluster (none while it's still growing in). */
+  function sprout(n) {
+    if (!TUFTS || grow < 0.8) return;
+    const I = effects.ice;
+    const S = I.spread / 0.36;
+    for (let j = 0; j < n && tufts.length < TUFTS; j++) {
+      const a = Math.random() * TAU;
+      const r = (0.42 + 0.4 * Math.random()) * S;
+      const kids = [];
+      const count = 3 + Math.floor(Math.random() * (PER_TUFT - 2));
+      for (let c = 0; c < count; c++) {
+        kids.push({
+          ang: a + (c / count - 0.5) * 2.4 + (Math.random() - 0.5) * 0.4, // fanned around the way it faces
+          tilt: c === 0 ? 0.1 + 0.15 * Math.random() : 0.35 + 0.55 * Math.random(),
+          twist: Math.random() * TAU,
+          h: (c === 0 ? 0.17 : 0.08 + 0.08 * Math.random()) * I.height,
+          w: (c === 0 ? 0.04 : 0.024 + 0.012 * Math.random()) * I.thickness,
+        });
+      }
+      tufts.push({ x: origin.x + Math.cos(a) * r, z: origin.z + Math.sin(a) * r, ang: a, t: -j * 0.07, hold: 0.45 + 0.35 * Math.random(), kids, chipped: false });
+    }
+  }
+  /** Place the live tufts from instance `n` on; returns the next free instance. */
+  function placeTufts(dt, n) {
+    for (let j = tufts.length - 1; j >= 0; j--) {
+      const tf = tufts[j];
+      tf.t += dt;
+      if (tf.t > TUFT_RISE + tf.hold + TUFT_SINK || !active) { tufts.splice(j, 1); continue; }
+    }
+    for (const tf of tufts) {
+      if (tf.t <= 0) continue;
+      const env = tf.t < TUFT_RISE ? easeOutBack(tf.t / TUFT_RISE)
+        : tf.t < TUFT_RISE + tf.hold ? 1
+          : 1 - clamp01((tf.t - TUFT_RISE - tf.hold) / TUFT_SINK) ** 2;
+      if (!tf.chipped) {
+        tf.chipped = true;
+        // A glint or two flicked off as it breaks the ash, and a breath of chill.
+        for (let c = 0; c < 2; c++) {
+          const i = mNext;
+          mNext = (mNext + 1) % MOTES;
+          const ix = i * 3;
+          M.pos[ix] = tf.x; M.pos[ix + 1] = 0.08; M.pos[ix + 2] = tf.z;
+          mVel[ix] = Math.cos(tf.ang) * (0.2 + Math.random() * 0.4);
+          mVel[ix + 1] = 0.5 + Math.random() * 0.6;
+          mVel[ix + 2] = Math.sin(tf.ang) * (0.2 + Math.random() * 0.4);
+          mAge[i] = 0;
+          mLife[i] = 0.5 + Math.random() * 0.5;
+        }
+        chill?.emit(tf.x, 0.05, tf.z, Math.cos(tf.ang) * 0.15, 0.02, Math.sin(tf.ang) * 0.15, 1.4, 0.3);
+      }
+      const fresh = Math.min(1, 0.5 + Math.max(0, 1 - tf.t / 0.35) * 0.6);
+      for (const k of tf.kids) {
+        place(mesh, n, tf.x, -0.02, tf.z, k.ang, k.tilt, k.twist, k.w, k.w * 0.9, k.h * env);
+        glow[n++] = fresh;
+      }
+    }
+    return n;
+  }
 
   // Echoes: outlines of the bigger crystals growing away and fading.
   const outlines = reducedMotion ? null : createBoltLines(fxMaterial, 720);
@@ -375,6 +444,7 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
       glow[n] = sGlow[i];
       n++;
     }
+    n = placeTufts(dt, n);
     mesh.count = n;
     mesh.instanceMatrix.needsUpdate = true;
     glowAttr.needsUpdate = true;
@@ -449,6 +519,8 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
    */
   function echo(time = ECHO_TIME) {
     if (!outlines || grow < 0.5 || echoes.length >= 3) return;
+    // The slow pulse sends up a few more tufts than a beat's quick echo.
+    sprout(time > 1 ? 3 : 1 + Math.floor(Math.random() * 2));
     mesh.updateMatrixWorld();
     const frames = [];
     const out = [];
