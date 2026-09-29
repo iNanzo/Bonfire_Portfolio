@@ -427,6 +427,7 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
   background-repeat: no-repeat;
   animation: slot-flash 240ms steps(3) both;
 }
+.touch .pack-toggle kbd { display: none; }
 .pack-toggle kbd {
   position: absolute;
   left: -8px;
@@ -493,7 +494,7 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
   scrollbar-width: thin;
   scrollbar-color: var(--c-stone) transparent;
   padding: 14px 10px 10px;
-  background: color-mix(in srgb, var(--c-void) 92%, transparent);
+  background: var(--c-void);
   box-shadow: 0 0 0 1px var(--line);
 }
 .pack-list[hidden] { display: none; }
