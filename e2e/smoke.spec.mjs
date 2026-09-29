@@ -58,6 +58,8 @@ test('the pack opens and swaps the scene', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   await page.hover('[data-pack-toggle]');
+  // The items rise in stepped frames (which can look settled mid-rise): let them land first.
+  await page.waitForFunction(() => document.querySelector('.pack-items').getAnimations({ subtree: true }).every((a) => a.playState !== 'running'));
   await page.hover('[data-pack-slot="map"]');
   const shrine = page.locator('[data-pack-option="shrine"]');
   await expect(shrine).toBeVisible();

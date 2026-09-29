@@ -48,6 +48,23 @@ const BACKPACK_BODY = [
   '................',
 ];
 
+// The anvil from its face down: the horn to the left, the heel to the right, a waist, feet.
+const ANVIL_BODY = [
+  '...###########..',
+  '.##..........#..',
+  '#............#..',
+  '.###.........#..',
+  '....####..####..',
+  '.......#..#.....',
+  '.......#..#.....',
+  '......##..##....',
+  '....##......##..',
+  '...#..........#.',
+  '...############.',
+  '................',
+  '................',
+];
+
 export const ICONS = {
   // Closed, then open (the flap thrown back, the mouth glowing).
   backpack: [
@@ -117,25 +134,19 @@ export const ICONS = {
       '................',
     ],
   ],
-  // A smith's hammer (it swings down on hover).
-  hammer: [
+  // An anvil with a hot bar on its face; on hover the bar is struck and throws sparks.
+  anvil: [
     [
       '................',
-      '.##############.',
-      '.#++..........#.',
-      '.#............#.',
-      '.######..######.',
-      '......#..#......',
-      '......#..#......',
-      '......#..#......',
-      '......#..#......',
-      '......#..#......',
-      '......#++#......',
-      '......#++#......',
-      '......#..#......',
-      '......####......',
       '................',
-      '................',
+      '......++++......',
+      ...ANVIL_BODY,
+    ],
+    [
+      '....+......+....',
+      '.......+........',
+      '..+...++++...+..',
+      ...ANVIL_BODY,
     ],
   ],
   // A spell tome with a rune on its cover (the rune flares on hover).

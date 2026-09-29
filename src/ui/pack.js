@@ -4,8 +4,9 @@
 // beside it, like a game's item menu:
 //
 //   Map         swap the scene around the fire
-//   Hammer      swap the weapon in it
-//   Spell Tome  the element's ring, the living weapon, and a new spell (element)
+//   Anvil       swap the weapon in it
+//   Spell Tome  the element's ring, the living weapon, a new spell (element) and new
+//               bonfire colors
 //
 // The page hands each item its options (what's current, what's unavailable right now)
 // and what picking one does. Keys: arrows move (up/down through the items, left into an
@@ -13,7 +14,8 @@
 import { esc, corners } from '../html.js';
 import { icon } from './pixelArt.js';
 import { weapons, ui } from '../content.js';
-import { elements } from '../elements.js';
+import { elements, flameTitle } from '../elements.js';
+import { flames, rotation } from '../palette.js';
 import { ELEMENT_IDS } from '../effectsDefaults.js';
 import { SCENERIES } from '../sceneries.js';
 
@@ -22,7 +24,7 @@ const CLOSE_DELAY = 320; // ms the pack stays open after the pointer leaves it
 /**
  * @param {object} o
  * @param {Array<{ id: string, name: string, verb: string, icon: string,
- *   options: () => Array<{ id?: string, label: string, current?: boolean, disabled?: boolean, heading?: boolean }>,
+ *   options: () => Array<{ id?: string, label: string, current?: boolean, disabled?: boolean, heading?: boolean, swatch?: string }>,
  *   pick: (id: string) => void }>} o.items
  * @param {string} [o.label]     the pack's own name (the button's label)
  * @param {string} [o.keyHint]   the key that opens it, shown on the button
@@ -74,7 +76,7 @@ export function createPack({ items, label = 'Pack', keyHint = 'I', onSound = () 
       ? `<li class="pack-heading" aria-hidden="true">${esc(o.label)}</li>`
       : `<li><button class="pack-option${o.current ? ' is-current' : ''}" type="button" data-pack-option="${esc(o.id)}"
             aria-pressed="${o.current ? 'true' : 'false'}"${o.disabled ? ' disabled' : ''}>
-            <span class="cursor" aria-hidden="true"></span><span class="pack-option-label">${esc(o.label)}</span>${o.current ? '<span class="gem" aria-hidden="true"></span>' : ''}
+            <span class="cursor" aria-hidden="true"></span>${o.swatch ? `<span class="pack-swatch" style="--sw: ${esc(o.swatch)}" aria-hidden="true"></span>` : ''}<span class="pack-option-label">${esc(o.label)}</span>${o.current ? '<span class="gem" aria-hidden="true"></span>' : ''}
           </button></li>`)).join('');
   }
 
@@ -237,7 +239,7 @@ export function createPack({ items, label = 'Pack', keyHint = 'I', onSound = () 
  * The bonfire's three items (the site and Bonfire Live share them; each page says what the
  * fire is doing and what a pick does).
  * @param {object} o
- * @param {() => { scenery: string, weapon: string, element: string } | null} o.state  null before the scene loads
+ * @param {() => { scenery: string, weapon: string, element: string, flame: string } | null} o.state  null before the scene loads
  * @param {() => boolean} o.busy       a weapon is being forged or is swinging (the living weapon waits)
  * @param {boolean} [o.reducedMotion]  no rings or living weapon then
  * @param {(key: string) => void} o.onScene
@@ -245,8 +247,9 @@ export function createPack({ items, label = 'Pack', keyHint = 'I', onSound = () 
  * @param {() => void} o.onRing
  * @param {() => void} o.onLiving
  * @param {(key: string) => void} o.onElement
+ * @param {(key: string) => void} o.onFlame   new bonfire colors (a flame from the rotation)
  */
-export function bonfireItems({ state, busy, reducedMotion = false, onScene, onWeapon, onRing, onLiving, onElement }) {
+export function bonfireItems({ state, busy, reducedMotion = false, onScene, onWeapon, onRing, onLiving, onElement, onFlame }) {
   const now = () => state() ?? {};
   return [
     {
@@ -255,7 +258,7 @@ export function bonfireItems({ state, busy, reducedMotion = false, onScene, onWe
       pick: onScene,
     },
     {
-      id: 'hammer', name: ui.packHammer ?? 'Hammer', verb: ui.packHammerVerb ?? 'Swap Weapon', icon: 'hammer',
+      id: 'anvil', name: ui.packAnvil ?? 'Anvil', verb: ui.packAnvilVerb ?? 'Swap Weapon', icon: 'anvil',
       options: () => Object.entries(weapons).map(([id, label]) => ({ id, label, current: now().weapon === id, disabled: !state() })),
       pick: onWeapon,
     },
@@ -268,12 +271,20 @@ export function bonfireItems({ state, busy, reducedMotion = false, onScene, onWe
           { id: 'living', label: ui.packLiving ?? 'Living Weapon', disabled: off || busy() },
           { heading: true, label: ui.packSpells ?? 'Swap Spells' },
           ...ELEMENT_IDS.map((id) => ({ id: `element:${id}`, label: elements[id]?.name ?? id, current: now().element === id, disabled: !state() })),
+          { heading: true, label: ui.packColors ?? 'Bonfire Colors' },
+          // Each palette in rotation, named as the fire would be in the element it's in now
+          // ("Azure Frost"), with a swatch of its bright tone.
+          ...rotation().map((key) => ({
+            id: `flame:${key}`, label: flameTitle(flames[key].name, now().element ?? 'fire'),
+            swatch: flames[key].ramp[2], current: now().flame === key, disabled: !state(),
+          })),
         ];
       },
       pick: (id) => {
         if (id === 'ring') onRing();
         else if (id === 'living') onLiving();
         else if (id.startsWith('element:')) onElement(id.slice(8));
+        else if (id.startsWith('flame:')) onFlame(id.slice(6));
       },
     },
   ];

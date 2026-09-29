@@ -574,7 +574,7 @@ document.documentElement.addEventListener('pointerleave', () => { fire?.hoverOff
 const pack = createPack({
   label: ui.pack,
   items: bonfireItems({
-    state: () => (fire ? { scenery: fire.scenery, weapon: equipment.weapon, element: equipment.element } : null),
+    state: () => (fire ? { scenery: fire.scenery, weapon: equipment.weapon, element: equipment.element, flame: equipment.flame } : null),
     busy: () => !fire || fire.forging,
     reducedMotion,
     onScene: (key) => {
@@ -600,6 +600,13 @@ const pack = createPack({
     onElement: (key) => {
       if (key === equipment.element) return;
       equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, { element: key });
+      discover('spell');
+    },
+    // New bonfire colors: the same weapon, relit in them (it lands like a stoke, no forge).
+    onFlame: (key) => {
+      if (key === equipment.flame) return;
+      blip('stoke');
+      equip(equipment.weapon, key, equipment.item);
       discover('spell');
     },
   }),

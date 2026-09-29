@@ -456,19 +456,16 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
 /* Each item's icon comes alive while it's hovered or showing its list. */
 .pack-item:is(:hover, .is-shown) .px-map .px-f1 { display: inline; animation: px-flip-b 0.9s steps(1) infinite; }
 .pack-item:is(:hover, .is-shown) .px-map .px-f0 { animation: px-flip-a 0.9s steps(1) infinite; }
-.pack-item:is(:hover, .is-shown) .px-hammer { transform-origin: 50% 82%; animation: px-swing 0.9s steps(1) infinite; }
+/* The anvil: the hot bar is struck, sparks fly and the anvil rings (a one-pixel jolt). */
+.pack-item:is(:hover, .is-shown) .px-anvil .px-f1 { display: inline; animation: px-flip-b 0.8s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-anvil .px-f0 { animation: px-flip-a 0.8s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-anvil { animation: px-clang 0.8s steps(1) infinite; }
 .pack-item:is(:hover, .is-shown) .px-tome .px-f1 { display: inline; animation: px-flip-b 1.2s steps(1) infinite; }
 .pack-item:is(:hover, .is-shown) .px-tome .px-f0 { animation: px-flip-a 1.2s steps(1) infinite; }
 .pack-item:is(:hover, .is-shown) .px-tome { animation: px-hop 1.2s steps(1) infinite; }
 @keyframes px-flip-a { 50% { opacity: 0; } }
 @keyframes px-flip-b { 0% { opacity: 0; } 50% { opacity: 1; } }
-@keyframes px-swing {
-  0%, 100% { transform: none; }
-  20% { transform: rotate(-22deg); }
-  38% { transform: rotate(-38deg); }
-  50% { transform: rotate(8deg) translateY(2px); }
-  62% { transform: rotate(2deg); }
-}
+@keyframes px-clang { 0%, 45%, 62%, 100% { transform: none; } 50% { transform: translateY(2px); } 56% { transform: translateX(-2px); } }
 @keyframes px-hop { 0%, 100% { transform: none; } 50% { transform: translateY(-2px); } }
 
 /* An item's options: a text list flying out beside it. */
@@ -513,6 +510,7 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
 .pack-options { display: grid; gap: 1px; }
 .pack-list.is-long { max-width: min(420px, calc(100vw - 100px)); }
 .pack-list.is-long .pack-options { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 6px; }
+.pack-list.is-long .pack-heading { grid-column: 1 / -1; } /* (a heading spans both columns) */
 @media (max-width: 559px) { .pack-list.is-long .pack-options { grid-template-columns: 1fr; } }
 .pack-option {
   display: flex;
@@ -537,6 +535,9 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
 .pack-option:focus-visible .cursor { visibility: visible; }
 .pack-option.is-current { color: var(--accent-hi); }
 .pack-option .gem { flex: none; width: 7px; height: 7px; margin-left: auto; box-shadow: none; background: var(--accent-hi); }
+/* A bonfire color's swatch: its bright tone in a small pixel frame. */
+.pack-swatch { flex: none; width: 10px; height: 10px; background: var(--sw); box-shadow: 0 0 0 1px var(--c-void), 0 0 0 2px var(--line-strong); }
+.pack-option.is-current .pack-swatch { box-shadow: 0 0 0 1px var(--c-void), 0 0 0 2px var(--accent-hi); }
 .pack-option:disabled { opacity: 0.4; cursor: default; }
 .pack-option:disabled:hover { background: transparent; color: var(--text-dim); }
 .pack-option:disabled .cursor { visibility: hidden; }

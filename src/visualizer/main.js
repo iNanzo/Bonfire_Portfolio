@@ -718,7 +718,7 @@ const recorder = createRecorder({
 const pack = createPack({
   label: ui.pack,
   items: bonfireItems({
-    state: () => (fire ? { scenery: fire.scenery, weapon: fire.weapon, element: fire.element } : null),
+    state: () => (fire ? { scenery: fire.scenery, weapon: fire.weapon, element: fire.element, flame: fire.flame } : null),
     busy: () => !fire || fire.forging,
     reducedMotion,
     onScene: (key) => { if (fire?.setScenery(key, { flash: true })) note(`Scene: ${SCENERIES[key]}`, 1.5); },
@@ -731,6 +731,11 @@ const pack = createPack({
     onRing: () => director?.ring(1),
     onLiving: () => actions.combo(),
     onElement: (key) => { if (!director?.hit({ element: key })) note('The forge is busy', 1.5); },
+    onFlame: (key) => {
+      if (!fire || key === fire.flame) return;
+      if (fire.forging) { note('The forge is busy', 1.5); return; }
+      fire.equip(fire.weapon, key, { element: fire.element }).catch(() => {});
+    },
   }),
 });
 app.append(pack.el);

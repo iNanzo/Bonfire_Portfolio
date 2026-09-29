@@ -927,13 +927,14 @@
     "packHint": "Hover, tap or press I: swap the scene or the weapon, or cast a spell.",
     "packMap": "Map",
     "packMapVerb": "Swap Scene",
-    "packHammer": "Hammer",
-    "packHammerVerb": "Swap Weapon",
+    "packAnvil": "Anvil",
+    "packAnvilVerb": "Swap Weapon",
     "packTome": "Spell Tome",
     "packTomeVerb": "Cast a Spell",
     "packRing": "Ring of",
     "packLiving": "Living Weapon",
     "packSpells": "Swap Spells",
+    "packColors": "Bonfire Colors",
     "prompts": [
       [
         "Q",
