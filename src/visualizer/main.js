@@ -231,7 +231,7 @@ function startScene() {
   const generation = ++sceneGeneration;
   applyDensity();
   return import('../bonfire/scene.js').then(async ({ createBonfire }) => {
-    const candidate = createBonfire(stage, { reducedMotion, sway: 0, lightTrails: true, onImpact, onRamp: setAccentRamp, onError: failScene, onFrame: (dt) => { if (fire === candidate) onFrame(dt); } });
+    const candidate = createBonfire(stage, { reducedMotion, sway: 0, lightTrails: true, effects: true, onImpact, onRamp: setAccentRamp, onError: failScene, onFrame: (dt) => { if (fire === candidate) onFrame(dt); } });
     const nextDirector = createDirector(candidate, { settings, reducedMotion, onEvent });
     await candidate.ready;
     if (generation !== sceneGeneration) { candidate.dispose(); return; }

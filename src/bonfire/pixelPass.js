@@ -3,8 +3,9 @@
 //   ordered Bayer dither → quantize to the palette.
 // The canvas is upscaled by CSS with nearest-neighbor filtering.
 //
-// Effects layer (the visualizer; all off on the site), all before the palette so every
-// effect comes out in the scene's own colors:
+// Effects layer (the visualizer: compiled in only with createPixelPass({ effects: true }),
+// so the site's shader is just the scene, the breakdown views, the flash and the dither),
+// all before the palette so every effect comes out in the scene's own colors:
 //   where a pixel reads the scene from — a kaleidoscope, a mirror (horizontal: either
 //     half copied onto the other; vertical: the top reflected down like a pool, or the
 //     bottom up; or both, one quarter copied four ways), block crunch, a row
@@ -146,11 +147,13 @@ const fragmentShader = /* glsl */ `
       float d = colorDist(c, palette[i]);
       if (d < bestD) { bestD = d; best = palette[i]; bestI = i; }
     }
+  #ifdef FX
     // Color cycling: the flame's four ramp colors (palette 5–8) rotate.
     if (uCycle > 0.5 && bestI >= 5 && bestI <= 8) {
       int target = 5 + int(mod(float(bestI - 5) + floor(uCycle + 0.5), 4.0));
       for (int i = 5; i <= 8; i++) if (i == target) best = palette[i];
     }
+  #endif
     return best;
   }
   float normalEdge(vec3 n, vec3 nn, float d, float nd) {
@@ -280,6 +283,8 @@ const fragmentShader = /* glsl */ `
 
     // Where this pixel reads the scene from.
     vec2 src = px;
+    float shock = 0.0;
+  #ifdef FX
     if (uKaleido > 0.5) {
       // Folded around the fire, from a wedge that looks up into the flames (zoomed in a little).
       vec2 p = src - uCenter;
@@ -297,7 +302,6 @@ const fragmentShader = /* glsl */ `
     }
     if (uBlock > 1.0) src = floor(src / uBlock) * uBlock + floor(uBlock * 0.5);
     if (uWave > 0.0) src.x += floor(sin(src.y * 0.11 + uTime * 7.0) * uWave + 0.5);
-    float shock = 0.0;
     if (uRippleAmp > 0.0) {
       vec2 d = src - uCenter;
       float r = length(d);
@@ -314,8 +318,10 @@ const fragmentShader = /* glsl */ `
       }
     }
     src.x = mod(src.x, resolution.x);
+  #endif
 
     vec3 col = sceneAt(src);
+  #ifdef FX
   #ifdef SCENE_TEX
     if (uBlur > 0.0) col = smear(src, col);
   #endif
@@ -362,9 +368,11 @@ const fragmentShader = /* glsl */ `
       vec3 gm = l < 0.5 ? mix(ga, gb, l * 2.0) : mix(gb, gc, l * 2.0 - 1.0);
       col = mix(col, blendMode(col, gm, uGradMode), uGrad);
     }
+  #endif
 
     vec2 v = ((px + 0.5) / resolution - 0.5) * vec2(resolution.x / resolution.y, 1.0);
     col *= 1.0 - smoothstep(0.45, 1.05, length(v) * 1.15) * vignette;
+  #ifdef FX
     if (uIris < 1.99) {
       float edge = length(px - uCenter) / resolution.y - uIris;
       if (edge > 0.0 && edge * 25.0 > bayer4(px)) col = vec3(0.0);
@@ -383,9 +391,11 @@ const fragmentShader = /* glsl */ `
     }
     if (uNoise > 0.0) col += (h21(px + floor(uTime * 24.0) * 17.0) - 0.5) * uNoise;
     if (uInvert > 0.0) col = mix(col, uInvertMode < 0.5 ? vec3(1.0) - col : blendMode(col, toSRGB(uCore), uInvertMode), uInvert);
+  #endif
     // Impact flash: the whole frame lifts toward the core color for a frame or two, still
     // quantized to the palette below so it reads as a pixel-art flash, not a white-out.
     if (uFlash > 0.0) col = mix(col, max(col, toSRGB(uCore)), uFlash);
+  #ifdef FX
     // Temperature: a gentle tilt before the palette snap, so bright music reads cooler
     // and dark music warmer by landing on neighboring palette colors.
     col *= vec3(1.0 - 0.07 * uTemp, 1.0 - 0.01 * abs(uTemp), 1.0 + 0.09 * uTemp);
@@ -399,6 +409,7 @@ const fragmentShader = /* glsl */ `
       col *= 1.0 - uFlicker * f;
     }
     col *= 1.0 - uBlackout;
+  #endif
 
     float threshold = (ditherScale > 6.0 ? bayer8(px) : bayer4(px)) - 0.5;
     col += threshold * ditherStrength;
@@ -493,7 +504,8 @@ const ghostShader = /* glsl */ `
   }
 `;
 
-export function createPixelPass() {
+/** `effects`: compile in the visualizer's effects layer and its stages (the site leaves it out). */
+export function createPixelPass({ effects = false } = {}) {
   const uniforms = {
     tColor: { value: null },
     tDepth: { value: null },
@@ -573,7 +585,8 @@ export function createPixelPass() {
     uWashEdge: { value: 0 },
   };
   // One uniforms object for every stage (each reads what it needs).
-  const make = (shader, defines = {}) => new THREE.ShaderMaterial({ uniforms, vertexShader, fragmentShader: shader, defines, depthTest: false, depthWrite: false });
+  const fx = effects ? { FX: '' } : {};
+  const make = (shader, defines = {}) => new THREE.ShaderMaterial({ uniforms, vertexShader, fragmentShader: shader, defines: { ...fx, ...defines }, depthTest: false, depthWrite: false });
   const materials = {
     single: make(fragmentShader),
     scene: make(fragmentShader, { SCENE_ONLY: '' }),
