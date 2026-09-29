@@ -267,6 +267,8 @@ kbd {
 body[data-screen='home'] .tabs { visibility: hidden; }
 
 .header-actions { display: flex; gap: 10px; margin-left: auto; }
+.resume-btn[hidden] { display: none; }
+@media (max-width: 899px) { .resume-btn { display: none; } } /* (it's in the menu there) */
 .sound-toggle .sound-icon {
   width: 12px; height: 12px;
   background: currentColor;

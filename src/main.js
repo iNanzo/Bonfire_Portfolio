@@ -1,6 +1,6 @@
 import './styles.css';
 import { applyCssPalette, base, flames, flameOr, rotation } from './palette.js';
-import { screens, hero, ui, weapons, startingEquipment, items, drawnWeapons } from './content.js';
+import { site, screens, hero, ui, weapons, startingEquipment, items, drawnWeapons } from './content.js';
 import { onEffects, setEffects } from './effects.js';
 import { drawElement, elementOr, flameTitle } from './elements.js';
 import { STRUCTURAL } from './effectsDefaults.js';
@@ -415,6 +415,18 @@ if (store.get('sound') === '1') {
   const resume = () => { applySound(true); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
   window.addEventListener('pointerdown', resume, { once: true });
   window.addEventListener('keydown', resume, { once: true });
+}
+
+// --- The résumé: its links show once there's a file to open (public/resume.pdf, or a link) --
+if (site.resumeUrl) {
+  const show = () => qa('[data-resume]').forEach((el) => { el.hidden = false; });
+  if (/^https?:/i.test(site.resumeUrl)) show();
+  else {
+    // (The dev server answers any path with the page itself, so check it's really a PDF.)
+    fetch(BASE + site.resumeUrl, { method: 'HEAD' })
+      .then((r) => { if (r.ok && /pdf/i.test(r.headers.get('content-type') ?? '')) show(); })
+      .catch(() => {});
+  }
 }
 
 // --- Grids: arrow keys / WASD like a game menu ---------------------------------------------

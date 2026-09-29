@@ -17,6 +17,8 @@ export const url = (href) => {
 export const linkAttrs = (href) =>
   `href="${esc(url(href))}"${/^https?:/i.test(href) ? ' target="_blank" rel="noopener noreferrer"' : ''}`;
 export const img = (src, card = false) => assetUrl(src, BASE, card);
+/** The résumé link's attributes (it opens in a new tab), or '' when there's none. */
+const resumeAttrs = () => (site.resumeUrl ? `href="${esc(url(site.resumeUrl))}" target="_blank" rel="noopener"` : '');
 
 export { corners };
 const screenMeta = Object.fromEntries(screens.map((s) => [s.id, s]));
@@ -52,6 +54,7 @@ export function renderChrome() {
         <button class="tab-key" type="button" data-step="1" title="${esc(ui.nextScreen)} (E)" aria-label="${esc(ui.nextScreen)}">E</button>
       </nav>
       <div class="header-actions">
+        ${site.resumeUrl ? `<a class="pix-btn resume-btn" ${resumeAttrs()} data-resume hidden>${esc(ui.resume)}</a>` : ''}
         <button class="pix-btn sound-toggle" type="button" data-sound aria-pressed="false" title="${esc(ui.soundHint)}">
           <span class="sound-icon" aria-hidden="true"></span><span data-sound-label>${esc(ui.soundOff)}</span>
         </button>
@@ -65,6 +68,7 @@ export function renderChrome() {
         <p class="rest-menu-flavor">${esc(ui.menuFlavor)}</p>
         <ul role="list" data-menu-list>
           ${screens.map((s) => `<li><a class="menu-item" href="#/${s.id === 'home' ? '' : s.id}" data-menu-item>${esc(s.label)}</a></li>`).join('')}
+          ${site.resumeUrl ? `<li data-resume hidden><a class="menu-item" ${resumeAttrs()} data-menu-item>${esc(ui.resume)}</a></li>` : ''}
           <li class="menu-sep" aria-hidden="true"></li>
           <li><button class="menu-item" type="button" data-menu-item data-menu-action="photo" title="${esc(ui.photoHint)}">${esc(ui.photo)} <kbd>F</kbd></button></li>
           <li><button class="menu-item" type="button" data-menu-item data-menu-action="breakdown" title="${esc(ui.breakdownHint)}">${esc(ui.breakdown)} <kbd>B</kbd></button></li>
@@ -336,6 +340,11 @@ export function renderContact() {
               <span class="contact-value">${esc(l.value)}</span>
               <span class="contact-arrow" aria-hidden="true">&gt;</span>
             </a></li>`).join('')}
+          ${site.resumeUrl ? `<li data-resume hidden><a class="contact-link" ${resumeAttrs()}>
+              <span class="contact-label">${esc(ui.resume)}</span>
+              <span class="contact-value">PDF</span>
+              <span class="contact-arrow" aria-hidden="true">&gt;</span>
+            </a></li>` : ''}
         </ul>
         <footer class="site-footer">
           <p>${esc(contact.footer)}</p>

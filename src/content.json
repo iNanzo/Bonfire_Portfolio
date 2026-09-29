@@ -5,6 +5,7 @@
     "title": "Newton Hoang — Full-stack developer & game maker",
     "description": "Newton Hoang builds internal tools and AI integrations at Lyft, and game engines and pixel-art worlds on his own time.",
     "email": "newtonhoang99@gmail.com",
+    "resumeUrl": "resume.pdf",
     "links": {
       "linkedin": "https://www.linkedin.com/in/newtonmhoang/",
       "github": "https://github.com/iNanzo"
@@ -92,7 +93,7 @@
     "element": "fire"
   },
   "hero": {
-    "eyebrow": "Creative Developer · Seattle, WA",
+    "eyebrow": "Full-Stack Developer & Game Maker · Seattle, WA",
     "value": "I build internal tools and AI integrations for the people at Lyft — and game engines and pixel-art worlds on my own time.",
     "menuLabel": "Main menu",
     "stokeLabel": "Stoke the fire",
@@ -181,6 +182,36 @@
     "todo": "Confirm your role."
   },
   "projects": [
+    {
+      "id": "lyft-tools",
+      "name": "Internal Tools at Lyft",
+      "kind": "Internal platforms & AI integrations",
+      "year": "2025 — now",
+      "status": "In use at Lyft",
+      "summary": "Full-stack internal platforms for Lyft’s Connected Experience team, and MCP servers that bring AI tools into everyday employee work.",
+      "outcome": "",
+      "problem": "",
+      "built": "Full-stack internal platforms used in employee workflows across the company, Model Context Protocol (MCP) servers that connect AI tools to everyday work, and the Slack bot infrastructure behind several internal services.",
+      "role": "Full-stack developer (contract)",
+      "tech": [
+        "MCP servers",
+        "Slack bots",
+        "Full-stack web"
+      ],
+      "flavor": "Tools that get out of the way.",
+      "note": "Work for an employer: described without internal details or screenshots.",
+      "links": [],
+      "images": [
+        {
+          "src": "assets/projects/lyft-tools/cover",
+          "alt": "A pixel diagram: a chat bubble and a toolbox bridged by a glowing rune",
+          "caption": "Chat, tools and AI, bridged",
+          "pixel": true
+        }
+      ],
+      "todo": "Before showing it: name what one MCP server connects and who uses it, the problem it solved (Problem), one number (people, hours, tickets) for the Result, and swap in a real cover if you can share one. Then switch Hidden off.",
+      "hidden": true
+    },
     {
       "id": "bonfire-live",
       "name": "Bonfire Live",
@@ -448,7 +479,7 @@
           "caption": "Original app imagery"
         }
       ],
-      "todo": "Confirm which features you owned and the stack."
+      "todo": "Confirm which features you owned and the stack, and add a real result."
     },
     {
       "id": "nba",
@@ -479,7 +510,8 @@
           "alt": "NBA Sports Facts showing a player photo next to his team and position",
           "caption": "Player lookup"
         }
-      ]
+      ],
+      "todo": "Add a real result (who used it, or what it taught you)."
     }
   ],
   "archive": [
@@ -565,7 +597,7 @@
       ],
       [
         "Class",
-        "Application Support Specialist"
+        "Full-Stack Developer & Game Maker"
       ],
       [
         "Current Guild",
@@ -777,22 +809,22 @@
         {
           "name": "Adobe Creative Suite",
           "glyph": "AD",
-          "flavor": "A vast array of tools and weapons for a designer in photo, video, motion graphics, and illustration"
+          "flavor": "A designer's whole armory: photo, video, motion and illustration."
         },
         {
           "name": "Procreate",
-          "glyph": "PC",
-          "flavor": "A tool used for tablet etching"
+          "glyph": "PR",
+          "flavor": "Sketches etched straight onto the tablet."
         },
         {
           "name": "Clip Studio Paint",
           "glyph": "CSP",
-          "flavor": "For a designer specializing in illustration"
+          "flavor": "Where the illustrations get inked."
         },
         {
           "name": "Blender, Maya, ZBrush",
           "glyph": "3D",
-          "flavor": "A sculptor's tools"
+          "flavor": "A sculptor's tools. This bonfire was modeled in Blender."
         }
       ]
     },
@@ -853,6 +885,7 @@
   },
   "ui": {
     "menu": "Menu",
+    "resume": "Résumé",
     "close": "Close",
     "back": "Back",
     "soundOn": "Sound: on",
