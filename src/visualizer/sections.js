@@ -89,7 +89,7 @@ export function createSections() {
     const low = state === 'breakdown' || state === 'build';
     if (!ref) ref = { low: w.lowDb, tot: w.totDb, high: w.highDb };
     else {
-      for (const [k, v] of [['low', w.lowDb], ['tot', w.totDb], ['high', w.highDb]]) {
+      for (const [k, v] of /** @type {[string, number][]} */ ([['low', w.lowDb], ['tot', w.totDb], ['high', w.highDb]])) {
         if (v > ref[k]) ref[k] += (v - ref[k]) * (low ? 0.1 : 0.35);
         else if (!low) ref[k] += (v - ref[k]) * 0.01;
       }

@@ -2,6 +2,10 @@
 node_modules/
 dist/
 
+# Browser test output (npm run e2e)
+test-results/
+playwright-report/
+
 # AI assistants: settings, instructions, memory, and scratch/review resources
 .claude/
 .codex/

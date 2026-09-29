@@ -11,6 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json",
     "model": "node tools/build-model.mjs",
     "screenshots": "node tools/import-screenshots.mjs",
     "link": "node tools/link-bridge.mjs",
@@ -19,16 +20,19 @@
     "admin:deploy": "npm run admin:build && npx --yes wrangler@4 deploy --config admin/wrangler.toml",
     "admin:test": "node --test \"admin/test/*.test.mjs\"",
     "test": "node --test \"test/*.test.mjs\"",
-    "check": "npm run lint && npm test && npm run admin:test"
+    "e2e": "playwright test",
+    "check": "npm run lint && npm run typecheck && npm test && npm run admin:test"
   },
   "dependencies": {
     "three": "^0.186.1"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "^1.63.0",
     "eslint": "10.11.0",
     "globals": "17.12.0",
     "sharp": "^0.35.4",
+    "typescript": "^7.0.2",
     "vite": "^8.3.1"
   }
 }

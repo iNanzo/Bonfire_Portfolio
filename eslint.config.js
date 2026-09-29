@@ -4,7 +4,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  { ignores: ['dist/', 'admin/dist/', 'node_modules/', 'public/', '.scratch/', 'review/'] },
+  { ignores: ['dist/', 'admin/dist/', 'node_modules/', 'public/', '.scratch/', 'review/', 'test-results/', 'playwright-report/'] },
   js.configs.recommended,
   {
     languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: globals.browser },
@@ -14,7 +14,7 @@ export default [
   },
   // Node: tests, build tools and config.
   {
-    files: ['test/**', 'admin/test/**', 'tools/**', '*.config.js', 'admin/vite.config.js'],
+    files: ['test/**', 'admin/test/**', 'e2e/**', 'tools/**', '*.config.js', '*.config.mjs', 'admin/vite.config.js'],
     languageOptions: { globals: globals.node },
   },
   // The admin's Cloudflare Worker.

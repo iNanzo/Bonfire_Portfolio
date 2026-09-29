@@ -1,0 +1,34 @@
+{
+  // Type checking for the plain-JS modules (npm run typecheck): TypeScript reads their
+  // JSDoc; nothing is compiled. It covers the logic that has no DOM or WebGL in it (audio
+  // analysis, tempo, sections, palettes, routes, links, content rules) and grows from there.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "es2023",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": [],
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true
+  },
+  "files": [
+    "src/math.js",
+    "src/html.js",
+    "src/routes.js",
+    "src/paletteGen.js",
+    "src/contentRules.js",
+    "src/sceneries.js",
+    "src/ui/pixelArt.js",
+    "src/visualizer/analyser.js",
+    "src/visualizer/tempo.js",
+    "src/visualizer/sections.js",
+    "src/visualizer/cameraEase.js",
+    "src/visualizer/record.js",
+    "src/bonfire/bladeMotion.js"
+  ]
+}
