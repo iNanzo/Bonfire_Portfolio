@@ -423,3 +423,11 @@ body.hud-off .pack:not(.is-open) { display: none; }
 /* Recording a clip (V): the button burns red and blinks while it records. */
 body.is-recording .viz-record { --b: #e03a3a; color: #ff8a8a; }
 body.is-recording .viz-record [data-record-label]::before { content: '\25CF\00A0'; animation: blink 1s steps(1) infinite; }
+
+/* MIDI controller mapping (settings, Sound tab). */
+.viz-midi { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 16px; margin-top: 10px; }
+.viz-midi li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.viz-midi li > span:first-child { flex: 1; font-family: var(--font-pixel); color: var(--c-bone); }
+.viz-midi-key { font-size: 0.8125rem; color: var(--text-dim); white-space: nowrap; }
+.viz-midi .pix-btn { padding: 3px 8px; font-size: 0.8125rem; }
+.viz-midi .pix-btn:disabled { opacity: 0.4; cursor: default; }

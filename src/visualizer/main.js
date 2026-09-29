@@ -34,6 +34,7 @@ import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
 import { createPack, bonfireItems } from '../ui/pack.js';
 import { createRecorder } from './record.js';
+import { createMidi, MIDI_ACTIONS } from './midi.js';
 import { logoMark } from '../ui/logo.js';
 import { SCENERIES } from '../sceneries.js';
 import { site, ui } from '../content.js';
@@ -736,6 +737,36 @@ app.append(pack.el);
 // It sits just above the HUD while the HUD is up.
 new ResizeObserver(() => document.body.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`)).observe(hud);
 settingsDialog.addEventListener('show-card', (e) => { settingsDialog.close(); showCard(e.detail); });
+// --- A MIDI controller (midi.js): pads for the moments, mapped by learning -----------------
+const midiList = q('[data-midi-list]');
+const midiStatus = q('[data-midi-status]');
+function drawMidi() {
+  const map = midi.mapping;
+  midiList.innerHTML = Object.entries(MIDI_ACTIONS).map(([id, name]) => `
+    <li><span>${esc(name)}</span><span class="viz-midi-key">${esc(map[id] ?? '—')}</span>
+      <button class="pix-btn" type="button" data-midi-learn="${id}"${midi.connected ? '' : ' disabled'}>Learn</button>
+      ${map[id] ? `<button class="pix-btn" type="button" data-midi-forget="${id}" aria-label="Forget ${esc(name)}">✕</button>` : ''}</li>`).join('');
+}
+const midiActions = {
+  drop: () => actions.drop(), arm: () => actions.arm(), ring: () => actions.ring(), combo: () => actions.combo(),
+  cut: () => actions.cut(), look: () => note(`Look: ${director?.nextLook()}`, 1.5), burst: () => director?.glitchHit(),
+  fire: () => director?.hit({ element: 'fire' }), lightning: () => director?.hit({ element: 'lightning' }), ice: () => director?.hit({ element: 'ice' }),
+  record: () => actions.record(),
+};
+const midi = createMidi({
+  onAction: (id) => { if (document.body.dataset.mode === 'live' && fire) { midiActions[id]?.(); wake(); } },
+  onStatus: (text) => { midiStatus.textContent = text; },
+  onChange: drawMidi,
+});
+drawMidi();
+settingsDialog.addEventListener('click', async (e) => {
+  if (e.target.closest('[data-midi-connect]')) { if (await midi.connect()) drawMidi(); return; }
+  const learn = e.target.closest('[data-midi-learn]');
+  if (learn) { midi.learn(learn.dataset.midiLearn); return; }
+  const forget = e.target.closest('[data-midi-forget]');
+  if (forget) midi.forget(forget.dataset.midiForget);
+});
+
 // The start screen's feel: a preset in one click, before the music starts.
 q('[data-feel]').addEventListener('click', (e) => {
   const b = e.target.closest('[data-preset]');

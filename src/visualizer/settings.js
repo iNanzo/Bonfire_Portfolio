@@ -278,6 +278,12 @@ export function settingsMarkup(settings, keys) {
             </ol>
           </details>
           ${range('linkPort', 'Bridge Port', 1024, 65535, 1, { hint: 'The port the Link bridge listens on (17001 unless you started it with --port).', adv: true })}
+        </fieldset>
+        <fieldset class="viz-span">
+          <legend>MIDI Controller</legend>
+          <p class="viz-help">Play the moments from a pad controller: connect it, press Learn beside an action, then the pad. The mapping stays with this computer.</p>
+          <div class="viz-row"><button class="pix-btn" type="button" data-midi-connect>Connect MIDI</button><span class="viz-help" data-midi-status></span></div>
+          <ul class="viz-midi" role="list" data-midi-list></ul>
         </fieldset>`)}
 
       ${panel('show', `

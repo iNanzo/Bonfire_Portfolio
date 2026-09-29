@@ -29,6 +29,7 @@
     "src/visualizer/sections.js",
     "src/visualizer/cameraEase.js",
     "src/visualizer/record.js",
+    "src/visualizer/midi.js",
     "src/bonfire/bladeMotion.js"
   ]
 }
