@@ -201,15 +201,54 @@ function go(hash) {
   render(next, true);
 }
 
+// Screen changes (styles.css "Switching screens"): the old screen stays up for a moment,
+// fixed where it was, while its panels dither away; the new one's slide in from the way
+// you're going (Q/E, or a tab to the left or right of this one).
+let leaving = null;
+let leaveTimer = 0;
+let stepDir = 0; // set by step() for the one render it triggers (it wraps around the ends)
+function finishLeaving() {
+  clearTimeout(leaveTimer);
+  if (!leaving) return;
+  leaving.classList.remove('is-leaving');
+  leaving.style.top = '';
+  if (leaving.dataset.screen !== route.screen) leaving.hidden = true;
+  leaving = null;
+}
+/** Number the panel's first lines (--k) so they rise in one after another. */
+function stagger(screen) {
+  for (const panel of screen.querySelectorAll('.panel, .home-copy')) {
+    let k = 0;
+    for (const child of panel.children) {
+      if (child.classList.contains('corner') || child.classList.contains('screen-head')) continue;
+      if (k < 8) child.style.setProperty('--k', k++);
+      else child.style.removeProperty('--k');
+    }
+  }
+}
+
 function render(next, user) {
   const prev = route;
   route = next;
   const changedScreen = prev.screen !== next.screen;
 
-  // Screen visibility + entrance.
+  // Screen visibility + entrance (and the old one's exit).
+  finishLeaving();
+  const scrolled = window.scrollY;
   for (const [id, el] of Object.entries(screenEls)) el.hidden = id !== next.screen;
   const el = screenEls[next.screen];
   if (changedScreen) {
+    const dir = stepDir || Math.sign(order.indexOf(next.screen) - order.indexOf(prev.screen)) || 1;
+    stepDir = 0;
+    for (const s of Object.values(screenEls)) s.style.setProperty('--dir', dir);
+    if (user && prev.screen && !reducedMotion) {
+      leaving = screenEls[prev.screen];
+      leaving.hidden = false;
+      leaving.style.top = `${-scrolled}px`;
+      leaving.classList.add('is-leaving');
+      leaveTimer = setTimeout(finishLeaving, 220);
+    }
+    stagger(el);
     el.classList.remove('is-entering');
     void el.offsetWidth;
     el.classList.add('is-entering');
@@ -218,6 +257,7 @@ function render(next, user) {
   document.body.dataset.screen = next.screen;
   qa('[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === next.screen));
   qa('[data-tab][aria-current]').forEach((a) => a.setAttribute('aria-current', 'page'));
+  placeTabCursor();
 
   document.body.classList.toggle('is-inspecting', next.screen === 'projects' && !!next.item);
 
@@ -298,6 +338,20 @@ window.addEventListener('keydown', (e) => {
 
 // --- Header, rest menu, sound ---------------------------------------------------------------
 const onScroll = () => header.classList.toggle('is-scrolled', window.scrollY > 24);
+
+// The current tab's underline glides from tab to tab (hidden on home, where no tab is current).
+function placeTabCursor() {
+  const cursor = q('[data-tabs-cursor]');
+  const current = q('[data-tab][aria-current]');
+  if (!cursor) return;
+  cursor.hidden = !current || !current.offsetWidth;
+  if (cursor.hidden) return;
+  cursor.style.width = `${current.offsetWidth}px`;
+  cursor.style.transform = `translateX(${current.offsetLeft}px)`;
+  q('.tabs').classList.add('has-cursor');
+}
+window.addEventListener('resize', placeTabCursor);
+document.fonts?.ready.then(placeTabCursor);
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 
@@ -329,6 +383,7 @@ listNav(menu, '[data-menu-item]', { onMove: () => blip('move') });
 function step(dir) {
   const i = order.indexOf(route.screen);
   const nextId = order[(i + dir + order.length) % order.length];
+  stepDir = dir;
   go(nextId === 'home' ? '#/' : `#/${nextId}`);
 }
 qa('[data-step]').forEach((b) => b.addEventListener('click', () => { step(Number(b.dataset.step)); blip('select'); }));

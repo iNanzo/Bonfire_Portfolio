@@ -48,7 +48,7 @@ export function renderChrome() {
       </a>
       <nav class="tabs" aria-label="Main">
         <button class="tab-key" type="button" data-step="-1" title="${esc(ui.prevScreen)} (Q)" aria-label="${esc(ui.prevScreen)}">Q</button>
-        <ul role="list">${tabs.map((s) => `<li><a href="#/${s.id}" data-tab="${s.id}">${esc(s.label)}</a></li>`).join('')}</ul>
+        <ul role="list">${tabs.map((s) => `<li><a href="#/${s.id}" data-tab="${s.id}">${esc(s.label)}</a></li>`).join('')}<li class="tabs-cursor" aria-hidden="true" data-tabs-cursor hidden></li></ul>
         <button class="tab-key" type="button" data-step="1" title="${esc(ui.nextScreen)} (E)" aria-label="${esc(ui.nextScreen)}">E</button>
       </nav>
       <div class="header-actions">
