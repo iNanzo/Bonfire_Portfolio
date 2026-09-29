@@ -235,6 +235,10 @@
         {
           "label": "Open Bonfire Live",
           "href": "visualizer/"
+        },
+        {
+          "label": "Take This Page Apart",
+          "href": "#how-its-made"
         }
       ],
       "images": [

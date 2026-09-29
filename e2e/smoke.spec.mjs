@@ -77,3 +77,12 @@ test('Bonfire Live starts the demo track', async ({ page }) => {
   await page.waitForTimeout(1500);
   expect(errors).toEqual([]);
 });
+
+test('Bonfire Live’s page takes this one apart (the breakdown)', async ({ page }) => {
+  const errors = watch(page);
+  await page.goto('/projects/bonfire-live/');
+  await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+  await page.getByRole('link', { name: /Take This Page Apart/ }).click();
+  await expect(page.locator('html')).toHaveClass(/is-breakdown/);
+  expect(errors).toEqual([]);
+});

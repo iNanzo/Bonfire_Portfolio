@@ -305,6 +305,12 @@ window.addEventListener('hashchange', () => syncRoute());
 document.addEventListener('click', (event) => {
   const a = event.target.closest('a');
   if (!a || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || a.target || a.hasAttribute('download')) return;
+  // A link to #how-its-made (Bonfire Live's page: the site is the same engine) opens the breakdown.
+  if (a.hash === '#how-its-made') {
+    event.preventDefault();
+    breakdown.enter();
+    return;
+  }
   if (a.classList.contains('skip-link')) {
     event.preventDefault();
     q('#main').focus();
