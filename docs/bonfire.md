@@ -308,9 +308,9 @@ throw sparks. The individual ingredients can be compared with `?lab` (e.g.
   posts.
 - **The pack** (`src/ui/pack.js`, `src/ui/pixelArt.js`): a backpack in the bottom-right
   corner. Hover it, tap it or press I; its items rise out of it and each one's options
-  fly out as a text list: the Map (swap the scene), the Hammer (swap the weapon), the
+  fly out as a text list: the Map (swap the scene), the Anvil (swap the weapon), the
   Spell Tome (the element's ring, the living weapon, a new spell: forging a new blade in
-  that element). The icons are 16×16 line-art pixel icons drawn from ASCII, animated in
+  that element, and new bonfire colors, each with a swatch). The icons are 16×16 line-art pixel icons drawn from ASCII, animated in
   CSS. The same pack is in Bonfire Live.
 - **Switching screens:** the old screen's panels dither away (the scene's own ordered
   dither, as a mask) as they slide off; the new ones slide in from the way you're going
