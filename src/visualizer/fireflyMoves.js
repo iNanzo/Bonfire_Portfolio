@@ -4,6 +4,8 @@
 //   swing    hop and swing around the fire, one way then the other
 //   bounce   bob up and fall back, like a ball
 //   dart     shoot off a short way and stop dead: up, down, left, right, toward or away
+//   anyway   the same dash, in any direction at all: every angle round and every tilt
+//            up or down, drawn back toward the fire when one strays too far or too low
 //   compass  all together round the compass, a step a beat: right, up, left, down
 //   zigzag   side to side, each its own way
 //   scatter  each its own way, drawn back in when it strays
@@ -13,10 +15,31 @@
 // music is loud.
 import { pick } from '../math.js';
 
-export const FLY_MOVES = { swing: 'Swing', bounce: 'Bounce', dart: 'Dart', compass: 'Compass', zigzag: 'Zigzag', scatter: 'Scatter' };
+export const FLY_MOVES = { swing: 'Swing', bounce: 'Bounce', dart: 'Dart', anyway: 'Dart Any Way', compass: 'Compass', zigzag: 'Zigzag', scatter: 'Scatter' };
 const CARDINAL = ['up', 'down', 'left', 'right', 'toward', 'away'];
 const COMPASS = ['right', 'up', 'left', 'down'];
 const MAX_SPEED = 4; // m/s at the start of a dash
+const STRAY = 1.9;    // m from the fire (on the ground) past which a dash leans back in
+const LOW = 0.35;     // m: below this a dash leans upward, so it doesn't drive into the ground
+
+/**
+ * A direction for 'anyway': uniform over the whole sphere, leaned back toward the fire past
+ * STRAY and upward below LOW (only as much as it takes, so it still reads as any way).
+ * `rand` () => 0..1. Returns { x, y, z }, unit length.
+ */
+export function anyDirection(pos, center, rand = Math.random) {
+  const y = rand() * 2 - 1;
+  const a = rand() * Math.PI * 2;
+  const r = Math.sqrt(1 - y * y);
+  const d = { x: Math.cos(a) * r, y, z: Math.sin(a) * r };
+  const ox = pos.x - center.x, oz = pos.z - center.z;
+  const out = Math.hypot(ox, oz);
+  if (out > STRAY && d.x * ox + d.z * oz > 0) { d.x -= (1.4 * ox) / out; d.z -= (1.4 * oz) / out; }
+  if (pos.y < LOW && d.y < 0) d.y = -d.y * 0.5 + 0.3;
+  const len = Math.hypot(d.x, d.y, d.z) || 1;
+  d.x /= len; d.y /= len; d.z /= len;
+  return d;
+}
 
 export function createFireflyMoves({ reducedMotion = false } = {}) {
   let move = 'swing';
@@ -75,11 +98,12 @@ export function createFireflyMoves({ reducedMotion = false } = {}) {
         const dur = Math.max((3 * dist) / MAX_SPEED, span * p.frac);
         if (move === 'bounce') fl.dart(f, 'up', { dist: dist * 0.6, dur: span * 0.85, bounce: true });
         else if (move === 'dart') fl.dart(f, pick(CARDINAL), { dist, dur });
+        else if (move === 'anyway') fl.dart(f, anyDirection(f.pos, fl.center), { dist, dur });
         else if (move === 'compass') fl.dart(f, COMPASS[((beat % 4) + 4) % 4], { dist: 0.3, dur: Math.max(0.23, span * 0.5) });
         else if (move === 'zigzag') { p.side = -p.side; fl.dart(f, p.side > 0 ? 'right' : 'left', { dist, dur }); }
         else if (move === 'scatter') {
           const out = Math.hypot(f.pos.x - fl.center.x, f.pos.z - fl.center.z);
-          fl.dart(f, out > 1.9 ? 'in' : pick(['out', 'left', 'right', 'up', 'toward', 'away']), { dist, dur });
+          fl.dart(f, out > STRAY ? 'in' : pick(['out', 'left', 'right', 'up', 'toward', 'away']), { dist, dur });
         }
       });
     },

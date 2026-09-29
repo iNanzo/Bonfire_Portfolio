@@ -7,7 +7,7 @@ import { base, flames } from '../src/palette.js';
 import { contrast } from '../src/contentRules.js';
 import { createColors, colorName } from '../src/visualizer/colors.js';
 import { createLooks, BLEND, DROP_FX, LAYERS, LOOKS, MIRRORS } from '../src/visualizer/looks.js';
-import { createFireflyMoves, FLY_MOVES } from '../src/visualizer/fireflyMoves.js';
+import { createFireflyMoves, FLY_MOVES, anyDirection } from '../src/visualizer/fireflyMoves.js';
 
 // colors.update() writes the page's CSS palette when a scenery blend ends.
 globalThis.document ??= { documentElement: { style: { setProperty() {} } } };
@@ -305,4 +305,28 @@ test('firefly moves: each keeps its own time, on the beat grid', () => {
   assert.equal(darts.length, 0);
   moves.beat(1, true, fl, 1);
   assert.deepEqual(darts, [{ dance: true }]);
+});
+
+test('firefly darts any way: every direction on the sphere, leaned back in when they stray', () => {
+  const center = { x: 0, z: 0 };
+  let up = 0, down = 0, diagonal = 0;
+  const headings = new Set();
+  for (let i = 0; i < 2000; i++) {
+    const d = anyDirection({ x: 0.5, y: 1, z: 0.3 }, center);
+    assert.ok(Math.abs(Math.hypot(d.x, d.y, d.z) - 1) < 1e-9, 'unit length');
+    if (d.y > 0.5) up++;
+    if (d.y < -0.5) down++;
+    if (Math.abs(d.y) > 0.3 && Math.abs(d.y) < 0.8) diagonal++;
+    headings.add(Math.floor(((Math.atan2(d.z, d.x) + Math.PI) / (2 * Math.PI)) * 16));
+  }
+  assert.ok(up > 300 && down > 300, `up ${up} and down ${down}, not only level`);
+  assert.ok(diagonal > 400, 'tilted ways too, not just the six cardinal ones');
+  assert.equal(headings.size, 16, 'every heading round');
+  // Far out, it never heads further out; near the ground, never further down.
+  for (let i = 0; i < 500; i++) {
+    const far = anyDirection({ x: 2.5, y: 1, z: 0 }, center);
+    assert.ok(far.x <= 0.01, 'a stray one comes back toward the fire');
+    const low = anyDirection({ x: 0, y: 0.2, z: 0 }, center);
+    assert.ok(low.y > 0, 'a low one heads up');
+  }
 });
