@@ -24,6 +24,9 @@
     "check": "npm run lint && npm run typecheck && npm test && npm run admin:test"
   },
   "dependencies": {
+    "@fontsource/cinzel": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/pixelify-sans": "^5.3.0",
     "three": "^0.186.1"
   },
   "devDependencies": {

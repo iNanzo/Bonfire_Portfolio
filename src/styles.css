@@ -5,20 +5,12 @@
      --accent-hi  text (always ≥ 4.5:1 on the void)
      --accent     borders, gems, decoration
      --accent-lo  deep decoration
+   The shared tokens (colors, fonts) are in tokens.css.
    ========================================================================== */
 
+@import './tokens.css';
+
 :root {
-  --c-void: #07070b;
-  --c-shadow: #15131d;
-  --c-stone: #2c2a3a;
-  --c-wood: #5b4535;
-  --c-bone: #e9e3d2;
-
-  --accent-lo: #8c1d2f;
-  --accent: #e0582a;
-  --accent-hi: #ffc76a;
-  --accent-core: #fff1d0;
-
   --text: var(--c-bone);
   --text-dim: color-mix(in srgb, var(--c-bone) 74%, var(--c-void));
   --line: color-mix(in srgb, var(--c-bone) 14%, transparent);
@@ -26,9 +18,6 @@
   --panel-bg: color-mix(in srgb, var(--c-void) 72%, transparent);
   --inset-bg: color-mix(in srgb, var(--c-shadow) 55%, transparent);
 
-  --font-pixel: 'Pixelify Sans', ui-monospace, 'Cascadia Mono', monospace;
-  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-name: 'Cinzel', 'Trajan Pro', Georgia, serif;
   --font-data: 600 0.8125rem/1.4 var(--font-body);
 
   --gutter: clamp(16px, 3vw, 40px);
