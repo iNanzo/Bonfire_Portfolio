@@ -128,6 +128,18 @@ export function applyPreset(settings, id) {
   const p = PRESETS[id];
   if (p) mergeInto(settings, p.values);
 }
+/** The preset the settings are on right now (every one of its values as it set them), or null. */
+export function presetOf(settings) {
+  const on = Object.entries(PRESETS).find(([, p]) => Object.entries(p.values).every(([k, v]) => settings[k] === v));
+  return on ? on[0] : null;
+}
+/** The presets as a row of buttons (the settings dialog's top, the start screen). */
+export const presetButtons = (cls = '') => Object.entries(PRESETS).map(([id, p]) => `<button class="pix-btn viz-preset ${cls}" type="button" data-preset="${id}" aria-pressed="false" title="${esc(p.hint)}"><b>${esc(p.name)}</b><span>${esc(p.hint)}</span></button>`).join('');
+/** Mark the preset in use (aria-pressed) on every preset button under `root`. */
+export function markPreset(root, settings) {
+  const on = presetOf(settings);
+  for (const b of root.querySelectorAll('[data-preset]')) b.setAttribute('aria-pressed', String(b.dataset.preset === on));
+}
 
 // --- setups: your own saved snapshots ------------------------------------------------------
 function readSetups() {
@@ -216,7 +228,7 @@ const effectItems = (group, names) => Object.entries(names).map(([id, name]) => 
 
 const TABS = [
   ['sound', 'Sound'], ['show', 'Show'], ['blade', 'Blade'], ['look', 'Look'], ['effects', 'Effects'],
-  ['camera', 'Camera'], ['flies', 'Fireflies'], ['titles', 'Title Cards'], ['setups', 'Presets & Setups'],
+  ['camera', 'Camera'], ['flies', 'Fireflies'], ['titles', 'Title Cards'], ['setups', 'My Setups'],
 ];
 
 /** The settings dialog. `keys`: [key, what it does] pairs for its list of keys. */
@@ -235,6 +247,9 @@ export function settingsMarkup(settings, keys) {
           <label><input type="radio" name="viz-view" value="simple" data-view-pick> Simple</label>
           <label><input type="radio" name="viz-view" value="all" data-view-pick> All settings</label>
         </div>
+      </div>
+      <div class="viz-presets viz-presets-top" role="group" aria-label="Presets: a kind of night in one click">
+        ${presetButtons()}
       </div>
       <div class="viz-tabs" role="tablist" aria-label="Settings sections">
         ${TABS.map(([id, name], i) => `<button type="button" role="tab" class="viz-tab" id="viz-tabbtn-${id}" aria-controls="viz-tab-${id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-tab="${id}">${esc(name)}</button>`).join('')}
@@ -378,12 +393,6 @@ export function settingsMarkup(settings, keys) {
 
       ${panel('setups', `
         <fieldset class="viz-span">
-          <legend>Presets</legend>
-          <div class="viz-presets">
-            ${Object.entries(PRESETS).map(([id, p]) => `<button class="pix-btn viz-preset" type="button" data-preset="${id}" title="${esc(p.hint)}"><b>${esc(p.name)}</b><span>${esc(p.hint)}</span></button>`).join('')}
-          </div>
-        </fieldset>
-        <fieldset class="viz-span">
           <legend>My Setups</legend>
           <p class="viz-help">Save everything as it is now under a name, to load again later. Your input device and volume aren’t part of a setup.</p>
           <div class="viz-row viz-setup-save">
@@ -441,6 +450,7 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {} }) 
     for (const r of dialog.querySelectorAll('[data-view-pick]')) r.checked = r.value === settings.view;
     drawCards();
     drawSetups();
+    markPreset(dialog, settings);
   }
 
   // --- tabs (arrow keys move between them, like any tab list)

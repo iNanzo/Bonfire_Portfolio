@@ -29,7 +29,7 @@ import { SHOTS } from './camera.js';
 import { MODES } from './looks.js';
 import { COLOR_MODES } from './colors.js';
 import { createDemo, DEMO_BPM } from './demo.js';
-import { bindSettings, loadSettings, resetSettings, saveSettings, settingsMarkup } from './settings.js';
+import { bindSettings, loadSettings, resetSettings, saveSettings, settingsMarkup, applyPreset, presetButtons, markPreset, PRESETS } from './settings.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
 import { createPack, bonfireItems } from '../ui/pack.js';
@@ -114,6 +114,10 @@ app.innerHTML = `
         <span class="viz-field-label">Input Device</span>
         <select data-device></select>
       </label>
+      <div class="viz-feel" role="group" aria-label="Tonight's feel (presets)" data-feel>
+        <span class="viz-group-label">Feel</span>
+        ${presetButtons('viz-feel-pick')}
+      </div>
       <button class="pix-btn viz-start-settings" type="button" data-act="settings"><kbd>S</kbd>Settings</button>
       <p class="viz-error" role="alert" data-error hidden></p>
       <input type="file" accept="audio/*" data-file hidden>
@@ -692,6 +696,7 @@ function applySettings() {
   if (settings.scenery !== 'mix') fire?.setScenery(settings.scenery);
   director?.setShot(settings.shot);
   saveSettings(settings);
+  markPreset(start, settings);
 }
 const settingsPanel = bindSettings(settingsDialog, settings, { onChange: applySettings, onNote: (text) => note(text, 1.5) });
 
@@ -731,6 +736,16 @@ app.append(pack.el);
 // It sits just above the HUD while the HUD is up.
 new ResizeObserver(() => document.body.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`)).observe(hud);
 settingsDialog.addEventListener('show-card', (e) => { settingsDialog.close(); showCard(e.detail); });
+// The start screen's feel: a preset in one click, before the music starts.
+q('[data-feel]').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-preset]');
+  if (!b) return;
+  applyPreset(settings, b.dataset.preset);
+  settingsPanel.fill();
+  applySettings();
+  note(`Preset: ${PRESETS[b.dataset.preset].name}`, 1.5);
+});
+markPreset(start, settings);
 
 // --- Beat by hand: a typed BPM, nudges -----------------------------------------------------
 const bpmInput = q('[data-bpm-set]');
