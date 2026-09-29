@@ -410,4 +410,4 @@ body.hud-off .pack:not(.is-open) { display: none; }
 
 /* Recording a clip (V): the button burns red and blinks while it records. */
 body.is-recording .viz-record { --b: #e03a3a; color: #ff8a8a; }
-body.is-recording .viz-record [data-record-label]::before { content: 'CF A0'; animation: blink 1s steps(1) infinite; }
+body.is-recording .viz-record [data-record-label]::before { content: '\25CF\00A0'; animation: blink 1s steps(1) infinite; }
