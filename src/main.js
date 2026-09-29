@@ -1,6 +1,6 @@
 import './styles.css';
 import { applyCssPalette, base, flames, flameOr, rotation } from './palette.js';
-import { screens, hero, ui, weapons, startingEquipment, items, drawnWeapons } from './content.js';
+import { site, screens, hero, ui, weapons, startingEquipment, items, drawnWeapons } from './content.js';
 import { onEffects, setEffects } from './effects.js';
 import { drawElement, elementOr, flameTitle } from './elements.js';
 import { STRUCTURAL } from './effectsDefaults.js';
@@ -16,6 +16,8 @@ import { setupInventory } from './ui/inventory.js';
 import { createDiscoveries } from './ui/discoveries.js';
 import { createPhotoMode } from './ui/photo.js';
 import { createBreakdown } from './ui/breakdown.js';
+import { createPack, bonfireItems } from './ui/pack.js';
+import { SCENERIES } from './sceneries.js';
 import { applyFlame, setAccentRamp } from './ui/theme.js';
 import { parseRoute, readRoute, routePath, isEditing } from './routes.js';
 import { updateMetadata } from './seo.js';
@@ -183,6 +185,7 @@ function onImpact(flame, _from, instant, selection) {
     blip(el === 'fire' ? 'stab' : `stab-${el}`);
     live.textContent = `The fire takes the ${weapons[displayedEquipment.weapon]}. ${fireName(displayedEquipment)}.`;
   }
+  pack.refresh();
 }
 
 // --- Router --------------------------------------------------------------------------------
@@ -198,23 +201,65 @@ function go(hash) {
   render(next, true);
 }
 
+// Screen changes (styles.css "Switching screens"): the old screen stays up for a moment,
+// fixed where it was, while its panels dither away; the new one's slide in from the way
+// you're going (Q/E, or a tab to the left or right of this one).
+let leaving = null;
+let leaveTimer = 0;
+let lastScrollY = 0; // (the page's scroll, for the fire's sweep: see "Scrolling" below)
+let stepDir = 0; // set by step() for the one render it triggers (it wraps around the ends)
+function finishLeaving() {
+  clearTimeout(leaveTimer);
+  if (!leaving) return;
+  leaving.classList.remove('is-leaving');
+  leaving.style.top = '';
+  if (leaving.dataset.screen !== route.screen) leaving.hidden = true;
+  leaving = null;
+}
+/** Number the panel's first lines (--k) so they rise in one after another. */
+function stagger(screen) {
+  for (const panel of screen.querySelectorAll('.panel, .home-copy')) {
+    let k = 0;
+    for (const child of panel.children) {
+      if (child.classList.contains('corner') || child.classList.contains('screen-head')) continue;
+      if (k < 8) child.style.setProperty('--k', k++);
+      else child.style.removeProperty('--k');
+    }
+  }
+}
+
 function render(next, user) {
   const prev = route;
   route = next;
   const changedScreen = prev.screen !== next.screen;
 
-  // Screen visibility + entrance.
+  // Screen visibility + entrance (and the old one's exit).
+  finishLeaving();
+  const scrolled = window.scrollY;
   for (const [id, el] of Object.entries(screenEls)) el.hidden = id !== next.screen;
   const el = screenEls[next.screen];
   if (changedScreen) {
+    const dir = stepDir || Math.sign(order.indexOf(next.screen) - order.indexOf(prev.screen)) || 1;
+    stepDir = 0;
+    for (const s of Object.values(screenEls)) s.style.setProperty('--dir', dir);
+    if (user && prev.screen && !reducedMotion) {
+      leaving = screenEls[prev.screen];
+      leaving.hidden = false;
+      leaving.style.top = `${-scrolled}px`;
+      leaving.classList.add('is-leaving');
+      leaveTimer = setTimeout(finishLeaving, 220);
+    }
+    stagger(el);
     el.classList.remove('is-entering');
     void el.offsetWidth;
     el.classList.add('is-entering');
     window.scrollTo({ top: 0, behavior: 'instant' });
+    lastScrollY = 0; // (the jump to the top isn't a scroll to sweep the fire with)
   }
   document.body.dataset.screen = next.screen;
   qa('[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === next.screen));
   qa('[data-tab][aria-current]').forEach((a) => a.setAttribute('aria-current', 'page'));
+  placeTabCursor();
 
   document.body.classList.toggle('is-inspecting', next.screen === 'projects' && !!next.item);
 
@@ -260,6 +305,12 @@ window.addEventListener('hashchange', () => syncRoute());
 document.addEventListener('click', (event) => {
   const a = event.target.closest('a');
   if (!a || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || a.target || a.hasAttribute('download')) return;
+  // A link to #how-its-made (Bonfire Live's page: the site is the same engine) opens the breakdown.
+  if (a.hash === '#how-its-made') {
+    event.preventDefault();
+    breakdown.enter();
+    return;
+  }
   if (a.classList.contains('skip-link')) {
     event.preventDefault();
     q('#main').focus();
@@ -284,6 +335,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'f') { photo.toggle(); return; }
   if (k === 'b') { breakdown.toggle(); return; }
   if (photo.active || breakdown.active) return;
+  if (k === 'i') { pack.toggle(); return; }
   if (k === 'q' || k === 'e') step(k === 'e' ? 1 : -1);
   else if (e.key === 'Escape') {
     if (!q('[data-kindled]').hidden) return;
@@ -294,6 +346,35 @@ window.addEventListener('keydown', (e) => {
 
 // --- Header, rest menu, sound ---------------------------------------------------------------
 const onScroll = () => header.classList.toggle('is-scrolled', window.scrollY > 24);
+
+// Scrolling sweeps the fire's loose particles and the fireflies a little the way the page
+// moves (scene.js scroll): the wheel with a mouse (so it's felt on screens that don't
+// scroll, like home), the page's own scroll on touch screens. Not in photo mode (there the
+// wheel zooms), and not for the jump to the top when the screen changes (render()).
+lastScrollY = window.scrollY;
+window.addEventListener('wheel', (e) => {
+  if (touch || photo.active) return;
+  fire?.scroll(e.deltaMode === 1 ? e.deltaY * 32 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY);
+}, { passive: true });
+window.addEventListener('scroll', () => {
+  const dy = window.scrollY - lastScrollY;
+  lastScrollY = window.scrollY;
+  if (touch && dy) fire?.scroll(dy);
+}, { passive: true });
+
+// The current tab's underline glides from tab to tab (hidden on home, where no tab is current).
+function placeTabCursor() {
+  const cursor = q('[data-tabs-cursor]');
+  const current = q('[data-tab][aria-current]');
+  if (!cursor) return;
+  cursor.hidden = !current || !current.offsetWidth;
+  if (cursor.hidden) return;
+  cursor.style.width = `${current.offsetWidth}px`;
+  cursor.style.transform = `translateX(${current.offsetLeft}px)`;
+  q('.tabs').classList.add('has-cursor');
+}
+window.addEventListener('resize', placeTabCursor);
+document.fonts?.ready.then(placeTabCursor);
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 
@@ -325,6 +406,7 @@ listNav(menu, '[data-menu-item]', { onMove: () => blip('move') });
 function step(dir) {
   const i = order.indexOf(route.screen);
   const nextId = order[(i + dir + order.length) % order.length];
+  stepDir = dir;
   go(nextId === 'home' ? '#/' : `#/${nextId}`);
 }
 qa('[data-step]').forEach((b) => b.addEventListener('click', () => { step(Number(b.dataset.step)); blip('select'); }));
@@ -356,6 +438,18 @@ if (store.get('sound') === '1') {
   const resume = () => { applySound(true); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
   window.addEventListener('pointerdown', resume, { once: true });
   window.addEventListener('keydown', resume, { once: true });
+}
+
+// --- The résumé: its links show once there's a file to open (public/resume.pdf, or a link) --
+if (site.resumeUrl) {
+  const show = () => qa('[data-resume]').forEach((el) => { el.hidden = false; });
+  if (/^https?:/i.test(site.resumeUrl)) show();
+  else {
+    // (The dev server answers any path with the page itself, so check it's really a PDF.)
+    fetch(BASE + site.resumeUrl, { method: 'HEAD' })
+      .then((r) => { if (r.ok && /pdf/i.test(r.headers.get('content-type') ?? '')) show(); })
+      .catch(() => {});
+  }
 }
 
 // --- Grids: arrow keys / WASD like a game menu ---------------------------------------------
@@ -473,6 +567,53 @@ window.addEventListener('pointermove', (e) => {
   setHover(what);
 }, { passive: true });
 document.documentElement.addEventListener('pointerleave', () => { fire?.hoverOff(); setHover(null); });
+
+// --- The pack (ui/pack.js): swap the scene or the weapon, or cast a spell -------------------
+// Weapons and spells follow what was last asked for (the gem moves as you pick), the scene
+// what's there now.
+const pack = createPack({
+  label: ui.pack,
+  items: bonfireItems({
+    state: () => (fire ? { scenery: fire.scenery, weapon: equipment.weapon, element: equipment.element, flame: equipment.flame } : null),
+    busy: () => !fire || fire.forging,
+    reducedMotion,
+    onScene: (key) => {
+      if (!fire?.setScenery(key, { flash: true })) return;
+      blip('stoke');
+      discover('scenery');
+      live.textContent = `The fire burns in ${SCENERIES[key]}.`;
+    },
+    onWeapon: (key) => { if (key !== equipment.weapon) equip(key, equipment.flame, equipment.item); },
+    onRing: () => {
+      fire?.ring(1.2);
+      blip(fire?.element === 'lightning' ? 'zap' : fire?.element === 'ice' ? 'chime' : 'stoke');
+      discover('spell');
+    },
+    onLiving: () => {
+      if (!fire || fire.forging) return;
+      blip('pull');
+      fire.flourish().then((ok) => { if (ok) blip('stab'); });
+      discover('flourish');
+      discover('spell');
+    },
+    // A new spell forges a new weapon in that element (the swap takes after it).
+    onElement: (key) => {
+      if (key === equipment.element) return;
+      equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, { element: key });
+      discover('spell');
+    },
+    // New bonfire colors: the same weapon, relit in them (it lands like a stoke, no forge).
+    onFlame: (key) => {
+      if (key === equipment.flame) return;
+      blip('stoke');
+      equip(equipment.weapon, key, equipment.item);
+      discover('spell');
+    },
+  }),
+  onSound: (kind) => blip(kind === 'open' ? 'pack' : kind),
+  onOpen: () => discover('pack'),
+});
+app.append(pack.el);
 
 // --- The bonfire --------------------------------------------------------------------------
 function failScene(error) {

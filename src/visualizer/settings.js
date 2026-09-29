@@ -8,7 +8,7 @@
 // read what it does. Every effect has a three-way switch: off, in the mix (it comes and
 // goes), always. Presets set many at once for a kind of night; setups are your own saved
 // snapshots (and can be exported to a file and imported on another computer).
-import { esc } from '../html.js';
+import { esc, corners } from '../html.js';
 import { elements } from '../elements.js';
 import { MOVES } from '../bonfire/bladeMotion.js';
 import { DEFAULT_SETTINGS } from './director.js';
@@ -128,6 +128,18 @@ export function applyPreset(settings, id) {
   const p = PRESETS[id];
   if (p) mergeInto(settings, p.values);
 }
+/** The preset the settings are on right now (every one of its values as it set them), or null. */
+export function presetOf(settings) {
+  const on = Object.entries(PRESETS).find(([, p]) => Object.entries(p.values).every(([k, v]) => settings[k] === v));
+  return on ? on[0] : null;
+}
+/** The presets as a row of buttons (the settings dialog's top, the start screen). */
+export const presetButtons = (cls = '') => Object.entries(PRESETS).map(([id, p]) => `<button class="pix-btn viz-preset ${cls}" type="button" data-preset="${id}" aria-pressed="false" title="${esc(p.hint)}"><b>${esc(p.name)}</b><span>${esc(p.hint)}</span></button>`).join('');
+/** Mark the preset in use (aria-pressed) on every preset button under `root`. */
+export function markPreset(root, settings) {
+  const on = presetOf(settings);
+  for (const b of root.querySelectorAll('[data-preset]')) b.setAttribute('aria-pressed', String(b.dataset.preset === on));
+}
 
 // --- setups: your own saved snapshots ------------------------------------------------------
 function readSetups() {
@@ -137,7 +149,6 @@ function writeSetups(all) { try { localStorage.setItem(SETUPS, JSON.stringify(al
 const snapshot = (settings) => Object.fromEntries(Object.entries(structuredClone(settings)).filter(([k]) => !LOCAL.includes(k)));
 
 // --- the dialog ---------------------------------------------------------------------------
-const corners = '<span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>';
 let tipId = 0;
 /** A "?" that shows `hint` on hover or focus (and is read out as the field's description). */
 const tip = (hint) => {
@@ -217,7 +228,7 @@ const effectItems = (group, names) => Object.entries(names).map(([id, name]) => 
 
 const TABS = [
   ['sound', 'Sound'], ['show', 'Show'], ['blade', 'Blade'], ['look', 'Look'], ['effects', 'Effects'],
-  ['camera', 'Camera'], ['flies', 'Fireflies'], ['titles', 'Title Cards'], ['setups', 'Presets & Setups'],
+  ['camera', 'Camera'], ['flies', 'Fireflies'], ['titles', 'Title Cards'], ['setups', 'My Setups'],
 ];
 
 /** The settings dialog. `keys`: [key, what it does] pairs for its list of keys. */
@@ -236,6 +247,9 @@ export function settingsMarkup(settings, keys) {
           <label><input type="radio" name="viz-view" value="simple" data-view-pick> Simple</label>
           <label><input type="radio" name="viz-view" value="all" data-view-pick> All settings</label>
         </div>
+      </div>
+      <div class="viz-presets viz-presets-top" role="group" aria-label="Presets: a kind of night in one click">
+        ${presetButtons()}
       </div>
       <div class="viz-tabs" role="tablist" aria-label="Settings sections">
         ${TABS.map(([id, name], i) => `<button type="button" role="tab" class="viz-tab" id="viz-tabbtn-${id}" aria-controls="viz-tab-${id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-tab="${id}">${esc(name)}</button>`).join('')}
@@ -264,6 +278,12 @@ export function settingsMarkup(settings, keys) {
             </ol>
           </details>
           ${range('linkPort', 'Bridge Port', 1024, 65535, 1, { hint: 'The port the Link bridge listens on (17001 unless you started it with --port).', adv: true })}
+        </fieldset>
+        <fieldset class="viz-span">
+          <legend>MIDI Controller</legend>
+          <p class="viz-help">Play the moments from a pad controller: connect it, press Learn beside an action, then the pad. The mapping stays with this computer.</p>
+          <div class="viz-row"><button class="pix-btn" type="button" data-midi-connect>Connect MIDI</button><span class="viz-help" data-midi-status></span></div>
+          <ul class="viz-midi" role="list" data-midi-list></ul>
         </fieldset>`)}
 
       ${panel('show', `
@@ -303,7 +323,7 @@ export function settingsMarkup(settings, keys) {
       ${panel('look', `
         <fieldset>
           <legend>Place</legend>
-          ${select('scenery', 'Scene', options(SCENERIES, ['mix', 'A new place every other drop']), { hint: 'What stands around the fire: the Gothic ruins, a blacksmith’s forge, or a hillside shrine with a torii gate and stone lanterns.' })}
+          ${select('scenery', 'Scene', options(SCENERIES, ['mix', 'A new place every other drop']), { hint: 'What stands around the fire: the Gothic ruins, a blacksmith’s forge, a hillside shrine with a torii gate and stone lanterns, a cathedral’s altar under stained glass, or a cult’s altar among hooded figures and rune stones.' })}
         </fieldset>
         <fieldset>
           <legend>Colors</legend>
@@ -379,12 +399,6 @@ export function settingsMarkup(settings, keys) {
 
       ${panel('setups', `
         <fieldset class="viz-span">
-          <legend>Presets</legend>
-          <div class="viz-presets">
-            ${Object.entries(PRESETS).map(([id, p]) => `<button class="pix-btn viz-preset" type="button" data-preset="${id}" title="${esc(p.hint)}"><b>${esc(p.name)}</b><span>${esc(p.hint)}</span></button>`).join('')}
-          </div>
-        </fieldset>
-        <fieldset class="viz-span">
           <legend>My Setups</legend>
           <p class="viz-help">Save everything as it is now under a name, to load again later. Your input device and volume aren’t part of a setup.</p>
           <div class="viz-row viz-setup-save">
@@ -442,6 +456,7 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {} }) 
     for (const r of dialog.querySelectorAll('[data-view-pick]')) r.checked = r.value === settings.view;
     drawCards();
     drawSetups();
+    markPreset(dialog, settings);
   }
 
   // --- tabs (arrow keys move between them, like any tab list)

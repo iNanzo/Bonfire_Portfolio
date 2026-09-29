@@ -7,7 +7,7 @@ import {
 const BASE = import.meta.env?.BASE_URL ?? '/'; // (outside Vite, e.g. under node --test: the root)
 
 export { esc } from './html.js';
-import { esc, isSafeUrl, assetUrl } from './html.js';
+import { esc, isSafeUrl, assetUrl, videoUrl, corners } from './html.js';
 import { logoMark } from './ui/logo.js';
 export const isExternal = (href) => /^(https?:|mailto:)/i.test(href);
 export const url = (href) => {
@@ -17,8 +17,11 @@ export const url = (href) => {
 export const linkAttrs = (href) =>
   `href="${esc(url(href))}"${/^https?:/i.test(href) ? ' target="_blank" rel="noopener noreferrer"' : ''}`;
 export const img = (src, card = false) => assetUrl(src, BASE, card);
+export const clip = (src) => videoUrl(src, BASE);
+/** The résumé link's attributes (it opens in a new tab), or '' when there's none. */
+const resumeAttrs = () => (site.resumeUrl ? `href="${esc(url(site.resumeUrl))}" target="_blank" rel="noopener"` : '');
 
-export const corners = '<span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>';
+export { corners };
 const screenMeta = Object.fromEntries(screens.map((s) => [s.id, s]));
 
 function screenHead(id) {
@@ -48,10 +51,11 @@ export function renderChrome() {
       </a>
       <nav class="tabs" aria-label="Main">
         <button class="tab-key" type="button" data-step="-1" title="${esc(ui.prevScreen)} (Q)" aria-label="${esc(ui.prevScreen)}">Q</button>
-        <ul role="list">${tabs.map((s) => `<li><a href="#/${s.id}" data-tab="${s.id}">${esc(s.label)}</a></li>`).join('')}</ul>
+        <ul role="list">${tabs.map((s) => `<li><a href="#/${s.id}" data-tab="${s.id}">${esc(s.label)}</a></li>`).join('')}<li class="tabs-cursor" aria-hidden="true" data-tabs-cursor hidden></li></ul>
         <button class="tab-key" type="button" data-step="1" title="${esc(ui.nextScreen)} (E)" aria-label="${esc(ui.nextScreen)}">E</button>
       </nav>
       <div class="header-actions">
+        ${site.resumeUrl ? `<a class="pix-btn resume-btn" ${resumeAttrs()} data-resume hidden>${esc(ui.resume)}</a>` : ''}
         <button class="pix-btn sound-toggle" type="button" data-sound aria-pressed="false" title="${esc(ui.soundHint)}">
           <span class="sound-icon" aria-hidden="true"></span><span data-sound-label>${esc(ui.soundOff)}</span>
         </button>
@@ -65,6 +69,7 @@ export function renderChrome() {
         <p class="rest-menu-flavor">${esc(ui.menuFlavor)}</p>
         <ul role="list" data-menu-list>
           ${screens.map((s) => `<li><a class="menu-item" href="#/${s.id === 'home' ? '' : s.id}" data-menu-item>${esc(s.label)}</a></li>`).join('')}
+          ${site.resumeUrl ? `<li data-resume hidden><a class="menu-item" ${resumeAttrs()} data-menu-item>${esc(ui.resume)}</a></li>` : ''}
           <li class="menu-sep" aria-hidden="true"></li>
           <li><button class="menu-item" type="button" data-menu-item data-menu-action="photo" title="${esc(ui.photoHint)}">${esc(ui.photo)} <kbd>F</kbd></button></li>
           <li><button class="menu-item" type="button" data-menu-item data-menu-action="breakdown" title="${esc(ui.breakdownHint)}">${esc(ui.breakdown)} <kbd>B</kbd></button></li>
@@ -176,7 +181,7 @@ export function renderProjects() {
             </div>
           </div>
           <figure class="viewer">
-            <button class="viewer-stage" type="button" data-open-gallery aria-label="${esc(ui.openGallery)}"><img data-d="img" alt=""><span class="veil" aria-hidden="true"></span><span class="viewer-zoom" aria-hidden="true">${esc(ui.openGallery)}</span></button>
+            <button class="viewer-stage" type="button" data-open-gallery aria-label="${esc(ui.openGallery)}"><img data-d="img" alt=""><video data-d="video" muted loop playsinline preload="none" hidden></video><span class="veil" aria-hidden="true"></span><span class="viewer-zoom" aria-hidden="true">${esc(ui.openGallery)}</span></button>
             <div class="viewer-bar">
               <figcaption class="viewer-caption" data-d="caption"></figcaption>
               <div class="viewer-controls" data-d="controls">
@@ -204,6 +209,7 @@ export function renderProjects() {
         <dialog class="gallery" data-gallery aria-label="${esc(ui.gallery)}">
           <figure class="gallery-figure">
             <img data-gl="img" alt="">
+            <video data-gl="video" muted loop playsinline controls preload="none" hidden></video>
             <figcaption data-gl="caption"></figcaption>
           </figure>
           <div class="gallery-bar">
@@ -336,6 +342,11 @@ export function renderContact() {
               <span class="contact-value">${esc(l.value)}</span>
               <span class="contact-arrow" aria-hidden="true">&gt;</span>
             </a></li>`).join('')}
+          ${site.resumeUrl ? `<li data-resume hidden><a class="contact-link" ${resumeAttrs()}>
+              <span class="contact-label">${esc(ui.resume)}</span>
+              <span class="contact-value">PDF</span>
+              <span class="contact-arrow" aria-hidden="true">&gt;</span>
+            </a></li>` : ''}
         </ul>
         <footer class="site-footer">
           <p>${esc(contact.footer)}</p>

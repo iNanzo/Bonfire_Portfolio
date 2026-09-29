@@ -1,12 +1,13 @@
-/* The admin panel, in the site's own palette (src/palette.js base + ember accents). */
+/* The admin panel, on the site's own tokens (src/tokens.css: palette and fonts). */
+@import '../../src/tokens.css';
+
 :root {
-  --void: #07070b;
-  --shadow: #15131d;
-  --stone: #2c2a3a;
-  --bone: #e9e3d2;
-  --lo: #8c1d2f;
-  --accent: #e0582a;
-  --hi: #ffc76a;
+  --void: var(--c-void);
+  --shadow: var(--c-shadow);
+  --stone: var(--c-stone);
+  --bone: var(--c-bone);
+  --lo: var(--accent-lo);
+  --hi: var(--accent-hi);
   --bad: #ff7474;
   --ok: #7fd18b;
   --dim: color-mix(in srgb, var(--bone) 62%, var(--void));
@@ -17,8 +18,8 @@
   --panel-raised: color-mix(in srgb, var(--stone) 38%, var(--shadow));
   --field: #0d0c13;
   --glow: color-mix(in srgb, var(--hi) 16%, transparent);
-  --pixel: 'Pixelify Sans', ui-monospace, monospace;
-  --body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --pixel: var(--font-pixel);
+  --body: var(--font-body);
   --top: 60px;
   --radius: 6px;
   color-scheme: dark;

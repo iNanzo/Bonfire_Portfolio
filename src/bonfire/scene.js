@@ -1,12 +1,9 @@
-// Always-on pixel-art bonfire behind the whole site.
+// Always-on pixel-art bonfire behind the whole site (and Bonfire Live, the visualizer).
 //
-// Render passes per frame (all at low resolution):
-//   1. normals  — outlined solid geometry → view-space normals + depth
-//   2. color    — solid geometry + "ghost" emissives (candle flames, dissolving
-//                 weapons) → linear color + depth
-//   3. fx       — particle fire + sparks, additive, depth-tested by hand against
-//                 pass 2's depth
-//   4. pixel    — outlines, + fx, vignette, Bayer dither, palette → canvas
+// Each frame is drawn in four low-resolution passes (frame.js): normals, color, the
+// additive particles, then the pixel pass (outlines, dither, palette). The visualizer
+// asks for `effects`: the pixel pass's effects layer and the stages it needs; the site
+// leaves them out, so it compiles a lean shader and allocates no extra buffers.
 //
 // The bonfire has an element — fire, lightning (a tesla ball, plasma.js) or ice
 // (glowing shards, ice.js) — that changes when a weapon lands, like the flame
@@ -26,7 +23,7 @@ import { ELEMENT_IDS } from '../effectsDefaults.js';
 import { elementOr } from '../elements.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { createPixelPass } from './pixelPass.js';
+import { createFrame } from './frame.js';
 import { createFlame, createParticleMaterial, createEffectMaterial, SHAPE } from './flame.js';
 import { createInteraction, MODES } from './interaction.js';
 import { createFireflies } from './fireflies.js';
@@ -62,7 +59,7 @@ const MATRIX_SIZES = [4, 8];
 
 const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
 
-export function createBonfire(container, { reducedMotion = false, sway: swayAmount = 1, lightTrails = false, onImpact, onFormed, onRamp, onError, onFrame } = {}) {
+export function createBonfire(container, { reducedMotion = false, sway: swayAmount = 1, lightTrails = false, effects: fxLayer = false, onImpact, onFormed, onRamp, onError, onFrame } = {}) {
   const scope = createResourceScope();
   const events = new AbortController();
   scope.cleanup(() => events.abort());
@@ -119,6 +116,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   fireLight.castShadow = renderer.shadowMap.enabled;
   fireLight.shadow.mapSize.set(512, 512);
   fireLight.shadow.bias = -0.004;
+  fireLight.shadow.normalBias = 0.02; // (no acne on thin, faceted pieces: posts, cylinders)
   fireLight.shadow.camera.near = 0.05;
   fireLight.shadow.camera.far = 10;
   scene.add(fireLight);
@@ -126,55 +124,16 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   const candleLight = new THREE.PointLight(0xffb25a, 0.35, 2.5, 1.8);
   scene.add(candleLight);
 
-  // --- Render targets
-  const rtOpts = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter };
-  const colorRT = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(1, 1) });
-  const normalRT = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, depthTexture: new THREE.DepthTexture(1, 1) });
-  const fxRT = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, type: THREE.HalfFloatType, depthBuffer: false });
-  const normalMaterial = new THREE.MeshNormalMaterial({ flatShading: true });
-  const pass = createPixelPass();
-  // Frame feedback for the echo effect (the visualizer): the pass renders into one buffer
-  // reading the last frame from the other, then a copy puts it on screen.
-  const feedbackRT = [0, 1].map(() => new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, depthBuffer: false }));
-  let feedbackFlip = 0;
-  let feedbackLive = false;
-  const copyScene = new THREE.Scene();
-  const copyMaterial = new THREE.ShaderMaterial({
-    uniforms: { map: { value: null }, resolution: pass.uniforms.resolution },
-    vertexShader: 'void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
-    fragmentShader: 'uniform sampler2D map; uniform vec2 resolution; void main() { gl_FragColor = texture2D(map, gl_FragCoord.xy / resolution); }',
-    depthTest: false, depthWrite: false,
+  // --- Drawing (frame.js): the passes, their buffers, and (the visualizer) the effects stages
+  const frame = createFrame({
+    renderer, scene, camera, voidColor, effects: fxLayer,
+    layers: { solid: LAYER_SOLID, fx: LAYER_FX, ghost: LAYER_GHOST },
+    own: (r) => scope.own(r), track: (t) => scope.trackTree(t),
   });
-  copyScene.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), copyMaterial), { frustumCulled: false }));
-  [...feedbackRT, copyMaterial].forEach((r) => scope.own(r));
-  // The pass's stages for the visualizer's heavier effects (pixelPass.js): the scene drawn
-  // into its own image (mipmapped, for the glow), maybe repainted, and a ghost trail kept
-  // beside it in two buffers (one read, one written). Only drawn while such an effect is on.
-  const stageOpts = { type: THREE.HalfFloatType, depthBuffer: false };
-  const sceneRT = new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
-  const styleRT = new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, ...rtOpts });
-  const ghostRT = [0, 1].map(() => new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, ...rtOpts }));
-  let ghostFlip = 0;
-  let ghostLive = false;
-  // Motion blur compares each frame's camera with the last one's.
-  const lastViewProj = new THREE.Matrix4();
-  const viewProj = new THREE.Matrix4();
-  const lastCamPos = new THREE.Vector3(Infinity, 0, 0);
-  const lastCamQuat = new THREE.Quaternion();
-  [sceneRT, styleRT, ...ghostRT, ...Object.values(pass.materials)].forEach((r) => scope.own(r));
-  scope.trackTree(copyScene);
-  [colorRT, normalRT, fxRT, normalMaterial].forEach((r) => scope.own(r));
-  scope.trackTree(pass.scene);
-  pass.uniforms.tColor.value = colorRT.texture;
-  pass.uniforms.tDepth.value = colorRT.depthTexture;
-  pass.uniforms.tNormal.value = normalRT.texture;
-  pass.uniforms.tNormalDepth.value = normalRT.depthTexture;
-  pass.uniforms.tFx.value = fxRT.texture;
-  pass.uniforms.cameraNear.value = camera.near;
-  pass.uniforms.cameraFar.value = camera.far;
+  const pass = frame.pass;
 
   // --- Fire particles
-  const particleMaterial = createParticleMaterial(colorRT.depthTexture, pass.uniforms.resolution.value);
+  const particleMaterial = createParticleMaterial(frame.depthTexture, pass.uniforms.resolution.value);
   const effectMaterial = createEffectMaterial(particleMaterial);
   // Each element's loose particles have a shape of their own (signatures.js): lightning's
   // sparks flash as crosses, ice glints as diamonds.
@@ -305,6 +264,9 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   // how far the fire has risen, brightened and started sparking to meet it (update).
   let hoverFlare = 0;
   let hoverGlow = 0;
+  // The page's scrolling (scroll(), below): an impulse that fades in a moment, sweeping the
+  // particles and the fireflies a little the way the page moves (-1..1, + up).
+  let sweep = 0;
 
   function applyFireParams() {
     const f = effects.fire;
@@ -361,16 +323,14 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   const paletteExtra = () => flames[forgeFlame] ?? (blend ? flames[blend.to] : null);
   let currentShade = flames[flameKey].shade;
   let currentMix = lightMix(flameKey);
+  // Everything that burns in the flame's colors as they blend. (The impact rings take the
+  // new colors at once instead, when a weapon lands: see impact().)
+  const tinted = [fire, flowView, plasma, crystals, chill, swingTrail];
   function applyColors(f, mix) {
     currentRamp = f.ramp;
     currentShade = f.shade;
     currentMix = mix;
-    fire.setRamp(f.ramp);
-    flowView.setRamp(f.ramp);
-    plasma.setRamp(f.ramp);
-    crystals.setRamp(f.ramp);
-    chill.setRamp(f.ramp);
-    swingTrail.setRamp(f.ramp);
+    for (const s of tinted) s.setRamp(f.ramp);
     pass.uniforms.uCore.value.set(f.ramp[3]);
     if (debugPaletteIndex === 0) {
       const extra = paletteExtra();
@@ -413,6 +373,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
       layerGhost: LAYER_GHOST,
       layerFx: LAYER_FX,
       particleMaterial: effectMaterial,
+      // Each element's forge particles in its own shape (signatures.js).
+      materials: { fire: effectMaterial, lightning: crossMaterial, ice: diamondMaterial },
       field,
       particles: pCount(P.forge),
       castShadows: renderer.shadowMap.enabled,
@@ -462,6 +424,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
 
     scope.trackTree(weapons.holder); scope.trackTree(weapons.forge);
     if (weapons.lines) { scope.trackTree(weapons.lines); scene.add(weapons.lines); }
+    for (const o of weapons.extras) { scope.trackTree(o); scene.add(o); }
     scope.cleanup(() => weapons.cancel());
     const flyTemplate = root.getObjectByName('Firefly');
     flyTemplate.removeFromParent();
@@ -625,8 +588,10 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   const terrains = {};
   const sceneryMaterials = {};
   const sceneries = {};
-  function setScenery(name) {
+  /** Move the fire to another place (SCENERIES). `flash`: the change lands like a hit, a flash hiding the cut. */
+  function setScenery(name, { flash = false } = {}) {
     if (!ready || !SCENERIES[name] || name === sceneryKey) return false;
+    if (flash) { hit(0.6, { freeze: false }); fire.burst(0.6 * flameShare(elementKey)); }
     const show = (key, on) => {
       if (key === 'ruins') { for (const o of ruinsOnly) o.visible = on; candleLight.visible = on; return; }
       const s = sceneries[key];
@@ -779,7 +744,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   /** An echo of the planted weapon's silhouette bursts out of it (and in ice, the crystals' outlines). */
   function echo() {
     if (!ready) return;
-    weapons.echo(currentRamp);
+    weapons.echo(currentRamp, elementKey);
     if (elementKey === 'ice') crystals.echo();
   }
   /**
@@ -857,14 +822,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     const w = Math.max(1, Math.ceil((container.clientWidth * dpr) / pd));
     const h = Math.max(1, Math.ceil((container.clientHeight * dpr) / pd));
     size = { w, h, pd };
-    renderer.setSize(w, h, false);
-    colorRT.setSize(w, h);
-    normalRT.setSize(w, h);
-    fxRT.setSize(w, h);
-    for (const rt of [...feedbackRT, sceneRT, styleRT, ...ghostRT]) rt.setSize(w, h);
-    feedbackLive = false;
-    ghostLive = false;
-    pass.uniforms.resolution.value.set(w, h);
+    frame.setSize(w, h, pd);
     canvas.style.width = `${(w * pd) / dpr}px`;
     canvas.style.height = `${(h * pd) / dpr}px`;
     pointer.measure(canvas);
@@ -891,6 +849,17 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     if (hoverGlow > 0.3 && Math.random() < realDt * 30 * hoverGlow) fire.sparkle(2);
     fire.params.level += (targetLevel + drive.level + 1.1 * hoverGlow - fire.params.level) * Math.min(1, dt * 1.1);
     fire.wind.set(drive.windX, 0, drive.windZ);
+    // Scrolling: the loose particles and the fireflies are swept along with the page, a little.
+    sweep *= Math.exp(-realDt / 0.3);
+    if (Math.abs(sweep) > 0.004) {
+      const push = sweep * 2.6 * realDt;
+      for (const set of sets) {
+        const V = set.vel;
+        const cap = set.maxV ?? 2;
+        for (let i = 0; i < set.n; i++) V[i * 3 + 1] = Math.max(-cap, Math.min(cap, V[i * 3 + 1] + push));
+      }
+      fireflies.drift.set(0, sweep * 0.55, 0);
+    } else if (fireflies.drift.y) fireflies.drift.set(0, 0, 0);
     for (const id of ELEMENT_IDS) {
       const d = (id === elementKey ? 1 : 0) - presence[id];
       presence[id] += Math.sign(d) * Math.min(Math.abs(d), dt / 0.6);
@@ -908,10 +877,25 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
       flameStep = fs;
       for (let i = 0; i < steps; i++) fire.stepFlame(1 / fps, t);
       candleFlames.forEach((c, i) => c.mesh.scale.set(c.scale.x, c.scale.y * (0.8 + hash(fs * 1.7 + i * 9.1) * 0.4), c.scale.z));
-      // Coals in the ash pulse between the flame's deep, body and bright tones.
+      // Coals in the ash pulse between the flame's deep, body and bright tones. The scenery's
+      // glows go by their kind (scenery.js): embers like the coals; lamps hold a steady light
+      // with a rare dip, every window of one lamp together; candle flames flicker bright and
+      // waver; stained glass and runes keep their own tone, a step brighter now and then.
       glows.forEach((g, i) => {
-        const h = hash(fs * 3.3 + i * 5.7);
-        g.material.color.set(currentRamp[h > 0.8 ? 2 : h > 0.3 ? 1 : 0]);
+        const k = g.userData.glow;
+        if (!k || k.kind === 'ember') {
+          const h = hash(fs * 3.3 + i * 5.7);
+          g.material.color.set(currentRamp[h > 0.8 ? 2 : h > 0.3 ? 1 : 0]);
+        } else if (k.kind === 'lamp') {
+          g.material.color.set(currentRamp[hash(fs * 1.9 + k.id * 13.1) > 0.92 ? 1 : 2]);
+        } else if (k.kind === 'flame') {
+          g.material.color.set(currentRamp[hash(fs * 2.3 + k.id * 7.3) > 0.7 ? 3 : 2]);
+          g.userData.baseY ??= g.scale.y;
+          g.scale.y = g.userData.baseY * (0.8 + hash(fs * 1.7 + i * 9.1) * 0.4);
+        } else {
+          const up = hash(Math.floor(fs / 6) * 2.1 + i * 3.7) > 0.8 ? 1 : 0;
+          g.material.color.set(currentRamp[Math.min(3, k.tone + up)]);
+        }
       });
     }
     fire.stepSparks(dt, t);
@@ -993,56 +977,6 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     return stale;
   }
 
-  /**
-   * The pass's stages, when an effect needs them (motion blur, ghosting, glow, a repaint):
-   * the scene into its own image, maybe repainted, the ghost trail stepped; then the final
-   * pass reads those. Otherwise the single pass does it all.
-   */
-  function renderStages() {
-    const u = pass.uniforms;
-    // Motion blur: this frame's view space → last frame's clip space. A cut (the camera
-    // jumping) starts over instead of smearing the whole frame.
-    camera.updateMatrixWorld();
-    viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-    const cut = camera.position.distanceTo(lastCamPos) > 0.6 || camera.quaternion.angleTo(lastCamQuat) > 0.35;
-    u.uInvProj.value.copy(camera.projectionMatrixInverse);
-    u.uPrevFromView.value.multiplyMatrices(cut ? viewProj : lastViewProj, camera.matrixWorld);
-    lastViewProj.copy(viewProj);
-    lastCamPos.copy(camera.position);
-    lastCamQuat.copy(camera.quaternion);
-
-    const style = u.uStyle.value > 0.5 && u.uStyleMix.value > 0;
-    const ghost = u.uGhost.value > 0;
-    if (!style && !ghost && !(u.uGlow.value > 0) && !(u.uBlur.value > 0)) {
-      ghostLive = false;
-      pass.use('single');
-      return;
-    }
-    const draw = (stage, target) => {
-      pass.use(stage);
-      renderer.setRenderTarget(target);
-      renderer.render(pass.scene, pass.camera);
-    };
-    draw('scene', sceneRT);
-    u.tScene.value = sceneRT.texture;
-    u.tSceneMip.value = sceneRT.texture;
-    if (style) {
-      draw('style', styleRT);
-      u.tScene.value = styleRT.texture;
-    }
-    if (ghost) {
-      // A new trail starts as the scene itself.
-      const write = ghostRT[ghostFlip];
-      u.tGhost.value = ghostRT[1 - ghostFlip].texture;
-      if (!ghostLive) u.uGhostKeep.value = 0;
-      draw('ghost', write);
-      ghostFlip = 1 - ghostFlip;
-      ghostLive = true;
-      u.tGhost.value = write.texture;
-    } else ghostLive = false;
-    pass.use('final');
-  }
-
   function renderFrame(dt) {
     renderer.info.reset();
     const t = timer.getElapsed();
@@ -1075,63 +1009,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     fireOnScreen.set(FIRE_ORIGIN.x, 0.55, FIRE_ORIGIN.z).project(camera);
     pass.uniforms.uCenter.value.set((fireOnScreen.x * 0.5 + 0.5) * size.w, (fireOnScreen.y * 0.5 + 0.5) * size.h);
 
-    scene.overrideMaterial = normalMaterial;
-    camera.layers.set(LAYER_SOLID);
-    renderer.setRenderTarget(normalRT);
-    renderer.setClearColor(0x000000, 0);
-    renderer.clear();
-    renderer.render(scene, camera);
-    scene.overrideMaterial = null;
-
-    camera.layers.set(LAYER_SOLID);
-    camera.layers.enable(LAYER_GHOST);
-    if (renderer.shadowMap.enabled && shadowNeedsUpdate()) renderer.shadowMap.needsUpdate = true;
-    renderer.setRenderTarget(colorRT);
-    renderer.setClearColor(voidColor, 1);
-    renderer.clear();
-    renderer.render(scene, camera);
-
-    camera.layers.set(LAYER_FX);
-    renderer.setRenderTarget(fxRT);
-    renderer.setClearColor(0x000000, 0);
-    renderer.clear();
-    renderer.render(scene, camera);
-
-    renderStages();
-    if (pass.uniforms.uFeedback.value > 0) {
-      if (!feedbackLive) {
-        for (const rt of feedbackRT) { renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 1); renderer.clear(); }
-        feedbackLive = true;
-      }
-      const write = feedbackRT[feedbackFlip];
-      pass.uniforms.tPrev.value = feedbackRT[1 - feedbackFlip].texture;
-      feedbackFlip = 1 - feedbackFlip;
-      renderer.setRenderTarget(write);
-      renderer.clear();
-      renderer.render(pass.scene, pass.camera);
-      copyMaterial.uniforms.map.value = write.texture;
-      renderer.setRenderTarget(null);
-      renderer.clear();
-      renderer.render(copyScene, pass.camera);
-    } else {
-      feedbackLive = false;
-      renderer.setRenderTarget(null);
-      renderer.clear();
-      renderer.render(pass.scene, pass.camera);
-    }
-    // A picture was asked for (photo mode): copy this frame now, while the canvas still
-    // holds it, scaled up with hard pixel edges.
-    if (captures.length) {
-      const out = document.createElement('canvas');
-      out.width = size.w * size.pd;
-      out.height = size.h * size.pd;
-      const ctx = out.getContext('2d');
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(canvas, 0, 0, out.width, out.height);
-      for (const done of captures.splice(0)) out.toBlob(done, 'image/png');
-    }
+    frame.draw({ shadows: renderer.shadowMap.enabled && shadowNeedsUpdate() });
   }
-  const captures = [];
 
   let running = false;
   function syncRunning() {
@@ -1262,11 +1141,43 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     return { drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, texels: `${size.w}×${size.h}`, systems: [...systems.values()] };
   }
 
-  /** A click anywhere makes the fireflies flash (brightest near the click). */
+  /**
+   * A click anywhere makes the fireflies flash (brightest near the click), and a soft gust
+   * goes out from it: the loose particles near the line under the cursor are pushed away.
+   */
+  const gustRay = new THREE.Raycaster();
+  const gustAt = new THREE.Vector3();
   function flash(clientX, clientY) {
     if (!fireflies) return;
     const r = canvas.getBoundingClientRect();
     fireflies.flash(clientX - r.left, clientY - r.top, camera, r.width, r.height);
+    if (reducedMotion) return;
+    pickNdc.set(((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
+    gustRay.setFromCamera(pickNdc, camera);
+    const { origin: o, direction: d } = gustRay.ray;
+    const R = 0.5;
+    for (const set of sets) {
+      const P = set.pos, V = set.vel;
+      const cap = set.maxV ?? 2;
+      for (let i = 0; i < set.n; i++) {
+        const ix = i * 3;
+        const px = P[ix] - o.x, py = P[ix + 1] - o.y, pz = P[ix + 2] - o.z;
+        const along = px * d.x + py * d.y + pz * d.z;
+        if (along <= 0) continue;
+        gustAt.set(px - d.x * along, py - d.y * along, pz - d.z * along); // from the ray to the particle
+        const dist = gustAt.length();
+        if (dist > R || dist < 1e-4) continue;
+        const k = 1.1 * (1 - dist / R) ** 2 / dist;
+        V[ix] = Math.max(-cap, Math.min(cap, V[ix] + gustAt.x * k));
+        V[ix + 1] = Math.max(-cap, Math.min(cap, V[ix + 1] + gustAt.y * k + 0.15 * (1 - dist / R)));
+        V[ix + 2] = Math.max(-cap, Math.min(cap, V[ix + 2] + gustAt.z * k));
+      }
+    }
+  }
+  /** The page scrolled by `dy` CSS px (+ down): everything loose is swept a little the way the page moved. */
+  function scroll(dy) {
+    if (!ready || reducedMotion || !dy) return;
+    sweep = Math.max(-1, Math.min(1, sweep + Math.max(-150, Math.min(150, dy)) / 420));
   }
 
   /** The scenery colors (palette.js `base`) changed: take them up (the visualizer's random palettes). */
@@ -1306,10 +1217,14 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   }
 
   return {
-    stoke, puff, equip, weaponAt, hoverAt, hoverOff, flourish, breakdown, stats, setScenery,
+    stoke, puff, equip, weaponAt, hoverAt, hoverOff, flourish, breakdown, stats, setScenery, scroll,
     get scenery() { return sceneryKey; },
     /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
-    capture: () => new Promise((resolve) => captures.push(resolve)), setView: view.setView, setPose: view.setPose, viewAxes: view.axes, cycle, describe, flash, applyEffects, refreshScene, pulse, sparkle, ring, echo, swing, drive, glitch, ready: loaded,
+    capture: frame.capture, setView: view.setView,
+    /** The canvas the scene draws into (low resolution: see resize). */
+    get canvas() { return canvas; },
+    /** Call `fn` right after every frame is drawn, while the canvas still holds it (recording a clip). Returns an unsubscribe. */
+    onRendered: frame.onRendered, setPose: view.setPose, viewAxes: view.axes, cycle, describe, flash, applyEffects, refreshScene, pulse, sparkle, ring, echo, swing, drive, glitch, ready: loaded,
     /** A jolt of the camera (0..~0.3), if screen shake is on. */
     shake: (amount) => jolt(amount),
     /** Skip ahead: a running weapon swap plays fast up to its impact. False if none is running. */

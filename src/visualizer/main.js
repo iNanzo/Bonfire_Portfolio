@@ -29,9 +29,15 @@ import { SHOTS } from './camera.js';
 import { MODES } from './looks.js';
 import { COLOR_MODES } from './colors.js';
 import { createDemo, DEMO_BPM } from './demo.js';
-import { bindSettings, loadSettings, resetSettings, saveSettings, settingsMarkup } from './settings.js';
+import { bindSettings, loadSettings, resetSettings, saveSettings, settingsMarkup, applyPreset, presetButtons, markPreset, PRESETS } from './settings.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
+import { createPack, bonfireItems } from '../ui/pack.js';
+import { createRecorder } from './record.js';
+import { createMidi, MIDI_ACTIONS } from './midi.js';
+import { logoMark } from '../ui/logo.js';
+import { SCENERIES } from '../sceneries.js';
+import { site, ui } from '../content.js';
 
 // Finding this page is one of the site's discoveries (counted when you're back on the site).
 createDiscoveries().discover('visualizer');
@@ -72,10 +78,12 @@ const KEYS = [
   ['[ ]', 'Nudge the beat 10 ms earlier or later'],
   ['Shift+1…9', 'Show a title card (1 = the main one)'],
   ['O', 'Open the output window (for a projector)'],
+  ['V', 'Record a clip (the picture and the sound), saved when you stop'],
   ['C', 'Cut to another shot'],
   ['H', 'Hide or show the controls'],
   ['F', 'Full screen'],
   ['S', 'Settings'],
+  ['I', 'The pack: swap the scene or the weapon, cast a ring, a living blade or a new element'],
 ];
 
 const app = document.getElementById('viz');
@@ -86,6 +94,9 @@ app.innerHTML = `
   </div>
   <p class="visually-hidden" aria-live="polite" data-live></p>
 
+  <a class="brand viz-home" href="${esc(import.meta.env.BASE_URL)}" aria-label="${esc(site.name)}: back to the portfolio" data-home-link>
+    ${logoMark('brand-mark')}<span class="brand-name">${esc(site.name)}</span>
+  </a>
   <section class="viz-start" data-start aria-labelledby="viz-title">
     <div class="viz-start-copy">
       <p class="eyebrow">Audio-Reactive Visualizer</p>
@@ -104,6 +115,10 @@ app.innerHTML = `
         <span class="viz-field-label">Input Device</span>
         <select data-device></select>
       </label>
+      <div class="viz-feel" role="group" aria-label="Tonight's feel (presets)" data-feel>
+        <span class="viz-group-label">Feel</span>
+        ${presetButtons('viz-feel-pick')}
+      </div>
       <button class="pix-btn viz-start-settings" type="button" data-act="settings"><kbd>S</kbd>Settings</button>
       <p class="viz-error" role="alert" data-error hidden></p>
       <input type="file" accept="audio/*" data-file hidden>
@@ -146,6 +161,7 @@ app.innerHTML = `
       <span class="viz-group-label">View</span>
       <button class="pix-btn" type="button" data-act="cut" title="Cut to another camera shot"><kbd>C</kbd>Shot</button>
       <button class="pix-btn" type="button" data-act="output" title="Open a window with just the picture, to drag onto a projector"><kbd>O</kbd><span data-output-label>Output</span></button>
+      <button class="pix-btn viz-record" type="button" data-act="record" title="Record a clip of the picture and the sound; press again to stop and save it"><kbd>V</kbd><span data-record-label>Record</span></button>
       <button class="pix-btn" type="button" data-act="settings" title="Settings, presets, title cards"><kbd>S</kbd>Settings</button>
       <button class="pix-btn" type="button" data-act="fullscreen" title="Full screen"><kbd>F</kbd><span data-fs-label>Full Screen</span></button>
     </div>
@@ -220,11 +236,12 @@ function startScene() {
   const generation = ++sceneGeneration;
   applyDensity();
   return import('../bonfire/scene.js').then(async ({ createBonfire }) => {
-    const candidate = createBonfire(stage, { reducedMotion, sway: 0, lightTrails: true, onImpact, onRamp: setAccentRamp, onError: failScene, onFrame: (dt) => { if (fire === candidate) onFrame(dt); } });
+    const candidate = createBonfire(stage, { reducedMotion, sway: 0, lightTrails: true, effects: true, onImpact, onRamp: setAccentRamp, onError: failScene, onFrame: (dt) => { if (fire === candidate) onFrame(dt); } });
     const nextDirector = createDirector(candidate, { settings, reducedMotion, onEvent });
     await candidate.ready;
     if (generation !== sceneGeneration) { candidate.dispose(); return; }
     const prev = fire;
+    recorder?.stop(); // (a clip ends with the scene it was recording)
     fire = candidate;
     director = nextDirector;
     frameFire();
@@ -608,6 +625,7 @@ const actions = {
   'change-source': () => { stopSource(); showStart(); },
   'show-title': () => { if (!settings.title.trim()) q('[data-set="title"]').focus(); else { settingsDialog.close(); showCard(0); } },
   output: () => openOutput(),
+  record: () => recorder.toggle(),
   'nudge-early': () => nudge(-0.01),
   'nudge-late': () => nudge(0.01),
   downbeat: () => {
@@ -640,6 +658,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'f') toggleFullscreen();
   else if (k === 's') openSettings();
   else if (k === 'h') { document.body.classList.toggle('hud-off'); wake(); }
+  else if (k === 'i') { pack.toggle(); wake(); }
   else if (document.body.dataset.mode !== 'live' || !fire) return;
   else if (e.key === ' ') { e.preventDefault(); actions.drop(); }
   else if (k === 'a') actions.arm();
@@ -649,6 +668,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === '[') nudge(-0.01);
   else if (e.key === ']') nudge(0.01);
   else if (k === 'o') openOutput();
+  else if (k === 'v') actions.record();
   else if (e.shiftKey && /^Digit[1-9]$/.test(e.code)) showCard(Number(e.code.slice(5)) - 1);
   else if (k === 'c') actions.cut();
   else if (k === 'r') director.ring(1);
@@ -677,9 +697,91 @@ function applySettings() {
   if (settings.scenery !== 'mix') fire?.setScenery(settings.scenery);
   director?.setShot(settings.shot);
   saveSettings(settings);
+  markPreset(start, settings);
 }
 const settingsPanel = bindSettings(settingsDialog, settings, { onChange: applySettings, onNote: (text) => note(text, 1.5) });
+
+// --- Recording a clip (record.js) -------------------------------------------------------------
+const recordLabel = q('[data-record-label]');
+const recorder = createRecorder({
+  scene: () => fire,
+  audio: () => (engine?.source ? { ctx: engine.ctx, node: engine.delay } : null),
+  onState: ({ recording, seconds, saved, error }) => {
+    document.body.classList.toggle('is-recording', recording);
+    recordLabel.textContent = recording ? `Rec ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : 'Record';
+    if (saved) note(`Saved ${saved}`, 3);
+    if (error) note(error, 3);
+  },
+});
+
+// --- The pack (ui/pack.js, the same as the site's): scene, weapon and spells by hand -----------
+const pack = createPack({
+  label: ui.pack,
+  items: bonfireItems({
+    state: () => (fire ? { scenery: fire.scenery, weapon: fire.weapon, element: fire.element, flame: fire.flame } : null),
+    busy: () => !fire || fire.forging,
+    reducedMotion,
+    onScene: (key) => { if (fire?.setScenery(key, { flash: true })) note(`Scene: ${SCENERIES[key]}`, 1.5); },
+    onWeapon: (key) => {
+      if (!fire || key === fire.weapon) return;
+      if (fire.forging) { note('The forge is busy', 1.5); return; }
+      fire.equip(key, fire.flame, { element: fire.element }).catch(() => {});
+      note(`Forging the ${weapons[key]}`, 2);
+    },
+    onRing: () => director?.ring(1),
+    onLiving: () => actions.combo(),
+    onElement: (key) => { if (!director?.hit({ element: key })) note('The forge is busy', 1.5); },
+    onFlame: (key) => {
+      if (!fire || key === fire.flame) return;
+      if (fire.forging) { note('The forge is busy', 1.5); return; }
+      fire.equip(fire.weapon, key, { element: fire.element }).catch(() => {});
+    },
+  }),
+});
+app.append(pack.el);
+// It sits just above the HUD while the HUD is up.
+new ResizeObserver(() => document.body.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`)).observe(hud);
 settingsDialog.addEventListener('show-card', (e) => { settingsDialog.close(); showCard(e.detail); });
+// --- A MIDI controller (midi.js): pads for the moments, mapped by learning -----------------
+const midiList = q('[data-midi-list]');
+const midiStatus = q('[data-midi-status]');
+function drawMidi() {
+  const map = midi.mapping;
+  midiList.innerHTML = Object.entries(MIDI_ACTIONS).map(([id, name]) => `
+    <li><span>${esc(name)}</span><span class="viz-midi-key">${esc(map[id] ?? '—')}</span>
+      <button class="pix-btn" type="button" data-midi-learn="${id}"${midi.connected ? '' : ' disabled'}>Learn</button>
+      ${map[id] ? `<button class="pix-btn" type="button" data-midi-forget="${id}" aria-label="Forget ${esc(name)}">✕</button>` : ''}</li>`).join('');
+}
+const midiActions = {
+  drop: () => actions.drop(), arm: () => actions.arm(), ring: () => actions.ring(), combo: () => actions.combo(),
+  cut: () => actions.cut(), look: () => note(`Look: ${director?.nextLook()}`, 1.5), burst: () => director?.glitchHit(),
+  fire: () => director?.hit({ element: 'fire' }), lightning: () => director?.hit({ element: 'lightning' }), ice: () => director?.hit({ element: 'ice' }),
+  record: () => actions.record(),
+};
+const midi = createMidi({
+  onAction: (id) => { if (document.body.dataset.mode === 'live' && fire) { midiActions[id]?.(); wake(); } },
+  onStatus: (text) => { midiStatus.textContent = text; },
+  onChange: drawMidi,
+});
+drawMidi();
+settingsDialog.addEventListener('click', async (e) => {
+  if (e.target.closest('[data-midi-connect]')) { if (await midi.connect()) drawMidi(); return; }
+  const learn = e.target.closest('[data-midi-learn]');
+  if (learn) { midi.learn(learn.dataset.midiLearn); return; }
+  const forget = e.target.closest('[data-midi-forget]');
+  if (forget) midi.forget(forget.dataset.midiForget);
+});
+
+// The start screen's feel: a preset in one click, before the music starts.
+q('[data-feel]').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-preset]');
+  if (!b) return;
+  applyPreset(settings, b.dataset.preset);
+  settingsPanel.fill();
+  applySettings();
+  note(`Preset: ${PRESETS[b.dataset.preset].name}`, 1.5);
+});
+markPreset(start, settings);
 
 // --- Beat by hand: a typed BPM, nudges -----------------------------------------------------
 const bpmInput = q('[data-bpm-set]');

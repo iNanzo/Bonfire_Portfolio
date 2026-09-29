@@ -381,6 +381,18 @@ body.hud-off .viz-hud { display: none; }
 .viz-preset { display: grid; gap: 4px; padding: 12px; text-align: left; }
 .viz-preset b { font-family: var(--font-pixel); font-weight: 400; font-size: 1rem; color: var(--accent-hi); }
 .viz-preset span { font-family: var(--font-body); font-size: 0.8125rem; line-height: 1.4; color: var(--text-dim); letter-spacing: 0; text-transform: none; }
+.viz-preset[aria-pressed='true'] { --b: var(--accent-hi); }
+.viz-preset[aria-pressed='true'] b::after { content: ' \25C6'; font-size: 0.75em; }
+/* Presets lead the dialog: a kind of night in one click, above the tabs. */
+.viz-presets-top { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 14px; }
+.viz-presets-top .viz-preset { padding: 8px 10px; }
+.viz-presets-top .viz-preset span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* The start screen's feel: the same presets as small pills. */
+.viz-feel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 18px; }
+.viz-feel .viz-group-label { margin-right: 4px; }
+.viz-feel .viz-preset { display: inline-flex; padding: 4px 10px; }
+.viz-feel .viz-preset span { display: none; }
+.viz-feel .viz-preset b { font-size: 0.9375rem; }
 .viz-setup-save input { flex: 1; min-width: 200px; }
 .viz-setups { display: grid; gap: 6px; margin: 10px 0; }
 .viz-setups li { display: flex; align-items: center; gap: 8px; }
@@ -390,3 +402,32 @@ body.hud-off .viz-hud { display: none; }
   /* A soft shade behind the start menu's text, so it reads over the scenery. */
   .viz-start { background: linear-gradient(90deg, color-mix(in srgb, var(--c-void) 78%, transparent) 0, transparent 52%); }
 }
+
+/* ---------- Back to the portfolio (start screen) ---------- */
+
+.viz-home {
+  position: fixed;
+  top: 14px;
+  left: var(--gutter);
+  z-index: 11;
+}
+body[data-mode='live'] .viz-home { display: none; }
+
+/* ---------- The pack (ui/pack.js; styles.css): above the HUD, fading with it ---------- */
+
+body.viz .pack { bottom: calc(var(--hud-h, 0px) + 24px); z-index: 21; transition: opacity 360ms steps(3); }
+body[data-mode='start'] .pack { bottom: 14px; }
+body.is-idle .pack:not(.is-open) { opacity: 0; pointer-events: none; }
+body.hud-off .pack:not(.is-open) { display: none; }
+
+/* Recording a clip (V): the button burns red and blinks while it records. */
+body.is-recording .viz-record { --b: #e03a3a; color: #ff8a8a; }
+body.is-recording .viz-record [data-record-label]::before { content: '\25CF\00A0'; animation: blink 1s steps(1) infinite; }
+
+/* MIDI controller mapping (settings, Sound tab). */
+.viz-midi { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 16px; margin-top: 10px; }
+.viz-midi li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.viz-midi li > span:first-child { flex: 1; font-family: var(--font-pixel); color: var(--c-bone); }
+.viz-midi-key { font-size: 0.8125rem; color: var(--text-dim); white-space: nowrap; }
+.viz-midi .pix-btn { padding: 3px 8px; font-size: 0.8125rem; }
+.viz-midi .pix-btn:disabled { opacity: 0.4; cursor: default; }

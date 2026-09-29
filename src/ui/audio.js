@@ -166,6 +166,7 @@ export function blip(kind = 'move') {
   if (kind === 'move') tone(660, t, 0.05, 0.05);
   else if (kind === 'select') { tone(523, t, 0.06, 0.06); tone(784, t + 0.06, 0.09, 0.06); }
   else if (kind === 'back') { tone(523, t, 0.06, 0.05); tone(392, t + 0.06, 0.08, 0.05); }
+  else if (kind === 'pack') { tone(196, t, 0.08, 0.08, 'triangle'); tone(587, t + 0.05, 0.07, 0.04); }
   else if (kind === 'stoke') {
     tone(110, t, 0.25, 0.18, 'triangle');
     for (let i = 0; i < 6; i++) setTimeout(() => enabled && pop(0.08), i * 40 + Math.random() * 30);

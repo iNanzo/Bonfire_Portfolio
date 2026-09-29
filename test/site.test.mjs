@@ -94,3 +94,9 @@ test('seo: every page has its own title, description, preview and structured dat
   for (const p of items()) assert.ok(xml.includes(`/projects/${p.id}/`), `${p.id} is listed`);
   assert.equal(pageMeta('projects/not-a-project'), null);
 });
+
+test('clips: an image entry with video plays <src>.mp4, checked like any image path', async () => {
+  const { videoUrl } = await import('../src/html.js');
+  assert.equal(videoUrl('assets/projects/bonfire-live/clip', '/'), '/assets/projects/bonfire-live/clip.mp4');
+  assert.throws(() => videoUrl('../secret', '/'));
+});

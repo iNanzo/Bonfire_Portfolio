@@ -540,6 +540,12 @@ function renderImages(list, path, ctx) {
       ctx.changed({ rerender: true });
     } });
     pixel.checked = !!im.pixel;
+    // A clip: the site plays <src>.mp4 (added to the repo by hand) with this image as its poster.
+    const video = el('input', { type: 'checkbox', onchange: () => {
+      if (video.checked) im.video = true; else delete im.video;
+      ctx.changed({ rerender: true });
+    } });
+    video.checked = !!im.video;
     box.append(el('figure', { class: `image-tile${im.hidden ? ' is-hidden' : ''}`, 'data-index': i, 'data-path': keyOf(ipath) },
       el('div', { class: 'image-frame', draggable: 'true', title: 'Drag to reorder' },
         el('img', { alt: im.alt || '', src: pending?.preview ?? ctx.thumb(im.src), loading: 'lazy' }),
@@ -550,6 +556,7 @@ function renderImages(list, path, ctx) {
       renderField(im.alt ?? '', [...ipath, 'alt'], ctx, 'Alt Text (Describe It)'),
       renderField(im.caption ?? '', [...ipath, 'caption'], ctx, 'Caption'),
       el('label', { class: 'check' }, pixel, ' Pixel Art (Keep It Crisp)'),
+      el('label', { class: 'check', title: 'Plays the .mp4 of the same name (put it in the repo beside this image), with this image as its still' }, video, ' Video Clip (Plays the .mp4)'),
       el('div', { class: 'image-actions' },
         iconButton('Move earlier', '←', () => moveItem(list, i, i - 1, ctx), { disabled: i === 0 }),
         iconButton('Move later', '→', () => moveItem(list, i, i + 1, ctx), { disabled: i === list.length - 1 }),

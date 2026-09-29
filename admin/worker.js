@@ -11,8 +11,8 @@ const csp = (siteUrl) => {
   let frame = "'none'";
   try { if (siteUrl) frame = new URL(siteUrl).origin; } catch { /* bad SITE_URL: no preview */ }
   return [
-    "default-src 'self'", "img-src 'self' blob: data:", "style-src 'self' https://fonts.googleapis.com",
-    'font-src https://fonts.gstatic.com', "connect-src 'self'", `frame-src ${frame}`, "frame-ancestors 'none'", "base-uri 'none'", "form-action 'none'",
+    "default-src 'self'", "img-src 'self' blob: data:", "style-src 'self'",
+    "font-src 'self'", "connect-src 'self'", `frame-src ${frame}`, "frame-ancestors 'none'", "base-uri 'none'", "form-action 'none'",
   ].join('; ');
 };
 const SECURITY_HEADERS = {

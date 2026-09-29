@@ -20,6 +20,9 @@ const BASE = [
   { id: 'breakdown', name: 'How it’s made', hint: 'Press B.' },
   { id: 'photo', name: 'Photographer', hint: 'The menu has a camera.' },
   { id: 'visualizer', name: 'The fire dances', hint: 'There’s a live version for music.' },
+  { id: 'pack', name: 'Rummaged the pack', hint: 'Something is tucked in the corner.' },
+  { id: 'scenery', name: 'Somewhere new', hint: 'The fire can burn in other places.' },
+  { id: 'spell', name: 'Spellcaster', hint: 'The pack holds a book of spells.' },
 ];
 
 export function createDiscoveries({ onNew = () => {} } = {}) {

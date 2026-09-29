@@ -133,14 +133,15 @@ export function readableOn(hex, bg, min = 4.6) {
  * @param {string} o.scheme   one of SCHEMES
  * @param {number} [o.vivid]  0..1, how much of the available chroma to use
  * @param {number} [o.shift]  degrees the scheme bends hues (hue shift / analogous)
- * @param {number} [o.dir]    ±1, which way analogous-style schemes turn
+ * @param {number} [o.dir]    1 or -1: which way analogous-style schemes turn
  * @param {number[]} [o.lightness]  0..1 per ramp step: where in its band it sits
  * @param {number[]} [o.L]          exact OKLCH lightness per ramp step (overrides `lightness`)
  * @param {string} o.voidHex  the page background (for the text-contrast rule)
- * @returns {{ lo, mid, hi, core, shade }}
+ * @returns {{ lo: string, mid: string, hi: string, core: string, shade: string }}
  */
 export function makeFlame({ hue, scheme = 'shift', vivid = 0.85, shift = 25, dir = 1, lightness = [0.5, 0.5, 0.5, 0.5], L: fixedL = null, voidHex }) {
   const hues = SCHEME_HUES[scheme](wrap(hue), shift, dir);
+  /** @type {any} */
   const out = {};
   RAMP.forEach((k, i) => {
     const L = fixedL?.[i] ?? lerp(BANDS[k][0], BANDS[k][1], lightness[i]);
@@ -153,7 +154,11 @@ export function makeFlame({ hue, scheme = 'shift', vivid = 0.85, shift = 25, dir
   return out;
 }
 
-/** A random flame that holds together: a random hue, scheme (weighted toward hue shift) and intensity. */
+/**
+ * A random flame that holds together: a random hue, scheme (weighted toward hue shift) and intensity.
+ * @param {() => number} rng
+ * @param {{ voidHex?: string, scheme?: string, hue?: number }} [o]
+ */
 export function harmoniousFlame(rng, { voidHex, scheme = 'auto', hue = rng() * 360 } = {}) {
   const id = scheme === 'auto' ? pickScheme(rng) : scheme;
   const colors = makeFlame({
@@ -263,6 +268,8 @@ export function harmoniousScene(rng, { flames = [] } = {}) {
  * Scenery with real color (the visualizer's recolors): harmoniousScene's tinted neutrals
  * two to four times stronger, around a hue that follows the flame's (`hue`: the same,
  * next to it, opposite, a third of the way round) or any hue at all.
+ * @param {() => number} rng
+ * @param {{ flames?: Array<{ hi?: string }>, hue?: number }} [o]  the flames to keep readable, the hue to follow
  */
 export function vividScene(rng, { flames = [], hue } = {}) {
   const turns = [0, 30, -30, 180, 120, -120];

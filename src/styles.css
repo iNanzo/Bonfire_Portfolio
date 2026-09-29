@@ -5,20 +5,12 @@
      --accent-hi  text (always ≥ 4.5:1 on the void)
      --accent     borders, gems, decoration
      --accent-lo  deep decoration
+   The shared tokens (colors, fonts) are in tokens.css.
    ========================================================================== */
 
+@import './tokens.css';
+
 :root {
-  --c-void: #07070b;
-  --c-shadow: #15131d;
-  --c-stone: #2c2a3a;
-  --c-wood: #5b4535;
-  --c-bone: #e9e3d2;
-
-  --accent-lo: #8c1d2f;
-  --accent: #e0582a;
-  --accent-hi: #ffc76a;
-  --accent-core: #fff1d0;
-
   --text: var(--c-bone);
   --text-dim: color-mix(in srgb, var(--c-bone) 74%, var(--c-void));
   --line: color-mix(in srgb, var(--c-bone) 14%, transparent);
@@ -26,9 +18,6 @@
   --panel-bg: color-mix(in srgb, var(--c-void) 72%, transparent);
   --inset-bg: color-mix(in srgb, var(--c-shadow) 55%, transparent);
 
-  --font-pixel: 'Pixelify Sans', ui-monospace, 'Cascadia Mono', monospace;
-  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-name: 'Cinzel', 'Trajan Pro', Georgia, serif;
   --font-data: 600 0.8125rem/1.4 var(--font-body);
 
   --gutter: clamp(16px, 3vw, 40px);
@@ -239,7 +228,20 @@ kbd {
 }
 
 .tabs { display: none; align-items: center; gap: 6px; margin: 0 auto; }
-.tabs ul { display: flex; gap: 2px; }
+.tabs ul { position: relative; display: flex; gap: 2px; }
+/* The current tab's underline glides to the next one (main.js places it). */
+.tabs-cursor {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 2px;
+  background: var(--accent-hi);
+  pointer-events: none;
+  transition: transform 200ms steps(5), width 200ms steps(5);
+}
+.tabs-cursor[hidden] { display: none; }
+.tabs.has-cursor a[aria-current] { box-shadow: none; }
 .tabs a {
   display: block;
   padding: 6px 12px;
@@ -254,6 +256,8 @@ kbd {
 body[data-screen='home'] .tabs { visibility: hidden; }
 
 .header-actions { display: flex; gap: 10px; margin-left: auto; }
+.resume-btn[hidden] { display: none; }
+@media (max-width: 899px) { .resume-btn { display: none; } } /* (it's in the menu there) */
 .sound-toggle .sound-icon {
   width: 12px; height: 12px;
   background: currentColor;
@@ -266,6 +270,10 @@ body[data-screen='home'] .tabs { visibility: hidden; }
 }
 
 @media (min-width: 900px) {
+  /* Three columns, so the tabs sit in the true middle whatever the brand and buttons measure. */
+  .site-header { display: grid; grid-template-columns: 1fr auto 1fr; }
+  .brand { justify-self: start; }
+  .header-actions { justify-self: end; margin-left: 0; }
   .tabs { display: flex; }
   .menu-toggle { display: none; }
 }
@@ -339,15 +347,222 @@ body[data-screen='home'] .tabs { visibility: hidden; }
 .prompt { display: inline-flex; align-items: center; gap: 5px; }
 .prompt kbd { font-size: 0.8125rem; }
 .prompt-stoke { color: color-mix(in srgb, var(--c-bone) 55%, var(--c-void)); }
+/* One place on every screen (bottom center, where the fire is), so switching screens never
+   moves them; a prompt that doesn't apply dims instead of leaving a gap. */
 @media (min-width: 1100px) and (hover: hover) {
-  .prompts { display: flex; max-width: 400px; }
-  body[data-screen='home'] .prompts,
-  body[data-screen='skills'] .prompts,
-  body[data-screen='contact'] .prompts { left: auto; right: var(--gutter); justify-content: flex-end; }
-  body[data-screen='projects'] .prompts { left: calc(30% + 64px); max-width: 330px; }
-  body[data-screen='projects'].is-inspecting .prompts { left: calc(42% + 64px); }
+  .prompts { display: flex; left: 50%; transform: translateX(-50%); justify-content: center; width: max-content; max-width: calc(100vw - 2 * var(--gutter) - 140px); }
 }
-body[data-screen='home'] .prompt[data-prompt='Back'] { display: none; }
+body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
+
+/* ---------- The pack (bottom right: ui/pack.js) ----------
+   A backpack slot; hovered, tapped or opened with I, its items rise out of it one by one,
+   and each item's options fly out beside it as a text list. Pixel icons (ui/pixelArt.js)
+   are line art in the text color with accent pixels in the flame's bright color. */
+
+.pack {
+  position: fixed;
+  right: var(--gutter);
+  bottom: 14px;
+  z-index: 16;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.no-webgl .pack,
+.is-photo .pack,
+.is-breakdown .pack { display: none; }
+.pack-items { display: flex; flex-direction: column; gap: 6px; }
+.pack-items[hidden] { display: none; }
+.pack-item { position: relative; }
+
+.pack-slot,
+.pack-toggle {
+  --b: var(--line-strong);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--c-void) 80%, transparent);
+  color: var(--text-dim);
+  box-shadow: 0 -1px 0 var(--b), 0 1px 0 var(--b), -1px 0 0 var(--b), 1px 0 0 var(--b);
+  cursor: pointer;
+  transition: box-shadow var(--snap) steps(2);
+}
+.pack-slot:hover,
+.pack-slot:focus-visible,
+.pack-item.is-shown .pack-slot,
+.pack-toggle:hover,
+.pack-toggle:focus-visible,
+.pack.is-open .pack-toggle { --b: var(--accent); color: var(--c-bone); outline: none; }
+.pack-slot:focus-visible,
+.pack-toggle:focus-visible { box-shadow: 0 -1px 0 var(--b), 0 1px 0 var(--b), -1px 0 0 var(--b), 1px 0 0 var(--b), 0 0 0 3px var(--c-void), 0 0 0 4px var(--accent-hi); }
+/* The shown item's slot: inner corner brackets, like the inventory's cursor. */
+.pack-item.is-shown .pack-slot::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 0 0 / 6px 2px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 0 0 / 2px 6px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 100% 0 / 6px 2px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 100% 0 / 2px 6px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 0 100% / 6px 2px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 0 100% / 2px 6px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 100% 100% / 6px 2px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 100% 100% / 2px 6px;
+  background-repeat: no-repeat;
+  animation: slot-flash 240ms steps(3) both;
+}
+.touch .pack-toggle kbd { display: none; }
+.pack-toggle kbd {
+  position: absolute;
+  left: -8px;
+  top: -8px;
+  min-width: 0;
+  padding: 0 4px;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  background: var(--c-void);
+}
+
+.px-icon { display: block; width: 32px; height: 32px; overflow: visible; }
+.px-line { fill: currentColor; }
+.px-accent { fill: var(--accent-hi); }
+.px-icon > g:not(.px-f0) { display: none; }
+
+/* The backpack bobs now and then; open, its flap is thrown back and its mouth glows. */
+.px-backpack { animation: pack-bob 5.2s steps(1) infinite; }
+@keyframes pack-bob {
+  0%, 90%, 100% { transform: none; }
+  92%, 96% { transform: translateY(-2px); }
+  94% { transform: translateY(-4px); }
+}
+.pack.is-open .px-backpack { animation: none; }
+.pack.is-open .px-backpack .px-f0 { display: none; }
+.pack.is-open .px-backpack .px-f1 { display: inline; }
+
+/* Items rise out of the pack, the nearest first. */
+.pack.is-open .pack-item { animation: pack-rise 240ms steps(4) both; animation-delay: calc(var(--i) * 50ms); }
+@keyframes pack-rise {
+  from { opacity: 0; transform: translateY(calc(20px + var(--i) * 10px)) scale(0.5); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Each item's icon comes alive while it's hovered or showing its list. */
+.pack-item:is(:hover, .is-shown) .px-map .px-f1 { display: inline; animation: px-flip-b 0.9s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-map .px-f0 { animation: px-flip-a 0.9s steps(1) infinite; }
+/* The anvil: the hot bar is struck, sparks fly and the anvil rings (a one-pixel jolt). */
+.pack-item:is(:hover, .is-shown) .px-anvil .px-f1 { display: inline; animation: px-flip-b 0.8s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-anvil .px-f0 { animation: px-flip-a 0.8s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-anvil { animation: px-clang 0.8s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-tome .px-f1 { display: inline; animation: px-flip-b 1.2s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-tome .px-f0 { animation: px-flip-a 1.2s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-tome { animation: px-hop 1.2s steps(1) infinite; }
+@keyframes px-flip-a { 50% { opacity: 0; } }
+@keyframes px-flip-b { 0% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes px-clang { 0%, 45%, 62%, 100% { transform: none; } 50% { transform: translateY(2px); } 56% { transform: translateX(-2px); } }
+@keyframes px-hop { 0%, 100% { transform: none; } 50% { transform: translateY(-2px); } }
+
+/* An item's options: a text list flying out beside it. */
+.pack-list {
+  position: absolute;
+  right: calc(100% + 12px);
+  bottom: -4px;
+  width: max-content;
+  min-width: 210px;
+  max-width: min(290px, calc(100vw - 100px));
+  max-height: min(62vh, 460px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-stone) transparent;
+  padding: 14px 10px 10px;
+  background: var(--c-void);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.pack-list[hidden] { display: none; }
+.pack-list.is-in { animation: pack-list-in 220ms steps(4) both; }
+@keyframes pack-list-in {
+  from { opacity: 0; transform: translateX(12px); clip-path: inset(0 0 0 100%); }
+  to { opacity: 1; transform: none; clip-path: inset(0); }
+}
+.pack-list-title {
+  margin: 0 6px 8px;
+  font-family: var(--font-pixel);
+  font-size: 0.8125rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-hi);
+}
+.pack-list-title span {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--text-dim);
+}
+.pack-options { display: grid; gap: 1px; }
+.pack-list.is-long { max-width: min(420px, calc(100vw - 100px)); }
+.pack-list.is-long .pack-options { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 6px; }
+.pack-list.is-long .pack-heading { grid-column: 1 / -1; } /* (a heading spans both columns) */
+@media (max-width: 559px) { .pack-list.is-long .pack-options { grid-template-columns: 1fr; } }
+.pack-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-pixel);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  text-align: left;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.pack-option .cursor { width: 7px; height: 10px; visibility: hidden; color: var(--accent-hi); }
+.pack-option:hover,
+.pack-option:focus-visible { color: var(--c-bone); background: var(--c-shadow); outline: none; }
+.pack-option:hover .cursor,
+.pack-option:focus-visible .cursor { visibility: visible; }
+.pack-option.is-current { color: var(--accent-hi); }
+.pack-option .gem { flex: none; width: 7px; height: 7px; margin-left: auto; box-shadow: none; background: var(--accent-hi); }
+/* A bonfire color's swatch: its bright tone in a small pixel frame. */
+.pack-swatch { flex: none; width: 10px; height: 10px; background: var(--sw); box-shadow: 0 0 0 1px var(--c-void), 0 0 0 2px var(--line-strong); }
+.pack-option.is-current .pack-swatch { box-shadow: 0 0 0 1px var(--c-void), 0 0 0 2px var(--accent-hi); }
+.pack-option:disabled { opacity: 0.4; cursor: default; }
+.pack-option:disabled:hover { background: transparent; color: var(--text-dim); }
+.pack-option:disabled .cursor { visibility: hidden; }
+.pack-heading {
+  margin: 8px 6px 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-pixel);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+@media (max-width: 559px) {
+  .pack { right: 12px; bottom: 12px; }
+  .pack-slot, .pack-toggle { width: 44px; height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .px-backpack,
+  .pack.is-open .pack-item,
+  .pack-list.is-in,
+  .pack-item:is(:hover, .is-shown) :is(.px-icon, .px-icon > g) { animation: none !important; }
+  .pack-item:is(:hover, .is-shown) .px-icon > g.px-f1 { display: none; }
+}
 
 /* ---------- Screens ---------- */
 
@@ -368,10 +583,72 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { display: none; }
   container-type: inline-size;
 }
 
+/* Switching screens (main.js render): the old screen's panels dither away as they slide
+   off the way you came from; the new ones slide in from the way you're going and dither
+   in (the same ordered dither as the scene: --dv-N, ui/dither.js), their corners flaring,
+   the title's gem turning in and the title drawn left to right, then the rest of the
+   panel's lines rising in one after another (--k). --dir: 1 forward (E), -1 back (Q). */
+.screen { --dir: 1; }
 .screen.is-entering .panel,
-.screen.is-entering .home-copy { animation: panel-in 360ms steps(5) both; }
-.screen.is-entering .panel:nth-child(2) { animation-delay: 60ms; }
+.screen.is-entering .home-copy {
+  -webkit-mask-size: calc(var(--dp) * 4) calc(var(--dp) * 4);
+  mask-size: calc(var(--dp) * 4) calc(var(--dp) * 4);
+  animation: panel-in 380ms steps(1) both;
+}
+.screen.is-entering .panel:nth-child(2) { animation-delay: 70ms; }
+.screen.is-entering .frame > .corner { animation: corner-flare 520ms steps(4) both; }
+.screen.is-entering .screen-title { animation: title-draw 340ms steps(8) 110ms both; }
+.screen.is-entering .screen-title::before { animation: gem-turn 360ms steps(4) 60ms both; }
+.screen.is-entering [style*='--k'] { animation: line-rise 300ms steps(3) both; animation-delay: calc(170ms + var(--k) * 45ms); }
+.screen.is-leaving {
+  position: fixed;
+  inset: 0 0 auto;
+  width: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+.screen.is-leaving * { pointer-events: none !important; }
+.screen.is-leaving .panel,
+.screen.is-leaving .home-copy {
+  -webkit-mask-size: calc(var(--dp) * 4) calc(var(--dp) * 4);
+  mask-size: calc(var(--dp) * 4) calc(var(--dp) * 4);
+  animation: panel-out 200ms steps(1) both;
+}
 @keyframes panel-in {
+  0% { transform: translateX(calc(var(--dir) * 30px)); -webkit-mask-image: var(--dv-1); mask-image: var(--dv-1); }
+  17% { transform: translateX(calc(var(--dir) * 20px)); -webkit-mask-image: var(--dv-3); mask-image: var(--dv-3); }
+  34% { transform: translateX(calc(var(--dir) * 12px)); -webkit-mask-image: var(--dv-6); mask-image: var(--dv-6); }
+  51% { transform: translateX(calc(var(--dir) * 6px)); -webkit-mask-image: var(--dv-10); mask-image: var(--dv-10); }
+  68% { transform: translateX(calc(var(--dir) * 2px)); -webkit-mask-image: var(--dv-13); mask-image: var(--dv-13); }
+  85% { transform: none; -webkit-mask-image: var(--dv-15); mask-image: var(--dv-15); }
+  100% { transform: none; -webkit-mask-image: none; mask-image: none; }
+}
+@keyframes panel-out {
+  0% { transform: none; -webkit-mask-image: var(--dv-12); mask-image: var(--dv-12); }
+  25% { transform: translateX(calc(var(--dir) * -8px)); -webkit-mask-image: var(--dv-8); mask-image: var(--dv-8); }
+  50% { transform: translateX(calc(var(--dir) * -16px)); -webkit-mask-image: var(--dv-4); mask-image: var(--dv-4); }
+  75% { transform: translateX(calc(var(--dir) * -24px)); -webkit-mask-image: var(--dv-1); mask-image: var(--dv-1); }
+  100% { transform: translateX(calc(var(--dir) * -30px)); opacity: 0; }
+}
+@keyframes corner-flare {
+  0% { --cc: var(--accent-core); }
+  50% { --cc: var(--accent-hi); }
+  75% { --cc: var(--accent); }
+  100% { --cc: var(--accent-lo); }
+}
+@keyframes title-draw {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 -20px 0 0); }
+}
+@keyframes gem-turn {
+  from { transform: rotate(-135deg) scale(0.3); }
+  to { transform: rotate(45deg); }
+}
+@keyframes line-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes panel-rise {
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: none; }
 }
@@ -687,7 +964,8 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { display: none; }
 }
 .glance-media img { width: 100%; height: 100%; object-fit: cover; }
 .glance-media img.pixel,
-.viewer-stage img.pixel { image-rendering: pixelated; }
+.viewer-stage img.pixel,
+.viewer-stage video.pixel { image-rendering: pixelated; }
 .glance-media .veil,
 .viewer-stage .veil { background-image: none; }
 .glance.is-swapping .veil,
@@ -742,9 +1020,11 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { display: none; }
   background: color-mix(in srgb, var(--accent-lo) 30%, transparent);
 }
 .gem { width: 9px; height: 9px; background: var(--accent); transform: rotate(45deg); box-shadow: 0 0 0 2px var(--accent-lo); }
-.detail.is-opening { animation: panel-in 320ms steps(4) both; }
+.detail.is-opening { animation: panel-rise 320ms steps(4) both; }
 
-.viewer-stage img { width: 100%; height: 100%; object-fit: contain; }
+.viewer-stage img,
+.viewer-stage video { width: 100%; height: 100%; object-fit: contain; }
+.viewer-stage video[hidden], .gallery-figure video[hidden], .viewer-stage img[hidden], .gallery-figure img[hidden] { display: none; }
 .viewer-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
 .viewer-caption { font-size: 0.875rem; color: var(--text-dim); }
 .viewer-controls { display: flex; align-items: center; gap: 8px; font-family: var(--font-pixel); font-size: 0.875rem; color: var(--text-dim); }
@@ -1197,8 +1477,10 @@ button.viewer-stage { display: block; width: 100%; padding: 0; border: 0; cursor
 }
 .gallery[open] { display: grid; grid-template-rows: 1fr auto; gap: 14px; animation: fade-in 200ms steps(4) both; }
 .gallery-figure { display: grid; grid-template-rows: 1fr auto; gap: 8px; min-height: 0; }
-.gallery-figure img { width: 100%; height: 100%; min-height: 0; object-fit: contain; }
-.gallery-figure img.pixel { image-rendering: pixelated; }
+.gallery-figure img,
+.gallery-figure video { width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.gallery-figure img.pixel,
+.gallery-figure video.pixel { image-rendering: pixelated; }
 .gallery-figure figcaption { text-align: center; color: var(--text-dim); font-size: 0.9375rem; }
 .gallery-bar { display: flex; justify-content: center; align-items: center; gap: 12px; font-family: var(--font-pixel); color: var(--text-dim); }
 .gallery-bar [hidden] { display: none; }

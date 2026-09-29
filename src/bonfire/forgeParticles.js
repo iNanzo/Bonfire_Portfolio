@@ -17,11 +17,17 @@
 //          a moment. It takes after the element the blade will strike with.
 //   fling  on release the whole vortex is flung outward as the blade strikes.
 //
+// The forge takes after the element being forged (the swap's `element`): fire's
+// particles drift and flicker as above; lightning's crackle, snapping about and blinking
+// out, mostly white-hot; ice's fall like chips as they're shed, before the helix takes
+// them, and each one glints as it freezes onto the new blade.
+//
 // weapons.js runs the choreography and hands each step what it needs (the phase's
 // progress, the old and new weapons, their colors).
 import * as THREE from 'three';
 import { smoothstep } from '../math.js';
 import { createPoints, markDirty } from './points.js';
+import { iceGlint } from './signatures.js';
 
 /** Turns of the forge helix along the blade (the forge lines trace it too). */
 export const HELIX_TURNS = 1.5;
@@ -120,10 +126,12 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
      * or -1 once it's over), gather 0..1 (the helix collapsing), forming, formU (the
      * forming edge), pulling (gather or form: the helix grips harder), blend 0..1 (old
      * colors → new), spin (the helix's turn), from, to (the weapons), time, colorsFrom,
-     * colorsTo ([lo, mid, hi, core] colors) }.
+     * colorsTo ([lo, mid, hi, core] colors), element ('fire' | 'lightning' | 'ice') }.
      */
     step(dt, c) {
       if (!N) return;
+      const zap = c.element === 'lightning';
+      const ice = c.element === 'ice';
       const k = c.gather;
       const shrink = 0.85 * smoothstep(0, 1, k);
       const onSurface = smoothstep(0.25, 1, k);
@@ -147,10 +155,10 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
         const fade = c.forming ? smoothstep(fadeAt[i] - 0.06, fadeAt[i] + 0.1, c.formU) : 1;
         if (fade <= 0.01) { state[i] = 2; FS[i] = 0; continue; }
         const n = field.fire(FP[ix] - anchor.x, FP[ix + 1], FP[ix + 2] - anchor.z, time);
-        // A subtle drift from where it was shed...
-        const drag = Math.exp(-dt * 2.2);
+        // A subtle drift from where it was shed (ice: a chip's fall)...
+        const drag = Math.exp(-dt * (ice ? 1.2 : 2.2));
         FV[ix] = (FV[ix] + n.x * 0.5 * dt) * drag;
-        FV[ix + 1] = (FV[ix + 1] + n.y * 0.3 * dt) * drag;
+        FV[ix + 1] = (FV[ix + 1] + n.y * 0.3 * dt) * drag - (ice ? 1.6 * dt : 0);
         FV[ix + 2] = (FV[ix + 2] + n.z * 0.5 * dt) * drag;
         FP[ix] += FV[ix] * dt; FP[ix + 1] += FV[ix + 1] * dt; FP[ix + 2] += FV[ix + 2] * dt;
         // ...until the helix takes it (fully by ~0.65 s after it was shed), collapsing onto
@@ -163,11 +171,18 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
         FP[ix] += (vH.x - FP[ix]) * pull;
         FP[ix + 1] += (vH.y - FP[ix + 1]) * pull;
         FP[ix + 2] += (vH.z - FP[ix + 2]) * pull;
+        // Lightning: a spark snaps sideways now and then (the helix pulls it back in).
+        if (zap && Math.random() < dt * 14) {
+          FP[ix] += (Math.random() - 0.5) * 0.06; FP[ix + 1] += (Math.random() - 0.5) * 0.04; FP[ix + 2] += (Math.random() - 0.5) * 0.06;
+        }
         // Vibrant, flickering flame colors turning from the current flame to the next:
-        // mostly the saturated body tone, with bright flickers.
+        // mostly the saturated body tone, with bright flickers (lightning: mostly white-hot;
+        // ice: pale, with a glint now and then).
         const flick = (Math.sin(time * 23 + heat[i] * 40) + 1) * 0.5;
-        const hot = flick > 0.72;
-        col.copy(c.colorsFrom[hot ? 2 : 1]).lerp(c.colorsTo[hot ? 2 : 1], c.blend).multiplyScalar(0.75 + flick * 0.25);
+        const glint = ice && (iceGlint(time * 3, i) || (c.forming && fade < 0.9));
+        const hot = zap ? flick > 0.35 : ice ? glint : flick > 0.72;
+        const lo = zap || ice ? 2 : 1;
+        col.copy(c.colorsFrom[hot ? lo + 1 : lo]).lerp(c.colorsTo[hot ? lo + 1 : lo], c.blend).multiplyScalar((ice ? 0.6 : 0.75) + flick * 0.25);
         FC[ix] = col.r; FC[ix + 1] = col.g; FC[ix + 2] = col.b;
 
         const age = time - born[i];
@@ -176,7 +191,8 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
         let size = grain[i] * (0.7 + 0.6 * pocket) * Math.min(1, 0.4 + age * 2.5) * (1 - 0.35 * k) * (0.75 + 0.25 * fade);
         let alpha = (0.35 + 0.65 * pocket) * Math.min(1, age * 6) * (0.75 + 0.25 * k);
         if (hot) { size *= 0.75; alpha = Math.max(alpha, 0.9); }
-        FS[i] = size;
+        if (glint) size = 2.2; // freezing onto the blade: a diamond's flash
+        FS[i] = zap && Math.random() < 0.25 ? 0 : size; // lightning blinks
         FA[i] = alpha * fade;
       }
       markDirty(points);

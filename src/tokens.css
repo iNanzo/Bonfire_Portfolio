@@ -1,0 +1,32 @@
+/* ==========================================================================
+   Design tokens shared by the site, Bonfire Live and the admin panel: the scene's
+   neutral colors, the flame's accents (ui/theme.js rewrites these as the flame
+   changes), and the three typefaces, served from this site (@fontsource) rather
+   than a font service, so pages render without a third-party request.
+   ========================================================================== */
+
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/400-italic.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/pixelify-sans/400.css';
+@import '@fontsource/pixelify-sans/500.css';
+@import '@fontsource/cinzel/500.css';
+@import '@fontsource/cinzel/600.css';
+
+:root {
+  --c-void: #07070b;
+  --c-shadow: #15131d;
+  --c-stone: #2c2a3a;
+  --c-wood: #5b4535;
+  --c-bone: #e9e3d2;
+
+  --accent-lo: #8c1d2f;
+  --accent: #e0582a;
+  --accent-hi: #ffc76a;
+  --accent-core: #fff1d0;
+
+  --font-pixel: 'Pixelify Sans', ui-monospace, 'Cascadia Mono', monospace;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-name: 'Cinzel', 'Trajan Pro', Georgia, serif;
+}
