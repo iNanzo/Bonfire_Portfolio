@@ -15,8 +15,19 @@
 //   how it's framed — an iris around the fire, letterbox bars, scanlines (thin rows, thick
 //     rows or columns), static;
 //   how it's colored — a 1-bit ink flash (dithered to void and the flame's core), a
-//     negative, and color cycling (the flame's ramp colors rotate, like old pixel-art
-//     palette animation).
+//     negative, color cycling (the flame's ramp colors rotate, like old pixel-art
+//     palette animation), a gradient map (brightness → three palette colors), a flicker;
+//   how the layers blend — each overlay (echoes, the ghost trail, a warp over the plain
+//     picture, ink, the negative, scanlines, glow, the gradient map) has a blend mode
+//     (blendMode: normal, add, multiply, screen, overlay, soft light, difference, …).
+//
+// Stages: normally one pass builds each pixel and finishes it. The heavier effects need
+// the finished scene around a pixel, so for them the scene is drawn once into its own
+// image first (SCENE_ONLY), maybe repainted (styleShader: painterly strokes or a
+// watercolor wash), with a fading ghost trail kept beside it (ghostShader); the final
+// pass (SCENE_TEX) reads those instead: motion blur (each texel smeared along the way
+// the camera moved it, from its depth), the ghost trail, and glow (from the scene
+// image's blurred mipmaps).
 import * as THREE from 'three';
 
 const MAX_COLORS = 16;
@@ -77,6 +88,33 @@ const fragmentShader = /* glsl */ `
   uniform float uLetterbox;        // bar height as a fraction of the height
   uniform float uInk;              // 0..1: the 1-bit look
   uniform float uCycle;            // 0..3: rotate the flame's ramp colors this many steps
+  uniform float uGrad;             // 0..1: the gradient map
+  uniform float uGradA;            // ...its palette slots, dark to light
+  uniform float uGradB;
+  uniform float uGradC;
+  uniform float uFlicker;          // 0..1: how far the light dips
+  uniform float uFlickerMode;      // 0 on the beat, 1 a rolling band, 2 film jitter, 3 a candle's waver
+  // Blend modes (blendMode's numbers) for the layers.
+  uniform float uFeedMode;
+  uniform float uWarpMode;
+  uniform float uWarpMix;          // 0..1: a warp over the plain picture (1: the warp alone)
+  uniform float uInkMode;
+  uniform float uInvertMode;       // 0: the negative; else the core color blended in
+  uniform float uScanBlend;
+  uniform float uGradMode;
+  // The stages (SCENE_TEX only).
+  uniform sampler2D tScene;        // the scene (maybe repainted), sRGB
+  uniform sampler2D tSceneMip;     // the scene with mipmaps, for the glow
+  uniform sampler2D tGhost;        // the ghost trail
+  uniform float uGhost;            // 0..1: how much of it shows
+  uniform float uGhostMode;
+  uniform float uBlur;             // motion blur strength (0: off)
+  uniform mat4 uInvProj;           // this frame's inverse projection
+  uniform mat4 uPrevFromView;      // this frame's view space → last frame's clip space
+  uniform float uGlow;             // how much light spills
+  uniform float uGlowSize;         // from this mipmap level (bigger: wider)
+  uniform float uGlowCut;          // only from what's brighter than this
+  uniform float uGlowMode;
 
   float linDepth(sampler2D t, vec2 uv) {
     return -perspectiveDepthToViewZ(texture2D(t, uv).x, cameraNear, cameraFar);
@@ -167,6 +205,62 @@ const fragmentShader = /* glsl */ `
     return toSRGB(lit);
   }
 
+  // Layer f over b (both sRGB, 0..1). 0 normal, 1 add, 2 subtract, 3 multiply, 4 screen,
+  // 5 darken, 6 lighten, 7 overlay, 8 hard light, 9 soft light, 10 difference, 11 exclusion.
+  vec3 blendMode(vec3 b, vec3 f, float mode) {
+    b = clamp(b, 0.0, 1.0);
+    f = clamp(f, 0.0, 1.0);
+    int m = int(mode + 0.5);
+    if (m == 1) return min(b + f, 1.0);
+    if (m == 2) return max(b - f, 0.0);
+    if (m == 3) return b * f;
+    if (m == 4) return 1.0 - (1.0 - b) * (1.0 - f);
+    if (m == 5) return min(b, f);
+    if (m == 6) return max(b, f);
+    if (m == 7) return mix(2.0 * b * f, 1.0 - 2.0 * (1.0 - b) * (1.0 - f), step(0.5, b));
+    if (m == 8) return mix(2.0 * b * f, 1.0 - 2.0 * (1.0 - b) * (1.0 - f), step(0.5, f));
+    if (m == 9) {
+      vec3 d = mix(((16.0 * b - 12.0) * b + 4.0) * b, sqrt(b), step(0.25, b));
+      return mix(b - (1.0 - 2.0 * f) * b * (1.0 - b), b + (2.0 * f - 1.0) * (d - b), step(0.5, f));
+    }
+    if (m == 10) return abs(b - f);
+    if (m == 11) return b + f - 2.0 * b * f;
+    return f;
+  }
+
+  // The scene at a texel: built here, or read from the scene stage.
+  vec3 sceneAt(vec2 px) {
+  #ifdef SCENE_TEX
+    return textureLod(tScene, (clamp(px, vec2(0.0), resolution - 1.0) + 0.5) / resolution, 0.0).rgb;
+  #else
+    return shade(px);
+  #endif
+  }
+
+  #ifdef SCENE_TEX
+  // Motion blur: where this texel's surface was on screen last frame (from its depth and
+  // the two cameras), and the picture smeared along the way it moved.
+  vec3 smear(vec2 src, vec3 col) {
+    vec2 uv = (clamp(src, vec2(0.0), resolution - 1.0) + 0.5) / resolution;
+    vec4 v = uInvProj * vec4(uv * 2.0 - 1.0, texture2D(tDepth, uv).x * 2.0 - 1.0, 1.0);
+    vec4 p = uPrevFromView * vec4(v.xyz / v.w, 1.0);
+    if (p.w <= 0.0) return col;
+    vec2 vel = (uv - (p.xy / p.w * 0.5 + 0.5)) * resolution * uBlur;
+    float len = length(vel);
+    if (len < 0.75) return col;
+    vel *= min(1.0, 16.0 / len);
+    vec3 acc = col;
+    for (int i = 0; i < 6; i++) {
+      vec2 at = src + vel * ((float(i) + 0.5) / 6.0 - 0.5);
+      acc += textureLod(tScene, (clamp(at, vec2(0.0), resolution - 1.0) + 0.5) / resolution, 0.0).rgb;
+    }
+    return acc / 7.0;
+  }
+  #endif
+
+  #ifdef SCENE_ONLY
+  void main() { gl_FragColor = vec4(shade(floor(gl_FragCoord.xy)), 1.0); }
+  #else
   void main() {
     vec2 px = floor(gl_FragCoord.xy);
 
@@ -221,11 +315,23 @@ const fragmentShader = /* glsl */ `
     }
     src.x = mod(src.x, resolution.x);
 
-    vec3 col = shade(src);
+    vec3 col = sceneAt(src);
+  #ifdef SCENE_TEX
+    if (uBlur > 0.0) col = smear(src, col);
+  #endif
     if (uSplit >= 1.0) {
-      col.r = shade(src + vec2(uSplit, 0.0)).r;
-      col.b = shade(src - vec2(uSplit, 0.0)).b;
+      col.r = sceneAt(src + vec2(uSplit, 0.0)).r;
+      col.b = sceneAt(src - vec2(uSplit, 0.0)).b;
     }
+    // A warp as a layer: the warped picture blended over the plain one.
+    if ((uWarpMix < 0.999 || uWarpMode > 0.5) && (src.x != px.x || src.y != px.y)) {
+      vec3 plain = sceneAt(px);
+      col = mix(plain, blendMode(plain, col, uWarpMode), uWarpMix);
+    }
+  #ifdef SCENE_TEX
+    vec2 suv = (clamp(src, vec2(0.0), resolution - 1.0) + 0.5) / resolution;
+    if (uGhost > 0.0) col = mix(col, blendMode(col, textureLod(tGhost, suv, 0.0).rgb, uGhostMode), uGhost);
+  #endif
     // The shock front glows faintly in the flame's core color.
     if (shock > 0.0) col = mix(col, toSRGB(uCore), shock * min(0.35, uRippleAmp * 0.04));
     if (uFeedback > 0.0) {
@@ -236,7 +342,25 @@ const fragmentShader = /* glsl */ `
       // (Minus a little each frame: dithering would otherwise hold dim echoes at the same
       // palette color forever. Only bright things streak.)
       vec3 prev = texture2D(tPrev, f / resolution).rgb;
-      col = max(col, prev * uFeedback - 0.09);
+      col = blendMode(col, max(prev * uFeedback - 0.09, 0.0), uFeedMode);
+    }
+  #ifdef SCENE_TEX
+    // Glow: light spilling from the bright parts (the scene's blurred mipmaps).
+    if (uGlow > 0.0) {
+      vec3 halo = 0.5 * (textureLod(tSceneMip, suv, uGlowSize).rgb + textureLod(tSceneMip, suv, uGlowSize + 1.0).rgb);
+      float peak = max(halo.r, max(halo.g, halo.b));
+      col = blendMode(col, halo * smoothstep(uGlowCut, uGlowCut + 0.3, peak) * uGlow, uGlowMode);
+    }
+  #endif
+    // Gradient map: the picture's brightness through three palette colors.
+    if (uGrad > 0.0) {
+      float l = clamp(dot(col, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
+      int last = paletteSize - 1;
+      vec3 ga = palette[min(int(uGradA), last)];
+      vec3 gb = palette[min(int(uGradB), last)];
+      vec3 gc = palette[min(int(uGradC), last)];
+      vec3 gm = l < 0.5 ? mix(ga, gb, l * 2.0) : mix(gb, gc, l * 2.0 - 1.0);
+      col = mix(col, blendMode(col, gm, uGradMode), uGrad);
     }
 
     vec2 v = ((px + 0.5) / resolution - 0.5) * vec2(resolution.x / resolution.y, 1.0);
@@ -249,25 +373,123 @@ const fragmentShader = /* glsl */ `
     if (uInk > 0.0) {
       float l = dot(col, vec3(0.3, 0.59, 0.11));
       vec3 ink = l > 0.18 + (bayer4(px) - 0.5) * 0.3 ? toSRGB(uCore) : vec3(0.0);
-      col = mix(col, ink, uInk);
+      col = mix(col, blendMode(col, ink, uInkMode), uInk);
     }
     if (uScan > 0.0) {
       float line = uScanMode > 1.5 ? step(1.0, mod(px.x, 2.0)) : uScanMode > 0.5 ? step(2.0, mod(px.y, 4.0)) : step(1.0, mod(px.y, 2.0));
-      col *= 1.0 - uScan * line;
+      // Dark lines (multiply), light ones (screen), or contrast lines (overlay).
+      vec3 lines = abs(uScanBlend - 4.0) < 0.5 ? vec3(0.6 * uScan * line) : uScanBlend > 6.5 ? vec3(0.5 - 0.5 * uScan * line) : vec3(1.0 - uScan * line);
+      col = blendMode(col, lines, uScanBlend);
     }
     if (uNoise > 0.0) col += (h21(px + floor(uTime * 24.0) * 17.0) - 0.5) * uNoise;
-    col = mix(col, vec3(1.0) - col, uInvert);
+    if (uInvert > 0.0) col = mix(col, uInvertMode < 0.5 ? vec3(1.0) - col : blendMode(col, toSRGB(uCore), uInvertMode), uInvert);
     // Impact flash: the whole frame lifts toward the core color for a frame or two, still
     // quantized to the palette below so it reads as a pixel-art flash, not a white-out.
     if (uFlash > 0.0) col = mix(col, max(col, toSRGB(uCore)), uFlash);
     // Temperature: a gentle tilt before the palette snap, so bright music reads cooler
     // and dark music warmer by landing on neighboring palette colors.
     col *= vec3(1.0 - 0.07 * uTemp, 1.0 - 0.01 * abs(uTemp), 1.0 + 0.09 * uTemp);
+    // Flicker: the light dips (on the beat: the amount itself pulses), a dark band rolls
+    // down, film jitters frame to frame, or it wavers like a candle.
+    if (uFlicker > 0.0) {
+      float f = 1.0;
+      if (uFlickerMode > 2.5) f = 0.5 + 0.5 * sin(uTime * 7.0 + 2.0 * sin(uTime * 2.3));
+      else if (uFlickerMode > 1.5) f = h11(floor(uTime * 18.0));
+      else if (uFlickerMode > 0.5) f = smoothstep(0.18, 0.0, abs(fract(px.y / resolution.y + uTime * 0.35) - 0.5));
+      col *= 1.0 - uFlicker * f;
+    }
     col *= 1.0 - uBlackout;
 
     float threshold = (ditherScale > 6.0 ? bayer8(px) : bayer4(px)) - 0.5;
     col += threshold * ditherStrength;
     gl_FragColor = vec4(quantize(col), 1.0);
+  }
+  #endif
+`;
+
+// Repaints the scene image (the stages): painterly strokes (in each brush-shaped patch
+// around a texel, the brightness band most of it falls in, averaged) or a watercolor
+// wash (a Kuwahara filter: the calmest of the four corners around it, with pigment
+// pooling darker along the edges).
+const styleShader = /* glsl */ `
+  uniform sampler2D tScene;
+  uniform vec2 resolution;
+  uniform float uStyle;        // 1 painterly, 2 watercolor
+  uniform float uStyleR;       // brush size, texels (2..4)
+  uniform float uStyleMix;     // 0..1
+  uniform float uPaintAngle;   // the strokes' direction (radians)...
+  uniform float uPaintAspect;  // ...and how long they are
+  uniform float uWashEdge;     // 0..1: how dark the pigment pools at edges
+
+  vec3 at(vec2 p) { return textureLod(tScene, (clamp(p, vec2(0.0), resolution - 1.0) + 0.5) / resolution, 0.0).rgb; }
+  float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+
+  vec3 paint(vec2 px) {
+    float count[8];
+    vec3 sum[8];
+    for (int i = 0; i < 8; i++) { count[i] = 0.0; sum[i] = vec3(0.0); }
+    float ca = cos(uPaintAngle), sa = sin(uPaintAngle);
+    float r2 = uStyleR * uStyleR + 0.5;
+    for (int y = -4; y <= 4; y++) {
+      for (int x = -4; x <= 4; x++) {
+        vec2 o = vec2(float(x), float(y));
+        vec2 q = vec2((ca * o.x + sa * o.y) / uPaintAspect, -sa * o.x + ca * o.y);
+        if (dot(q, q) > r2) continue;
+        vec3 c = at(px + o);
+        int band = int(clamp(luma(c) * 8.0, 0.0, 7.0));
+        count[band] += 1.0;
+        sum[band] += c;
+      }
+    }
+    int best = 0;
+    float most = 0.0;
+    for (int i = 0; i < 8; i++) if (count[i] > most) { most = count[i]; best = i; }
+    return sum[best] / max(most, 1.0);
+  }
+
+  vec3 wash(vec2 px) {
+    vec3 best = at(px);
+    float calm = 1e9;
+    for (int k = 0; k < 4; k++) {
+      vec2 dir = vec2(k == 1 || k == 3 ? 1.0 : -1.0, k >= 2 ? 1.0 : -1.0);
+      vec3 m = vec3(0.0), s = vec3(0.0);
+      float n = 0.0;
+      for (int y = 0; y <= 4; y++) {
+        for (int x = 0; x <= 4; x++) {
+          if (float(x) > uStyleR || float(y) > uStyleR) continue;
+          vec3 c = at(px + dir * vec2(float(x), float(y)));
+          m += c;
+          s += c * c;
+          n += 1.0;
+        }
+      }
+      m /= n;
+      vec3 v = abs(s / n - m * m);
+      float spread = v.r + v.g + v.b;
+      if (spread < calm) { calm = spread; best = m; }
+    }
+    return best * (1.0 - uWashEdge * 0.45 * smoothstep(0.002, 0.03, calm));
+  }
+
+  void main() {
+    vec2 px = floor(gl_FragCoord.xy);
+    vec3 orig = at(px);
+    vec3 c = uStyle < 1.5 ? paint(px) : wash(px);
+    gl_FragColor = vec4(mix(orig, c, uStyleMix), 1.0);
+  }
+`;
+
+// The ghost trail (the stages): this frame's scene over the trail so far, the older
+// part fading by uGhostKeep a frame. Kept in half floats, so faint trails fade out
+// instead of sticking on a palette color.
+const ghostShader = /* glsl */ `
+  uniform sampler2D tScene;
+  uniform sampler2D tGhost;
+  uniform vec2 resolution;
+  uniform float uGhostKeep;
+  void main() {
+    vec2 uv = gl_FragCoord.xy / resolution;
+    gl_FragColor = vec4(mix(textureLod(tScene, uv, 0.0).rgb, textureLod(tGhost, uv, 0.0).rgb, uGhostKeep), 1.0);
   }
 `;
 
@@ -317,9 +539,49 @@ export function createPixelPass() {
     uLetterbox: { value: 0 },
     uInk: { value: 0 },
     uCycle: { value: 0 },
+    uGrad: { value: 0 },
+    uGradA: { value: 0 },
+    uGradB: { value: 6 },
+    uGradC: { value: 8 },
+    uFlicker: { value: 0 },
+    uFlickerMode: { value: 0 },
+    uFeedMode: { value: 6 },
+    uWarpMode: { value: 0 },
+    uWarpMix: { value: 1 },
+    uInkMode: { value: 0 },
+    uInvertMode: { value: 0 },
+    uScanBlend: { value: 3 },
+    uGradMode: { value: 0 },
+    tScene: { value: null },
+    tSceneMip: { value: null },
+    tGhost: { value: null },
+    uGhost: { value: 0 },
+    uGhostKeep: { value: 0.9 },
+    uGhostMode: { value: 0 },
+    uBlur: { value: 0 },
+    uInvProj: { value: new THREE.Matrix4() },
+    uPrevFromView: { value: new THREE.Matrix4() },
+    uGlow: { value: 0 },
+    uGlowSize: { value: 2 },
+    uGlowCut: { value: 0.2 },
+    uGlowMode: { value: 1 },
+    uStyle: { value: 0 },
+    uStyleR: { value: 3 },
+    uStyleMix: { value: 1 },
+    uPaintAngle: { value: 0 },
+    uPaintAspect: { value: 1 },
+    uWashEdge: { value: 0 },
   };
-  const material = new THREE.ShaderMaterial({ uniforms, vertexShader, fragmentShader, depthTest: false, depthWrite: false });
-  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+  // One uniforms object for every stage (each reads what it needs).
+  const make = (shader, defines = {}) => new THREE.ShaderMaterial({ uniforms, vertexShader, fragmentShader: shader, defines, depthTest: false, depthWrite: false });
+  const materials = {
+    single: make(fragmentShader),
+    scene: make(fragmentShader, { SCENE_ONLY: '' }),
+    style: make(styleShader),
+    ghost: make(ghostShader),
+    final: make(fragmentShader, { SCENE_TEX: '' }),
+  };
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), materials.single);
   quad.frustumCulled = false;
   const scene = new THREE.Scene();
   scene.add(quad);
@@ -336,5 +598,8 @@ export function createPixelPass() {
     uniforms.paletteSize.value = Math.min(hexes.length, MAX_COLORS);
   }
 
-  return { scene, camera, uniforms, setPalette };
+  /** Which stage the next render of `scene` draws: single (all in one), scene, style, ghost, final. */
+  function use(stage) { quad.material = materials[stage]; }
+
+  return { scene, camera, uniforms, setPalette, materials, use };
 }

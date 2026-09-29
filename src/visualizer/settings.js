@@ -2,10 +2,11 @@
 // dialog. This module owns the values, their storage and the dialog; main.js decides
 // what a change does (bindSettings' onChange).
 //
-// The dialog is in tabs (Sound, Show, Blade, Look, Camera, Fireflies, Title Cards,
-// Setups). "Simple" shows the settings that matter most; "All settings" shows every one
-// (the rest carry `adv`). Every setting has a hint: hover or focus its "?" to read what
-// it does. Presets set many at once for a kind of night; setups are your own saved
+// The dialog is in tabs (Sound, Show, Blade, Look, Effects, Camera, Fireflies, Title
+// Cards, Setups). "Simple" shows the settings that matter most; "All settings" shows
+// every one (the rest carry `adv`). Every setting has a hint: hover or focus its "?" to
+// read what it does. Every effect has a three-way switch: off, in the mix (it comes and
+// goes), always. Presets set many at once for a kind of night; setups are your own saved
 // snapshots (and can be exported to a file and imported on another computer).
 import { esc } from '../html.js';
 import { elements } from '../elements.js';
@@ -13,7 +14,7 @@ import { MOVES } from '../bonfire/bladeMotion.js';
 import { DEFAULT_SETTINGS } from './director.js';
 import { SHOTS, SWING_CAMS, HOLD_CAMS, TRANSITIONS } from './camera.js';
 import { SWING_EASES } from './cameraEase.js';
-import { LOOKS, DROP_FX, MIRRORS, MODIFIER_MODES } from './looks.js';
+import { LOOKS, DROP_FX, LAYERS, MIRRORS, MODES, modeOf } from './looks.js';
 import { FLY_MOVES } from './fireflyMoves.js';
 import { COLOR_MODES, COLOR_SCHEMES } from './colors.js';
 import { BAR_OPTIONS, RANDOMIZABLE, RANDOM, rollable } from './bars.js';
@@ -32,9 +33,14 @@ const PAGE_DEFAULTS = {
   cards: [],          // more title cards: [{ title, subtitle, show: drops | phrases | manual }]
 };
 // Switch groups (one checkbox each): a saved group keeps only the switches that still exist.
-const GROUPS = ['elements', 'looks', 'moves', 'flyMoves', 'dropFx', 'mirrors'];
+const GROUPS = ['elements', 'moves', 'flyMoves', 'mirrors'];
 // Groups that always keep at least one switch on.
-const AT_LEAST_ONE = new Set(['elements', 'looks', 'moves', 'flyMoves', 'mirrors']);
+const AT_LEAST_ONE = new Set(['elements', 'moves', 'flyMoves', 'mirrors']);
+// Effect switches (off | mix | on): groups with one per effect, and single ones.
+const MODE_GROUPS = ['looks', 'dropFx'];
+const MODE_KEYS = new Set(['sparks', 'echo', 'punch', 'temperature', 'breathe', 'blackout', 'flash', 'sceneColors', ...Object.keys(LAYERS)]);
+// (Ember is the clean fire: taking turns, or not. "Always" would add nothing.)
+const NO_ALWAYS = { looks: ['ember'] };
 const NUMERIC = new Set(['sensitivity', 'offset', 'volume', 'reactivity', 'phraseBars', 'ringBars', 'cutBars', 'pixelSize', 'glitch', 'combos', 'comboBars', 'lookBars', 'flyBars', 'dropCount', 'linkPort']);
 // What a setup (or a preset) never changes: this computer's own things.
 const LOCAL = ['deviceId', 'volume', 'view'];
@@ -44,14 +50,28 @@ const cleanCards = (v) => (Array.isArray(v) ? v.filter((c) => c && typeof c.titl
   title: c.title.slice(0, 60), subtitle: typeof c.subtitle === 'string' ? c.subtitle.slice(0, 90) : '', show: CARD_SHOWS[c.show] ? c.show : 'drops',
 })) : []);
 
-/** `saved` over `out` (in place): known keys of the right type only. */
+/**
+ * `saved` over `out` (in place): known keys of the right type only. Effect switches saved
+ * as on/off (before they had three settings) come back as always/off; a look or drop hit
+ * that was switched on comes back in the mix (as they were: taking turns, drawn at random).
+ */
 function mergeInto(out, saved) {
   for (let [k, v] of Object.entries(saved ?? {})) {
     if (!(k in out)) continue;
-    // (Scanlines and the mirror were on/off switches before they joined the looks' mix.)
+    // (Scanlines and the mirror were on/off switches before they joined the looks' mix.
+    // The scenery recolor's old "off" was its default, back when it only worked with made
+    // palettes: it takes the new default.)
     if ((k === 'scanlines' || k === 'mirror') && typeof v === 'boolean') v = v ? 'on' : 'mix';
+    if (k === 'sceneColors' && v === false) continue;
     if (k === 'cards') out.cards = cleanCards(v);
     else if (GROUPS.includes(k)) { for (const id of Object.keys(out[k])) if (typeof v?.[id] === 'boolean') out[k][id] = v[id]; }
+    else if (MODE_GROUPS.includes(k)) {
+      for (const id of Object.keys(out[k])) {
+        if (v?.[id] === undefined) continue;
+        const m = modeOf(v[id], 'mix');
+        out[k][id] = m === 'on' && NO_ALWAYS[k]?.includes(id) ? 'mix' : m;
+      }
+    } else if (MODE_KEYS.has(k)) { if (typeof v === 'boolean' || MODES.some(([id]) => id === v)) out[k] = modeOf(v); }
     else if (typeof v === typeof out[k] || (v === RANDOM && RANDOMIZABLE.includes(k))) out[k] = v;
   }
   return out;
@@ -78,20 +98,29 @@ export function resetSettings(settings) {
 // --- presets: many settings at once, for a kind of night ------------------------------------
 export const PRESETS = {
   chill: {
-    name: 'Chill', hint: 'Slow and warm: drifting camera, soft looks, no flashes. Lounges, warm-ups, long sets.',
-    values: { reactivity: 0.8, glitch: 0.4, camera: 'drift', combos: 16, phraseBars: 32, ringBars: 0, flash: false, dropCount: 1, punch: false, mirror: 'off', lookBars: 32, blackout: false },
+    name: 'Chill', hint: 'Slow and warm: drifting camera, soft looks and layers (glow, ghosting, paint), no flashes. Lounges, warm-ups, long sets.',
+    values: {
+      reactivity: 0.8, glitch: 0.4, camera: 'drift', combos: 16, phraseBars: 32, ringBars: 0, flash: 'off', dropCount: 1, punch: 'off', mirror: 'off', lookBars: 32, blackout: 'off',
+      blend: 'mix', ghost: 'mix', glow: 'mix', gradient: 'mix', paint: 'mix', wash: 'mix', blur: 'off', flicker: 'off',
+    },
   },
   club: {
-    name: 'Club', hint: 'The default balance: cuts on phrases, a swing every 8 bars, the full drop.',
-    values: { reactivity: 1.2, glitch: 1, camera: 'cuts', cutBars: 2, combos: 8, phraseBars: 16, ringBars: 4, flash: true, dropCount: 2, punch: true, mirror: 'mix', lookBars: 16, blackout: true },
+    name: 'Club', hint: 'The default balance: cuts on phrases, a swing every 8 bars, the full drop, every layer in the mix.',
+    values: {
+      reactivity: 1.2, glitch: 1, camera: 'cuts', cutBars: 2, combos: 8, phraseBars: 16, ringBars: 4, flash: 'on', dropCount: 2, punch: 'on', mirror: 'mix', lookBars: 16, blackout: 'on',
+      blend: 'mix', ghost: 'mix', glow: 'mix', gradient: 'mix', paint: 'mix', wash: 'mix', blur: 'mix', flicker: 'mix',
+    },
   },
   rave: {
-    name: 'Rave', hint: 'Everything, faster: cuts every bar, a swing every 4, strong looks and up to three drop hits.',
-    values: { reactivity: 1.6, glitch: 1.6, camera: 'cuts', cutBars: 1, combos: 4, phraseBars: 8, ringBars: 2, flash: true, dropCount: 3, punch: true, mirror: 'mix', scanlines: 'mix', lookBars: 8, blackout: true },
+    name: 'Rave', hint: 'Everything, faster: cuts every bar, a swing every 4, strong looks, new blend modes every look and up to three drop hits.',
+    values: {
+      reactivity: 1.6, glitch: 1.6, camera: 'cuts', cutBars: 1, combos: 4, phraseBars: 8, ringBars: 2, flash: 'on', dropCount: 3, punch: 'on', mirror: 'mix', scanlines: 'mix', lookBars: 8, blackout: 'on',
+      blend: 'on', ghost: 'mix', glow: 'mix', gradient: 'mix', paint: 'mix', wash: 'mix', blur: 'mix', flicker: 'mix',
+    },
   },
   safe: {
-    name: 'Low Flash', hint: 'For sensitive rooms and big screens: no negative flashes or blackouts, gentle looks, glides between shots.',
-    values: { flash: false, blackout: false, glitch: 0.5, punch: false, dropCount: 1, cutBars: 4, transition: 'glide' },
+    name: 'Low Flash', hint: 'For sensitive rooms and big screens: no negative flashes, blackouts or flicker, gentle looks, glides between shots.',
+    values: { flash: 'off', blackout: 'off', flicker: 'off', glitch: 0.5, punch: 'off', dropCount: 1, cutBars: 4, transition: 'glide' },
   },
 };
 /** Apply a preset's values (the device, volume and the dialog's view are kept). */
@@ -153,8 +182,41 @@ const select = (key, label, opts, { hint = '', adv = false } = {}) => {
   </label>`;
 };
 
+// Effect switches: Off / In the mix / Always.
+const MIX_HINT = 'In the mix: it comes and goes, rolled again each time the look changes. Always: on the whole time.';
+/** One effect's switch (a select, like any other). */
+const mode = (key, label, { hint = '', adv = false } = {}) => select(key, label, MODES, { hint: `${hint} ${MIX_HINT}`.trim(), adv });
+/**
+ * A grid of effect switches: `items` are [settings key, name, hint?]. Keys may point into
+ * a group ("looks.glitch"); `noAlways` lists keys that only take off and in the mix.
+ */
+const modeGrid = (label, items, { hint = '', adv = false, noAlways = [] } = {}) => {
+  const t = tip(hint);
+  return `
+  <div${advAttr(adv)}>
+    <p class="viz-field-label">${label} ${t.mark}</p>
+    <div class="viz-modes">${items.map(([key, name, itemHint]) => {
+      const it = tip(itemHint);
+      return `<label class="viz-mode"><span>${esc(name)}</span>${it.mark}<select data-set="${key}" aria-label="${esc(name)}"${it.ref}>${MODES.filter(([v]) => v !== 'on' || !noAlways.includes(key)).map(([v, text]) => `<option value="${v}">${esc(text)}</option>`).join('')}</select></label>`;
+    }).join('')}</div>
+  </div>`;
+};
+const LAYER_HINTS = {
+  scanlines: 'CRT-style lines over the picture: dark, light or contrast lines.',
+  mirror: 'The picture folded onto itself (the kinds below). M switches live.',
+  blend: 'The layers blend in new ways each look: echoes in screen or difference, ink in overlay, a kaleidoscope ghosted over the plain picture… Off: each keeps its classic way.',
+  ghost: 'Everything that moves leaves a fading trail.',
+  blur: 'The camera’s moves smear the picture: whips, shakes and zoom punches.',
+  glow: 'Light spills from the bright parts, swelling on the kicks.',
+  gradient: 'The picture recolored by brightness through three palette colors (the fire’s, the stone’s, or any three).',
+  paint: 'The picture repainted in brush strokes, their size and direction new each time.',
+  wash: 'The picture washed into flat watercolor patches, pigment pooling at the edges.',
+  flicker: 'The light dips on the beat, a dark band rolls down, film jitters, or it wavers like a candle. Kept faint; off with the Low Flash preset.',
+};
+const effectItems = (group, names) => Object.entries(names).map(([id, name]) => [`${group}.${id}`, name]);
+
 const TABS = [
-  ['sound', 'Sound'], ['show', 'Show'], ['blade', 'Blade'], ['look', 'Look'],
+  ['sound', 'Sound'], ['show', 'Show'], ['blade', 'Blade'], ['look', 'Look'], ['effects', 'Effects'],
   ['camera', 'Camera'], ['flies', 'Fireflies'], ['titles', 'Title Cards'], ['setups', 'Presets & Setups'],
 ];
 
@@ -209,22 +271,22 @@ export function settingsMarkup(settings, keys) {
           <legend>Reaction</legend>
           ${range('reactivity', 'Reactivity', 0, 2, 0.05, { unit: '×', hint: 'How hard the fire answers the music: how high it jumps, how bright it flares.' })}
           ${select('particles', 'Particles', [['normal', 'As on the site'], ['more', 'More'], ['max', 'Most (a strong GPU)']], { hint: 'How many particles each effect uses. More looks richer but needs a stronger graphics card. Changing it restarts the scene.', adv: true })}
-          ${check('sparks', 'Hi-hats throw sparks', { hint: 'Each hi-hat throws a few sparks up out of the fire.', adv: true })}
+          ${mode('sparks', 'Hi-Hat Sparks', { hint: 'Each hi-hat throws a few sparks up out of the fire.', adv: true })}
         </fieldset>
         <fieldset>
           <legend>Weapons</legend>
           ${check('autoDrops', 'Forge in breakdowns, strike on the drop', { hint: 'When the bass drops out, a new weapon is forged over the fire and held; when the drop hits, it slams in.' })}
           ${select('phraseBars', 'New Weapon Every', barOptions('phraseBars'), { hint: 'Swap the weapon, colors and element on a phrase, landing exactly on its first beat. Random picks one of these intervals each time.' })}
           ${select('ringBars', 'Extra Ring Every', barOptions('ringBars'), { hint: 'The element’s ring races across the ground on the bar, with no swap.', adv: true })}
-          ${check('echo', 'The blade’s outline echoes on the bar', { hint: 'An outline of the planted weapon bursts out of it on each bar.', adv: true })}
+          ${mode('echo', 'Blade Outline Echo', { hint: 'An outline of the planted weapon bursts out of it on each bar.', adv: true })}
           ${checks('elements', 'Elements', Object.fromEntries(Object.keys(settings.elements).map((id) => [id, elements[id]?.name ?? id])), { hint: 'Which elements new weapons can bring: fire, lightning (a tesla ball) or ice (crystals).' })}
         </fieldset>
         <fieldset data-adv>
           <legend>Feel</legend>
-          ${check('temperature', 'Bright music cools the colors', { hint: 'Strong highs tint the picture cooler; heavy lows tint it warmer. Subtle.' })}
-          ${check('breathe', 'The sub-bass makes it breathe', { hint: 'The fire and the view swell slowly with the low end.' })}
+          ${mode('temperature', 'Color Temperature', { hint: 'Bright music cools the colors: strong highs tint the picture cooler, heavy lows warmer. Subtle.' })}
+          ${mode('breathe', 'Sub-Bass Breathing', { hint: 'The fire and the view swell slowly with the low end.' })}
           ${check('stages', 'Build-ups climb in stages', { hint: 'A build-up adds a notch every quarter of the way: pulses, a look burst, a ring, then sparks and tremors.' })}
-          ${check('blackout', 'A black beat before the drop', { hint: 'After a build-up, the screen goes black for a split second and the drop lands out of it. Off with the Low Flash preset.' })}
+          ${mode('blackout', 'Black Beat Before the Drop', { hint: 'After a build-up, the screen goes black for a split second and the drop lands out of it. Off with the Low Flash preset.' })}
           ${check('budget', 'Effects follow the song’s shape', { hint: 'Calm in intros and breakdowns, busy in the groove, everything in the bars after a drop. Off: always as busy as the settings allow.' })}
         </fieldset>`)}
 
@@ -247,20 +309,31 @@ export function settingsMarkup(settings, keys) {
           <legend>Colors</legend>
           ${select('colors', 'New Colors', options(COLOR_MODES), { hint: 'Where each new weapon’s colors come from: the site’s palettes, ones made to go together, fully random ones, or a mix. P switches live.' })}
           ${select('scheme', 'Harmony', options(COLOR_SCHEMES), { hint: 'For made palettes: how their colors relate (next to each other on the color wheel, opposite, …).', adv: true })}
-          ${check('sceneColors', 'Recolor the scenery with made palettes', { hint: 'Made palettes bring stone and shadow colors of their own, not just the fire’s.', adv: true })}
+          ${select('sceneColors', 'Recolor the Scenery', [['off', 'Off'], ['mix', 'With some flames'], ['on', 'With every flame']], { hint: 'As a new flame lands, the stone, wood, shadows and background blend to colors made for it on the spot, around its hue or any hue, a new set every time, whatever palette it came from. Off: the site’s own scenery.' })}
         </fieldset>
         <fieldset>
-          <legend>Rave Looks</legend>
-          ${range('glitch', 'Effects Strength', 0, 2, 0.05, { unit: '×', hint: 'How strong the picture effects (the looks) are. They take turns: a new one every few bars and after each drop. 0 = a clean picture.' })}
-          ${checks('looks', 'Looks', LOOKS, { hint: 'The picture effects that can take a turn.', adv: true })}
-          ${select('lookBars', 'New Look Every', barOptions('lookBars'), { hint: 'How often the look changes (always after a drop too).', adv: true })}
-          ${select('scanlines', 'Scanlines', MODIFIER_MODES, { hint: 'CRT-style lines over the picture: with some looks, always, or never.', adv: true })}
-          ${select('mirror', 'Mirror', MODIFIER_MODES, { hint: 'The picture folded onto itself: with some looks, always, or never. M switches live.', adv: true })}
-          ${checks('mirrors', 'Mirror Kinds', MIRRORS, { hint: 'Which ways the mirror may fold: left–right, top–bottom, or into quarters.', adv: true })}
-          ${check('flash', 'Negative flash on drops', { hint: 'The picture inverts for an instant when the drop hits (at most once every 2 seconds).' })}
-          ${checks('dropFx', 'Drop Hits', DROP_FX, { hint: 'The extra effects a drop can throw, drawn at random.', adv: true })}
-          ${select('dropCount', 'Hits per Drop', [['1', 'One'], ['2', 'Up to two'], ['3', 'Up to three']], { hint: 'How many drop hits land at once.', adv: true })}
+          <legend>Picture</legend>
+          ${range('glitch', 'Effects Strength', 0, 2, 0.05, { unit: '×', hint: 'How strong every picture effect is (the looks and the layers in the Effects tab). 0 = a clean picture.' })}
           ${select('pixelSize', 'Pixel Size', [['2', '2 px (fine)'], ['3', '3 px'], ['4', '4 px (the site)'], ['6', '6 px (chunky)'], ['8', '8 px']], { hint: 'How big each pixel of the picture is. Bigger is chunkier and lighter on the graphics card.', adv: true })}
+        </fieldset>`)}
+
+      ${panel('effects', `
+        <fieldset class="viz-span">
+          <legend>Rave Looks</legend>
+          <p class="viz-help">Every effect is Off, In the mix (it comes and goes: looks take turns, the rest are rolled again with each look, each time with new details), or Always.</p>
+          ${modeGrid('Looks', effectItems('looks', LOOKS), { hint: 'The picture’s styles. In the mix they take turns, a new one every few bars and after each drop; Always stays on under whichever look is taking its turn.', noAlways: ['looks.ember'] })}
+          ${select('lookBars', 'New Look Every', barOptions('lookBars'), { hint: 'How often the look changes, and the mix is rolled again (always after a drop too).', adv: true })}
+        </fieldset>
+        <fieldset class="viz-span">
+          <legend>Layers</legend>
+          ${modeGrid('Over Any Look', Object.entries(LAYERS).map(([k, name]) => [k, name, LAYER_HINTS[k]]), { hint: 'Effects laid over whatever look is playing. In the mix, at most two of the heavier ones come in at once.' })}
+          ${checks('mirrors', 'Mirror Kinds', MIRRORS, { hint: 'Which ways the mirror may fold: left–right, top–bottom, or into quarters.', adv: true })}
+        </fieldset>
+        <fieldset class="viz-span">
+          <legend>Drops</legend>
+          ${mode('flash', 'Negative Flash', { hint: 'The picture inverts for an instant when the drop hits (at most once every 2 seconds).' })}
+          ${modeGrid('Drop Hits', effectItems('dropFx', DROP_FX), { hint: 'The extra effects a drop throws. In the mix: drawn at random; Always: every drop.', adv: true })}
+          ${select('dropCount', 'Hits per Drop', [['1', 'One'], ['2', 'Up to two'], ['3', 'Up to three']], { hint: 'How many drop hits land at once (hits set to Always come on top when there are more of them).', adv: true })}
         </fieldset>`)}
 
       ${panel('camera', `
@@ -272,7 +345,7 @@ export function settingsMarkup(settings, keys) {
           ${select('swingCam', 'Blade Out', options(SWING_CAMS, ['mix', 'A mix, changing mid-move']), { hint: 'How the camera covers the blade while it fights: close angles, following it, riding on it, tracking or orbiting.', adv: true })}
           ${select('swingEase', 'Blade Camera Feel', options(Object.fromEntries(Object.entries(SWING_EASES).map(([k, e]) => [k, `${e.name}: ${e.hint}`])), ['mix', 'A mix, changing between combo moves']), { hint: 'How the camera moves while it covers the blade: an even lag, a spring, a hand-held bounce, a heavy crane or a snap.', adv: true })}
           ${select('holdCam', 'Held Blade', options(HOLD_CAMS, ['mix', 'A mix']), { hint: 'How the camera frames a blade held over the fire, waiting for the drop.', adv: true })}
-          ${check('punch', 'Zoom punch on kicks, shake on big hits', { hint: 'The view punches in a little on each kick and shakes on drops and impacts.' })}
+          ${mode('punch', 'Zoom Punch & Shake', { hint: 'The view punches in a little on each kick and shakes on drops and impacts.' })}
           ${select('shot', 'Starting Shot', Object.entries(SHOTS).map(([k, s]) => [k, s.name]), { hint: 'The shot it starts on (and stays on with a still camera).', adv: true })}
         </fieldset>`)}
 

@@ -496,7 +496,9 @@ the site links to it from its *Bonfire Live* project. Design notes: `docs/visual
 - **Colors** (`colors.js`): each new flame is one of the site's palettes, or one made on
   the spot with the admin's palette generator (`src/paletteGen.js`): harmonious (any
   scheme, or the one picked) or fully random, named for its hue ("Cobalt Lightning").
-  Made palettes can recolor the scenery too, blending in as the flame lands.
+  Any flame can recolor the scenery too (off, with some flames, with every flame): the
+  stone, wood, shadows and background blend to colors made for it as it lands, a new set
+  each time.
 - **Looks** (`looks.js`): the picture's effects take turns, a new one every 16 bars and
   after each drop, each with its own burst for the big hits:
   - **Ember:** clean.
@@ -511,18 +513,25 @@ the site links to it from its *Bonfire Live* project. Design notes: `docs/visual
   - **Haze:** rows shimmering like heat over the fire.
   - **Prism:** the colors splitting apart on every beat.
 
-  Each time a look comes round it rolls its own details (the echo's direction, the
-  spiral's turn) and, when they're *in the mix*, a mirror and scanlines (thin, thick or
-  columns); set to *always*, they stay on and change style with the look. Mirrors come
-  in three kinds, each switchable: horizontal (either half copied onto the other),
-  vertical (the top reflected down like a pool, or the bottom up) and quarter (one
-  quarter, four ways). Every drop also throws one to three **drop
-  hits**, never the same set twice running: shatter, shockwaves, an echo burst, a spiral,
-  a kaleidoscope, mirror flips, a color cycle, an RGB burst, a crunch, an iris snap, a
-  letterbox slam, an ink flash. Plus the negative flash on drops (at most one every 2 s).
-  Breakdowns letterbox and close an iris around the fire as the build rises; the drop
-  snaps it open. It's all in the pixel pass before the palette, so every effect stays in
-  the scene's colors. Reduced motion turns the moving ones off.
+  **Every effect has one switch: off, in the mix, or always.** Looks in the mix take
+  turns; a look set to always stays on under whichever one is taking its turn. Layers go
+  over any look: scanlines (thin, thick or columns), a mirror, **blend modes** (echoes in
+  screen or difference, ink in overlay, a kaleidoscope ghosted over the plain picture…),
+  ghosting, motion blur, glow, a gradient map, painterly strokes, a watercolor wash and a
+  flicker. Each time a look comes round, the layers in the mix are rolled again (at most
+  two heavy ones at once), each with new details: the echo's direction, the glow's size,
+  the gradient's colors, the brush's angle. Mirrors come in three kinds, each switchable:
+  horizontal (either half copied onto the other), vertical (the top reflected down like
+  a pool, or the bottom up) and quarter (one quarter, four ways). Every drop also throws
+  **drop hits**: those set to always, plus one to three drawn from the mix, never the
+  same set twice running: shatter, shockwaves, an echo burst, a spiral, a kaleidoscope,
+  mirror flips, a color cycle, an RGB burst, a crunch, an iris snap, a letterbox slam,
+  an ink flash. Plus the negative flash on drops (at most one every 2 s). The director's
+  own effects (sparks, the blade's echo, the zoom punch, color temperature, breathing,
+  the pre-drop blackout) take the same three-way switch. Breakdowns letterbox and close
+  an iris around the fire as the build rises; the drop snaps it open. It's all in the
+  pixel pass before the palette, so every effect stays in the scene's colors. Reduced
+  motion turns the moving ones off.
 
 **Keys:** `Space` drop (strike the held blade, or recolor now) · `A` forge and hold ·
 `B` swap on the beat · `R` ring · `X` the blade leaves the fire · `G` burst the look ·
@@ -538,9 +547,9 @@ rings fire, which elements are drawn; the living blade (how often and how long i
 its moves, rhythm, and whether it's alive); colors (the mode, the harmony scheme, the
 scenery); fireflies (their moves and how often they change); the camera (mode, cut
 length, transitions, how it covers the blade out and held, zoom punch, shot, pixel
-size); effects amount, which looks take turns and how often, scanlines and mirror (off,
-in the mix, always) and which kinds of mirror, the negative flash, which drop hits and
-how many; and a
+size); effects amount and, in the Effects tab, every look, layer and drop hit (off, in
+the mix, always), how often the look changes, which kinds of mirror, the negative
+flash, how many drop hits; and a
 title card (a DJ name in the site's checkpoint band, shown when the music starts and
 on drops).
 

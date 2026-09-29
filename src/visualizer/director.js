@@ -33,10 +33,13 @@
 //             and every bar right after a drop, by a cut, a whip pan or a glide; a zoom
 //             punch on each kick (camera.js).
 //   looks     the picture's effects take turns (looks.js), a new one every 16 bars and
-//             after each drop, with a mirror and scanlines in the mix; each has its own
-//             burst for the big hits, and every drop throws a few more drawn at random.
-//             Breakdowns letterbox and close an iris around the fire as the build rises;
-//             the drop snaps it open.
+//             after each drop, with layers coming and going over them (mirror,
+//             scanlines, ghosting, glow, a gradient map, a repaint…, each blending its
+//             own way); each has its own burst for the big hits, and every drop throws a
+//             few more drawn at random. Breakdowns letterbox and close an iris around the
+//             fire as the build rises; the drop snaps it open.
+//   switches  every effect is off, in the mix, or always (looks.js MODES). In the mix it
+//             comes and goes: each look's turn re-rolls which are on (looks.active).
 //   colors    each new flame is one of the site's palettes, or one made on the spot
 //             (colors.js), maybe with new scenery colors to match.
 //   feel      bright music (strong highs) cools the picture and dark music warms it
@@ -52,7 +55,7 @@ import { effects } from '../effects.js';
 import { MOVES } from '../bonfire/bladeMotion.js';
 import { createFireflyShow } from './fireflyShow.js';
 import { createFireflyMoves, FLY_MOVES } from './fireflyMoves.js';
-import { createLooks, LOOKS, DROP_FX, MIRRORS } from './looks.js';
+import { createLooks, LOOKS, DROP_FX, LAYERS, MIRRORS } from './looks.js';
 import { createCamera, CLOSE, WIDE, COMBO_SHOTS, SWING_CAMS, HOLD_CAMS } from './camera.js';
 import { SWING_EASES } from './cameraEase.js';
 import { createBarClock } from './bars.js';
@@ -61,20 +64,22 @@ import { SCENERIES } from '../bonfire/scenery.js';
 import { approach, pick, TAU } from '../math.js';
 
 const all = (names) => Object.fromEntries(Object.keys(names).map((k) => [k, true]));
+const every = (mode, names) => Object.fromEntries(Object.keys(names).map((k) => [k, mode]));
 
+// Effect switches take a mode: 'off' | 'mix' (comes and goes, re-rolled each look) | 'on'.
 export const DEFAULT_SETTINGS = {
   sensitivity: 1,       // onset thresholds (higher catches softer kicks)
   reactivity: 1.2,      // how hard the fire answers
   offset: 40,           // ms: beats this early, for render/display latency
   particles: 'more',    // normal | more | max
-  sparks: true,         // hats throw sparks
+  sparks: 'on',         // hats throw sparks
   blink: true,          // fireflies blink and move on the beat
   flyMoves: all(FLY_MOVES),
   flyBars: 8,           // a new firefly move every N bars
   autoDrops: true,      // forge in breakdowns, strike on the drop
   phraseBars: 16,       // a new weapon every N bars (0: only on drops)
   ringBars: 4,          // an extra ring every N bars (0: never)
-  echo: true,           // the blade's silhouette echoes out on every bar
+  echo: 'on',           // the blade's silhouette echoes out on every bar
   combos: 8,            // the blade leaves the fire every N bars (0: only after drops, -1: never)
   comboBars: 0,         // bars it stays out (0: 1, 2 or sometimes 4)
   moves: all(MOVES),
@@ -82,29 +87,28 @@ export const DEFAULT_SETTINGS = {
   alive: true,          // flourishes, a shudder on hard beats, a held blade's sway
   colors: 'site',       // site | harmonious | wild | mix (colors.js)
   scheme: 'auto',
-  sceneColors: false,   // made palettes bring scenery colors of their own
+  sceneColors: 'mix',   // a new flame brings scenery colors of its own (mix: some flames)
   camera: 'cuts',       // still | drift | cuts
   cutBars: 2,
   transition: 'mix',    // cut | whip | glide | mix
   swingCam: 'mix',      // how the camera covers the blade out of the fire (camera.js SWING_CAMS)
   swingEase: 'mix',     // ...and how it eases while it does (cameraEase.js SWING_EASES; mix: per combo, now and then per move)
   holdCam: 'mix',       // ...and a blade held for the drop (HOLD_CAMS)
-  punch: true,          // zoom punch on kicks, shake on the big hits
+  punch: 'on',          // zoom punch on kicks, shake on the big hits
   shot: 'clearing',
   glitch: 1,            // 0..2: how strong the looks' effects are
-  looks: all(LOOKS),
+  looks: every('mix', LOOKS), // mix: takes turns; on: always, under the one taking its turn
   lookBars: 16,         // a new look every N bars (0: only after drops)
-  scanlines: 'mix',     // off | mix (some looks) | on
-  mirror: 'mix',
+  ...every('mix', LAYERS), // scanlines, mirror, blend modes, ghosting, motion blur, glow, gradient map, painterly, watercolor, flicker
   mirrors: all(MIRRORS), // which kinds of mirror (horizontal, vertical, quarter)
-  flash: true,          // a negative flash on drops
-  temperature: true,    // bright music cools the picture, dark music warms it
-  breathe: true,        // the sub-bass makes the fire and the view swell
+  flash: 'on',          // a negative flash on drops
+  temperature: 'on',    // bright music cools the picture, dark music warms it
+  breathe: 'on',        // the sub-bass makes the fire and the view swell
   stages: true,         // build-ups climb in stages
-  blackout: true,       // a black frame of silence right before the drop
+  blackout: 'on',       // a black frame of silence right before the drop
   budget: true,         // effects follow the song's shape (calm intros, all-out after drops)
   scenery: 'ruins',     // where the fire burns: ruins | forge | shrine | mix (a new place every other big drop)
-  dropFx: all(DROP_FX),
+  dropFx: every('mix', DROP_FX), // mix: drawn at random; on: every drop
   dropCount: 2,         // up to this many drop hits at once
   elements: { fire: true, lightning: true, ice: true },
   title: '',
@@ -150,6 +154,9 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
   let beatCount = 0;
   const now = () => performance.now() / 1000;
   const moving = () => settings.camera !== 'still';
+  /** An effect switch is on right now (always, or in the mix and rolled on for this look). */
+  const on = (key) => looks.active(key, settings[key]);
+  const lookName = () => looks.playing.map((k) => LOOKS[k]).join(' + ');
 
   // --- choosing the next fire -----------------------------------------------------------
   const weaponKeys = drawnWeapons();
@@ -208,8 +215,8 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
   }
   /** The big-hit package: zoom punch, shake, the look's burst, fireflies scatter, maybe a negative flash. */
   function bang(amount = 1) {
-    if (settings.punch) { punch = Math.max(punch, 0.6 * amount); fire.shake(0.3 * amount); }
-    if (!reducedMotion) looks.bang(amount, { flash: settings.flash });
+    if (on('punch')) { punch = Math.max(punch, 0.6 * amount); fire.shake(0.3 * amount); }
+    if (!reducedMotion) looks.bang(amount, { flash: on('flash') });
     fire.fireflies?.dance(0.9 * amount, { dir: beatSign, lift: 0.6 * amount });
   }
   /** A drop's extra hits, drawn from those switched on. */
@@ -346,9 +353,9 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
 
     // Feel: brightness → color temperature, sub-bass → breathing.
     const bright = (b.highMid + b.high) / 2 - (b.bass + b.lowMid) / 2; // -1 (dark) … 1 (bright)
-    temp = approach(temp, settings.temperature ? Math.max(-1, Math.min(1, bright * 1.6)) * presence : 0, 1.5, dt);
+    temp = approach(temp, on('temperature') ? Math.max(-1, Math.min(1, bright * 1.6)) * presence : 0, 1.5, dt);
     g.temp = temp;
-    breath = approach(breath, settings.breathe ? b.bass * presence : 0, 0.45, dt);
+    breath = approach(breath, on('breathe') ? b.bass * presence : 0, 0.45, dt);
 
     // The budget: what the song's shape allows right now.
     const after = sinceDrop < 8 ? 1 - sinceDrop / 8 : 0; // the bars after a drop, fading
@@ -370,7 +377,7 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
         // one (a short cut coming back) throws a ring. After a build-up, a moment of
         // black comes first, and the drop lands out of it.
         const big = fire.holding || (settings.autoDrops && f.drop !== 'small');
-        if (big && settings.blackout && stage >= 2 && !reducedMotion) dropAt = now() + 0.09;
+        if (big && on('blackout') && stage >= 2 && !reducedMotion) dropAt = now() + 0.09;
         else if (big) strike();
         else if (settings.autoDrops) { ring(1); dropHits(); }
         stage = 0;
@@ -412,7 +419,7 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
         punch = Math.max(punch, s * (accent ? 1 : 0.6));
         windKick = Math.max(windKick, s);
         if (settings.blink) flyMoves.beat(s, accent, fire.fireflies, beatSign);
-        if (accent && settings.punch) fire.shake(0.05 * s);
+        if (accent && on('punch')) fire.shake(0.05 * s);
       } else if (low && fire.holding) {
         // No kick: the held blade still throbs on the beat, harder as it builds.
         fire.pulse(0.15 + 0.5 * f.build, { accent, blink: false });
@@ -426,7 +433,7 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
       punch = Math.max(punch, f.kick * 0.6);
     }
     if (f.hat) looks.hat(f.hat);
-    if (settings.sparks && f.hat) fire.sparkle(Math.round((4 + 8 * f.hat) * Math.min(1.5, settings.reactivity) * (0.4 + 0.6 * budget)));
+    if (on('sparks') && f.hat) fire.sparkle(Math.round((4 + 8 * f.hat) * Math.min(1.5, settings.reactivity) * (0.4 + 0.6 * budget)));
 
     // Continuous drive.
     d.level = r * (0.8 * b.bass + 0.5 * f.level - 0.3);
@@ -447,7 +454,7 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
       if (low && !wasLow) show.set('breathe');
       if (!low && wasLow && show.pattern === 'breathe') show.set(pick(GROOVE_SHOWS));
       if (!settings.flyMoves[flyMoves.move]) flyMoves.next(settings.flyMoves);
-      if (settings.sparks && f.hat) show.hat(f.hat, fl);
+      if (on('sparks') && f.hat) show.hat(f.hat, fl);
       const beatPos = period ? beatCount + (now() - beatAt) / period : now() * 2;
       show.update(fl, dt, { t: now(), beatPos, period, energy: f.level * presence, build, low, holding: fire.holding, cx: 0.02, cz: 0.02 });
       flyMoves.update(fl, { beatPos, period, energy: f.level * presence });
@@ -460,9 +467,9 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
     }
     wasLow = low;
 
-    // The look: its effects, and a breakdown's framing.
-    if (!settings.looks[looks.look]) looks.next(settings.looks);
-    looks.update(dt, { amt: reducedMotion ? 0 : settings.glitch * presence * (0.35 + 0.65 * budget), build, low, energy: f.level * presence, scanlines: settings.scanlines, mirror: settings.mirror, mirrors: settings.mirrors });
+    // The looks and layers: their effects, and a breakdown's framing.
+    looks.sync(settings.looks);
+    looks.update(dt, { amt: reducedMotion ? 0 : settings.glitch * presence * (0.35 + 0.65 * budget), build, low, energy: f.level * presence, modes: settings });
     // The scenery's colors, blending to a new palette's.
     if (colors.update(dt)) fire.refreshScene();
 
@@ -485,11 +492,11 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
       // The last stretch: sparks and tremors climbing with it.
       if (stage === 4) {
         if (Math.random() < dt * 12) fire.sparkle(3);
-        if (settings.punch && Math.random() < dt * 4) fire.shake(0.03);
+        if (on('punch') && Math.random() < dt * 4) fire.shake(0.03);
       }
     } else if (!low && dropAt < 0) stage = 0;
 
-    camera.update(dt, { period, punch, holding: fire.holding, build, breath: breath * (settings.breathe ? 1 : 0) });
+    camera.update(dt, { period, punch: on('punch') ? punch : 0, holding: fire.holding, build, breath: breath * (on('breathe') ? 1 : 0) });
   }
 
   function onBar(beat, period, f) {
@@ -508,7 +515,7 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
     if (groove && (sinceDrop === 2 || due(clock.bars('lookBars')))) {
       looks.next(settings.looks);
       clock.reroll('lookBars');
-      onEvent('look', { name: LOOKS[looks.look] });
+      onEvent('look', { name: lookName() });
     }
     // A synced swap asked for (manually or by the phrase timer) starts on this downbeat.
     if (pendingSync) {
@@ -531,7 +538,7 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
     if (groove && !fire.forging && !swapped && !comboed && beat.bar > 0) {
       const ringBars = clock.bars('ringBars');
       if (ringBars && beat.bar % ringBars === 0 && budget >= 0.45) { ring(0.6 + 0.6 * beat.strength); clock.reroll('ringBars'); }
-      else if (settings.echo && beat.strength > 0.2) fire.echo();
+      else if (on('echo') && beat.strength > 0.2) fire.echo();
     }
     // Cuts: every bar right after a drop, then every `cutBars`.
     if (settings.camera === 'cuts' && !fire.holding && !fire.swinging && !comboed && beat.bar > 0) {
@@ -548,8 +555,8 @@ export function createDirector(fire, { settings, onEvent = () => {}, reducedMoti
     ring,
     combo: () => comboSoon(lastPeriod),
     glitchHit,
-    nextLook() { looks.next(settings.looks); return LOOKS[looks.look]; },
-    get look() { return LOOKS[looks.look]; },
+    nextLook() { looks.next(settings.looks); return lookName(); },
+    get look() { return lookName(); },
     get flyMove() { return FLY_MOVES[flyMoves.move]; },
     forgeOnBeat,
     /** Cut to a shot or a rig (none: another shot). Returns its key. */

@@ -259,6 +259,18 @@ export function harmoniousScene(rng, { flames = [] } = {}) {
   return makeScene({ hue, accent, tint: 0.012 + rng() * 0.022, lightness: SCENE_KEYS.map(() => rng()) }, flames);
 }
 
+/**
+ * Scenery with real color (the visualizer's recolors): harmoniousScene's tinted neutrals
+ * two to four times stronger, around a hue that follows the flame's (`hue`: the same,
+ * next to it, opposite, a third of the way round) or any hue at all.
+ */
+export function vividScene(rng, { flames = [], hue } = {}) {
+  const turns = [0, 30, -30, 180, 120, -120];
+  const h = hue === undefined || rng() < 0.2 ? rng() * 360 : wrap(hue + turns[Math.floor(rng() * turns.length)] + (rng() - 0.5) * 20);
+  const accent = wrap(h + (rng() < 0.5 ? 180 : rng() < 0.5 ? 40 : -40) + (rng() - 0.5) * 30);
+  return makeScene({ hue: h, accent, tint: 0.035 + rng() * 0.05, lightness: SCENE_KEYS.map(() => rng()) }, flames);
+}
+
 /** Random hues and strengths for every scene color; lightness stays in order (the background darkest, bone lightest) so the site stays readable. */
 export function wildScene(rng, { flames = [] } = {}) {
   const scene = Object.fromEntries(SCENE_KEYS.map((k) => {

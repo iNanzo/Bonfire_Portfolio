@@ -331,8 +331,8 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
     framing.sy = approach(framing.sy, framing.toY, 0.5, dt);
     shown.pos.toArray(out.pos);
     shown.target.toArray(out.target);
-    // The zoom punch narrows the view for a moment on each kick.
-    out.fov = shown.fov * (1 - (settings.punch && !reducedMotion ? 0.09 * c.punch : 0));
+    // The zoom punch narrows the view for a moment on each kick (the director sends none when it's off).
+    out.fov = shown.fov * (1 - (reducedMotion ? 0 : 0.09 * c.punch));
     // Sub-bass breathing: the view swells in and out with the low end, slowly.
     if (!reducedMotion && c.breath) out.fov *= 1 - 0.035 * c.breath;
     out.roll = shown.roll;

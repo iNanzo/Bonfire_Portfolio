@@ -206,6 +206,13 @@ body.hud-off .viz-hud { display: none; }
 .viz-check:hover { color: var(--c-bone); }
 .viz-checks { display: flex; flex-wrap: wrap; gap: 8px 18px; }
 .viz-settings .viz-checks { margin-top: 6px; }
+/* Effect switches (Off / In the mix / Always), one per effect, in a grid. */
+.viz-modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 7px 20px; margin-top: 6px; }
+.viz-mode { display: flex; align-items: center; gap: 8px; font-size: 0.9375rem; color: var(--text-dim); }
+.viz-mode > span:first-child { flex: 1; min-width: 0; }
+.viz-mode:hover { color: var(--c-bone); }
+.viz .viz-mode select { flex: none; width: 8.4em; padding: 4px 6px; font-size: 0.875rem; }
+.viz-mode .viz-tip { flex: none; }
 
 .viz-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
 .viz-title-fields { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px 18px; }

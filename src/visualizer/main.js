@@ -26,7 +26,7 @@ import { esc } from '../html.js';
 import { createAnalyser, BAND_NAMES } from './analyser.js';
 import { createDirector } from './director.js';
 import { SHOTS } from './camera.js';
-import { MODIFIER_MODES } from './looks.js';
+import { MODES } from './looks.js';
 import { COLOR_MODES } from './colors.js';
 import { createDemo, DEMO_BPM } from './demo.js';
 import { bindSettings, loadSettings, resetSettings, saveSettings, settingsMarkup } from './settings.js';
@@ -595,7 +595,7 @@ const actions = {
     const modes = ['mix', 'on', 'off'];
     settings.mirror = modes[(modes.indexOf(settings.mirror) + 1) % modes.length];
     saveSettings(settings);
-    note(`Mirror: ${Object.fromEntries(MODIFIER_MODES)[settings.mirror]}`, 1.2);
+    note(`Mirror: ${Object.fromEntries(MODES)[settings.mirror]}`, 1.2);
   },
   settings: () => openSettings(),
   fullscreen: toggleFullscreen,

@@ -147,6 +147,21 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   });
   copyScene.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), copyMaterial), { frustumCulled: false }));
   [...feedbackRT, copyMaterial].forEach((r) => scope.own(r));
+  // The pass's stages for the visualizer's heavier effects (pixelPass.js): the scene drawn
+  // into its own image (mipmapped, for the glow), maybe repainted, and a ghost trail kept
+  // beside it in two buffers (one read, one written). Only drawn while such an effect is on.
+  const stageOpts = { type: THREE.HalfFloatType, depthBuffer: false };
+  const sceneRT = new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
+  const styleRT = new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, ...rtOpts });
+  const ghostRT = [0, 1].map(() => new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, ...rtOpts }));
+  let ghostFlip = 0;
+  let ghostLive = false;
+  // Motion blur compares each frame's camera with the last one's.
+  const lastViewProj = new THREE.Matrix4();
+  const viewProj = new THREE.Matrix4();
+  const lastCamPos = new THREE.Vector3(Infinity, 0, 0);
+  const lastCamQuat = new THREE.Quaternion();
+  [sceneRT, styleRT, ...ghostRT, ...Object.values(pass.materials)].forEach((r) => scope.own(r));
   scope.trackTree(copyScene);
   [colorRT, normalRT, fxRT, normalMaterial].forEach((r) => scope.own(r));
   scope.trackTree(pass.scene);
@@ -258,19 +273,32 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   const drive = { level: 0, brightness: 0, size: 0, height: 0, turbulence: 0, glow: 0, exposure: 0, windX: 0, windZ: 0 };
   // The pixel pass's effects layer (see pixelPass.js), all off on the site. `sliceSeed`
   // picks a tear pattern; the visualizer changes it with each hit.
+  // The layers and blend modes (the visualizer's looks.js) start at their classic ways:
+  // echoes lighten, glow adds, scanlines multiply, a warp replaces the picture.
   const glitch = {
     slice: 0, sliceSeed: 0, split: 0, block: 1, wave: 0, mirror: 0, scan: 0, scanMode: 0, noise: 0, invert: 0,
     feedback: 0, zoom: 1, feedRot: 0, kaleido: 0, kaleidoRot: 0, rippleR: 0, rippleAmp: 0, iris: 2, letterbox: 0, ink: 0, cycle: 0,
     temp: 0, blackout: 0,
+    ghost: 0, ghostKeep: 0.9, blur: 0, glow: 0, glowSize: 2, glowCut: 0.2, grad: 0, gradA: 0, gradB: 6, gradC: 8,
+    style: 0, styleR: 3, styleMix: 1, paintAngle: 0, paintAspect: 1, washEdge: 0, flicker: 0, flickerMode: 0,
+    feedMode: 6, ghostMode: 0, warpMode: 0, warpMix: 1, inkMode: 0, invertMode: 0, scanBlend: 3, glowMode: 1, gradMode: 0,
   };
   const GLITCH_UNIFORMS = {
     slice: 'uSlice', sliceSeed: 'uSliceSeed', split: 'uSplit', block: 'uBlock', wave: 'uWave', mirror: 'uMirror', scan: 'uScan', scanMode: 'uScanMode', noise: 'uNoise', invert: 'uInvert',
     feedback: 'uFeedback', zoom: 'uZoom', feedRot: 'uFeedRot', kaleido: 'uKaleido', kaleidoRot: 'uKaleidoRot', rippleR: 'uRippleR', rippleAmp: 'uRippleAmp', iris: 'uIris', letterbox: 'uLetterbox', ink: 'uInk', cycle: 'uCycle',
     temp: 'uTemp', blackout: 'uBlackout',
+    ghost: 'uGhost', ghostKeep: 'uGhostKeep', blur: 'uBlur', glow: 'uGlow', glowSize: 'uGlowSize', glowCut: 'uGlowCut', grad: 'uGrad', gradA: 'uGradA', gradB: 'uGradB', gradC: 'uGradC',
+    style: 'uStyle', styleR: 'uStyleR', styleMix: 'uStyleMix', paintAngle: 'uPaintAngle', paintAspect: 'uPaintAspect', washEdge: 'uWashEdge', flicker: 'uFlicker', flickerMode: 'uFlickerMode',
+    feedMode: 'uFeedMode', ghostMode: 'uGhostMode', warpMode: 'uWarpMode', warpMix: 'uWarpMix', inkMode: 'uInkMode', invertMode: 'uInvertMode', scanBlend: 'uScanBlend', glowMode: 'uGlowMode', gradMode: 'uGradMode',
   };
   const GLITCH_ENTRIES = Object.entries(GLITCH_UNIFORMS);
-  // Effects that are a still look rather than motion or flashing (kept under reduced motion).
-  const STILL = new Set(['mirror', 'scan', 'scanMode', 'block', 'letterbox', 'iris', 'zoom', 'temp']);
+  // Effects that are a still look rather than motion or flashing (kept under reduced motion):
+  // the framing, the palette's recolors and repaints, and how everything blends.
+  const STILL = new Set([
+    'mirror', 'scan', 'scanMode', 'block', 'letterbox', 'iris', 'zoom', 'temp',
+    'grad', 'gradA', 'gradB', 'gradC', 'style', 'styleR', 'styleMix', 'paintAngle', 'paintAspect', 'washEdge', 'glowSize', 'glowCut', 'ghostKeep', 'flickerMode',
+    'feedMode', 'ghostMode', 'warpMode', 'warpMix', 'inkMode', 'invertMode', 'scanBlend', 'glowMode', 'gradMode',
+  ]);
   const OFF = { iris: 2, zoom: 1, block: 1 };
   const boost = (v) => Math.max(0.1, 1 + v);
   // The site's hover on the fire (hoverAt, below): 1 while the cursor is on it, and eased,
@@ -833,8 +861,9 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     colorRT.setSize(w, h);
     normalRT.setSize(w, h);
     fxRT.setSize(w, h);
-    for (const rt of feedbackRT) rt.setSize(w, h);
+    for (const rt of [...feedbackRT, sceneRT, styleRT, ...ghostRT]) rt.setSize(w, h);
     feedbackLive = false;
+    ghostLive = false;
     pass.uniforms.resolution.value.set(w, h);
     canvas.style.width = `${(w * pd) / dpr}px`;
     canvas.style.height = `${(h * pd) / dpr}px`;
@@ -964,6 +993,56 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     return stale;
   }
 
+  /**
+   * The pass's stages, when an effect needs them (motion blur, ghosting, glow, a repaint):
+   * the scene into its own image, maybe repainted, the ghost trail stepped; then the final
+   * pass reads those. Otherwise the single pass does it all.
+   */
+  function renderStages() {
+    const u = pass.uniforms;
+    // Motion blur: this frame's view space → last frame's clip space. A cut (the camera
+    // jumping) starts over instead of smearing the whole frame.
+    camera.updateMatrixWorld();
+    viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    const cut = camera.position.distanceTo(lastCamPos) > 0.6 || camera.quaternion.angleTo(lastCamQuat) > 0.35;
+    u.uInvProj.value.copy(camera.projectionMatrixInverse);
+    u.uPrevFromView.value.multiplyMatrices(cut ? viewProj : lastViewProj, camera.matrixWorld);
+    lastViewProj.copy(viewProj);
+    lastCamPos.copy(camera.position);
+    lastCamQuat.copy(camera.quaternion);
+
+    const style = u.uStyle.value > 0.5 && u.uStyleMix.value > 0;
+    const ghost = u.uGhost.value > 0;
+    if (!style && !ghost && !(u.uGlow.value > 0) && !(u.uBlur.value > 0)) {
+      ghostLive = false;
+      pass.use('single');
+      return;
+    }
+    const draw = (stage, target) => {
+      pass.use(stage);
+      renderer.setRenderTarget(target);
+      renderer.render(pass.scene, pass.camera);
+    };
+    draw('scene', sceneRT);
+    u.tScene.value = sceneRT.texture;
+    u.tSceneMip.value = sceneRT.texture;
+    if (style) {
+      draw('style', styleRT);
+      u.tScene.value = styleRT.texture;
+    }
+    if (ghost) {
+      // A new trail starts as the scene itself.
+      const write = ghostRT[ghostFlip];
+      u.tGhost.value = ghostRT[1 - ghostFlip].texture;
+      if (!ghostLive) u.uGhostKeep.value = 0;
+      draw('ghost', write);
+      ghostFlip = 1 - ghostFlip;
+      ghostLive = true;
+      u.tGhost.value = write.texture;
+    } else ghostLive = false;
+    pass.use('final');
+  }
+
   function renderFrame(dt) {
     renderer.info.reset();
     const t = timer.getElapsed();
@@ -1018,6 +1097,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     renderer.clear();
     renderer.render(scene, camera);
 
+    renderStages();
     if (pass.uniforms.uFeedback.value > 0) {
       if (!feedbackLive) {
         for (const rt of feedbackRT) { renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 1); renderer.clear(); }

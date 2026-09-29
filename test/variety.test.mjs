@@ -1,11 +1,12 @@
-// The visualizer's variety: made palettes (colors.js), drop hits (looks.js) and firefly
-// moves (fireflyMoves.js).
+// The visualizer's variety: made palettes and recolored scenery (colors.js); looks, layers,
+// blend modes, drop hits and every effect's off / in the mix / always switch (looks.js);
+// firefly moves (fireflyMoves.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { base, flames } from '../src/palette.js';
 import { contrast } from '../src/contentRules.js';
 import { createColors, colorName } from '../src/visualizer/colors.js';
-import { createLooks, DROP_FX, MIRRORS } from '../src/visualizer/looks.js';
+import { createLooks, BLEND, DROP_FX, LAYERS, LOOKS, MIRRORS } from '../src/visualizer/looks.js';
 import { createFireflyMoves, FLY_MOVES } from '../src/visualizer/fireflyMoves.js';
 
 // colors.update() writes the page's CSS palette when a scenery blend ends.
@@ -49,18 +50,34 @@ test('site colors, arrow steps, and the mix', () => {
   assert.deepEqual([...kinds].sort(), ['made', 'site']);
 });
 
-test('recolored scenery blends in with a made palette and back out with a site one', () => {
-  const settings = { colors: 'harmonious', scheme: 'triadic', sceneColors: true };
+test('recolored scenery: any flame, new colors each landing, readable; off brings the site’s back', () => {
+  const settings = { colors: 'site', scheme: 'auto', sceneColors: 'on' };
   const colors = createColors(settings);
   const site = { ...base };
-  const key = colors.next('ember');
-  colors.landed(key);
-  for (let i = 0; i < 100; i++) colors.update(0.02);
-  assert.equal(base.void, flames[key].scene.void);
+  const settle = () => { while (colors.update(0.05)); };
+  const voids = new Set();
+  for (const key of ['ember', 'ember', Object.keys(flames).find((k) => k !== 'ember')]) {
+    colors.landed(key);
+    settle();
+    assert.ok(colors.scenery, `${key}: a site palette recolors the scenery too`);
+    assert.equal(base.void, colors.scenery.void);
+    assert.ok(contrast(flames[key].ramp[2], base.void) >= 4.5, 'the flame’s tips still read on the new background');
+    voids.add(base.void);
+  }
+  assert.equal(voids.size, 3, 'a new set every landing, even for the same flame');
   assert.notEqual(base.stone, site.stone);
+  settings.sceneColors = 'off';
   colors.landed('ember');
-  while (colors.update(0.05));
+  settle();
+  assert.equal(colors.scenery, null);
   assert.deepEqual({ ...base }, site);
+  settings.sceneColors = 'mix';
+  let recolored = 0;
+  for (let i = 0; i < 60; i++) { colors.landed('ember'); settle(); if (colors.scenery) recolored++; }
+  assert.ok(recolored > 12 && recolored < 48, `in the mix: some flames (${recolored}/60)`);
+  settings.sceneColors = 'off';
+  colors.landed('ember');
+  settle();
 });
 
 test('drops draw a different set of hits each time, only from those switched on', () => {
@@ -100,14 +117,19 @@ test('a drop hit shows up in the pixel pass, then clears', () => {
   assert.ok(g.feedback > 0.5 && g.feedRot !== 0, 'a spiral turns the echoes');
 });
 
+const every = (mode, names) => Object.fromEntries(Object.keys(names).map((k) => [k, mode]));
+const offLayers = every('off', LAYERS);
+const frame = (looks, modes, dt = 0) => looks.update(dt, { amt: 1, build: 0, low: false, energy: 0.5, modes: { ...offLayers, ...modes } });
+
 test('mirror and scanlines: off, in the mix, always', () => {
   const g = {};
   const looks = createLooks(g);
   const counts = { off: 0, mix: 0, on: 0 };
+  const turns = { ember: 'mix', glitch: 'mix', haze: 'mix' };
   for (let i = 0; i < 200; i++) {
-    looks.next(Object.fromEntries(['ember', 'glitch', 'haze'].map((k) => [k, true])));
+    looks.next(turns);
     for (const mode of ['off', 'mix', 'on']) {
-      looks.update(0, { amt: 1, build: 0, low: false, energy: 0, mirror: mode, scanlines: mode });
+      frame(looks, { looks: turns, mirror: mode, scanlines: mode });
       if (g.mirror > 0) counts[mode]++;
       if (mode === 'on') assert.ok(g.mirror >= 1 && g.mirror <= 8 && g.scan > 0);
       if (mode === 'off') assert.equal(g.scan, 0);
@@ -122,13 +144,14 @@ test('mirror kinds: horizontal, vertical and quarter, only those switched on', (
   const g = {};
   const looks = createLooks(g);
   const MODES = { horizontal: [1, 2], vertical: [3, 6], quarter: [4, 5, 7, 8] };
+  const turns = { ember: 'mix', glitch: 'mix', haze: 'mix' };
   const seenAll = new Set();
   for (const kind of Object.keys(MIRRORS)) {
     const mirrors = Object.fromEntries(Object.keys(MIRRORS).map((k) => [k, k === kind]));
     const seen = new Set();
     for (let i = 0; i < 200; i++) {
-      looks.next({ ember: true, glitch: true, haze: true });
-      looks.update(0, { amt: 1, build: 0, low: false, energy: 0, mirror: 'on', mirrors });
+      looks.next(turns);
+      frame(looks, { looks: turns, mirror: 'on', mirrors });
       seen.add(g.mirror);
       seenAll.add(g.mirror);
     }
@@ -136,12 +159,119 @@ test('mirror kinds: horizontal, vertical and quarter, only those switched on', (
   }
   assert.equal(seenAll.size, 8);
   // The drop's mirror flips keep to the kinds switched on too.
-  looks.drop({ flips: true }, 1);
+  looks.drop({ flips: 'mix' }, 1);
   for (let i = 0; i < 40; i++) {
     looks.beat(1, false, 0.5);
-    looks.update(0.01, { amt: 1, build: 0, low: false, energy: 0, mirror: 'off', mirrors: { vertical: true } });
+    frame(looks, { mirror: 'off', mirrors: { vertical: true } }, 0.01);
     assert.ok([3, 6].includes(g.mirror));
   }
+});
+
+test('looks: in the mix they take turns, always ones stay on under them, off never plays', () => {
+  const g = {};
+  const looks = createLooks(g);
+  const modes = { ...every('off', LOOKS), glitch: 'mix', echo: 'mix', kaleido: 'on' };
+  const turns = new Set();
+  for (let i = 0; i < 60; i++) {
+    looks.next(modes);
+    frame(looks, { looks: modes });
+    turns.add(looks.look);
+    assert.ok(g.kaleido > 0, 'the kaleidoscope, always on, plays under every turn');
+    assert.deepEqual(looks.playing, [looks.look, 'kaleido']);
+  }
+  assert.deepEqual([...turns].sort(), ['echo', 'glitch'], 'only looks in the mix take turns');
+  // None in the mix: the clean fire takes the turn, the always ones still play.
+  const none = { ...every('off', LOOKS), prism: 'on' };
+  looks.sync(none);
+  frame(looks, { looks: none });
+  assert.equal(looks.look, 'ember');
+  assert.deepEqual(looks.playing, ['prism']);
+  // A look switched out of the mix hands its turn on.
+  const moved = { ...every('off', LOOKS), haze: 'mix' };
+  looks.sync(moved);
+  assert.equal(looks.look, 'haze');
+});
+
+test('drop hits set to always come with every drop', () => {
+  const looks = createLooks({});
+  const modes = { ...every('mix', DROP_FX), iris: 'on', shock: 'off' };
+  for (let i = 0; i < 40; i++) {
+    const names = looks.drop(modes, 3);
+    assert.ok(names.includes(DROP_FX.iris));
+    assert.ok(!names.includes(DROP_FX.shock));
+    assert.ok(names.length >= 2 && names.length <= 3, 'always ones plus at least one from the mix, up to the count');
+  }
+  assert.deepEqual(looks.drop({ ...every('off', DROP_FX), slam: 'on', ink: 'on' }, 1), [DROP_FX.slam, DROP_FX.ink]);
+});
+
+test('layers: off, always, and a mix that re-rolls with each look, at most two heavy at once', () => {
+  const g = {};
+  const looks = createLooks(g);
+  const turns = { ...every('mix', LOOKS) };
+  const heavy = { ghost: 'ghost', blur: 'blur', glow: 'glow', gradient: 'grad', flicker: 'flicker' };
+  const on = (k) => (k === 'paint' ? g.style === 1 : k === 'wash' ? g.style === 2 : k === 'flicker' ? g.flickerMode >= 0 && g.flicker > 0 : g[heavy[k]] > 0);
+  // Always: on every turn (the beat dip flicker needs a beat).
+  for (let i = 0; i < 20; i++) {
+    looks.next(turns);
+    looks.beat(1, true);
+    frame(looks, { looks: turns, ...every('on', LAYERS), paint: 'off' });
+    for (const k of ['ghost', 'blur', 'glow', 'gradient', 'wash', 'flicker']) assert.ok(on(k), `${k} always on`);
+  }
+  // Off: never.
+  for (let i = 0; i < 20; i++) {
+    looks.next(turns);
+    frame(looks, { looks: turns });
+    assert.ok(!g.ghost && !g.blur && !g.glow && !g.grad && !g.style && !g.flicker);
+  }
+  // In the mix: each comes and goes; never more than two of the heavy ones.
+  const seen = Object.fromEntries(['ghost', 'blur', 'glow', 'gradient', 'paint', 'wash'].map((k) => [k, 0]));
+  for (let i = 0; i < 300; i++) {
+    looks.next(turns);
+    frame(looks, { looks: turns, ...every('mix', LAYERS), flicker: 'off' });
+    const lit = Object.keys(seen).filter(on);
+    lit.forEach((k) => seen[k]++);
+    assert.ok(lit.length <= 2, `at most two heavy layers (${lit})`);
+  }
+  for (const [k, n] of Object.entries(seen)) assert.ok(n > 15 && n < 200, `${k} comes and goes (${n}/300)`);
+  // The details change from turn to turn.
+  const sizes = new Set();
+  for (let i = 0; i < 10; i++) { looks.next(turns); frame(looks, { looks: turns, glow: 'on' }); sizes.add(g.glowSize.toFixed(3)); }
+  assert.ok(sizes.size > 5);
+});
+
+test('blend modes: classic when off, rolled when on', () => {
+  const g = {};
+  const looks = createLooks(g);
+  const turns = { ...every('mix', LOOKS) };
+  for (let i = 0; i < 10; i++) {
+    looks.next(turns);
+    frame(looks, { looks: turns, blend: 'off' });
+    assert.deepEqual([g.feedMode, g.ghostMode, g.warpMode, g.warpMix, g.inkMode, g.invertMode, g.scanBlend, g.glowMode], [BLEND.lighten, BLEND.normal, BLEND.normal, 1, BLEND.normal, BLEND.normal, BLEND.multiply, BLEND.add]);
+  }
+  const feeds = new Set();
+  const warps = new Set();
+  for (let i = 0; i < 80; i++) {
+    looks.next(turns);
+    frame(looks, { looks: turns, blend: 'on' });
+    feeds.add(g.feedMode);
+    warps.add(g.warpMode);
+    assert.ok([BLEND.lighten, BLEND.screen, BLEND.difference, BLEND.exclusion].includes(g.feedMode), 'echoes only blend where black changes nothing');
+    assert.ok(g.warpMix > 0.4 && g.warpMix < 1);
+  }
+  assert.ok(feeds.size >= 3 && warps.size >= 4);
+});
+
+test('the director’s effect switches: off, in the mix, always', () => {
+  const looks = createLooks({});
+  let rolled = 0;
+  for (let i = 0; i < 200; i++) {
+    looks.next({ ember: 'mix', glitch: 'mix' });
+    assert.equal(looks.active('sparks', 'on'), true);
+    assert.equal(looks.active('sparks', 'off'), false);
+    assert.equal(looks.active('sparks', true), true, 'an old saved "on" still counts');
+    if (looks.active('flash', 'mix')) rolled++;
+  }
+  assert.ok(rolled > 60 && rolled < 140, `a flash in the mix comes with some looks (${rolled}/200)`);
 });
 
 test('firefly moves: each keeps its own time, on the beat grid', () => {

@@ -71,8 +71,22 @@ bonfire's design, assets and code, then three rounds of feedback:
 | Z12 | More scenes: a forge, a shrine | `src/bonfire/scenery.js`, built from primitives in the model's materials where the ruins stand; *Scene* setting, or a new place every other drop |
 | Z13 | An Ableton Link helper | `tools/link-bridge.mjs` (`npm run link`): Carabiner → a local WebSocket → `link.js` → `tempo.external()`; *Beat From: Ableton Link*; `test/link.test.mjs` |
 | Z14 | Manual BPM and a phase nudge | a BPM field (holds until cleared), `[` `]` nudge 10 ms, `D` makes this beat beat 1; `tempo.js` `setManual`, `nudge`, `clearManual` |
+| AA1 | Off / In the mix / Always for every effect, existing ones included; endless variations | `looks.js` `MODES`, `active()`: looks (always ones stay on under the look taking its turn), drop hits (always ones come with every drop), layers, and the director's sparks, blade echo, zoom punch, temperature, breathing, blackout and negative flash. In the mix re-rolls with every look, each time with new details. A new *Effects* tab; old on/off settings carry over (`settings.js` `mergeInto`); `test/variety.test.mjs` |
+| AA2 | Layer blending (from the Pixel3D study) | `pixelPass.js` `blendMode`: twelve modes. Echoes, the ghost trail, a warp over the plain picture, ink, the negative, scanlines, glow and the gradient map each blend their own way; *Blend Modes* rolls new ones per look (off: the classic ways) |
+| AA3 | Ghosting, motion blur, flicker | a half-float ghost trail (so faint trails fade instead of sticking on a palette color); motion blur from each texel's depth and last frame's camera (cuts reset it); flicker on the beat, a rolling band, film jitter or a candle's waver, kept faint |
+| AA4 | Painterly and watercolor | `pixelPass.js` `styleShader`: brush strokes (the main brightness band in a rotated, stretched brush) or a Kuwahara wash with pigment pooling at edges; brush size, angle and length rolled each time |
+| AA5 | Glow and a gradient map | glow from the scene image's mipmaps, swelling on kicks; the gradient map recolors by brightness through three palette slots, rolled |
+| AA6 | Recolored scenery that works, with more variety | `colors.js` + `paletteGen.js` `vividScene`: any flame (the site's too), two to four times the tint, around the flame's hue or any hue, sometimes fully random, a new set every landing; off / with some flames / with every flame |
 
 ## Key decisions
+
+- **Stages only when needed.** The heavier layers (motion blur, ghosting, glow, painterly,
+  watercolor) need the finished scene around each pixel, so for them the scene is drawn
+  into its own image first and the final pass reads it. With none of them on (always, on
+  the site) the single pass runs as before. Everything still snaps to the palette at the
+  end, so any blend mode comes out in the scene's own colors.
+- **In the mix stays readable.** At most two heavy layers come in at once, and only one
+  repaint. Layers set to Always don't count toward that limit.
 
 - **Link through a bridge, not in the browser.** Link is UDP multicast, which pages can't
   do. Carabiner (a small free app) joins the session and speaks plain text over TCP; the
