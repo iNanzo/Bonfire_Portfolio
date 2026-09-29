@@ -116,9 +116,10 @@ test('element draws follow the weights and skip elements out of rotation', () =>
 
 test('hidden images: a project needs at least one visible image', () => {
   const c = content();
-  for (const im of c.projects[0].images) im.hidden = true;
-  assert.deepEqual(paths(c), ['projects[0].images']);
-  c.projects[0].images[1].hidden = false;
+  const i = c.projects.findIndex((p) => p.images.length > 1); // (one with two or more to switch between)
+  for (const im of c.projects[i].images) im.hidden = true;
+  assert.deepEqual(paths(c), [`projects[${i}].images`]);
+  c.projects[i].images[1].hidden = false;
   assert.deepEqual(paths(c), []);
 });
 
