@@ -54,6 +54,7 @@ export const LABELS = {
   'site.description': 'Search / share description',
   'site.url': 'Site address',
   'site.links': 'Profile links',
+  'site.resumeUrl': 'Résumé',
   'sections.projects': 'Project inventory screen',
   'sections.archive': 'Earlier explorations',
   'sections.about': 'About screen',
@@ -201,6 +202,7 @@ export const HELP = {
   '[].outcome': 'The result in one line, shown under the title: what it achieved or proved (players, numbers, awards, what it led to). Leave empty to hide.',
   '[].images[].alt': 'Read aloud instead of the image, and shown if it can’t load. Say what’s on screen in a sentence (“The scene editor: a forest level with…”), not “screenshot of…”. Required.',
   '[].href': 'https://…, mailto:…, or a path on this site like games/x.html.',
+  'site.resumeUrl': 'resume.pdf (a file in public/, shown once it’s there) or a https:// link. Empty: no Résumé button.',
   // effects
   'effects.flames': 'The color sets the bonfire can take. Fire, lightning and ice all burn in them, and the site’s accent colors follow along. Inspecting a project or clicking the fire draws one at random; hidden ones stay out of the draw (one can still be the starting colors). Keep at least 3 in rotation.',
   'effects.flames[].id': 'Internal name. Lowercase letters, numbers and dashes.',
