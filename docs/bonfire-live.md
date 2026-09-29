@@ -169,3 +169,15 @@ on drops).
 | Demo track (synthesized) | `src/visualizer/demo.js` |
 | Scene hooks: `drive`, `glitch`, `pulse`, `ring`, `echo`, `swing`, `setPose`, held swaps | `src/bonfire/scene.js`, `weapons.js`, `pixelPass.js`, `flame.js`, `fireflies.js` |
 | Tests: the tracker on synthetic onsets; the analysis and ten drop shapes (and non-drops) on synthesized tracks; the blade's moves (smooth, on the beat, clear of the ground and camera) and its return to the fire (`weapons.js` on a stand-in model); made palettes, drop hits, mirror kinds and mixes, firefly moves; a held swap's forge particles; the site's routes, links and templates | `test/` (`npm test`) |
+
+## New this round
+
+- **Feel:** pick a preset (Chill, Club, Rave, Low Flash) on the start screen or at the top
+  of the settings; fine-tune in the tabs.
+- **MIDI:** Settings → Sound → MIDI Controller. Connect, press Learn beside an action,
+  then the pad. Mappings stay on this computer.
+- **The pack (I):** swap the scene, forge a chosen weapon, cast the element's ring, send
+  the blade into a swing, or hit with another element.
+- **Record (V):** a clip of the picture and the sound, saved as MP4 when you stop. For the
+  portfolio page, save one as `public/assets/projects/bonfire-live/clip.mp4` with a
+  `clip.webp` still beside it and add it as the first image with *Video Clip* on.
