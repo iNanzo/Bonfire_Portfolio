@@ -413,6 +413,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
       layerGhost: LAYER_GHOST,
       layerFx: LAYER_FX,
       particleMaterial: effectMaterial,
+      // Each element's forge particles in its own shape (signatures.js).
+      materials: { fire: effectMaterial, lightning: crossMaterial, ice: diamondMaterial },
       field,
       particles: pCount(P.forge),
       castShadows: renderer.shadowMap.enabled,
@@ -462,6 +464,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
 
     scope.trackTree(weapons.holder); scope.trackTree(weapons.forge);
     if (weapons.lines) { scope.trackTree(weapons.lines); scene.add(weapons.lines); }
+    for (const o of weapons.extras) { scope.trackTree(o); scene.add(o); }
     scope.cleanup(() => weapons.cancel());
     const flyTemplate = root.getObjectByName('Firefly');
     flyTemplate.removeFromParent();
@@ -779,7 +782,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   /** An echo of the planted weapon's silhouette bursts out of it (and in ice, the crystals' outlines). */
   function echo() {
     if (!ready) return;
-    weapons.echo(currentRamp);
+    weapons.echo(currentRamp, elementKey);
     if (elementKey === 'ice') crystals.echo();
   }
   /**

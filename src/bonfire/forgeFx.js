@@ -5,6 +5,10 @@
 //               form completes; the caller closes them in to the blade's width
 //   • outline — the new weapon's own silhouette, echoed outward from the blade as
 //               it finishes forming: an expanding, noise-wobbled contour in its shape
+// Each takes after the element being forged (`style`): fire's lines are smooth and
+// shimmer; lightning's crackle (jagged, jumping, broken in flickering gaps); ice's are
+// faceted, a hexagonal spiral of straight runs, and its echo's contour is snapped to a
+// coarse grid so it reads as cut crystal.
 // Both come from one raster of the weapon's side profile (weaponSilhouette), built
 // once per weapon: the contour for the echo, a width profile for the helix.
 import * as THREE from 'three';
@@ -191,18 +195,24 @@ export function createForgeFx(fxMaterial, noise) {
    * can hug a flat blade); a slow noise drifting along the strands thins them in
    * patches (subtle dithered transparency), with a faster flicker on top.
    */
-  function helix({ matrix, y0, y1, spin, turns, growth, alpha, radiusX, radiusZ, lead, trail, head, t }) {
+  function helix({ matrix, y0, y1, spin, turns, growth, alpha, radiusX, radiusZ, lead, trail, head, t, style = 'fire' }) {
     const len = y1 - y0;
+    const zap = style === 'lightning';
+    const frame = Math.floor(t * 18); // lightning jumps to a new shape ~18 times a second
     const point = (strand, s, lift) => {
       const a = strand * Math.PI + s * turns * TAU + spin;
-      const w = 1 + 0.1 * noise.noise3d(s * 5, strand * 7.3, t * 2.4);
+      let w = 1 + 0.1 * noise.noise3d(s * 5, strand * 7.3, t * 2.4);
+      if (zap) w += 0.45 * noise.noise3d(s * 26, strand * 5.1, frame * 1.7);
       return P.set(Math.cos(a) * radiusX(s) * w, y0 + s * len + lift, Math.sin(a) * radiusZ(s) * w).applyMatrix4(matrix);
     };
+    const SEGS = style === 'ice' ? Math.round(turns * 6) : HELIX_SEGS; // ice: six straight runs a turn, a hexagonal spiral
     for (let strand = 0; strand < 2; strand++) {
       const headS = strand ? 1 - growth : growth;
       for (let sub = 0; sub < 2; sub++) {
-        for (let i = 0; i < HELIX_SEGS; i++) {
-          let s0 = i / HELIX_SEGS, s1 = (i + 1) / HELIX_SEGS;
+        for (let i = 0; i < SEGS; i++) {
+          let s0 = i / SEGS, s1 = (i + 1) / SEGS;
+          // Lightning breaks into flickering gaps.
+          const gap = zap && noise.noise3d(i * 0.31, strand * 3.7 + sub, frame * 2.3) > 0.42;
           if (strand === 0) { if (s0 >= growth) break; s1 = Math.min(s1, growth); }
           else { if (s1 <= 1 - growth) continue; s0 = Math.max(s0, 1 - growth); }
           for (const s of [s0, s1]) {
@@ -213,15 +223,18 @@ export function createForgeFx(fxMaterial, noise) {
             const body = (sub ? 0.55 : 1) * (0.55 + 0.45 * drift) * (0.88 + 0.12 * flick);
             C.copy(nearHead ? head : sub ? trail : lead);
             point(strand, s, sub * 0.022);
-            put(P.x, P.y, P.z, C, alpha * taper * (nearHead ? 1 : body));
+            put(P.x, P.y, P.z, C, gap ? 0 : alpha * taper * (nearHead ? 1 : body));
           }
         }
       }
     }
   }
 
-  /** The silhouette `sil`, pushed out along its normals by `dilate` and scaled about its center. */
-  function outline({ sil, matrix, dilate, scale, wobble, alpha, lead, trail, hot, t, seed }) {
+  /**
+   * The silhouette `sil`, pushed out along its normals by `dilate` and scaled about its center.
+   * `facet` (m, 0: none) snaps the contour to a grid that coarse: cut crystal.
+   */
+  function outline({ sil, matrix, dilate, scale, wobble, alpha, lead, trail, hot, t, seed, facet = 0 }) {
     const { verts, normals, segs, useX, depth, center } = sil;
     const nv = verts.length / 2;
     if (scratch.length < nv) scratch = new Float32Array(nv);
@@ -232,8 +245,9 @@ export function createForgeFx(fxMaterial, noise) {
         const i = segs[k];
         const n = scratch[i];
         const d = d0 + n * wobble;
-        const pu = center[0] + (verts[i * 2] - center[0]) * scale + normals[i * 2] * d;
-        const py = center[1] + (verts[i * 2 + 1] - center[1]) * scale + normals[i * 2 + 1] * d;
+        let pu = center[0] + (verts[i * 2] - center[0]) * scale + normals[i * 2] * d;
+        let py = center[1] + (verts[i * 2 + 1] - center[1]) * scale + normals[i * 2 + 1] * d;
+        if (facet) { pu = Math.round(pu / facet) * facet; py = Math.round(py / facet) * facet; }
         P.set(useX ? pu : depth, py, useX ? depth : pu).applyMatrix4(matrix);
         C.copy(!sub && n > 0.5 ? hot : sub ? trail : lead);
         put(P.x, P.y, P.z, C, alpha * (sub ? 0.55 : 1) * (0.6 + 0.2 * (n + 1)));
