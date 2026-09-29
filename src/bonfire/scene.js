@@ -397,6 +397,9 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
           fire.burst(0.45);
           onFormed?.();
         },
+        // An element's own big moment in the forge (a bolt out of the sky, the frozen blade
+        // shattering, the ice cocoon cracking off): a flash and a jolt.
+        onForgeStrike: (weight) => hit(weight, { freeze: false }),
         onImpact: impact,
         // A sword combo: the blade sheds fire and knocks the flames along its swing,
         // and plunging back in throws the element's ring.

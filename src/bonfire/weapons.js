@@ -23,20 +23,26 @@
 // swing (the planted weapon leaves the fire for a routine of moves, bladeMotion.js) and
 // signs of life: a shudder on hard beats, a held blade's sway and trembling.
 //
-// Every swap takes after the element it forges into, on top of the steps above (one
-// habit per step, so it stays readable):
-//   fire       as above: embers, a steady two-tone edge, smooth shimmering helix lines
-//   lightning  the blade is struck apart and re-forged: the edge flickers white-hot with
-//              a small arc crawling along it, the particles are crossed sparks that snap
-//              and blink, the helix crackles in broken jagged strands, and as the form
-//              completes a bolt strikes down into the pommel (the echo flickers with it)
-//   ice        the blade freezes and shatters: a pale frost edge, the particles fall
-//              away like diamond chips before the helix (turning slower) gathers them,
-//              each glints as it freezes onto the new blade, the helix lines are faceted,
-//              and the echo is cut crystal, growing out in steps
+// Every swap takes after the element it forges into, keeping the steps above; each
+// element has its own big moves, readable in the first half second:
+//   fire       as above: embers rising off a steady two-tone edge, a smooth shimmering
+//              helix, the blade forming from the pommel down
+//   lightning  struck apart and re-forged: a bolt out of the sky hits the old blade, which
+//              strobes as if electrocuted and crackles apart (a white-hot flickering edge,
+//              an arc crawling along it, crossed sparks that snap and blink); while the
+//              particles gather, arcs leap between them and the ground; the helix crackles
+//              in broken jagged strands; the new blade forms in five jumps, each a flash
+//              and an arc to the ground; then a bolt out of the sky into its pommel
+//   ice        frozen, shattered, grown back: frost creeps up the old blade from its point
+//              and it shatters all at once, its shards flung out and falling before a slow
+//              hexagonal helix gathers them; the new blade grows from its point up inside a
+//              cocoon of crystals, each glinting shard freezing onto it, and when it's
+//              whole the cocoon cracks off and a cut-crystal echo grows out in steps
+// Their big moments land like small hits (hooks.onForgeStrike: a flash and a jolt).
 import * as THREE from 'three';
 import { createForgeFx, weaponSilhouette, profileAt } from './forgeFx.js';
 import { createBoltLines, seeded, hashSeed } from './bolts.js';
+import { CRYSTAL_EDGES } from './ice.js';
 import { createRoutine } from './bladeMotion.js';
 import { createForgeParticles, HELIX_TURNS, helixWide } from './forgeParticles.js';
 import { smoothstep } from '../math.js';
@@ -71,15 +77,22 @@ function dissolveMaterial(src, uniforms, toRoot) {
       .replace('#include <common>', '#include <common>\nuniform mat4 uToRoot;\nvarying vec3 vLPos;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvLPos = (uToRoot * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vLPos;\nuniform float uDissolve;\nuniform vec3 uEdge;\nuniform vec3 uEdgeHot;\nuniform vec3 uRim;\nuniform float uGlow;\nuniform vec2 uSpan;\n${DISSOLVE_CHUNK}`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vLPos;\nuniform float uDissolve;\nuniform vec3 uEdge;\nuniform vec3 uEdgeHot;\nuniform vec3 uRim;\nuniform float uGlow;\nuniform vec2 uSpan;\nuniform float uFrost;\nuniform vec3 uFrostColor;\nuniform float uFlip;\n${DISSOLVE_CHUNK}`)
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>
         float rimK = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));
         gl_FragColor.rgb += uRim * (pow(rimK, 2.2) * 0.9 + 0.1);
         if (uGlow > 0.001) {
           gl_FragColor.rgb = mix(gl_FragColor.rgb, uEdge, uGlow * 0.55) + uEdge * uGlow * (0.25 + pow(rimK, 2.0) * 0.6);
         }
+        // Frost (the ice swap): a pale glaze creeping up from the point, a bright ragged front.
+        if (uFrost > 0.001) {
+          float hf = clamp((vLPos.y - uSpan.x) / (uSpan.y - uSpan.x), 0.0, 1.0);
+          float fr = uFrost * 1.15 - hf + (wBayer4(gl_FragCoord.xy) - 0.5) * 0.1 + (wNoise(vLPos * 14.0) - 0.5) * 0.14;
+          if (fr > 0.0) gl_FragColor.rgb = fr < 0.06 ? uFrostColor * 1.25 : mix(gl_FragColor.rgb, uFrostColor, 0.7) + uFrostColor * 0.15 * pow(rimK, 2.0);
+        }
         if (uDissolve > 0.001) {
           float h = clamp((vLPos.y - uSpan.x) / (uSpan.y - uSpan.x), 0.0, 1.0);
+          if (uFlip > 0.5) h = 1.0 - h; // (ice forms from the point up)
           float dv = wNoise(vLPos * 9.0) * 0.45 + wBayer4(gl_FragCoord.xy) * 0.25 + h * 0.3;
           float e = dv - (uDissolve * 1.15 - 0.05);
           if (e < 0.0) discard;
@@ -184,6 +197,7 @@ export function createWeapons(gltfRoot, {
     const uniforms = {
       uDissolve: { value: 0 }, uEdge: { value: new THREE.Color() }, uEdgeHot: { value: new THREE.Color() },
       uGlow: { value: 0 }, uRim: { value: rimColor.clone() }, uSpan: { value: surface.span },
+      uFrost: { value: 0 }, uFrostColor: { value: new THREE.Color() }, uFlip: { value: 0 },
     };
     for (const [o, m] of toRoot) {
       o.material = dissolveMaterial(o.material, uniforms, m);
@@ -205,7 +219,7 @@ export function createWeapons(gltfRoot, {
   const fx = N ? createForgeFx(particleMaterial, field.noise) : null;
   if (fx) fx.lines.layers.set(layerFx);
   // Lightning's arcs along the forge edge and its strike into the formed blade.
-  const arcs = N ? createBoltLines(particleMaterial, 96, 40) : null;
+  const arcs = N ? createBoltLines(particleMaterial, 220, 96) : null;
   if (arcs) for (const o of arcs.objects) o.layers.set(layerFx);
   let swapEl = 'fire'; // the element the swap under way forges into
   let strikeT = -1;    // the strike's age (s), or -1
@@ -271,8 +285,11 @@ export function createWeapons(gltfRoot, {
     current = items[key];
     current.position.set(0, 0, 0);
     spin(current);
-    current.userData.uniforms.uDissolve.value = 0;
-    current.userData.uniforms.uGlow.value = 0;
+    const u = current.userData.uniforms;
+    u.uDissolve.value = 0;
+    u.uGlow.value = 0;
+    u.uFrost.value = 0;
+    u.uFlip.value = 0;
     setLayer(current, layerSolid);
   }
 
@@ -307,6 +324,8 @@ export function createWeapons(gltfRoot, {
     forge.clear();
     clearLines();
     strikeT = -1;
+    cocoonT = -1;
+    groundArcT = -1;
     arcs?.clear();
   }
   // `pace` plays the whole choreography faster or slower (the visualizer fits it to a
@@ -358,14 +377,36 @@ export function createWeapons(gltfRoot, {
     // Place the incoming weapon now (still hidden) so its surface can be targeted.
     spin(incoming);
     incoming.position.set(0, HOVER, 0);
+    // Ice grows the new blade from the point up (and freezes the old one first); the others
+    // form it from the pommel down.
+    incoming.userData.uniforms.uFlip.value = swapEl === 'ice' ? 1 : 0;
+    incoming.userData.uniforms.uFrost.value = 0;
+    if (current) {
+      current.userData.uniforms.uFrost.value = 0;
+      current.userData.uniforms.uFrostColor.value.copy(rampNew[3]);
+    }
     phase = 'dissolve';
     t = 0;
     elapsed = 0;
     clearLines();
+    shattered = false;
+    formSteps = 0;
+    cocoonT = -1;
     if (current) setLayer(current, layerGhost);
-    forge.begin(current?.userData.heights, incoming.userData.heights, D.dissolve, edgeAt);
+    forge.begin(current?.userData.heights, incoming.userData.heights, D.dissolve, edgeAt, {
+      // Ice: everything breaks off at once when the frozen blade shatters.
+      releaseAt: swapEl === 'ice' ? () => SHATTER + Math.random() * 0.06 : null,
+      flipNew: swapEl === 'ice',
+    });
     helixSpin = Math.random() * Math.PI * 2;
+    if (swapEl === 'ice') buildCocoon();
     hooks.onSwapStart?.(payload);
+    // Lightning opens with a bolt out of the sky into the old blade.
+    if (swapEl === 'lightning' && current) {
+      holder.updateMatrixWorld(true);
+      strike(current, 0.55, 0.22);
+      hooks.onForgeStrike?.(0.6);
+    }
     return new Promise((r) => { resolveSwap = r; });
   }
 
@@ -399,7 +440,35 @@ export function createWeapons(gltfRoot, {
     });
   }
 
-  // --- Lightning's forge: the flickering edge, the arc crawling along it, the strike -----
+  // --- Each element's own moves, on top of the shared steps ------------------------------
+  // (Under reduced motion there are no bolts, strobes or flashes: only the frost and the colors.)
+  // Lightning: a bolt out of the sky into the old blade, which strobes as if electrocuted
+  // and crackles apart (an arc crawling along its edge); arcs leaping between the charging
+  // particle cloud and the ground; the new blade forming in jumps, each a flash and an arc
+  // to the ground; then a bolt out of the sky into the blade. Ice: frost creeping up the old
+  // blade from its point until it shatters at once into shards that fly out and fall; the
+  // new blade growing from its point up inside a cocoon of crystals that cracks off it.
+  const SHATTER = Math.min(0.6, D.dissolve * 0.43); // ice: the frozen blade shatters this far into the dissolve (s)
+  let shattered = false;
+  let formSteps = 0;   // lightning: the form's jumps so far...
+  let stepGlow = 0;    // ...each one flashes the blade...
+  let groundArcT = -1; // ...and throws an arc to the ground for a moment
+  let cocoonT = -1;    // ice: the cocoon's burst (s), or -1 while it grows
+  let strikeLen = 0.16;
+  const cocoon = [];   // ice: { s (up the blade from its point), a (around it), tilt, size, twist }
+  const anchorWorld = new THREE.Vector3();
+  const cA = new THREE.Vector3();
+  const cB = new THREE.Vector3();
+  const cDir = new THREE.Vector3();
+  const cQ = new THREE.Quaternion();
+  const cTwist = new THREE.Quaternion();
+  const cM = new THREE.Matrix4();
+  const cS = new THREE.Vector3();
+  const cBase = new THREE.Vector3();
+  const colA = new THREE.Color();
+  const colB = new THREE.Color();
+  const UP = new THREE.Vector3(0, 1, 0);
+
   let flickerStep = -1;
   /** Lightning: the forge edge (dissolving or forming) flickers white-hot at ~20 Hz. */
   function flickerEdge(u, ramp) {
@@ -424,15 +493,75 @@ export function createWeapons(gltfRoot, {
     }
     return null;
   }
-  function stepArcs(dt) {
+  /** A point `r` from `obj`'s axis at height `s` (0 point → 1 pommel), turned `a` round it (world). */
+  function bladePoint(obj, s, a, r, out) {
+    const span = obj.userData.uniforms.uSpan.value;
+    return out.set(Math.cos(a) * r, span.x + s * (span.y - span.x), Math.sin(a) * r).applyMatrix4(obj.matrixWorld);
+  }
+  /** A spot on the logs and ash around the fire for an arc to land on (world). */
+  function groundPoint(rng, out) {
+    holder.getWorldPosition(anchorWorld);
+    const a = rng() * Math.PI * 2;
+    const r = 0.45 + rng() * 0.35;
+    return out.set(anchorWorld.x + Math.cos(a) * r, anchorWorld.y + 0.12 + rng() * 0.14, anchorWorld.z + Math.sin(a) * r);
+  }
+
+  /** Ice: the crystals that will encase the new blade. */
+  function buildCocoon() {
+    cocoon.length = 0;
+    const n = 6;
+    for (let i = 0; i < n; i++) {
+      cocoon.push({
+        s: 0.1 + (i / (n - 1)) * 0.74 + (Math.random() - 0.5) * 0.06,
+        a: i * 2.4 + Math.random() * 0.8,
+        tilt: 0.9 + Math.random() * 0.45,
+        size: 0.1 + Math.random() * 0.06,
+        twist: Math.random() * Math.PI,
+      });
+    }
+  }
+  /**
+   * Ice: each crystal grows out of the blade as the forming front passes it (from the point
+   * up); once the blade is formed they crack off, flung outward as they fade.
+   */
+  function drawCocoon(dt) {
+    const profile = incoming.userData.silhouette?.profile;
+    if (!profile) return;
+    const burst = cocoonT >= 0 ? Math.min(1, (cocoonT += dt) / 0.45) : 0;
+    if (burst >= 1) { cocoonT = -1; return; }
+    const front = phase === 'form' ? 1 - edgeHeight(incoming.userData.uniforms.uDissolve.value) : 1;
+    const len = profile.y1 - profile.y0;
+    for (const c of cocoon) {
+      const grow = phase === 'form' ? smoothstep(c.s - 0.04, c.s + 0.16, front) : 1;
+      if (grow <= 0.01) continue;
+      const rx = profileAt(profile.rx, c.s), rz = profileAt(profile.rz, c.s);
+      cDir.set(Math.cos(c.a) * Math.sin(c.tilt), Math.cos(c.tilt), Math.sin(c.a) * Math.sin(c.tilt));
+      cBase.set(Math.cos(c.a) * rx, profile.y0 + c.s * len, Math.sin(c.a) * rz).addScaledVector(cDir, 0.18 * ease.outCubic(burst));
+      cQ.setFromUnitVectors(UP, cDir).multiply(cTwist.setFromAxisAngle(UP, c.twist));
+      const size = c.size * grow * (1 + 0.8 * ease.outCubic(burst));
+      cM.compose(cBase, cQ, cS.set(size, size * 1.9, size)).premultiply(incoming.matrixWorld);
+      const alpha = (1 - burst) ** 1.3 * (0.7 + 0.3 * grow);
+      colA.copy(rampNew[2]);
+      colB.copy(rampNew[3]);
+      for (const [p, q] of CRYSTAL_EDGES) {
+        cA.copy(p).applyMatrix4(cM);
+        cB.copy(q).applyMatrix4(cM);
+        arcs.segment(cA.x, cA.y, cA.z, cB.x, cB.y, cB.z, p.y > 0.5 ? colB : colA, q.y > 0.5 ? colB : colA, alpha, alpha);
+      }
+    }
+  }
+
+  function stepElement(dt) {
     arcs.begin();
+    holder.updateMatrixWorld(true);
+    const zap = swapEl === 'lightning';
+    // Lightning: an arc crawling along the forge edge, dissolving and then forming...
     const obj = phase === 'dissolve' ? current : phase === 'form' ? incoming : null;
     const ramp = phase === 'dissolve' ? rampOld : rampNew;
-    if (swapEl === 'lightning' && obj) {
+    if (zap && obj) {
       const h = edgeHeight(obj.userData.uniforms.uDissolve.value);
       const frame = Math.floor(totalT * 16); // a new arc ~16 times a second, one or two at a time
       const rng = seeded(hashSeed(frame, 11));
-      holder.updateMatrixWorld(true);
       const count = 1 + (rng() < 0.4 ? 1 : 0);
       for (let j = 0; j < count; j++) {
         if (!sampleNear(obj, h, arcA) || !sampleNear(obj, h, arcB) || arcA.distanceToSquared(arcB) < 0.0009) continue;
@@ -442,21 +571,35 @@ export function createWeapons(gltfRoot, {
         });
       }
     }
-    // The strike: a bolt down from the sky into the pommel of the weapon that just formed.
+    // ...arcs leaping between the charging particle cloud and the ground (and at each of the
+    // form's jumps)...
+    if (zap && incoming && (phase === 'swirl' || phase === 'gather' || groundArcT >= 0)) {
+      const rng = seeded(hashSeed(Math.floor(totalT * 12), 17));
+      const n = phase === 'gather' ? 2 : 1;
+      for (let j = 0; j < n; j++) {
+        bladePoint(incoming, 0.15 + rng() * 0.7, rng() * Math.PI * 2, phase === 'form' ? 0.02 : 0.24, arcA);
+        groundPoint(rng, arcB);
+        arcs.bolt(arcA.x, arcA.y, arcA.z, arcB.x, arcB.y, arcB.z, {
+          rng, depth: 4, jag: 0.28, width: (s) => 2.2 - 1.2 * s, heat: 1.3, alpha: 0.95,
+          color: (s, out) => out.copy(rampNew[3]).lerp(rampNew[2], s),
+        });
+      }
+      if (groundArcT >= 0 && (groundArcT -= dt) < 0) groundArcT = -1;
+    }
+    // ...and the strikes out of the sky (into the old blade, then into the new one).
     if (strikeT >= 0) {
       strikeT += dt;
-      const STRIKE = 0.16;
-      if (strikeT < STRIKE && incoming) {
+      if (strikeT < strikeLen) {
         const rng = seeded(hashSeed(Math.floor(strikeT / 0.04), 29)); // it jumps shape a few times
-        const k = strikeT / STRIKE;
+        const k = strikeT / strikeLen;
         arcCol.copy(rampNew[3]);
         arcs.bolt(strikeTop.x, strikeTop.y, strikeTop.z, strikeEnd.x, strikeEnd.y, strikeEnd.z, {
-          rng, depth: 5, jag: 0.16, width: (s) => 1 + 3 * s * (1 - k), heat: 1.6,
-          alpha: (s) => (1 - k * 0.6) * Math.min(1, 0.3 + s * 1.5),
+          rng, depth: 5, jag: 0.14, width: (s) => 1.5 + 4 * s * (1 - k * 0.7), heat: 1.7,
+          alpha: (s) => (1 - k * 0.5) * Math.min(1, 0.35 + s * 1.5),
           color: (s, out) => out.copy(rampNew[2]).lerp(arcCol, s),
           each: (x, y, z, s) => {
-            if (s > 0.25 && s < 0.6 && rng() < 0.18) {
-              arcs.bolt(x, y, z, x + (rng() - 0.5) * 0.6, y - 0.2 - rng() * 0.3, z + (rng() - 0.5) * 0.6, {
+            if (s > 0.2 && s < 0.7 && rng() < 0.22) {
+              arcs.bolt(x, y, z, x + (rng() - 0.5) * 0.7, y - 0.2 - rng() * 0.35, z + (rng() - 0.5) * 0.7, {
                 rng, depth: 2, jag: 0.4, alpha: (b) => (1 - b) * 0.7, color: (b, out) => out.copy(rampNew[2]),
               });
             }
@@ -464,16 +607,19 @@ export function createWeapons(gltfRoot, {
         });
       } else strikeT = -1;
     }
+    // Ice: the cocoon of crystals around the forming blade.
+    if (swapEl === 'ice' && incoming && (phase === 'form' || cocoonT >= 0)) drawCocoon(dt);
     arcs.end();
   }
-  /** Lightning: the strike, from above and a little to the side, down to the pommel of `obj`. */
-  function strike(obj) {
+  /** A bolt out of the sky, from above and a little to the side, down to height `s` of `obj`. */
+  function strike(obj, s = 1, len = 0.3) {
     if (!arcs) return;
     const span = obj.userData.uniforms.uSpan.value;
-    strikeEnd.set(0, span.y, 0).applyMatrix4(obj.matrixWorld);
+    strikeEnd.set(0, span.x + s * (span.y - span.x), 0).applyMatrix4(obj.matrixWorld);
     const a = Math.random() * Math.PI * 2;
-    strikeTop.set(strikeEnd.x + Math.cos(a) * 0.35, strikeEnd.y + 2.4, strikeEnd.z + Math.sin(a) * 0.35);
+    strikeTop.set(strikeEnd.x + Math.cos(a) * 0.4, strikeEnd.y + 3, strikeEnd.z + Math.sin(a) * 0.4);
     strikeT = 0;
+    strikeLen = len;
   }
 
   let auraKick = 0; // a beat's push on a held weapon's aura (and its glow and lines)
@@ -586,7 +732,7 @@ export function createWeapons(gltfRoot, {
     }
     if (phase !== 'idle' && phase !== 'settle') dt *= pace;
     stepLines(dt);
-    if (arcs && (swapEl === 'lightning' || strikeT >= 0)) stepArcs(dt);
+    if (arcs && (swapEl !== 'fire' || strikeT >= 0 || cocoonT >= 0)) stepElement(dt);
     if (phase === 'idle') return;
     t += dt;
     elapsed += dt;
@@ -599,8 +745,25 @@ export function createWeapons(gltfRoot, {
         const u = current.userData.uniforms;
         u.uEdge.value.copy(edgeOld);
         u.uEdgeHot.value.copy(edgeOldHot);
-        if (swapEl === 'lightning') flickerEdge(u, rampOld);
-        u.uDissolve.value = Math.max(0, (k - 0.08) / 0.92);
+        if (swapEl === 'ice') {
+          // Frozen from the point up, then it shatters all at once (its shards fly: forgeParticles).
+          u.uFrost.value = Math.min(1, t / (SHATTER * 0.9));
+          u.uDissolve.value = t < SHATTER ? 0 : Math.min(1, (t - SHATTER) / 0.12);
+          if (!shattered && t >= SHATTER) {
+            shattered = true;
+            if (fx) {
+              current.userData.silhouette ??= weaponSilhouette(current.userData.toRoot);
+              burstT = 0; burstEl = 'ice'; burstSil = current.userData.silhouette; burstMatrix.copy(current.matrixWorld);
+            }
+            hooks.onForgeStrike?.(0.45);
+          }
+        } else {
+          u.uDissolve.value = Math.max(0, (k - 0.08) / 0.92);
+        }
+        if (swapEl === 'lightning') {
+          flickerEdge(u, rampOld);
+          if (!reducedMotion) current.visible = t > 0.4 || Math.floor(t * 26) % 2 === 0; // struck: it strobes (never under reduced motion)
+        }
       }
       stepForge(dt);
       if (k >= 1) {
@@ -618,16 +781,26 @@ export function createWeapons(gltfRoot, {
       // the blade has formed, so it doesn't wash the edge out.
       const k = Math.min(1, t / D.form);
       const u = incoming.userData.uniforms;
-      if (swapEl === 'lightning') flickerEdge(u, rampNew);
-      u.uDissolve.value = 1 - ease.inOut(k);
-      u.uGlow.value = smoothstep(0.55, 1, k);
+      let kk = k;
+      if (swapEl === 'lightning' && !reducedMotion) {
+        // It forms in five jumps, each a flash and an arc to the ground.
+        flickerEdge(u, rampNew);
+        const jump = Math.ceil(k * 5);
+        kk = Math.min(1, jump / 5);
+        if (jump > formSteps) { formSteps = jump; stepGlow = 1; groundArcT = 0.09; }
+      }
+      stepGlow *= Math.exp(-dt / 0.08);
+      u.uDissolve.value = 1 - ease.inOut(kk);
+      u.uGlow.value = Math.max(smoothstep(0.55, 1, k), stepGlow * 0.9);
       stepForge(dt);
       if (k >= 1) {
         u.uDissolve.value = 0;
         u.uGlow.value = 1;
         forge.clear();
         if (fx) { burstT = 0; burstEl = swapEl; burstSil = incoming.userData.silhouette; burstMatrix.copy(incoming.matrixWorld); }
-        if (swapEl === 'lightning') { holder.updateMatrixWorld(true); strike(incoming); }
+        holder.updateMatrixWorld(true);
+        if (swapEl === 'lightning') { strike(incoming, 1, 0.3); hooks.onForgeStrike?.(0.8); }
+        if (swapEl === 'ice') { cocoonT = 0; hooks.onForgeStrike?.(0.4); } // the cocoon cracks off
         hooks.onFormed?.(swapPayload);
         next('hold', t - D.form);
       }
