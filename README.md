@@ -62,8 +62,9 @@ src/content.json ──► content.js ──► render.js (HTML) ──► main.
 
 Pushes to `main` deploy to GitHub Pages (`.github/workflows/deploy.yml`) only if the code
 lints, type-checks, passes the unit tests and loads cleanly in a browser (`e2e/`: every
-screen and Bonfire Live). Pull requests run the same checks (`checks.yml`). The admin is a
-separate deploy: `npm run admin:deploy`.
+screen and Bonfire Live). The same workflow deploys the admin's Cloudflare Worker once a
+`CLOUDFLARE_API_TOKEN` secret is set (docs/admin.md). Pull requests run the same checks
+(`checks.yml`).
 
 ## Docs
 

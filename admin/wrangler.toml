@@ -1,6 +1,8 @@
-# The admin panel Worker. Deploy with `npm run admin:deploy` (builds the page first).
+# The admin panel Worker. Pushes to main deploy it (.github/workflows/deploy.yml); by hand:
+# `npm run admin:deploy` (builds the page first).
 # One-time setup (Cloudflare Access, GitHub App, secrets): see "Admin panel" in README.md.
 name = "nhoang-admin"
+account_id = "90d160464f44b27cb7b5a6848a85416d"
 main = "worker.js"
 compatibility_date = "2026-09-01"
 workers_dev = true

@@ -174,7 +174,13 @@ and validates them first; nothing is stored.
    ```
    A fine-grained token for this repo (Contents read/write, Actions read) set as
    `GITHUB_TOKEN` also works instead of the app, but a leaked token lives longer.
-5. Run `npm run admin:deploy` again. Then set the Worker's URL in the `admin-url` meta
+5. **Deploys on merge:** in Cloudflare → My Profile → API Tokens → **Create Token**, use
+   the **Edit Cloudflare Workers** template, limited to this account. In GitHub → the
+   repo → Settings → Secrets and variables → Actions, add it as `CLOUDFLARE_API_TOKEN`.
+   From then on every push to `main` that passes the checks redeploys the Worker
+   alongside the site (`deploy.yml`, job `admin`). Without the secret that job skips
+   with a warning. `npm run admin:deploy` still deploys by hand.
+6. Run `npm run admin:deploy` again. Then set the Worker's URL in the `admin-url` meta
    tag of `public/admin/index.html`, so `nhoang.dev/admin` forwards to it. If you ever
    move `nhoang.dev`'s DNS to Cloudflare, you can route the Worker at
    `nhoang.dev/admin*` directly instead.
