@@ -7,7 +7,7 @@ import {
 const BASE = import.meta.env?.BASE_URL ?? '/'; // (outside Vite, e.g. under node --test: the root)
 
 export { esc } from './html.js';
-import { esc, isSafeUrl, assetUrl } from './html.js';
+import { esc, isSafeUrl, assetUrl, corners } from './html.js';
 import { logoMark } from './ui/logo.js';
 export const isExternal = (href) => /^(https?:|mailto:)/i.test(href);
 export const url = (href) => {
@@ -18,7 +18,7 @@ export const linkAttrs = (href) =>
   `href="${esc(url(href))}"${/^https?:/i.test(href) ? ' target="_blank" rel="noopener noreferrer"' : ''}`;
 export const img = (src, card = false) => assetUrl(src, BASE, card);
 
-export const corners = '<span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>';
+export { corners };
 const screenMeta = Object.fromEntries(screens.map((s) => [s.id, s]));
 
 function screenHead(id) {

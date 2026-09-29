@@ -339,15 +339,220 @@ body[data-screen='home'] .tabs { visibility: hidden; }
 .prompt { display: inline-flex; align-items: center; gap: 5px; }
 .prompt kbd { font-size: 0.8125rem; }
 .prompt-stoke { color: color-mix(in srgb, var(--c-bone) 55%, var(--c-void)); }
+/* One place on every screen (bottom center, where the fire is), so switching screens never
+   moves them; a prompt that doesn't apply dims instead of leaving a gap. */
 @media (min-width: 1100px) and (hover: hover) {
-  .prompts { display: flex; max-width: 400px; }
-  body[data-screen='home'] .prompts,
-  body[data-screen='skills'] .prompts,
-  body[data-screen='contact'] .prompts { left: auto; right: var(--gutter); justify-content: flex-end; }
-  body[data-screen='projects'] .prompts { left: calc(30% + 64px); max-width: 330px; }
-  body[data-screen='projects'].is-inspecting .prompts { left: calc(42% + 64px); }
+  .prompts { display: flex; left: 50%; transform: translateX(-50%); justify-content: center; width: max-content; max-width: calc(100vw - 2 * var(--gutter) - 140px); }
 }
-body[data-screen='home'] .prompt[data-prompt='Back'] { display: none; }
+body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
+
+/* ---------- The pack (bottom right: ui/pack.js) ----------
+   A backpack slot; hovered, tapped or opened with I, its items rise out of it one by one,
+   and each item's options fly out beside it as a text list. Pixel icons (ui/pixelArt.js)
+   are line art in the text color with accent pixels in the flame's bright color. */
+
+.pack {
+  position: fixed;
+  right: var(--gutter);
+  bottom: 14px;
+  z-index: 16;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.no-webgl .pack,
+.is-photo .pack,
+.is-breakdown .pack { display: none; }
+.pack-items { display: flex; flex-direction: column; gap: 6px; }
+.pack-items[hidden] { display: none; }
+.pack-item { position: relative; }
+
+.pack-slot,
+.pack-toggle {
+  --b: var(--line-strong);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--c-void) 80%, transparent);
+  color: var(--text-dim);
+  box-shadow: 0 -1px 0 var(--b), 0 1px 0 var(--b), -1px 0 0 var(--b), 1px 0 0 var(--b);
+  cursor: pointer;
+  transition: box-shadow var(--snap) steps(2);
+}
+.pack-slot:hover,
+.pack-slot:focus-visible,
+.pack-item.is-shown .pack-slot,
+.pack-toggle:hover,
+.pack-toggle:focus-visible,
+.pack.is-open .pack-toggle { --b: var(--accent); color: var(--c-bone); outline: none; }
+.pack-slot:focus-visible,
+.pack-toggle:focus-visible { box-shadow: 0 -1px 0 var(--b), 0 1px 0 var(--b), -1px 0 0 var(--b), 1px 0 0 var(--b), 0 0 0 3px var(--c-void), 0 0 0 4px var(--accent-hi); }
+/* The shown item's slot: inner corner brackets, like the inventory's cursor. */
+.pack-item.is-shown .pack-slot::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 0 0 / 6px 2px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 0 0 / 2px 6px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 100% 0 / 6px 2px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 100% 0 / 2px 6px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 0 100% / 6px 2px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 0 100% / 2px 6px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 100% 100% / 6px 2px,
+    linear-gradient(var(--accent-hi), var(--accent-hi)) 100% 100% / 2px 6px;
+  background-repeat: no-repeat;
+  animation: slot-flash 240ms steps(3) both;
+}
+.pack-toggle kbd {
+  position: absolute;
+  left: -8px;
+  top: -8px;
+  min-width: 0;
+  padding: 0 4px;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  background: var(--c-void);
+}
+
+.px-icon { display: block; width: 32px; height: 32px; overflow: visible; }
+.px-line { fill: currentColor; }
+.px-accent { fill: var(--accent-hi); }
+.px-icon > g:not(.px-f0) { display: none; }
+
+/* The backpack bobs now and then; open, its flap is thrown back and its mouth glows. */
+.px-backpack { animation: pack-bob 5.2s steps(1) infinite; }
+@keyframes pack-bob {
+  0%, 90%, 100% { transform: none; }
+  92%, 96% { transform: translateY(-2px); }
+  94% { transform: translateY(-4px); }
+}
+.pack.is-open .px-backpack { animation: none; }
+.pack.is-open .px-backpack .px-f0 { display: none; }
+.pack.is-open .px-backpack .px-f1 { display: inline; }
+
+/* Items rise out of the pack, the nearest first. */
+.pack.is-open .pack-item { animation: pack-rise 240ms steps(4) both; animation-delay: calc(var(--i) * 50ms); }
+@keyframes pack-rise {
+  from { opacity: 0; transform: translateY(calc(20px + var(--i) * 10px)) scale(0.5); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Each item's icon comes alive while it's hovered or showing its list. */
+.pack-item:is(:hover, .is-shown) .px-map .px-f1 { display: inline; animation: px-flip-b 0.9s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-map .px-f0 { animation: px-flip-a 0.9s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-hammer { transform-origin: 50% 82%; animation: px-swing 0.9s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-tome .px-f1 { display: inline; animation: px-flip-b 1.2s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-tome .px-f0 { animation: px-flip-a 1.2s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-tome { animation: px-hop 1.2s steps(1) infinite; }
+@keyframes px-flip-a { 50% { opacity: 0; } }
+@keyframes px-flip-b { 0% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes px-swing {
+  0%, 100% { transform: none; }
+  20% { transform: rotate(-22deg); }
+  38% { transform: rotate(-38deg); }
+  50% { transform: rotate(8deg) translateY(2px); }
+  62% { transform: rotate(2deg); }
+}
+@keyframes px-hop { 0%, 100% { transform: none; } 50% { transform: translateY(-2px); } }
+
+/* An item's options: a text list flying out beside it. */
+.pack-list {
+  position: absolute;
+  right: calc(100% + 12px);
+  bottom: -4px;
+  width: max-content;
+  min-width: 210px;
+  max-width: min(290px, calc(100vw - 100px));
+  max-height: min(62vh, 460px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-stone) transparent;
+  padding: 14px 10px 10px;
+  background: color-mix(in srgb, var(--c-void) 92%, transparent);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.pack-list[hidden] { display: none; }
+.pack-list.is-in { animation: pack-list-in 220ms steps(4) both; }
+@keyframes pack-list-in {
+  from { opacity: 0; transform: translateX(12px); clip-path: inset(0 0 0 100%); }
+  to { opacity: 1; transform: none; clip-path: inset(0); }
+}
+.pack-list-title {
+  margin: 0 6px 8px;
+  font-family: var(--font-pixel);
+  font-size: 0.8125rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-hi);
+}
+.pack-list-title span {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--text-dim);
+}
+.pack-options { display: grid; gap: 1px; }
+.pack-list.is-long { max-width: min(420px, calc(100vw - 100px)); }
+.pack-list.is-long .pack-options { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 6px; }
+@media (max-width: 559px) { .pack-list.is-long .pack-options { grid-template-columns: 1fr; } }
+.pack-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-pixel);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  text-align: left;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.pack-option .cursor { width: 7px; height: 10px; visibility: hidden; color: var(--accent-hi); }
+.pack-option:hover,
+.pack-option:focus-visible { color: var(--c-bone); background: var(--c-shadow); outline: none; }
+.pack-option:hover .cursor,
+.pack-option:focus-visible .cursor { visibility: visible; }
+.pack-option.is-current { color: var(--accent-hi); }
+.pack-option .gem { flex: none; width: 7px; height: 7px; margin-left: auto; box-shadow: none; background: var(--accent-hi); }
+.pack-option:disabled { opacity: 0.4; cursor: default; }
+.pack-option:disabled:hover { background: transparent; color: var(--text-dim); }
+.pack-option:disabled .cursor { visibility: hidden; }
+.pack-heading {
+  margin: 8px 6px 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-pixel);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+@media (max-width: 559px) {
+  .pack { right: 12px; bottom: 12px; }
+  .pack-slot, .pack-toggle { width: 44px; height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .px-backpack,
+  .pack.is-open .pack-item,
+  .pack-list.is-in,
+  .pack-item:is(:hover, .is-shown) :is(.px-icon, .px-icon > g) { animation: none !important; }
+  .pack-item:is(:hover, .is-shown) .px-icon > g.px-f1 { display: none; }
+}
 
 /* ---------- Screens ---------- */
 

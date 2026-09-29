@@ -14,7 +14,7 @@
 // Glowing parts ("glows") pulse in the flame's colors like the coals in the ash pile.
 import * as THREE from 'three';
 
-export const SCENERIES = { ruins: 'Gothic Ruins', forge: 'The Forge', shrine: 'The Shrine' };
+export { SCENERIES } from '../sceneries.js';
 
 // Where the ruins stand (three.js coordinates: the model's +y is -z here).
 const LEFT = new THREE.Vector3(-1.45, 0, -1.35);

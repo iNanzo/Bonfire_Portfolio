@@ -390,3 +390,20 @@ body.hud-off .viz-hud { display: none; }
   /* A soft shade behind the start menu's text, so it reads over the scenery. */
   .viz-start { background: linear-gradient(90deg, color-mix(in srgb, var(--c-void) 78%, transparent) 0, transparent 52%); }
 }
+
+/* ---------- Back to the portfolio (start screen) ---------- */
+
+.viz-home {
+  position: fixed;
+  top: 14px;
+  left: var(--gutter);
+  z-index: 11;
+}
+body[data-mode='live'] .viz-home { display: none; }
+
+/* ---------- The pack (ui/pack.js; styles.css): above the HUD, fading with it ---------- */
+
+body.viz .pack { bottom: calc(var(--hud-h, 0px) + 24px); z-index: 21; transition: opacity 360ms steps(3); }
+body[data-mode='start'] .pack { bottom: 14px; }
+body.is-idle .pack:not(.is-open) { opacity: 0; pointer-events: none; }
+body.hud-off .pack:not(.is-open) { display: none; }

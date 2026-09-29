@@ -32,6 +32,10 @@ import { createDemo, DEMO_BPM } from './demo.js';
 import { bindSettings, loadSettings, resetSettings, saveSettings, settingsMarkup } from './settings.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
+import { createPack, bonfireItems } from '../ui/pack.js';
+import { logoMark } from '../ui/logo.js';
+import { SCENERIES } from '../sceneries.js';
+import { site, ui } from '../content.js';
 
 // Finding this page is one of the site's discoveries (counted when you're back on the site).
 createDiscoveries().discover('visualizer');
@@ -76,6 +80,7 @@ const KEYS = [
   ['H', 'Hide or show the controls'],
   ['F', 'Full screen'],
   ['S', 'Settings'],
+  ['I', 'The pack: swap the scene or the weapon, cast a ring, a living blade or a new element'],
 ];
 
 const app = document.getElementById('viz');
@@ -86,6 +91,9 @@ app.innerHTML = `
   </div>
   <p class="visually-hidden" aria-live="polite" data-live></p>
 
+  <a class="brand viz-home" href="${esc(import.meta.env.BASE_URL)}" aria-label="${esc(site.name)}: back to the portfolio" data-home-link>
+    ${logoMark('brand-mark')}<span class="brand-name">${esc(site.name)}</span>
+  </a>
   <section class="viz-start" data-start aria-labelledby="viz-title">
     <div class="viz-start-copy">
       <p class="eyebrow">Audio-Reactive Visualizer</p>
@@ -640,6 +648,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'f') toggleFullscreen();
   else if (k === 's') openSettings();
   else if (k === 'h') { document.body.classList.toggle('hud-off'); wake(); }
+  else if (k === 'i') { pack.toggle(); wake(); }
   else if (document.body.dataset.mode !== 'live' || !fire) return;
   else if (e.key === ' ') { e.preventDefault(); actions.drop(); }
   else if (k === 'a') actions.arm();
@@ -679,6 +688,29 @@ function applySettings() {
   saveSettings(settings);
 }
 const settingsPanel = bindSettings(settingsDialog, settings, { onChange: applySettings, onNote: (text) => note(text, 1.5) });
+
+// --- The pack (ui/pack.js, the same as the site's): scene, weapon and spells by hand -----------
+const pack = createPack({
+  label: ui.pack,
+  items: bonfireItems({
+    state: () => (fire ? { scenery: fire.scenery, weapon: fire.weapon, element: fire.element } : null),
+    busy: () => !fire || fire.forging,
+    reducedMotion,
+    onScene: (key) => { if (fire?.setScenery(key, { flash: true })) note(`Scene: ${SCENERIES[key]}`, 1.5); },
+    onWeapon: (key) => {
+      if (!fire || key === fire.weapon) return;
+      if (fire.forging) { note('The forge is busy', 1.5); return; }
+      fire.equip(key, fire.flame, { element: fire.element }).catch(() => {});
+      note(`Forging the ${weapons[key]}`, 2);
+    },
+    onRing: () => director?.ring(1),
+    onLiving: () => actions.combo(),
+    onElement: (key) => { if (!director?.hit({ element: key })) note('The forge is busy', 1.5); },
+  }),
+});
+app.append(pack.el);
+// It sits just above the HUD while the HUD is up.
+new ResizeObserver(() => document.body.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`)).observe(hud);
 settingsDialog.addEventListener('show-card', (e) => { settingsDialog.close(); showCard(e.detail); });
 
 // --- Beat by hand: a typed BPM, nudges -----------------------------------------------------

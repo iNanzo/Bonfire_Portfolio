@@ -628,8 +628,10 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   const terrains = {};
   const sceneryMaterials = {};
   const sceneries = {};
-  function setScenery(name) {
+  /** Move the fire to another place (SCENERIES). `flash`: the change lands like a hit, a flash hiding the cut. */
+  function setScenery(name, { flash = false } = {}) {
     if (!ready || !SCENERIES[name] || name === sceneryKey) return false;
+    if (flash) { hit(0.6, { freeze: false }); fire.burst(0.6 * flameShare(elementKey)); }
     const show = (key, on) => {
       if (key === 'ruins') { for (const o of ruinsOnly) o.visible = on; candleLight.visible = on; return; }
       const s = sceneries[key];

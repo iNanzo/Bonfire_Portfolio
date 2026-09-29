@@ -8,7 +8,7 @@
 // read what it does. Every effect has a three-way switch: off, in the mix (it comes and
 // goes), always. Presets set many at once for a kind of night; setups are your own saved
 // snapshots (and can be exported to a file and imported on another computer).
-import { esc } from '../html.js';
+import { esc, corners } from '../html.js';
 import { elements } from '../elements.js';
 import { MOVES } from '../bonfire/bladeMotion.js';
 import { DEFAULT_SETTINGS } from './director.js';
@@ -137,7 +137,6 @@ function writeSetups(all) { try { localStorage.setItem(SETUPS, JSON.stringify(al
 const snapshot = (settings) => Object.fromEntries(Object.entries(structuredClone(settings)).filter(([k]) => !LOCAL.includes(k)));
 
 // --- the dialog ---------------------------------------------------------------------------
-const corners = '<span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>';
 let tipId = 0;
 /** A "?" that shows `hint` on hover or focus (and is read out as the field's description). */
 const tip = (hint) => {

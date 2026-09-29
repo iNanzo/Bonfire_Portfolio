@@ -16,6 +16,8 @@ import { setupInventory } from './ui/inventory.js';
 import { createDiscoveries } from './ui/discoveries.js';
 import { createPhotoMode } from './ui/photo.js';
 import { createBreakdown } from './ui/breakdown.js';
+import { createPack, bonfireItems } from './ui/pack.js';
+import { SCENERIES } from './sceneries.js';
 import { applyFlame, setAccentRamp } from './ui/theme.js';
 import { parseRoute, readRoute, routePath, isEditing } from './routes.js';
 import { updateMetadata } from './seo.js';
@@ -183,6 +185,7 @@ function onImpact(flame, _from, instant, selection) {
     blip(el === 'fire' ? 'stab' : `stab-${el}`);
     live.textContent = `The fire takes the ${weapons[displayedEquipment.weapon]}. ${fireName(displayedEquipment)}.`;
   }
+  pack.refresh();
 }
 
 // --- Router --------------------------------------------------------------------------------
@@ -284,6 +287,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'f') { photo.toggle(); return; }
   if (k === 'b') { breakdown.toggle(); return; }
   if (photo.active || breakdown.active) return;
+  if (k === 'i') { pack.toggle(); return; }
   if (k === 'q' || k === 'e') step(k === 'e' ? 1 : -1);
   else if (e.key === 'Escape') {
     if (!q('[data-kindled]').hidden) return;
@@ -473,6 +477,46 @@ window.addEventListener('pointermove', (e) => {
   setHover(what);
 }, { passive: true });
 document.documentElement.addEventListener('pointerleave', () => { fire?.hoverOff(); setHover(null); });
+
+// --- The pack (ui/pack.js): swap the scene or the weapon, or cast a spell -------------------
+// Weapons and spells follow what was last asked for (the gem moves as you pick), the scene
+// what's there now.
+const pack = createPack({
+  label: ui.pack,
+  items: bonfireItems({
+    state: () => (fire ? { scenery: fire.scenery, weapon: equipment.weapon, element: equipment.element } : null),
+    busy: () => !fire || fire.forging,
+    reducedMotion,
+    onScene: (key) => {
+      if (!fire?.setScenery(key, { flash: true })) return;
+      blip('stoke');
+      discover('scenery');
+      live.textContent = `The fire burns in ${SCENERIES[key]}.`;
+    },
+    onWeapon: (key) => { if (key !== equipment.weapon) equip(key, equipment.flame, equipment.item); },
+    onRing: () => {
+      fire?.ring(1.2);
+      blip(fire?.element === 'lightning' ? 'zap' : fire?.element === 'ice' ? 'chime' : 'stoke');
+      discover('spell');
+    },
+    onLiving: () => {
+      if (!fire || fire.forging) return;
+      blip('pull');
+      fire.flourish().then((ok) => { if (ok) blip('stab'); });
+      discover('flourish');
+      discover('spell');
+    },
+    // A new spell forges a new weapon in that element (the swap takes after it).
+    onElement: (key) => {
+      if (key === equipment.element) return;
+      equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, { element: key });
+      discover('spell');
+    },
+  }),
+  onSound: (kind) => blip(kind === 'open' ? 'pack' : kind),
+  onOpen: () => discover('pack'),
+});
+app.append(pack.el);
 
 // --- The bonfire --------------------------------------------------------------------------
 function failScene(error) {
