@@ -28,6 +28,10 @@ export function assetUrl(src, base = '/', card = false) {
   if (!/^assets\/projects\/[a-z0-9-]+\/[a-z0-9-]+$/.test(src)) throw new Error('Invalid project image path: ' + src);
   return base + src + (card ? '-card' : '') + '.webp';
 }
+/** A project clip's URL (an image entry with `video: true`: <src>.mp4 beside its .webp poster). */
+export function videoUrl(src, base = '/') {
+  return assetUrl(src, base).replace(/\.webp$/, '.mp4');
+}
 
 /** The four ornate corner brackets of a `.frame` panel (styles.css). */
 export const corners = '<span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>';

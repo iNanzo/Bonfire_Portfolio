@@ -7,7 +7,7 @@ import {
 const BASE = import.meta.env?.BASE_URL ?? '/'; // (outside Vite, e.g. under node --test: the root)
 
 export { esc } from './html.js';
-import { esc, isSafeUrl, assetUrl, corners } from './html.js';
+import { esc, isSafeUrl, assetUrl, videoUrl, corners } from './html.js';
 import { logoMark } from './ui/logo.js';
 export const isExternal = (href) => /^(https?:|mailto:)/i.test(href);
 export const url = (href) => {
@@ -17,6 +17,7 @@ export const url = (href) => {
 export const linkAttrs = (href) =>
   `href="${esc(url(href))}"${/^https?:/i.test(href) ? ' target="_blank" rel="noopener noreferrer"' : ''}`;
 export const img = (src, card = false) => assetUrl(src, BASE, card);
+export const clip = (src) => videoUrl(src, BASE);
 /** The résumé link's attributes (it opens in a new tab), or '' when there's none. */
 const resumeAttrs = () => (site.resumeUrl ? `href="${esc(url(site.resumeUrl))}" target="_blank" rel="noopener"` : '');
 
@@ -180,7 +181,7 @@ export function renderProjects() {
             </div>
           </div>
           <figure class="viewer">
-            <button class="viewer-stage" type="button" data-open-gallery aria-label="${esc(ui.openGallery)}"><img data-d="img" alt=""><span class="veil" aria-hidden="true"></span><span class="viewer-zoom" aria-hidden="true">${esc(ui.openGallery)}</span></button>
+            <button class="viewer-stage" type="button" data-open-gallery aria-label="${esc(ui.openGallery)}"><img data-d="img" alt=""><video data-d="video" muted loop playsinline preload="none" hidden></video><span class="veil" aria-hidden="true"></span><span class="viewer-zoom" aria-hidden="true">${esc(ui.openGallery)}</span></button>
             <div class="viewer-bar">
               <figcaption class="viewer-caption" data-d="caption"></figcaption>
               <div class="viewer-controls" data-d="controls">
@@ -208,6 +209,7 @@ export function renderProjects() {
         <dialog class="gallery" data-gallery aria-label="${esc(ui.gallery)}">
           <figure class="gallery-figure">
             <img data-gl="img" alt="">
+            <video data-gl="video" muted loop playsinline controls preload="none" hidden></video>
             <figcaption data-gl="caption"></figcaption>
           </figure>
           <div class="gallery-bar">

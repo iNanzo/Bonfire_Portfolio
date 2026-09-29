@@ -33,6 +33,7 @@ import { bindSettings, loadSettings, resetSettings, saveSettings, settingsMarkup
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
 import { createPack, bonfireItems } from '../ui/pack.js';
+import { createRecorder } from './record.js';
 import { logoMark } from '../ui/logo.js';
 import { SCENERIES } from '../sceneries.js';
 import { site, ui } from '../content.js';
@@ -76,6 +77,7 @@ const KEYS = [
   ['[ ]', 'Nudge the beat 10 ms earlier or later'],
   ['Shift+1…9', 'Show a title card (1 = the main one)'],
   ['O', 'Open the output window (for a projector)'],
+  ['V', 'Record a clip (the picture and the sound), saved when you stop'],
   ['C', 'Cut to another shot'],
   ['H', 'Hide or show the controls'],
   ['F', 'Full screen'],
@@ -154,6 +156,7 @@ app.innerHTML = `
       <span class="viz-group-label">View</span>
       <button class="pix-btn" type="button" data-act="cut" title="Cut to another camera shot"><kbd>C</kbd>Shot</button>
       <button class="pix-btn" type="button" data-act="output" title="Open a window with just the picture, to drag onto a projector"><kbd>O</kbd><span data-output-label>Output</span></button>
+      <button class="pix-btn viz-record" type="button" data-act="record" title="Record a clip of the picture and the sound; press again to stop and save it"><kbd>V</kbd><span data-record-label>Record</span></button>
       <button class="pix-btn" type="button" data-act="settings" title="Settings, presets, title cards"><kbd>S</kbd>Settings</button>
       <button class="pix-btn" type="button" data-act="fullscreen" title="Full screen"><kbd>F</kbd><span data-fs-label>Full Screen</span></button>
     </div>
@@ -233,6 +236,7 @@ function startScene() {
     await candidate.ready;
     if (generation !== sceneGeneration) { candidate.dispose(); return; }
     const prev = fire;
+    recorder?.stop(); // (a clip ends with the scene it was recording)
     fire = candidate;
     director = nextDirector;
     frameFire();
@@ -616,6 +620,7 @@ const actions = {
   'change-source': () => { stopSource(); showStart(); },
   'show-title': () => { if (!settings.title.trim()) q('[data-set="title"]').focus(); else { settingsDialog.close(); showCard(0); } },
   output: () => openOutput(),
+  record: () => recorder.toggle(),
   'nudge-early': () => nudge(-0.01),
   'nudge-late': () => nudge(0.01),
   downbeat: () => {
@@ -658,6 +663,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === '[') nudge(-0.01);
   else if (e.key === ']') nudge(0.01);
   else if (k === 'o') openOutput();
+  else if (k === 'v') actions.record();
   else if (e.shiftKey && /^Digit[1-9]$/.test(e.code)) showCard(Number(e.code.slice(5)) - 1);
   else if (k === 'c') actions.cut();
   else if (k === 'r') director.ring(1);
@@ -688,6 +694,19 @@ function applySettings() {
   saveSettings(settings);
 }
 const settingsPanel = bindSettings(settingsDialog, settings, { onChange: applySettings, onNote: (text) => note(text, 1.5) });
+
+// --- Recording a clip (record.js) -------------------------------------------------------------
+const recordLabel = q('[data-record-label]');
+const recorder = createRecorder({
+  scene: () => fire,
+  audio: () => (engine?.source ? { ctx: engine.ctx, node: engine.delay } : null),
+  onState: ({ recording, seconds, saved, error }) => {
+    document.body.classList.toggle('is-recording', recording);
+    recordLabel.textContent = recording ? `Rec ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : 'Record';
+    if (saved) note(`Saved ${saved}`, 3);
+    if (error) note(error, 3);
+  },
+});
 
 // --- The pack (ui/pack.js, the same as the site's): scene, weapon and spells by hand -----------
 const pack = createPack({

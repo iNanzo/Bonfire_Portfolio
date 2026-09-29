@@ -407,3 +407,7 @@ body.viz .pack { bottom: calc(var(--hud-h, 0px) + 24px); z-index: 21; transition
 body[data-mode='start'] .pack { bottom: 14px; }
 body.is-idle .pack:not(.is-open) { opacity: 0; pointer-events: none; }
 body.hud-off .pack:not(.is-open) { display: none; }
+
+/* Recording a clip (V): the button burns red and blinks while it records. */
+body.is-recording .viz-record { --b: #e03a3a; color: #ff8a8a; }
+body.is-recording .viz-record [data-record-label]::before { content: 'CF A0'; animation: blink 1s steps(1) infinite; }

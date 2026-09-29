@@ -1135,8 +1135,10 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
       ctx.drawImage(canvas, 0, 0, out.width, out.height);
       for (const done of captures.splice(0)) out.toBlob(done, 'image/png');
     }
+    for (const fn of rendered) fn();
   }
   const captures = [];
+  const rendered = new Set(); // called right after each frame is drawn (onRendered)
 
   let running = false;
   function syncRunning() {
@@ -1314,7 +1316,11 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     stoke, puff, equip, weaponAt, hoverAt, hoverOff, flourish, breakdown, stats, setScenery,
     get scenery() { return sceneryKey; },
     /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
-    capture: () => new Promise((resolve) => captures.push(resolve)), setView: view.setView, setPose: view.setPose, viewAxes: view.axes, cycle, describe, flash, applyEffects, refreshScene, pulse, sparkle, ring, echo, swing, drive, glitch, ready: loaded,
+    capture: () => new Promise((resolve) => captures.push(resolve)), setView: view.setView,
+    /** The canvas the scene draws into (low resolution: see resize). */
+    get canvas() { return canvas; },
+    /** Call `fn` right after every frame is drawn, while the canvas still holds it (recording a clip). Returns an unsubscribe. */
+    onRendered(fn) { rendered.add(fn); return () => rendered.delete(fn); }, setPose: view.setPose, viewAxes: view.axes, cycle, describe, flash, applyEffects, refreshScene, pulse, sparkle, ring, echo, swing, drive, glitch, ready: loaded,
     /** A jolt of the camera (0..~0.3), if screen shake is on. */
     shake: (amount) => jolt(amount),
     /** Skip ahead: a running weapon swap plays fast up to its impact. False if none is running. */

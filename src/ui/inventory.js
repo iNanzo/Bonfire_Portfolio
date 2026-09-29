@@ -2,7 +2,7 @@
 // (route #/projects/<id>), screenshot viewer and full-size gallery, and "equipped"
 // markers. The grid shows just enough empty slots to finish its last row.
 import { items, ui } from '../content.js';
-import { esc, img, linkAttrs } from '../render.js';
+import { esc, img, clip, linkAttrs } from '../render.js';
 import { blip } from './audio.js';
 
 export function setupInventory(root, { reducedMotion }) {
@@ -78,14 +78,32 @@ export function setupInventory(root, { reducedMotion }) {
   if (list.length) showGlance(list[0].id);
 
   // --- Item details ----------------------------------------------------------------
+  /**
+   * Put image entry `im` in an <img>/<video> pair: a still, or a clip (`video: true`: its
+   * .mp4, with the still as the poster) that plays muted on a loop (paused under reduced
+   * motion, with the still until it's played).
+   */
+  function showMedia(im, still, video) {
+    still.alt = im.alt;
+    still.classList.toggle('pixel', !!im.pixel);
+    video.classList.toggle('pixel', !!im.pixel);
+    video.hidden = !im.video;
+    still.hidden = !!im.video;
+    if (im.video) {
+      video.poster = img(im.src);
+      video.setAttribute('aria-label', im.alt);
+      if (video.dataset.src !== im.src) { video.dataset.src = im.src; video.src = clip(im.src); }
+      if (!reducedMotion) video.play().catch(() => {});
+    } else {
+      video.pause();
+      still.src = img(im.src);
+    }
+  }
   function showImage(i) {
     const imgs = current.images;
     imageIndex = (i + imgs.length) % imgs.length;
     const im = imgs[imageIndex];
-    const el = d('img');
-    el.src = img(im.src);
-    el.alt = im.alt;
-    el.classList.toggle('pixel', !!im.pixel);
+    showMedia(im, d('img'), d('video'));
     d('caption').textContent = im.caption ?? '';
     d('img-count').textContent = `${imageIndex + 1} / ${imgs.length}`;
     d('thumbs').querySelectorAll('.thumb').forEach((t, n) => t.setAttribute('aria-current', String(n === imageIndex)));
@@ -144,9 +162,7 @@ export function setupInventory(root, { reducedMotion }) {
   function showGallery(i) {
     showImage(i);
     const im = current.images[imageIndex];
-    gl('img').src = img(im.src);
-    gl('img').alt = im.alt;
-    gl('img').classList.toggle('pixel', !!im.pixel);
+    showMedia(im, gl('img'), gl('video'));
     gl('caption').textContent = im.caption ?? '';
     gl('count').textContent = `${imageIndex + 1} / ${current.images.length}`;
     gallery.querySelectorAll('[data-gl-prev], [data-gl-next]').forEach((b) => { b.hidden = current.images.length < 2; });
@@ -160,7 +176,7 @@ export function setupInventory(root, { reducedMotion }) {
     if (e.key === 'ArrowLeft') { e.preventDefault(); showGallery(imageIndex - 1); blip('move'); }
     if (e.key === 'ArrowRight') { e.preventDefault(); showGallery(imageIndex + 1); blip('move'); }
   });
-  gallery.addEventListener('close', () => blip('back'));
+  gallery.addEventListener('close', () => { gl('video').pause(); blip('back'); });
 
   detail.addEventListener('click', (e) => {
     if (e.target.closest('[data-open-gallery]')) {

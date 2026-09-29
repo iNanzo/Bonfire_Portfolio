@@ -263,6 +263,7 @@ export function validateContent(c) {
         }
         if (im.caption !== undefined) text(im.caption, `${ip}.caption`);
         flag(im.pixel, `${ip}.pixel`);
+        flag(im.video, `${ip}.video`);
         flag(im.hidden, `${ip}.hidden`);
       });
     }
