@@ -246,6 +246,7 @@ export function createFireflies(template, {
   const col = new THREE.Color();
   const colB = new THREE.Color();
   const desired = new THREE.Vector3();
+  const drift = new THREE.Vector3(); // a gentle push on everyone in flight (the site's scrolling)
   const flow = new THREE.Vector3();
   const screen = new THREE.Vector3();
   const right = new THREE.Vector3();
@@ -665,6 +666,7 @@ export function createFireflies(template, {
       if (land && Math.hypot(f.wp.pos.x - f.leash.x, f.wp.pos.z - f.leash.z) > f.leash.r + 0.6) { f.wp = pickWaypoint(f.pos); f.wpAge = 0; }
     }
     if (flowAt) desired.add(flowAt(f.pos.x, f.pos.y, f.pos.z, flow).multiplyScalar(0.35));
+    if (!final) desired.add(drift);
     f.vel.lerp(desired, 1 - Math.exp(-dt * (final ? 4 : 1.8)));
     moveThrough(f, dt, final);
   }
@@ -804,6 +806,8 @@ export function createFireflies(template, {
     pulse,
     dance,
     dart,
+    /** World m/s added to every firefly in flight (the scene eases it: the page's scrolling). */
+    drift,
     burst,
     trails: trails?.points ?? null,
     /** Send resting ones (those `which` picks) up into the air. */

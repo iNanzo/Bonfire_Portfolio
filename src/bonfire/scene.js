@@ -263,6 +263,9 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   // how far the fire has risen, brightened and started sparking to meet it (update).
   let hoverFlare = 0;
   let hoverGlow = 0;
+  // The page's scrolling (scroll(), below): an impulse that fades in a moment, sweeping the
+  // particles and the fireflies a little the way the page moves (-1..1, + up).
+  let sweep = 0;
 
   function applyFireParams() {
     const f = effects.fire;
@@ -845,6 +848,17 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     if (hoverGlow > 0.3 && Math.random() < realDt * 30 * hoverGlow) fire.sparkle(2);
     fire.params.level += (targetLevel + drive.level + 1.1 * hoverGlow - fire.params.level) * Math.min(1, dt * 1.1);
     fire.wind.set(drive.windX, 0, drive.windZ);
+    // Scrolling: the loose particles and the fireflies are swept along with the page, a little.
+    sweep *= Math.exp(-realDt / 0.3);
+    if (Math.abs(sweep) > 0.004) {
+      const push = sweep * 2.6 * realDt;
+      for (const set of sets) {
+        const V = set.vel;
+        const cap = set.maxV ?? 2;
+        for (let i = 0; i < set.n; i++) V[i * 3 + 1] = Math.max(-cap, Math.min(cap, V[i * 3 + 1] + push));
+      }
+      fireflies.drift.set(0, sweep * 0.55, 0);
+    } else if (fireflies.drift.y) fireflies.drift.set(0, 0, 0);
     for (const id of ELEMENT_IDS) {
       const d = (id === elementKey ? 1 : 0) - presence[id];
       presence[id] += Math.sign(d) * Math.min(Math.abs(d), dt / 0.6);
@@ -1111,11 +1125,43 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     return { drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, texels: `${size.w}×${size.h}`, systems: [...systems.values()] };
   }
 
-  /** A click anywhere makes the fireflies flash (brightest near the click). */
+  /**
+   * A click anywhere makes the fireflies flash (brightest near the click), and a soft gust
+   * goes out from it: the loose particles near the line under the cursor are pushed away.
+   */
+  const gustRay = new THREE.Raycaster();
+  const gustAt = new THREE.Vector3();
   function flash(clientX, clientY) {
     if (!fireflies) return;
     const r = canvas.getBoundingClientRect();
     fireflies.flash(clientX - r.left, clientY - r.top, camera, r.width, r.height);
+    if (reducedMotion) return;
+    pickNdc.set(((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
+    gustRay.setFromCamera(pickNdc, camera);
+    const { origin: o, direction: d } = gustRay.ray;
+    const R = 0.5;
+    for (const set of sets) {
+      const P = set.pos, V = set.vel;
+      const cap = set.maxV ?? 2;
+      for (let i = 0; i < set.n; i++) {
+        const ix = i * 3;
+        const px = P[ix] - o.x, py = P[ix + 1] - o.y, pz = P[ix + 2] - o.z;
+        const along = px * d.x + py * d.y + pz * d.z;
+        if (along <= 0) continue;
+        gustAt.set(px - d.x * along, py - d.y * along, pz - d.z * along); // from the ray to the particle
+        const dist = gustAt.length();
+        if (dist > R || dist < 1e-4) continue;
+        const k = 1.1 * (1 - dist / R) ** 2 / dist;
+        V[ix] = Math.max(-cap, Math.min(cap, V[ix] + gustAt.x * k));
+        V[ix + 1] = Math.max(-cap, Math.min(cap, V[ix + 1] + gustAt.y * k + 0.15 * (1 - dist / R)));
+        V[ix + 2] = Math.max(-cap, Math.min(cap, V[ix + 2] + gustAt.z * k));
+      }
+    }
+  }
+  /** The page scrolled by `dy` CSS px (+ down): everything loose is swept a little the way the page moved. */
+  function scroll(dy) {
+    if (!ready || reducedMotion || !dy) return;
+    sweep = Math.max(-1, Math.min(1, sweep + Math.max(-150, Math.min(150, dy)) / 420));
   }
 
   /** The scenery colors (palette.js `base`) changed: take them up (the visualizer's random palettes). */
@@ -1155,7 +1201,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   }
 
   return {
-    stoke, puff, equip, weaponAt, hoverAt, hoverOff, flourish, breakdown, stats, setScenery,
+    stoke, puff, equip, weaponAt, hoverAt, hoverOff, flourish, breakdown, stats, setScenery, scroll,
     get scenery() { return sceneryKey; },
     /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
     capture: frame.capture, setView: view.setView,

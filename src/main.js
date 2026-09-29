@@ -206,6 +206,7 @@ function go(hash) {
 // you're going (Q/E, or a tab to the left or right of this one).
 let leaving = null;
 let leaveTimer = 0;
+let lastScrollY = 0; // (the page's scroll, for the fire's sweep: see "Scrolling" below)
 let stepDir = 0; // set by step() for the one render it triggers (it wraps around the ends)
 function finishLeaving() {
   clearTimeout(leaveTimer);
@@ -253,6 +254,7 @@ function render(next, user) {
     void el.offsetWidth;
     el.classList.add('is-entering');
     window.scrollTo({ top: 0, behavior: 'instant' });
+    lastScrollY = 0; // (the jump to the top isn't a scroll to sweep the fire with)
   }
   document.body.dataset.screen = next.screen;
   qa('[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === next.screen));
@@ -338,6 +340,21 @@ window.addEventListener('keydown', (e) => {
 
 // --- Header, rest menu, sound ---------------------------------------------------------------
 const onScroll = () => header.classList.toggle('is-scrolled', window.scrollY > 24);
+
+// Scrolling sweeps the fire's loose particles and the fireflies a little the way the page
+// moves (scene.js scroll): the wheel with a mouse (so it's felt on screens that don't
+// scroll, like home), the page's own scroll on touch screens. Not in photo mode (there the
+// wheel zooms), and not for the jump to the top when the screen changes (render()).
+lastScrollY = window.scrollY;
+window.addEventListener('wheel', (e) => {
+  if (touch || photo.active) return;
+  fire?.scroll(e.deltaMode === 1 ? e.deltaY * 32 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY);
+}, { passive: true });
+window.addEventListener('scroll', () => {
+  const dy = window.scrollY - lastScrollY;
+  lastScrollY = window.scrollY;
+  if (touch && dy) fire?.scroll(dy);
+}, { passive: true });
 
 // The current tab's underline glides from tab to tab (hidden on home, where no tab is current).
 function placeTabCursor() {
