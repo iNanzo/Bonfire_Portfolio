@@ -15,8 +15,9 @@
 //              Title Case label and a "?" hint.
 //   switches   Off / In the Mix / Always as three radios (src/ui/fields.js tri(): one
 //              keyboard stop, the arrow keys move along it): a layer, a drop hit, the
-//              outlines, the knights' edge glow, dance, shine and reactions. A layer's
-//              choices audition (below).
+//              outlines, the knights' edge glow, dance, shine and reactions. A section with
+//              any says what the three mean once, over its first (the map's TRI_HELP). A
+//              layer's choices audition (below).
 //   chips      a choice drawn as a button (`data-pick` + `data-value`, JSON): the place, a
 //              look, a flame, a shot. Hovering one with `data-audition` (or a layer's
 //              choice) shows it on the stage at once (an audition); leaving puts the scene
@@ -47,7 +48,7 @@ import { DROP_FX, LAYER_BLENDS, LAYER_DETAILS, LAYERS, PARAMS } from '../visuali
 import { KNIGHT_MOVES, MAX_KNIGHTS } from '../visualizer/knightShow.js';
 import { FLY_MOVES } from '../visualizer/fireflyMoves.js';
 import { SCENE_RANGES } from '../scenes.js';
-import { SETTINGS } from '../settingsMap.js';
+import { SETTINGS, TRI_HELP } from '../settingsMap.js';
 import { SCHEMES } from '../paletteGen.js';
 import { modeOf } from '../modes.js';
 import {
@@ -162,6 +163,10 @@ function selectRow(id, c, { num = false, undef = false } = {}) {
   if (undef) html = unset(html);
   return row(id, html + moreOf(r.more));
 }
+/** The rows that are Off / In the Mix / Always switches (a section with any says what those mean, once). */
+const isTri = (id) => ['outlines', 'knightGlow', 'knightShine', 'knightDance', 'knightReactions'].includes(id) || /^(layer|dropFx)\./.test(id);
+/** What Off / In the Mix / Always mean, said over a section's first switch. */
+const triHelp = () => `<p class="pnt-help" data-tri-help>${esc(TRI_HELP)}</p>`;
 /** An Off / In the Mix / Always row. `missing`: the mode a missing value means. */
 function triRow(id, { missing = 'off', audition = false } = {}) {
   const r = rowText(id);
@@ -361,7 +366,7 @@ const ROWS = {
   knightFormation: (id, s, c) => selectRow(id, c),
   knightMoves: pickList,
   knightReactions: (id) => triRow(id),
-  // (Its label is the preview's sub-heading: the row is the buttons.)
+  // (Its label is the preview's sub-heading's name: the row is the buttons.)
   gestures: (id) => row(id, `<div class="pnt-chips" role="group" aria-labelledby="pnt-g-preview">${choices(id).map(([g, name]) => `<button type="button" class="pix-btn" data-paint-act="gesture" data-gesture="${esc(g)}">${esc(name)}</button>`).join('')}</div>`),
 
   flyLit: rangeRow,
@@ -394,22 +399,32 @@ const context = (ctx) => ({ ...ctx, siteBase: ctx.siteBase ?? SITE_BASE });
 /**
  * One section's body (what's drawn again when its shape changes): its rows by group, each
  * of the Knights' groups under its sub-heading (but the first, which the section's own
- * heading names, and none while there's only the one group: no knights by the fire).
+ * heading names, and none while there's only the one group: no knights by the fire). A
+ * section with Off / In the Mix / Always switches says what those mean once, over its first.
  * @param {string} id  a section (SECTIONS)
  * @param {any} scene
  * @param {PanelCtx} [ctx]
  */
 export function sectionMarkup(id, scene, ctx = {}) {
   const c = context(ctx);
+  let said = false;
+  const rowOf = (r) => {
+    const html = rowMarkup(r, scene, c);
+    if (said || !html || !isTri(r)) return html;
+    said = true;
+    return triHelp() + html;
+  };
   const groups = sectionRows(id)
-    .map(([g, rows]) => /** @type {const} */ ([g, rows.filter((r) => rowShown(r, scene)).map((r) => rowMarkup(r, scene, c)).join('')]))
+    .map(([g, rows]) => /** @type {const} */ ([g, rows.filter((r) => rowShown(r, scene)).map(rowOf).join('')]))
     .filter(([, html]) => html);
   const heads = groups.length > 1;
   const name = PANEL_SECTIONS.find((s) => s.id === id)?.label;
   const body = groups.map(([g, html]) => {
     if (!g.head || !heads || g.head === name) return html;
     const t = g.id === 'preview' ? tip(OWN.gestures.hint, { label: g.head }).mark : '';
-    return `<div class="pnt-group" data-group="${esc(g.id)}"><h3 class="pnt-subhead" id="pnt-g-${esc(g.id)}">${hl(g.head)}${t ? ` ${t}` : ''}</h3>${html}</div>`;
+    // (The heading's name has an id of its own: a group it heads is named by it alone, not
+    // by its "?" and the hint's hidden text too.)
+    return `<div class="pnt-group" data-group="${esc(g.id)}"><h3 class="pnt-subhead"><span data-hl id="pnt-g-${esc(g.id)}">${esc(g.head)}</span>${t ? ` ${t}` : ''}</h3>${html}</div>`;
   }).join('');
   return (id === 'fire' ? `<p class="pnt-help">${esc(FIRE_HELP)}</p>` : '') + body;
 }

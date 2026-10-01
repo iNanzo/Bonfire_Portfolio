@@ -22,7 +22,7 @@ import {
 import { PANEL_SECTIONS, LAYOUT, OWN, PAINTER_ITEM_HINTS, groupsOf, rowText, rowShown, shownRule, sectionRows, choices, sectionOfRow } from '../src/painter/layout.js';
 import { searchEntries, findInPanel } from '../src/painter/panelSearch.js';
 import { PAINTER_KEYS, TOOLS, toolsMarkup } from '../src/painter/toolbar.js';
-import { PAINTER_SECTIONS, SECTIONS as MAP_SECTIONS, SETTINGS, ITEM_HINTS, SYNONYMS, entriesFor } from '../src/settingsMap.js';
+import { PAINTER_SECTIONS, SECTIONS as MAP_SECTIONS, SETTINGS, ITEM_HINTS, SYNONYMS, TRI_HELP, entriesFor } from '../src/settingsMap.js';
 import { buildMatcher } from '../src/ui/settingsSearch.js';
 import { titleCase } from '../src/text.js';
 import { createHistory } from '../src/painter/history.js';
@@ -100,8 +100,11 @@ test('sections: the settings map’s Painter sections, in order; every row place
   // gestures last, a preview.
   assert.deepEqual(groupsOf('knights').map((g) => g.head), ['Knights', 'Armor', 'Dancing', 'Behavior', 'Try a Gesture (Preview, Not Saved)']);
   const knights = sectionMarkup('knights', fullScene(), ctx);
-  assert.deepEqual([...knights.matchAll(/<h3 class="pnt-subhead"[^>]*><span data-hl>([^<]+)<\/span>/g)].map((m) => m[1]), ['Armor', 'Dancing', 'Behavior', 'Try a Gesture (Preview, Not Saved)']);
+  assert.deepEqual([...knights.matchAll(/<h3 class="pnt-subhead"><span data-hl id="pnt-g-\w+">([^<]+)<\/span>/g)].map((m) => m[1]), ['Armor', 'Dancing', 'Behavior', 'Try a Gesture (Preview, Not Saved)']);
   assert.doesNotMatch(sectionMarkup('knights', normalizeScene(withPath(defaultScene(), 'knights.count', 0)), ctx), /pnt-subhead/, 'no knights: only the count, no headings');
+  // The gestures' group is named by its heading's name alone (not its "?" and hidden hint too).
+  assert.match(knights, /<span data-hl id="pnt-g-preview">Try a Gesture \(Preview, Not Saved\)<\/span> <button type="button" class="viz-tip"/);
+  assert.match(knights, /role="group" aria-labelledby="pnt-g-preview"/);
 });
 
 for (const [name, make] of SCENES) {
@@ -250,6 +253,16 @@ test('panel: Off / In the Mix / Always are radios, one keyboard stop a switch (L
   for (const key of ['render.outlines', 'knights.glow', 'knights.dance', 'knights.shine', 'knights.reactions', 'drops.fx.iris']) assert.match(all, new RegExp(`data-set-group="${key.replace(/\./g, '\\.')}"`), key);
   assert.match(all, /data-scene="render\.outlines" value="on" data-missing/, 'outlines: missing is Always');
   assert.match(all, /data-scene="knights\.glow" value="mix" data-missing/, 'edge glow: missing is In the Mix');
+  // What the three mean, said once in each section that has them, over its first switch (and
+  // nowhere else: no hint repeats it).
+  const help = `<p class="pnt-help" data-tri-help>${TRI_HELP}</p>`;
+  for (const [id] of SECTIONS) {
+    const body = sectionMarkup(id, fullScene(), ctx);
+    const switches = body.indexOf('<fieldset class="tri"');
+    assert.equal(body.split(help).length - 1, switches >= 0 ? 1 : 0, id);
+    if (switches >= 0) assert.ok(body.indexOf(help) < switches, `${id}: over the first`);
+  }
+  assert.doesNotMatch(sectionMarkup('show', normalizeScene(defaultScene()), ctx), /data-tri-help/, 'the show’s drop hits: no switches, no line');
 });
 
 test('bulk: a toolbar’s button is one edit (one undo step) that keeps the scene’s rules', () => {
