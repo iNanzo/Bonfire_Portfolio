@@ -114,6 +114,9 @@ kbd {
   color: var(--text-dim);
   box-shadow: 0 -1px 0 var(--line-strong), 0 1px 0 var(--line-strong), -1px 0 0 var(--line-strong), 1px 0 0 var(--line-strong);
 }
+/* (A key's border is drawn a pixel outside it: the shortcuts list (?), which scrolls its
+   groups, keeps that pixel for the keys at its edges.) */
+.keys-overlay-groups { padding: 1px; }
 
 .cursor,
 .rest-menu .menu-item::before {
@@ -1475,6 +1478,8 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
   100% { transform: none; }
 }
 .render-reset { margin-top: 4px; }
+/* (Under grouped rows, Reset puts back every group, not just the last: set apart from them.) */
+.render-group ~ .render-reset { margin-top: 8px; box-shadow: 0 -1px 0 var(--line); }
 .render-reset:disabled { opacity: 0.4; cursor: default; }
 .render-reset:disabled:hover { color: var(--text-dim); background: transparent; }
 .render-reset:disabled .cursor { visibility: hidden; }
