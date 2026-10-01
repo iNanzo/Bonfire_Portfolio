@@ -16,6 +16,17 @@
 // around the scenery with a height map (see terrain.js), and land on tops and
 // walls: they hover in front of the spot, ease onto it along the surface normal,
 // fold their wings, and take off the same way.
+//
+// Drawing: every part (body, lantern, wings, the halos) is one InstancedMesh for all
+// the flies, five draws instead of five a fly. Each fly keeps a rig of its own (plain
+// Object3Ds, out of the scene: its place, its turn, its wings' flap), and place(camera),
+// just before the frame is drawn, writes the rigs into the instances: each part's
+// view-space matrix (the camera's inverse times its world matrix, as three.js works out
+// a mesh's modelViewMatrix), with the instanced meshes standing at the camera, so the
+// GPU multiplies each vertex by exactly the matrix it used for the part's own mesh; the
+// lantern's and halos' colors and the halos' opacity as a flat per-instance tint, so
+// each texel comes out as it did; and the halos back to front, the order three.js drew
+// them in (additive blending rounds after each one).
 import * as THREE from 'three';
 import { SimplexNoise } from 'three/examples/jsm/math/SimplexNoise.js';
 import { smooth, TAU } from '../math.js';
@@ -146,38 +157,67 @@ export function createFireflies(template, {
   }
 
   // --- the flies -------------------------------------------------------------
+  // One InstancedMesh per part of the model's firefly (in the model's order: the body, the
+  // lantern, the wings), and one for the halos: two nested translucent spheres round each
+  // lantern (sizes in the firefly's local units, which are scaled ×1.6), drawn last, added on.
+  const parts = [];
+  template.traverse((o) => { if (o.isMesh) parts.push(o); });
+  const kinds = parts.map((o) => {
+    const lantern = o.name.includes('Lantern');
+    const material = lantern
+      ? tinted(new THREE.MeshBasicMaterial({ fog: false }))
+      : new THREE.MeshLambertMaterial({ color: o.material.color.clone(), flatShading: true });
+    return instanced(lantern ? withTint(o.geometry.clone(), count) : o.geometry, material, count);
+  });
+  const lanternKind = parts.findIndex((o) => o.name.includes('Lantern'));
+  const haloMesh = instanced(withTint(sphere, count * 2), tinted(new THREE.MeshBasicMaterial({
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+  })), count * 2);
+  haloMesh.renderOrder = 2;
+  for (const m of [...kinds, haloMesh]) group.add(m);
+  sphere.computeBoundingSphere(); // (where three.js measures a halo's depth from, to sort it)
+
+  /** An InstancedMesh of `n` that place() fills: on the flies' layer, never culled as a whole. */
+  function instanced(geometry, material, n) {
+    const m = new THREE.InstancedMesh(geometry, material, n);
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    m.layers.set(layer);
+    m.frustumCulled = false;
+    // (It stands where the camera is, set by place(): see the top of the file.)
+    m.matrixAutoUpdate = false;
+    m.matrixWorldAutoUpdate = false;
+    return m;
+  }
+  /** A per-instance color and opacity (`tint`, rgba) on `geometry`. */
+  function withTint(geometry, n) {
+    const tint = new THREE.InstancedBufferAttribute(new Float32Array(n * 4), 4);
+    tint.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute('tint', tint);
+    return geometry;
+  }
+
   for (let i = 0; i < count; i++) {
-    const obj = template.clone(true);
+    // The fly's rig: the model's firefly as bare Object3Ds (no mesh of its own: the parts'
+    // instances follow it), with its two halos at the lantern.
+    const rig = [];
+    const bare = (o) => {
+      const b = new THREE.Object3D().copy(o, false);
+      if (o.isMesh) rig.push(b);
+      for (const c of o.children) b.add(bare(c));
+      return b;
+    };
+    const obj = bare(template);
     obj.position.set(0, 0, 0);
     obj.scale.setScalar(1.6);
-    let lantern = null;
-    let wings = null;
-    obj.traverse((o) => {
-      if (!o.isMesh) return;
-      o.layers.set(layer);
-      if (o.name.includes('Lantern')) {
-        o.material = new THREE.MeshBasicMaterial({ color: 0x3b3346, fog: false });
-        lantern = o;
-      } else {
-        o.material = new THREE.MeshLambertMaterial({ color: o.material.color.clone(), flatShading: true });
-        if (o.name.includes('Wings')) wings = o;
-      }
-    });
-    // Halo: two nested translucent spheres around the lantern (sizes in the
-    // firefly's local units, which are scaled ×1.6).
+    const lantern = rig[lanternKind];
+    const wings = rig.find((o) => o.name.includes('Wings')) ?? null;
     const halos = [0.035, 0.062].map((r) => {
-      const m = new THREE.Mesh(sphere, new THREE.MeshBasicMaterial({
-        color: 0xffc76a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
-        depthWrite: false, fog: false,
-      }));
-      m.scale.setScalar(r);
-      m.position.copy(lantern.position);
-      m.layers.set(layer);
-      m.renderOrder = 2;
-      obj.add(m);
-      return m;
+      const h = new THREE.Object3D();
+      h.scale.setScalar(r);
+      h.position.copy(lantern.position);
+      obj.add(h);
+      return h;
     });
-    group.add(obj);
 
     const a = Math.random() * TAU;
     const r = 1.4 + Math.random() * 2.4;
@@ -185,7 +225,13 @@ export function createFireflies(template, {
     pos.y = terrain.solid(pos.x, pos.z) + CLEAR + 0.2 + Math.random() * 1.2;
     const lit = i < litCount ? 1 : 0;
     flies.push({
-      obj, lantern, wings, halos,
+      obj, rig, lantern, wings, halos,
+      // What place() draws them in: the lantern's color, each halo's color and opacity, and
+      // whether the halos show.
+      lanternColor: new THREE.Color(0x3b3346),
+      haloColor: [new THREE.Color(0xffc76a), new THREE.Color(0xffc76a)],
+      haloOpacity: [0, 0],
+      haloOn: true,
       seed: i * 13.7 + Math.random() * 5,
       pos,
       vel: new THREE.Vector3(),
@@ -486,14 +532,12 @@ export function createFireflies(template, {
       const heat = Math.max(f.heat, Math.min(1, f.zapT * 1.5));
       if (heat > 0) col.lerp(tone(f, 3, colB), heat * 0.6);
       col.multiplyScalar(0.45 + f.glow * 0.7);
-      f.lantern.material.color.copy(UNLIT).lerp(col, smooth(Math.min(1, k * 4)));
-      tone(f, 2, f.halos[0].material.color);
-      f.halos[0].material.opacity = Math.min(1.2, f.glow) * 0.22;
-      tone(f, 1, f.halos[1].material.color);
-      f.halos[1].material.opacity = Math.min(1.2, f.glow) * 0.08;
-      const on = f.glow > 0.02;
-      f.halos[0].visible = on;
-      f.halos[1].visible = on;
+      f.lanternColor.copy(UNLIT).lerp(col, smooth(Math.min(1, k * 4)));
+      tone(f, 2, f.haloColor[0]);
+      f.haloOpacity[0] = Math.min(1.2, f.glow) * 0.22;
+      tone(f, 1, f.haloColor[1]);
+      f.haloOpacity[1] = Math.min(1.2, f.glow) * 0.08;
+      f.haloOn = f.glow > 0.02;
     });
 
     if (trails) stepTrails(dt);
@@ -508,6 +552,59 @@ export function createFireflies(template, {
       tone(f, 1, l.color).lerp(tone(f, 2, colB), 0.5);
       l.intensity = Math.min(1.3, f.glow) * 1.2;
     }
+  }
+
+  // --- drawing -------------------------------------------------------------------
+  const meshes = [...kinds, haloMesh];
+  const lanternTint = kinds[lanternKind].geometry.attributes.tint;
+  const haloTint = haloMesh.geometry.attributes.tint;
+  const modelView = new THREE.Matrix4();
+  const projScreen = new THREE.Matrix4();
+  const depth = new THREE.Vector4();
+  // Every halo (two a fly), and the ones showing this frame, back to front.
+  const haloSlots = flies.flatMap((f, i) => [0, 1].map((k) => ({ f, k, id: i * 2 + k, z: 0 })));
+  const haloOrder = [];
+  // (three.js's order for see-through meshes: farther first, and the one made first on a tie:
+  // a fly's inner halo before its outer one.)
+  const backToFront = (a, b) => (a.z !== b.z ? b.z - a.z : a.id - b.id);
+
+  /**
+   * Write the flies into their instances for the frame about to be drawn with `camera`
+   * (scene.js calls it once the camera has moved, right before the draw): see the top of
+   * the file for why each part's matrix is in view space.
+   */
+  function place(camera) {
+    camera.updateMatrixWorld();
+    const toView = camera.matrixWorldInverse;
+    projScreen.multiplyMatrices(camera.projectionMatrix, toView);
+    for (const m of meshes) m.matrixWorld.copy(camera.matrixWorld);
+    flies.forEach((f, i) => {
+      f.obj.updateMatrixWorld(true);
+      for (let p = 0; p < kinds.length; p++) kinds[p].setMatrixAt(i, modelView.multiplyMatrices(toView, f.rig[p].matrixWorld));
+      const c = f.lanternColor;
+      lanternTint.setXYZW(i, c.r, c.g, c.b, 1);
+    });
+    for (const m of kinds) m.instanceMatrix.needsUpdate = true;
+    lanternTint.needsUpdate = true;
+    // The halos showing, sorted the way three.js would sort them as meshes of their own (its
+    // depth: the sphere's middle through the halo's world matrix, then the camera's).
+    haloOrder.length = 0;
+    for (const h of haloSlots) {
+      if (!h.f.haloOn) continue;
+      h.z = depth.copy(sphere.boundingSphere.center).applyMatrix4(h.f.halos[h.k].matrixWorld).applyMatrix4(projScreen).z;
+      haloOrder.push(h);
+    }
+    haloOrder.sort(backToFront);
+    for (let j = 0; j < haloOrder.length; j++) {
+      const { f, k } = haloOrder[j];
+      haloMesh.setMatrixAt(j, modelView.multiplyMatrices(toView, f.halos[k].matrixWorld));
+      const c = f.haloColor[k];
+      haloTint.setXYZW(j, c.r, c.g, c.b, f.haloOpacity[k]);
+    }
+    haloMesh.count = haloOrder.length;
+    haloMesh.visible = haloOrder.length > 0;
+    haloMesh.instanceMatrix.needsUpdate = true;
+    haloTint.needsUpdate = true;
   }
 
   /**
@@ -801,6 +898,8 @@ export function createFireflies(template, {
     /** The fire on the ground (world): what they circle, and what a leash or a dart 'in' pulls toward. */
     center,
     update,
+    /** Write the flies into their instances for the frame about to be drawn (see place()). */
+    place,
     flash,
     zap,
     nearest,
@@ -834,4 +933,19 @@ export function createFireflies(template, {
       };
     },
   };
+}
+
+/**
+ * `material` takes its color and opacity from each instance's `tint` (rgba), flat across
+ * the instance as a uniform is across a mesh. Made white and opaque, it draws the tint
+ * exactly (1 × the tint), the way the material's own color and opacity drew before.
+ */
+function tinted(material) {
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace('void main() {', 'attribute vec4 tint;\nflat varying vec4 vTint;\nvoid main() {\n\tvTint = tint;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('void main() {', 'flat varying vec4 vTint;\nvoid main() {')
+      .replace('#include <color_fragment>', '#include <color_fragment>\n\tdiffuseColor *= vTint;');
+  };
+  return material;
 }

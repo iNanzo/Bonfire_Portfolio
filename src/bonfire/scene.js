@@ -1553,6 +1553,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
 
     const t2 = perf ? performance.now() : 0;
     const shadows = renderer.shadowMap.enabled && shadowNeedsUpdate();
+    fireflies?.place(camera); // (their instances, for the camera as it is now: fireflies.js)
     frame.draw({ shadows });
     perf?.frame(t0, t1, t2, performance.now(), shadows);
   }
