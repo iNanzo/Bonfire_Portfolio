@@ -158,6 +158,13 @@ const EASE_GAIN = 0.01;
 const EASE_LET_GO = 0.25;
 // (Which part each channel of a pose moves: 0 his body, 1 his left arm, 2 his right.)
 const PART_OF = Uint8Array.from({ length: POSE_SIZE }, (_, i) => (i >= POSE.armL && i < POSE.armL + 7 ? 1 : i >= POSE.armR && i < POSE.armR + 7 ? 2 : 0));
+// (A seated foot's way to where he stands up to, checked at OVER_POINTS points for what it
+// steps over: it passes OVER_CLEAR (m) over the scenery's shapes, lifted at most OVER_MOST;
+// with more than OVER_CROSS to clear, he stands up over his feet first, then steps across.)
+const OVER_POINTS = 17;
+const OVER_CLEAR = 0.015;
+const OVER_MOST = 0.5;
+const OVER_CROSS = 0.06;
 
 /**
  * Each plate's id (`aPiece`, 0..1 per vertex, armor.js: each plate a touch lighter or darker
@@ -753,6 +760,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   // the template's, built in its steps (or here, at once). Every style's model is moved onto
   // this one's joints, so its points serve them all.
   const { arms: probes, body: bodyProbes, helms: helmProbes } = T.probes ?? drain(probesOf(T));
+  const FEET = [bodyProbes.find((b) => b.i === BONE_INDEX.footL), bodyProbes.find((b) => b.i === BONE_INDEX.footR)];
   const restPos = ALL_BONES.map((b) => new THREE.Vector3(...T.restPos[b]));
   const restQuat = ALL_BONES.map((b) => T.restQuat[b]);
   const restLocalPos = ALL_BONES.map((b, i) => {
@@ -1039,6 +1047,74 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       if (!h.roomUp) { h.roomUp = roomOf(h, k.stand); h.roomLess = null; }
     }
     return k.stand;
+  }
+  const _feet = new Float64Array(8);
+  /** A pose's feet (feetAt: x his left, z ahead) into _feet from `j`: left x, z, right x, z. */
+  function feetInto(p, j) {
+    const L = rig.pos.footL, R = rig.pos.footR;
+    _feet[j] = L.x + p[POSE.legL]; _feet[j + 1] = L.z + p[POSE.legL + 2];
+    _feet[j + 2] = R.x - p[POSE.legR]; _feet[j + 3] = R.z + p[POSE.legR + 2];
+  }
+  /**
+   * How near any of the scenery's shapes `cs` a foot comes (m; below 0, that far in) with its
+   * joint at (x, y, z) in his own space at his home `h`, level (its points: `foot`).
+   */
+  function footFrom(h, foot, x, y, z, cs) {
+    const c = Math.cos(h.yaw), sn = Math.sin(h.yaw);
+    const gx = h.x + x * c + z * sn, gy = h.y + y, gz = h.z - x * sn + z * c;
+    let d = Infinity;
+    for (const col of cs) {
+      if (distanceTo(col, gx, gy, gz) > foot.r + 0.05) continue;
+      for (const pt of foot.pts) d = Math.min(d, distanceTo(col, gx + pt.x * c + pt.z * sn, gy + pt.y, gz - pt.x * sn + pt.z * c));
+    }
+    return d;
+  }
+  /**
+   * How much higher each foot has to go on its way between where it rests seated and where
+   * it stands up to (rise()'s `over`, at OVER_POINTS points along the straight way from the
+   * seated end): as much as keeps it OVER_CLEAR clear of the scenery's shapes there (his boot
+   * resting up on the ruins' fallen drum steps up and off it, not down through it), and
+   * whether either has more than OVER_CROSS to clear (`cross`: he stands up over his feet
+   * first, then steps). Kept with him until his seat, his seat pose or where he stands up to
+   * changes; null away from a seat.
+   */
+  function overOf(k) {
+    const h = k.home;
+    if (!h?.seat) return null;
+    const o = (k.over ??= { L: new Float32Array(OVER_POINTS), R: new Float32Array(OVER_POINTS), cross: false, key: new Float64Array(8), home: null });
+    // (Each foot's place seated, then standing, as feetAt has them: x his left, z ahead.)
+    feetInto(k.sit, 0);
+    feetInto(k.stand, 4);
+    let same = o.home === h;
+    for (let i = 0; i < 8; i++) if (o.key[i] !== _feet[i]) same = false;
+    if (same) return o;
+    o.key.set(_feet);
+    o.home = h;
+    const cs = nearOf(k);
+    for (let f = 0; f < 2; f++) {
+      const out = f ? o.R : o.L;
+      out.fill(0);
+      if (!cs.length) continue;
+      const foot = FEET[f], leg = f ? POSE.legR : POSE.legL;
+      const ax = _feet[2 * f], az = _feet[2 * f + 1], bx = _feet[4 + 2 * f], bz = _feet[5 + 2 * f];
+      const ay = k.sit[leg + 1] + rig.ankleY, by = k.stand[leg + 1] + rig.ankleY;
+      for (let i = 1; i < OVER_POINTS - 1; i++) {
+        const e = i / (OVER_POINTS - 1);
+        const x = ax + (bx - ax) * e, y = ay + (by - ay) * e, z = az + (bz - az) * e;
+        if (footFrom(h, foot, x, y, z, cs) >= OVER_CLEAR) continue;
+        // (As little higher as clears it, to a centimetre.)
+        let lo = 0, hi = OVER_MOST;
+        while (hi - lo > 0.01) {
+          const m = (lo + hi) / 2;
+          if (footFrom(h, foot, x, y + m, z, cs) >= OVER_CLEAR) hi = m;
+          else lo = m;
+        }
+        out[i] = hi;
+      }
+    }
+    // (Something to step over on the way, not just a step down: he stands up first, rise().)
+    o.cross = Math.max(...o.L, ...o.R) > OVER_CROSS;
+    return o;
   }
 
   // --- presence (the dissolve) --------------------------------------------------------------------
@@ -1530,7 +1606,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const dt = Math.min(0.5, Math.max(0, k.clock - (k.evalAt ?? k.clock)));
     k.evalAt = k.clock;
     if (a?.kind === 'rise' || a?.kind === 'lower') {
-      rise(p, k.sit, k.stand, a.t, a.kind === 'lower');
+      rise(p, k.sit, k.stand, a.t, a.kind === 'lower', overOf(k));
       big = true;
     } else if (a?.kind === 'walk' && !a.teleport) {
       const moved = Math.min(a.length, a.t * WALK_SPEED);
@@ -1565,6 +1641,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
           turn: rising ? Math.atan2(Math.sin(front), Math.cos(front)) : 0,
           // (Up from his seat to the level spot in front of it; the room he has for his arms.)
           stand: rising && k.home ? standAtSeat(k) : null,
+          over: rising ? overOf(k) : null,
           room: roomNow(k),
           inPlace,
         });

@@ -1020,17 +1020,28 @@ function spline(out, keys, ts, t) {
 /** How high a stepping foot lifts (m). */
 const STEP_LIFT = 0.06;
 /**
- * The feet of `out` stepping from `from` to `to` (poses), each over its own [t0, t1] (s):
- * planted before and after, lifted on the way, the toes dipping. (Only the legs.)
+ * How much higher a foot stepping between its seated and its standing place has to go, `e`
+ * 0..1 of the way from the seated end (`h`: rise()'s `over`, at evenly spaced points; 0 at
+ * both ends).
  */
-function steps(out, from, to, t, plan) {
+function overAt(h, e) {
+  if (!h || h.length < 2) return 0;
+  const f = clamp01(e) * (h.length - 1), i = Math.min(h.length - 2, Math.floor(f));
+  return h[i] + (h[i + 1] - h[i]) * (f - i);
+}
+/**
+ * The feet of `out` stepping from `from` to `to` (poses), each over its own [t0, t1] (s):
+ * planted before and after, lifted on the way (over what lies there: `over`, rise()'s, from
+ * the seated end, `back` when `from` is the standing one), the toes dipping. (Only the legs.)
+ */
+function steps(out, from, to, t, plan, over = null, back = false) {
   for (const [s, t0, t1] of plan) {
     const o = legOf(s);
     const u = clamp01((t - t0) / (t1 - t0));
     if (u >= 1) { for (let i = 0; i < 5; i++) out[o + i] = to[o + i]; continue; }
     const e = smooth(u), lift = Math.sin(Math.PI * u);
     for (let i = 0; i < 5; i++) out[o + i] = from[o + i] + (to[o + i] - from[o + i]) * e;
-    out[o + 1] += STEP_LIFT * lift;
+    out[o + 1] += STEP_LIFT * lift + overAt(over?.[s], back ? 1 - e : e);
     out[o + 3] += 10 * DEG * lift;
   }
   return out;
@@ -1038,15 +1049,33 @@ function steps(out, from, to, t, plan) {
 /** Seconds to stand up or sit down. */
 export const RISE_TIME = 1.2;
 const riseKeys = Array.from({ length: 5 }, newPose);
+const riseOver = newPose();
+/**
+ * Standing up over where a seated pose's feet rest (`sit`'s feet, each on its own ground,
+ * the hips over the middle of them; the rest of him as `stand`), into `out`.
+ */
+function standOver(out, sit, stand) {
+  copy(out, stand);
+  for (const o of [POSE.legL, POSE.legR]) for (let i = 0; i < 3; i++) out[o + i] = sit[o + i];
+  out[0] = (sit[POSE.legL] - sit[POSE.legR]) / 2;
+  out[2] = (sit[POSE.legL + 2] + sit[POSE.legR + 2]) / 2 - 0.02;
+  return out;
+}
 /**
  * Getting up from a seat (`t` 0..RISE_TIME s; `sit` and `stand` the two ends, `stand`
  * with the hips over the feet): the feet step in under him (the one out in front first),
  * he leans forward with his hands to his knees, pushes off and rises, a little overshoot
  * back as he straightens. `down` plays it the other way: bend, reach back, lower onto the
- * seat and settle, then the feet step out to where they rest.
+ * seat and settle, then the feet step out to where they rest. `over` ({ L, R, cross }, each
+ * foot's extra lift (m) at evenly spaced points from its seated place to its standing one,
+ * 0 at both ends; knights.js, from the scenery's shapes): a foot stepping off or over
+ * something (the ruins' fallen drum) lifts over it on its way instead of through it, and
+ * where one has to go over something on its way (`cross`) he stands up first, over his feet
+ * where they rest, and then steps across (sitting down: steps back across, then sits).
  */
-export function rise(out, sit, stand, t, down = false) {
+export function rise(out, sit, stand, t, down = false, over = null) {
   const [k0, k1, k2, k3, k4] = riseKeys;
+  if (over?.cross) return riseAcross(out, sit, stand, t, down, over);
   if (!down) {
     copy(k0, sit);
     copy(k1, sit); nudge(k1, 'hips', 12); nudge(k1, 'spine', 26); nudge(k1, 'chest', 8); nudge(k1, 'head', -26);
@@ -1059,7 +1088,7 @@ export function rise(out, sit, stand, t, down = false) {
     arm(k3, 'L', 95, -84, 0.97, 0, 0, 0.7); arm(k3, 'R', 95, -84, 0.97, 0, 0, 0.7);
     copy(k4, stand);
     spline(out, riseKeys, [0, 0.3, 0.68, 0.98, RISE_TIME], t);
-    return steps(out, sit, stand, t, [['R', 0.0, 0.2], ['L', 0.12, 0.32]]);
+    return steps(out, sit, stand, t, [['R', 0.0, 0.2], ['L', 0.12, 0.32]], over);
   }
   copy(k0, stand);
   copy(k1, stand); k1[1] -= 0.1; k1[2] -= 0.06; nudge(k1, 'hips', 14); nudge(k1, 'spine', 26); nudge(k1, 'head', -20);
@@ -1069,7 +1098,40 @@ export function rise(out, sit, stand, t, down = false) {
   copy(k3, sit); nudge(k3, 'spine', 6); nudge(k3, 'head', 6);
   copy(k4, sit);
   spline(out, riseKeys, [0, 0.35, 0.78, 1.0, RISE_TIME], t);
-  return steps(out, stand, sit, t, [['R', 0.8, 0.99], ['L', 0.96, 1.18]]);
+  return steps(out, stand, sit, t, [['R', 0.8, 0.99], ['L', 0.96, 1.18]], over, true);
+}
+/**
+ * rise() where a foot has something to step over on its way (`over.cross`): up, he leans in
+ * and pushes up off his seat over his feet where they rest (one up on a fallen drum, say),
+ * then steps across to where he stands, the right foot and then the left, each lifted over
+ * what's in its way; down, the other way round: he steps back across, then bends and sits.
+ */
+function riseAcross(out, sit, stand, t, down, over) {
+  const [k0, k1, k2, k3, k4] = riseKeys;
+  const mid = standOver(riseOver, sit, stand);
+  if (!down) {
+    copy(k0, sit);
+    copy(k1, sit); nudge(k1, 'hips', 12); nudge(k1, 'spine', 26); nudge(k1, 'chest', 8); nudge(k1, 'head', -26);
+    arm(k1, 'L', 14, -40, 0.72, 25, 20, 0.6); arm(k1, 'R', 12, -40, 0.72, 25, 20, 0.6);
+    k1[2] += 0.04;
+    lerpPose(k2, sit, mid, 0.55);
+    nudge(k2, 'hips', 16); nudge(k2, 'spine', 22); nudge(k2, 'chest', 6); nudge(k2, 'head', -16);
+    arm(k2, 'L', 22, -62, 0.9, 20, 10, 0.7); arm(k2, 'R', 22, -62, 0.9, 20, 10, 0.7);
+    copy(k3, mid); k3[1] += 0.01; nudge(k3, 'spine', -3); nudge(k3, 'chest', -2);
+    arm(k3, 'L', 80, -82, 0.96, 0, 0, 0.7); arm(k3, 'R', 80, -82, 0.96, 0, 0, 0.7);
+    copy(k4, stand);
+    spline(out, riseKeys, [0, 0.3, 0.6, 0.86, RISE_TIME], t);
+    return steps(out, sit, stand, t, [['R', 0.78, 0.98], ['L', 0.94, 1.16]], over);
+  }
+  copy(k0, stand);
+  copy(k1, mid);
+  copy(k2, mid); k2[1] -= 0.1; k2[2] -= 0.05; nudge(k2, 'hips', 14); nudge(k2, 'spine', 26); nudge(k2, 'head', -20);
+  arm(k2, 'L', 30, -30, 0.92, 10, 0, 0.6); arm(k2, 'R', 30, -30, 0.92, 10, 0, 0.6);
+  copy(k3, sit); k3[1] += 0.03; nudge(k3, 'hips', 10); nudge(k3, 'spine', 18); nudge(k3, 'head', -10);
+  arm(k3, 'L', 40, -60, 0.9, 10, 0, 0.6); arm(k3, 'R', 40, -60, 0.9, 10, 0, 0.6);
+  copy(k4, sit);
+  spline(out, riseKeys, [0, 0.4, 0.68, 0.98, RISE_TIME], t);
+  return steps(out, stand, sit, t, [['L', 0.04, 0.26], ['R', 0.2, 0.42]], over, true);
 }
 
 /**
@@ -1256,17 +1318,18 @@ function gestureTarget(g, p, name, t, seated, room = FREE) {
  * they would standing (in the room: an arm thrown up is thrown up however he was slumped;
  * the helmet swap's hands still hold the helmet where it is). `turn` (rad,
  * + his left) is for 'dance': where the front is, to face it while he dances; `stand` (a
- * pose) where he stands up to for it (standBy() in front of the seat if not given).
- * `room` [left, right] 0..1: the room out to each side (knights.js, from the height map: a
- * pillar beside him): an arm that would be flung into something goes up instead (every
+ * pose) where he stands up to for it (standBy() in front of the seat if not given), and
+ * `over` what his feet step over on the way (rise()'s).
+ * `room` [left, right] 0..1: the room out to each side (knights.js, from the scenery's
+ * shapes: a pillar beside him): an arm that would be flung into something goes up instead (every
  * gesture keeps its arms' swing out and back within it: hem), and a wave changes hands.
  * `inPlace` (seated, 'dance'): he dances it in his seat instead of getting up
  * (DANCE_SEATED_TIME long): the view has no room over him to stand up in.
  */
-export function gesture(p, name, t, seated = false, seed = 0, { turn = 0, stand = null, room = FREE, inPlace = false } = {}) {
+export function gesture(p, name, t, seated = false, seed = 0, { turn = 0, stand = null, room = FREE, inPlace = false, over = null } = {}) {
   const T = GESTURE_TIME[name];
   if (!T || t < 0 || t >= T) return p;
-  if (name === 'dance') return seated && inPlace ? seatedDanceGesture(p, t, seed, room) : danceGesture(p, t, seated, seed, turn, stand, room);
+  if (name === 'dance') return seated && inPlace ? seatedDanceGesture(p, t, seed, room) : danceGesture(p, t, seated, seed, turn, stand, room, over);
   // (The other hand, as his mirror image: the pose mirrored, gestured, mirrored back.)
   if (RIGHT_HANDED.has(name) && room[1] < 0.5 && room[0] > room[1]) {
     mirrorPose(p);
@@ -1328,13 +1391,13 @@ const dRef = newPose();
  * clock, turns back and sits down again; standing, he just dances. Pure in `t`, like the
  * others.
  */
-function danceGesture(p, t, seated, seed, turn, standAt = null, room = FREE) {
+function danceGesture(p, t, seated, seed, turn, standAt = null, room = FREE, over = null) {
   const base = copy(dBase, p);
   const stand = !seated ? copy(dStand, base) : standAt ? copy(dStand, standAt) : standBy(dStand, clamp(seatOf(base), 0, 0.6));
   const t0 = seated ? RISE_TIME + DANCE_TURN : 0;
   const t1 = t0 + DANCE_LEN;
-  if (seated && t < RISE_TIME) return rise(p, base, stand, t);
-  if (seated && t >= t1 + DANCE_TURN) return rise(p, base, stand, t - t1 - DANCE_TURN, true);
+  if (seated && t < RISE_TIME) return rise(p, base, stand, t, false, over);
+  if (seated && t >= t1 + DANCE_TURN) return rise(p, base, stand, t - t1 - DANCE_TURN, true, over);
   if (!seated && t >= t1) return p;
   // On his feet: the dance over his standing pose, eased in and out over a quarter second.
   const period = 60 / DANCE_BPM;

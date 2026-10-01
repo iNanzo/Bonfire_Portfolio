@@ -8,7 +8,9 @@
 // them; and nothing he does there, nor any dancer at any place on the ring, goes more than
 // 1.5 cm into a shape (a failure names the action, the piece of him and the shape). Each
 // point is tested against the shapes themselves (no rays: those took minutes), and only the
-// pieces whose joint is within their reach of a shape (a broad phase).
+// pieces whose joint is within their reach of a shape (a broad phase). Keeping out of it
+// doesn't cost him his smoothness (getting up, sitting down and the site's dance step no
+// further at a time than round 9's did, give or take half).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -398,4 +400,47 @@ test('in the ruins his right boot rests up on the model’s fallen drum, his lef
   foot.getWorldPosition(_v);
   assert.ok(fireDist(_v.x, _v.z) > 1.05, `his raised boot is ${fireDist(_v.x, _v.z).toFixed(2)} m from the fire's middle`);
   k.dismiss(0, { instant: true });
+});
+
+// Round 9's (before the scenery kept him out), measured the same way on the same height maps:
+// the largest step (m) of his head and of either hand at the fire's 12 frames a second.
+const ROUND9_STEP = { 'getting up': { head: 0.241, hands: 0.253 }, 'sitting down': { head: 0.177, hands: 0.328 }, 'the site’s dance': { head: 0.241, hands: 0.369 } };
+test('[slow] getting up, sitting down and the site’s dance at every seat move on smoothly: no step of his head or hands more than 1.5× round 9’s', async () => {
+  const env = await realKnights();
+  const { k } = env;
+  const n = k.knights[0];
+  const parts = ['head', 'handL', 'handR'].map((b) => n.bones.find((x) => x.name === b));
+  const at = () => { n.group.updateMatrixWorld(true); return parts.map((b) => b.getWorldPosition(new THREE.Vector3())); };
+  const bad = [];
+  for (const name of NAMES) {
+    k.setScenery(name, await terrainOf(name));
+    for (const pose of SEAT_POSES) {
+      k.setSeatPose(pose);
+      k.summon(0, { instant: true });
+      k.update(0.5);
+      const run = (what, seconds) => {
+        let prev = at();
+        const most = [0, 0, 0], when = [0, 0, 0];
+        for (let t = 0; t < seconds; t += 1 / 12) {
+          k.update(1 / 12 + 1e-7);
+          const now = at();
+          now.forEach((v, i) => { const d = v.distanceTo(prev[i]); if (d > most[i]) { most[i] = d; when[i] = t; } });
+          prev = now;
+        }
+        const limit = ROUND9_STEP[what];
+        if (most[0] > 1.5 * limit.head) bad.push(`${name} (${pose}) ${what}: his head ${(most[0] * 100).toFixed(1)} cm in a step (${when[0].toFixed(2)} s)`);
+        for (const i of [1, 2]) if (most[i] > 1.5 * limit.hands) bad.push(`${name} (${pose}) ${what}: his ${parts[i].name} ${(most[i] * 100).toFixed(1)} cm in a step (${when[i].toFixed(2)} s)`);
+      };
+      k.stand(0);
+      run('getting up', 1.6);
+      k.sit(0);
+      run('sitting down', 1.8);
+      k.update(0.3);
+      k.gesture('dance', { index: 0 });
+      run('the site’s dance', GESTURE_TIME.dance + 0.4);
+      k.dismiss(0, { instant: true });
+    }
+  }
+  k.setSeatPose('resting');
+  assert.deepEqual(bad, [], `more than 1.5× round 9's steps`);
 });
