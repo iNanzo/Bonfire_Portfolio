@@ -76,6 +76,7 @@ import {
 } from './knightPose.js';
 import { SEATS, danceSlots, ringOf, restPlaces, planWalk, FIRE_AT } from './knightPlaces.js';
 import { collidersNear, distanceTo, outOf, roomAround, reachFits } from './colliders.js';
+import { clamp01, smooth } from '../math.js';
 import { weaponSilhouette } from './forgeFx.js';
 
 export { GESTURES, MOVES, SEAT_POSES };
@@ -129,21 +130,34 @@ const CLEAR_NEAR = 1.4;
 // (the 26 ways out of a cube) and at a point of its surface in every PROBE_CELL (m) it
 // touches (GAUNTLET_CELL for the hand and fingers: small pieces, near what they reach for).
 const ARM = ['pauldron', 'upperArm', 'forearm', 'hand', 'fingers'];
+const SIDES = ['L', 'R'];
+// (Each side's arm pieces and shoulder socket, by bone index.)
+const ARM_OF = { L: ARM.map((b) => BONE_INDEX[b + 'L']), R: ARM.map((b) => BONE_INDEX[b + 'R']) };
+const SHOULDER = { L: BONE_INDEX.upperArmL, R: BONE_INDEX.upperArmR };
 const PROBE_DIRS = [-1, 0, 1].flatMap((x) => [-1, 0, 1].flatMap((y) => [-1, 0, 1].map((z) => [x, y, z]))).filter((d) => d.some(Boolean));
 const PROBE_CELL = 0.03;
 const GAUNTLET_CELL = 0.02;
 // At home, his body (all but those arm pieces, his helmet with it) is checked too, and his
 // arms again once they're turned: whatever of him would still come nearer a shape near him
-// than DEPTH (m; below 0, that far in) eases back toward his resting pose there by each of
-// EASE_BACK in turn until it doesn't (a seated Praise arching back into a standing stone, a
-// boot stepping down through a fallen drum, a fist pumped into the stone at his side).
+// than DEPTH (m; below 0, that far in) eases back toward his resting pose there, as little as
+// keeps it out (halving the way EASE_STEPS times: a seated Praise arching back into a
+// standing stone, a fist pumped into the stone at his side).
 const BODY = ['hips', 'spine', 'chest', 'neck', 'head', 'shoulderL', 'shoulderR', 'tassetL', 'tassetR', 'thighL', 'thighR', 'shinL', 'shinR', 'footL', 'footR'];
+// (The pauldrons' domes ride up and out with their arm's swing: one in eases its arm back.)
+const DOME_OF = { shoulderL: 1, shoulderR: 2 };
 // (Its points are a few centimetres apart: kept 5 mm out, no point between them goes in far.)
 const DEPTH = 0.005;
 // (His boots and shins rest on what's under them, a seat's edge or a fallen drum: 1 cm in.)
 const RESTING = new Set(['shinL', 'shinR', 'footL', 'footR']);
 const DEPTH_RESTING = -0.01;
-const EASE_BACK = [0.35, 0.65, 1];
+const EASE_STEPS = 5;
+// (Where nothing gets him clear, easing back has to get him at least this much (m) further out.)
+const EASE_GAIN = 0.01;
+// (Past what he was eased back from, he lets go of it this much of the way a step: over a
+// quarter second, not at once.)
+const EASE_LET_GO = 0.25;
+// (Which part each channel of a pose moves: 0 his body, 1 his left arm, 2 his right.)
+const PART_OF = Uint8Array.from({ length: POSE_SIZE }, (_, i) => (i >= POSE.armL && i < POSE.armL + 7 ? 1 : i >= POSE.armR && i < POSE.armR + 7 ? 2 : 0));
 
 /**
  * Each plate's id (`aPiece`, 0..1 per vertex, armor.js: each plate a touch lighter or darker
@@ -662,7 +676,7 @@ function* probesOf(T) {
   }
   const body = [];
   for (const b of BODY) {
-    body.push({ i: BONE_INDEX[b], depth: RESTING.has(b) ? DEPTH_RESTING : DEPTH, ...piece(b, PROBE_CELL) });
+    body.push({ i: BONE_INDEX[b], depth: RESTING.has(b) ? DEPTH_RESTING : DEPTH, part: DOME_OF[b] ?? 0, ...piece(b, PROBE_CELL) });
     if (body.length % 3 === 0) yield;
   }
   const helms = {};
@@ -920,6 +934,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     h.feet = [soleUnder(h, fl[0], fl[1]), soleUnder(h, fr[0], fr[1])];
     seatedPose(k.sit, h.h, rig, style, h.feet);
     h.room = roomOf(h, k.sit);
+    h.roomLess = null;
     return k.sit;
   }
   const _rn = [0, 0, 0];
@@ -939,7 +954,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const c = Math.cos(h.yaw), sn = Math.sin(h.yaw);
     return ['L', 'R'].map((side, i) => {
       const sg = i ? -1 : 1;
-      const at = s.p[BONE_INDEX['upperArm' + side]];
+      const at = s.p[SHOULDER[side]];
       const wx = h.x + at.x * c + at.z * sn, wy = h.y + at.y, wz = h.z - at.x * sn + at.z * c;
       let d = Infinity;
       for (const col of cs) {
@@ -969,7 +984,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const up = h.roomUp ?? h.room;
     if (k.mode === 'sit' && !a && !(k.gestureName === 'dance' && !k.danceInPlace)) return h.room;
     if (k.mode === 'stand' && !a) return up;
-    return [Math.min(h.room[0], up[0]), Math.min(h.room[1], up[1])];
+    return (h.roomLess ??= [Math.min(h.room[0], up[0]), Math.min(h.room[1], up[1])]);
   }
   /**
    * Where he stands up to in front of his seat (his own space, the hips over it): a stride
@@ -1021,7 +1036,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       const [fl, fr] = feetAt(k.stand, rig);
       k.stand[33] += groundUnder(h, fl[0], fl[1]);
       k.stand[38] += groundUnder(h, fr[0], fr[1]);
-      h.roomUp ??= roomOf(h, k.stand);
+      if (!h.roomUp) { h.roomUp = roomOf(h, k.stand); h.roomLess = null; }
     }
     return k.stand;
   }
@@ -1652,6 +1667,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   const _kn = new THREE.Vector3();
   const _kx = new THREE.Vector3();
   const _karm = new THREE.Vector3();
+  const WAYS = [_kn, _kx]; // (keepClear's two ways to turn an arm: out of the shape, in to his middle)
   const near = { d: 0, hit: null, at: [0, 0, 0], arm: new THREE.Vector3() };
   /**
    * The piece of side `side`'s arm (as solved: `s`) nearest a shape in `cs`, if it's nearer
@@ -1663,8 +1679,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const c = Math.cos(k.yaw), sn = Math.sin(k.yaw);
     near.d = CLEAR_MARGIN;
     near.hit = null;
-    for (const b of ARM) {
-      const i = BONE_INDEX[b + side];
+    for (const i of ARM_OF[side]) {
       const { pts, r } = probes.get(i);
       const shapes = within(s.p[i], r + CLEAR_MARGIN, cs, gx, gy, gz, c, sn);
       if (!shapes.length) continue;
@@ -1677,7 +1692,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         }
       }
     }
-    near.arm.sub(s.p[BONE_INDEX['upperArm' + side]]);
+    near.arm.sub(s.p[SHOULDER[side]]);
     return near;
   }
   /**
@@ -1695,16 +1710,17 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const c = Math.cos(k.yaw), sn = Math.sin(k.yaw);
     const mid = s.p[BONE_INDEX.chest];
     let swung = false;
-    for (const side of ['L', 'R']) {
+    for (const side of SIDES) {
       let n = nearest(k, s, cs, side);
       for (let tries = 0; tries < CLEAR_TRIES && n.hit; tries++) {
         const before = n.d;
         // Out of the shape there (in his own space), or in toward his middle at that height.
         outOf(n.hit, n.at[0], n.at[1], n.at[2], _rn);
-        const ways = [_kn.set(_rn[0] * c - _rn[2] * sn, _rn[1], _rn[0] * sn + _rn[2] * c), _kx.set(mid.x - n.arm.x - s.p[BONE_INDEX['upperArm' + side]].x, 0, 0)];
+        _kn.set(_rn[0] * c - _rn[2] * sn, _rn[1], _rn[0] * sn + _rn[2] * c);
+        _kx.set(mid.x - n.arm.x - s.p[SHOULDER[side]].x, 0, 0);
         const arm = _karm.copy(n.arm);
         let helped = false;
-        for (const way of ways) {
+        for (const way of WAYS) {
           const axis = way.cross(arm);
           const lever = axis.length();
           if (lever < 1e-5) continue;
@@ -1724,68 +1740,211 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
 
   /** Knight k is at home (his seat, or where he sits down on the ground), seated or up in front of it. */
   const isHome = (k) => !!k.home && Math.hypot(k.group.position.x - k.home.x, k.group.position.z - k.home.z) < 0.05;
-  /** Whether knight k's body (as solved: `s`; not his arms) comes nearer a shape near him than DEPTH (DEPTH_RESTING for what rests on things). */
-  function bodyIn(k, s, cs) {
-    const { x: gx, y: gy, z: gz } = k.group.position;
-    const c = Math.cos(k.yaw), sn = Math.sin(k.yaw);
-    const into = (i, { pts, r }, depth) => {
-      const shapes = within(s.p[i], r, cs, gx, gy, gz, c, sn);
-      if (!shapes.length) return false;
-      for (const pt of pts) {
-        _kp.copy(pt).applyQuaternion(s.q[i]).add(s.p[i]);
-        const x = gx + _kp.x * c + _kp.z * sn, y = gy + _kp.y, z = gz - _kp.x * sn + _kp.z * c;
-        for (const col of shapes) if (distanceTo(col, x, y, z) < depth) return true;
-      }
-      return false;
-    };
-    return bodyProbes.some((b) => into(b.i, b, b.depth)) || into(BONE_INDEX.head, helmProbes[k.helmet] ?? { pts: [], r: 0 }, DEPTH);
+  /**
+   * Whether piece `i` of a solved pose (`s`; its points `pts` in its own space, as far as `r`
+   * from its joint) comes nearer one of the shapes `cs` than `depth`, where he stands at
+   * (gx, gy, gz) turned c, sn.
+   */
+  function pieceIn(s, i, pts, r, depth, cs, gx, gy, gz, c, sn) {
+    const shapes = within(s.p[i], r, cs, gx, gy, gz, c, sn);
+    if (!shapes.length) return false;
+    for (const pt of pts) {
+      _kp.copy(pt).applyQuaternion(s.q[i]).add(s.p[i]);
+      const x = gx + _kp.x * c + _kp.z * sn, y = gy + _kp.y, z = gz - _kp.x * sn + _kp.z * c;
+      for (const col of shapes) if (distanceTo(col, x, y, z) < depth) return true;
+    }
+    return false;
   }
   /**
-   * His resting pose at home now: seated, or standing up in front of his seat (whichever end
-   * of getting up, sitting down or the site's dance up from his seat he's nearer).
+   * How much further than it may (DEPTH, DEPTH_RESTING) piece `i` of a solved pose comes into
+   * a shape in `cs` (m; ≤ 0 if it doesn't), as pieceIn() has it.
+   */
+  function pieceDepth(s, i, pts, r, depth, cs, gx, gy, gz, c, sn) {
+    let worst = -Infinity;
+    const shapes = within(s.p[i], r, cs, gx, gy, gz, c, sn);
+    for (const pt of pts) {
+      if (!shapes.length) break;
+      _kp.copy(pt).applyQuaternion(s.q[i]).add(s.p[i]);
+      const x = gx + _kp.x * c + _kp.z * sn, y = gy + _kp.y, z = gz - _kp.x * sn + _kp.z * c;
+      for (const col of shapes) worst = Math.max(worst, depth - distanceTo(col, x, y, z));
+    }
+    return worst;
+  }
+  /** How much further than it may any piece of knight k (as solved: `s`) comes into a shape in `cs` (m; ≤ 0 if none does). */
+  function depthIn(k, s, cs) {
+    const { x: gx, y: gy, z: gz } = k.group.position;
+    const c = Math.cos(k.yaw), sn = Math.sin(k.yaw);
+    let worst = 0;
+    for (const b of bodyProbes) worst = Math.max(worst, pieceDepth(s, b.i, b.pts, b.r, b.depth, cs, gx, gy, gz, c, sn));
+    const helm = helmProbes[k.helmet];
+    if (helm) worst = Math.max(worst, pieceDepth(s, BONE_INDEX.head, helm.pts, helm.r, DEPTH, cs, gx, gy, gz, c, sn));
+    for (const side of SIDES) for (const i of ARM_OF[side]) { const p = probes.get(i); worst = Math.max(worst, pieceDepth(s, i, p.pts, p.r, DEPTH, cs, gx, gy, gz, c, sn)); }
+    return worst;
+  }
+  /**
+   * Which parts of knight k's body (as solved: `s`; not his arms) come nearer a shape near him
+   * than DEPTH (DEPTH_RESTING for what rests on things), into `out` as partsIn() has them (a
+   * pauldron's dome counts with its arm: DOME_OF); whether any does. `any`: only that (it
+   * stops at the first).
+   */
+  function bodyIn(k, s, cs, out, any = false) {
+    const { x: gx, y: gy, z: gz } = k.group.position;
+    const c = Math.cos(k.yaw), sn = Math.sin(k.yaw);
+    let found = false;
+    for (const b of bodyProbes) {
+      if (out[b.part] || !pieceIn(s, b.i, b.pts, b.r, b.depth, cs, gx, gy, gz, c, sn)) continue;
+      out[b.part] = found = true;
+      if (any) return true;
+    }
+    const helm = helmProbes[k.helmet];
+    if (!out[0] && helm && pieceIn(s, BONE_INDEX.head, helm.pts, helm.r, DEPTH, cs, gx, gy, gz, c, sn)) out[0] = found = true;
+    return found;
+  }
+  const _rest = newPose();
+  /**
+   * His resting pose at home now: seated, standing up in front of his seat, or on his way
+   * between the two (getting up, sitting down, the site's dance up from his seat and back):
+   * the one eased into the other as he goes, so what's eased back toward it moves on smoothly
+   * with him.
    */
   function restOf(k) {
     const a = k.act;
-    if (a?.kind === 'rise' || a?.kind === 'lower') return (a.t < a.dur / 2) === (a.kind === 'rise') ? k.sit : k.stand;
-    if (k.mode === 'sit' && k.gestureName === 'dance' && !k.danceInPlace) {
+    let up = k.mode === 'sit' ? 0 : 1;
+    if (a?.kind === 'rise' || a?.kind === 'lower') {
+      const u = smooth(clamp01(a.t / a.dur));
+      up = a.kind === 'rise' ? u : 1 - u;
+    } else if (k.mode === 'sit' && k.gestureName === 'dance' && !k.danceInPlace) {
       const t = k.gestureT, T = GESTURE_TIME.dance;
-      return t < RISE_TIME / 2 || t > T - RISE_TIME / 2 ? k.sit : k.stand;
+      up = smooth(clamp01(Math.min(t, T - t) / RISE_TIME));
     }
-    return k.mode === 'sit' ? k.sit : k.stand;
+    return up <= 0 ? k.sit : up >= 1 ? k.stand : lerpPose(_rest, k.sit, k.stand, up);
   }
-  const _eased = newPose();
   /** Whether side's arm (as solved: `s`) still comes nearer a shape in `cs` than DEPTH. */
   const armIn = (k, s, cs, side) => { const n = nearest(k, s, cs, side); return !!n.hit && n.d < DEPTH; };
   /**
+   * Which of knight k's parts (as solved: `s`) come nearer a shape in `cs` than they may, into
+   * `out` ([body, left arm, right arm]); whether any does (`any`: only that, the first found).
+   */
+  function partsIn(k, s, cs, out, any = false) {
+    out[0] = out[1] = out[2] = false;
+    if (bodyIn(k, s, cs, out, any) && any) return true;
+    if (!out[1]) out[1] = armIn(k, s, cs, 'L');
+    if (out[1] && any) return true;
+    if (!out[2]) out[2] = armIn(k, s, cs, 'R');
+    return out[0] || out[1] || out[2];
+  }
+  const _eased = newPose();
+  const _bad = [false, false, false];
+  const _now = [false, false, false];
+  /** Whether knight k (as solved: `s`) comes nearer a shape in `cs` anywhere than he may. */
+  const anyIn = (k, s, cs) => partsIn(k, s, cs, _now, true);
+  // (The ease the solver's output, shared, last held, solved from _eased; NaN if another.)
+  let easedAt = NaN;
+  let easedOut = null;
+  /** k.work with the parts in `bad` eased toward `base` by `f` (into _eased), solved and its arms kept clear. */
+  function easedSolve(k, base, bad, f) {
+    for (let i = 0; i < POSE_SIZE; i++) _eased[i] = bad[PART_OF[i]] ? k.work[i] + (base[i] - k.work[i]) * f : k.work[i];
+    const s = solver.solve(_eased, null, k.helmet);
+    keepClear(k, s);
+    easedAt = f;
+    easedOut = s;
+    return s;
+  }
+  /**
    * Knight k's pose (k.work) solved, his arms kept out of the scenery (keepClear) and, at home,
    * all of him: whatever would still go into a piece of it (his body, an arm) eases back
-   * toward his resting pose there (EASE_BACK) until it doesn't (k.work takes the pose he ends
-   * in). `moving` false (sitting or standing at rest, his idle at most): nothing to check, his
-   * seat keeps him clear of everything (test/knightClearance.test.mjs).
+   * toward his resting pose there (restOf), as little as clears it (to 1/2^EASE_STEPS of the
+   * way), so he slides along what he meets instead of jumping back from it; past it, he lets
+   * go over a few steps (EASE_LET_GO a step) instead of snapping on (k.work takes the pose he
+   * ends in). `moving` false (sitting or standing at rest, his idle at most): nothing to
+   * check, his seat keeps him clear of everything (test/knightClearance.test.mjs).
    */
   function solveClear(k, moving) {
+    const held = (k.ease ??= { f: 0, parts: [false, false, false] });
+    easedAt = NaN;
     let s = solver.solve(k.work, null, k.helmet);
-    if (!moving) return s;
+    if (!moving) { held.f = 0; return s; }
     keepClear(k, s);
     const cs = isHome(k) ? nearOf(k) : null;
-    if (!cs?.length) return s;
-    const bad = { body: bodyIn(k, s, cs), L: armIn(k, s, cs, 'L'), R: armIn(k, s, cs, 'R') };
-    if (!bad.body && !bad.L && !bad.R) return s;
+    if (!cs?.length) { held.f = 0; return s; }
+    const inNow = partsIn(k, s, cs, _bad);
+    if (!inNow && held.f <= 0) return s;
+    // (Still letting go of what he was eased back from: those parts too.)
+    if (held.f > 0) for (let j = 0; j < 3; j++) _bad[j] ||= held.parts[j];
     const base = restOf(k);
-    for (const f of EASE_BACK) {
-      for (let i = 0; i < POSE_SIZE; i++) {
-        const side = i >= POSE.armL && i < POSE.armL + 7 ? 'L' : i >= POSE.armR && i < POSE.armR + 7 ? 'R' : 'body';
-        _eased[i] = bad[side] ? k.work[i] + (base[i] - k.work[i]) * f : k.work[i];
-      }
-      s = solver.solve(_eased, null, k.helmet);
-      keepClear(k, s);
-      const now = { body: bodyIn(k, s, cs), L: armIn(k, s, cs, 'L'), R: armIn(k, s, cs, 'R') };
-      if (!now.body && !now.L && !now.R) break;
-      // (Easing one part back can bring another in: that eases too from here on; an arm still
-      // in when nearly back, the body leaning it there eases with it.)
-      for (const part of ['body', 'L', 'R']) bad[part] ||= now[part];
-      if (f >= 0.65 && (now.L || now.R)) bad.body = true;
+    // (Letting go, he's eased back no less than this, if he's clear there: one look, most steps.)
+    const floor = held.f - EASE_LET_GO;
+    let f;
+    if (!inNow) f = floor > 0 ? letGo(k, base, cs, 0, floor) : 0;
+    else if (floor > 0 && !anyIn(k, easedSolve(k, base, _bad, floor), cs)) f = floor;
+    else {
+      f = easeNeeded(k, base, cs, Math.max(0, floor));
+      // (Where easing back gets him nowhere, he still lets go as slowly as stays clear.)
+      if (f < floor) f = letGo(k, base, cs, f, floor);
     }
+    held.f = f;
+    for (let j = 0; j < 3; j++) held.parts[j] = _bad[j];
+    return solveAt(k, base, f);
+  }
+  /**
+   * How far back toward `base` (0..1) the parts in _bad (and any more that easing brings in)
+   * have to ease for knight k to be clear of `cs`: as little of the way as clears it. Where
+   * nothing short of all the way back does, all the way back is looked at (easing one part
+   * back can leave another in, or bring it in: that eases too; an arm still in all the way
+   * back, the body leaning it there eases with it), and where even that doesn't (his rest is
+   * no way out: a boot by a drum it stands by), only as far as gets him out as far as that
+   * does, and not at all if that's no better than where he is (no snapping back for nothing).
+   * (`from`: no less than that, where he's in.)
+   */
+  function easeNeeded(k, base, cs, from = 0) {
+    const f = leastEase(k, base, cs, 0, from);
+    if (f < 1) return f;
+    if (!partsIn(k, easedSolve(k, base, _bad, 1), cs, _now)) return 1;
+    for (let j = 0; j < 3; j++) _bad[j] ||= _now[j];
+    if (_now[1] || _now[2]) _bad[0] = true;
+    const s = easedSolve(k, base, _bad, 1);
+    if (!anyIn(k, s, cs)) return leastEase(k, base, cs, 0);
+    const most = depthIn(k, s, cs);
+    if (most > depthIn(k, easedSolve(k, base, _bad, 0), cs) - EASE_GAIN) return 0;
+    return leastEase(k, base, cs, most);
+  }
+  /**
+   * The least ease back toward `base` (`from`..1, to 1/2^EASE_STEPS of the way; 1 if nothing
+   * short of it) of the parts in _bad that clears knight k of `cs`, or with `most` (m), that
+   * gets him no further in than that.
+   */
+  function leastEase(k, base, cs, most, from = 0) {
+    let lo = from, hi = 1;
+    for (let j = 0; j < EASE_STEPS; j++) {
+      const f = (lo + hi) / 2;
+      const e = easedSolve(k, base, _bad, f);
+      if (most > 0 ? depthIn(k, e, cs) > most + EASE_GAIN / 4 : anyIn(k, e, cs)) lo = f;
+      else hi = f;
+    }
+    return hi;
+  }
+  /**
+   * Letting go of an ease back (from `to`, toward `from`, which is clear or as clear as easing
+   * gets him): `to` if he's clear there, else as near it as he is (an arm eased part of the way
+   * back to its rest can pass through what the arm going on its way misses: a hand swinging
+   * down past the ruins' plinth).
+   */
+  function letGo(k, base, cs, from, to) {
+    if (!anyIn(k, easedSolve(k, base, _bad, to), cs)) return to;
+    let lo = from, hi = to;
+    for (let j = 0; j < EASE_STEPS - 1; j++) {
+      const f = (lo + hi) / 2;
+      if (anyIn(k, easedSolve(k, base, _bad, f), cs)) hi = f;
+      else lo = f;
+    }
+    return lo;
+  }
+  /**
+   * k.work eased back by `f` (the parts in _bad), solved and kept clear: k.work takes it. (The
+   * ease looked at last is often the one taken: the solver still holds it.)
+   */
+  function solveAt(k, base, f) {
+    const s = easedAt === f ? easedOut : easedSolve(k, base, _bad, f);
     k.work.set(_eased);
     return s;
   }
