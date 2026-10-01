@@ -151,7 +151,7 @@ export function flamesBlockTools(ctx) {
         prev.forEach((colors, i) => { if (flames[i]) Object.assign(flames[i], colors); });
         ctx.changed({ rerender: true });
       }, { class: 'button small ghost', disabled: !st.history.length })),
-    el('p', { class: 'help', text: 'Names, IDs, rotation and cast light stay as they are. Each palette card has its own tools too.' }));
+    el('p', { class: 'help', text: 'Names, IDs, rotation and Light Whiteness stay as they are. Each palette card has its own tools too.' }));
 }
 
 // ---- place colors --------------------------------------------------------------------------
