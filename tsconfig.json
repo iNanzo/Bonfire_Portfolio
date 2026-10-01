@@ -90,7 +90,7 @@
     "src/bonfire/knightPlaces.js",
     "src/bonfire/steel.js",
     "src/bonfire/knightStyles.js",
-    "src/settingsMap.js"
+    "src/settingsMap.js",
     "src/bonfire/frameGate.js",
     "src/ui/perfOverlay.js"
   ]

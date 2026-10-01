@@ -275,7 +275,7 @@ export function createLooks(g, { reducedMotion = false } = {}) {
   let cycleFor = 0;
   let cycleStep = 0;
   let spinFor = 0;      // the palette spinning (echo's burst, the color cycle drop)
-  let ripples = [];     // { t, s }
+  const ripples = []; // { t, s }
   let kaleSeg = 6;
   let kaleRot = 0;
   let kaleSpin = 0;
