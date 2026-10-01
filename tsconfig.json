@@ -22,6 +22,8 @@
   "files": [
     "src/math.js",
     "src/html.js",
+    "src/modes.js",
+    "src/text.js",
     "src/routes.js",
     "src/paletteGen.js",
     "src/contentRules.js",
@@ -52,6 +54,8 @@
     "src/ui/settingsSearch.js",
     "src/ui/keysOverlay.js",
     "src/ui/shell.js",
+    "src/ui/fields.js",
+    "src/ui/orbit.js",
     "src/painter/history.js",
     "src/painter/beat.js",
     "src/painter/panel.js",
