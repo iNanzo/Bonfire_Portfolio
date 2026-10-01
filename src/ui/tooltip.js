@@ -6,8 +6,9 @@
 //   where      the browser's top layer (a manual popover), so no `overflow` clips it. Before
 //              it shows it moves into the trigger's open <dialog> (or the body): a modal
 //              dialog makes everything outside it inert, a tip included. place() puts it
-//              above its trigger (or on the side its data-tip-side names: beside an item in a
-//              list, say, so it doesn't cover the next), else below, else beside, kept 8 px
+//              above its trigger (or on the side its data-tip-side, or its CSS's --tip-side,
+//              names: beside an item in a list, say, so it doesn't cover the next), else
+//              below, else beside, kept 8 px
 //              inside the window, and places it again as the page scrolls or the window
 //              resizes; it goes when its trigger is gone or scrolled out of sight. Without
 //              the Popover API it's position: fixed, on top.
@@ -186,11 +187,21 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
     tip.style.setProperty('left', '0px');
     tip.style.setProperty('top', '0px');
     const size = tip.getBoundingClientRect();
-    const prefer = /** @type {any} */ (current.trigger.getAttribute('data-tip-side') ?? 'top');
-    const at = place(boxOf(current.anchor), { width: size.width, height: size.height }, view, { prefer });
+    const at = place(boxOf(current.anchor), { width: size.width, height: size.height }, view, { prefer: sideOf(current.trigger) });
     tip.style.setProperty('left', `${at.x}px`);
     tip.style.setProperty('top', `${at.y}px`);
     tip.dataset.side = at.side;
+  }
+
+  /**
+   * The side a trigger's tip would rather be on: its data-tip-side, else its style's
+   * `--tip-side` (a page's CSS can set one for a kind of trigger, and per window width), else
+   * above.
+   * @param {Element} el
+   * @returns {any}
+   */
+  function sideOf(el) {
+    return el.getAttribute('data-tip-side') || win.getComputedStyle(el).getPropertyValue('--tip-side').trim() || 'top';
   }
 
   /** Whether `el` shows at all: on screen, and not scrolled out of a box that clips it. */

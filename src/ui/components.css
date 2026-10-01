@@ -67,6 +67,12 @@
 .viz-tip:hover, .viz-tip:focus-visible { color: var(--c-bone); box-shadow: 0 0 0 1px var(--accent); outline: none; }
 /* The old pure-CSS tips (a box drawn from data-tip): the shared tooltip shows these now. */
 .viz-tip::after, .viz-source::after { content: none !important; }
+/* Bonfire Live's sound sources: each one's tip beside it (above, it would cover the one
+   before), or under it where there's no room beside: where the old tips sat. */
+.viz-sources .viz-source { --tip-side: right; }
+@media (max-width: 1099px) {
+  .viz-sources .viz-source { --tip-side: bottom; }
+}
 
 /* The fields' markup with a "?" (fields.js): the label beside it names the input by id. */
 .viz-field-label > label { cursor: pointer; }

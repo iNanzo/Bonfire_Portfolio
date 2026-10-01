@@ -101,6 +101,7 @@ function page({ popover = true } = {}) {
       this.textContent = '';
       this.focusVisible = false;
       this.overflow = 'visible';
+      this.vars = {}; // (custom properties its style gives it: --tip-side)
       this.open = false;
       if (popover) {
         this.showPopover = () => { this.open = true; };
@@ -141,7 +142,7 @@ function page({ popover = true } = {}) {
     clearTimeout(id) { timers.delete(id); },
     requestAnimationFrame(fn) { const id = nextId++; frames.set(id, fn); return id; },
     cancelAnimationFrame(id) { frames.delete(id); },
-    getComputedStyle: (el) => ({ overflowX: el.overflow, overflowY: el.overflow }),
+    getComputedStyle: (el) => ({ overflowX: el.overflow, overflowY: el.overflow, getPropertyValue: (n) => el.vars[n] ?? '' }),
     CSS: { escape: (s) => s },
     addEventListener() {},
     removeEventListener() {},
@@ -215,6 +216,17 @@ test('installTooltips: a pointer resting on a "?" shows its tip after the delay,
   // A trigger can ask for another side (an item in a list: beside it).
   const item = new p.El('button', { 'data-tip': 'Starts it.', 'data-tip-side': 'right' }).at(40, 500, 200, 30);
   p.doc.body.append(item);
+  p.fire('pointerover', { target: item, pointerType: 'mouse' });
+  p.tick(100);
+  assert.equal(tip.dataset.side, 'right');
+  // Or its CSS can (--tip-side: a kind of trigger, per window width); the attribute wins.
+  const styled = new p.El('button', { 'data-tip': 'Listens.' }).at(40, 560, 200, 30);
+  styled.vars['--tip-side'] = ' bottom';
+  p.doc.body.append(styled);
+  p.fire('pointerover', { target: styled, pointerType: 'mouse' });
+  p.tick(100);
+  assert.equal(tip.dataset.side, 'bottom');
+  item.vars['--tip-side'] = 'left';
   p.fire('pointerover', { target: item, pointerType: 'mouse' });
   p.tick(100);
   assert.equal(tip.dataset.side, 'right');
