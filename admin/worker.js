@@ -5,32 +5,24 @@ import { handleApi } from './server/api.js';
 import { verifyAccess } from './server/auth.js';
 import { createGitHubStore } from './server/github.js';
 import { HttpError } from './server/errors.js';
-
-/** The Effects page frames the public site as a live preview; nothing else may be framed. */
-const csp = (siteUrl) => {
-  let frame = "'none'";
-  try { if (siteUrl) frame = new URL(siteUrl).origin; } catch { /* bad SITE_URL: no preview */ }
-  return [
-    "default-src 'self'", "img-src 'self' blob: data:", "style-src 'self'",
-    "font-src 'self'", "connect-src 'self'", `frame-src ${frame}`, "frame-ancestors 'none'", "base-uri 'none'", "form-action 'none'",
-  ].join('; ');
-};
-const SECURITY_HEADERS = {
-  'Content-Security-Policy': csp(''),
-  'X-Frame-Options': 'DENY',
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-};
+import { securityHeaders } from './server/csp.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const blocked = (status, message) => new Response(
-  `<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>Admin</title>
-<body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#07070b;color:#e9e3d2;font:16px/1.5 system-ui,sans-serif">
-<main style="max-width:420px;padding:24px;text-align:center"><h1 style="font-size:20px;color:#ffc76a">${status === 403 ? 'Not allowed' : 'Sign in needed'}</h1>
-<p>${esc(message)}</p>${status === 403 ? '<p><a style="color:#ffc76a" href="/cdn-cgi/access/logout">Sign out and use another account</a></p>' : ''}</main>`,
-  { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS } },
-);
+/**
+ * The notice for a request without a good sign-in. Its look is one <style> block allowed by a
+ * nonce of its own: the policy blocks style="" attributes, so they'd leave it unstyled.
+ */
+function blocked(status, message) {
+  const nonce = crypto.randomUUID().replace(/-/g, '');
+  return new Response(
+    `<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>Admin</title>
+<style nonce="${nonce}">body{margin:0;display:grid;place-items:center;min-height:100vh;background:#07070b;color:#e9e3d2;font:16px/1.5 system-ui,sans-serif}
+main{max-width:420px;padding:24px;text-align:center}h1{font-size:20px;color:#ffc76a}a{color:#ffc76a}</style>
+<main><h1>${status === 403 ? 'Not allowed' : 'Sign in needed'}</h1>
+<p>${esc(message)}</p>${status === 403 ? '<p><a href="/cdn-cgi/access/logout">Sign out and use another account</a></p>' : ''}</main>`,
+    { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...securityHeaders('', { styleNonce: nonce }) } },
+  );
+}
 
 export default {
   async fetch(request, env) {
@@ -54,8 +46,8 @@ export default {
       res = await env.ASSETS.fetch(request);
     }
     const out = new Response(res.body, res);
-    for (const [k, v] of Object.entries(SECURITY_HEADERS)) out.headers.set(k, v);
-    out.headers.set('Content-Security-Policy', csp(env.SITE_URL));
+    // (The live preview frames the site: its origin is the one frame the policy allows.)
+    for (const [k, v] of Object.entries(securityHeaders(env.SITE_URL))) out.headers.set(k, v);
     return out;
   },
 };
