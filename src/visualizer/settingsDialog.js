@@ -205,7 +205,10 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
 
   // --- tabs (arrow keys move between them, like any tab list)
   const tabs = /** @type {HTMLElement[]} */ ([...dialog.querySelectorAll('[data-tab]')]);
+  const body = q('[data-settings-body]');
   function showTab(id, focus = false) {
+    // (Another tab starts at its top, not where the last one was scrolled to.)
+    if (tabs.find((t) => t.getAttribute('aria-selected') === 'true')?.dataset.tab !== id) body.scrollTop = 0;
     for (const t of tabs) {
       const on = t.dataset.tab === id;
       t.setAttribute('aria-selected', String(on));

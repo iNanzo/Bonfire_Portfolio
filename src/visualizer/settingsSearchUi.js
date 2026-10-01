@@ -210,8 +210,9 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
   const parentRow = (row) => row.parentElement?.closest('[data-row]') ?? null;
   /** An item whose whole group was found (the group counts for it). */
   const inWhole = (row) => { const up = parentRow(row); return !!up && !!last?.plan.whole.has(/** @type {HTMLElement} */ (up).dataset.row); };
-  /** The rows found, in the dialog's order, that show. */
-  const results = () => [...form.querySelectorAll('[data-row].is-hit')].filter((r) => !r.closest('.is-miss, [hidden]:not([data-tab-panel])'));
+  /** The rows found that show: the tabs' in the dialog's order, then the presets (in the header). */
+  const results = () => [...form.querySelectorAll('.viz-settings-body [data-row].is-hit'), ...form.querySelectorAll('.viz-settings-top [data-row].is-hit')]
+    .filter((r) => !r.closest('.is-miss, [hidden]:not([data-tab-panel])'));
   /** What to focus in a row: its switch's choice, its input, its button (never its "?"). */
   const focusable = (row) => {
     for (const s of FOCUS) {
@@ -298,7 +299,6 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
 
   const box = createSearchBox({ input, status: dialog.querySelector('[data-settings-search] [data-search-status]'), onQuery: apply, noun: 'setting' });
 
-
   /**
    * Show a row: the search cleared, its tab, scrolled to the middle and focused, a short
    * flash (none with reduced motion). A row only All Settings has stays shown in the Simple
@@ -317,7 +317,6 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
       if (el.hasAttribute('data-adv')) el.classList.add('is-revealed');
       if (el instanceof HTMLDetailsElement) el.open = true;
     }
-    if (row.hasAttribute('data-adv')) row.classList.add('is-revealed');
     const still = reducedMotion();
     row.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
     focusable(row)?.focus({ preventScroll: true });
@@ -334,8 +333,8 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
     if (e.key === 'Enter') {
       e.preventDefault(); // (the form is method=dialog: Enter would close it)
       box.run();
-      const found = last?.hits.filter((h) => !h.entry.parent || !last.plan.whole.has(h.entry.parent)) ?? [];
-      if (found.length === 1) reveal(found[0].entry.id);
+      const found = results().filter((r) => !inWhole(r));
+      if (found.length === 1) reveal(/** @type {HTMLElement} */ (found[0]).dataset.row);
     } else if (e.key === 'ArrowDown' && input.value.trim()) {
       box.run();
       const first = results().map(focusable).find(Boolean);
