@@ -7,23 +7,30 @@
 //             bonfire's own render loop; the director (director.js) turns it into the
 //             fire's drive, beats, swaps and camera. The HUD shows what it hears and
 //             hides itself (and the cursor) when the mouse rests.
-//   settings  kept in this browser (settings.js), in tabs, with presets and saved setups.
+//   settings  kept in this browser (settings.js), shown in a dialog (settingsDialog.js) in
+//             tabs, with a search (/), presets and saved setups. Saving waits for a burst of
+//             changes to settle, and is done at once as the page is hidden or left.
+//   keys      ? lists every shortcut (keys.js, the shared keys overlay).
+//   frames    Frame Rate (a setting of this computer's) caps how often the picture is drawn;
+//             the analyser still hears every frame the display shows (createBonfire's
+//             onTick), and what it heard in between reaches the director with the next drawn
+//             frame (tickBatch.js).
 //   beat      from the music, or set by hand (a BPM, nudges, "this is beat 1"), or from an
 //             Ableton Link session through the bridge (tools/link-bridge.mjs).
 //   output    a second window with just the picture, for a projector (the canvas is
 //             streamed into it), while this one keeps the controls.
 //   cards     title cards: the main one as an intro and on drops, more that take turns on
 //             drops, show every 32 bars, or on a key (Shift+1…9).
-//   render    P opens the render menu (ui/renderMenu.js, the site's): the Render tab's
+//   render    P opens Render Settings (ui/renderMenu.js, the site's): the Picture tab's
 //             pixel size, palette, dither, outlines, fog and x-ray, a digit a step, on the
-//             start screen too. (Colors moved to Shift+P.)
+//             start screen too. (Flame Colors are on Shift+P.)
 //   knights   K: the knights dance now, or sit; Shift+K: they come or go (knightShow.js).
-//             Their style, finish, edge glow and seat pose are in the Knights tab; the pack
+//             Their style, finish, edge glow and seat pose are in the Cast tab; the pack
 //             swaps the style and the finish by hand.
 //   scenes    preset scenes (the director's scene loop and player): the site's built-in
 //             ones (content.json `scenes`, hidden = out of the loop) and this browser's own
-//             from the Painter (sceneStore.js), filtered by the Scenes tab's From. The HUD
-//             names the one playing (a click opens the Scenes tab); the start screen's chips
+//             from the Painter (sceneStore.js), filtered by the loop's Scenes From. The HUD
+//             names the one playing (a click opens Scenes & Cards); the start screen's chips
 //             play one behind the menu (it's the first when the music starts); N plays the
 //             next (at once on the start screen, else on the next downbeat, in a flash);
 //             Shift+N switches them off / in the mix / always. ?scene=<ref> opens on one
@@ -38,7 +45,8 @@ import { startingEquipment, weapons } from '../content.js';
 import { elementOr, flameTitle } from '../elements.js';
 import { installDitherPatterns } from '../ui/dither.js';
 import { installTooltips } from '../ui/tooltip.js';
-import { applyFlame, setAccentRamp } from '../ui/theme.js';
+import { createKeysOverlay, isHelpKey } from '../ui/keysOverlay.js';
+import { applyFlame, setAccentRamp, setAccentRate } from '../ui/theme.js';
 import { esc } from '../html.js';
 import { createAnalyser, BAND_NAMES } from './analyser.js';
 import { createDirector } from './director.js';
@@ -47,8 +55,11 @@ import { MODES, modeOf } from './looks.js';
 import { COLOR_MODES } from './colors.js';
 import { createDemo, DEMO_BPM } from './demo.js';
 import { densityCounts } from './density.js';
-import { bindSettings, loadSettings, resetSettings, saveSettings, settingsMarkup, applyPreset, presetButtons, markPreset, PRESETS, defaults, scenesFrom, inLoop } from './settings.js';
-import { stepRender, renderText, XRAY_VIEWS } from './render.js';
+import { loadSettings, saveSettings, flushSettings, applyPreset, PRESETS, defaults, scenesFrom, inLoop, frameCap } from './settings.js';
+import { bindSettings, settingsMarkup, presetButtons, markPreset } from './settingsDialog.js';
+import { KEY_GROUPS, keyList } from './keys.js';
+import { createTickBatch } from './tickBatch.js';
+import { stepRender, renderText, XRAY_VIEWS, FOGS } from './render.js';
 import { HELMETS } from './knightShow.js';
 import { STYLE_NAMES } from '../bonfire/knightStyles.js';
 import { FINISH_NAMES } from '../bonfire/steel.js';
@@ -56,6 +67,7 @@ import { normalizeScene, parseRef, sceneRef, sceneSwatches } from '../scenes.js'
 import { createSceneStore, THUMB_MAX } from '../sceneStore.js';
 import * as siteContent from '../content.js';
 import { createRenderMenu } from '../ui/renderMenu.js';
+import { focusedNow } from '../ui/focus.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
 import { createPack, bonfireItems } from '../ui/pack.js';
@@ -74,6 +86,9 @@ const qa = (s, r = document) => [...r.querySelectorAll(s)];
 
 // --- Settings (this browser only: settings.js) -----------------------------------------------
 const settings = loadSettings();
+// (Saving waits for changes to settle: what's waiting is written as the page goes or hides.)
+addEventListener('pagehide', flushSettings);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flushSettings(); });
 
 // --- Preset scenes: the library -------------------------------------------------------------
 // The site's built-in scenes (content.json, stored normalized; hidden ones are out of the
@@ -90,8 +105,16 @@ function library() {
   ];
   return libraryCache;
 }
-/** The library the loop plays from (the Scenes tab's From; its in-or-out switches are the loop's). */
-const loopLibrary = () => scenesFrom(library(), settings);
+/**
+ * The library the loop plays from (Scenes From; its in-or-out switches are the loop's): the
+ * same list until the library or Scenes From changes (the HUD asks ten times a second).
+ */
+let loopCache = { of: null, from: '', list: [] };
+function loopLibrary() {
+  const all = library();
+  if (loopCache.of !== all || loopCache.from !== settings.sceneFrom) loopCache = { of: all, from: settings.sceneFrom, list: scenesFrom(all, settings) };
+  return loopCache.list;
+}
 /** A scene by its ref (a hidden built-in one too), or null. */
 function findScene(ref) {
   const { source, id } = parseRef(ref);
@@ -110,6 +133,9 @@ applyCssPalette();
 applyFlame(startingEquipment.flame);
 installDitherPatterns(base);
 installTooltips();
+// (The accents follow the flame through a color blend: 8 times a second is smooth enough here,
+// and each write restyles the whole page, the open settings too.)
+setAccentRate(125);
 
 // --- Markup ------------------------------------------------------------------------------------
 const SOURCES = [
@@ -118,35 +144,35 @@ const SOURCES = [
   ['file', 'Play an Audio File', 'A mix or a track from this computer (you can also drop one anywhere on the page). Plays through your speakers.'],
   ['demo', 'Demo Track', `A synthesized ${DEMO_BPM} BPM loop with a breakdown and a drop, to see every reaction.`],
 ];
-const KEYS = [
-  ['Space', 'Drop: strike the held blade, or recolor now'],
-  ['A', 'Forge a blade and hold it for the drop'],
-  ['B', 'Swap on the beat (lands on a downbeat)'],
-  ['R', 'A ring out of the fire'],
-  ['X', 'The blade leaves the fire (moves on the next beats)'],
-  ['G', 'A burst in the current look'],
-  ['L', 'Next look'],
-  ['M', 'Mirror: in the mix, always, off'],
-  ['P', 'The render menu: pixel size, palette, dither, outlines, fog, x-ray (its digits step them)'],
-  ['Shift+P', 'Colors: the site’s, harmonious, fully random, a mix'],
-  ['N', 'The next preset scene (on the next downbeat, in a flash; with a blade held for the drop, at the drop)'],
-  ['Shift+N', 'Preset scenes: in the mix, always, off'],
-  ['K', 'The knights dance now (for a phrase), or sit back down'],
-  ['Shift+K', 'The knights come or go (on the next drop if one is coming)'],
-  ['1 2 3', 'Hit with flame, lightning or frost'],
-  ['← →', 'Hit with the previous or next colors'],
-  ['T', 'Tap the tempo (first tap is beat 1)'],
-  ['D', 'This beat is beat 1 (fix the bar)'],
-  ['[ ]', 'Nudge the beat 10 ms earlier or later'],
-  ['Shift+1…9', 'Show a title card (1 = the main one)'],
-  ['O', 'Open the output window (for a projector)'],
-  ['V', 'Record a clip (the picture and the sound), saved when you stop'],
-  ['C', 'Cut to another shot'],
-  ['H', 'Hide or show the controls'],
-  ['F', 'Full screen'],
-  ['S', 'Settings'],
-  ['I', 'The pack: fast travel, swap the weapon, cast a ring, a living blade or a new element'],
-];
+// The HUD's buttons and readouts each say what they do through the shared tooltip (on hover,
+// focus or a tap), read out as their description; the ones whose label changes (Forge /
+// Strike, Dance / Sit, Full Screen / Exit Full Screen) change their tip with it.
+const HUD_TIPS = {
+  meter: 'The sound in five bands, lows to highs.',
+  pips: 'The bar: beat 1 is outlined.',
+  bpm: 'Type a BPM to lock the tempo; leave it empty to follow the music.',
+  early: 'Nudges the beat 10 ms earlier ([).',
+  late: 'Nudges the beat 10 ms later (]).',
+  downbeat: 'Makes this beat beat 1 of the bar (D).',
+  tap: 'Tap along 4 times or more to set the tempo; the first tap is beat 1 (T).',
+  drop: 'The drop: strikes the held weapon, or recolors the fire now (Space).',
+  forge: 'Forges a new weapon and holds it over the fire until the drop (A).',
+  strike: 'Strikes the held weapon into the fire now, as if the drop hit (A).',
+  ring: 'The element’s ring races out across the ground (R).',
+  living: 'The weapon leaves the fire and fights on the next beats (X).',
+  dance: 'The knights get up and dance now, for a phrase (K; Shift+K: they come or go).',
+  sit: 'The knights sit back down by the fire (K; Shift+K: they come or go).',
+  cut: 'Cuts to another camera shot (C).',
+  output: 'Opens a window with just the picture, to drag onto a projector (O).',
+  record: 'Records a clip of the picture and the sound; press again to stop and save it (V).',
+  settings: 'Settings: sound, show, picture, effects, camera, cast, scenes and setups (S).',
+  keys: 'Every keyboard shortcut, in groups (?).',
+  fullscreen: 'Fills the screen with the show (F).',
+  exitFullscreen: 'Back from full screen (F, or Esc).',
+};
+/** A HUD element's tip: the attribute, and the hidden text read out as its description. */
+const hudTip = (id, text = HUD_TIPS[id]) => ` data-tip="${esc(text)}" aria-describedby="viz-hud-${id}"`;
+const hudNote = (id, text = HUD_TIPS[id]) => `<span class="visually-hidden" id="viz-hud-${id}">${esc(text)}</span>`;
 
 const app = document.getElementById('viz');
 app.innerHTML = `
@@ -163,52 +189,54 @@ app.innerHTML = `
     <div class="viz-start-copy">
       <p class="eyebrow">Audio-Reactive Visualizer</p>
       <h1 class="hero-name" id="viz-title" tabindex="-1">Bonfire Live</h1>
-      <p class="hero-value">Feed it a DJ set. Kicks stoke the fire, breakdowns forge a new blade over it, and the drop drives it into the ashes.</p>
-      <nav class="title-menu viz-sources" aria-label="Sound source">
+      <p class="hero-value">Feed it a DJ set. Kicks stoke the fire, breakdowns forge a new weapon over it, and the drop drives it into the ashes.</p>
+      <nav class="title-menu viz-sources" aria-label="Sound Source">
         <ul role="list" data-sources>
           ${SOURCES.map(([id, label, hint]) => `
             <li><button class="title-item viz-source" type="button" data-source="${id}" data-tip="${esc(hint)}" aria-describedby="viz-src-${id}">
               <span class="cursor" aria-hidden="true"></span><span>${esc(label)}</span>
-              <span class="visually-hidden" id="viz-src-${id}">${esc(hint)}</span>
-            </button></li>`).join('')}
+            </button><span class="visually-hidden" id="viz-src-${id}">${esc(hint)}</span></li>`).join('')}
         </ul>
       </nav>
       <label class="viz-field viz-device" data-device-row hidden>
         <span class="viz-field-label">Input Device</span>
         <select data-device></select>
       </label>
-      <div class="viz-feel" role="group" aria-label="Tonight's feel (presets)" data-feel>
-        <span class="viz-group-label">Feel</span>
-        ${presetButtons('viz-feel-pick')}
+      <div class="viz-feel" role="group" aria-label="Presets: a kind of night in one click" data-feel>
+        <span class="viz-group-label">Presets</span>
+        ${presetButtons('viz-feel-pick', 'viz-start-preset')}
       </div>
-      <div class="viz-feel viz-scene-chips" role="group" aria-label="Preset scenes: play one behind the menu" data-scene-chips hidden></div>
+      <div class="viz-feel viz-scene-chips" role="group" aria-label="Preset Scenes: play one behind the menu" data-scene-chips hidden></div>
       <p class="viz-solo" data-solo hidden></p>
-      <button class="pix-btn viz-start-settings" type="button" data-act="settings"><kbd>S</kbd>Settings</button>
+      <div class="viz-start-row">
+        <button class="pix-btn viz-start-settings" type="button" data-act="settings"${hudTip('start-settings', HUD_TIPS.settings)}><kbd>S</kbd>Settings</button>${hudNote('start-settings', HUD_TIPS.settings)}
+        <button class="pix-btn viz-start-settings" type="button" data-act="keys"${hudTip('start-keys', HUD_TIPS.keys)}><kbd>?</kbd>Keys</button>${hudNote('start-keys', HUD_TIPS.keys)}
+      </div>
       <p class="viz-error" role="alert" data-error hidden></p>
       <input type="file" accept="audio/*" data-file hidden>
     </div>
   </section>
 
   <footer class="viz-hud" data-hud hidden>
-    <div class="viz-group viz-readout" role="group" aria-label="What it hears">
-      <div class="viz-meter" aria-hidden="true" title="The sound in five bands, lows to highs">
+    <div class="viz-group viz-readout" role="group" aria-label="What It Hears">
+      <div class="viz-meter" aria-hidden="true" data-tip="${esc(HUD_TIPS.meter)}">
         ${BAND_NAMES.map((b) => `<span class="viz-band" data-band="${b}"><i></i></span>`).join('')}
       </div>
       <div class="viz-status">
         <p class="viz-wield" data-wield></p>
         <p class="viz-state" data-state>Waiting for sound…</p>
-        <button class="viz-scene-line" type="button" data-scene-line hidden><span class="viz-scene-label">Scene</span> <span class="viz-scene-name" data-scene-name></span><span class="visually-hidden">: the Scenes settings</span></button>
+        <button class="viz-scene-line" type="button" data-scene-line hidden><span class="viz-scene-label">Scene</span> <span class="viz-scene-name" data-scene-name></span><span class="visually-hidden">: Scenes &amp; Cards settings</span></button>
       </div>
     </div>
     <div class="viz-group viz-beat" role="group" aria-label="Beat">
       <span class="viz-group-label">Beat</span>
-      <span class="viz-pips" aria-hidden="true" data-pips title="The bar: beat 1 is outlined"><i></i><i></i><i></i><i></i></span>
+      <span class="viz-pips" aria-hidden="true" data-pips data-tip="${esc(HUD_TIPS.pips)}"><i></i><i></i><i></i><i></i></span>
       <span class="viz-bpm" data-bpm>--- BPM</span>
-      <input class="viz-bpm-set" type="number" min="60" max="220" step="0.1" placeholder="Auto" data-bpm-set aria-label="Set the BPM" title="Type a BPM to lock the tempo. Empty: follow the music.">
-      <button class="pix-btn" type="button" data-act="nudge-early" title="Beats 10 ms earlier ([)" aria-label="Nudge the beat earlier">‹</button>
-      <button class="pix-btn" type="button" data-act="nudge-late" title="Beats 10 ms later (])" aria-label="Nudge the beat later">›</button>
-      <button class="pix-btn" type="button" data-act="downbeat" title="Make this beat beat 1 of the bar (D)"><kbd>D</kbd>1</button>
-      <button class="pix-btn" type="button" data-act="tap" title="Tap along 4 times or more to set the tempo; the first tap is beat 1"><kbd>T</kbd>Tap</button>
+      <input class="viz-bpm-set" type="number" min="60" max="220" step="0.1" placeholder="Auto" data-bpm-set aria-label="Set the BPM"${hudTip('bpm')}>${hudNote('bpm')}
+      <button class="pix-btn" type="button" data-act="nudge-early" aria-label="Nudge the Beat Earlier"${hudTip('early')}>‹</button>${hudNote('early')}
+      <button class="pix-btn" type="button" data-act="nudge-late" aria-label="Nudge the Beat Later"${hudTip('late')}>›</button>${hudNote('late')}
+      <button class="pix-btn" type="button" data-act="downbeat"${hudTip('downbeat')}><kbd>D</kbd>1</button>${hudNote('downbeat')}
+      <button class="pix-btn" type="button" data-act="tap"${hudTip('tap')}><kbd>T</kbd>Tap</button>${hudNote('tap')}
     </div>
     <div class="viz-transport" data-transport hidden>
       <button class="pix-btn" type="button" data-act="play">Pause</button>
@@ -217,24 +245,34 @@ app.innerHTML = `
     </div>
     <div class="viz-group viz-actions" role="group" aria-label="Moments">
       <span class="viz-group-label">Moments</span>
-      <button class="pix-btn" type="button" data-act="drop" title="The drop: strike the held blade, or recolor the fire now"><kbd>Space</kbd>Drop</button>
-      <button class="pix-btn" type="button" data-act="arm" title="Forge a new blade and hold it over the fire until the drop"><kbd>A</kbd><span data-arm-label>Forge</span></button>
-      <button class="pix-btn" type="button" data-act="ring" title="The element’s ring races out across the ground"><kbd>R</kbd>Ring</button>
-      <button class="pix-btn" type="button" data-act="combo" title="The blade leaves the fire and fights on the next beats"><kbd>X</kbd>Swing</button>
-      <button class="pix-btn" type="button" data-act="dance" title="The knights get up and dance now (for a phrase), or sit back down (Shift+K: they come or go)"><kbd>K</kbd><span data-dance-label>Dance</span></button>
+      <button class="pix-btn" type="button" data-act="drop"${hudTip('drop')}><kbd>Space</kbd>Drop</button>${hudNote('drop')}
+      <button class="pix-btn" type="button" data-act="arm"${hudTip('arm', HUD_TIPS.forge)}><kbd>A</kbd><span data-arm-label>Forge</span></button>${hudNote('arm', HUD_TIPS.forge)}
+      <button class="pix-btn" type="button" data-act="ring"${hudTip('ring')}><kbd>R</kbd>Ring</button>${hudNote('ring')}
+      <button class="pix-btn" type="button" data-act="combo"${hudTip('living')}><kbd>X</kbd>Living Weapon</button>${hudNote('living')}
+      <button class="pix-btn" type="button" data-act="dance"${hudTip('dance-act', HUD_TIPS.dance)}><kbd>K</kbd><span data-dance-label>Dance</span></button>${hudNote('dance-act', HUD_TIPS.dance)}
     </div>
     <div class="viz-group viz-actions" role="group" aria-label="View">
       <span class="viz-group-label">View</span>
-      <button class="pix-btn" type="button" data-act="cut" title="Cut to another camera shot"><kbd>C</kbd>Shot</button>
-      <button class="pix-btn" type="button" data-act="output" title="Open a window with just the picture, to drag onto a projector"><kbd>O</kbd><span data-output-label>Output</span></button>
-      <button class="pix-btn viz-record" type="button" data-act="record" title="Record a clip of the picture and the sound; press again to stop and save it"><kbd>V</kbd><span data-record-label>Record</span></button>
-      <button class="pix-btn" type="button" data-act="settings" title="Settings, presets, title cards"><kbd>S</kbd>Settings</button>
-      <button class="pix-btn" type="button" data-act="fullscreen" title="Full screen"><kbd>F</kbd><span data-fs-label>Full Screen</span></button>
+      <button class="pix-btn" type="button" data-act="cut"${hudTip('cut')}><kbd>C</kbd>Shot</button>${hudNote('cut')}
+      <button class="pix-btn" type="button" data-act="output"${hudTip('output')}><kbd>O</kbd><span data-output-label>Output</span></button>${hudNote('output')}
+      <button class="pix-btn viz-record" type="button" data-act="record"${hudTip('record')}><kbd>V</kbd><span data-record-label>Record</span></button>${hudNote('record')}
+      <button class="pix-btn" type="button" data-act="settings"${hudTip('settings')}><kbd>S</kbd>Settings</button>${hudNote('settings')}
+      <button class="pix-btn" type="button" data-act="keys"${hudTip('keys')}><kbd>?</kbd>Keys</button>${hudNote('keys')}
+      <button class="pix-btn" type="button" data-act="fullscreen"${hudTip('fs', HUD_TIPS.fullscreen)}><kbd>F</kbd><span data-fs-label>Full Screen</span></button>${hudNote('fs', HUD_TIPS.fullscreen)}
     </div>
   </footer>
 
-  ${settingsMarkup(settings, KEYS, { base: import.meta.env.BASE_URL })}
+  ${settingsMarkup(settings, keyList(), { base: import.meta.env.BASE_URL })}
 `;
+
+/** A HUD button's changing label, and its tip with it (written only when it changes). */
+function relabel(labelEl, text, tipId, tip) {
+  if (labelEl.textContent === text) return;
+  labelEl.textContent = text;
+  labelEl.closest('[data-tip]')?.setAttribute('data-tip', tip);
+  const said = document.getElementById(`viz-hud-${tipId}`);
+  if (said) said.textContent = tip;
+}
 
 const stage = q('[data-stage]');
 const hud = q('[data-hud]');
@@ -264,14 +302,26 @@ function onImpact(flameKey, _from, instant, selection) {
 
 // Ableton Link (link.js): while it's the beat's source, the session sets the grid.
 const link = createLinkClient({ port: () => settings.linkPort, onStatus: (text) => { if (settingsPanel) settingsPanel.linkStatus = text; } });
-function onFrame(dt) {
+// The sound is analysed on every frame the display shows (onTick), whatever Frame Rate
+// draws; the director and the HUD go with the drawn frames (onFrame), taking all it heard
+// since the last one (tickBatch.js).
+const heard = createTickBatch();
+function onTick(dt) {
   const now = performance.now() / 1000;
   if (settings.beatFrom === 'link' && engine?.source) link.update(now, engine.analyser.tempo);
   else link.close();
-  const f = engine?.source ? engine.analyser.update(now, dt, { sensitivity: settings.sensitivity, lead: settings.offset / 1000 }) : IDLE;
+  if (engine?.source) heard.add(engine.analyser.update(now, dt, { sensitivity: settings.sensitivity, lead: settings.offset / 1000 }));
+}
+function onFrame(dt) {
+  const f = (engine?.source && heard.take()) || IDLE;
   lastFeatures = f;
   director.update(f, dt);
   if (engine?.source) drawHud(f, dt);
+}
+/** Frame Rate as the scene's cap (only when it changed: a new cap starts its count again). */
+function applyFrameRate() {
+  const cap = frameCap(settings.frameRate);
+  if (fire && fire.maxFps !== cap) fire.setMaxFps(cap);
 }
 
 function failScene(error) {
@@ -296,7 +346,11 @@ function startScene() {
   const generation = ++sceneGeneration;
   applyDensity();
   return import('../bonfire/scene.js').then(async ({ createBonfire }) => {
-    const candidate = createBonfire(stage, { reducedMotion, sway: 0, lightTrails: settings.trails, effects: true, onImpact, onRamp: setAccentRamp, onError: failScene, onFrame: (dt) => { if (fire === candidate) onFrame(dt); } });
+    const candidate = createBonfire(stage, {
+      reducedMotion, sway: 0, lightTrails: settings.trails, effects: true, onImpact, onRamp: setAccentRamp, onError: failScene,
+      onFrame: (dt) => { if (fire === candidate) onFrame(dt); },
+      onTick: (dt) => { if (fire === candidate) onTick(dt); },
+    });
     const nextDirector = createDirector(candidate, { settings, reducedMotion, onEvent, scenes: loopLibrary });
     await candidate.ready;
     if (generation !== sceneGeneration) { candidate.dispose(); return; }
@@ -307,6 +361,7 @@ function startScene() {
     fire = candidate;
     director = nextDirector;
     frameFire();
+    applyFrameRate();
     // (Dev builds, and any build with ?bench in its address: tools/bench-viz.mjs drives the show through it.)
     if (import.meta.env.DEV || new URLSearchParams(location.search).has('bench')) window.__viz = { fire, director, settings, get engine() { return engine; }, get features() { return lastFeatures; } };
     director.applyRender(); // (the Render tab: render.js)
@@ -523,31 +578,24 @@ function cycleScenes() {
 
 /**
  * The first time a built-in scene plays live, keep a small picture of it for its row in the
- * Scenes tab (192×108 WebP, in the scene store; the Painter keeps one for each of yours):
- * 2.5 s in (it has settled), if it's still the one playing. Called when a scene arrives live
- * and when the music starts (the scene it opens on).
+ * loop (192×108 WebP, in the scene store; the Painter keeps one for each of yours): 2.5 s in
+ * (it has settled), if it's still the one playing. The scene copies it from its own texels
+ * straight to that size (fire.captureThumb), when the page has a moment (idle time). Called
+ * when a scene arrives live and when the music starts (the scene it opens on).
  */
 const thumbing = new Set(); // (refs with a picture on its way)
+const whenIdle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 1000 }) : setTimeout(fn, 0));
 function keepThumb(ref) {
-  if (!ref.startsWith('b:') || store.thumb(ref) || !fire?.capture || thumbing.has(ref)) return;
+  if (!ref.startsWith('b:') || store.thumb(ref) || !fire?.captureThumb || thumbing.has(ref)) return;
   thumbing.add(ref);
-  setTimeout(async () => {
+  setTimeout(() => whenIdle(async () => {
     thumbing.delete(ref);
     if (director?.sceneRef !== ref || !fire || document.body.dataset.mode !== 'live') return;
     try {
-      const bitmap = await createImageBitmap(await fire.capture());
-      const c = document.createElement('canvas');
-      c.width = 192;
-      c.height = 108;
-      const g = c.getContext('2d');
-      g.imageSmoothingEnabled = false;
-      // (Cover: the middle of the frame at 16:9.)
-      const k = Math.max(c.width / bitmap.width, c.height / bitmap.height);
-      g.drawImage(bitmap, (c.width - bitmap.width * k) / 2, (c.height - bitmap.height * k) / 2, bitmap.width * k, bitmap.height * k);
-      const url = c.toDataURL('image/webp', 0.7);
-      if (url.startsWith('data:image/webp') && url.length <= THUMB_MAX) store.setThumb(ref, url);
+      const url = await fire.captureThumb(192, 108);
+      if (url?.startsWith('data:image/webp') && url.length <= THUMB_MAX) store.setThumb(ref, url);
     } catch { /* no picture this time */ }
-  }, 2500);
+  }), 2500);
 }
 
 // The library changes when a Painter tab saves (or deletes) a scene; and a Painter can hand
@@ -654,6 +702,7 @@ function stopSource() {
   engine.source.stop();
   engine.source = null;
   engine.analyser.reset(); // (silent again, without a 'silence' event of its own)
+  heard.clear();
   director?.silence();
 }
 
@@ -676,6 +725,7 @@ async function useSource(kind, { file = null } = {}) {
     const latency = source.playback ? Math.min(0.5, e.ctx.outputLatency || e.ctx.baseLatency || 0.02) : 0;
     e.delay.delayTime.value = latency;
     e.analyser.reset();
+    heard.clear();
     e.source = source;
     source.track?.addEventListener('ended', () => {
       if (e.source !== source) return;
@@ -780,53 +830,73 @@ function goLive() {
 }
 
 // --- HUD -------------------------------------------------------------------------------------
-const bandEls = Object.fromEntries(qa('[data-band]').map((el) => [el.dataset.band, el]));
+// (Written only when what it shows changes: each write would restyle the HUD.)
+const bandEls = BAND_NAMES.map((b) => q(`[data-band="${b}"]`));
+const bandShown = BAND_NAMES.map(() => '');
 const pips = qa('[data-pips] i');
 const bpmEl = q('[data-bpm]');
 const stateEl = q('[data-state]');
 const armLabel = q('[data-arm-label]');
 const danceLabel = q('[data-dance-label]');
 const progress = q('[data-progress] i');
+let progressShown = '';
 let hudClock = 0;
 let pipOn = -1;
-function drawHud(f, dt) {
-  // Meter: stepped like everything else.
-  for (const b of BAND_NAMES) bandEls[b].style.setProperty('--v', (Math.round(f.bands[b] * 8) / 8).toFixed(3));
+/** Write `text` into `el` if it isn't there already. */
+const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
+function drawMeter(f) {
+  // (Stepped like everything else: eighths.)
+  BAND_NAMES.forEach((b, i) => {
+    const v = (Math.round(f.bands[b] * 8) / 8).toFixed(3);
+    if (v !== bandShown[i]) { bandShown[i] = v; bandEls[i].style.setProperty('--v', v); }
+  });
   for (const beat of f.beats) {
     if (!f.locked) continue;
     pipOn = beat.beat;
     pips.forEach((p, i) => { p.classList.toggle('is-on', i === pipOn); p.classList.toggle('is-down', i === 0); });
   }
   if (!f.locked && pipOn >= 0) { pips.forEach((p) => p.classList.remove('is-on')); pipOn = -1; }
+}
+/** The HUD's state line: a note, the section, a weapon waiting for the drop, the knights. */
+function stateText(f) {
+  const now = performance.now() / 1000;
+  const noting = stateNote && now < stateNote.until;
+  // (A scene N asked for in a breakdown: the line says it comes with the drop until it lands.)
+  const waiting = waitingForDrop();
+  const waits = waiting ? `“${waiting}” comes with the drop` : 'the weapon waits for the drop';
+  let text;
+  if (noting) text = waiting && !stateNote.text.includes(waiting) ? `${stateNote.text} · ${waits}` : stateNote.text;
+  else if (f.state === 'silent') text = 'Waiting for sound…';
+  else if (f.state === 'breakdown' || f.state === 'build') {
+    const what = f.state === 'build' ? `Build ${Math.round(f.build * 100)}%` : 'Breakdown';
+    text = fire?.holding ? `${what} · ${waits}` : what;
+  } else if (fire?.holding) text = waiting ? `The weapon waits for the drop: ${waits}` : 'The weapon waits for the drop';
+  else text = f.locked ? 'In the groove' : 'Listening for the beat…';
+  // ...and what the knights are doing.
+  const knights = director?.knights;
+  if (knights?.text && !noting && f.state !== 'silent') text += ` · ${knights.text}`;
+  return text;
+}
+function drawHud(f, dt) {
+  drawMeter(f);
   hudClock += dt;
   if (hudClock < 0.1) return;
   hudClock = 0;
   const by = engine.analyser.tempo.manual; // tap | manual | link | null (heard)
   const tag = { tap: ' · Tap', manual: ' · Set', link: ' · Link' }[by] ?? '';
-  bpmEl.textContent = f.bpm ? `${f.locked ? '' : '~'}${by === 'link' || by === 'manual' ? f.bpm.toFixed(1) : Math.round(f.bpm)} BPM${tag}` : '--- BPM';
+  setText(bpmEl, f.bpm ? `${f.locked ? '' : '~'}${by === 'link' || by === 'manual' ? f.bpm.toFixed(1) : Math.round(f.bpm)} BPM${tag}` : '--- BPM');
   bpmEl.classList.toggle('is-locked', f.locked);
-  const now = performance.now() / 1000;
-  // (A scene N asked for in a breakdown: the line says it comes with the drop until it lands.)
-  const waiting = waitingForDrop();
-  const waits = waiting ? `“${waiting}” comes with the drop` : 'the blade waits for the drop';
-  let text;
-  if (stateNote && now < stateNote.until) text = waiting && !stateNote.text.includes(waiting) ? `${stateNote.text} · ${waits}` : stateNote.text;
-  else if (f.state === 'silent') text = 'Waiting for sound…';
-  else if (f.state === 'breakdown' || f.state === 'build') {
-    const what = f.state === 'build' ? `Build ${Math.round(f.build * 100)}%` : 'Breakdown';
-    text = fire?.holding ? `${what} · ${waits}` : what;
-  }
-  else if (fire?.holding) text = waiting ? `The blade waits for the drop: ${waits}` : 'The blade waits for the drop';
-  else text = f.locked ? 'In the groove' : 'Listening for the beat…';
-  // ...and what the knights are doing.
-  const knights = director?.knights;
-  if (knights?.text && !(stateNote && now < stateNote.until) && f.state !== 'silent') text += ` · ${knights.text}`;
-  if (stateEl.textContent !== text) stateEl.textContent = text;
-  armLabel.textContent = fire?.holding ? 'Strike' : 'Forge';
-  danceLabel.textContent = knights && knights.mode !== 'rest' ? 'Sit' : 'Dance';
+  setText(stateEl, stateText(f));
+  const holding = !!fire?.holding;
+  relabel(armLabel, holding ? 'Strike' : 'Forge', 'arm', holding ? HUD_TIPS.strike : HUD_TIPS.forge);
+  const up = !!director?.knights && director.knights.mode !== 'rest';
+  relabel(danceLabel, up ? 'Sit' : 'Dance', 'dance-act', up ? HUD_TIPS.sit : HUD_TIPS.dance);
   showScene();
   const media = engine.source?.media;
-  if (media && media.duration) progress.style.setProperty('--p', (media.currentTime / media.duration).toFixed(4));
+  if (media && media.duration) {
+    const p = (media.currentTime / media.duration).toFixed(3);
+    if (p !== progressShown) { progressShown = p; progress.style.setProperty('--p', p); }
+  }
 }
 
 // Idle: the controls and cursor fade when the mouse rests (unless hidden or in use).
@@ -835,7 +905,7 @@ function wake() {
   document.body.classList.remove('is-idle');
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
-    if (document.body.dataset.mode !== 'live' || settingsDialog.open || hud.contains(document.activeElement) || renderMenu.el.contains(document.activeElement)) return;
+    if (document.body.dataset.mode !== 'live' || settingsDialog.open || keysOverlay.el.open || hud.contains(document.activeElement) || renderMenu.el.contains(document.activeElement)) return;
     document.body.classList.add('is-idle');
   }, 3000);
 }
@@ -856,7 +926,8 @@ function toggleFullscreen() {
   else document.documentElement.requestFullscreen?.().catch(() => {});
 }
 document.addEventListener('fullscreenchange', () => {
-  q('[data-fs-label]').textContent = document.fullscreenElement ? 'Exit Full Screen' : 'Full Screen';
+  const full = !!document.fullscreenElement;
+  relabel(q('[data-fs-label]'), full ? 'Exit Full Screen' : 'Full Screen', 'fs', full ? HUD_TIPS.exitFullscreen : HUD_TIPS.fullscreen);
 });
 
 function tap() {
@@ -871,7 +942,7 @@ const actions = {
   beat: () => { if (director?.forgeOnBeat(lastFeatures?.bpm ? 60 / lastFeatures.bpm : 0)) note('Swapping on the next downbeat', 2); },
   tap,
   ring: () => director?.ring(1),
-  combo: () => { if (!director?.combo()) note('The blade is busy (or no beat yet)', 1.5); },
+  combo: () => { if (!director?.combo()) note('The weapon is busy (or no beat yet)', 1.5); },
   cut: () => { director?.cut(); note(`Shot: ${SHOTS[director?.shot]?.name ?? ''}`, 1.5); },
   dance: () => {
     const r = director?.danceNow();
@@ -894,6 +965,7 @@ const actions = {
     note(`Mirror: ${Object.fromEntries(MODES)[settings.mirror]}`, 1.2);
   },
   settings: () => openSettings(),
+  keys: () => openKeys(),
   fullscreen: toggleFullscreen,
   play: () => {
     const m = engine?.source?.media;
@@ -912,11 +984,6 @@ const actions = {
     engine.analyser.tempo.anchor(performance.now() / 1000);
     note('This beat is beat 1', 1.2);
   },
-  'reset-settings': () => {
-    resetSettings(settings);
-    applySettings(Object.keys(settings));
-    settingsPanel.fill();
-  },
 };
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('[data-act]');
@@ -932,10 +999,13 @@ q('[data-progress]').addEventListener('click', (e) => {
 const typing = (el) => el?.closest?.('input, select, textarea, [contenteditable]');
 window.addEventListener('keydown', (e) => {
   if (e.altKey || e.ctrlKey || e.metaKey || typing(e.target)) return;
-  if (settingsDialog.open) return; // the dialog handles its own keys (Esc closes)
+  if (settingsDialog.open || keysOverlay.el.open) return; // each handles its own keys (Esc closes)
   // The render menu first: P, and its digits while it's open (before the element hits).
   if (renderMenu.handleKey(e)) { e.preventDefault(); wake(); return; }
   if (e.key === 'Escape' && renderMenu.isOpen) { renderMenu.close(); return; }
+  // ? lists the shortcuts; / opens the settings at their search box.
+  if (isHelpKey(e)) { e.preventDefault(); openKeys(); return; }
+  if (e.key === '/') { e.preventDefault(); openSettings(undefined, { search: true }); return; }
   const k = e.key.toLowerCase();
   if (k === 'f') toggleFullscreen();
   else if (k === 's') openSettings();
@@ -966,7 +1036,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') director.hit({ step: e.key === 'ArrowRight' ? 1 : -1, element: fire.element });
 });
 
-// --- Settings dialog (settings.js) ---------------------------------------------------------------
+// --- Settings dialog (settingsDialog.js) ---------------------------------------------------------
 // Settings the scene is built with (particle counts size its buffers; the fireflies' trails
 // are made with it): changing one rebuilds it.
 const REBUILD = ['particles', 'trails'];
@@ -978,7 +1048,7 @@ function applyRender() {
   director?.applyRender();
   saveSettings(settings);
   markPreset(start, settings);
-  settingsPanel.fill();
+  settingsPanel.fill(); // (only while the dialog is open: it fills as it opens)
 }
 /**
  * A setting changed (`key`: the one, or the ones a preset or a setup changed): one the scene
@@ -995,6 +1065,7 @@ function applySettings(key) {
     rebuildTimer = setTimeout(startScene, 200);
   }
   if (engine) engine.monitor.gain.value = settings.volume;
+  applyFrameRate();
   director?.applyRender();
   const held = !!director?.sceneRef;
   if (settings.scenery !== 'mix' && (!held || keys.includes('scenery'))) fire?.setScenery(settings.scenery);
@@ -1018,9 +1089,37 @@ const settingsPanel = bindSettings(settingsDialog, settings, {
     playScene(entry, { instant: document.body.dataset.mode !== 'live' });
   },
   base: import.meta.env.BASE_URL,
+  midi: () => MIDI_NAMES,
+  keys: keyList(),
+  onKeys: () => openKeys(),
 });
 
-// --- The render menu (P; ui/renderMenu.js, as on the site): the Render tab's switches ---------
+// --- The keyboard shortcuts (?): every key, in groups (keys.js) -------------------------------
+const keysOverlay = createKeysOverlay({ title: 'Keyboard Shortcuts', groups: KEY_GROUPS });
+let keysOpener = null;
+function openKeys() {
+  keysOpener = focusedNow();
+  keysOverlay.open();
+}
+/**
+ * A dialog closing with focus inside it gives focus back to what had it as it opened (the
+ * browser gives it back only to an element: opened from the page itself, a closed dialog's
+ * field would keep the focus a moment, and the next key would count as typing in it).
+ * @param {HTMLDialogElement} dialog @param {() => Element | null} opener
+ */
+function handBackFocus(dialog, opener) {
+  dialog.addEventListener('close', () => {
+    const a = /** @type {HTMLElement | null} */ (document.activeElement);
+    if (!a || !dialog.contains(a)) return;
+    const to = /** @type {HTMLElement | null} */ (opener());
+    if (to?.isConnected && to.getClientRects().length) to.focus({ preventScroll: true });
+    else a.blur();
+  });
+}
+handBackFocus(keysOverlay.el, () => keysOpener);
+handBackFocus(settingsDialog, () => settingsOpener);
+
+// --- Render Settings (P; ui/renderMenu.js, as on the site): the Picture tab's switches --------
 // Each row steps its setting (render.js RENDER_STEPS) and the picture follows at once. What
 // a switch in the mix is doing right now shows after it.
 const RENDER_ROWS = [
@@ -1032,26 +1131,26 @@ const RENDER_ROWS = [
   { key: '6', id: 'outlines', label: 'Outlines' },
   { key: '7', id: 'fog', label: 'Fog' },
   { key: '8', id: 'xray', label: 'X-Ray Flips' },
-  { key: '9', id: 'pixelShift', label: 'Pixel Shifts' },
+  { key: '9', id: 'pixelShift', label: 'Pixel Size Shifts' },
 ];
 function renderValues() {
-  // (What shows: a preset scene's own where it sets one, marked "· scene".)
+  // (What shows: a preset scene's own where it sets one, marked "· Scene".)
   const shown = director?.parts?.layers?.view ?? settings;
   const over = director?.parts?.layers?.over ?? {};
-  const v = Object.fromEntries(RENDER_ROWS.map((r) => [r.id, `${renderText(shown, r.id)}${Object.hasOwn(over, r.id) ? ' · scene' : ''}`]));
+  const v = Object.fromEntries(RENDER_ROWS.map((r) => [r.id, `${renderText(shown, r.id)}${Object.hasOwn(over, r.id) ? ' · Scene' : ''}`]));
   const live = director?.render;
   if (!live) return v;
   const mix = (key) => modeOf(shown[key]) === 'mix';
-  if (live.pixelSize && live.pixelSize !== shown.pixelSize) v.pixelSize += ` · ${live.pixelSize} px now`;
-  if (mix('fewColors')) v.fewColors += live.few ? ' · on' : ' · off';
-  if (mix('outlines')) v.outlines += live.outlines ? ' · on' : ' · off';
+  if (live.pixelSize && live.pixelSize !== shown.pixelSize) v.pixelSize += ` · ${live.pixelSize} px Now`;
+  if (mix('fewColors')) v.fewColors += live.few ? ' · On Now' : ' · Off Now';
+  if (mix('outlines')) v.outlines += live.outlines ? ' · On Now' : ' · Off Now';
   if (shown.ditherMatrix === 'mix') v.ditherMatrix += ` · ${live.matrix}×${live.matrix}`;
-  if (shown.fog === 'mix') v.fog += ` · ${live.fog}`;
+  if (shown.fog === 'mix') v.fog += ` · ${FOGS[live.fog] ?? live.fog}`;
   if (live.xray) v.xray += ` · ${XRAY_VIEWS[live.xray] ?? live.xray}`;
   return v;
 }
 const renderMenu = createRenderMenu({
-  title: 'Render',
+  title: 'Render Settings',
   rows: RENDER_ROWS,
   className: 'debug-hud viz-render-menu',
   read: renderValues,
@@ -1065,7 +1164,7 @@ const renderMenu = createRenderMenu({
     return renderValues();
   },
   reset: {
-    key: '0', label: 'Reset These', hint: 'the defaults',
+    key: '0', label: 'Reset Render Settings', hint: 'To the Defaults',
     run: () => {
       const d = defaults();
       for (const r of RENDER_ROWS) settings[r.id] = d[r.id];
@@ -1142,18 +1241,21 @@ const pack = createPack({
   }),
 });
 app.append(pack.el);
-// It sits just above the HUD while the HUD is up.
-new ResizeObserver(() => document.body.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`)).observe(hud);
+// It sits just above the HUD while the HUD is up. (On the page's own box, not the body: a
+// change restyles only what's in it.)
+new ResizeObserver(() => app.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`)).observe(hud);
 settingsDialog.addEventListener('show-card', (e) => { settingsDialog.close(); showCard(e.detail); });
 // --- A MIDI controller (midi.js): pads for the moments, mapped by learning -----------------
 const midiList = q('[data-midi-list]');
 const midiStatus = q('[data-midi-status]');
+// (The X moment is the Living Weapon everywhere people read it.)
+const MIDI_NAMES = { ...MIDI_ACTIONS, combo: 'Living Weapon' };
 function drawMidi() {
   const map = midi.mapping;
-  midiList.innerHTML = Object.entries(MIDI_ACTIONS).map(([id, name]) => `
-    <li><span>${esc(name)}</span><span class="viz-midi-key">${esc(map[id] ?? '—')}</span>
-      <button class="pix-btn" type="button" data-midi-learn="${id}"${midi.connected ? '' : ' disabled'}>Learn</button>
-      ${map[id] ? `<button class="pix-btn" type="button" data-midi-forget="${id}" aria-label="Forget ${esc(name)}">✕</button>` : ''}</li>`).join('');
+  midiList.innerHTML = Object.entries(MIDI_NAMES).map(([id, name]) => `
+    <li data-row="midi:${id}"><span data-name>${esc(name)}</span><span class="viz-midi-key">${esc(map[id] ?? '—')}</span>
+      <button class="pix-btn" type="button" data-midi-learn="${id}"${midi.connected ? '' : ' disabled'} aria-label="Learn ${esc(name)}">Learn</button>
+      ${map[id] ? `<button class="pix-btn" type="button" data-midi-forget="${id}" aria-label="Forget ${esc(name)}" data-tip="Forget this pad">✕</button>` : ''}</li>`).join('');
 }
 const midiActions = {
   drop: () => actions.drop(), arm: () => actions.arm(), ring: () => actions.ring(), combo: () => actions.combo(),
@@ -1176,13 +1278,13 @@ settingsDialog.addEventListener('click', async (e) => {
   if (forget) midi.forget(forget.dataset.midiForget);
 });
 
-// The start screen's feel: a preset in one click, before the music starts.
+// The start screen's presets: a kind of night in one click, before the music starts.
 q('[data-feel]').addEventListener('click', (e) => {
   const b = e.target.closest('[data-preset]');
   if (!b) return;
   applyPreset(settings, b.dataset.preset);
-  settingsPanel.fill();
   applySettings(Object.keys(PRESETS[b.dataset.preset].values));
+  flushSettings();
   note(`Preset: ${PRESETS[b.dataset.preset].name}`, 1.5);
 });
 markPreset(start, settings);
@@ -1264,7 +1366,10 @@ function openOutput() {
   q('[data-output-label]').textContent = 'Output (open)';
   note('Output window open', 2);
 }
-function openSettings(tab) {
-  settingsPanel.open(tab);
+/** Open the settings (on `tab`; `search`: with the focus in their search box). */
+let settingsOpener = null;
+function openSettings(tab, { search = false } = {}) {
+  if (!settingsDialog.open) settingsOpener = focusedNow();
+  settingsPanel.open(tab, { search });
   wake();
 }

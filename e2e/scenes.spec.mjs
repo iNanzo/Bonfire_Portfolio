@@ -1,8 +1,8 @@
 // Preset scenes in Bonfire Live, in a real browser: scenes of this browser's own (as the
 // Painter saves them, seeded before the page runs) open on ?scene=<ref> behind the start
 // menu, the HUD names the one playing once the music starts, N moves on to the next, the
-// Scenes tab lists them and its switches keep one out of the loop. The site's built-in
-// scenes (content.json) are on the start screen and in the Scenes tab, open by their ref
+// loop (Settings › Scenes & Cards) lists them and its switches keep one out of it. The site's
+// built-in scenes (content.json) are on the start screen and in the loop, open by their ref
 // (and play on the demo track), and the Painter lists them and opens one read-only. No
 // errors anywhere.
 import { test, expect } from '@playwright/test';
@@ -69,7 +69,7 @@ test('the demo names the scene playing in the HUD, and N moves on to the next', 
   // N: on the next downbeat, the other one (the loop has two, and scenes are Always).
   await page.keyboard.press('n');
   await expect(line.locator('[data-scene-name]')).toContainText('Second Scene', { timeout: 15_000 });
-  // The line opens the Scenes tab. (The controls hide when the mouse rests 3 s: the pointer
+  // The line opens Scenes & Cards. (The controls hide when the mouse rests 3 s: the pointer
   // moving onto the line wakes them for the click; a check before it could find them asleep.)
   await page.mouse.move(640, 400);
   await line.click({ force: true });
@@ -78,7 +78,7 @@ test('the demo names the scene playing in the HUD, and N moves on to the next', 
   expect(errors).toEqual([]);
 });
 
-test('the Scenes tab lists the loop; a switch keeps a scene out, and it’s remembered', async ({ page }) => {
+test('Scenes & Cards lists the loop; a switch keeps a scene out, and it’s remembered', async ({ page }) => {
   const errors = watch(page);
   await seed(page, [ONE, TWO]);
   await page.goto('/visualizer/');
@@ -88,10 +88,10 @@ test('the Scenes tab lists the loop; a switch keeps a scene out, and it’s reme
   const rows = page.locator('#viz-tab-scenes [data-scene-row^="m:"]');
   await expect(rows).toHaveCount(2);
   await expect(rows.first().locator('.viz-scene-badge')).toHaveText('Mine');
-  await expect(rows.first().locator('a', { hasText: 'Edit in Painter' })).toHaveAttribute('href', /painter\/\?scene=m:test$/);
+  await expect(rows.first().locator('a', { hasText: 'Edit In Painter' })).toHaveAttribute('href', /painter\/\?scene=m:test$/);
   await page.locator('[data-scene-toggle="m:second"]').uncheck();
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live')).sceneList);
-  expect(saved).toEqual({ 'm:second': false });
+  // (Saving waits for a burst of changes to settle: a moment later it's kept.)
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? '{}').sceneList)).toEqual({ 'm:second': false });
   // Play Now closes the settings and plays it (behind the start menu here).
   await page.locator('[data-scene-play="m:test"]').click();
   await expect(page.locator('[data-settings]')).toBeHidden();
@@ -103,7 +103,7 @@ test('the Scenes tab lists the loop; a switch keeps a scene out, and it’s reme
 const BUILT_IN = JSON.parse(fs.readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).scenes ?? [];
 const inLoop = BUILT_IN.filter((s) => !s.hidden);
 
-test('the built-in scenes are on the start screen and in the Scenes tab; ?scene=b: opens one', async ({ page }) => {
+test('the built-in scenes are on the start screen and in the loop; ?scene=b: opens one', async ({ page }) => {
   expect(inLoop.length, 'content.json has built-in scenes in the loop').toBeGreaterThan(1);
   const errors = watch(page);
   const [first, second] = inLoop;
@@ -114,13 +114,13 @@ test('the built-in scenes are on the start screen and in the Scenes tab; ?scene=
   await expect(chips).toHaveCount(Math.min(8, inLoop.length));
   await expect(page.locator(`[data-scene-chip="b:${second.id}"]`)).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator(`[data-scene-chip="b:${first.id}"]`)).toHaveAttribute('aria-pressed', 'false');
-  // The Scenes tab lists each one (the admin's hidden ones stay out), with its Painter link.
+  // The loop lists each one (the admin's hidden ones stay out), with its Painter link.
   await page.keyboard.press('s');
   await page.click('[data-tab="scenes"]');
   const rows = page.locator('#viz-tab-scenes [data-scene-row^="b:"]');
   await expect(rows).toHaveCount(inLoop.length);
   await expect(rows.first().locator('.viz-scene-badge')).toHaveText('Built-In');
-  await expect(rows.first().locator('a', { hasText: 'Edit in Painter' })).toHaveAttribute('href', new RegExp(`painter/\\?scene=b:${first.id}$`));
+  await expect(rows.first().locator('a', { hasText: 'Edit In Painter' })).toHaveAttribute('href', new RegExp(`painter/\\?scene=b:${first.id}$`));
   expect(errors).toEqual([]);
 });
 

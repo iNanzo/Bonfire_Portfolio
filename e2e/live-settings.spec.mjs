@@ -1,0 +1,225 @@
+// Bonfire Live's settings dialog in a real browser: the search (it filters every tab in
+// place, counts each tab's finds, shows an All Settings row in the Simple view, marks the words
+// found without ever running an imported name as markup), its keys (/ from the page, / and
+// Ctrl+F in the dialog, Esc to clear and then to close, ↓ into the results, Enter to reveal a
+// single one), the bulk buttons and their Undo (one change, one save), a setting that does
+// nothing as things stand (disabled, saying why), the keyboard shortcuts (?), and Frame Rate
+// capping how often the picture is drawn. No errors anywhere.
+import { test, expect } from '@playwright/test';
+
+/** Collect the page's errors (uncaught ones and console errors) for the test to check. */
+function watch(page) {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  return errors;
+}
+
+/** Bonfire Live with its scene ready; every localStorage write counted (window.__writes). */
+async function open(page, query = '') {
+  await page.addInitScript(() => {
+    window.__writes = [];
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) { window.__writes.push(k); return set.call(this, k, v); };
+  });
+  await page.goto(`/visualizer/${query}`);
+  await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+}
+const dialog = (page) => page.locator('[data-settings]');
+const box = (page) => page.locator('#viz-settings-search');
+/** The rows a search shows (found, not hidden). */
+const shown = (page) => page.locator('[data-settings] [data-row].is-hit').evaluateAll((rows) => rows.filter((r) => r.getClientRects().length).map((r) => r.dataset.row));
+const count = (page, tab) => page.locator(`[data-tab="${tab}"] [data-tab-count]`);
+
+test('search: "strobe" finds the flashes in every tab, each tab counting its finds; Esc clears, then closes', async ({ page }) => {
+  const errors = watch(page);
+  await open(page);
+  // / on the page opens the settings with the box focused.
+  await page.keyboard.press('/');
+  await expect(dialog(page)).toBeVisible();
+  await expect(box(page)).toBeFocused();
+  await page.keyboard.type('strobe');
+  await expect(page.locator('[data-settings] form')).toHaveAttribute('data-searching', '');
+  await expect.poll(() => shown(page)).toEqual(expect.arrayContaining(['flash', 'flicker', 'hitFlash']));
+  for (const id of ['flash', 'hitFlash', 'flicker']) await expect(page.locator(`[data-row="${id}"]`)).toBeVisible();
+  // Each tab with finds says how many; the rest are greyed at 0.
+  expect(Number(await count(page, 'drops').textContent())).toBeGreaterThanOrEqual(2);
+  expect(Number(await count(page, 'effects').textContent())).toBeGreaterThanOrEqual(1);
+  await expect(count(page, 'sound')).toHaveText('0');
+  await expect(page.locator('[data-tab="sound"]')).toHaveClass(/is-empty/);
+  // The words found are marked in the names; settings that don't match are gone.
+  await expect(page.locator('[data-row="flash"] mark')).toHaveText('Flash');
+  await expect(page.locator('[data-row="sensitivity"]')).toBeHidden();
+  await expect(page.locator('[data-settings-search] [role="status"]')).toContainText(/settings? found/);
+  // Esc clears the search (the dialog stays), and a second Esc closes it.
+  await page.keyboard.press('Escape');
+  await expect(box(page)).toHaveValue('');
+  await expect(dialog(page)).toBeVisible();
+  await expect(page.locator('[data-row="sensitivity"]')).toBeVisible();
+  await expect(page.locator('[data-settings] mark')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(dialog(page)).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('search: a row only All Settings has shows in the Simple view, badged; ↓ goes into the results; Enter reveals one', async ({ page }) => {
+  const errors = watch(page);
+  await open(page);
+  await page.keyboard.press('s');
+  await expect(dialog(page)).toBeVisible();
+  await expect(page.locator('[data-settings] form')).toHaveAttribute('data-view', 'simple');
+  await expect(page.locator('[data-row="ditherMatrix"]')).toBeHidden();
+  // Ctrl+F in the dialog goes to the box.
+  await page.locator('[data-tab="camera"]').click();
+  await page.keyboard.press('Control+f');
+  await expect(box(page)).toBeFocused();
+  await page.keyboard.type('dither pattern');
+  const row = page.locator('[data-row="ditherMatrix"]');
+  await expect(row).toBeVisible();
+  await expect(row.locator('.viz-adv-badge')).toBeVisible();
+  await expect(row.locator('.viz-adv-badge')).toHaveText('All Settings');
+  // ↓: the first result's field.
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('[data-set="ditherMatrix"]')).toBeFocused();
+  // Enter on a single result: its tab, shown and focused (the search cleared).
+  await box(page).focus();
+  await page.keyboard.press('Enter');
+  await expect(box(page)).toHaveValue('');
+  await expect(page.locator('[data-tab="picture"]')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-set="ditherMatrix"]')).toBeFocused();
+  await expect(row).toBeVisible();
+  await expect(row).toBeInViewport();
+  // / in the dialog (not while typing) goes back to the box.
+  await page.locator('[data-tab="picture"]').focus();
+  await page.keyboard.press('/');
+  await expect(box(page)).toBeFocused();
+  // Nothing found: words to try.
+  await page.keyboard.type('zzqqx');
+  await expect(page.locator('[data-search-empty]')).toBeVisible();
+  await expect(page.locator('[data-search-suggest] [data-suggest]').first()).toBeVisible();
+  await page.locator('[data-search-suggest] [data-suggest]').first().click();
+  await expect(page.locator('[data-search-empty]')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('search: an imported setup named like markup is found and marked as text, never run', async ({ page }) => {
+  const errors = watch(page);
+  await open(page);
+  await page.keyboard.press('s');
+  await page.locator('[data-tab="setups"]').click();
+  const name = '<img src=x onerror="window.__xss=1">';
+  await page.locator('[data-setup-file]').setInputFiles({
+    name: 'setups.json', mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ app: 'bonfire-live', setups: { [name]: { glitch: 0.5 } } })),
+  });
+  await expect(page.locator('[data-setups] [data-name]')).toHaveText(name);
+  await box(page).fill('img');
+  const found = page.locator('[data-setups] [data-row^="setup:"]');
+  await expect(found).toBeVisible();
+  await expect(found.locator('mark')).toHaveText('img');
+  await expect(found.locator('[data-name]')).toHaveText(name);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+  expect(await page.locator('[data-settings] img[src="x"]').count()).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('bulk buttons: All Off on the Looks is one change and one save; Undo puts every look back', async ({ page }) => {
+  const errors = watch(page);
+  await open(page, '?bench');
+  await page.keyboard.press('s');
+  await page.locator('[data-tab="effects"]').click();
+  const looks = () => page.evaluate(() => JSON.stringify(window.__viz.settings.looks));
+  const before = await looks();
+  await page.evaluate(() => { window.__writes.length = 0; });
+  await page.locator('[data-bulk-group="looks"][data-bulk="off"]').click();
+  expect(Object.values(JSON.parse(await looks())).every((v) => v === 'off')).toBe(true);
+  // Each switch shows it.
+  await expect(page.locator('[data-row="looks.glitch"] input[value="off"]')).toBeChecked();
+  await expect(page.locator('[data-toast]')).toContainText('Looks: All Off');
+  await page.waitForTimeout(700); // (saving waits 300 ms for the changes to settle)
+  expect(await page.evaluate(() => window.__writes.filter((k) => k === 'bonfire-live').length)).toBe(1);
+  await page.locator('[data-toast-undo]').click();
+  expect(await looks()).toBe(before);
+  await expect(page.locator('[data-row="looks.glitch"] input[value="mix"]')).toBeChecked();
+  // Shuffle and All Always (Ember has no Always: it takes In the Mix).
+  await page.locator('[data-bulk-group="looks"][data-bulk="on"]').click();
+  expect(JSON.parse(await looks()).ember).toBe('mix');
+  // A checklist that keeps one on: None is unavailable, and says why.
+  await page.locator('[data-view-pick][value="all"]').check();
+  const none = page.locator('[data-bulk-group="mirrors"][data-bulk="none"]');
+  await expect(none).toHaveAttribute('aria-disabled', 'true');
+  await none.dispatchEvent('click'); // (a click on it does nothing: its tip says why)
+  expect(Object.values(await page.evaluate(() => window.__viz.settings.mirrors)).some(Boolean)).toBe(true);
+  // Reset Section, undone.
+  await page.locator('[data-tab="cast"]').click();
+  await page.locator('[data-row="knightStyle"] select').selectOption('first');
+  await page.locator('[data-reset-section="armor"]').click();
+  expect(await page.evaluate(() => window.__viz.settings.knightStyle)).toBe('site');
+  await page.locator('[data-toast-undo]').click();
+  expect(await page.evaluate(() => window.__viz.settings.knightStyle)).toBe('first');
+  expect(errors).toEqual([]);
+});
+
+test('a setting that does nothing as things stand is disabled, saying why; Edge Glow back on brings it back', async ({ page }) => {
+  const errors = watch(page);
+  await open(page);
+  await page.keyboard.press('s');
+  await page.locator('[data-tab="cast"]').click();
+  const rim = page.locator('[data-set="knightRim"]');
+  await expect(rim).toBeEnabled();
+  await page.locator('[data-set="knightGlow"][value="off"]').check();
+  await expect(rim).toBeDisabled();
+  await expect(page.locator('#viz-why-knightRim')).toHaveText('Edge Glow is Off');
+  await expect(page.locator('#viz-why-knightRim')).toBeVisible();
+  await expect(rim).toHaveAttribute('aria-describedby', /viz-why-knightRim/);
+  await page.locator('[data-set="knightGlow"][value="mix"]').check();
+  await expect(rim).toBeEnabled();
+  await expect(page.locator('#viz-why-knightRim')).toBeHidden();
+  await expect(rim).not.toHaveAttribute('aria-describedby', /viz-why-knightRim/);
+  expect(errors).toEqual([]);
+});
+
+test('? lists the keyboard shortcuts in groups, from the page and from the settings', async ({ page }) => {
+  const errors = watch(page);
+  await open(page);
+  await page.keyboard.press('?');
+  const keys = page.locator('.keys-overlay');
+  await expect(keys).toBeVisible();
+  await expect(keys.locator('.keys-group-title')).toHaveText(['Moments', 'Beat', 'Show', 'View & Menus']);
+  await page.keyboard.press('Escape');
+  await expect(keys).toBeHidden();
+  await page.keyboard.press('s');
+  await page.locator('.viz-keys-btn').click();
+  await expect(keys).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(keys).toBeHidden();
+  await expect(dialog(page)).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('Frame Rate 30 caps how often the picture is drawn; Display takes the cap off; it isn’t in a setup', async ({ page }) => {
+  const errors = watch(page);
+  await open(page, '?bench');
+  expect(await page.evaluate(() => window.__viz.fire.maxFps)).toBe(0);
+  await page.keyboard.press('s');
+  await page.locator('[data-tab="picture"]').click();
+  await page.locator('[data-set="frameRate"]').selectOption('30');
+  expect(await page.evaluate(() => window.__viz.fire.maxFps)).toBe(30);
+  // Frames drawn in two seconds: at most 30 a second.
+  const fps = await page.evaluate(() => new Promise((resolve) => {
+    let n = 0;
+    const off = window.__viz.fire.onRendered(() => { n++; });
+    setTimeout(() => { off(); resolve(n / 2); }, 2000);
+  }));
+  expect(fps).toBeLessThanOrEqual(31.5);
+  await page.locator('[data-set="frameRate"]').selectOption('display');
+  expect(await page.evaluate(() => window.__viz.fire.maxFps)).toBe(0);
+  await page.locator('[data-set="frameRate"]').selectOption('60');
+  await page.locator('[data-tab="setups"]').click();
+  await page.locator('[data-setup-name]').fill('Capped');
+  await page.locator('[data-setup-save]').click();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live-setups')).Capped);
+  expect(saved).not.toHaveProperty('frameRate');
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? '{}').frameRate)).toBe('60');
+  expect(errors).toEqual([]);
+});
