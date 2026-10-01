@@ -4,8 +4,12 @@
 // survive a reload (and a link to another scene sets them aside), the top bar keeps every
 // button in reach from tablet to desktop, Play on an untouched built-in saves nothing, hands
 // it to an open Bonfire Live with no tab opened (else opens one on it, or links to it when
-// that's blocked), and a scene sent from the admin (#scene=) opens with its banner. (Reduced
-// motion showing the look being painted, on the stage and in its thumbnail, waits on the bonfire.)
+// that's blocked), and a scene sent from the admin (#scene=) opens with its banner. The panel:
+// it remembers which sections are open; a shape change draws only its own section again; a
+// bulk toolbar's button is one undo step; the search narrows the panel (and says what the
+// scene's shape leaves out), keeping its focus through a redraw; the Tools menu, the keys
+// overlay, the render menu and the library's name filter. (Reduced motion showing the look
+// being painted, on the stage and in its thumbnail, waits on the bonfire.)
 import { test, expect } from '@playwright/test';
 import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
@@ -112,7 +116,7 @@ test('unsaved changes come back after a reload, and a link to another scene sets
   await page.reload(); // (at once: the draft is written as the page goes)
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   await expect(page.locator('[data-saved]')).toHaveText('Unsaved Changes');
-  await page.click('[data-sec-toggle="look"]');
+  await expect(page.locator('[data-sec="look"]')).toHaveAttribute('data-open', ''); // (left open: remembered)
   await expect(kaleido).toHaveAttribute('aria-pressed', 'true');
   // A link to a built-in: the unsaved work waits in a banner.
   await ready(page, '/painter/?scene=b:frozen-shrine');
@@ -168,6 +172,9 @@ test('Play on an untouched built-in saves nothing and opens Bonfire Live on its 
   expect(await page.evaluate(() => window.__opened.map(({ url, name }) => [url, name]))).toEqual([['/visualizer/?scene=b%3Afrozen-shrine&solo', 'bonfire-live']]);
   await expect(page.locator('[data-note]')).toHaveText('Opened Bonfire Live with “Frozen Shrine”.');
   await expect(page.locator('[data-saved]')).toHaveText('Built-In');
+  // (Off Play, so its tooltip goes: a tip showing takes the first Esc, and this one's the library's.)
+  await page.mouse.move(0, 0);
+  await expect(page.locator('.ui-tip')).toBeHidden();
   // Space on the focused Library button opens the library (the preview stays as it was).
   const beat = page.locator('[data-preview="beat"]');
   const pressed = await beat.getAttribute('aria-pressed');
@@ -267,5 +274,153 @@ test('a scene from the admin (#scene=) opens with its banner', async ({ page }) 
   await expect(page.locator('[data-name]')).toHaveValue('From the Admin');
   await page.click('[data-sec-toggle="look"]');
   await expect(page.locator('[data-pick="look.name"][data-value="\\"haze\\""]')).toHaveAttribute('aria-pressed', 'true');
+  expect(errors).toEqual([]);
+});
+
+test('the panel remembers its open sections; a shape change draws only its own section again', async ({ page }) => {
+  const errors = watch(page);
+  await ready(page);
+  await page.click('[data-sec-toggle="layers"]');
+  await page.click('[data-sec-toggle="place"]'); // (closed)
+  await page.reload();
+  await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+  await expect(page.locator('[data-sec="layers"]')).toHaveAttribute('data-open', '');
+  await expect(page.locator('[data-sec="place"]')).not.toHaveAttribute('data-open', '');
+  // Glow on: only Layers is drawn again (an element of another section is still the same one).
+  await page.evaluate(() => {
+    window.__kept = [document.querySelector('#pnt-b-colors').firstElementChild, document.querySelector('[data-set-group="layers.mirror"]')];
+  });
+  const glow = page.locator('[data-set-group="layers.glow"]');
+  await glow.locator('label', { hasText: 'Always' }).click();
+  await expect(page.locator('[data-row="detail.glowAmt"]')).toBeVisible();
+  const kept = await page.evaluate(() => [window.__kept[0].isConnected, window.__kept[1].isConnected]);
+  expect(kept, 'Colors kept, Layers drawn again').toEqual([true, false]);
+  // The keyboard keeps its place through it: the switch's radio, focused again.
+  await expect(glow.locator('input[value="on"]')).toBeFocused();
+  await page.keyboard.press('ArrowLeft'); // (In the Mix: the same shape, the radios only)
+  await expect(glow.locator('input[value="mix"]')).toBeChecked();
+  await expect(glow.locator('input[value="mix"]')).toBeFocused();
+  // Only the sections scroll, never the panel round them: the search box stays in sight
+  // whatever's focused or scrolled into view (a phone's bottom sheet too).
+  for (const size of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    await page.locator('[data-row="detail.glowAmt"] input').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    expect(await page.locator('[data-panel]').evaluate((el) => [el.scrollTop, el.scrollHeight - el.clientHeight])).toEqual([0, 0]);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('a bulk toolbar sets every layer at once, and one Ctrl+Z puts them all back', async ({ page }) => {
+  const errors = watch(page);
+  await ready(page);
+  await page.click('[data-sec-toggle="layers"]');
+  await page.click('[data-bulk="on"][data-bulk-group="layers"]');
+  const radios = page.locator('[data-sec="layers"] fieldset.tri input:checked');
+  await expect(radios).toHaveCount(14);
+  const values = await radios.evaluateAll((els) => els.map((el) => /** @type {HTMLInputElement} */ (el).value));
+  expect(values.filter((v) => v === 'on').length).toBe(13); // (Painterly and Watercolor never both Always)
+  await expect(page.locator('[data-note]')).toContainText('Layers: All Always');
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => radios.evaluateAll((els) => els.every((el) => /** @type {HTMLInputElement} */ (el).value === 'off'))).toBe(true);
+  await expect(page.locator('[data-cmd="undo"]')).toBeDisabled(); // (one step: nothing more to undo)
+  expect(errors).toEqual([]);
+});
+
+test('search: "glow" finds the Glow layer and Edge Glow, says what the shape hides, and keeps its focus', async ({ page }) => {
+  const errors = watch(page);
+  await ready(page);
+  await page.keyboard.press('/');
+  const box = page.locator('#pnt-search');
+  await expect(box).toBeFocused();
+  await page.keyboard.type('glow');
+  await expect(page.locator('[data-row="layer.glow"]')).toBeVisible();
+  await expect(page.locator('[data-row="knightGlow"]')).toBeVisible();
+  await expect(page.locator('[data-row="knightRim"]')).toBeVisible();
+  await expect(page.locator('[data-row="exposure"]')).toBeHidden();
+  await expect(page.locator('[data-sec="pixels"]')).toBeHidden(); // (nothing found there)
+  await expect(page.locator('[data-row="layer.glow"] mark')).toHaveText('Glow');
+  // Glow is off: its details aren't drawn, so the box says how to bring them back.
+  const notes = page.locator('[data-search-notes]');
+  await expect(notes).toContainText('Glow Strength: turn on Glow in Layers to see this');
+  await expect(page.locator('[data-panel] [data-search-status]')).toContainText('settings found');
+  // The scene changes under the search (a redraw of Layers): the box keeps its focus and its
+  // query, and Glow's details are found now.
+  await page.evaluate(() => /** @type {HTMLInputElement} */ (document.querySelector('[data-set-group="layers.glow"] input[value="mix"]')).click());
+  await expect(page.locator('[data-row="detail.glowAmt"]')).toBeVisible();
+  await expect(box).toBeFocused();
+  await expect(box).toHaveValue('glow');
+  await expect(notes).not.toContainText('Glow Strength');
+  // Esc clears it: every section back as it was (only Place open).
+  await page.keyboard.press('Escape');
+  await expect(box).toHaveValue('');
+  await expect(page.locator('[data-row="exposure"]')).toBeVisible();
+  await expect(page.locator('[data-sec="layers"]')).not.toHaveAttribute('data-open', '');
+  await expect(notes).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('Tools: Render Settings in Bonfire Live’s words, and the keyboard shortcuts (also by ?)', async ({ page }) => {
+  const errors = watch(page);
+  await ready(page);
+  const tools = page.locator('[data-cmd="tools"]');
+  await tools.click();
+  await expect(tools).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('[data-tool="render"]')).toBeFocused();
+  await page.keyboard.press('Enter');
+  const menu = page.locator('.pnt-render-menu');
+  await expect(menu).toBeVisible();
+  await expect(menu.locator('.render-menu-title')).toHaveText('Render Settings');
+  await expect(menu.locator('[data-render-row="outlines"] [data-render-value]')).toHaveText('Always');
+  await expect(menu.locator('[data-render-row="xray"] [data-render-value]')).toHaveText('Off');
+  await expect(menu.locator('[data-render-reset] .render-row-label')).toHaveText('Reset Render Settings');
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  // The keys: from the menu, and from ?.
+  await tools.click();
+  await page.keyboard.press('End');
+  await expect(page.locator('[data-tool="keys"]')).toBeFocused();
+  await page.keyboard.press('Enter');
+  const keys = page.locator('dialog.keys-overlay');
+  await expect(keys).toBeVisible();
+  await expect(keys.locator('.keys-group-title')).toHaveText(['The Scene', 'Preview', 'Panels & Tools', 'Camera']);
+  await keys.locator('.keys-group').last().scrollIntoViewIfNeeded();
+  await expect(keys.locator('.keys-group').last()).toBeInViewport(); // (not run off past the edge)
+  await keys.locator('[data-keys-filter]').fill('lens');
+  await expect(keys.locator('.keys-row:visible')).toHaveCount(2);
+  await keys.locator('[data-keys-filter]').press('Escape'); // (clears the filter)
+  await page.keyboard.press('Escape'); // (closes)
+  await expect(keys).toBeHidden();
+  await page.keyboard.press('Shift+?');
+  await expect(keys).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(keys).toBeHidden();
+  // On a phone the menu hangs from the button's right edge, inside the window.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await tools.click();
+  const box = await page.locator('[data-tools-menu]').boundingBox();
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
+  await page.keyboard.press('Escape');
+  await expect(tools).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test('the library filters its scenes by name', async ({ page }) => {
+  const errors = watch(page);
+  await ready(page);
+  await page.keyboard.press('l');
+  const cards = page.locator('[data-lib-built] [data-card]:visible');
+  const all = await cards.count();
+  expect(all).toBeGreaterThan(1);
+  await page.keyboard.press('/');
+  await expect(page.locator('#pnt-lib-filter')).toBeFocused();
+  await page.keyboard.type('shrine');
+  await expect(cards).toHaveCount(1);
+  await expect(cards.locator('[data-card-name]')).toHaveText('Frozen Shrine');
+  await page.keyboard.press('Escape'); // (clears it; the drawer stays)
+  await expect(cards).toHaveCount(all);
+  await expect(page.locator('[data-library]')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-library]')).toBeHidden();
   expect(errors).toEqual([]);
 });
