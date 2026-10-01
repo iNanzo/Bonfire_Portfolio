@@ -148,15 +148,43 @@ function shell() {
   watchSticky();
 }
 
+let toastId = 0;
 /**
  * A note in the corner. `action` ([label, fn]) adds a button (Undo): the note then stays
- * longer, and goes once it's used.
+ * longer, waits while it's pointed at or has the focus, and goes once it's used (or on Esc).
+ * `focus`: the button takes the focus, as what comes next (Reset's Undo); `back()` gives
+ * where the focus goes when the note goes with it.
+ * @param {string} message @param {string} [kind] @param {[string, () => void] | null} [action]
+ * @param {{ focus?: boolean, back?: () => HTMLElement | null }} [o]
  */
-function toast(message, kind = 'info', action = null) {
-  const t = el('div', { class: `toast toast-${kind}`, role: kind === 'error' ? 'alert' : 'status' }, el('span', { text: message }));
-  if (action) t.append(el('button', { type: 'button', class: 'link-button toast-action', text: action[0], onclick: () => { t.remove(); action[1](); } }));
+function toast(message, kind = 'info', action = null, { focus = false, back = () => null } = {}) {
+  const text = el('span', { id: `toast-${++toastId}`, text: message });
+  const t = el('div', { class: `toast toast-${kind}`, role: kind === 'error' ? 'alert' : 'status' }, text);
+  const life = action ? 12000 : kind === 'error' ? 8000 : 4000;
+  let timer = 0;
+  const done = () => {
+    clearTimeout(timer);
+    const had = t.contains(document.activeElement);
+    t.remove();
+    if (had) back()?.focus();
+  };
+  const wait = () => { clearTimeout(timer); timer = setTimeout(done, life); };
+  if (action) {
+    const button = el('button', {
+      type: 'button', class: 'link-button toast-action', text: action[0], 'aria-describedby': text.id,
+      onclick: () => { action[1](); done(); },
+    });
+    t.append(button);
+    const held = () => t.matches(':hover') || t.contains(document.activeElement);
+    t.addEventListener('pointerenter', () => clearTimeout(timer));
+    t.addEventListener('focusin', () => clearTimeout(timer));
+    t.addEventListener('pointerleave', () => { if (!held()) wait(); });
+    t.addEventListener('focusout', (e) => { if (!t.contains(/** @type {Node | null} */ (e.relatedTarget)) && !t.matches(':hover')) wait(); });
+    t.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); done(); } });
+  }
   q('[data-toasts]').append(t);
-  setTimeout(() => t.remove(), action ? 12000 : kind === 'error' ? 8000 : 4000);
+  wait();
+  if (focus) t.querySelector('button')?.focus();
 }
 
 function busy(on, message = 'Working…') {
@@ -229,7 +257,7 @@ function block(key) {
   const effectsKey = key.startsWith('effects.') ? key.slice(8) : null;
   const reset = effectsKey && el('button', {
     // (Its name starts with the words it shows, for voice control; then which section.)
-    type: 'button', class: 'link-button', text: 'Reset Section', 'aria-label': `Reset Section: ${labelOf(key)}`,
+    type: 'button', class: 'link-button', 'data-reset': true, text: 'Reset Section', 'aria-label': `Reset Section: ${labelOf(key)}`,
     'data-tip': 'Back to the site’s defaults; Undo brings yours back (so does Discard, until you save).',
     onclick: () => resetBlock(key, effectsKey),
   });
@@ -243,18 +271,20 @@ function block(key) {
 
 /**
  * Reset a section of the effects to the defaults, with Undo (no question first). Flame
- * Colors keeps your own palettes (reset.js).
+ * Colors keeps your own palettes (reset.js). The page draws again, so the focus goes to the
+ * note's Undo, the next thing to want; Undo, or Esc, brings it back to the section's Reset.
  */
 function resetBlock(key, effectsKey) {
   const before = structuredClone(ctx.draft.effects[effectsKey]);
   const result = resetSection(effectsKey, ctx.draft.effects[effectsKey], DEFAULT_EFFECTS[effectsKey]);
   ctx.draft.effects[effectsKey] = result.value;
   changed({ rerender: true });
+  const back = () => q(`[data-path="${CSS.escape(key)}"] > .block-head [data-reset]`);
   toast(resetMessage(labelOf(key), result), 'info', ['Undo', () => {
     ctx.draft.effects[effectsKey] = before;
     changed({ rerender: true });
     toast(`“${labelOf(key)}” is as it was.`);
-  }]);
+  }], { focus: true, back });
 }
 
 /** A section content.json doesn't have yet: the optional scenes start as an empty list on the first add. */
