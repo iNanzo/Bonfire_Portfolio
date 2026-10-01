@@ -542,7 +542,8 @@ export const SUBGROUPS = {
   'effects.render': [
     { label: 'Pixel art', keys: ['pixelSize', 'pixelSizeSmall', 'dither', 'ditherMatrix', 'outlines'] },
     { label: 'Place & atmosphere', keys: ['vignette', 'exposure'] },
-    { label: 'Colors', keys: ['colorChange'] },
+    // (Bonfire Live files it under Colors; here that's another page's name.)
+    { label: 'Color change', keys: ['colorChange'] },
     { label: 'Camera', keys: ['shake'] },
   ],
   'effects.knight': [
@@ -551,8 +552,16 @@ export const SUBGROUPS = {
     { label: 'Behavior', keys: ['gestures', 'reactions'] },
   ],
   ui: [
-    { label: 'Header & menu', keys: ['menu', 'resume', 'close', 'back', 'sound*', 'skip', 'menuFlavor', 'keysHint', 'stokePrompt', 'photo*', 'breakdown*', 'discover*'] },
-    { label: 'Inventory & projects', keys: ['inspect', 'equipped', 'item', 'items', 'prev*', 'next*', 'openGallery', 'gallery', 'problem', 'built', 'role', 'tech', 'wields'] },
+    {
+      label: 'Header & menu',
+      keys: ['menu', 'resume', 'close', 'back', 'soundOn', 'soundOff', 'soundHint', 'skip', 'prevScreen', 'nextScreen', 'menuFlavor', 'keysHint',
+        'stokePrompt', 'photo', 'photoHint', 'breakdown', 'breakdownHint', 'discoveries', 'discoveriesFlavor', 'discovery'],
+    },
+    {
+      label: 'Inventory & projects',
+      keys: ['inspect', 'equipped', 'item', 'items', 'prevItem', 'nextItem', 'problem', 'built', 'role', 'tech', 'openGallery', 'gallery', 'prevImage', 'nextImage'],
+    },
+    { label: 'About', keys: ['wields'] },
     { label: 'Render settings', keys: ['render*'] },
     { label: 'Pack', keys: ['pack*'] },
     { label: 'Key prompts', keys: ['prompts'] },

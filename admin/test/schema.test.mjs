@@ -55,7 +55,13 @@ test('every Interface text has a real name and its place, and a hint where it is
   const unhelped = ui.filter((k) => !HELP[`ui.${k}`]);
   assert.ok(unhelped.length <= 12, `most have help (none: ${unhelped.join(', ')})`);
   const groups = subgroupsOf('ui', ui);
-  assert.deepEqual(groups.map((g) => g.label), ['Header & menu', 'Inventory & projects', 'Render settings', 'Pack', 'Key prompts'], 'nothing left for More');
+  assert.deepEqual(groups.map((g) => g.label), ['Header & menu', 'Inventory & projects', 'About', 'Render settings', 'Pack', 'Key prompts'], 'nothing left for More');
+  const keysOf = (label) => groups.find((g) => g.label === label).keys;
+  // The header's Q / E with the header; each Previous beside its Next.
+  assert.ok(keysOf('Header & menu').includes('prevScreen') && keysOf('Header & menu').includes('nextScreen'));
+  const inv = keysOf('Inventory & projects');
+  for (const [a, b] of [['prevItem', 'nextItem'], ['prevImage', 'nextImage']]) assert.equal(inv.indexOf(b), inv.indexOf(a) + 1, `${a} then ${b}`);
+  assert.deepEqual(keysOf('About'), ['wields'], 'the stat sheet’s row, with About');
   assert.ok(groups.find((g) => g.label === 'Pack').keys.includes('packSwords'));
   assert.ok(groups.find((g) => g.label === 'Pack').keys.includes('packMapVerb'));
   assert.deepEqual(groups.find((g) => g.label === 'Render settings').keys, ['renderMenu', 'renderReset']);

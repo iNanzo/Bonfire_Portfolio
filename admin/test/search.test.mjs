@@ -53,6 +53,7 @@ test('fields go by the names their page shows: an image’s, the featured projec
   assert.equal(entry(index, 'weapons.flambergezwei').label, draft.weapons.flambergezwei);
   assert.equal(entry(index, 'site.links.linkedin').label, 'LinkedIn');
   assert.equal(entry(index, 'notFound.cta').label, 'Button Text');
+  assert.deepEqual(crumbsOf(entry(index, 'effects.render.colorChange')), ['Picture', 'Pixel Art', 'Color Change'], 'not “Colors”: that’s a page');
 });
 
 test('results rank the label first: dither, Fast Travel, a typo, a choice, a renamed page', () => {
