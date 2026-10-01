@@ -49,11 +49,14 @@ jobs:
       - name: Coverage summary
         if: ${{ !cancelled() }}
         run: node tools/coverage-summary.mjs
+      # The report, lcov and the summary; not coverage/tmp, c8's raw V8 data (about 20 MB).
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
           name: coverage-node${{ matrix.node }}
-          path: coverage/
+          path: |
+            coverage/
+            !coverage/tmp/
           retention-days: 14
 
   e2e:
@@ -88,10 +91,13 @@ jobs:
         env:
           CI: true
           PW_PREBUILT: 1
+      # Dotfiles too (upload-artifact leaves them out by default), so a later
+      # public/.well-known/ still ships.
       - uses: actions/upload-artifact@v4
         with:
           name: site-dist
           path: dist/
+          include-hidden-files: true
           retention-days: 7
       - uses: actions/upload-artifact@v4
         if: failure()
