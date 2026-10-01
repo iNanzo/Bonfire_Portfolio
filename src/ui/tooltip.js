@@ -305,6 +305,13 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
   }
   function onDown(e) {
     const t = element(e.target);
+    // (A press on a button that has a tip acts: its tip, on the way or showing, goes, so it
+    // doesn't come up over what the press opened. A "?"'s own click opens or closes it.)
+    const pressed = t?.closest('[data-tip]');
+    if (pressed && !pressed.matches('.viz-tip')) {
+      if (pending === pressed) { win.clearTimeout(showTimer); pending = null; }
+      if (current?.trigger === pressed) { hide(); return; }
+    }
     if (!current || (t && (tip.contains(t) || current.trigger.contains(t)))) return;
     hide();
   }

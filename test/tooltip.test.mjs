@@ -378,3 +378,33 @@ test('installTooltips: once per page; destroy takes it all away; without the Pop
   old.fire('keydown', { key: 'Escape', target: f.mark });
   assert.equal(old.tip().hidden, true);
 });
+
+test('installTooltips: pressing a button that has a tip drops its tip, on the way or showing (a "?" toggles as before)', () => {
+  const p = page();
+  installTooltips({ doc: p.doc });
+  const button = new p.El('button', { 'data-tip': 'Opens a menu under it.' }).at(400, 10, 80, 30);
+  p.doc.body.append(button);
+  // Pressed before its tip came: it doesn't come after (over the menu the press opened).
+  p.fire('pointerover', { target: button, pointerType: 'mouse' });
+  p.tick(200);
+  p.fire('pointerdown', { target: button, pointerType: 'mouse' });
+  p.tick(1000);
+  assert.equal(p.shown(), false);
+  // Pressed while it shows: it goes.
+  p.fire('pointerout', { target: button, relatedTarget: p.doc.body, pointerType: 'mouse' });
+  p.fire('pointerover', { target: button, pointerType: 'mouse' });
+  p.tick(400);
+  assert.equal(p.shown(), true);
+  p.fire('pointerdown', { target: button, pointerType: 'mouse' });
+  assert.equal(p.shown(), false);
+  // A "?" hovered then clicked: its tip stays, now the click's.
+  const { mark } = p.field();
+  p.fire('pointerover', { target: mark, pointerType: 'mouse' });
+  p.tick(400);
+  p.fire('pointerdown', { target: mark, pointerType: 'mouse' });
+  p.fire('click', { target: mark });
+  assert.equal(p.shown(), true);
+  p.fire('pointerout', { target: mark, relatedTarget: p.doc.body, pointerType: 'mouse' });
+  p.tick(1000);
+  assert.equal(p.shown(), true, 'opened by the click: it stays');
+});
