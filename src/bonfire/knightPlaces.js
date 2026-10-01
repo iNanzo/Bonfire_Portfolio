@@ -65,7 +65,7 @@ export const SEATS = {
   // A drum fallen from the pillar, lying across his way (scenery.js), clear of the pillar at
   // his right shoulder; his right boot rests up on the model's own fallen drum in front of
   // him. (His sign lies beyond it at his left, the one open ground there in view.)
-  ruins: seat(-0.61, -1.57, 0.21, { signAt: { x: -1.16, z: -0.58 } }),
+  ruins: seat(-0.585, -1.545, 0.21, { signAt: { x: -1.16, z: -0.58 } }),
   // A stump by the anvil (scenery.js).
   forge: seat(-0.8, -1.52, 0.21),
   // A resting stone (scenery.js).
@@ -90,7 +90,7 @@ export const DANCE_RING = {
   center: [FIRE_AT.x, FIRE_AT.z],
   radius: 1.2,
   blocked: {
-    ruins: [[96, 142], [182, 244]],      // (his legs, and the model's fallen drum)
+    ruins: [[96, 142], [178, 244]],      // (his legs, and the model’s fallen drum)
     forge: [[96, 142], [184, 244]],
     shrine: [[96, 142], [186, 247]],
     cathedral: [[96, 142], [204, 265]],

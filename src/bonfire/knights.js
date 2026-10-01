@@ -986,13 +986,14 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     /** The ground under a boot there if it's level and open (nothing on it, out of the fire), else NaN. */
     const level = (x, z) => {
       let lo = Infinity, hi = -Infinity;
-      for (const [dx, dz] of [[0, 0], [0.06, 0], [-0.06, 0], [0, 0.12], [0, -0.06]]) {
+      // (Its sole, heel to its pointed toe and either side; the boot, toe aside, out of the fire.)
+      for (const [dx, dz] of [[0, 0], [0.07, 0], [-0.07, 0], [0, 0.12], [0, 0.24], [0.06, 0.18], [-0.06, 0.18], [0, -0.06]]) {
         const g = groundUnder(h, x + dx, z + dz);
         const w = atHome(h, x + dx, z + dz);
-        if (topUnder(h, x + dx, z + dz) - g > 0.05 || Math.hypot(w.x - FIRE.x, w.z - FIRE.z) < 1.05) return NaN;
+        if (topUnder(h, x + dx, z + dz) - g > 0.05 || (dz <= 0.12 && Math.hypot(w.x - FIRE.x, w.z - FIRE.z) < 1.05)) return NaN;
         lo = Math.min(lo, g); hi = Math.max(hi, g);
       }
-      return hi - lo < 0.04 ? (lo + hi) / 2 : NaN;
+      return hi - lo < 0.05 ? (lo + hi) / 2 : NaN;
     };
     let best = null;
     for (let dz = 0; dz < 0.36; dz += 0.05) {
@@ -1695,6 +1696,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     if (!cs.length) return;
     const c = Math.cos(k.yaw), sn = Math.sin(k.yaw);
     const mid = s.p[BONE_INDEX.chest];
+    let swung = false;
     for (const side of ['L', 'R']) {
       let n = nearest(k, s, cs, side);
       for (let tries = 0; tries < CLEAR_TRIES && n.hit; tries++) {
@@ -1710,14 +1712,16 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
           if (lever < 1e-5) continue;
           axis.divideScalar(-lever);
           const angle = Math.min(CLEAR_TURN, (CLEAR_MARGIN - before) / lever);
-          solver.swingArm(side, axis, angle, k.helmet);
+          solver.swingArm(side, axis, angle);
           n = nearest(k, s, cs, side);
-          if (!n.hit || n.d >= before + 0.002) { helped = true; break; }
-          solver.swingArm(side, axis, -angle, k.helmet);
+          if (!n.hit || n.d >= before + 0.002) { helped = true; swung = true; break; }
+          solver.swingArm(side, axis, -angle);
         }
         if (!helped) break;
       }
     }
+    // (Its pauldron rode the turned arm: out of the helmet's way again, once.)
+    if (swung) solver.clampPlates(k.helmet);
   }
 
   /** Knight k is at home (his seat, or where he sits down on the ground), seated or up in front of it. */
@@ -1757,10 +1761,13 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   /**
    * Knight k's pose (k.work) solved, his arms kept out of the scenery (keepClear) and, at home,
    * all of him: whatever would still go into a piece of it (his body, an arm) eases back
-   * toward his resting pose there (EASE_BACK) until it doesn't (k.work takes the pose he ends in).
+   * toward his resting pose there (EASE_BACK) until it doesn't (k.work takes the pose he ends
+   * in). `moving` false (sitting or standing at rest, his idle at most): nothing to check, his
+   * seat keeps him clear of everything (test/knightClearance.test.mjs).
    */
-  function solveClear(k) {
+  function solveClear(k, moving) {
     let s = solver.solve(k.work, null, k.helmet);
+    if (!moving) return s;
     keepClear(k, s);
     const cs = isHome(k) ? nearOf(k) : null;
     if (!cs?.length) return s;
@@ -1776,18 +1783,23 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       keepClear(k, s);
       const now = { body: bodyIn(k, s, cs), L: armIn(k, s, cs, 'L'), R: armIn(k, s, cs, 'R') };
       if (!now.body && !now.L && !now.R) break;
-      // (Easing one part back can bring another in: that eases too from here on.)
+      // (Easing one part back can bring another in: that eases too from here on; an arm still
+      // in when nearly back, the body leaning it there eases with it.)
       for (const part of ['body', 'L', 'R']) bad[part] ||= now[part];
+      if (f >= 0.65 && (now.L || now.R)) bad.body = true;
     }
     k.work.set(_eased);
     return s;
   }
 
   const lp = new THREE.Vector3();
-  /** The solved pose onto the bones (the plates swung on their springs, clear of the helmet). */
-  function apply(k) {
+  /**
+   * The solved pose onto the bones (the plates swung on their springs, clear of the helmet), and
+   * out of the scenery if he's `moving` (solveClear).
+   */
+  function apply(k, moving = true) {
     // (Each foot's ground is in the pose itself: seatPoseOf, standAtSeat.)
-    const s = solveClear(k);
+    const s = solveClear(k, moving);
     k.settling = springPlates(k, s, k.lastStep < 0 || reducedMotion);
     solver.clampPlates(k.helmet);
     // (The solver's output is reused for every knight: keep his own joints.)
@@ -1877,7 +1889,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       if (step === k.lastStep || k.forging === 'out') continue;
       k.lastStep = step;
       const big = evaluate(k);
-      apply(k);
+      apply(k, big);
       const pos = k.act?.kind === 'walk' && !k.act.teleport && k.act.pos ? k.act.pos : null;
       if (pos) k.group.position.copy(pos);
       k.group.rotation.y = k.yaw;

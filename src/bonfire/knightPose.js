@@ -774,7 +774,8 @@ export function createSolver(rig = DEFAULT_RIG) {
   /**
    * Turn side s's arm as last solved (the upper arm, forearm, hand and fingers, about its
    * shoulder socket) by `angle` (rad) about `axis` (knight space, unit): its pauldron rides it
-   * again and is kept out of the helmet. (knights.js: an arm turned out of a pillar.)
+   * again (kept out of `helmet`'s way if given: clampPlates). (knights.js: an arm turned out
+   * of a pillar.)
    */
   function swingArm(s, axis, angle, helmet = null) {
     turnQ.setFromAxisAngle(axis, angle);

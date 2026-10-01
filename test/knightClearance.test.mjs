@@ -243,9 +243,10 @@ test('[slow] seated at every seat, either seat pose, he is 4 cm clear of the sce
       k.setSeatPose(pose);
       k.summon(0, { instant: true });
       let least = { d: Infinity }, boot = { d: Infinity };
-      // (Over his idle: the breathing, the doze, the glances, a shift of his weight.)
-      for (let t = 0; t < 14; t += 0.875) {
-        k.update(0.875);
+      // (Over his idle, four times a second: the breathing, the doze and its start, the
+      // glances, a shift of his weight and hands.)
+      for (let t = 0; t < 26; t += 0.25) {
+        k.update(0.25);
         const w = nearestOf(env, 0, cs, { skip: boots, margin: 0.05 });
         if (w.d < least.d) least = w;
         const f = nearestOf(env, 0, cs, { skip: (b) => !boots(b) });
