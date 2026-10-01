@@ -162,6 +162,11 @@ for (const size of SIZES) {
       await expect(style).toBeEnabled({ timeout: 15_000 });
       await tap(style);
       await expect(style).toHaveAttribute('aria-pressed', 'true');
+      // (He's drawn anew in it, ~1.2 s, and then the list is drawn again: a tip showing then
+      // would go with the option it was on. Measured once that's done, when the options
+      // marked now are gone; on a slow machine it may be done already, and this waits 8 s.)
+      await page.evaluate(() => document.querySelector('[data-pack-list="knight"] [data-pack-options] > *')?.setAttribute('data-stale', ''));
+      await page.waitForFunction(() => !document.querySelector('[data-pack-list="knight"] [data-stale]'), null, { timeout: 8000 }).catch(() => {});
       const knight = page.locator('[data-pack-list="knight"]');
       await expect(knight.getByRole('group', { name: 'Finish', exact: true })).toContainText('wear their own colors');
       expect(await checkAll(page, '[data-pack-list="knight"]', { ...size, label: 'knight' })).toBe(10); // (6 styles, 4 finishes)
