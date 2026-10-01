@@ -15,6 +15,7 @@
 // music is loud.
 import { pick } from '../math.js';
 
+/** The moves, as the menus name them (the settings' Firefly Dances). */
 export const FLY_MOVES = { swing: 'Swing', bounce: 'Bounce', dart: 'Dart', anyway: 'Dart Any Way', compass: 'Compass', zigzag: 'Zigzag', scatter: 'Scatter' };
 const CARDINAL = ['up', 'down', 'left', 'right', 'toward', 'away'];
 const COMPASS = ['right', 'up', 'left', 'down'];

@@ -20,7 +20,8 @@ import { applyCssPalette, base, flames, mixHex, rotation } from '../palette.js';
 import { harmoniousFlame, hexToOklch, SCHEMES, vividScene, wildFlame, wildScene } from '../paletteGen.js';
 import { modeOf } from './looks.js';
 
-export const COLOR_MODES = { site: 'The Site’s Palettes', harmonious: 'Harmonious Random', wild: 'Fully Random', mix: 'A Mix of All Three' };
+/** Where a new flame's colors come from (the settings' Flame Colors), as the menus name them. */
+export const COLOR_MODES = { site: 'The Site’s Palettes', harmonious: 'Harmonious Random', wild: 'Fully Random', mix: 'A Mix, New Each Flame' };
 export const COLOR_SCHEMES = { auto: 'Any Scheme', ...Object.fromEntries(SCHEMES.map((s) => [s.id, s.label])) };
 
 // Hue names by OKLCH hue (each entry: up to this angle).

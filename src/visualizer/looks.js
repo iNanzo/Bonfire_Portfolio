@@ -78,7 +78,7 @@ export const LOOKS = {
   vortex: 'Vortex', mosaic: 'Mosaic', haze: 'Haze', prism: 'Prism',
 };
 export const DROP_FX = {
-  shatter: 'Shatter', shock: 'Shockwaves', burst: 'Echo Burst', spiral: 'Spiral', kaleido: 'Kaleidoscope', flips: 'Mirror Flips',
+  shatter: 'Shatter', shock: 'Shockwaves', burst: 'Echo Burst', spiral: 'Spiral', kaleido: 'Kaleido Burst', flips: 'Mirror Flips',
   cycle: 'Color Cycle', split: 'RGB Burst', crunch: 'Crunch', iris: 'Iris Snap', slam: 'Letterbox Slam', ink: 'Ink Flash',
   xray: 'X-Ray',
 };
@@ -164,31 +164,32 @@ export const PARAMS = {
   grad: { label: 'Gradient Colors', hint: 'The three palette colors the picture is recolored through, dark to light.', slots: 3, of: 10 },
   gradAmt: { label: 'Gradient Strength', hint: 'How much of the recolored picture shows over the real one.', range: [0.1, 1], roll: [0.35, 0.8], step: 0.05 },
   paintR: { label: 'Brush Size', hint: 'How big the painterly strokes are, in pixels.', values: [2, 3, 4] },
-  paintAngle: { label: 'Stroke Angle', hint: 'Which way the painterly strokes run.', range: [0, Math.PI], roll: [0, Math.PI], step: 0.05 },
+  paintAngle: { label: 'Stroke Angle', hint: 'Which way the painterly strokes run, in radians: 0 lies flat, about 1.57 stands upright and 3.14 lies flat again.', range: [0, Math.PI], roll: [0, Math.PI], step: 0.05 },
   paintAspect: { label: 'Stroke Length', hint: 'How long the painterly strokes are for their width.', range: [1, 3], roll: [1, 2.4], step: 0.1 },
   washR: { label: 'Wash Size', hint: 'How big the watercolor’s flat washes are, in pixels.', values: [2, 3, 4] },
   washEdge: { label: 'Wash Edges', hint: 'How dark the pigment pools along the watercolor’s edges.', range: [0, 1], roll: [0, 0.7], step: 0.05 },
   styleMix: { label: 'Repaint Strength', hint: 'How much of the painterly or watercolor repaint shows over the picture.', range: [0.3, 1], roll: [0.7, 1], step: 0.05 },
-  styleFlip: { label: 'Watercolor First', hint: 'When Painterly and Watercolor both come in the mix, which one shows.', bool: true, chance: 0.5 },
+  // (True shows the strokes: update() draws style 1 when it is. Rolled only, never pinned.)
+  styleFlip: { label: 'Painterly Over Watercolor', hint: 'When Painterly and Watercolor are both on, only one can show: on picks the brush strokes, off the watercolor wash.', bool: true, chance: 0.5 },
   flicker: { label: 'Flicker Kind', hint: 'How the light flickers: a dip on each beat, a rolling band, film jitter or a candle’s waver.', values: [0, 1, 2, 3], names: ['Beat Dip', 'Rolling Band', 'Film Jitter', 'Candle Waver'] },
   warpMix: { label: 'Warp Blend', hint: 'With Blend Modes: how much of a warp (the kaleidoscope, a ripple) lies over the plain picture.', range: [0.2, 1], roll: [0.5, 0.9], step: 0.05 },
-  grain: { label: 'Grain', hint: 'How heavy the film grain is.', range: [0.02, 0.4], roll: [0.1, 0.22], step: 0.01 },
-  grainKick: { label: 'Grain on the Kick', hint: 'How much heavier the grain swells on each kick (0: steady).', range: [0, 0.4], roll: [0.1, 0.25], chance: 0.5, step: 0.01 },
-  cinema: { label: 'Bar Height', hint: 'How tall the cinema bars are, as a part of the screen.', range: [0.04, 0.2], roll: [0.07, 0.14], step: 0.01 },
+  grain: { label: 'Grain', hint: 'How much the noise speckles the picture, from a faint film texture to heavy static.', range: [0.02, 0.4], roll: [0.1, 0.22], step: 0.01 },
+  grainKick: { label: 'Grain On the Kick', hint: 'How much heavier the grain swells on each kick (0: steady).', range: [0, 0.4], roll: [0.1, 0.25], chance: 0.5, step: 0.01 },
+  cinema: { label: 'Bar Height', hint: 'How tall each cinema bar is, as a share of the screen’s height: 0.1 covers a tenth at the top and a tenth at the bottom.', range: [0.04, 0.2], roll: [0.07, 0.14], step: 0.01 },
   spot: { label: 'Spotlight Size', hint: 'How wide the spotlight’s circle round the fire is.', range: [0.2, 0.8], roll: [0.28, 0.5], step: 0.01 },
   spotBreath: { label: 'Spotlight Breath', hint: 'How much the spotlight opens with the music and the kicks.', range: [0, 0.25], roll: [0.04, 0.14], step: 0.01 },
   chroma: { label: 'Split Width', hint: 'How far apart the color channels drift, in pixels.', values: [1, 2, 3], roll: [1, 2] },
-  chromaKick: { label: 'Split on the Kick', hint: 'How much wider the color split is kicked on each beat.', range: [0, 6], roll: [0, 4], step: 0.1 },
+  chromaKick: { label: 'Split On the Kick', hint: 'How much wider the color split is kicked on each beat.', range: [0, 6], roll: [0, 4], step: 0.1 },
   // The looks' own (LOOK_PARAMS).
   zoomIn: { label: 'Falls Inward', hint: 'The echo falls into the fire instead of streaming out of it.', bool: true, chance: 0.35 },
   turn: { label: 'Spiral Turn', hint: 'How fast the vortex turns its echoes, and which way (negative: the other way).', range: [-1.5, 1.5], roll: [0.5, 1.5], signed: true, step: 0.05 },
   crunch: { label: 'Crunch Size', hint: 'How big the mosaic’s pixels get on the kicks.', values: [2, 3, 4] },
   segments: { label: 'Segments', hint: 'How many mirrored segments the kaleidoscope has.', values: [4, 6, 8, 10], roll: [4, 6, 8] },
   // The layers' kinds.
-  scan: { label: 'Scanline Kind', hint: 'Thin rows, thick rows or columns.', values: [0, 1, 2], names: ['Thin Rows', 'Thick Rows', 'Columns'] },
+  scan: { label: 'Scanline Kind', hint: 'Which way the scanlines run: thin rows every other pixel, thick rows two pixels deep, or columns.', values: [0, 1, 2], names: ['Thin Rows', 'Thick Rows', 'Columns'] },
   mirror: {
     label: 'Mirror Kind', hint: 'Which half or quarter of the picture is mirrored over the rest.', values: [1, 2, 3, 4, 5, 6, 7, 8],
-    names: ['Left to Right', 'Right to Left', 'Top Down', 'Top Left Quarter', 'Top Right Quarter', 'Bottom Up', 'Bottom Left Quarter', 'Bottom Right Quarter'],
+    names: ['Left To Right', 'Right To Left', 'Top Down', 'Top Left Quarter', 'Top Right Quarter', 'Bottom Up', 'Bottom Left Quarter', 'Bottom Right Quarter'],
   },
 };
 /** The details each look has of its own (a scene's `look.params`). */

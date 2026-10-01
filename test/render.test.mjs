@@ -229,9 +229,13 @@ test('a render menu steps each setting through its values and shows it as text',
     assert.equal(seen.size, RENDER_STEPS[key].length, `${key} reaches every step`);
     assert.ok(renderText(s, key).length > 0);
   }
-  assert.equal(renderText({ palette: 'moonlit' }, 'palette'), 'Moonlit (4 colors)');
-  assert.equal(renderText({ xray: 'mix' }, 'xray'), 'in the mix');
-  assert.equal(renderText({ dither: 0 }, 'dither'), 'off');
+  // (In the menus' words: Title Case, and the switch's Off / In the Mix / Always.)
+  assert.equal(renderText({ palette: 'moonlit' }, 'palette'), 'Moonlit (4 Colors)');
+  assert.equal(renderText({ xray: 'mix' }, 'xray'), 'In the Mix');
+  assert.equal(renderText({ outlines: 'on' }, 'outlines'), 'Always');
+  assert.equal(renderText({ dither: 0 }, 'dither'), 'Off');
+  assert.equal(renderText({ fog: 'mix' }, 'fog'), 'A Mix');
+  assert.equal(renderText({ fog: 'light' }, 'fog'), 'Light');
 });
 
 test('a scene’s render: a few slots of the palette, one x-ray view held, and forgetApplied re-sends everything', () => {
@@ -241,7 +245,7 @@ test('a scene’s render: a few slots of the palette, one x-ray view held, and f
   applyRenderSettings(fire, s);
   assert.deepEqual(fire.calls.find(([n]) => n === 'setPalette')[1], [0, 6, 8]);
   for (const bad of [[0], [0, 12], ['0', 6], [0.5, 6]]) assert.equal(renderState({ ...s, palette: bad }).palette, 'flame', `${bad}: not slots`);
-  assert.equal(renderText(s, 'palette'), 'A scene’s 3 colors');
+  assert.equal(renderText(s, 'palette'), 'A Scene’s 3 Colors');
   // The show's own roll still wins while it's live (a few colors in the mix).
   assert.equal(renderState(s, { few: 'ashen' }).palette, 'ashen');
   // A held x-ray view (a scene's xrayView), under any flip of the show's.

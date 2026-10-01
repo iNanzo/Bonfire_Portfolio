@@ -24,14 +24,16 @@ import { modeOf } from './looks.js';
 import { pick } from '../math.js';
 
 /** The palettes the picture can be drawn in (the scene's setPalette). */
-export const PALETTES = { flame: 'The flame’s colors', ashen: 'Ashen (3 colors)', moonlit: 'Moonlit (4 colors)' };
+export const PALETTES = { flame: 'The Flame’s Colors', ashen: 'Ashen (3 Colors)', moonlit: 'Moonlit (4 Colors)' };
 /**
  * Few-color palettes the Few Colors switch rolls: the two fixed ones, or a few of the
  * flame's own, as slots of the scene palette (0 void, 1 shadow, 2 stone, 3 wood, 4 bone,
  * 5–8 the flame's ramp lo → core, 9 its shade; the first is the darkest, for the outlines).
  */
 export const FEW_PALETTES = ['ashen', 'moonlit', [0, 6, 8], [0, 5, 7], [0, 9, 7], [0, 1, 6, 8], [0, 2, 7, 8], [0, 5, 6, 8], [0, 7]];
-export const FOGS = { off: 'Off', light: 'Light (as on the site)', thick: 'Thick' };
+/** The fog's kinds (Light is the site's: the settings' hints say so). */
+export const FOGS = { off: 'Off', light: 'Light', thick: 'Thick' };
+/** The pixel sizes a menu offers: one list for every app (import it rather than keeping another). */
 export const PIXEL_SIZES = [2, 3, 4, 6, 8];
 export const FLAME_FPS = [8, 12, 24, 60];
 /** The x-ray's views (the scene's setXray). */
@@ -97,7 +99,7 @@ export function forgetApplied(fire) {
 }
 
 // The steps a render menu (P) walks each setting through, and how it shows them.
-const SWITCH = { off: 'off', mix: 'in the mix', on: 'always' };
+const SWITCH = { off: 'Off', mix: 'In the Mix', on: 'Always' };
 export const RENDER_STEPS = {
   pixelSize: PIXEL_SIZES,
   palette: Object.keys(PALETTES),
@@ -138,10 +140,10 @@ export function stepRender(settings, key, dir = 1) {
 export function renderText(settings, key) {
   const v = settings[key];
   if (key === 'pixelSize') return `${v} px`;
-  if (key === 'palette') return Array.isArray(v) ? `A scene’s ${v.length} colors` : PALETTES[v] ?? PALETTES.flame;
-  if (key === 'dither') return v ? Number(v).toFixed(2) : 'off';
+  if (key === 'palette') return Array.isArray(v) ? `A Scene’s ${v.length} Colors` : PALETTES[v] ?? PALETTES.flame;
+  if (key === 'dither') return v ? Number(v).toFixed(2) : 'Off';
   if (key === 'ditherMatrix') return v === 'mix' ? '4×4 / 8×8' : `${v}×${v}`;
-  if (key === 'fog') return v === 'mix' ? 'a mix' : FOGS[v] ?? FOGS.light;
+  if (key === 'fog') return v === 'mix' ? 'A Mix' : FOGS[v] ?? FOGS.light;
   if (key === 'flameFps') return `${v} fps`;
   return SWITCH[modeOf(v)] ?? String(v);
 }

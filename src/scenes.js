@@ -51,7 +51,7 @@ export const ID_MAX = 48;
 /** With the music: hold everything for the stretch, or open it and let the show play on. */
 export const MUSIC = { hold: 'Hold the Scene', base: 'Start From the Scene' };
 /** The framing's slow move, periodic and locked to the beat (visualizer/clearing.js movePose). */
-export const CAMERA_MOVES = { still: 'Still', sway: 'Sway', sweep: 'Sweep', push: 'Push In and Out', crane: 'Crane', vertigo: 'Vertigo' };
+export const CAMERA_MOVES = { still: 'Still', sway: 'Sway', sweep: 'Sweep', push: 'Push In & Out', crane: 'Crane', vertigo: 'Vertigo' };
 /** How many bars one cycle of the camera's move takes (clearing.js). */
 export { MOVE_BARS };
 /** The fireflies' light show (fireflyShow.js patterns), or in the mix. */

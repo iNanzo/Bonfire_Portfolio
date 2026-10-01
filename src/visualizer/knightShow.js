@@ -67,13 +67,14 @@ import { modeOf } from './looks.js';
 import { sideArcs, ringPlaces, slotPlaces, restPlaces, FRONT } from '../bonfire/knightPlaces.js';
 import { FINISHES } from '../bonfire/steel.js';
 import { DEFAULT_STYLE, STYLES, STYLE_KEYS, STYLE_NAMES } from '../bonfire/knightStyles.js';
+import { HELMET_NAMES } from '../knightNames.js';
 
 // (The ring's places are the engine's too: knights.js homes the others where they rest.)
 export { sideArcs, ringPlaces, slotPlaces, restPlaces, FRONT };
 
 export const MAX_KNIGHTS = 4;
-/** The helmets (knights.js HELMETS), as the settings name them. */
-export const HELMETS = { great: 'Great Helm', armet: 'Armet', bascinet: 'Bascinet' };
+/** The helmets (knights.js HELMETS), as the settings name them: the names every menu uses (knightNames.js). */
+export const HELMETS = HELMET_NAMES;
 /** The dance moves (knightPose.js MOVES), as the settings name them. */
 export const KNIGHT_MOVES = {
   nod: 'Nod', stepTouch: 'Step Touch', fistPump: 'Fist Pump', headbang: 'Headbang', swayArms: 'Sway', march: 'March',

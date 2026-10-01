@@ -74,7 +74,7 @@ export const SHOTS = {
   above: { name: 'Above', pos: [0.3, 5.6, 2.3], target: [0, 0.05, 0], fov: 40, spin: 0.05 },
   pillar: { name: 'Pillar Side', pos: [-2.5, 1.35, 3.3], target: [0.15, 0.7, -0.3], fov: 34, yaw: 0.2, push: 0.1 },
   wall: { name: 'Wall Side', pos: [2.3, 1.5, 3.6], target: [-0.2, 0.7, -0.3], fov: 34, yaw: 0.2, push: 0.1 },
-  blade: { name: 'Blade', pos: [0.3, 1.2, 2.2], target: [0, 1.0, 0], fov: 36, yaw: 0.45, push: 0.18 },
+  blade: { name: 'Weapon', pos: [0.3, 1.2, 2.2], target: [0, 1.0, 0], fov: 36, yaw: 0.45, push: 0.18 },
   embers: { name: 'Embers', pos: [0.9, 0.2, 2.5], target: [0, 0.6, 0], fov: 50, yaw: 0.3, roll: -0.08 },
   circle: { name: 'Circling', pos: [2.4, 2.6, 3.3], target: [0, 0.35, 0], fov: 36, spin: 0.035 },
   dutch: { name: 'Dutch', pos: [-0.6, 1.1, 3.0], target: [0, 0.8, 0], fov: 40, yaw: 0.2, roll: 0.14 },
@@ -101,8 +101,10 @@ export const KNIGHT_SHOTS = {
 };
 export const CLOSE = ['blade', 'hearth', 'low'];
 export const WIDE = ['clearing', 'above', 'circle', 'tele', 'sweep'];
-/** How the camera covers the blade out of the fire. */
-export const SWING_CAMS = { angles: 'Close Angles', follow: 'Follow the Blade', ride: 'Ride the Blade', track: 'Tracking', orbit: 'Orbit' };
+/** Bonfire Live's Movement setting (`camera`): one framing, a slow drift, or drifting and cutting between shots on the music. */
+export const CAMERA_MODES = { still: 'Still', drift: 'Slow Drift', cuts: 'Drift & Cut On Phrases' };
+/** How the camera covers the blade out of the fire (the living weapon, as people call it). */
+export const SWING_CAMS = { angles: 'Close Angles', follow: 'Follow the Weapon', ride: 'Ride the Weapon', track: 'Tracking', orbit: 'Orbit' };
 /** ...and a blade held for the drop. */
 export const HOLD_CAMS = { close: 'Close Shot', vertigo: 'Vertigo', orbit: 'Orbit' };
 export const TRANSITIONS = { cut: 'Cut', whip: 'Whip Pan', glide: 'Glide' };

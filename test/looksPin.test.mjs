@@ -30,7 +30,9 @@ test('the tables: every detail has a range the dice roll inside, a Title Case la
   for (const [k, p] of Object.entries(PARAMS)) {
     assert.match(p.label, /^[A-Z][A-Za-z]*( [A-Za-z]+)*$/, `${k}: label`);
     assert.match(p.label, /^([A-Z][a-z]*|the|a|of|on|in|to)( ([A-Z][a-z]*|the|a|of|on|in|to))*$/, `${k}: Title Case`);
-    assert.ok(p.hint.length >= 20, `${k}: a hint`);
+    // A hint that says what it does in a line, not the label again.
+    assert.ok(p.hint.length >= 12 && p.hint.length <= 160, `${k}: a hint of 12–160 characters (${p.hint.length})`);
+    assert.ok(!p.hint.toLowerCase().startsWith(p.label.toLowerCase()), `${k}: a hint that doesn't repeat its label`);
     if (p.range) {
       assert.ok(p.roll[0] >= p.range[0] - 1e-9 && p.roll[1] <= p.range[1] + 1e-9 && p.range[0] < p.range[1], `${k}: roll inside range`);
       if (p.signed) assert.ok(-p.roll[1] >= p.range[0], `${k}: the other way too`);
