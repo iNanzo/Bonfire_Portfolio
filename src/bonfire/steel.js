@@ -90,9 +90,9 @@ export const CEL_STEEL = {
  * flame's color where it lights him and recolors with it. `terminator` is the flame's dark,
  * saturated shade, one texel where a lit band gives way to the steel (the warm edge
  * between light and shadow); `ink` the line art over his lit tones (the void elsewhere).
- * The armor draws each band in one of these (armor.js), dithering a wide band's edge into
- * the next itself (in the pass's own Bayer pattern), and the pass snaps his pixels to them
- * (pixelPass.js setSteel), with no dither of its own.
+ * The armor draws each band in one of these (armor.js), dithering the band edges itself (a
+ * band's texels stepping into the next, in the pass's own Bayer pattern), and the pass
+ * snaps his pixels to them (pixelPass.js setSteel), with no dither of its own.
  *   cel          near-black backs, dark and mid gunmetal, a light steel between, the flame's
  *                body and cream tips; a dark warm ink on the lit side
  *   painterly    the cel tones with the shadows hue-shifted toward the flame's shade (as dark),

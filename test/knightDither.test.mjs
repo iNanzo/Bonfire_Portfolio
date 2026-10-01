@@ -14,6 +14,12 @@ import { STYLES, STYLE_KEYS, CEL_LOOKS } from '../src/bonfire/knightStyles.js';
 
 const fireAt = () => new THREE.Vector3(0, 0.95, 0.28);
 
+// The Bayer matrices' formula (dissolve.js wBayer2/4/8, the pass's bayer2/4/8), in JS.
+const fract = (x) => x - Math.floor(x);
+const b2 = (x, y) => fract(Math.floor(x) / 2 + Math.floor(y) ** 2 * 0.75);
+const b4 = (x, y) => b2(0.5 * x, 0.5 * y) * 0.25 + b2(x, y);
+const b8 = (x, y) => b4(0.5 * x, 0.5 * y) * 0.25 + b2(x, y);
+
 /** The armor's fragment shader, as three.js would build it (its chunks stubbed). */
 function armorFragment() {
   const mat = createArmorMaterial(createArmorShared({ fireAt: fireAt(), exposure: { value: 1 } }));
@@ -64,14 +70,34 @@ test('the band edges: an ordered Bayer dither on the pass grid, never the old ch
   // none at 0: then the bands are exactly the flat ones (no window, no offset at all).
   assert.match(fs2, /float dA = uCelDither \* clamp\(uDither \/ 0\.08, 0\.0, 2\.0\);/);
   assert.match(fs2, /if \(dA > 0\.0\) \{/);
-  // The window: a share of the narrower band (all of it at most: no texel skips a band), a few
-  // texels at most, none on a band too thin on screen.
-  assert.match(fs2, /min\(min\(a, 1\.0\) \* wb, a \* DITHER_MAX \* vw\)/);
-  assert.match(fs2, /smoothstep\(DITHER_MIN, DITHER_MIN \+ 1\.0, wb \/ vw\)/);
+  // A texel steps only toward its nearest edge, across it into the next band, never past that
+  // band: the window is at most twice the band it steps into, and the threshold (less than
+  // 0.5 from the middle) moves it under half the window.
+  assert.match(fs2, /if \(up \? \(v >= e \|\| thr <= 0\.0\) : \(v < e \|\| thr >= 0\.0\)\) return 0\.0;/);
+  assert.match(fs2, /min\(min\(a, 1\.0\) \* 2\.0 \* \(up \? wu : wd\), a \* reach \* vw\)/);
+  let top = 0, bottom = 1;
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { top = Math.max(top, b4(x, y), b8(x, y)); bottom = Math.min(bottom, b4(x, y), b8(x, y)); }
+  assert.ok(2 * (top - 0.5) < 1 && 2 * (0.5 - bottom) <= 1, 'a texel lands in the band it steps into, never past it');
+  // ...none from a band too thin on screen (it would break into dots), and a few texels at
+  // most, fewer as he's drawn bigger (more of his bands dither there).
+  assert.match(fs2, /smoothstep\(DITHER_MIN, DITHER_MIN \+ 1\.0, \(up \? wd : wu\) \/ vw\)/);
   const min = Number(fs2.match(/const float DITHER_MIN = ([\d.]+);/)?.[1]);
   const max = Number(fs2.match(/const float DITHER_MAX = ([\d.]+);/)?.[1]);
-  assert.ok(min >= 2, `a band under ${min} texels stays flat (no speckle on a limb)`);
-  assert.ok(max > 0 && max <= 4, `${max} texels at most at the style's full amount`);
+  assert.ok(min >= 2, `a band under ${min} texels gives up none (no speckle on a limb)`);
+  assert.ok(max > 0 && max <= 5, `${max} texels at most at the style's full amount`);
+  assert.match(fs2, /float celReach\(float px\) \{ return clamp\(DITHER_MAX \* DITHER_PX \/ max\(px, 1\.0\), 3\.4, DITHER_MAX\); \}/);
+  assert.match(fs2, /float reach = celReach\(vPx\);/);
+  // Only one side of an edge steps: the wider band's, and the lit bands always down into the
+  // steel (so no lone lit texel: the pass's terminator would ring it).
+  assert.match(fs2, /kv \+= celDither\(key, kw, e, wd, wu, e < 0\.7 && wd > wu, thr, dA, reach\);/);
+  // (Its table of the key's edges is the bands' own thresholds, each with a band either side.)
+  const edges = [...fs2.matchAll(/e = (-?[\d.]+), wd = [\d.]+, wu = [\d.]+;|e = (-?[\d.]+); wd = ([\d.]+); wu = ([\d.]+);/g)];
+  assert.ok(edges.length >= 9, `the key's edges (${edges.length})`);
+  for (const m of edges) {
+    const e = m[1] ?? m[2];
+    assert.ok(fs2.includes(`kv > ${e} ?`), `${e} is a band edge`);
+    if (m[3]) assert.ok(Number(m[3]) > 0 && Number(m[4]) > 0, `the bands beside ${e}`);
+  }
   // The lit bands, the far side's fill and turn, and a rounded plate's dark bands take it...
   assert.match(fs2, /b = kv > 0\.72 \? 4\.0 : kv > 0\.55 \? 3\.0 : kv > 0\.32 \? 2\.0 : fv > 0\.42 \? 2\.0 : \(fv > 0\.1 \|\| nv > -0\.3\) \? 1\.0 : 0\.0;/);
   assert.match(fs2, /if \(hard\) b = kv > 0\.76 \? 4\.0 : kv > 0\.38 \? 2\.0 : fv > 0\.45 \? 1\.0 : 0\.0;/);
@@ -91,10 +117,6 @@ test("the armor's Bayer matrices are the pass's own, texel for texel", () => {
   }
   // (The formula is a real Bayer matrix: each of 0..63 once in an 8x8 tile, the same at every
   // texel centre, which is what gl_FragCoord gives the armor and floor() the pass.)
-  const fract = (x) => x - Math.floor(x);
-  const b2 = (x, y) => fract(Math.floor(x) / 2 + Math.floor(y) ** 2 * 0.75);
-  const b4 = (x, y) => b2(0.5 * x, 0.5 * y) * 0.25 + b2(x, y);
-  const b8 = (x, y) => b4(0.5 * x, 0.5 * y) * 0.25 + b2(x, y);
   const seen = new Set();
   for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
     assert.equal(b8(x + 0.5, y + 0.5), b8(x, y));

@@ -34,13 +34,15 @@
 //                        edge, crease and overlap; a slight surface small on screen takes its
 //                        neighbour's id, so a gauntlet's fingers or a fauld's hoops aren't a
 //                        scribble far off), the fire's color just inside his outline on the
-//                        fire's side (pixelPass.js). The edges of the wide bands are
-//                        dithered: near one, each texel's ordered threshold (the pass's own
-//                        Bayer matrix, texel for texel with the scene's) moves it across, so
-//                        the band breaks into the next in the scene's pattern; how far
-//                        follows the Dither setting (uDither, uDitherScale: the pass's own,
-//                        shared) times the style's amount (uCelDither, knightStyles.js), and a
-//                        band too thin on screen stays flat (no speckle on a limb).
+//                        fire's side (pixelPass.js). The band edges are dithered: near one,
+//                        each texel's ordered threshold (the pass's own Bayer matrix, texel
+//                        for texel with the scene's) steps the wider band's texels across
+//                        into the narrower, so the band breaks into the next in the scene's
+//                        pattern and a thin one grows teeth rather than breaking up (the lit
+//                        bands always step down into the steel); how far follows the Dither
+//                        setting (uDither, uDitherScale: the pass's own, shared) times the
+//                        style's amount (uCelDither, knightStyles.js), and a band too thin on
+//                        screen gives up none (no speckle on a limb).
 //                        cel: four bands and a highlight, near-black ink (a dark warm ink over
 //                        the lit tones). painterly: shadows hue-shifted toward the flame's
 //                        shade, lips a little further round, a lighter ink over the lit
@@ -434,20 +436,30 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
         const float ROUND_GAIN = 2.0;
         const float ROUND_SKY = 0.2;
         const float ROUND_HOT = 1.1; // (the heart of its lit crescent: its small highlight)
-        // The pixel styles' dithered band edges: the window (in a value's units) a texel's
-        // Bayer threshold moves it by across an edge between two bands, the narrower wb wide,
-        // where the value changes vw a texel (its gradient's length: texels straight across the
-        // edge, whichever way it runs on screen). a is the style's amount at this Dither:
-        // that share of the band (all of it at most, so no texel ever skips a band) and at most
-        // a * DITHER_MAX texels; none where the band is under DITHER_MIN texels across (a thin
-        // limb's bands stay flat: no speckle), fading in over a texel more, so a band widening
-        // as he turns doesn't pop.
+        // The pixel styles' dithered band edges: how far a texel's Bayer threshold thr moves a
+        // value v (the key, the fill, the turn) across the edge e nearest it, between a band wd
+        // wide below it and wu above (in v's units), where v changes vw a texel (its
+        // gradient's length: texels straight across the edge, whichever way it runs on
+        // screen). Only one band's texels step across, into the other (up: the band below the
+        // edge's; the caller picks: the wider band's), so a thin band is never broken into
+        // dots, only toothed. a is the style's amount at this Dither: the window takes that
+        // share of twice the band stepped into (all of it at most: a texel lands in it, never
+        // past it) and at most a * reach texels (celReach); none from a band under DITHER_MIN
+        // texels across (a thin limb's bands stay flat), fading in over a texel more, so a
+        // band widening as he turns doesn't pop.
         const float DITHER_MIN = 2.0;
-        const float DITHER_MAX = 4.0;
-        float celWin(float wb, float vw, float a) {
+        float celDither(float v, float vw, float e, float wd, float wu, bool up, float thr, float a, float reach) {
+          if (up ? (v >= e || thr <= 0.0) : (v < e || thr >= 0.0)) return 0.0;
           vw = max(vw, 1e-4);
-          return smoothstep(DITHER_MIN, DITHER_MIN + 1.0, wb / vw) * min(min(a, 1.0) * wb, a * DITHER_MAX * vw);
+          return thr * smoothstep(DITHER_MIN, DITHER_MIN + 1.0, (up ? wd : wu) / vw) * min(min(a, 1.0) * 2.0 * (up ? wu : wd), a * reach * vw);
         }
+        // ...the reach, in texels: DITHER_MAX on a knight drawn up to DITHER_PX texels a
+        // metre (the site's home view at 1920 and anything smaller), a little less as he's
+        // drawn bigger, down to 3.4 (more of his bands are wide enough to dither there, and
+        // their dots would add up to speckle).
+        const float DITHER_MAX = 4.6;
+        const float DITHER_PX = 87.0;
+        float celReach(float px) { return clamp(DITHER_MAX * DITHER_PX / max(px, 1.0), 3.4, DITHER_MAX); }
         // The steel ramp's tone i (-1: the void).
         vec3 aSteel(int i) {
           vec3 c = uVoid;
@@ -656,28 +668,44 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
             bool hard = look == 3;
             // The dither on the band edges: near an edge, each texel's ordered threshold (the
             // pass's own Bayer matrix and size, so it lines up texel for texel with the scene's
-            // dither) moves it across by up to half the window (celWin). Its amount is the
-            // style's at the site's Dither (0.08), twice it from 0.16 on (Bonfire Live's slider
-            // goes to 0.4: capped, so it can't turn to speckle), none at 0 (the flat bands
-            // exactly). The far side's edges (the fill, the turn past the light) and a rounded
-            // plate's dark bands dither the same way; the highlight, the lips, the flame's flash
-            // and the sweeps, a flash of his own (uLift), the frost and the dissolve don't.
+            // dither) steps it across (celDither): the wider band's texels into the narrower,
+            // fewer the further from the edge, so a thin band (the light steel on the turn)
+            // grows teeth from both sides rather than breaking up. The lit bands always step
+            // down into the steel, never out over it, so the dither makes no lone lit texel for
+            // the pass's terminator to ring. Its amount is the style's at the site's Dither
+            // (0.08), twice it from 0.16 on (Bonfire Live's slider goes to 0.4: capped, so it
+            // can't turn to speckle), none at 0 (the flat bands exactly). The far side's edges
+            // (the fill, the turn past the light) and a rounded plate's dark bands dither the
+            // same way; the highlight, the lips, the flame's flash and the sweeps, a flash of
+            // his own (uLift), the frost and the dissolve don't.
             float dA = uCelDither * clamp(uDither / 0.08, 0.0, 2.0);
             float kv = key;
             float fv = fillL;
             float nv = nl;
             if (dA > 0.0) {
               float thr = (uDitherScale > 6.0 ? wBayer8(gl_FragCoord.xy) : wBayer4(gl_FragCoord.xy)) - 0.5;
-              // (The narrower band beside the edge nearest the key, in the key's units: the
-              // edges at 0.32, 0.55 and 0.72, chiaroscuro's at 0.38 and 0.76, a rounded plate's
-              // far side's at 0.12 and -0.1 (chiaroscuro's 0.05) too; the fill's at 0.1 and
-              // 0.42 (0.45), the turn's at -0.3.)
-              float wb = curved > 0.5
-                ? (hard ? (key < 0.57 ? 0.33 : 0.34) : key < 0.01 ? 0.22 : key < 0.435 ? 0.2 : 0.17)
-                : (hard ? (key < 0.57 ? 0.38 : 0.29) : key < 0.435 ? 0.23 : 0.17);
-              kv += thr * celWin(wb, length(vec2(dFdx(key), dFdy(key))), dA);
-              fv += thr * celWin(hard ? 0.4 : fillL < 0.26 ? 0.1 : 0.32, length(vec2(dFdx(fillL), dFdy(fillL))), dA);
-              nv += thr * celWin(0.3, length(vec2(dFdx(nl), dFdy(nl))), dA);
+              float reach = celReach(vPx);
+              float kw = length(vec2(dFdx(key), dFdy(key)));
+              float fw = length(vec2(dFdx(fillL), dFdy(fillL)));
+              float nw = length(vec2(dFdx(nl), dFdy(nl)));
+              // (The key's edge nearest it and the bands either side, in its units: 0.32, 0.55
+              // and 0.72 (the body: about 0.3 up to its peak); chiaroscuro's 0.38 and 0.76; a
+              // rounded plate's -0.1, 0.12, 0.55 and 0.72, chiaroscuro's 0.05, 0.38 and 0.76.)
+              float e = 0.72, wd = 0.17, wu = 0.3;
+              if (curved > 0.5) {
+                if (hard) { if (key < 0.215) { e = 0.05; wd = 0.3; wu = 0.33; } else if (key < 0.57) { e = 0.38; wd = 0.33; wu = 0.38; } else { e = 0.76; wd = 0.38; wu = 0.3; } }
+                else if (key < 0.01) { e = -0.1; wd = 0.3; wu = 0.22; }
+                else if (key < 0.335) { e = 0.12; wd = 0.22; wu = 0.43; }
+                else if (key < 0.635) { e = 0.55; wd = 0.43; wu = 0.17; }
+              } else if (hard) { if (key < 0.57) { e = 0.38; wd = 0.38; wu = 0.38; } else { e = 0.76; wd = 0.38; wu = 0.29; } }
+              else if (key < 0.435) { e = 0.32; wd = 0.32; wu = 0.23; }
+              else if (key < 0.635) { e = 0.55; wd = 0.23; wu = 0.17; }
+              kv += celDither(key, kw, e, wd, wu, e < 0.7 && wd > wu, thr, dA, reach);
+              // (The fill's at 0.1 and 0.42, chiaroscuro's at 0.45; the turn's at -0.3.)
+              if (hard) fv += celDither(fillL, fw, 0.45, 0.45, 0.4, true, thr, dA, reach);
+              else if (fillL < 0.26) fv += celDither(fillL, fw, 0.1, 0.1, 0.32, false, thr, dA, reach);
+              else fv += celDither(fillL, fw, 0.42, 0.32, 0.43, false, thr, dA, reach);
+              nv += celDither(nl, nw, -0.3, 0.7, 0.3, true, thr, dA, reach);
             }
             // The bands (steel.js CEL_TONES): the fire's body only where a plate squarely faces
             // the fire, a light steel on the turn, mid steel as it turns away; the far side

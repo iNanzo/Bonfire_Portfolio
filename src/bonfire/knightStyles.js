@@ -7,7 +7,7 @@
 //
 //   pixel-cel          the default: a hand-drawn sprite. Each plate one smooth, rounded
 //                      surface cut into four flat bands by the fire's light, their edges
-//                      dithered on the wide bands, a 1-texel ink line on every plate edge,
+//                      dithered in the scene's pattern, a 1-texel ink line on every plate edge,
 //                      seam and overlap, near-black where the fire can't reach; the planes
 //                      squarely facing the fire wear the flame's body and cream tips, the
 //                      rest stays cool gunmetal
@@ -32,14 +32,14 @@ export const MODELS = { main: 'models/knight.glb', first: 'models/knight-first.g
 /**
  * Each style: `look` the armor shader's (armor.js uLook), `model` a MODELS key, `finish`
  * whether the steel finishes apply, `dither` how far the pixel styles dither across their
- * band edges at the site's Dither (0..1: 1 the whole of the narrower band beside an edge, up
- * to 4 texels; armor.js uCelDither, which follows the Dither setting: 0 none), `hint` a line
- * for people.
+ * band edges at the site's Dither (0..1: at 1 a band's texels step up to ~4.6 texels into the
+ * next, armor.js celDither; uCelDither, which follows the Dither setting: 0 none), `hint` a
+ * line for people.
  */
 export const STYLES = {
   'pixel-cel': { look: 1, model: 'main', finish: true, dither: 1, hint: 'Hand-drawn sprite: flat bands with dithered edges, ink lines, lit in the fire’s color.' },
-  'pixel-painterly': { look: 2, model: 'main', finish: true, dither: 1, hint: 'The sprite with a painter’s touch: warm shadows, softer ink, lit lips.' },
-  'pixel-chiaroscuro': { look: 3, model: 'main', finish: true, dither: 0.2, hint: 'Hard firelight: near-black backs, the flame’s color only where it strikes.' },
+  'pixel-painterly': { look: 2, model: 'main', finish: true, dither: 0.8, hint: 'The sprite with a painter’s touch: warm shadows, softer ink, lit lips.' },
+  'pixel-chiaroscuro': { look: 3, model: 'main', finish: true, dither: 0.4, hint: 'Hard firelight: near-black backs, the flame’s color only where it strikes.' },
   gunmetal: { look: 0, model: 'main', finish: true, dither: 0, hint: 'Natural light on smooth steel, plate wear and a thin fire rim.' },
   blackgold: { look: 4, model: 'main', finish: false, dither: 0, hint: 'Blackened plate and dark gilt trim that catches the fire.' },
   first: { look: 5, model: 'first', finish: false, dither: 0, hint: 'The boxy first build, its trim glowing in the flame’s colors.' },

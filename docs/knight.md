@@ -352,14 +352,14 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   `STYLES` (`look`, `model`, `finish`, `dither`, `hint`), `STYLE_KEYS` (menu order),
   `STYLE_NAMES` (Title Case labels), `DEFAULT_STYLE`, `MODELS`, `styleOr(name)`,
   `styleModel(name)`. `dither` is how far a pixel style dithers its band edges at the
-  site's Dither (0..1; **Dither** below): Pixel Cel and Pixel Painterly 1, Pixel
-  Chiaroscuro 0.2, the rest 0. The hints are one short sentence each (Bonfire Live joins
+  site's Dither (0..1; **Dither** below): Pixel Cel 1, Pixel Painterly 0.8, Pixel
+  Chiaroscuro 0.4, the rest 0. The hints are one short sentence each (Bonfire Live joins
   them into one tip).
 
   | Key | Name | What |
   | --- | --- | --- |
-  | `pixel-cel` | Pixel Cel | **the default**: the sprite, four flat bands and a highlight on smooth plates (cool gunmetal darks and mids, the flame's body and cream tips only where it faces the fire), the wide bands' edges dithered, near-black ink with a dark warm ink over the lit tones, the fire on his outline's fire side |
-  | `pixel-painterly` | Pixel Painterly | the sprite with a painter's touch: shadows hue-shifted toward the flame's shade (as dark), lips a little further round the lit edges, a lighter ink over the lit tones, the flame's dark shade on the terminator, the band edges dithered as Pixel Cel's |
+  | `pixel-cel` | Pixel Cel | **the default**: the sprite, four flat bands and a highlight on smooth plates (cool gunmetal darks and mids, the flame's body and cream tips only where it faces the fire), the band edges dithered, near-black ink with a dark warm ink over the lit tones, the fire on his outline's fire side |
+  | `pixel-painterly` | Pixel Painterly | the sprite with a painter's touch: shadows hue-shifted toward the flame's shade (as dark), lips a little further round the lit edges, a lighter ink over the lit tones, the flame's dark shade on the terminator, the band edges dithered a little less than Pixel Cel's |
   | `pixel-chiaroscuro` | Pixel Chiaroscuro | hard firelight: the dark, mid steel and the fire's body (and the highlight), near-black backs and gaps, black ink, the terminator, a little dither |
   | `gunmetal` | Smooth Steel | round 9's natural light on gunmetal steel (below). Shown as Smooth Steel since round 10, so it isn't taken for the Gunmetal finish; the key stays (saved settings and scenes name it) |
   | `blackgold` | Black & Gold | round 8's final: blackened plate in the scene's stone, shadow and void by each facet's turn to the fire, dark gilt trim (wood and shadow) that catches the flame's mid, hi and core only in its reflection, rims a step up; no steel ramp, no fire rim |
@@ -428,28 +428,39 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   his pattern lines up with the scene's). The pass's `ditherStrength` and `ditherScale`
   are shared with the armor by reference (`uDither`, `uDitherScale`, like the exposure),
   so the render menu's Dither and Pattern rows and Bonfire Live's slider move him with the
-  scene. Near a band edge each texel's threshold moves the key (and the far side's fill
-  and turn, and a curved plate's dark bands) across by up to half a window: the style's
+  scene. Near a band edge each texel's threshold steps it across (`celDither`, on the key,
+  the far side's fill and turn, and a curved plate's dark bands), fewer the further from
+  the edge, toward the edge nearest it only. Only one band's texels step, the wider band's,
+  into the narrower: a thin band (the light steel on the turn, often 1–2 texels) grows
+  teeth from both sides instead of breaking into dots. The lit bands always step down into
+  the steel, never out over it, so the dither makes no lone lit texel, and the pass's
+  terminator is round 9's (a terminator rings a lone lit texel). The window: the style's
   amount `a` (`uCelDither`) times the Dither over the site's 0.08, at most 2x (Live's
-  slider goes to 0.4), takes `min(a, 1)` of the narrower band beside the edge (never more:
-  no texel skips a band) and at most `a` x 4 texels (`DITHER_MAX`); none where that band is
-  under 2 texels across on screen (`DITHER_MIN`, measured along the key's gradient; a thin
-  limb's bands stay flat), fading in over a texel more. At Dither 0 there's no offset at
-  all: exactly the flat bands. Not dithered: the highlight, the lips, the flame's flash
-  and the sweeps, his own flash (`uLift`), the frost and the dissolve. The old checker seam
-  (a band edge a texel early on alternate texels, only where the key changed under 0.03 a
-  texel) is gone: it moved 0.2–2 texels a frame. Measured in pairs (the same frame drawn
-  with round 9's shaders and the new ones; 3 bursts of 20 frames; home, Pixel Cel,
-  Dither 0.08): at 1920 the dither moves 58–75 texels of his ~3,300 a frame and makes up
-  7.5–9.6 % of the breastplate's, pauldrons' and cuisses' texels (patterned texels:
-  moved, or beside one moved), single-texel speckle +0.6 to +1.1 points (round 9's
-  method below; 9.4–9.5 % before), crawl at rest +0.05 points at most; at 1280 and 390,
-  where his bands are narrower, ~20 texels a frame (+0.4 to +0.6 points). At 0.16 and 0.4
-  the window widens on the wide bands only (speckle up to +1.35). Chiaroscuro's bands are
-  twice as wide, so it takes 0.2 (at 0.4 it went +3 to +4.5 points at 2x). The
-  painterly and chiaroscuro terminator isn't drawn beside a lone lit texel while the
-  dither's on (a dot of a dithered edge: a terminator round each would scatter over the
-  patch; at Dither 0 it's as before).
+  slider goes to 0.4); `min(a, 1)` of twice the band stepped into (a texel lands in it,
+  never past it: the threshold is under 0.5 from its middle) and at most `a` times the
+  reach (`celReach`): 4.6 texels (`DITHER_MAX`) on a knight drawn up to 87 texels a metre
+  (`DITHER_PX`: the home view at 1920 and everything smaller), less as he's drawn bigger,
+  down to 3.4 (the projects and inspect views, where more of his bands are wide enough to
+  dither and the dots would add up); none from a band under 2 texels across on screen
+  (`DITHER_MIN`, measured along the value's gradient), fading in over a texel more. At
+  Dither 0 there's no offset at all: exactly the flat bands. Not dithered: the highlight,
+  the lips, the flame's flash and the sweeps, his own flash (`uLift`), the frost and the
+  dissolve. The old checker seam (a band edge a texel early on alternate texels, only where
+  the key changed under 0.03 a texel) is gone: it moved 0.2–2 texels a frame. The first
+  cut (one window both sides, sized by the narrower band, so the edges beside the thin
+  light steel hardly dithered) flipped 2–3 % of the plate texels at 1920 and 1–1.5 % at
+  1280 and 390: it didn't read, and its pass guard (no terminator beside a lone lit texel)
+  took 10–22 % of the real terminators. Measured in pairs (the same frame drawn with round
+  9's shaders, the first cut's and these; 4 bursts of 20 frames a second apart; Pixel
+  Cel, Dither 0.08): home at 1920, the dither moves 118–125 texels of his ~3,300 a frame
+  and flips 4.7–4.9 % of the breastplate's, pauldrons' and cuisses' band texels; texels
+  between two of another tone there (an alternating pattern) 9.2–10.3 % (round 9 4.3–5.0 %,
+  its staircase edges); single-texel speckle +1.1 to +1.35 points (round 9's method below;
+  ~9.5 % before); crawl at rest +0.02 at most; projects and inspect +1.15 to +1.4; at 1280
+  and 390, 53–57 texels a frame, 4.0–4.9 % flipped, +0.9 to +1.1. Pixel Painterly (0.8)
+  +0.7 to +1.3, Pixel Chiaroscuro (0.4: its bands are twice as wide) +0.45 to +0.8. At 0.16
+  and 0.4 (2x) the bands step further, +1.3 to +2.7 (the scene is dithered as hard there).
+  The terminators stay within 3 % of round 9's.
   **Line art** (`pixelPass.js` `celLine`): a line only where both surfaces are at
   least two texels thick across the edge and one of them more (`CEL_THICK`: no outline
   round a one-texel sliver, a corner poking through, a finger peeking from a gauntlet in

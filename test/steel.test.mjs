@@ -122,7 +122,7 @@ test("the pixel styles' tones: cool steel darks and mids, the flame's colors onl
       assert.equal(t.length, CEL_TONES.length, `${look} ${finish}`);
       for (const h of t) assert.match(h, /^#[0-9a-f]{6}$/, `${look} ${h}`);
       // The six bands step up clearly (the pass snaps to them without a dither of its own; the
-      // armor dithers only a wide band's edge into the next, knightDither.test.mjs).
+      // armor dithers their edges, a band's texels stepping into the next, knightDither.test.mjs).
       for (let i = 1; i < 6; i++) assert.ok(luma(t[i]) - luma(t[i - 1]) >= 12, `${look} ${finish}: ${t[i - 1]} -> ${t[i]} a clear step up`);
       assert.equal(new Set(t.slice(0, 6)).size, 6, `${look}: six different bands`);
       assert.ok(luma(t[5]) > 180, `${look}: the highlight near cream (${t[5]})`);
