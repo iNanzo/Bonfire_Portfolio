@@ -49,46 +49,54 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     `tools/import-screenshots.mjs`). Reorder them (the first *visible* one is the
     inventory icon), hide one with ◉ (kept in the repo, off the site), and set alt text,
     caption and pixel art.
-- **Effects** (the Look & Feel page), with a **live preview** of the real site beside it:
-  - Bonfire colors (the palettes every element burns in, stored as `effects.flames`):
-    add, edit, reorder or delete them; ◉ takes one out of the random draw. Each
-    palette's `hi` must stay readable as text (≥ 4.5:1), and at least 3 stay in rotation.
-  - **Palette tools** (`src/paletteGen.js`, shared with the visualizer): 🎲 a harmonious palette for one flame
-    (any scheme, or one you pick: hue shift, analogous, monochrome, complementary, split
-    complementary, triadic), a fully random one, or **suggestions built around a color**
-    you pick (or one of the flame's own). There's also a set for every flame at once,
-    with hues spread around the wheel, and the same tools for the scene colors. Each one
-    has Undo. The harmonies work in OKLCH. Each ramp step has its own lightness band,
-    chroma is a share of what the gamut allows at that hue, and hues come from the
-    scheme. Tips are lightened until they read as text.
-  - Elements: each one's name on the site, whether it's in rotation and its relative
-    chance (with its share of the draws). **Try It** forges it in the preview.
-  - Lightning (ball size and height, filaments, ground strikes, bolt thickness, jaggedness, forking, crackle rate,
-    drift, brightness, reach for the cursor, light strobe, ring speed and arcs) and Ice
-    (crystals, height, spread, thickness, translucency, glow, shimmer, fire inside,
-    frost, freeze time, ring speed, shard height and hold).
-  - Fire (intensity, size, height, turbulence, flame life, cast light, frame rate, stoke
-    flare), fireflies (count, lit at rest, real lights, speed), the cursor effect and its
-    strength, particle counts (plus the touch-device scale), rendering (pixel size,
-    dither, outlines, vignette, exposure, color-change time, screen shake) and the scene's
-    base colors. Every section has **Reset to Defaults**.
-  - **The Knight** (`effects.knight`). He isn't there when a page opens: his summon sign
+- **Look & Feel:** the site's effects (`effects` in `content.json`) on four pages, each
+  with a **live preview** of the real site beside it (above it on narrower screens). The
+  old address `#effects` opens Colors.
+  - **Colors.** **Flame Colors** (the palettes every element burns in, stored as
+    `effects.flames`): add, edit, reorder or delete them; ◉ takes one out of the random
+    draw. Each palette's `hi` must stay readable as text (≥ 4.5:1), and at least 3 stay
+    in rotation. **Place Colors** (`effects.colors`): the neutrals every frame is built
+    from (void, shadow, stone, wood, bone).
+    - **Palette tools** (`src/paletteGen.js`, shared with the visualizer): 🎲 a harmonious
+      palette for one flame (any scheme, or one you pick: hue shift, analogous,
+      monochrome, complementary, split complementary, triadic), a fully random one, or
+      **suggestions built around a color** you pick (or one of the flame's own). There's
+      also a set for every flame at once, with hues spread around the wheel, and the same
+      tools for the place colors. Each one has Undo. The harmonies work in OKLCH. Each
+      ramp step has its own lightness band, chroma is a share of what the gamut allows at
+      that hue, and hues come from the scheme. Tips are lightened until they read as text.
+  - **Fire & Elements.** Fire (brightness, size, rise speed, turbulence, flame life,
+    Firelight, Flame Frame Rate, stoke flare); Elements (each one's name on the site,
+    whether it's in rotation and its relative chance, with its share of the draws; **Try
+    It** forges it in the preview); Lightning (ball size and height, filaments, ground
+    strikes, bolt thickness, jaggedness, forking, crackle rate, drift, brightness, reach
+    for the cursor, light strobe, ring speed and arcs); Ice (crystals, height, spread,
+    thickness, translucency, glow, shimmer, fire inside, frost, freeze time, ring speed,
+    shard height and hold); and Particles (counts, plus the touch-device scale).
+  - **Picture.** **Pixel Art** (`effects.render`: Pixel Size and Pixel Size On Phones,
+    picked from the sizes the menus offer, 2/3/4/6/8 px; Dither, Dither Pattern,
+    Outlines; then Vignette and Exposure under Place & Atmosphere, Color Blend Time under
+    Colors, Screen Shake under Camera), **Hits** (`effects.impact`: Hit-Stop, Hit Flash,
+    Debris, Ground Marks and the rest), Fireflies (how many, lit at rest, real lights,
+    speed) and the Cursor effect and its strength.
+  - **Knight** (`effects.knight`). He isn't there when a page opens: his summon sign
     (the NH monogram) glows on the ground by his seat, and a click on it or **Summon** in
     the pack calls him. He forms out of the sign in the fire's element, rests, then burns
-    away into it again. The settings, in the order the section shows them:
+    away into it again. The settings, in the order the page shows them (under Knight,
+    Armor and Behavior):
 
     | Setting | Key | What it does |
     | --- | --- | --- |
     | Show the Knight | `show` | Off: no knight and no sign. The pack has no Knight item, and the scene description never mentions him. |
     | Arrival | `arrival` | **Summon Sign** (`sign`, the default): he waits to be summoned and leaves after his rest. **There From the Start** (`start`): he rests there from the first frame and stays until a visitor sends him off. |
     | Shortest Rest / Longest Rest | `restMin` / `restMax` | Minutes he rests before he burns away (1–30; each summons rolls between the two; default 3–5). |
-    | Helmet | `helmet` | **Random Each Summon** (a new one each time he comes), or the Great Helm, Armet or Bascinet. |
-    | Style | `style` | How he's drawn (`src/bonfire/knightStyles.js`): Pixel Cel (the default), Pixel Painterly, Pixel Chiaroscuro, Gunmetal, Black & Gold, First Build. A change burns him away and forms him again in it. |
-    | Armor Finish | `finish` | His steel's color (`src/bonfire/steel.js`): Gunmetal, Blackened, Polished Steel or Burnished. Only for the styles that draw steel (all but Black & Gold and First Build). |
-    | Edge Glow | `rim` | 0–1: how strongly his edges catch the fire's color. |
-    | Armor Shine | `shine` | The fire's reflection sweeping over his plate, now and then and when the fire flares. |
     | Seat Pose | `seat` | **Resting** (slumped) or **Watchful** (leaning in over his knees, forearms on them, head up at the fire). |
-    | Answers a Click | `gestures` | While he rests, a click on him gets a gesture back. |
+    | Helmet | `helmet` | **Random Each Summon** (a new one each time he comes), or the Great Helm, Armet or Bascinet. |
+    | Style | `style` | How he's drawn (`src/bonfire/knightStyles.js`): Pixel Cel (the default), Pixel Painterly, Pixel Chiaroscuro, Smooth Steel (key `gunmetal`), Black & Gold, First Build. A change burns him away and forms him again in it. |
+    | Finish | `finish` | His steel's color (`src/bonfire/steel.js`): Gunmetal, Blackened, Polished Steel or Burnished. Only for the styles that draw steel (all but Black & Gold and First Build). |
+    | Edge Glow Strength | `rim` | 0–1: how strongly his edges catch the fire's color. |
+    | Armor Shine | `shine` | The fire's reflection sweeping over his plate, now and then and when the fire flares. |
+    | Gestures On Click | `gestures` | While he rests, a click on him gets a gesture back. |
     | Reactions | `reactions` | He watches a weapon rise, flinches, leans away from a stoke and lifts his feet for a ring. |
 
     Visitors can summon him, send him off and change his helmet, style and finish from the
@@ -104,7 +112,13 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     on him (the full swap, not saved) and **Gesture…** asks him for one. The messages are
     `nh:knight` (`do`: `summon` | `dismiss`), `nh:helmet` and `nh:gesture`. Nothing
     reaches visitors until you save.
-- **Scenes** (the Look & Feel page after Effects): Bonfire Live's built-in preset scenes
+  - **Reset Section** on each effects section puts it back to the site's defaults
+    (`src/effectsDefaults.js`) at once, with **Undo** in the note that follows (Discard
+    still brings back your saved values until you save). On Flame Colors it gives the
+    built-in palettes their colors, names and rotation back (bringing back any you deleted)
+    and keeps the palettes you made, unchanged, after them. Only the effects have Reset:
+    the other pages have no defaults to go back to.
+- **Scenes** (the Look & Feel page after Knight): Bonfire Live's built-in preset scenes
   (`content.json` `scenes`; the format is `src/scenes.js`), in the order it loops through
   them. They're made in the Bonfire Painter (`/painter/`), so a scene's card doesn't list
   its ~80 settings as fields. The site ships four: Cathedral Kaleidoscope, Frozen Shrine,
@@ -130,7 +144,24 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     "edit scenes". There's no live preview for scenes; **Open in Painter** is the preview.
 - **Hide / show** any entry (◉), and **reorder** any list by dragging ⋮⋮ or with ↑/↓.
 - **Rename** any sidebar page or section heading with ✎ (empty resets it). Renames are
-  stored in `content.admin.labels`, which the site ignores.
+  stored in `content.admin.labels`, which the site ignores. Help that names another
+  page or section ("Interface › Starting Equipment") follows the rename.
+- **Search** (`admin/ui/search.js`): **Ctrl/⌘+K** or **/** opens the box at the top of
+  the sidebar. It finds any field on any page by its label, its help, its search words
+  (the shared settings use Bonfire Live's, from `src/settingsMap.js`), a dropdown's
+  choices, a list entry's title (a project's or a flame's name) and the words in a short
+  text field ("Fast Travel" finds the pack's Map action). Each result shows "Page › Group
+  › Field" and a line of its help, what matched marked. ↑/↓ choose, **Enter** goes there:
+  the cards on the way open, the page changes, the field scrolls into view below the
+  sticky bars, takes the focus and glows for a moment. **Esc** clears the box, then closes
+  it. A field that needs fixing is gone to the same way when Save refuses.
+- **Names and help:** labels are in Title Case; the settings the site shares with Bonfire
+  Live and the Painter carry the same names there (Flame Frame Rate, Firelight, Edge Glow
+  Strength, Gestures On Click…). Each field's help sits under it, a sentence or two, and
+  is what its input reads out to a screen reader; anything longer folds under **More**.
+  Big sections are split under sub-headings: Interface Text into Header & Menu, Inventory
+  & Projects, Render Settings, Pack and Key Prompts; Pixel Art; the Knight. Icon buttons
+  and tools explain themselves in the shared tooltip (hover, or focus with the keyboard).
 - **Live checks:** each field is checked as you type against `src/contentRules.js`: unsafe
   links, bad ids, missing alt text, glyphs that won't fit and so on. Save is refused
   until they're fixed; the sidebar counts problems per page.
@@ -147,16 +178,17 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
 
 | Piece | File |
 | --- | --- |
-| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `schema.js` labels/help/grouping, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case, `paletteTools.js` the palette buttons (the generators are `src/paletteGen.js`), `sceneTools.js` the Scenes page's cards and Painter tools) |
+| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `el.js` its DOM builder, `paths.js` content paths, `schema.js` pages, labels, help, sub-groups, `search.js` the search, `reset.js` Reset, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case, `paletteTools.js` the palette buttons (the generators are `src/paletteGen.js`), `sceneTools.js` the Scenes page's cards and Painter tools) |
 | Effects defaults, ranges, runtime | `src/effectsDefaults.js`, `src/effects.js`, `src/elements.js` (design notes: `docs/design/admin-v2.md`, `docs/elements.md`) |
 | The scene format (Painter, Bonfire Live, the Scenes page) | `src/scenes.js` (design notes: `docs/painter.md`, `docs/design/visualizer.md`) |
 | API: session, content, save, deploy status, image thumbnails | `admin/server/api.js` |
 | Sign-in check (Cloudflare Access JWT) | `admin/server/auth.js` |
 | Content store on GitHub (one commit per save, Git Data API) | `admin/server/github.js` |
 | Content store on disk (local mode) | `admin/server/fsStore.js` |
-| Worker entry + security headers | `admin/worker.js`, `admin/wrangler.toml` |
+| Worker entry | `admin/worker.js`, `admin/wrangler.toml` |
+| Security headers (the Worker's and `admin:preview`'s) | `admin/server/csp.js` |
 | Local server + build | `admin/vite.config.js` |
-| Tests (sign-in, GitHub store, API, effects, palettes, scenes) | `admin/test/` (`npm run admin:test`) |
+| Tests (sign-in, GitHub store, API, effects, palettes, scenes, schema, search, the policy) | `admin/test/` (`npm run admin:test`); in a browser, `e2e/admin.spec.mjs` |
 
 The editor is generic: it renders whatever is in `content.json`, so a new field shows
 up without code. `admin/ui/schema.js` only adds labels, help text and grouping. The
@@ -174,7 +206,10 @@ exceptions are the cards that draw their own body: scenes (`sceneTools.js`).
 - **Requests:** saves must be same-origin JSON.
 - **Every save is re-checked server-side:** content rules, WebP-only uploads, image paths
   locked to `public/assets/projects/<id>/`, and no path traversal.
-- **Page hardening:** it ships a strict CSP and can't be framed.
+- **Page hardening:** it ships a strict CSP (`admin/server/csp.js`) and can't be framed.
+  The policy refuses inline styles, a `style=""` set by script included, so the page
+  sets styles through the style object (`el()` takes `style` as an object) and keeps
+  its fonts as files. Try it locally with `npm run admin:preview`.
 
 **Use it locally (no setup)**
 
@@ -184,8 +219,17 @@ npm run admin        # http://127.0.0.1:5175
 
 Local mode edits your working copy directly. Nothing is committed or deployed; commit
 and push yourself. It has no sign-in, so it only listens on 127.0.0.1. Run `npm run
-dev` alongside it to see changes live; the Effects preview loads that dev site
-(`http://localhost:5173/`, or set `ADMIN_SITE_URL`).
+dev` alongside it to see changes live; the Look & Feel pages' preview loads that dev
+site (`http://localhost:5173/`, or set `ADMIN_SITE_URL`).
+
+```bash
+npm run admin:preview   # the built admin under its production security headers, same API
+```
+
+`admin:preview` builds the admin and serves it the way the Worker does, with the
+Content Security Policy and the other security headers, so anything the policy would
+block shows up before a deploy (in the console). `ADMIN_READONLY=1` makes its API refuse
+saves; the end-to-end tests (`e2e/admin.spec.mjs`) run it that way.
 
 The deployed admin's preview frames `SITE_URL` (its CSP allows only that origin), so it
 shows the effects editor's changes once this version of the site is deployed. The site
