@@ -14,7 +14,9 @@
 // src/text.js: every word capitalized but a/an/the after the first), at most 32 characters;
 // hints a sentence or two, 12–160 characters, saying what it does and why it matters
 // without repeating the label; anything longer goes in `more` (one line per item, "\n"
-// between them), which the apps show folded and the search reads.
+// between them), which the apps show folded and the search reads. Where that text would be
+// wrong in an app (Live's presets, a switch the admin keeps as on/off), `mores` gives the
+// app its own, or null for none.
 //
 // No imports: the site, the admin and node's tests load it without pulling in anything else.
 
@@ -28,7 +30,7 @@
  *   section: string, label: string, hint: string, more?: string, keywords?: string[], simple?: boolean,
  *   range?: [number, number, number, string?], live?: string, painter?: string, admin?: string,
  *   labels?: { live?: string, painter?: string, admin?: string }, hints?: { live?: string, painter?: string, admin?: string },
- *   needs?: { live?: Need },
+ *   mores?: { live?: string | null, painter?: string | null, admin?: string | null }, needs?: { live?: Need },
  * }} Entry
  */
 
@@ -331,6 +333,7 @@ export const SETTINGS = {
       painter: 'The flame’s five colors, embers to core, and the shade firelit stone takes: one of the site’s, one made here, or each set by hand.',
       admin: 'The color sets the bonfire can take; fire, lightning and ice burn in them and the site’s accents follow. Keep at least 3 in rotation.',
     },
+    mores: { admin: 'Inspecting a project or clicking the fire draws one at random; hidden ones stay out of the draw (one can still be the starting colors).' },
     keywords: ['palette', 'flame', 'bonfire colors', 'theme'],
   },
   scheme: {
@@ -658,6 +661,7 @@ export const SETTINGS = {
       painter: 'Each knight’s helmet: Drawn at Random (a new one each time the scene comes round), or one of the three.',
       admin: 'The great helm, the armet or the pointed bascinet; Random Each Summon puts a new one on him each time he comes.',
     },
+    mores: { admin: 'A helmet the visitor picks in the pack wins over this (it’s kept in their browser).' },
     keywords: ['helm', 'armet', 'bascinet'],
   },
 
@@ -694,6 +698,10 @@ export const SETTINGS = {
     more: 'In the Mix: rolled at the hidden moments (the music starting, a big drop’s flash, a new scene); some stretches glow at a strength rolled round Edge Glow Strength, some don’t.\n'
       + 'Always: at Edge Glow Strength the whole time.\n'
       + 'A preset scene’s knights glow as it was painted: its own switch and strength.',
+    mores: {
+      painter: 'In the Mix: rolled as the scene arrives and in each big drop’s flash; some stretches glow at a strength rolled round Edge Glow Strength, some don’t.\n'
+        + 'Always: at Edge Glow Strength the whole time.',
+    },
     keywords: ['rim', 'glow', 'edges'],
   },
   knightRim: {
@@ -712,6 +720,14 @@ export const SETTINGS = {
     },
     more: 'A gentle band sweeps over the plate now and then as they rest, and a bright one whenever the fire flares (a weapon landing, a ring racing out).\n'
       + 'In the Mix the two come and go apart, rolled where it’s hidden: as the music starts, in a big drop’s flash, when the scene changes.',
+    // (scenePlayer.js: Live's own Armor Shine set Off, or reduced motion, keeps a scene's off.)
+    mores: {
+      painter: 'A gentle band sweeps over the plate now and then as they rest, and a bright one whenever the fire flares (a weapon landing, a ring racing out).\n'
+        + 'In the Mix the two come and go apart, rolled as the scene arrives and in each big drop’s flash.\n'
+        + 'Bonfire Live keeps it off while its own Armor Shine is Off, or for a viewer who asks for reduced motion.',
+      admin: 'The bright band comes whenever the fire flares: a stoke, a weapon landing, a ring, the cursor on the fire.\n'
+        + 'Never for visitors who ask their system for reduced motion.',
+    },
     keywords: ['reflection', 'sheen', 'sweep'],
   },
 
@@ -751,6 +767,7 @@ export const SETTINGS = {
     hints: { admin: 'He sits up to watch a new weapon rise, flinches when it lands, leans away from a stoke and lifts his feet as a ring passes.' },
     more: 'In the Mix they react for some stretches and not others, rolled where it’s hidden (the music starting, a big drop’s flash, a new scene).\n'
       + 'Off with the Chill preset.',
+    mores: { painter: 'In the Mix they react for some stretches and not others, rolled as the scene arrives and in each big drop’s flash.', admin: null },
     keywords: ['flinch', 'react'],
   },
   knightGestures: {
@@ -758,6 +775,10 @@ export const SETTINGS = {
     hint: 'Praise the Sun, a hurrah, a jump for joy or a point on a big drop, all together or a beat apart; a cheer on a small one.',
     labels: { admin: 'Gestures On Click' },
     hints: { admin: 'While he rests, a click on him gets a gesture back (Praise the Sun most often). Never with reduced motion.' },
+    mores: {
+      admin: 'Hovered, he looks up at you and his rim warms to say so.\n'
+        + 'Off: he isn’t a click target (a click on him stokes the fire like anywhere else); the pack’s gestures still work.',
+    },
     keywords: ['praise the sun', 'wave', 'cheer'],
   },
 
@@ -824,6 +845,11 @@ export const SETTINGS = {
     more: 'Hold the Scene: everything it sets stays for its stretch; the music only pulses it, and drops re-forge its own weapon in its colors.\n'
       + 'Start From the Scene: it opens the stretch with its place, colors, framing and look, then the show takes over (its render, knights and fireflies stay).\n'
       + 'Each Scene’s Own: as it was saved in the Painter.',
+    mores: {
+      painter: 'Hold the Scene: everything it sets stays for its stretch; the music only pulses it, and drops re-forge its own weapon in its colors.\n'
+        + 'Start From the Scene: it opens the stretch with its place, colors, framing and look, then the show takes over (its render, knights and fireflies stay).\n'
+        + 'Bonfire Live plays it this way unless its own With the Music holds or starts from every scene.',
+    },
     keywords: ['hold', 'start from'],
   },
   sceneCards: {
@@ -1040,9 +1066,9 @@ export function conceptOf(app, binding) {
 
 /**
  * What an app shows for a setting: its label and hint (the app's own where the control
- * means something else there), the longer text, whether it's only in Live's All Settings
- * view (`adv`), what it needs (Live), its search words and its section. Null when the map
- * has no entry for it.
+ * means something else there), the longer text (its own there too, '' for none), whether
+ * it's only in Live's All Settings view (`adv`), what it needs (Live), its search words and
+ * its section. Null when the map has no entry for it.
  * @param {'live'|'painter'|'admin'} app
  * @param {string} binding
  */
@@ -1054,7 +1080,7 @@ export function meta(app, binding) {
     id,
     label: e.labels?.[app] ?? e.label,
     hint: e.hints?.[app] ?? e.hint,
-    more: e.more ?? '',
+    more: (e.mores && Object.hasOwn(e.mores, app) ? e.mores[app] : e.more) ?? '',
     adv: app === 'live' && !e.simple,
     needs: e.needs?.[app] ?? null,
     keywords: e.keywords ?? [],

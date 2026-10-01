@@ -3,8 +3,9 @@
 // are the real saved keys, scene paths and content paths; a number keeps one range in every
 // app; the copy keeps its rules (Title Case labels of at most 32 characters, hints of 12–160
 // that don't repeat the label, no "In the mix:" boilerplate); every look, layer, drop hit
-// and x-ray view has a hint of its own; the needs hold where they say. And the shared data
-// tables' names are Title Case too.
+// and x-ray view has a hint of its own; the Painter and the admin never read Live's own
+// (presets, keys); the needs hold where they say. And the shared data tables' names are
+// Title Case too.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -227,9 +228,11 @@ test('the copy: Title Case labels of at most 32 characters, hints that say what 
       assert.ok(!hint.toLowerCase().startsWith(`${label.toLowerCase()} `) && !hint.toLowerCase().startsWith(`${label.toLowerCase()}:`), `${where}: doesn't start with "${label}"`);
     }
   }
-  // The long explanations: each line a sentence, under a "More".
-  for (const [id, e] of Object.entries(SETTINGS).filter(([, x]) => x.more)) {
-    for (const line of e.more.split('\n')) assert.ok(line.length >= 12 && line.length <= 200 && /[.)]$/.test(line), `${id}: "${line}"`);
+  // The long explanations (an app's own too): each line a sentence, under a "More".
+  for (const [id, e] of Object.entries(SETTINGS)) {
+    for (const more of [e.more, ...Object.values(e.mores ?? {})].filter(Boolean)) {
+      for (const line of more.split('\n')) assert.ok(line.length >= 12 && line.length <= 200 && /[.)]$/.test(line), `${id}: "${line}"`);
+    }
   }
   // Each style, finish and camera feel has its line (the gunmetal style is Smooth Steel to people).
   const styleLines = SETTINGS.knightStyle.more.split('\n');
@@ -240,6 +243,29 @@ test('the copy: Title Case labels of at most 32 characters, hints that say what 
   assert.equal(styleLines.length, STYLE_KEYS.length);
   assert.deepEqual(SETTINGS.knightFinish.more.split('\n').map((l) => l.split(':')[0]), Object.values(FINISH_NAMES));
   assert.deepEqual(SETTINGS.swingEase.more.split('\n'), Object.values(SWING_EASES).map((e) => `${e.name}: ${e.hint}`), 'the feels as cameraEase.js has them');
+});
+
+test('the Painter and the admin read only what holds for them (no Live presets or keys, no In the Mix on an on/off)', () => {
+  const LIVE_ONLY = /\bchill\b|low flash|\bpresets?\b|shift\+|each scene’s own|hidden moments/i;
+  const root = { effects: DEFAULT_EFFECTS };
+  for (const app of /** @type {const} */ (['painter', 'admin'])) {
+    for (const e of entriesFor(app)) {
+      const m = meta(app, e[app]);
+      for (const [what, text] of [['hint', m.hint], ['more', m.more]]) {
+        assert.doesNotMatch(text, LIVE_ONLY, `${app} ${e.id}: its ${what}`);
+        if (app === 'admin' && typeof at(root, e.admin) === 'boolean') assert.doesNotMatch(text, /in the mix|\balways\b/i, `${e.id}: an on/off's ${what}`);
+      }
+    }
+  }
+  // Live keeps its own: the presets, and the third way a scene holds.
+  assert.match(meta('live', 'knightReactions').more, /Chill/);
+  assert.match(meta('live', 'sceneHold').more, /^Each Scene’s Own: /m);
+  assert.doesNotMatch(meta('painter', 'music').more, /^Each Scene’s Own: /m);
+  assert.equal(meta('admin', 'effects.knight.reactions').more, '', 'none: its hint says it all');
+  // What the admin's help said beyond its hint has somewhere to go.
+  assert.match(meta('admin', 'effects.flames').more, /hidden ones stay out of the draw/);
+  assert.match(meta('admin', 'effects.knight.helmet').more, /the pack/);
+  assert.equal(meta('live', 'colors').more, '', 'the admin’s own, not Live’s');
 });
 
 test('sections: every entry sits in one, each Live one in a tab, each Painter one in a Painter section', () => {
