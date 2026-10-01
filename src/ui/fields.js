@@ -12,7 +12,8 @@
 // switches (checks, modeGrid, triGrid) has one "?" for the group: each switch in it reads the
 // group's hint out (after its own, if it has one), and focusing one shows its own tip, or the
 // group's. A "?" drawn on its own (tip() without `control`: a hint no one input stands for)
-// is a stop of its own instead, described by it.
+// is a stop of its own instead, described by it; so is a grid's when some of its switches
+// have hints of their own (focusing those shows theirs, so the grid's would never come up).
 //
 // A field with no hint keeps the simplest markup, its label wrapping its input; one with a
 // hint names its input by id instead, so the "?" can sit beside the label rather than in it.
@@ -32,18 +33,18 @@ const plain = (label) => String(label).replace(/<[^>]*>/g, '').replace(/"/g, '&q
  * button ("About <label>"; "Hint" without one).
  * @param {string} hint
  * @param {{ control?: boolean, label?: string }} [o]
- * @returns {{ mark: string, ref: string, id: string }} the "?" markup, the aria-describedby
- *   attribute for the input, and the hint's id (to describe more than one input with it)
+ * @returns {{ mark: string, button: string, note: string, ref: string, id: string }} the "?"
+ *   markup (`button` then `note`, the hidden hint: apart, for a "?" that goes where its text
+ *   mustn't, in a legend), the aria-describedby attribute for the input, and the hint's id
+ *   (to describe more than one input with it)
  */
 export const tip = (hint, { control = false, label = '' } = {}) => {
-  if (!hint) return { mark: '', ref: '', id: '' };
+  if (!hint) return { mark: '', button: '', note: '', ref: '', id: '' };
   const id = `viz-tip-${++uid}`;
   const name = label ? `About ${plain(label)}` : 'Hint';
-  return {
-    mark: `<button type="button" class="viz-tip" tabindex="${control ? -1 : 0}" data-tip="${esc(hint)}" aria-label="${name}" aria-describedby="${id}">?</button><span class="visually-hidden" id="${id}">${esc(hint)}</span>`,
-    ref: ` aria-describedby="${id}"`,
-    id,
-  };
+  const button = `<button type="button" class="viz-tip" tabindex="${control ? -1 : 0}" data-tip="${esc(hint)}" aria-label="${name}" aria-describedby="${id}">?</button>`;
+  const note = `<span class="visually-hidden" id="${id}">${esc(hint)}</span>`;
+  return { mark: button + note, button, note, ref: ` aria-describedby="${id}"`, id };
 };
 const advAttr = (adv) => (adv ? ' data-adv' : '');
 /** An aria-describedby attribute for these hint ids (empty ones left out), or ''. */
@@ -96,7 +97,9 @@ export const number = (key, label, { hint = '', unit = '', adv = false, min, max
   const t = tip(hint, { control: true, label });
   const limits = `${min === undefined ? '' : ` min="${min}"`}${max === undefined ? '' : ` max="${max}"`} step="${step}"`;
   const after = unit ? `<span class="viz-unit">${unit}</span>` : '';
-  return field(label, t, (id) => `<input type="number" data-set="${key}"${limits} inputmode="numeric"${id}${t.ref}>`, { adv, after });
+  // (A phone's numeric keypad has no decimal point: a fraction's step gets the decimal one.)
+  const keypad = Number.isInteger(step) ? 'numeric' : 'decimal';
+  return field(label, t, (id) => `<input type="number" data-set="${key}"${limits} inputmode="${keypad}"${id}${t.ref}>`, { adv, after });
 };
 
 /**
@@ -155,6 +158,13 @@ export const select = (key, label, opts, { hint = '', adv = false } = {}) => {
   return field(label, t, (id) => `<select data-set="${key}"${id}${t.ref}>${opts.map(([v, text]) => `<option value="${esc(v)}">${esc(text)}</option>`).join('')}</select>`, { adv });
 };
 
+/**
+ * Whether some of a grid's switches have hints of their own: then focusing one shows its own
+ * tip, never the grid's, so the grid's "?" is a keyboard stop of its own.
+ * @param {[string, string, string?][]} items
+ */
+const ownHints = (items) => items.some(([, , itemHint]) => !!itemHint);
+
 // Effect switches: Off / In the Mix / Always.
 export const MIX_HINT = 'In the Mix: it comes and goes, rolled again each time the look changes. Always: on the whole time.';
 
@@ -173,7 +183,7 @@ export const mode = (key, label, { hint = '', adv = false } = {}) => select(key,
  * @param {{ hint?: string, adv?: boolean, noAlways?: string[] }} [opts]
  */
 export const modeGrid = (label, items, { hint = '', adv = false, noAlways = [] } = {}) => {
-  const t = tip(hint, { control: true, label });
+  const t = tip(hint, { control: !ownHints(items), label });
   return `
   <div${advAttr(adv)}${t.id ? ' data-tip-group' : ''}>
     <p class="viz-field-label">${label} ${t.mark}</p>
@@ -196,6 +206,11 @@ export const modeGrid = (label, items, { hint = '', adv = false, noAlways = [] }
  * `missing`: the value marked `data-missing` (what a missing value means, the Painter's);
  * `group`: the hint id of the grid it's in, read out after its own; `attr`: more attributes
  * for each choice's label (the Painter's data-audition).
+ *
+ * The "?" sits in the legend: a disabled fieldset disables every button in it but those in
+ * its legend, and a switch that's off for now still has to say what it does (to a finger
+ * too). The legend's name alone names the group (aria-labelledby), not the "?" in it, and
+ * the hint's hidden text stays out of it.
  * @param {string} key @param {string} label (markup: escape it first)
  * @param {{ hint?: string, adv?: boolean, noAlways?: boolean, missing?: string, group?: string, attr?: string }} [opts]
  */
@@ -205,7 +220,9 @@ export const tri = (key, label, { hint = '', adv = false, noAlways = false, miss
   const choices = MODES.filter(([v]) => v !== 'on' || !noAlways).map(([v, text]) => (
     `<label class="tri-opt"${attr}><input type="radio" name="${name}" data-set="${key}" value="${v}"${v === missing ? ' data-missing' : ''}><span>${esc(text)}</span></label>`
   )).join('');
-  return `<fieldset class="tri"${advAttr(adv)} data-set-group="${esc(key)}"${noAlways ? ' data-no-always' : ''}${describedBy(t.id, group)}><legend>${label}</legend>${t.mark}<span class="tri-opts">${choices}</span></fieldset>`;
+  const nameId = t.id ? `${name}-name` : '';
+  const legend = `<legend><span class="tri-name"${nameId ? ` id="${nameId}"` : ''}>${label}</span>${t.id ? ` ${t.button}` : ''}</legend>${t.note}`;
+  return `<fieldset class="tri"${advAttr(adv)} data-set-group="${esc(key)}"${noAlways ? ' data-no-always' : ''}${nameId ? ` aria-labelledby="${nameId}"` : ''}${describedBy(t.id, group)}>${legend}<span class="tri-opts">${choices}</span></fieldset>`;
 };
 
 /**
@@ -217,7 +234,7 @@ export const tri = (key, label, { hint = '', adv = false, noAlways = false, miss
  * @param {{ hint?: string, adv?: boolean, noAlways?: string[], bulk?: string }} [opts]
  */
 export const triGrid = (label, items, { hint = '', adv = false, noAlways = [], bulk = '' } = {}) => {
-  const t = tip(hint, { control: true, label });
+  const t = tip(hint, { control: !ownHints(items), label });
   return `
   <div class="tri-grid-wrap"${advAttr(adv)}${t.id ? ' data-tip-group' : ''}>
     <p class="viz-field-label">${label} ${t.mark}</p>${bulk ? `
@@ -231,20 +248,26 @@ export const BULK_ACTIONS = {
   tri: [['off', 'All Off'], ['mix', 'All In the Mix'], ['on', 'All Always'], ['shuffle', 'Shuffle'], ['defaults', 'Defaults']],
   checks: [['all', 'All'], ['none', 'None'], ['defaults', 'Defaults']],
 };
+/** Why a list that keeps one on has no None. */
+const ONE_STAYS = 'At least one has to stay on.';
 /**
  * A toolbar that sets a whole grid or checklist at once: buttons with `data-bulk="<action>"`
  * and `data-bulk-group="<group>"` (the page wires them; bulkValues works out the new values).
  * `minOne`: the list keeps at least one on, so None is marked unavailable (aria-disabled:
- * still focusable, with a tip saying why).
+ * still focusable, with a tip saying why, and the same words read out: the tip itself is
+ * hidden from screen readers). A plain group of buttons, each a Tab stop (not a toolbar:
+ * that promises arrow keys between them).
  * @param {string} group @param {{ kind?: 'tri' | 'checks', minOne?: boolean, label?: string }} [o]
  */
 export const bulkBar = (group, { kind = 'tri', minOne = false, label = '' } = {}) => {
   const g = esc(group);
   const buttons = BULK_ACTIONS[kind].map(([action, text]) => {
-    const stuck = action === 'none' && minOne ? ' aria-disabled="true" data-tip="At least one has to stay on."' : '';
-    return `<button type="button" class="bulk-btn" data-bulk="${action}" data-bulk-group="${g}"${stuck}>${text}</button>`;
+    const button = (more) => `<button type="button" class="bulk-btn" data-bulk="${action}" data-bulk-group="${g}"${more}>${text}</button>`;
+    if (action !== 'none' || !minOne) return button('');
+    const why = `viz-why-${++uid}`;
+    return `${button(` aria-disabled="true" data-tip="${ONE_STAYS}" aria-describedby="${why}"`)}<span class="visually-hidden" id="${why}">${ONE_STAYS}</span>`;
   }).join('');
-  return `<div class="bulk" role="toolbar" aria-label="${label ? `Set All ${plain(label)}` : 'Set All'}">${buttons}</div>`;
+  return `<div class="bulk" role="group" aria-label="${label ? `Set All ${plain(label)}` : 'Set All'}">${buttons}</div>`;
 };
 
 /**

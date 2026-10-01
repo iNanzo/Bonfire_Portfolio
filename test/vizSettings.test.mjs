@@ -377,7 +377,10 @@ test('the hints: no "?" is a hidden keyboard stop; every setting reads its hint 
   const html = settingsMarkup(defaults(), [['P', 'Render menu']]);
   const marks = [...html.matchAll(/<button type="button" class="viz-tip"[^>]*>/g)].map((m) => m[0]);
   assert.ok(marks.length > 50);
-  for (const m of marks) assert.ok(/tabindex="-1"/.test(m), `a field's "?" isn't a stop (its input reads the hint out): ${m}`);
+  // (But a grid's whose switches have hints of their own: focusing those shows theirs.)
+  const grids = ['About Looks', 'About Over Any Look', 'About Drop Hits'];
+  for (const m of marks) assert.ok(/tabindex="-1"/.test(m) || grids.some((g) => m.includes(`aria-label="${g}"`)), `a field's "?" isn't a stop (its input reads the hint out): ${m}`);
+  assert.deepEqual(marks.filter((m) => /tabindex="0"/.test(m)).map((m) => m.match(/aria-label="([^"]+)"/)[1]), grids);
   // Every description points at a hint that's there.
   const hints = new Map([...html.matchAll(/<span class="visually-hidden" id="(viz-tip-\d+)">([^<]*)<\/span>/g)].map((m) => [m[1], m[2]]));
   const described = [...html.matchAll(/<(input|select)[^>]*data-set="([^"]+)"[^>]*>/g)].map((m) => [m[2], m[0].match(/aria-describedby="([^"]+)"/)?.[1].split(' ') ?? []]);

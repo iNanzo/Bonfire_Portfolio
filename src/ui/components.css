@@ -106,9 +106,13 @@ fieldset.tri {
   font-size: 0.9375rem;
   color: var(--ui-dim);
 }
-/* (Floated, the legend is laid out with the rest instead of on the fieldset's border.) */
+/* (Floated, the legend is laid out with the rest instead of on the fieldset's border. It
+   holds the name and its "?".) */
 fieldset.tri > legend {
   float: left;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: 0 1 auto;
   min-width: 0;
   margin: 0;
@@ -139,7 +143,8 @@ fieldset.tri:hover { color: var(--c-bone); }
 .tri-opt input:focus-visible + span { position: relative; z-index: 1; outline: 2px solid var(--accent-hi); outline-offset: 2px; }
 .tri-opt:has(input:disabled) { cursor: not-allowed; }
 .tri-opt input:disabled + span { opacity: 0.45; }
-fieldset.tri:disabled > legend { opacity: 0.6; }
+/* (Only the name dims: the "?" in the legend stays, to say what the switch does.) */
+fieldset.tri:disabled .tri-name { opacity: 0.6; }
 @media (forced-colors: active) {
   .tri-opt input:checked + span { outline: 2px solid CanvasText; outline-offset: -2px; }
 }

@@ -47,12 +47,15 @@ test('a field with a hint: the "?" is a button beside the label, outside it, and
   // The value and unit beside a slider's label.
   assert.match(range('glitch', 'Effects Strength', 0, 2, 0.05, { hint: 'x', unit: '×' }), /\?<\/button><span class="visually-hidden"[^>]*>x<\/span><output data-out="glitch"><\/output><span class="viz-unit">×<\/span>/);
   assert.match(number('linkPort', 'Port', { min: 1024, max: 65535 }), /<input type="number" data-set="linkPort" min="1024" max="65535" step="1" inputmode="numeric">/);
+  assert.match(number('gain', 'Gain', { step: 0.5 }), /step="0\.5" inputmode="decimal">/, 'a fraction: a keypad with a decimal point');
 });
 
 test('a field with no hint keeps its label wrapping its input (the Painter’s helmet rows rely on it)', () => {
   assert.match(select('knights.helmets.0', 'Knight 1', [['', 'Drawn at Random']]), /^\s*<label class="viz-field">\s*<span class="viz-field-label">Knight 1 <\/span>\s*<select data-set="knights\.helmets\.0">/);
   assert.equal(check('elements.fire', 'Fire', { group: 'viz-tip-9' }), '<label class="viz-check" data-group-tip><input type="checkbox" data-set="elements.fire" aria-describedby="viz-tip-9"><span>Fire</span></label>');
-  assert.deepEqual(tip(''), { mark: '', ref: '', id: '' });
+  assert.deepEqual(tip(''), { mark: '', button: '', note: '', ref: '', id: '' });
+  const t = tip('Hint.', { control: true, label: 'Fog' });
+  assert.equal(t.mark, t.button + t.note, 'the "?" and its hidden text, apart for a legend');
 });
 
 test('a "?" on its own is a keyboard stop, named and described by its hint', () => {
@@ -68,6 +71,7 @@ test('groups: one "?" for a checklist or a grid, each switch reading out its own
   const groupId = list.match(/<p class="viz-field-label">Elements <button[^>]*aria-describedby="(viz-tip-\d+)"/)?.[1];
   assert.ok(groupId);
   assert.equal([...list.matchAll(new RegExp(`aria-describedby="${groupId}"`, 'g'))].length, 3, 'the "?" and both boxes');
+  assert.match(list, /<p class="viz-field-label">Elements <button[^>]*tabindex="-1"/, 'every box shows the list’s tip: not a stop');
   assert.match(list, /<span>Ice &lt;Cold&gt;<\/span>/);
   assert.doesNotMatch(list, /class="bulk"/, 'no toolbar unless asked');
   const grid = modeGrid('Layers', [['grain', 'Grain', 'Film grain over the picture.'], ['cinema', 'Cinema Bars']], { hint: 'Effects over any look.' });
@@ -75,6 +79,10 @@ test('groups: one "?" for a checklist or a grid, each switch reading out its own
   const grain = grid.match(/<div class="viz-mode"><label for="([^"]+)">Grain<\/label><button[^>]*aria-describedby="(viz-tip-\d+)"[\s\S]*?<select data-set="grain" id="\1" aria-label="Grain" aria-describedby="\2 ([^"]+)">/);
   assert.ok(grain, 'its own "?" outside its label, then the grid’s');
   assert.equal(grain[3], gridId);
+  // Focusing Grain shows Grain's tip, so the grid's "?" is a stop of its own; with no hints
+  // but the grid's, every switch shows it, and it isn't.
+  assert.match(grid, /<p class="viz-field-label">Layers <button[^>]*tabindex="0"/);
+  assert.match(modeGrid('Layers', [['grain', 'Grain']], { hint: 'Over any look.' }), /<p class="viz-field-label">Layers <button[^>]*tabindex="-1"/);
   assert.match(grid, new RegExp(`<label class="viz-mode" data-group-tip><span>Cinema Bars</span><select data-set="cinema" aria-label="Cinema Bars" aria-describedby="${gridId}">`), 'one without a hint of its own: the grid’s');
   assert.deepEqual([...grid.matchAll(/<option value="([^"]+)">([^<]+)<\/option>/g)].slice(0, 3).map((m) => [m[1], m[2]]), MODES);
   assert.doesNotMatch(modeGrid('Looks', [['looks.ember', 'Ember']], { noAlways: ['looks.ember'] }), /value="on"/, 'no Always where it adds nothing');
@@ -83,7 +91,7 @@ test('groups: one "?" for a checklist or a grid, each switch reading out its own
 
 test('tri: three radios, one group, each with the key and its value', () => {
   const html = tri('knightGlow', 'Edge Glow', { hint: 'The armor’s edges catch the fire.' });
-  assert.match(html, /^<fieldset class="tri" data-set-group="knightGlow" aria-describedby="(viz-tip-\d+)"><legend>Edge Glow<\/legend><button type="button" class="viz-tip" tabindex="-1"[^>]*aria-describedby="\1">\?<\/button>/);
+  assert.match(html, /^<fieldset class="tri" data-set-group="knightGlow" aria-labelledby="([\w-]+)" aria-describedby="(viz-tip-\d+)"><legend><span class="tri-name" id="\1">Edge Glow<\/span> <button type="button" class="viz-tip" tabindex="-1"[^>]*aria-describedby="\2">\?<\/button><\/legend><span class="visually-hidden" id="\2">/);
   const radios = [...html.matchAll(/<input type="radio" name="([^"]+)" data-set="([^"]+)" value="([^"]+)">/g)];
   assert.deepEqual(radios.map((m) => m[3]), ['off', 'mix', 'on']);
   assert.ok(radios.every((m) => m[2] === 'knightGlow'), 'data-set on each');
@@ -95,23 +103,37 @@ test('tri: three radios, one group, each with the key and its value', () => {
   assert.match(ember, /^<fieldset class="tri" data-adv data-set-group="looks\.ember" data-no-always>/);
   assert.doesNotMatch(ember, /value="on"/);
   assert.match(ember, /<label class="tri-opt" data-audition><input type="radio" name="[^"]+" data-set="looks\.ember" value="mix" data-missing>/);
-  assert.doesNotMatch(tri('x', 'X'), /aria-describedby|viz-tip/, 'no hint: no "?"');
+  assert.equal(tri('x', 'X').match(/<legend>.*<\/legend>/)[0], '<legend><span class="tri-name">X</span></legend>');
+  assert.doesNotMatch(tri('x', 'X'), /aria-describedby|aria-labelledby|viz-tip/, 'no hint: no "?"');
   assert.notEqual(tri('a', 'A').match(/name="([^"]+)"/)[1], tri('a', 'A').match(/name="([^"]+)"/)[1], 'each its own group');
+});
+
+test('tri: the "?" is in the first legend, so a disabled switch still says what it does', () => {
+  // (A disabled fieldset disables every button in it but those in its first legend.)
+  const html = tri('knightRim', 'Rim Light', { hint: 'A rim of light.' });
+  const legend = html.match(/<legend>([\s\S]*?)<\/legend>/);
+  assert.equal(html.match(/<legend>/g).length, 1, 'one legend, the first');
+  assert.match(legend[1], /<button type="button" class="viz-tip"/, 'the "?" in it');
+  assert.doesNotMatch(legend[1], /visually-hidden|>A rim of light/, 'the hint’s text out of it (the legend names the group)');
+  assert.doesNotMatch(html.slice(html.indexOf('</legend>')), /<button/, 'no button past it');
 });
 
 test('triGrid and the bulk toolbars: actions in Title Case, the grid named for its toolbar', () => {
   const grid = triGrid('Looks', [['looks.ember', 'Ember', 'The clean fire.'], ['looks.glitch', 'Glitch']], { hint: 'The picture’s styles.', noAlways: ['looks.ember'], bulk: 'looks' });
   const gridId = grid.match(/<p class="viz-field-label">Looks <button[^>]*aria-describedby="(viz-tip-\d+)"/)?.[1];
-  assert.match(grid, /<div class="bulk" role="toolbar" aria-label="Set All Looks">/);
+  assert.match(grid, /<div class="bulk" role="group" aria-label="Set All Looks">/, 'a group of buttons (a toolbar would promise arrow keys)');
+  assert.match(grid, /<p class="viz-field-label">Looks <button[^>]*tabindex="0"/, 'Ember has a hint of its own: the grid’s "?" is a stop');
   assert.deepEqual([...grid.matchAll(/data-bulk="(\w+)" data-bulk-group="looks">([^<]+)</g)].map((m) => [m[1], m[2]]), BULK_ACTIONS.tri);
   assert.match(grid, /<div class="tri-grid" data-bulk-list="looks">/);
-  assert.match(grid, new RegExp(`data-set-group="looks\\.ember" data-no-always aria-describedby="viz-tip-\\d+ ${gridId}"`), 'its own hint, then the grid’s');
+  assert.match(grid, new RegExp(`data-set-group="looks\\.ember" data-no-always aria-labelledby="[\\w-]+" aria-describedby="viz-tip-\\d+ ${gridId}"`), 'its own hint, then the grid’s');
   assert.match(grid, new RegExp(`data-set-group="looks\\.glitch" aria-describedby="${gridId}"`));
   assert.doesNotMatch(triGrid('Layers', [['grain', 'Grain']]), /class="bulk"/, 'no toolbar without a name');
   for (const [, label] of [...BULK_ACTIONS.tri, ...BULK_ACTIONS.checks]) assert.equal(titleCase(label), label);
   const list = bulkBar('elements', { kind: 'checks', minOne: true, label: 'Elements' });
   assert.deepEqual([...list.matchAll(/data-bulk="(\w+)"/g)].map((m) => m[1]), ['all', 'none', 'defaults']);
-  assert.match(list, /data-bulk="none" data-bulk-group="elements" aria-disabled="true" data-tip="[^"]+">None</, 'at least one stays: None is out, and says why');
+  const none = list.match(/data-bulk="none" data-bulk-group="elements" aria-disabled="true" data-tip="([^"]+)" aria-describedby="([^"]+)">None<\/button><span class="visually-hidden" id="\2">([^<]+)<\/span>/);
+  assert.ok(none, 'at least one stays: None is out, and says why');
+  assert.equal(none[3], none[1], 'to a screen reader too (the tip is hidden from it)');
   assert.doesNotMatch(bulkBar('moves', { kind: 'checks' }), /aria-disabled/);
   assert.match(checks('moves', 'Attacks', { slash: 'Slash' }, { bulk: true }), /class="bulk"[\s\S]*<div class="viz-checks" data-bulk-list="moves">/);
 });
