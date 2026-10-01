@@ -1,22 +1,20 @@
-// The Bonfire Painter's pure parts: the panel (every field edits a part of the scene the
-// format keeps, and says what it does, a "?" a keyboard stop only where no field reads it
-// out), undo (a drag is one step; the limit), the silent beat (beats on the grid, bars
-// counted, the drop loop's sections in order), the orbit math shared with photo mode (and the
-// painted camera kept in the clearing), the panel's shape (a drag on the knights' count or a
-// move leaving Still), the few colors' slots, the thumbnail's crop, and the stage's director
-// and bonfire keeping the look being painted under reduced motion.
+// The Bonfire Painter's pure parts: undo (a drag is one step; the limit), the silent beat
+// (beats on the grid, bars counted, the drop loop's sections in order), the orbit math shared
+// with photo mode (and the painted camera kept in the clearing), paths into a scene, the
+// suggested colors, the thumbnail's crop, and the stage's director and bonfire keeping the
+// look being painted under reduced motion. (The panel, its search and the bar's tools are
+// test/painterPanel.test.mjs.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { panelMarkup, panelShape, getPath, withPath, flameChips, sceneryChips, slotColors, SECTIONS, HINTS } from '../src/painter/panel.js';
+import { getPath, withPath, flameChips, sceneryChips } from '../src/painter/panel.js';
 import { thumbCrop, THUMB_W, THUMB_H } from '../src/painter/thumbs.js';
-import { MAX_KNIGHTS } from '../src/visualizer/knightShow.js';
 import { createHistory } from '../src/painter/history.js';
 import { createBeatFeed, silentFrame, LOOP_BARS, DROP_LOOP } from '../src/painter/beat.js';
 import { cameraAt, PAINT_LIMITS } from '../src/painter/cameraRig.js';
 import { orbitPose, poseToOrbit, dragOrbit, zoomOrbit, panOrbit, PHOTO_LIMITS, ORBIT_TARGET } from '../src/ui/orbit.js';
-import { defaultScene, normalizeScene, validateScene, DETAIL_KEYS } from '../src/scenes.js';
-import { LAYERS, LAYER_BLENDS, LAYER_DETAILS, LOOK_PARAMS, DROP_FX } from '../src/visualizer/looks.js';
+import { defaultScene, normalizeScene, validateScene } from '../src/scenes.js';
+import { LAYERS, DROP_FX } from '../src/visualizer/looks.js';
 import { keepInClearing } from '../src/visualizer/clearing.js';
 import { suggestFlames, suggestScenes } from '../src/paletteGen.js';
 
@@ -36,115 +34,6 @@ function fullScene() {
   s.camera.move = { kind: 'push', amount: 0.5, bars: 8 };
   return normalizeScene(s);
 }
-const ctx = {
-  weapons: { rapier: 'Rapier', greatsword: 'Greatsword' },
-  flames: [{ key: 'ember', name: 'Ember Flame', colors: { lo: '#8c1d2f', mid: '#e0582a', hi: '#ffc76a', core: '#fff1d0', shade: '#2e1f1f', light: 0.34 } }],
-  shots: [{ key: 'clearing', name: 'Clearing', camera: defaultScene().camera }],
-};
-const ALL_OPEN = SECTIONS.map(([id]) => id);
-
-for (const [name, make] of [['a new scene', () => defaultScene()], ['a full scene', fullScene]]) {
-  test(`panel (${name}): every field edits a part of the scene the format keeps`, () => {
-    const scene = make();
-    const html = panelMarkup(scene, { ...ctx, open: ALL_OPEN });
-    const paths = attrs(html, 'data-scene');
-    assert.ok(paths.length > 40, `${paths.length} fields`);
-    for (const path of paths) {
-      const detail = /^details\.(\w+)/.exec(path)?.[1];
-      const param = /^look\.params\.(\w+)/.exec(path)?.[1];
-      const blend = /^blends\.(\w+)$/.exec(path)?.[1];
-      const helmet = /^knights\.helmets\.(\d)$/.exec(path)?.[1];
-      if (detail) { assert.ok(DETAIL_KEYS.includes(detail), path); continue; } // (a detail: pinned, or rolled)
-      if (blend) { assert.ok(Object.hasOwn(LAYER_BLENDS, blend), path); continue; }
-      if (param) { assert.ok(LOOK_PARAMS[scene.look.name].includes(param), path); continue; }
-      // (Every knight's helmet row is drawn; those past the count wait, hidden.)
-      if (helmet && Number(helmet) >= scene.knights.count) { assert.match(html, new RegExp(`data-helmet="${helmet}" hidden`)); continue; }
-      assert.notEqual(getPath(scene, path), undefined, `${path} is in the scene`);
-    }
-    // Chips pick values the format keeps as they are.
-    for (const [path, value] of attrs(html, 'data-pick').map((p, i) => [p, attrs(html, 'data-value')[i]])) {
-      const v = JSON.parse(value);
-      const next = normalizeScene(withPath(scene, path, v));
-      assert.deepEqual(getPath(next, path), v, `${path} = ${value}`);
-    }
-  });
-  test(`panel (${name}): every field and group says what it does`, () => {
-    const html = panelMarkup(make(), { ...ctx, open: ALL_OPEN });
-    for (const hint of attrs(html, 'data-tip')) assert.ok(hint.length >= 20, `a short hint: "${hint}"`);
-    // Every input bound to the scene is described by a hint…
-    for (const m of html.matchAll(/<(input|select)[^>]*data-scene="([^"]+)"[^>]*>/g)) assert.match(m[0], /aria-describedby="viz-tip-\d+"/, `${m[2]} has no hint`);
-    // …and every label, switch and group has its "?" (a row of a group, data-group-tip, the group's).
-    const rowsLeftOut = html.replace(/<label class="viz-field" data-group-tip>\s*<span class="viz-field-label">[^<]*<\/span>/g, '');
-    for (const m of rowsLeftOut.matchAll(/<(?:p|span) class="(?:viz-field-label|pnt-mode-name)">([\s\S]*?)<\/(?:p|span)>/g)) assert.match(m[1], /data-tip=/, `no "?" on ${m[1].slice(0, 40)}`);
-    // Every hint a field reads out is in the markup, and a "?" is a keyboard stop of its own
-    // only when no field reads its hint out (a color row's or a slot's would be a second stop):
-    // not its id, nor the same words under another id (the helmets' group and each knight's).
-    const ids = new Set([...html.matchAll(/(?<![\w-])id="([^"]+)"/g)].map((m) => m[1]));
-    const hintText = new Map([...html.matchAll(/<span class="visually-hidden" id="([^"]+)">([^<]*)<\/span>/g)].map((m) => [m[1], m[2]]));
-    const stops = new Set([...html.matchAll(/<button type="button" class="viz-tip" tabindex="0"[^>]*aria-describedby="([^"]+)"/g)].map((m) => m[1]));
-    const read = new Set();
-    for (const m of html.matchAll(/<(input|select|textarea|button)\b(?![^>]*class="viz-tip")[^>]*aria-describedby="([^"]+)"/g)) {
-      for (const id of m[2].split(/\s+/)) {
-        assert.ok(ids.has(id), `${m[0].slice(0, 60)}… points at a missing hint (${id})`);
-        assert.ok(!stops.has(id), `${m[0].slice(0, 60)}… reads out a hint whose "?" is a stop too`);
-        read.add(hintText.get(id));
-      }
-    }
-    assert.ok(stops.size > 0 && read.size > 20, `(stops ${stops.size}, hints read out ${read.size})`);
-    for (const id of stops) assert.ok(!read.has(hintText.get(id)), `a "?" stop repeats a hint a field reads out: "${hintText.get(id)?.slice(0, 60)}…"`);
-    // Title Case labels.
-    for (const m of html.matchAll(/class="viz-field-label">(?:<label[^>]*>)?([^<?]+?)(?:<\/label>)? (?:<|$)/g)) {
-      const words = m[1].trim().split(/\s+/).filter((w) => !['a', 'an', 'the', 'of', 'to', 'in', 'by', 'and', 'or', 'on', 'from', 'for', 'at', 'as', 'per'].includes(w));
-      for (const w of words) assert.match(w, /^[A-Z0-9“‘(]/, `"${m[1].trim()}" isn't Title Case`);
-    }
-  });
-}
-
-test('panel: hints for every layer, drop hit and section; its shape follows the layout, not the values', () => {
-  const s = defaultScene();
-  const html = panelMarkup(s, { ...ctx, open: ALL_OPEN });
-  for (const [id] of SECTIONS) assert.match(html, new RegExp(`data-sec="${id}"`));
-  for (const k of Object.keys(LAYERS)) assert.match(html, new RegExp(`data-pick="layers\\.${k}"`));
-  assert.ok(Object.values(HINTS).every((h) => h.length >= 20));
-  // A layer turned on shows its details (the shape changes); a slider moved doesn't.
-  const on = withPath(s, 'layers.glow', 'on');
-  assert.notEqual(panelShape(on), panelShape(s));
-  assert.match(panelMarkup(normalizeScene(on), { ...ctx, open: ['layers'] }), /data-scene="details\.glowSize"/);
-  assert.doesNotMatch(panelMarkup(s, { ...ctx, open: ['layers'] }), /data-scene="details\.glowSize"/);
-  assert.equal(panelShape(withPath(s, 'fire.level', 0.5)), panelShape(s));
-  // Only the open sections show (the rest are there, folded).
-  assert.match(panelMarkup(s, ctx), /id="pnt-b-look" hidden/);
-});
-
-test('panel: a drag on Knights by the Fire keeps its slider; a move leaving Still shows its size', () => {
-  const s = defaultScene();
-  // One to four knights: the same shape (the helmet rows are all drawn, the extra ones hidden)…
-  const shapes = [1, 2, 3, 4].map((n) => panelShape(normalizeScene(withPath(s, 'knights.count', n))));
-  assert.equal(new Set(shapes).size, 1, 'the count alone never redraws the panel');
-  const two = panelMarkup(normalizeScene(withPath(s, 'knights.count', 2)), { ...ctx, open: ['knights'] });
-  for (let i = 0; i < MAX_KNIGHTS; i++) assert.match(two, new RegExp(`data-helmet="${i}"${i < 2 ? '>' : ' hidden>'}`));
-  // …none is another (the rest of the section goes).
-  assert.notEqual(panelShape(normalizeScene(withPath(s, 'knights.count', 0))), shapes[0]);
-  assert.doesNotMatch(panelMarkup(normalizeScene(withPath(s, 'knights.count', 0)), { ...ctx, open: ['knights'] }), /data-helmet=/);
-  // Still has no size to set; any other move has (so leaving Still draws its fields).
-  const still = normalizeScene(withPath(s, 'camera.move', { kind: 'still', amount: 0, bars: 4 }));
-  const crane = normalizeScene(withPath(still, 'camera.move.kind', 'crane'));
-  assert.notEqual(panelShape(crane), panelShape(still));
-  assert.doesNotMatch(panelMarkup(still, { ...ctx, open: ['camera'] }), /data-scene="camera\.move\.amount"/);
-  assert.match(panelMarkup(crane, { ...ctx, open: ['camera'] }), /data-scene="camera\.move\.amount"/);
-});
-
-test('panel: the few colors\' slots are the scene\'s palette slots, pressed as picked', () => {
-  const s = normalizeScene(withPath(defaultScene(), 'render.palette', [0, 6, 8]));
-  const html = panelMarkup(s, { ...ctx, open: ['render'] });
-  const cols = slotColors(s);
-  const slots = [...html.matchAll(/data-slot="(\d)" aria-pressed="(true|false)"[^>]*><i style="--c:([^"]+)"/g)];
-  assert.equal(slots.length, 10);
-  for (const [, i, pressed, c] of slots) {
-    assert.equal(pressed === 'true', [0, 6, 8].includes(Number(i)), `slot ${i}`);
-    assert.equal(c, cols[Number(i)]);
-  }
-});
 
 test('thumbnails: cut round the middle of the part of the stage the panel leaves showing', () => {
   // The whole frame: its middle 16:9.
@@ -350,20 +239,6 @@ test('the camera by hand stays in the clearing, and what it looks at near the fi
     assert.equal(c.fov, cam.fov);
     assert.deepEqual(c.move, cam.move);
   }
-});
-
-test('panel: every layer with details lists them (looks.js LAYER_DETAILS) when it is on', () => {
-  const s = fullScene();
-  const html = panelMarkup(s, { ...ctx, open: ['layers'] });
-  for (const [layer, keys] of Object.entries(LAYER_DETAILS)) {
-    for (const k of keys) {
-      if (k === 'grad') assert.match(html, /data-scene="details\.grad\.0"/, layer);
-      else assert.match(html, new RegExp(`data-scene="details\\.${k}"`), `${layer}: ${k}`);
-    }
-  }
-  // Locks: pinned ones pressed, rolled ones not.
-  assert.match(html, /data-lock="details\.glowSize" aria-pressed="true"/);
-  assert.match(html, /data-lock="details\.glowCut" aria-pressed="false"/);
 });
 
 test('the stage: the Painter\'s director and bonfire keep the look being painted under reduced motion (paintedLook)', () => {

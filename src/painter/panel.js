@@ -1,52 +1,62 @@
-// The Painter's panel: every part of a scene as a field, in sections that fold (Place, Fire
-// & Colors, Camera, Look, Layers, Drops, Render, Knights, Fireflies, With the Music).
+// The Painter's panel: every part of a scene as a field, in sections that fold (Place &
+// Atmosphere, Colors, Fire, Pixel Art, Look, Layers, Camera, Knights, Fireflies, Show: the
+// settings map's PAINTER_SECTIONS, laid out by layout.js).
 //
 // panelMarkup(scene) draws it (pure: the tests read it in node); bindPanel wires it. Every
 // input names the part of the scene it edits by its path (`data-scene="details.glowSize"`,
 // `knights.helmets.1`), the same way Bonfire Live's dialog names a setting (the fields are
-// src/ui/fields.js, with `data-set` renamed), so one handler does them all:
+// src/ui/fields.js, with `data-set` renamed), so one handler does them all. Labels, hints
+// and the longer "More" come from the settings map (meta('painter', path)), the looks', the
+// layers' and the drop hits' own hints from its ITEM_HINTS, so a setting reads the same here
+// as in Bonfire Live. Every row carries `data-row` (its id in layout.js), which the search
+// (panelSearch.js) finds it by.
 //
 //   fields     sliders, selects, checkboxes and colors: `data-scene` paths, each with a
 //              Title Case label and a "?" hint.
-//   chips      a choice drawn as a button (`data-pick` + `data-value`, JSON): the scenery,
-//              a look, a flame, a shot, a layer's Off / In the Mix / Always. Hovering one
-//              with `data-audition` shows it on the stage at once (an audition); leaving puts
-//              the scene back; a click keeps it (an undo step). The hover is the effect:
-//              no text pops up.
+//   switches   Off / In the Mix / Always as three radios (src/ui/fields.js tri(): one
+//              keyboard stop, the arrow keys move along it): a layer, a drop hit, the
+//              outlines, the knights' edge glow, dance, shine and reactions. A layer's
+//              choices audition (below).
+//   chips      a choice drawn as a button (`data-pick` + `data-value`, JSON): the place, a
+//              look, a flame, a shot. Hovering one with `data-audition` (or a layer's
+//              choice) shows it on the stage at once (an audition); leaving puts the scene
+//              back; a click keeps it (an undo step). The hover is the effect: no text pops up.
 //   locks      each detail a look or layer rolls can be pinned (it stays as painted) or
 //              left to the dice (rolled again each time the look comes round: the endless
 //              variations). A rolled one shows what's on screen now, dimmed; moving its
-//              slider pins it.
+//              slider pins it. The lock says which in its own tooltip.
+//   bulk       a toolbar over the layers, the scene's own drop hits and the move lists (All
+//              Off / In the Mix / Always, Shuffle, Defaults; All / None / Defaults): one
+//              edit, so one undo step (bulkEdit).
 //   actions    buttons that do more than set one path (`data-paint-act`): a new harmonious
-//              or random flame, the scenery's colors, Pin What You See, a gesture to
+//              or random flame, the place's colors, Pin What You See, a gesture to
 //              preview. The page (painter/main.js) does those.
-// The panel is drawn again only when its shape changes (a layer turned on shows its
-// details, a move that isn't Still shows how big it is); otherwise fill() just sets the
-// values (and shows as many helmet rows as there are knights, so dragging Knights by the
-// Fire never swaps the slider out from under the pointer). A redraw keeps the keyboard's
-// place (the focused field, chip, lock or button is focused again), and one that would
-// come mid-drag waits for the drag to end. fill() leaves the field under the user's hand
-// alone (a slider being dragged or just moved), unless undo or redo forces it.
-//
-// The "?" hints open inside the panel: from one near its right edge they're shifted left,
-// and from one near its top they open downward (the panel clips what's outside it).
+// A section is drawn again only when its own shape changes (a layer turned on shows its
+// details, a move that isn't Still shows how big it is: layout.js sectionShapes), and only
+// that section; otherwise fill() just sets the values (and shows as many helmet rows as
+// there are knights, so dragging the knights' count never swaps the slider out from under
+// the pointer). A redraw keeps the keyboard's place (the focused field, chip, lock or button
+// is focused again), and one that would come mid-drag waits for the drag to end. fill()
+// leaves the field under the user's hand alone (a slider being dragged or just moved), unless
+// undo or redo forces it.
 import { esc } from '../html.js';
-import { range, select, check, tip } from '../ui/fields.js';
-import { DROP_FX, LAYER_BLENDS, LAYER_DETAILS, LAYERS, LOOK_PARAMS, LOOKS, MODES, PARAMS } from '../visualizer/looks.js';
-import { FOGS, PALETTES, PIXEL_SIZES, FLAME_FPS, XRAY_VIEWS } from '../visualizer/render.js';
-import { FORMATIONS, KNIGHT_MOVES, MAX_KNIGHTS } from '../visualizer/knightShow.js';
+import { range, select, check, tip, tri, bulkBar, bulkValues, more } from '../ui/fields.js';
+import { highlight } from '../ui/settingsSearch.js';
+import { DROP_FX, LAYER_BLENDS, LAYER_DETAILS, LAYERS, PARAMS } from '../visualizer/looks.js';
+import { KNIGHT_MOVES, MAX_KNIGHTS } from '../visualizer/knightShow.js';
 import { FLY_MOVES } from '../visualizer/fireflyMoves.js';
-import { SCENERIES } from '../sceneries.js';
-import { CAMERA_MOVES, FIRE_KEYS, FLY_SHOWS, KNIGHT_SEATS, MOVE_BARS, MUSIC, SCENE_RANGES } from '../scenes.js';
-import { FINISH_NAMES, GESTURE_NAMES, HELMET_NAMES, STYLE_NAMES } from '../knightNames.js';
-import { ELEMENT_IDS } from '../effectsDefaults.js';
+import { SCENE_RANGES } from '../scenes.js';
+import { SETTINGS } from '../settingsMap.js';
 import { SCHEMES } from '../paletteGen.js';
+import { modeOf } from '../modes.js';
+import {
+  PANEL_SECTIONS, OWN, FIRE_HELP, MUSIC_HELP, sectionRows, sectionShapes, rowShown, rowText, choices, itemHint,
+} from './layout.js';
+
+export { sectionShapes };
 
 /** The panel's sections, in order: [id, name]. */
-export const SECTIONS = [
-  ['place', 'Place'], ['colors', 'Fire & Colors'], ['camera', 'Camera'], ['look', 'Look'], ['layers', 'Layers'],
-  ['drops', 'Drops'], ['render', 'Render'], ['knights', 'Knights'], ['flies', 'Fireflies'], ['music', 'With the Music'],
-];
+export const SECTIONS = PANEL_SECTIONS.map((s) => /** @type {[string, string]} */ ([s.id, s.label]));
 
 // --- paths ------------------------------------------------------------------------------
 const parts = (path) => path.split('.').map((p) => (/^\d+$/.test(p) ? Number(p) : p));
@@ -80,111 +90,25 @@ export function withPath(obj, path, value) {
   return out;
 }
 
-// --- hints: every field says what it does (and the Painter's own words for a scene) ---------
-const DETAIL_ROLLED = 'Pinned, it stays as painted; left to the dice, it’s rolled again each time the look comes round.';
-const MODE_HINT = 'Off, In the Mix (it comes and goes: rolled again each time the look comes round, so a held scene keeps finding new pictures) or Always.';
-export const HINTS = {
-  'place.scenery': 'What stands round the fire: the Gothic ruins, the forge, the hillside shrine, the cathedral’s altar or the cult’s circle. Click to move there.',
-  'place.weapon': 'The weapon planted in the fire. Drawn by the Show: a new one each time a drop forges one, as Bonfire Live does.',
-  'place.element': 'What the fire is made of: flame, a lightning ball or ice. Drawn by the Show: each drop draws one from those Bonfire Live allows.',
-  'colors.flames': 'The site’s own palettes. Hover one to see it on the fire, click to use it (its colors are copied into the scene, so it keeps them).',
-  'colors.make': 'Harmonious: colors made to go together, in the scheme picked beside it. Fully Random: five random colors (the tips kept readable).',
-  'colors.scheme': 'How a harmonious flame’s colors relate on the color wheel: embers and tips leaning apart, neighbors, one hue, opposites…',
-  'colors.seed': 'Pick any color: flames are built round it, one per color scheme. Hover a suggestion to see it, click to use it.',
-  'colors.ramp': 'The flame’s five colors, dark to light: the embers, the body, the tips (kept readable as text: lightened if too dark), the white-hot core, and the shade firelit stone takes.',
-  'colors.flame.light': 'How far the light the fire casts is washed toward white: low keeps the flame’s own color on everything it lights.',
-  'colors.scenery': 'The stone, wood, shadows and background. The Site’s Own: as on the site. Or made for this scene: harmonious, vivid, fully random, or from a color.',
-  'colors.scenery.seed': 'Pick any color: scenery palettes built round it (its hue tints the stone, or it becomes the accent). Hover to see, click to use.',
-  'colors.scenery.edit': 'The scenery’s five colors: the background (always the darkest: it’s the outlines’ color), shadow, stone, wood and bone.',
-  'fire.level': 'Added to how high the fire burns, on top of what the music does to it.',
-  'fire.size': 'Added to how wide the flames are, on top of the music’s swell.',
-  'fire.height': 'Added to how tall the flames reach, on top of the kicks’ punches.',
-  'fire.turbulence': 'Added to how much the flames churn and flicker.',
-  'fire.glow': 'Added to how brightly the fire lights everything round it.',
-  'fire.windX': 'A steady wind across the fire: negative blows the flames left, positive right.',
-  'fire.windZ': 'A steady wind toward the camera (positive) or away from it (negative).',
-  'camera.drag': 'Drag the stage to orbit round what the camera looks at, Shift-drag (or right-drag) to slide it, the wheel to come nearer. Q and E tilt, [ and ] change the lens.',
-  'camera.shots': 'Bonfire Live’s own framings. Hover one to see it, click to start from it, then drag the stage to make it yours.',
-  'camera.fov': 'The lens: narrow (a long lens, flat and close) to wide (everything, stretched at the edges). In degrees.',
-  'camera.roll': 'Tilts the horizon: a Dutch angle, negative one way, positive the other.',
-  'camera.move.kind': 'How the framing moves while the scene holds, in time with the music: a sway, a long sweep, a push in and out, a crane up and down, or a vertigo dolly zoom.',
-  'camera.move.amount': 'How big the move is. It’s kept inside the clearing: near the edge it swings the other way only.',
-  'camera.move.bars': 'How many bars one cycle of the move takes; it comes back to your framing at the end of each.',
-  'look.name': 'The picture’s style for this scene. Hover a look to see it on the stage, click to paint with it.',
-  'look.amount': 'How strong the look is, even when the music is quiet (the beat still pulses and bursts it on top).',
-  'layers.pin': 'Copies every detail showing now (and which layers in the mix are on this turn) into the scene, pinned: the picture on the stage, kept.',
-  'layers.blends': 'With Blend Modes on: how each layer lies over the picture. Rolled Each Turn: a new way each time the look comes round.',
-  'drops.kind': 'What a drop throws in this scene: the show’s own Drop Hits (Bonfire Live’s settings), or the scene’s own set.',
-  'drops.fx': 'The extra effects a drop throws while this scene plays. In the mix: drawn at random; Always: every drop.',
-  'drops.count': 'How many drop hits land at once (those set to Always come on top).',
-  'render.pixelSize': 'How big each pixel of the picture is: small is fine detail, big is chunky.',
-  'render.palette': 'The colors everything snaps to: the flame’s own, Ashen’s three, Moonlit’s four, or a few of this scene’s own colors (pick them below).',
-  'render.slots': 'The few colors the picture is drawn in, from this scene’s palette. The first (the background) is always in: it’s the outlines’ color.',
-  'render.dither': 'How much colors are dithered where they meet: 0 is flat bands, more is a finer checkered blend.',
-  'render.ditherMatrix': 'The dither’s grid: 4×4 is the classic crosshatch, 8×8 a finer one with more steps.',
-  'render.outlines': `Dark outlines round everything solid, and the bright creases between facets. ${MODE_HINT}`,
-  'render.vignette': 'How much the corners darken.',
-  'render.exposure': 'How bright the whole picture is, before its colors snap to the palette.',
-  'render.fog': 'The dark closing in: off (the far scenery clear), light (as on the site) or thick (only what’s near the fire shows).',
-  'render.shadows': 'The scenery and the weapon throw shadows from the fire.',
-  'render.flameFps': 'How many times a second the flames move on: few is choppy, hand-drawn animation; 60 is smooth.',
-  'render.xray': 'Holds the picture in one of the passes it’s built from, in its own colors, for the whole scene. Off: the finished picture.',
-  'knights.count': 'How many knights are by the fire in this scene (0: the fire burns alone). Touch screens show two at most.',
-  'knights.helmets': 'Each knight’s helmet: Drawn at Random (a new one each time the scene comes round), or one of the three.',
-  'knights.style': 'How the knights are drawn: a hand-drawn pixel sprite (cel, painterly, chiaroscuro), gunmetal plate, black and gold, or the first boxy build. Bonfire Live’s Own: its Knights tab decides; In the Mix: rolled each time the scene comes round.',
-  'knights.finish': 'The steel their armor is made of (one for the whole cast). In the mix: rolled each time the scene comes round.',
-  'knights.glow': 'The edges of their armor catch the fire’s color, fading toward their backs. Off: plain steel edges. In the Mix: rolled each time the scene comes round (and at each big drop): some stretches glow, each at a strength rolled round the Glow Strength, some don’t. Always: at the Glow Strength.',
-  'knights.rim': 'How strongly the edges glow: 0 none, 1 a bright rim along every edge that faces the fire. With Edge Glow Always, this strength; in the mix, the strength the rolls land round.',
-  'knights.seat': 'How they sit by the fire: Resting (slumped over their knees, heads sunk), or Watchful (leaning in over their knees, forearms on them, heads up at the fire). In the mix: rolled each time.',
-  'knights.dance': `Whether they get up and dance with the music. ${MODE_HINT}`,
-  'knights.formation': 'Round the Fire, a Line facing you, Solo (each his own move), a Canon (each a step behind), or a new one each dance.',
-  'knights.moves': 'The dance moves they may do in this scene. The Show’s Moves: whatever Bonfire Live’s Knights tab allows.',
-  'knights.shine': `The fire’s reflection sweeping over their armor. ${MODE_HINT}`,
-  'knights.reactions': `They flinch when a blade lands, lean from a flare, lift their feet as a ring passes. ${MODE_HINT}`,
-  'knights.gestures': 'Try a gesture on the stage (a preview: gestures aren’t part of the scene; the show throws them on drops).',
-  'fireflies.lit': 'How many fireflies are glowing round the fire.',
-  'fireflies.show': 'Their light show: blinking patterns, one kind each (species), chasing round, twinkling, breathing, strobing, or a mix that changes.',
-  'fireflies.moves': 'The dances they may do on the beat. The Show’s Moves: whatever Bonfire Live allows.',
-  'fireflies.speed': 'How fast they fly, on top of what the music does.',
-  music: 'Hold: everything painted here stays for the scene’s stretch; the music only pulses and drops it. Start From: the scene opens the stretch (its place, colors, framing and look), then the show plays on.',
-};
-/** A detail's hint (looks.js PARAMS) with what its lock does. */
-const detailHint = (key) => `${PARAMS[key].hint} ${DETAIL_ROLLED}`;
-const LAYER_HINTS = {
-  scanlines: 'CRT-style lines over the picture.', mirror: 'The picture folded onto itself.',
-  blend: 'The layers blend in new ways (screen, difference, overlay…) instead of their classic ones.',
-  ghost: 'Everything that moves leaves a fading trail.', blur: 'The camera’s moves smear the picture.',
-  glow: 'Light spills from the bright parts, swelling on the kicks.', gradient: 'The picture recolored by brightness through three colors.',
-  paint: 'The picture repainted in brush strokes.', wash: 'The picture washed into flat watercolor patches.',
-  flicker: 'The light dips on the beat, a band rolls down, film jitters, or it wavers like a candle.',
-  grain: 'Film grain over the picture.', cinema: 'Black bars slide in top and bottom.',
-  spotlight: 'A dithered circle of light round the fire, the rest dark.', chroma: 'The color channels drift apart like a cheap lens.',
-};
-const LOOK_HINTS = {
-  ember: 'Clean: just the fire.', glitch: 'Torn rows, an RGB split on the kick, static.', echo: 'The last frame echoes out of the fire like a tunnel.',
-  ripple: 'A shockwave ring on every kick.', kaleido: 'A kaleidoscope round the fire.', ink: 'Downbeats flash to 1-bit over scanlines.',
-  vortex: 'Echoes turning as they stream out: a spiral.', mosaic: 'Kicks crunch the picture into big pixels.',
-  haze: 'Rows shimmer like heat over the fire.', prism: 'The colors split apart on every beat.',
-};
-/** The fire's shape sliders: [key, label]. */
-const FIRE_LABELS = { level: 'Fire Level', size: 'Flame Size', height: 'Flame Height', turbulence: 'Turbulence', glow: 'Glow on the Scene', windX: 'Wind Across', windZ: 'Wind Toward You' };
 /** The flame's colors: [key, label]. */
 export const RAMP_LABELS = { lo: 'Embers', mid: 'Body', hi: 'Tips', core: 'Core', shade: 'Shade' };
 export const SCENE_LABELS = { void: 'Background', shadow: 'Shadow', stone: 'Stone', wood: 'Wood', bone: 'Bone' };
 /** The scene palette's slots (palette.js scenePalette), as the slot picker and the gradient name them. */
 export const SLOT_NAMES = ['Background', 'Shadow', 'Stone', 'Wood', 'Bone', 'Embers', 'Body', 'Tips', 'Core', 'Shade'];
+/** What a detail's lock says it does, pinned and left to the dice. */
+export const LOCK_TIPS = { pinned: 'Pinned: stays as painted', rolled: 'Rolled each time: click to pin' };
 
 // --- pieces -------------------------------------------------------------------------------
 /** A field from src/ui/fields.js, bound to a scene path instead of a setting. */
 const sc = (html) => html.replace(/ data-set="/g, ' data-scene="');
 const numeric = (html) => html.replace('<select ', '<select data-num ');
 const unset = (html) => html.replace('<select ', '<select data-unset ');
-const hintOf = (path) => HINTS[path] ?? '';
-const rangeAt = (path, label, o = {}) => {
-  const [min, max, step, unit] = SCENE_RANGES[path];
-  return sc(range(path, label, min, max, step, { hint: hintOf(path), unit: unit ?? '', ...o }));
-};
-const selectAt = (path, label, opts, o = {}) => sc(select(path, label, opts, { hint: hintOf(path), ...o }));
+/** A label's text, where the search marks what it matched (`data-hl`). */
+const hl = (label) => `<span data-hl>${esc(label)}</span>`;
+/** A row: what the search shows or hides (`data-row`, its id in layout.js). */
+const row = (id, html, cls = '') => `<div class="pnt-field${cls ? ` ${cls}` : ''}" data-row="${esc(id)}">${html}</div>`;
+/** A row's More (folded), when it has one. */
+const moreOf = (text) => (text ? more(text.split('\n'), { adv: false }) : '');
 
 /** A small pixel icon (the lock's pin or die, the section fold's arrow). */
 const ICONS = {
@@ -205,73 +129,94 @@ export const swatches = (colors) => `<span class="pnt-sw" aria-hidden="true">${c
 export function chip(path, value, label, { audition = true, colors = null, cls = '', pressedWhenMissing = false } = {}) {
   return `<button type="button" class="pnt-chip${cls ? ` ${cls}` : ''}" data-pick="${esc(path)}" data-value="${esc(JSON.stringify(value))}"${audition ? ' data-audition' : ''}${pressedWhenMissing ? ' data-missing' : ''} aria-pressed="false">${colors ? swatches(colors) : ''}<span>${esc(label)}</span></button>`;
 }
-/** A field's label with its "?" (for groups of chips, which have no single input). */
-const groupHead = (label, hint) => {
-  const t = tip(hint);
-  return `<p class="viz-field-label">${esc(label)} ${t.mark}</p>`;
+/** A row's label with its "?" (for groups of chips or buttons, which have no single input). */
+const groupHead = (label, hint) => `<p class="viz-field-label">${hl(label)} ${tip(hint, { label }).mark}</p>`;
+/** A row headed by its label and "?", over `body`. */
+const headed = (id, body, cls = '') => {
+  const r = rowText(id);
+  return row(id, `${groupHead(r.label, r.hint)}${body}${moreOf(r.more)}`, cls);
 };
 /**
  * A row of color inputs under one label, and one hint that each reads out: the "?" is only
  * for the eye (not a stop of its own), lit while any of them has the keyboard's focus.
  */
-function colorRow(label, hint, base, labels) {
-  const t = tip(hint, { control: true });
-  return `<div data-tip-group><p class="viz-field-label">${esc(label)} ${t.mark}</p>
-      <div class="pnt-ramp">${Object.entries(labels).map(([key, name]) => `<label class="pnt-swatch" data-group-tip><input type="color" data-scene="${base}.${key}" aria-label="${esc(name)}"${t.ref}><span>${esc(name)}</span></label>`).join('')}</div></div>`;
+function colorRow(id, base, labels, note) {
+  const r = rowText(id);
+  const t = tip(r.hint, { control: true, label: r.label });
+  return row(id, `<p class="viz-field-label">${hl(r.label)} ${t.mark}</p>
+      <div class="pnt-ramp">${Object.entries(labels).map(([key, name]) => `<label class="pnt-swatch"><input type="color" data-scene="${base}.${key}" aria-label="${esc(name)}"${t.ref}><span>${esc(name)}</span></label>`).join('')}</div>${note}`);
 }
-/** Off / In the Mix / Always as three chips. `missing`: the mode a missing value means. */
-function modeChips(path, label, hint, { audition = true, missing = 'off' } = {}) {
-  const t = tip(hint);
-  return `<div class="pnt-mode" role="group" aria-label="${esc(label)}">
-    <span class="pnt-mode-name">${esc(label)} ${t.mark}</span>
-    <span class="pnt-seg">${MODES.map(([id, name]) => chip(path, id, name === 'In the mix' ? 'In the Mix' : name, { audition, pressedWhenMissing: id === missing, cls: 'pnt-seg-btn' })).join('')}</span>
+
+/** A slider row (its range from scenes.js SCENE_RANGES). */
+function rangeRow(id) {
+  const r = rowText(id);
+  const [min, max, step, unit] = SCENE_RANGES[r.path];
+  return row(id, sc(range(r.path, hl(r.label), min, max, step, { hint: r.hint, unit: unit ?? '' })) + moreOf(r.more));
+}
+/** A dropdown row of `choices(id)`; `num`: its values are numbers; `undef`: '' takes the value out. */
+function selectRow(id, c, { num = false, undef = false } = {}) {
+  const r = rowText(id);
+  let html = sc(select(r.path, hl(r.label), choices(id, c), { hint: r.hint }));
+  if (num) html = numeric(html);
+  if (undef) html = unset(html);
+  return row(id, html + moreOf(r.more));
+}
+/** An Off / In the Mix / Always row. `missing`: the mode a missing value means. */
+function triRow(id, { missing = 'off', audition = false } = {}) {
+  const r = rowText(id);
+  return row(id, sc(tri(r.path, hl(r.label), { hint: r.hint, missing, attr: audition ? ' data-audition' : '' })) + moreOf(r.more), 'pnt-tri');
+}
+
+/** A detail a look or a layer rolls, with its lock. */
+function detailField(id, scene) {
+  const { path } = rowText(id);
+  const key = id.split('.')[1];
+  const spec = PARAMS[key];
+  const pinned = getPath(scene, path) !== undefined;
+  const say = pinned ? 'pinned, stays as painted' : 'rolled each time, click to pin';
+  const lock = `<button type="button" class="pnt-lock" data-lock="${esc(path)}" aria-pressed="${pinned}" data-tip="${pinned ? LOCK_TIPS.pinned : LOCK_TIPS.rolled}" aria-label="${esc(spec.label)}: ${say}">${pinned ? ICONS.pin : ICONS.die}</button>`;
+  let field;
+  if (spec.slots) {
+    const t = tip(spec.hint, { control: true, label: spec.label }); // (each slot reads it out: the "?" is only for the eye)
+    field = `<div class="viz-field"><span class="viz-field-label">${hl(spec.label)} ${t.mark}</span><span class="pnt-slots3">${
+      Array.from({ length: spec.slots }, (_, i) => `<select data-scene="${esc(path)}.${i}" data-num aria-label="${esc(spec.label)} ${i + 1}"${t.ref}>${SLOT_NAMES.map((n, s) => `<option value="${s}">${esc(n)}</option>`).join('')}</select>`).join('')
+    }</span></div>`;
+  } else if (spec.bool) field = sc(check(path, hl(spec.label), { hint: spec.hint }));
+  else if (spec.values) field = numeric(sc(select(path, hl(spec.label), choices(id), { hint: spec.hint })));
+  else field = sc(range(path, hl(spec.label), spec.range[0], spec.range[1], spec.step ?? 0.01, { hint: spec.hint }));
+  return `<div class="pnt-detail${pinned ? '' : ' is-rolled'}" data-detail="${esc(path)}" data-row="${esc(id)}">${field}${lock}</div>`;
+}
+
+/**
+ * A checklist of names for a list the scene may leave to the show (null), with its bulk
+ * toolbar while it's the scene's own. Every box reads out the list's hint.
+ */
+function pickList(id, scene) {
+  const r = rowText(id);
+  const list = getPath(scene, r.path);
+  const own = Array.isArray(list);
+  const t = tip(r.hint, { control: true, label: r.label });
+  return `<div class="pnt-field pnt-list" data-list="${esc(r.path)}" data-row="${esc(id)}">
+    <p class="viz-field-label">${hl(r.label)} ${t.mark}</p>
+    <label class="viz-check"><input type="checkbox" data-list-show="${esc(r.path)}"${own ? '' : ' checked'}${t.ref}><span>The Show’s Moves</span></label>
+    ${own ? `${bulkBar(r.path, { kind: 'checks', minOne: true, label: r.label })}
+    <div class="viz-checks">${choices(id).map(([key, name]) => `<label class="viz-check"><input type="checkbox" data-list-item="${esc(key)}"${list.includes(key) ? ' checked' : ''}${t.ref}><span>${esc(name)}</span></label>`).join('')}</div>` : ''}
+    ${moreOf(r.more)}
   </div>`;
 }
+
 /**
  * Each knight's helmet, under one label and one hint that each select reads out: the "?"
  * is only for the eye (not a stop of its own), lit while any of them has the keyboard's
  * focus. Every row is drawn; those past `count` wait, hidden.
  */
 function helmetRows(count) {
-  const t = tip(HINTS['knights.helmets'], { control: true });
-  const opts = [['', 'Drawn at Random'], ...Object.entries(HELMET_NAMES)];
-  return `<div class="pnt-helmets" data-tip-group><p class="viz-field-label">Helmets ${t.mark}</p>
-      ${Array.from({ length: MAX_KNIGHTS }, (_, i) => `<div class="pnt-helmet" data-helmet="${i}"${i < count ? '' : ' hidden'}>${
-    sc(select(`knights.helmets.${i}`, `Knight ${i + 1}`, opts)).replace('<label class="viz-field"', '<label class="viz-field" data-group-tip').replace('<select ', `<select${t.ref} `)
-  }</div>`).join('')}</div>`;
-}
-/** A detail a look or a layer rolls, with its lock. */
-function detailField(key, path, scene) {
-  const spec = PARAMS[key];
-  const pinned = getPath(scene, path) !== undefined;
-  const lock = `<button type="button" class="pnt-lock" data-lock="${esc(path)}" aria-pressed="${pinned}" aria-label="${esc(spec.label)}: ${pinned ? 'pinned (click to leave it to the dice)' : 'rolled each turn (click to pin it)'}">${pinned ? ICONS.pin : ICONS.die}</button>`;
-  let field;
-  if (spec.slots) {
-    const t = tip(detailHint(key), { control: true }); // (each slot reads it out: the "?" is only for the eye)
-    field = `<div class="viz-field"><span class="viz-field-label">${esc(spec.label)} ${t.mark}</span><span class="pnt-slots3">${
-      Array.from({ length: spec.slots }, (_, i) => `<select data-scene="${esc(path)}.${i}" data-num aria-label="${esc(spec.label)} ${i + 1}"${t.ref}>${SLOT_NAMES.map((n, s) => `<option value="${s}">${esc(n)}</option>`).join('')}</select>`).join('')
-    }</span></div>`;
-  } else if (spec.bool) field = sc(check(path, esc(spec.label), { hint: detailHint(key) }));
-  else if (spec.values) field = numeric(sc(select(path, spec.label, spec.values.map((v, i) => [String(v), spec.names?.[i] ?? String(v)]), { hint: detailHint(key) })));
-  else field = sc(range(path, spec.label, spec.range[0], spec.range[1], spec.step ?? 0.01, { hint: detailHint(key) }));
-  return `<div class="pnt-detail${pinned ? '' : ' is-rolled'}" data-detail="${esc(path)}">${field}${lock}</div>`;
-}
-/** A checklist of names for a list the scene may leave to the show (null). */
-function pickList(path, label, names, hint, list) {
-  const t = tip(hint);
-  const own = Array.isArray(list);
-  return `<div class="pnt-list" data-list="${esc(path)}">
-    <p class="viz-field-label">${esc(label)} ${t.mark}</p>
-    <label class="viz-check"><input type="checkbox" data-list-show="${esc(path)}"${own ? '' : ' checked'}><span>The Show’s Moves</span></label>
-    ${own ? `<div class="viz-checks">${Object.entries(names).map(([id, name]) => `<label class="viz-check"><input type="checkbox" data-list-item="${esc(id)}"${list.includes(id) ? ' checked' : ''}><span>${esc(name)}</span></label>`).join('')}</div>` : ''}
-  </div>`;
-}
-/** A folding section of the panel. */
-function section(id, name, body, open) {
-  return `<section class="pnt-sec" data-sec="${id}"${open ? ' data-open' : ''} aria-labelledby="pnt-h-${id}">
-    <h2 class="pnt-sec-head"><button type="button" id="pnt-h-${id}" data-sec-toggle="${id}" aria-expanded="${open}" aria-controls="pnt-b-${id}"><span>${esc(name)}</span>${ICONS.fold}</button></h2>
-    <div class="pnt-sec-body" id="pnt-b-${id}"${open ? '' : ' hidden'}>${body}</div>
-  </section>`;
+  const r = rowText('knightHelmets');
+  const t = tip(r.hint, { control: true, label: r.label });
+  return row('knightHelmets', `<p class="viz-field-label">${hl(r.label)} ${t.mark}</p>
+      <div class="pnt-helmets">${Array.from({ length: MAX_KNIGHTS }, (_, i) => `<div class="pnt-helmet" data-helmet="${i}"${i < count ? '' : ' hidden'}>${
+    sc(select(`knights.helmets.${i}`, `Knight ${i + 1}`, choices('knightHelmets'))).replace('<select ', `<select${t.ref} `)
+  }</div>`).join('')}</div>`);
 }
 
 /**
@@ -286,271 +231,384 @@ export function flameChips(list, light = 0.34) {
     return chip('colors.flame', flame, label, { colors: [flame.lo, flame.mid, flame.hi, flame.core] });
   }).join('');
 }
-/** Chips for scenery palettes (suggested from a color): hover onto the scene, click to use. */
+/** Chips for place palettes (suggested from a color): hover onto the scene, click to use. */
 export function sceneryChips(list) {
   return list.map(({ label, colors }) => chip('colors.scenery', colors, label, { colors: [colors.void, colors.shadow, colors.stone, colors.wood, colors.bone] })).join('');
 }
 
 /**
- * The scene's palette slots' colors (palette.js scenePalette: the scenery's five, the
+ * The scene's palette slots' colors (palette.js scenePalette: the place's five, the
  * flame's ramp and shade), for the slot picker and the gradient's swatches.
  * @param {any} scene
- * @param {Record<string, string>} siteBase  the site's scenery colors (for a scene on its own)
+ * @param {Record<string, string>} siteBase  the site's place colors (for a scene on its own)
  */
 export function slotColors(scene, siteBase = SITE_BASE) {
   const s = scene.colors.scenery ?? siteBase;
   const f = scene.colors.flame;
   return [s.void, s.shadow, s.stone, s.wood, s.bone, f.lo, f.mid, f.hi, f.core, f.shade];
 }
-/** The site's scenery colors when the page doesn't say (palette.js base). */
+/** The site's place colors when the page doesn't say (palette.js base). */
 const SITE_BASE = { void: '#07070b', shadow: '#15131d', stone: '#2c2a3a', wood: '#5b4535', bone: '#e9e3d2' };
 
+// --- rows -----------------------------------------------------------------------------------
 /**
- * What the panel's layout depends on (not its values): when this changes it's drawn again.
- * (How many knights isn't: every helmet row is drawn, the ones past the count hidden, so
- * a drag on the count keeps its slider.)
- * @param {any} scene
- */
-export function panelShape(scene) {
-  return JSON.stringify([
-    scene.look.name, Object.keys(scene.look.params).sort(), scene.layers, Object.keys(scene.details).sort(),
-    !!scene.colors.scenery, scene.drops === null, Array.isArray(scene.render.palette), scene.knights.count > 0,
-    Array.isArray(scene.knights.moves), Array.isArray(scene.fireflies.moves), 'style' in scene.knights,
-    scene.camera.move.kind === 'still',
-  ]);
-}
-
-/**
- * The panel's markup for `scene`.
- * @param {any} scene
- * @param {{
- *   weapons?: Record<string, string>, elements?: Record<string, string>,
+ * @typedef {{ weapons?: Record<string, string>, elements?: Record<string, string>,
  *   flames?: { key: string, name: string, colors: { lo: string, mid: string, hi: string, core: string, shade: string, light?: number } }[],
- *   shots?: { key: string, name: string, camera: object }[],
- *   siteBase?: Record<string, string>, open?: Iterable<string>, styles?: Record<string, string>,
- * }} [ctx]  the page's lists (weapons by key, the site's flames, Bonfire Live's shots), the
- *   site's scenery colors, and which sections are open (default: Place)
+ *   shots?: { key: string, name: string, camera: object }[], siteBase?: Record<string, string>,
+ *   styles?: Record<string, string>, site?: { pixelSize?: number, ditherMatrix?: number, flameFps?: number },
+ *   open?: Iterable<string> }} PanelCtx
  */
-export function panelMarkup(scene, ctx = {}) {
-  const open = new Set(ctx.open ?? ['place']);
-  const weapons = ctx.weapons ?? {};
-  const elementNames = ctx.elements ?? Object.fromEntries(ELEMENT_IDS.map((id) => [id, id]));
-  const siteBase = ctx.siteBase ?? SITE_BASE;
-  const k = scene.knights;
-  const body = {};
+/** Each row's markup, by its id (an item row by its kind: "layer.glow" is ROWS.layer). */
+const ROWS = {
+  scenery: (id) => headed(id, `<div class="pnt-chips" role="group" aria-label="Place">${choices(id).map(([v, name]) => chip('place.scenery', v, name, { audition: false, cls: 'pnt-place' })).join('')}</div>`),
+  fog: (id, s, c) => selectRow(id, c),
+  exposure: rangeRow,
+  vignette: rangeRow,
+  shadows: (id) => { const r = rowText(id); return row(id, sc(check(r.path, hl(r.label), { hint: r.hint }))); },
 
-  body.place = `
-    <div>${groupHead('Scenery', HINTS['place.scenery'])}
-      <div class="pnt-chips">${Object.entries(SCENERIES).map(([id, name]) => chip('place.scenery', id, name, { audition: false, cls: 'pnt-place' })).join('')}</div></div>
-    ${selectAt('place.weapon', 'Weapon', [['', 'Drawn by the Show'], ...Object.entries(weapons)])}
-    ${selectAt('place.element', 'Element', [['', 'Drawn by the Show'], ...ELEMENT_IDS.map((id) => [id, elementNames[id] ?? id])])}`;
-
-  const flameList = (ctx.flames ?? []).map((f) => ({ label: f.name, colors: f.colors }));
-  // (The scheme reads its hint out; the "?" beside Make a Flame is the one for the eye.)
-  const schemeTip = tip(HINTS['colors.scheme'], { control: true });
-  body.colors = `
-    <div>${groupHead('The Site’s Flames', HINTS['colors.flames'])}
-      <div class="pnt-chips pnt-flames">${flameChips(flameList, scene.colors.flame.light)}</div></div>
-    <div class="pnt-make">${groupHead('Make a Flame', HINTS['colors.make'])}
-      <div class="pnt-row">
+  colors: (id, s, c) => headed(id, `<div class="pnt-chips pnt-flames">${flameChips((c.flames ?? []).map((f) => ({ label: f.name, colors: f.colors })), s.colors.flame.light)}</div>`),
+  flameMake: (id) => {
+    const h = SETTINGS.scheme;
+    const t = tip(h.hint, { control: true, label: h.label }); // (the select reads its hint out: its "?" is only for the eye)
+    const opts = [['auto', 'Any Harmony'], ...SCHEMES.map((x) => [x.id, x.label])];
+    return headed(id, `<div class="pnt-row">
         <button type="button" class="pix-btn" data-paint-act="flame-harmonious">Harmonious</button>
         <button type="button" class="pix-btn" data-paint-act="flame-random">Fully Random</button>
-        <label class="pnt-inline"><span class="visually-hidden">Scheme</span><select data-flame-scheme aria-label="Color scheme"${schemeTip.ref}>${[['auto', 'Any Scheme'], ...SCHEMES.map((s) => [s.id, s.label])].map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('')}</select></label><span class="visually-hidden" id="${schemeTip.id}">${esc(HINTS['colors.scheme'])}</span>
-      </div></div>
-    <div>${groupHead('From a Color', HINTS['colors.seed'])}
-      <div class="pnt-row"><input type="color" class="pnt-color" data-seed="flame" aria-label="A color to build flames round" value="${esc(scene.colors.flame.mid)}"></div>
-      <div class="pnt-chips pnt-flames" data-suggest="flame"></div></div>
-    <div>${colorRow('The Flame’s Colors', HINTS['colors.ramp'], 'colors.flame', RAMP_LABELS)}
-      <p class="pnt-note" data-readable hidden>The tips were lightened to stay readable.</p></div>
-    ${rangeAt('colors.flame.light', 'Light Toward White')}
-    <div>${groupHead('Scenery Colors', HINTS['colors.scenery'])}
-      <div class="pnt-chips">
-        ${chip('colors.scenery', null, 'The Site’s Own', { colors: [siteBase.void, siteBase.shadow, siteBase.stone, siteBase.wood, siteBase.bone] })}
+        <span class="pnt-inline"><label for="pnt-flame-scheme">${esc(h.label)}</label>${t.mark}<select id="pnt-flame-scheme" data-flame-scheme${t.ref}>${opts.map(([v, x]) => `<option value="${esc(v)}">${esc(x)}</option>`).join('')}</select></span>
+      </div>`, 'pnt-make');
+  },
+  flameSeed: (id, s) => headed(id, `<div class="pnt-row"><input type="color" class="pnt-color" data-seed="flame" aria-label="A color to build flames round" value="${esc(s.colors.flame.mid)}"></div>
+      <div class="pnt-chips pnt-flames" data-suggest="flame"></div>`),
+  flameRamp: (id) => colorRow(id, 'colors.flame', RAMP_LABELS, '<p class="pnt-note" data-readable hidden>The tips were lightened to stay readable.</p>'),
+  flameLight: rangeRow,
+  sceneColors: (id, s, c) => {
+    const b = c.siteBase;
+    return headed(id, `<div class="pnt-chips">
+        ${chip('colors.scenery', null, 'The Site’s Own', { colors: [b.void, b.shadow, b.stone, b.wood, b.bone] })}
         <button type="button" class="pix-btn" data-paint-act="scenery-harmonious">Harmonious</button>
         <button type="button" class="pix-btn" data-paint-act="scenery-vivid">Vivid</button>
         <button type="button" class="pix-btn" data-paint-act="scenery-random">Fully Random</button>
-      </div></div>
-    <div>${groupHead('Scenery From a Color', HINTS['colors.scenery.seed'])}
-      <div class="pnt-row"><input type="color" class="pnt-color" data-seed="scenery" aria-label="A color to build scenery colors round" value="${esc((scene.colors.scenery ?? siteBase).stone)}"></div>
-      <div class="pnt-chips" data-suggest="scenery"></div></div>
-    ${scene.colors.scenery ? `<div>${colorRow('The Scenery’s Colors', HINTS['colors.scenery.edit'], 'colors.scenery', SCENE_LABELS)}
-      <p class="pnt-note" data-darkest hidden>The background was darkened: it’s the darkest color (the outlines’).</p></div>` : ''}
-    <div class="pnt-sub">${groupHead('The Fire’s Shape', 'Added to what the music does to the fire, every frame: 0 leaves it to the music.')}
-      ${FIRE_KEYS.map((key) => rangeAt(`fire.${key}`, FIRE_LABELS[key])).join('')}</div>`;
+      </div>`);
+  },
+  sceneSeed: (id, s, c) => headed(id, `<div class="pnt-row"><input type="color" class="pnt-color" data-seed="scenery" aria-label="A color to build place colors round" value="${esc((s.colors.scenery ?? c.siteBase).stone)}"></div>
+      <div class="pnt-chips" data-suggest="scenery"></div>`),
+  sceneEdit: (id) => colorRow(id, 'colors.scenery', SCENE_LABELS, '<p class="pnt-note" data-darkest hidden>The background was darkened: it’s the darkest color (the outlines’).</p>'),
+  palette: (id, s, c) => selectRow(id, c),
+  paletteSlots: (id, s, c) => {
+    const cols = slotColors(s, c.siteBase);
+    return headed(id, `<div class="pnt-slots">${cols.map((col, i) => `<button type="button" class="pnt-slot" data-slot="${i}" aria-pressed="${s.render.palette.includes(i)}"${i === 0 ? ' disabled' : ''} aria-label="${esc(SLOT_NAMES[i])}"><i style="--c:${esc(col)}"></i></button>`).join('')}</div>`);
+  },
 
-  body.camera = `
-    <p class="pnt-help">${esc(HINTS['camera.drag'])}</p>
-    <div>${groupHead('Start From a Shot', HINTS['camera.shots'])}
-      <div class="pnt-chips">${(ctx.shots ?? []).map((s) => chip('camera', s.camera, s.name)).join('')}</div></div>
-    ${rangeAt('camera.fov', 'Lens')}
-    ${rangeAt('camera.roll', 'Tilt')}
-    ${selectAt('camera.move.kind', 'Move', Object.entries(CAMERA_MOVES))}
-    ${scene.camera.move.kind === 'still' ? '' : `${rangeAt('camera.move.amount', 'Move Amount')}
-    ${numeric(selectAt('camera.move.bars', 'One Cycle Takes', MOVE_BARS.map((b) => [String(b), `${b} bars`])))}`}`;
+  fireLevel: rangeRow, fireSize: rangeRow, fireHeight: rangeRow, fireTurbulence: rangeRow, fireGlow: rangeRow, windX: rangeRow, windZ: rangeRow,
 
-  const lookParams = LOOK_PARAMS[scene.look.name] ?? [];
-  body.look = `
-    <div>${groupHead('Look', HINTS['look.name'])}
-      <div class="pnt-chips pnt-looks">${Object.entries(LOOKS).map(([id, name]) => chip('look.name', id, name, { cls: 'pnt-look' })).join('')}</div>
-      <p class="pnt-help" data-look-hint>${esc(LOOK_HINTS[scene.look.name] ?? '')}</p></div>
-    ${lookParams.map((key) => detailField(key, `look.params.${key}`, scene)).join('')}
-    ${rangeAt('look.amount', 'Look Strength')}`;
+  pixelSize: (id, s, c) => selectRow(id, c, { num: true }),
+  dither: rangeRow,
+  ditherMatrix: (id, s, c) => selectRow(id, c, { num: true }),
+  outlines: (id) => triRow(id, { missing: 'on', audition: true }),
+  flameFps: (id, s, c) => selectRow(id, c, { num: true }),
 
-  const blendOn = (scene.layers.blend ?? 'off') !== 'off';
-  body.layers = `
-    <div class="pnt-row pnt-pin-all"><button type="button" class="pix-btn" data-paint-act="pin-all">Pin What You See</button>${tip(HINTS['layers.pin']).mark}</div>
-    ${Object.entries(LAYERS).map(([id, name]) => {
-      const m = scene.layers[id] ?? 'off';
-      const details = m === 'off' ? [] : LAYER_DETAILS[id];
-      return `<div class="pnt-layer${m === 'off' ? '' : ' is-on'}" data-layer="${id}">
-        ${modeChips(`layers.${id}`, name, `${LAYER_HINTS[id]} ${MODE_HINT}`)}
-        ${details.length ? `<div class="pnt-details">${details.map((key) => detailField(key, `details.${key}`, scene)).join('')}</div>` : ''}
+  looks: (id, s) => headed(id, `<div class="pnt-chips pnt-looks">${choices(id).map(([v, name]) => chip('look.name', v, name, { cls: 'pnt-look' })).join('')}</div>
+      <p class="pnt-help" data-look-hint>${esc(itemHint('looks', s.look.name))}</p>`),
+  param: detailField,
+  glitch: rangeRow,
+  xrayView: (id, s, c) => selectRow(id, c),
+
+  pinAll: (id) => {
+    const r = rowText(id);
+    return row(id, `<button type="button" class="pix-btn" data-paint-act="pin-all">${hl(r.label)}</button>${tip(r.hint, { label: r.label }).mark}`, 'pnt-row pnt-pin-all');
+  },
+  layers: (id) => headed(id, bulkBar('layers', { kind: 'tri', label: 'Layers' })),
+  layer: (id, s) => {
+    const key = id.split('.')[1];
+    const on = modeOf(s.layers[key]) !== 'off';
+    const details = on ? LAYER_DETAILS[key] : [];
+    const r = rowText(id);
+    return `<div class="pnt-layer${on ? ' is-on' : ''}" data-layer="${key}" data-row="${esc(id)}">
+        ${sc(tri(r.path, hl(r.label), { hint: r.hint, missing: 'off', attr: ' data-audition' }))}
+        ${details.length ? `<div class="pnt-details">${details.map((k) => detailField(`detail.${k}`, s)).join('')}</div>` : ''}
       </div>`;
-    }).join('')}
-    ${blendOn ? `<div class="pnt-sub">${groupHead('How Each Layer Blends', HINTS['layers.blends'])}
-      ${Object.entries(LAYER_BLENDS).map(([id, list]) => unset(sc(select(`blends.${id}`, BLEND_LABELS[id], [['', 'Rolled Each Turn'], ...list.map((b) => [b, BLEND_NAMES[b] ?? b])], { hint: `How the ${BLEND_LABELS[id].toLowerCase()} lies over the picture. ${HINTS['layers.blends']}` })))).join('')}</div>` : ''}`;
+  },
+  blends: (id) => {
+    const r = rowText(id);
+    return row(id, `${groupHead(r.label, r.hint)}
+      ${Object.keys(LAYER_BLENDS).map((b) => {
+        const br = rowText(`blend.${b}`);
+        return row(`blend.${b}`, unset(sc(select(br.path, hl(br.label), choices(`blend.${b}`), { hint: br.hint }))));
+      }).join('')}`, 'pnt-sub');
+  },
 
-  body.drops = `
-    <div>${groupHead('Drop Hits', HINTS['drops.kind'])}
-      <div class="pnt-chips">${chip('drops', null, 'The Show’s Drop Hits', { audition: false })}<button type="button" class="pnt-chip" data-paint-act="drops-own" aria-pressed="${scene.drops !== null}"><span>The Scene’s Own</span></button></div></div>
-    ${scene.drops ? `<div class="pnt-sub">${Object.entries(DROP_FX).map(([id, name]) => modeChips(`drops.fx.${id}`, name, `${HINTS['drops.fx']}`, { audition: false })).join('')}
-      ${numeric(selectAt('drops.count', 'Hits per Drop', [['1', 'One'], ['2', 'Up to Two'], ['3', 'Up to Three']]))}</div>` : ''}`;
+  cameraDrag: (id) => {
+    const r = rowText(id);
+    return row(id, `<p class="pnt-help"><strong data-hl>${esc(r.label)}</strong>: ${esc(r.hint)} Q and E tilt the horizon, [ and ] change the lens.</p>`);
+  },
+  shot: (id, s, c) => headed(id, `<div class="pnt-chips">${(c.shots ?? []).map((x) => chip('camera', x.camera, x.name)).join('')}</div>`),
+  lens: rangeRow,
+  tilt: rangeRow,
+  camera: (id, s, c) => selectRow(id, c),
+  moveAmount: rangeRow,
+  moveBars: (id, s, c) => selectRow(id, c, { num: true }),
 
-  const slots = slotColors(scene, siteBase);
-  const few = Array.isArray(scene.render.palette);
-  body.render = `
-    ${numeric(selectAt('render.pixelSize', 'Pixel Size', PIXEL_SIZES.map((px) => [String(px), `${px} px${px === 4 ? ' (the site)' : ''}`])))}
-    ${selectAt('render.palette', 'Palette', [...Object.entries(PALETTES), ['few', 'A Few of the Scene’s Colors']])}
-    ${few ? `<div>${groupHead('The Few Colors', HINTS['render.slots'])}
-      <div class="pnt-slots">${slots.map((c, i) => `<button type="button" class="pnt-slot" data-slot="${i}" aria-pressed="${scene.render.palette.includes(i)}"${i === 0 ? ' disabled' : ''} aria-label="${esc(SLOT_NAMES[i])}"><i style="--c:${esc(c)}"></i></button>`).join('')}</div></div>` : ''}
-    ${rangeAt('render.dither', 'Dither')}
-    ${numeric(selectAt('render.ditherMatrix', 'Dither Pattern', [['4', '4×4 (as on the site)'], ['8', '8×8 (finer)']]))}
-    ${modeChips('render.outlines', 'Outlines', HINTS['render.outlines'], { missing: 'on' })}
-    ${rangeAt('render.vignette', 'Vignette')}
-    ${rangeAt('render.exposure', 'Exposure')}
-    ${selectAt('render.fog', 'Fog', Object.entries(FOGS))}
-    ${sc(check('render.shadows', 'The Fire Casts Shadows', { hint: HINTS['render.shadows'] }))}
-    ${numeric(selectAt('render.flameFps', 'Flame Frame Rate', FLAME_FPS.map((f) => [String(f), `${f} fps`])))}
-    ${selectAt('render.xray', 'X-Ray View', [['', 'Off: the Finished Picture'], ...Object.entries(XRAY_VIEWS)])}`;
+  knightCount: rangeRow,
+  knightSeat: (id, s, c) => selectRow(id, c),
+  knightHelmets: (id, s) => helmetRows(s.knights.count),
+  knightStyle: (id, s, c) => selectRow(id, c),
+  knightFinish: (id, s, c) => selectRow(id, c),
+  knightGlow: (id) => triRow(id, { missing: 'mix' }),
+  knightRim: rangeRow,
+  knightShine: (id) => triRow(id),
+  knightDance: (id) => triRow(id),
+  knightFormation: (id, s, c) => selectRow(id, c),
+  knightMoves: pickList,
+  knightReactions: (id) => triRow(id),
+  // (Its label is the preview's sub-heading: the row is the buttons.)
+  gestures: (id) => row(id, `<div class="pnt-chips" role="group" aria-labelledby="pnt-g-preview">${choices(id).map(([g, name]) => `<button type="button" class="pix-btn" data-paint-act="gesture" data-gesture="${esc(g)}">${esc(name)}</button>`).join('')}</div>`),
 
-  const styleNames = ctx.styles ?? STYLE_NAMES;
-  body.knights = `
-    ${rangeAt('knights.count', 'Knights by the Fire')}
-    ${k.count ? `
-    ${helmetRows(k.count)}
-    ${'style' in k ? selectAt('knights.style', 'Style', [['', 'Bonfire Live’s Own'], ['mix', 'In the Mix'], ...Object.entries(styleNames)]) : ''}
-    ${selectAt('knights.finish', 'Armor Finish', [['mix', 'In the Mix'], ...Object.entries(FINISH_NAMES)])}
-    ${modeChips('knights.glow', 'Edge Glow', HINTS['knights.glow'], { audition: false, missing: 'mix' })}
-    ${rangeAt('knights.rim', 'Glow Strength')}
-    ${selectAt('knights.seat', 'Seat Pose', Object.entries(KNIGHT_SEATS))}
-    ${modeChips('knights.dance', 'Dance', HINTS['knights.dance'], { audition: false })}
-    ${selectAt('knights.formation', 'Formation', [...Object.entries(FORMATIONS), ['mix', 'A New One Each Dance']])}
-    ${pickList('knights.moves', 'Moves', KNIGHT_MOVES, HINTS['knights.moves'], k.moves)}
-    ${modeChips('knights.shine', 'Armor Shine', HINTS['knights.shine'], { audition: false })}
-    ${modeChips('knights.reactions', 'Reactions', HINTS['knights.reactions'], { audition: false })}
-    <div>${groupHead('Try a Gesture', HINTS['knights.gestures'])}
-      <div class="pnt-chips">${Object.entries(GESTURE_NAMES).map(([id, name]) => `<button type="button" class="pix-btn" data-paint-act="gesture" data-gesture="${esc(id)}">${esc(name)}</button>`).join('')}</div></div>` : ''}`;
+  flyLit: rangeRow,
+  flyShow: (id, s, c) => selectRow(id, c),
+  flyMoves: pickList,
+  flySpeed: rangeRow,
 
-  body.flies = `
-    ${rangeAt('fireflies.lit', 'Fireflies Lit')}
-    ${selectAt('fireflies.show', 'Light Show', Object.entries(FLY_SHOWS))}
-    ${pickList('fireflies.moves', 'Moves', FLY_MOVES, HINTS['fireflies.moves'], scene.fireflies.moves)}
-    ${rangeAt('fireflies.speed', 'Speed')}`;
+  sceneHold: (id) => headed(id, `<div class="pnt-chips">${choices(id).map(([v, name]) => chip('music', v, name, { audition: false })).join('')}</div>
+      <p class="pnt-help">${esc(MUSIC_HELP)}</p>`),
+  weapon: (id, s, c) => selectRow(id, c),
+  element: (id, s, c) => selectRow(id, c),
+  dropSource: (id, s) => {
+    const [[, show], [, own]] = choices(id);
+    return headed(id, `<div class="pnt-chips">${chip('drops', null, show, { audition: false })}<button type="button" class="pnt-chip" data-paint-act="drops-own" aria-pressed="${s.drops !== null}"><span>${esc(own)}</span></button></div>`);
+  },
+  dropFx: (id) => headed(id, bulkBar('drops.fx', { kind: 'tri', label: rowText(id).label })),
+  dropFxItem: (id) => triRow(id),
+  dropCount: (id, s, c) => selectRow(id, c, { num: true }),
+};
+/** A row's markup. */
+function rowMarkup(id, scene, c) {
+  const kind = id.includes('.') ? id.split('.')[0] : id;
+  const draw = kind === 'dropFx' && id !== 'dropFx' ? ROWS.dropFxItem : ROWS[kind];
+  return draw ? draw(id, scene, c) : '';
+}
 
-  body.music = `
-    <div>${groupHead('With the Music', HINTS.music)}
-      <div class="pnt-chips">${Object.entries(MUSIC).map(([id, name]) => chip('music', id, name, { audition: false })).join('')}</div>
-      <p class="pnt-help">The Painter always previews a scene held. A scene that starts the stretch opens like this in Bonfire Live, then the show takes over.</p></div>`;
+/** panelMarkup's ctx, with the site's place colors filled in. */
+const context = (ctx) => ({ ...ctx, siteBase: ctx.siteBase ?? SITE_BASE });
 
+/**
+ * One section's body (what's drawn again when its shape changes): its rows by group, each
+ * of the Knights' groups under its sub-heading (but the first, which the section's own
+ * heading names, and none while there's only the one group: no knights by the fire).
+ * @param {string} id  a section (SECTIONS)
+ * @param {any} scene
+ * @param {PanelCtx} [ctx]
+ */
+export function sectionMarkup(id, scene, ctx = {}) {
+  const c = context(ctx);
+  const groups = sectionRows(id)
+    .map(([g, rows]) => /** @type {const} */ ([g, rows.filter((r) => rowShown(r, scene)).map((r) => rowMarkup(r, scene, c)).join('')]))
+    .filter(([, html]) => html);
+  const heads = groups.length > 1;
+  const name = PANEL_SECTIONS.find((s) => s.id === id)?.label;
+  const body = groups.map(([g, html]) => {
+    if (!g.head || !heads || g.head === name) return html;
+    const t = g.id === 'preview' ? tip(OWN.gestures.hint, { label: g.head }).mark : '';
+    return `<div class="pnt-group" data-group="${esc(g.id)}"><h3 class="pnt-subhead" id="pnt-g-${esc(g.id)}">${hl(g.head)}${t ? ` ${t}` : ''}</h3>${html}</div>`;
+  }).join('');
+  return (id === 'fire' ? `<p class="pnt-help">${esc(FIRE_HELP)}</p>` : '') + body;
+}
+
+/** A folding section of the panel. */
+function section(id, name, body, open) {
+  return `<section class="pnt-sec" data-sec="${id}"${open ? ' data-open' : ''} aria-labelledby="pnt-h-${id}">
+    <h2 class="pnt-sec-head"><button type="button" id="pnt-h-${id}" data-sec-toggle="${id}" aria-expanded="${open}" aria-controls="pnt-b-${id}"><span>${esc(name)}</span>${ICONS.fold}</button></h2>
+    <div class="pnt-sec-body" id="pnt-b-${id}"${open ? '' : ' hidden'}>${body}</div>
+  </section>`;
+}
+
+/**
+ * What the panel's layout depends on (not its values), as one string: every section's
+ * (layout.js sectionShapes; bindPanel redraws only the sections whose own changed).
+ * @param {any} scene
+ */
+export const panelShape = (scene) => JSON.stringify(sectionShapes(scene));
+
+/**
+ * The panel's markup for `scene`: the phones' strip of section tabs, then every section.
+ * @param {any} scene
+ * @param {PanelCtx} [ctx]  the page's lists (weapons by key, the site's flames, Bonfire Live's
+ *   shots), the site's place colors and own render values, and which sections are open
+ *   (default: Place & Atmosphere)
+ */
+export function panelMarkup(scene, ctx = {}) {
+  const open = new Set(ctx.open ?? ['place']);
   return `
     <nav class="pnt-tabs" aria-label="Panel sections">${SECTIONS.map(([id, name]) => `<button type="button" data-sec-tab="${id}" aria-pressed="${open.has(id)}">${esc(name)}</button>`).join('')}</nav>
-    ${SECTIONS.map(([id, name]) => section(id, name, body[id], open.has(id))).join('')}`;
+    ${SECTIONS.map(([id, name]) => section(id, name, sectionMarkup(id, scene, ctx), open.has(id))).join('')}`;
 }
-const BLEND_LABELS = { feed: 'Echoes', ghost: 'Ghost Trail', warp: 'Warps', ink: 'Ink', invert: 'Negative', scan: 'Scanlines', glow: 'Glow', gradient: 'Gradient Map' };
-const BLEND_NAMES = {
-  normal: 'Normal', add: 'Add', subtract: 'Subtract', multiply: 'Multiply', screen: 'Screen', darken: 'Darken', lighten: 'Lighten',
-  overlay: 'Overlay', hardLight: 'Hard Light', softLight: 'Soft Light', difference: 'Difference', exclusion: 'Exclusion',
-};
+
+// --- bulk -----------------------------------------------------------------------------------
+/** The grids a bulk toolbar sets: their items by key (looks.js), what each is called in a note. */
+const GRIDS = { layers: [LAYERS, 'Layers'], 'drops.fx': [DROP_FX, 'This Scene’s Hits'] };
+const LISTS = { 'knights.moves': [KNIGHT_MOVES, 'Dance Moves'], 'fireflies.moves': [FLY_MOVES, 'Firefly Dances'] };
+/**
+ * What a bulk toolbar's button does to the scene, as one edit ({ path, value }: one undo
+ * step), or null when it can't (the scene has no drop hits of its own). A grid: Off / In the
+ * Mix / Always set every switch (Off ones left out, as a new scene leaves them), Shuffle rolls
+ * each with `rand`, Defaults is a new scene's (all Off). A move list: All or None (one stays:
+ * the list keeps at least one) or Shuffle; Defaults leaves it to the show (null), as a new
+ * scene does. `name`: what the grid is called, for a note.
+ * @param {any} scene @param {string} group  the toolbar's data-bulk-group (a path)
+ * @param {string} action  its data-bulk
+ * @param {() => number} [rand]
+ * @returns {{ path: string, value: any, name: string } | null}
+ */
+export function bulkEdit(scene, group, action, rand = Math.random) {
+  if (Object.hasOwn(GRIDS, group)) {
+    if (group === 'drops.fx' && !scene.drops) return null;
+    const [names, name] = GRIDS[group];
+    const keys = Object.keys(names);
+    const cur = getPath(scene, group) ?? {};
+    const now = Object.fromEntries(keys.map((k) => [k, modeOf(cur[k])]));
+    const next = action === 'defaults' ? {} : bulkValues(action, keys, now, {}, rand);
+    return { path: group, value: Object.fromEntries(Object.entries(next).filter(([, v]) => v !== 'off')), name };
+  }
+  if (Object.hasOwn(LISTS, group)) {
+    const [names, name] = LISTS[group];
+    if (action === 'defaults') return { path: group, value: null, name };
+    const keys = Object.keys(names);
+    const list = getPath(scene, group);
+    const now = Object.fromEntries(keys.map((k) => [k, Array.isArray(list) ? list.includes(k) : true]));
+    const next = bulkValues(action, keys, now, {}, rand, { minOne: true });
+    return { path: group, value: keys.filter((k) => next[k]), name };
+  }
+  return null;
+}
 
 // --- binding ----------------------------------------------------------------------------
 const decimals = (step) => { const s = String(step); return s.includes('.') ? s.split('.')[1].length : 0; };
 /** What names a focusable thing in the panel (so a redraw can focus it again). */
-const FOCUS_ATTRS = ['data-scene', 'data-pick', 'data-value', 'data-lock', 'data-sec-toggle', 'data-sec-tab', 'data-paint-act', 'data-gesture', 'data-slot',
-  'data-list-show', 'data-list-item', 'data-seed', 'data-flame-scheme', 'data-tip'];
+const FOCUS_ATTRS = ['data-scene', 'data-pick', 'data-value', 'data-sec-toggle', 'data-sec-tab', 'data-paint-act', 'data-gesture', 'data-slot',
+  'data-list-show', 'data-list-item', 'data-seed', 'data-flame-scheme', 'data-bulk', 'data-bulk-group', 'data-tip'];
 /** How long a field stays "under the hand" after the user moves it (ms): fill() leaves it be. */
 const HAND_MS = 300;
-/** A "?" hint's margin inside the panel (px). */
-const TIP_PAD = 8;
 
 /**
  * Wire a panel drawn by panelMarkup into `root`.
  * @param {HTMLElement} root
  * @param {{
  *   get: () => any,
- *   edit: (path: string, value: unknown, o?: { key?: string | null }) => void,
+ *   edit: (path: string, value: unknown, o?: { key?: string | null }) => (boolean | void),
  *   audition: (scene: any | null) => void,
  *   act: (name: string, el: HTMLElement) => void,
  *   live?: () => any,
- *   ctx: () => object,
- *   onSection?: (id: string, open: boolean) => void,
+ *   ctx: () => PanelCtx,
+ *   open?: Iterable<string>,
+ *   onSection?: (open: string[]) => void,
+ *   onBulk?: (note: string) => void,
+ *   onDraw?: () => void,
  * }} o
  *   `get` the scene; `edit` changes one path (`key`: which field, for undo's merging);
  *   `audition` shows a scene on the stage for a moment (null: back to the scene); `act` an
- *   action button; `live` what the look is doing now (looks.js details); `ctx` panelMarkup's.
+ *   action button; `live` what the look is doing now (looks.js details); `ctx` panelMarkup's;
+ *   `open` the sections open to start with; `onSection` every open section, after one is
+ *   opened or closed by hand (the page keeps them); `onBulk` a bulk toolbar's note (one undo
+ *   step); `onDraw` after the panel or a section of it is drawn again (the search goes over it).
  */
-export function bindPanel(root, { get, edit, audition, act, live = () => null, ctx, onSection = () => {} }) {
-  let shape = '';
-  const open = new Set(['place']);
+export function bindPanel(root, { get, edit, audition, act, live = () => null, ctx, open: opened = ['place'], onSection = () => {}, onBulk = () => {}, onDraw = () => {} }) {
+  /** @type {Record<string, string>} */
+  let shapes = {};
+  const ids = new Set(SECTIONS.map(([id]) => id));
+  const open = new Set([...opened].filter((id) => ids.has(id)));
+  if (!open.size) open.add('place');
   let auditioning = null;
   let dragging = null;    // the slider a pointer is down on (a redraw waits for it)
   let drawLater = false;  // a redraw that waited
   let handAt = 0;         // when the focused field was last moved by the user (performance.now)
+  /** @type {Map<string, { ranges: [number, number][], label: string }> | null} */
+  let filter = null;      // the search's rows while it has a query (panelSearch.js)
+  /** @type {Set<string> | null} */
+  let openBefore = null;  // the sections open before a search opened those it found things in
 
   /**
    * What the focused element in the panel is, as a selector that finds it again in a fresh
    * drawing (its path, its chip's value, its lock, its button), or null.
    */
   function focusKey() {
-    const el = /** @type {HTMLElement | null} */ (document.activeElement);
+    const el = /** @type {HTMLInputElement | null} */ (document.activeElement);
     if (!el || el === root || !root.contains(el)) return null;
-    const own = FOCUS_ATTRS.filter((a) => el.hasAttribute(a)).map((a) => `[${a}="${CSS.escape(el.getAttribute(a))}"]`).join('');
+    // (A lock's tip says whether it's pinned, which a click just changed: it's its path alone.)
+    if (el.hasAttribute('data-lock')) return `[data-lock="${CSS.escape(el.getAttribute('data-lock'))}"]`;
+    let own = FOCUS_ATTRS.filter((a) => el.hasAttribute(a)).map((a) => `[${a}="${CSS.escape(el.getAttribute(a))}"]`).join('');
     if (!own) return null;
+    if (el.type === 'radio') own += `[value="${CSS.escape(el.value)}"]`; // (a switch's three share a path)
     // (A move in a list is named by its list: the knights' and the fireflies' share ids.)
     const list = /** @type {HTMLElement | null} */ (el.closest('[data-list]'));
-    return list && el.hasAttribute('data-list-item') ? `[data-list="${CSS.escape(list.dataset.list)}"] ${own}` : own;
+    return list && (el.hasAttribute('data-list-item') || el.hasAttribute('data-bulk')) ? `[data-list="${CSS.escape(list.dataset.list)}"] ${own}` : own;
+  }
+  function refocus(key) {
+    if (key) /** @type {HTMLElement | null} */ (root.querySelector(key))?.focus({ preventScroll: true });
   }
 
+  /** The whole panel again (a scene opened). */
   function draw() {
     const scene = get();
     const scroll = root.scrollTop;
     const focus = focusKey();
     root.innerHTML = panelMarkup(scene, { ...ctx(), open });
-    shape = panelShape(scene);
+    shapes = sectionShapes(scene);
     drawLater = false;
     root.scrollTop = scroll;
-    if (focus) /** @type {HTMLElement | null} */ (root.querySelector(focus))?.focus({ preventScroll: true });
-    fill({ force: true });
+    refocus(focus);
+    fillValues(scene, { force: true });
+    applyFilter();
+    onDraw();
+  }
+  /** Only `which` sections again (their shapes changed): their bodies, freshly drawn. */
+  function drawSections(scene, which) {
+    const scroll = root.scrollTop;
+    const c = { ...ctx(), open };
+    const bodies = which.map((id) => /** @type {HTMLElement | null} */ (root.querySelector(`#pnt-b-${id}`))).filter(Boolean);
+    const focus = bodies.some((b) => b.contains(document.activeElement)) ? focusKey() : null;
+    for (const body of bodies) body.innerHTML = sectionMarkup(body.id.slice('pnt-b-'.length), scene, c);
+    shapes = sectionShapes(scene);
+    drawLater = false;
+    root.scrollTop = scroll;
+    refocus(focus);
+    return bodies;
   }
 
   /**
-   * Every value from the scene (and the rolled details from what's on screen). The field
-   * under the user's hand (focused, and dragged or moved in the last moment) keeps what it
-   * shows, unless `force` (undo and redo: the scene went back, the field goes with it).
+   * Every value from the scene (and the rolled details from what's on screen); a section
+   * whose shape changed is drawn again first. The field under the user's hand (focused, and
+   * dragged or moved in the last moment) keeps what it shows, unless `force` (undo and redo:
+   * the scene went back, the field goes with it).
    * @param {{ force?: boolean }} [o]
    */
   function fill({ force = false } = {}) {
     const scene = get();
-    if (panelShape(scene) !== shape) {
-      if (!dragging) { draw(); return; }
-      drawLater = true; // (the drag ends first: its slider stays under the pointer)
+    const next = sectionShapes(scene);
+    const changed = Object.keys(next).filter((id) => next[id] !== shapes[id]);
+    /** @type {HTMLElement[]} */
+    let fresh = [];
+    if (changed.length) {
+      if (dragging) drawLater = true; // (the drag ends first: its slider stays under the pointer)
+      else fresh = drawSections(scene, changed);
     }
+    fillValues(scene, { force, fresh });
+    if (fresh.length) {
+      applyFilter();
+      onDraw();
+    }
+  }
+  /** @param {any} scene @param {{ force?: boolean, fresh?: HTMLElement[] }} o  fresh: sections just drawn (every field set) */
+  function fillValues(scene, { force = false, fresh = [] }) {
     const now = live();
-    const busy = (input) => !force && input === document.activeElement && input.type !== 'checkbox' && input.tagName !== 'SELECT'
-      && (input === dragging || performance.now() - handAt < HAND_MS);
+    const busy = (input) => !force && input === document.activeElement && input.type !== 'checkbox' && input.type !== 'radio' && input.tagName !== 'SELECT'
+      && (input === dragging || performance.now() - handAt < HAND_MS) && !fresh.some((b) => b.contains(input));
     for (const el of root.querySelectorAll('[data-scene]')) {
       const input = /** @type {HTMLInputElement} */ (el);
       const path = input.dataset.scene;
       let v = getPath(scene, path);
+      if (input.type === 'radio') { // (Off / In the Mix / Always: missing is the one marked so)
+        input.checked = v === undefined || v === null ? input.hasAttribute('data-missing') : modeOf(v) === input.value;
+        continue;
+      }
       const rolled = v === undefined && /^(details|look\.params)\./.test(path);
       if (rolled) v = liveValue(now, path);
       if (path === 'render.palette') v = Array.isArray(v) ? 'few' : v;
@@ -561,6 +619,10 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
       const out = root.querySelector(`[data-out="${CSS.escape(path)}"]`);
       if (out && typeof v === 'number') out.textContent = v.toFixed(decimals(input.step || '0.01'));
     }
+    fillChoices(scene);
+  }
+  /** The chips pressed, the helmet rows, the few colors and the notes, as the scene has them. */
+  function fillChoices(scene) {
     for (const b of root.querySelectorAll('[data-pick]')) {
       const btn = /** @type {HTMLElement} */ (b);
       const v = getPath(scene, btn.dataset.pick);
@@ -568,21 +630,28 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
       btn.setAttribute('aria-pressed', String(pressed));
     }
     // As many helmet rows as knights.
-    for (const row of root.querySelectorAll('[data-helmet]')) /** @type {HTMLElement} */ (row).hidden = Number(/** @type {HTMLElement} */ (row).dataset.helmet) >= scene.knights.count;
+    for (const r of root.querySelectorAll('[data-helmet]')) /** @type {HTMLElement} */ (r).hidden = Number(/** @type {HTMLElement} */ (r).dataset.helmet) >= scene.knights.count;
     // The few colors: which are picked, in the scene's colors now.
     if (Array.isArray(scene.render.palette)) {
-      const cols = slotColors(scene, /** @type {any} */ (ctx()).siteBase);
+      const cols = slotColors(scene, ctx().siteBase);
       for (const b of root.querySelectorAll('[data-slot]')) {
         const i = Number(/** @type {HTMLElement} */ (b).dataset.slot);
         b.setAttribute('aria-pressed', String(scene.render.palette.includes(i)));
         /** @type {HTMLElement} */ (b.firstElementChild)?.style.setProperty('--c', cols[i]);
       }
     }
+    lookHint(auditioning?.dataset.pick === 'look.name' ? JSON.parse(auditioning.dataset.value) : scene.look.name);
     // (The page says when the rules moved a color: the tips lightened, the background darkened.)
     const readable = /** @type {HTMLElement | null} */ (root.querySelector('[data-readable]'));
     if (readable) readable.hidden = !root.dataset.lightened;
     const darkest = /** @type {HTMLElement | null} */ (root.querySelector('[data-darkest]'));
     if (darkest) darkest.hidden = !root.dataset.darkened;
+  }
+  /** The line under the looks says what the look (painted, or hovered) does. */
+  function lookHint(name) {
+    const el = root.querySelector('[data-look-hint]');
+    const text = itemHint('looks', name);
+    if (el && el.textContent !== text) el.textContent = text;
   }
   // A slider held: a redraw its edits call for waits until it's let go.
   root.addEventListener('pointerdown', (e) => {
@@ -598,40 +667,6 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
   window.addEventListener('pointerup', letGo);
   window.addEventListener('pointercancel', letGo);
 
-  /**
-   * Keep a "?" hint's box inside the panel: shifted left when it hangs from a mark near the
-   * right edge, opened downward when there's no room above. (A field's hint spans its field,
-   * visualizer.css: it only ever needs the flip.)
-   * @param {HTMLElement} mark
-   */
-  function placeTip(mark) {
-    const box = root.getBoundingClientRect();
-    const own = getComputedStyle(mark).position !== 'static'; // (else it hangs from its field)
-    const anchor = own ? mark : /** @type {HTMLElement} */ (mark.offsetParent ?? mark);
-    const at = anchor.getBoundingClientRect();
-    const after = getComputedStyle(mark, '::after');
-    const h = parseFloat(after.height) || 90;
-    if (own) {
-      const w = parseFloat(after.width) || 270;
-      const right = box.right - (root.offsetWidth - root.clientWidth) - TIP_PAD; // (inside the scrollbar)
-      const left = Math.max(box.left + TIP_PAD, Math.min(at.left - 10, right - w));
-      mark.style.setProperty('--tip-x', `${Math.round(left - at.left)}px`);
-    }
-    const above = at.top - box.top - TIP_PAD;
-    const below = box.bottom - at.bottom - TIP_PAD;
-    mark.toggleAttribute('data-tip-below', above < h + 8 && below > above);
-  }
-  // (Placed as it's about to show: the "?" hovered or focused, or its field focused.)
-  const tipOf = (e) => {
-    const t = /** @type {HTMLElement} */ (e.target);
-    const own = t.closest?.('.viz-tip');
-    // (Focused: its field's "?"; a row of a group, data-group-tip, shows the group's.)
-    const field = own || e.type !== 'focusin' ? null
-      : t.closest?.('[data-group-tip]') ? t.closest('[data-tip-group]') : t.closest?.('.viz-field, .viz-check, .viz-mode, .pnt-mode, [data-tip-group]');
-    return /** @type {HTMLElement | null} */ (own ?? field?.querySelector('.viz-tip') ?? null);
-  };
-  root.addEventListener('pointerover', (e) => { const m = tipOf(e); if (m) placeTip(m); });
-  root.addEventListener('focusin', (e) => { const m = tipOf(e); if (m) placeTip(m); });
   /** What a rolled detail is on screen now (looks.js details), for its dimmed field. */
   function liveValue(now, path) {
     if (!now) return undefined;
@@ -687,17 +722,21 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     }
     edit(path, read(input), { key: path });
   }
+  /** A field that takes its edit on `change` (a click's, not a drag's). */
+  const changesOnce = (input) => input.type === 'checkbox' || input.type === 'radio' || input.tagName === 'SELECT';
   root.addEventListener('input', (e) => {
     const input = /** @type {HTMLInputElement} */ (e.target);
     handAt = performance.now();
-    if (input.dataset?.scene && input.type !== 'checkbox' && input.tagName !== 'SELECT') editInput(input);
+    if (input.dataset?.scene && !changesOnce(input)) editInput(input);
     else if (input.dataset?.seed) act(`seed-${input.dataset.seed}`, input);
   });
   root.addEventListener('change', (e) => {
     const input = /** @type {HTMLInputElement} */ (e.target);
     if (input === dragging) letGo();
-    if (input.dataset?.scene && (input.type === 'checkbox' || input.tagName === 'SELECT')) editInput(input);
-    else if (input.dataset?.scene) edit(input.dataset.scene, read(input), { key: null }); // (a drag ended: the next is a step of its own)
+    if (input.dataset?.scene && changesOnce(input)) {
+      if (input.type === 'radio' && auditioning?.contains(input)) auditioning = null; // (kept: it's the scene now)
+      editInput(input);
+    } else if (input.dataset?.scene) edit(input.dataset.scene, read(input), { key: null }); // (a drag ended: the next is a step of its own)
     else if (input.hasAttribute?.('data-list-show')) {
       const path = input.dataset.listShow;
       edit(path, input.checked ? null : Object.keys(path.startsWith('knights') ? KNIGHT_MOVES : FLY_MOVES), { key: null });
@@ -729,6 +768,13 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
       }
       return;
     }
+    const bulk = /** @type {HTMLElement} */ (t.closest('[data-bulk]'));
+    if (bulk) {
+      if (bulk.getAttribute('aria-disabled') === 'true') return;
+      const change = bulkEdit(get(), bulk.dataset.bulkGroup, bulk.dataset.bulk);
+      if (change && edit(change.path, change.value, { key: null }) !== false) onBulk(`${change.name}: ${bulk.textContent.trim()}. Ctrl+Z undoes it.`);
+      return;
+    }
     const slot = /** @type {HTMLElement} */ (t.closest('[data-slot]'));
     if (slot) {
       const i = Number(slot.dataset.slot);
@@ -750,12 +796,22 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     const a = /** @type {HTMLElement} */ (t.closest('[data-paint-act]'));
     if (a) act(a.dataset.paintAct, a);
   });
-  // Hover = audition: the chip's scene on the stage while the pointer is on it.
+  // Hover = audition: the chip's (or a layer's choice's) scene on the stage while the
+  // pointer is on it.
+  /** What an audition shows: [path, value]. */
+  const auditionOf = (c) => {
+    if (c.dataset.pick) return [c.dataset.pick, JSON.parse(c.dataset.value)];
+    const input = /** @type {HTMLInputElement | null} */ (c.querySelector('input[data-scene]'));
+    return input ? [input.dataset.scene, input.value] : null;
+  };
   root.addEventListener('pointerover', (e) => {
     const c = /** @type {HTMLElement} */ (/** @type {HTMLElement} */ (e.target).closest?.('[data-audition]'));
     if (!c || c === auditioning || e.pointerType === 'touch') return;
+    const shows = auditionOf(c);
+    if (!shows) return;
     auditioning = c;
-    audition(withPath(get(), c.dataset.pick, JSON.parse(c.dataset.value)));
+    audition(withPath(get(), shows[0], shows[1]));
+    if (shows[0] === 'look.name') lookHint(shows[1]);
   });
   root.addEventListener('pointerout', (e) => {
     if (!auditioning) return;
@@ -763,9 +819,11 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     if (to && auditioning.contains(to)) return;
     auditioning = null;
     audition(null);
+    lookHint(get().look.name);
   });
 
-  function setOpen(id, on) {
+  /** @param {string} id @param {boolean} on @param {{ save?: boolean }} [o]  save: by hand (the page keeps it) */
+  function setOpen(id, on, { save = true } = {}) {
     if (on) open.add(id); else open.delete(id);
     const sec = root.querySelector(`[data-sec="${id}"]`);
     if (!sec) return;
@@ -773,9 +831,47 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     /** @type {HTMLElement} */ (sec.querySelector('.pnt-sec-body')).hidden = !on;
     sec.querySelector('[data-sec-toggle]').setAttribute('aria-expanded', String(on));
     root.querySelector(`[data-sec-tab="${id}"]`)?.setAttribute('aria-pressed', String(on));
-    onSection(id, on);
+    if (save && !filter) onSection([...open]);
   }
 
+  /**
+   * The search's rows shown, the rest hidden: a row found shows with the rows inside it (a
+   * layer's details) and round it; a section or group with nothing left goes, one with
+   * something is opened; what matched in a label is marked (escaped: settingsSearch.js
+   * highlight). With no query, everything's back, and the sections open before it.
+   */
+  function applyFilter() {
+    root.toggleAttribute('data-searching', !!filter);
+    for (const m of root.querySelectorAll('[data-hl].has-mark')) { m.replaceChildren(m.textContent); m.classList.remove('has-mark'); }
+    const rows = /** @type {HTMLElement[]} */ ([...root.querySelectorAll('[data-row]')]);
+    if (!filter) {
+      for (const el of root.querySelectorAll('.is-miss')) el.classList.remove('is-miss');
+      if (openBefore) {
+        for (const [id] of SECTIONS) setOpen(id, openBefore.has(id), { save: false });
+        openBefore = null;
+      }
+      return;
+    }
+    openBefore ??= new Set(open);
+    const hits = rows.filter((r) => filter.has(r.dataset.row));
+    for (const r of rows) r.classList.toggle('is-miss', !hits.some((h) => h === r || h.contains(r) || r.contains(h)));
+    for (const h of hits) {
+      const label = /** @type {HTMLElement | null} */ (h.querySelector('[data-hl]'));
+      const found = filter.get(h.dataset.row);
+      if (label && found?.ranges.length && label.textContent === found.label) {
+        label.innerHTML = highlight(found.label, found.ranges);
+        label.classList.add('has-mark');
+      }
+    }
+    for (const g of root.querySelectorAll('[data-group]')) g.classList.toggle('is-miss', !g.querySelector('[data-row]:not(.is-miss)'));
+    for (const [id] of SECTIONS) {
+      const sec = root.querySelector(`[data-sec="${id}"]`);
+      const any = !!sec?.querySelector('[data-row]:not(.is-miss)');
+      sec?.classList.toggle('is-miss', !any);
+      root.querySelector(`[data-sec-tab="${id}"]`)?.classList.toggle('is-miss', !any);
+      if (any !== open.has(id)) setOpen(id, any, { save: false });
+    }
+  }
   draw();
   return {
     fill,
@@ -784,11 +880,23 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     /** Open a section (and scroll to it). */
     show(id) { setOpen(id, true); root.querySelector(`[data-sec="${id}"]`)?.scrollIntoView({ block: 'nearest' }); },
     get open() { return [...open]; },
-    /** Suggestions for a seed color: chips drawn into the section (flame or scenery). */
+    /** Suggestions for a seed color: chips drawn into the section (flame or place). */
     suggest(kind, html) { const el = root.querySelector(`[data-suggest="${kind}"]`); if (el) el.innerHTML = html; },
     /** Whether a hover audition is showing. */
     get auditioning() { return !!auditioning; },
     /** End an audition without waiting for the pointer (a key, a click elsewhere). */
-    endAudition() { if (auditioning) { auditioning = null; audition(null); } },
+    endAudition() { if (auditioning) { auditioning = null; audition(null); lookHint(get().look.name); } },
+    /**
+     * Show only the rows a search found (row id → its label and what matched in it), or
+     * everything (null). Kept through every redraw until it's set again. `top`: scrolled to
+     * the first (a new query).
+     * @param {Map<string, { ranges: [number, number][], label: string }> | null} rows
+     * @param {{ top?: boolean }} [o]
+     */
+    filter(rows, { top = false } = {}) {
+      filter = rows;
+      applyFilter();
+      if (top) root.scrollTop = 0;
+    },
   };
 }

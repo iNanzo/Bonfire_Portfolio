@@ -207,12 +207,12 @@ export const SETTINGS = {
   },
   weapon: {
     section: 'weapons', label: 'Weapon', painter: 'place.weapon',
-    hint: 'The weapon planted in the fire. Drawn by the Show brings a new one each time a drop forges one, as Bonfire Live does.',
+    hint: 'The weapon planted in the fire. Drawn By the Show brings a new one each time a drop forges one, as Bonfire Live does.',
     keywords: ['sword', 'blade'],
   },
   element: {
     section: 'weapons', label: 'Element', painter: 'place.element',
-    hint: 'What the fire is made of: flame, a lightning ball or ice. Drawn by the Show draws one on each drop from those Bonfire Live allows.',
+    hint: 'What the fire is made of: flame, a lightning ball or ice. Drawn By the Show draws one on each drop from those Bonfire Live allows.',
     keywords: ['fire', 'lightning', 'ice', 'frost'],
   },
 

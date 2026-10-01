@@ -29,7 +29,8 @@
 //             offers it back until it's restored or discarded.
 //   keys      H the panel, L the library, P the render menu (bound to the scene), I the
 //             pack (it paints into the scene), F full screen, Space the beat, D a drop,
-//             C a picture of the stage, and the camera's (cameraRig.js).
+//             C a picture of the stage, and the camera's (cameraRig.js); / searches the
+//             panel.
 // Reduced motion: the Still preview to start with.
 import '../styles.css';
 import '../visualizer/visualizer.css';
@@ -40,6 +41,7 @@ import { scenes as builtInScenes, site, startingEquipment, ui, weapons } from '.
 import { elements, elementOr } from '../elements.js';
 import { installDitherPatterns } from '../ui/dither.js';
 import { installTooltips } from '../ui/tooltip.js';
+import { searchBoxMarkup } from '../ui/settingsSearch.js';
 import { applyFlame, setAccentRamp } from '../ui/theme.js';
 import { esc } from '../html.js';
 import { logoMark } from '../ui/logo.js';
@@ -57,6 +59,7 @@ import { defaultScene, decodeSceneHash, normalizeScene, parseRef, sceneRef, uniq
 import { createSceneStore } from '../sceneStore.js';
 import { harmoniousFlame, harmoniousScene, hexToOklch, suggestFlames, suggestScenes, vividScene, wildFlame, wildScene } from '../paletteGen.js';
 import { bindPanel, flameChips, getPath, sceneryChips, withPath } from './panel.js';
+import { createPanelSearch } from './panelSearch.js';
 import { createHistory } from './history.js';
 import { createBeatFeed, silentFrame } from './beat.js';
 import { createCameraRig } from './cameraRig.js';
@@ -74,6 +77,8 @@ const DRAFT = 'bonfire-painter-draft';
 const DRAFT_ASIDE = 'bonfire-painter-draft-aside';
 /** Bonfire Live's tab, by name: Play finds the one it opened. */
 const LIVE_TAB = 'bonfire-live';
+/** Which of the panel's sections are open, kept for the next visit. */
+const PANEL_KEY = 'bonfire-painter-panel';
 const BASE_URL = import.meta.env.BASE_URL;
 const voidHex = effects.colors.void;
 const siteBase = { ...base }; // (the site's own scenery colors, before a scene recolors them)
@@ -181,6 +186,16 @@ const PREVIEWS = [
   ['drop', 'Drop Loop', 'Drop', 'A silent 16 bars: groove, breakdown, build, and the drop landing in the scene.'],
   ['demo', 'Demo Track', 'Demo', 'Bonfire Live’s demo track, with sound.'],
 ];
+/** The panel's sections left open last time (the page's own: a scene doesn't keep them). */
+function readOpen() {
+  try {
+    const open = JSON.parse(localStorage.getItem(PANEL_KEY) ?? 'null');
+    return Array.isArray(open) && open.every((id) => typeof id === 'string') ? open : ['place'];
+  } catch { return ['place']; }
+}
+function saveOpen(open) {
+  try { localStorage.setItem(PANEL_KEY, JSON.stringify(open)); } catch { /* private mode: not kept */ }
+}
 /** A label with a shorter one for phones. */
 const label = (long, short) => (short === long ? esc(long) : `<span class="pnt-long">${esc(long)}</span><span class="pnt-short">${esc(short)}</span>`);
 const app = document.getElementById('painter');
@@ -221,13 +236,20 @@ app.innerHTML = `
       <button type="button" class="pix-btn pnt-danger" data-cmd="aside-discard">Discard It</button>
     </div>
   </div>
-  <aside class="pnt-panel frame" id="pnt-panel" data-panel aria-label="Scene"></aside>
+  <aside class="pnt-panel frame" id="pnt-panel" data-panel aria-label="Scene">
+    <div class="pnt-panel-head">
+      ${searchBoxMarkup({ id: 'pnt-search', label: 'Search the Scene’s Settings', placeholder: 'Search settings  /' })}
+      <div class="pnt-search-notes" data-search-notes hidden></div>
+    </div>
+    <div class="pnt-panel-body" data-panel-body></div>
+  </aside>
   <div class="pnt-lib" data-library></div>
   <p class="pnt-toast" role="status" aria-live="polite" data-note></p>
   <p class="viz-error pnt-error" role="alert" data-error hidden></p>
 `;
 const stage = q('[data-stage]');
 const panelEl = q('[data-panel]');
+const panelBody = /** @type {HTMLElement} */ (q('[data-panel-body]'));
 const nameInput = /** @type {HTMLInputElement} */ (q('[data-name]'));
 const noteEl = q('[data-note]');
 let noteTimer = 0;
@@ -390,8 +412,8 @@ function edit(path, value, { key = path } = {}) {
   // (And the background kept the darkest scenery color.)
   if (path.startsWith('colors.')) {
     const norm = normalizeScene(next, { voidHex });
-    panelEl.dataset.lightened = getPath(next, 'colors.flame.hi') !== norm.colors.flame.hi ? '1' : '';
-    panelEl.dataset.darkened = next.colors.scenery && next.colors.scenery.void !== norm.colors.scenery?.void ? '1' : '';
+    panelBody.dataset.lightened = getPath(next, 'colors.flame.hi') !== norm.colors.flame.hi ? '1' : '';
+    panelBody.dataset.darkened = next.colors.scenery && next.colors.scenery.void !== norm.colors.scenery?.void ? '1' : '';
   }
   return commit(next, key);
 }
@@ -490,6 +512,7 @@ const panelCtx = () => ({
   flames: rotation().map((key) => ({ key, name: flames[key].name, colors: flameColors(key) })),
   shots: Object.entries(SHOTS).map(([key, s]) => ({ key, name: s.name, camera: shotCamera(s) })),
   siteBase,
+  site: { pixelSize: effects.render.pixelSize, ditherMatrix: effects.render.ditherMatrix, flameFps: effects.fire.fps },
 });
 let flameScheme = 'auto';
 const sceneVoid = () => scene.colors.scenery?.void ?? siteBase.void;
@@ -537,15 +560,29 @@ function act(name, el) {
     if (!fire?.knights?.gesture(g, { index: 'all' })) note(reducedMotion ? 'The knights keep still (reduced motion).' : 'No knight free to do that right now.', 1.6);
   }
 }
-const panel = bindPanel(panelEl, {
+/** @type {ReturnType<typeof createPanelSearch> | null} */
+let search = null;
+const panel = bindPanel(panelBody, {
   get: () => scene,
   edit,
   audition,
   act,
   live: () => director?.parts.looks.details ?? null,
   ctx: panelCtx,
+  open: readOpen(),
+  onSection: saveOpen,
+  onBulk: (text) => note(text, 3),
+  onDraw: () => search?.refresh(),
 });
 setInterval(() => { if (!panelEl.hidden) panel.refreshLive(); }, 700);
+search = createPanelSearch({
+  input: /** @type {HTMLInputElement} */ (q('#pnt-search')),
+  status: q('[data-panel] [data-search-status]'),
+  notes: q('[data-search-notes]'),
+  panel,
+  scene: () => scene,
+  ctx: panelCtx(),
+});
 
 // --- The camera by hand ------------------------------------------------------------------------
 const rig = createCameraRig(stage, {
@@ -833,6 +870,11 @@ function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen?.();
   else document.documentElement.requestFullscreen?.().catch(() => {});
 }
+/** `/`: the panel's search (the panel shown first if it's hidden). */
+function focusSearch() {
+  if (!panelShown) togglePanel(true);
+  search.focus();
+}
 const commands = {
   library: () => library.toggle(),
   save: () => save(),
@@ -871,6 +913,7 @@ window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   // The library open: L closes it (Esc is its own); the stage's keys wait.
   if (library.isOpen) { if (k === 'l') { e.preventDefault(); library.close(); } return; }
+  if (e.key === '/') { e.preventDefault(); focusSearch(); return; }
   if (renderMenu.handleKey(e)) { e.preventDefault(); return; }
   if (e.key === 'Escape' && renderMenu.isOpen) { renderMenu.close(); return; }
   // The camera's keys act on the stage (not while a panel field has the arrows).

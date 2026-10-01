@@ -135,6 +135,8 @@ body.lib-open .pnt-banners { display: none; }
 .pnt-banner[hidden] { display: none; }
 
 /* ---------- The panel ---------- */
+/* The search over the sections (outside what's drawn again: it keeps its focus), then the
+   sections, which scroll. */
 .pnt-panel {
   position: fixed;
   top: var(--bar-h);
@@ -142,15 +144,37 @@ body.lib-open .pnt-banners { display: none; }
   bottom: 0;
   z-index: 20;
   width: var(--panel-w);
-  overflow: hidden auto;
-  overscroll-behavior: contain;
-  padding: 6px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: color-mix(in srgb, var(--c-void) 90%, transparent);
   box-shadow: -1px 0 0 var(--line);
+}
+.pnt-panel[hidden] { display: none; }
+.pnt-panel-head { flex: none; padding: 10px 16px 8px; box-shadow: 0 1px 0 var(--line); }
+/* (Positioned: the hints' hidden text, absolutely placed, then scrolls inside it. Held by
+   the panel instead, it ran past the panel's foot, and a field focused or scrolled into view
+   slid the whole panel up under the bar, the search box with it.) */
+.pnt-panel-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  padding: 0 16px 40px;
   scrollbar-width: thin;
   scrollbar-color: var(--c-stone) transparent;
 }
-.pnt-panel[hidden] { display: none; }
+/* What the search found that the scene's shape leaves out, and how to bring it back. */
+.pnt-search-notes { max-height: 7.5em; overflow: auto; margin-top: 6px; font-size: 0.8125rem; line-height: 1.45; color: var(--text-dim); }
+.pnt-search-notes[hidden] { display: none; }
+.pnt-search-notes-title { margin: 0 0 2px; font: 400 0.6875rem/1.4 var(--font-pixel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.pnt-search-notes ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.pnt-search-notes li { padding-left: 10px; box-shadow: inset 1px 0 0 var(--line-strong); }
+/* While searching: only the rows found (and the sections and groups they're in). */
+.pnt-panel-body[data-searching] .is-miss,
+.pnt-panel-body[data-searching] .pnt-sec-body > :not([data-row]):not(.pnt-group),
+.pnt-panel-body[data-searching] .pnt-group > :not([data-row]):not(.pnt-subhead) { display: none !important; }
 .pnt-tabs { display: none; }
 .pnt-sec + .pnt-sec { box-shadow: 0 -1px 0 var(--line); }
 .pnt-sec-head { margin: 0; }
@@ -175,10 +199,30 @@ body.lib-open .pnt-banners { display: none; }
 .pnt-sec-body { display: grid; gap: 14px; padding: 0 0 18px; }
 .pnt-sec-body[hidden] { display: none; }
 .pnt-sub { display: grid; gap: 12px; padding: 10px 0 0 10px; box-shadow: inset 1px 0 0 var(--line); }
+/* The Knights' groups, each under its sub-heading. */
+.pnt-group { display: grid; gap: 14px; }
+.pnt-subhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding-top: 10px;
+  box-shadow: 0 -1px 0 var(--line);
+  font: 400 0.75rem/1.3 var(--font-pixel);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 70%, var(--c-bone));
+}
+.pnt-group:first-child .pnt-subhead { margin-top: 0; padding-top: 0; box-shadow: none; }
+.pnt-subhead .viz-tip { letter-spacing: 0; }
+.pnt-field { display: grid; gap: 0; min-width: 0; }
+.pnt-field > .viz-more { margin-top: 6px; }
 .pnt-help { font-size: 0.8125rem; line-height: 1.5; color: var(--text-dim); }
 .pnt-note { font-size: 0.8125rem; color: var(--accent-hi); }
 .pnt-note[hidden] { display: none; }
 .pnt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pnt-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 0.875rem; color: var(--text-dim); }
+.pnt-inline label { cursor: pointer; }
 .pnt-inline select { width: auto; padding: 5px 8px; font-size: 0.875rem; }
 .pnt-panel .viz-field-label { font-size: 0.875rem; }
 .pnt-panel .viz-field-label + * { margin-top: 6px; }
@@ -235,23 +279,16 @@ body.lib-open .pnt-banners { display: none; }
 .pnt-sw i { width: 9px; height: 14px; background: var(--c); }
 .pnt-flames .pnt-chip { padding: 4px 8px 4px 5px; }
 
-/* Off / In the Mix / Always, three chips joined. */
-.pnt-mode { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.pnt-mode-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 0.9375rem; color: var(--c-bone); }
-.pnt-seg { display: inline-flex; flex: none; }
-.pnt-seg .pnt-chip { padding: 4px 7px; font-size: 0.75rem; }
-.pnt-seg .pnt-chip + .pnt-chip { margin-left: 1px; }
+/* Off / In the Mix / Always (fields.js tri(): radios, one keyboard stop): the name and its
+   "?" on the left, the three choices joined on the right. */
+.pnt-panel fieldset.tri { color: var(--c-bone); }
+.pnt-panel fieldset.tri .tri-opt span { padding: 4px 7px; font-size: 0.75rem; }
 
 /* The layers: a row each, its details under it while it's on. */
 .pnt-layer { padding: 6px 0 6px 10px; box-shadow: inset 2px 0 0 transparent; }
 .pnt-layer.is-on { box-shadow: inset 2px 0 0 var(--accent); }
 .pnt-details { display: grid; gap: 10px; padding: 10px 0 4px; }
 .pnt-pin-all { gap: 6px; }
-
-/* The "?" hints stay inside the panel (it clips what's outside it): bindPanel shifts one
-   near the right edge left (--tip-x) and opens one near the top downward. */
-.pnt-panel .viz-tip::after { left: var(--tip-x, -10px); }
-.pnt-panel .viz-tip[data-tip-below]::after { top: calc(100% + 8px); bottom: auto; }
 
 /* A detail and its lock: pinned (a pin) or left to the dice (a die, the field dimmed). */
 .pnt-detail { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 10px; }
@@ -304,9 +341,12 @@ body.lib-open .pnt-banners { display: none; }
 .pnt-slot:disabled { cursor: default; }
 .pnt-slot:not(:disabled):hover { box-shadow: 0 0 0 1px var(--accent), 0 0 10px -2px var(--accent); }
 
-.pnt-helmets { display: grid; gap: 8px; }
+.pnt-helmets { display: grid; gap: 8px; margin-top: 6px; }
 .pnt-helmet[hidden] { display: none; }
-.pnt-list .viz-checks { margin-top: 8px; }
+.pnt-list { gap: 6px; }
+.pnt-list .viz-field-label + * { margin-top: 0; }
+.pnt-list .bulk { margin: 2px 0 0; }
+.pnt-list .viz-checks { margin-top: 2px; }
 
 /* ---------- The render menu (P): to the panel's left ---------- */
 .pnt-render-menu { top: calc(var(--bar-h) + 10px); right: calc(var(--panel-w) + 14px); z-index: 25; }
@@ -429,9 +469,11 @@ body.pnt.panel-off .pack { right: var(--gutter); }
     left: 0;
     width: auto;
     height: 46vh;
-    padding: 0 12px 28px;
     box-shadow: 0 -1px 0 var(--line);
   }
+  .pnt-panel-head { padding: 8px 12px 6px; }
+  .pnt-panel-body { padding: 0 12px 28px; }
+  .pnt-search-notes { max-height: 4.5em; }
   .pnt-tabs {
     position: sticky;
     top: 0;
@@ -447,6 +489,7 @@ body.pnt.panel-off .pack { right: var(--gutter); }
   }
   .pnt-tabs button { flex: none; padding: 6px 9px; border: 0; background: none; font: 400 0.8125rem/1 var(--font-pixel); color: var(--text-dim); white-space: nowrap; cursor: pointer; }
   .pnt-tabs button[aria-pressed='true'] { color: var(--accent-hi); box-shadow: inset 0 -2px 0 var(--accent); }
+  .pnt-tabs button.is-miss { display: none; }
   .pnt-sec-head { display: none; }
   .pnt-sec + .pnt-sec { box-shadow: none; }
   .pnt-sec:not([data-open]) { display: none; }
