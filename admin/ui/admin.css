@@ -102,6 +102,32 @@ kbd { font: 11px var(--pixel); padding: 0 4px; border: 1px solid currentColor; b
 .nav-count:not(:empty) { min-width: 20px; padding: 0 6px; border-radius: 10px; background: var(--bad); color: var(--void); font: 600 12px/20px var(--body); text-align: center; }
 .who { padding: 12px; border-top: 1px solid var(--line); font-size: 13px; }
 
+/* ---- search (search.js): the box at the top of the sidebar, its results in the top layer ---- */
+.sidebar { justify-content: flex-start; }
+.sidebar > .who { margin-top: auto; }
+.admin-search { position: relative; display: grid; gap: 4px; }
+.admin-search-row { position: relative; display: block; }
+.admin-search input[type='search'] {
+  width: 100%; padding: 7px 52px 7px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--field); box-shadow: none; font: 400 14px/1.3 var(--body);
+}
+.admin-search input[type='search']:focus { border-color: var(--hi); box-shadow: 0 0 0 3px var(--glow); outline: none; }
+.admin-search-key { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.admin-search input:focus + .admin-search-key { display: none; }
+.admin-search .settings-search-status { padding: 0 2px; }
+.search-results {
+  position: fixed; inset: auto; left: 8px; top: 64px; width: min(560px, calc(100vw - 16px)); max-height: 70vh;
+  margin: 0; padding: 4px; overflow: auto; overscroll-behavior: contain; list-style: none; z-index: 40;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hi) 30%, transparent), 0 14px 40px rgb(0 0 0 / 0.6); color: var(--bone);
+}
+.search-result { display: grid; gap: 2px; padding: 7px 10px; border-radius: 4px; cursor: pointer; }
+.search-result[aria-selected='true'] { background: var(--glow); box-shadow: inset 3px 0 0 var(--hi); }
+.sr-path { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; font-size: 12px; color: var(--faint); }
+.sr-crumb::after { content: '›'; margin-left: 4px; }
+.sr-label { font: 500 14px var(--body); color: var(--bone); }
+.sr-hint { font-size: 12px; line-height: 1.4; color: var(--dim); }
+.search-result mark { border-radius: 2px; }
 .who p { margin: 0 0 4px; overflow-wrap: anywhere; }
 .muted { color: var(--dim); }
 
@@ -412,7 +438,16 @@ input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
     grid-row: auto; position: sticky; top: var(--top); z-index: 10; height: auto; padding: 6px 8px;
     border-right: 0; border-bottom: 1px solid var(--line); background: var(--void);
   }
-  .nav { display: flex; overflow-x: auto; gap: 4px; }
+  .sidebar { flex-direction: row; align-items: center; gap: 6px; }
+  .admin-search { flex: none; width: 8.5em; }
+  .admin-search input[type='search'] { padding: 6px 8px; font-size: 13px; }
+  .admin-search-key { display: none; }
+  /* (The status line floats under the strip, so the strip stays one row.) */
+  .admin-search .settings-search-status:not(:empty) {
+    position: absolute; left: 0; top: calc(100% + 4px); width: max-content; max-width: calc(100vw - 24px); z-index: 2;
+    padding: 4px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--panel);
+  }
+  .nav { flex: 1; min-width: 0; display: flex; overflow-x: auto; gap: 4px; }
   .nav-group { display: contents; }
   .nav-group-label { display: none; }
   .nav-group ul { display: contents; }

@@ -5,13 +5,15 @@
 // discard them. The Look & Feel pages (Colors, Fire & Elements, Picture, Knight) stream
 // the draft into a live preview of the site.
 //
-// A field that needs fixing is gone to by reveal(): the cards on the way opened, its page
-// shown, the field scrolled into view below the sticky bars, focused and flashed.
+// Ctrl+K or / opens the search (search.js); a result, like a field that needs fixing, is
+// gone to by reveal(): the cards on the way opened, its page shown, the field scrolled into
+// view below the sticky bars, focused and flashed.
 import './admin.css';
 import { imageRefs, SECTIONS, validateContent } from '../../src/contentRules.js';
 import { DEFAULT_EFFECTS } from '../../src/effectsDefaults.js';
 import { logoMark } from '../../src/ui/logo.js';
 import { installTooltips } from '../../src/ui/tooltip.js';
+import { typing } from '../../src/ui/shell.js';
 import { HELP, LABELS, PAGES, defaultLabel, moreFor, resolveHelp } from './schema.js';
 import { el, getAt, moreBox, renderFeatured, renderValue, showErrors } from './form.js';
 import { createPreview } from './preview.js';
@@ -19,7 +21,7 @@ import { flamesBlockTools, sceneBlockTools } from './paletteTools.js';
 import { scenesBlockTools } from './sceneTools.js';
 import { titleCase } from './text.js';
 import { parsePath, parentKey, within } from './paths.js';
-import { pageById, pageOf, revealPlan } from './search.js';
+import { buildIndex, createSearch, pageById, pageOf, revealPlan } from './search.js';
 import { resetMessage, resetSection } from './reset.js';
 
 const DRAFT_KEY = 'nh-admin-draft';
@@ -109,6 +111,8 @@ function renameable(tag, cls, key, id) {
 }
 
 // ---- shell ----------------------------------------------------------------------------
+const search = createSearch({ entries: () => buildIndex(ctx.draft, { labelOf }), onPick: (key) => reveal(key) });
+
 function renderNav() {
   const groups = [...new Set(PAGES.map((p) => p.group))];
   fill(q('[data-nav-list]'), groups.map((g) => el('li', { class: 'nav-group' },
@@ -118,6 +122,7 @@ function renderNav() {
         el('span', { text: labelOf(`page:${p.id}`) }),
         el('span', { class: 'nav-count', 'data-count': p.id }))))))));
   countErrors();
+  search.refresh();
 }
 
 function shell() {
@@ -135,7 +140,7 @@ function shell() {
         el('button', { type: 'button', class: 'button primary', 'data-save': true, onclick: save }, 'Save', el('kbd', { text: 'Ctrl S' })))),
     el('div', { class: 'notice', 'data-notice': true, hidden: true }),
     el('div', { class: 'layout', 'data-layout': true },
-      el('nav', { class: 'sidebar', 'aria-label': 'Sections' }, el('ul', { role: 'list', class: 'nav', 'data-nav-list': true }), el('div', { class: 'who', 'data-who': true })),
+      el('nav', { class: 'sidebar', 'aria-label': 'Sections' }, search.root, el('ul', { role: 'list', class: 'nav', 'data-nav-list': true }), el('div', { class: 'who', 'data-who': true })),
       el('main', { class: 'page', 'data-page': true, tabindex: '-1' }, el('p', { class: 'loading', text: 'Loading content…' })),
       el('div', { class: 'preview-slot', 'data-preview-slot': true, hidden: true })),
     el('div', { class: 'toasts', 'data-toasts': true, 'aria-live': 'polite' }),
@@ -305,7 +310,7 @@ function flashOnce(target) {
 /**
  * Go to a field (or a section, card or group) by its key: the cards on the way opened, its
  * page shown, then it's scrolled into view below the sticky bars, focused and (`flash`)
- * flashed.
+ * flashed. Errors and search results both come here.
  * @param {string} key
  * @param {{ flash?: boolean }} [o]
  */
@@ -351,6 +356,7 @@ function changed({ rerender = false } = {}) {
   clearTimeout(draftTimer);
   draftTimer = setTimeout(keepDraft, 600);
   updateStatus();
+  search.refresh();
 }
 
 function countErrors() {
@@ -576,6 +582,8 @@ async function boot() {
   window.addEventListener('keydown', (e) => {
     const mod = e.ctrlKey || e.metaKey;
     if (mod && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
+    else if (mod && !e.altKey && e.key.toLowerCase() === 'k') { e.preventDefault(); search.focus(); }
+    else if (e.key === '/' && !mod && !e.altKey && !typing(e.target) && !document.querySelector('dialog[open]')) { e.preventDefault(); search.focus(); }
   });
   window.addEventListener('beforeunload', (e) => { if (isDirty()) e.preventDefault(); });
 }
