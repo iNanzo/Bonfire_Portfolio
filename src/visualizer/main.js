@@ -455,7 +455,7 @@ const sceneLine = q('[data-scene-line]');
 const sceneNameEl = q('[data-scene-name]');
 const chipsEl = q('[data-scene-chips]');
 const soloEl = q('[data-solo]');
-const SCENE_SWITCH = { off: 'Off: the show plays free', mix: 'In the mix', on: 'Always' };
+const SCENE_SWITCH = { off: 'Off (the show plays free)', mix: 'In the Mix', on: 'Always' };
 
 /**
  * Play a scene: at once (`instant`: behind the start menu, a rebuilt scene), or while the
@@ -573,7 +573,7 @@ function cycleScenes() {
   settings.scenes = order[(order.indexOf(modeOf(settings.scenes)) + 1) % order.length];
   settingsPanel.fill();
   applySettings('scenes');
-  note(`Scenes: ${SCENE_SWITCH[settings.scenes]}`, 1.5);
+  note(`Preset Scenes: ${SCENE_SWITCH[settings.scenes]}`, 1.5);
 }
 
 /**
@@ -956,7 +956,7 @@ const actions = {
     const modes = Object.keys(COLOR_MODES);
     settings.colors = modes[(modes.indexOf(settings.colors) + 1) % modes.length];
     saveSettings(settings);
-    note(`Colors: ${COLOR_MODES[settings.colors]}`, 1.5);
+    note(`Flame Colors: ${COLOR_MODES[settings.colors]}`, 1.5);
   },
   mirror: () => {
     const modes = ['mix', 'on', 'off'];
@@ -996,7 +996,9 @@ q('[data-progress]').addEventListener('click', (e) => {
   m.currentTime = ((e.clientX - r.left) / r.width) * m.duration;
 });
 
-const typing = (el) => el?.closest?.('input, select, textarea, [contenteditable]');
+// (A field in a dialog that has just closed isn't being typed in: the focus can wait there
+// until the dialog's close event hands it back, and a key pressed in between is the page's.)
+const typing = (el) => !!el?.closest?.('input, select, textarea, [contenteditable]') && !el.closest('dialog:not([open])');
 window.addEventListener('keydown', (e) => {
   if (e.altKey || e.ctrlKey || e.metaKey || typing(e.target)) return;
   if (settingsDialog.open || keysOverlay.el.open) return; // each handles its own keys (Esc closes)
