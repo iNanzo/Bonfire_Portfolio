@@ -26,8 +26,9 @@
 //              variations). A rolled one shows what's on screen now, dimmed; moving its
 //              slider pins it. The lock says which in its own tooltip.
 //   bulk       a toolbar over the layers, the scene's own drop hits and the move lists (All
-//              Off / In the Mix / Always, Shuffle, Defaults; All / None / Defaults): one
-//              edit, so one undo step (bulkEdit).
+//              Off / In the Mix / Always, Shuffle, Defaults; All / None / Defaults, where None
+//              is marked unavailable: a list keeps at least one move): one edit, so one undo
+//              step (bulkEdit). A list's boxes follow the scene, as every field does.
 //   actions    buttons that do more than set one path (`data-paint-act`): a new harmonious
 //              or random flame, the place's colors, Pin What You See, a gesture to
 //              preview. The page (painter/main.js) does those.
@@ -621,13 +622,24 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     }
     fillChoices(scene);
   }
-  /** The chips pressed, the helmet rows, the few colors and the notes, as the scene has them. */
+  /** The chips pressed, the move lists ticked, the helmet rows, the few colors and the notes, as the scene has them. */
   function fillChoices(scene) {
     for (const b of root.querySelectorAll('[data-pick]')) {
       const btn = /** @type {HTMLElement} */ (b);
       const v = getPath(scene, btn.dataset.pick);
       const pressed = v === undefined ? btn.hasAttribute('data-missing') : JSON.stringify(v) === btn.dataset.value;
       btn.setAttribute('aria-pressed', String(pressed));
+    }
+    // (A list's boxes follow its moves: a bulk button, undo and redo change them without a
+    // redraw. A box ticked by hand is read from them, so a stale one would drop a move.)
+    for (const l of root.querySelectorAll('[data-list]')) {
+      const list = getPath(scene, /** @type {HTMLElement} */ (l).dataset.list);
+      const own = Array.isArray(list);
+      const show = /** @type {HTMLInputElement | null} */ (l.querySelector('[data-list-show]'));
+      if (show) show.checked = !own;
+      for (const c of l.querySelectorAll('[data-list-item]')) {
+        /** @type {HTMLInputElement} */ (c).checked = own && list.includes(/** @type {HTMLElement} */ (c).dataset.listItem);
+      }
     }
     // As many helmet rows as knights.
     for (const r of root.querySelectorAll('[data-helmet]')) /** @type {HTMLElement} */ (r).hidden = Number(/** @type {HTMLElement} */ (r).dataset.helmet) >= scene.knights.count;

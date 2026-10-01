@@ -326,6 +326,41 @@ test('a bulk toolbar sets every layer at once, and one Ctrl+Z puts them all back
   expect(errors).toEqual([]);
 });
 
+test('a move list’s boxes follow its bulk buttons, undo and redo', async ({ page }) => {
+  test.setTimeout(90_000);
+  const errors = watch(page);
+  await ready(page);
+  await page.click('[data-sec-toggle="knights"]');
+  const list = page.locator('[data-list="knights.moves"]');
+  const ticked = list.locator('[data-list-item]:checked');
+  // (The scene as the draft keeps it: written a moment after each change.)
+  const moves = () => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-painter-draft') ?? 'null')?.scene.knights.moves?.length ?? null);
+  await list.locator('[data-list-show]').click(); // (the scene's own list: every move)
+  await expect(ticked).toHaveCount(13);
+  for (const key of ['nod', 'stepTouch', 'fistPump']) await list.locator(`[data-list-item="${key}"]`).click();
+  await expect(ticked).toHaveCount(10);
+  await list.locator('[data-bulk="all"]').click();
+  await expect(ticked).toHaveCount(13);
+  await expect.poll(moves).toBe(13);
+  await page.mouse.move(10, 400);
+  await page.keyboard.press('Control+z');
+  await expect(ticked).toHaveCount(10);
+  await page.keyboard.press('Control+Shift+z');
+  await expect(ticked).toHaveCount(13);
+  // A box ticked by hand now keeps what All added (the boxes are what it's read from).
+  await list.locator('[data-list-item="clap"]').click();
+  await expect(ticked).toHaveCount(12);
+  await expect.poll(moves).toBe(12);
+  // None stays unavailable (a list keeps one); Defaults gives the moves back to the show.
+  await expect(list.locator('[data-bulk="none"]')).toHaveAttribute('aria-disabled', 'true');
+  await list.locator('[data-bulk="defaults"]').click();
+  await expect(list.locator('[data-list-show]')).toBeChecked();
+  await page.keyboard.press('Control+z');
+  await expect(list.locator('[data-list-show]')).not.toBeChecked();
+  await expect(ticked).toHaveCount(12);
+  expect(errors).toEqual([]);
+});
+
 test('search: "glow" finds the Glow layer and Edge Glow, says what the shape hides, and keeps its focus', async ({ page }) => {
   const errors = watch(page);
   await ready(page);

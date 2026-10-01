@@ -280,14 +280,14 @@ test('bulk: a toolbar’s button is one edit (one undo step) that keeps the scen
   const own = normalizeScene({ ...s, drops: { fx: {}, count: 2 } });
   assert.deepEqual(bulkEdit(own, 'drops.fx', 'on').value, Object.fromEntries(Object.keys(DROP_FX).map((k) => [k, 'on'])));
   assert.match(sectionMarkup('show', own, ctx), /data-bulk-group="drops\.fx"/);
-  // A move list: All, None keeping one (None is marked unavailable), Defaults back to the show's.
+  // A move list: All, Defaults back to the show's; None is there but marked unavailable, with
+  // why (a list keeps at least one move: the panel's click does nothing on it).
   const moves = normalizeScene({ ...s, knights: { ...s.knights, moves: ['nod'] } });
   assert.deepEqual(bulkEdit(moves, 'knights.moves', 'all').value, Object.keys(KNIGHT_MOVES));
-  assert.deepEqual(bulkEdit(moves, 'knights.moves', 'none').value, ['nod'], 'at least one stays');
   assert.equal(bulkEdit(moves, 'knights.moves', 'defaults').value, null);
   const list = sectionMarkup('knights', moves, ctx);
   assert.deepEqual(attrs(list, 'data-bulk'), ['all', 'none', 'defaults']);
-  assert.match(list, /data-bulk="none" data-bulk-group="knights\.moves" aria-disabled="true"/);
+  assert.match(list, /data-bulk="none" data-bulk-group="knights\.moves" aria-disabled="true" data-tip="At least one has to stay on\."/);
   assert.equal(bulkEdit(s, 'nope', 'on'), null);
 });
 
