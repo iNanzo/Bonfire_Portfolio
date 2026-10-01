@@ -250,53 +250,67 @@ him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
   they swing, so the shadow follows), then are clamped again.
 - **Seats** (`SEATS` in `knightPlaces.js`, re-exported by `scenery.js`). Round 9 moved
   them all back ("his feet are in the bonfire": round 8's were 1.1–1.4 m from the fire's
-  middle, his boots on the ring stones at the flames' edge). Round 10 moved three of them
-  clear of what stands beside them ("the knight is clipping with the pillar"): in the
-  ruins, the cathedral and the cult he overlapped the pillar, the right nave column and a
-  standing stone just sitting still (the ruins' right pauldron 12 cm into the pillar, the
+  middle, his boots on the ring stones at the flames' edge). Round 10 cleared him of what
+  stands beside them ("the knight is clipping with the pillar"): in the ruins, the
+  cathedral and the cult he overlapped the pillar, the right nave column and a standing
+  stone just sitting still (the ruins' right pauldron 12 cm into the pillar, the
   cathedral's column through his hips, stone C through his left side), and the ruins' old
   seat also stood his left boot in the model's fallen drum and placed him 18 cm up on the
-  plinth's edge (where his feet would go fell on it). Now behind the fire on the left, his
-  hips 1.68–1.78 m from its middle at bearings 201–229° (straighter behind it than the
-  plan's 225–240°, so he stays in the phone's narrow frame), at least 4 cm clear of every
+  plinth's edge (where his feet would go fell on it). The ruins' seat moved right of the
+  pillar (its face 0.48 m from his hips), his boots up on the model's fallen drum in front
+  of him (a seated boot rests on the highest ground under its sole, ankle to pointed toe,
+  up to 0.42 m up). The cathedral's and the cult's seats stayed (2 cm and a 3° turn from
+  round 9's): no seat on a 5 cm grid round them is clear of the column or the stone and
+  still in the phone's frame, under its header and out of the fire, so the scenery made
+  room instead: the right nave column (with its half of the arch) and stone C each stand
+  0.3 m further along their row, away from him (`colliders.js` `CATHEDRAL.nave`,
+  `CULT.stones`, which `scenery.js` builds them from). Now behind the fire
+  on the left, his hips 1.69–1.78 m from its middle at bearings 206–217° (straighter
+  behind it than the plan's 225–240°, so he stays in the phone's narrow frame: every piece
+  of him at least 17 px inside a 390×844 phone's home view, with every helmet, in either
+  seat pose, over his idle: `test/knights.test.mjs` asks 10), at least 4 cm clear of every
   piece of the scenery in either seat pose over his whole idle
-  (`test/knightClearance.test.mjs`), his boots ≥ 1.05 m out on the real sabatons over his
-  whole idle (`test/knights.test.mjs`; the ring stones reach 0.78, the flames 0.45), never
-  over the flames from the home, projects or inspect views at 1920, 1280 or 390 wide. The
-  ruins' seat is right of round 9's, the pillar's face 0.65 m from his hips, his right
-  boot resting up on the model's fallen drum in front of him (a seated boot rests on the
-  highest ground under its sole, ankle to pointed toe, up to 0.42 m up); the cathedral's
-  and the cult's are left of the column and the stones. The seats are low, 0.21–0.23 m
-  (knees up, as a knight rests at a Dark Souls bonfire): that far back, round 8's
-  0.32–0.40 m seats lifted his helmet 7–11 px into the page's header on a 390×844 phone
-  (its bar, 64 px, shows once the page scrolls); now the great helm's top stays at
-  65.4–71.6 px over his whole idle (`test/knights.test.mjs`, on the real helmets). The
-  seats: a drum fallen from the ruins' pillar, lying half sunk across his way (0.21 m;
-  built by `scenery.js` for the ruins, the one piece it adds to the model's, named
-  `Static_PillarDrum` so it's a solid, casts its shadow and is in the fireflies' height
-  map), a low stump by the forge's anvil (0.21; its barrel moved behind the anvil), a low
+  (`test/knightClearance.test.mjs`), his boots 1.06–1.15 m out on the real sabatons over
+  his whole idle (≥ 1.05: `test/knights.test.mjs`; the ring stones reach 0.78, the flames
+  0.45), never over the flames from the home, projects or inspect views at 1920, 1280 or
+  390 wide. The seats are low, 0.21–0.23 m (knees up, as a knight rests at a Dark Souls
+  bonfire): that far back, round 8's 0.32–0.40 m seats lifted his helmet 7–11 px into the
+  page's header on a 390×844 phone (its bar, 64 px, shows once the page scrolls); now the
+  top of every helmet stays at 65.2–67.3 px over his whole idle (`test/knights.test.mjs`,
+  on the real helmets). The seats: a drum fallen from the ruins' pillar, lying half sunk
+  across his way (0.21 m; built by `scenery.js` for the ruins, the one piece it adds to
+  the model's, named `Static_PillarDrum` so it's a solid, casts its shadow and is in the
+  fireflies' height map), a low stump by the forge's anvil (0.21; its barrel moved behind the anvil), a low
   resting stone at the shrine (0.21), the cathedral's fallen nave drum in front of the
   columns, half sunk (0.22; the rubble and floor candles moved clear of his boots) and the
   cult's fallen standing stone (0.23; the two black candles nearest him stand past his
   seat). Every moved or new piece keeps its place in its builder, so the seeded rng draws
   the same numbers and nothing else in any scenery moves (round 10: the meshes compared
-  byte for byte, only the three seats moved). Each seat's height is checked against the
+  byte for byte with round 9's; only the ruins' and the cathedral's seats, that column and
+  its arch, and stone C with its sigil moved). Each seat's height is checked against the
   scenery's height map when he sits (the table's value if the map disagrees by more than
   10 cm), and each foot's ground under him. The hips joint sits 0.162 m above the seat;
   two-bone IK puts the feet on the ground in front of it, the knees forward and up.
   Every seat is on a blocked arc of the dance ring (`DANCE_RING.blocked`, measured on the
-  height maps with his legs in either seat pose), so nobody dances on it; the cathedral's
-  and the cult's leave the left side arc 273–302° for dancers, and four dancers there
-  take a layout of their own (275°, 308°, 58°, 86°). Standing up he's 1.36–1.46 m from
-  the fire's middle (round 8: 0.74), on a spot in front of his seat level and open under
-  each whole sole (`standSpot`), and every walk from there to the dancers' places on his
-  side is clear of the pit.
+  height maps with his legs in either seat pose, and in the ruins where he stands up to),
+  so nobody dances on it. Standing up he's 1.34–1.43 m from the fire's middle (round 8:
+  0.74), on a spot in front of his seat level and open under each whole sole, each boot a
+  hand's breadth (10 cm) from the scenery's shapes and his chest, head and pauldrons'
+  domes 6 cm (room for a dome to ride up with a raised arm: the shrine's lantern roof is
+  at his right shoulder; `standSpot`); in the ruins it's looked for round to his right
+  (`SEATS` `standAside`), across the fallen drum in front of the pillar's plinth: straight
+  up from that seat he'd stand behind the flames, the sword across him, on the home view.
+  Stood up or dancing the site's dance in front of any seat he stays left of the planted
+  sword's blade at 1920 and 1280 wide (at 1920, dancing, 27–138 px clear; round 9: 11–139;
+  `test/knightClearance.test.mjs` asks a hundredth of the width). Every walk from there to
+  the dancers' places on his side is clear of the pit.
 - **His summon sign** lies in front of each seat (`SEATS[name].sign`: 0.55 m along his
-  way, or where that ground is taken, a spot of its own: the ruins' is at his left beyond
-  the model's fallen drum, 1.1 m from his hips, the open ground nearer being under the
-  drum or behind the flames; the cathedral's and the cult's at his left, clear of their
-  seats), on open ground clear of the ring stones, turned to read from the home view, and
-  in view from it on wide screens and phones (`test/knightPlaces.test.mjs`).
+  way, or where that ground is taken, a spot of its own: the ruins' is in front of the
+  pillar's plinth, where his boots go when he stands up (0.18 m from them) and 1.03 m from
+  his seat, the open ground nearer the seat being under the drum, on the plinth or behind
+  the flames from the home camera; the cathedral's and the cult's at his left, clear of
+  their seats), on open ground clear of the ring stones, turned to read from the home
+  view, and in view from it on wide screens and phones (`test/knightPlaces.test.mjs`).
 - **Keeping out of the scenery** (round 10). `colliders.js` describes each scenery's
   solid pieces near his seat and the dancers' ring as simple shapes: upright cylinders
   (the pillar, columns, posts, stumps), turned boxes (stones, lanterns, the anvil, the
@@ -310,26 +324,47 @@ him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
     (`room`, `knightPose.js` `hem`): a hemmed-in arm's reach behind him scales with it and
     what it would swing out to that side swings forward instead, so it goes up or out in
     front of him (Praise the Sun's arm, hemmed in by the ruins' pillar, goes up in front).
+    Only what the gesture adds is hemmed: as far out and back as his arm at rest already
+    is (clear, where he sits) it's left alone, so the resting arm never jumps as a gesture
+    starts or ends, and on its way between the two it swings out no further than that.
   - *After the solve* (on steps with real motion; his resting pose is clear by its seat),
     each arm's pieces (the pauldron's lames, the arm, the gauntlet: its surface every
     3 cm, a gauntlet's every 2 cm, and its farthest corners) are checked against the
     shapes within 1.4 m: an arm nearer one than 2 cm turns about its shoulder away from it
     (toward the way out of it, or inward to his middle; as far as clears it, up to 10°,
     three tries; `keepClear`). At home, whatever of him would still go in (his body and
-    helmet too, a raised boot resting on something allowed a centimetre) eases back
-    toward his resting pose by 35, 65 and 100 % until it doesn't (`solveClear`). It's
-    deterministic, and four busy knights cost 2.5–4 ms more per second of animation.
+    helmet too, a pauldron's dome with its arm, a raised boot resting on something allowed
+    a centimetre) eases back toward his resting pose there as little as clears it (halving
+    the way five times: he slides along what he meets instead of jumping back from it), and
+    lets go of it a quarter of the way a step after, never through anything on the way
+    (`solveClear`). His resting pose there blends from seated to standing as he gets up or
+    sits down, so what's eased moves on smoothly with him. It's deterministic. On a desktop
+    one knight gesturing at his seat costs 6–12 ms of CPU a second of animation (round 9:
+    3–4 ms; about a millisecond a 12 fps step at the most), four busy knights 13–19 ms
+    (round 9: 9–11).
+  - *Getting up across something.* A foot stepping between where it rests seated and where
+    he stands up to lifts over what lies on its way (`rise()`'s `over`, measured against
+    the shapes once a seat), and where one has to clear more than 6 cm (the ruins' drum,
+    his boots up on it) he pushes up over his feet where they rest first, then steps
+    across it, right foot then left (sitting down, back across, then down). Getting up,
+    sitting down and the site's dance step his head and hands no further at a time than
+    round 9's did (head ≤ 23 cm a 12 fps step; `test/knightClearance.test.mjs` allows
+    1.5×).
   - *Dancers.* The show leaves out a dance move whose reach (`MOVE_REACH`: measured on
     the real model, by height band and in front, aside and behind) doesn't clear the
-    shapes round the dancer's place with 5 cm to spare (`fire.knights.fits`), taking
-    another of the pool's, or turning to the fire for one if nothing fits facing the
-    cameras (the cult's watcher, the shrine's front lantern and the cathedral's pew stand
-    by the front-left places).
+    shapes round the dancer's place with 5 cm to spare (`fire.knights.fits`, or, where the
+    scene doesn't pass it on, the same question put to `colliders.js` by the show itself:
+    `createFits`), taking another of the pool's (by the dancer's seed, so nothing else the
+    show rolls changes), or turning to the fire for one if nothing fits facing the cameras
+    (the cult's watcher, the shrine's front lantern and the cathedral's pew stand by the
+    front-left places).
   - *Checked* on the real model at the fire's 12 fps (`test/knightClearance.test.mjs`):
     every seat sitting still (≥ 4 cm); every gesture seated and standing at the seat, the
     site's dance on a desktop and a phone, reactions, seated moves, getting up and sitting
     down; every dancer place, move and facing with the drop gestures over it; nothing
-    deeper than 1.5 cm (round 9: up to 23 cm into the ruins' pillar).
+    deeper than 1.5 cm (round 10: 1.1 cm at the most, a seated shrug's pauldron at the
+    cult's stone; round 9: up to 23 cm into the ruins' pillar), and still or standing at
+    his seat nothing at all (his boot resting on the ruins' drum aside).
 - **The others** (Bonfire Live) sit on the ground where the visualizer rests them
   (`restPlaces`: the layout for the whole cast less the place nearest the seat, on the
   ring's clear sides, never in front of the fire), their feet on the ring, facing the
@@ -382,10 +417,12 @@ him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
   the world (split 0.4 neck, 0.6 head), so a hover or a flinch never cocks the helmet.
 - **Transitions.** Standing up (1.2 s): a lean with hands to the knees, a push-off, a
   small overshoot as he straightens, the feet moved in small lifted steps (never slid) to
-  a level, open spot in front of his seat (`standSpot`). Sitting down: a bend, the hips
-  reaching back, a settle. The idle's weight shift lifts the foot it moves too. Walking: 0.95 m/s with a 12 fps gait, along the way `planWalk` finds: straight
+  a level, open spot in front of his seat (`standSpot`); where his feet have something to
+  cross on the way (the ruins' fallen drum, his boots up on it), he pushes up over them
+  first and then steps across (*Getting up across something*). Sitting down: a bend, the
+  hips reaching back, a settle. The idle's weight shift lifts the foot it moves too. Walking: 0.95 m/s with a 12 fps gait, along the way `planWalk` finds: straight
   where that's clear of the fire pit (0.72 m) and keeps 0.85 m from the fire (or no nearer
-  than his seat's step, where he stands up 1.32–1.39 m from it), and of anything the
+  than his seat's step, where he stands up 1.34–1.43 m from it), and of anything the
   height map says is taller than a step (0.16 m; a hand either side of his path);
   otherwise round the fire, easing out from one end's distance to the other's. Only a
   way longer than 2.4 m or blocked both ways goes by ember: he burns away and forms at
@@ -749,7 +786,7 @@ touch devices) have no seat and sit on the ground at home (see *The others* abov
 | `clock(beatPos, period)` | the beat, every frame: `beatPos` in beats, `period` s a beat. Moves are pure functions of it, so they stay on the beat through hit-stops and tempo jumps. Without it he dances on at the last tempo |
 | `gesture(name, { index })` | `praise`, `wave`, `bow`, `point`, `beckon`, `shrug`, `hurrah`, `joy` (1.6–2.3 s), over whatever he's doing, and `dance` (~7.3 s: seated, he stands, turns to the front, dances the Default Dance for two bars at 118 BPM on his own clock and sits back down; on the site's tall view, ~4.8 s in his seat: the Default Dance's arm swings and head bob leaning in over his knees, his helmet under the page's header all through); `index: 'all'` for everyone. `true` only if someone started it (a knight changing helmets has his hands full) |
 | `lookAt(point or null, { index })` | he turns chest, neck and head toward a world point (e.g. the cursor), or stops |
-| `slots(scenery?)` | `{ center, radius, free, slots }`: the dance ring (1.2 m round the fire), its clear arcs in degrees (0° toward the camera, 90° to +x; the arc 265°→360°→96° is clear everywhere) and the slots `[{ x, z, bearing }]`: 1 (270°), 2 (310°), 3 (50°), 4 (88°), 5 (168°, not in the cult). Dancing with no place given, 1 knight takes slot 1; 2 take 1 and 4; 3 take 1–3; 4 take 1–4 |
+| `slots(scenery?)` | `{ center, radius, free, slots }`: the dance ring (1.2 m round the fire), its clear arcs in degrees (0° toward the camera, 90° to +x; the arc 253°→360°→96° is clear everywhere) and the slots `[{ x, z, bearing }]`: 1 (270°), 2 (310°), 3 (50°), 4 (88°), 5 (168°, not in the cult). Dancing with no place given, 1 knight takes slot 1; 2 take 1 and 4; 3 take 1–3; 4 take 1–4 |
 | `fits(move, at, facing, scenery?)` | whether a dance move has room at a place on the ground `{ x, z }` facing that way: its reach (`colliders.js` `MOVE_REACH`) clear of the scenery's shapes there with 5 cm to spare; Bonfire Live's show leaves out one that doesn't (*Keeping out of the scenery*) |
 | `moving` | a pose stepped this frame with real motion, or he formed, burnt away or was put somewhere new (the shadow's redrawn) |
 
