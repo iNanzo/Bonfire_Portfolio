@@ -89,6 +89,7 @@
     "src/bonfire/knightPose.js",
     "src/bonfire/knightPlaces.js",
     "src/bonfire/steel.js",
-    "src/bonfire/knightStyles.js"
+    "src/bonfire/knightStyles.js",
+    "src/settingsMap.js"
   ]
 }
