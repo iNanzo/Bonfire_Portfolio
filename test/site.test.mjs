@@ -322,8 +322,11 @@ test('every tooltip on the site is read out too: the header, the menu, the photo
   assertTipsReadOut(render.renderChrome(), 'the header and the menu');
   assertTipsReadOut(render.renderProjects(), 'the projects');
   assertTipsReadOut(render.renderSkills(), 'the skills');
-  const { photoBarHtml } = await import('../src/ui/photo.js');
+  const { photoBarHtml, elementHint } = await import('../src/ui/photo.js');
   for (const touch of [false, true]) assertTipsReadOut(photoBarHtml({ touch }), `the photo toolbar${touch ? ' (touch)' : ''}`);
+  // (Its Element button names the elements as the pack does: the content's names.)
+  const { elements } = await import('../src/elements.js');
+  assert.equal(elementHint(), `The next element, in turn: ${elements.fire.name}, ${elements.lightning.name}, ${elements.ice.name}`);
   const { rowsHtml, RENDER_ROWS } = await import('../src/ui/renderMenu.js');
   assertTipsReadOut(rowsHtml(RENDER_ROWS, {}, { id: 'render-menu-x' }), 'the render settings');
   // The pack's lists: what the living weapon does, what else an element does, each style's

@@ -3,7 +3,7 @@ import { applyCssPalette, base, flames, flameOr, rotation } from './palette.js';
 import { site, screens, hero, ui, weapons, startingEquipment, items, drawnWeapons } from './content.js';
 import { effects, onEffects, setEffects } from './effects.js';
 import { drawElement, elementOr, flameTitle } from './elements.js';
-import { STRUCTURAL } from './effectsDefaults.js';
+import { STRUCTURAL, ELEMENT_IDS } from './effectsDefaults.js';
 import {
   renderChrome, renderHome, renderProjects, renderExperience,
   renderSkills, renderAbout, renderContact, sceneLabel, MENU_TEXT,
@@ -157,7 +157,7 @@ const photo = createPhotoMode({
   onExit: () => fire?.setView(route.screen === 'projects' && route.item ? 'inspect' : route.screen),
   onColors: () => { const fresh = rotation().filter((k) => k !== equipment.flame); equip(equipment.weapon, pick(fresh), equipment.item, { instant: true }); },
   onElement: () => {
-    const next = ['fire', 'lightning', 'ice'][(['fire', 'lightning', 'ice'].indexOf(equipment.element) + 1) % 3];
+    const next = ELEMENT_IDS[(ELEMENT_IDS.indexOf(equipment.element) + 1) % ELEMENT_IDS.length]; // (in the order its tooltip names them)
     equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, { element: next });
   },
   onEnter: () => { breakdown.exit(); discover('photo'); },
