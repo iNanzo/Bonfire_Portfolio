@@ -18,8 +18,9 @@
 //              long one or select its text), and goes `grace` ms after it leaves both. The
 //              keyboard: at once when a trigger takes focus with a visible focus ring, or a
 //              field whose hint a "?" shows (the field's aria-describedby names the hint the
-//              "?" is described by too). Touch: a tap on a "?" opens or closes its tip; a tap
-//              anywhere else closes it. Esc closes it, and only it: an open dialog stays open.
+//              "?" is described by too). Touch: a tap on a "?" (or on a trigger marked
+//              data-tip-tap, one a tap does nothing else with: the site's skills) opens or
+//              closes its tip; a tap anywhere else closes it. Esc closes it, and only it: an open dialog stays open.
 //              Nothing closes a tip on a timer while it's being read.
 //   what       the trigger's data-tip, under its data-tip-title in bold if it has one: set as
 //              text, never markup. The tip itself is aria-hidden: every trigger already reads
@@ -296,7 +297,8 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
     hide(); // (focus moving to another field shows that one's next)
   }
   function onClick(e) {
-    const mark = element(e.target)?.closest('.viz-tip[data-tip]');
+    // (A "?", or a trigger a tap does nothing else with that asks for this: data-tip-tap.)
+    const mark = element(e.target)?.closest('.viz-tip[data-tip], [data-tip][data-tip-tap]');
     if (!mark) return;
     if (current?.trigger === mark && current.how === 'click') { hide(); return; }
     show(mark, 'click', [mark]);

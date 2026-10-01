@@ -300,6 +300,22 @@ test('installTooltips: a tap on a "?" toggles its tip (touch has no hover); a ta
   assert.equal(p.shown(), false, 'a tap elsewhere closes it');
 });
 
+test('installTooltips: a trigger that asks for it (data-tip-tap: the site’s skills) toggles on a tap too; others don’t', () => {
+  const p = page();
+  installTooltips({ doc: p.doc });
+  const skill = new p.El('button', { class: 'slot', 'data-tip': 'The common tongue.', 'data-tip-title': 'JavaScript', 'data-tip-tap': '' }).at(300, 300, 120, 40);
+  const action = new p.El('button', { 'data-tip': 'Does a thing.' }).at(300, 400, 120, 40);
+  p.doc.body.append(skill, action);
+  p.fire('pointerdown', { target: skill, pointerType: 'touch' });
+  p.fire('click', { target: skill });
+  assert.equal(p.shown(), true);
+  assert.equal(p.tip().children[0].textContent, 'JavaScript');
+  p.fire('click', { target: skill });
+  assert.equal(p.shown(), false, 'a second tap closes it');
+  p.fire('click', { target: action });
+  assert.equal(p.shown(), false, 'a tap on a button that does something just does it');
+});
+
 test('installTooltips: Esc closes the tip and stops the dialog closing on that same Esc, once', () => {
   const p = page();
   installTooltips({ doc: p.doc });
