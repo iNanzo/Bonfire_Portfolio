@@ -3,7 +3,8 @@
 // the skills at the ends of each group (where a tip is likeliest to meet an edge), comes up
 // the ways a person would ask for it (a pointer resting on it and the keyboard's focus at
 // 1280×720; the keyboard, or a tap for a skill, on a 390×844 touch screen), inside the window
-// by 8 px and off what it explains; and no native title= is left on the site.
+// by 8 px and off what it explains, and heard by a screen reader too; and no native title=
+// is left on the site.
 import { test, expect } from '@playwright/test';
 import { collectTips, checkTip, assertInViewport, tipOf } from './lib/tips.mjs';
 
@@ -62,6 +63,21 @@ async function closeTip(page, root) {
   await tipOf(page).waitFor({ state: 'hidden', timeout: TIP_WAIT });
 }
 
+/**
+ * Every tip under `root` is heard too, not only seen (the shared tooltip is aria-hidden): it's
+ * its trigger's description (aria-describedby), or it only says the trigger's name and key.
+ */
+async function assertHeard(page, root) {
+  const unheard = await page.evaluate((sel) => [...document.querySelectorAll(`${sel} [data-tip]`)].filter((el) => {
+    const tip = el.getAttribute('data-tip') ?? '';
+    const ids = (el.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+    if (ids.some((id) => document.getElementById(id)?.textContent === tip)) return false;
+    const name = (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim();
+    return !(name === tip || (name.startsWith(tip.replace(/\s*\([^)]*\)$/, '')) && el.hasAttribute('aria-keyshortcuts')));
+  }).map((el) => el.getAttribute('data-tip')), root);
+  expect(unheard, `${root}: every tip is heard too`).toEqual([]);
+}
+
 /** No native title tooltips anywhere on the page now (the shared tooltip replaced them). */
 const noTitles = (page, where) => expect(page.locator('body [title]'), `${where}: no title=`).toHaveCount(0);
 
@@ -85,10 +101,13 @@ for (const size of SIZES) {
       await noTitles(page, 'the page');
       // The header: Q / E (where the tabs show) and Sound.
       expect(await checkAll(page, '[data-header]', { ...size, label: 'header' })).toBeGreaterThanOrEqual(size.touch ? 1 : 3);
+      await assertHeard(page, '[data-header]');
+      await assertHeard(page, '[data-pack]');
       // The rest menu's tools.
       await tap(page.locator('[data-menu-open]'));
       await expect(page.locator('[data-menu]')).toBeVisible();
       expect(await checkAll(page, '[data-menu]', { ...size, label: 'menu' })).toBe(6);
+      await assertHeard(page, '[data-menu]');
       await noTitles(page, 'the menu');
       expect(errors).toEqual([]);
       await context.close();
@@ -104,6 +123,7 @@ for (const size of SIZES) {
       const hud = page.locator('.debug-hud');
       await expect(hud).toBeVisible();
       expect(await checkAll(page, '.debug-hud', { ...size, label: 'render settings' })).toBe(7);
+      await assertHeard(page, '.debug-hud');
       await tap(hud.locator('[data-render-close]'));
       await expect(hud).toBeHidden();
       // The photo toolbar (F; a phone gets there from the menu).
@@ -113,6 +133,7 @@ for (const size of SIZES) {
       } else await page.keyboard.press('f');
       await expect(page.locator('.photo-bar')).toBeVisible();
       expect(await checkAll(page, '.photo-bar', { ...size, label: 'photo' })).toBe(3);
+      await assertHeard(page, '.photo-bar');
       await noTitles(page, 'photo mode');
       expect(errors).toEqual([]);
       await context.close();
@@ -130,6 +151,7 @@ for (const size of SIZES) {
         await tap(page.locator(`[data-pack-slot="${id}"]`));
         await expect(page.locator(`[data-pack-list="${id}"]`)).toBeVisible();
         expect(await checkAll(page, `[data-pack-list="${id}"]`, { ...size, label: id }), `${id} has tips`).toBeGreaterThan(0);
+        await assertHeard(page, `[data-pack-list="${id}"]`);
       }
       // The knight: summoned, then dressed in Black & Gold (whose finishes are off, and say why).
       await tap(page.locator('[data-pack-slot="knight"]'));
@@ -143,6 +165,7 @@ for (const size of SIZES) {
       const knight = page.locator('[data-pack-list="knight"]');
       await expect(knight.getByRole('group', { name: 'Finish', exact: true })).toContainText('wear their own colors');
       expect(await checkAll(page, '[data-pack-list="knight"]', { ...size, label: 'knight' })).toBe(10); // (6 styles, 4 finishes)
+      await assertHeard(page, '[data-pack-list="knight"]');
       expect(errors).toEqual([]);
       await context.close();
     });
@@ -153,6 +176,7 @@ for (const size of SIZES) {
       await ready(page);
       await noTitles(page, 'the skills');
       expect(await checkAll(page, '[data-skill-grid] li:is(:first-child, :last-child)', { ...size, label: 'skills' })).toBeGreaterThanOrEqual(6);
+      await assertHeard(page, '[data-skill-grid]');
       expect(errors).toEqual([]);
       await context.close();
     });

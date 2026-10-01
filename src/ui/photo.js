@@ -6,13 +6,33 @@
 // which the Painter's stage uses too.
 //
 // The toolbar's line says how, for a mouse or for touch; its buttons say what they do as
-// their tooltips (the shared one, ui/tooltip.js).
+// their tooltips (the shared one, ui/tooltip.js), which a screen reader hears as their
+// descriptions (ui/describedTip.js).
 import { ui } from '../content.js';
 import { esc } from '../html.js';
 import { isEditing } from '../routes.js';
 import { blip } from './audio.js';
 import { focusedNow, holdsFocus, returnFocus } from './focus.js';
+import { describedTip } from './describedTip.js';
 import { dragOrbit, orbitPose, zoomOrbit, ORBIT_TARGET, PHOTO_LIMITS, DRAG_RATE } from './orbit.js';
+
+/**
+ * The toolbar's insides (pure: the tests read it): how to frame the fire, for a mouse or for
+ * touch, then its buttons, each with its tooltip and description.
+ * @param {{ touch?: boolean }} [o]
+ */
+export function photoBarHtml({ touch = false } = {}) {
+  const button = (act, label, hint) => {
+    const tip = describedTip(`photo-tip-${act}`, hint);
+    return `<button class="pix-btn" type="button" data-photo="${act}"${tip.attrs}>${esc(label)}</button>${tip.note}`;
+  };
+  return `
+    <p class="photo-hint">${touch ? 'Drag to orbit · Pinch to zoom · Tap to stoke' : 'Drag to orbit · Scroll to zoom · Click to stoke'}</p>
+    ${button('colors', 'Colors', 'New flame colors, picked at random')}
+    ${button('element', 'Element', 'The next element: fire, lightning, ice')}
+    ${button('save', 'Save Picture', 'Save this frame as a PNG, at full pixel size')}
+    <button class="pix-btn" type="button" data-photo="exit">${esc(ui.close)} <kbd>Esc</kbd></button>`;
+}
 
 /**
  * @param {object} o
@@ -29,12 +49,7 @@ export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter 
   bar.hidden = true;
   bar.setAttribute('role', 'toolbar');
   bar.setAttribute('aria-label', ui.photo);
-  bar.innerHTML = `
-    <p class="photo-hint">${touch ? 'Drag to orbit · Pinch to zoom · Tap to stoke' : 'Drag to orbit · Scroll to zoom · Click to stoke'}</p>
-    <button class="pix-btn" type="button" data-photo="colors" data-tip="New flame colors, picked at random">Colors</button>
-    <button class="pix-btn" type="button" data-photo="element" data-tip="The next element: fire, lightning, ice">Element</button>
-    <button class="pix-btn" type="button" data-photo="save" data-tip="Save this frame as a PNG, at full pixel size">Save Picture</button>
-    <button class="pix-btn" type="button" data-photo="exit">${esc(ui.close)} <kbd>Esc</kbd></button>`;
+  bar.innerHTML = photoBarHtml({ touch });
   document.body.appendChild(bar);
 
   let view = { yaw: 0, pitch: 0.32, dist: 4.2, target: ORBIT_TARGET };

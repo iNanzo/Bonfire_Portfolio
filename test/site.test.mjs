@@ -295,6 +295,49 @@ test('no native title tooltips on the site: the shared tooltip shows data-tip on
   assert.doesNotMatch(chrome, /data-tooltip|class="tooltip"/, 'the old skill tooltip is gone');
 });
 
+/**
+ * Every tooltip trigger in `html` is heard as well as seen (the shared tip is aria-hidden):
+ * its aria-describedby names a span with its words, or its words are just its name
+ * (aria-label) and its key (aria-keyshortcuts says that).
+ */
+function assertTipsReadOut(html, where) {
+  const words = new Map([...html.matchAll(/<span (?:class="visually-hidden" )?id="([^"]+)"(?: hidden)?>([^<]*)<\/span>/g)].map(([, id, text]) => [id, text]));
+  const triggers = [...html.matchAll(/<(?:button|a)\b([^>]*\sdata-tip="([^"]*)"[^>]*)>/g)];
+  assert.ok(triggers.length, `${where}: has tips`);
+  for (const [, attrs, tip] of triggers) {
+    const ids = attrs.match(/\saria-describedby="([^"]+)"/)?.[1].split(/\s+/) ?? [];
+    if (ids.length) {
+      assert.ok(ids.some((id) => words.get(id) === tip), `${where}: "${tip}" is its trigger’s description`);
+      continue;
+    }
+    const name = attrs.match(/\saria-label="([^"]*)"/)?.[1] ?? '';
+    const said = name === tip || (!!name && name.startsWith(tip.replace(/\s*\([^)]*\)$/, '')) && /\saria-keyshortcuts="/.test(attrs));
+    assert.ok(said, `${where}: "${tip}" is said by its trigger’s name ("${name}")`);
+  }
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(new Set(ids).size, ids.length, `${where}: ids are unique`);
+}
+
+test('every tooltip on the site is read out too: the header, the menu, the photo toolbar, the render settings, the pack’s lists', async () => {
+  assertTipsReadOut(render.renderChrome(), 'the header and the menu');
+  assertTipsReadOut(render.renderProjects(), 'the projects');
+  assertTipsReadOut(render.renderSkills(), 'the skills');
+  const { photoBarHtml } = await import('../src/ui/photo.js');
+  for (const touch of [false, true]) assertTipsReadOut(photoBarHtml({ touch }), `the photo toolbar${touch ? ' (touch)' : ''}`);
+  const { rowsHtml, RENDER_ROWS } = await import('../src/ui/renderMenu.js');
+  assertTipsReadOut(rowsHtml(RENDER_ROWS, {}, { id: 'render-menu-x' }), 'the render settings');
+  // The pack's lists: what the living weapon does, what else an element does, each style's
+  // look, and (a style in its own colors) why the finishes are off.
+  const { bonfireItems, optionsHtml } = await import('../src/ui/pack.js');
+  const { rotation } = await import('../src/palette.js');
+  const state = () => ({ scenery: 'ruins', weapon: 'longsword', element: 'fire', flame: rotation()[0], helmet: 'great', presence: 'resting', style: 'blackgold', finish: 'gunmetal' });
+  const pack = bonfireItems({
+    state, busy: () => false, elementTip: 'Also forges a new weapon.',
+    onScene() {}, onWeapon() {}, onRing() {}, onLiving() {}, onElement() {}, onFlame() {}, onHelmet() {}, onGesture() {}, onStyle() {}, onFinish() {}, onSummon() {}, onDismiss() {},
+  });
+  for (const it of pack.filter((i) => i.id !== 'map')) assertTipsReadOut(optionsHtml(it.id, it.options()), `the pack’s ${it.id}`);
+});
+
 test('skills: each slot’s flavor is its tooltip (under its name) and its description for screen readers', async () => {
   const { skills, shown } = await import('../src/content.js');
   const html = render.renderSkills();

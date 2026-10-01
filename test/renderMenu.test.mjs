@@ -63,7 +63,9 @@ test('render menu: a run of rows with a group is a labelled group under its head
   assert.match(html, /<div class="render-group" role="group" aria-labelledby="m-g1">\s*<p class="render-group-title" id="m-g1">Second<\/p>/);
   assert.equal((html.match(/class="render-group"/g) ?? []).length, 2, 'one group per run');
   for (const r of rows) assert.match(html, new RegExp(`data-render-row="${r.id}" aria-keyshortcuts="${r.key}"`));
-  assert.match(html, /data-render-row="b" aria-keyshortcuts="2" data-tip="Says &quot;what&quot; B does\."/);
+  assert.match(html, /data-render-row="b" aria-keyshortcuts="2" data-tip="Says &quot;what&quot; B does\." aria-describedby="m-tip1">/);
+  assert.match(html, /<\/button><span id="m-tip1" hidden>Says &quot;what&quot; B does\.<\/span>/, 'and a screen reader hears the hint (the tooltip is aria-hidden)');
+  assert.doesNotMatch(html, /data-render-row="a"[^>]*aria-describedby/, 'no hint, no description');
   assert.match(html, /<kbd>1<\/kbd>/, 'the digit is read out too (not aria-hidden)');
   assert.doesNotMatch(html, /<kbd aria-hidden/);
   // Rows without groups (Bonfire Live's, the Painter's): just the rows, as before.
@@ -73,7 +75,7 @@ test('render menu: a run of rows with a group is a labelled group under its head
 test('render menu: titled Render Settings by default, a HUD has a close button, and the site’s reset is named for the menu', () => {
   const src = fs.readFileSync(new URL('../src/ui/renderMenu.js', import.meta.url), 'utf8');
   assert.match(src, /title = 'Render Settings'/);
-  assert.match(src, /collapse === 'all' \? `<button class="render-menu-close" type="button" aria-label="Close \$\{esc\(title\)\}"/);
+  assert.match(src, /collapse === 'all' \? `<button class="render-menu-close" type="button" aria-label="Close \$\{esc\(title\)\}" data-tip="Close \(\$\{esc\(toggleKey\)\} or Esc\)" aria-keyshortcuts="\$\{esc\(toggleKey\)\} Escape"/, 'its keys said too');
   const content = JSON.parse(fs.readFileSync(new URL('../src/content.json', import.meta.url), 'utf8'));
   assert.equal(content.ui.renderMenu, 'Render Settings');
   assert.equal(content.ui.renderReset, 'Reset Render Settings');

@@ -100,6 +100,7 @@
     "src/weaponGroups.js"
     "src/weaponGroups.js",
     "src/pixelSizes.js",
-    "src/ui/siteKeys.js"
+    "src/ui/siteKeys.js",
+    "src/ui/describedTip.js"
   ]
 }

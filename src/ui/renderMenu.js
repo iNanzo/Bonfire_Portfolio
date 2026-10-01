@@ -15,7 +15,8 @@
 //
 // Rows can carry a `group`: a run of rows with the same one goes under its heading, as a
 // labelled group. Each row tells assistive tech its key (aria-keyshortcuts) as well as
-// showing it as a <kbd>, and a row's `hint` is its tooltip (the shared one, ui/tooltip.js).
+// showing it as a <kbd>, and a row's `hint` is its tooltip (the shared one, ui/tooltip.js)
+// and its description (ui/describedTip.js).
 // A HUD has a visible close button too (a touch screen has no P to press).
 //
 // Values are only ever written as text, so a row keeps focus through a refresh (and the
@@ -27,6 +28,7 @@
 // HUD gives it back to what had it when it opened (ui/focus.js).
 import { esc } from '../html.js';
 import { focusedNow, returnFocus } from './focus.js';
+import { describedTip } from './describedTip.js';
 
 /**
  * @typedef {object} RenderRow
@@ -69,15 +71,20 @@ export const keyOf = (e) => (/^(Digit|Numpad)\d$/.test(e.code ?? '') ? e.code.sl
 export const rowForKey = (rows, key) => rows.find((r) => r.key === key) ?? null;
 
 /**
- * One row's button: its key said as a shortcut and shown as a <kbd>, its hint as its tooltip.
+ * One row's button: its key said as a shortcut and shown as a <kbd>, its hint as its tooltip
+ * and description (the span after it, `tipId`).
  * @param {RenderRow} r
  * @param {Record<string, unknown>} values
+ * @param {string} tipId
  */
-const rowHtml = (r, values) => `
-    <button class="render-row" type="button" data-render-row="${esc(r.id)}" aria-keyshortcuts="${esc(r.key)}"${r.hint ? ` data-tip="${esc(r.hint)}"` : ''}>
+const rowHtml = (r, values, tipId) => {
+  const tip = describedTip(tipId, r.hint);
+  return `
+    <button class="render-row" type="button" data-render-row="${esc(r.id)}" aria-keyshortcuts="${esc(r.key)}"${tip.attrs}>
       <span class="cursor" aria-hidden="true"></span><kbd>${esc(r.key)}</kbd><span class="render-row-label">${esc(r.label)}</span>
       <b class="render-row-value" data-render-value>${esc(String(values[r.id] ?? NO_VALUE))}</b>
-    </button>`;
+    </button>${tip.note}`;
+};
 
 /**
  * The rows' buttons, with their values (all text escaped). Rows with a `group` go under its
@@ -94,8 +101,9 @@ export function rowsHtml(rows, values = {}, { id = 'render-rows' } = {}) {
     if (last && last.group === r.group) last.rows.push(r);
     else runs.push({ group: r.group, rows: [r] });
   }
+  let n = 0;
   return runs.map((run, i) => {
-    const html = run.rows.map((r) => rowHtml(r, values)).join('');
+    const html = run.rows.map((r) => rowHtml(r, values, `${id}-tip${n++}`)).join('');
     if (!run.group) return html;
     return `
     <div class="render-group" role="group" aria-labelledby="${esc(id)}-g${i}">
@@ -138,7 +146,7 @@ export function createRenderMenu({
     <button class="render-menu-head" type="button" aria-expanded="false" aria-controls="${bodyId}" aria-keyshortcuts="${esc(toggleKey)}" data-render-head>
       <span class="render-menu-title" id="${bodyId}-title">${esc(title)}</span><kbd aria-hidden="true">${esc(toggleKey)}</kbd>
     </button>
-    ${collapse === 'all' ? `<button class="render-menu-close" type="button" aria-label="Close ${esc(title)}" data-tip="Close (${esc(toggleKey)} or Esc)" data-render-close>✕</button>` : ''}
+    ${collapse === 'all' ? `<button class="render-menu-close" type="button" aria-label="Close ${esc(title)}" data-tip="Close (${esc(toggleKey)} or Esc)" aria-keyshortcuts="${esc(toggleKey)} Escape" data-render-close>✕</button>` : ''}
     <div class="render-menu-rows" id="${bodyId}" data-render-rows${grouped ? '' : ` role="group" aria-labelledby="${bodyId}-title"`}>
       ${rowsHtml(rows, {}, { id: bodyId })}
       ${reset ? `

@@ -20,7 +20,8 @@
 // state on it for its icon to show (`state`, as data-state). A heading starts a group (a
 // labelled list: screen readers hear its name), with a `note` under it when the group is
 // off for a reason (the finishes of a style that wears its own colors); an option's `tip`
-// is its tooltip (ui/tooltip.js: what it does, or why it's off). Keys: arrows move
+// is its tooltip (ui/tooltip.js: what it does, or why it's off), which a screen reader
+// hears as its description. Keys: arrows move
 // (up/down through the items, left into an item's list and right back out), Enter picks,
 // Esc closes. A pick (or the page's refresh) redraws the list and keeps the keyboard in it:
 // on the same option, or when that one's gone or unavailable now (Summon once he's coming),
@@ -41,6 +42,7 @@ import { SCENERIES } from '../sceneries.js';
 import { HELMET_NAMES, GESTURE_NAMES, STYLE_NAMES, FINISH_NAMES } from '../knightNames.js';
 import { STYLES } from '../bonfire/knightStyles.js';
 import { WEAPON_GROUPS } from '../weaponGroups.js';
+import { describedTip } from './describedTip.js';
 
 export { HELMET_NAMES, GESTURE_NAMES, STYLE_NAMES, FINISH_NAMES };
 
@@ -81,15 +83,20 @@ export function packGroups(options) {
 /**
  * A list's markup (pure: the tests read it). Each heading's group is a labelled group (and
  * described by its note), holding a list of its options; `id` is the item's, for the
- * headings' ids. All text escaped.
+ * headings' ids. An option's tip is its description too (ui/describedTip.js). All text
+ * escaped.
  * @param {string} id
  * @param {PackOption[]} options
  */
 export function optionsHtml(id, options) {
-  const option = (o) => `<li><button class="pack-option${o.current ? ' is-current' : ''}" type="button" data-pack-option="${esc(o.id)}"
-            aria-pressed="${o.current ? 'true' : 'false'}"${o.disabled ? ' disabled' : ''}${o.tip ? ` data-tip="${esc(o.tip)}"` : ''}>
+  let tips = 0;
+  const option = (o) => {
+    const tip = describedTip(`pack-${id}-tip${tips++}`, o.tip);
+    return `<li><button class="pack-option${o.current ? ' is-current' : ''}" type="button" data-pack-option="${esc(o.id)}"
+            aria-pressed="${o.current ? 'true' : 'false'}"${o.disabled ? ' disabled' : ''}${tip.attrs}>
             <span class="cursor" aria-hidden="true"></span>${o.swatch ? `<span class="pack-swatch" style="--sw: ${esc(o.swatch)}" aria-hidden="true"></span>` : ''}<span class="pack-option-label">${esc(o.label)}</span>${o.current ? '<span class="gem" aria-hidden="true"></span>' : ''}
-          </button></li>`;
+          </button>${tip.note}</li>`;
+  };
   return packGroups(options).map((g, i) => {
     const list = `<ul class="pack-group-list" role="list">${g.options.map(option).join('')}</ul>`;
     if (!g.heading) return list;

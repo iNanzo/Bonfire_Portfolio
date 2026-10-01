@@ -9,6 +9,7 @@ const BASE = import.meta.env?.BASE_URL ?? '/'; // (outside Vite, e.g. under node
 export { esc } from './html.js';
 import { esc, isSafeUrl, assetUrl, videoUrl, corners } from './html.js';
 import { logoMark } from './ui/logo.js';
+import { describedTip } from './ui/describedTip.js';
 export const isExternal = (href) => /^(https?:|mailto:)/i.test(href);
 export const url = (href) => {
   if (!isSafeUrl(href)) throw new Error('Invalid link: ' + href);
@@ -42,6 +43,9 @@ function panel(cls, inner, attrs = '') {
 
 export function renderChrome() {
   const tabs = screens.filter((s) => s.id !== 'home');
+  // (Q's and E's tips are their names and keys, which they say already: aria-label and
+  // aria-keyshortcuts. Sound's says what a click does: a screen reader hears it too.)
+  const soundTip = describedTip('sound-tip', ui.soundHint);
   return `
     <a class="skip-link" href="#main">${esc(ui.skip)}</a>
     <div class="stage" data-stage></div>
@@ -56,9 +60,9 @@ export function renderChrome() {
       </nav>
       <div class="header-actions">
         ${site.resumeUrl ? `<a class="pix-btn resume-btn" ${resumeAttrs()} data-resume hidden>${esc(ui.resume)}</a>` : ''}
-        <button class="pix-btn sound-toggle" type="button" data-sound aria-pressed="false" data-tip="${esc(ui.soundHint)}" data-tip-side="bottom">
+        <button class="pix-btn sound-toggle" type="button" data-sound aria-pressed="false"${soundTip.attrs} data-tip-side="bottom">
           <span class="sound-icon" aria-hidden="true"></span><span data-sound-label>${esc(ui.soundOff)}</span>
-        </button>
+        </button>${soundTip.note}
         <button class="pix-btn menu-toggle" type="button" data-menu-open aria-haspopup="dialog">${esc(ui.menu)}</button>
       </div>
     </header>
@@ -101,11 +105,17 @@ export const MENU_TEXT = {
  * mode, the breakdown, the render settings, the discoveries, the keys, sound), each a
  * labelled group, then Close. Every item is a `data-menu-item` for its arrow keys
  * (ui/spatial.js listNav skips the hidden ones); the tools say what they do as their
- * tooltips, and show their keys.
+ * tooltips (a screen reader hears them as descriptions: ui/describedTip.js), and show their
+ * keys.
  */
 function renderRestMenu() {
-  const tool = (action, label, key, tip = '') => `
-            <li><button class="menu-item" type="button" data-menu-item data-menu-action="${action}"${key ? ` aria-keyshortcuts="${key === '?' ? 'Shift+?' : key}"` : ''}${tip ? ` data-tip="${esc(tip)}"` : ''}>${esc(label)}${key ? ` <kbd>${esc(key)}</kbd>` : ''}</button></li>`;
+  const tool = (action, label, key, hint = '') => {
+    const tip = describedTip(`menu-tip-${action}`, hint);
+    return `
+            <li><button class="menu-item" type="button" data-menu-item data-menu-action="${action}"${key ? ` aria-keyshortcuts="${key === '?' ? 'Shift+?' : key}"` : ''}${tip.attrs}>${esc(label)}${key ? ` <kbd>${esc(key)}</kbd>` : ''}</button>${tip.note}</li>`;
+  };
+  const discoveriesTip = describedTip('menu-tip-discoveries', ui.discoveriesFlavor);
+  const soundTip = describedTip('menu-tip-sound', ui.soundHint);
   return `
     <dialog class="rest-menu" data-menu aria-labelledby="rest-menu-title">
       <div class="rest-menu-inner frame">
@@ -122,8 +132,8 @@ function renderRestMenu() {
         <div class="menu-group" role="group" aria-labelledby="menu-tools-title">
           <p class="menu-group-title" id="menu-tools-title">${esc(MENU_TEXT.tools)}</p>
           <ul role="list">${tool('photo', ui.photo, 'F', ui.photoHint)}${tool('breakdown', ui.breakdown, 'B', ui.breakdownHint)}${tool('render', ui.renderMenu ?? 'Render Settings', 'P', MENU_TEXT.renderHint)}
-            <li><button class="menu-item" type="button" data-menu-item data-menu-action="discoveries" data-tip="${esc(ui.discoveriesFlavor)}">${esc(ui.discoveries)} <span class="menu-count" data-discovery-count></span></button></li>${tool('keys', MENU_TEXT.keys, '?', MENU_TEXT.keysHint)}
-            <li><button class="menu-item" type="button" data-menu-item data-sound aria-pressed="false" data-tip="${esc(ui.soundHint)}"><span data-sound-label>${esc(ui.soundOff)}</span></button></li>
+            <li><button class="menu-item" type="button" data-menu-item data-menu-action="discoveries"${discoveriesTip.attrs}>${esc(ui.discoveries)} <span class="menu-count" data-discovery-count></span></button>${discoveriesTip.note}</li>${tool('keys', MENU_TEXT.keys, '?', MENU_TEXT.keysHint)}
+            <li><button class="menu-item" type="button" data-menu-item data-sound aria-pressed="false"${soundTip.attrs}><span data-sound-label>${esc(ui.soundOff)}</span></button>${soundTip.note}</li>
           </ul>
         </div>
         <button class="menu-item menu-close" type="button" data-menu-item data-menu-close>${esc(ui.close)} <kbd>Esc</kbd></button>

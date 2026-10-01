@@ -104,7 +104,7 @@ test('the Anvil’s groups: every weapon the model has is in exactly one, and ea
   }
 });
 
-test('pack lists: each heading’s group is labelled by it (not hidden from screen readers), with its note; options escaped; two columns counted by options', async () => {
+test('pack lists: each heading’s group is labelled by it (not hidden from screen readers), with its note; options escaped, their tips read out; two columns counted by options', async () => {
   const { optionsHtml, packGroups } = await import('../src/ui/pack.js');
   const options = [
     { id: 'go', label: 'Go <now>' },
@@ -120,7 +120,8 @@ test('pack lists: each heading’s group is labelled by it (not hidden from scre
   assert.doesNotMatch(html, /aria-hidden="true">Kinds|class="pack-heading" aria-hidden/, 'headings are read out');
   assert.match(html, /<div class="pack-group" role="group" aria-labelledby="pack-anvil-g1" aria-describedby="pack-anvil-g1-why">\s*<p class="pack-heading" id="pack-anvil-g1">Kinds &amp; &lt;Sorts&gt;<\/p><p class="pack-why" id="pack-anvil-g1-why">Off: &lt;reasons&gt;.<\/p><ul class="pack-group-list" role="list">/);
   assert.match(html, /<div class="pack-group" role="group" aria-labelledby="pack-anvil-g2">\s*<p class="pack-heading" id="pack-anvil-g2">More<\/p><ul/);
-  assert.match(html, /data-pack-option="a"\s+aria-pressed="true" data-tip="What &quot;A&quot; does"/);
+  // An option's tip is its tooltip and, for a screen reader (the tooltip is aria-hidden), its description.
+  assert.match(html, /data-pack-option="a"\s+aria-pressed="true" data-tip="What &quot;A&quot; does" aria-describedby="pack-anvil-tip1">[\s\S]*?<\/button><span id="pack-anvil-tip1" hidden>What &quot;A&quot; does<\/span><\/li>/);
   assert.match(html, /data-pack-option="b"\s+aria-pressed="false" disabled>/);
   assert.ok(html.includes('Go &lt;now&gt;') && !html.includes('<now>'), 'labels escaped');
   assert.equal((html.match(/<ul class="pack-group-list" role="list">/g) ?? []).length, 3, 'a list per group, the actions’ too');
