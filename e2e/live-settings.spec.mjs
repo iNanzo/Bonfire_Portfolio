@@ -189,11 +189,23 @@ test('? lists the keyboard shortcuts in groups, from the page and from the setti
   await page.keyboard.press('Escape');
   await expect(keys).toBeHidden();
   await page.keyboard.press('s');
+  await expect(dialog(page)).toBeVisible();
+  // ? in the settings (not while typing), and the footer's button, open it over them.
+  await page.keyboard.press('?');
+  await expect(keys).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(keys).toBeHidden();
+  await expect(dialog(page)).toBeVisible();
   await page.locator('.viz-keys-btn').click();
   await expect(keys).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(keys).toBeHidden();
   await expect(dialog(page)).toBeVisible();
+  // Typed in the search box, ? is only a character.
+  await box(page).focus();
+  await page.keyboard.press('?');
+  await expect(box(page)).toHaveValue('?');
+  await expect(keys).toBeHidden();
   expect(errors).toEqual([]);
 });
 

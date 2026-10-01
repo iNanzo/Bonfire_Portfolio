@@ -26,6 +26,7 @@ import { esc, corners } from '../html.js';
 import { TABS, TRI_HELP, sectionsFor, entriesFor, meta, blockedBy } from '../settingsMap.js';
 import { searchBoxMarkup } from '../ui/settingsSearch.js';
 import { BULK_ACTIONS } from '../ui/fields.js';
+import { isHelpKey } from '../ui/keysOverlay.js';
 import { sceneSummary } from '../scenes.js';
 import {
   NUMERIC, AT_LEAST_ONE, RANDOM, PRESETS, applyPreset, presetOf, resetSettings, flushSettings, scenesFrom, setInLoop, inLoop,
@@ -472,6 +473,12 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
   dialog.addEventListener('close', () => {
     if (search.active) search.clear();
     quiet();
+  });
+  // ? (not while typing) lists the keyboard shortcuts, as the footer's button does.
+  dialog.addEventListener('keydown', (e) => {
+    if (!isHelpKey(e)) return;
+    e.preventDefault();
+    onKeys();
   });
   // (The fields once now, so they hold the settings even before it first opens.)
   fillFields();

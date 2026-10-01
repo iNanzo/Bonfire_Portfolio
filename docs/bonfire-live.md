@@ -190,7 +190,8 @@ notes: `docs/design/visualizer.md`.
   motion turns the moving ones off.
 
 **Keys** (`?` lists them all, in four groups: `src/visualizer/keys.js` and the shared
-keys overlay; the HUD's **Keys** button opens it too):
+keys overlay; the HUD's **Keys** button opens it too, and in Settings `?` or the footer's
+**Keyboard Shortcuts** opens it over them):
 
 - **Moments:** `Space` drop (strike the held weapon, or recolor now) · `A` forge and hold ·
   `B` swap on the beat · `R` ring · `X` the living weapon leaves the fire · `G` burst the
