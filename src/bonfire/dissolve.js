@@ -1,9 +1,13 @@
 // The dissolve's shader helpers, shared by everything that burns away and forms again in
 // ember edges (the weapons' swap, the knights' summoning and helmet swaps): a screen-locked
 // Bayer dither and a smooth value noise in object space. Pasted into a fragment shader.
+// The Bayer matrices are the pixel pass's own (pixelPass.js bayer4 / bayer8), so a pattern
+// drawn with them (the knight's band edges, armor.js) lines up texel for texel with the
+// scene's dither.
 export const DISSOLVE_CHUNK = /* glsl */ `
   float wBayer2(vec2 a) { a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
   float wBayer4(vec2 a) { return wBayer2(0.5 * a) * 0.25 + wBayer2(a); }
+  float wBayer8(vec2 a) { return wBayer4(0.5 * a) * 0.25 + wBayer2(a); }
   float wHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
   float wNoise(vec3 x) {
     vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);

@@ -6,16 +6,16 @@
 // the styles that draw steel (`finish: true`); the others have their own colors.
 //
 //   pixel-cel          the default: a hand-drawn sprite. Each plate one smooth, rounded
-//                      surface cut into four flat bands by the fire's light, a 1-texel ink
-//                      line on every plate edge, seam and overlap, near-black where the fire
-//                      can't reach; the planes squarely facing the fire wear the flame's body
-//                      and cream tips, the rest stays cool gunmetal
+//                      surface cut into four flat bands by the fire's light, their edges
+//                      dithered on the wide bands, a 1-texel ink line on every plate edge,
+//                      seam and overlap, near-black where the fire can't reach; the planes
+//                      squarely facing the fire wear the flame's body and cream tips, the
+//                      rest stays cool gunmetal
 //   pixel-painterly    the cel look with a painter's touches: shadows hue-shifted toward the
 //                      flame's shade, lips a little further round the lit edges, a lighter
-//                      ink on the lit side, a warm terminator, small dither patches on band
-//                      edges
+//                      ink on the lit side, a warm terminator
 //   pixel-chiaroscuro  fewer, harder bands: near-black backs and gaps, mid steel, the fire's
-//                      color where it strikes, cream highlights, black ink
+//                      color where it strikes, cream highlights, black ink, a little dither
 //   gunmetal           round 9's look: natural light on gunmetal steel, plate wear, a thin
 //                      fire rim, the fire's reflection flashing across his facets
 //   blackgold          round 8's: blackened plate in the scene's own stone, shadow and void,
@@ -30,15 +30,18 @@ export const MODELS = { main: 'models/knight.glb', first: 'models/knight-first.g
 
 /**
  * Each style: `look` the armor shader's (armor.js uLook), `model` a MODELS key, `finish`
- * whether the steel finishes apply, `hint` a line for people.
+ * whether the steel finishes apply, `dither` how far the pixel styles dither across their
+ * band edges at the site's Dither (0..1: 1 the whole of the narrower band beside an edge, up
+ * to 4 texels; armor.js uCelDither, which follows the Dither setting: 0 none), `hint` a line
+ * for people.
  */
 export const STYLES = {
-  'pixel-cel': { look: 1, model: 'main', finish: true, hint: 'Hand-drawn sprite: flat bands, ink lines, grey steel wearing the fire’s color where it lights him.' },
-  'pixel-painterly': { look: 2, model: 'main', finish: true, hint: 'The sprite with a painter’s touch: warm shadows, softer lines, lit plate lips.' },
-  'pixel-chiaroscuro': { look: 3, model: 'main', finish: true, hint: 'Hard firelight: near-black backs, the flame’s color only where it strikes.' },
-  gunmetal: { look: 0, model: 'main', finish: true, hint: 'Natural light on gunmetal steel, plate wear and a thin fire rim.' },
-  blackgold: { look: 4, model: 'main', finish: false, hint: 'Blackened plate and dark gilt trim that catches the fire.' },
-  first: { look: 5, model: 'first', finish: false, hint: 'The first build: the boxy original, its trim glowing in the flame’s colors.' },
+  'pixel-cel': { look: 1, model: 'main', finish: true, dither: 1, hint: 'Hand-drawn sprite: flat bands, ink lines, grey steel wearing the fire’s color where it lights him.' },
+  'pixel-painterly': { look: 2, model: 'main', finish: true, dither: 1, hint: 'The sprite with a painter’s touch: warm shadows, softer lines, lit plate lips.' },
+  'pixel-chiaroscuro': { look: 3, model: 'main', finish: true, dither: 0.2, hint: 'Hard firelight: near-black backs, the flame’s color only where it strikes.' },
+  gunmetal: { look: 0, model: 'main', finish: true, dither: 0, hint: 'Natural light on gunmetal steel, plate wear and a thin fire rim.' },
+  blackgold: { look: 4, model: 'main', finish: false, dither: 0, hint: 'Blackened plate and dark gilt trim that catches the fire.' },
+  first: { look: 5, model: 'first', finish: false, dither: 0, hint: 'The first build: the boxy original, its trim glowing in the flame’s colors.' },
 };
 
 /** The styles' keys, in menu order. */

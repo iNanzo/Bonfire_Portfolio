@@ -332,9 +332,11 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // The armor's shared uniforms: the fire's place and light, the exposure, the flame's ramp,
   // its style, finish and rim (the settings', effects.knight, or Bonfire Live's: applyArmor);
   // the colors his steel snaps to and the style's line art go to the pass (pixelPass.js
-  // setSteel).
+  // setSteel). The pass's dither strength and matrix are shared too: the pixel styles
+  // dither their band edges with them, so the Dither setting moves him with the scene.
   const armor = createArmorShared({
     fireAt: fireLight.position, exposure: pass.uniforms.exposure, resolution: pass.uniforms.resolution, moonAt: moon.position, reducedMotion,
+    dither: pass.uniforms.ditherStrength, ditherScale: pass.uniforms.ditherScale,
     style: styleOr(effects.knight?.style), finish: effects.knight?.finish ?? 'gunmetal', rim: effects.knight?.rim ?? 0.5,
     onSteel: (steel, rim, o) => pass.setSteel(steel, { rim, ...o }),
   });

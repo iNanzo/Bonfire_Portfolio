@@ -1,11 +1,12 @@
 // The knight's styles (knightStyles.js): every look he has had, selectable by one name, each
-// with a label, a hint and its model; the default is one of them; the models are shipped.
+// with a label, a hint, its model and its dither; the default is one of them; the models are
+// shipped.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { STYLES, STYLE_KEYS, STYLE_NAMES, DEFAULT_STYLE, MODELS, CEL_LOOKS, styleOr, styleModel } from '../src/bonfire/knightStyles.js';
 
-test('six styles, each named, hinted and with its look and model', () => {
+test('six styles, each named, hinted and with its look, model and dither', () => {
   assert.deepEqual(STYLE_KEYS, ['pixel-cel', 'pixel-painterly', 'pixel-chiaroscuro', 'gunmetal', 'blackgold', 'first']);
   const looks = new Set();
   for (const k of STYLE_KEYS) {
@@ -15,6 +16,7 @@ test('six styles, each named, hinted and with its look and model', () => {
     assert.ok(Object.hasOwn(MODELS, s.model), `${k}: a known model`);
     assert.equal(typeof s.finish, 'boolean');
     assert.ok(Number.isInteger(s.look) && s.look >= 0 && s.look <= 5, `${k}: a shader look`);
+    assert.ok(Number.isFinite(s.dither) && s.dither >= 0 && s.dither <= 1, `${k}: a dither amount 0..1`);
     looks.add(s.look);
   }
   assert.equal(looks.size, STYLE_KEYS.length, 'each style its own look');

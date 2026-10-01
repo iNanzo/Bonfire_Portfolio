@@ -78,8 +78,9 @@ a few flat tones per material, so it reads as a hand-made sprite. For the knight
   across its curve like the references' metal: a lit crescent toward the fire with a
   small highlight at its heart, then steel, mids and a dark far side, never one flat disc
   of the flame's color; a crescent of cream on a rounded plate's fire-side curve, small
-  glints, bright lips only on the raised edges the fire lights; dither only in a thin
-  checker seam on a wide band's edge. **The key light's color is the fire's**: only the
+  glints, bright lips only on the raised edges the fire lights; the wide bands' edges
+  dithered in the scene's own Bayer pattern, following the Dither setting (round 10).
+  **The key light's color is the fire's**: only the
   planes squarely facing it leave the steel, and those are the flame's own body and cream
   tips, so every flame recolors his lit side while the shadows and mids stay cool
   gunmetal: grey plate lit by that fire, not painted armor. The light falls off steeply
@@ -348,14 +349,17 @@ places and the walks between them; pure and unit-tested, shared with the visuali
 - **Knight Styles** (`src/bonfire/knightStyles.js`, pure): every look he has had, one
   name each, selectable at any time; how the armor draws him (`armor.js`, the shader's
   `uLook`), which model he's built from, and which colors the pass snaps his steel to.
-  `STYLES` (`look`, `model`, `finish`, `hint`), `STYLE_KEYS` (menu order), `STYLE_NAMES`
-  (Title Case labels), `DEFAULT_STYLE`, `MODELS`, `styleOr(name)`, `styleModel(name)`.
+  `STYLES` (`look`, `model`, `finish`, `dither`, `hint`), `STYLE_KEYS` (menu order),
+  `STYLE_NAMES` (Title Case labels), `DEFAULT_STYLE`, `MODELS`, `styleOr(name)`,
+  `styleModel(name)`. `dither` is how far a pixel style dithers its band edges at the
+  site's Dither (0..1; **Dither** below): Pixel Cel and Pixel Painterly 1, Pixel
+  Chiaroscuro 0.2, the rest 0.
 
   | Key | Name | What |
   | --- | --- | --- |
-  | `pixel-cel` | Pixel Cel | **the default**: the sprite, four flat bands and a highlight on smooth plates (cool gunmetal darks and mids, the flame's body and cream tips only where it faces the fire), near-black ink with a dark warm ink over the lit tones, the fire on his outline's fire side |
-  | `pixel-painterly` | Pixel Painterly | the sprite with a painter's touch: shadows hue-shifted toward the flame's shade (as dark), lips a little further round the lit edges, a lighter ink over the lit tones, the flame's dark shade on the terminator, wider checker seams |
-  | `pixel-chiaroscuro` | Pixel Chiaroscuro | hard firelight: the dark, mid steel and the fire's body (and the highlight), near-black backs and gaps, black ink, the terminator |
+  | `pixel-cel` | Pixel Cel | **the default**: the sprite, four flat bands and a highlight on smooth plates (cool gunmetal darks and mids, the flame's body and cream tips only where it faces the fire), the wide bands' edges dithered, near-black ink with a dark warm ink over the lit tones, the fire on his outline's fire side |
+  | `pixel-painterly` | Pixel Painterly | the sprite with a painter's touch: shadows hue-shifted toward the flame's shade (as dark), lips a little further round the lit edges, a lighter ink over the lit tones, the flame's dark shade on the terminator, the band edges dithered as Pixel Cel's |
+  | `pixel-chiaroscuro` | Pixel Chiaroscuro | hard firelight: the dark, mid steel and the fire's body (and the highlight), near-black backs and gaps, black ink, the terminator, a little dither |
   | `gunmetal` | Gunmetal | round 9's natural light on gunmetal steel (below) |
   | `blackgold` | Black & Gold | round 8's final: blackened plate in the scene's stone, shadow and void by each facet's turn to the fire, dark gilt trim (wood and shadow) that catches the flame's mid, hi and core only in its reflection, rims a step up; no steel ramp, no fire rim |
   | `first` | First Build | round 8's first build: its own boxy model (`public/models/knight-first.glb`, no `K_Pauldron` joints: its lames ride the dome), fetched only when chosen; the same blackened plate, its trim at least the flame's `lo`, so it glows in the flame's color |
@@ -414,7 +418,37 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   as a whole into the lit bands (its heart to the highlight; a curved plate a band or two
   up, keeping its curve), and the sweeps glide over the plates facing the fire the same
   way; the far side never lights. Fog takes a far knight's bands a step down, toward the
-  steel. **Line art** (`pixelPass.js` `celLine`): a line only where both surfaces are at
+  steel. **Dither** (round 10; the user: "i dont really see the dithering effect on him"):
+  the pass dithers the scenery's continuous color, but his pixels arrive in exact tones
+  and it leaves them alone (`if (!celHere)`), so the armor dithers his band edges itself,
+  in the pass's own Bayer matrix (`dissolve.js` `wBayer4`/`wBayer8`, the pass's `bayer4`/
+  `bayer8`: the color target is the pass's size, so `gl_FragCoord` is the pass's texel and
+  his pattern lines up with the scene's). The pass's `ditherStrength` and `ditherScale`
+  are shared with the armor by reference (`uDither`, `uDitherScale`, like the exposure),
+  so the render menu's Dither and Pattern rows and Bonfire Live's slider move him with the
+  scene. Near a band edge each texel's threshold moves the key (and the far side's fill
+  and turn, and a curved plate's dark bands) across by up to half a window: the style's
+  amount `a` (`uCelDither`) times the Dither over the site's 0.08, at most 2x (Live's
+  slider goes to 0.4), takes `min(a, 1)` of the narrower band beside the edge (never more:
+  no texel skips a band) and at most `a` x 4 texels (`DITHER_MAX`); none where that band is
+  under 2 texels across on screen (`DITHER_MIN`, measured along the key's gradient; a thin
+  limb's bands stay flat), fading in over a texel more. At Dither 0 there's no offset at
+  all: exactly the flat bands. Not dithered: the highlight, the lips, the flame's flash
+  and the sweeps, his own flash (`uLift`), the frost and the dissolve. The old checker seam
+  (a band edge a texel early on alternate texels, only where the key changed under 0.03 a
+  texel) is gone: it moved 0.2–2 texels a frame. Measured in pairs (the same frame drawn
+  with round 9's shaders and the new ones; 3 bursts of 20 frames; home, Pixel Cel,
+  Dither 0.08): at 1920 the dither moves 58–75 texels of his ~3,300 a frame and makes up
+  7.5–9.6 % of the breastplate's, pauldrons' and cuisses' texels (patterned texels:
+  moved, or beside one moved), single-texel speckle +0.6 to +1.1 points (round 9's
+  method below; 9.4–9.5 % before), crawl at rest +0.05 points at most; at 1280 and 390,
+  where his bands are narrower, ~20 texels a frame (+0.4 to +0.6 points). At 0.16 and 0.4
+  the window widens on the wide bands only (speckle up to +1.35). Chiaroscuro's bands are
+  twice as wide, so it takes 0.2 (at 0.4 it went +3 to +4.5 points at 2x). The
+  painterly and chiaroscuro terminator isn't drawn beside a lone lit texel while the
+  dither's on (a dot of a dithered edge: a terminator round each would scatter over the
+  patch; at Dither 0 it's as before).
+  **Line art** (`pixelPass.js` `celLine`): a line only where both surfaces are at
   least two texels thick across the edge and one of them more (`CEL_THICK`: no outline
   round a one-texel sliver, a corner poking through, a finger peeking from a gauntlet in
   his lap far off, nor between two thin strips such as a fauld's hoops, which show in
@@ -506,13 +540,15 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   his plate and the rim keep their flat tone). The pixel styles mark 0.62 + 0.002 the
   smooth surface's id (or the id it merges into, small on screen), 0.14 more on the fire's
   side: their pixels snap to the style's eight tones (`CEL_TONES`) without the pass's
-  dither and get no facet creases; the pass draws their line art: a 1-texel line wherever
+  dither (the armor dithers their band edges itself: **Dither** above) and get no facet
+  creases; the pass draws their line art: a 1-texel line wherever
   two surfaces meet on screen or he meets what's behind him, on the nearer surface's pixel
   (the same depth: the higher id's), so every plate edge, crease and overlap gets exactly
   one, but not a lone texel of it (a line texel with no line beside it); the void, or over
   his lit tones the style's lit ink (his outline too); Painterly and Chiaroscuro add the
   terminator, the flame's dark shade on the one steel texel where a lit band meets the
-  dark steel (only where the dark goes on past it, so a small part isn't speckled); their
+  dark steel (only where the dark goes on past it, so a small part isn't speckled, and
+  with the dither on not beside a lone lit texel, a dot of a dithered edge); their
   rim, just inside his outline over his steel, is the flame's body on the fire's side (its
   dark terminator shade under rim 0.35, two texels over 0.85) and its shade on the far
   side (over rim 0.3). The
