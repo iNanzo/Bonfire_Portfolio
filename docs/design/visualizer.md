@@ -447,7 +447,7 @@ bonfire's design, assets and code, then three rounds of feedback:
   hand) and `lock` (solo).
 - **The built-in scenes** (content.json `scenes`, made in the Painter and imported through
   the admin's Scenes page): *Cathedral Kaleidoscope*, *Frozen Shrine*, *Forge Rave* and
-  *Moonlit Ruins* (bonfire-live.md has what each is). Between them they cover the
+  *Moonlit Ruins* ([bonfire-live.md](../bonfire-live.md) has what each is). Between them they cover the
   format's range, each judged at real speed in the Painter's Still, Beat and Drop Loop
   and in Bonfire Live: a pinned look detail (the kaleidoscope's six segments) under a
   sweep that turns what it folds; a still framing with a spotlight, grain and the echo;

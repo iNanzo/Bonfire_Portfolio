@@ -1,7 +1,7 @@
 # Editing content and the admin panel
 
 How to change what the site says and shows, by hand or in the admin panel. The admin's
-design decisions are in [admin-v2.md](admin-v2.md).
+design decisions are in [design/admin-v2.md](design/admin-v2.md).
 
 ## Editing content
 
@@ -148,8 +148,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
 | Piece | File |
 | --- | --- |
 | The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `schema.js` labels/help/grouping, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case, `paletteTools.js` the palette buttons (the generators are `src/paletteGen.js`), `sceneTools.js` the Scenes page's cards and Painter tools) |
-| Effects defaults, ranges, runtime | `src/effectsDefaults.js`, `src/effects.js`, `src/elements.js` (design notes: `docs/admin-v2.md`, `docs/elements.md`) |
-| The scene format (Painter, Bonfire Live, the Scenes page) | `src/scenes.js` (design notes: `docs/painter.md`, `docs/visualizer.md`) |
+| Effects defaults, ranges, runtime | `src/effectsDefaults.js`, `src/effects.js`, `src/elements.js` (design notes: `docs/design/admin-v2.md`, `docs/elements.md`) |
+| The scene format (Painter, Bonfire Live, the Scenes page) | `src/scenes.js` (design notes: `docs/painter.md`, `docs/design/visualizer.md`) |
 | API: session, content, save, deploy status, image thumbnails | `admin/server/api.js` |
 | Sign-in check (Cloudflare Access JWT) | `admin/server/auth.js` |
 | Content store on GitHub (one commit per save, Git Data API) | `admin/server/github.js` |

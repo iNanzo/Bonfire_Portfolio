@@ -24,8 +24,11 @@ and a content admin on a Cloudflare Worker. Node 22.12 or later.
 ```bash
 npm install
 npm run dev           # the site: http://localhost:5173 (Bonfire Live at /visualizer/, the Painter at /painter/)
-npm run check         # lint, type check, unit tests (site, visualizer, admin)
+npm run check         # lint, type check, every unit test (site, visualizer, admin)
+npm run test:fast     # the unit tests minus the [slow] ones, while you work
+npm run coverage      # the unit tests with coverage (see Testing and coverage)
 npm run e2e           # the production build in a real browser (Playwright)
+npm run format        # Prettier, with .prettierrc.json's settings
 npm run admin         # the admin panel, editing your local files: http://127.0.0.1:5175
 npm run build         # outputs dist/
 npm run model         # rebuild the scene in Blender (tools/*.py → public/models/bonfire.glb)
@@ -74,12 +77,46 @@ src/content.json ──► content.js ──► render.js (HTML) ──► main.
 | "How it's made": the page takes itself apart, render settings and all (B on the site, or *Take This Page Apart* on the Portfolio's own project page) | `src/ui/breakdown.js`, `src/ui/renderMenu.js` |
 | Palettes generated in OKLCH that keep text readable | `src/paletteGen.js` |
 
+## Testing and coverage
+
+| Command | What it runs |
+| --- | --- |
+| `npm test` | the unit tests (`test/`) |
+| `npm run admin:test` | the admin's tests (`admin/test/`) |
+| `npm run test:all` | both at once; `npm run check` runs it after lint and types |
+| `npm run test:fast` | both, minus the tests whose titles end in `[slow]` (the knight on his real model, the longest drop tracks) |
+| `npm run coverage` | `test:all` under [c8](https://github.com/bcoe/c8), with a coverage report |
+| `npm run e2e` | the production build in a real browser (`e2e/`, Playwright) |
+
+The unit tests run in Node, with no browser: the engine's math and motion, the knight on
+his real model, the audio analysis on synthesized tracks, settings, scenes and content
+rules. The modules that need a page and WebGL (the three `main.js`, `scene.js`, the
+particle systems) are exercised by the browser tests instead. Locally,
+`PW_CHANNEL=chrome npm run e2e` uses your installed Chrome; `PW_PREBUILT=1` reuses the
+`dist/` you already built, and `PW_PORT` picks another port than 4173.
+
+**Coverage.** `npm run coverage` prints a table and writes `coverage/`: an HTML report
+(`coverage/lcov-report/index.html`), `lcov.info` and `coverage-summary.json`. It counts
+every file in `src/` and `admin/`, including those no unit test loads (at 0 %), so the
+total is honest rather than flattering. It fails if lines, statements, functions or
+branches drop under the thresholds in `.c8rc.json`; after adding tests,
+`npm run coverage:ratchet` raises them to what the tests now reach (it never lowers them).
+`node tools/coverage-summary.mjs` turns the last run into Markdown tables, by folder and
+by file; CI shows them on each run's summary page and keeps `coverage/` as an artifact.
+
 ## Checks and deploys
 
-Pushes to `main` deploy to GitHub Pages (`.github/workflows/deploy.yml`) only if the code
-lints, type-checks, passes the unit tests and loads cleanly in a browser (`e2e/`: every
-screen, Bonfire Live and its preset scenes, the Painter). Pull requests run the same
-checks (`checks.yml`). The admin is a separate deploy: `npm run admin:deploy`.
+Pull requests run `.github/workflows/checks.yml`, and pushes to `main` run `deploy.yml`.
+Both call one reusable workflow, `ci.yml`, whose three jobs run side by side: lint and
+type checks; the unit and admin tests with coverage, on Node 22 and 24; and the built
+site in a real browser (`e2e/`: every screen, Bonfire Live and its preset scenes, the
+Painter). `main` deploys to GitHub Pages only if all three pass, and it ships the very
+build the browser tests ran against. Dependabot proposes dependency and action updates
+weekly (Three.js is updated by hand, since a new version can change the look). The admin
+is a separate deploy: `npm run admin:deploy`.
+
+How to make and commit a change: [CONTRIBUTING.md](CONTRIBUTING.md). What changed:
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Docs
 
@@ -88,8 +125,9 @@ checks (`checks.yml`). The admin is a separate deploy: `npm run admin:deploy`.
 - [docs/painter.md](docs/painter.md): the Bonfire Painter, making preset scenes
 - [docs/admin.md](docs/admin.md): editing content, by hand or in the admin
 - [docs/knight.md](docs/knight.md): the knight: model, rig, styles, poses, arrival, places and API
-- [docs/elements.md](docs/elements.md), [docs/visualizer.md](docs/visualizer.md),
-  [docs/admin-v2.md](docs/admin-v2.md): design notes
+- [docs/elements.md](docs/elements.md): design notes for the elements and the palette tools
+- [docs/design/](docs/design/): the design logs, [Bonfire Live's](docs/design/visualizer.md)
+  and [the admin's](docs/design/admin-v2.md)
 
 ## Accessibility and performance
 
@@ -99,3 +137,9 @@ readers. `prefers-reduced-motion` gets instant camera cuts and a calmer, still-d
 fire. The scene renders at 3–4 CSS pixels a texel, pauses in a hidden tab, and uses fewer
 particles and no shadows on touch devices; Three.js loads after the page content, and
 fonts are served from the site itself.
+
+## License
+
+All rights reserved. The code, art, models and content are published to be seen, as a
+portfolio; no license is granted to copy, modify, distribute or use them without written
+permission ([LICENSE](LICENSE)). To report a security issue, see [SECURITY.md](SECURITY.md).

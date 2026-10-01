@@ -1,5 +1,5 @@
 # The admin panel Worker. Deploy with `npm run admin:deploy` (builds the page first).
-# One-time setup (Cloudflare Access, GitHub App, secrets): see "Admin panel" in README.md.
+# One-time setup (Cloudflare Access, GitHub App, secrets): "Put it online" in docs/admin.md.
 name = "nhoang-admin"
 main = "worker.js"
 compatibility_date = "2026-09-01"

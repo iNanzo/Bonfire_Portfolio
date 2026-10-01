@@ -1,7 +1,7 @@
 # Bonfire Live: using it
 
 How to run the visualizer at a show. Its design notes and the requirement log are in
-[visualizer.md](visualizer.md).
+[design/visualizer.md](design/visualizer.md).
 
 ## Bonfire Live (audio visualizer)
 
@@ -9,7 +9,7 @@ The bonfire as an audio-reactive visualizer for DJ sets, at **`/visualizer/`**
 (`npm run dev`, then `http://localhost:5173/visualizer/`). It's the same scene, colors,
 weapons and elements as the site, driven by the music instead of the cursor. The site
 links to it from its *Bonfire Live* project (which links to the Painter too). Design
-notes: `docs/visualizer.md`.
+notes: `docs/design/visualizer.md`.
 
 **Sound sources** (the start screen):
 
@@ -274,7 +274,7 @@ hits, the render, the knights and the fireflies. They're made in the **Painter**
 (content.json `scenes`; one taken out of the loop there is left out here), yours are kept
 in this browser (`src/sceneStore.js`, `bonfire-scenes`), shared with the Painter. Bonfire
 Live loops through them (the director's scene loop and player,
-[visualizer.md](visualizer.md)): a scene arrives on the music's start, in a drop's
+[design/visualizer.md](design/visualizer.md)): a scene arrives on the music's start, in a drop's
 flash, or on a phrase line as a new blade lands in its colors, never mid-phrase.
 
 **The built-in scenes** (made in the Painter, `content.json` `scenes`), in loop order:

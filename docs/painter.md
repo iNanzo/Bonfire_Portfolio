@@ -5,7 +5,7 @@ A scene editor for Bonfire Live, at **`/painter/`** (`npm run dev`, then
 it, its colors, the framing and its slow move, a look with its layers and their details,
 the drops, the render, the knights, the fireflies), watch it play to a silent beat, save
 it, and send it to Bonfire Live, which loops through preset scenes like it. The format is
-`src/scenes.js`; how Bonfire Live plays and loops scenes is in [visualizer.md](visualizer.md)
+`src/scenes.js`; how Bonfire Live plays and loops scenes is in [design/visualizer.md](design/visualizer.md)
 and [bonfire-live.md](bonfire-live.md); the admin's Scenes page (the built-in scenes) is in
 [admin.md](admin.md).
 

@@ -2,7 +2,7 @@
 
 The detailed behavior of the portfolio and its scene, moved out of the README (which is
 now the short version). Design notes for the elements are in [elements.md](elements.md);
-Bonfire Live's are in [visualizer.md](visualizer.md), the Painter's in
+Bonfire Live's are in [design/visualizer.md](design/visualizer.md), the Painter's in
 [painter.md](painter.md) and the knight's in [knight.md](knight.md).
 
 ## How it plays
