@@ -911,8 +911,12 @@ window.addEventListener('keydown', (e) => {
   if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
   if (mod || e.altKey) return;
   const k = e.key.toLowerCase();
-  // The library open: L closes it (Esc is its own); the stage's keys wait.
-  if (library.isOpen) { if (k === 'l') { e.preventDefault(); library.close(); } return; }
+  // The library open: L closes it (Esc is its own), / filters it; the stage's keys wait.
+  if (library.isOpen) {
+    if (k === 'l') { e.preventDefault(); library.close(); }
+    else if (e.key === '/') { e.preventDefault(); library.focusFilter(); }
+    return;
+  }
   if (e.key === '/') { e.preventDefault(); focusSearch(); return; }
   if (renderMenu.handleKey(e)) { e.preventDefault(); return; }
   if (e.key === 'Escape' && renderMenu.isOpen) { renderMenu.close(); return; }

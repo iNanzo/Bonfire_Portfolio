@@ -376,6 +376,8 @@ body.pnt.panel-off .pack { right: var(--gutter); }
 .pnt-lib-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
 .pnt-lib-title { font: 500 1.5rem/1.2 var(--font-name); letter-spacing: 0.04em; }
 .pnt-lib-note { min-height: 1.4em; margin: 10px 0 0; font-size: 0.875rem; color: var(--accent-hi); }
+.pnt-lib-search { flex-basis: 100%; max-width: 360px; }
+.pnt-card[hidden] { display: none; }
 .pnt-lib-sub { margin: 18px 0 8px; font: 400 0.8125rem/1 var(--font-pixel); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); }
 .pnt-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-top: 10px; }
 .pnt-card {

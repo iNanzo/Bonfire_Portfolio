@@ -9,12 +9,15 @@
 //                   (or a scene's JSON from the admin), ids that clash saved as copies;
 //                   every one of mine in one file (bonfire-scenes.json).
 // A card lifts on hover with a dithered glow in its own flame's color (an effect, no text).
+// A box over the lists filters both by name as you type (/ goes to it; Esc clears it, a
+// second Esc closes the drawer), and keeps filtering as the lists change.
 // The drawer lists what the store has each time it opens, and again when another tab
 // changes it; a redraw keeps the keyboard's place (the same button on the same card, or
 // the next card's when that one's gone). Opening a scene or starting a new one while the
 // one being painted has unsaved changes asks first, in place (Discard and Open / Keep
 // Painting). Esc closes the drawer wherever the focus is.
 import { esc } from '../html.js';
+import { createSearchBox, normalize, searchBoxMarkup } from '../ui/settingsSearch.js';
 import { readSceneFile, sceneFile, sceneRef, sceneSummary, sceneSwatches } from '../scenes.js';
 import { swatches } from './panel.js';
 
@@ -97,6 +100,7 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
           <button type="button" class="pix-btn" data-lib="keep">Keep Painting</button>
         </div>
         <input type="file" accept="application/json,.json" data-lib-file hidden>
+        ${searchBoxMarkup({ id: 'pnt-lib-filter', label: 'Filter Scenes by Name', placeholder: 'Filter by name  /' }).replace('class="settings-search"', 'class="settings-search pnt-lib-search"')}
       </header>
       <p class="pnt-lib-note" role="status" data-lib-note></p>
       <h3 class="pnt-lib-sub">My Scenes</h3>
@@ -111,7 +115,9 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
   const builtEl = el.querySelector('[data-lib-built]');
   const noteEl = el.querySelector('[data-lib-note]');
   const fileEl = /** @type {HTMLInputElement} */ (el.querySelector('[data-lib-file]'));
+  const filterEl = /** @type {HTMLInputElement} */ (el.querySelector('#pnt-lib-filter'));
   let opener = null;
+  let query = '';
 
   const note = (text) => { noteEl.textContent = text; };
   /** A scene by its ref ('m:' mine, 'b:' built-in). */
@@ -140,6 +146,7 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
     el.querySelector('[data-lib-empty]').hidden = mine.length > 0;
     builtEl.innerHTML = builtIns().map((s) => cardMarkup(s, sceneRef('b', s.id), { thumb: store.thumb(sceneRef('b', s.id)), current: cur === sceneRef('b', s.id) })).join('')
       || '<li class="pnt-help">No built-in scenes yet.</li>';
+    filter();
     if (!focus) return;
     const [ref, act] = focus;
     const cardOf = (r) => /** @type {HTMLElement | null} */ (el.querySelector(`[data-card="${CSS.escape(r)}"]`));
@@ -153,6 +160,19 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
     target?.focus();
   }
   store.onChange(() => { if (!el.hidden) draw(); });
+
+  /** Only the cards whose names have every word typed (anywhere in them); how many. */
+  function filter() {
+    const words = normalize(query).split(/\s+/).filter(Boolean);
+    let n = 0;
+    for (const card of /** @type {NodeListOf<HTMLElement>} */ (el.querySelectorAll('[data-card]'))) {
+      const name = normalize(card.querySelector('[data-card-name]')?.textContent ?? '');
+      card.hidden = !words.every((w) => name.includes(w));
+      if (!card.hidden) n++;
+    }
+    return n;
+  }
+  createSearchBox({ input: filterEl, status: el.querySelector('[data-search-status]'), noun: 'scene', onQuery: (q) => { query = q; return filter(); } });
 
   function open() {
     if (!el.hidden) return;
@@ -297,5 +317,7 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
     refresh() { if (!el.hidden) draw(); },
     get isOpen() { return !el.hidden; },
     note,
+    /** Focus the name filter (the drawer open). */
+    focusFilter() { filterEl.focus(); filterEl.select(); },
   };
 }
