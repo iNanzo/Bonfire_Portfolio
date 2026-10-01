@@ -149,8 +149,11 @@ const PROBE_CLUMP = 0.06;
 const BODY = ['hips', 'spine', 'chest', 'neck', 'head', 'shoulderL', 'shoulderR', 'tassetL', 'tassetR', 'thighL', 'thighR', 'shinL', 'shinR', 'footL', 'footR'];
 // (Which part of him each piece is, as the ease has them (PART_OF): his back, head and helmet
 // 0, his left arm 1, his right 2, his hips and legs 3. The pauldrons' domes ride up and out
-// with their arm's swing: one in eases its arm back.)
-const PART_OF_PIECE = { shoulderL: 1, shoulderR: 2, hips: 3, tassetL: 3, tassetR: 3, thighL: 3, thighR: 3, shinL: 3, shinR: 3, footL: 3, footR: 3 };
+// with their arm's swing and lean with his back: one in eases his lean back first (a seated
+// Praise arching back into a standing stone keeps its arms up), its arm only if that isn't
+// enough (DOME_OF).)
+const PART_OF_PIECE = { hips: 3, tassetL: 3, tassetR: 3, thighL: 3, thighR: 3, shinL: 3, shinR: 3, footL: 3, footR: 3 };
+const DOME_OF = { shoulderL: 1, shoulderR: 2 };
 // (Its points are a few centimetres apart: kept 5 mm out, no point between them goes in far.)
 const DEPTH = 0.005;
 // (His boots and shins rest on what's under them, a seat's edge or a fallen drum: 1 cm in.)
@@ -176,6 +179,8 @@ const EASE_LET_GO = 0.25;
 // footwork getting up and sitting down, over whatever he steps across).)
 const PART_OF = Uint8Array.from({ length: POSE_SIZE }, (_, i) => (i < POSE.hips || i >= POSE.legL ? 3 : i >= POSE.armL && i < POSE.armL + 7 ? 1 : i >= POSE.armR && i < POSE.armR + 7 ? 2 : 0));
 const PARTS = 4;
+// (What's found in, as marginOf() has it: each part, then each pauldron's dome, left and right.)
+const FLAGS = PARTS + 2;
 // (A seated foot's way to where he stands up to, checked at OVER_POINTS points for what it
 // steps over: it passes OVER_CLEAR (m) over the scenery's shapes, lifted at most OVER_MOST;
 // with more than OVER_CROSS to clear, he stands up over his feet first, then steps across.)
@@ -729,7 +734,7 @@ function* probesOf(T) {
   }
   const body = [];
   for (const b of BODY) {
-    body.push({ i: BONE_INDEX[b], depth: RESTING.has(b) ? DEPTH_RESTING : DEPTH, part: PART_OF_PIECE[b] ?? 0, ...piece(b, PROBE_CELL) });
+    body.push({ i: BONE_INDEX[b], depth: RESTING.has(b) ? DEPTH_RESTING : DEPTH, part: PART_OF_PIECE[b] ?? 0, dome: DOME_OF[b] ?? 0, ...piece(b, PROBE_CELL) });
     if (body.length % 3 === 0) yield;
   }
   const helms = {};
@@ -1991,8 +1996,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   /**
    * How far knight k (as solved: `s`, his arms as keepClear() left them) keeps from the shapes
    * `cs` past what each piece of him may come to (DEPTH; DEPTH_RESTING for what rests on things),
-   * out to MARGIN (m; below 0, that far in), and which parts of him are in (into `out`, as
-   * PART_OF numbers them).
+   * out to MARGIN (m; below 0, that far in), and what of him is in (into `out`: FLAGS).
    */
   function marginOf(k, s, cs, out) {
     out.fill(false);
@@ -2003,19 +2007,31 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       if (m < 0) out[1 + j] = true;
       most = Math.min(most, m);
     }
-    for (const b of bodyProbes) most = pieceMargin(s, b.i, b, b.depth, b.part, most, cs, out);
+    for (const b of bodyProbes) {
+      const m = pieceMargin(s, b.i, b, b.depth, Math.max(most, 0), cs);
+      if (m < 0) {
+        out[b.part] = true;
+        if (b.dome) out[PARTS + b.dome - 1] = true;
+      }
+      most = Math.min(most, m);
+    }
     const helm = helmProbes[k.helmet];
-    if (helm) most = pieceMargin(s, BONE_INDEX.head, helm, DEPTH, 0, most, cs, out);
+    if (helm) {
+      const m = pieceMargin(s, BONE_INDEX.head, helm, DEPTH, Math.max(most, 0), cs);
+      if (m < 0) out[0] = true;
+      most = Math.min(most, m);
+    }
     return most;
   }
-  /** The less of `most` and how far piece i (its points `pc`) keeps from `cs` past `depth`: marginOf() (its `part` into `out` if it's in). */
-  function pieceMargin(s, i, pc, depth, part, most, cs, out) {
-    // (Only nearer than the least so far matters, or in at all.)
-    const under = Math.max(most, 0) + depth;
-    const shapes = within(s, i, pc.r, under, cs);
-    if (!shapes.length || !nearestIn(pc, shapes, under).col) return most;
-    if (found.d < depth) out[part] = true;
-    return Math.min(most, found.d - depth);
+  /**
+   * How far piece i of a solved pose (`s`; its points `pc`) keeps from the shapes `cs` past
+   * `depth` (m), as marginOf() has it: only nearer than `under` (m) past it matters (MARGIN
+   * where it keeps further).
+   */
+  function pieceMargin(s, i, pc, depth, under, cs) {
+    const shapes = within(s, i, pc.r, under + depth, cs);
+    if (!shapes.length || !nearestIn(pc, shapes, under + depth).col) return MARGIN;
+    return found.d - depth;
   }
   const _rest = newPose();
   /**
@@ -2036,8 +2052,8 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     return up <= 0 ? k.sit : up >= 1 ? k.stand : lerpPose(_rest, k.sit, k.stand, up);
   }
   const _eased = newPose();
-  const _bad = new Array(PARTS).fill(false);
-  const _now = new Array(PARTS).fill(false);
+  const _bad = new Array(FLAGS).fill(false);
+  const _now = new Array(FLAGS).fill(false);
   // (The poses looked at this step, each as solved and kept clear: the ease may end on one
   // before the last, and the solver holds only the last.)
   const looked = Array.from({ length: EASE_SOLVES }, () => ({
@@ -2171,13 +2187,14 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     return b;
   }
   /**
-   * Into the ease whatever is still in all the way back (_now), and with an arm the body that
-   * leans it there, with the body his legs: whether that's more than it had (_bad).
+   * Into the ease whatever is still in all the way back (_now): with an arm the body that
+   * leans it there, with the body his legs, with a pauldron's dome its arm (raised, it lifts
+   * the dome). Whether that's more than it had (_bad).
    */
   function more() {
     let added = false;
     for (let j = 0; j < PARTS; j++) {
-      const want = _now[j] || (j === 0 && (_now[1] || _now[2])) || (j === 3 && _now[0]);
+      const want = _now[j] || (j === 0 && (_now[1] || _now[2])) || (j === 3 && _now[0]) || ((j === 1 || j === 2) && _now[PARTS + j - 1]);
       if (want && !_bad[j]) _bad[j] = added = true;
     }
     return added;
