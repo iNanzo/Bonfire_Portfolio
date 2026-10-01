@@ -403,6 +403,9 @@ body.hud-off .viz-hud { display: none; }
 .viz-keys-results dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 6px 24px; margin: 0 0 12px; }
 .viz-keys-results dl > div { display: flex; gap: 12px; font-size: 0.875rem; color: var(--text-dim); }
 .viz-keys-results dt { flex: none; min-width: 5em; }
+/* A result stepped to with ↓ / ↑ has the focus itself (not its field): ringed. */
+.viz-settings [data-result-focus]:focus { outline: none; }
+.viz-settings [data-result-focus]:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 4px; }
 /* Revealed (Enter on a single result): a short flash round the row. */
 .is-found { animation: viz-found 1.2s steps(6) both; }
 @keyframes viz-found {

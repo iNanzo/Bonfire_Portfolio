@@ -79,9 +79,19 @@ test('search: a row only All Settings has shows in the Simple view, badged; ↓ 
   await expect(row).toBeVisible();
   await expect(row.locator('.viz-adv-badge')).toBeVisible();
   await expect(row.locator('.viz-adv-badge')).toHaveText('All Settings');
-  // ↓: the first result's field.
+  // ↓: the first result, the row itself (↓ again on its field would change the setting);
+  // ↓ past the last stays, ↑ from the first goes back to the box, Enter goes into the row.
   await page.keyboard.press('ArrowDown');
+  await expect(row).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(row).toBeFocused();
+  await expect(page.locator('[data-set="ditherMatrix"]')).toHaveValue('4');
+  await page.keyboard.press('ArrowUp');
+  await expect(box(page)).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
   await expect(page.locator('[data-set="ditherMatrix"]')).toBeFocused();
+  await expect(box(page)).toHaveValue('dither pattern');
   // Enter on a single result: its tab, shown and focused (the search cleared).
   await box(page).focus();
   await page.keyboard.press('Enter');
@@ -94,6 +104,20 @@ test('search: a row only All Settings has shows in the Simple view, badged; ↓ 
   await page.locator('[data-tab="picture"]').focus();
   await page.keyboard.press('/');
   await expect(box(page)).toBeFocused();
+  // Several results, one named just as typed: Enter reveals that one.
+  await page.keyboard.type('frame rate');
+  await expect.poll(() => shown(page), { timeout: 15_000 }).toEqual(expect.arrayContaining(['frameRate', 'flameFps']));
+  await page.keyboard.press('Enter');
+  await expect(box(page)).toHaveValue('');
+  await expect(page.locator('[data-set="frameRate"]')).toBeFocused();
+  // Several with none named so: Enter goes to the first, changing nothing.
+  await box(page).focus();
+  await page.keyboard.type('strobe');
+  await expect.poll(() => shown(page), { timeout: 15_000 }).toEqual(expect.arrayContaining(['flash', 'flicker']));
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-settings] [data-row].is-hit:focus')).toHaveCount(1);
+  await expect(box(page)).toHaveValue('strobe');
+  await page.keyboard.press('/');
   // Nothing found: words to try.
   await page.keyboard.type('zzqqx');
   await expect(page.locator('[data-search-empty]')).toBeVisible();
@@ -220,6 +244,15 @@ test('? lists the keyboard shortcuts in groups, from the page and from the setti
   await box(page).focus();
   await page.keyboard.press('?');
   await expect(box(page)).toHaveValue('?');
+  await expect(keys).toBeHidden();
+  // A shortcut found, stepped to with ↓: Enter opens the shortcuts (it has no field to go into).
+  await box(page).fill('tap the tempo');
+  await expect(page.locator('[data-settings] [data-row^="key:"].is-hit')).toHaveCount(1);
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('[data-settings] [data-row^="key:"]:focus')).toHaveCount(1);
+  await page.keyboard.press('Enter');
+  await expect(keys).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(keys).toBeHidden();
   expect(errors).toEqual([]);
 });

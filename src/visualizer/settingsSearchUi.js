@@ -16,9 +16,13 @@
 //             a row from All Settings shows in the Simple view with a badge, and the words
 //             found are marked in the names (escaped: an imported setup's name is text).
 //   keys      / or Ctrl+F in the dialog goes to the box; Esc clears it (a second Esc closes
-//             the dialog); ↓ goes to the first result; Enter on a single result reveals it
-//             (its tab, scrolled to, focused and flashed, unless motion is reduced).
-//             Nothing found: words that would find something, from the map's synonyms.
+//             the dialog); ↓ goes to the first result, and ↓ / ↑ from result to result (the
+//             row itself takes the focus, not its field, so stepping through never changes
+//             a setting; Tab or Enter goes into it, ↑ from the first goes back to the box).
+//             Enter in the box reveals the one result, or the one named just as typed
+//             ("frame rate": Frame Rate, not Flame Frame Rate) (its tab, scrolled to,
+//             focused and flashed, unless motion is reduced); with several, it goes to the
+//             first. Nothing found: words that would find something, from the map's synonyms.
 import { esc } from '../html.js';
 import { buildMatcher, highlight, createSearchBox, normalize, oneEdit } from '../ui/settingsSearch.js';
 import { typing } from '../ui/shell.js';
@@ -163,7 +167,8 @@ export function planSearch(hits, entries) {
  * @returns {string[]}
  */
 export function suggestFor(query) {
-  const words = normalize(query).match(/[\p{L}\p{N}]+/gu) ?? [];
+  const words = /** @type {string[]} */ (normalize(query).match(/[\p{L}\p{N}]+/gu) ?? []);
+  /** @type {Set<string>} */
   const out = new Set();
   const nearTo = (w) => (t) => (w.length >= 3 && t.startsWith(w.slice(0, 3))) || (w.length >= 4 && oneEdit(w, t));
   for (const w of words) {
@@ -183,6 +188,23 @@ const FOCUS = [
   'textarea:not(:disabled)', 'button:not(:disabled):not(.viz-tip)', 'a[href]', 'summary',
 ];
 const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+/**
+ * What to focus in a row: its switch's choice, its input, its button (never its "?"); the
+ * row itself if it's a button.
+ * @param {Element} row
+ * @returns {HTMLElement | null}
+ */
+export function focusTarget(row) {
+  for (const s of FOCUS) {
+    const el = /** @type {HTMLElement | null} */ (row.querySelector(s));
+    if (el) return el;
+  }
+  return row.matches('button, summary') ? /** @type {HTMLElement} */ (row) : null;
+}
+
+/** A row's words as compared with a query's: "Frame Rate" → "frame rate". @param {string} text */
+const wordsOf = (text) => (normalize(text).match(/[\p{L}\p{N}]+/gu) ?? []).join(' ');
 
 /**
  * Wire the dialog's search box. `dynamic()` gives the changing rows' data at each query
@@ -211,16 +233,21 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
   /** An item whose whole group was found (the group counts for it). */
   const inWhole = (row) => { const up = parentRow(row); return !!up && !!last?.plan.whole.has(/** @type {HTMLElement} */ (up).dataset.row); };
   /** The rows found that show: the tabs' in the dialog's order, then the presets (in the header). */
-  const results = () => [...form.querySelectorAll('.viz-settings-body [data-row].is-hit'), ...form.querySelectorAll('.viz-settings-top [data-row].is-hit')]
-    .filter((r) => !r.closest('.is-miss, [hidden]:not([data-tab-panel])'));
-  /** What to focus in a row: its switch's choice, its input, its button (never its "?"). */
-  const focusable = (row) => {
-    for (const s of FOCUS) {
-      const el = /** @type {HTMLElement | null} */ (row.querySelector(s));
-      if (el) return el;
+  const results = () => /** @type {HTMLElement[]} */ ([...form.querySelectorAll('.viz-settings-body [data-row].is-hit'), ...form.querySelectorAll('.viz-settings-top [data-row].is-hit')]
+    .filter((r) => !r.closest('.is-miss, [hidden]:not([data-tab-panel])')));
+  /**
+   * A result takes the focus itself (focusable for now, if it isn't anyway): ↓ or ↑ on its
+   * field would change the setting.
+   * @param {HTMLElement} row
+   */
+  function focusRow(row) {
+    if (!row.matches('button, a[href], summary, input, select, textarea')) {
+      row.tabIndex = -1;
+      row.dataset.resultFocus = '';
     }
-    return row.matches('button, summary') ? /** @type {HTMLElement} */ (row) : null;
-  };
+    row.focus({ preventScroll: true });
+    row.scrollIntoView({ block: 'nearest' });
+  }
 
   function unmark() {
     for (const { el, text } of marked) el.textContent = text;
@@ -231,10 +258,12 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
   /** The dialog as it is without a query: one tab, every row, nothing marked. */
   function reset() {
     unmark();
+    // (The rows made focusable as results aren't any more.)
+    for (const el of form.querySelectorAll('[data-result-focus]')) { el.removeAttribute('tabindex'); el.removeAttribute('data-result-focus'); }
     delete form.dataset.searching;
     emptyEl.hidden = true;
     keysEl.hidden = true;
-    for (const b of form.querySelectorAll('[data-tab-count]')) { b.textContent = ''; b.hidden = true; }
+    for (const b of form.querySelectorAll('[data-tab-count]')) { b.textContent = ''; /** @type {HTMLElement} */ (b).hidden = true; }
     for (const t of form.querySelectorAll('[data-tab].is-empty')) t.classList.remove('is-empty');
     const on = form.querySelector('[data-tab][aria-selected="true"]');
     showTab(/** @type {HTMLElement} */ (on)?.dataset.tab ?? TABS[0].id);
@@ -319,7 +348,7 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
     }
     const still = reducedMotion();
     row.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
-    focusable(row)?.focus({ preventScroll: true });
+    focusTarget(row)?.focus({ preventScroll: true });
     if (!still) {
       row.classList.remove('is-found');
       void (/** @type {HTMLElement} */ (row)).offsetWidth;
@@ -329,16 +358,46 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
     return true;
   }
 
+  /** The result Enter goes to: the only one, or the one named just as typed. */
+  function bestResult() {
+    const found = results().filter((r) => !inWhole(r));
+    if (found.length <= 1) return found[0] ?? null;
+    const typed = wordsOf(input.value);
+    const named = last?.hits.find((h) => wordsOf(h.entry.label) === typed && found.some((r) => r.dataset.row === h.entry.id));
+    return named ? found.find((r) => r.dataset.row === named.entry.id) ?? null : null;
+  }
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault(); // (the form is method=dialog: Enter would close it)
       box.run();
-      const found = results().filter((r) => !inWhole(r));
-      if (found.length === 1) reveal(/** @type {HTMLElement} */ (found[0]).dataset.row);
+      const best = bestResult();
+      if (best) reveal(best.dataset.row);
+      else if (results().length) focusRow(results()[0]);
     } else if (e.key === 'ArrowDown' && input.value.trim()) {
       box.run();
-      const first = results().map(focusable).find(Boolean);
-      if (first) { e.preventDefault(); first.focus(); first.scrollIntoView({ block: 'nearest' }); }
+      const first = results()[0];
+      if (first) { e.preventDefault(); focusRow(first); }
+    }
+  });
+  // On a result (the row itself, not a field in it): ↓ / ↑ step through them (↑ from the
+  // first: the box), Enter goes into it.
+  form.addEventListener('keydown', (e) => {
+    const row = /** @type {HTMLElement} */ (e.target);
+    if (!input.value.trim() || !(row instanceof HTMLElement) || !row.matches('[data-row].is-hit')) return;
+    const list = results();
+    const i = list.indexOf(row);
+    if (i < 0) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const next = i + (e.key === 'ArrowDown' ? 1 : -1);
+      if (next < 0) input.focus();
+      else if (next < list.length) focusRow(list[next]);
+    } else if (e.key === 'Enter' && !row.matches('button, a[href], summary')) {
+      e.preventDefault();
+      // (A row with no field of its own, a shortcut's, opens what it names.)
+      const to = focusTarget(row);
+      if (to) to.focus();
+      else reveal(row.dataset.row);
     }
   });
   // In the dialog: / or Ctrl+F go to the box; Esc clears a query from anywhere first.
