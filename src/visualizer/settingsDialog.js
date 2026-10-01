@@ -198,7 +198,7 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
   }
 
   // --- the presets: the one in use marked; where they're names only (a phone, a short
-  // screen), a line under them says what the one in use does, or the one pointed at or focused
+  // screen), a note by them says what the one in use does, or the one pointed at or focused
   // from the keyboard (not one the focus went back to by script after a tap or a click, as an
   // Undo does: the note would say that one's in use when it isn't)
   const presetsEl = q('.viz-presets-top');

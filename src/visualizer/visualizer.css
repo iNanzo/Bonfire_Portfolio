@@ -492,30 +492,38 @@ body.hud-off .viz-hud { display: none; }
   .viz-preset-note b { margin-right: 4px; font: 400 0.75rem/1.4 var(--font-pixel); color: var(--accent-hi); }
 }
 
-/* A short screen (a phone on its side, a small laptop): the header closes up (the presets as
-   names, beside them a line saying what the one in use does; the search and the view switch
-   on the title's line), so the settings keep most of the height. */
+/* A short screen (a phone on its side, a small laptop, a small phone under its browser's bars):
+   the header closes up (the presets as names, under them a note saying what the one in use
+   does), so the settings keep most of the height. */
 @media (max-height: 600px) {
   .viz-settings-inner { height: calc(100dvh - 12px); max-height: 900px; }
-  .viz-settings-top { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 12px; padding-top: 10px; }
-  .viz-settings-head,
-  .viz-tabs { grid-column: 1 / -1; }
-  .viz-settings-head { grid-template-columns: auto minmax(120px, 1fr) auto auto; gap: 8px 14px; }
-  .viz-search,
-  .viz-view-switch,
-  .viz-close { grid-column: auto; grid-row: auto; }
-  .viz-close { width: 28px; height: 28px; }
+  .viz-settings-top { padding-top: 10px; }
   .viz-presets-top { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; scrollbar-width: thin; padding: 2px; }
   .viz-presets-top .viz-preset { flex: none; padding: 3px 10px; }
   .viz-presets-top .viz-preset span { display: none; }
   .viz-presets-top .viz-preset b { font-size: 0.875rem; }
-  .viz-preset-note:not(:empty) { display: block; margin: 8px 0 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 0.75rem; line-height: 1.4; color: var(--text-dim); }
-  .viz-preset-note b { margin-right: 4px; font: 400 0.75rem/1.4 var(--font-pixel); color: var(--accent-hi); }
   .viz-tabs { margin-top: 6px; }
   .viz-tab { padding-block: 5px; }
   .viz-settings-body { padding-top: 12px; }
   .viz-settings-foot { padding-block: 6px 8px; }
   .viz-settings-foot .pix-btn { padding-block: 4px; }
+}
+/* (Wide enough as well, the search and the view switch go on the title's line, and the note
+   on the presets' line if two lines there hold any preset's description, else on a line of its
+   own, still two: a touch screen has no tip to read the rest in. A phone held upright keeps the
+   phone's header, stacked, with the whole note.) */
+@media (max-height: 600px) and (min-width: 561px) {
+  .viz-settings-top { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; }
+  .viz-settings-head,
+  .viz-tabs { flex: 1 1 100%; }
+  .viz-settings-head { grid-template-columns: auto minmax(120px, 1fr) auto auto; gap: 8px 14px; }
+  .viz-search,
+  .viz-view-switch,
+  .viz-close { grid-column: auto; grid-row: auto; }
+  .viz-close { width: 28px; height: 28px; }
+  .viz-presets-top { flex: none; max-width: 100%; }
+  .viz-preset-note:not(:empty) { flex: 1 1 28rem; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 8px 0 0; font-size: 0.75rem; line-height: 1.4; color: var(--text-dim); }
+  .viz-preset-note b { margin-right: 4px; font: 400 0.75rem/1.4 var(--font-pixel); color: var(--accent-hi); }
 }
 /* The start screen's presets: the same, as small pills. */
 .viz-feel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 18px; }

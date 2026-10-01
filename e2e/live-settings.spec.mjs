@@ -4,8 +4,10 @@
 // Ctrl+F in the dialog, Esc to clear and then to close, ↓ and ↑ through the results without
 // changing them, Enter to reveal the one meant), the bulk buttons and their Undo (one change,
 // one save, the focus kept), a setting that does nothing as things stand (disabled, saying
-// why), the keyboard shortcuts (?, every group in sight), a short screen and a phone, and Frame
-// Rate capping how often the picture is drawn. No errors anywhere.
+// why, the focus still kept in the dialog when it's gone to), the keyboard shortcuts (?, every
+// group in sight), short screens and phones (the header in sight, the presets' note whole and
+// right after an Undo), and Frame Rate capping how often the picture is drawn. No errors
+// anywhere.
 import { test, expect } from '@playwright/test';
 
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
@@ -318,9 +320,27 @@ test('? lists the keyboard shortcuts in groups, from the page and from the setti
   expect(errors).toEqual([]);
 });
 
+/** The presets' note read whole: as tall as it is with no line limit, and no line cut short. */
+const noteWhole = (page) => page.locator('[data-preset-note]').evaluate((el) => {
+  const h = el.getBoundingClientRect().height;
+  el.style.webkitLineClamp = 'none';
+  const all = el.getBoundingClientRect().height;
+  el.style.webkitLineClamp = '';
+  return h > 0 && Math.abs(h - all) < 1 && el.scrollWidth <= el.clientWidth + 1;
+});
+/** Nothing off the dialog's sides: its ✕ and both views in it. */
+const headerFits = (page) => page.evaluate(() => {
+  const inner = document.querySelector('.viz-settings-inner');
+  const edge = inner.getBoundingClientRect();
+  const inside = (el) => { const r = el.getBoundingClientRect(); return r.left >= edge.left - 1 && r.right <= edge.right + 1; };
+  return { wide: inner.scrollWidth <= inner.clientWidth + 1, close: inside(document.querySelector('.viz-close')), views: [...document.querySelectorAll('.viz-view-switch label')].every(inside) };
+});
+
 test('a short screen keeps most of the dialog for the settings; a phone reads the toast whole, the presets’ note and every shortcut group', async ({ browser }) => {
   const baseURL = test.info().project.use.baseURL;
-  // A phone on its side.
+  const fits = { wide: true, close: true, views: true };
+  // A phone on its side: the note beside the presets' names (two lines hold it), then, a
+  // narrower one, on a line of its own.
   const land = await browser.newPage({ baseURL, viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
   const errors = watch(land);
   await open(land);
@@ -329,6 +349,14 @@ test('a short screen keeps most of the dialog for the settings; a phone reads th
   const [body, whole] = await land.evaluate(() => [document.querySelector('[data-settings-body]').clientHeight, document.querySelector('.viz-settings-inner').clientHeight]);
   expect(body / whole, `${body} of ${whole} px for the settings`).toBeGreaterThan(0.5);
   await expect(land.locator('[data-preset-note]')).toContainText('Club');
+  expect(await headerFits(land)).toEqual(fits);
+  for (const [width, height] of [[844, 390], [667, 375]]) {
+    await land.setViewportSize({ width, height });
+    for (const id of ['chill', 'club', 'rave', 'safe']) {
+      await land.locator(`.viz-presets-top [data-preset="${id}"]`).dispatchEvent('pointerover');
+      expect(await noteWhole(land), `${id}'s note whole at ${width}×${height}`).toBe(true);
+    }
+  }
   await land.close();
   // A phone.
   const phone = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -352,6 +380,15 @@ test('a short screen keeps most of the dialog for the settings; a phone reads th
   await phone.locator('.viz-keys-btn').click();
   await expect(phone.locator('.keys-overlay')).toBeVisible();
   await groupsInSight(phone);
+  await phone.keyboard.press('Escape');
+  await expect(phone.locator('.keys-overlay')).toBeHidden();
+  // A small phone held upright, under its browser's bars (short as a phone on its side): the
+  // phone's header, nothing off the side, the whole note (the longest, Low Flash's; the looks
+  // shuffled, no preset is in use).
+  await phone.setViewportSize({ width: 360, height: 560 });
+  expect(await headerFits(phone)).toEqual(fits);
+  await phone.locator('.viz-presets-top [data-preset="safe"]').dispatchEvent('pointerover');
+  expect(await noteWhole(phone), 'the note whole at 360×560').toBe(true);
   await phone.close();
   expect([...errors, ...phoneErrors]).toEqual([]);
 });

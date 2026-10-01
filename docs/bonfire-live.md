@@ -252,8 +252,9 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
   where Simple shows none of it, what it has ("Only In All Settings: Layers, Mirror Kinds",
   with no Reset Section there). A tab with three-way switches says once at its top what
   Off, In the Mix and Always mean (in Simple, only where one shows). On a phone or a short
-  screen the presets are names only, with a line under them saying what the one in use (or
-  pointed at) does.
+  screen the presets are names only, with a note under them (beside them on a short screen
+  wide enough for two lines there to hold it) saying what the one in use, or the one pointed
+  at or focused from the keyboard, does: whole, since a touch screen has no tip to read.
 - **Every effect is a three-way switch**, three radio buttons (one keyboard stop, the arrow
   keys move along it). Every grid of them (Looks, Layers, Drop Hits) has **All Off · All In
   the Mix · All Always · Shuffle · Defaults** over it, and every checklist (Attacks, Dance
