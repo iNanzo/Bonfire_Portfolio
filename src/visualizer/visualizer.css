@@ -336,6 +336,9 @@ body.hud-off .viz-hud { display: none; }
 .viz-tab-count[hidden] { display: none; }
 .viz-tab.is-empty { opacity: 0.45; }
 .viz-tab.is-empty .viz-tab-count { color: var(--text-dim); background: none; box-shadow: 0 0 0 1px var(--line-strong); }
+/* (While searching, every tab with finds shows: none is the one picked, each counts its finds.) */
+[data-searching] .viz-tab[aria-selected='true'] { color: var(--text-dim); box-shadow: inset 0 -2px 0 transparent; }
+[data-searching] .viz-tab[aria-selected='true']:hover { color: var(--c-bone); }
 .viz-tab-panel[hidden] { display: none; }
 .viz-tri-help { max-width: 60rem; margin: 0 0 18px; }
 
@@ -375,8 +378,11 @@ body.hud-off .viz-hud { display: none; }
 [data-view='simple'][data-searching] [data-row][data-adv] > .viz-adv-badge,
 [data-view='simple'] [data-row].is-revealed > .viz-adv-badge { display: inline-block; }
 .viz-setting[data-blocked='true'] .viz-field-label > label,
+.viz-setting[data-blocked='true'] .viz-field-label > [data-name],
 .viz-setting[data-blocked='true'] .tri-name,
-.viz-setting[data-blocked='true'] .viz-check > label { opacity: 0.55; }
+.viz-setting[data-blocked='true'] .viz-check > label,
+.viz-setting[data-blocked='true'] label.viz-check { opacity: 0.55; }
+.viz-setting[data-blocked='true'] .bulk-btn:disabled { opacity: 0.45; pointer-events: none; }
 /* (A top-level three-way switch's name reads like the other fields' labels.) */
 .viz-setting > fieldset.tri .tri-name { font-family: var(--font-pixel); font-size: 0.9375rem; color: var(--c-bone); }
 

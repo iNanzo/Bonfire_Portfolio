@@ -305,12 +305,18 @@ test('every effect is a three-way switch (Off / In the Mix / Always), every grid
   }
   // Each look, layer, drop hit and x-ray view says what it is, in its own "?".
   for (const [group, hints] of Object.entries(ITEM_HINTS)) for (const [id, hint] of Object.entries(hints)) assert.ok(attrs(html, 'data-tip').includes(hint), `${group}.${id} has its hint`);
-  // The three-way words, once per tab that has them.
+  // The three-way words, once per tab that has them; in the Simple view only where one shows
+  // (Show's are all in All Settings).
+  const sectionTab = Object.fromEntries(SECTIONS.map((x) => [x.id, x.tab]));
   for (const t of TABS) {
     const panel = tabOf(t.id);
     const has = /type="radio" name="viz-tri/.test(panel);
     assert.equal((panel.match(/class="viz-help viz-tri-help"/g) ?? []).length, has ? 1 : 0, `${t.id}: what Off, In the Mix and Always mean`);
+    if (!has) continue;
+    const simple = entriesFor('live').some((e) => sectionTab[e.section] === t.id && e.simple && ['tri', 'grid'].includes(kindOf(e.live)));
+    assert.equal(/class="viz-help viz-tri-help" data-adv/.test(panel), !simple, `${t.id}: the words in the Simple view only with a switch there`);
   }
+  assert.match(tabOf('show'), /class="viz-help viz-tri-help" data-adv/);
   assert.ok(html.includes(TRI_HELP));
 });
 
@@ -347,9 +353,15 @@ test('settings that can do nothing as the others stand each have a line saying w
     const has = entriesFor('live').some((e) => e.section === s.id) && s.id !== 'titles';
     assert.equal(html.includes(`data-reset-section="${s.id}"`), has, `${s.id}: Reset Section`);
   }
-  // Simple view: each section says how many more All Settings has.
+  // Simple view: each section says how many more All Settings has; one that shows nothing
+  // there names what All Settings has, and keeps its Reset Section for All Settings.
   const reaction = entriesFor('live').filter((e) => e.section === 'reaction' && !e.simple).length;
   assert.match(html, new RegExp(`data-show-all="reaction">${reaction} More In All Settings<`));
+  assert.match(html, /data-show-all="layers">Only In All Settings: Layers, Mirror Kinds</);
+  assert.match(html, /data-reset-section="layers" aria-label="Reset Section: Layers" data-adv>/);
+  assert.doesNotMatch(html, /data-reset-section="reaction"[^>]*data-adv/, 'a section with something in Simple resets there');
+  // (The loop shows its scenes in Simple: it counts its settings like the others.)
+  assert.match(html, /data-show-all="loop">2 More In All Settings</);
 });
 
 test('the Cast tab: the knights’ settings load, keep their type and choices', () => {

@@ -201,6 +201,24 @@ test('a setting that does nothing as things stand is disabled, saying why; Edge 
   await expect(rim).toBeEnabled();
   await expect(page.locator('#viz-why-knightRim')).toBeHidden();
   await expect(rim).not.toHaveAttribute('aria-describedby', /viz-why-knightRim/);
+  // A checklist: the firefly dances, with their light show and the preset scenes both Off.
+  await page.locator('[data-view-pick][value="all"]').check();
+  await page.locator('[data-tab="scenes"]').click();
+  await page.locator('[data-set="scenes"][value="off"]').check();
+  await page.locator('[data-tab="cast"]').click();
+  await page.locator('[data-set="blink"]').uncheck();
+  const fly = page.locator('[data-row="flyMoves"]');
+  await expect(fly.locator('#viz-why-flyMoves')).toHaveText('Blink & Dance and Preset Scenes are Off');
+  for (const item of await fly.locator('input[data-set]').all()) {
+    await expect(item).toBeDisabled();
+    await expect(item).toHaveAttribute('aria-describedby', /viz-why-flyMoves/);
+  }
+  for (const b of await fly.locator('.bulk-btn').all()) await expect(b).toBeDisabled();
+  // (Dimmed, its name too.)
+  expect(Number(await fly.locator('.viz-field-label [data-name]').first().evaluate((el) => getComputedStyle(el.closest('.viz-field-label > *')).opacity))).toBeLessThan(1);
+  await page.locator('[data-set="blink"]').check();
+  for (const item of await fly.locator('input[data-set]').all()) await expect(item).toBeEnabled();
+  await expect(fly.locator('#viz-why-flyMoves')).toBeHidden();
   expect(errors).toEqual([]);
 });
 

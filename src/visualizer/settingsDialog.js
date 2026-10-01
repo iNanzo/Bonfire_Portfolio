@@ -38,6 +38,8 @@ import { createLiveSearch } from './settingsSearchUi.js';
 
 export { presetButtons, sceneListMarkup };
 
+/** @typedef {{ id: string, tab: string, label: string, intro?: string }} Section  one of Live's (src/settingsMap.js SECTIONS) */
+
 // Sections as wide as the dialog: grids, lists and the cards.
 const WIDE = new Set(['midi', 'drop', 'looks', 'layers', 'loop', 'titles', 'moreCards', 'setups']);
 const tabOf = (id) => TABS.find((t) => t.id === id);
@@ -51,8 +53,10 @@ export function markPreset(root, settings) {
 /**
  * One section of a tab: its heading (with the tab's name before it while searching), its
  * line of intro, its settings in the map's order with its blocks among them, and its foot:
- * how many more All Settings has, and Reset Section.
- * @param {{ id: string, tab: string, label: string, intro?: string }} s
+ * how many more All Settings has, and Reset Section. A section with nothing in the Simple view
+ * names what All Settings has there instead, and has no Reset Section there (it would reset
+ * switches out of sight).
+ * @param {Section} s
  * @param {Record<string, any>} settings @param {string} base
  */
 function sectionMarkup(s, settings, base) {
@@ -62,9 +66,11 @@ function sectionMarkup(s, settings, base) {
     const m = meta('live', e.live);
     return row(e.live, m, CONTROLS[e.live](settings, m)) + (block.after?.[e.live] ?? '');
   }).join('');
-  const more = entries.filter((e) => !e.simple).length;
-  const cue = more ? `<button type="button" class="viz-more-cue" data-show-all="${s.id}">${more} More In All Settings</button>` : '';
-  const reset = sectionKeys(s.id).length ? `<button type="button" class="bulk-btn viz-reset-section" data-reset-section="${s.id}" aria-label="Reset Section: ${esc(s.label)}">Reset Section</button>` : '';
+  const adv = entries.filter((e) => !e.simple);
+  const hidden = adv.length > 0 && adv.length === entries.length && !block.start && !block.end;
+  const cue = !adv.length ? ''
+    : `<button type="button" class="viz-more-cue" data-show-all="${s.id}">${hidden ? `Only In All Settings: ${esc(adv.map((e) => meta('live', e.live).label).join(', '))}` : `${adv.length} More In All Settings`}</button>`;
+  const reset = sectionKeys(s.id).length ? `<button type="button" class="bulk-btn viz-reset-section" data-reset-section="${s.id}" aria-label="Reset Section: ${esc(s.label)}"${hidden ? ' data-adv' : ''}>Reset Section</button>` : '';
   return `
         <fieldset class="viz-section${WIDE.has(s.id) ? ' viz-span' : ''}" data-section="${s.id}">
           <legend><span class="viz-crumb">${esc(tabOf(s.tab)?.label ?? '')} › </span>${esc(s.label)}</legend>
@@ -81,11 +87,17 @@ function sectionMarkup(s, settings, base) {
  * @param {{ base?: string }} [o]
  */
 export function settingsMarkup(settings, keys = [], { base = '/' } = {}) {
-  const sections = sectionsFor('live');
-  const hasTri = (tab) => entriesFor('live').some((e) => sections.find((s) => s.id === e.section)?.tab === tab && ['tri', 'grid'].includes(kindOf(e.live)));
+  const sections = /** @type {Section[]} */ (sectionsFor('live'));
+  // (What Off, In the Mix and Always mean: once on a tab with three-way switches, and in the
+  // Simple view only if it shows one.)
+  const tris = (tab) => entriesFor('live').filter((e) => sections.find((s) => s.id === e.section)?.tab === tab && ['tri', 'grid'].includes(kindOf(e.live)));
+  const triHelp = (tab) => {
+    const all = tris(tab);
+    return all.length ? `<p class="viz-help viz-tri-help"${all.some((e) => e.simple) ? '' : ' data-adv'}>${esc(TRI_HELP)}</p>` : '';
+  };
   const panel = (t) => `
       <div class="viz-tab-panel" role="tabpanel" id="viz-tab-${t.id}" aria-labelledby="viz-tabbtn-${t.id}" data-tab-panel="${t.id}" hidden>
-        ${hasTri(t.id) ? `<p class="viz-help viz-tri-help">${esc(TRI_HELP)}</p>` : ''}
+        ${triHelp(t.id)}
         <div class="viz-settings-grid">${sections.filter((s) => s.tab === t.id).map((s) => sectionMarkup(s, settings, base)).join('')}</div>
       </div>`;
   return `
