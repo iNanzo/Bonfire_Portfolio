@@ -5,7 +5,7 @@
 // change and its Undo puts every value back as it was.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bulkPlan, sectionPlan, sectionKeys, applyValues, topKeys, changes, groupItems, getPath, setPath } from '../src/visualizer/settingsBulk.js';
+import { bulkPlan, sectionPlan, sectionKeys, applyValues, topKeys, changes, groupItems, getPath, setPath, createBatch } from '../src/visualizer/settingsBulk.js';
 import { defaults } from '../src/visualizer/settings.js';
 import { LOOKS, LAYERS, DROP_FX } from '../src/visualizer/looks.js';
 import { entriesFor } from '../src/settingsMap.js';
@@ -89,4 +89,44 @@ test('Reset Section: every setting in the section back to its default (a group a
   applyValues(t, sectionPlan('layers', t).values);
   t.mirrors.quarter = false;
   assert.equal(sectionPlan('layers', t).values['mirrors.quarter'], true);
+});
+
+test('as the dialog makes it: one onChange (one save), a toast with Undo; Undo the same way, saved at once', () => {
+  const s = defaults();
+  const calls = { onChange: [], refresh: [], flush: 0, toast: [] };
+  const batch = createBatch({
+    settings: s,
+    onChange: (keys) => calls.onChange.push(keys),
+    refresh: (all) => calls.refresh.push(all),
+    flush: () => { calls.flush++; },
+    toast: (text, undo = null) => calls.toast.push({ text, undo }),
+  });
+  const before = structuredClone(s);
+  // A bulk button: every look off, as one change.
+  assert.equal(batch.commit(bulkPlan('looks', 'off', s), 'Looks: All Off'), true);
+  assert.ok(Object.values(s.looks).every((v) => v === 'off'));
+  assert.deepEqual(calls.onChange, [['looks']], 'one onChange, told the one setting');
+  assert.deepEqual(calls.refresh, [false], 'the fields shown again (not the lists)');
+  assert.equal(calls.flush, 0, 'saved by the onChange (once, after it settles), not at once');
+  assert.equal(calls.toast.length, 1);
+  assert.equal(calls.toast[0].text, 'Looks: All Off');
+  // Its Undo: every look back, one more onChange, saved at once, and it says so.
+  calls.toast[0].undo();
+  assert.deepEqual(s, before);
+  assert.deepEqual(calls.onChange, [['looks'], ['looks']]);
+  assert.equal(calls.flush, 1);
+  assert.deepEqual(calls.toast.map((t) => [t.text, !!t.undo]), [['Looks: All Off', true], ['Looks: All Off: undone', false]]);
+  // Reset Section, the same way (one onChange for the five armor settings).
+  Object.assign(s, { knightStyle: 'first', knightShine: 'on' });
+  batch.commit(sectionPlan('armor', s), 'Armor: Reset');
+  assert.equal(calls.onChange.length, 3);
+  assert.deepEqual(new Set(calls.onChange[2]), new Set(['knightStyle', 'knightFinish', 'knightGlow', 'knightRim', 'knightShine']));
+  // Nothing to change: no change made, only a word.
+  assert.equal(batch.commit(bulkPlan('looks', 'defaults', defaults()), 'Looks: Defaults'), false);
+  assert.equal(calls.onChange.length, 3);
+  assert.equal(calls.toast.at(-1).text, 'Looks: Defaults: already so');
+  // Many at once (a preset, Reset To Defaults): saved at once, the lists shown again too.
+  batch.changed('Preset: Rave', ['scenes'], () => {}, { flush: true, all: true });
+  assert.deepEqual(calls.refresh.at(-1), true);
+  assert.equal(calls.flush, 2);
 });

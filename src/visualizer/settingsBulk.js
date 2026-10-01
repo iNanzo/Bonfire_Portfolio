@@ -2,7 +2,8 @@
 // A bulk button over a grid or a checklist (All Off, Shuffle, None, Defaults…), a section's
 // Reset Section and Reset to Defaults each become a plan: the new values by key ("looks.echo",
 // "glow") and the values they replace, so the dialog applies it as one change (one onChange,
-// one save) and its Undo puts `before` back the same way.
+// one save) and its Undo puts `before` back the same way: createBatch, the dialog's way of
+// making such a change (handed how to show it, so it runs without a page too).
 import { bulkValues } from '../ui/fields.js';
 import { entriesFor } from '../settingsMap.js';
 import { AT_LEAST_ONE, NO_ALWAYS, GROUPS, defaults } from './settings.js';
@@ -88,3 +89,42 @@ export function sectionPlan(section, settings) {
 
 /** Whether a plan changes anything (each value compared as it would be saved). */
 export const changes = (plan) => Object.entries(plan.values).some(([k, v]) => JSON.stringify(v) !== JSON.stringify(plan.before[k]));
+
+/**
+ * Many settings changed as one, the way the dialog does it. (No DOM: it's handed how to show
+ * them, so the tests can count the calls.)
+ *   changed(what, tops, undo, { flush, all })  after the settings changed: the fields shown
+ *       again (`refresh(all)`; `all`: the lists too), ONE onChange(tops) (so one save), saved
+ *       at once with `flush`, and a toast saying `what`, whose Undo runs `undo` the same way
+ *       (saved at once) and says it's undone.
+ *   commit(plan, what)  a bulk button's or Reset Section's plan made that way (Undo: its
+ *       `before`); one that changes nothing only says so. Whether it changed anything.
+ * @param {{ settings: Record<string, any>, onChange: (keys: string[]) => void, refresh: (all: boolean) => void,
+ *   flush: () => void, toast: (text: string, undo?: (() => void) | null) => void }} o
+ */
+export function createBatch({ settings, onChange, refresh, flush, toast }) {
+  /**
+   * @param {string} what @param {string[]} tops
+   * @param {(() => void) | null} undo @param {{ flush?: boolean, all?: boolean }} [o]
+   */
+  function changed(what, tops, undo, { flush: now = false, all = false } = {}) {
+    refresh(all);
+    onChange(tops);
+    if (now) flush();
+    toast(what, undo && (() => {
+      undo();
+      refresh(all);
+      onChange(tops);
+      flush();
+      toast(`${what}: undone`);
+    }));
+  }
+  /** @param {Plan} plan @param {string} what */
+  function commit(plan, what) {
+    if (!changes(plan)) { toast(`${what}: already so`); return false; }
+    applyValues(settings, plan.values);
+    changed(what, topKeys(plan.values), () => applyValues(settings, plan.before));
+    return true;
+  }
+  return { changed, commit };
+}

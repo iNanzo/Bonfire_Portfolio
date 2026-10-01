@@ -145,6 +145,15 @@ test('search: an imported setup named like markup is found and marked as text, n
   await expect(found.locator('[data-name]')).toHaveText(name);
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
   expect(await page.locator('[data-settings] img[src="x"]').count()).toBe(0);
+  // Deleted, then undone: back, and the toast says so (no Undo left that does nothing).
+  await box(page).fill('');
+  await page.locator('[data-setups] [data-setup-delete]').click();
+  await expect(page.locator('[data-setups] [data-name]')).toHaveCount(0);
+  await page.locator('[data-toast-undo]').click();
+  await expect(page.locator('[data-setups] [data-name]')).toHaveText(name);
+  await expect(page.locator('[data-toast]')).toContainText('undone');
+  await expect(page.locator('[data-toast-undo]')).toBeHidden();
+  await expect(page.locator('[data-setups] [data-setup-delete]')).toBeFocused();
   expect(errors).toEqual([]);
 });
 
@@ -163,9 +172,22 @@ test('bulk buttons: All Off on the Looks is one change and one save; Undo puts e
   await expect(page.locator('[data-toast]')).toContainText('Looks: All Off');
   await page.waitForTimeout(700); // (saving waits 300 ms for the changes to settle)
   expect(await page.evaluate(() => window.__writes.filter((k) => k === 'bonfire-live').length)).toBe(1);
-  await page.locator('[data-toast-undo]').click();
+  // Undo from the keyboard: the button that made the change gets the focus back (the dialog's
+  // keys keep working).
+  await page.locator('[data-toast-undo]').focus();
+  await page.keyboard.press('Enter');
   expect(await looks()).toBe(before);
   await expect(page.locator('[data-row="looks.glitch"] input[value="mix"]')).toBeChecked();
+  await expect(page.locator('[data-bulk-group="looks"][data-bulk="off"]')).toBeFocused();
+  await expect(page.locator('[data-toast-undo]')).toBeHidden();
+  // Layers shows nothing in the Simple view: its cue names what's there, its Reset Section
+  // waits for All Settings; the cue shows them and goes to the first.
+  await expect(page.locator('[data-show-all="layers"]')).toHaveText('Only In All Settings: Layers, Mirror Kinds');
+  await expect(page.locator('[data-reset-section="layers"]')).toBeHidden();
+  await page.locator('[data-show-all="layers"]').click();
+  await expect(page.locator('[data-settings] form')).toHaveAttribute('data-view', 'all');
+  await expect(page.locator('[data-section="layers"] [data-set]:focus')).toHaveCount(1);
+  await page.locator('[data-view-pick][value="simple"]').check();
   // Shuffle and All Always (Ember has no Always: it takes In the Mix).
   await page.locator('[data-bulk-group="looks"][data-bulk="on"]').click();
   expect(JSON.parse(await looks()).ember).toBe('mix');

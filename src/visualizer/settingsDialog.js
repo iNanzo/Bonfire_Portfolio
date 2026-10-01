@@ -33,8 +33,8 @@ import {
   readSetups, saveSetup, loadSetup, deleteSetup, exportSetups, importSetups,
 } from './settings.js';
 import { CONTROLS, BLOCKS, row, kindOf, presetButtons, sceneListMarkup, cardsMarkup, setupsMarkup, keysResultsMarkup } from './settingsControls.js';
-import { bulkPlan, sectionPlan, sectionKeys, applyValues, topKeys, changes, getPath, setPath } from './settingsBulk.js';
-import { createLiveSearch } from './settingsSearchUi.js';
+import { bulkPlan, sectionPlan, sectionKeys, getPath, setPath, createBatch } from './settingsBulk.js';
+import { createLiveSearch, focusTarget } from './settingsSearchUi.js';
 
 export { presetButtons, sceneListMarkup };
 
@@ -130,7 +130,7 @@ export function settingsMarkup(settings, keys = [], { base = '/' } = {}) {
       </div>
       <div class="viz-settings-foot">
         <button class="pix-btn viz-keys-btn" type="button" data-keys-open><kbd>?</kbd><span>Keyboard Shortcuts</span></button>
-        <p class="viz-toast" role="status" data-toast><span data-toast-text></span><button type="button" class="bulk-btn" data-toast-undo hidden>Undo</button></p>
+        <p class="viz-toast" role="status" data-toast><span data-toast-text tabindex="-1"></span><button type="button" class="bulk-btn" data-toast-undo hidden>Undo</button></p>
         <button class="pix-btn" type="button" data-reset-all>Reset To Defaults</button>
         <button class="pix-btn" value="close">Close</button>
       </div>
@@ -246,6 +246,8 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
   const toastText = q('[data-toast-text]');
   const undoBtn = /** @type {HTMLButtonElement} */ (q('[data-toast-undo]'));
   let undoing = null;
+  /** @type {HTMLElement | null} what had the focus when the change was made (it gets it back after an Undo) */
+  let undoFrom = null;
   let toastTimer = 0;
   function quiet() {
     clearTimeout(toastTimer);
@@ -256,38 +258,38 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     undoing = null;
     toastEl.classList.remove('is-on');
   }
-  function toast(text, undo = null) {
+  function toast(text, onUndo = null) {
     toastText.textContent = text;
-    undoBtn.hidden = !undo;
-    undoing = undo;
+    undoBtn.hidden = !onUndo;
+    undoing = onUndo;
+    undoFrom = onUndo ? /** @type {HTMLElement | null} */ (document.activeElement) : null;
     toastEl.classList.add('is-on');
     clearTimeout(toastTimer);
     toastTimer = window.setTimeout(quiet, 8000);
   }
-  /**
-   * Many settings changed at once (`tops`: their top keys), as one change: one onChange, the
-   * fields shown again, saved at once (`flush`), and an Undo that puts `undo` back the same way.
-   * @param {string} what what the toast says @param {string[]} tops
-   * @param {(() => void) | null} undo @param {{ flush?: boolean, all?: boolean }} [o]
-   */
-  function changed(what, tops, undo, { flush = false, all = false } = {}) {
-    if (all) fillNow(); else fillFields();
-    onChange(tops);
-    if (flush) flushSettings();
-    toast(what, undo && (() => {
-      undo();
-      if (all) fillNow(); else fillFields();
-      onChange(tops);
-      flushSettings();
-      toast(`${what}: undone`);
-    }));
+  /** Whether the focus can go back to `el`: still there, shown and usable. */
+  const usable = (el) => el instanceof HTMLElement && el !== undoBtn && el.isConnected && dialog.contains(el)
+    && el.getClientRects().length > 0 && !el.matches(':disabled');
+  function undo() {
+    const fn = undoing;
+    const back = undoFrom;
+    undoing = null;
+    fn?.();
+    undoBtn.hidden = true; // (spent, whether or not the undo said so)
+    // (Its button gone with it, the focus goes back to what made the change, else to the
+    // toast's words: never out of the dialog, where its keys stop working.)
+    const now = document.activeElement;
+    if (!now || now === undoBtn || now === document.body || !dialog.contains(now)) (usable(back) ? back : toastText).focus();
   }
-  /** A bulk button or Reset Section's plan, applied as one change (Undo: its `before`). */
-  function commit(plan, what) {
-    if (!changes(plan)) { toast(`${what}: already so`); return; }
-    applyValues(settings, plan.values);
-    changed(what, topKeys(plan.values), () => applyValues(settings, plan.before));
-  }
+  // Many settings changed at once, as one change (settingsBulk.js): the fields (and the
+  // loop, which a Reset Section can change) shown again, one onChange, and an Undo.
+  const { changed, commit } = createBatch({
+    settings,
+    onChange,
+    flush: flushSettings,
+    toast,
+    refresh: (all) => { if (all) fillNow(); else { fillFields(); drawScenes(); } },
+  });
   /** Everything as it was (a preset, a setup or Reset To Defaults undone). */
   const restoreAll = (before) => () => {
     for (const k of Object.keys(settings)) if (!(k in before)) delete settings[k];
@@ -378,12 +380,17 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
   const ACTIONS = {
     '[data-settings-close]': () => dialog.close(),
     '[data-keys-open]': () => onKeys(),
-    '[data-toast-undo]': () => { const fn = undoing; undoing = null; fn?.(); },
+    '[data-toast-undo]': undo,
     '[data-show-all]': (/** @type {HTMLElement} */ b) => {
       settings.view = 'all';
       fillFields();
       onChange();
-      q(`[data-section="${b.dataset.showAll}"]`)?.scrollIntoView({ block: 'start' });
+      // (The cue goes with the Simple view: the focus goes to the first setting it brought.)
+      const sec = q(`[data-section="${b.dataset.showAll}"]`);
+      sec?.scrollIntoView({ block: 'start' });
+      const first = sec?.querySelector('[data-row][data-adv]');
+      const to = first && focusTarget(first);
+      if (to) { to.focus({ preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); }
     },
     '[data-bulk]': (/** @type {HTMLElement} */ b) => {
       if (b.getAttribute('aria-disabled') === 'true') return; // (None, where one has to stay: its tip says why)
@@ -414,8 +421,11 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
       onChange();
     },
     '[data-card-remove]': (/** @type {HTMLElement} */ b) => {
-      settings.cards.splice(Number(/** @type {HTMLElement} */ (b.closest('[data-card]')).dataset.card), 1);
+      const i = Number(/** @type {HTMLElement} */ (b.closest('[data-card]')).dataset.card);
+      settings.cards.splice(i, 1);
       drawCards();
+      // (Its button went with it: the focus goes to the card now in its place, else Add a Card.)
+      /** @type {HTMLElement | null} */ (cardsEl.querySelector(`[data-card="${Math.min(i, settings.cards.length - 1)}"] [data-card-remove]`) ?? q('[data-card-add]'))?.focus();
       onChange();
     },
     '[data-card-show]': (/** @type {HTMLElement} */ b) => dialog.dispatchEvent(new CustomEvent('show-card', { detail: Number(/** @type {HTMLElement} */ (b.closest('[data-card]')).dataset.card) + 1 })),
@@ -437,10 +447,19 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     },
     '[data-setup-delete]': (/** @type {HTMLElement} */ b) => {
       const name = b.dataset.setupDelete;
+      const at = [...setupsEl.querySelectorAll('[data-setup-delete]')].indexOf(b);
       const kept = readSetups()[name];
       deleteSetup(name);
       drawSetups();
-      toast(`Deleted “${name}”`, kept ? () => { saveSetup(kept, name); drawSetups(); } : null);
+      // (Its row went with it: the focus goes to the next setup's ✕, else the name box.)
+      const rest = setupsEl.querySelectorAll('[data-setup-delete]');
+      /** @type {HTMLElement} */ (rest[Math.min(at, rest.length - 1)] ?? q('[data-setup-name]')).focus();
+      toast(`Deleted “${name}”`, kept ? () => {
+        saveSetup(kept, name);
+        drawSetups();
+        /** @type {HTMLElement | null} */ (setupsEl.querySelector(`[data-setup-delete="${CSS.escape(name)}"]`))?.focus();
+        toast(`Deleted “${name}”: undone`);
+      } : null);
     },
     '[data-setup-export]': () => {
       const a = document.createElement('a');
