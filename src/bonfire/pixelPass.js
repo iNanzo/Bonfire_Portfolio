@@ -3,6 +3,25 @@
 //   ordered Bayer dither → quantize to the palette.
 // The canvas is upscaled by CSS with nearest-neighbor filtering.
 //
+// The knight's steel has a ramp of its own (setSteel: five greys, steel.js; the palette has
+// no mid greys): the pixels his armor marks as steel in the color buffer's alpha (armor.js)
+// snap to that ramp, the void and the flame's colors, never to the scenery's shadow, stone,
+// wood or bone; his steel's crease lines step a tone down the ramp. Everything else snaps to
+// the palette as before. Only with the scene's own full palette (setPalette's `steel`): a
+// few-color or debug palette, the x-ray and the breakdown's passes draw him as they are.
+// The pixel styles (knightStyles.js) mark each of his smooth surfaces with its id instead:
+// their pixels snap to the style's tones (steel.js CEL_TONES) without the dither (the armor
+// draws its own seams) and their facet creases aren't drawn; the line art is drawn here: a
+// 1-texel line wherever two surfaces meet on screen (or he meets what's behind him), on the
+// nearer one's pixel, so every plate edge, crease and overlap gets exactly one, and a lone
+// texel of it (a corner, a sliver) or a dash on its own, shorter than five texels as it
+// shows, none (setSteel's `lines`), in the void, over his lit tones in the style's lit ink
+// (his outline too: lighter where the light is strongest); the terminator, the flame's dark
+// shade on the one steel texel where a lit band gives way to the dark (setSteel's
+// `terminator`); and his rim, the fire's color just inside his outline on the fire's side,
+// its shade on the far side. The black-and-gold styles hand no ramp:
+// he's snapped to the palette like the scenery, his creases a step darker in their own hue.
+//
 // Effects layer (the visualizer: compiled in only with createPixelPass({ effects: true }),
 // so the site's shader is just the scene, the breakdown views, the flash and the dither),
 // all before the palette so every effect comes out in the scene's own colors:
@@ -20,15 +39,20 @@
 //     palette animation), a gradient map (brightness → three palette colors), a flicker;
 //   how the layers blend — each overlay (echoes, the ghost trail, a warp over the plain
 //     picture, ink, the negative, scanlines, glow, the gradient map) has a blend mode
-//     (blendMode: normal, add, multiply, screen, overlay, soft light, difference, …).
+//     (blendMode: normal, add, multiply, screen, overlay, soft light, difference, …);
+//   the x-ray — one of the passes the picture is built from (the normals, the lighting,
+//     the particles) in place of the scene, carried on through everything above and the
+//     palette, so it stays pixel art in the scene's colors (the breakdown's views show the
+//     passes as they are instead).
 //
-// Stages: normally one pass builds each pixel and finishes it. The heavier effects need
-// the finished scene around a pixel, so for them the scene is drawn once into its own
-// image first (SCENE_ONLY), maybe repainted (styleShader: painterly strokes or a
-// watercolor wash), with a fading ghost trail kept beside it (ghostShader); the final
-// pass (SCENE_TEX) reads those instead: motion blur (each texel smeared along the way
-// the camera moved it, from its depth), the ghost trail, and glow (from the scene
-// image's blurred mipmaps).
+// Stages: on the site one pass builds each pixel and finishes it ('single'). With the
+// effects layer the scene is always drawn once into its own image first (SCENE_ONLY): the
+// effects read the scene at other texels (a split, a warp over the plain picture), and a
+// pass that built it at each of those would compile for seconds. It may be repainted
+// (styleShader: painterly strokes or a watercolor wash), with a fading ghost trail kept
+// beside it (ghostShader); the final pass (SCENE_TEX) reads those: every effect above,
+// motion blur (each texel smeared along the way the camera moved it, from its depth), the
+// ghost trail, and glow (from the scene image's blurred mipmaps).
 import * as THREE from 'three';
 
 const MAX_COLORS = 16;
@@ -57,6 +81,22 @@ const fragmentShader = /* glsl */ `
   uniform float vignette;
   uniform float exposure;
   uniform vec3 uCore;              // the flame's pale core color (linear)
+  // Below this, the color's alpha is the knight's armor's mark (armor.js): for his steel
+  // 0.30 + 0.025 a tone on the steel ramp (-1 the void .. 4), 0.15 more on the fire's side;
+  // the pixel styles' 0.62 + 0.002 the smooth surface's id (0..63), 0.14 more on the fire's
+  // side; 0.2 anything else of his. (A half float holds the ids apart: 4 steps of it.)
+  #define ARMOR_MARK 0.9
+  #define STEEL_MARK 0.285
+  #define STEEL_SIDE 0.44
+  #define CEL_MARK 0.61
+  #define CEL_SIDE 0.755
+  uniform vec3 steel[8];           // the armor's steel ramp (sRGB), dark to light (the pixel
+                                   // styles': steel.js CEL_TONES, the last two drawn here)
+  uniform int steelSize;           // 0: off (a few-color palette, a debug one)
+  uniform float steelRim;          // 0..1: the fire's color on his silhouette
+  uniform float celLines;          // the pixel styles' line art: 1 drawn, 0 not
+  uniform float celTerm;           // ...their terminator: 1 where a lit tone meets the dark
+                                   // steel, 0 none
 
   // Glitch layer.
   uniform float uTime;
@@ -116,6 +156,9 @@ const fragmentShader = /* glsl */ `
   uniform float uGlowSize;         // from this mipmap level (bigger: wider)
   uniform float uGlowCut;          // only from what's brighter than this
   uniform float uGlowMode;
+  #ifdef FX
+  uniform float uXray;             // the x-ray: 0 off, 1 the normals, 2 the lighting, 3 the particles
+  #endif
 
   float linDepth(sampler2D t, vec2 uv) {
     return -perspectiveDepthToViewZ(texture2D(t, uv).x, cameraNear, cameraFar);
@@ -156,20 +199,173 @@ const fragmentShader = /* glsl */ `
   #endif
     return best;
   }
+  // The knight's steel: its ramp (preferred a little, so the dither never tips a plate onto
+  // a flame color), the void and the flame's colors (slots 5 on: a flash or an effect over
+  // him still lands in the scene's colors), not the scenery's shadow, stone, wood or bone.
+  vec3 quantizeSteel(vec3 c) {
+    vec3 best = palette[0];
+    float bestD = colorDist(c, palette[0]);
+    for (int i = 0; i < 8; i++) {
+      if (i >= steelSize) break;
+      float d = colorDist(c, steel[i]) * 0.7;
+      if (d < bestD) { bestD = d; best = steel[i]; }
+    }
+    for (int i = 5; i < ${MAX_COLORS}; i++) {
+      if (i >= paletteSize) break;
+      float d = colorDist(c, palette[i]);
+      if (d < bestD) { bestD = d; best = palette[i]; }
+    }
+    return best;
+  }
+  // His steel's tone from its mark (-1 the void .. 4).
+  int steelTone(float mark) { return int(floor(((mark > STEEL_SIDE ? mark - 0.15 : mark) - 0.325) / 0.025 + 0.5)); }
+  // The pixel styles' marks: one of his smooth surfaces, and which (0..63).
+  bool isCel(float mark) { return mark > CEL_MARK && mark < ARMOR_MARK; }
+  float celId(float mark) { return floor((mark - (mark > CEL_SIDE ? 0.76 : 0.62)) / 0.002 + 0.5); }
+  // The pixel styles: is this color one of the lit tones (the flame's body, its highlight)?
+  bool litTone(vec3 c) {
+    vec3 a = c - steel[4], b = c - steel[5];
+    return dot(a, a) < 0.0006 || dot(b, b) < 0.0006;
+  }
+  // Does their line art show over this tone? The lit ink over the lit tones always; the void
+  // over the rest, but not over the deep tone (or the void itself), where it's all but lost.
+  bool inkShows(vec3 c) {
+    if (litTone(c)) return true;
+    vec3 v = c - palette[0], d = c - steel[0];
+    return dot(v, v) > 0.004 && dot(d, d) > 0.0006;
+  }
+  // How many texels (1..CEL_THICK + 1) of the surface id run from uv on in the direction step
+  // (uv itself counted): how thick a surface is across its edge there.
+  #define CEL_THICK 2
+  int celRun(vec2 uv, vec2 step, float id) {
+    int n = 1;
+    for (int k = 1; k <= CEL_THICK; k++) {
+      float a = textureLod(tColor, uv + step * float(k), 0.0).a; // (no derivatives: it's called in loops)
+      if (!isCel(a) || abs(celId(a) - id) > 0.5) break;
+      n++;
+    }
+    return n;
+  }
+  // The pixel styles' line art at a texel: where its smooth surface meets another (or what's
+  // behind him), on the nearer one's pixel (the same depth: the higher id's). Only where both
+  // surfaces are at least CEL_THICK texels thick across the edge, and one of them more: a
+  // sliver of a plate a texel wide, a corner poking through another, a finger peeking out of
+  // a gauntlet in his lap far off gets no outline round it, nor do two strips that thin (a
+  // fauld's hoops, a sabaton's lames far off: they show in their tones, not as a ladder of
+  // lines), so small parts don't scribble; the plates' real edges, where there's room, all
+  // keep theirs.
+  bool celLine(vec2 uv) {
+    vec2 texel = 1.0 / resolution;
+    float a = texture2D(tColor, uv).a;
+    if (!isCel(a)) return false;
+    float id = celId(a);
+    float dz = linDepth(tDepth, uv);
+    float eps = 0.01 + 0.004 * dz;
+    for (int i = 0; i < 4; i++) {
+      vec2 d = i == 0 ? vec2(0.0, texel.y) : i == 1 ? vec2(0.0, -texel.y) : i == 2 ? vec2(texel.x, 0.0) : vec2(-texel.x, 0.0);
+      vec2 o = uv + d;
+      float na = texture2D(tColor, o).a;
+      bool nCel = isCel(na);
+      float nid = nCel ? celId(na) : -1.0;
+      if (nCel ? abs(nid - id) < 0.5 : na < ARMOR_MARK) continue;
+      if (nCel) {
+        int ta = celRun(uv, -d, id), tb = celRun(o, d, nid);
+        if (ta < CEL_THICK || tb < CEL_THICK || (ta <= CEL_THICK && tb <= CEL_THICK)) continue;
+      }
+      float nz = linDepth(tDepth, o);
+      if (nz > dz + eps || (abs(nz - dz) <= eps && nCel && nid < id)) return true;
+    }
+    return false;
+  }
+  // His depth at a texel (no derivatives: it's called in loops).
+  float depthAt(vec2 uv) { return -perspectiveDepthToViewZ(textureLod(tDepth, uv, 0.0).x, cameraNear, cameraFar); }
+  // Is the texel at o, beside one of his at depth here, something well behind him (his
+  // silhouette: a line running into it runs on to his outline)?
+  bool behindHim(vec2 o, float here) { return depthAt(o) - here > 0.06 + 0.02 * here; }
+  // Is the line texel at uv part of a stroke (its line texels 8-connected) of STROKE_MIN
+  // texels or more, or of one that runs on to his outline (beside one of them, something
+  // well behind him: his silhouette)? A flood from uv, stopping as soon as it knows. Not a
+  // gap in him onto what's right behind (the log under his lap between a gauntlet and a
+  // thigh): a scrap there is a stray dash. Measured as it's seen: where uv's line shows
+  // (shown, inkShows), only line texels that show count.
+  #define STROKE_MIN 5
+  bool longStroke(vec2 uv, bool shown) {
+    vec2 texel = 1.0 / resolution;
+    vec2 q[STROKE_MIN]; // (the stroke's texels found so far, uv first)
+    for (int k = 0; k < STROKE_MIN; k++) q[k] = vec2(-1.0);
+    q[0] = uv;
+    int n = 1;
+    for (int head = 0; head < STROKE_MIN; head++) {
+      if (head >= n) break;
+      vec2 p = q[head];
+      float here = depthAt(p);
+      for (int j = 0; j < 8; j++) {
+        vec2 o = p + texel * (j < 3 ? vec2(float(j) - 1.0, 1.0) : j < 6 ? vec2(float(j) - 4.0, -1.0) : vec2(j == 6 ? 1.0 : -1.0, 0.0));
+        vec4 n4 = textureLod(tColor, o, 0.0);
+        if (!isCel(n4.a)) {
+          if (behindHim(o, here)) return true;
+          continue;
+        }
+        bool seen = false;
+        for (int k = 0; k < STROKE_MIN; k++) seen = seen || all(lessThan(abs(q[k] - o), texel * 0.5));
+        if (seen || !celLine(o) || (shown && !inkShows(toSRGB(n4.rgb * exposure)))) continue;
+        if (n == STROKE_MIN - 1) return true;
+        for (int k = 1; k < STROKE_MIN; k++) if (k == n) q[k] = o; // (constant indices: Direct3D)
+        n++;
+      }
+    }
+    return false;
+  }
+  // Is this texel of his on his silhouette (something well behind it beside it)?
+  bool depthEdgeHere(vec2 uv) {
+    vec2 texel = 1.0 / resolution;
+    float d = linDepth(tNormalDepth, uv);
+    for (int i = 0; i < 4; i++) {
+      vec2 o = uv + (i == 0 ? vec2(0.0, texel.y) : i == 1 ? vec2(0.0, -texel.y) : i == 2 ? vec2(texel.x, 0.0) : vec2(-texel.x, 0.0));
+      float nd = texture2D(tNormal, o).a > 0.5 ? linDepth(tNormalDepth, o) : cameraFar;
+      if (nd - d > 0.06 + 0.02 * d) return true;
+    }
+    return false;
+  }
   float normalEdge(vec3 n, vec3 nn, float d, float nd) {
     float normalIndicator = clamp(smoothstep(-0.01, 0.01, dot(n - nn, vec3(1.0))), 0.0, 1.0);
     float depthIndicator = clamp(sign((nd - d) * 0.25 + 0.0025), 0.0, 1.0);
     return (1.0 - dot(n, nn)) * depthIndicator * normalIndicator;
   }
 
+  #ifdef FX
+  // The x-ray's pass at a texel, in sRGB: the normals the outlines are found from (each
+  // way a surface faces in a palette color of its own: right the flame's body, left its
+  // deep tone, up the stone, toward the camera its bright tone; dimmer with depth), the lit
+  // color pass alone (no outlines, no fire: where the light falls, brighter), or the
+  // particles alone.
+  // (One return, each branch setting the result: the Direct3D compiler warns otherwise.)
+  vec3 xray(vec2 uv) {
+    vec3 v = vec3(0.0);
+    if (uXray < 1.5) {
+      vec4 nrm = texture2D(tNormal, uv);
+      vec3 n = normalize(nrm.rgb * 2.0 - 1.0);
+      int last = paletteSize - 1;
+      vec3 c = palette[min(6, last)] * max(n.x, 0.0) + palette[min(5, last)] * max(-n.x, 0.0)
+        + palette[min(2, last)] * max(n.y, 0.0) + palette[min(7, last)] * max(n.z, 0.0) * 0.8;
+      v = nrm.a > 0.5 ? c * (1.0 - 0.6 * smoothstep(3.0, 12.0, linDepth(tNormalDepth, uv))) : vec3(0.0);
+    } else if (uXray < 2.5) v = toSRGB(texture2D(tColor, uv).rgb * exposure * 2.0);
+    else v = toSRGB(min(texture2D(tFx, uv).rgb * exposure, vec3(1.0)));
+    return v;
+  }
+  #endif
+
   // The scene at one texel: outlined geometry plus the fire, in sRGB (before vignette).
   vec3 shade(vec2 px) {
     vec2 texel = 1.0 / resolution;
     vec2 uv = (clamp(px, vec2(0.0), resolution - 1.0) + 0.5) * texel;
 
-    vec3 col = toSRGB(texture2D(tColor, uv).rgb * exposure);
+    vec4 c4 = texture2D(tColor, uv);
+    vec3 col = toSRGB(c4.rgb * exposure);
+    bool cel = steelSize > 0 && isCel(c4.a);
 
     vec4 nrm = texture2D(tNormal, uv);
+    bool outlined = false;
     if (outlines > 0.5 && nrm.a > 0.5) {
       float d = linDepth(tNormalDepth, uv);
       float dMain = linDepth(tDepth, uv);
@@ -186,8 +382,96 @@ const fragmentShader = /* glsl */ `
           depthEdge = max(depthEdge, nd - d);
           nEdge += normalEdge(n, normalize(texture2D(tNormal, o).rgb * 2.0 - 1.0), d, nd);
         }
-        if (depthEdge > 0.06 + 0.02 * d) col = palette[0];
-        else if (nEdge > 0.18) col = col * 1.45 + 0.035;
+        // (The pixel styles' outline over his lit tones in their lit ink: lighter where the
+        // light is strongest.)
+        if (depthEdge > 0.06 + 0.02 * d) { col = cel && litTone(col) ? steel[7] : palette[0]; outlined = true; }
+        else if (nEdge > 0.18 && !cel) {
+          // A crease: the scenery's catches the light (a step brighter). The knight's armor
+          // marks itself in the color's alpha (armor.js; the scenery's is 1): his steel's
+          // creases are a tone down its own ramp (the darkest to the void), so steel never
+          // gets the brownish line; the flame in his plate, his rim and the like keep their
+          // flat tone. (Without the ramp: a step darker in its own hue.)
+          if (c4.a > ARMOR_MARK) col = col * 1.45 + 0.035;
+          else if (c4.a > STEEL_MARK && c4.a < CEL_MARK) {
+            int i = steelTone(c4.a) - 1;
+            if (steelSize == 0) col *= 0.55;
+            else col = i < 0 ? palette[0] : steel[min(i, steelSize - 1)];
+          }
+        }
+      }
+    }
+    // The pixel styles' line art: one texel where two of his smooth surfaces meet (celLine),
+    // in the void, or over his lit tones in the style's lit ink; only in a stroke of
+    // STROKE_MIN texels or more, or one that runs on to his outline (longStroke): a lone
+    // texel of it (a surface's corner, a sliver) or a short dash on its own (a fauld lame's
+    // or a finger plate's edge between the gauntlets and the thighs, in his lap) isn't drawn,
+    // so small parts show in their tones, not as scribbles. A stroke is measured as it's seen
+    // (inkShows): one that shows for a texel or two and runs on over the deep tone, where the
+    // void is lost, reads as a stray dash too, so where this texel shows, only neighbours that
+    // show count.
+    if (cel && celLines > 0.5 && outlines > 0.5 && !outlined && celLine(uv) && longStroke(uv, inkShows(col))) {
+      col = litTone(col) ? steel[7] : palette[0];
+      outlined = true;
+    }
+    // The terminator: a dark steel texel (not the light steel on the turn) beside a lit one
+    // of its own surface takes the flame's dark shade: one texel, the warm edge between the
+    // light and the shadow; only where the dark goes on past it (a band, not a sliver of a
+    // small part).
+    vec3 dk = col - steel[3];
+    if (cel && !outlined && steelSize > 6 && celTerm > 0.5 && !litTone(col) && dot(dk, dk) > 0.0006) {
+      float id = celId(c4.a);
+      for (int i = 0; i < 4; i++) {
+        vec2 o = i == 0 ? vec2(0.0, texel.y) : i == 1 ? vec2(0.0, -texel.y) : i == 2 ? vec2(texel.x, 0.0) : vec2(-texel.x, 0.0);
+        vec4 n4 = texture2D(tColor, uv + o);
+        if (!isCel(n4.a) || abs(celId(n4.a) - id) > 0.5 || !litTone(toSRGB(n4.rgb * exposure))) continue;
+        vec4 b4 = texture2D(tColor, uv - o);
+        if (isCel(b4.a) && abs(celId(b4.a) - id) < 0.5 && !litTone(toSRGB(b4.rgb * exposure))) { col = steel[6]; break; }
+      }
+    }
+    // The knight's rim (Edge Glow, setSteel's rim): his steel just inside his silhouette
+    // (the outline, or with none the edge itself) mirrors the fire, more and brighter as it
+    // rises, so every step of it shows:
+    //   up to 0.35  the fire's side only, one texel: the flame's dark (the pixel styles' warm
+    //               terminator; the flame's lo)
+    //   to 0.65     (the default, subtle) the flame's body there (lo), its shade on the far side
+    //   to 0.85     two texels on the fire's side, the outer its tips even over his lit tones
+    //               (the flame's mid), the far side the flame's lo: a backlit glow
+    //   above       three, the outer the highlight (the flame's hi), the far side two texels,
+    //               and the pixel styles' outline itself turns the flame's lo on the fire's
+    //               side (the glowing contour of a sprite lit from there)
+    bool fireRim = cel ? c4.a > CEL_SIDE : c4.a > STEEL_SIDE;
+    if (outlined && cel && steelSize > 6 && steelRim > 0.85 && paletteSize >= 10 && fireRim && depthEdgeHere(uv)) col = palette[5];
+    if (steelSize > 0 && steelRim > 0.01 && paletteSize >= 10 && !outlined && c4.a > STEEL_MARK && c4.a < ARMOR_MARK && nrm.a > 0.5) {
+      bool fireSide = fireRim;
+      float d = linDepth(tNormalDepth, uv);
+      float cut = 0.06 + 0.02 * d;
+      float first = outlines > 0.5 ? 2.0 : 1.0;
+      int width = fireSide ? (steelRim > 0.85 ? 3 : steelRim > 0.65 ? 2 : 1) : (steelRim > 0.85 ? 2 : steelRim > 0.3 ? 1 : 0);
+      for (int w = 0; w < 3; w++) {
+        if (w >= width) break;
+        float o = first + float(w);
+        bool edge = false;
+        for (int i = 0; i < 4; i++) {
+          vec2 dir = i == 0 ? vec2(0.0, 1.0) : i == 1 ? vec2(0.0, -1.0) : i == 2 ? vec2(1.0, 0.0) : vec2(-1.0, 0.0);
+          vec2 q = uv + dir * o * texel;
+          float nd = texture2D(tNormal, q).a > 0.5 ? linDepth(tNormalDepth, q) : cameraFar;
+          if (nd - d > cut) edge = true;
+        }
+        if (edge) {
+          bool outer = w == 0;
+          if (!cel) {
+            if (!fireSide) col = outer && steelRim > 0.65 ? palette[5] : palette[9];
+            else col = outer && steelRim > 0.85 ? palette[7] : outer && steelRim > 0.65 ? palette[6] : palette[5];
+          } else if (fireSide) {
+            // (The pixel styles: the flame's tones from their own ramp; the outer texel over
+            // his lit tones too once it's strong.)
+            bool lit = litTone(col);
+            if (outer && steelRim > 0.85) col = steel[5];
+            else if (outer && steelRim > 0.65) col = lit ? steel[5] : steel[4];
+            else if (!lit) col = steelRim > 0.35 ? steel[4] : steel[6];
+          } else if (!litTone(col)) col = outer && steelRim > 0.65 ? palette[5] : palette[9];
+          break;
+        }
       }
     }
 
@@ -205,7 +489,11 @@ const fragmentShader = /* glsl */ `
     // ...and its densest part glows in the flame's own core color, so every flame
     // gets the same two-tone look: body color below, a pale hot top.
     lit = mix(lit, max(lit, uCore), smoothstep(1.3, 2.6, heat) * 0.85);
+  #ifdef FX
+    return uXray > 0.5 ? xray(uv) : toSRGB(lit);
+  #else
     return toSRGB(lit);
+  #endif
   }
 
   // Layer f over b (both sRGB, 0..1). 0 normal, 1 add, 2 subtract, 3 multiply, 4 screen,
@@ -346,9 +634,12 @@ const fragmentShader = /* glsl */ `
       float cr = cos(uFeedRot), sr = sin(uFeedRot);
       vec2 f = vec2(cr * d.x + sr * d.y, -sr * d.x + cr * d.y) + uCenter;
       // (Minus a little each frame: dithering would otherwise hold dim echoes at the same
-      // palette color forever. Only bright things streak.)
+      // palette color forever. Only bright things streak. With only a few colors, their
+      // steps are too far apart for that to take an echo down one, so there the echoes
+      // also dissolve, a random scatter of their pixels at a time.)
       vec3 prev = texture2D(tPrev, f / resolution).rgb;
-      col = blendMode(col, max(prev * uFeedback - 0.09, 0.0), uFeedMode);
+      float fade = 0.09 + (paletteSize < 7 ? 0.4 * h21(px + floor(uTime * 60.0) * 13.7) : 0.0);
+      col = blendMode(col, max(prev * uFeedback - fade, 0.0), uFeedMode);
     }
   #ifdef SCENE_TEX
     // Glow: light spilling from the bright parts (the scene's blurred mipmaps).
@@ -411,9 +702,21 @@ const fragmentShader = /* glsl */ `
     col *= 1.0 - uBlackout;
   #endif
 
+    // The knight's steel snaps to its own ramp (not in the x-ray); the pixel styles' tones
+    // without the dither (the armor draws its own seams).
+    bool steelHere = false;
+    bool celHere = false;
+    if (steelSize > 0) {
+      float mark = texture2D(tColor, (clamp(src, vec2(0.0), resolution - 1.0) + 0.5) / resolution).a;
+      steelHere = mark > STEEL_MARK && mark < ARMOR_MARK;
+      celHere = isCel(mark);
+    #ifdef FX
+      if (uXray > 0.5) { steelHere = false; celHere = false; }
+    #endif
+    }
     float threshold = (ditherScale > 6.0 ? bayer8(px) : bayer4(px)) - 0.5;
-    col += threshold * ditherStrength;
-    gl_FragColor = vec4(quantize(col), 1.0);
+    if (!celHere) col += threshold * ditherStrength;
+    gl_FragColor = vec4(steelHere ? quantizeSteel(col) : quantize(col), 1.0);
   }
   #endif
 `;
@@ -518,6 +821,11 @@ export function createPixelPass({ effects = false } = {}) {
     cameraFar: { value: 40 },
     palette: { value: Array.from({ length: MAX_COLORS }, () => new THREE.Vector3()) },
     paletteSize: { value: 1 },
+    steel: { value: Array.from({ length: 8 }, () => new THREE.Vector3()) },
+    steelSize: { value: 0 },
+    steelRim: { value: 0.5 },
+    celLines: { value: 1 },
+    celTerm: { value: 0 },
     ditherStrength: { value: 0.16 },
     ditherScale: { value: 4 },
     outlines: { value: 1 },
@@ -583,6 +891,7 @@ export function createPixelPass({ effects = false } = {}) {
     uPaintAngle: { value: 0 },
     uPaintAspect: { value: 1 },
     uWashEdge: { value: 0 },
+    uXray: { value: 0 },
   };
   // One uniforms object for every stage (each reads what it needs).
   const fx = effects ? { FX: '' } : {};
@@ -594,7 +903,7 @@ export function createPixelPass({ effects = false } = {}) {
     ghost: make(ghostShader),
     final: make(fragmentShader, { SCENE_TEX: '' }),
   };
-  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), materials.single);
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), effects ? materials.final : materials.single);
   quad.frustumCulled = false;
   const scene = new THREE.Scene();
   scene.add(quad);
@@ -602,17 +911,42 @@ export function createPixelPass({ effects = false } = {}) {
 
   const c = new THREE.Color();
   const rgb = { r: 0, g: 0, b: 0 };
-  /** hexes are sRGB; quantization happens in sRGB space. */
-  function setPalette(hexes) {
+  /**
+   * hexes are sRGB; quantization happens in sRGB space. `steel`: this is the scene's own
+   * full palette, so the knight's steel snaps to its ramp (setSteel); any other palette (a
+   * few colors, a debug one) leaves it out.
+   */
+  function setPalette(hexes, { steel = false } = {}) {
     hexes.slice(0, MAX_COLORS).forEach((hex, i) => {
       c.set(hex).getRGB(rgb, THREE.SRGBColorSpace);
       uniforms.palette.value[i].set(rgb.r, rgb.g, rgb.b);
     });
     uniforms.paletteSize.value = Math.min(hexes.length, MAX_COLORS);
+    steelOn = !!steel;
+    uniforms.steelSize.value = steelOn ? steelCount : 0;
+  }
+  // The knight's steel ramp (sRGB hexes, dark to light, up to 8: the pixel styles' tones,
+  // steel.js CEL_TONES; none: he's snapped to the palette like the scenery): kept, and used
+  // while the palette is the scene's own; `rim` 0..1, the fire's color on his silhouette;
+  // `lines` the pixel styles' line art (1 drawn, 0 not); `terminator` their warm edge where a
+  // lit tone meets the dark steel (1 drawn, 0 not).
+  let steelOn = false;
+  let steelCount = 0;
+  function setSteel(hexes = [], { rim = uniforms.steelRim.value, lines = uniforms.celLines.value, terminator = uniforms.celTerm.value } = {}) {
+    uniforms.steelRim.value = Math.min(1, Math.max(0, rim));
+    uniforms.celLines.value = lines;
+    uniforms.celTerm.value = terminator;
+    const list = hexes.slice(0, 8);
+    list.forEach((hex, i) => {
+      c.set(hex).getRGB(rgb, THREE.SRGBColorSpace);
+      uniforms.steel.value[i].set(rgb.r, rgb.g, rgb.b);
+    });
+    steelCount = list.length;
+    uniforms.steelSize.value = steelOn ? steelCount : 0;
   }
 
-  /** Which stage the next render of `scene` draws: single (all in one), scene, style, ghost, final. */
+  /** Which stage the next render of `scene` draws: single (all in one: the site's), scene, style, ghost, final. */
   function use(stage) { quad.material = materials[stage]; }
 
-  return { scene, camera, uniforms, setPalette, materials, use };
+  return { scene, camera, uniforms, setPalette, setSteel, materials, use };
 }

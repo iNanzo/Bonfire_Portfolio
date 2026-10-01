@@ -338,7 +338,14 @@ body.hud-off .viz-hud { display: none; }
   box-shadow: 0 0 0 1px var(--line-strong);
   cursor: help;
 }
-.viz-tip:hover, .viz-tip:focus-visible { color: var(--c-bone); box-shadow: 0 0 0 1px var(--accent); outline: none; }
+/* A field's "?" lights up and shows its hint on hover, and while the field has the keyboard's
+   focus (the "?" isn't a stop of its own: src/ui/fields.js); a group's, for a switch in it
+   with no hint of its own. A "?" drawn on its own is a stop: its own focus shows it. */
+.viz-tip:hover, .viz-tip:focus-visible,
+.viz-field:has(:focus-visible) > .viz-field-label > .viz-tip,
+.viz-check:has(:focus-visible) > .viz-tip,
+.viz-mode:has(:focus-visible) > .viz-tip,
+[data-tip-group]:has([data-group-tip] :focus-visible) > .viz-field-label > .viz-tip { color: var(--c-bone); box-shadow: 0 0 0 1px var(--accent); outline: none; }
 .viz-tip::after {
   content: attr(data-tip);
   position: absolute;
@@ -362,8 +369,21 @@ body.hud-off .viz-hud { display: none; }
   visibility: hidden;
   pointer-events: none;
 }
-.viz-tip:hover::after, .viz-tip:focus-visible::after { opacity: 1; visibility: visible; }
+.viz-tip:hover::after, .viz-tip:focus-visible::after,
+.viz-field:has(:focus-visible) > .viz-field-label > .viz-tip::after,
+.viz-check:has(:focus-visible) > .viz-tip::after,
+.viz-mode:has(:focus-visible) > .viz-tip::after,
+[data-tip-group]:has([data-group-tip] :focus-visible) > .viz-field-label > .viz-tip::after { opacity: 1; visibility: visible; }
 .viz-check .viz-tip { margin-top: 3px; flex: none; }
+/* A field's hint spans the field, over it, and a group's the group (from the "?", one in the
+   column by the dialog's edge would run past it and be cut off). */
+.viz-field, .viz-mode, [data-tip-group] { position: relative; }
+.viz-field > .viz-field-label > .viz-tip,
+.viz-mode > .viz-tip,
+[data-tip-group] > .viz-field-label > .viz-tip { position: static; }
+.viz-field > .viz-field-label > .viz-tip::after,
+.viz-mode > .viz-tip::after,
+[data-tip-group] > .viz-field-label > .viz-tip::after { left: 0; right: 0; width: auto; max-width: none; }
 
 .viz-link-help { font-size: 0.875rem; color: var(--text-dim); }
 .viz-link-help summary { cursor: pointer; font-family: var(--font-pixel); color: var(--c-bone); }
@@ -420,6 +440,13 @@ body[data-mode='start'] .pack { bottom: 14px; }
 body.is-idle .pack:not(.is-open) { opacity: 0; pointer-events: none; }
 body.hud-off .pack:not(.is-open) { display: none; }
 
+/* ---------- The render menu (P; ui/renderMenu.js, styled in styles.css): top right, over
+   the picture, fading with the HUD when the mouse rests (and gone with it on H). ---------- */
+
+.viz-render-menu { top: 14px; z-index: 22; transition: opacity 360ms steps(3); }
+body.is-idle .viz-render-menu:not(:focus-within) { opacity: 0; pointer-events: none; }
+body.hud-off .viz-render-menu:not(:focus-within) { display: none; }
+
 /* Recording a clip (V): the button burns red and blinks while it records. */
 body.is-recording .viz-record { --b: #e03a3a; color: #ff8a8a; }
 body.is-recording .viz-record [data-record-label]::before { content: '\25CF\00A0'; animation: blink 1s steps(1) infinite; }
@@ -431,3 +458,138 @@ body.is-recording .viz-record [data-record-label]::before { content: '\25CF\00A0
 .viz-midi-key { font-size: 0.8125rem; color: var(--text-dim); white-space: nowrap; }
 .viz-midi .pix-btn { padding: 3px 8px; font-size: 0.8125rem; }
 .viz-midi .pix-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* ---------- Preset scenes ---------- */
+
+/* The HUD's line: the scene playing (a click opens the Scenes tab). Pointed at, its name
+   pulses in the flame's colors. */
+.viz-scene-line {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  max-width: 100%;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-pixel);
+  font-size: 0.875rem;
+  line-height: 1.35;
+  color: var(--c-bone);
+  cursor: pointer;
+  text-align: left;
+}
+.viz-scene-line[hidden] { display: none; }
+.viz-scene-label { font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); }
+.viz-scene-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--accent-hi); }
+.viz-scene-line.is-free .viz-scene-name { color: var(--text-dim); }
+.viz-scene-line:hover .viz-scene-name,
+.viz-scene-line:focus-visible .viz-scene-name { animation: viz-scene-pulse 900ms steps(4) infinite; }
+.viz-scene-line:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@keyframes viz-scene-pulse {
+  0%, 100% { color: var(--accent-hi); text-shadow: 0 0 0 transparent; box-shadow: inset 0 -1px 0 var(--accent-lo); }
+  50% { color: var(--accent-core); text-shadow: 0 0 2px var(--accent-hi), 0 0 12px var(--accent); box-shadow: inset 0 -2px 0 var(--accent-hi); }
+}
+.viz-scene-line:hover .viz-scene-label { color: var(--accent); }
+
+/* The start screen's chips: a scene's colors, then its name; pointed at, the colors shimmer. */
+.viz-scene-chips[hidden] { display: none; }
+.viz-scene-chips { margin-top: 10px; }
+.viz-scene-chip { align-items: center; gap: 7px; }
+.viz-feel .viz-scene-chip b { font-size: 0.875rem; }
+.viz-chip-swatches,
+.viz-feel .viz-preset .viz-chip-swatches { display: inline-flex; gap: 1px; }
+.viz-chip-swatches i { width: 4px; height: 12px; background: var(--sw0); }
+.viz-chip-swatches i:nth-child(2) { background: var(--sw1); }
+.viz-chip-swatches i:nth-child(3) { background: var(--sw2); }
+.viz-chip-swatches i:nth-child(4) { background: var(--sw3); }
+.viz-chip-swatches i:nth-child(5) { background: var(--sw4); }
+.viz-scene-chip:hover .viz-chip-swatches i,
+.viz-scene-chip:focus-visible .viz-chip-swatches i,
+.viz-scene-chip[aria-pressed='true'] .viz-chip-swatches i { animation: viz-shimmer 720ms steps(3) infinite; }
+.viz-chip-swatches i:nth-child(2) { animation-delay: -120ms !important; }
+.viz-chip-swatches i:nth-child(3) { animation-delay: -240ms !important; }
+.viz-chip-swatches i:nth-child(4) { animation-delay: -360ms !important; }
+.viz-chip-swatches i:nth-child(5) { animation-delay: -480ms !important; }
+@keyframes viz-shimmer {
+  0%, 100% { transform: translateY(0); filter: none; }
+  50% { transform: translateY(-3px); filter: brightness(1.6); }
+}
+.viz-scene-chip[aria-pressed='true'] { --b: var(--accent-hi); }
+.viz-scenes-all b { color: var(--text-dim); }
+.viz-scenes-all:hover b { color: var(--accent-hi); }
+.viz-solo { max-width: 34rem; margin-top: 10px; font-size: 0.875rem; color: var(--accent-hi); }
+.viz-solo[hidden] { display: none; }
+
+/* A scene's title card: the checkpoint band, smaller, lower. */
+.viz-title-card.is-scene { padding-top: max(calc(var(--header-h, 0px) + 24px), 22vh); }
+.viz-title-card.is-scene .kindled-band { padding: 14px var(--gutter); }
+.viz-title-card.is-scene .kindled-title { font-size: clamp(1.1rem, 3.2vw, 2rem); letter-spacing: 0.2em; }
+
+/* The Scenes tab's loop: a row per scene. Pointed at, a row glows in its flame's color and
+   its picture lifts; left out of the loop, it dims; the one playing wears the accent. */
+.viz-painter-link { flex: none; }
+.viz-scenes { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.viz-scene-row {
+  display: grid;
+  grid-template-columns: auto 96px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  box-shadow: 0 0 0 1px var(--line);
+  transition: box-shadow 200ms steps(2), background-color 200ms steps(2);
+}
+.viz-scene-row:hover,
+.viz-scene-row:focus-within {
+  background: color-mix(in srgb, var(--scene-glow) 9%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--scene-glow) 70%, transparent), 0 0 14px -4px var(--scene-glow);
+}
+.viz-scene-row input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; cursor: pointer; }
+.viz-scene-thumb {
+  display: flex;
+  width: 96px;
+  height: 54px;
+  overflow: hidden;
+  background: var(--c-void);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  transition: transform 160ms steps(2);
+}
+.viz-scene-thumb img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+.viz-scene-thumb i { flex: 1; }
+.viz-scene-row:hover .viz-scene-thumb { transform: translateY(-2px); box-shadow: 0 0 0 1px var(--scene-glow), 0 3px 0 -1px color-mix(in srgb, var(--scene-glow) 50%, var(--c-void)); }
+.viz-scene-text { display: grid; gap: 2px; min-width: 0; }
+.viz-scene-text b { font-family: var(--font-pixel); font-weight: 400; font-size: 0.9375rem; color: var(--c-bone); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.viz-scene-text span { font-size: 0.8125rem; line-height: 1.35; color: var(--text-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.viz-scene-badge {
+  padding: 2px 7px;
+  font-family: var(--font-pixel);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  white-space: nowrap;
+}
+.viz-scene-badge.is-mine { color: var(--accent-hi); box-shadow: 0 0 0 1px var(--accent-lo); }
+.viz-scene-row .pix-btn { padding: 4px 9px; font-size: 0.8125rem; white-space: nowrap; }
+.viz-scene-row.is-out .viz-scene-thumb,
+.viz-scene-row.is-out .viz-scene-text { opacity: 0.45; }
+.viz-scene-row.is-playing { box-shadow: inset 3px 0 0 var(--accent), 0 0 0 1px var(--accent-lo); }
+.viz-scene-row.is-playing .viz-scene-text b { color: var(--accent-hi); }
+.viz-scenes-empty { padding: 10px 0; }
+@media (max-width: 720px) {
+  /* Two lines: the switch, picture and name; then where it's from and the buttons. */
+  .viz-scene-row { grid-template-columns: auto 72px auto minmax(0, 1fr); gap: 8px; }
+  .viz-scene-row .pix-btn { padding: 4px 7px; }
+  .viz-scene-thumb { width: 72px; height: 40px; }
+  .viz-scene-text { grid-column: 3 / -1; }
+  .viz-scene-badge { grid-column: 2; justify-self: start; }
+  .viz-scene-row .pix-btn { justify-self: start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .viz-scene-line:hover .viz-scene-name,
+  .viz-scene-line:focus-visible .viz-scene-name { animation: none; color: var(--accent-core); text-shadow: 0 0 8px var(--accent); }
+  .viz-scene-chip .viz-chip-swatches i { animation: none !important; }
+  .viz-scene-chip:hover .viz-chip-swatches i { filter: brightness(1.5); }
+  .viz-scene-row:hover .viz-scene-thumb { transform: none; }
+}

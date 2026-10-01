@@ -1,7 +1,9 @@
 // The editor: renders any part of content.json as a form and writes edits back
 // into the draft. Lists of entries are cards (drag or ↑/↓ to reorder, hide, delete,
 // add); lists of text and table rows get row editors; `images` gets the image
-// manager; ranged numbers get sliders and #rrggbb text gets a color picker. Every
+// manager; ranged numbers get sliders and #rrggbb text gets a color picker. Bonfire
+// Live's scenes get cards of their own (sceneTools.js: made in the Painter, so a card
+// shows a scene's colors and summary rather than its ~80 settings). Every
 // field carries data-path (e.g. projects[2].images[0].alt) so validation messages
 // land on the right field.
 //
@@ -13,6 +15,7 @@ import {
 import { HEX_RE, ID_RE, shownImages, slugify } from '../../src/contentRules.js';
 import { newImageSrc, processImage } from './images.js';
 import { flameQuickRoll, flameTools } from './paletteTools.js';
+import { sceneCardBody, sceneMeta, sceneThumb } from './sceneTools.js';
 import { titleCase } from './text.js';
 import { ELEMENT_IDS } from '../../src/effectsDefaults.js';
 
@@ -206,6 +209,8 @@ function renderColor(value, path, ctx) {
 function scopeIds(ctx, parent) {
   const flames = ctx.draft.effects?.flames ?? [];
   if (flames.includes(parent)) return { taken: flames, fallback: 'flame' };
+  const scenes = ctx.draft.scenes ?? [];
+  if (scenes.includes(parent)) return { taken: scenes, fallback: 'scene' };
   return { taken: [ctx.draft.featured, ...ctx.draft.projects, ...ctx.draft.archive], fallback: 'project' };
 }
 function uniqueId(base, ctx, self) {
@@ -329,6 +334,7 @@ function renderCollection(list, path, ctx) {
 
 const isProjectPath = (path) => path.length === 1 && (path[0] === 'projects' || path[0] === 'archive');
 const isFlamePath = (path) => patternOf(path) === 'effects.flames';
+const isScenePath = (path) => patternOf(path) === 'scenes';
 
 function cardMeta(item, path) {
   if (isProjectPath(path) || path[0] === 'featured') {
@@ -344,8 +350,8 @@ function swatches(item, ipath) {
     SWATCH_KEYS.map((k) => el('span', { class: 'swatch', 'data-swatch': keyOf([...ipath, k]), style: `background:${HEX_RE.test(item[k] ?? '') ? item[k] : 'transparent'}` })));
 }
 
-/** The collapsible card head shared by list cards and the featured card. */
-function cardShell(item, ipath, ctx, { title, meta, thumb, lead = null, actions, badges, foot = null, open }) {
+/** The collapsible card head shared by list cards and the featured card (`body`: its own, in place of every field). */
+function cardShell(item, ipath, ctx, { title, meta, thumb, lead = null, actions, badges, foot = null, body: custom = null, open }) {
   const key = keyOf(ipath);
   const card = el('section', { class: `card${item.hidden ? ' is-hidden' : ''}`, 'data-path': key });
   const body = el('div', { class: 'card-body', hidden: !open });
@@ -367,7 +373,7 @@ function cardShell(item, ipath, ctx, { title, meta, thumb, lead = null, actions,
     el('div', { class: 'card-head' }, lead, toggle, badges, el('span', { class: 'card-actions' }, actions)),
     el('p', { class: 'error', role: 'alert' }),
     body);
-  body.append(renderObject(item, ipath, ctx));
+  body.append(custom ?? renderObject(item, ipath, ctx));
   if (foot) body.append(foot);
   return card;
 }
@@ -384,11 +390,13 @@ function renderCard(list, i, path, ctx, fixed) {
   const ipath = [...path, i];
   const isProject = isProjectPath(path);
   const isFlame = isFlamePath(path);
+  const isScene = isScenePath(path);
   const cover = isProject ? shownImages(item)[0] : null;
+  const eyeWords = isFlame ? { on: 'Put back in rotation', off: 'Take out of rotation' } : isScene ? { on: 'Put Back in the Loop', off: 'Take Out of the Loop' } : undefined;
   const actions = fixed ? [] : [
     isFlame ? flameQuickRoll(item, ctx) : null,
     ...orderButtons(list, i, ctx),
-    eyeButton(item, () => ctx.changed({ rerender: true }), isFlame ? { on: 'Put back in rotation', off: 'Take out of rotation' } : undefined),
+    eyeButton(item, () => ctx.changed({ rerender: true }), eyeWords),
     iconButton('Delete', '✕', () => {
       const extra = isProject && item.images?.length ? ' Its images are removed from the site when you save.' : '';
       if (!confirm(`Delete “${titleOf(item, i)}”?${extra}`)) return;
@@ -398,17 +406,19 @@ function renderCard(list, i, path, ctx, fixed) {
   ];
   const card = cardShell(item, ipath, ctx, {
     title: titleOf(item, i),
-    meta: cardMeta(item, path),
+    meta: isScene ? sceneMeta(item) : cardMeta(item, path),
     thumb: isProject && cover ? el('img', { class: 'card-thumb', alt: '', src: ctx.thumb(cover.src), loading: 'lazy' })
-      : isFlame ? swatches(item, ipath) : null,
+      : isFlame ? swatches(item, ipath) : isScene ? sceneThumb(item) : null,
     lead: fixed ? null : el('span', { class: 'handle', draggable: 'true', title: 'Drag to reorder', 'aria-hidden': 'true', text: '⋮⋮' }),
     actions,
     badges: badgesFor(item),
     foot: isProject ? projectActions(item, path[0], i, ctx) : isFlame ? flameActions(item, ctx) : null,
+    body: isScene ? sceneCardBody(item, ipath, ctx) : null,
     open: ctx.open.has(item),
   });
   card.dataset.index = i;
   if (isFlame && item.hidden) card.querySelector('.badges .badge').textContent = 'Out of Rotation';
+  if (isScene && item.hidden) card.querySelector('.badges .badge').textContent = 'Out of the Loop';
   return card;
 }
 
@@ -604,7 +614,11 @@ function allImageSrcs(d) {
 }
 
 // ---- validation display ------------------------------------------------------------------
-/** Put each error's message on its field (or the nearest enclosing one) and flag the cards around it. */
+/**
+ * Put each error's message on its field (or the nearest enclosing one) and flag the cards
+ * around it. A scene's card has no field for most of its settings, so every problem inside
+ * it is listed on the card, each with where it is (look.name: …).
+ */
 export function showErrors(root, errors) {
   for (const n of root.querySelectorAll('.has-error, .has-inner-error')) n.classList.remove('has-error', 'has-inner-error');
   for (const p of root.querySelectorAll('.error')) p.textContent = '';
@@ -620,7 +634,8 @@ export function showErrors(root, errors) {
     if (target) {
       target.classList.add('has-error');
       const slot = target.querySelector(':scope > .error');
-      if (slot && !slot.textContent) slot.textContent = message;
+      if (slot && p !== path && /^scenes\[\d+\]$/.test(p)) slot.textContent += `${slot.textContent ? '\n' : ''}${path.slice(p.length + 1)}: ${message}`;
+      else if (slot && !slot.textContent) slot.textContent = message;
     }
     for (const card of root.querySelectorAll('.card[data-path]')) {
       const k = card.dataset.path;

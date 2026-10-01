@@ -23,40 +23,33 @@
 // swing (the planted weapon leaves the fire for a routine of moves, bladeMotion.js) and
 // signs of life: a shudder on hard beats, a held blade's sway and trembling.
 //
-// Every swap takes after the element it forges into, on top of the steps above (one
-// habit per step, so it stays readable):
-//   fire       as above: embers, a steady two-tone edge, smooth shimmering helix lines
-//   lightning  the blade is struck apart and re-forged: the edge flickers white-hot with
-//              a small arc crawling along it, the particles are crossed sparks that snap
-//              and blink, the helix crackles in broken jagged strands, and as the form
-//              completes a bolt strikes down into the pommel (the echo flickers with it)
-//   ice        the blade freezes and shatters: a pale frost edge, the particles fall
-//              away like diamond chips before the helix (turning slower) gathers them,
-//              each glints as it freezes onto the new blade, the helix lines are faceted,
-//              and the echo is cut crystal, growing out in steps
+// Every swap takes after the element it forges into, keeping the steps above; each
+// element has its own big moves, readable in the first half second:
+//   fire       as above: embers rising off a steady two-tone edge, a smooth shimmering
+//              helix, the blade forming from the pommel down
+//   lightning  struck apart and re-forged: a bolt out of the sky hits the old blade, which
+//              strobes as if electrocuted and crackles apart (a white-hot flickering edge,
+//              an arc crawling along it, crossed sparks that snap and blink); while the
+//              particles gather, arcs leap between them and the ground; the helix crackles
+//              in broken jagged strands; the new blade forms in five jumps, each a flash
+//              and an arc to the ground; then a bolt out of the sky into its pommel
+//   ice        frozen, shattered, grown back: frost creeps up the old blade from its point
+//              and it shatters all at once, its shards flung out and falling before a slow
+//              hexagonal helix gathers them; the new blade grows from its point up inside a
+//              cocoon of crystals, each glinting shard freezing onto it, and when it's
+//              whole the cocoon cracks off and a cut-crystal echo grows out in steps
+// Their big moments land like small hits (hooks.onForgeStrike: a flash and a jolt).
+// The dissolve, swirl, gather and form, each element's moves among them, are forgeRun.js's
+// (the knight's arrival runs the same forge): the weapon is its subject, and this file adds
+// the rise to the forge height, the hold, the stab and the settle.
 import * as THREE from 'three';
-import { createForgeFx, weaponSilhouette, profileAt } from './forgeFx.js';
-import { createBoltLines, seeded, hashSeed } from './bolts.js';
+import { createForgeFx, weaponSilhouette } from './forgeFx.js';
+import { createBoltLines } from './bolts.js';
 import { createRoutine } from './bladeMotion.js';
-import { createForgeParticles, HELIX_TURNS, helixWide } from './forgeParticles.js';
+import { createForgeParticles } from './forgeParticles.js';
+import { createForgeRun, ease, FORGE_TIMES, FORGE_TIMES_REDUCED } from './forgeRun.js';
 import { smoothstep } from '../math.js';
-
-const DISSOLVE_CHUNK = /* glsl */ `
-  float wBayer2(vec2 a) { a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
-  float wBayer4(vec2 a) { return wBayer2(0.5 * a) * 0.25 + wBayer2(a); }
-  float wHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-  float wNoise(vec3 x) {
-    vec3 i = floor(x); vec3 f = fract(x); f = f * f * (3.0 - 2.0 * f);
-    return mix(mix(mix(wHash(i), wHash(i + vec3(1,0,0)), f.x), mix(wHash(i + vec3(0,1,0)), wHash(i + vec3(1,1,0)), f.x), f.y),
-               mix(mix(wHash(i + vec3(0,0,1)), wHash(i + vec3(1,0,1)), f.x), mix(wHash(i + vec3(0,1,1)), wHash(i + vec3(1,1,1)), f.x), f.y), f.z);
-  }
-`;
-
-// The ripple's threshold field: dv = noise·0.45 + bayer·0.25 + height·0.3, visible
-// where dv ≥ uDissolve·1.15 − 0.05. Rising uDissolve eats the weapon from the point
-// up; falling uDissolve builds it from the pommel down. edgeAt() is the same field
-// on average, so particles can shed / fade exactly where the edge is.
-const edgeAt = (h, jitter) => THREE.MathUtils.clamp((0.3925 + 0.3 * h + jitter) / 1.15, 0, 1);
+import { DISSOLVE_CHUNK } from './dissolve.js';
 
 // Weapons also get a firelit rim in the flame's bright color (faces turned away
 // from the camera catch it) plus a faint wash of that color, so silhouettes read
@@ -71,15 +64,22 @@ function dissolveMaterial(src, uniforms, toRoot) {
       .replace('#include <common>', '#include <common>\nuniform mat4 uToRoot;\nvarying vec3 vLPos;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvLPos = (uToRoot * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vLPos;\nuniform float uDissolve;\nuniform vec3 uEdge;\nuniform vec3 uEdgeHot;\nuniform vec3 uRim;\nuniform float uGlow;\nuniform vec2 uSpan;\n${DISSOLVE_CHUNK}`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vLPos;\nuniform float uDissolve;\nuniform vec3 uEdge;\nuniform vec3 uEdgeHot;\nuniform vec3 uRim;\nuniform float uGlow;\nuniform vec2 uSpan;\nuniform float uFrost;\nuniform vec3 uFrostColor;\nuniform float uFlip;\n${DISSOLVE_CHUNK}`)
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>
         float rimK = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));
         gl_FragColor.rgb += uRim * (pow(rimK, 2.2) * 0.9 + 0.1);
         if (uGlow > 0.001) {
           gl_FragColor.rgb = mix(gl_FragColor.rgb, uEdge, uGlow * 0.55) + uEdge * uGlow * (0.25 + pow(rimK, 2.0) * 0.6);
         }
+        // Frost (the ice swap): a pale glaze creeping up from the point, a bright ragged front.
+        if (uFrost > 0.001) {
+          float hf = clamp((vLPos.y - uSpan.x) / (uSpan.y - uSpan.x), 0.0, 1.0);
+          float fr = uFrost * 1.15 - hf + (wBayer4(gl_FragCoord.xy) - 0.5) * 0.1 + (wNoise(vLPos * 14.0) - 0.5) * 0.14;
+          if (fr > 0.0) gl_FragColor.rgb = fr < 0.06 ? uFrostColor * 1.25 : mix(gl_FragColor.rgb, uFrostColor, 0.7) + uFrostColor * 0.15 * pow(rimK, 2.0);
+        }
         if (uDissolve > 0.001) {
           float h = clamp((vLPos.y - uSpan.x) / (uSpan.y - uSpan.x), 0.0, 1.0);
+          if (uFlip > 0.5) h = 1.0 - h; // (ice forms from the point up)
           float dv = wNoise(vLPos * 9.0) * 0.45 + wBayer4(gl_FragCoord.xy) * 0.25 + h * 0.3;
           float e = dv - (uDissolve * 1.15 - 0.05);
           if (e < 0.0) discard;
@@ -90,12 +90,6 @@ function dissolveMaterial(src, uniforms, toRoot) {
   };
   return mat;
 }
-
-const ease = {
-  inQuad: (t) => t * t,
-  outCubic: (t) => 1 - (1 - t) ** 3,
-  inOut: (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2),
-};
 
 /** Mesh → weapon-root transforms, in the root's own space (the root has no parent yet). */
 function rootTransforms(root) {
@@ -184,6 +178,7 @@ export function createWeapons(gltfRoot, {
     const uniforms = {
       uDissolve: { value: 0 }, uEdge: { value: new THREE.Color() }, uEdgeHot: { value: new THREE.Color() },
       uGlow: { value: 0 }, uRim: { value: rimColor.clone() }, uSpan: { value: surface.span },
+      uFrost: { value: 0 }, uFrostColor: { value: new THREE.Color() }, uFlip: { value: 0 },
     };
     for (const [o, m] of toRoot) {
       o.material = dissolveMaterial(o.material, uniforms, m);
@@ -195,6 +190,7 @@ export function createWeapons(gltfRoot, {
     obj.userData.samples = surface.points;
     obj.userData.heights = surface.heights;
     obj.userData.toRoot = toRoot;
+    obj.userData.subject = subjectOf(obj);
     holder.add(obj);
   }
 
@@ -205,22 +201,8 @@ export function createWeapons(gltfRoot, {
   const fx = N ? createForgeFx(particleMaterial, field.noise) : null;
   if (fx) fx.lines.layers.set(layerFx);
   // Lightning's arcs along the forge edge and its strike into the formed blade.
-  const arcs = N ? createBoltLines(particleMaterial, 96, 40) : null;
+  const arcs = N ? createBoltLines(particleMaterial, 220, 96) : null;
   if (arcs) for (const o of arcs.objects) o.layers.set(layerFx);
-  let swapEl = 'fire'; // the element the swap under way forges into
-  let strikeT = -1;    // the strike's age (s), or -1
-  const strikeTop = new THREE.Vector3();
-  const strikeEnd = new THREE.Vector3();
-  const arcA = new THREE.Vector3();
-  const arcB = new THREE.Vector3();
-  const arcCol = new THREE.Color();
-  let burstT = -1;
-  let burstSil = null;
-  let burstEl = 'fire'; // the element the echo takes after
-  const burstMatrix = new THREE.Matrix4();
-  const lineLead = new THREE.Color();
-  const lineTrail = new THREE.Color();
-  const lineHot = new THREE.Color();
   // Smear frames: a fast swing leaves outlines of the blade at the poses it just passed
   // through (the last SMEAR frames), fading with age — the pixel-art way to sell speed.
   const SMEAR = 3;
@@ -233,37 +215,65 @@ export function createWeapons(gltfRoot, {
   function setLayer(obj, layer) {
     obj.traverse((o) => { if (o.isMesh) { o.layers.set(layer); o.castShadow = castShadows && layer === layerSolid; } });
   }
+  /** A weapon as the forge sees it (forgeRun.js ForgeSubject). */
+  function subjectOf(obj) {
+    return {
+      get matrixWorld() { return obj.matrixWorld; },
+      samples: obj.userData.samples,
+      heights: obj.userData.heights,
+      span: obj.userData.uniforms.uSpan.value,
+      silhouette: () => (obj.userData.silhouette ??= weaponSilhouette(obj.userData.toRoot)),
+      uniforms: obj.userData.uniforms,
+      show(on) { obj.visible = on; },
+      ghost(on) { setLayer(obj, on ? layerGhost : layerSolid); },
+    };
+  }
 
   let current = null;
   let incoming = null;
+  // idle | forge (forgeRun.js: dissolve, swirl, gather, form, hold) | stab | settle | swing
   let phase = 'idle';
   let t = 0;
   let queued = null;
   let resolveSwap = null;
   let swapPayload = null;
-  const edgeOld = new THREE.Color();
-  const edgeOldHot = new THREE.Color();
-  const edgeNew = new THREE.Color();
-  const edgeNewHot = new THREE.Color();
-  const rampOld = [];
-  const rampNew = [];
 
-  const D = reducedMotion
-    ? { dissolve: 0.35, swirl: 0, gather: 0, form: 0.35, hold: 0.1, stab: 0.01, settle: 0.6 }
-    : { dissolve: 1.4, swirl: 0.3, gather: 0.6, form: 0.9, hold: 0.25, stab: 0.13, settle: 1.1 };
-  const FORGE = D.dissolve + D.swirl + D.gather; // time over which the color turns old → new
-  const TURNED = FORGE * 0.5;                     // the particles' color has swapped: the helix lines start
-  const FORMED = FORGE + D.form;                  // ...and meet here
+  const D = reducedMotion ? { ...FORGE_TIMES_REDUCED, stab: 0.01, settle: 0.6 } : { ...FORGE_TIMES, stab: 0.13, settle: 1.1 };
   const HOVER = reducedMotion ? 0 : 0.5; // the forge height: the old weapon rises to it, the new one forms there
+
+  /** A spot on the logs and ash around the fire for an arc to land on (world). */
+  const anchorWorld = new THREE.Vector3();
+  function groundPoint(rng, out) {
+    holder.getWorldPosition(anchorWorld);
+    const a = rng() * Math.PI * 2;
+    const r = 0.45 + rng() * 0.35;
+    return out.set(anchorWorld.x + Math.cos(a) * r, anchorWorld.y + 0.12 + rng() * 0.14, anchorWorld.z + Math.sin(a) * r);
+  }
+
+  // --- the forge (forgeRun.js): the old weapon rises to the forge height as it dissolves; the
+  // new one forms there and hangs for the hold (a held one waits for the drop: stepHold).
+  const run = createForgeRun({
+    particles: forge, fx, arcs, materials, particleMaterial, times: D, reducedMotion, clock: () => totalT, groundPoint,
+    hooks: {
+      updateMatrices: () => holder.updateMatrixWorld(true),
+      onForgeStrike: (w) => hooks.onForgeStrike?.(w),
+      onFormed: () => hooks.onFormed?.(swapPayload),
+      onDissolve: (k) => { current.position.y = ease.inOut(k) * HOVER; },
+      onFormBegin: () => {
+        for (const o of Object.values(items)) if (o !== incoming) o.visible = false;
+        incoming.position.set(0, HOVER, 0);
+      },
+      onHold: stepHold,
+      // (A held weapon's helix comes back and pulses with the beat and the build-up.)
+      holdSpin: () => (holding ? 4 + 9 * charge + 20 * auraKick : 10),
+      holdAlpha: (th) => Math.max(1 - Math.min(1, th / D.hold),
+        holding ? (0.3 + 0.4 * charge + 0.5 * auraKick) * smoothstep(D.hold, D.hold + 0.8, th) : 0),
+    },
+  });
 
   /** Spin the blade about its own axis to a random angle (either face shown, never edge-on). */
   function spin(obj) {
     obj.rotation.set(0, (Math.random() < 0.5 ? 0 : Math.PI) + (Math.random() * 2 - 1) * 0.85, 0);
-  }
-
-  function clearLines() {
-    burstT = -1;
-    fx?.clear();
   }
 
   function show(key) {
@@ -271,8 +281,11 @@ export function createWeapons(gltfRoot, {
     current = items[key];
     current.position.set(0, 0, 0);
     spin(current);
-    current.userData.uniforms.uDissolve.value = 0;
-    current.userData.uniforms.uGlow.value = 0;
+    const u = current.userData.uniforms;
+    u.uDissolve.value = 0;
+    u.uGlow.value = 0;
+    u.uFrost.value = 0;
+    u.uFlip.value = 0;
     setLayer(current, layerSolid);
   }
 
@@ -304,10 +317,7 @@ export function createWeapons(gltfRoot, {
     pace = 1;
     holding = false;
     endSwing();
-    forge.clear();
-    clearLines();
-    strikeT = -1;
-    arcs?.clear();
+    run.cancel();
   }
   // `pace` plays the whole choreography faster or slower (the visualizer fits it to a
   // whole number of beats); `hold` keeps the new weapon hovering, formed, until
@@ -340,32 +350,17 @@ export function createWeapons(gltfRoot, {
       return Promise.resolve({ status: 'applied' });
     }
     swapPayload = payload;
-    swapEl = payload?.element ?? 'fire';
-    // Ice's edge is frost (the ramp's pale end); fire's and lightning's burn in the body and bright tones.
-    const e = swapEl === 'ice' ? 2 : 1;
-    edgeOld.set(fromRamp[e]);
-    edgeOldHot.set(fromRamp[e + 1]);
-    edgeNew.set(toRamp[e]);
-    edgeNewHot.set(toRamp[e + 1]);
-    forge.points.material = materials?.[swapEl] ?? particleMaterial;
-    strikeT = -1;
-    rampOld.length = 0; rampNew.length = 0;
-    fromRamp.forEach((h) => rampOld.push(new THREE.Color(h)));
-    toRamp.forEach((h) => rampNew.push(new THREE.Color(h)));
     incoming = items[key];
+    run.begin({ from: current?.userData.subject ?? null, to: incoming.userData.subject, fromRamp, toRamp, element: payload?.element ?? 'fire' });
     incoming.userData.uniforms.uRim.value.set(toRamp[2]);
-    if (fx) incoming.userData.silhouette ??= weaponSilhouette(incoming.userData.toRoot);
-    // Place the incoming weapon now (still hidden) so its surface can be targeted.
+    if (fx) incoming.userData.subject.silhouette();
+    // Place the incoming weapon now (still hidden) so its surface can be targeted. (Ice
+    // grows the new blade from the point up and freezes the old one first; the others form
+    // it from the pommel down: forgeRun.js.)
     spin(incoming);
     incoming.position.set(0, HOVER, 0);
-    phase = 'dissolve';
-    t = 0;
-    elapsed = 0;
-    clearLines();
-    if (current) setLayer(current, layerGhost);
-    forge.begin(current?.userData.heights, incoming.userData.heights, D.dissolve, edgeAt);
-    helixSpin = Math.random() * Math.PI * 2;
-    hooks.onSwapStart?.(payload);
+    phase = 'forge';
+    run.start({ onStart: () => hooks.onSwapStart?.(payload) });
     return new Promise((r) => { resolveSwap = r; });
   }
 
@@ -380,169 +375,11 @@ export function createWeapons(gltfRoot, {
     return true;
   }
 
-  let helixSpin = 0; // the forge helix's turn (the particles and the lines share it)
-  /** A step of the forge particles through the dissolve, swirl, gather and form. */
-  function stepForge(dt) {
-    holder.updateMatrixWorld(true);
-    const k = phase === 'gather' ? Math.min(1, t / D.gather) : phase === 'form' ? 1 : 0;
-    helixSpin += dt * 3.2 * (1 + 2.2 * k) * (swapEl === 'ice' ? 0.55 : 1); // ice turns slow
-    const p = Math.min(1, elapsed / FORGE);
-    forge.step(dt, {
-      shedUntil: phase === 'dissolve' ? t : -1,
-      gather: k,
-      forming: phase === 'form',
-      formU: phase === 'form' ? incoming.userData.uniforms.uDissolve.value : 1,
-      pulling: phase === 'gather' || phase === 'form',
-      blend: p * p * (3 - 2 * p), // current color → next color
-      spin: helixSpin, from: current, to: incoming, time: totalT, colorsFrom: rampOld, colorsTo: rampNew,
-      element: swapEl,
-    });
-  }
-
-  // --- Lightning's forge: the flickering edge, the arc crawling along it, the strike -----
-  let flickerStep = -1;
-  /** Lightning: the forge edge (dissolving or forming) flickers white-hot at ~20 Hz. */
-  function flickerEdge(u, ramp) {
-    const f = Math.floor(totalT * 20);
-    if (f === flickerStep) return;
-    flickerStep = f;
-    const hot = Math.random() < 0.55;
-    u.uEdgeHot.value.copy(ramp[hot ? 3 : 2]);
-    u.uEdge.value.copy(ramp[hot ? 2 : 1]);
-  }
-  /** Where the edge is on a weapon (0 point → 1 pommel) at dissolve amount `u` (see edgeAt). */
-  const edgeHeight = (u) => THREE.MathUtils.clamp((1.15 * u - 0.3925) / 0.3, 0, 1);
-  /** A surface sample of `obj` near height `h` (world, into `out`), or null. */
-  function sampleNear(obj, h, out) {
-    const hs = obj.userData.heights;
-    if (!hs?.length) return null;
-    for (let tries = 0; tries < 24; tries++) {
-      const i = Math.floor(Math.random() * hs.length);
-      if (Math.abs(hs[i] - h) > 0.07) continue;
-      const p = obj.userData.samples;
-      return out.set(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]).applyMatrix4(obj.matrixWorld);
-    }
-    return null;
-  }
-  function stepArcs(dt) {
-    arcs.begin();
-    const obj = phase === 'dissolve' ? current : phase === 'form' ? incoming : null;
-    const ramp = phase === 'dissolve' ? rampOld : rampNew;
-    if (swapEl === 'lightning' && obj) {
-      const h = edgeHeight(obj.userData.uniforms.uDissolve.value);
-      const frame = Math.floor(totalT * 16); // a new arc ~16 times a second, one or two at a time
-      const rng = seeded(hashSeed(frame, 11));
-      holder.updateMatrixWorld(true);
-      const count = 1 + (rng() < 0.4 ? 1 : 0);
-      for (let j = 0; j < count; j++) {
-        if (!sampleNear(obj, h, arcA) || !sampleNear(obj, h, arcB) || arcA.distanceToSquared(arcB) < 0.0009) continue;
-        arcs.bolt(arcA.x, arcA.y, arcA.z, arcB.x, arcB.y, arcB.z, {
-          rng, depth: 3, jag: 0.35, alpha: 0.9,
-          color: (s, out) => out.copy(ramp[3]).lerp(ramp[2], Math.abs(s - 0.5) * 2),
-        });
-      }
-    }
-    // The strike: a bolt down from the sky into the pommel of the weapon that just formed.
-    if (strikeT >= 0) {
-      strikeT += dt;
-      const STRIKE = 0.16;
-      if (strikeT < STRIKE && incoming) {
-        const rng = seeded(hashSeed(Math.floor(strikeT / 0.04), 29)); // it jumps shape a few times
-        const k = strikeT / STRIKE;
-        arcCol.copy(rampNew[3]);
-        arcs.bolt(strikeTop.x, strikeTop.y, strikeTop.z, strikeEnd.x, strikeEnd.y, strikeEnd.z, {
-          rng, depth: 5, jag: 0.16, width: (s) => 1 + 3 * s * (1 - k), heat: 1.6,
-          alpha: (s) => (1 - k * 0.6) * Math.min(1, 0.3 + s * 1.5),
-          color: (s, out) => out.copy(rampNew[2]).lerp(arcCol, s),
-          each: (x, y, z, s) => {
-            if (s > 0.25 && s < 0.6 && rng() < 0.18) {
-              arcs.bolt(x, y, z, x + (rng() - 0.5) * 0.6, y - 0.2 - rng() * 0.3, z + (rng() - 0.5) * 0.6, {
-                rng, depth: 2, jag: 0.4, alpha: (b) => (1 - b) * 0.7, color: (b, out) => out.copy(rampNew[2]),
-              });
-            }
-          },
-        });
-      } else strikeT = -1;
-    }
-    arcs.end();
-  }
-  /** Lightning: the strike, from above and a little to the side, down to the pommel of `obj`. */
-  function strike(obj) {
-    if (!arcs) return;
-    const span = obj.userData.uniforms.uSpan.value;
-    strikeEnd.set(0, span.y, 0).applyMatrix4(obj.matrixWorld);
-    const a = Math.random() * Math.PI * 2;
-    strikeTop.set(strikeEnd.x + Math.cos(a) * 0.35, strikeEnd.y + 2.4, strikeEnd.z + Math.sin(a) * 0.35);
-    strikeT = 0;
-  }
-
   let auraKick = 0; // a beat's push on a held weapon's aura (and its glow and lines)
   let auraElement = 'fire'; // the element the held blade will strike with: the aura takes after it
 
-  // The double helix: from the moment the particles' color has swapped, two lines
-  // trace the particle helix around the new weapon, one growing from the point up
-  // and one from the pommel down. They span exactly the blade's length and, as the
-  // blade completes, close in on the weapon itself: an oval just outside its real
-  // cross-section at every height (its width one way, its thickness the other), so
-  // they wrap the blade like a ribbon, passing behind it. They meet as the form
-  // completes and fade through the hold; both taper out toward the ends.
-  // The burst: once formed, one echo of the weapon's own silhouette grows out from
-  // it in its plane, wobbling with noise as it fades.
-  const TIGHTEN_FROM = D.dissolve + D.swirl; // the gather: the particles start collapsing
-  const SNUG = 0.02; // how far outside the weapon's surface the closed-in helix sits (~2 texels up close)
-  let tighten = 0;
-  let lineProfile = null;
-  const closeIn = (table, s) => {
-    const snug = profileAt(table, s) + SNUG;
-    const wide = Math.max(snug, helixWide(s));
-    return wide + (snug - wide) * tighten;
-  };
-  const lineRX = (s) => closeIn(lineProfile.rx, s);
-  // The lines fade through the hold, unless the weapon is held: then they come back
-  // and pulse with the beat and the build-up.
-  const heldLineAlpha = () => Math.max(1 - Math.min(1, t / D.hold),
-    holding ? (0.3 + 0.4 * charge + 0.5 * auraKick) * smoothstep(D.hold, D.hold + 0.8, t) : 0);
-  const lineRZ = (s) => closeIn(lineProfile.rz, s);
-  function stepLines(dt) {
-    if (!fx) return;
-    fx.begin();
-    if (incoming && (phase === 'dissolve' || phase === 'swirl' || phase === 'gather' || phase === 'form' || phase === 'hold')) {
-      const growth = smoothstep(0, 1, (elapsed - TURNED) / (FORMED - TURNED));
-      if (growth > 0) {
-        if (phase === 'hold') helixSpin += dt * (holding ? 4 + 9 * charge + 20 * auraKick : 10);
-        lineProfile = incoming.userData.silhouette.profile;
-        tighten = smoothstep(0.2, 1, (elapsed - TIGHTEN_FROM) / (FORMED - TIGHTEN_FROM));
-        // Ice's lines are frost-pale; lightning's burn white-hot.
-        const pale = swapEl !== 'fire';
-        lineLead.copy(rampNew[pale ? 3 : 2]);
-        if (swapEl === 'ice') lineLead.lerp(rampNew[2], 0.4);
-        lineTrail.copy(rampNew[pale ? 2 : 1]).multiplyScalar(0.65);
-        lineHot.copy(rampNew[3]);
-        fx.helix({
-          matrix: incoming.matrixWorld, y0: lineProfile.y0, y1: lineProfile.y1, spin: helixSpin, turns: HELIX_TURNS,
-          growth, alpha: phase === 'hold' ? heldLineAlpha() : 1, radiusX: lineRX, radiusZ: lineRZ,
-          lead: lineLead, trail: lineTrail, head: lineHot, t: totalT, style: swapEl,
-        });
-      }
-    }
-    if (burstT >= 0) {
-      burstT += dt;
-      const k = burstT / 0.6;
-      if (k < 1) {
-        // Fire's echo grows smoothly; ice's grows out in steps, cut like crystal; lightning's flickers.
-        const grown = burstEl === 'ice' ? ease.outCubic(Math.ceil(k * 4) / 4) : ease.outCubic(k);
-        const on = burstEl !== 'lightning' || Math.random() < 0.75;
-        const pale = burstEl !== 'fire';
-        lineLead.copy(rampNew[3]).lerp(rampNew[pale ? 3 : 2], k);
-        lineTrail.copy(rampNew[pale ? 2 : 1]).multiplyScalar(0.7);
-        lineHot.copy(rampNew[3]);
-        fx.outline({
-          sil: burstSil, matrix: burstMatrix, dilate: 0.02 + 0.07 * grown, scale: 1 + 0.55 * grown,
-          wobble: burstEl === 'ice' ? 0 : 0.01 + 0.025 * k, alpha: on ? (1 - k) ** 1.2 : 0,
-          lead: lineLead, trail: lineTrail, hot: lineHot, t: totalT, seed: 3, facet: burstEl === 'ice' ? 0.03 : 0,
-        });
-      } else burstT = -1;
-    }
+  /** The weapon's own lines, drawn with the forge's: a swinging blade's smear. */
+  function drawSmear() {
     if (phase === 'swing' && current?.userData.silhouette && smearSpeed > 3) {
       const k = Math.min(1, (smearSpeed - 3) / 6);
       smearLead.copy(current.userData.uniforms.uRim.value);
@@ -554,11 +391,39 @@ export function createWeapons(gltfRoot, {
         });
       }
     }
-    fx.end();
+  }
+
+  /**
+   * The hold (the forge's last phase; `th` s into it): the new weapon hangs there, formed. A
+   * held one bobs a little and glows with the build-up until release(); then it strikes.
+   */
+  function stepHold(th, dt) {
+    const k = Math.min(1, th / D.hold);
+    const bob = holding && !reducedMotion ? Math.sin((th - D.hold) * 2.4) * 0.012 * k : 0;
+    if (!reducedMotion) incoming.position.y = HOVER + ease.outCubic(k) * 0.06 + bob;
+    incoming.userData.uniforms.uGlow.value = 1 + 0.6 * (1 - k) ** 2 + (holding ? (0.5 * charge + 0.6 * auraKick) * k : 0); // the flash as it forms, settling to the glow
+    if (holding && th >= D.hold * 0.5) {
+      if (!forge.aura) forge.startAura(totalT);
+      holder.updateMatrixWorld(true);
+      auraKick *= Math.exp(-dt / 0.16);
+      forge.stepAura(dt, { blade: incoming, time: totalT, charge, kick: auraKick, element: auraElement, colors: run.colorsTo });
+    }
+    // Alive (the visualizer): it sways and turns as if looking about, and trembles harder
+    // as the build rises, straining to strike.
+    if (holding && alive && !reducedMotion) {
+      const on = smoothstep(D.hold, D.hold + 1.5, th);
+      const tremble = (0.003 + 0.03 * charge * charge) * on;
+      incoming.rotation.x = Math.sin(totalT * 0.9) * 0.05 * on + Math.sin(totalT * 71) * tremble;
+      incoming.rotation.z = Math.sin(totalT * 0.7 + 1.3) * 0.06 * on + Math.sin(totalT * 83 + 2) * tremble;
+    }
+    if (th >= D.hold && !holding) {
+      if (forge.aura) { holder.updateMatrixWorld(true); forge.fling(incoming.matrixWorld); }
+      run.finish();
+      next('stab', Math.min(th - D.hold, 0.05)); // (a released hold starts the strike fresh)
+    }
   }
 
   let totalT = 0;
-  let elapsed = 0;
   let pace = 1;
   let holding = false;
   let charge = 0; // 0..1: how hard a held weapon glows (the visualizer feeds it the build-up)
@@ -585,76 +450,13 @@ export function createWeapons(gltfRoot, {
       current.rotation.z = quiver > 0.002 ? Math.sin(totalT * 55) * 0.03 * quiver : 0;
     }
     if (phase !== 'idle' && phase !== 'settle') dt *= pace;
-    stepLines(dt);
-    if (arcs && (swapEl === 'lightning' || strikeT >= 0)) stepArcs(dt);
+    run.stepLines(dt, drawSmear);
+    run.stepElement(dt);
     if (phase === 'idle') return;
+    if (phase === 'forge') { run.step(dt); return; }
     t += dt;
-    elapsed += dt;
     if (phase === 'swing') {
       stepSwing(dt);
-    } else if (phase === 'dissolve') {
-      const k = Math.min(1, t / D.dissolve);
-      if (current) {
-        current.position.y = ease.inOut(k) * HOVER;
-        const u = current.userData.uniforms;
-        u.uEdge.value.copy(edgeOld);
-        u.uEdgeHot.value.copy(edgeOldHot);
-        if (swapEl === 'lightning') flickerEdge(u, rampOld);
-        u.uDissolve.value = Math.max(0, (k - 0.08) / 0.92);
-      }
-      stepForge(dt);
-      if (k >= 1) {
-        if (current) current.visible = false;
-        next(D.swirl > 0 ? 'swirl' : D.gather > 0 ? 'gather' : 'form', t - D.dissolve);
-      }
-    } else if (phase === 'swirl') {
-      stepForge(dt);
-      if (t >= D.swirl) next('gather', t - D.swirl);
-    } else if (phase === 'gather') {
-      stepForge(dt);
-      if (t >= D.gather) next('form', t - D.gather);
-    } else if (phase === 'form') {
-      // The ripple runs in reverse; the new color's glow comes in once most of
-      // the blade has formed, so it doesn't wash the edge out.
-      const k = Math.min(1, t / D.form);
-      const u = incoming.userData.uniforms;
-      if (swapEl === 'lightning') flickerEdge(u, rampNew);
-      u.uDissolve.value = 1 - ease.inOut(k);
-      u.uGlow.value = smoothstep(0.55, 1, k);
-      stepForge(dt);
-      if (k >= 1) {
-        u.uDissolve.value = 0;
-        u.uGlow.value = 1;
-        forge.clear();
-        if (fx) { burstT = 0; burstEl = swapEl; burstSil = incoming.userData.silhouette; burstMatrix.copy(incoming.matrixWorld); }
-        if (swapEl === 'lightning') { holder.updateMatrixWorld(true); strike(incoming); }
-        hooks.onFormed?.(swapPayload);
-        next('hold', t - D.form);
-      }
-    } else if (phase === 'hold') {
-      const k = Math.min(1, t / D.hold);
-      // A held weapon hangs there, bobbing a little and glowing with the build-up.
-      const bob = holding && !reducedMotion ? Math.sin((t - D.hold) * 2.4) * 0.012 * k : 0;
-      if (!reducedMotion) incoming.position.y = HOVER + ease.outCubic(k) * 0.06 + bob;
-      incoming.userData.uniforms.uGlow.value = 1 + 0.6 * (1 - k) ** 2 + (holding ? (0.5 * charge + 0.6 * auraKick) * k : 0); // the flash as it forms, settling to the glow
-      if (holding && t >= D.hold * 0.5) {
-        if (!forge.aura) forge.startAura(totalT);
-        holder.updateMatrixWorld(true);
-        auraKick *= Math.exp(-dt / 0.16);
-        forge.stepAura(dt, { blade: incoming, time: totalT, charge, kick: auraKick, element: auraElement, colors: rampNew });
-      }
-      // Alive (the visualizer): it sways and turns as if looking about, and trembles harder
-      // as the build rises, straining to strike.
-      if (holding && alive && !reducedMotion) {
-        const on = smoothstep(D.hold, D.hold + 1.5, t);
-        const tremble = (0.003 + 0.03 * charge * charge) * on;
-        incoming.rotation.x = Math.sin(totalT * 0.9) * 0.05 * on + Math.sin(totalT * 71) * tremble;
-        incoming.rotation.z = Math.sin(totalT * 0.7 + 1.3) * 0.06 * on + Math.sin(totalT * 83 + 2) * tremble;
-      }
-      if (t >= D.hold && !holding) {
-        if (forge.aura) { holder.updateMatrixWorld(true); forge.fling(incoming.matrixWorld); }
-        next('stab', Math.min(t - D.hold, 0.05)); // (a released hold starts the strike fresh)
-      }
     } else if (phase === 'stab') {
       const k = Math.min(1, t / D.stab);
       if (!reducedMotion) incoming.position.y = (HOVER + 0.06) * (1 - ease.inQuad(k));
@@ -667,6 +469,7 @@ export function createWeapons(gltfRoot, {
         incoming.rotation.z = 0;
         current = incoming;
         incoming = null;
+        run.forget();
         setLayer(current, layerSolid);
         next('settle', t - D.stab);
         hooks.onImpact?.(swapPayload, current.userData.key, false);
@@ -810,19 +613,6 @@ export function createWeapons(gltfRoot, {
   function next(p, carry = 0) {
     phase = p;
     t = Math.max(0, carry);
-    if (p === 'form') beginForm();
-  }
-
-  function beginForm() {
-    for (const o of Object.values(items)) if (o !== incoming) o.visible = false;
-    incoming.visible = true;
-    setLayer(incoming, layerGhost);
-    incoming.position.set(0, HOVER, 0);
-    const u = incoming.userData.uniforms;
-    u.uEdge.value.copy(edgeNew);
-    u.uEdgeHot.value.copy(edgeNewHot);
-    u.uDissolve.value = 1;
-    u.uGlow.value = 0;
   }
 
   /** Rim color follows the flame (sRGB hex); a weapon being forged keeps its new one. */
@@ -857,7 +647,7 @@ export function createWeapons(gltfRoot, {
      * For cameras that follow it.
      */
     blade(out) {
-      const obj = incoming && (phase === 'form' || phase === 'hold' || phase === 'stab') ? incoming : current;
+      const obj = incoming && ((phase === 'forge' && (run.phase === 'form' || run.phase === 'hold')) || phase === 'stab') ? incoming : current;
       if (!obj) return null;
       out.len = bladeLocal(obj, out.grip, out.tip);
       out.grip.applyMatrix4(obj.matrixWorld);
@@ -894,14 +684,7 @@ export function createWeapons(gltfRoot, {
     /** An echo of the planted weapon's silhouette bursts out of it, in `ramp`'s colors, after `element`'s ways. */
     echo(ramp, element = 'fire') {
       if (!fx || !current || (phase !== 'idle' && phase !== 'settle')) return;
-      burstEl = element;
-      current.userData.silhouette ??= weaponSilhouette(current.userData.toRoot);
-      rampNew.length = 0;
-      ramp.forEach((h) => rampNew.push(new THREE.Color(h)));
-      holder.updateMatrixWorld(true);
-      burstT = 0;
-      burstSil = current.userData.silhouette;
-      burstMatrix.copy(current.matrixWorld);
+      run.echo(current.userData.subject, ramp, element);
     },
     set charge(v) { charge = Math.min(1, Math.max(0, v)); },
     /** Seconds from swap() to impact at pace 1 (not counting a hold). */

@@ -3,33 +3,32 @@
 // the site would choke on: an unsafe link (the renderer throws on those), a bad
 // image path, a duplicate project id, a weapon the 3D model doesn't have.
 import { isSafeUrl } from './html.js';
-import { BASE_COLORS, CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, ELEMENT_IDS, RANGES } from './effectsDefaults.js';
+import {
+  BASE_COLORS, CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, ELEMENT_IDS, KNIGHT_ARRIVALS, KNIGHT_FINISHES, KNIGHT_HELMETS, KNIGHT_SEATS,
+  KNIGHT_STYLES, RANGES,
+} from './effectsDefaults.js';
+import { contrast, HEX_RE, ID_RE, WEAPON_KEYS } from './ruleBasics.js';
+import { validateScenes } from './scenes.js';
+
+// The basics moved to ruleBasics.js (so scenes.js can use them); re-exported for everyone
+// who imports them from here.
+export { contrast, HEX_RE, ID_RE, luminance, slugify, WEAPON_KEYS } from './ruleBasics.js';
 
 export const CONTENT_PATH = 'src/content.json';
 export const SECTIONS = ['site', 'screens', 'weapons', 'weaponDraw', 'startingEquipment', 'hero', 'sections', 'featured', 'projects',
   'archive', 'about', 'experience', 'leadership', 'education', 'skills', 'contact', 'ui', 'notFound', 'effects'];
 /** Screens are wired into the layout and camera; their ids can't change. */
 export const SCREEN_IDS = ['home', 'projects', 'experience', 'skills', 'about', 'contact'];
-/** Weapons are nodes in public/models/bonfire.glb; their keys can't change. */
-export const WEAPON_KEYS = ['longsword', 'broadsword', 'bastard', 'claymore', 'katana', 'uchigatana', 'sabre', 'rapier',
-  'estoc', 'spear', 'greatsword', 'glaive', 'naginata', 'zweihander', 'flamberge', 'flambergezwei',
-  'wingedspear', 'battleaxe', 'mace', 'warhammer', 'morningstar', 'halberd', 'lance'];
 /** The fewest weapons a random draw may pick from. */
 export const MIN_WEAPONS = 3;
 export const flameIds = (c) => (Array.isArray(c?.effects?.flames) ? c.effects.flames.map((f) => f?.id) : []);
-export const HEX_RE = /^#[0-9a-f]{6}$/i;
 /** Flames a random draw can pick from: it skips the current and the starting flame. */
 export const MIN_ROTATION = 3;
 export const KINDLED_SHOW = ['first', 'always', 'never'];
-export const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 /** An image's `src`: public/<src>.webp and public/<src>-card.webp. */
 export const IMAGE_RE = /^assets\/projects\/[a-z0-9-]+\/[a-z0-9-]+$/;
 /** More slots than this and the inventory grid overflows its 4×4 box. */
 export const GRID_SLOTS = 16;
-
-export const slugify = (text) =>
-  String(text).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
 
 /** Every project-like entry, in inventory order. */
 export const inventoryEntries = (c) => [c.featured, ...(c.projects ?? []), ...(c.archive ?? [])].filter(Boolean);
@@ -45,17 +44,6 @@ export function imageRefs(c) {
 }
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-
-const luminance = (hex) => {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
-    .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-/** WCAG contrast ratio of two #rrggbb colors. */
-export function contrast(a, b) {
-  const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
-  return (x + 0.05) / (y + 0.05);
-}
 
 /**
  * Check the `effects` section. `err(path, message)` gets paths like
@@ -134,6 +122,15 @@ export function validateEffects(e, err, base = 'effects') {
   group('impact', (k, v, p) => (k === 'marks' ? bool(v, p) : num(v, p)));
   group('lightning', numbers);
   group('ice', numbers);
+  // (The helmet, arrival, style, finish and seat are one of their lists; the rest and the edge
+  // glow are numbers; show, shine, gestures and reactions are on or off.)
+  const KNIGHT_CHOICES = { helmet: KNIGHT_HELMETS, arrival: KNIGHT_ARRIVALS, style: KNIGHT_STYLES, finish: KNIGHT_FINISHES, seat: KNIGHT_SEATS };
+  group('knight', (k, v, p) => {
+    if (Object.hasOwn(KNIGHT_CHOICES, k)) { if (!KNIGHT_CHOICES[k].includes(v)) err(at(p), `One of: ${KNIGHT_CHOICES[k].join(', ')}.`); }
+    else if (RANGES[p]) num(v, p);
+    else bool(v, p);
+  });
+  if (isObj(e.knight) && e.knight.restMin > e.knight.restMax) err(at('knight.restMax'), 'Must be at least the shortest rest.');
   for (const k of Object.keys(e)) if (!(k in DEFAULT_EFFECTS)) err(at(k), 'Unknown section.');
   if (isObj(e.colors)) for (const k of BASE_COLORS) if (!(k in e.colors)) err(at(`colors.${k}`), 'Missing color.');
 }
@@ -217,9 +214,15 @@ export function validateContent(c) {
     }
   }
 
+  // Bonfire Live's preset scenes (made in the Painter): optional like `admin`, but checked
+  // in full when it's there (scenes.js), against the site's own void when a scene keeps
+  // the site's scenery colors.
+  if (c.scenes !== undefined) validateScenes(c.scenes, err, 'scenes', { voidHex: c.effects?.colors?.void });
+
   // hero
   if (obj(c.hero, 'hero')) {
-    texts(c.hero, 'hero', ['eyebrow', 'value', 'menuLabel', 'stokeLabel', 'sceneLabel']);
+    texts(c.hero, 'hero', ['eyebrow', 'value', 'menuLabel', 'stokeLabel', 'sceneLabel', 'sceneKnight']);
+    optional(c.hero, 'hero', ['sceneSign']); // (his summon sign, while he's away)
     if (obj(c.hero.stokeHint, 'hero.stokeHint')) texts(c.hero.stokeHint, 'hero.stokeHint', ['pointer', 'touch']);
     if (obj(c.hero.kindled, 'hero.kindled')) {
       texts(c.hero.kindled, 'hero.kindled', ['title', 'subtitle']);

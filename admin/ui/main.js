@@ -11,6 +11,7 @@ import { HELP, LABELS, PAGES } from './schema.js';
 import { el, getAt, renderFeatured, renderValue, showErrors } from './form.js';
 import { createPreview } from './preview.js';
 import { flamesBlockTools, sceneBlockTools } from './paletteTools.js';
+import { scenesBlockTools } from './sceneTools.js';
 import { titleCase } from './text.js';
 
 const DRAFT_KEY = 'nh-admin-draft';
@@ -172,9 +173,21 @@ function block(key) {
   return el('section', { class: 'block', 'data-path': key, id: anchorOf(key) },
     el('div', { class: 'block-head' }, renameable('h2', 'block-title', key), reset),
     HELP[key] ? el('p', { class: 'help', text: HELP[key] }) : null,
-    key === 'effects.flames' ? flamesBlockTools(ctx) : key === 'effects.colors' ? sceneBlockTools(ctx) : null,
+    key === 'effects.flames' ? flamesBlockTools(ctx) : key === 'effects.colors' ? sceneBlockTools(ctx) : key === 'scenes' ? scenesBlockTools(ctx) : null,
     el('p', { class: 'error', role: 'alert' }),
-    key === 'featured' ? renderFeatured(ctx) : value === undefined ? el('p', { class: 'help', text: 'Missing from content.json.' }) : renderValue(value, path, ctx));
+    key === 'featured' ? renderFeatured(ctx) : value === undefined ? missing(key) : renderValue(value, path, ctx));
+}
+
+/** A section content.json doesn't have yet: the optional scenes start as an empty list on the first add. */
+function missing(key) {
+  if (key !== 'scenes') return el('p', { class: 'help', text: 'Missing from content.json.' });
+  return el('div', { class: 'collection' },
+    el('p', { class: 'help', text: 'No scenes yet: Bonfire Live plays its free show. Import some from the Painter, or add one.' }),
+    el('button', { type: 'button', class: 'add', text: '+ Add Scene', onclick: () => {
+      ctx.draft.scenes = [];
+      ctx.changed({ rerender: true });
+      q('[data-path="scenes"] .collection > .add')?.click();
+    } }));
 }
 
 function renderPage({ keepScroll = true } = {}) {
@@ -305,6 +318,7 @@ function summarize(uploadCount) {
   const changedKeys = SECTIONS.filter(differs);
   const parts = [];
   if (changedKeys.length) parts.push(`edit ${changedKeys.map((k) => (k === 'effects' ? 'effects' : (LABELS[k] ?? k).toLowerCase())).join(', ')}`);
+  if (differs('scenes')) parts.push('edit scenes');
   if (differs('admin')) parts.push('rename admin labels');
   if (uploadCount) parts.push(`add ${uploadCount} image${uploadCount > 1 ? 's' : ''}`);
   const removed = [...imageRefs(state.original)].filter((src) => !imageRefs(ctx.draft).has(src)).length;

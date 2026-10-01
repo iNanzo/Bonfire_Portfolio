@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
     "model": "node tools/build-model.mjs",
+    "model:knight": "node tools/build-model.mjs knight",
     "screenshots": "node tools/import-screenshots.mjs",
     "link": "node tools/link-bridge.mjs",
     "admin": "vite --config admin/vite.config.js",

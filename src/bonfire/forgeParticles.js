@@ -22,8 +22,11 @@
 // out, mostly white-hot; ice's fall like chips as they're shed, before the helix takes
 // them, and each one glints as it freezes onto the new blade.
 //
-// weapons.js runs the choreography and hands each step what it needs (the phase's
-// progress, the old and new weapons, their colors).
+// forgeRun.js runs the choreography and hands each step what it needs (the phase's
+// progress, the old and new subjects, their colors); weapons.js runs the aura and the
+// fling. The weapons are its subjects, and so are the knight and his summon sign
+// (knightArrival.js): anything with surface samples, their heights and a span to wind a
+// helix round (a subject can have its own helix radius, `helixWide`).
 import * as THREE from 'three';
 import { smoothstep } from '../math.js';
 import { createPoints, markDirty } from './points.js';
@@ -74,17 +77,18 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
   const vT = new THREE.Vector3();
   const col = new THREE.Color();
 
-  function worldSample(obj, i, out) {
-    const s = obj.userData.samples;
-    return out.set(s[i * 3], s[i * 3 + 1], s[i * 3 + 2]).applyMatrix4(obj.matrixWorld);
+  /** Sample i of a forge subject (forgeRun.js ForgeSubject), in world space. */
+  function worldSample(subject, i, out) {
+    const s = subject.samples;
+    return out.set(s[i * 3], s[i * 3 + 1], s[i * 3 + 2]).applyMatrix4(subject.matrixWorld);
   }
-  /** Particle i's slot on the double helix around the weapon's axis (world). */
+  /** Particle i's slot on the double helix around the subject's axis (world). */
   function helixSlot(to, i, spin, shrink, out) {
-    const span = to.userData.uniforms.uSpan.value;
-    const s = to.userData.heights[i];
+    const span = to.span;
+    const s = to.heights[i];
     const len = span.y - span.x;
     const a = hAng[i] + s * HELIX_TURNS * Math.PI * 2 + spin;
-    const r = (helixWide(s) + hRad[i]) * (1 - shrink);
+    const r = ((to.helixWide ?? helixWide)(s) + hRad[i]) * (1 - shrink);
     return out.set(Math.cos(a) * r, span.x + s * len, Math.sin(a) * r).applyMatrix4(to.matrixWorld);
   }
 
@@ -106,14 +110,16 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
      * A swap begins: when each particle is shed (by the old weapon's dissolving edge,
      * point first, over `dissolveTime`), where the forming edge fades it, and its look.
      * `oldHeights`/`newHeights`: each surface sample's height up its weapon (0..1).
+     * `releaseAt(i)`: when particle i is shed instead (ice: all at once, as the blade
+     * shatters); `flipNew`: the new weapon forms from its point up (ice), not its pommel down.
      */
-    begin(oldHeights, newHeights, dissolveTime, edgeAt) {
+    begin(oldHeights, newHeights, dissolveTime, edgeAt, { releaseAt = null, flipNew = false } = {}) {
       clear();
       for (let i = 0; i < N; i++) {
         state[i] = 0;
         const u = edgeAt(oldHeights ? oldHeights[i] : Math.random(), (Math.random() - 0.5) * 0.4);
-        release[i] = dissolveTime * (0.08 + 0.92 * u);
-        fadeAt[i] = edgeAt(newHeights[i], (Math.random() - 0.5) * 0.4);
+        release[i] = releaseAt ? releaseAt(i) : dissolveTime * (0.08 + 0.92 * u);
+        fadeAt[i] = edgeAt(flipNew ? 1 - newHeights[i] : newHeights[i], (Math.random() - 0.5) * 0.4);
         heat[i] = Math.random();
         const g = Math.random();
         grain[i] = g < 0.6 ? 0.72 : g < 0.9 ? 1.25 : 1.85;
@@ -125,8 +131,9 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
      * The forge (dissolve → swirl → gather → form). c: { shedUntil (the dissolve's time,
      * or -1 once it's over), gather 0..1 (the helix collapsing), forming, formU (the
      * forming edge), pulling (gather or form: the helix grips harder), blend 0..1 (old
-     * colors → new), spin (the helix's turn), from, to (the weapons), time, colorsFrom,
-     * colorsTo ([lo, mid, hi, core] colors), element ('fire' | 'lightning' | 'ice') }.
+     * colors → new), spin (the helix's turn), from, to (forge subjects, forgeRun.js: their
+     * samples, heights, span and world matrix), time, colorsFrom, colorsTo ([lo, mid, hi,
+     * core] colors), element ('fire' | 'lightning' | 'ice') }.
      */
     step(dt, c) {
       if (!N) return;
@@ -144,9 +151,20 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
           if (c.shedUntil >= release[i] && c.from) {
             worldSample(c.from, i, vA);
             FP[ix] = vA.x; FP[ix + 1] = vA.y; FP[ix + 2] = vA.z;
-            FV[ix] = (Math.random() - 0.5) * 0.5;
-            FV[ix + 1] = 0.2 + Math.random() * 0.3;
-            FV[ix + 2] = (Math.random() - 0.5) * 0.5;
+            if (ice) {
+              // A shard of the shattered blade: flung out from its axis, up a little, then falling.
+              vT.setFromMatrixPosition(c.from.matrixWorld);
+              const ox = vA.x - vT.x, oz = vA.z - vT.z;
+              const ol = Math.hypot(ox, oz) || 1;
+              const sp = 0.8 + Math.random() * 1.4;
+              FV[ix] = (ox / ol) * sp + (Math.random() - 0.5) * 0.6;
+              FV[ix + 1] = 0.3 + Math.random() * 0.9;
+              FV[ix + 2] = (oz / ol) * sp + (Math.random() - 0.5) * 0.6;
+            } else {
+              FV[ix] = (Math.random() - 0.5) * 0.5;
+              FV[ix + 1] = 0.2 + Math.random() * 0.3;
+              FV[ix + 2] = (Math.random() - 0.5) * 0.5;
+            }
             born[i] = time;
             state[i] = 1;
           } else { FS[i] = 0; continue; }
@@ -158,7 +176,7 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
         // A subtle drift from where it was shed (ice: a chip's fall)...
         const drag = Math.exp(-dt * (ice ? 1.2 : 2.2));
         FV[ix] = (FV[ix] + n.x * 0.5 * dt) * drag;
-        FV[ix + 1] = (FV[ix + 1] + n.y * 0.3 * dt) * drag - (ice ? 1.6 * dt : 0);
+        FV[ix + 1] = (FV[ix + 1] + n.y * 0.3 * dt) * drag - (ice ? 3.4 * dt : 0);
         FV[ix + 2] = (FV[ix + 2] + n.z * 0.5 * dt) * drag;
         FP[ix] += FV[ix] * dt; FP[ix + 1] += FV[ix + 1] * dt; FP[ix + 2] += FV[ix + 2] * dt;
         // ...until the helix takes it (fully by ~0.65 s after it was shed), collapsing onto
@@ -166,7 +184,8 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
         helixSlot(c.to, i, c.spin, shrink, vH);
         if (onSurface > 0) vH.lerp(worldSample(c.to, i, vT), onSurface);
         vH.x += n.x * shimmer; vH.y += n.y * shimmer; vH.z += n.z * shimmer;
-        const grip = k > 0 ? 1 : smoothstep(0.12, 0.65, time - born[i]);
+        // (Ice shards fly and fall for a moment before the helix catches them.)
+        const grip = k > 0 ? 1 : ice ? smoothstep(0.45, 1.05, time - born[i]) : smoothstep(0.12, 0.65, time - born[i]);
         const pull = (1 - Math.exp(-dt * rate)) * grip;
         FP[ix] += (vH.x - FP[ix]) * pull;
         FP[ix + 1] += (vH.y - FP[ix + 1]) * pull;
@@ -192,6 +211,7 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
         let alpha = (0.35 + 0.65 * pocket) * Math.min(1, age * 6) * (0.75 + 0.25 * k);
         if (hot) { size *= 0.75; alpha = Math.max(alpha, 0.9); }
         if (glint) size = 2.2; // freezing onto the blade: a diamond's flash
+        else if (ice && k === 0) size *= 1.35; // shards, not motes
         FS[i] = zap && Math.random() < 0.25 ? 0 : size; // lightning blinks
         FA[i] = alpha * fade;
       }

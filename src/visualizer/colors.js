@@ -13,6 +13,9 @@
 // real color (paletteGen's vividScene: around the flame's hue or any hue; fully random
 // now and then), a new set every landing, whatever palette the flame came from. Without
 // it, the site's own scenery comes back.
+// Preset scenes: a scene's flame is registered under its own key (register(), hidden from
+// the site's rotation and never pruned like the made ones), and its scenery colors are
+// pinned (pinScenery()): held, a landing leaves them alone until the scene lets go.
 import { applyCssPalette, base, flames, mixHex, rotation } from '../palette.js';
 import { harmoniousFlame, hexToOklch, SCHEMES, vividScene, wildFlame, wildScene } from '../paletteGen.js';
 import { modeOf } from './looks.js';
@@ -33,12 +36,17 @@ const KEEP = 6; // made palettes kept: the one burning, one blending out, one be
 const SCENE_KEYS = ['void', 'shadow', 'stone', 'wood', 'bone'];
 const RECOLOR_CHANCE = 0.5; // in the mix: how many landings recolor the scenery
 
+/** @typedef {{ lo: string, mid: string, hi: string, core: string, shade: string, light?: number }} FlameColors */
+/** @typedef {{ void: string, shadow: string, stone: string, wood: string, bone: string }} SceneryColors */
+
 export function createColors(settings) {
   const siteBase = { ...base };
   const made = [];
   let count = 0;
   let sceneBlend = null; // { from, to, t, dur }
   let scenery = null;    // the colors the scenery is on (or heading to); null: the site's
+  let held = false;      // a scene's scenery colors: landings leave them alone
+  const registered = new Map(); // key → a scene's flame (never pruned)
 
   function add(colors) {
     const key = `live-${++count}`;
@@ -57,7 +65,12 @@ export function createColors(settings) {
     const wild = settings.colors === 'wild' ? 0.5 : 0.15;
     return Math.random() < wild ? wildScene(Math.random, { flames: readable }) : vividScene(Math.random, { flames: readable, hue: hexToOklch(flame.ramp[1]).h });
   }
-  const siteKeys = () => Object.keys(flames).filter((k) => !k.startsWith('live-'));
+  const siteKeys = () => Object.keys(flames).filter((k) => !k.startsWith('live-') && !registered.has(k));
+  /** Blend the scenery to `want` over `seconds` (nothing to do if it's there already). */
+  function blendTo(want, seconds) {
+    if (SCENE_KEYS.every((k) => base[k] === want[k])) { sceneBlend = null; return; }
+    sceneBlend = { from: { ...base }, to: { ...want }, t: 0, dur: Math.max(0.001, seconds) };
+  }
 
   return {
     /** The scenery colors now showing or blending in (null: the site's own). */
@@ -80,15 +93,48 @@ export function createColors(settings) {
       const pool = fresh.length ? fresh : keys;
       return pool[Math.floor(Math.random() * pool.length)];
     },
-    /** A flame landed: blend the scenery to new colors made for it (or back to the site's). */
+    /** A flame landed: blend the scenery to new colors made for it (or back to the site's). A scene's held colors stay. */
     landed(key, seconds = 1.2) {
+      if (held) return;
       const mode = modeOf(settings.sceneColors);
       const recolor = flames[key] && (mode === 'on' || (mode === 'mix' && Math.random() < RECOLOR_CHANCE));
       scenery = recolor ? sceneFor(flames[key]) : null;
-      const want = scenery ?? siteBase;
-      if (SCENE_KEYS.every((k) => base[k] === want[k])) return;
-      sceneBlend = { from: { ...base }, to: { ...want }, t: 0, dur: seconds };
+      blendTo(scenery ?? siteBase, seconds);
     },
+    /**
+     * A scene's flame, under `key` (e.g. 'scene-b-frozen-shrine'): hidden from the site's
+     * rotation and the arrow keys, and never pruned. Returns the key.
+     * @param {string} key
+     * @param {FlameColors} flame
+     */
+    register(key, flame, name = `${colorName(flame.mid)} Flame`) {
+      const entry = { name, ramp: [flame.lo, flame.mid, flame.hi, flame.core], shade: flame.shade, light: flame.light ?? 0.34, hidden: true };
+      registered.set(key, entry);
+      flames[key] = entry;
+      return key;
+    },
+    /** Take a scene's flame away again. */
+    unregister(key) {
+      if (!registered.delete(key)) return;
+      delete flames[key];
+    },
+    /** The scene flames registered now. */
+    get registered() { return [...registered.keys()]; },
+    /**
+     * Blend the scenery to a scene's colors (null: the site's own) over `seconds`. Held,
+     * landings leave them alone until release() (or a pin with `hold: false`, which the
+     * next landing takes over from).
+     * @param {SceneryColors | null} colors
+     */
+    pinScenery(colors, { seconds = 1.2, hold = true } = {}) {
+      scenery = colors ? Object.fromEntries(SCENE_KEYS.map((k) => [k, colors[k] ?? siteBase[k]])) : null;
+      held = hold;
+      blendTo(scenery ?? siteBase, seconds);
+    },
+    /** Whether a scene holds the scenery colors. */
+    get held() { return held; },
+    /** Let go of a scene's scenery colors: the next landing recolors as the settings say. */
+    release() { held = false; },
     /** Per frame: step a scenery blend. True if the scenery colors changed. */
     update(dt) {
       if (!sceneBlend) return false;

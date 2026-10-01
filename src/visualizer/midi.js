@@ -1,8 +1,9 @@
 // A MIDI controller for Bonfire Live (Web MIDI): pads and buttons trigger the moments a
-// performer wants by hand (the drop, a forge, a ring, a swing, a cut, a look, a hit in an
-// element, recording). Mapping is by "learn": pick an action, press a pad, done. The
-// mapping belongs to this computer and its controller, so it's kept apart from the
-// settings and setups (localStorage 'bonfire-live-midi').
+// performer wants by hand (the drop, a forge, a ring, a swing, a cut, a look, the next
+// preset scene, a hit in an element, recording, the knights dancing or coming and going). Mapping is by "learn":
+// pick an action, press a pad, done. The mapping belongs to this computer and its
+// controller, so it's kept apart from the settings and setups (localStorage
+// 'bonfire-live-midi').
 //
 // A note-on (velocity > 0) is a press; so is a control change crossing up past 63 (a
 // button sending 127 then 0, or a knob turned past halfway). Everything else is ignored.
@@ -14,11 +15,14 @@ export const MIDI_ACTIONS = {
   combo: 'Swing',
   cut: 'Next Shot',
   look: 'Next Look',
+  scene: 'Next Scene',
   burst: 'Look Burst',
   fire: 'Hit: Flame',
   lightning: 'Hit: Lightning',
   ice: 'Hit: Frost',
   record: 'Record',
+  knightsDance: 'Knights Dance',
+  knights: 'Knights In / Out',
 };
 
 const STORE = 'bonfire-live-midi';

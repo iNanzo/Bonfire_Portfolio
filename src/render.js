@@ -69,7 +69,7 @@ export function renderChrome() {
         <p class="rest-menu-flavor">${esc(ui.menuFlavor)}</p>
         <ul role="list" data-menu-list>
           ${screens.map((s) => `<li><a class="menu-item" href="#/${s.id === 'home' ? '' : s.id}" data-menu-item>${esc(s.label)}</a></li>`).join('')}
-          ${site.resumeUrl ? `<li data-resume hidden><a class="menu-item" ${resumeAttrs()} data-menu-item>${esc(ui.resume)}</a></li>` : ''}
+          ${site.resumeUrl ? `<li data-resume hidden><a class="menu-item" ${resumeAttrs()} data-menu-item-later>${esc(ui.resume)}</a></li>` : ''}
           <li class="menu-sep" aria-hidden="true"></li>
           <li><button class="menu-item" type="button" data-menu-item data-menu-action="photo" title="${esc(ui.photoHint)}">${esc(ui.photo)} <kbd>F</kbd></button></li>
           <li><button class="menu-item" type="button" data-menu-item data-menu-action="breakdown" title="${esc(ui.breakdownHint)}">${esc(ui.breakdown)} <kbd>B</kbd></button></li>
@@ -101,17 +101,28 @@ export function renderChrome() {
     </dialog>
     <div class="toast" data-toast hidden role="status"><span class="toast-kicker" data-toast-kicker></span><span class="toast-text" data-toast-text></span></div>
     <p class="visually-hidden" aria-live="polite" data-live></p>
-    <div class="debug-hud" data-debug hidden></div>
     <div class="tooltip" data-tooltip hidden aria-hidden="true"><p class="tooltip-name"></p><p class="tooltip-flavor"></p></div>`;
 }
 
 // --- Home (title screen) ---------------------------------------------------------------
 
+/**
+ * The scene's description for screen readers (#scene-label): the scenery and the fire, then
+ * the knight's sentence while he's by the fire (true), or his summon sign's while he's away
+ * and can be called ('sign'), or nothing of him (false: his model didn't load, the site's
+ * setting has him off, or the scene isn't there yet). main.js redraws it as he comes and goes.
+ * @param {boolean | 'sign'} [knight]
+ */
+export function sceneLabel(knight = false) {
+  const his = knight === 'sign' ? hero.sceneSign : knight ? hero.sceneKnight : '';
+  return [hero.sceneLabel, his].filter((s) => s?.trim()).join(' ');
+}
+
 export function renderHome() {
   const menu = screens.filter((s) => s.id !== 'home');
   return `
     <section class="screen screen-home" data-screen="home" aria-labelledby="home-title" aria-describedby="scene-label">
-      <p class="visually-hidden" id="scene-label">${esc(hero.sceneLabel)}</p>
+      <p class="visually-hidden" id="scene-label">${esc(sceneLabel(false))}</p>
       <div class="home-copy">
         <p class="eyebrow">${esc(hero.eyebrow)}</p>
         <h1 class="hero-name" id="home-title" tabindex="-1">${esc(site.name)}</h1>

@@ -368,12 +368,16 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
+  transition: right 200ms steps(4), bottom 200ms steps(4);
 }
 .no-webgl .pack,
-.is-photo .pack,
-.is-breakdown .pack { display: none; }
+.is-photo .pack { display: none; }
+/* In the breakdown the pack stays usable: it steps aside to the panel's left (wide screens;
+   phones: above the panel, see "How it's made"), over it when open. Wherever it goes, its
+   lists are fitted inside the window (pack.js). */
+.is-breakdown .pack { z-index: 51; right: calc(var(--gutter) + var(--bd-w) + 14px); }
 .pack-items { display: flex; flex-direction: column; gap: 6px; }
-.pack-items[hidden] { display: none; }
+.pack-items[hidden], .pack-item[hidden] { display: none; }
 .pack-item { position: relative; }
 
 .pack-slot,
@@ -463,6 +467,16 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
 .pack-item:is(:hover, .is-shown) .px-tome .px-f1 { display: inline; animation: px-flip-b 1.2s steps(1) infinite; }
 .pack-item:is(:hover, .is-shown) .px-tome .px-f0 { animation: px-flip-a 1.2s steps(1) infinite; }
 .pack-item:is(:hover, .is-shown) .px-tome { animation: px-hop 1.2s steps(1) infinite; }
+/* The knight's helm swaps: the great helm, then the pointed bascinet, and back. */
+.pack-item:is(:hover, .is-shown) .px-helm .px-f1 { display: inline; animation: px-flip-b 1.6s steps(1) infinite; }
+.pack-item:is(:hover, .is-shown) .px-helm .px-f0 { animation: px-flip-a 1.6s steps(1) infinite; }
+/* While the knight is away (his sign waits on the ground) the helm is empty: its eye slit
+   dark. Reaching for it kindles the slit in steps, the summons it offers. */
+.pack-item:is([data-state='away'], [data-state='leaving']) .px-helm { opacity: 0.72; }
+.pack-item:is([data-state='away'], [data-state='leaving']) .px-helm .px-accent { opacity: 0.15; }
+.pack-item[data-state='away']:is(:hover, .is-shown) .px-helm { opacity: 1; }
+.pack-item[data-state='away']:is(:hover, .is-shown) .px-helm .px-accent { animation: px-kindle 1.2s steps(4) infinite alternate; }
+@keyframes px-kindle { from { opacity: 0.15; } to { opacity: 1; } }
 @keyframes px-flip-a { 50% { opacity: 0; } }
 @keyframes px-flip-b { 0% { opacity: 0; } 50% { opacity: 1; } }
 @keyframes px-clang { 0%, 45%, 62%, 100% { transform: none; } 50% { transform: translateY(2px); } 56% { transform: translateX(-2px); } }
@@ -511,7 +525,11 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
 .pack-list.is-long { max-width: min(420px, calc(100vw - 100px)); }
 .pack-list.is-long .pack-options { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 6px; }
 .pack-list.is-long .pack-heading { grid-column: 1 / -1; } /* (a heading spans both columns) */
+/* No room for two columns left of its item (pack.js fit): one, as wide as a short list. */
+.pack-list.is-long.is-narrow { max-width: min(290px, calc(100vw - 100px)); }
+.pack-list.is-long.is-narrow .pack-options { grid-template-columns: 1fr; }
 @media (max-width: 559px) { .pack-list.is-long .pack-options { grid-template-columns: 1fr; } }
+.pack-option-label { overflow-wrap: anywhere; } /* (a list narrowed to fit wraps its labels) */
 .pack-option {
   display: flex;
   align-items: center;
@@ -557,11 +575,13 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
   .pack-slot, .pack-toggle { width: 44px; height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .pack { transition: none; }
   .px-backpack,
   .pack.is-open .pack-item,
   .pack-list.is-in,
-  .pack-item:is(:hover, .is-shown) :is(.px-icon, .px-icon > g) { animation: none !important; }
+  .pack-item:is(:hover, .is-shown) :is(.px-icon, .px-icon > g, .px-accent) { animation: none !important; }
   .pack-item:is(:hover, .is-shown) .px-icon > g.px-f1 { display: none; }
+  .pack-item[data-state='away']:is(:hover, .is-shown) .px-helm .px-accent { opacity: 1; }
 }
 
 /* ---------- Screens ---------- */
@@ -1026,8 +1046,9 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
 .viewer-stage video { width: 100%; height: 100%; object-fit: contain; }
 .viewer-stage video[hidden], .gallery-figure video[hidden], .viewer-stage img[hidden], .gallery-figure img[hidden] { display: none; }
 .viewer-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
-.viewer-caption { font-size: 0.875rem; color: var(--text-dim); }
-.viewer-controls { display: flex; align-items: center; gap: 8px; font-family: var(--font-pixel); font-size: 0.875rem; color: var(--text-dim); }
+/* (The caption wraps; the arrows and the "1 / 4" between them keep their width, on one line.) */
+.viewer-caption { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; font-size: 0.875rem; color: var(--text-dim); }
+.viewer-controls { flex: none; display: flex; align-items: center; gap: 8px; font-family: var(--font-pixel); font-size: 0.875rem; color: var(--text-dim); white-space: nowrap; }
 .viewer-controls[hidden],
 .thumbs[hidden] { display: none; }
 .thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
@@ -1329,20 +1350,75 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
   100% { opacity: 0; }
 }
 
+/* ---------- The render settings (P: ui/renderMenu.js) ----------
+   A heading and a row per setting: its digit, its name and its value. A row is a button
+   (a click steps it); hovered or focused it shows the menus' pixel cursor, and a step
+   flashes it. As a HUD in the corner, or folded into the breakdown's panel. */
 .debug-hud {
   position: fixed;
   top: calc(var(--header-h) + 8px);
   right: var(--gutter);
   z-index: 40;
-  padding: 10px 14px;
+  width: min(300px, calc(100vw - 2 * var(--gutter)));
+  padding: 8px 8px 10px;
   background: var(--c-void);
-  font-family: var(--font-pixel);
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  color: var(--text-dim);
+  box-shadow: 0 0 0 1px var(--line);
 }
 .debug-hud[hidden] { display: none; }
-.debug-hud b { color: var(--accent-hi); font-weight: 400; }
+.render-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 2px 6px 6px;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-pixel);
+  font-size: 0.9375rem;
+  text-align: left;
+  color: var(--accent-hi);
+  cursor: pointer;
+}
+.render-menu-head kbd { margin-left: auto; }
+.render-menu-head:hover kbd,
+.render-menu-head:focus-visible kbd { color: var(--c-bone); box-shadow: 0 -1px 0 var(--accent), 0 1px 0 var(--accent), -1px 0 0 var(--accent), 1px 0 0 var(--accent); }
+.render-menu-head:focus-visible { outline: none; background: var(--c-shadow); }
+.render-menu-rows { display: grid; gap: 1px; }
+.render-menu-rows[hidden] { display: none; }
+.render-row {
+  display: grid;
+  grid-template-columns: 10px auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-pixel);
+  font-size: 0.875rem;
+  line-height: 1.3;
+  text-align: left;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.render-row kbd { min-width: 1.5em; padding: 0 4px; font-size: 0.75rem; }
+.render-row .cursor { visibility: hidden; color: var(--accent-hi); }
+.render-row b { font-weight: 400; color: var(--accent-hi); font-variant-numeric: tabular-nums; text-align: right; }
+.render-row:hover,
+.render-row:focus-visible { color: var(--c-bone); background: var(--c-shadow); outline: none; }
+.render-row:hover .cursor,
+.render-row:focus-visible .cursor { visibility: visible; }
+.render-row.is-hit b { animation: render-step 240ms steps(3) both; }
+@keyframes render-step {
+  0% { color: var(--c-bone); transform: translateX(-3px); }
+  100% { transform: none; }
+}
+.render-reset { margin-top: 4px; }
+.render-reset:disabled { opacity: 0.4; cursor: default; }
+.render-reset:disabled:hover { color: var(--text-dim); background: transparent; }
+.render-reset:disabled .cursor { visibility: hidden; }
+.touch .render-row kbd, .touch .render-menu-head kbd { display: none; }
+@media (prefers-reduced-motion: reduce) { .render-row.is-hit b { animation: none; } }
 
 /* Cursor-interaction lab (?lab) — temporary prototype picker. */
 .lab {
@@ -1362,10 +1438,13 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
 .lab-option input { accent-color: var(--accent); margin-top: 4px; }
 .lab-note { margin-top: 8px; font-size: 0.8125rem; color: var(--text-dim); }
 
-/* Without WebGL the stage is just the void; everything else still works. */
+/* Without WebGL the stage is just the void; everything else still works. What needs the
+   scene goes: the stoke, the pack, and the ways into photo mode and the breakdown (main.js
+   failScene takes them out of the rest menu). */
 .no-webgl .stage { cursor: default; }
 .no-webgl .stoke-btn,
-.no-webgl .prompt-stoke { display: none; }
+.no-webgl .prompt-stoke,
+.no-webgl a[href$='#how-its-made'] { display: none; }
 
 /* ---------- 404 ---------- */
 
@@ -1546,14 +1625,18 @@ button.viewer-stage { display: block; width: 100%; padding: 0; border: 0; cursor
 }
 .photo-bar[hidden], .breakdown[hidden] { display: none; }
 .photo-hint { width: 100%; text-align: center; font-size: 0.875rem; color: var(--text-dim); }
+:root { --bd-w: min(360px, calc(100vw - 2 * var(--gutter))); } /* (the pack steps aside by it) */
 .breakdown {
   position: fixed;
   top: 84px;
   right: var(--gutter);
   z-index: 50;
-  width: min(360px, calc(100vw - 2 * var(--gutter)));
+  width: var(--bd-w);
   max-height: calc(100vh - 110px);
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-stone) transparent;
   padding: 18px;
   background: color-mix(in srgb, var(--c-void) 90%, transparent);
 }
@@ -1566,7 +1649,33 @@ button.viewer-stage { display: block; width: 100%; padding: 0; border: 0; cursor
 .breakdown-stats { display: grid; gap: 2px; margin-bottom: 14px; font-size: 0.875rem; }
 .breakdown-stats div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 2px; }
 .breakdown-stats dt { color: var(--text-dim); }
-.breakdown-stats dd { font-variant-numeric: tabular-nums; }
+.breakdown-stats dd { font-variant-numeric: tabular-nums; text-align: right; }
+.breakdown-stats .is-now dd { color: var(--accent-hi); } /* (what's in the fire: the pack changes it) */
+.breakdown-stats .is-idle { opacity: 0.55; }           /* (a particle system with nothing live) */
+.breakdown-render { margin: 0 -6px 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+.breakdown-render .render-menu-head::before {
+  content: '';
+  flex: none;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-left-color: currentColor;
+  border-right-width: 0;
+  transition: transform var(--snap) steps(2);
+}
+.breakdown-render .render-menu-head[aria-expanded='true']::before { transform: rotate(90deg); }
+
+/* Phones: the panel is a sheet along the bottom (the fire shows above it) and the pack sits
+   on its top edge. */
+@media (max-width: 699px) {
+  :root { --bd-h: min(46vh, 420px); }
+  .breakdown { top: auto; bottom: 0; left: 0; right: 0; width: auto; height: var(--bd-h); max-height: none; padding: 14px 16px 16px; }
+  .breakdown-views { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  .breakdown-about { margin: 8px 0 10px; font-size: 0.875rem; }
+  .is-breakdown .pack { right: 12px; bottom: calc(var(--bd-h) + 10px); }
+  .is-breakdown .toast { bottom: calc(var(--bd-h) + 12px); }
+}
 
 /* ---------- Hover on the scene: the effects are in the scene; the cursor says it's clickable ---------- */
-.stage[data-hover='weapon'], .stage[data-hover='fire'], .stage[data-hover='skip'] { cursor: pointer; }
+/* (The knight's summon sign too: it brightens and its motes rise, and a click summons him.) */
+.stage:is([data-hover='weapon'], [data-hover='fire'], [data-hover='skip'], [data-hover='knight'], [data-hover='sign']) { cursor: pointer; }

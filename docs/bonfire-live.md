@@ -7,8 +7,9 @@ How to run the visualizer at a show. Its design notes and the requirement log ar
 
 The bonfire as an audio-reactive visualizer for DJ sets, at **`/visualizer/`**
 (`npm run dev`, then `http://localhost:5173/visualizer/`). It's the same scene, colors,
-weapons and elements as the site, driven by the music instead of the cursor. Nothing on
-the site links to it from its *Bonfire Live* project. Design notes: `docs/visualizer.md`.
+weapons and elements as the site, driven by the music instead of the cursor. The site
+links to it from its *Bonfire Live* project (which links to the Painter too). Design
+notes: `docs/visualizer.md`.
 
 **Sound sources** (the start screen):
 
@@ -65,6 +66,52 @@ the site links to it from its *Bonfire Live* project. Design notes: `docs/visual
     with sparks off the point only.
   - A blade held for the drop sways and turns as if looking about, trembling harder as
     the build rises.
+- **The knights** (`knightShow.js`, driving the scene's `fire.knights`): the site's
+  resting knight, and up to three more, 1 to 4 (touch screens: 2).
+  - **Before the first drop** they rest by the fire and nod along to the strong beats,
+    drumming on their thighs.
+  - **In a breakdown** they're still and watch the blade forged over the fire. Dancers
+    stop on its next downbeat: the others sit down where they are, the first stays on his
+    feet (he'll be up again for the build).
+  - **The build:** at its third stage they get up and take their places round the fire,
+    bouncing, facing it; at the last stretch they bounce twice as fast.
+  - **The drop:** on its first beat they leap. With *Summon on the Drop* they're already
+    in place in its flash; otherwise they spring up and hurry over, and knights joining
+    form out of embers where they'll dance. *Gestures on Drops* throws Praise the Sun (or
+    a hurrah, a jump for joy, a point), all together or going round them a beat apart.
+    Two bars of big moves (jumps, jumping jacks, spins, Praise the Sun, fist pumps,
+    headbangs), then the groove's, a new move every 4 bars (*New Move Every*). They sit
+    back down on a phrase line when the energy falls or after 8 to 24 bars (rolled), at
+    once when the music stops or the source changes. A small drop gets one cheer (with
+    *Gestures on Drops*).
+  - **How many dance** follows the song: `max(1, round(n × (0.4 + 0.6 × budget)))`,
+    counted again on phrase lines; the rest nod along in their seats, and the dancers keep
+    clear of them (at least 0.5 m): *Line*, *Solo* and *Canon* take the whole cast's
+    layout less the sitters' places, so when the count drops the dancers keep theirs and
+    the first takes the place by his seat; *Round the Fire* spreads them over the ring
+    less the sitters' arcs.
+  - **Formations:** *Round the Fire* (spread over the clear sides of the ring, stepping
+    along it every two bars and turning back each phrase, facing the fire or the room),
+    *Line* (together, facing the camera), *Solo* (each his own move), *Canon* (the same
+    move, each half a beat or a beat behind the one before), or a mix. Places are 1.2 m
+    out on the ring's clear arcs in each scenery, never within 50° of the cameras'
+    side (between the fire and the lens) or right behind it; two on one side stand one
+    behind the other from the front, so a third goes behind the fire to its right.
+  - **Coming and going** (*Knights*: In the mix): only where it's hidden: as the music
+    starts, in a big drop's blackout and flash, and when the scenery changes (they form
+    there out of embers anyway). How many (with *How Many*: Random) and each one's
+    helmet are rolled at the same moments. Never mid-phrase.
+  - **Reactions** (*Reactions*): they flinch when a blade lands, lean from a flare, lift
+    their feet as a ring passes, follow the living blade with their eyes, and flinch when
+    it swings close (the blade already plans its moves clear of them).
+  - **Armor Shine** (*Armor Shine*): the fire's reflection sweeping over their plate, a
+    gentle band now and then at rest and a bright one when the fire flares. In the mix
+    the rest sweeps and the flare sweeps are rolled apart, and the reactions on their
+    own, at the same hidden moments as presence.
+  - Their moves are pure functions of the beat: the director hands them the grid's
+    position every frame (with the visual lead, so they hit with the fire's pulses),
+    eased through nudges and taken at once, modulo 8 beats, when the grid restarts. They
+    only dance while the tempo holds. Reduced motion: they sit.
 - **Phrases:** every 16 bars (a setting) the fire takes a new weapon, flame and element.
   The swap is paced so its impact lands exactly on the next phrase's first beat.
 - **Breakdowns, builds and drops** (`sections.js`):
@@ -92,6 +139,13 @@ the site links to it from its *Bonfire Live* project. Design notes: `docs/visual
     rig mid-routine now and then.
   - **A held blade:** a close shot, a vertigo dolly zoom that deepens with the build,
     or an orbit.
+  - **The knights dancing** (*Knight Cameras*): about one cut in three goes to them:
+    *Dancers Low*, *Round the Fire* (circling), *Dancers Wide*, or the *Dancer* rig
+    (out past one knight from the fire, the fire behind him, drifting round him on the
+    beat). On a tall screen these widen to keep the ring in. The drop's wide cut skips
+    the long lens while they dance, and takes *Dancers Wide* only with Knight Cameras on
+    for that dance.
+  - A cut never picks a shot with a knight standing between the lens and the fire.
 - **Colors** (`colors.js`): each new flame is one of the site's palettes, or one made on
   the spot with the admin's palette generator (`src/paletteGen.js`): harmonious (any
   scheme, or the one picked) or fully random, named for its hue ("Cobalt Lightning").
@@ -116,46 +170,207 @@ the site links to it from its *Bonfire Live* project. Design notes: `docs/visual
   turns; a look set to always stays on under whichever one is taking its turn. Layers go
   over any look: scanlines (thin, thick or columns), a mirror, **blend modes** (echoes in
   screen or difference, ink in overlay, a kaleidoscope ghosted over the plain picture…),
-  ghosting, motion blur, glow, a gradient map, painterly strokes, a watercolor wash and a
-  flicker. Each time a look comes round, the layers in the mix are rolled again (at most
-  two heavy ones at once), each with new details: the echo's direction, the glow's size,
-  the gradient's colors, the brush's angle. Mirrors come in three kinds, each switchable:
+  ghosting, motion blur, glow, a gradient map, painterly strokes, a watercolor wash, a
+  flicker, film grain, cinema bars, a spotlight round the fire and a chroma split. Each
+  time a look comes round, the layers in the mix are rolled again (at most two heavy ones
+  at once), each with new details: the echo's direction, the glow's size, the gradient's
+  colors, the brush's angle, the grain's amount, the bars' height, the spotlight's size. Mirrors come in three kinds, each switchable:
   horizontal (either half copied onto the other), vertical (the top reflected down like
   a pool, or the bottom up) and quarter (one quarter, four ways). Every drop also throws
   **drop hits**: those set to always, plus one to three drawn from the mix, never the
   same set twice running: shatter, shockwaves, an echo burst, a spiral, a kaleidoscope,
-  mirror flips, a color cycle, an RGB burst, a crunch, an iris snap, a letterbox slam,
-  an ink flash. Plus the negative flash on drops (at most one every 2 s). The director's
+  mirror flips, a color cycle (with Color Cycle Off, no palette cycling at all: the Echo
+  look's downbeat color steps and spins stay still too), an RGB burst, a crunch, an iris snap, a letterbox slam,
+  an ink flash, an x-ray (the drop lands in one of the picture's passes for a beat). Plus
+  the negative flash on drops (at most one every 2 s). The director's
   own effects (sparks, the blade's echo, the zoom punch, color temperature, breathing,
-  the pre-drop blackout) take the same three-way switch. Breakdowns letterbox and close
+  the pre-drop blackout) and the render switches (below) take the same three-way switch. Breakdowns letterbox and close
   an iris around the fire as the build rises; the drop snaps it open. It's all in the
   pixel pass before the palette, so every effect stays in the scene's colors. Reduced
   motion turns the moving ones off.
 
 **Keys:** `Space` drop (strike the held blade, or recolor now) · `A` forge and hold ·
-`B` swap on the beat · `R` ring · `X` the blade leaves the fire · `G` burst the look ·
-`L` next look · `M` mirror (in the mix, always, off) · `P` colors (site, harmonious,
-fully random, a mix) · `1` `2` `3` hit with
-flame, lightning or frost · `←` `→` previous/next colors · `T` tap tempo (first tap is
-beat 1) · `C` cut · `H` hide the controls · `F` full screen · `S` settings. The
-controls and cursor hide when the mouse rests.
+`B` swap on the beat · `R` ring · `X` the blade leaves the fire · `K` the knights dance
+now (for a phrase, with *Dance* off too), or sit back down · `Shift+K` the knights come or go (on the next
+drop's flash if a blade is held for one, otherwise at once) · `G` burst the look ·
+`L` next look · `N` the next preset scene (on the next downbeat, in a flash; with a blade
+held for the drop, in its strike, the note saying "…, at the drop"; at once on the start screen) · `Shift+N` preset scenes in the mix, always, off · `M` mirror (in the
+mix, always, off) · `P` the render menu (below) ·
+`Shift+P` colors (site, harmonious, fully random, a mix) · `1` `2` `3` hit with
+flame, lightning or frost (while the render menu is open, digits step its rows instead) ·
+`←` `→` previous/next colors · `T` tap tempo (first tap is beat 1) · `C` cut · `H` hide
+the controls · `F` full screen · `S` settings · `I` the pack. The controls and cursor
+hide when the mouse rests. The HUD's *Moments* have a **Dance** button (K), and its
+state line says what the knights are doing ("In the groove · 3 knights dance"). Under
+it, **Scene: Name** names the preset scene playing ("The Free Show" between them); a
+click opens the Scenes tab, and pointing at it pulses the name in the flame's colors.
 
-**Settings** (kept in the browser): sensitivity, visual lead (to make up for projector
-lag), reactivity, particle density, sparks, auto drops, how often weapons change and
-rings fire, which elements are drawn; the living blade (how often and how long it's out,
-its moves, rhythm, and whether it's alive); colors (the mode, the harmony scheme, the
-scenery); fireflies (their moves and how often they change); the camera (mode, cut
-length, transitions, how it covers the blade out and held, zoom punch, shot, pixel
-size); effects amount and, in the Effects tab, every look, layer and drop hit (off, in
-the mix, always), how often the look changes, which kinds of mirror, the negative
-flash, how many drop hits; and a
-title card (a DJ name in the site's checkpoint band, shown when the music starts and
-on drops).
+**The render menu (P)**, the site's (`src/ui/renderMenu.js`), top right, on the start
+screen too: the Render tab's switches, one row each, stepped by a click (Shift+click:
+back) or its digit: `1` Pixel Size, `2` Palette, `3` Few Colors, `4` Dither, `5` Dither
+Pattern, `6` Outlines, `7` Fog, `8` X-Ray Flips, `9` Pixel Shifts, and `0` puts those
+back to the defaults. A switch in the mix shows what it's doing now ("in the mix · on",
+"4 px · 6 px now"), and a row a preset scene sets shows the scene's value, marked
+"· scene". Each step is saved with the settings and applied at once (the show goes on as
+it was); stepping a row the scene sets takes it back from the scene, from the scene's
+value, until the next scene. `P` or `Esc` closes it; it fades with the HUD when the
+mouse rests.
+
+**Settings** (kept in the browser), in tabs: **Sound** (sensitivity, visual lead to make
+up for projector lag, the beat's source, MIDI), **Show** (reactivity, particle density,
+sparks, auto drops, how often weapons change and rings fire, which elements are drawn,
+the feel), **Blade** (how often and how long the living blade is out, its moves, rhythm,
+and whether it's alive), **Look** (the scene, colors: the mode, the harmony scheme, the
+scenery; effects strength), **Render** (below), **Effects** (every look, layer and drop
+hit: off, in the mix, always; how often the look changes, which kinds of mirror, the
+negative flash, how many drop hits), **Scenes** (below), **Camera** (mode, cut length, transitions, how it
+covers the blade out and held, zoom punch, shot), **Fireflies** (their moves and how
+often they change), **Knights** (below), **Title Cards** (a DJ name in the site's checkpoint band, shown when
+the music starts and on drops, and more cards) and **My Setups**.
+
+**The Render tab** (`render.js`): how the picture itself is drawn. Everything applies at
+once through the scene's render overrides (`setRender`, `setPalette`, `setFog`,
+`setShadows`, `setXray` in `scene.js`), which the site never sets. The switches in the
+mix are rolled again with every look, each time with new details. *Simple* shows the
+first of each group; *All settings* shows the rest.
+
+| Setting | What it does | Values (default first) |
+| --- | --- | --- |
+| Pixel Size | How big each pixel is | 4 px (the site's size) · 2 · 3 · 6 · 8 |
+| Pixel Size Shifts | The size jumps with a new look and again when a drop lands, to one from half to twice the one set | In the mix · Off · Always |
+| Dither | How much colors are dithered where they meet | the site's (0.08) · 0 to 0.4 |
+| Dither Pattern | The ordered dither's grid | 4×4 · 8×8 · a mix (new each look) |
+| Outlines | The dark outlines and bright facet creases | In the mix (most looks) · Off · Always |
+| Palette | The colors everything snaps to | The flame's colors · Ashen (3) · Moonlit (4) |
+| Few Colors | The palette drops to a few: Ashen, Moonlit, or two to four of the flame's own (they change with it), a new few each time | In the mix · Off · Always |
+| Exposure, Vignette | The picture's brightness; how much the corners darken | the site's (1.45, 0.85) |
+| Fog | The dark closing in | Light (the site's) · Off · Thick · a mix |
+| The fire casts shadows | The scenery and the weapon throw the fire's shadow (off is lighter) | on |
+| X-Ray Flips | Now and then, on the beat, the picture flips for a beat, two or a bar to one of its passes, in its own colors: the normals, the lighting alone, the particles alone, the flow field. Never on a drop's own bar | In the mix · Off · Always |
+| X-Ray Views | Which of those passes it may show (the X-Ray drop hit too) | all four |
+| Flame Frame Rate | How often the flames move on (few: choppy, hand-drawn) | the site's (12) · 8 · 24 · 60 |
+| Color Change | How long a new flame's colors take to blend in | the site's (0.34 s) · 0.2 to 4 s |
+| Firefly light trails | The fireflies' trails (changing it restarts the scene) | on |
+| Hit-Stop, Hit Flash, Debris, Ground Marks | How big hits land: a freeze, the frame lifting toward the core color, bits of the element thrown, a mark on the ground | Always · Off · In the mix |
+
+Presets set the render switches too: Chill keeps the outlines, thick fog, no flips,
+shifts or hit-stop, and no flashes whatever preset came before (no negative flash, no Ink
+look, no Ink Flash, Color Cycle or X-Ray drop hit, so no Echo palette steps either); Rave has pixel shifts and x-ray flips
+every look; Low Flash turns off the x-ray (the drop's X-Ray hit too), pixel shifts, few
+colors, the hit flash, the 1-bit Ink (the Ink look and the drop's Ink Flash) and the drop's
+Color Cycle (the flame's palette spinning at 16 Hz; with it Off the Echo look's palette
+steps and spins stay still too, a scene's Echo included); Club is the defaults, and puts back
+whatever the others changed. Every render
+setting lives in the saved settings, so the render menu (P) reads and steps them
+(`render.js` `RENDER_STEPS`, `stepRender`, `renderText`) and applies them all with
+`applyRenderSettings(fire, settings)`. In the mix, the opening look (the start screen and
+the intro) keeps the flame's own colors; Few Colors comes in from the next look.
+
+**The Scenes tab: preset scenes.** A preset scene sets everything at once: a place, a
+flame and its colors (the scenery's too, if it has its own), a framing and its move, a
+look and its layers (their details pinned, or rolled each time it comes round), the drop
+hits, the render, the knights and the fireflies. They're made in the **Painter**
+(`/painter/`, [painter.md](painter.md)): the site's built-in ones come from the admin
+(content.json `scenes`; one taken out of the loop there is left out here), yours are kept
+in this browser (`src/sceneStore.js`, `bonfire-scenes`), shared with the Painter. Bonfire
+Live loops through them (the director's scene loop and player,
+[visualizer.md](visualizer.md)): a scene arrives on the music's start, in a drop's
+flash, or on a phrase line as a new blade lands in its colors, never mid-phrase.
+
+**The built-in scenes** (made in the Painter, `content.json` `scenes`), in loop order:
+
+| Scene | What it is | With the music |
+| --- | --- | --- |
+| Cathedral Kaleidoscope | The cathedral's altar folded into a six-way kaleidoscope round an amethyst flame (a flamberge in fire), so its lancet windows become a ring of stained-glass panels, a rose window; a soft glow, trails now and then, a slow sweep that turns the rose; two knights dancing in Pixel Painterly, folded into the pattern as they wheel through it after the drops; the kaleidoscope drop hit | Hold |
+| Frozen Shrine | The shrine seen low past its lantern and gate: ice under an uchigatana, an icy harmonious flame on blue-grey stone, the echo streaming out of the fire, a spotlight and fine grain, the camera still; one knight sitting watchful in Pixel Cel; the drop shatters | Hold |
+| Forge Rave | The forge in lightning: a magenta, cyan and acid-yellow flame, the Glitch look with chroma split and scanlines in the mix, the camera pushing in and out every 4 bars, four knights dancing in Pixel Chiaroscuro and polished steel, a chasing firefly show; shatter, shockwaves and more on the drops | Start from the scene |
+| Moonlit Ruins | The ruins in the Moonlit palette's four colors under thick fog, a zweihander in a low fire, the Haze look shimmering the pillar, a slow crane up and down; one knight resting in Black & Gold by the pillar, the fire's reflection sweeping over his plate now and then (Armor Shine), many fireflies twinkling | Hold |
+
+Each leaves something to the dice (a layer in the mix, the details it doesn't pin, the
+show's own drop hits where it has none), so it plays a little differently every time.
+
+| Setting | What it does | Values (default first) |
+| --- | --- | --- |
+| Scenes | Preset scenes. In the mix they come and go, with stretches of the free show between them; Always: one after another. `Shift+N` switches it (Off goes back to the free show at once) | In the mix · Off · Always |
+| Change Every | How often the next one comes: on a phrase line (as a blade lands), or a big drop's flash once half the stretch has played by it (the breakdown forges the next scene's blade); only on drops: every big drop's flash. A breakdown that ends without a big drop brings none | 32 bars · only on drops · 16 · 64 · 128 · Random |
+| With the Music | *Hold*: everything the scene sets stays for its stretch, the music only pulses and drops it (drops re-forge its own blade in its colors). *Start from the scene*: it opens the stretch with its place, colors, framing and look, then the show takes over (its render, knights and fireflies stay). *Each scene's own*: as saved in the Painter | Each scene's own · Hold · Start from the scene |
+| Scene Cards | A smaller title card with the scene's name as it arrives (it waits for one of your own cards that's showing) | Off · In the mix (some scenes) · Always |
+| Order | *In Turn*: the loop's order; *Shuffled*: each once before any comes again, never the same twice running | In Turn · Shuffled |
+| From | Which scenes it loops through | Built-In and Mine · Built-In · Mine |
+
+*The Loop* lists the scenes (From picks whose), each with its switch (in or out:
+`settings.sceneList`, by ref, `b:<id>` built-in or `m:<id>` mine; only the ones left out
+are kept), its picture (a Painter thumbnail; a built-in one's is taken the first time it
+plays here with the music on, the scene it opens on too) or its colors, its name and a one-line summary, *Built-In* or *Mine*,
+**Play Now** (closes the settings and plays it) and **Edit in Painter ↗**
+(`painter/?scene=<ref>`); **Make a Scene in the Painter ↗** opens a new one. The one
+playing is marked; pointing at a row lights it in the scene's flame color.
+
+- **The start screen** has a row of scene chips (up to 8, the loop's first, then *All
+  Scenes…*): a click plays it behind the menu at once, and it opens the show when the
+  music starts; a second click goes back to the free show. Pointing at a chip makes its
+  colors shimmer. `N` there steps through them at once.
+- **From the Painter:** `?scene=<ref>` opens on that scene (the start screen's backdrop,
+  then the show's first); `&solo` plays only it this visit ("Playing “X” from the
+  Painter. N: back to the loop." for one of yours, `m:<id>`; "Playing “X” on its own."
+  for a built-in, `b:<id>`; the HUD's scene line says the same). The Painter's *Play in Bonfire Live* hands a scene to
+  an open Bonfire Live tab (`store.onPlay`), which plays it in a flash (at once on the
+  start screen), or opens one with `?scene=m:<id>&solo`. A scene saved or deleted in a
+  Painter tab shows in the loop at once.
+- **Your hand wins:** what you change while a scene plays (a setting in the dialog, a row
+  of the P menu, a preset, the pack's map) takes over from the scene for that setting
+  until the next one. While a scene holds, changing other settings leaves its place and
+  framing alone. A rebuilt scene (Particles, trails) carries on with the scene playing.
+- **Low Flash** (and Chill) stays safe with any scene: a scene never turns on a flashy
+  effect the settings have off (the drop's X-Ray, Ink Flash and Color Cycle hits among
+  them), never throws more drop hits at once than the settings' *Hits per Drop*, a scene
+  painted in the Ink look plays it as Ember, and one in the Echo look plays its echo with
+  the palette still (no downbeat color steps or spins while Color Cycle is Off).
+- **Presets:** Chill holds each scene 64 bars (Always, Hold); Rave brings a new one every
+  16; Club (the defaults) has them in the mix every 32, each as it was saved.
+
+**The Knights tab** (`knightShow.js`). Every behavior has the three-way switch (Knights,
+Dance, Summon on the Drop, Gestures on Drops, Knight Cameras, Armor Shine, Reactions),
+with its details rolled each time (the formation, which way they face, the moves and
+their mirror images, how long a dance runs, each knight's helmet, how many with Random,
+which gesture and whether it goes round, the camera shots, the armor's rest and flare
+sweeps apart). The armor's options (Style, Finish, Seat Pose) are a fixed pick or a mix
+rolled at the same hidden moments, one for the whole cast; Edge Glow has the three-way
+switch too, with its Glow Strength beside it. *Simple* shows Knights, How
+Many, Seat Pose, Style, Finish, Edge Glow and its Glow Strength, Dance and Knight Cameras.
+
+| Setting | What it does | Values (default first) |
+| --- | --- | --- |
+| Knights | Knights by the fire. In the mix they come and go where it's hidden (the start, a big drop's flash, a new scenery) | In the mix · Off · Always |
+| How Many | How many come to the fire: the first takes the seat, the others sit on the ground round it. How many get up to dance follows the song | Random (1–4, one or two more often) · 1 · 2 · 3 · 4 |
+| Helmets | The helmets they may wear; each knight draws one as he arrives, some again at a new scenery | the great helm, the armet, the bascinet |
+| Seat Pose | How they sit: *Resting* (the bonfire rest, slumped over the knees, dozing now and then) or *Watchful* (leaning in over his knees, forearms on them, head up at the fire) (`fire.knights.setSeatPose`) | a mix (rolled where it's hidden) · Resting · Watchful |
+| Style | How they're drawn (`src/bonfire/knightStyles.js`, `fire.knights.setStyle`): the site's own (the admin's pick), Pixel Cel, Pixel Painterly, Pixel Chiaroscuro, Gunmetal, Black & Gold or First Build (the boxy original model, loaded when it's first picked). A new style at a hidden moment is there in the flash | The Site's Own · each style · a mix |
+| Finish | The steel's color for the styles that draw steel (`src/bonfire/steel.js`, `fire.knights.setFinish`): Gunmetal, Blackened, Polished Steel, Burnished | a mix (leaning to gunmetal) · each finish |
+| Edge Glow | The armor's edges catching the fire's color, fading toward their backs (`fire.knights.setRim`). In the mix, rolled where it's hidden: some stretches glow, each at a strength rolled round the Glow Strength (0.6× to 1.4× of it), some don't. Always: at the Glow Strength. A scene's knights glow as it's painted (its own Edge Glow switch and strength) | In the mix · Off · Always |
+| Glow Strength | How strongly the edges glow: Always's strength, and the one the mix rolls round | 0.5 · 0 to 1 |
+| Dance | In the mix: nods before the first drop, up for the build, the leap on the drop, dancing while the energy holds. Always: whenever the beat is locked in the groove. Off: they sit | In the mix · Off · Always |
+| Formation | Round the Fire, Line, Solo, Canon | a mix (new each dance) |
+| Moves | Which dance moves they may do (the big ones take the first two bars after a drop), the Default Dance among the groove's | all thirteen |
+| New Move Every | How often the dancers change moves | 4 bars · 2 · 8 · 16 · Random |
+| Summon on the Drop | On a big drop they're up and in place in its flash, already leaping (off: they get up and hurry over, a few beats late) | In the mix · Off · Always |
+| Gestures on Drops | Praise the Sun and the like on a big drop, together or going round; a cheer on a small drop | In the mix · Off · Always |
+| Knight Cameras | About one cut in three goes to the dancers (with the camera cutting), and the drop's wide may be theirs | In the mix (some dances) · Off · Always |
+| Armor Shine | The fire's reflection sweeping over their plate: now and then at rest, and whenever the fire flares (`fire.knights.setShine`) | In the mix (rest and flares rolled apart, where it's hidden) · Off · Always |
+| Reactions | They flinch when a blade lands, lean from a flare, hop as a ring passes, watch the living blade and flinch when it swings close (`fire.knights.setReactions`) | In the mix (rolled where it's hidden) · Off · Always |
+
+Presets: Rave has four watchful knights in Pixel Chiaroscuro and polished steel with a
+full edge glow (Always, at 1), dancing whenever the groove is locked, their armor always shining and
+reacting to everything; Chill has one, resting, in Pixel Painterly and burnished steel,
+his edges always catching the firelight (at 0.7), unbothered by the blade (Reactions off); Low Flash
+turns the armor's shine off; Club (the defaults) puts them all back: the site's own
+style, the finish, seat and edge glow in the mix (the glow round 0.5).
 
 | Piece | File |
 | --- | --- |
 | Page, sources, HUD, keys | `visualizer/index.html`, `src/visualizer/main.js`, `src/visualizer/visualizer.css` |
-| Settings: stored in the browser, the dialog | `src/visualizer/settings.js` |
+| Settings: stored in the browser, the dialog (its fields and "?" hints: `src/ui/fields.js`, shared with the Painter; a hint shows on hovering its "?" or while its setting has the keyboard's focus, and screen readers hear it as the setting's description) | `src/visualizer/settings.js` |
+| Preset scenes: the format, the browser's own, the loop and the player | `src/scenes.js`, `src/sceneStore.js`, `src/visualizer/sceneLoop.js`, `src/visualizer/scenePlayer.js`, `src/visualizer/layered.js` (the Scenes tab and the HUD line: `settings.js`, `main.js`) |
 | Bands, onsets | `src/visualizer/analyser.js` |
 | Sections: groove, breakdown, build, drop, silence | `src/visualizer/sections.js` |
 | Tempo, beat grid, bars, tap tempo | `src/visualizer/tempo.js` |
@@ -163,21 +378,28 @@ on drops).
 | Camera shots, blade rigs, transitions | `src/visualizer/camera.js` |
 | Colors: site or made palettes, scenery | `src/visualizer/colors.js` (the generator: `src/paletteGen.js`) |
 | Firefly light show; firefly moves | `src/visualizer/fireflyShow.js`, `src/visualizer/fireflyMoves.js` |
+| The knights: presence, dancing, formations, the Knights tab's switches | `src/visualizer/knightShow.js` (the scene's side: `src/bonfire/knights.js`, `knightPose.js`; `docs/knight.md`) |
+| The render menu (P) | `src/ui/renderMenu.js` (shared with the site), rows in `src/visualizer/main.js` |
 | Looks (effects that take turns), drop hits | `src/visualizer/looks.js` |
+| The Render tab: render options, few colors, pixel shifts, x-ray flips | `src/visualizer/render.js` (the scene's side: `scene.js` render overrides, `pixelPass.js` `uXray`) |
 | The living blade's moves | `src/bonfire/bladeMotion.js` |
 | Blade trail and hits (per element) | `src/bonfire/swingTrail.js` |
 | Demo track (synthesized) | `src/visualizer/demo.js` |
 | Scene hooks: `drive`, `glitch`, `pulse`, `ring`, `echo`, `swing`, `setPose`, held swaps | `src/bonfire/scene.js`, `weapons.js`, `pixelPass.js`, `flame.js`, `fireflies.js` |
-| Tests: the tracker on synthetic onsets; the analysis and ten drop shapes (and non-drops) on synthesized tracks; the blade's moves (smooth, on the beat, clear of the ground and camera) and its return to the fire (`weapons.js` on a stand-in model); made palettes, drop hits, mirror kinds and mixes, firefly moves; a held swap's forge particles; the site's routes, links and templates | `test/` (`npm test`) |
+| Tests: the tracker on synthetic onsets; the analysis and ten drop shapes (and non-drops) on synthesized tracks; the blade's moves (smooth, on the beat, clear of the ground and camera) and its return to the fire (`weapons.js` on a stand-in model); made palettes, drop hits, mirror kinds and mixes, the new layers, firefly moves; the render switches (off, in the mix, always), few colors kept off the opening look, x-ray flips on the beat, what the scene is sent; the knights (presence only where it's hidden, the drop's leap, breakdowns and silence, dancers by budget, places on the clear arcs and never on a seated knight, formations, the switches with Armor Shine and Reactions, K with Dance off, How Many changed mid-build, a new source mid-dance, a rebuild, a drop's new scenery, reduced motion) and a cut never picking a shot with a knight before the fire; old saved settings, presets (Club putting back what the others change, Low Flash's drop hits) and the dialog's fields; a held swap's forge particles; the site's routes, links and templates | `test/` (`npm test`) |
 
 ## New this round
 
 - **Feel:** pick a preset (Chill, Club, Rave, Low Flash) on the start screen or at the top
   of the settings; fine-tune in the tabs.
 - **MIDI:** Settings → Sound → MIDI Controller. Connect, press Learn beside an action,
-  then the pad. Mappings stay on this computer.
-- **The pack (I):** swap the scene, forge a chosen weapon, cast the element's ring, send
-  the blade into a swing, or hit with another element.
+  then the pad. Mappings stay on this computer. *Knights Dance* and *Knights In / Out*
+  are K and Shift+K; *Next Scene* is N.
+- **The pack (I):** *Fast Travel* to another place, forge a chosen weapon, cast the element's ring, send
+  the blade into a swing, or hit with another element; and while knights are by the
+  fire, the *Knight*: a new helmet for every one of them (hands to the helm), their
+  style and the color of their steel (for them all; with Style or Finish in the mix, the
+  next hidden moment rolls again), or a gesture from all of them.
 - **Record (V):** a clip of the picture and the sound, saved as MP4 when you stop. For the
   portfolio page, save one as `public/assets/projects/bonfire-live/clip.mp4` with a
   `clip.webp` still beside it and add it as the first image with *Video Clip* on.

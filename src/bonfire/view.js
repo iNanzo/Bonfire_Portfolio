@@ -86,6 +86,7 @@ export function createView(camera, { reducedMotion = false, sway: swayAmount = 1
       layout = next;
       if (view.name) setView(view.name, { instant: true });
     },
+    get layout() { return layout; },
     /** A jolt: `amount` (about 0.04 for a flick, 0.3 for a slam) adds trauma. */
     shake(amount) { trauma = Math.min(1, trauma + amount * 1.6); },
     /** 0..1: how much trauma the camera is carrying (for tests and debugging). */

@@ -47,7 +47,9 @@ const R6 = [1, 0.84, 1.06, 0.9, 1.02, 0.88];
 const ring6 = (y, s) => R6.map((r, i) => { const a = (i / 6) * TAU + 0.3; return new THREE.Vector3(Math.cos(a) * r * s, y, Math.sin(a) * r * s); });
 const CRYSTAL = { lo: ring6(-0.15, 1), hi: ring6(0.72, 0.86), apex: new THREE.Vector3(0.16, 1, -0.1) };
 // Its outline: the six side edges, the shoulder and the point.
-const EDGES = [];
+/** A crystal's outline edges ([from, to] in its own space: base ring at y −0.15, point at y 1). */
+export const CRYSTAL_EDGES = [];
+const EDGES = CRYSTAL_EDGES;
 for (let i = 0; i < 6; i++) {
   const j = (i + 1) % 6;
   EDGES.push([CRYSTAL.lo[i], CRYSTAL.hi[i]], [CRYSTAL.hi[i], CRYSTAL.hi[j]], [CRYSTAL.hi[i], CRYSTAL.apex]);

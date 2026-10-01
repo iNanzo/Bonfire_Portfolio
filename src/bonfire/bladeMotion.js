@@ -13,8 +13,9 @@
 //     from a pivot anywhere from the grip (wielded) to mid-blade (flung), the pivot
 //     itself lunging through the hit. A spin is a slash of a full turn or more from the
 //     middle. A thrust drives along the blade's own axis, stops dead and quivers.
-//   • Nothing passes through the ground or the camera: a move's random shape is drawn
-//     again until its sampled path clears both.
+//   • Nothing passes through the ground, the camera or the knights: a move's random shape
+//     is drawn again until its sampled path clears them all (the knights are capsules
+//     that `basis()` hands over as `avoid`, where they are as the move begins).
 // Shapes are random (the plane's angle and tilt, the side, the sweep, the pivot, a lunge,
 // a corkscrew), so no two routines look alike. A move takes its plane from the camera as
 // its glide begins (onMove fires first, so a cut can land before it), so it reads from
@@ -66,7 +67,8 @@ const copyPose = (from, to) => { to.c.copy(from.c); to.q.copy(from.q); return to
  * @param {{ grip: THREE.Vector3, tip: THREE.Vector3, len: number }} o.blade  local points
  * @param {{ pos: THREE.Vector3, quat: THREE.Quaternion }} o.home  the planted weapon (world)
  * @param {THREE.Vector3} o.center  where it fights: over the fire (world)
- * @param {() => { right, up, toCam, pos }} o.basis  the camera's axes and position (world)
+ * @param {() => { right, up, toCam, pos, avoid? }} o.basis  the camera's axes and position
+ *   (world), and optionally capsules to stay out of: [{ a, b, r }] (the knights)
  * @param {number[]} o.hits   seconds from now, rising
  * @param {number} o.plunge   seconds from now, after the last hit
  * @param {{ slash?: boolean, thrust?: boolean, spin?: boolean }} [o.moves]
@@ -89,6 +91,8 @@ export function createRoutine({
   const tv = new THREE.Vector3();
   const tw = new THREE.Vector3();
   const td = new THREE.Vector3();
+  const seg = new THREE.Vector3();
+  const tq2 = new THREE.Vector3();
   const sample = newPose();
 
   const worldPoint = (p, local, out) => out.copy(local).sub(mid).applyQuaternion(p.q).add(p.c);
@@ -272,14 +276,22 @@ export function createRoutine({
     if (W.lengthSq() < 1e-6) W.set(0, 1, 0);
     return { A, n, cocked, W, jitter: new THREE.Vector3().crossVectors(A, WORLD_UP).normalize() };
   }
-  /** Sample a move's path: the tip and grip stay above the ground, in the clearing and off the camera. */
+  /** How far p is from a capsule's axis, less its radius (< 0: inside). */
+  const outside = (p, c) => {
+    seg.subVectors(c.b, c.a);
+    const u = clamp01(tq2.subVectors(p, c.a).dot(seg) / Math.max(1e-6, seg.lengthSq()));
+    return p.distanceTo(tq2.copy(c.a).addScaledVector(seg, u)) - c.r;
+  };
+  /** Sample a move's path: the tip and grip stay above the ground, in the clearing, off the camera and out of the knights. */
   function clears(mv, b) {
+    const avoid = b.avoid ?? [];
     for (let i = 0; i <= 24; i++) {
       poseAt(mv, mv.cock + ((mv.end - mv.cock) * i) / 24, sample);
       const t = worldPoint(sample, tip, tv);
       if (t.y < ground || Math.hypot(t.x - fire.x, t.z - fire.z) > 2.6 || t.distanceTo(b.pos) < 0.8) return false;
       const g = worldPoint(sample, grip, tw);
       if (g.y < ground + 0.1 || g.distanceTo(b.pos) < 0.8 || sample.c.distanceTo(b.pos) < 0.8) return false;
+      for (const c of avoid) if (outside(t, c) < 0.05 || outside(g, c) < 0.05 || outside(sample.c, c) < 0.05) return false;
     }
     return true;
   }

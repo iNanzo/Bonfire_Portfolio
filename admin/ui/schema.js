@@ -4,7 +4,12 @@
 // Labels are run through titleCase(), so write them in any case.
 import { KINDLED_SHOW, WEAPON_KEYS } from '../../src/contentRules.js';
 import content from '../../src/content.json' with { type: 'json' };
-import { CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, ELEMENT_IDS, RANGES } from '../../src/effectsDefaults.js';
+import {
+  CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, ELEMENT_IDS, KNIGHT_ARRIVALS, KNIGHT_FINISHES, KNIGHT_HELMETS, KNIGHT_SEATS, KNIGHT_STYLES, RANGES,
+} from '../../src/effectsDefaults.js';
+import { FINISH_NAMES, HELMET_NAMES, STYLE_NAMES } from '../../src/knightNames.js';
+import { DEFAULT_STYLE, STYLES } from '../../src/bonfire/knightStyles.js';
+import { defaultScene, MUSIC, NAME_MAX } from '../../src/scenes.js';
 import { harmoniousFlame, hexToOklch } from '../../src/paletteGen.js';
 import { titleCase } from './text.js';
 
@@ -18,8 +23,12 @@ export const PAGES = [
   { id: 'contact', group: 'Content', label: 'Contact', keys: ['contact'], blurb: 'The contact screen and its links.' },
   {
     id: 'effects', group: 'Look & feel', label: 'Effects', preview: true,
-    keys: ['effects.flames', 'effects.elements', 'effects.fire', 'effects.lightning', 'effects.ice', 'effects.impact', 'effects.fireflies', 'effects.cursor', 'effects.particles', 'effects.render', 'effects.colors'],
-    blurb: 'Bonfire colors, its elements (fire, lightning, ice), fireflies, the cursor and the pixel-art look. The preview updates as you edit; nothing is published until you save.',
+    keys: ['effects.flames', 'effects.elements', 'effects.fire', 'effects.lightning', 'effects.ice', 'effects.impact', 'effects.fireflies', 'effects.cursor', 'effects.particles', 'effects.render', 'effects.knight', 'effects.colors'],
+    blurb: 'Bonfire colors, its elements (fire, lightning, ice), fireflies, the cursor, the pixel-art look and the knight who comes to the fire. The preview updates as you edit; nothing is published until you save.',
+  },
+  {
+    id: 'scenes', group: 'Look & feel', label: 'Scenes', keys: ['scenes'],
+    blurb: 'The preset scenes Bonfire Live loops through, in this order. Make them in the Bonfire Painter, then Import From Painter here.',
   },
   { id: 'headings', group: 'Settings', label: 'Screen headings', keys: ['sections'], blurb: 'The title, flavor line and intro at the top of each screen.' },
   { id: 'interface', group: 'Settings', label: 'Interface', keys: ['screens', 'ui', 'weapons', 'weaponDraw', 'startingEquipment', 'notFound'], blurb: 'Tab names, button text, weapon names and which weapons can be drawn, the starting equipment and the 404 page.' },
@@ -50,6 +59,8 @@ export const LABELS = {
   'hero.stokeHint': 'Stoke hint',
   'hero.value': 'Intro line',
   'hero.sceneLabel': 'Scene description (screen readers)',
+  'hero.sceneKnight': 'The knight in the scene description',
+  'hero.sceneSign': 'His summon sign in the scene description',
   'site.title': 'Browser title',
   'site.description': 'Search / share description',
   'site.url': 'Site address',
@@ -178,6 +189,24 @@ export const LABELS = {
   'effects.ice.ringSpeed': 'Ring speed',
   'effects.ice.ringHeight': 'Ring shard height',
   'effects.ice.ringHold': 'Ring shard hold',
+  'effects.knight': 'The Knight',
+  'effects.knight.show': 'Show the Knight',
+  'effects.knight.arrival': 'Arrival',
+  'effects.knight.restMin': 'Shortest Rest',
+  'effects.knight.restMax': 'Longest Rest',
+  'effects.knight.helmet': 'Helmet',
+  'effects.knight.style': 'Style',
+  'effects.knight.finish': 'Armor Finish',
+  'effects.knight.rim': 'Edge Glow',
+  'effects.knight.shine': 'Armor Shine',
+  'effects.knight.seat': 'Seat Pose',
+  'effects.knight.gestures': 'Answers a Click',
+  'effects.knight.reactions': 'Reactions',
+  // scenes
+  scenes: 'Built-In Scenes',
+  'scenes[].name': 'Name',
+  'scenes[].id': 'ID',
+  'scenes[].music': 'With the Music',
   'startingEquipment.element': 'Element',
   'startingEquipment.flame': 'Bonfire colors',
 };
@@ -189,6 +218,8 @@ export const HELP = {
   'hero.kindled': 'The checkpoint banner when the fire is stoked. Preview it on the site with ?kindled.',
   'hero.kindled.duration': 'Milliseconds on screen, fades included.',
   'hero.kindled.show': '“first”: the first stoke of a visit · “always”: every stoke · “never”.',
+  'hero.sceneKnight': 'Read after the scene description while the knight is by the fire. Left out when he’s away, off (Effects → The Knight) or his model doesn’t load.',
+  'hero.sceneSign': 'Read after the scene description while the knight is away and his summon sign waits on the ground. Left out where he can’t come. Optional.',
   screens: 'The site’s own menu. Labels only — the screens themselves are fixed.',
   weapons: 'Display names for the weapons in the fire (the models themselves are fixed).',
   weaponDraw: 'Which weapons a random draw can pick (inspecting a project, clicking the fire, the visualizer’s swaps). A weapon switched off never comes up, but can still be the starting weapon. Keep at least 3 on.',
@@ -297,11 +328,30 @@ export const HELP = {
   'effects.ice.shimmer': 'A slow breathing of the shards’ glow.',
   'effects.ice.growTime': 'How long the shards take to grow in (they sink back a little faster).',
   'effects.ice.ringHold': 'How long each ring shard stays up before sinking. Longer = a wider band of spikes.',
+  'effects.knight': 'A knight in steel plate comes to the fire when he’s summoned. His summon sign (the NH monogram) glows on the ground by his seat; a click on it, or Summon in the pack, calls him, and he forms out of it in the fire’s current element (the weapon swap’s own dissolve). He rests a while, then burns away into the sign again. Visitors can summon him, send him off and change his helmet, style and armor finish from the pack (their picks are remembered in their browser, over the settings here). Bonfire Live has knight settings of its own. Try him in the preview with the Knight…, Helmet… and Gesture… menus.',
+  'effects.knight.show': 'Off: no knight and no summon sign; the fire burns alone (and the pack has no Knight item).',
+  'effects.knight.arrival': 'Summon Sign: he isn’t there when a page opens; his sign glows on the ground until a visitor clicks it (or picks Summon in the pack), and after his rest he burns away into it again. There From the Start: he’s resting by the fire from the first frame and stays until a visitor sends him off.',
+  'effects.knight.restMin': 'The shortest he rests by the fire before he burns away into his sign again (minutes). Each summons rolls a rest between the shortest and the longest. There From the Start: he stays instead.',
+  'effects.knight.restMax': 'The longest he rests (minutes). The same as the shortest for an exact length.',
+  'effects.knight.helmet': 'The great helm, the armet or the pointed bascinet. “Random Each Summon” puts a new one on him each time he comes (unless the visitor picked one in the pack).',
+  'effects.knight.style': `How he’s drawn; a change burns him away and forms him again in it. ${Object.entries(STYLE_NAMES)
+    .map(([k, n]) => `${n}${k === DEFAULT_STYLE ? ' (the default)' : ''} — ${STYLES[k].hint.replace(/^./, (c) => c.toLowerCase())}`).join(' ')}`,
+  'effects.knight.finish': `The color of his steel, in the styles that draw steel (all but ${Object.keys(STYLES).filter((k) => !STYLES[k].finish).map((k) => STYLE_NAMES[k]).join(' and ')}, which have their own): Gunmetal is a cool mid grey, Blackened darker with mostly reflections, Polished Steel bright with a mirror sheen, Burnished a warm rubbed brown.`,
+  'effects.knight.rim': 'How strongly his edges catch the fire’s color: a thin line in the flame’s colors around him, brightest on the side facing the fire. 0 = none.',
+  'effects.knight.shine': 'The fire’s reflection sweeping over his plate: a gentle band every few seconds at rest, and a bright one whenever the fire flares (a stoke, a weapon landing, a ring, the cursor on the fire). Off: his plate keeps a calm, steady look. Never for visitors who ask for reduced motion.',
+  'effects.knight.seat': 'Resting: slumped by the fire, like a rest at a bonfire. Watchful: leaning in over his knees, forearms on them, head up at the fire, keeping watch.',
+  'effects.knight.gestures': 'While he rests, a click on him gets a gesture back (Praise the Sun most often); hovered, he looks up at you and his rim warms to say so. Off: he isn’t a click target (no hover, and a click on him stokes the fire like anywhere else); the pack’s gestures still work. Never for visitors who ask for reduced motion.',
+  'effects.knight.reactions': 'He sits up to watch a new weapon rise, flinches when it lands, leans away from a stoke and lifts his feet as a ring passes. Off: he just rests.',
+  // scenes
+  scenes: 'Bonfire Live loops through these in this order (its Scenes tab can shuffle them). ◉ takes one out of the loop without deleting it. Each is made in the Bonfire Painter: Open in Painter shows it there, where you can change it, and Replace From Painter… brings the change back. These are the scenes every visitor’s Bonfire Live has; the ones visitors make stay in their own browsers.',
+  'scenes[].name': `Shown on Bonfire Live’s scene cards and in its Scenes list. Up to ${NAME_MAX} characters.`,
+  'scenes[].id': 'The scene’s internal name: Bonfire Live’s links and saved loops use it (?scene=b:<id>), so keep it once it’s published. Lowercase letters, numbers and dashes.',
+  'scenes[].music': 'Hold the Scene: everything it sets stays for its stretch; the music only pulses and drops it. Start From the Scene: its place, colors, framing and look open the stretch, then the show plays on.',
 };
 
 /** Long text: a textarea. */
 export const MULTILINE = new Set(['value', 'summary', 'outcome', 'problem', 'built', 'flavor', 'note', 'body', 'text', 'description',
-  'intro', 'sceneLabel', 'alt', 'subtitle', 'footer', 'todo']);
+  'intro', 'sceneLabel', 'sceneKnight', 'sceneSign', 'alt', 'subtitle', 'footer', 'todo']);
 export const MULTILINE_LISTS = new Set(['about.paragraphs', 'experience[].roles[].bullets']);
 /** Short text fields that sit side by side instead of full width. */
 export const SHORT = new Set(['id', 'year', 'kind', 'status', 'dates', 'location', 'glyph', 'label', 'name', 'title', 'org', 'role',
@@ -312,12 +362,21 @@ export const FIXED = new Set(['screens']);
 export const READONLY = new Set(['screens[].id']);
 
 const opts = (list, label = (v) => titleCase(String(v))) => list.map((v) => ({ value: v, label: label(v) }));
+/** The knight's arrivals and seat poses, as the Knight section names them. */
+export const ARRIVAL_NAMES = { sign: 'Summon Sign', start: 'There From the Start' };
+export const SEAT_NAMES = { resting: 'Resting', watchful: 'Watchful' };
 /** Dropdowns: (draft) → [{ value, label }]. */
 export const SELECTS = {
   'hero.kindled.show': () => opts(KINDLED_SHOW),
   'startingEquipment.weapon': (d) => opts(WEAPON_KEYS, (k) => d.weapons?.[k] ?? k),
   'startingEquipment.flame': (d) => (d.effects?.flames ?? []).map((f) => ({ value: f.id, label: f.name || f.id })),
   'effects.cursor.mode': () => opts(CURSOR_MODES),
+  'effects.knight.helmet': () => opts(KNIGHT_HELMETS, (k) => HELMET_NAMES[k] ?? 'Random Each Summon'),
+  'effects.knight.arrival': () => opts(KNIGHT_ARRIVALS, (k) => ARRIVAL_NAMES[k]),
+  'effects.knight.style': () => opts(KNIGHT_STYLES, (k) => STYLE_NAMES[k]),
+  'effects.knight.finish': () => opts(KNIGHT_FINISHES, (k) => FINISH_NAMES[k]),
+  'effects.knight.seat': () => opts(KNIGHT_SEATS, (k) => SEAT_NAMES[k]),
+  'scenes[].music': () => opts(Object.keys(MUSIC), (k) => MUSIC[k]),
   'effects.render.ditherMatrix': () => opts(DITHER_MATRICES, (n) => `Bayer ${n}×${n}${n === 4 ? ' (coarse)' : ' (fine)'}`),
   'startingEquipment.element': (d) => ELEMENT_IDS.map((id) => {
     const name = d.effects?.elements?.[id]?.name?.trim();
@@ -367,6 +426,8 @@ export const TEMPLATES = {
   'about.stats': () => ['', ''],
   'ui.prompts': () => ['', null, ''],
   'effects.flames': newFlame,
+  // (A new scene is the Painter's default one; its id follows its name until edited.)
+  scenes: () => ({ ...defaultScene('New Scene'), id: '' }),
 };
 
 /** “+ Add …” button wording per list. */
@@ -387,6 +448,7 @@ export const ADD_LABELS = {
   'about.stats': 'stat',
   'ui.prompts': 'prompt',
   'effects.flames': 'palette',
+  scenes: 'scene',
 };
 
 /** The field a list entry is titled by. */
