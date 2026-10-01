@@ -32,7 +32,7 @@ function fakeGitHub({ files }) {
   let n = 0;
   const sha = () => (++n).toString(16).padStart(40, '0');
   const blobOf = (bytes) => { const s = sha(); blobs.set(s, bytes); return s; };
-  let tree = new Map(Object.entries(files).map(([p, text]) => [p, blobOf(utf8(text))]));
+  const tree = new Map(Object.entries(files).map(([p, text]) => [p, blobOf(utf8(text))]));
   const trees = new Map([['t0', tree]]);
   const commits = new Map([['c0', { tree: 't0', parents: [] }]]);
   const state = { head: 'c0', tokenRequests: 0, runs: [], moveRefBeforePatch: false };

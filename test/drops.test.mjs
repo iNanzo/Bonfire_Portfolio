@@ -16,7 +16,7 @@ function expectDrop(track, seen, bar, size) {
   if (size) assert.equal(drops[0].drop, size);
 }
 
-test('a build that keeps the kick: a high-passed roll speeding up under a riser, the bass cut', () => {
+test('a build that keeps the kick: a high-passed roll speeding up under a riser, the bass cut [slow]', () => {
   const bars = [
     ...groove(8),
     ...repeat(4, (i) => ({ kick: 1, thin: true, bass: false, hats: true, riser: 0.2 + i * 0.1 })),
@@ -30,14 +30,14 @@ test('a build that keeps the kick: a high-passed roll speeding up under a riser,
   expectDrop(track, seen, 16, 'big');
 });
 
-test('a breakdown that keeps a sub-bass pad', () => {
+test('a breakdown that keeps a sub-bass pad [slow]', () => {
   const bars = [...groove(8), ...repeat(8, { kick: 0, bass: false, hats: false, pad: true, sub: true }), ...groove(8)];
   const track = buildTrack(bars);
   const seen = analyse(track.audio);
   expectDrop(track, seen, 16, 'big');
 });
 
-test('a silence gap on the beat before the drop', () => {
+test('a silence gap on the beat before the drop [slow]', () => {
   const bars = [
     ...groove(8),
     ...repeat(8, (i) => ({ kick: 0, bass: false, hats: false, pad: true, riser: i >= 4 ? (i - 3) / 4 : 0, gapLastBeat: i === 7 })),
@@ -48,7 +48,7 @@ test('a silence gap on the beat before the drop', () => {
   expectDrop(track, seen, 16, 'big');
 });
 
-test('the classic: bass and kick cut for 8 bars, a pad and riser, then everything', () => {
+test('the classic: bass and kick cut for 8 bars, a pad and riser, then everything [slow]', () => {
   const bars = [...groove(8), ...repeat(8, (i) => ({ kick: 0, bass: false, hats: false, pad: true, riser: i >= 4 ? (i - 3) / 4 : 0 })), ...groove(8)];
   for (const gain of [1, 10 ** (-24 / 20)]) {
     const track = buildTrack(bars, { gain });
@@ -78,7 +78,7 @@ test('a groove fading in is not a drop', () => {
   assert.equal(eventsNamed(seen, 'drop').length, 0, describeEvents(seen, track));
 });
 
-test('a steady groove at 140 and at 174 BPM: no sections at all', () => {
+test('a steady groove at 140 and at 174 BPM: no sections at all [slow]', () => {
   for (const bpm of [140, 174]) {
     const track = buildTrack(groove(24), { bpm });
     const seen = analyse(track.audio);

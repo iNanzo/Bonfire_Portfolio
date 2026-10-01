@@ -2,9 +2,10 @@
 node_modules/
 dist/
 
-# Browser test output (npm run e2e)
+# Test output: browsers (npm run e2e) and coverage (npm run coverage)
 test-results/
 playwright-report/
+coverage/
 
 # AI assistants: settings, instructions, memory, and scratch/review resources
 .claude/

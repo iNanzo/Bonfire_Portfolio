@@ -64,7 +64,7 @@ const flatAt = (name) => ({
   top: (x, z) => (Math.hypot(x - SEATS[name].x, z - SEATS[name].z) < 0.15 ? SEATS[name].top : 0.02),
 });
 
-test('every pose stays inside the fixed culling sphere, with room to spare', () => {
+test('every pose stays inside the fixed culling sphere, with room to spare [slow]', () => {
   const k = createKnights(realRig(), { armor: armor(), max: 2 });
   const sphere = k.knights[0].body.boundingSphere;
   assert.ok(sphere && sphere.radius > 0, 'a fixed sphere, not computed from the first pose');
@@ -150,7 +150,7 @@ test('every pose stays inside the fixed culling sphere, with room to spare', () 
   assert.ok(room > 0.1, `the farthest piece (${worst.what}, ${worst.d.toFixed(2)} m) is inside ${sphere.radius} m with room (${room.toFixed(2)} m)`);
 });
 
-test('on the real model, the plates swing on their springs and settle, the same every time, and stay out of the helmet', async () => {
+test('on the real model, the plates swing on their springs and settle, the same every time, and stay out of the helmet [slow]', async () => {
   const model = await loadKnightMesh();
   const make = () => createKnights(model.scene(), { armor: armor(), max: 2 });
   const k = make();
