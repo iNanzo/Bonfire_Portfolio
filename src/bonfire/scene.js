@@ -93,7 +93,16 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   const jolt = (v) => { if (!reducedMotion && effects.render.shake) view.shake(v); };
 
   const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: 'high-performance' });
-  scope.own(renderer);
+  // (The scope's first resource, so it's disposed last, after every material and texture has
+  // given its GL objects back (resources.js). Then its context is let go at once, not whenever
+  // the old canvas is collected: Bonfire Live rebuilds the scene when Particles or Trails
+  // change, and each rebuild left a context behind (Chrome keeps 16 at most).)
+  scope.own({
+    dispose() {
+      renderer.dispose();
+      if (!renderer.getContext().isContextLost()) renderer.forceContextLoss();
+    },
+  });
   scope.cleanup(() => renderer.setAnimationLoop(null));
   renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
