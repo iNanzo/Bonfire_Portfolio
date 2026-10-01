@@ -248,15 +248,21 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
 | My Setups | Save everything as it is under a name; load, delete, export and import |
 
 - **Simple** shows the settings that matter most; each section says how many more *All
-  Settings* has ("3 More In All Settings", a click shows them). A tab with three-way switches
-  says once at its top what Off, In the Mix and Always mean.
+  Settings* has ("3 More In All Settings", a click shows them and goes to the first), or,
+  where Simple shows none of it, what it has ("Only In All Settings: Layers, Mirror Kinds",
+  with no Reset Section there). A tab with three-way switches says once at its top what
+  Off, In the Mix and Always mean (in Simple, only where one shows). On a phone or a short
+  screen the presets are names only, with a line under them saying what the one in use (or
+  pointed at) does.
 - **Every effect is a three-way switch**, three radio buttons (one keyboard stop, the arrow
   keys move along it). Every grid of them (Looks, Layers, Drop Hits) has **All Off · All In
   the Mix · All Always · Shuffle · Defaults** over it, and every checklist (Attacks, Dance
   Moves, Firefly Dances, Helmets, X-Ray Views, Mirror Kinds, Elements) **All · None ·
   Defaults** (None is unavailable where one has to stay on, and its tip says why). Each
   section has **Reset Section**. A bulk button, Reset Section, Reset To Defaults, a preset
-  and a setup are each one change (saved once) with an **Undo** in the footer.
+  and a setup are each one change (saved once) with an **Undo** in the footer (a setup
+  deleted has one too); after an Undo the focus goes back to the button that made the
+  change.
 - **A setting that does nothing as the others stand** is disabled, with a line saying why
   (Edge Glow Strength while Edge Glow is Off, the Link port unless the beat comes from Link,
   Dither Pattern at Dither 0, Harmony without made flame colors, Cut Every without cuts,
@@ -274,10 +280,14 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
   badge, the words found marked in the names. It searches the names, hints and More, search
   words and synonyms ("strobe" finds Negative Flash, Flicker and Hit Flash; "fps" Frame Rate
   and Flame Frame Rate), the choices, the scenes in the loop, the title cards, the setups,
-  the MIDI actions, the presets and the keyboard shortcuts. `↓` goes to the first result;
-  `Enter` on a single one reveals it (its tab, scrolled to, focused, a short flash unless
-  motion is reduced); `Esc` clears the search, a second `Esc` closes the dialog. Nothing
-  found suggests words that would find something.
+  the MIDI actions, the presets and the keyboard shortcuts. `↓` goes to the first result
+  and `↓` / `↑` from one to the next (the row itself, so stepping never changes a setting;
+  `Tab` or `Enter` goes into it, or a shortcut's opens the shortcuts; `↑` from the first goes
+  back to the box). `Enter` in the box reveals the only result, or the one named just as
+  typed ("frame rate": Frame Rate, not Flame Frame Rate): its tab, scrolled to, focused, a
+  short flash unless motion is reduced; with several it goes to the first. `Esc` clears the
+  search, a second `Esc` closes the dialog. Nothing found suggests words that would find
+  something.
 - **Frame Rate** (Picture › Performance): *Display* (every frame the screen shows, the
   default), *60 fps* or *30 fps*, for a busy computer. It stays with this computer (not in a
   setup or a preset, like the volume). The sound is still analysed on every frame the
