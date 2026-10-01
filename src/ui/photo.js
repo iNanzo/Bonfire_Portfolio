@@ -1,13 +1,14 @@
 // Photo mode: the page steps aside and the fire is yours to frame. Drag to orbit, scroll
 // (or pinch) to zoom, change its colors or element, and save the frame as a PNG at full
 // pixel size. Esc (or Exit) gives the page back, and the camera returns to the screen's
-// own view. A click without a drag still stokes the fire.
+// own view (and focus to what had it: ui/focus.js). A click without a drag still stokes
+// the fire. The orbit's math (turn, tilt, distance round the fire) is ui/orbit.js, which
+// the Painter's stage uses too.
 import { ui } from '../content.js';
 import { esc } from '../html.js';
 import { blip } from './audio.js';
-
-const TARGET = [0.02, 0.55, 0.02]; // the fire, a little above the ground
-const clampN = (v, a, b) => Math.min(b, Math.max(a, v));
+import { focusedNow, holdsFocus, returnFocus } from './focus.js';
+import { dragOrbit, orbitPose, zoomOrbit, ORBIT_TARGET, PHOTO_LIMITS } from './orbit.js';
 
 /**
  * @param {object} o
@@ -31,27 +32,23 @@ export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter 
     <button class="pix-btn" type="button" data-photo="exit">${esc(ui.close)} <kbd>Esc</kbd></button>`;
   document.body.appendChild(bar);
 
-  const view = { yaw: 0, pitch: 0.32, dist: 4.2 };
+  let view = { yaw: 0, pitch: 0.32, dist: 4.2, target: ORBIT_TARGET };
   let active = false;
   let drag = null;
   let dragged = false;
+  let opener = null; // what had focus as it opened (it gets it back)
 
   function pose(instant) {
-    const cp = Math.cos(view.pitch);
-    const pos = [
-      TARGET[0] + Math.sin(view.yaw) * cp * view.dist,
-      TARGET[1] + Math.sin(view.pitch) * view.dist,
-      TARGET[2] + Math.cos(view.yaw) * cp * view.dist,
-    ];
-    getFire()?.setPose({ pos, target: TARGET, fov: 32 }, { instant, duration: 0.8 });
+    getFire()?.setPose({ ...orbitPose(view), fov: 32 }, { instant, duration: 0.8 });
   }
 
   function enter() {
     if (active || !getFire()) return;
     active = true;
+    opener = focusedNow();
     document.documentElement.classList.add('is-photo');
     bar.hidden = false;
-    view.yaw = 0; view.pitch = 0.32; view.dist = 4.2;
+    view = { yaw: 0, pitch: 0.32, dist: 4.2, target: ORBIT_TARGET };
     pose(false);
     bar.querySelector('[data-photo="save"]').focus();
     blip('select');
@@ -60,10 +57,13 @@ export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter 
   function exit() {
     if (!active) return;
     active = false;
+    const giveBack = holdsFocus(bar); // (not when the breakdown took over: it has focus)
     document.documentElement.classList.remove('is-photo');
     bar.hidden = true;
     onExit();
     blip('back');
+    if (giveBack) returnFocus(opener);
+    opener = null;
   }
   async function save() {
     const blob = await getFire()?.capture();
@@ -88,22 +88,22 @@ export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter 
   });
   window.addEventListener('pointerdown', (e) => {
     if (!active || e.target.closest('.photo-bar') || e.button !== 0) return;
-    drag = { x: e.clientX, y: e.clientY, yaw: view.yaw, pitch: view.pitch };
+    drag = { x: e.clientX, y: e.clientY, from: view };
     dragged = false;
   });
   window.addEventListener('pointermove', (e) => {
     if (!active || !drag) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.hypot(dx, dy) > 4) dragged = true;
-    view.yaw = drag.yaw - dx * 0.006;
-    view.pitch = clampN(drag.pitch + dy * 0.004, 0.04, 1.2);
+    view = dragOrbit(drag.from, dx, dy, PHOTO_LIMITS);
     pose(true);
   });
   window.addEventListener('pointerup', () => { drag = null; });
   window.addEventListener('wheel', (e) => {
     if (!active) return;
     e.preventDefault();
-    view.dist = clampN(view.dist * Math.exp(e.deltaY * 0.001), 1.6, 7);
+    // (No nearer than 2.1 m, so the camera never ends up inside the knight by the fire.)
+    view = zoomOrbit(view, e.deltaY, PHOTO_LIMITS);
     pose(true);
   }, { passive: false });
   window.addEventListener('keydown', (e) => {

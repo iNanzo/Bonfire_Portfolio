@@ -45,7 +45,7 @@ function routePages() {
       for (const p of items()) {
         await socialImage(resolve(root, 'public', `${p.images[0].src}.webp`), p.name, resolve(outDir, `og/project-${p.id}.jpg`));
       }
-      writeFileSync(resolve(outDir, 'sitemap.xml'), sitemap(publicRoutes(), ['/visualizer/']));
+      writeFileSync(resolve(outDir, 'sitemap.xml'), sitemap(publicRoutes(), ['/visualizer/', '/painter/']));
       writeFileSync(resolve(outDir, 'robots.txt'), `User-agent: *\nAllow: /\nDisallow: /admin/\n\nSitemap: ${new URL('sitemap.xml', site.url).href}\n`);
     },
   };
@@ -64,17 +64,71 @@ async function socialImage(src, title, out) {
     .jpeg({ quality: 84 }).toFile(out);
 }
 
+// The portfolio's first load (index.html's script and its modulepreloads) is the site's
+// alone. Bonfire Live's and the Painter's modules (the scene format, the looks, the scene
+// store, the palette maker) only ever reach it through a static import from the site: the
+// four pages are built together, and Rolldown puts a module every page reaches into the
+// chunk they share, so one `import` in src/main.js of something that imports scenes.js
+// (contentRules.js does) adds ~20 kB gzip to every visit. The site imports those lazily
+// (`import()`); this check says so at build time if one comes back.
+const SHOW_ONLY = /[\\/]src[\\/]((scenes|sceneStore|paletteGen)\.js|visualizer[\\/]|painter[\\/])/;
+const shortId = (id) => id.split('\\').join('/').replace(/^.*?\/src\//, 'src/');
+/**
+ * The modules (with code in the bundle) a page's entry chunk loads before it runs: the
+ * chunk and every chunk it imports statically, all the way down.
+ * @param {Record<string, any>} bundle  Rolldown's output bundle
+ * @param {string} entry  the entry chunk's name (an `input` key)
+ */
+export function firstLoadModules(bundle, entry) {
+  const start = Object.values(bundle).find((c) => c.type === 'chunk' && c.isEntry && c.name === entry);
+  const seen = new Set();
+  const stack = start ? [start.fileName] : [];
+  while (stack.length) {
+    const file = stack.pop();
+    if (seen.has(file) || bundle[file]?.type !== 'chunk') continue;
+    seen.add(file);
+    stack.push(...bundle[file].imports);
+  }
+  return [...seen].flatMap((file) => Object.entries(bundle[file].modules).filter(([, m]) => m.renderedLength > 0).map(([id]) => id));
+}
+function firstLoadGuard() {
+  return {
+    name: 'first-load-guard',
+    apply: 'build',
+    generateBundle(_, bundle) {
+      const stray = firstLoadModules(bundle, 'main').filter((id) => SHOW_ONLY.test(id));
+      if (stray.length) this.warn(`The portfolio's first load carries Bonfire Live / Painter modules: ${stray.map(shortId).join(', ')}. Import what pulls them in lazily (import()) from the site.`);
+    },
+  };
+}
+
 export default defineConfig({
   base: repo ? `/${repo}/` : '/',
-  plugins: [routePages()],
+  plugins: [routePages(), firstLoadGuard()],
   build: {
-    // three.js is lazy-loaded for the hero only; its chunk is expected to be large.
-    chunkSizeWarningLimit: 700,
-    rollupOptions: {
+    // The largest chunk is three.js's renderer (~410 kB, lazy-loaded with the fire); the
+    // bonfire's own code is a chunk of its own beside it (~320 kB). More than this is
+    // something new to split.
+    chunkSizeWarningLimit: 500,
+    rolldownOptions: {
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
         notFound: resolve(import.meta.dirname, '404.html'),
         visualizer: resolve(import.meta.dirname, 'visualizer/index.html'),
+        painter: resolve(import.meta.dirname, 'painter/index.html'),
+      },
+      output: {
+        codeSplitting: {
+          groups: [
+            // three.js's renderer and the loaders from its examples, in a chunk of their own:
+            // it changes only when three.js does (the browser keeps it across deploys), and
+            // the bonfire's code (src/bonfire/scene.js and the rest) stays a chunk of its
+            // own size. three's core, which Bonfire Live and the Painter load up front, is
+            // left out of the group (and its dependencies with it): it stays where Rolldown
+            // puts it, shared.
+            { name: 'three', test: /[\\/]node_modules[\\/]three[\\/](build[\\/]three\.module\.js|examples[\\/])/, includeDependenciesRecursively: false },
+          ],
+        },
       },
     },
   },

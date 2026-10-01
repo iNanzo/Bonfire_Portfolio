@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bonfire Painter — Scene Editor for Bonfire Live</title>
+    <meta name="description" content="Paint scenes for Bonfire Live, the pixel-art bonfire visualizer from nhoang.dev: the place, the flame's colors, the camera and its move, the look and its layers, the knights. Watch them play to a silent beat, then send them to the show." />
+    <meta name="theme-color" content="#07070b" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/models/bonfire.glb" as="fetch" crossorigin />
+    <link rel="preload" href="/models/knight.glb" as="fetch" crossorigin />
+  </head>
+  <body class="viz pnt">
+    <div id="painter">
+      <noscript>
+        <main style="padding:48px 16px">
+          <h1>Bonfire Painter</h1>
+          <p>This scene editor needs JavaScript and WebGL.</p>
+        </main>
+      </noscript>
+    </div>
+    <script type="module" src="/src/painter/main.js"></script>
+  </body>
+</html>
