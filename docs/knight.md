@@ -353,14 +353,15 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   `STYLE_NAMES` (Title Case labels), `DEFAULT_STYLE`, `MODELS`, `styleOr(name)`,
   `styleModel(name)`. `dither` is how far a pixel style dithers its band edges at the
   site's Dither (0..1; **Dither** below): Pixel Cel and Pixel Painterly 1, Pixel
-  Chiaroscuro 0.2, the rest 0.
+  Chiaroscuro 0.2, the rest 0. The hints are one short sentence each (Bonfire Live joins
+  them into one tip).
 
   | Key | Name | What |
   | --- | --- | --- |
   | `pixel-cel` | Pixel Cel | **the default**: the sprite, four flat bands and a highlight on smooth plates (cool gunmetal darks and mids, the flame's body and cream tips only where it faces the fire), the wide bands' edges dithered, near-black ink with a dark warm ink over the lit tones, the fire on his outline's fire side |
   | `pixel-painterly` | Pixel Painterly | the sprite with a painter's touch: shadows hue-shifted toward the flame's shade (as dark), lips a little further round the lit edges, a lighter ink over the lit tones, the flame's dark shade on the terminator, the band edges dithered as Pixel Cel's |
   | `pixel-chiaroscuro` | Pixel Chiaroscuro | hard firelight: the dark, mid steel and the fire's body (and the highlight), near-black backs and gaps, black ink, the terminator, a little dither |
-  | `gunmetal` | Gunmetal | round 9's natural light on gunmetal steel (below) |
+  | `gunmetal` | Smooth Steel | round 9's natural light on gunmetal steel (below). Shown as Smooth Steel since round 10, so it isn't taken for the Gunmetal finish; the key stays (saved settings and scenes name it) |
   | `blackgold` | Black & Gold | round 8's final: blackened plate in the scene's stone, shadow and void by each facet's turn to the fire, dark gilt trim (wood and shadow) that catches the flame's mid, hi and core only in its reflection, rims a step up; no steel ramp, no fire rim |
   | `first` | First Build | round 8's first build: its own boxy model (`public/models/knight-first.glb`, no `K_Pauldron` joints: its lames ride the dome), fetched only when chosen; the same blackened plate, its trim at least the flame's `lo`, so it glows in the flame's color |
 
@@ -382,7 +383,8 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   repeat call while it loads waits on the same swap. Bonfire Live and the Painter get every
   such model ready in idle moments once their knights are in, and
   `fire.knights.prepareStyle(name)` does it on demand. The steel finishes are the color
-  option within the styles that draw steel (`finish: true`: the pixel styles and Gunmetal).
+  option within the styles that draw steel (`finish: true`: the pixel styles and Smooth
+  Steel).
   **The pixel styles** (`uLook` 1..3; `knights.js` builds their data from the model,
   once per model, ~0.1 s). Faces are joined into smooth surfaces across every edge turning
   less than 64° (the model's facets bend up to ~60° round a curve, its creases and box

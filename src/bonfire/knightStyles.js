@@ -16,8 +16,9 @@
 //                      ink on the lit side, a warm terminator
 //   pixel-chiaroscuro  fewer, harder bands: near-black backs and gaps, mid steel, the fire's
 //                      color where it strikes, cream highlights, black ink, a little dither
-//   gunmetal           round 9's look: natural light on gunmetal steel, plate wear, a thin
-//                      fire rim, the fire's reflection flashing across his facets
+//   gunmetal           round 9's look, shown as Smooth Steel (the Gunmetal finish keeps that
+//                      name): natural light on gunmetal steel, plate wear, a thin fire rim,
+//                      the fire's reflection flashing across his facets
 //   blackgold          round 8's: blackened plate in the scene's own stone, shadow and void,
 //                      flat facets, dark gilt trim that catches the fire, the reflection
 //                      column and sweeps (the look Bonfire Live was praised in)
@@ -36,23 +37,27 @@ export const MODELS = { main: 'models/knight.glb', first: 'models/knight-first.g
  * for people.
  */
 export const STYLES = {
-  'pixel-cel': { look: 1, model: 'main', finish: true, dither: 1, hint: 'Hand-drawn sprite: flat bands, ink lines, grey steel wearing the fire’s color where it lights him.' },
-  'pixel-painterly': { look: 2, model: 'main', finish: true, dither: 1, hint: 'The sprite with a painter’s touch: warm shadows, softer lines, lit plate lips.' },
+  'pixel-cel': { look: 1, model: 'main', finish: true, dither: 1, hint: 'Hand-drawn sprite: flat bands with dithered edges, ink lines, lit in the fire’s color.' },
+  'pixel-painterly': { look: 2, model: 'main', finish: true, dither: 1, hint: 'The sprite with a painter’s touch: warm shadows, softer ink, lit lips.' },
   'pixel-chiaroscuro': { look: 3, model: 'main', finish: true, dither: 0.2, hint: 'Hard firelight: near-black backs, the flame’s color only where it strikes.' },
-  gunmetal: { look: 0, model: 'main', finish: true, dither: 0, hint: 'Natural light on gunmetal steel, plate wear and a thin fire rim.' },
+  gunmetal: { look: 0, model: 'main', finish: true, dither: 0, hint: 'Natural light on smooth steel, plate wear and a thin fire rim.' },
   blackgold: { look: 4, model: 'main', finish: false, dither: 0, hint: 'Blackened plate and dark gilt trim that catches the fire.' },
-  first: { look: 5, model: 'first', finish: false, dither: 0, hint: 'The first build: the boxy original, its trim glowing in the flame’s colors.' },
+  first: { look: 5, model: 'first', finish: false, dither: 0, hint: 'The boxy first build, its trim glowing in the flame’s colors.' },
 };
 
 /** The styles' keys, in menu order. */
 export const STYLE_KEYS = Object.keys(STYLES);
 
-/** Their names for people (Title Case, for the admin, the pack and Bonfire Live). */
+/**
+ * Their names for people (Title Case, for the admin, the pack and Bonfire Live). The
+ * `gunmetal` style shows as Smooth Steel, so it isn't mistaken for the Gunmetal finish (the
+ * key stays: saved settings and scenes name it).
+ */
 export const STYLE_NAMES = {
   'pixel-cel': 'Pixel Cel',
   'pixel-painterly': 'Pixel Painterly',
   'pixel-chiaroscuro': 'Pixel Chiaroscuro',
-  gunmetal: 'Gunmetal',
+  gunmetal: 'Smooth Steel',
   blackgold: 'Black & Gold',
   first: 'First Build',
 };

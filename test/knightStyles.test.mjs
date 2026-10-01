@@ -12,7 +12,9 @@ test('six styles, each named, hinted and with its look, model and dither', () =>
   for (const k of STYLE_KEYS) {
     const s = STYLES[k];
     assert.match(STYLE_NAMES[k], /^[A-Z][a-z]*( ([A-Z][a-z]*|&))*$/, `${k}: a Title Case name (${STYLE_NAMES[k]})`);
-    assert.ok(typeof s.hint === 'string' && s.hint.length > 20 && s.hint.length < 100, `${k}: a one-line hint`);
+    // (One short sentence: they're joined into one tip in Bonfire Live.)
+    assert.ok(typeof s.hint === 'string' && s.hint.length > 20 && s.hint.length <= 90, `${k}: a one-line hint (${s.hint.length})`);
+    assert.match(s.hint, /^[A-Z][^A-Z]*\.$/u, `${k}: a sentence, in sentence case`);
     assert.ok(Object.hasOwn(MODELS, s.model), `${k}: a known model`);
     assert.equal(typeof s.finish, 'boolean');
     assert.ok(Number.isInteger(s.look) && s.look >= 0 && s.look <= 5, `${k}: a shader look`);
@@ -20,6 +22,10 @@ test('six styles, each named, hinted and with its look, model and dither', () =>
     looks.add(s.look);
   }
   assert.equal(looks.size, STYLE_KEYS.length, 'each style its own look');
+  // The gunmetal style shows as Smooth Steel, so it isn't taken for the Gunmetal finish (its
+  // key stays: saved settings and scenes name it).
+  assert.equal(STYLE_NAMES.gunmetal, 'Smooth Steel');
+  assert.equal(new Set(Object.values(STYLE_NAMES)).size, STYLE_KEYS.length, 'six different names');
   assert.deepEqual(Object.values(CEL_LOOKS), ['cel', 'painterly', 'chiaroscuro']);
   for (const look of Object.keys(CEL_LOOKS)) assert.ok(STYLE_KEYS.some((k) => STYLES[k].look === Number(look)));
 });
