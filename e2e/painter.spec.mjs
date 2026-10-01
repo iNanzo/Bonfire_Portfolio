@@ -424,6 +424,29 @@ test('Tools: Render Settings in Bonfire Live’s words, and the keyboard shortcu
   await expect(menu.locator('[data-render-reset] .render-row-label')).toHaveText('Reset Render Settings');
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
+  // A key the menu shows picks its item, the menu shut first (not left over what it opened);
+  // another key the page answers shuts it too. Its tooltip never comes up over it.
+  await tools.click();
+  await expect(page.locator('[data-tool="render"]')).toBeFocused();
+  await page.keyboard.press('p');
+  await expect(menu).toBeVisible();
+  await expect(page.locator('[data-tools-menu]')).toBeHidden();
+  await expect(tools).toHaveAttribute('aria-expanded', 'false');
+  await page.keyboard.press('Escape'); // (one Esc: Render Settings closes)
+  await expect(menu).toBeHidden();
+  await tools.click();
+  await page.keyboard.press('h');
+  await expect(page.locator('[data-tools-menu]')).toBeHidden();
+  await expect(page.locator('[data-panel]')).toBeHidden();
+  await page.keyboard.press('h');
+  await expect(page.locator('[data-panel]')).toBeVisible();
+  await tools.click();
+  await tools.locator('.pnt-tools-word').hover(); // (onto the word inside it: a fresh pointerover)
+  await page.waitForTimeout(800);
+  await expect(page.locator('.ui-tip')).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-tools-menu]')).toBeHidden();
+  await expect(tools).toHaveAttribute('data-tip', /Render Settings/); // (back for next time)
   // The keys: from the menu, and from ?.
   await tools.click();
   await page.keyboard.press('End');

@@ -21,7 +21,7 @@ import {
 } from '../src/painter/panel.js';
 import { PANEL_SECTIONS, LAYOUT, OWN, PAINTER_ITEM_HINTS, groupsOf, rowText, rowShown, shownRule, sectionRows, choices, sectionOfRow } from '../src/painter/layout.js';
 import { searchEntries, findInPanel, notesFor, PAINTER_SYNONYMS } from '../src/painter/panelSearch.js';
-import { PAINTER_KEYS, TOOLS, toolsMarkup } from '../src/painter/toolbar.js';
+import { PAINTER_KEYS, TIPS, TOOLS, toolsMarkup } from '../src/painter/toolbar.js';
 import { PAINTER_SECTIONS, SECTIONS as MAP_SECTIONS, SETTINGS, ITEM_HINTS, TRI_HELP, entriesFor } from '../src/settingsMap.js';
 import { buildMatcher } from '../src/ui/settingsSearch.js';
 import { titleCase } from '../src/text.js';
@@ -499,8 +499,17 @@ test('keys: the overlay lists every key the Painter answers (none changed); Tool
 
 test('the bar: icon and preview buttons carry the shared tooltip; the render menu reads values as Bonfire Live does', () => {
   const main = readFileSync(new URL('../src/painter/main.js', import.meta.url), 'utf8');
-  for (const cmd of ['undo', 'redo', 'banner-close', 'play']) assert.match(main, new RegExp(`data-cmd="${cmd}"[^>]*aria-label="[^"]+"[^>]*data-tip="[^"]{12,160}"`), cmd);
-  assert.match(main, /data-preview="\$\{id\}"[^>]*aria-label="\$\{esc\(name\)\}"[^>]*data-tip="\$\{esc\(hint\)\}"/);
+  // Each icon or bar button: a name, and a tip that's read out too (the shared tip is hidden
+  // from screen readers): its data-tip and the hidden text its aria-describedby names.
+  for (const [cmd, key] of [['undo', 'undo'], ['redo', 'redo'], ['banner-close', 'close'], ['play', 'play']]) {
+    assert.match(main, new RegExp(`data-cmd="${cmd}"[^>]*aria-label="[^"]+"[^>]*\\$\\{TIPS\\.${key}\\.attrs\\}[^>]*>.*?</button>\\$\\{TIPS\\.${key}\\.note\\}`), cmd);
+    const [, text, id] = TIPS[key].attrs.match(/^data-tip="([^"]+)" aria-describedby="([^"]+)"$/) ?? [];
+    assert.ok(text?.length >= 12 && text.length <= 160, `${cmd}: "${text}"`);
+    assert.equal(TIPS[key].note, `<span class="visually-hidden" id="${id}">${text}</span>`, `${cmd}: read out`);
+  }
+  assert.match(main, /data-preview="\$\{id\}"[^>]*aria-label="\$\{esc\(name\)\}" aria-describedby="pnt-pv-\$\{id\}" data-tip="\$\{esc\(hint\)\}"/);
+  // Tools: its tip read out the same way.
+  assert.match(toolsMarkup(), /data-cmd="tools"[^>]*aria-describedby="pnt-tools-menu-tip" data-tip="([^"]+)"[\s\S]*<span class="visually-hidden" id="pnt-tools-menu-tip">\1<\/span>/);
   assert.ok(!/\stitle="/.test(main), 'no native title tooltips');
   // Render Settings, its reset row, the values in renderText's words (no lowercase off).
   assert.match(main, /title: 'Render Settings'/);

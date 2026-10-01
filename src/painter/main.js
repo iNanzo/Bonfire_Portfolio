@@ -64,7 +64,7 @@ import { createSceneStore } from '../sceneStore.js';
 import { harmoniousFlame, harmoniousScene, hexToOklch, suggestFlames, suggestScenes, vividScene, wildFlame, wildScene } from '../paletteGen.js';
 import { bindPanel, flameChips, getPath, sceneryChips, withPath } from './panel.js';
 import { createPanelSearch } from './panelSearch.js';
-import { bindTools, PAINTER_KEYS, toolsMarkup } from './toolbar.js';
+import { bindTools, PAINTER_KEYS, TIPS, toolsMarkup } from './toolbar.js';
 import { createHistory } from './history.js';
 import { createBeatFeed, silentFrame } from './beat.js';
 import { createCameraRig } from './cameraRig.js';
@@ -216,8 +216,8 @@ app.innerHTML = `
     <div class="pnt-bar-group">
       <button type="button" class="pix-btn" data-cmd="library" aria-keyshortcuts="L"><kbd>L</kbd>Library</button>
       <button type="button" class="pix-btn" data-cmd="save" aria-keyshortcuts="Control+S">Save</button>
-      <button type="button" class="pix-btn pnt-icon" data-cmd="undo" aria-label="Undo (Ctrl+Z)" aria-keyshortcuts="Control+Z" data-tip="Undo the last change (Ctrl+Z)">↶</button>
-      <button type="button" class="pix-btn pnt-icon" data-cmd="redo" aria-label="Redo (Ctrl+Shift+Z)" aria-keyshortcuts="Control+Shift+Z Control+Y" data-tip="Redo what was undone (Ctrl+Shift+Z or Ctrl+Y)">↷</button>
+      <button type="button" class="pix-btn pnt-icon" data-cmd="undo" aria-label="Undo" aria-keyshortcuts="Control+Z" ${TIPS.undo.attrs}>↶</button>${TIPS.undo.note}
+      <button type="button" class="pix-btn pnt-icon" data-cmd="redo" aria-label="Redo" aria-keyshortcuts="Control+Shift+Z Control+Y" ${TIPS.redo.attrs}>↷</button>${TIPS.redo.note}
       ${toolsMarkup()}
     </div>
     <div class="pnt-bar-group pnt-preview" role="group" aria-label="Preview">
@@ -225,7 +225,7 @@ app.innerHTML = `
       <span class="pnt-beat" aria-hidden="true" data-beat><i></i><i></i><i></i><i></i><b data-beat-label></b></span>
     </div>
     <div class="pnt-bar-group">
-      <button type="button" class="pix-btn pnt-play" data-cmd="play" aria-label="Play in Bonfire Live (opens it)" data-tip="Plays this scene in Bonfire Live: an open Bonfire Live tab at once, else a new one. Changes are saved first." data-tip-side="bottom">${label('Play in Bonfire Live ↗', 'Play ↗')}</button>
+      <button type="button" class="pix-btn pnt-play" data-cmd="play" aria-label="Play in Bonfire Live (opens it)" ${TIPS.play.attrs} data-tip-side="bottom">${label('Play in Bonfire Live ↗', 'Play ↗')}</button>${TIPS.play.note}
       <button type="button" class="pix-btn" data-cmd="panel" aria-keyshortcuts="H" aria-controls="pnt-panel" aria-expanded="true"><kbd>H</kbd><span data-panel-label>Hide Panel</span></button>
     </div>
   </header>
@@ -234,7 +234,7 @@ app.innerHTML = `
       <p>Opened from the admin. Save it here, or copy its JSON back into the admin’s Scenes page (Import From Painter).</p>
       <button type="button" class="pix-btn" data-cmd="banner-save">Save to My Scenes</button>
       <button type="button" class="pix-btn" data-cmd="banner-copy">Copy JSON for the Admin</button>
-      <button type="button" class="pix-btn pnt-icon" data-cmd="banner-close" aria-label="Close" data-tip="Close this note (the scene stays as it is)">✕</button>
+      <button type="button" class="pix-btn pnt-icon" data-cmd="banner-close" aria-label="Close" ${TIPS.close.attrs}>✕</button>${TIPS.close.note}
     </div>
     <div class="pnt-banner" data-aside hidden>
       <p data-aside-text></p>
@@ -879,7 +879,7 @@ const tool = {
   fullscreen: () => toggleFullscreen(),
   keys: () => keysOverlay.open(),
 };
-const tools = bindTools(q('[data-tools]'), (cmd) => tool[cmd]?.());
+const tools = bindTools(q('[data-tools]'), (cmd) => tool[cmd]?.(), { hideTip: tips.hide });
 /** `/`: the panel's search (the panel shown first if it's hidden). */
 function focusSearch() {
   if (!panelShown) togglePanel(true);
