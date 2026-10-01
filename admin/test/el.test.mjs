@@ -107,6 +107,11 @@ test('every admin page renders without a style or title attribute anywhere', asy
   const mores = nodes.filter((n) => n.className === 'viz-more');
   assert.ok(mores.length >= 5, `a More per long explanation (${mores.length})`);
   for (const d of mores) assert.ok(d.children[0].children.some((c) => c.className === 'visually-hidden' && / about \S/.test(c.textContent)), 'More, about what');
+  // A project's Problem is prose (a textarea); the interface's Problem heading is a line.
+  const field = (path) => nodes.find((n) => n.getAttribute('data-path') === path);
+  const i = content.projects.findIndex((p) => p.problem);
+  assert.ok(field(`projects[${i}].problem`).querySelector('textarea'));
+  assert.ok(field('ui.problem').querySelector('input') && !field('ui.problem').querySelector('textarea'), 'ui.problem: one line');
 });
 
 test('no admin source sets a style attribute or a title', () => {

@@ -121,6 +121,12 @@ const isShort = (value, path) => {
   return typeof value === 'string' && SHORT.has(key) && value.length < 60;
 };
 
+/**
+ * Long text, for a textarea: a long value, or a field named for prose (a project's Problem;
+ * not the interface's heading of that name, ui.problem, a word or two).
+ */
+const isProse = (value, path) => (MULTILINE.has(path.at(-1)) && !(path[0] === 'ui' && path.length === 2)) || (typeof value === 'string' && value.length > 90);
+
 let uid = 0;
 /**
  * An object's fields (`level`: the heading level its groups take), under its sub-headings
@@ -221,7 +227,7 @@ function renderScalar(value, path, ctx, { nullable = hint(NULLABLE, patternOf(pa
     return input;
   }
   if (typeof value === 'string' && HEX_RE.test(value)) return renderColor(value, path, ctx);
-  multiline ??= MULTILINE.has(key) || (typeof value === 'string' && value.length > 90);
+  multiline ??= isProse(value, path);
   const input = multiline ? el('textarea', { rows: autoRows(value) }) : el('input', { type: 'text', spellcheck: key === 'id' || key === 'href' || key === 'src' ? 'false' : undefined });
   input.value = value ?? '';
   if (hint(READONLY, pattern)) input.readOnly = true;
