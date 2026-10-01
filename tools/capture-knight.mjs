@@ -96,13 +96,17 @@ async function grid(tiles, cols, file, labels) {
   await sharp({ create: { width: w * cols, height: h * Math.ceil(tiles.length / cols), channels: 3, background: '#000' } }).composite(comp).png().toFile(file);
   console.log(`✓ ${file}`);
 }
-/** Frames at wall-clock times (ms) after `act` runs in the page. */
-async function realTime(page, act, times, shoot) {
+/**
+ * Frames at wall-clock times (ms) after `act` runs in the page; `when` gets the time each was
+ * really taken at (a screenshot takes a while: a frame can come later than asked for).
+ */
+async function realTime(page, act, times, shoot, when = []) {
   await page.evaluate(act);
   await page.evaluate(() => { window.__t0 = performance.now(); });
   const out = [];
   for (const t of times) {
     await page.waitForFunction((ms) => performance.now() - window.__t0 >= ms, t, { polling: 5 });
+    when.push(await page.evaluate(() => Math.round(performance.now() - window.__t0)));
     out.push(await shoot(await page.screenshot(), t));
   }
   return out;
@@ -174,11 +178,12 @@ async function seq() {
     await page.evaluate(() => window.__fire.setView('home', { instant: true }));
     await page.waitForTimeout(900);
     // (Round his seat on the home view: him, the fire and what stands by his seat, wide
-    // enough for any round's seat: round 10's ruins seat sits further right than round 9's.)
-    const region = [0.32, 0.1, 0.82, 0.66];
+    // enough for any round's seat and where he stands up to, his arms thrown up.)
+    const region = [0.26, 0.0, 0.82, 0.66];
     for (const [nm, s] of Object.entries(SEQS)) {
-      const tiles = await realTime(page, s.act, s.at, (buf) => crop(buf, region, 380, 240));
-      await grid(tiles, 10, `${OUT}/${TAG}-seq-${name}-${nm}.png`, s.at.map((t) => `${name} ${nm} ${t} ms`));
+      const when = [];
+      const tiles = await realTime(page, s.act, s.at, (buf) => crop(buf, region, 380, 240), when);
+      await grid(tiles, 10, `${OUT}/${TAG}-seq-${name}-${nm}.png`, when.map((t) => `${name} ${nm} ${t} ms`));
       await page.waitForTimeout(1500);
       await page.evaluate(() => window.__fire.knights.sit(0));
       await page.waitForTimeout(1600);
