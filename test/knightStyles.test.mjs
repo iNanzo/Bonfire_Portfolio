@@ -1,0 +1,38 @@
+// The knight's styles (knightStyles.js): every look he has had, selectable by one name, each
+// with a label, a hint and its model; the default is one of them; the models are shipped.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { STYLES, STYLE_KEYS, STYLE_NAMES, DEFAULT_STYLE, MODELS, CEL_LOOKS, styleOr, styleModel } from '../src/bonfire/knightStyles.js';
+
+test('six styles, each named, hinted and with its look and model', () => {
+  assert.deepEqual(STYLE_KEYS, ['pixel-cel', 'pixel-painterly', 'pixel-chiaroscuro', 'gunmetal', 'blackgold', 'first']);
+  const looks = new Set();
+  for (const k of STYLE_KEYS) {
+    const s = STYLES[k];
+    assert.match(STYLE_NAMES[k], /^[A-Z][a-z]*( ([A-Z][a-z]*|&))*$/, `${k}: a Title Case name (${STYLE_NAMES[k]})`);
+    assert.ok(typeof s.hint === 'string' && s.hint.length > 20 && s.hint.length < 100, `${k}: a one-line hint`);
+    assert.ok(Object.hasOwn(MODELS, s.model), `${k}: a known model`);
+    assert.equal(typeof s.finish, 'boolean');
+    assert.ok(Number.isInteger(s.look) && s.look >= 0 && s.look <= 5, `${k}: a shader look`);
+    looks.add(s.look);
+  }
+  assert.equal(looks.size, STYLE_KEYS.length, 'each style its own look');
+  assert.deepEqual(Object.values(CEL_LOOKS), ['cel', 'painterly', 'chiaroscuro']);
+  for (const look of Object.keys(CEL_LOOKS)) assert.ok(STYLE_KEYS.some((k) => STYLES[k].look === Number(look)));
+});
+
+test('the default is a style; anything else falls back to it; each style names its model file', () => {
+  assert.equal(DEFAULT_STYLE, 'pixel-cel', "the round-9 finals' pick: the Pixel Cel sprite");
+  assert.equal(styleOr('blackgold'), 'blackgold');
+  assert.equal(styleOr('gold'), DEFAULT_STYLE);
+  assert.equal(styleOr(undefined), DEFAULT_STYLE);
+  assert.equal(styleModel('first'), 'models/knight-first.glb');
+  assert.equal(styleModel('gunmetal'), 'models/knight.glb');
+  assert.equal(styleModel('nope'), styleModel(DEFAULT_STYLE));
+  for (const file of Object.values(MODELS)) assert.ok(fs.existsSync(new URL(`../public/${file}`, import.meta.url)), `${file} is shipped`);
+  // (The finishes are the color option only where he's drawn in steel.)
+  assert.equal(STYLES.blackgold.finish, false);
+  assert.equal(STYLES.first.finish, false);
+  assert.equal(STYLES.gunmetal.finish, true);
+});

@@ -15,11 +15,22 @@
 // core color, adds camera trauma (view.js), throws debris that bounces off the scenery
 // (debris.js) and leaves a mark on the ground that fades (marks.js). While lots is going
 // on, the background extras thin out (`busy`) so the main hit reads.
+//
+// A knight rests at the fire (knights.js, his own model fetched alongside the scene's; the
+// fire burns without him if it fails): he looks up at a weapon rising out of the fire,
+// flinches at its impact, leans away from a stoke and lifts his feet as a ring passes. On
+// the site he follows effects.knight (there or not, which helmet; the visitor's own pick
+// from the pack, `knightHelmet`, wins for the visit). In Bonfire Live a few can be
+// summoned to dance round the fire (fire.knights); that page casts them itself. His code is
+// a chunk of its own (knightBundle.js), fetched with his model. On the site, when he isn't
+// there at load (his sign waits for him), the fire's first frame doesn't wait for him: he's
+// built after it, a step at a time in idle moments, his shaders compiled before he and his
+// sign are put in the scene (the sign kindles as it appears).
 import * as THREE from 'three';
 import { createResourceScope } from './resources.js';
 import { weapons as weaponNames, startingEquipment } from '../content.js';
 import { effects } from '../effects.js';
-import { ELEMENT_IDS } from '../effectsDefaults.js';
+import { ELEMENT_IDS, KNIGHT_HELMETS } from '../effectsDefaults.js';
 import { elementOr } from '../elements.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
@@ -31,6 +42,9 @@ import { createTerrain } from './terrain.js';
 import { createImpactFx, createSmokeMaterial } from './impact.js';
 import { createCurlField } from './curl.js';
 import { createWeapons } from './weapons.js';
+import { SEATS } from './knightPlaces.js';
+import { createArmorShared } from './armor.js';
+import { MODELS, styleOr, styleModel } from './knightStyles.js';
 import { createPlasma } from './plasma.js';
 import { createLightningRing } from './lightningRing.js';
 import { createCrystals, createIceRing } from './ice.js';
@@ -41,7 +55,8 @@ import { createPointer } from './pointer.js';
 import { createGroundMarks } from './marks.js';
 import { createDebris } from './debris.js';
 import { createFlowView } from './flowView.js';
-import { buildScenery, SCENERIES } from './scenery.js';
+import { buildScenery, SCENERIES, MAX_LAMPS } from './scenery.js';
+import { passValue, stillClock } from './stillFx.js';
 import { base, flames, flameOr, scenePalette, debugPalettes, mixFlame, flameEase } from '../palette.js';
 
 const BASE = import.meta.env.BASE_URL;
@@ -54,12 +69,17 @@ const WEAPON_ANCHOR = new THREE.Vector3(0.04, 0, 0.03);
 
 const PIXEL_SIZES = [2, 3, 4, 6];
 const DEBUG_PALETTES = Object.keys(debugPalettes);
-const DITHER_LEVELS = [0.16, 0.26, 0.08, 0];
+const DITHER_LEVELS = [0.08, 0.16, 0.26]; // (the render menu steps up through these from the current value, then to none)
 const MATRIX_SIZES = [4, 8];
 
 const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
+// The knight's helmets (knights.js HELMETS: the settings' own list, less 'random'; his code
+// loads with his model, this is needed before).
+const HELMETS = KNIGHT_HELMETS.filter((h) => h !== 'random');
+// A moment the page isn't busy (a frame's spare time; Safari has no requestIdleCallback).
+const idle = (fn) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 250 }) : setTimeout(fn, 16));
 
-export function createBonfire(container, { reducedMotion = false, sway: swayAmount = 1, lightTrails = false, effects: fxLayer = false, onImpact, onFormed, onRamp, onError, onFrame } = {}) {
+export function createBonfire(container, { reducedMotion = false, paintedLook = false, sway: swayAmount = 1, lightTrails = false, effects: fxLayer = false, knightHelmet = null, onImpact, onFormed, onRamp, onError, onFrame } = {}) {
   const scope = createResourceScope();
   const events = new AbortController();
   scope.cleanup(() => events.abort());
@@ -123,6 +143,16 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
 
   const candleLight = new THREE.PointLight(0xffb25a, 0.35, 2.5, 1.8);
   scene.add(candleLight);
+  // The other sceneries' lamps (scenery.js) take their places in a fixed pool, and the
+  // candle's light goes dark away from the ruins: every light stays in the scene (and on
+  // every layer, once the model is in), so the lit shaders are built once, at load, and a
+  // new place or a pass that sees different lights never makes them rebuild.
+  const lamps = Array.from({ length: MAX_LAMPS }, () => {
+    const l = new THREE.PointLight(0xffb25a, 0, 2, 1.8);
+    l.userData.base = 0;
+    scene.add(l);
+    return l;
+  });
 
   // --- Drawing (frame.js): the passes, their buffers, and (the visualizer) the effects stages
   const frame = createFrame({
@@ -251,14 +281,10 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     feedMode: 'uFeedMode', ghostMode: 'uGhostMode', warpMode: 'uWarpMode', warpMix: 'uWarpMix', inkMode: 'uInkMode', invertMode: 'uInvertMode', scanBlend: 'uScanBlend', glowMode: 'uGlowMode', gradMode: 'uGradMode',
   };
   const GLITCH_ENTRIES = Object.entries(GLITCH_UNIFORMS);
-  // Effects that are a still look rather than motion or flashing (kept under reduced motion):
-  // the framing, the palette's recolors and repaints, and how everything blends.
-  const STILL = new Set([
-    'mirror', 'scan', 'scanMode', 'block', 'letterbox', 'iris', 'zoom', 'temp',
-    'grad', 'gradA', 'gradB', 'gradC', 'style', 'styleR', 'styleMix', 'paintAngle', 'paintAspect', 'washEdge', 'glowSize', 'glowCut', 'ghostKeep', 'flickerMode',
-    'feedMode', 'ghostMode', 'warpMode', 'warpMix', 'inkMode', 'invertMode', 'scanBlend', 'glowMode', 'gradMode',
-  ]);
-  const OFF = { iris: 2, zoom: 1, block: 1 };
+  // Under reduced motion only the still effects reach the picture; the Painter's
+  // (`paintedLook`) lets the look being painted through, all but what flashes or jitters
+  // (stillFx.js).
+  const stillOpts = { reducedMotion, paintedLook };
   const boost = (v) => Math.max(0.1, 1 + v);
   // The site's hover on the fire (hoverAt, below): 1 while the cursor is on it, and eased,
   // how far the fire has risen, brightened and started sparking to meet it (update).
@@ -302,6 +328,16 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   interaction.strength = effects.cursor.strength;
 
   let weapons = null; // set once the model loads
+  let knights = null; // ...and the knights, once theirs does (knights.js)
+  // The armor's shared uniforms: the fire's place and light, the exposure, the flame's ramp,
+  // its style, finish and rim (the settings', effects.knight, or Bonfire Live's: applyArmor);
+  // the colors his steel snaps to and the style's line art go to the pass (pixelPass.js
+  // setSteel).
+  const armor = createArmorShared({
+    fireAt: fireLight.position, exposure: pass.uniforms.exposure, resolution: pass.uniforms.resolution, moonAt: moon.position, reducedMotion,
+    style: styleOr(effects.knight?.style), finish: effects.knight?.finish ?? 'gunmetal', rim: effects.knight?.rim ?? 0.5,
+    onSteel: (steel, rim, o) => pass.setSteel(steel, { rim, ...o }),
+  });
 
   // --- Flame color state: eased blends between flames (see flameEase)
   let flameKey = flameOr(startingEquipment.flame);
@@ -331,10 +367,13 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     currentShade = f.shade;
     currentMix = mix;
     for (const s of tinted) s.setRamp(f.ramp);
+    // (The armor: the flame's ramp, its shade for the rim and the warm ground he mirrors, and
+    // its light, which his steel's lit tones lean toward.)
+    armor.setRamp(f.ramp, { shade: f.shade, mix });
     pass.uniforms.uCore.value.set(f.ramp[3]);
     if (debugPaletteIndex === 0) {
       const extra = paletteExtra();
-      pass.setPalette(extra ? [...scenePalette(f), ...extra.ramp, extra.shade] : scenePalette(f));
+      pass.setPalette(extra ? [...scenePalette(f), ...extra.ramp, extra.shade] : scenePalette(f), { steel: true });
     }
     fireLight.color.set(f.ramp[1]).lerp(white, mix);
     lightBase.copy(fireLight.color);
@@ -342,6 +381,109 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     onRamp?.(f.ramp);
   }
   applyColors(flames[flameKey], lightMix(flameKey));
+  // The armor's style, finish and rim: the settings' (effects.knight), or Bonfire Live's over
+  // them (fire.knights.setStyle / setFinish / setRim; null gives the settings' back).
+  const armorOverride = { style: null, finish: null, rim: null };
+  function applyArmor() {
+    armor.setFinish(armorOverride.finish ?? effects.knight?.finish ?? 'gunmetal');
+    armor.setRim(armorOverride.rim ?? effects.knight?.rim ?? 0.5);
+    applyStyle();
+  }
+  // The style (knightStyles.js): its shader (armor.js) and its model (knights.js). A style with
+  // its own model (the first build's) has it fetched and its template built (a step at a time,
+  // in idle moments) once: when that style is first chosen, or beforehand (prepareStyle: Bonfire
+  // Live and the Painter get them ready once the knights are in, so a roll to one at a drop
+  // shows at once). Changing it on a knight who's here burns him away and forms him again in it
+  // (`instant`: at once, if its model is ready; if it isn't, he burns and forms when it is,
+  // never popping in whole a moment late). Resolves true once it shows, false if it couldn't
+  // (no knights, the model didn't load, another style took over).
+  const styleModels = new Map(); // model file -> Promise<its scene | null>
+  function styleScene(file) {
+    if (!styleModels.has(file)) {
+      styleModels.set(file, loader.loadAsync(`${BASE}${file}`).then((g) => {
+        if (scope.disposed) return null;
+        scope.trackTree(g.scene);
+        return g.scene;
+      }, (error) => {
+        // (Not tried again for half a minute: every finish or rim change asks for it.)
+        console.warn(`The knight model ${file} did not load; he keeps his style.`, error);
+        setTimeout(() => styleModels.delete(file), 30000);
+        return null;
+      }));
+    }
+    return styleModels.get(file);
+  }
+  const styleTemplates = new Map(); // model file -> Promise<its scene, its template built | null>
+  const styleReady = new Map();     // model file -> its scene, once its template is built
+  /** A style's model fetched and its template built in idle moments (once). Resolves with its scene, or null. */
+  function prepareStyleModel(file) {
+    if (file === MODELS.main) return Promise.resolve(null);
+    if (!styleTemplates.has(file)) {
+      const ready = styleScene(file).then((root) => (root && !scope.disposed ? knightsIn.then(() => (knights && bundle ? inSteps(bundle.templateSteps(root)) : null)) : null)).then((t) => {
+        if (!t || !knights || scope.disposed) { styleTemplates.delete(file); return null; }
+        knights.adoptTemplate(t);
+        for (const g of knights.geometries) scope.own(g);
+        styleReady.set(file, t.root);
+        return t.root;
+      }, (error) => {
+        console.warn(`The knight model ${file} is unusable; he keeps his style.`, error);
+        return null;
+      });
+      styleTemplates.set(file, ready);
+    }
+    return styleTemplates.get(file);
+  }
+  let styleGoal = null; // the style asked for last (it may still be loading)
+  let stylePending = null; // { name, promise }: a style asked for whose model isn't ready yet
+  function applyStyle({ instant = false } = {}) {
+    const name = styleOr(armorOverride.style ?? effects.knight?.style);
+    if (!knights) {
+      // (Not there yet: the shader takes it now, the model when they come: addKnights.)
+      styleGoal = name;
+      if (styleModel(name) === MODELS.main) armor.setStyle(name);
+      return Promise.resolve(false);
+    }
+    // (Asked for again while its model is on its way: the same wait, not a second swap.)
+    if (stylePending?.name === name) { styleGoal = name; return stylePending.promise; }
+    if (name === styleGoal && (name === knights.style || knights.restyling)) return Promise.resolve(true);
+    styleGoal = name;
+    const file = styleModel(name);
+    const root = file === MODELS.main ? null : styleReady.get(file);
+    if (file === MODELS.main || root) {
+      stylePending = null;
+      return knights.setStyle(name, { model: root, instant });
+    }
+    const promise = prepareStyleModel(file).then((scene) => {
+      if (stylePending?.promise === promise) stylePending = null;
+      if (styleGoal !== name || !knights || scope.disposed) return false;
+      if (!scene) { styleGoal = knights.style; return false; }
+      // (Late: he burns away and forms in it, the swap's own way, whatever was asked.)
+      return knights.setStyle(name, { model: scene });
+    });
+    stylePending = { name, promise };
+    return promise;
+  }
+  /**
+   * Run `steps` (a generator: knights.js templateSteps) in idle moments, a few ms at a time,
+   * so building a knight's template never stalls the fire. Resolves with its return value
+   * (null if the scene is gone first).
+   */
+  function inSteps(steps) {
+    return new Promise((resolve, reject) => {
+      const slice = (deadline) => {
+        if (scope.disposed) { resolve(null); return; }
+        const budget = deadline?.timeRemaining ? Math.min(12, Math.max(4, deadline.timeRemaining())) : 8;
+        const until = performance.now() + budget;
+        try {
+          let r = steps.next();
+          while (!r.done && performance.now() < until) r = steps.next();
+          if (r.done) resolve(r.value);
+          else idle(slice);
+        } catch (error) { reject(error); }
+      };
+      idle(slice);
+    });
+  }
 
   // --- Model
   const candleFlames = [];
@@ -351,11 +493,27 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
 
   const draco = scope.own(new DRACOLoader());
   const loader = new GLTFLoader().setDRACOLoader(draco);
-  const modelLoaded = loader.loadAsync(`${BASE}models/bonfire.glb`).then((gltf) => {
+  // The knight is fetched alongside, his code with his model (knightBundle.js: a chunk of its
+  // own); either failing only leaves him out. On the site, when he isn't there from the start
+  // (his sign waits for him, or he isn't allowed), the fire doesn't wait for him: he's built
+  // after its first frame (knightsIn).
+  let bundle = null; // knightBundle.js, once loaded
+  let knightsShown = true; // (false while he and his sign are made but not yet in the scene: knightsIn)
+  const knightLoaded = Promise.all([loader.loadAsync(`${BASE}models/knight.glb`), import('./knightBundle.js')]).then(([gltf, code]) => {
+    bundle = code;
+    return gltf.scene;
+  }).catch((error) => {
+    console.warn('The knight did not load; the fire burns without him.', error);
+    return null;
+  });
+  const knightLater = !fxLayer && !(effects.knight?.show && effects.knight?.arrival === 'start');
+  const modelLoaded = Promise.all([loader.loadAsync(`${BASE}models/bonfire.glb`), knightLater ? null : knightLoaded]).then(([gltf, knightScene]) => {
     const root = gltf.scene;
     if (scope.disposed) {
       const late = createResourceScope();
-      late.trackTree(root); late.dispose();
+      late.trackTree(root);
+      if (knightScene) late.trackTree(knightScene);
+      late.dispose();
       return;
     }
     scope.trackTree(root);
@@ -366,6 +524,11 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     for (const name of ['Firefly_Lantern', 'Firefly_Wings']) {
       if (!root.getObjectByName(name)) throw new Error('Model is missing required node: ' + name);
     }
+    // The ruins' seat for the knight (scenery.js): a drum fallen from the pillar, one of the
+    // ruins' own pieces from here on (its solid, its shadow, the fireflies' height map).
+    const ruinsSeat = buildScenery('ruins', { pillar: root.getObjectByName('Static_Pillar')?.material ?? new THREE.MeshLambertMaterial() }, () => null);
+    ruinsSeat.group.traverse((o) => { if (o.isMesh) o.name = 'Static_PillarDrum'; });
+    root.add(ruinsSeat.group);
     root.updateMatrixWorld(true);
     weapons = createWeapons(root, {
       anchor: WEAPON_ANCHOR,
@@ -395,6 +558,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
         onFormed: () => {
           hit(0.45, { freeze: false });
           fire.burst(0.45);
+          armor.flare(0.8);
           onFormed?.();
         },
         // An element's own big moment in the forge (a bolt out of the sky, the frozen blade
@@ -578,9 +742,168 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     scene.add(root, weapons.holder);
     weapons.setRim(currentRamp[2]);
     weapons.set(startingEquipment.weapon);
+    if (knightScene) addKnights(knightScene);
+    // Every light on every layer: each pass (frame.js) then sees the same lights, so the lit
+    // materials aren't re-set-up for a different light count every frame (the particles'
+    // pass has no lit materials: they change nothing there).
+    scene.traverse((o) => { if (o.isLight) o.layers.enableAll(); });
     ready = true;
 
   });
+
+  /**
+   * The knights (knights.js) from their model (`template`: its template, built beforehand in
+   * idle moments). None is there at first: on the site the first comes when he's summoned
+   * (knightArrival.js: his sign on the ground, the pack) unless the settings have him there
+   * from the start; Bonfire Live casts its own (knightShow.js). Returns what goes in the scene
+   * (his and his sign's objects): put there now, or (`attach` false) by the caller.
+   */
+  function addKnights(model, { template = null, attach = true } = {}) {
+    scope.trackTree(model);
+    try {
+      knights = bundle.createKnights(model, {
+        layerSolid: LAYER_SOLID, layerGhost: LAYER_GHOST, castShadows: renderer.shadowMap.enabled, armor,
+        max: coarse ? 2 : 4, reducedMotion, template,
+        onSparks: (list) => fire.emitSparks(list),
+      });
+    } catch (error) {
+      console.warn('The knight model is unusable; the fire burns without him.', error);
+      knights = null;
+      return [];
+    }
+    for (const r of [...knights.materials, ...knights.geometries]) scope.own(r);
+    scope.trackTree(knights.group);
+    const skeletons = knights.skeletons;
+    scope.cleanup(() => skeletons.forEach((s) => s.dispose()));
+    const objects = [knights.group];
+    tinted.push(knights);
+    knights.setRamp(currentRamp);
+    // (His style's model, if it isn't the knight's own: as he first comes, at once.)
+    styleGoal = null;
+    applyStyle({ instant: true });
+    knights.setScenery(sceneryKey, terrains[sceneryKey]);
+    fitKnights();
+    if (siteKnight) objects.push(...addArrival());
+    applyKnight(true);
+    if (attach) scene.add(...objects);
+    return objects;
+  }
+
+  // --- The site's knight (effects.knight). He comes and goes (knightArrival.js): away, his
+  // summon sign glows on the ground in front of his seat (summonSign.js) and a click on it,
+  // or the pack, summons him; arriving, the sign burns away into him in the current element's
+  // own way (the weapon swap's forge); resting a while (effects.knight.rest); leaving, he
+  // burns away into the sign. effects.knight.show allows him at all; arrival 'start' has him
+  // there from the first frame (and staying) instead. His helmet: the setting's, or for
+  // 'random' a new one on each summon, unless the visitor picked one in the pack
+  // (`knightHelmet`, remembered by main.js; a pick holds for the visit). A helmet setting
+  // changed in the admin shows at once. Bonfire Live (`effects`) casts its own knights and
+  // leaves all this alone.
+  const siteKnight = !fxLayer;
+  let knightSetting = null; // the helmet setting last applied (null: none yet)
+  let helmetGoal = null;    // the helmet knight 0 has on or is putting on (fire.knights.helmet)
+  let visitorHelmet = HELMETS.includes(knightHelmet) ? knightHelmet : null;
+  let arrivalSetting = null; // effects.knight.arrival as last applied
+  let showSetting = null;    // ...and effects.knight.show
+  let sign = null;          // his summon sign (summonSign.js), on the site
+  let arrival = null;       // ...and his comings and goings (knightArrival.js)
+  const presenceListeners = new Set();
+  function wearHelmet(name, o = {}) {
+    if (!knights || !HELMETS.includes(name)) return Promise.resolve(false);
+    if (o.index == null || o.index === 0) helmetGoal = name;
+    return knights.setHelmet(name, o);
+  }
+  /** The helmet he comes in: the setting's, the visitor's pick, or a new one at random. */
+  function helmetForSummon() {
+    const setting = effects.knight.helmet;
+    if (HELMETS.includes(setting)) return setting;
+    if (visitorHelmet) return visitorHelmet;
+    const others = HELMETS.filter((h) => h !== helmetGoal);
+    return others[Math.floor(Math.random() * others.length)];
+  }
+  /** Where his sign lies in a scenery: in front of the seat (knightPlaces.js), on the ground there. */
+  function signPlace(name) {
+    const s = SEATS[name]?.sign ?? SEATS.ruins.sign;
+    const t = terrains[name];
+    let y = 0;
+    if (t) for (const dx of [-0.2, 0, 0.2]) for (const dz of [-0.25, 0, 0.25]) y = Math.max(y, t.height(s.x + dx, s.z + dz));
+    return { x: s.x, y: Math.min(0.08, y) + 0.004, z: s.z, yaw: s.yaw };
+  }
+  /** The sign and the arrival (the site's knight), once there are knights. Returns their objects (for the scene). */
+  function addArrival() {
+    sign = bundle.createSummonSign({ layer: LAYER_GHOST, layerSolid: LAYER_SOLID, layerFx: LAYER_FX, moteMaterial: effectMaterial, exposure: pass.uniforms.exposure, reducedMotion });
+    for (const r of [...sign.geometries, ...sign.materials]) scope.own(r);
+    scope.trackTree(sign.group); scope.trackTree(sign.motes);
+    sign.setRamp(currentRamp);
+    tinted.push(sign);
+    arrival = bundle.createKnightArrival({
+      knights, sign, particleMaterial: effectMaterial,
+      materials: { fire: effectMaterial, lightning: crossMaterial, ice: diamondMaterial },
+      layerFx: LAYER_FX, field, anchor: WEAPON_ANCHOR, count: pCount(P.forge), reducedMotion,
+      now: () => ({ element: elementKey, ramp: currentRamp }),
+      // (effects.knight's rest is in minutes, rolled between the two on each arrival; one not
+      // set: knightArrival.js REST's.)
+      rest: () => [effects.knight.restMin, effects.knight.restMax].map((m) => m * 60),
+      // (His rest running out waits while he's mid-gesture, changing his helmet or style, or
+      // looking at the cursor on him.)
+      busy: () => !!knights?.busyAt(0) || knights?.hovered === 0,
+      hooks: {
+        onForgeStrike: (w) => hit(w, { freeze: false }),
+        // He's whole: a light hit, and the fire's reflection sweeps his new armor.
+        onFormed: (which) => {
+          hit(which === 'knight' ? 0.35 : 0.2, { freeze: false });
+          if (which === 'knight') { armor.flare(0.8); fire.burst(0.3 * flameShare(elementKey)); }
+        },
+      },
+    });
+    for (const o of arrival.objects) scope.trackTree(o);
+    arrival.onPresence((p) => { for (const fn of presenceListeners) fn(p); });
+    arrival.setScenery(signPlace(sceneryKey));
+    return [sign.group, sign.motes, ...arrival.objects];
+  }
+  function applyKnight(first = false) {
+    if (!knights || !siteKnight) return;
+    const { show, helmet } = effects.knight;
+    const mode = effects.knight.arrival ?? 'sign';
+    // The fire's reflection sweeping his armor, at rest now and then and when the fire flares.
+    const shine = effects.knight.shine ?? true;
+    armor.setShine({ rest: shine, flares: shine });
+    // How he sits: resting (the Dark Souls rest) or watchful (only a change eases him over).
+    const seat = effects.knight.seat ?? 'resting';
+    if (knights.seatPose !== undefined && seat !== knights.seatPose) knights.setSeatPose(seat);
+    arrival.allowed = !!show;
+    arrival.resting = mode !== 'start';
+    // There from the start: at load, or the moment the settings say so (the admin's preview:
+    // arrival turned to it, or Show turned back on with it).
+    if (show && mode === 'start' && (arrivalSetting !== 'start' || !showSetting) && arrival.presence === 'away') {
+      wearHelmet(helmetForSummon(), { index: 0, instant: true });
+      arrival.summon({ instant: true });
+    }
+    arrivalSetting = mode;
+    showSetting = !!show;
+    if (helmet === knightSetting) return;
+    const was = knightSetting;
+    knightSetting = helmet;
+    // (A fixed helmet set in the admin shows at once; 'random' waits for the next summon.)
+    if (!first && was !== null && HELMETS.includes(helmet)) wearHelmet(helmet, { index: 0, instant: arrival.presence !== 'resting' });
+  }
+  /**
+   * The visitor did something with the site's knight (a gesture from the pack or a click on
+   * him, a new helmet): his rest is topped up so he doesn't leave right after (a minute at least).
+   */
+  const busyWithHim = (index = 0) => { if (index == null || index === 0 || index === 'all') arrival?.extendRest(60); };
+  /** Summon the site's knight (through the forge from his sign; `instant`: at once). False if he can't come now. */
+  function summonKnight({ instant = false } = {}) {
+    if (!arrival || !knightsShown || arrival.presence !== 'away' || !arrival.allowed) return false;
+    wearHelmet(helmetForSummon(), { index: 0, instant: true });
+    return arrival.summon({ instant });
+  }
+  // Whether the knights react (flinch, lean, hop, watch a weapon in flight): the site's
+  // follows effects.knight.reactions; Bonfire Live switches its own (setReactions).
+  let liveReactions = true;
+  const reacts = () => (siteKnight ? effects.knight.reactions : liveReactions);
+  /** Something happened at the fire (knights.js react), if the knights mind it (reacts). */
+  function reactKnights(kind, strength, where) { if (knights && reacts()) knights.react(kind, strength, where); }
 
   // --- Scenery (scenery.js): the ruins, the forge or the shrine around the fire. Built on
   // first use; each has its own height map for the fireflies.
@@ -596,21 +919,12 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     if (!ready || !SCENERIES[name] || name === sceneryKey) return false;
     if (flash) { hit(0.6, { freeze: false }); fire.burst(0.6 * flameShare(elementKey)); }
     const show = (key, on) => {
-      if (key === 'ruins') { for (const o of ruinsOnly) o.visible = on; candleLight.visible = on; return; }
-      const s = sceneries[key];
-      s.group.visible = on;
-      for (const l of s.lights) l.visible = on;
+      if (key === 'ruins') { for (const o of ruinsOnly) o.visible = on; return; }
+      sceneries[key].group.visible = on;
     };
     if (name !== 'ruins' && !sceneries[name]) {
       const s = buildScenery(name, sceneryMaterials, () => new THREE.MeshBasicMaterial({ color: currentRamp[1], fog: false }));
       s.group.traverse((o) => { if (o.isMesh) { o.layers.set(s.glows.includes(o) ? LAYER_GHOST : LAYER_SOLID); scope.trackTree(o); } });
-      s.lights = s.lights.map((l) => {
-        const light = new THREE.PointLight(0xffb25a, l.intensity, l.distance, 1.8);
-        light.position.copy(l.at);
-        light.userData.base = l.intensity;
-        scene.add(light);
-        return light;
-      });
       glows.push(...s.glows);
       scene.add(s.group);
       s.group.updateMatrixWorld(true);
@@ -621,8 +935,21 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     show(sceneryKey, false);
     show(name, true);
     sceneryKey = name;
+    // Its lamps take the pool's lights (the rest go dark; the candle's is the ruins' own: see update()).
+    const list = sceneries[name]?.lights ?? [];
+    if (name !== 'ruins') candleLight.intensity = 0;
+    lamps.forEach((l, i) => {
+      const d = list[i];
+      l.userData.base = d ? d.intensity : 0;
+      l.intensity = l.userData.base;
+      if (d) { l.position.copy(d.at); l.distance = d.distance; }
+    });
     liveStatics = name === 'ruins' ? [...baseStatics, ...ruinsOnly.filter((o) => o.name.startsWith('Static_'))] : [...baseStatics, ...sceneries[name].solids];
     terrains[name] ??= createTerrain(renderer, liveStatics);
+    // His sign moves to the seat there (a summoning or a leaving under way ends at once), and
+    // the knights take their places there, forming out of embers.
+    arrival?.setScenery(signPlace(name));
+    knights?.setScenery(name, terrains[name]);
     shadowFrames = 2;
     return true;
   }
@@ -640,6 +967,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     hit(0.4, { freeze: false });
     // Lightning reaches for the nearest firefly.
     if (elementKey === 'lightning') strikeFirefly(1);
+    reactKnights('stoke');
+    armor.flare(1); // (the flare's reflection sweeps across the knights' armor)
     const wasFirst = firstStoke;
     firstStoke = false;
     return wasFirst;
@@ -668,6 +997,9 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     else if (elementKey === 'ice') { frostRing.burst(); crystals.burst(1); }
     else fx.burst();
     fireflies.burst(flames[flameKey].ramp);
+    reactKnights('impact', stationary ? 0.5 : 1);
+    reactKnights('ring');
+    armor.flare(1);
     hit(stationary ? 0.5 : 1);
     scar(FIRE_ORIGIN.x, FIRE_ORIGIN.z, 1.2);
     // The new ball needs a moment to grow in before it can reach for a firefly.
@@ -720,6 +1052,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     }
     if (blink) fireflies.pulse(accent ? s : s * 0.45);
     weapons.beat(s * (accent ? 1 : 0.6));
+    knights?.beat(s * (accent ? 1 : 0.6));
   }
   /**
    * The current element's ring, without a new weapon or colors: a ring of fire, of
@@ -734,6 +1067,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     else if (elementKey === 'ice') { frostRing.burst(); crystals.burst(0.8 * s); crystals.beat(1); crystals.echo(); }
     else { fx.burst(); fire.burst(0.9 * s); }
     fire.params.level = Math.max(fire.params.level, 1.6 + s);
+    reactKnights('ring', s);
+    armor.flare(0.45 + 0.4 * Math.min(1, s));
     jolt(0.12 * s);
   }
   /** Lightning jumps from the ball to the nearest firefly within reach, which flickers hot. */
@@ -760,7 +1095,10 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   let swingDone = null;
   function swing(plan) {
     if (!ready || reducedMotion) return Promise.resolve(false);
-    if (!weapons.swing({ basis: view.axes, ...plan })) return Promise.resolve(false);
+    // (It fights clear of the knights: each move's shape avoids them where they are then.)
+    const basis = plan.basis ?? view.axes;
+    const clearOfKnights = () => Object.assign(basis(), { avoid: knights?.capsules() ?? [] });
+    if (!weapons.swing({ ...plan, basis: clearOfKnights })) return Promise.resolve(false);
     return new Promise((resolve) => { swingDone = () => resolve(true); });
   }
   /** Where the blade is (world): { mid, tip, grip, normal, quat, len, swinging, free }, or null. */
@@ -804,19 +1142,128 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
   let sets = [...fire.sets, ...plasma.sets, ...crystals.sets, ...chill.sets]; // particle sets the cursor moves (the rings join on load)
 
   // --- Sizing (fixed on-screen pixel size; the render target scales instead)
-  const settings = { pixelSize: null, ditherIndex: 0, matrixIndex: 0 };
+  const settings = { pixelSize: null };
   let size = { w: 1, h: 1, pd: 4 };
   const isSmall = () => container.clientWidth < 700;
   const pixelSize = () => settings.pixelSize ?? (isSmall() ? effects.render.pixelSizeSmall : effects.render.pixelSize);
+  // --- Render options: the settings' own (effects.render), or absolute values over them
+  // (the visualizer's Render tab: setRender, setPalette, setFog, setShadows, setXray). An
+  // override stands until it's cleared, applyEffects (the admin preview) included; with
+  // none set, everything is exactly as the settings say (the site never sets one).
+  const renderOverride = {};
+  // Settings read live where they're used (the flame's frame rate, how long a color change
+  // takes, how hits land): an override writes through to them, and clearing it puts the
+  // settings' own value back. (A value there that isn't the override's is the settings'
+  // own: the admin preview replaced it.) The hit ones take true (the settings' own) or
+  // false (none: the value after the name).
+  const WRITE_THROUGH = {
+    flameFps: ['fire', 'fps'], colorChange: ['render', 'colorChange'],
+    hitStop: ['impact', 'hitStop', 0], hitFlash: ['impact', 'flash', 0], debris: ['impact', 'debris', 0], marks: ['impact', 'marks', false],
+  };
+  const ownValues = {};
   function applyRender() {
-    const r = effects.render;
+    const r = { ...effects.render, ...renderOverride };
     pass.uniforms.ditherStrength.value = r.dither;
     pass.uniforms.ditherScale.value = r.ditherMatrix;
     pass.uniforms.outlines.value = r.outlines ? 1 : 0;
     pass.uniforms.vignette.value = r.vignette;
     pass.uniforms.exposure.value = r.exposure;
+    for (const [key, [section, name]] of Object.entries(WRITE_THROUGH)) {
+      const live = effects[section];
+      if (key in renderOverride) {
+        if (live[name] !== renderOverride[key]) ownValues[key] = live[name];
+        live[name] = renderOverride[key];
+      } else if (key in ownValues) {
+        live[name] = ownValues[key];
+        delete ownValues[key];
+      }
+    }
   }
   applyRender();
+  /**
+   * Render options over the settings, as a partial: a value sets one, null clears it back to
+   * the settings', and anything left out stays as it is. dither (0..0.5), ditherMatrix (4 | 8),
+   * outlines, vignette (0..1.5), exposure, colorChange (seconds), flameFps (the flame's
+   * frame rate), pixelSize (CSS px, the same as setPixelSize but redrawn only when it
+   * changes), and how hits land: hitStop (seconds of freeze), hitFlash (0..1), debris
+   * (×), marks, each also true (the settings') or false (none).
+   */
+  function setRender(partial = {}) {
+    for (const [key, value] of Object.entries(partial)) {
+      if (value === undefined || key === 'pixelSize') continue;
+      const off = WRITE_THROUGH[key]?.[2];
+      const v = off !== undefined && typeof value === 'boolean' ? (value ? null : off) : value;
+      if (v === null) delete renderOverride[key];
+      else renderOverride[key] = v;
+    }
+    applyRender();
+    if (partial.pixelSize !== undefined && (partial.pixelSize ?? null) !== settings.pixelSize) {
+      settings.pixelSize = partial.pixelSize ?? null;
+      resize();
+    }
+  }
+  // The palette: null (the settings': the flame's own, which the debug HUD may cycle),
+  // 'flame' (always the flame's own), a debug palette ('ashen', 'moonlit'), or a few of the
+  // flame's own colors ([slot, …] of scenePalette, e.g. [0, 6, 8]), which follow the flame
+  // as it changes (keepPalette, every frame).
+  let paletteOverride = null;
+  const paletteIndex = (id) => Math.max(0, DEBUG_PALETTES.findIndex((n) => n.toLowerCase().startsWith(id)));
+  function keepPalette(force = false) {
+    const p = paletteOverride;
+    if (p === null) return;
+    if (Array.isArray(p)) {
+      const all = scenePalette({ ramp: currentRamp, shade: currentShade });
+      pass.setPalette(p.map((i) => all[i] ?? all[0]));
+      return;
+    }
+    const index = paletteIndex(p);
+    if (!force && index === debugPaletteIndex) return;
+    debugPaletteIndex = index;
+    if (index) pass.setPalette(debugPalettes[DEBUG_PALETTES[index]]);
+    else applyColors({ ramp: currentRamp, shade: currentShade }, currentMix);
+  }
+  function setPalette(p = null) {
+    const was = paletteOverride;
+    const slots = Array.isArray(p) ? p.filter((i) => Number.isInteger(i) && i >= 0) : null;
+    paletteOverride = slots ? (slots.length ? slots : null) : p ?? null;
+    if (paletteOverride === null) {
+      if (was !== null) { debugPaletteIndex = 0; applyColors({ ramp: currentRamp, shade: currentShade }, currentMix); }
+      return;
+    }
+    // (A few of the flame's colors go over the flame's own palette, which stays the one
+    // applyColors keeps, so going back to it is immediate.)
+    if (slots) debugPaletteIndex = 0;
+    keepPalette(true);
+  }
+  // Fog: the scene's own (light), none, or thick (near and far, meters from the camera).
+  const FOGS = { light: [scene.fog.near, scene.fog.far], thick: [3.2, 8], off: [1000, 1001] };
+  let fogKind = 'light';
+  function setFog(kind = 'light') {
+    fogKind = FOGS[kind] ? kind : 'light';
+    [scene.fog.near, scene.fog.far] = FOGS[fogKind];
+  }
+  /**
+   * The fire's shadow on or off, only where shadows are drawn at all. Its strength, not
+   * whether the light casts one: no shader changes (none is rebuilt), and while it's off the
+   * shadow map isn't redrawn either (shadowNeedsUpdate), so it's lighter on the card.
+   */
+  let shadowsOn = true;
+  function setShadows(on = true) {
+    if (!!on === shadowsOn) return;
+    shadowsOn = !!on;
+    fireLight.shadow.intensity = shadowsOn ? 1 : 0;
+    if (shadowsOn) shadowFrames = Math.max(shadowFrames, 1); // (it's stale: redraw it now)
+  }
+  // X-ray (the visualizer): one of the passes the picture is built from, in place of the
+  // scene but carried on through the effects and the palette (pixelPass.js uXray), or the
+  // flow field over the fire. null: the picture.
+  const XRAY = { normals: 1, lighting: 2, particles: 3, flow: 0 };
+  let xrayView = null;
+  function setXray(view = null) {
+    xrayView = view in XRAY ? view : null;
+    pass.uniforms.uXray.value = XRAY[xrayView] ?? 0;
+    flowView.visible = xrayView === 'flow';
+  }
   function resize() {
     if (scope.disposed) return;
     const dpr = window.devicePixelRatio || 1;
@@ -831,7 +1278,11 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     pointer.measure(canvas);
     camera.aspect = w / h;
     view.layout = container.clientWidth >= 1100 && w / h > 1.15 ? 'wide' : 'tall';
+    fitKnights();
   }
+  // The site's tall layout (a phone) frames his seat right under the page's header, with no
+  // room over him to stand up in: the dance from the pack is danced in his seat there.
+  function fitKnights() { if (knights && siteKnight) knights.headroom = view.layout === 'wide'; }
   const observer = new ResizeObserver(resize);
   observer.observe(container);
   scope.cleanup(() => observer.disconnect());
@@ -939,9 +1390,12 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     if (ls !== lightStep) {
       lightStep = ls;
       lightFlicker = 0.82 + Math.random() * 0.3;
-      candleLight.intensity = 0.28 + Math.random() * 0.12;
-      const s = sceneries[sceneryKey];
-      if (s) for (const l of s.lights) { l.intensity = l.userData.base * (0.8 + Math.random() * 0.3); l.color.set(currentRamp[1]).lerp(white, 0.3); }
+      candleLight.intensity = sceneryKey === 'ruins' ? 0.28 + Math.random() * 0.12 : 0;
+      for (const l of lamps) {
+        if (!l.userData.base) continue;
+        l.intensity = l.userData.base * (0.8 + Math.random() * 0.3);
+        l.color.set(currentRamp[1]).lerp(white, 0.3);
+      }
     }
     // Each element lights the scene its own way: fire flickers, the ball strobes
     // with its crackle, ice glows steadily and breathes.
@@ -954,7 +1408,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     fireLight.position.lerpVectors(FIRE_LIGHT_AT, ballLightAt.set(FIRE_ORIGIN.x, Math.max(effects.lightning.height, BALL_LIGHT_MIN_Y), FIRE_ORIGIN.z + 0.12), presence.lightning);
     // A discharge (weapon impact, stoke) flashes the whole scene for an instant.
     const flash = reducedMotion ? 0 : plasma.flash;
-    pass.uniforms.exposure.value = effects.render.exposure * (1 + flash * 0.45) * boost(drive.exposure);
+    pass.uniforms.exposure.value = (renderOverride.exposure ?? effects.render.exposure) * (1 + flash * 0.45) * boost(drive.exposure);
+    keepPalette();
     pass.uniforms.uFlash.value = reducedMotion ? 0 : flashAmt;
     // The music's color temperature (the visualizer) tints the cast light too.
     const temp = glitch.temp;
@@ -964,16 +1419,29 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * flicker * blendMul * (1 + flash * 1.5) * boost(drive.glow) * (1 + 0.6 * hoverGlow);
 
     weapons.update(dt);
+    if (knights) {
+      // The armor mirrors the fire as it flickers; the knights glance at a weapon in flight.
+      armor.uniforms.uFire.value = Math.min(1.6, fireLight.intensity / Math.max(0.1, effects.fire.glow));
+      const b = weapons.busy ? weapons.blade(bladeState) : null;
+      knights.update(dt, { lookAt: b && reacts() ? (b.free ? b.tip : b.mid) : null, cameraAt: camera.position });
+      // (The site's: his sign, and his coming and going, after his pose.)
+      arrival?.update(dt);
+    }
 
     view.step(realDt);
   }
 
-  // The shadow is redrawn while a weapon moves (and a frame after), when the light moves
-  // (the lightning ball's height), and once after the model loads or the settings change.
+  // The shadow is redrawn while a weapon moves (and a frame after), in the frame a knight's
+  // pose steps or he forms or goes (knights.moving: the skeleton is updated in the same
+  // render, before the shadow, so once is enough), when the light moves (the lightning
+  // ball's height), and once after the model loads or the settings change; never while
+  // the shadow is switched off (setShadows).
   const shadowLightAt = new THREE.Vector3(Infinity, 0, 0);
   let shadowFrames = 0;
   function shadowNeedsUpdate() {
+    if (!shadowsOn) return false;
     if (weapons?.moving) shadowFrames = 2;
+    else if (knights?.moving) shadowFrames = Math.max(shadowFrames, 1);
     const stale = shadowFrames > 0 || !fireLight.position.equals(shadowLightAt);
     shadowFrames = Math.max(0, shadowFrames - 1);
     shadowLightAt.copy(fireLight.position);
@@ -1001,10 +1469,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     simT += simDt;
     if (ready) update(simDt, simT, dt);
     view.apply(dt, size, pointer);
-    for (const [k, u] of GLITCH_ENTRIES) {
-      pass.uniforms[u].value = reducedMotion && !STILL.has(k) ? OFF[k] ?? 0 : glitch[k];
-    }
-    pass.uniforms.uTime.value = t;
+    for (const [k, u] of GLITCH_ENTRIES) pass.uniforms[u].value = passValue(k, glitch[k], stillOpts);
+    pass.uniforms.uTime.value = stillClock(stillOpts) ? 0 : t;
     // The ripple is sized to the screen: radius as a fraction of the height, push per 270 rows.
     pass.uniforms.uRippleR.value = glitch.rippleR * size.h;
     pass.uniforms.uRippleAmp.value = reducedMotion ? 0 : (glitch.rippleAmp * size.h) / 270;
@@ -1028,11 +1494,130 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     } : null);
   }
   document.addEventListener('visibilitychange', syncRunning, { signal: events.signal });
-  // Only one readiness promise owns startup failures; callers handle its rejection.
-  const loaded = modelLoaded.then(() => { resize(); syncRunning(); }).catch((error) => {
-    scope.dispose();
-    throw error;
+  // Only one readiness promise owns startup failures; callers handle its rejection. The
+  // shaders are built before the first frame (frame.compile: in parallel where the browser
+  // can), so drawing it doesn't stall on them.
+  const loaded = modelLoaded
+    .then(() => (ready && !scope.disposed ? frame.compile().catch(() => {}) : null))
+    .then(() => { resize(); syncRunning(); })
+    .catch((error) => {
+      scope.dispose();
+      throw error;
+    });
+  /** Resolves once the frame after this has been drawn (or the scene is gone). */
+  const nextFrame = () => new Promise((resolve) => {
+    const off = frame.onRendered(() => { off(); resolve(); });
+    scope.cleanup(resolve);
   });
+  // The site's knight when he isn't there at load: after the fire's first frame, his template
+  // is built in idle moments, then he and his sign are made, their shaders compiled, and put in
+  // the scene; the sign kindles as it appears (its settling glow). Resolves once he's in (or
+  // won't be).
+  const knightsIn = !knightLater ? loaded : loaded
+    .then(() => Promise.all([knightLoaded, nextFrame()]))
+    .then(([model]) => (model && ready && !scope.disposed ? inSteps(bundle.templateSteps(model)).then((template) => [model, template]) : null))
+    .then((got) => {
+      if (!got || !got[1] || scope.disposed) return null;
+      knightsShown = false; // (his sign can't be clicked, nor he summoned, till they're in)
+      const objects = addKnights(got[0], { template: got[1], attach: false });
+      return objects.length ? frame.prepare(objects).catch(() => {}).then(() => {
+        if (scope.disposed) return;
+        scene.add(...objects);
+        knightsShown = true;
+        if (sign?.mode === 'lit') sign.uniforms.uGlow.value = 1.2;
+      }) : null;
+    })
+    .catch((error) => { console.warn('The knight could not be built; the fire burns without him.', error); });
+  // (Bonfire Live and the Painter can roll a style with its own model at any moment: its
+  // template is built beforehand, in idle moments once the knights are in.)
+  if (fxLayer) knightsIn.then(() => { if (knights) for (const file of new Set(Object.values(MODELS))) prepareStyleModel(file); }, () => {});
+
+  // fire.knights: what knights.js offers, forwarded once they exist.
+  const knightsApi = {
+    /** Resolves true once there are knights (on the site, when he's away at load, a moment after the first frame). */
+    ready: knightsIn.then(() => !!knights, () => false),
+    get count() { return knights?.count ?? 0; },
+    get present() { return knights?.present ?? 0; },
+    get max() { return knights?.max ?? 0; },
+    get list() { return knights?.list ?? []; },
+    get positions() { return knights?.positions ?? []; },
+    get moving() { return knights?.moving ?? false; },
+    /** Knight 0's helmet: the one he has on, or the one he's putting on mid-swap. */
+    get helmet() { return knights ? helmetGoal ?? knights.helmet : null; },
+    set helmet(name) { wearHelmet(name); },
+    /** (On the site, knight 0's helmet asked for here, the visitor's pick in the pack, holds for the visit: he comes in it.) */
+    setHelmet: (name, o) => {
+      if (o?.index == null || o.index === 0) visitorHelmet = HELMETS.includes(name) ? name : visitorHelmet;
+      busyWithHim(o?.index);
+      return wearHelmet(name, o);
+    },
+    setCast: (o) => { if (o?.helmets) helmetGoal = null; knights?.setCast(o); },
+    /**
+     * The site's knight's presence (knightArrival.js): 'away' (his sign waits on the ground),
+     * 'arriving', 'resting', 'leaving'. Bonfire Live: 'resting' while knight 0 is there.
+     */
+    get presence() { return arrival?.presence ?? (knights?.list[0]?.present ? 'resting' : 'away'); },
+    /** Summon him (the site: from his sign, through the forge; `instant`: at once). False if he can't come now. */
+    summonKnight: (o) => summonKnight(o),
+    /** Send him off (the site: he burns away into his sign; `instant`: at once). False if he isn't there. */
+    dismissKnight: (o) => arrival?.dismiss(o) ?? false,
+    /** Call `fn(presence)` whenever the site's knight comes or goes. Returns an unsubscribe. */
+    onPresence: (fn) => { presenceListeners.add(fn); return () => presenceListeners.delete(fn); },
+    /** Seconds of his rest left (the site), Infinity if it doesn't run out; settable (for tests). */
+    get restLeft() { return arrival?.restLeft ?? Infinity; },
+    set restLeft(sec) { if (arrival) arrival.restLeft = sec; },
+    summon: (i, o) => knights?.summon(i, o) ?? false,
+    dismiss: (i, o) => knights?.dismiss(i, o) ?? false,
+    sit: (i = 0) => knights?.sit(i) ?? false,
+    stand: (i = 0) => knights?.stand(i) ?? false,
+    dance: (i, o) => knights?.dance(i, o) ?? false,
+    gesture: (name, o) => {
+      const on = knights?.gesture(name, o) ?? false;
+      if (on) busyWithHim(o?.index ?? 0);
+      return on;
+    },
+    /** 'impact' (strength 0..1: a flinch), 'stoke' (he leans away), 'ring' (he lifts his feet as it passes). */
+    react: (kind, strength, where) => reactKnights(kind, strength, where),
+    /**
+     * Bonfire Live: whether the knights react at all (react(), and the fire's own stokes,
+     * impacts and rings) and sit up to watch a weapon in flight. The site's knight follows
+     * effects.knight.reactions instead.
+     */
+    setReactions: (on) => { liveReactions = !!on; },
+    get reactions() { return reacts(); },
+    /**
+     * The fire's reflection sweeping over the armor (armor.js): `rest` (now and then) and
+     * `flares` (when the fire flares) on or off; `shine` reads them back.
+     */
+    setShine: (o) => armor.setShine(o),
+    get shine() { return armor.shine; },
+    /**
+     * The knight's style (knightStyles.js STYLES; null: the settings', effects.knight.style):
+     * knights who are here burn away and form again in it (~1.2 s; `{ instant: true }` at
+     * once). Resolves true once it shows (a style with its own model fetches it first).
+     */
+    setStyle: (name = null, { instant = false } = {}) => { armorOverride.style = name ?? null; return applyStyle({ instant }); },
+    /**
+     * Get a style's model ready beforehand (fetched, its template built in idle moments), so a
+     * change to it later shows at once. Resolves true once it's ready (a style on the knight's
+     * own model always is).
+     */
+    prepareStyle: (name) => prepareStyleModel(styleModel(styleOr(name))).then((root) => styleModel(styleOr(name)) === MODELS.main || !!root),
+    /** The style he's drawn in now (knightStyles.js key). */
+    get style() { return knights?.style ?? armor.style; },
+    /** The armor's finish (steel.js FINISHES; null: the settings'), and the one he wears. */
+    setFinish: (name = null) => { armorOverride.finish = name ?? null; applyArmor(); },
+    get finish() { return armor.finish; },
+    /** The fire's color on his edges, 0..1 (null: the settings'), and how strong it is. */
+    setRim: (v = null) => { armorOverride.rim = v ?? null; applyArmor(); },
+    get rim() { return armor.rim; },
+    /** How they sit (knights.js setSeatPose): 'resting' | 'watchful'; `{ index }` for one knight. The site's follows effects.knight.seat. */
+    setSeatPose: (name, o) => knights?.setSeatPose?.(name, o),
+    get seatPose() { return knights?.seatPose ?? 'resting'; },
+    lookAt: (point, o) => knights?.lookAt(point, o),
+    clock: (beatPos, period) => knights?.clock(beatPos, period),
+    slots: (name) => knights?.slots(name ?? sceneryKey) ?? null,
+  };
 
   // --- Debug HUD
   function cycle(what) {
@@ -1042,13 +1627,15 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
       resize();
     } else if (what === 'palette') {
       debugPaletteIndex = (debugPaletteIndex + 1) % DEBUG_PALETTES.length;
-      pass.setPalette(debugPalettes[DEBUG_PALETTES[debugPaletteIndex]] ?? scenePalette({ ramp: currentRamp, shade: flames[flameKey].shade }));
+      const debug = debugPalettes[DEBUG_PALETTES[debugPaletteIndex]];
+      pass.setPalette(debug ?? scenePalette({ ramp: currentRamp, shade: flames[flameKey].shade }), { steel: !debug });
     } else if (what === 'dither') {
-      settings.ditherIndex = (settings.ditherIndex + 1) % DITHER_LEVELS.length;
-      pass.uniforms.ditherStrength.value = DITHER_LEVELS[settings.ditherIndex];
+      // (Up a level from what's showing now, the settings' own included, then back to none.)
+      const cur = pass.uniforms.ditherStrength.value;
+      pass.uniforms.ditherStrength.value = DITHER_LEVELS.find((v) => v > cur + 1e-4) ?? 0;
     } else if (what === 'matrix') {
-      settings.matrixIndex = (settings.matrixIndex + 1) % MATRIX_SIZES.length;
-      pass.uniforms.ditherScale.value = MATRIX_SIZES[settings.matrixIndex];
+      const cur = pass.uniforms.ditherScale.value;
+      pass.uniforms.ditherScale.value = MATRIX_SIZES[(MATRIX_SIZES.indexOf(cur) + 1) % MATRIX_SIZES.length];
     } else if (what === 'interaction') {
       const keys = Object.keys(MODES);
       interaction.mode = keys[(keys.indexOf(interaction.mode) + 1) % keys.length];
@@ -1080,28 +1667,70 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     pickRay.params.Mesh = { threshold: 0 };
     return pickRay.intersectObject(w, true).length > 0;
   }
+  const knightHit = { distance: Infinity };
+  const fireHitAt = new THREE.Vector3();
   // The fire, for hover: a sphere around the flames (world).
   const fireBounds = new THREE.Sphere(new THREE.Vector3(FIRE_ORIGIN.x, 0.45, FIRE_ORIGIN.z), 0.55);
   /**
-   * What's under the point (client px), for the site's hover effects: 'weapon' (the planted
-   * weapon: a click wakes it), 'fire' (a click stokes it) or null. The effect shows in the
-   * scene itself: the weapon's rim glows, the fire flares.
+   * What's under the point (client px): the weapon, else a knight (index) or the fire,
+   * whichever is nearer. `knight` false: the knights aren't looked for (a click isn't for
+   * them), so the fire behind one counts as the fire.
    */
-  function hoverAt(clientX, clientY) {
+  function pickAt(clientX, clientY, { knight = true } = {}) {
     const onWeapon = weaponAt(clientX, clientY);
     let onFire = false;
+    let onKnight = -1;
+    let onSign = false;
     if (!onWeapon) {
       const r = canvas.getBoundingClientRect();
       pickNdc.set(((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
       pickRay.setFromCamera(pickNdc, camera);
-      onFire = pickRay.ray.intersectsSphere(fireBounds);
+      onKnight = knights && knight ? knights.pick(pickRay.ray, knightHit) : -1;
+      // (Whichever is nearest: the fire in front of him, him in front of the fire, or his sign.)
+      const fireHit = pickRay.ray.intersectSphere(fireBounds, fireHitAt);
+      const fireD = fireHit ? fireHit.distanceTo(pickRay.ray.origin) : Infinity;
+      const knightD = onKnight >= 0 ? knightHit.distance : Infinity;
+      const signHit = sign && knightsShown ? sign.hit(pickRay.ray) : -1;
+      const signD = signHit >= 0 ? signHit : Infinity;
+      const nearest = Math.min(fireD, knightD, signD);
+      onFire = nearest < Infinity && nearest === fireD;
+      onSign = !onFire && nearest < Infinity && nearest === signD;
+      if (onFire || onSign) onKnight = -1;
     }
+    return { onWeapon, onKnight, onFire, onSign };
+  }
+  /**
+   * What's under the point (client px), for the site's hover effects: 'weapon' (the planted
+   * weapon: a click wakes it), 'sign' (the knight's summon sign: a click summons him),
+   * 'knight' (a click greets him), 'fire' (a click stokes it) or null. The effect shows in the
+   * scene itself: the weapon's rim glows, the sign brightens and its motes rise, the knight's
+   * rim warms and he looks at you, the fire flares. `knight` false (a click doesn't greet him:
+   * the site's setting, reduced motion, he isn't resting there): he's never the hover, and
+   * the fire behind him is.
+   */
+  function hoverAt(clientX, clientY, { knight = true } = {}) {
+    const { onWeapon, onKnight, onFire, onSign } = pickAt(clientX, clientY, { knight });
     if (weapons) weapons.hovered = onWeapon;
+    if (sign) sign.hovered = onSign;
+    // A hovered knight's rim warms and he turns his head to you.
+    if (knights) knights.hovered = onKnight;
+    if (onFire && !hoverFlare) armor.flare(0.7); // (the fire rises to meet the cursor: its reflection sweeps the armor)
     hoverFlare = onFire ? 1 : 0;
-    return onWeapon ? 'weapon' : onFire ? 'fire' : null;
+    return onWeapon ? 'weapon' : onSign ? 'sign' : onKnight >= 0 ? 'knight' : onFire ? 'fire' : null;
+  }
+  /** Whether the knight's summon sign is under the point (client px), as hoverAt sees it: a click there summons him. */
+  function signAt(clientX, clientY) {
+    return !!sign && pickAt(clientX, clientY, { knight: false }).onSign;
+  }
+  /**
+   * Which knight is under the point (client px): his index, or -1 (also when the weapon or
+   * the fire is in front of him there, as hoverAt sees it: a click on those isn't for him).
+   */
+  function knightAt(clientX, clientY) {
+    return knights ? pickAt(clientX, clientY).onKnight : -1;
   }
   /** The cursor left the scene: no hint. */
-  function hoverOff() { if (weapons) weapons.hovered = false; hoverFlare = 0; }
+  function hoverOff() { if (weapons) weapons.hovered = false; if (sign) sign.hovered = false; if (knights) knights.hovered = -1; hoverFlare = 0; }
 
   /**
    * The living blade's flourish (the site): the planted weapon pulls free, cuts a couple of
@@ -1141,6 +1770,8 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
       s.total += size.length;
       systems.set(o.name, s);
     });
+    // (The site's one knight is a row of the breakdown's own; Bonfire Live's cast counts here.)
+    if (knights && !siteKnight) systems.set('Knights', { name: 'Knights', live: knights.present, total: knights.max });
     return { drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, texels: `${size.w}×${size.h}`, systems: [...systems.values()] };
   }
 
@@ -1202,6 +1833,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     settings.pixelSize = null;
     voidColor.set(base.void);
     scene.fog.color.set(base.void);
+    applyArmor();
     resize();
     if (!ready) return;
     fireflies.setLit(fCount(effects.fireflies.lit));
@@ -1217,10 +1849,11 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     fireflies.setRamp(currentRamp);
     for (const r of [fx, zap, frostRing]) r.setRamp(currentRamp);
     weapons.setRim(currentRamp[2]);
+    applyKnight();
   }
 
   return {
-    stoke, puff, equip, weaponAt, hoverAt, hoverOff, flourish, breakdown, stats, setScenery, scroll,
+    stoke, puff, equip, weaponAt, knightAt, signAt, hoverAt, hoverOff, flourish, breakdown, stats, setScenery, scroll,
     get scenery() { return sceneryKey; },
     /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
     capture: frame.capture, setView: view.setView,
@@ -1243,9 +1876,24 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     get blade() { return weapons?.blade(bladeState) ?? null; },
     /** Render pixel size in CSS px (null: the settings' size). */
     setPixelSize(px) { settings.pixelSize = px; resize(); },
+    /** Render options over the settings (see setRender); the palette, the fog, the shadow and the x-ray view. */
+    setRender, setPalette, setFog, setShadows, setXray,
+    /** The render options in effect: the settings' own with any override over them. */
+    get render() {
+      return {
+        ...effects.render, ...renderOverride, pixelSize: pixelSize(), flameFps: effects.fire.fps,
+        hitStop: effects.impact.hitStop, hitFlash: effects.impact.flash, debris: effects.impact.debris, marks: effects.impact.marks,
+        palette: paletteOverride ?? 'flame', fog: fogKind, shadows: shadowsOn && renderer.shadowMap.enabled, xray: xrayView,
+      };
+    },
     get flame() { return flameKey; },
     get element() { return elementKey; },
     get weapon() { return weapons?.currentKey ?? null; },
+    /**
+     * The knights (knights.js has the whole API): safe before the model loads and without
+     * it (no knights, nothing happens). `ready` resolves true once there are knights.
+     */
+    knights: knightsApi,
     /** A weapon swap is running (or a weapon is held, waiting to strike, or swinging). */
     get forging() { return weapons?.busy ?? false; },
     get swinging() { return weapons?.swinging ?? false; },
@@ -1254,7 +1902,7 @@ export function createBonfire(container, { reducedMotion = false, sway: swayAmou
     get swapTime() { return weapons?.impactTime ?? 3.58; },
     get fireflies() { return fireflies; },
     /** Internals for debugging (dev builds expose this as window.__fire). */
-    get debug() { return { weapons, fx, plasma, zap, frostRing, crystals, chill, marks, debris, view, hit: { get busy() { return busy; }, get flash() { return flashAmt; }, get debt() { return timeDebt; } } }; },
+    get debug() { return { weapons, knights, sign, arrival, armor, frame, fx, plasma, zap, frostRing, crystals, chill, marks, debris, view, hit: { get busy() { return busy; }, get flash() { return flashAmt; }, get debt() { return timeDebt; } } }; },
     get interaction() { return interaction.mode; },
     set interaction(m) { interaction.mode = m; },
   };

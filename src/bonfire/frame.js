@@ -9,10 +9,16 @@
 // the heavier effects need: frame feedback for the echo (the pass reads the last frame
 // from one buffer while writing the other, then a copy puts it on screen), and the scene
 // drawn into its own image (mipmapped, for the glow), maybe repainted, with a ghost trail
-// kept beside it. Without it (the site) none of those buffers is sized or drawn.
+// kept beside it. With the effects the scene is always drawn into that image first and the
+// final pass reads it (never the all-in-one pass: with the effects' warps and splits it
+// builds the scene four times over, and its shader takes seconds to compile). Without them
+// (the site) none of those buffers is sized or drawn: the one pass does it all.
 //
 // After the last pass, while the canvas still holds the frame, photo mode's captures
-// are taken and onRendered's listeners run (recording a clip).
+// are taken and onRendered's listeners run (recording a clip). Before the first frame,
+// compile() builds the shaders in parallel (where the browser can), so it doesn't stall:
+// the ones the first frame draws with are waited for, the rest (the effects' other stages,
+// the knight's shadow for when he first comes) build on in the background.
 import * as THREE from 'three';
 import { createPixelPass } from './pixelPass.js';
 
@@ -86,9 +92,9 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
   }
 
   /**
-   * The pass's stages, when an effect needs them (motion blur, ghosting, glow, a repaint):
-   * the scene into its own image, maybe repainted, the ghost trail stepped; then the final
-   * pass reads those. Otherwise the single pass does it all.
+   * The pass's stages (with the effects): the scene into its own image, maybe repainted (a
+   * style), the ghost trail stepped; then the final pass reads those. (The site's single
+   * pass does it all.)
    */
   function renderStages() {
     if (!fx) { pass.use('single'); return; }
@@ -105,11 +111,6 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
 
     const style = u.uStyle.value > 0.5 && u.uStyleMix.value > 0;
     const ghost = u.uGhost.value > 0;
-    if (!style && !ghost && !(u.uGlow.value > 0) && !(u.uBlur.value > 0)) {
-      fx.ghostLive = false;
-      pass.use('single');
-      return;
-    }
     const draw = (stage, target) => {
       pass.use(stage);
       renderer.setRenderTarget(target);
@@ -133,6 +134,124 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
       u.tGhost.value = write.texture;
     } else fx.ghostLive = false;
     pass.use('final');
+  }
+
+  // Every mesh has three shaders: its own (the color pass), the normals pass's (one material
+  // for all: a shader for each kind of mesh, skinned or not) and, if it casts one, the fire's
+  // shadow's (a point light's: three.js draws each caster into it with a distance material it
+  // keeps, WebGLShadowMap, a shader for each kind of mesh). warm() builds the last two for the
+  // kinds among `roots` not built yet: the normals with the pass's own material, the shadow's
+  // with a stand-in on the shadow map's settings (kept: the shader stays the one it uses).
+  const SHADOW_SIDE = { [THREE.FrontSide]: THREE.BackSide, [THREE.BackSide]: THREE.FrontSide, [THREE.DoubleSide]: THREE.DoubleSide };
+  const warmed = new Set(); // the kinds of mesh whose normals / shadow shaders are built
+  /** A stand-in for the shadow map's distance material over `m` (WebGLShadowMap getDepthMaterial's settings). */
+  function distanceFor(m) {
+    const d = own(new THREE.MeshDistanceMaterial());
+    d.side = m.shadowSide ?? SHADOW_SIDE[m.side];
+    for (const key of ['alphaMap', 'map', 'displacementMap', 'displacementScale', 'displacementBias', 'clipShadows', 'clippingPlanes', 'clipIntersection', 'wireframe']) d[key] = m[key];
+    d.alphaTest = m.alphaToCoverage ? 0.5 : m.alphaTest;
+    return d;
+  }
+  /** Each kind of mesh among `roots` (the normals': skinned or not; the shadow's: by skinning, normals, morphs and side). */
+  function warm(roots) {
+    /** @type {Map<string, THREE.Mesh>} */
+    const normals = new Map();
+    /** @type {Map<string, THREE.Mesh>} */
+    const casters = new Map();
+    for (const root of roots) {
+      root.traverse((o) => {
+        const mesh = /** @type {THREE.Mesh} */ (o);
+        if (!mesh.isMesh || Array.isArray(mesh.material)) return;
+        const skinned = !!mesh.isSkinnedMesh;
+        if (!warmed.has(`n|${skinned}`)) normals.set(`n|${skinned}`, mesh);
+        const g = mesh.geometry;
+        const kind = `s|${skinned}|${!!g?.attributes.normal}|${Object.keys(g?.morphAttributes ?? {}).join()}|${mesh.material?.side}`;
+        if (mesh.castShadow && renderer.shadowMap.enabled && !warmed.has(kind)) casters.set(kind, mesh);
+      });
+    }
+    renderer.setRenderTarget(normalRT);
+    for (const [kind, mesh] of normals) {
+      const mat = mesh.material;
+      mesh.material = normalMaterial;
+      renderer.compile(mesh, camera, scene);
+      mesh.material = mat;
+      warmed.add(kind);
+    }
+    // (The shadow map is drawn with no fog, into its own target: a target, like the normals'.)
+    const fog = scene.fog;
+    scene.fog = null;
+    for (const [kind, mesh] of casters) {
+      const mat = mesh.material;
+      mesh.material = distanceFor(/** @type {THREE.Material} */ (mat));
+      renderer.compile(mesh, camera, scene);
+      mesh.material = mat;
+      warmed.add(kind);
+    }
+    scene.fog = fog;
+  }
+
+  /**
+   * Build the shaders the frame draws with before the first one (scene.js, at load), in
+   * parallel where the browser can (KHR_parallel_shader_compile), so the first frame
+   * doesn't stall on them. Resolves when the first frame's are ready, or after `timeout` ms
+   * regardless; the rest (the effects' other stages) build on in the background. The
+   * scene's are built as the color pass draws (its target; the lights are on every layer,
+   * so every pass sees the same ones), with their normals and shadows (warm: the knight's
+   * too, though he's away at first: no hitch as he first comes), and the pixel pass's as it
+   * draws to the screen.
+   */
+  function compile({ timeout = 6000 } = {}) {
+    const was = renderer.getRenderTarget();
+    camera.layers.set(layers.solid);
+    camera.layers.enable(layers.ghost);
+    renderer.setRenderTarget(colorRT);
+    const built = [renderer.compileAsync(scene, camera)];
+    warm([scene]);
+    renderer.setRenderTarget(null);
+    if (!fx) {
+      pass.use('single');
+      built.push(renderer.compileAsync(pass.scene, pass.camera));
+    } else {
+      // Bonfire Live: the scene stage and the final pass to the screen (the first frame's),
+      // then the other stages, each into the target it draws to (a shader is built per
+      // target), in the background: the first look that needs one mustn't stall the show.
+      const stage = (name, target) => {
+        pass.use(name);
+        renderer.setRenderTarget(target);
+        return renderer.compileAsync(pass.scene, pass.camera);
+      };
+      built.push(stage('scene', fx.sceneRT), stage('final', null));
+      const later = [stage('style', fx.styleRT), stage('ghost', fx.ghostRT[0]), stage('final', fx.feedbackRT[0]), renderer.compileAsync(fx.copyScene, pass.camera)];
+      Promise.all(later).catch(() => {});
+      pass.use('final');
+    }
+    renderer.setRenderTarget(was);
+    let timer = 0;
+    return Promise.race([
+      Promise.all(built),
+      new Promise((resolve) => { timer = setTimeout(resolve, timeout); }),
+    ]).finally(() => clearTimeout(timer));
+  }
+
+  /**
+   * Build the shaders of `objects` made after compile() (the site's knight and his sign, built
+   * after the first frame), before they're put in the scene: their own, their normals and
+   * their shadow's, in parallel where the browser can. Resolves when they're ready (or after
+   * `timeout` ms regardless).
+   */
+  function prepare(objects, { timeout = 4000 } = {}) {
+    const was = renderer.getRenderTarget();
+    camera.layers.set(layers.solid);
+    camera.layers.enable(layers.ghost);
+    renderer.setRenderTarget(colorRT);
+    const built = objects.map((o) => renderer.compileAsync(o, camera, scene));
+    warm(objects);
+    renderer.setRenderTarget(was);
+    let timer = 0;
+    return Promise.race([
+      Promise.all(built),
+      new Promise((resolve) => { timer = setTimeout(resolve, timeout); }),
+    ]).finally(() => clearTimeout(timer));
   }
 
   const captures = [];
@@ -204,6 +323,8 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
     depthTexture: colorRT.depthTexture,
     setSize,
     draw,
+    compile,
+    prepare,
     get size() { return size; },
     /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
     capture: () => new Promise((resolve) => captures.push(resolve)),

@@ -22,8 +22,11 @@
 // out, mostly white-hot; ice's fall like chips as they're shed, before the helix takes
 // them, and each one glints as it freezes onto the new blade.
 //
-// weapons.js runs the choreography and hands each step what it needs (the phase's
-// progress, the old and new weapons, their colors).
+// forgeRun.js runs the choreography and hands each step what it needs (the phase's
+// progress, the old and new subjects, their colors); weapons.js runs the aura and the
+// fling. The weapons are its subjects, and so are the knight and his summon sign
+// (knightArrival.js): anything with surface samples, their heights and a span to wind a
+// helix round (a subject can have its own helix radius, `helixWide`).
 import * as THREE from 'three';
 import { smoothstep } from '../math.js';
 import { createPoints, markDirty } from './points.js';
@@ -74,17 +77,18 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
   const vT = new THREE.Vector3();
   const col = new THREE.Color();
 
-  function worldSample(obj, i, out) {
-    const s = obj.userData.samples;
-    return out.set(s[i * 3], s[i * 3 + 1], s[i * 3 + 2]).applyMatrix4(obj.matrixWorld);
+  /** Sample i of a forge subject (forgeRun.js ForgeSubject), in world space. */
+  function worldSample(subject, i, out) {
+    const s = subject.samples;
+    return out.set(s[i * 3], s[i * 3 + 1], s[i * 3 + 2]).applyMatrix4(subject.matrixWorld);
   }
-  /** Particle i's slot on the double helix around the weapon's axis (world). */
+  /** Particle i's slot on the double helix around the subject's axis (world). */
   function helixSlot(to, i, spin, shrink, out) {
-    const span = to.userData.uniforms.uSpan.value;
-    const s = to.userData.heights[i];
+    const span = to.span;
+    const s = to.heights[i];
     const len = span.y - span.x;
     const a = hAng[i] + s * HELIX_TURNS * Math.PI * 2 + spin;
-    const r = (helixWide(s) + hRad[i]) * (1 - shrink);
+    const r = ((to.helixWide ?? helixWide)(s) + hRad[i]) * (1 - shrink);
     return out.set(Math.cos(a) * r, span.x + s * len, Math.sin(a) * r).applyMatrix4(to.matrixWorld);
   }
 
@@ -127,8 +131,9 @@ export function createForgeParticles({ count, material, layer, field, anchor }) 
      * The forge (dissolve → swirl → gather → form). c: { shedUntil (the dissolve's time,
      * or -1 once it's over), gather 0..1 (the helix collapsing), forming, formU (the
      * forming edge), pulling (gather or form: the helix grips harder), blend 0..1 (old
-     * colors → new), spin (the helix's turn), from, to (the weapons), time, colorsFrom,
-     * colorsTo ([lo, mid, hi, core] colors), element ('fire' | 'lightning' | 'ice') }.
+     * colors → new), spin (the helix's turn), from, to (forge subjects, forgeRun.js: their
+     * samples, heights, span and world matrix), time, colorsFrom, colorsTo ([lo, mid, hi,
+     * core] colors), element ('fire' | 'lightning' | 'ice') }.
      */
     step(dt, c) {
       if (!N) return;

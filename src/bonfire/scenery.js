@@ -13,10 +13,19 @@
 //              window of stained glass under a pointed arch between broken walls; back
 //              left, a nave column pair with a broken arch; front left, a pew and a
 //              cluster of floor candles
-//   cult       back right, a slab altar on a round dais, carved with glowing runes,
-//              ember bowls and black candles, two hooded stone figures behind it; back
-//              left, standing stones carved with runes; front left, a hooded watcher; a
-//              half ring of black candles behind the fire
+//   cult       back right, a slab altar on a round dais, carved with a glowing sigil (the
+//              NH monogram, ui/logo.js), ember bowls and black candles, two hooded stone
+//              figures behind it; back left, standing stones carved with the same sigil;
+//              front left, a hooded watcher; a half ring of black candles behind the fire
+//
+// In every one there's a seat for the knight (knights.js) behind the fire on the left, well
+// back from it (his boots clear of the ring stones and the flames), where the site's cameras
+// see him three-quarter-on without him covering the fire, the weapon or the page: a drum
+// fallen from the ruins' pillar (the one piece built here for the ruins), the cathedral's
+// fallen nave drum, the cult's fallen standing stone, a stump by the forge's anvil, a
+// resting stone at the shrine (SEATS, knightPlaces.js). His summon sign lies in front of it
+// (summonSign.js). Dancers (Bonfire Live) stand on a ring round the
+// fire, in the arcs each scenery leaves clear (DANCE_RING, danceSlots).
 //
 // Built so the pixel pass draws it cleanly (the rules the forge and shrine taught):
 //   - faces stay flat: the hand-made look is a slight lean, twist and uneven scale of each
@@ -33,15 +42,26 @@
 //     steady light with an occasional dip, the same for every window of one lamp, stained
 //     glass and runes keep their tone and breathe slowly
 import * as THREE from 'three';
+import { SEATS } from './knightPlaces.js';
+import { logoBars } from '../ui/logo.js';
 
 export { SCENERIES } from '../sceneries.js';
+// The knights' seats and the dance ring live in knightPlaces.js (pure: the visualizer uses them too).
+export { SEATS, DANCE_RING, danceSlots } from './knightPlaces.js';
 
 // Where the ruins stand (three.js coordinates: the model's +y is -z here).
 const LEFT = new THREE.Vector3(-1.45, 0, -1.35);
 const RIGHT = new THREE.Vector3(1.9, 0, -1.5);
 const FRONT_LEFT = new THREE.Vector3(-1.9, 0, 0.6);
 const RIGHT_TURN = THREE.MathUtils.degToRad(-28);
+const UP = new THREE.Vector3(0, 1, 0);
 const SEEDS = { forge: 7, shrine: 11, cathedral: 23, cult: 31 };
+/**
+ * The most small point lights (lamps) a scenery may have: scene.js keeps this many in a
+ * fixed pool, so a new place changes no light count and no shader is rebuilt (it lights
+ * only this many; test/knightPlaces.test.mjs checks no scenery has more).
+ */
+export const MAX_LAMPS = 3;
 
 /** A seeded random (the same scenery every time). */
 function rng(seed) {
@@ -76,10 +96,11 @@ function jag(geo, amount, rand) {
 }
 
 /**
- * Build one scenery. `mat`: the model's materials by name (stone, pillar, wood, char, wax,
- * mortar), `glowMaterial()`: a new glowing material. Returns { group, glows, lights }:
+ * Build one scenery (for 'ruins', the model's own, only the knight's seat). `mat`: the model's
+ * materials by name (stone, pillar, wood, char, wax, mortar), `glowMaterial()`: a new glowing
+ * material. Returns { group, glows, lights }:
  * each glow carries userData.glow = { kind, id, tone }; `lights` are
- * [{ at: Vector3, intensity, distance }] for small point lights.
+ * [{ at: Vector3, intensity, distance }] for small point lights (MAX_LAMPS at most).
  */
 export function buildScenery(name, mat, glowMaterial) {
   const group = new THREE.Group();
@@ -155,7 +176,15 @@ export function buildScenery(name, mat, glowMaterial) {
   };
 
   // ------------------------------------------------------------------------------------
-  if (name === 'forge') {
+  if (name === 'ruins') {
+    // The ruins are the model's own; only the knight's seat is built here (scene.js adds it to
+    // the model's pieces): a drum fallen from the pillar, lying by its plinth, half sunk in
+    // the ground (a low seat), across his way to the fire.
+    const seat = SEATS.ruins;
+    add(cyl(0.16, 0.155, 0.52, 8), mat.pillar, seat.x, seat.top - 0.16, seat.z, { rz: Math.PI / 2, ry: Math.atan2(seat.x, seat.z) + 0.2, rough: 0.01 });
+
+  // ------------------------------------------------------------------------------------
+  } else if (name === 'forge') {
     // --- the hearth, back right: block courses round a firebox, a slab, a hood, a chimney
     const hearth = place(RIGHT, RIGHT_TURN);
     const D = 0.8;
@@ -193,13 +222,19 @@ export function buildScenery(name, mat, glowMaterial) {
     add(cyl(0.022, 0.022, 0.34, 6), mat.wood, -0.05, 0.853, 0.05, { parent: smith, rz: Math.PI / 2, ry: 0.4, rough: 0 });
     add(box(0.07, 0.07, 0.13), mat.stone, -0.2, 0.865, 0.1, { parent: smith, ry: 0.4, rough: 0 });
     // A quench barrel, full to the brim (the barrel leans as one piece, water and all).
-    const barrel = place(new THREE.Vector3(0.62, 0, 0.3), 0, { parent: smith });
+    // (behind the anvil, clear of the knight's seat)
+    const barrel = place(new THREE.Vector3(-0.5, 0, -0.35), 0, { parent: smith });
     barrel.rotation.set((rand() - 0.5) * 0.04, rand(), (rand() - 0.5) * 0.04);
     add(cyl(0.26, 0.24, 0.6, 10), mat.wood, 0, 0.3, 0, { parent: barrel, rough: 0 });
     add(cyl(0.215, 0.215, 0.012, 10), mat.mortar, 0, 0.604, 0, { parent: barrel, rough: 0 });       // the water
     for (const y of [0.12, 0.48]) add(cyl(0.262, 0.255, 0.035, 10), mat.char, 0, y, 0, { parent: barrel, rough: 0 }); // hoops
     // Bar stock stacked by the anvil (each bar rests a little into the one below).
     for (let i = 0; i < 4; i++) add(box(0.7, 0.05, 0.06), mat.char, -0.45, 0.025 + i * 0.042, 0.45 + i * 0.02, { parent: smith, ry: 0.3 + i * 0.05, rough: 0.003 });
+
+    // --- the knight's seat: a stump by the anvil, sawn flat (last, so nothing above moves)
+    const seat = SEATS.forge;
+    add(cyl(0.18, 0.16, seat.top, 9), mat.wood, seat.x, seat.top / 2, seat.z, { ry: 0.4 });
+    add(cyl(0.145, 0.145, 0.014, 9), mat.char, seat.x, seat.top + 0.002, seat.z, { ry: 0.4, rough: 0 }); // its cut face
 
   // ------------------------------------------------------------------------------------
   } else if (name === 'shrine') {
@@ -244,6 +279,10 @@ export function buildScenery(name, mat, glowMaterial) {
     };
     lantern(LEFT, 0.3);
     lantern(FRONT_LEFT, -0.2, 0.8);
+
+    // --- the knight's seat: a flat resting stone (last, so nothing above moves)
+    const seat = SEATS.shrine;
+    add(cyl(0.23, 0.2, seat.top, 7), mat.stone, seat.x, seat.top / 2, seat.z, { ry: 0.3, rough: 0.02 });
 
   // ------------------------------------------------------------------------------------
   } else if (name === 'cathedral') {
@@ -300,8 +339,10 @@ export function buildScenery(name, mat, glowMaterial) {
     light(chancel, [0, 1.15, 0.2], 1.2, 2.6);
     light(chancel, [0, 1.8, -0.35], 0.8, 2.2);
 
-    // --- the nave, back left: two columns and a broken pointed arch, a fallen drum
+    // --- the nave, back left: two columns and a broken pointed arch, a fallen drum (the
+    // knight's seat: SEATS.cathedral, in the nave's own space)
     const nave = place(LEFT, 0.35);
+    const drum = new THREE.Vector3(SEATS.cathedral.x, 0, SEATS.cathedral.z).sub(LEFT).applyAxisAngle(UP, -0.35);
     for (const x of [-0.58, 0.58]) {
       add(box(0.5, 0.16, 0.5), mat.pillar, x, 0.08, 0, { parent: nave, rough: 0.008 });
       add(cyl(0.17, 0.15, 2.36, 8), mat.pillar, x, 1.33, 0, { parent: nave, rough: 0.006 });
@@ -309,13 +350,14 @@ export function buildScenery(name, mat, glowMaterial) {
     }
     add(box(0.8, 0.16, 0.22), mat.pillar, 0.32, 2.78, 0, { parent: nave, rz: -0.62, rough: 0.008 });  // the arch, broken off
     add(box(0.34, 0.16, 0.22), mat.pillar, -0.45, 2.7, 0, { parent: nave, rz: 0.62, rough: 0.008 });
-    add(cyl(0.16, 0.16, 0.5, 8), mat.pillar, 0.15, 0.16, 0.6, { parent: nave, rz: Math.PI / 2, ry: 0.5, rough: 0.008 });
-    for (let i = 0; i < 5; i++) add(rock(0.05 + rand() * 0.05), mat.pillar, -0.3 + rand() * 0.9, 0.04, 0.3 + rand() * 0.5, { parent: nave, jagged: 0.02 });
-    // A cluster of floor candles at the columns' foot.
-    const cluster = place(new THREE.Vector3(-0.1, 0, 0.4), 0, { parent: nave });
+    add(cyl(0.16, 0.16, 0.5, 8), mat.pillar, drum.x, SEATS.cathedral.top - 0.16, drum.z, { parent: nave, rz: Math.PI / 2, ry: 0.5, rough: 0.008 }); // (half sunk: a low seat)
+    // (Rubble behind the drum, clear of where his boots go.)
+    for (let i = 0; i < 5; i++) add(rock(0.05 + rand() * 0.05), mat.pillar, -0.55 + rand() * 0.5, 0.04, -0.05 + rand() * 0.35, { parent: nave, jagged: 0.02 });
+    // A cluster of floor candles at the left column's foot.
+    const cluster = place(new THREE.Vector3(-0.62, 0, 0.46), 0, { parent: nave });
     const id = lampId++;
     for (const [x, z, h] of [[0, 0, 0.3], [0.1, 0.06, 0.2], [-0.09, 0.08, 0.16], [0.05, -0.1, 0.24], [-0.12, -0.06, 0.12]]) candle(cluster, x, 0, z, h, { id });
-    light(nave, [-0.1, 0.45, 0.6], 0.8, 2);
+    light(nave, [-0.62, 0.45, 0.66], 0.8, 2);
 
     // --- a pew, front left, turned toward the altar
     const pew = place(FRONT_LEFT, Math.atan2(RIGHT.x - FRONT_LEFT.x, RIGHT.z - FRONT_LEFT.z));
@@ -337,11 +379,12 @@ export function buildScenery(name, mat, glowMaterial) {
       for (const ex of [-0.045, 0.045]) glow(box(0.035, 0.02, 0.02), ex, 1.75, 0.245, { parent: f, kind: 'rune', id: eyes, tone: 3 });
       add(box(0.32, 0.13, 0.16), mat.pillar, 0, 1.02, 0.24, { parent: f, rough: 0.006 });            // clasped sleeves
     };
-    /** A rune on a face: a stave and two branches (ᛉ), glowing. */
-    const rune = (g, x, y, z, size = 1, id = lampId++) => {
-      const s = size * 0.13;
-      glow(box(0.022, s * 1.3, 0.014), x, y, z, { parent: g, kind: 'rune', id, tone: 2 });
-      for (const side of [-1, 1]) glow(box(0.02, s * 0.7, 0.014), x + side * s * 0.28, y + s * 0.38, z, { parent: g, kind: 'rune', id, tone: 2, rz: -side * 0.6 });
+    /**
+     * A sigil carved in a face: the NH monogram (ui/logo.js), `tall` m tall, in 3 cm strokes
+     * (tall enough that its two inner stems keep a gap between them from the cameras), glowing.
+     */
+    const sigil = (g, x, y, z, tall, id = lampId++) => {
+      for (const b of logoBars(tall, 0.03)) glow(box(b.len, b.width, 0.014), x + b.u, y + b.v, z, { parent: g, kind: 'rune', id, tone: 2, rz: b.angle });
     };
 
     // --- the altar, back right: a round dais, a slab on boulders, bowls of embers
@@ -351,7 +394,10 @@ export function buildScenery(name, mat, glowMaterial) {
     for (const x of [-0.44, 0.44]) add(rock(0.27, 0), mat.stone, x, 0.44, 0, { parent: altar, jagged: 0.05, scale: [1, 1, 0.8] });
     add(box(0.56, 0.44, 0.38), mat.pillar, 0, 0.46, 0, { parent: altar, rough: 0.01 });
     add(box(1.32, 0.17, 0.62), mat.char, 0, 0.74, 0, { parent: altar, rough: 0.004 });
-    for (const [x, s] of [[-0.42, 0.9], [0, 1.2], [0.42, 0.9]]) rune(altar, x, 0.74, 0.322, s * 0.9);
+    // (One sigil on the block under the slab, between the boulders: the old three runes' lamp
+    // ids are kept, so every later lamp still flickers as it did.)
+    lampId += 2;
+    sigil(altar, 0, 0.46, 0.2, 0.38);
     for (const x of [-0.44, 0.44]) {
       add(cyl(0.08, 0.13, 0.09, 8), mat.char, x, 0.87, 0.06, { parent: altar, rough: 0 });
       for (let i = 0; i < 3; i++) glow(rock(0.045 + rand() * 0.02), x + (rand() - 0.5) * 0.1, 0.92, 0.06 + (rand() - 0.5) * 0.1, { parent: altar, kind: 'ember', jagged: 0.015 });
@@ -361,26 +407,29 @@ export function buildScenery(name, mat, glowMaterial) {
     hooded(altar, 0.98, -0.5, -0.25);
     light(altar, [0, 1.05, 0.4], 1.1, 2.6);
 
-    // --- standing stones, back left, each carved with a rune
+    // --- standing stones, back left, each carved with the sigil
     const stones = place(LEFT, 0.4);
     for (const [x, z, w, h, t] of [[-0.62, 0.12, 0.36, 1.55, 0.06], [0, -0.14, 0.42, 2.05, -0.02], [0.62, 0.12, 0.34, 1.35, -0.08]]) {
-      // (The stone leans as a whole, its rune with it, so the rune stays on its face.)
+      // (The stone leans as a whole, its sigil with it, so the sigil stays on its face.)
       const s = place(new THREE.Vector3(x, -0.04, z), (rand() - 0.5) * 0.3, { parent: stones });
       s.rotation.x = (rand() - 0.5) * 0.08;
       s.rotation.z = t;
       add(box(w, h, 0.26), mat.stone, 0, h / 2, 0, { parent: s, rough: 0 });
-      rune(s, 0, h * 0.64, 0.14, 1.1);
+      sigil(s, 0, h * 0.62, 0.14, Math.min(0.55, (w - 0.05) / 0.72)); // (as wide as the stone allows)
     }
-    add(box(0.9, 0.2, 0.3), mat.stone, 0.3, 0.1, 0.55, { parent: stones, ry: 0.5, rz: 0.08, rough: 0.03 });   // a fallen one
+    // A fallen one (the knight's seat: SEATS.cult, in the stones' own space).
+    const fallen = new THREE.Vector3(SEATS.cult.x, 0, SEATS.cult.z).sub(LEFT).applyAxisAngle(UP, -0.4);
+    add(box(0.9, 0.2, 0.3), mat.stone, fallen.x, 0.1, fallen.z, { parent: stones, ry: 0.5, rz: 0.08, rough: 0.03 });
     light(stones, [0, 1.0, 0.5], 0.7, 2.2);
 
     // --- a hooded watcher, front left, turned toward the fire
     hooded(group, FRONT_LEFT.x, FRONT_LEFT.z, Math.atan2(-FRONT_LEFT.x, -FRONT_LEFT.z), 0.78);
 
-    // --- a half ring of black candles behind the fire
+    // --- a half ring of black candles behind the fire (the two nearest the knight's seat stand
+    // past it, so his boots go between them)
     const ring = lampId++;
     for (let i = 0; i < 7; i++) {
-      const a = Math.PI * (1.18 + (i / 6) * 0.64);
+      const a = i < 2 ? Math.PI * (1.05 - i * 0.107) : Math.PI * (1.18 + (i / 6) * 0.64);
       candle(group, Math.cos(a) * 1.5, 0, Math.sin(a) * 1.5, 0.08 + rand() * 0.1, { material: mat.char, id: ring + i, r: 0.035 });
     }
   }
