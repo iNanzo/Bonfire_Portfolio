@@ -19,9 +19,8 @@
 // shows, none (setSteel's `lines`), in the void, over his lit tones in the style's lit ink
 // (his outline too: lighter where the light is strongest); the terminator, the flame's dark
 // shade on the one steel texel where a lit band gives way to the dark (setSteel's
-// `terminator`; not round the lone dots of a dithered band edge, so it doesn't scatter
-// over them); and his rim, the fire's color just inside his outline on the fire's side, its
-// shade on the far side. The black-and-gold styles hand no ramp:
+// `terminator`); and his rim, the fire's color just inside his outline on the fire's side,
+// its shade on the far side. The black-and-gold styles hand no ramp:
 // he's snapped to the palette like the scenery, his creases a step darker in their own hue.
 //
 // Effects layer (the visualizer: compiled in only with createPixelPass({ effects: true }),
@@ -279,13 +278,6 @@ const fragmentShader = /* glsl */ `
     }
     return false;
   }
-  // The texel at uv on his smooth surface id: in a lit tone (1), in another (0), or not on it
-  // (-1). (No derivatives: it's called in loops.)
-  int celLight(vec2 uv, float id) {
-    vec4 c = textureLod(tColor, uv, 0.0);
-    if (!isCel(c.a) || abs(celId(c.a) - id) > 0.5) return -1;
-    return litTone(toSRGB(c.rgb * exposure)) ? 1 : 0;
-  }
   // His depth at a texel (no derivatives: it's called in loops).
   float depthAt(vec2 uv) { return -perspectiveDepthToViewZ(textureLod(tDepth, uv, 0.0).x, cameraNear, cameraFar); }
   // Is the texel at o, beside one of his at depth here, something well behind him (his
@@ -425,9 +417,8 @@ const fragmentShader = /* glsl */ `
     // The terminator: a dark steel texel (not the light steel on the turn) beside a lit one
     // of its own surface takes the flame's dark shade: one texel, the warm edge between the
     // light and the shadow; only where the dark goes on past it (a band, not a sliver of a
-    // small part). With the dither on, not beside a lit texel on its own (none of its surface's
-    // lit texels beside it): that's a dot of a dithered band edge (armor.js), and a terminator
-    // round each would scatter over the patch.
+    // small part). (The armor's dither steps his lit bands down into the steel, never out
+    // over it, so it makes no lone lit texels for this to ring.)
     vec3 dk = col - steel[3];
     if (cel && !outlined && steelSize > 6 && celTerm > 0.5 && !litTone(col) && dot(dk, dk) > 0.0006) {
       float id = celId(c4.a);
@@ -435,11 +426,8 @@ const fragmentShader = /* glsl */ `
         vec2 o = i == 0 ? vec2(0.0, texel.y) : i == 1 ? vec2(0.0, -texel.y) : i == 2 ? vec2(texel.x, 0.0) : vec2(-texel.x, 0.0);
         vec4 n4 = texture2D(tColor, uv + o);
         if (!isCel(n4.a) || abs(celId(n4.a) - id) > 0.5 || !litTone(toSRGB(n4.rgb * exposure))) continue;
-        if (celLight(uv - o, id) != 0) continue;
-        vec2 side = i < 2 ? vec2(texel.x, 0.0) : vec2(0.0, texel.y);
-        if (ditherStrength > 0.0 && celLight(uv + 2.0 * o, id) != 1 && celLight(uv + o + side, id) != 1 && celLight(uv + o - side, id) != 1) continue;
-        col = steel[6];
-        break;
+        vec4 b4 = texture2D(tColor, uv - o);
+        if (isCel(b4.a) && abs(celId(b4.a) - id) < 0.5 && !litTone(toSRGB(b4.rgb * exposure))) { col = steel[6]; break; }
       }
     }
     // The knight's rim (Edge Glow, setSteel's rim): his steel just inside his silhouette

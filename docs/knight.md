@@ -560,8 +560,7 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   one, but not a lone texel of it (a line texel with no line beside it); the void, or over
   his lit tones the style's lit ink (his outline too); Painterly and Chiaroscuro add the
   terminator, the flame's dark shade on the one steel texel where a lit band meets the
-  dark steel (only where the dark goes on past it, so a small part isn't speckled, and
-  with the dither on not beside a lone lit texel, a dot of a dithered edge); their
+  dark steel (only where the dark goes on past it, so a small part isn't speckled); their
   rim, just inside his outline over his steel, is the flame's body on the fire's side (its
   dark terminator shade under rim 0.35, two texels over 0.85) and its shade on the far
   side (over rim 0.3). The

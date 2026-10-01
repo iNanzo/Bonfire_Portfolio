@@ -2,7 +2,8 @@
 // band edges in the pass's own Bayer pattern, by the style's amount times the Dither setting
 // (shared with the pass by reference, so the render menu and Bonfire Live's slider move him
 // too, and Off turns it off); the pass still adds no noise of its own over his flat tones, and
-// keeps its terminator off the dither's lone dots.
+// its terminator is round 9's (the dither steps his lit bands down, never out over the steel,
+// so it makes no lone lit texel for the terminator to ring).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -125,12 +126,13 @@ test("the armor's Bayer matrices are the pass's own, texel for texel", () => {
   assert.equal(seen.size, 64);
 });
 
-test('the pass: still no dither of its own over his tones; no terminator round a lone lit dot', () => {
+test("the pass: still no dither of its own over his tones; round 9's terminator", () => {
   const src = createPixelPass().materials.single.fragmentShader;
   assert.match(src, /if \(!celHere\) col \+= threshold \* ditherStrength;/);
-  // (Only with the dither on: at 0 the terminator is exactly as it was.)
-  assert.match(src, /if \(ditherStrength > 0\.0 && celLight\(uv \+ 2\.0 \* o, id\) != 1 && celLight\(uv \+ o \+ side, id\) != 1 && celLight\(uv \+ o - side, id\) != 1\) continue;/);
-  assert.match(src, /if \(celLight\(uv - o, id\) != 0\) continue;/, 'and only where the dark goes on past it');
+  // (Beside a lit texel of his surface, where the dark goes on past it; whatever the Dither:
+  // the armor's dither makes no lone lit texels, so it needs no guard.)
+  assert.match(src, /vec4 b4 = texture2D\(tColor, uv - o\);\s*if \(isCel\(b4\.a\) && abs\(celId\(b4\.a\) - id\) < 0\.5 && !litTone\(toSRGB\(b4\.rgb \* exposure\)\)\) \{ col = steel\[6\]; break; \}/);
+  assert.doesNotMatch(src, /ditherStrength > 0\.0 &&/);
 });
 
 test("scene.js hands the armor the pass's dither uniforms", () => {
