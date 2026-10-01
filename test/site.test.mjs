@@ -216,3 +216,39 @@ test('discoveries that can’t be found here now (no knight) leave the count, un
     delete globalThis.localStorage;
   }
 });
+
+// --- The build's page metadata, however index.html is wrapped ------------------------------
+
+/** A tag's attribute value, however the tag is wrapped. */
+const metaValue = (html, attr, name) => html.match(new RegExp(`<meta\\s+${attr}="${name}"\\s+content="([^"]*)"`))?.[1] ?? null;
+
+test('seo: withMeta updates every tag in the real index.html, and in a copy Prettier has wrapped', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { fileURLToPath } = await import('node:url');
+  const { pageMeta, withMeta } = await import('../src/seoPages.js');
+  const file = new URL('../index.html', import.meta.url);
+  const source = await readFile(file, 'utf8');
+  const prettier = await import('prettier');
+  const formatted = await prettier.format(source, { ...(await prettier.resolveConfig(fileURLToPath(file))), parser: 'html' });
+  // (By hand too: every attribute on its own line, whatever Prettier decides to wrap.)
+  const split = source.replace(/<meta (name|property)=("[^"]*") content=/g, '<meta\n      $1=$2\n      content=');
+  assert.notEqual(split, source);
+  const meta = pageMeta(`projects/${items()[0].id}`);
+  for (const [name, html] of [['index.html', source], ['formatted', formatted], ['split', split]]) {
+    const out = withMeta(html, meta);
+    assert.equal(out.match(/<title>([^<]*)<\/title>/)?.[1], esc(meta.title), `${name}: title`);
+    assert.equal(metaValue(out, 'name', 'description'), esc(meta.description), `${name}: description`);
+    assert.equal(metaValue(out, 'property', 'og:title'), esc(meta.title), `${name}: og:title`);
+    assert.equal(metaValue(out, 'property', 'og:description'), esc(meta.description), `${name}: og:description`);
+    assert.equal(metaValue(out, 'property', 'og:type'), 'article', `${name}: og:type`);
+    assert.match(out, /<link rel="canonical" href="https:\/\/[^"]+\/projects\//, `${name}: the page's own tags added`);
+    for (const [attr, tag] of [['name', 'description'], ['property', 'og:title'], ['property', 'og:description'], ['property', 'og:type']]) {
+      assert.notEqual(metaValue(out, attr, tag), metaValue(html, attr, tag), `${name}: ${tag} changed`);
+    }
+  }
+  // A "$" in the text is just a dollar sign (not a replacement pattern).
+  const odd = 'Cost $1 & $& or $' + "' and $" + '`';
+  const dollars = withMeta(source, { ...meta, title: odd, description: odd });
+  assert.equal(dollars.match(/<title>([^<]*)<\/title>/)?.[1], esc(odd));
+  assert.equal(metaValue(dollars, 'name', 'description'), esc(odd));
+});

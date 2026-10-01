@@ -78,7 +78,11 @@ export function pageMeta(route) {
   };
 }
 
-/** index.html with a page's own metadata in its head. */
+/**
+ * index.html with a page's own metadata in its head. The tags it rewrites may have their
+ * attributes split over lines (as a formatter wraps a long one): any whitespace between
+ * them matches.
+ */
 export function withMeta(html, meta) {
   const url = abs(meta.path);
   const image = abs(meta.image);
@@ -95,13 +99,15 @@ export function withMeta(html, meta) {
     `<meta name="twitter:image" content="${esc(image)}" />`,
     ...meta.jsonLd.map((d) => `<script type="application/ld+json">${JSON.stringify(d).replace(/</g, '\\u003c')}</script>`),
   ].map((t) => `    ${t}`).join('\n');
+  // (Replacement functions, not strings: a "$" in a title or summary would read as a pattern.)
+  const set = (value) => (_, open, close) => `${open}${value}${close}`;
   return html
-    .replace(/<title>[^<]*<\/title>/, `<title>${esc(meta.title)}</title>`)
-    .replace(/(<meta name="description" content=")[^"]*(")/, `$1${esc(meta.description)}$2`)
-    .replace(/(<meta property="og:title" content=")[^"]*(")/, `$1${esc(meta.title)}$2`)
-    .replace(/(<meta property="og:description" content=")[^"]*(")/, `$1${esc(meta.description)}$2`)
-    .replace(/(<meta property="og:type" content=")[^"]*(")/, `$1${meta.type}$2`)
-    .replace('</head>', `${tags}\n  </head>`);
+    .replace(/<title>[^<]*<\/title>/, () => `<title>${esc(meta.title)}</title>`)
+    .replace(/(<meta\s+name="description"\s+content=")[^"]*(")/, set(esc(meta.description)))
+    .replace(/(<meta\s+property="og:title"\s+content=")[^"]*(")/, set(esc(meta.title)))
+    .replace(/(<meta\s+property="og:description"\s+content=")[^"]*(")/, set(esc(meta.description)))
+    .replace(/(<meta\s+property="og:type"\s+content=")[^"]*(")/, set(esc(meta.type)))
+    .replace('</head>', () => `${tags}\n  </head>`);
 }
 
 /** Every route meant to be found: home, each screen, each shown project. */
