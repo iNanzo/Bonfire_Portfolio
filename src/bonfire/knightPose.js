@@ -395,17 +395,21 @@ function armAt(p, s, x, y, z, elbow = 0, wrist = 0, fist = 0.8, roll = 0, rig = 
  * Keep side s's arm in the room it has there (`r` 0..1): its reach back behind him scaled by
  * it, and what it would have swung out to that side swung forward instead, so an arm that
  * would be flung into a pillar goes up or out in front of him. In the pose's own terms (the
- * chest's frame).
+ * chest's frame). `from` (a pose): as far out and back as its arm already is, his arm is left
+ * as it is (his arm at rest, clear where he sits): only what's more than that is hemmed.
  */
-function hem(p, s, r) {
+function hem(p, s, r, from = null) {
   if (!(r < 1)) return p;
   const o = sideOf(s);
   const yaw = p[o], pitch = p[o + 1];
   let out = Math.sin(yaw) * Math.cos(pitch), fwd = Math.cos(yaw) * Math.cos(pitch);
   const up = Math.sin(pitch);
   const k = clamp01(r);
-  if (fwd < 0) fwd *= k;
-  if (out > 0) { fwd += out * (1 - k); out *= k; }
+  // (How far out and back `from`'s arm already points.)
+  const out0 = from ? Math.max(0, Math.sin(from[o]) * Math.cos(from[o + 1])) : 0;
+  const back0 = from ? Math.max(0, -Math.cos(from[o]) * Math.cos(from[o + 1])) : 0;
+  if (fwd < -back0) fwd = -back0 + (fwd + back0) * k;
+  if (out > out0) { fwd += (out - out0) * (1 - k); out = out0 + (out - out0) * k; }
   // (Hardly anywhere left to point, it points ahead.)
   const len = Math.hypot(out, up, fwd);
   if (len < 0.5) fwd += 0.5 - len;
@@ -414,8 +418,11 @@ function hem(p, s, r) {
   p[o + 1] = Math.asin(clamp(up / Math.hypot(out, up, fwd), -1, 1));
   return p;
 }
-/** Both arms kept in their room ([left, right] 0..1). */
-const hemArms = (p, room) => { if (room[0] < 1) hem(p, 'L', room[0]); if (room[1] < 1) hem(p, 'R', room[1]); return p; };
+/**
+ * Both arms kept in their room ([left, right] 0..1); with `from` (a pose), only past where its
+ * arms already are (hem).
+ */
+const hemArms = (p, room, from = null) => { if (room[0] < 1) hem(p, 'L', room[0], from); if (room[1] < 1) hem(p, 'R', room[1], from); return p; };
 
 const _ha = new THREE.Vector3();
 /** Where the head joint is (knight space) in a pose. Reused: copy what you keep. */
@@ -1137,6 +1144,7 @@ export const CHEERS = ['praise', 'hurrah', 'joy', 'dance'];
 const gTarget = newPose();
 const gStand = newPose();
 const gWind = newPose();
+const gRest = newPose();
 const gFrom = new THREE.Quaternion();
 const gLook = new THREE.Vector3();
 /** How far a seated knight sits up for a gesture (a share of attend()). */
@@ -1258,7 +1266,7 @@ function gestureTarget(g, p, name, t, seated, room = FREE) {
 export function gesture(p, name, t, seated = false, seed = 0, { turn = 0, stand = null, room = FREE, inPlace = false } = {}) {
   const T = GESTURE_TIME[name];
   if (!T || t < 0 || t >= T) return p;
-  if (name === 'dance') return hemArms(seated && inPlace ? seatedDanceGesture(p, t, seed, room) : danceGesture(p, t, seated, seed, turn, stand, room), room);
+  if (name === 'dance') return seated && inPlace ? seatedDanceGesture(p, t, seed, room) : danceGesture(p, t, seated, seed, turn, stand, room);
   // (The other hand, as his mirror image: the pose mirrored, gestured, mirrored back.)
   if (RIGHT_HANDED.has(name) && room[1] < 0.5 && room[0] > room[1]) {
     mirrorPose(p);
@@ -1266,6 +1274,8 @@ export function gesture(p, name, t, seated = false, seed = 0, { turn = 0, stand 
     return mirrorPose(p);
   }
   const up = seated ? env(t, 0, 0.25, T, 0.5) * (SIT_UP[name] ?? 0.8) : 0;
+  // (His arms at rest, as the gesture finds them: hemmed in, what it adds is kept in the room.)
+  const rest = copy(gRest, p);
   // Praise the Sun winds up first: the arms swing down and back, a dip, then the up-throw.
   if (name === 'praise') {
     const wind = copy(gWind, p);
@@ -1278,6 +1288,7 @@ export function gesture(p, name, t, seated = false, seed = 0, { turn = 0, stand 
       gFrom.copy(chestFrame(s).q);
       reframeArms(wind, gFrom, chestFrame(wind).q);
     }
+    hemArms(wind, room);
     const w = env(t, 0.36, 0.34, T, 0.5);
     lerpPose(p, p, wind, env(t, 0, 0.3, 0.7, 0.34) * (1 - w));
   }
@@ -1296,10 +1307,13 @@ export function gesture(p, name, t, seated = false, seed = 0, { turn = 0, stand 
     aimHead(g, gLook, 1);
     if (name === 'helm') { const h = headAt(g); for (const [side, sg] of /** @type {[string, number][]} */ ([['L', 1], ['R', -1]])) armAt(g, side, h.x + sg * HELM_HOLD[0], h.y + HELM_HOLD[1], h.z + HELM_HOLD[2], HELM_HOLD[3], HELM_HOLD[4], 0.25, HELM_HOLD[5]); }
   }
-  // (Hemmed in at a side: that arm keeps to the room it has, on its way there too.)
+  // (Hemmed in at a side: that arm keeps to the room it has, there and on its way there. Only
+  // what the gesture adds: his arm at rest is clear where he sits, so it's left as it is (it
+  // never jumps as a gesture starts or ends), and eased from there toward the hemmed one it
+  // swings out no further than it hung at rest.)
   hemArms(g, room);
   lerpPose(p, p, g, w);
-  hemArms(p, room);
+  hemArms(p, room, rest);
   if (seed < 0) return p; // (every knight gestures alike today; `seed` is for variations)
   return p;
 }
@@ -1332,6 +1346,8 @@ function danceGesture(p, t, seated, seed, turn, standAt = null, room = FREE) {
   for (const o of [POSE.legL, POSE.legR]) for (let i = 0; i < 3; i++) m[o + i] += stand[o + i] - ref[o + i];
   const inOut = smooth(clamp01((t - t0) / 0.25)) * smooth(clamp01((t1 - t) / 0.25));
   lerpPose(p, stand, m, inOut);
+  // (The dance's arms are hemmed in (dance()); eased from his standing ones, no further out.)
+  hemArms(p, room, stand);
   // (Into the dance's stance and out of it with a little hop.)
   const hop = 0.04 * Math.sin(Math.PI * inOut);
   p[POSE.legL + 1] += hop; p[POSE.legR + 1] += hop;
@@ -1347,6 +1363,7 @@ function danceGesture(p, t, seated, seed, turn, standAt = null, room = FREE) {
   return p;
 }
 const dSeat = newPose();
+const dRest = newPose();
 /**
  * The site's dance in his seat (gesture()'s `inPlace`): the Default Dance's seated version
  * (its arm swings and head bob over the seat, dance()'s `seated`) for the same two bars,
@@ -1360,7 +1377,9 @@ function seatedDanceGesture(p, t, seed, room = FREE) {
   nudge(m, 'spine', SEATED_DANCE_LEAN);
   dance(m, 'defaultDance', clamp(t - DANCE_EASE, 0, DANCE_LEN) / period, { period, energy: 0.85, seed: seed & ~1, seated: true, up: SEATED_DANCE_UP, room });
   const w = smooth(clamp01(t / DANCE_EASE)) * smooth(clamp01((DANCE_SEATED_TIME - t) / DANCE_EASE));
-  return lerpPose(p, p, m, w);
+  // (The dance's arms are hemmed in (dance()); eased from his resting ones, no further out.)
+  const rest = copy(dRest, p);
+  return hemArms(lerpPose(p, p, m, w), room, rest);
 }
 
 // --- dancing --------------------------------------------------------------------------------------
