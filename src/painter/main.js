@@ -39,6 +39,7 @@ import { effects } from '../effects.js';
 import { scenes as builtInScenes, site, startingEquipment, ui, weapons } from '../content.js';
 import { elements, elementOr } from '../elements.js';
 import { installDitherPatterns } from '../ui/dither.js';
+import { installTooltips } from '../ui/tooltip.js';
 import { applyFlame, setAccentRamp } from '../ui/theme.js';
 import { esc } from '../html.js';
 import { logoMark } from '../ui/logo.js';
@@ -83,6 +84,7 @@ document.documentElement.classList.add('js');
 applyCssPalette();
 applyFlame(startingEquipment.flame);
 installDitherPatterns(base);
+installTooltips();
 
 // --- The scene being painted --------------------------------------------------------------
 const store = createSceneStore({ voidHex });

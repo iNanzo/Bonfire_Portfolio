@@ -4,33 +4,46 @@
 // draws them wires the inputs: they only carry the key, never a handler. `adv` marks a field
 // that only the "All settings" view shows (a `data-adv` attribute the page's CSS hides).
 //
-// The hints: the "?" shows its hint on hover, and while its field has the keyboard's focus
-// (visualizer.css). The "?" itself isn't a stop for the keyboard and is hidden from screen
-// readers: the field's input reads the hint out as its description (aria-describedby). A
-// group of switches (checks, modeGrid) has one "?" for the group: each switch in it reads the
-// group's hint out (after its own, if it has one), and one with no hint of its own shows the
-// group's while it has focus (data-group-tip in a data-tip-group). A "?" drawn on its own
-// (tip() without `control`: a hint no one input stands for) is a stop of its own instead,
-// named "Hint" and described by it.
+// The hints: the "?" is a small button beside the label (never inside it: a click on it
+// would reach the field, and tick a checkbox). It shows its hint through the shared tooltip
+// (src/ui/tooltip.js): on hover, on a tap, and while its field has the keyboard's focus. So a
+// field's "?" isn't a keyboard stop of its own (tabindex -1): the field's input reads the
+// hint out as its description (aria-describedby), and focusing it shows the tip. A group of
+// switches (checks, modeGrid, triGrid) has one "?" for the group: each switch in it reads the
+// group's hint out (after its own, if it has one), and focusing one shows its own tip, or the
+// group's. A "?" drawn on its own (tip() without `control`: a hint no one input stands for)
+// is a stop of its own instead, described by it.
+//
+// A field with no hint keeps the simplest markup, its label wrapping its input; one with a
+// hint names its input by id instead, so the "?" can sit beside the label rather than in it.
 import { esc } from '../html.js';
-import { MODES } from '../visualizer/looks.js';
-import { BAR_OPTIONS, RANDOMIZABLE, RANDOM, rollable } from '../visualizer/bars.js';
+import { MODES } from '../modes.js';
 
-let tipId = 0;
+export { barOptions } from '../modes.js';
+
+let uid = 0;
+/** A field's label as plain text for an attribute (labels are markup: escaped, maybe tagged). */
+const plain = (label) => String(label).replace(/<[^>]*>/g, '').replace(/"/g, '&quot;').trim();
+
 /**
  * A "?" that shows `hint`, and the hidden text it's read out from. With `control`, the input
- * that takes `ref` stands for it (the "?" is only for the eye); without, the "?" is a
- * keyboard stop of its own, named "Hint" and described by it.
+ * that takes `ref` stands for it (the "?" is for the eye, the pointer and touch: not a stop of
+ * its own); without, the "?" is a keyboard stop of its own, described by it. `label` names the
+ * button ("About <label>"; "Hint" without one).
  * @param {string} hint
- * @param {{ control?: boolean }} [o]
+ * @param {{ control?: boolean, label?: string }} [o]
  * @returns {{ mark: string, ref: string, id: string }} the "?" markup, the aria-describedby
  *   attribute for the input, and the hint's id (to describe more than one input with it)
  */
-export const tip = (hint, { control = false } = {}) => {
+export const tip = (hint, { control = false, label = '' } = {}) => {
   if (!hint) return { mark: '', ref: '', id: '' };
-  const id = `viz-tip-${++tipId}`;
-  const own = control ? 'aria-hidden="true"' : `tabindex="0" role="img" aria-label="Hint" aria-describedby="${id}"`;
-  return { mark: `<span class="viz-tip" ${own} data-tip="${esc(hint)}">?</span><span class="visually-hidden" id="${id}">${esc(hint)}</span>`, ref: ` aria-describedby="${id}"`, id };
+  const id = `viz-tip-${++uid}`;
+  const name = label ? `About ${plain(label)}` : 'Hint';
+  return {
+    mark: `<button type="button" class="viz-tip" tabindex="${control ? -1 : 0}" data-tip="${esc(hint)}" aria-label="${name}" aria-describedby="${id}">?</button><span class="visually-hidden" id="${id}">${esc(hint)}</span>`,
+    ref: ` aria-describedby="${id}"`,
+    id,
+  };
 };
 const advAttr = (adv) => (adv ? ' data-adv' : '');
 /** An aria-describedby attribute for these hint ids (empty ones left out), or ''. */
@@ -40,17 +53,50 @@ const describedBy = (...ids) => {
 };
 
 /**
+ * A labelled field: the label (with its "?", and `after` it: a value, a unit) over one
+ * control. `control(idAttr)` draws the control, taking the id its label names it by.
+ * @param {string} label @param {{ mark: string, id: string }} t its tip()
+ * @param {(idAttr: string) => string} control
+ * @param {{ adv?: boolean, after?: string }} [o]
+ */
+const field = (label, t, control, { adv = false, after = '' } = {}) => {
+  if (!t.id) {
+    return `
+  <label class="viz-field"${advAttr(adv)}>
+    <span class="viz-field-label">${label} ${after}</span>
+    ${control('')}
+  </label>`;
+  }
+  const id = `viz-fld-${++uid}`;
+  return `
+  <div class="viz-field"${advAttr(adv)}>
+    <span class="viz-field-label"><label for="${id}">${label}</label> ${t.mark}${after}</span>
+    ${control(` id="${id}"`)}
+  </div>`;
+};
+
+/**
  * A slider with its value shown beside the label (in `<output data-out="<key>">`).
  * @param {string} key @param {string} label @param {number} min @param {number} max @param {number} step
  * @param {{ hint?: string, unit?: string, adv?: boolean }} [opts]
  */
 export const range = (key, label, min, max, step, { hint = '', unit = '', adv = false } = {}) => {
-  const t = tip(hint, { control: true });
-  return `
-  <label class="viz-field"${advAttr(adv)}>
-    <span class="viz-field-label">${label} ${t.mark}<output data-out="${key}"></output>${unit ? `<span class="viz-unit">${unit}</span>` : ''}</span>
-    <input type="range" data-set="${key}" min="${min}" max="${max}" step="${step}"${t.ref}>
-  </label>`;
+  const t = tip(hint, { control: true, label });
+  const after = `<output data-out="${key}"></output>${unit ? `<span class="viz-unit">${unit}</span>` : ''}`;
+  return field(label, t, (id) => `<input type="range" data-set="${key}" min="${min}" max="${max}" step="${step}"${id}${t.ref}>`, { adv, after });
+};
+
+/**
+ * A number typed in (a port, a count): a box rather than a slider, for values too many to
+ * drag through.
+ * @param {string} key @param {string} label
+ * @param {{ hint?: string, unit?: string, adv?: boolean, min?: number, max?: number, step?: number }} [opts]
+ */
+export const number = (key, label, { hint = '', unit = '', adv = false, min, max, step = 1 } = {}) => {
+  const t = tip(hint, { control: true, label });
+  const limits = `${min === undefined ? '' : ` min="${min}"`}${max === undefined ? '' : ` max="${max}"`} step="${step}"`;
+  const after = unit ? `<span class="viz-unit">${unit}</span>` : '';
+  return field(label, t, (id) => `<input type="number" data-set="${key}"${limits} inputmode="numeric"${id}${t.ref}>`, { adv, after });
 };
 
 /**
@@ -59,12 +105,8 @@ export const range = (key, label, min, max, step, { hint = '', unit = '', adv = 
  * @param {{ hint?: string, adv?: boolean, max?: number, placeholder?: string }} [opts]
  */
 export const text = (key, label, { hint = '', adv = false, max = 60, placeholder = '' } = {}) => {
-  const t = tip(hint, { control: true });
-  return `
-  <label class="viz-field"${advAttr(adv)}>
-    <span class="viz-field-label">${label} ${t.mark}</span>
-    <input type="text" data-set="${key}" maxlength="${max}" placeholder="${esc(placeholder)}" autocomplete="off"${t.ref}>
-  </label>`;
+  const t = tip(hint, { control: true, label });
+  return field(label, t, (id) => `<input type="text" data-set="${key}" maxlength="${max}" placeholder="${esc(placeholder)}" autocomplete="off"${id}${t.ref}>`, { adv });
 };
 
 /**
@@ -73,22 +115,26 @@ export const text = (key, label, { hint = '', adv = false, max = 60, placeholder
  * @param {{ hint?: string, adv?: boolean, group?: string }} [opts]
  */
 export const check = (key, label, { hint = '', adv = false, group = '' } = {}) => {
-  const t = tip(hint, { control: true });
-  return `<label class="viz-check"${advAttr(adv)}${group && !t.id ? ' data-group-tip' : ''}><input type="checkbox" data-set="${key}"${describedBy(t.id, group)}><span>${label}</span>${t.mark}</label>`;
+  const t = tip(hint, { control: true, label });
+  const box = `<input type="checkbox" data-set="${key}"${describedBy(t.id, group)}><span>${label}</span>`;
+  if (!t.id) return `<label class="viz-check"${advAttr(adv)}${group ? ' data-group-tip' : ''}>${box}</label>`;
+  return `<div class="viz-check"${advAttr(adv)}><label>${box}</label>${t.mark}</div>`;
 };
 
 /**
  * A row of checkboxes, one per entry of `names` ({ id: label }), for settings[group], each
- * reading out the group's hint.
+ * reading out the group's hint. `bulk`: with a toolbar of All / None / Defaults over them
+ * (bulkBar; `minOne`: the group keeps at least one on, so None can't empty it).
  * @param {string} group @param {string} label @param {Record<string, string>} names
- * @param {{ hint?: string, adv?: boolean }} [opts]
+ * @param {{ hint?: string, adv?: boolean, bulk?: boolean, minOne?: boolean }} [opts]
  */
-export const checks = (group, label, names, { hint = '', adv = false } = {}) => {
-  const t = tip(hint, { control: true });
+export const checks = (group, label, names, { hint = '', adv = false, bulk = false, minOne = false } = {}) => {
+  const t = tip(hint, { control: true, label });
   return `
   <div${advAttr(adv)}${t.id ? ' data-tip-group' : ''}>
-    <p class="viz-field-label">${label} ${t.mark}</p>
-    <div class="viz-checks">${Object.entries(names).map(([id, name]) => check(`${group}.${id}`, esc(name), { group: t.id })).join('')}</div>
+    <p class="viz-field-label">${label} ${t.mark}</p>${bulk ? `
+    ${bulkBar(group, { kind: 'checks', minOne, label })}` : ''}
+    <div class="viz-checks"${bulk ? ` data-bulk-list="${esc(group)}"` : ''}>${Object.entries(names).map(([id, name]) => check(`${group}.${id}`, esc(name), { group: t.id })).join('')}</div>
   </div>`;
 };
 
@@ -100,31 +146,17 @@ export const checks = (group, label, names, { hint = '', adv = false } = {}) => 
 export const options = (names, first = null) => [...(first ? [first] : []), ...Object.entries(names)];
 
 /**
- * An "every N bars" setting's choices (bars.js), plus Random where it's offered.
- * @param {string} key a key of BAR_OPTIONS
- * @returns {[string, string][]}
- */
-export const barOptions = (key) => [
-  ...BAR_OPTIONS[key].map(([v, t]) => [String(v), t]),
-  ...(RANDOMIZABLE.includes(key) ? [[RANDOM, `Random (${rollable(key).join(', ')} bars, rolled each time)`]] : []),
-];
-
-/**
  * A dropdown.
  * @param {string} key @param {string} label @param {string[][]} opts [value, text] pairs
  * @param {{ hint?: string, adv?: boolean }} [opts]
  */
 export const select = (key, label, opts, { hint = '', adv = false } = {}) => {
-  const t = tip(hint, { control: true });
-  return `
-  <label class="viz-field"${advAttr(adv)}>
-    <span class="viz-field-label">${label} ${t.mark}</span>
-    <select data-set="${key}"${t.ref}>${opts.map(([v, text]) => `<option value="${esc(v)}">${esc(text)}</option>`).join('')}</select>
-  </label>`;
+  const t = tip(hint, { control: true, label });
+  return field(label, t, (id) => `<select data-set="${key}"${id}${t.ref}>${opts.map(([v, text]) => `<option value="${esc(v)}">${esc(text)}</option>`).join('')}</select>`, { adv });
 };
 
-// Effect switches: Off / In the mix / Always.
-export const MIX_HINT = 'In the mix: it comes and goes, rolled again each time the look changes. Always: on the whole time.';
+// Effect switches: Off / In the Mix / Always.
+export const MIX_HINT = 'In the Mix: it comes and goes, rolled again each time the look changes. Always: on the whole time.';
 
 /**
  * One effect's switch (a select of MODES, like any other), its hint ending with what the
@@ -141,13 +173,122 @@ export const mode = (key, label, { hint = '', adv = false } = {}) => select(key,
  * @param {{ hint?: string, adv?: boolean, noAlways?: string[] }} [opts]
  */
 export const modeGrid = (label, items, { hint = '', adv = false, noAlways = [] } = {}) => {
-  const t = tip(hint, { control: true });
+  const t = tip(hint, { control: true, label });
   return `
   <div${advAttr(adv)}${t.id ? ' data-tip-group' : ''}>
     <p class="viz-field-label">${label} ${t.mark}</p>
     <div class="viz-modes">${items.map(([key, name, itemHint]) => {
-      const it = tip(itemHint, { control: true });
-      return `<label class="viz-mode"${t.id && !it.id ? ' data-group-tip' : ''}><span>${esc(name)}</span>${it.mark}<select data-set="${key}" aria-label="${esc(name)}"${describedBy(it.id, t.id)}>${MODES.filter(([v]) => v !== 'on' || !noAlways.includes(key)).map(([v, text]) => `<option value="${v}">${esc(text)}</option>`).join('')}</select></label>`;
+      const it = tip(itemHint, { control: true, label: esc(name) });
+      const choices = MODES.filter(([v]) => v !== 'on' || !noAlways.includes(key)).map(([v, text]) => `<option value="${v}">${esc(text)}</option>`).join('');
+      const pick = (id) => `<select data-set="${key}"${id} aria-label="${esc(name)}"${describedBy(it.id, t.id)}>${choices}</select>`;
+      if (!it.id) return `<label class="viz-mode"${t.id ? ' data-group-tip' : ''}><span>${esc(name)}</span>${pick('')}</label>`;
+      const id = `viz-fld-${++uid}`;
+      return `<div class="viz-mode"><label for="${id}">${esc(name)}</label>${it.mark}${pick(` id="${id}"`)}</div>`;
     }).join('')}</div>
   </div>`;
+};
+
+/**
+ * One effect's switch as three radio buttons, Off / In the Mix / Always (one keyboard stop:
+ * the arrow keys move along it). Each radio carries `data-set` and its value, so a page reads
+ * one the way it reads a select (the checked radio's value). The fieldset carries
+ * `data-set-group="<key>"`, and `data-no-always` where there's no Always (`noAlways`).
+ * `missing`: the value marked `data-missing` (what a missing value means, the Painter's);
+ * `group`: the hint id of the grid it's in, read out after its own; `attr`: more attributes
+ * for each choice's label (the Painter's data-audition).
+ * @param {string} key @param {string} label (markup: escape it first)
+ * @param {{ hint?: string, adv?: boolean, noAlways?: boolean, missing?: string, group?: string, attr?: string }} [opts]
+ */
+export const tri = (key, label, { hint = '', adv = false, noAlways = false, missing = '', group = '', attr = '' } = {}) => {
+  const t = tip(hint, { control: true, label });
+  const name = `viz-tri-${++uid}`;
+  const choices = MODES.filter(([v]) => v !== 'on' || !noAlways).map(([v, text]) => (
+    `<label class="tri-opt"${attr}><input type="radio" name="${name}" data-set="${key}" value="${v}"${v === missing ? ' data-missing' : ''}><span>${esc(text)}</span></label>`
+  )).join('');
+  return `<fieldset class="tri"${advAttr(adv)} data-set-group="${esc(key)}"${noAlways ? ' data-no-always' : ''}${describedBy(t.id, group)}><legend>${label}</legend>${t.mark}<span class="tri-opts">${choices}</span></fieldset>`;
+};
+
+/**
+ * A grid of tri() switches: `items` are [settings key, name, hint?] (like modeGrid's), each
+ * reading out its own hint, then the grid's. `noAlways` lists keys that only take off and in
+ * the mix. `bulk`: the grid's name for a toolbar over it (bulkBar: All Off, All In the Mix,
+ * All Always, Shuffle, Defaults), its switches in `data-bulk-list="<bulk>"`.
+ * @param {string} label @param {[string, string, string?][]} items
+ * @param {{ hint?: string, adv?: boolean, noAlways?: string[], bulk?: string }} [opts]
+ */
+export const triGrid = (label, items, { hint = '', adv = false, noAlways = [], bulk = '' } = {}) => {
+  const t = tip(hint, { control: true, label });
+  return `
+  <div class="tri-grid-wrap"${advAttr(adv)}${t.id ? ' data-tip-group' : ''}>
+    <p class="viz-field-label">${label} ${t.mark}</p>${bulk ? `
+    ${bulkBar(bulk, { kind: 'tri', label })}` : ''}
+    <div class="tri-grid"${bulk ? ` data-bulk-list="${esc(bulk)}"` : ''}>${items.map(([key, name, itemHint]) => tri(key, esc(name), { hint: itemHint, noAlways: noAlways.includes(key), group: t.id })).join('')}</div>
+  </div>`;
+};
+
+/** A bulk toolbar's buttons per kind: [data-bulk action, label]. */
+export const BULK_ACTIONS = {
+  tri: [['off', 'All Off'], ['mix', 'All In the Mix'], ['on', 'All Always'], ['shuffle', 'Shuffle'], ['defaults', 'Defaults']],
+  checks: [['all', 'All'], ['none', 'None'], ['defaults', 'Defaults']],
+};
+/**
+ * A toolbar that sets a whole grid or checklist at once: buttons with `data-bulk="<action>"`
+ * and `data-bulk-group="<group>"` (the page wires them; bulkValues works out the new values).
+ * `minOne`: the list keeps at least one on, so None is marked unavailable (aria-disabled:
+ * still focusable, with a tip saying why).
+ * @param {string} group @param {{ kind?: 'tri' | 'checks', minOne?: boolean, label?: string }} [o]
+ */
+export const bulkBar = (group, { kind = 'tri', minOne = false, label = '' } = {}) => {
+  const g = esc(group);
+  const buttons = BULK_ACTIONS[kind].map(([action, text]) => {
+    const stuck = action === 'none' && minOne ? ' aria-disabled="true" data-tip="At least one has to stay on."' : '';
+    return `<button type="button" class="bulk-btn" data-bulk="${action}" data-bulk-group="${g}"${stuck}>${text}</button>`;
+  }).join('');
+  return `<div class="bulk" role="toolbar" aria-label="${label ? `Set All ${plain(label)}` : 'Set All'}">${buttons}</div>`;
+};
+
+/**
+ * A bulk toolbar's action worked out (pure): the new values for `items` (keys, or { key,
+ * noAlways }) from their `current` ones. 'off' / 'mix' / 'on' set every switch (one without
+ * Always takes In the Mix for 'on'); 'all' / 'none' tick or clear every box; 'defaults' puts
+ * each back (`defaults[key]`); 'shuffle' rolls each with `rand()`: a switch any of its states,
+ * a box on or off. `minOne`: if that leaves none on, the first one that was on stays on (or
+ * the first). Returns a new object: `current`'s other keys as they were, the items' new.
+ * @param {string} action
+ * @param {(string | { key: string, noAlways?: boolean })[]} items
+ * @param {Record<string, any>} current @param {Record<string, any>} defaults
+ * @param {() => number} [rand]
+ * @param {{ minOne?: boolean }} [o]
+ * @returns {Record<string, any>}
+ */
+export function bulkValues(action, items, current = {}, defaults = {}, rand = Math.random, { minOne = false } = {}) {
+  const list = items.map((it) => (typeof it === 'string' ? { key: it, noAlways: false } : { key: it.key, noAlways: !!it.noAlways }));
+  const out = { ...current };
+  const isBox = (key) => typeof (current[key] ?? defaults[key]) === 'boolean';
+  const on = (v) => v === true || (typeof v === 'string' && v !== 'off');
+  for (const { key, noAlways } of list) {
+    if (action === 'off' || action === 'mix' || action === 'on') out[key] = action === 'on' && noAlways ? 'mix' : action;
+    else if (action === 'all' || action === 'none') out[key] = action === 'all';
+    else if (action === 'defaults') out[key] = key in defaults ? defaults[key] : current[key];
+    else if (action === 'shuffle') {
+      const states = isBox(key) ? [false, true] : MODES.map(([v]) => v).filter((v) => v !== 'on' || !noAlways);
+      out[key] = states[Math.min(states.length - 1, Math.floor(rand() * states.length))];
+    }
+  }
+  if (minOne && list.length && !list.some(({ key }) => on(out[key]))) {
+    const keep = list.find(({ key }) => on(current[key])) ?? list[0];
+    out[keep.key] = on(current[keep.key]) ? current[keep.key] : isBox(keep.key) ? true : 'mix';
+  }
+  return out;
+}
+
+/**
+ * "More": a longer explanation folded under a field, opened on demand (a line of text, or a
+ * list of lines). Only the All settings view shows it, unless `adv` is false.
+ * @param {string | string[]} body plain text
+ * @param {{ adv?: boolean }} [o]
+ */
+export const more = (body, { adv = true } = {}) => {
+  const inner = Array.isArray(body) ? `<ul>${body.map((line) => `<li>${esc(line)}</li>`).join('')}</ul>` : `<p>${esc(body)}</p>`;
+  return `<details class="viz-more"${advAttr(adv)}><summary>More</summary>${inner}</details>`;
 };

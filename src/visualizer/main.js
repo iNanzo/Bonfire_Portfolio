@@ -37,6 +37,7 @@ import { effects } from '../effects.js';
 import { startingEquipment, weapons } from '../content.js';
 import { elementOr, flameTitle } from '../elements.js';
 import { installDitherPatterns } from '../ui/dither.js';
+import { installTooltips } from '../ui/tooltip.js';
 import { applyFlame, setAccentRamp } from '../ui/theme.js';
 import { esc } from '../html.js';
 import { createAnalyser, BAND_NAMES } from './analyser.js';
@@ -108,6 +109,7 @@ document.documentElement.classList.add('js');
 applyCssPalette();
 applyFlame(startingEquipment.flame);
 installDitherPatterns(base);
+installTooltips();
 
 // --- Markup ------------------------------------------------------------------------------------
 const SOURCES = [

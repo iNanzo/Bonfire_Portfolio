@@ -9,6 +9,7 @@
    ========================================================================== */
 
 @import './tokens.css';
+@import './ui/components.css';
 
 :root {
   --text: var(--c-bone);

@@ -1,5 +1,6 @@
 /* The admin panel, on the site's own tokens (src/tokens.css: palette and fonts). */
 @import '../../src/tokens.css';
+@import '../../src/ui/components.css';
 
 :root {
   --void: var(--c-void);

@@ -13,6 +13,7 @@ import { createPreview } from './preview.js';
 import { flamesBlockTools, sceneBlockTools } from './paletteTools.js';
 import { scenesBlockTools } from './sceneTools.js';
 import { titleCase } from './text.js';
+import { installTooltips } from '../../src/ui/tooltip.js';
 
 const DRAFT_KEY = 'nh-admin-draft';
 const local = {
@@ -491,4 +492,5 @@ async function boot() {
   window.addEventListener('beforeunload', (e) => { if (isDirty()) e.preventDefault(); });
 }
 
+installTooltips();
 boot();

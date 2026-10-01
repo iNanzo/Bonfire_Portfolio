@@ -81,9 +81,9 @@ for (const [name, make] of [['a new scene', () => defaultScene()], ['a full scen
     // not its id, nor the same words under another id (the helmets' group and each knight's).
     const ids = new Set([...html.matchAll(/(?<![\w-])id="([^"]+)"/g)].map((m) => m[1]));
     const hintText = new Map([...html.matchAll(/<span class="visually-hidden" id="([^"]+)">([^<]*)<\/span>/g)].map((m) => [m[1], m[2]]));
-    const stops = new Set([...html.matchAll(/<span class="viz-tip" tabindex="0"[^>]*aria-describedby="([^"]+)"/g)].map((m) => m[1]));
+    const stops = new Set([...html.matchAll(/<button type="button" class="viz-tip" tabindex="0"[^>]*aria-describedby="([^"]+)"/g)].map((m) => m[1]));
     const read = new Set();
-    for (const m of html.matchAll(/<(input|select|textarea|button)\b[^>]*aria-describedby="([^"]+)"/g)) {
+    for (const m of html.matchAll(/<(input|select|textarea|button)\b(?![^>]*class="viz-tip")[^>]*aria-describedby="([^"]+)"/g)) {
       for (const id of m[2].split(/\s+/)) {
         assert.ok(ids.has(id), `${m[0].slice(0, 60)}… points at a missing hint (${id})`);
         assert.ok(!stops.has(id), `${m[0].slice(0, 60)}… reads out a hint whose "?" is a stop too`);
@@ -93,7 +93,7 @@ for (const [name, make] of [['a new scene', () => defaultScene()], ['a full scen
     assert.ok(stops.size > 0 && read.size > 20, `(stops ${stops.size}, hints read out ${read.size})`);
     for (const id of stops) assert.ok(!read.has(hintText.get(id)), `a "?" stop repeats a hint a field reads out: "${hintText.get(id)?.slice(0, 60)}…"`);
     // Title Case labels.
-    for (const m of html.matchAll(/class="viz-field-label">([^<?]+?) (?:<|$)/g)) {
+    for (const m of html.matchAll(/class="viz-field-label">(?:<label[^>]*>)?([^<?]+?)(?:<\/label>)? (?:<|$)/g)) {
       const words = m[1].trim().split(/\s+/).filter((w) => !['a', 'an', 'the', 'of', 'to', 'in', 'by', 'and', 'or', 'on', 'from', 'for', 'at', 'as', 'per'].includes(w));
       for (const w of words) assert.match(w, /^[A-Z0-9“‘(]/, `"${m[1].trim()}" isn't Title Case`);
     }

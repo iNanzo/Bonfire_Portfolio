@@ -9,6 +9,7 @@ import {
   renderSkills, renderAbout, renderContact, sceneLabel,
 } from './render.js';
 import { installDitherPatterns } from './ui/dither.js';
+import { installTooltips } from './ui/tooltip.js';
 import { setSound, blip, forgeHum } from './ui/audio.js';
 import { gridNav, listNav } from './ui/spatial.js';
 import { setupInventory } from './ui/inventory.js';
@@ -42,6 +43,7 @@ if (touch) document.documentElement.classList.add('touch');
 applyCssPalette();
 applyFlame(startingEquipment.flame);
 installDitherPatterns(base);
+installTooltips();
 
 // --- Render ---------------------------------------------------------------------------
 const app = document.getElementById('app');

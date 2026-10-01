@@ -155,7 +155,7 @@ test('Low Flash and Chill promise no palette cycling, and say so: Color Cycle of
   assert.match(PRESETS.chill.hint, /no flashes \(negative, 1-bit ink, or a color cycle/);
   // The switches say what Off does: Color Cycle (Drop Hits) and the Echo look each have a hint of their own.
   const html = settingsMarkup(defaults(), [['P', 'Render menu']]);
-  const item = (key) => [...html.matchAll(/<label class="viz-mode"[\s\S]*?<\/label>/g)].map((m) => m[0]).find((l) => l.includes(`data-set="${key}"`))?.match(/data-tip="([^"]+)"/)?.[1];
+  const item = (key) => [...html.matchAll(/<(label|div) class="viz-mode"[\s\S]*?<\/\1>/g)].map((m) => m[0]).find((l) => l.includes(`data-set="${key}"`))?.match(/data-tip="([^"]+)"/)?.[1];
   assert.match(item('dropFx.cycle') ?? '', /Off: no palette cycling at all, the Echo look’s downbeat color steps and spins too/);
   assert.match(item('looks.echo') ?? '', /unless Color Cycle \(Drop Hits\) is Off/);
 });
@@ -174,13 +174,13 @@ test('the dialog: every field is a setting; the Render tab has one of each, each
   assert.ok(render.includes('xrayViews.normals'));
   assert.equal(keys.filter((k) => k === 'pixelSize').length, 1, 'the pixel size moved (it isn’t in the Look tab too)');
   // A hint on every field of the tab: one "?" per label (switch groups have one for the group).
-  const fields = [...panel.matchAll(/<label class="viz-(field|check)"[\s\S]*?<\/label>/g)].map((m) => m[0]).filter((f) => !/data-set="xrayViews\./.test(f));
+  const fields = [...panel.matchAll(/<(label|div) class="viz-(?:field|check)"[\s\S]*?<\/\1>/g)].map((m) => m[0]).filter((f) => !/data-set="xrayViews\./.test(f));
   assert.ok(fields.length >= 19);
   for (const f of fields) assert.match(f, /data-tip="[^"]{20,}"/, `a hint: ${f.match(/data-set="([^"]+)"/)?.[1]}`);
   // The new layers are in the Layers grid, each with its hint.
   for (const k of ['grain', 'cinema', 'spotlight', 'chroma']) {
     assert.ok(k in LAYERS);
-    assert.match(html, new RegExp(`<span>${LAYERS[k]}</span><span class="viz-tip"[^>]*data-tip="[^"]{20,}"`));
+    assert.match(html, new RegExp(`>${LAYERS[k]}</label><button type="button" class="viz-tip"[^>]*data-tip="[^"]{20,}"`));
   }
 });
 
@@ -214,7 +214,7 @@ test('the Knights tab: its settings load, keep their type and choices, and each 
   const panel = html.slice(html.indexOf('id="viz-tab-knights"'), html.indexOf('id="viz-tab-titles"'));
   const keys = [...panel.matchAll(/data-set="([^"]+)"/g)].map((m) => m[1]);
   for (const k of ['knights', 'knightCount', 'knightDance', 'knightFormation', 'danceBars', 'knightCam', 'knightSummon', 'knightGestures', 'knightShine', 'knightReactions', 'knightMoves.praise', 'knightHelmets.bascinet']) assert.ok(keys.includes(k), `${k} is in the Knights tab`);
-  const fields = [...panel.matchAll(/<label class="viz-field"[\s\S]*?<\/label>/g)].map((m) => m[0]);
+  const fields = [...panel.matchAll(/<(label|div) class="viz-field"[\s\S]*?<\/\1>/g)].map((m) => m[0]);
   assert.ok(fields.length >= 10);
   // Every knight behavior has the three-way switch.
   for (const k of ['knights', 'knightDance', 'knightSummon', 'knightGestures', 'knightCam', 'knightShine', 'knightReactions', 'knightGlow']) {
@@ -222,7 +222,7 @@ test('the Knights tab: its settings load, keep their type and choices, and each 
     assert.deepEqual([...f.matchAll(/<option value="([^"]+)"/g)].map((m) => m[1]), ['off', 'mix', 'on'], `${k}: Off / In the mix / Always`);
   }
   for (const f of fields) assert.match(f, /data-tip="[^"]{40,}"/, `a hint: ${f.match(/data-set="([^"]+)"/)?.[1]}`);
-  assert.equal([...panel.matchAll(/<p class="viz-field-label">[^<]*<span class="viz-tip"/g)].length, 2, 'the move and helmet groups have a hint each');
+  assert.equal([...panel.matchAll(/<p class="viz-field-label">[^<]*<button type="button" class="viz-tip"/g)].length, 2, 'the move and helmet groups have a hint each');
   // Presets: Rave is four knights dancing whenever it's locked; Chill one, resting.
   const rave = defaults(); applyPreset(rave, 'rave');
   assert.deepEqual([rave.knights, rave.knightCount, rave.knightDance, rave.knightShine, rave.knightReactions], ['on', 4, 'on', 'on', 'on']);
@@ -280,13 +280,13 @@ test('the knight options: style, finish, edge glow and seat pose load with their
   assert.match(panel, /<input type="range" data-set="knightRim" min="0" max="1"/);
   assert.deepEqual(choicesOf(panel, 'knightGlow'), ['off', 'mix', 'on'], 'Edge Glow: Off / In the mix / Always');
   assert.ok(panel.indexOf('data-set="knightGlow"') < panel.indexOf('data-set="knightRim"'), 'the switch, then its strength');
-  assert.match(panel, /<span class="viz-field-label">Edge Glow [\s\S]*?data-set="knightGlow"/);
-  assert.match(panel, /<span class="viz-field-label">Glow Strength [\s\S]*?data-set="knightRim"/);
+  assert.match(panel, /<span class="viz-field-label"><label for="[^"]+">Edge Glow<\/label> [\s\S]*?data-set="knightGlow"/);
+  assert.match(panel, /<span class="viz-field-label"><label for="[^"]+">Glow Strength<\/label> [\s\S]*?data-set="knightRim"/);
   for (const k of ['knightStyle', 'knightFinish', 'knightGlow', 'knightRim', 'knightSeat']) {
-    const f = [...panel.matchAll(/<label class="viz-field"[\s\S]*?<\/label>/g)].map((m) => m[0]).find((x) => x.includes(`data-set="${k}"`));
+    const f = [...panel.matchAll(/<(label|div) class="viz-field"[\s\S]*?<\/\1>/g)].map((m) => m[0]).find((x) => x.includes(`data-set="${k}"`));
     assert.ok(f, `${k} is in the Knights tab`);
     assert.match(f, /data-tip="[^"]{60,}"/, `${k} has a hint`);
-    assert.match(f, /<span class="viz-field-label">[A-Z][a-z]+( [A-Z][a-z]+)* /, `${k}: a Title Case label`);
+    assert.match(f, /<span class="viz-field-label"><label for="[^"]+">[A-Z][a-z]+( [A-Z][a-z]+)*(?: |<\/label>)/, `${k}: a Title Case label`);
   }
   // Default Dance is one of the moves (knightShow.js), so the Moves row has it.
   assert.match(panel, /data-set="knightMoves\.defaultDance"/);
@@ -310,11 +310,11 @@ test('the Scenes tab: after Effects, its fields are real settings with hints, th
   const panel = tabOf(html, 'scenes');
   const keys = [...panel.matchAll(/data-set="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(keys.sort(), ['sceneBars', 'sceneCards', 'sceneFrom', 'sceneHold', 'sceneOrder', 'scenes']);
-  const fields = [...panel.matchAll(/<label class="viz-field"[\s\S]*?<\/label>/g)].map((m) => m[0]);
+  const fields = [...panel.matchAll(/<(label|div) class="viz-field"[\s\S]*?<\/\1>/g)].map((m) => m[0]);
   assert.equal(fields.length, 6);
   for (const f of fields) {
     assert.match(f, /data-tip="[^"]{60,}"/, `a hint: ${f.match(/data-set="([^"]+)"/)?.[1]}`);
-    assert.match(f, /<span class="viz-field-label">[A-Z][a-z]+( [A-Z][a-z]+)* /, `a Title Case label: ${f.match(/data-set="([^"]+)"/)?.[1]}`);
+    assert.match(f, /<span class="viz-field-label"><label for="[^"]+">[A-Z][a-z]+( [A-Z][a-z]+)*(?: |<\/label>)/, `a Title Case label: ${f.match(/data-set="([^"]+)"/)?.[1]}`);
   }
   assert.deepEqual(choicesOf(panel, 'scenes'), ['off', 'mix', 'on'], 'Scenes: Off / In the mix / Always');
   assert.deepEqual(choicesOf(panel, 'sceneCards'), ['off', 'mix', 'on'], 'Scene Cards: Off / In the mix / Always');
@@ -375,9 +375,9 @@ test('the scene presets: Club is the defaults with the scenes in the mix, Chill 
 test('the hints: no "?" is a hidden keyboard stop; every setting reads its hint out, a group’s switches the group’s too', async () => {
   const { tip } = await import('../src/ui/fields.js');
   const html = settingsMarkup(defaults(), [['P', 'Render menu']]);
-  const marks = [...html.matchAll(/<span class="viz-tip"[^>]*>/g)].map((m) => m[0]);
+  const marks = [...html.matchAll(/<button type="button" class="viz-tip"[^>]*>/g)].map((m) => m[0]);
   assert.ok(marks.length > 50);
-  for (const m of marks) assert.ok(!/tabindex/.test(m), `a field's "?" isn't a stop (its input reads the hint out): ${m}`);
+  for (const m of marks) assert.ok(/tabindex="-1"/.test(m), `a field's "?" isn't a stop (its input reads the hint out): ${m}`);
   // Every description points at a hint that's there.
   const hints = new Map([...html.matchAll(/<span class="visually-hidden" id="(viz-tip-\d+)">([^<]*)<\/span>/g)].map((m) => [m[1], m[2]]));
   const described = [...html.matchAll(/<(input|select)[^>]*data-set="([^"]+)"[^>]*>/g)].map((m) => [m[2], m[0].match(/aria-describedby="([^"]+)"/)?.[1].split(' ') ?? []]);
@@ -393,7 +393,7 @@ test('the hints: no "?" is a hidden keyboard stop; every setting reads its hint 
   for (const [key, ids] of described) assert.ok(ids.length > 0, `${key} reads a hint out`);
   // A "?" drawn on its own (no input stands for it) is a named stop, described by its hint.
   const lone = tip('What this does, at length.');
-  assert.match(lone.mark, /tabindex="0" role="img" aria-label="Hint" aria-describedby="viz-tip-\d+"/);
+  assert.match(lone.mark, /tabindex="0" data-tip="[^"]+" aria-label="Hint" aria-describedby="viz-tip-\d+"/);
   assert.doesNotMatch(lone.mark, /aria-hidden/);
-  assert.match(tip('x', { control: true }).mark, /^<span class="viz-tip" aria-hidden="true" data-tip/);
+  assert.match(tip('x', { control: true }).mark, /^<button type="button" class="viz-tip" tabindex="-1" data-tip/);
 });
