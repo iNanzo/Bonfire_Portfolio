@@ -43,8 +43,12 @@ const METRICS = [
   ['busy ms/frame', (w) => (w.busyMsPerS != null && w.fps ? w.busyMsPerS / w.fps : null), false],
   ['draw calls', (w) => w.drawCalls, false],
   ['shadows/s', (w) => w.shadowsPerS, false],
+  ['shadows/frame', (w) => (w.shadowsPerS != null && w.fps ? w.shadowsPerS / w.fps : null), false],
   ['alloc MB/s', (w) => w.allocMBperS, false],
   ['profile busy ms/s', (w) => w.profileBusyMsPerS, false],
+  ['stepped ms/frame', (w) => w.steppedMsPerFrame, false],
+  ['stepped CPU ms/frame', (w) => w.steppedCpuMsPerFrame, false],
+  ['shadows/frame (stepped)', (w) => w.shadowsPerFrame, false],
 ];
 
 const median = (xs) => {

@@ -52,7 +52,7 @@ stay put. Each scenario runs in a fresh browser context; each measured window re
 | top functions | with `--profile`: a CPU profile after the window, inclusive ms/s of `src/` functions |
 | programs / textures / contexts | WebGL objects still alive (scenario E), per context; a lost context's go with it |
 
-Scenarios (`--scenarios A,B,…`; the default is `A,B,E,F`):
+Scenarios (`--scenarios A,B,…`; the default is `A,B,E,F,H`):
 
 - **A** — the ruins, the free show grooving to the demo.
 - **B** — each of the five places (ruins, forge, shrine, cathedral, cult) with four knights
@@ -65,6 +65,12 @@ Scenarios (`--scenarios A,B,…`; the default is `A,B,E,F`):
 - **F** — the settings: the P menu's digits pressed fast with the dialog closed, then a
   slider dragged back and forth in the open dialog.
 - **G** — the frame cap (`fire.setMaxFps(--cap)`, 60 by default), where the build has it.
+- **H** — deterministic: no music, and the page's clock and animation frames are virtual
+  (nothing moves until the bench steps it), with the same seed on both sides. In each place
+  four knights dance and a hard beat lands every 30 frames while 300 frames are stepped in
+  a tight loop. It reports ms per frame on the wall clock and on the main thread's CPU
+  clock (`stepped CPU ms/frame`), draw calls and shadow redraws per frame. Both sides draw
+  exactly the same frames, so this is the one to trust on a busy machine.
 
 Run it against a server that's already up, or let it start Vite on a checkout:
 
@@ -102,7 +108,10 @@ after with the change and whether it's better; with several runs or rounds on a 
 number is their median. Scenario E adds the GPU objects at the start and after six rebuilds.
 
 **Interleave the runs** (before, after, before, after) when the machine is doing anything
-else: one run each is easily off by 30% on a shared or thermally limited machine. Frame
+else: one run each is easily off by 30% on a shared or thermally limited machine. The live
+windows (A–G) also play a different show on each run (the music's timing decides which look,
+element or weapon is up when), so compare their medians, and lean on H and on the counts
+(draw calls, shadow redraws, GPU objects), which don't depend on either. Frame
 times only mean something next to the display's own rate (`displayHz` in the JSON): on a
 144 Hz display an uncapped frame is 6.9 ms at best, and a 60 cap draws every second or third
 frame (13.9 or 20.8 ms apart), so its % > 16.7 ms is high by design.

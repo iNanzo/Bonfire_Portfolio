@@ -6,7 +6,7 @@
 //   node tools/bench-viz.mjs --root ../bp-wt/base --port 5193 --label base   (starts Vite on it)
 //   node tools/bench-viz.mjs --root . --port 5183 --prod --label prod        (a build, ?bench)
 //
-// Options: --scenarios A,B,C,D,E,F,G (default A,B,E,F) · --throttle 4 (CPU slowdown) ·
+// Options: --scenarios A,B,C,D,E,F,G,H (default A,B,E,F,H) · --throttle 4 (CPU slowdown) ·
 // --seconds 10 (each measured window) · --rounds 1 · --alloc 4 (seconds of allocation
 // sampling after each window; 0: none) · --profile (a CPU profile after each window: busy
 // ms/s and the top functions) · --cap 60 (scenario G's frame cap) · --seed 1 · --headed ·
@@ -23,6 +23,11 @@
 //   F  the settings: P-menu digits pressed fast with the dialog closed, then a slider dragged
 //      in the open dialog
 //   G  the frame cap (fire.setMaxFps, where the build has it) at --cap fps
+//   H  deterministic: no music, the page's clock and animation frames virtual, the same seed;
+//      in each place four knights dance and a hard beat lands every 30 frames while 300
+//      frames are stepped in a tight loop, timed on the real clock (ms per frame, with the GPU
+//      finished). The states are the same on both sides of a comparison, so it holds up on a
+//      busy machine where A-G's live windows don't.
 //
 // Metrics per window: drawn frames and their intervals (p50/p95/p99/max ms, and the share
 // over 16.7 and 33 ms, each with 5% slack for vsync jitter), long tasks, main-thread busy and
@@ -38,10 +43,10 @@ import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
 const SCENERY_NAMES = ['ruins', 'forge', 'shrine', 'cathedral', 'cult'];
-const ALL = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+const ALL = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 function parseArgs(argv) {
-  const o = { scenarios: 'A,B,E,F', throttle: 1, seconds: 10, rounds: 1, alloc: 0, cap: 60, seed: 1, out: 'test-results/perf', label: null };
+  const o = { scenarios: 'A,B,E,F,H', throttle: 1, seconds: 10, rounds: 1, alloc: 0, cap: 60, seed: 1, out: 'test-results/perf', label: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith('--')) continue;
@@ -90,7 +95,7 @@ const label = opts.label ?? sha ?? 'run';
 
 // --- In the page, before the app's code: a seeded Math.random, long tasks, the WebGL objects
 // alive per context (a context that's lost takes its objects with it), and the settings.
-function initPage({ seed, settings }) {
+function initPage({ seed, settings, virtual = false }) {
   let s = seed >>> 0 || 1;
   Math.random = () => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -99,6 +104,25 @@ function initPage({ seed, settings }) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+  window.__reseed = (n) => { s = n >>> 0; };
+  if (virtual) {
+    // (Scenario H: nothing moves until stepped; __step(n) runs n animation frames 1/60 s apart.)
+    window.__realNow = performance.now.bind(performance);
+    let vnow = 1000;
+    performance.now = () => vnow;
+    let queue = [];
+    let nextId = 1;
+    window.requestAnimationFrame = (cb) => { const id = nextId++; queue.push({ id, cb }); return id; };
+    window.cancelAnimationFrame = (id) => { queue = queue.filter((q) => q.id !== id); };
+    window.__step = (n, ms = 1000 / 60) => {
+      for (let i = 0; i < n; i++) {
+        vnow += ms;
+        const run = queue;
+        queue = [];
+        for (const q of run) q.cb(vnow);
+      }
+    };
+  }
   window.__lt = [];
   try {
     new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lt.push({ start: e.startTime, dur: e.duration }); })
@@ -440,6 +464,76 @@ const SCENARIOS = {
       await drag;
     } else out.slider = { error: 'no range input in the open dialog' };
     await page.keyboard.press('Escape');
+    await context.close();
+    return { windows: out, errors };
+  },
+  async H(browser) {
+    const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
+    await context.addInitScript(initPage, { seed: opts.seed, virtual: true, settings: { ...BASE_SETTINGS, pixelShift: 'off', knights: 'on', knightCount: 4 } });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message.slice(0, 200)));
+    await page.goto(`${baseUrl}/visualizer/?bench`);
+    await page.waitForFunction(() => window.__viz?.fire, null, { timeout: 120000, polling: 250 });
+    await page.evaluate(() => window.__viz.fire.ready);
+    await page.evaluate(() => window.__step(1));
+    await page.evaluate(() => window.__viz.fire.knights.ready);
+    await sleep(3000);
+    const cdp = await context.newCDPSession(page);
+    if (opts.throttle > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: opts.throttle });
+    const out = {};
+    await cdp.send('Performance.enable', { timeDomain: 'threadTicks' }).catch(() => cdp.send('Performance.enable'));
+    for (const name of SCENERY_NAMES) {
+      // (Set up and warmed in one task, stepped in the next, so the main thread's time for
+      // the stepping alone is known: CPU time, which a busy machine inflates far less than
+      // the wall clock.)
+      await page.evaluate(([name, seed]) => {
+        const fire = window.__viz.fire;
+        window.__viz.settings.scenery = name;
+        fire.setScenery(name);
+        const k = fire.knights;
+        k.setCast({ count: 4, instant: true });
+        for (let i = 0; i < 4; i++) k.dance(i, { move: 'defaultDance', slot: i, facing: 'front' });
+        window.__reseed(seed);
+        window.__step(60);
+        const scene = fire.debug.weapons.holder.parent;
+        const H = (window.__H = { renderer: null, shadows: 0, calls: 0 });
+        const own = scene.onBeforeRender;
+        scene.onBeforeRender = function (r, ...rest) { H.renderer = r; return own.call(this, r, ...rest); };
+        window.__step(1);
+        scene.onBeforeRender = own;
+        const sm = H.renderer.shadowMap;
+        H.render = sm.render;
+        sm.render = function (lights, ...rest) { if (this.needsUpdate && lights.length) H.shadows++; return H.render.call(this, lights, ...rest); };
+        H.off = fire.onRendered(() => { H.calls += H.renderer.info.render.calls; });
+        H.renderer.getContext().finish();
+      }, [name, opts.seed]);
+      const frames = 300;
+      const before = await perfMetrics(cdp);
+      const wallMs = await page.evaluate((frames) => {
+        const fire = window.__viz.fire;
+        const t0 = window.__realNow();
+        for (let i = 0; i < frames; i++) {
+          if (i % 30 === 0) fire.pulse(1, { accent: true });
+          window.__step(1);
+        }
+        window.__H.renderer.getContext().finish();
+        return window.__realNow() - t0;
+      }, frames);
+      const after = await perfMetrics(cdp);
+      out[name] = await page.evaluate(([frames, wallMs, cpuMs]) => {
+        const H = window.__H;
+        H.off();
+        H.renderer.shadowMap.render = H.render;
+        const fire = window.__viz.fire;
+        return {
+          steppedMsPerFrame: +(wallMs / frames).toFixed(3), steppedCpuMsPerFrame: +(cpuMs / frames).toFixed(3),
+          shadowsPerFrame: +(H.shadows / frames).toFixed(3), drawCalls: Math.round(H.calls / frames), frames, scenery: fire.scenery, knights: fire.knights.present,
+        };
+      }, [frames, wallMs, (after.task - before.task) * 1000]);
+      const w = out[name];
+      console.log(`  H ${name.padEnd(12)} ${w.steppedMsPerFrame} ms/frame stepped (CPU ${w.steppedCpuMsPerFrame})  shadows/frame ${w.shadowsPerFrame}  draws ${w.drawCalls}`);
+    }
     await context.close();
     return { windows: out, errors };
   },
