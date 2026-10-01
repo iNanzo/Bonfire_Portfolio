@@ -6,8 +6,9 @@
 //
 //   seats     one per scenery, behind the fire on the left, well back from it (SEATS): where
 //             the site's cameras see him three-quarter-on without him covering the fire, the
-//             weapon or the page, his boots clear of the ring stones and the flames. He sits
-//             turned a little from the fire toward the cameras (his front catches the light).
+//             weapon or the page, his boots clear of the ring stones and the flames, and he's
+//             clear of the scenery round him (colliders.js) however he sits. He sits turned a
+//             little from the fire toward the cameras (his front catches the light).
 //   the sign  his summon sign (the NH monogram) lies on the ground in front of his seat, where
 //             his boots will be, turned to read from the home view (SEATS[name].sign).
 //   the ring  1.2 m round the fire; `blocked` holds the arcs where something stands on it
@@ -37,8 +38,9 @@ const SIGN_OUT = 0.55;
  * A seat: his hips' place (x, z), the seat's height (m), which way he faces (`yaw`: the fire,
  * turned `turn` toward the cameras) and his summon sign in front of it ({ x, z, yaw }: the
  * sign's letters read from the home camera): `signOut` along his way (between the seat and
- * the ring stones), or at `signAt` ({ x, z }) where something of the scenery's lies there. knights.js checks the height against the
- * scenery's height map when he sits, and places his feet on the ground in front of it.
+ * the ring stones), or at `signAt` ({ x, z }) where something of the scenery's lies there.
+ * knights.js checks the height against the scenery's height map when he sits, and rests his
+ * feet on the ground in front of it (or on whatever lies there).
  */
 function seat(x, z, top, { turn = TURN, signOut = SIGN_OUT, signAt = null } = {}) {
   const yaw = Math.atan2(FIRE_AT.x - x, FIRE_AT.z - z) + turn;
@@ -47,29 +49,33 @@ function seat(x, z, top, { turn = TURN, signOut = SIGN_OUT, signAt = null } = {}
 }
 
 /**
- * The knight's seat in each scenery, behind the fire on the left, 1.6–1.8 m from its middle
- * (bearings 208–217°) so his boots stay well out of it (≥ 1.05 m: test/knights.test.mjs, on
- * the real model) and his legs leave the dance ring clear from 256° round the front. The
+ * The knight's seat in each scenery, behind the fire on the left, 1.68–1.74 m from its middle
+ * (bearings 203–229°) so his boots stay well out of it (≥ 1.05 m: test/knights.test.mjs, on
+ * the real model) and his legs leave the dance ring clear from 266° round the front. The
  * seats are low (0.21–0.23 m, knees up, like a knight resting at a Dark Souls bonfire): that
  * far back a higher one would lift his helmet into the page's header on phones
- * (test/knights.test.mjs). His sign
- * lies on open ground in front of it, clear of the ring stones and in view of the home camera
- * on wide screens and phones (test/knightPlaces.test.mjs).
+ * (test/knights.test.mjs). Each keeps him at least 4 cm clear of whatever stands round it
+ * (the ruins' pillar, the cathedral's columns, the cult's standing stones, the anvil's horn)
+ * in either seat pose, his boots resting on what's under them
+ * (test/knightClearance.test.mjs). His sign lies on open ground in front of it, clear of the
+ * ring stones and in view of the home camera on wide screens and phones
+ * (test/knightPlaces.test.mjs).
  */
 export const SEATS = {
-  // A drum fallen from the pillar, by its plinth (scenery.js). (The model's own fallen drum
-  // lies where his sign would go: it lies on the open ground at his left, toward the cameras.)
-  ruins: seat(-1.02, -1.42, 0.21, { signAt: { x: -1.16, z: -0.58 } }),
+  // A drum fallen from the pillar, lying across his way (scenery.js), clear of the pillar at
+  // his right shoulder; his right boot rests up on the model's own fallen drum in front of
+  // him. (His sign lies beyond it at his left, the one open ground there in view.)
+  ruins: seat(-0.61, -1.57, 0.21, { signAt: { x: -1.16, z: -0.58 } }),
   // A stump by the anvil (scenery.js).
   forge: seat(-0.8, -1.52, 0.21),
   // A resting stone (scenery.js).
   shrine: seat(-0.9, -1.5, 0.21, { signOut: 0.57 }),
-  // The fallen nave drum, at the column's foot (scenery.js); the sign a little to his left,
-  // clear of the drum and the ring stones.
-  cathedral: seat(-0.98, -1.36, 0.22, { signAt: { x: -0.94, z: -0.78 } }),
-  // The fallen standing stone, his back to the others: a low seat, knees up (scenery.js); the
-  // sign to his left, clear of the ring stones.
-  cult: seat(-1.0, -1.33, 0.23, { turn: -0.25, signAt: { x: -1.04, z: -0.59 } }),
+  // The fallen nave drum, in front of the columns, clear of them (scenery.js); the sign a
+  // little to his left, clear of the drum and the ring stones.
+  cathedral: seat(-1.22, -1.14, 0.22, { signAt: { x: -1.1, z: -0.56 } }),
+  // The fallen standing stone, his back to the others, clear of them: a low seat, knees up
+  // (scenery.js); the sign to his left, clear of the ring stones.
+  cult: seat(-1.27, -1.12, 0.23, { turn: -0.25, signAt: { x: -1.04, z: -0.53 } }),
 };
 
 /**
@@ -77,18 +83,18 @@ export const SEATS = {
  * needing about 0.35 m. `blocked`: the arcs (degrees) where something stands on it in each
  * scenery (measured on the height maps, a dancer's feet 1.0–1.4 m out and ±0.18 m aside,
  * with a few degrees to spare): the spare logs everywhere, then each scenery's own pieces,
- * and the seated knight's legs (his seat is well back, but his boots reach the ring). The arc
- * from 253° through 0° to 96° is clear everywhere.
+ * and the seated knight's legs, either seat pose (his seat is well back, but his boots reach
+ * the ring). The arc from 265° through 0° to 96° is clear everywhere.
  */
 export const DANCE_RING = {
   center: [FIRE_AT.x, FIRE_AT.z],
   radius: 1.2,
   blocked: {
-    ruins: [[96, 142], [192, 252]],      // (the model's fallen drum, then his legs)
+    ruins: [[96, 142], [182, 244]],      // (his legs, and the model's fallen drum)
     forge: [[96, 142], [184, 244]],
     shrine: [[96, 142], [186, 247]],
-    cathedral: [[96, 142], [190, 253]],
-    cult: [[96, 142], [190, 253]],
+    cathedral: [[96, 142], [204, 265]],
+    cult: [[96, 142], [205, 265]],
   },
   /** The clear arcs of a scenery, [[from°, to°], …] going round (to° may pass 360). */
   free(name) {
@@ -121,12 +127,13 @@ const STEP = 10; // Round the Fire: degrees a step (every two bars)
 // Line, Solo, Canon: where 1–4 dancers stand (bearings), the first layout that's clear in
 // the scenery. Seen from the cameras in front, two on one side stand one behind the
 // other, so a third goes behind the fire and to its right, where his head and shoulders
-// show over the flames.
+// show over the flames. (Four where his legs take more of the ring on the left, the
+// cathedral's and the cult's: two each side, as far apart as the arcs allow.)
 const LAYOUTS = [
   [[275], [285], [80]],
   [[275, 80], [270, 300], [60, 86]],
   [[275, 80, 157], [270, 305, 75], [272, 305, 62]],
-  [[262, 300, 80, 157], [268, 304, 58, 86], [270, 306, 60, 87]],
+  [[262, 300, 80, 157], [268, 304, 58, 86], [270, 306, 60, 87], [275, 308, 58, 86]],
 ];
 const wrap360 = (a) => ((a % 360) + 360) % 360;
 

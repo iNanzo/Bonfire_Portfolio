@@ -4,16 +4,17 @@
 // burning away) between the seat and the ring, the others at home on the ring's clear
 // sides, each knight's own pose for the cameras and the blade, the shadow redrawn whenever
 // what casts it changes, the show's comings and goings (a new scenery, an ember walk, the
-// cast's count), reactions that leave a dance alone, and nothing left behind.
+// cast's count), reactions that leave a dance alone, the room for his arms at home and
+// where a dance move fits (from the scenery's shapes), and nothing left behind.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { createKnights, HELMETS } from '../src/bonfire/knights.js';
+import { createKnights, HELMETS, MOVES } from '../src/bonfire/knights.js';
 import { createArmorShared } from '../src/bonfire/armor.js';
 import { BONES, BONE_NODES, PARENT, DEFAULT_REST, TASSET_FOLLOW, SEAT_DEPTH, SEAT_POSES, GESTURE_TIME, DANCE_SEATED_TIME } from '../src/bonfire/knightPose.js';
 import { createResourceScope } from '../src/bonfire/resources.js';
 import { SEATS, DANCE_RING } from '../src/bonfire/scenery.js';
-import { restPlaces, ringOf, sideArcs, slotPlaces, FRONT } from '../src/bonfire/knightPlaces.js';
+import { restPlaces, ringOf, sideArcs, slotPlaces, FRONT, FIRE_AT } from '../src/bonfire/knightPlaces.js';
 
 /** The model's rig as plain groups (docs/knight.md), a box on every joint, three helmets on the head. */
 function standInModel() {
@@ -706,6 +707,28 @@ async function phoneView() {
     },
   };
 }
+
+test('his room for each arm at home comes from the scenery’s shapes; a dance move fits a place only with room for its reach', () => {
+  const k = make();
+  // The cult's standing stones stand at his left on his seat (colliders.js): less room there.
+  k.setScenery('cult', flatAt('cult'));
+  k.summon(0, { instant: true });
+  run(k, 0.3);
+  const [left, right] = k.knights[0].home.room;
+  assert.ok(left < 0.6 && left < right, `seated in the cult: room ${left.toFixed(2)} left, ${right.toFixed(2)} right`);
+  // On the open ground of the ring (a knight at home there), nothing in an arm's reach.
+  k.setScenery('ruins', flatAt('ruins'));
+  k.setCast({ count: 2, instant: true });
+  run(k, 0.3);
+  assert.deepEqual(k.knights[1].home.room, [1, 1], 'the others at home on the ring: all the room');
+  // A spin's arms all round don't fit beside the shrine's front lantern; on the open side of
+  // the ring every move does.
+  const ring = k.slots('shrine');
+  const tight = slotPlaces(ring, 1)[0];
+  assert.equal(k.fits('spin', tight, 'front', 'shrine'), false, `a spin by the lantern (${tight.bearing}°)`);
+  const open = { x: FIRE_AT.x + Math.sin((70 * Math.PI) / 180) * 1.2, z: FIRE_AT.z + Math.cos((70 * Math.PI) / 180) * 1.2 };
+  for (const move of MOVES) assert.ok(k.fits(move, open, 'fire', 'shrine'), `${move} at 70°`);
+});
 
 test('the settings’ helmets are his (effectsDefaults KNIGHT_HELMETS, less random: scene.js reads them before his code loads)', async () => {
   const { KNIGHT_HELMETS } = await import('../src/effectsDefaults.js');
