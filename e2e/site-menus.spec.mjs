@@ -2,7 +2,8 @@
 // in it), its two groups (Go To hides where the header has tabs) and its arrow keys, the
 // keyboard shortcuts (?), the pack's Anvil and Spell Tome in labelled groups, the render
 // settings from the menu (touch too: a close button, no P to press) with the cursor's pick
-// remembered, and the keys that mustn't fire while typing or with Shift.
+// remembered, and the keys that mustn't fire while typing or with Shift (or, in photo mode,
+// close it from under the keys list).
 import { test, expect } from '@playwright/test';
 
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
@@ -90,6 +91,29 @@ test('? lists every key; Esc closes it; Shift with a letter does nothing', async
   await expect(keys).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(keys).toBeHidden();
+  await expect(page).toHaveURL(/\/experience\/$/);
+  expect(errors).toEqual([]);
+});
+
+test('photo mode: ? lists the keys over it, and Esc closes the list, not photo mode', async ({ page }) => {
+  const errors = watch(page);
+  await page.goto('/experience/');
+  await ready(page);
+  await page.keyboard.press('f');
+  const bar = page.locator('.photo-bar');
+  await expect(bar).toBeVisible();
+  await page.keyboard.press('Shift+Slash');
+  const keys = page.locator('.keys-overlay');
+  await expect(keys).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(keys).toBeHidden();
+  await expect(bar).toBeVisible();
+  await expect(page.locator('html')).toHaveClass(/is-photo/);
+  // Then Esc gives the page back (after closing the tooltip of the button focus went back
+  // to, if it showed one: an Esc closes a tooltip, and only it).
+  if (await page.locator('.ui-tip').isVisible()) await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(bar).toBeHidden();
   await expect(page).toHaveURL(/\/experience\/$/);
   expect(errors).toEqual([]);
 });

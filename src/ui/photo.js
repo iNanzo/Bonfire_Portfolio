@@ -9,6 +9,7 @@
 // their tooltips (the shared one, ui/tooltip.js).
 import { ui } from '../content.js';
 import { esc } from '../html.js';
+import { isEditing } from '../routes.js';
 import { blip } from './audio.js';
 import { focusedNow, holdsFocus, returnFocus } from './focus.js';
 import { dragOrbit, orbitPose, zoomOrbit, ORBIT_TARGET, PHOTO_LIMITS, DRAG_RATE } from './orbit.js';
@@ -137,8 +138,13 @@ export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter 
     view = zoomOrbit(view, e.deltaY, PHOTO_LIMITS);
     pose(true);
   }, { passive: false });
+  // Esc gives the page back: not while typing, and not under a dialog (the shortcuts list,
+  // ?, opens over photo mode, and the Esc is its own).
   window.addEventListener('keydown', (e) => {
-    if (active && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); exit(); }
+    if (!active || e.key !== 'Escape' || isEditing(e.target) || document.querySelector('dialog[open]')) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    exit();
   });
 
   return {
