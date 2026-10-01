@@ -387,7 +387,7 @@ function onEvent(type, data = {}) {
     live.textContent = 'Drop.';
     if (data.title !== false) nextCard('drops');
   } else if (type === 'arm') {
-    note('Forging a blade for the drop…', 4);
+    note('Forging a weapon for the drop…', 4);
   } else if (type === 'start') {
     if (settings.intro) showCard(0);
     // (A scene already playing when the music starts, from ?scene=, a chip or N on the start
