@@ -101,7 +101,10 @@ function openDiscoveries() {
       <span class="visually-hidden">${found ? 'found' : 'not found yet'}</span></li>`;
   }).join('');
   discoveriesDialog.showModal();
-  q('[data-discoveries-close]', discoveriesDialog).focus();
+  // Focus on Close (the one thing to press), but the list from its top: its title, the count
+  // and the first ones in sight, not scrolled down to where Close is.
+  q('[data-discoveries-close]', discoveriesDialog).focus({ preventScroll: true });
+  q('[data-discoveries-scroll]', discoveriesDialog).scrollTop = 0;
 }
 discoveriesDialog.addEventListener('click', (e) => {
   if (e.target === discoveriesDialog || e.target.closest('[data-discoveries-close]')) discoveriesDialog.close();

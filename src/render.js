@@ -78,12 +78,14 @@ export function renderChrome() {
       </div>
     </div>
     <dialog class="rest-menu" data-discoveries aria-labelledby="discoveries-title">
-      <div class="rest-menu-inner frame discoveries-inner">
+      <div class="rest-menu-inner has-scroll frame discoveries-inner">
         ${corners}
-        <p class="rest-menu-title" id="discoveries-title">${esc(ui.discoveries)} <span data-discovery-count></span></p>
-        <p class="rest-menu-flavor">${esc(ui.discoveriesFlavor)}</p>
-        <ul class="discovery-list" role="list" data-discovery-list></ul>
-        <button class="pix-btn" type="button" data-discoveries-close>${esc(ui.close)} <kbd>Esc</kbd></button>
+        <div class="rest-menu-scroll" data-discoveries-scroll>
+          <p class="rest-menu-title" id="discoveries-title">${esc(ui.discoveries)} <span data-discovery-count></span></p>
+          <p class="rest-menu-flavor">${esc(ui.discoveriesFlavor)}</p>
+          <ul class="discovery-list" role="list" data-discovery-list></ul>
+          <button class="pix-btn" type="button" data-discoveries-close>${esc(ui.close)} <kbd>Esc</kbd></button>
+        </div>
       </div>
     </dialog>
     <div class="toast" data-toast hidden role="status"><span class="toast-kicker" data-toast-kicker></span><span class="toast-text" data-toast-text></span></div>
@@ -106,7 +108,8 @@ export const MENU_TEXT = {
  * labelled group, then Close. Every item is a `data-menu-item` for its arrow keys
  * (ui/spatial.js listNav skips the hidden ones); the tools say what they do as their
  * tooltips (a screen reader hears them as descriptions: ui/describedTip.js), and show their
- * keys.
+ * keys. Its insides scroll inside the frame on a short window: the frame's corners sit a
+ * pixel outside it, so it can't clip them.
  */
 function renderRestMenu() {
   const tool = (action, label, key, hint = '') => {
@@ -118,26 +121,28 @@ function renderRestMenu() {
   const soundTip = describedTip('menu-tip-sound', ui.soundHint);
   return `
     <dialog class="rest-menu" data-menu aria-labelledby="rest-menu-title">
-      <div class="rest-menu-inner frame">
+      <div class="rest-menu-inner has-scroll frame">
         ${corners}
-        <p class="rest-menu-title" id="rest-menu-title">${esc(ui.menu)}</p>
-        <p class="rest-menu-flavor">${esc(ui.menuFlavor)}</p>
-        <div class="menu-group menu-go-to" role="group" aria-labelledby="menu-go-to-title">
-          <p class="menu-group-title" id="menu-go-to-title">${esc(MENU_TEXT.goTo)}</p>
-          <ul role="list" data-menu-list>
-            ${screens.map((s) => `<li><a class="menu-item" href="#/${s.id === 'home' ? '' : s.id}" data-menu-item>${esc(s.label)}</a></li>`).join('')}
-            ${site.resumeUrl ? `<li data-resume hidden><a class="menu-item" ${resumeAttrs()} data-menu-item>${esc(ui.resume)}</a></li>` : ''}
-          </ul>
+        <div class="rest-menu-scroll">
+          <p class="rest-menu-title" id="rest-menu-title">${esc(ui.menu)}</p>
+          <p class="rest-menu-flavor">${esc(ui.menuFlavor)}</p>
+          <div class="menu-group menu-go-to" role="group" aria-labelledby="menu-go-to-title">
+            <p class="menu-group-title" id="menu-go-to-title">${esc(MENU_TEXT.goTo)}</p>
+            <ul role="list" data-menu-list>
+              ${screens.map((s) => `<li><a class="menu-item" href="#/${s.id === 'home' ? '' : s.id}" data-menu-item>${esc(s.label)}</a></li>`).join('')}
+              ${site.resumeUrl ? `<li data-resume hidden><a class="menu-item" ${resumeAttrs()} data-menu-item>${esc(ui.resume)}</a></li>` : ''}
+            </ul>
+          </div>
+          <div class="menu-group" role="group" aria-labelledby="menu-tools-title">
+            <p class="menu-group-title" id="menu-tools-title">${esc(MENU_TEXT.tools)}</p>
+            <ul role="list">${tool('photo', ui.photo, 'F', ui.photoHint)}${tool('breakdown', ui.breakdown, 'B', ui.breakdownHint)}${tool('render', ui.renderMenu ?? 'Render Settings', 'P', MENU_TEXT.renderHint)}
+              <li><button class="menu-item" type="button" data-menu-item data-menu-action="discoveries"${discoveriesTip.attrs}>${esc(ui.discoveries)} <span class="menu-count" data-discovery-count></span></button>${discoveriesTip.note}</li>${tool('keys', MENU_TEXT.keys, '?', MENU_TEXT.keysHint)}
+              <li><button class="menu-item" type="button" data-menu-item data-sound aria-pressed="false"${soundTip.attrs}><span data-sound-label>${esc(ui.soundOff)}</span></button>${soundTip.note}</li>
+            </ul>
+          </div>
+          <button class="menu-item menu-close" type="button" data-menu-item data-menu-close>${esc(ui.close)} <kbd>Esc</kbd></button>
+          <p class="rest-menu-keys">${esc(ui.keysHint)}</p>
         </div>
-        <div class="menu-group" role="group" aria-labelledby="menu-tools-title">
-          <p class="menu-group-title" id="menu-tools-title">${esc(MENU_TEXT.tools)}</p>
-          <ul role="list">${tool('photo', ui.photo, 'F', ui.photoHint)}${tool('breakdown', ui.breakdown, 'B', ui.breakdownHint)}${tool('render', ui.renderMenu ?? 'Render Settings', 'P', MENU_TEXT.renderHint)}
-            <li><button class="menu-item" type="button" data-menu-item data-menu-action="discoveries"${discoveriesTip.attrs}>${esc(ui.discoveries)} <span class="menu-count" data-discovery-count></span></button>${discoveriesTip.note}</li>${tool('keys', MENU_TEXT.keys, '?', MENU_TEXT.keysHint)}
-            <li><button class="menu-item" type="button" data-menu-item data-sound aria-pressed="false"${soundTip.attrs}><span data-sound-label>${esc(ui.soundOff)}</span></button>${soundTip.note}</li>
-          </ul>
-        </div>
-        <button class="menu-item menu-close" type="button" data-menu-item data-menu-close>${esc(ui.close)} <kbd>Esc</kbd></button>
-        <p class="rest-menu-keys">${esc(ui.keysHint)}</p>
       </div>
     </dialog>`;
 }

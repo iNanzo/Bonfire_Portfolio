@@ -28,6 +28,8 @@ test('the Menu button shows on desktop; Go To hides there (the tabs do it), Tool
   await expect(menu).toBeVisible();
   await expect(page.getByRole('group', { name: 'Tools' })).toBeVisible();
   await expect(page.locator('.menu-go-to')).toBeHidden();
+  // It fits: nothing to scroll (its frame's corners, a pixel outside it, don't count).
+  expect(await page.locator('[data-menu] .rest-menu-scroll').evaluate((el) => el.scrollHeight - el.clientHeight)).toBe(0);
   // Focus starts on the first item that shows, and the arrows skip the hidden ones.
   expect(await focusedText(page)).toMatch(/^Photo Mode/);
   await page.keyboard.press('ArrowUp');
@@ -42,6 +44,9 @@ test('the Menu button shows on desktop; Go To hides there (the tabs do it), Tool
   await expect(menu).toBeHidden();
   expect(await list.locator('.discovery').count()).toBeGreaterThan(20);
   await expect(list.locator('[data-discovery-count]')).toHaveText(/^\d+ \/ \d+$/);
+  // Focus on Close, but the list from its top: its title and count in sight.
+  await expect(list.locator('[data-discoveries-close]')).toBeFocused();
+  await expect(list.locator('#discoveries-title')).toBeInViewport();
   await page.keyboard.press('Escape');
   await expect(list).toBeHidden();
   expect(errors).toEqual([]);

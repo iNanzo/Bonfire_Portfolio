@@ -301,16 +301,18 @@ body[data-screen='home'] .tabs { visibility: hidden; }
 }
 .rest-menu::backdrop { background: color-mix(in srgb, var(--c-void) 80%, transparent); }
 .rest-menu[open] { display: grid; place-items: center; animation: fade-in 200ms steps(4) both; }
-.rest-menu-inner {
-  position: relative;
-  width: min(92vw, 380px);
-  max-height: calc(100dvh - 24px);
+.rest-menu-inner { position: relative; width: min(92vw, 380px); padding: 32px 28px 24px; background: var(--c-void); }
+/* The site's menus: no taller than the window, their insides scrolling within the frame
+   (.rest-menu-scroll), not the frame itself: its corners sit a pixel outside it, and would
+   be cut in half and leave a pixel to scroll. */
+.rest-menu-inner.has-scroll { display: flex; flex-direction: column; max-height: calc(100dvh - 24px); padding: 0; }
+.rest-menu-scroll {
+  min-height: 0;
+  padding: 28px 28px 22px;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--c-stone) transparent;
-  padding: 28px 28px 22px;
-  background: var(--c-void);
 }
 .rest-menu-title { font-family: var(--font-pixel); font-size: 0.8125rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent-hi); margin-bottom: 6px; }
 .rest-menu-flavor { font-style: italic; color: var(--text-dim); margin-bottom: 14px; font-size: 0.9375rem; }
@@ -359,7 +361,7 @@ body[data-screen='home'] .tabs { visibility: hidden; }
 .touch .rest-menu .menu-item kbd { display: none; }
 @media (max-width: 899px) {
   .rest-menu .menu-item { padding: 6px 8px; font-size: 1.125rem; }
-  .rest-menu-inner { padding: 22px 22px 18px; }
+  .rest-menu-scroll { padding: 22px 22px 18px; }
 }
 
 /* ---------- Button prompts (desktop) ---------- */
@@ -1650,7 +1652,7 @@ button.viewer-stage { display: block; width: 100%; padding: 0; border: 0; cursor
 }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 .menu-count { margin-left: 6px; color: var(--text-dim); font-size: 0.875rem; }
-.discoveries-inner { width: min(92vw, 460px); max-height: 86vh; overflow: auto; }
+.rest-menu-inner.discoveries-inner { width: min(92vw, 460px); max-height: min(86vh, calc(100dvh - 24px)); }
 .discovery-list { display: grid; gap: 8px; margin-bottom: 18px; }
 .discovery { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; color: var(--text-dim); }
 .discovery b { display: block; font-weight: 500; color: var(--text-dim); }
