@@ -284,7 +284,8 @@ export function createSearch({ entries, onPick, doc = document }) {
       api.close({ restore: true });
     }
   });
-  input.addEventListener('focus', () => { if (input.value.trim()) open(); });
+  // (Back in the box: the query again, on the draft as it is now.)
+  input.addEventListener('focus', () => { if (input.value.trim()) box.run(); });
   root.addEventListener('focusout', (e) => {
     if (!root.contains(/** @type {Node | null} */ (e.relatedTarget))) close();
   });
@@ -296,10 +297,11 @@ export function createSearch({ entries, onPick, doc = document }) {
     root,
     /** Open the search: the box focused, its text selected, its results back. */
     focus() {
-      if (doc.activeElement !== input) back = doc.activeElement;
-      input.focus();
+      const already = doc.activeElement === input;
+      if (!already) back = doc.activeElement;
+      input.focus(); // (taking the focus runs the query again)
       input.select();
-      if (input.value.trim()) box.run();
+      if (already && input.value.trim()) box.run();
     },
     /** Close the results; `restore`: the focus goes back to where it was before the search. */
     close({ restore = false } = {}) {

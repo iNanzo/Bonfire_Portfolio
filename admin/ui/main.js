@@ -213,7 +213,8 @@ function block(key) {
   const value = getAt(ctx.draft, path);
   const effectsKey = key.startsWith('effects.') ? key.slice(8) : null;
   const reset = effectsKey && el('button', {
-    type: 'button', class: 'link-button', text: 'Reset Section', 'aria-label': `Reset “${labelOf(key)}” to the defaults`,
+    // (Its name starts with the words it shows, for voice control; then which section.)
+    type: 'button', class: 'link-button', text: 'Reset Section', 'aria-label': `Reset Section: ${labelOf(key)}`,
     'data-tip': 'Back to the site’s defaults; Undo brings yours back (so does Discard, until you save).',
     onclick: () => resetBlock(key, effectsKey),
   });
