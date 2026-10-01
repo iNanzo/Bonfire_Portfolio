@@ -1,10 +1,11 @@
 // Bonfire Live's settings dialog in a real browser: the search (it filters every tab in
 // place, counts each tab's finds, shows an All Settings row in the Simple view, marks the words
 // found without ever running an imported name as markup), its keys (/ from the page, / and
-// Ctrl+F in the dialog, Esc to clear and then to close, ↓ into the results, Enter to reveal a
-// single one), the bulk buttons and their Undo (one change, one save), a setting that does
-// nothing as things stand (disabled, saying why), the keyboard shortcuts (?), and Frame Rate
-// capping how often the picture is drawn. No errors anywhere.
+// Ctrl+F in the dialog, Esc to clear and then to close, ↓ and ↑ through the results without
+// changing them, Enter to reveal the one meant), the bulk buttons and their Undo (one change,
+// one save, the focus kept), a setting that does nothing as things stand (disabled, saying
+// why), the keyboard shortcuts (?, every group in sight), a short screen and a phone, and Frame
+// Rate capping how often the picture is drawn. No errors anywhere.
 import { test, expect } from '@playwright/test';
 
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
@@ -295,6 +296,37 @@ test('? lists the keyboard shortcuts in groups, from the page and from the setti
   await page.keyboard.press('Escape');
   await expect(keys).toBeHidden();
   expect(errors).toEqual([]);
+});
+
+test('a short screen keeps most of the dialog for the settings; a phone reads the toast whole, the presets’ note and every shortcut group', async ({ browser }) => {
+  const baseURL = test.info().project.use.baseURL;
+  // A phone on its side.
+  const land = await browser.newPage({ baseURL, viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  const errors = watch(land);
+  await open(land);
+  await land.locator('[data-start] [data-act="settings"]').click();
+  await expect(dialog(land)).toBeVisible();
+  const [body, whole] = await land.evaluate(() => [document.querySelector('[data-settings-body]').clientHeight, document.querySelector('.viz-settings-inner').clientHeight]);
+  expect(body / whole, `${body} of ${whole} px for the settings`).toBeGreaterThan(0.5);
+  await expect(land.locator('[data-preset-note]')).toContainText('Club');
+  await land.close();
+  // A phone.
+  const phone = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const phoneErrors = watch(phone);
+  await open(phone);
+  await phone.locator('[data-start] [data-act="settings"]').click();
+  await expect(phone.locator('[data-preset-note]')).toBeVisible();
+  await phone.locator('[data-tab="effects"]').click();
+  await phone.locator('[data-bulk-group="looks"][data-bulk="shuffle"]').click();
+  const toast = phone.locator('[data-toast-text]');
+  await expect(toast).toHaveText('Looks: Shuffle');
+  expect(await toast.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), 'the toast read whole').toBe(true);
+  await expect(phone.locator('[data-toast-undo]')).toBeVisible();
+  await phone.locator('.viz-keys-btn').click();
+  await expect(phone.locator('.keys-overlay')).toBeVisible();
+  await groupsInSight(phone);
+  await phone.close();
+  expect([...errors, ...phoneErrors]).toEqual([]);
 });
 
 test('Frame Rate 30 caps how often the picture is drawn; Display takes the cap off; it isn’t in a setup', async ({ page }) => {

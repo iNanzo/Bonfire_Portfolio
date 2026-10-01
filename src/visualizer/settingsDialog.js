@@ -115,6 +115,7 @@ export function settingsMarkup(settings, keys = [], { base = '/' } = {}) {
           <button type="button" class="viz-close" data-settings-close aria-label="Close Settings" data-tip="Close (Esc)">✕</button>
         </div>
         <div class="viz-presets viz-presets-top" role="group" aria-label="Presets">${presetButtons()}</div>
+        <p class="viz-preset-note" data-preset-note aria-hidden="true"></p>
         <div class="viz-tabs" role="tablist" aria-label="Settings Tabs">
           ${TABS.map((t, i) => `<button type="button" role="tab" class="viz-tab" id="viz-tabbtn-${t.id}" aria-controls="viz-tab-${t.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-tab="${t.id}"${i === 0 ? ' autofocus' : ''}>${esc(t.label)}<span class="viz-tab-count" data-tab-count hidden></span></button>`).join('')}
         </div>
@@ -182,7 +183,7 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     }
     form.dataset.view = settings.view;
     for (const r of dialog.querySelectorAll('[data-view-pick]')) /** @type {HTMLInputElement} */ (r).checked = /** @type {HTMLInputElement} */ (r).value === settings.view;
-    markPreset(dialog, settings);
+    markPresets();
     applyDeps();
   }
   function fillNow() {
@@ -195,6 +196,23 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
   function fill() {
     if (dialog.open) fillNow();
   }
+
+  // --- the presets: the one in use marked; where they're names only (a phone, a short
+  // screen), a line under them says what the one in use does, or the one pointed at or focused
+  const presetsEl = q('.viz-presets-top');
+  const presetNote = q('[data-preset-note]');
+  function notePreset(id = presetOf(settings)) {
+    const p = id ? PRESETS[id] : null;
+    const html = p ? `<b>${esc(p.name)}</b> ${esc(p.hint)}` : '';
+    if (presetNote.innerHTML !== html) presetNote.innerHTML = html;
+  }
+  function markPresets() {
+    markPreset(dialog, settings);
+    notePreset();
+  }
+  const presetUnder = (e) => /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest?.('[data-preset]'));
+  for (const type of ['pointerover', 'focusin']) presetsEl.addEventListener(type, (e) => { const b = presetUnder(e); if (b) notePreset(b.dataset.preset); });
+  for (const type of ['pointerout', 'focusout']) presetsEl.addEventListener(type, () => notePreset());
 
   // --- needs: a setting that does nothing as things stand is off, saying why
   const needs = entriesFor('live').filter((e) => e.needs?.live).map((e) => ({ key: e.live, row: q(`[data-row="${e.live}"]`), why: q(`#viz-why-${e.live}`) })).filter((n) => n.row && n.why);
@@ -371,7 +389,7 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     setPath(settings, key, v);
     showOutput(key);
     applyDeps();
-    markPreset(dialog, settings);
+    markPresets();
     if (key === 'sceneFrom') drawScenes();
     onChange(group);
   });
