@@ -173,10 +173,11 @@ async function seq() {
     await seatIn(page, name, 'resting');
     await page.evaluate(() => window.__fire.setView('home', { instant: true }));
     await page.waitForTimeout(900);
-    // (Round his seat on the home view: him, the fire and what stands by his seat.)
-    const region = [0.3, 0.2, 0.62, 0.66];
+    // (Round his seat on the home view: him, the fire and what stands by his seat, wide
+    // enough for any round's seat: round 10's ruins seat sits further right than round 9's.)
+    const region = [0.32, 0.1, 0.82, 0.66];
     for (const [nm, s] of Object.entries(SEQS)) {
-      const tiles = await realTime(page, s.act, s.at, (buf) => crop(buf, region, 300, 310));
+      const tiles = await realTime(page, s.act, s.at, (buf) => crop(buf, region, 380, 240));
       await grid(tiles, 10, `${OUT}/${TAG}-seq-${name}-${nm}.png`, s.at.map((t) => `${name} ${nm} ${t} ms`));
       await page.waitForTimeout(1500);
       await page.evaluate(() => window.__fire.knights.sit(0));
