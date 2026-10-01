@@ -163,7 +163,8 @@ test('the shared words: MODES and the bar choices live in src/modes.js, in Title
   assert.equal(modeOf(true, 'mix'), 'mix');
   assert.equal(modeOf('mix'), 'mix');
   assert.equal(modeOf('nope'), 'off');
-  assert.deepEqual(barOptions('ringBars').at(-1), [RANDOM, 'Random (1, 2, 4, 8 Bars)']);
+  assert.deepEqual(barOptions('ringBars').at(-1), [RANDOM, 'Random (1, 2, 4, 8 Bars, Rolled Each Time)']);
+  assert.equal(titleCase(barOptions('ringBars').at(-1)[1]), barOptions('ringBars').at(-1)[1]);
   assert.equal(barOptions('comboBars').some(([v]) => v === RANDOM), false, 'comboBars has its own random');
   assert.deepEqual(options({ a: 'A' }, ['mix', 'A Mix']), [['mix', 'A Mix'], ['a', 'A']]);
 });

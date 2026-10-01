@@ -42,12 +42,12 @@ export const RANDOMIZABLE = Object.keys(BAR_OPTIONS).filter((k) => k !== 'comboB
 export const rollable = (key) => BAR_OPTIONS[key].map(([v]) => v).filter((v) => v > 0);
 
 /**
- * An "every N bars" setting's choices for a select, plus Random where it's offered (what
- * Random rolls goes in the setting's hint).
+ * An "every N bars" setting's choices for a select, plus Random where it's offered: what it
+ * rolls, and that it rolls again each time (few of the settings' hints say so).
  * @param {string} key a key of BAR_OPTIONS
  * @returns {[string, string][]}
  */
 export const barOptions = (key) => [
   ...BAR_OPTIONS[key].map(([v, t]) => /** @type {[string, string]} */ ([String(v), t])),
-  ...(RANDOMIZABLE.includes(key) ? [/** @type {[string, string]} */ ([RANDOM, `Random (${rollable(key).join(', ')} Bars)`])] : []),
+  ...(RANDOMIZABLE.includes(key) ? [/** @type {[string, string]} */ ([RANDOM, `Random (${rollable(key).join(', ')} Bars, Rolled Each Time)`])] : []),
 ];
