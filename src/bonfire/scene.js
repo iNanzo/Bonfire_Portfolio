@@ -1494,10 +1494,13 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // ball's height), and once after the model loads or the settings change; never while
   // the shadow is switched off (setShadows). A planted weapon's shudder on a hard beat
   // (weapons.moving, but not movingForShadow) redraws it at the art's own 12 fps instead
-  // (one frame per light step, none if a knight's step just did), and once more when it's
-  // still: with the beats coming every half second, it had all six faces redrawn every
-  // frame of the show. (Its shadow is magnified on the far scenery, the shrine's torii, so
-  // it isn't left out: it shudders in steps, like the flame.)
+  // (one frame per light step, none if a knight's step just did: at most 12 a second
+  // more), and once more when it's still: with the beats coming every half second, it had
+  // all six faces redrawn every frame of the show. It isn't left out altogether: from a
+  // light this close the blade's shadow is magnified on the far scenery (the shrine's
+  // torii flickers lit and shadowed with it), and held still through the show's near-
+  // constant shudders that flicker would be gone. (Sampled at 12 fps, the blade's 8.75 Hz
+  // wobble shows in the shadow as a slower, stepped one, not the blade's own rhythm.)
   const shadowLightAt = new THREE.Vector3(Infinity, 0, 0);
   let shadowFrames = 0;
   let shuddering = false;
