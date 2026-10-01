@@ -34,7 +34,7 @@ import {
 } from './settings.js';
 import { CONTROLS, BLOCKS, row, kindOf, presetButtons, sceneListMarkup, cardsMarkup, setupsMarkup, keysResultsMarkup } from './settingsControls.js';
 import { bulkPlan, sectionPlan, sectionKeys, getPath, setPath, createBatch } from './settingsBulk.js';
-import { createLiveSearch, focusTarget } from './settingsSearchUi.js';
+import { createLiveSearch, focusIn } from './settingsSearchUi.js';
 
 export { presetButtons, sceneListMarkup };
 
@@ -403,12 +403,13 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
       settings.view = 'all';
       fillFields();
       onChange();
-      // (The cue goes with the Simple view: the focus goes to the first setting it brought.)
+      // (The cue goes with the Simple view: the focus goes to the first setting it brought, its
+      // field, or the row itself where that's off for now (Link Bridge Port, until Beat From
+      // is Link): never out of the dialog, where its keys stop working.)
       const sec = q(`[data-section="${b.dataset.showAll}"]`);
       sec?.scrollIntoView({ block: 'start' });
-      const first = sec?.querySelector('[data-row][data-adv]');
-      const to = first && focusTarget(first);
-      if (to) { to.focus({ preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); }
+      const first = /** @type {HTMLElement[]} */ ([...(sec?.querySelectorAll('[data-row][data-adv]') ?? [])]).find((r) => r.getClientRects().length);
+      if (first) { focusIn(first, { preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); }
     },
     '[data-bulk]': (/** @type {HTMLElement} */ b) => {
       if (b.getAttribute('aria-disabled') === 'true') return; // (None, where one has to stay: its tip says why)

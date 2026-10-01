@@ -242,6 +242,26 @@ test('a setting that does nothing as things stand is disabled, saying why; Edge 
   await page.locator('[data-set="blink"]').check();
   for (const item of await fly.locator('input[data-set]').all()) await expect(item).toBeEnabled();
   await expect(fly.locator('#viz-why-flyMoves')).toBeHidden();
+  // One that's off still takes the focus, which never drops out of the dialog (where / and ?
+  // stop working): the Beat cue's one setting, Link Bridge Port (until Beat From is Link)…
+  await page.locator('[data-view-pick][value="simple"]').check();
+  await page.locator('[data-tab="sound"]').click();
+  await page.locator('[data-show-all="beat"]').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-row="linkPort"]')).toBeFocused();
+  await page.keyboard.press('/');
+  await expect(box(page)).toBeFocused();
+  // …and a result stepped to with nothing to go into, Harmony: Enter shows it in its place.
+  await page.keyboard.type('harmony');
+  await page.keyboard.press('ArrowDown');
+  const harmony = page.locator('[data-row="scheme"]');
+  await expect(harmony).toBeFocused();
+  await expect(page.locator('[data-set="scheme"]').first()).toBeDisabled();
+  await page.keyboard.press('Enter');
+  await expect(box(page)).toHaveValue('');
+  await expect(harmony).toBeFocused();
+  await page.keyboard.press('/');
+  await expect(box(page)).toBeFocused();
   expect(errors).toEqual([]);
 });
 

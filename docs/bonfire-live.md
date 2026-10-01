@@ -282,8 +282,9 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
   and Flame Frame Rate), the choices, the scenes in the loop, the title cards, the setups,
   the MIDI actions, the presets and the keyboard shortcuts. `↓` goes to the first result
   and `↓` / `↑` from one to the next (the row itself, so stepping never changes a setting;
-  `Tab` or `Enter` goes into it, or a shortcut's opens the shortcuts; `↑` from the first goes
-  back to the box). `Enter` in the box reveals the only result, or the one named just as
+  `Tab` or `Enter` goes into it; a shortcut's opens the shortcuts, and one with nothing to go
+  into, off for now or a MIDI action's, shows in its place; `↑` from the first goes back to
+  the box). `Enter` in the box reveals the only result, or the one named just as
   typed ("frame rate": Frame Rate, not Flame Frame Rate): its tab, scrolled to, focused, a
   short flash unless motion is reduced; with several it goes to the first. `Esc` clears the
   search, a second `Esc` closes the dialog. Nothing found suggests words that would find

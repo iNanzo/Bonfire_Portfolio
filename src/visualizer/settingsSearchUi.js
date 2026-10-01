@@ -18,7 +18,8 @@
 //   keys      / or Ctrl+F in the dialog goes to the box; Esc clears it (a second Esc closes
 //             the dialog); ↓ goes to the first result, and ↓ / ↑ from result to result (the
 //             row itself takes the focus, not its field, so stepping through never changes
-//             a setting; Tab or Enter goes into it, ↑ from the first goes back to the box).
+//             a setting; Tab or Enter goes into it, or, with nothing to go into, Enter
+//             reveals it; ↑ from the first goes back to the box).
 //             Enter in the box reveals the one result, or the one named just as typed
 //             ("frame rate": Frame Rate, not Flame Frame Rate) (its tab, scrolled to,
 //             focused and flashed, unless motion is reduced); with several, it goes to the
@@ -188,19 +189,41 @@ const FOCUS = [
   'textarea:not(:disabled)', 'button:not(:disabled):not(.viz-tip)', 'a[href]', 'summary',
 ];
 const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+/** Whether `el` shows (a closed details block's insides don't, though Chrome lays them out). @param {Element} el */
+const shows = (el) => el.checkVisibility?.() ?? el.getClientRects().length > 0;
 
 /**
  * What to focus in a row: its switch's choice, its input, its button (never its "?"); the
- * row itself if it's a button.
+ * row itself if it's a button. Only one that shows: a link in a closed block (the Link help's
+ * Carabiner) can't take the focus, so its summary does.
  * @param {Element} row
  * @returns {HTMLElement | null}
  */
 export function focusTarget(row) {
   for (const s of FOCUS) {
-    const el = /** @type {HTMLElement | null} */ (row.querySelector(s));
+    const el = /** @type {HTMLElement | undefined} */ ([...row.querySelectorAll(s)].find(shows));
     if (el) return el;
   }
   return row.matches('button, summary') ? /** @type {HTMLElement} */ (row) : null;
+}
+
+/**
+ * Focus a row: its field (focusTarget), else the row itself, focusable (and ringed, as a
+ * result stepped to is) until the focus leaves it. A row whose field is off for now, or one
+ * with none (a MIDI action's), still takes the focus: it never drops out of the dialog,
+ * where the dialog's keys (/, ?, Esc) stop working.
+ * @param {HTMLElement} row
+ * @param {FocusOptions} [options]
+ */
+export function focusIn(row, options) {
+  const to = focusTarget(row);
+  if (to) { to.focus(options); return; }
+  if (!row.hasAttribute('tabindex')) {
+    row.tabIndex = -1;
+    row.dataset.resultFocus = '';
+    row.addEventListener('blur', () => { row.removeAttribute('tabindex'); row.removeAttribute('data-result-focus'); }, { once: true });
+  }
+  row.focus(options);
 }
 
 /** A row's words as compared with a query's: "Frame Rate" → "frame rate". @param {string} text */
@@ -348,7 +371,7 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
     }
     const still = reducedMotion();
     row.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
-    focusTarget(row)?.focus({ preventScroll: true });
+    focusIn(/** @type {HTMLElement} */ (row), { preventScroll: true });
     if (!still) {
       row.classList.remove('is-found');
       void (/** @type {HTMLElement} */ (row)).offsetWidth;
@@ -394,7 +417,8 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
       else if (next < list.length) focusRow(list[next]);
     } else if (e.key === 'Enter' && !row.matches('button, a[href], summary')) {
       e.preventDefault();
-      // (A row with no field of its own, a shortcut's, opens what it names.)
+      // (A row with no field to go into opens what it names, a shortcut's, or shows itself in
+      // its place: one off for now, saying why, or a MIDI action's.)
       const to = focusTarget(row);
       if (to) to.focus();
       else reveal(row.dataset.row);
