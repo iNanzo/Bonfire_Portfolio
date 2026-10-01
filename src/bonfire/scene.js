@@ -59,6 +59,7 @@ import { createFlowView } from './flowView.js';
 import { buildScenery, SCENERIES, MAX_LAMPS } from './scenery.js';
 import { passValue, stillClock } from './stillFx.js';
 import { base, flames, flameOr, scenePalette, debugPalettes, mixFlame, flameEase } from '../palette.js';
+import { PIXEL_SIZES } from '../pixelSizes.js';
 
 const BASE = import.meta.env.BASE_URL;
 const LAYER_SOLID = 0;
@@ -68,7 +69,6 @@ const LIGHT_FPS = 12;
 const FIRE_ORIGIN = new THREE.Vector3(0.02, 0.12, 0.02);
 const WEAPON_ANCHOR = new THREE.Vector3(0.04, 0, 0.03);
 
-const PIXEL_SIZES = [2, 3, 4, 6];
 const DEBUG_PALETTES = Object.keys(debugPalettes);
 const DITHER_LEVELS = [0.08, 0.16, 0.26]; // (the render menu steps up through these from the current value, then to none)
 const MATRIX_SIZES = [4, 8];
@@ -1720,39 +1720,50 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     slots: (name) => knights?.slots(name ?? sceneryKey) ?? null,
   };
 
-  // --- Debug HUD
-  function cycle(what) {
+  // --- The render settings (the site's P menu, ui/renderMenu.js): cycle() steps one
+  // setting on (dir 1) or back (-1, a Shift+click), describe() says what each is now.
+  /** The value after `cur` in `list` going `dir` (wrapping; from one that isn't in it, the nearest that way). */
+  const stepIn = (list, cur, dir) => {
+    const i = list.indexOf(cur);
+    if (i >= 0) return list[(i + dir + list.length) % list.length];
+    const next = dir > 0 ? list.find((v) => v > cur) : list.findLast((v) => v < cur);
+    return next ?? (dir > 0 ? list[0] : list.at(-1));
+  };
+  function cycle(what, dir = 1) {
+    dir = dir < 0 ? -1 : 1;
     if (what === 'pixel') {
-      const cur = pixelSize();
-      settings.pixelSize = PIXEL_SIZES[(PIXEL_SIZES.indexOf(cur) + 1) % PIXEL_SIZES.length];
+      settings.pixelSize = stepIn(PIXEL_SIZES, pixelSize(), dir);
       resize();
     } else if (what === 'palette') {
-      debugPaletteIndex = (debugPaletteIndex + 1) % DEBUG_PALETTES.length;
+      debugPaletteIndex = (debugPaletteIndex + dir + DEBUG_PALETTES.length) % DEBUG_PALETTES.length;
       const debug = debugPalettes[DEBUG_PALETTES[debugPaletteIndex]];
       pass.setPalette(debug ?? scenePalette({ ramp: currentRamp, shade: flames[flameKey].shade }), { steel: !debug });
       fewStale = true;
     } else if (what === 'dither') {
-      // (Up a level from what's showing now, the settings' own included, then back to none.)
+      // (Up a level from what's showing now, the settings' own included, then back to none;
+      // back, down a level from it, from none to the strongest.)
       const cur = pass.uniforms.ditherStrength.value;
-      pass.uniforms.ditherStrength.value = DITHER_LEVELS.find((v) => v > cur + 1e-4) ?? 0;
+      pass.uniforms.ditherStrength.value = dir > 0
+        ? DITHER_LEVELS.find((v) => v > cur + 1e-4) ?? 0
+        : cur > 1e-4 ? DITHER_LEVELS.findLast((v) => v < cur - 1e-4) ?? 0 : DITHER_LEVELS.at(-1);
     } else if (what === 'matrix') {
-      const cur = pass.uniforms.ditherScale.value;
-      pass.uniforms.ditherScale.value = MATRIX_SIZES[(MATRIX_SIZES.indexOf(cur) + 1) % MATRIX_SIZES.length];
+      pass.uniforms.ditherScale.value = stepIn(MATRIX_SIZES, pass.uniforms.ditherScale.value, dir);
     } else if (what === 'interaction') {
       const keys = Object.keys(MODES);
-      interaction.mode = keys[(keys.indexOf(interaction.mode) + 1) % keys.length];
+      interaction.mode = keys[(keys.indexOf(interaction.mode) + dir + keys.length) % keys.length];
     } else if (what === 'outlines') {
       pass.uniforms.outlines.value = pass.uniforms.outlines.value ? 0 : 1;
     }
     return describe();
   }
+  /** The values as the menu shows them (Title Case, as its options are: "Off", "Ashen (3 Colors)"). */
   function describe() {
     return {
-      pixel: `${pixelSize()}px (${size.w}×${size.h})`,
-      palette: debugPaletteIndex === 0 ? flames[flameKey].name : DEBUG_PALETTES[debugPaletteIndex],
-      dither: pass.uniforms.ditherStrength.value ? pass.uniforms.ditherStrength.value.toFixed(2) : 'off',
+      pixel: `${pixelSize()} px (${size.w}×${size.h})`,
+      palette: debugPaletteIndex === 0 ? flames[flameKey].name : DEBUG_PALETTES[debugPaletteIndex].replace(/(\d) color\)$/, '$1 Colors)'),
+      dither: pass.uniforms.ditherStrength.value ? pass.uniforms.ditherStrength.value.toFixed(2) : 'Off',
       matrix: `${pass.uniforms.ditherScale.value}×${pass.uniforms.ditherScale.value}`,
-      outlines: pass.uniforms.outlines.value ? 'on' : 'off',
+      outlines: pass.uniforms.outlines.value ? 'On' : 'Off',
       interaction: MODES[interaction.mode].name,
     };
   }

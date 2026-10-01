@@ -34,6 +34,7 @@ const previewing = new URLSearchParams(location.search).has('preview') && window
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
+  remove(k) { try { localStorage.removeItem(k); } catch { /* private mode */ } },
 };
 const q = (s, r = document) => r.querySelector(s);
 const qa = (s, r = document) => [...r.querySelectorAll(s)];
@@ -114,13 +115,24 @@ function sawFlame(key) {
 // --- The render settings (P: ui/renderMenu.js) --------------------------------------------
 // One menu in two places: a HUD in the corner, or folded into the breakdown's panel while
 // that's open (the HUD would sit behind it). Opening one while the other shows hands over.
+// The cursor's pick (how the pointer stirs the fire) is remembered in this browser, in the
+// same place ?lab keeps its pick; the rest is the site's look again on a reload.
+const CURSOR_KEY = 'fireInteraction';
 const renderSettings = {
-  title: ui.renderMenu ?? 'Render settings',
+  title: ui.renderMenu ?? 'Render Settings',
   read: () => fire?.describe() ?? null,
-  pick: (id) => fire?.cycle(id),
-  // Back to the site's own look (the effects in content.json). Not mid-swap: it would also
-  // settle the colors the new weapon is bringing in.
-  reset: { key: '0', label: ui.renderReset ?? 'Reset', run: () => fire?.applyEffects(), disabled: () => !fire || fire.forging },
+  pick: (id, dir) => {
+    const values = fire?.cycle(id, dir);
+    if (id === 'interaction' && fire) store.set(CURSOR_KEY, fire.interaction);
+    return values;
+  },
+  // Back to the site's own look (the effects in content.json; the cursor's pick forgotten).
+  // Not mid-swap: it would also settle the colors the new weapon is bringing in.
+  reset: {
+    key: '0', label: ui.renderReset ?? 'Reset Render Settings', hint: 'the site’s look',
+    run: () => { fire?.applyEffects(); store.remove(CURSOR_KEY); },
+    disabled: () => !fire || fire.forging,
+  },
   onSound: (what) => blip(what === 'open' ? 'select' : what),
   onToggle: (open) => { if (open) discover('render'); },
 };
@@ -867,11 +879,14 @@ function startScene() {
     // (He comes and goes: the page follows.)
     fire.knights.onPresence(() => { if (fire === candidate) knightChanged(); });
     // (A visitor's style and finish from an earlier visit; the admin's preview shows the draft's.)
+    // (And the cursor's pick from the render settings or ?lab: the setter takes only a real one.)
     if (!previewing) {
       const style = store.get(KNIGHT_STYLE);
       const finish = store.get(KNIGHT_FINISH);
+      const cursor = store.get(CURSOR_KEY);
       if (Object.hasOwn(STYLE_NAMES, style)) fire.knights.setStyle(style, { instant: true });
       if (Object.hasOwn(FINISH_NAMES, finish)) fire.knights.setFinish(finish);
+      if (cursor) fire.interaction = cursor;
     }
     fire.setView(route.screen === 'projects' && route.item ? 'inspect' : route.screen, { instant: true });
     // Navigation during loading only changes requested state; initialize with its latest value.
@@ -884,10 +899,9 @@ startScene().then(async () => {
     if (!fire) return;
     if (wantsBreakdown) { wantsBreakdown = false; breakdown.enter(); }
 
-    // Cursor-interaction lab (prototype picker): open the site with ?lab.
+    // Cursor-interaction lab (prototype picker): open the site with ?lab. (Its pick is the
+    // render settings' Cursor row's, kept in the same place: startScene put it on.)
     if (new URLSearchParams(location.search).has('lab')) {
-      const saved = store.get('fireInteraction');
-      if (saved) fire.interaction = saved;
       await import('./bonfire/interaction.js').then(({ MODES }) => {
         const lab = document.createElement('aside');
         lab.className = 'lab';
@@ -899,7 +913,7 @@ startScene().then(async () => {
           <p class="lab-note">Move the cursor through the fire. Your pick is remembered in this browser.</p>`;
         lab.addEventListener('change', (e) => {
           fire.interaction = e.target.value;
-          store.set('fireInteraction', e.target.value);
+          store.set(CURSOR_KEY, e.target.value);
         });
         document.body.appendChild(lab);
       });

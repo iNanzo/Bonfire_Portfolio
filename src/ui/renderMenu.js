@@ -1,13 +1,22 @@
 // The render menu (P): the pixel pass's settings as a short list, one row each. A row is a
 // button: click it (or press its digit) and the setting steps to its next value, shown live
-// beside it. The site shows it as a HUD in the top-right corner and as a fold of the
-// breakdown panel ("How it's made"); Bonfire Live can hand it its own rows.
+// beside it (a Shift+click steps it back). The site shows it as a HUD in the top-right
+// corner (P, or Render Settings in the rest menu) and as a fold of the breakdown panel
+// ("How It's Made"); Bonfire Live and the Painter hand it their own rows.
 //
-//   Render settings                P
-//   1  Pixel size     3px (427×267)
-//   2  Palette          Ember Flame
+//   Render Settings               P ✕
+//   Picture
+//   1  Pixel Size     3 px (427×267)
+//   2  Palette           Ember Flame
 //   …
-//   0  Reset to the site's look
+//   Interaction
+//   6  Cursor                  Ember
+//   0  Reset Render Settings   the site's look
+//
+// Rows can carry a `group`: a run of rows with the same one goes under its heading, as a
+// labelled group. Each row tells assistive tech its key (aria-keyshortcuts) as well as
+// showing it as a <kbd>, and a row's `hint` is its tooltip (the shared one, ui/tooltip.js).
+// A HUD has a visible close button too (a touch screen has no P to press).
 //
 // Values are only ever written as text, so a row keeps focus through a refresh (and the
 // menu refreshes itself while it's open). It doesn't know what a setting does: `read` says
@@ -23,17 +32,23 @@ import { focusedNow, returnFocus } from './focus.js';
  * @typedef {object} RenderRow
  * @property {string} key    the digit that steps it ('1'…'9')
  * @property {string} id     the setting (a key of `read()`'s values)
- * @property {string} label
+ * @property {string} label  Title Case
+ * @property {string} [group]  the heading it goes under (with the rows next to it that have the same one)
+ * @property {string} [hint]   what it does, as a sentence: its tooltip
  */
 
-/** The site's rows: fire.cycle(id) steps one, fire.describe()[id] says what it is. */
+/**
+ * The site's rows: fire.cycle(id) steps one, fire.describe()[id] says what it is. The
+ * picture's settings, then the cursor's (how the pointer stirs the fire: not a render
+ * setting, so a group of its own).
+ */
 export const RENDER_ROWS = /** @type {RenderRow[]} */ ([
-  { key: '1', id: 'pixel', label: 'Pixel size' },
-  { key: '2', id: 'palette', label: 'Palette' },
-  { key: '3', id: 'dither', label: 'Dither' },
-  { key: '4', id: 'matrix', label: 'Dither pattern' },
-  { key: '5', id: 'outlines', label: 'Outlines' },
-  { key: '6', id: 'interaction', label: 'Cursor' },
+  { key: '1', id: 'pixel', label: 'Pixel Size', group: 'Picture', hint: 'How many screen pixels make one of the picture’s: bigger is chunkier, and lighter on the graphics card.' },
+  { key: '2', id: 'palette', label: 'Palette', group: 'Picture', hint: 'The colors the picture is snapped to: the fire’s own, or a fixed set of three or four.' },
+  { key: '3', id: 'dither', label: 'Dither', group: 'Picture', hint: 'How strongly an ordered pattern blends neighboring colors where a smooth gradient would be.' },
+  { key: '4', id: 'matrix', label: 'Dither Pattern', group: 'Picture', hint: 'The pattern’s size: 4×4 reads coarser, 8×8 finer.' },
+  { key: '5', id: 'outlines', label: 'Outlines', group: 'Picture', hint: 'A dark line wherever a surface’s distance, or the way it faces, jumps.' },
+  { key: '6', id: 'interaction', label: 'Cursor', group: 'Interaction', hint: 'How moving the pointer through the fire stirs it. Remembered on this device.' },
 ]);
 
 /** What a value shows as when `read()` doesn't have it (yet). */
@@ -54,16 +69,39 @@ export const keyOf = (e) => (/^(Digit|Numpad)\d$/.test(e.code ?? '') ? e.code.sl
 export const rowForKey = (rows, key) => rows.find((r) => r.key === key) ?? null;
 
 /**
- * The rows' buttons, with their values (all text escaped).
+ * One row's button: its key said as a shortcut and shown as a <kbd>, its hint as its tooltip.
+ * @param {RenderRow} r
+ * @param {Record<string, unknown>} values
+ */
+const rowHtml = (r, values) => `
+    <button class="render-row" type="button" data-render-row="${esc(r.id)}" aria-keyshortcuts="${esc(r.key)}"${r.hint ? ` data-tip="${esc(r.hint)}"` : ''}>
+      <span class="cursor" aria-hidden="true"></span><kbd>${esc(r.key)}</kbd><span class="render-row-label">${esc(r.label)}</span>
+      <b class="render-row-value" data-render-value>${esc(String(values[r.id] ?? NO_VALUE))}</b>
+    </button>`;
+
+/**
+ * The rows' buttons, with their values (all text escaped). Rows with a `group` go under its
+ * heading, a run of them in one labelled group (`id` makes the headings' ids: one per menu).
  * @param {RenderRow[]} rows
  * @param {Record<string, unknown>} [values]
+ * @param {{ id?: string }} [o]
  */
-export function rowsHtml(rows, values = {}) {
-  return rows.map((r) => `
-    <button class="render-row" type="button" data-render-row="${esc(r.id)}">
-      <span class="cursor" aria-hidden="true"></span><kbd aria-hidden="true">${esc(r.key)}</kbd><span class="render-row-label">${esc(r.label)}</span>
-      <b class="render-row-value" data-render-value>${esc(String(values[r.id] ?? NO_VALUE))}</b>
-    </button>`).join('');
+export function rowsHtml(rows, values = {}, { id = 'render-rows' } = {}) {
+  /** @type {{ group: string | undefined, rows: RenderRow[] }[]} */
+  const runs = [];
+  for (const r of rows) {
+    const last = runs.at(-1);
+    if (last && last.group === r.group) last.rows.push(r);
+    else runs.push({ group: r.group, rows: [r] });
+  }
+  return runs.map((run, i) => {
+    const html = run.rows.map((r) => rowHtml(r, values)).join('');
+    if (!run.group) return html;
+    return `
+    <div class="render-group" role="group" aria-labelledby="${esc(id)}-g${i}">
+      <p class="render-group-title" id="${esc(id)}-g${i}">${esc(run.group)}</p>${html}
+    </div>`;
+  }).join('');
 }
 
 /**
@@ -73,35 +111,39 @@ export function rowsHtml(rows, values = {}) {
  *   step one setting (dir -1: back, from a Shift+click; a setting that can only go forward
  *   may ignore it); may return the new values
  * @param {RenderRow[]} [o.rows]
- * @param {string} [o.title]      the heading
+ * @param {string} [o.title]      the heading (Title Case)
  * @param {string} [o.toggleKey]  the key that opens and closes it, shown by the heading
- * @param {'all' | 'rows'} [o.collapse]  closed, 'all' hides the whole menu (a HUD); 'rows'
- *   keeps the heading as a button and folds the rows under it (a section of a panel)
+ * @param {'all' | 'rows'} [o.collapse]  closed, 'all' hides the whole menu (a HUD, with a
+ *   close button of its own); 'rows' keeps the heading as a button and folds the rows under
+ *   it (a section of a panel)
  * @param {{ key?: string, label: string, hint?: string, run: () => void, disabled?: () => boolean } | null} [o.reset]
- *   a last row that puts every setting back (disabled while `disabled()` says so)
+ *   a last row that puts every setting back (disabled while `disabled()` says so); `hint`
+ *   shows where a value would, saying what it goes back to
  * @param {string} [o.className]
  * @param {(what: 'move' | 'select' | 'open' | 'back') => void} [o.onSound]
  * @param {(open: boolean) => void} [o.onToggle]  it opened or closed (by key, click or call)
  * @param {number} [o.poll]  ms between refreshes while it's open and on screen (0: only on picks)
  */
 export function createRenderMenu({
-  read, pick, rows = RENDER_ROWS, title = 'Render settings', toggleKey = 'P', collapse = 'all',
+  read, pick, rows = RENDER_ROWS, title = 'Render Settings', toggleKey = 'P', collapse = 'all',
   reset = null, className = '', onSound = () => {}, onToggle = () => {}, poll = 250,
 }) {
   const el = document.createElement('section');
   el.className = `render-menu ${className}`.trim();
   el.dataset.renderMenu = collapse;
   const bodyId = `render-menu-${Math.random().toString(36).slice(2, 8)}`;
-  el.setAttribute('aria-label', title);
+  const grouped = rows.some((r) => r.group); // (then the groups are the rows' groups)
+  el.setAttribute('aria-labelledby', `${bodyId}-title`);
   el.innerHTML = `
-    <button class="render-menu-head" type="button" aria-expanded="false" aria-controls="${bodyId}" data-render-head>
-      <span class="render-menu-title">${esc(title)}</span><kbd aria-hidden="true">${esc(toggleKey)}</kbd>
+    <button class="render-menu-head" type="button" aria-expanded="false" aria-controls="${bodyId}" aria-keyshortcuts="${esc(toggleKey)}" data-render-head>
+      <span class="render-menu-title" id="${bodyId}-title">${esc(title)}</span><kbd aria-hidden="true">${esc(toggleKey)}</kbd>
     </button>
-    <div class="render-menu-rows" id="${bodyId}" role="group" data-render-rows>
-      ${rowsHtml(rows)}
+    ${collapse === 'all' ? `<button class="render-menu-close" type="button" aria-label="Close ${esc(title)}" data-tip="Close (${esc(toggleKey)} or Esc)" data-render-close>✕</button>` : ''}
+    <div class="render-menu-rows" id="${bodyId}" data-render-rows${grouped ? '' : ` role="group" aria-labelledby="${bodyId}-title"`}>
+      ${rowsHtml(rows, {}, { id: bodyId })}
       ${reset ? `
-      <button class="render-row render-reset" type="button" data-render-reset>
-        <span class="cursor" aria-hidden="true"></span>${reset.key ? `<kbd aria-hidden="true">${esc(reset.key)}</kbd>` : '<span></span>'}<span class="render-row-label">${esc(reset.label)}</span>
+      <button class="render-row render-reset" type="button" data-render-reset${reset.key ? ` aria-keyshortcuts="${esc(reset.key)}"` : ''}>
+        <span class="cursor" aria-hidden="true"></span>${reset.key ? `<kbd>${esc(reset.key)}</kbd>` : '<span></span>'}<span class="render-row-label">${esc(reset.label)}</span>
         <b class="render-row-value">${esc(reset.hint ?? '')}</b>
       </button>` : ''}
     </div>`;
@@ -178,6 +220,7 @@ export function createRenderMenu({
   el.addEventListener('click', (e) => {
     const t = /** @type {Element} */ (e.target);
     if (t.closest('[data-render-head]')) { toggle(); return; }
+    if (t.closest('[data-render-close]')) { close(); return; }
     const row = /** @type {HTMLElement | null} */ (t.closest('[data-render-row]'));
     if (row) step(row.dataset.renderRow, e.shiftKey ? -1 : 1);
     else if (t.closest('[data-render-reset]')) doReset();

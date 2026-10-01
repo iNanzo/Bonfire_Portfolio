@@ -98,5 +98,7 @@
     "admin/ui/reset.js",
     "admin/server/csp.js"
     "src/weaponGroups.js"
+    "src/weaponGroups.js",
+    "src/pixelSizes.js"
   ]
 }

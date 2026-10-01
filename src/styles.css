@@ -1356,20 +1356,51 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
 }
 
 /* ---------- The render settings (P: ui/renderMenu.js) ----------
-   A heading and a row per setting: its digit, its name and its value. A row is a button
-   (a click steps it); hovered or focused it shows the menus' pixel cursor, and a step
-   flashes it. As a HUD in the corner, or folded into the breakdown's panel. */
+   A heading and a row per setting: its digit, its name and its value, under its group's
+   heading (the site's: Picture, Interaction). A row is a button (a click steps it); hovered
+   or focused it shows the menus' pixel cursor, and a step flashes it. As a HUD in the
+   corner (with a close button), or folded into the breakdown's panel. */
 .debug-hud {
   position: fixed;
   top: calc(var(--header-h) + 8px);
   right: var(--gutter);
   z-index: 40;
-  width: min(300px, calc(100vw - 2 * var(--gutter)));
+  width: min(340px, calc(100vw - 2 * var(--gutter)));
   padding: 8px 8px 10px;
   background: var(--c-void);
   box-shadow: 0 0 0 1px var(--line);
 }
 .debug-hud[hidden] { display: none; }
+.debug-hud .render-menu-head { padding-right: 40px; } /* (room for the close button) */
+.render-menu-close {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.875rem;
+  line-height: 1;
+  color: var(--text-dim);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  cursor: pointer;
+}
+.render-menu-close:hover,
+.render-menu-close:focus-visible { color: var(--c-bone); box-shadow: 0 0 0 1px var(--accent); outline: none; }
+.render-group { display: grid; gap: 1px; }
+.render-group-title {
+  margin: 6px 6px 2px;
+  font-family: var(--font-pixel);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.render-group + .render-group .render-group-title { padding-top: 6px; border-top: 1px solid var(--line); }
 .render-menu-head {
   display: flex;
   align-items: center;
@@ -1391,6 +1422,7 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
 .render-menu-rows { display: grid; gap: 1px; }
 .render-menu-rows[hidden] { display: none; }
 .render-row {
+  --tip-side: left; /* (its tooltip out to the left, off the menu: above, it would cover the row before) */
   display: grid;
   grid-template-columns: 10px auto 1fr auto;
   align-items: center;

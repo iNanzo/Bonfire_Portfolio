@@ -36,6 +36,54 @@ test('render menu: keys find their row, by the digit wherever the layout puts it
   assert.equal(keyOf({ key: 'p' }), 'p', 'no code (a synthetic event)');
 });
 
+test('render menu: the site’s rows in two groups (the picture, then the cursor), Title Case, each with a hint', async () => {
+  const { titleCase } = await import('../src/text.js');
+  assert.deepEqual([...new Set(RENDER_ROWS.map((r) => r.group))], ['Picture', 'Interaction']);
+  assert.deepEqual(RENDER_ROWS.filter((r) => r.group === 'Interaction').map((r) => r.id), ['interaction']);
+  for (const r of RENDER_ROWS) {
+    assert.equal(titleCase(r.label), r.label, `${r.id}: Title Case`);
+    assert.ok(r.hint && r.hint.length >= 12 && r.hint.length <= 160, `${r.id}: a hint of 12–160 characters`);
+    assert.match(r.hint, /^[A-Z].*\.$/, `${r.id}: the hint is a sentence`);
+    assert.ok(!r.hint.toLowerCase().startsWith(r.label.toLowerCase()), `${r.id}: the hint doesn't restate the label`);
+  }
+});
+
+test('render menu: a run of rows with a group is a labelled group under its heading; each row says its key', () => {
+  const rows = [
+    { key: '1', id: 'a', label: 'A', group: 'First <G>' },
+    { key: '2', id: 'b', label: 'B', group: 'First <G>', hint: 'Says "what" B does.' },
+    { key: '3', id: 'c', label: 'C', group: 'Second' },
+  ];
+  const html = rowsHtml(rows, {}, { id: 'm' });
+  assert.match(html, /<div class="render-group" role="group" aria-labelledby="m-g0">\s*<p class="render-group-title" id="m-g0">First &lt;G&gt;<\/p>/);
+  assert.match(html, /<div class="render-group" role="group" aria-labelledby="m-g1">\s*<p class="render-group-title" id="m-g1">Second<\/p>/);
+  assert.equal((html.match(/class="render-group"/g) ?? []).length, 2, 'one group per run');
+  for (const r of rows) assert.match(html, new RegExp(`data-render-row="${r.id}" aria-keyshortcuts="${r.key}"`));
+  assert.match(html, /data-render-row="b" aria-keyshortcuts="2" data-tip="Says &quot;what&quot; B does\."/);
+  assert.match(html, /<kbd>1<\/kbd>/, 'the digit is read out too (not aria-hidden)');
+  assert.doesNotMatch(html, /<kbd aria-hidden/);
+  // Rows without groups (Bonfire Live's, the Painter's): just the rows, as before.
+  assert.doesNotMatch(rowsHtml([{ key: '1', id: 'a', label: 'A' }]), /render-group/);
+});
+
+test('render menu: titled Render Settings by default, a HUD has a close button, and the site’s reset is named for the menu', () => {
+  const src = fs.readFileSync(new URL('../src/ui/renderMenu.js', import.meta.url), 'utf8');
+  assert.match(src, /title = 'Render Settings'/);
+  assert.match(src, /collapse === 'all' \? `<button class="render-menu-close" type="button" aria-label="Close \$\{esc\(title\)\}"/);
+  const content = JSON.parse(fs.readFileSync(new URL('../src/content.json', import.meta.url), 'utf8'));
+  assert.equal(content.ui.renderMenu, 'Render Settings');
+  assert.equal(content.ui.renderReset, 'Reset Render Settings');
+});
+
+test('render menu: one list of pixel sizes for the site, Bonfire Live and the Painter', async () => {
+  const { PIXEL_SIZES } = await import('../src/pixelSizes.js');
+  const { PIXEL_SIZES: live } = await import('../src/visualizer/render.js');
+  assert.deepEqual(live, PIXEL_SIZES, 'visualizer/render.js offers the same sizes');
+  const scene = fs.readFileSync(new URL('../src/bonfire/scene.js', import.meta.url), 'utf8');
+  assert.match(scene, /import \{ PIXEL_SIZES \} from '\.\.\/pixelSizes\.js';/);
+  assert.doesNotMatch(scene, /const PIXEL_SIZES =/, 'no list of its own');
+});
+
 test('render menu: rows are buttons with their values, escaped', () => {
   const rows = [{ key: '1', id: 'a', label: 'A <b>' }, { key: '2', id: 'b', label: 'B' }];
   const html = rowsHtml(rows, { a: '<img src=x>' });
