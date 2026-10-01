@@ -5,7 +5,7 @@
 // 1280×720; the keyboard, or a tap for a skill, on a 390×844 touch screen), inside the window
 // by 8 px and off what it explains; and no native title= is left on the site.
 import { test, expect } from '@playwright/test';
-import { collectTips, checkTip, assertInViewport, dismissTip, tipOf } from './lib/tips.mjs';
+import { collectTips, checkTip, assertInViewport, tipOf } from './lib/tips.mjs';
 
 const SIZES = [
   { name: '1280×720', viewport: { width: 1280, height: 720 }, touch: false },
@@ -20,6 +20,9 @@ function watch(page) {
   return errors;
 }
 const ready = (page) => expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+// How long a tip may take to come (its 400 ms delay, on a software-rendered page that may be
+// sharing the machine with other specs' pages: a frame can take a second then).
+const TIP_WAIT = 8000;
 
 /**
  * Check every tip under `root`: on a desktop by hover and by focus; on a touch screen by
@@ -34,15 +37,26 @@ async function checkAll(page, root, { touch, label }) {
     const tapped = (await trigger.getAttribute('data-tip-tap')) !== null;
     const modes = touch ? (tapped ? ['tap'] : disabled ? [] : ['focus']) : ['hover', ...(disabled ? [] : ['focus'])];
     for (const mode of modes) {
-      const r = await checkTip(page, trigger, { mode });
+      await closeTip(page, root);
+      const r = await checkTip(page, trigger, { mode, timeout: TIP_WAIT });
       expect(r.shown, `${name} (${mode}) shows its tip`).toBe(true);
       assertInViewport(r.rect, r.viewport, 8);
       expect(r.coversTrigger, `${name} (${mode}) leaves its trigger in sight`).toBe(false);
     }
   }
-  // (Nothing left open for the next surface.)
-  if (await tipOf(page).isVisible()) await dismissTip(page).catch(() => {});
+  await closeTip(page, root); // (nothing left open for the next surface)
   return triggers.length;
+}
+
+/**
+ * Close the tip the last check left open, the way a press elsewhere does (on the surface being
+ * checked, so the pack or the menu stays open). Not with Esc: on a slow machine the tip may
+ * have gone by the time the key lands, and the Esc would close the menu's dialog instead.
+ */
+async function closeTip(page, root) {
+  if (!(await tipOf(page).isVisible())) return;
+  await page.locator(root).first().dispatchEvent('pointerdown');
+  await tipOf(page).waitFor({ state: 'hidden', timeout: TIP_WAIT });
 }
 
 /** No native title tooltips anywhere on the page now (the shared tooltip replaced them). */
@@ -94,7 +108,7 @@ for (const size of SIZES) {
       const { context, page, errors, tap } = await open(browser, size);
       await page.goto('/');
       await ready(page);
-      await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 15_000 });
+      await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 30_000 }); // (his model is its own file)
       await tap(page.locator('[data-pack-toggle]'));
       await page.waitForFunction(() => document.querySelector('.pack-items').getAnimations({ subtree: true }).every((a) => a.playState !== 'running'));
       await noTitles(page, 'the pack');

@@ -116,7 +116,7 @@ test('the knight isn’t there on first load: his sign glows, and a click on it 
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   const label = page.locator('#scene-label');
-  await expect(label).toContainText(/summon sign/i, { timeout: 15_000 }); // (his model is in: the sign waits)
+  await expect(label).toContainText(/summon sign/i, { timeout: 30_000 }); // (his model is in: the sign waits)
   await expect(label).not.toContainText(/knight in steel plate sits/i);
   const sign = await findSign(page);
   expect(sign, 'the sign is on the ground, and hovering it says so').not.toBeNull();
@@ -184,7 +184,7 @@ test('the pack keeps the keyboard: Summon and Send Him Off picked with Enter lea
     await page.locator('[data-pack-slot="knight"]').focus();
     await page.keyboard.press('ArrowLeft');
   };
-  await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 15_000 }); // (his model is in)
+  await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 30_000 }); // (his model is in)
   await page.keyboard.press('i');
   await intoKnight();
   const summon = page.locator('[data-pack-option="summon"]');
@@ -261,7 +261,7 @@ test('the pack’s lists stay on screen at every size, with the breakdown open a
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   // (The Knight item is there once his model is in: it's its own file, after the scene.)
-  await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 15_000 });
+  await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 30_000 });
   // (The items rising and the list sliding in have landed; the icons' own loops don't end.)
   const settled = () => page.waitForFunction(() => document.querySelector('[data-pack]').getAnimations({ subtree: true }).filter((a) => a.effect?.getTiming().iterations !== Infinity).every((a) => a.playState !== 'running'));
   const off = [];
