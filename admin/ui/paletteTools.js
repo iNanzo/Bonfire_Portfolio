@@ -5,7 +5,7 @@
 //   • the Place Colors block: harmonious / random neutrals, or suggestions from a color.
 // A change is an ordinary edit (Discard still brings back the saved colors), and the
 // preview switches to the flame you're working on so you see it in the fire at once.
-import { el } from './form.js';
+import { el, labelFor } from './form.js';
 import {
   FLAME_KEYS, SCENE_KEYS, SCHEMES, flameSet, harmoniousFlame, harmoniousScene, suggestFlames, suggestScenes, wildFlame, wildScene,
 } from '../../src/paletteGen.js';
@@ -44,8 +44,11 @@ function chips(list, keys, onPick) {
   }, strip(s.colors, keys), el('span', { class: 'pt-chip-label', text: s.label }))));
 }
 
-/** A color well that seeds suggestions, plus the current colors as quick starting points. */
-function seedPicker(current, keys, seed, onSeed) {
+/**
+ * A color well that seeds suggestions, plus the current colors as quick starting points, each
+ * named as its field is (`path`: where those fields are, for their labels).
+ */
+function seedPicker(current, keys, path, seed, onSeed) {
   const well = el('input', { type: 'color', class: 'pt-seed', 'aria-label': 'Pick a color to build palettes around' });
   well.value = (HEX_RE.test(seed ?? '') ? seed : current[keys[1]] ?? '#e0582a').toLowerCase();
   let queued = false;
@@ -57,10 +60,13 @@ function seedPicker(current, keys, seed, onSeed) {
   return el('span', { class: 'pt-seeds' },
     well,
     el('span', { class: 'pt-or', text: 'or start from' }),
-    keys.filter((k) => HEX_RE.test(current[k] ?? '')).map((k) => el('button', {
-      type: 'button', class: 'pt-dot', 'data-tip': `Start from ${k} (${current[k]})`, 'aria-label': `Suggest palettes from the ${k} color`,
-      style: { background: current[k] }, onclick: () => { well.value = current[k].toLowerCase(); onSeed(current[k]); },
-    })));
+    keys.filter((k) => HEX_RE.test(current[k] ?? '')).map((k) => {
+      const name = labelFor([...path, k]);
+      return el('button', {
+        type: 'button', class: 'pt-dot', 'data-tip': `Start from ${name}, ${current[k]}`, 'aria-label': `Suggest palettes from ${name}, ${current[k]}`,
+        style: { background: current[k] }, onclick: () => { well.value = current[k].toLowerCase(); onSeed(current[k]); },
+      });
+    }));
 }
 
 // ---- one flame ----------------------------------------------------------------------------
@@ -112,7 +118,7 @@ export function flameTools(item, ctx) {
       }, { class: 'button small ghost', disabled: !st.history.length })),
     el('div', { class: 'pt-row' },
       el('span', { class: 'pt-label', text: 'From a Color' }),
-      seedPicker(item, ['lo', 'mid', 'hi', 'core'], st.seed, onSeed)),
+      seedPicker(item, ['lo', 'mid', 'hi', 'core'], ['effects', 'flames', 0], st.seed, onSeed)),
     suggestions);
 }
 
@@ -181,7 +187,7 @@ export function sceneBlockTools(ctx) {
       }, { class: 'button small ghost', disabled: !st.history.length })),
     el('div', { class: 'pt-row' },
       el('span', { class: 'pt-label', text: 'From a Color' }),
-      seedPicker(colors, ['stone', 'wood', 'bone'], st.seed, (hex) => {
+      seedPicker(colors, ['stone', 'wood', 'bone'], ['effects', 'colors'], st.seed, (hex) => {
         st.seed = hex;
         st.suggestions = suggestScenes(hex, { flames: flames() });
         showSuggestions();

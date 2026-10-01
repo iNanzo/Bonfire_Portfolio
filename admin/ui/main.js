@@ -248,7 +248,7 @@ function blockHelp(key) {
   const o = { labelOf, draft: ctx.draft };
   const help = resolveHelp(HELP[key], o);
   const more = resolveHelp(moreFor(key), o);
-  return [help ? el('p', { class: 'help', text: help }) : null, more ? moreBox(more) : null];
+  return [help ? el('p', { class: 'help', text: help }) : null, more ? moreBox(more, labelOf(key)) : null];
 }
 
 function block(key) {

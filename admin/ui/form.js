@@ -46,10 +46,14 @@ export function helpFor(path, ctx) {
   const o = { labelOf: ctx?.labelOf, draft: ctx?.draft };
   return { help: resolveHelp(hint(HELP, pattern), o), more: resolveHelp(moreFor(pattern), o) };
 }
-/** "More": a longer explanation, folded (a paragraph, or a list of its lines). @param {string} text */
-export function moreBox(text) {
+/**
+ * "More": a longer explanation, folded (a paragraph, or a list of its lines). `about`: what
+ * it's about, said after "More" to a screen reader (a page has several).
+ * @param {string} text @param {string} [about]
+ */
+export function moreBox(text, about = '') {
   const lines = String(text).split('\n').filter(Boolean);
-  return el('details', { class: 'viz-more' }, el('summary', { text: 'More' }),
+  return el('details', { class: 'viz-more' }, el('summary', {}, 'More', about ? el('span', { class: 'visually-hidden', text: ` about ${about}` }) : null),
     lines.length > 1 ? el('ul', {}, lines.map((line) => el('li', { text: line }))) : el('p', { text: lines[0] ?? '' }));
 }
 
@@ -160,7 +164,7 @@ export function renderField(value, path, ctx, label = labelFor(path), level = 3)
     wrap.append(el('label', { for: id, text: label }));
   }
   if (help) wrap.append(el('p', { class: 'help', id: helpId, text: help }));
-  if (more) wrap.append(moreBox(more));
+  if (more) wrap.append(moreBox(more, label));
   const control = renderValue(value, path, ctx, level + 1);
   if (!group) {
     (control.querySelector?.('[data-main]') ?? control).id = id;

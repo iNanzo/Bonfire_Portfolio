@@ -99,6 +99,14 @@ test('every admin page renders without a style or title attribute anywhere', asy
   assert.ok(tables.length >= 2 && tables.every((n) => n.styles.some(([k]) => k === '--cols')), 'tables know their column count');
   const sceneStrips = nodes.filter((n) => n.className === 'swatches scene-swatches');
   assert.ok(sceneStrips.length && sceneStrips.every((s) => s.children.every((c) => c.styles.length)), 'scene cards’ swatches too');
+  // (While it's all drawn: an image's two switches can be gone to, as the search finds them,
+  // and say what they do; each folded More says what it's about to a screen reader.)
+  const checks = nodes.filter((n) => n.className === 'check' && n.attrs.has('data-path'));
+  for (const key of ['pixel', 'video']) assert.ok(checks.some((n) => n.getAttribute('data-path').endsWith(`.${key}`)), `an image’s ${key} switch`);
+  assert.ok(checks.every((n) => n.getAttribute('data-tip')), 'each with its tip');
+  const mores = nodes.filter((n) => n.className === 'viz-more');
+  assert.ok(mores.length >= 5, `a More per long explanation (${mores.length})`);
+  for (const d of mores) assert.ok(d.children[0].children.some((c) => c.className === 'visually-hidden' && / about \S/.test(c.textContent)), 'More, about what');
 });
 
 test('no admin source sets a style attribute or a title', () => {
