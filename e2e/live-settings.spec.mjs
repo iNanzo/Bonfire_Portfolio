@@ -336,6 +336,13 @@ test('a short screen keeps most of the dialog for the settings; a phone reads th
   await open(phone);
   await phone.locator('[data-start] [data-act="settings"]').click();
   await expect(phone.locator('[data-preset-note]')).toBeVisible();
+  // Low Flash tapped, then Undo: Club's in use again and the note says so (not Low Flash,
+  // which the Undo gave the focus back to).
+  await phone.locator('.viz-presets-top [data-preset="safe"]').tap();
+  await expect(phone.locator('[data-preset-note]')).toContainText('Low Flash');
+  await phone.locator('[data-toast-undo]').tap();
+  await expect(phone.locator('.viz-presets-top [data-preset="club"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(phone.locator('[data-preset-note]')).toContainText('Club');
   await phone.locator('[data-tab="effects"]').click();
   await phone.locator('[data-bulk-group="looks"][data-bulk="shuffle"]').click();
   const toast = phone.locator('[data-toast-text]');

@@ -199,6 +199,8 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
 
   // --- the presets: the one in use marked; where they're names only (a phone, a short
   // screen), a line under them says what the one in use does, or the one pointed at or focused
+  // from the keyboard (not one the focus went back to by script after a tap or a click, as an
+  // Undo does: the note would say that one's in use when it isn't)
   const presetsEl = q('.viz-presets-top');
   const presetNote = q('[data-preset-note]');
   function notePreset(id = presetOf(settings)) {
@@ -211,7 +213,8 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     notePreset();
   }
   const presetUnder = (e) => /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest?.('[data-preset]'));
-  for (const type of ['pointerover', 'focusin']) presetsEl.addEventListener(type, (e) => { const b = presetUnder(e); if (b) notePreset(b.dataset.preset); });
+  presetsEl.addEventListener('pointerover', (e) => { const b = presetUnder(e); if (b) notePreset(b.dataset.preset); });
+  presetsEl.addEventListener('focusin', (e) => { const b = presetUnder(e); if (b?.matches(':focus-visible')) notePreset(b.dataset.preset); });
   for (const type of ['pointerout', 'focusout']) presetsEl.addEventListener(type, () => notePreset());
 
   // --- needs: a setting that does nothing as things stand is off, saying why
