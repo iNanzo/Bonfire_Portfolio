@@ -39,6 +39,22 @@ test('the index holds every page’s sections, groups, entries and fields, each 
   assert.equal(entry(index, 'about.paragraphs[0]').value, '');
 });
 
+test('fields go by the names their page shows: an image’s, the featured project’s, the weapons’', () => {
+  const draft = content();
+  const index = buildIndex(draft);
+  const i = draft.projects.findIndex((p) => p.images?.length);
+  assert.equal(entry(index, `projects[${i}].images[0].alt`).label, 'Alt Text (Describe It)');
+  assert.equal(entry(index, `projects[${i}].images[0].pixel`).label, 'Pixel Art (Keep It Crisp)', 'a switch, on or off');
+  assert.equal(entry(index, `projects[${i}].images[0].video`).label, 'Video Clip');
+  assert.match(top(draft, 'alt text')[0], /\.images\[\d+\]\.alt$/);
+  assert.match(top(draft, 'crisp')[0], /\.images\[\d+\]\.pixel$/);
+  assert.match(top(draft, 'video clip')[0], /\.images\[\d+\]\.video$/);
+  assert.equal(entry(index, 'featured.built').label, 'What I Built', 'the featured project’s fields named as any project’s');
+  assert.equal(entry(index, 'weapons.flambergezwei').label, draft.weapons.flambergezwei);
+  assert.equal(entry(index, 'site.links.linkedin').label, 'LinkedIn');
+  assert.equal(entry(index, 'notFound.cta').label, 'Button Text');
+});
+
 test('results rank the label first: dither, Fast Travel, a typo, a choice, a renamed page', () => {
   const draft = content();
   assert.deepEqual(top(draft, 'dither', 2), ['effects.render.dither', 'effects.render.ditherMatrix']);

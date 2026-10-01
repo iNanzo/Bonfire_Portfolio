@@ -617,6 +617,9 @@ function renderImages(list, path, ctx) {
       ctx.changed({ rerender: true });
     } });
     video.checked = !!im.video;
+    // (A switch's name and tip are the schema's, as the search finds it; data-path lets a result land on it.)
+    const check = (key, input) => el('label', { class: 'check', 'data-path': keyOf([...ipath, key]), 'data-tip': helpFor([...ipath, key], ctx).help || null },
+      input, ` ${labelFor([...ipath, key])}`);
     box.append(el('figure', { class: `image-tile${im.hidden ? ' is-hidden' : ''}`, 'data-index': i, 'data-path': keyOf(ipath) },
       el('div', { class: 'image-frame', draggable: 'true', 'data-tip': 'Drag to reorder' },
         el('img', { alt: im.alt || '', src: pending?.preview ?? ctx.thumb(im.src), loading: 'lazy' }),
@@ -624,10 +627,10 @@ function renderImages(list, path, ctx) {
         im.hidden ? el('span', { class: 'image-tag image-hidden', text: 'Hidden' }) : null,
         pending ? el('span', { class: 'image-tag image-new', text: 'New' }) : null),
       el('code', { class: 'image-src', text: im.src }),
-      renderField(im.alt ?? '', [...ipath, 'alt'], ctx, 'Alt Text (Describe It)'),
-      renderField(im.caption ?? '', [...ipath, 'caption'], ctx, 'Caption'),
-      el('label', { class: 'check' }, pixel, ' Pixel Art (Keep It Crisp)'),
-      el('label', { class: 'check', 'data-tip': 'Plays the .mp4 of the same name (put it in the repo beside this image), with this image as its still' }, video, ' Video Clip (Plays the .mp4)'),
+      renderField(im.alt ?? '', [...ipath, 'alt'], ctx),
+      renderField(im.caption ?? '', [...ipath, 'caption'], ctx),
+      check('pixel', pixel),
+      check('video', video),
       el('div', { class: 'image-actions' },
         iconButton('Move earlier', '←', () => moveItem(list, i, i - 1, ctx), { disabled: i === 0 }),
         iconButton('Move later', '→', () => moveItem(list, i, i + 1, ctx), { disabled: i === list.length - 1 }),

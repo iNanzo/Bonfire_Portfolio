@@ -76,10 +76,16 @@ export const LABELS = {
   ui: 'Interface text',
   weapons: 'Weapon names',
   weaponDraw: 'Weapons in the draw',
-  // (The switches are labelled with the weapons' names as the site ships them.)
-  ...Object.fromEntries(WEAPON_KEYS.map((k) => [`weaponDraw.${k}`, content.weapons?.[k] ?? k])),
+  // (Each weapon's name box and its switch are labelled with its name as the site ships it.)
+  ...Object.fromEntries(WEAPON_KEYS.flatMap((k) => [[`weapons.${k}`, content.weapons?.[k] ?? k], [`weaponDraw.${k}`, content.weapons?.[k] ?? k]])),
   startingEquipment: 'Starting equipment',
   notFound: '404 page',
+  'notFound.cta': 'Button text',
+  'hero.eyebrow': 'Line above your name',
+  'hero.menuLabel': 'Title menu (screen readers)',
+  'hero.stokeLabel': 'Stoke button',
+  'hero.stokeHint.pointer': 'With a mouse',
+  'hero.stokeHint.touch': 'On a touch screen',
   'hero.kindled': '“Embers Kindled” banner',
   'hero.stokeHint': 'Stoke hint',
   'hero.value': 'Intro line',
@@ -90,6 +96,8 @@ export const LABELS = {
   'site.description': 'Search / share description',
   'site.url': 'Site address',
   'site.links': 'Profile links',
+  'site.links.linkedin': 'LinkedIn',
+  'site.links.github': 'GitHub',
   'site.resumeUrl': 'Résumé',
   'sections.projects': 'Project inventory screen',
   'sections.archive': 'Earlier explorations',
@@ -99,7 +107,7 @@ export const LABELS = {
   'sections.contact': 'Contact screen',
   'about.paragraphs': 'Paragraphs',
   'about.stats': 'Stat sheet',
-  'experience[].org': 'Organization',
+  '[].org': 'Organization',
   'experience[].roles': 'Roles',
   'experience[].roles[].bullets': 'Highlights',
   'leadership.items': 'Entries',
@@ -117,6 +125,11 @@ export const LABELS = {
   '[].href': 'Link',
   '[].glyph': 'Glyph',
   '[].todo': 'To confirm',
+  // An image's fields (form.js renderImages): the page and the search share these names.
+  '[].images[].alt': 'Alt text (describe it)',
+  '[].images[].caption': 'Caption',
+  '[].images[].pixel': 'Pixel art (keep it crisp)',
+  '[].images[].video': 'Video clip',
   // ui: the site's interface text, by where it shows (SUBGROUPS)
   'ui.menu': 'Menu button',
   'ui.resume': 'Résumé button',
@@ -279,6 +292,9 @@ export const HELP = {
   'hero.kindled': 'The checkpoint banner when the fire is stoked. Preview it on the site with ?kindled.',
   'hero.kindled.duration': 'Milliseconds on screen, fades included.',
   'hero.kindled.show': 'First: only on a visit’s first stoke. Always: on every stoke. Never: no banner.',
+  'hero.menuLabel': 'Read out for the title screen’s list of screens.',
+  'hero.stokeHint': 'The smaller words after the Stoke button: one for a mouse, one for a touch screen.',
+  'notFound.cta': 'The 404 page’s button back to the title screen.',
   'hero.sceneKnight': 'Read after the scene description while the knight is by the fire; left out while he’s away, or off ({{page:knight}} › {{label:effects.knight.show}}).',
   'hero.sceneSign': 'Read after the scene description while the knight is away and his summon sign waits on the ground. Left out where he can’t come. Optional.',
   screens: 'The site’s own menu. Labels only: the screens themselves are fixed.',
@@ -292,6 +308,8 @@ export const HELP = {
   '[].summary': 'One or two lines for the inventory’s at-a-glance panel.',
   '[].outcome': 'The result in one line, under the title: what it achieved or proved (players, numbers, awards, what it led to). Empty hides it.',
   '[].images[].alt': 'Read aloud instead of the image, and shown if it can’t load. Required: say what’s on screen in a sentence, not “screenshot of…”.',
+  '[].images[].pixel': 'Scaled without smoothing so hard pixel edges stay sharp. Small captures (800 px wide or less) always are.',
+  '[].images[].video': 'Plays the .mp4 of the same name (put it in the repo beside this image), with this image as its still.',
   '[].tech': 'The tags under the Tech heading on the project’s page.',
   '[].href': 'https://…, mailto:…, or a path on this site like games/x.html.',
   'site.resumeUrl': 'resume.pdf (a file in public/, shown once it’s there) or a https:// link. Empty: no Résumé button.',
@@ -679,8 +697,15 @@ export const TITLE_KEYS = ['name', 'title', 'org', 'group', 'label', 'heading'];
 /** Flame color fields, in ramp order (shown as a swatch strip on each flame card). */
 export const SWATCH_KEYS = ['lo', 'mid', 'hi', 'core', 'shade'];
 
-/** A lookup that tries the exact pattern, then the same pattern from any list (`[].key`). */
+/**
+ * A lookup that tries the exact pattern, then the same pattern in any list: from the outer
+ * list (`[].images[].alt`), then from the innermost (`[].alt`). The featured project counts
+ * as a project in a list (featured.id is `[].id`).
+ */
 export function hint(table, pattern) {
-  if (table instanceof Set) return table.has(pattern) || table.has(pattern.replace(/^.*\[\]/, '[]'));
-  return table[pattern] ?? table[pattern.replace(/^.*\[\]/, '[]')];
+  const p = pattern.replace(/^featured\./, '[].');
+  const tries = [pattern, p, p.replace(/^[^[]*\[\]/, '[]'), p.replace(/^.*\[\]/, '[]')];
+  if (table instanceof Set) return tries.some((t) => table.has(t));
+  for (const t of tries) if (table[t] !== undefined) return table[t];
+  return undefined;
 }

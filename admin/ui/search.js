@@ -51,8 +51,12 @@ export function revealPlan(draft, key) {
  */
 /** A text value long enough to be prose isn't searched (a project's summary, a paragraph). */
 const VALUE_MAX = 120;
-/** Cards that show only some of their entry's keys as fields: a scene's, an image's. */
-const ONLY = { 'scenes[]': ['name', 'id', 'music'], '[].images[]': ['alt', 'caption'] };
+/**
+ * Cards that show only some of their entry's keys as fields: a scene's, an image's. An image
+ * shows all of its own, its two switches too, set or not (they're only stored when on).
+ */
+const ONLY = { 'scenes[]': ['name', 'id', 'music'], '[].images[]': ['alt', 'caption', 'pixel', 'video'] };
+const ALWAYS = new Set(['[].images[]']);
 const isGroup = (v) => v !== null && typeof v === 'object';
 
 /**
@@ -78,8 +82,9 @@ export function buildIndex(draft, { labelOf = defaultLabel } = {}) {
   function walk(value, path, crumbs) {
     if (Array.isArray(value)) return walkList(value, path, crumbs);
     if (!isGroup(value)) return;
-    const only = ONLY[patternOf(path).replace(/^.*\.images\[\]$/, '[].images[]')];
-    const keys = Object.keys(value).filter((k) => k !== 'hidden' && k !== 'todo' && (!only || only.includes(k)));
+    const kind = patternOf(path).replace(/^.*\.images\[\]$/, '[].images[]');
+    const only = ONLY[kind];
+    const keys = ALWAYS.has(kind) ? only : Object.keys(value).filter((k) => k !== 'hidden' && k !== 'todo' && (!only || only.includes(k)));
     const groups = subgroupsOf(patternOf(path), keys) ?? [{ label: '', keys }];
     for (const g of groups) {
       const heading = g.label ? subgroupHeading(g, path, ctx) : null;
