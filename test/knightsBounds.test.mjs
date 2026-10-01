@@ -186,7 +186,8 @@ test('on the real model, the plates swing on their springs and settle, the same 
     return out;
   };
   const a = drive(make()), b = drive(make());
-  assert.ok(a.every((q, i) => q.angleTo(b[i]) < 1e-9), 'the same steps, the same swing');
+  // (Exactly: a quaternion's angleTo itself comes to ~4e-8 rad, the rounding of its acos.)
+  assert.ok(a.every((q, i) => q.equals(b[i])), 'the same steps, the same swing');
   // Sprung, the pauldrons still stay out of the helmet he wears.
   const HELMS = { great: 'K_Helm_Great', armet: 'K_Helm_Armet', bascinet: 'K_Helm_Bascinet' };
   const soft = { skip: ['K_Mail'] };
