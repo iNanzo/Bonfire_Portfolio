@@ -126,5 +126,6 @@
     "admin/server/auth.js",
     "admin/server/bytes.js",
     "admin/server/errors.js"
+    "src/bonfire/colliders.js"
   ]
 }

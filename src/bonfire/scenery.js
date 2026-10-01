@@ -43,17 +43,20 @@
 //     glass and runes keep their tone and breathe slowly
 import * as THREE from 'three';
 import { SEATS } from './knightPlaces.js';
+import { CLEARING, FORGE, SHRINE, CATHEDRAL, CULT, HOODED } from './colliders.js';
 import { logoBars } from '../ui/logo.js';
 
 export { SCENERIES } from '../sceneries.js';
 // The knights' seats and the dance ring live in knightPlaces.js (pure: the visualizer uses them too).
 export { SEATS, DANCE_RING, danceSlots } from './knightPlaces.js';
 
-// Where the ruins stand (three.js coordinates: the model's +y is -z here).
-const LEFT = new THREE.Vector3(-1.45, 0, -1.35);
-const RIGHT = new THREE.Vector3(1.9, 0, -1.5);
-const FRONT_LEFT = new THREE.Vector3(-1.9, 0, 0.6);
-const RIGHT_TURN = THREE.MathUtils.degToRad(-28);
+// Where the ruins stand (three.js coordinates: the model's +y is -z here). These and each
+// piece's size and place below come from colliders.js, which makes the knights' shapes of
+// them from the same numbers.
+const LEFT = new THREE.Vector3(CLEARING.left[0], 0, CLEARING.left[1]);
+const RIGHT = new THREE.Vector3(CLEARING.right[0], 0, CLEARING.right[1]);
+const FRONT_LEFT = new THREE.Vector3(CLEARING.frontLeft[0], 0, CLEARING.frontLeft[1]);
+const RIGHT_TURN = CLEARING.rightTurn;
 const UP = new THREE.Vector3(0, 1, 0);
 const SEEDS = { forge: 7, shrine: 11, cathedral: 23, cult: 31 };
 /**
@@ -186,14 +189,15 @@ export function buildScenery(name, mat, glowMaterial) {
   // ------------------------------------------------------------------------------------
   } else if (name === 'forge') {
     // --- the hearth, back right: block courses round a firebox, a slab, a hood, a chimney
+    const H = FORGE.hearth;
     const hearth = place(RIGHT, RIGHT_TURN);
-    const D = 0.8;
-    const whole = [[-0.85, 0.85]];
-    const sides = [[-0.85, -0.36], [0.36, 0.85]]; // the firebox opening between them
-    course(hearth, whole, 0, 0.24, D);
-    course(hearth, sides, 0.24, 0.22, D, { offset: 0.2 });
-    course(hearth, sides, 0.46, 0.22, D);
-    course(hearth, whole, 0.68, 0.24, D, { offset: 0.2 });
+    const D = H.depth;
+    const whole = [[-H.half, H.half]];
+    const sides = [[-H.half, -H.opening], [H.opening, H.half]]; // the firebox opening between them
+    course(hearth, whole, ...H.courses[0], D);
+    course(hearth, sides, ...H.courses[1], D, { offset: 0.2 });
+    course(hearth, sides, ...H.courses[2], D);
+    course(hearth, whole, ...H.courses[3], D, { offset: 0.2 });
     // The firebox: a sooty back wall and floor, a heap of coals and a glowing bed.
     add(box(0.74, 0.46, 0.08), mat.char, 0, 0.46, -0.32, { parent: hearth, rough: 0 });
     add(box(0.74, 0.03, 0.66), mat.char, 0, 0.245, -0.02, { parent: hearth, rough: 0 });
@@ -201,9 +205,9 @@ export function buildScenery(name, mat, glowMaterial) {
     for (let i = 0; i < 9; i++) {
       glow(rock(0.045 + rand() * 0.035), -0.24 + rand() * 0.48, 0.29 + rand() * 0.03, -0.12 + rand() * 0.3, { parent: hearth, kind: 'ember', jagged: 0.02 });
     }
-    add(box(1.76, 0.12, 0.92), mat.stone, 0, 0.975, 0, { parent: hearth, rough: 0.008 });           // the hearth slab
-    add(cyl(0.62, 0.38, 0.5, 4), mat.pillar, 0, 1.27, 0, { parent: hearth, ry: Math.PI / 4 });        // the hood
-    add(cyl(0.3, 0.24, 1.6, 4), mat.pillar, 0, 2.3, -0.05, { parent: hearth, ry: Math.PI / 4 });      // the chimney
+    add(box(...H.slab.size), mat.stone, 0, H.slab.y, 0, { parent: hearth, rough: 0.008 });           // the hearth slab
+    add(cyl(...H.hood.r, H.hood.h, 4), mat.pillar, 0, H.hood.y, 0, { parent: hearth, ry: Math.PI / 4 });        // the hood
+    add(cyl(...H.chimney.r, H.chimney.h, 4), mat.pillar, 0, H.chimney.y, H.chimney.z, { parent: hearth, ry: Math.PI / 4 });      // the chimney
     // Bellows beside it: a leather wedge between two boards.
     add(box(0.5, 0.05, 0.34), mat.wood, 1.14, 0.5, 0.1, { parent: hearth, rz: -0.25 });
     add(box(0.5, 0.05, 0.34), mat.wood, 1.14, 0.36, 0.1, { parent: hearth });
@@ -212,22 +216,23 @@ export function buildScenery(name, mat, glowMaterial) {
     light(hearth, [0, 0.5, 0.65], 1.4, 2.6);
 
     // --- the anvil, back left
-    const smith = place(LEFT, 0.5);
-    add(cyl(0.28, 0.25, 0.52, 9), mat.wood, 0, 0.26, 0, { parent: smith });                          // the stump
-    add(box(0.28, 0.1, 0.22), mat.char, 0, 0.565, 0, { parent: smith, rough: 0.004 });               // anvil foot
-    add(box(0.15, 0.14, 0.13), mat.char, 0, 0.675, 0, { parent: smith, rough: 0 });                  // waist
-    add(box(0.44, 0.1, 0.18), mat.char, 0.02, 0.785, 0, { parent: smith, rough: 0.004 });            // face
-    add(new THREE.ConeGeometry(0.075, 0.26, 6), mat.char, 0.35, 0.785, 0, { parent: smith, rz: -Math.PI / 2, rough: 0 }); // horn
+    const A = FORGE.anvil, B = FORGE.barrel;
+    const smith = place(LEFT, A.turn);
+    add(cyl(...A.stump.r, A.stump.h, 9), mat.wood, 0, 0.26, 0, { parent: smith });                          // the stump
+    add(box(...A.foot.size), mat.char, 0, A.foot.y, 0, { parent: smith, rough: 0.004 });               // anvil foot
+    add(box(...A.waist.size), mat.char, 0, A.waist.y, 0, { parent: smith, rough: 0 });                  // waist
+    add(box(...A.face.size), mat.char, ...A.face.at, 0, { parent: smith, rough: 0.004 });            // face
+    add(new THREE.ConeGeometry(A.horn.r, A.horn.length, 6), mat.char, ...A.horn.at, 0, { parent: smith, rz: -Math.PI / 2, rough: 0 }); // horn
     // A hammer lying on the face.
-    add(cyl(0.022, 0.022, 0.34, 6), mat.wood, -0.05, 0.853, 0.05, { parent: smith, rz: Math.PI / 2, ry: 0.4, rough: 0 });
-    add(box(0.07, 0.07, 0.13), mat.stone, -0.2, 0.865, 0.1, { parent: smith, ry: 0.4, rough: 0 });
+    add(cyl(A.handle.r, A.handle.r, A.handle.length, 6), mat.wood, ...A.handle.at, { parent: smith, rz: Math.PI / 2, ry: A.handle.turn, rough: 0 });
+    add(box(...A.head.size), mat.stone, ...A.head.at, { parent: smith, ry: A.head.turn, rough: 0 });
     // A quench barrel, full to the brim (the barrel leans as one piece, water and all).
     // (behind the anvil, clear of the knight's seat)
-    const barrel = place(new THREE.Vector3(-0.5, 0, -0.35), 0, { parent: smith });
+    const barrel = place(new THREE.Vector3(B.at[0], 0, B.at[1]), 0, { parent: smith });
     barrel.rotation.set((rand() - 0.5) * 0.04, rand(), (rand() - 0.5) * 0.04);
-    add(cyl(0.26, 0.24, 0.6, 10), mat.wood, 0, 0.3, 0, { parent: barrel, rough: 0 });
+    add(cyl(...B.r, B.h, 10), mat.wood, 0, 0.3, 0, { parent: barrel, rough: 0 });
     add(cyl(0.215, 0.215, 0.012, 10), mat.mortar, 0, 0.604, 0, { parent: barrel, rough: 0 });       // the water
-    for (const y of [0.12, 0.48]) add(cyl(0.262, 0.255, 0.035, 10), mat.char, 0, y, 0, { parent: barrel, rough: 0 }); // hoops
+    for (const y of [0.12, 0.48]) add(cyl(...B.hoop, 0.035, 10), mat.char, 0, y, 0, { parent: barrel, rough: 0 }); // hoops
     // Bar stock stacked by the anvil (each bar rests a little into the one below).
     for (let i = 0; i < 4; i++) add(box(0.7, 0.05, 0.06), mat.char, -0.45, 0.025 + i * 0.042, 0.45 + i * 0.02, { parent: smith, ry: 0.3 + i * 0.05, rough: 0.003 });
 
@@ -239,46 +244,48 @@ export function buildScenery(name, mat, glowMaterial) {
   // ------------------------------------------------------------------------------------
   } else if (name === 'shrine') {
     // --- the torii, back right, over two steps
+    const T = SHRINE.torii;
     const gate = place(RIGHT, RIGHT_TURN);
     add(box(2.4, 0.12, 1.1), mat.stone, 0, 0.06, 0, { parent: gate, rough: 0.008 });
     add(box(2.0, 0.13, 0.8), mat.stone, 0, 0.18, -0.08, { parent: gate, rough: 0.008 });
-    for (const x of [-0.72, 0.72]) {
-      add(cyl(0.1, 0.085, 2.14, 8), mat.wood, x, 1.3, -0.08, { parent: gate, rough: 0.006 });
-      add(cyl(0.14, 0.14, 0.16, 8), mat.char, x, 0.31, -0.08, { parent: gate, rough: 0 });        // the footing
+    for (const x of T.posts) {
+      add(cyl(...T.post.r, T.post.h, 8), mat.wood, x, T.post.y, T.z, { parent: gate, rough: 0.006 });
+      add(cyl(T.footing.r, T.footing.r, T.footing.h, 8), mat.char, x, T.footing.y, T.z, { parent: gate, rough: 0 });        // the footing
     }
-    add(box(1.84, 0.1, 0.14), mat.wood, 0, 1.95, -0.08, { parent: gate });                          // nuki (tie beam)
-    add(box(2.3, 0.12, 0.22), mat.wood, 0, 2.3, -0.08, { parent: gate });                           // shimaki
-    add(box(2.6, 0.11, 0.26), mat.char, 0, 2.4, -0.08, { parent: gate, rough: 0.006 });            // kasagi (top)
-    add(box(0.12, 0.36, 0.12), mat.wood, 0, 2.12, -0.08, { parent: gate });                         // gakuzuka
+    const [nuki, shimaki, kasagi, gakuzuka] = T.beams;
+    add(box(...nuki.size), mat.wood, 0, nuki.y, T.z, { parent: gate });                          // nuki (tie beam)
+    add(box(...shimaki.size), mat.wood, 0, shimaki.y, T.z, { parent: gate });                           // shimaki
+    add(box(...kasagi.size), mat.char, 0, kasagi.y, T.z, { parent: gate, rough: 0.006 });            // kasagi (top)
+    add(box(...gakuzuka.size), mat.wood, 0, gakuzuka.y, T.z, { parent: gate });                         // gakuzuka
     // A paper lantern hanging from the tie beam on a cord lights the gate.
     const lamp = lampId++;
-    add(cyl(0.016, 0.016, 0.34, 5), mat.char, 0, 1.76, -0.08, { parent: gate, rough: 0 });
-    glow(cyl(0.12, 0.12, 0.28, 8), 0, 1.46, -0.08, { parent: gate, kind: 'lamp', id: lamp });
-    add(cyl(0.1, 0.1, 0.05, 8), mat.char, 0, 1.61, -0.08, { parent: gate, rough: 0 });
-    add(cyl(0.1, 0.1, 0.05, 8), mat.char, 0, 1.31, -0.08, { parent: gate, rough: 0 });
+    add(cyl(T.lamp.cord.r, T.lamp.cord.r, T.lamp.cord.h, 5), mat.char, 0, T.lamp.cord.y, T.z, { parent: gate, rough: 0 });
+    glow(cyl(T.lamp.r, T.lamp.r, T.lamp.h, 8), 0, T.lamp.y, T.z, { parent: gate, kind: 'lamp', id: lamp });
+    for (const y of T.lamp.caps) add(cyl(0.1, 0.1, 0.05, 8), mat.char, 0, y, T.z, { parent: gate, rough: 0 });
     light(gate, [0, 1.4, 0.3], 0.9, 2.4);
     // A small offering stone in front of the gate, roped round.
-    add(rock(0.22), mat.stone, 0.2, 0.46, 0.25, { parent: gate, jagged: 0.03 });
-    add(new THREE.TorusGeometry(0.21, 0.035, 4, 10), mat.wax, 0.2, 0.47, 0.25, { parent: gate, rx: Math.PI / 2, rough: 0 });
+    add(rock(T.offering.r), mat.stone, ...T.offering.at, { parent: gate, jagged: 0.03 });
+    add(new THREE.TorusGeometry(0.21, 0.035, 4, 10), mat.wax, T.offering.at[0], 0.47, T.offering.at[2], { parent: gate, rx: Math.PI / 2, rough: 0 });
 
     // --- stone lanterns (tōrō): back left, and one front left. Each lights its own stone
     // from just outside the window that faces the fire.
+    const L = SHRINE.lantern;
     const lantern = (at, turn, scale = 1) => {
       const t = place(at, turn, { scale });
       const id = lampId++;
-      add(box(0.5, 0.15, 0.5), mat.pillar, 0, 0.075, 0, { parent: t });                              // base
-      add(cyl(0.1, 0.08, 0.84, 6), mat.pillar, 0, 0.56, 0, { parent: t });                           // post
-      add(box(0.44, 0.1, 0.44), mat.pillar, 0, 0.99, 0, { parent: t });                              // platform
-      add(box(0.32, 0.3, 0.32), mat.pillar, 0, 1.18, 0, { parent: t, rough: 0 });                   // light box
-      glow(box(0.2, 0.2, 0.345), 0, 1.18, 0, { parent: t, kind: 'lamp', id });                       // paper windows
-      glow(box(0.345, 0.2, 0.2), 0, 1.18, 0, { parent: t, kind: 'lamp', id });
-      add(new THREE.ConeGeometry(0.38, 0.24, 4), mat.pillar, 0, 1.44, 0, { parent: t, ry: Math.PI / 4, rough: 0 }); // roof
-      add(new THREE.SphereGeometry(0.06, 5, 4), mat.pillar, 0, 1.59, 0, { parent: t, rough: 0 });  // finial
+      add(box(...L.base.size), mat.pillar, 0, L.base.y, 0, { parent: t });                              // base
+      add(cyl(...L.post.r, L.post.h, 6), mat.pillar, 0, L.post.y, 0, { parent: t });                           // post
+      add(box(...L.platform.size), mat.pillar, 0, L.platform.y, 0, { parent: t });                              // platform
+      add(box(...L.box.size), mat.pillar, 0, L.box.y, 0, { parent: t, rough: 0 });                   // light box
+      glow(box(0.2, 0.2, L.box.window), 0, L.box.y, 0, { parent: t, kind: 'lamp', id });                       // paper windows
+      glow(box(L.box.window, 0.2, 0.2), 0, L.box.y, 0, { parent: t, kind: 'lamp', id });
+      add(new THREE.ConeGeometry(L.roof.r, L.roof.h, 4), mat.pillar, 0, L.roof.y, 0, { parent: t, ry: Math.PI / 4, rough: 0 }); // roof
+      add(new THREE.SphereGeometry(L.finial.r, 5, 4), mat.pillar, 0, L.finial.y, 0, { parent: t, rough: 0 });  // finial
       const toFire = new THREE.Vector3(-at.x, 0, -at.z).normalize().multiplyScalar(0.34 * scale);
       lights.push({ at: new THREE.Vector3(at.x + toFire.x, 1.18 * scale, at.z + toFire.z), intensity: 0.7, distance: 2 });
     };
-    lantern(LEFT, 0.3);
-    lantern(FRONT_LEFT, -0.2, 0.8);
+    const AT = { left: LEFT, frontLeft: FRONT_LEFT };
+    for (const l of SHRINE.lanterns) lantern(AT[l.at], l.turn, l.scale);
 
     // --- the knight's seat: a flat resting stone (last, so nothing above moves)
     const seat = SEATS.shrine;
@@ -292,20 +299,22 @@ export function buildScenery(name, mat, glowMaterial) {
     add(box(2.2, 0.11, 1.1), mat.stone, 0, 0.14, -0.12, { parent: chancel, rough: 0.006 });
     add(box(1.7, 0.11, 0.8), mat.stone, 0, 0.23, -0.24, { parent: chancel, rough: 0.006 });
     // The altar: a block with a slab on it and a pale frontal cloth.
-    add(box(1.1, 0.5, 0.42), mat.pillar, 0, 0.52, -0.3, { parent: chancel, rough: 0.006 });
-    add(box(1.3, 0.08, 0.56), mat.pillar, 0, 0.8, -0.3, { parent: chancel, rough: 0.004 });
-    add(box(0.36, 0.42, 0.02), mat.wax, 0, 0.53, -0.075, { parent: chancel, rough: 0 });
+    const C = CATHEDRAL;
+    add(box(...C.altar.block.size), mat.pillar, 0, ...C.altar.block.at, { parent: chancel, rough: 0.006 });
+    add(box(...C.altar.slab.size), mat.pillar, 0, ...C.altar.slab.at, { parent: chancel, rough: 0.004 });
+    add(box(...C.altar.cloth.size), mat.wax, 0, ...C.altar.cloth.at, { parent: chancel, rough: 0 });
     add(box(0.46, 0.05, 0.03), mat.wax, 0, 0.745, -0.08, { parent: chancel, rough: 0 });
-    for (const x of [-0.46, 0.46]) candle(chancel, x, 0.835, -0.3, 0.2);
+    for (const x of C.altar.candles.x) candle(chancel, x, C.altar.candles.y, C.altar.candles.z, C.altar.candles.h);
     // A gilded reliquary between them, its little window aglow.
-    add(box(0.2, 0.16, 0.13), mat.wax, 0, 0.915, -0.34, { parent: chancel, rough: 0 });
+    add(box(...C.altar.reliquary.size), mat.wax, 0, ...C.altar.reliquary.at, { parent: chancel, rough: 0 });
     glow(box(0.08, 0.08, 0.14), 0, 0.915, -0.34, { parent: chancel, kind: 'glass', tone: 3 });
     // The window: two lancets of stained glass split by a mullion, a rose above, framed by
     // shafts and a pointed arch.
-    const W = -0.66;
-    for (const x of [-0.8, 0.8]) {
-      add(cyl(0.09, 0.08, 2.56, 8), mat.pillar, x, 1.47, W, { parent: chancel, rough: 0 });         // from the dais up
-      add(box(0.26, 0.12, 0.26), mat.pillar, x, 2.8, W, { parent: chancel, rough: 0.004 });         // capital
+    const WIN = C.window;
+    const W = WIN.z;
+    for (const x of WIN.shafts) {
+      add(cyl(...WIN.shaft.r, WIN.shaft.h, 8), mat.pillar, x, WIN.shaft.y, W, { parent: chancel, rough: 0 });         // from the dais up
+      add(box(...WIN.capital.size), mat.pillar, x, WIN.capital.y, W, { parent: chancel, rough: 0.004 });         // capital
     }
     const rise = 0.55, half = 0.8, spring = 2.84;
     const arcLen = Math.hypot(half, rise) + 0.12;
@@ -316,68 +325,71 @@ export function buildScenery(name, mat, glowMaterial) {
     // background shows between them.
     const panes = [[-0.38, 1.11, 0.94, 1], [0.38, 1.11, 0.94, 2], [-0.38, 2.02, 0.84, 2], [0.38, 2.02, 0.84, 1]];
     for (const [x, y, h, tone] of panes) glow(box(0.7, h, 0.02), x, y, W - 0.02, { parent: chancel, kind: 'glass', tone });
-    add(box(0.07, 1.9, 0.07), mat.char, 0, 1.59, W + 0.02, { parent: chancel, rough: 0 });         // mullion
+    add(box(...WIN.mullion.size), mat.char, 0, WIN.mullion.y, W + WIN.mullion.z, { parent: chancel, rough: 0 });         // mullion
     add(box(1.46, 0.07, 0.07), mat.char, 0, 1.59, W + 0.02, { parent: chancel, rough: 0 });         // transom
-    add(box(1.56, 0.08, 0.1), mat.pillar, 0, 0.62, W, { parent: chancel, rough: 0 });               // sill
-    glow(cyl(0.26, 0.26, 0.02, 10), 0, 2.82, W - 0.02, { parent: chancel, kind: 'glass', tone: 3, rx: Math.PI / 2 }); // the rose
-    add(new THREE.TorusGeometry(0.27, 0.045, 4, 10), mat.char, 0, 2.82, W + 0.01, { parent: chancel, rough: 0 });
+    add(box(...WIN.sill.size), mat.pillar, 0, WIN.sill.y, W, { parent: chancel, rough: 0 });               // sill
+    glow(cyl(WIN.rose.r, WIN.rose.r, 0.02, 10), 0, WIN.rose.y, W - 0.02, { parent: chancel, kind: 'glass', tone: 3, rx: Math.PI / 2 }); // the rose
+    add(new THREE.TorusGeometry(WIN.rose.ring, WIN.rose.tube, 4, 10), mat.char, 0, WIN.rose.y, W + 0.01, { parent: chancel, rough: 0 });
     // Broken walls either side of the window, meeting its shafts.
-    for (const [x, h] of [[-1.24, 2.5], [1.24, 1.7]]) {
+    for (const [x, h] of C.walls.at) {
       for (let y = 0, i = 0; y < h; i++) {
         const bh = Math.min(0.5 + rand() * 0.2, h - y);
-        add(box(0.72 - i * 0.03, bh + 0.02, 0.34), mat.pillar, x + (rand() - 0.5) * 0.03, y + bh / 2, W, { parent: chancel, rough: 0.01 });
+        add(box(C.walls.width - i * 0.03, bh + 0.02, C.walls.depth), mat.pillar, x + (rand() - 0.5) * 0.03, y + bh / 2, W, { parent: chancel, rough: 0.01 });
         y += bh;
       }
     }
     // Tall iron candle stands at the dais' corners.
-    for (const x of [-1.08, 1.08]) {
-      add(new THREE.ConeGeometry(0.12, 0.14, 6), mat.char, x, 0.17, 0.02, { parent: chancel, rough: 0 });
-      add(cyl(0.026, 0.022, 1.26, 6), mat.char, x, 0.8, 0.02, { parent: chancel, rough: 0 });
-      add(cyl(0.05, 0.08, 0.04, 8), mat.char, x, 1.44, 0.02, { parent: chancel, rough: 0 });
-      candle(chancel, x, 1.455, 0.02, 0.18, { r: 0.036 });
+    const S = C.stands;
+    for (const x of S.x) {
+      add(new THREE.ConeGeometry(S.foot.r, S.foot.h, 6), mat.char, x, S.foot.y, S.z, { parent: chancel, rough: 0 });
+      add(cyl(...S.stem.r, S.stem.h, 6), mat.char, x, S.stem.y, S.z, { parent: chancel, rough: 0 });
+      add(cyl(...S.dish.r, S.dish.h, 8), mat.char, x, S.dish.y, S.z, { parent: chancel, rough: 0 });
+      candle(chancel, x, S.candle.y, S.z, S.candle.h, { r: S.candle.r });
     }
     light(chancel, [0, 1.15, 0.2], 1.2, 2.6);
     light(chancel, [0, 1.8, -0.35], 0.8, 2.2);
 
     // --- the nave, back left: two columns and a broken pointed arch, a fallen drum (the
     // knight's seat: SEATS.cathedral, in the nave's own space)
-    const nave = place(LEFT, 0.35);
-    const drum = new THREE.Vector3(SEATS.cathedral.x, 0, SEATS.cathedral.z).sub(LEFT).applyAxisAngle(UP, -0.35);
-    for (const x of [-0.58, 0.58]) {
-      add(box(0.5, 0.16, 0.5), mat.pillar, x, 0.08, 0, { parent: nave, rough: 0.008 });
-      add(cyl(0.17, 0.15, 2.36, 8), mat.pillar, x, 1.33, 0, { parent: nave, rough: 0.006 });
-      add(box(0.46, 0.14, 0.46), mat.pillar, x, 2.56, 0, { parent: nave, rough: 0.008 });
+    const N = C.nave;
+    const nave = place(LEFT, N.turn);
+    const drum = new THREE.Vector3(SEATS.cathedral.x, 0, SEATS.cathedral.z).sub(LEFT).applyAxisAngle(UP, -N.turn);
+    for (const x of N.columns) {
+      add(box(...N.base.size), mat.pillar, x, N.base.y, 0, { parent: nave, rough: 0.008 });
+      add(cyl(...N.shaft.r, N.shaft.h, 8), mat.pillar, x, N.shaft.y, 0, { parent: nave, rough: 0.006 });
+      add(box(...N.capital.size), mat.pillar, x, N.capital.y, 0, { parent: nave, rough: 0.008 });
     }
-    add(box(0.8, 0.16, 0.22), mat.pillar, 0.32, 2.78, 0, { parent: nave, rz: -0.62, rough: 0.008 });  // the arch, broken off
-    add(box(0.34, 0.16, 0.22), mat.pillar, -0.45, 2.7, 0, { parent: nave, rz: 0.62, rough: 0.008 });
+    for (const a of N.arch) add(box(...a.size), mat.pillar, ...a.at, 0, { parent: nave, rz: a.roll, rough: 0.008 });  // the arch, broken off
     add(cyl(0.16, 0.16, 0.5, 8), mat.pillar, drum.x, SEATS.cathedral.top - 0.16, drum.z, { parent: nave, rz: Math.PI / 2, ry: 0.5, rough: 0.008 }); // (half sunk: a low seat)
     // (Rubble behind the drum, clear of where his boots go.)
     for (let i = 0; i < 5; i++) add(rock(0.05 + rand() * 0.05), mat.pillar, -0.55 + rand() * 0.5, 0.04, -0.05 + rand() * 0.35, { parent: nave, jagged: 0.02 });
     // A cluster of floor candles at the left column's foot.
-    const cluster = place(new THREE.Vector3(-0.62, 0, 0.46), 0, { parent: nave });
+    const cluster = place(new THREE.Vector3(N.candles.at[0], 0, N.candles.at[1]), 0, { parent: nave });
     const id = lampId++;
-    for (const [x, z, h] of [[0, 0, 0.3], [0.1, 0.06, 0.2], [-0.09, 0.08, 0.16], [0.05, -0.1, 0.24], [-0.12, -0.06, 0.12]]) candle(cluster, x, 0, z, h, { id });
+    for (const [x, z, h] of N.candles.list) candle(cluster, x, 0, z, h, { id });
     light(nave, [-0.62, 0.45, 0.66], 0.8, 2);
 
     // --- a pew, front left, turned toward the altar
+    const P = C.pew;
     const pew = place(FRONT_LEFT, Math.atan2(RIGHT.x - FRONT_LEFT.x, RIGHT.z - FRONT_LEFT.z));
-    add(box(1.1, 0.06, 0.36), mat.wood, 0, 0.44, 0, { parent: pew });
-    add(box(1.1, 0.46, 0.06), mat.wood, 0, 0.72, -0.17, { parent: pew });
-    for (const x of [-0.56, 0.56]) add(box(0.06, 0.9, 0.42), mat.wood, x, 0.45, -0.02, { parent: pew });
-    add(box(1.02, 0.06, 0.14), mat.wood, 0, 0.14, 0.3, { parent: pew });                              // the kneeler
+    add(box(...P.seat.size), mat.wood, 0, ...P.seat.at, { parent: pew });
+    add(box(...P.back.size), mat.wood, 0, ...P.back.at, { parent: pew });
+    for (const x of P.ends.x) add(box(...P.ends.size), mat.wood, x, ...P.ends.at, { parent: pew });
+    add(box(...P.kneeler.size), mat.wood, 0, ...P.kneeler.at, { parent: pew });                              // the kneeler
 
   // ------------------------------------------------------------------------------------
   } else if (name === 'cult') {
     /** A hooded figure of stone: a robe, clasped sleeves, a hood with a dark face and glowing eyes. */
     const hooded = (g, x, z, turn, scale = 1) => {
       const f = place(new THREE.Vector3(x, 0, z), turn, { parent: g, scale });
-      add(new THREE.ConeGeometry(0.36, 1.62, 7), mat.pillar, 0, 0.81, 0, { parent: f, rough: 0.008 });
-      add(new THREE.ConeGeometry(0.2, 0.5, 7), mat.pillar, 0, 1.46, 0.02, { parent: f, rough: 0 });   // shoulders
-      add(rock(0.2, 0), mat.pillar, 0, 1.74, 0, { parent: f, jagged: 0.02, scale: [1, 1.2, 1.05] });   // the hood
-      add(box(0.18, 0.2, 0.08), mat.char, 0, 1.72, 0.2, { parent: f, rough: 0 });                    // the face, in shadow
+      const H = HOODED;
+      add(new THREE.ConeGeometry(H.robe.r, H.robe.h, 7), mat.pillar, 0, 0.81, 0, { parent: f, rough: 0.008 });
+      add(new THREE.ConeGeometry(H.shoulders.r, H.shoulders.h, 7), mat.pillar, 0, ...H.shoulders.at, { parent: f, rough: 0 });   // shoulders
+      add(rock(H.hood.r, 0), mat.pillar, 0, H.hood.y, 0, { parent: f, jagged: 0.02, scale: H.hood.scale });   // the hood
+      add(box(...H.face.size), mat.char, 0, ...H.face.at, { parent: f, rough: 0 });                    // the face, in shadow
       const eyes = lampId++;
-      for (const ex of [-0.045, 0.045]) glow(box(0.035, 0.02, 0.02), ex, 1.75, 0.245, { parent: f, kind: 'rune', id: eyes, tone: 3 });
-      add(box(0.32, 0.13, 0.16), mat.pillar, 0, 1.02, 0.24, { parent: f, rough: 0.006 });            // clasped sleeves
+      for (const ex of [-H.eyes.x, H.eyes.x]) glow(box(0.035, 0.02, 0.02), ex, ...H.eyes.at, { parent: f, kind: 'rune', id: eyes, tone: 3 });
+      add(box(...H.sleeves.size), mat.pillar, 0, ...H.sleeves.at, { parent: f, rough: 0.006 });            // clasped sleeves
     };
     /**
      * A sigil carved in a face: the NH monogram (ui/logo.js), `tall` m tall, in 3 cm strokes
@@ -388,42 +400,42 @@ export function buildScenery(name, mat, glowMaterial) {
     };
 
     // --- the altar, back right: a round dais, a slab on boulders, bowls of embers
+    const A = CULT.altar;
     const altar = place(RIGHT, RIGHT_TURN);
     add(cyl(1.16, 1.1, 0.14, 12), mat.stone, 0, 0.07, 0, { parent: altar, rough: 0.006 });
     add(cyl(0.8, 0.76, 0.13, 12), mat.stone, 0, 0.19, -0.05, { parent: altar, rough: 0.006 });
-    for (const x of [-0.44, 0.44]) add(rock(0.27, 0), mat.stone, x, 0.44, 0, { parent: altar, jagged: 0.05, scale: [1, 1, 0.8] });
-    add(box(0.56, 0.44, 0.38), mat.pillar, 0, 0.46, 0, { parent: altar, rough: 0.01 });
-    add(box(1.32, 0.17, 0.62), mat.char, 0, 0.74, 0, { parent: altar, rough: 0.004 });
+    for (const x of A.boulders.x) add(rock(A.boulders.r, 0), mat.stone, x, A.boulders.y, 0, { parent: altar, jagged: 0.05, scale: [1, 1, 0.8] });
+    add(box(...A.block.size), mat.pillar, 0, A.block.y, 0, { parent: altar, rough: 0.01 });
+    add(box(...A.slab.size), mat.char, 0, A.slab.y, 0, { parent: altar, rough: 0.004 });
     // (One sigil on the block under the slab, between the boulders: the old three runes' lamp
     // ids are kept, so every later lamp still flickers as it did.)
     lampId += 2;
     sigil(altar, 0, 0.46, 0.2, 0.38);
-    for (const x of [-0.44, 0.44]) {
-      add(cyl(0.08, 0.13, 0.09, 8), mat.char, x, 0.87, 0.06, { parent: altar, rough: 0 });
+    for (const x of A.boulders.x) {
+      add(cyl(...A.bowls.r, A.bowls.h, 8), mat.char, x, ...A.bowls.at, { parent: altar, rough: 0 });
       for (let i = 0; i < 3; i++) glow(rock(0.045 + rand() * 0.02), x + (rand() - 0.5) * 0.1, 0.92, 0.06 + (rand() - 0.5) * 0.1, { parent: altar, kind: 'ember', jagged: 0.015 });
     }
-    for (const [x, h] of [[-0.18, 0.2], [0, 0.28], [0.2, 0.16]]) candle(altar, x, 0.815, -0.2, h, { material: mat.char });
-    hooded(altar, -0.98, -0.5, 0.25);
-    hooded(altar, 0.98, -0.5, -0.25);
+    for (const [x, h] of A.candles) candle(altar, x, A.candleAt[0], A.candleAt[1], h, { material: mat.char });
+    for (const [x, z, turn] of A.figures) hooded(altar, x, z, turn);
     light(altar, [0, 1.05, 0.4], 1.1, 2.6);
 
     // --- standing stones, back left, each carved with the sigil
-    const stones = place(LEFT, 0.4);
-    for (const [x, z, w, h, t] of [[-0.62, 0.12, 0.36, 1.55, 0.06], [0, -0.14, 0.42, 2.05, -0.02], [0.62, 0.12, 0.34, 1.35, -0.08]]) {
+    const stones = place(LEFT, CULT.stones.turn);
+    for (const [x, z, w, h, t] of CULT.stones.list) {
       // (The stone leans as a whole, its sigil with it, so the sigil stays on its face.)
       const s = place(new THREE.Vector3(x, -0.04, z), (rand() - 0.5) * 0.3, { parent: stones });
       s.rotation.x = (rand() - 0.5) * 0.08;
       s.rotation.z = t;
-      add(box(w, h, 0.26), mat.stone, 0, h / 2, 0, { parent: s, rough: 0 });
+      add(box(w, h, CULT.stones.depth), mat.stone, 0, h / 2, 0, { parent: s, rough: 0 });
       sigil(s, 0, h * 0.62, 0.14, Math.min(0.55, (w - 0.05) / 0.72)); // (as wide as the stone allows)
     }
     // A fallen one (the knight's seat: SEATS.cult, in the stones' own space).
-    const fallen = new THREE.Vector3(SEATS.cult.x, 0, SEATS.cult.z).sub(LEFT).applyAxisAngle(UP, -0.4);
+    const fallen = new THREE.Vector3(SEATS.cult.x, 0, SEATS.cult.z).sub(LEFT).applyAxisAngle(UP, -CULT.stones.turn);
     add(box(0.9, 0.2, 0.3), mat.stone, fallen.x, 0.1, fallen.z, { parent: stones, ry: 0.5, rz: 0.08, rough: 0.03 });
     light(stones, [0, 1.0, 0.5], 0.7, 2.2);
 
     // --- a hooded watcher, front left, turned toward the fire
-    hooded(group, FRONT_LEFT.x, FRONT_LEFT.z, Math.atan2(-FRONT_LEFT.x, -FRONT_LEFT.z), 0.78);
+    hooded(group, FRONT_LEFT.x, FRONT_LEFT.z, Math.atan2(-FRONT_LEFT.x, -FRONT_LEFT.z), CULT.watcher.scale);
 
     // --- a half ring of black candles behind the fire (the two nearest the knight's seat stand
     // past it, so his boots go between them)

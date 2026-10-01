@@ -1,6 +1,6 @@
 // The real knight model's pieces for the tests: public/models/knight.glb decoded in Node
-// (its meshes are Draco-compressed; three.js' own asm.js decoder runs here without a
-// Worker), so a test can pose the actual plates and helmets instead of stand-in boxes.
+// (test/lib/glb.mjs: its meshes are Draco-compressed), so a test can pose the actual plates
+// and helmets instead of stand-in boxes.
 //
 //   const model = await loadKnightMesh();
 //   model.nodes.get('K_Shoulder_L')   { name, translation: [x, y, z], parent, children }
@@ -13,12 +13,11 @@
 // Each takes { skip: ['K_Mail'] } to leave out a material's primitives (mail drapes: the
 // bascinet's aventail is an open skirt of it, not a solid).
 //   model.scene()                     the model as a three.js tree (for createKnights)
-import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import * as THREE from 'three';
+import { loadGlb } from './glb.mjs';
 
+export { loadGlb };
 const MODEL = new URL('../../public/models/knight.glb', import.meta.url);
-const DECODER = new URL('../../node_modules/three/examples/jsm/libs/draco/draco_decoder.js', import.meta.url);
 
 let cached = null;
 
@@ -45,61 +44,11 @@ function triDistance(px, py, pz, A, B, C) {
   return at(vb * den, vc * den);
 }
 
-/** The decoder module (Emscripten's; `require` and a script dir handed in, as Node would). */
-async function decoder() {
-  const src = fs.readFileSync(DECODER, 'utf8');
-  const require = createRequire(import.meta.url);
-  const make = new Function('module', 'exports', 'require', '__dirname', '__filename', `${src};return DracoDecoderModule;`);
-  return make(undefined, undefined, require, '.', 'draco_decoder.js')({});
-}
-
 /** Decode the model once: its node tree and each mesh's positions and triangles. */
 export async function loadKnightMesh() {
   if (cached) return cached;
-  const M = await decoder();
-  const buf = fs.readFileSync(MODEL);
-  const jsonLen = buf.readUInt32LE(12);
-  const gltf = JSON.parse(buf.toString('utf8', 20, 20 + jsonLen));
-  const bin = buf.subarray(20 + jsonLen + 8);
-  const dec = new M.Decoder();
-  /** @type {Map<string, { name: string, translation: number[], parent: string | null, children: string[], mesh?: number }>} */
-  const nodes = new Map();
-  gltf.nodes.forEach((n) => nodes.set(n.name, { name: n.name, translation: n.translation ?? [0, 0, 0], parent: null, children: (n.children ?? []).map((c) => gltf.nodes[c].name), mesh: n.mesh }));
-  for (const n of nodes.values()) for (const c of n.children) nodes.get(c).parent = n.name;
-  const meshCache = new Map();
+  const { nodes, primitives: decode } = await loadGlb(MODEL);
   const geometries = new Map();
-  /** A mesh's primitives, decoded: [{ pos: Float32Array, idx: Uint32Array, material }]. */
-  function decode(meshIndex) {
-    if (meshCache.has(meshIndex)) return meshCache.get(meshIndex);
-    const out = [];
-    for (const prim of gltf.meshes[meshIndex].primitives) {
-      const ext = prim.extensions?.KHR_draco_mesh_compression;
-      if (!ext) continue;
-      const view = gltf.bufferViews[ext.bufferView];
-      const data = bin.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength);
-      const db = new M.DecoderBuffer();
-      db.Init(new Int8Array(data.buffer, data.byteOffset, data.byteLength), data.byteLength);
-      const g = new M.Mesh();
-      if (!dec.DecodeBufferToMesh(db, g).ok()) throw new Error(`Draco decode failed: mesh ${meshIndex}`);
-      const att = dec.GetAttributeByUniqueId(g, ext.attributes.POSITION);
-      const n = g.num_points();
-      const arr = new M.DracoFloat32Array();
-      dec.GetAttributeFloatForAllPoints(g, att, arr);
-      const pos = new Float32Array(n * 3);
-      for (let i = 0; i < n * 3; i++) pos[i] = arr.GetValue(i);
-      const faces = g.num_faces();
-      const tri = new M.DracoInt32Array();
-      const idx = new Uint32Array(faces * 3);
-      for (let f = 0; f < faces; f++) {
-        dec.GetFaceFromMesh(g, f, tri);
-        idx[f * 3] = tri.GetValue(0); idx[f * 3 + 1] = tri.GetValue(1); idx[f * 3 + 2] = tri.GetValue(2);
-      }
-      M.destroy(tri); M.destroy(arr); M.destroy(g); M.destroy(db);
-      out.push({ pos, idx, material: gltf.materials?.[prim.material]?.name ?? '' });
-    }
-    meshCache.set(meshIndex, out);
-    return out;
-  }
   /** The mesh under a joint: `<joint>_Mesh` (or the node's own). */
   const meshOf = (name) => nodes.get(`${name}_Mesh`)?.mesh ?? nodes.get(name)?.mesh;
   /** A piece's primitives, less those in a skipped material (e.g. mail, which drapes). */
