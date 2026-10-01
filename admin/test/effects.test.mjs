@@ -125,7 +125,7 @@ test('hidden images: a project needs at least one visible image', () => {
 
 test('admin label overrides are short text', () => {
   const c = content();
-  c.admin = { labels: { 'page:effects': 'Fire & Effects', featured: 'x'.repeat(61) } };
+  c.admin = { labels: { 'page:colors': 'Fire & Effects', featured: 'x'.repeat(61) } };
   assert.deepEqual(paths(c), ['admin.labels.featured']);
 });
 
@@ -140,7 +140,7 @@ test('knight settings: switches, choices from his own lists, ranged numbers; the
   const c = content();
   assert.deepEqual(Object.keys(c.effects.knight).sort(), Object.keys(DEFAULT_EFFECTS.knight).sort());
   assert.deepEqual(Object.keys(DEFAULT_EFFECTS.knight), ['show', 'arrival', 'restMin', 'restMax', 'helmet', 'style', 'finish', 'rim', 'shine', 'seat', 'gestures', 'reactions'],
-    'every option, in the order the admin shows them');
+    'every option');
   c.effects.knight.helmet = 'sallet';
   c.effects.knight.show = 'yes';
   c.effects.knight.gestures = 1;
@@ -169,23 +169,33 @@ test('knight settings: switches, choices from his own lists, ranged numbers; the
       assert.deepEqual(paths(d), [], `${k}: ${v}`);
     }
   }
-  const { SELECTS, PAGES, LABELS, HELP } = await import('../ui/schema.js');
+  const { SELECTS, PAGES, LABELS, HELP, SUBGROUPS, subgroupsOf } = await import('../ui/schema.js');
   assert.deepEqual(SELECTS['effects.knight.helmet']().map((o) => o.value), ['random', 'great', 'armet', 'bascinet']);
   assert.deepEqual(SELECTS['effects.knight.helmet']().map((o) => o.label), ['Random Each Summon', 'Great Helm', 'Armet', 'Bascinet']);
   assert.deepEqual(SELECTS['effects.knight.arrival']().map((o) => o.label), ['Summon Sign', 'There From the Start']);
   assert.deepEqual(SELECTS['effects.knight.style']().map((o) => o.value), KNIGHT_STYLES);
-  assert.deepEqual(SELECTS['effects.knight.finish']().map((o) => o.label), ['Gunmetal', 'Blackened', 'Polished Steel', 'Burnished']);
+  assert.ok(SELECTS['effects.knight.style']().some((o) => o.value === 'gunmetal' && o.label === 'Smooth Steel'), 'the gunmetal style reads Smooth Steel');
+  assert.deepEqual(SELECTS['effects.knight.finish']().map((o) => o.label), ['Gunmetal', 'Blackened', 'Polished Steel', 'Burnished'], 'the finish keeps Gunmetal');
   assert.deepEqual(SELECTS['effects.knight.seat']().map((o) => o.label), ['Resting', 'Watchful']);
   for (const k of ['helmet', 'arrival', 'style', 'finish', 'seat']) {
     for (const o of SELECTS[`effects.knight.${k}`]()) assert.equal(o.label, titleCase(o.label), `${k}: “${o.label}” in Title Case`);
   }
-  assert.ok(PAGES.find((p) => p.id === 'effects').keys.includes('effects.knight'), 'on the Effects page');
+  // His own page, its fields under Knight / Armor / Behavior: every setting in one of them.
+  const page = PAGES.find((p) => p.id === 'knight');
+  assert.deepEqual(page?.keys, ['effects.knight'], 'the Knight page');
+  assert.equal(page.preview, true, 'beside the live preview');
+  assert.deepEqual(SUBGROUPS['effects.knight'].map((g) => g.label), ['Knight', 'Armor', 'Behavior']);
+  const groups = subgroupsOf('effects.knight', Object.keys(DEFAULT_EFFECTS.knight));
+  assert.deepEqual(groups.map((g) => g.label), ['Knight', 'Armor', 'Behavior'], 'nothing left over for More');
+  assert.deepEqual(groups.flatMap((g) => g.keys).sort(), Object.keys(DEFAULT_EFFECTS.knight).sort());
   for (const k of Object.keys(DEFAULT_EFFECTS.knight)) {
     const label = LABELS[`effects.knight.${k}`];
-    assert.ok(label && HELP[`effects.knight.${k}`], `${k}: a label and a hover hint`);
+    assert.ok(label && HELP[`effects.knight.${k}`], `${k}: a label and a hint`);
     assert.equal(label, titleCase(label), `${k}: written in Title Case (“${label}”)`);
     if (typeof DEFAULT_EFFECTS.knight[k] === 'number') assert.ok(RANGES[`knight.${k}`], `${k}: a range (a slider)`);
   }
+  assert.equal(LABELS['effects.knight.rim'], 'Edge Glow Strength', 'the name Bonfire Live and the Painter use');
+  assert.equal(LABELS['effects.knight.gestures'], 'Gestures On Click');
   assert.equal(LABELS['effects.knight'], titleCase(LABELS['effects.knight']));
   assert.doesNotMatch(HELP['effects.knight'], /black plate|gilt/i, 'a knight in steel plate');
   const e = resolveEffects({});

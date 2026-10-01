@@ -108,17 +108,20 @@ test('the API refuses a bad scene (422, with paths) and saves a good one', async
 // (new ones at the end; one with an id already here replaces it if you confirm, keeping its
 // place and its loop switch, else comes in as a copy).
 test('the Scenes page: its labels, hints, the With the Music choices and a new scene', async () => {
-  const { PAGES, LABELS, HELP, SELECTS, TEMPLATES, ADD_LABELS, hint } = await import('../ui/schema.js');
+  const { PAGES, LABELS, HELP, SELECTS, TEMPLATES, ADD_LABELS, hint, moreFor } = await import('../ui/schema.js');
   const { titleCase } = await import('../ui/text.js');
   const { MUSIC, validateScene } = await import('../../src/scenes.js');
   const page = PAGES.find((p) => p.id === 'scenes');
   assert.deepEqual(page?.keys, ['scenes']);
   assert.equal(page.group, 'Look & feel');
+  assert.equal(PAGES[PAGES.indexOf(page) - 1].id, 'knight', 'after the four effects pages');
+  assert.ok(!page.preview, 'no live preview: Open in Painter is its preview');
   assert.match(page.blurb, /Painter/);
+  assert.match(moreFor('scenes'), /Replace From Painter/, 'the longer story under More');
   for (const key of ['scenes', 'scenes[].name', 'scenes[].id', 'scenes[].music']) {
     assert.ok(LABELS[key], `${key}: a label`);
     assert.equal(LABELS[key], titleCase(LABELS[key]), `${key}: Title Case`);
-    assert.ok(HELP[key]?.length >= 20, `${key}: a hover hint`);
+    assert.ok(HELP[key]?.length >= 20 && HELP[key].length <= 160, `${key}: a hint, short`);
   }
   assert.deepEqual(SELECTS['scenes[].music']().map((o) => o.value), Object.keys(MUSIC));
   assert.deepEqual(SELECTS['scenes[].music']().map((o) => o.label), ['Hold the Scene', 'Start From the Scene']);

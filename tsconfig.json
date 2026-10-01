@@ -93,7 +93,9 @@
     "src/settingsMap.js",
     "src/bonfire/frameGate.js",
     "src/ui/perfOverlay.js",
-    "admin/server/csp.js",
-    "admin/ui/el.js"
+    "admin/ui/el.js",
+    "admin/ui/paths.js",
+    "admin/ui/reset.js",
+    "admin/server/csp.js"
   ]
 }

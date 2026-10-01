@@ -5,14 +5,19 @@
 // Live's scenes get cards of their own (sceneTools.js: made in the Painter, so a card
 // shows a scene's colors and summary rather than its ~80 settings). Every
 // field carries data-path (e.g. projects[2].images[0].alt) so validation messages
-// land on the right field.
+// and the search land on the right field.
+//
+// A field's help sits under it and is what its input reads out (aria-describedby); a longer
+// explanation folds under the help ("More"). An object with SUBGROUPS shows its fields under
+// sub-headings. Headings go down a level per group: h2 a section, h3 a group or sub-group in
+// it, h4 one inside that.
 //
 // User text only ever reaches the page through .value / textContent. Hover tips are data-tip
 // (the shared tooltip, src/ui/tooltip.js), never title. Styles go through el()'s style object
 // (el.js): the deployed admin's policy blocks style attributes.
 import {
   ADD_LABELS, COLUMNS, FIXED, HELP, LABELS, MULTILINE, MULTILINE_LISTS, NULLABLE, READONLY, SELECTS, SHORT, SWATCH_KEYS,
-  TEMPLATES, TITLE_KEYS, hint, rangeFor,
+  TEMPLATES, TITLE_KEYS, hint, moreFor, rangeFor, resolveHelp, subgroupsOf,
 } from './schema.js';
 import { HEX_RE, ID_RE, shownImages, slugify } from '../../src/contentRules.js';
 import { newImageSrc, processImage } from './images.js';
@@ -21,22 +26,53 @@ import { sceneCardBody, sceneMeta, sceneThumb } from './sceneTools.js';
 import { titleCase } from './text.js';
 import { ELEMENT_IDS } from '../../src/effectsDefaults.js';
 import { el } from './el.js';
+import { getAt, keyOf, patternOf } from './paths.js';
 
-export { el };
-
-// ---- paths ------------------------------------------------------------------------
-export const keyOf = (path) => path.map((k, i) => (typeof k === 'number' ? `[${k}]` : (i ? '.' : '') + k)).join('');
-export const patternOf = (path) => path.map((k, i) => (typeof k === 'number' ? '[]' : (i ? '.' : '') + k)).join('');
-export const getAt = (obj, path) => path.reduce((o, k) => o?.[k], obj);
+export { el, getAt, keyOf, patternOf };
 const setAt = (obj, path, value) => { getAt(obj, path.slice(0, -1))[path.at(-1)] = value; };
 
 const humanize = (key) => String(key).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 export const labelFor = (path) => titleCase(hint(LABELS, patternOf(path)) ?? humanize(path.at(-1)));
 const addLabel = (path) => titleCase(hint(ADD_LABELS, patternOf(path)) ?? 'entry');
 
+/**
+ * A field's help and its longer explanation ('' for none), naming any page or field they
+ * mention as it's named now (ctx.labelOf: renames included) and quoting the draft.
+ * @param {(string|number)[]} path
+ * @param {{ labelOf?: (key: string) => string, draft?: any }} [ctx]
+ */
+export function helpFor(path, ctx) {
+  const pattern = patternOf(path);
+  const o = { labelOf: ctx?.labelOf, draft: ctx?.draft };
+  return { help: resolveHelp(hint(HELP, pattern), o), more: resolveHelp(moreFor(pattern), o) };
+}
+/** "More": a longer explanation, folded (a paragraph, or a list of its lines). @param {string} text */
+export function moreBox(text) {
+  const lines = String(text).split('\n').filter(Boolean);
+  return el('details', { class: 'viz-more' }, el('summary', { text: 'More' }),
+    lines.length > 1 ? el('ul', {}, lines.map((line) => el('li', { text: line }))) : el('p', { text: lines[0] ?? '' }));
+}
+
+/**
+ * The heading a sub-group of the object at `path` shows, or null where it would only repeat
+ * the heading above it (Pixel Art inside Pixel Art, Knight inside The Knight) or its one
+ * field's own label (Key Prompts).
+ * @param {{ label: string, keys: string[] }} group
+ * @param {(string|number)[]} path
+ * @param {{ labelOf?: (key: string) => string }} [ctx]
+ */
+export function subgroupHeading(group, path, ctx) {
+  const plain = (s) => String(s ?? '').toLowerCase().replace(/^the\s+/, '').trim();
+  const label = titleCase(group.label);
+  const above = ctx?.labelOf ? ctx.labelOf(keyOf(path)) : labelFor(path);
+  if (plain(label) === plain(above)) return null;
+  if (group.keys.length === 1 && plain(label) === plain(labelFor([...path, group.keys[0]]))) return null;
+  return label;
+}
+
 const CATEGORIES = [['featured', 'Featured'], ['projects', 'Projects'], ['archive', 'Earlier Explorations']];
 
-// ---- buttons ----------------------------------------------------------------------
+// ---- buttons ------------------------------------------------------------------------
 // (A disabled button gets no hover or focus, so no tip: one could never show.)
 const iconButton = (label, glyph, onclick, extra = {}) => el('button', { type: 'button', class: 'icon', 'data-tip': extra.disabled ? null : label, 'aria-label': label, onclick, ...extra }, glyph);
 const eyeButton = (item, onToggle, { on = 'Show on the site', off = 'Hide from the site' } = {}) => iconButton(item.hidden ? on : off, item.hidden ? '◌' : '◉', () => {
@@ -59,15 +95,15 @@ const autoRows = (text) => Math.min(12, Math.max(2, Math.ceil(String(text ?? '')
  *   changed({ rerender }), thumb(src), siteUrl, toast(msg), busy(on), preview?
  * }
  */
-export function renderValue(value, path, ctx) {
+export function renderValue(value, path, ctx, level = 3) {
   if (path.at(-1) === 'images' && Array.isArray(value)) return renderImages(value, path, ctx);
   if (Array.isArray(value)) {
     const sample = value.find((v) => v !== null && v !== undefined) ?? hint(TEMPLATES, patternOf(path))?.();
     if (Array.isArray(sample) || COLUMNS[patternOf(path)]) return renderRows(value, path, ctx);
-    if (sample && typeof sample === 'object') return renderCollection(value, path, ctx);
+    if (sample && typeof sample === 'object') return renderCollection(value, path, ctx, level);
     return renderStrings(value, path, ctx);
   }
-  if (value !== null && typeof value === 'object') return renderObject(value, path, ctx);
+  if (value !== null && typeof value === 'object') return renderObject(value, path, ctx, level);
   return renderScalar(value, path, ctx);
 }
 
@@ -76,30 +112,61 @@ const isShort = (value, path) => {
   if (typeof value === 'number' || typeof value === 'boolean') return true;
   if (typeof value === 'string' && HEX_RE.test(value)) return true;
   if (SELECTS[patternOf(path)]) return true;
+  // (The interface's words and buttons sit two to a row: most are a word or two.)
+  if (typeof value === 'string' && path[0] === 'ui' && path.length === 2 && value.length < 40) return true;
   return typeof value === 'string' && SHORT.has(key) && value.length < 60;
 };
 
-export function renderObject(obj, path, ctx) {
+let uid = 0;
+/**
+ * An object's fields (`level`: the heading level its groups take), under its sub-headings
+ * where SUBGROUPS has some for it.
+ */
+export function renderObject(obj, path, ctx, level = 3) {
   const box = el('div', { class: 'fields' });
   if (typeof obj.todo === 'string') box.append(renderTodo(obj, path, ctx));
-  for (const [k, v] of Object.entries(obj)) {
-    if (k === 'hidden' || k === 'todo') continue;
-    box.append(renderField(v, [...path, k], ctx));
+  const keys = Object.keys(obj).filter((k) => k !== 'hidden' && k !== 'todo');
+  const groups = subgroupsOf(patternOf(path), keys);
+  if (!groups) {
+    for (const k of keys) box.append(renderField(obj[k], [...path, k], ctx, undefined, level));
+    return box;
+  }
+  for (const g of groups) {
+    const heading = subgroupHeading(g, path, ctx);
+    const id = heading ? `f${++uid}-sub` : null;
+    box.append(el('div', { class: 'subgroup', 'data-subgroup': g.label, role: heading ? 'group' : null, 'aria-labelledby': id },
+      heading ? el(`h${Math.min(level, 6)}`, { class: 'subgroup-label', id, text: heading }) : null,
+      el('div', { class: 'fields' }, g.keys.map((k) => renderField(obj[k], [...path, k], ctx, undefined, heading ? level + 1 : level)))));
   }
   return box;
 }
 
-let uid = 0;
-export function renderField(value, path, ctx, label = labelFor(path)) {
+/**
+ * One field (or a group: an object or list), labelled, with its help and More, its control
+ * and its error slot. `level`: a group's heading level.
+ */
+export function renderField(value, path, ctx, label = labelFor(path), level = 3) {
   const group = value !== null && typeof value === 'object';
   const wrap = el('div', { class: `${group ? 'group' : 'field'}${!group && isShort(value, path) ? ' is-short' : ''}`, 'data-path': keyOf(path) });
   const id = `f${++uid}`;
-  // The help is written under the field.
-  const help = hint(HELP, patternOf(path));
-  wrap.append(group ? el('h4', { class: 'group-label', text: label }) : el('label', { for: id, text: label }));
-  if (help) wrap.append(el('p', { class: 'help', text: help }));
-  const control = renderValue(value, path, ctx);
-  if (!group) (control.querySelector?.('[data-main]') ?? control).id = id;
+  const { help, more } = helpFor(path, ctx);
+  const helpId = help ? `${id}-help` : null;
+  if (group) {
+    wrap.setAttribute('role', 'group');
+    wrap.setAttribute('aria-labelledby', `${id}-head`);
+    if (helpId) wrap.setAttribute('aria-describedby', helpId);
+    wrap.append(el(`h${Math.min(level, 6)}`, { class: 'group-label', id: `${id}-head`, text: label }));
+  } else {
+    wrap.append(el('label', { for: id, text: label }));
+  }
+  if (help) wrap.append(el('p', { class: 'help', id: helpId, text: help }));
+  if (more) wrap.append(moreBox(more));
+  const control = renderValue(value, path, ctx, level + 1);
+  if (!group) {
+    (control.querySelector?.('[data-main]') ?? control).id = id;
+    // The help is what the input reads out (a slider's number box and a color's picker too).
+    if (helpId) for (const input of [control, ...control.querySelectorAll('input, select, textarea')]) if (/^(INPUT|SELECT|TEXTAREA)$/.test(input.tagName)) input.setAttribute('aria-describedby', helpId);
+  }
   wrap.append(control, el('p', { class: 'error', role: 'alert' }));
   if (isElementPath(path)) wrap.append(elementFoot(path.at(-1), ctx));
   return wrap;
@@ -314,10 +381,10 @@ function addEntry(list, path, ctx) {
 }
 
 /** Lists of entries (projects, roles, skills, flames…): one card each. */
-function renderCollection(list, path, ctx) {
+function renderCollection(list, path, ctx, level = 3) {
   const fixed = hint(FIXED, patternOf(path));
   const box = el('div', { class: 'collection' });
-  list.forEach((item, i) => box.append(renderCard(list, i, path, ctx, fixed)));
+  list.forEach((item, i) => box.append(renderCard(list, i, path, ctx, fixed, level)));
   if (!fixed) {
     sortable(box, list, ctx);
     box.append(el('button', { type: 'button', class: 'add', text: `+ Add ${addLabel(path)}`, onclick: () => addEntry(list, path, ctx) }));
@@ -344,7 +411,7 @@ function swatches(item, ipath) {
 }
 
 /** The collapsible card head shared by list cards and the featured card (`body`: its own, in place of every field). */
-function cardShell(item, ipath, ctx, { title, meta, thumb, lead = null, actions, badges, foot = null, body: custom = null, open }) {
+function cardShell(item, ipath, ctx, { title, meta, thumb, lead = null, actions, badges, foot = null, body: custom = null, open, level = 3 }) {
   const key = keyOf(ipath);
   const card = el('section', { class: `card${item.hidden ? ' is-hidden' : ''}`, 'data-path': key });
   const body = el('div', { class: 'card-body', hidden: !open });
@@ -366,7 +433,7 @@ function cardShell(item, ipath, ctx, { title, meta, thumb, lead = null, actions,
     el('div', { class: 'card-head' }, lead, toggle, badges, el('span', { class: 'card-actions' }, actions)),
     el('p', { class: 'error', role: 'alert' }),
     body);
-  body.append(custom ?? renderObject(item, ipath, ctx));
+  body.append(custom ?? renderObject(item, ipath, ctx, level));
   if (foot) body.append(foot);
   return card;
 }
@@ -378,7 +445,7 @@ function badgesFor(item) {
     el('span', { class: 'badge badge-error', text: 'Needs Fixing' }));
 }
 
-function renderCard(list, i, path, ctx, fixed) {
+function renderCard(list, i, path, ctx, fixed, level = 3) {
   const item = list[i];
   const ipath = [...path, i];
   const isProject = isProjectPath(path);
@@ -408,6 +475,7 @@ function renderCard(list, i, path, ctx, fixed) {
     foot: isProject ? projectActions(item, path[0], i, ctx) : isFlame ? flameActions(item, ctx) : null,
     body: isScene ? sceneCardBody(item, ipath, ctx) : null,
     open: ctx.open.has(item),
+    level,
   });
   card.dataset.index = i;
   if (isFlame && item.hidden) card.querySelector('.badges .badge').textContent = 'Out of Rotation';

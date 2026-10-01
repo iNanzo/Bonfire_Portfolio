@@ -27,13 +27,18 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--void); color: var(--bone); }
-html { scroll-padding-top: calc(var(--top) + 16px); }
+/* (--sticky: what the page strip and a pinned preview cover besides the top bar, main.js) */
+html { scroll-padding-top: calc(var(--top) + var(--sticky, 0px) + 16px); }
 body { font: 400 15px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
 a { color: var(--hi); }
 button, input, textarea, select { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
 kbd { font: 11px var(--pixel); padding: 0 4px; border: 1px solid currentColor; border-radius: 2px; opacity: 0.7; }
+.visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; border: 0;
+}
 
 /* ---- top bar ---- */
 .topbar {
@@ -96,6 +101,7 @@ kbd { font: 11px var(--pixel); padding: 0 4px; border: 1px solid currentColor; b
 .sidebar a[aria-current]::before { content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: 2px; background: var(--hi); }
 .nav-count:not(:empty) { min-width: 20px; padding: 0 6px; border-radius: 10px; background: var(--bad); color: var(--void); font: 600 12px/20px var(--body); text-align: center; }
 .who { padding: 12px; border-top: 1px solid var(--line); font-size: 13px; }
+
 .who p { margin: 0 0 4px; overflow-wrap: anywhere; }
 .muted { color: var(--dim); }
 
@@ -127,18 +133,35 @@ input.page-title { font: 500 26px var(--pixel) !important; color: var(--hi); }
 input.block-title { font: 500 19px var(--pixel) !important; }
 
 /* ---- blocks, groups, fields ---- */
-.block { margin-bottom: 40px; scroll-margin-top: calc(var(--top) + 16px); }
+.block { margin-bottom: 40px; }
+/* Jumps and reveals land below the sticky bars (html's scroll-padding counts them too). */
+.block, .field, .group, .card, .row { scroll-margin-top: calc(var(--top) + var(--sticky, 0px) + 16px); }
 .block-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
 .block-title { margin: 0; font: 500 21px var(--pixel); letter-spacing: 0.03em; }
 .block > .help { margin-bottom: 14px; max-width: 72ch; }
+.block > .viz-more { margin: -8px 0 14px; max-width: 72ch; }
 .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px 18px; }
 .fields > :not(.is-short) { grid-column: 1 / -1; }
 .group { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: color-mix(in srgb, var(--shadow) 45%, transparent); }
 .group-label { margin: 0 0 10px; font: 600 12px var(--body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+.group > .help { margin: -4px 0 10px; }
+.group > .viz-more { margin: -4px 0 10px; }
+/* Sub-headings inside one section (schema.js SUBGROUPS): Pack, Armor, Place & Atmosphere… */
+.fields > .subgroup { grid-column: 1 / -1; }
+.subgroup + .subgroup { margin-top: 10px; }
+.fields > .subgroup:first-child > .subgroup-label { margin-top: 6px; }
+.subgroup-label {
+  margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line);
+  font: 500 15px var(--pixel); letter-spacing: 0.04em; color: var(--bone);
+}
 .field { display: grid; gap: 5px; align-content: start; }
 .field > label { font-size: 13px; font-weight: 600; color: var(--dim); }
 .help { margin: 0; font-size: 13px; line-height: 1.45; color: var(--faint); }
 .field > .help { order: 3; }
+.field > .viz-more { order: 4; }
+/* A search result or a jump lands: a brief glow (none under reduced motion, below). */
+.is-flash { animation: flash 1.4s ease-out; }
+@keyframes flash { 0%, 30% { box-shadow: 0 0 0 3px var(--hi), 0 0 18px var(--glow); background-color: var(--glow); } }
 input[type='text'], input[type='number'], textarea, select {
   width: 100%; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius);
   background: var(--field); line-height: 1.45; transition: border-color 120ms, box-shadow 120ms;
@@ -357,6 +380,8 @@ input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
 .toasts { position: fixed; right: 16px; bottom: 16px; z-index: 50; display: grid; gap: 8px; max-width: min(420px, calc(100vw - 32px)); }
 .toast { padding: 10px 14px; border-radius: var(--radius); background: var(--stone); border-left: 3px solid var(--ok); box-shadow: 0 6px 24px rgb(0 0 0 / 0.5); animation: toast-in 180ms ease-out; }
 .toast-error { border-left-color: var(--bad); }
+.toast { display: flex; align-items: baseline; gap: 14px; }
+.toast-action { flex: none; font-weight: 600; }
 @keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
 .busy { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgb(7 7 11 / 0.6); }
 .busy-box { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line-strong); }
@@ -395,7 +420,7 @@ input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
   .sidebar a[aria-current]::before { display: none; }
   .who { display: none; }
   .layout.has-preview .sidebar { order: -2; }
-  .layout.has-preview .preview-slot { order: -1; grid-column: 1; grid-row: auto; position: sticky; top: calc(var(--top) + 45px); max-height: 38vh; }
+  .layout.has-preview .preview-slot { order: -1; grid-column: 1; grid-row: auto; position: sticky; top: calc(var(--top) + var(--nav-h, 45px)); max-height: 38vh; }
   .layout.has-preview .page { grid-column: 1; grid-row: auto; }
   .preview { padding: 8px 12px; }
   .preview-head .link-button, .preview-tools .ghost { display: none; }
@@ -408,8 +433,9 @@ input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
   .pt-label { min-width: 0; width: 100%; }
   .pt-chips { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
   .rename { opacity: 1; }
-  .slider { grid-template-columns: minmax(0, 1fr) 70px; }
-  .slider .unit { display: none; }
+  /* The unit stays: 0.4 m and 0.4 s aren't the same setting. */
+  .slider { grid-template-columns: minmax(0, 1fr) 64px auto; gap: 8px; }
+  .slider .unit { min-width: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

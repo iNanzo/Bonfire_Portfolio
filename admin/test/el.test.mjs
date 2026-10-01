@@ -68,19 +68,20 @@ test('el() sets styles through the style object, never a style attribute', () =>
 
 test('every admin page renders without a style or title attribute anywhere', async () => {
   const content = JSON.parse(readFileSync(new URL('../../src/content.json', import.meta.url), 'utf8'));
-  const { PAGES } = await import('../ui/schema.js');
+  const { PAGES, defaultLabel } = await import('../ui/schema.js');
   const { getAt, renderFeatured, renderValue } = await import('../ui/form.js');
   const { flamesBlockTools, sceneBlockTools } = await import('../ui/paletteTools.js');
   const { scenesBlockTools } = await import('../ui/sceneTools.js');
+  const { parsePath } = await import('../ui/paths.js');
   const ctx = {
     draft: content, uploads: new Map(), open: new WeakSet(), fresh: new WeakSet(), drag: null, focus: null, siteUrl: 'https://site.test/',
-    preview: null, changed() {}, toast() {}, busy() {}, thumb: () => 'blob:x',
+    preview: null, changed() {}, toast() {}, busy() {}, thumb: () => 'blob:x', labelOf: defaultLabel,
   };
   const roots = [flamesBlockTools(ctx), sceneBlockTools(ctx), scenesBlockTools(ctx), renderFeatured(ctx)];
   for (const page of PAGES) {
     for (const key of page.keys) {
       if (key === 'featured') continue;
-      const path = key.split('.'); // (page keys have no list indexes)
+      const path = parsePath(key);
       roots.push(renderValue(getAt(content, path), path, ctx));
     }
   }

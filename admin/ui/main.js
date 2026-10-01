@@ -2,18 +2,25 @@
 // it live against src/contentRules.js, and saves it (with any new images) as one
 // change. On GitHub that's a commit that redeploys the site; this page follows the
 // deploy until it's live. Unsaved edits are kept in this browser until you save or
-// discard them. The Effects page streams the draft into a live preview of the site.
+// discard them. The Look & Feel pages (Colors, Fire & Elements, Picture, Knight) stream
+// the draft into a live preview of the site.
+//
+// A field that needs fixing is gone to by reveal(): the cards on the way opened, its page
+// shown, the field scrolled into view below the sticky bars, focused and flashed.
 import './admin.css';
 import { imageRefs, SECTIONS, validateContent } from '../../src/contentRules.js';
 import { DEFAULT_EFFECTS } from '../../src/effectsDefaults.js';
 import { logoMark } from '../../src/ui/logo.js';
-import { HELP, LABELS, PAGES } from './schema.js';
-import { el, getAt, renderFeatured, renderValue, showErrors } from './form.js';
+import { installTooltips } from '../../src/ui/tooltip.js';
+import { HELP, LABELS, PAGES, defaultLabel, moreFor, resolveHelp } from './schema.js';
+import { el, getAt, moreBox, renderFeatured, renderValue, showErrors } from './form.js';
 import { createPreview } from './preview.js';
 import { flamesBlockTools, sceneBlockTools } from './paletteTools.js';
 import { scenesBlockTools } from './sceneTools.js';
 import { titleCase } from './text.js';
-import { installTooltips } from '../../src/ui/tooltip.js';
+import { parsePath, parentKey, within } from './paths.js';
+import { pageById, pageOf, revealPlan } from './search.js';
+import { resetMessage, resetSection } from './reset.js';
 
 const DRAFT_KEY = 'nh-admin-draft';
 const local = {
@@ -24,9 +31,6 @@ const local = {
 const q = (s, r = document) => r.querySelector(s);
 /** replaceChildren, skipping empty slots (the DOM would print them as "null"). */
 const fill = (node, ...kids) => node.replaceChildren(...kids.flat().filter((k) => k !== null && k !== undefined && k !== false));
-const parsePath = (s) => [...s.matchAll(/([^.[\]]+)|\[(\d+)\]/g)].map((m) => (m[2] !== undefined ? Number(m[2]) : m[1]));
-const within = (path, key) => path === key || path.startsWith(`${key}.`) || path.startsWith(`${key}[`);
-const pageOf = (path) => PAGES.find((p) => p.keys.some((k) => within(path, k))) ?? PAGES[0];
 
 const state = { session: null, original: null, sha: null, errors: [], warnings: [], saving: false, deploy: null, deployTimer: 0 };
 const ctx = {
@@ -36,12 +40,14 @@ const ctx = {
   fresh: new WeakSet(),
   drag: null,
   focus: null,
+  flash: false,
   siteUrl: '',
   preview: null,
   changed,
   thumb: (src) => ctx.uploads.get(src)?.preview ?? `/api/image?src=${encodeURIComponent(src)}&card=1`,
   toast,
   busy,
+  labelOf: (key) => labelOf(key),
 };
 
 async function api(path, init) {
@@ -58,7 +64,6 @@ async function api(path, init) {
 }
 
 // ---- labels (defaults in Title Case; any of them can be renamed) -----------------------
-const defaultLabel = (key) => titleCase(key.startsWith('page:') ? PAGES.find((p) => `page:${p.id}` === key)?.label ?? key : LABELS[key] ?? key);
 const labelOf = (key) => ctx.draft?.admin?.labels?.[key] || defaultLabel(key);
 
 function setLabel(key, value) {
@@ -135,12 +140,18 @@ function shell() {
       el('div', { class: 'preview-slot', 'data-preview-slot': true, hidden: true })),
     el('div', { class: 'toasts', 'data-toasts': true, 'aria-live': 'polite' }),
     el('div', { class: 'busy', 'data-busy': true, hidden: true }, el('div', { class: 'busy-box' }, el('span', { class: 'spinner', 'aria-hidden': 'true' }), el('span', { 'data-busy-text': true }))));
+  watchSticky();
 }
 
-function toast(message, kind = 'info') {
-  const t = el('div', { class: `toast toast-${kind}`, role: kind === 'error' ? 'alert' : 'status', text: message });
+/**
+ * A note in the corner. `action` ([label, fn]) adds a button (Undo): the note then stays
+ * longer, and goes once it's used.
+ */
+function toast(message, kind = 'info', action = null) {
+  const t = el('div', { class: `toast toast-${kind}`, role: kind === 'error' ? 'alert' : 'status' }, el('span', { text: message }));
+  if (action) t.append(el('button', { type: 'button', class: 'link-button toast-action', text: action[0], onclick: () => { t.remove(); action[1](); } }));
   q('[data-toasts]').append(t);
-  setTimeout(() => t.remove(), kind === 'error' ? 8000 : 4000);
+  setTimeout(() => t.remove(), action ? 12000 : kind === 'error' ? 8000 : 4000);
 }
 
 function busy(on, message = 'Working…') {
@@ -155,28 +166,74 @@ function notice(message, actions = []) {
   n.replaceChildren(el('span', { text: message }), ...actions.map(([label, fn, cls = 'button ghost small']) => el('button', { type: 'button', class: cls, text: label, onclick: fn })));
 }
 
+/**
+ * How much of the top of the window the sticky bars cover besides the top bar: the page
+ * strip on a phone and the preview pinned over the page (narrower than 1280 px). Kept in
+ * --sticky (and the strip's height in --nav-h), so jumps and reveals land below them.
+ */
+function watchSticky() {
+  const root = document.documentElement;
+  const nav = q('.sidebar');
+  const slot = q('[data-preview-slot]');
+  const narrow = matchMedia('(max-width: 860px)');
+  const medium = matchMedia('(max-width: 1279px)');
+  const measure = () => {
+    const strip = narrow.matches ? nav.offsetHeight : 0;
+    const pinned = medium.matches && !slot.hidden ? slot.offsetHeight : 0;
+    root.style.setProperty('--nav-h', `${strip}px`);
+    root.style.setProperty('--sticky', `${strip + pinned}px`);
+  };
+  const ro = new ResizeObserver(measure);
+  ro.observe(nav);
+  ro.observe(slot);
+  narrow.addEventListener('change', measure);
+  medium.addEventListener('change', measure);
+  measure();
+}
+
 // ---- pages ----------------------------------------------------------------------------
-const currentPage = () => PAGES.find((p) => `#${p.id}` === location.hash) ?? PAGES[0];
+const currentPage = () => pageById(location.hash.slice(1)) ?? PAGES[0];
 const anchorOf = (key) => `s-${key.replace(/\./g, '-')}`;
+
+/** A section's help, any page or field it names as named now, and its More. */
+function blockHelp(key) {
+  const o = { labelOf, draft: ctx.draft };
+  const help = resolveHelp(HELP[key], o);
+  const more = resolveHelp(moreFor(key), o);
+  return [help ? el('p', { class: 'help', text: help }) : null, more ? moreBox(more) : null];
+}
 
 function block(key) {
   const path = parsePath(key);
   const value = getAt(ctx.draft, path);
   const effectsKey = key.startsWith('effects.') ? key.slice(8) : null;
   const reset = effectsKey && el('button', {
-    type: 'button', class: 'link-button', text: 'Reset to Defaults',
-    onclick: () => {
-      if (!confirm(`Reset “${labelOf(key)}” to the original settings? (Discard still brings back your saved values until you save.)`)) return;
-      ctx.draft.effects[effectsKey] = structuredClone(DEFAULT_EFFECTS[effectsKey]);
-      changed({ rerender: true });
-    },
+    type: 'button', class: 'link-button', text: 'Reset Section', 'aria-label': `Reset “${labelOf(key)}” to the defaults`,
+    'data-tip': 'Back to the site’s defaults; Undo brings yours back (so does Discard, until you save).',
+    onclick: () => resetBlock(key, effectsKey),
   });
-  return el('section', { class: 'block', 'data-path': key, id: anchorOf(key) },
-    el('div', { class: 'block-head' }, renameable('h2', 'block-title', key), reset),
-    HELP[key] ? el('p', { class: 'help', text: HELP[key] }) : null,
+  return el('section', { class: 'block', 'data-path': key, id: anchorOf(key), 'aria-labelledby': `${anchorOf(key)}-title` },
+    el('div', { class: 'block-head' }, renameable('h2', 'block-title', key, `${anchorOf(key)}-title`), reset),
+    ...blockHelp(key),
     key === 'effects.flames' ? flamesBlockTools(ctx) : key === 'effects.colors' ? sceneBlockTools(ctx) : key === 'scenes' ? scenesBlockTools(ctx) : null,
     el('p', { class: 'error', role: 'alert' }),
     key === 'featured' ? renderFeatured(ctx) : value === undefined ? missing(key) : renderValue(value, path, ctx));
+}
+
+/**
+ * Reset a section of the effects to the defaults, with Undo (no question first). Flame
+ * Colors keeps your own palettes (reset.js).
+ */
+function resetBlock(key, effectsKey) {
+  const before = structuredClone(ctx.draft.effects[effectsKey]);
+  const result = resetSection(effectsKey, ctx.draft.effects[effectsKey], DEFAULT_EFFECTS[effectsKey]);
+  ctx.draft.effects[effectsKey] = result.value;
+  changed({ rerender: true });
+  toast(resetMessage(labelOf(key), result), 'info', ['Undo', () => {
+    ctx.draft.effects[effectsKey] = before;
+    changed({ rerender: true });
+    toast(`“${labelOf(key)}” is as it was.`);
+  }]);
 }
 
 /** A section content.json doesn't have yet: the optional scenes start as an empty list on the first add. */
@@ -210,23 +267,59 @@ function renderPage({ keepScroll = true } = {}) {
   }
   showPreview(!!page.preview);
   if (ctx.focus) {
-    let path = ctx.focus;
-    let target = main.querySelector(`[data-path="${CSS.escape(path)}"]`);
-    while (!target && /(\.[^.[\]]+|\[\d+\])$/.test(path)) { // nearest rendered ancestor
-      path = path.replace(/(\.[^.[\]]+|\[\d+\])$/, '');
-      target = main.querySelector(`[data-path="${CSS.escape(path)}"]`);
+    let key = ctx.focus;
+    let target = main.querySelector(`[data-path="${CSS.escape(key)}"]`);
+    while (!target && parentKey(key)) { // nearest rendered ancestor
+      key = parentKey(key);
+      target = main.querySelector(`[data-path="${CSS.escape(key)}"]`);
     }
+    const flash = ctx.flash;
     ctx.focus = null;
+    ctx.flash = false;
     if (target) {
       target.scrollIntoView({ block: 'center' });
-      target.querySelector('input:not([type=file]):not([type=color]), textarea, select')?.focus({ preventScroll: true });
+      focusIn(target);
+      if (flash) flashOnce(target);
     }
   } else if (keepScroll) {
     window.scrollTo(0, y);
   }
 }
 
-// ---- live preview (Effects page) ---------------------------------------------------------
+/** Focus what a revealed field or card offers: its input, or its card's toggle. */
+function focusIn(target) {
+  const own = target.matches('.card') ? target.querySelector(':scope > .card-head .card-toggle') : null;
+  (own ?? target.querySelector('input:not([type=file]):not([type=color]), textarea, select, .card-toggle'))?.focus({ preventScroll: true });
+}
+
+/** A brief highlight on what a search or a jump landed on (none with reduced motion: no animation, no class left behind). */
+function flashOnce(target) {
+  target.classList.remove('is-flash');
+  void target.offsetWidth; // (restart it if it's still going)
+  target.classList.add('is-flash');
+  const done = () => target.classList.remove('is-flash');
+  target.addEventListener('animationend', done, { once: true });
+  setTimeout(done, 1600);
+}
+
+/**
+ * Go to a field (or a section, card or group) by its key: the cards on the way opened, its
+ * page shown, then it's scrolled into view below the sticky bars, focused and (`flash`)
+ * flashed.
+ * @param {string} key
+ * @param {{ flash?: boolean }} [o]
+ */
+function reveal(key, { flash = true } = {}) {
+  const { page, opens } = revealPlan(ctx.draft, key);
+  for (const node of opens) ctx.open.add(node);
+  ctx.focus = key;
+  ctx.flash = flash;
+  if (currentPage() !== page) location.hash = page.id; // hashchange renders
+  else renderPage();
+}
+const goToError = (error) => reveal(error.path, { flash: false });
+
+// ---- live preview (the Look & Feel pages) ----------------------------------------------
 function showPreview(on) {
   const slot = q('[data-preview-slot]');
   slot.hidden = !on;
@@ -326,19 +419,6 @@ function summarize(uploadCount) {
   if (removed) parts.push(`remove ${removed} image${removed > 1 ? 's' : ''}`);
   const text = parts.join('; ') || 'update content';
   return text[0].toUpperCase() + text.slice(1);
-}
-
-function goToError(error) {
-  const path = parsePath(error.path);
-  let node = ctx.draft;
-  for (const k of path) { // open every card on the way down
-    node = node?.[k];
-    if (node && typeof node === 'object' && !Array.isArray(node)) ctx.open.add(node);
-  }
-  const page = pageOf(error.path);
-  ctx.focus = error.path;
-  if (currentPage() !== page) location.hash = page.id; // hashchange renders
-  else renderPage();
 }
 
 async function save() {
@@ -457,6 +537,13 @@ function offerDraft() {
 }
 
 // ---- boot --------------------------------------------------------------------------------
+/** An old page address (#effects) becomes its page's (#colors), without a history step. */
+function canonicalHash() {
+  const page = pageById(location.hash.slice(1));
+  if (page && location.hash !== `#${page.id}`) history.replaceState(null, '', `#${page.id}`);
+  return page;
+}
+
 async function boot() {
   shell();
   try {
@@ -473,7 +560,7 @@ async function boot() {
     el('p', { text: s.mode === 'local' ? 'Local Mode' : s.email }),
     el('p', { class: 'muted', text: s.mode === 'local' ? 'Saves write to your files; nothing is committed.' : `Saves to ${s.store}` }),
     s.mode === 'local' ? null : el('a', { href: '/cdn-cgi/access/logout', text: 'Sign Out' }));
-  if (!location.hash) history.replaceState(null, '', `#${PAGES[0].id}`);
+  if (!canonicalHash()) history.replaceState(null, '', `#${PAGES[0].id}`);
   renderNav();
   validate();
   renderPage({ keepScroll: false });
@@ -481,13 +568,14 @@ async function boot() {
   updateStatus();
 
   window.addEventListener('hashchange', () => {
-    if (!PAGES.some((p) => `#${p.id}` === location.hash)) return; // in-page jump links
+    if (!canonicalHash()) return; // in-page jump links
     const focusing = !!ctx.focus;
     renderPage({ keepScroll: focusing });
     if (!focusing) window.scrollTo(0, 0);
   });
   window.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
   });
   window.addEventListener('beforeunload', (e) => { if (isDirty()) e.preventDefault(); });
 }
