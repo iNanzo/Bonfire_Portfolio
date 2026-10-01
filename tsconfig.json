@@ -96,8 +96,7 @@
     "admin/ui/el.js",
     "admin/ui/paths.js",
     "admin/ui/reset.js",
-    "admin/server/csp.js"
-    "src/weaponGroups.js"
+    "admin/server/csp.js",
     "src/weaponGroups.js",
     "src/pixelSizes.js",
     "src/ui/siteKeys.js",
