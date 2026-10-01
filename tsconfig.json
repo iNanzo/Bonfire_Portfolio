@@ -104,5 +104,6 @@
     "src/painter/layout.js",
     "src/painter/panelSearch.js",
     "src/painter/toolbar.js"
+    "src/visualizer/tickBatch.js"
   ]
 }

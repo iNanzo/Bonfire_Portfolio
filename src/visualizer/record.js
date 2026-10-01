@@ -3,8 +3,10 @@
 // set, and for the portfolio's Bonfire Live page (its gallery plays clips).
 //
 // Each frame is copied right after the scene draws it (scene.onRendered), so the WebGL
-// canvas needs no preserved buffer. MP4 where the browser records it (Chrome and Edge do),
-// otherwise WebM. The title cards are HTML over the picture, so they aren't in it.
+// canvas needs no preserved buffer; at most 60 a second (the clip's own rate: on a 120 or
+// 144 Hz display the copies in between would only be thrown away, after a scaled draw each).
+// MP4 where the browser records it (Chrome and Edge do), otherwise WebM. The title cards are
+// HTML over the picture, so they aren't in it.
 
 const TYPES = [
   'video/mp4;codecs=avc1.640028,mp4a.40.2',
@@ -21,6 +23,26 @@ export function recordType(isSupported = (t) => globalThis.MediaRecorder?.isType
 
 /** The scale that brings `height` rows to about 1080 (a whole number, so pixels stay square). */
 export const recordScale = (height) => Math.max(1, Math.round(1080 / Math.max(1, height)));
+
+/** The clip's frame rate: the most frames a second it copies. */
+export const RECORD_FPS = 60;
+
+/**
+ * A gate that lets a frame through at most `fps` times a second (`now` in ms): each one is due
+ * an interval after the last was due, so a faster display averages `fps` without drifting; a
+ * frame up to 1 ms early counts (display timestamps jitter); after a stall it starts over.
+ * @param {number} [fps]
+ * @returns {(now: number) => boolean}
+ */
+export function frameEvery(fps = RECORD_FPS) {
+  const interval = 1000 / fps;
+  let next = -Infinity;
+  return (now) => {
+    if (now < next - 1) return false;
+    next = now - next > interval ? now + interval : next + interval;
+    return true;
+  };
+}
 
 /**
  * @param {object} o
@@ -50,8 +72,13 @@ export function createRecorder({ scene, audio, onState }) {
       g.imageSmoothingEnabled = false;
     };
     fit();
-    stopFrames = s.onRendered(() => { fit(); g.drawImage(src, 0, 0, out.width, out.height); });
-    const stream = out.captureStream(60);
+    const due = frameEvery(RECORD_FPS);
+    stopFrames = s.onRendered(() => {
+      if (!due(performance.now())) return;
+      fit();
+      g.drawImage(src, 0, 0, out.width, out.height);
+    });
+    const stream = out.captureStream(RECORD_FPS);
     const a = audio();
     if (a) {
       sink = a.ctx.createMediaStreamDestination();
