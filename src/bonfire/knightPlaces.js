@@ -42,7 +42,8 @@ const SIGN_OUT = 0.55;
  * knights.js checks the height against the scenery's height map when he sits, and rests his
  * feet on the ground in front of it (or on whatever lies there). `standAside` (m, + his
  * left): where he stands up to is looked for round that far to his side, not straight ahead
- * (knights.js standSpot: in the ruins, straight up he'd stand behind the flames).
+ * (knights.js standSpot: in the ruins, straight up he'd stand behind the flames; at the shrine
+ * his gestures up there would cross the sword planted in them).
  */
 function seat(x, z, top, { turn = TURN, signOut = SIGN_OUT, signAt = null, standAside = 0 } = {}) {
   const yaw = Math.atan2(FIRE_AT.x - x, FIRE_AT.z - z) + turn;
@@ -73,8 +74,10 @@ export const SEATS = {
   ruins: seat(-0.75, -1.53, 0.21, { signAt: { x: -1.16, z: -0.58 }, standAside: -0.35 }),
   // A stump by the anvil (scenery.js).
   forge: seat(-0.8, -1.52, 0.21),
-  // A resting stone (scenery.js).
-  shrine: seat(-0.9, -1.5, 0.21, { signOut: 0.57 }),
+  // A resting stone (scenery.js). He stands up a little to his right, out of the line between
+  // the cameras and the sword planted in the fire (his standing gestures stay left of it) and
+  // a little further from the back lantern.
+  shrine: seat(-0.9, -1.5, 0.21, { signOut: 0.57, standAside: -0.1 }),
   // The fallen nave drum, in front of the columns (scenery.js; the right one stands back,
   // clear of him: colliders.js CATHEDRAL.nave); the sign a little to his left, clear of the
   // drum and the ring stones.

@@ -557,7 +557,16 @@ test('[slow] up from his seat for the site’s dance, an arm with all the room i
   assert.deepEqual(bad, [], 'tucked in where there is room');
 });
 
-test('[slow] stood up in front of his seat, and all through the site’s dance, he stays left of the planted sword on the home view (1920 and 1280 wide)', async () => {
+// Round 9's rightmost on the home view (its x at 16:9, -1..1) in Bonfire Live's breakdown's
+// gestures, standing up in front of his seat: at the forge they already went over the blade.
+const ROUND9_STANDING = {
+  ruins: { praise: -0.0511, joy: -0.0892, hurrah: -0.1683 },
+  forge: { praise: 0.0335, joy: 0.0395, hurrah: -0.0371 },
+  shrine: { praise: 0.0046, joy: 0.0085, hurrah: -0.0681 },
+  cathedral: { praise: -0.0131, joy: 0.0075, hurrah: -0.074 },
+  cult: { praise: -0.0192, joy: 0.014, hurrah: -0.0711 },
+};
+test('[slow] stood up in front of his seat, and all through the site’s dance, he stays left of the planted sword on the home view (1920 and 1280 wide); his gestures up there no further over than round 9’s', async () => {
   const env = await realKnights();
   const { k, corners } = env;
   const n = k.knights[0];
@@ -593,14 +602,22 @@ test('[slow] stood up in front of his seat, and all through the site’s dance, 
     k.setScenery(name, await terrainOf(name));
     k.summon(0, { instant: true });
     k.update(0.5);
-    for (const [what, act, seconds] of [['stood up', () => k.stand(0), 2.4], ['dancing', () => { k.sit(0); for (let t = 0; t < 1.8; t += 1 / 12) k.update(1 / 12 + 1e-7); k.gesture('dance', { index: 0 }); }, GESTURE_TIME.dance + 0.3]]) {
+    const gestured = (g) => [`standing ${g}`, () => k.gesture(g, { index: 0 }), GESTURE_TIME[g] + 0.2, ROUND9_STANDING[name][g]];
+    for (const [what, act, seconds, was] of [
+      ['stood up', () => k.stand(0), 2.4],
+      // (Bonfire Live's breakdown has him up there; the drop throws a Praise or a cheer.)
+      gestured('praise'), gestured('joy'), gestured('hurrah'),
+      ['dancing', () => { k.sit(0); for (let t = 0; t < 1.8; t += 1 / 12) k.update(1 / 12 + 1e-7); k.gesture('dance', { index: 0 }); }, GESTURE_TIME.dance + 0.3],
+    ]) {
       act();
       let most = -Infinity;
       for (let t = 0; t < seconds; t += 1 / 12) { k.update(1 / 12 + 1e-7); most = right(most); }
-      // (A hundredth of the view's width to spare: his edge, then the blade.)
+      // (A hundredth of the view's width to spare: his edge, then the blade. Or, where round 9's
+      // gesture came nearer than that, no more than half a hundredth further than it did.)
       for (const view of views) {
         const [his, its] = [view.px(most), view.px(blade)];
-        assert.ok(his <= its - view.W / 100, `${name}, ${what}, ${view.W} wide: he comes to ${his.toFixed(0)} px, the sword's blade is at ${its.toFixed(0)} px`);
+        const most9 = was == null ? -Infinity : view.px(was) + view.W / 200;
+        assert.ok(his <= Math.max(its - view.W / 100, most9), `${name}, ${what}, ${view.W} wide: he comes to ${his.toFixed(0)} px, the sword's blade is at ${its.toFixed(0)} px${was == null ? '' : ` (round 9: ${view.px(was).toFixed(0)} px)`}`);
       }
     }
     k.dismiss(0, { instant: true });
