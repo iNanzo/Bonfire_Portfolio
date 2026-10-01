@@ -38,6 +38,9 @@ async function checkAll(page, root, { touch, label }) {
     const modes = touch ? (tapped ? ['tap'] : disabled ? [] : ['focus']) : ['hover', ...(disabled ? [] : ['focus'])];
     for (const mode of modes) {
       await closeTip(page, root);
+      // (The menu puts focus on its first tool as it opens: let go of it first, or focusing it
+      // again would be no focus at all, and so no tip.)
+      if (mode === 'focus') await trigger.evaluate((el) => { if (el === document.activeElement) /** @type {HTMLElement} */ (el).blur(); });
       const r = await checkTip(page, trigger, { mode, timeout: TIP_WAIT });
       expect(r.shown, `${name} (${mode}) shows its tip`).toBe(true);
       assertInViewport(r.rect, r.viewport, 8);
@@ -71,9 +74,11 @@ async function open(browser, size) {
 
 for (const size of SIZES) {
   test.describe(`site tips at ${size.name}`, () => {
-    test.describe.configure({ timeout: 240_000 });
+    test.describe.configure({ timeout: 360_000 }); // (a busy machine's software-rendered page can take 8 s a tip)
 
-    test('the header, the rest menu, the render settings and the photo toolbar', async ({ browser }) => {
+    // (Two tests, not one: each tip takes its 400 ms and more on a busy machine, and each
+    // surface's own time limit says which one was slow.)
+    test('the header and the rest menu', async ({ browser }) => {
       const { context, page, errors, tap } = await open(browser, size);
       await page.goto('/experience/');
       await ready(page);
@@ -85,7 +90,16 @@ for (const size of SIZES) {
       await expect(page.locator('[data-menu]')).toBeVisible();
       expect(await checkAll(page, '[data-menu]', { ...size, label: 'menu' })).toBe(6);
       await noTitles(page, 'the menu');
-      // Render Settings from it: every row's tip, and its close button's.
+      expect(errors).toEqual([]);
+      await context.close();
+    });
+
+    test('the render settings (from the menu) and the photo toolbar', async ({ browser }) => {
+      const { context, page, errors, tap } = await open(browser, size);
+      await page.goto('/experience/');
+      await ready(page);
+      // Render Settings from the menu: every row's tip, and its close button's.
+      await tap(page.locator('[data-menu-open]'));
       await tap(page.getByRole('button', { name: /^Render Settings/ }));
       const hud = page.locator('.debug-hud');
       await expect(hud).toBeVisible();
