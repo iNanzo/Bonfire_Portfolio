@@ -1,0 +1,23 @@
+# Weekly update PRs, each one run through checks.yml like any other.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # The tooling (lint, types, tests, build) moves together in one PR.
+      dev-dependencies:
+        dependency-type: development
+    ignore:
+      # A new Three.js can change how the scene looks (lighting, color, shaders), so it's
+      # updated by hand and checked by eye at real speed, not by a bot.
+      - dependency-name: three
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']

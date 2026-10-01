@@ -7,44 +7,36 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      # Nothing deploys unless the code lints, type-checks, every test passes and the built
-      # site loads in a real browser (e2e/: every screen and Bonfire Live, no errors).
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run admin:test
-      - run: npx playwright install --with-deps chromium
-      - run: npm run e2e
-        env:
-          CI: true
-      - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
+  # Nothing deploys unless the code lints, type-checks, every test passes and the built
+  # site loads in a real browser (e2e/: every screen, Bonfire Live, the Painter, no errors).
+  ci:
+    uses: ./.github/workflows/ci.yml
 
+  # Ships the build the browser tests ran against (ci.yml's `site-dist`), not a second one.
   deploy:
-    needs: build
+    needs: ci
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
       - id: deployment
         uses: actions/deploy-pages@v4

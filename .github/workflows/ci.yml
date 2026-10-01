@@ -1,0 +1,101 @@
+name: CI
+
+# The checks every change goes through, shared by checks.yml (pull requests) and deploy.yml
+# (main). Three jobs run side by side: lint and types; the unit and admin tests under
+# coverage, on each Node the site supports; and the built site in a real browser. The
+# browser job uploads the build it tested as `site-dist`, and that's what a deploy ships.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  SKIP_SIMPLE_GIT_HOOKS: 1 # CI commits nothing; the git hooks are for local commits.
+
+jobs:
+  static:
+    name: Lint and types
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+
+  unit:
+    name: Unit tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      # Every unit and admin test, slow ones included, under c8. It fails if coverage
+      # drops under the thresholds in .c8rc.json.
+      - run: npm run coverage
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        run: node tools/coverage-summary.mjs
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-node${{ matrix.node }}
+          path: coverage/
+          retention-days: 14
+
+  e2e:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Playwright's browsers are cached per Playwright version (the one the lockfile pins).
+      - name: Playwright version
+        id: playwright
+        run: |
+          version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      # A cache hit has the browser but not the system libraries it needs.
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - run: npm run build
+      - run: npm run e2e
+        env:
+          CI: true
+          PW_PREBUILT: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-dist
+          path: dist/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: test-results/
+          retention-days: 7
