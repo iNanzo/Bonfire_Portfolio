@@ -673,7 +673,8 @@ function realRig(model) {
 
 /**
  * The 390×844 phone's home view (the site: tall layout) and where on it (px from the top) the
- * highest point of knight 0's helmet comes over `seconds` of `k.update` (every 6th frame).
+ * highest point of knight 0's helmet comes over `seconds` of `k.update` (every 6th frame); and
+ * (frame()) how far left and right on it (px) any piece of him comes, with that helmet.
  */
 async function phoneView() {
   const { loadKnightMesh } = await import('./lib/knightMesh.mjs');
@@ -687,9 +688,31 @@ async function phoneView() {
   cam.updateMatrixWorld(true);
   const v = new THREE.Vector3();
   const helmPoints = (helmet) => model.points(`K_Helm_${helmet[0].toUpperCase()}${helmet.slice(1)}`);
+  const piecePoints = Object.fromEntries(Object.entries(BONE_NODES).map(([b, node]) => [b, model.points(node)]));
   return {
-    model, helmPoints,
+    model, helmPoints, W,
     HEADER: 64, // (the site header's bottom there, px)
+    /** The helmet's top (px from the top) and his silhouette's left and right (px) over `seconds`. */
+    frame(k, helmet, seconds) {
+      const helm = helmPoints(helmet);
+      let top = Infinity, left = Infinity, right = -Infinity;
+      for (let f = 0; f < 60 * seconds; f++) {
+        k.update(1 / 60);
+        if (f % 6) continue;
+        k.group.updateMatrixWorld(true);
+        for (const b of k.knights[0].bones) {
+          const pts = b.name === 'head' ? [...piecePoints.head, ...helm] : piecePoints[b.name];
+          for (const p of pts ?? []) {
+            v.set(...p).applyMatrix4(b.matrixWorld).project(cam);
+            const x = ((v.x + 2 * pov.sx + 1) / 2) * W;
+            left = Math.min(left, x);
+            right = Math.max(right, x);
+            top = Math.min(top, ((1 - (v.y + 2 * pov.sy)) / 2) * H);
+          }
+        }
+      }
+      return { top, left, right };
+    },
     helmetTop(k, helmet, seconds) {
       const pts = helmPoints(helmet);
       let top = Infinity;
@@ -759,7 +782,7 @@ test('his template built a step at a time (templateSteps) is the one built at on
   assert.equal(k.hasTemplate(other), true);
 });
 
-test('seated at every seat (either seat pose), his helmet stays under the page header on a 390×844 phone (the home view)', async () => {
+test('seated at every seat (either seat pose), his helmet stays under the page header on a 390×844 phone (the home view), and all of him 10 px inside its sides', async () => {
   const view = await phoneView();
   for (const pose of SEAT_POSES) {
     for (const name of Object.keys(SEATS)) {
@@ -771,9 +794,11 @@ test('seated at every seat (either seat pose), his helmet stays under the page h
         k.setHelmet(helmet, { index: 0, instant: true });
         k.summon(0, { instant: true });
         // (Over his idle: breathing, the doze and its start, the glances, a shift of his weight.)
-        const top = view.helmetTop(k, helmet, 14);
+        const { top, left, right } = view.frame(k, helmet, 14);
         // (Scrolled, the header's bar covers its 64 px: his helmet stays clear of it.)
         assert.ok(top >= view.HEADER + 1, `${pose}, ${name}, ${helmet}: his helmet's top comes to ${top.toFixed(1)} px (the header ends at ${view.HEADER})`);
+        // (Seated left of the fire, his far shoulder nears the frame's left edge.)
+        assert.ok(left >= 10 && right <= view.W - 10, `${pose}, ${name}, ${helmet}: he spans ${left.toFixed(1)}–${right.toFixed(1)} px of the phone's ${view.W}`);
       }
     }
   }

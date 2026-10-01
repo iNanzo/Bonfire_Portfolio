@@ -146,9 +146,10 @@ test('his summon sign lies in front of each seat, on open ground, in view of the
   for (const [name, s] of Object.entries(SEATS)) {
     const sign = s.sign;
     const out = Math.hypot(sign.x - s.x, sign.z - s.z);
-    // (In the ruins it lies beyond the model's fallen drum, his boot up on it, at his left: the
-    // open ground nearer is under the drum or behind the flames.)
-    assert.ok(out > 0.35 && out < (name === 'ruins' ? 1.15 : 0.95), `${name}: the sign is in front of his seat (${out.toFixed(2)} m)`);
+    // (In the ruins it lies in front of the pillar's plinth, just beyond where he stands up to
+    // across the model's fallen drum: the open ground nearer his seat is under the drum or
+    // behind the flames, out of sight.)
+    assert.ok(out > 0.35 && out < (name === 'ruins' ? 1.05 : 0.95), `${name}: the sign is in front of his seat (${out.toFixed(2)} m)`);
     const pts = footprint(sign);
     const near = Math.min(...pts.map(fireDist));
     assert.ok(near > 0.82, `${name}: the sign is clear of the ring stones (0.78 m) (${near.toFixed(2)} m from the fire's middle)`);

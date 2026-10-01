@@ -10,7 +10,8 @@
 // point is tested against the shapes themselves (no rays: those took minutes), and only the
 // pieces whose joint is within their reach of a shape (a broad phase). Keeping out of it
 // doesn't cost him his smoothness (getting up, sitting down and the site's dance step no
-// further at a time than round 9's did, give or take half).
+// further at a time than round 9's did, give or take half), nor his place on the home view
+// (stood up or dancing there, he stays left of the planted sword).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -18,6 +19,7 @@ import { createKnights, GESTURES, SEAT_POSES } from '../src/bonfire/knights.js';
 import { createArmorShared } from '../src/bonfire/armor.js';
 import { BONE_NODES, GESTURE_TIME, DANCE_SEATED_TIME, MOVE_INFO } from '../src/bonfire/knightPose.js';
 import { SEATS, FIRE_AT, ringOf, slotPlaces, ringPlaces } from '../src/bonfire/knightPlaces.js';
+import { getPov } from '../src/bonfire/povs.js';
 import { buildScenery } from '../src/bonfire/scenery.js';
 import { CULT, MOVE_REACH, REACH_BANDS, collidersOf, distanceTo, clearanceTo, roomAround, reachFits } from '../src/bonfire/colliders.js';
 import { loadKnightMesh } from './lib/knightMesh.mjs';
@@ -190,12 +192,16 @@ async function realKnights() {
   if (engine) return engine;
   const model = await loadKnightMesh();
   const k = createKnights(model.scene(), { armor: armor(), max: 2 });
-  const pieces = {};
+  const pieces = {}, corners = {};
   for (const b of k.knights[0].bones) {
-    const pts = model.surface(BONE_NODES[b.name] ?? HELM_NODES[b.name.replace('helm_', '')], 0.03);
+    const node = BONE_NODES[b.name] ?? HELM_NODES[b.name.replace('helm_', '')];
+    const pts = model.surface(node, 0.03);
     if (pts.length) pieces[b.name] = { pts: Float32Array.from(pts.flat()), r: Math.max(...pts.map((p) => Math.hypot(...p))) };
+    // (Its corners alone: the farthest it comes any way.)
+    const vs = model.points(node);
+    if (vs.length) corners[b.name] = Float32Array.from(vs.flat());
   }
-  engine = { k, pieces };
+  engine = { k, pieces, corners };
   return engine;
 }
 const _v = new THREE.Vector3();
@@ -386,19 +392,25 @@ test('[slow] no dance move reaches further than colliders.js MOVE_REACH has it, 
   k.dismiss(1, { instant: true });
 });
 
-test('in the ruins his right boot rests up on the model’s fallen drum, his left on the ground, both well out of the fire', async () => {
+test('in the ruins his boots rest up on the model’s fallen drum, well out of the fire; he stands up over them and steps across it', async () => {
   const env = await realKnights();
   const { k } = env;
   k.setSeatPose('resting');
   k.setScenery('ruins', await terrainOf('ruins'));
   k.summon(0, { instant: true });
-  const h = k.knights[0].home;
-  // His right boot up on the model's drum, his left on the ground; still out of the fire.
-  assert.ok(h.feet[1] > 0.3 && Math.abs(h.feet[0]) < 0.06, `his boots rest at ${h.feet.map((q) => q.toFixed(2))} m`);
+  const n = k.knights[0];
+  // His right boot up on the model's drum (his left on its flank); still out of the fire.
+  assert.ok(n.home.feet[1] > 0.3, `his boots rest at ${n.home.feet.map((q) => q.toFixed(2))} m`);
   k.update(0.5);
-  const foot = k.knights[0].bones.find((b) => b.name === 'footR');
+  const foot = n.bones.find((b) => b.name === 'footR');
   foot.getWorldPosition(_v);
   assert.ok(fireDist(_v.x, _v.z) > 1.05, `his raised boot is ${fireDist(_v.x, _v.z).toFixed(2)} m from the fire's middle`);
+  // He stands up to his right, in front of the pillar's plinth (SEATS standAside), across the
+  // drum: up over his boots first, then a step across (knightPose.js rise()'s `over`).
+  k.stand(0);
+  k.update(1 / 12 + 1e-7);
+  assert.ok(n.over?.cross, 'something to step across on his way up');
+  assert.ok(n.home.stand.x < -0.3, `he stands up to his right (${n.home.stand.x.toFixed(2)} m)`);
   k.dismiss(0, { instant: true });
 });
 
@@ -443,4 +455,54 @@ test('[slow] getting up, sitting down and the site’s dance at every seat move 
   }
   k.setSeatPose('resting');
   assert.deepEqual(bad, [], `more than 1.5× round 9's steps`);
+});
+
+test('[slow] stood up in front of his seat, and all through the site’s dance, he stays left of the planted sword on the home view (1920 and 1280 wide)', async () => {
+  const env = await realKnights();
+  const { k, corners } = env;
+  const n = k.knights[0];
+  // The planted weapon's blade (scene.js WEAPON_ANCHOR, weapons.js's holder: its lean).
+  const holder = new THREE.Object3D();
+  holder.position.set(0.04, 0, 0.03);
+  holder.rotation.set(0.07, 0.16, -0.05);
+  holder.updateMatrixWorld(true);
+  // (The same camera on both: only the aspect differs, so a point's x across the view scales.)
+  const pov = getPov('home', 'wide');
+  const cam = new THREE.PerspectiveCamera(pov.fov, 16 / 9, 0.1, 50);
+  cam.position.set(...pov.pos);
+  cam.lookAt(new THREE.Vector3(...pov.target));
+  cam.updateMatrixWorld(true);
+  const toView = new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+  const views = [[1920, 1080], [1280, 800]].map(([W, H]) => ({ W, px: (x) => ((x * (16 / 9) / (W / H) + 2 * pov.sx + 1) / 2) * W }));
+  let blade = Infinity;
+  for (let y = 0.3; y <= 1.6; y += 0.05) blade = Math.min(blade, new THREE.Vector3(0, y, 0).applyMatrix4(holder.matrixWorld).applyMatrix4(toView).x);
+  const m = new THREE.Matrix4();
+  /** His rightmost point now (the view's x, -1..1 at 16:9), or `most` if that's further. */
+  const right = (most) => {
+    n.group.updateMatrixWorld(true);
+    for (const b of n.bones) {
+      const vs = corners[b.name];
+      if (!vs || (b.name.startsWith('helm_') && !n.helms[b.name.slice(5)].visible)) continue;
+      m.multiplyMatrices(toView, b.matrixWorld);
+      for (let p = 0; p < vs.length; p += 3) most = Math.max(most, _v.set(vs[p], vs[p + 1], vs[p + 2]).applyMatrix4(m).x);
+    }
+    return most;
+  };
+  for (const name of NAMES) {
+    k.setSeatPose('resting');
+    k.setScenery(name, await terrainOf(name));
+    k.summon(0, { instant: true });
+    k.update(0.5);
+    for (const [what, act, seconds] of [['stood up', () => k.stand(0), 2.4], ['dancing', () => { k.sit(0); for (let t = 0; t < 1.8; t += 1 / 12) k.update(1 / 12 + 1e-7); k.gesture('dance', { index: 0 }); }, GESTURE_TIME.dance + 0.3]]) {
+      act();
+      let most = -Infinity;
+      for (let t = 0; t < seconds; t += 1 / 12) { k.update(1 / 12 + 1e-7); most = right(most); }
+      // (A hundredth of the view's width to spare: his edge, then the blade.)
+      for (const view of views) {
+        const [his, its] = [view.px(most), view.px(blade)];
+        assert.ok(his <= its - view.W / 100, `${name}, ${what}, ${view.W} wide: he comes to ${his.toFixed(0)} px, the sword's blade is at ${its.toFixed(0)} px`);
+      }
+    }
+    k.dismiss(0, { instant: true });
+  }
 });

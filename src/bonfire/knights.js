@@ -99,10 +99,11 @@ const TURN_SPEED = 5;    // rad/s
 const CROSSFADE = 0.2;
 const STEP_OVER = 0.16; // m: what a walking knight steps over (a fire pit's stone, a spare log)
 // His meshes' bounds (his own space: the ground under him, turned with him), for culling:
-// every pose he takes stays inside with 0.2 m to spare (the farthest reach, 1.39 m from
-// here, is his hand thrown up in a cheer standing in front of his seat; the leaps, Praise
-// the Sun and the rest are inside too: test/knightsBounds.test.mjs, on the real model).
-const BOUNDS = new THREE.Sphere(new THREE.Vector3(0, 1.05, 0.15), 1.6);
+// every pose he takes stays inside with 0.1 m to spare (the farthest reach, 1.76 m from
+// here, is a boot kicked out in the site's dance where he stands up to, to his right across
+// the ruins' fallen drum; the leaps, Praise the Sun and the rest are inside too:
+// test/knightsBounds.test.mjs, on the real model).
+const BOUNDS = new THREE.Sphere(new THREE.Vector3(0, 1.05, 0.15), 1.9);
 // Gestures that throw the arms up (or dance): a flinch or a lean over one would hide it.
 const CHEERING = new Set(CHEERS);
 // The plates on straps: the pauldrons (dome and lames, on the chest) and the tassets (on the
@@ -165,6 +166,16 @@ const OVER_POINTS = 17;
 const OVER_CLEAR = 0.015;
 const OVER_MOST = 0.5;
 const OVER_CROSS = 0.06;
+// (Where he stands up to in front of his seat, each boot this far (m) from the scenery's shapes,
+// and his upper body (UPPER: his chest, head and pauldrons' domes) UPPER_CLEAR: room for a
+// dome to ride up with a raised arm (the shrine's lantern roof is at his shoulder): standSpot.)
+const STAND_CLEAR = 0.1;
+const UPPER = new Set(['chest', 'neck', 'head', 'shoulderL', 'shoulderR'].map((b) => BONE_INDEX[b]));
+const UPPER_CLEAR = 0.06;
+// (Standing where he's placed, and the channels standing in front of his seat moves: his root
+// and his feet, sideways, up to their ground and ahead.)
+const STANDING = standingPose();
+const STAND_OFFSET = [0, 2, POSE.legL, POSE.legL + 1, POSE.legL + 2, POSE.legR, POSE.legR + 1, POSE.legR + 2];
 
 /**
  * Each plate's id (`aPiece`, 0..1 per vertex, armor.js: each plate a touch lighter or darker
@@ -874,7 +885,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       };
       const gL = ground(1), gR = ground(-1);
       const y = Math.max(0, Math.min(gL, gR));
-      return { x: seat.x, z: seat.z, yaw, h: Math.max(0.15, top - y), feet: [gL - y, gR - y], y, seat: true };
+      return { x: seat.x, z: seat.z, yaw, h: Math.max(0.15, top - y), feet: [gL - y, gR - y], y, seat: true, aside: seat.standAside ?? 0 };
     }
     // The others sit on the ground where the visualizer rests them (knightPlaces.js
     // restPlaces: the ring's clear sides, never in front of the fire), their feet on the ring.
@@ -1004,7 +1015,20 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const z0 = seatFeet(h.h) - 0.03;
     if (!h.seat || !terrain) return { x: 0, z: z0 };
     const fx = rig.pos.footL.x + 0.03, fz = rig.pos.footL.z + 0.02;
-    /** The ground under a boot there if it's level and open (nothing on it, out of the fire), else NaN. */
+    const cs = collidersNear(sceneryName, h.x, h.z, CLEAR_NEAR);
+    const upper = upperBody();
+    /** Whether his upper body standing at (x, z), the ground `g` up, keeps UPPER_CLEAR from the shapes. */
+    const roomAbove = (x, z, g) => {
+      for (let j = 0; j < upper.length; j += 3) {
+        const w = atHome(h, x + upper[j], z + upper[j + 2]);
+        for (const c of cs) if (distanceTo(c, w.x, h.y + g + upper[j + 1], w.z) < UPPER_CLEAR) return false;
+      }
+      return true;
+    };
+    /**
+     * The ground under a boot there if it's level and open (nothing on it, out of the fire, a
+     * hand's breadth from the scenery's shapes: room for the dance's steps), else NaN.
+     */
     const level = (x, z) => {
       let lo = Infinity, hi = -Infinity;
       // (Its sole, heel to its pointed toe and either side; the boot, toe aside, out of the fire.)
@@ -1012,23 +1036,38 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         const g = groundUnder(h, x + dx, z + dz);
         const w = atHome(h, x + dx, z + dz);
         if (topUnder(h, x + dx, z + dz) - g > 0.05 || (dz <= 0.12 && Math.hypot(w.x - FIRE.x, w.z - FIRE.z) < 1.05)) return NaN;
+        for (const c of cs) if (distanceTo(c, w.x, h.y + g + 0.05, w.z) < STAND_CLEAR || distanceTo(c, w.x, h.y + g + 0.3, w.z) < STAND_CLEAR) return NaN;
         lo = Math.min(lo, g); hi = Math.max(hi, g);
       }
       return hi - lo < 0.05 ? (lo + hi) / 2 : NaN;
     };
     let best = null;
+    // (Round the seat's own way aside, if it has one: SEATS standAside.)
+    const aside = h.aside ?? 0;
     for (let dz = 0; dz < 0.36; dz += 0.05) {
       for (let dx = 0; dx < 0.41; dx += 0.05) {
-        for (const x of dx ? [-dx, dx] : [0]) {
-          const score = Math.abs(x) + 0.8 * dz;
+        for (const x of dx ? [aside - dx, aside + dx] : [aside]) {
+          const score = Math.abs(x - aside) + 0.8 * dz;
           if (best && score >= best.score) continue;
           const gl = level(x + fx, z0 + dz + fz), gr = level(x - fx, z0 + dz + fz);
-          // (Both boots level with each other, not up on anything or down a hole.)
-          if (Math.abs(gl - gr) < 0.04 && gl > -0.12 && gl < 0.06) best = { x, z: z0 + dz, score };
+          // (Both boots level with each other, not up on anything or down a hole; room above.)
+          if (Math.abs(gl - gr) < 0.04 && gl > -0.12 && gl < 0.06 && roomAbove(x, z0 + dz, (gl + gr) / 2)) best = { x, z: z0 + dz, score };
         }
       }
     }
     return best ?? { x: 0, z: z0 };
+  }
+  let upperPts = null;
+  /** His upper body's points (UPPER) standing where he's placed, in his own space: x, y, z, … (once). */
+  function upperBody() {
+    if (upperPts) return upperPts;
+    const s = solver.solve(standingPose(newPose()));
+    const out = [], v = new THREE.Vector3();
+    for (const b of bodyProbes) {
+      if (!UPPER.has(b.i)) continue;
+      for (const pt of b.pts) { v.copy(pt).applyQuaternion(s.q[b.i]).add(s.p[b.i]); out.push(v.x, v.y, v.z); }
+    }
+    return (upperPts = Float32Array.from(out));
   }
   /** His standing pose in front of his seat (standSpot), over his feet, each on its ground. */
   function standAtSeat(k) {
@@ -1582,6 +1621,13 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       p[37] -= d.x; p[38] += d.y; p[39] += d.z;
     }
   }
+  /**
+   * Pose `p` moved by `sign` times how far knight k's standing pose (k.stand) is from
+   * standing where he's placed (standingPose): his root and his feet, each on its ground.
+   */
+  function standOffset(p, k, sign) {
+    for (const i of STAND_OFFSET) p[i] += sign * (k.stand[i] - STANDING[i]);
+  }
   /** Standing up in front of his seat, his pose is offset from where he's placed: move the place under him instead. */
   function reroot(k) {
     const x = k.stand[0], z = k.stand[2];
@@ -1637,6 +1683,11 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       else {
         const rising = k.gestureName === 'dance' && seated && !inPlace;
         const front = facingFor(k.group.position.x, k.group.position.z, 'front') - k.yaw;
+        // (Up in front of his seat, his standing pose is offset from where he's placed (reroot):
+        // the gesture is made over it moved back under him, then moved out again, so one
+        // that plants his feet plants them where he stands, not back at his seat.)
+        const offset = !seated && !k.dancing?.seated && k.gestureName !== 'dance';
+        if (offset) standOffset(p, k, -1);
         gesture(p, k.gestureName, k.gestureT, seated || !!k.dancing?.seated, k.seed, {
           turn: rising ? Math.atan2(Math.sin(front), Math.cos(front)) : 0,
           // (Up from his seat to the level spot in front of it; the room he has for his arms.)
@@ -1645,6 +1696,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
           room: roomNow(k),
           inPlace,
         });
+        if (offset) standOffset(p, k, 1);
         big = true;
       }
     }

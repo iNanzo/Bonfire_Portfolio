@@ -115,11 +115,14 @@ export const CATHEDRAL = {
     foot: { r: 0.12, h: 0.14, y: 0.17 }, stem: { r: [0.026, 0.022], h: 1.26, y: 0.8 }, dish: { r: [0.05, 0.08], h: 0.04, y: 1.44 }, candle: { r: 0.036, h: 0.18, y: 1.455 },
   },
   nave: {
-    turn: 0.35, columns: [-0.58, 0.58],
+    // (The right column, with its half of the arch, stands 0.3 m further along the row than
+    // round 9's: the knight's seat at its foot overlapped it, and no seat clear of it kept
+    // him in a phone's frame: knightPlaces.js SEATS.)
+    turn: 0.35, columns: [-0.58, 0.88],
     base: { size: [0.5, 0.16, 0.5], y: 0.08 },
     shaft: { r: [0.17, 0.15], h: 2.36, y: 1.33 },
     capital: { size: [0.46, 0.14, 0.46], y: 2.56 },
-    arch: [{ size: [0.8, 0.16, 0.22], at: [0.32, 2.78], roll: -0.62 }, { size: [0.34, 0.16, 0.22], at: [-0.45, 2.7], roll: 0.62 }],
+    arch: [{ size: [0.8, 0.16, 0.22], at: [0.62, 2.78], roll: -0.62 }, { size: [0.34, 0.16, 0.22], at: [-0.45, 2.7], roll: 0.62 }],
     // A cluster of floor candles at the left column's foot: [x, z, height] about `at`.
     candles: { at: [-0.62, 0.46], list: [[0, 0, 0.3], [0.1, 0.06, 0.2], [-0.09, 0.08, 0.16], [0.05, -0.1, 0.24], [-0.12, -0.06, 0.12]] },
   },
@@ -147,8 +150,10 @@ export const CULT = {
   },
   stones: {
     turn: 0.4,
-    // [x, z, width, height, lean] in the stones' own space, each 0.26 deep.
-    list: [[-0.62, 0.12, 0.36, 1.55, 0.06], [0, -0.14, 0.42, 2.05, -0.02], [0.62, 0.12, 0.34, 1.35, -0.08]],
+    // [x, z, width, height, lean] in the stones' own space, each 0.26 deep. (Stone C stands
+    // 0.3 m further along than round 9's, out of the seated knight's way, as the cathedral's
+    // right column does.)
+    list: [[-0.62, 0.12, 0.36, 1.55, 0.06], [0, -0.14, 0.42, 2.05, -0.02], [0.92, 0.12, 0.34, 1.35, -0.08]],
     depth: 0.26,
     // (How each also turns and tips: scenery.js draws these from its seeded rng, after the
     // altar's pieces; the numbers it draws, checked by test/knightClearance.test.mjs.)
