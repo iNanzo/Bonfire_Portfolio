@@ -519,10 +519,19 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
         k.seed = Math.floor(rng() * 64);
       }
       // (Up for the drop already, they leap facing the way they stood; they turn on the next bar.)
-      const f = k.want === 'ready' && fromDrop && sinceBig === 0 ? k.facing
+      let f = k.want === 'ready' && fromDrop && sinceBig === 0 ? k.facing
         : formation === 'solo' ? (joining || moves !== 'keep' ? pickR(['front', 'front', 'fire']) : k.facing) : facing;
-      const offset = formation === 'canon' ? i * (MOVE_CYCLE[move] >= 4 ? 1 : 0.5) : 0;
       const place = places[i];
+      // (A move too wide for his place, a lantern or a pew within its reach, gives way to one
+      // of the pool's that fits there, or he turns to the fire for one: fire.knights.fits.)
+      const fits = (mv, way) => kn.fits(mv, place, way, scenery ?? undefined);
+      if (kn.fits && move && !fits(move, f)) {
+        for (const way of f === 'fire' ? ['fire'] : [f, 'fire']) {
+          const ok = pool.filter((mv) => fits(mv, way));
+          if (ok.length) { move = pickR(ok); f = way; break; }
+        }
+      }
+      const offset = formation === 'canon' ? i * (MOVE_CYCLE[move] >= 4 ? 1 : 0.5) : 0;
       if (gone(e, i)) {
         if (!e?.present) kn.setHelmet(helmetFor(e, true, i), { index: i, instant: true });
         else kn.summon(i); // (sent away, burning out: back)

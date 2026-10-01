@@ -1,8 +1,9 @@
 // Bonfire Live's knights (src/visualizer/knightShow.js) against a stand-in for the scene's
 // fire.knights: they only come and go where it's hidden, leap into the dance on the drop's
 // beat, sit for breakdowns and silence, dance in numbers that follow the budget, stand
-// only on the clear sides of the ring and never on a knight sitting one out, sit still under
-// reduced motion, and every switch's off / in the mix / always does what it says (Armor Shine
+// only on the clear sides of the ring and never on a knight sitting one out, dance only moves
+// that have room at their places, sit still under reduced motion, and every switch's off /
+// in the mix / always does what it says (Armor Shine
 // and Reactions too); and through the director on a stand-in scene: a drop's new scenery
 // first, Knight Cameras, the music taken away.
 import { test } from 'node:test';
@@ -842,6 +843,28 @@ test('knight options: Style (the site’s own, one of the styles, in the mix) ro
   assert.equal(kn.log.filter((e) => e[0] === 'style').length, calls + 1, 'told once');
   assert.deepEqual(Object.keys(KNIGHT_STYLES), ['site', ...STYLE_KEYS]);
   assert.ok(Object.values(KNIGHT_STYLES).every((l) => /^[A-Z]/.test(l)), 'Title Case labels');
+});
+
+test('a move too wide for a dancer’s place (fire.knights.fits) gives way to one that fits there, or he turns to the fire for one', () => {
+  // A stand-in for the engine's fits(): facing the cameras only the nod has room; facing the
+  // fire, everything but the spin.
+  const fits = (move, place, facing) => (facing === 'fire' ? move !== 'spin' : move === 'nod');
+  let danced = 0;
+  for (const formation of ['line', 'solo', 'ring', 'canon']) {
+    for (let seed = 1; seed <= 6; seed++) {
+      const { show, kn } = showFor({ knights: 'on', knightCount: 3, knightDance: 'on', knightFormation: formation, knightSummon: 'on' }, { seed: seed * 7 });
+      kn.fits = (move, place, facing) => { assert.ok(place && Number.isFinite(place.x), 'asked about a place'); return fits(move, place, facing); };
+      show.start(kn);
+      const mark = kn.log.length;
+      show.drop(kn, 'big');
+      play(show, kn, 16, { budget: 1 });
+      for (const e of dancesOf(kn.log, mark)) {
+        danced++;
+        assert.ok(fits(e[2].move, e[2].position, e[2].facing), `${formation}: ${e[2].move} facing the ${e[2].facing} fits`);
+      }
+    }
+  }
+  assert.ok(danced > 40, `they danced (${danced})`);
 });
 
 test('the Default Dance is one of the groove’s moves (8 beats a cycle)', () => {
