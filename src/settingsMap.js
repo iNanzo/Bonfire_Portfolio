@@ -92,9 +92,9 @@ export const SECTIONS = [
 ];
 
 /**
- * The Painter's panel sections, in order, each gathering the shared sections in `from` (a
- * scene's parts sit where Live keeps the same setting; Show is the Painter's own: what a
- * scene leaves to the music).
+ * The Painter's panel sections, in order, each gathering the shared sections in `from`, in
+ * the order it shows them (a scene's parts sit where Live keeps the same setting; Show is
+ * the Painter's own: what a scene leaves to the music, With the Music first).
  * @type {{ id: string, label: string, from: string[] }[]}
  */
 export const PAINTER_SECTIONS = [
@@ -107,7 +107,7 @@ export const PAINTER_SECTIONS = [
   { id: 'camera', label: 'Camera', from: ['camera'] },
   { id: 'knights', label: 'Knights', from: ['knights', 'armor', 'dancing', 'behavior'] },
   { id: 'fireflies', label: 'Fireflies', from: ['fireflies'] },
-  { id: 'show', label: 'Show', from: ['weapons', 'drop', 'presetScenes'] },
+  { id: 'show', label: 'Show', from: ['presetScenes', 'weapons', 'drop'] },
 ];
 
 /** What the three-way switch's words mean (once per tab or section that has them). */

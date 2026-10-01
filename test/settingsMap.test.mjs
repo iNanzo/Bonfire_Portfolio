@@ -296,6 +296,10 @@ test('sections: every entry sits in one, each Live one in a tab, each Painter on
   // sectionsFor: Live's tabbed ones, the Painter's own, the admin's that hold its entries.
   assert.deepEqual(sectionsFor('live').map((s) => s.id), SECTIONS.filter((s) => s.tab).map((s) => s.id));
   assert.deepEqual(sectionsFor('painter').map((s) => s.id), PAINTER_SECTIONS.map((s) => s.id));
+  // A Painter section shows its parts section by section, in `from`'s order: Show starts
+  // with With the Music, then the weapon, the element and the drop hits.
+  const show = PAINTER_SECTIONS.find((s) => s.id === 'show').from.flatMap((sec) => entriesFor('painter').filter((e) => e.section === sec).map((e) => e.painter));
+  assert.deepEqual(show, ['music', 'place.weapon', 'place.element', 'drops', 'drops.fx', 'drops.count']);
   for (const s of sectionsFor('admin')) assert.ok(entriesFor('admin').some((e) => e.section === s.id), s.id);
   // Simple view: the settings that matter most in each tab, the rest a search or a click away.
   const simple = Object.fromEntries(tabs.map((t) => [t, entriesFor('live').filter((e) => e.simple && SECTIONS.find((s) => s.id === e.section).tab === t).length]));
