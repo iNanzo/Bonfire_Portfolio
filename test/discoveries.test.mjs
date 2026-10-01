@@ -21,12 +21,14 @@ test('discoveries: unique ids, Title Case names, sentence hints', () => {
   assert.ok(list.filter((d) => d.id.startsWith('project:')).every((d) => d.name.startsWith('Inspected ')));
 });
 
-test('discoveries: the words match the menus (Living Weapon, How It’s Made, Flame Colors), and the render settings’ hint points at the menu', () => {
+test('discoveries: the words match the menus (Living Weapon, How It’s Made, Flame Colors), and the render settings’ and the breakdown’s hints point at the menu', () => {
   const byId = Object.fromEntries(fixed().map((d) => [d.id, d]));
   assert.equal(byId.flourish.name, 'The Living Weapon');
   assert.equal(byId.breakdown.name, 'How It’s Made');
   assert.equal(byId.palettes.name, 'Every Flame Color');
   assert.match(byId.render.hint, /press P/i);
   assert.match(byId.render.hint, /menu/i, 'touch screens have no P: the menu has it');
+  assert.match(byId.breakdown.hint, /press B/i);
+  assert.match(byId.breakdown.hint, /menu/i, 'nor B');
   assert.match(byId.photo.hint, /menu/i);
 });

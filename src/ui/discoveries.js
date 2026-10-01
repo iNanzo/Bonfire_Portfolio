@@ -22,7 +22,7 @@ const BASE = [
   { id: 'palettes', name: 'Every Flame Color', hint: 'The fire has many colors.' },
   { id: 'gallery', name: 'A Closer Look', hint: 'Screenshots open full size.' },
   { id: 'sound', name: 'Heard the Fire', hint: 'The fire has a voice too.' },
-  { id: 'breakdown', name: 'How It’s Made', hint: 'Press B.' },
+  { id: 'breakdown', name: 'How It’s Made', hint: 'Press B, or look in the menu.' },
   { id: 'render', name: 'Under the Hood', hint: 'The picture has settings of its own: press P, or look in the menu.' },
   { id: 'photo', name: 'Photographer', hint: 'The menu has a camera.' },
   { id: 'visualizer', name: 'The Fire Dances', hint: 'There’s a live version for music.' },
