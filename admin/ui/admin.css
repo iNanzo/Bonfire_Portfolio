@@ -438,7 +438,8 @@ input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
     grid-row: auto; position: sticky; top: var(--top); z-index: 10; height: auto; padding: 6px 8px;
     border-right: 0; border-bottom: 1px solid var(--line); background: var(--void);
   }
-  .sidebar { flex-direction: row; align-items: center; gap: 6px; }
+  /* (Not a scroller here, or it would clip the search's status line below it; the page links scroll on their own.) */
+  .sidebar { flex-direction: row; align-items: center; gap: 6px; overflow: visible; }
   .admin-search { flex: none; width: 8.5em; }
   .admin-search input[type='search'] { padding: 6px 8px; font-size: 13px; }
   .admin-search-key { display: none; }
