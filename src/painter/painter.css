@@ -499,10 +499,9 @@ body.pnt.panel-off .pack { right: var(--gutter); }
   .pnt-bar kbd { display: none; }
   .pnt-home .brand-mark { height: 26px; }
   .pnt-title { flex: 1 1 90px; }
-  /* (Tools as its ▾ alone: the first row keeps the name in sight.) */
-  .pnt-tools-word { display: none; }
-  .pnt-tools [data-cmd='tools'] { min-width: 32px; justify-content: center; }
-  .pnt-tools .pnt-caret { margin: 0; font-size: 1em; }
+  /* (Tools by its word, its ▾ left out to keep the name in sight: a finger can't hover for
+     its tooltip, so the word says what it is.) */
+  .pnt-tools .pnt-caret { display: none; }
   .pnt-name { flex: 1 1 auto; min-width: 80px; }
   .pnt-dot { font-size: 0; gap: 0; }
   .pnt-bar .pix-btn { padding: 4px 7px; font-size: 0.8125rem; }

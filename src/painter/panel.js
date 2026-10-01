@@ -523,8 +523,9 @@ const HAND_MS = 300;
  *   `audition` shows a scene on the stage for a moment (null: back to the scene); `act` an
  *   action button; `live` what the look is doing now (looks.js details); `ctx` panelMarkup's;
  *   `open` the sections open to start with; `onSection` every open section, after one is
- *   opened or closed by hand (the page keeps them); `onBulk` a bulk toolbar's note (one undo
- *   step); `onDraw` after the panel or a section of it is drawn again (the search goes over it).
+ *   opened or closed by hand (the page keeps them); `onBulk` what a bulk toolbar did (one undo
+ *   step: the page says how to undo it); `onDraw` after the panel or a section of it is drawn
+ *   again (the search goes over it).
  */
 export function bindPanel(root, { get, edit, audition, act, live = () => null, ctx, open: opened = ['place'], onSection = () => {}, onBulk = () => {}, onDraw = () => {} }) {
   /** @type {Record<string, string>} */
@@ -799,7 +800,7 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     if (bulk) {
       if (bulk.getAttribute('aria-disabled') === 'true') return;
       const change = bulkEdit(get(), bulk.dataset.bulkGroup, bulk.dataset.bulk);
-      if (change && edit(change.path, change.value, { key: null }) !== false) onBulk(`${change.name}: ${bulk.textContent.trim()}. Ctrl+Z undoes it.`);
+      if (change && edit(change.path, change.value, { key: null }) !== false) onBulk(`${change.name}: ${bulk.textContent.trim()}.`);
       return;
     }
     const slot = /** @type {HTMLElement} */ (t.closest('[data-slot]'));

@@ -203,6 +203,8 @@ function saveOpen(open) {
 }
 /** A label with a shorter one for phones. */
 const label = (long, short) => (short === long ? esc(long) : `<span class="pnt-long">${esc(long)}</span><span class="pnt-short">${esc(short)}</span>`);
+/** A phone or tablet: no keyboard to name keys on (the search's "/", the bulk note's Ctrl+Z). */
+const coarse = matchMedia('(pointer: coarse)').matches;
 const app = document.getElementById('painter');
 app.innerHTML = `
   <div class="stage viz-stage pnt-stage" data-stage></div>
@@ -244,7 +246,7 @@ app.innerHTML = `
   </div>
   <aside class="pnt-panel frame" id="pnt-panel" data-panel aria-label="Scene">
     <div class="pnt-panel-head">
-      ${searchBoxMarkup({ id: 'pnt-search', label: 'Search the Scene’s Settings', placeholder: 'Search settings  /' })}
+      ${searchBoxMarkup({ id: 'pnt-search', label: 'Search the Scene’s Settings', placeholder: coarse ? 'Search settings' : 'Search settings  /' })}
       <div class="pnt-search-notes" data-search-notes hidden></div>
     </div>
     <div class="pnt-panel-body" data-panel-body></div>
@@ -577,7 +579,7 @@ const panel = bindPanel(panelBody, {
   ctx: panelCtx,
   open: readOpen(),
   onSection: saveOpen,
-  onBulk: (text) => note(text, 3),
+  onBulk: (text) => note(`${text} ${coarse ? 'Undo (↶) puts it back.' : 'Ctrl+Z undoes it.'}`, 3),
   onDraw: () => search?.refresh(),
 });
 setInterval(() => { if (!panelEl.hidden) panel.refreshLive(); }, 700);
