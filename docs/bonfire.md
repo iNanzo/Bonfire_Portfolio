@@ -521,9 +521,9 @@ above and `docs/knight.md`). On the site (`src/main.js`, `src/bonfire/scene.js`)
   way to it), but only one he really starts (not mid-swap). With
   `effects.knight.gestures` off, or reduced motion (he sits still), he isn't a click
   target: no hover, no pointer, and a click stokes as anywhere else.
-- **The pack's Knight item** (round 9 added Summon, Send Him Off, Styles, Armor Finishes
-  and the Default Dance, above; the helm icon: the great helm with its lit eye slit; on
-  hover it swaps with the pointed bascinet): **Helmets** (Great Helm, Armet, Bascinet:
+- **The pack's Knight item** (round 9 added Summon, Send Him Off, the Style and Finish
+  groups and the Default Dance, above; the helm icon: the great helm with its lit eye slit;
+  on hover it swaps with the pointed bascinet): **Helmet** (Great Helm, Armet, Bascinet:
   hands to the helm, the old one burns away in ember edges, the new one forms in a flash
   and a puff of sparks, 1.6 s, with a shimmer sound as it forms) and **Gestures** (Praise
   the Sun, Wave, Bow, Point Forward, Beckon, Shrug, Hurrah, Joy). The gem marks the helmet
