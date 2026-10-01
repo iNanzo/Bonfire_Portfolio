@@ -1311,6 +1311,9 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     const h = Math.max(1, Math.ceil((container.clientHeight * dpr) / pd));
     size = { w, h, pd };
     frame.setSize(w, h, pd);
+    // (Each size has its own targets, the color pass's depth among them: the particles, all
+    // sharing this uniform, test themselves against the current one.)
+    particleMaterial.uniforms.tDepth.value = frame.depthTexture;
     canvas.style.width = `${(w * pd) / dpr}px`;
     canvas.style.height = `${(h * pd) / dpr}px`;
     pointer.measure(canvas);

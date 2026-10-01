@@ -22,6 +22,7 @@
 // other stages, the knight's shadow for when he first comes) build on in the background.
 import * as THREE from 'three';
 import { createPixelPass } from './pixelPass.js';
+import { createSetCache, KEEP_SETS } from './targetCache.js';
 
 /**
  * @param {object} o
@@ -37,26 +38,20 @@ import { createPixelPass } from './pixelPass.js';
 export function createFrame({ renderer, scene, camera, layers, voidColor, effects = false, own, track }) {
   const canvas = renderer.domElement;
   const rtOpts = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter };
-  const colorRT = own(new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(1, 1) }));
-  const normalRT = own(new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, depthTexture: new THREE.DepthTexture(1, 1) }));
-  const fxRT = own(new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, type: THREE.HalfFloatType, depthBuffer: false }));
+  // The render targets come in sets, one per size (targetsFor, setSize): these are the
+  // current set's.
+  let colorRT, normalRT, fxRT;
   const normalMaterial = own(new THREE.MeshNormalMaterial({ flatShading: true }));
   const pass = createPixelPass({ effects });
   for (const m of Object.values(pass.materials)) own(m);
   track(pass.scene);
   const u = pass.uniforms;
-  u.tColor.value = colorRT.texture;
-  u.tDepth.value = colorRT.depthTexture;
-  u.tNormal.value = normalRT.texture;
-  u.tNormalDepth.value = normalRT.depthTexture;
-  u.tFx.value = fxRT.texture;
   u.cameraNear.value = camera.near;
   u.cameraFar.value = camera.far;
 
   // --- The visualizer's stages (only with `effects`).
   const fx = effects ? createStages() : null;
   function createStages() {
-    const feedbackRT = [0, 1].map(() => own(new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, depthBuffer: false })));
     const copyScene = new THREE.Scene();
     const copyMaterial = own(new THREE.ShaderMaterial({
       uniforms: { map: { value: null }, resolution: u.resolution },
@@ -68,26 +63,62 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
     quad.frustumCulled = false;
     copyScene.add(quad);
     track(copyScene);
-    const stageOpts = { type: THREE.HalfFloatType, depthBuffer: false };
-    const sceneRT = own(new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter }));
-    const styleRT = own(new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, ...rtOpts }));
-    const ghostRT = [0, 1].map(() => own(new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, ...rtOpts })));
     return {
-      feedbackRT, copyScene, copyMaterial, sceneRT, styleRT, ghostRT,
+      // (The current set's targets: targetsFor, setSize.)
+      feedbackRT: null, sceneRT: null, styleRT: null, ghostRT: null,
+      copyScene, copyMaterial,
       feedbackFlip: 0, feedbackLive: false, ghostFlip: 0, ghostLive: false,
       // Motion blur compares each frame's camera with the last one's.
       lastViewProj: new THREE.Matrix4(), viewProj: new THREE.Matrix4(),
       lastCamPos: new THREE.Vector3(Infinity, 0, 0), lastCamQuat: new THREE.Quaternion(),
-      all: () => [...feedbackRT, sceneRT, styleRT, ...ghostRT],
     };
   }
+
+  // --- The render targets, a set per size. Bonfire Live's pixel size shifts (a new look, a
+  // drop) jump between a few sizes over and over; making a size's targets again each time
+  // (nine of them with the effects, each freed and allocated again on the GPU) stalled the
+  // frame of every shift. The last KEEP_SETS sizes' sets are kept (targetCache.js), so a
+  // shift back to one of them only swaps them in. What a set holds from its last use never
+  // shows: the passes clear or overwrite their targets each frame, and the trails start
+  // over on a shift (feedback cleared, the ghost's old image mixed in at 0), as they did.
+  const stageOpts = { type: THREE.HalfFloatType, depthBuffer: false };
+  /** A set of render targets at w×h texels. */
+  function makeTargets(w, h) {
+    const set = {
+      colorRT: new THREE.WebGLRenderTarget(w, h, { ...rtOpts, type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(w, h) }),
+      normalRT: new THREE.WebGLRenderTarget(w, h, { ...rtOpts, depthTexture: new THREE.DepthTexture(w, h) }),
+      fxRT: new THREE.WebGLRenderTarget(w, h, { ...rtOpts, type: THREE.HalfFloatType, depthBuffer: false }),
+      feedbackRT: null, sceneRT: null, styleRT: null, ghostRT: null,
+    };
+    if (fx) {
+      set.feedbackRT = [0, 1].map(() => new THREE.WebGLRenderTarget(w, h, { ...rtOpts, depthBuffer: false }));
+      set.sceneRT = new THREE.WebGLRenderTarget(w, h, { ...stageOpts, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
+      set.styleRT = new THREE.WebGLRenderTarget(w, h, { ...stageOpts, ...rtOpts });
+      set.ghostRT = [0, 1].map(() => new THREE.WebGLRenderTarget(w, h, { ...stageOpts, ...rtOpts }));
+    }
+    return set;
+  }
+  const targetsOf = (set) => [set.colorRT, set.normalRT, set.fxRT, ...(set.feedbackRT ?? []), set.sceneRT, set.styleRT, ...(set.ghostRT ?? [])].filter(Boolean);
+  const sets = createSetCache(KEEP_SETS, (set) => { for (const rt of targetsOf(set)) rt.dispose(); });
+  own({ dispose: () => sets.clear() });
+  /** Make `set` the one drawn with: the passes' targets and what the pixel pass reads. */
+  function useTargets(set) {
+    ({ colorRT, normalRT, fxRT } = set);
+    if (fx) Object.assign(fx, { feedbackRT: set.feedbackRT, sceneRT: set.sceneRT, styleRT: set.styleRT, ghostRT: set.ghostRT });
+    u.tColor.value = colorRT.texture;
+    u.tDepth.value = colorRT.depthTexture;
+    u.tNormal.value = normalRT.texture;
+    u.tNormalDepth.value = normalRT.depthTexture;
+    u.tFx.value = fxRT.texture;
+  }
+  useTargets(sets.get('1×1', () => makeTargets(1, 1))); // (compile() draws into these before the first setSize)
 
   let size = { w: 1, h: 1, pd: 4 };
   /** Size every buffer to w×h texels (each drawn pd device pixels wide). */
   function setSize(w, h, pd) {
     size = { w, h, pd };
     renderer.setSize(w, h, false);
-    for (const rt of [colorRT, normalRT, fxRT, ...(fx ? fx.all() : [])]) rt.setSize(w, h);
+    useTargets(sets.get(`${w}×${h}`, () => makeTargets(w, h)));
     if (fx) { fx.feedbackLive = false; fx.ghostLive = false; }
     u.resolution.value.set(w, h);
   }
@@ -360,8 +391,8 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
 
   return {
     pass,
-    /** The color pass's depth (the particles test themselves against it). */
-    depthTexture: colorRT.depthTexture,
+    /** The color pass's depth (the particles test themselves against it): the current size's, so it changes with setSize. */
+    get depthTexture() { return colorRT.depthTexture; },
     setSize,
     draw,
     compile,
