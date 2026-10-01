@@ -87,8 +87,11 @@ export function createPreview(siteUrl) {
 
   return {
     pane,
-    /** Start loading the site (first time the pane is shown). */
-    open() { if (!frame.src) reload(); requestAnimationFrame(fit); },
+    /**
+     * Start loading the site (first time the pane is shown). Sized at once, so the page can
+     * measure the pane before it scrolls to a field below it.
+     */
+    open() { if (!frame.src) reload(); fit(); requestAnimationFrame(fit); },
     /** Push the draft's effects, at most once per frame. */
     update(next, { valid = true } = {}) {
       if (!valid) { state.textContent = 'Paused — fix the flagged fields'; state.dataset.tone = 'bad'; return; }

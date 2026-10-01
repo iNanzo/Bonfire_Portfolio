@@ -174,26 +174,41 @@ function notice(message, actions = []) {
 /**
  * How much of the top of the window the sticky bars cover besides the top bar: the page
  * strip on a phone and the preview pinned over the page (narrower than 1280 px). Kept in
- * --sticky (and the strip's height in --nav-h), so jumps and reveals land below them.
+ * --sticky (and the strip's height in --nav-h), so jumps and reveals land below them, and
+ * in `sticky.px`. Measured again whenever they change size, and at once by showPreview()
+ * (the page scrolls to a revealed field before a ResizeObserver would have run).
  */
+const sticky = { px: 0, measure: () => {} };
 function watchSticky() {
   const root = document.documentElement;
   const nav = q('.sidebar');
   const slot = q('[data-preview-slot]');
   const narrow = matchMedia('(max-width: 860px)');
   const medium = matchMedia('(max-width: 1279px)');
-  const measure = () => {
+  sticky.measure = () => {
     const strip = narrow.matches ? nav.offsetHeight : 0;
     const pinned = medium.matches && !slot.hidden ? slot.offsetHeight : 0;
+    sticky.px = strip + pinned;
     root.style.setProperty('--nav-h', `${strip}px`);
-    root.style.setProperty('--sticky', `${strip + pinned}px`);
+    root.style.setProperty('--sticky', `${sticky.px}px`);
   };
-  const ro = new ResizeObserver(measure);
+  const ro = new ResizeObserver(() => sticky.measure());
   ro.observe(nav);
   ro.observe(slot);
-  narrow.addEventListener('change', measure);
-  medium.addEventListener('change', measure);
-  measure();
+  narrow.addEventListener('change', () => sticky.measure());
+  medium.addEventListener('change', () => sticky.measure());
+  sticky.measure();
+}
+
+/**
+ * Scroll a revealed field (or card, group, section) into the part of the window the sticky
+ * bars leave: centered there if it fits, else its top at the top of it (html's scroll-padding
+ * is that edge).
+ * @param {Element} target
+ */
+function bringIntoView(target) {
+  const room = innerHeight - (q('.topbar').offsetHeight + sticky.px + 16);
+  target.scrollIntoView({ block: target.getBoundingClientRect().height <= room ? 'center' : 'start' });
 }
 
 // ---- pages ----------------------------------------------------------------------------
@@ -283,7 +298,7 @@ function renderPage({ keepScroll = true } = {}) {
     ctx.focus = null;
     ctx.flash = false;
     if (target) {
-      target.scrollIntoView({ block: 'center' });
+      bringIntoView(target);
       focusIn(target);
       if (flash) flashOnce(target);
     }
@@ -330,13 +345,15 @@ function showPreview(on) {
   const slot = q('[data-preview-slot]');
   slot.hidden = !on;
   q('[data-layout]').classList.toggle('has-preview', on);
-  if (!on) return;
-  if (!ctx.preview) {
-    ctx.preview = createPreview(state.session?.siteUrl);
-    slot.append(ctx.preview.pane);
+  if (on) {
+    if (!ctx.preview) {
+      ctx.preview = createPreview(state.session?.siteUrl);
+      slot.append(ctx.preview.pane);
+    }
+    ctx.preview.open();
+    pushPreview();
   }
-  ctx.preview.open();
-  pushPreview();
+  sticky.measure(); // (pinned or gone: the room below the bars changed)
 }
 
 function pushPreview() {

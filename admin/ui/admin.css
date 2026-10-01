@@ -27,7 +27,9 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--void); color: var(--bone); }
-/* (--sticky: what the page strip and a pinned preview cover besides the top bar, main.js) */
+/* Jumps, reveals and in-page links land below the sticky bars. (--sticky: what the page strip
+   and a pinned preview cover besides the top bar, main.js. Counted here only: a scroll-margin
+   on the targets as well would count it twice and push a centered field off the bottom.) */
 html { scroll-padding-top: calc(var(--top) + var(--sticky, 0px) + 16px); }
 body { font: 400 15px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
 a { color: var(--hi); }
@@ -160,8 +162,6 @@ input.block-title { font: 500 19px var(--pixel) !important; }
 
 /* ---- blocks, groups, fields ---- */
 .block { margin-bottom: 40px; }
-/* Jumps and reveals land below the sticky bars (html's scroll-padding counts them too). */
-.block, .field, .group, .card, .row { scroll-margin-top: calc(var(--top) + var(--sticky, 0px) + 16px); }
 .block-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
 .block-title { margin: 0; font: 500 21px var(--pixel); letter-spacing: 0.03em; }
 .block > .help { margin-bottom: 14px; max-width: 72ch; }
