@@ -35,6 +35,7 @@ import { elementOr } from '../elements.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { createFrame } from './frame.js';
+import { createFrameGate } from './frameGate.js';
 import { createFlame, createParticleMaterial, createEffectMaterial, SHAPE } from './flame.js';
 import { createInteraction, MODES } from './interaction.js';
 import { createFireflies } from './fireflies.js';
@@ -79,7 +80,7 @@ const HELMETS = KNIGHT_HELMETS.filter((h) => h !== 'random');
 // A moment the page isn't busy (a frame's spare time; Safari has no requestIdleCallback).
 const idle = (fn) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 250 }) : setTimeout(fn, 16));
 
-export function createBonfire(container, { reducedMotion = false, paintedLook = false, sway: swayAmount = 1, lightTrails = false, effects: fxLayer = false, knightHelmet = null, onImpact, onFormed, onRamp, onError, onFrame } = {}) {
+export function createBonfire(container, { reducedMotion = false, paintedLook = false, sway: swayAmount = 1, lightTrails = false, effects: fxLayer = false, knightHelmet = null, onImpact, onFormed, onRamp, onError, onFrame, onTick } = {}) {
   const scope = createResourceScope();
   const events = new AbortController();
   scope.cleanup(() => events.abort());
@@ -1516,10 +1517,12 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   }
 
   function renderFrame(dt) {
+    const t0 = perf ? performance.now() : 0;
     renderer.info.reset();
     const t = timer.getElapsed();
     // The visualizer drives the fire from here, so its changes land in this frame.
     if (ready) onFrame?.(dt, t);
+    const t1 = perf ? performance.now() : 0;
     // Hit-stop: most of a freeze's time is held back from the simulation, then repaid a
     // little faster than real time, so everything ends up where the music expects it.
     let simDt = dt;
@@ -1545,19 +1548,47 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     fireOnScreen.set(FIRE_ORIGIN.x, 0.55, FIRE_ORIGIN.z).project(camera);
     pass.uniforms.uCenter.value.set((fireOnScreen.x * 0.5 + 0.5) * size.w, (fireOnScreen.y * 0.5 + 0.5) * size.h);
 
-    frame.draw({ shadows: renderer.shadowMap.enabled && shadowNeedsUpdate() });
+    const t2 = perf ? performance.now() : 0;
+    const shadows = renderer.shadowMap.enabled && shadowNeedsUpdate();
+    frame.draw({ shadows });
+    perf?.frame(t0, t1, t2, performance.now(), shadows);
   }
 
+  // ?perf in the page's address (the site, Bonfire Live and the Painter alike): a small
+  // overlay (ui/perfOverlay.js) with the frame rate and times (the page's part, the scene's
+  // update, the draw), the draw calls, the shadow's redraws and the GPU's programs and
+  // textures, and the same times as performance.measure entries for the browser's profiler.
+  // Without it nothing is timed, and the overlay's code isn't even loaded.
+  let perf = null;
+  if (new URLSearchParams(location.search).has('perf')) {
+    import('../ui/perfOverlay.js').then(({ createPerfOverlay }) => {
+      if (scope.disposed) return;
+      perf = createPerfOverlay({ info: renderer.info, maxFps: () => gate.maxFps });
+      scope.cleanup(() => { perf?.dispose(); perf = null; });
+    }, (error) => console.warn('The ?perf overlay did not load.', error));
+  }
+
+  // The loop runs at the display's rate. With a cap (setMaxFps; none unless asked: every frame
+  // the display shows is drawn), the frames in between are skipped: the scene's clock, the
+  // page's onFrame and everything after it run only on the frames that are drawn, while
+  // onTick(dt) runs on every one (Bonfire Live's audio analysis keeps its time resolution).
+  const gate = createFrameGate();
+  let lastTick = -1;
   let running = false;
   function syncRunning() {
     const should = ready && !scope.disposed && !document.hidden;
     if (should === running) return;
     running = should;
-    if (running) timer.reset(); // (the time it was paused doesn't count)
-    renderer.setAnimationLoop(running ? () => {
-      timer.update(); // (performance.now(), like reset(): never a negative step)
-      try { renderFrame(Math.min(timer.getDelta(), 0.1)); }
-      catch (error) { scope.dispose(); onError?.(error); }
+    if (running) { timer.reset(); lastTick = -1; } // (the time it was paused doesn't count)
+    renderer.setAnimationLoop(running ? (now) => {
+      const tickMs = lastTick < 0 ? 0 : now - lastTick;
+      lastTick = now;
+      try {
+        onTick?.(Math.min(tickMs / 1000, 0.1));
+        if (!gate.due(tickMs)) return;
+        timer.update(); // (performance.now(), like reset(): never a negative step)
+        renderFrame(Math.min(timer.getDelta(), 0.1));
+      } catch (error) { scope.dispose(); onError?.(error); }
     } : null);
   }
   document.addEventListener('visibilitychange', syncRunning, { signal: events.signal });
@@ -1932,6 +1963,20 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     get scenery() { return sceneryKey; },
     /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
     capture: frame.capture, setView: view.setView,
+    /**
+     * The next frame as a small picture (a scene's thumbnail): w×h (192×108 by default), the
+     * middle of the frame at that shape, taken from its texels with hard edges, as a WebP data
+     * URL (the browser's PNG where it can't make WebP; null if it fails). Cheap: no full-size
+     * copy, and the encoding is the browser's, off the page's thread.
+     */
+    captureThumb: (w = 192, h = 108) => frame.thumb(w, h),
+    /**
+     * Draw at most `fps` frames a second (0: every frame the display shows, the default). The
+     * animation loop keeps the display's rate for onTick; the frames between are skipped.
+     */
+    setMaxFps: (fps) => gate.setMaxFps(fps),
+    /** The cap setMaxFps set (0: none). */
+    get maxFps() { return gate.maxFps; },
     /** The canvas the scene draws into (low resolution: see resize). */
     get canvas() { return canvas; },
     /** Call `fn` right after every frame is drawn, while the canvas still holds it (recording a clip). Returns an unsubscribe. */

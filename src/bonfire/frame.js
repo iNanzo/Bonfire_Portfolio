@@ -8,17 +8,18 @@
 // With `effects` (the visualizer) the pixel pass carries its effects layer and the stages
 // the heavier effects need: frame feedback for the echo (the pass reads the last frame
 // from one buffer while writing the other, then a copy puts it on screen), and the scene
-// drawn into its own image (mipmapped, for the glow), maybe repainted, with a ghost trail
-// kept beside it. With the effects the scene is always drawn into that image first and the
-// final pass reads it (never the all-in-one pass: with the effects' warps and splits it
-// builds the scene four times over, and its shader takes seconds to compile). Without them
-// (the site) none of those buffers is sized or drawn: the one pass does it all.
+// drawn into its own image (mipmapped for the glow, the mipmaps made only while it shows),
+// maybe repainted, with a ghost trail kept beside it. With the effects the scene is always
+// drawn into that image first and the final pass reads it (never the all-in-one pass: with
+// the effects' warps and splits it builds the scene four times over, and its shader takes
+// seconds to compile). Without them (the site) none of those buffers is sized or drawn: the
+// one pass does it all.
 //
-// After the last pass, while the canvas still holds the frame, photo mode's captures
-// are taken and onRendered's listeners run (recording a clip). Before the first frame,
-// compile() builds the shaders in parallel (where the browser can), so it doesn't stall:
-// the ones the first frame draws with are waited for, the rest (the effects' other stages,
-// the knight's shadow for when he first comes) build on in the background.
+// After the last pass, while the canvas still holds the frame, photo mode's captures and
+// scene thumbnails are taken and onRendered's listeners run (recording a clip). Before the
+// first frame, compile() builds the shaders in parallel (where the browser can), so it
+// doesn't stall: the ones the first frame draws with are waited for, the rest (the effects'
+// other stages, the knight's shadow for when he first comes) build on in the background.
 import * as THREE from 'three';
 import { createPixelPass } from './pixelPass.js';
 
@@ -322,7 +323,38 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
       ctx.drawImage(canvas, 0, 0, out.width, out.height);
       for (const done of captures.splice(0)) out.toBlob(done, 'image/png');
     }
+    for (const t of thumbs.splice(0)) t.done(thumbCanvas(t.w, t.h));
     for (const fn of rendered) fn();
+  }
+
+  // Thumbnails (thumb): the middle of the frame at w:h, copied straight from the canvas, which
+  // is texel-sized (each texel one canvas pixel: setSize), with hard edges. No screen-sized
+  // copy, no PNG to encode and decode again.
+  const thumbs = [];
+  function thumbCanvas(w, h) {
+    const out = document.createElement('canvas');
+    out.width = w;
+    out.height = h;
+    const ctx = out.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    const k = Math.max(w / canvas.width, h / canvas.height);
+    ctx.drawImage(canvas, (w - canvas.width * k) / 2, (h - canvas.height * k) / 2, canvas.width * k, canvas.height * k);
+    return out;
+  }
+  /** The next frame as a w×h WebP data URL (resolves null if it can't be made). */
+  function thumb(w, h, quality = 0.7) {
+    return new Promise((resolve) => {
+      thumbs.push({
+        w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)),
+        done: (out) => out.toBlob((blob) => {
+          if (!blob) { resolve(null); return; }
+          const reader = new FileReader();
+          reader.onload = () => resolve(/** @type {string} */ (reader.result));
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        }, 'image/webp', quality),
+      });
+    });
   }
 
   return {
@@ -336,6 +368,7 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
     get size() { return size; },
     /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
     capture: () => new Promise((resolve) => captures.push(resolve)),
+    thumb,
     /** Call `fn` right after every frame is drawn. Returns an unsubscribe. */
     onRendered(fn) { rendered.add(fn); return () => rendered.delete(fn); },
     /** (Feedback and ghost trails start over: the picture jumped.) */
