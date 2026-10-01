@@ -744,14 +744,26 @@ export function createSolver(rig = DEFAULT_RIG) {
   const hq = new THREE.Quaternion();
   const away = new THREE.Vector3();
   const w = new THREE.Vector3();
+  const pq = new THREE.Quaternion();
   /** Whether any of a plate's points go deeper than `allow` into the helmet, the pauldron pushed `d` m `away`. */
   function deeper(pts, sg, bone, env, d, allow) {
+    // (Its points straight into the head's space: its turn and place, the head's undone. The
+    // knights check the pauldrons every pose they solve: a matrix, not two turns a point.)
+    const { x, y, z, w: qw } = pq.multiplyQuaternions(hq, q[bone]);
+    const x2 = x + x, y2 = y + y, z2 = z + z;
+    const xx = x * x2, xy = x * y2, xz = x * z2, yy = y * y2, yz = y * z2, zz = z * z2, wx = qw * x2, wy = qw * y2, wz = qw * z2;
+    const r00 = sg * (1 - (yy + zz)), r01 = xy - wz, r02 = xz + wy;
+    const r10 = sg * (xy + wz), r11 = 1 - (xx + zz), r12 = yz - wx;
+    const r20 = sg * (xz - wy), r21 = yz + wx, r22 = 1 - (xx + yy);
+    w.copy(p[bone]).addScaledVector(away, d).sub(p[IDX.head]).applyQuaternion(hq);
     for (let i = 0; i < pts.length; i += 3) {
-      w.set(sg * pts[i], pts[i + 1], pts[i + 2]).applyQuaternion(q[bone]).add(p[bone]).addScaledVector(away, d).sub(p[IDX.head]).applyQuaternion(hq);
-      if (helmDepth(env, w.x, w.y, w.z) > allow) return true;
+      const px = pts[i], py = pts[i + 1], pz = pts[i + 2];
+      if (helmDepth(env, r00 * px + r01 * py + r02 * pz + w.x, r10 * px + r11 * py + r12 * pz + w.y, r20 * px + r21 * py + r22 * pz + w.z) > allow) return true;
     }
     return false;
   }
+  /** Whether side s's pauldron (its sign sg; dome sh, lames pa) goes further into the helmet than it may, pushed `d` m `away`. */
+  const platesIn = (env, sg, sh, pa, d) => deeper(rig.plates.dome, sg, sh, env, d, env.allow.dome) || deeper(rig.plates.lames, sg, pa, env, d, env.allow.lames);
   /**
    * Keep the pauldrons out of the helmet (no deeper than the model sits at rest): a dome or
    * its lames that would go further in are shoved out from the neck and a little down, the
@@ -761,16 +773,16 @@ export function createSolver(rig = DEFAULT_RIG) {
     const env = helmet && rig.plates?.helmets?.[helmet];
     if (!env) return;
     hq.copy(q[IDX.head]).invert();
-    for (const [s, sg] of /** @type {[string, number][]} */ ([['L', 1], ['R', -1]])) {
-      const sh = IDX['shoulder' + s], pa = IDX['pauldron' + s];
+    for (let side = 0; side < 2; side++) {
+      const sg = side ? -1 : 1;
+      const sh = side ? IDX.shoulderR : IDX.shoulderL, pa = side ? IDX.pauldronR : IDX.pauldronL;
       away.set(sg, -0.3, 0).normalize().applyQuaternion(q[IDX.chest]);
-      const over = (d) => deeper(rig.plates.dome, sg, sh, env, d, env.allow.dome) || deeper(rig.plates.lames, sg, pa, env, d, env.allow.lames);
-      if (!over(0)) continue;
+      if (!platesIn(env, sg, sh, pa, 0)) continue;
       let lo = 0, hi = PAULDRON.push;
-      if (over(hi)) lo = hi;
+      if (platesIn(env, sg, sh, pa, hi)) lo = hi;
       for (let it = 0; it < 7 && lo < hi; it++) {
         const m = (lo + hi) / 2;
-        if (over(m)) lo = m; else hi = m;
+        if (platesIn(env, sg, sh, pa, m)) lo = m; else hi = m;
       }
       p[sh].addScaledVector(away, hi);
       p[pa].copy(off[pa]).applyQuaternion(q[sh]).add(p[sh]);

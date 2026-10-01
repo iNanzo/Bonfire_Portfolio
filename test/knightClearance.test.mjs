@@ -11,7 +11,8 @@
 // pieces whose joint is within their reach of a shape (a broad phase). Keeping out of it
 // doesn't cost him his smoothness (getting up, sitting down and the site's dance step no
 // further at a time than round 9's did, give or take half), nor his place on the home view
-// (stood up or dancing there, he stays left of the planted sword).
+// (stood up or dancing there, he stays left of the planted sword), nor much of a frame's time
+// (a step solves at most four poses; round 9's solved one).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -228,13 +229,21 @@ function nearestOf(env, i, cs, { skip = null, margin = 0 } = {}) {
   }
   return best;
 }
-/** Step the engine `seconds` at 12 fps (`each(t)` first each step) and keep the deepest of knight i in `cs` into `log[what]`. */
-function watch(env, i, cs, seconds, what, log, each = null) {
+// (The most poses a knight's step solves, keeping him out of the scenery: knights.js
+// EASE_SOLVES. Round 9's solved one; each costs about what its whole step did.)
+const MOST_SOLVES = 4;
+/**
+ * Step the engine `seconds` at 12 fps (`each(t)` first each step) and keep the deepest of
+ * knight i in `cs` into `log[what]`, and the most poses a step of his solved into `solves`.
+ */
+function watch(env, i, cs, seconds, what, log, each = null, solves = null) {
   for (let t = 0; t < seconds; t += 1 / 12) {
     each?.(t);
     env.k.update(1 / 12 + 1e-7);
     const w = nearestOf(env, i, cs);
     if (-w.d > (log[what]?.depth ?? 0)) log[what] = { depth: -w.d, bone: w.bone, shape: w.shape, t };
+    const n = env.k.knights[i].solves;
+    if (solves && n > (solves.n ?? 0)) Object.assign(solves, { n, what, t });
   }
 }
 const DEEPEST = 0.015;
@@ -268,49 +277,59 @@ test('[slow] seated at every seat, either seat pose, he is 4 cm clear of the sce
   k.setSeatPose('resting');
 });
 
-test('[slow] nothing he does at his seat goes into the scenery: gestures seated and standing, the site’s dance, reactions, seated moves, getting up and sitting down', async () => {
+test('[slow] nothing he does at his seat goes into the scenery (every helmet in the ruins): gestures seated and standing, the site’s dance, reactions, seated moves, getting up and sitting down; no step of it solves more than 4 poses', async () => {
   const env = await realKnights();
   const { k } = env;
   const bad = [];
+  const solves = {};
   for (const name of NAMES) {
     const cs = collidersOf(name);
     k.setScenery(name, await terrainOf(name));
-    for (const pose of SEAT_POSES) {
-      const log = {};
-      const at = (what) => `${name} (${pose}) ${what}`;
-      k.setSeatPose(pose);
-      k.summon(0, { instant: true });
-      watch(env, 0, cs, 1, at('sitting'), log);
-      // Every gesture seated (the site's dance gets up for its two bars and sits back down),
-      // and the site's dance in his seat (a phone's view).
-      for (const g of GESTURES) { k.gesture(g, { index: 0 }); watch(env, 0, cs, GESTURE_TIME[g] + 0.2, at(`seated ${g}`), log); }
-      k.headroom = false;
-      k.gesture('dance', { index: 0 });
-      watch(env, 0, cs, DANCE_SEATED_TIME + 0.2, at('the dance in his seat'), log);
-      k.headroom = true;
-      for (const r of ['impact', 'stoke', 'ring']) { k.react(r, 1); watch(env, 0, cs, 1.4, at(`seated ${r}`), log); }
-      // Every seated move on a beat clock (two beats a second).
-      for (const m of Object.keys(MOVE_INFO).filter((mv) => MOVE_INFO[mv].seated)) {
-        k.dance(0, { move: m, energy: 1, seated: true });
-        let b = 0;
-        watch(env, 0, cs, Math.min(4, MOVE_INFO[m].cycle * 0.5) + 0.25, at(`seated ${m}`), log, () => k.clock((b += 1 / 6), 0.5));
+    // (The helmets reach differently: the bascinet's visor juts, its mail hangs low. In the
+    // ruins he stands up over the drum, his head low over it.)
+    for (const helmet of name === 'ruins' ? ['great', 'armet', 'bascinet'] : ['great']) {
+      for (const pose of SEAT_POSES) {
+        const log = {};
+        const at = (what) => `${name} (${pose}${helmet === 'great' ? '' : `, ${helmet}`}) ${what}`;
+        const see = (seconds, what, each = null) => watch(env, 0, cs, seconds, at(what), log, each, solves);
+        k.setSeatPose(pose);
+        k.summon(0, { instant: true });
+        await k.setHelmet(helmet, { index: 0, instant: true });
+        see(1, 'sitting');
+        // Every gesture seated (the site's dance gets up for its two bars and sits back down),
+        // and the site's dance in his seat (a phone's view).
+        for (const g of GESTURES) { k.gesture(g, { index: 0 }); see(GESTURE_TIME[g] + 0.2, `seated ${g}`); }
+        k.headroom = false;
+        k.gesture('dance', { index: 0 });
+        see(DANCE_SEATED_TIME + 0.2, 'the dance in his seat');
+        k.headroom = true;
+        for (const r of ['impact', 'stoke', 'ring']) { k.react(r, 1); see(1.4, `seated ${r}`); }
+        // Every seated move on a beat clock (two beats a second).
+        for (const m of Object.keys(MOVE_INFO).filter((mv) => MOVE_INFO[mv].seated)) {
+          k.dance(0, { move: m, energy: 1, seated: true });
+          let b = 0;
+          see(Math.min(4, MOVE_INFO[m].cycle * 0.5) + 0.25, `seated ${m}`, () => k.clock((b += 1 / 6), 0.5));
+        }
+        k.sit(0);
+        see(0.6, 'settling');
+        // Up on his feet in front of his seat (as Bonfire Live's breakdown has him watch), every
+        // gesture there and the reactions, and back down.
+        k.stand(0);
+        see(1.4, 'getting up');
+        for (const g of GESTURES.filter((q) => q !== 'dance')) { k.gesture(g, { index: 0 }); see(GESTURE_TIME[g] + 0.2, `standing ${g}`); }
+        for (const r of ['impact', 'stoke', 'ring']) { k.react(r, 1); see(1.4, `standing ${r}`); }
+        k.sit(0);
+        see(1.6, 'sitting down');
+        bad.push(...report(log));
+        k.dismiss(0, { instant: true });
       }
-      k.sit(0);
-      watch(env, 0, cs, 0.6, at('settling'), log);
-      // Up on his feet in front of his seat (as Bonfire Live's breakdown has him watch), every
-      // gesture there and the reactions, and back down.
-      k.stand(0);
-      watch(env, 0, cs, 1.4, at('getting up'), log);
-      for (const g of GESTURES.filter((q) => q !== 'dance')) { k.gesture(g, { index: 0 }); watch(env, 0, cs, GESTURE_TIME[g] + 0.2, at(`standing ${g}`), log); }
-      for (const r of ['impact', 'stoke', 'ring']) { k.react(r, 1); watch(env, 0, cs, 1.4, at(`standing ${r}`), log); }
-      k.sit(0);
-      watch(env, 0, cs, 1.6, at('sitting down'), log);
-      bad.push(...report(log));
-      k.dismiss(0, { instant: true });
     }
   }
   k.setSeatPose('resting');
+  await k.setHelmet('great', { index: 0, instant: true });
   assert.deepEqual(bad, [], `deeper than ${DEEPEST * 100} cm`);
+  assert.ok(solves.n <= MOST_SOLVES, `${solves.what}: a step solved ${solves.n} poses (${solves.t.toFixed(2)} s)`);
+  assert.ok(solves.n > 1, 'he eases back somewhere, a few poses a step');
 });
 
 test('[slow] dancers at every place on the ring, every move that fits there facing the fire or the front, and the drop gestures, stay out of the scenery', async () => {

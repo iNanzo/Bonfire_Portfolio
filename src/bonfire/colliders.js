@@ -25,7 +25,7 @@
 
 /**
  * @typedef {{ kind: 'cyl' | 'box' | 'log', name: string, x?: number, z?: number, r0?: number, r1?: number, y0?: number, y1?: number,
- *   c?: number[], h?: number[], yaw?: number, pitch?: number, roll?: number, m?: number[], r?: number, half?: number }} Collider
+ *   c?: number[], h?: number[], yaw?: number, pitch?: number, roll?: number, m?: number[], r?: number, half?: number, ax?: number, az?: number, lip?: number }} Collider
  */
 
 // --- where things stand ------------------------------------------------------------------
@@ -392,6 +392,14 @@ export function collidersOf(name) {
     for (const c of list) seen.set(c.name, (seen.get(c.name) ?? 0) + 1);
     const n = new Map();
     for (const c of list) if (seen.get(c.name) > 1) { n.set(c.name, (n.get(c.name) ?? 0) + 1); c.name = `${c.name} ${n.get(c.name)}`; }
+    // (A drum's axis, worked out once: distanceTo() runs thousands of times a knight's step.
+    // And how fast its distance can change, m a metre (`lip`: 1 for a box; for a cylinder or a
+    // drum, more by its taper): what's within r of a point is no nearer than the point's
+    // distance less r × lip.)
+    for (const c of list) {
+      if (c.kind === 'log') { c.ax = Math.sin(c.yaw); c.az = Math.cos(c.yaw); }
+      c.lip = 1 + (c.kind === 'cyl' ? Math.abs(c.r1 - c.r0) / (c.y1 - c.y0) : c.kind === 'log' && c.r1 != null ? Math.abs(c.r1 - c.r) / (2 * c.half) : 0);
+    }
     built.set(name, Object.freeze(list.map((c) => Object.freeze(c))));
   }
   return built.get(name);
@@ -404,28 +412,35 @@ export function collidersOf(name) {
  * within a few per cent of the true distance.)
  */
 export function distanceTo(c, x, y, z) {
+  // (Square roots, not Math.hypot: this is the knights' innermost loop, and hypot is slow.)
   if (c.kind === 'log') {
     const dx = x - c.c[0], dy = y - c.c[1], dz = z - c.c[2];
-    const ax = Math.sin(c.yaw), az = Math.cos(c.yaw);
+    const ax = c.ax ?? Math.sin(c.yaw), az = c.az ?? Math.cos(c.yaw);
     const w = dx * ax + dz * az;
     const r = c.r1 == null ? c.r : c.r + (c.r1 - c.r) * Math.min(1, Math.max(0, (w + c.half) / (2 * c.half)));
-    const side = Math.hypot(dx - w * ax, dy, dz - w * az) - r;
+    const ox = dx - w * ax, oz = dz - w * az;
+    const side = Math.sqrt(ox * ox + dy * dy + oz * oz) - r;
     const end = Math.abs(w) - c.half;
-    return Math.hypot(Math.max(side, 0), Math.max(end, 0)) + Math.min(Math.max(side, end), 0);
+    const ps = Math.max(side, 0), pe = Math.max(end, 0);
+    return Math.sqrt(ps * ps + pe * pe) + Math.min(Math.max(side, end), 0);
   }
   if (c.kind === 'cyl') {
-    const rho = Math.hypot(x - c.x, z - c.z);
+    const rx = x - c.x, rz = z - c.z;
+    const rho = Math.sqrt(rx * rx + rz * rz);
     const t = Math.min(1, Math.max(0, (y - c.y0) / (c.y1 - c.y0)));
     const side = rho - (c.r0 + (c.r1 - c.r0) * t);
     const end = Math.max(c.y0 - y, y - c.y1);
-    return side <= 0 && end <= 0 ? Math.max(side, end) : Math.hypot(Math.max(side, 0), Math.max(end, 0));
+    if (side <= 0 && end <= 0) return Math.max(side, end);
+    const ps = Math.max(side, 0), pe = Math.max(end, 0);
+    return Math.sqrt(ps * ps + pe * pe);
   }
   const m = c.m, dx = x - c.c[0], dy = y - c.c[1], dz = z - c.c[2];
   // (Into the box's own axes: its turn's transpose.)
   const qx = Math.abs(m[0] * dx + m[3] * dy + m[6] * dz) - c.h[0];
   const qy = Math.abs(m[1] * dx + m[4] * dy + m[7] * dz) - c.h[1];
   const qz = Math.abs(m[2] * dx + m[5] * dy + m[8] * dz) - c.h[2];
-  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qy, qz), 0);
+  const px = Math.max(qx, 0), py = Math.max(qy, 0), pz = Math.max(qz, 0);
+  return Math.sqrt(px * px + py * py + pz * pz) + Math.min(Math.max(qx, qy, qz), 0);
 }
 /** The way out of a shape at a point (unit, the clearing's axes): where its distance grows fastest. */
 export function outOf(c, x, y, z, out = [0, 0, 0]) {
