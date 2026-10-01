@@ -40,11 +40,72 @@ test('routes: reading the address bar', () => {
   assert.deepEqual(readRoute({ hash: '', pathname: '/repo/index.html' }, '/repo/'), HOME);
   assert.deepEqual(readRoute({ hash: '#/contact', pathname: '/repo/' }, '/repo/'), { screen: 'contact', item: null }, 'a legacy hash wins once');
   assert.deepEqual(readRoute({ hash: '#main', pathname: '/about/' }), { screen: 'about', item: null }, 'the skip link is not a route');
+  assert.deepEqual(readRoute({ hash: '#how-its-made', pathname: '/projects/portfolio/' }), { screen: 'projects', item: 'portfolio' }, 'the breakdown link is not a route');
   assert.deepEqual(readRoute({ hash: '', pathname: '/elsewhere/skills/' }, '/repo/'), HOME, 'outside the base');
   const within = (sel) => ({ closest: (s) => (s.includes(sel) ? {} : null) });
   assert.equal(isEditing(within('input')), true);
   assert.equal(isEditing(within('nothing')), false);
   assert.equal(isEditing(null), false);
+  const focused = (tagName, type) => ({ closest: () => ({ tagName, type }) });
+  assert.equal(isEditing(focused('INPUT', 'text')), true);
+  assert.equal(isEditing(focused('TEXTAREA', 'textarea')), true);
+  for (const type of ['radio', 'checkbox', 'button']) assert.equal(isEditing(focused('INPUT', type)), false, `a focused ${type} keeps the page's keys (the breakdown's views)`);
+});
+
+test('content: the Portfolio project takes this page apart (not Bonfire Live any more)', () => {
+  const portfolio = items().find((p) => p.id === 'portfolio');
+  assert.ok(portfolio, 'the Portfolio is in the inventory');
+  assert.ok(portfolio.links.some((l) => l.href === '#how-its-made'), 'its link opens the breakdown');
+  assert.ok(portfolio.images.length >= 1 && portfolio.images.every((im) => im.alt?.length >= 15), 'screenshots with real alt text');
+  const live = items().find((p) => p.id === 'bonfire-live');
+  assert.ok(!live.links.some((l) => l.href === '#how-its-made'), 'the breakdown moved off Bonfire Live');
+  assert.equal(projects.at(-1).id, 'nba', 'nba stays last (admin/test/api.test.mjs)');
+});
+
+test('content: the Bonfire Painter has its own project, next to Bonfire Live, and they link each other', async () => {
+  const { existsSync } = await import('node:fs');
+  const painter = items().find((p) => p.id === 'bonfire-painter');
+  assert.ok(painter, 'the Painter is in the inventory');
+  const at = projects.findIndex((p) => p.id === 'bonfire-painter');
+  assert.equal(projects[at - 1]?.id, 'bonfire-live', 'right after Bonfire Live');
+  assert.ok(painter.links.some((l) => l.href === 'painter/'), 'it opens the Painter');
+  assert.ok(painter.links.some((l) => l.href === 'projects/bonfire-live/'), 'and links Bonfire Live’s project');
+  assert.ok(painter.images.length >= 3, 'real screenshots');
+  for (const im of painter.images) {
+    assert.ok(im.alt?.length >= 15 && im.caption, `${im.src}: alt text and a caption`);
+    for (const file of [`${im.src}.webp`, `${im.src}-card.webp`]) assert.ok(existsSync(new URL(`../public/${file}`, import.meta.url)), `${file} is there`);
+  }
+  const live = items().find((p) => p.id === 'bonfire-live');
+  assert.ok(live.links.some((l) => l.href === 'projects/bonfire-painter/'), 'Bonfire Live links the Painter’s project');
+  assert.match(live.built, /Preset Scenes/, 'and says what the Painter makes for it');
+  assert.equal(projects.at(-1).id, 'nba', 'nba stays last (admin/test/api.test.mjs)');
+});
+
+test('first load: the site’s static imports carry none of Bonfire Live’s, the Painter’s or the admin’s code', async () => {
+  // (What main.js reaches through static imports is what every visitor downloads before the
+  // page shows: the bonfire's scene and the admin preview's content rules load on demand.
+  // The content rules bring the scene format, which brings Bonfire Live's looks and tables.)
+  const { readFile } = await import('node:fs/promises');
+  const { fileURLToPath } = await import('node:url');
+  const path = await import('node:path');
+  const src = fileURLToPath(new URL('../src/', import.meta.url));
+  const seen = new Set();
+  const walk = async (file) => {
+    if (seen.has(file)) return;
+    seen.add(file);
+    const code = await readFile(file, 'utf8');
+    for (const m of code.matchAll(/^[ \t]*(?:import|export)\s[^'"]*?from\s*['"](\.[^'"]+)['"]|^[ \t]*import\s*['"](\.[^'"]+)['"]/gm)) {
+      const spec = m[1] ?? m[2];
+      if (spec.endsWith('.js')) await walk(path.resolve(path.dirname(file), spec));
+    }
+  };
+  await walk(path.join(src, 'main.js'));
+  const files = [...seen].map((f) => path.relative(src, f).replaceAll('\\', '/'));
+  assert.ok(files.includes('render.js') && files.includes('ui/pack.js'), 'the walk follows the site’s imports');
+  for (const f of files) {
+    assert.ok(!/^(visualizer|painter)\//.test(f), `${f}: Bonfire Live’s or the Painter’s`);
+    assert.ok(!['scenes.js', 'contentRules.js', 'sceneStore.js', 'scenePlayer.js'].includes(f), `${f}: the scene format or the content rules`);
+  }
 });
 
 test('html: escaping, safe links, asset paths', () => {
@@ -99,4 +160,59 @@ test('clips: an image entry with video plays <src>.mp4, checked like any image p
   const { videoUrl } = await import('../src/html.js');
   assert.equal(videoUrl('assets/projects/bonfire-live/clip', '/'), '/assets/projects/bonfire-live/clip.mp4');
   assert.throws(() => videoUrl('../secret', '/'));
+});
+
+test('the knight on the site: described for screen readers, greeted with gestures, counted as discoveries', async () => {
+  const { hero } = await import('../src/content.js');
+  const { sceneLabel, renderHome } = await import('../src/render.js');
+  assert.match(sceneLabel(true), /knight/i, 'the scene description mentions him while he’s there');
+  assert.ok(sceneLabel(true).startsWith(hero.sceneLabel) && sceneLabel(true).endsWith(hero.sceneKnight));
+  assert.ok(sceneLabel('sign').endsWith(hero.sceneSign) && /sign/i.test(sceneLabel('sign')), 'his summon sign while he’s away');
+  assert.doesNotMatch(sceneLabel(false), /knight/i, 'and not when he can’t come (no model, or switched off)');
+  assert.equal(sceneLabel(false), hero.sceneLabel);
+  assert.match(renderHome(), new RegExp(`id="scene-label">${hero.sceneLabel.slice(0, 30)}[^<]*</p>`));
+  assert.doesNotMatch(renderHome().match(/id="scene-label">([^<]*)/)[1], /knight/i, 'he isn’t there on first load');
+  assert.doesNotMatch(`${hero.sceneKnight} ${hero.sceneSign}`, /black|gilt/i, 'a knight in steel plate');
+  const { greeting, GESTURE_NAMES, HELMET_NAMES } = await import('../src/knightNames.js');
+  assert.equal(greeting(null), 'praise', 'Praise the Sun the first time');
+  let last = 'praise';
+  const seen = {};
+  for (let i = 0; i < 2000; i++) {
+    const g = greeting(last, () => ((i * 0.618034) % 1));
+    assert.notEqual(g, last, 'never the same twice running');
+    assert.ok(g in GESTURE_NAMES);
+    seen[g] = (seen[g] ?? 0) + 1;
+    last = g;
+  }
+  assert.deepEqual(Object.keys(seen).sort(), Object.keys(GESTURE_NAMES).filter((g) => g !== 'dance').sort(), 'every gesture comes up (the Default Dance is the pack’s)');
+  assert.equal(GESTURE_NAMES.dance, 'Default Dance');
+  assert.ok(Object.entries(seen).every(([g, n]) => g === 'praise' || n < seen.praise), 'Praise the Sun most often');
+  assert.deepEqual(Object.keys(HELMET_NAMES), ['great', 'armet', 'bascinet']);
+  const { createDiscoveries } = await import('../src/ui/discoveries.js');
+  const ids = createDiscoveries().list.map((d) => d.id);
+  for (const id of ['summon', 'knight', 'helm', 'style', 'painter']) assert.ok(ids.includes(id), `a discovery: ${id}`);
+});
+
+test('discoveries that can’t be found here now (no knight) leave the count, unless found before', async () => {
+  const store = new Map();
+  globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)) };
+  try {
+    const { createDiscoveries } = await import('../src/ui/discoveries.js');
+    const news = [];
+    const d = createDiscoveries({ onNew: (x, n, total) => news.push([x.id, n, total]) });
+    const all = d.total;
+    d.discover('helm');
+    d.setOut(['knight', 'helm']); // (his model didn't load)
+    assert.equal(d.total, all - 1, 'the unfound one leaves the total; the one found before stays');
+    assert.ok(!d.list.some((x) => x.id === 'knight') && d.list.some((x) => x.id === 'helm'));
+    assert.equal(d.discover('knight'), false, 'and can’t be found meanwhile');
+    assert.ok(d.count <= d.total);
+    d.setOut([]); // (he's back)
+    assert.equal(d.total, all);
+    assert.equal(d.discover('knight'), true);
+    assert.deepEqual(news.at(-1), ['knight', 2, all]);
+    assert.deepEqual(JSON.parse(store.get('discoveries')).sort(), ['helm', 'knight']);
+  } finally {
+    delete globalThis.localStorage;
+  }
 });

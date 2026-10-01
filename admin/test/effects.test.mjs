@@ -135,3 +135,76 @@ test('title case capitalizes every word except articles', () => {
   assert.equal(titleCase('pixel size (small screens)'), 'Pixel Size (Small Screens)');
   assert.equal(titleCase('convert to WebP'), 'Convert To WebP');
 });
+
+test('knight settings: switches, choices from his own lists, ranged numbers; the admin can pick any of them', async () => {
+  const c = content();
+  assert.deepEqual(Object.keys(c.effects.knight).sort(), Object.keys(DEFAULT_EFFECTS.knight).sort());
+  assert.deepEqual(Object.keys(DEFAULT_EFFECTS.knight), ['show', 'arrival', 'restMin', 'restMax', 'helmet', 'style', 'finish', 'rim', 'shine', 'seat', 'gestures', 'reactions'],
+    'every option, in the order the admin shows them');
+  c.effects.knight.helmet = 'sallet';
+  c.effects.knight.show = 'yes';
+  c.effects.knight.gestures = 1;
+  c.effects.knight.cape = true;
+  c.effects.knight.arrival = 'portal';
+  c.effects.knight.style = 'watercolor';
+  c.effects.knight.finish = 'gold';
+  c.effects.knight.seat = 'lying';
+  c.effects.knight.rim = 1.5;
+  c.effects.knight.restMin = '3';
+  assert.deepEqual(paths(c).sort(), ['arrival', 'cape', 'finish', 'gestures', 'helmet', 'restMin', 'rim', 'seat', 'show', 'style'].map((k) => `effects.knight.${k}`).sort());
+  const long = content();
+  long.effects.knight.restMin = 10;
+  long.effects.knight.restMax = 4;
+  assert.deepEqual(paths(long), ['effects.knight.restMax'], 'the longest rest is at least the shortest');
+  const { KNIGHT_ARRIVALS, KNIGHT_FINISHES, KNIGHT_SEATS, KNIGHT_STYLES } = await import('../../src/effectsDefaults.js');
+  const { STYLES, DEFAULT_STYLE } = await import('../../src/bonfire/knightStyles.js');
+  const { FINISHES } = await import('../../src/bonfire/steel.js');
+  assert.deepEqual(KNIGHT_STYLES, Object.keys(STYLES), 'the styles are knightStyles.js’s');
+  assert.deepEqual(KNIGHT_FINISHES, Object.keys(FINISHES), 'the finishes are steel.js’s');
+  const every = { helmet: ['random', 'great', 'armet', 'bascinet'], arrival: KNIGHT_ARRIVALS, style: KNIGHT_STYLES, finish: KNIGHT_FINISHES, seat: KNIGHT_SEATS };
+  for (const [k, list] of Object.entries(every)) {
+    for (const v of list) {
+      const d = content();
+      d.effects.knight[k] = v;
+      assert.deepEqual(paths(d), [], `${k}: ${v}`);
+    }
+  }
+  const { SELECTS, PAGES, LABELS, HELP } = await import('../ui/schema.js');
+  assert.deepEqual(SELECTS['effects.knight.helmet']().map((o) => o.value), ['random', 'great', 'armet', 'bascinet']);
+  assert.deepEqual(SELECTS['effects.knight.helmet']().map((o) => o.label), ['Random Each Summon', 'Great Helm', 'Armet', 'Bascinet']);
+  assert.deepEqual(SELECTS['effects.knight.arrival']().map((o) => o.label), ['Summon Sign', 'There From the Start']);
+  assert.deepEqual(SELECTS['effects.knight.style']().map((o) => o.value), KNIGHT_STYLES);
+  assert.deepEqual(SELECTS['effects.knight.finish']().map((o) => o.label), ['Gunmetal', 'Blackened', 'Polished Steel', 'Burnished']);
+  assert.deepEqual(SELECTS['effects.knight.seat']().map((o) => o.label), ['Resting', 'Watchful']);
+  for (const k of ['helmet', 'arrival', 'style', 'finish', 'seat']) {
+    for (const o of SELECTS[`effects.knight.${k}`]()) assert.equal(o.label, titleCase(o.label), `${k}: “${o.label}” in Title Case`);
+  }
+  assert.ok(PAGES.find((p) => p.id === 'effects').keys.includes('effects.knight'), 'on the Effects page');
+  for (const k of Object.keys(DEFAULT_EFFECTS.knight)) {
+    const label = LABELS[`effects.knight.${k}`];
+    assert.ok(label && HELP[`effects.knight.${k}`], `${k}: a label and a hover hint`);
+    assert.equal(label, titleCase(label), `${k}: written in Title Case (“${label}”)`);
+    if (typeof DEFAULT_EFFECTS.knight[k] === 'number') assert.ok(RANGES[`knight.${k}`], `${k}: a range (a slider)`);
+  }
+  assert.equal(LABELS['effects.knight'], titleCase(LABELS['effects.knight']));
+  assert.doesNotMatch(HELP['effects.knight'], /black plate|gilt/i, 'a knight in steel plate');
+  const e = resolveEffects({});
+  assert.equal(e.knight.helmet, 'random', 'a new helmet each summons by default');
+  assert.equal(e.knight.arrival, 'sign', 'he waits for his summons by default');
+  assert.equal(e.knight.style, DEFAULT_STYLE, 'the knight styles’ default');
+  assert.equal(e.knight.finish, 'gunmetal');
+  assert.ok(e.knight.restMin >= 1 && e.knight.restMin <= e.knight.restMax, 'a long rest');
+});
+
+test('knight armor shine: an on/off switch, on by default, that the admin can turn off', () => {
+  assert.equal(DEFAULT_EFFECTS.knight.shine, true);
+  assert.equal(resolveEffects({}).knight.shine, true);
+  assert.equal(content().effects.knight.shine, true, 'content.json says so too');
+  const off = content();
+  off.effects.knight.shine = false;
+  assert.deepEqual(paths(off), []);
+  assert.equal(resolveEffects(off.effects).knight.shine, false);
+  const bad = content();
+  bad.effects.knight.shine = 'sometimes';
+  assert.deepEqual(paths(bad), ['effects.knight.shine']);
+});

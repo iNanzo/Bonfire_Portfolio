@@ -1,13 +1,12 @@
 import './styles.css';
 import { applyCssPalette, base, flames, flameOr, rotation } from './palette.js';
 import { site, screens, hero, ui, weapons, startingEquipment, items, drawnWeapons } from './content.js';
-import { onEffects, setEffects } from './effects.js';
+import { effects, onEffects, setEffects } from './effects.js';
 import { drawElement, elementOr, flameTitle } from './elements.js';
 import { STRUCTURAL } from './effectsDefaults.js';
-import { validateEffects } from './contentRules.js';
 import {
   renderChrome, renderHome, renderProjects, renderExperience,
-  renderSkills, renderAbout, renderContact,
+  renderSkills, renderAbout, renderContact, sceneLabel,
 } from './render.js';
 import { installDitherPatterns } from './ui/dither.js';
 import { setSound, blip, forgeHum } from './ui/audio.js';
@@ -15,8 +14,10 @@ import { gridNav, listNav } from './ui/spatial.js';
 import { setupInventory } from './ui/inventory.js';
 import { createDiscoveries } from './ui/discoveries.js';
 import { createPhotoMode } from './ui/photo.js';
-import { createBreakdown } from './ui/breakdown.js';
+import { createBreakdown, BREAKDOWN_HASH } from './ui/breakdown.js';
+import { createRenderMenu } from './ui/renderMenu.js';
 import { createPack, bonfireItems } from './ui/pack.js';
+import { HELMET_NAMES, GESTURE_NAMES, STYLE_NAMES, FINISH_NAMES, greeting } from './knightNames.js';
 import { SCENERIES } from './sceneries.js';
 import { applyFlame, setAccentRamp } from './ui/theme.js';
 import { parseRoute, readRoute, routePath, isEditing } from './routes.js';
@@ -27,6 +28,8 @@ const BASE = import.meta.env.BASE_URL;
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const touch = matchMedia('(hover: none)').matches;
+/** The admin's live preview: this page in its frame, the draft's effects streamed in (the end of this file). */
+const previewing = new URLSearchParams(location.search).has('preview') && window.parent !== window;
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
@@ -106,6 +109,22 @@ function sawFlame(key) {
   if (rotation().every((k) => flamesSeen.has(k))) discover('palettes');
 }
 
+// --- The render settings (P: ui/renderMenu.js) --------------------------------------------
+// One menu in two places: a HUD in the corner, or folded into the breakdown's panel while
+// that's open (the HUD would sit behind it). Opening one while the other shows hands over.
+const renderSettings = {
+  title: ui.renderMenu ?? 'Render settings',
+  read: () => fire?.describe() ?? null,
+  pick: (id) => fire?.cycle(id),
+  // Back to the site's own look (the effects in content.json). Not mid-swap: it would also
+  // settle the colors the new weapon is bringing in.
+  reset: { key: '0', label: ui.renderReset ?? 'Reset', run: () => fire?.applyEffects(), disabled: () => !fire || fire.forging },
+  onSound: (what) => blip(what === 'open' ? 'select' : what),
+  onToggle: (open) => { if (open) discover('render'); },
+};
+const hud = createRenderMenu({ ...renderSettings, className: 'debug-hud' });
+app.append(hud.el);
+
 // --- Photo mode and "How it's made" (ui/photo.js, ui/breakdown.js). Created before the
 // page's own keys, so their Esc closes them without also going back a screen.
 const photo = createPhotoMode({
@@ -118,7 +137,33 @@ const photo = createPhotoMode({
   },
   onEnter: () => { breakdown.exit(); discover('photo'); },
 });
-const breakdown = createBreakdown({ getFire: () => fire, onEnter: () => { photo.exit(); discover('breakdown'); } });
+// Closing the breakdown hands its open render settings back to the HUD only where P can
+// close that again: on touch screens there's no key for it, so they just fold away.
+const breakdown = createBreakdown({
+  getFire: () => fire,
+  render: renderSettings,
+  onEnter: () => {
+    photo.exit();
+    if (hud.isOpen) { hud.close({ quiet: true }); breakdown.render.open({ quiet: true }); }
+    pack.refresh(); // (it steps aside: its list, if one's showing, fits where it goes)
+    discover('breakdown');
+  },
+  onExit: () => {
+    if (breakdown.render.isOpen) {
+      breakdown.render.close({ quiet: true });
+      if (!touch) hud.open({ quiet: true });
+    }
+    pack.refresh();
+  },
+});
+// A link to the breakdown (the Portfolio project's "Take This Page Apart", or the address
+// itself) opens it now, or once the scene has loaded. Without WebGL there's nothing to take
+// apart (failScene hides the ways in).
+let wantsBreakdown = false;
+function openBreakdown() {
+  if (fire) breakdown.enter();
+  else if (!document.documentElement.classList.contains('no-webgl')) wantsBreakdown = true;
+}
 
 // --- Equipment (weapon + flame + element in the fire) ---------------------------------------
 const weaponKeys = drawnWeapons(); // (the ones in the random draw: the admin can switch some off)
@@ -296,8 +341,11 @@ function render(next, user) {
 // Native links remain crawlable and open correctly in new tabs. Only ordinary
 // same-origin route clicks are enhanced into in-place navigation.
 function syncRoute(user = true) {
+  const breakdownLink = location.hash === BREAKDOWN_HASH; // (the address loses it just below)
   const next = parseHash();
   history.replaceState(null, '', routePath(next, BASE) + location.search);
+  if (breakdownLink) openBreakdown();
+  if (breakdownLink && route.screen === next.screen && route.item === next.item) return; // (only the breakdown was asked for)
   render(next, user);
 }
 window.addEventListener('popstate', () => syncRoute());
@@ -305,10 +353,10 @@ window.addEventListener('hashchange', () => syncRoute());
 document.addEventListener('click', (event) => {
   const a = event.target.closest('a');
   if (!a || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || a.target || a.hasAttribute('download')) return;
-  // A link to #how-its-made (Bonfire Live's page: the site is the same engine) opens the breakdown.
-  if (a.hash === '#how-its-made') {
+  // A link to #how-its-made (the Portfolio project's page) opens the breakdown in place.
+  if (a.hash === BREAKDOWN_HASH) {
     event.preventDefault();
-    breakdown.enter();
+    openBreakdown();
     return;
   }
   if (a.classList.contains('skip-link')) {
@@ -334,8 +382,8 @@ window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (k === 'f') { photo.toggle(); return; }
   if (k === 'b') { breakdown.toggle(); return; }
+  if (k === 'i' && !photo.active) { pack.toggle(); return; } // (the pack stays in the breakdown)
   if (photo.active || breakdown.active) return;
-  if (k === 'i') { pack.toggle(); return; }
   if (k === 'q' || k === 'e') step(k === 'e' ? 1 : -1);
   else if (e.key === 'Escape') {
     if (!q('[data-kindled]').hidden) return;
@@ -442,7 +490,11 @@ if (store.get('sound') === '1') {
 
 // --- The résumé: its links show once there's a file to open (public/resume.pdf, or a link) --
 if (site.resumeUrl) {
-  const show = () => qa('[data-resume]').forEach((el) => { el.hidden = false; });
+  // (The menu's arrow keys take its link only once it shows: a hidden one would stop them.)
+  const show = () => {
+    qa('[data-resume]').forEach((el) => { el.hidden = false; });
+    qa('[data-menu-item-later]').forEach((a) => a.setAttribute('data-menu-item', ''));
+  };
   if (/^https?:/i.test(site.resumeUrl)) show();
   else {
     // (The dev server answers any path with the page itself, so check it's really a PDF.)
@@ -516,6 +568,8 @@ document.addEventListener('click', (e) => {
   // Clicking the fire draws a new weapon and flame — except in the inventory,
   // where the fire holds the inspected project's weapon (there it just stokes).
   if (e.target.closest('[data-stage], [data-stoke]')) {
+    // A click on the knight's summon sign (he's away) summons him.
+    if (fire && e.target.closest('[data-stage]') && fire.signAt(e.clientX, e.clientY) && summonKnight()) return;
     // A click while a new weapon is being forged skips ahead to its impact.
     if (fire?.forging && !fire.swinging && fire.hurry()) { blip('select'); discover('hurry'); return; }
     // A click on the planted weapon wakes it: it pulls free for a flourish and plunges back.
@@ -524,6 +578,11 @@ document.addEventListener('click', (e) => {
       fire.flourish().then((ok) => { if (ok) blip('stab'); });
       discover('flourish');
       return;
+    }
+    // A click on the knight greets him: he answers with a gesture (and the fire isn't stoked).
+    if (fire && greets()) {
+      const index = fire.knightAt(e.clientX, e.clientY);
+      if (index >= 0) { greet(index); return; }
     }
     stoke();
     if (route.screen !== 'projects') rollFor(null);
@@ -541,40 +600,168 @@ document.addEventListener('click', (e) => {
   fire?.puff(0.3);
 });
 
+// --- The knight who comes to the fire (bonfire/knights.js) ------------------------------------
+// He isn't there when the page opens: his summon sign glows on the ground by his seat, and a
+// click on it (or the pack's "Summon") calls him. He forms out of it in the current
+// element's way (scene.js, bonfire/knightArrival.js), rests a long while (effects.knight's
+// rest), then burns away into it again; the pack's "Send Him Off" sends him sooner. The
+// admin can have him there from the start instead (effects.knight.arrival 'start').
+//
+// A click on him while he rests is a greeting: he answers with a gesture, never the same one
+// twice running, and Praise the Sun most of all (always the first time). effects.knight.gestures
+// turns that off (then a click on him stokes the fire like anywhere else), and so does
+// reduced motion, where he sits still. The pack dresses him: his helmet (a new one each
+// summons unless the visitor picks one: then that one, remembered in this browser, and
+// scene.js starts him in it), his style and his armor's finish (a visitor's pick is
+// remembered too, and put on him as the scene loads; the admin's preview shows the draft's
+// settings instead), and a gesture on request (the Default Dance too).
+//
+// Whether he may come at all: effects.knight.show, and his model having loaded (it's its own
+// file; without it, or without WebGL, the fire burns alone). fire.knights.presence, followed
+// through onPresence, says where he is. The scene's description follows him: his sentence
+// while he's by the fire, his sign's while he's away, nothing where he can't come; and the
+// discoveries only he gives leave the count where he can't come (knightChanged).
+const KNIGHT_HELMET = 'knightHelmet'; // (the store keys)
+const KNIGHT_STYLE = 'knightStyle';
+const KNIGHT_FINISH = 'knightFinish';
+const KNIGHT_FINDS = ['summon', 'knight', 'helm', 'style']; // (the discoveries only he gives)
+let lastGreeting = null;
+let knightModel = null; // his model loaded (true), didn't (false), or not known yet (null)
+const hasKnight = () => knightModel === true && effects.knight.show;
+/** Where he is: 'away' (his sign waits), 'arriving', 'resting', 'leaving'. */
+const knightPresence = () => fire?.knights.presence ?? 'away';
+/** He's by the fire now (not away: forming, resting or leaving). */
+const knightHere = () => hasKnight() && knightPresence() !== 'away';
+const greets = () => effects.knight.gestures && !reducedMotion && hasKnight() && knightPresence() === 'resting';
+function knightChanged() {
+  // (Until the scene loads there's no sign drawn yet; there from the start, he's described
+  // from the first.)
+  const allowed = knightModel === null ? effects.knight.show : hasKnight();
+  const here = knightModel === null ? effects.knight.show && effects.knight.arrival === 'start' : knightHere();
+  const label = q('#scene-label');
+  const text = sceneLabel(here ? true : allowed && knightModel === true ? 'sign' : false);
+  if (label && label.textContent !== text) label.textContent = text;
+  // Where he can't come, what only he gives leaves the count. 'knight' is a greeting (a click on
+  // him, or a gesture from the pack): motion, so never for reduced motion.
+  discoveries.setOut(allowed ? (reducedMotion ? ['knight'] : []) : KNIGHT_FINDS);
+  drawDiscoveryCount();
+  pack.refresh();
+}
+/** The knight's helmet for the pack: null while he isn't there (hidden, or no model). */
+const knightHelmet = () => (fire?.knights.list[0]?.present ? fire.knights.helmet : null);
+function greet(index) {
+  const name = greeting(lastGreeting);
+  if (!fire?.knights.gesture(name, { index })) return;
+  lastGreeting = name;
+  blip('select');
+  discover('knight');
+  live.textContent = `The knight answers: ${GESTURE_NAMES[name]}.`;
+}
+/** Summon him from his sign (a click on it, or the pack): he forms out of it in the current element's way. False if he can't come now. */
+function summonKnight() {
+  if (!hasKnight() || !fire?.knights.summonKnight()) return false;
+  blip('form');
+  discover('summon');
+  live.textContent = 'The knight answers the summons.';
+  return true;
+}
+/** Send him off (the pack): he burns away into his sign. False if he isn't resting there. */
+function dismissKnight() {
+  if (knightPresence() !== 'resting' || !fire?.knights.dismissKnight()) return false;
+  blip('back');
+  live.textContent = 'The knight burns away into his sign.';
+  return true;
+}
+/** The style he's changing into (the pack marks it at once; the change takes ~1.2 s, a style's own model loads first). */
+let styleGoal = null;
+const knightStyle = () => styleGoal ?? fire?.knights.style ?? null;
+/** His style (the pack): he burns away and forms again in it. Remembered for the next visit. False if nothing changes. */
+function changeStyle(key, { remember = true } = {}) {
+  if (!fire || !Object.hasOwn(STYLE_NAMES, key) || key === knightStyle() || knightPresence() !== 'resting') return false;
+  if (remember) store.set(KNIGHT_STYLE, key);
+  styleGoal = key;
+  const now = fire;
+  now.knights.setStyle(key).finally(() => {
+    if (styleGoal === key) styleGoal = null;
+    if (fire === now) pack.refresh(); // (the finishes are the steel styles')
+  });
+  if (!reducedMotion) setTimeout(() => blip('form'), 700);
+  live.textContent = `The knight is drawn anew: ${STYLE_NAMES[key]}.`;
+  return true;
+}
+/** His armor's finish (the pack): the steel's color changes at once. Remembered for the next visit. False if nothing changes. */
+function changeFinish(key, { remember = true } = {}) {
+  if (!fire || !Object.hasOwn(FINISH_NAMES, key) || key === fire.knights.finish || knightPresence() !== 'resting') return false;
+  if (remember) store.set(KNIGHT_FINISH, key);
+  fire.knights.setFinish(key);
+  live.textContent = `His armor turns ${FINISH_NAMES[key]}.`;
+  return true;
+}
+/** Put a helmet on him (the pack): the swap takes 1.6 s, and a shimmer as the new one forms. False if nothing changes. */
+function changeHelmet(key, { remember = true } = {}) {
+  if (!fire || !HELMET_NAMES[key] || key === knightHelmet() || !knightHelmet()) return false;
+  if (remember) store.set(KNIGHT_HELMET, key);
+  fire.knights.setHelmet(key, { index: 0 });
+  if (!reducedMotion) setTimeout(() => blip('form'), 1200);
+  live.textContent = `The knight puts on the ${HELMET_NAMES[key]}.`;
+  return true;
+}
+
 // --- Hover effects: what a click on the scene will do ----------------------------------------
-// Over the planted weapon its rim glows (a click wakes it); over the fire it flares up (a
-// click stokes it, or skips ahead while a new weapon is being forged). The effects are in
-// the scene itself (scene.js hoverAt); here the cursor turns to a pointer. Mouse and pen
-// only; checked at most ~12 times a second.
+// Over the planted weapon its rim glows (a click wakes it); over the knight's summon sign it
+// brightens and its motes rise (a click summons him); over the knight his rim warms and he
+// looks up at you (a click greets him: only while it does, greets()); over the fire
+// it flares up (a click stokes it, or skips ahead while a new weapon is being forged). The
+// effects are in the scene itself (scene.js hoverAt); here the cursor turns to a pointer.
+// Mouse and pen only; checked at most ~12 times a second (and once more where the pointer
+// comes to rest).
 let hoverAt = 0;
 let hoverWhat = null;
+let hoverInScene = false; // (something in the scene shows its hover, pointer or not)
+let hoverTimer = 0;
 const stageEl = q('[data-stage]');
 function setHover(what) {
   if (what === hoverWhat) return;
   hoverWhat = what;
-  stageEl.dataset.hover = what ?? '';
+  stageEl.dataset.hover = what ?? ''; // (styles.css turns the cursor to a pointer over what a click works on)
+}
+function checkHover(x, y) {
+  hoverAt = performance.now();
+  // (Not greeting: he's no click target, so no hover of his; the fire behind him is the fire.)
+  let what = fire.hoverAt(x, y, { knight: greets() });
+  hoverInScene = !!what;
+  if (what === 'weapon' && (reducedMotion || fire.forging)) what = 'fire'; // (no flourish then)
+  if (fire.forging && !fire.swinging && what && what !== 'sign') what = 'skip';
+  setHover(what);
+}
+function leaveHover() {
+  clearTimeout(hoverTimer);
+  if (hoverInScene) fire?.hoverOff();
+  hoverInScene = false;
+  setHover(null);
 }
 window.addEventListener('pointermove', (e) => {
   if (e.pointerType === 'touch' || !fire) return;
   const onStage = e.target.closest?.('[data-stage]') && !photo.active && !breakdown.active;
-  if (!onStage) { if (hoverWhat) { fire.hoverOff(); setHover(null); } return; }
-  const now = performance.now();
-  if (now - hoverAt < 80) return;
-  hoverAt = now;
-  let what = fire.hoverAt(e.clientX, e.clientY);
-  if (what === 'weapon' && (reducedMotion || fire.forging)) what = 'fire'; // (no flourish then)
-  if (fire.forging && !fire.swinging && what) what = 'skip';
-  setHover(what);
+  if (!onStage) { if (hoverInScene || hoverWhat) leaveHover(); return; }
+  clearTimeout(hoverTimer);
+  const wait = 80 - (performance.now() - hoverAt);
+  const { clientX: x, clientY: y } = e;
+  if (wait > 0) hoverTimer = setTimeout(() => { if (fire) checkHover(x, y); }, wait); // (the last move counts too)
+  else checkHover(x, y);
 }, { passive: true });
-document.documentElement.addEventListener('pointerleave', () => { fire?.hoverOff(); setHover(null); });
+document.documentElement.addEventListener('pointerleave', leaveHover);
 
-// --- The pack (ui/pack.js): swap the scene or the weapon, or cast a spell -------------------
-// Weapons and spells follow what was last asked for (the gem moves as you pick), the scene
-// what's there now.
+// --- The pack (ui/pack.js): fast travel, swap the weapon, cast a spell, or tend the knight --
+// Weapons and spells follow what was last asked for (the gem moves as you pick), the place
+// (the scenery the Map travels to) what's there now.
 const pack = createPack({
   label: ui.pack,
   items: bonfireItems({
-    state: () => (fire ? { scenery: fire.scenery, weapon: equipment.weapon, element: equipment.element, flame: equipment.flame } : null),
+    state: () => (fire ? {
+      scenery: fire.scenery, weapon: equipment.weapon, element: equipment.element, flame: equipment.flame,
+      helmet: knightHelmet(), presence: knightPresence(), style: knightStyle(), finish: fire.knights.finish,
+    } : null),
     busy: () => !fire || fire.forging,
     reducedMotion,
     onScene: (key) => {
@@ -609,20 +796,50 @@ const pack = createPack({
       equip(equipment.weapon, key, equipment.item);
       discover('spell');
     },
+    // The knight: summoned while he's away; by the fire, a new helmet, style or finish (kept
+    // for your next visit), a gesture on request (a greeting as much as a click on him is: the
+    // keyboard's way to one), or sent off. Only where he may come (hasKnight): otherwise the
+    // pack leaves the item out.
+    onSummon: () => summonKnight(),
+    onDismiss: () => dismissKnight(),
+    onHelmet: (key) => { if (changeHelmet(key)) discover('helm'); },
+    onStyle: (key) => { if (changeStyle(key)) discover('style'); },
+    onFinish: (key) => { if (changeFinish(key)) discover('style'); },
+    onGesture: (name) => {
+      if (!fire?.knights.gesture(name, { index: 0 })) return; // (false: he didn't start it, e.g. mid-swap)
+      lastGreeting = name;
+      discover('knight');
+      live.textContent = `The knight: ${GESTURE_NAMES[name]}.`;
+    },
+    hasKnight,
   }),
   onSound: (kind) => blip(kind === 'open' ? 'pack' : kind),
   onOpen: () => discover('pack'),
+  clearTop: () => header.getBoundingClientRect().bottom, // (the header is over the pack's lists)
 });
 app.append(pack.el);
+knightChanged();
 
 // --- The bonfire --------------------------------------------------------------------------
+// Without WebGL there's no scene: the page stays, and the ways into what needs one go
+// (photo mode and the breakdown in the rest menu; styles.css hides the rest, like the
+// Portfolio's "Take This Page Apart").
 function failScene(error) {
   fire?.dispose();
   fire = null;
   delete window.__fire;
   document.documentElement.classList.add('no-webgl');
   q('[data-stage]').classList.remove('is-ready');
-  q('[data-debug]').hidden = true;
+  hud.close({ quiet: true });
+  breakdown.exit();
+  photo.exit();
+  wantsBreakdown = false;
+  for (const b of qa('[data-menu-action="photo"], [data-menu-action="breakdown"]')) {
+    b.closest('li').hidden = true;
+    b.removeAttribute('data-menu-item'); // (out of the menu's arrow keys too)
+  }
+  knightModel = false;
+  knightChanged();
   displayedEquipment = { ...equipment };
   applyFlame(equipment.flame);
   refreshEquipLabels();
@@ -635,11 +852,25 @@ function startScene() {
   const generation = ++sceneGeneration;
   return import('./bonfire/scene.js').then(async ({ createBonfire }) => {
     const stage = q('[data-stage]');
-    const candidate = createBonfire(stage, { reducedMotion, onImpact, onFormed: () => blip('form'), onRamp: setAccentRamp, onError: failScene });
+    const candidate = createBonfire(stage, {
+      reducedMotion, knightHelmet: store.get(KNIGHT_HELMET), onImpact, onFormed: () => blip('form'), onRamp: setAccentRamp, onError: failScene,
+    });
     await candidate.ready;
     if (generation !== sceneGeneration) { candidate.dispose(); return; } // superseded by a newer rebuild
     fire = candidate;
+    styleGoal = null; // (a style change under way was the last scene's)
     if (import.meta.env.DEV) window.__fire = fire;
+    // (His model comes with the scene's: known now, or at once after.)
+    fire.knights.ready.then((ok) => { if (fire === candidate) { knightModel = ok; knightChanged(); } });
+    // (He comes and goes: the page follows.)
+    fire.knights.onPresence(() => { if (fire === candidate) knightChanged(); });
+    // (A visitor's style and finish from an earlier visit; the admin's preview shows the draft's.)
+    if (!previewing) {
+      const style = store.get(KNIGHT_STYLE);
+      const finish = store.get(KNIGHT_FINISH);
+      if (Object.hasOwn(STYLE_NAMES, style)) fire.knights.setStyle(style, { instant: true });
+      if (Object.hasOwn(FINISH_NAMES, finish)) fire.knights.setFinish(finish);
+    }
     fire.setView(route.screen === 'projects' && route.item ? 'inspect' : route.screen, { instant: true });
     // Navigation during loading only changes requested state; initialize with its latest value.
     await fire.equip(equipment.weapon, equipment.flame, { instant: true, item: equipment.item, element: equipment.element });
@@ -649,12 +880,7 @@ function startScene() {
 
 startScene().then(async () => {
     if (!fire) return;
-    // Render debug HUD: P toggles, 1–5 cycle settings.
-    const hud = q('[data-debug]');
-    const drawHud = (dsc) => {
-      hud.innerHTML = `<b>RENDER DEBUG</b> (P to close)<br>[1] pixel ${dsc.pixel}<br>[2] palette ${dsc.palette}<br>[3] dither ${dsc.dither}<br>[4] matrix ${dsc.matrix}<br>[5] outlines ${dsc.outlines}<br>[6] cursor ${dsc.interaction}`;
-    };
-    const keys = { 1: 'pixel', 2: 'palette', 3: 'dither', 4: 'matrix', 5: 'outlines', 6: 'interaction' };
+    if (wantsBreakdown) { wantsBreakdown = false; breakdown.enter(); }
 
     // Cursor-interaction lab (prototype picker): open the site with ?lab.
     if (new URLSearchParams(location.search).has('lab')) {
@@ -676,11 +902,11 @@ startScene().then(async () => {
         document.body.appendChild(lab);
       });
     }
+    // The render settings' keys (P, and while it's open 1–6 and 0). The breakdown takes
+    // them first while it's open (its own fold of the menu).
     window.addEventListener('keydown', (e) => {
-      if (!fire) return;
-      if (e.altKey || e.ctrlKey || e.metaKey || isEditing(e.target) || document.querySelector('dialog[open]')) return;
-      if (e.key === 'p' || e.key === 'P') { hud.hidden = !hud.hidden; drawHud(fire.describe()); }
-      else if (!hud.hidden && keys[e.key]) drawHud(fire.cycle(keys[e.key]));
+      if (!fire || breakdown.active || isEditing(e.target) || document.querySelector('dialog[open]')) return;
+      if (hud.handleKey(e)) e.preventDefault();
     });
   });
 
@@ -706,17 +932,23 @@ onEffects((next, prev) => {
     }, 300);
   }
   fire?.applyEffects();
+  knightChanged(); // (effects.knight.show)
 });
 
-if (new URLSearchParams(location.search).has('preview') && window.parent !== window) {
+if (previewing) {
   document.documentElement.classList.add('is-preview');
+  // (The content rules only load here: they bring the scene format and Bonfire Live's tables
+  // with them, which no visitor's first load should carry. Drafts apply in the order sent.)
+  const rulesReady = import('./contentRules.js');
   window.addEventListener('message', (e) => {
     if (e.source !== window.parent || typeof e.data?.type !== 'string') return;
     const msg = e.data;
     if (msg.type === 'nh:effects') {
-      let ok = true;
-      validateEffects(msg.effects, () => { ok = false; });
-      if (ok) setEffects(msg.effects);
+      rulesReady.then(({ validateEffects }) => {
+        let ok = true;
+        validateEffects(msg.effects, () => { ok = false; });
+        if (ok) setEffects(msg.effects);
+      }, () => { /* the rules didn't load: the draft isn't shown */ });
     } else if (msg.type === 'nh:flame' && Object.hasOwn(flames, msg.id)) {
       // Forge it (a new weapon, the full swap), or just show it: recolor in place.
       if (msg.instant) { if (equipment.flame !== msg.id) equip(equipment.weapon, msg.id, equipment.item, { instant: true }); }
@@ -732,6 +964,14 @@ if (new URLSearchParams(location.search).has('preview') && window.parent !== win
       if (msg.key !== equipment.weapon) equip(msg.key, equipment.flame, equipment.item);
     } else if (msg.type === 'nh:flourish') {
       if (fire && !fire.forging) fire.flourish();
+    } else if (msg.type === 'nh:helmet' && Object.hasOwn(HELMET_NAMES, msg.key)) {
+      changeHelmet(msg.key, { remember: false }); // (the admin is trying it: not this browser's pick)
+    } else if (msg.type === 'nh:gesture' && Object.hasOwn(GESTURE_NAMES, msg.name)) {
+      fire?.knights.gesture(msg.name, { index: 0 });
+    } else if (msg.type === 'nh:knight') {
+      // (The admin trying his arrival and leaving, in the fire's current element.)
+      if (msg.do === 'summon') summonKnight();
+      else if (msg.do === 'dismiss') dismissKnight();
     } else if (msg.type === 'nh:screen' && order.includes(msg.screen)) {
       go(msg.screen === 'home' ? '#/' : `#/${msg.screen}`);
     }

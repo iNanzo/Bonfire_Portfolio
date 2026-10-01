@@ -107,7 +107,9 @@
       "show": "first",
       "duration": 2600
     },
-    "sceneLabel": "A pixel-art bonfire burning among ruins, a weapon planted in its flames, beside a broken stone pillar with candles and a crumbling wall."
+    "sceneLabel": "A pixel-art bonfire burning among ruins, a weapon planted in its flames, beside a broken stone pillar with candles and a crumbling wall.",
+    "sceneKnight": "A knight in steel plate sits beside the fire.",
+    "sceneSign": "A summon sign glows on the ground beside it, waiting to call a knight to the fire."
   },
   "sections": {
     "projects": {
@@ -213,6 +215,77 @@
       "hidden": true
     },
     {
+      "id": "portfolio",
+      "name": "Bonfire Portfolio",
+      "kind": "Interactive portfolio & real-time renderer",
+      "year": "2026",
+      "status": "Live",
+      "summary": "The site you’re on: a 3D bonfire drawn as pixel art that burns behind every page, forges a new weapon for each project you open, and can be taken apart to show how it’s made.",
+      "outcome": "",
+      "problem": "Portfolios tend to read like résumés. I wanted mine to play like the games I make, without slowing down someone who only wants to skim the projects.",
+      "built": "A Three.js scene drawn small in three passes (normals, lit color, glowing particles) and finished by one pixel pass that outlines, dithers and snaps every pixel to the flame’s palette. The fire is particles carried by a curl-noise flow field. Opening a project forges one of 23 Blender-modeled weapons in fire, lightning or ice; a pack swaps between five places to burn, the weapons and spells; and a knight in steel plate answers a summon sign glowing on the ground, forming out of it in the fire’s element, resting a while and burning away again, drawn in a hand-drawn pixel-art style the pack can change. Around it: photo mode, discoveries, a title, description and social image for every page, and an admin whose live preview shows every effect before it commits the change to GitHub. Bonfire Live and its scene editor, the Bonfire Painter, run on the same engine.",
+      "role": "Design, 3D modeling, rendering & development",
+      "tech": [
+        "Three.js",
+        "GLSL",
+        "JavaScript",
+        "Vite",
+        "Blender",
+        "Cloudflare Workers"
+      ],
+      "flavor": "Every fire can be taken apart. This one wants to be.",
+      "note": "Works by keyboard throughout. Phones get fewer particles and no shadows; reduced motion gets a calmer fire and instant camera cuts.",
+      "links": [
+        {
+          "label": "Take This Page Apart",
+          "href": "#how-its-made"
+        },
+        {
+          "label": "Open Bonfire Live",
+          "href": "visualizer/"
+        }
+      ],
+      "images": [
+        {
+          "src": "assets/projects/portfolio/final",
+          "alt": "The pixel-art bonfire in the Gothic ruins, a sword planted in its flames and a knight in steel plate and a great helm resting beside it on a low fallen drum by a broken pillar, knees up, the fire lighting his helm, pauldrons and knees in orange and cream; candles at the pillar’s foot, a crumbling wall on the right",
+          "caption": "The final image",
+          "pixel": true
+        },
+        {
+          "src": "assets/projects/portfolio/normals",
+          "alt": "The same view as surface normals, every face tinted by the way it faces, the knight’s plates and helm as clear as the stones: the data the outline pass reads",
+          "caption": "Normals & depth: where the outlines come from",
+          "pixel": true
+        },
+        {
+          "src": "assets/projects/portfolio/lighting",
+          "alt": "The same view lit by the fire, the fireflies and the moon but not yet cut down to the palette: smooth light and the fire’s shadows on the ruins, the knight’s steel plate already shaded in flat bands, grey in shadow and orange and cream where the fire catches it, and no particles",
+          "caption": "Lighting, before the particles",
+          "pixel": true
+        },
+        {
+          "src": "assets/projects/portfolio/particles",
+          "alt": "Only the particle layer: the fire’s flames, sparks and embers glowing on black",
+          "caption": "The particles on their own",
+          "pixel": true
+        },
+        {
+          "src": "assets/projects/portfolio/flow",
+          "alt": "The same view with the flow field drawn over the fire as a tangle of bright strokes, showing where each bit of flame is carried right now",
+          "caption": "The flow field that moves the fire",
+          "pixel": true
+        },
+        {
+          "src": "assets/projects/portfolio/knight",
+          "alt": "Close on the knight resting by the bonfire in the Gothic ruins: steel plate and a great helm drawn like a hand-drawn pixel-art sprite, in flat bands of grey, orange and cream, sitting on a low drum with his forearms on his knees, the fire catching the face of his helm, his pauldrons and a greave; candles at the foot of the pillar behind him, the planted sword glowing and the burning logs on the right",
+          "caption": "The knight resting by the fire (the great helm, one of his three)",
+          "pixel": true
+        }
+      ],
+      "todo": "Confirm the name (Bonfire Portfolio?) and the write-up, add a result line once there is one (visitors, a reaction, where it was shared), and link the repo if it’s public."
+    },
+    {
       "id": "bonfire-live",
       "name": "Bonfire Live",
       "kind": "Audio-reactive visualizer",
@@ -221,7 +294,7 @@
       "summary": "This site’s bonfire turned into a live visualizer for DJ sets: it hears the beat, the build-ups and the drops, and answers with fire, lightning and ice.",
       "outcome": "Runs a live show from one laptop: it locks to the DJ’s beat by ear or through Ableton Link, and plays full screen on a projector.",
       "problem": "Most visualizers only follow loudness, so a build-up and a drop look alike and nothing on screen feels like it’s performing with the DJ.",
-      "built": "A browser visualizer on the portfolio’s pixel-art renderer: beat and tempo tracking, section detection that forges a new weapon in the breakdown and strikes it on the drop, a living blade that fights on the beat with cinematic follow cameras, rave looks (kaleidoscope, mirrors, echo, glitch) and palettes generated on the fly.",
+      "built": "A browser visualizer on the portfolio’s pixel-art renderer: beat and tempo tracking, section detection that forges a new weapon in the breakdown and strikes it on the drop, a living blade that fights on the beat with cinematic follow cameras, rave looks (kaleidoscope, mirrors, echo, glitch) and palettes generated on the fly. Up to four knights rest by the fire in any of the knight’s styles and get up to dance on the drop (the Default Dance among their moves), and a Render tab sets how the picture is drawn: pixel size, palette, dither, outlines, fog and x-ray views of its passes. Preset Scenes, painted in the Bonfire Painter, set all of it at once (the place, the colors, the framing and its move, the look, the knights, the render), and the show loops through them, each arriving in a drop’s flash or on a phrase line.",
       "role": "Design, rendering & audio analysis",
       "tech": [
         "Three.js",
@@ -237,8 +310,12 @@
           "href": "visualizer/"
         },
         {
-          "label": "Take This Page Apart",
-          "href": "#how-its-made"
+          "label": "Make Its Scenes in the Painter",
+          "href": "projects/bonfire-painter/"
+        },
+        {
+          "label": "The Portfolio It Runs On",
+          "href": "projects/portfolio/"
         }
       ],
       "images": [
@@ -264,6 +341,60 @@
         }
       ],
       "todo": "Check the write-up and the result line (swap in where it has been played, if it has). Then record a 20–30 s clip to real music (V in Bonfire Live), save it as public/assets/projects/bonfire-live/clip.mp4 with a clip.webp still beside it, and add it as the first image with Video on."
+    },
+    {
+      "id": "bonfire-painter",
+      "name": "Bonfire Painter",
+      "kind": "Scene editor",
+      "year": "2026",
+      "status": "Live",
+      "summary": "A scene editor for Bonfire Live: paint the place, the fire’s colors, the camera and its slow move, a look and its layers, the knights and the render, watch it play to a silent beat, then send it to Bonfire Live, which loops through scenes like it.",
+      "outcome": "",
+      "problem": "Bonfire Live rolls its own looks, colors and camera shots as the music plays. There was no way to set up a whole scene by hand, keep it, and have the show come back to it.",
+      "built": "A page on Bonfire Live’s own engine and director, holding the scene through the same scene player, so what’s painted is what plays. A panel in ten folding sections reaches every part of a scene: the place, the weapon and element, the flame’s and the scenery’s colors, the camera (orbit it on the stage, or start from one of the show’s shots), the ten looks and their details, the layers, the drops, the render, the knights (style, finish, seat pose, the Default Dance) and the fireflies. Hovering a flame, a look, a shot or a layer shows it on the stage at once; every detail can be pinned or left to the dice, rolled again each time the look comes round. It previews in Still, a silent 124 BPM beat, a silent 16-bar drop loop or the demo track, with undo, a draft that autosaves, and a library of saved scenes with thumbnails, JSON import and export. Play in Bonfire Live hands the scene to an open Bonfire Live tab, or opens one playing it. Bonfire Live’s four built-in scenes were painted here.",
+      "role": "Design & development",
+      "tech": [
+        "Three.js",
+        "JavaScript",
+        "Web Audio",
+        "Vite"
+      ],
+      "flavor": "The fire can be painted too.",
+      "note": "Every field has a “?” that says what it does. On a phone the panel becomes a bottom sheet with a strip of section tabs; with reduced motion it opens on the Still preview. Saved scenes stay in this browser, and Export makes a file of them.",
+      "links": [
+        {
+          "label": "Open the Painter",
+          "href": "painter/"
+        },
+        {
+          "label": "The Show Its Scenes Play In",
+          "href": "projects/bonfire-live/"
+        }
+      ],
+      "images": [
+        {
+          "src": "assets/projects/bonfire-painter/editor",
+          "alt": "The Bonfire Painter open on the Frozen Shrine scene: an ice-blue bonfire before a torii gate and its glowing lantern, a knight in steel plate seated on watch at the left edge, and the panel on the right with its Knights section open (how many knights, the helmet, the Pixel Cel style, the armor finish, edge glow, seat pose and dance), the bar of tools across the top",
+          "caption": "Painting a scene: the Knights section"
+        },
+        {
+          "src": "assets/projects/bonfire-painter/scene",
+          "alt": "Cathedral Kaleidoscope, one of the built-in scenes, full screen: the kaleidoscope folds the cathedral and its violet fire into a rose window, rings of pink and purple panes around a bright, busy center, pale blue lights round its rim",
+          "caption": "A finished scene: Cathedral Kaleidoscope",
+          "pixel": true
+        },
+        {
+          "src": "assets/projects/bonfire-painter/library",
+          "alt": "The Painter’s library drawer open over a golden fire in the ruins: two saved scenes, Blood Rite and Gilded Vigil, above Bonfire Live’s built-in ones, each on a card with its thumbnail, a one-line summary and buttons to play, duplicate and export; the Frozen Shrine card, pointed at, lifts with a dithered glow in its flame’s ice blue",
+          "caption": "The library: saved scenes and the built-in ones"
+        },
+        {
+          "src": "assets/projects/bonfire-painter/live",
+          "alt": "Bonfire Live playing the Forge Rave scene on its demo track: two knights in steel lit purple and cyan dance by a lightning fire in magenta, cyan and yellow, the glitch look splitting their edges, and the HUD along the bottom names the scene: Forge Rave, on its own",
+          "caption": "Played in Bonfire Live, the HUD naming the scene"
+        }
+      ],
+      "todo": "Check the write-up (the role, the problem line) and add a result line once there is one (a set played from scenes painted here, say). The screenshots are re-taken with tools/capture-painter.mjs (npm run dev first)."
     },
     {
       "id": "gamex",
@@ -919,14 +1050,15 @@
     "photo": "Photo mode",
     "photoHint": "Hide the page and frame the fire yourself: drag to orbit, scroll to zoom, then save a picture.",
     "breakdown": "How it’s made",
-    "breakdownHint": "Take the picture apart: the render passes, the flow field that moves the fire, and every particle system.",
+    "breakdownHint": "Take the picture apart: the render passes, the flow field that moves the fire, every particle system and the render settings.",
+    "renderMenu": "Render settings",
+    "renderReset": "Reset to the site’s look",
     "discoveries": "Discoveries",
     "discoveriesFlavor": "Small secrets around the fire. Found ones are remembered on this device.",
     "discovery": "Discovery",
     "pack": "Pack",
-    "packHint": "Hover, tap or press I: swap the scene or the weapon, or cast a spell.",
     "packMap": "Map",
-    "packMapVerb": "Swap Scene",
+    "packMapVerb": "Fast Travel",
     "packAnvil": "Anvil",
     "packAnvilVerb": "Swap Weapon",
     "packTome": "Spell Tome",
@@ -935,6 +1067,14 @@
     "packLiving": "Living Weapon",
     "packSpells": "Swap Spells",
     "packColors": "Bonfire Colors",
+    "packKnight": "Knight",
+    "packKnightVerb": "Summon & Tend",
+    "packHelmets": "Helmets",
+    "packGestures": "Gestures",
+    "packSummon": "Summon",
+    "packDismiss": "Send Him Off",
+    "packStyles": "Styles",
+    "packFinishes": "Armor Finishes",
     "prompts": [
       [
         "Q",
@@ -1204,6 +1344,466 @@
       "exposure": 1.45,
       "colorChange": 0.34,
       "shake": true
+    },
+    "knight": {
+      "show": true,
+      "arrival": "sign",
+      "restMin": 3,
+      "restMax": 5,
+      "helmet": "random",
+      "style": "pixel-cel",
+      "finish": "gunmetal",
+      "rim": 0.5,
+      "shine": true,
+      "seat": "resting",
+      "gestures": true,
+      "reactions": true
     }
-  }
+  },
+  "scenes": [
+    {
+      "v": 1,
+      "id": "cathedral-kaleidoscope",
+      "name": "Cathedral Kaleidoscope",
+      "music": "hold",
+      "place": {
+        "scenery": "cathedral",
+        "weapon": "flamberge",
+        "element": "fire"
+      },
+      "colors": {
+        "flame": {
+          "lo": "#142591",
+          "mid": "#8a2be2",
+          "hi": "#ea86f4",
+          "core": "#f2b0ff",
+          "shade": "#21293e",
+          "light": 0.12
+        },
+        "scenery": {
+          "void": "#06030e",
+          "shadow": "#1a1226",
+          "stone": "#3d2d49",
+          "wood": "#5a2d7a",
+          "bone": "#7f9cf0"
+        }
+      },
+      "fire": {
+        "level": 0,
+        "size": 0,
+        "height": 0.1,
+        "turbulence": 0,
+        "glow": 0,
+        "windX": 0,
+        "windZ": 0
+      },
+      "camera": {
+        "pos": [
+          -3.7,
+          1.6,
+          5.1
+        ],
+        "target": [
+          0.15,
+          0.7,
+          -0.3
+        ],
+        "fov": 34,
+        "roll": -0.12,
+        "move": {
+          "kind": "sweep",
+          "amount": 0.4,
+          "bars": 16
+        }
+      },
+      "look": {
+        "name": "kaleido",
+        "amount": 1,
+        "params": {
+          "segments": 6
+        }
+      },
+      "layers": {
+        "ghost": "mix",
+        "glow": "on"
+      },
+      "details": {
+        "glowSize": 2.2,
+        "glowCut": 0.45,
+        "glowAmt": 0.35
+      },
+      "blends": {},
+      "drops": {
+        "fx": {
+          "burst": "mix",
+          "spiral": "mix",
+          "kaleido": "on"
+        },
+        "count": 2
+      },
+      "render": {
+        "pixelSize": 4,
+        "palette": "flame",
+        "dither": 0.16,
+        "ditherMatrix": 4,
+        "outlines": "on",
+        "vignette": 0.85,
+        "exposure": 1,
+        "fog": "light",
+        "shadows": true,
+        "flameFps": 12,
+        "xray": null
+      },
+      "knights": {
+        "count": 2,
+        "helmets": [
+          "armet",
+          "bascinet"
+        ],
+        "dance": "on",
+        "formation": "ring",
+        "moves": null,
+        "shine": "on",
+        "reactions": "mix",
+        "finish": "polished",
+        "seat": "resting",
+        "glow": "on",
+        "rim": 1,
+        "style": "pixel-painterly"
+      },
+      "fireflies": {
+        "lit": 12,
+        "show": "twinkle",
+        "moves": null,
+        "speed": 0.8
+      }
+    },
+    {
+      "v": 1,
+      "id": "frozen-shrine",
+      "name": "Frozen Shrine",
+      "music": "hold",
+      "place": {
+        "scenery": "shrine",
+        "weapon": "uchigatana",
+        "element": "ice"
+      },
+      "colors": {
+        "flame": {
+          "lo": "#255b58",
+          "mid": "#33a4c2",
+          "hi": "#b4dcf8",
+          "core": "#f1f4f8",
+          "shade": "#1c2e2d",
+          "light": 0.5
+        },
+        "scenery": {
+          "void": "#00060a",
+          "shadow": "#0c1d28",
+          "stone": "#2c4557",
+          "wood": "#3a5a7a",
+          "bone": "#e2eefc"
+        }
+      },
+      "fire": {
+        "level": 0,
+        "size": -0.1,
+        "height": 0.1,
+        "turbulence": -0.3,
+        "glow": 0,
+        "windX": 0,
+        "windZ": 0
+      },
+      "camera": {
+        "pos": [
+          -2.2,
+          0.55,
+          2.9
+        ],
+        "target": [
+          0.1,
+          0.95,
+          -0.3
+        ],
+        "fov": 44,
+        "roll": 0,
+        "move": {
+          "kind": "still",
+          "amount": 0,
+          "bars": 8
+        }
+      },
+      "look": {
+        "name": "echo",
+        "amount": 1,
+        "params": {
+          "zoomIn": false
+        }
+      },
+      "layers": {
+        "grain": "on",
+        "spotlight": "on"
+      },
+      "details": {
+        "grain": 0.1,
+        "grainKick": 0.05,
+        "spot": 0.62,
+        "spotBreath": 0.05
+      },
+      "blends": {},
+      "drops": {
+        "fx": {
+          "shatter": "on",
+          "burst": "mix"
+        },
+        "count": 1
+      },
+      "render": {
+        "pixelSize": 4,
+        "palette": "flame",
+        "dither": 0.16,
+        "ditherMatrix": 4,
+        "outlines": "on",
+        "vignette": 0.85,
+        "exposure": 1,
+        "fog": "light",
+        "shadows": true,
+        "flameFps": 12,
+        "xray": null
+      },
+      "knights": {
+        "count": 1,
+        "helmets": [
+          "great"
+        ],
+        "dance": "off",
+        "formation": "solo",
+        "moves": null,
+        "shine": "mix",
+        "reactions": "on",
+        "finish": "polished",
+        "seat": "watchful",
+        "glow": "on",
+        "rim": 0.6,
+        "style": "pixel-cel"
+      },
+      "fireflies": {
+        "lit": 6,
+        "show": "breathe",
+        "moves": null,
+        "speed": 0.6
+      }
+    },
+    {
+      "v": 1,
+      "id": "forge-rave",
+      "name": "Forge Rave",
+      "music": "base",
+      "place": {
+        "scenery": "forge",
+        "weapon": "warhammer",
+        "element": "lightning"
+      },
+      "colors": {
+        "flame": {
+          "lo": "#3a0a6e",
+          "mid": "#ff2bd6",
+          "hi": "#3cf2ff",
+          "core": "#f4ff6a",
+          "shade": "#1a0930",
+          "light": 0.5
+        },
+        "scenery": {
+          "void": "#05020a",
+          "shadow": "#150a24",
+          "stone": "#2a1840",
+          "wood": "#3d1f5c",
+          "bone": "#c8f7ff"
+        }
+      },
+      "fire": {
+        "level": 0.15,
+        "size": 0.15,
+        "height": 0.2,
+        "turbulence": 0.4,
+        "glow": 0.2,
+        "windX": 0,
+        "windZ": 0
+      },
+      "camera": {
+        "pos": [
+          1.5,
+          2,
+          5.4
+        ],
+        "target": [
+          0,
+          0.75,
+          0
+        ],
+        "fov": 40,
+        "roll": -0.05,
+        "move": {
+          "kind": "push",
+          "amount": 0.35,
+          "bars": 4
+        }
+      },
+      "look": {
+        "name": "glitch",
+        "amount": 1,
+        "params": {}
+      },
+      "layers": {
+        "scanlines": "mix",
+        "chroma": "mix"
+      },
+      "details": {},
+      "blends": {},
+      "drops": {
+        "fx": {
+          "shatter": "on",
+          "shock": "on",
+          "split": "mix",
+          "crunch": "mix",
+          "slam": "mix"
+        },
+        "count": 2
+      },
+      "render": {
+        "pixelSize": 4,
+        "palette": "flame",
+        "dither": 0.16,
+        "ditherMatrix": 4,
+        "outlines": "on",
+        "vignette": 0.85,
+        "exposure": 1,
+        "fog": "light",
+        "shadows": true,
+        "flameFps": 12,
+        "xray": null
+      },
+      "knights": {
+        "count": 4,
+        "helmets": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "dance": "on",
+        "formation": "mix",
+        "moves": null,
+        "shine": "on",
+        "reactions": "on",
+        "finish": "polished",
+        "seat": "mix",
+        "glow": "on",
+        "rim": 1,
+        "style": "pixel-chiaroscuro"
+      },
+      "fireflies": {
+        "lit": 14,
+        "show": "chase",
+        "moves": null,
+        "speed": 1.6
+      }
+    },
+    {
+      "v": 1,
+      "id": "moonlit-ruins",
+      "name": "Moonlit Ruins",
+      "music": "hold",
+      "place": {
+        "scenery": "ruins",
+        "weapon": "zweihander",
+        "element": "fire"
+      },
+      "colors": {
+        "flame": {
+          "lo": "#2a3c55",
+          "mid": "#6f8fb0",
+          "hi": "#c9d6e6",
+          "core": "#f2efe6",
+          "shade": "#1d2a3a",
+          "light": 0.3
+        },
+        "scenery": null
+      },
+      "fire": {
+        "level": -0.1,
+        "size": 0,
+        "height": 0,
+        "turbulence": -0.2,
+        "glow": 0,
+        "windX": 0.2,
+        "windZ": 0
+      },
+      "camera": {
+        "pos": [
+          -0.6,
+          0.7,
+          2.6
+        ],
+        "target": [
+          -0.85,
+          0.9,
+          -1.3
+        ],
+        "fov": 40,
+        "roll": 0,
+        "move": {
+          "kind": "crane",
+          "amount": 0.5,
+          "bars": 16
+        }
+      },
+      "look": {
+        "name": "haze",
+        "amount": 0.8,
+        "params": {}
+      },
+      "layers": {
+        "ghost": "mix"
+      },
+      "details": {},
+      "blends": {},
+      "drops": null,
+      "render": {
+        "pixelSize": 4,
+        "palette": "moonlit",
+        "dither": 0.16,
+        "ditherMatrix": 4,
+        "outlines": "on",
+        "vignette": 1.1,
+        "exposure": 1,
+        "fog": "thick",
+        "shadows": true,
+        "flameFps": 12,
+        "xray": null
+      },
+      "knights": {
+        "count": 1,
+        "helmets": [
+          "great"
+        ],
+        "dance": "off",
+        "formation": "solo",
+        "moves": null,
+        "shine": "on",
+        "reactions": "on",
+        "finish": "gunmetal",
+        "seat": "resting",
+        "glow": "on",
+        "rim": 1,
+        "style": "blackgold"
+      },
+      "fireflies": {
+        "lit": 16,
+        "show": "twinkle",
+        "moves": null,
+        "speed": 0.7
+      }
+    }
+  ]
 }

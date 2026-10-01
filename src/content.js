@@ -30,6 +30,8 @@
 //     duration in ms. Preview with ?kindled.
 //   - skills[].items[].glyph: the 2–3 letter mark drawn in the slot.
 //   - about.stats: [label, value] rows of the stat sheet.
+//   - scenes (optional): Bonfire Live's preset scenes, made in the Painter and brought in
+//     through the admin's Scenes page (src/scenes.js has the format).
 //   - images[].hidden keeps an image in the repo but off the site; the first
 //     *visible* image is the icon. Hidden images are stripped here, so the rest
 //     of the site never sees them.
@@ -44,6 +46,13 @@ const withShownImages = (p) => (Array.isArray(p.images) ? { ...p, images: p.imag
 export const featured = withShownImages(content.featured);
 export const projects = content.projects.map(withShownImages);
 export const archive = content.archive.map(withShownImages);
+
+/**
+ * Bonfire Live's built-in preset scenes (made in the Bonfire Painter; the format is
+ * src/scenes.js), in loop order. A `hidden` one stays in the list, out of the loop.
+ * @type {object[]}
+ */
+export const scenes = /** @type {any} */ (content).scenes ?? [];
 
 /** The weapons a random draw can pick (the admin's switches; all of them unless switched off). */
 export const drawnWeapons = () => Object.keys(weapons).filter((k) => weaponDraw[k] !== false);

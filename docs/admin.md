@@ -39,7 +39,7 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
 **What it does**
 
 - **Text:** every section: projects, home, about, journey, skills, contact, screen
-  headings and interface text.
+  headings and interface text (the pack's labels too, `ui.pack*`).
 - **Projects:**
   - Add, edit or delete projects. **Move To…** on any project card moves it between
     Featured, Projects and Earlier Explorations (moving one into Featured swaps the old
@@ -72,8 +72,62 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     strength, particle counts (plus the touch-device scale), rendering (pixel size,
     dither, outlines, vignette, exposure, color-change time, screen shake) and the scene's
     base colors. Every section has **Reset to Defaults**.
-  - The preview updates as you drag. "Forge It" on a flame, **Stoke** and **Random
-    Swap** play the effects. Nothing reaches visitors until you save.
+  - **The Knight** (`effects.knight`). He isn't there when a page opens: his summon sign
+    (the NH monogram) glows on the ground by his seat, and a click on it or **Summon** in
+    the pack calls him. He forms out of the sign in the fire's element, rests, then burns
+    away into it again. The settings, in the order the section shows them:
+
+    | Setting | Key | What it does |
+    | --- | --- | --- |
+    | Show the Knight | `show` | Off: no knight and no sign. The pack has no Knight item, and the scene description never mentions him. |
+    | Arrival | `arrival` | **Summon Sign** (`sign`, the default): he waits to be summoned and leaves after his rest. **There From the Start** (`start`): he rests there from the first frame and stays until a visitor sends him off. |
+    | Shortest Rest / Longest Rest | `restMin` / `restMax` | Minutes he rests before he burns away (1–30; each summons rolls between the two; default 3–5). |
+    | Helmet | `helmet` | **Random Each Summon** (a new one each time he comes), or the Great Helm, Armet or Bascinet. |
+    | Style | `style` | How he's drawn (`src/bonfire/knightStyles.js`): Pixel Cel (the default), Pixel Painterly, Pixel Chiaroscuro, Gunmetal, Black & Gold, First Build. A change burns him away and forms him again in it. |
+    | Armor Finish | `finish` | His steel's color (`src/bonfire/steel.js`): Gunmetal, Blackened, Polished Steel or Burnished. Only for the styles that draw steel (all but Black & Gold and First Build). |
+    | Edge Glow | `rim` | 0–1: how strongly his edges catch the fire's color. |
+    | Armor Shine | `shine` | The fire's reflection sweeping over his plate, now and then and when the fire flares. |
+    | Seat Pose | `seat` | **Resting** (slumped) or **Watchful** (leaning in over his knees, forearms on them, head up at the fire). |
+    | Answers a Click | `gestures` | While he rests, a click on him gets a gesture back. |
+    | Reactions | `reactions` | He watches a weapon rise, flinches, leans away from a stoke and lifts his feet for a ring. |
+
+    Visitors can summon him, send him off and change his helmet, style and finish from the
+    pack. Their picks are kept in their browser and win over these settings there; the
+    preview always shows the draft's. Changing a setting here shows at once in the
+    preview. The Home page's scene description (`hero.sceneLabel`) follows him: it adds
+    his sentence (`hero.sceneKnight`) while he's there, his sign's (`hero.sceneSign`,
+    optional) while he's away, and nothing where he can't come. Bonfire Live keeps knight
+    settings of its own.
+  - The preview updates as you drag. "Forge It" on a flame, **Stoke**, **Random Swap**
+    and **Wake the Blade** play the effects. **Knight…** summons the knight or sends him
+    off (his arrival and leaving in the fire's current element). **Helmet…** puts a helmet
+    on him (the full swap, not saved) and **Gesture…** asks him for one. The messages are
+    `nh:knight` (`do`: `summon` | `dismiss`), `nh:helmet` and `nh:gesture`. Nothing
+    reaches visitors until you save.
+- **Scenes** (the Look & Feel page after Effects): Bonfire Live's built-in preset scenes
+  (`content.json` `scenes`; the format is `src/scenes.js`), in the order it loops through
+  them. They're made in the Bonfire Painter (`/painter/`), so a scene's card doesn't list
+  its ~80 settings as fields. The site ships four: Cathedral Kaleidoscope, Frozen Shrine,
+  Forge Rave and Moonlit Ruins (docs/bonfire-live.md has what each is).
+  - **The card:** its colors as swatches (the flame's ramp, then its own scenery colors)
+    and a one-line summary. Opened, it lists what the scene holds part by part (place,
+    camera, look, drops, knights, fireflies, render). Its **Name**, **ID** and **With the
+    Music** are fields. Keep a published scene's id: visitors' saved loops and `?scene=b:<id>`
+    links use it.
+  - **◉ Take Out of the Loop / Put Back in the Loop:** the scene stays in the list, marked
+    **Out of the Loop** (`hidden: true`). Reorder by dragging ⋮⋮ or with ↑/↓.
+  - **Open in Painter ↗** opens the scene in the Painter as it is here, saved or not (it
+    rides in the link: `painter/#scene=<base64url JSON>`). **Copy JSON** copies it.
+    **Replace From Painter…** puts the Painter's version in its place (a file, or pasted
+    JSON), keeping its id and its place in the loop.
+  - **The Painter** row above the list: **Import From Painter…** (a `bonfire-scenes.json`
+    the Painter exported, or pasted JSON; a scene whose id is already here replaces that
+    one if you confirm, else comes in as a copy with a new id), **Open the Painter ↗** and
+    **Export All** (every scene here as `bonfire-scenes.json`, for the Painter's Import).
+  - **Checks:** every scene is validated in full (`validateScenes`). The section is
+    optional, holds up to 48 scenes, and ids must be unique. A problem deep inside a scene
+    is listed on its card with where it is (`look.name: …`). The commit message says
+    "edit scenes". There's no live preview for scenes; **Open in Painter** is the preview.
 - **Hide / show** any entry (◉), and **reorder** any list by dragging ⋮⋮ or with ↑/↓.
 - **Rename** any sidebar page or section heading with ✎ (empty resets it). Renames are
   stored in `content.admin.labels`, which the site ignores.
@@ -93,18 +147,20 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
 
 | Piece | File |
 | --- | --- |
-| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `schema.js` labels/help/grouping, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case, `paletteTools.js` the palette buttons; the generators are `src/paletteGen.js`) |
+| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `schema.js` labels/help/grouping, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case, `paletteTools.js` the palette buttons (the generators are `src/paletteGen.js`), `sceneTools.js` the Scenes page's cards and Painter tools) |
 | Effects defaults, ranges, runtime | `src/effectsDefaults.js`, `src/effects.js`, `src/elements.js` (design notes: `docs/admin-v2.md`, `docs/elements.md`) |
+| The scene format (Painter, Bonfire Live, the Scenes page) | `src/scenes.js` (design notes: `docs/painter.md`, `docs/visualizer.md`) |
 | API: session, content, save, deploy status, image thumbnails | `admin/server/api.js` |
 | Sign-in check (Cloudflare Access JWT) | `admin/server/auth.js` |
 | Content store on GitHub (one commit per save, Git Data API) | `admin/server/github.js` |
 | Content store on disk (local mode) | `admin/server/fsStore.js` |
 | Worker entry + security headers | `admin/worker.js`, `admin/wrangler.toml` |
 | Local server + build | `admin/vite.config.js` |
-| Tests (sign-in, GitHub store, API) | `admin/test/` (`npm run admin:test`) |
+| Tests (sign-in, GitHub store, API, effects, palettes, scenes) | `admin/test/` (`npm run admin:test`) |
 
 The editor is generic: it renders whatever is in `content.json`, so a new field shows
-up without code. `admin/ui/schema.js` only adds labels, help text and grouping.
+up without code. `admin/ui/schema.js` only adds labels, help text and grouping. The
+exceptions are the cards that draw their own body: scenes (`sceneTools.js`).
 
 **Security**
 

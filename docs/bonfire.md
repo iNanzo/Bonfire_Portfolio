@@ -2,7 +2,8 @@
 
 The detailed behavior of the portfolio and its scene, moved out of the README (which is
 now the short version). Design notes for the elements are in [elements.md](elements.md);
-Bonfire Live's are in [visualizer.md](visualizer.md).
+Bonfire Live's are in [visualizer.md](visualizer.md), the Painter's in
+[painter.md](painter.md) and the knight's in [knight.md](knight.md).
 
 ## How it plays
 
@@ -213,7 +214,7 @@ variables (`--accent-hi` for text — every `hi` must be ≥ 4.5:1 on the backgr
 | Piece | File |
 | --- | --- |
 | Blender scene (procedural) | `tools/bonfire.py` |
-| The 16 weapons (procedural, planted point-first) | `tools/weapons.py` |
+| The 23 weapons (procedural, planted point-first) | `tools/weapons.py` |
 | Firefly model | `tools/bonfire.py` (`firefly()`) |
 | Editable source | `assets/source/bonfire.blend` |
 | Preview renders | `assets/source/bonfire-preview.png`, `assets/source/weapons-lineup.png` |
@@ -235,6 +236,16 @@ variables (`--accent-hi` for text — every `hi` must be ≥ 4.5:1 on the backgr
 | Forge lines: double helix, weapon silhouette tracing + echo burst | `src/bonfire/forgeFx.js` |
 | The frame's passes and buffers (and the visualizer's effect stages) | `src/bonfire/frame.js` |
 | Pixel pass: outlines → fire → vignette → Bayer dither → palette (+ the visualizer's effects layer, `FX`) | `src/bonfire/pixelPass.js` |
+| The knight: loading, skinning, seats, reactions, the dancers (`fire.knights`) | `src/bonfire/knights.js` |
+| Where the knights sit, rest, dance and walk (the seats, the dance ring, places, `planWalk`) | `src/bonfire/knightPlaces.js` |
+| The knight's poses: IK, sitting and standing, gestures, reactions, the dance moves | `src/bonfire/knightPose.js` |
+| The knight's armor: his styles' shading, the fire's light and color on his plate | `src/bonfire/armor.js` |
+| His styles (pixel-cel, pixel-painterly, pixel-chiaroscuro, gunmetal, blackgold, first) and finishes (the steel's colors) | `src/bonfire/knightStyles.js`, `src/bonfire/steel.js` |
+| His comings and goings (away → arriving → resting → leaving) and his summon sign | `src/bonfire/knightArrival.js`, `src/bonfire/summonSign.js` |
+| The element's forge run (the weapon swap's, reused for his arrival and leaving) | `src/bonfire/forgeRun.js` |
+| The dissolve's shader helpers (weapons and knights) | `src/bonfire/dissolve.js` |
+| Knight model (procedural) and its web model | `tools/knight.py` → `public/models/knight.glb` |
+| The First Build style's own model: round 8's first build, frozen as it was exported (no tool writes it again; `test/knightModel.test.mjs` guards its rig), fetched only when that style is chosen | `public/models/knight-first.glb` |
 
 Rebuild the model after editing the Python files:
 
@@ -249,8 +260,15 @@ normals on) to `public/models/bonfire.glb`. Keep the names `Weapon_<key>`,
 `CandleFlame_*` and `Glow_*` — the site finds them by name. In the `.blend`, the weapons
 stand in a row in front of the scene; the site places them in the fire.
 
-**Render debug:** press **P**, then **1** pixel size · **2** palette · **3** dither
-strength · **4** Bayer 4×4/8×8 · **5** outlines · **6** cursor interaction.
+**Render settings** (`src/ui/renderMenu.js`): press **P**, then **1** pixel size ·
+**2** palette · **3** dither strength · **4** Bayer 4×4/8×8 · **5** outlines · **6** cursor
+interaction · **0** reset to the site's look (the effects in `content.json`; not while a
+weapon is being forged). Every row is a button too: a click steps it. It shows as a HUD in
+the top-right corner, or inside the breakdown's panel while that's open (see below); the
+two hand over, so P means the same thing in both (except on touch screens, where there's
+no P to close the HUD: closing the breakdown just folds them away). Closed with focus in
+it, the HUD gives focus back to what had it before (`src/ui/focus.js`). Nothing is saved:
+a reload is the site's look again.
 
 ### Weapons
 
@@ -284,6 +302,55 @@ throw sparks. The individual ingredients can be compared with `?lab` (e.g.
 | Part | the flame parts gently around the cursor and flows back together |
 | Draw | the plume leans and reaches toward the cursor |
 
+### The knight
+
+A knight in steel plate comes to the fire in every scenery when he's summoned (see "The
+knight comes when summoned" below; design notes and the model's rig: `docs/knight.md`).
+His model is its own file, fetched alongside the scene's; if it fails to load the fire
+burns without him (a console warning, not an error).
+
+- **Where he sits.** Behind the fire on the left, facing it: the ruins' fallen pillar
+  drum, the cathedral's fallen nave drum, the cult's fallen standing stone, and a stump
+  (the forge) or a resting stone (the shrine) added for him at the end of their builders
+  (`SEATS` in `src/bonfire/knightPlaces.js`, re-exported by `scenery.js`). The seat's
+  height is read from the scenery's height map when he sits, and two-bone IK puts his
+  feet on the ground in front of it. The higher the seat, the deeper he slumps, which
+  keeps his helmet under ~1.2 m (clear of the page's header on phones).
+- **One mesh.** Each knight is one rigidly skinned mesh (every vertex on its piece's
+  bone) plus one for the helmets, geometry shared between knights: two draw calls. The
+  helmets not worn are scaled to nothing. Tassets follow the thighs (the model says how
+  far); the pauldrons ride the arms on their own joints, lag and settle on a spring, and
+  never go into the helmet.
+- **Sprite motion.** Poses step at the fire's 12 frames a second. The fire's shadow is
+  redrawn only on steps with real motion (getting up, a gesture, a flinch, dancing),
+  never for breathing or a glance.
+- **At rest** he breathes, lets his head sink and lifts it, glances about, shifts now and
+  then. **He reacts**: sits up and watches a weapon rise out of the fire (and the living
+  blade in flight), flinches at the impact, leans away from a stoke with an arm up,
+  lifts his feet as a ring passes. **Hovered**, his rim warms and he turns to look at you
+  (`hoverAt` returns `'knight'`; `knightAt()` gives which one).
+- **Armor** (`armor.js`; docs/knight.md has the details): he's drawn in one of his
+  styles (`knightStyles.js`): by default *Pixel Cel*, a hand-drawn sprite with ink lines on
+  every plate edge and flat bands, whose lit plates wear the flame's colors; the other
+  pixel styles, *Gunmetal* (natural light on gunmetal steel), and round 8's looks (*Black
+  & Gold*, *First Build*, its own model loaded when chosen). The steel styles take a
+  finish (`steel.js`: Gunmetal, Blackened, Polished Steel, Burnished) and an edge glow in
+  the fire's color. When the fire flares (a click that stokes it, the cursor coming onto
+  it, a weapon forming or landing, a ring) its reflection sweeps across the whole armor,
+  fading within a second; at rest a gentler sweep runs over him every few seconds. A beat
+  (the visualizer's pulses) widens the reflection for a moment.
+- **The living blade** plans its moves clear of the knights (capsules round them).
+- **Photo mode** stops the camera 2.1 m from the fire, so it never ends up inside him.
+- **Reduced motion:** he sits still: no idle motion, reactions, gestures or dancing, and
+  a helmet change is instant.
+
+`fire.knights` (safe before the model loads, and without it) is the API the site and
+Bonfire Live drive: the cast (`setCast`, `summon`, `dismiss`), helmets (`setHelmet`, with
+the swap animation), `sit`/`stand`, `gesture(name)`, `lookAt(point)`, `dance(i, {...})`
+with a per-frame `clock(beatPos, period)`, `slots(scenery)` for where dancers can stand,
+and `list`/`positions` for cameras. The full list is in the header of `knights.js` and in
+`docs/knight.md`.
+
 ## Round 7 additions (at a glance)
 
 - **Swaps take after their element** (`weapons.js`, `forgeParticles.js`, `forgeFx.js`):
@@ -308,10 +375,13 @@ throw sparks. The individual ingredients can be compared with `?lab` (e.g.
   posts.
 - **The pack** (`src/ui/pack.js`, `src/ui/pixelArt.js`): a backpack in the bottom-right
   corner. Hover it, tap it or press I; its items rise out of it and each one's options
-  fly out as a text list: the Map (swap the scene), the Anvil (swap the weapon), the
-  Spell Tome (the element's ring, the living weapon, a new spell: forging a new blade in
-  that element, and new bonfire colors, each with a swatch). The icons are 16×16 line-art pixel icons drawn from ASCII, animated in
-  CSS. The same pack is in Bonfire Live.
+  fly out as a text list: the Map (*Fast Travel*: another place for the fire), the Anvil
+  (swap the weapon), the Spell Tome (the element's ring, the living weapon, a new spell:
+  forging a new blade in that element, and new bonfire colors, each with a swatch) and,
+  since round 8, the Knight (*Summon & Tend*: his summons and send-off, helmet, style,
+  finish and gestures; see "The knight comes when summoned"). The icons are 16×16
+  line-art pixel icons drawn from ASCII, animated in CSS. The same pack is in Bonfire
+  Live and the Painter (where it paints into the scene).
 - **Switching screens:** the old screen's panels dither away (the scene's own ordered
   dither, as a mask) as they slide off; the new ones slide in from the way you're going
   and dither in, corners flaring, the title's gem turning in and the title drawing left
@@ -324,4 +394,159 @@ throw sparks. The individual ingredients can be compared with `?lab` (e.g.
 - **Content:** one headline everywhere (Full-Stack Developer & Game Maker), a Résumé
   button that appears once `public/resume.pdf` exists, a drafted Lyft case study (hidden
   until it has real details), clips in project galleries (`video: true` on an image plays
-  its `.mp4`), and a link from Bonfire Live's page into this page's own breakdown.
+  its `.mp4`), and a link from Bonfire Live's page into this page's own breakdown (moved
+  to the Portfolio's page in round 8).
+
+## The Portfolio page and the breakdown (round 8)
+
+- **The Portfolio is a project** (`portfolio` in `content.json`, just before Bonfire Live):
+  what the site is and how it was built, with the breakdown's five views as its
+  screenshots, plus a close view of the knight (`public/assets/projects/portfolio/`:
+  final, normals, lighting, particles, flow, knight; captured from the scene at 4 px a
+  texel and scaled with hard edges). Its *Take This
+  Page Apart* opens the breakdown in place; Bonfire Live's page links here instead.
+- **Links to the breakdown:** any link to `#how-its-made` opens it: in place, or on
+  arrival once the scene has loaded (`/#how-its-made`, `/projects/portfolio/#how-its-made`;
+  the address keeps its path and drops the hash).
+- **Inside the breakdown** (`src/ui/breakdown.js`): the views, what the one picked shows,
+  the render settings (folded; **P** opens them and puts the cursor on the first row, the
+  digits step them, the heading is a button for the mouse), then the counts: what's in
+  the fire (the scene, the weapon and the fire's name, which follow the pack's picks as
+  they land), the frame's draw calls and size, and every particle system (idle ones
+  dimmed). **B** or **Esc** closes it; **F** swaps it for photo mode. Closed, focus goes
+  back to what opened it (the link, the Menu button), or to the page's main region; photo
+  mode does the same (`src/ui/focus.js`).
+- **The pack stays:** on wide screens it steps aside to the panel's left (its lists still
+  fly out to the left, over the scene); on phones the panel is a sheet along the bottom
+  and the pack sits on its top edge. **I** opens it as anywhere else, and Esc inside it
+  closes only the pack.
+- **Pack lists always fit** (`fitList` in `src/ui/pack.js`, everywhere, not only here):
+  measured as they open (and on resize, and when the pack moves), a list too wide for the
+  room left of its item drops to one column and then narrows; one too tall slides down,
+  as far as the window's bottom, then scrolls. They stay below the header. The e2e test
+  opens every list at 390×844, 768×1024, 844×390, 1024×768, 1280×800 and 1920×1080 with
+  the breakdown open and closed.
+- **Without WebGL** there's nothing to take apart: *Take This Page Apart* is hidden, the
+  rest menu drops Photo and How it's made, and `#how-its-made` links do nothing.
+- **Keys with a view picked:** the views are radio buttons, and a focused radio no longer
+  counts as typing (`isEditing` in `src/routes.js`), so B, F, P and I work at once.
+
+## The knight comes when summoned (round 9)
+
+He isn't there when a page opens: the user found him too distracting on first load. On
+the site (`src/main.js`, `src/bonfire/scene.js`, `src/bonfire/knightArrival.js`):
+
+- **His summon sign** (`summonSign.js`): the NH monogram (the logo's own strokes,
+  `LOGO_STROKES` in `src/ui/logo.js`) glows on the ground in front of his seat in every
+  scenery, breathing slowly. **Hovered**, it brightens and its motes rise (the scene's own
+  effect; `hoverAt` returns `'sign'`; the page only turns the cursor into a pointer,
+  `.stage[data-hover='sign']` in `styles.css`). **A click on it summons him**; so does
+  **Summon** in the pack (the keyboard's way).
+- **Arriving and leaving** use the weapon swap's own dissolve in the current element's way
+  (`forgeRun.js`): fire rises off the sign's strokes and spirals round him as he forms from
+  the feet up; lightning strikes him in; ice glazes, shatters and cracks off a cocoon. ~3 s.
+  After a long rest (`effects.knight` `restMin`–`restMax` minutes, rolled on each summons,
+  3–5 by default) he burns away into the sign the same way and it relights. Reduced motion:
+  he appears and goes at once.
+- **Presence:** `fire.knights.presence` is `'away'` (the sign waits), `'arriving'`,
+  `'resting'` or `'leaving'`; `onPresence(fn)` follows it. The page follows too
+  (`knightChanged` in main.js): the scene's screen-reader description adds his sentence
+  (`hero.sceneKnight`) while he's there and his sign's (`hero.sceneSign`) while he's away;
+  the pack redraws its Knight item; a click on him greets him only while he rests.
+- **A new helmet each summons** (`effects.knight.helmet` `random`, the default), unless the
+  admin fixed one or the visitor picked one in the pack (that one, from then on).
+- **The pack's Knight item** (*Summon & Tend*). While he's away it offers only **Summon**,
+  and its helm icon's eye slit is dark (it kindles in steps as you reach for it; the item's
+  `data-state`, set from `state()` in `bonfireItems`). While he rests: **Send Him Off**
+  (he burns away into his sign), **Helmets**, **Styles** (the six; a change burns him away
+  and forms him again in it, ~1.2 s, the first build's model fetched first), **Armor
+  Finishes** (the steel's color; off for the styles with their own colors) and **Gestures**
+  (Praise the Sun, Wave, Bow, Point Forward, Beckon, Shrug, Hurrah, Joy and the **Default
+  Dance**: he stands, dances two bars and sits back down). Forming or burning away, there's
+  nothing to pick. A visitor's helmet, style and finish are remembered in this browser
+  (`knightHelmet`, `knightStyle`, `knightFinish`) and put on him as the scene loads (not in
+  the admin's preview, which shows the draft's settings).
+- **Discoveries:** *Summoned the knight* (the sign or the pack), *Greeted the knight*, *A
+  change of helm* and *A change of style* (a style or a finish). Where he can't come (no
+  model, switched off, no WebGL) they leave the count. The Painter's own, *The fire,
+  painted*, is found on `/painter/`.
+- **The admin** (*The Knight* on the Effects page): Show, Arrival (Summon Sign / There From
+  the Start: resting from the first frame, staying until sent off), Shortest and Longest
+  Rest, Helmet, Style, Armor Finish, Edge Glow, Armor Shine, Seat Pose (Resting /
+  Watchful), Answers a Click, Reactions (docs/admin.md has the table). `applyArmor` and
+  `applyKnight` in scene.js apply them as they change; the preview's **Knight…** menu
+  summons him or sends him off (`nh:knight`).
+- **The breakdown's** *Knight* row says where he is: away (his sign waits), or his helmet,
+  style and what he's doing (forming, resting, burning away).
+
+## The knight on the site (round 8)
+
+The knight rests by the fire on every page once summoned (the scene side is "The knight"
+above and `docs/knight.md`). On the site (`src/main.js`, `src/bonfire/scene.js`):
+
+- **Hover** (mouse and pen): his rim warms and he turns his head up to you. That's the
+  scene's own effect (`hoverAt` returns `'knight'`, whichever of him and the fire is
+  nearer); the page only turns the cursor into a pointer (`.stage[data-hover='knight']`).
+  No label. The hover check also runs once more where the pointer comes to rest, so
+  stopping on him always shows it. Only while a click greets him: otherwise the page asks
+  `fire.hoverAt(x, y, { knight: false })`, which looks past him (no rim, no look, and the
+  fire behind him flares as the fire).
+- **Click (or tap) on him:** a greeting. He answers with a gesture: Praise the Sun the
+  first time and most often after that (four times the others' chance), never the same
+  one twice running (`greeting()` in `src/knightNames.js`). The click is his: it
+  doesn't stoke the fire or draw a new weapon (a click while a weapon is being forged
+  still hurries it, and one on the planted weapon still wakes it). The first greeting is
+  a discovery, *Greeted the knight*; a gesture from the pack counts too (the keyboard's
+  way to it), but only one he really starts (not mid-swap). With
+  `effects.knight.gestures` off, or reduced motion (he sits still), he isn't a click
+  target: no hover, no pointer, and a click stokes as anywhere else.
+- **The pack's Knight item** (round 9 added Summon, Send Him Off, Styles, Armor Finishes
+  and the Default Dance, above; the helm icon: the great helm with its lit eye slit; on
+  hover it swaps with the pointed bascinet): **Helmets** (Great Helm, Armet, Bascinet:
+  hands to the helm, the old one burns away in ember edges, the new one forms in a flash
+  and a puff of sparks, 1.6 s, with a shimmer sound as it forms) and **Gestures** (Praise
+  the Sun, Wave, Bow, Point Forward, Beckon, Shrug, Hurrah, Joy). The gem marks the helmet
+  he has on or is putting on. Nothing can be picked while he's away for a moment
+  (forming, burning away); gestures are off for reduced motion, where a helmet change is
+  instant. The
+  first swap is a discovery, *A change of helm*. The pick is remembered in this browser
+  (`knightHelmet`) and he wears it whenever he comes.
+- **No knight** (his model didn't load, the admin has him off, or no WebGL): the page
+  doesn't mention him. The pack leaves the Knight item out (`hasKnight` in
+  `bonfireItems`), the scene's description drops his sentence, and *Greeted the knight*
+  and *A change of helm* leave the discoveries' count (unless found before; for reduced
+  motion, *Greeted the knight* is out too: `setOut` in `src/ui/discoveries.js`). All of
+  it comes back if the admin turns him on again.
+- **Settings** (`effects.knight`, the admin's Effects page, *The Knight*; every key with
+  its range and default is in [docs/admin.md](admin.md)'s knight table): `show`,
+  `arrival` (`sign`: his summon sign waits and a click calls him; `start`: there from the
+  start), `restMin` / `restMax` (how long he rests before he burns away, minutes),
+  `helmet` (`random`: a new one each summons since round 9, or a fixed one), `style`
+  (how he's drawn: one of the six styles, `knightStyles.js`), `finish` (his steel's color:
+  gunmetal, blackened, polished, burnished; the styles that draw steel), `rim` (*Edge
+  Glow*: how strongly his edges catch the fire's color), `seat` (`resting` or
+  `watchful`), `gestures` (clicks get gestures), `reactions` (watching a weapon rise,
+  flinching, leaning away from a stoke, lifting his feet for a ring), `shine` (*Armor
+  Shine*: the fire's reflection sweeping over his plate, now and then and when the fire
+  flares; scene.js `applyKnight` sets `armor.setShine`). The visitor's own picks (helmet,
+  style, finish) win over the settings; a changed setting shows at once in the admin
+  preview, and **Helmet…** / **Gesture…** there try them (`nh:helmet`, `nh:gesture`).
+  Bonfire Live (`effects: true`) casts its own knights with its own Knights tab and
+  ignores these, except `style`: its style *The Site’s Own* follows `effects.knight.style`.
+- **The breakdown** has a *Knight* row (his helmet and what he's doing: resting,
+  forming, burning away…), and its Normals and Lighting texts say what the armor does
+  there (the knight's parts only while he's there). The scene's screen-reader
+  description is `hero.sceneLabel` plus his sentence, `hero.sceneKnight`, while he's there
+  (worded for any seat and either arrival: he may have been there from the start), or
+  `hero.sceneSign` while his sign waits (`sceneLabel()` in `src/render.js`).
+- **Render settings:** the dither and dither-pattern rows now step from the value on
+  screen (the site's 0.08 goes to 0.16, 0.26, then off), not from a fixed first level.
+
+`bonfireItems` (`src/ui/pack.js`) is shared with Bonfire Live: pass `onHelmet` (and
+`onGesture`) to get the Knight item, `helmet` in `state()` (null while there's no
+knight), and `hasKnight` to leave the item out while there's none at all. Since round 9:
+`onSummon` / `onDismiss` with `presence` in `state()` give the summons and the send-off
+(without `onSummon`, as in Bonfire Live, he's there whenever he has a helmet), and
+`onStyle` / `onFinish` with `style` / `finish` in `state()` give his styles and finishes.
+The display names are in `src/knightNames.js` (`HELMET_NAMES`, `GESTURE_NAMES`, and
+`STYLE_NAMES` / `FINISH_NAMES` from knightStyles.js and steel.js), apart from the 3D code.

@@ -2,12 +2,24 @@
 // constants in src/palette.js and src/bonfire/*. content.json's `effects` section
 // is merged over these (src/effects.js), and the admin's "Reset to defaults" uses them.
 // `RANGES` bounds every number: validation and the admin's sliders both read it.
+import { DEFAULT_STYLE, STYLE_KEYS } from './bonfire/knightStyles.js';
+import { FINISHES } from './bonfire/steel.js';
 
 export const CURSOR_MODES = ['ember', 'stir', 'wake', 'part', 'draw', 'slash'];
 /** What the bonfire is made of. Each one reuses the flame colors; the visuals are code (src/bonfire/). */
 export const ELEMENT_IDS = ['fire', 'lightning', 'ice'];
 export const DITHER_MATRICES = [4, 8];
 export const BASE_COLORS = ['void', 'shadow', 'stone', 'wood', 'bone'];
+/** The site knight's helmet: one of the three (knights.js HELMETS), or 'random' (a new one each time he's summoned). */
+export const KNIGHT_HELMETS = ['random', 'great', 'armet', 'bascinet'];
+/** How the site's knight comes: at his summon sign's call ('sign'), or there from the start ('start'). */
+export const KNIGHT_ARRIVALS = ['sign', 'start'];
+/** How he sits (knightPose.js SEAT_POSES): the Dark Souls rest, or watchful (leaning in over his knees, forearms on them, head up at the fire). */
+export const KNIGHT_SEATS = ['resting', 'watchful'];
+/** His styles (bonfire/knightStyles.js STYLES), in menu order. */
+export const KNIGHT_STYLES = STYLE_KEYS;
+/** His armor's finishes (bonfire/steel.js FINISHES): the steel color within the styles that draw steel. */
+export const KNIGHT_FINISHES = Object.keys(FINISHES);
 
 const flame = (id, name, [lo, mid, hi, core], shade, light = 0.34) => ({ id, name, lo, mid, hi, core, shade, light });
 
@@ -46,6 +58,20 @@ export const DEFAULT_EFFECTS = {
   // afterimages and strikes on fireflies, and how much busy moments thin the extras out.
   impact: { hitStop: 0.06, flash: 0.5, marks: true, markLife: 20, debris: 1, afterimages: 0.6, fireflyStrikes: 0.5, budget: 0.6 },
   render: { pixelSize: 4, pixelSizeSmall: 3, dither: 0.16, ditherMatrix: 4, outlines: true, vignette: 0.85, exposure: 1, colorChange: 1.25, shake: true },
+  // The knight who comes to the fire (src/bonfire/knights.js, knightArrival.js): whether he
+  // may come at all; how (his summon sign on the ground, or there from the start); how long
+  // he rests before he burns away into the sign again (minutes, rolled between the two on
+  // each summon); his helmet (a new one each summon, or one fixed here); his style
+  // (knightStyles.js: how he's drawn) and armor finish (steel.js: its steel's color, in the
+  // styles that draw steel); how strongly his edges catch the fire's color; whether the
+  // fire's reflection sweeps over his armor (armor.js: now and then, and when the fire
+  // flares); how he sits; whether a click on him gets a gesture back; and whether he reacts
+  // to what the fire does (flinching at impacts, leaning away from a stoke, watching a
+  // weapon rise). Bonfire Live casts its own knights (its Knights settings).
+  knight: {
+    show: true, arrival: 'sign', restMin: 3, restMax: 5, helmet: 'random', style: DEFAULT_STYLE, finish: 'gunmetal',
+    rim: 0.5, shine: true, seat: 'resting', gestures: true, reactions: true,
+  },
 };
 
 /** [min, max, step, unit?] per number, keyed by path pattern (`flames[].light`). */
@@ -114,6 +140,9 @@ export const RANGES = {
   'ice.ringSpeed': [0.4, 2, 0.05, '×'],
   'ice.ringHeight': [0.3, 2, 0.05, '×'],
   'ice.ringHold': [0, 1.5, 0.05, 's'],
+  'knight.restMin': [1, 30, 0.5, 'min'],
+  'knight.restMax': [1, 30, 0.5, 'min'],
+  'knight.rim': [0, 1, 0.05],
 };
 
 /** Changing these resizes GPU buffers or light pools, so the scene is rebuilt. */

@@ -265,6 +265,23 @@ input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
 .pt-strip i:last-child { flex: 0.7; margin-left: 3px; }
 .pt-suggest > .help { margin: 0; }
 
+/* Scenes (Bonfire Live's preset scenes, made in the Painter): its colors as the thumbnail
+   (the flame's ramp, its shade set apart, then its own scenery colors), a summary, and
+   every problem inside it listed on the card with where it is. */
+.scene-swatches .swatch { width: 9px; }
+.scene-swatches .swatch:last-child { margin-left: 0; }
+.scene-swatches .swatch:nth-child(5) { margin-left: 2px; }
+.scene-swatches .swatch.is-scenery { margin-left: 5px; }
+.card[data-path^='scenes['] > .error { white-space: pre-line; }
+.scene-details { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 18px; margin: 14px 0 0; font-size: 13px; }
+.scene-details > div { display: grid; gap: 2px; }
+.scene-details dt { font: 600 11px var(--body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+.scene-details dd { margin: 0; color: var(--dim); }
+.scene-body > .fields { padding-top: 14px; }
+.scene-import { display: grid; gap: 8px; margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--field); }
+.scene-paste { font: 12px/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+.scene-import-slot:empty { display: none; }
+
 /* Elements: the three side by side, each with its share of the draws */
 .block[data-path='effects.elements'] > .fields { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
 .block[data-path='effects.elements'] > .fields > .group { grid-column: auto; display: grid; align-content: start; }
