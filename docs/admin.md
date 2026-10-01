@@ -76,7 +76,7 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
   - **Picture.** **Pixel Art** (`effects.render`: Pixel Size and Pixel Size On Phones,
     picked from the sizes the menus offer, 2/3/4/6/8 px; Dither, Dither Pattern,
     Outlines; then Vignette and Exposure under Place & Atmosphere, Color Blend Time under
-    Colors, Screen Shake under Camera), **Hits** (`effects.impact`: Hit-Stop, Hit Flash,
+    Color Change, Screen Shake under Camera), **Hits** (`effects.impact`: Hit-Stop, Hit Flash,
     Debris, Ground Marks and the rest), Fireflies (how many, lit at rest, real lights,
     speed) and the Cursor effect and its strength.
   - **Knight** (`effects.knight`). He isn't there when a page opens: his summon sign
@@ -114,7 +114,9 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     reaches visitors until you save.
   - **Reset Section** on each effects section puts it back to the site's defaults
     (`src/effectsDefaults.js`) at once, with **Undo** in the note that follows (Discard
-    still brings back your saved values until you save). On Flame Colors it gives the
+    still brings back your saved values until you save). The focus goes to that Undo, and
+    the note waits while it has the focus or the pointer; Undo, or Esc, brings the focus
+    back to Reset Section. On Flame Colors it gives the
     built-in palettes their colors, names and rotation back (bringing back any you deleted)
     and keeps the palettes you made, unchanged, after them. Only the effects have Reset:
     the other pages have no defaults to go back to.
@@ -160,7 +162,10 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
   Strength, Gestures On Click…). Each field's help sits under it, a sentence or two, and
   is what its input reads out to a screen reader; anything longer folds under **More**.
   Big sections are split under sub-headings: Interface Text into Header & Menu, Inventory
-  & Projects, Render Settings, Pack and Key Prompts; Pixel Art; the Knight. Icon buttons
+  & Projects, About, Render Settings, Pack and Key Prompts; Pixel Art; the Knight. A
+  project's image fields (Alt Text, Caption, Pixel Art, Video Clip) and the featured
+  project's fields go by the same names as any project's, on the page and in the search.
+  Icon buttons
   and tools explain themselves in the shared tooltip (hover, or focus with the keyboard).
 - **Live checks:** each field is checked as you type against `src/contentRules.js`: unsafe
   links, bad ids, missing alt text, glyphs that won't fit and so on. Save is refused
