@@ -60,7 +60,9 @@ export const FORGE = {
     chimney: { r: [0.3, 0.24], h: 1.6, y: 2.3, z: -0.05 },
   },
   anvil: {
-    turn: 0.5,
+    // (Turned 0.3 rad further than round 9's, its horn pointing back past the seated knight's
+    // right shoulder instead of at it: a seated Praise goes all the way up there.)
+    turn: 0.8,
     stump: { r: [0.28, 0.25], h: 0.52 },
     foot: { size: [0.28, 0.1, 0.22], y: 0.565 },
     waist: { size: [0.15, 0.14, 0.13], y: 0.675 },
@@ -115,14 +117,15 @@ export const CATHEDRAL = {
     foot: { r: 0.12, h: 0.14, y: 0.17 }, stem: { r: [0.026, 0.022], h: 1.26, y: 0.8 }, dish: { r: [0.05, 0.08], h: 0.04, y: 1.44 }, candle: { r: 0.036, h: 0.18, y: 1.455 },
   },
   nave: {
-    // (The right column, with its half of the arch, stands 0.3 m further along the row than
-    // round 9's: the knight's seat at its foot overlapped it, and no seat clear of it kept
-    // him in a phone's frame: knightPlaces.js SEATS.)
-    turn: 0.35, columns: [-0.58, 0.88],
+    // (The right column, with its half of the arch, stands 0.5 m further along the row than
+    // round 9's: the knight's seat at its foot overlapped it, no seat clear of it kept him in
+    // a phone's frame (knightPlaces.js SEATS), and his left arm needs the room for a seated
+    // Praise.)
+    turn: 0.35, columns: [-0.58, 1.08],
     base: { size: [0.5, 0.16, 0.5], y: 0.08 },
     shaft: { r: [0.17, 0.15], h: 2.36, y: 1.33 },
     capital: { size: [0.46, 0.14, 0.46], y: 2.56 },
-    arch: [{ size: [0.8, 0.16, 0.22], at: [0.62, 2.78], roll: -0.62 }, { size: [0.34, 0.16, 0.22], at: [-0.45, 2.7], roll: 0.62 }],
+    arch: [{ size: [0.8, 0.16, 0.22], at: [0.82, 2.78], roll: -0.62 }, { size: [0.34, 0.16, 0.22], at: [-0.45, 2.7], roll: 0.62 }],
     // A cluster of floor candles at the left column's foot: [x, z, height] about `at`.
     candles: { at: [-0.62, 0.46], list: [[0, 0, 0.3], [0.1, 0.06, 0.2], [-0.09, 0.08, 0.16], [0.05, -0.1, 0.24], [-0.12, -0.06, 0.12]] },
   },

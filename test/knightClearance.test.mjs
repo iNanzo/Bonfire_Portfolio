@@ -433,6 +433,49 @@ test('in the ruins his boots rest up on the model’s fallen drum, well out of t
   k.dismiss(0, { instant: true });
 });
 
+// Round 9's seated Praise the Sun (the scenery not yet in its way): how high each hand got over
+// his hips (m), [left, right], at each seat in either seat pose. (Its room then raised a hand
+// hemmed in at a side straight up, a little higher.)
+const ROUND9_PRAISE = {
+  ruins: { resting: [0.814, 0.897], watchful: [0.822, 0.905] },
+  forge: { resting: [0.814, 0.897], watchful: [0.822, 0.905] },
+  shrine: { resting: [0.814, 0.897], watchful: [0.822, 0.905] },
+  cathedral: { resting: [0.814, 0.814], watchful: [0.822, 0.822] },
+  cult: { resting: [0.897, 0.897], watchful: [0.905, 0.905] },
+};
+test('[slow] seated Praise the Sun at every seat, either seat pose, throws both arms up: each hand at least 90 % as high over his hips as round 9’s', async () => {
+  const env = await realKnights();
+  const { k } = env;
+  const n = k.knights[0];
+  const [hips, ...hands] = ['hips', 'handL', 'handR'].map((b) => n.bones.find((x) => x.name === b));
+  const y = (b) => b.getWorldPosition(_v).y;
+  const bad = [];
+  for (const name of NAMES) {
+    k.setScenery(name, await terrainOf(name));
+    for (const pose of SEAT_POSES) {
+      k.setSeatPose(pose);
+      k.summon(0, { instant: true });
+      k.update(0.5);
+      n.group.updateMatrixWorld(true);
+      const rest = y(hips);
+      k.gesture('praise', { index: 0 });
+      const top = [-Infinity, -Infinity];
+      for (let t = 0; t < GESTURE_TIME.praise; t += 1 / 12) {
+        k.update(1 / 12 + 1e-7);
+        n.group.updateMatrixWorld(true);
+        hands.forEach((b, i) => { top[i] = Math.max(top[i], y(b) - rest); });
+      }
+      top.forEach((h, i) => {
+        const was = ROUND9_PRAISE[name][pose][i];
+        if (h < 0.9 * was) bad.push(`${name} (${pose}): his ${hands[i].name} ${(h * 100).toFixed(0)} cm over his hips (round 9: ${(was * 100).toFixed(0)})`);
+      });
+      k.dismiss(0, { instant: true });
+    }
+  }
+  k.setSeatPose('resting');
+  assert.deepEqual(bad, [], 'a hand held down');
+});
+
 // Round 9's (before the scenery kept him out), measured the same way on the same height maps:
 // the largest step (m) of his head and of either hand at the fire's 12 frames a second.
 const ROUND9_STEP = { 'getting up': { head: 0.241, hands: 0.253 }, 'sitting down': { head: 0.177, hands: 0.328 }, 'the site’s dance': { head: 0.241, hands: 0.369 } };
