@@ -103,10 +103,10 @@ for (const size of SIZES) {
       expect(await checkAll(page, '[data-header]', { ...size, label: 'header' })).toBeGreaterThanOrEqual(size.touch ? 1 : 3);
       await assertHeard(page, '[data-header]');
       await assertHeard(page, '[data-pack]');
-      // The rest menu's tools.
+      // The rest menu's tools (no keyboard shortcuts on a touch screen).
       await tap(page.locator('[data-menu-open]'));
       await expect(page.locator('[data-menu]')).toBeVisible();
-      expect(await checkAll(page, '[data-menu]', { ...size, label: 'menu' })).toBe(6);
+      expect(await checkAll(page, '[data-menu]', { ...size, label: 'menu' })).toBe(size.touch ? 5 : 6);
       await assertHeard(page, '[data-menu]');
       await noTitles(page, 'the menu');
       expect(errors).toEqual([]);

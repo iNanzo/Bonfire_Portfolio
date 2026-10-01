@@ -61,6 +61,8 @@ test('a phone: the menu has Go To and Tools, and nothing needs a scroll to reach
   await page.locator('[data-menu-open]').tap();
   await expect(page.getByRole('group', { name: 'Go To' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Tools' })).toBeVisible();
+  // (No keyboard shortcuts on a touch screen: a list of keys it has none of.)
+  await expect(page.locator('[data-menu-action="keys"]')).toBeHidden();
   const close = page.locator('[data-menu] [data-menu-close]');
   const box = await close.boundingBox();
   expect(box && box.y + box.height).toBeLessThanOrEqual(844);

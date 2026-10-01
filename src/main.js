@@ -468,7 +468,10 @@ onScroll();
 listNav(q('.tabs'), 'a', { horizontal: true, onMove: () => blip('move') });
 listNav(q('[data-title-menu]'), '[data-title-item]', { onMove: () => blip('move') });
 
-// The rest menu (ui/restMenu.js; the Menu button, at every width): Go To and Tools.
+// The rest menu (ui/restMenu.js; the Menu button, at every width): Go To and Tools. Not the
+// keyboard shortcuts on a touch screen: a list of keys there are none of to press (and its
+// filter would bring up the on-screen keyboard over it).
+if (touch) q('[data-menu-action="keys"]').closest('li').hidden = true;
 setupRestMenu({
   menu: q('[data-menu]'), opener: q('[data-menu-open]'), onSound: blip,
   actions: { photo: () => photo.enter(), breakdown: () => breakdown.enter(), render: openRenderSettings, discoveries: openDiscoveries, keys: () => keysOverlay.open() },
