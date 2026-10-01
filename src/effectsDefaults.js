@@ -74,7 +74,10 @@ export const DEFAULT_EFFECTS = {
   },
 };
 
-/** [min, max, step, unit?] per number, keyed by path pattern (`flames[].light`). */
+/**
+ * [min, max, step, unit?] per number, keyed by path pattern (`flames[].light`). A number
+ * Bonfire Live and the Painter have too keeps the same range here (settingsMap.js).
+ */
 export const RANGES = {
   'flames[].light': [0, 1, 0.01],
   'fire.brightness': [0.05, 1, 0.01],
@@ -100,9 +103,9 @@ export const RANGES = {
   'cursor.strength': [0, 2, 0.05, '×'],
   'render.pixelSize': [2, 8, 1, 'px'],
   'render.pixelSizeSmall': [2, 8, 1, 'px'],
-  'render.dither': [0, 0.5, 0.01],
+  'render.dither': [0, 0.4, 0.02],
   'render.vignette': [0, 1.5, 0.05],
-  'render.exposure': [0.3, 2, 0.05],
+  'render.exposure': [0.5, 2, 0.05, '×'],
   'render.colorChange': [0.2, 4, 0.05, 's'],
   'impact.hitStop': [0, 0.15, 0.01, 's'],
   'impact.flash': [0, 1, 0.05],
