@@ -669,8 +669,14 @@ export function createWeapons(gltfRoot, {
       return true;
     },
     get currentKey() { return current?.userData.key ?? null; },
-    /** A weapon is moving this frame (so its shadow needs redrawing). */
+    /** A weapon is moving this frame. */
     get moving() { return phase !== 'idle' || quiver > 0.002; },
+    /**
+     * ...enough for its shadow to need redrawing every frame: moving, but not just a planted
+     * one's shudder on a hard beat (±0.03 rad at most, fading in a second: scene.js
+     * shadowNeedsUpdate redraws that at the art's 12 fps).
+     */
+    get movingForShadow() { return phase !== 'idle'; },
     keys: Object.keys(items),
     get busy() { return phase !== 'idle'; },
     get holding() { return holding; },

@@ -1491,16 +1491,27 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // pose steps or he forms or goes (knights.moving: the skeleton is updated in the same
   // render, before the shadow, so once is enough), when the light moves (the lightning
   // ball's height), and once after the model loads or the settings change; never while
-  // the shadow is switched off (setShadows).
+  // the shadow is switched off (setShadows). A planted weapon's shudder on a hard beat
+  // (weapons.moving, but not movingForShadow) redraws it at the art's own 12 fps instead
+  // (one frame per light step, none if a knight's step just did), and once more when it's
+  // still: with the beats coming every half second, it had all six faces redrawn every
+  // frame of the show. (Its shadow is magnified on the far scenery, the shrine's torii, so
+  // it isn't left out: it shudders in steps, like the flame.)
   const shadowLightAt = new THREE.Vector3(Infinity, 0, 0);
   let shadowFrames = 0;
+  let shuddering = false;
+  let shadowStep = -1; // (the light step of the last redraw)
   function shadowNeedsUpdate() {
     if (!shadowsOn) return false;
-    if (weapons?.moving) shadowFrames = 2;
-    else if (knights?.moving) shadowFrames = Math.max(shadowFrames, 1);
+    const shudder = !!weapons?.moving && !weapons.movingForShadow;
+    const step = Math.floor(simT * LIGHT_FPS);
+    if (weapons?.movingForShadow) shadowFrames = 2;
+    else if (knights?.moving || (shudder && step !== shadowStep) || (shuddering && !shudder)) shadowFrames = Math.max(shadowFrames, 1);
+    shuddering = shudder;
     const stale = shadowFrames > 0 || !fireLight.position.equals(shadowLightAt);
     shadowFrames = Math.max(0, shadowFrames - 1);
     shadowLightAt.copy(fireLight.position);
+    if (stale) shadowStep = step;
     return stale;
   }
 
