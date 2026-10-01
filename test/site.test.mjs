@@ -217,7 +217,7 @@ test('discoveries that can’t be found here now (no knight) leave the count, un
   }
 });
 
-// --- The build's page metadata, however index.html is wrapped ------------------------------
+// --- Round 10: the menus, their tooltips, and the build's page metadata -----------------------
 
 /** A tag's attribute value, however the tag is wrapped. */
 const metaValue = (html, attr, name) => html.match(new RegExp(`<meta\\s+${attr}="${name}"\\s+content="([^"]*)"`))?.[1] ?? null;
@@ -251,6 +251,61 @@ test('seo: withMeta updates every tag in the real index.html, and in a copy Pret
   const dollars = withMeta(source, { ...meta, title: odd, description: odd });
   assert.equal(dollars.match(/<title>([^<]*)<\/title>/)?.[1], esc(odd));
   assert.equal(metaValue(dollars, 'name', 'description'), esc(odd));
+});
+
+test('the rest menu: Go To and Tools as labelled groups, the tools with their keys and tooltips', async () => {
+  const { MENU_TEXT } = render;
+  const { titleCase } = await import('../src/text.js');
+  const { ui } = await import('../src/content.js');
+  const chrome = render.renderChrome();
+  const start = chrome.indexOf('<dialog class="rest-menu" data-menu');
+  const dialog = chrome.slice(start, chrome.indexOf('</dialog>', start));
+  const groups = [...dialog.matchAll(/<div class="menu-group[^"]*" role="group" aria-labelledby="([^"]+)">\s*<p class="menu-group-title" id="([^"]+)">([^<]+)<\/p>/g)];
+  assert.deepEqual(groups.map((m) => m[3]), [MENU_TEXT.goTo, MENU_TEXT.tools]);
+  assert.ok(groups.every((m) => m[1] === m[2]), 'each group is labelled by its heading');
+  const [goTo, tools] = dialog.split(/<div class="menu-group" role="group"/);
+  for (const s of screens) assert.ok(goTo.includes(`>${esc(s.label)}</a>`), `Go To: ${s.label}`);
+  assert.match(goTo, /class="menu-group menu-go-to"/, 'Go To hides where the header has tabs (styles.css)');
+  const actions = [...tools.matchAll(/data-menu-action="([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(actions, ['photo', 'breakdown', 'render', 'discoveries', 'keys'], 'the tools, in order');
+  assert.match(tools, /data-sound/, 'and Sound');
+  for (const [action, key, kbd] of [['photo', 'F', 'F'], ['breakdown', 'B', 'B'], ['render', 'P', 'P'], ['keys', 'Shift\\+\\?', '\\?']]) {
+    assert.match(tools, new RegExp(`data-menu-action="${action}" aria-keyshortcuts="${key}"[^>]*>[^<]+ <kbd>${kbd}</kbd>`), `${action}: its key`);
+  }
+  assert.match(tools, new RegExp(`>${esc(ui.renderMenu)} <kbd>P</kbd>`));
+  for (const label of [MENU_TEXT.goTo, MENU_TEXT.tools, MENU_TEXT.keys, ui.photo, ui.breakdown, ui.renderMenu, ui.discoveries]) {
+    assert.equal(titleCase(label), label, `"${label}" in Title Case`);
+  }
+  assert.equal((tools.match(/data-tip="/g) ?? []).length, 6, 'every tool says what it does');
+  assert.match(dialog, /data-menu-close>/, 'and Close');
+  assert.match(chrome, /class="pix-btn menu-toggle" type="button" data-menu-open/, 'the Menu button (shown at every width: styles.css)');
+});
+
+test('no native title tooltips on the site: the shared tooltip shows data-tip on hover, focus and tap', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const pages = ['renderChrome', 'renderHome', 'renderProjects', 'renderExperience', 'renderSkills', 'renderAbout', 'renderContact'].map((name) => render[name]());
+  for (const html of pages) assert.doesNotMatch(html, /\stitle="/);
+  for (const f of ['main.js', 'render.js', 'ui/pack.js', 'ui/photo.js', 'ui/renderMenu.js', 'ui/breakdown.js', 'ui/inventory.js', 'ui/restMenu.js']) {
+    const code = await readFile(new URL(`../src/${f}`, import.meta.url), 'utf8');
+    assert.doesNotMatch(code, /\stitle="|\.title = |setAttribute\('title'/, `${f}: no title attribute`);
+  }
+  const chrome = render.renderChrome();
+  assert.match(chrome, /data-step="-1" data-tip="[^"]+\(Q\)"[^>]*aria-label="[^"]+" aria-keyshortcuts="Q"/, 'Q: a tooltip, a name, its key');
+  assert.match(chrome, /class="pix-btn sound-toggle"[^>]*data-tip="/, 'Sound');
+  assert.doesNotMatch(chrome, /data-tooltip|class="tooltip"/, 'the old skill tooltip is gone');
+});
+
+test('skills: each slot’s flavor is its tooltip (under its name) and its description for screen readers', async () => {
+  const { skills, shown } = await import('../src/content.js');
+  const html = render.renderSkills();
+  const slots = [...html.matchAll(/<button class="slot" type="button" data-skill="([^"]*)" data-tip-title="([^"]*)" data-tip="([^"]*)" data-tip-tap aria-describedby="([^"]+)">/g)];
+  const all = shown(skills).filter((g) => shown(g.items).length).flatMap((g) => shown(g.items));
+  assert.equal(slots.length, all.length, 'every skill');
+  for (const [, name, title, tip, id] of slots) {
+    assert.equal(title, name);
+    assert.ok(html.includes(`<span class="visually-hidden" id="${id}">${tip}</span>`), `${name}: described by its flavor`);
+  }
+  assert.equal(new Set(slots.map((m) => m[4])).size, slots.length, 'ids are unique');
 });
 
 test('content: a menu group’s heading can’t be blank', async () => {

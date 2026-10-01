@@ -21,16 +21,17 @@ import { blip } from './audio.js';
 import { createRenderMenu } from './renderMenu.js';
 import { focusedNow, holdsFocus, returnFocus } from './focus.js';
 import { HELMET_NAMES, STYLE_NAMES } from '../knightNames.js';
+import { isEditing } from '../routes.js';
 
 /** Links to this hash open the breakdown (main.js), in place or on arrival. */
 export const BREAKDOWN_HASH = '#how-its-made';
 
 const VIEWS = [
-  ['final', 'Final image', 'Everything combined, then snapped to a small palette and dithered: the pixel-art look is made here, at the end, from a normal 3D render.'],
-  ['normals', 'Normals & depth', 'Which way each surface faces, and how far away it is. Where either jumps between neighboring pixels, the final pass draws an outline. The knight’s armor, when he’s there, is a set of plates, so the pass traces every plate’s edge and each one reads as a shape of its own.'],
+  ['final', 'Final Image', 'Everything combined, then snapped to a small palette and dithered: the pixel-art look is made here, at the end, from a normal 3D render.'],
+  ['normals', 'Normals & Depth', 'Which way each surface faces, and how far away it is. Where either jumps between neighboring pixels, the final pass draws an outline. The knight’s armor, when he’s there, is a set of plates, so the pass traces every plate’s edge and each one reads as a shape of its own.'],
   ['color', 'Lighting', 'The scenery lit by the fire, the fireflies and the moon, with shadows from the fire; and the knight, when he’s by it: his armor takes the fire’s color wherever it lights him and fades to shadow toward his back, in the few tones of his style. No particles yet.'],
   ['particles', 'Particles', 'Every particle system on its own layer: flames, sparks, rings, debris. Added on top of the lighting as light.'],
-  ['flow', 'Flow field', 'Where the fire’s flow carries a particle right now: rising heat, swirling curl noise, and a pull toward the middle that shapes the flame into tongues.'],
+  ['flow', 'Flow Field', 'Where the fire’s flow carries a particle right now: rising heat, swirling curl noise, and a pull toward the middle that shapes the flame into tongues.'],
 ];
 
 /**
@@ -84,8 +85,8 @@ export function createBreakdown({ getFire, render, onEnter = () => {}, onExit = 
       ['Weapon', weapons[fire.weapon] ?? '—', 'now'],
       ['Fire', flameTitle(flames[fire.flame]?.name, fire.element), 'now'],
       ...knightRow(fire),
-      ['Draw calls', s.drawCalls],
-      ['Render size', `${s.texels} px`],
+      ['Draw Calls', s.drawCalls],
+      ['Render Size', `${s.texels} px`],
       ...(s.rows ?? []), // (anything else the scene counts: [label, value] pairs)
       ...s.systems.filter((x) => x.total > 0).map((x) => [x.name, `${x.live} / ${x.total}`, x.live ? '' : 'idle']),
     ];
@@ -133,11 +134,13 @@ export function createBreakdown({ getFire, render, onEnter = () => {}, onExit = 
     if (/** @type {Element} */ (e.target).closest('[data-bd-close]')) exit();
   });
   // Its keys come first (it's created before the page's own), so the page doesn't also act.
+  // Not while someone types in a field (a b, a p or a digit is a letter then), nor while a
+  // dialog is open over it (the rest menu, the discoveries, the keys: Esc closes that one).
   window.addEventListener('keydown', (e) => {
-    if (!active) return;
+    if (!active || isEditing(e.target) || document.querySelector('dialog[open]')) return;
     const stop = () => { e.preventDefault(); e.stopImmediatePropagation(); };
     if (e.key === 'Escape') { stop(); exit(); return; }
-    if (e.altKey || e.ctrlKey || e.metaKey || document.querySelector('dialog[open]')) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
     if (e.key === 'b' || e.key === 'B') { stop(); exit(); return; }
     const wasOpen = menu.isOpen;
     if (menu.handleKey(e)) {

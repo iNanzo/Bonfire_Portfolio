@@ -46,6 +46,10 @@ test('render menu: the site’s rows in two groups (the picture, then the cursor
     assert.match(r.hint, /^[A-Z].*\.$/, `${r.id}: the hint is a sentence`);
     assert.ok(!r.hint.toLowerCase().startsWith(r.label.toLowerCase()), `${r.id}: the hint doesn't restate the label`);
   }
+  // The site's shortcuts list names the same digits.
+  const { SITE_KEYS } = await import('../src/ui/siteKeys.js');
+  const listed = SITE_KEYS.flatMap((g) => g.keys.flatMap((k) => k.keys));
+  assert.ok(listed.includes(`${RENDER_ROWS[0].key}–${RENDER_ROWS.at(-1).key}`) && listed.includes('P') && listed.includes('0') && listed.includes('?'));
 });
 
 test('render menu: a run of rows with a group is a labelled group under its heading; each row says its key', () => {

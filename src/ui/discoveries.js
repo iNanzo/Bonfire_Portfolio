@@ -8,29 +8,32 @@ import { items } from '../content.js';
 
 const STORE = 'discoveries';
 
-/** The fixed ones; one per project is added below. `hint` is shown while it's unfound. */
+/**
+ * The fixed ones; one per project is added below. `name` is a title (Title Case, as the
+ * menus' labels are), `hint` a sentence shown while it's unfound. Ids are what's stored.
+ */
 const BASE = [
-  { id: 'stoke', name: 'Stoked the fire', hint: 'The fire likes attention.' },
-  { id: 'fire', name: 'The flame', hint: 'It started as fire.' },
-  { id: 'lightning', name: 'The storm ball', hint: 'Some weapons bring lightning.' },
-  { id: 'ice', name: 'The frost', hint: 'Some weapons bring ice.' },
-  { id: 'flourish', name: 'The living blade', hint: 'Whatever is planted in the fire is not entirely still.' },
-  { id: 'hurry', name: 'Impatient smith', hint: 'Forging can be rushed.' },
-  { id: 'palettes', name: 'Every color of flame', hint: 'The fire has many colors.' },
-  { id: 'gallery', name: 'A closer look', hint: 'Screenshots open full size.' },
-  { id: 'sound', name: 'Heard the fire', hint: 'The fire has a voice too.' },
-  { id: 'breakdown', name: 'How it’s made', hint: 'Press B.' },
-  { id: 'render', name: 'Under the hood', hint: 'The picture has settings of its own. Press P.' },
+  { id: 'stoke', name: 'Stoked the Fire', hint: 'The fire likes attention.' },
+  { id: 'fire', name: 'The Flame', hint: 'It started as fire.' },
+  { id: 'lightning', name: 'The Storm Ball', hint: 'Some weapons bring lightning.' },
+  { id: 'ice', name: 'The Frost', hint: 'Some weapons bring ice.' },
+  { id: 'flourish', name: 'The Living Weapon', hint: 'Whatever is planted in the fire is not entirely still.' },
+  { id: 'hurry', name: 'Impatient Smith', hint: 'Forging can be rushed.' },
+  { id: 'palettes', name: 'Every Flame Color', hint: 'The fire has many colors.' },
+  { id: 'gallery', name: 'A Closer Look', hint: 'Screenshots open full size.' },
+  { id: 'sound', name: 'Heard the Fire', hint: 'The fire has a voice too.' },
+  { id: 'breakdown', name: 'How It’s Made', hint: 'Press B.' },
+  { id: 'render', name: 'Under the Hood', hint: 'The picture has settings of its own: press P, or look in the menu.' },
   { id: 'photo', name: 'Photographer', hint: 'The menu has a camera.' },
-  { id: 'visualizer', name: 'The fire dances', hint: 'There’s a live version for music.' },
-  { id: 'painter', name: 'The fire, painted', hint: 'The fire can be painted too.' },
-  { id: 'pack', name: 'Rummaged the pack', hint: 'Something is tucked in the corner.' },
-  { id: 'scenery', name: 'Somewhere new', hint: 'The fire can burn in other places.' },
+  { id: 'visualizer', name: 'The Fire Dances', hint: 'There’s a live version for music.' },
+  { id: 'painter', name: 'The Fire, Painted', hint: 'The fire can be painted too.' },
+  { id: 'pack', name: 'Rummaged the Pack', hint: 'Something is tucked in the corner.' },
+  { id: 'scenery', name: 'Somewhere New', hint: 'The fire can burn in other places.' },
   { id: 'spell', name: 'Spellcaster', hint: 'The pack holds a book of spells.' },
-  { id: 'summon', name: 'Summoned the knight', hint: 'Something glows on the ground by the fire.' },
-  { id: 'knight', name: 'Greeted the knight', hint: 'Whoever answers the sign likes a hello.' },
-  { id: 'helm', name: 'A change of helm', hint: 'The knight packed more than one helmet.' },
-  { id: 'style', name: 'A change of style', hint: 'The knight has worn other looks.' },
+  { id: 'summon', name: 'Summoned the Knight', hint: 'Something glows on the ground by the fire.' },
+  { id: 'knight', name: 'Greeted the Knight', hint: 'Whoever answers the sign likes a hello.' },
+  { id: 'helm', name: 'A New Helm', hint: 'The knight packed more than one helmet.' },
+  { id: 'style', name: 'A New Style', hint: 'The knight has worn other looks.' },
 ];
 
 export function createDiscoveries({ onNew = () => {} } = {}) {

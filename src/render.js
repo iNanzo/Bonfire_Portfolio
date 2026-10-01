@@ -50,36 +50,19 @@ export function renderChrome() {
         ${logoMark('brand-mark')}<span class="brand-name">${esc(site.name)}</span>
       </a>
       <nav class="tabs" aria-label="Main">
-        <button class="tab-key" type="button" data-step="-1" title="${esc(ui.prevScreen)} (Q)" aria-label="${esc(ui.prevScreen)}">Q</button>
+        <button class="tab-key" type="button" data-step="-1" data-tip="${esc(ui.prevScreen)} (Q)" data-tip-side="bottom" aria-label="${esc(ui.prevScreen)}" aria-keyshortcuts="Q">Q</button>
         <ul role="list">${tabs.map((s) => `<li><a href="#/${s.id}" data-tab="${s.id}">${esc(s.label)}</a></li>`).join('')}<li class="tabs-cursor" aria-hidden="true" data-tabs-cursor hidden></li></ul>
-        <button class="tab-key" type="button" data-step="1" title="${esc(ui.nextScreen)} (E)" aria-label="${esc(ui.nextScreen)}">E</button>
+        <button class="tab-key" type="button" data-step="1" data-tip="${esc(ui.nextScreen)} (E)" data-tip-side="bottom" aria-label="${esc(ui.nextScreen)}" aria-keyshortcuts="E">E</button>
       </nav>
       <div class="header-actions">
         ${site.resumeUrl ? `<a class="pix-btn resume-btn" ${resumeAttrs()} data-resume hidden>${esc(ui.resume)}</a>` : ''}
-        <button class="pix-btn sound-toggle" type="button" data-sound aria-pressed="false" title="${esc(ui.soundHint)}">
+        <button class="pix-btn sound-toggle" type="button" data-sound aria-pressed="false" data-tip="${esc(ui.soundHint)}" data-tip-side="bottom">
           <span class="sound-icon" aria-hidden="true"></span><span data-sound-label>${esc(ui.soundOff)}</span>
         </button>
         <button class="pix-btn menu-toggle" type="button" data-menu-open aria-haspopup="dialog">${esc(ui.menu)}</button>
       </div>
     </header>
-    <dialog class="rest-menu" data-menu aria-label="${esc(ui.menu)}">
-      <div class="rest-menu-inner frame">
-        ${corners}
-        <p class="rest-menu-title">${esc(ui.menu)}</p>
-        <p class="rest-menu-flavor">${esc(ui.menuFlavor)}</p>
-        <ul role="list" data-menu-list>
-          ${screens.map((s) => `<li><a class="menu-item" href="#/${s.id === 'home' ? '' : s.id}" data-menu-item>${esc(s.label)}</a></li>`).join('')}
-          ${site.resumeUrl ? `<li data-resume hidden><a class="menu-item" ${resumeAttrs()} data-menu-item-later>${esc(ui.resume)}</a></li>` : ''}
-          <li class="menu-sep" aria-hidden="true"></li>
-          <li><button class="menu-item" type="button" data-menu-item data-menu-action="photo" title="${esc(ui.photoHint)}">${esc(ui.photo)} <kbd>F</kbd></button></li>
-          <li><button class="menu-item" type="button" data-menu-item data-menu-action="breakdown" title="${esc(ui.breakdownHint)}">${esc(ui.breakdown)} <kbd>B</kbd></button></li>
-          <li><button class="menu-item" type="button" data-menu-item data-menu-action="discoveries">${esc(ui.discoveries)} <span class="menu-count" data-discovery-count></span></button></li>
-          <li><button class="menu-item" type="button" data-menu-item data-sound><span data-sound-label>${esc(ui.soundOff)}</span></button></li>
-          <li><button class="menu-item" type="button" data-menu-item data-menu-close>${esc(ui.close)}</button></li>
-        </ul>
-        <p class="rest-menu-keys">${esc(ui.keysHint)}</p>
-      </div>
-    </dialog>
+    ${renderRestMenu()}
     <div class="prompts" aria-hidden="true">
       ${ui.prompts.map(([a, b, label]) => `<span class="prompt" data-prompt="${esc(label)}"><kbd>${esc(a)}</kbd>${b ? `<kbd>${esc(b)}</kbd>` : ''}${esc(label)}</span>`).join('')}
       <span class="prompt prompt-stoke">${esc(ui.stokePrompt)}</span>
@@ -100,8 +83,53 @@ export function renderChrome() {
       </div>
     </dialog>
     <div class="toast" data-toast hidden role="status"><span class="toast-kicker" data-toast-kicker></span><span class="toast-text" data-toast-text></span></div>
-    <p class="visually-hidden" aria-live="polite" data-live></p>
-    <div class="tooltip" data-tooltip hidden aria-hidden="true"><p class="tooltip-name"></p><p class="tooltip-flavor"></p></div>`;
+    <p class="visually-hidden" aria-live="polite" data-live></p>`;
+}
+
+/** The rest menu's group headings and the tools' own words (the content has no keys for these). */
+export const MENU_TEXT = {
+  goTo: 'Go To',
+  tools: 'Tools',
+  keys: 'Keyboard Shortcuts',
+  keysHint: 'Every key the site answers, in one list.',
+  renderHint: 'The picture’s pixel size, palette, dither and outlines, and the cursor’s way with the fire.',
+};
+
+/**
+ * The rest menu (the header's Menu button, at every width): Go To (the screens and the
+ * résumé: the header's tabs do this from 900 px up, so it hides there) and Tools (photo
+ * mode, the breakdown, the render settings, the discoveries, the keys, sound), each a
+ * labelled group, then Close. Every item is a `data-menu-item` for its arrow keys
+ * (ui/spatial.js listNav skips the hidden ones); the tools say what they do as their
+ * tooltips, and show their keys.
+ */
+function renderRestMenu() {
+  const tool = (action, label, key, tip = '') => `
+            <li><button class="menu-item" type="button" data-menu-item data-menu-action="${action}"${key ? ` aria-keyshortcuts="${key === '?' ? 'Shift+?' : key}"` : ''}${tip ? ` data-tip="${esc(tip)}"` : ''}>${esc(label)}${key ? ` <kbd>${esc(key)}</kbd>` : ''}</button></li>`;
+  return `
+    <dialog class="rest-menu" data-menu aria-labelledby="rest-menu-title">
+      <div class="rest-menu-inner frame">
+        ${corners}
+        <p class="rest-menu-title" id="rest-menu-title">${esc(ui.menu)}</p>
+        <p class="rest-menu-flavor">${esc(ui.menuFlavor)}</p>
+        <div class="menu-group menu-go-to" role="group" aria-labelledby="menu-go-to-title">
+          <p class="menu-group-title" id="menu-go-to-title">${esc(MENU_TEXT.goTo)}</p>
+          <ul role="list" data-menu-list>
+            ${screens.map((s) => `<li><a class="menu-item" href="#/${s.id === 'home' ? '' : s.id}" data-menu-item>${esc(s.label)}</a></li>`).join('')}
+            ${site.resumeUrl ? `<li data-resume hidden><a class="menu-item" ${resumeAttrs()} data-menu-item>${esc(ui.resume)}</a></li>` : ''}
+          </ul>
+        </div>
+        <div class="menu-group" role="group" aria-labelledby="menu-tools-title">
+          <p class="menu-group-title" id="menu-tools-title">${esc(MENU_TEXT.tools)}</p>
+          <ul role="list">${tool('photo', ui.photo, 'F', ui.photoHint)}${tool('breakdown', ui.breakdown, 'B', ui.breakdownHint)}${tool('render', ui.renderMenu ?? 'Render Settings', 'P', MENU_TEXT.renderHint)}
+            <li><button class="menu-item" type="button" data-menu-item data-menu-action="discoveries" data-tip="${esc(ui.discoveriesFlavor)}">${esc(ui.discoveries)} <span class="menu-count" data-discovery-count></span></button></li>${tool('keys', MENU_TEXT.keys, '?', MENU_TEXT.keysHint)}
+            <li><button class="menu-item" type="button" data-menu-item data-sound aria-pressed="false" data-tip="${esc(ui.soundHint)}"><span data-sound-label>${esc(ui.soundOff)}</span></button></li>
+          </ul>
+        </div>
+        <button class="menu-item menu-close" type="button" data-menu-item data-menu-close>${esc(ui.close)} <kbd>Esc</kbd></button>
+        <p class="rest-menu-keys">${esc(ui.keysHint)}</p>
+      </div>
+    </dialog>`;
 }
 
 // --- Home (title screen) ---------------------------------------------------------------
@@ -186,9 +214,9 @@ export function renderProjects() {
           <div class="detail-top">
             <a class="pix-btn" href="#/projects" data-back>&lt; ${esc(ui.back)} <kbd>Esc</kbd></a>
             <div class="detail-nav">
-              <a class="pix-btn" data-d="prev" href="#/projects" aria-label="${esc(ui.prevItem)}">&lt;</a>
+              <a class="pix-btn" data-d="prev" href="#/projects" aria-label="${esc(ui.prevItem)}" data-tip="${esc(ui.prevItem)}">&lt;</a>
               <span data-d="count"></span>
-              <a class="pix-btn" data-d="next" href="#/projects" aria-label="${esc(ui.nextItem)}">&gt;</a>
+              <a class="pix-btn" data-d="next" href="#/projects" aria-label="${esc(ui.nextItem)}" data-tip="${esc(ui.nextItem)}">&gt;</a>
             </div>
           </div>
           <figure class="viewer">
@@ -196,9 +224,9 @@ export function renderProjects() {
             <div class="viewer-bar">
               <figcaption class="viewer-caption" data-d="caption"></figcaption>
               <div class="viewer-controls" data-d="controls">
-                <button class="pix-btn" type="button" data-prev-img aria-label="${esc(ui.prevImage)}">&lt;</button>
+                <button class="pix-btn" type="button" data-prev-img aria-label="${esc(ui.prevImage)}" data-tip="${esc(ui.prevImage)}">&lt;</button>
                 <span data-d="img-count" aria-live="polite"></span>
-                <button class="pix-btn" type="button" data-next-img aria-label="${esc(ui.nextImage)}">&gt;</button>
+                <button class="pix-btn" type="button" data-next-img aria-label="${esc(ui.nextImage)}" data-tip="${esc(ui.nextImage)}">&gt;</button>
               </div>
             </div>
             <div class="thumbs" data-d="thumbs"></div>
@@ -224,9 +252,9 @@ export function renderProjects() {
             <figcaption data-gl="caption"></figcaption>
           </figure>
           <div class="gallery-bar">
-            <button class="pix-btn" type="button" data-gl-prev aria-label="${esc(ui.prevImage)}">&lt;</button>
+            <button class="pix-btn" type="button" data-gl-prev aria-label="${esc(ui.prevImage)}" data-tip="${esc(ui.prevImage)}">&lt;</button>
             <span data-gl="count" aria-live="polite"></span>
-            <button class="pix-btn" type="button" data-gl-next aria-label="${esc(ui.nextImage)}">&gt;</button>
+            <button class="pix-btn" type="button" data-gl-next aria-label="${esc(ui.nextImage)}" data-tip="${esc(ui.nextImage)}">&gt;</button>
             <button class="pix-btn" type="button" data-gl-close>${esc(ui.close)} <kbd>Esc</kbd></button>
           </div>
         </dialog>
@@ -293,7 +321,11 @@ export function renderExperience() {
 
 // --- Skills ---------------------------------------------------------------------------
 
+// Each skill's slot shows its name; its flavor line is its tooltip (the shared one,
+// ui/tooltip.js: the name over the flavor), which a screen reader hears as its description.
+// A slot does nothing else, so a tap (a touch screen has no hover) opens it too.
 export function renderSkills() {
+  let n = 0;
   return `
     <section class="screen screen-skills side-left" data-screen="skills" aria-labelledby="skills-title" hidden>
       ${panel('page-panel', `
@@ -303,14 +335,17 @@ export function renderSkills() {
             <div class="skill-group">
               <h2>${esc(g.group)}</h2>
               <ul class="slots" role="list">
-                ${shown(g.items).map((s) => `
+                ${shown(g.items).map((s) => {
+                  const id = `skill-flavor-${++n}`;
+                  return `
                   <li data-nav-item>
-                    <button class="slot" type="button" data-skill="${esc(s.name)}" data-flavor="${esc(s.flavor)}">
+                    <button class="slot" type="button" data-skill="${esc(s.name)}" data-tip-title="${esc(s.name)}" data-tip="${esc(s.flavor)}" data-tip-tap aria-describedby="${id}">
                       <span class="slot-glyph" aria-hidden="true">${esc(s.glyph)}</span>
                       <span class="slot-label">${esc(s.name)}</span>
-                      <span class="visually-hidden">: ${esc(s.flavor)}</span>
                     </button>
-                  </li>`).join('')}
+                    <span class="visually-hidden" id="${id}">${esc(s.flavor)}</span>
+                  </li>`;
+                }).join('')}
               </ul>
             </div>`).join('')}
         </div>

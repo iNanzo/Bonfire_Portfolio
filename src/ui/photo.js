@@ -1,14 +1,17 @@
 // Photo mode: the page steps aside and the fire is yours to frame. Drag to orbit, scroll
-// (or pinch) to zoom, change its colors or element, and save the frame as a PNG at full
-// pixel size. Esc (or Exit) gives the page back, and the camera returns to the screen's
-// own view (and focus to what had it: ui/focus.js). A click without a drag still stokes
-// the fire. The orbit's math (turn, tilt, distance round the fire) is ui/orbit.js, which
-// the Painter's stage uses too.
+// (or pinch, two fingers) to zoom, change its colors or element, and save the frame as a
+// PNG at full pixel size. Esc (or Close) gives the page back, and the camera returns to the
+// screen's own view (and focus to what had it: ui/focus.js). A click without a drag still
+// stokes the fire. The orbit's math (turn, tilt, distance round the fire) is ui/orbit.js,
+// which the Painter's stage uses too.
+//
+// The toolbar's line says how, for a mouse or for touch; its buttons say what they do as
+// their tooltips (the shared one, ui/tooltip.js).
 import { ui } from '../content.js';
 import { esc } from '../html.js';
 import { blip } from './audio.js';
 import { focusedNow, holdsFocus, returnFocus } from './focus.js';
-import { dragOrbit, orbitPose, zoomOrbit, ORBIT_TARGET, PHOTO_LIMITS } from './orbit.js';
+import { dragOrbit, orbitPose, zoomOrbit, ORBIT_TARGET, PHOTO_LIMITS, DRAG_RATE } from './orbit.js';
 
 /**
  * @param {object} o
@@ -17,18 +20,19 @@ import { dragOrbit, orbitPose, zoomOrbit, ORBIT_TARGET, PHOTO_LIMITS } from './o
  * @param {() => void} o.onColors        draw new colors (the site's roll)
  * @param {() => void} o.onElement       next element
  * @param {() => void} o.onEnter         (a discovery)
+ * @param {boolean} [o.touch]            a touch screen (the line says pinch and tap)
  */
-export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter = () => {} }) {
+export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter = () => {}, touch = false }) {
   const bar = document.createElement('div');
   bar.className = 'photo-bar frame';
   bar.hidden = true;
   bar.setAttribute('role', 'toolbar');
   bar.setAttribute('aria-label', ui.photo);
   bar.innerHTML = `
-    <p class="photo-hint">Drag to orbit · Scroll to zoom · Click to stoke</p>
-    <button class="pix-btn" type="button" data-photo="colors" title="Draw new flame colors">Colors</button>
-    <button class="pix-btn" type="button" data-photo="element" title="Switch between fire, lightning and ice">Element</button>
-    <button class="pix-btn" type="button" data-photo="save" title="Save this frame as a PNG">Save picture</button>
+    <p class="photo-hint">${touch ? 'Drag to orbit · Pinch to zoom · Tap to stoke' : 'Drag to orbit · Scroll to zoom · Click to stoke'}</p>
+    <button class="pix-btn" type="button" data-photo="colors" data-tip="New flame colors, picked at random">Colors</button>
+    <button class="pix-btn" type="button" data-photo="element" data-tip="The next element: fire, lightning, ice">Element</button>
+    <button class="pix-btn" type="button" data-photo="save" data-tip="Save this frame as a PNG, at full pixel size">Save Picture</button>
     <button class="pix-btn" type="button" data-photo="exit">${esc(ui.close)} <kbd>Esc</kbd></button>`;
   document.body.appendChild(bar);
 
@@ -36,6 +40,9 @@ export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter 
   let active = false;
   let drag = null;
   let dragged = false;
+  /** @type {Map<number, { x: number, y: number }>} the fingers (pointers) down on the scene */
+  const pointers = new Map();
+  let pinch = null; // two fingers down: how far apart they began, and the view then
   let opener = null; // what had focus as it opened (it gets it back)
 
   function pose(instant) {
@@ -86,19 +93,43 @@ export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter 
     else if (act === 'colors') onColors();
     else if (act === 'element') onElement();
   });
+  // One pointer drags the orbit round; a second finger makes it a pinch, which zooms (as far
+  // as the fingers spread or close: the wheel's own rate, so both feel the same).
+  const spread = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
   window.addEventListener('pointerdown', (e) => {
     if (!active || e.target.closest('.photo-bar') || e.button !== 0) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2) {
+      drag = null;
+      dragged = true; // (a pinch isn't a tap: it doesn't stoke)
+      pinch = { d: spread(), from: view };
+      return;
+    }
+    if (pointers.size > 2) return;
     drag = { x: e.clientX, y: e.clientY, from: view };
     dragged = false;
   });
   window.addEventListener('pointermove', (e) => {
-    if (!active || !drag) return;
+    if (!active) return;
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && pointers.size === 2) {
+      view = zoomOrbit(pinch.from, Math.log(pinch.d / spread()) / DRAG_RATE.zoom, PHOTO_LIMITS);
+      pose(true);
+      return;
+    }
+    if (!drag) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.hypot(dx, dy) > 4) dragged = true;
     view = dragOrbit(drag.from, dx, dy, PHOTO_LIMITS);
     pose(true);
   });
-  window.addEventListener('pointerup', () => { drag = null; });
+  const lift = (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    drag = null;
+  };
+  window.addEventListener('pointerup', lift);
+  window.addEventListener('pointercancel', lift);
   window.addEventListener('wheel', (e) => {
     if (!active) return;
     e.preventDefault();

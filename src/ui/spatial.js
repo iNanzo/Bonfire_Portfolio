@@ -46,7 +46,10 @@ export function gridNav(container, focusSelector, itemOf = (el) => el, onMove) {
   });
 }
 
-/** Vertical list: up/down (W/S) move, wrapping. Left/right optional. */
+/**
+ * Vertical list: up/down (W/S) move, wrapping. Left/right optional. Items that don't show
+ * (hidden, or in a part of the list the window's width hides) are skipped.
+ */
 export function listNav(container, focusSelector, { horizontal = false, onMove } = {}) {
   container.addEventListener('keydown', (e) => {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
@@ -55,7 +58,7 @@ export function listNav(container, focusSelector, { horizontal = false, onMove }
     if (!dir || !current) return;
     const step = horizontal ? dir[0] : dir[1];
     if (!step) return;
-    const all = [...container.querySelectorAll(focusSelector)];
+    const all = [...container.querySelectorAll(focusSelector)].filter((el) => el === current || el.getClientRects().length);
     const i = all.indexOf(current);
     const next = all[(i + step + all.length) % all.length];
     e.preventDefault();

@@ -141,8 +141,9 @@ export function setupInventory(root, { reducedMotion }) {
     const multi = p.images.length > 1;
     d('controls').hidden = !multi;
     d('thumbs').hidden = !multi;
+    // (A thumbnail says which picture it is as its tooltip: its caption, as its label does.)
     d('thumbs').innerHTML = multi
-      ? p.images.map((im, n) => `<button class="thumb" type="button" data-thumb="${n}" aria-label="Show image ${n + 1}: ${esc(im.caption ?? '')}"><img src="${esc(img(im.src, true))}" alt="" loading="lazy"></button>`).join('')
+      ? p.images.map((im, n) => `<button class="thumb" type="button" data-thumb="${n}" aria-label="Show image ${n + 1}: ${esc(im.caption ?? '')}" data-tip="${esc(im.caption || `Image ${n + 1}`)}"><img src="${esc(img(im.src, true))}" alt="" loading="lazy"></button>`).join('')
       : '';
     showImage(0);
     for (const s of slots) {

@@ -6,12 +6,15 @@ import { drawElement, elementOr, flameTitle } from './elements.js';
 import { STRUCTURAL } from './effectsDefaults.js';
 import {
   renderChrome, renderHome, renderProjects, renderExperience,
-  renderSkills, renderAbout, renderContact, sceneLabel,
+  renderSkills, renderAbout, renderContact, sceneLabel, MENU_TEXT,
 } from './render.js';
 import { installDitherPatterns } from './ui/dither.js';
 import { installTooltips } from './ui/tooltip.js';
+import { createKeysOverlay, isHelpKey } from './ui/keysOverlay.js';
+import { SITE_KEYS } from './ui/siteKeys.js';
 import { setSound, blip, forgeHum } from './ui/audio.js';
 import { gridNav, listNav } from './ui/spatial.js';
+import { setupRestMenu } from './ui/restMenu.js';
 import { setupInventory } from './ui/inventory.js';
 import { createDiscoveries } from './ui/discoveries.js';
 import { createPhotoMode } from './ui/photo.js';
@@ -138,6 +141,14 @@ const renderSettings = {
 };
 const hud = createRenderMenu({ ...renderSettings, className: 'debug-hud' });
 app.append(hud.el);
+/** Render Settings from the rest menu (a touch screen's way in): the breakdown's fold while that's open, else the HUD. */
+function openRenderSettings() {
+  if (!fire) return;
+  (breakdown.active ? breakdown.render : hud).open({ focus: true });
+}
+
+// --- Keyboard shortcuts (?): every key the site answers, in one list (ui/siteKeys.js) -------
+const keysOverlay = createKeysOverlay({ title: MENU_TEXT.keys, groups: SITE_KEYS });
 
 // --- Photo mode and "How it's made" (ui/photo.js, ui/breakdown.js). Created before the
 // page's own keys, so their Esc closes them without also going back a screen.
@@ -150,6 +161,7 @@ const photo = createPhotoMode({
     equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, { element: next });
   },
   onEnter: () => { breakdown.exit(); discover('photo'); },
+  touch,
 });
 // Closing the breakdown hands its open render settings back to the HUD only where P can
 // close that again: on touch screens there's no key for it, so they just fold away.
@@ -390,9 +402,12 @@ document.addEventListener('click', (event) => {
 });
 syncRoute(false);
 
-// --- Keyboard: Q/E switch screens, Esc goes back ------------------------------------------
+// --- Keyboard: Q/E switch screens, Esc goes back, ? lists every key -------------------------
+// (Shift with a letter isn't one of the site's keys: only ?, which is Shift+/ on most keyboards.)
 window.addEventListener('keydown', (e) => {
   if (e.altKey || e.ctrlKey || e.metaKey || isEditing(e.target) || document.querySelector('dialog[open]')) return;
+  if (isHelpKey(e)) { e.preventDefault(); keysOverlay.open(); return; }
+  if (e.shiftKey) return;
   const k = e.key.toLowerCase();
   if (k === 'f') { photo.toggle(); return; }
   if (k === 'b') { breakdown.toggle(); return; }
@@ -404,6 +419,13 @@ window.addEventListener('keydown', (e) => {
     if (route.screen === 'projects' && route.item) go('#/projects');
     else if (route.screen !== 'home') go('#/');
   }
+});
+// The render settings' keys (P, and while it's open 1–6 and 0): listened for from the start,
+// and nothing until the scene is there. The breakdown takes them first while it's open (its
+// own fold of the menu).
+window.addEventListener('keydown', (e) => {
+  if (!fire || breakdown.active || isEditing(e.target) || document.querySelector('dialog[open]')) return;
+  if (hud.handleKey(e)) e.preventDefault();
 });
 
 // --- Header, rest menu, sound ---------------------------------------------------------------
@@ -443,26 +465,11 @@ onScroll();
 listNav(q('.tabs'), 'a', { horizontal: true, onMove: () => blip('move') });
 listNav(q('[data-title-menu]'), '[data-title-item]', { onMove: () => blip('move') });
 
-const menu = q('[data-menu]');
-q('[data-menu-open]').addEventListener('click', () => {
-  menu.showModal();
-  q('[data-menu-item]', menu).focus();
-  blip('select');
+// The rest menu (ui/restMenu.js; the Menu button, at every width): Go To and Tools.
+setupRestMenu({
+  menu: q('[data-menu]'), opener: q('[data-menu-open]'), onSound: blip,
+  actions: { photo: () => photo.enter(), breakdown: () => breakdown.enter(), render: openRenderSettings, discoveries: openDiscoveries, keys: () => keysOverlay.open() },
 });
-menu.addEventListener('click', (e) => {
-  if (e.target === menu || e.target.closest('[data-menu-close]')) return menu.close();
-  const action = e.target.closest('[data-menu-action]')?.dataset.menuAction;
-  if (action) {
-    menu.close();
-    if (action === 'photo') photo.enter();
-    else if (action === 'breakdown') breakdown.enter();
-    else if (action === 'discoveries') openDiscoveries();
-    return;
-  }
-  if (e.target.closest('a[data-menu-item]')) menu.close();
-});
-menu.addEventListener('close', () => blip('back'));
-listNav(menu, '[data-menu-item]', { onMove: () => blip('move') });
 
 // The Q / E keys are buttons too (the same step through the screens).
 function step(dir) {
@@ -473,13 +480,12 @@ function step(dir) {
 }
 qa('[data-step]').forEach((b) => b.addEventListener('click', () => { step(Number(b.dataset.step)); blip('select'); }));
 
-// Sound: the label says what it is now ("Sound: off"), the tooltip what a click does.
+// Sound: the label says what it is now ("Sound: Off"), the tooltip what a click does.
 const soundButtons = qa('[data-sound]');
 function applySound(on) {
   on = setSound(on);
   soundButtons.forEach((b) => {
     b.setAttribute('aria-pressed', String(on));
-    b.title = ui.soundHint ?? '';
     q('[data-sound-label]', b).textContent = on ? ui.soundOn : ui.soundOff;
   });
   store.set('sound', on ? '1' : '0');
@@ -494,7 +500,6 @@ if (store.get('sound') === '1') {
   // with the first click or key press.
   soundButtons.forEach((b) => {
     b.setAttribute('aria-pressed', 'true');
-    b.title = ui.soundHint ?? '';
     q('[data-sound-label]', b).textContent = ui.soundOn;
   });
   const resume = () => { applySound(true); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
@@ -504,11 +509,7 @@ if (store.get('sound') === '1') {
 
 // --- The résumé: its links show once there's a file to open (public/resume.pdf, or a link) --
 if (site.resumeUrl) {
-  // (The menu's arrow keys take its link only once it shows: a hidden one would stop them.)
-  const show = () => {
-    qa('[data-resume]').forEach((el) => { el.hidden = false; });
-    qa('[data-menu-item-later]').forEach((a) => a.setAttribute('data-menu-item', ''));
-  };
+  const show = () => { qa('[data-resume]').forEach((el) => { el.hidden = false; }); };
   if (/^https?:/i.test(site.resumeUrl)) show();
   else {
     // (The dev server answers any path with the page itself, so check it's really a PDF.)
@@ -521,28 +522,7 @@ if (site.resumeUrl) {
 // --- Grids: arrow keys / WASD like a game menu ---------------------------------------------
 gridNav(q('[data-inv-grid]'), '.slot-item', (el) => el.closest('[data-nav-item]'), () => blip('move'));
 gridNav(q('[data-skill-grid]'), '.slot', (el) => el.closest('[data-nav-item]'), () => blip('move'));
-
-// Skill tooltips.
-const tooltip = q('[data-tooltip]');
-function showTip(slot) {
-  q('.tooltip-name', tooltip).textContent = slot.dataset.skill;
-  q('.tooltip-flavor', tooltip).textContent = slot.dataset.flavor;
-  tooltip.hidden = false;
-  const r = slot.getBoundingClientRect();
-  const t = tooltip.getBoundingClientRect();
-  const left = Math.min(Math.max(8, r.left + r.width / 2 - t.width / 2), window.innerWidth - t.width - 8);
-  const top = r.top - t.height - 10 < 8 ? r.bottom + 10 : r.top - t.height - 10;
-  tooltip.style.left = `${Math.round(left)}px`;
-  tooltip.style.top = `${Math.round(top)}px`;
-}
-const hideTip = () => { tooltip.hidden = true; };
-qa('.slot').forEach((s) => {
-  s.addEventListener('mouseenter', () => showTip(s));
-  s.addEventListener('mouseleave', () => { if (document.activeElement !== s) hideTip(); });
-  s.addEventListener('focus', () => showTip(s));
-  s.addEventListener('blur', hideTip);
-});
-window.addEventListener('scroll', hideTip, { passive: true });
+// (A skill's flavor is its tooltip: the shared one, installTooltips above.)
 
 // --- Clicks: UI "hit" feedback, and the fire answers ----------------------------------------
 const kindled = q('[data-kindled]');
@@ -798,6 +778,7 @@ const pack = createPack({
       discover('spell');
     },
     // A new spell forges a new weapon in that element (the swap takes after it).
+    elementTip: 'Also forges a new weapon.',
     onElement: (key) => {
       if (key === equipment.element) return;
       equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, { element: key });
@@ -848,9 +829,8 @@ function failScene(error) {
   breakdown.exit();
   photo.exit();
   wantsBreakdown = false;
-  for (const b of qa('[data-menu-action="photo"], [data-menu-action="breakdown"]')) {
-    b.closest('li').hidden = true;
-    b.removeAttribute('data-menu-item'); // (out of the menu's arrow keys too)
+  for (const b of qa('[data-menu-action="photo"], [data-menu-action="breakdown"], [data-menu-action="render"]')) {
+    b.closest('li').hidden = true; // (and so out of the menu's arrow keys)
   }
   knightModel = false;
   knightChanged();
@@ -918,12 +898,6 @@ startScene().then(async () => {
         document.body.appendChild(lab);
       });
     }
-    // The render settings' keys (P, and while it's open 1–6 and 0). The breakdown takes
-    // them first while it's open (its own fold of the menu).
-    window.addEventListener('keydown', (e) => {
-      if (!fire || breakdown.active || isEditing(e.target) || document.querySelector('dialog[open]')) return;
-      if (hud.handleKey(e)) e.preventDefault();
-    });
   });
 
 // --- Admin live preview ------------------------------------------------------------------
