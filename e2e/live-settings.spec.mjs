@@ -40,7 +40,8 @@ test('search: "strobe" finds the flashes in every tab, each tab counting its fin
   await expect(box(page)).toBeFocused();
   await page.keyboard.type('strobe');
   await expect(page.locator('[data-settings] form')).toHaveAttribute('data-searching', '');
-  await expect.poll(() => shown(page)).toEqual(expect.arrayContaining(['flash', 'flicker', 'hitFlash']));
+  // (A pass takes a few ms; the time allowed is for a runner starved by software-rendered WebGL.)
+  await expect.poll(() => shown(page), { timeout: 15_000 }).toEqual(expect.arrayContaining(['flash', 'flicker', 'hitFlash']));
   for (const id of ['flash', 'hitFlash', 'flicker']) await expect(page.locator(`[data-row="${id}"]`)).toBeVisible();
   // Each tab with finds says how many; the rest are greyed at 0.
   expect(Number(await count(page, 'drops').textContent())).toBeGreaterThanOrEqual(2);
