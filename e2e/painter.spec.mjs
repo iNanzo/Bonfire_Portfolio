@@ -203,7 +203,8 @@ test('Play hands the scene to an open Bonfire Live with no tab opened; a blocked
   const errors = watch(page);
   await ready(page, '/painter/?scene=b:frozen-shrine');
   await page.click('[data-cmd="play"]');
-  await expect(page.locator('[data-note]')).toHaveText('Playing “Frozen Shrine” in Bonfire Live.');
+  // (The stand-in answers on its own page's thread: a machine running every spec at once is slow to.)
+  await expect(page.locator('[data-note]')).toHaveText('Playing “Frozen Shrine” in Bonfire Live.', { timeout: 15_000 });
   expect(await page.evaluate(() => window.__played)).toEqual(['b:frozen-shrine']);
   expect(await page.evaluate(() => window.__opened)).toEqual([]); // (not even a blank one, opened and shut)
   expect(errors).toEqual([]);
@@ -224,7 +225,7 @@ test('Play hands the scene to an open Bonfire Live with no tab opened; a blocked
 // held still, only what flashes or jitters kept off (stillFx.js), so Kaleido's kaleidoscope
 // and echo reach the stage and its thumbnail.)
 test('under reduced motion the look being painted still shows, on the stage and in its thumbnail', async ({ page }) => {
-  test.setTimeout(120_000); // (a few averaged captures of a software-rendered stage)
+  test.setTimeout(180_000); // (a few averaged captures of a software-rendered stage, slower beside other specs)
   await page.emulateMedia({ reducedMotion: 'reduce' });
   // (Every thumbnail written, in order, so a new one is seen even if it's the same picture.)
   await page.addInitScript(() => {
@@ -244,7 +245,9 @@ test('under reduced motion the look being painted still shows, on the stage and 
   await page.waitForTimeout(3500); // (the start's puff settles)
   const a = await picture(page);
   await page.click('[data-cmd="save"]');
-  await expect.poll(() => page.evaluate(() => window.__thumbs.length)).toBe(1);
+  // (A thumbnail is the stage a couple of frames on: a software-rendered stage beside other
+  // specs can take longer than a poll's 5 s to draw them.)
+  await expect.poll(() => page.evaluate(() => window.__thumbs.length), { timeout: 30_000 }).toBe(1);
   const b = await picture(page);
   const kaleido = page.locator('[data-pick="look.name"][data-value="\\"kaleido\\""]');
   await kaleido.click();
@@ -256,7 +259,7 @@ test('under reduced motion the look being painted still shows, on the stage and 
   expect(apart(b, c)).toBeGreaterThan(Math.max(4, 2 * apart(a, b)));
   // The thumbnail: saved again, it's Kaleido's too.
   await page.click('[data-cmd="save"]');
-  await expect.poll(() => page.evaluate(() => window.__thumbs.length)).toBe(2);
+  await expect.poll(() => page.evaluate(() => window.__thumbs.length), { timeout: 30_000 }).toBe(2);
   const [ember, kal] = await page.evaluate(() => window.__thumbs);
   const pixels = async (url) => {
     const raw = await sharp(Buffer.from(url.split(',')[1], 'base64')).resize(32, 18, { fit: 'fill' }).removeAlpha().raw().toBuffer();
@@ -278,6 +281,7 @@ test('a scene from the admin (#scene=) opens with its banner', async ({ page }) 
 });
 
 test('the panel remembers its open sections; a shape change draws only its own section again', async ({ page }) => {
+  test.setTimeout(120_000); // (a reload and two window sizes of a software-rendered stage)
   const errors = watch(page);
   await ready(page);
   await page.click('[data-sec-toggle="layers"]');

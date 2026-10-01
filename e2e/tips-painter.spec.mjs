@@ -12,7 +12,7 @@
 // stage the other specs use, a frame takes 100–300 ms, every hover and focus waits on a few,
 // and these ~600 checks would take half an hour.
 import { test, expect } from '@playwright/test';
-import { collectTips, checkTip, assertInViewport, dismissTip, tipOf } from './lib/tips.mjs';
+import { collectTips, checkTip, assertInViewport, tipOf } from './lib/tips.mjs';
 import { defaultScene, encodeSceneHash } from '../src/scenes.js';
 import { DROP_FX, LAYERS } from '../src/visualizer/looks.js';
 import { PAINTER_SECTIONS } from '../src/settingsMap.js';
@@ -56,6 +56,22 @@ async function ready(page) {
 }
 
 /**
+ * Close an open tip with Esc and wait for it to go: hidden, or showing another trigger's
+ * words (the panel scrolled under a resting pointer brings up what's under it now). (The
+ * shared helper's dismissTip waits 2 s: on a machine running every spec at once, the other
+ * specs' software-rendered stages can keep this page's thread from answering that soon,
+ * though Esc hides the tip at once.)
+ */
+async function dismiss(page) {
+  const was = await tipOf(page).textContent();
+  await page.keyboard.press('Escape');
+  await page.waitForFunction((text) => {
+    const t = document.querySelector('.ui-tip');
+    return !t || !t.getClientRects().length || t.textContent !== text;
+  }, was, { timeout: 15_000 });
+}
+
+/**
  * Open each trigger's tip `how` (hover, focus or tap), check where it lands, then close it
  * with Esc (every tip: a tap's stays until then). (On a machine running every spec at once a
  * hover now and then lands before the page has caught up with the last one: a tip that
@@ -73,7 +89,7 @@ async function checkAll(page, triggers, how) {
     if (!r.shown) { missing.push(`${mode}: ${what}`); continue; }
     assertInViewport(r.rect, r.viewport, 8);
     expect(r.coversTrigger, `${what}: the tip covers what opened it`).toBe(false);
-    await dismissTip(page);
+    await dismiss(page);
   }
   expect(missing, 'every tip shows').toEqual([]);
 }
@@ -88,7 +104,7 @@ for (const [label, viewport, touch] of [['laptop', { width: 1280, height: 720 },
     // (Each way of opening them a test of its own: Layers alone has about 80.)
     for (const how of touch ? ['tap', 'focus'] : ['hover', 'focus']) {
       test(`the bar (${how}): undo, redo, Tools, the previews, Play and the banner’s close`, async ({ page }) => {
-        test.setTimeout(120_000);
+        test.setTimeout(240_000);
         await ready(page);
         const triggers = [...await collectTips(page, '[data-bar]'), ...await collectTips(page, '.pnt-banners')];
         expect(triggers.length).toBeGreaterThanOrEqual(touch ? 6 : 8);
