@@ -97,5 +97,6 @@
     "admin/ui/paths.js",
     "admin/ui/reset.js",
     "admin/server/csp.js"
+    "src/weaponGroups.js"
   ]
 }

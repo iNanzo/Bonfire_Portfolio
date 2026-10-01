@@ -522,14 +522,15 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
   text-transform: none;
   color: var(--text-dim);
 }
-.pack-options { display: grid; gap: 1px; }
+/* The options in groups (pack.js): the item's actions first, then a labelled group per
+   heading, each its own list. A long list's groups go in two columns, the actions in one. */
+.pack-options, .pack-group-list { display: grid; gap: 1px; }
 .pack-list.is-long { max-width: min(420px, calc(100vw - 100px)); }
-.pack-list.is-long .pack-options { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 6px; }
-.pack-list.is-long .pack-heading { grid-column: 1 / -1; } /* (a heading spans both columns) */
+.pack-list.is-long .pack-group .pack-group-list { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 6px; }
 /* No room for two columns left of its item (pack.js fit): one, as wide as a short list. */
 .pack-list.is-long.is-narrow { max-width: min(290px, calc(100vw - 100px)); }
-.pack-list.is-long.is-narrow .pack-options { grid-template-columns: 1fr; }
-@media (max-width: 559px) { .pack-list.is-long .pack-options { grid-template-columns: 1fr; } }
+.pack-list.is-long.is-narrow .pack-group .pack-group-list { grid-template-columns: 1fr; }
+@media (max-width: 559px) { .pack-list.is-long .pack-group .pack-group-list { grid-template-columns: 1fr; } }
 .pack-option-label { overflow-wrap: anywhere; } /* (a list narrowed to fit wraps its labels) */
 .pack-option {
   display: flex;
@@ -546,6 +547,7 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
   text-align: left;
   color: var(--text-dim);
   cursor: pointer;
+  --tip-side: left; /* (its tooltip out to the left, over the scene: above, it would cover the one before) */
 }
 .pack-option .cursor { width: 7px; height: 10px; visibility: hidden; color: var(--accent-hi); }
 .pack-option:hover,
@@ -570,6 +572,8 @@ body[data-screen='home'] .prompt[data-prompt='Back'] { opacity: 0.35; }
   text-transform: uppercase;
   color: var(--text-dim);
 }
+/* Why a group's options are off (a style that wears its own colors; reduced motion). */
+.pack-why { margin: 0 6px 4px; font-size: 0.8125rem; line-height: 1.35; font-style: italic; color: var(--text-dim); }
 
 @media (max-width: 559px) {
   .pack { right: 12px; bottom: 12px; }

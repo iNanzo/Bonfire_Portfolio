@@ -13,6 +13,8 @@ import { validateScenes } from './scenes.js';
 // The basics moved to ruleBasics.js (so scenes.js can use them); re-exported for everyone
 // who imports them from here.
 export { contrast, HEX_RE, ID_RE, luminance, slugify, WEAPON_KEYS } from './ruleBasics.js';
+// The weapons by kind (the pack's Anvil groups them so), next to the keys they group.
+export { WEAPON_GROUPS } from './weaponGroups.js';
 
 export const CONTENT_PATH = 'src/content.json';
 export const SECTIONS = ['site', 'screens', 'weapons', 'weaponDraw', 'startingEquipment', 'hero', 'sections', 'featured', 'projects',
@@ -29,6 +31,9 @@ export const KINDLED_SHOW = ['first', 'always', 'never'];
 export const IMAGE_RE = /^assets\/projects\/[a-z0-9-]+\/[a-z0-9-]+$/;
 /** More slots than this and the inventory grid overflows its 4×4 box. */
 export const GRID_SLOTS = 16;
+/** The `ui` texts that head a group in a menu (the pack's lists): each must say something. */
+export const UI_HEADINGS = ['packSwords', 'packGreatswords', 'packPolearms', 'packAxes', 'packSpells', 'packColors',
+  'packGestures', 'packHelmets', 'packStyles', 'packFinishes'];
 
 /** Every project-like entry, in inventory order. */
 export const inventoryEntries = (c) => [c.featured, ...(c.projects ?? []), ...(c.archive ?? [])].filter(Boolean);
@@ -341,9 +346,10 @@ export function validateContent(c) {
     });
   }
 
-  // interface text
+  // interface text (a menu's group headings can't be blank: a group with no name reads out
+  // as nothing to a screen reader, and shows as a bare line)
   if (obj(c.ui, 'ui')) for (const [k, v] of Object.entries(c.ui)) {
-    if (k !== 'prompts') { text(v, `ui.${k}`); continue; }
+    if (k !== 'prompts') { text(v, `ui.${k}`, UI_HEADINGS.includes(k)); continue; }
     list(v, 'ui.prompts', (row, p) => {
       if (!Array.isArray(row) || row.length !== 3) return err(p, 'Each prompt is: key, second key (or empty), label.');
       text(row[0], `${p}[0]`, true);

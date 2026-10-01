@@ -252,3 +252,17 @@ test('seo: withMeta updates every tag in the real index.html, and in a copy Pret
   assert.equal(dollars.match(/<title>([^<]*)<\/title>/)?.[1], esc(odd));
   assert.equal(metaValue(dollars, 'name', 'description'), esc(odd));
 });
+
+test('content: a menu group’s heading can’t be blank', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { validateContent, UI_HEADINGS } = await import('../src/contentRules.js');
+  const content = JSON.parse(await readFile(new URL('../src/content.json', import.meta.url), 'utf8'));
+  assert.deepEqual(validateContent(content).errors, []);
+  for (const key of UI_HEADINGS) assert.ok(typeof content.ui[key] === 'string' && content.ui[key].trim(), `ui.${key}`);
+  const blank = structuredClone(content);
+  blank.ui.packSwords = ' ';
+  assert.deepEqual(validateContent(blank).errors.map((e) => e.path), ['ui.packSwords']);
+  const other = structuredClone(content);
+  other.ui.menuFlavor = '';
+  assert.deepEqual(validateContent(other).errors, [], 'other interface text may be empty, as before');
+});
