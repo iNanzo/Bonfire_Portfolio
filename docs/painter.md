@@ -91,30 +91,47 @@ browser; Place & Atmosphere the first time).
 
 **Switches and setting them all at once.** Every *Off / In the Mix / Always* is three radio
 buttons: one Tab stop each (Layers is 14, where it was 42), the arrow keys move along it.
+Each section with switches says once, over its first, what the three mean (the settings
+map's `TRI_HELP`): Off never plays it, In the Mix lets it come and go, Always keeps it on.
 The layers, the scene's own drop hits and the move lists have a toolbar over them: *All
 Off · All In the Mix · All Always · Shuffle · Defaults* (a new scene's: all off), and for
-the moves *All · None · Defaults* (*None* can't empty the list: one stays; *Defaults* leaves
-the moves to the show). A toolbar's button is one change: one Ctrl+Z puts it all back, and a
-note says so. The scene's rules still hold (Painterly and Watercolor are never both
-Always).
+the moves *All · None · Defaults*. *None* is there but unavailable (a list keeps at least
+one move; its tooltip says so): untick moves one by one instead, or *Defaults* to leave
+them to the show. A toolbar's button is one change: one Ctrl+Z puts it all back, and a note
+says so (on a phone: Undo ↶). The scene's rules still hold (Painterly and Watercolor are
+never both Always). A move list's boxes follow the scene through a toolbar's button, undo
+and redo.
 
 **Searching the panel.** The box over the sections (`/` goes to it) narrows the panel as you
-type: only the rows it finds, their sections opened, what matched marked, scrolled to the
-first. It reads each row's label, its search words, its section and heading, its choices
-and its hint ("bloom" finds Glow, "armet" the helmets, "exposre" Exposure), with the same
-matcher as Bonfire Live's settings. A row the scene's shape leaves out is listed under the
-box (*Not shown now*, with how many) with how to bring it back: *Glow Strength: turn on
-Glow in Layers to see this*, *Helmets: set Knights above 0 to see this*. The search holds
-while you paint: a change that draws a section again is searched again, and the box keeps
-the keyboard. How many were found is read out once you stop typing; Esc clears it (every
-section back as it was) and Esc again hands the keyboard back to the page. The box stays
-in sight: only the sections under it scroll.
+type: only the rows it finds, their sections opened, what matched marked, the best found
+scrolled to the top. It reads each row's label, its search words, its section and group
+(a heading, or the settings map's name for it: "drop" finds every drop hit, in *The
+Drop*), its choices and its hint ("bloom" finds Glow, "armet" the helmets, "exposre"
+Exposure, "firefly" the Fireflies), with the same matcher as Bonfire Live's settings. A row
+found only in its hint gives way when others are found by name: "drop" shows Drop Hits, not
+every knight's hint that mentions a drop. A row the scene's shape leaves out is listed under
+the box (*Not shown now*, with how many; folded to that count on a phone) with how to bring
+it back: *Glow Strength: turn on Glow in Layers to see this*, *Helmets: set Knights above 0
+to see this* (many left out for one reason share a line: *Hits Per Drop, This Scene's Hits,
+Shatter and 12 more: pick This Scene's Own under Drop Hits to see this*), and the row that
+brings it back shows in the panel (Glow's switch, Drop Hits' own choice), one click from
+the note. How Each Layer Blends names its rows *Glow Blend*, *Echoes Blend*…, so they don't
+read as the layers themselves. The search holds while you paint: a change that draws a
+section again is searched again, and the box keeps the keyboard. How many were found is
+read out once you stop typing; Esc clears it (every section back as it was) and Esc again
+hands the keyboard back to the page. The box stays in sight: only the sections under it
+scroll.
 
 **Tools ▾** reaches what only a key did before: *Render Settings* (P), *Pack* (I),
-*Capture* (C), *Full Screen* (F) and *Keyboard Shortcuts* (?). Render Settings shows the
-scene's render in Bonfire Live's words (*Always*, *Off*, *A Scene's 3 Colors*) and its last
-row is *Reset Render Settings* (a new scene's). `?` lists every key below, with a box that
-filters them.
+*Capture* (C), *Full Screen* (F) and *Keyboard Shortcuts* (?). With the menu open, those
+keys pick their item (the menu closes first, so what opens isn't under it), and any other
+key the page answers closes it first too; Esc closes it back onto the button. Its tooltip
+steps aside while it's open. On a phone it's the word *Tools* (a finger can't hover for the
+tooltip). Render Settings shows the scene's render in Bonfire Live's words (*Always*,
+*Off*, *A Scene's 3 Colors*) and its last row is *Reset Render Settings* (a new scene's).
+`?` lists every key below, with a box that filters them. The bar's icon buttons (undo,
+redo, the banner's ✕), Tools, Play and the previews have tooltips that a screen reader
+reads out too (each button's description).
 
 **The preview**
 
