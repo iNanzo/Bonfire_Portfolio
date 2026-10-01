@@ -134,11 +134,9 @@ const PROBE_CELL = 0.03;
 const GAUNTLET_CELL = 0.02;
 // At home, his body (all but those arm pieces, his helmet with it) is checked too, and his
 // arms again once they're turned: whatever of him would still come nearer a shape near him
-// than DEPTH (m; less than 0: that far in) (his body, or an arm the turns couldn't clear)
-// eases back toward his
-// resting pose there by each of EASE_BACK in turn until it doesn't (a seated Praise arching
-// back into a standing stone, a boot stepping down through a fallen drum, a fist pumped
-// into the stone at his side).
+// than DEPTH (m; below 0, that far in) eases back toward his resting pose there by each of
+// EASE_BACK in turn until it doesn't (a seated Praise arching back into a standing stone, a
+// boot stepping down through a fallen drum, a fist pumped into the stone at his side).
 const BODY = ['hips', 'spine', 'chest', 'neck', 'head', 'shoulderL', 'shoulderR', 'tassetL', 'tassetR', 'thighL', 'thighR', 'shinL', 'shinR', 'footL', 'footR'];
 // (Its points are a few centimetres apart: kept 5 mm out, no point between them goes in far.)
 const DEPTH = 0.005;
