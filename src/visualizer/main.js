@@ -307,7 +307,8 @@ function startScene() {
     fire = candidate;
     director = nextDirector;
     frameFire();
-    if (import.meta.env.DEV) window.__viz = { fire, director, settings, get engine() { return engine; }, get features() { return lastFeatures; } };
+    // (Dev builds, and any build with ?bench in its address: tools/bench-viz.mjs drives the show through it.)
+    if (import.meta.env.DEV || new URLSearchParams(location.search).has('bench')) window.__viz = { fire, director, settings, get engine() { return engine; }, get features() { return lastFeatures; } };
     director.applyRender(); // (the Render tab: render.js)
     const eq = prev ? { weapon: prev.weapon, flame: prev.flame, element: prev.element } : { weapon: startingEquipment.weapon, flame: startingEquipment.flame, element: elementOr(startingEquipment.element) };
     prev?.dispose();
