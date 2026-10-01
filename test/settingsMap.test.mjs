@@ -68,7 +68,7 @@ test('Live: every setting the dialog picks has exactly one entry, bound to a key
   const d = defaults();
   const count = new Map();
   for (const e of entriesFor('live')) for (const k of liveKeys(e)) count.set(k, (count.get(k) ?? 0) + 1);
-  for (const k of Object.keys(d).filter((k) => !PAGE_LOCALS.includes(k))) assert.equal(count.get(k), 1, `${k}: one entry`);
+  for (const key of Object.keys(d).filter((k) => !PAGE_LOCALS.includes(k))) assert.equal(count.get(key), 1, `${key}: one entry`);
   // (Frame Rate is the page's own, coming with its control; every other binding is a setting.)
   for (const k of count.keys()) assert.ok(k in d || k === 'frameRate', `${k} is a setting`);
   for (const k of PAGE_LOCALS) assert.equal(count.get(k), undefined, `${k} is the page's own`);
@@ -160,17 +160,11 @@ test('one range per number, the same in Bonfire Live, the Painter and the admin'
     if (e.painter && SCENE_RANGES[e.painter] && !OWN.painter.includes(id)) assert.deepEqual(SCENE_RANGES[e.painter], r, `${id}: the Painter's`);
     const pattern = e.admin?.slice('effects.'.length);
     if (pattern && RANGES[pattern] && !OWN.admin.includes(id)) assert.deepEqual(RANGES[pattern], r, `${id}: the admin's`);
-    if (r) {
-      assert.ok(r[0] < r[1] && r[2] > 0 && r[2] <= r[1] - r[0], `${id}: ${r}`);
-      // The defaults and the site's tuned values sit inside it.
-      if (e.live && typeof defaults()[e.live] === 'number') assert.ok(defaults()[e.live] >= r[0] && defaults()[e.live] <= r[1], `${id}: Live's default`);
-      if (pattern) {
-        for (const root of [{ effects: DEFAULT_EFFECTS }, content]) {
-          const v = at(root, e.admin);
-          if (typeof v === 'number') assert.ok(v >= r[0] && v <= r[1], `${id}: ${v} in ${r}`);
-        }
-      }
-    }
+    if (!r) continue;
+    assert.ok(r[0] < r[1] && r[2] > 0 && r[2] <= r[1] - r[0], `${id}: ${r}`);
+    // The defaults and the site's tuned values sit inside it.
+    const values = [e.live && defaults()[e.live], ...(pattern ? [at({ effects: DEFAULT_EFFECTS }, e.admin), at(content, e.admin)] : [])];
+    for (const v of values.filter((x) => typeof x === 'number')) assert.ok(v >= r[0] && v <= r[1], `${id}: ${v} in ${r}`);
   }
   assert.deepEqual(sharedRange('dither'), [0, 0.4, 0.02]);
   assert.deepEqual(sharedRange('exposure'), [0.5, 2, 0.05, '×']);
@@ -290,8 +284,7 @@ test('sections: every entry sits in one, each Live one in a tab, each Painter on
     assert.ok(e.live || e.painter || e.admin, `${id}: bound somewhere`);
   }
   // The entries come in their sections' order.
-  const at = (e) => ids.indexOf(e.section);
-  const seq = Object.values(SETTINGS).map(at);
+  const seq = Object.values(SETTINGS).map((e) => ids.indexOf(e.section));
   assert.deepEqual(seq, [...seq].sort((a, b) => a - b), 'SETTINGS in the sections’ order');
   // sectionsFor: Live's tabbed ones, the Painter's own, the admin's that hold its entries.
   assert.deepEqual(sectionsFor('live').map((s) => s.id), SECTIONS.filter((s) => s.tab).map((s) => s.id));
