@@ -1,4 +1,5 @@
-// The visualizer's variety: made palettes and recolored scenery (colors.js); looks, layers,
+// The visualizer's variety: made palettes and recolored scenery (colors.js), and a scene's
+// registered flame and pinned scenery colors; looks, layers,
 // blend modes, drop hits and every effect's off / in the mix / always switch (looks.js);
 // firefly moves (fireflyMoves.js).
 import { test } from 'node:test';
@@ -75,6 +76,56 @@ test('recolored scenery: any flame, new colors each landing, readable; off bring
   let recolored = 0;
   for (let i = 0; i < 60; i++) { colors.landed('ember'); settle(); if (colors.scenery) recolored++; }
   assert.ok(recolored > 12 && recolored < 48, `in the mix: some flames (${recolored}/60)`);
+  settings.sceneColors = 'off';
+  colors.landed('ember');
+  settle();
+});
+
+test('a scene’s flame: registered, hidden, never pruned; its scenery colors held through landings', () => {
+  const settings = { colors: 'harmonious', scheme: 'auto', sceneColors: 'on' };
+  const colors = createColors(settings);
+  const site = { ...base };
+  const settle = () => { while (colors.update(0.05)); };
+  const ramp = { lo: '#1a3050', mid: '#3070b0', hi: '#90d0ff', core: '#f0faff', shade: '#202838', light: 0.3 };
+  const key = colors.register('scene-b-frozen', ramp);
+  assert.equal(key, 'scene-b-frozen');
+  assert.deepEqual(flames[key].ramp, ['#1a3050', '#3070b0', '#90d0ff', '#f0faff']);
+  assert.ok(flames[key].hidden, 'out of the site’s rotation');
+  assert.match(flames[key].name, /^[A-Z][a-z]+ Flame$/);
+  let k = key;
+  for (let i = 0; i < 20; i++) k = colors.next(k);
+  assert.ok(flames[key], 'still there after 20 made palettes');
+  assert.deepEqual(colors.registered, [key]);
+  settings.colors = 'site';
+  const siteKeys = Object.keys(flames).filter((f) => !f.startsWith('live-') && f !== key);
+  let at = siteKeys[0];
+  for (let i = 0; i < siteKeys.length + 2; i++) {
+    at = colors.next(at, 1);
+    assert.notEqual(at, key, 'the arrows walk the site’s palettes only');
+  }
+  // Pinned scenery colors: held, a landing leaves them be; released, the next landing recolors.
+  const scene = { void: '#05060a', shadow: '#10141c', stone: '#28303c', wood: '#3a3028', bone: '#d8e0e8' };
+  colors.pinScenery(scene);
+  settle();
+  assert.deepEqual({ ...base }, { ...site, ...scene });
+  assert.equal(colors.held, true);
+  colors.landed('ember');
+  settle();
+  assert.equal(base.stone, scene.stone, 'a landing leaves the scene’s colors alone');
+  colors.release();
+  colors.landed('ember');
+  settle();
+  assert.notEqual(base.stone, scene.stone, 'released: the next landing recolors');
+  // null: the site's own, held.
+  colors.pinScenery(null, { seconds: 0.1 });
+  settle();
+  assert.deepEqual({ ...base }, site);
+  colors.landed('ember');
+  settle();
+  assert.deepEqual({ ...base }, site);
+  colors.release();
+  colors.unregister(key);
+  assert.equal(flames[key], undefined);
   settings.sceneColors = 'off';
   colors.landed('ember');
   settle();
@@ -329,4 +380,57 @@ test('firefly darts any way: every direction on the sphere, leaned back in when 
     const low = anyDirection({ x: 0, y: 0.2, z: 0 }, center);
     assert.ok(low.y > 0, 'a low one heads up');
   }
+});
+
+test('grain, cinema bars, spotlight and chroma split: off, always, in the mix, each rolled anew', () => {
+  const g = {};
+  const looks = createLooks(g);
+  const turns = { ...every('mix', LOOKS), glitch: 'off', prism: 'off' }; // (their own tears and splits aside)
+  const NEW = ['grain', 'cinema', 'spotlight', 'chroma'];
+  const settle = (modes) => { for (let i = 0; i < 90; i++) frame(looks, { looks: turns, ...modes }, 1 / 30); };
+  const lit = { grain: () => g.noise > 0.05, cinema: () => g.letterbox > 0.05, spotlight: () => g.iris < 1, chroma: () => g.split >= 1 };
+  for (const k of NEW) {
+    looks.next(turns);
+    settle({ [k]: 'on' });
+    assert.ok(lit[k](), `${k} always: on`);
+    settle({ [k]: 'off' });
+    assert.ok(!lit[k](), `${k} off: gone again`);
+  }
+  // In the mix: some looks' turns.
+  const seen = Object.fromEntries(NEW.map((k) => [k, 0]));
+  const details = { cinema: new Set(), spotlight: new Set() };
+  for (let i = 0; i < 120; i++) {
+    looks.next(turns);
+    settle(every('mix', { grain: 1, cinema: 1, spotlight: 1, chroma: 1 }));
+    for (const k of NEW) if (lit[k]()) seen[k]++;
+    if (lit.cinema()) details.cinema.add(g.letterbox.toFixed(3));
+    if (lit.spotlight()) details.spotlight.add(g.iris.toFixed(2));
+  }
+  for (const [k, n] of Object.entries(seen)) assert.ok(n > 6 && n < 110, `${k} comes and goes (${n}/120)`);
+  assert.ok(details.cinema.size > 3 && details.spotlight.size > 3, 'their size is rolled each time');
+});
+
+test('the new framing layers keep the breakdown’s bars and the drop’s snaps', () => {
+  const g = {};
+  const looks = createLooks(g);
+  const turns = { ...every('mix', LOOKS) };
+  looks.next(turns);
+  for (let i = 0; i < 90; i++) looks.update(1 / 30, { amt: 1, build: 0.9, low: true, energy: 0.5, modes: { ...offLayers, looks: turns } });
+  const barsOnly = g.letterbox;
+  assert.ok(barsOnly > 0.05 && g.iris < 1, 'a breakdown frames itself');
+  for (let i = 0; i < 90; i++) looks.update(1 / 30, { amt: 1, build: 0.9, low: true, energy: 0.5, modes: { ...offLayers, looks: turns, cinema: 'on', spotlight: 'on' } });
+  assert.ok(g.letterbox >= barsOnly - 1e-9, 'whichever bars are taller win');
+  looks.drop({ iris: 'on' }, 1);
+  looks.update(1 / 60, { amt: 1, build: 0, low: false, energy: 0.5, modes: { ...offLayers, looks: turns, spotlight: 'on' } });
+  assert.ok(g.iris < 0.2, 'the drop’s iris snap still shuts it');
+});
+
+test('the X-Ray drop hit is drawn like any other, with no timer of its own here', () => {
+  const looks = createLooks({});
+  const turn = looks.turn;
+  for (let i = 0; i < 20; i++) assert.deepEqual(looks.drop({ xray: 'on' }, 1), [DROP_FX.xray]);
+  looks.update(1, { amt: 1, build: 0, low: false, energy: 0.5 });
+  assert.equal(looks.turn, turn, 'a drop hit doesn’t roll a new turn');
+  looks.next({ ember: 'mix', glitch: 'mix' });
+  assert.equal(looks.turn, turn + 1, 'a new look does');
 });

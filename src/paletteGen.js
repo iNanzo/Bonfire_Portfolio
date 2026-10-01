@@ -21,7 +21,7 @@
 //   • It must still work on the site: the tips (`hi`) double as accent text, so they
 //     are lightened until they reach 4.5:1 contrast on the background, and `shade`
 //     is a dark, barely tinted neutral for firelit stone.
-import { contrast, HEX_RE } from './contentRules.js';
+import { contrast, HEX_RE } from './ruleBasics.js';
 
 // ---- color math ---------------------------------------------------------------------------
 const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);

@@ -14,18 +14,51 @@
 //              track    one spot, the lens following the blade and widening to fit it
 //              orbit    circling the fire, looking at the blade
 //              vertigo  a dolly zoom on a held blade, deeper as the build rises
+//            ...or a dancing knight (the knights' positions come in through update):
+//              dancer   out past him from the fire, the fire behind him, drifting round
+//                       him on the beat
+//   knights  shots of the dancers round the fire (KNIGHT_SHOTS), for the cuts while they
+//            dance; and a cut to another shot never picks one with a knight standing
+//            between the lens and the fire.
 //   moves    cut, whip (a fast swing to the new framing, leaning as it goes) or glide.
 //   feels    how rigs chase the blade and moves ease between framings (cameraEase.js):
 //            smooth (the original lag), spring, bouncy, heavy or snappy.
+//   scenes   a preset scene pins its own framing and move (pin(); clearing.js movePose):
+//            held, the show's cuts, rigs and setShot are refused and the move plays; not
+//            held (a Base scene, or one ending: letGo()), the next cut takes over. pause()
+//            freezes the move (the Painter, while you drag).
 // Every framing stays in the clearing: above the ground, out of the fire, in front of the
-// ruins.
+// ruins (clearing.js keepInClearing).
 import * as THREE from 'three';
 import { approach, clamp, pick, TAU } from '../math.js';
 import { createFollower, curveFor, SWING_EASES, easeOr } from './cameraEase.js';
+import { CLEARING, fitMove, keepInClearing, poseOnCycle } from './clearing.js';
 
-
-const FIRE = new THREE.Vector3(0.02, 0, 0.02);
+const FIRE = new THREE.Vector3(...CLEARING.fire);
 const UP = new THREE.Vector3(0, 1, 0);
+const FIRE_MID = new THREE.Vector3(0.02, 0.55, 0.02); // (what a knight mustn't hide)
+
+/**
+ * A knight stands between a camera at `pos` ([x, y, z]) and the fire: one of the `heads`
+ * (world Vector3s), or his chest below it, within 0.4 m of the line of sight.
+ */
+export function hidesFire(pos, heads) {
+  if (!heads?.length) return false;
+  const from = new THREE.Vector3(...pos);
+  const line = new THREE.Line3(from, FIRE_MID);
+  const at = new THREE.Vector3();
+  const p = new THREE.Vector3();
+  for (const h of heads) {
+    for (const drop of [0.1, 0.55]) {
+      p.set(h.x, h.y - drop, h.z);
+      const t = line.closestPointToPointParameter(p, true);
+      if (t < 0.08 || t > 0.95) continue;
+      line.at(t, at);
+      if (at.distanceTo(p) < 0.4) return true;
+    }
+  }
+  return false;
+}
 
 // Shots (the fire at the origin; the broken pillar back-left, the wall back-right).
 //   yaw    sway around the target (radians either side), over 16 beats
@@ -59,6 +92,13 @@ export const COMBO_SHOTS = {
   duelFront: { name: 'Face', pos: [0.05, 1.3, 2.7], target: [0, 1.25, 0], fov: 48, yaw: 0.2, track: 0.6 },
   duelUnder: { name: 'Under', pos: [-0.7, 0.3, 1.9], target: [0, 1.5, 0], fov: 58, roll: 0.1, track: 0.7 },
 };
+// Shots of the knights dancing round the fire (the ring is 1.2 m out); not in the usual
+// rotation or the Starting Shot list: the cuts visit them while the knights dance.
+export const KNIGHT_SHOTS = {
+  dancersLow: { name: 'Dancers Low', pos: [0.4, 0.45, 3.9], target: [0, 1.0, 0], fov: 50, yaw: 0.35 },
+  roundFire: { name: 'Round the Fire', pos: [2.2, 2.4, 3.4], target: [0, 0.75, 0], fov: 44, spin: 0.045 },
+  dancersWide: { name: 'Dancers Wide', pos: [-0.5, 0.95, 5.2], target: [0, 0.9, 0], fov: 40, yaw: 0.3, push: 0.12 },
+};
 export const CLOSE = ['blade', 'hearth', 'low'];
 export const WIDE = ['clearing', 'above', 'circle', 'tele', 'sweep'];
 /** How the camera covers the blade out of the fire. */
@@ -80,20 +120,6 @@ function rollFor(pos, target, up) {
   return Math.atan2(-up.dot(x), up.dot(y));
 }
 
-/** Keep a camera position in the clearing: above the ground, out of the fire, in front of the ruins. */
-function keepInClearing(p) {
-  const dx = p.x - FIRE.x;
-  const dz = p.z - FIRE.z;
-  let r = Math.hypot(dx, dz);
-  let a = Math.atan2(dx, dz); // 0: straight in front
-  if (Math.abs(a) > 1.75) a = Math.sign(a) * 1.75;
-  r = Math.min(6.5, p.y < 1.7 ? Math.max(0.9, r) : r);
-  p.x = FIRE.x + Math.sin(a) * r;
-  p.z = FIRE.z + Math.cos(a) * r;
-  p.y = clamp(p.y, 0.25, 6.5);
-  return p;
-}
-
 export function createCamera(fire, settings, { reducedMotion = false, onShot = () => {} } = {}) {
   let shot = SHOTS[settings.shot] ? settings.shot : 'clearing';
   let rig = null;       // { name, t, … } while a rig runs
@@ -110,6 +136,12 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
   const from = newPose();
   let started = false;
   const out = { pos: [0, 0, 0], target: [0, 0, 0], fov: 32, sx: 0, sy: 0, roll: 0 };
+  let heads = [];       // the knights by the fire (their heads, world), from update()
+  /** @type {import('./clearing.js').CameraPin | null} */
+  let pinned = null;    // a scene's framing (pin())
+  let pinHold = true;   // ...refusing the show's cuts (false: until the next one)
+  let pinU = 0;         // where its move is in its cycle (0..1, running on)
+  let paused = false;   // the move (and the shot's drift) frozen
   const fallbackBlade = { mid: new THREE.Vector3(0.02, 0.8, 0.02), tip: new THREE.Vector3(0.02, 0.2, 0.02), grip: new THREE.Vector3(0.02, 1.2, 0.02), quat: new THREE.Quaternion(), normal: new THREE.Vector3(0, 0, 1), len: 1, free: false };
   const v = new THREE.Vector3();
   const w = new THREE.Vector3();
@@ -128,12 +160,14 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
   }
 
   /**
-   * Go to a shot (SHOTS or COMBO_SHOTS; none: another of SHOTS) or a rig (follow, ride,
-   * track, orbit, vertigo). `bars`: how long it's expected to run. `move`: cut, whip or
-   * glide (default: the setting). `ease`: the feel (SWING_EASES; default smooth) of the
-   * move there and of a rig's chase.
+   * Go to a shot (SHOTS, COMBO_SHOTS or KNIGHT_SHOTS; none: another of SHOTS, one with no
+   * knight hiding the fire) or a rig (follow, ride, track, orbit, vertigo, dancer). `bars`:
+   * how long it's expected to run. `move`: cut, whip or glide (default: the setting).
+   * `ease`: the feel (SWING_EASES; default smooth) of the move there and of a rig's chase.
    */
   function cut(name, { bars = (typeof settings.cutBars === 'number' && settings.cutBars) || 8, move, ease } = {}) {
+    if (pinned && pinHold) return null; // (a scene holds the framing)
+    pinned = null;
     begin(move, ease);
     shotT = 0;
     shotLen = Math.max(2, bars * 4 * lastPeriod);
@@ -146,8 +180,9 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
     }
     rig = null;
     const names = Object.keys(SHOTS).filter((n) => n !== shot);
-    shot = name && name !== shot && (SHOTS[name] || COMBO_SHOTS[name]) ? name : pick(names);
-    onShot((SHOTS[shot] ?? COMBO_SHOTS[shot]).name);
+    const clear = names.filter((n) => !hidesFire(SHOTS[n].pos, heads));
+    shot = name && name !== shot && (SHOTS[name] || COMBO_SHOTS[name] || KNIGHT_SHOTS[name]) ? name : pick(clear.length ? clear : names);
+    onShot((SHOTS[shot] ?? COMBO_SHOTS[shot] ?? KNIGHT_SHOTS[shot]).name);
     return shot;
   }
 
@@ -246,6 +281,33 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
         o.roll = 0.05 * Math.sin((TAU * st.t) / (beat * 8));
       },
     },
+    dancer: {
+      name: 'Dancer',
+      // Out past a knight from the fire (the fire behind him), low, drifting round him on
+      // the beat. Knights come in as heads; with none, it watches the fire.
+      start(st) {
+        st.i = Math.floor(Math.random() * Math.max(1, heads.length));
+        st.side = Math.random() < 0.5 ? -1 : 1;
+        st.r = 2.0 + Math.random() * 0.5;
+        st.h = 0.95 + Math.random() * 0.5;
+        st.look = (heads[st.i] ?? FIRE_MID).clone();
+      },
+      pose(st, b, dt, o) {
+        const head = heads[st.i] ?? heads[0] ?? null;
+        const beat = lastPeriod;
+        const at = head ?? FIRE_MID;
+        v.subVectors(at, FIRE).setY(0);
+        if (v.lengthSq() < 1e-4) v.set(0, 0, 1);
+        const a = Math.atan2(v.x, v.z) + st.side * (0.55 + 0.25 * Math.sin((TAU * st.t) / (beat * 16)));
+        o.pos.set(at.x + Math.sin(a) * st.r, st.h, at.z + Math.cos(a) * st.r);
+        // His chest, drawn a little toward the fire so it stays in the picture.
+        w.set(at.x, at.y - 0.45, at.z).lerp(FIRE_MID, head ? 0.3 : 0);
+        st.f.vec(st.look, w, 0.15, dt);
+        o.target.copy(st.look);
+        o.fov = 52;
+        o.roll = 0.04 * Math.sin((TAU * st.t) / (beat * 8));
+      },
+    },
     vertigo: {
       name: 'Vertigo',
       start(st, b) {
@@ -269,8 +331,19 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
   };
 
   // --- shots --------------------------------------------------------------------------
+  /** A scene's framing, where its move is now (a held blade raises it as it does a shot). */
+  function pinPose(o) {
+    const p = poseOnCycle(pinned, pinU);
+    o.pos.fromArray(p.pos);
+    o.target.fromArray(p.target);
+    o.pos.y += 0.6 * holdEase;
+    o.target.y += 0.45 * holdEase;
+    o.fov = p.fov + 7 * holdEase;
+    o.roll = p.roll;
+  }
   function shotPose(o, dt, c) {
-    const s = SHOTS[shot] ?? COMBO_SHOTS[shot] ?? SHOTS.clearing;
+    if (pinned) { pinPose(o); return; }
+    const s = SHOTS[shot] ?? COMBO_SHOTS[shot] ?? KNIGHT_SHOTS[shot] ?? SHOTS.clearing;
     const beat = lastPeriod;
     let yaw = 0;
     let k = 0;
@@ -294,6 +367,13 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
     if (s.track && trackEase > 0.001) o.target.lerp(blade().mid, s.track * trackEase);
     const dolly = s.dolly ? (2 * Math.atan(Math.tan((s.fov * Math.PI) / 360) / (1 - s.dolly * k)) * 180) / Math.PI : s.fov;
     o.fov = dolly + 7 * holdEase;
+    // The knights' shots keep the whole ring across the picture (1.8 m either side of the
+    // fire), widening the lens on a tall screen.
+    if (KNIGHT_SHOTS[shot]) {
+      const aspect = globalThis.innerWidth > 0 && globalThis.innerHeight > 0 ? globalThis.innerWidth / globalThis.innerHeight : 16 / 9;
+      const across = 1.8 / o.pos.distanceTo(o.target);
+      o.fov = Math.min(80, Math.max(o.fov, (2 * Math.atan(across / aspect) * 180) / Math.PI));
+    }
     o.roll = moving ? (s.roll ?? 0) + Math.sin(driftT * 0.7) * 0.02 : 0;
   }
 
@@ -307,11 +387,16 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
   }
 
   /**
-   * Per frame. c: { period, punch 0..1, holding, build 0..1 }.
+   * Per frame. c: { period, punch 0..1, holding, build 0..1, knights (their heads, world) }.
    */
   function update(dt, c) {
     if (c.period) lastPeriod = c.period;
-    if (settings.camera !== 'still' && !reducedMotion) { driftT += dt; shotT += dt; }
+    heads = c.knights ?? [];
+    if (settings.camera !== 'still' && !reducedMotion && !paused) {
+      driftT += dt;
+      shotT += dt;
+      if (pinned) pinU += dt / (fitMove(pinned).bars * 4 * lastPeriod);
+    }
     holdEase = approach(holdEase, c.holding ? 1 : 0, 0.6, dt);
     trackEase = approach(trackEase, fire.blade?.free ? 1 : 0, 0.3, dt);
     frameWanted(dt, c);
@@ -346,7 +431,9 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
     update,
     /** The rig running, or null. */
     get rig() { return rig?.name ?? null; },
-    get shot() { return rig ? rig.name : shot; },
+    get shot() { return rig ? rig.name : pinned ? 'scene' : shot; },
+    /** The knight shots (and the dancer rig) with nobody standing between them and the fire now. */
+    knightShots: () => [...Object.keys(KNIGHT_SHOTS).filter((n) => !hidesFire(KNIGHT_SHOTS[n].pos, heads)), 'dancer'],
     /**
      * Where the camera is headed (world): { right, up, toCam, pos }. The blade takes each
      * move's plane from it, so a move reads from the framing it's cut to.
@@ -363,8 +450,42 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
       up.multiplyScalar(Math.cos(want.roll)).addScaledVector(r, -Math.sin(want.roll));
       return { right, up, toCam, pos: want.pos.clone() };
     },
-    /** Where the fire sits on screen, as a fraction of the view from center (+x right, +y up). */
-    frame(sx = 0, sy = 0) { framing.toX = sx; framing.toY = sy; },
-    setShot(name) { if (SHOTS[name] && !rig) { shot = name; shotT = 0; } },
+    /**
+     * Where the fire sits on screen, as a fraction of the view from center (+x right, +y
+     * up). `instant`: there now, no easing (e.g. for a thumbnail).
+     */
+    frame(sx = 0, sy = 0, { instant = false } = {}) {
+      framing.toX = sx;
+      framing.toY = sy;
+      if (instant) { framing.sx = sx; framing.sy = sy; }
+    },
+    setShot(name) {
+      if (!SHOTS[name] || rig || (pinned && pinHold)) return;
+      pinned = null;
+      shot = name;
+      shotT = 0;
+    },
+    /**
+     * A scene's framing and move (null: back to the show's shots). Held (`hold`), the
+     * show's cuts, rigs and setShot are refused until it's unpinned; not held, the next
+     * cut takes over. `move`: how the camera gets there (cut, whip, glide).
+     * @param {import('./clearing.js').CameraPin | null} p
+     */
+    pin(p, { hold = true, move = 'cut' } = {}) {
+      begin(move);
+      if (!p) { pinned = null; return; }
+      rig = null;
+      pinned = { pos: [...p.pos], target: [...p.target], fov: p.fov, roll: p.roll ?? 0, move: p.move ? { ...p.move } : { kind: 'still', amount: 0, bars: 8 } };
+      pinHold = hold;
+      pinU = 0;
+    },
+    /** The scene's framing pinned now, or null. */
+    get pinned() { return pinned; },
+    /** A scene holds the framing: the show's cuts are refused. */
+    get held() { return !!pinned && pinHold; },
+    /** Freeze the move (and a shot's drift) where it is, or let it run on. */
+    pause(on) { paused = !!on; },
+    /** Let a scene's framing go without a jump: it stays, moving, until the show's next cut. */
+    letGo() { pinHold = false; },
   };
 }
