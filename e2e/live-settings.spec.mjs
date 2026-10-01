@@ -180,13 +180,27 @@ test('a setting that does nothing as things stand is disabled, saying why; Edge 
   expect(errors).toEqual([]);
 });
 
+/** Every group of the shortcuts lies inside the overlay's box (scrolled to, if need be). */
+async function groupsInSight(page) {
+  const keys = page.locator('.keys-overlay');
+  const groups = keys.locator('.keys-overlay-groups');
+  expect(await groups.evaluate((g) => g.scrollWidth <= g.clientWidth + 1), 'nothing off to the side').toBe(true);
+  for (const title of await keys.locator('.keys-group-title').all()) {
+    await title.evaluate((t) => t.scrollIntoView({ block: 'nearest' }));
+    const [t, g] = [await title.boundingBox(), await groups.boundingBox()];
+    expect(t.x >= g.x - 1 && t.x + t.width <= g.x + g.width + 1 && t.y >= g.y - 1 && t.y + t.height <= g.y + g.height + 1, `${await title.textContent()} in sight`).toBe(true);
+  }
+}
+
 test('? lists the keyboard shortcuts in groups, from the page and from the settings', async ({ page }) => {
   const errors = watch(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
   await open(page);
   await page.keyboard.press('?');
   const keys = page.locator('.keys-overlay');
   await expect(keys).toBeVisible();
   await expect(keys.locator('.keys-group-title')).toHaveText(['Moments', 'Beat', 'Show', 'View & Menus']);
+  await groupsInSight(page);
   await page.keyboard.press('Escape');
   await expect(keys).toBeHidden();
   await page.keyboard.press('s');

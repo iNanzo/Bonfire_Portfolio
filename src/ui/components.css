@@ -277,4 +277,5 @@ mark { padding: 0 1px; color: var(--c-void); background: var(--accent-hi); }
   align-content: start;
   align-items: start;
   column-gap: 32px;
+  overflow: hidden auto; /* (down, never sideways) */
 }
