@@ -323,7 +323,8 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
       ctx.drawImage(canvas, 0, 0, out.width, out.height);
       for (const done of captures.splice(0)) out.toBlob(done, 'image/png');
     }
-    for (const t of thumbs.splice(0)) t.done(thumbCanvas(t.w, t.h));
+    // (Guarded like the captures: splice(0) makes a new array every frame, even an empty one.)
+    if (thumbs.length) for (const t of thumbs.splice(0)) t.done(thumbCanvas(t.w, t.h));
     for (const fn of rendered) fn();
   }
 
