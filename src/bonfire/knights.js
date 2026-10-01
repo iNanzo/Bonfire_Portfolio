@@ -147,10 +147,10 @@ const PROBE_CLUMP = 0.06;
 // keeps it out (a seated Praise arching back into a standing stone, a fist pumped into the
 // stone at his side).
 const BODY = ['hips', 'spine', 'chest', 'neck', 'head', 'shoulderL', 'shoulderR', 'tassetL', 'tassetR', 'thighL', 'thighR', 'shinL', 'shinR', 'footL', 'footR'];
-// (Which part of him each piece is, as the ease has them (PART_OF): his body and helmet 0, his
-// left arm 1, his right 2, his legs 3. The pauldrons' domes ride up and out with their arm's
-// swing: one in eases its arm back. His shins and boots go where his legs put them.)
-const PART_OF_PIECE = { shoulderL: 1, shoulderR: 2, shinL: 3, shinR: 3, footL: 3, footR: 3 };
+// (Which part of him each piece is, as the ease has them (PART_OF): his back, head and helmet
+// 0, his left arm 1, his right 2, his hips and legs 3. The pauldrons' domes ride up and out
+// with their arm's swing: one in eases its arm back.)
+const PART_OF_PIECE = { shoulderL: 1, shoulderR: 2, hips: 3, tassetL: 3, tassetR: 3, thighL: 3, thighR: 3, shinL: 3, shinR: 3, footL: 3, footR: 3 };
 // (Its points are a few centimetres apart: kept 5 mm out, no point between them goes in far.)
 const DEPTH = 0.005;
 // (His boots and shins rest on what's under them, a seat's edge or a fallen drum: 1 cm in.)
@@ -171,9 +171,10 @@ const EASE_GAIN = 0.01;
 // (Past what he was eased back from, he lets go of it this much of the way a step: over a
 // quarter second, not at once.)
 const EASE_LET_GO = 0.25;
-// (Which part each channel of a pose moves: 0 his body (where he is, his hips, back, neck and
-// head), 1 his left arm, 2 his right, 3 his legs (where each foot goes).)
-const PART_OF = Uint8Array.from({ length: POSE_SIZE }, (_, i) => (i >= POSE.armL && i < POSE.armL + 7 ? 1 : i >= POSE.armR && i < POSE.armR + 7 ? 2 : i >= POSE.legL ? 3 : 0));
+// (Which part each channel of a pose moves: 0 his body (how his hips, back, neck and head turn:
+// a lean), 1 his left arm, 2 his right, 3 his legs (where his hips are and each foot goes: his
+// footwork getting up and sitting down, over whatever he steps across).)
+const PART_OF = Uint8Array.from({ length: POSE_SIZE }, (_, i) => (i < POSE.hips || i >= POSE.legL ? 3 : i >= POSE.armL && i < POSE.armL + 7 ? 1 : i >= POSE.armR && i < POSE.armR + 7 ? 2 : 0));
 const PARTS = 4;
 // (A seated foot's way to where he stands up to, checked at OVER_POINTS points for what it
 // steps over: it passes OVER_CLEAR (m) over the scenery's shapes, lifted at most OVER_MOST;
