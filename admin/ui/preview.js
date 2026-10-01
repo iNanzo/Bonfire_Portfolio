@@ -19,7 +19,7 @@ export function createPreview(siteUrl) {
   let frameQueued = false;
   let viewport = 'desktop';
 
-  const frame = el('iframe', { title: 'Live preview of the site', class: 'preview-frame', loading: 'lazy' });
+  const frame = el('iframe', { 'aria-label': 'Live preview of the site', class: 'preview-frame', loading: 'lazy' });
   const stage = el('div', { class: 'preview-stage' }, frame);
   const state = el('span', { class: 'preview-state', text: 'Loading…' });
 
@@ -37,10 +37,10 @@ export function createPreview(siteUrl) {
   function fit() {
     const [w, h] = VIEWPORTS[viewport];
     const scale = Math.min(stage.clientWidth / w, 1);
-    frame.style.width = `${w}px`;
-    frame.style.height = `${h}px`;
-    frame.style.transform = `scale(${scale})`;
-    stage.style.height = `${Math.round(h * scale)}px`;
+    frame.style.setProperty('width', `${w}px`);
+    frame.style.setProperty('height', `${h}px`);
+    frame.style.setProperty('transform', `scale(${scale})`);
+    stage.style.setProperty('height', `${Math.round(h * scale)}px`);
   }
   new ResizeObserver(fit).observe(stage);
 
@@ -51,16 +51,16 @@ export function createPreview(siteUrl) {
   // Forge a chosen weapon in the preview (the full swap), in the fire's current colors.
   const weapon = el('select', {
     'aria-label': 'Preview a weapon',
-    title: 'Forge this weapon in the preview: the whole swap, then it stands in the fire',
+    'data-tip': 'Forge this weapon in the preview: the whole swap, then it stands in the fire',
     onchange: () => { if (weapon.value) send({ type: 'nh:weapon', key: weapon.value }); weapon.value = ''; },
   },
   el('option', { value: '', text: 'Weapon…' }),
   WEAPON_KEYS.map((k) => el('option', { value: k, text: content.weapons?.[k] ?? k })));
   // The knight: summon him or send him off (his arrival and leaving, in the fire's current
   // element), swap his helmet (the full 1.6 s swap), or ask for a gesture.
-  const oneShot = (label, title, options, type, key) => {
+  const oneShot = (label, tip, options, type, key) => {
     const select = el('select', {
-      'aria-label': label, title,
+      'aria-label': label, 'data-tip': tip,
       onchange: () => { if (select.value) send({ type, [key]: select.value }); select.value = ''; },
     },
     el('option', { value: '', text: `${label}…` }),
@@ -79,10 +79,10 @@ export function createPreview(siteUrl) {
     stage,
     el('div', { class: 'preview-tools' },
       screen, size, weapon, knight, helmet, gesture,
-      el('button', { type: 'button', class: 'button small', text: 'Stoke', title: 'Stoke the fire: a flare, the element’s ring, a ground mark', onclick: () => send({ type: 'nh:stoke' }) }),
-      el('button', { type: 'button', class: 'button small', text: 'Random Swap', title: 'Forge a random new weapon, colors and element: the full swap and its impact', onclick: () => send({ type: 'nh:roll' }) }),
-      el('button', { type: 'button', class: 'button small', text: 'Wake the Blade', title: 'The planted weapon pulls free for a flourish and plunges back in (hit-stop, flash, shake, debris)', onclick: () => send({ type: 'nh:flourish' }) }),
-      el('button', { type: 'button', class: 'button small ghost', text: 'Reload', onclick: reload })),
+      el('button', { type: 'button', class: 'button small', text: 'Stoke', 'data-tip': 'Stoke the fire: a flare, the element’s ring, a ground mark', onclick: () => send({ type: 'nh:stoke' }) }),
+      el('button', { type: 'button', class: 'button small', text: 'Random Swap', 'data-tip': 'Forge a random new weapon, colors and element: the full swap and its impact', onclick: () => send({ type: 'nh:roll' }) }),
+      el('button', { type: 'button', class: 'button small', text: 'Wake the Blade', 'data-tip': 'The planted weapon pulls free for a flourish and plunges back in (hit-stop, flash, shake, debris)', onclick: () => send({ type: 'nh:flourish' }) }),
+      el('button', { type: 'button', class: 'button small ghost', text: 'Reload', 'data-tip': 'Load the site in the preview again', onclick: reload })),
     el('p', { class: 'help', text: 'Move your cursor through the fire to try the cursor effect, click the summon sign to call the knight, or click him to greet him. Unsaved — visitors see the saved version.' }));
 
   return {

@@ -78,7 +78,7 @@ function renameable(tag, cls, key, id) {
   const heading = el(tag, { class: cls, id, text: labelOf(key) });
   const row = el('div', { class: 'title-row' }, heading);
   const button = el('button', {
-    type: 'button', class: 'rename', title: 'Rename', 'aria-label': `Rename “${labelOf(key)}”`, text: '✎',
+    type: 'button', class: 'rename', 'data-tip': 'Rename', 'aria-label': `Rename “${labelOf(key)}”`, text: '✎',
     onclick: () => {
       const input = el('input', { type: 'text', class: `rename-input ${cls}`, maxlength: 60, 'aria-label': 'New name (empty resets it)', placeholder: defaultLabel(key) });
       input.value = labelOf(key);

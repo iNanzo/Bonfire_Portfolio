@@ -171,6 +171,11 @@ test('a scene card says what the scene holds, part by part', async () => {
   assert.match(rows.Camera, /^Still · a 32° lens$/);
   assert.match(rows.Look, /with .*· .* in the mix/);
   assert.ok(Object.values(rows).every((v) => typeof v === 'string' && v.length > 2 && !/undefined|null/.test(v)));
+  // The Render line names a fixed palette in the line's own case, the whole name.
+  s.render = { ...s.render, pixelSize: 3, palette: 'ashen', fog: 'thick' };
+  assert.equal(Object.fromEntries(sceneDetails(s)).Render, '3 px pixel size · ashen (3 colors) · thick fog');
+  s.render.palette = 'flame';
+  assert.match(Object.fromEntries(sceneDetails(s)).Render, /· the flame’s colors ·/);
   assert.match(sceneMeta(s), /The Shrine/);
   assert.equal(sceneMeta(null), sceneMeta(undefined), 'never throws on junk');
 });

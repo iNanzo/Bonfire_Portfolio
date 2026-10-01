@@ -1,8 +1,8 @@
-// Palette tools on the Effects page (the color math lives in src/paletteGen.js):
+// Palette tools on the Colors page (the color math lives in src/paletteGen.js):
 //   • each flame card: 🎲 a harmonious palette (any scheme, or one you pick), a fully
 //     random one, suggestions built from a color, and Undo;
-//   • the Bonfire Colors block: re-roll every palette at once, hues spread apart;
-//   • the Scene Colors block: harmonious / random neutrals, or suggestions from a color.
+//   • the Flame Colors block: re-roll every palette at once, hues spread apart;
+//   • the Place Colors block: harmonious / random neutrals, or suggestions from a color.
 // A change is an ordinary edit (Discard still brings back the saved colors), and the
 // preview switches to the flame you're working on so you see it in the fire at once.
 import { el } from './form.js';
@@ -31,14 +31,15 @@ const remember = (st, snapshot) => { st.history.push(snapshot); if (st.history.l
 
 /** A strip of color swatches (the last one set a little apart, like the card's). */
 function strip(colors, keys, cls = 'pt-strip') {
-  return el('span', { class: cls, 'aria-hidden': 'true' }, keys.map((k) => el('i', { style: `background:${colors[k]}` })));
+  return el('span', { class: cls, 'aria-hidden': 'true' }, keys.map((k) => el('i', { style: { background: colors[k] } })));
 }
-const toolButton = (text, title, onclick, extra = {}) => el('button', { type: 'button', class: 'button small', text, title, onclick, ...extra });
+/** A tool's button; `tip` says what it does (the shared tooltip, on hover and focus; none while it's disabled). */
+const toolButton = (text, tip, onclick, extra = {}) => el('button', { type: 'button', class: 'button small', text, 'data-tip': extra.disabled ? null : tip, onclick, ...extra });
 
 /** Suggestion chips: click one to apply it. */
 function chips(list, keys, onPick) {
   return el('div', { class: 'pt-chips', role: 'list' }, list.map((s) => el('button', {
-    type: 'button', class: 'pt-chip', role: 'listitem', title: s.blurb ? `${s.label} — ${s.blurb}` : s.label,
+    type: 'button', class: 'pt-chip', role: 'listitem', 'data-tip': s.blurb ? `${s.label}: ${s.blurb}` : s.label,
     'aria-label': `Use the ${s.label} palette`, onclick: () => onPick(s.colors),
   }, strip(s.colors, keys), el('span', { class: 'pt-chip-label', text: s.label }))));
 }
@@ -57,8 +58,8 @@ function seedPicker(current, keys, seed, onSeed) {
     well,
     el('span', { class: 'pt-or', text: 'or start from' }),
     keys.filter((k) => HEX_RE.test(current[k] ?? '')).map((k) => el('button', {
-      type: 'button', class: 'pt-dot', title: `Start from ${k} (${current[k]})`, 'aria-label': `Suggest palettes from the ${k} color`,
-      style: `background:${current[k]}`, onclick: () => { well.value = current[k].toLowerCase(); onSeed(current[k]); },
+      type: 'button', class: 'pt-dot', 'data-tip': `Start from ${k} (${current[k]})`, 'aria-label': `Suggest palettes from the ${k} color`,
+      style: { background: current[k] }, onclick: () => { well.value = current[k].toLowerCase(); onSeed(current[k]); },
     })));
 }
 
@@ -72,10 +73,16 @@ export function flameTools(item, ctx) {
     ctx.changed({ rerender: true });
     if (item.id) ctx.preview?.show(item.id);
   };
-  const schemeSelect = el('select', { class: 'pt-scheme', 'aria-label': 'Color scheme', onchange: () => { st.scheme = schemeSelect.value; } },
-    el('option', { value: 'auto', text: 'Any Scheme' }),
-    SCHEMES.map((s) => el('option', { value: s.id, text: s.label, title: s.blurb })));
+  // (An <option> can't show a tip: the select carries the chosen scheme's.)
+  const blurbOf = (id) => SCHEMES.find((s) => s.id === id)?.blurb ?? 'Any scheme: each roll picks one.';
+  const schemeSelect = el('select', {
+    class: 'pt-scheme', 'aria-label': 'Color scheme',
+    onchange: () => { st.scheme = schemeSelect.value; schemeSelect.dataset.tip = blurbOf(st.scheme); },
+  },
+  el('option', { value: 'auto', text: 'Any Scheme' }),
+  SCHEMES.map((s) => el('option', { value: s.id, text: s.label })));
   schemeSelect.value = st.scheme;
+  schemeSelect.dataset.tip = blurbOf(st.scheme);
 
   const suggestions = el('div', { class: 'pt-suggest' });
   const showSuggestions = () => {
@@ -112,7 +119,7 @@ export function flameTools(item, ctx) {
 /** The 🎲 in a flame card's head: a quick harmonious re-roll, even while it's collapsed. */
 export function flameQuickRoll(item, ctx) {
   return el('button', {
-    type: 'button', class: 'icon', title: 'New harmonious colors', 'aria-label': 'New harmonious colors', text: '🎲',
+    type: 'button', class: 'icon', 'data-tip': 'New harmonious colors', 'aria-label': 'New harmonious colors', text: '🎲',
     onclick: () => {
       const st = forFlame(item);
       remember(st, pick(item, FLAME_KEYS));
@@ -147,7 +154,7 @@ export function flamesBlockTools(ctx) {
     el('p', { class: 'help', text: 'Names, IDs, rotation and cast light stay as they are. Each palette card has its own tools too.' }));
 }
 
-// ---- scene colors --------------------------------------------------------------------------
+// ---- place colors --------------------------------------------------------------------------
 export function sceneBlockTools(ctx) {
   const colors = ctx.draft.effects?.colors;
   if (!colors) return null;
@@ -166,7 +173,7 @@ export function sceneBlockTools(ctx) {
       el('span', { class: 'pt-label', text: 'Palette' }),
       toolButton('🎲 Harmonious', 'Neutrals tinted one hue with a matching accent for wood and bone', () => apply(harmoniousScene(Math.random, { flames: flames() }))),
       toolButton('🎲 Fully Random', 'Random hues and strengths. Lightness stays in order (background darkest, bone lightest) so the site stays readable', () => apply(wildScene(Math.random, { flames: flames() }))),
-      toolButton('↶ Undo', 'Put back the scene colors from before the last palette change', () => {
+      toolButton('↶ Undo', 'Put back the place colors from before the last palette change', () => {
         const prev = st.history.pop();
         if (!prev) return;
         Object.assign(colors, prev);

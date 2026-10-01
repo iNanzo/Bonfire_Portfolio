@@ -22,7 +22,8 @@ import { PALETTES } from '../../src/visualizer/render.js';
 import { FORMATIONS } from '../../src/visualizer/knightShow.js';
 
 const voidOf = (ctx) => (HEX_RE.test(ctx.draft.effects?.colors?.void ?? '') ? ctx.draft.effects.colors.void : undefined);
-const toolButton = (text, title, onclick, extra = {}) => el('button', { type: 'button', class: 'button small', text, title, onclick, ...extra });
+/** A tool's button; `tip` says what it does (the shared tooltip, on hover and focus; none while it's disabled). */
+const toolButton = (text, tip, onclick, extra = {}) => el('button', { type: 'button', class: 'button small', text, 'data-tip': extra.disabled ? null : tip, onclick, ...extra });
 /** The Painter's address on the site (with a scene to open, in the hash), or null without a site address. */
 const painterUrl = (ctx, scene = null) => (ctx.siteUrl ? `${ctx.siteUrl}painter/${scene ? `#scene=${encodeSceneHash(scene)}` : ''}` : null);
 /** A scene as the Painter writes it (the admin's loop switch isn't part of it). */
@@ -109,7 +110,7 @@ export function scenesBlockTools(ctx) {
     el('div', { class: 'pt-row' },
       el('span', { class: 'pt-label', text: 'The Painter' }),
       toolButton('Import From Painter…', 'Bring in scenes the Painter exported (a file, or pasted JSON)', open),
-      painter ? el('a', { class: 'button small ghost', href: painter, target: '_blank', rel: 'noopener', text: 'Open the Painter ↗', title: 'Make a new scene in the Bonfire Painter, then export it and import it here' }) : null,
+      painter ? el('a', { class: 'button small ghost', href: painter, target: '_blank', rel: 'noopener', text: 'Open the Painter ↗', 'data-tip': 'Make a new scene in the Bonfire Painter, then export it and import it here' }) : null,
       toolButton('Export All', 'Download every scene here as bonfire-scenes.json (the Painter’s Import reads it)', () => download(sceneFile(scenes.map(bare)), 'bonfire-scenes.json'), { class: 'button small ghost', disabled: !scenes.length })),
     slot,
     el('p', { class: 'help', text: `${scenes.length} of up to ${MAX_SCENES} scenes, ${scenes.filter((s) => !s?.hidden).length} in the loop.` }));
@@ -128,7 +129,7 @@ function download(data, name) {
 export function sceneThumb(scene) {
   const colors = sceneSwatches(scene);
   return el('span', { class: 'swatches scene-swatches', 'aria-hidden': 'true' },
-    colors.map((c, i) => el('span', { class: `swatch${i === 5 ? ' is-scenery' : ''}`, style: `background:${HEX_RE.test(c) ? c : 'transparent'}` })));
+    colors.map((c, i) => el('span', { class: `swatch${i === 5 ? ' is-scenery' : ''}`, style: { background: HEX_RE.test(c) ? c : 'transparent' } })));
 }
 
 /** A scene card's one-line summary (its place, look, knights, how it plays with the music). */
@@ -149,7 +150,8 @@ export function sceneDetails(raw, weapons = {}) {
   const on = Object.keys(LAYERS).filter((k) => layers[k] === 'on').map((k) => LAYERS[k]);
   const mixed = Object.keys(LAYERS).filter((k) => layers[k] === 'mix').map((k) => LAYERS[k]);
   const hits = drops ? Object.keys(DROP_FX).filter((k) => drops.fx[k] === 'on').map((k) => DROP_FX[k]) : [];
-  const palette = Array.isArray(render.palette) ? `${render.palette.length} of the flame’s colors` : named(PALETTES, render.palette).replace(/^./, (c) => c.toLowerCase());
+  // (A fixed palette's name in the line's own case: "the flame’s colors", "ashen (3 colors)".)
+  const palette = Array.isArray(render.palette) ? `${render.palette.length} of the flame’s colors` : named(PALETTES, render.palette).toLowerCase();
   return [
     ['Place', [SCENERIES[place.scenery], place.weapon ? weapons[place.weapon] ?? place.weapon : 'a drawn weapon', place.element ? ELEMENT_WORDS[place.element] : 'a drawn element'].join(' · ')],
     ['Camera', `${CAMERA_MOVES[camera.move.kind]}${camera.move.kind === 'still' ? '' : ` over ${camera.move.bars} bars`} · a ${camera.fov}° lens`],
@@ -196,13 +198,13 @@ export function sceneCardBody(item, ipath, ctx) {
     el('dl', { class: 'scene-details' }, sceneDetails(item, ctx.draft.weapons).map(([k, v]) => el('div', {}, el('dt', { text: k }), el('dd', { text: v })))),
     fields,
     el('div', { class: 'card-foot' },
-      link ? el('a', { class: 'link-button', href: link, target: '_blank', rel: 'noopener', text: 'Open in Painter ↗', title: 'Open this scene in the Bonfire Painter as it is here (saved or not): see it play, change it, export it' }) : null,
+      link ? el('a', { class: 'link-button', href: link, target: '_blank', rel: 'noopener', text: 'Open in Painter ↗', 'data-tip': 'Open this scene in the Bonfire Painter as it is here (saved or not): see it play, change it, export it' }) : null,
       el('button', {
-        type: 'button', class: 'link-button', text: 'Copy JSON', title: 'Copy this scene’s JSON (the Painter’s Import reads it)',
+        type: 'button', class: 'link-button', text: 'Copy JSON', 'data-tip': 'Copy this scene’s JSON (the Painter’s Import reads it)',
         onclick: async () => {
           try { await navigator.clipboard.writeText(JSON.stringify(bare(item), null, 2)); ctx.toast(`“${item.name}” copied.`); } catch { ctx.toast('Couldn’t copy (the browser said no).', 'error'); }
         },
       }),
-      el('button', { type: 'button', class: 'link-button', text: 'Replace From Painter…', title: 'Put the Painter’s version of this scene in its place (a file, or pasted JSON)', onclick: replace })),
+      el('button', { type: 'button', class: 'link-button', text: 'Replace From Painter…', 'data-tip': 'Put the Painter’s version of this scene in its place (a file, or pasted JSON)', onclick: replace })),
     slot);
 }

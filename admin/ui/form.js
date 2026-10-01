@@ -7,7 +7,9 @@
 // field carries data-path (e.g. projects[2].images[0].alt) so validation messages
 // land on the right field.
 //
-// User text only ever reaches the page through .value / textContent.
+// User text only ever reaches the page through .value / textContent. Hover tips are data-tip
+// (the shared tooltip, src/ui/tooltip.js), never title. Styles go through el()'s style object
+// (el.js): the deployed admin's policy blocks style attributes.
 import {
   ADD_LABELS, COLUMNS, FIXED, HELP, LABELS, MULTILINE, MULTILINE_LISTS, NULLABLE, READONLY, SELECTS, SHORT, SWATCH_KEYS,
   TEMPLATES, TITLE_KEYS, hint, rangeFor,
@@ -18,6 +20,9 @@ import { flameQuickRoll, flameTools } from './paletteTools.js';
 import { sceneCardBody, sceneMeta, sceneThumb } from './sceneTools.js';
 import { titleCase } from './text.js';
 import { ELEMENT_IDS } from '../../src/effectsDefaults.js';
+import { el } from './el.js';
+
+export { el };
 
 // ---- paths ------------------------------------------------------------------------
 export const keyOf = (path) => path.map((k, i) => (typeof k === 'number' ? `[${k}]` : (i ? '.' : '') + k)).join('');
@@ -31,21 +36,9 @@ const addLabel = (path) => titleCase(hint(ADD_LABELS, patternOf(path)) ?? 'entry
 
 const CATEGORIES = [['featured', 'Featured'], ['projects', 'Projects'], ['archive', 'Earlier Explorations']];
 
-// ---- DOM helper -------------------------------------------------------------------
-export function el(tag, props = {}, ...children) {
-  const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(props)) {
-    if (v === undefined || v === null || v === false) continue;
-    if (k === 'class') node.className = v;
-    else if (k === 'text') node.textContent = v;
-    else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
-    else if (k in node && typeof v !== 'string') node[k] = v;
-    else node.setAttribute(k, v === true ? '' : v);
-  }
-  node.append(...children.flat().filter((c) => c !== null && c !== undefined && c !== false));
-  return node;
-}
-const iconButton = (label, glyph, onclick, extra = {}) => el('button', { type: 'button', class: 'icon', title: label, 'aria-label': label, onclick, ...extra }, glyph);
+// ---- buttons ----------------------------------------------------------------------
+// (A disabled button gets no hover or focus, so no tip: one could never show.)
+const iconButton = (label, glyph, onclick, extra = {}) => el('button', { type: 'button', class: 'icon', 'data-tip': extra.disabled ? null : label, 'aria-label': label, onclick, ...extra }, glyph);
 const eyeButton = (item, onToggle, { on = 'Show on the site', off = 'Hide from the site' } = {}) => iconButton(item.hidden ? on : off, item.hidden ? '◌' : '◉', () => {
   if (item.hidden) delete item.hidden; else item.hidden = true;
   onToggle();
@@ -101,9 +94,9 @@ export function renderField(value, path, ctx, label = labelFor(path)) {
   const group = value !== null && typeof value === 'object';
   const wrap = el('div', { class: `${group ? 'group' : 'field'}${!group && isShort(value, path) ? ' is-short' : ''}`, 'data-path': keyOf(path) });
   const id = `f${++uid}`;
-  // The help is written under the field and is also the label's hover tooltip.
+  // The help is written under the field.
   const help = hint(HELP, patternOf(path));
-  wrap.append(group ? el('h4', { class: 'group-label', text: label, ...(help ? { title: help } : {}) }) : el('label', { for: id, text: label, ...(help ? { title: help } : {}) }));
+  wrap.append(group ? el('h4', { class: 'group-label', text: label }) : el('label', { for: id, text: label }));
   if (help) wrap.append(el('p', { class: 'help', text: help }));
   const control = renderValue(value, path, ctx);
   if (!group) (control.querySelector?.('[data-main]') ?? control).id = id;
@@ -240,7 +233,7 @@ function update(path, value, ctx) {
   if (path[0] === 'effects' && path[1] === 'elements' && (key === 'weight' || key === 'rotation')) refreshChances(ctx);
   if (SWATCH_KEYS.includes(key) && HEX_RE.test(value)) {
     const sw = document.querySelector(`[data-swatch="${CSS.escape(keyOf(path))}"]`);
-    if (sw) sw.style.background = value;
+    if (sw) sw.style.setProperty('background', value);
   }
   ctx.changed();
 }
@@ -347,7 +340,7 @@ function cardMeta(item, path) {
 
 function swatches(item, ipath) {
   return el('span', { class: 'swatches', 'aria-hidden': 'true' },
-    SWATCH_KEYS.map((k) => el('span', { class: 'swatch', 'data-swatch': keyOf([...ipath, k]), style: `background:${HEX_RE.test(item[k] ?? '') ? item[k] : 'transparent'}` })));
+    SWATCH_KEYS.map((k) => el('span', { class: 'swatch', 'data-swatch': keyOf([...ipath, k]), style: { background: HEX_RE.test(item[k] ?? '') ? item[k] : 'transparent' } })));
 }
 
 /** The collapsible card head shared by list cards and the featured card (`body`: its own, in place of every field). */
@@ -409,7 +402,7 @@ function renderCard(list, i, path, ctx, fixed) {
     meta: isScene ? sceneMeta(item) : cardMeta(item, path),
     thumb: isProject && cover ? el('img', { class: 'card-thumb', alt: '', src: ctx.thumb(cover.src), loading: 'lazy' })
       : isFlame ? swatches(item, ipath) : isScene ? sceneThumb(item) : null,
-    lead: fixed ? null : el('span', { class: 'handle', draggable: 'true', title: 'Drag to reorder', 'aria-hidden': 'true', text: '⋮⋮' }),
+    lead: fixed ? null : el('span', { class: 'handle', draggable: 'true', 'data-tip': 'Drag to reorder', 'aria-hidden': 'true', text: '⋮⋮' }),
     actions,
     badges: badgesFor(item),
     foot: isProject ? projectActions(item, path[0], i, ctx) : isFlame ? flameActions(item, ctx) : null,
@@ -510,7 +503,7 @@ function renderStrings(list, path, ctx) {
 function renderRows(list, path, ctx) {
   const pattern = patternOf(path);
   const cols = COLUMNS[pattern] ?? (list[0] ?? []).map((_, c) => `Column ${c + 1}`);
-  const box = el('div', { class: 'rows table', style: `--cols: ${cols.length}` });
+  const box = el('div', { class: 'rows table', style: { '--cols': cols.length } });
   box.append(el('div', { class: 'row row-head', 'aria-hidden': 'true' }, el('span'), ...cols.map((c) => el('span', { text: titleCase(c) }))));
   list.forEach((row, i) => {
     const ipath = [...path, i];
@@ -557,7 +550,7 @@ function renderImages(list, path, ctx) {
     } });
     video.checked = !!im.video;
     box.append(el('figure', { class: `image-tile${im.hidden ? ' is-hidden' : ''}`, 'data-index': i, 'data-path': keyOf(ipath) },
-      el('div', { class: 'image-frame', draggable: 'true', title: 'Drag to reorder' },
+      el('div', { class: 'image-frame', draggable: 'true', 'data-tip': 'Drag to reorder' },
         el('img', { alt: im.alt || '', src: pending?.preview ?? ctx.thumb(im.src), loading: 'lazy' }),
         im === icon ? el('span', { class: 'image-tag', text: 'Icon' }) : null,
         im.hidden ? el('span', { class: 'image-tag image-hidden', text: 'Hidden' }) : null,
@@ -566,7 +559,7 @@ function renderImages(list, path, ctx) {
       renderField(im.alt ?? '', [...ipath, 'alt'], ctx, 'Alt Text (Describe It)'),
       renderField(im.caption ?? '', [...ipath, 'caption'], ctx, 'Caption'),
       el('label', { class: 'check' }, pixel, ' Pixel Art (Keep It Crisp)'),
-      el('label', { class: 'check', title: 'Plays the .mp4 of the same name (put it in the repo beside this image), with this image as its still' }, video, ' Video Clip (Plays the .mp4)'),
+      el('label', { class: 'check', 'data-tip': 'Plays the .mp4 of the same name (put it in the repo beside this image), with this image as its still' }, video, ' Video Clip (Plays the .mp4)'),
       el('div', { class: 'image-actions' },
         iconButton('Move earlier', '←', () => moveItem(list, i, i - 1, ctx), { disabled: i === 0 }),
         iconButton('Move later', '→', () => moveItem(list, i, i + 1, ctx), { disabled: i === list.length - 1 }),
