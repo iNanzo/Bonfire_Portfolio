@@ -88,7 +88,7 @@ export const SECTIONS = [
   { id: 'loop', tab: 'scenes', label: 'The Loop', intro: 'The scenes it plays, in this order. Untick one to leave it out; Play Now shows it at once.' },
   { id: 'titles', tab: 'scenes', label: 'Title Cards' },
   { id: 'moreCards', tab: 'scenes', label: 'More Cards', intro: 'Shout-outs, the next act, a hashtag… Each shows on drops, every 32 bars, or when you press its key (Shift+2 to Shift+9).' },
-  { id: 'setups', tab: 'setups', label: 'My Setups', intro: 'Save everything as it is now under a name, to load again later. Your input device and volume aren’t part of a setup.' },
+  { id: 'setups', tab: 'setups', label: 'My Setups', intro: 'Save everything as it is now under a name, to load again later. Your input device, volume and frame rate aren’t part of a setup.' },
 ];
 
 /**
@@ -459,7 +459,7 @@ export const SETTINGS = {
   // --- Picture › Performance
   frameRate: {
     section: 'performance', label: 'Frame Rate', live: 'frameRate', simple: true,
-    hint: 'How often the picture is drawn: Display matches your screen; 60 or 30 fps eases the load on a busy computer.',
+    hint: 'How often the picture is drawn: Display matches your screen; 60 or 30 fps eases the load on a busy computer. Kept on this one, not in setups.',
     keywords: ['fps', 'lag', 'cap', 'refresh', 'vsync'],
   },
   particles: {
