@@ -588,6 +588,7 @@ search = createPanelSearch({
   panel,
   scene: () => scene,
   ctx: panelCtx(),
+  folded: () => innerWidth < 760, // (a phone's bottom sheet: its room for the rows found)
 });
 
 // --- The camera by hand ------------------------------------------------------------------------

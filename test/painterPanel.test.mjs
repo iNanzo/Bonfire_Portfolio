@@ -20,9 +20,9 @@ import {
   panelMarkup, panelShape, sectionMarkup, sectionShapes, getPath, withPath, slotColors, bulkEdit, SECTIONS, LOCK_TIPS,
 } from '../src/painter/panel.js';
 import { PANEL_SECTIONS, LAYOUT, OWN, PAINTER_ITEM_HINTS, groupsOf, rowText, rowShown, shownRule, sectionRows, choices, sectionOfRow } from '../src/painter/layout.js';
-import { searchEntries, findInPanel } from '../src/painter/panelSearch.js';
+import { searchEntries, findInPanel, notesFor, PAINTER_SYNONYMS } from '../src/painter/panelSearch.js';
 import { PAINTER_KEYS, TOOLS, toolsMarkup } from '../src/painter/toolbar.js';
-import { PAINTER_SECTIONS, SECTIONS as MAP_SECTIONS, SETTINGS, ITEM_HINTS, SYNONYMS, TRI_HELP, entriesFor } from '../src/settingsMap.js';
+import { PAINTER_SECTIONS, SECTIONS as MAP_SECTIONS, SETTINGS, ITEM_HINTS, TRI_HELP, entriesFor } from '../src/settingsMap.js';
 import { buildMatcher } from '../src/ui/settingsSearch.js';
 import { titleCase } from '../src/text.js';
 import { createHistory } from '../src/painter/history.js';
@@ -374,7 +374,7 @@ test('choices: Title Case, the site’s own marked, every select’s', () => {
 
 // --- the search -----------------------------------------------------------------------------
 const entries = searchEntries(ctx);
-const match = buildMatcher(entries, { synonyms: SYNONYMS });
+const match = buildMatcher(entries, { synonyms: PAINTER_SYNONYMS });
 const find = (q, scene = normalizeScene(defaultScene())) => findInPanel(match, q, scene);
 
 test('search: the index has every row (a layer’s details, the blends), each with its label, section and hint', () => {
@@ -412,12 +412,53 @@ test('search: "glow" finds the Glow layer and Edge Glow; what the scene leaves o
   assert.ok(find('iris', s).hidden.some((h) => h.note === 'Iris Snap: pick This Scene’s Own under Drop Hits to see this'));
   assert.ok(find('segments', s).hidden.some((h) => h.note === 'Segments: pick the Kaleido look to see this'));
   assert.ok(find('segments', normalizeScene(withPath(s, 'look.name', 'kaleido'))).rows.has('param.segments'));
-  // Every rule's note says how; every row it hides shows in some scene.
-  for (const id of entries.map((e) => e.id)) {
+  // Every rule's note says how, and names rows that do it (rows of the panel, in sight
+  // whenever the hidden one isn't, so it's one click from the note).
+  const ids = new Set(entries.map((e) => e.id));
+  for (const id of ids) {
     const rule = shownRule(id);
     if (!rule) continue;
-    assert.match(rule[1], /^(turn on|pick|set) .+ to see (this|how it blends)$/, `${id}: "${rule[1]}"`);
+    assert.match(rule[1], /^(turn on|pick|set) .+ to see this$/, `${id}: "${rule[1]}"`);
+    assert.ok(rule[2].length && rule[2].every((r) => ids.has(r) && !shownRule(r)), `${id}: brought back by ${rule[2]}`);
   }
+  // The row that brings a hidden one back shows beside its note (not counted as found), and
+  // the panel scrolls to it: "iris" with the show's drop hits shows Drop Hits' own choice.
+  const iris = find('iris', s);
+  assert.deepEqual(iris.hidden.map((h) => h.id), ['dropFx.iris']);
+  assert.deepEqual([...iris.rows.keys()], ['dropSource']);
+  assert.deepEqual([...iris.via], ['dropSource']);
+  assert.equal(iris.first, 'dropSource');
+  assert.deepEqual(iris.rows.get('dropSource').ranges, [], 'nothing marked in it: it wasn’t found');
+  assert.ok(glow.rows.has('layer.glow') && !glow.via.has('layer.glow'), 'Glow found, as well as bringing its details back');
+  assert.equal(glow.first, 'layer.glow', 'the best found first, wherever it sits in the panel');
+  // The blends' rows are named apart from their layers': "Glow Blend", not a second "Glow".
+  assert.ok(on.hidden.some((h) => h.note === 'Glow Blend: turn on Blend Modes in Layers to see this'));
+  assert.equal(rowText('blend.feed').hint, 'How the Echoes layer lies over the picture; Rolled Each Turn picks a new way each time the look comes round.');
+});
+
+test('search: a row found only in its hint gives way to rows found by name; a group’s name finds its rows', () => {
+  const s = normalizeScene(defaultScene());
+  // "drop": Drop Hits' rows (by their names, their words, The Drop), not every hint that
+  // mentions a drop (the knights' reactions, their edge glow…).
+  const drop = find('drop', s);
+  for (const id of ['dropSource']) assert.ok(drop.rows.has(id), id);
+  for (const id of ['knightGlow', 'knightShine', 'knightReactions', 'knightCount', 'weapon', 'gestures']) {
+    assert.ok(!drop.rows.has(id) && !drop.hidden.some((h) => h.id === id), `${id} only mentions a drop`);
+  }
+  assert.ok(drop.hidden.some((h) => h.id === 'dropFx.iris'), 'the scene’s own hits, by their group');
+  assert.equal(drop.first, 'dropSource');
+  // Many left out for one reason share a line under the box; a few keep one each.
+  assert.deepEqual(notesFor(drop.hidden), [`Hits Per Drop, This Scene’s Hits, Shatter and ${drop.hidden.length - 3} more: pick This Scene’s Own under Drop Hits to see this`]);
+  assert.deepEqual(notesFor(find('glow', s).hidden).slice(0, 3), ['Glow Size: turn on Glow in Layers to see this', 'Glow Threshold: turn on Glow in Layers to see this', 'Glow Strength: turn on Glow in Layers to see this']);
+  assert.equal(entries.find((e) => e.id === 'dropFx.iris').tab, 'The Drop');
+  // "fire": the Fire section's sliders and what's named for the fire, not every hint.
+  const fire = find('fire', s);
+  for (const id of ['fireLevel', 'fireSize', 'windX', 'fireGlow']) assert.ok(fire.rows.has(id), id);
+  for (const id of ['fog', 'vignette', 'knightSeat', 'dropFx.shock']) assert.ok(!fire.rows.has(id) && !fire.hidden.some((h) => h.id === id), id);
+  // With nothing found by name, the hints still find it.
+  const hintOnly = find('outlines take', s);
+  assert.ok(hintOnly.rows.size + hintOnly.hidden.length > 0);
+  for (const h of [...hintOnly.rows.keys()]) assert.ok(rowText(h)?.hint.toLowerCase().includes('outlines take') || hintOnly.via.has(h), h);
 });
 
 test('search: synonyms, typos, choices and keywords find their rows', () => {
@@ -428,6 +469,9 @@ test('search: synonyms, typos, choices and keywords find their rows', () => {
   assert.ok(find('praise').rows.has('gestures'));
   assert.ok(find('scenery').rows.has('scenery'));
   assert.ok(find('kaleidoscope').rows.has('looks'));
+  // The Painter's own: "firefly" (not the start of "fireflies") finds the Fireflies section.
+  assert.ok(find('firefly speed').rows.has('flySpeed'));
+  for (const id of ['flyLit', 'flyShow', 'flyMoves', 'flySpeed']) assert.ok(find('firefly').rows.has(id), id);
   assert.equal(find('').rows.size, 0, 'nothing for nothing');
   assert.equal(find('zzqx').rows.size + find('zzqx').hidden.length, 0);
 });

@@ -385,6 +385,20 @@ test('search: "glow" finds the Glow layer and Edge Glow, says what the shape hid
   await expect(box).toBeFocused();
   await expect(box).toHaveValue('glow');
   await expect(notes).not.toContainText('Glow Strength');
+  // A row left out shows the row that brings it back, scrolled to: "iris" with the show's
+  // drop hits is Drop Hits' own choice (not an empty panel), and one is found.
+  await box.fill('iris');
+  const source = page.locator('[data-row="dropSource"]');
+  await expect(source).toBeVisible();
+  await expect(source).toBeInViewport();
+  await expect(notes).toContainText('Iris Snap: pick This Scene’s Own under Drop Hits to see this');
+  await expect(page.locator('[data-panel] [data-search-status]')).toHaveText('1 setting found');
+  // "drop": Drop Hits, not every hint that mentions a drop; the hits it leaves out share a line.
+  await box.fill('drop');
+  await expect(source).toBeVisible();
+  await expect(page.locator('[data-row="knightReactions"]')).toBeHidden();
+  await expect(notes.locator('li')).toHaveCount(1);
+  await expect(notes).toContainText('and 12 more: pick This Scene’s Own under Drop Hits to see this');
   // Esc clears it: every section back as it was (only Place open).
   await page.keyboard.press('Escape');
   await expect(box).toHaveValue('');

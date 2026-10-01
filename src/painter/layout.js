@@ -9,10 +9,11 @@
 // looks.js and the map's ITEM_HINTS.
 //
 // Some rows only show while the scene has the shape for them (a layer's details while it's
-// on, Movement Size while the camera moves…): SHOWN says when, and why not, so the search
-// can say how to bring a hidden one back ("Glow Strength: turn on Glow in Layers to see
-// this"). sectionShapes says what each section's layout depends on (not its values): a
-// section is drawn again only when its own shape changes.
+// on, Movement Size while the camera moves…): SHOWN says when, why not and which row brings
+// it back, so the search can say how ("Glow Strength: turn on Glow in Layers to see this")
+// and show that row (Glow's switch) beside the note. sectionShapes says what each section's
+// layout depends on (not its values): a section is drawn again only when its own shape
+// changes.
 import { PAINTER_SECTIONS, SECTIONS as MAP_SECTIONS, SETTINGS, ITEM_HINTS, meta } from '../settingsMap.js';
 import { DROP_FX, LAYER_BLENDS, LAYER_DETAILS, LAYERS, LOOK_PARAMS, LOOKS, PARAMS } from '../visualizer/looks.js';
 import { FOGS, PALETTES, PIXEL_SIZES, FLAME_FPS, XRAY_VIEWS } from '../visualizer/render.js';
@@ -105,15 +106,20 @@ export const FIRE_HELP = 'Each adds to what the music does to the fire, every fr
 /** With the Music: how the Painter previews it. */
 export const MUSIC_HELP = 'The Painter always previews a scene held. One that starts the stretch opens like this in Bonfire Live, then the show takes over.';
 
-/** The blend modes' layers, as How Each Layer Blends names them (looks.js LAYER_BLENDS). */
-export const BLEND_LABELS = { feed: 'Echoes', ghost: 'Ghost Trail', warp: 'Warps', ink: 'Ink', invert: 'Negative', scan: 'Scanlines', glow: 'Glow', gradient: 'Gradient Map' };
+/** The layers that blend (looks.js LAYER_BLENDS), by their names in Layers. */
+const BLEND_LAYERS = { feed: 'Echoes', ghost: 'Ghost Trail', warp: 'Warps', ink: 'Ink', invert: 'Negative', scan: 'Scanlines', glow: 'Glow', gradient: 'Gradient Map' };
+/**
+ * How Each Layer Blends' rows: "Glow Blend", not "Glow" (the layer's own row in Layers is
+ * Glow: two rows of one name would read as one in the search's list).
+ */
+export const BLEND_LABELS = Object.fromEntries(Object.entries(BLEND_LAYERS).map(([k, name]) => [k, `${name} Blend`]));
 /** The blend modes, as the selects name them. */
 export const BLEND_NAMES = {
   normal: 'Normal', add: 'Add', subtract: 'Subtract', multiply: 'Multiply', screen: 'Screen', darken: 'Darken', lighten: 'Lighten',
   overlay: 'Overlay', hardLight: 'Hard Light', softLight: 'Soft Light', difference: 'Difference', exclusion: 'Exclusion',
 };
 /** A blend select's hint. */
-export const blendHint = (id) => `How ${BLEND_LABELS[id]} lies over the picture; Rolled Each Turn picks a new way each time the look comes round.`;
+export const blendHint = (id) => `How the ${BLEND_LAYERS[id]} layer lies over the picture; Rolled Each Turn picks a new way each time the look comes round.`;
 
 // --- The choices a row offers ----------------------------------------------------------
 /** A scene's few-color palette, as Palette's last choice. */
@@ -184,22 +190,23 @@ const STILL = 'pick a Movement other than Still to see this';
 const SHOW_DROPS = 'pick This Scene’s Own under Drop Hits to see this';
 const or = (names) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names.at(-1)}` : names[0]);
 
+/** @typedef {[(scene: any) => boolean, string, string[]]} ShownRule */
 /**
  * Rows that show only while the scene has the shape for them: [shown(scene), how to bring
- * it back]. (Item rows' rules are made below: a layer's details, a look's own, the blends,
- * the scene's own drop hits.)
- * @type {Record<string, [(scene: any) => boolean, string]>}
+ * it back, the rows that do]. (Item rows' rules are made below: a layer's details, a look's
+ * own, the blends, the scene's own drop hits.)
+ * @type {Record<string, ShownRule>}
  */
 const SHOWN = {
-  sceneEdit: [(s) => !!s.colors.scenery, 'pick Place Colors other than The Site’s Own to see this'],
-  paletteSlots: [(s) => Array.isArray(s.render.palette), 'pick A Few Of the Scene’s Colors under Palette to see this'],
-  moveAmount: [moving, STILL],
-  moveBars: [moving, STILL],
-  ...Object.fromEntries([...LAYOUT.knights.slice(1), ...LAYOUT.armor, ...LAYOUT.dancing, ...LAYOUT.behavior, ...LAYOUT.preview].map((id) => [id, [knights, NO_KNIGHTS]])),
-  knightStyle: [(s) => knights(s) && 'style' in s.knights, NO_KNIGHTS],
-  blends: [(s) => layerOn(s, 'blend'), `turn on ${LAYERS.blend} in Layers to see this`],
-  dropFx: [ownDrops, SHOW_DROPS],
-  dropCount: [ownDrops, SHOW_DROPS],
+  sceneEdit: [(s) => !!s.colors.scenery, 'pick Place Colors other than The Site’s Own to see this', ['sceneColors']],
+  paletteSlots: [(s) => Array.isArray(s.render.palette), 'pick A Few Of the Scene’s Colors under Palette to see this', ['palette']],
+  moveAmount: [moving, STILL, ['camera']],
+  moveBars: [moving, STILL, ['camera']],
+  ...Object.fromEntries([...LAYOUT.knights.slice(1), ...LAYOUT.armor, ...LAYOUT.dancing, ...LAYOUT.behavior, ...LAYOUT.preview].map((id) => [id, [knights, NO_KNIGHTS, ['knightCount']]])),
+  knightStyle: [(s) => knights(s) && 'style' in s.knights, NO_KNIGHTS, ['knightCount']],
+  blends: [(s) => layerOn(s, 'blend'), `turn on ${LAYERS.blend} in Layers to see this`, ['layer.blend']],
+  dropFx: [ownDrops, SHOW_DROPS, ['dropSource']],
+  dropCount: [ownDrops, SHOW_DROPS, ['dropSource']],
 };
 /** The layers a detail belongs to (styleMix: Painterly's and Watercolor's). */
 const DETAIL_LAYERS = /* @__PURE__ */ (() => {
@@ -217,22 +224,23 @@ const PARAM_LOOKS = /* @__PURE__ */ (() => {
 })();
 
 /**
- * When `id` shows ([shown(scene), how to bring it back]), or null for a row that always does.
+ * When `id` shows ([shown(scene), how to bring it back, the rows that do: a layer's switch,
+ * the looks, Knights, Movement…]), or null for a row that always does.
  * @param {string} id
- * @returns {[(scene: any) => boolean, string] | null}
+ * @returns {ShownRule | null}
  */
 export function shownRule(id) {
   if (Object.hasOwn(SHOWN, id)) return SHOWN[id];
   const [kind, key] = id.split('.');
   if (kind === 'detail' && DETAIL_LAYERS[key]) {
     const layers = DETAIL_LAYERS[key];
-    return [(s) => layers.some((l) => layerOn(s, l)), `turn on ${or(layers.map((l) => LAYERS[l]))} in Layers to see this`];
+    return [(s) => layers.some((l) => layerOn(s, l)), `turn on ${or(layers.map((l) => LAYERS[l]))} in Layers to see this`, layers.map((l) => `layer.${l}`)];
   }
   if (kind === 'param' && PARAM_LOOKS[key]) {
     const looks = PARAM_LOOKS[key];
-    return [(s) => looks.includes(s.look.name), `pick the ${or(looks.map((l) => LOOKS[l]))} look to see this`];
+    return [(s) => looks.includes(s.look.name), `pick the ${or(looks.map((l) => LOOKS[l]))} look to see this`, ['looks']];
   }
-  if (kind === 'blend') return [SHOWN.blends[0], `turn on ${LAYERS.blend} in Layers to see how it blends`];
+  if (kind === 'blend') return SHOWN.blends;
   if (kind === 'dropFx') return SHOWN.dropFx;
   return null;
 }

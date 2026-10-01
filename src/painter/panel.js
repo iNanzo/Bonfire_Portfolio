@@ -899,6 +899,24 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
       if (any !== open.has(id)) setOpen(id, any, { save: false });
     }
   }
+  /**
+   * Where the panel scrolls to put row `id` at its top (under the phones' strip of tabs, which
+   * stays over it), its section's heading with it when the row is near the section's start;
+   * 0 for none.
+   * @param {string | null} id
+   */
+  function scrollFor(id) {
+    const el = id ? root.querySelector(`[data-row="${CSS.escape(id)}"]`) : null;
+    if (!el) return 0;
+    const top = root.getBoundingClientRect().top - root.scrollTop;
+    const sec = el.closest('[data-sec]');
+    const at = (n) => n.getBoundingClientRect().top - top;
+    let y = at(el);
+    if (sec && y - at(sec) < root.clientHeight / 3) y = at(sec);
+    const tabs = /** @type {HTMLElement | null} */ (root.querySelector('.pnt-tabs'));
+    const over = tabs && getComputedStyle(tabs).position === 'sticky' ? tabs.offsetHeight : 0;
+    return Math.max(0, y - over - 8);
+  }
   draw();
   return {
     fill,
@@ -915,15 +933,15 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     endAudition() { if (auditioning) { auditioning = null; audition(null); lookHint(get().look.name); } },
     /**
      * Show only the rows a search found (row id → its label and what matched in it), or
-     * everything (null). Kept through every redraw until it's set again. `top`: scrolled to
-     * the first (a new query).
+     * everything (null). Kept through every redraw until it's set again. `top` (a new query):
+     * scrolled to row `to` (the best found), or to the top.
      * @param {Map<string, { ranges: [number, number][], label: string }> | null} rows
-     * @param {{ top?: boolean }} [o]
+     * @param {{ top?: boolean, to?: string | null }} [o]
      */
-    filter(rows, { top = false } = {}) {
+    filter(rows, { top = false, to = null } = {}) {
       filter = rows;
       applyFilter();
-      if (top) root.scrollTop = 0;
+      if (top) root.scrollTop = scrollFor(to);
     },
   };
 }
