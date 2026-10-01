@@ -140,7 +140,8 @@ export function createBreakdown({ getFire, render, onEnter = () => {}, onExit = 
     if (!active || isEditing(e.target) || document.querySelector('dialog[open]')) return;
     const stop = () => { e.preventDefault(); e.stopImmediatePropagation(); };
     if (e.key === 'Escape') { stop(); exit(); return; }
-    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    // (Shift with a letter is no shortcut on the site: Shift+B doesn't close it, ? goes on to the page.)
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
     if (e.key === 'b' || e.key === 'B') { stop(); exit(); return; }
     const wasOpen = menu.isOpen;
     if (menu.handleKey(e)) {

@@ -94,11 +94,14 @@ test('? lists every key; Esc closes it; Shift with a letter does nothing', async
   expect(errors).toEqual([]);
 });
 
-test('typing in the shortcuts’ filter over the breakdown types: b doesn’t close it, p doesn’t open the render settings', async ({ page }) => {
+test('the breakdown ignores Shift+B; typing in the shortcuts’ filter over it types: b doesn’t close it, p doesn’t open the render settings', async ({ page }) => {
   const errors = watch(page);
   await page.goto('/');
   await ready(page);
   await page.keyboard.press('b');
+  await expect(page.locator('html')).toHaveClass(/is-breakdown/);
+  await page.keyboard.press('Shift+B'); // (no shortcut: it stays)
+  await page.waitForTimeout(300);
   await expect(page.locator('html')).toHaveClass(/is-breakdown/);
   await page.keyboard.press('Shift+Slash');
   const filter = page.locator('.keys-overlay [data-keys-filter]');
