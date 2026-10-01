@@ -47,6 +47,12 @@
 // a head tilted onto a shoulder, or an arm swinging the plates up against it, shoves the
 // pauldron out from the neck instead (clampPlates). knights.js adds a spring on top (they
 // lag and overshoot a little) and clamps again.
+//
+// Room for the arms. Hemmed in at a side (`room`, knights.js: a pillar at his shoulder, a
+// standing stone, a lantern; 0..1 a side), every gesture and dance move keeps that arm's swing
+// out to the side and back behind him within it (hem): the arm goes up or forward instead.
+// knights.js then checks the solved arm against the scenery's shapes and turns it clear
+// (swingArm).
 import * as THREE from 'three';
 import { TAU, clamp, clamp01, smooth, smoother } from '../math.js';
 
@@ -385,6 +391,32 @@ function armAt(p, s, x, y, z, elbow = 0, wrist = 0, fist = 0.8, roll = 0, rig = 
   setArmDir(p, o, d, sg);
 }
 
+/**
+ * Keep side s's arm in the room it has there (`r` 0..1): its reach back behind him scaled by
+ * it, and what it would have swung out to that side swung forward instead, so an arm that
+ * would be flung into a pillar goes up or out in front of him. In the pose's own terms (the
+ * chest's frame).
+ */
+function hem(p, s, r) {
+  if (!(r < 1)) return p;
+  const o = sideOf(s);
+  const yaw = p[o], pitch = p[o + 1];
+  let out = Math.sin(yaw) * Math.cos(pitch), fwd = Math.cos(yaw) * Math.cos(pitch);
+  const up = Math.sin(pitch);
+  const k = clamp01(r);
+  if (fwd < 0) fwd *= k;
+  if (out > 0) { fwd += out * (1 - k); out *= k; }
+  // (Hardly anywhere left to point, it points ahead.)
+  const len = Math.hypot(out, up, fwd);
+  if (len < 0.5) fwd += 0.5 - len;
+  const y = Math.atan2(out, fwd);
+  p[o] = y + TAU * Math.round((yaw - y) / TAU);
+  p[o + 1] = Math.asin(clamp(up / Math.hypot(out, up, fwd), -1, 1));
+  return p;
+}
+/** Both arms kept in their room ([left, right] 0..1). */
+const hemArms = (p, room) => { if (room[0] < 1) hem(p, 'L', room[0]); if (room[1] < 1) hem(p, 'R', room[1]); return p; };
+
 const _ha = new THREE.Vector3();
 /** Where the head joint is (knight space) in a pose. Reused: copy what you keep. */
 function headAt(p, rig = DEFAULT_RIG) {
@@ -623,8 +655,9 @@ function twoBone(S, T, a, b, pole, mid, end, bendOut) {
  * bone's rotation from its rest orientation (knight space, a "world delta") and its position
  * (knight space), by BONES index; `ground` [left, right] raises each foot's floor (m);
  * `helmet` (with the rig's plates) keeps the pauldrons out of it. clampPlates(helmet) does
- * that again on the last solve's plates (after knights.js springs them). The arrays are
- * reused: copy what you keep.
+ * that again on the last solve's plates (after knights.js springs them); swingArm(side, axis,
+ * angle, helmet) turns an arm of the last solve about its shoulder. The arrays are reused:
+ * copy what you keep.
  */
 export function createSolver(rig = DEFAULT_RIG) {
   const n = BONES.length;
@@ -737,6 +770,26 @@ export function createSolver(rig = DEFAULT_RIG) {
     }
   }
 
+  const turnQ = new THREE.Quaternion();
+  /**
+   * Turn side s's arm as last solved (the upper arm, forearm, hand and fingers, about its
+   * shoulder socket) by `angle` (rad) about `axis` (knight space, unit): its pauldron rides it
+   * again and is kept out of the helmet. (knights.js: an arm turned out of a pillar.)
+   */
+  function swingArm(s, axis, angle, helmet = null) {
+    turnQ.setFromAxisAngle(axis, angle);
+    S.copy(p[IDX['upperArm' + s]]);
+    for (const b of ['upperArm', 'forearm', 'hand', 'fingers']) {
+      const i = IDX[b + s];
+      q[i].premultiply(turnQ);
+      p[i].sub(S).applyQuaternion(turnQ).add(S);
+    }
+    mid.copy(p[IDX['forearm' + s]]);
+    pauldron(s, s === 'L' ? 1 : -1, q[IDX.chest]);
+    clampPlates(helmet);
+    return out;
+  }
+
   function solve(pose, ground = null, helmet = null) {
     // The spine, from the hips.
     const H = IDX.hips;
@@ -802,7 +855,7 @@ export function createSolver(rig = DEFAULT_RIG) {
     }
     return out;
   }
-  return { solve, clampPlates, rest, n };
+  return { solve, clampPlates, swingArm, rest, n };
 }
 
 // --- curves -------------------------------------------------------------------------------------
@@ -1196,14 +1249,15 @@ function gestureTarget(g, p, name, t, seated, room = FREE) {
  * + his left) is for 'dance': where the front is, to face it while he dances; `stand` (a
  * pose) where he stands up to for it (standBy() in front of the seat if not given).
  * `room` [left, right] 0..1: the room out to each side (knights.js, from the height map: a
- * pillar beside him): an arm that would be flung into something goes up instead, and a
- * wave changes hands. `inPlace` (seated, 'dance'): he dances it in his seat instead of
- * getting up (DANCE_SEATED_TIME long): the view has no room over him to stand up in.
+ * pillar beside him): an arm that would be flung into something goes up instead (every
+ * gesture keeps its arms' swing out and back within it: hem), and a wave changes hands.
+ * `inPlace` (seated, 'dance'): he dances it in his seat instead of getting up
+ * (DANCE_SEATED_TIME long): the view has no room over him to stand up in.
  */
 export function gesture(p, name, t, seated = false, seed = 0, { turn = 0, stand = null, room = FREE, inPlace = false } = {}) {
   const T = GESTURE_TIME[name];
   if (!T || t < 0 || t >= T) return p;
-  if (name === 'dance') return seated && inPlace ? seatedDanceGesture(p, t, seed) : danceGesture(p, t, seated, seed, turn, stand);
+  if (name === 'dance') return hemArms(seated && inPlace ? seatedDanceGesture(p, t, seed, room) : danceGesture(p, t, seated, seed, turn, stand, room), room);
   // (The other hand, as his mirror image: the pose mirrored, gestured, mirrored back.)
   if (RIGHT_HANDED.has(name) && room[1] < 0.5 && room[0] > room[1]) {
     mirrorPose(p);
@@ -1241,7 +1295,10 @@ export function gesture(p, name, t, seated = false, seed = 0, { turn = 0, stand 
     aimHead(g, gLook, 1);
     if (name === 'helm') { const h = headAt(g); for (const [side, sg] of /** @type {[string, number][]} */ ([['L', 1], ['R', -1]])) armAt(g, side, h.x + sg * HELM_HOLD[0], h.y + HELM_HOLD[1], h.z + HELM_HOLD[2], HELM_HOLD[3], HELM_HOLD[4], 0.25, HELM_HOLD[5]); }
   }
+  // (Hemmed in at a side: that arm keeps to the room it has, on its way there too.)
+  hemArms(g, room);
   lerpPose(p, p, g, w);
+  hemArms(p, room);
   if (seed < 0) return p; // (every knight gestures alike today; `seed` is for variations)
   return p;
 }
@@ -1256,7 +1313,7 @@ const dRef = newPose();
  * clock, turns back and sits down again; standing, he just dances. Pure in `t`, like the
  * others.
  */
-function danceGesture(p, t, seated, seed, turn, standAt = null) {
+function danceGesture(p, t, seated, seed, turn, standAt = null, room = FREE) {
   const base = copy(dBase, p);
   const stand = !seated ? copy(dStand, base) : standAt ? copy(dStand, standAt) : standBy(dStand, clamp(seatOf(base), 0, 0.6));
   const t0 = seated ? RISE_TIME + DANCE_TURN : 0;
@@ -1267,7 +1324,7 @@ function danceGesture(p, t, seated, seed, turn, standAt = null) {
   // On his feet: the dance over his standing pose, eased in and out over a quarter second.
   const period = 60 / DANCE_BPM;
   const m = standingPose(dMove);
-  dance(m, 'defaultDance', clamp(t - t0, 0, DANCE_LEN) / period, { period, energy: 0.85, seed: seed & ~1 });
+  dance(m, 'defaultDance', clamp(t - t0, 0, DANCE_LEN) / period, { period, energy: 0.85, seed: seed & ~1, room });
   // (Moved from over the rest place to where he stands, feet and all.)
   const ref = standingPose(dRef);
   for (let i = 0; i < 3; i++) m[i] += stand[i] - ref[i];
@@ -1296,11 +1353,11 @@ const dSeat = newPose();
  * instead of sitting up (SEATED_DANCE_UP, SEATED_DANCE_LEAN), so his helmet stays as low as
  * it sits: the view it's for frames his seat right under the page's header. Pure in `t`.
  */
-function seatedDanceGesture(p, t, seed) {
+function seatedDanceGesture(p, t, seed, room = FREE) {
   const period = 60 / DANCE_BPM;
   const m = copy(dSeat, p);
   nudge(m, 'spine', SEATED_DANCE_LEAN);
-  dance(m, 'defaultDance', clamp(t - DANCE_EASE, 0, DANCE_LEN) / period, { period, energy: 0.85, seed: seed & ~1, seated: true, up: SEATED_DANCE_UP });
+  dance(m, 'defaultDance', clamp(t - DANCE_EASE, 0, DANCE_LEN) / period, { period, energy: 0.85, seed: seed & ~1, seated: true, up: SEATED_DANCE_UP, room });
   const w = smooth(clamp01(t / DANCE_EASE)) * smooth(clamp01((DANCE_SEATED_TIME - t) / DANCE_EASE));
   return lerpPose(p, p, m, w);
 }
@@ -1346,12 +1403,13 @@ const SEATED_DANCE_LEAN = 14;
  * move into `p`. Unknown moves nod. `seated`: the upper body of the move over the seat — he
  * sits up (`up` 0..1 how far: all the way by default), keeps part of the move's lean and
  * sway, and his arms and head go where they would standing (the head level); the legs and
- * hips keep the seat (the nod drums on his knees).
+ * hips keep the seat (the nod drums on his knees). `room` [left, right] 0..1: hemmed in at a
+ * side, that arm's swing out and back keeps within it (as for gesture()).
  */
-export function dance(p, move, b, { period = 0.5, energy = 0.7, seed = 0, seated = false, up = SEATED_UP } = {}) {
+export function dance(p, move, b, { period = 0.5, energy = 0.7, seed = 0, seated = false, up = SEATED_UP, room = FREE } = {}) {
   const info = MOVE_INFO[move] ?? MOVE_INFO.nod;
   if (!MOVE_INFO[move] || (seated && !info.seated)) move = 'nod';
-  if (!seated) return danceOn(p, move, b, period, energy, seed, false);
+  if (!seated) return hemArms(danceOn(p, move, b, period, energy, seed, false), room);
   // The move standing, for its torso and where its arms go.
   const s = danceOn(standingPose(sStand), move, b, period, energy, seed, true);
   const ref = standingPose(dMove);
@@ -1367,7 +1425,7 @@ export function dance(p, move, b, { period = 0.5, energy = 0.7, seed = 0, seated
   // The head looks where it would standing (nodding, banging), level.
   aimHead(p, sLook, 1);
   if (move === 'nod') drum(p, b, 0.8 + 0.45 * clamp01(energy));
-  return p;
+  return hemArms(p, room);
 }
 /**
  * Seated nodding along: the forearms drumming on the knees, bent at the elbow, one hand

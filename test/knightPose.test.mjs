@@ -2,7 +2,8 @@
 // seat height (resting or watchful), every move and gesture gives a sound pose, the moves
 // keep to the beat, the joints stay within what a body (in plate) can do, the head looks
 // level, the feet step instead of sliding, the pauldrons ride the arms and stay out of every
-// helmet (on the real model's pieces), and the Default Dance and the site's dance read.
+// helmet (on the real model's pieces), an arm hemmed in at a side keeps to it, and the
+// Default Dance and the site's dance read.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -323,6 +324,42 @@ test('the pauldrons swing with the arm (no twist), a raise to the side more than
   assert.ok(PAULDRON.lames > PAULDRON.dome);
 });
 
+test('hemmed in at a side (room 0), that hand stays on its side of the shoulder and out of the way behind, in every gesture and seated move; the swing goes in front instead', () => {
+  // The hand from its shoulder socket, in the chest's frame: + out to its side, + forward.
+  const hand = (s, side) => {
+    const sg = side === 'L' ? 1 : -1;
+    const v = s.p[I['hand' + side]].clone().sub(s.p[I['upperArm' + side]]).applyQuaternion(s.q[I.chest].clone().invert());
+    return { out: sg * v.x, fwd: v.z };
+  };
+  const sit = seatedPose(newPose(), 0.36);
+  let swungOut = 0;
+  for (const [side, room] of [['L', [0, 1]], ['R', [1, 0]]]) {
+    const check = (what, pose) => {
+      const h = hand(solver.solve(pose), side);
+      assert.ok(h.out < 0.08, `${what}: the ${side} hand ${h.out.toFixed(2)} m out past its shoulder`);
+      assert.ok(h.fwd > -0.1, `${what}: the ${side} hand ${(-h.fwd).toFixed(2)} m behind its shoulder`);
+    };
+    for (const g of [...GESTURES, 'helm']) {
+      const T = GESTURE_TIME[g];
+      for (let t = 0; t < T; t += T / 24) {
+        check(`${g} seated t=${t.toFixed(2)}`, gesture(Float32Array.from(sit), g, t, true, 0, { room, turn: 0.6, inPlace: g === 'dance' }));
+        if (g !== 'dance') check(`${g} standing t=${t.toFixed(2)}`, gesture(standingPose(), g, t, false, 0, { room }));
+        // (With all the room, some do swing out there: the test means something.)
+        if (hand(solver.solve(gesture(Float32Array.from(sit), g, t, true, 0, { inPlace: g === 'dance' })), side).out > 0.25) swungOut++;
+      }
+    }
+    for (const move of MOVES.filter((m) => MOVE_INFO[m].seated)) {
+      for (let b = 0; b < MOVE_INFO[move].cycle; b += 1 / 6) {
+        for (const seed of [0, 1]) check(`${move} seated b=${b.toFixed(2)} seed ${seed}`, dance(Float32Array.from(sit), move, b, { energy: 1, seed, seated: true, room }));
+      }
+    }
+  }
+  assert.ok(swungOut > 20, `with room, hands swing out (${swungOut})`);
+  // Hemmed in, Praise the Sun still throws that arm up, in front of him.
+  const up = solver.solve(gesture(Float32Array.from(sit), 'praise', 1.2, true, 0, { room: [1, 0] }));
+  assert.ok(up.p[I.handR].y > up.p[I.head].y && hand(up, 'R').fwd > 0.05, 'praise hemmed in: the right hand up, in front');
+});
+
 test('the Default Dance: arms swinging across the chest, then heel kicks with the arms thrown down and out', () => {
   const at = (b) => joints(dance(standingPose(), 'defaultDance', b, { period: 60 / DANCE_BPM, energy: 0.8 }));
   // Beats 0–3: on each beat both hands are over to one side, one across the chest, and over
@@ -375,7 +412,7 @@ test("the site's dance: up from the seat, two bars of the Default Dance facing t
   assert.ok(s.L < 0.03 && s.R < 0.03, `the feet slid ${s.L.toFixed(3)} / ${s.R.toFixed(3)} m`);
 });
 
-test('the pauldrons stay out of every helmet (no deeper than the model sits at rest), over every move, gesture and look (the real model)', async () => {
+test('[slow] the pauldrons stay out of every helmet (no deeper than the model sits at rest), over every move, gesture and look (the real model)', async () => {
   const model = await loadKnightMesh();
   const HELMS = { great: 'K_Helm_Great', armet: 'K_Helm_Armet', bascinet: 'K_Helm_Bascinet' };
   assert.ok(model.has('K_Pauldron_L') && model.has('K_Pauldron_R'), 'the model has its lames on K_Pauldron_*');
