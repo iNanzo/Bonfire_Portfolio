@@ -4,11 +4,15 @@
 //     palette and scene chips are styled, and no policy error reaches the console;
 //   • the search: Ctrl+K "dither" + Enter lands on Dither (Picture), "Fast Travel" finds the
 //     pack's Map action, / opens it and Esc clears then closes;
-//   • #effects still opens (on Colors); Reset Flame Colors keeps your palettes, with Undo;
+//   • a result lands in sight, below the sticky top bar, page strip and pinned preview, on a
+//     laptop and a phone, from a page with the preview and to one without; a search that
+//     finds nothing says so on a phone too;
+//   • #effects still opens (on Colors); Reset Flame Colors keeps your palettes, with Undo,
+//     which the focus goes to (and back to Reset from);
 //   • every page's hover tips stay inside the window at 1280×720 and 390×844, and no title
 //     attribute is left (the shared tooltip shows hints).
 import { test, expect } from '@playwright/test';
-import { assertInViewport, checkTip, collectTips } from './lib/tips.mjs';
+import { assertInViewport, checkTip } from './lib/tips.mjs';
 
 const ADMIN = process.env.PW_ADMIN_ORIGIN ?? `http://127.0.0.1:${(Number(process.env.PW_PORT) || 4173) + 100}`;
 const PAGES = ['projects', 'home', 'about', 'journey', 'skills', 'contact', 'colors', 'fire', 'picture', 'knight', 'scenes', 'headings', 'interface'];
@@ -35,6 +39,32 @@ const background = (loc) => loc.evaluate((el) => getComputedStyle(el).background
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 /** The field that has the focus: its data-path. */
 const focusedPath = (page) => page.evaluate(() => document.activeElement?.closest('[data-path]')?.getAttribute('data-path') ?? null);
+
+/**
+ * Where the focused control is, and the part of the window it should be in: below whatever
+ * sticks across the top (the top bar; on a phone the page strip; under 1280 px a pinned preview).
+ */
+const landing = (page) => page.evaluate(() => {
+  const r = document.activeElement.getBoundingClientRect();
+  const stuck = [...document.querySelectorAll('.topbar, .sidebar, [data-preview-slot]')]
+    .map((n) => [n, n.getBoundingClientRect()])
+    .filter(([n, b]) => !n.hidden && getComputedStyle(n).position === 'sticky' && b.top < innerHeight / 2 && b.width > innerWidth / 2)
+    .map(([, b]) => b.bottom);
+  return { top: r.top, bottom: r.bottom, below: Math.max(0, ...stuck), height: innerHeight };
+});
+
+/**
+ * The tip triggers that show, as locators, found in one pass over the page (a locator's own
+ * isVisible() is a round trip each, and a page has hundreds).
+ */
+async function visibleTips(page) {
+  const all = page.locator('[data-tip]');
+  const shown = await all.evaluateAll((els) => els.flatMap((el, i) => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' ? [i] : [];
+  }));
+  return shown.map((i) => all.nth(i));
+}
 
 // The live preview frames the real site (software-rendered WebGL: heavy). Only the policy
 // test lets it load; the rest leave the frame empty.
@@ -123,21 +153,56 @@ test('“Fast Travel” finds the pack’s Map action; / opens the search and Es
   expect(await focusedPath(page), 'back where it was').toBe('ui.packMapVerb');
 });
 
+for (const [w, h] of [[1024, 768], [390, 844]]) {
+  test(`at ${w}×${h} a result lands in sight, below the bars and the pinned preview`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    // From a page with the preview: fields on other preview pages, far down them, and one on
+    // a page without it (the room below the bars changes on the way).
+    const trips = [['edge glow', 'effects.knight.rim'], ['reactions', 'effects.knight.reactions'], ['screen shake', 'effects.render.shake'], ['fast travel', 'ui.packMapVerb']];
+    for (const [query, key] of trips) {
+      await open(page, 'colors');
+      await page.keyboard.press('Control+K');
+      await page.keyboard.type(query);
+      await expect(page.locator('#admin-search-list .search-result').first()).toHaveAttribute('data-key', key);
+      await page.keyboard.press('Enter');
+      await expect.poll(() => focusedPath(page)).toBe(key);
+      const at = await landing(page);
+      expect(at.top, `“${query}”: below the bars (${at.below} px)`).toBeGreaterThanOrEqual(at.below - 0.5);
+      expect(at.bottom, `“${query}”: above the window’s bottom (${at.height} px)`).toBeLessThanOrEqual(at.height + 0.5);
+    }
+    // Nothing found: it says so (on a phone that line hangs below the page strip).
+    await page.keyboard.press('Control+K');
+    await page.keyboard.type('zzqxv');
+    const status = page.locator('.admin-search .settings-search-status');
+    await expect(status).toContainText('No results');
+    const box = await status.boundingBox();
+    const seen = await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.settings-search-status'), [box.x + 4, box.y + box.height / 2]);
+    expect(seen, 'not clipped').toBe(true);
+  });
+}
+
 test('#effects opens Colors; Reset Flame Colors keeps your palettes, and Undo puts it back', async ({ page }) => {
   await page.goto(`${ADMIN}/#effects`);
   await expect(page.locator('.page-title')).toHaveText('Colors');
   await expect(page).toHaveURL(/#colors$/);
   const cards = page.locator('[data-path="effects.flames"] .collection > .card');
+  // A palette of your own (in this draft only: the API is read-only), and something to
+  // reset: a different color, typed in.
+  await page.locator('[data-path="effects.flames"] .collection > .add').click();
   const names = await cards.locator('.card-title').allTextContents();
-  // Something to reset: a different color, typed in.
   await cards.first().locator('.card-toggle').click();
   const hex = cards.first().locator('[data-path$=".mid"] input.hex');
   await hex.fill('#123456');
-  await page.locator('[data-path="effects.flames"] .block-head').getByRole('button', { name: /Reset/ }).click();
-  await expect(page.locator('.toast').last()).toContainText('own palettes are kept');
+  // By keyboard: Reset, and the focus is on the note's Undo, which waits while it has it.
+  const reset = page.locator('[data-path="effects.flames"] > .block-head [data-reset]');
+  await reset.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.toast').last()).toContainText(/own palettes? (is|are) kept/);
+  await expect(page.locator('.toast-action')).toBeFocused();
   await expect(cards).toHaveCount(names.length);
   expect(await cards.locator('.card-title').allTextContents()).toEqual(names);
-  await page.locator('.toast-action').click();
+  await page.keyboard.press('Enter');
+  await expect(reset, 'back on Reset').toBeFocused();
   await cards.first().locator('.card-toggle').click();
   await expect(cards.first().locator('[data-path$=".mid"] input.hex')).toHaveValue('#123456');
 });
@@ -147,9 +212,10 @@ for (const [w, h] of [[1280, 720], [390, 844]]) {
     test.use({ viewport: { width: w, height: h } });
     for (const id of PAGES) {
       test(`${id}: hover tips stay inside the window, and no title is left`, async ({ page }) => {
+        test.setTimeout(90_000);
         await open(page, id);
         expect(await page.locator('[title]').count(), 'no title attributes').toBe(0);
-        const tips = await collectTips(page);
+        const tips = await visibleTips(page);
         // A spread of them, the first and last included (they all go through one placement).
         const pick = tips.length <= 8 ? tips : Array.from({ length: 8 }, (_, i) => tips[Math.round((i * (tips.length - 1)) / 7)]);
         for (const [i, trigger] of pick.entries()) {

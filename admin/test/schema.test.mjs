@@ -110,8 +110,10 @@ test('pixel sizes are the ones the menus offer (2, 3, 4, 6, 8), plus content’s
 
 test('Reset: a section back to the defaults; Flame Colors keeps the palettes you made', () => {
   const c = content();
+  // A palette of your own (made here, not taken from content.json, which can lose its own).
+  c.effects.flames.push({ ...structuredClone(DEFAULT_EFFECTS.flames[0]), id: 'test-own', name: 'Test Own' });
   const own = c.effects.flames.filter((f) => !DEFAULT_EFFECTS.flames.some((d) => d.id === f.id));
-  assert.ok(own.length >= 1, 'the content has palettes of its own');
+  assert.ok(own.length >= 1, 'palettes of your own');
   c.effects.flames[0].mid = '#123456';
   c.effects.flames.splice(1, 1); // a built-in deleted
   const r = resetSection('flames', c.effects.flames, DEFAULT_EFFECTS.flames);
