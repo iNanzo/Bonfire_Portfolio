@@ -100,7 +100,7 @@
     "src/weaponGroups.js",
     "src/pixelSizes.js",
     "src/ui/siteKeys.js",
-    "src/ui/describedTip.js"
+    "src/ui/describedTip.js",
     "src/painter/layout.js",
     "src/painter/panelSearch.js",
     "src/painter/toolbar.js"
