@@ -13,60 +13,108 @@ and [bonfire-live.md](bonfire-live.md); the admin's Scenes page (the built-in sc
 
 **The layout.** The stage fills the window. Across the top: the home link, the scene's name
 (click it to rename), a dot that says *Saved*, *Unsaved Changes* or *Built-In*, **Library**,
-**Save**, undo and redo, the **Preview** (Still, Beat, Drop Loop, Demo Track, with the beat's
-pips), **Play in Bonfire Live ↗** and **Hide Panel**. On the right, the panel: the scene in
-sections that fold. The bar keeps every button on screen and the name clear of them at any
-width: from 1700px it has everything; narrower, the beat's words go (its pips stay), then
-the app's name and the long preview labels (*Drop*, *Demo*); below 1240px it's two rows
-(the scene and its commands, then the preview and Play). On a phone the panel is a bottom
-sheet with a strip of section tabs and the library fills the screen.
+**Save**, undo and redo, **Tools ▾**, the **Preview** (Still, Beat, Drop Loop, Demo Track,
+with the beat's pips), **Play in Bonfire Live ↗** and **Hide Panel**. On the right, the
+panel: a search box, then the scene in sections that fold. The bar keeps every button on
+screen and the name clear of them at any width: from 1700px it has everything; narrower,
+the beat's words go (its pips stay), then the app's name and the long labels (*Drop*,
+*Demo*, *Play ↗*); below 1240px it's two rows (the scene and its commands, then the preview
+and Play). On a phone the panel is a bottom sheet with a strip of section tabs, Tools is
+its ▾ alone, and the library fills the screen.
 
-**Hover to audition.** Hover a flame, a look, a shot, a suggested palette or a layer's
-*Off / In the Mix / Always* and the stage shows it at once; move off and the scene comes
-back; click to keep it (one undo step). A look hovered bursts once as it comes on, so even
-a look that lives on the beat (Glitch, Ripple, Mosaic…) shows in the Still preview. Every
-field also has a "?" that says what it does; its hint always opens inside the panel (shifted
-in from the right edge, or downward near the top).
+**Hover to audition.** Hover a flame, a look, a shot, a suggested palette or one of a
+layer's *Off / In the Mix / Always* and the stage shows it at once; move off and the scene
+comes back; click to keep it (one undo step). A look hovered bursts once as it comes on, so
+even a look that lives on the beat (Glitch, Ripple, Mosaic…) shows in the Still preview,
+and the line under the looks says what the hovered one does. A chip shows no text when
+it's hovered: the stage is its answer.
 
-**The sections**
+**Tooltips.** Every field has a "?" that says what it does, in a sentence or two (the
+longer explanations fold under a *More*). The words are the settings map's
+(`src/settingsMap.js`): a setting is called and explained the same here as in Bonfire Live,
+and every look, layer and drop hit has a hint of its own. The tip is the site's shared one
+(`src/ui/tooltip.js`): it opens on a hover, on the keyboard's focus (a field's own "?" shows
+while the field has it) or on a tap of the "?", stays inside the window whatever the panel's
+scroll, and Esc closes it. The icon buttons have one too: undo, redo, Tools, the banner's ✕,
+each preview, Play, and a detail's lock (*Pinned: stays as painted* / *Rolled each time:
+click to pin*).
 
-- **Place:** the scenery (the ruins, the forge, the shrine, the cathedral's altar, the
-  cult's circle; click only, a place takes a moment to build), the weapon and the element
-  (or *Drawn by the Show*: a new one each time a drop forges one).
-- **Fire & Colors:** the site's flames; *Harmonious* (in a scheme) or *Fully Random*; *From
-  a Color* (pick any color: flames built round it, one per scheme); the flame's five colors
-  by hand (the tips are kept readable as text and lightened if needed: a note says so) and
-  its light; the scenery's colors (the site's own, harmonious, vivid, fully random, from a
-  color, or by hand, the background kept the darkest); the fire's shape (level, size,
-  height, turbulence, glow, wind), added to what the music does.
+**The sections** (the settings map's `PAINTER_SECTIONS`: a part of a scene sits where
+Bonfire Live keeps the same setting, the Painter's own rows beside it; `src/painter/layout.js`)
+
+- **Place & Atmosphere:** the place (the ruins, the forge, the shrine, the cathedral's
+  altar, the cult's circle; click only, a place takes a moment to build), fog, exposure,
+  vignette and the fire's shadows.
+- **Colors:** the flame's: the site's flames, *Make a Flame* (*Harmonious*, in the
+  *Harmony* picked beside it, or *Fully Random*), *Flame From a Color* (pick any color: flames
+  built round it, one per harmony), each flame color by hand (the tips are kept readable as
+  text and lightened if needed: a note says so) and *Light Whiteness*. The place's: *Place
+  Colors* (the site's own, harmonious, vivid, fully random), *Place From a Color*, each
+  place color by hand (the background kept the darkest). Then the palette (the flame's,
+  Ashen, Moonlit, or a few of the scene's own colors picked from its ten).
+- **Fire:** the fire's shape (level, size, height, turbulence, Firelight, wind across and
+  toward you), added to what the music does.
+- **Pixel Art:** pixel size, dither and its pattern, outlines, the flame's frame rate.
+- **Look:** the ten looks (the line under them says what the painted one does), the look's
+  own detail (the kaleidoscope's segments, the echo falling inward, the vortex's turn, the
+  mosaic's crunch), its strength, and an x-ray view held for the scene.
+- **Layers:** *Pin What You See* copies everything on the stage now into the scene; *All
+  Layers* sets every switch at once (below); then every layer's switch. A layer that's on
+  shows its details, each with a **lock**: pinned (a pin: it stays as painted) or left to
+  the dice (a die: rolled again each time the look comes round; the field shows what's on
+  screen now, dimmed, and moving it pins it). With Blend Modes on, how each layer blends
+  (or rolled each turn).
 - **Camera:** drag the stage to orbit round what the camera looks at, Shift-drag (or
   right-drag) to slide it, the wheel (or a pinch) to come nearer; *Start From a Shot*
-  (Bonfire Live's framings); the lens, the tilt, and the move: still, sway, sweep, push in
-  and out, crane or vertigo, how big, and how many bars a cycle takes (a move picked after
-  Still with no size gets a new scene's, so it moves at once). The camera is kept
-  in the clearing (above the ground, out of the fire, in front of the ruins), the same rule
-  Bonfire Live plays it under.
-- **Look:** the ten looks, the look's own detail (the kaleidoscope's segments, the echo
-  falling inward, the vortex's turn, the mosaic's crunch) and its strength.
-- **Layers:** every layer's switch; a layer that's on shows its details, each with a
-  **lock**: pinned (a pin: it stays as painted) or left to the dice (a die: rolled again
-  each time the look comes round; the field shows what's on screen now, dimmed, and moving
-  it pins it). *Pin What You See* copies everything on the stage now into the scene. With
-  Blend Modes on, how each layer blends (or rolled each turn).
-- **Drops:** the show's own drop hits, or the scene's own set and how many at once.
-- **Render:** pixel size, palette (the flame's, Ashen, Moonlit, or a few of the scene's own
-  colors picked from its ten), dither and its pattern, outlines, vignette, exposure, fog,
-  shadows, the flame's frame rate, an x-ray view held for the scene.
-- **Knights:** how many (0 to 4), each one's helmet (or drawn at random), their style
-  (the pixel sprites, gunmetal, black and gold, the first build; or Bonfire Live's own, or
-  in the mix), armor finish, Edge Glow (off, in the mix: rolled round its Glow Strength
-  each time they come round, or always at it), seat pose, dance, formation, moves (the Default
-  Dance among them), armor shine and reactions; *Try a Gesture* plays one on the stage
-  (a preview: gestures aren't part of a scene).
-- **Fireflies:** how many glow, their light show, their moves, their speed.
-- **With the Music:** *Hold the Scene* (everything stays for its stretch; the music only
-  pulses and drops it) or *Start From the Scene* (it opens the stretch, then the show plays
-  on). The Painter always previews a scene held.
+  (Bonfire Live's framings); the lens, the tilt, and the *Movement*: still, sway, sweep,
+  push in and out, crane or vertigo, how big, and how many bars a cycle takes (a movement
+  picked after Still with no size gets a new scene's, so it moves at once). The camera is
+  kept in the clearing (above the ground, out of the fire, in front of the ruins), the same
+  rule Bonfire Live plays it under.
+- **Knights:** how many (0 to 4), their seat pose and each one's helmet (or drawn at
+  random); then, under their own headings, **Armor** (style: the pixel sprites, Smooth
+  Steel, Black & Gold, the first build, or Bonfire Live's own, or in the mix; finish; Edge
+  Glow: off, in the mix, rolled round its strength each time they come round, or always at
+  it; Edge Glow Strength; armor shine), **Dancing** (dance, formation, dance moves, the
+  Default Dance among them), **Behavior** (reactions) and **Try a Gesture (Preview, Not
+  Saved)**: one played on the stage now (gestures aren't part of a scene).
+- **Fireflies:** how many glow, their light show, their dances, their speed.
+- **Show:** what the scene leaves to the music. *With the Music*: *Hold the Scene*
+  (everything stays for its stretch; the music only pulses and drops it) or *Start From the
+  Scene* (it opens the stretch, then the show plays on); the Painter always previews a scene
+  held. The weapon and the element (or *Drawn By the Show*: a new one each time a drop
+  forges one). *Drop Hits*: the show's own, or this scene's own set (every hit's switch)
+  and how many land at once.
+
+The open sections are remembered for the next visit (`bonfire-painter-panel` in this
+browser; Place & Atmosphere the first time).
+
+**Switches and setting them all at once.** Every *Off / In the Mix / Always* is three radio
+buttons: one Tab stop each (Layers is 14, where it was 42), the arrow keys move along it.
+The layers, the scene's own drop hits and the move lists have a toolbar over them: *All
+Off · All In the Mix · All Always · Shuffle · Defaults* (a new scene's: all off), and for
+the moves *All · None · Defaults* (*None* can't empty the list: one stays; *Defaults* leaves
+the moves to the show). A toolbar's button is one change: one Ctrl+Z puts it all back, and a
+note says so. The scene's rules still hold (Painterly and Watercolor are never both
+Always).
+
+**Searching the panel.** The box over the sections (`/` goes to it) narrows the panel as you
+type: only the rows it finds, their sections opened, what matched marked, scrolled to the
+first. It reads each row's label, its search words, its section and heading, its choices
+and its hint ("bloom" finds Glow, "armet" the helmets, "exposre" Exposure), with the same
+matcher as Bonfire Live's settings. A row the scene's shape leaves out is listed under the
+box (*Not shown now*, with how many) with how to bring it back: *Glow Strength: turn on
+Glow in Layers to see this*, *Helmets: set Knights above 0 to see this*. The search holds
+while you paint: a change that draws a section again is searched again, and the box keeps
+the keyboard. How many were found is read out once you stop typing; Esc clears it (every
+section back as it was) and Esc again hands the keyboard back to the page. The box stays
+in sight: only the sections under it scroll.
+
+**Tools ▾** reaches what only a key did before: *Render Settings* (P), *Pack* (I),
+*Capture* (C), *Full Screen* (F) and *Keyboard Shortcuts* (?). Render Settings shows the
+scene's render in Bonfire Live's words (*Always*, *Off*, *A Scene's 3 Colors*) and its last
+row is *Reset Render Settings* (a new scene's). `?` lists every key below, with a box that
+filters them.
 
 **The preview**
 
@@ -91,8 +139,9 @@ It**, until you pick one. **Save** (Ctrl+S) keeps it in *My Scenes* in this brow
 thumbnail of the stage (taken round the part the panel leaves showing, where the fire is
 framed, a couple of frames on: nothing moves for it); a scene saved the first time
 takes its id from its name. The **Library** (L) lists My Scenes and Bonfire Live's built-in
-ones: open, play in Bonfire Live, duplicate, rename, export, delete (asked twice, on the
-card), plus New Scene, Import (a file the Painter exported, or a scene's JSON from the admin;
+ones, with a box that filters both by name (`/` goes to it while the library's open; Esc
+clears it, then closes the drawer): open, play in Bonfire Live, duplicate, rename, export,
+delete (asked twice, on the card), plus New Scene, Import (a file the Painter exported, or a scene's JSON from the admin;
 a scene whose id is taken comes in as a copy) and Export All (`bonfire-scenes.json`).
 Opening a scene or starting a new one over unsaved changes asks first, in place (*Discard
 and Open* / *Keep Painting*). Built-in scenes open read-only: paint on one and it becomes a
@@ -139,9 +188,11 @@ with *Import From Painter*).
 | Ctrl+S | save |
 | H | hide or show the panel |
 | L | the library (L or Esc closes it, wherever the focus is) |
-| P | the render menu, bound to the scene's render (its digits step it) |
-| I | the pack: it paints into the scene (scenery, weapon, element, flame, the first knight's helmet, the knights' style and finish); its gestures are previews |
+| P | Render Settings, bound to the scene's render (its digits step it, 0 resets it) |
+| I | the pack: it paints into the scene (place, weapon, element, flame, the first knight's helmet, the knights' style and finish); its gestures are previews |
 | F | full screen |
+| / | search the panel (the library's filter while it's open) |
+| ? | every key, in a list that filters |
 
 ## Design notes
 
@@ -162,8 +213,9 @@ with *Import From Painter*).
   and Drop Loop turn the look over every 16 bars), and the locks and *Pin What You See*
   decide what stays.
 - **Hover is an effect.** Chips audition on the stage, lift and glow; library cards lift
-  with a dithered glow in their own flame's color; the scenery's chips glow but don't
-  audition. No text tooltip is the affordance (the "?" hints are the fields' help).
+  with a dithered glow in their own flame's color; the place's chips glow but don't
+  audition. No text tooltip is a chip's affordance; the "?" hints, the icon buttons and the
+  preview buttons have the shared tooltip.
 - **The silent beat** (`src/painter/beat.js`) gives the director exactly what the analyser
   would: bands, level, kicks and hats, beats on a locked grid (early by the Visual Lead),
   sections and their events, the bar count starting again at each drop.
@@ -174,11 +226,20 @@ with *Import From Painter*).
 - **Undo** (`history.js`) merges a drag on one field into one step (edits of the same path
   within 600 ms), keeps 150 steps, and a new edit drops what could have been redone. Undo
   and redo move the panel's fields too, the one under your hand included.
-- **The panel keeps your place.** It's drawn again only when its shape changes; a redraw
-  focuses the same field, chip, lock or button again, and one that a slider's drag calls
-  for waits for the drag to end (every knight's helmet row is drawn, the extra ones hidden,
-  so dragging *Knights by the Fire* never swaps its slider out). The field under your hand
-  keeps what it shows while you move it; its number follows it.
+- **The panel keeps your place.** A section is drawn again only when its own shape changes
+  (`layout.js` `sectionShapes`: a layer turned on, a look with a detail of its own, the
+  knights' count going to 0…), and only that section: turning Glow on redraws Layers (about
+  21 KB of markup) where the whole panel (about 78 KB, 131 KB with everything on) was drawn
+  before. A redraw focuses the same field, radio, chip, lock or button again, and one that a
+  slider's drag calls for waits for the drag to end (every knight's helmet row is drawn, the
+  extra ones hidden, so dragging the knights' count never swaps its slider out). The field
+  under your hand keeps what it shows while you move it; its number follows it.
+- **One map of the words.** The labels, hints and longer *More* come from the settings map
+  (`meta('painter', path)`, `ITEM_HINTS`), the section order from its `PAINTER_SECTIONS`;
+  the Painter's own rows (the actions, the color pickers, the gestures) are `layout.js`
+  `OWN`. Where a shared hint speaks of what only Bonfire Live has (a key it answers),
+  `PAINTER_ITEM_HINTS` says it for a scene. Labels and choices are Title Case (`src/text.js`
+  `titleCase`), hints sentences of at most 160 characters that don't repeat the label.
 - **Storage** is `src/sceneStore.js` (shared with Bonfire Live): My Scenes and their
   thumbnails (the first to go when the storage is full), a draft of its own
   (`bonfire-painter-draft`: the scene, its ref, the ref it was opened from, and whether it
@@ -186,11 +247,16 @@ with *Import From Painter*).
   BroadcastChannel to hand a scene to an open Bonfire Live.
 
 **Modules** (`src/painter/`): `main.js` (the page: the stage, the bar, editing, saving,
-keys), `panel.js` (pure `panelMarkup` + `bindPanel`; fields from `src/ui/fields.js` bound by
-`data-scene` paths), `cameraRig.js`, `library.js`, `history.js` (pure), `beat.js` (pure),
-`thumbs.js`, `painter.css`. The page is `painter/index.html` (a Vite input; `/painter/` is in
+keys), `panel.js` (pure `panelMarkup` / `sectionMarkup` + `bindPanel`, `bulkEdit`; fields
+from `src/ui/fields.js` bound by `data-scene` paths), `layout.js` (pure: the sections and
+rows, their words, when a row shows, each section's shape), `panelSearch.js` (the panel's
+search: its index, pure, and its box), `toolbar.js` (the Tools menu and the keys' list),
+`cameraRig.js`, `library.js`, `history.js` (pure), `beat.js` (pure), `thumbs.js`,
+`painter.css`. The page is `painter/index.html` (a Vite input; `/painter/` is in
 the sitemap). Finding it is one of the site's discoveries (`painter`). Dev builds expose
-`window.__painter`. Tests: `test/painter.test.mjs`, `e2e/painter.spec.mjs`.
+`window.__painter`. Tests: `test/painter.test.mjs`, `test/painterPanel.test.mjs` (the panel,
+its search, the bar's tools), `e2e/painter.spec.mjs`, `e2e/tips-painter.spec.mjs` (every
+tooltip at 1280×720 and on a 390×844 touch screen).
 
 **The build** (`vite.config.js`) makes the four pages together (the site, 404, Bonfire Live,
 the Painter). The site's first load stays the site's: Bonfire Live's and the Painter's
@@ -232,5 +298,6 @@ it with `--write <name>=<png>` without capturing again. The tool's header has th
 | "knight options overall for the portfolio and visualizer" / "knight model version options" | Knights: style, finish, edge glow, seat pose, helmets per knight |
 | Standing: every effect Off / In the Mix / Always with rolled parameters ("endless variations") | every layer, drop hit and switch has the three; every detail has a pin/dice lock |
 | Standing: hover affordances are effects, never text labels | hover auditions on the stage; lifts and glows |
-| Standing: Title Case labels, a "?" on every setting | every field and group (tested in `test/painter.test.mjs`) |
+| Standing: Title Case labels, a "?" on every setting | every field and group (tested in `test/painterPanel.test.mjs`) |
+| Round 10: "optimize our menus … grouped in a UX friendly way", "setting item search", "tooltips should make sense and not cut off on screen" | the sections in the settings map's order and words; the panel's search; the shared tooltip on every "?" and icon button; Tools ▾ and the `?` keys list |
 | The plan: starter scenes made in the Painter | the four built-in scenes (above), painted, saved and exported here; `e2e/scenes.spec.mjs` opens them in the Painter and Bonfire Live |
