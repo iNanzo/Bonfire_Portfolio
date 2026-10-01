@@ -18,7 +18,11 @@ Bonfire Live's are in [design/visualizer.md](design/visualizer.md), the Painter'
 | Contact | `#/contact` | low and wide |
 
 - **Keyboard:** `Q` / `E` switch screens · arrows or WASD move through menus, items and
-  skills · `Enter` selects · `Esc` goes back (item → inventory → home).
+  skills · `Enter` selects · `Esc` goes back (item → inventory → home) · `F` photo mode ·
+  `B` how it's made · `I` the pack · `P` the render settings · `?` lists them all (the
+  keyboard shortcuts, `src/ui/siteKeys.js` through the shared `src/ui/keysOverlay.js`).
+  Shift with a letter is no shortcut (only `?`), and nothing fires while you type in a
+  field (the shortcuts' filter, say).
 - **The fire:** click it (or “Stoke the fire”) to stoke it. Moving the cursor through it
   bends and stirs the flames (see *Cursor interaction* below). Clicking any button or
   link makes the fire flare.
@@ -260,15 +264,22 @@ normals on) to `public/models/bonfire.glb`. Keep the names `Weapon_<key>`,
 `CandleFlame_*` and `Glow_*` — the site finds them by name. In the `.blend`, the weapons
 stand in a row in front of the scene; the site places them in the fire.
 
-**Render settings** (`src/ui/renderMenu.js`): press **P**, then **1** pixel size ·
-**2** palette · **3** dither strength · **4** Bayer 4×4/8×8 · **5** outlines · **6** cursor
-interaction · **0** reset to the site's look (the effects in `content.json`; not while a
-weapon is being forged). Every row is a button too: a click steps it. It shows as a HUD in
-the top-right corner, or inside the breakdown's panel while that's open (see below); the
-two hand over, so P means the same thing in both (except on touch screens, where there's
-no P to close the HUD: closing the breakdown just folds them away). Closed with focus in
-it, the HUD gives focus back to what had it before (`src/ui/focus.js`). Nothing is saved:
-a reload is the site's look again.
+**Render Settings** (`src/ui/renderMenu.js`): press **P** (or pick *Render Settings* in the
+menu: the way in on a touch screen), then, under **Picture**, **1** Pixel Size (2, 3, 4, 6
+or 8 px: `src/pixelSizes.js`, the same list as Bonfire Live's and the Painter's) · **2**
+Palette · **3** Dither · **4** Dither Pattern (4×4 / 8×8) · **5** Outlines, and under
+**Interaction** **6** Cursor (how the pointer stirs the fire) · **0** *Reset Render
+Settings*, back to the site's look (the effects in `content.json`; not while a weapon is
+being forged). Every row is a button too: a click steps it, a Shift+click steps it back;
+each says what it does as its tooltip, and tells assistive tech its key
+(`aria-keyshortcuts`). It shows as a HUD in the top-right corner, with a close button, or
+inside the breakdown's panel while that's open (see below); the two hand over, so P means
+the same thing in both (except on touch screens, where there's no P: closing the
+breakdown just folds them away). Closed with focus in it, the HUD gives focus back to what
+had it before (`src/ui/focus.js`). Only the cursor's pick is remembered (`fireInteraction`
+in this browser, where `?lab` keeps its pick too; the reset forgets it): the rest is the
+site's look again on a reload. The P key is listened for from the start and does nothing
+until the scene is there.
 
 ### Weapons
 
@@ -332,7 +343,7 @@ burns without him (a console warning, not an error).
 - **Armor** (`armor.js`; docs/knight.md has the details): he's drawn in one of his
   styles (`knightStyles.js`): by default *Pixel Cel*, a hand-drawn sprite with ink lines on
   every plate edge and flat bands, whose lit plates wear the flame's colors; the other
-  pixel styles, *Gunmetal* (natural light on gunmetal steel), and round 8's looks (*Black
+  pixel styles, *Smooth Steel* (the `gunmetal` style: natural light on gunmetal steel), and round 8's looks (*Black
   & Gold*, *First Build*, its own model loaded when chosen). The steel styles take a
   finish (`steel.js`: Gunmetal, Blackened, Polished Steel, Burnished) and an edge glow in
   the fire's color. When the fire flares (a click that stokes it, the cursor coming onto
@@ -376,12 +387,19 @@ and `list`/`positions` for cameras. The full list is in the header of `knights.j
 - **The pack** (`src/ui/pack.js`, `src/ui/pixelArt.js`): a backpack in the bottom-right
   corner. Hover it, tap it or press I; its items rise out of it and each one's options
   fly out as a text list: the Map (*Fast Travel*: another place for the fire), the Anvil
-  (swap the weapon), the Spell Tome (the element's ring, the living weapon, a new spell:
-  forging a new blade in that element, and new bonfire colors, each with a swatch) and,
-  since round 8, the Knight (*Summon & Tend*: his summons and send-off, helmet, style,
-  finish and gestures; see "The knight comes when summoned"). The icons are 16×16
-  line-art pixel icons drawn from ASCII, animated in CSS. The same pack is in Bonfire
-  Live and the Painter (where it paints into the scene).
+  (*Swap Weapon*: the *Living Weapon* first, then the weapons by kind, *Swords*,
+  *Greatswords*, *Polearms* and *Axes & Hammers*: `WEAPON_GROUPS` in `src/weaponGroups.js`,
+  re-exported by `src/contentRules.js`, the headings `ui.packSwords` and so on), the Spell
+  Tome (*Cast a Spell*: the element's ring, then *Elements*, a new spell, which on the site
+  also forges a new blade in that element and says so as its tooltip, and *Flame Colors*,
+  each with a swatch) and, since round 8, the Knight (*Summon & Tend*: his summons and
+  send-off, then his gestures, helmet, style and finish; see "The knight comes when
+  summoned"). Each heading names a group screen readers hear (`role="group"`, labelled by
+  it); a long list (more than 12 options, headings aside) goes in two columns. An option
+  that's off for a reason says why: under its heading and as its tooltip (a style that
+  wears its own colors has no finish; reduced motion has no gestures, ring or living
+  weapon). The icons are 16×16 line-art pixel icons drawn from ASCII, animated in CSS. The
+  same pack is in Bonfire Live and the Painter (where it paints into the scene).
 - **Switching screens:** the old screen's panels dither away (the scene's own ordered
   dither, as a mask) as they slide off; the new ones slide in from the way you're going
   and dither in, corners flaring, the title's gem turning in and the title drawing left
@@ -427,7 +445,8 @@ and `list`/`positions` for cameras. The full list is in the header of `knights.j
   opens every list at 390×844, 768×1024, 844×390, 1024×768, 1280×800 and 1920×1080 with
   the breakdown open and closed.
 - **Without WebGL** there's nothing to take apart: *Take This Page Apart* is hidden, the
-  rest menu drops Photo and How it's made, and `#how-its-made` links do nothing.
+  rest menu drops Photo Mode, How It's Made and Render Settings, and `#how-its-made`
+  links do nothing.
 - **Keys with a view picked:** the views are radio buttons, and a focused radio no longer
   counts as typing (`isEditing` in `src/routes.js`), so B, F, P and I work at once.
 
@@ -458,18 +477,20 @@ the site (`src/main.js`, `src/bonfire/scene.js`, `src/bonfire/knightArrival.js`)
 - **The pack's Knight item** (*Summon & Tend*). While he's away it offers only **Summon**,
   and its helm icon's eye slit is dark (it kindles in steps as you reach for it; the item's
   `data-state`, set from `state()` in `bonfireItems`). While he rests: **Send Him Off**
-  (he burns away into his sign), **Helmets**, **Styles** (the six; a change burns him away
-  and forms him again in it, ~1.2 s, the first build's model fetched first), **Armor
-  Finishes** (the steel's color; off for the styles with their own colors) and **Gestures**
-  (Praise the Sun, Wave, Bow, Point Forward, Beckon, Shrug, Hurrah, Joy and the **Default
-  Dance**: he stands, dances two bars and sits back down). Forming or burning away, there's
+  (he burns away into his sign), then **Gestures** (Praise the Sun, Wave, Bow, Point
+  Forward, Beckon, Shrug, Hurrah, Joy and the **Default Dance**: he stands, dances two bars
+  and sits back down; off under reduced motion, which the list says), **Helmet**, **Style**
+  (the six, each saying what it looks like as its tooltip; the `gunmetal` style shows as
+  *Smooth Steel*; a change burns him away and forms him again in it, ~1.2 s, the first
+  build's model fetched first) and **Finish** (the steel's color; off for the styles with
+  their own colors: "Black & Gold and First Build wear their own colors."). Forming or burning away, there's
   nothing to pick. A visitor's helmet, style and finish are remembered in this browser
   (`knightHelmet`, `knightStyle`, `knightFinish`) and put on him as the scene loads (not in
   the admin's preview, which shows the draft's settings).
-- **Discoveries:** *Summoned the knight* (the sign or the pack), *Greeted the knight*, *A
-  change of helm* and *A change of style* (a style or a finish). Where he can't come (no
-  model, switched off, no WebGL) they leave the count. The Painter's own, *The fire,
-  painted*, is found on `/painter/`.
+- **Discoveries:** *Summoned the Knight* (the sign or the pack), *Greeted the Knight*, *A
+  New Helm* and *A New Style* (a style or a finish). Where he can't come (no model,
+  switched off, no WebGL) they leave the count. The Painter's own, *The Fire, Painted*, is
+  found on `/painter/`.
 - **The admin** (*The Knight* on the Effects page): Show, Arrival (Summon Sign / There From
   the Start: resting from the first frame, staying until sent off), Shortest and Longest
   Rest, Helmet, Style, Armor Finish, Edge Glow, Armor Shine, Seat Pose (Resting /
@@ -496,7 +517,7 @@ above and `docs/knight.md`). On the site (`src/main.js`, `src/bonfire/scene.js`)
   one twice running (`greeting()` in `src/knightNames.js`). The click is his: it
   doesn't stoke the fire or draw a new weapon (a click while a weapon is being forged
   still hurries it, and one on the planted weapon still wakes it). The first greeting is
-  a discovery, *Greeted the knight*; a gesture from the pack counts too (the keyboard's
+  a discovery, *Greeted the Knight*; a gesture from the pack counts too (the keyboard's
   way to it), but only one he really starts (not mid-swap). With
   `effects.knight.gestures` off, or reduced motion (he sits still), he isn't a click
   target: no hover, no pointer, and a click stokes as anywhere else.
@@ -509,13 +530,13 @@ above and `docs/knight.md`). On the site (`src/main.js`, `src/bonfire/scene.js`)
   he has on or is putting on. Nothing can be picked while he's away for a moment
   (forming, burning away); gestures are off for reduced motion, where a helmet change is
   instant. The
-  first swap is a discovery, *A change of helm*. The pick is remembered in this browser
+  first swap is a discovery, *A New Helm*. The pick is remembered in this browser
   (`knightHelmet`) and he wears it whenever he comes.
 - **No knight** (his model didn't load, the admin has him off, or no WebGL): the page
   doesn't mention him. The pack leaves the Knight item out (`hasKnight` in
-  `bonfireItems`), the scene's description drops his sentence, and *Greeted the knight*
-  and *A change of helm* leave the discoveries' count (unless found before; for reduced
-  motion, *Greeted the knight* is out too: `setOut` in `src/ui/discoveries.js`). All of
+  `bonfireItems`), the scene's description drops his sentence, and *Greeted the Knight*
+  and *A New Helm* leave the discoveries' count (unless found before; for reduced
+  motion, *Greeted the Knight* is out too: `setOut` in `src/ui/discoveries.js`). All of
   it comes back if the admin turns him on again.
 - **Settings** (`effects.knight`, the admin's Effects page, *The Knight*; every key with
   its range and default is in [docs/admin.md](admin.md)'s knight table): `show`,
@@ -550,3 +571,50 @@ knight), and `hasKnight` to leave the item out while there's none at all. Since 
 `onStyle` / `onFinish` with `style` / `finish` in `state()` give his styles and finishes.
 The display names are in `src/knightNames.js` (`HELMET_NAMES`, `GESTURE_NAMES`, and
 `STYLE_NAMES` / `FINISH_NAMES` from knightStyles.js and steel.js), apart from the 3D code.
+
+Since round 10: the Anvil offers `onLiving` (the *Living Weapon*, first), the weapons in
+`WEAPON_GROUPS`; `elementTip` is what else a new element does on the page (the site's
+"Also forges a new weapon."; Bonfire Live's recolors the weapon there, so it passes none).
+An option's `tip` is its tooltip and a heading's `note` says why its group is off.
+`optionsHtml()` draws a list (pure, tested), `isLong()` decides its two columns.
+
+## Menus and tooltips (round 10)
+
+- **The Menu button shows at every width** (Discoveries, How It's Made, Photo Mode and
+  Render Settings had no way in on a desktop but their keys, and Discoveries none at all).
+  The rest menu (`renderRestMenu` in `src/render.js`, `src/ui/restMenu.js`) has two
+  labelled groups (`role="group"`, `aria-labelledby` its heading): **Go To**, the screens
+  and the Résumé (hidden from 900 px up, where the header's tabs do it), and **Tools**:
+  Photo Mode `F` · How It’s Made `B` · Render Settings `P` · Discoveries (found / total) ·
+  Keyboard Shortcuts `?` · Sound, each saying what it does as its tooltip. Then Close.
+  Focus starts on the first item that shows, and the arrows skip what's hidden
+  (`listNav` in `src/ui/spatial.js`). A phone sees all of it without scrolling; on touch
+  screens the key chips and the keys line go. From 900 to 1099 px the header's Sound is
+  its icon alone (and its tooltip), so the tabs keep one line beside the Menu button.
+- **Keyboard Shortcuts (`?`)**: the shared overlay (`createKeysOverlay`), with the site's
+  keys from `src/ui/siteKeys.js` (Getting Around, Tools, Render Settings) and a filter.
+  The page's keys ignore Shift (only `?` takes it), the breakdown's ignore typing and any
+  open dialog (Esc closes the dialog, not the breakdown), and P is listened for from the
+  start.
+- **Tooltips** are the shared one (`src/ui/tooltip.js`): no `title=` is left on the site.
+  The Q / E keys, Sound, the pack's button, the menu's tools, the render settings' rows
+  and close button, the photo toolbar, the project viewer's arrows and thumbnails, and the
+  pack's options that need a word carry `data-tip` (beside a list's item, not over the one
+  before: `--tip-side` in `styles.css`). A skill's slot shows its name over its flavor
+  (`data-tip-title`, `data-tip`; the flavor is its description for screen readers, and a
+  tap opens it too, `data-tip-tap`); the old hand-placed skill tooltip is gone.
+- **Photo mode on a touch screen** says "Drag to orbit · Pinch to zoom · Tap to stoke",
+  and a pinch zooms (two fingers, at the wheel's own rate).
+- **Words** follow the round's casing: Title Case for labels, headings and options (the
+  menus, the pack's headings, the render rows, the breakdown's views and counts, the
+  discoveries' names), sentences for tooltips. The content's `ui` texts were recased
+  (`Photo Mode`, `How It’s Made`, `Render Settings`, `Reset Render Settings`, `Elements`,
+  `Flame Colors`, `Helmet`, `Style`, `Finish`…), and the pack's group headings can't be
+  left blank (`UI_HEADINGS` in `src/contentRules.js`).
+- **Tests:** `test/pack.test.mjs` (the groups, the Living Weapon in the Anvil, every weapon
+  in one group, headings read out, why an option is off), `test/renderMenu.test.mjs`
+  (groups, keys, the shared pixel sizes), `test/site.test.mjs` (the menu's groups, no
+  `title=`, the skills' tips, `withMeta` on the real and a Prettier-wrapped `index.html`),
+  `test/discoveries.test.mjs`; in the browser `e2e/site-menus.spec.mjs` and
+  `e2e/tips-site.spec.mjs` (every tip at 1280×720 and on a 390×844 touch screen: shown by
+  hover, focus or tap, 8 px inside the window, off its trigger).
