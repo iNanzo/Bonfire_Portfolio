@@ -2,8 +2,9 @@
    The Bonfire Painter: the stage full-bleed, a top bar, the scene's panel on the right
    (a bottom sheet on phones) and the library as a drawer on the left. The site's pixel
    primitives (styles.css) and Bonfire Live's fields (visualizer.css) underneath; accents
-   follow the flame being painted. Hover is an effect (a glow, a lift, the stage itself
-   auditioning what's hovered), never a label popping up.
+   follow the flame being painted. Hover on a choice is an effect (a glow, a lift, the
+   stage itself auditioning what's hovered), never a label popping up; the "?" hints, the
+   icon buttons and the preview buttons show the shared tooltip (src/ui/tooltip.js).
    ========================================================================== */
 
 .pnt {
@@ -20,9 +21,10 @@
 /* ---------- The top bar ----------
    One row where it fits, the name taking what the buttons leave (never under them): the
    full labels from 1700px; narrower, the beat's words go (its pips stay), then the app's
-   name and the preview's long labels; below 1240px, two rows (the scene and its commands,
-   then the preview and Play); phones, further down. It wraps rather than run off-screen
-   whatever the width or the text size. (main.js keeps --bar-h at its height.) */
+   name and the long labels (the preview's, Play's); below 1240px, two rows (the scene and
+   its commands, then the preview and Play); phones, further down, Tools its ▾ alone. It
+   wraps rather than run off-screen whatever the width or the text size. (main.js keeps
+   --bar-h at its height.) */
 .pnt-bar {
   position: fixed;
   inset: 0 0 auto;
@@ -38,7 +40,8 @@
   box-shadow: 0 1px 0 var(--line);
 }
 .pnt-home .brand-mark { height: 32px; }
-.pnt-title { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; overflow: hidden; }
+/* (Its base is small: the buttons claim their room first, then it takes what's left.) */
+.pnt-title { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 260px; overflow: hidden; }
 .pnt-app {
   flex: none;
   font-family: var(--font-pixel);
@@ -83,8 +86,8 @@
 }
 @media (max-width: 1499px) {
   .pnt-app { display: none; }
-  .pnt-preview .pnt-long { display: none; }
-  .pnt-preview .pnt-short { display: inline; }
+  .pnt-preview .pnt-long, .pnt-play .pnt-long { display: none; }
+  .pnt-preview .pnt-short, .pnt-play .pnt-short { display: inline; }
 }
 /* Two rows: the scene and its commands, then (after a break) the preview and Play. */
 @media (max-width: 1239px) {
@@ -94,6 +97,38 @@
   .pnt-bar .pnt-long { display: none; }
   .pnt-bar .pnt-short { display: inline; }
 }
+
+/* Tools ▾: what only a key reached (toolbar.js), a menu under its button. */
+.pnt-tools { position: relative; }
+.pnt-caret { margin-left: 4px; font-size: 0.75em; }
+/* (Hung from its button's right edge: on a phone the button is at the window's.) */
+.pnt-tools-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  min-width: 15rem;
+  padding: 4px 0;
+  background: var(--c-void);
+  box-shadow: 0 0 0 1px var(--accent), 0 8px 24px rgb(0 0 0 / 0.5);
+}
+.pnt-tools-menu[hidden] { display: none; }
+.pnt-tools-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 12px;
+  border: 0;
+  background: none;
+  font: 400 0.875rem/1.3 var(--font-pixel);
+  color: var(--c-bone);
+  text-align: left;
+  cursor: pointer;
+}
+.pnt-tools-item kbd { font-size: 0.6875rem; color: var(--text-dim); }
+.pnt-tools-item:hover, .pnt-tools-item:focus-visible { color: var(--accent-hi); background: color-mix(in srgb, var(--accent-lo) 30%, var(--c-void)); outline: none; }
 
 /* The beat: four pips (beat 1 outlined), the drop loop's place in its 16 bars. */
 .pnt-beat { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
@@ -462,6 +497,10 @@ body.pnt.panel-off .pack { right: var(--gutter); }
   .pnt-bar kbd { display: none; }
   .pnt-home .brand-mark { height: 26px; }
   .pnt-title { flex: 1 1 90px; }
+  /* (Tools as its ▾ alone: the first row keeps the name in sight.) */
+  .pnt-tools-word { display: none; }
+  .pnt-tools [data-cmd='tools'] { min-width: 32px; justify-content: center; }
+  .pnt-tools .pnt-caret { margin: 0; font-size: 1em; }
   .pnt-name { flex: 1 1 auto; min-width: 80px; }
   .pnt-dot { font-size: 0; gap: 0; }
   .pnt-bar .pix-btn { padding: 4px 7px; font-size: 0.8125rem; }

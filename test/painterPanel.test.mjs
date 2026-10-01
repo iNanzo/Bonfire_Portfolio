@@ -1,4 +1,4 @@
-// The Bonfire Painter's panel and its search (pure parts; the browser's are
+// The Bonfire Painter's panel, its search and the bar's tools (pure parts; the browser's are
 // e2e/painter.spec.mjs and e2e/tips-painter.spec.mjs):
 //   - its sections are the settings map's, in order, each row where its setting sits, every
 //     part of a scene the map binds for the Painter placed once;
@@ -10,14 +10,18 @@
 //     and Watercolor never both Always; a move list keeps one);
 //   - a shape change draws again only its own section, the others' markup the same;
 //   - the search finds every row by its label, words, choices and hint, and says how to
-//     bring back one the scene's shape leaves out ("Glow Strength: turn on Glow in Layers…").
+//     bring back one the scene's shape leaves out ("Glow Strength: turn on Glow in Layers…");
+//   - the keys overlay lists every key the Painter answers; the render menu reads values the
+//     way Bonfire Live does.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   panelMarkup, panelShape, sectionMarkup, sectionShapes, getPath, withPath, slotColors, bulkEdit, SECTIONS, LOCK_TIPS,
 } from '../src/painter/panel.js';
 import { PANEL_SECTIONS, LAYOUT, OWN, PAINTER_ITEM_HINTS, groupsOf, rowText, rowShown, shownRule, sectionRows, choices, sectionOfRow } from '../src/painter/layout.js';
 import { searchEntries, findInPanel } from '../src/painter/panelSearch.js';
+import { PAINTER_KEYS, TOOLS, toolsMarkup } from '../src/painter/toolbar.js';
 import { PAINTER_SECTIONS, SECTIONS as MAP_SECTIONS, SETTINGS, ITEM_HINTS, SYNONYMS, entriesFor } from '../src/settingsMap.js';
 import { buildMatcher } from '../src/ui/settingsSearch.js';
 import { titleCase } from '../src/text.js';
@@ -413,4 +417,37 @@ test('search: synonyms, typos, choices and keywords find their rows', () => {
   assert.ok(find('kaleidoscope').rows.has('looks'));
   assert.equal(find('').rows.size, 0, 'nothing for nothing');
   assert.equal(find('zzqx').rows.size + find('zzqx').hidden.length, 0);
+});
+
+// --- the bar ---------------------------------------------------------------------------------
+test('keys: the overlay lists every key the Painter answers (none changed); Tools reaches the key-only ones', () => {
+  const listed = PAINTER_KEYS.flatMap((g) => g.keys.map((r) => r.keys.join('+')));
+  for (const k of ['Ctrl+S', 'Ctrl+Z', 'Ctrl+Shift+Z', 'Ctrl+Y', 'H', 'L', 'I', 'F', 'C', 'Space', 'D', 'P', '1–8', '0', 'Arrow Keys', 'Shift+Arrow Keys', '+', '-', 'Q', 'E', '[', ']', '?', '/']) {
+    assert.ok(listed.includes(k), `${k} is listed`);
+  }
+  for (const g of PAINTER_KEYS) assert.equal(titleCase(g.title), g.title);
+  // (The page answers them: main.js's keys, the camera's.)
+  const main = readFileSync(new URL('../src/painter/main.js', import.meta.url), 'utf8');
+  for (const k of ['h', 'l', 'i', 'f', 'c', 'd']) assert.match(main, new RegExp(`k === '${k}'`), k);
+  assert.match(main, /isHelpKey\(e\)/);
+  assert.match(main, /e\.key === '\/'/);
+  // Tools: Render Settings P, Pack I, Capture C, Full Screen F, Keyboard Shortcuts ?.
+  assert.deepEqual(TOOLS.map((t) => `${t.label} ${t.key}`), ['Render Settings P', 'Pack I', 'Capture C', 'Full Screen F', 'Keyboard Shortcuts ?']);
+  const html = toolsMarkup();
+  assert.match(html, /data-cmd="tools" aria-label="Tools" aria-haspopup="menu" aria-expanded="false"/);
+  assert.equal([...html.matchAll(/role="menuitem"/g)].length, TOOLS.length);
+  assert.match(html, /aria-keyshortcuts="Shift\+\?"/);
+  assert.doesNotMatch(html, /\stitle="/);
+});
+
+test('the bar: icon and preview buttons carry the shared tooltip; the render menu reads values as Bonfire Live does', () => {
+  const main = readFileSync(new URL('../src/painter/main.js', import.meta.url), 'utf8');
+  for (const cmd of ['undo', 'redo', 'banner-close', 'play']) assert.match(main, new RegExp(`data-cmd="${cmd}"[^>]*aria-label="[^"]+"[^>]*data-tip="[^"]{12,160}"`), cmd);
+  assert.match(main, /data-preview="\$\{id\}"[^>]*aria-label="\$\{esc\(name\)\}"[^>]*data-tip="\$\{esc\(hint\)\}"/);
+  assert.ok(!/\stitle="/.test(main), 'no native title tooltips');
+  // Render Settings, its reset row, the values in renderText's words (no lowercase off).
+  assert.match(main, /title: 'Render Settings'/);
+  assert.match(main, /label: 'Reset Render Settings'/);
+  assert.match(main, /renderText\(r, id\)/);
+  assert.ok(!/SWITCH_TEXT|'in the mix'|xray: r\.xray \? XRAY_VIEWS\[r\.xray\] : 'off'/.test(main), 'no lowercase switch words');
 });

@@ -30,7 +30,9 @@
 //   keys      H the panel, L the library, P the render menu (bound to the scene), I the
 //             pack (it paints into the scene), F full screen, Space the beat, D a drop,
 //             C a picture of the stage, and the camera's (cameraRig.js); / searches the
-//             panel.
+//             panel and ? lists them all (toolbar.js PAINTER_KEYS). The Tools menu in the
+//             bar reaches the ones only a key did before (Render Settings, Pack, Capture,
+//             Full Screen, the keys).
 // Reduced motion: the Still preview to start with.
 import '../styles.css';
 import '../visualizer/visualizer.css';
@@ -41,7 +43,9 @@ import { scenes as builtInScenes, site, startingEquipment, ui, weapons } from '.
 import { elements, elementOr } from '../elements.js';
 import { installDitherPatterns } from '../ui/dither.js';
 import { installTooltips } from '../ui/tooltip.js';
+import { createKeysOverlay, isHelpKey } from '../ui/keysOverlay.js';
 import { searchBoxMarkup } from '../ui/settingsSearch.js';
+import { typing } from '../ui/shell.js';
 import { applyFlame, setAccentRamp } from '../ui/theme.js';
 import { esc } from '../html.js';
 import { logoMark } from '../ui/logo.js';
@@ -53,13 +57,14 @@ import { SHOTS } from '../visualizer/camera.js';
 import { createAnalyser } from '../visualizer/analyser.js';
 import { createDemo } from '../visualizer/demo.js';
 import { densityCounts } from '../visualizer/density.js';
-import { FLAME_FPS, FOGS, PALETTES, PIXEL_SIZES, RENDER_STEPS, XRAY_VIEWS } from '../visualizer/render.js';
+import { FLAME_FPS, FOGS, PALETTES, PIXEL_SIZES, RENDER_STEPS, XRAY_VIEWS, renderText } from '../visualizer/render.js';
 import { LAYER_DETAILS, LAYERS, LOOK_PARAMS } from '../visualizer/looks.js';
 import { defaultScene, decodeSceneHash, normalizeScene, parseRef, sceneRef, uniqueSceneId } from '../scenes.js';
 import { createSceneStore } from '../sceneStore.js';
 import { harmoniousFlame, harmoniousScene, hexToOklch, suggestFlames, suggestScenes, vividScene, wildFlame, wildScene } from '../paletteGen.js';
 import { bindPanel, flameChips, getPath, sceneryChips, withPath } from './panel.js';
 import { createPanelSearch } from './panelSearch.js';
+import { bindTools, PAINTER_KEYS, toolsMarkup } from './toolbar.js';
 import { createHistory } from './history.js';
 import { createBeatFeed, silentFrame } from './beat.js';
 import { createCameraRig } from './cameraRig.js';
@@ -89,7 +94,7 @@ document.documentElement.classList.add('js');
 applyCssPalette();
 applyFlame(startingEquipment.flame);
 installDitherPatterns(base);
-installTooltips();
+const tips = installTooltips();
 
 // --- The scene being painted --------------------------------------------------------------
 const store = createSceneStore({ voidHex });
@@ -211,15 +216,16 @@ app.innerHTML = `
     <div class="pnt-bar-group">
       <button type="button" class="pix-btn" data-cmd="library" aria-keyshortcuts="L"><kbd>L</kbd>Library</button>
       <button type="button" class="pix-btn" data-cmd="save" aria-keyshortcuts="Control+S">Save</button>
-      <button type="button" class="pix-btn pnt-icon" data-cmd="undo" aria-label="Undo (Ctrl+Z)" aria-keyshortcuts="Control+Z">↶</button>
-      <button type="button" class="pix-btn pnt-icon" data-cmd="redo" aria-label="Redo (Ctrl+Shift+Z)" aria-keyshortcuts="Control+Shift+Z">↷</button>
+      <button type="button" class="pix-btn pnt-icon" data-cmd="undo" aria-label="Undo (Ctrl+Z)" aria-keyshortcuts="Control+Z" data-tip="Undo the last change (Ctrl+Z)">↶</button>
+      <button type="button" class="pix-btn pnt-icon" data-cmd="redo" aria-label="Redo (Ctrl+Shift+Z)" aria-keyshortcuts="Control+Shift+Z Control+Y" data-tip="Redo what was undone (Ctrl+Shift+Z or Ctrl+Y)">↷</button>
+      ${toolsMarkup()}
     </div>
     <div class="pnt-bar-group pnt-preview" role="group" aria-label="Preview">
-      ${PREVIEWS.map(([id, name, short, hint]) => `<button type="button" class="pix-btn" data-preview="${id}" aria-pressed="false" aria-label="${esc(name)}" aria-describedby="pnt-pv-${id}">${label(name, short)}</button><span class="visually-hidden" id="pnt-pv-${id}">${esc(hint)}</span>`).join('')}
+      ${PREVIEWS.map(([id, name, short, hint]) => `<button type="button" class="pix-btn" data-preview="${id}" aria-pressed="false" aria-label="${esc(name)}" aria-describedby="pnt-pv-${id}" data-tip="${esc(hint)}" data-tip-side="bottom">${label(name, short)}</button><span class="visually-hidden" id="pnt-pv-${id}">${esc(hint)}</span>`).join('')}
       <span class="pnt-beat" aria-hidden="true" data-beat><i></i><i></i><i></i><i></i><b data-beat-label></b></span>
     </div>
     <div class="pnt-bar-group">
-      <button type="button" class="pix-btn pnt-play" data-cmd="play" aria-label="Play in Bonfire Live (opens it)">${label('Play in Bonfire Live ↗', 'Play ↗')}</button>
+      <button type="button" class="pix-btn pnt-play" data-cmd="play" aria-label="Play in Bonfire Live (opens it)" data-tip="Plays this scene in Bonfire Live: an open Bonfire Live tab at once, else a new one. Changes are saved first." data-tip-side="bottom">${label('Play in Bonfire Live ↗', 'Play ↗')}</button>
       <button type="button" class="pix-btn" data-cmd="panel" aria-keyshortcuts="H" aria-controls="pnt-panel" aria-expanded="true"><kbd>H</kbd><span data-panel-label>Hide Panel</span></button>
     </div>
   </header>
@@ -228,7 +234,7 @@ app.innerHTML = `
       <p>Opened from the admin. Save it here, or copy its JSON back into the admin’s Scenes page (Import From Painter).</p>
       <button type="button" class="pix-btn" data-cmd="banner-save">Save to My Scenes</button>
       <button type="button" class="pix-btn" data-cmd="banner-copy">Copy JSON for the Admin</button>
-      <button type="button" class="pix-btn pnt-icon" data-cmd="banner-close" aria-label="Close">✕</button>
+      <button type="button" class="pix-btn pnt-icon" data-cmd="banner-close" aria-label="Close" data-tip="Close this note (the scene stays as it is)">✕</button>
     </div>
     <div class="pnt-banner" data-aside hidden>
       <p data-aside-text></p>
@@ -793,22 +799,15 @@ const STEPS = {
   pixelSize: PIXEL_SIZES, palette: Object.keys(PALETTES), dither: RENDER_STEPS.dither, ditherMatrix: [4, 8],
   outlines: ['on', 'mix', 'off'], fog: Object.keys(FOGS), flameFps: FLAME_FPS, xray: [null, ...Object.keys(XRAY_VIEWS)],
 };
-const SWITCH_TEXT = { on: 'always', mix: 'in the mix', off: 'off' };
+/** The scene's render as the menu shows it: Bonfire Live's words (render.js renderText). */
 function renderValues() {
   const r = scene.render;
-  return {
-    pixelSize: `${r.pixelSize} px`,
-    palette: Array.isArray(r.palette) ? `${r.palette.length} of the scene’s colors` : PALETTES[r.palette],
-    dither: r.dither ? r.dither.toFixed(2) : 'off',
-    ditherMatrix: `${r.ditherMatrix}×${r.ditherMatrix}`,
-    outlines: SWITCH_TEXT[r.outlines],
-    fog: FOGS[r.fog],
-    flameFps: `${r.flameFps} fps`,
-    xray: r.xray ? XRAY_VIEWS[r.xray] : 'off',
-  };
+  const values = Object.fromEntries(RENDER_ROWS.map(({ id }) => [id, renderText(r, id)]));
+  values.xray = XRAY_VIEWS[r.xray] ?? 'Off'; // (a view held for the scene, not a switch)
+  return values;
 }
 const renderMenu = createRenderMenu({
-  title: 'Render',
+  title: 'Render Settings',
   rows: RENDER_ROWS,
   className: 'debug-hud pnt-render-menu',
   read: renderValues,
@@ -820,7 +819,7 @@ const renderMenu = createRenderMenu({
     edit(`render.${id}`, steps[(((i + dir) % steps.length) + steps.length) % steps.length], { key: null });
     return renderValues();
   },
-  reset: { key: '0', label: 'Reset These', hint: 'a new scene’s', run: () => edit('render', defaultScene().render, { key: null }) },
+  reset: { key: '0', label: 'Reset Render Settings', hint: 'As a New Scene', run: () => edit('render', defaultScene().render, { key: null }) },
 });
 app.append(renderMenu.el);
 
@@ -870,12 +869,23 @@ function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen?.();
   else document.documentElement.requestFullscreen?.().catch(() => {});
 }
+const keysOverlay = createKeysOverlay({ title: 'Keyboard Shortcuts', groups: PAINTER_KEYS });
+/** The Tools menu's items (toolbar.js TOOLS). */
+const tool = {
+  render: () => renderMenu.open({ focus: true }),
+  pack: () => pack.toggle(),
+  capture: () => capture(),
+  fullscreen: () => toggleFullscreen(),
+  keys: () => keysOverlay.open(),
+};
+const tools = bindTools(q('[data-tools]'), (cmd) => tool[cmd]?.());
 /** `/`: the panel's search (the panel shown first if it's hidden). */
 function focusSearch() {
   if (!panelShown) togglePanel(true);
   search.focus();
 }
 const commands = {
+  tools: () => tools.toggle(),
   library: () => library.toggle(),
   save: () => save(),
   undo, redo,
@@ -899,11 +909,10 @@ document.addEventListener('click', (e) => {
   const pv = /** @type {HTMLElement} */ (t.closest('[data-preview]'));
   if (pv) setPreview(pv.dataset.preview);
 });
-const typing = (el) => el?.closest?.('input:not([type="range"]):not([type="checkbox"]):not([type="color"]), select, textarea, [contenteditable]');
 /** Where Space is the page's (the beat), not a focused control's own (a button presses). */
 const spaceIsOurs = (el) => el === document.body || el === document.documentElement || stage.contains(el);
 window.addEventListener('keydown', (e) => {
-  if (e.defaultPrevented) return; // (a drawer or a menu took it)
+  if (e.defaultPrevented || keysOverlay.el.open) return; // (a drawer, a menu or the keys' list took it)
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); save(); return; }
   if (typing(e.target)) return;
@@ -911,6 +920,10 @@ window.addEventListener('keydown', (e) => {
   if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
   if (mod || e.altKey) return;
   const k = e.key.toLowerCase();
+  // (A key the page answers, off the panel: what it opens comes up clear of a tip left
+  // showing by the bar's focus. A panel field's keys move it, and keep its tip.)
+  if (!panelEl.contains(/** @type {Node} */ (e.target))) tips.hide();
+  if (isHelpKey(e)) { e.preventDefault(); tools.close(); keysOverlay.open(); return; }
   // The library open: L closes it (Esc is its own), / filters it; the stage's keys wait.
   if (library.isOpen) {
     if (k === 'l') { e.preventDefault(); library.close(); }
