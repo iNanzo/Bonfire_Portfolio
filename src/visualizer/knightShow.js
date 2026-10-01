@@ -64,7 +64,8 @@
 // Moves are functions of the beat (knightPose.js): the director hands the knights the beat
 // position every frame, and they only dance while the tempo holds. Reduced motion: they sit.
 import { modeOf } from './looks.js';
-import { sideArcs, ringPlaces, slotPlaces, restPlaces, FRONT } from '../bonfire/knightPlaces.js';
+import { sideArcs, ringPlaces, slotPlaces, restPlaces, facingYaw, FRONT } from '../bonfire/knightPlaces.js';
+import { createFits } from '../bonfire/colliders.js';
 import { FINISHES } from '../bonfire/steel.js';
 import { DEFAULT_STYLE, STYLES, STYLE_KEYS, STYLE_NAMES } from '../bonfire/knightStyles.js';
 import { HELMET_NAMES } from '../knightNames.js';
@@ -199,6 +200,8 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
     want: i === 0 ? 'sit' : 'away', move: 'nod', place: null, facing: 'front', offset: 0, seed: i * 7 + 3, energy: 0.7,
   }));
   let inited = false;
+  // (Which moves fit at which places, when the scene's knights don't say: colliders.js.)
+  const ownFits = createFits();
   let started = false;     // the music has started (the start screen only has the resting knight)
   let inn = true;          // the knights are by the fire
   let cast = 1;            // how many, while they are
@@ -523,12 +526,14 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
         : formation === 'solo' ? (joining || moves !== 'keep' ? pickR(['front', 'front', 'fire']) : k.facing) : facing;
       const place = places[i];
       // (A move too wide for his place, a lantern or a pew within its reach, gives way to one
-      // of the pool's that fits there, or he turns to the fire for one: fire.knights.fits.)
-      const fits = (mv, way) => kn.fits(mv, place, way, scenery ?? undefined);
-      if (kn.fits && move && !fits(move, f)) {
+      // of the pool's that fits there, or he turns to the fire for one: fire.knights.fits, or
+      // the same question put to colliders.js here where the scene doesn't pass it on. Which
+      // one by his seed: nothing else the show rolls changes for it.)
+      const fits = (mv, way) => (kn.fits ? kn.fits(mv, place, way, scenery ?? undefined) : !scenery || ownFits.fits(scenery, mv, place.x, place.z, facingYaw(place.x, place.z, way)));
+      if (move && !fits(move, f)) {
         for (const way of f === 'fire' ? ['fire'] : [f, 'fire']) {
           const ok = pool.filter((mv) => fits(mv, way));
-          if (ok.length) { move = pickR(ok); f = way; break; }
+          if (ok.length) { move = ok[k.seed % ok.length]; f = way; break; }
         }
       }
       const offset = formation === 'canon' ? i * (MOVE_CYCLE[move] >= 4 ? 1 : 0.5) : 0;

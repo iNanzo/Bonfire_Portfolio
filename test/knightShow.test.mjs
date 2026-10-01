@@ -16,6 +16,9 @@ import { hidesFire, SHOTS, KNIGHT_SHOTS } from '../src/visualizer/camera.js';
 import { MOVES, MOVE_INFO, GESTURES } from '../src/bonfire/knightPose.js';
 import { HELMETS as ENGINE_HELMETS } from '../src/bonfire/knights.js';
 import { DANCE_RING, danceSlots, SCENERIES } from '../src/bonfire/scenery.js';
+import { facingYaw } from '../src/bonfire/knightPlaces.js';
+import { roomAround, reachFits } from '../src/bonfire/colliders.js';
+import { readFile } from 'node:fs/promises';
 import { PERIOD, showFor, play, dancesOf, ins, FRAME, directorFor } from './lib/fakeScene.mjs';
 
 test('the moves, helmets and cycles are the engine’s', () => {
@@ -865,6 +868,39 @@ test('a move too wide for a dancer’s place (fire.knights.fits) gives way to on
     }
   }
   assert.ok(danced > 40, `they danced (${danced})`);
+});
+
+test('without fire.knights.fits (a scene that doesn’t pass it on), the show asks the scenery’s shapes itself: every move danced has room at its place', () => {
+  let danced = 0, swapped = 0;
+  for (const scenery of ['cult', 'shrine', 'cathedral']) {
+    for (const formation of ['line', 'solo', 'ring', 'canon']) {
+      for (let seed = 1; seed <= 4; seed++) {
+        const { show, kn } = showFor({ knights: 'on', knightCount: 4, knightDance: 'on', knightFormation: formation, knightSummon: 'on' }, { seed: seed * 5, scenery });
+        assert.equal(kn.fits, undefined, 'the stand-in scene has no fits()');
+        show.start(kn, { scenery });
+        const mark = kn.log.length;
+        show.drop(kn, 'big');
+        play(show, kn, 16, { budget: 1 });
+        for (const e of dancesOf(kn.log, mark)) {
+          const { move, position: at, facing } = e[2];
+          if (!at) continue;
+          danced++;
+          const room = roomAround(scenery, at.x, at.z, facingYaw(at.x, at.z, facing));
+          assert.ok(reachFits(move, room), `${scenery} ${formation}: ${move} facing the ${facing} at (${at.x.toFixed(2)}, ${at.z.toFixed(2)}) has room`);
+          if (!reachFits('spin', room)) swapped++;
+        }
+      }
+    }
+  }
+  assert.ok(danced > 100, `they danced (${danced})`);
+  assert.ok(swapped > 0, `some places are too tight for a spin (${swapped}): the filter had work to do`);
+});
+
+test('scene.js passes the engine’s fits() on in its knights API (the show’s move filter asks it)', { todo: 'scene.js line added at merge' }, async () => {
+  const src = await readFile(new URL('../src/bonfire/scene.js', import.meta.url), 'utf8');
+  const api = src.slice(src.indexOf('slots: (name) => knights?.slots('), src.indexOf('// --- Debug HUD'));
+  const line = 'fits: (move, at, facing, name) => knights?.fits(move, at, facing, name ?? sceneryKey) ?? true,';
+  assert.ok(api.includes(line), `scene.js's knights API has \`${line}\` after \`slots\``);
 });
 
 test('the Default Dance is one of the groove’s moves (8 beats a cycle)', () => {

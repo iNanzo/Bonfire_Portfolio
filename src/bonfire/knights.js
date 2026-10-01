@@ -74,8 +74,8 @@ import {
   BONES, BONE_NODES, PARENT, DEFAULT_REST, POSE, POSE_SIZE, measureRig, measurePlates, createSolver, newPose, lerpPose, seatedPose, standingPose, seatFeet, feetAt,
   idle, look, attend, flinch, shield, hop, rise, walk, gesture, dance, RISE_TIME, GESTURE_TIME, DANCE_SEATED_TIME, GESTURES, MOVES, CHEERS, SEAT_POSES,
 } from './knightPose.js';
-import { SEATS, danceSlots, ringOf, restPlaces, planWalk, FIRE_AT } from './knightPlaces.js';
-import { collidersNear, distanceTo, outOf, roomAround, reachFits } from './colliders.js';
+import { SEATS, danceSlots, ringOf, restPlaces, planWalk, facingYaw, FIRE_AT } from './knightPlaces.js';
+import { collidersNear, distanceTo, outOf, createFits } from './colliders.js';
 import { clamp01, smooth } from '../math.js';
 import { weaponSilhouette } from './forgeFx.js';
 
@@ -856,7 +856,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   let headroom = true;
   let beat = { pos: 0, period: 0.5, at: -1 };
   let simT = 0;
-  let roomMemo = null; // (the last place fits() measured the room round)
+  const fitsAt = createFits(); // (the room round each place fits() was asked about, until a new scenery)
 
   // --- placement --------------------------------------------------------------------------------
   const heightAt = (x, z) => terrain?.height(x, z) ?? 0;
@@ -2292,13 +2292,8 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const s = slot == null ? slots[slotOf(i)] : slots[(slot - 1 + slots.length) % slots.length];
     return { x: s.x, z: s.z };
   }
-  function facingFor(x, z, facing) {
-    if (typeof facing === 'number') return facing;
-    if (facing === 'fire') return faceFire(x, z);
-    if (facing === 'out') return faceFire(x, z) + Math.PI;
-    // 'front': toward where the cameras usually are, turned a little toward the fire.
-    return Math.atan2(0 - x, 5 - z) * 0.75 + faceFire(x, z) * 0.25;
-  }
+  /** Which way to face at (x, z): a yaw, or 'fire', 'out' or 'front' (knightPlaces.js facingYaw). */
+  function facingFor(x, z, facing) { return facingYaw(x, z, facing); }
   function danceFn(i, opts = {}) {
     if (!valid(i) || reducedMotion) return false;
     const k = knights[i];
@@ -2410,6 +2405,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   function setScenery(name, heights) {
     sceneryName = name;
     terrain = heights;
+    fitsAt.clear();
     let left = false;
     for (const k of knights) {
       if (leaving(k)) { vanish(k); left = true; }
@@ -2576,12 +2572,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
      * MOVE_REACH) clear of the scenery's shapes there, with 5 cm to spare. The show leaves out
      * one that doesn't.
      */
-    fits(move, at, facing = 'fire', name = sceneryName) {
-      const yaw = facingFor(at.x, at.z, facing);
-      const key = `${name} ${at.x} ${at.z} ${yaw}`;
-      if (roomMemo?.key !== key) roomMemo = { key, room: roomAround(name, at.x, at.z, yaw) };
-      return reachFits(move, roomMemo.room);
-    },
+    fits: (move, at, facing = 'fire', name = sceneryName) => fitsAt.fits(name, move, at.x, at.z, facingFor(at.x, at.z, facing)),
     /** A beat (0..1): the armor glints, a step up the ramp for a moment. */
     beat(s = 1) { if (!reducedMotion) armor.uniforms.uGlint.value = Math.max(armor.uniforms.uGlint.value, 0.25 * s); },
     set hovered(i) { hovered = valid(i) && knights[i].present ? i : -1; },

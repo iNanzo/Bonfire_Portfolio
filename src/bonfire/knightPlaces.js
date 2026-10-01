@@ -120,6 +120,19 @@ export function danceSlots(name) {
   const r = DANCE_RING.radius;
   return SLOT_BEARINGS.filter((b, i) => i < 4 || name !== 'cult').map((b) => ({ x: cx + Math.sin(b * RAD) * r, z: cz + Math.cos(b * RAD) * r, bearing: b }));
 }
+/**
+ * Which way someone standing at (x, z) faces (a yaw: 0 toward +z, the cameras): `facing` a
+ * yaw as it is, 'fire' toward the fire's middle, 'out' away from it, or 'front' toward where
+ * the cameras usually are, turned a little toward the fire. (knights.js turns dancers by it;
+ * the show asks colliders.js about a dance move's room facing that way.)
+ */
+export function facingYaw(x, z, facing) {
+  if (typeof facing === 'number') return facing;
+  const fire = Math.atan2(FIRE_AT.x - x, FIRE_AT.z - z);
+  if (facing === 'fire') return fire;
+  if (facing === 'out') return fire + Math.PI;
+  return Math.atan2(0 - x, 5 - z) * 0.75 + fire * 0.25;
+}
 /** The ring as the knights hand it out (knights.js slots()). */
 export const ringOf = (name) => ({ center: { x: DANCE_RING.center[0], z: DANCE_RING.center[1] }, radius: DANCE_RING.radius, free: DANCE_RING.free(name), slots: danceSlots(name) });
 

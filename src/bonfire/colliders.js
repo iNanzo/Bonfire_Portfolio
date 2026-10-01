@@ -508,3 +508,24 @@ export function roomAround(name, x, z, yaw, most = 1.2) {
 }
 /** Whether a move's reach (MOVE_REACH) fits in a place's room (roomAround), with `spare` (m) to spare. */
 export const reachFits = (move, room, spare = 0.05) => (MOVE_REACH[move] ?? []).every((band, b) => band.every((r, w) => !r || r <= room[b][w] - spare));
+/**
+ * Whether dance moves fit at places, the room round each place kept (roomAround casts a few
+ * hundred rays; a show's places are a handful per scenery): fits(scenery, move, x, z, yaw).
+ * clear() forgets them (a new scenery); past `most` places it starts over.
+ */
+export function createFits(most = 64) {
+  const rooms = new Map();
+  return {
+    fits(name, move, x, z, yaw) {
+      const key = `${name} ${x} ${z} ${yaw}`;
+      let room = rooms.get(key);
+      if (!room) {
+        if (rooms.size >= most) rooms.clear();
+        room = roomAround(name, x, z, yaw);
+        rooms.set(key, room);
+      }
+      return reachFits(move, room);
+    },
+    clear() { rooms.clear(); },
+  };
+}
