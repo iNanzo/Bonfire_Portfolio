@@ -1033,17 +1033,24 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   /**
    * The room he has for his arms now: at home (his seat, or where he sat down on the ground)
    * the room there, seated or standing up in front of it (the less of the two while he gets
-   * up, sits down or dances the site's dance up from it); elsewhere all of it (a dancer's
-   * place is picked with room for its moves: fits()). keepClear() catches the rest.
+   * up or sits down; the site's dance up from his seat has that on its way up and down, and
+   * the room up there while he's up: danceUp); elsewhere all of it (a dancer's place is picked
+   * with room for its moves: fits()). keepClear() catches the rest.
    */
   function roomNow(k) {
     const h = k.home;
     if (!h?.room || Math.hypot(k.group.position.x - h.x, k.group.position.z - h.z) > 0.05) return FREE;
     const a = k.act?.kind;
     const up = h.roomUp ?? h.room;
-    if (k.mode === 'sit' && !a && !(k.gestureName === 'dance' && !k.danceInPlace)) return h.room;
+    const less = (h.roomLess ??= [Math.min(h.room[0], up[0]), Math.min(h.room[1], up[1])]);
+    if (k.mode === 'sit' && !a) {
+      if (k.gestureName !== 'dance' || k.danceInPlace) return h.room;
+      const u = danceUp(k), r = (k.roomNow ??= [0, 0]);
+      for (let j = 0; j < 2; j++) r[j] = less[j] + (up[j] - less[j]) * u;
+      return r;
+    }
     if (k.mode === 'stand' && !a) return up;
-    return (h.roomLess ??= [Math.min(h.room[0], up[0]), Math.min(h.room[1], up[1])]);
+    return less;
   }
   /**
    * How far up from his seat knight k is in the site's dance (0..1): seated at its ends,

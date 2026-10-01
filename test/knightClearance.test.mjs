@@ -476,6 +476,44 @@ test('[slow] getting up, sitting down and the site’s dance at every seat move 
   assert.deepEqual(bad, [], `more than 1.5× round 9's steps`);
 });
 
+// Round 9's site's dance (no scenery in its way): how far each hand travelled (m), [left,
+// right], from 2 s in to 2 s before the end, where he dances on his feet. The same at every seat.
+const ROUND9_DANCE_PATH = [4.74, 4.8];
+test('[slow] up from his seat for the site’s dance, an arm with all the room it wants up there swings as far as round 9’s (90 %)', async () => {
+  const env = await realKnights();
+  const { k } = env;
+  const n = k.knights[0];
+  const hands = ['handL', 'handR'].map((b) => n.bones.find((x) => x.name === b));
+  const bad = [];
+  let open = 0;
+  for (const name of NAMES) {
+    k.setSeatPose('resting');
+    k.setScenery(name, await terrainOf(name));
+    k.summon(0, { instant: true });
+    k.update(0.5);
+    k.gesture('dance', { index: 0 });
+    const path = [0, 0];
+    let prev = null;
+    for (let t = 0; t < GESTURE_TIME.dance; t += 1 / 12) {
+      k.update(1 / 12 + 1e-7);
+      if (t < 2 || t > GESTURE_TIME.dance - 2) continue;
+      n.group.updateMatrixWorld(true);
+      const now = hands.map((b) => b.getWorldPosition(new THREE.Vector3()));
+      if (prev) now.forEach((v, i) => { path[i] += v.distanceTo(prev[i]); });
+      prev = now;
+    }
+    // (Where the scenery leaves an arm less room standing there, the dance keeps it in: keepClear's.)
+    for (const i of [0, 1]) {
+      if (n.home.roomUp[i] < 1) continue;
+      open++;
+      if (path[i] < 0.9 * ROUND9_DANCE_PATH[i]) bad.push(`${name}: his ${hands[i].name} ${(path[i] * 100).toFixed(0)} cm (round 9: ${(ROUND9_DANCE_PATH[i] * 100).toFixed(0)})`);
+    }
+    k.dismiss(0, { instant: true });
+  }
+  assert.ok(open >= 5, `${open} arms with all the room they want`);
+  assert.deepEqual(bad, [], 'tucked in where there is room');
+});
+
 test('[slow] stood up in front of his seat, and all through the site’s dance, he stays left of the planted sword on the home view (1920 and 1280 wide)', async () => {
   const env = await realKnights();
   const { k, corners } = env;
