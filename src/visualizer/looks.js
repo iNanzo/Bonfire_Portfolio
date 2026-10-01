@@ -71,6 +71,7 @@
 // already clamped to its still parts (scenePlayer.js: Ember, no layer that moves), which show
 // at their painted strength without a pulse; the spotlight doesn't breathe.
 import { approach, clamp, pick, shuffle } from '../math.js';
+import { modeOf } from '../modes.js';
 
 export const LOOKS = {
   ember: 'Ember', glitch: 'Glitch', echo: 'Echo', ripple: 'Ripple', kaleido: 'Kaleido', ink: 'Ink',
@@ -81,11 +82,9 @@ export const DROP_FX = {
   cycle: 'Color Cycle', split: 'RGB Burst', crunch: 'Crunch', iris: 'Iris Snap', slam: 'Letterbox Slam', ink: 'Ink Flash',
   xray: 'X-Ray',
 };
-/** Every effect's switch: never, in the mix (it comes and goes), always. */
-export const MODES = [['off', 'Off'], ['mix', 'In the mix'], ['on', 'Always']];
-const MODE_IDS = new Set(MODES.map(([id]) => id));
-/** A saved switch as a mode. (Switches were on/off before; `yes` is what `true` meant.) */
-export const modeOf = (v, yes = 'on') => (v === true ? yes : MODE_IDS.has(v) ? v : 'off');
+// Every effect's switch (Off / In the Mix / Always) and a saved one read as a mode: shared
+// with the settings fields, so they live in src/modes.js.
+export { MODES, modeOf } from '../modes.js';
 /** Layers over any look, each with its own switch (settings keys). */
 export const LAYERS = {
   scanlines: 'Scanlines', mirror: 'Mirror', blend: 'Blend Modes', ghost: 'Ghosting', blur: 'Motion Blur', glow: 'Glow',

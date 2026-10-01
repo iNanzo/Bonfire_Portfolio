@@ -39,6 +39,7 @@
     "src/render.js",
     "src/seo.js",
     "src/seoPages.js",
+    "src/modes.js",
     "src/text.js",
     "src/ui/pixelArt.js",
     "src/ui/logo.js",
