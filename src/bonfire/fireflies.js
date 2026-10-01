@@ -256,9 +256,10 @@ export function createFireflies(template, {
   const qTarget = new THREE.Quaternion();
   let step = -1;
 
+  /** Where `p` (world) is on a w×h screen: `screen` set to (x px, y px, depth), and returned (no new array per fly). */
   function toScreen(p, camera, w, h) {
     screen.copy(p).project(camera);
-    return [(screen.x + 1) / 2 * w, (1 - screen.y) / 2 * h, screen.z];
+    return screen.set((screen.x + 1) / 2 * w, (1 - screen.y) / 2 * h, screen.z);
   }
 
   const grounded = (f) => f.mode !== 'fly';
@@ -396,7 +397,7 @@ export function createFireflies(template, {
       // --- hover: light up (even past the limit), flicker, and shy away
       f.hovered = false;
       if (cursor.present) {
-        const [sx, sy, sz] = toScreen(f.pos, camera, cursor.width, cursor.height);
+        const { x: sx, y: sy, z: sz } = toScreen(f.pos, camera, cursor.width, cursor.height);
         const ddx = sx - cursor.bx, ddy = sy - cursor.by;
         if (sz < 1 && ddx * ddx + ddy * ddy < 36 * 36) {
           f.hovered = true;
@@ -776,7 +777,7 @@ export function createFireflies(template, {
   /** Click: every firefly flashes; ones near the click flash hardest and dart off. */
   function flash(x, y, camera, width, height) {
     for (const f of flies) {
-      const [sx, sy] = toScreen(f.pos, camera, width, height);
+      const { x: sx, y: sy } = toScreen(f.pos, camera, width, height);
       const near = Math.hypot(sx - x, sy - y) < 160;
       f.flash = 0.5;
       f.flashPower = near ? 1.6 : 1.1;

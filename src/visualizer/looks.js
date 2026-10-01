@@ -539,7 +539,7 @@ export function createLooks(g, { reducedMotion = false } = {}) {
       invertFor -= dt;
       cycleFor -= dt;
       spinFor -= dt;
-      for (const k of Object.keys(fx)) fx[k] = Math.max(0, fx[k] - dt);
+      for (const k in fx) fx[k] = Math.max(0, fx[k] - dt); // (in place: no list of keys every frame)
       const env = (k) => fx[k] / FX_TIME[k]; // 1 → 0 through a drop hit
       const on = amt > 0 ? 1 : 0;
       const a = Math.min(1, amt);
@@ -576,9 +576,17 @@ export function createLooks(g, { reducedMotion = false } = {}) {
       g.feedRot = (has('vortex') ? lookParam('turn') * (0.02 + 0.05 * kaleSpin) : 0) + lookParam('turn') * 0.07 * env('spiral');
       g.cycle = !cycles ? 0 : spinFor > 0 ? Math.floor(clock * 16) % 4 : cycleFor > 0 ? cycleStep : 0;
 
-      // Ripple: rings out of the fire (radius as a fraction of the screen height).
-      ripples = ripples.filter((r) => (r.t += dt) < 0.7);
-      const front = ripples.filter((r) => r.t >= 0).at(-1);
+      // Ripple: rings out of the fire (radius as a fraction of the screen height). The ones
+      // still going are kept in place, and the front is the latest that has begun.
+      let front = null;
+      let kept = 0;
+      for (let i = 0; i < ripples.length; i++) {
+        const r = ripples[i];
+        if ((r.t += dt) >= 0.7) continue;
+        ripples[kept++] = r;
+        if (r.t >= 0) front = r;
+      }
+      ripples.length = kept;
       g.rippleR = front ? front.t * 1.6 : 0;
       g.rippleAmp = front && amt > 0 ? amt * 7 * front.s * (1 - front.t / 0.7) : 0;
 

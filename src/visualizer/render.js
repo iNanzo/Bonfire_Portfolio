@@ -71,16 +71,46 @@ export function renderState(s, live = null) {
 }
 
 const SET_RENDER = ['pixelSize', 'dither', 'ditherMatrix', 'outlines', 'vignette', 'exposure', 'colorChange', 'flameFps', 'hitStop', 'hitFlash', 'debris', 'marks'];
-const applied = new WeakMap(); // per scene: the state it was last sent
+/**
+ * Everything renderState reads: the settings' keys and the render show's rolls (exported for
+ * the tests, which hold renderState to it).
+ */
+export const RENDER_READS = {
+  settings: ['pixelSize', 'dither', 'ditherMatrix', 'outlines', 'vignette', 'exposure', 'colorChange', 'flameFps', 'hitStop', 'hitFlash', 'debris', 'marks', 'palette', 'fog', 'shadows', 'xrayView'],
+  live: ['outlines', 'hitStop', 'hitFlash', 'debris', 'marks', 'pixelSize', 'matrix', 'few', 'fog', 'xray'],
+};
+// (A value as it was read: a list of palette slots is copied, so one changed in place shows.)
+const same = (a, b) => {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
+function unchanged(seen, settings, live) {
+  if (seen.live !== !!live) return false;
+  for (const k of RENDER_READS.settings) if (!same(seen.settings[k], settings[k])) return false;
+  if (live) for (const k of RENDER_READS.live) if (!same(seen.rolls[k], live[k])) return false;
+  return true;
+}
+function remember(seen, settings, live) {
+  seen.live = !!live;
+  for (const k of RENDER_READS.settings) seen.settings[k] = Array.isArray(settings[k]) ? [...settings[k]] : settings[k];
+  if (live) for (const k of RENDER_READS.live) seen.rolls[k] = Array.isArray(live[k]) ? [...live[k]] : live[k];
+}
+const applied = new WeakMap(); // per scene: { state: the state it was last sent, seen: what that was worked out from }
 /**
  * Every Render setting onto the scene (`live`: the render show's current rolls; without,
  * each switch in the mix rests as renderState says). Only what changed since the last call
- * for this scene is sent, so it's cheap every frame and a new scene gets everything.
+ * for this scene is sent, so a new scene gets everything. The render show calls it every
+ * frame, and most frames nothing it reads has changed: then it's done before working out
+ * anything (no state, no strings to compare).
  */
 export function applyRenderSettings(fire, settings, live = null) {
   if (!fire) return;
+  const last = applied.get(fire);
+  if (last && unchanged(last.seen, settings, live)) return;
   const want = renderState(settings, live);
-  const was = applied.get(fire) ?? {};
+  const was = last?.state ?? {};
   const changed = (k) => String(want[k]) !== String(was[k]);
   const partial = Object.fromEntries(SET_RENDER.filter(changed).map((k) => [k, want[k]]));
   if (Object.keys(partial).length) fire.setRender(partial);
@@ -88,7 +118,9 @@ export function applyRenderSettings(fire, settings, live = null) {
   if (changed('fog')) fire.setFog(want.fog);
   if (changed('shadows')) fire.setShadows(want.shadows);
   if (changed('xray')) fire.setXray(want.xray);
-  applied.set(fire, want);
+  const seen = last?.seen ?? { live: false, settings: {}, rolls: {} };
+  remember(seen, settings, live);
+  applied.set(fire, { state: want, seen });
 }
 /**
  * Forget what the scene was last sent, so the next apply sends everything (after anything

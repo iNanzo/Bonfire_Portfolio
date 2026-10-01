@@ -27,22 +27,33 @@ function updateFavicon(ramp) {
 }
 
 // During a color blend the scene calls setAccentRamp() every frame. Each write restyles
-// the whole page, so the colors are written at most every 50 ms (the blend still reads
-// as smooth), always ending on the latest ramp; `now` writes at once (a flame set outright).
+// the whole page, so the colors are written at most every 50 ms (setAccentRate: Bonfire
+// Live, busier, writes them less often; the blend still reads as smooth), always ending on
+// the latest ramp; `now` writes at once (a flame set outright). A color that's already
+// what it would be written as isn't written again (the scene also calls it when only the
+// scenery's colors changed, with the same ramp).
 let accentRamp = null;
 let accentRoot = null;
 let accentTimer = 0;
 let accentLast = -Infinity;
+let accentEvery = 50;
 function writeAccents() {
   accentTimer = 0;
   accentLast = performance.now();
-  accentRamp.forEach((hex, i) => accentRoot.style.setProperty(VARS[i], hex));
+  accentRamp.forEach((hex, i) => {
+    if (accentRoot.style.getPropertyValue(VARS[i]) !== hex) accentRoot.style.setProperty(VARS[i], hex);
+  });
+}
+
+/** Write the accent colors at most every `ms` during a blend (50 by default). */
+export function setAccentRate(ms) {
+  accentEvery = Number.isFinite(ms) && ms >= 0 ? ms : 50;
 }
 
 export function setAccentRamp(ramp, root = document.documentElement, { now = false } = {}) {
   accentRamp = ramp;
   accentRoot = root;
-  const wait = 50 - (performance.now() - accentLast);
+  const wait = accentEvery - (performance.now() - accentLast);
   if (now || wait <= 0) {
     clearTimeout(accentTimer);
     writeAccents();

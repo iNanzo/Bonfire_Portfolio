@@ -116,7 +116,15 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
       renderer.setRenderTarget(target);
       renderer.render(pass.scene, pass.camera);
     };
-    draw('scene', fx.sceneRT);
+    // The scene's image keeps its mipmaps' storage (it's allocated with them), but they're
+    // only made in the frames the glow reads them (tSceneMip): everything else reads its top
+    // level. (Switched off only for the render itself, after the target is set: a target
+    // allocated without mipmaps would have none to make later.)
+    pass.use('scene');
+    renderer.setRenderTarget(fx.sceneRT);
+    fx.sceneRT.texture.generateMipmaps = u.uGlow.value > 0;
+    renderer.render(pass.scene, pass.camera);
+    fx.sceneRT.texture.generateMipmaps = true;
     u.tScene.value = fx.sceneRT.texture;
     u.tSceneMip.value = fx.sceneRT.texture;
     if (style) {

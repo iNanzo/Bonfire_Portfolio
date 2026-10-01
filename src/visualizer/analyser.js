@@ -21,24 +21,46 @@ const FFT = 2048;
 
 export const BAND_NAMES = ['bass', 'lowMid', 'mid', 'highMid', 'high'];
 
-/** An onset detector over a flux rate; returns the onset strength (0 = none) each frame. */
-function onsetDetector({ refractory, history = 0.8 }) {
-  const times = [];
-  const values = [];
+/**
+ * An onset detector over a flux rate; returns the onset strength (0 = none) each frame. The
+ * last `history` seconds of rates are kept in a ring (it grows if the frames come faster
+ * than it holds), oldest first, so nothing is shifted or allocated frame to frame.
+ * (Exported for the tests.)
+ */
+export function onsetDetector({ refractory, history = 0.8 }) {
+  let times = new Float64Array(256);
+  let values = new Float64Array(256);
+  let first = 0; // the oldest entry's slot
+  let size = 0;
   let peak = 1e-6;
   let over = false;
   let last = -Infinity;
   const out = { onset: 0, value: 0 };
+  function push(now, rate) {
+    if (size === times.length) {
+      const n = times.length;
+      const t = new Float64Array(n * 2);
+      const v = new Float64Array(n * 2);
+      for (let i = 0; i < n; i++) { t[i] = times[(first + i) % n]; v[i] = values[(first + i) % n]; }
+      times = t;
+      values = v;
+      first = 0;
+    }
+    const at = (first + size) % times.length;
+    times[at] = now;
+    values[at] = rate;
+    size++;
+  }
   return (now, dt, rate, sensitivity) => {
-    times.push(now);
-    values.push(rate);
-    while (times.length && now - times[0] > history) { times.shift(); values.shift(); }
+    push(now, rate);
+    while (size && now - times[first] > history) { first = (first + 1) % times.length; size--; }
+    const n = times.length;
     let mean = 0;
-    for (const v of values) mean += v;
-    mean /= values.length;
+    for (let i = 0; i < size; i++) mean += values[(first + i) % n];
+    mean /= size;
     let varSum = 0;
-    for (const v of values) varSum += (v - mean) ** 2;
-    const std = Math.sqrt(varSum / values.length);
+    for (let i = 0; i < size; i++) varSum += (values[(first + i) % n] - mean) ** 2;
+    const std = Math.sqrt(varSum / size);
     peak = Math.max(rate, peak * Math.exp(-dt / 6), 1e-6);
     const threshold = mean + (1.6 / sensitivity) * std;
     const wasOver = over;
@@ -97,6 +119,7 @@ export function createFeatures({ sampleRate, fftSize = FFT }) {
   let specRef = 1e-6; // running peak magnitude: flux is measured relative to it, so level doesn't change its shape
   const env = Object.fromEntries(BAND_NAMES.map((b) => [b, 0]));
   const peak = Object.fromEntries(BAND_NAMES.map((b) => [b, 1e-5]));
+  const power = Object.fromEntries(BAND_NAMES.map((b) => [b, 0])); // (each band's power this frame: reused)
   let levelEnv = 0;
   let levelPeak = 1e-5;
 
@@ -130,7 +153,7 @@ export function createFeatures({ sampleRate, fftSize = FFT }) {
     // are taken relative to the running peak first (the loudest bin lands near 200), so
     // a quiet line in and a hot master compress alike.
     let full = 0, kick = 0, hat = 0;
-    const power = { bass: 0, lowMid: 0, mid: 0, highMid: 0, high: 0 };
+    for (const b of BAND_NAMES) power[b] = 0;
     let kickPower = 0;
     let maxA = 0;
     const scale = 200 / Math.max(specRef, 1e-7);

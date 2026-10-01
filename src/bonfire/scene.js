@@ -355,6 +355,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   let blend = null; // { from, to, t }
   let blendMul = 1;
   let debugPaletteIndex = 0;
+  let fewStale = true; // (the palette was set since a few colors were last put over it: keepPalette)
   let currentRamp = flames[flameKey].ramp;
   const blendTime = () => (reducedMotion ? 0.4 : effects.render.colorChange);
   const white = new THREE.Color('#ffffff');
@@ -385,6 +386,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     if (debugPaletteIndex === 0) {
       const extra = paletteExtra();
       pass.setPalette(extra ? [...scenePalette(f), ...extra.ramp, extra.shade] : scenePalette(f), { steel: true });
+      fewStale = true;
     }
     fireLight.color.set(f.ramp[1]).lerp(white, mix);
     lightBase.copy(fireLight.color);
@@ -498,7 +500,11 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
 
   // --- Model
   const candleFlames = [];
+  // Every glow in its flame-step colors (update: recolorGlows), each by its index here. The
+  // model's own (the coals in the ash) come first and burn in every place; each place's join
+  // them as it's first built (setScenery), and only the current place's are recolored.
   const glows = [];
+  let sharedGlows = 0; // (how many are the model's)
   let ready = false;
   let targetLevel = 1;
 
@@ -673,6 +679,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
         o.receiveShadow = true;
       }
     });
+    sharedGlows = glows.length;
     candleLight.position.copy(candlePos).add(new THREE.Vector3(0.1, 0.25, 0.3));
     ruinsOnly.push(...candleFlames.map((c) => c.mesh));
     // The model's materials, for the other sceneries.
@@ -933,10 +940,13 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       if (key === 'ruins') { for (const o of ruinsOnly) o.visible = on; return; }
       sceneries[key].group.visible = on;
     };
+    const revisit = !!sceneries[name];
     if (name !== 'ruins' && !sceneries[name]) {
       const s = buildScenery(name, sceneryMaterials, () => new THREE.MeshBasicMaterial({ color: currentRamp[1], fog: false }));
       s.group.traverse((o) => { if (o.isMesh) { o.layers.set(s.glows.includes(o) ? LAYER_GHOST : LAYER_SOLID); scope.trackTree(o); } });
+      s.glowFrom = glows.length;
       glows.push(...s.glows);
+      s.glowTo = glows.length;
       scene.add(s.group);
       s.group.updateMatrixWorld(true);
       s.solids = [];
@@ -945,6 +955,9 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     }
     show(sceneryKey, false);
     show(name, true);
+    // (A place shown again takes the colors its glows would have had at the last flame step,
+    // as if they'd been recolored all along while it was hidden.)
+    if (revisit && flameStep >= 0) recolorGlows(sceneries[name].glowFrom, sceneries[name].glowTo, flameStep);
     sceneryKey = name;
     // Its lamps take the pool's lights (the rest go dark; the candle's is the ruins' own: see update()).
     const list = sceneries[name]?.lights ?? [];
@@ -1219,10 +1232,23 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // as it changes (keepPalette, every frame).
   let paletteOverride = null;
   const paletteIndex = (id) => Math.max(0, DEBUG_PALETTES.findIndex((n) => n.toLowerCase().startsWith(id)));
+  // (A few colors are put over the palette again only when something they come from changed:
+  // the slots, the flame's colors (applyColors, which puts the full palette back: fewStale),
+  // or the scenery's (palette.js base). Not every frame.)
+  let fewSlots = null;
+  const fewBase = { void: '', shadow: '', stone: '', wood: '', bone: '' };
+  function fewChanged(slots) {
+    let changed = fewStale || slots !== fewSlots;
+    for (const k in fewBase) if (fewBase[k] !== base[k]) { fewBase[k] = base[k]; changed = true; }
+    fewStale = false;
+    fewSlots = slots;
+    return changed;
+  }
   function keepPalette(force = false) {
     const p = paletteOverride;
     if (p === null) return;
     if (Array.isArray(p)) {
+      if (!fewChanged(p) && !force) return;
       const all = scenePalette({ ramp: currentRamp, shade: currentShade });
       pass.setPalette(p.map((i) => all[i] ?? all[0]));
       return;
@@ -1303,6 +1329,38 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   let lightStep = -1;
   let lightFlicker = 1;
   const fireOnScreen = new THREE.Vector3();
+  // The flame's colors as the glows take them (parsed once a flame step, not once a glow),
+  // and as the lamps do (once a light step).
+  const glowRamp = [0, 1, 2, 3].map(() => new THREE.Color());
+  const lampColor = new THREE.Color();
+
+  /**
+   * Coals in the ash pulse between the flame's deep, body and bright tones. The scenery's
+   * glows go by their kind (scenery.js): embers like the coals; lamps hold a steady light
+   * with a rare dip, every window of one lamp together; candle flames flicker bright and
+   * waver; stained glass and runes keep their own tone, a step brighter now and then. These
+   * are glows[from…to) at flame step `fs`, in glowRamp's colors (each glow's index is its own
+   * number in the rolls).
+   */
+  function recolorGlows(from, to, fs) {
+    for (let i = from; i < to; i++) {
+      const g = glows[i];
+      const k = g.userData.glow;
+      if (!k || k.kind === 'ember') {
+        const h = hash(fs * 3.3 + i * 5.7);
+        g.material.color.copy(glowRamp[h > 0.8 ? 2 : h > 0.3 ? 1 : 0]);
+      } else if (k.kind === 'lamp') {
+        g.material.color.copy(glowRamp[hash(fs * 1.9 + k.id * 13.1) > 0.92 ? 1 : 2]);
+      } else if (k.kind === 'flame') {
+        g.material.color.copy(glowRamp[hash(fs * 2.3 + k.id * 7.3) > 0.7 ? 3 : 2]);
+        g.userData.baseY ??= g.scale.y;
+        g.scale.y = g.userData.baseY * (0.8 + hash(fs * 1.7 + i * 9.1) * 0.4);
+      } else {
+        const up = hash(Math.floor(fs / 6) * 2.1 + i * 3.7) > 0.8 ? 1 : 0;
+        g.material.color.copy(glowRamp[Math.min(3, k.tone + up)]);
+      }
+    }
+  }
 
   // `dt`, `t`: the simulation's step and clock (they stop during a hit-stop); `realDt`:
   // the frame's own step (the camera, the cursor and the fades of the hit itself).
@@ -1342,26 +1400,12 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       flameStep = fs;
       for (let i = 0; i < steps; i++) fire.stepFlame(1 / fps, t);
       candleFlames.forEach((c, i) => c.mesh.scale.set(c.scale.x, c.scale.y * (0.8 + hash(fs * 1.7 + i * 9.1) * 0.4), c.scale.z));
-      // Coals in the ash pulse between the flame's deep, body and bright tones. The scenery's
-      // glows go by their kind (scenery.js): embers like the coals; lamps hold a steady light
-      // with a rare dip, every window of one lamp together; candle flames flicker bright and
-      // waver; stained glass and runes keep their own tone, a step brighter now and then.
-      glows.forEach((g, i) => {
-        const k = g.userData.glow;
-        if (!k || k.kind === 'ember') {
-          const h = hash(fs * 3.3 + i * 5.7);
-          g.material.color.set(currentRamp[h > 0.8 ? 2 : h > 0.3 ? 1 : 0]);
-        } else if (k.kind === 'lamp') {
-          g.material.color.set(currentRamp[hash(fs * 1.9 + k.id * 13.1) > 0.92 ? 1 : 2]);
-        } else if (k.kind === 'flame') {
-          g.material.color.set(currentRamp[hash(fs * 2.3 + k.id * 7.3) > 0.7 ? 3 : 2]);
-          g.userData.baseY ??= g.scale.y;
-          g.scale.y = g.userData.baseY * (0.8 + hash(fs * 1.7 + i * 9.1) * 0.4);
-        } else {
-          const up = hash(Math.floor(fs / 6) * 2.1 + i * 3.7) > 0.8 ? 1 : 0;
-          g.material.color.set(currentRamp[Math.min(3, k.tone + up)]);
-        }
-      });
+      // The glows: the model's coals, and the current place's (the others are hidden, and
+      // catch up if they're shown again: setScenery).
+      for (let i = 0; i < 4; i++) glowRamp[i].set(currentRamp[i]);
+      recolorGlows(0, sharedGlows, fs);
+      const place = sceneries[sceneryKey];
+      if (place) recolorGlows(place.glowFrom, place.glowTo, fs);
     }
     fire.stepSparks(dt, t);
     // The density budget: background extras thin out while a big hit is on screen.
@@ -1402,10 +1446,11 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       lightStep = ls;
       lightFlicker = 0.82 + Math.random() * 0.3;
       candleLight.intensity = sceneryKey === 'ruins' ? 0.28 + Math.random() * 0.12 : 0;
+      lampColor.set(currentRamp[1]).lerp(white, 0.3);
       for (const l of lamps) {
         if (!l.userData.base) continue;
         l.intensity = l.userData.base * (0.8 + Math.random() * 0.3);
-        l.color.set(currentRamp[1]).lerp(white, 0.3);
+        l.color.copy(lampColor);
       }
     }
     // Each element lights the scene its own way: fire flickers, the ball strobes
@@ -1640,6 +1685,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       debugPaletteIndex = (debugPaletteIndex + 1) % DEBUG_PALETTES.length;
       const debug = debugPalettes[DEBUG_PALETTES[debugPaletteIndex]];
       pass.setPalette(debug ?? scenePalette({ ramp: currentRamp, shade: flames[flameKey].shade }), { steel: !debug });
+      fewStale = true;
     } else if (what === 'dither') {
       // (Up a level from what's showing now, the settings' own included, then back to none.)
       const cur = pass.uniforms.ditherStrength.value;
@@ -1825,8 +1871,15 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     sweep = Math.max(-1, Math.min(1, sweep + Math.max(-150, Math.min(150, dy)) / 420));
   }
 
+  // (The scenery colors as last taken up. Bonfire Live blends them (colors.js) and asks every
+  // frame of the blend, but they're whole hex values: most frames of a slow one bring nothing
+  // new, and those are skipped.)
+  const baseSeen = { void: '', shadow: '', stone: '', wood: '', bone: '' };
   /** The scenery colors (palette.js `base`) changed: take them up (the visualizer's random palettes). */
   function refreshScene() {
+    let moved = false;
+    for (const k in baseSeen) if (baseSeen[k] !== base[k]) { baseSeen[k] = base[k]; moved = true; }
+    if (!moved) return;
     voidColor.set(base.void);
     scene.fog.color.set(base.void);
     applyColors({ ramp: currentRamp, shade: currentShade }, currentMix);
