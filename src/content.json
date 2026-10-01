@@ -1348,8 +1348,8 @@
     "knight": {
       "show": true,
       "arrival": "sign",
-      "restMin": 3,
-      "restMax": 5,
+      "restMin": 1,
+      "restMax": 3,
       "helmet": "random",
       "style": "pixel-cel",
       "finish": "gunmetal",
