@@ -93,6 +93,7 @@
     "src/bonfire/knightStyles.js",
     "src/settingsMap.js",
     "src/bonfire/frameGate.js",
+    "src/bonfire/sceneryMerge.js",
     "src/ui/perfOverlay.js",
     "admin/ui/el.js",
     "admin/ui/paths.js",
