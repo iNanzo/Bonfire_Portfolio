@@ -251,10 +251,14 @@ export function saveSetup(settings, name) {
   writeSetups({ ...all, [kept]: snapshot(settings) });
   return kept;
 }
-/** Load the setup `name` into the settings: the keys it set, or null if there's none by that name. */
+/**
+ * Load the setup `name` into the settings: the keys it set, or null if there's none by that
+ * name. (This computer's own stay as they are, even if an imported file carries them.)
+ */
 export function loadSetup(settings, name) {
-  const values = readSetups()[name];
-  if (!values || typeof values !== 'object') return null;
+  const saved = readSetups()[name];
+  if (!saved || typeof saved !== 'object') return null;
+  const values = Object.fromEntries(Object.entries(saved).filter(([k]) => !LOCAL.includes(k)));
   mergeInto(settings, values);
   return Object.keys(values);
 }

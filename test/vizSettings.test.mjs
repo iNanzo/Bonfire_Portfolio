@@ -137,6 +137,10 @@ test('Frame Rate: one of its choices, this computer’s own (never in a setup or
   loadSetup(there, 'Thirty');
   assert.equal(there.frameRate, 'display');
   assert.ok(!('frameRate' in readSetups().Thirty));
+  // A file from elsewhere that carries one (or the volume) changes neither here.
+  importSetups(JSON.stringify({ app: 'bonfire-live', setups: { Odd: { frameRate: '30', volume: 0.1, glitch: 1.4 } } }));
+  assert.deepEqual(loadSetup(there, 'Odd'), ['glitch']);
+  assert.deepEqual([there.frameRate, there.volume, there.glitch], ['display', PAGE_DEFAULTS.volume, 1.4]);
   store.clear();
 });
 
