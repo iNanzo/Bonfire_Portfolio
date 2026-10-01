@@ -1,7 +1,10 @@
 {
   // Type checking for the plain-JS modules (npm run typecheck): TypeScript reads their
-  // JSDoc; nothing is compiled. It covers the logic that has no DOM or WebGL in it (audio
-  // analysis, tempo, sections, palettes, routes, links, content rules) and grows from there.
+  // JSDoc; nothing is compiled. It started with the logic that has no DOM or WebGL in it
+  // (audio analysis, tempo, sections, palettes, routes, links, content rules) and grows from
+  // there: a module joins the list once it (and what it imports) checks clean, and a new
+  // module joins when it's written. Three.js ships no types, so its values are `any`;
+  // `vite/client` types `import.meta.env` and asset imports.
   "compilerOptions": {
     "allowJs": true,
     "checkJs": true,
@@ -11,7 +14,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "lib": ["es2023", "dom", "dom.iterable"],
-    "types": [],
+    "types": ["vite/client"],
     "strict": false,
     "noImplicitAny": false,
     "skipLibCheck": true
@@ -27,11 +30,22 @@
     "src/sceneStore.js",
     "src/sceneries.js",
     "src/knightNames.js",
+    "src/404.js",
+    "src/content.js",
+    "src/effects.js",
+    "src/effectsDefaults.js",
+    "src/elements.js",
+    "src/palette.js",
+    "src/render.js",
+    "src/seo.js",
+    "src/seoPages.js",
     "src/ui/pixelArt.js",
     "src/ui/logo.js",
     "src/ui/renderMenu.js",
     "src/ui/fields.js",
     "src/ui/orbit.js",
+    "src/ui/dither.js",
+    "src/ui/focus.js",
     "src/painter/history.js",
     "src/painter/beat.js",
     "src/painter/panel.js",
@@ -50,6 +64,21 @@
     "src/visualizer/sceneLoop.js",
     "src/visualizer/scenePlayer.js",
     "src/visualizer/density.js",
+    "src/visualizer/bars.js",
+    "src/visualizer/demo.js",
+    "src/visualizer/fireflyMoves.js",
+    "src/visualizer/fireflyShow.js",
+    "src/visualizer/link.js",
+    "src/bonfire/curl.js",
+    "src/bonfire/dissolve.js",
+    "src/bonfire/frame.js",
+    "src/bonfire/interaction.js",
+    "src/bonfire/pixelPass.js",
+    "src/bonfire/points.js",
+    "src/bonfire/povs.js",
+    "src/bonfire/resources.js",
+    "src/bonfire/signatures.js",
+    "src/bonfire/stillFx.js",
     "src/bonfire/bladeMotion.js",
     "src/bonfire/knightPose.js",
     "src/bonfire/knightPlaces.js",
