@@ -589,22 +589,33 @@ An option's `tip` is its tooltip and a heading's `note` says why its group is of
   Keyboard Shortcuts `?` · Sound, each saying what it does as its tooltip. Then Close.
   Focus starts on the first item that shows, and the arrows skip what's hidden
   (`listNav` in `src/ui/spatial.js`). A phone sees all of it without scrolling; on touch
-  screens the key chips and the keys line go. From 900 to 1099 px the header's Sound is
-  its icon alone (and its tooltip), so the tabs keep one line beside the Menu button.
+  screens the key chips, the keys line and Keyboard Shortcuts go (a list of keys a phone
+  has none of). On a window too short for it, the menu's insides scroll within its frame
+  (`.rest-menu-scroll`; the frame's corners sit a pixel outside it). Discoveries opens with
+  focus on Close but the list at its top, its title and count in sight. From 900 to
+  1099 px the header's Sound is its icon alone (and its tooltip), so the tabs keep one
+  line beside the Menu button.
 - **Keyboard Shortcuts (`?`)**: the shared overlay (`createKeysOverlay`), with the site's
   keys from `src/ui/siteKeys.js` (Getting Around, Tools, Render Settings) and a filter.
-  The page's keys ignore Shift (only `?` takes it), the breakdown's ignore typing and any
-  open dialog (Esc closes the dialog, not the breakdown), and P is listened for from the
-  start.
+  The page's keys ignore Shift (only `?` takes it), the breakdown's and photo mode's
+  ignore typing and any open dialog (Esc closes the dialog, not the breakdown or photo
+  mode: `?` opens over both), and P is listened for from the start.
 - **Tooltips** are the shared one (`src/ui/tooltip.js`): no `title=` is left on the site.
   The Q / E keys, Sound, the pack's button, the menu's tools, the render settings' rows
   and close button, the photo toolbar, the project viewer's arrows and thumbnails, and the
   pack's options that need a word carry `data-tip` (beside a list's item, not over the one
   before: `--tip-side` in `styles.css`). A skill's slot shows its name over its flavor
   (`data-tip-title`, `data-tip`; the flavor is its description for screen readers, and a
-  tap opens it too, `data-tip-tap`); the old hand-placed skill tooltip is gone.
+  tap opens it too, `data-tip-tap`); the old hand-placed skill tooltip is gone. The tip
+  itself is aria-hidden, so every hint is its trigger's description as well
+  (`aria-describedby`, a hidden span beside it: `src/ui/describedTip.js`), unless it only
+  says the trigger's name and key (Q / E, the pack's button, the render settings' close,
+  which say their keys with `aria-keyshortcuts`).
 - **Photo mode on a touch screen** says "Drag to orbit · Pinch to zoom · Tap to stoke",
-  and a pinch zooms (two fingers, at the wheel's own rate).
+  and a pinch zooms (two fingers, at the wheel's own rate). Its Element button names the
+  elements as the pack does (the content's names: Flame, Lightning, Frost).
+- **Render Settings' reset** sits apart from the groups (a rule above it): it puts back
+  every group, not just the last.
 - **Words** follow the round's casing: Title Case for labels, headings and options (the
   menus, the pack's headings, the render rows, the breakdown's views and counts, the
   discoveries' names), sentences for tooltips. The content's `ui` texts were recased
@@ -617,4 +628,6 @@ An option's `tip` is its tooltip and a heading's `note` says why its group is of
   `title=`, the skills' tips, `withMeta` on the real and a Prettier-wrapped `index.html`),
   `test/discoveries.test.mjs`; in the browser `e2e/site-menus.spec.mjs` and
   `e2e/tips-site.spec.mjs` (every tip at 1280×720 and on a 390×844 touch screen: shown by
-  hover, focus or tap, 8 px inside the window, off its trigger).
+  hover, focus or tap, 8 px inside the window, off its trigger, and heard: a description
+  or its trigger's name). `test/site.test.mjs` checks every tip in the templates, the
+  photo toolbar, the render rows and the pack's lists is read out too.
