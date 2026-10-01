@@ -45,7 +45,10 @@ differs. `.editorconfig` sets the basics for any editor.
 
 `src/content.json` is never formatted: the admin writes it with `JSON.stringify` on every
 save, so hand-formatting would only be undone. Edit it through the admin
-([docs/admin.md](docs/admin.md)) when you can. Markdown is wrapped by hand.
+([docs/admin.md](docs/admin.md)) when you can. Markdown is wrapped by hand. The root
+`index.html` keeps each `<meta>` tag on one line: the build copies it for every page and
+swaps in that page's description and preview tags with one-line patterns
+(`withMeta` in `src/seoPages.js`).
 
 ## Rules that keep things working
 

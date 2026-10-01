@@ -2,9 +2,13 @@
 # - src/content.json: the admin writes it with JSON.stringify on every save, so formatting
 #   it here would only be undone (and fail format:check) after the next save;
 # - Markdown: the docs are wrapped by hand;
+# - index.html: the build stamps each page's description and preview tags into copies of it
+#   with regexes that expect each <meta> on one line (withMeta in src/seoPages.js), and
+#   Prettier wraps the long ones;
 # - assets, the public folder (it holds a built single-file game), the lockfile;
 # - build, test and coverage output, and local scratch.
 src/content.json
+/index.html
 *.md
 public/
 assets/
