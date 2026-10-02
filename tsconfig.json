@@ -139,6 +139,7 @@
     "src/bonfire/sceneFire.js",
     "src/bonfire/sceneRender.js",
     "src/bonfire/sceneUpdate.js",
-    "src/bonfire/scenePick.js"
+    "src/bonfire/scenePick.js",
+    "src/bonfire/sceneKnight.js"
   ]
 }

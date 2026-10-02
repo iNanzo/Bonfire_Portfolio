@@ -45,6 +45,8 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {(n: number) => number} fCount  a firefly count for this device
  * @property {(n: number) => number} impactCount  an impact's particle count for this device
  * @property {boolean} siteKnight  the site's knight (sceneKnight.js); Bonfire Live (`fxLayer`) casts its own
+ * @property {string | null} knightHelmet  createBonfire's: the helmet the visitor picked on an earlier visit (main.js)
+ * @property {any[]} tinted  everything that burns in the flame's colors as they blend (the knights and the sign join)
  * @property {any} renderer  the THREE.WebGLRenderer
  * @property {HTMLCanvasElement} canvas  the renderer's (low resolution: sceneRender.js resize)
  * @property {any} scene
@@ -196,10 +198,6 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {() => void} applyFireParams  the flame's parameters from the settings, the element and the drive
  * @property {(f: { ramp: string[], shade: string }, mix: number) => void} applyColors  the flame's colors, everywhere they burn
  * @property {Promise<void>} loaded  the model is in and the shaders built: the scene's `ready`
- * @property {() => boolean} reacts  whether the knights react (the site's setting, or Bonfire Live's)
- * @property {(kind: string, strength?: number, where?: any) => void} reactKnights  something happened at the fire, if the knights mind it
- * @property {(model: any, o?: { template?: any, attach?: boolean }) => any[]} addKnights  the knights, from their model
- * @property {(name: string) => { x: number, y: number, z: number, yaw: number }} signPlace  where the knight's sign lies in a place
  */
 
 /**
@@ -243,4 +241,23 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {(dy: number) => void} scroll  the page scrolled by `dy` CSS px
  */
 
-/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart & SceneryPart & FirePart & RenderPart & UpdatePart & PickPart & MainPart} SceneContext */
+/**
+ * The knights (sceneKnight.js).
+ * @typedef {object} KnightPart
+ * @property {Promise<void>} knightsIn  the knights are in (on the site, when he's away at load, a moment after the first frame)
+ * @property {{ style: string | null, finish: string | null, rim: number | null }} armorOverride  Bonfire Live's style, finish and rim over the settings'
+ * @property {() => void} applyArmor  the finish, the rim and the style, as set now
+ * @property {(o?: { instant?: boolean }) => Promise<boolean>} applyStyle  the style as set now, on the shader and (its own model) the knights
+ * @property {(file: string) => Promise<any>} prepareStyleModel  a style's model fetched and its template built in idle moments (once)
+ * @property {(model: any, o?: { template?: any, attach?: boolean }) => any[]} addKnights  the knights, from their model
+ * @property {(name: string) => { x: number, y: number, z: number, yaw: number }} signPlace  where the knight's sign lies in a place
+ * @property {(name: string, o?: any) => Promise<boolean>} wearHelmet
+ * @property {(first?: boolean) => void} applyKnight  the site's knight as effects.knight says
+ * @property {(index?: number | string) => void} busyWithHim  the visitor did something with him: his rest topped up
+ * @property {(o?: { instant?: boolean }) => boolean} summonKnight  the site's knight, from his sign
+ * @property {Set<(presence: string) => void>} presenceListeners  told whenever the site's knight comes or goes
+ * @property {() => boolean} reacts  whether the knights react (the site's setting, or Bonfire Live's)
+ * @property {(kind: string, strength?: number, where?: any) => void} reactKnights  something happened at the fire, if the knights mind it
+ */
+
+/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart & SceneryPart & FirePart & RenderPart & UpdatePart & PickPart & KnightPart & MainPart} SceneContext */
