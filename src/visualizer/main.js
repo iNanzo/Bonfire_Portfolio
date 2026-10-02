@@ -68,6 +68,7 @@ import { createSceneStore, THUMB_MAX } from '../sceneStore.js';
 import * as siteContent from '../content.js';
 import { createRenderMenu } from '../ui/renderMenu.js';
 import { focusedNow } from '../ui/focus.js';
+import { q, qa, typing, toggleFullscreen, failScene } from '../ui/shell.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
 import { createPack, bonfireItems } from '../ui/pack.js';
@@ -81,8 +82,6 @@ import { site, ui } from '../content.js';
 createDiscoveries().discover('visualizer');
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const q = (s, r = document) => r.querySelector(s);
-const qa = (s, r = document) => [...r.querySelectorAll(s)];
 
 // --- Settings (this browser only: settings.js) -----------------------------------------------
 const settings = loadSettings();
@@ -324,12 +323,11 @@ function applyFrameRate() {
   if (fire && fire.maxFps !== cap) fire.setMaxFps(cap);
 }
 
-function failScene(error) {
+/** The scene couldn't start (no WebGL): it's let go, and the start screen says so (ui/shell.js). */
+function sceneFailed(error) {
   fire?.dispose();
   fire = null;
-  document.documentElement.classList.add('no-webgl');
-  showError('This browser couldn’t start WebGL, so the bonfire can’t render here. Try Chrome or Edge with hardware acceleration on.');
-  console.warn('Bonfire unavailable.', error);
+  failScene(errorEl, error);
 }
 
 // More particles than the site: the visualizer is the show (density.js, the Painter's too).
@@ -347,7 +345,7 @@ function startScene() {
   applyDensity();
   return import('../bonfire/scene.js').then(async ({ createBonfire }) => {
     const candidate = createBonfire(stage, {
-      reducedMotion, sway: 0, lightTrails: settings.trails, effects: true, onImpact, onRamp: setAccentRamp, onError: failScene,
+      reducedMotion, sway: 0, lightTrails: settings.trails, effects: true, onImpact, onRamp: setAccentRamp, onError: sceneFailed,
       onFrame: (dt) => { if (fire === candidate) onFrame(dt); },
       onTick: (dt) => { if (fire === candidate) onTick(dt); },
     });
@@ -374,7 +372,7 @@ function startScene() {
     if (opening) playScene(opening, { instant: true, lock: opening.ref === solo });
     stage.classList.add('is-ready');
     if (output && !output.closed) streamInto(output);
-  }).catch(failScene);
+  }).catch(sceneFailed);
 }
 startScene();
 
@@ -921,10 +919,6 @@ async function keepAwake() {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && engine?.source) keepAwake(); });
 
 // --- Actions ---------------------------------------------------------------------------------
-function toggleFullscreen() {
-  if (document.fullscreenElement) document.exitFullscreen?.();
-  else document.documentElement.requestFullscreen?.().catch(() => {});
-}
 document.addEventListener('fullscreenchange', () => {
   const full = !!document.fullscreenElement;
   relabel(q('[data-fs-label]'), full ? 'Exit Full Screen' : 'Full Screen', 'fs', full ? HUD_TIPS.exitFullscreen : HUD_TIPS.fullscreen);
@@ -996,11 +990,13 @@ q('[data-progress]').addEventListener('click', (e) => {
   m.currentTime = ((e.clientX - r.left) / r.width) * m.duration;
 });
 
-// (A field in a dialog that has just closed isn't being typed in: the focus can wait there
-// until the dialog's close event hands it back, and a key pressed in between is the page's.)
-const typing = (el) => !!el?.closest?.('input, select, textarea, [contenteditable]') && !el.closest('dialog:not([open])');
+// Typing (ui/shell.js: a text field, a select; a slider, a checkbox or a button isn't) leaves
+// the keys alone. (A field in a dialog that has just closed isn't being typed in: the focus
+// can wait there until the dialog's close event hands it back, and a key pressed in between
+// is the page's.)
+const typingIn = (el) => typing(el) && !el.closest('dialog:not([open])');
 window.addEventListener('keydown', (e) => {
-  if (e.altKey || e.ctrlKey || e.metaKey || typing(e.target)) return;
+  if (e.altKey || e.ctrlKey || e.metaKey || typingIn(e.target)) return;
   if (settingsDialog.open || keysOverlay.el.open) return; // each handles its own keys (Esc closes)
   // The render menu first: P, and its digits while it's open (before the element hits).
   if (renderMenu.handleKey(e)) { e.preventDefault(); wake(); return; }
