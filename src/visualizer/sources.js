@@ -10,6 +10,21 @@ import { q } from '../ui/shell.js';
 import { esc } from '../html.js';
 
 /**
+ * What the start screen says when a source won't start.
+ * @param {any} error  what getUserMedia, getDisplayMedia or playing the file threw
+ * @param {string} kind  the source: input | capture | file | demo
+ */
+export function describeError(error, kind) {
+  if (error?.name === 'NotAllowedError') {
+    return kind === 'capture' ? 'Sharing was cancelled or blocked.' : 'The browser wasn’t allowed to use the microphone or line in. Allow it in the address bar’s site settings and try again.';
+  }
+  if (error?.name === 'NotFoundError') return 'No audio input was found. Plug in your interface or mic and try again.';
+  if (error?.name === 'NotReadableError') return 'That input is busy or unavailable (another app may have it exclusively).';
+  if (kind === 'file') return error?.name === 'NotAllowedError' ? 'The browser held the sound back. Click the page once, then try the file again.' : 'That file couldn’t be played. Try an MP3, WAV, AAC or FLAC file.';
+  return error?.message || 'Something went wrong starting the sound.';
+}
+
+/**
  * The sound's part of the page.
  * @param {import('./context.js').LiveContext} ctx
  */
@@ -140,16 +155,6 @@ export function createSources(ctx) {
     } finally {
       busy = false;
     }
-  }
-
-  function describeError(error, kind) {
-    if (error?.name === 'NotAllowedError') {
-      return kind === 'capture' ? 'Sharing was cancelled or blocked.' : 'The browser wasn’t allowed to use the microphone or line in. Allow it in the address bar’s site settings and try again.';
-    }
-    if (error?.name === 'NotFoundError') return 'No audio input was found. Plug in your interface or mic and try again.';
-    if (error?.name === 'NotReadableError') return 'That input is busy or unavailable (another app may have it exclusively).';
-    if (kind === 'file') return error?.name === 'NotAllowedError' ? 'The browser held the sound back. Click the page once, then try the file again.' : 'That file couldn’t be played. Try an MP3, WAV, AAC or FLAC file.';
-    return error?.message || 'Something went wrong starting the sound.';
   }
 
   async function listDevices() {
