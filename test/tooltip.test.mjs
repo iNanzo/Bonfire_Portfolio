@@ -439,6 +439,25 @@ test('installTooltips: Esc closes the tip and stops the dialog closing on that s
   assert.equal(p.shown(), false);
 });
 
+test('installTooltips: outside a dialog, Esc closes the tip and the page’s own Esc still runs on that press', () => {
+  const p = page();
+  installTooltips({ doc: p.doc });
+  // (Photo mode's Save Picture, focused on entry: its tip shows, and one Esc leaves photo mode.)
+  const save = new p.El('button', { 'data-tip': 'Save this frame as a PNG.' }).at(600, 650, 120, 40);
+  p.doc.body.append(save);
+  save.focusVisible = true;
+  p.fire('focusin', { target: save });
+  assert.equal(p.shown(), true);
+  const key = p.fire('keydown', { key: 'Escape', target: save });
+  assert.equal(p.shown(), false, 'the tip goes');
+  assert.ok(!key.defaultPrevented && !key.stopped, 'and the key goes on to the page');
+  // Nor is the next dialog's cancel stopped by it.
+  p.fire('keyup', { key: 'Escape' });
+  const dialog = new p.El('dialog', { open: '' }).at(100, 100, 900, 500);
+  p.doc.body.append(dialog);
+  assert.equal(p.fire('cancel', { target: dialog }).defaultPrevented, false);
+});
+
 test('installTooltips: a tip goes when its trigger is drawn over, or scrolls out of the box it is in', () => {
   const p = page();
   installTooltips({ doc: p.doc });

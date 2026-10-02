@@ -2,8 +2,9 @@
 // in it), its two groups (Go To hides where the header has tabs) and its arrow keys, the
 // keyboard shortcuts (?), the pack's Anvil and Spell Tome in labelled groups, the render
 // settings from the menu (touch too: a close button, no P to press) with the cursor's pick
-// remembered, and the keys that mustn't fire while typing or with Shift (or, in photo mode,
-// close it from under the keys list).
+// remembered, the keys that mustn't fire while typing or with Shift (or, in photo mode,
+// close it from under the keys list), and one Esc doing its job while a focused control's
+// tip shows.
 import { test, expect } from '@playwright/test';
 
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
@@ -124,12 +125,40 @@ test('photo mode: ? lists the keys over it, and Esc closes the list, not photo m
   await expect(keys).toBeHidden();
   await expect(bar).toBeVisible();
   await expect(page.locator('html')).toHaveClass(/is-photo/);
-  // Then Esc gives the page back (after closing the tooltip of the button focus went back
-  // to, if it showed one: an Esc closes a tooltip, and only it).
-  if (await page.locator('.ui-tip').isVisible()) await page.keyboard.press('Escape');
+  // Then one Esc gives the page back (the tip of the button focus went back to, if it shows
+  // one, goes with it).
   await page.keyboard.press('Escape');
   await expect(bar).toBeHidden();
   await expect(page).toHaveURL(/\/experience\/$/);
+  expect(errors).toEqual([]);
+});
+
+test('one Esc does its job with a tip showing on what’s focused: F then Esc leaves photo mode; a focused skill then Esc goes back', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  const tip = page.locator('.ui-tip');
+  await page.goto('/experience/');
+  await ready(page);
+  // Photo mode puts the focus on Save Picture, whose tip shows; one Esc takes both away.
+  await page.keyboard.press('f');
+  const bar = page.locator('.photo-bar');
+  await expect(bar).toBeVisible();
+  await expect(tip).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(bar).toBeHidden();
+  await expect(tip).toBeHidden();
+  await expect(page.locator('html')).not.toHaveClass(/is-photo/);
+  await expect(page).toHaveURL(/\/experience\/$/);
+  // A skill focused from the keyboard shows its tip; one Esc goes back to the start.
+  await page.goto('/skills/');
+  await ready(page);
+  await page.keyboard.press('Shift'); // (so the focus that follows is the keyboard's: :focus-visible)
+  await page.locator('[data-skill]').first().focus();
+  await expect(tip).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/');
+  await expect(tip).toBeHidden();
   expect(errors).toEqual([]);
 });
 

@@ -20,7 +20,8 @@
 //              field whose hint a "?" shows (the field's aria-describedby names the hint the
 //              "?" is described by too). Touch: a tap on a "?" (or on a trigger marked
 //              data-tip-tap, one a tap does nothing else with: the site's skills) opens or
-//              closes its tip; a tap anywhere else closes it. Esc closes it, and only it: an open dialog stays open.
+//              closes its tip; a tap anywhere else closes it. Esc closes it: in an open dialog
+//              only it (the dialog stays open), elsewhere the page's own Esc runs too.
 //              Nothing closes a tip on a timer while it's being read.
 //   what       the trigger's data-tip, under its data-tip-title in bold if it has one: set as
 //              text, never markup. The tip itself is aria-hidden: every trigger already reads
@@ -366,7 +367,13 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
   }
   function onKey(e) {
     if (e.key !== 'Escape' || !current) return;
+    // (Only an open dialog under the tip is kept from closing on the Esc that closes the tip.
+    // Anywhere else the page's own Esc runs on the same press: leaving photo mode, closing
+    // the pack or the render settings, going back a screen; a focused control shows a tip,
+    // and one Esc has always done those.)
+    const inDialog = !!current.trigger.closest('dialog[open]');
     hide();
+    if (!inDialog) return;
     e.preventDefault();
     e.stopPropagation();
     escaped = true;

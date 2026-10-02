@@ -78,6 +78,25 @@ test('search: "strobe" finds the flashes in every tab, each tab counting its fin
   expect(errors).toEqual([]);
 });
 
+test('Esc with a focused field’s tip showing takes the tip away and leaves the dialog open; the next Esc closes it', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await open(page);
+  await page.keyboard.press('s');
+  await expect(dialog(page)).toBeVisible();
+  const tip = page.locator('.ui-tip');
+  await page.keyboard.press('Shift'); // (so the focus that follows is the keyboard's: :focus-visible)
+  await page.locator('[data-set="sensitivity"]').focus();
+  await expect(tip).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(tip).toBeHidden();
+  await expect(dialog(page)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog(page)).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
 test('search: a row only All Settings has shows in the Simple view, badged; ↓ goes into the results; Enter reveals one', async ({
   page,
 }) => {
