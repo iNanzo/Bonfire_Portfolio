@@ -10,7 +10,10 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  # A deploy that has started finishes (GitHub's advice for Pages); runs queued behind it
+  # are skipped for the newest one. Cancelling it left a red "cancelled" check on a commit
+  # whenever another merge followed it quickly.
+  cancel-in-progress: false
 
 jobs:
   # Nothing deploys unless the code lints, type-checks, every test passes and the built
