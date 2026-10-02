@@ -128,6 +128,10 @@
     "admin/server/auth.js",
     "admin/server/bytes.js",
     "admin/server/errors.js",
-    "src/bonfire/colliders.js"
+    "src/bonfire/colliders.js",
+    "src/bonfire/knightRig.js",
+    "src/bonfire/knightSolve.js",
+    "src/bonfire/knightBody.js",
+    "src/bonfire/knightGestures.js"
   ]
 }
