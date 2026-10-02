@@ -27,7 +27,7 @@
 // Pure (no DOM, no three.js): the admin's API and node's tests use it as it is. The
 // vocabularies come from the engine's own tables (looks.js PARAMS and friends, render.js,
 // knightShow.js, the knight's steel finishes), so the format can't drift from what plays.
-import { contrast, HEX_RE, ID_RE, luminance, slugify, WEAPON_KEYS } from './ruleBasics.js';
+import { contrast, HEX_RE, ID_RE, isObj, luminance, slugify, WEAPON_KEYS } from './ruleBasics.js';
 import { BASE_COLORS, DEFAULT_EFFECTS, ELEMENT_IDS } from './effectsDefaults.js';
 import { SCENERIES } from './sceneries.js';
 import { HELMET_NAMES } from './knightNames.js';
@@ -132,7 +132,6 @@ const LOOK_PARAM_KEYS = /* @__PURE__ */ (() => [...new Set(Object.values(LOOK_PA
 export const DETAIL_KEYS = /* @__PURE__ */ (() => [...new Set(Object.values(LAYER_DETAILS).flat())])();
 const TOP_KEYS = ['v', 'id', 'name', 'hidden', 'music', 'place', 'colors', 'fire', 'camera', 'look', 'layers', 'details', 'blends', 'drops', 'render', 'knights', 'fireflies'];
 
-const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const own = (o, k) => isObj(o) && Object.hasOwn(o, k);
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 /** @type {(v: number, range: readonly (number | string)[]) => number} */

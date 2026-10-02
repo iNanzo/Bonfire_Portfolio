@@ -20,7 +20,7 @@
 //               (otherwise the Painter opens a new tab).
 // With no localStorage at all (a private window that blocks it) the store keeps the
 // scenes in memory for the visit (`persistent` is false), so nothing throws.
-import { ID_RE } from './ruleBasics.js';
+import { ID_RE, isObj } from './ruleBasics.js';
 import { normalizeScene, parseRef, sceneRef, SCENE_VERSION, uniqueSceneId } from './scenes.js';
 
 /** @typedef {import('./scenes.js').Scene} Scene */
@@ -36,8 +36,6 @@ export const ANSWER_MS = 300;
 // Remote changes arriving close together (a message and a storage event for one save)
 // are told once.
 const COALESCE_MS = 40;
-
-const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 /** A Storage-shaped map, for when the browser has no localStorage to give. */
 function memoryStorage() {

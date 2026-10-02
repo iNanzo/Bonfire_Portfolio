@@ -7,7 +7,7 @@ import {
   BASE_COLORS, CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, ELEMENT_IDS, KNIGHT_ARRIVALS, KNIGHT_FINISHES, KNIGHT_HELMETS, KNIGHT_SEATS,
   KNIGHT_STYLES, RANGES,
 } from './effectsDefaults.js';
-import { contrast, HEX_RE, ID_RE, WEAPON_KEYS } from './ruleBasics.js';
+import { contrast, HEX_RE, ID_RE, isObj, WEAPON_KEYS } from './ruleBasics.js';
 import { validateScenes } from './scenes.js';
 
 // The basics moved to ruleBasics.js (so scenes.js can use them); re-exported for everyone
@@ -47,8 +47,6 @@ export function imageRefs(c) {
   for (const p of inventoryEntries(c)) for (const im of Array.isArray(p.images) ? p.images : []) if (typeof im?.src === 'string') refs.add(im.src);
   return refs;
 }
-
-const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 /**
  * Check the `effects` section. `err(path, message)` gets paths like
