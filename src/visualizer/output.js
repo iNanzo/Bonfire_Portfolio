@@ -47,7 +47,7 @@ export function createOutput(ctx) {
       if (el.tagName !== 'LINK') return el.cloneNode(true);
       const link = output.document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = el.href;
+      link.href = /** @type {HTMLLinkElement} */ (el).href;
       return link;
     }));
     output.document.body.innerHTML = `

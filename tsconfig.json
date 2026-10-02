@@ -107,6 +107,10 @@
     "src/visualizer/keys.js",
     "src/visualizer/tickBatch.js",
     "src/visualizer/context.js",
-    "src/visualizer/markup.js"
+    "src/visualizer/markup.js",
+    "src/visualizer/cards.js",
+    "src/visualizer/hud.js",
+    "src/visualizer/midiUi.js",
+    "src/visualizer/output.js"
   ]
 }
