@@ -210,7 +210,8 @@ keys overlay; the HUD's **Keys** button opens it too, and in Settings `?` or the
   brings them back) · `F` full screen · `O` the output window · `V` record · `S` settings ·
   `/` the settings' search · `I` the pack · `?` the shortcuts.
 
-The controls and cursor hide when the mouse rests. The HUD's *Moments* have **Living
+The controls and cursor hide when the mouse rests on the picture (not while it rests on the
+controls, so a tooltip stays to be read). The HUD's *Moments* have **Living
 Weapon** (X) and a **Dance** button (K), and its state line says what the knights are
 doing ("In the groove · 3 knights dance"). Under it, **Scene: Name** names the preset
 scene playing ("The Free Show" between them); a click opens Scenes & Cards, and pointing

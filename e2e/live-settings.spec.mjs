@@ -580,3 +580,25 @@ test('Frame Rate 30 caps how often the picture is drawn; Display takes the cap o
     .toBe('60');
   expect(errors).toEqual([]);
 });
+
+test('the HUD stays while the mouse rests on it (its tip with it), and fades when it rests on the picture', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await open(page);
+  await page.click('[data-source="demo"]');
+  const drop = page.locator('[data-hud] [data-act="drop"]');
+  await expect(drop).toBeVisible();
+  const at = await drop.boundingBox();
+  await page.mouse.move(at.x + at.width / 2 - 2, at.y + at.height / 2);
+  await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+  await expect(page.locator('.ui-tip')).toBeVisible();
+  await page.waitForTimeout(3600); // past the 3 s the HUD waits before fading
+  await expect(page.locator('body')).not.toHaveClass(/is-idle/);
+  await expect(page.locator('.ui-tip')).toBeVisible();
+  // Off the HUD, over the picture, the same rest fades it.
+  await page.mouse.move(640, 260);
+  await expect(page.locator('body')).toHaveClass(/is-idle/, { timeout: 8000 });
+  expect(errors).toEqual([]);
+});
