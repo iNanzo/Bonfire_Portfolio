@@ -34,7 +34,8 @@
     "e2e": "playwright test",
     "bench": "node tools/bench-viz.mjs",
     "bench:compare": "node tools/bench-compare.mjs",
-    "check": "npm run lint && npm run typecheck && npm run test:all"
+    "check": "npm run lint && npm run typecheck && npm run format:check && npm run test:all",
+    "prepare": "simple-git-hooks"
   },
   "dependencies": {
     "@fontsource/cinzel": "^5.3.0",
@@ -48,9 +49,21 @@
     "c8": "^12.0.0",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.9.9",
     "sharp": "^0.35.4",
+    "simple-git-hooks": "^2.14.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.1"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{css,html,json,yml,yaml}": "prettier --write"
   }
 }

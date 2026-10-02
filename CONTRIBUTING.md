@@ -51,7 +51,12 @@ The [README](README.md) lists every script; [docs/](docs/) has how each app beha
 
 Prettier's settings are in `.prettierrc.json` (120 columns, single quotes, semicolons,
 trailing commas); `npm run format` applies them and `npm run format:check` lists what
-differs. `.editorconfig` sets the basics for any editor.
+differs (`npm run check` and CI run it). `.editorconfig` sets the basics for any editor.
+
+A pre-commit hook (simple-git-hooks, installed by `npm install`) runs lint-staged:
+Prettier and `eslint --fix` on the files you're committing. The one commit that formatted
+the whole repo is listed in `.git-blame-ignore-revs`; to have `git blame` skip it locally,
+run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once (GitHub already does).
 
 `src/content.json` is never formatted: the admin writes it with `JSON.stringify` on every
 save, so hand-formatting would only be undone. Edit it through the admin
