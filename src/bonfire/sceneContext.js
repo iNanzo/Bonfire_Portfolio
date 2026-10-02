@@ -1,8 +1,27 @@
 // What the bonfire's parts share. scene.js (createBonfire) makes one `ctx` and keeps on it
 // every value that more than one part of the scene reads or changes, so each lives in one
 // place: the hit's weight, the flame's colors, the weapons and the knights once they're in,
-// the place the fire is in. Nothing here runs: it's the list of what's in `ctx`, for the
-// reader and the type check.
+// the place the fire is in. Here: the constants and the small helpers more than one part
+// uses, and the list of what's in `ctx` (typedefs only, for the reader and the type check).
+import * as THREE from 'three';
+import { effects } from '../effects.js';
+import { flames } from '../palette.js';
+
+// The passes' layers (frame.js): solid geometry (outlined: the normals and color passes),
+// the additive particles (the fx pass), and the "ghost" emissives only the color pass draws.
+export const LAYER_SOLID = 0;
+export const LAYER_FX = 1;
+export const LAYER_GHOST = 2;
+export const FIRE_ORIGIN = new THREE.Vector3(0.02, 0.12, 0.02);
+export const WEAPON_ANCHOR = new THREE.Vector3(0.04, 0, 0.03);
+
+/** How much of the fire burns for an element: all of it, a banked glow in the ice, none in the ball. */
+export const flameShare = (key) => (key === 'fire' ? 1 : key === 'ice' ? effects.ice.innerFire : 0);
+// Keep the cast light less saturated than the flame so lit stone lands on the
+// dark tinted shade, with the ramp's mid tone only in hot spots.
+export const lightMix = (key) => flames[key]?.light ?? 0.34;
+/** A drive value (a fraction added: scene.js `drive`) as a factor, never below 0.1. */
+export const boost = (v) => Math.max(0.1, 1 + v);
 
 /**
  * What the scene is doing. Each value is set where its part of the scene says what it is
@@ -61,5 +80,3 @@
  */
 
 /** @typedef {SceneState} SceneContext */
-
-export {};

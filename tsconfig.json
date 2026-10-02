@@ -133,5 +133,6 @@
     "src/bonfire/knightSolve.js",
     "src/bonfire/knightBody.js",
     "src/bonfire/knightGestures.js"
+    "src/bonfire/sceneContext.js"
   ]
 }

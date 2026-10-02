@@ -61,14 +61,10 @@ import { mergeSteps } from './sceneryMerge.js';
 import { passValue, stillClock } from './stillFx.js';
 import { base, flames, flameOr, scenePalette, debugPalettes, mixFlame, flameEase } from '../palette.js';
 import { PIXEL_SIZES } from '../pixelSizes.js';
+import { LAYER_SOLID, LAYER_FX, LAYER_GHOST, FIRE_ORIGIN, WEAPON_ANCHOR, flameShare, lightMix, boost } from './sceneContext.js';
 
 const BASE = import.meta.env.BASE_URL;
-const LAYER_SOLID = 0;
-const LAYER_FX = 1;
-const LAYER_GHOST = 2;
 const LIGHT_FPS = 12;
-const FIRE_ORIGIN = new THREE.Vector3(0.02, 0.12, 0.02);
-const WEAPON_ANCHOR = new THREE.Vector3(0.04, 0, 0.03);
 
 const DEBUG_PALETTES = Object.keys(debugPalettes);
 const DITHER_LEVELS = [0.08, 0.16, 0.26]; // (the render menu steps up through these from the current value, then to none)
@@ -278,8 +274,6 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     for (const id of ELEMENT_IDS) presence[id] = id === ctx.elementKey ? 1 : 0;
     if (ctx.elementKey !== 'fire') fire.extinguish();
   }
-  /** How much of the fire burns for an element: all of it, a banked glow in the ice, none in the ball. */
-  const flameShare = (key) => (key === 'fire' ? 1 : key === 'ice' ? effects.ice.innerFire : 0);
 
   // Live modulation from outside (the audio visualizer writes it every frame). All
   // zeros is the fire as the settings describe it; each value is a fraction added
@@ -310,7 +304,6 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // (`paintedLook`) lets the look being painted through, all but what flashes or jitters
   // (stillFx.js).
   const stillOpts = { reducedMotion, paintedLook };
-  const boost = (v) => Math.max(0.1, 1 + v);
   // The site's hover on the fire (hoverAt, below): 1 while the cursor is on it, and eased,
   // how far the fire has risen, brightened and started sparking to meet it (update).
   ctx.hoverFlare = 0;
@@ -377,9 +370,6 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   const white = new THREE.Color('#ffffff');
   const lightBase = new THREE.Color(); // the cast light's color before the temperature
   const lightWarm = new THREE.Color(); // ...and what a warm temperature leans it toward
-  // Keep the cast light less saturated than the flame so lit stone lands on the
-  // dark tinted shade, with the ramp's mid tone only in hot spots.
-  const lightMix = (key) => flames[key]?.light ?? 0.34;
   // While a weapon is being forged, the next flame's colors join the palette so
   // the forge particles and the new weapon's glow can actually show them; after
   // the impact, the flame being blended to stays in until the blend is done.
