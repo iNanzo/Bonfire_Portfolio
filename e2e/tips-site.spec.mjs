@@ -7,6 +7,7 @@
 // is left on the site.
 import { test, expect } from '@playwright/test';
 import { collectTips, checkTip, assertInViewport, tipOf } from './lib/tips.mjs';
+import { startsWith, ui } from './lib/content.mjs';
 
 const SIZES = [
   { name: '1280×720', viewport: { width: 1280, height: 720 }, touch: false },
@@ -138,7 +139,7 @@ for (const size of SIZES) {
       await ready(page);
       // Render Settings from the menu: every row's tip, and its close button's.
       await tap(page.locator('[data-menu-open]'));
-      await tap(page.getByRole('button', { name: /^Render Settings/ }));
+      await tap(page.getByRole('button', { name: startsWith(ui.renderMenu ?? 'Render Settings') }));
       const hud = page.locator('.debug-hud');
       await expect(hud).toBeVisible();
       expect(await checkAll(page, '.debug-hud', { ...size, label: 'render settings' })).toBe(7);
@@ -148,7 +149,7 @@ for (const size of SIZES) {
       // The photo toolbar (F; a phone gets there from the menu).
       if (size.touch) {
         await tap(page.locator('[data-menu-open]'));
-        await tap(page.getByRole('button', { name: /^Photo Mode/ }));
+        await tap(page.getByRole('button', { name: startsWith(ui.photo) }));
       } else await page.keyboard.press('f');
       await expect(page.locator('.photo-bar')).toBeVisible();
       expect(await checkAll(page, '.photo-bar', { ...size, label: 'photo' })).toBe(3);
@@ -203,7 +204,9 @@ for (const size of SIZES) {
         })
         .catch(() => {});
       const knight = page.locator('[data-pack-list="knight"]');
-      await expect(knight.getByRole('group', { name: 'Finish', exact: true })).toContainText('wear their own colors');
+      await expect(knight.getByRole('group', { name: ui.packFinishes ?? 'Finish', exact: true })).toContainText(
+        'wear their own colors',
+      );
       expect(await checkAll(page, '[data-pack-list="knight"]', { ...size, label: 'knight' })).toBe(10); // (6 styles, 4 finishes)
       await assertHeard(page, '[data-pack-list="knight"]');
       expect(errors).toEqual([]);

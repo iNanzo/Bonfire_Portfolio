@@ -13,7 +13,15 @@ globalThis.document ??= /** @type {any} */ ({
 const { buildIndex, crumbsOf, matcherFor, pageById, pageOf, revealPlan, snippetOf } = await import('../ui/search.js');
 const { PAGES } = await import('../ui/schema.js');
 
-const content = () => JSON.parse(readFileSync(new URL('../../src/content.json', import.meta.url), 'utf8'));
+// The site's content as it is now, with the few words these tests search for set on it: the
+// admin can rename any of them, so they're the tests' own, never content.json's pinned.
+const content = () => {
+  const draft = JSON.parse(readFileSync(new URL('../../src/content.json', import.meta.url), 'utf8'));
+  draft.ui.packMapVerb = 'Fast Travel';
+  draft.about.paragraphs[0] =
+    'A long paragraph, the kind the About page opens with: well over the length past which a text is searched by its field and not by its words.';
+  return draft;
+};
 const top = (draft, query, n = 1) =>
   matcherFor(buildIndex(draft))(query)
     .slice(0, n)

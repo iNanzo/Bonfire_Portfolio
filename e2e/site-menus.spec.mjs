@@ -6,6 +6,10 @@
 // close it from under the keys list), and one Esc doing its job while a focused control's
 // tip shows.
 import { test, expect } from '@playwright/test';
+import { screenLabel, startsWith, ui } from './lib/content.mjs';
+
+// The names content.json gives (the admin can rename them): read, never pinned.
+const RENDER = ui.renderMenu ?? 'Render Settings';
 
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
 function watch(page) {
@@ -39,14 +43,14 @@ test('the Menu button shows on desktop; Go To hides there (the tabs do it), Tool
     0,
   );
   // Focus starts on the first item that shows, and the arrows skip the hidden ones.
-  expect(await focusedText(page)).toMatch(/^Photo Mode/);
+  expect(await focusedText(page)).toMatch(startsWith(ui.photo));
   await page.keyboard.press('ArrowUp');
-  expect(await focusedText(page)).toMatch(/^Close/);
+  expect(await focusedText(page)).toMatch(startsWith(ui.close));
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
-  expect(await focusedText(page)).toMatch(/^How It’s Made/);
+  expect(await focusedText(page)).toMatch(startsWith(ui.breakdown));
   // Discoveries: the dialog, with every discovery (found or a hint).
-  await page.getByRole('button', { name: /^Discoveries/ }).click();
+  await page.getByRole('button', { name: startsWith(ui.discoveries) }).click();
   const list = page.locator('[data-discoveries]');
   await expect(list).toBeVisible();
   await expect(menu).toBeHidden();
@@ -74,7 +78,10 @@ test('a phone: the menu has Go To and Tools, and nothing needs a scroll to reach
   const close = page.locator('[data-menu] [data-menu-close]');
   const box = await close.boundingBox();
   expect(box && box.y + box.height).toBeLessThanOrEqual(844);
-  await page.getByRole('link', { name: 'Skills' }).first().tap();
+  await page
+    .getByRole('link', { name: screenLabel('skills') })
+    .first()
+    .tap();
   await expect(page).toHaveURL(/\/skills\/$/);
   await expect(page.locator('[data-menu]')).toBeHidden();
   expect(errors).toEqual([]);
@@ -209,10 +216,10 @@ test('the pack’s Anvil: the living weapon first, then the weapons in labelled 
   const groups = anvil.getByRole('group');
   await expect(groups).toHaveCount(4);
   for (const [name, has, hasNot] of [
-    ['Swords', 'longsword', 'spear'],
-    ['Greatswords', 'claymore', 'mace'],
-    ['Polearms', 'wingedspear', 'katana'],
-    ['Axes & Hammers', 'warhammer', 'longsword'],
+    [ui.packSwords ?? 'Swords', 'longsword', 'spear'],
+    [ui.packGreatswords ?? 'Greatswords', 'claymore', 'mace'],
+    [ui.packPolearms ?? 'Polearms', 'wingedspear', 'katana'],
+    [ui.packAxes ?? 'Axes & Hammers', 'warhammer', 'longsword'],
   ]) {
     const g = anvil.getByRole('group', { name, exact: true });
     await expect(g).toBeVisible();
@@ -223,8 +230,8 @@ test('the pack’s Anvil: the living weapon first, then the weapons in labelled 
   expect(await anvil.locator('[data-pack-option]').count()).toBe(24); // (23 weapons and the living weapon)
   await page.locator('[data-pack-slot="tome"]').click();
   const tome = page.locator('[data-pack-list="tome"]');
-  await expect(tome.getByRole('group', { name: 'Elements' })).toBeVisible();
-  await expect(tome.getByRole('group', { name: 'Flame Colors' })).toBeVisible();
+  await expect(tome.getByRole('group', { name: ui.packSpells ?? 'Elements' })).toBeVisible();
+  await expect(tome.getByRole('group', { name: ui.packColors ?? 'Flame Colors' })).toBeVisible();
   await expect(tome.locator('[data-pack-option="living"]')).toHaveCount(0);
   await expect(tome.locator('[data-pack-option="element:ice"]')).toHaveAttribute('data-tip', /forges a new weapon/i);
   await page.keyboard.press('Escape');
@@ -238,14 +245,14 @@ test('render settings from the menu: grouped rows with their keys; the cursor’
   await page.goto('/');
   await ready(page);
   await page.locator('[data-menu-open]').click();
-  await page.getByRole('button', { name: /^Render Settings/ }).click();
+  await page.getByRole('button', { name: startsWith(RENDER) }).click();
   const hud = page.locator('.debug-hud');
   await expect(hud).toBeVisible();
   await expect(hud.locator('[data-render-row="pixel"]')).toBeFocused();
   await expect(hud.getByRole('group', { name: 'Picture' })).toBeVisible();
   const cursor = hud.getByRole('group', { name: 'Interaction' }).locator('[data-render-row="interaction"]');
   await expect(cursor).toHaveAttribute('aria-keyshortcuts', '6');
-  await expect(hud.locator('[data-render-reset]')).toContainText('Reset Render Settings');
+  await expect(hud.locator('[data-render-reset]')).toContainText(ui.renderReset ?? 'Reset Render Settings');
   const was = (await cursor.locator('b').textContent()).trim();
   await cursor.click();
   const now = (await cursor.locator('b').textContent()).trim();
@@ -273,10 +280,10 @@ test('touch: Render Settings opens from the menu and its close button closes it'
   await page.goto('/');
   await ready(page);
   await page.locator('[data-menu-open]').tap();
-  await page.getByRole('button', { name: /^Render Settings/ }).tap();
+  await page.getByRole('button', { name: startsWith(RENDER) }).tap();
   const hud = page.locator('.debug-hud');
   await expect(hud).toBeVisible();
-  const close = hud.getByRole('button', { name: 'Close Render Settings' });
+  const close = hud.getByRole('button', { name: `Close ${RENDER}` });
   await expect(close).toBeVisible();
   await hud.locator('[data-render-row="outlines"]').tap();
   await close.tap();

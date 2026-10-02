@@ -60,6 +60,21 @@ const focusedPath = (page) =>
   page.evaluate(() => document.activeElement?.closest('[data-path]')?.getAttribute('data-path') ?? null);
 
 /**
+ * The admin given its content with the pack's map action named "Fast Travel", whatever
+ * content.json calls it now: the admin can rename it, so the words searched for are the
+ * test's own, never pinned from the file.
+ */
+const FAST_TRAVEL = 'Fast Travel';
+async function withPackVerb(page) {
+  await page.route('**/api/content', async (route) => {
+    const response = await route.fetch();
+    const json = await response.json();
+    json.content.ui.packMapVerb = FAST_TRAVEL;
+    await route.fulfill({ response, json });
+  });
+}
+
+/**
  * Where the focused control is, and the part of the window it should be in: below whatever
  * sticks across the top (the top bar; on a phone the page strip; under 1280 px a pinned preview).
  */
@@ -160,13 +175,14 @@ test('Ctrl+K “dither” + Enter lands on Dither, on Picture, focused', async (
 });
 
 test('“Fast Travel” finds the pack’s Map action; / opens the search and Esc clears, then closes', async ({ page }) => {
+  await withPackVerb(page);
   await open(page, 'colors');
   await page.keyboard.press('/');
   await expect(page.locator('#admin-search-input')).toBeFocused();
-  await page.keyboard.type('Fast Travel');
+  await page.keyboard.type(FAST_TRAVEL);
   const first = page.locator('#admin-search-list .search-result').first();
   await expect(first).toHaveAttribute('data-key', 'ui.packMapVerb');
-  await expect(first.locator('.sr-hint')).toContainText('Fast Travel');
+  await expect(first.locator('.sr-hint')).toContainText(FAST_TRAVEL);
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('Enter');
@@ -190,13 +206,14 @@ for (const [w, h] of [
 ]) {
   test(`at ${w}×${h} a result lands in sight, below the bars and the pinned preview`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
+    await withPackVerb(page);
     // From a page with the preview: fields on other preview pages, far down them, and one on
     // a page without it (the room below the bars changes on the way).
     const trips = [
       ['edge glow', 'effects.knight.rim'],
       ['reactions', 'effects.knight.reactions'],
       ['screen shake', 'effects.render.shake'],
-      ['fast travel', 'ui.packMapVerb'],
+      [FAST_TRAVEL.toLowerCase(), 'ui.packMapVerb'],
     ];
     for (const [query, key] of trips) {
       await open(page, 'colors');

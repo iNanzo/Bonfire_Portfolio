@@ -34,6 +34,9 @@ The [README](README.md) lists every script; [docs/](docs/) has how each app beha
   loads included, and fails if it drops under the thresholds in `.c8rc.json`. When new
   tests raise it, run `npm run coverage:ratchet` and commit the raised thresholds with
   them. The report is in `coverage/` (open `coverage/lcov-report/index.html`).
+- **Content wording.** Tests must not pin `src/content.json` wording: the admin edits it and a
+  save deploys only if the tests pass, so read the text from the content (`src/content.js`,
+  `e2e/lib/content.mjs`) or set it on the test's own fixture.
 - **Browser tests.** They need WebGL. Locally, `PW_CHANNEL=chrome npm run e2e` (or `msedge`)
   uses your installed browser instead of downloading Playwright's. `PW_PREBUILT=1` serves the
   `dist/` you already built instead of building again; `PW_PORT=4180` moves the preview

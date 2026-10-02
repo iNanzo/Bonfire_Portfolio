@@ -129,11 +129,13 @@ test('a partial element setting keeps the rest of its defaults', () => {
 });
 
 test('the fire is named for its flame color and element', () => {
+  // (The elements' names are content.json's, which the admin can rename: read, not pinned.)
+  const { lightning, ice } = elements;
   assert.equal(flameTitle('Azure Flame', 'fire'), 'Azure Flame');
-  assert.equal(flameTitle('Azure Flame', 'lightning'), 'Azure Lightning');
-  assert.equal(flameTitle('Ember Flame', 'ice'), 'Ember Frost');
+  assert.equal(flameTitle('Azure Flame', 'lightning'), `Azure ${lightning.name}`);
+  assert.equal(flameTitle('Ember Flame', 'ice'), `Ember ${ice.name}`);
   assert.equal(flameTitle('Moonlight', 'fire'), 'Moonlight');
-  assert.equal(flameTitle('Moonlight', 'ice'), 'Moonlight Frost');
+  assert.equal(flameTitle('Moonlight', 'ice'), `Moonlight ${ice.name}`);
   assert.equal(flameTitle('Azure Flame', 'nope'), 'Azure Flame');
 });
 

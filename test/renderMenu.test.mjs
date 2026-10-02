@@ -101,9 +101,11 @@ test('render menu: titled Render Settings by default, a HUD has a close button, 
     /collapse === 'all' \? `<button class="render-menu-close" type="button" aria-label="Close \$\{esc\(title\)\}" data-tip="Close \(\$\{esc\(toggleKey\)\} or Esc\)" aria-keyshortcuts="\$\{esc\(toggleKey\)\} Escape"/,
     'its keys said too',
   );
-  const content = JSON.parse(fs.readFileSync(new URL('../src/content.json', import.meta.url), 'utf8'));
-  assert.equal(content.ui.renderMenu, 'Render Settings');
-  assert.equal(content.ui.renderReset, 'Reset Render Settings');
+  // The site's menu and its reset take their names from content.json (the admin can rename
+  // them, so they aren't pinned here), with the same defaults.
+  const site = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(site, /title: ui\.renderMenu \?\? 'Render Settings'/);
+  assert.match(site, /label: ui\.renderReset \?\? 'Reset Render Settings'/);
 });
 
 test('render menu: one list of pixel sizes for the site, Bonfire Live and the Painter', async () => {

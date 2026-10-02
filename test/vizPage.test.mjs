@@ -7,6 +7,9 @@ import assert from 'node:assert/strict';
 import { pageMarkup, HUD_TIPS } from '../src/visualizer/markup.js';
 import { KEY_GROUPS } from '../src/visualizer/keys.js';
 import { wieldLabel } from '../src/visualizer/hud.js';
+import { weapons } from '../src/content.js';
+import { flames } from '../src/palette.js';
+import { elements, flameTitle } from '../src/elements.js';
 import { describeError } from '../src/visualizer/sources.js';
 
 const html = pageMarkup({
@@ -93,9 +96,18 @@ test('the HUD’s keys: each key a chip or a tip names is one of the shortcuts, 
 });
 
 test('the HUD’s weapon line: the weapon’s name, and its flame in its element', () => {
-  assert.equal(wieldLabel({ weapon: 'uchigatana', flame: 'ember', element: 'fire' }), 'Uchigatana · Ember Flame');
-  assert.equal(wieldLabel({ weapon: 'uchigatana', flame: 'ember', element: 'ice' }), 'Uchigatana · Ember Frost');
-  assert.equal(wieldLabel({ weapon: 'longsword', flame: 'blood' }), 'Longsword · Blood Flame', 'no element: fire');
+  // (Weapon, flame and element names are content.json's, which the admin can rename: read,
+  // not pinned.)
+  const ember = (element) => `${weapons.uchigatana} · ${flameTitle(flames.ember.name, element)}`;
+  assert.equal(wieldLabel({ weapon: 'uchigatana', flame: 'ember', element: 'fire' }), ember('fire'));
+  const ice = wieldLabel({ weapon: 'uchigatana', flame: 'ember', element: 'ice' });
+  assert.equal(ice, ember('ice'));
+  assert.ok(ice.endsWith(` ${elements.ice.name}`), 'its flame in its element');
+  assert.equal(
+    wieldLabel({ weapon: 'longsword', flame: 'blood' }),
+    `${weapons.longsword} · ${flameTitle(flames.blood.name, 'fire')}`,
+    'no element: fire',
+  );
   assert.equal(wieldLabel({ weapon: 'nope', flame: 'nope', element: 'fire' }), ' · ', 'nothing known: nothing named');
 });
 

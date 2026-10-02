@@ -5,9 +5,32 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ICONS, pixelSvg } from '../src/ui/pixelArt.js';
 import { bonfireItems } from '../src/ui/pack.js';
-import { weapons } from '../src/content.js';
+import { weapons, ui } from '../src/content.js';
+import { elements } from '../src/elements.js';
 import { SCENERIES } from '../src/sceneries.js';
 import { flames, rotation } from '../src/palette.js';
+
+// The pack's names come from content.json (the admin can rename them): the tests read them,
+// with the code's own fallbacks, and never pin them.
+const NAMES = {
+  living: ui.packLiving ?? 'Living Weapon',
+  groups: [
+    ui.packSwords ?? 'Swords',
+    ui.packGreatswords ?? 'Greatswords',
+    ui.packPolearms ?? 'Polearms',
+    ui.packAxes ?? 'Axes & Hammers',
+  ],
+  ring: (element) => `${ui.packRing ?? 'Ring of'} ${elements[element].name}`.trim(),
+  spells: ui.packSpells ?? 'Elements',
+  colors: ui.packColors ?? 'Flame Colors',
+  knight: ui.packKnight ?? 'Knight',
+  gestures: ui.packGestures ?? 'Gestures',
+  helmet: ui.packHelmets ?? 'Helmet',
+  style: ui.packStyles ?? 'Style',
+  finish: ui.packFinishes ?? 'Finish',
+  summon: ui.packSummon ?? 'Summon',
+  dismiss: ui.packDismiss ?? 'Send Him Off',
+};
 
 test('pixel icons: every frame is 16×16 and draws line and accent pixels', () => {
   for (const [name, frames] of Object.entries(ICONS)) {
@@ -57,11 +80,11 @@ test('pack items: scenes, weapons and spells follow the fire', () => {
   // The Anvil: the living weapon first, then every weapon (even ones out of the draw) by kind.
   const forge = anvil.options();
   assert.equal(forge[0].id, 'living');
-  assert.equal(forge[0].label, 'Living Weapon');
+  assert.equal(forge[0].label, NAMES.living);
   assert.equal(forge[0].disabled, false);
   assert.deepEqual(
     forge.filter((o) => o.heading).map((o) => o.label),
-    ['Swords', 'Greatswords', 'Polearms', 'Axes & Hammers'],
+    NAMES.groups,
   );
   assert.deepEqual(
     forge
@@ -76,8 +99,8 @@ test('pack items: scenes, weapons and spells follow the fire', () => {
     ['katana'],
   );
   const swords = forge.slice(
-    forge.findIndex((o) => o.label === 'Swords') + 1,
-    forge.findIndex((o) => o.label === 'Greatswords'),
+    forge.findIndex((o) => o.label === NAMES.groups[0]) + 1,
+    forge.findIndex((o) => o.label === NAMES.groups[1]),
   );
   assert.ok(
     swords.some((o) => o.id === 'longsword') && !swords.some((o) => o.id === 'spear'),
@@ -85,11 +108,11 @@ test('pack items: scenes, weapons and spells follow the fire', () => {
   );
 
   const spells = tome.options();
-  assert.equal(spells[0].label, 'Ring of Frost', 'the ring is named for the element');
+  assert.equal(spells[0].label, NAMES.ring('ice'), 'the ring is named for the element');
   assert.ok(!spells.some((o) => o.id === 'living'), 'the living weapon moved to the Anvil');
   assert.deepEqual(
     spells.filter((o) => o.heading).map((o) => o.label),
-    ['Elements', 'Flame Colors'],
+    [NAMES.spells, NAMES.colors],
   );
   assert.deepEqual(
     spells.filter((o) => o.current).map((o) => o.id),
@@ -105,12 +128,12 @@ test('pack items: scenes, weapons and spells follow the fire', () => {
     colors.every((o) => /^#[0-9a-f]{6}$/i.test(o.swatch)),
     'each with a swatch',
   );
-  assert.match(colors[0].label, /Frost$/, 'named for the element it burns as now');
+  assert.ok(colors[0].label.endsWith(elements.ice.name), 'named for the element it burns as now');
   assert.equal(colors[0].swatch, flames[flameA].ramp[2]);
   busy = true;
   assert.equal(anvil.options().find((o) => o.id === 'living').disabled, true, 'no living weapon mid-forge');
   state = { ...state, element: 'lightning' };
-  assert.equal(tome.options()[0].label, 'Ring of Lightning');
+  assert.equal(tome.options()[0].label, NAMES.ring('lightning'));
 
   map.pick('shrine');
   anvil.pick('spear');
@@ -167,7 +190,6 @@ test('pack items: the site’s elements say what else they do; reduced motion sa
 
 test('the Anvil’s groups: every weapon the model has is in exactly one, and each group has a heading in the content', async () => {
   const { WEAPON_GROUPS, WEAPON_KEYS, UI_HEADINGS } = await import('../src/contentRules.js');
-  const { ui } = await import('../src/content.js');
   const all = Object.values(WEAPON_GROUPS).flat();
   assert.equal(all.length, new Set(all).size, 'no weapon in two groups');
   assert.deepEqual([...all].sort(), [...WEAPON_KEYS].sort(), 'every weapon in a group, and nothing else');
@@ -264,11 +286,11 @@ test('pack items: the knight is there only where the page has one; his helmets a
   );
   const knight = items[3];
   assert.equal(knight.icon, 'helm');
-  assert.equal(knight.name, 'Knight');
+  assert.equal(knight.name, NAMES.knight);
   const opts = knight.options();
   assert.deepEqual(
     opts.filter((o) => o.heading).map((o) => o.label),
-    ['Gestures', 'Helmet'],
+    [NAMES.gestures, NAMES.helmet],
     'gestures first',
   );
   assert.deepEqual(
@@ -316,7 +338,7 @@ test('pack items: the knight is there only where the page has one; his helmets a
   const still = bonfireItems({ ...base, reducedMotion: true, state: () => state, onHelmet() {} })[3].options();
   assert.ok(still.filter((o) => o.id?.startsWith('helm:')).every((o) => !o.disabled));
   assert.ok(still.filter((o) => o.id?.startsWith('gesture:')).every((o) => o.disabled && o.tip === MOTION_OFF));
-  assert.equal(still.find((o) => o.heading && o.label === 'Gestures').note, MOTION_OFF);
+  assert.equal(still.find((o) => o.heading && o.label === NAMES.gestures).note, MOTION_OFF);
   assert.ok(!opts.some((o) => o.note || o.tip), 'with motion, nothing to explain');
 });
 
@@ -364,7 +386,7 @@ test('pack items: the site’s knight comes and goes: Summon while he’s away, 
       .map((o) => o.id);
 
   // Away (his sign waits): only the summons, and the helm's eye slit is dark (the item's state).
-  assert.deepEqual(knight.options(), [{ id: 'summon', label: 'Summon', disabled: false }]);
+  assert.deepEqual(knight.options(), [{ id: 'summon', label: NAMES.summon, disabled: false }]);
   assert.equal(knight.state(), 'away');
   knight.pick('summon');
   // Forming: everything he'll offer, nothing to pick yet (and no second summons).
@@ -376,10 +398,10 @@ test('pack items: the site’s knight comes and goes: Summon while he’s away, 
   const opts = knight.options();
   assert.deepEqual(
     opts.filter((o) => o.heading).map((o) => o.label),
-    ['Gestures', 'Helmet', 'Style', 'Finish'],
+    [NAMES.gestures, NAMES.helmet, NAMES.style, NAMES.finish],
   );
   assert.equal(opts[0].id, 'dismiss');
-  assert.equal(opts[0].label, 'Send Him Off');
+  assert.equal(opts[0].label, NAMES.dismiss);
   assert.deepEqual(
     opts.filter((o) => o.id?.startsWith('style:')).map((o) => o.label),
     Object.values(STYLE_NAMES),
@@ -420,10 +442,10 @@ test('pack items: the site’s knight comes and goes: Summon while he’s away, 
   state = { ...state, style: 'blackgold' };
   const own = knight.options().filter((o) => o.id?.startsWith('finish:'));
   assert.ok(own.every((o) => o.disabled && !o.current && o.tip === OWN_COLORS));
-  assert.equal(knight.options().find((o) => o.heading && o.label === 'Finish').note, OWN_COLORS);
+  assert.equal(knight.options().find((o) => o.heading && o.label === NAMES.finish).note, OWN_COLORS);
   // Burning away into his sign: the summons again, not yet (he isn't gone).
   state = { ...state, presence: 'leaving' };
-  assert.deepEqual(knight.options(), [{ id: 'summon', label: 'Summon', disabled: true }]);
+  assert.deepEqual(knight.options(), [{ id: 'summon', label: NAMES.summon, disabled: true }]);
   assert.deepEqual(calls, [
     ['summon'],
     ['style', 'gunmetal'],
@@ -442,7 +464,7 @@ test('pack items: the site’s knight comes and goes: Summon while he’s away, 
       .options()
       .filter((o) => o.heading)
       .map((o) => o.label),
-    ['Gestures', 'Helmet'],
+    [NAMES.gestures, NAMES.helmet],
   );
   assert.ok(!live.options().some((o) => o.id === 'summon' || o.id === 'dismiss'));
 });
