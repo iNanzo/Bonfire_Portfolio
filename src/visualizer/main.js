@@ -49,16 +49,13 @@ import { applyFlame, setAccentRamp, setAccentRate } from '../ui/theme.js';
 import { esc } from '../html.js';
 import { BAND_NAMES } from './analyser.js';
 import { createDirector } from './director.js';
-import { modeOf } from './looks.js';
 import { densityCounts } from './density.js';
-import { loadSettings, flushSettings, defaults, frameCap } from './settings.js';
+import { loadSettings, flushSettings, frameCap } from './settings.js';
 import { markPreset } from './settingsDialog.js';
 import { createTickBatch } from './tickBatch.js';
-import { stepRender, renderText, XRAY_VIEWS, FOGS } from './render.js';
 import { HELMETS } from './knightShow.js';
 import { STYLE_NAMES } from '../bonfire/knightStyles.js';
 import { FINISH_NAMES } from '../bonfire/steel.js';
-import { createRenderMenu } from '../ui/renderMenu.js';
 import { pageMarkup } from './markup.js';
 import { createScenesUi } from './scenesUi.js';
 import { createCards } from './cards.js';
@@ -67,6 +64,7 @@ import { createHud, wieldLabel } from './hud.js';
 import { createStart } from './start.js';
 import { createActions } from './actions.js';
 import { createDialogs } from './dialogs.js';
+import { createRenderUi } from './renderUi.js';
 import { q, failScene } from '../ui/shell.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
@@ -252,63 +250,9 @@ Object.assign(ctx, createActions(ctx));
 // --- Settings and the keyboard shortcuts (dialogs.js) --------------------------------------------
 Object.assign(ctx, createDialogs(ctx));
 
-// --- Render Settings (P; ui/renderMenu.js, as on the site): the Picture tab's switches --------
-// Each row steps its setting (render.js RENDER_STEPS) and the picture follows at once. What
-// a switch in the mix is doing right now shows after it.
-const RENDER_ROWS = [
-  { key: '1', id: 'pixelSize', label: 'Pixel Size' },
-  { key: '2', id: 'palette', label: 'Palette' },
-  { key: '3', id: 'fewColors', label: 'Few Colors' },
-  { key: '4', id: 'dither', label: 'Dither' },
-  { key: '5', id: 'ditherMatrix', label: 'Dither Pattern' },
-  { key: '6', id: 'outlines', label: 'Outlines' },
-  { key: '7', id: 'fog', label: 'Fog' },
-  { key: '8', id: 'xray', label: 'X-Ray Flips' },
-  { key: '9', id: 'pixelShift', label: 'Pixel Size Shifts' },
-];
-function renderValues() {
-  // (What shows: a preset scene's own where it sets one, marked "· Scene".)
-  const shown = ctx.director?.parts?.layers?.view ?? settings;
-  const over = ctx.director?.parts?.layers?.over ?? {};
-  const v = Object.fromEntries(RENDER_ROWS.map((r) => [r.id, `${renderText(shown, r.id)}${Object.hasOwn(over, r.id) ? ' · Scene' : ''}`]));
-  const live = ctx.director?.render;
-  if (!live) return v;
-  const mix = (key) => modeOf(shown[key]) === 'mix';
-  if (live.pixelSize && live.pixelSize !== shown.pixelSize) v.pixelSize += ` · ${live.pixelSize} px Now`;
-  if (mix('fewColors')) v.fewColors += live.few ? ' · On Now' : ' · Off Now';
-  if (mix('outlines')) v.outlines += live.outlines ? ' · On Now' : ' · Off Now';
-  if (shown.ditherMatrix === 'mix') v.ditherMatrix += ` · ${live.matrix}×${live.matrix}`;
-  if (shown.fog === 'mix') v.fog += ` · ${FOGS[live.fog] ?? live.fog}`;
-  if (live.xray) v.xray += ` · ${XRAY_VIEWS[live.xray] ?? live.xray}`;
-  return v;
-}
-const renderMenu = createRenderMenu({
-  title: 'Render Settings',
-  rows: RENDER_ROWS,
-  className: 'debug-hud viz-render-menu',
-  read: renderValues,
-  pick: (id, dir) => {
-    // (Stepping a row the scene sets takes it back from the scene, from its value.)
-    const over = ctx.director?.parts?.layers?.over;
-    if (over && Object.hasOwn(over, id)) settings[id] = over[id];
-    ctx.director?.releaseScene(id === 'xray' ? [id, 'xrayView'] : [id]);
-    stepRender(settings, /** @type {any} */ (id), dir);
-    ctx.applyRender();
-    return renderValues();
-  },
-  reset: {
-    key: '0', label: 'Reset Render Settings', hint: 'To the Defaults',
-    run: () => {
-      const d = defaults();
-      for (const r of RENDER_ROWS) settings[r.id] = d[r.id];
-      ctx.director?.releaseScene([...RENDER_ROWS.map((r) => r.id), 'xrayView']);
-      ctx.applyRender();
-    },
-  },
-  onToggle: () => ctx.wake(),
-});
-app.append(renderMenu.el);
-ctx.renderMenu = renderMenu;
+// --- Render Settings (renderUi.js): P, the Picture tab's switches, as on the site --------------
+Object.assign(ctx, createRenderUi(ctx));
+app.append(ctx.renderMenu.el);
 
 // --- Recording a clip (record.js) -------------------------------------------------------------
 const recordLabel = q('[data-record-label]');

@@ -104,6 +104,12 @@
  */
 
 /**
+ * Render Settings (renderUi.js).
+ * @typedef {object} RenderPart
+ * @property {any} renderMenu  ui/renderMenu.js: Render Settings (P)
+ */
+
+/**
  * What main.js gives the parts: building the scene, and the parts it still holds itself.
  * @typedef {object} MainPart
  * @property {() => Promise<void>} startScene  build the scene (again: a setting it's built with changed)
@@ -112,9 +118,8 @@
  * @property {() => void} mirrorCard  copy the title card into the output window
  * @property {() => void} openOutput  the output window, for a projector (O)
  * @property {any} pack  ui/pack.js: the pack (I)
- * @property {any} renderMenu  ui/renderMenu.js: Render Settings (P)
  */
 
-/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & DialogsPart & MainPart} LiveContext */
+/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & DialogsPart & RenderPart & MainPart} LiveContext */
 
 export {};
