@@ -4,7 +4,7 @@
 //   npm run dev                                   (in one terminal)
 //   node tools/capture-knight.mjs [--port 5173] [--out .scratch/knight-shots] [--tag now]
 //                                 [--only seats,gestures,moves,seq,home] [--sceneries ruins,cult]
-//                                 [--helmet bascinet] [--style first] [--standing]
+//                                 [--helmet bascinet] [--style first] [--standing] [--seqs praise]
 //
 //   seats     close-ups of him seated in each scenery, in both seat poses, from his left, from
 //             his right and from above (what stands round his seat in view): <tag>-seats.png
@@ -15,7 +15,9 @@
 //             Headbang), real time: <tag>-moves-<scenery>.png
 //   seq       real-speed sequences from the home camera, the page hidden: Praise the Sun,
 //             shrug and hurrah seated, Praise standing at his seat, getting up and sitting
-//             down, the site's dance: <tag>-seq-<scenery>-<name>.png
+//             down, the site's dance: <tag>-seq-<scenery>-<name>.png (--seqs praise,dance
+//             for some of them). Real speed: the frames are the page's own, as Chrome's
+//             screencast hands them over, each labelled with when it was drawn.
 //   home      the home view as a visitor sees it (the page on), 1920, 1280 and 390 wide, in
 //             each scenery: <tag>-home-<width>.png
 //
@@ -35,6 +37,7 @@ const SCENERIES = opt('sceneries', 'ruins,forge,shrine,cathedral,cult').split(',
 const HELMET = opt('helmet', null);
 const STYLE = opt('style', null);
 const STANDING = argv.includes('--standing');
+const SEQ_NAMES = opt('seqs', null)?.split(',') ?? null;
 fs.mkdirSync(OUT, { recursive: true });
 
 /** GPU Chrome on the dev server's site, the knight there at rest (dressed as asked). */
@@ -97,17 +100,29 @@ async function grid(tiles, cols, file, labels) {
   console.log(`✓ ${file}`);
 }
 /**
- * Frames at wall-clock times (ms) after `act` runs in the page; `when` gets the time each was
- * really taken at (a screenshot takes a while: a frame can come later than asked for).
+ * Frames at real speed, `times` (ms) after `act` (an expression) runs in the page: the page's
+ * own frames as it draws them (Chrome's screencast; a screenshot each would hold the page up
+ * for a while, and come late), the nearest to each time. `when` gets the time each was drawn.
  */
 async function realTime(page, act, times, shoot, when = []) {
-  await page.evaluate(act);
-  await page.evaluate(() => { window.__t0 = performance.now(); });
+  const cdp = await page.context().newCDPSession(page);
+  const frames = [];
+  cdp.on('Page.screencastFrame', (f) => {
+    frames.push({ t: f.metadata.timestamp * 1000, data: f.data });
+    cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {});
+  });
+  await cdp.send('Page.startScreencast', { format: 'png', everyNthFrame: 1 });
+  await page.waitForTimeout(300);
+  // (The page's clock, the screencast's: when it ran.)
+  const t0 = await page.evaluate(`(() => { const t = Date.now(); ${act}; return t; })()`);
+  await page.waitForTimeout(Math.max(...times) + 250);
+  await cdp.send('Page.stopScreencast');
+  await cdp.detach();
   const out = [];
   for (const t of times) {
-    await page.waitForFunction((ms) => performance.now() - window.__t0 >= ms, t, { polling: 5 });
-    when.push(await page.evaluate(() => Math.round(performance.now() - window.__t0)));
-    out.push(await shoot(await page.screenshot(), t));
+    const f = frames.reduce((best, fr) => (Math.abs(fr.t - t0 - t) < Math.abs(best.t - t0 - t) ? fr : best), frames[0]);
+    when.push(Math.round(f.t - t0));
+    out.push(await shoot(Buffer.from(f.data, 'base64'), t));
   }
   return out;
 }
@@ -180,7 +195,7 @@ async function seq() {
     // (Round his seat on the home view: him, the fire and what stands by his seat, wide
     // enough for any round's seat and where he stands up to, his arms thrown up.)
     const region = [0.26, 0.0, 0.82, 0.66];
-    for (const [nm, s] of Object.entries(SEQS)) {
+    for (const [nm, s] of Object.entries(SEQS).filter(([nm]) => !SEQ_NAMES || SEQ_NAMES.includes(nm))) {
       const when = [];
       const tiles = await realTime(page, s.act, s.at, (buf) => crop(buf, region, 380, 240), when);
       await grid(tiles, 10, `${OUT}/${TAG}-seq-${name}-${nm}.png`, when.map((t) => `${name} ${nm} ${t} ms`));
