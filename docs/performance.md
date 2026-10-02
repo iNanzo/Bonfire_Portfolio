@@ -139,3 +139,73 @@ Measured first with the tools above; each change says why in a comment where it'
   written only when they change (`setAccentRate` sets how often during a blend).
 - **Thumbnails** — `fire.captureThumb(w, h)` takes a scene's 192×108 picture straight from
   the canvas's texels, encoded by the browser off the page's thread.
+- **Scenery drawn per material** — the forge, shrine, cathedral and cult were built from
+  33–83 small meshes each, every one a draw in the normals pass, the color pass and each
+  shadow face it falls in. `buildScenery` ends by merging a place's still pieces into one
+  mesh per material, their transforms baked in (`src/bonfire/sceneryMerge.js`): 48 solid
+  meshes become 5 in the forge, 61 become 5 in the cathedral. The glows stay apart (each is
+  recolored), and the merged meshes cast and take shadows and stay the place's solids, so
+  the fireflies' height map and raycasts see the same faces.
+- **Fireflies instanced** — each part of a firefly (body, lantern, wings, halos) is one
+  `InstancedMesh` for all of them: 4 draws instead of 5 a fly. `fireflies.place(camera)`
+  writes them just before the draw: each part's view-space matrix with the meshes standing
+  at the camera (so the GPU multiplies each vertex by the matrix it used for the part's own
+  mesh), the lantern and halo colors and the halos' opacity as a flat per-instance tint, and
+  the halos back to front the way three.js sorted them (additive blending rounds after each).
+- **Render targets per pixel size** — a pixel-size shift swaps in the targets of a size used
+  lately (the last three sizes, `src/bonfire/targetCache.js`) instead of freeing and
+  allocating every target again; a shift back to a kept size makes no GL textures or
+  framebuffers (6 and 4 before, on its frame).
+- **Places built beforehand** — the other places and their height maps are built in idle
+  moments once the fire is up (`prepareSceneries` in `scene.js`), with their materials set
+  up for drawing, and every height map is drawn with one shared material (its shader built
+  once): a first visit only puts the place in the scene. It takes about 4.5 MB of JS heap
+  more per scene.
+- **One matrix update a frame** — `frame.draw` brings the scene's world matrices up to date
+  once for its three renders (three.js did it in each), a place's still pieces keep the
+  matrices made when it's built, and a place not shown is out of the scene, not hidden.
+
+### What that came to
+
+Bonfire Live, dev server, GPU Chrome, 1920×1080, medians of interleaved runs (two a side for
+A, B and D, five for H) on a machine busy with other work, so lean on the counts and on H.
+"Round start" is `73412c4`, before any of it; "before tier B" has the first five bullets
+above and not the last five:
+
+| | round start | before tier B | after |
+| --- | --- | --- | --- |
+| H draws per frame (ruins / forge / shrine / cathedral / cult) | 282 / 436 / 371 / 463 / 416 | 194 / 300 / 251 / 307 / 297 | 123 / 136 / 129 / 135 / 163 |
+| H CPU ms per frame (same order; five runs each) | 3.9 / 4.4 / 4.0 / 4.3 / 4.2 | 3.3 / 3.6 / 3.3 / 3.5 / 3.9 | 2.7 / 2.8 / 2.4 / 2.5 / 2.7 |
+| H ms per frame at 4× CPU throttle (one run each) | | 20.0 / 27.7 / 20.9 / 23.1 / 24.0 | 16.7 / 15.7 / 15.0 / 15.3 / 16.0 |
+| B busy ms per drawn frame (same order) | 5.2 / 6.5 / 7.1 / 7.2 / 6.3 | 5.6 / 5.8 / 6.6 / 5.7 / 6.1 | 4.5 / 4.8 / 5.3 / 4.6 / 5.2 |
+| A, D busy ms per drawn frame | 4.7, 5.5 | 4.5, 4.4 | 4.0, 3.5 |
+| First visit to a place (its frame, GPU finished, median) | | 34–40 ms (up to 59) | 8–9 ms (up to 28) |
+| Scene-graph nodes visited per frame (4 dancers) | | 1690–2320 | 513–571 |
+| WebGL programs / textures after 6 rebuilds | 161 / 85 | 23 / 15 | 26 / 24 |
+
+(The three more programs are the instanced fireflies'; the textures are the kept render
+target sets.) Frame-interval percentiles moved within the runs' noise: at 131 Hz the frames
+were already on time almost always, and the spare time is what grew.
+
+Where the time goes now (a CPU profile of the cult with four dancers): three.js's draw about
+half of it (per-object uniform uploads and state, the shadow cube's redraws), the particle
+sims' curl noise (`noise3d`) the biggest single piece of the update. The 40 point lights cost
+three.js about 40 ms/s setting them up (`WebGLLights.setup`) on top of their uniforms: a pool
+of about 18 would save part of that, but changing the light count changes every lit shader,
+so it waits until it can be checked to the texel.
+
+## Checking that the picture didn't change
+
+Every change above was checked texel by texel against the commit before it: Bonfire Live
+(and the site) opened on both sides with `Math.random` seeded and the clock and animation
+frames virtual (as scenario H does), the same frames stepped and read back from the canvas
+(`gl.readPixels` right after each draw), and compared. Two things make that work: the case
+is set up after the reseed (a place built in the stepped run, not while the page's timers
+run), and three.js's uuids (four `Math.random` calls for every object it makes) come from a
+stream of their own, so a build that makes more or fewer objects doesn't shift every number
+drawn after it. The cases: each place at rest, and with four dancers, beats and a weapon swap
+moving the shadow; a tour of all five after a flame change; the living blade's flourish;
+pixel-size shifts with the echo and the ghost trail on; the fireflies blinking and dancing.
+Everything is identical except for the merged scenery, where at most one dithered texel in
+a frame (of 129,600) differs from the branch start: a baked transform rounds a vertex a
+float's last bit differently and tips one dither threshold.
