@@ -30,10 +30,12 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {any} scope  resources.js: everything the scene owns, given back when it's disposed
  * @property {HTMLElement} container  what the canvas fills
  * @property {boolean} reducedMotion
+ * @property {boolean} paintedLook  the Painter's: under reduced motion the look being painted still shows, held still (stillFx.js)
  * @property {boolean} lightTrails  the fireflies leave trails of light (Bonfire Live's Trails)
  * @property {boolean} fxLayer  the pixel pass's effects layer and stages (Bonfire Live and the Painter; not the site)
  * @property {(() => void) | undefined} onFormed  createBonfire's: a new weapon finished forming
  * @property {((flame: string, from: string, instant: boolean, selection: any) => void) | undefined} onImpact  createBonfire's: a weapon landed (or was set at once)
+ * @property {((dt: number, t: number) => void) | undefined} onFrame  createBonfire's: the page's part of each drawn frame (Bonfire Live's director)
  * @property {(amount: number) => void} jolt  a jolt of the camera, if screen shake is on
  * @property {any} view  the camera's framing, sway and shake (view.js)
  * @property {boolean} coarse  a touch screen: the scaled-down counts
@@ -53,6 +55,16 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {any} flowView  breakdown mode's flow field over the fire (flowView.js)
  * @property {any} interaction  how the cursor moves flames, sparks and fireflies (interaction.js)
  * @property {any} pointer  the cursor's path, and its ray (pointer.js)
+ * @property {any} timer  the scene's clock (THREE.Timer: advanced once per drawn frame)
+ * @property {any} FIRE_LIGHT_AT  where the fire's light hangs (sceneLights.js), and where it goes for the lightning ball:
+ * @property {any} ballLightAt
+ * @property {number} BALL_LIGHT_MIN_Y
+ * @property {Record<string, number>} drive  live modulation from outside (Bonfire Live writes it every frame)
+ * @property {Record<string, number>} glitch  the pixel pass's effects layer's values (Bonfire Live's looks)
+ * @property {Record<string, number>} presence  each element eased in (1) and out (0)
+ * @property {any} white  (a THREE.Color, never changed)
+ * @property {any} lightBase  the cast light's color before the temperature
+ * @property {any} lightWarm  ...and what a warm temperature leans it toward
  * @property {any} frame  the passes and their buffers (frame.js)
  * @property {any} candleLight  the ruins' candle's light (sceneLights.js)
  * @property {any[]} lamps  the pool of lights the places' lamps take (sceneLights.js)
@@ -181,12 +193,13 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * What scene.js itself hands the parts.
  * @typedef {object} MainPart
  * @property {(key: string, instant?: boolean) => void} setElement  the fire's element (`instant`: no easing)
+ * @property {() => void} applyFireParams  the flame's parameters from the settings, the element and the drive
  * @property {(f: { ramp: string[], shade: string }, mix: number) => void} applyColors  the flame's colors, everywhere they burn
  * @property {Promise<void>} loaded  the model is in and the shaders built: the scene's `ready`
+ * @property {() => boolean} reacts  whether the knights react (the site's setting, or Bonfire Live's)
  * @property {(kind: string, strength?: number, where?: any) => void} reactKnights  something happened at the fire, if the knights mind it
  * @property {(model: any, o?: { template?: any, attach?: boolean }) => any[]} addKnights  the knights, from their model
  * @property {(name: string) => { x: number, y: number, z: number, yaw: number }} signPlace  where the knight's sign lies in a place
- * @property {(from: number, to: number, fs: number) => void} recolorGlows  glows[from…to) at flame step `fs`
  */
 
 /**
@@ -211,4 +224,11 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {() => any} stats  the draw calls, the size and each particle system's count
  */
 
-/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart & SceneryPart & FirePart & RenderPart & MainPart} SceneContext */
+/**
+ * Every frame (sceneUpdate.js).
+ * @typedef {object} UpdatePart
+ * @property {(from: number, to: number, fs: number) => void} recolorGlows  glows[from…to) at flame step `fs`
+ * @property {(dt: number) => void} renderFrame  a frame: the page's part, the update, the draw
+ */
+
+/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart & SceneryPart & FirePart & RenderPart & UpdatePart & MainPart} SceneContext */

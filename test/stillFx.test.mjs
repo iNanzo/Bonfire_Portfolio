@@ -1,4 +1,4 @@
-// The pixel pass's effects under reduced motion (src/bonfire/stillFx.js, as scene.js sets the
+// The pixel pass's effects under reduced motion (src/bonfire/stillFx.js, as sceneUpdate.js sets the
 // pass's uniforms): the show's keep only the still ones, as before; the Painter's painted look
 // (`paintedLook`) shows as painted, held still (no palette cycle, negative, ink, blackout,
 // flicker, torn rows, RGB split, ripple or kaleidoscope turn; the clock stopped), so the look
@@ -8,8 +8,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { passValue, stillClock, STILL, HELD, OFF } from '../src/bonfire/stillFx.js';
 
-const sceneSrc = readFileSync(new URL('../src/bonfire/scene.js', import.meta.url), 'utf8');
-/** The pass's effects (scene.js GLITCH_UNIFORMS' keys). */
+const sceneSrc = readFileSync(new URL('../src/bonfire/sceneUpdate.js', import.meta.url), 'utf8');
+/** The pass's effects (sceneUpdate.js GLITCH_UNIFORMS' keys). */
 const KEYS = Object.keys(Object.fromEntries([...(/const GLITCH_UNIFORMS = \{([\s\S]*?)\n {2}\};/.exec(sceneSrc)?.[1] ?? '').matchAll(/(\w+): 'u\w+'/g)].map((m) => [m[1], 1])));
 /** A painted Kaleido look with glow, grain, a gradient and a trail, caught mid-flash. */
 const LOOK = {
@@ -19,8 +19,8 @@ const LOOK = {
 };
 const apply = (o) => Object.fromEntries(Object.entries(LOOK).map(([k, v]) => [k, passValue(k, v, o)]));
 
-test('every effect the gate names is one of the pass’s, and scene.js sets the pass through it', () => {
-  assert.ok(KEYS.length > 40, `the pass's effects read from scene.js (${KEYS.length})`);
+test('every effect the gate names is one of the pass’s, and sceneUpdate.js sets the pass through it', () => {
+  assert.ok(KEYS.length > 40, `the pass's effects read from sceneUpdate.js (${KEYS.length})`);
   for (const k of [...STILL, ...HELD, ...Object.keys(OFF)]) assert.ok(KEYS.includes(k), `${k} is a pass effect`);
   for (const k of Object.keys(LOOK)) assert.ok(KEYS.includes(k), `(the test's ${k})`);
   assert.match(sceneSrc, /pass\.uniforms\[u\]\.value = passValue\(k, glitch\[k\], stillOpts\)/);
