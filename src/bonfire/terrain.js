@@ -39,11 +39,38 @@ export function createTerrainMaterial() {
  * @param {number} o.pad    cells to grow obstacles by for flight clearance
  * @param {THREE.ShaderMaterial} [o.material]  createTerrainMaterial(), kept by the caller (one is made and freed here without it)
  */
-export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2, material: shared = null } = {}) {
-  const half = size / 2;
-  const cell = size / res;
+export function createTerrain(renderer, meshes, o = {}) {
+  const h = drawHeights(renderer, meshes, o);
+  renderer.readRenderTargetPixels(h.rt, 0, 0, h.res, h.res, h.px);
+  h.done();
+  return fromHeights(h.px, h);
+}
 
-  // --- render heights from above
+/**
+ * createTerrain in two parts, for a height map made ahead of time (scene.js builds the other
+ * places' in idle moments). The heights are drawn now and read back without waiting on the
+ * GPU (a fence, polled): a blocking read stalls the page until the GPU has finished all it
+ * was given before, the frame just drawn too (in software rendering, 70 ms and more). It
+ * resolves with build(), which makes the height map from them, as createTerrain returns it:
+ * the CPU part (a few ms), for the caller to run when it suits.
+ * @param {THREE.WebGLRenderer} renderer
+ * @param {THREE.Mesh[]} meshes  as createTerrain's
+ * @param {object} [o]  as createTerrain's
+ * @returns {Promise<() => ReturnType<typeof createTerrain>>}
+ */
+export async function readTerrain(renderer, meshes, o = {}) {
+  const h = drawHeights(renderer, meshes, o);
+  try {
+    await renderer.readRenderTargetPixelsAsync(h.rt, 0, 0, h.res, h.res, h.px);
+  } finally {
+    h.done();
+  }
+  return () => fromHeights(h.px, h);
+}
+
+/** Draw the meshes' heights from straight above into a target of their own, to be read into `px` (then done()). */
+function drawHeights(renderer, meshes, { size = 12, res = 320, pad = 2, material: shared = null } = {}) {
+  const half = size / 2;
   const scene = new THREE.Scene();
   const material = shared ?? createTerrainMaterial();
   for (const m of meshes) {
@@ -67,12 +94,19 @@ export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2,
   renderer.setClearColor(0x000000, 1);
   renderer.clear();
   renderer.render(scene, cam);
-  const px = new Uint8Array(res * res * 4);
-  renderer.readRenderTargetPixels(rt, 0, 0, res, res, px);
   renderer.setRenderTarget(prevTarget);
   renderer.setClearColor(prevClear, prevAlpha);
-  rt.dispose();
-  if (!shared) material.dispose();
+  const done = () => {
+    rt.dispose();
+    if (!shared) material.dispose();
+  };
+  return { rt, px: new Uint8Array(res * res * 4), done, size, res, pad };
+}
+
+/** The height map's queries, from the heights drawn (`px`, two bytes a cell). */
+function fromHeights(px, { size, res, pad }) {
+  const half = size / 2;
+  const cell = size / res;
 
   // H: raw heights (row 0 = +z edge). D: heights grown by `pad` cells.
   const H = new Float32Array(res * res);

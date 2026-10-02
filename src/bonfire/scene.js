@@ -39,7 +39,7 @@ import { createFrameGate } from './frameGate.js';
 import { createFlame, createParticleMaterial, createEffectMaterial, SHAPE } from './flame.js';
 import { createInteraction, MODES } from './interaction.js';
 import { createFireflies } from './fireflies.js';
-import { createTerrain, createTerrainMaterial } from './terrain.js';
+import { createTerrain, readTerrain, createTerrainMaterial } from './terrain.js';
 import { createImpactFx, createSmokeMaterial } from './impact.js';
 import { createCurlField } from './curl.js';
 import { createWeapons } from './weapons.js';
@@ -479,10 +479,12 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   }
   /**
    * Run `steps` (a generator: knights.js templateSteps) in idle moments, a few ms at a time,
-   * so building a knight's template never stalls the fire. Resolves with its return value
-   * (null if the scene is gone first).
+   * so building a knight's template never stalls the fire. A step that yields a promise
+   * (prepareSceneries: a height map read back) has the next wait for it, the page idle
+   * meanwhile. Resolves with its return value (null if the scene is gone first).
    */
   function inSteps(steps) {
+    const waits = (v) => typeof v?.then === 'function';
     return new Promise((resolve, reject) => {
       const slice = (deadline) => {
         if (scope.disposed) { resolve(null); return; }
@@ -490,8 +492,9 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
         const until = performance.now() + budget;
         try {
           let r = steps.next();
-          while (!r.done && performance.now() < until) r = steps.next();
+          while (!r.done && !waits(r.value) && performance.now() < until) r = steps.next();
           if (r.done) resolve(r.value);
+          else if (waits(r.value)) r.value.then(() => idle(slice), () => idle(slice));
           else idle(slice);
         } catch (error) { reject(error); }
       };
@@ -953,10 +956,11 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     sceneries[name] = s;
     return s;
   }
+  /** What a place's height map is drawn from: the model's ground and stones, and the place's solids. */
+  const staticsOf = (name) => (name === 'ruins' ? [...baseStatics, ...ruinsOnly.filter((o) => o.name.startsWith('Static_'))] : [...baseStatics, ...sceneryOf(name).solids]);
   /** The height map the fireflies (and the strikes, the mist, the debris) read in a place. */
   function terrainOf(name) {
-    const statics = name === 'ruins' ? [...baseStatics, ...ruinsOnly.filter((o) => o.name.startsWith('Static_'))] : [...baseStatics, ...sceneryOf(name).solids];
-    terrains[name] ??= createTerrain(renderer, statics, { material: terrainMaterial });
+    terrains[name] ??= createTerrain(renderer, staticsOf(name), { material: terrainMaterial });
     return terrains[name];
   }
   /** Move the fire to another place (SCENERIES). `flash`: the change lands like a hit, a flash hiding the cut. */
@@ -996,7 +1000,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       l.intensity = l.userData.base;
       if (d) { l.position.copy(d.at); l.distance = d.distance; }
     });
-    liveStatics = name === 'ruins' ? [...baseStatics, ...ruinsOnly.filter((o) => o.name.startsWith('Static_'))] : [...baseStatics, ...sceneries[name].solids];
+    liveStatics = staticsOf(name);
     terrainOf(name);
     // His sign moves to the seat there (a summoning or a leaving under way ends at once), and
     // the knights take their places there, forming out of embers.
@@ -1671,7 +1675,14 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     for (const name of Object.keys(SCENERIES)) {
       if (name === 'ruins' || !ready) continue;
       if (!sceneries[name]) { frame.prepare([sceneryOf(name).group]).catch(() => {}); yield; }
-      if (!terrains[name]) { terrainOf(name); yield; }
+      if (terrains[name]) continue;
+      // Its heights are read back without waiting on the GPU (the next step waits for them,
+      // the page idle meanwhile), then made into its map in an idle moment. (A visit before
+      // that builds its own then, and this one is let go.)
+      let build = null;
+      yield readTerrain(renderer, staticsOf(name), { material: terrainMaterial }).then((b) => { build = b; }, () => {});
+      if (build && !terrains[name]) terrains[name] = build();
+      yield;
     }
   }
   loaded.then(() => (ready && !scope.disposed ? inSteps(prepareSceneries()) : null), () => null)
