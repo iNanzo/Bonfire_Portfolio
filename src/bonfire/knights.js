@@ -166,8 +166,9 @@ const DEPTH = 0.005;
 const RESTING = new Set(['shinL', 'shinR', 'footL', 'footR']);
 const DEPTH_RESTING = -0.01;
 // The ease is looked for from where it was the step before (it changes little from one step
-// to the next): letting go of it as fast as it may, holding it, or further back, where the
-// margins he's left with say the least that clears him lies. At most EASE_SOLVES poses are
+// to the next): letting go of it as fast as it may, holding it, or further back (just
+// touching something, halfway first), where the margins he's left with say the least that
+// clears him lies, a little at a time where they can't say. At most EASE_SOLVES poses are
 // solved a step, the first one asked for with them (round 9 solved one): a step costs a few
 // of round 9's at most (test/knightClearance.test.mjs).
 const EASE_SOLVES = 4;
@@ -178,7 +179,8 @@ const EASE_AIM = 0.004;
 // (Where nothing gets him clear, easing back has to get him at least this much (m) further out.)
 const EASE_GAIN = 0.01;
 // (Past what he was eased back from, he lets go of it this much of the way a step: over a
-// quarter second, not at once.)
+// quarter second, not at once. Where the margins can't say how much more he needs, a look
+// goes at most this much further back than where he's still in: easeBack().)
 const EASE_LET_GO = 0.25;
 // (Which part each channel of a pose moves: 0 his body (how his hips, back, neck and head turn:
 // a lean), 1 his left arm, 2 his right, 3 his legs (where his hips are and each foot goes: his
@@ -2172,16 +2174,22 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   /**
    * The least ease back toward `base` (0..1) of the parts in _bad that clears knight k of
    * `cs`, where he's in by `m0` (m) without it, from `was` (the step before's): that or as much
-   * less as he may let go if that clears him; else all the way back (and if even that doesn't,
-   * with whatever easing brings in: an arm still in all the way back, the body leaning it there
+   * less as he may let go if that clears him; just touching something (nothing eased the step
+   * before), halfway back first; else all the way back (and if even that doesn't, with
+   * whatever easing brings in: an arm still in all the way back, the body leaning it there
    * eases with it; the body, his legs); then between there and where he's in, where the
-   * margins say the least that clears him lies, as near as the looks left this step get it.
+   * margins say the least that clears him lies (where they can't say, a little further than
+   * where he's in, as far as how fast he was coming out there says), as near as the looks
+   * left this step get it.
    * Where even all the way back doesn't clear him (his rest is no way out: a boot by a drum it
    * stands by), as far back as that if it gets him out further (EASE_GAIN), else as he was (no
    * snapping back for nothing).
    */
   function easeBack(k, base, cs, was, m0) {
     let a = 0, ma = m0, b = 1, mb = NaN;
+    // (The look before a, where he was in too: with a's, how fast he comes out there.)
+    let a0 = NaN, ma0 = NaN;
+    const inAt = (f, m) => { a0 = a; ma0 = ma; a = f; ma = m; };
     // (Where he'd stay, and how far in that leaves him.)
     let stay = 0, mStay = m0;
     if (was > 0) {
@@ -2193,28 +2201,47 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         if (floor > 0) {
           const mf = easeTo(k, base, cs, floor);
           if (mf >= 0) return floor;
-          a = floor;
-          ma = mf;
+          inAt(floor, mf);
         }
       } else {
-        a = stay = was;
-        ma = mStay = mw;
+        inAt(was, mw);
+        stay = was;
+        mStay = mw;
       }
+    } else {
+      // (Just touching something, a little ease is usually enough: all the way back first
+      // would leave the looks left between all and nothing, the arm thrown back toward its
+      // rest in one step.)
+      const mh = easeTo(k, base, cs, 0.5);
+      if (mh >= 0) { b = 0.5; mb = mh; } else inAt(0.5, mh);
     }
     if (Number.isNaN(mb)) {
       mb = easeTo(k, base, cs, 1);
       if (mb < 0 && solves < budget && more()) {
         a = 0;
         ma = m0;
+        a0 = ma0 = NaN;
         mb = easeTo(k, base, cs, 1);
       }
       if (mb < 0) return mb > mStay + EASE_GAIN ? 1 : stay;
     }
-    // (Between a, where he's in, and b, where he's clear.)
+    // (Between a, where he's in, and b, where he's clear, where the margins put the least
+    // ease. The margin is the nearest piece's, and past some ease another piece may be the
+    // nearest: where b is barely clear, the line to it says nothing. Then the two looks he
+    // was still in at say how fast he was coming out (the same piece nearest), and the look
+    // goes as far on as that says, at most halfway to b and EASE_LET_GO past a: the least
+    // ease is mostly a little past a, and a look halfway to all the way back would leave an
+    // arm thrown back toward its rest whenever a little more was enough.)
     while (solves < budget) {
-      const f = a + (b - a) * THREE.MathUtils.clamp((EASE_AIM - ma) / (mb - ma), 0.15, 0.85);
+      const r = (EASE_AIM - ma) / (mb - ma);
+      let f;
+      if (r <= 0.85) f = a + (b - a) * Math.max(r, 0.15);
+      else {
+        const on = ma > ma0 ? ((EASE_AIM - ma) / (ma - ma0)) * (a - a0) : Infinity;
+        f = a + Math.min(Math.max(on, 0.1 * (b - a)), (b - a) / 2, EASE_LET_GO);
+      }
       const m = easeTo(k, base, cs, f);
-      if (m >= 0) { b = f; mb = m; } else { a = f; ma = m; }
+      if (m >= 0) { b = f; mb = m; } else inAt(f, m);
     }
     return b;
   }

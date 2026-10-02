@@ -9,12 +9,12 @@
 // 1.5 cm into a shape (a failure names the action, the piece of him and the shape). Each
 // point is tested against the shapes themselves (no rays: those took minutes), and only the
 // pieces whose joint is within their reach of a shape (a broad phase). Keeping out of it
-// doesn't cost him his smoothness (getting up, sitting down and the site's dance step no
-// further at a time than round 9's did, give or take half), nor his place on the home view
-// (stood up or dancing there, he stays left of the planted sword), nor much of a frame's time
-// (a step solves at most four poses; round 9's solved one). Where his feet rest high (up
-// on the ruins' drum, or sitting on the ground), a ring under him doesn't fold a knee down
-// under his leg.
+// doesn't cost him his smoothness (nothing he does at his seat steps further at a time than
+// round 9's did, give or take half, nor past that a quarter further than it would with nothing
+// there), nor his place on the home view (stood up or dancing there, he stays left of the
+// planted sword), nor much of a frame's time (a step solves at most four poses; round 9's
+// solved one). Where his feet rest high (up on the ruins' drum, or sitting on the ground), a
+// ring under him doesn't fold a knee down under his leg.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -479,46 +479,101 @@ test('[slow] seated Praise the Sun at every seat, either seat pose, throws both 
 });
 
 // Round 9's (before the scenery kept him out), measured the same way on the same height maps:
-// the largest step (m) of his head and of either hand at the fire's 12 frames a second.
-const ROUND9_STEP = { 'getting up': { head: 0.241, hands: 0.253 }, 'sitting down': { head: 0.177, hands: 0.328 }, 'the site’s dance': { head: 0.241, hands: 0.369 } };
-test('[slow] getting up, sitting down and the site’s dance at every seat move on smoothly: no step of his head or hands more than 1.5× round 9’s', async () => {
+// the largest step (m) of his head and of either hand at the fire's 12 frames a second in each
+// thing he does at his seat, at any seat in either seat pose.
+const ROUND9_STEP = {
+  'getting up': { head: 0.241, hands: 0.243 }, 'sitting down': { head: 0.177, hands: 0.328 }, 'the site’s dance': { head: 0.242, hands: 0.369 },
+  'seated praise': { head: 0.095, hands: 0.672 }, 'seated wave': { head: 0.057, hands: 0.436 }, 'seated bow': { head: 0.032, hands: 0.296 },
+  'seated point': { head: 0.038, hands: 0.28 }, 'seated beckon': { head: 0.068, hands: 0.196 }, 'seated shrug': { head: 0.067, hands: 0.245 },
+  'seated hurrah': { head: 0.115, hands: 0.588 }, 'seated joy': { head: 0.116, hands: 0.763 },
+  'seated impact': { head: 0.199, hands: 0.628 }, 'seated stoke': { head: 0.099, hands: 0.339 }, 'seated ring': { head: 0.046, hands: 0.031 },
+  'standing praise': { head: 0.29, hands: 0.652 }, 'standing wave': { head: 0.019, hands: 0.41 }, 'standing bow': { head: 0.084, hands: 0.146 },
+  'standing point': { head: 0.052, hands: 0.387 }, 'standing beckon': { head: 0.017, hands: 0.254 }, 'standing shrug': { head: 0.019, hands: 0.179 },
+  'standing hurrah': { head: 0.059, hands: 0.68 }, 'standing joy': { head: 0.368, hands: 0.978 },
+  'standing impact': { head: 0.248, hands: 0.583 }, 'standing stoke': { head: 0.159, hands: 0.55 }, 'standing ring': { head: 0.114, hands: 0.224 },
+};
+// (Kept clear, a step that goes further than round 9's went goes at most this much further
+// than the same step with nothing there to keep clear of, and 1 cm: the step he first touches
+// something, he eases back about as little as clears him, not most of the way. Four poses a
+// step find it to within a few hundredths of all the way back: a seated beckon's or Point's
+// first touch of the ruins' pillar goes up to a fifth further.)
+const CLEAR_STEP = 1.25;
+// (Each from six moments in his idle, a quarter second and more apart: where his arms are
+// when it starts, and how the fire's 12 frames a second fall on it, change what he first
+// touches and when.)
+const IDLE = [0.5, 0.79, 1.08, 1.37, 1.66, 1.95];
+test('[slow] everything he does at his seat moves on smoothly: no step of his head or hands more than 1.5× round 9’s, and none further than round 9’s a quarter further than with nothing there to keep clear of', async () => {
   const env = await realKnights();
   const { k } = env;
   const n = k.knights[0];
   const parts = ['head', 'handL', 'handR'].map((b) => n.bones.find((x) => x.name === b));
   const at = () => { n.group.updateMatrixWorld(true); return parts.map((b) => b.getWorldPosition(new THREE.Vector3())); };
+  const STEP = 1 / 12 + 1e-7;
   const bad = [];
-  for (const name of NAMES) {
-    k.setScenery(name, await terrainOf(name));
-    for (const pose of SEAT_POSES) {
-      k.setSeatPose(pose);
-      k.summon(0, { instant: true });
-      k.update(0.5);
-      const run = (what, seconds) => {
-        let prev = at();
-        const most = [0, 0, 0], when = [0, 0, 0];
-        for (let t = 0; t < seconds; t += 1 / 12) {
-          k.update(1 / 12 + 1e-7);
-          const now = at();
-          now.forEach((v, i) => { const d = v.distanceTo(prev[i]); if (d > most[i]) { most[i] = d; when[i] = t; } });
-          prev = now;
-        }
-        const limit = ROUND9_STEP[what];
-        if (most[0] > 1.5 * limit.head) bad.push(`${name} (${pose}) ${what}: his head ${(most[0] * 100).toFixed(1)} cm in a step (${when[0].toFixed(2)} s)`);
-        for (const i of [1, 2]) if (most[i] > 1.5 * limit.hands) bad.push(`${name} (${pose}) ${what}: his ${parts[i].name} ${(most[i] * 100).toFixed(1)} cm in a step (${when[i].toFixed(2)} s)`);
-      };
-      k.stand(0);
-      run('getting up', 1.6);
-      k.sit(0);
-      run('sitting down', 1.8);
-      k.update(0.3);
-      k.gesture('dance', { index: 0 });
-      run('the site’s dance', GESTURE_TIME.dance + 0.4);
-      k.dismiss(0, { instant: true });
+  // (An impact's flinch starts a moment late at random: the same moment every time here.)
+  const random = Math.random;
+  Math.random = () => 0.5;
+  try {
+    for (const name of NAMES) {
+      k.setScenery(name, await terrainOf(name));
+      for (const pose of SEAT_POSES) {
+        k.setSeatPose(pose);
+        // The largest step of his head and each hand (and when) over `seconds` from `start()`,
+        // `idle` s after he's seated (or then `standing` up in front of it); `bare`, with
+        // nothing near him to keep clear of (knights.js nearOf()'s list, emptied: his room for
+        // his arms is still his seat's).
+        const steps = (seconds, start, standing, idle, bare) => {
+          const tick = () => {
+            n.near = bare ? { scenery: name, x: n.group.position.x, z: n.group.position.z, list: [] } : null;
+            k.update(STEP);
+          };
+          k.dismiss(0, { instant: true });
+          k.summon(0, { instant: true });
+          k.update(idle);
+          if (standing) { k.stand(0); for (let t = 0; t < 1.8; t += 1 / 12) tick(); }
+          start();
+          let prev = at();
+          const most = [0, 0, 0], when = [0, 0, 0];
+          for (let t = 0; t < seconds; t += 1 / 12) {
+            tick();
+            const now = at();
+            now.forEach((v, i) => { const d = v.distanceTo(prev[i]); if (d > most[i]) { most[i] = d; when[i] = t; } });
+            prev = now;
+          }
+          n.near = null;
+          return { most, when };
+        };
+        const run = (what, seconds, start, standing = false) => {
+          const r9 = ROUND9_STEP[what];
+          for (const idle of IDLE) {
+            const kept = steps(seconds, start, standing, idle, false);
+            // (Only a step further than round 9's needs the measure without.)
+            const free = kept.most.some((d, i) => d > (i ? r9.hands : r9.head)) ? steps(seconds, start, standing, idle, true) : null;
+            kept.most.forEach((d, i) => {
+              const was = i ? r9.hands : r9.head, without = free?.most[i] ?? 0;
+              const step = `${name} (${pose}) ${what} (${idle} s into his idle): his ${parts[i].name} ${(d * 100).toFixed(1)} cm in a step (${kept.when[i].toFixed(2)} s)`;
+              // (Where his seat itself has him go further than round 9's anywhere did, kept clear
+              // or not, that's the measure: in the ruins his hands start up on knees raised over
+              // the fallen drum.)
+              if (d > 1.5 * Math.max(was, without)) bad.push(`${step}; round 9's at most ${(was * 100).toFixed(1)}`);
+              if (d > was && d > CLEAR_STEP * without + 0.01) bad.push(`${step}; with nothing to keep clear of ${(without * 100).toFixed(1)}`);
+            });
+          }
+        };
+        run('getting up', 1.6, () => k.stand(0));
+        run('sitting down', 1.8, () => k.sit(0), true);
+        for (const g of GESTURES) run(g === 'dance' ? 'the site’s dance' : `seated ${g}`, GESTURE_TIME[g] + 0.4, () => k.gesture(g, { index: 0 }));
+        for (const r of ['impact', 'stoke', 'ring']) run(`seated ${r}`, 1.4, () => k.react(r, 1));
+        for (const g of GESTURES.filter((q) => q !== 'dance')) run(`standing ${g}`, GESTURE_TIME[g] + 0.4, () => k.gesture(g, { index: 0 }), true);
+        for (const r of ['impact', 'stoke', 'ring']) run(`standing ${r}`, 1.4, () => k.react(r, 1), true);
+      }
     }
+  } finally {
+    Math.random = random;
+    k.dismiss(0, { instant: true });
+    k.setSeatPose('resting');
   }
-  k.setSeatPose('resting');
-  assert.deepEqual(bad, [], `more than 1.5× round 9's steps`);
+  assert.deepEqual(bad, [], 'steps further than round 9’s, or than with nothing to keep clear of');
 });
 
 // (Bonfire Live rests the others on the ground round the fire: knightPlaces.js restPlaces.)

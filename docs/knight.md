@@ -360,25 +360,41 @@ him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
     their springs lag and overshoot after that: one whose swing would take it into a shape
     stops where his pose has it (clear) and goes on with the pose from there.
   - *Cost.* The ease is looked for from the step before's: let go as far as he may if
-    that clears him, else held, else further back, between where he's in and where he's
-    clear by the margins each pose leaves him (regula falsi), never more than four poses
-    solved a step (`EASE_SOLVES`; `k.solves` counts them, the test holds every action at
-    every seat to it; most steps solve one, as round 9's did). Each piece's points sit in
+    that clears him, else held, else further back (just touching something, halfway back
+    first, all the way only if that isn't enough), between where he's in and where he's
+    clear by the margins each pose leaves him (regula falsi; where they can't say, since
+    the margin is the nearest piece's and further back another piece may be the nearest,
+    as far on as the two looks he was still in at say he was coming out, a quarter
+    further back than where he's in at most). So an arm that first touches something eases
+    back about as little as clears it, not most of the way to its rest in one step. Never
+    more than four poses are solved a step (`EASE_SOLVES`; `k.solves` counts them, the
+    test holds every action at every seat to it; most steps solve one, as round 9's
+    did). Each piece's points sit in
     6 cm clumps, passed over whole when their ball can't reach a shape (each shape's
     distance changes no faster than its `lip`), and are placed by one matrix a piece; the
-    pauldrons' helmet check is a matrix too. In GPU Chrome on the dev site, `knights.update`
-    while the knight at home gestures, dances the site's dance, gets up or sits down costs
-    about what round 9's did: at most 1.4 ms a frame at any seat (round 9's: 1.4), 95% of
-    frames 0.6 ms or less (round 9's: 0.4); four knights dancing on the ring, at most
-    0.7 ms (round 9's: 1.6).
+    pauldrons' helmet check is a matrix too. In GPU Chrome on the dev site (its quiet
+    windows, at 144 fps), `knights.update` while the knight at home gestures, dances the
+    site's dance, gets up or sits down costs about what round 9's did: at most 1.6 ms a
+    frame in the best of a few tries at any seat, 2.2 once getting up (round 9's: 1.6),
+    95% of frames 0.6 ms or less (round 9's: 0.4); four knights dancing on the ring in
+    Bonfire Live, at most 1.2 ms, 95% of frames 0.6 or less (round 9's: 3.3 and 1.6).
   - *Getting up across something.* A foot stepping between where it rests seated and where
     he stands up to lifts over what lies on its way (`rise()`'s `over`, measured against
     the shapes once a seat), and where one has to clear more than 6 cm (the ruins' drum,
     his boots up on it) he pushes up over his feet where they rest first, then steps
-    across it, right foot then left (sitting down, back across, then down). Getting up,
-    sitting down and the site's dance step his head and hands no further at a time than
-    round 9's did (head ≤ 23 cm a 12 fps step; `test/knightClearance.test.mjs` allows
-    1.5×).
+    across it, right foot then left (sitting down, back across, then down).
+  - *Smooth.* Nothing he does at his seat (every gesture seated and standing, the site's
+    dance, the reactions, getting up and sitting down) steps his head or hands further at a
+    time than round 9's did in the same thing, give or take half, and a step past round
+    9's goes at most a quarter further (and 1 cm) than the same step does with nothing
+    there to keep clear of (`test/knightClearance.test.mjs`, at the fire's 12 fps, each
+    from six moments in his idle; round 10: a fifth at the most, a seated beckon's or
+    Point's first touch of the ruins' pillar, the Point's hand 38 cm where round 9's went
+    28 and it goes 32–33 with nothing there; before the ease looked halfway first, up to
+    44). In the ruins his hands start up on knees raised over the fallen drum, so a
+    gesture's start takes them further than round 9's anywhere (watchful, a beckon's free
+    hand 30 cm a step, round 9's 20), kept clear or not: there the step with nothing to
+    keep clear of is the measure.
   - *Dancers.* The show leaves out a dance move whose reach (`MOVE_REACH`: measured on
     the real model, by height band and in front, aside and behind) doesn't clear the
     shapes round the dancer's place with 5 cm to spare (`fire.knights.fits`, or, where the
