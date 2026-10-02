@@ -122,14 +122,20 @@
  */
 
 /**
- * What main.js gives the parts: building the scene, and the parts it still holds itself.
+ * The output window (output.js).
+ * @typedef {object} OutputPart
+ * @property {() => void} openOutput  the output window, for a projector (O)
+ * @property {() => void} mirrorCard  copy the title card into the output window
+ * @property {() => void} streamOutput  stream a rebuilt scene's canvas into the output window, if it's open
+ */
+
+/**
+ * What main.js gives the parts: building the scene, and capping how often it's drawn.
  * @typedef {object} MainPart
  * @property {() => Promise<void>} startScene  build the scene (again: a setting it's built with changed)
  * @property {() => void} applyFrameRate  Frame Rate as the scene's cap
- * @property {() => void} mirrorCard  copy the title card into the output window
- * @property {() => void} openOutput  the output window, for a projector (O)
  */
 
-/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & DialogsPart & RenderPart & PackPart & MidiPart & MainPart} LiveContext */
+/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & DialogsPart & RenderPart & PackPart & MidiPart & OutputPart & MainPart} LiveContext */
 
 export {};
