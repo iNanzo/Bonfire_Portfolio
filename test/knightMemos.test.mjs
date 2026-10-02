@@ -1,6 +1,7 @@
 // What the knights hand out every frame, made without garbage: knights.positions (the heads
 // for the cameras, read by the director each frame) is one array of the same vectors, filled
-// in place.
+// in place; the Knights settings the show compares each frame (knightShow.js knightSettings,
+// through memoOn) are made again only when a setting they're made from changes, in place too.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -8,6 +9,8 @@ import { createKnights } from '../src/bonfire/knights.js';
 import { createArmorShared } from '../src/bonfire/armor.js';
 import { BONES, BONE_NODES, PARENT, DEFAULT_REST } from '../src/bonfire/knightPose.js';
 import { SEATS } from '../src/bonfire/scenery.js';
+import { memoOn } from '../src/visualizer/knightShow.js';
+import { showFor, play } from './lib/fakeScene.mjs';
 
 /** The rig as plain groups with a box on every joint and three helmets (as knights.test.mjs has it). */
 function standInModel() {
@@ -64,4 +67,59 @@ test('positions: the present knights’ heads, one array of the same vectors, fi
   // (None there: empty.)
   kn.setCast({ count: 0, instant: true });
   assert.equal(kn.positions.length, 0);
+});
+
+test('memoOn: the same value while every input noted is the same; made again when one changes, in place too', () => {
+  let made = 0;
+  const s = { a: 1, list: ['x', 'y'], on: { p: true } };
+  const get = memoOn((note) => {
+    note(s.a);
+    note(s.list?.length);
+    for (let i = 0; i < (s.list?.length ?? 0); i++) note(s.list[i]);
+    note(s.on.p);
+  }, () => ({ n: ++made, a: s.a, list: (s.list ?? []).join(), p: s.on.p }));
+  const first = get();
+  assert.deepEqual(first, { n: 1, a: 1, list: 'x,y', p: true });
+  for (let i = 0; i < 5; i++) assert.equal(get(), first, 'nothing changed: the same object, nothing made');
+  assert.equal(made, 1);
+  s.a = 2;
+  const second = get();
+  assert.notEqual(second, first);
+  assert.deepEqual(second, { n: 2, a: 2, list: 'x,y', p: true });
+  assert.equal(get(), second);
+  s.list[1] = 'z'; // (changed in place)
+  assert.deepEqual(get(), { n: 3, a: 2, list: 'x,z', p: true });
+  s.list.push('w'); // (one more input)
+  assert.equal(get().list, 'x,z,w');
+  s.list = null; // (fewer inputs)
+  assert.equal(get().list, '');
+  s.on.p = false; // (a member of an object, in place)
+  assert.equal(get().p, false);
+  s.list = []; // (null and empty notes differently, so it's made again: the same value)
+  assert.deepEqual({ ...get(), n: 0 }, { n: 0, a: 2, list: '', p: false });
+  const n = made;
+  for (let i = 0; i < 5; i++) get();
+  assert.equal(made, n, 'and then the same again');
+  // (NaN is NaN: Object.is.)
+  s.a = NaN;
+  get();
+  const m = made;
+  get();
+  assert.equal(made, m);
+});
+
+test('the show still acts on Knights settings changed in place (a helmet switched off, a place in the helmet order)', () => {
+  const { show, kn, settings } = showFor({ knights: 'on', knightCount: 3, knightHelmetOrder: ['armet', 'armet', 'armet'] }, { seed: 5 });
+  kn.moment = 'start';
+  show.start(kn);
+  play(show, kn, 2);
+  assert.deepEqual(kn.list.slice(0, 3).map((e) => e.helmet), ['armet', 'armet', 'armet']);
+  settings.knightHelmetOrder[1] = 'bascinet';
+  play(show, kn, 1);
+  assert.equal(kn.list[1].helmet, 'bascinet', 'the order changed in place: acted on');
+  settings.knightHelmetOrder = null;
+  settings.knightHelmets.great = false;
+  settings.knightHelmets.armet = false;
+  play(show, kn, 1);
+  assert.deepEqual(kn.list.slice(0, 3).map((e) => e.helmet), ['bascinet', 'bascinet', 'bascinet'], 'the switches changed in place: acted on');
 });

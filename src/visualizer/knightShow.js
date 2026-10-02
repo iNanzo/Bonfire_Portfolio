@@ -182,6 +182,36 @@ export function ringAround(ring, sitters) {
 export const dancersFor = (n, budget = 1) => (n < 1 ? 0 : Math.min(n, Math.max(1, Math.round(n * (0.4 + 0.6 * clamp01(budget))))));
 
 /**
+ * A value asked for every frame, made again only when what it's made from has changed:
+ * `read(note)` notes each of its inputs (note(v), in the same order each time; an array's or
+ * object's members one by one, so one changed in place counts), and `make()` makes it. The
+ * function returned hands back the same value until an input isn't what it was (Object.is),
+ * so asking every frame makes nothing new (createKnightShow's knightSettings).
+ * @template T
+ * @param {(note: (v: unknown) => void) => void} read
+ * @param {() => T} make
+ * @returns {() => T}
+ */
+export function memoOn(read, make) {
+  const was = [];
+  let n = 0;
+  let changed = true;
+  let value;
+  const note = (v) => {
+    if (n >= was.length || !Object.is(was[n], v)) { was[n] = v; changed = true; }
+    n++;
+  };
+  return () => {
+    n = 0;
+    read(note);
+    if (n !== was.length) { was.length = n; changed = true; }
+    if (changed) { value = make(); changed = false; }
+    return value;
+  };
+}
+const HELMET_KEYS = Object.keys(HELMETS);
+
+/**
  * The knights' show. `settings` is read live (the Knights tab: knights, knightCount,
  * knightDance, knightFormation, knightMoves, knightHelmets, danceBars, knightCam,
  * knightSummon, knightGestures, knightShine, knightReactions, knightStyle, knightFinish,
@@ -616,11 +646,23 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
     rollArmor(kn);
     last = knightSettings();
   }
-  const knightSettings = () => ({
+  // (The Knights settings as sync() compares them, asked for every frame: made again only when
+  // one of the settings they're made from changed, each helmet's switch and each place in the
+  // helmet order counted on its own, as a menu may change them in place.)
+  const knightSettings = memoOn((note) => {
+    note(settings.knights); note(settings.knightCount); note(settings.knightDance);
+    const on = settings.knightHelmets;
+    for (let i = 0; i < HELMET_KEYS.length; i++) note(on?.[HELMET_KEYS[i]]);
+    const order = settings.knightHelmetOrder;
+    note(order?.length);
+    for (let i = 0; i < (order?.length ?? 0); i++) note(order[i]);
+    note(settings.knightShine); note(settings.knightReactions); note(settings.knightFinish);
+    note(settings.knightGlow); note(settings.knightRim); note(settings.knightSeat); note(settings.knightStyle);
+  }, () => ({
     k: modeOf(settings.knights), c: String(settings.knightCount), d: danceMode(), h: helmetsOn().join(),
     o: (settings.knightHelmetOrder ?? []).join(), s: modeOf(settings.knightShine), r: modeOf(settings.knightReactions),
     f: String(settings.knightFinish), rim: `${glowMode()} ${rimOf()}`, seat: String(settings.knightSeat), st: String(settings.knightStyle),
-  });
+  }));
   /** The Knights settings changed (by hand): act at once. */
   function sync(kn) {
     const now = knightSettings();
