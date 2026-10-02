@@ -163,6 +163,8 @@ export function createEffectMaterial(fireMaterial, { shape = SHAPE.square } = {}
  * @param {number} o.sparks     spark particles
  * @param {THREE.Material} o.material
  * @param {THREE.Vector3} o.origin  base of the fire (world)
+ * @param {ReturnType<typeof import('./curl.js').createCurlField>} o.field  the shared curl-noise field (curl.js)
+ * @param {boolean} [o.reducedMotion]  sparks rise gently (prefers-reduced-motion)
  */
 export function createFlame({ count, sparks: sparkCount, material, origin, field, reducedMotion }) {
   const flame = createPoints(count, material, { alpha: false });

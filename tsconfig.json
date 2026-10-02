@@ -113,5 +113,18 @@
     "src/visualizer/hud.js",
     "src/visualizer/midiUi.js",
     "src/visualizer/output.js"
+    "src/bonfire/flame.js",
+    "src/bonfire/flowView.js",
+    "src/bonfire/forgeFx.js",
+    "src/bonfire/rings.js",
+    "src/bonfire/summonSign.js",
+    "src/ui/audio.js",
+    "src/ui/inventory.js",
+    "admin/ui/images.js",
+    "admin/ui/schema.js",
+    "admin/ui/text.js",
+    "admin/server/auth.js",
+    "admin/server/bytes.js",
+    "admin/server/errors.js"
   ]
 }

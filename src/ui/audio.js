@@ -13,7 +13,7 @@ let crackleTimer = null;
 
 function ensureContext() {
   if (ctx) return ctx;
-  const AC = window.AudioContext || window.webkitAudioContext;
+  const AC = window.AudioContext || /** @type {any} */ (window).webkitAudioContext; // (older Safari)
   if (!AC) return null;
   ctx = new AC();
   master = ctx.createGain();

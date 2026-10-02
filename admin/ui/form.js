@@ -94,10 +94,10 @@ const autoRows = (text) => Math.min(12, Math.max(2, Math.ceil(String(text ?? '')
 
 // ---- values ------------------------------------------------------------------------
 /**
- * @param ctx {
- *   draft, uploads: Map, open: WeakSet, fresh: WeakSet, drag: {},
- *   changed({ rerender }), thumb(src), siteUrl, toast(msg), busy(on), preview?
- * }
+ * @param {*} value @param {(string|number)[]} path
+ * @param {*} ctx  the page's: { draft, uploads: Map, open: WeakSet, fresh: WeakSet, drag: {},
+ *   changed({ rerender }), thumb(src), siteUrl, toast(msg), busy(on), preview? }
+ * @param {number} [level]
  */
 export function renderValue(value, path, ctx, level = 3) {
   if (path.at(-1) === 'images' && Array.isArray(value)) return renderImages(value, path, ctx);
@@ -195,7 +195,7 @@ function chances(draft) {
 const chanceText = (p) => (p > 0 ? `≈ ${Math.round(p * 100)}% of draws` : 'Never drawn');
 function refreshChances(ctx) {
   const c = chances(ctx.draft);
-  for (const n of document.querySelectorAll('[data-chance]')) n.textContent = chanceText(c[n.dataset.chance]);
+  for (const n of document.querySelectorAll('[data-chance]')) n.textContent = chanceText(c[/** @type {HTMLElement} */ (n).dataset.chance]);
 }
 
 function elementFoot(id, ctx) {
@@ -204,6 +204,10 @@ function elementFoot(id, ctx) {
     el('button', { type: 'button', class: 'button small', text: '▶ Try It in the Preview', onclick: () => ctx.preview?.element(id) }));
 }
 
+/**
+ * @param {*} value @param {(string|number)[]} path @param {*} ctx
+ * @param {{ nullable?: boolean, multiline?: boolean }} [o]
+ */
 function renderScalar(value, path, ctx, { nullable = hint(NULLABLE, patternOf(path)), multiline } = {}) {
   const pattern = patternOf(path);
   const key = path.at(-1);
@@ -300,7 +304,7 @@ function update(path, value, ctx) {
   // A new entry's id follows its name until you edit the id yourself.
   if (key === 'name' && parent && ctx.fresh.has(parent) && 'id' in parent) {
     parent.id = uniqueId(slugify(value) || scopeIds(ctx, parent).fallback, ctx, parent);
-    const idField = document.querySelector(`[data-path="${CSS.escape(keyOf([...parentPath, 'id']))}"] input`);
+    const idField = /** @type {HTMLInputElement | null} */ (document.querySelector(`[data-path="${CSS.escape(keyOf([...parentPath, 'id']))}"] input`));
     if (idField) idField.value = parent.id;
   }
   if (key === 'id' && parent) ctx.fresh.delete(parent);
@@ -309,7 +313,7 @@ function update(path, value, ctx) {
   }
   if (path[0] === 'effects' && path[1] === 'elements' && (key === 'weight' || key === 'rotation')) refreshChances(ctx);
   if (SWATCH_KEYS.includes(key) && HEX_RE.test(value)) {
-    const sw = document.querySelector(`[data-swatch="${CSS.escape(keyOf(path))}"]`);
+    const sw = /** @type {HTMLElement | null} */ (document.querySelector(`[data-swatch="${CSS.escape(keyOf(path))}"]`));
     if (sw) sw.style.setProperty('background', value);
   }
   ctx.changed();
