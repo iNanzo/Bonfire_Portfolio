@@ -93,19 +93,28 @@
  */
 
 /**
- * What main.js still gives the parts (until each moves into one of its own).
- * @typedef {object} MainPart
- * @property {() => void} mirrorCard  copy the title card into the output window
- * @property {(tab?: string, o?: { search?: boolean }) => void} openSettings
- * @property {() => void} openKeys  the keyboard shortcuts (?)
- * @property {() => void} openOutput  the output window, for a projector (O)
- * @property {any} pack  ui/pack.js: the pack (I)
- * @property {(key: string | string[]) => void} applySettings  a setting (or the ones a preset changed) changed
+ * The settings and the keyboard shortcuts (dialogs.js).
+ * @typedef {object} DialogsPart
  * @property {any} settingsPanel  settingsDialog.js bindSettings: the settings dialog
  * @property {any} keysOverlay  ui/keysOverlay.js: every shortcut (?)
+ * @property {(key: string | string[]) => void} applySettings  a setting changed (or the ones a preset or a setup changed)
+ * @property {() => void} applyRender  a render setting changed (the P menu): only the picture follows
+ * @property {(tab?: string, o?: { search?: boolean }) => void} openSettings  the settings (on `tab`; `search`: in their search box)
+ * @property {() => void} openKeys  the keyboard shortcuts (?)
+ */
+
+/**
+ * What main.js gives the parts: building the scene, and the parts it still holds itself.
+ * @typedef {object} MainPart
+ * @property {() => Promise<void>} startScene  build the scene (again: a setting it's built with changed)
+ * @property {() => void} applyFrameRate  Frame Rate as the scene's cap
+ * @property {Record<string, string>} midiNames  the MIDI pads' moments, as the settings list them
+ * @property {() => void} mirrorCard  copy the title card into the output window
+ * @property {() => void} openOutput  the output window, for a projector (O)
+ * @property {any} pack  ui/pack.js: the pack (I)
  * @property {any} renderMenu  ui/renderMenu.js: Render Settings (P)
  */
 
-/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & MainPart} LiveContext */
+/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & DialogsPart & MainPart} LiveContext */
 
 export {};

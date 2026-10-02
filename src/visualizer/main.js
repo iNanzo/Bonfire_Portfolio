@@ -45,23 +45,20 @@ import { startingEquipment, weapons } from '../content.js';
 import { elementOr } from '../elements.js';
 import { installDitherPatterns } from '../ui/dither.js';
 import { installTooltips } from '../ui/tooltip.js';
-import { createKeysOverlay } from '../ui/keysOverlay.js';
 import { applyFlame, setAccentRamp, setAccentRate } from '../ui/theme.js';
 import { esc } from '../html.js';
 import { BAND_NAMES } from './analyser.js';
 import { createDirector } from './director.js';
 import { modeOf } from './looks.js';
 import { densityCounts } from './density.js';
-import { loadSettings, saveSettings, flushSettings, defaults, frameCap } from './settings.js';
-import { bindSettings, markPreset } from './settingsDialog.js';
-import { KEY_GROUPS, keyList } from './keys.js';
+import { loadSettings, flushSettings, defaults, frameCap } from './settings.js';
+import { markPreset } from './settingsDialog.js';
 import { createTickBatch } from './tickBatch.js';
 import { stepRender, renderText, XRAY_VIEWS, FOGS } from './render.js';
 import { HELMETS } from './knightShow.js';
 import { STYLE_NAMES } from '../bonfire/knightStyles.js';
 import { FINISH_NAMES } from '../bonfire/steel.js';
 import { createRenderMenu } from '../ui/renderMenu.js';
-import { focusedNow } from '../ui/focus.js';
 import { pageMarkup } from './markup.js';
 import { createScenesUi } from './scenesUi.js';
 import { createCards } from './cards.js';
@@ -69,6 +66,7 @@ import { createSources } from './sources.js';
 import { createHud, wieldLabel } from './hud.js';
 import { createStart } from './start.js';
 import { createActions } from './actions.js';
+import { createDialogs } from './dialogs.js';
 import { q, failScene } from '../ui/shell.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
@@ -125,7 +123,7 @@ const askedScene = params.get('scene');
 ctx.firstScene = askedScene ? ctx.findScene(askedScene) : null;
 ctx.solo = ctx.firstScene && params.has('solo') ? ctx.firstScene.ref : null;
 // (What main.js still gives the parts, until each moves out.)
-Object.assign(ctx, { openSettings, openKeys, applySettings, mirrorCard, openOutput });
+Object.assign(ctx, { startScene, applyFrameRate, mirrorCard, openOutput });
 
 // --- The bonfire ---------------------------------------------------------------------------
 const IDLE = { state: 'silent', bands: Object.fromEntries(BAND_NAMES.map((b) => [b, 0])), level: 0, beats: [], events: [], kick: 0, hat: 0, bpm: 0, locked: false, build: 0 };
@@ -139,7 +137,7 @@ function onImpact(flameKey, _from, instant, selection) {
 }
 
 // Ableton Link (link.js): while it's the beat's source, the session sets the grid.
-const link = createLinkClient({ port: () => settings.linkPort, onStatus: (text) => { if (settingsPanel) settingsPanel.linkStatus = text; } });
+const link = createLinkClient({ port: () => settings.linkPort, onStatus: (text) => { if (ctx.settingsPanel) ctx.settingsPanel.linkStatus = text; } });
 // The sound is analysed on every frame the display shows (onTick), whatever Frame Rate
 // draws; the director and the HUD go with the drawn frames (onFrame), taking all it heard
 // since the last one (ctx.heard: tickBatch.js).
@@ -251,90 +249,8 @@ Object.assign(ctx, createHud(ctx));
 // --- Actions (actions.js): the buttons, the keyboard shortcuts, the beat by hand ---------------
 Object.assign(ctx, createActions(ctx));
 
-// --- Settings dialog (settingsDialog.js) ---------------------------------------------------------
-// Settings the scene is built with (particle counts size its buffers; the fireflies' trails
-// are made with it): changing one rebuilds it.
-const REBUILD = ['particles', 'trails'];
-const builtWith = () => REBUILD.map((k) => String(settings[k])).join();
-let built = builtWith();
-let rebuildTimer = 0;
-/** A render setting changed (the P menu): only the picture, the rest of the show as it is. */
-function applyRender() {
-  ctx.director?.applyRender();
-  saveSettings(settings);
-  markPreset(start, settings);
-  settingsPanel.fill(); // (only while the dialog is open: it fills as it opens)
-}
-/**
- * A setting changed (`key`: the one, or the ones a preset or a setup changed): one the scene
- * is built with rebuilds it; the rest apply at once. What you touch by hand wins over the
- * preset scene playing, until the next one; while a scene holds, the place and the shot stay
- * its own unless it's them you changed.
- */
-function applySettings(key) {
-  const keys = [key].flat().filter((k) => typeof k === 'string');
-  if (keys.length) ctx.director?.releaseScene(keys.includes('xray') ? [...keys, 'xrayView'] : keys);
-  if (builtWith() !== built) {
-    built = builtWith();
-    clearTimeout(rebuildTimer);
-    rebuildTimer = setTimeout(startScene, 200);
-  }
-  if (ctx.engine) ctx.engine.monitor.gain.value = settings.volume;
-  applyFrameRate();
-  ctx.director?.applyRender();
-  const held = !!ctx.director?.sceneRef;
-  if (settings.scenery !== 'mix' && (!held || keys.includes('scenery'))) ctx.fire?.setScenery(settings.scenery);
-  if (!held || keys.includes('shot')) ctx.director?.setShot(settings.shot);
-  // Scenes switched off: back to the free show now (a solo from the Painter stays).
-  if (keys.includes('scenes') && modeOf(settings.scenes) === 'off' && held && !ctx.solo) ctx.playScene(null, { instant: !ctx.engine?.source });
-  if (keys.some((k) => k === 'sceneFrom' || k === 'sceneList')) ctx.drawChips();
-  saveSettings(settings);
-  markPreset(start, settings);
-  ctx.showScene();
-}
-const settingsPanel = bindSettings(settingsDialog, settings, {
-  onChange: applySettings,
-  onNote: (text) => ctx.note(text, 1.5),
-  scenes: ctx.library,
-  thumb: (ref) => ctx.store.thumb(ref),
-  onPlayScene: (ref) => {
-    const entry = ctx.findScene(ref);
-    if (!entry) return;
-    if (document.body.dataset.mode !== 'live') ctx.firstScene = entry;
-    ctx.playScene(entry, { instant: document.body.dataset.mode !== 'live' });
-  },
-  base: import.meta.env.BASE_URL,
-  midi: () => MIDI_NAMES,
-  keys: keyList(),
-  onKeys: () => openKeys(),
-});
-ctx.settingsPanel = settingsPanel;
-
-// --- The keyboard shortcuts (?): every key, in groups (keys.js) -------------------------------
-const keysOverlay = createKeysOverlay({ title: 'Keyboard Shortcuts', groups: KEY_GROUPS });
-ctx.keysOverlay = keysOverlay;
-let keysOpener = null;
-function openKeys() {
-  keysOpener = focusedNow();
-  keysOverlay.open();
-}
-/**
- * A dialog closing with focus inside it gives focus back to what had it as it opened (the
- * browser gives it back only to an element: opened from the page itself, a closed dialog's
- * field would keep the focus a moment, and the next key would count as typing in it).
- * @param {HTMLDialogElement} dialog @param {() => Element | null} opener
- */
-function handBackFocus(dialog, opener) {
-  dialog.addEventListener('close', () => {
-    const a = /** @type {HTMLElement | null} */ (document.activeElement);
-    if (!a || !dialog.contains(a)) return;
-    const to = /** @type {HTMLElement | null} */ (opener());
-    if (to?.isConnected && to.getClientRects().length) to.focus({ preventScroll: true });
-    else a.blur();
-  });
-}
-handBackFocus(keysOverlay.el, () => keysOpener);
-handBackFocus(settingsDialog, () => settingsOpener);
+// --- Settings and the keyboard shortcuts (dialogs.js) --------------------------------------------
+Object.assign(ctx, createDialogs(ctx));
 
 // --- Render Settings (P; ui/renderMenu.js, as on the site): the Picture tab's switches --------
 // Each row steps its setting (render.js RENDER_STEPS) and the picture follows at once. What
@@ -377,7 +293,7 @@ const renderMenu = createRenderMenu({
     if (over && Object.hasOwn(over, id)) settings[id] = over[id];
     ctx.director?.releaseScene(id === 'xray' ? [id, 'xrayView'] : [id]);
     stepRender(settings, /** @type {any} */ (id), dir);
-    applyRender();
+    ctx.applyRender();
     return renderValues();
   },
   reset: {
@@ -386,7 +302,7 @@ const renderMenu = createRenderMenu({
       const d = defaults();
       for (const r of RENDER_ROWS) settings[r.id] = d[r.id];
       ctx.director?.releaseScene([...RENDER_ROWS.map((r) => r.id), 'xrayView']);
-      applyRender();
+      ctx.applyRender();
     },
   },
   onToggle: () => ctx.wake(),
@@ -463,12 +379,12 @@ ctx.pack = pack;
 // It sits just above the HUD while the HUD is up. (On the page's own box, not the body: a
 // change restyles only what's in it.)
 new ResizeObserver(() => app.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`)).observe(hud);
-settingsDialog.addEventListener('show-card', (e) => { settingsDialog.close(); ctx.showCard(e.detail); });
 // --- A MIDI controller (midi.js): pads for the moments, mapped by learning -----------------
 const midiList = q('[data-midi-list]');
 const midiStatus = q('[data-midi-status]');
 // (The X moment is the Living Weapon everywhere people read it.)
 const MIDI_NAMES = { ...MIDI_ACTIONS, combo: 'Living Weapon' };
+ctx.midiNames = MIDI_NAMES;
 function drawMidi() {
   const map = midi.mapping;
   midiList.innerHTML = Object.entries(MIDI_NAMES).map(([id, name]) => `
@@ -560,11 +476,4 @@ function openOutput() {
   output.addEventListener('pagehide', () => { q('[data-output-label]').textContent = 'Output'; });
   q('[data-output-label]').textContent = 'Output (open)';
   ctx.note('Output window open', 2);
-}
-/** Open the settings (on `tab`; `search`: with the focus in their search box). */
-let settingsOpener = null;
-function openSettings(tab, { search = false } = {}) {
-  if (!settingsDialog.open) settingsOpener = focusedNow();
-  settingsPanel.open(tab, { search });
-  ctx.wake();
 }
