@@ -39,7 +39,7 @@ function setup() {
 const f32 = (m) => Float32Array.from(m.elements);
 const at = (mesh, i) => mesh.instanceMatrix.array.slice(i * 16, i * 16 + 16);
 
-test('five draws for every fly: a mesh per part and one for the halos, on the flies\' layer', () => {
+test('four draws for all the flies (five a fly before): a mesh per part and one for the halos, on the flies\' layer', () => {
   const { flies } = setup();
   const meshes = flies.group.children.filter((o) => o.isInstancedMesh);
   assert.equal(meshes.length, 4, 'body, lantern, wings, halos');

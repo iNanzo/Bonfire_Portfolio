@@ -18,15 +18,15 @@
 // fold their wings, and take off the same way.
 //
 // Drawing: every part (body, lantern, wings, the halos) is one InstancedMesh for all
-// the flies, five draws instead of five a fly. Each fly keeps a rig of its own (plain
-// Object3Ds, out of the scene: its place, its turn, its wings' flap), and place(camera),
-// just before the frame is drawn, writes the rigs into the instances: each part's
-// view-space matrix (the camera's inverse times its world matrix, as three.js works out
-// a mesh's modelViewMatrix), with the instanced meshes standing at the camera, so the
-// GPU multiplies each vertex by exactly the matrix it used for the part's own mesh; the
-// lantern's and halos' colors and the halos' opacity as a flat per-instance tint, so
-// each texel comes out as it did; and the halos back to front, the order three.js drew
-// them in (additive blending rounds after each one).
+// the flies, four draws in all instead of five a fly. Each fly keeps a rig of its own
+// (plain Object3Ds, out of the scene: its place, its turn, its wings' flap), and
+// place(camera), just before the frame is drawn, writes the rigs into the instances:
+// each part's view-space matrix (the camera's inverse times its world matrix, as
+// three.js works out a mesh's modelViewMatrix), with the instanced meshes standing at
+// the camera, so the GPU multiplies each vertex by exactly the matrix it used for the
+// part's own mesh; the lantern's and halos' colors and the halos' opacity as a flat
+// per-instance tint, so each texel comes out as it did; and the halos back to front,
+// the order three.js drew them in (additive blending rounds after each one).
 import * as THREE from 'three';
 import { SimplexNoise } from 'three/examples/jsm/math/SimplexNoise.js';
 import { smooth, TAU } from '../math.js';
