@@ -57,7 +57,8 @@ trailing commas); `npm run format` applies them and `npm run format:check` lists
 differs (`npm run check` and CI run it). `.editorconfig` sets the basics for any editor.
 
 A pre-commit hook (simple-git-hooks, installed by `npm install`) runs lint-staged:
-Prettier and `eslint --fix` on the files you're committing. The one commit that formatted
+`eslint --fix`, then Prettier, on the files you're committing (in that order, so a fix that
+lengthens a line is formatted before it's committed). The one commit that formatted
 the whole repo is listed in `.git-blame-ignore-revs`; to have `git blame` skip it locally,
 run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once (GitHub already does).
 
