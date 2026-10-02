@@ -45,7 +45,7 @@ import { installDitherPatterns } from '../ui/dither.js';
 import { installTooltips } from '../ui/tooltip.js';
 import { createKeysOverlay, isHelpKey } from '../ui/keysOverlay.js';
 import { searchBoxMarkup } from '../ui/settingsSearch.js';
-import { typing } from '../ui/shell.js';
+import { failScene as markSceneFailed, q, qa, toggleFullscreen, typing } from '../ui/shell.js';
 import { applyFlame, setAccentRamp } from '../ui/theme.js';
 import { esc } from '../html.js';
 import { logoMark } from '../ui/logo.js';
@@ -75,8 +75,6 @@ import { captureThumb } from './thumbs.js';
 createDiscoveries().discover('painter');
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const q = (s, r = document) => r.querySelector(s);
-const qa = (s, r = document) => [...r.querySelectorAll(s)];
 const DRAFT = 'bonfire-painter-draft';
 /** A draft with unsaved changes that a link to another scene took the place of. */
 const DRAFT_ASIDE = 'bonfire-painter-draft-aside';
@@ -315,11 +313,7 @@ function onFrame(dt) {
 function failScene(error) {
   fire?.dispose();
   fire = null;
-  document.documentElement.classList.add('no-webgl');
-  const el = q('[data-error]');
-  el.textContent = 'This browser couldn’t start WebGL, so the bonfire can’t render here. Try Chrome or Edge with hardware acceleration on.';
-  el.hidden = false;
-  console.warn('Bonfire unavailable.', error);
+  markSceneFailed(q('[data-error]'), error);
 }
 
 import('../bonfire/scene.js').then(async ({ createBonfire }) => {
@@ -867,10 +861,6 @@ function capture() {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     note('Saved a picture of the stage.');
   });
-}
-function toggleFullscreen() {
-  if (document.fullscreenElement) document.exitFullscreen?.();
-  else document.documentElement.requestFullscreen?.().catch(() => {});
 }
 const keysOverlay = createKeysOverlay({ title: 'Keyboard Shortcuts', groups: PAINTER_KEYS });
 /** The Tools menu's items (toolbar.js TOOLS). */

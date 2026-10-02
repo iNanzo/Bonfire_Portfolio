@@ -13,7 +13,7 @@ import { imageRefs, SECTIONS, validateContent } from '../../src/contentRules.js'
 import { DEFAULT_EFFECTS } from '../../src/effectsDefaults.js';
 import { logoMark } from '../../src/ui/logo.js';
 import { installTooltips } from '../../src/ui/tooltip.js';
-import { typing } from '../../src/ui/shell.js';
+import { q, typing } from '../../src/ui/shell.js';
 import { HELP, LABELS, PAGES, defaultLabel, moreFor, resolveHelp } from './schema.js';
 import { el, getAt, moreBox, renderFeatured, renderValue, showErrors } from './form.js';
 import { createPreview } from './preview.js';
@@ -30,7 +30,6 @@ const local = {
   set(v) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(v)); } catch { /* storage full or blocked: drafts are a convenience */ } },
   clear() { try { localStorage.removeItem(DRAFT_KEY); } catch { /* blocked */ } },
 };
-const q = (s, r = document) => r.querySelector(s);
 /** replaceChildren, skipping empty slots (the DOM would print them as "null"). */
 const fill = (node, ...kids) => node.replaceChildren(...kids.flat().filter((k) => k !== null && k !== undefined && k !== false));
 

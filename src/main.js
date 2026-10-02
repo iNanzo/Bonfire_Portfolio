@@ -10,6 +10,7 @@ import {
 } from './render.js';
 import { installDitherPatterns } from './ui/dither.js';
 import { installTooltips } from './ui/tooltip.js';
+import { failScene as markSceneFailed, q, qa } from './ui/shell.js';
 import { createKeysOverlay, isHelpKey } from './ui/keysOverlay.js';
 import { SITE_KEYS } from './ui/siteKeys.js';
 import { setSound, blip, forgeHum } from './ui/audio.js';
@@ -39,8 +40,6 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
   remove(k) { try { localStorage.removeItem(k); } catch { /* private mode */ } },
 };
-const q = (s, r = document) => r.querySelector(s);
-const qa = (s, r = document) => [...r.querySelectorAll(s)];
 
 document.documentElement.classList.add('js');
 if (touch) document.documentElement.classList.add('touch');
@@ -829,7 +828,7 @@ function failScene(error) {
   fire?.dispose();
   fire = null;
   delete window.__fire;
-  document.documentElement.classList.add('no-webgl');
+  markSceneFailed(null, error, { log: 'Bonfire unavailable; showing the static portfolio.' });
   q('[data-stage]').classList.remove('is-ready');
   hud.close({ quiet: true });
   breakdown.exit();
@@ -843,7 +842,6 @@ function failScene(error) {
   displayedEquipment = { ...equipment };
   applyFlame(equipment.flame);
   refreshEquipLabels();
-  console.warn('Bonfire unavailable; showing the static portfolio.', error);
 }
 
 // Construct the real renderer once instead of probing with a second WebGL context.
