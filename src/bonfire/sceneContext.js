@@ -231,4 +231,16 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {(dt: number) => void} renderFrame  a frame: the page's part, the update, the draw
  */
 
-/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart & SceneryPart & FirePart & RenderPart & UpdatePart & MainPart} SceneContext */
+/**
+ * What's under the cursor, and what a click or a scroll does (scenePick.js). Points are client px.
+ * @typedef {object} PickPart
+ * @property {(x: number, y: number) => boolean} weaponAt  the planted weapon is under the point
+ * @property {(x: number, y: number) => number} knightAt  the knight under the point (his index), or -1
+ * @property {(x: number, y: number) => boolean} signAt  the knight's summon sign is under the point
+ * @property {(x: number, y: number, o?: { knight?: boolean }) => string | null} hoverAt  'weapon' | 'sign' | 'knight' | 'fire' | null, its effect shown
+ * @property {() => void} hoverOff  the cursor left the scene
+ * @property {(x: number, y: number) => void} flash  a click: the fireflies flash, a gust pushes the loose particles
+ * @property {(dy: number) => void} scroll  the page scrolled by `dy` CSS px
+ */
+
+/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart & SceneryPart & FirePart & RenderPart & UpdatePart & PickPart & MainPart} SceneContext */

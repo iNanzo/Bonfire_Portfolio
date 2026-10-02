@@ -138,6 +138,7 @@
     "src/bonfire/sceneIdle.js",
     "src/bonfire/sceneFire.js",
     "src/bonfire/sceneRender.js",
-    "src/bonfire/sceneUpdate.js"
+    "src/bonfire/sceneUpdate.js",
+    "src/bonfire/scenePick.js"
   ]
 }
