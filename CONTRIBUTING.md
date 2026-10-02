@@ -41,9 +41,11 @@ The [README](README.md) lists every script; [docs/](docs/) has how each app beha
 - **Browser test shards.** The whole run is about 15 minutes with two workers. CI splits it
   into five shards on one build (`.github/workflows/ci.yml`): Bonfire Live's tooltip sweeps
   (`e2e/tips-live.spec.mjs`) in two, every other spec in three. To run a part locally, name
-  a file (`npm run e2e -- tips-site`) or a shard (`npm run e2e -- --shard=1/3`). A spec whose
-  tests each open their own page can say `test.describe.configure({ mode: 'parallel' })`, so
-  its tests run side by side and shard one by one, as the tooltip specs do.
+  a file (`npm run e2e -- tips-site`), or repeat a CI shard with its own arguments:
+  `npm run e2e -- --grep-invert tips-live --shard=1/3` (all but Live tips, 1 of 3) or
+  `npm run e2e -- tips-live --shard=1/2` (Live tips, 1 of 2). A spec whose tests each open
+  their own page can say `test.describe.configure({ mode: 'parallel' })`, so its tests run
+  side by side and shard one by one, as tips-live and tips-painter do.
 
 ## Formatting
 
