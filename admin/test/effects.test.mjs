@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { contrast, validateContent } from '../../src/contentRules.js';
 import { DEFAULT_EFFECTS, RANGES } from '../../src/effectsDefaults.js';
+import { PIXEL_SIZES } from '../../src/pixelSizes.js';
 import { resolveEffects } from '../../src/effects.js';
 import { drawElement, elements, flameTitle } from '../../src/elements.js';
 import { titleCase } from '../ui/text.js';
@@ -53,6 +54,21 @@ test('numbers stay inside their ranges; unknown settings are refused', () => {
   c.effects.cursor.mode = 'laser';
   c.effects.fire.bogus = 1;
   assert.deepEqual(paths(c).sort(), ['effects.cursor.mode', 'effects.fire.bogus', 'effects.fire.size', 'effects.fireflies.lit', 'effects.render.ditherMatrix'].sort());
+});
+
+test('pixel sizes are the ones the menus step through: 2, 3, 4, 6 or 8 px', () => {
+  for (const key of ['pixelSize', 'pixelSizeSmall']) {
+    for (const px of PIXEL_SIZES) {
+      const c = content();
+      c.effects.render[key] = px;
+      assert.deepEqual(paths(c), [], `${key} ${px}`);
+    }
+    for (const px of [1, 5, 7, 9, 4.5, '4']) {
+      const c = content();
+      c.effects.render[key] = px;
+      assert.deepEqual(paths(c), [`effects.render.${key}`], `${key} ${px}`);
+    }
+  }
 });
 
 test('missing effect settings fall back to the defaults', () => {

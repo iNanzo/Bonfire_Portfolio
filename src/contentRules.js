@@ -8,6 +8,7 @@ import {
   KNIGHT_STYLES, RANGES,
 } from './effectsDefaults.js';
 import { contrast, HEX_RE, ID_RE, isObj, WEAPON_KEYS } from './ruleBasics.js';
+import { PIXEL_SIZES } from './pixelSizes.js';
 import { validateScenes } from './scenes.js';
 
 // The basics moved to ruleBasics.js (so scenes.js can use them); re-exported for everyone
@@ -106,9 +107,12 @@ export function validateEffects(e, err, base = 'effects') {
   group('cursor', (k, v, p) => {
     if (k === 'mode') { if (!CURSOR_MODES.includes(v)) err(at(p), `One of: ${CURSOR_MODES.join(', ')}.`); } else num(v, p);
   });
+  // (The pixel sizes are the ones every render menu steps through, src/pixelSizes.js.)
   group('render', (k, v, p) => {
     if (k === 'outlines' || k === 'shake') bool(v, p);
-    else if (k === 'ditherMatrix') { if (!DITHER_MATRICES.includes(v)) err(at(p), `One of: ${DITHER_MATRICES.join(', ')}.`); } else num(v, p);
+    else if (k === 'ditherMatrix') { if (!DITHER_MATRICES.includes(v)) err(at(p), `One of: ${DITHER_MATRICES.join(', ')}.`); }
+    else if (k === 'pixelSize' || k === 'pixelSizeSmall') { if (!PIXEL_SIZES.includes(v)) err(at(p), `One of: ${PIXEL_SIZES.join(', ')} px.`); }
+    else num(v, p);
   });
   group('elements', (id, el, p) => {
     if (!isObj(el)) return err(at(p), 'Must be a group of fields.');
