@@ -7,7 +7,7 @@
 // is left on the site.
 import { test, expect } from '@playwright/test';
 import { collectTips, checkTip, assertInViewport, tipOf } from './lib/tips.mjs';
-import { startsWith, ui } from './lib/content.mjs';
+import { content, startsWith, ui } from './lib/content.mjs';
 
 const SIZES = [
   { name: '1280×720', viewport: { width: 1280, height: 720 }, touch: false },
@@ -165,7 +165,7 @@ for (const size of SIZES) {
       const { context, page, errors, tap } = await open(browser, size);
       await page.goto('/');
       await ready(page);
-      await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 30_000 }); // (his model is its own file)
+      await expect(page.locator('#scene-label')).toContainText(content.hero.sceneSign, { timeout: 30_000 }); // (his model is its own file)
       await tap(page.locator('[data-pack-toggle]'));
       await page.waitForFunction(() =>
         document

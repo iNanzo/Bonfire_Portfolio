@@ -4,6 +4,16 @@
 // focus checks: the pack's lists on screen at phone to desktop sizes, focus back after the
 // breakdown, and no render HUD left behind on touch screens.
 import { test, expect } from '@playwright/test';
+import { content, screenLabel, startsWith } from './lib/content.mjs';
+
+// The words checked for are content.json's, which the admin edits (CONTRIBUTING.md): read
+// here, not pinned. The scene's description (#scene-label): the scene, then the knight's
+// sentence while he's by the fire or his summon sign's while he's away.
+const { sceneLabel: SCENE, sceneKnight: KNIGHT_HERE, sceneSign: SIGN } = content.hero;
+/** The Portfolio page's link that opens the breakdown (its href is #how-its-made), by its name. */
+const TAKE_APART = startsWith(
+  content.projects.find((p) => p.id === 'portfolio').links.find((l) => l.href === '#how-its-made').label,
+);
 
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
 function watch(page) {
@@ -50,13 +60,15 @@ async function findSign(page) {
   return null;
 }
 
+/** A screen's heading: the site's name on the title screen, else its section's title (or its name). */
+const titleOf = (id) => (id === 'home' ? content.site.name : (content.sections[id]?.title ?? screenLabel(id)));
 const SCREENS = [
-  ['/', 'Newton Hoang'],
-  ['/projects/', 'Project Inventory'],
-  ['/experience/', 'Journey'],
-  ['/skills/', 'Skills'],
-  ['/about/', 'About'],
-  ['/contact/', 'Contact'],
+  ['/', titleOf('home')],
+  ['/projects/', titleOf('projects')],
+  ['/experience/', titleOf('experience')],
+  ['/skills/', titleOf('skills')],
+  ['/about/', titleOf('about')],
+  ['/contact/', titleOf('contact')],
 ];
 
 for (const [path, heading] of SCREENS) {
@@ -133,14 +145,14 @@ test('the knight isn’t there on first load: his sign glows, and a click on it 
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   const label = page.locator('#scene-label');
-  await expect(label).toContainText(/summon sign/i, { timeout: 30_000 }); // (his model is in: the sign waits)
-  await expect(label).not.toContainText(/knight in steel plate sits/i);
+  await expect(label).toContainText(SIGN, { timeout: 30_000 }); // (his model is in: the sign waits)
+  await expect(label).not.toContainText(KNIGHT_HERE);
   const sign = await findSign(page);
   expect(sign, 'the sign is on the ground, and hovering it says so').not.toBeNull();
   expect(await page.locator('[data-stage]').evaluate((s) => getComputedStyle(s).cursor)).toBe('pointer');
   await page.mouse.click(sign.x, sign.y);
   // He forms out of it in the fire's element (~3 s), then rests.
-  await expect(label).toContainText(/knight in steel plate sits/i, { timeout: 15_000 });
+  await expect(label).toContainText(KNIGHT_HERE, { timeout: 15_000 });
   await page.mouse.move(5, 5);
   await page.waitForTimeout(500);
   expect(errors).toEqual([]);
@@ -187,7 +199,7 @@ test('the pack’s knight item summons him, swaps his helmet and style (remember
   // Sent off: he burns away into his sign, and the pack offers the summons again.
   await dismiss.click();
   await expect(summon).toBeEnabled({ timeout: 15_000 });
-  await expect(page.locator('#scene-label')).toContainText(/summon sign/i);
+  await expect(page.locator('#scene-label')).toContainText(SIGN);
   await page.keyboard.press('Escape');
   expect(errors).toEqual([]);
 });
@@ -205,7 +217,7 @@ test('the pack keeps the keyboard: Summon and Send Him Off picked with Enter lea
     await page.locator('[data-pack-slot="knight"]').focus();
     await page.keyboard.press('ArrowLeft');
   };
-  await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 30_000 }); // (his model is in)
+  await expect(page.locator('#scene-label')).toContainText(SIGN, { timeout: 30_000 }); // (his model is in)
   await page.keyboard.press('i');
   await intoKnight();
   const summon = page.locator('[data-pack-option="summon"]');
@@ -249,7 +261,7 @@ test('the Portfolio’s page takes this one apart: the breakdown, its render set
   const errors = watch(page);
   await page.goto('/projects/portfolio/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
-  await page.getByRole('link', { name: /Take This Page Apart/ }).click();
+  await page.getByRole('link', { name: TAKE_APART }).click();
   await expect(page.locator('html')).toHaveClass(/is-breakdown/);
   // The pack stays, and its key works with focus on the panel's views.
   await expect(page.locator('[data-pack-toggle]')).toBeVisible();
@@ -268,7 +280,7 @@ test('the Portfolio’s page takes this one apart: the breakdown, its render set
   // B leaves it, and focus goes back to the link that opened it.
   await page.keyboard.press('b');
   await expect(page.locator('html')).not.toHaveClass(/is-breakdown/);
-  await expect(page.getByRole('link', { name: /Take This Page Apart/ })).toBeFocused();
+  await expect(page.getByRole('link', { name: TAKE_APART })).toBeFocused();
   expect(errors).toEqual([]);
 });
 
@@ -289,7 +301,7 @@ test('the pack’s lists stay on screen at every size, with the breakdown open a
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   // (The Knight item is there once his model is in: it's its own file, after the scene.)
-  await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 30_000 });
+  await expect(page.locator('#scene-label')).toContainText(SIGN, { timeout: 30_000 });
   // (The items rising and the list sliding in have landed; the icons' own loops don't end.)
   const settled = () =>
     page.waitForFunction(() =>
@@ -355,8 +367,7 @@ test('no knight (his model doesn’t load): no Knight item in the pack, nor a wo
   await page.route('**/models/knight.glb', (r) => r.abort());
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
-  await expect(page.locator('#scene-label')).not.toContainText(/knight/i);
-  await expect(page.locator('#scene-label')).toContainText(/bonfire/i);
+  await expect(page.locator('#scene-label'), 'the scene alone').toHaveText(SCENE);
   await page.locator('[data-pack-toggle]').click();
   await expect(page.locator('[data-pack-slot="map"]')).toBeVisible();
   await expect(page.locator('[data-pack-item="knight"]')).toBeHidden();
@@ -370,7 +381,7 @@ test('touch screens: closing the breakdown folds its render settings away (no st
   await page.goto('/projects/portfolio/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   await expect(page.locator('html')).toHaveClass(/\btouch\b/);
-  await page.getByRole('link', { name: /Take This Page Apart/ }).tap();
+  await page.getByRole('link', { name: TAKE_APART }).tap();
   await expect(page.locator('html')).toHaveClass(/is-breakdown/);
   await page.locator('.breakdown [data-render-head]').tap();
   await expect(page.locator('.breakdown [data-render-row="outlines"]')).toBeVisible();
@@ -388,7 +399,7 @@ test('a link to #how-its-made opens the breakdown on arrival; Bonfire Live’s p
   await page.goto('/#how-its-made');
   await expect(page.locator('html')).toHaveClass(/is-breakdown/, { timeout: 30_000 });
   await page.goto('/projects/bonfire-live/');
-  await expect(page.getByRole('link', { name: /Take This Page Apart/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: TAKE_APART })).toHaveCount(0);
   await expect(page.locator('.detail-link[href$="/projects/portfolio/"]')).toBeVisible();
   expect(errors).toEqual([]);
 });

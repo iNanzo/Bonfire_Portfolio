@@ -14,6 +14,14 @@ import { test, expect } from '@playwright/test';
 import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
 import { defaultScene, encodeSceneHash, readSceneFile } from '../src/scenes.js';
+import { normalize } from '../src/ui/settingsSearch.js';
+import { content } from './lib/content.mjs';
+
+/**
+ * The built-in Frozen Shrine's name, as content.json has it: the admin's Scenes page can
+ * rename it, so it's read, not pinned (CONTRIBUTING.md).
+ */
+const SHRINE = content.scenes.find((s) => s.id === 'frozen-shrine').name;
 
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
 function watch(page) {
@@ -125,7 +133,7 @@ test('unsaved changes come back after a reload, and a link to another scene sets
   await expect(kaleido).toHaveAttribute('aria-pressed', 'true');
   // A link to a built-in: the unsaved work waits in a banner.
   await ready(page, '/painter/?scene=b:frozen-shrine');
-  await expect(page.locator('[data-name]')).toHaveValue('Frozen Shrine');
+  await expect(page.locator('[data-name]')).toHaveValue(SHRINE);
   await expect(page.locator('[data-aside-restore]')).toHaveText('Restore “Reload Test”');
   await page.click('[data-aside-restore]');
   await expect(page.locator('[data-name]')).toHaveValue('Reload Test');
@@ -192,7 +200,7 @@ test('Play on an untouched built-in saves nothing and opens Bonfire Live on its 
   expect(await page.evaluate(() => window.__opened.map(({ url, name }) => [url, name]))).toEqual([
     ['/visualizer/?scene=b%3Afrozen-shrine&solo', 'bonfire-live'],
   ]);
-  await expect(page.locator('[data-note]')).toHaveText('Opened Bonfire Live with “Frozen Shrine”.');
+  await expect(page.locator('[data-note]')).toHaveText(`Opened Bonfire Live with “${SHRINE}”.`);
   await expect(page.locator('[data-saved]')).toHaveText('Built-In');
   // (Off Play, so its tooltip goes: a tip showing takes the first Esc, and this one's the library's.)
   await page.mouse.move(0, 0);
@@ -229,7 +237,9 @@ test('Play hands the scene to an open Bonfire Live with no tab opened; a blocked
   await ready(page, '/painter/?scene=b:frozen-shrine');
   await page.click('[data-cmd="play"]');
   // (The stand-in answers on its own page's thread: a machine running every spec at once is slow to.)
-  await expect(page.locator('[data-note]')).toHaveText('Playing “Frozen Shrine” in Bonfire Live.', { timeout: 15_000 });
+  await expect(page.locator('[data-note]')).toHaveText(`Playing “${SHRINE}” in Bonfire Live.`, {
+    timeout: 15_000,
+  });
   expect(await page.evaluate(() => window.__played)).toEqual(['b:frozen-shrine']);
   expect(await page.evaluate(() => window.__opened)).toEqual([]); // (not even a blank one, opened and shut)
   expect(errors).toEqual([]);
@@ -558,9 +568,13 @@ test('the library filters its scenes by name', async ({ page }) => {
   expect(all).toBeGreaterThan(1);
   await page.keyboard.press('/');
   await expect(page.locator('#pnt-lib-filter')).toBeFocused();
-  await page.keyboard.type('shrine');
-  await expect(cards).toHaveCount(1);
-  await expect(cards.locator('[data-card-name]')).toHaveText('Frozen Shrine');
+  // A word of the Frozen Shrine's name, in lower case: only the cards whose names have it.
+  const word = SHRINE.split(/\s+/).pop().toLowerCase();
+  const named = content.scenes.map((s) => s.name).filter((n) => normalize(n).includes(normalize(word)));
+  expect(named).toContain(SHRINE);
+  await page.keyboard.type(word);
+  await expect(cards).toHaveCount(named.length);
+  await expect(cards.locator('[data-card-name]')).toHaveText(named);
   await page.keyboard.press('Escape'); // (clears it; the drawer stays)
   await expect(cards).toHaveCount(all);
   await expect(page.locator('[data-library]')).toBeVisible();
