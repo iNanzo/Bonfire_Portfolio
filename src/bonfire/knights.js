@@ -44,7 +44,8 @@
 //                              state: away, arriving, leaving, ember (going somewhere by
 //                              ember), sitting, standing, dancing, or the act he's in (rise,
 //                              lower, walk, turn, place)
-//   positions                  where each present knight's head is (world): for cameras
+//   positions                  where each present knight's head is (world): for cameras (one
+//                              array, its vectors updated in place each read)
 //   helmet / setHelmet(name, { index, instant })  'great' | 'armet' | 'bascinet': hands to
 //                              the helm, the old one burns away, the new one forms, a puff
 //                              of sparks (1.6 s), or at once
@@ -2682,7 +2683,10 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
 
   // Start: the first knight at his seat, in the great helm.
   for (const k of knights) wear(k, 'great');
-  const helmPos = new THREE.Vector3();
+  // (positions, read every frame for the cameras: one array, a vector a knight, filled in
+  // place each read instead of built anew.)
+  const heads = knights.map(() => new THREE.Vector3());
+  const headList = [];
 
   return {
     group: root,
@@ -2773,8 +2777,18 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         position: k.group.position.clone(), facing: k.yaw, helmet: k.helmet, move: k.dancing?.move ?? null,
       }));
     },
+    /**
+     * Where each present knight's head is (world), in knight order. The same array each read,
+     * and the same vector for each knight, updated in place: good until the next read (the
+     * director reads it once a frame for the cameras); copy what you keep longer.
+     */
     get positions() {
-      return knights.filter((k) => k.present && k.solved).map((k) => helmPos.copy(k.solved.p[BONE_INDEX.head]).applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position).clone());
+      let n = 0;
+      for (const k of knights) {
+        if (k.present && k.solved) headList[n++] = heads[k.index].copy(k.solved.p[BONE_INDEX.head]).applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position);
+      }
+      headList.length = n;
+      return headList;
     },
     /** (Internals, for tests and debugging.) */
     knights,
