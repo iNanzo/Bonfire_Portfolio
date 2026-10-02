@@ -300,7 +300,7 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
 
 **Picture › Pixel Art and the other render settings** (`render.js`): how the picture itself
 is drawn. Everything applies at once through the scene's render overrides (`setRender`,
-`setPalette`, `setFog`, `setShadows`, `setXray` in `scene.js`), which the site never sets.
+`setPalette`, `setFog`, `setShadows`, `setXray` in `sceneRender.js`), which the site never sets.
 The switches in the mix are rolled again with every look, each time with new details.
 
 | Setting | What it does | Values (default first) |
@@ -455,11 +455,11 @@ style, the finish, seat and edge glow in the mix (the glow round 0.5).
 | The knights: presence, dancing, formations, the Cast tab's switches | `src/visualizer/knightShow.js` (the scene's side: `src/bonfire/knights.js`, `knightPose.js`; `docs/knight.md`) |
 | Render Settings (P) | `src/ui/renderMenu.js` (shared with the site), rows in `src/visualizer/renderUi.js` |
 | Looks (effects that take turns), drop hits | `src/visualizer/looks.js` |
-| The render settings: render options, few colors, pixel size shifts, x-ray flips | `src/visualizer/render.js` (the scene's side: `scene.js` render overrides, `pixelPass.js` `uXray`) |
+| The render settings: render options, few colors, pixel size shifts, x-ray flips | `src/visualizer/render.js` (the scene's side: `sceneRender.js` render overrides, `pixelPass.js` `uXray`) |
 | The living weapon's moves | `src/bonfire/bladeMotion.js` |
 | Weapon trail and hits (per element) | `src/bonfire/swingTrail.js` |
 | Demo track (synthesized) | `src/visualizer/demo.js` |
-| Scene hooks: `drive`, `glitch`, `pulse`, `ring`, `echo`, `swing`, `setPose`, held swaps | `src/bonfire/scene.js`, `weapons.js`, `pixelPass.js`, `flame.js`, `fireflies.js` |
+| Scene hooks: `drive`, `glitch`, `pulse`, `ring`, `echo`, `swing`, `setPose`, held swaps | `src/bonfire/scene.js` (drive, glitch, setPose), `sceneFire.js` (pulse, ring, echo, swing), `weapons.js`, `pixelPass.js`, `flame.js`, `fireflies.js` |
 | Tests: the tracker on synthetic onsets; the analysis and ten drop shapes (and non-drops) on synthesized tracks; the weapon's moves (smooth, on the beat, clear of the ground and camera) and its return to the fire (`weapons.js` on a stand-in model); made palettes, drop hits, mirror kinds and mixes, the new layers, firefly moves; the render switches (off, in the mix, always), few colors kept off the opening look, x-ray flips on the beat, what the scene is sent; the knights (presence only where it's hidden, the drop's leap, breakdowns and silence, dancers by budget, places on the clear arcs and never on a seated knight, formations, the switches with Armor Shine and Reactions, K with Dance off, How Many changed mid-build, a new source mid-dance, a rebuild, a drop's new scenery, reduced motion) and a cut never picking a shot with a knight before the fire; old saved settings, presets (Club putting back what the others change, Low Flash's drop hits) and the dialog's fields; a held swap's forge particles; the site's routes, links and templates | `test/` (`npm test`) |
 
 ## New this round

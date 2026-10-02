@@ -249,9 +249,9 @@ variables (`--accent-hi` for text — every `hi` must be ≥ 4.5:1 on the backgr
 | Forge lines: double helix, weapon silhouette tracing + echo burst | `src/bonfire/forgeFx.js` |
 | The frame's passes and buffers (and the visualizer's effect stages) | `src/bonfire/frame.js` |
 | Pixel pass: outlines → fire → vignette → Bayer dither → palette (+ the visualizer's effects layer, `FX`) | `src/bonfire/pixelPass.js` |
-| The knight: loading, skinning, seats, reactions, the dancers (`fire.knights`) | `src/bonfire/knights.js` |
+| The knight: loading, skinning, seats, reactions, the dancers (`fire.knights`) | `src/bonfire/knights.js` (the model's template: `knightMesh.js`; keeping clear of the scenery: `knightClear.js`, `colliders.js`; the plates' springs: `knightPlates.js`; the scene's side: `sceneKnight.js`) |
 | Where the knights sit, rest, dance and walk (the seats, the dance ring, places, `planWalk`) | `src/bonfire/knightPlaces.js` |
-| The knight's poses: IK, sitting and standing, gestures, reactions, the dance moves | `src/bonfire/knightPose.js` |
+| The knight's poses: IK, sitting and standing, gestures, reactions, the dance moves | `src/bonfire/knightPose.js` (re-exports `knightRig.js`, `knightSolve.js`, `knightBody.js`, `knightGestures.js`) |
 | The knight's armor: his styles' shading, the fire's light and color on his plate | `src/bonfire/armor.js` |
 | His styles (pixel-cel, pixel-painterly, pixel-chiaroscuro, gunmetal, blackgold, first) and finishes (the steel's colors) | `src/bonfire/knightStyles.js`, `src/bonfire/steel.js` |
 | His comings and goings (away → arriving → resting → leaving) and his summon sign | `src/bonfire/knightArrival.js`, `src/bonfire/summonSign.js` |

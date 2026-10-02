@@ -898,7 +898,7 @@ test('without fire.knights.fits (a scene that doesn’t pass it on), the show as
 
 test('the scene passes the engine’s fits() on in its knights API (sceneKnight.js; the show’s move filter asks it)', async () => {
   const src = await readFile(new URL('../src/bonfire/sceneKnight.js', import.meta.url), 'utf8');
-  const api = src.slice(src.indexOf('slots: (name) => ctx.knights?.slots('), src.indexOf('// --- Debug HUD'));
+  const api = src.slice(src.indexOf('slots: (name) => ctx.knights?.slots('), src.indexOf('};', src.indexOf('slots: (name) => ctx.knights?.slots(')));
   const line = 'fits: (move, at, facing, name) => ctx.knights?.fits(move, at, facing, name ?? ctx.sceneryKey) ?? true,';
   assert.ok(api.includes(line), `the knights API has \`${line}\` after \`slots\``);
 });

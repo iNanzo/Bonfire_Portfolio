@@ -229,7 +229,7 @@ reactions, getting up, sitting down and walking) and `knightGestures.js` (the ge
 the dance moves). With them: `knightPlaces.js` (the seats, the dance ring, its places and
 the walks between them; pure and unit-tested, shared with the visualizer's `knightShow.js`),
 `colliders.js` (the scenery's solid pieces as simple shapes, for keeping him out of them;
-pure) and `armor.js` (the material); wired up in `scene.js`.
+pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`.
 
 - **Loading.** `knight.glb` is fetched alongside `bonfire.glb` with the same loader (one
   Draco decoder), and preloaded by both pages. If it fails, or lacks `Knight`/`K_Hips`,
@@ -454,7 +454,7 @@ pure) and `armor.js` (the material); wired up in `scene.js`.
   blade's capsules and his glances are his own.
 - **At rest** he breathes, his head sinks over several seconds and lifts with a start,
   he glances about, and every ~12 s shifts his weight, a hand or a foot.
-- **Reactions** (from `scene.js`): while a weapon is being forged or the living blade
+- **Reactions** (from `sceneFire.js` and `sceneKnight.js`): while a weapon is being forged or the living blade
   flies he sits up and watches it (chest up, head turned to it); `impact()` → a flinch
   (jerks back, head turned away, forearms up, ~1 s); `stoke()` → he leans away, an arm up
   against the heat; `ring()` (and the impact's ring) → he lifts his feet (standing: a
@@ -687,7 +687,7 @@ pure) and `armor.js` (the material); wired up in `scene.js`.
   black-and-gold styles gild it).
   **Sweeps**: when the fire flares (a stoke 1, an impact 1, a weapon forming 0.8, a ring
   0.45–0.85, the cursor coming onto the fire 0.7; `armor.flare(strength)` from
-  `scene.js`) its reflection sweeps across the whole armor: a band of facets, the leading
+  `sceneFire.js`) its reflection sweeps across the whole armor: a band of facets, the leading
   edge in the flame's `core` and the rest in `hi`, rolls out from the facets that mirror
   the fire to those turned furthest from it in 0.6–0.95 s, fading as it goes. At rest a
   gentler band in `hi` runs over him every 4–8 s (out from the fire, up from below, or
@@ -756,7 +756,7 @@ too distracting. His **summon sign** glows on the ground in front of his seat in
 a click on it brings him; coming and going are the weapon swap's own dissolve, in the
 current element's way. Bonfire Live is unchanged: its show casts its own knights.
 
-- **Presence** (`src/bonfire/knightArrival.js`, wired up in `scene.js`): `away` (the sign
+- **Presence** (`src/bonfire/knightArrival.js`, wired up in `sceneKnight.js`): `away` (the sign
   lit) → `arriving` (~3.6 s) → `resting` (a rest rolled between `effects.knight.restMin`
   and `restMax`, 3–5 minutes by default, each time he comes) → `leaving` (~3.6 s, the same
   forge the other way) → `away`. His rest never runs out mid-action: while he's gesturing
