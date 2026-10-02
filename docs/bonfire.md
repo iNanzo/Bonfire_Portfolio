@@ -448,7 +448,8 @@ and `list`/`positions` for cameras. The full list is in the header of `knights.j
   rest menu drops Photo Mode, How It's Made and Render Settings, and `#how-its-made`
   links do nothing.
 - **Keys with a view picked:** the views are radio buttons, and a focused radio no longer
-  counts as typing (`isEditing` in `src/routes.js`), so B, F, P and I work at once.
+  counts as typing (`typing` in `src/ui/shell.js`; the breakdown's own keys ask `isEditing`
+  in `src/routes.js`, which agrees), so B, F, P and I work at once.
 
 ## The knight comes when summoned (round 9)
 

@@ -10,7 +10,7 @@ import {
 } from './render.js';
 import { installDitherPatterns } from './ui/dither.js';
 import { installTooltips } from './ui/tooltip.js';
-import { failScene as markSceneFailed, q, qa } from './ui/shell.js';
+import { failScene as markSceneFailed, q, qa, typing } from './ui/shell.js';
 import { createKeysOverlay, isHelpKey } from './ui/keysOverlay.js';
 import { SITE_KEYS } from './ui/siteKeys.js';
 import { setSound, blip, forgeHum } from './ui/audio.js';
@@ -25,7 +25,7 @@ import { createPack, bonfireItems } from './ui/pack.js';
 import { HELMET_NAMES, GESTURE_NAMES, STYLE_NAMES, FINISH_NAMES, greeting } from './knightNames.js';
 import { SCENERIES } from './sceneries.js';
 import { applyFlame, setAccentRamp } from './ui/theme.js';
-import { parseRoute, readRoute, routePath, isEditing } from './routes.js';
+import { parseRoute, readRoute, routePath } from './routes.js';
 import { updateMetadata } from './seo.js';
 import { pick } from './math.js';
 import { esc } from './html.js';
@@ -407,7 +407,7 @@ syncRoute(false);
 // --- Keyboard: Q/E switch screens, Esc goes back, ? lists every key -------------------------
 // (Shift with a letter isn't one of the site's keys: only ?, which is Shift+/ on most keyboards.)
 window.addEventListener('keydown', (e) => {
-  if (e.altKey || e.ctrlKey || e.metaKey || isEditing(e.target) || document.querySelector('dialog[open]')) return;
+  if (e.altKey || e.ctrlKey || e.metaKey || typing(e.target) || document.querySelector('dialog[open]')) return;
   if (isHelpKey(e)) { e.preventDefault(); keysOverlay.open(); return; }
   if (e.shiftKey) return;
   const k = e.key.toLowerCase();
@@ -426,7 +426,7 @@ window.addEventListener('keydown', (e) => {
 // and nothing until the scene is there. The breakdown takes them first while it's open (its
 // own fold of the menu).
 window.addEventListener('keydown', (e) => {
-  if (!fire || breakdown.active || isEditing(e.target) || document.querySelector('dialog[open]')) return;
+  if (!fire || breakdown.active || typing(e.target) || document.querySelector('dialog[open]')) return;
   if (hud.handleKey(e)) e.preventDefault();
 });
 
