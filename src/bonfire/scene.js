@@ -944,6 +944,9 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     const s = buildScenery(name, sceneryMaterials, () => new THREE.MeshBasicMaterial({ color: currentRamp[1], fog: false }));
     s.group.traverse((o) => { if (o.isMesh) { o.layers.set(s.glows.includes(o) ? LAYER_GHOST : LAYER_SOLID); scope.trackTree(o); } });
     s.group.updateMatrixWorld(true);
+    // (Its pieces never move: their matrices are made here, once, and not again every frame.
+    // The glows keep theirs up to date: a candle's flame stretches.)
+    s.group.traverse((o) => { if (!s.glows.includes(o)) o.matrixAutoUpdate = false; });
     s.solids = [];
     s.group.traverse((o) => { if (o.isMesh && !s.glows.includes(o)) s.solids.push(o); });
     s.shown = false;
@@ -960,9 +963,12 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   function setScenery(name, { flash = false } = {}) {
     if (!ready || !SCENERIES[name] || name === sceneryKey) return false;
     if (flash) { hit(0.6, { freeze: false }); fire.burst(0.6 * flameShare(elementKey)); }
+    // (A place not shown is out of the scene, so no pass walks its pieces; the ruins' own are
+    // the model's, hidden.)
     const show = (key, on) => {
       if (key === 'ruins') { for (const o of ruinsOnly) o.visible = on; return; }
-      sceneries[key].group.visible = on;
+      if (on) scene.add(sceneries[key].group);
+      else sceneries[key].group.removeFromParent();
     };
     const revisit = !!sceneries[name]?.shown;
     if (name !== 'ruins' && !revisit) {
@@ -973,7 +979,6 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       s.glowFrom = glows.length;
       glows.push(...s.glows);
       s.glowTo = glows.length;
-      scene.add(s.group);
       s.shown = true;
     }
     show(sceneryKey, false);

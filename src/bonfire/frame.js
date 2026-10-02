@@ -38,9 +38,14 @@ import { createSetCache, KEEP_SETS } from './targetCache.js';
 export function createFrame({ renderer, scene, camera, layers, voidColor, effects = false, own, track }) {
   const canvas = renderer.domElement;
   const rtOpts = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter };
-  // The render targets come in sets, one per size (targetsFor, setSize): these are the
+  // The render targets come in sets, one per size (makeTargets, setSize): these are the
   // current set's.
   let colorRT, normalRT, fxRT;
+  // The scene's world matrices are brought up to date once a frame, at the start of draw(),
+  // not by each of its three renders (and the scene itself never moves): nothing moves
+  // between the passes, and three.js walked the whole graph again for each one.
+  scene.matrixAutoUpdate = false;
+  scene.matrixWorldAutoUpdate = false;
   const normalMaterial = own(new THREE.MeshNormalMaterial({ flatShading: true }));
   const pass = createPixelPass({ effects });
   for (const m of Object.values(pass.materials)) own(m);
@@ -299,6 +304,7 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
 
   /** Draw this frame. `shadows`: whether the fire's shadow must be redrawn this frame. */
   function draw({ shadows = false } = {}) {
+    scene.updateMatrixWorld(); // (once for the three passes: see the top)
     scene.overrideMaterial = normalMaterial;
     camera.layers.set(layers.solid);
     renderer.setRenderTarget(normalRT);
