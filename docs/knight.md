@@ -33,7 +33,7 @@ fluted plate with gold trim, an armet).
 | K16 | Round 9: "a nice neutral texture … lean towards a gunmetal grey … best practices for material metal in a 3d pixelart pipeline" | A steel ramp of his own (`steel.js`), metal as reflection, texture at the scale of the plates (a fine noise judged and dropped: **Material**) |
 | K17 | Round 9 (after the Variante references): "render it more like a 2d pixel art character", "it still doesn't look like that knight is reflecting the color of the bonfire" | The pixel styles, *Pixel Cel* the default: smooth plates in flat bands with line art, the lit planes in the flame's own colors (**Knight Styles**) |
 | K18 | Round 9: "knight options overall for the portfolio and visualizer", "knight model version options based on what we've generated already" | Every look he has had is a Knight Style (`knightStyles.js`); style, finish, edge glow, seat pose and helmet in the admin (`effects.knight`), the pack (a visitor's picks) and Bonfire Live's Knights tab; a Painter scene sets them for its knights |
-| K19 | Round 9: "pauldron movement is lacking" | The lames on their own nodes (`K_Pauldron_*`), a swing-twist follow of the arm with a lift and roll above level, kept out of the helmets (`knightPose.js` `PAULDRON`, `clampPlates`), and a spring on the plates (`knights.js` `SPRUNG`) |
+| K19 | Round 9: "pauldron movement is lacking" | The lames on their own nodes (`K_Pauldron_*`), a swing-twist follow of the arm with a lift and roll above level, kept out of the helmets (`knightPose.js` `PAULDRON`, `clampPlates`), and a spring on the plates (`knightPlates.js` `SPRUNG`) |
 | K20 | Round 9: "some sitting animations especially don't look good" | Seated gestures sit up first and aim in the room (no cocked helm, no facepalm), a shallower bow, Praise thrown up over four steps, feet stepped (never slid), a softer doze; the seat poses *Resting* and *Watchful* |
 | K21 | Round 9: "Can we add the fortnite default dance to dance options?" | `defaultDance` (8 beats, a seated version) among Bonfire Live's moves; on the site a pack gesture: he stands, dances two bars and sits back down (`dance`); on a phone's tall view, which frames his seat right under the page's header, he dances it in his seat (`headroom`) |
 
@@ -218,11 +218,18 @@ oversized, like the references'. Each is a closed shell whose bottom cap is `K_C
 
 ## In the scene
 
-Built in `src/bonfire/knights.js` (loading, skinning, placing, the API), `knightPose.js`
-(every pose, pure and unit-tested), `knightPlaces.js` (the seats, the dance ring, its
-places and the walks between them; pure and unit-tested, shared with the visualizer's
-`knightShow.js`), `colliders.js` (the scenery's solid pieces as simple shapes, for keeping
-him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
+Built in `src/bonfire/knights.js` (loading, skinning, placing, the API) with the modules
+beside it: `knightMesh.js` (the model's template: its pieces merged and marked, the points
+he's checked at; `templateSteps`), `knightClear.js` (keeping him out of the scenery:
+`keepClear`, the ease back, `solveClear`) and `knightPlates.js` (the plates' springs).
+`knightPose.js` hands out every pose, pure and unit-tested, from `knightRig.js` (the pose
+layout, the rig, the plates' collision data), `knightSolve.js` (`createSolver`: the IK and
+the pauldrons), `knightBody.js` (writing poses, aiming, the base poses, idle, looking,
+reactions, getting up, sitting down and walking) and `knightGestures.js` (the gestures and
+the dance moves). With them: `knightPlaces.js` (the seats, the dance ring, its places and
+the walks between them; pure and unit-tested, shared with the visualizer's `knightShow.js`),
+`colliders.js` (the scenery's solid pieces as simple shapes, for keeping him out of them;
+pure) and `armor.js` (the material); wired up in `scene.js`.
 
 - **Loading.** `knight.glb` is fetched alongside `bonfire.glb` with the same loader (one
   Draco decoder), and preloaded by both pages. If it fails, or lacks `Knight`/`K_Hips`,
@@ -245,7 +252,7 @@ him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
   riding up over the shoulder. A dome or lame is never pushed deeper into the helmet than
   the model has it at rest: a head tilted onto a shoulder or an arm swinging them up
   against it shoves the pauldron out from the neck instead (`clampPlates`, at most 5 cm).
-  On top, `knights.js` gives the shoulders, lames and tassets a spring (`SPRUNG`, 2.6 Hz,
+  On top, `knightPlates.js` gives the shoulders, lames and tassets a spring (`SPRUNG`, 2.6 Hz,
   damping 0.38, four substeps a 12 fps step, each plate's lag capped at 0.09–0.13 rad): they
   lag, overshoot a little and settle ~0.4 s after a move stops (`moving` stays true while
   they swing, so the shadow follows), then are clamped again.
@@ -331,7 +338,7 @@ him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
     each arm has, seated and standing up in front of the seat: from each shoulder to the
     nearest shape not across on his other side, at any height; 0.12 m or less leaves
     none, 0.57 m or more all of it. Every gesture, dance move and reaction there gets it
-    (`room`, `knightPose.js` `hem`): a hemmed-in arm's reach behind him scales with it and
+    (`room`, `knightBody.js` `hem`): a hemmed-in arm's reach behind him scales with it and
     what it would swing out to that side swings forward instead, so it goes up or out in
     front of him (Praise the Sun's arm, hemmed in by the ruins' pillar, goes up in front).
     Only what the gesture adds is hemmed: as far out and back as his arm at rest already
@@ -522,7 +529,7 @@ him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
   into the flame's only on the side facing it, fading in ~0.5 s), never a wash of one
   color over him (the forge's lightning `uGlow` ends as he stands whole): no flat
   silhouette at the end of a swap. A style with its own model fetches it first and builds
-  its template once (`knights.js` `templateSteps`, a step at a time in idle moments, then
+  its template once (`knightMesh.js` `templateSteps`, a step at a time in idle moments, then
   `adoptTemplate`: on the same rig, each piece moved from its joint's rest place there to
   the knight's; the rig, the solver and the plates' collision data stay the knight's).
   Asked for at once (`instant`, as Bonfire Live does at a hidden moment) before that's
@@ -532,7 +539,7 @@ him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
   `fire.knights.prepareStyle(name)` does it on demand. The steel finishes are the color
   option within the styles that draw steel (`finish: true`: the pixel styles and Smooth
   Steel).
-  **The pixel styles** (`uLook` 1..3; `knights.js` builds their data from the model,
+  **The pixel styles** (`uLook` 1..3; `knightMesh.js` builds their data from the model,
   once per model, ~0.1 s). Faces are joined into smooth surfaces across every edge turning
   less than 64° (the model's facets bend up to ~60° round a curve, its creases and box
   edges 70° and more), welded by position across materials. Per corner: `aSmooth`, the
@@ -665,7 +672,7 @@ him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
   stone, fights the ordered dither and adds single-texel speckle (steel texels unlike all
   four neighbours: 9.5 → 12.0 % at 1280, 10.1 → 12.3 % at 390) that crawls as he
   breathes. C won, modestly: each plate a touch lighter or darker than the next (a piece
-  id per connected plate, `aPiece`, computed from the model in `knights.js`), the raised
+  id per connected plate, `aPiece`, computed from the model in `knightMesh.js`), the raised
   rims and ridges worn bright, the undersides where plates overlap a step darker; it
   separates the overlapping lames, hoops and bands without adding speckle (7.6 % against
   A's 8.2 % at home 1920) or crawl. So the idea was half right: a texture does help the
@@ -729,9 +736,9 @@ him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
   3.4 s → 0.3–0.5 s, the first scenery change 2.2 s → none over 100 ms, the first shadows
   toggle 2.1 s → none; round 9's review: no shader built at his first summon (19 programs
   before and after).
-- **Loading.** His code (`knights.js`, `knightPose.js`, `knightArrival.js`,
-  `summonSign.js`) is a chunk of its own (`knightBundle.js`, ~80 kB), fetched with
-  `knight.glb`, not with the fire's. On the site, when he isn't there at load (the sign
+- **Loading.** His code (`knights.js`, `knightPose.js` and the modules beside them,
+  `knightArrival.js`, `summonSign.js`) is a chunk of its own (`knightBundle.js`, ~80 kB),
+  fetched with `knight.glb`, not with the fire's. On the site, when he isn't there at load (the sign
   waits, or he isn't allowed), the fire's first frame doesn't wait for him: after it, his
   template is built in idle moments (`templateSteps`: each joint's plates and surfaces and
   the occlusion's pieces a step), then he and his sign are made, their shaders compiled
@@ -825,7 +832,7 @@ touch devices) have no seat and sit on the ground at home (see *The others* abov
 | `ready` | resolves `true` once there are knights (`false` without the model); on the site, when he's away at load, a moment after the first frame (see *Loading*) |
 | `count`, `present`, `max` | knights in the cast (up to the highest one here and staying: it drops as knights are sent away), how many are showing, the most allowed |
 | `list` | `[{ index, present, state, position, facing, helmet, move }]`; `state` is `sitting`, `standing`, `dancing`, the act he's in (`rise`, `lower`, `walk`, `turn`, `place`: settling onto his seat, a frame), `arriving`, `leaving` (burning away for good), `ember` (going somewhere by ember: still in the cast) or `away` |
-| `positions` | each present knight's head (world `Vector3`s), for cameras |
+| `positions` | each present knight's head (world `Vector3`s), for cameras: one array, its vectors updated in place on each read (copy what you keep) |
 | `helmet`, `setHelmet(name, { index, instant })` | `'great'`, `'armet'`, `'bascinet'`: hands to the helm, the old one burns away in ember edges, the new one forms, a flash and a puff of sparks (1.6 s); resolves when done. The setter swaps every knight's |
 | `setCast({ count, helmets, instant })` | how many knights are there (the rest are summoned or dismissed); `helmets` a name, a list (per knight) or `'random'` |
 | `summon(i, { instant })`, `dismiss(i, { instant })` | forming out of embers feet first (0.55 s) at his seat or home (or standing `at` a place); burning away. With `forge: true`: handed to the forge instead (`forgeSubject`, `forged`) |
