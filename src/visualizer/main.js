@@ -67,6 +67,7 @@ import { createRenderMenu } from '../ui/renderMenu.js';
 import { focusedNow } from '../ui/focus.js';
 import { pageMarkup, HUD_TIPS, relabel } from './markup.js';
 import { createScenesUi } from './scenesUi.js';
+import { createCards } from './cards.js';
 import { q, qa, typing, toggleFullscreen, failScene } from '../ui/shell.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
@@ -123,7 +124,7 @@ const askedScene = params.get('scene');
 ctx.firstScene = askedScene ? ctx.findScene(askedScene) : null;
 ctx.solo = ctx.firstScene && params.has('solo') ? ctx.firstScene.ref : null;
 // (What main.js still gives the parts, until each moves out.)
-Object.assign(ctx, { note, showCard, openSettings, applySettings });
+Object.assign(ctx, { note, openSettings, applySettings, mirrorCard });
 
 // --- The bonfire ---------------------------------------------------------------------------
 const IDLE = { state: 'silent', bands: Object.fromEntries(BAND_NAMES.map((b) => [b, 0])), level: 0, beats: [], events: [], kick: 0, hat: 0, bpm: 0, locked: false, build: 0 };
@@ -222,16 +223,16 @@ function onEvent(type, data = {}) {
   if (type === 'drop') {
     note('Drop!');
     live.textContent = 'Drop.';
-    if (data.title !== false) nextCard('drops');
+    if (data.title !== false) ctx.nextCard('drops');
   } else if (type === 'arm') {
     note('Forging a weapon for the drop…', 4);
   } else if (type === 'start') {
-    if (settings.intro) showCard(0);
+    if (settings.intro) ctx.showCard(0);
     // (A scene already playing when the music starts, from ?scene=, a chip or N on the start
     // screen, carries on without a new 'scene' event: its picture is kept from here.)
     if (ctx.director?.sceneRef) ctx.keepThumb(ctx.director.sceneRef);
   } else if (type === 'bar') {
-    if (data.bar > 0 && data.bar % 32 === 0) nextCard('phrases');
+    if (data.bar > 0 && data.bar % 32 === 0) ctx.nextCard('phrases');
   } else if (type === 'stage') {
     note(['', 'Building…', 'Building… halfway', 'Building… three quarters', 'Here it comes'][data.stage] ?? '', 2);
   } else if (type === 'scene') {
@@ -240,53 +241,8 @@ function onEvent(type, data = {}) {
 }
 function note(text, seconds = 2) { stateNote = { text, until: performance.now() / 1000 + seconds }; }
 
-// --- Title cards ----------------------------------------------------------------------------
-// Card 0 is the main one (settings.title/subtitle); 1… are settings.cards. `show` says when
-// each of the others comes up: on drops (taking turns with the main one, if it shows on
-// drops), every 32 bars, or only on its key.
-const titleCard = q('[data-title-card]');
-let titleTimer = 0;
-const cardAt = (n) => (n === 0 ? { title: settings.title, subtitle: settings.subtitle } : settings.cards[n - 1]);
-const turns = { drops: 0, phrases: 0 };
-/** The next card whose turn it is for `when` (drops | phrases), if any. */
-function nextCard(when) {
-  const pool = [];
-  if (when === 'drops' && settings.titleOnDrop && settings.title.trim()) pool.push(0);
-  settings.cards.forEach((c, i) => { if (c.show === when && c.title.trim()) pool.push(i + 1); });
-  if (!pool.length) return;
-  showCard(pool[turns[when]++ % pool.length]);
-}
-let cardUntil = 0;       // (performance time) when the card showing goes
-let sceneCardNext = null; // a scene's card waiting for the one showing to go
-/**
- * Show card `n` (0 the main one), or a card of its own ({ title, subtitle, scene }: a
- * preset scene's name, smaller, which waits for a title card of yours that's showing).
- */
-function showCard(n, { ms = 3600 } = {}) {
-  const card = typeof n === 'number' ? cardAt(n) : n;
-  if (!card?.title?.trim()) return;
-  const now = performance.now();
-  if (card.scene && !titleCard.hidden && !titleCard.classList.contains('is-scene') && now < cardUntil) { sceneCardNext = card; return; }
-  titleCard.classList.toggle('is-scene', !!card.scene);
-  q('[data-title-main]').textContent = card.title;
-  q('[data-title-sub]').textContent = card.subtitle ?? '';
-  q('[data-title-sub]').hidden = !card.subtitle?.trim();
-  titleCard.style.setProperty('--kindle-time', `${ms}ms`);
-  titleCard.hidden = true;
-  void titleCard.offsetWidth;
-  titleCard.hidden = false;
-  cardUntil = now + ms;
-  mirrorCard();
-  clearTimeout(titleTimer);
-  titleTimer = setTimeout(() => {
-    titleCard.hidden = true;
-    mirrorCard();
-    const next = sceneCardNext;
-    sceneCardNext = null;
-    if (next) showCard(next, { ms: 2600 });
-  }, ms);
-}
-
+// --- Title cards (cards.js) ------------------------------------------------------------------
+Object.assign(ctx, createCards(ctx));
 
 // --- Audio ---------------------------------------------------------------------------------
 function openEngine() {
@@ -644,7 +600,7 @@ const actions = {
     q('[data-act="play"]').textContent = m.paused ? 'Play' : 'Pause';
   },
   'change-source': () => { stopSource(); showStart(); },
-  'show-title': () => { if (!settings.title.trim()) q('[data-set="title"]').focus(); else { settingsDialog.close(); showCard(0); } },
+  'show-title': () => { if (!settings.title.trim()) q('[data-set="title"]').focus(); else { settingsDialog.close(); ctx.showCard(0); } },
   output: () => openOutput(),
   record: () => recorder.toggle(),
   'nudge-early': () => nudge(-0.01),
@@ -696,7 +652,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === ']') nudge(0.01);
   else if (k === 'o') openOutput();
   else if (k === 'v') actions.record();
-  else if (e.shiftKey && /^Digit[1-9]$/.test(e.code)) showCard(Number(e.code.slice(5)) - 1);
+  else if (e.shiftKey && /^Digit[1-9]$/.test(e.code)) ctx.showCard(Number(e.code.slice(5)) - 1);
   else if (k === 'c') actions.cut();
   else if (k === 'r') ctx.director.ring(1);
   else if (k === 'x') actions.combo();
@@ -919,7 +875,7 @@ app.append(pack.el);
 // It sits just above the HUD while the HUD is up. (On the page's own box, not the body: a
 // change restyles only what's in it.)
 new ResizeObserver(() => app.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`)).observe(hud);
-settingsDialog.addEventListener('show-card', (e) => { settingsDialog.close(); showCard(e.detail); });
+settingsDialog.addEventListener('show-card', (e) => { settingsDialog.close(); ctx.showCard(e.detail); });
 // --- A MIDI controller (midi.js): pads for the moments, mapped by learning -----------------
 const midiList = q('[data-midi-list]');
 const midiStatus = q('[data-midi-status]');
@@ -985,6 +941,7 @@ function nudge(seconds) {
 // --- The output window: just the picture, for a projector ----------------------------------
 // The canvas is streamed into a second window (so it can go full screen on another display)
 // while this one keeps the controls. A rebuilt scene (new particle counts) streams again.
+const titleCard = q('[data-title-card]'); // (cards.js shows it here; it's copied there)
 let output = null;
 function streamInto(win) {
   const canvas = stage.querySelector('canvas');

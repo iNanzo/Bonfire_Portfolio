@@ -51,15 +51,22 @@
  */
 
 /**
+ * The title cards (cards.js).
+ * @typedef {object} CardsPart
+ * @property {(n: number | { title: string, subtitle?: string, scene?: boolean }, o?: { ms?: number }) => void} showCard  card n (0: the main one), or a card of its own
+ * @property {(when: 'drops' | 'phrases') => void} nextCard  the next card whose turn it is, if any
+ */
+
+/**
  * What main.js still gives the parts (until each moves into one of its own).
  * @typedef {object} MainPart
  * @property {(text: string, seconds?: number) => void} note  a passing line in the HUD
- * @property {(n: number | { title: string, subtitle?: string, scene?: boolean }, o?: { ms?: number }) => void} showCard  a title card
+ * @property {() => void} mirrorCard  copy the title card into the output window
  * @property {(tab?: string, o?: { search?: boolean }) => void} openSettings
  * @property {(key: string | string[]) => void} applySettings  a setting (or the ones a preset changed) changed
  * @property {any} settingsPanel  settingsDialog.js bindSettings: the settings dialog
  */
 
-/** @typedef {LiveState & ScenesPart & MainPart} LiveContext */
+/** @typedef {LiveState & ScenesPart & CardsPart & MainPart} LiveContext */
 
 export {};
