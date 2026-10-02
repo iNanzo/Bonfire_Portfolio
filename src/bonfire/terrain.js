@@ -43,7 +43,10 @@ export function createTerrain(renderer, meshes, o = {}) {
   const h = drawHeights(renderer, meshes, o);
   renderer.readRenderTargetPixels(h.rt, 0, 0, h.res, h.res, h.px);
   h.done();
-  return fromHeights(h.px, h);
+  const steps = heightSteps(h.px, h);
+  let r = steps.next();
+  while (!r.done) r = steps.next();
+  return r.value;
 }
 
 /**
@@ -51,12 +54,13 @@ export function createTerrain(renderer, meshes, o = {}) {
  * places' in idle moments). The heights are drawn now and read back without waiting on the
  * GPU (a fence, polled): a blocking read stalls the page until the GPU has finished all it
  * was given before, the frame just drawn too (in software rendering, 70 ms and more). It
- * resolves with build(), which makes the height map from them, as createTerrain returns it:
- * the CPU part (a few ms), for the caller to run when it suits.
+ * resolves with the steps that make the height map from them (heightSteps: a generator
+ * whose value at the end is the map, as createTerrain returns it): the CPU part, a few ms
+ * in all, for the caller to run a little at a time.
  * @param {THREE.WebGLRenderer} renderer
  * @param {THREE.Mesh[]} meshes  as createTerrain's
  * @param {object} [o]  as createTerrain's
- * @returns {Promise<() => ReturnType<typeof createTerrain>>}
+ * @returns {Promise<Generator<void, ReturnType<typeof createTerrain>, void>>}
  */
 export async function readTerrain(renderer, meshes, o = {}) {
   const h = drawHeights(renderer, meshes, o);
@@ -65,7 +69,7 @@ export async function readTerrain(renderer, meshes, o = {}) {
   } finally {
     h.done();
   }
-  return () => fromHeights(h.px, h);
+  return heightSteps(h.px, h);
 }
 
 /** Draw the meshes' heights from straight above into a target of their own, to be read into `px` (then done()). */
@@ -103,14 +107,25 @@ function drawHeights(renderer, meshes, { size = 12, res = 320, pad = 2, material
   return { rt, px: new Uint8Array(res * res * 4), done, size, res, pad };
 }
 
-/** The height map's queries, from the heights drawn (`px`, two bytes a cell). */
-function fromHeights(px, { size, res, pad }) {
+/** Rows of the height map worked through between two steps of heightSteps (a ms or so). */
+const ROWS_A_STEP = 64;
+
+/**
+ * The height map's queries, from the heights drawn (`px`, two bytes a cell), made a few rows
+ * at a time: it yields between them (createTerrain runs it through at once) and returns the map.
+ * @param {Uint8Array} px
+ * @param {{ size: number, res: number, pad: number }} o
+ */
+export function* heightSteps(px, { size, res, pad }) {
   const half = size / 2;
   const cell = size / res;
 
   // H: raw heights (row 0 = +z edge). D: heights grown by `pad` cells.
   const H = new Float32Array(res * res);
-  for (let k = 0; k < res * res; k++) H[k] = ((px[k * 4] * 256 + px[k * 4 + 1]) / 65535) * MAX_H;
+  for (let j = 0; j < res; j++) {
+    for (let k = j * res; k < (j + 1) * res; k++) H[k] = ((px[k * 4] * 256 + px[k * 4 + 1]) / 65535) * MAX_H;
+    if (j % ROWS_A_STEP === ROWS_A_STEP - 1) yield;
+  }
   const rowMax = new Float32Array(res * res);
   const D = new Float32Array(res * res);
   for (let j = 0; j < res; j++) {
@@ -119,6 +134,7 @@ function fromHeights(px, { size, res, pad }) {
       for (let a = Math.max(0, i - pad); a <= Math.min(res - 1, i + pad); a++) m = Math.max(m, H[j * res + a]);
       rowMax[j * res + i] = m;
     }
+    if (j % ROWS_A_STEP === ROWS_A_STEP - 1) yield;
   }
   for (let j = 0; j < res; j++) {
     for (let i = 0; i < res; i++) {
@@ -126,6 +142,7 @@ function fromHeights(px, { size, res, pad }) {
       for (let b = Math.max(0, j - pad); b <= Math.min(res - 1, j + pad); b++) m = Math.max(m, rowMax[b * res + i]);
       D[j * res + i] = m;
     }
+    if (j % ROWS_A_STEP === ROWS_A_STEP - 1) yield;
   }
 
   const ci = (x) => Math.floor((x + half) / cell);
@@ -174,6 +191,7 @@ function fromHeights(px, { size, res, pad }) {
         wallSpots.push({ x, z, lo, hi: h, nx: g.x, nz: g.z });
       }
     }
+    if (j % ROWS_A_STEP === ROWS_A_STEP - 1) yield;
   }
 
   return { height, top, solid, slope, wallSpots, cell };

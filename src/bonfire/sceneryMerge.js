@@ -1,5 +1,5 @@
 // A scenery's still pieces drawn as one mesh per material (scenery.js buildScenery calls it
-// last). The forge, shrine, cathedral and cult are built from dozens of small pieces (a
+// last, or scene.js in steps). The forge, shrine, cathedral and cult are built from dozens of small pieces (a
 // course of blocks is a box per block), and every mesh is a draw of its own in each pass
 // that sees it: the normals, the color, and each of the fire's six shadow faces it falls in.
 // Merged, a place costs a handful of draws instead of a hundred or more, every frame.
@@ -44,6 +44,21 @@ export function mergeKey(mesh, matrix = mesh.matrixWorld) {
  * @returns {THREE.Mesh[]}
  */
 export function mergeStatic(group, keep = []) {
+  const steps = mergeSteps(group, keep);
+  let r = steps.next();
+  while (!r.done) r = steps.next();
+  return r.value;
+}
+
+/**
+ * mergeStatic a little at a time, for a place built in idle moments (scene.js): it yields
+ * after each piece and each merge, and returns the merged meshes. Between steps the group is
+ * half merged (not to be shown till it's done); the end is mergeStatic's, mesh for mesh.
+ * @param {THREE.Object3D} group
+ * @param {Iterable<THREE.Object3D>} [keep]
+ * @returns {Generator<void, THREE.Mesh[], void>}
+ */
+export function* mergeSteps(group, keep = []) {
   const kept = new Set(keep);
   group.updateMatrixWorld(true);
   const toGroup = new THREE.Matrix4().copy(group.matrixWorld).invert();
@@ -63,12 +78,14 @@ export function mergeStatic(group, keep = []) {
     if (pieces.length < 2) continue;
     // (Every piece indexed, so the triangle soups (rocks) join the boxes and cylinders: an
     // index of 0, 1, 2… draws the same triangles in the same order.)
-    const geometries = pieces.map(({ mesh, matrix }) => {
+    const geometries = [];
+    for (const { mesh, matrix } of pieces) {
       const g = mesh.geometry.clone().applyMatrix4(matrix);
       g.clearGroups(); // (a box's or a cylinder's groups are for a material per face: one material draws them all)
       if (!g.index) g.setIndex([...Array(g.attributes.position.count).keys()]);
-      return g;
-    });
+      geometries.push(g);
+      yield;
+    }
     const geometry = mergeGeometries(geometries, false);
     for (const g of geometries) g.dispose();
     if (!geometry) continue;
@@ -87,6 +104,7 @@ export function mergeStatic(group, keep = []) {
     }
     group.add(mesh);
     merged.push(mesh);
+    yield;
   }
   // (Groups whose pieces all went into merged meshes are left empty: they go too.)
   const prune = (o) => {

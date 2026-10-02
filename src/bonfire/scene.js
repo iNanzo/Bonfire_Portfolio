@@ -57,6 +57,7 @@ import { createGroundMarks } from './marks.js';
 import { createDebris } from './debris.js';
 import { createFlowView } from './flowView.js';
 import { buildScenery, SCENERIES, MAX_LAMPS } from './scenery.js';
+import { mergeSteps } from './sceneryMerge.js';
 import { passValue, stillClock } from './stillFx.js';
 import { base, flames, flameOr, scenePalette, debugPalettes, mixFlame, flameEase } from '../palette.js';
 import { PIXEL_SIZES } from '../pixelSizes.js';
@@ -79,6 +80,15 @@ const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(
 const HELMETS = KNIGHT_HELMETS.filter((h) => h !== 'random');
 // A moment the page isn't busy (a frame's spare time; Safari has no requestIdleCallback).
 const idle = (fn) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 250 }) : setTimeout(fn, 16));
+// The places built beforehand (Bonfire Live, the Painter): how long after the show is up they
+// start, and the idle time left a step needs to start: most (a few pieces merged, a few rows
+// of a height map, a map drawn) take about a ms or less; a place's own build 3 to 10. Never
+// more than this share of the display's frame, though: no idle moment is longer than one (a
+// 144 Hz screen's offer 4 ms or so at most, Bonfire Live drawing every frame).
+const PREBUILD_AFTER_MS = 4000;
+const SMALL_STEP_MS = 3;
+const BIG_STEP_MS = 12;
+const STEP_FRAME_SHARE = 0.6;
 
 export function createBonfire(container, { reducedMotion = false, paintedLook = false, sway: swayAmount = 1, lightTrails = false, effects: fxLayer = false, knightHelmet = null, onImpact, onFormed, onRamp, onError, onFrame, onTick } = {}) {
   const scope = createResourceScope();
@@ -479,12 +489,10 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   }
   /**
    * Run `steps` (a generator: knights.js templateSteps) in idle moments, a few ms at a time,
-   * so building a knight's template never stalls the fire. A step that yields a promise
-   * (prepareSceneries: a height map read back) has the next wait for it, the page idle
-   * meanwhile. Resolves with its return value (null if the scene is gone first).
+   * so building a knight's template never stalls the fire. Resolves with its return value
+   * (null if the scene is gone first).
    */
   function inSteps(steps) {
-    const waits = (v) => typeof v?.then === 'function';
     return new Promise((resolve, reject) => {
       const slice = (deadline) => {
         if (scope.disposed) { resolve(null); return; }
@@ -492,13 +500,62 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
         const until = performance.now() + budget;
         try {
           let r = steps.next();
-          while (!r.done && !waits(r.value) && performance.now() < until) r = steps.next();
+          while (!r.done && performance.now() < until) r = steps.next();
           if (r.done) resolve(r.value);
-          else if (waits(r.value)) r.value.then(() => idle(slice), () => idle(slice));
           else idle(slice);
         } catch (error) { reject(error); }
       };
       idle(slice);
+    });
+  }
+  /**
+   * Run `steps` only in time the page truly has spare, for work nobody waits on (the places
+   * built beforehand: prepareSceneries). Unlike inSteps there's no timeout, and a step starts
+   * only with the time it needs still left of the idle moment, so it ends before the next
+   * frame is due: each yields how many ms the next one needs (a number), or nothing
+   * (SMALL_STEP_MS), or a promise for the next to wait on, the page idle meanwhile. (A need is
+   * capped at STEP_FRAME_SHARE of the display's frame, measured first: a step bigger than any
+   * moment, a place's build on a fast screen, starts at the start of an empty one, and runs a
+   * few ms past it.) On a page with no spare time (a busy phone) nothing runs, and whoever
+   * needs the work first does it then (sceneryOf). Needs requestIdleCallback (Safari has none:
+   * its places are built on their first visit). Resolves with the return value (null if the
+   * scene is gone first).
+   */
+  function inIdle(steps) {
+    return new Promise((resolve, reject) => {
+      let need = SMALL_STEP_MS;
+      let frameMs = 1000 / 60;
+      const next = () => requestIdleCallback(slice);
+      /** @param {IdleDeadline} deadline */
+      const slice = (deadline) => {
+        if (scope.disposed) { resolve(null); return; }
+        try {
+          while (deadline.timeRemaining() >= Math.min(need, frameMs * STEP_FRAME_SHARE)) {
+            const r = steps.next();
+            if (r.done) { resolve(r.value); return; }
+            if (typeof r.value?.then === 'function') {
+              need = SMALL_STEP_MS;
+              r.value.then(next, next);
+              return;
+            }
+            need = typeof r.value === 'number' ? r.value : SMALL_STEP_MS;
+          }
+          next();
+        } catch (error) { reject(error); }
+      };
+      // (The display's frame first: the shortest of a few, frames being only ever late.)
+      let last = -1;
+      let frames = 0;
+      let shortest = Infinity;
+      const measure = (now) => {
+        if (scope.disposed) { resolve(null); return; }
+        if (last >= 0) shortest = Math.min(shortest, now - last);
+        last = now;
+        if (++frames <= 8) { requestAnimationFrame(measure); return; }
+        if (shortest > 0 && Number.isFinite(shortest)) frameMs = shortest;
+        next();
+      };
+      requestAnimationFrame(measure);
     });
   }
 
@@ -928,11 +985,11 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   function reactKnights(kind, strength, where) { if (knights && reacts()) knights.react(kind, strength, where); }
 
   // --- Scenery (scenery.js): the ruins, the forge or the shrine around the fire. Each has
-  // its own height map for the fireflies. The other places and their height maps are built
-  // in idle moments once the fire is up (prepareSceneries, below), so the first visit to one
-  // only puts it in the scene: built then, a place and its map (a draw of the whole place
-  // read back from the GPU) froze the frame it came on. (Still built then if it's asked for
-  // before they're ready.)
+  // its own height map for the fireflies. In Bonfire Live and the Painter the other places
+  // and their height maps are built in idle moments a while after the show starts
+  // (prepareSceneries, below), so the first visit to one only puts it in the scene: built
+  // then, a place and its map (a draw of the whole place read back from the GPU) froze the
+  // frame it came on. (Still built then if it's asked for before they're ready, and on the site.)
   let sceneryKey = 'ruins';
   let ruinsOnly = [];
   let baseStatics = [];
@@ -941,10 +998,24 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   const terrainMaterial = scope.own(createTerrainMaterial()); // (one for every height map: its shader built once)
   const sceneryMaterials = {};
   const sceneries = {};
+  const building = {}; // a place being built in idle moments (sceneryParts), till it's done
   /** A place's pieces (scenery.js), built once (prepareSceneries, or its first visit), not yet in the scene. */
   function sceneryOf(name) {
-    if (sceneries[name]) return sceneries[name];
-    const s = buildScenery(name, sceneryMaterials, () => new THREE.MeshBasicMaterial({ color: currentRamp[1], fog: false }));
+    if (!sceneries[name]) {
+      // (One being built in idle moments is finished now, at once.)
+      const steps = building[name] ?? sceneryParts(name);
+      while (!steps.next().done);
+    }
+    return sceneries[name];
+  }
+  /**
+   * sceneryOf a step at a time: its pieces built (the biggest step), merged a few at a time
+   * (sceneryMerge.js), then readied to show. Not in sceneries till the last step.
+   */
+  function* sceneryParts(name) {
+    const s = buildScenery(name, sceneryMaterials, () => new THREE.MeshBasicMaterial({ color: currentRamp[1], fog: false }), { merge: false });
+    yield;
+    yield* mergeSteps(s.group, s.glows);
     s.group.traverse((o) => { if (o.isMesh) { o.layers.set(s.glows.includes(o) ? LAYER_GHOST : LAYER_SOLID); scope.trackTree(o); } });
     s.group.updateMatrixWorld(true);
     // (Its pieces never move: their matrices are made here, once, and not again every frame.
@@ -954,7 +1025,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     s.group.traverse((o) => { if (o.isMesh && !s.glows.includes(o)) s.solids.push(o); });
     s.shown = false;
     sceneries[name] = s;
-    return s;
+    delete building[name];
   }
   /** What a place's height map is drawn from: the model's ground and stones, and the place's solids. */
   const staticsOf = (name) => (name === 'ruins' ? [...baseStatics, ...ruinsOnly.filter((o) => o.name.startsWith('Static_'))] : [...baseStatics, ...sceneryOf(name).solids]);
@@ -1667,26 +1738,39 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // (Bonfire Live and the Painter can roll a style with its own model at any moment: its
   // template is built beforehand, in idle moments once the knights are in.)
   if (fxLayer) knightsIn.then(() => { if (knights) for (const file of new Set(Object.values(MODELS))) prepareStyleModel(file); }, () => {});
-  // Every other place, and its height map, built beforehand in idle moments once the fire is
-  // up (a step each), so the first visit to one doesn't freeze the show (setScenery). Its
+  // Bonfire Live and the Painter: every other place, and its height map, built beforehand, so
+  // the first visit to one doesn't freeze the show (setScenery). Not in the show's first
+  // seconds (they have enough to do: PREBUILD_AFTER_MS), and then only in time the page has
+  // spare, in steps of about a ms or less (inIdle), the place's own build the one big one. Its
   // materials are set up for drawing too (frame.prepare: the cult's 46 glows, each its own
-  // material, took a frame's worth of setting up the first time they were drawn).
+  // material, took a frame's worth of setting up the first time they were drawn). On the
+  // site, where a visitor seldom changes place, each is built on its first visit.
   function* prepareSceneries() {
     for (const name of Object.keys(SCENERIES)) {
       if (name === 'ruins' || !ready) continue;
-      if (!sceneries[name]) { frame.prepare([sceneryOf(name).group]).catch(() => {}); yield; }
+      if (!sceneries[name]) {
+        yield BIG_STEP_MS;
+        if (!sceneries[name]) yield* (building[name] ??= sceneryParts(name));
+        frame.prepare([sceneries[name].group]).catch(() => {});
+        yield;
+      }
       if (terrains[name]) continue;
-      // Its heights are read back without waiting on the GPU (the next step waits for them,
-      // the page idle meanwhile), then made into its map in an idle moment. (A visit before
-      // that builds its own then, and this one is let go.)
-      let build = null;
-      yield readTerrain(renderer, staticsOf(name), { material: terrainMaterial }).then((b) => { build = b; }, () => {});
-      if (build && !terrains[name]) terrains[name] = build();
-      yield;
+      // Its heights are drawn, then read back without waiting on the GPU (the next step waits
+      // for them, the page idle meanwhile), then made into its map a few rows at a time. (A
+      // visit before that makes its own then, and this one is let go.)
+      let steps = null;
+      yield readTerrain(renderer, staticsOf(name), { material: terrainMaterial }).then((s) => { steps = s; }, () => {});
+      if (!steps || terrains[name]) continue;
+      const map = yield* steps;
+      terrains[name] ??= map;
     }
   }
-  loaded.then(() => (ready && !scope.disposed ? inSteps(prepareSceneries()) : null), () => null)
-    .catch((error) => console.warn('The places could not be built beforehand; each is built when first shown.', error));
+  if (fxLayer && typeof requestIdleCallback === 'function') {
+    knightsIn
+      .then(() => new Promise((resolve) => setTimeout(resolve, PREBUILD_AFTER_MS)), () => null)
+      .then(() => (ready && !scope.disposed ? inIdle(prepareSceneries()) : null))
+      .catch((error) => console.warn('The places could not be built beforehand; each is built when first shown.', error));
+  }
 
   // fire.knights: what knights.js offers, forwarded once they exist.
   const knightsApi = {

@@ -105,8 +105,10 @@ function jag(geo, amount, rand) {
  * material. Returns { group, glows, lights }:
  * each glow carries userData.glow = { kind, id, tone }; `lights` are
  * [{ at: Vector3, intensity, distance }] for small point lights (MAX_LAMPS at most).
+ * `merge`: false leaves the still pieces unmerged, for the caller to merge (scene.js does,
+ * a few at a time, building a place beforehand in idle moments).
  */
-export function buildScenery(name, mat, glowMaterial) {
+export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
   const group = new THREE.Group();
   group.name = `Scenery_${name}`;
   const glows = [];
@@ -450,6 +452,6 @@ export function buildScenery(name, mat, glowMaterial) {
   group.traverse((o) => { if (o.isMesh) { o.castShadow = !glows.includes(o); o.receiveShadow = true; } });
   // The still pieces drawn as one mesh per material (sceneryMerge.js): a draw or two a
   // material instead of one a block, the same picture. The glows stay as they are.
-  mergeStatic(group, glows);
+  if (merge) mergeStatic(group, glows);
   return { group, glows, lights };
 }

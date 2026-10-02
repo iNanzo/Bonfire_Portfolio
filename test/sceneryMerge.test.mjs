@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { mergeKey, mergeStatic } from '../src/bonfire/sceneryMerge.js';
+import { mergeKey, mergeStatic, mergeSteps } from '../src/bonfire/sceneryMerge.js';
 import { buildScenery } from '../src/bonfire/scenery.js';
 
 /** Every triangle of the meshes under `root` (not `skip`), in world space, as sorted strings to 4 dp. */
@@ -140,5 +140,31 @@ test('each place is a handful of meshes: its merged solids and its glows', () =>
       assert.ok(g.parent, `${name}: every glow still in the scenery`);
       assert.ok(!g.castShadow && g.userData.glow, name);
     }
+  }
+});
+
+test('merged a step at a time (a place built in idle moments), each place ends exactly as merged at once', () => {
+  const material = (name) => new THREE.MeshLambertMaterial({ name });
+  const mat = { stone: material('stone'), pillar: material('pillar'), wood: material('wood'), char: material('char'), wax: material('wax'), mortar: material('mortar') };
+  const glow = () => new THREE.MeshBasicMaterial();
+  /** Each mesh in tree order: its name, material, flags and every vertex as stored. */
+  const meshes = (group) => {
+    const out = [];
+    group.traverse((o) => {
+      if (o.isMesh) out.push([o.name, o.material.name, o.castShadow, o.receiveShadow, o.parent === group, [...o.geometry.attributes.position.array], [...(o.geometry.index?.array ?? [])]]);
+    });
+    return out;
+  };
+  for (const name of ['forge', 'shrine', 'cathedral', 'cult']) {
+    const once = buildScenery(name, mat, glow);
+    const later = buildScenery(name, mat, glow, { merge: false });
+    assert.ok(meshes(later.group).length > meshes(once.group).length, `${name}: left unmerged when asked`);
+    const steps = mergeSteps(later.group, later.glows);
+    let yields = 0;
+    let r = steps.next();
+    while (!r.done) { yields++; r = steps.next(); }
+    assert.ok(yields > 10, `${name}: in many small steps (${yields})`);
+    assert.ok(r.value.length >= 1 && r.value.every((m) => m.parent === later.group), name);
+    assert.deepEqual(meshes(later.group), meshes(once.group), `${name}: the same meshes, in the same order, vertex for vertex`);
   }
 });
