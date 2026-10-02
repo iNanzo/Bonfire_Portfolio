@@ -107,10 +107,11 @@ by file; CI shows them on each run's summary page and keeps `coverage/` as an ar
 ## Checks and deploys
 
 Pull requests run `.github/workflows/checks.yml`, and pushes to `main` run `deploy.yml`.
-Both call one reusable workflow, `ci.yml`, whose three jobs run side by side: lint and
-type checks; the unit and admin tests with coverage, on Node 22 and 24; and the built
-site in a real browser (`e2e/`: every screen, Bonfire Live and its preset scenes, the
-Painter). `main` deploys to GitHub Pages only if all three pass, and it ships the very
+Both call one reusable workflow, `ci.yml`, which runs side by side: lint and type checks;
+the unit and admin tests with coverage, on Node 22 and 24; and the build, which the
+browser tests then run against (`e2e/`: every screen, Bonfire Live and its preset scenes,
+the Painter, the admin) in five shards, two of them for Bonfire Live's long tooltip
+sweeps. `main` deploys to GitHub Pages only if all of it passes, and it ships the very
 build the browser tests ran against. Dependabot proposes dependency and action updates
 weekly (Three.js is updated by hand, since a new version can change the look). The admin
 is a separate deploy: `npm run admin:deploy`.

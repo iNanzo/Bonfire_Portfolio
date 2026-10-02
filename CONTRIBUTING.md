@@ -36,6 +36,12 @@ The [README](README.md) lists every script; [docs/](docs/) has how each app beha
   uses your installed browser instead of downloading Playwright's. `PW_PREBUILT=1` serves the
   `dist/` you already built instead of building again; `PW_PORT=4180` moves the preview
   server off 4173, so two checkouts can test at once.
+- **Browser test shards.** The whole run is about 20 minutes with two workers. CI splits it
+  into five shards on one build (`.github/workflows/ci.yml`): Bonfire Live's tooltip sweeps
+  (`e2e/tips-live.spec.mjs`) in two, every other spec in three. To run a part locally, name
+  a file (`npm run e2e -- tips-site`) or a shard (`npm run e2e -- --shard=1/3`). A spec whose
+  tests each open their own page can say `test.describe.configure({ mode: 'parallel' })`, so
+  its tests run side by side and shard one by one, as the tooltip specs do.
 
 ## Formatting
 
@@ -76,5 +82,5 @@ swaps in that page's description and preview tags with one-line patterns
   commit of its own, with nothing else changed in it.
 - Pull requests fill in the template: captures for anything visible, what happens to saved
   state, and the checks you ran. CI (`.github/workflows/ci.yml`) runs lint and types, the
-  unit tests with coverage on Node 22 and 24, and the browser tests; `main` deploys only
-  when all of it passes.
+  unit tests with coverage on Node 22 and 24, and the browser tests (five shards on one
+  build); `main` deploys only when all of it passes.

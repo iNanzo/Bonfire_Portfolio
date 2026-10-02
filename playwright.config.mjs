@@ -2,8 +2,8 @@
 // real browser with WebGL (software-rendered, so it runs headless and in CI).
 // Locally, PW_CHANNEL=chrome (or msedge) uses an installed browser instead of Playwright's.
 // PW_PREBUILT=1 serves the dist/ that's already there instead of building it first (CI
-// builds once, and deploys the build it tested). PW_PORT moves the server off 4173, so two
-// checkouts can run their e2e at the same time.
+// builds once, tests that build in shards, and deploys it). PW_PORT moves the server off
+// 4173, so two checkouts can run their e2e at the same time.
 //
 // The admin (e2e/admin.spec.mjs) runs on a second server: `npm run admin:preview`, the built
 // admin under its production security headers (admin/server/csp.js), its live preview

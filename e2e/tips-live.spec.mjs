@@ -7,6 +7,10 @@
 import { test, expect } from '@playwright/test';
 import { collectTips, checkTip, assertInViewport, tipOf } from './lib/tips.mjs';
 
+// Each test opens a page of its own, so they can run side by side: with two workers, and
+// split between CI's shards (this file is a third of the suite's time; .github/workflows/ci.yml).
+test.describe.configure({ mode: 'parallel' });
+
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
 function watch(page) {
   const errors = [];

@@ -1,9 +1,9 @@
 name: CI
 
 # The checks every change goes through, shared by checks.yml (pull requests) and deploy.yml
-# (main). Three jobs run side by side: lint and types; the unit and admin tests under
-# coverage, on each Node the site supports; and the built site in a real browser. The
-# browser job uploads the build it tested as `site-dist`, and that's what a deploy ships.
+# (main). Lint and types, the unit and admin tests under coverage (on each Node the site
+# supports) and the build run side by side; the build is uploaded once as `site-dist`, the
+# browser tests run against it in five shards, and that same build is what a deploy ships.
 on:
   workflow_call:
 
@@ -59,10 +59,47 @@ jobs:
             !coverage/tmp/
           retention-days: 14
 
-  e2e:
-    name: Browser tests
+  build:
+    name: Build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Dotfiles too (upload-artifact leaves them out by default), so a later
+      # public/.well-known/ still ships.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-dist
+          path: dist/
+          include-hidden-files: true
+          retention-days: 7
+
+  e2e:
+    name: Browser tests (${{ matrix.name }})
+    needs: build
+    runs-on: ubuntu-latest
+    # The whole suite is about 40 minutes of software-rendered browser time; the biggest
+    # shard's share is about 11, which leaves room for a slower runner and a retry.
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # Playwright's --shard deals tests out by count, in file order, but Bonfire Live's
+        # tooltip sweeps (e2e/tips-live.spec.mjs) take a third of the time in a ninth of the
+        # tests. So they get two shards of their own, and every other spec (a new one too)
+        # shares three.
+        include:
+          - { id: rest-1, name: 'all but Live tips, 1 of 3', args: '--grep-invert tips-live --shard=1/3' }
+          - { id: rest-2, name: 'all but Live tips, 2 of 3', args: '--grep-invert tips-live --shard=2/3' }
+          - { id: rest-3, name: 'all but Live tips, 3 of 3', args: '--grep-invert tips-live --shard=3/3' }
+          - { id: tips-live-1, name: 'Live tips, 1 of 2', args: 'tips-live --shard=1/2' }
+          - { id: tips-live-2, name: 'Live tips, 2 of 2', args: 'tips-live --shard=2/2' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -86,22 +123,18 @@ jobs:
       # A cache hit has the browser but not the system libraries it needs.
       - if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
-      - run: npm run build
-      - run: npm run e2e
+      # The build job's dist/, served as it is (PW_PREBUILT): every shard tests the one build.
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+      - run: npm run e2e -- ${{ matrix.args }}
         env:
           CI: true
           PW_PREBUILT: 1
-      # Dotfiles too (upload-artifact leaves them out by default), so a later
-      # public/.well-known/ still ships.
-      - uses: actions/upload-artifact@v4
-        with:
-          name: site-dist
-          path: dist/
-          include-hidden-files: true
-          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.id }}
           path: test-results/
           retention-days: 7
