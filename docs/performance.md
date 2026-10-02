@@ -159,40 +159,53 @@ Measured first with the tools above; each change says why in a comment where it'
 - **Places built beforehand** — the other places and their height maps are built in idle
   moments once the fire is up (`prepareSceneries` in `scene.js`), with their materials set
   up for drawing, and every height map is drawn with one shared material (its shader built
-  once): a first visit only puts the place in the scene. It takes about 4.5 MB of JS heap
-  more per scene.
+  once): a first visit only puts the place in the scene. The height maps are read back
+  through a fence (`readTerrain` in `terrain.js`), not a blocking read, which waited for
+  the GPU to finish the frame just drawn (75 ms a map in software rendering), and made from
+  the heights in an idle step of their own. It all takes about 4.6 MB more of the JS heap
+  (measured after a GC).
 - **One matrix update a frame** — `frame.draw` brings the scene's world matrices up to date
   once for its three renders (three.js did it in each), a place's still pieces keep the
   matrices made when it's built, and a place not shown is out of the scene, not hidden.
 
 ### What that came to
 
-Bonfire Live, dev server, GPU Chrome, 1920×1080, medians of interleaved runs (two a side for
-A, B and D, five for H) on a machine busy with other work, so lean on the counts and on H.
-"Round start" is `73412c4`, before any of it; "before tier B" has the first five bullets
-above and not the last five:
+Bonfire Live, dev server, GPU Chrome, 1920×1080. The counts are exact (both sides draw the
+same frames); the times are medians of interleaved runs on a machine busy with other work,
+at times very busy, so they only point the way. "Round start" is `73412c4`, before any of
+round 10; "before tier B" has the first five bullets above and not the last five. The
+places in each row are in the order ruins / forge / shrine / cathedral / cult:
 
 | | round start | before tier B | after |
 | --- | --- | --- | --- |
-| H draws per frame (ruins / forge / shrine / cathedral / cult) | 282 / 436 / 371 / 463 / 416 | 194 / 300 / 251 / 307 / 297 | 123 / 136 / 129 / 135 / 163 |
-| H CPU ms per frame (same order; five runs each) | 3.9 / 4.4 / 4.0 / 4.3 / 4.2 | 3.3 / 3.6 / 3.3 / 3.5 / 3.9 | 2.7 / 2.8 / 2.4 / 2.5 / 2.7 |
-| H ms per frame at 4× CPU throttle (one run each) | | 20.0 / 27.7 / 20.9 / 23.1 / 24.0 | 16.7 / 15.7 / 15.0 / 15.3 / 16.0 |
-| B busy ms per drawn frame (same order) | 5.2 / 6.5 / 7.1 / 7.2 / 6.3 | 5.6 / 5.8 / 6.6 / 5.7 / 6.1 | 4.5 / 4.8 / 5.3 / 4.6 / 5.2 |
-| A, D busy ms per drawn frame | 4.7, 5.5 | 4.5, 4.4 | 4.0, 3.5 |
-| First visit to a place (its frame, GPU finished, median) | | 34–40 ms (up to 59) | 8–9 ms (up to 28) |
-| Scene-graph nodes visited per frame (4 dancers) | | 1690–2320 | 513–571 |
-| WebGL programs / textures after 6 rebuilds | 161 / 85 | 23 / 15 | 26 / 24 |
+| H draws per frame (four dancers) | 282 / 436 / 371 / 463 / 416 | 194 / 300 / 251 / 307 / 297 | 123 / 136 / 129 / 135 / 163 |
+| … on a frame the fire's shadow is redrawn | (every frame, as above) | 285 / 432 / 365 / 457 / 420 | 211 / 238 / 224 / 233 / 255 |
+| … on the other frames | | 174 / 261 / 215 / 263 / 273 | 100 / 109 / 105 / 112 / 139 |
+| H CPU ms per frame, against before tier B (five runs a side) | | 3.8 / 4.1 / 3.5 / 3.4 / 3.7 | 2.9 / 2.5 / 2.7 / 2.5 / 2.4 |
+| H CPU ms per frame, against round start (two runs a side, very busy) | 4.7 / 6.3 / 6.1 / 7.0 / 6.2 | | 3.9 / 3.5 / 3.4 / 3.4 / 3.6 |
+| B busy ms per drawn frame (two runs a side) | | 5.0 / 5.7 / 5.7 / 5.9 / 6.3 | 4.1 / 3.7 / 4.6 / 4.8 / 5.4 |
+| A, D busy ms per drawn frame | | 4.7, 5.2 | 3.9, 4.6 |
+| First visit to a place: its frame, GPU finished (median; main thread; over 50 ms) | | 55 ms; 35 ms; 7 of 12 | 11 ms; 10 ms; 1 of 12 |
+| A height map made in idle time, main thread (GPU; software rendering) | | 4.8 ms; 75 ms | 0.5 + 2.7 ms; 0.5 + 2.9 ms |
+| A pixel-size shift back to a size used lately: GL textures, framebuffers made | | 6, 4 | 0, 0 |
+| Scene-graph nodes visited per frame (four dancers) | | 1690–2320 | 513–571 |
+| WebGL programs / textures after 6 rebuilds | 161 / 84–85 | 23 / 15–18 | 26 / 23–25 |
+| JS heap after load and a GC (a still page) | | 48.6 MB | 53.2 MB |
 
-(The three more programs are the instanced fireflies'; the textures are the kept render
-target sets.) Frame-interval percentiles moved within the runs' noise: at 131 Hz the frames
-were already on time almost always, and the spare time is what grew.
+Of the draws, the merged scenery saves 45–88 on a frame (75–160 when the shadow's six faces
+are redrawn) and the instanced fireflies 63–75. (The three more programs are the
+instanced fireflies'; the textures are the kept render target sets.) Frame-interval
+percentiles mostly moved within the runs' noise: at 144 Hz the frames were already on time
+almost always, and the spare time is what grew. A shift's frame took about as long as
+before (its hitch was 2–3 ms either way on this GPU): what went is the allocation.
 
-Where the time goes now (a CPU profile of the cult with four dancers): three.js's draw about
-half of it (per-object uniform uploads and state, the shadow cube's redraws), the particle
-sims' curl noise (`noise3d`) the biggest single piece of the update. The 40 point lights cost
-three.js about 40 ms/s setting them up (`WebGLLights.setup`) on top of their uniforms: a pool
-of about 18 would save part of that, but changing the light count changes every lit shader,
-so it waits until it can be checked to the texel.
+Where the time goes now (a CPU profile of the cult with four dancers): three.js's draw a
+little under half of it (per-object uniform uploads and state, the shadow cube's redraws),
+the particle sims' curl noise (`noise3d`, 150 ms/s) the biggest single piece of the
+update. The 40 point lights cost three.js about 40 ms/s setting them up
+(`WebGLLights.setup`), 5% of the busy time: a pool of about 18 would save part of that,
+but changing the light count changes every lit shader, and the pool would have to cover
+the most lights ever lit at once, so it waits until it can be checked to the texel.
 
 ## Checking that the picture didn't change
 
@@ -206,6 +219,12 @@ stream of their own, so a build that makes more or fewer objects doesn't shift e
 drawn after it. The cases: each place at rest, and with four dancers, beats and a weapon swap
 moving the shadow; a tour of all five after a flame change; the living blade's flourish;
 pixel-size shifts with the echo and the ghost trail on; the fireflies blinking and dancing.
-Everything is identical except for the merged scenery, where at most one dithered texel in
-a frame (of 129,600) differs from the branch start: a baked transform rounds a vertex a
-float's last bit differently and tips one dither threshold.
+The whole of it was then checked against the branch start the same way at pixel sizes 4
+and 2. Everything is identical except where merged scenery is in view: at most 2 texels in a
+frame differ (of 129,600) at size 4, and 14 (of 518,400, 0.003%) at size 2, single texels
+scattered over the place, a dither cell in the dark ground or a spark at the edge of the
+depth test. Baking a piece's transform into its vertices rounds them a float's last bit
+differently, which moves the shadow's and the depth buffer's values by as much and tips a
+threshold here and there (and 1–3 of the 102,400 height-map cells in the cathedral and the
+cult by one 16-bit step, 0.06 mm). Everything after the merge matches it texel for texel at
+both sizes.
