@@ -129,13 +129,19 @@ Measured first with the tools above; each change says why in a comment where it'
 - **Frame cap** — `fire.setMaxFps(fps)` (`src/bonfire/frameGate.js`): an accumulator over
   the display's frames, 1 ms of slack, no drift, no burst after a stall. Uncapped by
   default. The loop still runs at the display's rate and calls `onTick(dt)` on every frame
-  (for the audio analysis), the scene's clock and the draw only on the frames it keeps.
+  (for the audio analysis), the scene's clock and the draw only on the frames it keeps. A
+  cap that doesn't divide the display's rate can't be paced evenly: on a 144 Hz screen a
+  60 cap draws every second or third frame (13.9 or 20.8 ms apart, alternating), which
+  can look like judder even at a steady 60 fps; on a 120 Hz screen it's every second
+  frame, even but half as smooth as Display. Scenario G measured it (uncapped at about
+  131 Hz): 60.2 fps, 28% of frames over 16.7 ms, 42% less main-thread work.
 - **Shadow** — a planted weapon's shudder on a hard beat redraws the fire's shadow at the
   art's 12 fps instead of every frame (`weapons.movingForShadow`); real motion (a swap, the
   living weapon) still redraws it every frame.
 - **Rebuilds** — a scene's resources are disposed last-made first, so the renderer goes
   after the materials and textures that need it, and then its context is let go
-  (`forceContextLoss`).
+  (`forceContextLoss`). A rebuild's hitch is a little longer than before the round (its
+  long task about 9%, the first rebuild's about 25%: **Before → after**, below).
 - **Per-frame work and garbage** — only the current place's glows are recolored, with the
   ramp parsed once a step; a few-color palette is set again only when it changes; the
   scenery colors are taken up only when a blend step changes them; `applyRenderSettings`
@@ -175,9 +181,12 @@ Measured first with the tools above; each change says why in a comment where it'
   at the start of an empty moment. A page with no spare time builds nothing ahead, and a
   visit before a place is done finishes its build there and then. The height maps are read
   back through a fence (`readTerrain`), not a blocking read, which waited for the GPU to
-  finish the frame just drawn (75 ms a map in software rendering). It all takes about
-  4.6 MB more of the JS heap (measured after a GC). The site doesn't: a visitor seldom
-  changes place, so each is built on its first visit, as before.
+  finish the frame just drawn (75 ms a map in software rendering). It costs JS heap: a
+  still page measured 4.6 MB more than before tier B, and against the round's start
+  Bonfire Live's heap is about 11.6 MB larger 5 s into the show (53.7 → 65.3 MB, after a
+  GC) and 12 MB larger after six rebuilds (82 → 94 MB). That's a fixed amount: it grows
+  across rebuilds at the same rate as before, so it isn't a leak. The site doesn't build
+  ahead: a visitor seldom changes place, so each is built on its first visit, as before.
 - **One matrix update a frame** — `frame.draw` brings the scene's world matrices up to date
   once for its three renders (three.js did it in each), a place's still pieces keep the
   matrices made when it's built, and a place not shown is out of the scene, not hidden.
@@ -231,6 +240,36 @@ update. The 40 point lights cost three.js about 40 ms/s setting them up
 (`WebGLLights.setup`), 5% of the busy time: a pool of about 18 would save part of that,
 but changing the light count changes every lit shader, and the pool would have to cover
 the most lights ever lit at once, so it waits until it can be checked to the texel.
+
+### Before → after (round 10)
+
+The final benchmark, the round's start (`73412c4`) against its end, each side on its own
+dev server and Vite cache, headless GPU Chrome at 1920×1080, runs interleaved, medians
+(A 6 runs a side, B 9, the 4× CPU throttle 2). Busy is the main thread's work per drawn
+frame; at 4× both sides use all of it, so fps is the number to compare there.
+
+| Place (scenario) | busy ms per frame | draws per frame | shadow redraws/s | fps at 4× CPU throttle |
+| --- | --- | --- | --- | --- |
+| Ruins (A, the free show) | 3.18 → 2.74 (−14%) | 211 → 125 (−41%) | 127 → 71 (−44%) | 68.7 → 83.9 (+22%) |
+| Ruins (B, four dancers) | 3.58 → 3.19 (−11%) | 239 → 158 (−34%) | 132 → 71 (−46%) | 50.9 → 66.8 (+31%) |
+| Forge (B) | 3.57 → 2.95 (−17%) | 362 → 186 (−49%) | 122 → 81 (−33%) | 55.7 → 65.8 (+18%) |
+| Shrine (B) | 3.71 → 3.29 (−11%) | 325 → 179 (−45%) | 132 → 105 (−21%) | 48.6 → 55.3 (+14%) |
+| Cathedral (B) | 3.59 → 2.44 (−32%) | 386 → 133 (−66%) | 113 → 34 (−70%) | 52.4 → 74.6 (+43%) |
+| Cult (B) | 4.04 → 3.29 (−19%) | 373 → 214 (−43%) | 132 → 102 (−23%) | 41.1 → 55.0 (+34%) |
+
+After six scene rebuilds (E): WebGL programs 23 → 161 before, 26 → 26 after; contexts
+still alive 7 of 7 before, 1 of 7 after. None of the windows in the table had a long task
+unthrottled, on either side.
+
+What got worse:
+
+- **JS heap:** about 11.6 MB more 5 s into the show (53.7 → 65.3 MB, after a GC) and 82 →
+  94 MB after six rebuilds: a fixed amount, not a leak.
+- **A scene rebuild's hitch:** its long task is about 9% longer (median 87.5 → 95.5 ms),
+  the first rebuild about 25% (99–108 → 129–132 ms).
+- **The shrine at 4× throttle:** fps rose 14%, but its slowest frames got worse in both
+  runs (p99 32.7 → 38.3 ms, frames over 33 ms 0.6 → 2.0%, one 51 ms long task). Two runs
+  only.
 
 ## Checking that the picture didn't change
 

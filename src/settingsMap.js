@@ -713,7 +713,7 @@ export const SETTINGS = {
     label: 'Frame Rate',
     live: 'frameRate',
     simple: true,
-    hint: 'How often the picture is drawn: Display matches your screen; 60 or 30 fps eases the load on a busy computer. Kept on this one, not in setups.',
+    hint: 'Draws at most this often. Lighter on the computer; on a 120 or 144 Hz screen 60 can look less smooth than Display. Kept on this computer, not in setups.',
     keywords: ['fps', 'lag', 'cap', 'refresh', 'vsync'],
   },
   particles: {

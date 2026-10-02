@@ -291,10 +291,13 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
   search, a second `Esc` closes the dialog. Nothing found suggests words that would find
   something.
 - **Frame Rate** (Picture › Performance): *Display* (every frame the screen shows, the
-  default), *60 fps* or *30 fps*, for a busy computer. It stays with this computer (not in a
-  setup or a preset, like the volume). The sound is still analysed on every frame the
-  display shows, so beats land as precisely when it's capped (`createBonfire`'s `onTick`;
-  what's heard between drawn frames reaches the director with the next one: `tickBatch.js`).
+  default), *60 fps* or *30 fps*, for a busy computer. On a 144 Hz screen 60 can't be paced
+  evenly (it draws every second or third frame the screen shows) and on a 120 Hz one it's
+  half the screen's rate, so it can look less smooth than Display, though it's lighter on
+  the computer. It stays with this computer (not in a setup or a preset, like the volume).
+  The sound is still analysed on every frame the display shows, so beats land as precisely
+  when it's capped (`createBonfire`'s `onTick`; what's heard between drawn frames reaches
+  the director with the next one: `tickBatch.js`).
 - Saving waits for a burst of changes to settle (300 ms: a slider dragged writes once) and
   is done at once as the page is hidden or left, and for a preset, a setup or a reset.
 
