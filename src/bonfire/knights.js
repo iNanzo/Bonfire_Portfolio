@@ -948,6 +948,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     k.group.rotation.y = k.yaw;
     seatPoseOf(k);
     standAtSeat(k);
+    // (His feet's way up over what's in front of his seat, worked out now: not in the step he
+    // gets up on, the site's first click away.)
+    overOf(k);
     k.mode = 'sit';
     k.act = null;
     k.queue.length = 0;
