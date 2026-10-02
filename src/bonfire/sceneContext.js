@@ -42,8 +42,17 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {(n: number) => number} pCount  a particle count for this device
  * @property {(n: number) => number} fCount  a firefly count for this device
  * @property {(n: number) => number} impactCount  an impact's particle count for this device
+ * @property {boolean} siteKnight  the site's knight (sceneKnight.js); Bonfire Live (`fxLayer`) casts its own
  * @property {any} renderer  the THREE.WebGLRenderer
+ * @property {HTMLCanvasElement} canvas  the renderer's (low resolution: sceneRender.js resize)
  * @property {any} scene
+ * @property {any} camera
+ * @property {any} pass  the pixel pass (pixelPass.js): its uniforms, palette and steel
+ * @property {any} fireLight  the fire's light, the one that casts the shadow (sceneLights.js)
+ * @property {any} particleMaterial  the flame's particles' material (flame.js), whose depth texture follows the size
+ * @property {any} flowView  breakdown mode's flow field over the fire (flowView.js)
+ * @property {any} interaction  how the cursor moves flames, sparks and fireflies (interaction.js)
+ * @property {any} pointer  the cursor's path, and its ray (pointer.js)
  * @property {any} frame  the passes and their buffers (frame.js)
  * @property {any} candleLight  the ruins' candle's light (sceneLights.js)
  * @property {any[]} lamps  the pool of lights the places' lamps take (sceneLights.js)
@@ -177,8 +186,29 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {(kind: string, strength?: number, where?: any) => void} reactKnights  something happened at the fire, if the knights mind it
  * @property {(model: any, o?: { template?: any, attach?: boolean }) => any[]} addKnights  the knights, from their model
  * @property {(name: string) => { x: number, y: number, z: number, yaw: number }} signPlace  where the knight's sign lies in a place
- * @property {(objects: any[], name: string) => void} named  name point sets for the breakdown's counts
  * @property {(from: number, to: number, fs: number) => void} recolorGlows  glows[from…to) at flame step `fs`
  */
 
-/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart & SceneryPart & FirePart & MainPart} SceneContext */
+/**
+ * How the picture is drawn (sceneRender.js).
+ * @typedef {object} RenderPart
+ * @property {{ pixelSize: number | null }} settings  the pixel size set over the settings' (null: theirs)
+ * @property {Record<string, any>} renderOverride  render options set over the settings' (setRender)
+ * @property {() => number} pixelSize  the pixel size in CSS px
+ * @property {() => void} applyRender  the render options as the pass's uniforms (and the settings they write through to)
+ * @property {(partial?: Record<string, any>) => void} setRender
+ * @property {(p?: any) => void} setPalette
+ * @property {(kind?: string) => void} setFog
+ * @property {(on?: boolean) => void} setShadows
+ * @property {(view?: string | null) => void} setXray
+ * @property {(force?: boolean) => void} keepPalette  the palette set over the flame's kept up with it (every frame)
+ * @property {() => void} resize  the render target sized to the container (and the knights' headroom)
+ * @property {() => void} fitKnights  whether the site's knight has room over his seat to stand up in
+ * @property {(what: string, dir?: number) => Record<string, string>} cycle  the P menu: step a setting
+ * @property {() => Record<string, string>} describe  the P menu: what each setting is now
+ * @property {(view?: string) => void} breakdown  one of the passes in place of the picture, or the flow field
+ * @property {(objects: any[], name: string) => void} named  name point sets for the breakdown's counts
+ * @property {() => any} stats  the draw calls, the size and each particle system's count
+ */
+
+/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart & SceneryPart & FirePart & RenderPart & MainPart} SceneContext */

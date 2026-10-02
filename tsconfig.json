@@ -136,6 +136,7 @@
     "src/bonfire/sceneContext.js"
     "src/bonfire/sceneContext.js",
     "src/bonfire/sceneIdle.js",
-    "src/bonfire/sceneFire.js"
+    "src/bonfire/sceneFire.js",
+    "src/bonfire/sceneRender.js"
   ]
 }

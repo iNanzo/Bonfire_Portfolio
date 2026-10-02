@@ -15,8 +15,8 @@ test('render menu: one row per setting, each on its own digit', () => {
   }
 });
 
-test('render menu: the site steps and describes every row (bonfire/scene.js)', () => {
-  const src = fs.readFileSync(new URL('../src/bonfire/scene.js', import.meta.url), 'utf8');
+test('render menu: the site steps and describes every row (bonfire/sceneRender.js)', () => {
+  const src = fs.readFileSync(new URL('../src/bonfire/sceneRender.js', import.meta.url), 'utf8');
   const describe = src.slice(src.indexOf('function describe()'));
   const body = describe.slice(0, describe.indexOf('\n  }'));
   for (const { id } of RENDER_ROWS) {
@@ -85,7 +85,7 @@ test('render menu: one list of pixel sizes for the site, Bonfire Live and the Pa
   const { PIXEL_SIZES } = await import('../src/pixelSizes.js');
   const { PIXEL_SIZES: live } = await import('../src/visualizer/render.js');
   assert.deepEqual(live, PIXEL_SIZES, 'visualizer/render.js offers the same sizes');
-  const scene = fs.readFileSync(new URL('../src/bonfire/scene.js', import.meta.url), 'utf8');
+  const scene = fs.readFileSync(new URL('../src/bonfire/sceneRender.js', import.meta.url), 'utf8');
   assert.match(scene, /import \{ PIXEL_SIZES \} from '\.\.\/pixelSizes\.js';/);
   assert.doesNotMatch(scene, /const PIXEL_SIZES =/, 'no list of its own');
 });
