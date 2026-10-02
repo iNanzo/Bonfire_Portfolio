@@ -46,16 +46,34 @@ const SCENERY_NAMES = ['ruins', 'forge', 'shrine', 'cathedral', 'cult'];
 const ALL = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 function parseArgs(argv) {
-  const o = { scenarios: 'A,B,E,F,H', throttle: 1, seconds: 10, rounds: 1, alloc: 0, cap: 60, seed: 1, out: 'test-results/perf', label: null };
+  const o = {
+    scenarios: 'A,B,E,F,H',
+    throttle: 1,
+    seconds: 10,
+    rounds: 1,
+    alloc: 0,
+    cap: 60,
+    seed: 1,
+    out: 'test-results/perf',
+    label: null,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith('--')) continue;
     const key = a.slice(2);
-    if (['prod', 'profile', 'headed', 'dev'].includes(key)) { o[key] = true; continue; }
+    if (['prod', 'profile', 'headed', 'dev'].includes(key)) {
+      o[key] = true;
+      continue;
+    }
     o[key] = argv[++i];
   }
-  for (const k of ['throttle', 'seconds', 'rounds', 'alloc', 'cap', 'seed', 'port']) if (o[k] != null) o[k] = Number(o[k]);
-  o.scenarios = String(o.scenarios).toUpperCase().split(',').map((s) => s.trim()).filter((s) => ALL.includes(s));
+  for (const k of ['throttle', 'seconds', 'rounds', 'alloc', 'cap', 'seed', 'port'])
+    if (o[k] != null) o[k] = Number(o[k]);
+  o.scenarios = String(o.scenarios)
+    .toUpperCase()
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => ALL.includes(s));
   return o;
 }
 
@@ -73,24 +91,51 @@ const root = opts.root ? resolve(opts.root) : null;
 if (!baseUrl) {
   const port = opts.port || 5183;
   const viteEntry = join(root, 'node_modules', 'vite', 'dist', 'node', 'index.js');
-  const vite = await import(pathToFileURL(existsSync(viteEntry) ? viteEntry : join(process.cwd(), 'node_modules', 'vite', 'dist', 'node', 'index.js')).href);
+  const vite = await import(
+    pathToFileURL(
+      existsSync(viteEntry) ? viteEntry : join(process.cwd(), 'node_modules', 'vite', 'dist', 'node', 'index.js'),
+    ).href
+  );
   const configFile = join(root, 'vite.config.js');
   const cacheDir = `node_modules/.vite-${port}`;
   if (opts.prod) {
     const outDir = join(root, 'node_modules', `.bench-dist-${port}`);
     console.log(`Building ${root} into ${outDir}…`);
     await vite.build({ root, configFile, cacheDir, logLevel: 'warn', build: { outDir, emptyOutDir: true } });
-    server = await vite.preview({ root, configFile, cacheDir, logLevel: 'warn', build: { outDir }, preview: { port, strictPort: true, host: 'localhost' } });
+    server = await vite.preview({
+      root,
+      configFile,
+      cacheDir,
+      logLevel: 'warn',
+      build: { outDir },
+      preview: { port, strictPort: true, host: 'localhost' },
+    });
   } else {
-    server = await vite.createServer({ root, configFile, cacheDir, logLevel: 'warn', server: { port, strictPort: true, hmr: false, host: 'localhost' } });
+    server = await vite.createServer({
+      root,
+      configFile,
+      cacheDir,
+      logLevel: 'warn',
+      server: { port, strictPort: true, hmr: false, host: 'localhost' },
+    });
     await server.listen();
   }
   baseUrl = `http://localhost:${port}`;
 }
-const closeServer = async () => { try { await (server?.close?.() ?? server?.httpServer?.close()); } catch { /* gone */ } };
+const closeServer = async () => {
+  try {
+    await (server?.close?.() ?? server?.httpServer?.close());
+  } catch {
+    /* gone */
+  }
+};
 
 let sha = null;
-try { sha = execFileSync('git', ['-C', root ?? process.cwd(), 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim(); } catch { /* not a checkout */ }
+try {
+  sha = execFileSync('git', ['-C', root ?? process.cwd(), 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
+} catch {
+  /* not a checkout */
+}
 const label = opts.label ?? sha ?? 'run';
 
 // --- In the page, before the app's code: a seeded Math.random, long tasks, the WebGL objects
@@ -104,7 +149,9 @@ function initPage({ seed, settings, virtual = false }) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-  window.__reseed = (n) => { s = n >>> 0; };
+  window.__reseed = (n) => {
+    s = n >>> 0;
+  };
   if (virtual) {
     // (Scenario H: nothing moves until stepped; __step(n) runs n animation frames 1/60 s apart.)
     window.__realNow = performance.now.bind(performance);
@@ -112,8 +159,14 @@ function initPage({ seed, settings, virtual = false }) {
     performance.now = () => vnow;
     let queue = [];
     let nextId = 1;
-    window.requestAnimationFrame = (cb) => { const id = nextId++; queue.push({ id, cb }); return id; };
-    window.cancelAnimationFrame = (id) => { queue = queue.filter((q) => q.id !== id); };
+    window.requestAnimationFrame = (cb) => {
+      const id = nextId++;
+      queue.push({ id, cb });
+      return id;
+    };
+    window.cancelAnimationFrame = (id) => {
+      queue = queue.filter((q) => q.id !== id);
+    };
     window.__step = (n, ms = 1000 / 60) => {
       for (let i = 0; i < n; i++) {
         vnow += ms;
@@ -125,9 +178,12 @@ function initPage({ seed, settings, virtual = false }) {
   }
   window.__lt = [];
   try {
-    new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lt.push({ start: e.startTime, dur: e.duration }); })
-      .observe({ type: 'longtask', buffered: true });
-  } catch { /* no long tasks here */ }
+    new PerformanceObserver((l) => {
+      for (const e of l.getEntries()) window.__lt.push({ start: e.startTime, dur: e.duration });
+    }).observe({ type: 'longtask', buffered: true });
+  } catch {
+    /* no long tasks here */
+  }
   const contexts = [];
   window.__gl = {
     created: 0,
@@ -151,19 +207,46 @@ function initPage({ seed, settings, virtual = false }) {
       const c = { programs: 0, textures: 0, buffers: 0, lost: false };
       contexts.push(c);
       window.__gl.created++;
-      this.addEventListener('webglcontextlost', () => { c.lost = true; });
-      const wrap = (name, fn) => { const o = ctx[name].bind(ctx); ctx[name] = (...a) => fn(o, ...a); };
-      wrap('createProgram', (o, ...a) => { c.programs++; return o(...a); });
-      wrap('deleteProgram', (o, p) => { if (p) c.programs--; return o(p); });
-      wrap('createTexture', (o, ...a) => { c.textures++; return o(...a); });
-      wrap('deleteTexture', (o, t) => { if (t) c.textures--; return o(t); });
-      wrap('createBuffer', (o, ...a) => { c.buffers++; return o(...a); });
-      wrap('deleteBuffer', (o, b) => { if (b) c.buffers--; return o(b); });
+      this.addEventListener('webglcontextlost', () => {
+        c.lost = true;
+      });
+      const wrap = (name, fn) => {
+        const o = ctx[name].bind(ctx);
+        ctx[name] = (...a) => fn(o, ...a);
+      };
+      wrap('createProgram', (o, ...a) => {
+        c.programs++;
+        return o(...a);
+      });
+      wrap('deleteProgram', (o, p) => {
+        if (p) c.programs--;
+        return o(p);
+      });
+      wrap('createTexture', (o, ...a) => {
+        c.textures++;
+        return o(...a);
+      });
+      wrap('deleteTexture', (o, t) => {
+        if (t) c.textures--;
+        return o(t);
+      });
+      wrap('createBuffer', (o, ...a) => {
+        c.buffers++;
+        return o(...a);
+      });
+      wrap('deleteBuffer', (o, b) => {
+        if (b) c.buffers--;
+        return o(b);
+      });
     }
     return ctx;
   };
   if (settings && location.pathname.includes('/visualizer')) {
-    try { localStorage.setItem('bonfire-live', JSON.stringify(settings)); } catch { /* no storage */ }
+    try {
+      localStorage.setItem('bonfire-live', JSON.stringify(settings));
+    } catch {
+      /* no storage */
+    }
   }
 }
 
@@ -206,18 +289,28 @@ function sampleWindow(ms) {
     const P = window.__bp;
     const fire = P.fire;
     const drawn = [];
-    let n = 0, callSum = 0, callN = 0, callMax = 0, triSum = 0;
+    let n = 0,
+      callSum = 0,
+      callN = 0,
+      callMax = 0,
+      triSum = 0;
     const shadows0 = P.shadows;
     const off = fire.onRendered(() => {
       drawn.push(performance.now());
       if (++n % 30 === 0 && P.renderer) {
         const r = P.renderer.info.render;
-        callSum += r.calls; callN++; callMax = Math.max(callMax, r.calls); triSum += r.triangles;
+        callSum += r.calls;
+        callN++;
+        callMax = Math.max(callMax, r.calls);
+        triSum += r.triangles;
       }
     });
     const ticks = [];
     let ticking = true;
-    const tick = (t) => { ticks.push(t); if (ticking) requestAnimationFrame(tick); };
+    const tick = (t) => {
+      ticks.push(t);
+      if (ticking) requestAnimationFrame(tick);
+    };
     requestAnimationFrame(tick);
     const start = performance.now();
     setTimeout(() => {
@@ -228,8 +321,10 @@ function sampleWindow(ms) {
       const iv = [];
       for (let i = 1; i < drawn.length; i++) iv.push(drawn[i] - drawn[i - 1]);
       const sorted = [...iv].sort((a, b) => a - b);
-      const q = (p) => (sorted.length ? +sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1)))].toFixed(2) : null);
-      const over = (msMax) => (iv.length ? +((100 * iv.filter((v) => v > msMax * 1.05).length) / iv.length).toFixed(2) : null);
+      const q = (p) =>
+        sorted.length ? +sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1)))].toFixed(2) : null;
+      const over = (msMax) =>
+        iv.length ? +((100 * iv.filter((v) => v > msMax * 1.05).length) / iv.length).toFixed(2) : null;
       const lt = window.__lt.filter((e) => e.start >= start && e.start < end);
       const k = fire.knights;
       resolve({
@@ -237,9 +332,17 @@ function sampleWindow(ms) {
         frames: drawn.length,
         fps: +(drawn.length / secs).toFixed(1),
         displayHz: +(ticks.length / secs).toFixed(1),
-        p50: q(0.5), p95: q(0.95), p99: q(0.99), max: q(1),
-        over16_7: over(1000 / 60), over33: over(1000 / 30),
-        longTasks: { count: lt.length, totalMs: Math.round(lt.reduce((a, e) => a + e.dur, 0)), maxMs: Math.round(lt.reduce((a, e) => Math.max(a, e.dur), 0)) },
+        p50: q(0.5),
+        p95: q(0.95),
+        p99: q(0.99),
+        max: q(1),
+        over16_7: over(1000 / 60),
+        over33: over(1000 / 30),
+        longTasks: {
+          count: lt.length,
+          totalMs: Math.round(lt.reduce((a, e) => a + e.dur, 0)),
+          maxMs: Math.round(lt.reduce((a, e) => Math.max(a, e.dur), 0)),
+        },
         drawCalls: callN ? Math.round(callSum / callN) : null,
         drawCallsMax: callN ? callMax : null,
         triangles: callN ? Math.round(triSum / callN) : null,
@@ -258,7 +361,12 @@ async function gpuCounts(page) {
     window.gc?.();
     await new Promise((r) => setTimeout(r, 250));
     window.gc?.();
-    return { ...window.__gl.live(), contextsCreated: window.__gl.created, heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1e6).toFixed(1) : null, canvases: document.querySelectorAll('canvas').length };
+    return {
+      ...window.__gl.live(),
+      contextsCreated: window.__gl.created,
+      heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1e6).toFixed(1) : null,
+      canvases: document.querySelectorAll('canvas').length,
+    };
   });
 }
 
@@ -280,17 +388,26 @@ async function measure(page, cdp, name, extra = {}) {
   if (opts.alloc > 0) w.allocMBperS = await allocationRate(cdp, opts.alloc);
   if (opts.profile) Object.assign(w, await cpuProfile(cdp, Math.min(opts.seconds, 8)));
   Object.assign(w, extra);
-  console.log(`  ${name.padEnd(14)} ${w.fps} fps  p50 ${w.p50}  p95 ${w.p95}  p99 ${w.p99}  >16.7 ${w.over16_7}%  long ${w.longTasks.count}/${w.longTasks.totalMs}ms  busy ${w.busyMsPerS}  draws ${w.drawCalls}  shadows/s ${w.shadowsPerS}${w.allocMBperS != null ? `  alloc ${w.allocMBperS} MB/s` : ''}`);
+  console.log(
+    `  ${name.padEnd(14)} ${w.fps} fps  p50 ${w.p50}  p95 ${w.p95}  p99 ${w.p99}  >16.7 ${w.over16_7}%  long ${w.longTasks.count}/${w.longTasks.totalMs}ms  busy ${w.busyMsPerS}  draws ${w.drawCalls}  shadows/s ${w.shadowsPerS}${w.allocMBperS != null ? `  alloc ${w.allocMBperS} MB/s` : ''}`,
+  );
   return w;
 }
 
 async function allocationRate(cdp, secs) {
   await cdp.send('HeapProfiler.enable');
-  await cdp.send('HeapProfiler.startSampling', { samplingInterval: 8192, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+  await cdp.send('HeapProfiler.startSampling', {
+    samplingInterval: 8192,
+    includeObjectsCollectedByMajorGC: true,
+    includeObjectsCollectedByMinorGC: true,
+  });
   await sleep(secs * 1000);
   const { profile } = await cdp.send('HeapProfiler.stopSampling');
   let total = 0;
-  const walk = (node) => { total += node.selfSize; for (const c of node.children) walk(c); };
+  const walk = (node) => {
+    total += node.selfSize;
+    for (const c of node.children) walk(c);
+  };
   walk(profile.head);
   return +(total / 1e6 / secs).toFixed(2);
 }
@@ -314,10 +431,17 @@ async function cpuProfile(cdp, secs) {
     for (let cur = id; cur != null; cur = parent.get(cur)) {
       const cf = byId.get(cur).callFrame;
       const key = `${cf.functionName || '(anon)'} ${cf.url.replace(/^.*\/(src|node_modules)\//, '$1/').replace(/\?.*$/, '')}`;
-      if (!seen.has(key)) { seen.add(key); incl.set(key, (incl.get(key) ?? 0) + d); }
+      if (!seen.has(key)) {
+        seen.add(key);
+        incl.set(key, (incl.get(key) ?? 0) + d);
+      }
     }
   });
-  const top = [...incl].filter(([k]) => / src\//.test(k)).sort((a, b) => b[1] - a[1]).slice(0, 25).map(([k, v]) => [k, +(v / secs).toFixed(1)]);
+  const top = [...incl]
+    .filter(([k]) => / src\//.test(k))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 25)
+    .map(([k, v]) => [k, +(v / secs).toFixed(1)]);
   return { profileBusyMsPerS: +(busy / secs).toFixed(1), topFunctions: top };
 }
 
@@ -329,7 +453,9 @@ async function openShow(browser, settings = {}) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message.slice(0, 200)));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text().slice(0, 200));
+  });
   const cdp = await context.newCDPSession(page);
   await cdp.send('Performance.enable', { timeDomain: 'threadTicks' }).catch(() => cdp.send('Performance.enable'));
   await page.goto(`${baseUrl}/visualizer/?bench`);
@@ -350,7 +476,11 @@ const SCENARIOS = {
     return { windows: out, errors };
   },
   async B(browser) {
-    const { context, page, cdp, errors } = await openShow(browser, { knights: 'on', knightCount: 4, knightDance: 'on' });
+    const { context, page, cdp, errors } = await openShow(browser, {
+      knights: 'on',
+      knightCount: 4,
+      knightDance: 'on',
+    });
     const out = {};
     for (const name of SCENERY_NAMES) {
       await page.evaluate(async (name) => {
@@ -370,13 +500,19 @@ const SCENARIOS = {
   },
   async C(browser) {
     const { context, page, cdp, errors } = await openShow(browser, { scenery: 'forge' });
-    await page.evaluate(() => { window.__viz.fire.setScenery('forge'); });
+    await page.evaluate(() => {
+      window.__viz.fire.setScenery('forge');
+    });
     await sleep(1000);
     // A, then Space, then X, over and over (forge, strike, the living weapon).
     let looping = true;
     const loop = (async () => {
       while (looping) {
-        for (const [key, wait] of [['a', 2500], [' ', 2500], ['x', 4500]]) {
+        for (const [key, wait] of [
+          ['a', 2500],
+          [' ', 2500],
+          ['x', 4500],
+        ]) {
           if (!looping) break;
           await page.keyboard.press(key === ' ' ? 'Space' : key).catch(() => {});
           await sleep(wait);
@@ -400,26 +536,44 @@ const SCENARIOS = {
     await page.evaluate(attachProbe);
     const out = { start: await gpuCounts(page), rebuilds: [] };
     for (let i = 0; i < 6; i++) {
-      const t = await page.evaluate(() => { window.__prevFire = window.__viz.fire; return performance.now(); });
+      const t = await page.evaluate(() => {
+        window.__prevFire = window.__viz.fire;
+        return performance.now();
+      });
       const changed = await page.evaluate(() => {
-        const el = document.querySelector('select[data-set="particles"]') ?? document.querySelector('[data-set="particles"]');
+        const el =
+          document.querySelector('select[data-set="particles"]') ?? document.querySelector('[data-set="particles"]');
         if (!el) return false;
         el.value = el.value === 'normal' ? 'more' : 'normal';
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
         return true;
       });
-      if (!changed) { out.error = 'no Particles setting found ([data-set="particles"])'; break; }
+      if (!changed) {
+        out.error = 'no Particles setting found ([data-set="particles"])';
+        break;
+      }
       await page.waitForFunction(() => window.__viz.fire !== window.__prevFire, null, { timeout: 60000 });
       await sleep(2500);
       const lt = await page.evaluate((t) => window.__lt.filter((e) => e.start >= t), t);
-      out.rebuilds.push({ ...(await gpuCounts(page)), longTasks: lt.length, longMs: Math.round(lt.reduce((a, e) => a + e.dur, 0)), longMax: Math.round(lt.reduce((a, e) => Math.max(a, e.dur), 0)) });
+      out.rebuilds.push({
+        ...(await gpuCounts(page)),
+        longTasks: lt.length,
+        longMs: Math.round(lt.reduce((a, e) => a + e.dur, 0)),
+        longMax: Math.round(lt.reduce((a, e) => Math.max(a, e.dur), 0)),
+      });
       const r = out.rebuilds.at(-1);
-      console.log(`  E rebuild ${i + 1}     programs ${r.programs}  textures ${r.textures}  buffers ${r.buffers}  contexts ${r.contexts} (${r.contextsCreated} made)  heap ${r.heapMB} MB  long ${r.longTasks}/${r.longMs}ms`);
+      console.log(
+        `  E rebuild ${i + 1}     programs ${r.programs}  textures ${r.textures}  buffers ${r.buffers}  contexts ${r.contexts} (${r.contextsCreated} made)  heap ${r.heapMB} MB  long ${r.longTasks}/${r.longMs}ms`,
+      );
     }
     out.after = await measure(page, cdp, 'E after');
     await context.close();
-    return { gpu: { start: out.start, rebuilds: out.rebuilds, error: out.error }, windows: { after: out.after }, errors };
+    return {
+      gpu: { start: out.start, rebuilds: out.rebuilds, error: out.error },
+      windows: { after: out.after },
+      errors,
+    };
   },
   async F(browser) {
     const { context, page, cdp, errors } = await openShow(browser);
@@ -429,7 +583,10 @@ const SCENARIOS = {
     let spamming = true;
     const spam = (async () => {
       const keys = ['2', '3', '4', '5', '6', '7'];
-      for (let i = 0; spamming; i++) { await page.keyboard.press(keys[i % keys.length]).catch(() => {}); await sleep(110); }
+      for (let i = 0; spamming; i++) {
+        await page.keyboard.press(keys[i % keys.length]).catch(() => {});
+        await sleep(110);
+      }
     })();
     const out = { pmenu: await measure(page, cdp, 'F P digits') };
     spamming = false;
@@ -440,7 +597,9 @@ const SCENARIOS = {
     await page.keyboard.press('s');
     await sleep(600);
     const box = await page.evaluate(() => {
-      const visible = [...document.querySelectorAll('dialog[open] input[type="range"]')].filter((el) => el.offsetParent && el.getBoundingClientRect().width > 40);
+      const visible = [...document.querySelectorAll('dialog[open] input[type="range"]')].filter(
+        (el) => el.offsetParent && el.getBoundingClientRect().width > 40,
+      );
       const el = visible[0];
       if (!el) return null;
       el.scrollIntoView({ block: 'center' });
@@ -469,7 +628,11 @@ const SCENARIOS = {
   },
   async H(browser) {
     const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
-    await context.addInitScript(initPage, { seed: opts.seed, virtual: true, settings: { ...BASE_SETTINGS, pixelShift: 'off', knights: 'on', knightCount: 4 } });
+    await context.addInitScript(initPage, {
+      seed: opts.seed,
+      virtual: true,
+      settings: { ...BASE_SETTINGS, pixelShift: 'off', knights: 'on', knightCount: 4 },
+    });
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message.slice(0, 200)));
@@ -487,27 +650,38 @@ const SCENARIOS = {
       // (Set up and warmed in one task, stepped in the next, so the main thread's time for
       // the stepping alone is known: CPU time, which a busy machine inflates far less than
       // the wall clock.)
-      await page.evaluate(([name, seed]) => {
-        const fire = window.__viz.fire;
-        window.__viz.settings.scenery = name;
-        fire.setScenery(name);
-        const k = fire.knights;
-        k.setCast({ count: 4, instant: true });
-        for (let i = 0; i < 4; i++) k.dance(i, { move: 'defaultDance', slot: i, facing: 'front' });
-        window.__reseed(seed);
-        window.__step(60);
-        const scene = fire.debug.weapons.holder.parent;
-        const H = (window.__H = { renderer: null, shadows: 0, calls: 0 });
-        const own = scene.onBeforeRender;
-        scene.onBeforeRender = function (r, ...rest) { H.renderer = r; return own.call(this, r, ...rest); };
-        window.__step(1);
-        scene.onBeforeRender = own;
-        const sm = H.renderer.shadowMap;
-        H.render = sm.render;
-        sm.render = function (lights, ...rest) { if (this.needsUpdate && lights.length) H.shadows++; return H.render.call(this, lights, ...rest); };
-        H.off = fire.onRendered(() => { H.calls += H.renderer.info.render.calls; });
-        H.renderer.getContext().finish();
-      }, [name, opts.seed]);
+      await page.evaluate(
+        ([name, seed]) => {
+          const fire = window.__viz.fire;
+          window.__viz.settings.scenery = name;
+          fire.setScenery(name);
+          const k = fire.knights;
+          k.setCast({ count: 4, instant: true });
+          for (let i = 0; i < 4; i++) k.dance(i, { move: 'defaultDance', slot: i, facing: 'front' });
+          window.__reseed(seed);
+          window.__step(60);
+          const scene = fire.debug.weapons.holder.parent;
+          const H = (window.__H = { renderer: null, shadows: 0, calls: 0 });
+          const own = scene.onBeforeRender;
+          scene.onBeforeRender = function (r, ...rest) {
+            H.renderer = r;
+            return own.call(this, r, ...rest);
+          };
+          window.__step(1);
+          scene.onBeforeRender = own;
+          const sm = H.renderer.shadowMap;
+          H.render = sm.render;
+          sm.render = function (lights, ...rest) {
+            if (this.needsUpdate && lights.length) H.shadows++;
+            return H.render.call(this, lights, ...rest);
+          };
+          H.off = fire.onRendered(() => {
+            H.calls += H.renderer.info.render.calls;
+          });
+          H.renderer.getContext().finish();
+        },
+        [name, opts.seed],
+      );
       const frames = 300;
       const before = await perfMetrics(cdp);
       const wallMs = await page.evaluate((frames) => {
@@ -521,26 +695,43 @@ const SCENARIOS = {
         return window.__realNow() - t0;
       }, frames);
       const after = await perfMetrics(cdp);
-      out[name] = await page.evaluate(([frames, wallMs, cpuMs]) => {
-        const H = window.__H;
-        H.off();
-        H.renderer.shadowMap.render = H.render;
-        const fire = window.__viz.fire;
-        return {
-          steppedMsPerFrame: +(wallMs / frames).toFixed(3), steppedCpuMsPerFrame: +(cpuMs / frames).toFixed(3),
-          shadowsPerFrame: +(H.shadows / frames).toFixed(3), drawCalls: Math.round(H.calls / frames), frames, scenery: fire.scenery, knights: fire.knights.present,
-        };
-      }, [frames, wallMs, (after.task - before.task) * 1000]);
+      out[name] = await page.evaluate(
+        ([frames, wallMs, cpuMs]) => {
+          const H = window.__H;
+          H.off();
+          H.renderer.shadowMap.render = H.render;
+          const fire = window.__viz.fire;
+          return {
+            steppedMsPerFrame: +(wallMs / frames).toFixed(3),
+            steppedCpuMsPerFrame: +(cpuMs / frames).toFixed(3),
+            shadowsPerFrame: +(H.shadows / frames).toFixed(3),
+            drawCalls: Math.round(H.calls / frames),
+            frames,
+            scenery: fire.scenery,
+            knights: fire.knights.present,
+          };
+        },
+        [frames, wallMs, (after.task - before.task) * 1000],
+      );
       const w = out[name];
-      console.log(`  H ${name.padEnd(12)} ${w.steppedMsPerFrame} ms/frame stepped (CPU ${w.steppedCpuMsPerFrame})  shadows/frame ${w.shadowsPerFrame}  draws ${w.drawCalls}`);
+      console.log(
+        `  H ${name.padEnd(12)} ${w.steppedMsPerFrame} ms/frame stepped (CPU ${w.steppedCpuMsPerFrame})  shadows/frame ${w.shadowsPerFrame}  draws ${w.drawCalls}`,
+      );
     }
     await context.close();
     return { windows: out, errors };
   },
   async G(browser) {
     const { context, page, cdp, errors } = await openShow(browser);
-    const has = await page.evaluate((fps) => { const f = window.__viz.fire; if (typeof f.setMaxFps !== 'function') return false; f.setMaxFps(fps); return true; }, opts.cap);
-    const out = has ? { [`cap${opts.cap}`]: await measure(page, cdp, `G cap ${opts.cap}`) } : { [`cap${opts.cap}`]: { skipped: 'this build has no fire.setMaxFps' } };
+    const has = await page.evaluate((fps) => {
+      const f = window.__viz.fire;
+      if (typeof f.setMaxFps !== 'function') return false;
+      f.setMaxFps(fps);
+      return true;
+    }, opts.cap);
+    const out = has
+      ? { [`cap${opts.cap}`]: await measure(page, cdp, `G cap ${opts.cap}`) }
+      : { [`cap${opts.cap}`]: { skipped: 'this build has no fire.setMaxFps' } };
     await context.close();
     return { windows: out, errors };
   },
@@ -549,11 +740,26 @@ const SCENARIOS = {
 const browser = await chromium.launch({
   channel: 'chrome',
   headless: !opts.headed,
-  args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu', '--enable-precise-memory-info', '--js-flags=--expose-gc', '--autoplay-policy=no-user-gesture-required'],
+  args: [
+    '--use-angle=d3d11',
+    '--ignore-gpu-blocklist',
+    '--enable-gpu',
+    '--enable-precise-memory-info',
+    '--js-flags=--expose-gc',
+    '--autoplay-policy=no-user-gesture-required',
+  ],
 });
 const result = {
-  label, sha, url: baseUrl, mode: opts.prod ? 'prod' : opts.url ? 'url' : 'dev', date: new Date().toISOString(),
-  chrome: browser.version(), throttle: opts.throttle, seconds: opts.seconds, seed: opts.seed, viewport: '1920x1080@1',
+  label,
+  sha,
+  url: baseUrl,
+  mode: opts.prod ? 'prod' : opts.url ? 'url' : 'dev',
+  date: new Date().toISOString(),
+  chrome: browser.version(),
+  throttle: opts.throttle,
+  seconds: opts.seconds,
+  seed: opts.seed,
+  viewport: '1920x1080@1',
   rounds: [],
 };
 try {
@@ -569,8 +775,12 @@ try {
     console.log(`${label} — round ${r + 1}/${opts.rounds}, CPU ×${opts.throttle}`);
     const round = {};
     for (const id of opts.scenarios) {
-      try { round[id] = await SCENARIOS[id](browser); }
-      catch (error) { round[id] = { error: String(error?.message ?? error).slice(0, 300) }; console.log(`  ${id} failed: ${round[id].error}`); }
+      try {
+        round[id] = await SCENARIOS[id](browser);
+      } catch (error) {
+        round[id] = { error: String(error?.message ?? error).slice(0, 300) };
+        console.log(`  ${id} failed: ${round[id].error}`);
+      }
     }
     result.rounds.push(round);
   }

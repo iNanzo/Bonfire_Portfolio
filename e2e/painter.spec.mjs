@@ -19,7 +19,9 @@ import { defaultScene, encodeSceneHash, readSceneFile } from '../src/scenes.js';
 function watch(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
   return errors;
 }
 /** The stage, small and averaged over a few frames (so the flames' flicker averages out), as RGB. */
@@ -70,7 +72,10 @@ test('a look chip changes the picture, and undo takes it back', async ({ page })
   // (The same look twice, as far apart, against before and after the chip.)
   expect(apart(b, c)).toBeGreaterThan(Math.max(4, 2 * apart(a, b)));
   await page.keyboard.press('Control+z');
-  await expect(page.locator('[data-pick="look.name"][data-value="\\"ember\\""]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-pick="look.name"][data-value="\\"ember\\""]')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await expect(kaleido).toHaveAttribute('aria-pressed', 'false');
   await page.keyboard.press('Control+Shift+z');
   await expect(kaleido).toHaveAttribute('aria-pressed', 'true');
@@ -134,7 +139,11 @@ test('the top bar keeps every button in reach and the name uncovered, tablet to 
     await page.setViewportSize({ width, height: 900 });
     await page.waitForTimeout(150);
     const r = await page.evaluate(() => {
-      const hit = (el, f = 0.5) => { const b = el.getBoundingClientRect(); const x = b.left + b.width * f; return x > 0 && x < innerWidth && el.contains(document.elementFromPoint(x, b.top + b.height / 2)); };
+      const hit = (el, f = 0.5) => {
+        const b = el.getBoundingClientRect();
+        const x = b.left + b.width * f;
+        return x > 0 && x < innerWidth && el.contains(document.elementFromPoint(x, b.top + b.height / 2));
+      };
       const buttons = [...document.querySelectorAll('[data-bar] [data-cmd], [data-bar] [data-preview]')];
       const name = document.querySelector('[data-name]');
       return {
@@ -157,19 +166,32 @@ async function standInTabs(page, { blocked = false } = {}) {
     window.__opened = [];
     window.open = (url, name) => {
       window.__opened.push({ url, name });
-      return blockAll ? null : { closed: false, opener: window, close() { this.closed = true; }, focus() {} };
+      return blockAll
+        ? null
+        : {
+            closed: false,
+            opener: window,
+            close() {
+              this.closed = true;
+            },
+            focus() {},
+          };
     };
   }, blocked);
 }
 
-test('Play on an untouched built-in saves nothing and opens Bonfire Live on its ref; Space on a button presses it', async ({ page }) => {
+test('Play on an untouched built-in saves nothing and opens Bonfire Live on its ref; Space on a button presses it', async ({
+  page,
+}) => {
   await standInTabs(page);
   const errors = watch(page);
   await ready(page, '/painter/?scene=b:frozen-shrine');
   await page.click('[data-cmd="play"]');
   // (No Bonfire Live answered: its tab opens once, on the scene, with no blank one first.)
   await expect.poll(() => page.evaluate(() => window.__opened.length)).toBe(1);
-  expect(await page.evaluate(() => window.__opened.map(({ url, name }) => [url, name]))).toEqual([['/visualizer/?scene=b%3Afrozen-shrine&solo', 'bonfire-live']]);
+  expect(await page.evaluate(() => window.__opened.map(({ url, name }) => [url, name]))).toEqual([
+    ['/visualizer/?scene=b%3Afrozen-shrine&solo', 'bonfire-live'],
+  ]);
   await expect(page.locator('[data-note]')).toHaveText('Opened Bonfire Live with “Frozen Shrine”.');
   await expect(page.locator('[data-saved]')).toHaveText('Built-In');
   // (Off Play, so its tooltip goes: a tip showing takes the first Esc, and this one's the library's.)
@@ -188,7 +210,10 @@ test('Play on an untouched built-in saves nothing and opens Bonfire Live on its 
   expect(errors).toEqual([]);
 });
 
-test('Play hands the scene to an open Bonfire Live with no tab opened; a blocked tab gets a link', async ({ page, context }) => {
+test('Play hands the scene to an open Bonfire Live with no tab opened; a blocked tab gets a link', async ({
+  page,
+  context,
+}) => {
   await standInTabs(page);
   // An open Bonfire Live stood in for: it answers on the scene store's channel (sceneStore.js).
   await page.addInitScript(() => {
@@ -218,7 +243,9 @@ test('Play hands the scene to an open Bonfire Live with no tab opened; a blocked
   await blocked.click('[data-cmd="play"]');
   await expect(blocked.locator('[data-note]')).toContainText('The browser blocked Bonfire Live’s tab.');
   await expect(blocked.locator('[data-note] a')).toHaveAttribute('href', '/visualizer/?scene=b%3Afrozen-shrine&solo');
-  expect(await blocked.evaluate(() => window.__opened.map(({ url }) => url))).toEqual(['/visualizer/?scene=b%3Afrozen-shrine&solo']);
+  expect(await blocked.evaluate(() => window.__opened.map(({ url }) => url))).toEqual([
+    '/visualizer/?scene=b%3Afrozen-shrine&solo',
+  ]);
 });
 
 // (The Painter's director and bonfire both take paintedLook: the look being painted shows,
@@ -232,7 +259,13 @@ test('under reduced motion the look being painted still shows, on the stage and 
     window.__thumbs = [];
     const set = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key, value) {
-      if (key === 'bonfire-scene-thumbs') { try { window.__thumbs.push(Object.values(JSON.parse(value)).at(-1)); } catch { /* not ours */ } }
+      if (key === 'bonfire-scene-thumbs') {
+        try {
+          window.__thumbs.push(Object.values(JSON.parse(value)).at(-1));
+        } catch {
+          /* not ours */
+        }
+      }
       return set.call(this, key, value);
     };
   });
@@ -262,7 +295,11 @@ test('under reduced motion the look being painted still shows, on the stage and 
   await expect.poll(() => page.evaluate(() => window.__thumbs.length), { timeout: 30_000 }).toBe(2);
   const [ember, kal] = await page.evaluate(() => window.__thumbs);
   const pixels = async (url) => {
-    const raw = await sharp(Buffer.from(url.split(',')[1], 'base64')).resize(32, 18, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+    const raw = await sharp(Buffer.from(url.split(',')[1], 'base64'))
+      .resize(32, 18, { fit: 'fill' })
+      .removeAlpha()
+      .raw()
+      .toBuffer();
     return Float64Array.from(raw);
   };
   expect(apart(await pixels(ember), await pixels(kal))).toBeGreaterThan(Math.max(4, 2 * apart(a, b)));
@@ -276,7 +313,10 @@ test('a scene from the admin (#scene=) opens with its banner', async ({ page }) 
   await expect(page.locator('[data-banner]')).toBeVisible();
   await expect(page.locator('[data-name]')).toHaveValue('From the Admin');
   await page.click('[data-sec-toggle="look"]');
-  await expect(page.locator('[data-pick="look.name"][data-value="\\"haze\\""]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-pick="look.name"][data-value="\\"haze\\""]')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   expect(errors).toEqual([]);
 });
 
@@ -292,7 +332,10 @@ test('the panel remembers its open sections; a shape change draws only its own s
   await expect(page.locator('[data-sec="place"]')).not.toHaveAttribute('data-open', '');
   // Glow on: only Layers is drawn again (an element of another section is still the same one).
   await page.evaluate(() => {
-    window.__kept = [document.querySelector('#pnt-b-colors').firstElementChild, document.querySelector('[data-set-group="layers.mirror"]')];
+    window.__kept = [
+      document.querySelector('#pnt-b-colors').firstElementChild,
+      document.querySelector('[data-set-group="layers.mirror"]'),
+    ];
   });
   const glow = page.locator('[data-set-group="layers.glow"]');
   await glow.locator('label', { hasText: 'Always' }).click();
@@ -306,10 +349,15 @@ test('the panel remembers its open sections; a shape change draws only its own s
   await expect(glow.locator('input[value="mix"]')).toBeFocused();
   // Only the sections scroll, never the panel round them: the search box stays in sight
   // whatever's focused or scrolled into view (a phone's bottom sheet too).
-  for (const size of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  for (const size of [
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
     await page.setViewportSize(size);
     await page.locator('[data-row="detail.glowAmt"] input').evaluate((el) => el.scrollIntoView({ block: 'center' }));
-    expect(await page.locator('[data-panel]').evaluate((el) => [el.scrollTop, el.scrollHeight - el.clientHeight])).toEqual([0, 0]);
+    expect(
+      await page.locator('[data-panel]').evaluate((el) => [el.scrollTop, el.scrollHeight - el.clientHeight]),
+    ).toEqual([0, 0]);
   }
   expect(errors).toEqual([]);
 });
@@ -322,11 +370,21 @@ test('a bulk toolbar sets every layer at once, and one Ctrl+Z puts them all back
   const radios = page.locator('[data-sec="layers"] fieldset.tri input:checked');
   await expect(radios).toHaveCount(14);
   // (The Painter fills its panel again on the next animation frame: the radios are read until they show it.)
-  await expect.poll(() => radios.evaluateAll((els) => els.filter((el) => /** @type {HTMLInputElement} */ (el).checked && /** @type {HTMLInputElement} */ (el).value === 'on').length))
+  await expect
+    .poll(() =>
+      radios.evaluateAll(
+        (els) =>
+          els.filter(
+            (el) => /** @type {HTMLInputElement} */ (el).checked && /** @type {HTMLInputElement} */ (el).value === 'on',
+          ).length,
+      ),
+    )
     .toBe(13); // (Painterly and Watercolor never both Always)
   await expect(page.locator('[data-note]')).toContainText('Layers: All Always');
   await page.keyboard.press('Control+z');
-  await expect.poll(() => radios.evaluateAll((els) => els.every((el) => /** @type {HTMLInputElement} */ (el).value === 'off'))).toBe(true);
+  await expect
+    .poll(() => radios.evaluateAll((els) => els.every((el) => /** @type {HTMLInputElement} */ (el).value === 'off')))
+    .toBe(true);
   await expect(page.locator('[data-cmd="undo"]')).toBeDisabled(); // (one step: nothing more to undo)
   expect(errors).toEqual([]);
 });
@@ -339,7 +397,10 @@ test('a move list’s boxes follow its bulk buttons, undo and redo', async ({ pa
   const list = page.locator('[data-list="knights.moves"]');
   const ticked = list.locator('[data-list-item]:checked');
   // (The scene as the draft keeps it: written a moment after each change.)
-  const moves = () => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-painter-draft') ?? 'null')?.scene.knights.moves?.length ?? null);
+  const moves = () =>
+    page.evaluate(
+      () => JSON.parse(localStorage.getItem('bonfire-painter-draft') ?? 'null')?.scene.knights.moves?.length ?? null,
+    );
   await list.locator('[data-list-show]').click(); // (the scene's own list: every move)
   await expect(ticked).toHaveCount(13);
   for (const key of ['nod', 'stepTouch', 'fistPump']) await list.locator(`[data-list-item="${key}"]`).click();
@@ -366,7 +427,9 @@ test('a move list’s boxes follow its bulk buttons, undo and redo', async ({ pa
   expect(errors).toEqual([]);
 });
 
-test('search: "glow" finds the Glow layer and Edge Glow, says what the shape hides, and keeps its focus', async ({ page }) => {
+test('search: "glow" finds the Glow layer and Edge Glow, says what the shape hides, and keeps its focus', async ({
+  page,
+}) => {
   const errors = watch(page);
   await ready(page);
   await page.keyboard.press('/');
@@ -385,7 +448,11 @@ test('search: "glow" finds the Glow layer and Edge Glow, says what the shape hid
   await expect(page.locator('[data-panel] [data-search-status]')).toContainText('settings found');
   // The scene changes under the search (a redraw of Layers): the box keeps its focus and its
   // query, and Glow's details are found now.
-  await page.evaluate(() => /** @type {HTMLInputElement} */ (document.querySelector('[data-set-group="layers.glow"] input[value="mix"]')).click());
+  await page.evaluate(() =>
+    /** @type {HTMLInputElement} */ (
+      document.querySelector('[data-set-group="layers.glow"] input[value="mix"]')
+    ).click(),
+  );
   await expect(page.locator('[data-row="detail.glowAmt"]')).toBeVisible();
   await expect(box).toBeFocused();
   await expect(box).toHaveValue('glow');

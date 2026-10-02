@@ -40,22 +40,39 @@ export function createSceneScenery(ctx) {
    * (sceneryMerge.js), then readied to show. Not in sceneries till the last step.
    */
   function* sceneryParts(name) {
-    const s = buildScenery(name, sceneryMaterials, () => new THREE.MeshBasicMaterial({ color: ctx.currentRamp[1], fog: false }), { merge: false });
+    const s = buildScenery(
+      name,
+      sceneryMaterials,
+      () => new THREE.MeshBasicMaterial({ color: ctx.currentRamp[1], fog: false }),
+      { merge: false },
+    );
     yield;
     yield* mergeSteps(s.group, s.glows);
-    s.group.traverse((o) => { if (o.isMesh) { o.layers.set(s.glows.includes(o) ? LAYER_GHOST : LAYER_SOLID); scope.trackTree(o); } });
+    s.group.traverse((o) => {
+      if (o.isMesh) {
+        o.layers.set(s.glows.includes(o) ? LAYER_GHOST : LAYER_SOLID);
+        scope.trackTree(o);
+      }
+    });
     s.group.updateMatrixWorld(true);
     // (Its pieces never move: their matrices are made here, once, and not again every frame.
     // The glows keep theirs up to date: a candle's flame stretches.)
-    s.group.traverse((o) => { if (!s.glows.includes(o)) o.matrixAutoUpdate = false; });
+    s.group.traverse((o) => {
+      if (!s.glows.includes(o)) o.matrixAutoUpdate = false;
+    });
     s.solids = [];
-    s.group.traverse((o) => { if (o.isMesh && !s.glows.includes(o)) s.solids.push(o); });
+    s.group.traverse((o) => {
+      if (o.isMesh && !s.glows.includes(o)) s.solids.push(o);
+    });
     s.shown = false;
     sceneries[name] = s;
     delete building[name];
   }
   /** What a place's height map is drawn from: the model's ground and stones, and the place's solids. */
-  const staticsOf = (name) => (name === 'ruins' ? [...ctx.baseStatics, ...ctx.ruinsOnly.filter((o) => o.name.startsWith('Static_'))] : [...ctx.baseStatics, ...sceneryOf(name).solids]);
+  const staticsOf = (name) =>
+    name === 'ruins'
+      ? [...ctx.baseStatics, ...ctx.ruinsOnly.filter((o) => o.name.startsWith('Static_'))]
+      : [...ctx.baseStatics, ...sceneryOf(name).solids];
   /** The height map the fireflies (and the strikes, the mist, the debris) read in a place. */
   function terrainOf(name) {
     terrains[name] ??= createTerrain(renderer, staticsOf(name), { material: terrainMaterial });
@@ -64,11 +81,17 @@ export function createSceneScenery(ctx) {
   /** Move the fire to another place (SCENERIES). `flash`: the change lands like a hit, a flash hiding the cut. */
   function setScenery(name, { flash = false } = {}) {
     if (!ctx.ready || !SCENERIES[name] || name === ctx.sceneryKey) return false;
-    if (flash) { ctx.hit(0.6, { freeze: false }); fire.burst(0.6 * flameShare(ctx.elementKey)); }
+    if (flash) {
+      ctx.hit(0.6, { freeze: false });
+      fire.burst(0.6 * flameShare(ctx.elementKey));
+    }
     // (A place not shown is out of the scene, so no pass walks its pieces; the ruins' own are
     // the model's, hidden.)
     const show = (key, on) => {
-      if (key === 'ruins') { for (const o of ctx.ruinsOnly) o.visible = on; return; }
+      if (key === 'ruins') {
+        for (const o of ctx.ruinsOnly) o.visible = on;
+        return;
+      }
       if (on) scene.add(sceneries[key].group);
       else sceneries[key].group.removeFromParent();
     };
@@ -87,7 +110,8 @@ export function createSceneScenery(ctx) {
     show(name, true);
     // (A place shown again takes the colors its glows would have had at the last flame step,
     // as if they'd been recolored all along while it was hidden.)
-    if (revisit && ctx.flameStep >= 0) ctx.recolorGlows(sceneries[name].glowFrom, sceneries[name].glowTo, ctx.flameStep);
+    if (revisit && ctx.flameStep >= 0)
+      ctx.recolorGlows(sceneries[name].glowFrom, sceneries[name].glowTo, ctx.flameStep);
     ctx.sceneryKey = name;
     // Its lamps take the pool's lights (the rest go dark; the candle's is the ruins' own: see update()).
     const list = sceneries[name]?.lights ?? [];
@@ -96,7 +120,10 @@ export function createSceneScenery(ctx) {
       const d = list[i];
       l.userData.base = d ? d.intensity : 0;
       l.intensity = l.userData.base;
-      if (d) { l.position.copy(d.at); l.distance = d.distance; }
+      if (d) {
+        l.position.copy(d.at);
+        l.distance = d.distance;
+      }
     });
     ctx.liveStatics = staticsOf(name);
     terrainOf(name);
@@ -122,7 +149,12 @@ export function createSceneScenery(ctx) {
       // for them, the page idle meanwhile), then made into its map a few rows at a time. (A
       // visit before that makes its own then, and this one is let go.)
       let steps = null;
-      yield readTerrain(renderer, staticsOf(name), { material: terrainMaterial }).then((s) => { steps = s; }, () => {});
+      yield readTerrain(renderer, staticsOf(name), { material: terrainMaterial }).then(
+        (s) => {
+          steps = s;
+        },
+        () => {},
+      );
       if (!steps || terrains[name]) continue;
       const map = yield* steps;
       terrains[name] ??= map;

@@ -31,7 +31,9 @@ export function createRenderUi(ctx) {
     // (What shows: a preset scene's own where it sets one, marked "· Scene".)
     const shown = ctx.director?.parts?.layers?.view ?? settings;
     const over = ctx.director?.parts?.layers?.over ?? {};
-    const v = Object.fromEntries(RENDER_ROWS.map((r) => [r.id, `${renderText(shown, r.id)}${Object.hasOwn(over, r.id) ? ' · Scene' : ''}`]));
+    const v = Object.fromEntries(
+      RENDER_ROWS.map((r) => [r.id, `${renderText(shown, r.id)}${Object.hasOwn(over, r.id) ? ' · Scene' : ''}`]),
+    );
     const live = ctx.director?.render;
     if (!live) return v;
     const mix = (key) => modeOf(shown[key]) === 'mix';
@@ -58,7 +60,9 @@ export function createRenderUi(ctx) {
       return renderValues();
     },
     reset: {
-      key: '0', label: 'Reset Render Settings', hint: 'To the Defaults',
+      key: '0',
+      label: 'Reset Render Settings',
+      hint: 'To the Defaults',
       run: () => {
         const d = defaults();
         for (const r of RENDER_ROWS) settings[r.id] = d[r.id];

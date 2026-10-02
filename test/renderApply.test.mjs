@@ -11,30 +11,71 @@ const every = (mode, names) => Object.fromEntries(Object.keys(names).map((k) => 
 function fakeFire() {
   const calls = [];
   const fire = { calls };
-  for (const name of ['setRender', 'setPalette', 'setFog', 'setShadows', 'setXray']) fire[name] = (v) => calls.push([name, v]);
+  for (const name of ['setRender', 'setPalette', 'setFog', 'setShadows', 'setXray'])
+    fire[name] = (v) => calls.push([name, v]);
   return fire;
 }
 const SETTINGS = () => ({
-  pixelSize: 4, pixelShift: 'off', dither: 0.08, ditherMatrix: '4', outlines: 'on', palette: 'flame', fewColors: 'off',
-  vignette: 0.85, exposure: 1.45, fog: 'light', shadows: true, flameFps: 12, colorChange: 0.34,
-  xray: 'off', xrayView: null, xrayViews: every(true, XRAY_VIEWS), hitStop: 'on', hitFlash: 'on', debris: 'on', marks: 'on',
+  pixelSize: 4,
+  pixelShift: 'off',
+  dither: 0.08,
+  ditherMatrix: '4',
+  outlines: 'on',
+  palette: 'flame',
+  fewColors: 'off',
+  vignette: 0.85,
+  exposure: 1.45,
+  fog: 'light',
+  shadows: true,
+  flameFps: 12,
+  colorChange: 0.34,
+  xray: 'off',
+  xrayView: null,
+  xrayViews: every(true, XRAY_VIEWS),
+  hitStop: 'on',
+  hitFlash: 'on',
+  debris: 'on',
+  marks: 'on',
   looks: every('mix', LOOKS),
 });
-const LIVE = () => ({ outlines: true, few: null, pixelSize: null, matrix: 4, fog: 'light', hitStop: true, hitFlash: true, debris: true, marks: true, xray: null });
+const LIVE = () => ({
+  outlines: true,
+  few: null,
+  pixelSize: null,
+  matrix: 4,
+  fog: 'light',
+  hitStop: true,
+  hitFlash: true,
+  debris: true,
+  marks: true,
+  xray: null,
+});
 
 /** The keys an object is read for while `fn` runs over it. */
 function readsOf(obj, fn) {
   const keys = new Set();
-  const proxy = new Proxy(obj, { get(t, k) { if (typeof k === 'string') keys.add(k); return t[k]; } });
+  const proxy = new Proxy(obj, {
+    get(t, k) {
+      if (typeof k === 'string') keys.add(k);
+      return t[k];
+    },
+  });
   fn(proxy);
   return keys;
 }
 
 test('renderState reads nothing the early-out doesn’t watch', () => {
   const variants = [
-    [SETTINGS(), null], [SETTINGS(), LIVE()],
-    [{ ...SETTINGS(), palette: [0, 6, 8], fog: 'mix', ditherMatrix: 'mix', xrayView: 'normals' }, { ...LIVE(), few: [0, 5, 7], xray: 'flow' }],
-    [{ ...SETTINGS(), outlines: 'off', hitStop: 'mix' }, { ...LIVE(), outlines: false, pixelSize: 3 }],
+    [SETTINGS(), null],
+    [SETTINGS(), LIVE()],
+    [
+      { ...SETTINGS(), palette: [0, 6, 8], fog: 'mix', ditherMatrix: 'mix', xrayView: 'normals' },
+      { ...LIVE(), few: [0, 5, 7], xray: 'flow' },
+    ],
+    [
+      { ...SETTINGS(), outlines: 'off', hitStop: 'mix' },
+      { ...LIVE(), outlines: false, pixelSize: 3 },
+    ],
   ];
   for (const [s, live] of variants) {
     const fromSettings = readsOf(s, (p) => renderState(p, live));

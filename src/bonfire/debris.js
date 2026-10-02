@@ -30,7 +30,10 @@ export function createDebris({ kind, material, count = 120, reducedMotion = fals
   const vel = new Float32Array(count * 3);
   const points = createPoints(count, material, { vel });
   const g = points.geometry.attributes;
-  const P = g.position.array, C = g.color.array, S = g.size.array, A = g.alpha.array;
+  const P = g.position.array,
+    C = g.color.array,
+    S = g.size.array,
+    A = g.alpha.array;
   const age = new Float32Array(count).fill(1);
   const life = new Float32Array(count).fill(0);
   const landed = new Float32Array(count); // time since the last landing (glints, rest)
@@ -44,9 +47,13 @@ export function createDebris({ kind, material, count = 120, reducedMotion = fals
   return {
     points,
     /** The scenery's height at (x, z). */
-    setGround(fn) { ground = fn; },
+    setGround(fn) {
+      ground = fn;
+    },
     /** [lo, mid, hi, core] as THREE.Colors. */
-    setRamp(colors) { colors.forEach((c, i) => ramp[i].copy(c)); },
+    setRamp(colors) {
+      colors.forEach((c, i) => ramp[i].copy(c));
+    },
     /**
      * Throw `n` bits from (x, y, z), spraying all around, or mostly along `dir` (x, z
      * heading, radians) when given. `power` scales their speed.
@@ -59,7 +66,9 @@ export function createDebris({ kind, material, count = 120, reducedMotion = fals
         const ix = i * 3;
         const a = dir == null ? Math.random() * TAU : dir + (Math.random() - 0.5) * 1.4;
         const s = rand(K.speed) * power;
-        P[ix] = x; P[ix + 1] = y; P[ix + 2] = z;
+        P[ix] = x;
+        P[ix + 1] = y;
+        P[ix + 2] = z;
         vel[ix] = Math.cos(a) * s;
         vel[ix + 1] = rand(K.up) * Math.sqrt(power);
         vel[ix + 2] = Math.sin(a) * s;
@@ -73,21 +82,28 @@ export function createDebris({ kind, material, count = 120, reducedMotion = fals
       if (!live) return;
       let any = false;
       for (let i = 0; i < count; i++) {
-        if (age[i] >= life[i]) { S[i] = 0; vel[i * 3] = vel[i * 3 + 1] = vel[i * 3 + 2] = 0; continue; }
+        if (age[i] >= life[i]) {
+          S[i] = 0;
+          vel[i * 3] = vel[i * 3 + 1] = vel[i * 3 + 2] = 0;
+          continue;
+        }
         any = true;
         age[i] += dt;
         landed[i] += dt;
         const ix = i * 3;
         if (kind === 'lightning') arcJitter(vel, ix, dt, 12, 0.5);
         vel[ix + 1] -= GRAVITY * K.gravity * dt;
-        P[ix] += vel[ix] * dt; P[ix + 1] += vel[ix + 1] * dt; P[ix + 2] += vel[ix + 2] * dt;
+        P[ix] += vel[ix] * dt;
+        P[ix + 1] += vel[ix + 1] * dt;
+        P[ix + 2] += vel[ix + 2] * dt;
         const floor = ground(P[ix], P[ix + 2]) + 0.015;
         if (P[ix + 1] < floor) {
           P[ix + 1] = floor;
           if (vel[ix + 1] < -0.5) landed[i] = 0; // a real landing (not just resting)
           vel[ix + 1] = Math.abs(vel[ix + 1]) * K.bounce;
           if (vel[ix + 1] < 0.12) vel[ix + 1] = 0;
-          vel[ix] *= K.friction; vel[ix + 2] *= K.friction;
+          vel[ix] *= K.friction;
+          vel[ix + 2] *= K.friction;
         }
         const k = Math.min(1, age[i] / life[i]);
         const fade = Math.min(1, (1 - k) * 3);
@@ -95,7 +111,10 @@ export function createDebris({ kind, material, count = 120, reducedMotion = fals
           // Coals cool from the core down to embers, and flicker as they tumble.
           const h = Math.min(2.999, (1 - k) * 3.2);
           const b = Math.floor(h);
-          tmp.copy(ramp[b]).lerp(ramp[Math.min(3, b + 1)], h - b).multiplyScalar(0.8 + 0.2 * Math.sin(age[i] * 31 + i));
+          tmp
+            .copy(ramp[b])
+            .lerp(ramp[Math.min(3, b + 1)], h - b)
+            .multiplyScalar(0.8 + 0.2 * Math.sin(age[i] * 31 + i));
           S[i] = k < 0.35 ? 2 : 1;
         } else if (kind === 'ice') {
           const glint = landed[i] < 0.06;
@@ -105,7 +124,9 @@ export function createDebris({ kind, material, count = 120, reducedMotion = fals
           tmp.copy(ramp[2]).lerp(ramp[3], 0.5).lerp(white, arcHeat(age[i]));
           S[i] = age[i] < 0.06 ? 3 : 1;
         }
-        C[ix] = tmp.r; C[ix + 1] = tmp.g; C[ix + 2] = tmp.b;
+        C[ix] = tmp.r;
+        C[ix + 1] = tmp.g;
+        C[ix + 2] = tmp.b;
         A[i] = fade;
       }
       markDirty(points);

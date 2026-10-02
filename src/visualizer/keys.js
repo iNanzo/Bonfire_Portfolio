@@ -34,7 +34,10 @@ export const KEY_GROUPS = [
     keys: [
       { keys: ['L'], label: 'The next look' },
       { keys: ['M'], label: 'Mirror: In the Mix, Always, Off' },
-      { keys: ['N'], label: 'The next preset scene (on the next downbeat, in a flash; at the drop if a weapon is held for it)' },
+      {
+        keys: ['N'],
+        label: 'The next preset scene (on the next downbeat, in a flash; at the drop if a weapon is held for it)',
+      },
       { keys: ['Shift', 'N'], label: 'Preset Scenes: In the Mix, Always, Off' },
       { keys: ['K'], label: 'The knights dance now (for a phrase), or sit back down' },
       { keys: ['Shift', 'K'], label: 'The knights come or go (on the next drop if one is coming)' },
@@ -45,7 +48,11 @@ export const KEY_GROUPS = [
   {
     title: 'View & Menus',
     keys: [
-      { keys: ['P'], label: 'Render Settings: pixel size, palette, dither, outlines, fog, x-ray (its digits step them, 0 resets them)' },
+      {
+        keys: ['P'],
+        label:
+          'Render Settings: pixel size, palette, dither, outlines, fog, x-ray (its digits step them, 0 resets them)',
+      },
       { keys: ['C'], label: 'Cut to another shot' },
       { keys: ['H'], label: 'Hide or show the controls (Esc shows them again)' },
       { keys: ['F'], label: 'Full screen' },
@@ -64,4 +71,5 @@ export const KEY_GROUPS = [
  * (A row's keys are pressed together; "1 / 2 / 3" is one chip: any of them.)
  * @returns {[string, string][]}
  */
-export const keyList = () => KEY_GROUPS.flatMap((g) => g.keys.map((row) => /** @type {[string, string]} */ ([row.keys.join('+'), row.label])));
+export const keyList = () =>
+  KEY_GROUPS.flatMap((g) => g.keys.map((row) => /** @type {[string, string]} */ ([row.keys.join('+'), row.label])));

@@ -28,7 +28,10 @@ import sharp from 'sharp';
 import fs from 'node:fs';
 
 const argv = process.argv.slice(2);
-const opt = (name, fallback) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : fallback; };
+const opt = (name, fallback) => {
+  const i = argv.indexOf(`--${name}`);
+  return i >= 0 ? argv[i + 1] : fallback;
+};
 const PORT = Number(opt('port', '5173'));
 const OUT = opt('out', '.scratch/knight-shots');
 const TAG = opt('tag', `knight-${PORT}`);
@@ -42,51 +45,77 @@ fs.mkdirSync(OUT, { recursive: true });
 
 /** GPU Chrome on the dev server's site, the knight there at rest (dressed as asked). */
 async function open({ width = 1280, height = 800, hide = true } = {}) {
-  const browser = await chromium.launch({ channel: 'chrome', args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
+  const browser = await chromium.launch({
+    channel: 'chrome',
+    args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],
+  });
   const page = await (await browser.newContext({ viewport: { width, height } })).newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(`console: ${m.text()}`);
+  });
   await page.goto(`http://localhost:${PORT}/`);
   await page.waitForFunction(() => window.__fire?.knights, null, { timeout: 120000 });
   await page.evaluate(() => window.__fire.knights.ready);
-  if (hide) await page.addStyleTag({ content: 'body * { visibility: hidden !important; } .stage, .stage * { visibility: visible !important; }' });
-  await page.evaluate(async ([helmet, style]) => {
-    const k = window.__fire.knights;
-    // (Away when the page opens: here at once, for good.)
-    k.summon(0, { instant: true });
-    k.restLeft = Infinity;
-    if (style) await k.setStyle(style, { instant: true });
-    if (helmet) await k.setHelmet(helmet, { index: 0, instant: true });
-  }, [HELMET, STYLE]);
+  if (hide)
+    await page.addStyleTag({
+      content: 'body * { visibility: hidden !important; } .stage, .stage * { visibility: visible !important; }',
+    });
+  await page.evaluate(
+    async ([helmet, style]) => {
+      const k = window.__fire.knights;
+      // (Away when the page opens: here at once, for good.)
+      k.summon(0, { instant: true });
+      k.restLeft = Infinity;
+      if (style) await k.setStyle(style, { instant: true });
+      if (helmet) await k.setHelmet(helmet, { index: 0, instant: true });
+    },
+    [HELMET, STYLE],
+  );
   await page.waitForTimeout(600);
   return { browser, page, errors };
 }
 /** The scenery `name`, the knight seated at its seat (or the seat pose `pose`). */
 async function seatIn(page, name, pose = null) {
-  await page.evaluate(([name, pose]) => {
-    const F = window.__fire;
-    if (F.scenery !== name) F.setScenery(name);
-    const k = F.debug.knights;
-    if (pose) k.setSeatPose(pose);
-    k.setScenery(name, k.terrain); // (formed at the seat at once, sitting)
-    F.knights.summon(0, { instant: true });
-  }, [name, pose]);
+  await page.evaluate(
+    ([name, pose]) => {
+      const F = window.__fire;
+      if (F.scenery !== name) F.setScenery(name);
+      const k = F.debug.knights;
+      if (pose) k.setSeatPose(pose);
+      k.setScenery(name, k.terrain); // (formed at the seat at once, sitting)
+      F.knights.summon(0, { instant: true });
+    },
+    [name, pose],
+  );
   await page.waitForTimeout(1200);
-  return page.evaluate(() => { const l = window.__fire.knights.list[0]; return { x: l.position.x, y: l.position.y, z: l.position.z, yaw: l.facing }; });
+  return page.evaluate(() => {
+    const l = window.__fire.knights.list[0];
+    return { x: l.position.x, y: l.position.y, z: l.position.z, yaw: l.facing };
+  });
 }
 /** A camera `ahead` m in front of him, `left` m to his left (− right), `up` m high, looking at his middle (or `at` m up). */
 const around = (k, ahead, left, up, at = 0.65) => ({
-  pos: [k.x + Math.sin(k.yaw) * ahead + Math.cos(k.yaw) * left, up, k.z + Math.cos(k.yaw) * ahead - Math.sin(k.yaw) * left],
+  pos: [
+    k.x + Math.sin(k.yaw) * ahead + Math.cos(k.yaw) * left,
+    up,
+    k.z + Math.cos(k.yaw) * ahead - Math.sin(k.yaw) * left,
+  ],
   target: [k.x + Math.sin(k.yaw) * 0.15, at, k.z + Math.cos(k.yaw) * 0.15],
 });
-const look = (page, cam, fov = 36) => page.evaluate(([cam, fov]) => window.__fire.setPose({ ...cam, fov }, { instant: true }), [cam, fov]);
+const look = (page, cam, fov = 36) =>
+  page.evaluate(([cam, fov]) => window.__fire.setPose({ ...cam, fov }, { instant: true }), [cam, fov]);
 /** Part of a screenshot (fractions of its width and height), scaled to `w`×`h` (nearest). */
 async function crop(buf, [u0, v0, u1, v1], w, h) {
   const { width, height } = await sharp(buf).metadata();
-  const left = Math.round(u0 * width), top = Math.round(v0 * height);
-  return sharp(buf).extract({ left, top, width: Math.round((u1 - u0) * width), height: Math.round((v1 - v0) * height) })
-    .resize(w, h, { fit: 'contain', kernel: 'nearest', background: '#000' }).png().toBuffer();
+  const left = Math.round(u0 * width),
+    top = Math.round(v0 * height);
+  return sharp(buf)
+    .extract({ left, top, width: Math.round((u1 - u0) * width), height: Math.round((v1 - v0) * height) })
+    .resize(w, h, { fit: 'contain', kernel: 'nearest', background: '#000' })
+    .png()
+    .toBuffer();
 }
 /** Tiles of one size into a grid, each with its label, written to `file`. */
 async function grid(tiles, cols, file, labels) {
@@ -94,9 +123,20 @@ async function grid(tiles, cols, file, labels) {
   const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const comp = tiles.flatMap((t, i) => [
     { input: t, left: (i % cols) * w, top: Math.floor(i / cols) * h },
-    { input: Buffer.from(`<svg width="${w}" height="20"><rect width="100%" height="20" fill="black" opacity="0.65"/><text x="5" y="14" font-family="monospace" font-size="13" fill="white">${esc(labels[i] ?? '')}</text></svg>`), left: (i % cols) * w, top: Math.floor(i / cols) * h },
+    {
+      input: Buffer.from(
+        `<svg width="${w}" height="20"><rect width="100%" height="20" fill="black" opacity="0.65"/><text x="5" y="14" font-family="monospace" font-size="13" fill="white">${esc(labels[i] ?? '')}</text></svg>`,
+      ),
+      left: (i % cols) * w,
+      top: Math.floor(i / cols) * h,
+    },
   ]);
-  await sharp({ create: { width: w * cols, height: h * Math.ceil(tiles.length / cols), channels: 3, background: '#000' } }).composite(comp).png().toFile(file);
+  await sharp({
+    create: { width: w * cols, height: h * Math.ceil(tiles.length / cols), channels: 3, background: '#000' },
+  })
+    .composite(comp)
+    .png()
+    .toFile(file);
   console.log(`✓ ${file}`);
 }
 /**
@@ -131,11 +171,16 @@ const every = (from, to, step) => Array.from({ length: Math.round((to - from) / 
 // --- seats ---------------------------------------------------------------------------------------
 async function seats() {
   const { browser, page, errors } = await open();
-  const tiles = [], labels = [];
+  const tiles = [],
+    labels = [];
   for (const name of SCENERIES) {
     for (const pose of ['resting', 'watchful']) {
       const k = await seatIn(page, name, pose);
-      for (const [view, cam] of [['his left', around(k, 0.5, 2.0, 0.85)], ['his right', around(k, 1.3, -1.5, 1.0)], ['above', around(k, 1.1, 0.3, 2.7, 0.3)]]) {
+      for (const [view, cam] of [
+        ['his left', around(k, 0.5, 2.0, 0.85)],
+        ['his right', around(k, 1.3, -1.5, 1.0)],
+        ['above', around(k, 1.1, 0.3, 2.7, 0.3)],
+      ]) {
         await look(page, cam);
         await page.waitForTimeout(450);
         tiles.push(await crop(await page.screenshot(), [0.2, 0.05, 0.8, 0.95], 380, 380));
@@ -152,26 +197,39 @@ async function seats() {
 // --- gestures and moves ------------------------------------------------------------------------------
 async function sheet(kind) {
   const { browser, page, errors } = await open();
-  const acts = kind === 'gestures'
-    ? ['praise', 'wave', 'bow', 'point', 'beckon', 'shrug', 'hurrah', 'joy']
-    : ['defaultDance', 'swayArms', 'fistPump', 'headbang'];
+  const acts =
+    kind === 'gestures'
+      ? ['praise', 'wave', 'bow', 'point', 'beckon', 'shrug', 'hurrah', 'joy']
+      : ['defaultDance', 'swayArms', 'fistPump', 'headbang'];
   const times = kind === 'gestures' ? [300, 600, 900, 1200, 1500] : [250, 750, 1250, 1750, 2250, 2750];
   for (const name of SCENERIES) {
     const k = await seatIn(page, name, 'resting');
-    if (kind === 'gestures' && STANDING) { await page.evaluate(() => window.__fire.knights.stand(0)); await page.waitForTimeout(1800); }
+    if (kind === 'gestures' && STANDING) {
+      await page.evaluate(() => window.__fire.knights.stand(0));
+      await page.waitForTimeout(1800);
+    }
     // (From in front of him and a little to his left, his seat and what stands by it in view.)
     await look(page, around(k, 2.6, 0.9, 1.3, 0.85), 40);
     await page.waitForTimeout(500);
-    const tiles = [], labels = [];
+    const tiles = [],
+      labels = [];
     for (const act of acts) {
-      const go = kind === 'gestures' ? `window.__fire.knights.gesture('${act}', { index: 0 })` : `window.__fire.knights.dance(0, { move: '${act}', energy: 1, seated: true })`;
-      tiles.push(...await realTime(page, go, times, (buf) => crop(buf, [0.22, 0, 0.78, 1], 230, 330)));
+      const go =
+        kind === 'gestures'
+          ? `window.__fire.knights.gesture('${act}', { index: 0 })`
+          : `window.__fire.knights.dance(0, { move: '${act}', energy: 1, seated: true })`;
+      tiles.push(...(await realTime(page, go, times, (buf) => crop(buf, [0.22, 0, 0.78, 1], 230, 330))));
       labels.push(...times.map((t) => `${act} ${t} ms`));
       if (kind === 'moves') await page.evaluate(() => window.__fire.knights.sit(0));
       await page.waitForTimeout(kind === 'gestures' ? 1100 : 900);
     }
     if (kind === 'gestures' && STANDING) await page.evaluate(() => window.__fire.knights.sit(0));
-    await grid(tiles, times.length, `${OUT}/${TAG}-${kind}${kind === 'gestures' && STANDING ? '-standing' : ''}-${name}.png`, labels);
+    await grid(
+      tiles,
+      times.length,
+      `${OUT}/${TAG}-${kind}${kind === 'gestures' && STANDING ? '-standing' : ''}-${name}.png`,
+      labels,
+    );
   }
   if (errors.length) console.log(errors.join('\n'));
   await browser.close();
@@ -184,8 +242,14 @@ async function seq() {
     praise: { act: `window.__fire.knights.gesture('praise', { index: 0 })`, at: every(0, 2400, 120) },
     shrug: { act: `window.__fire.knights.gesture('shrug', { index: 0 })`, at: every(0, 1680, 120) },
     hurrah: { act: `window.__fire.knights.gesture('hurrah', { index: 0 })`, at: every(0, 1800, 120) },
-    'standing-praise': { act: `(() => { const k = window.__fire.knights; k.stand(0); setTimeout(() => k.gesture('praise', { index: 0 }), 1500); })()`, at: every(1500, 3900, 120) },
-    sitstand: { act: `(() => { const k = window.__fire.knights; k.stand(0); setTimeout(() => k.sit(0), 1700); })()`, at: every(0, 3360, 120) },
+    'standing-praise': {
+      act: `(() => { const k = window.__fire.knights; k.stand(0); setTimeout(() => k.gesture('praise', { index: 0 }), 1500); })()`,
+      at: every(1500, 3900, 120),
+    },
+    sitstand: {
+      act: `(() => { const k = window.__fire.knights; k.stand(0); setTimeout(() => k.sit(0), 1700); })()`,
+      at: every(0, 3360, 120),
+    },
     dance: { act: `window.__fire.knights.gesture('dance', { index: 0 })`, at: every(0, 7200, 240) },
   };
   for (const name of SCENERIES) {
@@ -198,7 +262,12 @@ async function seq() {
     for (const [nm, s] of Object.entries(SEQS).filter(([nm]) => !SEQ_NAMES || SEQ_NAMES.includes(nm))) {
       const when = [];
       const tiles = await realTime(page, s.act, s.at, (buf) => crop(buf, region, 380, 240), when);
-      await grid(tiles, 10, `${OUT}/${TAG}-seq-${name}-${nm}.png`, when.map((t) => `${name} ${nm} ${t} ms`));
+      await grid(
+        tiles,
+        10,
+        `${OUT}/${TAG}-seq-${name}-${nm}.png`,
+        when.map((t) => `${name} ${nm} ${t} ms`),
+      );
       await page.waitForTimeout(1500);
       await page.evaluate(() => window.__fire.knights.sit(0));
       await page.waitForTimeout(1600);
@@ -210,7 +279,11 @@ async function seq() {
 
 // --- the home view, as a visitor sees it ---------------------------------------------------------------
 async function home() {
-  for (const [w, h] of [[1920, 1080], [1280, 800], [390, 844]]) {
+  for (const [w, h] of [
+    [1920, 1080],
+    [1280, 800],
+    [390, 844],
+  ]) {
     const { browser, page, errors } = await open({ width: w, height: h, hide: false });
     const tiles = [];
     for (const name of SCENERIES) {
@@ -218,11 +291,25 @@ async function home() {
       await page.evaluate(() => window.__fire.setView('home', { instant: true }));
       await page.waitForTimeout(1200);
       const buf = await page.screenshot();
-      tiles.push(await sharp(buf).resize(w > 1000 ? 640 : 390, null, { kernel: 'nearest' }).png().toBuffer());
+      tiles.push(
+        await sharp(buf)
+          .resize(w > 1000 ? 640 : 390, null, { kernel: 'nearest' })
+          .png()
+          .toBuffer(),
+      );
     }
     // (Each the same size: the phone's top half, the rest whole.)
-    const sized = await Promise.all(tiles.map((t) => (w > 1000 ? t : sharp(t).extract({ left: 0, top: 0, width: 390, height: 460 }).png().toBuffer())));
-    await grid(sized, w > 1000 ? 3 : 5, `${OUT}/${TAG}-home-${w}.png`, SCENERIES.map((n) => `${n} ${w}×${h}`));
+    const sized = await Promise.all(
+      tiles.map((t) =>
+        w > 1000 ? t : sharp(t).extract({ left: 0, top: 0, width: 390, height: 460 }).png().toBuffer(),
+      ),
+    );
+    await grid(
+      sized,
+      w > 1000 ? 3 : 5,
+      `${OUT}/${TAG}-home-${w}.png`,
+      SCENERIES.map((n) => `${n} ${w}×${h}`),
+    );
     if (errors.length) console.log(errors.join('\n'));
     await browser.close();
   }

@@ -15,12 +15,14 @@ const SLACK_MS = 1;
  * @returns {{ readonly maxFps: number, setMaxFps(fps: number): void, due(ms: number): boolean }}
  */
 export function createFrameGate() {
-  let maxFps = 0;   // 0: no cap (every frame is drawn)
+  let maxFps = 0; // 0: no cap (every frame is drawn)
   let interval = 0; // ms between draws
-  let owed = 0;     // ms since the last draw was due (what it was late by carries over; early, it owes nothing)
+  let owed = 0; // ms since the last draw was due (what it was late by carries over; early, it owes nothing)
   let fresh = true; // (the next frame draws, and the cadence starts from it)
   return {
-    get maxFps() { return maxFps; },
+    get maxFps() {
+      return maxFps;
+    },
     /** Draw at most `fps` frames a second (0, or anything not above 0: every frame). The next frame draws. */
     setMaxFps(fps) {
       maxFps = Number.isFinite(fps) && fps > 0 ? fps : 0;
@@ -30,7 +32,11 @@ export function createFrameGate() {
     /** An animation frame, `ms` after the last one: true if it's to be drawn. */
     due(ms) {
       if (!interval) return true;
-      if (fresh) { fresh = false; owed = 0; return true; }
+      if (fresh) {
+        fresh = false;
+        owed = 0;
+        return true;
+      }
       owed += Math.max(0, ms);
       if (owed < interval - SLACK_MS) return false;
       // (Late by a whole interval or more, a stall: the cadence starts over from here.)

@@ -42,8 +42,12 @@ function memoryStorage() {
   const m = new Map();
   return {
     getItem: (k) => (m.has(k) ? m.get(k) : null),
-    setItem: (k, v) => { m.set(k, String(v)); },
-    removeItem: (k) => { m.delete(k); },
+    setItem: (k, v) => {
+      m.set(k, String(v));
+    },
+    removeItem: (k) => {
+      m.delete(k);
+    },
   };
 }
 /** localStorage when the page may use it (reading it throws in some private windows). */
@@ -59,7 +63,9 @@ function browserStorage() {
 
 /** The storage said no (full, or blocked). */
 function fullError(cause) {
-  const e = new Error('The browser’s storage is full: delete a scene or two (or their thumbnails), then save again.', { cause });
+  const e = new Error('The browser’s storage is full: delete a scene or two (or their thumbnails), then save again.', {
+    cause,
+  });
   e.name = 'StorageFull';
   return e;
 }
@@ -90,7 +96,7 @@ export function createSceneStore({
   const listeners = new Set();
   const players = new Set();
   const waiting = new Map(); // play() nonces → settle(answered)
-  let pending = null;        // a coalesced remote change: its timer
+  let pending = null; // a coalesced remote change: its timer
   let pendingWhat = 'thumbs'; // …and what changed ('scenes' if anything but thumbnails did)
   let cache = { text: /** @type {string|null} */ (null), order: /** @type {string[]} */ ([]), byId: new Map() };
   /** @type {{ text: string|null, map: Readonly<Record<string, string>> }} */
@@ -104,14 +110,24 @@ export function createSceneStore({
     channel = null;
   }
 
-  const readText = (key) => { try { return store.getItem(key); } catch { return null; } };
+  const readText = (key) => {
+    try {
+      return store.getItem(key);
+    } catch {
+      return null;
+    }
+  };
 
   /** The stored scenes: their order and each by id (normalized; cached while the text is the same). */
   function read() {
     const text = readText(SCENES_KEY);
     if (text === cache.text) return cache;
     let data;
-    try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
     const byId = new Map();
     for (const [id, raw] of Object.entries(isObj(data?.scenes) ? data.scenes : {})) {
       if (!ID_RE.test(id) || !isObj(raw)) continue;
@@ -128,10 +144,16 @@ export function createSceneStore({
     const text = readText(THUMBS_KEY);
     if (text === thumbCache.text) return thumbCache.map;
     let data;
-    try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
     /** @type {Record<string, string>} */
     const out = {};
-    if (isObj(data)) for (const [ref, url] of Object.entries(data)) if (parseRef(ref).source && typeof url === 'string') out[ref] = url;
+    if (isObj(data))
+      for (const [ref, url] of Object.entries(data))
+        if (parseRef(ref).source && typeof url === 'string') out[ref] = url;
     thumbCache = { text, map: Object.freeze(out) };
     return thumbCache.map;
   }
@@ -153,7 +175,13 @@ export function createSceneStore({
     const [oldest] = Object.keys(thumbs);
     if (!oldest) return false;
     delete thumbs[oldest];
-    if (!writeThumbs(thumbs)) { try { store.removeItem(THUMBS_KEY); } catch { /* nothing more to free */ } }
+    if (!writeThumbs(thumbs)) {
+      try {
+        store.removeItem(THUMBS_KEY);
+      } catch {
+        /* nothing more to free */
+      }
+    }
     return true;
   }
 
@@ -174,11 +202,23 @@ export function createSceneStore({
     writeWithRoom(SCENES_KEY, JSON.stringify(data));
   }
 
-  function emit(detail) { for (const fn of [...listeners]) { try { fn(detail); } catch (e) { console.error(e); } } }
+  function emit(detail) {
+    for (const fn of [...listeners]) {
+      try {
+        fn(detail);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
   /** Our own change: tell our listeners now, and the other tabs and stores. */
   function changed(what) {
     emit({ what, remote: false });
-    try { channel?.postMessage({ type: 'change', what }); } catch { /* a closed channel */ }
+    try {
+      channel?.postMessage({ type: 'change', what });
+    } catch {
+      /* a closed channel */
+    }
   }
   /** Someone else's change (coalesced: one call for a burst, 'scenes' if any scene changed). */
   function remoteChange(what) {
@@ -199,9 +239,19 @@ export function createSceneStore({
       const { source, id } = parseRef(data.ref);
       if (!source || !players.size) return;
       let took = false;
-      for (const fn of [...players]) { try { if (fn(sceneRef(source, id)) !== false) took = true; } catch (e) { console.error(e); } }
+      for (const fn of [...players]) {
+        try {
+          if (fn(sceneRef(source, id)) !== false) took = true;
+        } catch (e) {
+          console.error(e);
+        }
+      }
       if (!took) return;
-      try { channel?.postMessage({ type: 'playing', nonce: data.nonce }); } catch { /* closed */ }
+      try {
+        channel?.postMessage({ type: 'playing', nonce: data.nonce });
+      } catch {
+        /* closed */
+      }
     } else if (data.type === 'playing' && typeof data.nonce === 'string') waiting.get(data.nonce)?.(true);
   }
   function onStorage(e) {
@@ -236,7 +286,10 @@ export function createSceneStore({
     save(scene, { fresh = false } = {}) {
       const { order, byId } = read();
       const s = normalizeScene(scene, { voidHex });
-      const given = isObj(scene) && typeof (/** @type {any} */ (scene).id) === 'string' && ID_RE.test(/** @type {any} */ (scene).id);
+      const given =
+        isObj(scene) &&
+        typeof (/** @type {any} */ (scene).id) === 'string' &&
+        ID_RE.test(/** @type {any} */ (scene).id);
       if ((fresh || !given) && byId.has(s.id)) s.id = uniqueSceneId(s.id, new Set(byId.keys()));
       const next = new Map(byId).set(s.id, s);
       writeScenes(order.includes(s.id) ? order : [...order, s.id], next);
@@ -249,9 +302,15 @@ export function createSceneStore({
       if (!byId.has(id)) return;
       const next = new Map(byId);
       next.delete(id);
-      writeScenes(order.filter((x) => x !== id), next);
+      writeScenes(
+        order.filter((x) => x !== id),
+        next,
+      );
       const thumbs = readThumbs();
-      if (Object.hasOwn(thumbs, sceneRef('m', id))) { delete thumbs[sceneRef('m', id)]; writeThumbs(thumbs); }
+      if (Object.hasOwn(thumbs, sceneRef('m', id))) {
+        delete thumbs[sceneRef('m', id)];
+        writeThumbs(thumbs);
+      }
       changed('scenes');
     },
     /** Put the scenes in this order (ids left out keep theirs, after); throws like save(). @param {string[]} ids */
@@ -281,7 +340,13 @@ export function createSceneStore({
      * @param {string} dataUrl
      */
     setThumb(ref, dataUrl) {
-      if (!parseRef(ref).source || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/') || dataUrl.length > THUMB_MAX) return false;
+      if (
+        !parseRef(ref).source ||
+        typeof dataUrl !== 'string' ||
+        !dataUrl.startsWith('data:image/') ||
+        dataUrl.length > THUMB_MAX
+      )
+        return false;
       const thumbs = readThumbs();
       delete thumbs[ref];
       thumbs[ref] = dataUrl;
@@ -318,10 +383,18 @@ export function createSceneStore({
       if (!source || !channel) return Promise.resolve(false);
       const nonce = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
       return new Promise((resolve) => {
-        const settle = (answered) => { clearTimeout(timer); waiting.delete(nonce); resolve(answered); };
+        const settle = (answered) => {
+          clearTimeout(timer);
+          waiting.delete(nonce);
+          resolve(answered);
+        };
         const timer = setTimeout(() => settle(false), answerMs);
         waiting.set(nonce, settle);
-        try { channel.postMessage({ type: 'play', ref: sceneRef(source, id), nonce }); } catch { settle(false); }
+        try {
+          channel.postMessage({ type: 'play', ref: sceneRef(source, id), nonce });
+        } catch {
+          settle(false);
+        }
       });
     },
     /**
@@ -340,7 +413,11 @@ export function createSceneStore({
       for (const settle of [...waiting.values()]) settle(false);
       channel?.removeEventListener?.('message', onMessage);
       events?.removeEventListener?.('storage', onStorage);
-      try { channel?.close(); } catch { /* already closed */ }
+      try {
+        channel?.close();
+      } catch {
+        /* already closed */
+      }
       channel = null;
       listeners.clear();
       players.clear();

@@ -34,8 +34,12 @@ export function createChill({ material, field, origin, count = 1400, reducedMoti
     const i = next;
     next = (next + 1) % count;
     const ix = i * 3;
-    P[ix] = x; P[ix + 1] = y; P[ix + 2] = z;
-    vel[ix] = vx; vel[ix + 1] = vy; vel[ix + 2] = vz;
+    P[ix] = x;
+    P[ix + 1] = y;
+    P[ix + 2] = z;
+    vel[ix] = vx;
+    vel[ix + 1] = vy;
+    vel[ix + 2] = vz;
     turb[ix] = turb[ix + 1] = turb[ix + 2] = 0;
     age[i] = 0;
     life[i] = span * (0.8 + Math.random() * 0.4);
@@ -49,8 +53,16 @@ export function createChill({ material, field, origin, count = 1400, reducedMoti
       const a = Math.random() * Math.PI * 2;
       const r = Math.sqrt(Math.random()) * radius;
       const s = speed * (0.45 + Math.random() * 0.75);
-      emit(x + Math.cos(a) * r, ground(x, z) + 0.03 + Math.random() * 0.14, z + Math.sin(a) * r,
-        Math.cos(a) * s, rise * (0.3 + Math.random()), Math.sin(a) * s, span, alpha);
+      emit(
+        x + Math.cos(a) * r,
+        ground(x, z) + 0.03 + Math.random() * 0.14,
+        z + Math.sin(a) * r,
+        Math.cos(a) * s,
+        rise * (0.3 + Math.random()),
+        Math.sin(a) * s,
+        span,
+        alpha,
+      );
     }
   }
 
@@ -58,7 +70,10 @@ export function createChill({ material, field, origin, count = 1400, reducedMoti
     frame++;
     let any = false;
     for (let i = 0; i < count; i++) {
-      if (age[i] >= life[i]) { Sz[i] = 0; continue; }
+      if (age[i] >= life[i]) {
+        Sz[i] = 0;
+        continue;
+      }
       any = true;
       age[i] += dt;
       const ix = i * 3;
@@ -66,7 +81,9 @@ export function createChill({ material, field, origin, count = 1400, reducedMoti
       // Curl turbulence, refreshed every third frame (it's the costly part).
       if ((i + frame) % 3 === 0) {
         const c = field.fire(P[ix] - origin.x, P[ix + 1] * 0.6, P[ix + 2] - origin.z, t * 0.4);
-        turb[ix] = c.x * 0.22; turb[ix + 1] = c.y * 0.06; turb[ix + 2] = c.z * 0.22;
+        turb[ix] = c.x * 0.22;
+        turb[ix + 1] = c.y * 0.06;
+        turb[ix + 2] = c.z * 0.22;
       }
       const drag = Math.exp(-dt * 1.5);
       vel[ix] *= drag;
@@ -76,9 +93,14 @@ export function createChill({ material, field, origin, count = 1400, reducedMoti
       P[ix + 1] += (vel[ix + 1] + turb[ix + 1]) * dt;
       P[ix + 2] += (vel[ix + 2] + turb[ix + 2]) * dt;
       const floor = ground(P[ix], P[ix + 2]) + 0.025;
-      if (P[ix + 1] < floor) { P[ix + 1] = floor; vel[ix + 1] = 0; }
+      if (P[ix + 1] < floor) {
+        P[ix + 1] = floor;
+        vel[ix + 1] = 0;
+      }
       const c = cols[tone[i]];
-      Cl[ix] = c.r; Cl[ix + 1] = c.g; Cl[ix + 2] = c.b;
+      Cl[ix] = c.r;
+      Cl[ix + 1] = c.g;
+      Cl[ix + 2] = c.b;
       Sz[i] = 1.6 + k * 1.8;
       A[i] = peak[i] * Math.min(1, age[i] * 5) * (1 - k) ** 1.4;
     }
@@ -92,7 +114,9 @@ export function createChill({ material, field, origin, count = 1400, reducedMoti
     puff,
     step,
     sets: [{ pos: P, vel, n: count, geo: g, maxV: 1.2 }],
-    setGround(fn) { ground = fn; },
+    setGround(fn) {
+      ground = fn;
+    },
     /** Pale mist in the flame's lightest colors. */
     setRamp(hexes) {
       cols[0].set(hexes[2]).lerp(tint.set(hexes[3]), 0.6);

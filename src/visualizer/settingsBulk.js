@@ -22,7 +22,8 @@ export function setPath(obj, key, value) {
 }
 /** Every value of a plan into the settings (a copy of each object, so `before` stays as it was). */
 export function applyValues(settings, values) {
-  for (const [key, v] of Object.entries(values)) setPath(settings, key, v && typeof v === 'object' ? structuredClone(v) : v);
+  for (const [key, v] of Object.entries(values))
+    setPath(settings, key, v && typeof v === 'object' ? structuredClone(v) : v);
 }
 /** The settings a plan touches, by their top key (what onChange is told: 'looks' for 'looks.echo'). */
 export const topKeys = (values) => [...new Set(Object.keys(values).map((k) => k.split('.')[0]))];
@@ -36,8 +37,10 @@ export const topKeys = (values) => [...new Set(Object.keys(values).map((k) => k.
  */
 export function groupItems(group, settings = defaults()) {
   const noAlways = (id) => (NO_ALWAYS[group] ?? []).includes(id);
-  if (Object.hasOwn(GRID_KEYS, group)) return GRID_KEYS[group].map((key) => ({ key, noAlways: noAlways(key.split('.').pop()) }));
-  if (GROUPS.includes(group)) return Object.keys(settings[group] ?? {}).map((id) => ({ key: `${group}.${id}`, noAlways: false }));
+  if (Object.hasOwn(GRID_KEYS, group))
+    return GRID_KEYS[group].map((key) => ({ key, noAlways: noAlways(key.split('.').pop()) }));
+  if (GROUPS.includes(group))
+    return Object.keys(settings[group] ?? {}).map((id) => ({ key: `${group}.${id}`, noAlways: false }));
   return [];
 }
 
@@ -67,10 +70,12 @@ export function bulkPlan(group, action, settings, { rand = Math.random } = {}) {
  */
 export function sectionKeys(section, settings = defaults()) {
   if (section === 'titles') return [];
-  return entriesFor('live').filter((e) => e.section === section).flatMap((e) => {
-    const items = groupItems(e.live, settings);
-    return items.length ? items.map((it) => it.key) : [e.live];
-  });
+  return entriesFor('live')
+    .filter((e) => e.section === section)
+    .flatMap((e) => {
+      const items = groupItems(e.live, settings);
+      return items.length ? items.map((it) => it.key) : [e.live];
+    });
 }
 
 /**
@@ -88,7 +93,8 @@ export function sectionPlan(section, settings) {
 }
 
 /** Whether a plan changes anything (each value compared as it would be saved). */
-export const changes = (plan) => Object.entries(plan.values).some(([k, v]) => JSON.stringify(v) !== JSON.stringify(plan.before[k]));
+export const changes = (plan) =>
+  Object.entries(plan.values).some(([k, v]) => JSON.stringify(v) !== JSON.stringify(plan.before[k]));
 
 /**
  * Many settings changed as one, the way the dialog does it. (No DOM: it's handed how to show
@@ -111,17 +117,24 @@ export function createBatch({ settings, onChange, refresh, flush, toast }) {
     refresh(all);
     onChange(tops);
     if (now) flush();
-    toast(what, undo && (() => {
-      undo();
-      refresh(all);
-      onChange(tops);
-      flush();
-      toast(`${what}: undone`);
-    }));
+    toast(
+      what,
+      undo &&
+        (() => {
+          undo();
+          refresh(all);
+          onChange(tops);
+          flush();
+          toast(`${what}: undone`);
+        }),
+    );
   }
   /** @param {Plan} plan @param {string} what */
   function commit(plan, what) {
-    if (!changes(plan)) { toast(`${what}: already so`); return false; }
+    if (!changes(plan)) {
+      toast(`${what}: already so`);
+      return false;
+    }
     applyValues(settings, plan.values);
     changed(what, topKeys(plan.values), () => applyValues(settings, plan.before));
     return true;

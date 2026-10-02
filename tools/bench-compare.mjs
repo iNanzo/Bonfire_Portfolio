@@ -13,7 +13,10 @@ import { join } from 'node:path';
 
 const args = process.argv.slice(2);
 const flag = (k) => args.includes(`--${k}`);
-const opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
+const opt = (k, d) => {
+  const i = args.indexOf(`--${k}`);
+  return i >= 0 ? args[i + 1] : d;
+};
 const dir = opt('dir', 'test-results/perf');
 const sides = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--dir');
 if (sides.length !== 2) {
@@ -74,12 +77,18 @@ function windowsOf(runs) {
         if (sc.gpu?.rebuilds?.length) {
           const last = sc.gpu.rebuilds.at(-1);
           const rows = {
-            'programs at start': sc.gpu.start?.programs, 'programs after 6': last.programs,
-            'textures at start': sc.gpu.start?.textures, 'textures after 6': last.textures,
-            'contexts alive after 6': last.contexts, 'heap MB after 6': last.heapMB,
+            'programs at start': sc.gpu.start?.programs,
+            'programs after 6': last.programs,
+            'textures at start': sc.gpu.start?.textures,
+            'textures after 6': last.textures,
+            'contexts alive after 6': last.contexts,
+            'heap MB after 6': last.heapMB,
             'rebuild long ms (median)': median(sc.gpu.rebuilds.map((r) => r.longMs)),
           };
-          for (const [k, v] of Object.entries(rows)) { if (!gpu.has(k)) gpu.set(k, []); gpu.get(k).push(v); }
+          for (const [k, v] of Object.entries(rows)) {
+            if (!gpu.has(k)) gpu.set(k, []);
+            gpu.get(k).push(v);
+          }
         }
       }
     }
@@ -90,14 +99,18 @@ function windowsOf(runs) {
 const [before, after] = sides.map(load);
 const A = windowsOf(before);
 const B = windowsOf(after);
-const fmt = (v) => (v == null ? '—' : Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
+const fmt = (v) =>
+  v == null ? '—' : Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2);
 function change(a, b, higherBetter) {
   if (a == null || b == null) return ['', ''];
   if (a === b) return ['0%', '='];
   const pct = a === 0 ? (b > 0 ? Infinity : -Infinity) : ((b - a) / Math.abs(a)) * 100;
   const better = higherBetter ? b > a : b < a;
   const small = Math.abs(pct) < 3;
-  return [`${pct > 0 ? '+' : ''}${Number.isFinite(pct) ? pct.toFixed(1) : pct > 0 ? '+∞' : '−∞'}%`, small ? '≈' : better ? 'better' : 'worse'];
+  return [
+    `${pct > 0 ? '+' : ''}${Number.isFinite(pct) ? pct.toFixed(1) : pct > 0 ? '+∞' : '−∞'}%`,
+    small ? '≈' : better ? 'better' : 'worse',
+  ];
 }
 
 const rows = [];
@@ -119,14 +132,21 @@ for (const k of [...new Set([...A.gpu.keys(), ...B.gpu.keys()])]) {
 }
 
 const head = ['scenario', 'metric', sides[0], sides[1], 'change', ''];
-const meta = (runs) => runs.map((r) => `${r.label} (${r.sha ?? '?'}, ${r.mode}, CPU ×${r.throttle}, ${r.rounds.length} round${r.rounds.length === 1 ? '' : 's'})`).join(' + ');
+const meta = (runs) =>
+  runs
+    .map(
+      (r) =>
+        `${r.label} (${r.sha ?? '?'}, ${r.mode}, CPU ×${r.throttle}, ${r.rounds.length} round${r.rounds.length === 1 ? '' : 's'})`,
+    )
+    .join(' + ');
 console.log(`before: ${meta(before)}\nafter:  ${meta(after)}\n`);
 if (flag('md')) {
   console.log(`| ${head.join(' | ')} |\n|${head.map(() => '---').join('|')}|`);
   for (const r of rows) console.log(`| ${r.join(' | ')} |`);
 } else {
   const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => String(r[i]).length)));
-  const line = (r) => r.map((c, i) => (i >= 2 && i <= 4 ? String(c).padStart(widths[i]) : String(c).padEnd(widths[i]))).join('  ');
+  const line = (r) =>
+    r.map((c, i) => (i >= 2 && i <= 4 ? String(c).padStart(widths[i]) : String(c).padEnd(widths[i]))).join('  ');
   console.log(line(head));
   let last = null;
   for (const r of rows) {

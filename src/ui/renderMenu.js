@@ -45,12 +45,48 @@ import { describedTip } from './describedTip.js';
  * setting, so a group of its own).
  */
 export const RENDER_ROWS = /** @type {RenderRow[]} */ ([
-  { key: '1', id: 'pixel', label: 'Pixel Size', group: 'Picture', hint: 'How many screen pixels make one of the picture’s: bigger is chunkier, and lighter on the graphics card.' },
-  { key: '2', id: 'palette', label: 'Palette', group: 'Picture', hint: 'The colors the picture is snapped to: the fire’s own, or a fixed set of three or four.' },
-  { key: '3', id: 'dither', label: 'Dither', group: 'Picture', hint: 'How strongly an ordered pattern blends neighboring colors where a smooth gradient would be.' },
-  { key: '4', id: 'matrix', label: 'Dither Pattern', group: 'Picture', hint: 'The pattern’s size: 4×4 reads coarser, 8×8 finer.' },
-  { key: '5', id: 'outlines', label: 'Outlines', group: 'Picture', hint: 'A dark line wherever a surface’s distance, or the way it faces, jumps.' },
-  { key: '6', id: 'interaction', label: 'Cursor', group: 'Interaction', hint: 'How moving the pointer through the fire stirs it. Remembered on this device.' },
+  {
+    key: '1',
+    id: 'pixel',
+    label: 'Pixel Size',
+    group: 'Picture',
+    hint: 'How many screen pixels make one of the picture’s: bigger is chunkier, and lighter on the graphics card.',
+  },
+  {
+    key: '2',
+    id: 'palette',
+    label: 'Palette',
+    group: 'Picture',
+    hint: 'The colors the picture is snapped to: the fire’s own, or a fixed set of three or four.',
+  },
+  {
+    key: '3',
+    id: 'dither',
+    label: 'Dither',
+    group: 'Picture',
+    hint: 'How strongly an ordered pattern blends neighboring colors where a smooth gradient would be.',
+  },
+  {
+    key: '4',
+    id: 'matrix',
+    label: 'Dither Pattern',
+    group: 'Picture',
+    hint: 'The pattern’s size: 4×4 reads coarser, 8×8 finer.',
+  },
+  {
+    key: '5',
+    id: 'outlines',
+    label: 'Outlines',
+    group: 'Picture',
+    hint: 'A dark line wherever a surface’s distance, or the way it faces, jumps.',
+  },
+  {
+    key: '6',
+    id: 'interaction',
+    label: 'Cursor',
+    group: 'Interaction',
+    hint: 'How moving the pointer through the fire stirs it. Remembered on this device.',
+  },
 ]);
 
 /** What a value shows as when `read()` doesn't have it (yet). */
@@ -102,14 +138,16 @@ export function rowsHtml(rows, values = {}, { id = 'render-rows' } = {}) {
     else runs.push({ group: r.group, rows: [r] });
   }
   let n = 0;
-  return runs.map((run, i) => {
-    const html = run.rows.map((r) => rowHtml(r, values, `${id}-tip${n++}`)).join('');
-    if (!run.group) return html;
-    return `
+  return runs
+    .map((run, i) => {
+      const html = run.rows.map((r) => rowHtml(r, values, `${id}-tip${n++}`)).join('');
+      if (!run.group) return html;
+      return `
     <div class="render-group" role="group" aria-labelledby="${esc(id)}-g${i}">
       <p class="render-group-title" id="${esc(id)}-g${i}">${esc(run.group)}</p>${html}
     </div>`;
-  }).join('');
+    })
+    .join('');
 }
 
 /**
@@ -133,8 +171,17 @@ export function rowsHtml(rows, values = {}, { id = 'render-rows' } = {}) {
  * @param {number} [o.poll]  ms between refreshes while it's open and on screen (0: only on picks)
  */
 export function createRenderMenu({
-  read, pick, rows = RENDER_ROWS, title = 'Render Settings', toggleKey = 'P', collapse = 'all',
-  reset = null, className = '', onSound = () => {}, onToggle = () => {}, poll = 250,
+  read,
+  pick,
+  rows = RENDER_ROWS,
+  title = 'Render Settings',
+  toggleKey = 'P',
+  collapse = 'all',
+  reset = null,
+  className = '',
+  onSound = () => {},
+  onToggle = () => {},
+  poll = 250,
 }) {
   const el = document.createElement('section');
   el.className = `render-menu ${className}`.trim();
@@ -149,11 +196,15 @@ export function createRenderMenu({
     ${collapse === 'all' ? `<button class="render-menu-close" type="button" aria-label="Close ${esc(title)}" data-tip="Close (${esc(toggleKey)} or Esc)" aria-keyshortcuts="${esc(toggleKey)} Escape" data-render-close>✕</button>` : ''}
     <div class="render-menu-rows" id="${bodyId}" data-render-rows${grouped ? '' : ` role="group" aria-labelledby="${bodyId}-title"`}>
       ${rowsHtml(rows, {}, { id: bodyId })}
-      ${reset ? `
+      ${
+        reset
+          ? `
       <button class="render-row render-reset" type="button" data-render-reset${reset.key ? ` aria-keyshortcuts="${esc(reset.key)}"` : ''}>
         <span class="cursor" aria-hidden="true"></span>${reset.key ? `<kbd>${esc(reset.key)}</kbd>` : '<span></span>'}<span class="render-row-label">${esc(reset.label)}</span>
         <b class="render-row-value">${esc(reset.hint ?? '')}</b>
-      </button>` : ''}
+      </button>`
+          : ''
+      }
     </div>`;
   const head = /** @type {HTMLButtonElement} */ (el.querySelector('[data-render-head]'));
   const body = /** @type {HTMLElement} */ (el.querySelector('[data-render-rows]'));
@@ -168,11 +219,12 @@ export function createRenderMenu({
 
   /** Write the values in (text only, so focus stays where it is). */
   function refresh(values = read()) {
-    if (values) for (const r of rows) {
-      const v = rowEl(r.id)?.querySelector('[data-render-value]');
-      const text = String(values[r.id] ?? NO_VALUE);
-      if (v && v.textContent !== text) v.textContent = text;
-    }
+    if (values)
+      for (const r of rows) {
+        const v = rowEl(r.id)?.querySelector('[data-render-value]');
+        const text = String(values[r.id] ?? NO_VALUE);
+        if (v && v.textContent !== text) v.textContent = text;
+      }
     if (resetBtn) resetBtn.disabled = !!reset.disabled?.();
   }
   const onScreen = () => el.isConnected && el.getClientRects().length > 0;
@@ -185,7 +237,10 @@ export function createRenderMenu({
       shown().hidden = false;
       head.setAttribute('aria-expanded', 'true');
       refresh();
-      if (poll) timer = window.setInterval(() => { if (onScreen()) refresh(); }, poll);
+      if (poll)
+        timer = window.setInterval(() => {
+          if (onScreen()) refresh();
+        }, poll);
       if (!quiet) onSound('open');
       onToggle(true);
     }
@@ -215,7 +270,7 @@ export function createRenderMenu({
     onSound('move');
     const row = rowEl(id);
     row?.classList.remove('is-hit');
-    void (/** @type {HTMLElement} */ (row))?.offsetWidth; // (restart the flash)
+    void (/** @type {HTMLElement} */ (row)?.offsetWidth); // (restart the flash)
     row?.classList.add('is-hit');
   }
   function doReset() {
@@ -227,8 +282,14 @@ export function createRenderMenu({
 
   el.addEventListener('click', (e) => {
     const t = /** @type {Element} */ (e.target);
-    if (t.closest('[data-render-head]')) { toggle(); return; }
-    if (t.closest('[data-render-close]')) { close(); return; }
+    if (t.closest('[data-render-head]')) {
+      toggle();
+      return;
+    }
+    if (t.closest('[data-render-close]')) {
+      close();
+      return;
+    }
     const row = /** @type {HTMLElement | null} */ (t.closest('[data-render-row]'));
     if (row) step(row.dataset.renderRow, e.shiftKey ? -1 : 1);
     else if (t.closest('[data-render-reset]')) doReset();
@@ -250,7 +311,8 @@ export function createRenderMenu({
     if (!t.closest('.render-row') || !['ArrowUp', 'ArrowDown', 'w', 's', 'W', 'S'].includes(e.key)) return;
     const all = /** @type {HTMLElement[]} */ ([...body.querySelectorAll('.render-row:not(:disabled)')]);
     const by = e.key === 'ArrowUp' || e.key.toLowerCase() === 'w' ? -1 : 1;
-    const next = all[(all.indexOf(/** @type {HTMLElement} */ (t.closest('.render-row'))) + by + all.length) % all.length];
+    const next =
+      all[(all.indexOf(/** @type {HTMLElement} */ (t.closest('.render-row'))) + by + all.length) % all.length];
     e.preventDefault();
     e.stopPropagation();
     next?.focus();
@@ -262,7 +324,9 @@ export function createRenderMenu({
     open,
     close,
     toggle,
-    get isOpen() { return isOpen; },
+    get isOpen() {
+      return isOpen;
+    },
     refresh,
     /**
      * The menu's keys from a page-wide keydown: its toggle key opens or closes it; open, a
@@ -272,12 +336,21 @@ export function createRenderMenu({
      */
     handleKey(e) {
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return false;
-      if (e.key.toLowerCase() === toggleKey.toLowerCase()) { toggle(); return true; }
+      if (e.key.toLowerCase() === toggleKey.toLowerCase()) {
+        toggle();
+        return true;
+      }
       if (!isOpen) return false;
       const key = keyOf(e);
       const row = rowForKey(rows, key);
-      if (row) { step(row.id); return true; }
-      if (reset?.key && key === reset.key) { doReset(); return true; }
+      if (row) {
+        step(row.id);
+        return true;
+      }
+      if (reset?.key && key === reset.key) {
+        doReset();
+        return true;
+      }
       return false;
     },
   };

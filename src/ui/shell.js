@@ -16,7 +16,9 @@ const PRESSED = new Set(['range', 'checkbox', 'radio', 'button', 'submit', 'rese
  * @param {EventTarget | null | undefined} el
  */
 export function typing(el) {
-  const field = /** @type {any} */ (el)?.closest?.('input, select, textarea, [contenteditable]:not([contenteditable="false"])');
+  const field = /** @type {any} */ (el)?.closest?.(
+    'input, select, textarea, [contenteditable]:not([contenteditable="false"])',
+  );
   if (!field) return false;
   return !(field.tagName === 'INPUT' && PRESSED.has(String(field.type).toLowerCase()));
 }
@@ -29,7 +31,8 @@ export function toggleFullscreen(el = document.documentElement) {
 }
 
 /** What a page says when the bonfire can't start. */
-export const NO_WEBGL = 'This browser couldn’t start WebGL, so the bonfire can’t render here. Try Chrome or Edge with hardware acceleration on.';
+export const NO_WEBGL =
+  'This browser couldn’t start WebGL, so the bonfire can’t render here. Try Chrome or Edge with hardware acceleration on.';
 /**
  * The scene couldn't start (no WebGL): the page is marked `no-webgl` (each app's CSS hides
  * what needs the scene by it), `el` (the page's error line, if it has one) says so, and why

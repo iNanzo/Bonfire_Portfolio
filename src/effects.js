@@ -27,7 +27,10 @@ export function resolveEffects(saved) {
 export const effects = resolveEffects(content.effects);
 
 const listeners = new Set();
-export const onEffects = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
+export const onEffects = (fn) => {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+};
 
 /** Replace the live effects (preview only). `prev` is handed to subscribers. */
 export function setEffects(next) {

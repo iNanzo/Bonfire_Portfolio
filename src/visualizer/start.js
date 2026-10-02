@@ -32,9 +32,13 @@ export function createStart(ctx) {
     if (file) ctx.useSource('file', { file });
   });
   // Drop a file anywhere.
-  window.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.items ?? [])].some((i) => i.kind === 'file')) e.preventDefault(); });
+  window.addEventListener('dragover', (e) => {
+    if ([...(e.dataTransfer?.items ?? [])].some((i) => i.kind === 'file')) e.preventDefault();
+  });
   window.addEventListener('drop', (e) => {
-    const file = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith('audio/') || /\.(mp3|wav|flac|aac|m4a|ogg|opus|aiff?)$/i.test(f.name));
+    const file = [...(e.dataTransfer?.files ?? [])].find(
+      (f) => f.type.startsWith('audio/') || /\.(mp3|wav|flac|aac|m4a|ogg|opus|aiff?)$/i.test(f.name),
+    );
     if (!file) return;
     e.preventDefault();
     ctx.useSource('file', { file });
@@ -51,8 +55,13 @@ export function createStart(ctx) {
   }
   window.addEventListener('resize', frameFire);
 
-  function showError(text) { errorEl.textContent = text; errorEl.hidden = false; }
-  function hideError() { errorEl.hidden = true; }
+  function showError(text) {
+    errorEl.textContent = text;
+    errorEl.hidden = false;
+  }
+  function hideError() {
+    errorEl.hidden = true;
+  }
 
   function showStart(message) {
     document.body.dataset.mode = 'start';
@@ -68,11 +77,17 @@ export function createStart(ctx) {
     start.hidden = true;
     hud.hidden = false;
     const s = ctx.engine.source;
-    q('[data-source-name]').textContent = `${{ input: 'Line in', capture: 'Shared audio', file: 'File', demo: 'Demo' }[s.kind]}: ${s.name}`;
+    q('[data-source-name]').textContent =
+      `${{ input: 'Line in', capture: 'Shared audio', file: 'File', demo: 'Demo' }[s.kind]}: ${s.name}`;
     q('[data-transport]').hidden = !s.media;
     q('[data-track]').textContent = s.media ? s.name : '';
     q('[data-volume-row]').hidden = !s.playback;
-    if (ctx.fire) q('[data-wield]').textContent = wieldLabel({ weapon: ctx.fire.weapon, flame: ctx.fire.flame, element: ctx.fire.element });
+    if (ctx.fire)
+      q('[data-wield]').textContent = wieldLabel({
+        weapon: ctx.fire.weapon,
+        flame: ctx.fire.flame,
+        element: ctx.fire.element,
+      });
     live.textContent = `Listening to ${s.name}.`;
     frameFire();
     ctx.keepAwake();

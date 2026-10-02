@@ -24,19 +24,37 @@ import { BONE_NODES, GESTURE_TIME, DANCE_SEATED_TIME, MOVE_INFO } from '../src/b
 import { SEATS, FIRE_AT, ringOf, slotPlaces, ringPlaces } from '../src/bonfire/knightPlaces.js';
 import { getPov } from '../src/bonfire/povs.js';
 import { buildScenery } from '../src/bonfire/scenery.js';
-import { CULT, MOVE_REACH, REACH_BANDS, collidersOf, distanceTo, clearanceTo, roomAround, reachFits } from '../src/bonfire/colliders.js';
+import {
+  CULT,
+  MOVE_REACH,
+  REACH_BANDS,
+  collidersOf,
+  distanceTo,
+  clearanceTo,
+  roomAround,
+  reachFits,
+} from '../src/bonfire/colliders.js';
 import { loadKnightMesh } from './lib/knightMesh.mjs';
 import { loadGlb } from './lib/glb.mjs';
 
 const NAMES = Object.keys(SEATS);
 const material = () => new THREE.MeshLambertMaterial();
-const MAT = { stone: material(), pillar: material(), wood: material(), char: material(), wax: material(), mortar: material() };
+const MAT = {
+  stone: material(),
+  pillar: material(),
+  wood: material(),
+  char: material(),
+  wax: material(),
+  mortar: material(),
+};
 const fireDist = (x, z) => Math.hypot(x - FIRE_AT.x, z - FIRE_AT.z);
 /** Every place the show stands a dancer on in a scenery (slotPlaces and ringPlaces, 1–4, steps -3..3). */
 function placesOf(name) {
   const ring = ringOf(name);
   const seen = new Map();
-  for (const n of [1, 2, 3, 4]) for (const p of [...slotPlaces(ring, n), ...[-3, -2, -1, 0, 1, 2, 3].flatMap((st) => ringPlaces(ring, n, st))]) seen.set(p.bearing.toFixed(1), p);
+  for (const n of [1, 2, 3, 4])
+    for (const p of [...slotPlaces(ring, n), ...[-3, -2, -1, 0, 1, 2, 3].flatMap((st) => ringPlaces(ring, n, st))])
+      seen.set(p.bearing.toFixed(1), p);
   return [...seen.values()];
 }
 /** The least distance from a point to a scenery's shapes. */
@@ -58,24 +76,43 @@ test('every piece scenery.js builds in a knight’s reach is inside its shapes (
       // (Above his shins, within an arm's reach of his seat or a dancer's place; the seat itself
       // and anything lower is his to rest on.)
       if (box.max.y < 0.3) return;
-      const reach = Math.min(...near.map((p) => Math.hypot(Math.max(box.min.x - p.x, 0, p.x - box.max.x), Math.max(box.min.z - p.z, 0, p.z - box.max.z))));
+      const reach = Math.min(
+        ...near.map((p) =>
+          Math.hypot(Math.max(box.min.x - p.x, 0, p.x - box.max.x), Math.max(box.min.z - p.z, 0, p.z - box.max.z)),
+        ),
+      );
       if (reach > 1.2) return;
       pieces++;
       const pos = m.geometry.attributes.position;
-      let worst = 0, at = null;
+      let worst = 0,
+        at = null;
       for (let i = 0; i < pos.count; i++) {
         v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
         const d = nearestShape(cs, v.x, v.y, v.z);
-        if (d > worst) { worst = d; at = v.toArray(); }
+        if (d > worst) {
+          worst = d;
+          at = v.toArray();
+        }
       }
-      assert.ok(worst <= 0.02, `${name}: a ${m.geometry.type} reaches ${worst.toFixed(3)} m out of the shapes at (${at?.map((q) => q.toFixed(2))})`);
+      assert.ok(
+        worst <= 0.02,
+        `${name}: a ${m.geometry.type} reaches ${worst.toFixed(3)} m out of the shapes at (${at?.map((q) => q.toFixed(2))})`,
+      );
     });
     assert.ok(pieces > 8, `${name}: ${pieces} pieces in reach`);
   }
   // The cult's standing stones turn and tip by the seeded draws colliders.js has written down.
   const s = buildScenery('cult', MAT, () => new THREE.MeshBasicMaterial(), { merge: false });
   const stones = [];
-  s.group.traverse((m) => { if (m.isMesh && m.geometry.type === 'BoxGeometry' && m.geometry.parameters.depth === CULT.stones.depth && m.geometry.parameters.height > 1) stones.push(m.parent); });
+  s.group.traverse((m) => {
+    if (
+      m.isMesh &&
+      m.geometry.type === 'BoxGeometry' &&
+      m.geometry.parameters.depth === CULT.stones.depth &&
+      m.geometry.parameters.height > 1
+    )
+      stones.push(m.parent);
+  });
   assert.equal(stones.length, 3);
   stones.forEach((g, i) => {
     assert.equal(g.rotation.y, CULT.stones.drawn[i][0], `stone ${'ABC'[i]} turns as drawn`);
@@ -91,11 +128,15 @@ test('the ruins’ shapes are the model’s own (bonfire.glb): the pillar’s bo
   const pts = glb.worldPoints('Static_Pillar');
   const shaft = pts.filter(([x, y, z]) => y > pillar.y0 - 0.005 && Math.hypot(x - pillar.x, z - pillar.z) < 0.3);
   assert.ok(shaft.length > 16, `the shaft's corners (${shaft.length})`);
-  const lo = [0, 1, 2].map((k) => Math.min(...shaft.map((p) => p[k]))), hi = [0, 1, 2].map((k) => Math.max(...shaft.map((p) => p[k])));
+  const lo = [0, 1, 2].map((k) => Math.min(...shaft.map((p) => p[k]))),
+    hi = [0, 1, 2].map((k) => Math.max(...shaft.map((p) => p[k])));
   const r = Math.max(pillar.r0, pillar.r1);
   const want = { lo: [pillar.x - r, pillar.y0, pillar.z - r], hi: [pillar.x + r, pillar.y1, pillar.z + r] };
   for (let k = 0; k < 3; k++) {
-    assert.ok(Math.abs(lo[k] - want.lo[k]) <= 0.02 && Math.abs(hi[k] - want.hi[k]) <= 0.02, `the shaft's ${'xyz'[k]} ${lo[k].toFixed(3)}..${hi[k].toFixed(3)} (its shape's ${want.lo[k].toFixed(3)}..${want.hi[k].toFixed(3)})`);
+    assert.ok(
+      Math.abs(lo[k] - want.lo[k]) <= 0.02 && Math.abs(hi[k] - want.hi[k]) <= 0.02,
+      `the shaft's ${'xyz'[k]} ${lo[k].toFixed(3)}..${hi[k].toFixed(3)} (its shape's ${want.lo[k].toFixed(3)}..${want.hi[k].toFixed(3)})`,
+    );
   }
   // Every piece of the model's pillar (plinth, shaft, fallen drum, wall) and its candles above
   // the rubble, within reach of his seat or a dancer, inside the shapes to 2 cm.
@@ -115,7 +156,10 @@ test('the ruins’ shapes are the model’s own (bonfire.glb): the pillar’s bo
 test('the room round a place: all of it in the open, less toward a piece, and a move fits only with its reach clear of it', () => {
   // Out on the open ground in front of the fire: nothing in reach.
   const open = roomAround('shrine', 0, 1.6, Math.PI);
-  assert.ok(open.every((band) => band.every((r) => r >= 1.2 - 1e-9)), 'all the room there is');
+  assert.ok(
+    open.every((band) => band.every((r) => r >= 1.2 - 1e-9)),
+    'all the room there is',
+  );
   for (const move of Object.keys(MOVE_REACH)) assert.ok(reachFits(move, open), `${move} fits in the open`);
   // Beside the shrine's front lantern, facing the fire (it at his back and to his right):
   // less room behind him there than in front, at the light box's height.
@@ -123,18 +167,30 @@ test('the room round a place: all of it in the open, less toward a piece, and a 
   const yaw = Math.atan2(FIRE_AT.x - fx, FIRE_AT.z - fz);
   const room = roomAround('shrine', fx, fz, yaw);
   const band = REACH_BANDS.findIndex((y, i) => i && y > 1.0) - 1;
-  assert.ok(room[band][2] < room[band][0], `behind him ${room[band][2].toFixed(2)} m, in front ${room[band][0].toFixed(2)} m`);
+  assert.ok(
+    room[band][2] < room[band][0],
+    `behind him ${room[band][2].toFixed(2)} m, in front ${room[band][0].toFixed(2)} m`,
+  );
   assert.ok(!reachFits('spin', room), 'a spin’s arms all round don’t fit by the lantern');
   // The shapes' distances: inside a cylinder, its depth; out from a box, the distance.
   const pillar = collidersOf('ruins').find((c) => c.name === 'pillar');
-  assert.ok(Math.abs(distanceTo(pillar, pillar.x, 1, pillar.z) + pillar.r0 - (pillar.r0 - pillar.r1) * ((1 - pillar.y0) / (pillar.y1 - pillar.y0))) < 1e-9);
+  assert.ok(
+    Math.abs(
+      distanceTo(pillar, pillar.x, 1, pillar.z) +
+        pillar.r0 -
+        (pillar.r0 - pillar.r1) * ((1 - pillar.y0) / (pillar.y1 - pillar.y0)),
+    ) < 1e-9,
+  );
   assert.ok(Math.abs(clearanceTo(pillar, pillar.x + 1, pillar.z) - (1 - pillar.r0)) < 0.01);
 });
 
 // --- the knight on the real model -----------------------------------------------------------------
 const armor = () => createArmorShared({ fireAt: new THREE.Vector3(0, 0.95, 0.28), exposure: { value: 1.45 } });
 const HELM_NODES = { great: 'K_Helm_Great', armet: 'K_Helm_Armet', bascinet: 'K_Helm_Bascinet' };
-const SIZE = 12, RES = 320, CELL = SIZE / RES, HALF = SIZE / 2; // (terrain.js's)
+const SIZE = 12,
+  RES = 320,
+  CELL = SIZE / RES,
+  HALF = SIZE / 2; // (terrain.js's)
 let statics = null;
 /**
  * The scene's height map for a scenery (terrain.js: its cells, each the highest surface over
@@ -164,7 +220,12 @@ async function terrainOf(name) {
   const s = buildScenery(name, MAT, () => new THREE.MeshBasicMaterial());
   s.group.updateMatrixWorld(true);
   const own = [];
-  s.group.traverse((o) => { if (o.isMesh && !s.glows.includes(o)) { o.material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }); own.push(o); } });
+  s.group.traverse((o) => {
+    if (o.isMesh && !s.glows.includes(o)) {
+      o.material = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+      own.push(o);
+    }
+  });
   const meshes = name === 'ruins' ? [...statics, ...own] : [...statics.filter((m) => !ruinsOnly(m)), ...own];
   const ray = new THREE.Raycaster();
   const down = new THREE.Vector3(0, -1, 0);
@@ -182,8 +243,12 @@ async function terrainOf(name) {
   return {
     top: (x, z) => at(Math.floor((x + HALF) / CELL), Math.floor((HALF - z) / CELL)),
     height(x, z) {
-      const fx = (x + HALF) / CELL - 0.5, fz = (HALF - z) / CELL - 0.5;
-      const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
+      const fx = (x + HALF) / CELL - 0.5,
+        fz = (HALF - z) / CELL - 0.5;
+      const i = Math.floor(fx),
+        j = Math.floor(fz),
+        u = fx - i,
+        v = fz - j;
       return (at(i, j) * (1 - u) + at(i + 1, j) * u) * (1 - v) + (at(i, j + 1) * (1 - u) + at(i + 1, j + 1) * u) * v;
     },
   };
@@ -195,11 +260,13 @@ async function realKnights() {
   if (engine) return engine;
   const model = await loadKnightMesh();
   const k = createKnights(model.scene(), { armor: armor(), max: 2 });
-  const pieces = {}, corners = {};
+  const pieces = {},
+    corners = {};
   for (const b of k.knights[0].bones) {
     const node = BONE_NODES[b.name] ?? HELM_NODES[b.name.replace('helm_', '')];
     const pts = model.surface(node, 0.03);
-    if (pts.length) pieces[b.name] = { pts: Float32Array.from(pts.flat()), r: Math.max(...pts.map((p) => Math.hypot(...p))) };
+    if (pts.length)
+      pieces[b.name] = { pts: Float32Array.from(pts.flat()), r: Math.max(...pts.map((p) => Math.hypot(...p))) };
     // (Its corners alone: the farthest it comes any way.)
     const vs = model.points(node);
     if (vs.length) corners[b.name] = Float32Array.from(vs.flat());
@@ -226,7 +293,10 @@ function nearestOf(env, i, cs, { skip = null, margin = 0 } = {}) {
     if (!near.length) continue;
     for (let p = 0; p < pc.pts.length; p += 3) {
       _v.set(pc.pts[p], pc.pts[p + 1], pc.pts[p + 2]).applyMatrix4(b.matrixWorld);
-      for (const c of near) { const d = distanceTo(c, _v.x, _v.y, _v.z); if (d < best.d) best = { d, bone: b.name, shape: c.name }; }
+      for (const c of near) {
+        const d = distanceTo(c, _v.x, _v.y, _v.z);
+        if (d < best.d) best = { d, bone: b.name, shape: c.name };
+      }
     }
   }
   return best;
@@ -249,7 +319,10 @@ function watch(env, i, cs, seconds, what, log, each = null, solves = null) {
   }
 }
 const DEEPEST = 0.015;
-const report = (log) => Object.entries(log).filter(([, w]) => w.depth > DEEPEST).map(([what, w]) => `${what}: ${w.bone} ${(w.depth * 100).toFixed(1)} cm into ${w.shape} (${w.t.toFixed(2)} s)`);
+const report = (log) =>
+  Object.entries(log)
+    .filter(([, w]) => w.depth > DEEPEST)
+    .map(([what, w]) => `${what}: ${w.bone} ${(w.depth * 100).toFixed(1)} cm into ${w.shape} (${w.t.toFixed(2)} s)`);
 
 test('[slow] seated at every seat, either seat pose, he is 4 cm clear of the scenery all through his idle (his boots resting on what’s under them)', async () => {
   const env = await realKnights();
@@ -261,7 +334,8 @@ test('[slow] seated at every seat, either seat pose, he is 4 cm clear of the sce
     for (const pose of SEAT_POSES) {
       k.setSeatPose(pose);
       k.summon(0, { instant: true });
-      let least = { d: Infinity }, boot = { d: Infinity };
+      let least = { d: Infinity },
+        boot = { d: Infinity };
       // (Over his idle, four times a second: the breathing, the doze and its start, the
       // glances, a shift of his weight and hands.)
       for (let t = 0; t < 26; t += 0.25) {
@@ -271,8 +345,14 @@ test('[slow] seated at every seat, either seat pose, he is 4 cm clear of the sce
         const f = nearestOf(env, 0, cs, { skip: (b) => !boots(b) });
         if (f.d < boot.d) boot = f;
       }
-      assert.ok(least.d >= 0.04, `${name}, ${pose}: his ${least.bone} comes to ${(least.d * 100).toFixed(1)} cm of the ${least.shape}`);
-      assert.ok(boot.d >= -0.01, `${name}, ${pose}: his ${boot.bone} rests ${(-boot.d * 100).toFixed(1)} cm into the ${boot.shape}`);
+      assert.ok(
+        least.d >= 0.04,
+        `${name}, ${pose}: his ${least.bone} comes to ${(least.d * 100).toFixed(1)} cm of the ${least.shape}`,
+      );
+      assert.ok(
+        boot.d >= -0.01,
+        `${name}, ${pose}: his ${boot.bone} rests ${(-boot.d * 100).toFixed(1)} cm into the ${boot.shape}`,
+      );
       k.dismiss(0, { instant: true });
     }
   }
@@ -300,12 +380,18 @@ test('[slow] nothing he does at his seat goes into the scenery (every helmet in 
         see(1, 'sitting');
         // Every gesture seated (the site's dance gets up for its two bars and sits back down),
         // and the site's dance in his seat (a phone's view).
-        for (const g of GESTURES) { k.gesture(g, { index: 0 }); see(GESTURE_TIME[g] + 0.2, `seated ${g}`); }
+        for (const g of GESTURES) {
+          k.gesture(g, { index: 0 });
+          see(GESTURE_TIME[g] + 0.2, `seated ${g}`);
+        }
         k.headroom = false;
         k.gesture('dance', { index: 0 });
         see(DANCE_SEATED_TIME + 0.2, 'the dance in his seat');
         k.headroom = true;
-        for (const r of ['impact', 'stoke', 'ring']) { k.react(r, 1); see(1.4, `seated ${r}`); }
+        for (const r of ['impact', 'stoke', 'ring']) {
+          k.react(r, 1);
+          see(1.4, `seated ${r}`);
+        }
         // Every seated move on a beat clock (two beats a second).
         for (const m of Object.keys(MOVE_INFO).filter((mv) => MOVE_INFO[mv].seated)) {
           k.dance(0, { move: m, energy: 1, seated: true });
@@ -318,8 +404,14 @@ test('[slow] nothing he does at his seat goes into the scenery (every helmet in 
         // gesture there and the reactions, and back down.
         k.stand(0);
         see(1.4, 'getting up');
-        for (const g of GESTURES.filter((q) => q !== 'dance')) { k.gesture(g, { index: 0 }); see(GESTURE_TIME[g] + 0.2, `standing ${g}`); }
-        for (const r of ['impact', 'stoke', 'ring']) { k.react(r, 1); see(1.4, `standing ${r}`); }
+        for (const g of GESTURES.filter((q) => q !== 'dance')) {
+          k.gesture(g, { index: 0 });
+          see(GESTURE_TIME[g] + 0.2, `standing ${g}`);
+        }
+        for (const r of ['impact', 'stoke', 'ring']) {
+          k.react(r, 1);
+          see(1.4, `standing ${r}`);
+        }
         k.sit(0);
         see(1.6, 'sitting down');
         bad.push(...report(log));
@@ -343,7 +435,9 @@ test('[slow] dancers at every place on the ring, every move that fits there faci
     const cs = collidersOf(name);
     k.setScenery(name, await terrainOf(name));
     // (Places with nothing within any move's reach can't meet anything.)
-    const places = placesOf(name).filter((p) => cs.some((c) => clearanceTo(c, p.x, p.z, { from: 0, to: 2.6 }) < reach + 0.1));
+    const places = placesOf(name).filter((p) =>
+      cs.some((c) => clearanceTo(c, p.x, p.z, { from: 0, to: 2.6 }) < reach + 0.1),
+    );
     for (const p of places) {
       for (const facing of ['fire', 'front']) {
         const log = {};
@@ -351,7 +445,11 @@ test('[slow] dancers at every place on the ring, every move that fits there faci
         k.dismiss(1, { instant: true });
         k.summon(1, { instant: true, at: p, facing });
         const fitting = Object.keys(MOVE_INFO).filter((m) => k.fits(m, p, facing));
-        if (facing === 'fire') assert.ok(fitting.length > 2, `${name} ${p.bearing.toFixed(0)}°: moves fit there facing the fire (${fitting})`);
+        if (facing === 'fire')
+          assert.ok(
+            fitting.length > 2,
+            `${name} ${p.bearing.toFixed(0)}°: moves fit there facing the fire (${fitting})`,
+          );
         for (const m of fitting) {
           k.dance(1, { move: m, energy: 1, position: p, facing, seed: 0 });
           let b = 0;
@@ -406,9 +504,14 @@ test('[slow] no dance move reaches further than colliders.js MOVE_REACH has it, 
         }
       }
     }
-    most.forEach((band, i) => band.forEach((r, w) => {
-      assert.ok(r <= MOVE_REACH[move][i][w] + 0.005, `${move}: ${(r * 100).toFixed(1)} cm ${['in front', 'aside', 'behind'][w]} at ${REACH_BANDS[i]}–${REACH_BANDS[i + 1]} m (MOVE_REACH ${MOVE_REACH[move][i][w]})`);
-    }));
+    most.forEach((band, i) =>
+      band.forEach((r, w) => {
+        assert.ok(
+          r <= MOVE_REACH[move][i][w] + 0.005,
+          `${move}: ${(r * 100).toFixed(1)} cm ${['in front', 'aside', 'behind'][w]} at ${REACH_BANDS[i]}–${REACH_BANDS[i + 1]} m (MOVE_REACH ${MOVE_REACH[move][i][w]})`,
+        );
+      }),
+    );
   }
   k.dismiss(1, { instant: true });
 });
@@ -425,7 +528,10 @@ test('in the ruins his boots rest up on the model’s fallen drum, well out of t
   k.update(0.5);
   const foot = n.bones.find((b) => b.name === 'footR');
   foot.getWorldPosition(_v);
-  assert.ok(fireDist(_v.x, _v.z) > 1.05, `his raised boot is ${fireDist(_v.x, _v.z).toFixed(2)} m from the fire's middle`);
+  assert.ok(
+    fireDist(_v.x, _v.z) > 1.05,
+    `his raised boot is ${fireDist(_v.x, _v.z).toFixed(2)} m from the fire's middle`,
+  );
   // He stands up to his right, in front of the pillar's plinth (SEATS standAside), across the
   // drum: up over his boots first, then a step across (knightPose.js rise()'s `over`).
   k.stand(0);
@@ -465,11 +571,16 @@ test('[slow] seated Praise the Sun at every seat, either seat pose, throws both 
       for (let t = 0; t < GESTURE_TIME.praise; t += 1 / 12) {
         k.update(1 / 12 + 1e-7);
         n.group.updateMatrixWorld(true);
-        hands.forEach((b, i) => { top[i] = Math.max(top[i], y(b) - rest); });
+        hands.forEach((b, i) => {
+          top[i] = Math.max(top[i], y(b) - rest);
+        });
       }
       top.forEach((h, i) => {
         const was = ROUND9_PRAISE[name][pose][i];
-        if (h < 0.9 * was) bad.push(`${name} (${pose}): his ${hands[i].name} ${(h * 100).toFixed(0)} cm over his hips (round 9: ${(was * 100).toFixed(0)})`);
+        if (h < 0.9 * was)
+          bad.push(
+            `${name} (${pose}): his ${hands[i].name} ${(h * 100).toFixed(0)} cm over his hips (round 9: ${(was * 100).toFixed(0)})`,
+          );
       });
       k.dismiss(0, { instant: true });
     }
@@ -482,15 +593,31 @@ test('[slow] seated Praise the Sun at every seat, either seat pose, throws both 
 // the largest step (m) of his head and of either hand at the fire's 12 frames a second in each
 // thing he does at his seat, at any seat in either seat pose.
 const ROUND9_STEP = {
-  'getting up': { head: 0.241, hands: 0.243 }, 'sitting down': { head: 0.177, hands: 0.328 }, 'the site’s dance': { head: 0.242, hands: 0.369 },
-  'seated praise': { head: 0.095, hands: 0.672 }, 'seated wave': { head: 0.057, hands: 0.436 }, 'seated bow': { head: 0.032, hands: 0.296 },
-  'seated point': { head: 0.038, hands: 0.28 }, 'seated beckon': { head: 0.068, hands: 0.196 }, 'seated shrug': { head: 0.067, hands: 0.245 },
-  'seated hurrah': { head: 0.115, hands: 0.588 }, 'seated joy': { head: 0.116, hands: 0.763 },
-  'seated impact': { head: 0.199, hands: 0.628 }, 'seated stoke': { head: 0.099, hands: 0.339 }, 'seated ring': { head: 0.046, hands: 0.031 },
-  'standing praise': { head: 0.29, hands: 0.652 }, 'standing wave': { head: 0.019, hands: 0.41 }, 'standing bow': { head: 0.084, hands: 0.146 },
-  'standing point': { head: 0.052, hands: 0.387 }, 'standing beckon': { head: 0.017, hands: 0.254 }, 'standing shrug': { head: 0.019, hands: 0.179 },
-  'standing hurrah': { head: 0.059, hands: 0.68 }, 'standing joy': { head: 0.368, hands: 0.978 },
-  'standing impact': { head: 0.248, hands: 0.583 }, 'standing stoke': { head: 0.159, hands: 0.55 }, 'standing ring': { head: 0.114, hands: 0.224 },
+  'getting up': { head: 0.241, hands: 0.243 },
+  'sitting down': { head: 0.177, hands: 0.328 },
+  'the site’s dance': { head: 0.242, hands: 0.369 },
+  'seated praise': { head: 0.095, hands: 0.672 },
+  'seated wave': { head: 0.057, hands: 0.436 },
+  'seated bow': { head: 0.032, hands: 0.296 },
+  'seated point': { head: 0.038, hands: 0.28 },
+  'seated beckon': { head: 0.068, hands: 0.196 },
+  'seated shrug': { head: 0.067, hands: 0.245 },
+  'seated hurrah': { head: 0.115, hands: 0.588 },
+  'seated joy': { head: 0.116, hands: 0.763 },
+  'seated impact': { head: 0.199, hands: 0.628 },
+  'seated stoke': { head: 0.099, hands: 0.339 },
+  'seated ring': { head: 0.046, hands: 0.031 },
+  'standing praise': { head: 0.29, hands: 0.652 },
+  'standing wave': { head: 0.019, hands: 0.41 },
+  'standing bow': { head: 0.084, hands: 0.146 },
+  'standing point': { head: 0.052, hands: 0.387 },
+  'standing beckon': { head: 0.017, hands: 0.254 },
+  'standing shrug': { head: 0.019, hands: 0.179 },
+  'standing hurrah': { head: 0.059, hands: 0.68 },
+  'standing joy': { head: 0.368, hands: 0.978 },
+  'standing impact': { head: 0.248, hands: 0.583 },
+  'standing stoke': { head: 0.159, hands: 0.55 },
+  'standing ring': { head: 0.114, hands: 0.224 },
 };
 // (Kept clear, a step that goes further than round 9's went goes at most this much further
 // than the same step with nothing there to keep clear of, and 1 cm: the step he first touches
@@ -507,7 +634,10 @@ test('[slow] everything he does at his seat moves on smoothly: no step of his he
   const { k } = env;
   const n = k.knights[0];
   const parts = ['head', 'handL', 'handR'].map((b) => n.bones.find((x) => x.name === b));
-  const at = () => { n.group.updateMatrixWorld(true); return parts.map((b) => b.getWorldPosition(new THREE.Vector3())); };
+  const at = () => {
+    n.group.updateMatrixWorld(true);
+    return parts.map((b) => b.getWorldPosition(new THREE.Vector3()));
+  };
   const STEP = 1 / 12 + 1e-7;
   const bad = [];
   // (An impact's flinch starts a moment late at random: the same moment every time here.)
@@ -530,14 +660,24 @@ test('[slow] everything he does at his seat moves on smoothly: no step of his he
           k.dismiss(0, { instant: true });
           k.summon(0, { instant: true });
           k.update(idle);
-          if (standing) { k.stand(0); for (let t = 0; t < 1.8; t += 1 / 12) tick(); }
+          if (standing) {
+            k.stand(0);
+            for (let t = 0; t < 1.8; t += 1 / 12) tick();
+          }
           start();
           let prev = at();
-          const most = [0, 0, 0], when = [0, 0, 0];
+          const most = [0, 0, 0],
+            when = [0, 0, 0];
           for (let t = 0; t < seconds; t += 1 / 12) {
             tick();
             const now = at();
-            now.forEach((v, i) => { const d = v.distanceTo(prev[i]); if (d > most[i]) { most[i] = d; when[i] = t; } });
+            now.forEach((v, i) => {
+              const d = v.distanceTo(prev[i]);
+              if (d > most[i]) {
+                most[i] = d;
+                when[i] = t;
+              }
+            });
             prev = now;
           }
           n.near = null;
@@ -548,23 +688,31 @@ test('[slow] everything he does at his seat moves on smoothly: no step of his he
           for (const idle of IDLE) {
             const kept = steps(seconds, start, standing, idle, false);
             // (Only a step further than round 9's needs the measure without.)
-            const free = kept.most.some((d, i) => d > (i ? r9.hands : r9.head)) ? steps(seconds, start, standing, idle, true) : null;
+            const free = kept.most.some((d, i) => d > (i ? r9.hands : r9.head))
+              ? steps(seconds, start, standing, idle, true)
+              : null;
             kept.most.forEach((d, i) => {
-              const was = i ? r9.hands : r9.head, without = free?.most[i] ?? 0;
+              const was = i ? r9.hands : r9.head,
+                without = free?.most[i] ?? 0;
               const step = `${name} (${pose}) ${what} (${idle} s into his idle): his ${parts[i].name} ${(d * 100).toFixed(1)} cm in a step (${kept.when[i].toFixed(2)} s)`;
               // (Where his seat itself has him go further than round 9's anywhere did, kept clear
               // or not, that's the measure: in the ruins his hands start up on knees raised over
               // the fallen drum.)
               if (d > 1.5 * Math.max(was, without)) bad.push(`${step}; round 9's at most ${(was * 100).toFixed(1)}`);
-              if (d > was && d > CLEAR_STEP * without + 0.01) bad.push(`${step}; with nothing to keep clear of ${(without * 100).toFixed(1)}`);
+              if (d > was && d > CLEAR_STEP * without + 0.01)
+                bad.push(`${step}; with nothing to keep clear of ${(without * 100).toFixed(1)}`);
             });
           }
         };
         run('getting up', 1.6, () => k.stand(0));
         run('sitting down', 1.8, () => k.sit(0), true);
-        for (const g of GESTURES) run(g === 'dance' ? 'the site’s dance' : `seated ${g}`, GESTURE_TIME[g] + 0.4, () => k.gesture(g, { index: 0 }));
+        for (const g of GESTURES)
+          run(g === 'dance' ? 'the site’s dance' : `seated ${g}`, GESTURE_TIME[g] + 0.4, () =>
+            k.gesture(g, { index: 0 }),
+          );
         for (const r of ['impact', 'stoke', 'ring']) run(`seated ${r}`, 1.4, () => k.react(r, 1));
-        for (const g of GESTURES.filter((q) => q !== 'dance')) run(`standing ${g}`, GESTURE_TIME[g] + 0.4, () => k.gesture(g, { index: 0 }), true);
+        for (const g of GESTURES.filter((q) => q !== 'dance'))
+          run(`standing ${g}`, GESTURE_TIME[g] + 0.4, () => k.gesture(g, { index: 0 }), true);
         for (const r of ['impact', 'stoke', 'ring']) run(`standing ${r}`, 1.4, () => k.react(r, 1), true);
       }
     }
@@ -580,9 +728,15 @@ test('[slow] everything he does at his seat moves on smoothly: no step of his he
 test('[slow] seated at every seat, either seat pose, and on the ground by the fire, his knees keep their bend through a ring under him (an impact with it too) and every seated gesture and move with a ring in it: never down under both his hip and his foot, nor swung round 18 cm a step with his foot all but still', async () => {
   const env = await realKnights();
   const { k } = env;
-  const legs = [0, 1].flatMap((i) => ['L', 'R'].map((s) => ({
-    i, s, bones: ['thigh', 'shin', 'foot'].map((b) => k.knights[i].bones.find((x) => x.name === b + s)), knee: null, foot: null,
-  })));
+  const legs = [0, 1].flatMap((i) =>
+    ['L', 'R'].map((s) => ({
+      i,
+      s,
+      bones: ['thigh', 'shin', 'foot'].map((b) => k.knights[i].bones.find((x) => x.name === b + s)),
+      knee: null,
+      foot: null,
+    })),
+  );
   let low = { d: Infinity, what: '' };
   const swung = [];
   /**
@@ -603,7 +757,8 @@ test('[slow] seated at every seat, either seat pose, and on the ground by the fi
         if (d < low.d) low = { d, what: which };
         knee.sub(hip);
         foot.sub(hip);
-        if (leg.knee && knee.distanceTo(leg.knee) >= 0.18 && foot.distanceTo(leg.foot) < 0.1) swung.push(`${which} ${(knee.distanceTo(leg.knee) * 100).toFixed(0)} cm`);
+        if (leg.knee && knee.distanceTo(leg.knee) >= 0.18 && foot.distanceTo(leg.foot) < 0.1)
+          swung.push(`${which} ${(knee.distanceTo(leg.knee) * 100).toFixed(0)} cm`);
         leg.knee = knee;
         leg.foot = foot;
       }
@@ -622,7 +777,9 @@ test('[slow] seated at every seat, either seat pose, and on the ground by the fi
       k.react('impact', 1);
       k.react('ring', 1);
       see(1.6, at('an impact and a ring'));
-      const ringAt = (t) => { if (Math.abs(t - 0.5) < 0.01) k.react('ring', 1); };
+      const ringAt = (t) => {
+        if (Math.abs(t - 0.5) < 0.01) k.react('ring', 1);
+      };
       for (const g of GESTURES.filter((q) => q !== 'dance')) {
         for (const i of [0, 1]) k.gesture(g, { index: i });
         see(GESTURE_TIME[g] + 0.2, at(`seated ${g}, a ring in it`), ringAt);
@@ -630,7 +787,10 @@ test('[slow] seated at every seat, either seat pose, and on the ground by the fi
       for (const m of Object.keys(MOVE_INFO).filter((mv) => MOVE_INFO[mv].seated)) {
         for (const i of [0, 1]) k.dance(i, { move: m, energy: 1, seated: true });
         let b = 0;
-        see(Math.min(4, MOVE_INFO[m].cycle * 0.5) + 0.25, at(`seated ${m}, a ring in it`), (t) => { ringAt(t); k.clock((b += 1 / 6), 0.5); });
+        see(Math.min(4, MOVE_INFO[m].cycle * 0.5) + 0.25, at(`seated ${m}, a ring in it`), (t) => {
+          ringAt(t);
+          k.clock((b += 1 / 6), 0.5);
+        });
       }
       for (const i of [0, 1]) k.dismiss(i, { instant: true });
       for (const leg of legs) leg.knee = leg.foot = null;
@@ -664,14 +824,20 @@ test('[slow] up from his seat for the site’s dance, an arm with all the room i
       if (t < 2 || t > GESTURE_TIME.dance - 2) continue;
       n.group.updateMatrixWorld(true);
       const now = hands.map((b) => b.getWorldPosition(new THREE.Vector3()));
-      if (prev) now.forEach((v, i) => { path[i] += v.distanceTo(prev[i]); });
+      if (prev)
+        now.forEach((v, i) => {
+          path[i] += v.distanceTo(prev[i]);
+        });
       prev = now;
     }
     // (Where the scenery leaves an arm less room standing there, the dance keeps it in: keepClear's.)
     for (const i of [0, 1]) {
       if (n.home.roomUp[i] < 1) continue;
       open++;
-      if (path[i] < 0.9 * ROUND9_DANCE_PATH[i]) bad.push(`${name}: his ${hands[i].name} ${(path[i] * 100).toFixed(0)} cm (round 9: ${(ROUND9_DANCE_PATH[i] * 100).toFixed(0)})`);
+      if (path[i] < 0.9 * ROUND9_DANCE_PATH[i])
+        bad.push(
+          `${name}: his ${hands[i].name} ${(path[i] * 100).toFixed(0)} cm (round 9: ${(ROUND9_DANCE_PATH[i] * 100).toFixed(0)})`,
+        );
     }
     k.dismiss(0, { instant: true });
   }
@@ -704,9 +870,13 @@ test('[slow] stood up in front of his seat, and all through the site’s dance, 
   cam.lookAt(new THREE.Vector3(...pov.target));
   cam.updateMatrixWorld(true);
   const toView = new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
-  const views = [[1920, 1080], [1280, 800]].map(([W, H]) => ({ W, px: (x) => ((x * (16 / 9) / (W / H) + 2 * pov.sx + 1) / 2) * W }));
+  const views = [
+    [1920, 1080],
+    [1280, 800],
+  ].map(([W, H]) => ({ W, px: (x) => (((x * (16 / 9)) / (W / H) + 2 * pov.sx + 1) / 2) * W }));
   let blade = Infinity;
-  for (let y = 0.3; y <= 1.6; y += 0.05) blade = Math.min(blade, new THREE.Vector3(0, y, 0).applyMatrix4(holder.matrixWorld).applyMatrix4(toView).x);
+  for (let y = 0.3; y <= 1.6; y += 0.05)
+    blade = Math.min(blade, new THREE.Vector3(0, y, 0).applyMatrix4(holder.matrixWorld).applyMatrix4(toView).x);
   const m = new THREE.Matrix4();
   /** His rightmost point now (the view's x, -1..1 at 16:9), or `most` if that's further. */
   const right = (most) => {
@@ -715,7 +885,8 @@ test('[slow] stood up in front of his seat, and all through the site’s dance, 
       const vs = corners[b.name];
       if (!vs || (b.name.startsWith('helm_') && !n.helms[b.name.slice(5)].visible)) continue;
       m.multiplyMatrices(toView, b.matrixWorld);
-      for (let p = 0; p < vs.length; p += 3) most = Math.max(most, _v.set(vs[p], vs[p + 1], vs[p + 2]).applyMatrix4(m).x);
+      for (let p = 0; p < vs.length; p += 3)
+        most = Math.max(most, _v.set(vs[p], vs[p + 1], vs[p + 2]).applyMatrix4(m).x);
     }
     return most;
   };
@@ -724,22 +895,43 @@ test('[slow] stood up in front of his seat, and all through the site’s dance, 
     k.setScenery(name, await terrainOf(name));
     k.summon(0, { instant: true });
     k.update(0.5);
-    const gestured = (g) => [`standing ${g}`, () => k.gesture(g, { index: 0 }), GESTURE_TIME[g] + 0.2, ROUND9_STANDING[name][g]];
+    const gestured = (g) => [
+      `standing ${g}`,
+      () => k.gesture(g, { index: 0 }),
+      GESTURE_TIME[g] + 0.2,
+      ROUND9_STANDING[name][g],
+    ];
     for (const [what, act, seconds, was] of [
       ['stood up', () => k.stand(0), 2.4],
       // (Bonfire Live's breakdown has him up there; the drop throws a Praise or a cheer.)
-      gestured('praise'), gestured('joy'), gestured('hurrah'),
-      ['dancing', () => { k.sit(0); for (let t = 0; t < 1.8; t += 1 / 12) k.update(1 / 12 + 1e-7); k.gesture('dance', { index: 0 }); }, GESTURE_TIME.dance + 0.3],
+      gestured('praise'),
+      gestured('joy'),
+      gestured('hurrah'),
+      [
+        'dancing',
+        () => {
+          k.sit(0);
+          for (let t = 0; t < 1.8; t += 1 / 12) k.update(1 / 12 + 1e-7);
+          k.gesture('dance', { index: 0 });
+        },
+        GESTURE_TIME.dance + 0.3,
+      ],
     ]) {
       act();
       let most = -Infinity;
-      for (let t = 0; t < seconds; t += 1 / 12) { k.update(1 / 12 + 1e-7); most = right(most); }
+      for (let t = 0; t < seconds; t += 1 / 12) {
+        k.update(1 / 12 + 1e-7);
+        most = right(most);
+      }
       // (A hundredth of the view's width to spare: his edge, then the blade. Or, where round 9's
       // gesture came nearer than that, no more than half a hundredth further than it did.)
       for (const view of views) {
         const [his, its] = [view.px(most), view.px(blade)];
         const most9 = was == null ? -Infinity : view.px(was) + view.W / 200;
-        assert.ok(his <= Math.max(its - view.W / 100, most9), `${name}, ${what}, ${view.W} wide: he comes to ${his.toFixed(0)} px, the sword's blade is at ${its.toFixed(0)} px${was == null ? '' : ` (round 9: ${view.px(was).toFixed(0)} px)`}`);
+        assert.ok(
+          his <= Math.max(its - view.W / 100, most9),
+          `${name}, ${what}, ${view.W} wide: he comes to ${his.toFixed(0)} px, the sword's blade is at ${its.toFixed(0)} px${was == null ? '' : ` (round 9: ${view.px(was).toFixed(0)} px)`}`,
+        );
       }
     }
     k.dismiss(0, { instant: true });

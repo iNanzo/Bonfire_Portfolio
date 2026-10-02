@@ -153,10 +153,14 @@ export function* heightSteps(px, { size, res, pad }) {
   function height(x, z) {
     const fx = (x + half) / cell - 0.5;
     const fz = (half - z) / cell - 0.5;
-    const i = Math.floor(fx), j = Math.floor(fz);
-    const u = fx - i, v = fz - j;
-    return (at(H, i, j) * (1 - u) + at(H, i + 1, j) * u) * (1 - v)
-      + (at(H, i, j + 1) * (1 - u) + at(H, i + 1, j + 1) * u) * v;
+    const i = Math.floor(fx),
+      j = Math.floor(fz);
+    const u = fx - i,
+      v = fz - j;
+    return (
+      (at(H, i, j) * (1 - u) + at(H, i + 1, j) * u) * (1 - v) +
+      (at(H, i, j + 1) * (1 - u) + at(H, i + 1, j + 1) * u) * v
+    );
   }
   /** Raw surface height of the cell under (x, z) — steps stay sharp. */
   const top = (x, z) => at(H, ci(x), cj(z));
@@ -164,16 +168,28 @@ export function* heightSteps(px, { size, res, pad }) {
   const solid = (x, z) => at(D, ci(x), cj(z));
   /** Uphill direction of the raw heights around (x, z) (world x/z, unnormalized). */
   function slope(x, z, out) {
-    const i = ci(x), j = cj(z);
-    const gx = (at(H, i + 2, j) - at(H, i - 2, j)) + 0.5 * (at(H, i + 2, j - 1) - at(H, i - 2, j - 1) + at(H, i + 2, j + 1) - at(H, i - 2, j + 1));
-    const gz = (at(H, i, j - 2) - at(H, i, j + 2)) + 0.5 * (at(H, i - 1, j - 2) - at(H, i - 1, j + 2) + at(H, i + 1, j - 2) - at(H, i + 1, j + 2));
+    const i = ci(x),
+      j = cj(z);
+    const gx =
+      at(H, i + 2, j) -
+      at(H, i - 2, j) +
+      0.5 * (at(H, i + 2, j - 1) - at(H, i - 2, j - 1) + at(H, i + 2, j + 1) - at(H, i - 2, j + 1));
+    const gz =
+      at(H, i, j - 2) -
+      at(H, i, j + 2) +
+      0.5 * (at(H, i - 1, j - 2) - at(H, i - 1, j + 2) + at(H, i + 1, j - 2) - at(H, i + 1, j + 2));
     return out.set(gx, 0, gz);
   }
 
   // --- vertical faces worth landing on: steps of 25 cm or more
   const wallSpots = [];
   const g = new THREE.Vector3();
-  const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const N4 = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ];
   for (let j = 1; j < res - 1; j++) {
     for (let i = 1; i < res - 1; i++) {
       const h = H[j * res + i];
@@ -185,7 +201,8 @@ export function* heightSteps(px, { size, res, pad }) {
         const z = half - (j + 0.5 + dj * 0.5) * cell;
         // outward normal: downhill, but always toward the low side
         slope(x, z, g).negate();
-        const ox = di, oz = -dj;
+        const ox = di,
+          oz = -dj;
         if (g.lengthSq() < 1e-6 || (g.x * ox + g.z * oz) / g.length() < 0.35) g.set(ox, 0, oz);
         g.normalize();
         wallSpots.push({ x, z, lo, hi: h, nx: g.x, nz: g.z });

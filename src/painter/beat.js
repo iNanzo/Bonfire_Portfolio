@@ -30,9 +30,23 @@ export const LOOP_BARS = DROP_LOOP.groove + DROP_LOOP.breakdown + DROP_LOOP.buil
  */
 export function silentFrame(events = []) {
   return {
-    time: 0, rms: 0, level: 0, kick: 0, hat: 0, beats: [], events,
-    bands: Object.fromEntries(BANDS.map((b) => [b, 0])), bpm: 0, locked: false, strength: 0,
-    state: 'silent', build: 0, breakdownFor: 0, intensity: 0, drop: null, dropScore: 0,
+    time: 0,
+    rms: 0,
+    level: 0,
+    kick: 0,
+    hat: 0,
+    beats: [],
+    events,
+    bands: Object.fromEntries(BANDS.map((b) => [b, 0])),
+    bpm: 0,
+    locked: false,
+    strength: 0,
+    state: 'silent',
+    build: 0,
+    breakdownFor: 0,
+    intensity: 0,
+    drop: null,
+    dropScore: 0,
   };
 }
 
@@ -44,23 +58,27 @@ export function silentFrame(events = []) {
 export function createBeatFeed({ bpm = 124, shape = 'groove', start = 0, lead = 0 } = {}) {
   const period = 60 / bpm;
   const loopBeats = LOOP_BARS * 4;
-  let t0 = start + 0.05;   // when beat 0 of the count falls
-  let next = 0;            // the next beat to give (counted from t0)
+  let t0 = start + 0.05; // when beat 0 of the count falls
+  let next = 0; // the next beat to give (counted from t0)
   let first = true;
   let dropAsked = false;
-  let reanchor = false;    // a drop by hand: the count starts again on the next beat
+  let reanchor = false; // a drop by hand: the count starts again on the next beat
   let lastKick = -Infinity;
   let lastHat = -Infinity;
-  let hatStep = -1;        // the last sixteenth (or eighth) a hat was due on
+  let hatStep = -1; // the last sixteenth (or eighth) a hat was due on
   let lastSection = 'groove';
-  let lowAt = 0;           // when the breakdown began (for breakdownFor)
+  let lowAt = 0; // when the breakdown began (for breakdownFor)
 
   /** Where beat `n` of the count sits: its bar and beat, and the section it's in. */
   function place(n) {
     const count = shape === 'dropLoop' ? n % loopBeats : n;
     const bar = Math.floor(count / 4);
-    const section = shape !== 'dropLoop' || bar < DROP_LOOP.groove ? 'groove'
-      : bar < DROP_LOOP.groove + DROP_LOOP.breakdown ? 'breakdown' : 'build';
+    const section =
+      shape !== 'dropLoop' || bar < DROP_LOOP.groove
+        ? 'groove'
+        : bar < DROP_LOOP.groove + DROP_LOOP.breakdown
+          ? 'breakdown'
+          : 'build';
     return { count, bar, beat: count % 4, section };
   }
   /** 0..1: how far the build has climbed at time `now` (0 outside the breakdown and build). */
@@ -79,7 +97,9 @@ export function createBeatFeed({ bpm = 124, shape = 'groove', start = 0, lead = 
     period,
     shape,
     /** A drop on the next frame (and the bar count starting again on the next beat). */
-    drop() { dropAsked = true; },
+    drop() {
+      dropAsked = true;
+    },
     /**
      * This frame's features at `now` (seconds).
      * @param {number} now
@@ -88,7 +108,10 @@ export function createBeatFeed({ bpm = 124, shape = 'groove', start = 0, lead = 
     frame(now, dt = 1 / 60) {
       void dt;
       const events = [];
-      if (first) { events.push('start'); first = false; }
+      if (first) {
+        events.push('start');
+        first = false;
+      }
       let drop = null;
       if (dropAsked) {
         dropAsked = false;
@@ -101,20 +124,32 @@ export function createBeatFeed({ bpm = 124, shape = 'groove', start = 0, lead = 
       let kicked = 0;
       while (t0 + next * period <= now + lead) {
         const time = t0 + next * period;
-        if (reanchor) { t0 = time; next = 0; reanchor = false; }
+        if (reanchor) {
+          t0 = time;
+          next = 0;
+          reanchor = false;
+        }
         const p = place(next);
         // The loop's sections turn over on their first beat; its drop is the next loop's beat 1.
         if (p.section !== lastSection) {
-          if (p.section === 'breakdown') { events.push('breakdown'); lowAt = time; }
-          else if (p.section === 'build') events.push('build');
-          else if (p.section === 'groove' && lastSection === 'build' && !events.includes('drop')) { events.push('drop'); drop = 'big'; }
+          if (p.section === 'breakdown') {
+            events.push('breakdown');
+            lowAt = time;
+          } else if (p.section === 'build') events.push('build');
+          else if (p.section === 'groove' && lastSection === 'build' && !events.includes('drop')) {
+            events.push('drop');
+            drop = 'big';
+          }
           lastSection = p.section;
         }
         const groove = p.section === 'groove';
         const lastBar = p.section === 'build' && p.bar === LOOP_BARS - 1;
         const strength = groove ? (p.beat === 0 ? 0.95 : 0.82) : lastBar ? 0.3 : 0.04;
         beats.push({ time, count: p.count, beat: p.beat, bar: p.bar, strength });
-        if (groove) { kicked = Math.max(kicked, strength); lastKick = time; }
+        if (groove) {
+          kicked = Math.max(kicked, strength);
+          lastKick = time;
+        }
         next++;
       }
       // Hats on the off-beats (every sixteenth up the build; none in the breakdown).
@@ -144,10 +179,23 @@ export function createBeatFeed({ bpm = 124, shape = 'groove', start = 0, lead = 
       };
       for (const b of BANDS) bands[b] = Math.min(1, Math.max(0, bands[b]));
       return {
-        time: now, rms: 0.3 * level, level, kick: kicked, hat, beats, events,
-        bands, bpm, locked: true, strength: 0.8,
-        state: section, build: low ? build : 0, breakdownFor: low ? Math.max(0, now - lowAt) : 0,
-        intensity: low ? 0.3 : 0.85, drop, dropScore: drop ? 1 : 0,
+        time: now,
+        rms: 0.3 * level,
+        level,
+        kick: kicked,
+        hat,
+        beats,
+        events,
+        bands,
+        bpm,
+        locked: true,
+        strength: 0.8,
+        state: section,
+        build: low ? build : 0,
+        breakdownFor: low ? Math.max(0, now - lowAt) : 0,
+        intensity: low ? 0.3 : 0.85,
+        drop,
+        dropScore: drop ? 1 : 0,
       };
     },
   };

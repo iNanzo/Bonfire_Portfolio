@@ -14,8 +14,12 @@ export const STEP_FPS = 12;
 // quarter's overshoot), `max` how far (rad) a plate may stray from its pose.
 /** @type {[string, string, number][]} */
 const SPRUNG = [
-  ['shoulderL', 'chest', 0.1], ['pauldronL', 'chest', 0.13], ['shoulderR', 'chest', 0.1], ['pauldronR', 'chest', 0.13],
-  ['tassetL', 'hips', 0.09], ['tassetR', 'hips', 0.09],
+  ['shoulderL', 'chest', 0.1],
+  ['pauldronL', 'chest', 0.13],
+  ['shoulderR', 'chest', 0.1],
+  ['pauldronR', 'chest', 0.13],
+  ['tassetL', 'hips', 0.09],
+  ['tassetR', 'hips', 0.09],
 ];
 const SPRING = { hz: 2.6, damp: 0.38, substeps: 4 };
 
@@ -29,7 +33,8 @@ const rel = new THREE.Vector3();
 /** A unit quaternion as a rotation vector (axis × angle, the short way round), into `out`. */
 function logQ(r, out) {
   const sgn = r.w < 0 ? -1 : 1;
-  const half = Math.acos(Math.min(1, sgn * r.w)), sn = Math.sin(half);
+  const half = Math.acos(Math.min(1, sgn * r.w)),
+    sn = Math.sin(half);
   return sn < 1e-9 ? out.set(0, 0, 0) : out.set(r.x, r.y, r.z).multiplyScalar((sgn * 2 * half) / sn);
 }
 /** A rotation vector as a quaternion, into `out`. */
@@ -59,17 +64,29 @@ export function createPlateSprings({ probes, bodyProbes, nearOf }) {
    * wants redrawing).
    */
   function springPlates(k, s, snap) {
-    const st = k.spring ??= SPRUNG.map(() => ({ q: new THREE.Quaternion(), v: new THREE.Vector3(), pose: new THREE.Quaternion(), set: false }));
+    const st = (k.spring ??= SPRUNG.map(() => ({
+      q: new THREE.Quaternion(),
+      v: new THREE.Vector3(),
+      pose: new THREE.Quaternion(),
+      set: false,
+    })));
     const cs = snap ? null : nearOf(k);
     if (cs?.length) place(k);
     const h = 1 / STEP_FPS / SPRING.substeps;
     const w0 = 2 * Math.PI * SPRING.hz;
     let swinging = false;
     SPRUNG.forEach(([bone, par, max], j) => {
-      const i = BONE_INDEX[bone], pi = BONE_INDEX[par];
+      const i = BONE_INDEX[bone],
+        pi = BONE_INDEX[par];
       const x = st[j];
       tq.copy(s.q[pi]).invert().multiply(s.q[i]);
-      if (snap || !x.set) { x.q.copy(tq); x.pose.copy(tq); x.v.set(0, 0, 0); x.set = true; return; }
+      if (snap || !x.set) {
+        x.q.copy(tq);
+        x.pose.copy(tq);
+        x.v.set(0, 0, 0);
+        x.set = true;
+        return;
+      }
       logQ(dq.copy(tq).multiply(sq.copy(x.pose).invert()), vt).multiplyScalar(STEP_FPS);
       x.pose.copy(tq);
       for (let n = 0; n < SPRING.substeps; n++) {

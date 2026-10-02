@@ -9,7 +9,10 @@
 import { site, screens, items, sections } from './content.js';
 import { esc } from './html.js';
 
-const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+const clean = (s) =>
+  String(s ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
 const abs = (path) => new URL(path.replace(/^\//, ''), site.url.endsWith('/') ? site.url : `${site.url}/`).href;
 
 /** The social preview image of a page, as a path under the site ("og/<name>.jpg"). */
@@ -51,18 +54,20 @@ export function pageMeta(route) {
       description: clean(p.summary || p.built),
       image: ogImagePath(`project-${p.id}`),
       type: 'article',
-      jsonLd: [{
-        '@context': 'https://schema.org',
-        '@type': 'CreativeWork',
-        name: p.name,
-        description: clean(p.summary),
-        genre: p.kind,
-        ...(year ? { dateCreated: year } : {}),
-        keywords: (p.tech ?? []).join(', '),
-        image: abs(ogImagePath(`project-${p.id}`)),
-        url: abs(`/projects/${p.id}/`),
-        creator: person,
-      }],
+      jsonLd: [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'CreativeWork',
+          name: p.name,
+          description: clean(p.summary),
+          genre: p.kind,
+          ...(year ? { dateCreated: year } : {}),
+          keywords: (p.tech ?? []).join(', '),
+          image: abs(ogImagePath(`project-${p.id}`)),
+          url: abs(`/projects/${p.id}/`),
+          creator: person,
+        },
+      ],
     };
   }
   const screen = screens.find((s) => s.id === screenId);
@@ -97,8 +102,12 @@ export function withMeta(html, meta) {
     `<meta name="twitter:title" content="${esc(meta.title)}" />`,
     `<meta name="twitter:description" content="${esc(meta.description)}" />`,
     `<meta name="twitter:image" content="${esc(image)}" />`,
-    ...meta.jsonLd.map((d) => `<script type="application/ld+json">${JSON.stringify(d).replace(/</g, '\\u003c')}</script>`),
-  ].map((t) => `    ${t}`).join('\n');
+    ...meta.jsonLd.map(
+      (d) => `<script type="application/ld+json">${JSON.stringify(d).replace(/</g, '\\u003c')}</script>`,
+    ),
+  ]
+    .map((t) => `    ${t}`)
+    .join('\n');
   // (Replacement functions, not strings: a "$" in a title or summary would read as a pattern.)
   const set = (value) => (_, open, close) => `${open}${value}${close}`;
   return html
@@ -112,7 +121,11 @@ export function withMeta(html, meta) {
 
 /** Every route meant to be found: home, each screen, each shown project. */
 export function publicRoutes() {
-  return ['home', ...screens.filter((s) => s.id !== 'home').map((s) => s.id), ...items().map((p) => `projects/${p.id}`)];
+  return [
+    'home',
+    ...screens.filter((s) => s.id !== 'home').map((s) => s.id),
+    ...items().map((p) => `projects/${p.id}`),
+  ];
 }
 
 /** sitemap.xml for the routes (plus any extra paths, like the visualizer). */

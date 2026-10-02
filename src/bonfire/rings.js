@@ -35,30 +35,39 @@ export function createRingLines(fxMaterial, vertices) {
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices * 3), 3));
   geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(vertices * 3), 3));
   geo.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(vertices), 1));
-  const lines = new THREE.LineSegments(geo, new THREE.ShaderMaterial({
-    uniforms: { tDepth: fxMaterial.uniforms.tDepth, resolution: fxMaterial.uniforms.resolution },
-    vertexShader,
-    fragmentShader,
-    blending: THREE.CustomBlending,
-    blendEquation: THREE.AddEquation,
-    blendSrc: THREE.OneFactor,
-    blendDst: THREE.OneFactor,
-    blendSrcAlpha: THREE.OneFactor,
-    blendDstAlpha: THREE.OneFactor,
-    depthTest: false,
-    depthWrite: false,
-    transparent: true,
-  }));
+  const lines = new THREE.LineSegments(
+    geo,
+    new THREE.ShaderMaterial({
+      uniforms: { tDepth: fxMaterial.uniforms.tDepth, resolution: fxMaterial.uniforms.resolution },
+      vertexShader,
+      fragmentShader,
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.AddEquation,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneFactor,
+      blendSrcAlpha: THREE.OneFactor,
+      blendDstAlpha: THREE.OneFactor,
+      depthTest: false,
+      depthWrite: false,
+      transparent: true,
+    }),
+  );
   lines.frustumCulled = false;
   return {
     lines,
     pos: geo.attributes.position.array,
     col: geo.attributes.color.array,
     alpha: geo.attributes.alpha.array,
-    commit() { for (const a of ['position', 'color', 'alpha']) geo.attributes[a].needsUpdate = true; },
-    clear() { geo.attributes.alpha.array.fill(0); geo.attributes.alpha.needsUpdate = true; },
+    commit() {
+      for (const a of ['position', 'color', 'alpha']) geo.attributes[a].needsUpdate = true;
+    },
+    clear() {
+      geo.attributes.alpha.array.fill(0);
+      geo.attributes.alpha.needsUpdate = true;
+    },
   };
 }
 
 /** Seamless simplex noise around a ring (angle a), scrolled by t: −1..1. */
-export const ringNoise = (noise, a, freq, t, seed = 0) => noise.noise3d(Math.cos(a) * freq + seed, Math.sin(a) * freq - seed, t);
+export const ringNoise = (noise, a, freq, t, seed = 0) =>
+  noise.noise3d(Math.cos(a) * freq + seed, Math.sin(a) * freq - seed, t);

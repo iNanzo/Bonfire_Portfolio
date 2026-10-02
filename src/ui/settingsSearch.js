@@ -45,7 +45,10 @@ function fold(text) {
   for (let i = 0; i < src.length;) {
     const ch = String.fromCodePoint(src.codePointAt(i));
     const piece = (QUOTES[ch] ?? ch).normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
-    for (let k = 0; k < piece.length; k++) { at.push(i); to.push(i + ch.length); }
+    for (let k = 0; k < piece.length; k++) {
+      at.push(i);
+      to.push(i + ch.length);
+    }
     out += piece;
     i += ch.length;
   }
@@ -56,7 +59,10 @@ const WORD = /[\p{L}\p{N}]/u;
 /** The words typed: letters and digits (an apostrophe inside a word stays: "song's"). */
 const tokens = (query) => [...new Set(normalize(query).match(/[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)*/gu) ?? [])];
 /** A key's words: "knightRim" is "knight rim", "looks.glitch" "looks glitch". */
-const keyWords = (key) => String(key ?? '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[._-]+/g, ' ');
+const keyWords = (key) =>
+  String(key ?? '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[._-]+/g, ' ');
 
 /** Where `term` starts a word in folded `text`: [start, end] pairs. */
 function starts(text, term) {
@@ -91,7 +97,10 @@ function nearStarts(text, token) {
     if (word.length < 5 || word[0] !== token[0]) continue;
     for (const n of [token.length - 1, token.length, token.length + 1]) {
       if (n < 1 || n > word.length) continue;
-      if (oneEdit(token, word.slice(0, n))) { found.push([m.index, m.index + n]); break; }
+      if (oneEdit(token, word.slice(0, n))) {
+        found.push([m.index, m.index + n]);
+        break;
+      }
     }
   }
   return found;
@@ -139,7 +148,10 @@ export function buildMatcher(entries, { synonyms = {} } = {}) {
         for (const [name, f] of parts) {
           let found = terms.flatMap((t) => starts(f.text, t));
           let worth = WEIGHTS[name];
-          if (!found.length && name === 'label') { found = nearStarts(f.text, word); worth /= 2; }
+          if (!found.length && name === 'label') {
+            found = nearStarts(f.text, word);
+            worth /= 2;
+          }
           if (!found.length) continue;
           // (A whole word typed counts a little more than the start of one.)
           const whole = found.some(([, e]) => e === f.text.length || !WORD.test(f.text[e]));
@@ -149,7 +161,13 @@ export function buildMatcher(entries, { synonyms = {} } = {}) {
         if (!best) return; // (a word found nowhere: not a hit)
         score += best;
       }
-      hits.push({ entry, score, ranges: merge(marks.label ?? []), fields: Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, merge(v)])), order });
+      hits.push({
+        entry,
+        score,
+        ranges: merge(marks.label ?? []),
+        fields: Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, merge(v)])),
+        order,
+      });
     });
     hits.sort((a, b) => b.score - a.score || a.order - b.order);
     return hits.map(({ order, ...hit }) => hit);
@@ -218,14 +236,22 @@ export function createSearchBox({ input, status = null, onQuery, debounce = 80, 
   let sayTimer = 0;
   let cleared = false; // Esc just cleared the box: the dialog's cancel that follows is stopped
 
-  const say = (text) => { if (status && status.textContent !== text) status.textContent = text; };
+  const say = (text) => {
+    if (status && status.textContent !== text) status.textContent = text;
+  };
   function run(query = input.value) {
     win.clearTimeout(typingTimer);
     win.clearTimeout(sayTimer);
     const got = onQuery(query);
     const n = typeof got === 'number' ? got : Array.isArray(got) ? got.length : 0;
-    if (!query.trim()) { say(''); return; }
-    if (!n) { say(`No ${noun}s match “${query.trim()}”`); return; }
+    if (!query.trim()) {
+      say('');
+      return;
+    }
+    if (!n) {
+      say(`No ${noun}s match “${query.trim()}”`);
+      return;
+    }
     sayTimer = win.setTimeout(() => say(`${n} ${noun}${n === 1 ? '' : 's'} found`), announce);
   }
   function clear() {
@@ -245,7 +271,9 @@ export function createSearchBox({ input, status = null, onQuery, debounce = 80, 
     e.stopPropagation();
     cleared = true;
   };
-  const onKeyUp = (e) => { if (e.key === 'Escape') cleared = false; };
+  const onKeyUp = (e) => {
+    if (e.key === 'Escape') cleared = false;
+  };
   const onCancel = (e) => {
     if (!cleared) return;
     cleared = false;

@@ -85,13 +85,25 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const settings = loadSettings();
 // (Saving waits for changes to settle: what's waiting is written as the page goes or hides.)
 addEventListener('pagehide', flushSettings);
-document.addEventListener('visibilitychange', () => { if (document.hidden) flushSettings(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) flushSettings();
+});
 
 // --- What the page's parts share (context.js) ---------------------------------------------------
 // The scene, its director and the sound come and go while the page is open (a rebuilt scene,
 // another source), so each part reads them from here when it needs them.
 /** @type {import('./context.js').LiveContext} */
-const ctx = { settings, reducedMotion, fire: null, director: null, engine: null, heard: createTickBatch(), lastFeatures: null, firstScene: null, solo: null };
+const ctx = {
+  settings,
+  reducedMotion,
+  fire: null,
+  director: null,
+  engine: null,
+  heard: createTickBatch(),
+  lastFeatures: null,
+  firstScene: null,
+  solo: null,
+};
 
 document.documentElement.classList.add('js');
 applyCssPalette();
@@ -127,7 +139,18 @@ ctx.firstScene = askedScene ? ctx.findScene(askedScene) : null;
 ctx.solo = ctx.firstScene && params.has('solo') ? ctx.firstScene.ref : null;
 
 // --- The bonfire ---------------------------------------------------------------------------
-const IDLE = { state: 'silent', bands: Object.fromEntries(BAND_NAMES.map((b) => [b, 0])), level: 0, beats: [], events: [], kick: 0, hat: 0, bpm: 0, locked: false, build: 0 };
+const IDLE = {
+  state: 'silent',
+  bands: Object.fromEntries(BAND_NAMES.map((b) => [b, 0])),
+  level: 0,
+  beats: [],
+  events: [],
+  kick: 0,
+  hat: 0,
+  bpm: 0,
+  locked: false,
+  build: 0,
+};
 
 function onImpact(flameKey, _from, instant, selection) {
   document.documentElement.dataset.flame = flameKey;
@@ -138,7 +161,12 @@ function onImpact(flameKey, _from, instant, selection) {
 }
 
 // Ableton Link (link.js): while it's the beat's source, the session sets the grid.
-const link = createLinkClient({ port: () => settings.linkPort, onStatus: (text) => { if (ctx.settingsPanel) ctx.settingsPanel.linkStatus = text; } });
+const link = createLinkClient({
+  port: () => settings.linkPort,
+  onStatus: (text) => {
+    if (ctx.settingsPanel) ctx.settingsPanel.linkStatus = text;
+  },
+});
 // The sound is analysed on every frame the display shows (onTick), whatever Frame Rate
 // draws; the director and the HUD go with the drawn frames (onFrame), taking all it heard
 // since the last one (ctx.heard: tickBatch.js).
@@ -146,7 +174,10 @@ function onTick(dt) {
   const now = performance.now() / 1000;
   if (settings.beatFrom === 'link' && ctx.engine?.source) link.update(now, ctx.engine.analyser.tempo);
   else link.close();
-  if (ctx.engine?.source) ctx.heard.add(ctx.engine.analyser.update(now, dt, { sensitivity: settings.sensitivity, lead: settings.offset / 1000 }));
+  if (ctx.engine?.source)
+    ctx.heard.add(
+      ctx.engine.analyser.update(now, dt, { sensitivity: settings.sensitivity, lead: settings.offset / 1000 }),
+    );
 }
 function onFrame(dt) {
   const f = (ctx.engine?.source && ctx.heard.take()) || IDLE;
@@ -180,36 +211,68 @@ let sceneGeneration = 0;
 function startScene() {
   const generation = ++sceneGeneration;
   applyDensity();
-  return import('../bonfire/scene.js').then(async ({ createBonfire }) => {
-    const candidate = createBonfire(stage, {
-      reducedMotion, sway: 0, lightTrails: settings.trails, effects: true, onImpact, onRamp: setAccentRamp, onError: sceneFailed,
-      onFrame: (dt) => { if (ctx.fire === candidate) onFrame(dt); },
-      onTick: (dt) => { if (ctx.fire === candidate) onTick(dt); },
-    });
-    const nextDirector = createDirector(candidate, { settings, reducedMotion, onEvent, scenes: ctx.loopLibrary });
-    await candidate.ready;
-    if (generation !== sceneGeneration) { candidate.dispose(); return; }
-    const prev = ctx.fire;
-    // (A rebuilt scene carries on with the preset scene that was playing.)
-    const playing = ctx.director?.sceneRef ? ctx.findScene(ctx.director.sceneRef) : null;
-    ctx.recorder?.stop(); // (a clip ends with the scene it was recording)
-    ctx.fire = candidate;
-    ctx.director = nextDirector;
-    ctx.frameFire();
-    applyFrameRate();
-    // (Dev builds, and any build with ?bench in its address: tools/bench-viz.mjs drives the show through it.)
-    if (import.meta.env.DEV || new URLSearchParams(location.search).has('bench')) window.__viz = { fire: ctx.fire, director: ctx.director, settings, get engine() { return ctx.engine; }, get features() { return ctx.lastFeatures; } };
-    ctx.director.applyRender(); // (the Render tab: render.js)
-    const eq = prev ? { weapon: prev.weapon, flame: prev.flame, element: prev.element } : { weapon: startingEquipment.weapon, flame: startingEquipment.flame, element: elementOr(startingEquipment.element) };
-    prev?.dispose();
-    await ctx.fire.equip(eq.weapon, eq.flame, { instant: true, element: eq.element });
-    ctx.fire.setScenery(settings.scenery === 'mix' ? prev?.scenery ?? 'ruins' : settings.scenery);
-    // (The first build opens on ?scene= or a chip picked while it loaded.)
-    const opening = prev ? playing : playing ?? ctx.firstScene;
-    if (opening) ctx.playScene(opening, { instant: true, lock: opening.ref === ctx.solo });
-    stage.classList.add('is-ready');
-    ctx.streamOutput();
-  }).catch(sceneFailed);
+  return import('../bonfire/scene.js')
+    .then(async ({ createBonfire }) => {
+      const candidate = createBonfire(stage, {
+        reducedMotion,
+        sway: 0,
+        lightTrails: settings.trails,
+        effects: true,
+        onImpact,
+        onRamp: setAccentRamp,
+        onError: sceneFailed,
+        onFrame: (dt) => {
+          if (ctx.fire === candidate) onFrame(dt);
+        },
+        onTick: (dt) => {
+          if (ctx.fire === candidate) onTick(dt);
+        },
+      });
+      const nextDirector = createDirector(candidate, { settings, reducedMotion, onEvent, scenes: ctx.loopLibrary });
+      await candidate.ready;
+      if (generation !== sceneGeneration) {
+        candidate.dispose();
+        return;
+      }
+      const prev = ctx.fire;
+      // (A rebuilt scene carries on with the preset scene that was playing.)
+      const playing = ctx.director?.sceneRef ? ctx.findScene(ctx.director.sceneRef) : null;
+      ctx.recorder?.stop(); // (a clip ends with the scene it was recording)
+      ctx.fire = candidate;
+      ctx.director = nextDirector;
+      ctx.frameFire();
+      applyFrameRate();
+      // (Dev builds, and any build with ?bench in its address: tools/bench-viz.mjs drives the show through it.)
+      if (import.meta.env.DEV || new URLSearchParams(location.search).has('bench'))
+        window.__viz = {
+          fire: ctx.fire,
+          director: ctx.director,
+          settings,
+          get engine() {
+            return ctx.engine;
+          },
+          get features() {
+            return ctx.lastFeatures;
+          },
+        };
+      ctx.director.applyRender(); // (the Render tab: render.js)
+      const eq = prev
+        ? { weapon: prev.weapon, flame: prev.flame, element: prev.element }
+        : {
+            weapon: startingEquipment.weapon,
+            flame: startingEquipment.flame,
+            element: elementOr(startingEquipment.element),
+          };
+      prev?.dispose();
+      await ctx.fire.equip(eq.weapon, eq.flame, { instant: true, element: eq.element });
+      ctx.fire.setScenery(settings.scenery === 'mix' ? (prev?.scenery ?? 'ruins') : settings.scenery);
+      // (The first build opens on ?scene= or a chip picked while it loaded.)
+      const opening = prev ? playing : (playing ?? ctx.firstScene);
+      if (opening) ctx.playScene(opening, { instant: true, lock: opening.ref === ctx.solo });
+      stage.classList.add('is-ready');
+      ctx.streamOutput();
+    })
+    .catch(sceneFailed);
 }
 // (A settings change rebuilds the scene, or caps its frame rate: dialogs.js.)
 Object.assign(ctx, { startScene, applyFrameRate });
@@ -266,7 +329,9 @@ ctx.recorder = createRecorder({
   audio: () => (ctx.engine?.source ? { ctx: ctx.engine.ctx, node: ctx.engine.delay } : null),
   onState: ({ recording, seconds, saved, error }) => {
     document.body.classList.toggle('is-recording', recording);
-    recordLabel.textContent = recording ? `Rec ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : 'Record';
+    recordLabel.textContent = recording
+      ? `Rec ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+      : 'Record';
     if (saved) ctx.note(`Saved ${saved}`, 3);
     if (error) ctx.note(error, 3);
   },
@@ -287,4 +352,7 @@ Object.assign(ctx, createOutput(ctx));
 
 markPreset(start, settings);
 ctx.drawChips();
-if (askedScene && !ctx.firstScene) ctx.showError('That scene isn’t in this browser (it may have been made in another one). Pick another below, or make one in the Painter.');
+if (askedScene && !ctx.firstScene)
+  ctx.showError(
+    'That scene isn’t in this browser (it may have been made in another one). Pick another below, or make one in the Painter.',
+  );

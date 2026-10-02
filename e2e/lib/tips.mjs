@@ -22,7 +22,8 @@ export async function collectTips(page, rootSelector = 'body') {
 }
 
 /** Two boxes overlapping by more than a pixel's rounding. */
-const overlap = (a, b) => a.x < b.x + b.width - 1 && a.x + a.width > b.x + 1 && a.y < b.y + b.height - 1 && a.y + a.height > b.y + 1;
+const overlap = (a, b) =>
+  a.x < b.x + b.width - 1 && a.x + a.width > b.x + 1 && a.y < b.y + b.height - 1 && a.y + a.height > b.y + 1;
 
 /**
  * Close a tip left open by the last check, so the next measures its own: the pointer moved
@@ -34,8 +35,16 @@ async function closeTip(page) {
   const tip = tipOf(page);
   if (!(await tip.isVisible())) return;
   await page.mouse.move(0, 0);
-  await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
-  if (await tip.waitFor({ state: 'hidden', timeout: 1000 }).then(() => true, () => false)) return;
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+  if (
+    await tip.waitFor({ state: 'hidden', timeout: 1000 }).then(
+      () => true,
+      () => false,
+    )
+  )
+    return;
   await dismissTip(page);
 }
 
@@ -57,7 +66,10 @@ export async function checkTip(page, trigger, { mode = 'hover', timeout = 2000 }
   const tip = tipOf(page);
   await closeTip(page);
   await trigger.scrollIntoViewIfNeeded();
-  const want = { text: (await trigger.getAttribute('data-tip')) ?? '', title: (await trigger.getAttribute('data-tip-title')) ?? '' };
+  const want = {
+    text: (await trigger.getAttribute('data-tip')) ?? '',
+    title: (await trigger.getAttribute('data-tip-title')) ?? '',
+  };
   let via = mode;
   if (mode === 'focus') {
     // (A key first, so the focus that follows counts as the keyboard's: :focus-visible.)
@@ -72,9 +84,13 @@ export async function checkTip(page, trigger, { mode = 'hover', timeout = 2000 }
       if (!id) return 'none';
       const markOf = (h) => document.querySelector(`[data-tip][aria-describedby~="${CSS.escape(h)}"]`);
       const first = (f) => (f.getAttribute('aria-describedby') ?? '').split(/\s+/).find((h) => h && markOf(h));
-      const holders = [...document.querySelectorAll(`[aria-describedby~="${CSS.escape(id)}"]`)].filter((f) => f !== el && !f.hasAttribute('data-tip') && first(f) === id);
+      const holders = [...document.querySelectorAll(`[aria-describedby~="${CSS.escape(id)}"]`)].filter(
+        (f) => f !== el && !f.hasAttribute('data-tip') && first(f) === id,
+      );
       for (const holder of holders) {
-        const target = holder.matches('fieldset') ? holder.querySelector('input:checked:not(:disabled), input:not(:disabled)') : holder;
+        const target = holder.matches('fieldset')
+          ? holder.querySelector('input:checked:not(:disabled), input:not(:disabled)')
+          : holder;
         if (!target || target.matches(':disabled') || !target.getClientRects().length) continue;
         target.setAttribute('data-tip-probe', '');
         return 'field';
@@ -97,16 +113,25 @@ export async function checkTip(page, trigger, { mode = 'hover', timeout = 2000 }
   // holds a weapon over the fire and strikes it) counts with either words: the ones it had when
   // the check began, or the ones it has now.
   const el = await trigger.elementHandle();
-  const shown = await page.waitForFunction(([node, w]) => {
-    const t = document.querySelector('.ui-tip');
-    if (!t || !t.getClientRects().length) return false;
-    const text = t.querySelector('.ui-tip-text')?.textContent;
-    const title = t.querySelector('.ui-tip-title')?.textContent ?? '';
-    const now = { text: node.getAttribute('data-tip') ?? '', title: node.getAttribute('data-tip-title') ?? '' };
-    return [w, now].some((words) => text === words.text && title === words.title);
-  }, [el, want], { timeout }).then(() => true, () => false);
+  const shown = await page
+    .waitForFunction(
+      ([node, w]) => {
+        const t = document.querySelector('.ui-tip');
+        if (!t || !t.getClientRects().length) return false;
+        const text = t.querySelector('.ui-tip-text')?.textContent;
+        const title = t.querySelector('.ui-tip-title')?.textContent ?? '';
+        const now = { text: node.getAttribute('data-tip') ?? '', title: node.getAttribute('data-tip-title') ?? '' };
+        return [w, now].some((words) => text === words.text && title === words.title);
+      },
+      [el, want],
+      { timeout },
+    )
+    .then(
+      () => true,
+      () => false,
+    );
   await el.dispose();
-  const viewport = page.viewportSize() ?? await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  const viewport = page.viewportSize() ?? (await page.evaluate(() => ({ width: innerWidth, height: innerHeight })));
   if (!shown) return { shown, rect: null, viewport, coversTrigger: false, text: '', via };
   const rect = await tip.boundingBox();
   const at = await trigger.boundingBox();

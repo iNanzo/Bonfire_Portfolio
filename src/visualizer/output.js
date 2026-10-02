@@ -33,23 +33,35 @@ export function createOutput(ctx) {
     doc.documentElement.style.cssText = document.documentElement.style.cssText;
     const copy = doc.importNode(titleCard, true); // a fresh node restarts the fade-in
     const old = doc.querySelector('[data-title-card]');
-    if (old) old.replaceWith(copy); else doc.body.append(copy);
+    if (old) old.replaceWith(copy);
+    else doc.body.append(copy);
   }
   function openOutput() {
-    if (output && !output.closed) { output.focus(); return; }
-    if (!stage.querySelector('canvas')?.captureStream) { ctx.note('This browser can’t send the picture to another window', 3); return; }
+    if (output && !output.closed) {
+      output.focus();
+      return;
+    }
+    if (!stage.querySelector('canvas')?.captureStream) {
+      ctx.note('This browser can’t send the picture to another window', 3);
+      return;
+    }
     output = window.open('', 'bonfire-output', 'popup,width=1280,height=720');
-    if (!output) { ctx.note('The window was blocked: allow pop-ups for this page', 3); return; }
+    if (!output) {
+      ctx.note('The window was blocked: allow pop-ups for this page', 3);
+      return;
+    }
     output.document.title = 'Bonfire Live — Output';
     // The page's styles come along so the title card (HTML over the canvas, not in the stream)
     // looks the same there.
-    output.document.head.replaceChildren(...[...document.querySelectorAll('link[rel="stylesheet"], style')].map((el) => {
-      if (el.tagName !== 'LINK') return el.cloneNode(true);
-      const link = output.document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = /** @type {HTMLLinkElement} */ (el).href;
-      return link;
-    }));
+    output.document.head.replaceChildren(
+      ...[...document.querySelectorAll('link[rel="stylesheet"], style')].map((el) => {
+        if (el.tagName !== 'LINK') return el.cloneNode(true);
+        const link = output.document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = /** @type {HTMLLinkElement} */ (el).href;
+        return link;
+      }),
+    );
     output.document.body.innerHTML = `
       <style>
         html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
@@ -61,14 +73,22 @@ export function createOutput(ctx) {
       <video autoplay muted playsinline></video>
       <p class="viz-out-hint">Drag this window to the projector, then double-click for full screen.</p>`;
     const doc = output.document;
-    doc.addEventListener('dblclick', () => (doc.fullscreenElement ? doc.exitFullscreen() : doc.documentElement.requestFullscreen?.()));
+    doc.addEventListener('dblclick', () =>
+      doc.fullscreenElement ? doc.exitFullscreen() : doc.documentElement.requestFullscreen?.(),
+    );
     let quiet = 0;
-    const wakeOut = () => { doc.body.classList.remove('quiet'); clearTimeout(quiet); quiet = setTimeout(() => doc.body.classList.add('quiet'), 2500); };
+    const wakeOut = () => {
+      doc.body.classList.remove('quiet');
+      clearTimeout(quiet);
+      quiet = setTimeout(() => doc.body.classList.add('quiet'), 2500);
+    };
     doc.addEventListener('pointermove', wakeOut);
     wakeOut();
     streamInto(output);
     mirrorCard();
-    output.addEventListener('pagehide', () => { q('[data-output-label]').textContent = 'Output'; });
+    output.addEventListener('pagehide', () => {
+      q('[data-output-label]').textContent = 'Output';
+    });
     q('[data-output-label]').textContent = 'Output (open)';
     ctx.note('Output window open', 2);
   }

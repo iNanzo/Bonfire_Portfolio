@@ -898,7 +898,15 @@ export function createPixelPass({ effects = false } = {}) {
   };
   // One uniforms object for every stage (each reads what it needs).
   const fx = effects ? { FX: '' } : {};
-  const make = (shader, defines = {}) => new THREE.ShaderMaterial({ uniforms, vertexShader, fragmentShader: shader, defines: { ...fx, ...defines }, depthTest: false, depthWrite: false });
+  const make = (shader, defines = {}) =>
+    new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader,
+      fragmentShader: shader,
+      defines: { ...fx, ...defines },
+      depthTest: false,
+      depthWrite: false,
+    });
   const materials = {
     single: make(fragmentShader),
     scene: make(fragmentShader, { SCENE_ONLY: '' }),
@@ -935,7 +943,10 @@ export function createPixelPass({ effects = false } = {}) {
   // lit tone meets the dark steel (1 drawn, 0 not).
   let steelOn = false;
   let steelCount = 0;
-  function setSteel(hexes = [], { rim = uniforms.steelRim.value, lines = uniforms.celLines.value, terminator = uniforms.celTerm.value } = {}) {
+  function setSteel(
+    hexes = [],
+    { rim = uniforms.steelRim.value, lines = uniforms.celLines.value, terminator = uniforms.celTerm.value } = {},
+  ) {
     uniforms.steelRim.value = Math.min(1, Math.max(0, rim));
     uniforms.celLines.value = lines;
     uniforms.celTerm.value = terminator;
@@ -949,7 +960,9 @@ export function createPixelPass({ effects = false } = {}) {
   }
 
   /** Which stage the next render of `scene` draws: single (all in one: the site's), scene, style, ghost, final. */
-  function use(stage) { quad.material = materials[stage]; }
+  function use(stage) {
+    quad.material = materials[stage];
+  }
 
   return { scene, camera, uniforms, setPalette, setSteel, materials, use };
 }

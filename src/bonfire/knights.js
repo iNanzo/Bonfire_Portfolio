@@ -75,13 +75,48 @@
 import * as THREE from 'three';
 import { createArmorMaterial } from './armor.js';
 import {
-  BONES, POSE, measureRig, createSolver, newPose, lerpPose, seatedPose, standingPose, seatFeet, feetAt,
-  idle, look, attend, flinch, shield, hop, rise, walk, gesture, dance, RISE_TIME, GESTURE_TIME, DANCE_SEATED_TIME, GESTURES, MOVES, CHEERS, SEAT_POSES,
+  BONES,
+  POSE,
+  measureRig,
+  createSolver,
+  newPose,
+  lerpPose,
+  seatedPose,
+  standingPose,
+  seatFeet,
+  feetAt,
+  idle,
+  look,
+  attend,
+  flinch,
+  shield,
+  hop,
+  rise,
+  walk,
+  gesture,
+  dance,
+  RISE_TIME,
+  GESTURE_TIME,
+  DANCE_SEATED_TIME,
+  GESTURES,
+  MOVES,
+  CHEERS,
+  SEAT_POSES,
 } from './knightPose.js';
 import { SEATS, danceSlots, ringOf, restPlaces, planWalk, facingYaw, FIRE_AT } from './knightPlaces.js';
 import { collidersNear, distanceTo, outOf, createFits } from './colliders.js';
 import { weaponSilhouette } from './forgeFx.js';
-import { HELMETS, ALL_BONES, BONE_INDEX, PARENT_ALL, templateSteps, probesOf, drain, buildTemplate, platesOf } from './knightMesh.js';
+import {
+  HELMETS,
+  ALL_BONES,
+  BONE_INDEX,
+  PARENT_ALL,
+  templateSteps,
+  probesOf,
+  drain,
+  buildTemplate,
+  platesOf,
+} from './knightMesh.js';
 import { CLEAR_NEAR, SIDES, SHOULDER, danceUp, createClearance } from './knightClear.js';
 import { STEP_FPS, createPlateSprings } from './knightPlates.js';
 
@@ -89,10 +124,10 @@ export { GESTURES, MOVES, SEAT_POSES };
 export { HELMETS, templateSteps };
 
 const FIRE = new THREE.Vector3(FIRE_AT.x, 0, FIRE_AT.z);
-const FADE_TIME = 0.55;  // summoning or dismissing (s)
-const HELM_TIME = 1.6;   // the helmet swap
+const FADE_TIME = 0.55; // summoning or dismissing (s)
+const HELM_TIME = 1.6; // the helmet swap
 const WALK_SPEED = 0.95; // m/s
-const TURN_SPEED = 5;    // rad/s
+const TURN_SPEED = 5; // rad/s
 const CROSSFADE = 0.2;
 const STEP_OVER = 0.16; // m: what a walking knight steps over (a fire pit's stone, a spare log)
 // His meshes' bounds (his own space: the ground under him, turned with him), for culling:
@@ -141,7 +176,19 @@ const STAND_OFFSET = [0, 2, POSE.legL, POSE.legL + 1, POSE.legL + 2, POSE.legR, 
  * @param {object} [o.template]      the model's template, built beforehand (templateSteps: in
  *   idle moments); without it, it's built here at once
  */
-export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castShadows = true, armor, max = 4, reducedMotion = false, onSparks = null, template = null } = {}) {
+export function createKnights(
+  gltfRoot,
+  {
+    layerSolid = 0,
+    layerGhost = 2,
+    castShadows = true,
+    armor,
+    max = 4,
+    reducedMotion = false,
+    onSparks = null,
+    template = null,
+  } = {},
+) {
   // The template he's built from now: the knight's own, or another style's model on the same
   // rig (setStyle). The rig, the solver and the plates' collision data are the knight's own.
   let T = template?.root === gltfRoot ? template : buildTemplate(gltfRoot);
@@ -150,7 +197,8 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   const armorPlates = platesOf(T);
   const rig = measureRig(T.restPos, {
     ...(T.tassetFollow ? { tassetFollow: T.tassetFollow } : {}),
-    plates: armorPlates?.plates ?? null, lamesNode: armorPlates?.lamesNode ?? false,
+    plates: armorPlates?.plates ?? null,
+    lamesNode: armorPlates?.lamesNode ?? false,
   });
   const solver = createSolver(rig);
   // The points his arms and body are checked at against the scenery (keepClear, solveClear):
@@ -170,7 +218,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const pi = BONE_INDEX[par];
     return restPos[i].clone().sub(restPos[pi]).applyQuaternion(restQuat[pi].clone().invert());
   });
-  const boneInverses = ALL_BONES.map((b, i) => new THREE.Matrix4().compose(restPos[i], restQuat[i], new THREE.Vector3(1, 1, 1)).invert());
+  const boneInverses = ALL_BONES.map((b, i) =>
+    new THREE.Matrix4().compose(restPos[i], restQuat[i], new THREE.Vector3(1, 1, 1)).invert(),
+  );
   const root = new THREE.Group();
   root.name = 'Knights';
   const materials = [];
@@ -185,8 +235,14 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       bone.quaternion.copy(par ? restQuat[BONE_INDEX[par]].clone().invert().multiply(restQuat[i]) : restQuat[i]);
       return bone;
     });
-    ALL_BONES.forEach((b, i) => { const par = PARENT_ALL[b]; if (par) bones[BONE_INDEX[par]].add(bones[i]); });
-    const skeleton = new THREE.Skeleton(bones, boneInverses.map((mm) => mm.clone()));
+    ALL_BONES.forEach((b, i) => {
+      const par = PARENT_ALL[b];
+      if (par) bones[BONE_INDEX[par]].add(bones[i]);
+    });
+    const skeleton = new THREE.Skeleton(
+      bones,
+      boneInverses.map((mm) => mm.clone()),
+    );
     const bodyMat = createArmorMaterial(armor, { span: T.bodySpan });
     const helmMat = createArmorMaterial(armor, { span: T.helmSpan });
     materials.push(bodyMat, helmMat);
@@ -211,23 +267,48 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     root.add(group);
     const helms = Object.fromEntries(HELMETS.map((h, j) => [h, meshes[j + 1]]));
     return {
-      index, group, bones, skeleton, body: meshes[0], helms, meshes, bodyMat, helmMat,
-      pose: newPose(), from: newPose(), blend: 1, sit: newPose(), stand: newPose(), work: newPose(),
-      present: false, fade: null, ghost: false,
-      forging: null,     // 'in' | 'out': the forge is summoning or sending him off (forgeSubject)
-      mode: 'sit', act: null, queue: [],
-      home: null,        // where he sits: { x, z, yaw, h, feet: [gL, gR], y } (world)
-      yaw: 0, lastStep: -1, clock: 0,
+      index,
+      group,
+      bones,
+      skeleton,
+      body: meshes[0],
+      helms,
+      meshes,
+      bodyMat,
+      helmMat,
+      pose: newPose(),
+      from: newPose(),
+      blend: 1,
+      sit: newPose(),
+      stand: newPose(),
+      work: newPose(),
+      present: false,
+      fade: null,
+      ghost: false,
+      forging: null, // 'in' | 'out': the forge is summoning or sending him off (forgeSubject)
+      mode: 'sit',
+      act: null,
+      queue: [],
+      home: null, // where he sits: { x, z, yaw, h, feet: [gL, gR], y } (world)
+      yaw: 0,
+      lastStep: -1,
+      clock: 0,
       react: { flinch: -9, flinchK: 0, stoke: -9, hop: -9 },
-      lookAt: null, lookW: 0, lookYaw: 0, lookPitch: 0, attn: 0, attnMoving: false,
-      helmet: 'great', swap: null,
-      dancing: null,     // { move, energy, offset, seed, seated }: the dance he's doing
-      nextDance: null,   // ...or the one he's on his way to
-      danceAt: null,     // where he dances: { x, z, yaw, seated }
+      lookAt: null,
+      lookW: 0,
+      lookYaw: 0,
+      lookPitch: 0,
+      attn: 0,
+      attnMoving: false,
+      helmet: 'great',
+      swap: null,
+      dancing: null, // { move, energy, offset, seed, seated }: the dance he's doing
+      nextDance: null, // ...or the one he's on his way to
+      danceAt: null, // where he dances: { x, z, yaw, seated }
       seed: index * 7 + 3,
-      wasBig: false,     // (his last pose step was real motion)
-      solves: 0,         // (how many poses his last step solved: solveClear)
-      solved: null,      // his solved pose's joints (knight space): { p: [Vector3 by BONES index] }
+      wasBig: false, // (his last pose step was real motion)
+      solves: 0, // (how many poses his last step solved: solveClear)
+      solved: null, // his solved pose's joints (knight space): { p: [Vector3 by BONES index] }
       own: { p: BONES.map(() => new THREE.Vector3()) }, // (his own copy: the solver's is shared)
     };
   }
@@ -274,16 +355,28 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         const p = new THREE.Vector3(side * 0.17, 0, seatFeet(top)).applyAxisAngle(Y_AXIS, yaw);
         return heightAt(seat.x + p.x, seat.z + p.z);
       };
-      const gL = ground(1), gR = ground(-1);
+      const gL = ground(1),
+        gR = ground(-1);
       const y = Math.max(0, Math.min(gL, gR));
-      return { x: seat.x, z: seat.z, yaw, h: Math.max(0.15, top - y), feet: [gL - y, gR - y], y, seat: true, aside: seat.standAside ?? 0 };
+      return {
+        x: seat.x,
+        z: seat.z,
+        yaw,
+        h: Math.max(0.15, top - y),
+        feet: [gL - y, gR - y],
+        y,
+        seat: true,
+        aside: seat.standAside ?? 0,
+      };
     }
     // The others sit on the ground where the visualizer rests them (knightPlaces.js
     // restPlaces: the ring's clear sides, never in front of the fire), their feet on the ring.
-    const place = restPlaces(ringOf(sceneryName), Math.max(cast, i + 1), seat)[i - 1] ?? danceSlots(sceneryName)[slotOf(i)];
+    const place =
+      restPlaces(ringOf(sceneryName), Math.max(cast, i + 1), seat)[i - 1] ?? danceSlots(sceneryName)[slotOf(i)];
     const out = Math.hypot(place.x - FIRE.x, place.z - FIRE.z) || 1;
     const back = seatFeet(0) - 0.03;
-    const x = place.x + ((place.x - FIRE.x) / out) * back, z = place.z + ((place.z - FIRE.z) / out) * back;
+    const x = place.x + ((place.x - FIRE.x) / out) * back,
+      z = place.z + ((place.z - FIRE.z) / out) * back;
     return { x, z, yaw: faceFire(x, z), h: 0, feet: [0, 0], y: Math.max(0, heightAt(x, z)), seat: false };
   }
   /** Put knight k seated at home now. */
@@ -320,9 +413,17 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   // --- the ground round his seat (his feet, standing up, room for his arms) ----------------------
   const _hw = new THREE.Vector3();
   /** A place in his own space at `home` ({ x, z, yaw }: x his left, z ahead), in the world (reused). */
-  const atHome = (home, x, z) => { _hw.set(x, 0, z).applyAxisAngle(Y_AXIS, home.yaw); _hw.x += home.x; _hw.z += home.z; return _hw; };
+  const atHome = (home, x, z) => {
+    _hw.set(x, 0, z).applyAxisAngle(Y_AXIS, home.yaw);
+    _hw.x += home.x;
+    _hw.z += home.z;
+    return _hw;
+  };
   /** The ground at a place in his own space at `home`, above the ground he's placed on (m). */
-  const groundUnder = (home, x, z) => { const w = atHome(home, x, z); return THREE.MathUtils.clamp(heightAt(w.x, w.z) - home.y, -0.1, 0.42); };
+  const groundUnder = (home, x, z) => {
+    const w = atHome(home, x, z);
+    return THREE.MathUtils.clamp(heightAt(w.x, w.z) - home.y, -0.1, 0.42);
+  };
   /**
    * The ground a seated boot rests on at a place in his own space at `home` (its ankle at x, z):
    * the highest under its sole from the ankle to the pointed toe (0.3 m ahead), so the toe
@@ -331,11 +432,15 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
    */
   const soleUnder = (home, x, z) => {
     let g = -Infinity;
-    for (const dz of [0, 0.1, 0.2, 0.28]) for (const dx of [-0.05, 0.05]) g = Math.max(g, groundUnder(home, x + dx, z + dz));
+    for (const dz of [0, 0.1, 0.2, 0.28])
+      for (const dx of [-0.05, 0.05]) g = Math.max(g, groundUnder(home, x + dx, z + dz));
     return g;
   };
   /** What stands at a place in his own space at `home` (its top), above the ground he's placed on (m). */
-  const topUnder = (home, x, z) => { const w = atHome(home, x, z); return topAt(w.x, w.z) - home.y; };
+  const topUnder = (home, x, z) => {
+    const w = atHome(home, x, z);
+    return topAt(w.x, w.z) - home.y;
+  };
   /**
    * His seated pose at home (into k.sit), each foot on the ground where the pose rests it
    * (a foot up on the seat's log, or down a slope), and the room he has for his arms.
@@ -354,7 +459,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   /** How far each foot of a seated pose may lift when a ring passes under him (hop()'s `rise`), [left, right] (m): up to HOP_TOP over its hip joint. */
   function riseOf(pose) {
     const s = solve(pose);
-    return SIDES.map((side) => Math.max(0, HOP_TOP - (s.p[BONE_INDEX['foot' + side]].y - s.p[BONE_INDEX['thigh' + side]].y)));
+    return SIDES.map((side) =>
+      Math.max(0, HOP_TOP - (s.p[BONE_INDEX['foot' + side]].y - s.p[BONE_INDEX['thigh' + side]].y)),
+    );
   }
   const _rn = [0, 0, 0];
   /**
@@ -370,11 +477,14 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     if (!cs.length) return FREE;
     const s = solve(pose);
     const hipsX = s.p[BONE_INDEX.hips].x;
-    const c = Math.cos(h.yaw), sn = Math.sin(h.yaw);
+    const c = Math.cos(h.yaw),
+      sn = Math.sin(h.yaw);
     return ['L', 'R'].map((side, i) => {
       const sg = i ? -1 : 1;
       const at = s.p[SHOULDER[side]];
-      const wx = h.x + at.x * c + at.z * sn, wy = h.y + at.y, wz = h.z - at.x * sn + at.z * c;
+      const wx = h.x + at.x * c + at.z * sn,
+        wy = h.y + at.y,
+        wz = h.z - at.x * sn + at.z * c;
       let d = Infinity;
       for (const col of cs) {
         const e = distanceTo(col, wx, wy, wz);
@@ -405,7 +515,8 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const less = (h.roomLess ??= [Math.min(h.room[0], up[0]), Math.min(h.room[1], up[1])]);
     if (k.mode === 'sit' && !a) {
       if (k.gestureName !== 'dance' || k.danceInPlace) return h.room;
-      const u = danceUp(k), r = (k.roomNow ??= [0, 0]);
+      const u = danceUp(k),
+        r = (k.roomNow ??= [0, 0]);
       for (let j = 0; j < 2; j++) r[j] = less[j] + (up[j] - less[j]) * u;
       return r;
     }
@@ -421,7 +532,8 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   function standSpot(h) {
     const z0 = seatFeet(h.h) - 0.03;
     if (!h.seat || !terrain) return { x: 0, z: z0 };
-    const fx = rig.pos.footL.x + 0.03, fz = rig.pos.footL.z + 0.02;
+    const fx = rig.pos.footL.x + 0.03,
+      fz = rig.pos.footL.z + 0.02;
     const cs = collidersNear(sceneryName, h.x, h.z, CLEAR_NEAR);
     const upper = upperBody();
     /** Whether his upper body standing at (x, z), the ground `g` up, keeps UPPER_CLEAR from the shapes. */
@@ -437,14 +549,31 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
      * hand's breadth from the scenery's shapes: room for the dance's steps), else NaN.
      */
     const level = (x, z) => {
-      let lo = Infinity, hi = -Infinity;
+      let lo = Infinity,
+        hi = -Infinity;
       // (Its sole, heel to its pointed toe and either side; the boot, toe aside, out of the fire.)
-      for (const [dx, dz] of [[0, 0], [0.07, 0], [-0.07, 0], [0, 0.12], [0, 0.24], [0.06, 0.18], [-0.06, 0.18], [0, -0.06]]) {
+      for (const [dx, dz] of [
+        [0, 0],
+        [0.07, 0],
+        [-0.07, 0],
+        [0, 0.12],
+        [0, 0.24],
+        [0.06, 0.18],
+        [-0.06, 0.18],
+        [0, -0.06],
+      ]) {
         const g = groundUnder(h, x + dx, z + dz);
         const w = atHome(h, x + dx, z + dz);
-        if (topUnder(h, x + dx, z + dz) - g > 0.05 || (dz <= 0.12 && Math.hypot(w.x - FIRE.x, w.z - FIRE.z) < 1.05)) return NaN;
-        for (const c of cs) if (distanceTo(c, w.x, h.y + g + 0.05, w.z) < STAND_CLEAR || distanceTo(c, w.x, h.y + g + 0.3, w.z) < STAND_CLEAR) return NaN;
-        lo = Math.min(lo, g); hi = Math.max(hi, g);
+        if (topUnder(h, x + dx, z + dz) - g > 0.05 || (dz <= 0.12 && Math.hypot(w.x - FIRE.x, w.z - FIRE.z) < 1.05))
+          return NaN;
+        for (const c of cs)
+          if (
+            distanceTo(c, w.x, h.y + g + 0.05, w.z) < STAND_CLEAR ||
+            distanceTo(c, w.x, h.y + g + 0.3, w.z) < STAND_CLEAR
+          )
+            return NaN;
+        lo = Math.min(lo, g);
+        hi = Math.max(hi, g);
       }
       return hi - lo < 0.05 ? (lo + hi) / 2 : NaN;
     };
@@ -456,9 +585,11 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         for (const x of dx ? [aside - dx, aside + dx] : [aside]) {
           const score = Math.abs(x - aside) + 0.8 * dz;
           if (best && score >= best.score) continue;
-          const gl = level(x + fx, z0 + dz + fz), gr = level(x - fx, z0 + dz + fz);
+          const gl = level(x + fx, z0 + dz + fz),
+            gr = level(x - fx, z0 + dz + fz);
           // (Both boots level with each other, not up on anything or down a hole; room above.)
-          if (Math.abs(gl - gr) < 0.04 && gl > -0.12 && gl < 0.06 && roomAbove(x, z0 + dz, (gl + gr) / 2)) best = { x, z: z0 + dz, score };
+          if (Math.abs(gl - gr) < 0.04 && gl > -0.12 && gl < 0.06 && roomAbove(x, z0 + dz, (gl + gr) / 2))
+            best = { x, z: z0 + dz, score };
         }
       }
     }
@@ -469,10 +600,14 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   function upperBody() {
     if (upperPts) return upperPts;
     const s = solve(standingPose(newPose()));
-    const out = [], v = new THREE.Vector3();
+    const out = [],
+      v = new THREE.Vector3();
     for (const b of bodyProbes) {
       if (!UPPER.has(b.i)) continue;
-      for (let j = 0; j < b.pts.length; j += 3) { v.fromArray(b.pts, j).applyQuaternion(s.q[b.i]).add(s.p[b.i]); out.push(v.x, v.y, v.z); }
+      for (let j = 0; j < b.pts.length; j += 3) {
+        v.fromArray(b.pts, j).applyQuaternion(s.q[b.i]).add(s.p[b.i]);
+        out.push(v.x, v.y, v.z);
+      }
     }
     return (upperPts = Float32Array.from(out));
   }
@@ -483,23 +618,30 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const s = h ? (h.stand ??= standSpot(h)) : { x: 0, z: 0 };
     k.stand[0] = s.x;
     k.stand[2] = s.z;
-    k.stand[32] += s.x; k.stand[37] -= s.x; // (legs: x is out to each side)
+    k.stand[32] += s.x;
+    k.stand[37] -= s.x; // (legs: x is out to each side)
     k.stand[32 + 2] = s.z + 0.02;
     k.stand[37 + 2] = s.z + 0.02;
     if (h) {
       const [fl, fr] = feetAt(k.stand, rig);
       k.stand[33] += groundUnder(h, fl[0], fl[1]);
       k.stand[38] += groundUnder(h, fr[0], fr[1]);
-      if (!h.roomUp) { h.roomUp = roomOf(h, k.stand); h.roomLess = null; }
+      if (!h.roomUp) {
+        h.roomUp = roomOf(h, k.stand);
+        h.roomLess = null;
+      }
     }
     return k.stand;
   }
   const _feet = new Float64Array(8);
   /** A pose's feet (feetAt: x his left, z ahead) into _feet from `j`: left x, z, right x, z. */
   function feetInto(p, j) {
-    const L = rig.pos.footL, R = rig.pos.footR;
-    _feet[j] = L.x + p[POSE.legL]; _feet[j + 1] = L.z + p[POSE.legL + 2];
-    _feet[j + 2] = R.x - p[POSE.legR]; _feet[j + 3] = R.z + p[POSE.legR + 2];
+    const L = rig.pos.footL,
+      R = rig.pos.footR;
+    _feet[j] = L.x + p[POSE.legL];
+    _feet[j + 1] = L.z + p[POSE.legL + 2];
+    _feet[j + 2] = R.x - p[POSE.legR];
+    _feet[j + 3] = R.z + p[POSE.legR + 2];
   }
   /**
    * Whether a foot comes nearer any of the scenery's shapes `cs` than `under` (m) with its joint
@@ -507,15 +649,25 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
    * that can't come that near passed over whole).
    */
   function footIn(h, foot, x, y, z, cs, under) {
-    const c = Math.cos(h.yaw), sn = Math.sin(h.yaw);
-    const gx = h.x + x * c + z * sn, gy = h.y + y, gz = h.z - x * sn + z * c;
-    const P = foot.pts, C = foot.clumps;
+    const c = Math.cos(h.yaw),
+      sn = Math.sin(h.yaw);
+    const gx = h.x + x * c + z * sn,
+      gy = h.y + y,
+      gz = h.z - x * sn + z * c;
+    const P = foot.pts,
+      C = foot.clumps;
     for (const col of cs) {
       if (distanceTo(col, gx, gy, gz) - col.lip * foot.r >= under) continue;
       for (let q = 0; q < C.length; q += 6) {
-        if (distanceTo(col, gx + C[q] * c + C[q + 2] * sn, gy + C[q + 1], gz - C[q] * sn + C[q + 2] * c) - col.lip * C[q + 3] >= under) continue;
+        if (
+          distanceTo(col, gx + C[q] * c + C[q + 2] * sn, gy + C[q + 1], gz - C[q] * sn + C[q + 2] * c) -
+            col.lip * C[q + 3] >=
+          under
+        )
+          continue;
         for (let j = C[q + 4], end = C[q + 5]; j < end; j += 3) {
-          if (distanceTo(col, gx + P[j] * c + P[j + 2] * sn, gy + P[j + 1], gz - P[j] * sn + P[j + 2] * c) < under) return true;
+          if (distanceTo(col, gx + P[j] * c + P[j + 2] * sn, gy + P[j + 1], gz - P[j] * sn + P[j + 2] * c) < under)
+            return true;
         }
       }
     }
@@ -533,7 +685,13 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   function overOf(k) {
     const h = k.home;
     if (!h?.seat) return null;
-    const o = (k.over ??= { L: new Float32Array(OVER_POINTS), R: new Float32Array(OVER_POINTS), cross: false, key: new Float64Array(8), home: null });
+    const o = (k.over ??= {
+      L: new Float32Array(OVER_POINTS),
+      R: new Float32Array(OVER_POINTS),
+      cross: false,
+      key: new Float64Array(8),
+      home: null,
+    });
     // (Each foot's place seated, then standing, as feetAt has them: x his left, z ahead.)
     feetInto(k.sit, 0);
     feetInto(k.stand, 4);
@@ -547,15 +705,23 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       const out = f ? o.R : o.L;
       out.fill(0);
       if (!cs.length) continue;
-      const foot = FEET[f], leg = f ? POSE.legR : POSE.legL;
-      const ax = _feet[2 * f], az = _feet[2 * f + 1], bx = _feet[4 + 2 * f], bz = _feet[5 + 2 * f];
-      const ay = k.sit[leg + 1] + rig.ankleY, by = k.stand[leg + 1] + rig.ankleY;
+      const foot = FEET[f],
+        leg = f ? POSE.legR : POSE.legL;
+      const ax = _feet[2 * f],
+        az = _feet[2 * f + 1],
+        bx = _feet[4 + 2 * f],
+        bz = _feet[5 + 2 * f];
+      const ay = k.sit[leg + 1] + rig.ankleY,
+        by = k.stand[leg + 1] + rig.ankleY;
       for (let i = 1; i < OVER_POINTS - 1; i++) {
         const e = i / (OVER_POINTS - 1);
-        const x = ax + (bx - ax) * e, y = ay + (by - ay) * e, z = az + (bz - az) * e;
+        const x = ax + (bx - ax) * e,
+          y = ay + (by - ay) * e,
+          z = az + (bz - az) * e;
         if (!footIn(h, foot, x, y, z, cs, OVER_CLEAR)) continue;
         // (As little higher as clears it, to a centimetre.)
-        let lo = 0, hi = OVER_MOST;
+        let lo = 0,
+          hi = OVER_MOST;
         while (hi - lo > 0.01) {
           const m = (lo + hi) / 2;
           if (!footIn(h, foot, x, y + m, z, cs, OVER_CLEAR)) hi = m;
@@ -573,7 +739,10 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   function setGhost(k, on) {
     if (k.ghost === on) return;
     k.ghost = on;
-    for (const mesh of k.meshes) { mesh.layers.set(on ? layerGhost : layerSolid); mesh.castShadow = castShadows && !on; }
+    for (const mesh of k.meshes) {
+      mesh.layers.set(on ? layerGhost : layerSolid);
+      mesh.castShadow = castShadows && !on;
+    }
     shadowDirty = true;
   }
   /** Shown or hidden (his group), and the shadow redrawn for it. */
@@ -591,7 +760,12 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     k.fade = null;
     endForge(k);
     setShown(k, false);
-    if (k.swap) { const s = k.swap; k.swap = null; wear(k, s.to); s.resolve(true); }
+    if (k.swap) {
+      const s = k.swap;
+      k.swap = null;
+      wear(k, s.to);
+      s.resolve(true);
+    }
     k.gestureName = null;
     setGhost(k, false);
     setHelmGhost(k, false);
@@ -603,7 +777,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   /** The cast is as many as the highest knight who's here and staying (setCast sets it outright). */
   function recount() {
     cast = 0;
-    knights.forEach((k, i) => { if (k.present && !leaving(k)) cast = i + 1; });
+    knights.forEach((k, i) => {
+      if (k.present && !leaving(k)) cast = i + 1;
+    });
   }
   /** Burn away (to 1) or form (to 0) over FADE_TIME, with an ember edge; then `done`. */
   function fade(k, to, done = null) {
@@ -626,12 +802,17 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     k.fade = null;
     // (Gone, unless he's only going somewhere else: `done` brings him back.)
     if (f.to >= 1 && !f.done) vanish(k);
-    else if (f.to < 1) { setGhost(k, false); flash(k, 0.7); }
+    else if (f.to < 1) {
+      setGhost(k, false);
+      flash(k, 0.7);
+    }
     f.done?.();
   }
   // A flash over him (formed, or a new helmet), fading: in his own tones (the armor's uLift),
   // never a wash of the edge color (that turns him into a flat cut-out of one color).
-  function flash(k, amount, helmOnly = false) { k.glow = { v: amount, helmOnly }; }
+  function flash(k, amount, helmOnly = false) {
+    k.glow = { v: amount, helmOnly };
+  }
 
   // --- summoned and sent off by the forge (the site's knight: knightArrival.js) ----------------
   // summon(i, { forge: true }) seats him burnt away on the ghost layer and leaves his dissolve
@@ -640,7 +821,12 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   // it: whole and solid again, or gone. Meanwhile his helmet burns with his body (its dissolve
   // runs over his whole height, not the helmet's own) and nothing else touches his dissolve.
   function beginForge(k, dir) {
-    if (k.swap) { const s = k.swap; k.swap = null; wear(k, s.to); s.resolve(true); }
+    if (k.swap) {
+      const s = k.swap;
+      k.swap = null;
+      wear(k, s.to);
+      s.resolve(true);
+    }
     k.fade = null;
     k.glow = null;
     for (const m of [k.bodyMat, k.helmMat]) m.userData.uniforms.uLift.value = 0;
@@ -652,7 +838,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     if (!k.forging) return;
     k.forging = null;
     k.helmMat.userData.uniforms.uSpan.value.set(T.helmSpan[0], T.helmSpan[1]);
-    for (const m of [k.bodyMat, k.helmMat]) { m.userData.uniforms.uFrost && (m.userData.uniforms.uFrost.value = 0); }
+    for (const m of [k.bodyMat, k.helmMat]) {
+      m.userData.uniforms.uFrost && (m.userData.uniforms.uFrost.value = 0);
+    }
   }
   /**
    * Knight i as the forge sees him (forgeRun.js ForgeSubject), posed as he is now: `n` points
@@ -674,27 +862,44 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const restY = new Float32Array(count);
     const v = new THREE.Vector3();
     let o = 0;
-    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    let x0 = Infinity,
+      x1 = -Infinity,
+      z0 = Infinity,
+      z1 = -Infinity;
     for (const g of geos) {
-      const p = g.attributes.position, s = g.attributes.skinIndex;
+      const p = g.attributes.position,
+        s = g.attributes.skinIndex;
       for (let j = 0; j < p.count; j++, o++) {
         v.fromBufferAttribute(p, j);
         restY[o] = v.y;
         v.applyMatrix4(M[s.getX(j)]);
-        posed[o * 3] = v.x; posed[o * 3 + 1] = v.y; posed[o * 3 + 2] = v.z;
-        x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); z0 = Math.min(z0, v.z); z1 = Math.max(z1, v.z);
+        posed[o * 3] = v.x;
+        posed[o * 3 + 1] = v.y;
+        posed[o * 3 + 2] = v.z;
+        x0 = Math.min(x0, v.x);
+        x1 = Math.max(x1, v.x);
+        z0 = Math.min(z0, v.z);
+        z1 = Math.max(z1, v.z);
       }
     }
     // (His own axis: the middle of him from above, so the helix winds round all of him.)
-    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-    for (let j = 0; j < count; j++) { posed[j * 3] -= cx; posed[j * 3 + 2] -= cz; }
+    const cx = (x0 + x1) / 2,
+      cz = (z0 + z1) / 2;
+    for (let j = 0; j < count; j++) {
+      posed[j * 3] -= cx;
+      posed[j * 3 + 2] -= cz;
+    }
     const [lo, hi] = T.bodySpan;
     const tris = count / 3;
     const cum = new Float32Array(tris);
-    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    const a = new THREE.Vector3(),
+      b = new THREE.Vector3(),
+      c = new THREE.Vector3();
     let total = 0;
     for (let t = 0; t < tris; t++) {
-      a.fromArray(posed, t * 9); b.fromArray(posed, t * 9 + 3); c.fromArray(posed, t * 9 + 6);
+      a.fromArray(posed, t * 9);
+      b.fromArray(posed, t * 9 + 3);
+      c.fromArray(posed, t * 9 + 6);
       total += b.sub(a).cross(c.sub(a)).length() / 2;
       cum[t] = total;
     }
@@ -702,11 +907,24 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const heights = new Float32Array(n);
     for (let s = 0; s < n; s++) {
       const r = Math.random() * total;
-      let l = 0, h = tris - 1;
-      while (l < h) { const mid = (l + h) >> 1; if (cum[mid] < r) l = mid + 1; else h = mid; }
-      let u = Math.random(), w = Math.random();
-      if (u + w > 1) { u = 1 - u; w = 1 - w; }
-      for (let d = 0; d < 3; d++) samples[s * 3 + d] = posed[l * 9 + d] + (posed[l * 9 + 3 + d] - posed[l * 9 + d]) * u + (posed[l * 9 + 6 + d] - posed[l * 9 + d]) * w;
+      let l = 0,
+        h = tris - 1;
+      while (l < h) {
+        const mid = (l + h) >> 1;
+        if (cum[mid] < r) l = mid + 1;
+        else h = mid;
+      }
+      let u = Math.random(),
+        w = Math.random();
+      if (u + w > 1) {
+        u = 1 - u;
+        w = 1 - w;
+      }
+      for (let d = 0; d < 3; d++)
+        samples[s * 3 + d] =
+          posed[l * 9 + d] +
+          (posed[l * 9 + 3 + d] - posed[l * 9 + d]) * u +
+          (posed[l * 9 + 6 + d] - posed[l * 9 + d]) * w;
       const y = restY[l * 3] + (restY[l * 3 + 1] - restY[l * 3]) * u + (restY[l * 3 + 2] - restY[l * 3]) * w;
       heights[s] = THREE.MathUtils.clamp((y - lo) / (hi - lo), 0, 1);
     }
@@ -714,19 +932,58 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const offset = new THREE.Matrix4().makeTranslation(cx, 0, cz);
     const matrixWorld = () => frame.multiplyMatrices(k.group.matrixWorld, offset);
     let silhouette = null;
-    const A = k.bodyMat.userData.uniforms, B = k.helmMat.userData.uniforms;
-    const both = (name, k = 1) => ({ get value() { return A[name].value / k; }, set value(x) { A[name].value = x * k; B[name].value = x * k; } });
-    const bothColor = (name) => ({ value: { copy(x) { A[name].value.copy(x); B[name].value.copy(x); return A[name].value; } } });
+    const A = k.bodyMat.userData.uniforms,
+      B = k.helmMat.userData.uniforms;
+    const both = (name, k = 1) => ({
+      get value() {
+        return A[name].value / k;
+      },
+      set value(x) {
+        A[name].value = x * k;
+        B[name].value = x * k;
+      },
+    });
+    const bothColor = (name) => ({
+      value: {
+        copy(x) {
+          A[name].value.copy(x);
+          B[name].value.copy(x);
+          return A[name].value;
+        },
+      },
+    });
     // (The armor's frost glaze if it has one; otherwise the frost washes him in the edge's
     // pale tone, the dissolve's glow.)
     let frost = 0;
-    const frosty = A.uFrost ? both('uFrost') : { get value() { return frost; }, set value(x) { frost = x; A.uGlow.value = B.uGlow.value = x * 0.85; } };
+    const frosty = A.uFrost
+      ? both('uFrost')
+      : {
+          get value() {
+            return frost;
+          },
+          set value(x) {
+            frost = x;
+            A.uGlow.value = B.uGlow.value = x * 0.85;
+          },
+        };
     const head = new THREE.Vector3();
     return {
-      get matrixWorld() { return matrixWorld(); },
-      samples, heights,
+      get matrixWorld() {
+        return matrixWorld();
+      },
+      samples,
+      heights,
       span: new THREE.Vector2(lo, hi),
-      silhouette: () => (silhouette ??= weaponSilhouette(new Map([[{ geometry: new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(posed, 3)) }, new THREE.Matrix4()]]), 0.02)),
+      silhouette: () =>
+        (silhouette ??= weaponSilhouette(
+          new Map([
+            [
+              { geometry: new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(posed, 3)) },
+              new THREE.Matrix4(),
+            ],
+          ]),
+          0.02,
+        )),
       helixWide: (s) => 0.42 + 0.16 * Math.sin(Math.PI * s),
       formsUp: true, // (from his boots up, whatever the element)
       formGlow: false, // (in his own steel behind the burning edge: see uGlow)
@@ -739,7 +996,8 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         return out.copy(head).setY(head.y + (s > 0.8 ? 0.3 : 0));
       },
       ground(rng, out) {
-        const ang = rng() * Math.PI * 2, r = 0.45 + rng() * 0.35;
+        const ang = rng() * Math.PI * 2,
+          r = 0.45 + rng() * 0.35;
         return out.set(Math.cos(ang) * r, 0.05, Math.sin(ang) * r).applyMatrix4(matrixWorld());
       },
       uniforms: {
@@ -747,13 +1005,23 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         // in it reads as a flat cut-out, not as him. He forms in his own steel behind the
         // burning edge, each of the lightning's jumps flashing him up his own ramp (uLift, as a
         // new helmet does); formed, the fire's reflection sweeps him: scene.js.)
-        uDissolve: both('uDissolve'), uGlow: both('uGlow', 0.5), uFlip: both('uFlip'), uLift: both('uLift'),
-        uEdge: bothColor('uEdge'), uEdgeHot: bothColor('uEdgeHot'),
-        uFrost: frosty, uFrostColor: A.uFrostColor ? bothColor('uFrostColor') : { value: new THREE.Color() },
+        uDissolve: both('uDissolve'),
+        uGlow: both('uGlow', 0.5),
+        uFlip: both('uFlip'),
+        uLift: both('uLift'),
+        uEdge: bothColor('uEdge'),
+        uEdgeHot: bothColor('uEdgeHot'),
+        uFrost: frosty,
+        uFrostColor: A.uFrostColor ? bothColor('uFrostColor') : { value: new THREE.Color() },
       },
       // (A ghost casts no shadow: the lightning's strobe needn't redraw it.)
-      show(on) { if (k.ghost) k.group.visible = on; else setShown(k, on); },
-      ghost(on) { setGhost(k, on); },
+      show(on) {
+        if (k.ghost) k.group.visible = on;
+        else setShown(k, on);
+      },
+      ghost(on) {
+        setGhost(k, on);
+      },
     };
   }
   /**
@@ -776,14 +1044,22 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     if (!valid(i)) return false;
     const k = knights[i];
     if (!k.forging) return false;
-    if (k.forging === 'out') { vanish(k); recount(); return true; }
+    if (k.forging === 'out') {
+      vanish(k);
+      recount();
+      return true;
+    }
     const glow = k.bodyMat.userData.uniforms.uGlow.value;
     endForge(k);
     k.group.visible = true;
     setShown(k, true);
     setGhost(k, false);
     // (The forge's wash ends as he stands whole; what's left of it flashes in his own tones.)
-    for (const m of [k.bodyMat, k.helmMat]) { m.userData.uniforms.uDissolve.value = 0; m.userData.uniforms.uFlip.value = 0; m.userData.uniforms.uGlow.value = 0; }
+    for (const m of [k.bodyMat, k.helmMat]) {
+      m.userData.uniforms.uDissolve.value = 0;
+      m.userData.uniforms.uFlip.value = 0;
+      m.userData.uniforms.uGlow.value = 0;
+    }
     if (glow > 0.02) flash(k, Math.min(1, glow));
     shadowDirty = true;
     return true;
@@ -796,7 +1072,14 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     for (let j = 0; j < n; j++) {
       const b = bone ?? Math.floor(Math.random() * BONES.length);
       k.bones[b].getWorldPosition(sparkAt);
-      list.push({ x: sparkAt.x + (Math.random() - 0.5) * 0.15, y: sparkAt.y + (Math.random() - 0.3) * 0.12, z: sparkAt.z + (Math.random() - 0.5) * 0.15, vx: (Math.random() - 0.5) * 0.5, vy: 0.5 + Math.random() * 0.9, vz: (Math.random() - 0.5) * 0.5 });
+      list.push({
+        x: sparkAt.x + (Math.random() - 0.5) * 0.15,
+        y: sparkAt.y + (Math.random() - 0.3) * 0.12,
+        z: sparkAt.z + (Math.random() - 0.5) * 0.15,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: 0.5 + Math.random() * 0.9,
+        vz: (Math.random() - 0.5) * 0.5,
+      });
     }
     onSparks(list);
   }
@@ -821,17 +1104,26 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   function adopt(t) {
     if (templates.has(t.root)) return templates.get(t.root);
     for (const g of [t.bodyGeo, ...t.helmGeos]) {
-      const p = g.attributes.position, si = g.attributes.skinIndex;
+      const p = g.attributes.position,
+        si = g.attributes.skinIndex;
       if (!p || !si) continue;
       for (let i = 0; i < p.count; i++) {
         const b = ALL_BONES[si.getX(i)];
-        const from = t.restPos[b], to = T0.restPos[b];
+        const from = t.restPos[b],
+          to = T0.restPos[b];
         p.setXYZ(i, p.getX(i) + to[0] - from[0], p.getY(i) + to[1] - from[1], p.getZ(i) + to[2] - from[2]);
       }
       p.needsUpdate = true;
       g.computeBoundingSphere();
     }
-    const out = { ...T0, root: t.root, bodyGeo: t.bodyGeo, helmGeos: t.helmGeos, bodySpan: t.bodySpan, helmSpan: t.helmSpan };
+    const out = {
+      ...T0,
+      root: t.root,
+      bodyGeo: t.bodyGeo,
+      helmGeos: t.helmGeos,
+      bodySpan: t.bodySpan,
+      helmSpan: t.helmSpan,
+    };
     templates.set(t.root, out);
     return out;
   }
@@ -842,7 +1134,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     T = next;
     for (const k of knights) {
       k.body.geometry = T.bodyGeo;
-      HELMETS.forEach((h, j) => { k.helms[h].geometry = T.helmGeos[j]; });
+      HELMETS.forEach((h, j) => {
+        k.helms[h].geometry = T.helmGeos[j];
+      });
       k.bodyMat.userData.uniforms.uSpan.value.set(T.bodySpan[0], T.bodySpan[1]);
       const hs = k.forging || restyle?.ks.includes(k) ? T.bodySpan : T.helmSpan;
       k.helmMat.userData.uniforms.uSpan.value.set(hs[0], hs[1]);
@@ -880,7 +1174,12 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       restyle = { t: 0, name, T: next, switched: false, flashed: false, resolve, ks };
       for (const k of ks) {
         // (A helmet swap in the way is done at once: the whole of him burns now.)
-        if (k.swap) { const s = k.swap; k.swap = null; wear(k, s.to); s.resolve(true); }
+        if (k.swap) {
+          const s = k.swap;
+          k.swap = null;
+          wear(k, s.to);
+          s.resolve(true);
+        }
         k.helmMat.userData.uniforms.uSpan.value.set(T.bodySpan[0], T.bodySpan[1]);
         setGhost(k, true);
       }
@@ -892,7 +1191,11 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     r.t += dt;
     const t = r.t;
     const burning = t < RESTYLE_BURN;
-    const d = burning ? t / RESTYLE_BURN : t < RESTYLE_BURN + RESTYLE_GAP ? 1 : Math.max(0, 1 - (t - RESTYLE_BURN - RESTYLE_GAP) / RESTYLE_BURN);
+    const d = burning
+      ? t / RESTYLE_BURN
+      : t < RESTYLE_BURN + RESTYLE_GAP
+        ? 1
+        : Math.max(0, 1 - (t - RESTYLE_BURN - RESTYLE_GAP) / RESTYLE_BURN);
     if (!r.switched && !burning) {
       r.switched = true;
       switchStyle(r.name, r.T);
@@ -905,7 +1208,12 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         m.userData.uniforms.uDissolve.value = formed ? 0 : d;
       }
       if (!formed && Math.random() < 0.6) sparksFrom(k, 1);
-      if (formed && !r.flashed) { setGhost(k, false); setHelmGhost(k, false); flash(k, 0.9); sparksFrom(k, 14); }
+      if (formed && !r.flashed) {
+        setGhost(k, false);
+        setHelmGhost(k, false);
+        flash(k, 0.9);
+        sparksFrom(k, 14);
+      }
     }
     if (formed) r.flashed = true;
     if (t >= RESTYLE_TIME) endRestyle(true);
@@ -920,13 +1228,23 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   }
   function setHelmetOf(k, name, instant) {
     if (!HELMETS.includes(name)) return Promise.resolve(false);
-    if (k.swap) { k.swap.resolve(false); k.swap = null; setHelmGhost(k, false); }
+    if (k.swap) {
+      k.swap.resolve(false);
+      k.swap = null;
+      setHelmGhost(k, false);
+    }
     if (name === k.helmet && !k.swap) return Promise.resolve(true);
-    if (instant || reducedMotion || !k.present || k.fade) { wear(k, name); return Promise.resolve(true); }
+    if (instant || reducedMotion || !k.present || k.fade) {
+      wear(k, name);
+      return Promise.resolve(true);
+    }
     return new Promise((resolve) => {
       k.swap = { t: 0, from: k.helmet, to: name, switched: false, resolve };
       // (Dancing, he changes it without stopping: the helm burns and forms on its own.)
-      if (k.gestureName !== 'dance') { k.gestureName = 'helm'; k.gestureT = 0; }
+      if (k.gestureName !== 'dance') {
+        k.gestureName = 'helm';
+        k.gestureT = 0;
+      }
     });
   }
   function setHelmGhost(k, on) {
@@ -946,17 +1264,42 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const u = k.helmMat.userData.uniforms;
     if (s.t < 0.3) return;
     if (s.t < 1.2) setHelmGhost(k, true);
-    if (s.t < 0.75) { u.uFlip.value = 1; u.uDissolve.value = (s.t - 0.3) / 0.45; if (Math.random() < 0.6) sparksFrom(k, 1, BONE_INDEX.head); return; }
-    if (!s.switched) { s.switched = true; wear(k, s.to); u.uFlip.value = 0; }
-    if (s.t < 1.2) { u.uDissolve.value = 1 - (s.t - 0.75) / 0.45; return; }
-    if (!s.puffed) { s.puffed = true; u.uDissolve.value = 0; setHelmGhost(k, false); flash(k, 0.9, true); sparksFrom(k, 14, BONE_INDEX.head); }
-    if (s.t >= HELM_TIME) { k.swap = null; s.resolve(true); }
+    if (s.t < 0.75) {
+      u.uFlip.value = 1;
+      u.uDissolve.value = (s.t - 0.3) / 0.45;
+      if (Math.random() < 0.6) sparksFrom(k, 1, BONE_INDEX.head);
+      return;
+    }
+    if (!s.switched) {
+      s.switched = true;
+      wear(k, s.to);
+      u.uFlip.value = 0;
+    }
+    if (s.t < 1.2) {
+      u.uDissolve.value = 1 - (s.t - 0.75) / 0.45;
+      return;
+    }
+    if (!s.puffed) {
+      s.puffed = true;
+      u.uDissolve.value = 0;
+      setHelmGhost(k, false);
+      flash(k, 0.9, true);
+      sparksFrom(k, 14, BONE_INDEX.head);
+    }
+    if (s.t >= HELM_TIME) {
+      k.swap = null;
+      s.resolve(true);
+    }
   }
 
   // --- actions ----------------------------------------------------------------------------------------
   // A knight runs one action at a time (getting up, walking, turning, sitting down, settling
   // onto his seat, starting a dance); what he was asked to do next waits in his queue.
-  function startCrossfade(k, dur = CROSSFADE) { k.from.set(k.pose); k.blend = 0; k.blendRate = 1 / dur; }
+  function startCrossfade(k, dur = CROSSFADE) {
+    k.from.set(k.pose);
+    k.blend = 0;
+    k.blendRate = 1 / dur;
+  }
   function run(k) {
     while (!k.act && k.queue.length) {
       const next = k.queue.shift();
@@ -964,20 +1307,49 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       if (k.act) k.act.t = 0;
     }
   }
-  function enqueue(k, ...acts) { k.queue.push(...acts); run(k); }
-  function clearActs(k) { k.act = null; k.queue.length = 0; }
+  function enqueue(k, ...acts) {
+    k.queue.push(...acts);
+    run(k);
+  }
+  function clearActs(k) {
+    k.act = null;
+    k.queue.length = 0;
+  }
   /** Asked for something new halfway through an ember walk: he forms again where he is. */
-  function stayPut(k) { if (k.fade?.done) fade(k, 0); }
+  function stayPut(k) {
+    if (k.fade?.done) fade(k, 0);
+  }
 
   const act = {
-    rise: (k) => ({ kind: 'rise', dur: RISE_TIME, start: () => { if (k.mode !== 'sit') return false; standAtSeat(k); }, end: () => { k.mode = 'stand'; } }),
-    lower: (k) => ({ kind: 'lower', dur: RISE_TIME, start: () => { if (k.mode === 'sit') return false; }, end: () => { k.mode = 'sit'; k.dancing = null; } }),
+    rise: (k) => ({
+      kind: 'rise',
+      dur: RISE_TIME,
+      start: () => {
+        if (k.mode !== 'sit') return false;
+        standAtSeat(k);
+      },
+      end: () => {
+        k.mode = 'stand';
+      },
+    }),
+    lower: (k) => ({
+      kind: 'lower',
+      dur: RISE_TIME,
+      start: () => {
+        if (k.mode === 'sit') return false;
+      },
+      end: () => {
+        k.mode = 'sit';
+        k.dancing = null;
+      },
+    }),
     /**
      * Walk to x, z (knightPlaces.js planWalk): straight, or round the fire when the straight
      * way passes it; too far or blocked, he burns away and forms there.
      */
     go: (k, x, z) => ({
-      kind: 'walk', dur: 0,
+      kind: 'walk',
+      dur: 0,
       start() {
         reroot(k);
         const p = k.group.position;
@@ -998,30 +1370,46 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         this.dur = this.teleport ? 2 * FADE_TIME + 0.05 : this.length / WALK_SPEED;
         this.heading = this.teleport ? k.yaw : Math.atan2(this.pts[1].x - p.x, this.pts[1].z - p.z);
         k.mode = 'stand';
-        if (this.teleport) fade(k, 1, () => { k.group.position.copy(this.to); fade(k, 0); });
+        if (this.teleport)
+          fade(k, 1, () => {
+            k.group.position.copy(this.to);
+            fade(k, 0);
+          });
       },
       /** Where he is `s` m along the walk (into `out`), and which way it goes there. */
       along(s, out) {
         let i = 1;
         while (i < this.pts.length - 1 && this.at[i] < s) i++;
-        const a = this.pts[i - 1], b = this.pts[i];
+        const a = this.pts[i - 1],
+          b = this.pts[i];
         const u = Math.min(1, Math.max(0, (s - this.at[i - 1]) / Math.max(1e-6, this.at[i] - this.at[i - 1])));
         out.lerpVectors(a, b, u);
         this.heading = Math.atan2(b.x - a.x, b.z - a.z);
         return out;
       },
-      end() { if (!this.teleport) k.group.position.copy(this.to); },
+      end() {
+        if (!this.teleport) k.group.position.copy(this.to);
+      },
     }),
     turn: (k, yaw) => ({
-      kind: 'turn', dur: 0,
+      kind: 'turn',
+      dur: 0,
       start() {
         reroot(k);
         let d = (yaw - k.yaw) % (Math.PI * 2);
-        if (d > Math.PI) d -= Math.PI * 2; else if (d < -Math.PI) d += Math.PI * 2;
-        if (Math.abs(d) < 0.08) { k.yaw = yaw; return false; }
-        this.from = k.yaw; this.d = d; this.dur = Math.abs(d) / TURN_SPEED + 0.15;
+        if (d > Math.PI) d -= Math.PI * 2;
+        else if (d < -Math.PI) d += Math.PI * 2;
+        if (Math.abs(d) < 0.08) {
+          k.yaw = yaw;
+          return false;
+        }
+        this.from = k.yaw;
+        this.d = d;
+        this.dur = Math.abs(d) / TURN_SPEED + 0.15;
       },
-      end() { k.yaw = this.from + this.d; },
+      end() {
+        k.yaw = this.from + this.d;
+      },
     }),
   };
   /** Move where he's placed without moving him: his pose takes up the difference. */
@@ -1029,9 +1417,15 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const d = new THREE.Vector3().subVectors(k.group.position, to).applyAxisAngle(Y_AXIS, -k.yaw);
     k.group.position.copy(to);
     for (const p of [k.pose, k.from, k.work]) {
-      p[0] += d.x; p[1] += d.y; p[2] += d.z;
-      p[32] += d.x; p[33] += d.y; p[34] += d.z; // (legs: x is outward, so the right one's goes the other way)
-      p[37] -= d.x; p[38] += d.y; p[39] += d.z;
+      p[0] += d.x;
+      p[1] += d.y;
+      p[2] += d.z;
+      p[32] += d.x;
+      p[33] += d.y;
+      p[34] += d.z; // (legs: x is outward, so the right one's goes the other way)
+      p[37] -= d.x;
+      p[38] += d.y;
+      p[39] += d.z;
     }
   }
   /**
@@ -1043,7 +1437,8 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   }
   /** Standing up in front of his seat, his pose is offset from where he's placed: move the place under him instead. */
   function reroot(k) {
-    const x = k.stand[0], z = k.stand[2];
+    const x = k.stand[0],
+      z = k.stand[2];
     if (Math.abs(x) < 1e-4 && Math.abs(z) < 1e-4) return;
     const to = new THREE.Vector3(x, 0, z).applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position);
     to.y = Math.max(0, heightAt(to.x, to.z));
@@ -1091,7 +1486,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     // with no headroom when it started, he dances it in his seat).
     if (k.gestureName) {
       const inPlace = k.gestureName === 'dance' && k.danceInPlace;
-      const T = inPlace ? DANCE_SEATED_TIME : GESTURE_TIME[k.gestureName] ?? 1.5;
+      const T = inPlace ? DANCE_SEATED_TIME : (GESTURE_TIME[k.gestureName] ?? 1.5);
       if (k.gestureT >= T) k.gestureName = null;
       else {
         const rising = k.gestureName === 'dance' && seated && !inPlace;
@@ -1116,9 +1511,18 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     // Reactions.
     if (!reducedMotion) {
       const t = k.clock;
-      if (t - k.react.flinch < 1.4) { flinch(p, t - k.react.flinch, k.react.flinchK, seated); big = true; }
-      if (t - k.react.stoke < 1.3) { shield(p, t - k.react.stoke, 1, seated); big = true; }
-      if (t - k.react.hop >= 0 && t - k.react.hop < 0.6) { hop(p, t - k.react.hop, 1, seated, k.home?.rise); big = true; }
+      if (t - k.react.flinch < 1.4) {
+        flinch(p, t - k.react.flinch, k.react.flinchK, seated);
+        big = true;
+      }
+      if (t - k.react.stoke < 1.3) {
+        shield(p, t - k.react.stoke, 1, seated);
+        big = true;
+      }
+      if (t - k.react.hop >= 0 && t - k.react.hop < 0.6) {
+        hop(p, t - k.react.hop, 1, seated, k.home?.rise);
+        big = true;
+      }
     }
     // Watching something: he straightens up and turns to it. Hovered (seated, at rest), he
     // sits up a little to look at you.
@@ -1129,7 +1533,10 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     if (k.attnMoving || Math.abs(hover - k.hoverUp) > 0.03) big = true;
     if (k.lookW > 0.01) look(p, k.lookYaw, k.lookPitch, k.lookW);
     // Crossfading from where he was.
-    if (k.blend < 1) { lerpPose(p, k.from, p, k.blend); big = true; }
+    if (k.blend < 1) {
+      lerpPose(p, k.from, p, k.blend);
+      big = true;
+    }
     return big;
   }
 
@@ -1187,7 +1594,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     armor.uniforms.uGlint.value *= Math.exp(-dt / 0.12);
     armor.uniforms.uTime.value = simT;
     armor.step?.(dt); // (the fire's reflection sweeping over the armor)
-    stepRestyle(dt);  // (a style swap burning through them)
+    stepRestyle(dt); // (a style swap burning through them)
     // Without a clock from outside, the beat runs on at its last tempo.
     if (beat.at < 0 || simT - beat.at > 0.5) beat.pos += dt / beat.period;
     moving = false;
@@ -1219,12 +1626,17 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         } else if (a.kind === 'turn') {
           k.yaw = a.from + a.d * Math.min(1, a.t / Math.max(1e-3, a.dur - 0.15));
         }
-        if (a.t >= a.dur) { a.end?.(); k.act = null; startCrossfade(k); run(k); }
+        if (a.t >= a.dur) {
+          a.end?.();
+          k.act = null;
+          startCrossfade(k);
+          run(k);
+        }
       }
       if (k.blend < 1) k.blend = Math.min(1, k.blend + dt * (k.blendRate ?? 1 / CROSSFADE));
       // Where he looks: the cursor on him (the camera), what he was asked to, or the moment's
       // attention (a rising or flying weapon).
-      const target = hovered === k.index ? ctx.cameraAt : k.lookAt ?? (reducedMotion ? null : ctx.lookAt);
+      const target = hovered === k.index ? ctx.cameraAt : (k.lookAt ?? (reducedMotion ? null : ctx.lookAt));
       k.lookW += ((target ? 1 : 0) - k.lookW) * Math.min(1, dt * 5);
       // The moment's attention (a weapon in flight) sits him up; a glance (the cursor) doesn't.
       const attn = target && target === ctx.lookAt ? 1 : 0;
@@ -1255,7 +1667,10 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       k.helmMat.userData.uniforms.uCenter.value.copy(c);
     }
     // (Changes since the last frame, or in this one, to what casts his shadow.)
-    if (shadowDirty) { moving = true; shadowDirty = false; }
+    if (shadowDirty) {
+      moving = true;
+      shadowDirty = false;
+    }
   }
 
   // --- the API -------------------------------------------------------------------------------------------------
@@ -1279,11 +1694,17 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     setShown(k, true);
     k.work.set(k.mode === 'sit' ? k.sit : k.stand);
     apply(k);
-    if (instant || reducedMotion) { k.fade = null; setGhost(k, false); for (const m of [k.bodyMat, k.helmMat]) m.userData.uniforms.uDissolve.value = 0; }
-    else if (forge) {
+    if (instant || reducedMotion) {
+      k.fade = null;
+      setGhost(k, false);
+      for (const m of [k.bodyMat, k.helmMat]) m.userData.uniforms.uDissolve.value = 0;
+    } else if (forge) {
       beginForge(k, 'in');
       setGhost(k, true);
-      for (const m of [k.bodyMat, k.helmMat]) { m.userData.uniforms.uDissolve.value = 1; m.userData.uniforms.uGlow.value = 0; }
+      for (const m of [k.bodyMat, k.helmMat]) {
+        m.userData.uniforms.uDissolve.value = 1;
+        m.userData.uniforms.uGlow.value = 0;
+      }
     } else fade(k, 0);
     cast = Math.max(cast, i + 1);
     return true;
@@ -1317,25 +1738,45 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     if (home.seat) {
       k.home = home;
       seatPoseOf(k);
-      const spot = home.stand ??= standSpot(home);
+      const spot = (home.stand ??= standSpot(home));
       const front = new THREE.Vector3(spot.x, 0, spot.z).applyAxisAngle(Y_AXIS, home.yaw);
-      enqueue(k, act.go(k, home.x + front.x, home.z + front.z), act.turn(k, home.yaw), {
-        kind: 'place', dur: 0, start() { shiftPlace(k, new THREE.Vector3(home.x, home.y, home.z)); standAtSeat(k); },
-      }, act.lower(k));
+      enqueue(
+        k,
+        act.go(k, home.x + front.x, home.z + front.z),
+        act.turn(k, home.yaw),
+        {
+          kind: 'place',
+          dur: 0,
+          start() {
+            shiftPlace(k, new THREE.Vector3(home.x, home.y, home.z));
+            standAtSeat(k);
+          },
+        },
+        act.lower(k),
+      );
     } else {
       const p = k.group.position;
       k.home = { x: p.x, z: p.z, yaw: faceFire(p.x, p.z), h: 0, feet: [0, 0], y: p.y, seat: false };
       seatPoseOf(k);
-      enqueue(k, act.turn(k, k.home.yaw), {
-        kind: 'place', dur: 0,
-        start() {
-          // (He sits down where he stands: his seat is a step behind his feet.)
-          const back = new THREE.Vector3(0, 0, -(seatFeet(0) - 0.03)).applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position);
-          shiftPlace(k, back);
-          k.home.x = back.x; k.home.z = back.z;
-          standAtSeat(k);
+      enqueue(
+        k,
+        act.turn(k, k.home.yaw),
+        {
+          kind: 'place',
+          dur: 0,
+          start() {
+            // (He sits down where he stands: his seat is a step behind his feet.)
+            const back = new THREE.Vector3(0, 0, -(seatFeet(0) - 0.03))
+              .applyAxisAngle(Y_AXIS, k.yaw)
+              .add(k.group.position);
+            shiftPlace(k, back);
+            k.home.x = back.x;
+            k.home.z = back.z;
+            standAtSeat(k);
+          },
         },
-      }, act.lower(k));
+        act.lower(k),
+      );
     }
     return true;
   }
@@ -1359,15 +1800,20 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     return { x: s.x, z: s.z };
   }
   /** Which way to face at (x, z): a yaw, or 'fire', 'out' or 'front' (knightPlaces.js facingYaw). */
-  function facingFor(x, z, facing) { return facingYaw(x, z, facing); }
+  function facingFor(x, z, facing) {
+    return facingYaw(x, z, facing);
+  }
   function danceFn(i, opts = {}) {
     if (!valid(i) || reducedMotion) return false;
     const k = knights[i];
     const prev = k.nextDance ?? k.dancing;
     const seated = opts.seated ?? prev?.seated ?? false;
     const next = {
-      move: opts.move ?? prev?.move ?? 'nod', energy: opts.energy ?? prev?.energy ?? 0.7,
-      offset: opts.offset ?? prev?.offset ?? 0, seed: opts.seed ?? prev?.seed ?? k.seed, seated,
+      move: opts.move ?? prev?.move ?? 'nod',
+      energy: opts.energy ?? prev?.energy ?? 0.7,
+      offset: opts.offset ?? prev?.offset ?? 0,
+      seed: opts.seed ?? prev?.seed ?? k.seed,
+      seated,
     };
     const where = opts.slot != null || opts.position ? placeFor(i, opts) : null;
     // Burning away, or on an ember walk: he comes back (forming where he is) and goes to
@@ -1376,7 +1822,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     else stayPut(k);
     // Not here yet: he forms right there, on his feet and dancing (or seated, to dance sitting).
     if (!k.present) {
-      const to = seated ? null : where ?? placeFor(i);
+      const to = seated ? null : (where ?? placeFor(i));
       summon(i, seated ? {} : { at: to, facing: opts.facing ?? 'front' });
       k.dancing = k.nextDance = next;
       k.danceAt = seated ? { seated } : { x: to.x, z: to.z, yaw: k.yaw, seated };
@@ -1386,8 +1832,10 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     // and the offset just change. (The visualizer can call this every bar.)
     const at = k.danceAt;
     if (at && at.seated === seated) {
-      const same = seated || ((!where || Math.hypot(where.x - at.x, where.z - at.z) < 0.05)
-        && (opts.facing == null || Math.abs(Math.sin((facingFor(at.x, at.z, opts.facing) - at.yaw) / 2)) < 0.03));
+      const same =
+        seated ||
+        ((!where || Math.hypot(where.x - at.x, where.z - at.z) < 0.05) &&
+          (opts.facing == null || Math.abs(Math.sin((facingFor(at.x, at.z, opts.facing) - at.yaw) / 2)) < 0.03));
       if (same) {
         if (k.dancing && k.dancing.move !== next.move) startCrossfade(k);
         if (k.dancing) k.dancing = next;
@@ -1398,16 +1846,35 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     // Somewhere else: sit (to dance seated), or get up, go there, turn, and dance. (The dance
     // is noted before anything is queued: when he's already up, there and turned, the queue
     // runs straight through to `start` at once, which takes up whatever is noted.)
-    const start = { kind: 'dance', dur: 0, start() { k.mode = seated ? 'sit' : 'stand'; k.dancing = k.nextDance; return false; } };
+    const start = {
+      kind: 'dance',
+      dur: 0,
+      start() {
+        k.mode = seated ? 'sit' : 'stand';
+        k.dancing = k.nextDance;
+        return false;
+      },
+    };
     if (seated) {
-      if (k.mode !== 'sit') { sit(i); k.nextDance = next; k.danceAt = { seated }; enqueue(k, start); }
-      else { clearActs(k); startCrossfade(k, 0.5); k.dancing = k.nextDance = next; k.danceAt = { seated }; }
+      if (k.mode !== 'sit') {
+        sit(i);
+        k.nextDance = next;
+        k.danceAt = { seated };
+        enqueue(k, start);
+      } else {
+        clearActs(k);
+        startCrossfade(k, 0.5);
+        k.dancing = k.nextDance = next;
+        k.danceAt = { seated };
+      }
       return true;
     }
     clearActs(k);
     startCrossfade(k);
     k.dancing = null;
-    const to = where ?? (at && !at.seated ? at : k.mode === 'sit' ? placeFor(i) : { x: k.group.position.x, z: k.group.position.z });
+    const to =
+      where ??
+      (at && !at.seated ? at : k.mode === 'sit' ? placeFor(i) : { x: k.group.position.x, z: k.group.position.z });
     const yaw = facingFor(to.x, to.z, opts.facing ?? 'front');
     k.nextDance = next;
     k.danceAt = { x: to.x, z: to.z, yaw, seated };
@@ -1421,13 +1888,19 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       if (i < n) summon(i, { instant });
       else dismiss(i, { instant });
       if (i < n && helmets) {
-        const h = helmets === 'random' ? HELMETS[Math.floor(Math.random() * HELMETS.length)] : Array.isArray(helmets) ? helmets[i % helmets.length] : helmets;
+        const h =
+          helmets === 'random'
+            ? HELMETS[Math.floor(Math.random() * HELMETS.length)]
+            : Array.isArray(helmets)
+              ? helmets[i % helmets.length]
+              : helmets;
         setHelmetOf(k, h, instant || !k.present);
       }
     });
   }
   function setHelmet(name, { index = null, instant = false } = {}) {
-    const list = index == null ? knights.filter((k) => k.present || k.index < cast) : valid(index) ? [knights[index]] : [];
+    const list =
+      index == null ? knights.filter((k) => k.present || k.index < cast) : valid(index) ? [knights[index]] : [];
     return Promise.all(list.map((k) => setHelmetOf(k, name, instant))).then((r) => r.every(Boolean));
   }
   /**
@@ -1436,7 +1909,12 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
    */
   function gestureFn(name, { index = 0 } = {}) {
     if (!GESTURE_TIME[name] || reducedMotion) return false;
-    const ks = index === 'all' ? knights.filter((k) => k.present) : valid(index) && knights[index].present ? [knights[index]] : [];
+    const ks =
+      index === 'all'
+        ? knights.filter((k) => k.present)
+        : valid(index) && knights[index].present
+          ? [knights[index]]
+          : [];
     let n = 0;
     for (const k of ks) {
       if (k.swap || k.gestureName === 'dance') continue;
@@ -1474,7 +1952,10 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     fitsAt.clear();
     let left = false;
     for (const k of knights) {
-      if (leaving(k)) { vanish(k); left = true; }
+      if (leaving(k)) {
+        vanish(k);
+        left = true;
+      }
     }
     if (left) recount();
     for (const k of knights) {
@@ -1506,7 +1987,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       const feet = k.group.position.clone();
       const head = k.solved.p[BONE_INDEX.head].clone().applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position);
       up.copy(k.solved.p[0]).applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position);
-      feet.x = feet.x * 0.5 + up.x * 0.5; feet.z = feet.z * 0.5 + up.z * 0.5; feet.y += 0.25;
+      feet.x = feet.x * 0.5 + up.x * 0.5;
+      feet.z = feet.z * 0.5 + up.z * 0.5;
+      feet.y += 0.25;
       head.y += 0.12;
       out.push({ a: feet, b: head, r: 0.32, index: k.index });
     }
@@ -1516,12 +1999,16 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   const seg = new THREE.Vector3();
   /** The knight a ray passes through (index), or -1; `out.distance` how far along the ray he is. */
   function pick(ray, out = null) {
-    let best = -1, bestD = Infinity;
+    let best = -1,
+      bestD = Infinity;
     for (const c of capsules()) {
       const d = ray.distanceSqToSegment(c.a, c.b, hit, seg);
       if (d < c.r * c.r * 0.7) {
         const along = hit.distanceTo(ray.origin);
-        if (along < bestD) { bestD = along; best = c.index; }
+        if (along < bestD) {
+          bestD = along;
+          best = c.index;
+        }
       }
     }
     if (out) out.distance = bestD;
@@ -1531,7 +2018,8 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
    * Dancing on his feet (or on his way to), or cheering: a flinch or a lean would bury the
    * move (the drop's leap, Praise the Sun), so he doesn't. He still hops a ring.
    */
-  const performing = (k) => !!((k.nextDance ?? k.dancing) && !(k.nextDance ?? k.dancing).seated) || CHEERING.has(k.gestureName);
+  const performing = (k) =>
+    !!((k.nextDance ?? k.dancing) && !(k.nextDance ?? k.dancing).seated) || CHEERING.has(k.gestureName);
   /**
    * Something happened: 'impact' (a weapon lands; strength 0..1), 'stoke', 'ring' (a ring
    * races out). With `at` ({ x, z }) it happened there (the living blade swinging close):
@@ -1544,10 +2032,13 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       const near = !!at;
       if (near && Math.hypot(k.group.position.x - at.x, k.group.position.z - at.z) > radius) continue;
       if (kind === 'impact') {
-        if (near || !performing(k)) { k.react.flinch = k.clock + Math.random() * 0.05; k.react.flinchK = Math.min(1, strength) * (near && performing(k) ? 0.6 : 1); }
-      }
-      else if (kind === 'stoke') { if (!performing(k)) k.react.stoke = k.clock; }
-      else if (kind === 'ring') {
+        if (near || !performing(k)) {
+          k.react.flinch = k.clock + Math.random() * 0.05;
+          k.react.flinchK = Math.min(1, strength) * (near && performing(k) ? 0.6 : 1);
+        }
+      } else if (kind === 'stoke') {
+        if (!performing(k)) k.react.stoke = k.clock;
+      } else if (kind === 'ring') {
         // The ring's front reaches him a moment later (about 4 m/s).
         const r = Math.hypot(k.group.position.x - FIRE.x, k.group.position.z - FIRE.z);
         k.react.hop = k.clock + Math.max(0, r - 0.3) / 4;
@@ -1576,30 +2067,42 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     group: root,
     materials,
     /** Every template's geometry (the knight's own and any other style's model built since). */
-    get geometries() { return [...templates.values()].flatMap((t) => [t.bodyGeo, ...t.helmGeos]); },
+    get geometries() {
+      return [...templates.values()].flatMap((t) => [t.bodyGeo, ...t.helmGeos]);
+    },
     skeletons: knights.map((k) => k.skeleton),
     rig,
     update,
     setRamp,
     /** The armor's finish (steel.js FINISHES) and the fire's rim on his edges (0..1): armor.js. */
     setFinish: (name) => armor.setFinish?.(name),
-    get finish() { return armor.finish ?? 'gunmetal'; },
+    get finish() {
+      return armor.finish ?? 'gunmetal';
+    },
     setRim: (v) => armor.setRim?.(v),
-    get rim() { return armor.rim ?? 0.5; },
+    get rim() {
+      return armor.rim ?? 0.5;
+    },
     /**
      * The style (knightStyles.js): its shader, from the model `model` (its loaded scene; null
      * the knight's own). Knights who are here burn away and form again in it (~1.2 s;
      * `instant`: at once). Resolves true once it shows.
      */
     setStyle,
-    get style() { return armor.style; },
+    get style() {
+      return armor.style;
+    },
     /** A style swap is burning through them. */
-    get restyling() { return !!restyle; },
+    get restyling() {
+      return !!restyle;
+    },
     /**
      * Another style's model, its template built beforehand (templateSteps over its scene, in
      * idle moments: scene.js): setStyle() with it then needn't build it on the spot.
      */
-    adoptTemplate(t) { if (t?.root) adopt(t); },
+    adoptTemplate(t) {
+      if (t?.root) adopt(t);
+    },
     /** Whether a model's template is built yet (null: the knight's own, always). */
     hasTemplate: (root) => !root || templates.has(root),
     /**
@@ -1610,29 +2113,54 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     busyAt(i) {
       if (!valid(i) || !knights[i].present) return false;
       const k = knights[i];
-      return !!(k.gestureName || k.swap || k.act || k.queue.length || k.dancing || k.nextDance || restyle?.ks.includes(k));
+      return !!(
+        k.gestureName ||
+        k.swap ||
+        k.act ||
+        k.queue.length ||
+        k.dancing ||
+        k.nextDance ||
+        restyle?.ks.includes(k)
+      );
     },
     setScenery,
     react,
     capsules,
     pick,
-    summon, dismiss, sit, stand, dance: danceFn, setCast, setHelmet, gesture: gestureFn,
+    summon,
+    dismiss,
+    sit,
+    stand,
+    dance: danceFn,
+    setCast,
+    setHelmet,
+    gesture: gestureFn,
     setSeatPose,
     /** How they sit (setSeatPose): 'resting' | 'watchful'. */
-    get seatPose() { return seatStyle; },
+    get seatPose() {
+      return seatStyle;
+    },
     /**
      * Whether the view has room over his seat for him to stand up in (scene.js sets it: not
      * on a phone's tall view, which frames his seat right under the page's header). Without
      * it, the site's dance (gesture 'dance') is danced in his seat; one under way keeps its way.
      */
-    get headroom() { return headroom; },
-    set headroom(on) { headroom = !!on; },
+    get headroom() {
+      return headroom;
+    },
+    set headroom(on) {
+      headroom = !!on;
+    },
     /** The forge's side of summon/dismiss({ forge: true }): his posed body as a forge subject, and the end. */
-    forgeSubject, forged,
+    forgeSubject,
+    forged,
     /** The beat (every frame, from the music): `beatPos` in beats, `period` s a beat. */
-    clock(beatPos, period = beat.period) { beat = { pos: beatPos, period: Math.max(0.2, period), at: simT }; },
+    clock(beatPos, period = beat.period) {
+      beat = { pos: beatPos, period: Math.max(0.2, period), at: simT };
+    },
     lookAt(point, { index = null } = {}) {
-      for (const k of index == null ? knights : valid(index) ? [knights[index]] : []) k.lookAt = point ? new THREE.Vector3().copy(point) : null;
+      for (const k of index == null ? knights : valid(index) ? [knights[index]] : [])
+        k.lookAt = point ? new THREE.Vector3().copy(point) : null;
     },
     slots: (name = sceneryName) => ringOf(name),
     /**
@@ -1641,24 +2169,55 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
      * MOVE_REACH) clear of the scenery's shapes there, with 5 cm to spare. The show leaves out
      * one that doesn't.
      */
-    fits: (move, at, facing = 'fire', name = sceneryName) => fitsAt.fits(name, move, at.x, at.z, facingFor(at.x, at.z, facing)),
+    fits: (move, at, facing = 'fire', name = sceneryName) =>
+      fitsAt.fits(name, move, at.x, at.z, facingFor(at.x, at.z, facing)),
     /** A beat (0..1): the armor glints, a step up the ramp for a moment. */
-    beat(s = 1) { if (!reducedMotion) armor.uniforms.uGlint.value = Math.max(armor.uniforms.uGlint.value, 0.25 * s); },
-    set hovered(i) { hovered = valid(i) && knights[i].present ? i : -1; },
-    get hovered() { return hovered; },
-    get moving() { return moving; },
-    get count() { return cast; },
-    get present() { return knights.filter((k) => k.present).length; },
+    beat(s = 1) {
+      if (!reducedMotion) armor.uniforms.uGlint.value = Math.max(armor.uniforms.uGlint.value, 0.25 * s);
+    },
+    set hovered(i) {
+      hovered = valid(i) && knights[i].present ? i : -1;
+    },
+    get hovered() {
+      return hovered;
+    },
+    get moving() {
+      return moving;
+    },
+    get count() {
+      return cast;
+    },
+    get present() {
+      return knights.filter((k) => k.present).length;
+    },
     max: knights.length,
-    get helmet() { return knights[0].helmet; },
-    set helmet(name) { setHelmet(name); },
+    get helmet() {
+      return knights[0].helmet;
+    },
+    set helmet(name) {
+      setHelmet(name);
+    },
     get list() {
       return knights.map((k) => ({
-        index: k.index, present: k.present,
-        state: !k.present ? 'away' : k.forging ? (k.forging === 'in' ? 'arriving' : 'leaving')
-          : k.fade ? (k.fade.done ? 'ember' : k.fade.to ? 'leaving' : 'arriving')
-          : k.act?.kind ?? (k.dancing ? 'dancing' : k.mode === 'sit' ? 'sitting' : 'standing'),
-        position: k.group.position.clone(), facing: k.yaw, helmet: k.helmet, move: k.dancing?.move ?? null,
+        index: k.index,
+        present: k.present,
+        state: !k.present
+          ? 'away'
+          : k.forging
+            ? k.forging === 'in'
+              ? 'arriving'
+              : 'leaving'
+            : k.fade
+              ? k.fade.done
+                ? 'ember'
+                : k.fade.to
+                  ? 'leaving'
+                  : 'arriving'
+              : (k.act?.kind ?? (k.dancing ? 'dancing' : k.mode === 'sit' ? 'sitting' : 'standing')),
+        position: k.group.position.clone(),
+        facing: k.yaw,
+        helmet: k.helmet,
+        move: k.dancing?.move ?? null,
       }));
     },
     /**
@@ -1669,14 +2228,20 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     get positions() {
       let n = 0;
       for (const k of knights) {
-        if (k.present && k.solved) headList[n++] = heads[k.index].copy(k.solved.p[BONE_INDEX.head]).applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position);
+        if (k.present && k.solved)
+          headList[n++] = heads[k.index]
+            .copy(k.solved.p[BONE_INDEX.head])
+            .applyAxisAngle(Y_AXIS, k.yaw)
+            .add(k.group.position);
       }
       headList.length = n;
       return headList;
     },
     /** (Internals, for tests and debugging.) */
     knights,
-    get terrain() { return terrain; },
+    get terrain() {
+      return terrain;
+    },
   };
 }
 const Y_AXIS = new THREE.Vector3(0, 1, 0);

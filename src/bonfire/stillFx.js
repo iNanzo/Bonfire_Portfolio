@@ -16,12 +16,52 @@
 
 /** Effects that are a still look rather than motion or flashing (kept under reduced motion). */
 export const STILL = new Set([
-  'mirror', 'scan', 'scanMode', 'block', 'letterbox', 'iris', 'zoom', 'temp',
-  'grad', 'gradA', 'gradB', 'gradC', 'style', 'styleR', 'styleMix', 'paintAngle', 'paintAspect', 'washEdge', 'glowSize', 'glowCut', 'ghostKeep', 'flickerMode',
-  'feedMode', 'ghostMode', 'warpMode', 'warpMix', 'inkMode', 'invertMode', 'scanBlend', 'glowMode', 'gradMode',
+  'mirror',
+  'scan',
+  'scanMode',
+  'block',
+  'letterbox',
+  'iris',
+  'zoom',
+  'temp',
+  'grad',
+  'gradA',
+  'gradB',
+  'gradC',
+  'style',
+  'styleR',
+  'styleMix',
+  'paintAngle',
+  'paintAspect',
+  'washEdge',
+  'glowSize',
+  'glowCut',
+  'ghostKeep',
+  'flickerMode',
+  'feedMode',
+  'ghostMode',
+  'warpMode',
+  'warpMix',
+  'inkMode',
+  'invertMode',
+  'scanBlend',
+  'glowMode',
+  'gradMode',
 ]);
 /** What flashes, jitters or turns: off under reduced motion even in the Painter's painted look. */
-export const HELD = new Set(['cycle', 'invert', 'ink', 'blackout', 'flicker', 'slice', 'sliceSeed', 'split', 'rippleR', 'rippleAmp', 'kaleidoRot']);
+export const HELD = new Set([
+  'cycle',
+  'invert',
+  'ink',
+  'blackout',
+  'flicker',
+  'slice',
+  'sliceSeed',
+  'split',
+  'rippleR',
+  'rippleAmp',
+  'kaleidoRot',
+]);
 /** Resting values that aren't 0. */
 export const OFF = { iris: 2, zoom: 1, block: 1 };
 
@@ -34,7 +74,7 @@ export const OFF = { iris: 2, zoom: 1, block: 1 };
 export function passValue(key, value, { reducedMotion = false, paintedLook = false }) {
   if (!reducedMotion) return value;
   const kept = paintedLook ? !HELD.has(key) : STILL.has(key);
-  return kept ? value : OFF[key] ?? 0;
+  return kept ? value : (OFF[key] ?? 0);
 }
 
 /** Whether the pass's clock (uTime: the grain, the shimmer, the flicker) holds still. */

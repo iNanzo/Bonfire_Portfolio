@@ -35,11 +35,15 @@ export function keysOverlayMarkup({ title = 'Keyboard Shortcuts', groups, id = `
       <input type="search" id="${id}-filter" placeholder="Filter shortcuts" autocomplete="off" spellcheck="false" data-keys-filter>
       <p class="settings-search-status" role="status" data-search-status></p>
     </search>
-    <div class="keys-overlay-groups">${groups.map((g, gi) => `
+    <div class="keys-overlay-groups">${groups
+      .map(
+        (g, gi) => `
       <section class="keys-group" data-keys-group="${gi}" aria-labelledby="${id}-g${gi}">
         <h3 class="keys-group-title" id="${id}-g${gi}">${esc(g.title)}</h3>
         <dl>${g.keys.map((row, ri) => `<div class="keys-row" data-keys-row="${gi}.${ri}"><dt>${kbds(row.keys)}</dt><dd>${esc(row.label)}</dd></div>`).join('')}</dl>
-      </section>`).join('')}
+      </section>`,
+      )
+      .join('')}
     </div>
   </div>`;
 }
@@ -49,9 +53,15 @@ export function keysOverlayMarkup({ title = 'Keyboard Shortcuts', groups, id = `
  * ids "<group>.<row>" as in the markup.
  * @param {KeyGroup[]} groups
  */
-export const keyEntries = (groups) => groups.flatMap((g, gi) => g.keys.map((row, ri) => ({
-  id: `${gi}.${ri}`, label: row.label, keywords: [row.keys.join(' ')], section: g.title,
-})));
+export const keyEntries = (groups) =>
+  groups.flatMap((g, gi) =>
+    g.keys.map((row, ri) => ({
+      id: `${gi}.${ri}`,
+      label: row.label,
+      keywords: [row.keys.join(' ')],
+      section: g.title,
+    })),
+  );
 
 /**
  * The overlay as a modal <dialog class="keys-overlay"> at the end of the body: open() shows it
@@ -77,8 +87,12 @@ export function createKeysOverlay({ title = 'Keyboard Shortcuts', groups, doc = 
     noun: 'shortcut',
     onQuery(query) {
       const hits = query.trim() ? new Set(match(query).map((h) => h.entry.id)) : null;
-      for (const row of rows) /** @type {HTMLElement} */ (row).hidden = !!hits && !hits.has(/** @type {HTMLElement} */ (row).dataset.keysRow);
-      for (const s of sections) /** @type {HTMLElement} */ (s).hidden = ![...s.querySelectorAll('[data-keys-row]')].some((r) => !(/** @type {HTMLElement} */ (r).hidden));
+      for (const row of rows)
+        /** @type {HTMLElement} */ (row).hidden = !!hits && !hits.has(/** @type {HTMLElement} */ (row).dataset.keysRow);
+      for (const s of sections)
+        /** @type {HTMLElement} */ (s).hidden = ![...s.querySelectorAll('[data-keys-row]')].some(
+          (r) => !(/** @type {HTMLElement} */ (r).hidden),
+        );
       return hits ? hits.size : rows.length;
     },
   });
@@ -89,7 +103,9 @@ export function createKeysOverlay({ title = 'Keyboard Shortcuts', groups, doc = 
     el.showModal();
     input.focus();
   };
-  const close = () => { if (el.open) el.close(); };
+  const close = () => {
+    if (el.open) el.close();
+  };
   el.addEventListener('click', (e) => {
     const t = /** @type {Element} */ (e.target);
     if (t === el || t.closest('[data-keys-close]')) close();

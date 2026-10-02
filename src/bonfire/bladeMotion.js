@@ -36,7 +36,7 @@ const bump = (u) => 16 * u * u * (1 - u) * (1 - u);
 const follow = (v, m) => v * (m + v * (3 - 2 * m + v * (m - 2)));
 /** The least time a glide gets between moves (it turns the blade, so it needs room). */
 const minGlide = (gap) => Math.max(0.08, 0.22 * gap);
-const GLIDE_TURN = 22;   // rad/s: the fastest a glide should turn the blade (it takes longer when it can)
+const GLIDE_TURN = 22; // rad/s: the fastest a glide should turn the blade (it takes longer when it can)
 
 const LOCAL_X = new THREE.Vector3(1, 0, 0);
 const LOCAL_Y = new THREE.Vector3(0, 1, 0);
@@ -59,7 +59,11 @@ function orient(d, n, out) {
 }
 
 const newPose = () => ({ c: new THREE.Vector3(), q: new THREE.Quaternion() });
-const copyPose = (from, to) => { to.c.copy(from.c); to.q.copy(from.q); return to; };
+const copyPose = (from, to) => {
+  to.c.copy(from.c);
+  to.q.copy(from.q);
+  return to;
+};
 
 /**
  * Plan a routine.
@@ -78,7 +82,17 @@ const copyPose = (from, to) => { to.c.copy(from.c); to.q.copy(from.q); return to
  * @param {number} [o.ground]  the lowest the tip may go (world y)
  */
 export function createRoutine({
-  blade, home, center, basis, hits, plunge, moves = { slash: true, thrust: true, spin: true }, alive = true, onMove, rng = Math.random, ground = 0.22,
+  blade,
+  home,
+  center,
+  basis,
+  hits,
+  plunge,
+  moves = { slash: true, thrust: true, spin: true },
+  alive = true,
+  onMove,
+  rng = Math.random,
+  ground = 0.22,
 }) {
   const grip = blade.grip.clone();
   const tip = blade.tip.clone();
@@ -111,7 +125,11 @@ export function createRoutine({
   const homeTip = worldPoint(homePose, tip, new THREE.Vector3());
   const lift = (tipY) => Math.max(0.2, (tipY - homeTip.y) / Math.max(0.3, -homeDir.y));
   /** The planted pose drawn up along its own axis until the tip is at `tipY`. */
-  const drawnUp = (tipY) => { const p = copyPose(homePose, newPose()); p.c.addScaledVector(homeDir, -lift(tipY)); return p; };
+  const drawnUp = (tipY) => {
+    const p = copyPose(homePose, newPose());
+    p.c.addScaledVector(homeDir, -lift(tipY));
+    return p;
+  };
 
   // --- the moves ----------------------------------------------------------------------
   const list = [];
@@ -123,7 +141,10 @@ export function createRoutine({
     const from = fresh.length ? fresh : pool.length ? pool : ['slash'];
     const weight = { slash: 3, thrust: 2, spin: 1 };
     let r = rng() * from.reduce((s, k) => s + weight[k], 0);
-    for (const k of from) { r -= weight[k]; if (r < 0) return k; }
+    for (const k of from) {
+      r -= weight[k];
+      if (r < 0) return k;
+    }
     return from.at(-1);
   };
   hits.forEach((hit, k) => {
@@ -136,35 +157,45 @@ export function createRoutine({
   /** A slash or a spin: its timing and the parts of its shape that don't need the camera. */
   function arcMove(kind, hit, gapPrev, gapNext) {
     const spin = kind === 'spin';
-    const p = spin ? 1.6 : 2 + rng() * 0.6;                          // how sharply it accelerates into the hit
-    const d1 = (spin ? 300 + rng() * 90 : 95 + rng() * 50) * DEG;    // the strike's sweep
-    const dc = (spin ? 10 + rng() * 15 : 15 + rng() * 25) * DEG;     // the cock back
+    const p = spin ? 1.6 : 2 + rng() * 0.6; // how sharply it accelerates into the hit
+    const d1 = (spin ? 300 + rng() * 90 : 95 + rng() * 50) * DEG; // the strike's sweep
+    const dc = (spin ? 10 + rng() * 15 : 15 + rng() * 25) * DEG; // the cock back
     const T1 = spin ? clamp(0.5 * gapPrev, 0.3, 0.5) : clamp(0.34 * gapPrev, 0.09, 0.2);
     const Tc = clamp(0.2 * gapPrev, 0.05, 0.16);
     const m = 2.4 + rng() * 1.6;
     const vHit = (p * d1) / T1;
     const d2 = clamp((vHit * clamp(0.28 * gapNext, 0.06, 0.24)) / m, 40 * DEG, (spin ? 160 : 200) * DEG);
     return {
-      kind, hit, p, d1, dc, m, d2,
+      kind,
+      hit,
+      p,
+      d1,
+      dc,
+      m,
+      d2,
       T: { T1, Tc, T2: (m * d2) / vHit, Tq: 0 },
-      pivot: spin ? 0.42 + rng() * 0.13 : rng() * 0.3,   // along grip → tip
-      arm: spin ? 0 : rng() * 0.1,                         // the grip leaning against the blade
-      lunge: spin ? rng() * 0.1 : rng() * 0.3,             // the pivot flying through the hit
-      whirl: spin && rng() < 0.5,                          // a flat whirl rather than a wheel
+      pivot: spin ? 0.42 + rng() * 0.13 : rng() * 0.3, // along grip → tip
+      arm: spin ? 0 : rng() * 0.1, // the grip leaning against the blade
+      lunge: spin ? rng() * 0.1 : rng() * 0.3, // the pivot flying through the hit
+      whirl: spin && rng() < 0.5, // a flat whirl rather than a wheel
     };
   }
   /** A thrust. */
   function thrustMove(hit, gapPrev, gapNext) {
     const p = 2 + rng();
-    const L = 0.4 + rng() * 0.35;   // the lunge
+    const L = 0.4 + rng() * 0.35; // the lunge
     const T1 = clamp(0.22 * gapPrev, 0.07, 0.14);
     const m = 2 + rng();
     // It stops in a few hundredths of a second, carried further the faster it went.
     const T2 = clamp(0.07 * gapNext, 0.025, 0.045);
     return {
-      kind: 'thrust', hit, p, L, m,
-      o: ((p * L) / T1) * T2 / m,
-      b: 0.1 + rng() * 0.15,        // the draw back
+      kind: 'thrust',
+      hit,
+      p,
+      L,
+      m,
+      o: (((p * L) / T1) * T2) / m,
+      b: 0.1 + rng() * 0.15, // the draw back
       T: { T1, Tc: clamp(0.3 * gapPrev, 0.08, 0.24), T2, Tq: clamp(0.22 * gapNext, 0.06, 0.15) },
       twist: alive && rng() < 0.4 ? (rng() < 0.5 ? -1 : 1) * Math.PI : 0, // a corkscrew as it drives in
     };
@@ -216,7 +247,10 @@ export function createRoutine({
       found++;
       poseAt(mv, mv.cock, sample);
       const score = sample.q.angleTo(from.q) + 1.5 * sample.c.distanceTo(from.c);
-      if (score < bestScore) { bestScore = score; best = mv.geo; }
+      if (score < bestScore) {
+        bestScore = score;
+        best = mv.geo;
+      }
     }
     mv.geo = best ?? mv.geo;
     mv.ready = poseAt(mv, mv.cock, newPose());
@@ -233,7 +267,8 @@ export function createRoutine({
   }
   /** Where a move fights: near the fire, moved about a little each time. */
   function spot(b) {
-    const C = center.clone()
+    const C = center
+      .clone()
       .addScaledVector(b.right, (rng() - 0.5) * 0.6)
       .addScaledVector(WORLD_UP, rng() * 0.25 - 0.05)
       .addScaledVector(b.toCam.clone().setY(0).normalize(), (rng() - 0.3) * 0.4);
@@ -253,8 +288,12 @@ export function createRoutine({
       const phi = rng() * TAU;
       const tau = (rng() * 2 - 1) * 0.45;
       a = b.right.clone().multiplyScalar(Math.cos(phi)).addScaledVector(b.up, Math.sin(phi));
-      u = b.right.clone().multiplyScalar(-Math.sin(phi)).addScaledVector(b.up, Math.cos(phi))
-        .multiplyScalar(Math.cos(tau)).addScaledVector(b.toCam, Math.sin(tau));
+      u = b.right
+        .clone()
+        .multiplyScalar(-Math.sin(phi))
+        .addScaledVector(b.up, Math.cos(phi))
+        .multiplyScalar(Math.cos(tau))
+        .addScaledVector(b.toCam, Math.sin(tau));
       u.addScaledVector(a, -u.dot(a)).normalize();
     }
     const n = new THREE.Vector3().crossVectors(a, u).normalize();
@@ -266,9 +305,12 @@ export function createRoutine({
   }
   function thrustShape(mv, b, safe) {
     const side = rng() < 0.5 ? -1 : 1;
-    const A = b.right.clone().multiplyScalar(side * (0.55 + 0.45 * rng()))
+    const A = b.right
+      .clone()
+      .multiplyScalar(side * (0.55 + 0.45 * rng()))
       .addScaledVector(b.up, safe ? 0 : -0.45 + 0.7 * rng())
-      .addScaledVector(b.toCam, safe ? -0.1 : -0.25 + 0.8 * rng()).normalize();
+      .addScaledVector(b.toCam, safe ? -0.1 : -0.25 + 0.8 * rng())
+      .normalize();
     const n = (rng() < 0.5 ? WORLD_UP : b.toCam).clone().applyAxisAngle(A, (rng() * 2 - 1) * 0.6);
     const C = safe ? center.clone() : spot(b);
     const cocked = C.clone().addScaledVector(A, -(mv.L / 2 + 0.45 * len));
@@ -291,7 +333,8 @@ export function createRoutine({
       if (t.y < ground || Math.hypot(t.x - fire.x, t.z - fire.z) > 2.6 || t.distanceTo(b.pos) < 0.8) return false;
       const g = worldPoint(sample, grip, tw);
       if (g.y < ground + 0.1 || g.distanceTo(b.pos) < 0.8 || sample.c.distanceTo(b.pos) < 0.8) return false;
-      for (const c of avoid) if (outside(t, c) < 0.05 || outside(g, c) < 0.05 || outside(sample.c, c) < 0.05) return false;
+      for (const c of avoid)
+        if (outside(t, c) < 0.05 || outside(g, c) < 0.05 || outside(sample.c, c) < 0.05) return false;
     }
     return true;
   }
@@ -314,7 +357,9 @@ export function createRoutine({
     td.copy(g.a).multiplyScalar(Math.cos(th)).addScaledVector(g.u, Math.sin(th));
     orient(td, g.n, tq);
     const prog = (ang - (mv.d1 - mv.dc)) / (mv.d1 + mv.d2); // 0 at the hit
-    tw.copy(g.C).addScaledVector(g.tHit, mv.lunge * prog).addScaledVector(td, -mv.arm);
+    tw.copy(g.C)
+      .addScaledVector(g.tHit, mv.lunge * prog)
+      .addScaledVector(td, -mv.arm);
     return fromPivot(tw, tq, g.pivotL, out);
   }
   function thrustPose(mv, t, out) {
@@ -354,7 +399,8 @@ export function createRoutine({
   function makeGlide(from, to, t0, t1, { flip = false } = {}) {
     const T = t1 - t0;
     const b = basis();
-    const bulge = WORLD_UP.clone().multiplyScalar((0.06 + 0.12 * rng()) * Math.min(1, T / 0.4))
+    const bulge = WORLD_UP.clone()
+      .multiplyScalar((0.06 + 0.12 * rng()) * Math.min(1, T / 0.4))
       .addScaledVector(b.right, (rng() - 0.5) * 0.12 * Math.min(1, T / 0.4));
     const gl = { from, to, t0, t1, bulge, twirl: 0, flip: 0, flipAxis: b.right.clone(), hover: null };
     if (alive && T >= 0.3) {
@@ -365,11 +411,19 @@ export function createRoutine({
     if (T > 0.6 && !flip) {
       // Time to spare: it hangs in the air, breathing, its point turned toward the camera.
       const tilt = 0.25 + 0.35 * rng();
-      const d = WORLD_UP.clone().negate().multiplyScalar(Math.cos(tilt))
-        .addScaledVector(b.toCam, Math.sin(tilt) * 0.7).addScaledVector(b.right, Math.sin(tilt) * (rng() - 0.5)).normalize();
+      const d = WORLD_UP.clone()
+        .negate()
+        .multiplyScalar(Math.cos(tilt))
+        .addScaledVector(b.toCam, Math.sin(tilt) * 0.7)
+        .addScaledVector(b.right, Math.sin(tilt) * (rng() - 0.5))
+        .normalize();
       const at = spot(b);
       at.y += 0.1;
-      gl.hover = { pose: { c: at, q: orient(d, b.toCam, new THREE.Quaternion()) }, a: t0 + Math.min(0.28, T * 0.3), b: t1 - Math.min(0.28, T * 0.3) };
+      gl.hover = {
+        pose: { c: at, q: orient(d, b.toCam, new THREE.Quaternion()) },
+        a: t0 + Math.min(0.28, T * 0.3),
+        b: t1 - Math.min(0.28, T * 0.3),
+      };
       gl.twirl = 0;
     }
     // A turn between two poses can swing the point down through the fire: arc higher.
@@ -378,7 +432,10 @@ export function createRoutine({
       let at = 0.5;
       for (let i = 1; i < 16; i++) {
         const y = worldPoint(glidePose(gl, t0 + (T * i) / 16, sample), tip, tv).y;
-        if (y < low) { low = y; at = i / 16; }
+        if (y < low) {
+          low = y;
+          at = i / 16;
+        }
       }
       if (low >= ground + 0.05) break;
       gl.bulge.y = Math.min(1, gl.bulge.y + (ground + 0.05 - low) / Math.max(0.3, bump(at))); // (at most a metre higher)
@@ -434,13 +491,22 @@ export function createRoutine({
       return out;
     }
     prepare(0);
-    return glidePose(glide('rise', () => makeGlide(pulled, first.ready, pullEnd, riseT)), t, out);
+    return glidePose(
+      glide('rise', () => makeGlide(pulled, first.ready, pullEnd, riseT)),
+      t,
+      out,
+    );
   }
 
   // --- the plunge ----------------------------------------------------------------------
   const raised = drawnUp(alive && rng() < 0.35 ? 1.25 : 0.9);
   function plungePose(t, out) {
-    if (t < raiseEnd) return glidePose(glide('raise', () => makeGlide(prepare(list.length - 1).done, raised, last.end, raiseEnd, { flip: true })), t, out);
+    if (t < raiseEnd)
+      return glidePose(
+        glide('raise', () => makeGlide(prepare(list.length - 1).done, raised, last.end, raiseEnd, { flip: true })),
+        t,
+        out,
+      );
     const u = clamp01((t - raiseEnd) / Math.max(1e-3, stab));
     out.q.copy(homePose.q);
     out.c.lerpVectors(raised.c, homePose.c, u * u);
@@ -461,7 +527,11 @@ export function createRoutine({
       if (t >= mv.cock) p = poseAt(mv, t, outPose);
       else {
         const prev = prepare(k - 1);
-        p = glidePose(glide(k, () => makeGlide(prev.done, mv.ready, prev.end, mv.cock)), t, outPose);
+        p = glidePose(
+          glide(k, () => makeGlide(prev.done, mv.ready, prev.end, mv.cock)),
+          t,
+          outPose,
+        );
       }
     }
     outQuat.copy(p.q);

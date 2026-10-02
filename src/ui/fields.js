@@ -24,7 +24,11 @@ export { barOptions } from '../modes.js';
 
 let uid = 0;
 /** A field's label as plain text for an attribute (labels are markup: escaped, maybe tagged). */
-const plain = (label) => String(label).replace(/<[^>]*>/g, '').replace(/"/g, '&quot;').trim();
+const plain = (label) =>
+  String(label)
+    .replace(/<[^>]*>/g, '')
+    .replace(/"/g, '&quot;')
+    .trim();
 
 /**
  * A "?" that shows `hint`, and the hidden text it's read out from. With `control`, the input
@@ -84,7 +88,12 @@ const field = (label, t, control, { adv = false, after = '' } = {}) => {
 export const range = (key, label, min, max, step, { hint = '', unit = '', adv = false } = {}) => {
   const t = tip(hint, { control: true, label });
   const after = `<output data-out="${key}"></output>${unit ? `<span class="viz-unit">${unit}</span>` : ''}`;
-  return field(label, t, (id) => `<input type="range" data-set="${key}" min="${min}" max="${max}" step="${step}"${id}${t.ref}>`, { adv, after });
+  return field(
+    label,
+    t,
+    (id) => `<input type="range" data-set="${key}" min="${min}" max="${max}" step="${step}"${id}${t.ref}>`,
+    { adv, after },
+  );
 };
 
 /**
@@ -99,7 +108,12 @@ export const number = (key, label, { hint = '', unit = '', adv = false, min, max
   const after = unit ? `<span class="viz-unit">${unit}</span>` : '';
   // (A phone's numeric keypad has no decimal point: a fraction's step gets the decimal one.)
   const keypad = Number.isInteger(step) ? 'numeric' : 'decimal';
-  return field(label, t, (id) => `<input type="number" data-set="${key}"${limits} inputmode="${keypad}"${id}${t.ref}>`, { adv, after });
+  return field(
+    label,
+    t,
+    (id) => `<input type="number" data-set="${key}"${limits} inputmode="${keypad}"${id}${t.ref}>`,
+    { adv, after },
+  );
 };
 
 /**
@@ -109,7 +123,13 @@ export const number = (key, label, { hint = '', unit = '', adv = false, min, max
  */
 export const text = (key, label, { hint = '', adv = false, max = 60, placeholder = '' } = {}) => {
   const t = tip(hint, { control: true, label });
-  return field(label, t, (id) => `<input type="text" data-set="${key}" maxlength="${max}" placeholder="${esc(placeholder)}" autocomplete="off"${id}${t.ref}>`, { adv });
+  return field(
+    label,
+    t,
+    (id) =>
+      `<input type="text" data-set="${key}" maxlength="${max}" placeholder="${esc(placeholder)}" autocomplete="off"${id}${t.ref}>`,
+    { adv },
+  );
 };
 
 /**
@@ -135,9 +155,15 @@ export const checks = (group, label, names, { hint = '', adv = false, bulk = fal
   const t = tip(hint, { control: true, label });
   return `
   <div${advAttr(adv)}${t.id ? ' data-tip-group' : ''}>
-    <p class="viz-field-label">${label} ${t.mark}</p>${bulk ? `
-    ${bulkBar(group, { kind: 'checks', minOne, label })}` : ''}
-    <div class="viz-checks"${bulk ? ` data-bulk-list="${esc(group)}"` : ''}>${Object.entries(names).map(([id, name]) => check(`${group}.${id}`, esc(name), { group: t.id })).join('')}</div>
+    <p class="viz-field-label">${label} ${t.mark}</p>${
+      bulk
+        ? `
+    ${bulkBar(group, { kind: 'checks', minOne, label })}`
+        : ''
+    }
+    <div class="viz-checks"${bulk ? ` data-bulk-list="${esc(group)}"` : ''}>${Object.entries(names)
+      .map(([id, name]) => check(`${group}.${id}`, esc(name), { group: t.id }))
+      .join('')}</div>
   </div>`;
 };
 
@@ -155,7 +181,13 @@ export const options = (names, first = null) => [...(first ? [first] : []), ...O
  */
 export const select = (key, label, opts, { hint = '', adv = false } = {}) => {
   const t = tip(hint, { control: true, label });
-  return field(label, t, (id) => `<select data-set="${key}"${id}${t.ref}>${opts.map(([v, text]) => `<option value="${esc(v)}">${esc(text)}</option>`).join('')}</select>`, { adv });
+  return field(
+    label,
+    t,
+    (id) =>
+      `<select data-set="${key}"${id}${t.ref}>${opts.map(([v, text]) => `<option value="${esc(v)}">${esc(text)}</option>`).join('')}</select>`,
+    { adv },
+  );
 };
 
 /**
@@ -173,7 +205,8 @@ const MIX_HINT = 'In the Mix: it comes and goes, rolled again each time the look
  * three settings mean.
  * @param {string} key @param {string} label @param {{ hint?: string, adv?: boolean }} [opts]
  */
-export const mode = (key, label, { hint = '', adv = false } = {}) => select(key, label, MODES, { hint: `${hint} ${MIX_HINT}`.trim(), adv });
+export const mode = (key, label, { hint = '', adv = false } = {}) =>
+  select(key, label, MODES, { hint: `${hint} ${MIX_HINT}`.trim(), adv });
 
 /**
  * A grid of effect switches: `items` are [settings key, name, hint?]. Keys may point into
@@ -187,14 +220,20 @@ export const modeGrid = (label, items, { hint = '', adv = false, noAlways = [] }
   return `
   <div${advAttr(adv)}${t.id ? ' data-tip-group' : ''}>
     <p class="viz-field-label">${label} ${t.mark}</p>
-    <div class="viz-modes">${items.map(([key, name, itemHint]) => {
-      const it = tip(itemHint, { control: true, label: esc(name) });
-      const choices = MODES.filter(([v]) => v !== 'on' || !noAlways.includes(key)).map(([v, text]) => `<option value="${v}">${esc(text)}</option>`).join('');
-      const pick = (id) => `<select data-set="${key}"${id} aria-label="${esc(name)}"${describedBy(it.id, t.id)}>${choices}</select>`;
-      if (!it.id) return `<label class="viz-mode"${t.id ? ' data-group-tip' : ''}><span>${esc(name)}</span>${pick('')}</label>`;
-      const id = `viz-fld-${++uid}`;
-      return `<div class="viz-mode"><label for="${id}">${esc(name)}</label>${it.mark}${pick(` id="${id}"`)}</div>`;
-    }).join('')}</div>
+    <div class="viz-modes">${items
+      .map(([key, name, itemHint]) => {
+        const it = tip(itemHint, { control: true, label: esc(name) });
+        const choices = MODES.filter(([v]) => v !== 'on' || !noAlways.includes(key))
+          .map(([v, text]) => `<option value="${v}">${esc(text)}</option>`)
+          .join('');
+        const pick = (id) =>
+          `<select data-set="${key}"${id} aria-label="${esc(name)}"${describedBy(it.id, t.id)}>${choices}</select>`;
+        if (!it.id)
+          return `<label class="viz-mode"${t.id ? ' data-group-tip' : ''}><span>${esc(name)}</span>${pick('')}</label>`;
+        const id = `viz-fld-${++uid}`;
+        return `<div class="viz-mode"><label for="${id}">${esc(name)}</label>${it.mark}${pick(` id="${id}"`)}</div>`;
+      })
+      .join('')}</div>
   </div>`;
 };
 
@@ -214,12 +253,19 @@ export const modeGrid = (label, items, { hint = '', adv = false, noAlways = [] }
  * @param {string} key @param {string} label (markup: escape it first)
  * @param {{ hint?: string, adv?: boolean, noAlways?: boolean, missing?: string, group?: string, attr?: string }} [opts]
  */
-export const tri = (key, label, { hint = '', adv = false, noAlways = false, missing = '', group = '', attr = '' } = {}) => {
+export const tri = (
+  key,
+  label,
+  { hint = '', adv = false, noAlways = false, missing = '', group = '', attr = '' } = {},
+) => {
   const t = tip(hint, { control: true, label });
   const name = `viz-tri-${++uid}`;
-  const choices = MODES.filter(([v]) => v !== 'on' || !noAlways).map(([v, text]) => (
-    `<label class="tri-opt"${attr}><input type="radio" name="${name}" data-set="${key}" value="${v}"${v === missing ? ' data-missing' : ''}><span>${esc(text)}</span></label>`
-  )).join('');
+  const choices = MODES.filter(([v]) => v !== 'on' || !noAlways)
+    .map(
+      ([v, text]) =>
+        `<label class="tri-opt"${attr}><input type="radio" name="${name}" data-set="${key}" value="${v}"${v === missing ? ' data-missing' : ''}><span>${esc(text)}</span></label>`,
+    )
+    .join('');
   const nameId = t.id ? `${name}-name` : '';
   const legend = `<legend><span class="tri-name"${nameId ? ` id="${nameId}"` : ''}>${label}</span>${t.id ? ` ${t.button}` : ''}</legend>${t.note}`;
   return `<fieldset class="tri"${advAttr(adv)} data-set-group="${esc(key)}"${noAlways ? ' data-no-always' : ''}${nameId ? ` aria-labelledby="${nameId}"` : ''}${describedBy(t.id, group)}>${legend}<span class="tri-opts">${choices}</span></fieldset>`;
@@ -237,16 +283,30 @@ export const triGrid = (label, items, { hint = '', adv = false, noAlways = [], b
   const t = tip(hint, { control: !ownHints(items), label });
   return `
   <div class="tri-grid-wrap"${advAttr(adv)}${t.id ? ' data-tip-group' : ''}>
-    <p class="viz-field-label">${label} ${t.mark}</p>${bulk ? `
-    ${bulkBar(bulk, { kind: 'tri', label })}` : ''}
+    <p class="viz-field-label">${label} ${t.mark}</p>${
+      bulk
+        ? `
+    ${bulkBar(bulk, { kind: 'tri', label })}`
+        : ''
+    }
     <div class="tri-grid"${bulk ? ` data-bulk-list="${esc(bulk)}"` : ''}>${items.map(([key, name, itemHint]) => tri(key, esc(name), { hint: itemHint, noAlways: noAlways.includes(key), group: t.id })).join('')}</div>
   </div>`;
 };
 
 /** A bulk toolbar's buttons per kind: [data-bulk action, label]. */
 export const BULK_ACTIONS = {
-  tri: [['off', 'All Off'], ['mix', 'All In the Mix'], ['on', 'All Always'], ['shuffle', 'Shuffle'], ['defaults', 'Defaults']],
-  checks: [['all', 'All'], ['none', 'None'], ['defaults', 'Defaults']],
+  tri: [
+    ['off', 'All Off'],
+    ['mix', 'All In the Mix'],
+    ['on', 'All Always'],
+    ['shuffle', 'Shuffle'],
+    ['defaults', 'Defaults'],
+  ],
+  checks: [
+    ['all', 'All'],
+    ['none', 'None'],
+    ['defaults', 'Defaults'],
+  ],
 };
 /** Why a list that keeps one on has no None. */
 const ONE_STAYS = 'At least one has to stay on.';
@@ -261,12 +321,15 @@ const ONE_STAYS = 'At least one has to stay on.';
  */
 export const bulkBar = (group, { kind = 'tri', minOne = false, label = '' } = {}) => {
   const g = esc(group);
-  const buttons = BULK_ACTIONS[kind].map(([action, text]) => {
-    const button = (more) => `<button type="button" class="bulk-btn" data-bulk="${action}" data-bulk-group="${g}"${more}>${text}</button>`;
-    if (action !== 'none' || !minOne) return button('');
-    const why = `viz-why-${++uid}`;
-    return `${button(` aria-disabled="true" data-tip="${ONE_STAYS}" aria-describedby="${why}"`)}<span class="visually-hidden" id="${why}">${ONE_STAYS}</span>`;
-  }).join('');
+  const buttons = BULK_ACTIONS[kind]
+    .map(([action, text]) => {
+      const button = (more) =>
+        `<button type="button" class="bulk-btn" data-bulk="${action}" data-bulk-group="${g}"${more}>${text}</button>`;
+      if (action !== 'none' || !minOne) return button('');
+      const why = `viz-why-${++uid}`;
+      return `${button(` aria-disabled="true" data-tip="${ONE_STAYS}" aria-describedby="${why}"`)}<span class="visually-hidden" id="${why}">${ONE_STAYS}</span>`;
+    })
+    .join('');
   return `<div class="bulk" role="group" aria-label="${label ? `Set All ${plain(label)}` : 'Set All'}">${buttons}</div>`;
 };
 
@@ -285,12 +348,15 @@ export const bulkBar = (group, { kind = 'tri', minOne = false, label = '' } = {}
  * @returns {Record<string, any>}
  */
 export function bulkValues(action, items, current = {}, defaults = {}, rand = Math.random, { minOne = false } = {}) {
-  const list = items.map((it) => (typeof it === 'string' ? { key: it, noAlways: false } : { key: it.key, noAlways: !!it.noAlways }));
+  const list = items.map((it) =>
+    typeof it === 'string' ? { key: it, noAlways: false } : { key: it.key, noAlways: !!it.noAlways },
+  );
   const out = { ...current };
   const isBox = (key) => typeof (current[key] ?? defaults[key]) === 'boolean';
   const on = (v) => v === true || (typeof v === 'string' && v !== 'off');
   for (const { key, noAlways } of list) {
-    if (action === 'off' || action === 'mix' || action === 'on') out[key] = action === 'on' && noAlways ? 'mix' : action;
+    if (action === 'off' || action === 'mix' || action === 'on')
+      out[key] = action === 'on' && noAlways ? 'mix' : action;
     else if (action === 'all' || action === 'none') out[key] = action === 'all';
     else if (action === 'defaults') out[key] = key in defaults ? defaults[key] : current[key];
     else if (action === 'shuffle') {
@@ -312,6 +378,8 @@ export function bulkValues(action, items, current = {}, defaults = {}, rand = Ma
  * @param {{ adv?: boolean }} [o]
  */
 export const more = (body, { adv = true } = {}) => {
-  const inner = Array.isArray(body) ? `<ul>${body.map((line) => `<li>${esc(line)}</li>`).join('')}</ul>` : `<p>${esc(body)}</p>`;
+  const inner = Array.isArray(body)
+    ? `<ul>${body.map((line) => `<li>${esc(line)}</li>`).join('')}</ul>`
+    : `<p>${esc(body)}</p>`;
   return `<details class="viz-more"${advAttr(adv)}><summary>More</summary>${inner}</details>`;
 };

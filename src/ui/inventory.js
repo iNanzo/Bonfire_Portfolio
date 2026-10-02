@@ -45,9 +45,14 @@ export function setupInventory(root, { reducedMotion }) {
   function fitEmpties() {
     const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length || 4;
     const need = (cols - (slots.length % cols)) % cols;
-    empties.forEach((e, i) => { e.hidden = i >= need; });
+    empties.forEach((e, i) => {
+      e.hidden = i >= need;
+    });
   }
-  new ResizeObserver(() => { fitEmpties(); placeCursor({ glide: false }); }).observe(box);
+  new ResizeObserver(() => {
+    fitEmpties();
+    placeCursor({ glide: false });
+  }).observe(box);
   fitEmpties();
 
   // --- At a glance ---------------------------------------------------------------
@@ -92,7 +97,10 @@ export function setupInventory(root, { reducedMotion }) {
     if (im.video) {
       video.poster = img(im.src);
       video.setAttribute('aria-label', im.alt);
-      if (video.dataset.src !== im.src) { video.dataset.src = im.src; video.src = clip(im.src); }
+      if (video.dataset.src !== im.src) {
+        video.dataset.src = im.src;
+        video.src = clip(im.src);
+      }
       if (!reducedMotion) video.play().catch(() => {});
     } else {
       video.pause();
@@ -106,7 +114,9 @@ export function setupInventory(root, { reducedMotion }) {
     showMedia(im, d('img'), d('video'));
     d('caption').textContent = im.caption ?? '';
     d('img-count').textContent = `${imageIndex + 1} / ${imgs.length}`;
-    d('thumbs').querySelectorAll('.thumb').forEach((t, n) => t.setAttribute('aria-current', String(n === imageIndex)));
+    d('thumbs')
+      .querySelectorAll('.thumb')
+      .forEach((t, n) => t.setAttribute('aria-current', String(n === imageIndex)));
     if (!reducedMotion) {
       viewerStage.classList.remove('is-switching');
       void viewerStage.offsetWidth;
@@ -136,14 +146,21 @@ export function setupInventory(root, { reducedMotion }) {
     d('role').textContent = p.role;
     d('note').textContent = p.note ?? '';
     d('note').hidden = !p.note;
-    d('links').innerHTML = (p.links ?? []).map((l) => `<a class="pix-btn detail-link" ${linkAttrs(l.href)}>${esc(l.label)} &gt;</a>`).join('');
+    d('links').innerHTML = (p.links ?? [])
+      .map((l) => `<a class="pix-btn detail-link" ${linkAttrs(l.href)}>${esc(l.label)} &gt;</a>`)
+      .join('');
     d('links').hidden = !p.links?.length;
     const multi = p.images.length > 1;
     d('controls').hidden = !multi;
     d('thumbs').hidden = !multi;
     // (A thumbnail says which picture it is as its tooltip: its caption, as its label does.)
     d('thumbs').innerHTML = multi
-      ? p.images.map((im, n) => `<button class="thumb" type="button" data-thumb="${n}" aria-label="Show image ${n + 1}: ${esc(im.caption ?? '')}" data-tip="${esc(im.caption || `Image ${n + 1}`)}"><img src="${esc(img(im.src, true))}" alt="" loading="lazy"></button>`).join('')
+      ? p.images
+          .map(
+            (im, n) =>
+              `<button class="thumb" type="button" data-thumb="${n}" aria-label="Show image ${n + 1}: ${esc(im.caption ?? '')}" data-tip="${esc(im.caption || `Image ${n + 1}`)}"><img src="${esc(img(im.src, true))}" alt="" loading="lazy"></button>`,
+          )
+          .join('')
       : '';
     showImage(0);
     for (const s of slots) {
@@ -166,18 +183,36 @@ export function setupInventory(root, { reducedMotion }) {
     showMedia(im, gl('img'), gl('video'));
     gl('caption').textContent = im.caption ?? '';
     gl('count').textContent = `${imageIndex + 1} / ${current.images.length}`;
-    gallery.querySelectorAll('[data-gl-prev], [data-gl-next]').forEach((b) => { b.hidden = current.images.length < 2; });
+    gallery.querySelectorAll('[data-gl-prev], [data-gl-next]').forEach((b) => {
+      b.hidden = current.images.length < 2;
+    });
   }
   gallery.addEventListener('click', (e) => {
     if (e.target === gallery || e.target.closest('[data-gl-close]')) gallery.close();
-    else if (e.target.closest('[data-gl-prev]')) { showGallery(imageIndex - 1); blip('move'); }
-    else if (e.target.closest('[data-gl-next]')) { showGallery(imageIndex + 1); blip('move'); }
+    else if (e.target.closest('[data-gl-prev]')) {
+      showGallery(imageIndex - 1);
+      blip('move');
+    } else if (e.target.closest('[data-gl-next]')) {
+      showGallery(imageIndex + 1);
+      blip('move');
+    }
   });
   gallery.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft') { e.preventDefault(); showGallery(imageIndex - 1); blip('move'); }
-    if (e.key === 'ArrowRight') { e.preventDefault(); showGallery(imageIndex + 1); blip('move'); }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      showGallery(imageIndex - 1);
+      blip('move');
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      showGallery(imageIndex + 1);
+      blip('move');
+    }
   });
-  gallery.addEventListener('close', () => { gl('video').pause(); blip('back'); });
+  gallery.addEventListener('close', () => {
+    gl('video').pause();
+    blip('back');
+  });
 
   detail.addEventListener('click', (e) => {
     if (e.target.closest('[data-open-gallery]')) {
@@ -185,17 +220,32 @@ export function setupInventory(root, { reducedMotion }) {
       gallery.showModal();
       gallery.querySelector('[data-gl-close]').focus();
       blip('select');
-    } else if (e.target.closest('[data-prev-img]')) { showImage(imageIndex - 1); blip('move'); }
-    else if (e.target.closest('[data-next-img]')) { showImage(imageIndex + 1); blip('move'); }
-    else {
+    } else if (e.target.closest('[data-prev-img]')) {
+      showImage(imageIndex - 1);
+      blip('move');
+    } else if (e.target.closest('[data-next-img]')) {
+      showImage(imageIndex + 1);
+      blip('move');
+    } else {
       const t = e.target.closest('[data-thumb]');
-      if (t) { showImage(Number(t.dataset.thumb)); blip('move'); }
+      if (t) {
+        showImage(Number(t.dataset.thumb));
+        blip('move');
+      }
     }
   });
   detail.addEventListener('keydown', (e) => {
     if (!current || current.images.length < 2 || e.target.closest('a, [data-d="thumbs"]')) return;
-    if (e.key === 'ArrowLeft') { e.preventDefault(); showImage(imageIndex - 1); blip('move'); }
-    if (e.key === 'ArrowRight') { e.preventDefault(); showImage(imageIndex + 1); blip('move'); }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      showImage(imageIndex - 1);
+      blip('move');
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      showImage(imageIndex + 1);
+      blip('move');
+    }
   });
 
   /** Mark the slot whose item holds the fire (moves on click, before the weapon lands). */
@@ -221,6 +271,8 @@ export function setupInventory(root, { reducedMotion }) {
     setWield,
     has: (id) => byId.has(id),
     slotFor: (id) => slots.find((s) => s.dataset.item === id),
-    get current() { return current; },
+    get current() {
+      return current;
+    },
   };
 }

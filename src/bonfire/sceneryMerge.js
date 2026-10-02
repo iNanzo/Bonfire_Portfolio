@@ -28,11 +28,22 @@ export function mergeKey(mesh, matrix = mesh.matrixWorld) {
   const m = mesh.material;
   if (!g || !m || Array.isArray(m) || mesh.isSkinnedMesh || mesh.isInstancedMesh || mesh.isBatchedMesh) return null;
   if (Object.keys(g.morphAttributes).length || matrix.determinant() <= 0) return null;
-  const attrs = Object.keys(g.attributes).sort().map((name) => {
-    const a = g.attributes[name];
-    return `${name}:${a.itemSize}:${a.normalized ? 1 : 0}:${a.array.constructor.name}`;
-  });
-  return [m.uuid, mesh.castShadow, mesh.receiveShadow, mesh.layers.mask, mesh.renderOrder, mesh.frustumCulled, mesh.visible, ...attrs].join('|');
+  const attrs = Object.keys(g.attributes)
+    .sort()
+    .map((name) => {
+      const a = g.attributes[name];
+      return `${name}:${a.itemSize}:${a.normalized ? 1 : 0}:${a.array.constructor.name}`;
+    });
+  return [
+    m.uuid,
+    mesh.castShadow,
+    mesh.receiveShadow,
+    mesh.layers.mask,
+    mesh.renderOrder,
+    mesh.frustumCulled,
+    mesh.visible,
+    ...attrs,
+  ].join('|');
 }
 
 /**

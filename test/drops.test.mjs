@@ -6,13 +6,19 @@ import { buildTrack, analyse, eventsNamed } from './lib/track.mjs';
 
 const groove = (n, extra = {}) => Array.from({ length: n }, () => ({ ...extra }));
 const repeat = (n, spec) => Array.from({ length: n }, (_, i) => (typeof spec === 'function' ? spec(i) : { ...spec }));
-const describeEvents = (seen, track) => seen.events.map((x) => `${x.e}${x.drop ? `(${x.drop})` : ''}@bar ${((x.t - track.barTime(0)) / track.bar).toFixed(2)}`).join(', ');
+const describeEvents = (seen, track) =>
+  seen.events
+    .map((x) => `${x.e}${x.drop ? `(${x.drop})` : ''}@bar ${((x.t - track.barTime(0)) / track.bar).toFixed(2)}`)
+    .join(', ');
 
 function expectDrop(track, seen, bar, size) {
   const drops = eventsNamed(seen, 'drop');
   assert.equal(drops.length, 1, `drops: ${describeEvents(seen, track)}`);
   const at = track.barTime(bar);
-  assert.ok(drops[0].t >= at - 0.02 && drops[0].t < at + 0.08, `drop ${((drops[0].t - at) * 1000).toFixed(0)} ms from the bar line (${describeEvents(seen, track)})`);
+  assert.ok(
+    drops[0].t >= at - 0.02 && drops[0].t < at + 0.08,
+    `drop ${((drops[0].t - at) * 1000).toFixed(0)} ms from the bar line (${describeEvents(seen, track)})`,
+  );
   if (size) assert.equal(drops[0].drop, size);
 }
 
@@ -40,7 +46,14 @@ test('a breakdown that keeps a sub-bass pad [slow]', () => {
 test('a silence gap on the beat before the drop [slow]', () => {
   const bars = [
     ...groove(8),
-    ...repeat(8, (i) => ({ kick: 0, bass: false, hats: false, pad: true, riser: i >= 4 ? (i - 3) / 4 : 0, gapLastBeat: i === 7 })),
+    ...repeat(8, (i) => ({
+      kick: 0,
+      bass: false,
+      hats: false,
+      pad: true,
+      riser: i >= 4 ? (i - 3) / 4 : 0,
+      gapLastBeat: i === 7,
+    })),
     ...groove(8),
   ];
   const track = buildTrack(bars);
@@ -49,7 +62,11 @@ test('a silence gap on the beat before the drop [slow]', () => {
 });
 
 test('the classic: bass and kick cut for 8 bars, a pad and riser, then everything [slow]', () => {
-  const bars = [...groove(8), ...repeat(8, (i) => ({ kick: 0, bass: false, hats: false, pad: true, riser: i >= 4 ? (i - 3) / 4 : 0 })), ...groove(8)];
+  const bars = [
+    ...groove(8),
+    ...repeat(8, (i) => ({ kick: 0, bass: false, hats: false, pad: true, riser: i >= 4 ? (i - 3) / 4 : 0 })),
+    ...groove(8),
+  ];
   for (const gain of [1, 10 ** (-24 / 20)]) {
     const track = buildTrack(bars, { gain });
     expectDrop(track, analyse(track.audio), 16, 'big');
@@ -82,14 +99,25 @@ test('a steady groove at 140 and at 174 BPM: no sections at all [slow]', () => {
   for (const bpm of [140, 174]) {
     const track = buildTrack(groove(24), { bpm });
     const seen = analyse(track.audio);
-    assert.deepEqual([...new Set(seen.events.map((x) => x.e))], ['start', 'silence'], `${bpm}: ${describeEvents(seen, track)}`);
+    assert.deepEqual(
+      [...new Set(seen.events.map((x) => x.e))],
+      ['start', 'silence'],
+      `${bpm}: ${describeEvents(seen, track)}`,
+    );
   }
 });
 
 test('a lone boom in a breakdown is not the drop', () => {
   const bars = [
     ...groove(8),
-    ...repeat(8, (i) => ({ kick: 0, bass: false, hats: false, pad: true, riser: i >= 4 ? (i - 3) / 4 : 0, boom: i === 3 })),
+    ...repeat(8, (i) => ({
+      kick: 0,
+      bass: false,
+      hats: false,
+      pad: true,
+      riser: i >= 4 ? (i - 3) / 4 : 0,
+      boom: i === 3,
+    })),
     ...groove(8),
   ];
   const track = buildTrack(bars);
@@ -99,7 +127,11 @@ test('a lone boom in a breakdown is not the drop', () => {
 
 test('a drop into a half-time groove (kick on 1, snare on 3, a sustained sub)', () => {
   const half = (extra = {}) => ({ kick: 1, halfTime: true, bass: false, sub: true, ...extra });
-  const bars = [...repeat(8, half()), ...repeat(8, { kick: 0, bass: false, hats: false, pad: true, riser: 0.5 }), ...repeat(8, half())];
+  const bars = [
+    ...repeat(8, half()),
+    ...repeat(8, { kick: 0, bass: false, hats: false, pad: true, riser: 0.5 }),
+    ...repeat(8, half()),
+  ];
   const track = buildTrack(bars, { bpm: 140 });
   const seen = analyse(track.audio);
   expectDrop(track, seen, 16);

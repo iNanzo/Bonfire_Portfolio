@@ -22,10 +22,10 @@ export function createSceneFire(ctx) {
   // --- Hit feel. `busy` (0..1) rises with every big moment and drains over a second or
   // so; `ambient()` is how much of the background extras to keep (see the header).
   ctx.busy = 0;
-  ctx.hitStop = 0;   // seconds of freeze left
-  ctx.timeDebt = 0;  // frozen time still to be repaid
-  ctx.simT = 0;      // the simulation's clock (real time minus the freezes still owed)
-  ctx.flashAmt = 0;  // the impact flash, 0..1
+  ctx.hitStop = 0; // seconds of freeze left
+  ctx.timeDebt = 0; // frozen time still to be repaid
+  ctx.simT = 0; // the simulation's clock (real time minus the freezes still owed)
+  ctx.flashAmt = 0; // the impact flash, 0..1
   let lastFlash = -1;
   ctx.strikeAt = -1; // (simulation time) a firefly strike waiting for the ball to grow in
   const ambient = () => 1 - ctx.busy * effects.impact.budget;
@@ -40,7 +40,10 @@ export function createSceneFire(ctx) {
     if (reducedMotion) return;
     if (freeze && I.hitStop > 0) ctx.hitStop = Math.max(ctx.hitStop, I.hitStop * weight);
     const now = performance.now() / 1000;
-    if (flash && I.flash > 0 && weight >= 0.5 && now - lastFlash > 0.45) { ctx.flashAmt = Math.max(ctx.flashAmt, I.flash * weight); lastFlash = now; }
+    if (flash && I.flash > 0 && weight >= 0.5 && now - lastFlash > 0.45) {
+      ctx.flashAmt = Math.max(ctx.flashAmt, I.flash * weight);
+      lastFlash = now;
+    }
   }
   const rampNow = () => ctx.currentRamp.map((h) => new THREE.Color(h));
   /** Mark the ground and throw debris for the current element at (x, z). `size` 0..1+. */
@@ -62,8 +65,15 @@ export function createSceneFire(ctx) {
   function stoke() {
     fire.params.level = Math.min(2.4, fire.params.level + effects.fire.stoke);
     fire.burst(Math.min(1.5, effects.fire.stoke / 0.9));
-    if (ctx.elementKey === 'lightning') { plasma.discharge(0.5); ctx.zap?.crackle(0.35, 3); }
-    if (ctx.elementKey === 'ice') { crystals.burst(0.6); crystals.beat(0.8); crystals.echo(); }
+    if (ctx.elementKey === 'lightning') {
+      plasma.discharge(0.5);
+      ctx.zap?.crackle(0.35, 3);
+    }
+    if (ctx.elementKey === 'ice') {
+      crystals.burst(0.6);
+      crystals.beat(0.8);
+      crystals.echo();
+    }
     // Every stoke throws a smaller ring of the element too (skipped under reduced motion).
     ring(0.6, { quiet: true });
     ctx.weapons?.beat(1); // the planted weapon shudders
@@ -96,9 +106,13 @@ export function createSceneFire(ctx) {
     fire.params.level = reducedMotion || stationary ? 2 : 3.2;
     ctx.targetLevel = 1;
     fire.burst((reducedMotion ? 0.8 : 1.7) * flameShare(ctx.elementKey));
-    if (ctx.elementKey === 'lightning') { ctx.zap.burst(effects.lightning.height); plasma.discharge(1); }
-    else if (ctx.elementKey === 'ice') { ctx.frostRing.burst(); crystals.burst(1); }
-    else ctx.fx.burst();
+    if (ctx.elementKey === 'lightning') {
+      ctx.zap.burst(effects.lightning.height);
+      plasma.discharge(1);
+    } else if (ctx.elementKey === 'ice') {
+      ctx.frostRing.burst();
+      crystals.burst(1);
+    } else ctx.fx.burst();
     ctx.fireflies.burst(flames[ctx.flameKey].ramp);
     ctx.reactKnights('impact', stationary ? 0.5 : 1);
     ctx.reactKnights('ring');
@@ -115,7 +129,11 @@ export function createSceneFire(ctx) {
    * (see weapons.js): the visualizer times the impact to the beat, or holds the new
    * weapon over the fire until release().
    */
-  function equip(weaponKey, key, { instant = false, item = null, element = ctx.elementKey, pace = 1, hold = false, rush = false } = {}) {
+  function equip(
+    weaponKey,
+    key,
+    { instant = false, item = null, element = ctx.elementKey, pace = 1, hold = false, rush = false } = {},
+  ) {
     return ctx.loaded.then(() => {
       if (scope.disposed) return { status: 'cancelled' };
       if (!Object.hasOwn(flames, key)) throw new Error('Unknown flame: ' + key);
@@ -148,7 +166,10 @@ export function createSceneFire(ctx) {
     fire.burst(0.45 * s * (accent ? 1.5 : 1) * flameShare(ctx.elementKey));
     if (ctx.elementKey === 'lightning') {
       ctx.zap.crackle(0.12 + 0.15 * s, Math.round(2 + 3 * s + (accent ? 3 : 0)));
-      if (accent) { plasma.discharge(0.35 * s); if (Math.random() < effects.impact.fireflyStrikes) strikeFirefly(s); }
+      if (accent) {
+        plasma.discharge(0.35 * s);
+        if (Math.random() < effects.impact.fireflyStrikes) strikeFirefly(s);
+      }
     } else if (ctx.elementKey === 'ice') {
       crystals.burst(0.4 * s * (accent ? 1.5 : 1));
       crystals.beat(s * (accent ? 1 : 0.7));
@@ -166,9 +187,18 @@ export function createSceneFire(ctx) {
     const s = Math.min(1.5, Math.max(0, strength));
     if (!quiet) hit(0.35 * s, { freeze: false, flash: false, shake: false });
     scar(FIRE_ORIGIN.x, FIRE_ORIGIN.z, s, { ring: true });
-    if (ctx.elementKey === 'lightning') { ctx.zap.burst(effects.lightning.height); plasma.discharge(0.6 * s); }
-    else if (ctx.elementKey === 'ice') { ctx.frostRing.burst(); crystals.burst(0.8 * s); crystals.beat(1); crystals.echo(); }
-    else { ctx.fx.burst(); fire.burst(0.9 * s); }
+    if (ctx.elementKey === 'lightning') {
+      ctx.zap.burst(effects.lightning.height);
+      plasma.discharge(0.6 * s);
+    } else if (ctx.elementKey === 'ice') {
+      ctx.frostRing.burst();
+      crystals.burst(0.8 * s);
+      crystals.beat(1);
+      crystals.echo();
+    } else {
+      ctx.fx.burst();
+      fire.burst(0.9 * s);
+    }
     fire.params.level = Math.max(fire.params.level, 1.6 + s);
     ctx.reactKnights('ring', s);
     armor.flare(0.45 + 0.4 * Math.min(1, s));
@@ -176,7 +206,8 @@ export function createSceneFire(ctx) {
   }
   /** Lightning jumps from the ball to the nearest firefly within reach, which flickers hot. */
   function strikeFirefly(power = 1) {
-    if (!ctx.fireflies || ctx.elementKey !== 'lightning' || reducedMotion || effects.impact.fireflyStrikes <= 0) return false;
+    if (!ctx.fireflies || ctx.elementKey !== 'lightning' || reducedMotion || effects.impact.fireflyStrikes <= 0)
+      return false;
     const f = ctx.fireflies.nearest(plasma.center, 1.4 + effects.lightning.size * 2);
     if (!f || !plasma.jump(f.pos)) return false;
     ctx.fireflies.zap(f, plasma.center, power);
@@ -202,16 +233,33 @@ export function createSceneFire(ctx) {
     const basis = plan.basis ?? view.axes;
     const clearOfKnights = () => Object.assign(basis(), { avoid: ctx.knights?.capsules() ?? [] });
     if (!ctx.weapons.swing({ ...plan, basis: clearOfKnights })) return Promise.resolve(false);
-    return new Promise((resolve) => { ctx.swingDone = () => resolve(true); });
+    return new Promise((resolve) => {
+      ctx.swingDone = () => resolve(true);
+    });
   }
   /** Where the blade is (world): { mid, tip, grip, normal, quat, len, swinging, free }, or null. */
-  const bladeState = { mid: new THREE.Vector3(), tip: new THREE.Vector3(), grip: new THREE.Vector3(), normal: new THREE.Vector3(), quat: new THREE.Quaternion(), len: 1, swinging: false, free: false };
+  const bladeState = {
+    mid: new THREE.Vector3(),
+    tip: new THREE.Vector3(),
+    grip: new THREE.Vector3(),
+    normal: new THREE.Vector3(),
+    quat: new THREE.Quaternion(),
+    len: 1,
+    swinging: false,
+    free: false,
+  };
   /** Flames and sparks near the moving blade get knocked along with it. */
   function bladeWake(g0, t0, g1, t1, dt) {
     const inv = 1 / Math.max(dt, 1e-3);
-    const vgx = (g1.x - g0.x) * inv, vgy = (g1.y - g0.y) * inv, vgz = (g1.z - g0.z) * inv;
-    const vtx = (t1.x - t0.x) * inv, vty = (t1.y - t0.y) * inv, vtz = (t1.z - t0.z) * inv;
-    const abx = t1.x - g1.x, aby = t1.y - g1.y, abz = t1.z - g1.z;
+    const vgx = (g1.x - g0.x) * inv,
+      vgy = (g1.y - g0.y) * inv,
+      vgz = (g1.z - g0.z) * inv;
+    const vtx = (t1.x - t0.x) * inv,
+      vty = (t1.y - t0.y) * inv,
+      vtz = (t1.z - t0.z) * inv;
+    const abx = t1.x - g1.x,
+      aby = t1.y - g1.y,
+      abz = t1.z - g1.z;
     const len2 = abx * abx + aby * aby + abz * abz || 1;
     const R = 0.3;
     for (const set of fire.sets) {
@@ -219,9 +267,13 @@ export function createSceneFire(ctx) {
       const V = set.vel;
       for (let i = 0; i < set.n; i++) {
         const ix = i * 3;
-        const px = P[ix] - g1.x, py = P[ix + 1] - g1.y, pz = P[ix + 2] - g1.z;
+        const px = P[ix] - g1.x,
+          py = P[ix + 1] - g1.y,
+          pz = P[ix + 2] - g1.z;
         const s = Math.min(1, Math.max(0, (px * abx + py * aby + pz * abz) / len2));
-        const dx = px - abx * s, dy = py - aby * s, dz = pz - abz * s;
+        const dx = px - abx * s,
+          dy = py - aby * s,
+          dz = pz - abz * s;
         const d2 = dx * dx + dy * dy + dz * dz;
         if (d2 > R * R) continue;
         const k = 0.45 * (1 - Math.sqrt(d2) / R);
@@ -246,5 +298,22 @@ export function createSceneFire(ctx) {
     const hits = Array.from({ length: moves }, (_, i) => 0.55 + i * 0.42);
     return swing({ hits, plunge: hits[hits.length - 1] + 0.6 });
   }
-  return { ambient, hit, scar, stoke, puff, impact, equip, pulse, ring, strikeFirefly, echo, swing, flourish, bladeState, bladeWake, sparkle };
+  return {
+    ambient,
+    hit,
+    scar,
+    stoke,
+    puff,
+    impact,
+    equip,
+    pulse,
+    ring,
+    strikeFirefly,
+    echo,
+    swing,
+    flourish,
+    bladeState,
+    bladeWake,
+    sparkle,
+  };
 }

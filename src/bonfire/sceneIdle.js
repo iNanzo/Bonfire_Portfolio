@@ -4,7 +4,8 @@
 // returns, or null if the scene is gone first.
 
 // A moment the page isn't busy (a frame's spare time; Safari has no requestIdleCallback).
-const idle = (fn) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 250 }) : setTimeout(fn, 16));
+const idle = (fn) =>
+  typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 250 }) : setTimeout(fn, 16);
 // The places built beforehand (Bonfire Live, the Painter): how long after the show is up they
 // start, and the idle time left a step needs to start: most (a few pieces merged, a few rows
 // of a height map, a map drawn) take about a ms or less; a place's own build 3 to 10. Never
@@ -29,7 +30,10 @@ export function createSceneIdle(ctx) {
   function inSteps(steps) {
     return new Promise((resolve, reject) => {
       const slice = (deadline) => {
-        if (scope.disposed) { resolve(null); return; }
+        if (scope.disposed) {
+          resolve(null);
+          return;
+        }
         const budget = deadline?.timeRemaining ? Math.min(12, Math.max(4, deadline.timeRemaining())) : 8;
         const until = performance.now() + budget;
         try {
@@ -37,7 +41,9 @@ export function createSceneIdle(ctx) {
           while (!r.done && performance.now() < until) r = steps.next();
           if (r.done) resolve(r.value);
           else idle(slice);
-        } catch (error) { reject(error); }
+        } catch (error) {
+          reject(error);
+        }
       };
       idle(slice);
     });
@@ -62,11 +68,17 @@ export function createSceneIdle(ctx) {
       const next = () => requestIdleCallback(slice);
       /** @param {IdleDeadline} deadline */
       const slice = (deadline) => {
-        if (scope.disposed) { resolve(null); return; }
+        if (scope.disposed) {
+          resolve(null);
+          return;
+        }
         try {
           while (deadline.timeRemaining() >= Math.min(need, frameMs * STEP_FRAME_SHARE)) {
             const r = steps.next();
-            if (r.done) { resolve(r.value); return; }
+            if (r.done) {
+              resolve(r.value);
+              return;
+            }
             if (typeof r.value?.then === 'function') {
               need = SMALL_STEP_MS;
               r.value.then(next, next);
@@ -75,17 +87,25 @@ export function createSceneIdle(ctx) {
             need = typeof r.value === 'number' ? r.value : SMALL_STEP_MS;
           }
           next();
-        } catch (error) { reject(error); }
+        } catch (error) {
+          reject(error);
+        }
       };
       // (The display's frame first: the shortest of a few, frames being only ever late.)
       let last = -1;
       let frames = 0;
       let shortest = Infinity;
       const measure = (now) => {
-        if (scope.disposed) { resolve(null); return; }
+        if (scope.disposed) {
+          resolve(null);
+          return;
+        }
         if (last >= 0) shortest = Math.min(shortest, now - last);
         last = now;
-        if (++frames <= 8) { requestAnimationFrame(measure); return; }
+        if (++frames <= 8) {
+          requestAnimationFrame(measure);
+          return;
+        }
         if (shortest > 0 && Number.isFinite(shortest)) frameMs = shortest;
         next();
       };

@@ -6,7 +6,13 @@
 // nothing found suggests words that would find something.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { staticEntries, dynamicEntries, planSearch, suggestFor, matcherFor } from '../src/visualizer/settingsSearchUi.js';
+import {
+  staticEntries,
+  dynamicEntries,
+  planSearch,
+  suggestFor,
+  matcherFor,
+} from '../src/visualizer/settingsSearchUi.js';
 import { highlight } from '../src/ui/settingsSearch.js';
 import { entriesFor } from '../src/settingsMap.js';
 import { defaults, PRESETS } from '../src/visualizer/settings.js';
@@ -58,7 +64,10 @@ test('a group found shows whole and counts once; its items found alone show alon
   let { plan } = search('looks');
   assert.ok(plan.whole.has('looks'));
   const counted = plan.counts.effects;
-  assert.ok(counted < Object.keys(LOOKS).length, `the Looks grid counts once, not its ${Object.keys(LOOKS).length} looks (${counted})`);
+  assert.ok(
+    counted < Object.keys(LOOKS).length,
+    `the Looks grid counts once, not its ${Object.keys(LOOKS).length} looks (${counted})`,
+  );
   ({ plan } = search('kaleido'));
   assert.ok(plan.found.has('looks.kaleido') && plan.found.has('dropFx.kaleido'), 'the look and the drop hit');
   assert.ok(plan.partly.has('looks') && plan.partly.has('dropFx'));
@@ -73,7 +82,10 @@ test('a group found shows whole and counts once; its items found alone show alon
 test('the rows that change are found too: scenes, cards, setups, MIDI actions, presets, keys', () => {
   const dyn = {
     scenes: [{ ref: 'b:frozen-shrine', name: 'Frozen Shrine', summary: 'The shrine in ice' }],
-    cards: [{ title: 'Next: DJ Ember', subtitle: '' }, { title: '', subtitle: '' }],
+    cards: [
+      { title: 'Next: DJ Ember', subtitle: '' },
+      { title: '', subtitle: '' },
+    ],
     setups: ['Friday Residency'],
     midi: { drop: 'Drop', combo: 'Living Weapon' },
   };

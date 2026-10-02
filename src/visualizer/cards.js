@@ -22,11 +22,13 @@ export function createCards(ctx) {
   function nextCard(when) {
     const pool = [];
     if (when === 'drops' && settings.titleOnDrop && settings.title.trim()) pool.push(0);
-    settings.cards.forEach((c, i) => { if (c.show === when && c.title.trim()) pool.push(i + 1); });
+    settings.cards.forEach((c, i) => {
+      if (c.show === when && c.title.trim()) pool.push(i + 1);
+    });
     if (!pool.length) return;
     showCard(pool[turns[when]++ % pool.length]);
   }
-  let cardUntil = 0;       // (performance time) when the card showing goes
+  let cardUntil = 0; // (performance time) when the card showing goes
   let sceneCardNext = null; // a scene's card waiting for the one showing to go
   /**
    * Show card `n` (0 the main one), or a card of its own ({ title, subtitle, scene }: a
@@ -36,7 +38,10 @@ export function createCards(ctx) {
     const card = typeof n === 'number' ? cardAt(n) : n;
     if (!card?.title?.trim()) return;
     const now = performance.now();
-    if (card.scene && !titleCard.hidden && !titleCard.classList.contains('is-scene') && now < cardUntil) { sceneCardNext = card; return; }
+    if (card.scene && !titleCard.hidden && !titleCard.classList.contains('is-scene') && now < cardUntil) {
+      sceneCardNext = card;
+      return;
+    }
     titleCard.classList.toggle('is-scene', !!card.scene);
     q('[data-title-main]').textContent = card.title;
     q('[data-title-sub]').textContent = card.subtitle ?? '';

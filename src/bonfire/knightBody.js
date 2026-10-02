@@ -4,38 +4,69 @@
 // reactions, and getting up, sitting down and walking.
 import * as THREE from 'three';
 import { TAU, clamp, clamp01, smooth, smoother } from '../math.js';
-import { DEG, POSE, POSE_SIZE, AXIAL, newPose, IDX, DEFAULT_REST, SEAT_DEPTH, DEFAULT_RIG, sideOf, legOf, eulerQ } from './knightRig.js';
+import {
+  DEG,
+  POSE,
+  POSE_SIZE,
+  AXIAL,
+  newPose,
+  IDX,
+  DEFAULT_REST,
+  SEAT_DEPTH,
+  DEFAULT_RIG,
+  sideOf,
+  legOf,
+  eulerQ,
+} from './knightRig.js';
 import { createSolver } from './knightSolve.js';
 
 // --- writing poses -------------------------------------------------------------------------
 /** Set a joint's pitch, yaw, roll (degrees). */
 export function joint(p, name, pitch, yaw = 0, roll = 0) {
   const o = POSE[name];
-  p[o] = pitch * DEG; p[o + 1] = yaw * DEG; p[o + 2] = roll * DEG;
+  p[o] = pitch * DEG;
+  p[o + 1] = yaw * DEG;
+  p[o + 2] = roll * DEG;
 }
 /** Add to a joint's pitch, yaw, roll (degrees). */
 export function nudge(p, name, pitch, yaw = 0, roll = 0) {
   const o = POSE[name];
-  p[o] += pitch * DEG; p[o + 1] += yaw * DEG; p[o + 2] += roll * DEG;
+  p[o] += pitch * DEG;
+  p[o + 1] += yaw * DEG;
+  p[o + 2] += roll * DEG;
 }
 /** A hand: yaw/pitch in degrees, reach 0..1, elbow/wrist/roll in degrees, fist 0..1. */
 export function arm(p, s, yaw, pitch, reach, elbow = 0, wrist = 0, fist = 0.8, roll = 0) {
   const o = sideOf(s);
-  p[o] = yaw * DEG; p[o + 1] = pitch * DEG; p[o + 2] = reach; p[o + 3] = elbow * DEG;
-  p[o + 4] = wrist * DEG; p[o + 5] = roll * DEG; p[o + 6] = fist;
+  p[o] = yaw * DEG;
+  p[o + 1] = pitch * DEG;
+  p[o + 2] = reach;
+  p[o + 3] = elbow * DEG;
+  p[o + 4] = wrist * DEG;
+  p[o + 5] = roll * DEG;
+  p[o + 6] = fist;
 }
 /** An ankle, as an offset from its rest place (m; x out to that side), foot pitch and knee out (degrees). */
 export function leg(p, s, x, y, z, pitch = 0, knee = 8) {
   const o = legOf(s);
-  p[o] = x; p[o + 1] = y; p[o + 2] = z; p[o + 3] = pitch * DEG; p[o + 4] = knee * DEG;
+  p[o] = x;
+  p[o + 1] = y;
+  p[o + 2] = z;
+  p[o + 3] = pitch * DEG;
+  p[o + 4] = knee * DEG;
 }
-export function root(p, x, y, z) { p[0] = x; p[1] = y; p[2] = z; }
+export function root(p, x, y, z) {
+  p[0] = x;
+  p[1] = y;
+  p[2] = z;
+}
 /** Blend `a` toward `b` by t into `out` (the hips' turn the short way round). */
 export function lerpPose(out, a, b, t) {
   for (let i = 0; i < POSE_SIZE; i++) out[i] = a[i] + (b[i] - a[i]) * t;
   const y = POSE.hips + 1;
   let d = (b[y] - a[y]) % TAU;
-  if (d > Math.PI) d -= TAU; else if (d < -Math.PI) d += TAU;
+  if (d > Math.PI) d -= TAU;
+  else if (d < -Math.PI) d += TAU;
   out[y] = a[y] + d * t;
   return out;
 }
@@ -48,13 +79,27 @@ function lerpArms(out, b, t, s = null) {
 }
 /** Swap a pose's sides: his left does what his right did. */
 export function mirrorPose(p) {
-  for (let i = 0; i < 7; i++) { const t = p[POSE.armL + i]; p[POSE.armL + i] = p[POSE.armR + i]; p[POSE.armR + i] = t; }
-  for (let i = 0; i < 5; i++) { const t = p[POSE.legL + i]; p[POSE.legL + i] = p[POSE.legR + i]; p[POSE.legR + i] = t; }
-  for (const j of AXIAL) { p[POSE[j] + 1] *= -1; p[POSE[j] + 2] *= -1; }
+  for (let i = 0; i < 7; i++) {
+    const t = p[POSE.armL + i];
+    p[POSE.armL + i] = p[POSE.armR + i];
+    p[POSE.armR + i] = t;
+  }
+  for (let i = 0; i < 5; i++) {
+    const t = p[POSE.legL + i];
+    p[POSE.legL + i] = p[POSE.legR + i];
+    p[POSE.legR + i] = t;
+  }
+  for (const j of AXIAL) {
+    p[POSE[j] + 1] *= -1;
+    p[POSE[j] + 2] *= -1;
+  }
   p[0] *= -1;
   return p;
 }
-export const copy = (out, p) => { out.set(p); return out; };
+export const copy = (out, p) => {
+  out.set(p);
+  return out;
+};
 
 // --- frames: the chest, and aiming arms and the head in knight space ---------------------------
 const _fq = new THREE.Quaternion();
@@ -78,7 +123,8 @@ export function chestFrame(p, rig = DEFAULT_RIG, out = _frame) {
   return out;
 }
 /** A hand's direction (unit, the chest's frame) from its yaw and pitch. */
-const armVec = (out, yaw, pitch, sg) => out.set(sg * Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+const armVec = (out, yaw, pitch, sg) =>
+  out.set(sg * Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
 /** Write a direction (the chest's frame) as an arm's yaw and pitch, the yaw nearest `near`. */
 function setArmDir(p, o, d, sg) {
   const near = p[o];
@@ -99,7 +145,8 @@ const IDENTITY = new THREE.Quaternion();
 export function reframeArms(p, from, to, s = null) {
   _rq.copy(to).invert().multiply(from);
   for (const side of s ? [s] : ['L', 'R']) {
-    const o = sideOf(side), sg = side === 'L' ? 1 : -1;
+    const o = sideOf(side),
+      sg = side === 'L' ? 1 : -1;
     setArmDir(p, o, armVec(_rv, p[o], p[o + 1], sg).applyQuaternion(_rq), sg);
   }
 }
@@ -114,11 +161,16 @@ export function armRoom(p, s, yaw, pitch, reach, elbow = 0, wrist = 0, fist = 0.
  */
 export function armAt(p, s, x, y, z, elbow = 0, wrist = 0, fist = 0.8, roll = 0, rig = DEFAULT_RIG) {
   const f = chestFrame(p, rig);
-  const sock = _fv2.copy(rig.pos['upperArm' + s]).sub(rig.pos.chest).applyQuaternion(f.q).add(f.pos);
+  const sock = _fv2
+    .copy(rig.pos['upperArm' + s])
+    .sub(rig.pos.chest)
+    .applyQuaternion(f.q)
+    .add(f.pos);
   const d = _rv.set(x, y, z).sub(sock);
   const reach = d.length() / (rig.arm[0] + rig.arm[1]);
   d.applyQuaternion(_rq.copy(f.q).invert()).normalize();
-  const o = sideOf(s), sg = s === 'L' ? 1 : -1;
+  const o = sideOf(s),
+    sg = s === 'L' ? 1 : -1;
   arm(p, s, 0, 0, clamp(reach, 0.2, 1), elbow, wrist, fist, roll);
   setArmDir(p, o, d, sg);
 }
@@ -133,15 +185,20 @@ export function armAt(p, s, x, y, z, elbow = 0, wrist = 0, fist = 0.8, roll = 0,
 function hem(p, s, r, from = null) {
   if (!(r < 1)) return p;
   const o = sideOf(s);
-  const yaw = p[o], pitch = p[o + 1];
-  let out = Math.sin(yaw) * Math.cos(pitch), fwd = Math.cos(yaw) * Math.cos(pitch);
+  const yaw = p[o],
+    pitch = p[o + 1];
+  let out = Math.sin(yaw) * Math.cos(pitch),
+    fwd = Math.cos(yaw) * Math.cos(pitch);
   const up = Math.sin(pitch);
   const k = clamp01(r);
   // (How far out and back `from`'s arm already points.)
   const out0 = from ? Math.max(0, Math.sin(from[o]) * Math.cos(from[o + 1])) : 0;
   const back0 = from ? Math.max(0, -Math.cos(from[o]) * Math.cos(from[o + 1])) : 0;
   if (fwd < -back0) fwd = -back0 + (fwd + back0) * k;
-  if (out > out0) { fwd += (out - out0) * (1 - k); out = out0 + (out - out0) * k; }
+  if (out > out0) {
+    fwd += (out - out0) * (1 - k);
+    out = out0 + (out - out0) * k;
+  }
   // (Hardly anywhere left to point, it points ahead.)
   const len = Math.hypot(out, up, fwd);
   if (len < 0.5) fwd += 0.5 - len;
@@ -154,7 +211,11 @@ function hem(p, s, r, from = null) {
  * Both arms kept in their room ([left, right] 0..1); with `from` (a pose), only past where its
  * arms already are (hem).
  */
-export const hemArms = (p, room, from = null) => { if (room[0] < 1) hem(p, 'L', room[0], from); if (room[1] < 1) hem(p, 'R', room[1], from); return p; };
+export const hemArms = (p, room, from = null) => {
+  if (room[0] < 1) hem(p, 'L', room[0], from);
+  if (room[1] < 1) hem(p, 'R', room[1], from);
+  return p;
+};
 
 const _ha = new THREE.Vector3();
 /** Where the head joint is (knight space) in a pose. Reused: copy what you keep. */
@@ -162,7 +223,12 @@ export function headAt(p, rig = DEFAULT_RIG) {
   const f = chestFrame(p, rig);
   const P = rig.pos;
   const nq = _fq.copy(f.q).multiply(eulerQ(_hh, p[POSE.neck], p[POSE.neck + 1], p[POSE.neck + 2]));
-  return _ha.copy(P.neck).sub(P.chest).applyQuaternion(f.q).add(f.pos).add(_fv.copy(P.head).sub(P.neck).applyQuaternion(nq));
+  return _ha
+    .copy(P.neck)
+    .sub(P.chest)
+    .applyQuaternion(f.q)
+    .add(f.pos)
+    .add(_fv.copy(P.head).sub(P.neck).applyQuaternion(nq));
 }
 /** The helmet swap's hold: each wrist this far out, up, forward from the head (m); the elbow's turn, the wrist, its roll (degrees). */
 export const HELM_HOLD = [0.215, 0.04, 0.0, -40, -10, -75];
@@ -175,7 +241,9 @@ const _hx = new THREE.Vector3();
 const _hy = new THREE.Vector3();
 const _hz = new THREE.Vector3();
 /** How far the neck and head together turn from the chest (rad): side to side, up, down. */
-const NECK_YAW = 72 * DEG, NECK_UP = 62 * DEG, NECK_DOWN = 55 * DEG;
+const NECK_YAW = 72 * DEG,
+  NECK_UP = 62 * DEG,
+  NECK_DOWN = 55 * DEG;
 /** The neck's share of a look (the head takes the rest). */
 const NECK_SHARE = 0.4;
 /** The head's facing in knight space (unit), from a pose. */
@@ -195,10 +263,13 @@ export function aimHead(p, dir, w = 1) {
   if (w <= 0) return p;
   const c = chestFrame(p).q;
   // Where the neck and head point now, from the chest.
-  const cur = eulerQ(_hr, p[POSE.neck], p[POSE.neck + 1], p[POSE.neck + 2]).multiply(eulerQ(_hh, p[POSE.head], p[POSE.head + 1], p[POSE.head + 2]));
+  const cur = eulerQ(_hr, p[POSE.neck], p[POSE.neck + 1], p[POSE.neck + 2]).multiply(
+    eulerQ(_hh, p[POSE.head], p[POSE.head + 1], p[POSE.head + 2]),
+  );
   // The aim in the chest's frame, turned and nodded no further than a neck goes.
   const f = _hz.copy(dir).normalize().applyQuaternion(_hd.copy(c).invert());
-  let yaw = Math.atan2(f.x, f.z), pitch = Math.asin(clamp(-f.y, -1, 1));
+  let yaw = Math.atan2(f.x, f.z),
+    pitch = Math.asin(clamp(-f.y, -1, 1));
   yaw = clamp(yaw, -NECK_YAW, NECK_YAW);
   pitch = clamp(pitch, -NECK_UP, NECK_DOWN);
   f.set(Math.sin(yaw) * Math.cos(pitch), -Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)).applyQuaternion(c);
@@ -213,10 +284,15 @@ export function aimHead(p, dir, w = 1) {
   cur.slerp(goal, clamp01(w));
   _hn.identity().slerp(cur, NECK_SHARE);
   _hh.copy(_hn).invert().multiply(cur);
-  for (const [name, q] of /** @type {[string, THREE.Quaternion][]} */ ([['neck', _hn], ['head', _hh]])) {
+  for (const [name, q] of /** @type {[string, THREE.Quaternion][]} */ ([
+    ['neck', _hn],
+    ['head', _hh],
+  ])) {
     _he.setFromQuaternion(q, 'YXZ');
     const o = POSE[name];
-    p[o] = _he.x; p[o + 1] = _he.y; p[o + 2] = _he.z;
+    p[o] = _he.x;
+    p[o + 1] = _he.y;
+    p[o + 2] = _he.z;
   }
   return p;
 }
@@ -239,7 +315,9 @@ function turnHead(p, dyaw, dpitch, w = 1) {
 export function standingPose(p = newPose()) {
   p.fill(0);
   root(p, 0, -0.025, 0);
-  joint(p, 'spine', 3); joint(p, 'chest', 2); joint(p, 'head', -4);
+  joint(p, 'spine', 3);
+  joint(p, 'chest', 2);
+  joint(p, 'head', -4);
   arm(p, 'L', 62, -80, 0.95, 0, 0, 0.7);
   arm(p, 'R', 62, -80, 0.95, 0, 0, 0.7);
   leg(p, 'L', 0.03, 0, 0.01, 0, 10);
@@ -256,8 +334,12 @@ export const seatOf = (p, rig = DEFAULT_RIG) => p[1] + rig.hipsY - SEAT_DEPTH;
  * (the ankle's place; knights.js looks up the ground under it).
  */
 export function feetAt(p, rig = DEFAULT_RIG) {
-  const L = rig.pos.footL, R = rig.pos.footR;
-  return [[L.x + p[POSE.legL], L.z + p[POSE.legL + 2]], [R.x - p[POSE.legR], R.z + p[POSE.legR + 2]]];
+  const L = rig.pos.footL,
+    R = rig.pos.footR;
+  return [
+    [L.x + p[POSE.legL], L.z + p[POSE.legL + 2]],
+    [R.x - p[POSE.legR], R.z + p[POSE.legR + 2]],
+  ];
 }
 /**
  * Standing up in front of a seat of height `h`, over his feet (where standing up from it
@@ -274,7 +356,14 @@ export function standBy(p, h) {
 
 const solvers = new WeakMap();
 /** A solver for a rig, made once (the seated poses measure their knees with it). */
-const solverOf = (rig) => { let s = solvers.get(rig); if (!s) { s = createSolver(rig); solvers.set(rig, s); } return s; };
+const solverOf = (rig) => {
+  let s = solvers.get(rig);
+  if (!s) {
+    s = createSolver(rig);
+    solvers.set(rig, s);
+  }
+  return s;
+};
 const _kL = new THREE.Vector3();
 const _kR = new THREE.Vector3();
 
@@ -299,17 +388,28 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
   root(p, 0, h + SEAT_DEPTH - rig.hipsY, 0);
   const watch = style === 'watchful';
   const z = seatFeet(h);
-  const grounded = () => { if (feet) { p[POSE.legL + 1] += feet[0]; p[POSE.legR + 1] += feet[1]; } };
+  const grounded = () => {
+    if (feet) {
+      p[POSE.legL + 1] += feet[0];
+      p[POSE.legR + 1] += feet[1];
+    }
+  };
   if (h < 0.12) {
     // On the ground: knees drawn up, forearms across them (watchful: sitting up, head up).
-    joint(p, 'hips', -14); joint(p, 'spine', watch ? 12 : 20); joint(p, 'chest', watch ? 4 : 10);
-    joint(p, 'neck', watch ? -2 : 4); joint(p, 'head', watch ? -8 : 14);
+    joint(p, 'hips', -14);
+    joint(p, 'spine', watch ? 12 : 20);
+    joint(p, 'chest', watch ? 4 : 10);
+    joint(p, 'neck', watch ? -2 : 4);
+    joint(p, 'head', watch ? -8 : 14);
     leg(p, 'L', 0.05, 0, z, 10, 22);
     leg(p, 'R', 0.07, 0, z - 0.04, 6, 26);
     grounded();
     arm(p, 'L', 18, -28, 0.66, 30, 20, 0.6);
     arm(p, 'R', 18, -28, 0.66, 30, 20, 0.6);
-    if (watch) { p[POSE.armL + 1] += 6 * DEG; p[POSE.armR + 1] += 6 * DEG; }
+    if (watch) {
+      p[POSE.armL + 1] += 6 * DEG;
+      p[POSE.armR + 1] += 6 * DEG;
+    }
     return p;
   }
   const k = clamp01((h - 0.22) / 0.18);
@@ -317,20 +417,27 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
     // Leaning in over his knees, the head tipped back up to watch the fire, feet planted a
     // stride apart under his knees. (No higher at the helmet than the rest: a phone frames
     // his seat right under the page's header. His boots stay as far out of the fire.)
-    joint(p, 'hips', 8); joint(p, 'spine', 20 + 4 * k); joint(p, 'chest', 8 + 3 * k);
-    joint(p, 'neck', -6); joint(p, 'head', -12);
+    joint(p, 'hips', 8);
+    joint(p, 'spine', 20 + 4 * k);
+    joint(p, 'chest', 8 + 3 * k);
+    joint(p, 'neck', -6);
+    joint(p, 'head', -12);
     leg(p, 'L', 0.06, 0, z - 0.055, 0, 16);
     leg(p, 'R', 0.08, 0, z - 0.025, 0, 18);
   } else {
-    joint(p, 'hips', -2 + 2 * k); joint(p, 'spine', 21 + 6 * k); joint(p, 'chest', 12 + 3 * k);
-    joint(p, 'neck', 3, -3); joint(p, 'head', -2 - 2 * k, -8, -4);
+    joint(p, 'hips', -2 + 2 * k);
+    joint(p, 'spine', 21 + 6 * k);
+    joint(p, 'chest', 12 + 3 * k);
+    joint(p, 'neck', 3, -3);
+    joint(p, 'head', -2 - 2 * k, -8, -4);
     leg(p, 'L', 0.03, 0, Math.max(0.22, z - 0.2), 0, 10);
     leg(p, 'R', 0.1, 0, z + 0.12, 0, 26);
   }
   grounded();
   // The knees, where the hands go.
   const s = solverOf(rig).solve(p);
-  const kL = _kL.copy(s.p[IDX.shinL]), kR = _kR.copy(s.p[IDX.shinR]);
+  const kL = _kL.copy(s.p[IDX.shinL]),
+    kR = _kR.copy(s.p[IDX.shinR]);
   if (watch) {
     // Forearms on the knees, the hands loosely together in front of them.
     armAt(p, 'L', kL.x - 0.05, kL.y + 0.05, kL.z + 0.14, 55, 25, 0.55, 0, rig);
@@ -349,9 +456,13 @@ export const fr = (x) => x - Math.floor(x);
 /** An accent on the beat: 1 as it lands, gone by mid-beat, winding up just before the next. */
 export const accent = (ph) => Math.exp(-7 * ph) + Math.exp(-18 * (1 - ph));
 /** A rise over [a, a + r], a hold, a fall over [T − f, T]. */
-export const env = (t, a, r, T, f) => (t < a ? 0 : t < a + r ? smooth((t - a) / r) : t < T - f ? 1 : t < T ? smooth((T - t) / f) : 0);
+export const env = (t, a, r, T, f) =>
+  t < a ? 0 : t < a + r ? smooth((t - a) / r) : t < T - f ? 1 : t < T ? smooth((T - t) / f) : 0;
 /** A seeded 0..1 from a number. */
-const hash = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const hash = (n) => {
+  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return s - Math.floor(s);
+};
 
 // --- idle -------------------------------------------------------------------------------------
 /**
@@ -379,7 +490,8 @@ export function idle(p, t, seed = 0, seated = true, alert = 0) {
   const k = Math.floor(t / 12 + hash(seed + 2));
   const v = clamp01((fr(t / 12 + hash(seed + 2)) * 12) / 0.9);
   const w = smooth(v);
-  const a = hash(k + seed * 7), b = hash(k - 1 + seed * 7);
+  const a = hash(k + seed * 7),
+    b = hash(k - 1 + seed * 7);
   const roll = (a - 0.5) * 6 * w + (b - 0.5) * 6 * (1 - w);
   nudge(p, 'hips', 0, 0, roll);
   nudge(p, 'chest', 0, (a - 0.5) * 8 * w + (b - 0.5) * 8 * (1 - w), -roll * 0.6);
@@ -424,7 +536,10 @@ export function attend(p, w, seated = true) {
   nudge(p, 'hips', (seated ? 4 : 0) * w);
   nudge(p, 'spine', (seated ? -16 : -4) * w);
   nudge(p, 'chest', -8 * w);
-  if (seated) { p[POSE.armL + 1] -= 10 * DEG * w; p[POSE.armR + 1] -= 10 * DEG * w; }
+  if (seated) {
+    p[POSE.armL + 1] -= 10 * DEG * w;
+    p[POSE.armR + 1] -= 10 * DEG * w;
+  }
   return p;
 }
 const scratchA = newPose();
@@ -436,21 +551,27 @@ const scratchA = newPose();
 export function flinch(p, t, k = 1, seated = true) {
   const e = (t < 0.05 ? t / 0.05 : Math.exp(-(t - 0.05) / 0.42)) * k * (1 - smooth(clamp01((t - 0.9) / 0.5)));
   if (e <= 0.001) return p;
-  nudge(p, 'spine', -18 * e); nudge(p, 'chest', -12 * e); nudge(p, 'neck', -8 * e);
+  nudge(p, 'spine', -18 * e);
+  nudge(p, 'chest', -12 * e);
+  nudge(p, 'neck', -8 * e);
   turnHead(p, 32 * DEG, 12 * DEG, e);
   // The forearms up in front of the face (in the room, however he sits).
   const g = copy(scratchA, p);
   armRoom(g, 'L', -8, 36, 0.4, 60, 20, 1);
   armRoom(g, 'R', -14, 44, 0.38, 55, 20, 1);
   lerpArms(p, g, clamp01(e * 1.1));
-  if (!seated) { p[1] -= 0.05 * e; p[2] -= 0.04 * e; }
+  if (!seated) {
+    p[1] -= 0.05 * e;
+    p[2] -= 0.04 * e;
+  }
   return p;
 }
 /** Leaning away from the stoked fire, `t` s after (over in ~1.2 s), an arm up against the heat. */
 export function shield(p, t, k = 1, seated = true) {
   const e = env(t, 0, 0.12, 1.2, 0.8) * k;
   if (e <= 0.001) return p;
-  nudge(p, 'spine', -12 * e); nudge(p, 'chest', -6 * e);
+  nudge(p, 'spine', -12 * e);
+  nudge(p, 'chest', -6 * e);
   turnHead(p, -24 * DEG, 10 * DEG, e);
   const g = copy(scratchA, p);
   armRoom(g, 'R', -8, 28, 0.45, 60, 35, 0.4);
@@ -470,19 +591,29 @@ export function hop(p, t, k = 1, seated = true, rise = null) {
   if (t < 0 || t > 0.6) return p;
   if (seated) {
     const e = Math.sin(Math.PI * clamp01(t / 0.55)) * k;
-    nudge(p, 'spine', -10 * e); nudge(p, 'chest', -4 * e);
+    nudge(p, 'spine', -10 * e);
+    nudge(p, 'chest', -4 * e);
     for (let i = 0; i < 2; i++) {
-      const o = i ? POSE.legR : POSE.legL, f = rise ? e * clamp01(rise[i] / HOP_FEET) : e;
-      p[o + 1] += HOP_FEET * f; p[o + 2] -= 0.04 * f; p[o + 3] -= 12 * DEG * f;
+      const o = i ? POSE.legR : POSE.legL,
+        f = rise ? e * clamp01(rise[i] / HOP_FEET) : e;
+      p[o + 1] += HOP_FEET * f;
+      p[o + 2] -= 0.04 * f;
+      p[o + 3] -= 12 * DEG * f;
     }
-    p[POSE.armL + 1] -= 12 * DEG * e; p[POSE.armR + 1] -= 12 * DEG * e;
+    p[POSE.armL + 1] -= 12 * DEG * e;
+    p[POSE.armR + 1] -= 12 * DEG * e;
     return p;
   }
   const u = clamp01(t / 0.42);
   const air = 4 * u * (1 - u) * k;
   p[1] += 0.2 * air;
-  for (const s of ['L', 'R']) { const o = legOf(s); p[o + 1] += 0.2 * air + 0.1 * air; p[o + 3] += 10 * DEG * air; }
-  p[POSE.armL + 1] += 30 * DEG * air; p[POSE.armR + 1] += 30 * DEG * air;
+  for (const s of ['L', 'R']) {
+    const o = legOf(s);
+    p[o + 1] += 0.2 * air + 0.1 * air;
+    p[o + 3] += 10 * DEG * air;
+  }
+  p[POSE.armL + 1] += 30 * DEG * air;
+  p[POSE.armR + 1] += 30 * DEG * air;
   return p;
 }
 
@@ -495,10 +626,19 @@ function spline(out, keys, ts, t) {
   let k = 0;
   while (t > ts[k + 1]) k++;
   const u = (t - ts[k]) / (ts[k + 1] - ts[k]);
-  const P0 = keys[Math.max(0, k - 1)], P1 = keys[k], P2 = keys[k + 1], P3 = keys[Math.min(n - 1, k + 2)];
-  const u2 = u * u, u3 = u2 * u;
+  const P0 = keys[Math.max(0, k - 1)],
+    P1 = keys[k],
+    P2 = keys[k + 1],
+    P3 = keys[Math.min(n - 1, k + 2)];
+  const u2 = u * u,
+    u3 = u2 * u;
   for (let i = 0; i < POSE_SIZE; i++) {
-    out[i] = 0.5 * (2 * P1[i] + (P2[i] - P0[i]) * u + (2 * P0[i] - 5 * P1[i] + 4 * P2[i] - P3[i]) * u2 + (3 * P1[i] - P0[i] - 3 * P2[i] + P3[i]) * u3);
+    out[i] =
+      0.5 *
+      (2 * P1[i] +
+        (P2[i] - P0[i]) * u +
+        (2 * P0[i] - 5 * P1[i] + 4 * P2[i] - P3[i]) * u2 +
+        (3 * P1[i] - P0[i] - 3 * P2[i] + P3[i]) * u3);
   }
   return out;
 }
@@ -511,7 +651,8 @@ const STEP_LIFT = 0.06;
  */
 function overAt(h, e) {
   if (!h || h.length < 2) return 0;
-  const f = clamp01(e) * (h.length - 1), i = Math.min(h.length - 2, Math.floor(f));
+  const f = clamp01(e) * (h.length - 1),
+    i = Math.min(h.length - 2, Math.floor(f));
   return h[i] + (h[i + 1] - h[i]) * (f - i);
 }
 /**
@@ -523,8 +664,12 @@ function steps(out, from, to, t, plan, over = null, back = false) {
   for (const [s, t0, t1] of plan) {
     const o = legOf(s);
     const u = clamp01((t - t0) / (t1 - t0));
-    if (u >= 1) { for (let i = 0; i < 5; i++) out[o + i] = to[o + i]; continue; }
-    const e = smooth(u), lift = Math.sin(Math.PI * u);
+    if (u >= 1) {
+      for (let i = 0; i < 5; i++) out[o + i] = to[o + i];
+      continue;
+    }
+    const e = smooth(u),
+      lift = Math.sin(Math.PI * u);
     for (let i = 0; i < 5; i++) out[o + i] = from[o + i] + (to[o + i] - from[o + i]) * e;
     out[o + 1] += STEP_LIFT * lift + overAt(over?.[s], back ? 1 - e : e);
     out[o + 3] += 10 * DEG * lift;
@@ -563,27 +708,75 @@ export function rise(out, sit, stand, t, down = false, over = null) {
   if (over?.cross) return riseAcross(out, sit, stand, t, down, over);
   if (!down) {
     copy(k0, sit);
-    copy(k1, sit); nudge(k1, 'hips', 12); nudge(k1, 'spine', 26); nudge(k1, 'chest', 8); nudge(k1, 'head', -26);
-    arm(k1, 'L', 14, -40, 0.72, 25, 20, 0.6); arm(k1, 'R', 12, -40, 0.72, 25, 20, 0.6);
+    copy(k1, sit);
+    nudge(k1, 'hips', 12);
+    nudge(k1, 'spine', 26);
+    nudge(k1, 'chest', 8);
+    nudge(k1, 'head', -26);
+    arm(k1, 'L', 14, -40, 0.72, 25, 20, 0.6);
+    arm(k1, 'R', 12, -40, 0.72, 25, 20, 0.6);
     k1[2] += 0.05;
-    lerpPose(k2, sit, stand, 0.5); k2[2] = sit[2] + (stand[2] - sit[2]) * 0.8;
-    nudge(k2, 'hips', 16); nudge(k2, 'spine', 24); nudge(k2, 'chest', 6); nudge(k2, 'head', -18);
-    arm(k2, 'L', 22, -62, 0.9, 20, 10, 0.7); arm(k2, 'R', 22, -62, 0.9, 20, 10, 0.7);
-    copy(k3, stand); k3[1] += 0.015; nudge(k3, 'spine', -5); nudge(k3, 'chest', -3);
-    arm(k3, 'L', 95, -84, 0.97, 0, 0, 0.7); arm(k3, 'R', 95, -84, 0.97, 0, 0, 0.7);
+    lerpPose(k2, sit, stand, 0.5);
+    k2[2] = sit[2] + (stand[2] - sit[2]) * 0.8;
+    nudge(k2, 'hips', 16);
+    nudge(k2, 'spine', 24);
+    nudge(k2, 'chest', 6);
+    nudge(k2, 'head', -18);
+    arm(k2, 'L', 22, -62, 0.9, 20, 10, 0.7);
+    arm(k2, 'R', 22, -62, 0.9, 20, 10, 0.7);
+    copy(k3, stand);
+    k3[1] += 0.015;
+    nudge(k3, 'spine', -5);
+    nudge(k3, 'chest', -3);
+    arm(k3, 'L', 95, -84, 0.97, 0, 0, 0.7);
+    arm(k3, 'R', 95, -84, 0.97, 0, 0, 0.7);
     copy(k4, stand);
     spline(out, riseKeys, [0, 0.3, 0.68, 0.98, RISE_TIME], t);
-    return steps(out, sit, stand, t, [['R', 0.0, 0.2], ['L', 0.12, 0.32]], over);
+    return steps(
+      out,
+      sit,
+      stand,
+      t,
+      [
+        ['R', 0.0, 0.2],
+        ['L', 0.12, 0.32],
+      ],
+      over,
+    );
   }
   copy(k0, stand);
-  copy(k1, stand); k1[1] -= 0.1; k1[2] -= 0.06; nudge(k1, 'hips', 14); nudge(k1, 'spine', 26); nudge(k1, 'head', -20);
-  arm(k1, 'L', 30, -30, 0.92, 10, 0, 0.6); arm(k1, 'R', 30, -30, 0.92, 10, 0, 0.6);
-  copy(k2, sit); k2[1] += 0.03; nudge(k2, 'hips', 10); nudge(k2, 'spine', 18); nudge(k2, 'head', -10);
-  arm(k2, 'L', 40, -60, 0.9, 10, 0, 0.6); arm(k2, 'R', 40, -60, 0.9, 10, 0, 0.6);
-  copy(k3, sit); nudge(k3, 'spine', 6); nudge(k3, 'head', 6);
+  copy(k1, stand);
+  k1[1] -= 0.1;
+  k1[2] -= 0.06;
+  nudge(k1, 'hips', 14);
+  nudge(k1, 'spine', 26);
+  nudge(k1, 'head', -20);
+  arm(k1, 'L', 30, -30, 0.92, 10, 0, 0.6);
+  arm(k1, 'R', 30, -30, 0.92, 10, 0, 0.6);
+  copy(k2, sit);
+  k2[1] += 0.03;
+  nudge(k2, 'hips', 10);
+  nudge(k2, 'spine', 18);
+  nudge(k2, 'head', -10);
+  arm(k2, 'L', 40, -60, 0.9, 10, 0, 0.6);
+  arm(k2, 'R', 40, -60, 0.9, 10, 0, 0.6);
+  copy(k3, sit);
+  nudge(k3, 'spine', 6);
+  nudge(k3, 'head', 6);
   copy(k4, sit);
   spline(out, riseKeys, [0, 0.35, 0.78, 1.0, RISE_TIME], t);
-  return steps(out, stand, sit, t, [['R', 0.8, 0.99], ['L', 0.96, 1.18]], over, true);
+  return steps(
+    out,
+    stand,
+    sit,
+    t,
+    [
+      ['R', 0.8, 0.99],
+      ['L', 0.96, 1.18],
+    ],
+    over,
+    true,
+  );
 }
 /**
  * rise() where a foot has something to step over on its way (`over.cross`): up, he leans in
@@ -596,27 +789,72 @@ function riseAcross(out, sit, stand, t, down, over) {
   const mid = standOver(riseOver, sit, stand);
   if (!down) {
     copy(k0, sit);
-    copy(k1, sit); nudge(k1, 'hips', 12); nudge(k1, 'spine', 26); nudge(k1, 'chest', 8); nudge(k1, 'head', -26);
-    arm(k1, 'L', 14, -40, 0.72, 25, 20, 0.6); arm(k1, 'R', 12, -40, 0.72, 25, 20, 0.6);
+    copy(k1, sit);
+    nudge(k1, 'hips', 12);
+    nudge(k1, 'spine', 26);
+    nudge(k1, 'chest', 8);
+    nudge(k1, 'head', -26);
+    arm(k1, 'L', 14, -40, 0.72, 25, 20, 0.6);
+    arm(k1, 'R', 12, -40, 0.72, 25, 20, 0.6);
     k1[2] += 0.04;
     lerpPose(k2, sit, mid, 0.55);
-    nudge(k2, 'hips', 16); nudge(k2, 'spine', 22); nudge(k2, 'chest', 6); nudge(k2, 'head', -16);
-    arm(k2, 'L', 22, -62, 0.9, 20, 10, 0.7); arm(k2, 'R', 22, -62, 0.9, 20, 10, 0.7);
-    copy(k3, mid); k3[1] += 0.01; nudge(k3, 'spine', -3); nudge(k3, 'chest', -2);
-    arm(k3, 'L', 80, -82, 0.96, 0, 0, 0.7); arm(k3, 'R', 80, -82, 0.96, 0, 0, 0.7);
+    nudge(k2, 'hips', 16);
+    nudge(k2, 'spine', 22);
+    nudge(k2, 'chest', 6);
+    nudge(k2, 'head', -16);
+    arm(k2, 'L', 22, -62, 0.9, 20, 10, 0.7);
+    arm(k2, 'R', 22, -62, 0.9, 20, 10, 0.7);
+    copy(k3, mid);
+    k3[1] += 0.01;
+    nudge(k3, 'spine', -3);
+    nudge(k3, 'chest', -2);
+    arm(k3, 'L', 80, -82, 0.96, 0, 0, 0.7);
+    arm(k3, 'R', 80, -82, 0.96, 0, 0, 0.7);
     copy(k4, stand);
     spline(out, riseKeys, [0, 0.3, 0.6, 0.86, RISE_TIME], t);
-    return steps(out, sit, stand, t, [['R', 0.78, 0.98], ['L', 0.94, 1.16]], over);
+    return steps(
+      out,
+      sit,
+      stand,
+      t,
+      [
+        ['R', 0.78, 0.98],
+        ['L', 0.94, 1.16],
+      ],
+      over,
+    );
   }
   copy(k0, stand);
   copy(k1, mid);
-  copy(k2, mid); k2[1] -= 0.1; k2[2] -= 0.05; nudge(k2, 'hips', 14); nudge(k2, 'spine', 26); nudge(k2, 'head', -20);
-  arm(k2, 'L', 30, -30, 0.92, 10, 0, 0.6); arm(k2, 'R', 30, -30, 0.92, 10, 0, 0.6);
-  copy(k3, sit); k3[1] += 0.03; nudge(k3, 'hips', 10); nudge(k3, 'spine', 18); nudge(k3, 'head', -10);
-  arm(k3, 'L', 40, -60, 0.9, 10, 0, 0.6); arm(k3, 'R', 40, -60, 0.9, 10, 0, 0.6);
+  copy(k2, mid);
+  k2[1] -= 0.1;
+  k2[2] -= 0.05;
+  nudge(k2, 'hips', 14);
+  nudge(k2, 'spine', 26);
+  nudge(k2, 'head', -20);
+  arm(k2, 'L', 30, -30, 0.92, 10, 0, 0.6);
+  arm(k2, 'R', 30, -30, 0.92, 10, 0, 0.6);
+  copy(k3, sit);
+  k3[1] += 0.03;
+  nudge(k3, 'hips', 10);
+  nudge(k3, 'spine', 18);
+  nudge(k3, 'head', -10);
+  arm(k3, 'L', 40, -60, 0.9, 10, 0, 0.6);
+  arm(k3, 'R', 40, -60, 0.9, 10, 0, 0.6);
   copy(k4, sit);
   spline(out, riseKeys, [0, 0.4, 0.68, 0.98, RISE_TIME], t);
-  return steps(out, stand, sit, t, [['L', 0.04, 0.26], ['R', 0.2, 0.42]], over, true);
+  return steps(
+    out,
+    stand,
+    sit,
+    t,
+    [
+      ['L', 0.04, 0.26],
+      ['R', 0.2, 0.42],
+    ],
+    over,
+    true,
+  );
 }
 
 /**
@@ -627,12 +865,15 @@ function riseAcross(out, sit, stand, t, down, over) {
 export function walk(out, base, phase, stride = 0.28) {
   copy(out, base);
   const u = fr(phase);
-  for (const [s, off] of /** @type {[string, number][]} */ ([['L', 0], ['R', 0.5]])) {
+  for (const [s, off] of /** @type {[string, number][]} */ ([
+    ['L', 0],
+    ['R', 0.5],
+  ])) {
     const o = legOf(s);
     const v = fr(u + off);
     // Swing (0..0.5): lifted and brought forward; stance (0.5..1): planted, sliding back under him.
     const z = v < 0.5 ? -stride / 2 + stride * smooth(v / 0.5) : stride / 2 - stride * ((v - 0.5) / 0.5);
-    const lift = v < 0.5 ? Math.sin(Math.PI * v / 0.5) : 0;
+    const lift = v < 0.5 ? Math.sin((Math.PI * v) / 0.5) : 0;
     out[o + 2] += z;
     out[o + 1] += (0.09 + (stride ? 0 : 0.03)) * lift;
     out[o + 3] += 10 * DEG * lift;
@@ -653,14 +894,23 @@ export function walk(out, base, phase, stride = 0.28) {
  * lifted on the way): the body turns with the hips, the feet with their own steps.
  */
 export function turnPose(p, a, fL = 1, fR = 1, cx = p[0], cz = p[2]) {
-  const rot = (x, z, ang) => { const c = Math.cos(ang), s = Math.sin(ang); return [cx + (x - cx) * c + (z - cz) * s, cz - (x - cx) * s + (z - cz) * c]; };
-  for (const [s, f] of /** @type {[string, number][]} */ ([['L', fL], ['R', fR]])) {
-    const o = legOf(s), sg = s === 'L' ? 1 : -1;
+  const rot = (x, z, ang) => {
+    const c = Math.cos(ang),
+      s = Math.sin(ang);
+    return [cx + (x - cx) * c + (z - cz) * s, cz - (x - cx) * s + (z - cz) * c];
+  };
+  for (const [s, f] of /** @type {[string, number][]} */ ([
+    ['L', fL],
+    ['R', fR],
+  ])) {
+    const o = legOf(s),
+      sg = s === 'L' ? 1 : -1;
     const rx = DEFAULT_REST['foot' + s][0];
     const [x, z] = rot(rx + sg * p[o], p[o + 2], a * f);
-    p[o] = sg * (x - rx); p[o + 2] = z;
+    p[o] = sg * (x - rx);
+    p[o + 2] = z;
     p[o + 1] += STEP_LIFT * 0.8 * Math.sin(Math.PI * clamp01(f)) * Math.min(1, Math.abs(a) / 0.3);
   }
-  p[POSE.hips + 1] += a * (fL + fR) / 2;
+  p[POSE.hips + 1] += (a * (fL + fR)) / 2;
   return p;
 }

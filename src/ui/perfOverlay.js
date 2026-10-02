@@ -27,9 +27,18 @@ export function createPerfOverlay({ info, maxFps = () => 0, parent = document.bo
   el.setAttribute('aria-hidden', 'true');
   // (Inline through the style object, not an attribute: a page's CSP may refuse those.)
   const look = {
-    position: 'fixed', left: '8px', bottom: '8px', 'z-index': '2147483647', 'pointer-events': 'none',
-    font: '11px/1.4 ui-monospace, Consolas, monospace', color: '#e9e3d2', background: 'rgba(7, 7, 11, 0.8)',
-    padding: '6px 8px', 'border-radius': '3px', 'white-space': 'pre', 'font-variant-numeric': 'tabular-nums',
+    position: 'fixed',
+    left: '8px',
+    bottom: '8px',
+    'z-index': '2147483647',
+    'pointer-events': 'none',
+    font: '11px/1.4 ui-monospace, Consolas, monospace',
+    color: '#e9e3d2',
+    background: 'rgba(7, 7, 11, 0.8)',
+    padding: '6px 8px',
+    'border-radius': '3px',
+    'white-space': 'pre',
+    'font-variant-numeric': 'tabular-nums',
   };
   for (const [k, v] of Object.entries(look)) el.style.setProperty(k, v);
   el.textContent = 'perf…';
@@ -40,7 +49,12 @@ export function createPerfOverlay({ info, maxFps = () => 0, parent = document.bo
   let count = 0;
   let head = 0;
   let lastStart = -1;
-  let frames = 0, pageMs = 0, updateMs = 0, drawMs = 0, shadows = 0, calls = 0;
+  let frames = 0,
+    pageMs = 0,
+    updateMs = 0,
+    drawMs = 0,
+    shadows = 0,
+    calls = 0;
   let since = performance.now();
 
   function show(now) {
@@ -56,7 +70,11 @@ export function createPerfOverlay({ info, maxFps = () => 0, parent = document.bo
       `draws ${calls}  shadows ${(shadows / secs).toFixed(0)}/s`,
       `programs ${info.programs?.length ?? '?'}  textures ${info.memory?.textures ?? '?'}  geometries ${info.memory?.geometries ?? '?'}`,
     ].join('\n');
-    frames = 0; pageMs = 0; updateMs = 0; drawMs = 0; shadows = 0;
+    frames = 0;
+    pageMs = 0;
+    updateMs = 0;
+    drawMs = 0;
+    shadows = 0;
     since = now;
     for (const name of PARTS) performance.clearMeasures(name);
   }

@@ -16,7 +16,8 @@
  *   `restored`: built-in palettes put back
  */
 export function resetSection(key, current, defaults) {
-  if (key !== 'flames' || !Array.isArray(current) || !Array.isArray(defaults)) return { value: structuredClone(defaults), kept: 0, restored: 0 };
+  if (key !== 'flames' || !Array.isArray(current) || !Array.isArray(defaults))
+    return { value: structuredClone(defaults), kept: 0, restored: 0 };
   const builtIn = new Set(defaults.map((f) => f.id));
   const own = current.filter((f) => !builtIn.has(f?.id));
   return { value: [...structuredClone(defaults), ...own], kept: own.length, restored: defaults.length };

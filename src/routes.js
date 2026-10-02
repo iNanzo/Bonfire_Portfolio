@@ -4,7 +4,10 @@ import { screens, items } from './content.js';
 const screenIds = new Set(screens.map(({ id }) => id));
 const itemIds = new Set(items().map(({ id }) => id));
 export function parseRoute(value = '') {
-  const parts = value.replace(/^#?\/?/, '').replace(/\/$/, '').split('/');
+  const parts = value
+    .replace(/^#?\/?/, '')
+    .replace(/\/$/, '')
+    .split('/');
   const [screen = '', item] = parts;
   if (!screen || !screenIds.has(screen) || parts.length > 2) return { screen: 'home', item: null };
   return { screen, item: screen === 'projects' && itemIds.has(item) ? item : null };

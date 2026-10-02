@@ -28,7 +28,14 @@ export default defineConfig({
   use: {
     baseURL: origin,
     channel: process.env.PW_CHANNEL || undefined,
-    launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] },
+    launchOptions: {
+      args: [
+        '--use-angle=swiftshader',
+        '--enable-unsafe-swiftshader',
+        '--ignore-gpu-blocklist',
+        '--autoplay-policy=no-user-gesture-required',
+      ],
+    },
     viewport: { width: 1280, height: 800 },
   },
   webServer: [

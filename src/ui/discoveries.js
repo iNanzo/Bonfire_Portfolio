@@ -39,24 +39,44 @@ const BASE = [
 export function createDiscoveries({ onNew = () => {} } = {}) {
   const all = [
     ...BASE,
-    ...items().map((p) => ({ id: `project:${p.id}`, name: `Inspected ${p.name}`, hint: 'Every item in the inventory has a story.' })),
+    ...items().map((p) => ({
+      id: `project:${p.id}`,
+      name: `Inspected ${p.name}`,
+      hint: 'Every item in the inventory has a story.',
+    })),
   ];
   const ids = new Set(all.map((d) => d.id));
   let found = new Set();
   let out = new Set(); // (can't be found here now)
-  try { found = new Set(JSON.parse(localStorage.getItem(STORE) ?? '[]').filter((id) => ids.has(id))); } catch { /* storage off */ }
-  const save = () => { try { localStorage.setItem(STORE, JSON.stringify([...found])); } catch { /* storage off */ } };
+  try {
+    found = new Set(JSON.parse(localStorage.getItem(STORE) ?? '[]').filter((id) => ids.has(id)));
+  } catch {
+    /* storage off */
+  }
+  const save = () => {
+    try {
+      localStorage.setItem(STORE, JSON.stringify([...found]));
+    } catch {
+      /* storage off */
+    }
+  };
   const list = () => all.filter((d) => found.has(d.id) || !out.has(d.id));
 
   return {
     /** Every discovery that counts here now: the ones that can be found, and any found already. */
-    get list() { return list(); },
+    get list() {
+      return list();
+    },
     /** Mark one found. Returns true if it was new (and calls onNew with it). */
     discover(id) {
       if (!ids.has(id) || found.has(id) || out.has(id)) return false;
       found.add(id);
       save();
-      onNew(all.find((d) => d.id === id), found.size, list().length);
+      onNew(
+        all.find((d) => d.id === id),
+        found.size,
+        list().length,
+      );
       return true;
     },
     /**
@@ -64,9 +84,15 @@ export function createDiscoveries({ onNew = () => {} } = {}) {
      * there): out of the list and the total, unless found before. Replaces the last set.
      * @param {Iterable<string>} next
      */
-    setOut(next) { out = new Set(next); },
+    setOut(next) {
+      out = new Set(next);
+    },
     has: (id) => found.has(id),
-    get count() { return found.size; },
-    get total() { return list().length; },
+    get count() {
+      return found.size;
+    },
+    get total() {
+      return list().length;
+    },
   };
 }

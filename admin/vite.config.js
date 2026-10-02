@@ -22,7 +22,12 @@ const siteUrl = process.env.ADMIN_SITE_URL ?? 'http://localhost:5173/';
 function store() {
   const files = createFsStore(process.env.ADMIN_CONTENT_ROOT ? resolve(process.env.ADMIN_CONTENT_ROOT) : repo);
   if (!process.env.ADMIN_READONLY) return files;
-  return { ...files, async commit() { throw new HttpError(403, 'This admin is read-only (ADMIN_READONLY): nothing was saved.'); } };
+  return {
+    ...files,
+    async commit() {
+      throw new HttpError(403, 'This admin is read-only (ADMIN_READONLY): nothing was saved.');
+    },
+  };
 }
 
 /** The API on a Node server (dev or preview): /api/* through handleApi, `extra` headers on its answers. */
@@ -34,7 +39,8 @@ function apiMiddleware(extra = {}) {
       const chunks = [];
       for await (const chunk of req) chunks.push(chunk);
       const headers = new Headers();
-      for (const name of ['origin', 'sec-fetch-site', 'content-type']) if (req.headers[name]) headers.set(name, req.headers[name]);
+      for (const name of ['origin', 'sec-fetch-site', 'content-type'])
+        if (req.headers[name]) headers.set(name, req.headers[name]);
       const request = new Request(`http://${req.headers.host}${req.url}`, {
         method: req.method,
         headers,
@@ -54,8 +60,12 @@ function apiMiddleware(extra = {}) {
 function localApi() {
   return {
     name: 'admin-local-api',
-    configureServer(server) { server.middlewares.use(apiMiddleware()); },
-    configurePreviewServer(server) { server.middlewares.use(apiMiddleware(securityHeaders(siteUrl))); },
+    configureServer(server) {
+      server.middlewares.use(apiMiddleware());
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(apiMiddleware(securityHeaders(siteUrl)));
+    },
   };
 }
 

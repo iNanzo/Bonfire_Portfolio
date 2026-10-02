@@ -35,10 +35,26 @@ export const PANEL_SECTIONS = PAINTER_SECTIONS.map(({ id, label, from }) => ({ i
  */
 export const LAYOUT = {
   place: ['scenery', 'fog', 'exposure', 'vignette', 'shadows'],
-  colors: ['colors', 'flameMake', 'flameSeed', 'flameRamp', 'flameLight', 'sceneColors', 'sceneSeed', 'sceneEdit', 'palette', 'paletteSlots'],
+  colors: [
+    'colors',
+    'flameMake',
+    'flameSeed',
+    'flameRamp',
+    'flameLight',
+    'sceneColors',
+    'sceneSeed',
+    'sceneEdit',
+    'palette',
+    'paletteSlots',
+  ],
   fire: ['fireLevel', 'fireSize', 'fireHeight', 'fireTurbulence', 'fireGlow', 'windX', 'windZ'],
   pixels: ['pixelSize', 'dither', 'ditherMatrix', 'outlines', 'flameFps'],
-  looks: ['looks', ...Object.values(LOOK_PARAMS).flat().map((k) => `param.${k}`)],
+  looks: [
+    'looks',
+    ...Object.values(LOOK_PARAMS)
+      .flat()
+      .map((k) => `param.${k}`),
+  ],
   strength: ['glitch'],
   xray: ['xrayView'],
   layers: ['pinAll', 'layers', ...Object.keys(LAYERS).map((k) => `layer.${k}`), 'blends'],
@@ -65,7 +81,10 @@ export function groupsOf(id) {
   const sec = PANEL_SECTIONS.find((s) => s.id === id);
   if (!sec) return [];
   const headed = id === 'knights';
-  const groups = sec.from.map((g) => ({ id: g, head: headed ? MAP_SECTIONS.find((s) => s.id === g)?.label ?? null : null }));
+  const groups = sec.from.map((g) => ({
+    id: g,
+    head: headed ? (MAP_SECTIONS.find((s) => s.id === g)?.label ?? null) : null,
+  }));
   if (headed) groups.push({ id: 'preview', head: OWN.gestures.label });
   return groups;
 }
@@ -76,16 +95,56 @@ export function groupsOf(id) {
  * @type {Record<string, { label: string, hint: string, keywords?: string[] }>}
  */
 export const OWN = {
-  flameMake: { label: 'Make a Flame', hint: 'Harmonious builds five colors that go together, in the harmony picked beside it; Fully Random rolls any five, kept readable.', keywords: ['harmonious', 'random', 'generate'] },
-  flameSeed: { label: 'Flame From a Color', hint: 'Pick any color and flames are built round it, one per harmony. Hover a suggestion to see it, click to use it.', keywords: ['seed', 'picker'] },
-  flameRamp: { label: 'Each Flame Color', hint: 'Dark to light: the embers, the body, the tips (lightened if too dark to read), the white-hot core, and the shade firelit stone takes.', keywords: ['embers', 'body', 'tips', 'core', 'shade', 'ramp'] },
-  sceneSeed: { label: 'Place From a Color', hint: 'Pick any color and place colors are built round it: its hue tints the stone, or it becomes the accent. Hover to see, click to use.', keywords: ['seed', 'scenery colors'] },
-  sceneEdit: { label: 'Each Place Color', hint: 'The background (always the darkest: the outlines take it), the shadow, the stone, the wood and the bone, set by hand.', keywords: ['background', 'stone', 'wood', 'bone', 'scenery colors'] },
-  paletteSlots: { label: 'Few Colors', hint: 'The colors the picture is drawn in, from this scene’s palette. The first, the background, is always in: the outlines take it.', keywords: ['slots', 'limited'] },
-  cameraDrag: { label: 'Framing By Hand', hint: 'Drag the stage to orbit round what the camera looks at, Shift-drag (or right-drag) to slide it, the wheel to come nearer.', keywords: ['orbit', 'drag', 'pan', 'zoom', 'mouse'] },
-  pinAll: { label: 'Pin What You See', hint: 'Copies every detail showing now, and which layers in the mix are on this turn, into the scene, pinned: the picture on the stage, kept.', keywords: ['pin', 'keep', 'freeze', 'lock'] },
-  layers: { label: 'All Layers', hint: meta('painter', 'layers')?.hint ?? '', keywords: ['bulk', 'all off', 'shuffle'] },
-  gestures: { label: 'Try a Gesture (Preview, Not Saved)', hint: 'Plays one on the stage now. Gestures aren’t part of a scene: the show throws them on drops.', keywords: ['praise the sun', 'wave', 'bow', 'dance'] },
+  flameMake: {
+    label: 'Make a Flame',
+    hint: 'Harmonious builds five colors that go together, in the harmony picked beside it; Fully Random rolls any five, kept readable.',
+    keywords: ['harmonious', 'random', 'generate'],
+  },
+  flameSeed: {
+    label: 'Flame From a Color',
+    hint: 'Pick any color and flames are built round it, one per harmony. Hover a suggestion to see it, click to use it.',
+    keywords: ['seed', 'picker'],
+  },
+  flameRamp: {
+    label: 'Each Flame Color',
+    hint: 'Dark to light: the embers, the body, the tips (lightened if too dark to read), the white-hot core, and the shade firelit stone takes.',
+    keywords: ['embers', 'body', 'tips', 'core', 'shade', 'ramp'],
+  },
+  sceneSeed: {
+    label: 'Place From a Color',
+    hint: 'Pick any color and place colors are built round it: its hue tints the stone, or it becomes the accent. Hover to see, click to use.',
+    keywords: ['seed', 'scenery colors'],
+  },
+  sceneEdit: {
+    label: 'Each Place Color',
+    hint: 'The background (always the darkest: the outlines take it), the shadow, the stone, the wood and the bone, set by hand.',
+    keywords: ['background', 'stone', 'wood', 'bone', 'scenery colors'],
+  },
+  paletteSlots: {
+    label: 'Few Colors',
+    hint: 'The colors the picture is drawn in, from this scene’s palette. The first, the background, is always in: the outlines take it.',
+    keywords: ['slots', 'limited'],
+  },
+  cameraDrag: {
+    label: 'Framing By Hand',
+    hint: 'Drag the stage to orbit round what the camera looks at, Shift-drag (or right-drag) to slide it, the wheel to come nearer.',
+    keywords: ['orbit', 'drag', 'pan', 'zoom', 'mouse'],
+  },
+  pinAll: {
+    label: 'Pin What You See',
+    hint: 'Copies every detail showing now, and which layers in the mix are on this turn, into the scene, pinned: the picture on the stage, kept.',
+    keywords: ['pin', 'keep', 'freeze', 'lock'],
+  },
+  layers: {
+    label: 'All Layers',
+    hint: meta('painter', 'layers')?.hint ?? '',
+    keywords: ['bulk', 'all off', 'shuffle'],
+  },
+  gestures: {
+    label: 'Try a Gesture (Preview, Not Saved)',
+    hint: 'Plays one on the stage now. Gestures aren’t part of a scene: the show throws them on drops.',
+    keywords: ['praise the sun', 'wave', 'bow', 'dance'],
+  },
 };
 /**
  * The items' hints as the Painter shows them: the map's ITEM_HINTS, the same as Bonfire
@@ -93,8 +152,12 @@ export const OWN = {
  * taking turns), said here for a scene.
  */
 export const PAINTER_ITEM_HINTS = {
-  looks: { ember: 'Just the fire, clean: no effect of its own, while the zoom punch and the shake still land on the beat.' },
-  layers: { mirror: 'The picture folded onto itself: a half or a quarter copied over the rest (Mirror Kind picks which).' },
+  looks: {
+    ember: 'Just the fire, clean: no effect of its own, while the zoom punch and the shake still land on the beat.',
+  },
+  layers: {
+    mirror: 'The picture folded onto itself: a half or a quarter copied over the rest (Mirror Kind picks which).',
+  },
 };
 /**
  * A look's, layer's or drop hit's hint, as the Painter shows it.
@@ -104,10 +167,20 @@ export const itemHint = (group, key) => PAINTER_ITEM_HINTS[group]?.[key] ?? ITEM
 /** The fire's section says this once, over its sliders. */
 export const FIRE_HELP = 'Each adds to what the music does to the fire, every frame: 0 leaves it to the music.';
 /** With the Music: how the Painter previews it. */
-export const MUSIC_HELP = 'The Painter always previews a scene held. One that starts the stretch opens like this in Bonfire Live, then the show takes over.';
+export const MUSIC_HELP =
+  'The Painter always previews a scene held. One that starts the stretch opens like this in Bonfire Live, then the show takes over.';
 
 /** The layers that blend (looks.js LAYER_BLENDS), by their names in Layers. */
-const BLEND_LAYERS = { feed: 'Echoes', ghost: 'Ghost Trail', warp: 'Warps', ink: 'Ink', invert: 'Negative', scan: 'Scanlines', glow: 'Glow', gradient: 'Gradient Map' };
+const BLEND_LAYERS = {
+  feed: 'Echoes',
+  ghost: 'Ghost Trail',
+  warp: 'Warps',
+  ink: 'Ink',
+  invert: 'Negative',
+  scan: 'Scanlines',
+  glow: 'Glow',
+  gradient: 'Gradient Map',
+};
 /**
  * How Each Layer Blends' rows: "Glow Blend", not "Glow" (the layer's own row in Layers is
  * Glow: two rows of one name would read as one in the search's list).
@@ -115,11 +188,22 @@ const BLEND_LAYERS = { feed: 'Echoes', ghost: 'Ghost Trail', warp: 'Warps', ink:
 const BLEND_LABELS = Object.fromEntries(Object.entries(BLEND_LAYERS).map(([k, name]) => [k, `${name} Blend`]));
 /** The blend modes, as the selects name them. */
 const BLEND_NAMES = {
-  normal: 'Normal', add: 'Add', subtract: 'Subtract', multiply: 'Multiply', screen: 'Screen', darken: 'Darken', lighten: 'Lighten',
-  overlay: 'Overlay', hardLight: 'Hard Light', softLight: 'Soft Light', difference: 'Difference', exclusion: 'Exclusion',
+  normal: 'Normal',
+  add: 'Add',
+  subtract: 'Subtract',
+  multiply: 'Multiply',
+  screen: 'Screen',
+  darken: 'Darken',
+  lighten: 'Lighten',
+  overlay: 'Overlay',
+  hardLight: 'Hard Light',
+  softLight: 'Soft Light',
+  difference: 'Difference',
+  exclusion: 'Exclusion',
 };
 /** A blend select's hint. */
-const blendHint = (id) => `How the ${BLEND_LAYERS[id]} layer lies over the picture; Rolled Each Turn picks a new way each time the look comes round.`;
+const blendHint = (id) =>
+  `How the ${BLEND_LAYERS[id]} layer lies over the picture; Rolled Each Turn picks a new way each time the look comes round.`;
 
 // --- The choices a row offers ----------------------------------------------------------
 /** A scene's few-color palette, as Palette's last choice. */
@@ -140,14 +224,20 @@ const named = (id) => id.charAt(0).toUpperCase() + id.slice(1);
  * @returns {[string, string][]}
  */
 export function choices(id, ctx = {}) {
-  const site = { pixelSize: DEFAULT_EFFECTS.render.pixelSize, ditherMatrix: DEFAULT_EFFECTS.render.ditherMatrix, flameFps: DEFAULT_EFFECTS.fire.fps, ...ctx.site };
+  const site = {
+    pixelSize: DEFAULT_EFFECTS.render.pixelSize,
+    ditherMatrix: DEFAULT_EFFECTS.render.ditherMatrix,
+    flameFps: DEFAULT_EFFECTS.fire.fps,
+    ...ctx.site,
+  };
   /** @type {Record<string, () => [string, string][]>} */
   const by = {
     scenery: () => Object.entries(SCENERIES),
     fog: () => Object.entries(FOGS),
     palette: () => [...Object.entries(PALETTES), ['few', FEW_COLORS]],
     pixelSize: () => PIXEL_SIZES.map((px) => [String(px), `${px} px${px === site.pixelSize ? SITE_MARK : ''}`]),
-    ditherMatrix: () => [4, 8].map((n) => [String(n), `${n}×${n}${n === site.ditherMatrix ? SITE_MARK : n === 8 ? ' (Finer)' : ''}`]),
+    ditherMatrix: () =>
+      [4, 8].map((n) => [String(n), `${n}×${n}${n === site.ditherMatrix ? SITE_MARK : n === 8 ? ' (Finer)' : ''}`]),
     flameFps: () => FLAME_FPS.map((f) => [String(f), `${f} fps${f === site.flameFps ? SITE_MARK : ''}`]),
     xrayView: () => [['', 'Off: the Finished Picture'], ...Object.entries(XRAY_VIEWS)],
     looks: () => Object.entries(LOOKS),
@@ -155,7 +245,11 @@ export function choices(id, ctx = {}) {
     moveBars: () => MOVE_BARS.map((b) => [String(b), `${b} Bars`]),
     knightSeat: () => Object.entries(KNIGHT_SEATS),
     knightHelmets: () => [['', 'Drawn At Random'], ...Object.entries(HELMET_NAMES)],
-    knightStyle: () => [['', 'Bonfire Live’s Own'], ['mix', 'In the Mix'], ...Object.entries(ctx.styles ?? STYLE_NAMES)],
+    knightStyle: () => [
+      ['', 'Bonfire Live’s Own'],
+      ['mix', 'In the Mix'],
+      ...Object.entries(ctx.styles ?? STYLE_NAMES),
+    ],
     knightFinish: () => [['mix', 'In the Mix'], ...Object.entries(FINISH_NAMES)],
     knightFormation: () => [...Object.entries(FORMATIONS), ['mix', 'A New One Each Dance']],
     knightMoves: () => Object.entries(KNIGHT_MOVES),
@@ -164,19 +258,41 @@ export function choices(id, ctx = {}) {
     flyMoves: () => Object.entries(FLY_MOVES),
     sceneHold: () => Object.entries(MUSIC),
     weapon: () => [['', DRAWN], ...Object.entries(ctx.weapons ?? {})],
-    element: () => [['', DRAWN], ...ELEMENT_IDS.map((e) => /** @type {[string, string]} */ ([e, ctx.elements?.[e] ?? named(e)]))],
-    dropSource: () => [['show', 'The Show’s Drop Hits'], ['own', 'This Scene’s Own']],
-    dropCount: () => [['1', 'One'], ['2', 'Up To Two'], ['3', 'Up To Three']],
+    element: () => [
+      ['', DRAWN],
+      ...ELEMENT_IDS.map((e) => /** @type {[string, string]} */ ([e, ctx.elements?.[e] ?? named(e)])),
+    ],
+    dropSource: () => [
+      ['show', 'The Show’s Drop Hits'],
+      ['own', 'This Scene’s Own'],
+    ],
+    dropCount: () => [
+      ['1', 'One'],
+      ['2', 'Up To Two'],
+      ['3', 'Up To Three'],
+    ],
     colors: () => (ctx.flames ?? []).map((f) => [f.key, f.name]),
     shot: () => (ctx.shots ?? []).map((s) => [s.key, s.name]),
-    flameMake: () => [['harmonious', 'Harmonious'], ['random', 'Fully Random']],
-    sceneColors: () => [['site', 'The Site’s Own'], ['harmonious', 'Harmonious'], ['vivid', 'Vivid'], ['random', 'Fully Random']],
+    flameMake: () => [
+      ['harmonious', 'Harmonious'],
+      ['random', 'Fully Random'],
+    ],
+    sceneColors: () => [
+      ['site', 'The Site’s Own'],
+      ['harmonious', 'Harmonious'],
+      ['vivid', 'Vivid'],
+      ['random', 'Fully Random'],
+    ],
   };
   if (Object.hasOwn(by, id)) return by[id]();
   const [kind, key] = id.split('.');
   const spec = (kind === 'detail' || kind === 'param') && Object.hasOwn(PARAMS, key) ? PARAMS[key] : null;
   if (spec?.values) return spec.values.map((v, i) => [String(v), spec.names?.[i] ?? String(v)]);
-  if (kind === 'blend' && LAYER_BLENDS[key]) return [['', 'Rolled Each Turn'], ...LAYER_BLENDS[key].map((b) => /** @type {[string, string]} */ ([b, BLEND_NAMES[b] ?? b]))];
+  if (kind === 'blend' && LAYER_BLENDS[key])
+    return [
+      ['', 'Rolled Each Turn'],
+      ...LAYER_BLENDS[key].map((b) => /** @type {[string, string]} */ ([b, BLEND_NAMES[b] ?? b])),
+    ];
   return [];
 }
 
@@ -199,10 +315,18 @@ const or = (names) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} or $
  */
 const SHOWN = {
   sceneEdit: [(s) => !!s.colors.scenery, 'pick Place Colors other than The Site’s Own to see this', ['sceneColors']],
-  paletteSlots: [(s) => Array.isArray(s.render.palette), 'pick A Few Of the Scene’s Colors under Palette to see this', ['palette']],
+  paletteSlots: [
+    (s) => Array.isArray(s.render.palette),
+    'pick A Few Of the Scene’s Colors under Palette to see this',
+    ['palette'],
+  ],
   moveAmount: [moving, STILL, ['camera']],
   moveBars: [moving, STILL, ['camera']],
-  ...Object.fromEntries([...LAYOUT.knights.slice(1), ...LAYOUT.armor, ...LAYOUT.dancing, ...LAYOUT.behavior, ...LAYOUT.preview].map((id) => [id, [knights, NO_KNIGHTS, ['knightCount']]])),
+  ...Object.fromEntries(
+    [...LAYOUT.knights.slice(1), ...LAYOUT.armor, ...LAYOUT.dancing, ...LAYOUT.behavior, ...LAYOUT.preview].map(
+      (id) => [id, [knights, NO_KNIGHTS, ['knightCount']]],
+    ),
+  ),
   knightStyle: [(s) => knights(s) && 'style' in s.knights, NO_KNIGHTS, ['knightCount']],
   blends: [(s) => layerOn(s, 'blend'), `turn on ${LAYERS.blend} in Layers to see this`, ['layer.blend']],
   dropFx: [ownDrops, SHOW_DROPS, ['dropSource']],
@@ -234,11 +358,19 @@ export function shownRule(id) {
   const [kind, key] = id.split('.');
   if (kind === 'detail' && DETAIL_LAYERS[key]) {
     const layers = DETAIL_LAYERS[key];
-    return [(s) => layers.some((l) => layerOn(s, l)), `turn on ${or(layers.map((l) => LAYERS[l]))} in Layers to see this`, layers.map((l) => `layer.${l}`)];
+    return [
+      (s) => layers.some((l) => layerOn(s, l)),
+      `turn on ${or(layers.map((l) => LAYERS[l]))} in Layers to see this`,
+      layers.map((l) => `layer.${l}`),
+    ];
   }
   if (kind === 'param' && PARAM_LOOKS[key]) {
     const looks = PARAM_LOOKS[key];
-    return [(s) => looks.includes(s.look.name), `pick the ${or(looks.map((l) => LOOKS[l]))} look to see this`, ['looks']];
+    return [
+      (s) => looks.includes(s.look.name),
+      `pick the ${or(looks.map((l) => LOOKS[l]))} look to see this`,
+      ['looks'],
+    ];
   }
   if (kind === 'blend') return SHOWN.blends;
   if (kind === 'dropFx') return SHOWN.dropFx;
@@ -259,14 +391,26 @@ export const rowShown = (id, scene) => shownRule(id)?.[0](scene) ?? true;
 export function rowText(id) {
   const [kind, key] = id.split('.');
   if (key !== undefined) {
-    if (kind === 'layer' && LAYERS[key]) return { label: LAYERS[key], hint: itemHint('layers', key), more: '', keywords: [], path: `layers.${key}` };
-    if (kind === 'dropFx' && DROP_FX[key]) return { label: DROP_FX[key], hint: itemHint('dropFx', key), more: '', keywords: [], path: `drops.fx.${key}` };
-    if (kind === 'detail' && PARAMS[key]) return { label: PARAMS[key].label, hint: PARAMS[key].hint, more: '', keywords: [], path: `details.${key}` };
-    if (kind === 'param' && PARAMS[key]) return { label: PARAMS[key].label, hint: PARAMS[key].hint, more: '', keywords: [], path: `look.params.${key}` };
-    if (kind === 'blend' && BLEND_LABELS[key]) return { label: BLEND_LABELS[key], hint: blendHint(key), more: '', keywords: ['blend modes'], path: `blends.${key}` };
+    if (kind === 'layer' && LAYERS[key])
+      return { label: LAYERS[key], hint: itemHint('layers', key), more: '', keywords: [], path: `layers.${key}` };
+    if (kind === 'dropFx' && DROP_FX[key])
+      return { label: DROP_FX[key], hint: itemHint('dropFx', key), more: '', keywords: [], path: `drops.fx.${key}` };
+    if (kind === 'detail' && PARAMS[key])
+      return { label: PARAMS[key].label, hint: PARAMS[key].hint, more: '', keywords: [], path: `details.${key}` };
+    if (kind === 'param' && PARAMS[key])
+      return { label: PARAMS[key].label, hint: PARAMS[key].hint, more: '', keywords: [], path: `look.params.${key}` };
+    if (kind === 'blend' && BLEND_LABELS[key])
+      return {
+        label: BLEND_LABELS[key],
+        hint: blendHint(key),
+        more: '',
+        keywords: ['blend modes'],
+        path: `blends.${key}`,
+      };
     return null;
   }
-  if (Object.hasOwn(OWN, id)) return { label: OWN[id].label, hint: OWN[id].hint, more: '', keywords: OWN[id].keywords ?? [], path: '' };
+  if (Object.hasOwn(OWN, id))
+    return { label: OWN[id].label, hint: OWN[id].hint, more: '', keywords: OWN[id].keywords ?? [], path: '' };
   const e = Object.hasOwn(SETTINGS, id) ? SETTINGS[id] : null;
   if (!e?.painter) return null;
   const m = meta('painter', e.painter);

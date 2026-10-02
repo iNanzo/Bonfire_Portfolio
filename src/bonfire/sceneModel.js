@@ -27,8 +27,33 @@ const BASE = import.meta.env.BASE_URL;
  */
 export function createSceneModel(ctx) {
   const {
-    scope, renderer, scene, reducedMotion, lightTrails, fxLayer, onFormed, coarse, P, F, pCount, fCount, impactCount,
-    candleLight, effectMaterial, crossMaterial, diamondMaterial, field, fire, plasma, chill, crystals, swingTrail, marks, debris, smokeMaterial, armor,
+    scope,
+    renderer,
+    scene,
+    reducedMotion,
+    lightTrails,
+    fxLayer,
+    onFormed,
+    coarse,
+    P,
+    F,
+    pCount,
+    fCount,
+    impactCount,
+    candleLight,
+    effectMaterial,
+    crossMaterial,
+    diamondMaterial,
+    field,
+    fire,
+    plasma,
+    chill,
+    crystals,
+    swingTrail,
+    marks,
+    debris,
+    smokeMaterial,
+    armor,
   } = ctx;
   const candleFlames = [];
   // Every glow in its flame-step colors (update: recolorGlows), each by its index here. The
@@ -47,15 +72,20 @@ export function createSceneModel(ctx) {
   // after its first frame (knightsIn).
   ctx.bundle = null; // knightBundle.js, once loaded
   ctx.knightsShown = true; // (false while he and his sign are made but not yet in the scene: knightsIn)
-  const knightLoaded = Promise.all([loader.loadAsync(`${BASE}models/knight.glb`), import('./knightBundle.js')]).then(([gltf, code]) => {
-    ctx.bundle = code;
-    return gltf.scene;
-  }).catch((error) => {
-    console.warn('The knight did not load; the fire burns without him.', error);
-    return null;
-  });
+  const knightLoaded = Promise.all([loader.loadAsync(`${BASE}models/knight.glb`), import('./knightBundle.js')])
+    .then(([gltf, code]) => {
+      ctx.bundle = code;
+      return gltf.scene;
+    })
+    .catch((error) => {
+      console.warn('The knight did not load; the fire burns without him.', error);
+      return null;
+    });
   const knightLater = !fxLayer && !(effects.knight?.show && effects.knight?.arrival === 'start');
-  const modelLoaded = Promise.all([loader.loadAsync(`${BASE}models/bonfire.glb`), knightLater ? null : knightLoaded]).then(([gltf, knightScene]) => {
+  const modelLoaded = Promise.all([
+    loader.loadAsync(`${BASE}models/bonfire.glb`),
+    knightLater ? null : knightLoaded,
+  ]).then(([gltf, knightScene]) => {
     const root = gltf.scene;
     if (scope.disposed) {
       const late = createResourceScope();
@@ -74,8 +104,14 @@ export function createSceneModel(ctx) {
     }
     // The ruins' seat for the knight (scenery.js): a drum fallen from the pillar, one of the
     // ruins' own pieces from here on (its solid, its shadow, the fireflies' height map).
-    const ruinsSeat = buildScenery('ruins', { pillar: root.getObjectByName('Static_Pillar')?.material ?? new THREE.MeshLambertMaterial() }, () => null);
-    ruinsSeat.group.traverse((o) => { if (o.isMesh) o.name = 'Static_PillarDrum'; });
+    const ruinsSeat = buildScenery(
+      'ruins',
+      { pillar: root.getObjectByName('Static_Pillar')?.material ?? new THREE.MeshLambertMaterial() },
+      () => null,
+    );
+    ruinsSeat.group.traverse((o) => {
+      if (o.isMesh) o.name = 'Static_PillarDrum';
+    });
     root.add(ruinsSeat.group);
     root.updateMatrixWorld(true);
     ctx.weapons = createWeapons(root, {
@@ -137,16 +173,25 @@ export function createSceneModel(ctx) {
       },
     });
 
-    scope.trackTree(ctx.weapons.holder); scope.trackTree(ctx.weapons.forge);
-    if (ctx.weapons.lines) { scope.trackTree(ctx.weapons.lines); scene.add(ctx.weapons.lines); }
-    for (const o of ctx.weapons.extras) { scope.trackTree(o); scene.add(o); }
+    scope.trackTree(ctx.weapons.holder);
+    scope.trackTree(ctx.weapons.forge);
+    if (ctx.weapons.lines) {
+      scope.trackTree(ctx.weapons.lines);
+      scene.add(ctx.weapons.lines);
+    }
+    for (const o of ctx.weapons.extras) {
+      scope.trackTree(o);
+      scene.add(o);
+    }
     scope.cleanup(() => ctx.weapons.cancel());
     const flyTemplate = root.getObjectByName('Firefly');
     flyTemplate.removeFromParent();
     // Solid scenery: fireflies steer around it with a height map and land on its
     // tops and walls (exact contact points and normals come from raycasts).
     const statics = [];
-    root.traverse((o) => { if (o.isMesh && o.name.startsWith('Static_')) statics.push(o); });
+    root.traverse((o) => {
+      if (o.isMesh && o.name.startsWith('Static_')) statics.push(o);
+    });
     // The ruins' own pieces (hidden in the other sceneries: scenery.js).
     ctx.ruinsOnly = statics.filter((o) => /Static_(Pillar|Mortar|Wax)/.test(o.name));
     ctx.baseStatics = statics.filter((o) => !ctx.ruinsOnly.includes(o));
@@ -159,8 +204,12 @@ export function createSceneModel(ctx) {
       top: (x, z) => now().top(x, z),
       solid: (x, z) => now().solid(x, z),
       slope: (x, z, out) => now().slope(x, z, out),
-      get wallSpots() { return now().wallSpots; },
-      get cell() { return now().cell; },
+      get wallSpots() {
+        return now().wallSpots;
+      },
+      get cell() {
+        return now().cell;
+      },
     };
     const ray = new THREE.Raycaster();
     const normalMatrix = new THREE.Matrix3();
@@ -169,7 +218,10 @@ export function createSceneModel(ctx) {
       ray.far = far;
       const hit = ray.intersectObjects(ctx.liveStatics, false)[0];
       if (!hit?.face) return null;
-      const normal = hit.face.normal.clone().applyMatrix3(normalMatrix.getNormalMatrix(hit.object.matrixWorld)).normalize();
+      const normal = hit.face.normal
+        .clone()
+        .applyMatrix3(normalMatrix.getNormalMatrix(hit.object.matrixWorld))
+        .normalize();
       if (normal.dot(dir) > 0) normal.negate();
       return { point: hit.point.clone(), normal };
     };
@@ -186,7 +238,11 @@ export function createSceneModel(ctx) {
       trailMaterial: lightTrails ? effectMaterial : null,
     });
     scope.trackTree(ctx.fireflies.group);
-    if (ctx.fireflies.trails) { scope.trackTree(ctx.fireflies.trails); ctx.fireflies.trails.layers.set(LAYER_FX); scene.add(ctx.fireflies.trails); }
+    if (ctx.fireflies.trails) {
+      scope.trackTree(ctx.fireflies.trails);
+      ctx.fireflies.trails.layers.set(LAYER_FX);
+      scene.add(ctx.fireflies.trails);
+    }
     ctx.fireflies.setRamp(ctx.currentRamp);
     scene.add(ctx.fireflies.group);
 
@@ -214,13 +270,22 @@ export function createSceneModel(ctx) {
     candleLight.position.copy(candlePos).add(new THREE.Vector3(0.1, 0.25, 0.3));
     ctx.ruinsOnly.push(...candleFlames.map((c) => c.mesh));
     // The model's materials, for the other sceneries.
-    for (const [key, name] of [['stone', 'Stone'], ['pillar', 'Pillar'], ['wood', 'Wood'], ['char', 'Charred'], ['wax', 'Wax'], ['mortar', 'Mortar']]) {
+    for (const [key, name] of [
+      ['stone', 'Stone'],
+      ['pillar', 'Pillar'],
+      ['wood', 'Wood'],
+      ['char', 'Charred'],
+      ['wax', 'Wax'],
+      ['mortar', 'Mortar'],
+    ]) {
       ctx.sceneryMaterials[key] = root.getObjectByName(`Static_${name}`)?.material;
     }
 
     // How far a ground flame can run in each direction before it hits something.
     const blockers = [];
-    root.traverse((o) => { if (o.isMesh && !/Ground|Flagstone|Ash|Glow|Candle/.test(o.name)) blockers.push(o); });
+    root.traverse((o) => {
+      if (o.isMesh && !/Ground|Flagstone|Ash|Glow|Candle/.test(o.name)) blockers.push(o);
+    });
     const BINS = 96;
     const reachDist = new Float32Array(BINS);
     const rc = new THREE.Raycaster();
@@ -239,7 +304,8 @@ export function createSceneModel(ctx) {
       }
       reachDist[b] = d;
     }
-    const reach = (a) => reachDist[Math.round((((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2) * BINS) % BINS];
+    const reach = (a) =>
+      reachDist[Math.round(((((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2)) * BINS) % BINS];
     ctx.fx = createImpactFx({
       fireMaterial: effectMaterial,
       smokeMaterial,
@@ -255,7 +321,8 @@ export function createSceneModel(ctx) {
       lights: coarse ? 4 : 6,
       reducedMotion,
     });
-    for (const object of [ctx.fx.ring, ctx.fx.embers, ctx.fx.wave, ctx.fx.haze, ctx.fx.puff, ctx.fx.flecks]) scope.trackTree(object);
+    for (const object of [ctx.fx.ring, ctx.fx.embers, ctx.fx.wave, ctx.fx.haze, ctx.fx.puff, ctx.fx.flecks])
+      scope.trackTree(object);
     for (const l of ctx.fx.lights) scene.add(l);
     ctx.fx.ring.layers.set(LAYER_FX);
     ctx.fx.embers.layers.set(LAYER_FX);
@@ -271,14 +338,47 @@ export function createSceneModel(ctx) {
     chill.setGround(terrain.top);
     ctx.terrainTop = terrain.top;
     for (const d of Object.values(debris)) d.setGround(terrain.top);
-    ctx.zap = createLightningRing({ fxMaterial: effectMaterial, sparkMaterial: crossMaterial, origin: ground, field, reach, ground: terrain.top, emitters: coarse ? 72 : 96, sparks: impactCount(260), lights: coarse ? 4 : 6, reducedMotion });
-    ctx.frostRing = createIceRing({ fxMaterial: effectMaterial, glintMaterial: diamondMaterial, origin: ground, field, reach, chill, chips: impactCount(320), lights: coarse ? 4 : 6, reducedMotion });
-    for (const o of [...ctx.zap.objects, ...ctx.frostRing.objects]) { scope.trackTree(o); o.layers.set(LAYER_FX); scene.add(o); }
+    ctx.zap = createLightningRing({
+      fxMaterial: effectMaterial,
+      sparkMaterial: crossMaterial,
+      origin: ground,
+      field,
+      reach,
+      ground: terrain.top,
+      emitters: coarse ? 72 : 96,
+      sparks: impactCount(260),
+      lights: coarse ? 4 : 6,
+      reducedMotion,
+    });
+    ctx.frostRing = createIceRing({
+      fxMaterial: effectMaterial,
+      glintMaterial: diamondMaterial,
+      origin: ground,
+      field,
+      reach,
+      chill,
+      chips: impactCount(320),
+      lights: coarse ? 4 : 6,
+      reducedMotion,
+    });
+    for (const o of [...ctx.zap.objects, ...ctx.frostRing.objects]) {
+      scope.trackTree(o);
+      o.layers.set(LAYER_FX);
+      scene.add(o);
+    }
     ctx.frostRing.solid.layers.set(LAYER_SOLID);
     for (const l of [...ctx.zap.lights, ...ctx.frostRing.lights]) scene.add(l);
     ctx.zap.setRamp(ctx.currentRamp);
     ctx.frostRing.setRamp(ctx.currentRamp);
-    ctx.sets = [...fire.sets, ...plasma.sets, ...crystals.sets, ...chill.sets, ...ctx.fx.sets, ...ctx.zap.sets, ...ctx.frostRing.sets];
+    ctx.sets = [
+      ...fire.sets,
+      ...plasma.sets,
+      ...crystals.sets,
+      ...chill.sets,
+      ...ctx.fx.sets,
+      ...ctx.zap.sets,
+      ...ctx.frostRing.sets,
+    ];
     ctx.named([ctx.fx.ring], 'Ring of fire');
     ctx.named([ctx.fx.embers], 'Embers');
     ctx.named([ctx.fx.haze, ctx.fx.puff], 'Smoke');
@@ -295,9 +395,10 @@ export function createSceneModel(ctx) {
     // Every light on every layer: each pass (frame.js) then sees the same lights, so the lit
     // materials aren't re-set-up for a different light count every frame (the particles'
     // pass has no lit materials: they change nothing there).
-    scene.traverse((o) => { if (o.isLight) o.layers.enableAll(); });
+    scene.traverse((o) => {
+      if (o.isLight) o.layers.enableAll();
+    });
     ctx.ready = true;
-
   });
   return { candleFlames, glows, loader, knightLoaded, knightLater, modelLoaded };
 }

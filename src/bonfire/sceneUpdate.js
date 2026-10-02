@@ -12,7 +12,10 @@ import { passValue, stillClock } from './stillFx.js';
 import { FIRE_ORIGIN, lightMix, boost } from './sceneContext.js';
 
 const LIGHT_FPS = 12;
-const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(s); };
+const hash = (n) => {
+  const s = Math.sin(n) * 43758.5453;
+  return s - Math.floor(s);
+};
 
 /**
  * The update and the frame.
@@ -20,20 +23,100 @@ const hash = (n) => { const s = Math.sin(n) * 43758.5453; return s - Math.floor(
  */
 export function createSceneUpdate(ctx) {
   const {
-    reducedMotion, paintedLook, onFrame, renderer, camera, frame, pass, timer, pointer, view, interaction,
-    fire, plasma, crystals, chill, swingTrail, debris, flowView, marks, armor,
-    candleLight, lamps, fireLight, FIRE_LIGHT_AT, ballLightAt, BALL_LIGHT_MIN_Y, drive, glitch, presence, white, lightBase, lightWarm,
-    candleFlames, glows, sceneries, renderOverride, keepPalette, ambient, strikeFirefly, bladeState,
+    reducedMotion,
+    paintedLook,
+    onFrame,
+    renderer,
+    camera,
+    frame,
+    pass,
+    timer,
+    pointer,
+    view,
+    interaction,
+    fire,
+    plasma,
+    crystals,
+    chill,
+    swingTrail,
+    debris,
+    flowView,
+    marks,
+    armor,
+    candleLight,
+    lamps,
+    fireLight,
+    FIRE_LIGHT_AT,
+    ballLightAt,
+    BALL_LIGHT_MIN_Y,
+    drive,
+    glitch,
+    presence,
+    white,
+    lightBase,
+    lightWarm,
+    candleFlames,
+    glows,
+    sceneries,
+    renderOverride,
+    keepPalette,
+    ambient,
+    strikeFirefly,
+    bladeState,
   } = ctx;
   const blendTime = () => (reducedMotion ? 0.4 : effects.render.colorChange);
   // Each of `glitch`'s values (scene.js), and the pass uniform it's written to (renderFrame).
   const GLITCH_UNIFORMS = {
-    slice: 'uSlice', sliceSeed: 'uSliceSeed', split: 'uSplit', block: 'uBlock', wave: 'uWave', mirror: 'uMirror', scan: 'uScan', scanMode: 'uScanMode', noise: 'uNoise', invert: 'uInvert',
-    feedback: 'uFeedback', zoom: 'uZoom', feedRot: 'uFeedRot', kaleido: 'uKaleido', kaleidoRot: 'uKaleidoRot', rippleR: 'uRippleR', rippleAmp: 'uRippleAmp', iris: 'uIris', letterbox: 'uLetterbox', ink: 'uInk', cycle: 'uCycle',
-    temp: 'uTemp', blackout: 'uBlackout',
-    ghost: 'uGhost', ghostKeep: 'uGhostKeep', blur: 'uBlur', glow: 'uGlow', glowSize: 'uGlowSize', glowCut: 'uGlowCut', grad: 'uGrad', gradA: 'uGradA', gradB: 'uGradB', gradC: 'uGradC',
-    style: 'uStyle', styleR: 'uStyleR', styleMix: 'uStyleMix', paintAngle: 'uPaintAngle', paintAspect: 'uPaintAspect', washEdge: 'uWashEdge', flicker: 'uFlicker', flickerMode: 'uFlickerMode',
-    feedMode: 'uFeedMode', ghostMode: 'uGhostMode', warpMode: 'uWarpMode', warpMix: 'uWarpMix', inkMode: 'uInkMode', invertMode: 'uInvertMode', scanBlend: 'uScanBlend', glowMode: 'uGlowMode', gradMode: 'uGradMode',
+    slice: 'uSlice',
+    sliceSeed: 'uSliceSeed',
+    split: 'uSplit',
+    block: 'uBlock',
+    wave: 'uWave',
+    mirror: 'uMirror',
+    scan: 'uScan',
+    scanMode: 'uScanMode',
+    noise: 'uNoise',
+    invert: 'uInvert',
+    feedback: 'uFeedback',
+    zoom: 'uZoom',
+    feedRot: 'uFeedRot',
+    kaleido: 'uKaleido',
+    kaleidoRot: 'uKaleidoRot',
+    rippleR: 'uRippleR',
+    rippleAmp: 'uRippleAmp',
+    iris: 'uIris',
+    letterbox: 'uLetterbox',
+    ink: 'uInk',
+    cycle: 'uCycle',
+    temp: 'uTemp',
+    blackout: 'uBlackout',
+    ghost: 'uGhost',
+    ghostKeep: 'uGhostKeep',
+    blur: 'uBlur',
+    glow: 'uGlow',
+    glowSize: 'uGlowSize',
+    glowCut: 'uGlowCut',
+    grad: 'uGrad',
+    gradA: 'uGradA',
+    gradB: 'uGradB',
+    gradC: 'uGradC',
+    style: 'uStyle',
+    styleR: 'uStyleR',
+    styleMix: 'uStyleMix',
+    paintAngle: 'uPaintAngle',
+    paintAspect: 'uPaintAspect',
+    washEdge: 'uWashEdge',
+    flicker: 'uFlicker',
+    flickerMode: 'uFlickerMode',
+    feedMode: 'uFeedMode',
+    ghostMode: 'uGhostMode',
+    warpMode: 'uWarpMode',
+    warpMix: 'uWarpMix',
+    inkMode: 'uInkMode',
+    invertMode: 'uInvertMode',
+    scanBlend: 'uScanBlend',
+    glowMode: 'uGlowMode',
+    gradMode: 'uGradMode',
   };
   const GLITCH_ENTRIES = Object.entries(GLITCH_UNIFORMS);
   // Under reduced motion only the still effects reach the picture; the Painter's
@@ -87,7 +170,8 @@ export function createSceneUpdate(ctx) {
     // Hovered (the site), the fire eases up to meet the cursor: taller, brighter, a trickle of sparks.
     ctx.hoverGlow += ((ctx.hoverFlare ? 1 : 0) - ctx.hoverGlow) * Math.min(1, realDt * 6);
     if (ctx.hoverGlow > 0.3 && Math.random() < realDt * 30 * ctx.hoverGlow) fire.sparkle(2);
-    fire.params.level += (ctx.targetLevel + drive.level + 1.1 * ctx.hoverGlow - fire.params.level) * Math.min(1, dt * 1.1);
+    fire.params.level +=
+      (ctx.targetLevel + drive.level + 1.1 * ctx.hoverGlow - fire.params.level) * Math.min(1, dt * 1.1);
     fire.wind.set(drive.windX, 0, drive.windZ);
     // Scrolling: the loose particles and the fireflies are swept along with the page, a little.
     ctx.sweep *= Math.exp(-realDt / 0.3);
@@ -116,7 +200,9 @@ export function createSceneUpdate(ctx) {
       const steps = ctx.flameStep < 0 || fs < ctx.flameStep ? 1 : Math.min(3, fs - ctx.flameStep);
       ctx.flameStep = fs;
       for (let i = 0; i < steps; i++) fire.stepFlame(1 / fps, t);
-      candleFlames.forEach((c, i) => c.mesh.scale.set(c.scale.x, c.scale.y * (0.8 + hash(fs * 1.7 + i * 9.1) * 0.4), c.scale.z));
+      candleFlames.forEach((c, i) =>
+        c.mesh.scale.set(c.scale.x, c.scale.y * (0.8 + hash(fs * 1.7 + i * 9.1) * 0.4), c.scale.z),
+      );
       // The glows: the model's coals, and the current place's (the others are hidden, and
       // catch up if they're shown again: setScenery).
       for (let i = 0; i < 4; i++) glowRamp[i].set(ctx.currentRamp[i]);
@@ -138,17 +224,26 @@ export function createSceneUpdate(ctx) {
     flowView.step(t);
     marks.step(realDt);
     ctx.fireflies.update(dt, t, camera, pointer.cursor, interaction.flowWorld);
-    if (ctx.strikeAt >= 0 && t >= ctx.strikeAt) { ctx.strikeAt = -1; strikeFirefly(1); }
+    if (ctx.strikeAt >= 0 && t >= ctx.strikeAt) {
+      ctx.strikeAt = -1;
+      strikeFirefly(1);
+    }
     // Now and then the ball reaches for a firefly on its own (more when stoked).
-    if (ctx.elementKey === 'lightning' && Math.random() < dt * effects.impact.fireflyStrikes * 0.25 * ambient() * Math.max(0.5, fire.params.level)) strikeFirefly(0.6);
+    if (
+      ctx.elementKey === 'lightning' &&
+      Math.random() < dt * effects.impact.fireflyStrikes * 0.25 * ambient() * Math.max(0.5, fire.params.level)
+    )
+      strikeFirefly(0.6);
 
     // After a weapon lands: ease from the old flame into the new one, with the
     // light swelling and settling as the color turns over.
     if (ctx.blend) {
       ctx.blend.t = Math.min(1, ctx.blend.t + (dt / blendTime()) * (ctx.blend.fast ? 4 : 1));
       const k = flameEase(ctx.blend.t);
-      ctx.applyColors(mixFlame(flames[ctx.blend.from], flames[ctx.blend.to], k),
-        THREE.MathUtils.lerp(lightMix(ctx.blend.from), lightMix(ctx.blend.to), k));
+      ctx.applyColors(
+        mixFlame(flames[ctx.blend.from], flames[ctx.blend.to], k),
+        THREE.MathUtils.lerp(lightMix(ctx.blend.from), lightMix(ctx.blend.to), k),
+      );
       ctx.blendMul = 1 + Math.sin(ctx.blend.t * Math.PI) * 0.35;
       if (ctx.blend.t >= 1) {
         ctx.blend = null;
@@ -172,16 +267,25 @@ export function createSceneUpdate(ctx) {
     }
     // Each element lights the scene its own way: fire flickers, the ball strobes
     // with its crackle, ice glows steadily and breathes.
-    const iceLight = (0.88 + 0.07 * Math.sin(t * 1.3) * effects.ice.shimmer) * effects.ice.glow * 0.8 * (1 + 0.5 * crystals.beatGlow);
-    const lit = presence.fire * lightFlicker + presence.lightning * plasma.lightFlicker * effects.lightning.brightness + presence.ice * iceLight;
+    const iceLight =
+      (0.88 + 0.07 * Math.sin(t * 1.3) * effects.ice.shimmer) * effects.ice.glow * 0.8 * (1 + 0.5 * crystals.beatGlow);
+    const lit =
+      presence.fire * lightFlicker +
+      presence.lightning * plasma.lightFlicker * effects.lightning.brightness +
+      presence.ice * iceLight;
     const flicker = lit / Math.max(1e-3, presence.fire + presence.lightning + presence.ice);
     // The ball lights the scene from where it hangs — but no lower than the top of the
     // logs, so a ball set down in the core still lights the clearing instead of being
     // shadowed by the logs around it.
-    fireLight.position.lerpVectors(FIRE_LIGHT_AT, ballLightAt.set(FIRE_ORIGIN.x, Math.max(effects.lightning.height, BALL_LIGHT_MIN_Y), FIRE_ORIGIN.z + 0.12), presence.lightning);
+    fireLight.position.lerpVectors(
+      FIRE_LIGHT_AT,
+      ballLightAt.set(FIRE_ORIGIN.x, Math.max(effects.lightning.height, BALL_LIGHT_MIN_Y), FIRE_ORIGIN.z + 0.12),
+      presence.lightning,
+    );
     // A discharge (weapon impact, stoke) flashes the whole scene for an instant.
     const flash = reducedMotion ? 0 : plasma.flash;
-    pass.uniforms.exposure.value = (renderOverride.exposure ?? effects.render.exposure) * (1 + flash * 0.45) * boost(drive.exposure);
+    pass.uniforms.exposure.value =
+      (renderOverride.exposure ?? effects.render.exposure) * (1 + flash * 0.45) * boost(drive.exposure);
     keepPalette();
     pass.uniforms.uFlash.value = reducedMotion ? 0 : ctx.flashAmt;
     // The music's color temperature (the visualizer) tints the cast light too.
@@ -189,14 +293,24 @@ export function createSceneUpdate(ctx) {
     fireLight.color.copy(lightBase);
     if (temp > 0) fireLight.color.lerp(white, temp * 0.45);
     else if (temp < 0) fireLight.color.lerp(lightWarm, -temp * 0.35);
-    fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * flicker * ctx.blendMul * (1 + flash * 1.5) * boost(drive.glow) * (1 + 0.6 * ctx.hoverGlow);
+    fireLight.intensity =
+      effects.fire.glow *
+      Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 *
+      flicker *
+      ctx.blendMul *
+      (1 + flash * 1.5) *
+      boost(drive.glow) *
+      (1 + 0.6 * ctx.hoverGlow);
 
     ctx.weapons.update(dt);
     if (ctx.knights) {
       // The armor mirrors the fire as it flickers; the knights glance at a weapon in flight.
       armor.uniforms.uFire.value = Math.min(1.6, fireLight.intensity / Math.max(0.1, effects.fire.glow));
       const b = ctx.weapons.busy ? ctx.weapons.blade(bladeState) : null;
-      ctx.knights.update(dt, { lookAt: b && ctx.reacts() ? (b.free ? b.tip : b.mid) : null, cameraAt: camera.position });
+      ctx.knights.update(dt, {
+        lookAt: b && ctx.reacts() ? (b.free ? b.tip : b.mid) : null,
+        cameraAt: camera.position,
+      });
       // (The site's: his sign, and his coming and going, after his pose.)
       ctx.arrival?.update(dt);
     }
@@ -226,7 +340,8 @@ export function createSceneUpdate(ctx) {
     const shudder = !!ctx.weapons?.moving && !ctx.weapons.movingForShadow;
     const step = Math.floor(ctx.simT * LIGHT_FPS);
     if (ctx.weapons?.movingForShadow) ctx.shadowFrames = 2;
-    else if (ctx.knights?.moving || (shudder && step !== shadowStep) || (shuddering && !shudder)) ctx.shadowFrames = Math.max(ctx.shadowFrames, 1);
+    else if (ctx.knights?.moving || (shudder && step !== shadowStep) || (shuddering && !shudder))
+      ctx.shadowFrames = Math.max(ctx.shadowFrames, 1);
     shuddering = shudder;
     const stale = ctx.shadowFrames > 0 || !fireLight.position.equals(shadowLightAt);
     ctx.shadowFrames = Math.max(0, ctx.shadowFrames - 1);
@@ -265,7 +380,10 @@ export function createSceneUpdate(ctx) {
     pass.uniforms.uRippleAmp.value = reducedMotion ? 0 : (glitch.rippleAmp * ctx.size.h) / 270;
     // Where the fire is on screen (texels): the ripple, the iris and the echoes center on it.
     fireOnScreen.set(FIRE_ORIGIN.x, 0.55, FIRE_ORIGIN.z).project(camera);
-    pass.uniforms.uCenter.value.set((fireOnScreen.x * 0.5 + 0.5) * ctx.size.w, (fireOnScreen.y * 0.5 + 0.5) * ctx.size.h);
+    pass.uniforms.uCenter.value.set(
+      (fireOnScreen.x * 0.5 + 0.5) * ctx.size.w,
+      (fireOnScreen.y * 0.5 + 0.5) * ctx.size.h,
+    );
 
     const t2 = ctx.perf ? performance.now() : 0;
     const shadows = renderer.shadowMap.enabled && shadowNeedsUpdate();

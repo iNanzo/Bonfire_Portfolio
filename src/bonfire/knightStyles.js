@@ -37,12 +37,48 @@ export const MODELS = { main: 'models/knight.glb', first: 'models/knight-first.g
  * line for people.
  */
 export const STYLES = {
-  'pixel-cel': { look: 1, model: 'main', finish: true, dither: 1, hint: 'Hand-drawn sprite: flat bands with dithered edges, ink lines, lit in the fire’s color.' },
-  'pixel-painterly': { look: 2, model: 'main', finish: true, dither: 0.8, hint: 'The sprite with a painter’s touch: warm shadows, softer ink, lit lips.' },
-  'pixel-chiaroscuro': { look: 3, model: 'main', finish: true, dither: 0.4, hint: 'Hard firelight: near-black backs, the flame’s color only where it strikes.' },
-  gunmetal: { look: 0, model: 'main', finish: true, dither: 0, hint: 'Natural light on smooth steel, plate wear and a thin fire rim.' },
-  blackgold: { look: 4, model: 'main', finish: false, dither: 0, hint: 'Blackened plate and dark gilt trim that catches the fire.' },
-  first: { look: 5, model: 'first', finish: false, dither: 0, hint: 'The boxy first build, its trim glowing in the flame’s colors.' },
+  'pixel-cel': {
+    look: 1,
+    model: 'main',
+    finish: true,
+    dither: 1,
+    hint: 'Hand-drawn sprite: flat bands with dithered edges, ink lines, lit in the fire’s color.',
+  },
+  'pixel-painterly': {
+    look: 2,
+    model: 'main',
+    finish: true,
+    dither: 0.8,
+    hint: 'The sprite with a painter’s touch: warm shadows, softer ink, lit lips.',
+  },
+  'pixel-chiaroscuro': {
+    look: 3,
+    model: 'main',
+    finish: true,
+    dither: 0.4,
+    hint: 'Hard firelight: near-black backs, the flame’s color only where it strikes.',
+  },
+  gunmetal: {
+    look: 0,
+    model: 'main',
+    finish: true,
+    dither: 0,
+    hint: 'Natural light on smooth steel, plate wear and a thin fire rim.',
+  },
+  blackgold: {
+    look: 4,
+    model: 'main',
+    finish: false,
+    dither: 0,
+    hint: 'Blackened plate and dark gilt trim that catches the fire.',
+  },
+  first: {
+    look: 5,
+    model: 'first',
+    finish: false,
+    dither: 0,
+    hint: 'The boxy first build, its trim glowing in the flame’s colors.',
+  },
 };
 
 /** The styles' keys, in menu order. */

@@ -5,12 +5,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-globalThis.document ??= /** @type {any} */ ({ createElement: () => { throw new Error('no DOM in these tests'); } });
+globalThis.document ??= /** @type {any} */ ({
+  createElement: () => {
+    throw new Error('no DOM in these tests');
+  },
+});
 const { buildIndex, crumbsOf, matcherFor, pageById, pageOf, revealPlan, snippetOf } = await import('../ui/search.js');
 const { PAGES } = await import('../ui/schema.js');
 
 const content = () => JSON.parse(readFileSync(new URL('../../src/content.json', import.meta.url), 'utf8'));
-const top = (draft, query, n = 1) => matcherFor(buildIndex(draft))(query).slice(0, n).map((h) => h.entry.admin.id);
+const top = (draft, query, n = 1) =>
+  matcherFor(buildIndex(draft))(query)
+    .slice(0, n)
+    .map((h) => h.entry.admin.id);
 const entry = (index, id) => index.find((e) => e.id === id);
 
 test('the index holds every page’s sections, groups, entries and fields, each on its page', () => {
@@ -18,11 +25,17 @@ test('the index holds every page’s sections, groups, entries and fields, each 
   const index = buildIndex(draft);
   const ids = new Set(index.map((e) => e.id));
   assert.equal(ids.size, index.length, 'one entry per path');
-  for (const p of PAGES) for (const key of p.keys) if (draft[key.split('.')[0]] !== undefined) assert.ok(ids.has(key), `${key}: its section`);
+  for (const p of PAGES)
+    for (const key of p.keys)
+      if (draft[key.split('.')[0]] !== undefined) assert.ok(ids.has(key), `${key}: its section`);
   for (const e of index) assert.equal(pageOf(e.id).id, e.page, `${e.id} is on ${e.page}`);
   const dither = entry(index, 'effects.render.dither');
   assert.equal(dither.page, 'picture');
-  assert.deepEqual(crumbsOf(dither), ['Picture', 'Pixel Art'], 'Page › Group (its sub-group repeats its section, so once)');
+  assert.deepEqual(
+    crumbsOf(dither),
+    ['Picture', 'Pixel Art'],
+    'Page › Group (its sub-group repeats its section, so once)',
+  );
   assert.equal(dither.label, 'Dither');
   assert.ok(dither.keywords.includes('bayer'), 'the settings map’s search words');
   assert.deepEqual(crumbsOf(entry(index, 'effects.knight.style')), ['Knight', 'Armor']);
@@ -44,16 +57,28 @@ test('fields go by the names their page shows: an image’s, the featured projec
   const index = buildIndex(draft);
   const i = draft.projects.findIndex((p) => p.images?.length);
   assert.equal(entry(index, `projects[${i}].images[0].alt`).label, 'Alt Text (Describe It)');
-  assert.equal(entry(index, `projects[${i}].images[0].pixel`).label, 'Pixel Art (Keep It Crisp)', 'a switch, on or off');
+  assert.equal(
+    entry(index, `projects[${i}].images[0].pixel`).label,
+    'Pixel Art (Keep It Crisp)',
+    'a switch, on or off',
+  );
   assert.equal(entry(index, `projects[${i}].images[0].video`).label, 'Video Clip');
   assert.match(top(draft, 'alt text')[0], /\.images\[\d+\]\.alt$/);
   assert.match(top(draft, 'crisp')[0], /\.images\[\d+\]\.pixel$/);
   assert.match(top(draft, 'video clip')[0], /\.images\[\d+\]\.video$/);
-  assert.equal(entry(index, 'featured.built').label, 'What I Built', 'the featured project’s fields named as any project’s');
+  assert.equal(
+    entry(index, 'featured.built').label,
+    'What I Built',
+    'the featured project’s fields named as any project’s',
+  );
   assert.equal(entry(index, 'weapons.flambergezwei').label, draft.weapons.flambergezwei);
   assert.equal(entry(index, 'site.links.linkedin').label, 'LinkedIn');
   assert.equal(entry(index, 'notFound.cta').label, 'Button Text');
-  assert.deepEqual(crumbsOf(entry(index, 'effects.render.colorChange')), ['Picture', 'Pixel Art', 'Color Change'], 'not “Colors”: that’s a page');
+  assert.deepEqual(
+    crumbsOf(entry(index, 'effects.render.colorChange')),
+    ['Picture', 'Pixel Art', 'Color Change'],
+    'not “Colors”: that’s a page',
+  );
 });
 
 test('results rank the label first: dither, Fast Travel, a typo, a choice, a renamed page', () => {
@@ -69,7 +94,10 @@ test('results rank the label first: dither, Fast Travel, a typo, a choice, a ren
   assert.deepEqual(top(draft, 'zzqx'), []);
   const renamed = content();
   renamed.admin = { labels: { 'page:picture': 'Rendering', 'effects.render': 'The Pixels' } };
-  const dither = entry(buildIndex(renamed, { labelOf: (k) => renamed.admin.labels[k] ?? (k === 'page:picture' ? 'Picture' : k) }), 'effects.render.dither');
+  const dither = entry(
+    buildIndex(renamed, { labelOf: (k) => renamed.admin.labels[k] ?? (k === 'page:picture' ? 'Picture' : k) }),
+    'effects.render.dither',
+  );
   assert.equal(dither.pageLabel, 'Rendering', 'a page renamed with ✎ is found by its new name');
 });
 

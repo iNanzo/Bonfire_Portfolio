@@ -38,14 +38,20 @@ export const SIGN_STROKE = 0.032;
 // looks a third as wide as it is: strokes are drawn wider the more they lie across, so every
 // stroke reads about as heavy as the upright stems (the gaps between the stems stay open).
 const BOLD = 1.1;
-const HALO = 0.014;     // how much wider the halo is than a bar (m)
-const THICK = 0.012;    // the bars' thickness (m); the halo's is half
-const COLUMN = 0.95;    // the forge's column over the sign (m)
+const HALO = 0.014; // how much wider the halo is than a bar (m)
+const THICK = 0.012; // the bars' thickness (m); the halo's is half
+const COLUMN = 0.95; // the forge's column over the sign (m)
 const MOTES = 18;
-const BREATH = 5.5;     // s between breaths
-const hash = (n) => { const s = Math.sin(n * 12.9898 + 4.1414) * 43758.5453; return s - Math.floor(s); };
+const BREATH = 5.5; // s between breaths
+const hash = (n) => {
+  const s = Math.sin(n * 12.9898 + 4.1414) * 43758.5453;
+  return s - Math.floor(s);
+};
 /** The glyph's bars (ui/logo.js logoBars), each as wide as it needs to read from the cameras. */
-const BARS = logoBars(SIGN_HEIGHT, SIGN_STROKE).map((b) => ({ ...b, width: b.width * (1 + BOLD * Math.abs(Math.cos(b.angle))) }));
+const BARS = logoBars(SIGN_HEIGHT, SIGN_STROKE).map((b) => ({
+  ...b,
+  width: b.width * (1 + BOLD * Math.abs(Math.cos(b.angle))),
+}));
 
 /**
  * The glyph's bars (and their halo) in the sign's own space: x across the letters, y up out
@@ -55,11 +61,15 @@ function glyphGeometry() {
   const parts = [];
   for (const b of BARS) {
     for (const halo of [0, 1]) {
-      const w = b.width + (halo ? HALO : 0), t = halo ? THICK * 0.5 : THICK;
+      const w = b.width + (halo ? HALO : 0),
+        t = halo ? THICK * 0.5 : THICK;
       const g = new THREE.BoxGeometry(b.len + (halo ? HALO : 0), t, w).toNonIndexed();
       g.rotateY(b.angle);
       g.translate(b.u, t / 2, -b.v);
-      g.setAttribute('aHalo', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(halo), 1));
+      g.setAttribute(
+        'aHalo',
+        new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(halo), 1),
+      );
       g.deleteAttribute('uv');
       parts.push(g);
     }
@@ -78,17 +88,25 @@ function signMaterial(uniforms) {
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float aHalo;\nvarying float vHalo;\nvarying vec3 vSign;')
+      .replace(
+        '#include <common>',
+        '#include <common>\nattribute float aHalo;\nvarying float vHalo;\nvarying vec3 vSign;',
+      )
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSign = position;\nvHalo = aHalo;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>
+      .replace(
+        '#include <common>',
+        `#include <common>
         varying float vHalo; varying vec3 vSign;
         uniform vec3 uRest; uniform vec3 uHot; uniform vec3 uLo; uniform vec3 uMid;
         uniform float uBreath; uniform float uLift; uniform float uGlow; uniform float uExposure;
         uniform float uDissolve; uniform vec3 uEdge; uniform vec3 uEdgeHot; uniform float uFlip;
         uniform float uFrost; uniform vec3 uFrostColor; uniform vec2 uSpanV;
-        ${DISSOLVE_CHUNK}`)
-      .replace('#include <dithering_fragment>', `#include <dithering_fragment>
+        ${DISSOLVE_CHUNK}`,
+      )
+      .replace(
+        '#include <dithering_fragment>',
+        `#include <dithering_fragment>
         {
           float h = clamp((-vSign.z - uSpanV.x) / (uSpanV.y - uSpanV.x), 0.0, 1.0); // (0 the letters' feet, 1 their tops)
           bool halo = vHalo > 0.5;
@@ -111,7 +129,8 @@ function signMaterial(uniforms) {
             else if (e < 0.12) col = uEdge;
           }
           gl_FragColor = vec4(col / max(uExposure, 0.05), 1.0);
-        }`);
+        }`,
+      );
   };
   mat.customProgramCacheKey = () => 'summon-sign-1';
   return mat;
@@ -126,14 +145,31 @@ function signMaterial(uniforms) {
  * @param {{ value: number }} o.exposure   the pixel pass's exposure (shared)
  * @param {boolean} [o.reducedMotion]      no breath, no motes
  */
-export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMaterial, exposure, reducedMotion = false }) {
+export function createSummonSign({
+  layer,
+  layerSolid = layer,
+  layerFx,
+  moteMaterial,
+  exposure,
+  reducedMotion = false,
+}) {
   const group = new THREE.Group();
   group.name = 'Summon sign';
   const uniforms = {
-    uRest: { value: new THREE.Color() }, uHot: { value: new THREE.Color() }, uLo: { value: new THREE.Color() }, uMid: { value: new THREE.Color() },
-    uBreath: { value: -1 }, uLift: { value: 0 }, uGlow: { value: 0 }, uExposure: exposure,
-    uDissolve: { value: 0 }, uEdge: { value: new THREE.Color() }, uEdgeHot: { value: new THREE.Color() }, uFlip: { value: 0 },
-    uFrost: { value: 0 }, uFrostColor: { value: new THREE.Color() },
+    uRest: { value: new THREE.Color() },
+    uHot: { value: new THREE.Color() },
+    uLo: { value: new THREE.Color() },
+    uMid: { value: new THREE.Color() },
+    uBreath: { value: -1 },
+    uLift: { value: 0 },
+    uGlow: { value: 0 },
+    uExposure: exposure,
+    uDissolve: { value: 0 },
+    uEdge: { value: new THREE.Color() },
+    uEdgeHot: { value: new THREE.Color() },
+    uFlip: { value: 0 },
+    uFrost: { value: 0 },
+    uFrostColor: { value: new THREE.Color() },
     uSpanV: { value: new THREE.Vector2(-SIGN_HEIGHT / 2, SIGN_HEIGHT / 2) },
   };
   const geometry = glyphGeometry();
@@ -152,12 +188,19 @@ export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMater
   const areaSum = barArea.reduce((a, b) => a + b, 0);
   /** A point on the strokes' tops (sign space) for u1, u2, u3 in 0..1, and its height up the letters. */
   function onStrokes(u1, u2, u3, out) {
-    let r = u1 * areaSum, i = 0;
-    while (i < bars.length - 1 && r > barArea[i]) { r -= barArea[i]; i++; }
+    let r = u1 * areaSum,
+      i = 0;
+    while (i < bars.length - 1 && r > barArea[i]) {
+      r -= barArea[i];
+      i++;
+    }
     const b = bars[i];
-    const along = (u2 - 0.5) * b.len, across = (u3 - 0.5) * b.width;
-    const c = Math.cos(b.angle), s = Math.sin(b.angle);
-    const u = b.u + along * c - across * s, v = b.v + along * s + across * c;
+    const along = (u2 - 0.5) * b.len,
+      across = (u3 - 0.5) * b.width;
+    const c = Math.cos(b.angle),
+      s = Math.sin(b.angle);
+    const u = b.u + along * c - across * s,
+      v = b.v + along * s + across * c;
     out.set(u, THICK, -v);
     return (v + SIGN_HEIGHT / 2) / SIGN_HEIGHT;
   }
@@ -173,7 +216,7 @@ export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMater
 
   let mode = 'off'; // 'lit' (he's away: it glows), 'forge' (the forge drives it), 'off'
   let hovered = false;
-  let lift = 0;     // the hover, eased (the motes)
+  let lift = 0; // the hover, eased (the motes)
   let clock = 0;
   let placed = null; // { x, y, z, yaw }
 
@@ -182,7 +225,10 @@ export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMater
     for (let i = 0; i < MOTES; i++) {
       // At rest only every third one drifts up; hovered, all of them, faster.
       const active = on && (i % 3 === 0 || lift > 0.05);
-      if (!active) { MS[i] = 0; continue; }
+      if (!active) {
+        MS[i] = 0;
+        continue;
+      }
       const period = 2.4 + hash(i) * 1.8;
       const speed = 1 + 1.2 * lift;
       const k0 = (clock * speed) / period + hash(i + 17);
@@ -193,10 +239,14 @@ export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMater
       v3.y += rise;
       v3.x += Math.sin(clock * 1.3 + i) * 0.03 * k;
       v3.applyMatrix4(group.matrixWorld);
-      MP[i * 3] = v3.x; MP[i * 3 + 1] = v3.y; MP[i * 3 + 2] = v3.z;
+      MP[i * 3] = v3.x;
+      MP[i * 3 + 1] = v3.y;
+      MP[i * 3 + 2] = v3.z;
       const hot = hash(i * 1.3 + cycle) > 0.6 || lift > 0.5;
       const c = ramp[hot ? 3 : 2];
-      MC[i * 3] = c.r; MC[i * 3 + 1] = c.g; MC[i * 3 + 2] = c.b;
+      MC[i * 3] = c.r;
+      MC[i * 3 + 1] = c.g;
+      MC[i * 3 + 2] = c.b;
       MS[i] = (0.8 + 0.5 * hash(i * 9.9)) * (1 + 0.3 * lift);
       MA[i] = Math.sin(Math.PI * k) * (0.35 + 0.5 * lift);
     }
@@ -207,10 +257,20 @@ export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMater
   const silGeo = (() => {
     // (The glyph in its own plane: x across, y up the letters, z out of the ground.)
     const g = geometry.clone();
-    g.applyMatrix4(new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0)));
+    g.applyMatrix4(
+      new THREE.Matrix4().makeBasis(
+        new THREE.Vector3(1, 0, 0),
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(0, -1, 0),
+      ),
+    );
     return g;
   })();
-  const toSil = new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 1, 0));
+  const toSil = new THREE.Matrix4().makeBasis(
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(0, 0, -1),
+    new THREE.Vector3(0, 1, 0),
+  );
   let silhouette = null;
   const silMatrix = new THREE.Matrix4();
   const radius = new Float32Array(64).fill(0.2);
@@ -221,17 +281,27 @@ export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMater
    */
   function subject(n) {
     let seed = 7;
-    const rng = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const rng = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
     const samples = new Float32Array(n * 3);
     const heights = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       heights[i] = onStrokes(rng(), rng(), rng(), v3);
-      samples[i * 3] = v3.x; samples[i * 3 + 1] = v3.y; samples[i * 3 + 2] = v3.z;
+      samples[i * 3] = v3.x;
+      samples[i * 3 + 1] = v3.y;
+      samples[i * 3 + 2] = v3.z;
     }
     return {
-      get matrixWorld() { return group.matrixWorld; },
-      get silMatrix() { return silMatrix.multiplyMatrices(group.matrixWorld, toSil); },
-      samples, heights,
+      get matrixWorld() {
+        return group.matrixWorld;
+      },
+      get silMatrix() {
+        return silMatrix.multiplyMatrices(group.matrixWorld, toSil);
+      },
+      samples,
+      heights,
       span: new THREE.Vector2(0, COLUMN),
       silhouette: () => (silhouette ??= weaponSilhouette(new Map([[{ geometry: silGeo }, new THREE.Matrix4()]]), 0.01)),
       profile: () => profile,
@@ -240,12 +310,17 @@ export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMater
       cocoon: { n: 7, size: 0.07, spread: 0.04, out: 0.16 },
       strikePoint: (s, out) => out.set(0, THICK, 0).applyMatrix4(group.matrixWorld),
       ground: (rng2, out) => {
-        const a = rng2() * Math.PI * 2, r = 0.3 + rng2() * 0.25;
+        const a = rng2() * Math.PI * 2,
+          r = 0.3 + rng2() * 0.25;
         return out.set(Math.cos(a) * r, 0.03, Math.sin(a) * r).applyMatrix4(group.matrixWorld);
       },
       uniforms,
-      show(on) { mesh.visible = on; },
-      ghost(on) { mesh.layers.set(on ? layer : layerSolid); },
+      show(on) {
+        mesh.visible = on;
+      },
+      ghost(on) {
+        mesh.layers.set(on ? layer : layerSolid);
+      },
     };
   }
 
@@ -259,7 +334,9 @@ export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMater
       group.rotation.set(0, yaw + Math.PI, 0);
       group.updateMatrixWorld(true);
     },
-    get placed() { return placed; },
+    get placed() {
+      return placed;
+    },
     /** The flame's ramp, [lo, mid, hi, core] (sRGB hex): it glows in its tones. */
     setRamp(r) {
       r.forEach((h, i) => ramp[i].set(h));
@@ -272,7 +349,9 @@ export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMater
      * 'lit' (he's away: it glows, breathes and answers the cursor), 'forge' (the forge
      * drives its dissolve: shown, the breath stops) or 'off' (gone).
      */
-    get mode() { return mode; },
+    get mode() {
+      return mode;
+    },
     set mode(m) {
       mode = m;
       group.visible = m !== 'off';
@@ -283,12 +362,22 @@ export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMater
         uniforms.uFrost.value = 0;
         uniforms.uFlip.value = 0;
       }
-      if (m !== 'lit') { uniforms.uBreath.value = -1; uniforms.uLift.value = 0; }
-      if (m === 'off' || reducedMotion) { MS.fill(0); markDirty(motes); }
+      if (m !== 'lit') {
+        uniforms.uBreath.value = -1;
+        uniforms.uLift.value = 0;
+      }
+      if (m === 'off' || reducedMotion) {
+        MS.fill(0);
+        markDirty(motes);
+      }
     },
     /** The cursor is on it: it brightens and its motes rise. */
-    set hovered(v) { hovered = !!v; },
-    get hovered() { return hovered && mode === 'lit'; },
+    set hovered(v) {
+      hovered = !!v;
+    },
+    get hovered() {
+      return hovered && mode === 'lit';
+    },
     /** Each frame (`dt` s): the breath, the hover, the motes; the glow a formed sign settles from. */
     update(dt) {
       clock += dt;
@@ -310,12 +399,15 @@ export function createSummonSign({ layer, layerSolid = layer, layerFx, moteMater
       const at = ray.intersectPlane(plane, new THREE.Vector3());
       if (!at) return -1;
       const local = group.worldToLocal(at.clone());
-      const w = SIGN_HEIGHT * 0.36 + 0.1, hgt = SIGN_HEIGHT / 2 + 0.1;
+      const w = SIGN_HEIGHT * 0.36 + 0.1,
+        hgt = SIGN_HEIGHT / 2 + 0.1;
       return Math.abs(local.x) < w && Math.abs(local.z) < hgt ? at.distanceTo(ray.origin) : -1;
     },
     subject,
     /** Its world matrix is kept up to date by place(); the forge reads it. */
-    get uniforms() { return uniforms; },
+    get uniforms() {
+      return uniforms;
+    },
     geometries: [geometry, silGeo],
     materials: [material],
   };

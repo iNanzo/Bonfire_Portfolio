@@ -12,7 +12,10 @@ function run(gate, intervals) {
 }
 const steady = (hz, seconds, jitter = 0, seed = 3) => {
   let s = seed;
-  const r = () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296 * 2 - 1; };
+  const r = () => {
+    s = (s * 1664525 + 1013904223) % 4294967296;
+    return (s / 4294967296) * 2 - 1;
+  };
   return Array.from({ length: Math.round(hz * seconds) }, () => 1000 / hz + r() * jitter);
 };
 
@@ -30,7 +33,15 @@ test('no cap (the default): every frame is drawn', () => {
 });
 
 test('a cap draws that many a second on average, on every refresh rate, with no drift', () => {
-  for (const [hz, cap] of [[144, 60], [165, 60], [120, 60], [120, 30], [75, 60], [144, 30], [240, 60]]) {
+  for (const [hz, cap] of [
+    [144, 60],
+    [165, 60],
+    [120, 60],
+    [120, 30],
+    [75, 60],
+    [144, 30],
+    [240, 60],
+  ]) {
     const gate = createFrameGate();
     gate.setMaxFps(cap);
     const drawn = run(gate, steady(hz, 20)).filter(Boolean).length;
@@ -41,14 +52,35 @@ test('a cap draws that many a second on average, on every refresh rate, with no 
 test('120 Hz at 60 draws exactly every other frame; 120 at 30 every fourth', () => {
   const gate = createFrameGate();
   gate.setMaxFps(60);
-  assert.deepEqual(run(gate, steady(120, 0.1)), [true, false, true, false, true, false, true, false, true, false, true, false]);
+  assert.deepEqual(run(gate, steady(120, 0.1)), [
+    true,
+    false,
+    true,
+    false,
+    true,
+    false,
+    true,
+    false,
+    true,
+    false,
+    true,
+    false,
+  ]);
   gate.setMaxFps(30);
   const quarter = run(gate, steady(120, 0.1));
-  assert.deepEqual(quarter.map((d, i) => (d ? i : -1)).filter((i) => i >= 0), [0, 4, 8]);
+  assert.deepEqual(
+    quarter.map((d, i) => (d ? i : -1)).filter((i) => i >= 0),
+    [0, 4, 8],
+  );
 });
 
 test('a cap at the display’s own rate skips nothing, jitter or a display a hair fast', () => {
-  for (const [hz, jitter] of [[60, 0.4], [60.05, 0], [59.94, 0.3], [30, 0.5]]) {
+  for (const [hz, jitter] of [
+    [60, 0.4],
+    [60.05, 0],
+    [59.94, 0.3],
+    [30, 0.5],
+  ]) {
     const gate = createFrameGate();
     gate.setMaxFps(60);
     const drawn = run(gate, steady(hz, 30, jitter));
@@ -69,6 +101,14 @@ test('the first frame after a cap is set draws, and a stall comes back as one dr
   // Faster than the cap the cadence is two or three display frames apart, never one.
   const gaps = [];
   let last = -1;
-  run(gate, steady(144, 2)).forEach((d, i) => { if (d) { if (last >= 0) gaps.push(i - last); last = i; } });
-  assert.ok(gaps.every((g) => g === 2 || g === 3), gaps.join());
+  run(gate, steady(144, 2)).forEach((d, i) => {
+    if (d) {
+      if (last >= 0) gaps.push(i - last);
+      last = i;
+    }
+  });
+  assert.ok(
+    gaps.every((g) => g === 2 || g === 3),
+    gaps.join(),
+  );
 });

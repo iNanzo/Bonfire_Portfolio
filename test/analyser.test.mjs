@@ -19,7 +19,7 @@ const END = LEAD_IN + DROP[1] * BAR;
 function rng(seed = 9) {
   return () => {
     seed = (seed * 1664525 + 1013904223) % 4294967296;
-    return seed / 4294967296 * 2 - 1;
+    return (seed / 4294967296) * 2 - 1;
   };
 }
 
@@ -41,15 +41,30 @@ function synthesize(gain = 1) {
   };
   const hat = (t0) => {
     let prev = 0;
-    add(t0, 0.06, (t) => { const n = noise(); const hp = n - prev; prev = n; return 0.18 * hp * Math.exp(-t / 0.018); });
+    add(t0, 0.06, (t) => {
+      const n = noise();
+      const hp = n - prev;
+      prev = n;
+      return 0.18 * hp * Math.exp(-t / 0.018);
+    });
   };
   const clap = (t0) => {
-    let a = 0, b = 0;
-    add(t0, 0.12, (t) => { const n = noise(); a += (n - a) * 0.3; b += (a - b) * 0.3; return 0.35 * (a - b) * Math.exp(-t / 0.03); });
+    let a = 0,
+      b = 0;
+    add(t0, 0.12, (t) => {
+      const n = noise();
+      a += (n - a) * 0.3;
+      b += (a - b) * 0.3;
+      return 0.35 * (a - b) * Math.exp(-t / 0.03);
+    });
   };
   const bass = (t0) => {
     let lp = 0;
-    add(t0, 0.22, (t) => { const saw = ((t * 55) % 1) * 2 - 1; lp += (saw - lp) * 0.04; return 0.5 * lp * Math.exp(-t / 0.09); });
+    add(t0, 0.22, (t) => {
+      const saw = ((t * 55) % 1) * 2 - 1;
+      lp += (saw - lp) * 0.04;
+      return 0.5 * lp * Math.exp(-t / 0.09);
+    });
   };
   for (let bar = 0; bar < DROP[1]; bar++) {
     const barT = LEAD_IN + bar * BAR;
@@ -65,14 +80,21 @@ function synthesize(gain = 1) {
     if (breakdown) {
       // Pad: a chord, and a riser climbing in the last half.
       const into = bar - BREAKDOWN[0];
-      const chord = (t) => 0.05 * (Math.sin(2 * Math.PI * 220 * t) + Math.sin(2 * Math.PI * 261.6 * t) + Math.sin(2 * Math.PI * 329.6 * t));
+      const chord = (t) =>
+        0.05 *
+        (Math.sin(2 * Math.PI * 220 * t) + Math.sin(2 * Math.PI * 261.6 * t) + Math.sin(2 * Math.PI * 329.6 * t));
       add(barT, BAR, (t) => chord(barT + t)); // continuous phase: no click at each bar line
       // A snare roll into the drop: 8ths, then 16ths. (On every 8th, the beat's phase is
       // ambiguous: the grid mustn't slip onto the off-beats.)
       if (into >= 6) for (let i = 0; i < (into === 7 ? 16 : 8); i++) clap(barT + (i * BAR) / (into === 7 ? 16 : 8));
       if (into >= 4) {
         let prev = 0;
-        add(barT, BAR, (t) => { const n = noise(); const hp = n - prev; prev = n; return hp * 0.05 * ((into - 4) + t / BAR) / 4; });
+        add(barT, BAR, (t) => {
+          const n = noise();
+          const hp = n - prev;
+          prev = n;
+          return (hp * 0.05 * (into - 4 + t / BAR)) / 4;
+        });
       }
     }
   }
@@ -86,22 +108,33 @@ function fft(re, im) {
     let bit = n >> 1;
     for (; j & bit; bit >>= 1) j ^= bit;
     j ^= bit;
-    if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+    if (i < j) {
+      [re[i], re[j]] = [re[j], re[i]];
+      [im[i], im[j]] = [im[j], im[i]];
+    }
   }
   for (let len = 2; len <= n; len <<= 1) {
     const ang = (-2 * Math.PI) / len;
     for (let i = 0; i < n; i += len) {
       for (let k = 0; k < len / 2; k++) {
-        const wr = Math.cos(ang * k), wi = Math.sin(ang * k);
-        const a = i + k, b = i + k + len / 2;
-        const xr = re[b] * wr - im[b] * wi, xi = re[b] * wi + im[b] * wr;
-        re[b] = re[a] - xr; im[b] = im[a] - xi;
-        re[a] += xr; im[a] += xi;
+        const wr = Math.cos(ang * k),
+          wi = Math.sin(ang * k);
+        const a = i + k,
+          b = i + k + len / 2;
+        const xr = re[b] * wr - im[b] * wi,
+          xi = re[b] * wi + im[b] * wr;
+        re[b] = re[a] - xr;
+        im[b] = im[a] - xi;
+        re[a] += xr;
+        im[a] += xi;
       }
     }
   }
 }
-const blackman = Float64Array.from({ length: N }, (_, n) => 0.42 - 0.5 * Math.cos((2 * Math.PI * n) / N) + 0.08 * Math.cos((4 * Math.PI * n) / N));
+const blackman = Float64Array.from(
+  { length: N },
+  (_, n) => 0.42 - 0.5 * Math.cos((2 * Math.PI * n) / N) + 0.08 * Math.cos((4 * Math.PI * n) / N),
+);
 
 /** Run the analysis over `audio` at a jittery ~60 fps; returns what it saw. */
 function analyse(audio, opts = {}) {
@@ -134,7 +167,10 @@ function analyse(audio, opts = {}) {
 
 const barTime = (bar) => LEAD_IN + bar * BAR;
 
-for (const [label, gain] of [['a hot master', 1], ['a quiet line in (-24 dB)', 10 ** (-24 / 20)]]) {
+for (const [label, gain] of [
+  ['a hot master', 1],
+  ['a quiet line in (-24 dB)', 10 ** (-24 / 20)],
+]) {
   test(`sections, tempo and beats on ${label} [slow]`, () => {
     const seen = analyse(synthesize(gain));
     const at = (name) => seen.events.filter((x) => x.e === name).map((x) => x.t);
@@ -144,43 +180,73 @@ for (const [label, gain] of [['a hot master', 1], ['a quiet line in (-24 dB)', 1
     assert.ok(Math.abs(start - LEAD_IN) < 0.3, `start at ${start}`);
     assert.equal(at('breakdown').length, 1, `breakdowns: ${at('breakdown')}`);
     const breakdown = at('breakdown')[0];
-    assert.ok(breakdown > barTime(BREAKDOWN[0]) + 1.5 && breakdown < barTime(BREAKDOWN[0]) + 4, `breakdown at ${breakdown}, section at ${barTime(BREAKDOWN[0])}`);
+    assert.ok(
+      breakdown > barTime(BREAKDOWN[0]) + 1.5 && breakdown < barTime(BREAKDOWN[0]) + 4,
+      `breakdown at ${breakdown}, section at ${barTime(BREAKDOWN[0])}`,
+    );
     assert.equal(at('drop').length, 1, `drops: ${at('drop')}`);
     const drop = at('drop')[0];
-    assert.ok(drop >= barTime(DROP[0]) && drop < barTime(DROP[0]) + 0.08, `drop at ${drop}, the bass is back at ${barTime(DROP[0])}`);
+    assert.ok(
+      drop >= barTime(DROP[0]) && drop < barTime(DROP[0]) + 0.08,
+      `drop at ${drop}, the bass is back at ${barTime(DROP[0])}`,
+    );
     assert.ok(at('silence').length === 1 && at('silence')[0] > END, 'silence after the end');
 
     // Tempo: locked on 126 within a couple of bars, and through the drop.
     const locked = seen.bpmAt.find((x) => x.locked && Math.abs(x.bpm - BPM) < 1);
     assert.ok(locked && locked.t < LEAD_IN + 2 * BAR, `locked at ${locked?.t}`);
     const late = seen.bpmAt.filter((x) => x.t > barTime(DROP[0] + 2) && x.t < END);
-    assert.ok(late.every((x) => Math.abs(x.bpm - BPM) < 1.5), 'still 126 after the drop');
+    assert.ok(
+      late.every((x) => Math.abs(x.bpm - BPM) < 1.5),
+      'still 126 after the drop',
+    );
 
     // The bar counts from where the music started (the demo, like most tunes, starts on beat 1).
     const downbeats = seen.beats.filter((b) => b.beat === 0 && b.time > barTime(1) && b.time < barTime(GROOVE[1]));
     assert.ok(downbeats.length >= 5);
-    for (const b of downbeats) assert.ok(Math.abs((b.time - LEAD_IN) / BAR - Math.round((b.time - LEAD_IN) / BAR)) < 0.05, `downbeat at ${b.time.toFixed(3)}`);
+    for (const b of downbeats)
+      assert.ok(
+        Math.abs((b.time - LEAD_IN) / BAR - Math.round((b.time - LEAD_IN) / BAR)) < 0.05,
+        `downbeat at ${b.time.toFixed(3)}`,
+      );
 
     // Beats land on the kicks, and the drop's beat is a downbeat (it anchors the bar).
-    const kicksOnBeats = seen.beats.filter((b) => b.time > barTime(2) && b.time < barTime(GROOVE[1]))
-      .map((b) => { const u = (b.time - LEAD_IN) / BEAT; return (u - Math.round(u)) * BEAT; });
+    const kicksOnBeats = seen.beats
+      .filter((b) => b.time > barTime(2) && b.time < barTime(GROOVE[1]))
+      .map((b) => {
+        const u = (b.time - LEAD_IN) / BEAT;
+        return (u - Math.round(u)) * BEAT;
+      });
     assert.ok(kicksOnBeats.length > 20);
     for (const e of kicksOnBeats) assert.ok(Math.abs(e) < 0.03, `beat ${(e * 1000).toFixed(0)} ms off the kick`);
     // (The drop's own beat goes out a moment before the drop is heard; the next is beat 2.)
     const afterDropBeat = seen.beats.find((b) => b.time > barTime(DROP[0]) + BEAT / 2);
     assert.equal(afterDropBeat.beat, 1, 'the beat after the drop is beat 2 of its bar');
     const afterDrop = seen.beats.filter((b) => b.time > barTime(DROP[0]) + BAR && b.time < END - BAR);
-    assert.ok(afterDrop.every((b) => (b.beat === 0) === (Math.round((b.time - barTime(DROP[0])) / BEAT) % 4 === 0)), 'bars count from the drop');
+    assert.ok(
+      afterDrop.every((b) => (b.beat === 0) === (Math.round((b.time - barTime(DROP[0])) / BEAT) % 4 === 0)),
+      'bars count from the drop',
+    );
 
     // Through the breakdown the grid keeps time with the tune.
-    const offGrid = seen.beats.filter((b) => b.time > barTime(BREAKDOWN[0]) && b.time < barTime(DROP[0]))
-      .map((b) => { const u = (b.time - LEAD_IN) / BEAT; return Math.abs(u - Math.round(u)) * BEAT; });
-    assert.ok(offGrid.length > 25 && offGrid.every((e) => e < 0.035), `breakdown beats off by up to ${(Math.max(...offGrid) * 1000).toFixed(0)} ms`);
+    const offGrid = seen.beats
+      .filter((b) => b.time > barTime(BREAKDOWN[0]) && b.time < barTime(DROP[0]))
+      .map((b) => {
+        const u = (b.time - LEAD_IN) / BEAT;
+        return Math.abs(u - Math.round(u)) * BEAT;
+      });
+    assert.ok(
+      offGrid.length > 25 && offGrid.every((e) => e < 0.035),
+      `breakdown beats off by up to ${(Math.max(...offGrid) * 1000).toFixed(0)} ms`,
+    );
 
     // Pulses: strong in the groove, gone in the breakdown, back after the drop.
     const mean = (xs) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
     const strength = (from, to) => mean(seen.beats.filter((b) => b.time > from && b.time < to).map((b) => b.strength));
-    assert.ok(strength(barTime(2), barTime(GROOVE[1])) > 0.4, `groove pulses ${strength(barTime(2), barTime(GROOVE[1]))}`);
+    assert.ok(
+      strength(barTime(2), barTime(GROOVE[1])) > 0.4,
+      `groove pulses ${strength(barTime(2), barTime(GROOVE[1]))}`,
+    );
     // (Only until the snare roll: a roll into the drop pulsing the fire is the build-up.)
     assert.ok(strength(barTime(BREAKDOWN[0] + 2), barTime(BREAKDOWN[0] + 6)) < 0.05, 'no pulses in the breakdown');
     assert.ok(strength(barTime(DROP[0] + 1), END) > 0.4, 'pulses come back');

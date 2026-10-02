@@ -39,7 +39,9 @@ export function createSetCache(keep, release) {
     },
     /** The keys kept, the oldest first. */
     keys: () => [...map.keys()],
-    get size() { return map.size; },
+    get size() {
+      return map.size;
+    },
     /** Let every one go. */
     clear() {
       for (const [key, value] of map) release(value, key);

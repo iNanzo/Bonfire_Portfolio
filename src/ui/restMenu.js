@@ -21,7 +21,10 @@ export function setupRestMenu({ menu, opener, actions, onSound = () => {} }) {
   });
   menu.addEventListener('click', (e) => {
     const t = /** @type {Element} */ (e.target);
-    if (t === menu || t.closest('[data-menu-close]')) { menu.close(); return; }
+    if (t === menu || t.closest('[data-menu-close]')) {
+      menu.close();
+      return;
+    }
     const action = /** @type {HTMLElement | null} */ (t.closest('[data-menu-action]'))?.dataset.menuAction;
     if (action && Object.hasOwn(actions, action)) {
       menu.close();

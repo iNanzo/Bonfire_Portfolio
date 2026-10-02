@@ -27,7 +27,8 @@ import { getAt, keyOf, parsePath, patternOf, within } from './paths.js';
 /** The page with this id (or an old id's page: #effects is Colors now), or null. @param {string} id */
 export const pageById = (id) => PAGES.find((p) => p.id === (PAGE_ALIASES[id] ?? id)) ?? null;
 /** The page a field is on (an effects path no page names: Colors; anything else: the first). @param {string} key */
-export const pageOf = (key) => PAGES.find((p) => p.keys.some((k) => within(key, k))) ?? (within(key, 'effects') ? pageById('colors') : PAGES[0]);
+export const pageOf = (key) =>
+  PAGES.find((p) => p.keys.some((k) => within(key, k))) ?? (within(key, 'effects') ? pageById('colors') : PAGES[0]);
 
 /**
  * What going to the field at `key` takes: its page, its path, and every object on the way
@@ -74,17 +75,29 @@ export function buildIndex(draft, { labelOf = defaultLabel } = {}) {
     const { help, more } = helpFor(path, ctx);
     return [help, more].filter(Boolean).join(' ');
   };
-  const add = (path, label, kind, crumbs, extra = {}) => out.push({
-    id: keyOf(path), page: page.id, pageLabel, crumbs, label, kind, hint: words(path),
-    keywords: keywordsFor(patternOf(path)), options: [], value: '', ...extra,
-  });
+  const add = (path, label, kind, crumbs, extra = {}) =>
+    out.push({
+      id: keyOf(path),
+      page: page.id,
+      pageLabel,
+      crumbs,
+      label,
+      kind,
+      hint: words(path),
+      keywords: keywordsFor(patternOf(path)),
+      options: [],
+      value: '',
+      ...extra,
+    });
 
   function walk(value, path, crumbs) {
     if (Array.isArray(value)) return walkList(value, path, crumbs);
     if (!isGroup(value)) return;
     const kind = patternOf(path).replace(/^.*\.images\[\]$/, '[].images[]');
     const only = ONLY[kind];
-    const keys = ALWAYS.has(kind) ? only : Object.keys(value).filter((k) => k !== 'hidden' && k !== 'todo' && (!only || only.includes(k)));
+    const keys = ALWAYS.has(kind)
+      ? only
+      : Object.keys(value).filter((k) => k !== 'hidden' && k !== 'todo' && (!only || only.includes(k)));
     const groups = subgroupsOf(patternOf(path), keys) ?? [{ label: '', keys }];
     for (const g of groups) {
       const heading = g.label ? subgroupHeading(g, path, ctx) : null;
@@ -95,13 +108,16 @@ export function buildIndex(draft, { labelOf = defaultLabel } = {}) {
   function walkList(list, path, crumbs) {
     list.forEach((item, i) => {
       const ipath = [...path, i];
-      if (Array.isArray(item)) { // a table row: found by its cells
+      if (Array.isArray(item)) {
+        // a table row: found by its cells
         add(ipath, titleOf(item, i), 'entry', crumbs, { value: item.filter((c) => typeof c === 'string').join(' · ') });
-      } else if (isGroup(item)) { // a card: found by its title, then its fields under it
+      } else if (isGroup(item)) {
+        // a card: found by its title, then its fields under it
         const title = path.at(-1) === 'images' ? `Image ${i + 1}` : titleOf(item, i);
         add(ipath, title, 'entry', crumbs);
         walk(item, ipath, [...crumbs, title]);
-      } else if (typeof item === 'string') { // a list of text: found by what it says
+      } else if (typeof item === 'string') {
+        // a list of text: found by what it says
         add(ipath, labelFor(path), 'field', crumbs, { value: item.length <= VALUE_MAX ? item : '' });
       }
     });
@@ -136,7 +152,8 @@ export function buildIndex(draft, { labelOf = defaultLabel } = {}) {
 export function crumbsOf(entry) {
   const plain = (s) => s.toLowerCase().replace(/^the\s+/, '');
   const trail = [];
-  for (const c of [entry.pageLabel, ...entry.crumbs]) if (!trail.length || plain(trail.at(-1)) !== plain(c)) trail.push(c);
+  for (const c of [entry.pageLabel, ...entry.crumbs])
+    if (!trail.length || plain(trail.at(-1)) !== plain(c)) trail.push(c);
   if (trail.length > 1 && plain(trail.at(-1)) === plain(entry.label)) trail.pop();
   return trail;
 }
@@ -147,10 +164,23 @@ export function crumbsOf(entry) {
  * @param {AdminEntry[]} entries
  */
 export function matcherFor(entries) {
-  return buildMatcher(entries.map((e) => ({
-    id: e.id, label: e.label, keywords: e.keywords, section: e.crumbs.join(' · '), tab: e.pageLabel,
-    options: [...e.options, e.value].filter(Boolean), hint: e.hint, key: e.id.split(/[.[\]]/).filter(Boolean).at(-1), admin: e,
-  })), { synonyms: SYNONYMS });
+  return buildMatcher(
+    entries.map((e) => ({
+      id: e.id,
+      label: e.label,
+      keywords: e.keywords,
+      section: e.crumbs.join(' · '),
+      tab: e.pageLabel,
+      options: [...e.options, e.value].filter(Boolean),
+      hint: e.hint,
+      key: e.id
+        .split(/[.[\]]/)
+        .filter(Boolean)
+        .at(-1),
+      admin: e,
+    })),
+    { synonyms: SYNONYMS },
+  );
 }
 
 /**
@@ -163,11 +193,16 @@ export function snippetOf(hit) {
   const e = hit.entry.admin;
   if (e.value && hit.fields.options) {
     const start = [...e.options, e.value].join(' · ').length - e.value.length;
-    const ranges = hit.fields.options.filter(([s]) => s >= start).map(([s, t]) => /** @type {[number, number]} */ ([s - start, t - start]));
+    const ranges = hit.fields.options
+      .filter(([s]) => s >= start)
+      .map(([s, t]) => /** @type {[number, number]} */ ([s - start, t - start]));
     if (ranges.length) return `“${highlight(e.value, ranges)}”`;
   }
   const hint = e.hint.length > 150 ? `${e.hint.slice(0, 150).replace(/\s+\S*$/, '')}…` : e.hint;
-  return highlight(hint, (hit.fields.hint ?? []).filter(([, t]) => t <= hint.length));
+  return highlight(
+    hint,
+    (hit.fields.hint ?? []).filter(([, t]) => t <= hint.length),
+  );
 }
 
 const MAX_RESULTS = 30;
@@ -182,17 +217,46 @@ export function createSearch({ entries, onPick, doc = document }) {
   const win = doc.defaultView ?? window;
   const id = 'admin-search';
   const input = el('input', {
-    type: 'search', id: `${id}-input`, class: 'admin-search-input', placeholder: 'Search', autocomplete: 'off', spellcheck: 'false',
-    enterkeyhint: 'go', role: 'combobox', 'aria-expanded': 'false', 'aria-controls': `${id}-list`, 'aria-autocomplete': 'list',
-    'aria-describedby': `${id}-note`, 'aria-keyshortcuts': 'Control+K /',
+    type: 'search',
+    id: `${id}-input`,
+    class: 'admin-search-input',
+    placeholder: 'Search',
+    autocomplete: 'off',
+    spellcheck: 'false',
+    enterkeyhint: 'go',
+    role: 'combobox',
+    'aria-expanded': 'false',
+    'aria-controls': `${id}-list`,
+    'aria-autocomplete': 'list',
+    'aria-describedby': `${id}-note`,
+    'aria-keyshortcuts': 'Control+K /',
   });
-  const list = el('ul', { id: `${id}-list`, class: 'search-results', role: 'listbox', 'aria-label': 'Search results', popover: 'manual' });
+  const list = el('ul', {
+    id: `${id}-list`,
+    class: 'search-results',
+    role: 'listbox',
+    'aria-label': 'Search results',
+    popover: 'manual',
+  });
   const status = el('p', { class: 'settings-search-status', role: 'status' });
-  const root = el('search', { class: 'admin-search settings-search' },
+  const root = el(
+    'search',
+    { class: 'admin-search settings-search' },
     el('label', { class: 'visually-hidden', for: input.id, text: 'Search the admin' }),
-    el('span', { class: 'admin-search-row' }, input, el('kbd', { class: 'admin-search-key', 'aria-hidden': 'true', text: 'Ctrl K' })),
-    el('span', { class: 'visually-hidden', id: `${id}-note`, text: 'Results update as you type: up and down choose one, Enter goes to it, Escape clears.' }),
-    status, list);
+    el(
+      'span',
+      { class: 'admin-search-row' },
+      input,
+      el('kbd', { class: 'admin-search-key', 'aria-hidden': 'true', text: 'Ctrl K' }),
+    ),
+    el('span', {
+      class: 'visually-hidden',
+      id: `${id}-note`,
+      text: 'Results update as you type: up and down choose one, Enter goes to it, Escape clears.',
+    }),
+    status,
+    list,
+  );
 
   /** @type {ReturnType<typeof matcherFor> | null} */
   let matcher = null;
@@ -216,13 +280,25 @@ export function createSearch({ entries, onPick, doc = document }) {
   function open() {
     if (!hits.length) return close();
     if (!isOpen()) {
-      if (popover) { try { list.showPopover(); } catch { /* showing */ } } else list.hidden = false;
+      if (popover) {
+        try {
+          list.showPopover();
+        } catch {
+          /* showing */
+        }
+      } else list.hidden = false;
       input.setAttribute('aria-expanded', 'true');
     }
     place();
   }
   function close() {
-    if (popover) { try { list.hidePopover(); } catch { /* hidden */ } } else list.hidden = true;
+    if (popover) {
+      try {
+        list.hidePopover();
+      } catch {
+        /* hidden */
+      }
+    } else list.hidden = true;
     input.setAttribute('aria-expanded', 'false');
     input.removeAttribute('aria-activedescendant');
   }
@@ -238,27 +314,48 @@ export function createSearch({ entries, onPick, doc = document }) {
     }
   }
   function render() {
-    list.replaceChildren(...hits.map((hit, i) => {
-      const e = hit.entry.admin;
-      const label = el('span', { class: 'sr-label' });
-      label.innerHTML = highlight(e.label, hit.ranges); // (escaped, then marked)
-      const line = el('span', { class: 'sr-hint' });
-      line.innerHTML = snippetOf(hit);
-      return el('li', {
-        id: `${id}-opt-${i}`, role: 'option', class: 'search-result', 'aria-selected': 'false', 'data-key': e.id,
-        onpointerdown: (ev) => ev.preventDefault(), // (keeps the focus in the box until the pick)
-        onpointermove: () => { if (active !== i) setActive(i); },
-        onclick: () => pick(i),
-      },
-      el('span', { class: 'sr-path' }, crumbsOf(e).map((c) => el('span', { class: 'sr-crumb', text: c })), label),
-      line.textContent ? line : null);
-    }));
+    list.replaceChildren(
+      ...hits.map((hit, i) => {
+        const e = hit.entry.admin;
+        const label = el('span', { class: 'sr-label' });
+        label.innerHTML = highlight(e.label, hit.ranges); // (escaped, then marked)
+        const line = el('span', { class: 'sr-hint' });
+        line.innerHTML = snippetOf(hit);
+        return el(
+          'li',
+          {
+            id: `${id}-opt-${i}`,
+            role: 'option',
+            class: 'search-result',
+            'aria-selected': 'false',
+            'data-key': e.id,
+            onpointerdown: (ev) => ev.preventDefault(), // (keeps the focus in the box until the pick)
+            onpointermove: () => {
+              if (active !== i) setActive(i);
+            },
+            onclick: () => pick(i),
+          },
+          el(
+            'span',
+            { class: 'sr-path' },
+            crumbsOf(e).map((c) => el('span', { class: 'sr-crumb', text: c })),
+            label,
+          ),
+          line.textContent ? line : null,
+        );
+      }),
+    );
     setActive(hits.length ? 0 : -1);
-    if (doc.activeElement === input) open(); else close();
+    if (doc.activeElement === input) open();
+    else close();
   }
   function run(query) {
     const q = query.trim();
-    if (!q) { hits = []; render(); return 0; }
+    if (!q) {
+      hits = [];
+      render();
+      return 0;
+    }
     matcher ??= matcherFor(entries());
     const all = matcher(q);
     hits = all.slice(0, MAX_RESULTS);
@@ -284,17 +381,22 @@ export function createSearch({ entries, onPick, doc = document }) {
       if (!hits.length) return;
       e.preventDefault();
       pick();
-    } else if (e.key === 'Escape' && !e.defaultPrevented) { // (the box had nothing left to clear)
+    } else if (e.key === 'Escape' && !e.defaultPrevented) {
+      // (the box had nothing left to clear)
       e.preventDefault();
       api.close({ restore: true });
     }
   });
   // (Back in the box: the query again, on the draft as it is now.)
-  input.addEventListener('focus', () => { if (input.value.trim()) box.run(); });
+  input.addEventListener('focus', () => {
+    if (input.value.trim()) box.run();
+  });
   root.addEventListener('focusout', (e) => {
     if (!root.contains(/** @type {Node | null} */ (e.relatedTarget))) close();
   });
-  const replace = () => { if (isOpen()) place(); };
+  const replace = () => {
+    if (isOpen()) place();
+  };
   win.addEventListener('resize', replace);
   doc.addEventListener('scroll', replace, { capture: true, passive: true });
 

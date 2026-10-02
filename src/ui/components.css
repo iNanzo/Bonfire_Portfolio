@@ -16,7 +16,7 @@
 
 .ui-tip {
   position: fixed;
-  inset: auto;  /* (a popover's own inset: 0 and margin: auto would stretch and center it) */
+  inset: auto; /* (a popover's own inset: 0 and margin: auto would stretch and center it) */
   left: 0;
   top: 0;
   z-index: 2000; /* (without the Popover API: over everything but a modal dialog's top layer) */
@@ -35,11 +35,20 @@
   overflow-wrap: break-word;
   color: var(--c-bone);
   background: var(--c-void);
-  box-shadow: 0 0 0 1px var(--accent), 0 6px 18px rgb(0 0 0 / 0.5);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 6px 18px rgb(0 0 0 / 0.5);
   pointer-events: auto; /* (it can be hovered: the pointer moving onto it keeps it open) */
 }
-.ui-tip-title { display: block; margin-bottom: 2px; font-weight: 600; color: var(--accent-hi); }
-.ui-tip-title[hidden] { display: none; }
+.ui-tip-title {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 600;
+  color: var(--accent-hi);
+}
+.ui-tip-title[hidden] {
+  display: none;
+}
 
 /* ---------- The "?" beside a field: a button, a 24 px target round a small box ---------- */
 
@@ -63,21 +72,49 @@
   cursor: help;
   appearance: none;
 }
-.viz-tip::before { content: ''; position: absolute; inset: min(0px, calc((1.15em - 24px) / 2)); }
-.viz-tip:hover, .viz-tip:focus-visible { color: var(--c-bone); box-shadow: 0 0 0 1px var(--accent); outline: none; }
+.viz-tip::before {
+  content: '';
+  position: absolute;
+  inset: min(0px, calc((1.15em - 24px) / 2));
+}
+.viz-tip:hover,
+.viz-tip:focus-visible {
+  color: var(--c-bone);
+  box-shadow: 0 0 0 1px var(--accent);
+  outline: none;
+}
 /* The old pure-CSS tips (a box drawn from data-tip): the shared tooltip shows these now. */
-.viz-tip::after, .viz-source::after { content: none !important; }
+.viz-tip::after,
+.viz-source::after {
+  content: none !important;
+}
 /* Bonfire Live's sound sources: each one's tip beside it (above, it would cover the one
    before), or under it where there's no room beside: where the old tips sat. */
-.viz-sources .viz-source { --tip-side: right; }
+.viz-sources .viz-source {
+  --tip-side: right;
+}
 @media (max-width: 1099px) {
-  .viz-sources .viz-source { --tip-side: bottom; }
+  .viz-sources .viz-source {
+    --tip-side: bottom;
+  }
 }
 
 /* The fields' markup with a "?" (fields.js): the label beside it names the input by id. */
-.viz-field-label > label { cursor: pointer; }
-.viz-check > label { display: flex; align-items: flex-start; gap: 9px; min-width: 0; cursor: pointer; }
-.viz-mode > label:first-child { flex: 1; min-width: 0; cursor: pointer; }
+.viz-field-label > label {
+  cursor: pointer;
+}
+.viz-check > label {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+  cursor: pointer;
+}
+.viz-mode > label:first-child {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
 /* A number typed in (fields.js number()), drawn like the fields' text boxes. */
 .viz-field input[type='number'] {
   width: 100%;
@@ -90,7 +127,9 @@
   font: 400 0.9375rem/1.3 var(--font-body);
   color: var(--c-bone);
 }
-.viz-field input[type='number']:hover { box-shadow: 0 0 0 1px var(--accent); }
+.viz-field input[type='number']:hover {
+  box-shadow: 0 0 0 1px var(--accent);
+}
 
 /* ---------- Three-way switch: Off / In the Mix / Always as radios ---------- */
 
@@ -122,13 +161,35 @@ fieldset.tri > legend {
   text-transform: none;
   color: inherit;
 }
-fieldset.tri[data-set-group] > * + * { margin-top: 0; }
-fieldset.tri:hover { color: var(--c-bone); }
-.tri-opts { display: inline-flex; flex: none; margin-left: auto; }
-.tri-opt { position: relative; display: inline-flex; cursor: pointer; }
-.tri-opt + .tri-opt { margin-left: 1px; }
+fieldset.tri[data-set-group] > * + * {
+  margin-top: 0;
+}
+fieldset.tri:hover {
+  color: var(--c-bone);
+}
+.tri-opts {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+}
+.tri-opt {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+.tri-opt + .tri-opt {
+  margin-left: 1px;
+}
 /* (The radio itself covers its choice, unseen: clicks, focus and the arrow keys stay native.) */
-.tri-opt input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
+.tri-opt input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
 .tri-opt span {
   display: block;
   padding: 4px 8px;
@@ -138,22 +199,53 @@ fieldset.tri:hover { color: var(--c-bone); }
   background: var(--c-shadow);
   box-shadow: 0 0 0 1px var(--ui-line-strong);
 }
-.tri-opt:hover span { color: var(--c-bone); box-shadow: 0 0 0 1px var(--accent); }
-.tri-opt input:checked + span { color: var(--c-void); background: var(--accent-hi); box-shadow: 0 0 0 1px var(--accent-hi); }
-.tri-opt input:focus-visible + span { position: relative; z-index: 1; outline: 2px solid var(--accent-hi); outline-offset: 2px; }
-.tri-opt:has(input:disabled) { cursor: not-allowed; }
-.tri-opt input:disabled + span { opacity: 0.45; }
+.tri-opt:hover span {
+  color: var(--c-bone);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.tri-opt input:checked + span {
+  color: var(--c-void);
+  background: var(--accent-hi);
+  box-shadow: 0 0 0 1px var(--accent-hi);
+}
+.tri-opt input:focus-visible + span {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 2px;
+}
+.tri-opt:has(input:disabled) {
+  cursor: not-allowed;
+}
+.tri-opt input:disabled + span {
+  opacity: 0.45;
+}
 /* (Only the name dims: the "?" in the legend stays, to say what the switch does.) */
-fieldset.tri:disabled .tri-name { opacity: 0.6; }
+fieldset.tri:disabled .tri-name {
+  opacity: 0.6;
+}
 @media (forced-colors: active) {
-  .tri-opt input:checked + span { outline: 2px solid CanvasText; outline-offset: -2px; }
+  .tri-opt input:checked + span {
+    outline: 2px solid CanvasText;
+    outline-offset: -2px;
+  }
 }
 /* (Wide enough for a long name, its "?" and the three choices on one line.) */
-.tri-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 8px 24px; margin-top: 6px; }
+.tri-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 8px 24px;
+  margin-top: 6px;
+}
 
 /* ---------- Bulk toolbar: a whole grid or list at once ---------- */
 
-.bulk { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.bulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0;
+}
 .bulk-btn {
   padding: 3px 8px;
   border: 0;
@@ -165,16 +257,40 @@ fieldset.tri:disabled .tri-name { opacity: 0.6; }
   box-shadow: 0 0 0 1px var(--ui-line);
   cursor: pointer;
 }
-.bulk-btn:hover { color: var(--accent-hi); box-shadow: 0 0 0 1px var(--accent); }
-.bulk-btn:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 1px; }
-.bulk-btn[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
-.bulk-btn[aria-disabled='true']:hover { color: var(--ui-dim); box-shadow: 0 0 0 1px var(--ui-line); }
+.bulk-btn:hover {
+  color: var(--accent-hi);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.bulk-btn:focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 1px;
+}
+.bulk-btn[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.bulk-btn[aria-disabled='true']:hover {
+  color: var(--ui-dim);
+  box-shadow: 0 0 0 1px var(--ui-line);
+}
 
 /* ---------- Why a setting is off, and More ---------- */
 
-.viz-why { margin: 4px 0 0; font-size: 0.8125rem; line-height: 1.4; font-style: italic; color: var(--ui-dim); }
-.viz-why[hidden] { display: none; }
-.viz-more { font-size: 0.8125rem; line-height: 1.45; color: var(--ui-dim); }
+.viz-why {
+  margin: 4px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-style: italic;
+  color: var(--ui-dim);
+}
+.viz-why[hidden] {
+  display: none;
+}
+.viz-more {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--ui-dim);
+}
 .viz-more > summary {
   width: max-content;
   font-family: var(--font-pixel);
@@ -182,14 +298,31 @@ fieldset.tri:disabled .tri-name { opacity: 0.6; }
   color: var(--c-bone);
   cursor: pointer;
 }
-.viz-more > summary:hover { color: var(--accent-hi); }
-.viz-more > p, .viz-more > ul { margin: 6px 0 0; padding: 0 0 0 10px; box-shadow: inset 1px 0 0 var(--ui-line-strong); }
-.viz-more > ul { display: grid; gap: 4px; list-style: none; }
+.viz-more > summary:hover {
+  color: var(--accent-hi);
+}
+.viz-more > p,
+.viz-more > ul {
+  margin: 6px 0 0;
+  padding: 0 0 0 10px;
+  box-shadow: inset 1px 0 0 var(--ui-line-strong);
+}
+.viz-more > ul {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+}
 
 /* ---------- Search: the box, its status line, what matched ---------- */
 
-mark { padding: 0 1px; color: var(--c-void); background: var(--accent-hi); }
-.settings-search { display: block; }
+mark {
+  padding: 0 1px;
+  color: var(--c-void);
+  background: var(--accent-hi);
+}
+.settings-search {
+  display: block;
+}
 .settings-search input[type='search'] {
   width: 100%;
   padding: 7px 10px;
@@ -200,11 +333,25 @@ mark { padding: 0 1px; color: var(--c-void); background: var(--accent-hi); }
   font: 400 0.9375rem/1.3 var(--font-body);
   color: var(--c-bone);
 }
-.settings-search input[type='search']:hover { box-shadow: 0 0 0 1px var(--accent); }
-.settings-search input[type='search']:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 0; }
-.settings-search input[type='search']::placeholder { color: color-mix(in srgb, var(--c-bone) 45%, var(--c-void)); }
-.settings-search-status { margin: 0; font-size: 0.75rem; line-height: 1.4; color: var(--ui-dim); }
-.settings-search-status:not(:empty) { margin-top: 4px; }
+.settings-search input[type='search']:hover {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.settings-search input[type='search']:focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 0;
+}
+.settings-search input[type='search']::placeholder {
+  color: color-mix(in srgb, var(--c-bone) 45%, var(--c-void));
+}
+.settings-search-status {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--ui-dim);
+}
+.settings-search-status:not(:empty) {
+  margin-top: 4px;
+}
 
 /* ---------- Keyboard shortcuts (?) ---------- */
 
@@ -220,7 +367,9 @@ mark { padding: 0 1px; color: var(--c-void); background: var(--accent-hi); }
   background: var(--c-void);
   box-shadow: 0 0 0 1px var(--accent);
 }
-.keys-overlay::backdrop { background: color-mix(in srgb, var(--c-void) 80%, transparent); }
+.keys-overlay::backdrop {
+  background: color-mix(in srgb, var(--c-void) 80%, transparent);
+}
 .keys-overlay-inner {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -228,7 +377,12 @@ mark { padding: 0 1px; color: var(--c-void); background: var(--accent-hi); }
   max-height: min(88vh, 760px);
   padding: 22px clamp(16px, 3vw, 28px);
 }
-.keys-overlay-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.keys-overlay-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 .keys-overlay-title {
   margin: 0;
   font: 500 0.875rem/1.2 var(--font-pixel);
@@ -248,10 +402,24 @@ mark { padding: 0 1px; color: var(--c-void); background: var(--accent-hi); }
   box-shadow: 0 0 0 1px var(--ui-line-strong);
   cursor: pointer;
 }
-.keys-overlay-close:hover { color: var(--c-bone); box-shadow: 0 0 0 1px var(--accent); }
-.keys-overlay-groups { overflow: auto; overscroll-behavior: contain; columns: 2 280px; column-gap: 32px; }
-.keys-group { break-inside: avoid; margin: 0 0 18px; }
-.keys-group[hidden], .keys-row[hidden] { display: none; }
+.keys-overlay-close:hover {
+  color: var(--c-bone);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.keys-overlay-groups {
+  overflow: auto;
+  overscroll-behavior: contain;
+  columns: 2 280px;
+  column-gap: 32px;
+}
+.keys-group {
+  break-inside: avoid;
+  margin: 0 0 18px;
+}
+.keys-group[hidden],
+.keys-row[hidden] {
+  display: none;
+}
 .keys-group-title {
   margin: 0 0 8px;
   font: 400 0.75rem/1.2 var(--font-pixel);
@@ -259,11 +427,32 @@ mark { padding: 0 1px; color: var(--c-void); background: var(--accent-hi); }
   text-transform: uppercase;
   color: var(--ui-dim);
 }
-.keys-group dl { display: grid; gap: 5px; margin: 0; }
-.keys-row { display: flex; align-items: baseline; gap: 12px; font-size: 0.875rem; line-height: 1.4; }
-.keys-row dt { flex: none; min-width: 7.5em; margin: 0; }
-.keys-row dd { margin: 0; color: var(--ui-dim); }
-.keys-plus { margin: 0 3px; font-size: 0.75em; color: var(--ui-dim); }
+.keys-group dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+.keys-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+.keys-row dt {
+  flex: none;
+  min-width: 7.5em;
+  margin: 0;
+}
+.keys-row dd {
+  margin: 0;
+  color: var(--ui-dim);
+}
+.keys-plus {
+  margin: 0 3px;
+  font-size: 0.75em;
+  color: var(--ui-dim);
+}
 
 /* ---------- PT (round 10, the Painter's package): fixes and additions ---------- */
 

@@ -15,15 +15,33 @@ import { test, expect } from '@playwright/test';
 import { assertInViewport, checkTip } from './lib/tips.mjs';
 
 const ADMIN = process.env.PW_ADMIN_ORIGIN ?? `http://127.0.0.1:${(Number(process.env.PW_PORT) || 4173) + 100}`;
-const PAGES = ['projects', 'home', 'about', 'journey', 'skills', 'contact', 'colors', 'fire', 'picture', 'knight', 'scenes', 'headings', 'interface'];
+const PAGES = [
+  'projects',
+  'home',
+  'about',
+  'journey',
+  'skills',
+  'contact',
+  'colors',
+  'fire',
+  'picture',
+  'knight',
+  'scenes',
+  'headings',
+  'interface',
+];
 
 /** Collect what the Content Security Policy refuses: its events in the page, and the console's words. */
 async function watchPolicy(page) {
   const said = [];
-  page.on('console', (m) => { if (/Content Security Policy|Refused to (apply|load|execute|frame|connect)/i.test(m.text())) said.push(m.text()); });
+  page.on('console', (m) => {
+    if (/Content Security Policy|Refused to (apply|load|execute|frame|connect)/i.test(m.text())) said.push(m.text());
+  });
   await page.addInitScript(() => {
     window.__csp = [];
-    document.addEventListener('securitypolicyviolation', (e) => window.__csp.push(`${e.violatedDirective}: ${e.blockedURI || e.sample}`));
+    document.addEventListener('securitypolicyviolation', (e) =>
+      window.__csp.push(`${e.violatedDirective}: ${e.blockedURI || e.sample}`),
+    );
   });
   return async () => [...said, ...(await page.evaluate(() => window.__csp))];
 }
@@ -38,20 +56,25 @@ async function open(page, id) {
 const background = (loc) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);
 const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 /** The field that has the focus: its data-path. */
-const focusedPath = (page) => page.evaluate(() => document.activeElement?.closest('[data-path]')?.getAttribute('data-path') ?? null);
+const focusedPath = (page) =>
+  page.evaluate(() => document.activeElement?.closest('[data-path]')?.getAttribute('data-path') ?? null);
 
 /**
  * Where the focused control is, and the part of the window it should be in: below whatever
  * sticks across the top (the top bar; on a phone the page strip; under 1280 px a pinned preview).
  */
-const landing = (page) => page.evaluate(() => {
-  const r = document.activeElement.getBoundingClientRect();
-  const stuck = [...document.querySelectorAll('.topbar, .sidebar, [data-preview-slot]')]
-    .map((n) => [n, n.getBoundingClientRect()])
-    .filter(([n, b]) => !n.hidden && getComputedStyle(n).position === 'sticky' && b.top < innerHeight / 2 && b.width > innerWidth / 2)
-    .map(([, b]) => b.bottom);
-  return { top: r.top, bottom: r.bottom, below: Math.max(0, ...stuck), height: innerHeight };
-});
+const landing = (page) =>
+  page.evaluate(() => {
+    const r = document.activeElement.getBoundingClientRect();
+    const stuck = [...document.querySelectorAll('.topbar, .sidebar, [data-preview-slot]')]
+      .map((n) => [n, n.getBoundingClientRect()])
+      .filter(
+        ([n, b]) =>
+          !n.hidden && getComputedStyle(n).position === 'sticky' && b.top < innerHeight / 2 && b.width > innerWidth / 2,
+      )
+      .map(([, b]) => b.bottom);
+    return { top: r.top, bottom: r.bottom, below: Math.max(0, ...stuck), height: innerHeight };
+  });
 
 /**
  * The tip triggers that show, as locators, found in one pass over the page (a locator's own
@@ -59,20 +82,25 @@ const landing = (page) => page.evaluate(() => {
  */
 async function visibleTips(page) {
   const all = page.locator('[data-tip]');
-  const shown = await all.evaluateAll((els) => els.flatMap((el, i) => {
-    const r = el.getBoundingClientRect();
-    return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' ? [i] : [];
-  }));
+  const shown = await all.evaluateAll((els) =>
+    els.flatMap((el, i) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' ? [i] : [];
+    }),
+  );
   return shown.map((i) => all.nth(i));
 }
 
 // The live preview frames the real site (software-rendered WebGL: heavy). Only the policy
 // test lets it load; the rest leave the frame empty.
 test.beforeEach(async ({ page, baseURL }, info) => {
-  if (!info.title.startsWith('under the production policy')) await page.route(`${new URL(baseURL).origin}/**`, (route) => route.abort());
+  if (!info.title.startsWith('under the production policy'))
+    await page.route(`${new URL(baseURL).origin}/**`, (route) => route.abort());
 });
 
-test('under the production policy: swatches, table columns and chips are styled, and nothing is refused', async ({ page }) => {
+test('under the production policy: swatches, table columns and chips are styled, and nothing is refused', async ({
+  page,
+}) => {
   test.slow(); // (the preview loads the whole site)
   const refused = await watchPolicy(page);
   const res = await open(page, 'colors');
@@ -101,7 +129,10 @@ test('under the production policy: swatches, table columns and chips are styled,
   const table = page.locator('[data-path="ui.prompts"] .rows.table');
   await expect(table).toBeVisible();
   expect(await table.evaluate((el) => getComputedStyle(el).getPropertyValue('--cols').trim())).toBe('3');
-  const tracks = await table.locator('.row').nth(1).evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+  const tracks = await table
+    .locator('.row')
+    .nth(1)
+    .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
   expect(tracks, 'handle, 3 columns, ↑ ↓ ✕').toBe(7);
 
   // A scene card's swatches.
@@ -153,12 +184,20 @@ test('“Fast Travel” finds the pack’s Map action; / opens the search and Es
   expect(await focusedPath(page), 'back where it was').toBe('ui.packMapVerb');
 });
 
-for (const [w, h] of [[1024, 768], [390, 844]]) {
+for (const [w, h] of [
+  [1024, 768],
+  [390, 844],
+]) {
   test(`at ${w}×${h} a result lands in sight, below the bars and the pinned preview`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     // From a page with the preview: fields on other preview pages, far down them, and one on
     // a page without it (the room below the bars changes on the way).
-    const trips = [['edge glow', 'effects.knight.rim'], ['reactions', 'effects.knight.reactions'], ['screen shake', 'effects.render.shake'], ['fast travel', 'ui.packMapVerb']];
+    const trips = [
+      ['edge glow', 'effects.knight.rim'],
+      ['reactions', 'effects.knight.reactions'],
+      ['screen shake', 'effects.render.shake'],
+      ['fast travel', 'ui.packMapVerb'],
+    ];
     for (const [query, key] of trips) {
       await open(page, 'colors');
       await page.keyboard.press('Control+K');
@@ -176,7 +215,10 @@ for (const [w, h] of [[1024, 768], [390, 844]]) {
     const status = page.locator('.admin-search .settings-search-status');
     await expect(status).toContainText('No results');
     const box = await status.boundingBox();
-    const seen = await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.settings-search-status'), [box.x + 4, box.y + box.height / 2]);
+    const seen = await page.evaluate(
+      ([x, y]) => !!document.elementFromPoint(x, y)?.closest('.settings-search-status'),
+      [box.x + 4, box.y + box.height / 2],
+    );
     expect(seen, 'not clipped').toBe(true);
   });
 }
@@ -207,7 +249,10 @@ test('#effects opens Colors; Reset Flame Colors keeps your palettes, and Undo pu
   await expect(cards.first().locator('[data-path$=".mid"] input.hex')).toHaveValue('#123456');
 });
 
-for (const [w, h] of [[1280, 720], [390, 844]]) {
+for (const [w, h] of [
+  [1280, 720],
+  [390, 844],
+]) {
   test.describe(`tips at ${w}×${h}`, () => {
     test.use({ viewport: { width: w, height: h } });
     for (const id of PAGES) {
@@ -217,7 +262,8 @@ for (const [w, h] of [[1280, 720], [390, 844]]) {
         expect(await page.locator('[title]').count(), 'no title attributes').toBe(0);
         const tips = await visibleTips(page);
         // A spread of them, the first and last included (they all go through one placement).
-        const pick = tips.length <= 8 ? tips : Array.from({ length: 8 }, (_, i) => tips[Math.round((i * (tips.length - 1)) / 7)]);
+        const pick =
+          tips.length <= 8 ? tips : Array.from({ length: 8 }, (_, i) => tips[Math.round((i * (tips.length - 1)) / 7)]);
         for (const [i, trigger] of pick.entries()) {
           await trigger.evaluate((el) => el.scrollIntoView({ block: 'center' }));
           // (The keyboard too, on the first two that take focus: buttons, links, selects.)

@@ -11,9 +11,21 @@ import { logoMark } from '../ui/logo.js';
 import { site } from '../content.js';
 
 const SOURCES = [
-  ['input', 'Line In or Microphone', 'An audio interface or your mixer’s record out works best; a mic in the room works too. Echo cancelling and auto gain are off.'],
-  ['capture', 'Tab or System Audio', 'Share a browser tab, or your whole screen with “Share system audio” ticked to catch rekordbox, Serato or Traktor on this computer.'],
-  ['file', 'Play an Audio File', 'A mix or a track from this computer (you can also drop one anywhere on the page). Plays through your speakers.'],
+  [
+    'input',
+    'Line In or Microphone',
+    'An audio interface or your mixer’s record out works best; a mic in the room works too. Echo cancelling and auto gain are off.',
+  ],
+  [
+    'capture',
+    'Tab or System Audio',
+    'Share a browser tab, or your whole screen with “Share system audio” ticked to catch rekordbox, Serato or Traktor on this computer.',
+  ],
+  [
+    'file',
+    'Play an Audio File',
+    'A mix or a track from this computer (you can also drop one anywhere on the page). Plays through your speakers.',
+  ],
   ['demo', 'Demo Track', `A synthesized ${DEMO_BPM} BPM loop with a breakdown and a drop, to see every reaction.`],
 ];
 // The HUD's buttons and readouts each say what they do through the shared tooltip (on hover,
@@ -69,10 +81,12 @@ export const pageMarkup = ({ base, presets, settingsDialog }) => `
       <p class="hero-value">Feed it a DJ set. Kicks stoke the fire, breakdowns forge a new weapon over it, and the drop drives it into the ashes.</p>
       <nav class="title-menu viz-sources" aria-label="Sound Source">
         <ul role="list" data-sources>
-          ${SOURCES.map(([id, label, hint]) => `
+          ${SOURCES.map(
+            ([id, label, hint]) => `
             <li><button class="title-item viz-source" type="button" data-source="${id}" data-tip="${esc(hint)}" aria-describedby="viz-src-${id}">
               <span class="cursor" aria-hidden="true"></span><span>${esc(label)}</span>
-            </button><span class="visually-hidden" id="viz-src-${id}">${esc(hint)}</span></li>`).join('')}
+            </button><span class="visually-hidden" id="viz-src-${id}">${esc(hint)}</span></li>`,
+          ).join('')}
         </ul>
       </nav>
       <label class="viz-field viz-device" data-device-row hidden>

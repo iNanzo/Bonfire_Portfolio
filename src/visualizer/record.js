@@ -60,15 +60,22 @@ export function createRecorder({ scene, audio, onState }) {
   function start() {
     const s = scene();
     const type = recordType();
-    if (!s || !type || !window.MediaRecorder) { onState({ recording: false, seconds: 0, error: 'This browser can’t record video' }); return false; }
+    if (!s || !type || !window.MediaRecorder) {
+      onState({ recording: false, seconds: 0, error: 'This browser can’t record video' });
+      return false;
+    }
     const src = s.canvas;
     const out = document.createElement('canvas');
     const g = out.getContext('2d');
     const fit = () => {
       const k = recordScale(src.height);
       // (Even sizes: video encoders want them.)
-      const w = (src.width * k) & ~1, h = (src.height * k) & ~1;
-      if (out.width !== w || out.height !== h) { out.width = w; out.height = h; }
+      const w = (src.width * k) & ~1,
+        h = (src.height * k) & ~1;
+      if (out.width !== w || out.height !== h) {
+        out.width = w;
+        out.height = h;
+      }
       g.imageSmoothingEnabled = false;
     };
     fit();
@@ -87,10 +94,18 @@ export function createRecorder({ scene, audio, onState }) {
     }
     const chunks = [];
     rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 16e6, audioBitsPerSecond: 192e3 });
-    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    rec.ondataavailable = (e) => {
+      if (e.data.size) chunks.push(e.data);
+    };
     rec.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
-      if (sink && a) { try { a.node.disconnect(sink); } catch { /* already gone */ } }
+      if (sink && a) {
+        try {
+          a.node.disconnect(sink);
+        } catch {
+          /* already gone */
+        }
+      }
       sink = null;
       const blob = new Blob(chunks, { type: type.split(';')[0] });
       const name = `bonfire-live-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.${type.includes('mp4') ? 'mp4' : 'webm'}`;
@@ -106,7 +121,10 @@ export function createRecorder({ scene, audio, onState }) {
     rec.start(1000);
     began = performance.now();
     clearInterval(tick);
-    tick = setInterval(() => onState({ recording: true, seconds: Math.floor((performance.now() - began) / 1000) }), 500);
+    tick = setInterval(
+      () => onState({ recording: true, seconds: Math.floor((performance.now() - began) / 1000) }),
+      500,
+    );
     onState({ recording: true, seconds: 0 });
     return true;
   }
@@ -121,8 +139,13 @@ export function createRecorder({ scene, audio, onState }) {
   }
 
   return {
-    get recording() { return !!rec; },
-    toggle() { if (rec) stop(); else start(); },
+    get recording() {
+      return !!rec;
+    },
+    toggle() {
+      if (rec) stop();
+      else start();
+    },
     stop,
   };
 }

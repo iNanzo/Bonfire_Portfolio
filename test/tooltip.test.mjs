@@ -11,8 +11,13 @@ import { place, installTooltips, TIP_MAX } from '../src/ui/tooltip.js';
 
 const VIEW = { width: 1280, height: 720 };
 const box = (left, top, width = 14, height = 14) => ({ left, top, right: left + width, bottom: top + height });
-const inside = (at, size, view, margin = 8) => at.x >= margin && at.y >= margin && at.x + Math.min(size.width, TIP_MAX) <= view.width - margin && at.y + size.height <= view.height - margin;
-const overlaps = (at, size, a) => at.x < a.right && at.x + size.width > a.left && at.y < a.bottom && at.y + size.height > a.top;
+const inside = (at, size, view, margin = 8) =>
+  at.x >= margin &&
+  at.y >= margin &&
+  at.x + Math.min(size.width, TIP_MAX) <= view.width - margin &&
+  at.y + size.height <= view.height - margin;
+const overlaps = (at, size, a) =>
+  at.x < a.right && at.x + size.width > a.left && at.y < a.bottom && at.y + size.height > a.top;
 
 test('place: above the anchor, centered on it, when it fits', () => {
   const a = box(600, 400);
@@ -33,7 +38,10 @@ test('place: flips below near the top edge, beside when neither fits, and prefer
   const short = { width: 800, height: 300 };
   const beside = place(box(100, 140, 14, 20), { width: 200, height: 250 }, short);
   assert.equal(beside.side, 'right');
-  assert.ok(inside(beside, { width: 200, height: 250 }, short) && !overlaps(beside, { width: 200, height: 250 }, box(100, 140, 14, 20)));
+  assert.ok(
+    inside(beside, { width: 200, height: 250 }, short) &&
+      !overlaps(beside, { width: 200, height: 250 }, box(100, 140, 14, 20)),
+  );
   // …and to the left when the anchor is at the right edge.
   const left = place(box(760, 140, 14, 20), { width: 200, height: 250 }, short);
   assert.equal(left.side, 'left');
@@ -45,10 +53,10 @@ test('place: flips below near the top edge, beside when neither fits, and prefer
 test('place: shifted along the edge to stay 8 px inside, at all four edges', () => {
   const tip = { width: 300, height: 80 };
   const cases = {
-    left: box(0, 400),        // a "?" hard against the left edge
-    right: box(1270, 400),    // …the right edge (the old tips ran off here)
-    top: box(600, 0),         // …the top (they opened upward into it)
-    bottom: box(600, 706),    // …the bottom
+    left: box(0, 400), // a "?" hard against the left edge
+    right: box(1270, 400), // …the right edge (the old tips ran off here)
+    top: box(600, 0), // …the top (they opened upward into it)
+    bottom: box(600, 706), // …the bottom
   };
   for (const [edge, a] of Object.entries(cases)) {
     const at = place(a, tip, VIEW);
@@ -95,7 +103,12 @@ function page({ popover = true } = {}) {
       this.children = [];
       this.parentNode = null;
       this.rect = { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
-      this.style = { props: {}, setProperty(k, v) { this.props[k] = v; } };
+      this.style = {
+        props: {},
+        setProperty(k, v) {
+          this.props[k] = v;
+        },
+      };
       this.dataset = {};
       this.hidden = false;
       this.textContent = '';
@@ -104,20 +117,51 @@ function page({ popover = true } = {}) {
       this.vars = {}; // (custom properties its style gives it: --tip-side)
       this.open = false;
       if (popover) {
-        this.showPopover = () => { this.open = true; };
-        this.hidePopover = () => { this.open = false; };
+        this.showPopover = () => {
+          this.open = true;
+        };
+        this.hidePopover = () => {
+          this.open = false;
+        };
       }
     }
-    get className() { return this.attrs.class ?? ''; }
-    set className(v) { this.attrs.class = v; }
-    getAttribute(n) { return this.attrs[n] ?? null; }
-    setAttribute(n, v) { this.attrs[n] = String(v); }
-    hasAttribute(n) { return n in this.attrs; }
-    append(...kids) { for (const k of kids) { k.remove(); k.parentNode = this; this.children.push(k); } return this; }
-    remove() { if (this.parentNode) this.parentNode.children.splice(this.parentNode.children.indexOf(this), 1); this.parentNode = null; }
-    contains(o) { for (let n = o; n; n = n.parentNode) if (n === this) return true; return false; }
-    get isConnected() { return doc.documentElement.contains(this); }
-    get parentElement() { return this.parentNode instanceof El ? this.parentNode : null; }
+    get className() {
+      return this.attrs.class ?? '';
+    }
+    set className(v) {
+      this.attrs.class = v;
+    }
+    getAttribute(n) {
+      return this.attrs[n] ?? null;
+    }
+    setAttribute(n, v) {
+      this.attrs[n] = String(v);
+    }
+    hasAttribute(n) {
+      return n in this.attrs;
+    }
+    append(...kids) {
+      for (const k of kids) {
+        k.remove();
+        k.parentNode = this;
+        this.children.push(k);
+      }
+      return this;
+    }
+    remove() {
+      if (this.parentNode) this.parentNode.children.splice(this.parentNode.children.indexOf(this), 1);
+      this.parentNode = null;
+    }
+    contains(o) {
+      for (let n = o; n; n = n.parentNode) if (n === this) return true;
+      return false;
+    }
+    get isConnected() {
+      return doc.documentElement.contains(this);
+    }
+    get parentElement() {
+      return this.parentNode instanceof El ? this.parentNode : null;
+    }
     matches(sel) {
       return sel.split(',').some((one) => {
         const { tag, bits } = parts(one);
@@ -131,18 +175,42 @@ function page({ popover = true } = {}) {
         });
       });
     }
-    closest(sel) { for (let n = this; n instanceof El; n = n.parentNode) if (n.matches(sel)) return n; return null; }
-    getBoundingClientRect() { return { ...this.rect }; }
-    at(left, top, width, height) { this.rect = { left, top, width, height, right: left + width, bottom: top + height }; return this; }
+    closest(sel) {
+      for (let n = this; n instanceof El; n = n.parentNode) if (n.matches(sel)) return n;
+      return null;
+    }
+    getBoundingClientRect() {
+      return { ...this.rect };
+    }
+    at(left, top, width, height) {
+      this.rect = { left, top, width, height, right: left + width, bottom: top + height };
+      return this;
+    }
   }
   const all = (n) => [n, ...n.children.flatMap(all)];
   const win = {
     performance: { now: () => now },
-    setTimeout(fn, ms) { const id = nextId++; timers.set(id, { at: now + ms, fn }); return id; },
-    clearTimeout(id) { timers.delete(id); },
-    requestAnimationFrame(fn) { const id = nextId++; frames.set(id, fn); return id; },
-    cancelAnimationFrame(id) { frames.delete(id); },
-    getComputedStyle: (el) => ({ overflowX: el.overflow, overflowY: el.overflow, getPropertyValue: (n) => el.vars[n] ?? '' }),
+    setTimeout(fn, ms) {
+      const id = nextId++;
+      timers.set(id, { at: now + ms, fn });
+      return id;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+    },
+    requestAnimationFrame(fn) {
+      const id = nextId++;
+      frames.set(id, fn);
+      return id;
+    },
+    cancelAnimationFrame(id) {
+      frames.delete(id);
+    },
+    getComputedStyle: (el) => ({
+      overflowX: el.overflow,
+      overflowY: el.overflow,
+      getPropertyValue: (n) => el.vars[n] ?? '',
+    }),
     CSS: { escape: (s) => s },
     addEventListener() {},
     removeEventListener() {},
@@ -151,9 +219,15 @@ function page({ popover = true } = {}) {
     defaultView: win,
     documentElement: new El('html'),
     createElement: (tag) => new El(tag),
-    querySelector(sel) { return all(doc.documentElement).find((n) => n.matches(sel)) ?? null; },
-    addEventListener(type, fn) { (listeners.get(type) ?? listeners.set(type, new Set()).get(type)).add(fn); },
-    removeEventListener(type, fn) { listeners.get(type)?.delete(fn); },
+    querySelector(sel) {
+      return all(doc.documentElement).find((n) => n.matches(sel)) ?? null;
+    },
+    addEventListener(type, fn) {
+      (listeners.get(type) ?? listeners.set(type, new Set()).get(type)).add(fn);
+    },
+    removeEventListener(type, fn) {
+      listeners.get(type)?.delete(fn);
+    },
   };
   doc.documentElement.clientWidth = 1280;
   doc.documentElement.clientHeight = 720;
@@ -161,7 +235,18 @@ function page({ popover = true } = {}) {
   doc.documentElement.append(doc.body);
   // An event through the document's listeners; what the page saw of it comes back.
   const fire = (type, props = {}) => {
-    const e = { type, defaultPrevented: false, stopped: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; }, ...props };
+    const e = {
+      type,
+      defaultPrevented: false,
+      stopped: false,
+      preventDefault() {
+        this.defaultPrevented = true;
+      },
+      stopPropagation() {
+        this.stopped = true;
+      },
+      ...props,
+    };
     for (const fn of [...(listeners.get(type) ?? [])]) fn(e);
     return e;
   };
@@ -176,18 +261,30 @@ function page({ popover = true } = {}) {
     }
     now = until;
   };
-  const frame = () => { const fns = [...frames.values()]; frames.clear(); for (const fn of fns) fn(); };
+  const frame = () => {
+    const fns = [...frames.values()];
+    frames.clear();
+    for (const fn of fns) fn();
+  };
   // A field: a "?" (data-tip, described by the hint) and its input reading the hint out.
   let fields = 0;
   const field = (parent = doc.body, { left = 100, top = 300 } = {}) => {
     const id = `hint-${++fields}`;
-    const mark = new El('button', { class: 'viz-tip', 'data-tip': `What field ${fields} does.`, 'aria-describedby': id, tabindex: '-1' }).at(left, top, 14, 14);
+    const mark = new El('button', {
+      class: 'viz-tip',
+      'data-tip': `What field ${fields} does.`,
+      'aria-describedby': id,
+      tabindex: '-1',
+    }).at(left, top, 14, 14);
     const input = new El('select', { 'aria-describedby': id }).at(left, top + 20, 200, 30);
     parent.append(mark, input);
     return { mark, input };
   };
   const tip = () => all(doc.documentElement).find((n) => n.className === 'ui-tip');
-  const shown = () => { const t = tip(); return !!t && (popover ? t.open : !t.hidden); };
+  const shown = () => {
+    const t = tip();
+    return !!t && (popover ? t.open : !t.hidden);
+  };
   return { El, doc, win, fire, tick, frame, field, tip, shown, listeners };
 }
 
@@ -303,7 +400,12 @@ test('installTooltips: a tap on a "?" toggles its tip (touch has no hover); a ta
 test('installTooltips: a trigger that asks for it (data-tip-tap: the site’s skills) toggles on a tap too; others don’t', () => {
   const p = page();
   installTooltips({ doc: p.doc });
-  const skill = new p.El('button', { class: 'slot', 'data-tip': 'The common tongue.', 'data-tip-title': 'JavaScript', 'data-tip-tap': '' }).at(300, 300, 120, 40);
+  const skill = new p.El('button', {
+    class: 'slot',
+    'data-tip': 'The common tongue.',
+    'data-tip-title': 'JavaScript',
+    'data-tip-tap': '',
+  }).at(300, 300, 120, 40);
   const action = new p.El('button', { 'data-tip': 'Does a thing.' }).at(300, 400, 120, 40);
   p.doc.body.append(skill, action);
   p.fire('pointerdown', { target: skill, pointerType: 'touch' });
@@ -365,7 +467,10 @@ test('installTooltips: once per page; destroy takes it all away; without the Pop
   const one = installTooltips({ doc: p.doc });
   assert.equal(installTooltips({ doc: p.doc }), one, 'a second install is the first');
   one.destroy();
-  assert.ok([...p.listeners.values()].every((s) => s.size === 0), 'no listeners left');
+  assert.ok(
+    [...p.listeners.values()].every((s) => s.size === 0),
+    'no listeners left',
+  );
   const { mark } = p.field();
   p.fire('click', { target: mark });
   assert.equal(p.tip(), undefined);

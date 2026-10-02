@@ -62,7 +62,10 @@ export function createSmokeMaterial() {
 
 const SPLASH = 120; // extra ember slots for collision splashes (recycled)
 // Shock ring strands: radial offset, height, brightness.
-const STRANDS = [{ dr: 0, y: 0.05, lead: true }, { dr: -0.045, y: 0.09, lead: false }];
+const STRANDS = [
+  { dr: 0, y: 0.05, lead: true },
+  { dr: -0.045, y: 0.09, lead: false },
+];
 const grainOf = (g) => (g < 0.6 ? 0.75 : g < 0.9 ? 1.3 : 1.9);
 
 /**
@@ -74,9 +77,19 @@ const grainOf = (g) => (g < 0.6 ? 0.75 : g < 0.9 ? 1.3 : 1.9);
  * @param {(angle:number)=>number} o.reach  distance to the first obstacle along a heading
  */
 export function createImpactFx({
-  fireMaterial, smokeMaterial, origin, field, reach,
-  emitters = 144, flames = 3200, haze = 1500, smoke = 520, ash = 220, embers = 160,
-  lights: lightCount = 6, reducedMotion = false,
+  fireMaterial,
+  smokeMaterial,
+  origin,
+  field,
+  reach,
+  emitters = 144,
+  flames = 3200,
+  haze = 1500,
+  smoke = 520,
+  ash = 220,
+  embers = 160,
+  lights: lightCount = 6,
+  reducedMotion = false,
 }) {
   const ring = createPoints(flames, fireMaterial);
   const hazePts = createPoints(haze, smokeMaterial);
@@ -88,7 +101,7 @@ export function createImpactFx({
 
   // Shock ring: per strand, one segment from each emitter to the next.
   const W = createRingLines(fireMaterial, STRANDS.length * emitters * 2);
-  const wWob = new Float32Array(emitters);  // crawling radius / height wobble, −1..1
+  const wWob = new Float32Array(emitters); // crawling radius / height wobble, −1..1
   const wFlick = new Float32Array(emitters); // fast flicker: brightness, hot spots, strand gap
   let waveSeed = 0;
   let waveLive = false;
@@ -107,7 +120,9 @@ export function createImpactFx({
     if ((i + frame) % 3) return;
     const ix = i * 3;
     const c = field.fire(P[ix] - origin.x, P[ix + 1], P[ix + 2] - origin.z, t);
-    T[ix] = c.x * scale; T[ix + 1] = c.y * scale; T[ix + 2] = c.z * scale;
+    T[ix] = c.x * scale;
+    T[ix + 1] = c.y * scale;
+    T[ix + 2] = c.z * scale;
   }
 
   // --- ring emitters ------------------------------------------------------------------
@@ -117,14 +132,19 @@ export function createImpactFx({
   const eMax = new Float32Array(emitters);
   const eAge = new Float32Array(emitters).fill(1e3);
   const eLife = new Float32Array(emitters).fill(1);
-  const eHit = new Float32Array(emitters);    // time since hitting an obstacle (−1 = not hit)
-  const eAcc = new Float32Array(emitters);    // flame emission accumulator
-  const eSmoke = new Float32Array(emitters);  // smoke emission accumulator
-  const eHeat = new Float32Array(emitters);   // current intensity 0..1+
+  const eHit = new Float32Array(emitters); // time since hitting an obstacle (−1 = not hit)
+  const eAcc = new Float32Array(emitters); // flame emission accumulator
+  const eSmoke = new Float32Array(emitters); // smoke emission accumulator
+  const eHeat = new Float32Array(emitters); // current intensity 0..1+
   let ringActive = false;
 
   // --- flame tongues (pool) -------------------------------------------------------------
-  const F = { pos: ring.geometry.attributes.position.array, col: ring.geometry.attributes.color.array, size: ring.geometry.attributes.size.array, alpha: ring.geometry.attributes.alpha.array };
+  const F = {
+    pos: ring.geometry.attributes.position.array,
+    col: ring.geometry.attributes.color.array,
+    size: ring.geometry.attributes.size.array,
+    alpha: ring.geometry.attributes.alpha.array,
+  };
   const fVel = new Float32Array(flames * 3);
   const fTurb = new Float32Array(flames * 3);
   const fAge = new Float32Array(flames).fill(1e3);
@@ -134,7 +154,12 @@ export function createImpactFx({
   let fNext = 0;
 
   // --- ring smoke (pool) ------------------------------------------------------------------
-  const Hz = { pos: hazePts.geometry.attributes.position.array, col: hazePts.geometry.attributes.color.array, size: hazePts.geometry.attributes.size.array, alpha: hazePts.geometry.attributes.alpha.array };
+  const Hz = {
+    pos: hazePts.geometry.attributes.position.array,
+    col: hazePts.geometry.attributes.color.array,
+    size: hazePts.geometry.attributes.size.array,
+    alpha: hazePts.geometry.attributes.alpha.array,
+  };
   const hVel = new Float32Array(haze * 3);
   const hTurb = new Float32Array(haze * 3);
   const hAge = new Float32Array(haze).fill(1e3);
@@ -144,21 +169,39 @@ export function createImpactFx({
   let hNext = 0;
 
   // --- ring lights ----------------------------------------------------------------------
-  const lights = Array.from({ length: reducedMotion ? 0 : lightCount }, () => new THREE.PointLight(0xff8a3c, 0, 2.6, 2));
+  const lights = Array.from(
+    { length: reducedMotion ? 0 : lightCount },
+    () => new THREE.PointLight(0xff8a3c, 0, 2.6, 2),
+  );
 
   // --- impact puff, ash, embers ----------------------------------------------------------
-  const S = { pos: puff.geometry.attributes.position.array, col: puff.geometry.attributes.color.array, size: puff.geometry.attributes.size.array, alpha: puff.geometry.attributes.alpha.array };
+  const S = {
+    pos: puff.geometry.attributes.position.array,
+    col: puff.geometry.attributes.color.array,
+    size: puff.geometry.attributes.size.array,
+    alpha: puff.geometry.attributes.alpha.array,
+  };
   const sVel = new Float32Array(smoke * 3);
   const sTurb = new Float32Array(smoke * 3);
   const sAge = new Float32Array(smoke).fill(1e3);
   const sLife = new Float32Array(smoke).fill(1);
   const sSize = new Float32Array(smoke);
-  const A = { pos: flecks.geometry.attributes.position.array, col: flecks.geometry.attributes.color.array, size: flecks.geometry.attributes.size.array, alpha: flecks.geometry.attributes.alpha.array };
+  const A = {
+    pos: flecks.geometry.attributes.position.array,
+    col: flecks.geometry.attributes.color.array,
+    size: flecks.geometry.attributes.size.array,
+    alpha: flecks.geometry.attributes.alpha.array,
+  };
   const aVel = new Float32Array(ash * 3);
   const aAge = new Float32Array(ash).fill(1e3);
   const aLife = new Float32Array(ash).fill(1);
   const aPhase = new Float32Array(ash);
-  const E = { pos: sparks.geometry.attributes.position.array, col: sparks.geometry.attributes.color.array, size: sparks.geometry.attributes.size.array, alpha: sparks.geometry.attributes.alpha.array };
+  const E = {
+    pos: sparks.geometry.attributes.position.array,
+    col: sparks.geometry.attributes.color.array,
+    size: sparks.geometry.attributes.size.array,
+    alpha: sparks.geometry.attributes.alpha.array,
+  };
   const kAge = new Float32Array(emberCount).fill(1e3);
   const kLife = new Float32Array(emberCount).fill(1);
   const kGrain = new Float32Array(emberCount);
@@ -202,7 +245,9 @@ export function createImpactFx({
       sLife[i] = 1.6 + Math.random() * 1.6;
       sSize[i] = Math.random() < 0.7 ? 0.8 : 1.5;
       tmp.copy(pickCol(smokeCols));
-      S.col[ix] = tmp.r; S.col[ix + 1] = tmp.g; S.col[ix + 2] = tmp.b;
+      S.col[ix] = tmp.r;
+      S.col[ix + 1] = tmp.g;
+      S.col[ix + 2] = tmp.b;
     }
     // Ash flakes: thrown up, then they flutter down.
     for (let i = 0; i < ash; i++) {
@@ -220,7 +265,9 @@ export function createImpactFx({
       aLife[i] = 2.8 + Math.random() * 2.4;
       aPhase[i] = Math.random() * TAU;
       tmp.copy(pickCol(ashCols));
-      A.col[ix] = tmp.r; A.col[ix + 1] = tmp.g; A.col[ix + 2] = tmp.b;
+      A.col[ix] = tmp.r;
+      A.col[ix + 1] = tmp.g;
+      A.col[ix + 2] = tmp.b;
     }
     // Embers: hot sparks that arc up and cool as they fall.
     for (let i = 0; i < embers; i++) {
@@ -245,7 +292,8 @@ export function createImpactFx({
     const slots = emberCount - embers;
     if (!slots) return;
     const n = Math.random() < 0.6 ? 2 : 1;
-    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const ca = Math.cos(ang),
+      sa = Math.sin(ang);
     for (let s = 0; s < n; s++) {
       const i = embers + (kSplash++ % slots);
       const ix = i * 3;
@@ -286,7 +334,8 @@ export function createImpactFx({
     hNext = (hNext + 1) % haze;
     const ix = i * 3;
     const rr = r - 0.05 - Math.random() * 0.12;
-    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const ca = Math.cos(ang),
+      sa = Math.sin(ang);
     Hz.pos[ix] = origin.x + ca * rr + (Math.random() - 0.5) * 0.08;
     Hz.pos[ix + 1] = 0.12 + Math.random() * 0.2 + heat * 0.1;
     Hz.pos[ix + 2] = origin.z + sa * rr + (Math.random() - 0.5) * 0.08;
@@ -299,7 +348,9 @@ export function createImpactFx({
     hLife[i] = 1.3 + Math.random() * 1.1;
     hSize[i] = Math.random() < 0.75 ? 0.8 : 1.5;
     tmp.copy(pickCol(hazeCols));
-    hBase[ix] = tmp.r; hBase[ix + 1] = tmp.g; hBase[ix + 2] = tmp.b;
+    hBase[ix] = tmp.r;
+    hBase[ix + 1] = tmp.g;
+    hBase[ix + 2] = tmp.b;
   }
 
   const lightR = new Float32Array(lightCount);
@@ -311,7 +362,9 @@ export function createImpactFx({
     // --- ring emitters race outward and throw off flame tongues and smoke
     if (ringActive) {
       let alive = false;
-      lightR.fill(0); lightHeat.fill(0); lc.fill(0);
+      lightR.fill(0);
+      lightHeat.fill(0);
+      lc.fill(0);
       for (let i = 0; i < emitters; i++) {
         if (eAge[i] > eLife[i]) continue;
         alive = true;
@@ -325,7 +378,8 @@ export function createImpactFx({
             eR[i] = eMax[i];
             eHit[i] = 0;
             eLife[i] = Math.min(eLife[i], eAge[i] + 0.55 + Math.random() * 0.3);
-            if (eMax[i] < 4.2) splash(origin.x + Math.cos(eAng[i]) * eR[i], origin.z + Math.sin(eAng[i]) * eR[i], eAng[i]);
+            if (eMax[i] < 4.2)
+              splash(origin.x + Math.cos(eAng[i]) * eR[i], origin.z + Math.sin(eAng[i]) * eR[i], eAng[i]);
           } else eR[i] = next;
         } else eHit[i] += dt;
         // Burns low as it spreads; flares and climbs where it hits something.
@@ -334,17 +388,28 @@ export function createImpactFx({
         const x = origin.x + Math.cos(eAng[i]) * eR[i];
         const z = origin.z + Math.sin(eAng[i]) * eR[i];
         eAcc[i] += dt * 120 * eHeat[i];
-        while (eAcc[i] >= 1) { eAcc[i] -= 1; emit(x, z, eHeat[i], flare * 0.9); }
+        while (eAcc[i] >= 1) {
+          eAcc[i] -= 1;
+          emit(x, z, eHeat[i], flare * 0.9);
+        }
         eSmoke[i] += dt * 18 * (0.3 + eHeat[i]);
-        while (eSmoke[i] >= 1) { eSmoke[i] -= 1; emitHaze(eAng[i], eR[i], eHeat[i]); }
+        while (eSmoke[i] >= 1) {
+          eSmoke[i] -= 1;
+          emitHaze(eAng[i], eR[i], eHeat[i]);
+        }
         // ring lights: average radius and heat per sector
         if (lightCount) {
           const s = Math.floor((eAng[i] / TAU) * lightCount + lightCount) % lightCount;
-          lightR[s] += eR[i]; lightHeat[s] += eHeat[i]; lc[s] += 1;
+          lightR[s] += eR[i];
+          lightHeat[s] += eHeat[i];
+          lc[s] += 1;
         }
       }
       lights.forEach((l, s) => {
-        if (!lc[s]) { l.intensity = 0; return; }
+        if (!lc[s]) {
+          l.intensity = 0;
+          return;
+        }
         const a = ((s + 0.5) / lightCount) * TAU;
         const r = lightR[s] / lc[s];
         l.position.set(origin.x + Math.cos(a) * r, 0.3, origin.z + Math.sin(a) * r);
@@ -352,7 +417,10 @@ export function createImpactFx({
         const heat = lightHeat[s] / lc[s];
         l.intensity = Number.isFinite(heat) ? heat * 2.6 : 0;
       });
-      if (!alive) { ringActive = false; for (const l of lights) l.intensity = 0; }
+      if (!alive) {
+        ringActive = false;
+        for (const l of lights) l.intensity = 0;
+      }
       stepWave(t);
     } else if (waveLive) {
       W.clear();
@@ -362,7 +430,10 @@ export function createImpactFx({
     // --- flame tongues: rise and curl through the bonfire's noise, cooling as they go
     let anyFlame = false;
     for (let i = 0; i < flames; i++) {
-      if (fAge[i] > fLife[i]) { F.size[i] = 0; continue; }
+      if (fAge[i] > fLife[i]) {
+        F.size[i] = 0;
+        continue;
+      }
       anyFlame = true;
       fAge[i] += dt;
       const ix = i * 3;
@@ -376,14 +447,20 @@ export function createImpactFx({
       const h = Math.min(0.999, heat) * 3;
       const j = Math.floor(h);
       const fade = Math.min(1, (1 - k) * 3);
-      tmp.copy(ramp[j]).lerp(ramp[j + 1], h - j).multiplyScalar(0.34 * (0.4 + heat) * fade);
-      F.col[ix] = tmp.r; F.col[ix + 1] = tmp.g; F.col[ix + 2] = tmp.b;
+      tmp
+        .copy(ramp[j])
+        .lerp(ramp[j + 1], h - j)
+        .multiplyScalar(0.34 * (0.4 + heat) * fade);
+      F.col[ix] = tmp.r;
+      F.col[ix + 1] = tmp.g;
+      F.col[ix + 2] = tmp.b;
       // Young, hot tongues: small and solid. Cooling ones swell into fainter wisps,
       // more so where the curl turbulence is strong.
       const swell = Math.min(1, Math.hypot(fTurb[ix], fTurb[ix + 1], fTurb[ix + 2]) * 1.2);
       const flick = 0.5 + 0.5 * Math.sin(fAge[i] * 17 + i * 1.7);
       F.size[i] = fade < 0.05 ? 0 : fGrain[i] * (0.65 + 0.5 * k + 0.35 * swell) * (heat > 0.6 ? 0.8 : 1);
-      F.alpha[i] = Math.min(1, (0.45 + 0.55 * heat) * (0.7 + 0.3 * flick) + (heat > 0.6 ? 0.3 : 0)) * Math.min(1, fade * 1.5);
+      F.alpha[i] =
+        Math.min(1, (0.45 + 0.55 * heat) * (0.7 + 0.3 * flick) + (heat > 0.6 ? 0.3 : 0)) * Math.min(1, fade * 1.5);
     }
     if (anyFlame) {
       for (const a of ['position', 'color', 'size', 'alpha']) ring.geometry.attributes[a].needsUpdate = true;
@@ -392,19 +469,26 @@ export function createImpactFx({
     // --- ring smoke: rises off the flames, lit from below at first, then drifts and thins
     let anyHaze = false;
     for (let i = 0; i < haze; i++) {
-      if (hAge[i] > hLife[i]) { Hz.size[i] = 0; continue; }
+      if (hAge[i] > hLife[i]) {
+        Hz.size[i] = 0;
+        continue;
+      }
       anyHaze = true;
       hAge[i] += dt;
       const ix = i * 3;
       const k = Math.min(1, hAge[i] / hLife[i]);
       turbulence(Hz.pos, hTurb, i, t, 0.3);
       const drag = Math.exp(-dt * 0.9);
-      hVel[ix] *= drag; hVel[ix + 1] = hVel[ix + 1] * drag + 0.12 * dt; hVel[ix + 2] *= drag;
+      hVel[ix] *= drag;
+      hVel[ix + 1] = hVel[ix + 1] * drag + 0.12 * dt;
+      hVel[ix + 2] *= drag;
       Hz.pos[ix] += (hVel[ix] + hTurb[ix]) * dt;
       Hz.pos[ix + 1] += (hVel[ix + 1] + hTurb[ix + 1] * 0.5) * dt;
       Hz.pos[ix + 2] += (hVel[ix + 2] + hTurb[ix + 2]) * dt;
       tmp.setRGB(hBase[ix], hBase[ix + 1], hBase[ix + 2]).lerp(ramp[0], 0.55 * (1 - k) ** 2);
-      Hz.col[ix] = tmp.r; Hz.col[ix + 1] = tmp.g; Hz.col[ix + 2] = tmp.b;
+      Hz.col[ix] = tmp.r;
+      Hz.col[ix + 1] = tmp.g;
+      Hz.col[ix + 2] = tmp.b;
       Hz.size[i] = hSize[i];
       Hz.alpha[i] = 0.75 * Math.min(1, hAge[i] * 6) * (1 - k) ** 1.4;
     }
@@ -415,15 +499,23 @@ export function createImpactFx({
     // --- impact smoke: billows up and out, slows, curls and thins
     let anySmoke = false;
     for (let i = 0; i < smoke; i++) {
-      if (sAge[i] > sLife[i]) { S.size[i] = 0; continue; }
+      if (sAge[i] > sLife[i]) {
+        S.size[i] = 0;
+        continue;
+      }
       anySmoke = true;
       sAge[i] += dt;
-      if (sAge[i] < 0) { S.size[i] = 0; continue; }
+      if (sAge[i] < 0) {
+        S.size[i] = 0;
+        continue;
+      }
       const ix = i * 3;
       const k = Math.min(1, sAge[i] / sLife[i]);
       turbulence(S.pos, sTurb, i, t, 0.35);
       const drag = Math.exp(-dt * 1.2);
-      sVel[ix] *= drag; sVel[ix + 1] = sVel[ix + 1] * drag + 0.16 * dt; sVel[ix + 2] *= drag;
+      sVel[ix] *= drag;
+      sVel[ix + 1] = sVel[ix + 1] * drag + 0.16 * dt;
+      sVel[ix + 2] *= drag;
       S.pos[ix] += (sVel[ix] + sTurb[ix]) * dt;
       S.pos[ix + 1] += (sVel[ix + 1] + sTurb[ix + 1] * 0.5) * dt;
       S.pos[ix + 2] += (sVel[ix + 2] + sTurb[ix + 2]) * dt;
@@ -434,10 +526,16 @@ export function createImpactFx({
     // --- ash: thrown up, then flutters down (rocking side to side) and settles
     let anyAsh = false;
     for (let i = 0; i < ash; i++) {
-      if (aAge[i] > aLife[i]) { A.size[i] = 0; continue; }
+      if (aAge[i] > aLife[i]) {
+        A.size[i] = 0;
+        continue;
+      }
       anyAsh = true;
       aAge[i] += dt;
-      if (aAge[i] < 0) { A.size[i] = 0; continue; }
+      if (aAge[i] < 0) {
+        A.size[i] = 0;
+        continue;
+      }
       const ix = i * 3;
       const k = Math.min(1, aAge[i] / aLife[i]);
       if (A.pos[ix + 1] > 0.03) {
@@ -446,13 +544,21 @@ export function createImpactFx({
         aVel[ix] = aVel[ix] * drag + rock * Math.cos(aPhase[i]) * 0.9 * dt;
         aVel[ix + 1] = Math.max(-0.28, aVel[ix + 1] * drag - 0.55 * dt); // flakes fall slowly
         aVel[ix + 2] = aVel[ix + 2] * drag + rock * Math.sin(aPhase[i]) * 0.9 * dt;
-        A.pos[ix] += aVel[ix] * dt; A.pos[ix + 1] += aVel[ix + 1] * dt; A.pos[ix + 2] += aVel[ix + 2] * dt;
-        if (A.pos[ix + 1] <= 0.03) { A.pos[ix + 1] = 0.03; aVel[ix] = aVel[ix + 1] = aVel[ix + 2] = 0; }
+        A.pos[ix] += aVel[ix] * dt;
+        A.pos[ix + 1] += aVel[ix + 1] * dt;
+        A.pos[ix + 2] += aVel[ix + 2] * dt;
+        if (A.pos[ix + 1] <= 0.03) {
+          A.pos[ix + 1] = 0.03;
+          aVel[ix] = aVel[ix + 1] = aVel[ix + 2] = 0;
+        }
       }
       A.size[i] = 0.8;
-      A.alpha[i] = k > 0.8 ? (1 - k) / 0.2 * 0.9 : 0.9;
+      A.alpha[i] = k > 0.8 ? ((1 - k) / 0.2) * 0.9 : 0.9;
     }
-    for (const [p, any] of [[puff, anySmoke], [flecks, anyAsh]]) {
+    for (const [p, any] of [
+      [puff, anySmoke],
+      [flecks, anyAsh],
+    ]) {
       if (!any) continue;
       for (const a of ['position', 'color', 'size', 'alpha']) p.geometry.attributes[a].needsUpdate = true;
     }
@@ -460,21 +566,41 @@ export function createImpactFx({
     // --- embers: arc up and out, cool from bright to deep as they fall
     let anyEmber = false;
     for (let i = 0; i < emberCount; i++) {
-      if (kAge[i] > kLife[i]) { E.size[i] = 0; continue; }
+      if (kAge[i] > kLife[i]) {
+        E.size[i] = 0;
+        continue;
+      }
       anyEmber = true;
       kAge[i] += dt;
-      if (kAge[i] < 0) { E.size[i] = 0; continue; }
+      if (kAge[i] < 0) {
+        E.size[i] = 0;
+        continue;
+      }
       const ix = i * 3;
       const k = Math.min(1, kAge[i] / kLife[i]);
       const drag = Math.exp(-dt * 1.4);
-      kVel[ix] *= drag; kVel[ix + 1] = kVel[ix + 1] * drag - 1.3 * dt; kVel[ix + 2] *= drag;
-      E.pos[ix] += kVel[ix] * dt; E.pos[ix + 1] += kVel[ix + 1] * dt; E.pos[ix + 2] += kVel[ix + 2] * dt;
-      if (E.pos[ix + 1] < 0.02) { E.pos[ix + 1] = 0.02; kVel[ix + 1] *= -0.3; kVel[ix] *= 0.5; kVel[ix + 2] *= 0.5; }
+      kVel[ix] *= drag;
+      kVel[ix + 1] = kVel[ix + 1] * drag - 1.3 * dt;
+      kVel[ix + 2] *= drag;
+      E.pos[ix] += kVel[ix] * dt;
+      E.pos[ix + 1] += kVel[ix + 1] * dt;
+      E.pos[ix + 2] += kVel[ix + 2] * dt;
+      if (E.pos[ix + 1] < 0.02) {
+        E.pos[ix + 1] = 0.02;
+        kVel[ix + 1] *= -0.3;
+        kVel[ix] *= 0.5;
+        kVel[ix + 2] *= 0.5;
+      }
       const heat = 1 - k;
       const h = heat * 1.999;
       const j = Math.floor(h);
-      tmp.copy(ramp[j]).lerp(ramp[j + 1], h - j).multiplyScalar(0.55 + heat * 0.6);
-      E.col[ix] = tmp.r; E.col[ix + 1] = tmp.g; E.col[ix + 2] = tmp.b;
+      tmp
+        .copy(ramp[j])
+        .lerp(ramp[j + 1], h - j)
+        .multiplyScalar(0.55 + heat * 0.6);
+      E.col[ix] = tmp.r;
+      E.col[ix + 1] = tmp.g;
+      E.col[ix + 2] = tmp.b;
       // Big embers only while hot; they twinkle out as they cool.
       E.size[i] = k < 0.3 ? kGrain[i] : 0.8;
       E.alpha[i] = Math.min(1, heat * 2.5) * (0.65 + 0.35 * Math.sin(kAge[i] * 21 + i * 2.3));
@@ -501,21 +627,36 @@ export function createImpactFx({
     for (const s of STRANDS) {
       for (let i = 0; i < emitters; i++) {
         const j = (i + 1) % emitters;
-        const ok = eAge[i] >= 0 && eAge[i] <= eLife[i] && eAge[j] >= 0 && eAge[j] <= eLife[j] && Math.abs(eR[i] - eR[j]) < 0.22;
+        const ok =
+          eAge[i] >= 0 && eAge[i] <= eLife[i] && eAge[j] >= 0 && eAge[j] <= eLife[j] && Math.abs(eR[i] - eR[j]) < 0.22;
         for (const e of [i, j]) {
           const ix = v * 3;
           const flare = eHit[e] >= 0 ? Math.max(0, 1 - eHit[e] / 0.5) : 0;
           const heat = Math.min(1, eHeat[e]);
-          const wob = wWob[e], flick = wFlick[e];
+          const wob = wWob[e],
+            flick = wFlick[e];
           const r = Math.min(eR[e] + wob * 0.06 + s.dr * (1 + 0.6 * flick), eMax[e] - 0.03);
           W.pos[ix] = origin.x + Math.cos(eAng[e]) * r;
           W.pos[ix + 1] = s.y + wob * 0.025 + (eHit[e] >= 0 ? (1 - flare) * 0.02 + flare * 0.12 : 0);
           W.pos[ix + 2] = origin.z + Math.sin(eAng[e]) * r;
           const hotSpot = s.lead && flick > 0.5 ? 0.7 : 0;
-          if (s.lead) tmp.copy(ramp[2]).lerp(ramp[3], Math.max(flare, hotSpot)).multiplyScalar(0.55 + 0.45 * heat);
-          else tmp.copy(ramp[1]).lerp(ramp[2], flare).multiplyScalar(0.4 + 0.3 * heat);
-          W.col[ix] = tmp.r; W.col[ix + 1] = tmp.g; W.col[ix + 2] = tmp.b;
-          const a = Math.min(1, heat ** 0.7 * 1.15) * Math.min(1, eAge[e] * 10) * (0.62 + 0.38 * (flick + 1) * 0.5 + flare * 0.3);
+          if (s.lead)
+            tmp
+              .copy(ramp[2])
+              .lerp(ramp[3], Math.max(flare, hotSpot))
+              .multiplyScalar(0.55 + 0.45 * heat);
+          else
+            tmp
+              .copy(ramp[1])
+              .lerp(ramp[2], flare)
+              .multiplyScalar(0.4 + 0.3 * heat);
+          W.col[ix] = tmp.r;
+          W.col[ix + 1] = tmp.g;
+          W.col[ix + 2] = tmp.b;
+          const a =
+            Math.min(1, heat ** 0.7 * 1.15) *
+            Math.min(1, eAge[e] * 10) *
+            (0.62 + 0.38 * (flick + 1) * 0.5 + flare * 0.3);
           W.alpha[v] = ok ? (s.lead ? a : a * 0.6) : 0;
           v++;
         }
@@ -542,6 +683,8 @@ export function createImpactFx({
       { pos: A.pos, vel: aVel, n: ash, geo: flecks.geometry, maxV: 1.6 },
       { pos: E.pos, vel: kVel, n: emberCount, geo: sparks.geometry, maxV: 2 },
     ],
-    setRamp(hexes) { setRampColors(ramp, hexes); },
+    setRamp(hexes) {
+      setRampColors(ramp, hexes);
+    },
   };
 }

@@ -45,7 +45,11 @@ const OVERSHOOT = 1.9;
 // A crystal: hexagonal prism, slightly irregular and tapering, with an off-center point.
 // Radius ~1, base at y = −0.15, tip at y = 1.
 const R6 = [1, 0.84, 1.06, 0.9, 1.02, 0.88];
-const ring6 = (y, s) => R6.map((r, i) => { const a = (i / 6) * TAU + 0.3; return new THREE.Vector3(Math.cos(a) * r * s, y, Math.sin(a) * r * s); });
+const ring6 = (y, s) =>
+  R6.map((r, i) => {
+    const a = (i / 6) * TAU + 0.3;
+    return new THREE.Vector3(Math.cos(a) * r * s, y, Math.sin(a) * r * s);
+  });
 const CRYSTAL = { lo: ring6(-0.15, 1), hi: ring6(0.72, 0.86), apex: new THREE.Vector3(0.16, 1, -0.1) };
 // Its outline: the six side edges, the shoulder and the point.
 /** A crystal's outline edges ([from, to] in its own space: base ring at y −0.15, point at y 1). */
@@ -133,8 +137,16 @@ const fragmentShader = /* glsl */ `
 function crystalMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: {
-      uLo: { value: new THREE.Color() }, uMid: { value: new THREE.Color() }, uHi: { value: new THREE.Color() }, uCore: { value: new THREE.Color() },
-      uGlow: { value: 1 }, uTime: { value: 0 }, uShimmer: { value: 0.5 }, uClarity: { value: 0.35 }, uBeat: { value: 0 }, uWave: { value: 0 },
+      uLo: { value: new THREE.Color() },
+      uMid: { value: new THREE.Color() },
+      uHi: { value: new THREE.Color() },
+      uCore: { value: new THREE.Color() },
+      uGlow: { value: 1 },
+      uTime: { value: 0 },
+      uShimmer: { value: 0.5 },
+      uClarity: { value: 0.35 },
+      uBeat: { value: 0 },
+      uWave: { value: 0 },
     },
     vertexShader,
     fragmentShader,
@@ -157,7 +169,10 @@ function crystalMesh(max) {
 
 function setRampUniforms(material, hexes) {
   const u = material.uniforms;
-  u.uLo.value.set(hexes[0]); u.uMid.value.set(hexes[1]); u.uHi.value.set(hexes[2]); u.uCore.value.set(hexes[3]);
+  u.uLo.value.set(hexes[0]);
+  u.uMid.value.set(hexes[1]);
+  u.uHi.value.set(hexes[2]);
+  u.uCore.value.set(hexes[3]);
 }
 
 // Composing instance matrices.
@@ -187,7 +202,14 @@ function place(mesh, slot, x, y, z, ang, tilt, twist, width, depth, height) {
  * @param {object} o.field               shared curl noise (curl.js)
  * @param {object} o.chill               cold mist (chill.js)
  */
-export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin, field, chill, reducedMotion = false }) {
+export function createCrystals({
+  fxMaterial,
+  glintMaterial = fxMaterial,
+  origin,
+  field,
+  chill,
+  reducedMotion = false,
+}) {
   const MAX = 40;
   const FLOATERS = 5;
   const MOTES = 200;
@@ -195,7 +217,12 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
   const PER_TUFT = 5;
   const { mesh, glow, glowAttr } = crystalMesh(MAX + FLOATERS + TUFTS * PER_TUFT);
   const motes = createPoints(MOTES, glintMaterial); // diamond glints (signatures.js)
-  const M = { pos: motes.geometry.attributes.position.array, col: motes.geometry.attributes.color.array, size: motes.geometry.attributes.size.array, alpha: motes.geometry.attributes.alpha.array };
+  const M = {
+    pos: motes.geometry.attributes.position.array,
+    col: motes.geometry.attributes.color.array,
+    size: motes.geometry.attributes.size.array,
+    alpha: motes.geometry.attributes.alpha.array,
+  };
   const mVel = new Float32Array(MOTES * 3);
   const mAge = new Float32Array(MOTES).fill(1);
   const mLife = new Float32Array(MOTES).fill(0);
@@ -207,9 +234,17 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
 
   // Layout: seeded, so the same settings always grow the same cluster.
   const N = MAX + FLOATERS;
-  const sx = new Float32Array(N), sy = new Float32Array(N), sz = new Float32Array(N), sAng = new Float32Array(N);
-  const sH = new Float32Array(N), sW = new Float32Array(N), sD = new Float32Array(N);
-  const sTilt = new Float32Array(N), sTwist = new Float32Array(N), sDelay = new Float32Array(N), sGlow = new Float32Array(N);
+  const sx = new Float32Array(N),
+    sy = new Float32Array(N),
+    sz = new Float32Array(N),
+    sAng = new Float32Array(N);
+  const sH = new Float32Array(N),
+    sW = new Float32Array(N),
+    sD = new Float32Array(N);
+  const sTilt = new Float32Array(N),
+    sTwist = new Float32Array(N),
+    sDelay = new Float32Array(N),
+    sGlow = new Float32Array(N);
   let crystals = 0;
   let layoutKey = '';
   function layout(I) {
@@ -240,10 +275,26 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
     add(rng() * TAU, 0.02, 0.05 + 0.07 * rng(), 1, 0.17, 0);
     // A few medium ones fanning out from the same root.
     const o1 = rng() * TAU;
-    for (let j = 0; j < medium; j++) add(o1 + ((j + (rng() - 0.5) * 0.5) / medium) * TAU, 0.07 + 0.08 * rng(), 0.38 + 0.38 * rng(), 0.5 + 0.3 * rng(), 0.08 + 0.035 * rng(), 0.12 + 0.2 * rng());
+    for (let j = 0; j < medium; j++)
+      add(
+        o1 + ((j + (rng() - 0.5) * 0.5) / medium) * TAU,
+        0.07 + 0.08 * rng(),
+        0.38 + 0.38 * rng(),
+        0.5 + 0.3 * rng(),
+        0.08 + 0.035 * rng(),
+        0.12 + 0.2 * rng(),
+      );
     // A spray of small ones radiating low over the ash.
     const o2 = rng() * TAU;
-    for (let j = 0; j < small; j++) add(o2 + ((j + (rng() - 0.5) * 0.8) / small) * TAU, 0.14 + 0.18 * rng(), 0.8 + 0.45 * rng(), 0.2 + 0.22 * rng(), 0.045 + 0.028 * rng(), 0.3 + 0.35 * rng());
+    for (let j = 0; j < small; j++)
+      add(
+        o2 + ((j + (rng() - 0.5) * 0.8) / small) * TAU,
+        0.14 + 0.18 * rng(),
+        0.8 + 0.45 * rng(),
+        0.2 + 0.22 * rng(),
+        0.045 + 0.028 * rng(),
+        0.3 + 0.35 * rng(),
+      );
     crystals = i;
     // Loose shards drifting above the cluster.
     for (let j = 0; j < FLOATERS; j++) {
@@ -263,14 +314,14 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
   }
 
   let active = false;
-  let grow = 0;       // 0 = in the ground, 1 = fully formed
-  let pulse = 0;      // a stoke's flash, decaying
+  let grow = 0; // 0 = in the ground, 1 = fully formed
+  let pulse = 0; // a stoke's flash, decaying
   let live = false;
-  let seep = 0;       // chill seeping off at rest
-  let beatGlow = 0;   // a beat's glow (the visualizer), decaying...
-  let wave = 1;       // ...and how far up the crystals it has risen
-  let pulseIn = 1.5;  // seconds to the next slow ambient pulse (effects.ice.pulse)
-  let pulseT = 9;     // seconds into the current slow pulse (it swells and fades over SLOW)
+  let seep = 0; // chill seeping off at rest
+  let beatGlow = 0; // a beat's glow (the visualizer), decaying...
+  let wave = 1; // ...and how far up the crystals it has risen
+  let pulseIn = 1.5; // seconds to the next slow ambient pulse (effects.ice.pulse)
+  let pulseT = 9; // seconds into the current slow pulse (it swells and fades over SLOW)
   const SLOW = 1.6;
   const slowGlow = () => (pulseT < SLOW ? Math.sin((Math.PI * pulseT) / SLOW) * 0.45 : 0);
   const slotOf = new Int16Array(N).fill(-1); // each crystal's instance this frame
@@ -298,7 +349,15 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
           w: (c === 0 ? 0.04 : 0.024 + 0.012 * Math.random()) * I.thickness,
         });
       }
-      tufts.push({ x: origin.x + Math.cos(a) * r, z: origin.z + Math.sin(a) * r, ang: a, t: -j * 0.07, hold: 0.45 + 0.35 * Math.random(), kids, chipped: false });
+      tufts.push({
+        x: origin.x + Math.cos(a) * r,
+        z: origin.z + Math.sin(a) * r,
+        ang: a,
+        t: -j * 0.07,
+        hold: 0.45 + 0.35 * Math.random(),
+        kids,
+        chipped: false,
+      });
     }
   }
   /** Place the live tufts from instance `n` on; returns the next free instance. */
@@ -306,13 +365,19 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
     for (let j = tufts.length - 1; j >= 0; j--) {
       const tf = tufts[j];
       tf.t += dt;
-      if (tf.t > TUFT_RISE + tf.hold + TUFT_SINK || !active) { tufts.splice(j, 1); continue; }
+      if (tf.t > TUFT_RISE + tf.hold + TUFT_SINK || !active) {
+        tufts.splice(j, 1);
+        continue;
+      }
     }
     for (const tf of tufts) {
       if (tf.t <= 0) continue;
-      const env = tf.t < TUFT_RISE ? easeOutBack(tf.t / TUFT_RISE, OVERSHOOT)
-        : tf.t < TUFT_RISE + tf.hold ? 1
-          : 1 - clamp01((tf.t - TUFT_RISE - tf.hold) / TUFT_SINK) ** 2;
+      const env =
+        tf.t < TUFT_RISE
+          ? easeOutBack(tf.t / TUFT_RISE, OVERSHOOT)
+          : tf.t < TUFT_RISE + tf.hold
+            ? 1
+            : 1 - clamp01((tf.t - TUFT_RISE - tf.hold) / TUFT_SINK) ** 2;
       if (!tf.chipped) {
         tf.chipped = true;
         // A glint or two flicked off as it breaks the ash, and a breath of chill.
@@ -320,7 +385,9 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
           const i = mNext;
           mNext = (mNext + 1) % MOTES;
           const ix = i * 3;
-          M.pos[ix] = tf.x; M.pos[ix + 1] = 0.08; M.pos[ix + 2] = tf.z;
+          M.pos[ix] = tf.x;
+          M.pos[ix + 1] = 0.08;
+          M.pos[ix + 2] = tf.z;
           mVel[ix] = Math.cos(tf.ang) * (0.2 + Math.random() * 0.4);
           mVel[ix + 1] = 0.5 + Math.random() * 0.6;
           mVel[ix + 2] = Math.sin(tf.ang) * (0.2 + Math.random() * 0.4);
@@ -359,7 +426,10 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
       const e = echoes[j];
       e.t += dt;
       const k = e.t / e.time;
-      if (k >= 1) { echoes.splice(j, 1); continue; }
+      if (k >= 1) {
+        echoes.splice(j, 1);
+        continue;
+      }
       const grown = 1 - (1 - k) ** 3;
       const s = 1 + 0.6 * grown;
       const push = 0.12 * grown;
@@ -415,11 +485,16 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
       }
     }
     let anyMote = false;
-    for (let i = 0; i < MOTES; i++) if (mAge[i] < mLife[i]) { anyMote = true; break; }
+    for (let i = 0; i < MOTES; i++)
+      if (mAge[i] < mLife[i]) {
+        anyMote = true;
+        break;
+      }
     if (grow <= 0 && !anyMote) {
       if (live) {
         mesh.count = 0;
-        M.size.fill(0); motes.geometry.attributes.size.needsUpdate = true;
+        M.size.fill(0);
+        motes.geometry.attributes.size.needsUpdate = true;
         live = false;
       }
       return;
@@ -442,7 +517,19 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
         // Floaters bob and turn slowly; they shrink away rather than sink.
         const bob = reducedMotion ? 0 : Math.sin(t * 0.9 + i * 2.1) * 0.035;
         const s = Math.min(1, g);
-        place(mesh, n, sx[i], sy[i] + bob, sz[i], sAng[i], sTilt[i] + (reducedMotion ? 0 : Math.sin(t * 0.5 + i) * 0.2), sTwist[i] + (reducedMotion ? 0 : t * 0.4), sW[i] * s, sD[i] * s, sH[i] * s);
+        place(
+          mesh,
+          n,
+          sx[i],
+          sy[i] + bob,
+          sz[i],
+          sAng[i],
+          sTilt[i] + (reducedMotion ? 0 : Math.sin(t * 0.5 + i) * 0.2),
+          sTwist[i] + (reducedMotion ? 0 : t * 0.4),
+          sW[i] * s,
+          sD[i] * s,
+          sH[i] * s,
+        );
       }
       glow[n] = sGlow[i];
       n++;
@@ -467,7 +554,16 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
         const a = Math.random() * TAU;
         const r = I.spread * (0.4 + Math.random() * 0.8);
         const s = 0.05 + Math.random() * 0.12;
-        chill.emit(origin.x + Math.cos(a) * r, 0.06 + Math.random() * 0.15, origin.z + Math.sin(a) * r, Math.cos(a) * s, 0, Math.sin(a) * s, 3, 0.26);
+        chill.emit(
+          origin.x + Math.cos(a) * r,
+          0.06 + Math.random() * 0.15,
+          origin.z + Math.sin(a) * r,
+          Math.cos(a) * s,
+          0,
+          Math.sin(a) * s,
+          3,
+          0.26,
+        );
       }
     }
 
@@ -477,7 +573,10 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
       const ix = i * 3;
       if (mAge[i] >= mLife[i]) {
         if (i < want && active && Math.random() < dt * 2) spawnMote(i, I);
-        else { M.size[i] = 0; continue; }
+        else {
+          M.size[i] = 0;
+          continue;
+        }
       }
       mAge[i] += dt;
       const k = mAge[i] / mLife[i];
@@ -493,7 +592,9 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
       // Ice's signature: now and then a mote catches the light as a bright diamond.
       const glint = reducedMotion ? 0 : iceGlint(t, i);
       tmp.copy(i % 3 || glint ? ramp[3] : ramp[2]).multiplyScalar(glint ? 1.1 : 0.75);
-      M.col[ix] = tmp.r; M.col[ix + 1] = tmp.g; M.col[ix + 2] = tmp.b;
+      M.col[ix] = tmp.r;
+      M.col[ix + 1] = tmp.g;
+      M.col[ix + 2] = tmp.b;
       M.size[i] = glint ? 3 : tw > 0.97 ? 2 : 1;
       M.alpha[i] = glint ? 1 : Math.min(1, k * 5, (1 - k) * 3) * (0.35 + 0.65 * tw);
     }
@@ -505,8 +606,17 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
     if (reducedMotion) return;
     const I = effects.ice;
     const n = Math.round(22 * amount);
-    for (let j = 0; j < n; j++) { spawnMote(mNext, I, 1); mNext = (mNext + 1) % MOTES; }
-    chill?.puff(origin.x, origin.z, Math.round(140 * amount), { radius: I.spread, speed: 1.1 * amount, rise: 0.08, span: 2.4, alpha: 0.4 });
+    for (let j = 0; j < n; j++) {
+      spawnMote(mNext, I, 1);
+      mNext = (mNext + 1) % MOTES;
+    }
+    chill?.puff(origin.x, origin.z, Math.round(140 * amount), {
+      radius: I.spread,
+      speed: 1.1 * amount,
+      rise: 0.08,
+      span: 2.4,
+      alpha: 0.4,
+    });
     pulse = Math.max(pulse, 0.6 * amount);
   }
 
@@ -547,15 +657,21 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
     beat,
     echo,
     /** 0..1: the latest beat's glow (the scene brightens the ice's light with it). */
-    get beatGlow() { return Math.max(beatGlow, slowGlow()); },
+    get beatGlow() {
+      return Math.max(beatGlow, slowGlow());
+    },
     setActive(on, instant = false) {
       active = on;
       if (instant) grow = on ? 1 : 0;
     },
-    get amount() { return grow; },
+    get amount() {
+      return grow;
+    },
     sets: [{ pos: M.pos, vel: mVel, n: MOTES, geo: motes.geometry, maxV: 1.2 }],
     /** 0..1: how much of the background frost to keep (the scene thins it during big hits). */
-    set ambient(v) { ambientShare = v; },
+    set ambient(v) {
+      ambientShare = v;
+    },
     setRamp(hexes) {
       setRampColors(ramp, hexes);
       setRampUniforms(mesh.material, hexes);
@@ -570,13 +686,30 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
  * @param {(angle:number)=>number} o.reach  distance to the first obstacle along a heading
  * @param {object} o.chill                  cold mist (chill.js)
  */
-export function createIceRing({ fxMaterial, glintMaterial = fxMaterial, origin, field, reach, chill, maxSites = 900, chips = 320, bins = 96, lights: lightCount = 6, reducedMotion = false }) {
+export function createIceRing({
+  fxMaterial,
+  glintMaterial = fxMaterial,
+  origin,
+  field,
+  reach,
+  chill,
+  maxSites = 900,
+  chips = 320,
+  bins = 96,
+  lights: lightCount = 6,
+  reducedMotion = false,
+}) {
   const PER = 3; // crystals per cluster, at most
   const { mesh, glow, glowAttr } = crystalMesh(maxSites * PER);
   const frost = createBoltLines(fxMaterial, bins * 2);
   const kVel = new Float32Array(chips * 3);
   const chipPts = createPoints(chips, glintMaterial, { vel: kVel }); // shards that streak and glint as diamonds
-  const K = { pos: chipPts.geometry.attributes.position.array, col: chipPts.geometry.attributes.color.array, size: chipPts.geometry.attributes.size.array, alpha: chipPts.geometry.attributes.alpha.array };
+  const K = {
+    pos: chipPts.geometry.attributes.position.array,
+    col: chipPts.geometry.attributes.color.array,
+    size: chipPts.geometry.attributes.size.array,
+    alpha: chipPts.geometry.attributes.alpha.array,
+  };
   const kAge = new Float32Array(chips).fill(1);
   const kLife = new Float32Array(chips).fill(0);
   let kNext = 0;
@@ -584,16 +717,29 @@ export function createIceRing({ fxMaterial, glintMaterial = fxMaterial, origin, 
   const ramp = rampColors(['#0f2f66', '#2f7fe0', '#8cc8ff', '#e8f4ff']);
   const white = new THREE.Color('#ffffff');
   const tmp = new THREE.Color();
-  const lights = Array.from({ length: reducedMotion ? 0 : lightCount }, () => new THREE.PointLight(0x8cc8ff, 0, 2.4, 2));
+  const lights = Array.from(
+    { length: reducedMotion ? 0 : lightCount },
+    () => new THREE.PointLight(0x8cc8ff, 0, 2.4, 2),
+  );
 
   // Sites: where a cluster will break the ground, and when the front gets there.
   // Each cluster: a main crystal plus up to two smaller ones splayed off its root.
   const S = {
-    x: new Float32Array(maxSites), z: new Float32Array(maxSites), ang: new Float32Array(maxSites),
-    at: new Float32Array(maxSites), h: new Float32Array(maxSites), w: new Float32Array(maxSites),
-    tilt: new Float32Array(maxSites), twist: new Float32Array(maxSites), hold: new Float32Array(maxSites),
-    glow: new Float32Array(maxSites), up: new Uint8Array(maxSites), kids: new Uint8Array(maxSites),
-    kidAng: new Float32Array(maxSites * 2), kidTilt: new Float32Array(maxSites * 2), kidH: new Float32Array(maxSites * 2),
+    x: new Float32Array(maxSites),
+    z: new Float32Array(maxSites),
+    ang: new Float32Array(maxSites),
+    at: new Float32Array(maxSites),
+    h: new Float32Array(maxSites),
+    w: new Float32Array(maxSites),
+    tilt: new Float32Array(maxSites),
+    twist: new Float32Array(maxSites),
+    hold: new Float32Array(maxSites),
+    glow: new Float32Array(maxSites),
+    up: new Uint8Array(maxSites),
+    kids: new Uint8Array(maxSites),
+    kidAng: new Float32Array(maxSites * 2),
+    kidTilt: new Float32Array(maxSites * 2),
+    kidH: new Float32Array(maxSites * 2),
   };
   let sites = 0;
   // The front per heading bin: r(t) = r0 + v/k·(1 − e^(−kt)), stopped at the obstacle.
@@ -602,7 +748,7 @@ export function createIceRing({ fxMaterial, glintMaterial = fxMaterial, origin, 
   const bV = new Float32Array(bins);
   const bMax = new Float32Array(bins);
   const frontAt = (b, time) => Math.min(R0 + (bV[b] / DECAY) * (1 - Math.exp(-DECAY * time)), bMax[b] - 0.03);
-  const binOf = (a) => Math.round((((a % TAU) + TAU) % TAU) / TAU * bins) % bins;
+  const binOf = (a) => Math.round(((((a % TAU) + TAU) % TAU) / TAU) * bins) % bins;
   let since = 1e3;
   let active = false;
   let live = false;
@@ -664,7 +810,9 @@ export function createIceRing({ fxMaterial, glintMaterial = fxMaterial, origin, 
     const i = kNext;
     kNext = (kNext + 1) % chips;
     const ix = i * 3;
-    K.pos[ix] = x; K.pos[ix + 1] = y; K.pos[ix + 2] = z;
+    K.pos[ix] = x;
+    K.pos[ix + 1] = y;
+    K.pos[ix + 2] = z;
     const out = 0.3 + Math.random() * 0.7;
     const side = (Math.random() - 0.5) * 0.8;
     kVel[ix] = Math.cos(ang) * out - Math.sin(ang) * side;
@@ -685,11 +833,13 @@ export function createIceRing({ fxMaterial, glintMaterial = fxMaterial, origin, 
       live = true;
       // --- clusters: rise fast (with a small overshoot), hold, sink back
       let n = 0;
-      lightR.fill(0); lc.fill(0);
+      lightR.fill(0);
+      lc.fill(0);
       for (let i = 0; i < sites; i++) {
         const tau = since - S.at[i];
         if (tau <= 0) continue;
-        const RISE = 0.07, SINK = 0.16;
+        const RISE = 0.07,
+          SINK = 0.16;
         let env;
         if (tau < RISE) env = easeOutBack(tau / RISE, OVERSHOOT);
         else if (tau < RISE + S.hold[i]) env = 1;
@@ -699,22 +849,45 @@ export function createIceRing({ fxMaterial, glintMaterial = fxMaterial, origin, 
           S.up[i] = 1;
           if (Math.random() < 0.7) chip(S.x[i], S.h[i] * 0.6, S.z[i], S.ang[i]);
           // Chill trails the ring, shed low as each cluster breaks the ground.
-          if (chill) for (let c = 0; c < 2; c++) {
-            const s = 0.15 + Math.random() * 0.35;
-            chill.emit(S.x[i] + (Math.random() - 0.5) * 0.1, 0.04 + Math.random() * 0.08, S.z[i] + (Math.random() - 0.5) * 0.1, Math.cos(S.ang[i]) * s, 0.03 + Math.random() * 0.05, Math.sin(S.ang[i]) * s, 1.5, 0.38);
-          }
+          if (chill)
+            for (let c = 0; c < 2; c++) {
+              const s = 0.15 + Math.random() * 0.35;
+              chill.emit(
+                S.x[i] + (Math.random() - 0.5) * 0.1,
+                0.04 + Math.random() * 0.08,
+                S.z[i] + (Math.random() - 0.5) * 0.1,
+                Math.cos(S.ang[i]) * s,
+                0.03 + Math.random() * 0.05,
+                Math.sin(S.ang[i]) * s,
+                1.5,
+                0.38,
+              );
+            }
         }
         const fresh = Math.min(1, 0.35 + S.glow[i] * 0.3 + Math.max(0, 1 - tau / 0.4) * 0.6);
         place(mesh, n, S.x[i], -0.02, S.z[i], S.ang[i], S.tilt[i], S.twist[i], S.w[i], S.w[i] * 0.9, S.h[i] * env);
         glow[n++] = fresh;
         for (let c = 0; c < S.kids[i]; c++) {
           const k = i * 2 + c;
-          place(mesh, n, S.x[i], -0.02, S.z[i], S.kidAng[k], S.kidTilt[k], S.twist[i] + c * 2, S.w[i] * 0.6, S.w[i] * 0.55, S.h[i] * S.kidH[k] * env);
+          place(
+            mesh,
+            n,
+            S.x[i],
+            -0.02,
+            S.z[i],
+            S.kidAng[k],
+            S.kidTilt[k],
+            S.twist[i] + c * 2,
+            S.w[i] * 0.6,
+            S.w[i] * 0.55,
+            S.h[i] * S.kidH[k] * env,
+          );
           glow[n++] = fresh * 0.9;
         }
         if (lightCount && tau < RISE + 0.15) {
           const s = Math.floor((S.ang[i] / TAU) * lightCount + lightCount) % lightCount;
-          lightR[s] += Math.hypot(S.x[i] - origin.x, S.z[i] - origin.z); lc[s] += 1;
+          lightR[s] += Math.hypot(S.x[i] - origin.x, S.z[i] - origin.z);
+          lc[s] += 1;
         }
       }
       mesh.count = n;
@@ -730,16 +903,34 @@ export function createIceRing({ fxMaterial, glintMaterial = fxMaterial, origin, 
       const fade = clamp01(1 - since / Math.max(0.3, duration * 0.8));
       for (let b = 0; b < bins; b++) {
         const c = (b + 1) % bins;
-        const ra = frontAt(b, since), rb = frontAt(c, since);
+        const ra = frontAt(b, since),
+          rb = frontAt(c, since);
         if (Math.abs(ra - rb) > 0.2 || ra >= bMax[b] - 0.035 || rb >= bMax[c] - 0.035) continue;
-        const a0 = (b / bins) * TAU, a1 = (c / bins) * TAU;
-        tmp.copy(ramp[2]).lerp(ramp[3], 0.4).multiplyScalar(0.9 * fade);
-        frost.segment(origin.x + Math.cos(a0) * ra, 0.02, origin.z + Math.sin(a0) * ra, origin.x + Math.cos(a1) * rb, 0.02, origin.z + Math.sin(a1) * rb, tmp, tmp, fade);
+        const a0 = (b / bins) * TAU,
+          a1 = (c / bins) * TAU;
+        tmp
+          .copy(ramp[2])
+          .lerp(ramp[3], 0.4)
+          .multiplyScalar(0.9 * fade);
+        frost.segment(
+          origin.x + Math.cos(a0) * ra,
+          0.02,
+          origin.z + Math.sin(a0) * ra,
+          origin.x + Math.cos(a1) * rb,
+          0.02,
+          origin.z + Math.sin(a1) * rb,
+          tmp,
+          tmp,
+          fade,
+        );
       }
       frost.end();
 
       lights.forEach((l, s) => {
-        if (!lc[s]) { l.intensity = 0; return; }
+        if (!lc[s]) {
+          l.intensity = 0;
+          return;
+        }
         const a = ((s + 0.5) / lightCount) * TAU;
         const r = lightR[s] / lc[s];
         l.position.set(origin.x + Math.cos(a) * r, 0.35, origin.z + Math.sin(a) * r);
@@ -760,22 +951,38 @@ export function createIceRing({ fxMaterial, glintMaterial = fxMaterial, origin, 
 
     // --- chips: thrown up and out, glinting as they tumble and settle
     for (let i = 0; i < chips; i++) {
-      if (kAge[i] >= kLife[i]) { K.size[i] = 0; continue; }
+      if (kAge[i] >= kLife[i]) {
+        K.size[i] = 0;
+        continue;
+      }
       anyChip = true;
       kAge[i] += dt;
       const ix = i * 3;
       const drag = Math.exp(-dt * 1.2);
-      kVel[ix] *= drag; kVel[ix + 1] = kVel[ix + 1] * drag - 3.5 * dt; kVel[ix + 2] *= drag;
-      K.pos[ix] += kVel[ix] * dt; K.pos[ix + 1] += kVel[ix + 1] * dt; K.pos[ix + 2] += kVel[ix + 2] * dt;
+      kVel[ix] *= drag;
+      kVel[ix + 1] = kVel[ix + 1] * drag - 3.5 * dt;
+      kVel[ix + 2] *= drag;
+      K.pos[ix] += kVel[ix] * dt;
+      K.pos[ix + 1] += kVel[ix + 1] * dt;
+      K.pos[ix + 2] += kVel[ix + 2] * dt;
       let bounced = false;
-      if (K.pos[ix + 1] < 0.02) { K.pos[ix + 1] = 0.02; bounced = kVel[ix + 1] < -0.4; kVel[ix + 1] *= -0.25; kVel[ix] *= 0.5; kVel[ix + 2] *= 0.5; }
+      if (K.pos[ix + 1] < 0.02) {
+        K.pos[ix + 1] = 0.02;
+        bounced = kVel[ix + 1] < -0.4;
+        kVel[ix + 1] *= -0.25;
+        kVel[ix] *= 0.5;
+        kVel[ix + 2] *= 0.5;
+      }
       const k = kAge[i] / kLife[i];
       tmp.copy(i & 1 || bounced ? ramp[3] : ramp[2]).multiplyScalar(bounced ? 1.1 : 0.8);
-      K.col[ix] = tmp.r; K.col[ix + 1] = tmp.g; K.col[ix + 2] = tmp.b;
+      K.col[ix] = tmp.r;
+      K.col[ix + 1] = tmp.g;
+      K.col[ix + 2] = tmp.b;
       K.size[i] = bounced ? 3 : 1; // a shard glints as it hits the ground
       K.alpha[i] = Math.min(1, (1 - k) * 2.5) * (0.55 + 0.45 * Math.sin(kAge[i] * 30 + i));
     }
-    if (anyChip || active) for (const k of ['position', 'color', 'size', 'alpha', 'vel']) chipPts.geometry.attributes[k].needsUpdate = true;
+    if (anyChip || active)
+      for (const k of ['position', 'color', 'size', 'alpha', 'vel']) chipPts.geometry.attributes[k].needsUpdate = true;
   }
 
   return {

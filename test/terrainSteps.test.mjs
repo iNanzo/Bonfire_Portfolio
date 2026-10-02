@@ -10,10 +10,11 @@ const MAX_H = 4; // (terrain.js packs heights into 16 bits over [0, 4] m)
 function drawn(res) {
   const px = new Uint8Array(res * res * 4);
   const v = Math.round((1 / MAX_H) * 65535);
-  for (let j = 150; j < 180; j++) for (let i = 100; i < 140; i++) {
-    px[(j * res + i) * 4] = v >> 8;
-    px[(j * res + i) * 4 + 1] = v & 255;
-  }
+  for (let j = 150; j < 180; j++)
+    for (let i = 100; i < 140; i++) {
+      px[(j * res + i) * 4] = v >> 8;
+      px[(j * res + i) * 4 + 1] = v & 255;
+    }
   return px;
 }
 
@@ -22,7 +23,10 @@ test('stepped, the height map comes in small steps and reads the heights drawn',
   const steps = heightSteps(drawn(o.res), o);
   let yields = 0;
   let r = steps.next();
-  while (!r.done) { yields++; r = steps.next(); }
+  while (!r.done) {
+    yields++;
+    r = steps.next();
+  }
   assert.ok(yields >= 10, `a few rows a step (${yields} steps)`);
   const map = r.value;
   const cell = o.size / o.res;
@@ -32,5 +36,8 @@ test('stepped, the height map comes in small steps and reads the heights drawn',
   assert.equal(map.top(x(20), z(20)), 0, 'the ground: 0');
   assert.ok(Math.abs(map.solid(x(98), z(160)) - 1) < 1e-3, 'grown by the pad beside it');
   assert.equal(map.solid(x(96), z(160)), 0, 'and no further');
-  assert.ok(map.wallSpots.length > 0 && map.wallSpots.every((w) => w.hi - w.lo >= 0.25), 'its sides are walls to land on');
+  assert.ok(
+    map.wallSpots.length > 0 && map.wallSpots.every((w) => w.hi - w.lo >= 0.25),
+    'its sides are walls to land on',
+  );
 });

@@ -8,7 +8,23 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  tip, range, number, text, check, checks, select, options, barOptions, mode, modeGrid, tri, triGrid, bulkBar, bulkValues, more, BULK_ACTIONS,
+  tip,
+  range,
+  number,
+  text,
+  check,
+  checks,
+  select,
+  options,
+  barOptions,
+  mode,
+  modeGrid,
+  tri,
+  triGrid,
+  bulkBar,
+  bulkValues,
+  more,
+  BULK_ACTIONS,
 } from '../src/ui/fields.js';
 import { MODES, modeOf, BAR_OPTIONS, RANDOM } from '../src/modes.js';
 import * as looks from '../src/visualizer/looks.js';
@@ -22,7 +38,15 @@ const described = (html) => html.match(/<(?:input|select)\b[^>]*aria-describedby
 test('a field with a hint: the "?" is a button beside the label, outside it, and the input reads the hint', () => {
   for (const html of [
     range('glitch', 'Effects Strength', 0, 2, 0.05, { hint: 'How strong every effect is.', unit: '×' }),
-    select('fog', 'Fog', [['off', 'Off'], ['light', 'Light']], { hint: 'The dark closing in.' }),
+    select(
+      'fog',
+      'Fog',
+      [
+        ['off', 'Off'],
+        ['light', 'Light'],
+      ],
+      { hint: 'The dark closing in.' },
+    ),
     text('title', 'Title', { hint: 'The main card’s big line.' }),
     number('linkPort', 'Link Bridge Port', { hint: 'The port the bridge listens on.', min: 1024, max: 65535 }),
     check('shadows', 'Fire Shadows', { hint: 'The scenery casts the fire’s shadows.' }),
@@ -43,16 +67,35 @@ test('a field with a hint: the "?" is a button beside the label, outside it, and
   assert.ok(forId);
   assert.match(sel, new RegExp(`<select data-set="fog" id="${forId}"`));
   // A checkbox: the box and its words in the label, the "?" after it.
-  assert.match(check('shadows', 'Fire Shadows', { hint: 'Casts shadows.' }), /^<div class="viz-check"><label><input type="checkbox" data-set="shadows" aria-describedby="viz-tip-\d+"><span>Fire Shadows<\/span><\/label><button type="button" class="viz-tip"/);
+  assert.match(
+    check('shadows', 'Fire Shadows', { hint: 'Casts shadows.' }),
+    /^<div class="viz-check"><label><input type="checkbox" data-set="shadows" aria-describedby="viz-tip-\d+"><span>Fire Shadows<\/span><\/label><button type="button" class="viz-tip"/,
+  );
   // The value and unit beside a slider's label.
-  assert.match(range('glitch', 'Effects Strength', 0, 2, 0.05, { hint: 'x', unit: '×' }), /\?<\/button><span class="visually-hidden"[^>]*>x<\/span><output data-out="glitch"><\/output><span class="viz-unit">×<\/span>/);
-  assert.match(number('linkPort', 'Port', { min: 1024, max: 65535 }), /<input type="number" data-set="linkPort" min="1024" max="65535" step="1" inputmode="numeric">/);
-  assert.match(number('gain', 'Gain', { step: 0.5 }), /step="0\.5" inputmode="decimal">/, 'a fraction: a keypad with a decimal point');
+  assert.match(
+    range('glitch', 'Effects Strength', 0, 2, 0.05, { hint: 'x', unit: '×' }),
+    /\?<\/button><span class="visually-hidden"[^>]*>x<\/span><output data-out="glitch"><\/output><span class="viz-unit">×<\/span>/,
+  );
+  assert.match(
+    number('linkPort', 'Port', { min: 1024, max: 65535 }),
+    /<input type="number" data-set="linkPort" min="1024" max="65535" step="1" inputmode="numeric">/,
+  );
+  assert.match(
+    number('gain', 'Gain', { step: 0.5 }),
+    /step="0\.5" inputmode="decimal">/,
+    'a fraction: a keypad with a decimal point',
+  );
 });
 
 test('a field with no hint keeps its label wrapping its input (the Painter’s helmet rows rely on it)', () => {
-  assert.match(select('knights.helmets.0', 'Knight 1', [['', 'Drawn at Random']]), /^\s*<label class="viz-field">\s*<span class="viz-field-label">Knight 1 <\/span>\s*<select data-set="knights\.helmets\.0">/);
-  assert.equal(check('elements.fire', 'Fire', { group: 'viz-tip-9' }), '<label class="viz-check" data-group-tip><input type="checkbox" data-set="elements.fire" aria-describedby="viz-tip-9"><span>Fire</span></label>');
+  assert.match(
+    select('knights.helmets.0', 'Knight 1', [['', 'Drawn at Random']]),
+    /^\s*<label class="viz-field">\s*<span class="viz-field-label">Knight 1 <\/span>\s*<select data-set="knights\.helmets\.0">/,
+  );
+  assert.equal(
+    check('elements.fire', 'Fire', { group: 'viz-tip-9' }),
+    '<label class="viz-check" data-group-tip><input type="checkbox" data-set="elements.fire" aria-describedby="viz-tip-9"><span>Fire</span></label>',
+  );
   assert.deepEqual(tip(''), { mark: '', button: '', note: '', ref: '', id: '' });
   const t = tip('Hint.', { control: true, label: 'Fog' });
   assert.equal(t.mark, t.button + t.note, 'the "?" and its hidden text, apart for a legend');
@@ -60,52 +103,119 @@ test('a field with no hint keeps its label wrapping its input (the Painter’s h
 
 test('a "?" on its own is a keyboard stop, named and described by its hint', () => {
   const lone = tip('What this does, at length.', { label: 'Make a Flame' });
-  assert.match(lone.mark, /^<button type="button" class="viz-tip" tabindex="0" data-tip="What this does, at length\." aria-label="About Make a Flame" aria-describedby="(viz-tip-\d+)">\?<\/button><span class="visually-hidden" id="\1">/);
+  assert.match(
+    lone.mark,
+    /^<button type="button" class="viz-tip" tabindex="0" data-tip="What this does, at length\." aria-label="About Make a Flame" aria-describedby="(viz-tip-\d+)">\?<\/button><span class="visually-hidden" id="\1">/,
+  );
   assert.match(tip('x').mark, /aria-label="Hint"/, 'no label: "Hint"');
   assert.match(tip('a "quoted" <hint>').mark, /data-tip="a &quot;quoted&quot; &lt;hint&gt;"/, 'escaped');
-  assert.match(tip('x', { label: 'Say “hi” <b>now</b>' }).mark, /aria-label="About Say “hi” now"/, 'the label as plain text');
+  assert.match(
+    tip('x', { label: 'Say “hi” <b>now</b>' }).mark,
+    /aria-label="About Say “hi” now"/,
+    'the label as plain text',
+  );
 });
 
 test('groups: one "?" for a checklist or a grid, each switch reading out its own hint then the group’s', () => {
-  const list = checks('elements', 'Elements', { fire: 'Fire', ice: 'Ice <Cold>' }, { hint: 'Which elements new weapons bring.' });
+  const list = checks(
+    'elements',
+    'Elements',
+    { fire: 'Fire', ice: 'Ice <Cold>' },
+    { hint: 'Which elements new weapons bring.' },
+  );
   const groupId = list.match(/<p class="viz-field-label">Elements <button[^>]*aria-describedby="(viz-tip-\d+)"/)?.[1];
   assert.ok(groupId);
-  assert.equal([...list.matchAll(new RegExp(`aria-describedby="${groupId}"`, 'g'))].length, 3, 'the "?" and both boxes');
-  assert.match(list, /<p class="viz-field-label">Elements <button[^>]*tabindex="-1"/, 'every box shows the list’s tip: not a stop');
+  assert.equal(
+    [...list.matchAll(new RegExp(`aria-describedby="${groupId}"`, 'g'))].length,
+    3,
+    'the "?" and both boxes',
+  );
+  assert.match(
+    list,
+    /<p class="viz-field-label">Elements <button[^>]*tabindex="-1"/,
+    'every box shows the list’s tip: not a stop',
+  );
   assert.match(list, /<span>Ice &lt;Cold&gt;<\/span>/);
   assert.doesNotMatch(list, /class="bulk"/, 'no toolbar unless asked');
-  const grid = modeGrid('Layers', [['grain', 'Grain', 'Film grain over the picture.'], ['cinema', 'Cinema Bars']], { hint: 'Effects over any look.' });
+  const grid = modeGrid(
+    'Layers',
+    [
+      ['grain', 'Grain', 'Film grain over the picture.'],
+      ['cinema', 'Cinema Bars'],
+    ],
+    { hint: 'Effects over any look.' },
+  );
   const gridId = grid.match(/<p class="viz-field-label">Layers <button[^>]*aria-describedby="(viz-tip-\d+)"/)?.[1];
-  const grain = grid.match(/<div class="viz-mode"><label for="([^"]+)">Grain<\/label><button[^>]*aria-describedby="(viz-tip-\d+)"[\s\S]*?<select data-set="grain" id="\1" aria-label="Grain" aria-describedby="\2 ([^"]+)">/);
+  const grain = grid.match(
+    /<div class="viz-mode"><label for="([^"]+)">Grain<\/label><button[^>]*aria-describedby="(viz-tip-\d+)"[\s\S]*?<select data-set="grain" id="\1" aria-label="Grain" aria-describedby="\2 ([^"]+)">/,
+  );
   assert.ok(grain, 'its own "?" outside its label, then the grid’s');
   assert.equal(grain[3], gridId);
   // Focusing Grain shows Grain's tip, so the grid's "?" is a stop of its own; with no hints
   // but the grid's, every switch shows it, and it isn't.
   assert.match(grid, /<p class="viz-field-label">Layers <button[^>]*tabindex="0"/);
-  assert.match(modeGrid('Layers', [['grain', 'Grain']], { hint: 'Over any look.' }), /<p class="viz-field-label">Layers <button[^>]*tabindex="-1"/);
-  assert.match(grid, new RegExp(`<label class="viz-mode" data-group-tip><span>Cinema Bars</span><select data-set="cinema" aria-label="Cinema Bars" aria-describedby="${gridId}">`), 'one without a hint of its own: the grid’s');
-  assert.deepEqual([...grid.matchAll(/<option value="([^"]+)">([^<]+)<\/option>/g)].slice(0, 3).map((m) => [m[1], m[2]]), MODES);
-  assert.doesNotMatch(modeGrid('Looks', [['looks.ember', 'Ember']], { noAlways: ['looks.ember'] }), /value="on"/, 'no Always where it adds nothing');
-  assert.match(mode('sparks', 'Hi-Hat Sparks', { hint: 'Sparks on the hats.' }), /data-tip="Sparks on the hats\. In the Mix: /);
+  assert.match(
+    modeGrid('Layers', [['grain', 'Grain']], { hint: 'Over any look.' }),
+    /<p class="viz-field-label">Layers <button[^>]*tabindex="-1"/,
+  );
+  assert.match(
+    grid,
+    new RegExp(
+      `<label class="viz-mode" data-group-tip><span>Cinema Bars</span><select data-set="cinema" aria-label="Cinema Bars" aria-describedby="${gridId}">`,
+    ),
+    'one without a hint of its own: the grid’s',
+  );
+  assert.deepEqual(
+    [...grid.matchAll(/<option value="([^"]+)">([^<]+)<\/option>/g)].slice(0, 3).map((m) => [m[1], m[2]]),
+    MODES,
+  );
+  assert.doesNotMatch(
+    modeGrid('Looks', [['looks.ember', 'Ember']], { noAlways: ['looks.ember'] }),
+    /value="on"/,
+    'no Always where it adds nothing',
+  );
+  assert.match(
+    mode('sparks', 'Hi-Hat Sparks', { hint: 'Sparks on the hats.' }),
+    /data-tip="Sparks on the hats\. In the Mix: /,
+  );
 });
 
 test('tri: three radios, one group, each with the key and its value', () => {
   const html = tri('knightGlow', 'Edge Glow', { hint: 'The armor’s edges catch the fire.' });
-  assert.match(html, /^<fieldset class="tri" data-set-group="knightGlow" aria-labelledby="([\w-]+)" aria-describedby="(viz-tip-\d+)"><legend><span class="tri-name" id="\1">Edge Glow<\/span> <button type="button" class="viz-tip" tabindex="-1"[^>]*aria-describedby="\2">\?<\/button><\/legend><span class="visually-hidden" id="\2">/);
+  assert.match(
+    html,
+    /^<fieldset class="tri" data-set-group="knightGlow" aria-labelledby="([\w-]+)" aria-describedby="(viz-tip-\d+)"><legend><span class="tri-name" id="\1">Edge Glow<\/span> <button type="button" class="viz-tip" tabindex="-1"[^>]*aria-describedby="\2">\?<\/button><\/legend><span class="visually-hidden" id="\2">/,
+  );
   const radios = [...html.matchAll(/<input type="radio" name="([^"]+)" data-set="([^"]+)" value="([^"]+)">/g)];
-  assert.deepEqual(radios.map((m) => m[3]), ['off', 'mix', 'on']);
-  assert.ok(radios.every((m) => m[2] === 'knightGlow'), 'data-set on each');
+  assert.deepEqual(
+    radios.map((m) => m[3]),
+    ['off', 'mix', 'on'],
+  );
+  assert.ok(
+    radios.every((m) => m[2] === 'knightGlow'),
+    'data-set on each',
+  );
   assert.equal(new Set(radios.map((m) => m[1])).size, 1, 'one name: one group, one tab stop');
-  assert.deepEqual([...html.matchAll(/<span>([^<]+)<\/span><\/label>/g)].map((m) => m[1]), ['Off', 'In the Mix', 'Always']);
+  assert.deepEqual(
+    [...html.matchAll(/<span>([^<]+)<\/span><\/label>/g)].map((m) => m[1]),
+    ['Off', 'In the Mix', 'Always'],
+  );
   for (const l of labels(html)) assert.ok(!l.includes('class="viz-tip"'), 'the "?" isn’t in a choice’s label');
   // No Always; a missing value's mark; advanced; more attributes per choice.
   const ember = tri('looks.ember', 'Ember', { noAlways: true, missing: 'mix', adv: true, attr: ' data-audition' });
   assert.match(ember, /^<fieldset class="tri" data-adv data-set-group="looks\.ember" data-no-always>/);
   assert.doesNotMatch(ember, /value="on"/);
-  assert.match(ember, /<label class="tri-opt" data-audition><input type="radio" name="[^"]+" data-set="looks\.ember" value="mix" data-missing>/);
+  assert.match(
+    ember,
+    /<label class="tri-opt" data-audition><input type="radio" name="[^"]+" data-set="looks\.ember" value="mix" data-missing>/,
+  );
   assert.equal(tri('x', 'X').match(/<legend>.*<\/legend>/)[0], '<legend><span class="tri-name">X</span></legend>');
   assert.doesNotMatch(tri('x', 'X'), /aria-describedby|aria-labelledby|viz-tip/, 'no hint: no "?"');
-  assert.notEqual(tri('a', 'A').match(/name="([^"]+)"/)[1], tri('a', 'A').match(/name="([^"]+)"/)[1], 'each its own group');
+  assert.notEqual(
+    tri('a', 'A').match(/name="([^"]+)"/)[1],
+    tri('a', 'A').match(/name="([^"]+)"/)[1],
+    'each its own group',
+  );
 });
 
 test('tri: the "?" is in the first legend, so a disabled switch still says what it does', () => {
@@ -114,44 +224,97 @@ test('tri: the "?" is in the first legend, so a disabled switch still says what 
   const legend = html.match(/<legend>([\s\S]*?)<\/legend>/);
   assert.equal(html.match(/<legend>/g).length, 1, 'one legend, the first');
   assert.match(legend[1], /<button type="button" class="viz-tip"/, 'the "?" in it');
-  assert.doesNotMatch(legend[1], /visually-hidden|>A rim of light/, 'the hint’s text out of it (the legend names the group)');
+  assert.doesNotMatch(
+    legend[1],
+    /visually-hidden|>A rim of light/,
+    'the hint’s text out of it (the legend names the group)',
+  );
   assert.doesNotMatch(html.slice(html.indexOf('</legend>')), /<button/, 'no button past it');
 });
 
 test('triGrid and the bulk toolbars: actions in Title Case, the grid named for its toolbar', () => {
-  const grid = triGrid('Looks', [['looks.ember', 'Ember', 'The clean fire.'], ['looks.glitch', 'Glitch']], { hint: 'The picture’s styles.', noAlways: ['looks.ember'], bulk: 'looks' });
+  const grid = triGrid(
+    'Looks',
+    [
+      ['looks.ember', 'Ember', 'The clean fire.'],
+      ['looks.glitch', 'Glitch'],
+    ],
+    { hint: 'The picture’s styles.', noAlways: ['looks.ember'], bulk: 'looks' },
+  );
   const gridId = grid.match(/<p class="viz-field-label">Looks <button[^>]*aria-describedby="(viz-tip-\d+)"/)?.[1];
-  assert.match(grid, /<div class="bulk" role="group" aria-label="Set All Looks">/, 'a group of buttons (a toolbar would promise arrow keys)');
-  assert.match(grid, /<p class="viz-field-label">Looks <button[^>]*tabindex="0"/, 'Ember has a hint of its own: the grid’s "?" is a stop');
-  assert.deepEqual([...grid.matchAll(/data-bulk="(\w+)" data-bulk-group="looks">([^<]+)</g)].map((m) => [m[1], m[2]]), BULK_ACTIONS.tri);
+  assert.match(
+    grid,
+    /<div class="bulk" role="group" aria-label="Set All Looks">/,
+    'a group of buttons (a toolbar would promise arrow keys)',
+  );
+  assert.match(
+    grid,
+    /<p class="viz-field-label">Looks <button[^>]*tabindex="0"/,
+    'Ember has a hint of its own: the grid’s "?" is a stop',
+  );
+  assert.deepEqual(
+    [...grid.matchAll(/data-bulk="(\w+)" data-bulk-group="looks">([^<]+)</g)].map((m) => [m[1], m[2]]),
+    BULK_ACTIONS.tri,
+  );
   assert.match(grid, /<div class="tri-grid" data-bulk-list="looks">/);
-  assert.match(grid, new RegExp(`data-set-group="looks\\.ember" data-no-always aria-labelledby="[\\w-]+" aria-describedby="viz-tip-\\d+ ${gridId}"`), 'its own hint, then the grid’s');
+  assert.match(
+    grid,
+    new RegExp(
+      `data-set-group="looks\\.ember" data-no-always aria-labelledby="[\\w-]+" aria-describedby="viz-tip-\\d+ ${gridId}"`,
+    ),
+    'its own hint, then the grid’s',
+  );
   assert.match(grid, new RegExp(`data-set-group="looks\\.glitch" aria-describedby="${gridId}"`));
   assert.doesNotMatch(triGrid('Layers', [['grain', 'Grain']]), /class="bulk"/, 'no toolbar without a name');
   for (const [, label] of [...BULK_ACTIONS.tri, ...BULK_ACTIONS.checks]) assert.equal(titleCase(label), label);
   const list = bulkBar('elements', { kind: 'checks', minOne: true, label: 'Elements' });
-  assert.deepEqual([...list.matchAll(/data-bulk="(\w+)"/g)].map((m) => m[1]), ['all', 'none', 'defaults']);
-  const none = list.match(/data-bulk="none" data-bulk-group="elements" aria-disabled="true" data-tip="([^"]+)" aria-describedby="([^"]+)">None<\/button><span class="visually-hidden" id="\2">([^<]+)<\/span>/);
+  assert.deepEqual(
+    [...list.matchAll(/data-bulk="(\w+)"/g)].map((m) => m[1]),
+    ['all', 'none', 'defaults'],
+  );
+  const none = list.match(
+    /data-bulk="none" data-bulk-group="elements" aria-disabled="true" data-tip="([^"]+)" aria-describedby="([^"]+)">None<\/button><span class="visually-hidden" id="\2">([^<]+)<\/span>/,
+  );
   assert.ok(none, 'at least one stays: None is out, and says why');
   assert.equal(none[3], none[1], 'to a screen reader too (the tip is hidden from it)');
   assert.doesNotMatch(bulkBar('moves', { kind: 'checks' }), /aria-disabled/);
-  assert.match(checks('moves', 'Attacks', { slash: 'Slash' }, { bulk: true }), /class="bulk"[\s\S]*<div class="viz-checks" data-bulk-list="moves">/);
+  assert.match(
+    checks('moves', 'Attacks', { slash: 'Slash' }, { bulk: true }),
+    /class="bulk"[\s\S]*<div class="viz-checks" data-bulk-list="moves">/,
+  );
 });
 
 test('bulkValues: every switch set, Always as In the Mix where there’s none, defaults back, shuffles rolled, at least one kept', () => {
   const items = ['looks.glitch', { key: 'looks.ember', noAlways: true }, 'looks.echo'];
   const current = { 'looks.glitch': 'off', 'looks.ember': 'mix', 'looks.echo': 'on', other: 42 };
   const defaults = { 'looks.glitch': 'mix', 'looks.ember': 'mix', 'looks.echo': 'mix' };
-  assert.deepEqual(bulkValues('on', items, current, defaults), { 'looks.glitch': 'on', 'looks.ember': 'mix', 'looks.echo': 'on', other: 42 });
-  assert.deepEqual(bulkValues('off', items, current, defaults), { 'looks.glitch': 'off', 'looks.ember': 'off', 'looks.echo': 'off', other: 42 });
+  assert.deepEqual(bulkValues('on', items, current, defaults), {
+    'looks.glitch': 'on',
+    'looks.ember': 'mix',
+    'looks.echo': 'on',
+    other: 42,
+  });
+  assert.deepEqual(bulkValues('off', items, current, defaults), {
+    'looks.glitch': 'off',
+    'looks.ember': 'off',
+    'looks.echo': 'off',
+    other: 42,
+  });
   assert.deepEqual(bulkValues('mix', items, current, defaults), { ...defaults, other: 42 });
-  assert.deepEqual(bulkValues('defaults', items, current, { 'looks.glitch': 'mix' }), { ...current, 'looks.glitch': 'mix' }, 'no default: as it was');
+  assert.deepEqual(
+    bulkValues('defaults', items, current, { 'looks.glitch': 'mix' }),
+    { ...current, 'looks.glitch': 'mix' },
+    'no default: as it was',
+  );
   const out = bulkValues('on', items, current, defaults);
   assert.notEqual(out, current, 'a new object');
   assert.equal(current['looks.glitch'], 'off', 'the old one untouched');
   // Shuffle: each switch any of its states, from the dice given.
   const rolls = [0, 0.99, 0.99];
-  assert.deepEqual(bulkValues('shuffle', items, current, defaults, () => rolls.shift()), { 'looks.glitch': 'off', 'looks.ember': 'mix', 'looks.echo': 'on', other: 42 });
+  assert.deepEqual(
+    bulkValues('shuffle', items, current, defaults, () => rolls.shift()),
+    { 'looks.glitch': 'off', 'looks.ember': 'mix', 'looks.echo': 'on', other: 42 },
+  );
   const seen = new Set();
   for (let i = 0; i < 60; i++) seen.add(bulkValues('shuffle', ['a'], { a: 'off' }, {}, Math.random).a);
   assert.deepEqual([...seen].sort(), ['mix', 'off', 'on']);
@@ -160,23 +323,52 @@ test('bulkValues: every switch set, Always as In the Mix where there’s none, d
   const on = { fire: false, lightning: true, ice: true };
   assert.deepEqual(bulkValues('all', boxes, on, {}), { fire: true, lightning: true, ice: true });
   assert.deepEqual(bulkValues('none', boxes, on, {}), { fire: false, lightning: false, ice: false });
-  assert.deepEqual(bulkValues('none', boxes, on, {}, Math.random, { minOne: true }), { fire: false, lightning: true, ice: false }, 'the first that was on stays');
-  assert.deepEqual(bulkValues('none', boxes, { fire: false, lightning: false, ice: false }, {}, Math.random, { minOne: true }), { fire: true, lightning: false, ice: false });
-  assert.deepEqual(bulkValues('shuffle', boxes, on, {}, () => 0, { minOne: true }), { fire: false, lightning: true, ice: false }, 'shuffled to none: the first that was on, back');
-  assert.deepEqual(bulkValues('shuffle', boxes, on, {}, () => 0.9), { fire: true, lightning: true, ice: true });
-  assert.deepEqual(bulkValues('off', ['a', 'b'], { a: 'on', b: 'mix' }, {}, Math.random, { minOne: true }), { a: 'on', b: 'off' }, 'a switch kept as it was');
+  assert.deepEqual(
+    bulkValues('none', boxes, on, {}, Math.random, { minOne: true }),
+    { fire: false, lightning: true, ice: false },
+    'the first that was on stays',
+  );
+  assert.deepEqual(
+    bulkValues('none', boxes, { fire: false, lightning: false, ice: false }, {}, Math.random, { minOne: true }),
+    { fire: true, lightning: false, ice: false },
+  );
+  assert.deepEqual(
+    bulkValues('shuffle', boxes, on, {}, () => 0, { minOne: true }),
+    { fire: false, lightning: true, ice: false },
+    'shuffled to none: the first that was on, back',
+  );
+  assert.deepEqual(
+    bulkValues('shuffle', boxes, on, {}, () => 0.9),
+    { fire: true, lightning: true, ice: true },
+  );
+  assert.deepEqual(
+    bulkValues('off', ['a', 'b'], { a: 'on', b: 'mix' }, {}, Math.random, { minOne: true }),
+    { a: 'on', b: 'off' },
+    'a switch kept as it was',
+  );
   assert.deepEqual(bulkValues('dance', boxes, on, {}), on, 'an unknown action changes nothing');
 });
 
 test('more: the longer text folded away, escaped, a line or a list', () => {
-  assert.equal(more('Each style <b>draws</b>.'), '<details class="viz-more" data-adv><summary>More</summary><p>Each style &lt;b&gt;draws&lt;/b&gt;.</p></details>');
-  assert.equal(more(['One.', 'Two.'], { adv: false }), '<details class="viz-more"><summary>More</summary><ul><li>One.</li><li>Two.</li></ul></details>');
+  assert.equal(
+    more('Each style <b>draws</b>.'),
+    '<details class="viz-more" data-adv><summary>More</summary><p>Each style &lt;b&gt;draws&lt;/b&gt;.</p></details>',
+  );
+  assert.equal(
+    more(['One.', 'Two.'], { adv: false }),
+    '<details class="viz-more"><summary>More</summary><ul><li>One.</li><li>Two.</li></ul></details>',
+  );
 });
 
 test('the shared words: MODES and the bar choices live in src/modes.js, in Title Case; Live reads the same ones', () => {
-  assert.deepEqual(MODES, [['off', 'Off'], ['mix', 'In the Mix'], ['on', 'Always']]);
+  assert.deepEqual(MODES, [
+    ['off', 'Off'],
+    ['mix', 'In the Mix'],
+    ['on', 'Always'],
+  ]);
   for (const [, label] of MODES) assert.equal(titleCase(label), label);
-  for (const list of Object.values(BAR_OPTIONS)) for (const [, label] of list) assert.equal(titleCase(label), label, label);
+  for (const list of Object.values(BAR_OPTIONS))
+    for (const [, label] of list) assert.equal(titleCase(label), label, label);
   assert.equal(looks.MODES, MODES, 'looks.js re-exports them');
   assert.equal(looks.modeOf, modeOf);
   assert.equal(bars.BAR_OPTIONS, BAR_OPTIONS, 'bars.js re-exports them');
@@ -187,8 +379,15 @@ test('the shared words: MODES and the bar choices live in src/modes.js, in Title
   assert.equal(modeOf('nope'), 'off');
   assert.deepEqual(barOptions('ringBars').at(-1), [RANDOM, 'Random (1, 2, 4, 8 Bars, Rolled Each Time)']);
   assert.equal(titleCase(barOptions('ringBars').at(-1)[1]), barOptions('ringBars').at(-1)[1]);
-  assert.equal(barOptions('comboBars').some(([v]) => v === RANDOM), false, 'comboBars has its own random');
-  assert.deepEqual(options({ a: 'A' }, ['mix', 'A Mix']), [['mix', 'A Mix'], ['a', 'A']]);
+  assert.equal(
+    barOptions('comboBars').some(([v]) => v === RANDOM),
+    false,
+    'comboBars has its own random',
+  );
+  assert.deepEqual(options({ a: 'A' }, ['mix', 'A Mix']), [
+    ['mix', 'A Mix'],
+    ['a', 'A'],
+  ]);
 });
 
 test('fields.js leans only on html.js and modes.js (not on Bonfire Live)', () => {

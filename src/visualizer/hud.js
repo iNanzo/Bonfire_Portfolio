@@ -24,7 +24,9 @@ export function createHud(ctx) {
   const settingsDialog = q('[data-settings]');
 
   let stateNote = null; // a transient HUD line: { text, until }
-  function note(text, seconds = 2) { stateNote = { text, until: performance.now() / 1000 + seconds }; }
+  function note(text, seconds = 2) {
+    stateNote = { text, until: performance.now() / 1000 + seconds };
+  }
 
   // (Written only when what it shows changes: each write would restyle the HUD.)
   const bandEls = BAND_NAMES.map((b) => q(`[data-band="${b}"]`));
@@ -39,19 +41,30 @@ export function createHud(ctx) {
   let hudClock = 0;
   let pipOn = -1;
   /** Write `text` into `el` if it isn't there already. */
-  const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
+  const setText = (el, text) => {
+    if (el.textContent !== text) el.textContent = text;
+  };
   function drawMeter(f) {
     // (Stepped like everything else: eighths.)
     BAND_NAMES.forEach((b, i) => {
       const v = (Math.round(f.bands[b] * 8) / 8).toFixed(3);
-      if (v !== bandShown[i]) { bandShown[i] = v; bandEls[i].style.setProperty('--v', v); }
+      if (v !== bandShown[i]) {
+        bandShown[i] = v;
+        bandEls[i].style.setProperty('--v', v);
+      }
     });
     for (const beat of f.beats) {
       if (!f.locked) continue;
       pipOn = beat.beat;
-      pips.forEach((p, i) => { p.classList.toggle('is-on', i === pipOn); p.classList.toggle('is-down', i === 0); });
+      pips.forEach((p, i) => {
+        p.classList.toggle('is-on', i === pipOn);
+        p.classList.toggle('is-down', i === 0);
+      });
     }
-    if (!f.locked && pipOn >= 0) { pips.forEach((p) => p.classList.remove('is-on')); pipOn = -1; }
+    if (!f.locked && pipOn >= 0) {
+      pips.forEach((p) => p.classList.remove('is-on'));
+      pipOn = -1;
+    }
   }
   /** The HUD's state line: a note, the section, a weapon waiting for the drop, the knights. */
   function stateText(f) {
@@ -66,7 +79,8 @@ export function createHud(ctx) {
     else if (f.state === 'breakdown' || f.state === 'build') {
       const what = f.state === 'build' ? `Build ${Math.round(f.build * 100)}%` : 'Breakdown';
       text = ctx.fire?.holding ? `${what} · ${waits}` : what;
-    } else if (ctx.fire?.holding) text = waiting ? `The weapon waits for the drop: ${waits}` : 'The weapon waits for the drop';
+    } else if (ctx.fire?.holding)
+      text = waiting ? `The weapon waits for the drop: ${waits}` : 'The weapon waits for the drop';
     else text = f.locked ? 'In the groove' : 'Listening for the beat…';
     // ...and what the knights are doing.
     const knights = ctx.director?.knights;
@@ -80,7 +94,12 @@ export function createHud(ctx) {
     hudClock = 0;
     const by = ctx.engine.analyser.tempo.manual; // tap | manual | link | null (heard)
     const tag = { tap: ' · Tap', manual: ' · Set', link: ' · Link' }[by] ?? '';
-    setText(bpmEl, f.bpm ? `${f.locked ? '' : '~'}${by === 'link' || by === 'manual' ? f.bpm.toFixed(1) : Math.round(f.bpm)} BPM${tag}` : '--- BPM');
+    setText(
+      bpmEl,
+      f.bpm
+        ? `${f.locked ? '' : '~'}${by === 'link' || by === 'manual' ? f.bpm.toFixed(1) : Math.round(f.bpm)} BPM${tag}`
+        : '--- BPM',
+    );
     bpmEl.classList.toggle('is-locked', f.locked);
     setText(stateEl, stateText(f));
     const holding = !!ctx.fire?.holding;
@@ -91,7 +110,10 @@ export function createHud(ctx) {
     const media = ctx.engine.source?.media;
     if (media && media.duration) {
       const p = (media.currentTime / media.duration).toFixed(3);
-      if (p !== progressShown) { progressShown = p; progress.style.setProperty('--p', p); }
+      if (p !== progressShown) {
+        progressShown = p;
+        progress.style.setProperty('--p', p);
+      }
     }
   }
 
@@ -101,7 +123,14 @@ export function createHud(ctx) {
     document.body.classList.remove('is-idle');
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
-      if (document.body.dataset.mode !== 'live' || settingsDialog.open || ctx.keysOverlay.el.open || hud.contains(document.activeElement) || ctx.renderMenu.el.contains(document.activeElement)) return;
+      if (
+        document.body.dataset.mode !== 'live' ||
+        settingsDialog.open ||
+        ctx.keysOverlay.el.open ||
+        hud.contains(document.activeElement) ||
+        ctx.renderMenu.el.contains(document.activeElement)
+      )
+        return;
       document.body.classList.add('is-idle');
     }, 3000);
   }
@@ -112,9 +141,15 @@ export function createHud(ctx) {
   // Keep the screen on while it's playing.
   let wakeLock = null;
   async function keepAwake() {
-    try { if (!wakeLock || wakeLock.released) wakeLock = await navigator.wakeLock?.request('screen'); } catch { /* not allowed: fine */ }
+    try {
+      if (!wakeLock || wakeLock.released) wakeLock = await navigator.wakeLock?.request('screen');
+    } catch {
+      /* not allowed: fine */
+    }
   }
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && ctx.engine?.source) keepAwake(); });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && ctx.engine?.source) keepAwake();
+  });
 
   return { note, drawHud, wake, keepAwake };
 }

@@ -62,10 +62,18 @@ function dissolveMaterial(src, uniforms, toRoot) {
     Object.assign(shader.uniforms, uniforms, { uToRoot: { value: toRoot } });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nuniform mat4 uToRoot;\nvarying vec3 vLPos;')
-      .replace('#include <project_vertex>', '#include <project_vertex>\nvLPos = (uToRoot * vec4(transformed, 1.0)).xyz;');
+      .replace(
+        '#include <project_vertex>',
+        '#include <project_vertex>\nvLPos = (uToRoot * vec4(transformed, 1.0)).xyz;',
+      );
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vLPos;\nuniform float uDissolve;\nuniform vec3 uEdge;\nuniform vec3 uEdgeHot;\nuniform vec3 uRim;\nuniform float uGlow;\nuniform vec2 uSpan;\nuniform float uFrost;\nuniform vec3 uFrostColor;\nuniform float uFlip;\n${DISSOLVE_CHUNK}`)
-      .replace('#include <dithering_fragment>', `#include <dithering_fragment>
+      .replace(
+        '#include <common>',
+        `#include <common>\nvarying vec3 vLPos;\nuniform float uDissolve;\nuniform vec3 uEdge;\nuniform vec3 uEdgeHot;\nuniform vec3 uRim;\nuniform float uGlow;\nuniform vec2 uSpan;\nuniform float uFrost;\nuniform vec3 uFrostColor;\nuniform float uFlip;\n${DISSOLVE_CHUNK}`,
+      )
+      .replace(
+        '#include <dithering_fragment>',
+        `#include <dithering_fragment>
         float rimK = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));
         gl_FragColor.rgb += uRim * (pow(rimK, 2.2) * 0.9 + 0.1);
         if (uGlow > 0.001) {
@@ -86,7 +94,8 @@ function dissolveMaterial(src, uniforms, toRoot) {
           if (e < 0.05) gl_FragColor.rgb = uEdgeHot;
           else if (e < 0.12) gl_FragColor.rgb = uEdge;
           else if (e > 0.19 && e < 0.215) gl_FragColor.rgb = mix(gl_FragColor.rgb, uEdge, 0.6);
-        }`);
+        }`,
+      );
   };
   return mat;
 }
@@ -96,7 +105,9 @@ function rootTransforms(root) {
   root.updateMatrixWorld(true);
   const inv = root.matrixWorld.clone().invert();
   const out = new Map();
-  root.traverse((o) => { if (o.isMesh) out.set(o, new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)); });
+  root.traverse((o) => {
+    if (o.isMesh) out.set(o, new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+  });
   return out;
 }
 
@@ -104,14 +115,19 @@ function rootTransforms(root) {
 function sampleSurface(toRoot, n) {
   const tris = [];
   let total = 0;
-  let yMin = Infinity, yMax = -Infinity;
-  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  let yMin = Infinity,
+    yMax = -Infinity;
+  const a = new THREE.Vector3(),
+    b = new THREE.Vector3(),
+    c = new THREE.Vector3();
   for (const [o, m] of toRoot) {
     const pos = o.geometry.attributes.position;
     const idx = o.geometry.index;
     const count = idx ? idx.count : pos.count;
     for (let i = 0; i < count; i += 3) {
-      const ia = idx ? idx.getX(i) : i, ib = idx ? idx.getX(i + 1) : i + 1, ic = idx ? idx.getX(i + 2) : i + 2;
+      const ia = idx ? idx.getX(i) : i,
+        ib = idx ? idx.getX(i + 1) : i + 1,
+        ic = idx ? idx.getX(i + 2) : i + 2;
       a.fromBufferAttribute(pos, ia).applyMatrix4(m);
       b.fromBufferAttribute(pos, ib).applyMatrix4(m);
       c.fromBufferAttribute(pos, ic).applyMatrix4(m);
@@ -127,11 +143,20 @@ function sampleSurface(toRoot, n) {
   const heights = new Float32Array(n);
   for (let k = 0; k < n; k++) {
     const r = Math.random() * total;
-    let lo = 0, hi = tris.length - 1;
-    while (lo < hi) { const mid = (lo + hi) >> 1; if (tris[mid].cum < r) lo = mid + 1; else hi = mid; }
+    let lo = 0,
+      hi = tris.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (tris[mid].cum < r) lo = mid + 1;
+      else hi = mid;
+    }
     const t = tris[lo];
-    let u = Math.random(), v = Math.random();
-    if (u + v > 1) { u = 1 - u; v = 1 - v; }
+    let u = Math.random(),
+      v = Math.random();
+    if (u + v > 1) {
+      u = 1 - u;
+      v = 1 - v;
+    }
     points[k * 3] = t.a.x + (t.b.x - t.a.x) * u + (t.c.x - t.a.x) * v;
     points[k * 3 + 1] = t.a.y + (t.b.y - t.a.y) * u + (t.c.y - t.a.y) * v;
     points[k * 3 + 2] = t.a.z + (t.b.z - t.a.z) * u + (t.c.z - t.a.z) * v;
@@ -149,9 +174,22 @@ function sampleSurface(toRoot, n) {
  * @param {number} o.layerFx        additive fx layer (forge particles)
  * @param {THREE.Material} o.particleMaterial
  */
-export function createWeapons(gltfRoot, {
-  anchor, layerSolid, layerGhost, layerFx, particleMaterial, materials = null, field, castShadows, reducedMotion, particles = 640, hooks,
-}) {
+export function createWeapons(
+  gltfRoot,
+  {
+    anchor,
+    layerSolid,
+    layerGhost,
+    layerFx,
+    particleMaterial,
+    materials = null,
+    field,
+    castShadows,
+    reducedMotion,
+    particles = 640,
+    hooks,
+  },
+) {
   const holder = new THREE.Group();
   holder.position.copy(anchor);
   // The holder sets the usual planted lean; its origin is where the weapon
@@ -176,9 +214,15 @@ export function createWeapons(gltfRoot, {
     const toRoot = rootTransforms(obj);
     const surface = sampleSurface(toRoot, N);
     const uniforms = {
-      uDissolve: { value: 0 }, uEdge: { value: new THREE.Color() }, uEdgeHot: { value: new THREE.Color() },
-      uGlow: { value: 0 }, uRim: { value: rimColor.clone() }, uSpan: { value: surface.span },
-      uFrost: { value: 0 }, uFrostColor: { value: new THREE.Color() }, uFlip: { value: 0 },
+      uDissolve: { value: 0 },
+      uEdge: { value: new THREE.Color() },
+      uEdgeHot: { value: new THREE.Color() },
+      uGlow: { value: 0 },
+      uRim: { value: rimColor.clone() },
+      uSpan: { value: surface.span },
+      uFrost: { value: 0 },
+      uFrostColor: { value: new THREE.Color() },
+      uFlip: { value: 0 },
     };
     for (const [o, m] of toRoot) {
       o.material = dissolveMaterial(o.material, uniforms, m);
@@ -213,19 +257,30 @@ export function createWeapons(gltfRoot, {
   const smearTrail = new THREE.Color();
 
   function setLayer(obj, layer) {
-    obj.traverse((o) => { if (o.isMesh) { o.layers.set(layer); o.castShadow = castShadows && layer === layerSolid; } });
+    obj.traverse((o) => {
+      if (o.isMesh) {
+        o.layers.set(layer);
+        o.castShadow = castShadows && layer === layerSolid;
+      }
+    });
   }
   /** A weapon as the forge sees it (forgeRun.js ForgeSubject). */
   function subjectOf(obj) {
     return {
-      get matrixWorld() { return obj.matrixWorld; },
+      get matrixWorld() {
+        return obj.matrixWorld;
+      },
       samples: obj.userData.samples,
       heights: obj.userData.heights,
       span: obj.userData.uniforms.uSpan.value,
       silhouette: () => (obj.userData.silhouette ??= weaponSilhouette(obj.userData.toRoot)),
       uniforms: obj.userData.uniforms,
-      show(on) { obj.visible = on; },
-      ghost(on) { setLayer(obj, on ? layerGhost : layerSolid); },
+      show(on) {
+        obj.visible = on;
+      },
+      ghost(on) {
+        setLayer(obj, on ? layerGhost : layerSolid);
+      },
     };
   }
 
@@ -238,7 +293,9 @@ export function createWeapons(gltfRoot, {
   let resolveSwap = null;
   let swapPayload = null;
 
-  const D = reducedMotion ? { ...FORGE_TIMES_REDUCED, stab: 0.01, settle: 0.6 } : { ...FORGE_TIMES, stab: 0.13, settle: 1.1 };
+  const D = reducedMotion
+    ? { ...FORGE_TIMES_REDUCED, stab: 0.01, settle: 0.6 }
+    : { ...FORGE_TIMES, stab: 0.13, settle: 1.1 };
   const HOVER = reducedMotion ? 0 : 0.5; // the forge height: the old weapon rises to it, the new one forms there
 
   /** A spot on the logs and ash around the fire for an arc to land on (world). */
@@ -247,18 +304,32 @@ export function createWeapons(gltfRoot, {
     holder.getWorldPosition(anchorWorld);
     const a = rng() * Math.PI * 2;
     const r = 0.45 + rng() * 0.35;
-    return out.set(anchorWorld.x + Math.cos(a) * r, anchorWorld.y + 0.12 + rng() * 0.14, anchorWorld.z + Math.sin(a) * r);
+    return out.set(
+      anchorWorld.x + Math.cos(a) * r,
+      anchorWorld.y + 0.12 + rng() * 0.14,
+      anchorWorld.z + Math.sin(a) * r,
+    );
   }
 
   // --- the forge (forgeRun.js): the old weapon rises to the forge height as it dissolves; the
   // new one forms there and hangs for the hold (a held one waits for the drop: stepHold).
   const run = createForgeRun({
-    particles: forge, fx, arcs, materials, particleMaterial, times: D, reducedMotion, clock: () => totalT, groundPoint,
+    particles: forge,
+    fx,
+    arcs,
+    materials,
+    particleMaterial,
+    times: D,
+    reducedMotion,
+    clock: () => totalT,
+    groundPoint,
     hooks: {
       updateMatrices: () => holder.updateMatrixWorld(true),
       onForgeStrike: (w) => hooks.onForgeStrike?.(w),
       onFormed: () => hooks.onFormed?.(swapPayload),
-      onDissolve: (k) => { current.position.y = ease.inOut(k) * HOVER; },
+      onDissolve: (k) => {
+        current.position.y = ease.inOut(k) * HOVER;
+      },
       onFormBegin: () => {
         for (const o of Object.values(items)) if (o !== incoming) o.visible = false;
         incoming.position.set(0, HOVER, 0);
@@ -266,8 +337,11 @@ export function createWeapons(gltfRoot, {
       onHold: stepHold,
       // (A held weapon's helix comes back and pulses with the beat and the build-up.)
       holdSpin: () => (holding ? 4 + 9 * charge + 20 * auraKick : 10),
-      holdAlpha: (th) => Math.max(1 - Math.min(1, th / D.hold),
-        holding ? (0.3 + 0.4 * charge + 0.5 * auraKick) * smoothstep(D.hold, D.hold + 0.8, th) : 0),
+      holdAlpha: (th) =>
+        Math.max(
+          1 - Math.min(1, th / D.hold),
+          holding ? (0.3 + 0.4 * charge + 0.5 * auraKick) * smoothstep(D.hold, D.hold + 0.8, th) : 0,
+        ),
     },
   });
 
@@ -335,9 +409,14 @@ export function createWeapons(gltfRoot, {
     }
     if (phase !== 'idle') {
       cancelQueued();
-      if (rush) { hurry(2.2); swapPace = Math.max(swapPace, 1.6); }
+      if (rush) {
+        hurry(2.2);
+        swapPace = Math.max(swapPace, 1.6);
+      }
       queued = { key, fromRamp, toRamp, payload, opts: { pace: swapPace, hold } };
-      return new Promise((r) => { queued.resolve = r; });
+      return new Promise((r) => {
+        queued.resolve = r;
+      });
     }
     pace = swapPace;
     holding = hold;
@@ -351,7 +430,13 @@ export function createWeapons(gltfRoot, {
     }
     swapPayload = payload;
     incoming = items[key];
-    run.begin({ from: current?.userData.subject ?? null, to: incoming.userData.subject, fromRamp, toRamp, element: payload?.element ?? 'fire' });
+    run.begin({
+      from: current?.userData.subject ?? null,
+      to: incoming.userData.subject,
+      fromRamp,
+      toRamp,
+      element: payload?.element ?? 'fire',
+    });
     incoming.userData.uniforms.uRim.value.set(toRamp[2]);
     if (fx) incoming.userData.subject.silhouette();
     // Place the incoming weapon now (still hidden) so its surface can be targeted. (Ice
@@ -361,7 +446,9 @@ export function createWeapons(gltfRoot, {
     incoming.position.set(0, HOVER, 0);
     phase = 'forge';
     run.start({ onStart: () => hooks.onSwapStart?.(payload) });
-    return new Promise((r) => { resolveSwap = r; });
+    return new Promise((r) => {
+      resolveSwap = r;
+    });
   }
 
   /**
@@ -386,8 +473,17 @@ export function createWeapons(gltfRoot, {
       smearTrail.copy(smearLead).multiplyScalar(0.5);
       for (let j = 0; j < smearCount; j++) {
         fx.outline({
-          sil: current.userData.silhouette, matrix: smearMats[j], dilate: 0, scale: 1, wobble: 0.004,
-          alpha: k * (1 - (j + 1) / (smearCount + 1)) * 0.8, lead: smearLead, trail: smearTrail, hot: smearLead, t: totalT, seed: 7 + j,
+          sil: current.userData.silhouette,
+          matrix: smearMats[j],
+          dilate: 0,
+          scale: 1,
+          wobble: 0.004,
+          alpha: k * (1 - (j + 1) / (smearCount + 1)) * 0.8,
+          lead: smearLead,
+          trail: smearTrail,
+          hot: smearLead,
+          t: totalT,
+          seed: 7 + j,
         });
       }
     }
@@ -401,12 +497,20 @@ export function createWeapons(gltfRoot, {
     const k = Math.min(1, th / D.hold);
     const bob = holding && !reducedMotion ? Math.sin((th - D.hold) * 2.4) * 0.012 * k : 0;
     if (!reducedMotion) incoming.position.y = HOVER + ease.outCubic(k) * 0.06 + bob;
-    incoming.userData.uniforms.uGlow.value = 1 + 0.6 * (1 - k) ** 2 + (holding ? (0.5 * charge + 0.6 * auraKick) * k : 0); // the flash as it forms, settling to the glow
+    incoming.userData.uniforms.uGlow.value =
+      1 + 0.6 * (1 - k) ** 2 + (holding ? (0.5 * charge + 0.6 * auraKick) * k : 0); // the flash as it forms, settling to the glow
     if (holding && th >= D.hold * 0.5) {
       if (!forge.aura) forge.startAura(totalT);
       holder.updateMatrixWorld(true);
       auraKick *= Math.exp(-dt / 0.16);
-      forge.stepAura(dt, { blade: incoming, time: totalT, charge, kick: auraKick, element: auraElement, colors: run.colorsTo });
+      forge.stepAura(dt, {
+        blade: incoming,
+        time: totalT,
+        charge,
+        kick: auraKick,
+        element: auraElement,
+        colors: run.colorsTo,
+      });
     }
     // Alive (the visualizer): it sways and turns as if looking about, and trembles harder
     // as the build rises, straining to strike.
@@ -417,7 +521,10 @@ export function createWeapons(gltfRoot, {
       incoming.rotation.z = Math.sin(totalT * 0.7 + 1.3) * 0.06 * on + Math.sin(totalT * 83 + 2) * tremble;
     }
     if (th >= D.hold && !holding) {
-      if (forge.aura) { holder.updateMatrixWorld(true); forge.fling(incoming.matrixWorld); }
+      if (forge.aura) {
+        holder.updateMatrixWorld(true);
+        forge.fling(incoming.matrixWorld);
+      }
       run.finish();
       next('stab', Math.min(th - D.hold, 0.05)); // (a released hold starts the strike fresh)
     }
@@ -428,7 +535,7 @@ export function createWeapons(gltfRoot, {
   let holding = false;
   let charge = 0; // 0..1: how hard a held weapon glows (the visualizer feeds it the build-up)
   let glowKick = 0; // a beat's glow on the planted weapon
-  let quiver = 0;   // a hard beat's shudder through the planted weapon
+  let quiver = 0; // a hard beat's shudder through the planted weapon
   let alive = true; // (the visualizer) the blade moves as if alive: it shudders, sways, trembles
   let hovered = false; // the cursor is on the planted weapon (the site): its rim glows
   let hoverGlow = 0;
@@ -442,7 +549,8 @@ export function createWeapons(gltfRoot, {
     if (glowKick > 0.005) {
       glowKick *= Math.exp(-dt / 0.2);
       if (current && phase === 'idle') current.userData.uniforms.uGlow.value = glowKick > 0.005 ? glowKick * 0.8 : 0;
-      else if (current && phase === 'settle') current.userData.uniforms.uGlow.value = Math.max(current.userData.uniforms.uGlow.value, glowKick * 0.8);
+      else if (current && phase === 'settle')
+        current.userData.uniforms.uGlow.value = Math.max(current.userData.uniforms.uGlow.value, glowKick * 0.8);
     }
     // ...and a hard one shudders through it.
     if (quiver > 0.002 && current && phase === 'idle') {
@@ -453,7 +561,10 @@ export function createWeapons(gltfRoot, {
     run.stepLines(dt, drawSmear);
     run.stepElement(dt);
     if (phase === 'idle') return;
-    if (phase === 'forge') { run.step(dt); return; }
+    if (phase === 'forge') {
+      run.step(dt);
+      return;
+    }
     t += dt;
     if (phase === 'swing') {
       stepSwing(dt);
@@ -546,8 +657,18 @@ export function createWeapons(gltfRoot, {
     center.y = Math.max(1.05, 0.35 + 0.6 * len);
     routine = createRoutine({
       blade: { grip: gripL, tip: tipL, len },
-      home: { pos: current.getWorldPosition(new THREE.Vector3()), quat: current.getWorldQuaternion(new THREE.Quaternion()) },
-      center, basis: plan.basis, hits: plan.hits, plunge: plan.plunge, moves: plan.moves, alive: plan.alive ?? alive, onMove: plan.onMove, rng: plan.rng,
+      home: {
+        pos: current.getWorldPosition(new THREE.Vector3()),
+        quat: current.getWorldQuaternion(new THREE.Quaternion()),
+      },
+      center,
+      basis: plan.basis,
+      hits: plan.hits,
+      plunge: plan.plunge,
+      moves: plan.moves,
+      alive: plan.alive ?? alive,
+      onMove: plan.onMove,
+      rng: plan.rng,
     });
     swingPlan = plan;
     hitIndex = 0;
@@ -635,19 +756,30 @@ export function createWeapons(gltfRoot, {
     swing,
     hurry,
     /** The cursor is on the planted weapon: its rim glows (the site's hover hint). */
-    set hovered(v) { hovered = !!v; },
+    set hovered(v) {
+      hovered = !!v;
+    },
     /** The planted weapon (for picking it with the cursor), or null mid-swap. */
-    get planted() { return phase === 'idle' ? current : null; },
-    get swinging() { return phase === 'swing'; },
+    get planted() {
+      return phase === 'idle' ? current : null;
+    },
+    get swinging() {
+      return phase === 'swing';
+    },
     /** (The visualizer) the blade moves as if alive: flourishes, a shudder on hard beats, a held one's sway. */
-    set alive(v) { alive = !!v; },
+    set alive(v) {
+      alive = !!v;
+    },
     /**
      * Where the blade is (world, as of the last frame): its middle, point and grip, the
      * flat's normal and its rotation, and whether it's out of the fire (swinging or held).
      * For cameras that follow it.
      */
     blade(out) {
-      const obj = incoming && ((phase === 'forge' && (run.phase === 'form' || run.phase === 'hold')) || phase === 'stab') ? incoming : current;
+      const obj =
+        incoming && ((phase === 'forge' && (run.phase === 'form' || run.phase === 'hold')) || phase === 'stab')
+          ? incoming
+          : current;
       if (!obj) return null;
       out.len = bladeLocal(obj, out.grip, out.tip);
       out.grip.applyMatrix4(obj.matrixWorld);
@@ -660,7 +792,9 @@ export function createWeapons(gltfRoot, {
       return out;
     },
     /** The element a held blade will strike with (its vortex takes after it). */
-    set auraElement(key) { auraElement = key; },
+    set auraElement(key) {
+      auraElement = key;
+    },
     /** Let a held weapon strike, at `strikePace` × the usual speed. False if nothing is held. */
     release(strikePace = 1) {
       if (!holding) return false;
@@ -668,18 +802,28 @@ export function createWeapons(gltfRoot, {
       pace = strikePace;
       return true;
     },
-    get currentKey() { return current?.userData.key ?? null; },
+    get currentKey() {
+      return current?.userData.key ?? null;
+    },
     /** A weapon is moving this frame. */
-    get moving() { return phase !== 'idle' || quiver > 0.002; },
+    get moving() {
+      return phase !== 'idle' || quiver > 0.002;
+    },
     /**
      * ...enough for its shadow to need redrawing every frame: moving, but not just a planted
      * one's shudder on a hard beat (±0.03 rad at most, fading in a second: sceneUpdate.js
      * shadowNeedsUpdate redraws that at the art's 12 fps).
      */
-    get movingForShadow() { return phase !== 'idle'; },
+    get movingForShadow() {
+      return phase !== 'idle';
+    },
     keys: Object.keys(items),
-    get busy() { return phase !== 'idle'; },
-    get holding() { return holding; },
+    get busy() {
+      return phase !== 'idle';
+    },
+    get holding() {
+      return holding;
+    },
     /** A beat (the visualizer): a held weapon's aura kicks out; a planted one glows. 0..1. */
     beat(strength = 1) {
       if (reducedMotion) return;
@@ -692,7 +836,9 @@ export function createWeapons(gltfRoot, {
       if (!fx || !current || (phase !== 'idle' && phase !== 'settle')) return;
       run.echo(current.userData.subject, ramp, element);
     },
-    set charge(v) { charge = Math.min(1, Math.max(0, v)); },
+    set charge(v) {
+      charge = Math.min(1, Math.max(0, v));
+    },
     /** Seconds from swap() to impact at pace 1 (not counting a hold). */
     impactTime: D.dissolve + D.swirl + D.gather + D.form + D.hold + D.stab,
   };

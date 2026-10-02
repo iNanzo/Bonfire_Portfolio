@@ -30,7 +30,17 @@ import { FINISH_NAMES } from '../bonfire/steel.js';
 import { SCENERIES } from '../sceneries.js';
 import { sceneSwatches, sceneSummary } from '../scenes.js';
 import { entriesFor, ITEM_HINTS, sharedRange } from '../settingsMap.js';
-import { CARD_SHOWS, PRESETS, RANDOM, AT_LEAST_ONE, GROUPS, MODE_KEYS, NO_ALWAYS, scenesFrom, inLoop } from './settings.js';
+import {
+  CARD_SHOWS,
+  PRESETS,
+  RANDOM,
+  AT_LEAST_ONE,
+  GROUPS,
+  MODE_KEYS,
+  NO_ALWAYS,
+  scenesFrom,
+  inLoop,
+} from './settings.js';
 
 let uid = 0;
 
@@ -43,13 +53,21 @@ let uid = 0;
  */
 export function tipped(hint) {
   const id = `viz-hint-${++uid}`;
-  return { attrs: ` data-tip="${esc(hint)}" aria-describedby="${id}"`, note: `<span class="visually-hidden" id="${id}">${esc(hint)}</span>`, id };
+  return {
+    attrs: ` data-tip="${esc(hint)}" aria-describedby="${id}"`,
+    note: `<span class="visually-hidden" id="${id}">${esc(hint)}</span>`,
+    id,
+  };
 }
 
 const PIXEL_NOTES = { 2: ' (Fine)', 4: ' (As On the Site)', 6: ' (Chunky)' };
 // The flame's frame rates, with the site's own among them.
-const FLAME_FPS_OPTIONS = [...new Set([...FLAME_FPS, DEFAULT_SETTINGS.flameFps])].sort((a, b) => a - b)
-  .map((fps) => [String(fps), `${fps} fps${fps === DEFAULT_SETTINGS.flameFps ? ' (As On the Site)' : fps < 12 ? ' (Choppy)' : fps >= 60 ? ' (Smooth)' : ''}`]);
+const FLAME_FPS_OPTIONS = [...new Set([...FLAME_FPS, DEFAULT_SETTINGS.flameFps])]
+  .sort((a, b) => a - b)
+  .map((fps) => [
+    String(fps),
+    `${fps} fps${fps === DEFAULT_SETTINGS.flameFps ? ' (As On the Site)' : fps < 12 ? ' (Choppy)' : fps >= 60 ? ' (Smooth)' : ''}`,
+  ]);
 
 /**
  * Every dropdown's choices, [value, what it says] (Title Case: what a choice means more
@@ -57,23 +75,45 @@ const FLAME_FPS_OPTIONS = [...new Set([...FLAME_FPS, DEFAULT_SETTINGS.flameFps])
  * @type {Record<string, string[][]>}
  */
 export const OPTIONS = {
-  beatFrom: [['music', 'The Music (Heard)'], ['link', 'Ableton Link (Helper App)']],
+  beatFrom: [
+    ['music', 'The Music (Heard)'],
+    ['link', 'Ableton Link (Helper App)'],
+  ],
   phraseBars: barOptions('phraseBars'),
   ringBars: barOptions('ringBars'),
   combos: barOptions('combos'),
   comboBars: barOptions('comboBars'),
-  rhythm: [['varied', 'Varied'], ['beats', 'Every Beat']],
-  dropCount: [['1', 'One'], ['2', 'Up To Two'], ['3', 'Up To Three']],
+  rhythm: [
+    ['varied', 'Varied'],
+    ['beats', 'Every Beat'],
+  ],
+  dropCount: [
+    ['1', 'One'],
+    ['2', 'Up To Two'],
+    ['3', 'Up To Three'],
+  ],
   scenery: options(SCENERIES, ['mix', 'A New Place Every Other Drop']),
   fog: [...Object.entries(FOGS), ['mix', 'A Mix, New Each Look']],
   colors: options(COLOR_MODES),
   scheme: options(COLOR_SCHEMES),
   palette: options(PALETTES),
   pixelSize: PIXEL_SIZES.map((px) => [String(px), `${px} px${PIXEL_NOTES[px] ?? ''}`]),
-  ditherMatrix: [['4', '4×4 (As On the Site)'], ['8', '8×8 (Finer)'], ['mix', 'A Mix, New Each Look']],
+  ditherMatrix: [
+    ['4', '4×4 (As On the Site)'],
+    ['8', '8×8 (Finer)'],
+    ['mix', 'A Mix, New Each Look'],
+  ],
   flameFps: FLAME_FPS_OPTIONS,
-  frameRate: [['display', 'Display'], ['60', '60 fps'], ['30', '30 fps']],
-  particles: [['normal', 'As On the Site'], ['more', 'More'], ['max', 'Most (Strong GPU)']],
+  frameRate: [
+    ['display', 'Display'],
+    ['60', '60 fps'],
+    ['30', '30 fps'],
+  ],
+  particles: [
+    ['normal', 'As On the Site'],
+    ['more', 'More'],
+    ['max', 'Most (Strong GPU)'],
+  ],
   lookBars: barOptions('lookBars'),
   camera: options(CAMERA_MODES),
   shot: Object.entries(SHOTS).map(([k, s]) => [k, s.name]),
@@ -83,7 +123,13 @@ export const OPTIONS = {
   // (Names only: each feel's line is in the setting's More.)
   swingEase: [...Object.entries(SWING_EASES).map(([k, e]) => [k, e.name]), ['mix', 'A Mix, Changing Between Attacks']],
   holdCam: options(HOLD_CAMS, ['mix', 'A Mix']),
-  knightCount: [['1', 'One'], ['2', 'Two'], ['3', 'Three'], ['4', 'Four'], [RANDOM, 'Random (1–4)']],
+  knightCount: [
+    ['1', 'One'],
+    ['2', 'Two'],
+    ['3', 'Three'],
+    ['4', 'Four'],
+    [RANDOM, 'Random (1–4)'],
+  ],
   knightSeat: [...Object.entries(SEAT_POSES), ['mix', 'A Mix, New Now And Then']],
   knightStyle: [...Object.entries(KNIGHT_STYLES), ['mix', 'A Mix, New Now And Then']],
   knightFinish: [...Object.entries(FINISH_NAMES), ['mix', 'A Mix, Leaning To Gunmetal']],
@@ -91,9 +137,20 @@ export const OPTIONS = {
   danceBars: barOptions('danceBars'),
   flyBars: barOptions('flyBars'),
   sceneBars: barOptions('sceneBars'),
-  sceneHold: [['scene', 'Each Scene’s Own'], ['hold', 'Hold the Scene'], ['base', 'Start From the Scene']],
-  sceneOrder: [['turn', 'In Turn'], ['shuffle', 'Shuffled']],
-  sceneFrom: [['both', 'Built-In And Mine'], ['builtin', 'Built-In'], ['mine', 'Mine (Made In the Painter)']],
+  sceneHold: [
+    ['scene', 'Each Scene’s Own'],
+    ['hold', 'Hold the Scene'],
+    ['base', 'Start From the Scene'],
+  ],
+  sceneOrder: [
+    ['turn', 'In Turn'],
+    ['shuffle', 'Shuffled'],
+  ],
+  sceneFrom: [
+    ['both', 'Built-In And Mine'],
+    ['builtin', 'Built-In'],
+    ['mine', 'Mine (Made In the Painter)'],
+  ],
 };
 
 /**
@@ -103,17 +160,30 @@ export const OPTIONS = {
  */
 export function itemNames(group, settings = DEFAULT_SETTINGS) {
   switch (group) {
-    case 'elements': return Object.fromEntries(Object.keys(settings.elements ?? DEFAULT_SETTINGS.elements).map((id) => [id, elements[id]?.name ?? id]));
-    case 'moves': return MOVES;
-    case 'mirrors': return MIRRORS;
-    case 'xrayViews': return XRAY_VIEWS;
-    case 'knightHelmets': return HELMETS;
-    case 'knightMoves': return KNIGHT_MOVES;
-    case 'flyMoves': return FLY_MOVES;
-    case 'looks': return LOOKS;
-    case 'dropFx': return DROP_FX;
-    case 'layers': return LAYERS;
-    default: return {};
+    case 'elements':
+      return Object.fromEntries(
+        Object.keys(settings.elements ?? DEFAULT_SETTINGS.elements).map((id) => [id, elements[id]?.name ?? id]),
+      );
+    case 'moves':
+      return MOVES;
+    case 'mirrors':
+      return MIRRORS;
+    case 'xrayViews':
+      return XRAY_VIEWS;
+    case 'knightHelmets':
+      return HELMETS;
+    case 'knightMoves':
+      return KNIGHT_MOVES;
+    case 'flyMoves':
+      return FLY_MOVES;
+    case 'looks':
+      return LOOKS;
+    case 'dropFx':
+      return DROP_FX;
+    case 'layers':
+      return LAYERS;
+    default:
+      return {};
   }
 }
 /** The grids of three-way switches: their items' settings keys (a layer's is its own). */
@@ -142,9 +212,16 @@ export function kindOf(key) {
  * grid's three-way switches, a checklist's boxes.
  * @param {string} html a triGrid's or a checklist's markup
  */
-const itemRows = (html) => html
-  .replace(/<fieldset class="tri" data-set-group="([^"]+)"/g, '<fieldset class="tri" data-row="$1" data-set-group="$1"')
-  .replace(/<(label|div) class="viz-check"([^>]*)>(<label>)?<input type="checkbox" data-set="([^"]+)"/g, '<$1 class="viz-check" data-row="$4"$2>$3<input type="checkbox" data-set="$4"');
+const itemRows = (html) =>
+  html
+    .replace(
+      /<fieldset class="tri" data-set-group="([^"]+)"/g,
+      '<fieldset class="tri" data-row="$1" data-set-group="$1"',
+    )
+    .replace(
+      /<(label|div) class="viz-check"([^>]*)>(<label>)?<input type="checkbox" data-set="([^"]+)"/g,
+      '<$1 class="viz-check" data-row="$4"$2>$3<input type="checkbox" data-set="$4"',
+    );
 /** A label as markup, its text marked for the search to light up (fields.js takes markup). */
 const named = (label) => `<span data-name>${esc(label)}</span>`;
 /** A slider's range: the map's, the same in every app that has it. */
@@ -158,13 +235,16 @@ const rangeOf = (m) => sharedRange(m.id) ?? [0, 1, 0.05];
  */
 function checklist(group, label, names, hint) {
   const minOne = AT_LEAST_ONE.has(group);
-  if (!Object.keys(names).some((id) => itemHint(group, id))) return checks(group, named(label), names, { hint, bulk: true, minOne });
+  if (!Object.keys(names).some((id) => itemHint(group, id)))
+    return checks(group, named(label), names, { hint, bulk: true, minOne });
   const t = tip(hint, { label });
   return `
   <div data-tip-group>
     <p class="viz-field-label">${named(label)} ${t.mark}</p>
     ${bulkBar(group, { kind: 'checks', minOne, label })}
-    <div class="viz-checks" data-bulk-list="${esc(group)}">${Object.entries(names).map(([id, name]) => check(`${group}.${id}`, esc(name), { hint: itemHint(group, id), group: t.id })).join('')}</div>
+    <div class="viz-checks" data-bulk-list="${esc(group)}">${Object.entries(names)
+      .map(([id, name]) => check(`${group}.${id}`, esc(name), { hint: itemHint(group, id), group: t.id }))
+      .join('')}</div>
   </div>`;
 }
 
@@ -180,19 +260,26 @@ function control(key, settings, m) {
       const [min, max, step] = rangeOf(m);
       return number(key, named(label), { hint, min, max, step });
     }
-    case 'text': return key === 'title'
-      ? text(key, named(label), { hint, max: 60, placeholder: 'DJ name or set title' })
-      : text(key, named(label), { hint, max: 90, placeholder: 'Venue, date, anything' });
+    case 'text':
+      return key === 'title'
+        ? text(key, named(label), { hint, max: 60, placeholder: 'DJ name or set title' })
+        : text(key, named(label), { hint, max: 90, placeholder: 'Venue, date, anything' });
     case 'grid': {
       const ids = Object.keys(itemNames(key));
-      const items = /** @type {[string, string, string][]} */ (GRID_KEYS[key].map((k, i) => [k, itemNames(key)[ids[i]], itemHint(key, ids[i])]));
+      const items = /** @type {[string, string, string][]} */ (
+        GRID_KEYS[key].map((k, i) => [k, itemNames(key)[ids[i]], itemHint(key, ids[i])])
+      );
       const noAlways = (NO_ALWAYS[key] ?? []).map((id) => `${key}.${id}`);
       return itemRows(triGrid(named(label), items, { hint, noAlways, bulk: key }));
     }
-    case 'checks': return itemRows(checklist(key, label, itemNames(key, settings), hint));
-    case 'select': return select(key, named(label), OPTIONS[key], { hint });
-    case 'tri': return tri(key, named(label), { hint });
-    case 'check': return check(key, named(label), { hint });
+    case 'checks':
+      return itemRows(checklist(key, label, itemNames(key, settings), hint));
+    case 'select':
+      return select(key, named(label), OPTIONS[key], { hint });
+    case 'tri':
+      return tri(key, named(label), { hint });
+    case 'check':
+      return check(key, named(label), { hint });
     default: {
       const [min, max, step, unit = ''] = rangeOf(m);
       return range(key, named(label), min, max, step, { hint, unit });
@@ -204,7 +291,9 @@ function control(key, settings, m) {
  * Every setting's control: CONTROLS[key](settings, meta) → markup (without its row()).
  * @type {Record<string, (settings: Record<string, any>, m: { id: string, label: string, hint: string }) => string>}
  */
-export const CONTROLS = Object.fromEntries(entriesFor('live').map((e) => [e.live, (settings, m) => control(e.live, settings, m)]));
+export const CONTROLS = Object.fromEntries(
+  entriesFor('live').map((e) => [e.live, (settings, m) => control(e.live, settings, m)]),
+);
 
 /**
  * A setting's row: its control, its More (folded, the All Settings view's), the line saying
@@ -264,7 +353,9 @@ export const BLOCKS = {
   }),
   titles: () => {
     const t = tipped('Shows the main card now (Shift+1).');
-    return { end: `<div class="viz-row"><button class="pix-btn" type="button" data-act="show-title"${t.attrs}>Show Now</button>${t.note}</div>` };
+    return {
+      end: `<div class="viz-row"><button class="pix-btn" type="button" data-act="show-title"${t.attrs}>Show Now</button>${t.note}</div>`,
+    };
   },
   moreCards: () => ({
     end: `
@@ -295,8 +386,13 @@ export const BLOCKS = {
  * name, described by its hint (shown under it where there's room, and as its tip).
  * @param {string} [cls] @param {string} [prefix] keeps their ids apart where there are two rows
  */
-export const presetButtons = (cls = '', prefix = 'viz-preset') => Object.entries(PRESETS).map(([id, p]) => `
-  <button class="pix-btn viz-preset ${cls}" type="button" data-preset="${id}" data-row="preset:${id}" aria-pressed="false" data-tip="${esc(p.hint)}" aria-labelledby="${prefix}-${id}" aria-describedby="${prefix}-${id}-hint"><b id="${prefix}-${id}" data-name>${esc(p.name)}</b><span id="${prefix}-${id}-hint">${esc(p.hint)}</span></button>`).join('');
+export const presetButtons = (cls = '', prefix = 'viz-preset') =>
+  Object.entries(PRESETS)
+    .map(
+      ([id, p]) => `
+  <button class="pix-btn viz-preset ${cls}" type="button" data-preset="${id}" data-row="preset:${id}" aria-pressed="false" data-tip="${esc(p.hint)}" aria-labelledby="${prefix}-${id}" aria-describedby="${prefix}-${id}-hint"><b id="${prefix}-${id}" data-name>${esc(p.name)}</b><span id="${prefix}-${id}-hint">${esc(p.hint)}</span></button>`,
+    )
+    .join('');
 
 /**
  * The loop, as list items: per scene its switch (in or out; `data-scene-toggle`, not a
@@ -309,21 +405,29 @@ export const presetButtons = (cls = '', prefix = 'viz-preset') => Object.entries
 export function sceneListMarkup(library, settings, { playing = null, thumb = () => null, base = '/' } = {}) {
   const list = scenesFrom(library, settings);
   if (!list.length) {
-    const why = { mine: 'No scenes of your own yet: make one in the Painter and save it, and it shows here.', builtin: 'The site has no built-in scenes yet.' }[settings.sceneFrom]
-      ?? 'No scenes yet: make one in the Painter and save it, and it shows here.';
+    const why =
+      {
+        mine: 'No scenes of your own yet: make one in the Painter and save it, and it shows here.',
+        builtin: 'The site has no built-in scenes yet.',
+      }[settings.sceneFrom] ?? 'No scenes yet: make one in the Painter and save it, and it shows here.';
     return `<li class="viz-help viz-scenes-empty">${why}</li>`;
   }
-  return list.map(({ ref, scene }) => {
-    const on = inLoop(settings, ref);
-    const now = ref === playing;
-    const mine = ref.startsWith('m:');
-    const name = esc(scene.name);
-    const swatches = sceneSwatches(scene);
-    const image = thumb(ref);
-    const face = image && /^data:image\/(webp|png|jpeg);base64,/.test(image)
-      ? `<img src="${esc(image)}" alt="" width="96" height="54" loading="lazy" decoding="async">`
-      : swatches.slice(0, 5).map((c) => `<i style="background:${esc(c)}"></i>`).join('');
-    return `
+  return list
+    .map(({ ref, scene }) => {
+      const on = inLoop(settings, ref);
+      const now = ref === playing;
+      const mine = ref.startsWith('m:');
+      const name = esc(scene.name);
+      const swatches = sceneSwatches(scene);
+      const image = thumb(ref);
+      const face =
+        image && /^data:image\/(webp|png|jpeg);base64,/.test(image)
+          ? `<img src="${esc(image)}" alt="" width="96" height="54" loading="lazy" decoding="async">`
+          : swatches
+              .slice(0, 5)
+              .map((c) => `<i style="background:${esc(c)}"></i>`)
+              .join('');
+      return `
       <li class="viz-scene-row${on ? '' : ' is-out'}${now ? ' is-playing' : ''}" data-scene-row="${esc(ref)}" data-row="scene:${esc(ref)}" style="--scene-glow:${esc(swatches[2] ?? '#ffffff')}"${now ? ' aria-current="true"' : ''}>
         <input type="checkbox" data-scene-toggle="${esc(ref)}"${on ? ' checked' : ''} aria-label="${name}: In the Loop">
         <span class="viz-scene-thumb" aria-hidden="true">${face}</span>
@@ -332,27 +436,39 @@ export function sceneListMarkup(library, settings, { playing = null, thumb = () 
         <button class="pix-btn" type="button" data-scene-play="${esc(ref)}">Play Now</button>
         <a class="pix-btn" href="${esc(`${painterLink(base)}?scene=${ref}`)}" target="_blank" rel="noopener">Edit In Painter <span aria-hidden="true">↗</span></a>
       </li>`;
-  }).join('');
+    })
+    .join('');
 }
 
 /** The title cards after the main one, as list items (card n + 2 shows on Shift+n+2). */
-export const cardsMarkup = (cards) => cards.map((c, i) => {
-  const show = tipped(`Shows card ${i + 2} now.`);
-  return `
+export const cardsMarkup = (cards) =>
+  cards
+    .map((c, i) => {
+      const show = tipped(`Shows card ${i + 2} now.`);
+      return `
       <li class="viz-card" data-card="${i}" data-row="card:${i}">
         <span class="viz-card-key" aria-hidden="true" data-tip="Shift+${i + 2} shows it">⇧${i + 2}</span><span class="visually-hidden">Shift+${i + 2}</span>
         <input type="text" data-card-field="title" maxlength="60" value="${esc(c.title)}" placeholder="Title" aria-label="Card ${i + 2} Title" autocomplete="off">
         <input type="text" data-card-field="subtitle" maxlength="90" value="${esc(c.subtitle)}" placeholder="Subtitle (optional)" aria-label="Card ${i + 2} Subtitle" autocomplete="off">
-        <select data-card-field="show" aria-label="When Card ${i + 2} Shows">${Object.entries(CARD_SHOWS).map(([v, t]) => `<option value="${v}"${c.show === v ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>
+        <select data-card-field="show" aria-label="When Card ${i + 2} Shows">${Object.entries(CARD_SHOWS)
+          .map(([v, t]) => `<option value="${v}"${c.show === v ? ' selected' : ''}>${esc(t)}</option>`)
+          .join('')}</select>
         <button class="pix-btn" type="button" data-card-show${show.attrs}>Show</button>${show.note}
         <button class="pix-btn" type="button" data-card-remove aria-label="Remove Card ${i + 2}" data-tip="Remove this card">✕</button>
       </li>`;
-}).join('');
+    })
+    .join('');
 
 /** The saved setups, as list items (or a line saying there are none). */
-export const setupsMarkup = (names) => (names.length
-  ? names.map((n) => `<li data-row="setup:${esc(n)}"><span data-name>${esc(n)}</span><button class="pix-btn" type="button" data-setup-load="${esc(n)}">Load</button><button class="pix-btn" type="button" data-setup-delete="${esc(n)}" aria-label="Delete ${esc(n)}" data-tip="Delete this setup">✕</button></li>`).join('')
-  : '<li class="viz-help">No setups saved yet.</li>');
+export const setupsMarkup = (names) =>
+  names.length
+    ? names
+        .map(
+          (n) =>
+            `<li data-row="setup:${esc(n)}"><span data-name>${esc(n)}</span><button class="pix-btn" type="button" data-setup-load="${esc(n)}">Load</button><button class="pix-btn" type="button" data-setup-delete="${esc(n)}" aria-label="Delete ${esc(n)}" data-tip="Delete this setup">✕</button></li>`,
+        )
+        .join('')
+    : '<li class="viz-help">No setups saved yet.</li>';
 
 /**
  * The keyboard shortcuts as the search shows them ([keys, what it does] pairs): a row each,

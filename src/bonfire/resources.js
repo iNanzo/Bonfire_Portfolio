@@ -27,17 +27,30 @@ export function createResourceScope() {
     });
   }
   return {
-    get disposed() { return disposed; },
-    own(resource) { resources.add(resource); return resource; },
-    trackTree(root) { trees.add(root); collect(root); return root; },
-    cleanup(fn) { cleanups.push(fn); },
+    get disposed() {
+      return disposed;
+    },
+    own(resource) {
+      resources.add(resource);
+      return resource;
+    },
+    trackTree(root) {
+      trees.add(root);
+      collect(root);
+      return root;
+    },
+    cleanup(fn) {
+      cleanups.push(fn);
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
       for (const root of trees) collect(root);
       for (const fn of cleanups.reverse()) fn();
       for (const resource of [...resources].reverse()) resource.dispose();
-      resources.clear(); trees.clear(); cleanups.length = 0;
+      resources.clear();
+      trees.clear();
+      cleanups.length = 0;
     },
   };
 }

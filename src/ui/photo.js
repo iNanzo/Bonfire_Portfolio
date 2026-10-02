@@ -19,7 +19,8 @@ import { describedTip } from './describedTip.js';
 import { dragOrbit, orbitPose, zoomOrbit, ORBIT_TARGET, PHOTO_LIMITS, DRAG_RATE } from './orbit.js';
 
 /** What Element does, with the elements' names as the site calls them (the content's: Flame, Lightning, Frost). */
-export const elementHint = () => `The next element, in turn: ${ELEMENT_IDS.map((id) => elements[id]?.name ?? id).join(', ')}`;
+export const elementHint = () =>
+  `The next element, in turn: ${ELEMENT_IDS.map((id) => elements[id]?.name ?? id).join(', ')}`;
 
 /**
  * The toolbar's insides (pure: the tests read it): how to frame the fire, for a mouse or for
@@ -120,7 +121,10 @@ export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter 
   });
   // One pointer drags the orbit round; a second finger makes it a pinch, which zooms (as far
   // as the fingers spread or close: the wheel's own rate, so both feel the same).
-  const spread = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
+  const spread = () => {
+    const [a, b] = [...pointers.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y) || 1;
+  };
   window.addEventListener('pointerdown', (e) => {
     if (!active || e.target.closest('.photo-bar') || e.button !== 0) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -143,7 +147,8 @@ export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter 
       return;
     }
     if (!drag) return;
-    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    const dx = e.clientX - drag.x,
+      dy = e.clientY - drag.y;
     if (Math.hypot(dx, dy) > 4) dragged = true;
     view = dragOrbit(drag.from, dx, dy, PHOTO_LIMITS);
     pose(true);
@@ -155,13 +160,17 @@ export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter 
   };
   window.addEventListener('pointerup', lift);
   window.addEventListener('pointercancel', lift);
-  window.addEventListener('wheel', (e) => {
-    if (!active) return;
-    e.preventDefault();
-    // (No nearer than 2.1 m, so the camera never ends up inside the knight by the fire.)
-    view = zoomOrbit(view, e.deltaY, PHOTO_LIMITS);
-    pose(true);
-  }, { passive: false });
+  window.addEventListener(
+    'wheel',
+    (e) => {
+      if (!active) return;
+      e.preventDefault();
+      // (No nearer than 2.1 m, so the camera never ends up inside the knight by the fire.)
+      view = zoomOrbit(view, e.deltaY, PHOTO_LIMITS);
+      pose(true);
+    },
+    { passive: false },
+  );
   // Esc gives the page back: not while typing, and not under a dialog (the shortcuts list,
   // ?, opens over photo mode, and the Esc is its own).
   window.addEventListener('keydown', (e) => {
@@ -174,9 +183,18 @@ export function createPhotoMode({ getFire, onExit, onColors, onElement, onEnter 
   return {
     enter,
     exit,
-    toggle() { if (active) exit(); else enter(); },
-    get active() { return active; },
+    toggle() {
+      if (active) exit();
+      else enter();
+    },
+    get active() {
+      return active;
+    },
     /** True if the click that just ended was the end of a drag (it shouldn't stoke). */
-    wasDrag() { const d = dragged; dragged = false; return d; },
+    wasDrag() {
+      const d = dragged;
+      dragged = false;
+      return d;
+    },
   };
 }

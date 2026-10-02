@@ -7,7 +7,8 @@ import { createGitHubStore } from './server/github.js';
 import { HttpError } from './server/errors.js';
 import { securityHeaders } from './server/csp.js';
 
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const esc = (s) =>
+  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 /**
  * The notice for a request without a good sign-in. Its look is one <style> block allowed by a
  * nonce of its own: the policy blocks style="" attributes, so they'd leave it unstyled.
@@ -20,7 +21,14 @@ function blocked(status, message) {
 main{max-width:420px;padding:24px;text-align:center}h1{font-size:20px;color:#ffc76a}a{color:#ffc76a}</style>
 <main><h1>${status === 403 ? 'Not allowed' : 'Sign in needed'}</h1>
 <p>${esc(message)}</p>${status === 403 ? '<p><a href="/cdn-cgi/access/logout">Sign out and use another account</a></p>' : ''}</main>`,
-    { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...securityHeaders('', { styleNonce: nonce }) } },
+    {
+      status,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+        ...securityHeaders('', { styleNonce: nonce }),
+      },
+    },
   );
 }
 
@@ -38,9 +46,13 @@ export default {
     if (url.pathname.startsWith('/api/')) {
       try {
         res = await handleApi(request, { store: createGitHubStore(env), user, siteUrl: env.SITE_URL ?? '' });
-      } catch (e) { // store misconfiguration
+      } catch (e) {
+        // store misconfiguration
         const status = e instanceof HttpError ? e.status : 500;
-        res = new Response(JSON.stringify({ error: e.message }), { status, headers: { 'Content-Type': 'application/json' } });
+        res = new Response(JSON.stringify({ error: e.message }), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        });
       }
     } else {
       res = await env.ASSETS.fetch(request);

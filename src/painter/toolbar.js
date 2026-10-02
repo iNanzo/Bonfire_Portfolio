@@ -82,12 +82,18 @@ const shortcut = (key) => (key === '?' ? 'Shift+?' : key);
  * data-tip and an aria-describedby for the button, and the hidden text it names (after it).
  * @param {string} id @param {string} text
  */
-const tipped = (id, text) => ({ attrs: `data-tip="${esc(text)}" aria-describedby="${id}"`, note: `<span class="visually-hidden" id="${id}">${esc(text)}</span>` });
+const tipped = (id, text) => ({
+  attrs: `data-tip="${esc(text)}" aria-describedby="${id}"`,
+  note: `<span class="visually-hidden" id="${id}">${esc(text)}</span>`,
+});
 /** The bar's other buttons' tooltips (main.js draws them): undo, redo, Play and the banner's ✕. */
 export const TIPS = {
   undo: tipped('pnt-tip-undo', 'Undo the last change (Ctrl+Z)'),
   redo: tipped('pnt-tip-redo', 'Redo what was undone (Ctrl+Shift+Z or Ctrl+Y)'),
-  play: tipped('pnt-tip-play', 'Plays this scene in Bonfire Live: an open Bonfire Live tab at once, else a new one. Changes are saved first.'),
+  play: tipped(
+    'pnt-tip-play',
+    'Plays this scene in Bonfire Live: an open Bonfire Live tab at once, else a new one. Changes are saved first.',
+  ),
   close: tipped('pnt-tip-close', 'Close this note (the scene stays as it is)'),
 };
 /** The Tools button's tooltip (read out too, the same way). */
@@ -176,15 +182,22 @@ export function bindTools(el, run, { hideTip = () => {} } = {}) {
     close({ focus: true });
     run(item.dataset.tool);
   });
-  doc.addEventListener('pointerdown', (e) => { if (isOpen() && !el.contains(/** @type {Node} */ (e.target))) close(); });
+  doc.addEventListener('pointerdown', (e) => {
+    if (isOpen() && !el.contains(/** @type {Node} */ (e.target))) close();
+  });
   menu.addEventListener('focusout', (e) => {
     const to = /** @type {Node | null} */ (e.relatedTarget);
     if (to && !el.contains(to)) close();
   });
   return {
     /** Open it on its first item, or close it. (A click or a key on the button.) */
-    toggle() { if (isOpen()) close({ focus: true }); else open(0); },
+    toggle() {
+      if (isOpen()) close({ focus: true });
+      else open(0);
+    },
     close,
-    get isOpen() { return isOpen(); },
+    get isOpen() {
+      return isOpen();
+    },
   };
 }

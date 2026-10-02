@@ -74,12 +74,30 @@ import { approach, clamp, pick, shuffle } from '../math.js';
 import { modeOf } from '../modes.js';
 
 export const LOOKS = {
-  ember: 'Ember', glitch: 'Glitch', echo: 'Echo', ripple: 'Ripple', kaleido: 'Kaleido', ink: 'Ink',
-  vortex: 'Vortex', mosaic: 'Mosaic', haze: 'Haze', prism: 'Prism',
+  ember: 'Ember',
+  glitch: 'Glitch',
+  echo: 'Echo',
+  ripple: 'Ripple',
+  kaleido: 'Kaleido',
+  ink: 'Ink',
+  vortex: 'Vortex',
+  mosaic: 'Mosaic',
+  haze: 'Haze',
+  prism: 'Prism',
 };
 export const DROP_FX = {
-  shatter: 'Shatter', shock: 'Shockwaves', burst: 'Echo Burst', spiral: 'Spiral', kaleido: 'Kaleido Burst', flips: 'Mirror Flips',
-  cycle: 'Color Cycle', split: 'RGB Burst', crunch: 'Crunch', iris: 'Iris Snap', slam: 'Letterbox Slam', ink: 'Ink Flash',
+  shatter: 'Shatter',
+  shock: 'Shockwaves',
+  burst: 'Echo Burst',
+  spiral: 'Spiral',
+  kaleido: 'Kaleido Burst',
+  flips: 'Mirror Flips',
+  cycle: 'Color Cycle',
+  split: 'RGB Burst',
+  crunch: 'Crunch',
+  iris: 'Iris Snap',
+  slam: 'Letterbox Slam',
+  ink: 'Ink Flash',
   xray: 'X-Ray',
 };
 // Every effect's switch (Off / In the Mix / Always) and a saved one read as a mode: shared
@@ -87,9 +105,20 @@ export const DROP_FX = {
 export { MODES, modeOf } from '../modes.js';
 /** Layers over any look, each with its own switch (settings keys). */
 export const LAYERS = {
-  scanlines: 'Scanlines', mirror: 'Mirror', blend: 'Blend Modes', ghost: 'Ghosting', blur: 'Motion Blur', glow: 'Glow',
-  gradient: 'Gradient Map', paint: 'Painterly', wash: 'Watercolor', flicker: 'Flicker',
-  grain: 'Grain', cinema: 'Cinema Bars', spotlight: 'Spotlight', chroma: 'Chroma Split',
+  scanlines: 'Scanlines',
+  mirror: 'Mirror',
+  blend: 'Blend Modes',
+  ghost: 'Ghosting',
+  blur: 'Motion Blur',
+  glow: 'Glow',
+  gradient: 'Gradient Map',
+  paint: 'Painterly',
+  wash: 'Watercolor',
+  flicker: 'Flicker',
+  grain: 'Grain',
+  cinema: 'Cinema Bars',
+  spotlight: 'Spotlight',
+  chroma: 'Chroma Split',
 };
 export const MIRRORS = { horizontal: 'Horizontal', vertical: 'Vertical', quarter: 'Quarter' };
 // The pixel pass's mirror modes (x + 3y) for each kind; quarters mostly keep the top.
@@ -106,11 +135,35 @@ function mirrorMode(kinds, r1, r2) {
 // blackout and negative flash), and the render switches (render.js: outlines, a few
 // colors, pixel shifts, x-ray flips, how hits land).
 export const CHANCE = {
-  scanlines: 0.3, mirror: 0.3, blend: 0.5,
-  ghost: 0.3, blur: 0.35, glow: 0.4, gradient: 0.3, paint: 0.2, wash: 0.2, flicker: 0.25,
-  grain: 0.3, cinema: 0.25, spotlight: 0.2, chroma: 0.3,
-  sparks: 0.6, echo: 0.6, punch: 0.75, temperature: 0.6, breathe: 0.6, blackout: 0.5, flash: 0.5,
-  outlines: 0.75, fewColors: 0.2, pixelShift: 0.35, xray: 0.35, hitStop: 0.6, hitFlash: 0.7, debris: 0.75, marks: 0.75,
+  scanlines: 0.3,
+  mirror: 0.3,
+  blend: 0.5,
+  ghost: 0.3,
+  blur: 0.35,
+  glow: 0.4,
+  gradient: 0.3,
+  paint: 0.2,
+  wash: 0.2,
+  flicker: 0.25,
+  grain: 0.3,
+  cinema: 0.25,
+  spotlight: 0.2,
+  chroma: 0.3,
+  sparks: 0.6,
+  echo: 0.6,
+  punch: 0.75,
+  temperature: 0.6,
+  breathe: 0.6,
+  blackout: 0.5,
+  flash: 0.5,
+  outlines: 0.75,
+  fewColors: 0.2,
+  pixelShift: 0.35,
+  xray: 0.35,
+  hitStop: 0.6,
+  hitFlash: 0.7,
+  debris: 0.75,
+  marks: 0.75,
 };
 const HEAVY = ['ghost', 'blur', 'glow', 'gradient', 'paint', 'wash', 'flicker'];
 const MAX_HEAVY = 2;
@@ -119,7 +172,18 @@ const MAX_HEAVY = 2;
 // roll: the first is its classic way. Echoes and glow only get modes where black
 // leaves the picture alone (their layer is mostly black).
 export const BLEND = {
-  normal: 0, add: 1, subtract: 2, multiply: 3, screen: 4, darken: 5, lighten: 6, overlay: 7, hardLight: 8, softLight: 9, difference: 10, exclusion: 11,
+  normal: 0,
+  add: 1,
+  subtract: 2,
+  multiply: 3,
+  screen: 4,
+  darken: 5,
+  lighten: 6,
+  overlay: 7,
+  hardLight: 8,
+  softLight: 9,
+  difference: 10,
+  exclusion: 11,
 };
 /** The blend modes each layer may roll (BLEND names), its classic way first. */
 export const LAYER_BLENDS = {
@@ -135,7 +199,15 @@ export const LAYER_BLENDS = {
 const CLASSIC = Object.fromEntries(Object.entries(LAYER_BLENDS).map(([k, list]) => [k, BLEND[list[0]]]));
 // Gradient maps: palette slots (scenePalette: 0 void, 1 shadow, 2 stone, 3 wood, 4 bone,
 // 5–8 the flame's ramp lo → core, 9 its shade), dark to light.
-const GRADIENTS = [[0, 6, 8], [9, 5, 7], [0, 2, 4], [1, 6, 4], [0, 5, 7], [2, 7, 8], [0, 3, 8]];
+const GRADIENTS = [
+  [0, 6, 8],
+  [9, 5, 7],
+  [0, 2, 4],
+  [1, 6, 4],
+  [0, 5, 7],
+  [2, 7, 8],
+  [0, 3, 8],
+];
 // The flicker's kinds: a dip on each beat, a band rolling down, film jitter, a candle's
 // waver. The fast ones stay faint.
 const FLICKER_AMP = [0.22, 0.25, 0.06, 0.09];
@@ -155,56 +227,250 @@ const FLICKER_AMP = [0.22, 0.25, 0.06, 0.09];
 /** @type {Record<string, ParamSpec>} Every detail the dice roll for a look's turn. */
 export const PARAMS = {
   // The layers' details (rolled into each turn, in this order).
-  ghostKeep: { label: 'Trail Length', hint: 'How long the ghost trail lingers behind everything that moves.', range: [0.6, 0.97], roll: [0.8, 0.94], step: 0.01 },
-  ghostMix: { label: 'Trail Strength', hint: 'How much of the ghost trail shows over the picture.', range: [0.1, 0.85], roll: [0.35, 0.7], step: 0.01 },
-  blur: { label: 'Blur Amount', hint: 'How far the camera’s moves (whips, shakes, punches) smear the picture.', range: [0.2, 2], roll: [0.6, 1.2], step: 0.05 },
-  glowSize: { label: 'Glow Size', hint: 'How wide the light spills from the bright parts.', range: [1, 5], roll: [1.5, 3.2], step: 0.1 },
-  glowCut: { label: 'Glow Threshold', hint: 'Only what is brighter than this glows: lower lets more of the picture spill light.', range: [0.05, 0.6], roll: [0.12, 0.3], step: 0.01 },
-  glowAmt: { label: 'Glow Strength', hint: 'How bright the spilled light is; it swells on the kicks.', range: [0, 1.6], roll: [0.5, 1.1], step: 0.05 },
-  grad: { label: 'Gradient Colors', hint: 'The three palette colors the picture is recolored through, dark to light.', slots: 3, of: 10 },
-  gradAmt: { label: 'Gradient Strength', hint: 'How much of the recolored picture shows over the real one.', range: [0.1, 1], roll: [0.35, 0.8], step: 0.05 },
+  ghostKeep: {
+    label: 'Trail Length',
+    hint: 'How long the ghost trail lingers behind everything that moves.',
+    range: [0.6, 0.97],
+    roll: [0.8, 0.94],
+    step: 0.01,
+  },
+  ghostMix: {
+    label: 'Trail Strength',
+    hint: 'How much of the ghost trail shows over the picture.',
+    range: [0.1, 0.85],
+    roll: [0.35, 0.7],
+    step: 0.01,
+  },
+  blur: {
+    label: 'Blur Amount',
+    hint: 'How far the camera’s moves (whips, shakes, punches) smear the picture.',
+    range: [0.2, 2],
+    roll: [0.6, 1.2],
+    step: 0.05,
+  },
+  glowSize: {
+    label: 'Glow Size',
+    hint: 'How wide the light spills from the bright parts.',
+    range: [1, 5],
+    roll: [1.5, 3.2],
+    step: 0.1,
+  },
+  glowCut: {
+    label: 'Glow Threshold',
+    hint: 'Only what is brighter than this glows: lower lets more of the picture spill light.',
+    range: [0.05, 0.6],
+    roll: [0.12, 0.3],
+    step: 0.01,
+  },
+  glowAmt: {
+    label: 'Glow Strength',
+    hint: 'How bright the spilled light is; it swells on the kicks.',
+    range: [0, 1.6],
+    roll: [0.5, 1.1],
+    step: 0.05,
+  },
+  grad: {
+    label: 'Gradient Colors',
+    hint: 'The three palette colors the picture is recolored through, dark to light.',
+    slots: 3,
+    of: 10,
+  },
+  gradAmt: {
+    label: 'Gradient Strength',
+    hint: 'How much of the recolored picture shows over the real one.',
+    range: [0.1, 1],
+    roll: [0.35, 0.8],
+    step: 0.05,
+  },
   paintR: { label: 'Brush Size', hint: 'How big the painterly strokes are, in pixels.', values: [2, 3, 4] },
-  paintAngle: { label: 'Stroke Angle', hint: 'Which way the painterly strokes run, in radians: 0 lies flat, about 1.57 stands upright and 3.14 lies flat again.', range: [0, Math.PI], roll: [0, Math.PI], step: 0.05 },
-  paintAspect: { label: 'Stroke Length', hint: 'How long the painterly strokes are for their width.', range: [1, 3], roll: [1, 2.4], step: 0.1 },
+  paintAngle: {
+    label: 'Stroke Angle',
+    hint: 'Which way the painterly strokes run, in radians: 0 lies flat, about 1.57 stands upright and 3.14 lies flat again.',
+    range: [0, Math.PI],
+    roll: [0, Math.PI],
+    step: 0.05,
+  },
+  paintAspect: {
+    label: 'Stroke Length',
+    hint: 'How long the painterly strokes are for their width.',
+    range: [1, 3],
+    roll: [1, 2.4],
+    step: 0.1,
+  },
   washR: { label: 'Wash Size', hint: 'How big the watercolor’s flat washes are, in pixels.', values: [2, 3, 4] },
-  washEdge: { label: 'Wash Edges', hint: 'How dark the pigment pools along the watercolor’s edges.', range: [0, 1], roll: [0, 0.7], step: 0.05 },
-  styleMix: { label: 'Repaint Strength', hint: 'How much of the painterly or watercolor repaint shows over the picture.', range: [0.3, 1], roll: [0.7, 1], step: 0.05 },
+  washEdge: {
+    label: 'Wash Edges',
+    hint: 'How dark the pigment pools along the watercolor’s edges.',
+    range: [0, 1],
+    roll: [0, 0.7],
+    step: 0.05,
+  },
+  styleMix: {
+    label: 'Repaint Strength',
+    hint: 'How much of the painterly or watercolor repaint shows over the picture.',
+    range: [0.3, 1],
+    roll: [0.7, 1],
+    step: 0.05,
+  },
   // (True shows the strokes: update() draws style 1 when it is. Rolled only, never pinned.)
-  styleFlip: { label: 'Painterly Over Watercolor', hint: 'When Painterly and Watercolor are both on, only one can show: on picks the brush strokes, off the watercolor wash.', bool: true, chance: 0.5 },
-  flicker: { label: 'Flicker Kind', hint: 'How the light flickers: a dip on each beat, a rolling band, film jitter or a candle’s waver.', values: [0, 1, 2, 3], names: ['Beat Dip', 'Rolling Band', 'Film Jitter', 'Candle Waver'] },
-  warpMix: { label: 'Warp Blend', hint: 'With Blend Modes: how much of a warp (the kaleidoscope, a ripple) lies over the plain picture.', range: [0.2, 1], roll: [0.5, 0.9], step: 0.05 },
-  grain: { label: 'Grain', hint: 'How much the noise speckles the picture, from a faint film texture to heavy static.', range: [0.02, 0.4], roll: [0.1, 0.22], step: 0.01 },
-  grainKick: { label: 'Grain On the Kick', hint: 'How much heavier the grain swells on each kick (0: steady).', range: [0, 0.4], roll: [0.1, 0.25], chance: 0.5, step: 0.01 },
-  cinema: { label: 'Bar Height', hint: 'How tall each cinema bar is, as a share of the screen’s height: 0.1 covers a tenth at the top and a tenth at the bottom.', range: [0.04, 0.2], roll: [0.07, 0.14], step: 0.01 },
-  spot: { label: 'Spotlight Size', hint: 'How wide the spotlight’s circle round the fire is.', range: [0.2, 0.8], roll: [0.28, 0.5], step: 0.01 },
-  spotBreath: { label: 'Spotlight Breath', hint: 'How much the spotlight opens with the music and the kicks.', range: [0, 0.25], roll: [0.04, 0.14], step: 0.01 },
-  chroma: { label: 'Split Width', hint: 'How far apart the color channels drift, in pixels.', values: [1, 2, 3], roll: [1, 2] },
-  chromaKick: { label: 'Split On the Kick', hint: 'How much wider the color split is kicked on each beat.', range: [0, 6], roll: [0, 4], step: 0.1 },
+  styleFlip: {
+    label: 'Painterly Over Watercolor',
+    hint: 'When Painterly and Watercolor are both on, only one can show: on picks the brush strokes, off the watercolor wash.',
+    bool: true,
+    chance: 0.5,
+  },
+  flicker: {
+    label: 'Flicker Kind',
+    hint: 'How the light flickers: a dip on each beat, a rolling band, film jitter or a candle’s waver.',
+    values: [0, 1, 2, 3],
+    names: ['Beat Dip', 'Rolling Band', 'Film Jitter', 'Candle Waver'],
+  },
+  warpMix: {
+    label: 'Warp Blend',
+    hint: 'With Blend Modes: how much of a warp (the kaleidoscope, a ripple) lies over the plain picture.',
+    range: [0.2, 1],
+    roll: [0.5, 0.9],
+    step: 0.05,
+  },
+  grain: {
+    label: 'Grain',
+    hint: 'How much the noise speckles the picture, from a faint film texture to heavy static.',
+    range: [0.02, 0.4],
+    roll: [0.1, 0.22],
+    step: 0.01,
+  },
+  grainKick: {
+    label: 'Grain On the Kick',
+    hint: 'How much heavier the grain swells on each kick (0: steady).',
+    range: [0, 0.4],
+    roll: [0.1, 0.25],
+    chance: 0.5,
+    step: 0.01,
+  },
+  cinema: {
+    label: 'Bar Height',
+    hint: 'How tall each cinema bar is, as a share of the screen’s height: 0.1 covers a tenth at the top and a tenth at the bottom.',
+    range: [0.04, 0.2],
+    roll: [0.07, 0.14],
+    step: 0.01,
+  },
+  spot: {
+    label: 'Spotlight Size',
+    hint: 'How wide the spotlight’s circle round the fire is.',
+    range: [0.2, 0.8],
+    roll: [0.28, 0.5],
+    step: 0.01,
+  },
+  spotBreath: {
+    label: 'Spotlight Breath',
+    hint: 'How much the spotlight opens with the music and the kicks.',
+    range: [0, 0.25],
+    roll: [0.04, 0.14],
+    step: 0.01,
+  },
+  chroma: {
+    label: 'Split Width',
+    hint: 'How far apart the color channels drift, in pixels.',
+    values: [1, 2, 3],
+    roll: [1, 2],
+  },
+  chromaKick: {
+    label: 'Split On the Kick',
+    hint: 'How much wider the color split is kicked on each beat.',
+    range: [0, 6],
+    roll: [0, 4],
+    step: 0.1,
+  },
   // The looks' own (LOOK_PARAMS).
-  zoomIn: { label: 'Falls Inward', hint: 'The echo falls into the fire instead of streaming out of it.', bool: true, chance: 0.35 },
-  turn: { label: 'Spiral Turn', hint: 'How fast the vortex turns its echoes, and which way (negative: the other way).', range: [-1.5, 1.5], roll: [0.5, 1.5], signed: true, step: 0.05 },
+  zoomIn: {
+    label: 'Falls Inward',
+    hint: 'The echo falls into the fire instead of streaming out of it.',
+    bool: true,
+    chance: 0.35,
+  },
+  turn: {
+    label: 'Spiral Turn',
+    hint: 'How fast the vortex turns its echoes, and which way (negative: the other way).',
+    range: [-1.5, 1.5],
+    roll: [0.5, 1.5],
+    signed: true,
+    step: 0.05,
+  },
   crunch: { label: 'Crunch Size', hint: 'How big the mosaic’s pixels get on the kicks.', values: [2, 3, 4] },
-  segments: { label: 'Segments', hint: 'How many mirrored segments the kaleidoscope has.', values: [4, 6, 8, 10], roll: [4, 6, 8] },
+  segments: {
+    label: 'Segments',
+    hint: 'How many mirrored segments the kaleidoscope has.',
+    values: [4, 6, 8, 10],
+    roll: [4, 6, 8],
+  },
   // The layers' kinds.
-  scan: { label: 'Scanline Kind', hint: 'Which way the scanlines run: thin rows every other pixel, thick rows two pixels deep, or columns.', values: [0, 1, 2], names: ['Thin Rows', 'Thick Rows', 'Columns'] },
+  scan: {
+    label: 'Scanline Kind',
+    hint: 'Which way the scanlines run: thin rows every other pixel, thick rows two pixels deep, or columns.',
+    values: [0, 1, 2],
+    names: ['Thin Rows', 'Thick Rows', 'Columns'],
+  },
   mirror: {
-    label: 'Mirror Kind', hint: 'Which half or quarter of the picture is mirrored over the rest.', values: [1, 2, 3, 4, 5, 6, 7, 8],
-    names: ['Left To Right', 'Right To Left', 'Top Down', 'Top Left Quarter', 'Top Right Quarter', 'Bottom Up', 'Bottom Left Quarter', 'Bottom Right Quarter'],
+    label: 'Mirror Kind',
+    hint: 'Which half or quarter of the picture is mirrored over the rest.',
+    values: [1, 2, 3, 4, 5, 6, 7, 8],
+    names: [
+      'Left To Right',
+      'Right To Left',
+      'Top Down',
+      'Top Left Quarter',
+      'Top Right Quarter',
+      'Bottom Up',
+      'Bottom Left Quarter',
+      'Bottom Right Quarter',
+    ],
   },
 };
 /** The details each look has of its own (a scene's `look.params`). */
 export const LOOK_PARAMS = { echo: ['zoomIn'], kaleido: ['segments'], vortex: ['turn'], mosaic: ['crunch'] };
 /** The details each layer has (a scene's `details`). */
 export const LAYER_DETAILS = {
-  scanlines: ['scan'], mirror: ['mirror'], ghost: ['ghostKeep', 'ghostMix'], blur: ['blur'],
-  glow: ['glowSize', 'glowCut', 'glowAmt'], gradient: ['grad', 'gradAmt'], paint: ['paintR', 'paintAngle', 'paintAspect', 'styleMix'],
-  wash: ['washR', 'washEdge', 'styleMix'], flicker: ['flicker'], grain: ['grain', 'grainKick'], cinema: ['cinema'],
-  spotlight: ['spot', 'spotBreath'], chroma: ['chroma', 'chromaKick'], blend: ['warpMix'],
+  scanlines: ['scan'],
+  mirror: ['mirror'],
+  ghost: ['ghostKeep', 'ghostMix'],
+  blur: ['blur'],
+  glow: ['glowSize', 'glowCut', 'glowAmt'],
+  gradient: ['grad', 'gradAmt'],
+  paint: ['paintR', 'paintAngle', 'paintAspect', 'styleMix'],
+  wash: ['washR', 'washEdge', 'styleMix'],
+  flicker: ['flicker'],
+  grain: ['grain', 'grainKick'],
+  cinema: ['cinema'],
+  spotlight: ['spot', 'spotBreath'],
+  chroma: ['chroma', 'chromaKick'],
+  blend: ['warpMix'],
 };
 // A turn's layer details, in the order the dice roll them.
 const ROLLED = [
-  'ghostKeep', 'ghostMix', 'blur', 'glowSize', 'glowCut', 'glowAmt', 'grad', 'gradAmt', 'paintR', 'paintAngle', 'paintAspect',
-  'washR', 'washEdge', 'styleMix', 'styleFlip', 'flicker', 'warpMix', 'grain', 'grainKick', 'cinema', 'spot', 'spotBreath', 'chroma', 'chromaKick',
+  'ghostKeep',
+  'ghostMix',
+  'blur',
+  'glowSize',
+  'glowCut',
+  'glowAmt',
+  'grad',
+  'gradAmt',
+  'paintR',
+  'paintAngle',
+  'paintAspect',
+  'washR',
+  'washEdge',
+  'styleMix',
+  'styleFlip',
+  'flicker',
+  'warpMix',
+  'grain',
+  'grainKick',
+  'cinema',
+  'spot',
+  'spotBreath',
+  'chroma',
+  'chromaKick',
 ];
 const BLEND_NAME = Object.fromEntries(Object.entries(BLEND).map(([k, v]) => [v, k]));
 
@@ -222,7 +488,11 @@ function rollParam(spec) {
 }
 /** A gradient map: mostly the picked one; sometimes random slots, sometimes turned upside down. */
 function rollGrad(picked) {
-  return Math.random() < 0.25 ? [0, 0, 0].map(() => Math.floor(Math.random() * PARAMS.grad.of)) : Math.random() < 0.2 ? [...picked].reverse() : picked;
+  return Math.random() < 0.25
+    ? [0, 0, 0].map(() => Math.floor(Math.random() * PARAMS.grad.of))
+    : Math.random() < 0.2
+      ? [...picked].reverse()
+      : picked;
 }
 /** A pinned value made safe for `key` (PARAMS), or undefined when it can't be. */
 export function cleanParam(key, v) {
@@ -230,7 +500,9 @@ export function cleanParam(key, v) {
   if (!spec) return undefined;
   if (spec.bool) return typeof v === 'boolean' ? v : undefined;
   if (spec.slots) {
-    return Array.isArray(v) && v.length === spec.slots && v.every((n) => Number.isInteger(n) && n >= 0 && n < spec.of) ? [...v] : undefined;
+    return Array.isArray(v) && v.length === spec.slots && v.every((n) => Number.isInteger(n) && n >= 0 && n < spec.of)
+      ? [...v]
+      : undefined;
   }
   if (typeof v !== 'number' || !Number.isFinite(v)) return undefined;
   if (spec.values) return spec.values.includes(v) ? v : undefined;
@@ -263,43 +535,56 @@ const DETAIL_KEYS = [...new Set(Object.values(LAYER_DETAILS).flat())];
  */
 export function createLooks(g, { reducedMotion = false } = {}) {
   let look = 'ember';
-  let modes = {};       // the settings, as of the last update
+  let modes = {}; // the settings, as of the last update
   let slice = 0;
   let block = 0;
-  let hitEnv = 0;       // the last big hit, decaying
+  let hitEnv = 0; // the last big hit, decaying
   let kick = 0;
-  let dip = 0;          // the flicker's beat dip
+  let dip = 0; // the flicker's beat dip
   let inkFor = 0;
   let invertFor = 0;
   let lastFlash = -Infinity;
   let cycleFor = 0;
   let cycleStep = 0;
-  let spinFor = 0;      // the palette spinning (echo's burst, the color cycle drop)
+  let spinFor = 0; // the palette spinning (echo's burst, the color cycle drop)
   const ripples = []; // { t, s }
   let kaleSeg = 6;
   let kaleRot = 0;
   let kaleSpin = 0;
   let letterbox = 0;
   let iris = 2;
-  let cinema = 0;       // the cinema bars' height, sliding in and out
-  let spot = 2;         // the spotlight's radius (2: open)
+  let cinema = 0; // the cinema bars' height, sliding in and out
+  let spot = 2; // the spotlight's radius (2: open)
   let clock = 0;
-  let turn = 0;         // counts the rolls (each look's turn)
+  let turn = 0; // counts the rolls (each look's turn)
   // Rolled each time a look comes round: its details, which switches in the mix are on,
   // and how the layers look and blend.
   const roll = { zoomIn: false, turn: 1, mirror: [0, 0], scan: 0, crunch: 1, on: {}, p: {}, blends: { ...CLASSIC } };
   // Drop hits: seconds left of each (and their envelopes).
-  const FX_TIME = { shatter: 0.5, burst: 0.9, spiral: 1.2, kaleido: 1.6, flips: 2, split: 0.6, crunch: 0.5, iris: 0.45, slam: 0.6, ink: 0.2 };
+  const FX_TIME = {
+    shatter: 0.5,
+    burst: 0.9,
+    spiral: 1.2,
+    kaleido: 1.6,
+    flips: 2,
+    split: 0.6,
+    crunch: 0.5,
+    iris: 0.45,
+    slam: 0.6,
+    ink: 0.2,
+  };
   const fx = Object.fromEntries(Object.keys(FX_TIME).map((k) => [k, 0]));
   let flip = [0, 0]; // the mirror flips' current rolls
   let lastDrop = '';
   /** @type {null | { look: string, amount: number, params: Record<string, any>, layers: Record<string, string>, details: Record<string, any>, blends: Record<string, number>, blendNames: Record<string, string>, dropFx: any }} */
-  let pinned = null;    // a scene's look (pin())
-  let pinHold = true;   // ...held until unpinned (false: for this turn only)
-  let P = roll.p;       // the details on screen: the turn's, with a pin's laid over them
+  let pinned = null; // a scene's look (pin())
+  let pinHold = true; // ...held until unpinned (false: for this turn only)
+  let P = roll.p; // the details on screen: the turn's, with a pin's laid over them
   let blendsNow = roll.blends;
 
-  function reseed() { g.sliceSeed = Math.random() * 100; }
+  function reseed() {
+    g.sliceSeed = Math.random() * 100;
+  }
   /** The details and blends on screen: the rolled ones, with the pinned ones over them. */
   function merge() {
     P = pinned ? { ...roll.p, ...pinned.details } : roll.p;
@@ -316,7 +601,9 @@ export function createLooks(g, { reducedMotion = false } = {}) {
     for (const [k, c] of Object.entries(CHANCE)) roll.on[k] = Math.random() < c;
     // Keep the mix from piling up: two heavy layers at most, one restyle.
     const heavy = shuffle(HEAVY.filter((k) => roll.on[k]));
-    heavy.forEach((k, i) => { roll.on[k] = i < MAX_HEAVY; });
+    heavy.forEach((k, i) => {
+      roll.on[k] = i < MAX_HEAVY;
+    });
     if (roll.on.paint && roll.on.wash) roll.on[Math.random() < 0.5 ? 'paint' : 'wash'] = false;
     const grad = pick(GRADIENTS);
     const p = {};
@@ -344,20 +631,27 @@ export function createLooks(g, { reducedMotion = false } = {}) {
   const has = (k) => k === look || (!pinned && modeOf(modes.looks?.[k], 'mix') === 'on');
   const mixLooks = (enabled) => Object.keys(LOOKS).filter((k) => modeOf(enabled?.[k], 'mix') === 'mix');
   /** A layer's switch: the pinned scene's (missing: off), or the settings'. */
-  const layerMode = (k, m = modes) => (pinned ? pinned.layers[k] ?? 'off' : m[k]);
+  const layerMode = (k, m = modes) => (pinned ? (pinned.layers[k] ?? 'off') : m[k]);
   const lookParam = (k) => pinned?.params[k] ?? roll[k];
-  const segmentsNow = () => (pinned?.params.segments !== undefined && !(fx.kaleido > 0) ? pinned.params.segments : kaleSeg);
+  const segmentsNow = () =>
+    pinned?.params.segments !== undefined && !(fx.kaleido > 0) ? pinned.params.segments : kaleSeg;
   const mirrorNow = (kinds) => P.mirror ?? mirrorMode(kinds, ...roll.mirror);
   const scanNow = () => P.scan ?? roll.scan;
 
   return {
-    get look() { return look; },
+    get look() {
+      return look;
+    },
     /** Counts the looks' turns: a new one each time the mix is rolled again. */
-    get turn() { return turn; },
+    get turn() {
+      return turn;
+    },
     /** The looks playing: the one taking its turn, then those always on (a pinned look alone). */
     get playing() {
       if (pinned) return [look];
-      const always = Object.keys(LOOKS).filter((k) => k !== look && k !== 'ember' && modeOf(modes.looks?.[k], 'mix') === 'on');
+      const always = Object.keys(LOOKS).filter(
+        (k) => k !== look && k !== 'ember' && modeOf(modes.looks?.[k], 'mix') === 'on',
+      );
       return look === 'ember' && always.length ? always : [look, ...always];
     },
     set,
@@ -378,7 +672,8 @@ export function createLooks(g, { reducedMotion = false } = {}) {
         return;
       }
       const blendNames = {};
-      for (const [k, v] of Object.entries(p.blends ?? {})) if (Object.hasOwn(LAYER_BLENDS, k) && Object.hasOwn(BLEND, v)) blendNames[k] = v;
+      for (const [k, v] of Object.entries(p.blends ?? {}))
+        if (Object.hasOwn(LAYER_BLENDS, k) && Object.hasOwn(BLEND, v)) blendNames[k] = v;
       const layers = {};
       for (const k of Object.keys(LAYERS)) {
         const m = p.layers?.[k];
@@ -406,10 +701,20 @@ export function createLooks(g, { reducedMotion = false } = {}) {
     get pinned() {
       if (!pinned) return null;
       const { look: l, amount, params, layers, details, blendNames, dropFx } = pinned;
-      return { look: l, amount, params: { ...params }, layers: { ...layers }, details: structuredClone(details), blends: { ...blendNames }, dropFx };
+      return {
+        look: l,
+        amount,
+        params: { ...params },
+        layers: { ...layers },
+        details: structuredClone(details),
+        blends: { ...blendNames },
+        dropFx,
+      };
     },
     /** Whether a pin holds past this turn. */
-    get held() { return !!pinned && pinHold; },
+    get held() {
+      return !!pinned && pinHold;
+    },
     /**
      * What's on screen now, in a pin's terms ("Pin What You See"): the look and its
      * details, which layers are showing this turn, their details and how they blend.
@@ -432,7 +737,10 @@ export function createLooks(g, { reducedMotion = false } = {}) {
     },
     /** Another look from those in the mix (with none, the clean fire); the mix re-rolls either way. */
     next(enabled) {
-      if (pinned && pinHold) { reroll(); return; }
+      if (pinned && pinHold) {
+        reroll();
+        return;
+      }
       if (pinned) {
         // A turn-only pin ends here: the show carries on from it.
         pinned = null;
@@ -459,25 +767,41 @@ export function createLooks(g, { reducedMotion = false } = {}) {
       if (fx.flips > 0) flip = [Math.random(), Math.random()];
       if (s < 0.05) return;
       if (has('ripple') && s > 0.2) ripples.push({ t: 0, s: accent ? 1 : 0.6 * s });
-      if (has('echo') && accent && s > 0.3) { cycleFor = period * 0.5; cycleStep = 1 + Math.floor(Math.random() * 3); }
+      if (has('echo') && accent && s > 0.3) {
+        cycleFor = period * 0.5;
+        cycleStep = 1 + Math.floor(Math.random() * 3);
+      }
       if (has('ink') && accent) inkFor = 0.09;
       if ((has('kaleido') || has('vortex')) && accent) kaleSpin = Math.max(kaleSpin, 0.6 * s);
     },
     hat(s) {
       if (reducedMotion) return;
-      if (has('glitch') && s > 0.6 && Math.random() < 0.15) { slice = Math.max(slice, 0.2); reseed(); }
+      if (has('glitch') && s > 0.6 && Math.random() < 0.15) {
+        slice = Math.max(slice, 0.2);
+        reseed();
+      }
     },
     /** A big hit in the playing looks' style (drops, combos landing, rings, G). */
     bang(amount = 1, { flash = false } = {}) {
       if (reducedMotion) return;
       hitEnv = Math.max(hitEnv, amount);
-      if (has('glitch')) { slice = Math.max(slice, amount); block = Math.max(block, amount); reseed(); }
+      if (has('glitch')) {
+        slice = Math.max(slice, amount);
+        block = Math.max(block, amount);
+        reseed();
+      }
       if (has('echo')) spinFor = 0.5 * amount;
       if (has('ripple')) for (let k = 0; k < 3; k++) ripples.push({ t: -k * 0.12, s: amount });
-      if (has('kaleido')) { kaleSeg = pick([4, 6, 8, 10].filter((n) => n !== kaleSeg)); kaleSpin = Math.max(kaleSpin, 2 * amount); }
+      if (has('kaleido')) {
+        kaleSeg = pick([4, 6, 8, 10].filter((n) => n !== kaleSeg));
+        kaleSpin = Math.max(kaleSpin, 2 * amount);
+      }
       if (has('vortex')) kaleSpin = Math.max(kaleSpin, 2.5 * amount);
       if (has('ink')) inkFor = 0.22 * amount;
-      if (flash && amount >= 0.9 && clock - lastFlash > 2) { lastFlash = clock; invertFor = 0.07; }
+      if (flash && amount >= 0.9 && clock - lastFlash > 2) {
+        lastFlash = clock;
+        invertFor = 0.07;
+      }
     },
     /**
      * A drop: the hits set to always, and up to `max` in all with one or more drawn from
@@ -500,10 +824,15 @@ export function createLooks(g, { reducedMotion = false } = {}) {
       for (const name of chosen) {
         if (name === 'shock') for (let k = 0; k < 4; k++) ripples.push({ t: -k * 0.1, s: 1 });
         else if (name === 'cycle') spinFor = 0.6;
-        else if (name === 'xray') { /* the render show flips the view (render.js xrayHit) */ }
-        else {
+        else if (name === 'xray') {
+          /* the render show flips the view (render.js xrayHit) */
+        } else {
           fx[name] = FX_TIME[name];
-          if (name === 'shatter') { slice = 1; block = 1; reseed(); }
+          if (name === 'shatter') {
+            slice = 1;
+            block = 1;
+            reseed();
+          }
           if (name === 'kaleido') kaleSeg = pick([6, 8, 10]);
           if (name === 'flips') flip = [Math.random(), Math.random()];
         }
@@ -546,20 +875,27 @@ export function createLooks(g, { reducedMotion = false } = {}) {
       const layer = (k) => on && active(k, layerMode(k, m));
 
       // Glitch (and a shatter): tears and crunch.
-      if (!reducedMotion && has('glitch') && amt > 0 && build > 0.3 && Math.random() < dt * 6 * build) { slice = Math.max(slice, 0.25 + 0.5 * build); reseed(); }
+      if (!reducedMotion && has('glitch') && amt > 0 && build > 0.3 && Math.random() < dt * 6 * build) {
+        slice = Math.max(slice, 0.25 + 0.5 * build);
+        reseed();
+      }
       const gl = has('glitch') || fx.shatter > 0 ? amt : 0;
       g.slice = gl * Math.min(1, slice);
-      g.split = Math.round(Math.max(
-        (has('glitch') ? amt * (1.6 * kick + 3 * hitEnv + 1.5 * build) : 0)
-        + (has('prism') ? amt * (1 + 5 * kick + 6 * hitEnv) : 0)
-        + amt * 10 * env('split') ** 1.5,
-        layer('chroma') ? Math.max(1, a * (P.chroma + P.chromaKick * kick)) : 0,
-      ));
-      g.block = 1 + Math.round(
-        gl * 3 * block
-        + (has('mosaic') ? amt * (lookParam('crunch') * 1.6 * kick + 4 * hitEnv) : 0)
-        + amt * 7 * env('crunch') ** 2,
+      g.split = Math.round(
+        Math.max(
+          (has('glitch') ? amt * (1.6 * kick + 3 * hitEnv + 1.5 * build) : 0) +
+            (has('prism') ? amt * (1 + 5 * kick + 6 * hitEnv) : 0) +
+            amt * 10 * env('split') ** 1.5,
+          layer('chroma') ? Math.max(1, a * (P.chroma + P.chromaKick * kick)) : 0,
+        ),
       );
+      g.block =
+        1 +
+        Math.round(
+          gl * 3 * block +
+            (has('mosaic') ? amt * (lookParam('crunch') * 1.6 * kick + 4 * hitEnv) : 0) +
+            amt * 7 * env('crunch') ** 2,
+        );
       g.wave = gl * (1.2 * build + 3 * hitEnv) + (has('haze') ? amt * (0.8 + 1.8 * energy + 2.5 * kick) : 0);
       g.noise = Math.max(gl * (0.08 * build + 0.12 * hitEnv), layer('grain') ? a * (P.grain + P.grainKick * kick) : 0);
 
@@ -573,7 +909,8 @@ export function createLooks(g, { reducedMotion = false } = {}) {
       g.feedback = Math.min(0.9, amt * echo);
       const zoomBy = has('echo') ? 0.012 + 0.03 * kick + 0.05 * hitEnv : has('vortex') ? 0.01 + 0.02 * kick : 0.006;
       g.zoom = 1 + (has('echo') && lookParam('zoomIn') ? -0.6 : 1) * zoomBy + 0.06 * env('burst');
-      g.feedRot = (has('vortex') ? lookParam('turn') * (0.02 + 0.05 * kaleSpin) : 0) + lookParam('turn') * 0.07 * env('spiral');
+      g.feedRot =
+        (has('vortex') ? lookParam('turn') * (0.02 + 0.05 * kaleSpin) : 0) + lookParam('turn') * 0.07 * env('spiral');
       g.cycle = !cycles ? 0 : spinFor > 0 ? Math.floor(clock * 16) % 4 : cycleFor > 0 ? cycleStep : 0;
 
       // Ripple: rings out of the fire (radius as a fraction of the screen height). The ones

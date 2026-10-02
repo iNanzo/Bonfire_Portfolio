@@ -26,7 +26,10 @@ const GLOW_TIME = { fire: 2.4, ice: 1.6, lightning: 0.7 }; // seconds a fresh ma
  */
 export function createGroundMarks({ center, half = 3.4, res = 256 } = {}) {
   const make = () => {
-    const canvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(res, res) : Object.assign(document.createElement('canvas'), { width: res, height: res });
+    const canvas =
+      typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(res, res)
+        : Object.assign(document.createElement('canvas'), { width: res, height: res });
     const ctx = canvas.getContext('2d');
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -60,18 +63,28 @@ export function createGroundMarks({ center, half = 3.4, res = 256 } = {}) {
     for (let i = 0; i < n; i++) {
       const walk = (a, len, depth) => {
         const pts = [[0, 0]];
-        let x = 0, y = 0;
+        let x = 0,
+          y = 0;
         const steps = 6;
         for (let s = 1; s <= steps; s++) {
           a += (Math.random() - 0.5) * 0.9;
           x += Math.cos(a) * (len / steps);
           y += Math.sin(a) * (len / steps);
           pts.push([x, y]);
-          if (depth < 2 && Math.random() < 0.28) arms.push({ from: [x, y], pts: walk(a + (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.6), len * 0.45, depth + 1), w: 1 / (depth + 2) });
+          if (depth < 2 && Math.random() < 0.28)
+            arms.push({
+              from: [x, y],
+              pts: walk(a + (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.6), len * 0.45, depth + 1),
+              w: 1 / (depth + 2),
+            });
         }
         return pts;
       };
-      arms.push({ from: [0, 0], pts: walk((i / n) * TAU + Math.random() * 0.6, r * (0.7 + Math.random() * 0.5), 0), w: 1 });
+      arms.push({
+        from: [0, 0],
+        pts: walk((i / n) * TAU + Math.random() * 0.6, r * (0.7 + Math.random() * 0.5), 0),
+        w: 1,
+      });
     }
     return arms;
   }
@@ -100,9 +113,21 @@ export function createGroundMarks({ center, half = 3.4, res = 256 } = {}) {
       }
     }
     stamps.push({
-      kind, x, z, r, strength, born: performance.now() / 1000,
-      blobs, arms: kind === 'lightning' ? lichtenberg(r * 1.6) : null,
-      spokes: kind === 'ice' ? Array.from({ length: 7 + Math.floor(Math.random() * 5) }, () => [Math.random() * TAU, 0.5 + Math.random() * 0.7]) : null,
+      kind,
+      x,
+      z,
+      r,
+      strength,
+      born: performance.now() / 1000,
+      blobs,
+      arms: kind === 'lightning' ? lichtenberg(r * 1.6) : null,
+      spokes:
+        kind === 'ice'
+          ? Array.from({ length: 7 + Math.floor(Math.random() * 5) }, () => [
+              Math.random() * TAU,
+              0.5 + Math.random() * 0.7,
+            ])
+          : null,
       colors: ramp.map((c) => c.clone()),
     });
     repaintIn = 0;
@@ -136,11 +161,13 @@ export function createGroundMarks({ center, half = 3.4, res = 256 } = {}) {
           };
           A.lineWidth = Math.max(1, 2.2 * arm.w);
           A.strokeStyle = `rgba(8,7,12,${0.8 * fade})`;
-          path(A); A.stroke();
+          path(A);
+          A.stroke();
           if (hot > 0) {
             G.lineWidth = Math.max(1, 2 * arm.w);
             G.strokeStyle = css(hot > 0.6 ? core : hi, hot);
-            path(G); G.stroke();
+            path(G);
+            G.stroke();
           }
         }
         // The ground flash: a bright splash where it struck, gone in a blink.
@@ -154,7 +181,9 @@ export function createGroundMarks({ center, half = 3.4, res = 256 } = {}) {
         continue;
       }
       for (const [bx, by, br] of s.blobs) {
-        const x = cx + bx * perM, y = cy + by * perM, rad = Math.max(1.5, br * perM);
+        const x = cx + bx * perM,
+          y = cy + by * perM,
+          rad = Math.max(1.5, br * perM);
         const g = A.createRadialGradient(x, y, 0, x, y, rad);
         if (s.kind === 'fire') {
           g.addColorStop(0, `rgba(6,5,9,${0.85 * fade})`);
@@ -181,11 +210,16 @@ export function createGroundMarks({ center, half = 3.4, res = 256 } = {}) {
       if (hot > 0) {
         // Fire: embers glowing around the scorch's edge; ice: a faint cold glow.
         for (const [bx, by, br] of s.blobs) {
-          const x = cx + bx * perM, y = cy + by * perM, rad = Math.max(1.5, br * perM);
+          const x = cx + bx * perM,
+            y = cy + by * perM,
+            rad = Math.max(1.5, br * perM);
           // (Fire: a band just inside the scorch's edge, where the embers are.)
           const g = G.createRadialGradient(x, y, 0, x, y, rad);
           g.addColorStop(0, css(lo, 0));
-          g.addColorStop(s.kind === 'fire' ? 0.45 : 0.1, css(s.kind === 'fire' ? lo : hi, s.kind === 'fire' ? 0 : 0.18 * hot));
+          g.addColorStop(
+            s.kind === 'fire' ? 0.45 : 0.1,
+            css(s.kind === 'fire' ? lo : hi, s.kind === 'fire' ? 0 : 0.18 * hot),
+          );
           g.addColorStop(0.75, css(s.kind === 'fire' ? mid : hi, (s.kind === 'fire' ? 0.55 : 0.12) * hot * hot));
           g.addColorStop(1, css(lo, 0));
           G.fillStyle = g;
@@ -206,11 +240,23 @@ export function createGroundMarks({ center, half = 3.4, res = 256 } = {}) {
     patch(material) {
       material.onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, uniforms);
-        sh.vertexShader = 'uniform vec4 uMarkBox;\nvarying vec2 vMarkUv;\n' + sh.vertexShader.replace('#include <project_vertex>',
-          '#include <project_vertex>\n  vMarkUv = ((modelMatrix * vec4(transformed, 1.0)).xz - uMarkBox.xy) / uMarkBox.zw;');
-        sh.fragmentShader = 'uniform sampler2D tMarks;\nuniform sampler2D tMarkGlow;\nvarying vec2 vMarkUv;\n' + sh.fragmentShader
-          .replace('#include <color_fragment>', '#include <color_fragment>\n  vec4 markTint = texture2D(tMarks, vMarkUv);\n  diffuseColor.rgb = mix(diffuseColor.rgb, markTint.rgb, markTint.a);')
-          .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += texture2D(tMarkGlow, vMarkUv).rgb * 0.7;');
+        sh.vertexShader =
+          'uniform vec4 uMarkBox;\nvarying vec2 vMarkUv;\n' +
+          sh.vertexShader.replace(
+            '#include <project_vertex>',
+            '#include <project_vertex>\n  vMarkUv = ((modelMatrix * vec4(transformed, 1.0)).xz - uMarkBox.xy) / uMarkBox.zw;',
+          );
+        sh.fragmentShader =
+          'uniform sampler2D tMarks;\nuniform sampler2D tMarkGlow;\nvarying vec2 vMarkUv;\n' +
+          sh.fragmentShader
+            .replace(
+              '#include <color_fragment>',
+              '#include <color_fragment>\n  vec4 markTint = texture2D(tMarks, vMarkUv);\n  diffuseColor.rgb = mix(diffuseColor.rgb, markTint.rgb, markTint.a);',
+            )
+            .replace(
+              '#include <emissivemap_fragment>',
+              '#include <emissivemap_fragment>\n  totalEmissiveRadiance += texture2D(tMarkGlow, vMarkUv).rgb * 0.7;',
+            );
       };
       material.customProgramCacheKey = () => 'ground-marks';
     },
@@ -225,8 +271,17 @@ export function createGroundMarks({ center, half = 3.4, res = 256 } = {}) {
       dirty = stamps.length > 0; // one more paint after the last mark goes, to clear it
     },
     /** Wipe every mark (an effects change turned them off). */
-    clear() { stamps.length = 0; dirty = true; repaintIn = 0; },
-    get count() { return stamps.length; },
-    dispose() { albedo.tex.dispose(); glow.tex.dispose(); },
+    clear() {
+      stamps.length = 0;
+      dirty = true;
+      repaintIn = 0;
+    },
+    get count() {
+      return stamps.length;
+    },
+    dispose() {
+      albedo.tex.dispose();
+      glow.tex.dispose();
+    },
   };
 }

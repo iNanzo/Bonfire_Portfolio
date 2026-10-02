@@ -5,17 +5,34 @@
 // change and its Undo puts every value back as it was.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bulkPlan, sectionPlan, sectionKeys, applyValues, topKeys, changes, groupItems, getPath, setPath, createBatch } from '../src/visualizer/settingsBulk.js';
+import {
+  bulkPlan,
+  sectionPlan,
+  sectionKeys,
+  applyValues,
+  topKeys,
+  changes,
+  groupItems,
+  getPath,
+  setPath,
+  createBatch,
+} from '../src/visualizer/settingsBulk.js';
 import { defaults } from '../src/visualizer/settings.js';
 import { LOOKS, LAYERS, DROP_FX } from '../src/visualizer/looks.js';
 import { entriesFor } from '../src/settingsMap.js';
 
-const seq = (...values) => { let i = 0; return () => values[i++ % values.length]; };
+const seq = (...values) => {
+  let i = 0;
+  return () => values[i++ % values.length];
+};
 
 test('a grid’s bulk buttons set every switch; Ember has no Always, so All Always gives it In the Mix', () => {
   const s = defaults();
   const off = bulkPlan('looks', 'off', s);
-  assert.deepEqual(Object.keys(off.values), Object.keys(LOOKS).map((id) => `looks.${id}`));
+  assert.deepEqual(
+    Object.keys(off.values),
+    Object.keys(LOOKS).map((id) => `looks.${id}`),
+  );
   assert.ok(Object.values(off.values).every((v) => v === 'off'));
   const on = bulkPlan('looks', 'on', s);
   assert.equal(on.values['looks.ember'], 'mix');
@@ -25,7 +42,9 @@ test('a grid’s bulk buttons set every switch; Ember has no Always, so All Alwa
   assert.deepEqual(Object.keys(bulkPlan('layers', 'off', s).values), Object.keys(LAYERS));
   // Shuffle rolls each one; Ember still never Always.
   const shuffled = bulkPlan('looks', 'shuffle', s, { rand: seq(0.95, 0.5, 0.1) });
-  assert.ok(Object.values(shuffled.values).some((v) => v === 'on') && Object.values(shuffled.values).some((v) => v === 'off'));
+  assert.ok(
+    Object.values(shuffled.values).some((v) => v === 'on') && Object.values(shuffled.values).some((v) => v === 'off'),
+  );
   assert.notEqual(shuffled.values['looks.ember'], 'on');
   // Defaults: as they come.
   s.looks.glitch = 'off';
@@ -40,10 +59,21 @@ test('a checklist’s bulk buttons: All, None (one stays on where one has to), D
   assert.equal(Object.values(none.values).filter(Boolean).length, 1, 'at least one dance move stays on');
   assert.equal(none.values['knightMoves.nod'], true, 'the first one that was on');
   s.elements = { fire: false, lightning: true, ice: false };
-  assert.deepEqual(bulkPlan('elements', 'none', s).values, { 'elements.fire': false, 'elements.lightning': true, 'elements.ice': false });
+  assert.deepEqual(bulkPlan('elements', 'none', s).values, {
+    'elements.fire': false,
+    'elements.lightning': true,
+    'elements.ice': false,
+  });
   assert.ok(Object.values(bulkPlan('elements', 'all', s).values).every(Boolean));
-  assert.deepEqual(bulkPlan('elements', 'defaults', s).values, { 'elements.fire': true, 'elements.lightning': true, 'elements.ice': true });
-  assert.deepEqual(groupItems('xrayViews', s).map((i) => i.key), Object.keys(s.xrayViews).map((id) => `xrayViews.${id}`));
+  assert.deepEqual(bulkPlan('elements', 'defaults', s).values, {
+    'elements.fire': true,
+    'elements.lightning': true,
+    'elements.ice': true,
+  });
+  assert.deepEqual(
+    groupItems('xrayViews', s).map((i) => i.key),
+    Object.keys(s.xrayViews).map((id) => `xrayViews.${id}`),
+  );
 });
 
 test('a plan applied as one change, and its Undo: every value back as it was', () => {
@@ -59,7 +89,12 @@ test('a plan applied as one change, and its Undo: every value back as it was', (
   applyValues(s, plan.before);
   assert.deepEqual(s, before, 'undone');
   // A plan that changes nothing says so (the dialog doesn't make it a change).
-  assert.equal(changes(bulkPlan('looks', 'off', { ...defaults(), looks: Object.fromEntries(Object.keys(LOOKS).map((k) => [k, 'off'])) })), false);
+  assert.equal(
+    changes(
+      bulkPlan('looks', 'off', { ...defaults(), looks: Object.fromEntries(Object.keys(LOOKS).map((k) => [k, 'off'])) }),
+    ),
+    false,
+  );
   // The paths reach into a group.
   setPath(s, 'dropFx.iris', 'on');
   assert.equal(getPath(s, 'dropFx.iris'), 'on');
@@ -69,18 +104,36 @@ test('Reset Section: every setting in the section back to its default (a group a
   const d = defaults();
   for (const section of new Set(entriesFor('live').map((e) => e.section))) {
     const keys = sectionKeys(section);
-    if (section === 'titles') { assert.deepEqual(keys, [], 'your title cards’ words aren’t reset'); continue; }
+    if (section === 'titles') {
+      assert.deepEqual(keys, [], 'your title cards’ words aren’t reset');
+      continue;
+    }
     assert.ok(keys.length > 0, `${section} has settings`);
     for (const k of keys) assert.notEqual(getPath(d, k), undefined, `${section}: ${k} is a setting`);
   }
-  assert.deepEqual(sectionKeys('layers'), [...Object.keys(LAYERS), 'mirrors.horizontal', 'mirrors.vertical', 'mirrors.quarter']);
-  assert.ok(sectionKeys('drop').includes('dropFx.iris') && Object.keys(DROP_FX).every((id) => sectionKeys('drop').includes(`dropFx.${id}`)));
+  assert.deepEqual(sectionKeys('layers'), [
+    ...Object.keys(LAYERS),
+    'mirrors.horizontal',
+    'mirrors.vertical',
+    'mirrors.quarter',
+  ]);
+  assert.ok(
+    sectionKeys('drop').includes('dropFx.iris') &&
+      Object.keys(DROP_FX).every((id) => sectionKeys('drop').includes(`dropFx.${id}`)),
+  );
   const s = defaults();
-  Object.assign(s, { knightStyle: 'first', knightFinish: 'polished', knightGlow: 'off', knightRim: 0.1, knightShine: 'on' });
+  Object.assign(s, {
+    knightStyle: 'first',
+    knightFinish: 'polished',
+    knightGlow: 'off',
+    knightRim: 0.1,
+    knightShine: 'on',
+  });
   const before = structuredClone(s);
   const plan = sectionPlan('armor', s);
   applyValues(s, plan.values);
-  for (const k of ['knightStyle', 'knightFinish', 'knightGlow', 'knightRim', 'knightShine']) assert.deepEqual(s[k], d[k], k);
+  for (const k of ['knightStyle', 'knightFinish', 'knightGlow', 'knightRim', 'knightShine'])
+    assert.deepEqual(s[k], d[k], k);
   applyValues(s, plan.before);
   assert.deepEqual(s, before);
   // The defaults are copies: changing one after a reset leaves the next reset's alone.
@@ -98,7 +151,9 @@ test('as the dialog makes it: one onChange (one save), a toast with Undo; Undo t
     settings: s,
     onChange: (keys) => calls.onChange.push(keys),
     refresh: (all) => calls.refresh.push(all),
-    flush: () => { calls.flush++; },
+    flush: () => {
+      calls.flush++;
+    },
     toast: (text, undo = null) => calls.toast.push({ text, undo }),
   });
   const before = structuredClone(s);
@@ -115,12 +170,21 @@ test('as the dialog makes it: one onChange (one save), a toast with Undo; Undo t
   assert.deepEqual(s, before);
   assert.deepEqual(calls.onChange, [['looks'], ['looks']]);
   assert.equal(calls.flush, 1);
-  assert.deepEqual(calls.toast.map((t) => [t.text, !!t.undo]), [['Looks: All Off', true], ['Looks: All Off: undone', false]]);
+  assert.deepEqual(
+    calls.toast.map((t) => [t.text, !!t.undo]),
+    [
+      ['Looks: All Off', true],
+      ['Looks: All Off: undone', false],
+    ],
+  );
   // Reset Section, the same way (one onChange for the five armor settings).
   Object.assign(s, { knightStyle: 'first', knightShine: 'on' });
   batch.commit(sectionPlan('armor', s), 'Armor: Reset');
   assert.equal(calls.onChange.length, 3);
-  assert.deepEqual(new Set(calls.onChange[2]), new Set(['knightStyle', 'knightFinish', 'knightGlow', 'knightRim', 'knightShine']));
+  assert.deepEqual(
+    new Set(calls.onChange[2]),
+    new Set(['knightStyle', 'knightFinish', 'knightGlow', 'knightRim', 'knightShine']),
+  );
   // Nothing to change: no change made, only a word.
   assert.equal(batch.commit(bulkPlan('looks', 'defaults', defaults()), 'Looks: Defaults'), false);
   assert.equal(calls.onChange.length, 3);

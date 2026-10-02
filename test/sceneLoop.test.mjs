@@ -28,8 +28,14 @@ function run(loop, n, { dropsAt = [] } = {}) {
     bar++;
     if (dropsAt.includes(i)) {
       bar = 0; // (the grid counts from the drop)
-      if (loop.dropDue()) { const e = loop.advance(); if (e) took.push(refOf(e)); }
-    } else if (loop.due(bar)) { const e = loop.advance(); if (e) took.push(refOf(e)); }
+      if (loop.dropDue()) {
+        const e = loop.advance();
+        if (e) took.push(refOf(e));
+      }
+    } else if (loop.due(bar)) {
+      const e = loop.advance();
+      if (e) took.push(refOf(e));
+    }
   }
   return took;
 }
@@ -40,7 +46,11 @@ test('the filters: Scenes From, The Loop and the admin’s hidden ones', () => {
   assert.deepEqual(refs({}), ['b:cathedral', 'b:frozen', 'm:rave', 'm:moonlit', 'b:ruins'], 'hidden stays out');
   assert.deepEqual(refs({ sceneFrom: 'builtin' }), ['b:cathedral', 'b:frozen', 'b:ruins']);
   assert.deepEqual(refs({ sceneFrom: 'mine' }), ['m:rave', 'm:moonlit']);
-  assert.deepEqual(refs({ sceneList: { 'b:frozen': false, 'm:rave': true } }), ['b:cathedral', 'm:rave', 'm:moonlit', 'b:ruins'], 'switched out of The Loop');
+  assert.deepEqual(
+    refs({ sceneList: { 'b:frozen': false, 'm:rave': true } }),
+    ['b:cathedral', 'm:rave', 'm:moonlit', 'b:ruins'],
+    'switched out of The Loop',
+  );
   assert.deepEqual(loopEntries([null, { ref: 3 }, { ref: 'b:x' }], {}), [], 'junk');
 });
 
@@ -59,13 +69,24 @@ test('Always, in turn: the first at the start, the next on every Change Every ph
   const { loop } = loopFor({ scenes: 'on', sceneBars: 32 });
   assert.equal(refOf(loop.start()), 'b:cathedral');
   const took = run(loop, 32 * 5);
-  assert.deepEqual(took, ['b:frozen', 'm:rave', 'm:moonlit', 'b:ruins', 'b:cathedral'], 'on bars 32, 64… in the library’s order, round again');
+  assert.deepEqual(
+    took,
+    ['b:frozen', 'm:rave', 'm:moonlit', 'b:ruins', 'b:cathedral'],
+    'on bars 32, 64… in the library’s order, round again',
+  );
   // ...and only on those lines.
   const { loop: l2 } = loopFor({ scenes: 'on', sceneBars: 16 });
   l2.start();
   let bar = 0;
   const lines = [];
-  for (let i = 1; i <= 64; i++) { l2.bar(); bar++; if (l2.due(bar)) { lines.push(bar); l2.advance(); } }
+  for (let i = 1; i <= 64; i++) {
+    l2.bar();
+    bar++;
+    if (l2.due(bar)) {
+      lines.push(bar);
+      l2.advance();
+    }
+  }
   assert.deepEqual(lines, [16, 32, 48, 64]);
 });
 
@@ -143,7 +164,11 @@ test('Change Every on Random rolls a new length at each change, still on its own
   for (let i = 1; i <= 2000; i++) {
     loop.bar();
     bar++;
-    if (loop.due(bar)) { gaps.push(bar - lastAt); lastAt = bar; loop.advance(); }
+    if (loop.due(bar)) {
+      gaps.push(bar - lastAt);
+      lastAt = bar;
+      loop.advance();
+    }
   }
   assert.ok(gaps.length > 10);
   assert.ok(new Set(gaps).size > 1, `more than one length: ${[...new Set(gaps)]}`);
@@ -153,7 +178,8 @@ test('Shuffled: a deck that deals every scene before a repeat, never the same tw
   for (const seed of [1, 2, 3, 4, 5, 6]) {
     const { loop } = loopFor({ scenes: 'on', sceneOrder: 'shuffle', sceneBars: 16 }, { seed });
     const played = [refOf(loop.start()), ...run(loop, 16 * 40)];
-    for (let i = 1; i < played.length; i++) assert.notEqual(played[i], played[i - 1], `seed ${seed}: twice running at ${i}`);
+    for (let i = 1; i < played.length; i++)
+      assert.notEqual(played[i], played[i - 1], `seed ${seed}: twice running at ${i}`);
     for (let r = 0; r + 5 <= played.length; r += 5) {
       assert.equal(new Set(played.slice(r, r + 5)).size, 5, `seed ${seed}: round ${r / 5} deals all five`);
     }
@@ -179,7 +205,11 @@ test('In the mix: stretches of the free show between scenes, scenes most of the 
   // After a scene the free show comes about FREE_AFTER_SCENE of the time.
   let afterScene = 0;
   let toFree = 0;
-  for (let i = 1; i < played.length; i++) if (played[i - 1] !== 'free') { afterScene++; if (played[i] === 'free') toFree++; }
+  for (let i = 1; i < played.length; i++)
+    if (played[i - 1] !== 'free') {
+      afterScene++;
+      if (played[i] === 'free') toFree++;
+    }
   assert.ok(Math.abs(toFree / afterScene - FREE_AFTER_SCENE) < 0.1, `${(toFree / afterScene).toFixed(2)}`);
   // Never the same scene twice running, a free stretch between or not.
   for (let i = 1; i < scenesOnly.length; i++) assert.notEqual(scenesOnly[i], scenesOnly[i - 1], `at ${i}`);

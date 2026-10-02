@@ -10,13 +10,18 @@ import { test, expect } from '@playwright/test';
 function watch(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
   return errors;
 }
 const ready = (page) => expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
-const focusedText = (page) => page.evaluate(() => document.activeElement?.textContent?.replace(/\s+/g, ' ').trim() ?? '');
+const focusedText = (page) =>
+  page.evaluate(() => document.activeElement?.textContent?.replace(/\s+/g, ' ').trim() ?? '');
 
-test('the Menu button shows on desktop; Go To hides there (the tabs do it), Tools opens Discoveries', async ({ page }) => {
+test('the Menu button shows on desktop; Go To hides there (the tabs do it), Tools opens Discoveries', async ({
+  page,
+}) => {
   const errors = watch(page);
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/');
@@ -29,7 +34,9 @@ test('the Menu button shows on desktop; Go To hides there (the tabs do it), Tool
   await expect(page.getByRole('group', { name: 'Tools' })).toBeVisible();
   await expect(page.locator('.menu-go-to')).toBeHidden();
   // It fits: nothing to scroll (its frame's corners, a pixel outside it, don't count).
-  expect(await page.locator('[data-menu] .rest-menu-scroll').evaluate((el) => el.scrollHeight - el.clientHeight)).toBe(0);
+  expect(await page.locator('[data-menu] .rest-menu-scroll').evaluate((el) => el.scrollHeight - el.clientHeight)).toBe(
+    0,
+  );
   // Focus starts on the first item that shows, and the arrows skip the hidden ones.
   expect(await focusedText(page)).toMatch(/^Photo Mode/);
   await page.keyboard.press('ArrowUp');
@@ -85,7 +92,8 @@ test('? lists every key; Esc closes it; Shift with a letter does nothing', async
   const keys = page.locator('.keys-overlay');
   await expect(keys).toBeVisible();
   await expect(keys.getByRole('heading', { name: 'Keyboard Shortcuts' })).toBeVisible();
-  for (const k of ['Q', 'E', 'F', 'B', 'I', 'P', '0', '?', '1–6']) await expect(keys.locator('kbd', { hasText: new RegExp(`^${k.replace('?', '\\?')}$`) }).first()).toBeVisible();
+  for (const k of ['Q', 'E', 'F', 'B', 'I', 'P', '0', '?', '1–6'])
+    await expect(keys.locator('kbd', { hasText: new RegExp(`^${k.replace('?', '\\?')}$`) }).first()).toBeVisible();
   // Its filter narrows the list as you type (and typing there is just typing).
   await page.keyboard.type('photo');
   await expect(keys.locator('[data-keys-row]:visible')).toHaveCount(1);
@@ -125,7 +133,9 @@ test('photo mode: ? lists the keys over it, and Esc closes the list, not photo m
   expect(errors).toEqual([]);
 });
 
-test('the breakdown ignores Shift+B; typing in the shortcuts’ filter over it types: b doesn’t close it, p doesn’t open the render settings', async ({ page }) => {
+test('the breakdown ignores Shift+B; typing in the shortcuts’ filter over it types: b doesn’t close it, p doesn’t open the render settings', async ({
+  page,
+}) => {
   const errors = watch(page);
   await page.goto('/');
   await ready(page);
@@ -150,19 +160,31 @@ test('the breakdown ignores Shift+B; typing in the shortcuts’ filter over it t
   expect(errors).toEqual([]);
 });
 
-test('the pack’s Anvil: the living weapon first, then the weapons in labelled groups; the Tome’s Elements and Flame Colors', async ({ page }) => {
+test('the pack’s Anvil: the living weapon first, then the weapons in labelled groups; the Tome’s Elements and Flame Colors', async ({
+  page,
+}) => {
   const errors = watch(page);
   await page.goto('/');
   await ready(page);
   await page.locator('[data-pack-toggle]').click();
-  await page.waitForFunction(() => document.querySelector('.pack-items').getAnimations({ subtree: true }).every((a) => a.playState !== 'running'));
+  await page.waitForFunction(() =>
+    document
+      .querySelector('.pack-items')
+      .getAnimations({ subtree: true })
+      .every((a) => a.playState !== 'running'),
+  );
   await page.locator('[data-pack-slot="anvil"]').click();
   const anvil = page.locator('[data-pack-list="anvil"]');
   await expect(anvil).toBeVisible();
   await expect(anvil.locator('[data-pack-option]').first()).toHaveAttribute('data-pack-option', 'living');
   const groups = anvil.getByRole('group');
   await expect(groups).toHaveCount(4);
-  for (const [name, has, hasNot] of [['Swords', 'longsword', 'spear'], ['Greatswords', 'claymore', 'mace'], ['Polearms', 'wingedspear', 'katana'], ['Axes & Hammers', 'warhammer', 'longsword']]) {
+  for (const [name, has, hasNot] of [
+    ['Swords', 'longsword', 'spear'],
+    ['Greatswords', 'claymore', 'mace'],
+    ['Polearms', 'wingedspear', 'katana'],
+    ['Axes & Hammers', 'warhammer', 'longsword'],
+  ]) {
     const g = anvil.getByRole('group', { name, exact: true });
     await expect(g).toBeVisible();
     await expect(g.locator(`[data-pack-option="${has}"]`)).toHaveCount(1);
@@ -180,7 +202,9 @@ test('the pack’s Anvil: the living weapon first, then the weapons in labelled 
   expect(errors).toEqual([]);
 });
 
-test('render settings from the menu: grouped rows with their keys; the cursor’s pick survives a reload; Reset forgets it', async ({ page }) => {
+test('render settings from the menu: grouped rows with their keys; the cursor’s pick survives a reload; Reset forgets it', async ({
+  page,
+}) => {
   const errors = watch(page);
   await page.goto('/');
   await ready(page);

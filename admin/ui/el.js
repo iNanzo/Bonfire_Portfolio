@@ -18,14 +18,21 @@ const cssName = (name) => (name.startsWith('--') ? name : name.replace(/[A-Z]/g,
  * @returns {[string, string][]}
  */
 export function styleEntries(style) {
-  const pairs = typeof style === 'string'
-    ? style.split(';').map((d) => {
-      const at = d.indexOf(':');
-      return at < 0 ? ['', ''] : [d.slice(0, at), d.slice(at + 1)];
-    })
-    : Object.entries(style ?? {});
+  const pairs =
+    typeof style === 'string'
+      ? style.split(';').map((d) => {
+          const at = d.indexOf(':');
+          return at < 0 ? ['', ''] : [d.slice(0, at), d.slice(at + 1)];
+        })
+      : Object.entries(style ?? {});
   return pairs
-    .map(([k, v]) => /** @type {[string, string]} */ ([cssName(String(k).trim()), v === null || v === undefined ? '' : String(v).trim()]))
+    .map(
+      ([k, v]) =>
+        /** @type {[string, string]} */ ([
+          cssName(String(k).trim()),
+          v === null || v === undefined ? '' : String(v).trim(),
+        ]),
+    )
     .filter(([k, v]) => k && v !== '');
 }
 

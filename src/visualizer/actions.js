@@ -21,7 +21,12 @@ export function createActions(ctx) {
   // --- Actions ---------------------------------------------------------------------------------
   document.addEventListener('fullscreenchange', () => {
     const full = !!document.fullscreenElement;
-    relabel(q('[data-fs-label]'), full ? 'Exit Full Screen' : 'Full Screen', 'fs', full ? HUD_TIPS.exitFullscreen : HUD_TIPS.fullscreen);
+    relabel(
+      q('[data-fs-label]'),
+      full ? 'Exit Full Screen' : 'Full Screen',
+      'fs',
+      full ? HUD_TIPS.exitFullscreen : HUD_TIPS.fullscreen,
+    );
   });
 
   function tap() {
@@ -32,19 +37,47 @@ export function createActions(ctx) {
 
   const actions = {
     drop: () => ctx.director?.strike(),
-    arm: () => { if (ctx.fire?.holding) ctx.director.strike(); else ctx.director?.arm(); },
-    beat: () => { if (ctx.director?.forgeOnBeat(ctx.lastFeatures?.bpm ? 60 / ctx.lastFeatures.bpm : 0)) ctx.note('Swapping on the next downbeat', 2); },
+    arm: () => {
+      if (ctx.fire?.holding) ctx.director.strike();
+      else ctx.director?.arm();
+    },
+    beat: () => {
+      if (ctx.director?.forgeOnBeat(ctx.lastFeatures?.bpm ? 60 / ctx.lastFeatures.bpm : 0))
+        ctx.note('Swapping on the next downbeat', 2);
+    },
     tap,
     ring: () => ctx.director?.ring(1),
-    combo: () => { if (!ctx.director?.combo()) ctx.note('The weapon is busy (or no beat yet)', 1.5); },
-    cut: () => { ctx.director?.cut(); ctx.note(`Shot: ${SHOTS[ctx.director?.shot]?.name ?? ''}`, 1.5); },
+    combo: () => {
+      if (!ctx.director?.combo()) ctx.note('The weapon is busy (or no beat yet)', 1.5);
+    },
+    cut: () => {
+      ctx.director?.cut();
+      ctx.note(`Shot: ${SHOTS[ctx.director?.shot]?.name ?? ''}`, 1.5);
+    },
     dance: () => {
       const r = ctx.director?.danceNow();
-      ctx.note(r === 'dance' ? 'The knights get up to dance' : r === 'sit' ? 'The knights sit back down' : reducedMotion ? 'The knights keep still (reduced motion)' : 'No knights by the fire', 1.5);
+      ctx.note(
+        r === 'dance'
+          ? 'The knights get up to dance'
+          : r === 'sit'
+            ? 'The knights sit back down'
+            : reducedMotion
+              ? 'The knights keep still (reduced motion)'
+              : 'No knights by the fire',
+        1.5,
+      );
     },
     knights: () => {
       const r = ctx.director?.knightsInOut();
-      ctx.note({ in: 'The knights come to the fire', out: 'The knights leave the fire', 'in-next': 'The knights come on the next drop', 'out-next': 'The knights leave on the next drop' }[r] ?? 'No knights here', 1.8);
+      ctx.note(
+        {
+          in: 'The knights come to the fire',
+          out: 'The knights leave the fire',
+          'in-next': 'The knights come on the next drop',
+          'out-next': 'The knights leave on the next drop',
+        }[r] ?? 'No knights here',
+        1.8,
+      );
     },
     colors: () => {
       const modes = Object.keys(COLOR_MODES);
@@ -64,11 +97,21 @@ export function createActions(ctx) {
     play: () => {
       const m = ctx.engine?.source?.media;
       if (!m) return;
-      if (m.paused) m.play(); else m.pause();
+      if (m.paused) m.play();
+      else m.pause();
       q('[data-act="play"]').textContent = m.paused ? 'Play' : 'Pause';
     },
-    'change-source': () => { ctx.stopSource(); ctx.showStart(); },
-    'show-title': () => { if (!settings.title.trim()) q('[data-set="title"]').focus(); else { settingsDialog.close(); ctx.showCard(0); } },
+    'change-source': () => {
+      ctx.stopSource();
+      ctx.showStart();
+    },
+    'show-title': () => {
+      if (!settings.title.trim()) q('[data-set="title"]').focus();
+      else {
+        settingsDialog.close();
+        ctx.showCard(0);
+      }
+    },
     output: () => ctx.openOutput(),
     record: () => ctx.recorder.toggle(),
     'nudge-early': () => nudge(-0.01),
@@ -99,20 +142,44 @@ export function createActions(ctx) {
     if (e.altKey || e.ctrlKey || e.metaKey || typingIn(e.target)) return;
     if (settingsDialog.open || ctx.keysOverlay.el.open) return; // each handles its own keys (Esc closes)
     // The render menu first: P, and its digits while it's open (before the element hits).
-    if (ctx.renderMenu.handleKey(e)) { e.preventDefault(); ctx.wake(); return; }
-    if (e.key === 'Escape' && ctx.renderMenu.isOpen) { ctx.renderMenu.close(); return; }
+    if (ctx.renderMenu.handleKey(e)) {
+      e.preventDefault();
+      ctx.wake();
+      return;
+    }
+    if (e.key === 'Escape' && ctx.renderMenu.isOpen) {
+      ctx.renderMenu.close();
+      return;
+    }
     // ? lists the shortcuts; / opens the settings at their search box.
-    if (isHelpKey(e)) { e.preventDefault(); ctx.openKeys(); return; }
-    if (e.key === '/') { e.preventDefault(); ctx.openSettings(undefined, { search: true }); return; }
+    if (isHelpKey(e)) {
+      e.preventDefault();
+      ctx.openKeys();
+      return;
+    }
+    if (e.key === '/') {
+      e.preventDefault();
+      ctx.openSettings(undefined, { search: true });
+      return;
+    }
     const k = e.key.toLowerCase();
     if (k === 'f') toggleFullscreen();
     else if (k === 's') ctx.openSettings();
-    else if (k === 'h') { document.body.classList.toggle('hud-off'); ctx.wake(); }
-    else if (k === 'i') { ctx.pack.toggle(); ctx.wake(); }
-    else if (k === 'n') { if (e.shiftKey) ctx.cycleScenes(); else ctx.nextScene(); ctx.wake(); }
-    else if (document.body.dataset.mode !== 'live' || !ctx.fire) return;
-    else if (e.key === ' ') { e.preventDefault(); actions.drop(); }
-    else if (k === 'a') actions.arm();
+    else if (k === 'h') {
+      document.body.classList.toggle('hud-off');
+      ctx.wake();
+    } else if (k === 'i') {
+      ctx.pack.toggle();
+      ctx.wake();
+    } else if (k === 'n') {
+      if (e.shiftKey) ctx.cycleScenes();
+      else ctx.nextScene();
+      ctx.wake();
+    } else if (document.body.dataset.mode !== 'live' || !ctx.fire) return;
+    else if (e.key === ' ') {
+      e.preventDefault();
+      actions.drop();
+    } else if (k === 'a') actions.arm();
     else if (k === 'b') actions.beat();
     else if (k === 't') tap();
     else if (k === 'd') actions.downbeat();
@@ -129,9 +196,13 @@ export function createActions(ctx) {
     else if (k === 'm') actions.mirror();
     else if (k === 'p' && e.shiftKey) actions.colors();
     else if (k === 'k') actions[e.shiftKey ? 'knights' : 'dance']();
-    else if (k === 'escape') { document.body.classList.remove('hud-off'); ctx.wake(); }
-    else if (['1', '2', '3'].includes(e.key)) ctx.director.hit({ element: ['fire', 'lightning', 'ice'][Number(e.key) - 1] });
-    else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') ctx.director.hit({ step: e.key === 'ArrowRight' ? 1 : -1, element: ctx.fire.element });
+    else if (k === 'escape') {
+      document.body.classList.remove('hud-off');
+      ctx.wake();
+    } else if (['1', '2', '3'].includes(e.key))
+      ctx.director.hit({ element: ['fire', 'lightning', 'ice'][Number(e.key) - 1] });
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft')
+      ctx.director.hit({ step: e.key === 'ArrowRight' ? 1 : -1, element: ctx.fire.element });
   });
 
   // --- Beat by hand: a typed BPM, nudges -----------------------------------------------------
@@ -140,10 +211,18 @@ export function createActions(ctx) {
     if (!ctx.engine?.source) return;
     const v = Number(bpmInput.value);
     const tempo = ctx.engine.analyser.tempo;
-    if (bpmInput.value && v >= 60 && v <= 220) { tempo.setManual(v, performance.now() / 1000); ctx.note(`Tempo set to ${v} BPM`, 1.5); }
-    else { bpmInput.value = ''; tempo.clearManual(); ctx.note('Following the music’s tempo', 1.5); }
+    if (bpmInput.value && v >= 60 && v <= 220) {
+      tempo.setManual(v, performance.now() / 1000);
+      ctx.note(`Tempo set to ${v} BPM`, 1.5);
+    } else {
+      bpmInput.value = '';
+      tempo.clearManual();
+      ctx.note('Following the music’s tempo', 1.5);
+    }
   });
-  bpmInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') bpmInput.blur(); });
+  bpmInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') bpmInput.blur();
+  });
   function nudge(seconds) {
     if (!ctx.engine?.source) return;
     ctx.engine.analyser.tempo.nudge(seconds);

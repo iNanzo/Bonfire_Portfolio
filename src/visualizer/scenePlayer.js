@@ -241,10 +241,24 @@ const COLOR_KEYS = ['colors', 'scheme', 'sceneColors'];
  *   paintedLook?: boolean, onScene?: (scene: Scene | null, ref: string | null, mode: 'hold'|'base'|null) => void,
  *   now?: () => number }} parts
  */
-export function createScenePlayer(fire, {
-  layers, looks, colors, camera, knights, render, show = null, user = {}, effects = null, reducedMotion = false,
-  paintedLook = false, onScene = () => {}, now = () => performance.now() / 1000,
-}) {
+export function createScenePlayer(
+  fire,
+  {
+    layers,
+    looks,
+    colors,
+    camera,
+    knights,
+    render,
+    show = null,
+    user = {},
+    effects = null,
+    reducedMotion = false,
+    paintedLook = false,
+    onScene = () => {},
+    now = () => performance.now() / 1000,
+  },
+) {
   /** @type {Scene | null} */
   let scene = null;
   /** @type {string | null} */
@@ -252,8 +266,8 @@ export function createScenePlayer(fire, {
   /** @type {'hold'|'base'|null} */
   let mode = null;
   let flameKey = null;
-  let last = {};                 // each part as last applied (JSON)
-  const released = new Set();   // settings keys the user took back
+  let last = {}; // each part as last applied (JSON)
+  const released = new Set(); // settings keys the user took back
   const clampOpts = { reducedMotion, paintedLook };
 
   const flies = () => fire.fireflies ?? null;
@@ -302,7 +316,10 @@ export function createScenePlayer(fire, {
     colors.release();
     const p = looks.pinned;
     if (instant) {
-      if (p) { looks.pin(null); looks.next(user.looks); }
+      if (p) {
+        looks.pin(null);
+        looks.next(user.looks);
+      }
       camera.pin?.(null);
     } else {
       if (p && looks.held) looks.pin(p, { hold: false, fresh: false });
@@ -317,7 +334,8 @@ export function createScenePlayer(fire, {
     last = {};
     released.clear();
     // Back to the user's own place, and their knights, in the same moment.
-    if (user.scenery && user.scenery !== 'mix' && fire.scenery && fire.scenery !== user.scenery) fire.setScenery?.(user.scenery, { flash: flash && !instant });
+    if (user.scenery && user.scenery !== 'mix' && fire.scenery && fire.scenery !== user.scenery)
+      fire.setScenery?.(user.scenery, { flash: flash && !instant });
     render.update?.(now());
     if (retake) knights.retake(fire.knights, { instant, groove, budget, scenery: fire.scenery ?? null });
     onScene(null, null, null);
@@ -340,7 +358,20 @@ export function createScenePlayer(fire, {
      * @param {{ ref?: string | null, mode?: 'hold'|'base', instant?: boolean, flash?: boolean, landed?: boolean,
      *   groove?: boolean, budget?: number, knights?: boolean, fresh?: boolean }} [o]
      */
-    apply(next, { ref: nextRef = null, mode: nextMode, instant = false, flash = false, landed = false, groove = false, budget = 1, knights: retake = true, fresh } = {}) {
+    apply(
+      next,
+      {
+        ref: nextRef = null,
+        mode: nextMode,
+        instant = false,
+        flash = false,
+        landed = false,
+        groove = false,
+        budget = 1,
+        knights: retake = true,
+        fresh,
+      } = {},
+    ) {
       if (!next) {
         if (!scene) return false;
         letGo({ flash, instant, retake, groove, budget });
@@ -358,7 +389,10 @@ export function createScenePlayer(fire, {
       let any = false;
 
       // 1. The overlay.
-      if (changed('overlay')) { layers.set(overlay()); any = true; }
+      if (changed('overlay')) {
+        layers.set(overlay());
+        any = true;
+      }
       // 2. The flame (registered under the scene's own key) and the scenery's colors.
       flameKey = sceneFlameKey(next, nextRef);
       if (changed('flame') || !colors.registered?.includes(flameKey)) colors.register(flameKey, next.colors.flame);
@@ -377,8 +411,11 @@ export function createScenePlayer(fire, {
         if (weapon) {
           if (instant) Promise.resolve(fire.equip(weapon, key, { instant: true, element })).catch(noop);
           else {
-            const first = weapon !== fire.weapon || fire.forging ? fire.equip(weapon, key, { instant: true, element }) : null;
-            Promise.resolve(first).then(() => fire.equip(weapon, key, { element })).catch(noop);
+            const first =
+              weapon !== fire.weapon || fire.forging ? fire.equip(weapon, key, { instant: true, element }) : null;
+            Promise.resolve(first)
+              .then(() => fire.equip(weapon, key, { element }))
+              .catch(noop);
           }
           any = true;
         }
@@ -389,14 +426,23 @@ export function createScenePlayer(fire, {
         any = true;
       }
       // 5. The look.
-      if (changed('look') && !released.has('looks')) { looks.pin(lookPin(), { hold, fresh: isFresh }); any = true; }
+      if (changed('look') && !released.has('looks')) {
+        looks.pin(lookPin(), { hold, fresh: isFresh });
+        any = true;
+      }
       // 6. The framing.
-      if (changed('camera') && !CAMERA_KEYS.some((k) => released.has(k))) { camera.pin(cameraPin(next), { hold, move: 'cut' }); any = true; }
+      if (changed('camera') && !CAMERA_KEYS.some((k) => released.has(k))) {
+        camera.pin(cameraPin(next), { hold, move: 'cut' });
+        any = true;
+      }
       // 7. The render, in this same frame.
       render.update?.(now());
       // 8. The knights: a hidden moment of their own (for an edit, the knights' show acts on
       // the changed settings by itself, at once).
-      if (retake && isFresh) { knights.retake(fire.knights, { instant, groove, budget, scenery: fire.scenery ?? null }); any = true; }
+      if (retake && isFresh) {
+        knights.retake(fire.knights, { instant, groove, budget, scenery: fire.scenery ?? null });
+        any = true;
+      }
       // 9. The fireflies: the show's pattern and how many fly lit.
       if (changed('fireflies')) {
         const pattern = next.fireflies.show;
@@ -410,13 +456,23 @@ export function createScenePlayer(fire, {
       return any || arrived;
     },
     /** The scene playing (null: the free show), its ref and how it plays. */
-    get scene() { return scene; },
-    get ref() { return ref; },
-    get mode() { return mode; },
+    get scene() {
+      return scene;
+    },
+    get ref() {
+      return ref;
+    },
+    get mode() {
+      return mode;
+    },
     /** Holding: the scene's flame key (the swaps forge in it); otherwise null (the show's). */
-    get flameKey() { return scene && mode === 'hold' && !COLOR_KEYS.some((k) => released.has(k)) ? flameKey : null; },
+    get flameKey() {
+      return scene && mode === 'hold' && !COLOR_KEYS.some((k) => released.has(k)) ? flameKey : null;
+    },
     /** The flame key the scene registered, holding or not (null: no scene). */
-    get sceneFlame() { return scene ? flameKey : null; },
+    get sceneFlame() {
+      return scene ? flameKey : null;
+    },
     /**
      * A flame landed: does the scenery keep the scene's colors through it? The scene's own
      * flame does (unless the user took the colors back). Holding, landings leave the colors
@@ -432,17 +488,25 @@ export function createScenePlayer(fire, {
      * Holding: the scene's weapon and element (null: drawn by the show, as without a scene;
      * an element the user has unchecked is drawn from theirs too).
      */
-    get weapon() { return scene && mode === 'hold' ? scene.place.weapon : null; },
-    get element() { return scene && mode === 'hold' && !released.has('elements') ? sceneElement(scene, user) : null; },
+    get weapon() {
+      return scene && mode === 'hold' ? scene.place.weapon : null;
+    },
+    get element() {
+      return scene && mode === 'hold' && !released.has('elements') ? sceneElement(scene, user) : null;
+    },
     /** The scene's fire shape, added to the music's drive (zeros without one). */
-    get offsets() { return scene ? scene.fire : NO_OFFSETS; },
+    get offsets() {
+      return scene ? scene.fire : NO_OFFSETS;
+    },
     /** The fireflies' show pinned by the scene (null: the show's own patterns). */
     get flyShow() {
       const p = scene?.fireflies.show;
       return p && p !== 'mix' && p !== 'off' && !released.has('blink') ? p : null;
     },
     /** How fast the fireflies fly, as a share of their own speed (1 without a scene). */
-    get flySpeed() { return scene ? scene.fireflies.speed : 1; },
+    get flySpeed() {
+      return scene ? scene.fireflies.speed : 1;
+    },
     /**
      * Whether the scene holds a part now: 'place' | 'colors' | 'camera' | 'look' | 'render' |
      * 'knights' | 'fireflies' (false with no scene, or once the show has taken it back).
@@ -451,14 +515,22 @@ export function createScenePlayer(fire, {
     holds(part) {
       if (!scene) return false;
       switch (part) {
-        case 'place': return !released.has('scenery');
-        case 'colors': return !!colors.held;
-        case 'camera': return !!camera.held;
-        case 'look': return !!looks.held;
-        case 'render': return layers.over ? 'pixelSize' in layers.over || 'palette' in layers.over : false;
-        case 'knights': return layers.over ? 'knights' in layers.over : false;
-        case 'fireflies': return layers.over ? 'blink' in layers.over : false;
-        default: return false;
+        case 'place':
+          return !released.has('scenery');
+        case 'colors':
+          return !!colors.held;
+        case 'camera':
+          return !!camera.held;
+        case 'look':
+          return !!looks.held;
+        case 'render':
+          return layers.over ? 'pixelSize' in layers.over || 'palette' in layers.over : false;
+        case 'knights':
+          return layers.over ? 'knights' in layers.over : false;
+        case 'fireflies':
+          return layers.over ? 'blink' in layers.over : false;
+        default:
+          return false;
       }
     },
     /**
@@ -474,8 +546,10 @@ export function createScenePlayer(fire, {
       layers.release(keys);
       if (keys.some((k) => CAMERA_KEYS.includes(k)) && camera.pinned) camera.pin(null);
       if (keys.some((k) => COLOR_KEYS.includes(k))) colors.release();
-      if (keys.includes('looks')) { if (looks.pinned) looks.pin(null); }
-      else if (keys.some((k) => Object.hasOwn(LAYERS, k)) && looks.pinned) looks.pin(lookPin(), { hold: mode === 'hold', fresh: false });
+      if (keys.includes('looks')) {
+        if (looks.pinned) looks.pin(null);
+      } else if (keys.some((k) => Object.hasOwn(LAYERS, k)) && looks.pinned)
+        looks.pin(lookPin(), { hold: mode === 'hold', fresh: false });
       // (Re-applying this scene leaves what the user took back alone.)
       last = { ...last, overlay: JSON.stringify(overlay()), look: JSON.stringify([lookPin(), mode]) };
     },

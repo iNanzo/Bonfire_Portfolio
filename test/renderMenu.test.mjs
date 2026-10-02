@@ -39,7 +39,10 @@ test('render menu: keys find their row, by the digit wherever the layout puts it
 test('render menu: the site’s rows in two groups (the picture, then the cursor), Title Case, each with a hint', async () => {
   const { titleCase } = await import('../src/text.js');
   assert.deepEqual([...new Set(RENDER_ROWS.map((r) => r.group))], ['Picture', 'Interaction']);
-  assert.deepEqual(RENDER_ROWS.filter((r) => r.group === 'Interaction').map((r) => r.id), ['interaction']);
+  assert.deepEqual(
+    RENDER_ROWS.filter((r) => r.group === 'Interaction').map((r) => r.id),
+    ['interaction'],
+  );
   for (const r of RENDER_ROWS) {
     assert.equal(titleCase(r.label), r.label, `${r.id}: Title Case`);
     assert.ok(r.hint && r.hint.length >= 12 && r.hint.length <= 160, `${r.id}: a hint of 12–160 characters`);
@@ -49,7 +52,12 @@ test('render menu: the site’s rows in two groups (the picture, then the cursor
   // The site's shortcuts list names the same digits.
   const { SITE_KEYS } = await import('../src/ui/siteKeys.js');
   const listed = SITE_KEYS.flatMap((g) => g.keys.flatMap((k) => k.keys));
-  assert.ok(listed.includes(`${RENDER_ROWS[0].key}–${RENDER_ROWS.at(-1).key}`) && listed.includes('P') && listed.includes('0') && listed.includes('?'));
+  assert.ok(
+    listed.includes(`${RENDER_ROWS[0].key}–${RENDER_ROWS.at(-1).key}`) &&
+      listed.includes('P') &&
+      listed.includes('0') &&
+      listed.includes('?'),
+  );
 });
 
 test('render menu: a run of rows with a group is a labelled group under its heading; each row says its key', () => {
@@ -59,12 +67,25 @@ test('render menu: a run of rows with a group is a labelled group under its head
     { key: '3', id: 'c', label: 'C', group: 'Second' },
   ];
   const html = rowsHtml(rows, {}, { id: 'm' });
-  assert.match(html, /<div class="render-group" role="group" aria-labelledby="m-g0">\s*<p class="render-group-title" id="m-g0">First &lt;G&gt;<\/p>/);
-  assert.match(html, /<div class="render-group" role="group" aria-labelledby="m-g1">\s*<p class="render-group-title" id="m-g1">Second<\/p>/);
+  assert.match(
+    html,
+    /<div class="render-group" role="group" aria-labelledby="m-g0">\s*<p class="render-group-title" id="m-g0">First &lt;G&gt;<\/p>/,
+  );
+  assert.match(
+    html,
+    /<div class="render-group" role="group" aria-labelledby="m-g1">\s*<p class="render-group-title" id="m-g1">Second<\/p>/,
+  );
   assert.equal((html.match(/class="render-group"/g) ?? []).length, 2, 'one group per run');
   for (const r of rows) assert.match(html, new RegExp(`data-render-row="${r.id}" aria-keyshortcuts="${r.key}"`));
-  assert.match(html, /data-render-row="b" aria-keyshortcuts="2" data-tip="Says &quot;what&quot; B does\." aria-describedby="m-tip1">/);
-  assert.match(html, /<\/button><span id="m-tip1" hidden>Says &quot;what&quot; B does\.<\/span>/, 'and a screen reader hears the hint (the tooltip is aria-hidden)');
+  assert.match(
+    html,
+    /data-render-row="b" aria-keyshortcuts="2" data-tip="Says &quot;what&quot; B does\." aria-describedby="m-tip1">/,
+  );
+  assert.match(
+    html,
+    /<\/button><span id="m-tip1" hidden>Says &quot;what&quot; B does\.<\/span>/,
+    'and a screen reader hears the hint (the tooltip is aria-hidden)',
+  );
   assert.doesNotMatch(html, /data-render-row="a"[^>]*aria-describedby/, 'no hint, no description');
   assert.match(html, /<kbd>1<\/kbd>/, 'the digit is read out too (not aria-hidden)');
   assert.doesNotMatch(html, /<kbd aria-hidden/);
@@ -75,7 +96,11 @@ test('render menu: a run of rows with a group is a labelled group under its head
 test('render menu: titled Render Settings by default, a HUD has a close button, and the site’s reset is named for the menu', () => {
   const src = fs.readFileSync(new URL('../src/ui/renderMenu.js', import.meta.url), 'utf8');
   assert.match(src, /title = 'Render Settings'/);
-  assert.match(src, /collapse === 'all' \? `<button class="render-menu-close" type="button" aria-label="Close \$\{esc\(title\)\}" data-tip="Close \(\$\{esc\(toggleKey\)\} or Esc\)" aria-keyshortcuts="\$\{esc\(toggleKey\)\} Escape"/, 'its keys said too');
+  assert.match(
+    src,
+    /collapse === 'all' \? `<button class="render-menu-close" type="button" aria-label="Close \$\{esc\(title\)\}" data-tip="Close \(\$\{esc\(toggleKey\)\} or Esc\)" aria-keyshortcuts="\$\{esc\(toggleKey\)\} Escape"/,
+    'its keys said too',
+  );
   const content = JSON.parse(fs.readFileSync(new URL('../src/content.json', import.meta.url), 'utf8'));
   assert.equal(content.ui.renderMenu, 'Render Settings');
   assert.equal(content.ui.renderReset, 'Reset Render Settings');
@@ -91,7 +116,10 @@ test('render menu: one list of pixel sizes for the site, Bonfire Live and the Pa
 });
 
 test('render menu: rows are buttons with their values, escaped', () => {
-  const rows = [{ key: '1', id: 'a', label: 'A <b>' }, { key: '2', id: 'b', label: 'B' }];
+  const rows = [
+    { key: '1', id: 'a', label: 'A <b>' },
+    { key: '2', id: 'b', label: 'B' },
+  ];
   const html = rowsHtml(rows, { a: '<img src=x>' });
   assert.equal((html.match(/<button /g) ?? []).length, 2);
   assert.match(html, /type="button" data-render-row="a"/);

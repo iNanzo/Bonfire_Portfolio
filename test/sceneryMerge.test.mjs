@@ -56,18 +56,38 @@ function sample() {
   const stump = add(new THREE.CylinderGeometry(0.2, 0.2, 0.5, 9), wood, root, -1, 0.25, -1);
   stump.scale.set(1, 1.3, 0.9);
   add(new THREE.BoxGeometry(0.1, 0.5, 0.1), wood, place, -0.4, 0.25, 0.2, 0.05);
-  const glow = add(new THREE.BoxGeometry(0.2, 0.05, 0.2), new THREE.MeshBasicMaterial({ name: 'glow' }), place, 0, 0.22, 0);
+  const glow = add(
+    new THREE.BoxGeometry(0.2, 0.05, 0.2),
+    new THREE.MeshBasicMaterial({ name: 'glow' }),
+    place,
+    0,
+    0.22,
+    0,
+  );
   glow.castShadow = false;
   return { root, place, glow, stone, wood };
 }
 
 test('the merge key: the same material, flags and vertex layout merge; anything else stays apart', () => {
   const a = new THREE.MeshLambertMaterial();
-  const mk = (geo, mat = a) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.updateMatrixWorld(); return m; };
+  const mk = (geo, mat = a) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = true;
+    m.updateMatrixWorld();
+    return m;
+  };
   const box = mk(new THREE.BoxGeometry());
-  assert.equal(mergeKey(box), mergeKey(mk(new THREE.CylinderGeometry())), 'a box and a cylinder in one material: one key');
+  assert.equal(
+    mergeKey(box),
+    mergeKey(mk(new THREE.CylinderGeometry())),
+    'a box and a cylinder in one material: one key',
+  );
   assert.equal(mergeKey(box), mergeKey(mk(new THREE.IcosahedronGeometry())), 'indexed or not (the soup gets an index)');
-  assert.notEqual(mergeKey(box), mergeKey(mk(new THREE.BoxGeometry(), new THREE.MeshLambertMaterial())), 'another material object');
+  assert.notEqual(
+    mergeKey(box),
+    mergeKey(mk(new THREE.BoxGeometry(), new THREE.MeshLambertMaterial())),
+    'another material object',
+  );
   const noShadow = mk(new THREE.BoxGeometry());
   noShadow.castShadow = false;
   assert.notEqual(mergeKey(box), mergeKey(noShadow), 'shadow flags');
@@ -92,7 +112,10 @@ test('merging keeps every triangle where it was, in its material, and leaves the
   const before = worldTriangles(root);
   const merged = mergeStatic(root, [glow]);
   assert.equal(merged.length, 2, 'one mesh per material');
-  assert.deepEqual(merged.map((m) => m.material).sort((x, y) => x.id - y.id), [stone, wood].sort((x, y) => x.id - y.id));
+  assert.deepEqual(
+    merged.map((m) => m.material).sort((x, y) => x.id - y.id),
+    [stone, wood].sort((x, y) => x.id - y.id),
+  );
   for (const m of merged) {
     assert.equal(m.parent, root);
     assert.ok(m.castShadow && m.receiveShadow, 'shadow flags kept');
@@ -105,7 +128,9 @@ test('merging keeps every triangle where it was, in its material, and leaves the
   assert.equal(after.length, before.length);
   assert.deepEqual(after, before, 'the same triangles, the same way round');
   let meshes = 0;
-  root.traverse((o) => { if (o.isMesh) meshes++; });
+  root.traverse((o) => {
+    if (o.isMesh) meshes++;
+  });
   assert.equal(meshes, 3, 'two merged meshes and the glow');
 });
 
@@ -128,14 +153,29 @@ test('a lone piece in its material is left as it is, and emptied groups go', () 
 
 test('each place is a handful of meshes: its merged solids and its glows', () => {
   const material = (name) => new THREE.MeshLambertMaterial({ name });
-  const mat = { stone: material('stone'), pillar: material('pillar'), wood: material('wood'), char: material('char'), wax: material('wax'), mortar: material('mortar') };
+  const mat = {
+    stone: material('stone'),
+    pillar: material('pillar'),
+    wood: material('wood'),
+    char: material('char'),
+    wax: material('wax'),
+    mortar: material('mortar'),
+  };
   for (const name of ['forge', 'shrine', 'cathedral', 'cult']) {
     const { group, glows } = buildScenery(name, mat, () => new THREE.MeshBasicMaterial());
     const solids = [];
-    group.traverse((o) => { if (o.isMesh && !glows.includes(o)) solids.push(o); });
-    assert.ok(solids.length <= Object.keys(mat).length, `${name}: ${solids.length} solid meshes, at most one per material`);
+    group.traverse((o) => {
+      if (o.isMesh && !glows.includes(o)) solids.push(o);
+    });
+    assert.ok(
+      solids.length <= Object.keys(mat).length,
+      `${name}: ${solids.length} solid meshes, at most one per material`,
+    );
     assert.equal(new Set(solids.map((s) => s.material)).size, solids.length, `${name}: one mesh per material`);
-    assert.ok(solids.every((s) => s.castShadow && s.receiveShadow), name);
+    assert.ok(
+      solids.every((s) => s.castShadow && s.receiveShadow),
+      name,
+    );
     for (const g of glows) {
       assert.ok(g.parent, `${name}: every glow still in the scenery`);
       assert.ok(!g.castShadow && g.userData.glow, name);
@@ -145,13 +185,29 @@ test('each place is a handful of meshes: its merged solids and its glows', () =>
 
 test('merged a step at a time (a place built in idle moments), each place ends exactly as merged at once', () => {
   const material = (name) => new THREE.MeshLambertMaterial({ name });
-  const mat = { stone: material('stone'), pillar: material('pillar'), wood: material('wood'), char: material('char'), wax: material('wax'), mortar: material('mortar') };
+  const mat = {
+    stone: material('stone'),
+    pillar: material('pillar'),
+    wood: material('wood'),
+    char: material('char'),
+    wax: material('wax'),
+    mortar: material('mortar'),
+  };
   const glow = () => new THREE.MeshBasicMaterial();
   /** Each mesh in tree order: its name, material, flags and every vertex as stored. */
   const meshes = (group) => {
     const out = [];
     group.traverse((o) => {
-      if (o.isMesh) out.push([o.name, o.material.name, o.castShadow, o.receiveShadow, o.parent === group, [...o.geometry.attributes.position.array], [...(o.geometry.index?.array ?? [])]]);
+      if (o.isMesh)
+        out.push([
+          o.name,
+          o.material.name,
+          o.castShadow,
+          o.receiveShadow,
+          o.parent === group,
+          [...o.geometry.attributes.position.array],
+          [...(o.geometry.index?.array ?? [])],
+        ]);
     });
     return out;
   };
@@ -162,9 +218,16 @@ test('merged a step at a time (a place built in idle moments), each place ends e
     const steps = mergeSteps(later.group, later.glows);
     let yields = 0;
     let r = steps.next();
-    while (!r.done) { yields++; r = steps.next(); }
+    while (!r.done) {
+      yields++;
+      r = steps.next();
+    }
     assert.ok(yields > 10, `${name}: in many small steps (${yields})`);
     assert.ok(r.value.length >= 1 && r.value.every((m) => m.parent === later.group), name);
-    assert.deepEqual(meshes(later.group), meshes(once.group), `${name}: the same meshes, in the same order, vertex for vertex`);
+    assert.deepEqual(
+      meshes(later.group),
+      meshes(once.group),
+      `${name}: the same meshes, in the same order, vertex for vertex`,
+    );
   }
 });

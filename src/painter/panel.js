@@ -52,7 +52,16 @@ import { SETTINGS, TRI_HELP } from '../settingsMap.js';
 import { SCHEMES } from '../paletteGen.js';
 import { modeOf } from '../modes.js';
 import {
-  PANEL_SECTIONS, OWN, FIRE_HELP, MUSIC_HELP, sectionRows, sectionShapes, rowShown, rowText, choices, itemHint,
+  PANEL_SECTIONS,
+  OWN,
+  FIRE_HELP,
+  MUSIC_HELP,
+  sectionRows,
+  sectionShapes,
+  rowShown,
+  rowText,
+  choices,
+  itemHint,
 } from './layout.js';
 
 export { sectionShapes };
@@ -120,7 +129,8 @@ const ICONS = {
 };
 
 /** Swatches (a few colors side by side). */
-export const swatches = (colors) => `<span class="pnt-sw" aria-hidden="true">${colors.map((c) => `<i style="--c:${esc(c)}"></i>`).join('')}</span>`;
+export const swatches = (colors) =>
+  `<span class="pnt-sw" aria-hidden="true">${colors.map((c) => `<i style="--c:${esc(c)}"></i>`).join('')}</span>`;
 
 /**
  * A choice as a button: picking it sets `path` to `value`. `audition`: hovering it shows it
@@ -128,7 +138,12 @@ export const swatches = (colors) => `<span class="pnt-sw" aria-hidden="true">${c
  * @param {string} path @param {unknown} value @param {string} label
  * @param {{ audition?: boolean, colors?: string[] | null, cls?: string, pressedWhenMissing?: boolean }} [o]
  */
-export function chip(path, value, label, { audition = true, colors = null, cls = '', pressedWhenMissing = false } = {}) {
+export function chip(
+  path,
+  value,
+  label,
+  { audition = true, colors = null, cls = '', pressedWhenMissing = false } = {},
+) {
   return `<button type="button" class="pnt-chip${cls ? ` ${cls}` : ''}" data-pick="${esc(path)}" data-value="${esc(JSON.stringify(value))}"${audition ? ' data-audition' : ''}${pressedWhenMissing ? ' data-missing' : ''} aria-pressed="false">${colors ? swatches(colors) : ''}<span>${esc(label)}</span></button>`;
 }
 /** A row's label with its "?" (for groups of chips or buttons, which have no single input). */
@@ -145,8 +160,16 @@ const headed = (id, body, cls = '') => {
 function colorRow(id, base, labels, note) {
   const r = rowText(id);
   const t = tip(r.hint, { control: true, label: r.label });
-  return row(id, `<p class="viz-field-label">${hl(r.label)} ${t.mark}</p>
-      <div class="pnt-ramp">${Object.entries(labels).map(([key, name]) => `<label class="pnt-swatch"><input type="color" data-scene="${base}.${key}" aria-label="${esc(name)}"${t.ref}><span>${esc(name)}</span></label>`).join('')}</div>${note}`);
+  return row(
+    id,
+    `<p class="viz-field-label">${hl(r.label)} ${t.mark}</p>
+      <div class="pnt-ramp">${Object.entries(labels)
+        .map(
+          ([key, name]) =>
+            `<label class="pnt-swatch"><input type="color" data-scene="${base}.${key}" aria-label="${esc(name)}"${t.ref}><span>${esc(name)}</span></label>`,
+        )
+        .join('')}</div>${note}`,
+  );
 }
 
 /** A slider row (its range from scenes.js SCENE_RANGES). */
@@ -164,13 +187,19 @@ function selectRow(id, c, { num = false, undef = false } = {}) {
   return row(id, html + moreOf(r.more));
 }
 /** The rows that are Off / In the Mix / Always switches (a section with any says what those mean, once). */
-const isTri = (id) => ['outlines', 'knightGlow', 'knightShine', 'knightDance', 'knightReactions'].includes(id) || /^(layer|dropFx)\./.test(id);
+const isTri = (id) =>
+  ['outlines', 'knightGlow', 'knightShine', 'knightDance', 'knightReactions'].includes(id) ||
+  /^(layer|dropFx)\./.test(id);
 /** What Off / In the Mix / Always mean, said over a section's first switch. */
 const triHelp = () => `<p class="pnt-help" data-tri-help>${esc(TRI_HELP)}</p>`;
 /** An Off / In the Mix / Always row. `missing`: the mode a missing value means. */
 function triRow(id, { missing = 'off', audition = false } = {}) {
   const r = rowText(id);
-  return row(id, sc(tri(r.path, hl(r.label), { hint: r.hint, missing, attr: audition ? ' data-audition' : '' })) + moreOf(r.more), 'pnt-tri');
+  return row(
+    id,
+    sc(tri(r.path, hl(r.label), { hint: r.hint, missing, attr: audition ? ' data-audition' : '' })) + moreOf(r.more),
+    'pnt-tri',
+  );
 }
 
 /** A detail a look or a layer rolls, with its lock. */
@@ -184,9 +213,11 @@ function detailField(id, scene) {
   let field;
   if (spec.slots) {
     const t = tip(spec.hint, { control: true, label: spec.label }); // (each slot reads it out: the "?" is only for the eye)
-    field = `<div class="viz-field"><span class="viz-field-label">${hl(spec.label)} ${t.mark}</span><span class="pnt-slots3">${
-      Array.from({ length: spec.slots }, (_, i) => `<select data-scene="${esc(path)}.${i}" data-num aria-label="${esc(spec.label)} ${i + 1}"${t.ref}>${SLOT_NAMES.map((n, s) => `<option value="${s}">${esc(n)}</option>`).join('')}</select>`).join('')
-    }</span></div>`;
+    field = `<div class="viz-field"><span class="viz-field-label">${hl(spec.label)} ${t.mark}</span><span class="pnt-slots3">${Array.from(
+      { length: spec.slots },
+      (_, i) =>
+        `<select data-scene="${esc(path)}.${i}" data-num aria-label="${esc(spec.label)} ${i + 1}"${t.ref}>${SLOT_NAMES.map((n, s) => `<option value="${s}">${esc(n)}</option>`).join('')}</select>`,
+    ).join('')}</span></div>`;
   } else if (spec.bool) field = sc(check(path, hl(spec.label), { hint: spec.hint }));
   else if (spec.values) field = numeric(sc(select(path, hl(spec.label), choices(id), { hint: spec.hint })));
   else field = sc(range(path, hl(spec.label), spec.range[0], spec.range[1], spec.step ?? 0.01, { hint: spec.hint }));
@@ -205,8 +236,17 @@ function pickList(id, scene) {
   return `<div class="pnt-field pnt-list" data-list="${esc(r.path)}" data-row="${esc(id)}">
     <p class="viz-field-label">${hl(r.label)} ${t.mark}</p>
     <label class="viz-check"><input type="checkbox" data-list-show="${esc(r.path)}"${own ? '' : ' checked'}${t.ref}><span>The Show’s Moves</span></label>
-    ${own ? `${bulkBar(r.path, { kind: 'checks', minOne: true, label: r.label })}
-    <div class="viz-checks">${choices(id).map(([key, name]) => `<label class="viz-check"><input type="checkbox" data-list-item="${esc(key)}"${list.includes(key) ? ' checked' : ''}${t.ref}><span>${esc(name)}</span></label>`).join('')}</div>` : ''}
+    ${
+      own
+        ? `${bulkBar(r.path, { kind: 'checks', minOne: true, label: r.label })}
+    <div class="viz-checks">${choices(id)
+      .map(
+        ([key, name]) =>
+          `<label class="viz-check"><input type="checkbox" data-list-item="${esc(key)}"${list.includes(key) ? ' checked' : ''}${t.ref}><span>${esc(name)}</span></label>`,
+      )
+      .join('')}</div>`
+        : ''
+    }
     ${moreOf(r.more)}
   </div>`;
 }
@@ -219,10 +259,17 @@ function pickList(id, scene) {
 function helmetRows(count) {
   const r = rowText('knightHelmets');
   const t = tip(r.hint, { control: true, label: r.label });
-  return row('knightHelmets', `<p class="viz-field-label">${hl(r.label)} ${t.mark}</p>
-      <div class="pnt-helmets">${Array.from({ length: MAX_KNIGHTS }, (_, i) => `<div class="pnt-helmet" data-helmet="${i}"${i < count ? '' : ' hidden'}>${
-    sc(select(`knights.helmets.${i}`, `Knight ${i + 1}`, choices('knightHelmets'))).replace('<select ', `<select${t.ref} `)
-  }</div>`).join('')}</div>`);
+  return row(
+    'knightHelmets',
+    `<p class="viz-field-label">${hl(r.label)} ${t.mark}</p>
+      <div class="pnt-helmets">${Array.from(
+        { length: MAX_KNIGHTS },
+        (_, i) =>
+          `<div class="pnt-helmet" data-helmet="${i}"${i < count ? '' : ' hidden'}>${sc(
+            select(`knights.helmets.${i}`, `Knight ${i + 1}`, choices('knightHelmets')),
+          ).replace('<select ', `<select${t.ref} `)}</div>`,
+      ).join('')}</div>`,
+  );
 }
 
 /**
@@ -232,14 +279,29 @@ function helmetRows(count) {
  * @param {number} [light]  the light the flames take (the scene's own when they have none)
  */
 export function flameChips(list, light = 0.34) {
-  return list.map(({ label, colors }) => {
-    const flame = { lo: colors.lo, mid: colors.mid, hi: colors.hi, core: colors.core, shade: colors.shade, light: colors.light ?? light };
-    return chip('colors.flame', flame, label, { colors: [flame.lo, flame.mid, flame.hi, flame.core] });
-  }).join('');
+  return list
+    .map(({ label, colors }) => {
+      const flame = {
+        lo: colors.lo,
+        mid: colors.mid,
+        hi: colors.hi,
+        core: colors.core,
+        shade: colors.shade,
+        light: colors.light ?? light,
+      };
+      return chip('colors.flame', flame, label, { colors: [flame.lo, flame.mid, flame.hi, flame.core] });
+    })
+    .join('');
 }
 /** Chips for place palettes (suggested from a color): hover onto the scene, click to use. */
 export function sceneryChips(list) {
-  return list.map(({ label, colors }) => chip('colors.scenery', colors, label, { colors: [colors.void, colors.shadow, colors.stone, colors.wood, colors.bone] })).join('');
+  return list
+    .map(({ label, colors }) =>
+      chip('colors.scenery', colors, label, {
+        colors: [colors.void, colors.shadow, colors.stone, colors.wood, colors.bone],
+      }),
+    )
+    .join('');
 }
 
 /**
@@ -266,46 +328,98 @@ const SITE_BASE = { void: '#07070b', shadow: '#15131d', stone: '#2c2a3a', wood: 
  */
 /** Each row's markup, by its id (an item row by its kind: "layer.glow" is ROWS.layer). */
 const ROWS = {
-  scenery: (id) => headed(id, `<div class="pnt-chips" role="group" aria-label="Place">${choices(id).map(([v, name]) => chip('place.scenery', v, name, { audition: false, cls: 'pnt-place' })).join('')}</div>`),
+  scenery: (id) =>
+    headed(
+      id,
+      `<div class="pnt-chips" role="group" aria-label="Place">${choices(id)
+        .map(([v, name]) => chip('place.scenery', v, name, { audition: false, cls: 'pnt-place' }))
+        .join('')}</div>`,
+    ),
   fog: (id, s, c) => selectRow(id, c),
   exposure: rangeRow,
   vignette: rangeRow,
-  shadows: (id) => { const r = rowText(id); return row(id, sc(check(r.path, hl(r.label), { hint: r.hint }))); },
+  shadows: (id) => {
+    const r = rowText(id);
+    return row(id, sc(check(r.path, hl(r.label), { hint: r.hint })));
+  },
 
-  colors: (id, s, c) => headed(id, `<div class="pnt-chips pnt-flames">${flameChips((c.flames ?? []).map((f) => ({ label: f.name, colors: f.colors })), s.colors.flame.light)}</div>`),
+  colors: (id, s, c) =>
+    headed(
+      id,
+      `<div class="pnt-chips pnt-flames">${flameChips(
+        (c.flames ?? []).map((f) => ({ label: f.name, colors: f.colors })),
+        s.colors.flame.light,
+      )}</div>`,
+    ),
   flameMake: (id) => {
     const h = SETTINGS.scheme;
     const t = tip(h.hint, { control: true, label: h.label }); // (the select reads its hint out: its "?" is only for the eye)
     const opts = [['auto', 'Any Harmony'], ...SCHEMES.map((x) => [x.id, x.label])];
-    return headed(id, `<div class="pnt-row">
+    return headed(
+      id,
+      `<div class="pnt-row">
         <button type="button" class="pix-btn" data-paint-act="flame-harmonious">Harmonious</button>
         <button type="button" class="pix-btn" data-paint-act="flame-random">Fully Random</button>
         <span class="pnt-inline"><label for="pnt-flame-scheme">${esc(h.label)}</label>${t.mark}<select id="pnt-flame-scheme" data-flame-scheme${t.ref}>${opts.map(([v, x]) => `<option value="${esc(v)}">${esc(x)}</option>`).join('')}</select></span>
-      </div>`, 'pnt-make');
+      </div>`,
+      'pnt-make',
+    );
   },
-  flameSeed: (id, s) => headed(id, `<div class="pnt-row"><input type="color" class="pnt-color" data-seed="flame" aria-label="A color to build flames round" value="${esc(s.colors.flame.mid)}"></div>
-      <div class="pnt-chips pnt-flames" data-suggest="flame"></div>`),
-  flameRamp: (id) => colorRow(id, 'colors.flame', RAMP_LABELS, '<p class="pnt-note" data-readable hidden>The tips were lightened to stay readable.</p>'),
+  flameSeed: (id, s) =>
+    headed(
+      id,
+      `<div class="pnt-row"><input type="color" class="pnt-color" data-seed="flame" aria-label="A color to build flames round" value="${esc(s.colors.flame.mid)}"></div>
+      <div class="pnt-chips pnt-flames" data-suggest="flame"></div>`,
+    ),
+  flameRamp: (id) =>
+    colorRow(
+      id,
+      'colors.flame',
+      RAMP_LABELS,
+      '<p class="pnt-note" data-readable hidden>The tips were lightened to stay readable.</p>',
+    ),
   flameLight: rangeRow,
   sceneColors: (id, s, c) => {
     const b = c.siteBase;
-    return headed(id, `<div class="pnt-chips">
+    return headed(
+      id,
+      `<div class="pnt-chips">
         ${chip('colors.scenery', null, 'The Site’s Own', { colors: [b.void, b.shadow, b.stone, b.wood, b.bone] })}
         <button type="button" class="pix-btn" data-paint-act="scenery-harmonious">Harmonious</button>
         <button type="button" class="pix-btn" data-paint-act="scenery-vivid">Vivid</button>
         <button type="button" class="pix-btn" data-paint-act="scenery-random">Fully Random</button>
-      </div>`);
+      </div>`,
+    );
   },
-  sceneSeed: (id, s, c) => headed(id, `<div class="pnt-row"><input type="color" class="pnt-color" data-seed="scenery" aria-label="A color to build place colors round" value="${esc((s.colors.scenery ?? c.siteBase).stone)}"></div>
-      <div class="pnt-chips" data-suggest="scenery"></div>`),
-  sceneEdit: (id) => colorRow(id, 'colors.scenery', SCENE_LABELS, '<p class="pnt-note" data-darkest hidden>The background was darkened: it’s the darkest color (the outlines’).</p>'),
+  sceneSeed: (id, s, c) =>
+    headed(
+      id,
+      `<div class="pnt-row"><input type="color" class="pnt-color" data-seed="scenery" aria-label="A color to build place colors round" value="${esc((s.colors.scenery ?? c.siteBase).stone)}"></div>
+      <div class="pnt-chips" data-suggest="scenery"></div>`,
+    ),
+  sceneEdit: (id) =>
+    colorRow(
+      id,
+      'colors.scenery',
+      SCENE_LABELS,
+      '<p class="pnt-note" data-darkest hidden>The background was darkened: it’s the darkest color (the outlines’).</p>',
+    ),
   palette: (id, s, c) => selectRow(id, c),
   paletteSlots: (id, s, c) => {
     const cols = slotColors(s, c.siteBase);
-    return headed(id, `<div class="pnt-slots">${cols.map((col, i) => `<button type="button" class="pnt-slot" data-slot="${i}" aria-pressed="${s.render.palette.includes(i)}"${i === 0 ? ' disabled' : ''} aria-label="${esc(SLOT_NAMES[i])}"><i style="--c:${esc(col)}"></i></button>`).join('')}</div>`);
+    return headed(
+      id,
+      `<div class="pnt-slots">${cols.map((col, i) => `<button type="button" class="pnt-slot" data-slot="${i}" aria-pressed="${s.render.palette.includes(i)}"${i === 0 ? ' disabled' : ''} aria-label="${esc(SLOT_NAMES[i])}"><i style="--c:${esc(col)}"></i></button>`).join('')}</div>`,
+    );
   },
 
-  fireLevel: rangeRow, fireSize: rangeRow, fireHeight: rangeRow, fireTurbulence: rangeRow, fireGlow: rangeRow, windX: rangeRow, windZ: rangeRow,
+  fireLevel: rangeRow,
+  fireSize: rangeRow,
+  fireHeight: rangeRow,
+  fireTurbulence: rangeRow,
+  fireGlow: rangeRow,
+  windX: rangeRow,
+  windZ: rangeRow,
 
   pixelSize: (id, s, c) => selectRow(id, c, { num: true }),
   dither: rangeRow,
@@ -313,15 +427,25 @@ const ROWS = {
   outlines: (id) => triRow(id, { missing: 'on', audition: true }),
   flameFps: (id, s, c) => selectRow(id, c, { num: true }),
 
-  looks: (id, s) => headed(id, `<div class="pnt-chips pnt-looks">${choices(id).map(([v, name]) => chip('look.name', v, name, { cls: 'pnt-look' })).join('')}</div>
-      <p class="pnt-help" data-look-hint>${esc(itemHint('looks', s.look.name))}</p>`),
+  looks: (id, s) =>
+    headed(
+      id,
+      `<div class="pnt-chips pnt-looks">${choices(id)
+        .map(([v, name]) => chip('look.name', v, name, { cls: 'pnt-look' }))
+        .join('')}</div>
+      <p class="pnt-help" data-look-hint>${esc(itemHint('looks', s.look.name))}</p>`,
+    ),
   param: detailField,
   glitch: rangeRow,
   xrayView: (id, s, c) => selectRow(id, c),
 
   pinAll: (id) => {
     const r = rowText(id);
-    return row(id, `<button type="button" class="pix-btn" data-paint-act="pin-all">${hl(r.label)}</button>${tip(r.hint, { label: r.label }).mark}`, 'pnt-row pnt-pin-all');
+    return row(
+      id,
+      `<button type="button" class="pix-btn" data-paint-act="pin-all">${hl(r.label)}</button>${tip(r.hint, { label: r.label }).mark}`,
+      'pnt-row pnt-pin-all',
+    );
   },
   layers: (id) => headed(id, bulkBar('layers', { kind: 'tri', label: 'Layers' })),
   layer: (id, s) => {
@@ -336,18 +460,28 @@ const ROWS = {
   },
   blends: (id) => {
     const r = rowText(id);
-    return row(id, `${groupHead(r.label, r.hint)}
-      ${Object.keys(LAYER_BLENDS).map((b) => {
-        const br = rowText(`blend.${b}`);
-        return row(`blend.${b}`, unset(sc(select(br.path, hl(br.label), choices(`blend.${b}`), { hint: br.hint }))));
-      }).join('')}`, 'pnt-sub');
+    return row(
+      id,
+      `${groupHead(r.label, r.hint)}
+      ${Object.keys(LAYER_BLENDS)
+        .map((b) => {
+          const br = rowText(`blend.${b}`);
+          return row(`blend.${b}`, unset(sc(select(br.path, hl(br.label), choices(`blend.${b}`), { hint: br.hint }))));
+        })
+        .join('')}`,
+      'pnt-sub',
+    );
   },
 
   cameraDrag: (id) => {
     const r = rowText(id);
-    return row(id, `<p class="pnt-help"><strong data-hl>${esc(r.label)}</strong>: ${esc(r.hint)} Q and E tilt the horizon, [ and ] change the lens.</p>`);
+    return row(
+      id,
+      `<p class="pnt-help"><strong data-hl>${esc(r.label)}</strong>: ${esc(r.hint)} Q and E tilt the horizon, [ and ] change the lens.</p>`,
+    );
   },
-  shot: (id, s, c) => headed(id, `<div class="pnt-chips">${(c.shots ?? []).map((x) => chip('camera', x.camera, x.name)).join('')}</div>`),
+  shot: (id, s, c) =>
+    headed(id, `<div class="pnt-chips">${(c.shots ?? []).map((x) => chip('camera', x.camera, x.name)).join('')}</div>`),
   lens: rangeRow,
   tilt: rangeRow,
   camera: (id, s, c) => selectRow(id, c),
@@ -367,20 +501,38 @@ const ROWS = {
   knightMoves: pickList,
   knightReactions: (id) => triRow(id),
   // (Its label is the preview's sub-heading's name: the row is the buttons.)
-  gestures: (id) => row(id, `<div class="pnt-chips" role="group" aria-labelledby="pnt-g-preview">${choices(id).map(([g, name]) => `<button type="button" class="pix-btn" data-paint-act="gesture" data-gesture="${esc(g)}">${esc(name)}</button>`).join('')}</div>`),
+  gestures: (id) =>
+    row(
+      id,
+      `<div class="pnt-chips" role="group" aria-labelledby="pnt-g-preview">${choices(id)
+        .map(
+          ([g, name]) =>
+            `<button type="button" class="pix-btn" data-paint-act="gesture" data-gesture="${esc(g)}">${esc(name)}</button>`,
+        )
+        .join('')}</div>`,
+    ),
 
   flyLit: rangeRow,
   flyShow: (id, s, c) => selectRow(id, c),
   flyMoves: pickList,
   flySpeed: rangeRow,
 
-  sceneHold: (id) => headed(id, `<div class="pnt-chips">${choices(id).map(([v, name]) => chip('music', v, name, { audition: false })).join('')}</div>
-      <p class="pnt-help">${esc(MUSIC_HELP)}</p>`),
+  sceneHold: (id) =>
+    headed(
+      id,
+      `<div class="pnt-chips">${choices(id)
+        .map(([v, name]) => chip('music', v, name, { audition: false }))
+        .join('')}</div>
+      <p class="pnt-help">${esc(MUSIC_HELP)}</p>`,
+    ),
   weapon: (id, s, c) => selectRow(id, c),
   element: (id, s, c) => selectRow(id, c),
   dropSource: (id, s) => {
     const [[, show], [, own]] = choices(id);
-    return headed(id, `<div class="pnt-chips">${chip('drops', null, show, { audition: false })}<button type="button" class="pnt-chip" data-paint-act="drops-own" aria-pressed="${s.drops !== null}"><span>${esc(own)}</span></button></div>`);
+    return headed(
+      id,
+      `<div class="pnt-chips">${chip('drops', null, show, { audition: false })}<button type="button" class="pnt-chip" data-paint-act="drops-own" aria-pressed="${s.drops !== null}"><span>${esc(own)}</span></button></div>`,
+    );
   },
   dropFx: (id) => headed(id, bulkBar('drops.fx', { kind: 'tri', label: rowText(id).label })),
   dropFxItem: (id) => triRow(id),
@@ -415,17 +567,28 @@ export function sectionMarkup(id, scene, ctx = {}) {
     return triHelp() + html;
   };
   const groups = sectionRows(id)
-    .map(([g, rows]) => /** @type {const} */ ([g, rows.filter((r) => rowShown(r, scene)).map(rowOf).join('')]))
+    .map(
+      ([g, rows]) =>
+        /** @type {const} */ ([
+          g,
+          rows
+            .filter((r) => rowShown(r, scene))
+            .map(rowOf)
+            .join(''),
+        ]),
+    )
     .filter(([, html]) => html);
   const heads = groups.length > 1;
   const name = PANEL_SECTIONS.find((s) => s.id === id)?.label;
-  const body = groups.map(([g, html]) => {
-    if (!g.head || !heads || g.head === name) return html;
-    const t = g.id === 'preview' ? tip(OWN.gestures.hint, { label: g.head }).mark : '';
-    // (The heading's name has an id of its own: a group it heads is named by it alone, not
-    // by its "?" and the hint's hidden text too.)
-    return `<div class="pnt-group" data-group="${esc(g.id)}"><h3 class="pnt-subhead"><span data-hl id="pnt-g-${esc(g.id)}">${esc(g.head)}</span>${t ? ` ${t}` : ''}</h3>${html}</div>`;
-  }).join('');
+  const body = groups
+    .map(([g, html]) => {
+      if (!g.head || !heads || g.head === name) return html;
+      const t = g.id === 'preview' ? tip(OWN.gestures.hint, { label: g.head }).mark : '';
+      // (The heading's name has an id of its own: a group it heads is named by it alone, not
+      // by its "?" and the hint's hidden text too.)
+      return `<div class="pnt-group" data-group="${esc(g.id)}"><h3 class="pnt-subhead"><span data-hl id="pnt-g-${esc(g.id)}">${esc(g.head)}</span>${t ? ` ${t}` : ''}</h3>${html}</div>`;
+    })
+    .join('');
   return (id === 'fire' ? `<p class="pnt-help">${esc(FIRE_HELP)}</p>` : '') + body;
 }
 
@@ -497,10 +660,28 @@ export function bulkEdit(scene, group, action, rand = Math.random) {
 }
 
 // --- binding ----------------------------------------------------------------------------
-const decimals = (step) => { const s = String(step); return s.includes('.') ? s.split('.')[1].length : 0; };
+const decimals = (step) => {
+  const s = String(step);
+  return s.includes('.') ? s.split('.')[1].length : 0;
+};
 /** What names a focusable thing in the panel (so a redraw can focus it again). */
-const FOCUS_ATTRS = ['data-scene', 'data-pick', 'data-value', 'data-sec-toggle', 'data-sec-tab', 'data-paint-act', 'data-gesture', 'data-slot',
-  'data-list-show', 'data-list-item', 'data-seed', 'data-flame-scheme', 'data-bulk', 'data-bulk-group', 'data-tip'];
+const FOCUS_ATTRS = [
+  'data-scene',
+  'data-pick',
+  'data-value',
+  'data-sec-toggle',
+  'data-sec-tab',
+  'data-paint-act',
+  'data-gesture',
+  'data-slot',
+  'data-list-show',
+  'data-list-item',
+  'data-seed',
+  'data-flame-scheme',
+  'data-bulk',
+  'data-bulk-group',
+  'data-tip',
+];
 /** How long a field stays "under the hand" after the user moves it (ms): fill() leaves it be. */
 const HAND_MS = 300;
 
@@ -527,20 +708,34 @@ const HAND_MS = 300;
  *   step: the page says how to undo it); `onDraw` after the panel or a section of it is drawn
  *   again (the search goes over it).
  */
-export function bindPanel(root, { get, edit, audition, act, live = () => null, ctx, open: opened = ['place'], onSection = () => {}, onBulk = () => {}, onDraw = () => {} }) {
+export function bindPanel(
+  root,
+  {
+    get,
+    edit,
+    audition,
+    act,
+    live = () => null,
+    ctx,
+    open: opened = ['place'],
+    onSection = () => {},
+    onBulk = () => {},
+    onDraw = () => {},
+  },
+) {
   /** @type {Record<string, string>} */
   let shapes = {};
   const ids = new Set(SECTIONS.map(([id]) => id));
   const open = new Set([...opened].filter((id) => ids.has(id)));
   if (!open.size) open.add('place');
   let auditioning = null;
-  let dragging = null;    // the slider a pointer is down on (a redraw waits for it)
-  let drawLater = false;  // a redraw that waited
-  let handAt = 0;         // when the focused field was last moved by the user (performance.now)
+  let dragging = null; // the slider a pointer is down on (a redraw waits for it)
+  let drawLater = false; // a redraw that waited
+  let handAt = 0; // when the focused field was last moved by the user (performance.now)
   /** @type {Map<string, { ranges: [number, number][], label: string }> | null} */
-  let filter = null;      // the search's rows while it has a query (panelSearch.js)
+  let filter = null; // the search's rows while it has a query (panelSearch.js)
   /** @type {Set<string> | null} */
-  let openBefore = null;  // the sections open before a search opened those it found things in
+  let openBefore = null; // the sections open before a search opened those it found things in
 
   /**
    * What the focused element in the panel is, as a selector that finds it again in a fresh
@@ -551,12 +746,16 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     if (!el || el === root || !root.contains(el)) return null;
     // (A lock's tip says whether it's pinned, which a click just changed: it's its path alone.)
     if (el.hasAttribute('data-lock')) return `[data-lock="${CSS.escape(el.getAttribute('data-lock'))}"]`;
-    let own = FOCUS_ATTRS.filter((a) => el.hasAttribute(a)).map((a) => `[${a}="${CSS.escape(el.getAttribute(a))}"]`).join('');
+    let own = FOCUS_ATTRS.filter((a) => el.hasAttribute(a))
+      .map((a) => `[${a}="${CSS.escape(el.getAttribute(a))}"]`)
+      .join('');
     if (!own) return null;
     if (el.type === 'radio') own += `[value="${CSS.escape(el.value)}"]`; // (a switch's three share a path)
     // (A move in a list is named by its list: the knights' and the fireflies' share ids.)
     const list = /** @type {HTMLElement | null} */ (el.closest('[data-list]'));
-    return list && (el.hasAttribute('data-list-item') || el.hasAttribute('data-bulk')) ? `[data-list="${CSS.escape(list.dataset.list)}"] ${own}` : own;
+    return list && (el.hasAttribute('data-list-item') || el.hasAttribute('data-bulk'))
+      ? `[data-list="${CSS.escape(list.dataset.list)}"] ${own}`
+      : own;
   }
   function refocus(key) {
     if (key) /** @type {HTMLElement | null} */ (root.querySelector(key))?.focus({ preventScroll: true });
@@ -580,7 +779,9 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
   function drawSections(scene, which) {
     const scroll = root.scrollTop;
     const c = { ...ctx(), open };
-    const bodies = which.map((id) => /** @type {HTMLElement | null} */ (root.querySelector(`#pnt-b-${id}`))).filter(Boolean);
+    const bodies = which
+      .map((id) => /** @type {HTMLElement | null} */ (root.querySelector(`#pnt-b-${id}`)))
+      .filter(Boolean);
     const focus = bodies.some((b) => b.contains(document.activeElement)) ? focusKey() : null;
     for (const body of bodies) body.innerHTML = sectionMarkup(body.id.slice('pnt-b-'.length), scene, c);
     shapes = sectionShapes(scene);
@@ -604,7 +805,8 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     /** @type {HTMLElement[]} */
     let fresh = [];
     if (changed.length) {
-      if (dragging) drawLater = true; // (the drag ends first: its slider stays under the pointer)
+      if (dragging)
+        drawLater = true; // (the drag ends first: its slider stays under the pointer)
       else fresh = drawSections(scene, changed);
     }
     fillValues(scene, { force, fresh });
@@ -616,20 +818,28 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
   /** @param {any} scene @param {{ force?: boolean, fresh?: HTMLElement[] }} o  fresh: sections just drawn (every field set) */
   function fillValues(scene, { force = false, fresh = [] }) {
     const now = live();
-    const busy = (input) => !force && input === document.activeElement && input.type !== 'checkbox' && input.type !== 'radio' && input.tagName !== 'SELECT'
-      && (input === dragging || performance.now() - handAt < HAND_MS) && !fresh.some((b) => b.contains(input));
+    const busy = (input) =>
+      !force &&
+      input === document.activeElement &&
+      input.type !== 'checkbox' &&
+      input.type !== 'radio' &&
+      input.tagName !== 'SELECT' &&
+      (input === dragging || performance.now() - handAt < HAND_MS) &&
+      !fresh.some((b) => b.contains(input));
     for (const el of root.querySelectorAll('[data-scene]')) {
       const input = /** @type {HTMLInputElement} */ (el);
       const path = input.dataset.scene;
       let v = getPath(scene, path);
-      if (input.type === 'radio') { // (Off / In the Mix / Always: missing is the one marked so)
+      if (input.type === 'radio') {
+        // (Off / In the Mix / Always: missing is the one marked so)
         input.checked = v === undefined || v === null ? input.hasAttribute('data-missing') : modeOf(v) === input.value;
         continue;
       }
       const rolled = v === undefined && /^(details|look\.params)\./.test(path);
       if (rolled) v = liveValue(now, path);
       if (path === 'render.palette') v = Array.isArray(v) ? 'few' : v;
-      if (!busy(input)) { // (not under the user's hand; its number follows it all the same)
+      if (!busy(input)) {
+        // (not under the user's hand; its number follows it all the same)
         if (input.type === 'checkbox') input.checked = !!v;
         else input.value = v === null || v === undefined ? '' : String(v);
       }
@@ -654,11 +864,14 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
       const show = /** @type {HTMLInputElement | null} */ (l.querySelector('[data-list-show]'));
       if (show) show.checked = !own;
       for (const c of l.querySelectorAll('[data-list-item]')) {
-        /** @type {HTMLInputElement} */ (c).checked = own && list.includes(/** @type {HTMLElement} */ (c).dataset.listItem);
+        /** @type {HTMLInputElement} */ (c).checked =
+          own && list.includes(/** @type {HTMLElement} */ (c).dataset.listItem);
       }
     }
     // As many helmet rows as knights.
-    for (const r of root.querySelectorAll('[data-helmet]')) /** @type {HTMLElement} */ (r).hidden = Number(/** @type {HTMLElement} */ (r).dataset.helmet) >= scene.knights.count;
+    for (const r of root.querySelectorAll('[data-helmet]'))
+      /** @type {HTMLElement} */ (r).hidden =
+        Number(/** @type {HTMLElement} */ (r).dataset.helmet) >= scene.knights.count;
     // The few colors: which are picked, in the scene's colors now.
     if (Array.isArray(scene.render.palette)) {
       const cols = slotColors(scene, ctx().siteBase);
@@ -764,15 +977,23 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     if (input.dataset?.scene && changesOnce(input)) {
       if (input.type === 'radio' && auditioning?.contains(input)) auditioning = null; // (kept: it's the scene now)
       editInput(input);
-    } else if (input.dataset?.scene) edit(input.dataset.scene, read(input), { key: null }); // (a drag ended: the next is a step of its own)
+    } else if (input.dataset?.scene)
+      edit(input.dataset.scene, read(input), { key: null }); // (a drag ended: the next is a step of its own)
     else if (input.hasAttribute?.('data-list-show')) {
       const path = input.dataset.listShow;
-      edit(path, input.checked ? null : Object.keys(path.startsWith('knights') ? KNIGHT_MOVES : FLY_MOVES), { key: null });
+      edit(path, input.checked ? null : Object.keys(path.startsWith('knights') ? KNIGHT_MOVES : FLY_MOVES), {
+        key: null,
+      });
     } else if (input.hasAttribute?.('data-list-item')) {
       const list = /** @type {HTMLElement} */ (input.closest('[data-list]'));
       const path = list.dataset.list;
-      const picked = [...list.querySelectorAll('[data-list-item]')].filter((c) => /** @type {HTMLInputElement} */ (c).checked).map((c) => /** @type {HTMLElement} */ (c).dataset.listItem);
-      if (!picked.length) { input.checked = true; return; } // (at least one)
+      const picked = [...list.querySelectorAll('[data-list-item]')]
+        .filter((c) => /** @type {HTMLInputElement} */ (c).checked)
+        .map((c) => /** @type {HTMLElement} */ (c).dataset.listItem);
+      if (!picked.length) {
+        input.checked = true;
+        return;
+      } // (at least one)
       edit(path, picked, { key: null });
     } else if (input.hasAttribute?.('data-flame-scheme')) act('flame-scheme', input);
   });
@@ -800,7 +1021,8 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     if (bulk) {
       if (bulk.getAttribute('aria-disabled') === 'true') return;
       const change = bulkEdit(get(), bulk.dataset.bulkGroup, bulk.dataset.bulk);
-      if (change && edit(change.path, change.value, { key: null }) !== false) onBulk(`${change.name}: ${bulk.textContent.trim()}.`);
+      if (change && edit(change.path, change.value, { key: null }) !== false)
+        onBulk(`${change.name}: ${bulk.textContent.trim()}.`);
       return;
     }
     const slot = /** @type {HTMLElement} */ (t.closest('[data-slot]'));
@@ -813,7 +1035,10 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
       return;
     }
     const toggle = /** @type {HTMLElement} */ (t.closest('[data-sec-toggle]'));
-    if (toggle) { setOpen(toggle.dataset.secToggle, !open.has(toggle.dataset.secToggle)); return; }
+    if (toggle) {
+      setOpen(toggle.dataset.secToggle, !open.has(toggle.dataset.secToggle));
+      return;
+    }
     const tab = /** @type {HTMLElement} */ (t.closest('[data-sec-tab]'));
     if (tab) {
       // (Phones: one section at a time.)
@@ -852,7 +1077,8 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
 
   /** @param {string} id @param {boolean} on @param {{ save?: boolean }} [o]  save: by hand (the page keeps it) */
   function setOpen(id, on, { save = true } = {}) {
-    if (on) open.add(id); else open.delete(id);
+    if (on) open.add(id);
+    else open.delete(id);
     const sec = root.querySelector(`[data-sec="${id}"]`);
     if (!sec) return;
     sec.toggleAttribute('data-open', on);
@@ -870,7 +1096,10 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
    */
   function applyFilter() {
     root.toggleAttribute('data-searching', !!filter);
-    for (const m of root.querySelectorAll('[data-hl].has-mark')) { m.replaceChildren(m.textContent); m.classList.remove('has-mark'); }
+    for (const m of root.querySelectorAll('[data-hl].has-mark')) {
+      m.replaceChildren(m.textContent);
+      m.classList.remove('has-mark');
+    }
     const rows = /** @type {HTMLElement[]} */ ([...root.querySelectorAll('[data-row]')]);
     if (!filter) {
       for (const el of root.querySelectorAll('.is-miss')) el.classList.remove('is-miss');
@@ -891,7 +1120,8 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
         label.classList.add('has-mark');
       }
     }
-    for (const g of root.querySelectorAll('[data-group]')) g.classList.toggle('is-miss', !g.querySelector('[data-row]:not(.is-miss)'));
+    for (const g of root.querySelectorAll('[data-group]'))
+      g.classList.toggle('is-miss', !g.querySelector('[data-row]:not(.is-miss)'));
     for (const [id] of SECTIONS) {
       const sec = root.querySelector(`[data-sec="${id}"]`);
       const any = !!sec?.querySelector('[data-row]:not(.is-miss)');
@@ -924,14 +1154,30 @@ export function bindPanel(root, { get, edit, audition, act, live = () => null, c
     draw,
     refreshLive,
     /** Open a section (and scroll to it). */
-    show(id) { setOpen(id, true); root.querySelector(`[data-sec="${id}"]`)?.scrollIntoView({ block: 'nearest' }); },
-    get open() { return [...open]; },
+    show(id) {
+      setOpen(id, true);
+      root.querySelector(`[data-sec="${id}"]`)?.scrollIntoView({ block: 'nearest' });
+    },
+    get open() {
+      return [...open];
+    },
     /** Suggestions for a seed color: chips drawn into the section (flame or place). */
-    suggest(kind, html) { const el = root.querySelector(`[data-suggest="${kind}"]`); if (el) el.innerHTML = html; },
+    suggest(kind, html) {
+      const el = root.querySelector(`[data-suggest="${kind}"]`);
+      if (el) el.innerHTML = html;
+    },
     /** Whether a hover audition is showing. */
-    get auditioning() { return !!auditioning; },
+    get auditioning() {
+      return !!auditioning;
+    },
     /** End an audition without waiting for the pointer (a key, a click elsewhere). */
-    endAudition() { if (auditioning) { auditioning = null; audition(null); lookHint(get().look.name); } },
+    endAudition() {
+      if (auditioning) {
+        auditioning = null;
+        audition(null);
+        lookHint(get().look.name);
+      }
+    },
     /**
      * Show only the rows a search found (row id → its label and what matched in it), or
      * everything (null). Kept through every redraw until it's set again. `top` (a new query):

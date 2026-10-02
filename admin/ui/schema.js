@@ -13,7 +13,16 @@
 import { KINDLED_SHOW, WEAPON_KEYS } from '../../src/contentRules.js';
 import content from '../../src/content.json' with { type: 'json' };
 import {
-  CURSOR_MODES, DEFAULT_EFFECTS, DITHER_MATRICES, ELEMENT_IDS, KNIGHT_ARRIVALS, KNIGHT_FINISHES, KNIGHT_HELMETS, KNIGHT_SEATS, KNIGHT_STYLES, RANGES,
+  CURSOR_MODES,
+  DEFAULT_EFFECTS,
+  DITHER_MATRICES,
+  ELEMENT_IDS,
+  KNIGHT_ARRIVALS,
+  KNIGHT_FINISHES,
+  KNIGHT_HELMETS,
+  KNIGHT_SEATS,
+  KNIGHT_STYLES,
+  RANGES,
 } from '../../src/effectsDefaults.js';
 import { FINISH_NAMES, HELMET_NAMES, STYLE_NAMES } from '../../src/knightNames.js';
 import { defaultScene, MUSIC, NAME_MAX } from '../../src/scenes.js';
@@ -25,36 +34,92 @@ import { titleCase } from './text.js';
 const PREVIEW_BLURB = 'The preview updates as you edit; nothing is published until you save.';
 /** Sidebar pages, grouped, and the content sections (dotted paths allowed) each one edits. */
 export const PAGES = [
-  { id: 'projects', group: 'Content', label: 'Projects', keys: ['featured', 'projects', 'archive'], blurb: 'The inventory: the flagship first, then projects, then earlier explorations.' },
-  { id: 'home', group: 'Content', label: 'Home & site', keys: ['hero', 'site'], blurb: 'The title screen, the “Embers Kindled” banner, and what search engines see.' },
+  {
+    id: 'projects',
+    group: 'Content',
+    label: 'Projects',
+    keys: ['featured', 'projects', 'archive'],
+    blurb: 'The inventory: the flagship first, then projects, then earlier explorations.',
+  },
+  {
+    id: 'home',
+    group: 'Content',
+    label: 'Home & site',
+    keys: ['hero', 'site'],
+    blurb: 'The title screen, the “Embers Kindled” banner, and what search engines see.',
+  },
   { id: 'about', group: 'Content', label: 'About', keys: ['about'], blurb: 'Paragraphs and the stat sheet.' },
-  { id: 'journey', group: 'Content', label: 'Journey', keys: ['experience', 'leadership', 'education'], blurb: 'Work history, leadership and certificates.' },
-  { id: 'skills', group: 'Content', label: 'Skills', keys: ['skills'], blurb: 'Skill groups and the glyphs drawn in their slots.' },
+  {
+    id: 'journey',
+    group: 'Content',
+    label: 'Journey',
+    keys: ['experience', 'leadership', 'education'],
+    blurb: 'Work history, leadership and certificates.',
+  },
+  {
+    id: 'skills',
+    group: 'Content',
+    label: 'Skills',
+    keys: ['skills'],
+    blurb: 'Skill groups and the glyphs drawn in their slots.',
+  },
   { id: 'contact', group: 'Content', label: 'Contact', keys: ['contact'], blurb: 'The contact screen and its links.' },
   // The site's effects, on four pages beside the live preview (they were one long Effects page).
   {
-    id: 'colors', group: 'Look & feel', label: 'Colors', preview: true, keys: ['effects.flames', 'effects.colors'],
+    id: 'colors',
+    group: 'Look & feel',
+    label: 'Colors',
+    preview: true,
+    keys: ['effects.flames', 'effects.colors'],
     blurb: `The flame colors the bonfire draws from, and the place colors every frame is built on. ${PREVIEW_BLURB}`,
   },
   {
-    id: 'fire', group: 'Look & feel', label: 'Fire & elements', preview: true,
+    id: 'fire',
+    group: 'Look & feel',
+    label: 'Fire & elements',
+    preview: true,
     keys: ['effects.fire', 'effects.elements', 'effects.lightning', 'effects.ice', 'effects.particles'],
     blurb: `How the bonfire burns, what it’s made of (fire, lightning, ice) and how many particles each effect uses. ${PREVIEW_BLURB}`,
   },
   {
-    id: 'picture', group: 'Look & feel', label: 'Picture', preview: true, keys: ['effects.render', 'effects.impact', 'effects.fireflies', 'effects.cursor'],
+    id: 'picture',
+    group: 'Look & feel',
+    label: 'Picture',
+    preview: true,
+    keys: ['effects.render', 'effects.impact', 'effects.fireflies', 'effects.cursor'],
     blurb: `The pixel-art pass over the scene, what makes a hit land, the fireflies and the cursor’s pull on the fire. ${PREVIEW_BLURB}`,
   },
   {
-    id: 'knight', group: 'Look & feel', label: 'Knight', preview: true, keys: ['effects.knight'],
+    id: 'knight',
+    group: 'Look & feel',
+    label: 'Knight',
+    preview: true,
+    keys: ['effects.knight'],
     blurb: `The knight who comes to the fire: when he comes, how he’s drawn and how he answers visitors. ${PREVIEW_BLURB}`,
   },
   {
-    id: 'scenes', group: 'Look & feel', label: 'Scenes', keys: ['scenes'],
-    blurb: 'The preset scenes Bonfire Live loops through, in this order. Make them in the Bonfire Painter, then Import From Painter here.',
+    id: 'scenes',
+    group: 'Look & feel',
+    label: 'Scenes',
+    keys: ['scenes'],
+    blurb:
+      'The preset scenes Bonfire Live loops through, in this order. Make them in the Bonfire Painter, then Import From Painter here.',
   },
-  { id: 'headings', group: 'Settings', label: 'Screen headings', keys: ['sections'], blurb: 'The title, flavor line and intro at the top of each screen.' },
-  { id: 'interface', group: 'Settings', label: 'Interface', keys: ['screens', 'ui', 'weapons', 'weaponDraw', 'startingEquipment', 'notFound'], blurb: 'Tab names, the header, menus and pack, weapon names and which weapons can be drawn, the starting equipment and the 404 page.' },
+  {
+    id: 'headings',
+    group: 'Settings',
+    label: 'Screen headings',
+    keys: ['sections'],
+    blurb: 'The title, flavor line and intro at the top of each screen.',
+  },
+  {
+    id: 'interface',
+    group: 'Settings',
+    label: 'Interface',
+    keys: ['screens', 'ui', 'weapons', 'weaponDraw', 'startingEquipment', 'notFound'],
+    blurb:
+      'Tab names, the header, menus and pack, weapon names and which weapons can be drawn, the starting equipment and the 404 page.',
+  },
 ];
 /** Old page addresses that still work (#effects was the one Effects page). */
 export const PAGE_ALIASES = { effects: 'colors' };
@@ -77,7 +142,12 @@ export const LABELS = {
   weapons: 'Weapon names',
   weaponDraw: 'Weapons in the draw',
   // (Each weapon's name box and its switch are labelled with its name as the site ships it.)
-  ...Object.fromEntries(WEAPON_KEYS.flatMap((k) => [[`weapons.${k}`, content.weapons?.[k] ?? k], [`weaponDraw.${k}`, content.weapons?.[k] ?? k]])),
+  ...Object.fromEntries(
+    WEAPON_KEYS.flatMap((k) => [
+      [`weapons.${k}`, content.weapons?.[k] ?? k],
+      [`weaponDraw.${k}`, content.weapons?.[k] ?? k],
+    ]),
+  ),
   startingEquipment: 'Starting equipment',
   notFound: '404 page',
   'notFound.cta': 'Button text',
@@ -233,12 +303,14 @@ export const LABELS = {
   'effects.impact.fireflyStrikes': 'Lightning strikes fireflies',
   'effects.impact.budget': 'Thin out busy moments',
   'effects.elements': 'Elements',
-  ...Object.fromEntries(ELEMENT_IDS.flatMap((id) => [
-    [`effects.elements.${id}`, id],
-    [`effects.elements.${id}.name`, 'Name on the site'],
-    [`effects.elements.${id}.rotation`, 'In rotation'],
-    [`effects.elements.${id}.weight`, 'Relative chance'],
-  ])),
+  ...Object.fromEntries(
+    ELEMENT_IDS.flatMap((id) => [
+      [`effects.elements.${id}`, id],
+      [`effects.elements.${id}.name`, 'Name on the site'],
+      [`effects.elements.${id}.rotation`, 'In rotation'],
+      [`effects.elements.${id}.weight`, 'Relative chance'],
+    ]),
+  ),
   'effects.lightning': 'Lightning',
   'effects.lightning.size': 'Ball size',
   'effects.lightning.height': 'Ball height',
@@ -288,31 +360,41 @@ export const LABELS = {
 export const HELP = {
   featured: 'Always first in the inventory: the flagship. Move To… on any project can swap it in.',
   projects: 'Shown after the featured project, in this order.',
-  archive: 'Older work, after the projects. Items without images appear as the inventory’s “Also:” line (using their link) instead of a slot.',
+  archive:
+    'Older work, after the projects. Items without images appear as the inventory’s “Also:” line (using their link) instead of a slot.',
   'hero.kindled': 'The checkpoint banner when the fire is stoked. Preview it on the site with ?kindled.',
   'hero.kindled.duration': 'Milliseconds on screen, fades included.',
   'hero.kindled.show': 'First: only on a visit’s first stoke. Always: on every stoke. Never: no banner.',
   'hero.menuLabel': 'Read out for the title screen’s list of screens.',
   'hero.stokeHint': 'The smaller words after the Stoke button: one for a mouse, one for a touch screen.',
   'notFound.cta': 'The 404 page’s button back to the title screen.',
-  'hero.sceneKnight': 'Read after the scene description while the knight is by the fire; left out while he’s away, or off ({{page:knight}} › {{label:effects.knight.show}}).',
-  'hero.sceneSign': 'Read after the scene description while the knight is away and his summon sign waits on the ground. Left out where he can’t come. Optional.',
+  'hero.sceneKnight':
+    'Read after the scene description while the knight is by the fire; left out while he’s away, or off ({{page:knight}} › {{label:effects.knight.show}}).',
+  'hero.sceneSign':
+    'Read after the scene description while the knight is away and his summon sign waits on the ground. Left out where he can’t come. Optional.',
   screens: 'The site’s own menu. Labels only: the screens themselves are fixed.',
   weapons: 'Display names for the weapons in the fire (the models themselves are fixed).',
-  weaponDraw: 'Which weapons a random draw can pick: inspecting a project, clicking the fire, Bonfire Live’s swaps. Keep at least 3 on.',
+  weaponDraw:
+    'Which weapons a random draw can pick: inspecting a project, clicking the fire, Bonfire Live’s swaps. Keep at least 3 on.',
   startingEquipment: 'What’s in the fire when the site opens (and after Home).',
   'about.stats': 'Label and value rows of the stat sheet.',
   'skills[].items[].glyph': '2–3 characters drawn in the slot.',
   '[].id': 'The page address: /projects/<id>/. Lowercase letters, numbers and dashes.',
-  '[].images': 'The first visible image is the inventory icon. Uploads become WebP (full size and a 720 px card). ◉ hides one without deleting it.',
+  '[].images':
+    'The first visible image is the inventory icon. Uploads become WebP (full size and a 720 px card). ◉ hides one without deleting it.',
   '[].summary': 'One or two lines for the inventory’s at-a-glance panel.',
-  '[].outcome': 'The result in one line, under the title: what it achieved or proved (players, numbers, awards, what it led to). Empty hides it.',
-  '[].images[].alt': 'Read aloud instead of the image, and shown if it can’t load. Required: say what’s on screen in a sentence, not “screenshot of…”.',
-  '[].images[].pixel': 'Scaled without smoothing so hard pixel edges stay sharp. Small captures (800 px wide or less) always are.',
-  '[].images[].video': 'Plays the .mp4 of the same name (put it in the repo beside this image), with this image as its still.',
+  '[].outcome':
+    'The result in one line, under the title: what it achieved or proved (players, numbers, awards, what it led to). Empty hides it.',
+  '[].images[].alt':
+    'Read aloud instead of the image, and shown if it can’t load. Required: say what’s on screen in a sentence, not “screenshot of…”.',
+  '[].images[].pixel':
+    'Scaled without smoothing so hard pixel edges stay sharp. Small captures (800 px wide or less) always are.',
+  '[].images[].video':
+    'Plays the .mp4 of the same name (put it in the repo beside this image), with this image as its still.',
   '[].tech': 'The tags under the Tech heading on the project’s page.',
   '[].href': 'https://…, mailto:…, or a path on this site like games/x.html.',
-  'site.resumeUrl': 'resume.pdf (a file in public/, shown once it’s there) or a https:// link. Empty: no Résumé button.',
+  'site.resumeUrl':
+    'resume.pdf (a file in public/, shown once it’s there) or a https:// link. Empty: no Résumé button.',
   // ui
   'ui.menu': 'The header button that opens the rest menu, and the menu’s title.',
   'ui.resume': 'In the header, the rest menu and on Contact, once {{label:site.resumeUrl}} under {{page:home}} is set.',
@@ -376,17 +458,21 @@ export const HELP = {
   'effects.flames[].hi': 'Also the color of accent text, so it must stay readable on the background (4.5:1).',
   'effects.flames[].shade': 'A dark, tinted neutral for stone lit by this fire.',
   'effects.fire': 'How the bonfire burns at rest. Stoking and weapon swaps flare it from here.',
-  'effects.particles': 'How many particles each effect uses: more looks richer but is slower on old machines. A change briefly reloads the preview.',
+  'effects.particles':
+    'How many particles each effect uses: more looks richer but is slower on old machines. A change briefly reloads the preview.',
   'effects.particles.touchScale': 'Phones and tablets use this fraction of every particle count.',
   'effects.particles.impact': 'The ring of fire, smoke, ash and embers when a new weapon lands.',
   'effects.fireflies': 'The fireflies roaming the clearing.',
   'effects.fireflies.count': 'How many roam the clearing. A change briefly reloads the preview.',
   'effects.fireflies.lit': 'How many glow at once while resting. Landing or hovering can light more for a moment.',
-  'effects.fireflies.lights': 'Fireflies that cast real light on the scene: the costliest part. A change briefly reloads the preview.',
+  'effects.fireflies.lights':
+    'Fireflies that cast real light on the scene: the costliest part. A change briefly reloads the preview.',
   'effects.fireflies.speed': 'How fast they fly, as a multiple of their own pace.',
-  'effects.fireflies.touchScale': 'Phones and tablets get this fraction of the fireflies. A change briefly reloads the preview.',
+  'effects.fireflies.touchScale':
+    'Phones and tablets get this fraction of the fireflies. A change briefly reloads the preview.',
   'effects.cursor': 'How moving the cursor through the fire pushes it around.',
-  'effects.cursor.mode': 'Ember mixes the others, with a slash on fast swings; the rest are its ingredients, one at a time.',
+  'effects.cursor.mode':
+    'Ember mixes the others, with a slash on fast swings; the rest are its ingredients, one at a time.',
   'effects.render': 'The pixel-art pass over the whole scene, and the camera’s feel.',
   'effects.colors.void': 'The empty dark behind everything, and the page’s own background.',
   'effects.colors.shadow': 'The darkest shade of the scenery, in the shadows away from the fire.',
@@ -397,7 +483,8 @@ export const HELP = {
   'effects.fire.height': 'How fast the flames rise, and so how tall the fire stands.',
   'effects.fire.turbulence': 'How much the flames swirl and lick about. 0 is a calm, straight flame.',
   'effects.fire.swirl': 'The size of the swirls: low is big slow curls, high small busy ones.',
-  'effects.fire.lifeMin': 'The shortest a flame particle lives before it fades (s). With the longest, it sets how tall and ragged the tongues are.',
+  'effects.fire.lifeMin':
+    'The shortest a flame particle lives before it fades (s). With the longest, it sets how tall and ragged the tongues are.',
   'effects.fire.lifeMax': 'The longest a flame particle lives before it fades (s).',
   'effects.fire.stoke': 'How much a click on the fire flares it up.',
   'effects.particles.fire': 'Particles in the bonfire itself. The biggest cost on slow machines.',
@@ -412,7 +499,8 @@ export const HELP = {
   'effects.lightning.brightness': 'How bright the arcs and the light they cast are.',
   'effects.lightning.ringSpeed': 'How fast the ring of lightning races out when a weapon lands.',
   'effects.ice.shards': 'How many crystals grow around the fire.',
-  'effects.ice.pulse': 'Every few seconds a slow glow rises through the ice and the crystals’ outlines drift out. 0 is off.',
+  'effects.ice.pulse':
+    'Every few seconds a slow glow rises through the ice and the crystals’ outlines drift out. 0 is off.',
   'effects.ice.height': 'The tallest crystal’s height (m); the rest are shorter.',
   'effects.ice.spread': 'How far out from the fire the crystals grow (m).',
   'effects.ice.thickness': 'How chunky the crystals are.',
@@ -422,41 +510,64 @@ export const HELP = {
   'effects.ice.ringHeight': 'How tall the ring’s shards spike up.',
   'effects.impact': 'What makes a hit feel heavy: when a weapon lands, a swing strikes or the fire is stoked.',
   'effects.impact.markLife': 'Seconds until a mark has faded away completely.',
-  'effects.impact.afterimages': 'Lightning bolts leave a dim trace for a moment, like the glare after a real flash. 0 is off.',
+  'effects.impact.afterimages':
+    'Lightning bolts leave a dim trace for a moment, like the glare after a real flash. 0 is off.',
   'effects.impact.fireflyStrikes': 'How often lightning jumps to a nearby firefly, which flickers bright. 0 is never.',
-  'effects.impact.budget': 'When lots happens at once, the background extras (motes, sparkles, trails) thin out so the main hit reads. 0 never thins.',
-  'effects.elements': 'What the bonfire is made of. Each draw picks an element from the ones in rotation, weighted by chance, with new flame colors.',
-  ...Object.fromEntries(ELEMENT_IDS.flatMap((id) => [
-    [`effects.elements.${id}.name`, id === 'fire'
-      ? 'The word after the color in the fire’s name on the site: Azure {{value:effects.elements.fire.name}}.'
-      : `Takes the place of “{{value:effects.elements.fire.name}}” in the fire’s name: Azure {{value:effects.elements.${id}.name}}.`],
-    [`effects.elements.${id}.rotation`, 'Off keeps it out of every random draw; it can still be the starting element.'],
-    [`effects.elements.${id}.weight`, 'How often it’s drawn compared to the others.'],
-  ])),
-  'effects.lightning': 'The bonfire as a tesla ball with no glass: filaments crackle out from a white-hot core, and heavy bolts strike the ground round it.',
-  'effects.lightning.height': 'Where the ball sits: about 0.3 m is down in the bonfire’s core, between the logs; about 0.66 m floats above them.',
+  'effects.impact.budget':
+    'When lots happens at once, the background extras (motes, sparkles, trails) thin out so the main hit reads. 0 never thins.',
+  'effects.elements':
+    'What the bonfire is made of. Each draw picks an element from the ones in rotation, weighted by chance, with new flame colors.',
+  ...Object.fromEntries(
+    ELEMENT_IDS.flatMap((id) => [
+      [
+        `effects.elements.${id}.name`,
+        id === 'fire'
+          ? 'The word after the color in the fire’s name on the site: Azure {{value:effects.elements.fire.name}}.'
+          : `Takes the place of “{{value:effects.elements.fire.name}}” in the fire’s name: Azure {{value:effects.elements.${id}.name}}.`,
+      ],
+      [
+        `effects.elements.${id}.rotation`,
+        'Off keeps it out of every random draw; it can still be the starting element.',
+      ],
+      [`effects.elements.${id}.weight`, 'How often it’s drawn compared to the others.'],
+    ]),
+  ),
+  'effects.lightning':
+    'The bonfire as a tesla ball with no glass: filaments crackle out from a white-hot core, and heavy bolts strike the ground round it.',
+  'effects.lightning.height':
+    'Where the ball sits: about 0.3 m is down in the bonfire’s core, between the logs; about 0.66 m floats above them.',
   'effects.lightning.crackle': 'How many times a second the bolts strike again in a new shape.',
-  'effects.lightning.strikes': 'Heavy bolts the ball throws at the ground, logs and stones; each lands with a flash, crawls along the ground, then jumps on.',
-  'effects.lightning.boltWidth': 'How thick the heavy bolts are, in scene pixels (they taper as they go). Filaments are a little thinner.',
+  'effects.lightning.strikes':
+    'Heavy bolts the ball throws at the ground, logs and stones; each lands with a flash, crawls along the ground, then jumps on.',
+  'effects.lightning.boltWidth':
+    'How thick the heavy bolts are, in scene pixels (they taper as they go). Filaments are a little thinner.',
   'effects.lightning.cursorPull': 'Like a plasma globe: the filaments nearest the cursor reach toward it. 0 is off.',
-  'effects.lightning.flicker': 'How hard the light it casts strobes with the crackle. Keep it low for visitors sensitive to flashing light.',
+  'effects.lightning.flicker':
+    'How hard the light it casts strobes with the crackle. Keep it low for visitors sensitive to flashing light.',
   'effects.lightning.ringArcs': 'Forks skittering off the ring and arcs leaping up from it.',
-  'effects.ice': 'The bonfire encased in a glowing crystal cluster that grows up round the blade, with a low fire still burning inside.',
+  'effects.ice':
+    'The bonfire encased in a glowing crystal cluster that grows up round the blade, with a low fire still burning inside.',
   'effects.ice.clarity': 'How much you can see through the ice (the blade, logs and fire inside). 0 is solid.',
   'effects.ice.innerFire': 'How much of the fire keeps burning inside the ice. 0 is none.',
   'effects.ice.shimmer': 'A slow breathing of the shards’ glow.',
   'effects.ice.growTime': 'How long the shards take to grow in (they sink back a little faster).',
   'effects.ice.ringHold': 'How long each ring shard stays up before sinking. Longer is a wider band of spikes.',
-  'effects.knight': 'A knight in steel plate who comes to the fire when he’s summoned, rests a while, then burns away into his sign again.',
+  'effects.knight':
+    'A knight in steel plate who comes to the fire when he’s summoned, rests a while, then burns away into his sign again.',
   'effects.knight.show': 'Off: no knight and no summon sign; the fire burns alone (and the pack has no Knight item).',
-  'effects.knight.arrival': 'Summon Sign: his sign waits on the ground until a visitor calls him. There From the Start: he rests by the fire from the first frame.',
-  'effects.knight.restMin': 'The shortest he rests before he burns away into his sign (minutes); each summons rolls a rest between this and the longest.',
+  'effects.knight.arrival':
+    'Summon Sign: his sign waits on the ground until a visitor calls him. There From the Start: he rests by the fire from the first frame.',
+  'effects.knight.restMin':
+    'The shortest he rests before he burns away into his sign (minutes); each summons rolls a rest between this and the longest.',
   'effects.knight.restMax': 'The longest a rest can roll (minutes). Set it to the shortest for an exact length.',
   // scenes
-  scenes: 'The preset scenes Bonfire Live loops through, in this order. ◉ takes one out of the loop without deleting it.',
+  scenes:
+    'The preset scenes Bonfire Live loops through, in this order. ◉ takes one out of the loop without deleting it.',
   'scenes[].name': `Shown on Bonfire Live’s scene cards and in its Scenes list. Up to ${NAME_MAX} characters.`,
-  'scenes[].id': 'Bonfire Live’s links and saved loops use it (?scene=b:<id>), so keep it once it’s published. Lowercase letters, numbers and dashes.',
-  'scenes[].music': 'Hold the Scene keeps all it sets for its stretch. Start From the Scene opens with its place, colors and look, then the show plays on.',
+  'scenes[].id':
+    'Bonfire Live’s links and saved loops use it (?scene=b:<id>), so keep it once it’s published. Lowercase letters, numbers and dashes.',
+  'scenes[].music':
+    'Hold the Scene keeps all it sets for its stretch. Start From the Scene opens with its place, colors and look, then the show plays on.',
   // The settings the site shares with Bonfire Live and the Painter: the map's help wins.
   ...adminHelp(),
 };
@@ -468,21 +579,28 @@ export const HELP = {
 const OWN_MORE = {
   weaponDraw: 'A weapon switched off never comes up in a draw, but can still be the starting weapon.',
   'hero.sceneKnight': 'He’s also left out where his model doesn’t load.',
-  'effects.cursor.mode': 'Stir swirls the flames along the cursor’s swing.\nWake leaves spinning eddies behind it.\nPart pushes the flames aside round it.\nDraw pulls them toward it.\nSlash cuts through on a fast swing, the original effect.',
-  'effects.elements': 'Inspecting a project or clicking the fire makes a draw, and every element burns in the flame colors.\n'
-    + 'Home brings back the starting element ({{page:interface}} › {{label:startingEquipment}}).',
-  'effects.lightning': 'Each heavy bolt lights the ground where it lands.\n'
-    + 'When a weapon lands, lightning crackles out of the fire and a ring of lightning races across the ground instead of fire.',
-  'effects.ice': 'When a weapon lands, a ring of ice shards spikes up as it races outward and sinks back behind itself, and a tuft of chill rolls off.',
-  'effects.knight': 'His summon sign (the NH monogram) glows on the ground by his seat. A click on it, or Summon in the pack, calls him, and he forms out of it in the fire’s element.\n'
-    + 'Visitors can summon him, send him off and change his helmet, style and finish from the pack; their picks stay in their browser, over these settings.\n'
-    + 'Bonfire Live casts knights of its own (its Cast settings).\n'
-    + 'Try him in the preview with the Knight…, Helmet… and Gesture… menus.',
-  'effects.knight.arrival': 'With the sign, he burns away into it again after his rest.\nFrom the start, he stays until a visitor sends him off.',
+  'effects.cursor.mode':
+    'Stir swirls the flames along the cursor’s swing.\nWake leaves spinning eddies behind it.\nPart pushes the flames aside round it.\nDraw pulls them toward it.\nSlash cuts through on a fast swing, the original effect.',
+  'effects.elements':
+    'Inspecting a project or clicking the fire makes a draw, and every element burns in the flame colors.\n' +
+    'Home brings back the starting element ({{page:interface}} › {{label:startingEquipment}}).',
+  'effects.lightning':
+    'Each heavy bolt lights the ground where it lands.\n' +
+    'When a weapon lands, lightning crackles out of the fire and a ring of lightning races across the ground instead of fire.',
+  'effects.ice':
+    'When a weapon lands, a ring of ice shards spikes up as it races outward and sinks back behind itself, and a tuft of chill rolls off.',
+  'effects.knight':
+    'His summon sign (the NH monogram) glows on the ground by his seat. A click on it, or Summon in the pack, calls him, and he forms out of it in the fire’s element.\n' +
+    'Visitors can summon him, send him off and change his helmet, style and finish from the pack; their picks stay in their browser, over these settings.\n' +
+    'Bonfire Live casts knights of its own (its Cast settings).\n' +
+    'Try him in the preview with the Knight…, Helmet… and Gesture… menus.',
+  'effects.knight.arrival':
+    'With the sign, he burns away into it again after his rest.\nFrom the start, he stays until a visitor sends him off.',
   'effects.knight.restMin': 'There From the Start: he stays instead.',
-  scenes: 'Each is made in the Bonfire Painter: Open in Painter shows it there, where you can change it, and Replace From Painter… brings the change back.\n'
-    + 'These are the scenes every visitor’s Bonfire Live has; the ones visitors make stay in their own browsers.\n'
-    + 'Bonfire Live’s Scenes & Cards settings can shuffle them.',
+  scenes:
+    'Each is made in the Bonfire Painter: Open in Painter shows it there, where you can change it, and Replace From Painter… brings the change back.\n' +
+    'These are the scenes every visitor’s Bonfire Live has; the ones visitors make stay in their own browsers.\n' +
+    'Bonfire Live’s Scenes & Cards settings can shuffle them.',
 };
 /** A field's longer explanation (its "More"), or ''. */
 export const moreFor = (pattern) => hint(OWN_MORE, pattern) ?? meta('admin', pattern)?.more ?? '';
@@ -506,14 +624,18 @@ const OWN_KEYWORDS = {
   weaponDraw: ['weapons', 'random'],
 };
 /** A field's search words. */
-export const keywordsFor = (pattern) => [...(hint(OWN_KEYWORDS, pattern) ?? []), ...(meta('admin', pattern)?.keywords ?? [])];
+export const keywordsFor = (pattern) => [
+  ...(hint(OWN_KEYWORDS, pattern) ?? []),
+  ...(meta('admin', pattern)?.keywords ?? []),
+];
 
 /**
  * A page's or section's name before any ✎ rename: 'page:<id>' for a page, a content key
  * ('startingEquipment', 'effects.knight.show') for the rest; in Title Case.
  * @param {string} key
  */
-export const defaultLabel = (key) => titleCase(key.startsWith('page:') ? PAGES.find((p) => `page:${p.id}` === key)?.label ?? key : LABELS[key] ?? key);
+export const defaultLabel = (key) =>
+  titleCase(key.startsWith('page:') ? (PAGES.find((p) => `page:${p.id}` === key)?.label ?? key) : (LABELS[key] ?? key));
 
 /**
  * Help text with its {{page:id}}, {{label:key}} and {{value:path}} filled in: the names
@@ -526,8 +648,11 @@ export function resolveHelp(text, { labelOf = defaultLabel, draft } = {}) {
   return text.replace(/\{\{(page|label|value):([^}]+)\}\}/g, (_, kind, key) => {
     if (kind !== 'value') return labelOf(kind === 'page' ? `page:${key}` : key);
     const v = key.split('.').reduce((o, k) => o?.[k], draft);
-    const fallback = key.split('.').slice(1).reduce((o, k) => o?.[k], DEFAULT_EFFECTS);
-    return String(typeof v === 'string' && v.trim() ? v.trim() : fallback ?? '');
+    const fallback = key
+      .split('.')
+      .slice(1)
+      .reduce((o, k) => o?.[k], DEFAULT_EFFECTS);
+    return String(typeof v === 'string' && v.trim() ? v.trim() : (fallback ?? ''));
   });
 }
 
@@ -554,12 +679,47 @@ export const SUBGROUPS = {
   ui: [
     {
       label: 'Header & menu',
-      keys: ['menu', 'resume', 'close', 'back', 'soundOn', 'soundOff', 'soundHint', 'skip', 'prevScreen', 'nextScreen', 'menuFlavor', 'keysHint',
-        'stokePrompt', 'photo', 'photoHint', 'breakdown', 'breakdownHint', 'discoveries', 'discoveriesFlavor', 'discovery'],
+      keys: [
+        'menu',
+        'resume',
+        'close',
+        'back',
+        'soundOn',
+        'soundOff',
+        'soundHint',
+        'skip',
+        'prevScreen',
+        'nextScreen',
+        'menuFlavor',
+        'keysHint',
+        'stokePrompt',
+        'photo',
+        'photoHint',
+        'breakdown',
+        'breakdownHint',
+        'discoveries',
+        'discoveriesFlavor',
+        'discovery',
+      ],
     },
     {
       label: 'Inventory & projects',
-      keys: ['inspect', 'equipped', 'item', 'items', 'prevItem', 'nextItem', 'problem', 'built', 'role', 'tech', 'openGallery', 'gallery', 'prevImage', 'nextImage'],
+      keys: [
+        'inspect',
+        'equipped',
+        'item',
+        'items',
+        'prevItem',
+        'nextItem',
+        'problem',
+        'built',
+        'role',
+        'tech',
+        'openGallery',
+        'gallery',
+        'prevImage',
+        'nextImage',
+      ],
     },
     { label: 'About', keys: ['wields'] },
     { label: 'Render settings', keys: ['render*'] },
@@ -582,7 +742,12 @@ export function subgroupsOf(pattern, keys) {
   const matches = (want, k) => (want.endsWith('*') ? k.startsWith(want.slice(0, -1)) : k === want);
   const out = groups.map((g) => {
     const mine = [];
-    for (const want of g.keys) for (const k of keys) if (!taken.has(k) && matches(want, k)) { taken.add(k); mine.push(k); }
+    for (const want of g.keys)
+      for (const k of keys)
+        if (!taken.has(k) && matches(want, k)) {
+          taken.add(k);
+          mine.push(k);
+        }
     return { label: g.label, keys: mine };
   });
   out.push({ label: 'More', keys: keys.filter((k) => !taken.has(k)) });
@@ -590,12 +755,56 @@ export function subgroupsOf(pattern, keys) {
 }
 
 /** Long text: a textarea. */
-export const MULTILINE = new Set(['value', 'summary', 'outcome', 'problem', 'built', 'flavor', 'note', 'body', 'text', 'description',
-  'intro', 'sceneLabel', 'sceneKnight', 'sceneSign', 'alt', 'subtitle', 'footer', 'todo']);
+export const MULTILINE = new Set([
+  'value',
+  'summary',
+  'outcome',
+  'problem',
+  'built',
+  'flavor',
+  'note',
+  'body',
+  'text',
+  'description',
+  'intro',
+  'sceneLabel',
+  'sceneKnight',
+  'sceneSign',
+  'alt',
+  'subtitle',
+  'footer',
+  'todo',
+]);
 export const MULTILINE_LISTS = new Set(['about.paragraphs', 'experience[].roles[].bullets']);
 /** Short text fields that sit side by side instead of full width. */
-export const SHORT = new Set(['id', 'year', 'kind', 'status', 'dates', 'location', 'glyph', 'label', 'name', 'title', 'org', 'role',
-  'heading', 'eyebrow', 'menuLabel', 'stokeLabel', 'pointer', 'touch', 'cta', 'caption', 'email', 'url', 'weapon', 'flame', 'show', 'duration']);
+export const SHORT = new Set([
+  'id',
+  'year',
+  'kind',
+  'status',
+  'dates',
+  'location',
+  'glyph',
+  'label',
+  'name',
+  'title',
+  'org',
+  'role',
+  'heading',
+  'eyebrow',
+  'menuLabel',
+  'stokeLabel',
+  'pointer',
+  'touch',
+  'cta',
+  'caption',
+  'email',
+  'url',
+  'weapon',
+  'flame',
+  'show',
+  'duration',
+]);
 
 /** Lists you can edit but not add to, remove from, reorder or hide. */
 export const FIXED = new Set(['screens']);
@@ -607,9 +816,10 @@ const opts = (list, label = (v) => titleCase(String(v))) => list.map((v) => ({ v
  * PIXEL_SIZES), plus the content's own if it's another (older content could have a 5 or 7).
  * @param {unknown} current
  */
-const pixelSizes = (current) => [...new Set([...PIXEL_SIZES, ...(Number.isInteger(current) ? [current] : [])])]
-  .sort((a, b) => Number(a) - Number(b))
-  .map((n) => ({ value: n, label: PIXEL_SIZES.includes(Number(n)) ? `${n} px` : `${n} px (not in the menus)` }));
+const pixelSizes = (current) =>
+  [...new Set([...PIXEL_SIZES, ...(Number.isInteger(current) ? [current] : [])])]
+    .sort((a, b) => Number(a) - Number(b))
+    .map((n) => ({ value: n, label: PIXEL_SIZES.includes(Number(n)) ? `${n} px` : `${n} px (not in the menus)` }));
 /** The knight's arrivals and seat poses, as the Knight page names them. */
 const ARRIVAL_NAMES = { sign: 'Summon Sign', start: 'There From the Start' };
 const SEAT_NAMES = { resting: 'Resting', watchful: 'Watchful' };
@@ -627,11 +837,13 @@ export const SELECTS = {
   'effects.render.pixelSize': (d) => pixelSizes(d?.effects?.render?.pixelSize),
   'effects.render.pixelSizeSmall': (d) => pixelSizes(d?.effects?.render?.pixelSizeSmall),
   'scenes[].music': () => opts(Object.keys(MUSIC), (k) => MUSIC[k]),
-  'effects.render.ditherMatrix': () => opts(DITHER_MATRICES, (n) => `Bayer ${n}×${n}${n === 4 ? ' (Coarse)' : ' (Fine)'}`),
-  'startingEquipment.element': (d) => ELEMENT_IDS.map((id) => {
-    const name = d.effects?.elements?.[id]?.name?.trim();
-    return { value: id, label: titleCase(name && name.toLowerCase() !== id ? `${id} (${name})` : id) };
-  }),
+  'effects.render.ditherMatrix': () =>
+    opts(DITHER_MATRICES, (n) => `Bayer ${n}×${n}${n === 4 ? ' (Coarse)' : ' (Fine)'}`),
+  'startingEquipment.element': (d) =>
+    ELEMENT_IDS.map((id) => {
+      const name = d.effects?.elements?.[id]?.name?.trim();
+      return { value: id, label: titleCase(name && name.toLowerCase() !== id ? `${id} (${name})` : id) };
+    }),
 };
 
 /** A slider for a number: [min, max, step, unit?]. */
@@ -646,13 +858,19 @@ export const COLUMNS = {
 
 /** A new flame: harmonious colors, its hue in the widest gap between the existing flames'. */
 function newFlame(d) {
-  const hues = (d?.effects?.flames ?? []).filter((f) => /^#[0-9a-f]{6}$/i.test(f?.mid ?? '')).map((f) => hexToOklch(f.mid).h).sort((a, b) => a - b);
+  const hues = (d?.effects?.flames ?? [])
+    .filter((f) => /^#[0-9a-f]{6}$/i.test(f?.mid ?? ''))
+    .map((f) => hexToOklch(f.mid).h)
+    .sort((a, b) => a - b);
   let hue = Math.random() * 360;
   if (hues.length) {
     let best = -1;
     hues.forEach((h, i) => {
       const next = i + 1 < hues.length ? hues[i + 1] : hues[0] + 360;
-      if (next - h > best) { best = next - h; hue = h + best / 2; }
+      if (next - h > best) {
+        best = next - h;
+        hue = h + best / 2;
+      }
     });
   }
   const { colors } = harmoniousFlame(Math.random, { voidHex: d?.effects?.colors?.void ?? '#07070b', hue });
@@ -661,10 +879,39 @@ function newFlame(d) {
 
 /** What “Add” creates in each list (anything else copies the shape of the first entry). Gets the draft. */
 export const TEMPLATES = {
-  projects: () => ({ id: '', name: 'New project', kind: '', year: String(new Date().getFullYear()), status: '', summary: '', outcome: '',
-    problem: '', built: '', role: '', tech: [], flavor: '', note: '', links: [], images: [] }),
-  archive: () => ({ id: '', name: 'New item', kind: '', year: String(new Date().getFullYear()), summary: '', outcome: '', flavor: '',
-    problem: '', built: '', role: '', tech: [], note: '', links: [], images: [] }),
+  projects: () => ({
+    id: '',
+    name: 'New project',
+    kind: '',
+    year: String(new Date().getFullYear()),
+    status: '',
+    summary: '',
+    outcome: '',
+    problem: '',
+    built: '',
+    role: '',
+    tech: [],
+    flavor: '',
+    note: '',
+    links: [],
+    images: [],
+  }),
+  archive: () => ({
+    id: '',
+    name: 'New item',
+    kind: '',
+    year: String(new Date().getFullYear()),
+    summary: '',
+    outcome: '',
+    flavor: '',
+    problem: '',
+    built: '',
+    role: '',
+    tech: [],
+    note: '',
+    links: [],
+    images: [],
+  }),
   experience: () => ({ org: 'New organization', location: '', roles: [] }),
   'experience[].roles': () => ({ title: 'New role', dates: '', bullets: [] }),
   'leadership.items': () => ({ org: 'New entry', role: '', dates: '', text: '' }),

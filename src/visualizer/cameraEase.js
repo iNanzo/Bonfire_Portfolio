@@ -15,7 +15,10 @@ const CURVES = {
   sine: (u) => -(Math.cos(Math.PI * u) - 1) / 2,
   quintOut: (u) => 1 - (1 - u) ** 5,
   // Overshoots by about 10% and settles back.
-  backOut: (u) => { const c = 1.70158; return 1 + (c + 1) * (u - 1) ** 3 + c * (u - 1) ** 2; },
+  backOut: (u) => {
+    const c = 1.70158;
+    return 1 + (c + 1) * (u - 1) ** 3 + c * (u - 1) ** 2;
+  },
 };
 
 /**
@@ -26,10 +29,30 @@ const CURVES = {
  */
 export const SWING_EASES = {
   smooth: { name: 'Smooth', hint: 'Glides after the weapon with an even lag.', lag: 1, curve: 'cubic', dur: 1 },
-  spring: { name: 'Spring', hint: 'Builds speed and lands softly, with no overshoot.', lag: 1, zeta: 1, curve: 'expo', dur: 1 },
-  bouncy: { name: 'Bouncy', hint: 'Swings past the weapon a little and settles back, like a hand-held camera.', lag: 0.9, zeta: 0.5, curve: 'backOut', dur: 1 },
+  spring: {
+    name: 'Spring',
+    hint: 'Builds speed and lands softly, with no overshoot.',
+    lag: 1,
+    zeta: 1,
+    curve: 'expo',
+    dur: 1,
+  },
+  bouncy: {
+    name: 'Bouncy',
+    hint: 'Swings past the weapon a little and settles back, like a hand-held camera.',
+    lag: 0.9,
+    zeta: 0.5,
+    curve: 'backOut',
+    dur: 1,
+  },
   heavy: { name: 'Heavy', hint: 'A slow, weighty crane that trails well behind.', lag: 1.8, curve: 'sine', dur: 1.3 },
-  snappy: { name: 'Snappy', hint: 'Jumps onto the weapon and eases into place.', lag: 0.55, curve: 'quintOut', dur: 0.8 },
+  snappy: {
+    name: 'Snappy',
+    hint: 'Jumps onto the weapon and eases into place.',
+    lag: 0.55,
+    curve: 'quintOut',
+    dur: 0.8,
+  },
 };
 export const easeOr = (key) => (SWING_EASES[key] ? key : 'smooth');
 /** The move between framings, for a feel (u 0..1 → 0..1). */

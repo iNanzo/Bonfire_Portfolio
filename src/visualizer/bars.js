@@ -25,7 +25,9 @@ export function createBarClock(settings, rng = Math.random) {
       if (v !== RANDOM) return v;
       return rolls[key] ?? roll(key);
     },
-    reroll(key) { if (settings[key] === RANDOM) roll(key); },
+    reroll(key) {
+      if (settings[key] === RANDOM) roll(key);
+    },
     /** Whether a setting is on Random. */
     isRandom: (key) => settings[key] === RANDOM,
   };

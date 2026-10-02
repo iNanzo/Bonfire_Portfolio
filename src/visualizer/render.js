@@ -30,7 +30,17 @@ export const PALETTES = { flame: 'The Flame’s Colors', ashen: 'Ashen (3 Colors
  * flame's own, as slots of the scene palette (0 void, 1 shadow, 2 stone, 3 wood, 4 bone,
  * 5–8 the flame's ramp lo → core, 9 its shade; the first is the darkest, for the outlines).
  */
-export const FEW_PALETTES = ['ashen', 'moonlit', [0, 6, 8], [0, 5, 7], [0, 9, 7], [0, 1, 6, 8], [0, 2, 7, 8], [0, 5, 6, 8], [0, 7]];
+export const FEW_PALETTES = [
+  'ashen',
+  'moonlit',
+  [0, 6, 8],
+  [0, 5, 7],
+  [0, 9, 7],
+  [0, 1, 6, 8],
+  [0, 2, 7, 8],
+  [0, 5, 6, 8],
+  [0, 7],
+];
 /** The fog's kinds (Light is the site's: the settings' hints say so). */
 export const FOGS = { off: 'Off', light: 'Light', thick: 'Thick' };
 /** The pixel sizes a menu offers: one list for every app (import it rather than keeping another). */
@@ -49,11 +59,14 @@ const FLIP_START = [0, 0, 0, 1, 2];
  */
 export function renderState(s, live = null) {
   const lit = (key) => live?.[key] ?? modeOf(s[key]) !== 'off';
-  const slots = Array.isArray(s.palette) && s.palette.length >= 2 && s.palette.every((i) => Number.isInteger(i) && i >= 0 && i <= 9);
+  const slots =
+    Array.isArray(s.palette) &&
+    s.palette.length >= 2 &&
+    s.palette.every((i) => Number.isInteger(i) && i >= 0 && i <= 9);
   return {
     pixelSize: live?.pixelSize ?? s.pixelSize,
     dither: s.dither,
-    ditherMatrix: s.ditherMatrix === 'mix' ? live?.matrix ?? 4 : String(s.ditherMatrix) === '8' ? 8 : 4,
+    ditherMatrix: s.ditherMatrix === 'mix' ? (live?.matrix ?? 4) : String(s.ditherMatrix) === '8' ? 8 : 4,
     outlines: lit('outlines'),
     vignette: s.vignette,
     exposure: s.exposure,
@@ -64,19 +77,49 @@ export function renderState(s, live = null) {
     debris: lit('debris'),
     marks: lit('marks'),
     palette: live?.few ?? (slots ? [...s.palette] : PALETTES[s.palette] ? s.palette : 'flame'),
-    fog: s.fog === 'mix' ? live?.fog ?? 'light' : FOGS[s.fog] ? s.fog : 'light',
+    fog: s.fog === 'mix' ? (live?.fog ?? 'light') : FOGS[s.fog] ? s.fog : 'light',
     shadows: s.shadows !== false,
     xray: live?.xray ?? (XRAY_VIEWS[s.xrayView] ? s.xrayView : null),
   };
 }
 
-const SET_RENDER = ['pixelSize', 'dither', 'ditherMatrix', 'outlines', 'vignette', 'exposure', 'colorChange', 'flameFps', 'hitStop', 'hitFlash', 'debris', 'marks'];
+const SET_RENDER = [
+  'pixelSize',
+  'dither',
+  'ditherMatrix',
+  'outlines',
+  'vignette',
+  'exposure',
+  'colorChange',
+  'flameFps',
+  'hitStop',
+  'hitFlash',
+  'debris',
+  'marks',
+];
 /**
  * Everything renderState reads: the settings' keys and the render show's rolls (exported for
  * the tests, which hold renderState to it).
  */
 export const RENDER_READS = {
-  settings: ['pixelSize', 'dither', 'ditherMatrix', 'outlines', 'vignette', 'exposure', 'colorChange', 'flameFps', 'hitStop', 'hitFlash', 'debris', 'marks', 'palette', 'fog', 'shadows', 'xrayView'],
+  settings: [
+    'pixelSize',
+    'dither',
+    'ditherMatrix',
+    'outlines',
+    'vignette',
+    'exposure',
+    'colorChange',
+    'flameFps',
+    'hitStop',
+    'hitFlash',
+    'debris',
+    'marks',
+    'palette',
+    'fog',
+    'shadows',
+    'xrayView',
+  ],
   live: ['outlines', 'hitStop', 'hitFlash', 'debris', 'marks', 'pixelSize', 'matrix', 'few', 'fog', 'xray'],
 };
 // (A value as it was read: a list of palette slots is copied, so one changed in place shows.)
@@ -172,10 +215,10 @@ export function stepRender(settings, key, dir = 1) {
 export function renderText(settings, key) {
   const v = settings[key];
   if (key === 'pixelSize') return `${v} px`;
-  if (key === 'palette') return Array.isArray(v) ? `A Scene’s ${v.length} Colors` : PALETTES[v] ?? PALETTES.flame;
+  if (key === 'palette') return Array.isArray(v) ? `A Scene’s ${v.length} Colors` : (PALETTES[v] ?? PALETTES.flame);
   if (key === 'dither') return v ? Number(v).toFixed(2) : 'Off';
   if (key === 'ditherMatrix') return v === 'mix' ? '4×4 / 8×8' : `${v}×${v}`;
-  if (key === 'fog') return v === 'mix' ? 'A Mix' : FOGS[v] ?? FOGS.light;
+  if (key === 'fog') return v === 'mix' ? 'A Mix' : (FOGS[v] ?? FOGS.light);
   if (key === 'flameFps') return `${v} fps`;
   return SWITCH[modeOf(v)] ?? String(v);
 }
@@ -194,12 +237,23 @@ export function shiftSize(base, not = base, rng = Math.random) {
  * xrayHit() when it throws the X-Ray hit. Times are in seconds (performance time).
  */
 export function createRenderShow(fire, settings, { looks, reducedMotion = false }) {
-  const live = { outlines: true, few: null, pixelSize: null, matrix: 4, fog: 'light', hitStop: true, hitFlash: true, debris: true, marks: true, xray: null };
+  const live = {
+    outlines: true,
+    few: null,
+    pixelSize: null,
+    matrix: 4,
+    fog: 'light',
+    hitStop: true,
+    hitFlash: true,
+    debris: true,
+    marks: true,
+    xray: null,
+  };
   const rolled = { few: FEW_PALETTES[0], matrix: 4, fog: 'light', xrayRate: 0.4 };
-  let turn = -1;        // the look's turn the details were rolled for
-  let firstTurn = -1;   // ...and the opening look's (the start screen and the intro)
+  let turn = -1; // the look's turn the details were rolled for
+  let firstTurn = -1; // ...and the opening look's (the start screen and the intro)
   let base = settings.pixelSize;
-  let flip = null;      // an x-ray flip: { view, start, end, hit (the drop's) }
+  let flip = null; // an x-ray flip: { view, start, end, hit (the drop's) }
   let lastView = null;
   const on = (key) => looks.active(key, settings[key]);
   const moving = () => !reducedMotion;
@@ -222,11 +276,18 @@ export function createRenderShow(fire, settings, { looks, reducedMotion = false 
 
   return {
     /** The current rolls (what renderState reads for the switches in the mix). */
-    get live() { return live; },
+    get live() {
+      return live;
+    },
     /** Send the scene everything as it stands now. */
-    apply() { applyRenderSettings(fire, settings, live); },
+    apply() {
+      applyRenderSettings(fire, settings, live);
+    },
     update(t) {
-      if (settings.pixelSize !== base) { base = settings.pixelSize; live.pixelSize = null; }
+      if (settings.pixelSize !== base) {
+        base = settings.pixelSize;
+        live.pixelSize = null;
+      }
       if (looks.turn !== turn) {
         const first = turn < 0;
         turn = looks.turn;
@@ -250,7 +311,8 @@ export function createRenderShow(fire, settings, { looks, reducedMotion = false 
      * and less in calm parts (`budget`, the director's).
      */
     bar(t, { period, sinceDrop, budget = 1 }) {
-      if (!moving() || !period || flip || sinceDrop < 1 || looks.turn !== turn || !on('xray') || !views().length) return;
+      if (!moving() || !period || flip || sinceDrop < 1 || looks.turn !== turn || !on('xray') || !views().length)
+        return;
       if (Math.random() > rolled.xrayRate * (0.4 + 0.6 * budget)) return;
       const beats = pick(FLIP_BEATS);
       flipTo(t + (beats === 4 ? 0 : pick(FLIP_START)) * period, beats, period);

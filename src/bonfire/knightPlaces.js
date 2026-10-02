@@ -47,8 +47,16 @@ const SIGN_OUT = 0.55;
  */
 function seat(x, z, top, { turn = TURN, signOut = SIGN_OUT, signAt = null, standAside = 0 } = {}) {
   const yaw = Math.atan2(FIRE_AT.x - x, FIRE_AT.z - z) + turn;
-  const sx = signAt?.x ?? x + Math.sin(yaw) * signOut, sz = signAt?.z ?? z + Math.cos(yaw) * signOut;
-  return { x, z, top, yaw, standAside, sign: { x: sx, z: sz, yaw: Math.atan2(sx - HOME_CAMERA.x, sz - HOME_CAMERA.z) } };
+  const sx = signAt?.x ?? x + Math.sin(yaw) * signOut,
+    sz = signAt?.z ?? z + Math.cos(yaw) * signOut;
+  return {
+    x,
+    z,
+    top,
+    yaw,
+    standAside,
+    sign: { x: sx, z: sz, yaw: Math.atan2(sx - HOME_CAMERA.x, sz - HOME_CAMERA.z) },
+  };
 }
 
 /**
@@ -101,11 +109,26 @@ export const DANCE_RING = {
   center: [FIRE_AT.x, FIRE_AT.z],
   radius: 1.2,
   blocked: {
-    ruins: [[96, 142], [192, 252]],      // (his legs, the model's fallen drum, and where he stands up to)
-    forge: [[96, 142], [184, 244]],
-    shrine: [[96, 142], [186, 247]],
-    cathedral: [[96, 142], [190, 253]],
-    cult: [[96, 142], [190, 253]],
+    ruins: [
+      [96, 142],
+      [192, 252],
+    ], // (his legs, the model's fallen drum, and where he stands up to)
+    forge: [
+      [96, 142],
+      [184, 244],
+    ],
+    shrine: [
+      [96, 142],
+      [186, 247],
+    ],
+    cathedral: [
+      [96, 142],
+      [190, 253],
+    ],
+    cult: [
+      [96, 142],
+      [190, 253],
+    ],
   },
   /** The clear arcs of a scenery, [[from°, to°], …] going round (to° may pass 360). */
   free(name) {
@@ -121,7 +144,11 @@ const SLOT_BEARINGS = [270, 310, 50, 88, 168];
 export function danceSlots(name) {
   const [cx, cz] = DANCE_RING.center;
   const r = DANCE_RING.radius;
-  return SLOT_BEARINGS.filter((b, i) => i < 4 || name !== 'cult').map((b) => ({ x: cx + Math.sin(b * RAD) * r, z: cz + Math.cos(b * RAD) * r, bearing: b }));
+  return SLOT_BEARINGS.filter((b, i) => i < 4 || name !== 'cult').map((b) => ({
+    x: cx + Math.sin(b * RAD) * r,
+    z: cz + Math.cos(b * RAD) * r,
+    bearing: b,
+  }));
 }
 /**
  * Which way someone standing at (x, z) faces (a yaw: 0 toward +z, the cameras): `facing` a
@@ -137,7 +164,12 @@ export function facingYaw(x, z, facing) {
   return Math.atan2(0 - x, 5 - z) * 0.75 + fire * 0.25;
 }
 /** The ring as the knights hand it out (knights.js slots()). */
-export const ringOf = (name) => ({ center: { x: DANCE_RING.center[0], z: DANCE_RING.center[1] }, radius: DANCE_RING.radius, free: DANCE_RING.free(name), slots: danceSlots(name) });
+export const ringOf = (name) => ({
+  center: { x: DANCE_RING.center[0], z: DANCE_RING.center[1] },
+  radius: DANCE_RING.radius,
+  free: DANCE_RING.free(name),
+  slots: danceSlots(name),
+});
 
 // --- places on the ring ----------------------------------------------------------------------
 // Where dancers may stand on the ring: its clear arcs less a margin at each end, and only on
@@ -146,7 +178,10 @@ export const ringOf = (name) => ({ center: { x: DANCE_RING.center[0], z: DANCE_R
 export const FRONT = 50;
 const BACK = 20;
 const MARGIN = 8;
-const WINDOWS = [[FRONT, 180 - BACK], [180 + BACK, 360 - FRONT]];
+const WINDOWS = [
+  [FRONT, 180 - BACK],
+  [180 + BACK, 360 - FRONT],
+];
 const STEP = 10; // Round the Fire: degrees a step (every two bars)
 // Line, Solo, Canon: where 1–4 dancers stand (bearings), the first layout that's clear in
 // the scenery. Seen from the cameras in front, two on one side stand one behind the
@@ -154,9 +189,21 @@ const STEP = 10; // Round the Fire: degrees a step (every two bars)
 // show over the flames.
 const LAYOUTS = [
   [[275], [285], [80]],
-  [[275, 80], [270, 300], [60, 86]],
-  [[275, 80, 157], [270, 305, 75], [272, 305, 62]],
-  [[262, 300, 80, 157], [268, 304, 58, 86], [270, 306, 60, 87]],
+  [
+    [275, 80],
+    [270, 300],
+    [60, 86],
+  ],
+  [
+    [275, 80, 157],
+    [270, 305, 75],
+    [272, 305, 62],
+  ],
+  [
+    [262, 300, 80, 157],
+    [268, 304, 58, 86],
+    [270, 306, 60, 87],
+  ],
 ];
 const wrap360 = (a) => ((a % 360) + 360) % 360;
 
@@ -178,13 +225,22 @@ export function sideArcs(free) {
       }
     }
   }
-  return out.map(([lo, hi]) => { const s = Math.floor(lo / 360) * 360; return [lo - s, hi - s]; }).sort((p, q) => p[0] - q[0]);
+  return out
+    .map(([lo, hi]) => {
+      const s = Math.floor(lo / 360) * 360;
+      return [lo - s, hi - s];
+    })
+    .sort((p, q) => p[0] - q[0]);
 }
 
 /** A point on the ring at a bearing (degrees). */
 function onRing(ring, bearing) {
   const a = bearing * RAD;
-  return { x: ring.center.x + Math.sin(a) * ring.radius, z: ring.center.z + Math.cos(a) * ring.radius, bearing: wrap360(bearing) };
+  return {
+    x: ring.center.x + Math.sin(a) * ring.radius,
+    z: ring.center.z + Math.cos(a) * ring.radius,
+    bearing: wrap360(bearing),
+  };
 }
 
 /**
@@ -201,7 +257,11 @@ export function ringPlaces(ring, n, step = 0) {
   const want = arcs.map(([a, b]) => (n * (b - a)) / total);
   const got = want.map((w) => Math.floor(w));
   let left = n - got.reduce((s, v) => s + v, 0);
-  for (const i of [...want.keys()].sort((p, q) => (want[q] - got[q]) - (want[p] - got[p]))) if (left > 0) { got[i]++; left--; }
+  for (const i of [...want.keys()].sort((p, q) => want[q] - got[q] - (want[p] - got[p])))
+    if (left > 0) {
+      got[i]++;
+      left--;
+    }
   const out = [];
   arcs.forEach(([a, b], i) => {
     const share = (b - a) / Math.max(1, got[i]);
@@ -240,7 +300,9 @@ export function restPlaces(ring, n, seat = null) {
   const left = (p) => wrap360(Math.atan2(p.x - ring.center.x, p.z - ring.center.z) / RAD) > 180;
   const mine = all.some((p) => left(p) === left(s)) ? (p) => left(p) === left(s) : () => true;
   let skip = -1;
-  all.forEach((p, j) => { if (mine(p) && (skip < 0 || d(p) < d(all[skip]))) skip = j; });
+  all.forEach((p, j) => {
+    if (mine(p) && (skip < 0 || d(p) < d(all[skip]))) skip = j;
+  });
   return all.filter((_, j) => j !== skip);
 }
 
@@ -256,7 +318,8 @@ const ENDS = 0.16; // (m round each end where `blocked` isn't asked: his seat, t
 const fireDist = (x, z) => Math.hypot(x - FIRE_AT.x, z - FIRE_AT.z);
 /** How near the segment a→b comes to the fire. */
 function nearest(a, b) {
-  const dx = b.x - a.x, dz = b.z - a.z;
+  const dx = b.x - a.x,
+    dz = b.z - a.z;
   const l2 = dx * dx + dz * dz;
   const t = l2 > 1e-9 ? Math.min(1, Math.max(0, ((FIRE_AT.x - a.x) * dx + (FIRE_AT.z - a.z) * dz) / l2)) : 0;
   return fireDist(a.x + dx * t, a.z + dz * t);
@@ -265,12 +328,15 @@ function nearest(a, b) {
 function clearLeg(a, b, blocked, from, to) {
   const near = Math.min(CLEAR, Math.min(fireDist(from.x, from.z), fireDist(to.x, to.z)) - 0.02);
   if (nearest(a, b) < Math.max(PIT, near)) return false;
-  const dx = b.x - a.x, dz = b.z - a.z;
+  const dx = b.x - a.x,
+    dz = b.z - a.z;
   const len = Math.hypot(dx, dz);
   const n = Math.ceil(len / 0.05);
-  const sx = len > 1e-6 ? -dz / len : 0, sz = len > 1e-6 ? dx / len : 0;
+  const sx = len > 1e-6 ? -dz / len : 0,
+    sz = len > 1e-6 ? dx / len : 0;
   for (let i = 0; i <= n; i++) {
-    const x = a.x + (dx * i) / Math.max(1, n), z = a.z + (dz * i) / Math.max(1, n);
+    const x = a.x + (dx * i) / Math.max(1, n),
+      z = a.z + (dz * i) / Math.max(1, n);
     if (Math.hypot(x - from.x, z - from.z) < ENDS || Math.hypot(x - to.x, z - to.z) < ENDS) continue;
     for (const s of [0, -0.1, 0.1]) if (blocked(x + sx * s, z + sz * s)) return false;
   }
@@ -296,7 +362,8 @@ export function planWalk(from, to, { blocked = () => false, max = MAX_WALK } = {
   // Round the fire: from the one end's distance to the other's as it goes round (never into
   // the pit), in steps of at most 15°. (From his seat's step, near the pit, he keeps close
   // to the fire at first and swings out as he goes, clear of the seat behind him.)
-  const r0 = fireDist(from.x, from.z), r1 = fireDist(to.x, to.z);
+  const r0 = fireDist(from.x, from.z),
+    r1 = fireDist(to.x, to.z);
   const b0 = Math.atan2(from.x - FIRE_AT.x, from.z - FIRE_AT.z) / RAD;
   const d = wrap360(Math.atan2(to.x - FIRE_AT.x, to.z - FIRE_AT.z) / RAD - b0);
   for (const sweep of d <= 180 ? [d, d - 360] : [d - 360, d]) {

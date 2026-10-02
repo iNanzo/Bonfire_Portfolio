@@ -54,7 +54,8 @@ export function createDialogs(ctx) {
     if (settings.scenery !== 'mix' && (!held || keys.includes('scenery'))) ctx.fire?.setScenery(settings.scenery);
     if (!held || keys.includes('shot')) ctx.director?.setShot(settings.shot);
     // Scenes switched off: back to the free show now (a solo from the Painter stays).
-    if (keys.includes('scenes') && modeOf(settings.scenes) === 'off' && held && !ctx.solo) ctx.playScene(null, { instant: !ctx.engine?.source });
+    if (keys.includes('scenes') && modeOf(settings.scenes) === 'off' && held && !ctx.solo)
+      ctx.playScene(null, { instant: !ctx.engine?.source });
     if (keys.some((k) => k === 'sceneFrom' || k === 'sceneList')) ctx.drawChips();
     saveSettings(settings);
     markPreset(start, settings);
@@ -102,7 +103,10 @@ export function createDialogs(ctx) {
   handBackFocus(keysOverlay.el, () => keysOpener);
   handBackFocus(settingsDialog, () => settingsOpener);
 
-  settingsDialog.addEventListener('show-card', (e) => { settingsDialog.close(); ctx.showCard(e.detail); });
+  settingsDialog.addEventListener('show-card', (e) => {
+    settingsDialog.close();
+    ctx.showCard(e.detail);
+  });
 
   /** Open the settings (on `tab`; `search`: with the focus in their search box). */
   let settingsOpener = null;

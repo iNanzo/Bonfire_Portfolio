@@ -26,8 +26,27 @@ export const stepIn = (list, cur, dir) => {
  */
 export function createSceneRender(ctx) {
   const {
-    scope, container, renderer, canvas, scene, camera, frame, pass, fireLight, particleMaterial, flowView, interaction, pointer, view, siteKnight,
-    fire, plasma, crystals, chill, swingTrail, debris,
+    scope,
+    container,
+    renderer,
+    canvas,
+    scene,
+    camera,
+    frame,
+    pass,
+    fireLight,
+    particleMaterial,
+    flowView,
+    interaction,
+    pointer,
+    view,
+    siteKnight,
+    fire,
+    plasma,
+    crystals,
+    chill,
+    swingTrail,
+    debris,
   } = ctx;
   // --- Sizing (fixed on-screen pixel size; the render target scales instead)
   const settings = { pixelSize: null };
@@ -46,8 +65,12 @@ export function createSceneRender(ctx) {
   // false (none: the value after the name).
   /** @type {Record<string, [string, string, (number | boolean)?]>} */
   const WRITE_THROUGH = {
-    flameFps: ['fire', 'fps'], colorChange: ['render', 'colorChange'],
-    hitStop: ['impact', 'hitStop', 0], hitFlash: ['impact', 'flash', 0], debris: ['impact', 'debris', 0], marks: ['impact', 'marks', false],
+    flameFps: ['fire', 'fps'],
+    colorChange: ['render', 'colorChange'],
+    hitStop: ['impact', 'hitStop', 0],
+    hitFlash: ['impact', 'flash', 0],
+    debris: ['impact', 'debris', 0],
+    marks: ['impact', 'marks', false],
   };
   const ownValues = {};
   function applyRender() {
@@ -96,7 +119,11 @@ export function createSceneRender(ctx) {
   // flame's own colors ([slot, …] of scenePalette, e.g. [0, 6, 8]), which follow the flame
   // as it changes (keepPalette, every frame).
   ctx.paletteOverride = null;
-  const paletteIndex = (id) => Math.max(0, DEBUG_PALETTES.findIndex((n) => n.toLowerCase().startsWith(id)));
+  const paletteIndex = (id) =>
+    Math.max(
+      0,
+      DEBUG_PALETTES.findIndex((n) => n.toLowerCase().startsWith(id)),
+    );
   // (A few colors are put over the palette again only when something they come from changed:
   // the slots, the flame's colors (applyColors, which puts the full palette back: fewStale),
   // or the scenery's (palette.js base). Not every frame.)
@@ -104,7 +131,11 @@ export function createSceneRender(ctx) {
   const fewBase = { void: '', shadow: '', stone: '', wood: '', bone: '' };
   function fewChanged(slots) {
     let changed = ctx.fewStale || slots !== fewSlots;
-    for (const k in fewBase) if (fewBase[k] !== base[k]) { fewBase[k] = base[k]; changed = true; }
+    for (const k in fewBase)
+      if (fewBase[k] !== base[k]) {
+        fewBase[k] = base[k];
+        changed = true;
+      }
     ctx.fewStale = false;
     fewSlots = slots;
     return changed;
@@ -127,9 +158,12 @@ export function createSceneRender(ctx) {
   function setPalette(p = null) {
     const was = ctx.paletteOverride;
     const slots = Array.isArray(p) ? p.filter((i) => Number.isInteger(i) && i >= 0) : null;
-    ctx.paletteOverride = slots ? (slots.length ? slots : null) : p ?? null;
+    ctx.paletteOverride = slots ? (slots.length ? slots : null) : (p ?? null);
     if (ctx.paletteOverride === null) {
-      if (was !== null) { ctx.debugPaletteIndex = 0; ctx.applyColors({ ramp: ctx.currentRamp, shade: ctx.currentShade }, ctx.currentMix); }
+      if (was !== null) {
+        ctx.debugPaletteIndex = 0;
+        ctx.applyColors({ ramp: ctx.currentRamp, shade: ctx.currentShade }, ctx.currentMix);
+      }
       return;
     }
     // (A few of the flame's colors go over the flame's own palette, which stays the one
@@ -187,7 +221,9 @@ export function createSceneRender(ctx) {
   }
   // The site's tall layout (a phone) frames his seat right under the page's header, with no
   // room over him to stand up in: the dance from the pack is danced in his seat there.
-  function fitKnights() { if (ctx.knights && siteKnight) ctx.knights.headroom = view.layout === 'wide'; }
+  function fitKnights() {
+    if (ctx.knights && siteKnight) ctx.knights.headroom = view.layout === 'wide';
+  }
   const observer = new ResizeObserver(resize);
   observer.observe(container);
   scope.cleanup(() => observer.disconnect());
@@ -202,15 +238,20 @@ export function createSceneRender(ctx) {
     } else if (what === 'palette') {
       ctx.debugPaletteIndex = (ctx.debugPaletteIndex + dir + DEBUG_PALETTES.length) % DEBUG_PALETTES.length;
       const debug = debugPalettes[DEBUG_PALETTES[ctx.debugPaletteIndex]];
-      pass.setPalette(debug ?? scenePalette({ ramp: ctx.currentRamp, shade: flames[ctx.flameKey].shade }), { steel: !debug });
+      pass.setPalette(debug ?? scenePalette({ ramp: ctx.currentRamp, shade: flames[ctx.flameKey].shade }), {
+        steel: !debug,
+      });
       ctx.fewStale = true;
     } else if (what === 'dither') {
       // (Up a level from what's showing now, the settings' own included, then back to none;
       // back, down a level from it, from none to the strongest.)
       const cur = pass.uniforms.ditherStrength.value;
-      pass.uniforms.ditherStrength.value = dir > 0
-        ? DITHER_LEVELS.find((v) => v > cur + 1e-4) ?? 0
-        : cur > 1e-4 ? DITHER_LEVELS.findLast((v) => v < cur - 1e-4) ?? 0 : DITHER_LEVELS.at(-1);
+      pass.uniforms.ditherStrength.value =
+        dir > 0
+          ? (DITHER_LEVELS.find((v) => v > cur + 1e-4) ?? 0)
+          : cur > 1e-4
+            ? (DITHER_LEVELS.findLast((v) => v < cur - 1e-4) ?? 0)
+            : DITHER_LEVELS.at(-1);
     } else if (what === 'matrix') {
       pass.uniforms.ditherScale.value = stepIn(MATRIX_SIZES, pass.uniforms.ditherScale.value, dir);
     } else if (what === 'interaction') {
@@ -225,7 +266,10 @@ export function createSceneRender(ctx) {
   function describe() {
     return {
       pixel: `${pixelSize()} px (${ctx.size.w}×${ctx.size.h})`,
-      palette: ctx.debugPaletteIndex === 0 ? flames[ctx.flameKey].name : DEBUG_PALETTES[ctx.debugPaletteIndex].replace(/(\d) color\)$/, '$1 Colors)'),
+      palette:
+        ctx.debugPaletteIndex === 0
+          ? flames[ctx.flameKey].name
+          : DEBUG_PALETTES[ctx.debugPaletteIndex].replace(/(\d) color\)$/, '$1 Colors)'),
       dither: pass.uniforms.ditherStrength.value ? pass.uniforms.ditherStrength.value.toFixed(2) : 'Off',
       matrix: `${pass.uniforms.ditherScale.value}×${pass.uniforms.ditherScale.value}`,
       outlines: pass.uniforms.outlines.value ? 'On' : 'Off',
@@ -241,14 +285,19 @@ export function createSceneRender(ctx) {
     flowView.visible = view === 'flow';
   }
   // Particle systems, for the breakdown's counts: the scene's point sets grouped by name.
-  const named = (objects, name) => { for (const o of objects) if (o?.isPoints) o.name = name; };
+  const named = (objects, name) => {
+    for (const o of objects) if (o?.isPoints) o.name = name;
+  };
   named([fire.flame], 'Bonfire flames');
   named([fire.spark], 'Bonfire sparks');
   named(plasma.objects, 'Lightning ball');
   named(crystals.objects, 'Frost motes');
   named([chill.points], 'Cold mist');
   named(swingTrail.objects, 'Blade trail');
-  named(Object.values(debris).map((d) => d.points), 'Debris');
+  named(
+    Object.values(debris).map((d) => d.points),
+    'Debris',
+  );
   function stats() {
     const systems = new Map();
     scene.traverse((o) => {
@@ -262,8 +311,32 @@ export function createSceneRender(ctx) {
       systems.set(o.name, s);
     });
     // (The site's one knight is a row of the breakdown's own; Bonfire Live's cast counts here.)
-    if (ctx.knights && !siteKnight) systems.set('Knights', { name: 'Knights', live: ctx.knights.present, total: ctx.knights.max });
-    return { drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, texels: `${ctx.size.w}×${ctx.size.h}`, systems: [...systems.values()] };
+    if (ctx.knights && !siteKnight)
+      systems.set('Knights', { name: 'Knights', live: ctx.knights.present, total: ctx.knights.max });
+    return {
+      drawCalls: renderer.info.render.calls,
+      triangles: renderer.info.render.triangles,
+      texels: `${ctx.size.w}×${ctx.size.h}`,
+      systems: [...systems.values()],
+    };
   }
-  return { settings, renderOverride, pixelSize, applyRender, setRender, setPalette, setFog, setShadows, setXray, keepPalette, resize, fitKnights, cycle, describe, breakdown, named, stats };
+  return {
+    settings,
+    renderOverride,
+    pixelSize,
+    applyRender,
+    setRender,
+    setPalette,
+    setFog,
+    setShadows,
+    setXray,
+    keepPalette,
+    resize,
+    fitKnights,
+    cycle,
+    describe,
+    breakdown,
+    named,
+    stats,
+  };
 }

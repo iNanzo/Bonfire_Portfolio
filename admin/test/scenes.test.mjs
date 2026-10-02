@@ -12,7 +12,11 @@ import { gitBlobSha, utf8 } from '../server/bytes.js';
 
 const TEXT = readFileSync(new URL('../../src/content.json', import.meta.url), 'utf8');
 const content = () => JSON.parse(TEXT);
-const scenePaths = (c) => validateContent(c).errors.map((e) => e.path).filter((p) => p.startsWith('scenes')).sort();
+const scenePaths = (c) =>
+  validateContent(c)
+    .errors.map((e) => e.path)
+    .filter((p) => p.startsWith('scenes'))
+    .sort();
 const withScenes = (...scenes) => ({ ...content(), scenes });
 
 test('scenes are optional, and not a required section', () => {
@@ -21,7 +25,10 @@ test('scenes are optional, and not a required section', () => {
   assert.deepEqual(validateContent(c).errors, []);
   assert.equal(SECTIONS.includes('scenes'), false, 'not required, and out of the commit summary’s section list');
   assert.deepEqual(validateContent(withScenes()).errors, [], 'an empty list is fine');
-  assert.deepEqual(validateContent(withScenes(defaultScene('Frozen Shrine'), { ...defaultScene('Forge Rave'), hidden: true })).errors, []);
+  assert.deepEqual(
+    validateContent(withScenes(defaultScene('Frozen Shrine'), { ...defaultScene('Forge Rave'), hidden: true })).errors,
+    [],
+  );
 });
 
 test('a bad scene is reported at its path', () => {
@@ -33,14 +40,21 @@ test('a bad scene is reported at its path', () => {
   bad.hidden = 'yes';
   bad.layers = { paint: 'on', wash: 'on' };
   bad.knights.count = 2;
-  assert.deepEqual(scenePaths(withScenes(bad)), ['scenes[0].hidden', 'scenes[0].knights.helmets', 'scenes[0].layers.wash']);
+  assert.deepEqual(scenePaths(withScenes(bad)), [
+    'scenes[0].hidden',
+    'scenes[0].knights.helmets',
+    'scenes[0].layers.wash',
+  ]);
   assert.deepEqual(scenePaths({ ...content(), scenes: { one: defaultScene() } }), ['scenes']);
   assert.deepEqual(scenePaths(withScenes('nope')), ['scenes[0]']);
 });
 
 test('ids are unique; at most MAX_SCENES', () => {
   const { errors } = validateContent(withScenes(defaultScene('Twin'), defaultScene('Other'), defaultScene('Twin')));
-  assert.deepEqual(errors.map((e) => e.path), ['scenes[2].id']);
+  assert.deepEqual(
+    errors.map((e) => e.path),
+    ['scenes[2].id'],
+  );
   assert.match(errors[0].message, /already used by “Twin”/);
   const many = Array.from({ length: MAX_SCENES + 1 }, (_, i) => defaultScene(`Scene ${i}`));
   assert.deepEqual(scenePaths(withScenes(...many)), ['scenes']);
@@ -64,24 +78,40 @@ function memoryStore() {
   const files = new Map([['src/content.json', utf8(TEXT)]]);
   const commits = [];
   return {
-    files, commits, mode: 'test', label: 'memory',
-    async read(p) { const b = files.get(p); if (!b) throw new HttpError(404, 'missing'); return { text: new TextDecoder().decode(b), sha: await gitBlobSha(b) }; },
-    async readBytes(p) { const b = files.get(p); if (!b) throw new HttpError(404, 'missing'); return b; },
+    files,
+    commits,
+    mode: 'test',
+    label: 'memory',
+    async read(p) {
+      const b = files.get(p);
+      if (!b) throw new HttpError(404, 'missing');
+      return { text: new TextDecoder().decode(b), sha: await gitBlobSha(b) };
+    },
+    async readBytes(p) {
+      const b = files.get(p);
+      if (!b) throw new HttpError(404, 'missing');
+      return b;
+    },
     async commit({ files: fs, deletes, message }) {
       commits.push({ files: fs.map((f) => f.path), deletes, message });
       for (const f of fs) files.set(f.path, f.bytes);
       return { commit: { sha: 'f'.repeat(40), url: 'u' }, contentSha: await gitBlobSha(files.get('src/content.json')) };
     },
-    async deployStatus() { return { state: 'live' }; },
+    async deployStatus() {
+      return { state: 'live' };
+    },
   };
 }
 const ORIGIN = 'https://admin.test';
 const call = async (store, method, path, body) => {
-  const res = await handleApi(new Request(ORIGIN + path, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json', Origin: ORIGIN } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  }), { store, user: { email: 'me@gmail.com' }, siteUrl: 'https://site.test/' });
+  const res = await handleApi(
+    new Request(ORIGIN + path, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json', Origin: ORIGIN } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    }),
+    { store, user: { email: 'me@gmail.com' }, siteUrl: 'https://site.test/' },
+  );
   return { status: res.status, data: await res.json() };
 };
 
@@ -93,14 +123,20 @@ test('the API refuses a bad scene (422, with paths) and saves a good one', async
   c.scenes = [defaultScene('Fine'), bad];
   const refused = await call(store, 'POST', '/api/save', { baseSha: sha, content: c });
   assert.equal(refused.status, 422);
-  assert.deepEqual(refused.data.errors.map((e) => e.path), ['scenes[1].place.scenery']);
+  assert.deepEqual(
+    refused.data.errors.map((e) => e.path),
+    ['scenes[1].place.scenery'],
+  );
   assert.equal(store.commits.length, 0);
 
   c.scenes[1].place.scenery = 'shrine';
   const saved = await call(store, 'POST', '/api/save', { baseSha: sha, content: c, message: 'Edit scenes' });
   assert.equal(saved.status, 200);
   const stored = JSON.parse(new TextDecoder().decode(store.files.get('src/content.json')));
-  assert.deepEqual(stored.scenes.map((s) => s.id), ['fine', 'broken']);
+  assert.deepEqual(
+    stored.scenes.map((s) => s.id),
+    ['fine', 'broken'],
+  );
 });
 
 // The admin's Scenes page (schema.js, sceneTools.js): a page of its own, Title Case labels
@@ -123,8 +159,14 @@ test('the Scenes page: its labels, hints, the With the Music choices and a new s
     assert.equal(LABELS[key], titleCase(LABELS[key]), `${key}: Title Case`);
     assert.ok(HELP[key]?.length >= 20 && HELP[key].length <= 160, `${key}: a hint, short`);
   }
-  assert.deepEqual(SELECTS['scenes[].music']().map((o) => o.value), Object.keys(MUSIC));
-  assert.deepEqual(SELECTS['scenes[].music']().map((o) => o.label), ['Hold the Scene', 'Start From the Scene']);
+  assert.deepEqual(
+    SELECTS['scenes[].music']().map((o) => o.value),
+    Object.keys(MUSIC),
+  );
+  assert.deepEqual(
+    SELECTS['scenes[].music']().map((o) => o.label),
+    ['Hold the Scene', 'Start From the Scene'],
+  );
   assert.equal(ADD_LABELS.scenes, 'scene');
   const made = hint(TEMPLATES, 'scenes')();
   assert.equal(made.id, '', 'its id follows its name until you edit it');
@@ -142,11 +184,19 @@ test('importing from the Painter: new scenes join the loop, a same-id one replac
   shrine.place.scenery = 'shrine';
   const asks = [];
   // Replace: it takes the old one's place and stays out of the loop.
-  let r = importScenes([shrine, defaultScene('Moonlit Ruins')], ctx, { confirm: (m) => { asks.push(m); return true; } });
+  let r = importScenes([shrine, defaultScene('Moonlit Ruins')], ctx, {
+    confirm: (m) => {
+      asks.push(m);
+      return true;
+    },
+  });
   assert.deepEqual(r, { added: 1, replaced: 1 });
   assert.equal(asks.length, 1);
   assert.match(asks[0], /Frozen Shrine/);
-  assert.deepEqual(ctx.draft.scenes.map((s) => s.id), ['forge-rave', 'frozen-shrine', 'moonlit-ruins']);
+  assert.deepEqual(
+    ctx.draft.scenes.map((s) => s.id),
+    ['forge-rave', 'frozen-shrine', 'moonlit-ruins'],
+  );
   assert.equal(ctx.draft.scenes[1].place.scenery, 'shrine');
   assert.equal(ctx.draft.scenes[1].hidden, true, 'the loop switch is the admin’s, kept');
   // Declined: it comes in as a copy with its own id.
@@ -159,7 +209,10 @@ test('importing from the Painter: new scenes join the loop, a same-id one replac
   const empty = { draft: content() };
   delete empty.draft.scenes;
   importScenes([defaultScene('One')], empty);
-  assert.deepEqual(empty.draft.scenes.map((s) => s.id), ['one']);
+  assert.deepEqual(
+    empty.draft.scenes.map((s) => s.id),
+    ['one'],
+  );
 });
 
 test('a scene card says what the scene holds, part by part', async () => {

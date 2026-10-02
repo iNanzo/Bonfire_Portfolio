@@ -18,7 +18,7 @@ export function createHistory({ limit = 100, coalesceMs = 600, now = () => Date.
   let past = [];
   /** @type {T[]} */
   let future = [];
-  let lastKey = null;  // the field the last step changed (null: none to merge with)
+  let lastKey = null; // the field the last step changed (null: none to merge with)
   let lastAt = -Infinity;
 
   return {
@@ -63,12 +63,24 @@ export function createHistory({ limit = 100, coalesceMs = 600, now = () => Date.
       return structuredClone(future.pop());
     },
     /** The next edit starts a step of its own, whatever it changes (a click after a drag). */
-    seal() { lastKey = null; },
+    seal() {
+      lastKey = null;
+    },
     /** Forget every step (a scene opened from the library). */
-    clear() { past = []; future = []; lastKey = null; },
-    get canUndo() { return past.length > 0; },
-    get canRedo() { return future.length > 0; },
+    clear() {
+      past = [];
+      future = [];
+      lastKey = null;
+    },
+    get canUndo() {
+      return past.length > 0;
+    },
+    get canRedo() {
+      return future.length > 0;
+    },
     /** How many steps back there are. */
-    get size() { return past.length; },
+    get size() {
+      return past.length;
+    },
   };
 }

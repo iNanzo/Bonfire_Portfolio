@@ -34,7 +34,11 @@ export const DRAG_RATE = { yaw: 0.006, pitch: 0.004, zoom: 0.001 };
 export function orbitPose({ yaw, pitch, dist, target = ORBIT_TARGET }) {
   const cp = Math.cos(pitch);
   return {
-    pos: [target[0] + Math.sin(yaw) * cp * dist, target[1] + Math.sin(pitch) * dist, target[2] + Math.cos(yaw) * cp * dist],
+    pos: [
+      target[0] + Math.sin(yaw) * cp * dist,
+      target[1] + Math.sin(pitch) * dist,
+      target[2] + Math.cos(yaw) * cp * dist,
+    ],
     target: [...target],
   };
 }
@@ -62,7 +66,11 @@ export function poseToOrbit({ pos, target }) {
  * @returns {Orbit}
  */
 export function dragOrbit(view, dx, dy, limits = PHOTO_LIMITS) {
-  return { ...view, yaw: view.yaw - dx * DRAG_RATE.yaw, pitch: clamp(view.pitch + dy * DRAG_RATE.pitch, limits.pitch[0], limits.pitch[1]) };
+  return {
+    ...view,
+    yaw: view.yaw - dx * DRAG_RATE.yaw,
+    pitch: clamp(view.pitch + dy * DRAG_RATE.pitch, limits.pitch[0], limits.pitch[1]),
+  };
 }
 
 /**

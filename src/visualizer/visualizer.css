@@ -5,12 +5,19 @@
    and gets out of the way while the music plays.
    ========================================================================== */
 
-body.viz { overflow: hidden; }
-.viz-stage { cursor: default; touch-action: none; }
+body.viz {
+  overflow: hidden;
+}
+.viz-stage {
+  cursor: default;
+  touch-action: none;
+}
 /* The cursor hides with the controls when the mouse rests: over the picture (everything else
    is faded out of its way then). Only the stage: a toggle restyles what the selector reaches. */
 body.is-idle,
-body.is-idle .viz-stage { cursor: none; }
+body.is-idle .viz-stage {
+  cursor: none;
+}
 
 /* ---------- Start screen (like the site's title screen) ---------- */
 
@@ -23,12 +30,25 @@ body.is-idle .viz-stage { cursor: none; }
   padding: 24px var(--gutter) clamp(40px, 8vh, 88px);
   pointer-events: none;
 }
-.viz-start[hidden] { display: none; }
-.viz-start-copy { max-width: 640px; pointer-events: auto; }
-@media (max-width: 1099px) {
-  .viz-start-copy { width: 100%; margin-inline: auto; padding: 20px; background: var(--panel-bg); box-shadow: 0 0 0 1px var(--line); }
+.viz-start[hidden] {
+  display: none;
 }
-.viz-start .title-menu { margin-top: 22px; }
+.viz-start-copy {
+  max-width: 640px;
+  pointer-events: auto;
+}
+@media (max-width: 1099px) {
+  .viz-start-copy {
+    width: 100%;
+    margin-inline: auto;
+    padding: 20px;
+    background: var(--panel-bg);
+    box-shadow: 0 0 0 1px var(--line);
+  }
+}
+.viz-start .title-menu {
+  margin-top: 22px;
+}
 .viz-sources .title-item {
   border: 0;
   background: none;
@@ -43,12 +63,29 @@ body.is-idle .viz-stage { cursor: none; }
   box-shadow: inset 2px 0 0 var(--accent);
   font-size: 0.9375rem;
 }
-.viz-error[hidden] { display: none; }
-.viz-device { max-width: 380px; margin-top: 16px; }
-.viz-start-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-.viz-start-settings { color: var(--text-dim); font-size: 0.875rem; }
-.viz-start-settings kbd { font-size: 0.625rem; }
-.viz-device[hidden] { display: none; }
+.viz-error[hidden] {
+  display: none;
+}
+.viz-device {
+  max-width: 380px;
+  margin-top: 16px;
+}
+.viz-start-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.viz-start-settings {
+  color: var(--text-dim);
+  font-size: 0.875rem;
+}
+.viz-start-settings kbd {
+  font-size: 0.625rem;
+}
+.viz-device[hidden] {
+  display: none;
+}
 
 /* ---------- HUD ---------- */
 
@@ -67,13 +104,32 @@ body.is-idle .viz-stage { cursor: none; }
   box-shadow: 0 0 0 1px var(--line);
   transition: opacity 360ms steps(3);
 }
-.viz-hud[hidden] { display: none; }
-body.is-idle .viz-hud { opacity: 0; pointer-events: none; }
-body.hud-off .viz-hud { display: none; }
+.viz-hud[hidden] {
+  display: none;
+}
+body.is-idle .viz-hud {
+  opacity: 0;
+  pointer-events: none;
+}
+body.hud-off .viz-hud {
+  display: none;
+}
 
-.viz-readout { display: flex; align-items: center; gap: 18px; flex: 1 1 380px; min-width: 0; }
+.viz-readout {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex: 1 1 380px;
+  min-width: 0;
+}
 
-.viz-meter { display: flex; align-items: flex-end; gap: 3px; height: 30px; flex: none; }
+.viz-meter {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 30px;
+  flex: none;
+}
 .viz-band {
   position: relative;
   width: 8px;
@@ -87,16 +143,30 @@ body.hud-off .viz-hud { display: none; }
   clip-path: inset(calc((1 - var(--v, 0)) * 100%) 0 0 0);
 }
 
-.viz-tempo { display: flex; align-items: center; gap: 10px; flex: none; }
-.viz-pips { display: flex; gap: 4px; }
+.viz-tempo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.viz-pips {
+  display: flex;
+  gap: 4px;
+}
 .viz-pips i {
   width: 8px;
   height: 8px;
   background: var(--line-strong);
 }
-.viz-pips i.is-down { box-shadow: 0 0 0 1px var(--accent-lo); }
-.viz-pips i.is-on { background: var(--accent-hi); }
-.viz-pips i.is-on.is-down { background: var(--accent-core); }
+.viz-pips i.is-down {
+  box-shadow: 0 0 0 1px var(--accent-lo);
+}
+.viz-pips i.is-on {
+  background: var(--accent-hi);
+}
+.viz-pips i.is-on.is-down {
+  background: var(--accent-core);
+}
 .viz-bpm {
   min-width: 8.5em;
   font-family: var(--font-pixel);
@@ -104,18 +174,57 @@ body.hud-off .viz-hud { display: none; }
   letter-spacing: 0.04em;
   color: var(--text-dim);
 }
-.viz-bpm.is-locked { color: var(--accent-hi); }
+.viz-bpm.is-locked {
+  color: var(--accent-hi);
+}
 
-.viz-status { min-width: 0; }
+.viz-status {
+  min-width: 0;
+}
 .viz-wield,
-.viz-state { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.viz-wield { font-family: var(--font-pixel); font-size: 1rem; line-height: 1.3; color: var(--accent-hi); }
-.viz-state { font-size: 0.8125rem; line-height: 1.4; color: var(--text-dim); }
+.viz-state {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.viz-wield {
+  font-family: var(--font-pixel);
+  font-size: 1rem;
+  line-height: 1.3;
+  color: var(--accent-hi);
+}
+.viz-state {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
 
-.viz-transport { display: flex; align-items: center; gap: 12px; flex: 1 1 260px; min-width: 0; }
-.viz-transport[hidden] { display: none; }
-.viz-track { max-width: 18em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 0.8125rem; color: var(--text-dim); }
-.viz-progress { flex: 1; min-width: 60px; height: 6px; padding: 6px 0; background: var(--line) content-box; cursor: pointer; }
+.viz-transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.viz-transport[hidden] {
+  display: none;
+}
+.viz-track {
+  max-width: 18em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+.viz-progress {
+  flex: 1;
+  min-width: 60px;
+  height: 6px;
+  padding: 6px 0;
+  background: var(--line) content-box;
+  cursor: pointer;
+}
 .viz-progress i {
   display: block;
   height: 100%;
@@ -124,24 +233,53 @@ body.hud-off .viz-hud { display: none; }
   transform-origin: left;
 }
 
-.viz-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
-.viz-actions .pix-btn { padding: 5px 10px; font-size: 0.875rem; }
-.viz-actions kbd { min-width: 0; font-size: 0.625rem; }
+.viz-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+.viz-actions .pix-btn {
+  padding: 5px 10px;
+  font-size: 0.875rem;
+}
+.viz-actions kbd {
+  min-width: 0;
+  font-size: 0.625rem;
+}
 
 /* Phones are under 760px wide (every max-width: 759px here): NARROW in src/ui/breakpoints.js,
    the width the page's script tests too. */
 @media (max-width: 759px) {
-  .viz-hud { left: 8px; right: 8px; bottom: 8px; gap: 10px; }
-  .viz-readout { flex-wrap: wrap; gap: 10px 14px; }
-  .viz-actions { margin-left: 0; }
-  .viz-actions kbd { display: none; }
+  .viz-hud {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    gap: 10px;
+  }
+  .viz-readout {
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+  .viz-actions {
+    margin-left: 0;
+  }
+  .viz-actions kbd {
+    display: none;
+  }
 }
 
 /* ---------- Title card (the site's checkpoint band) ---------- */
 
-.viz-title-card { z-index: 30; }
-.viz-title-card .kindled-band { pointer-events: none; }
-.viz-title-card .kindled-sub[hidden] { display: none; }
+.viz-title-card {
+  z-index: 30;
+}
+.viz-title-card .kindled-band {
+  pointer-events: none;
+}
+.viz-title-card .kindled-sub[hidden] {
+  display: none;
+}
 
 /* ---------- Settings ---------- */
 
@@ -157,7 +295,10 @@ body.hud-off .viz-hud { display: none; }
   padding: 0;
   --pad-x: clamp(16px, 3vw, 32px);
 }
-.viz-settings-top { flex: none; padding: 20px var(--pad-x) 0; }
+.viz-settings-top {
+  flex: none;
+  padding: 20px var(--pad-x) 0;
+}
 .viz-settings-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -171,8 +312,15 @@ body.hud-off .viz-hud { display: none; }
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 26px 32px;
 }
-.viz-settings fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
-.viz-settings fieldset > * + * { margin-top: 14px; }
+.viz-settings fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.viz-settings fieldset > * + * {
+  margin-top: 14px;
+}
 .viz-settings legend {
   margin-bottom: 12px;
   padding: 0;
@@ -182,9 +330,14 @@ body.hud-off .viz-hud { display: none; }
   text-transform: uppercase;
   color: var(--accent);
 }
-.viz-span { grid-column: 1 / -1; }
+.viz-span {
+  grid-column: 1 / -1;
+}
 
-.viz-field { display: grid; gap: 5px; }
+.viz-field {
+  display: grid;
+  gap: 5px;
+}
 .viz-field-label {
   display: flex;
   align-items: baseline;
@@ -193,11 +346,25 @@ body.hud-off .viz-hud { display: none; }
   font-size: 0.9375rem;
   color: var(--c-bone);
 }
-.viz-field-label output { margin-left: auto; color: var(--accent-hi); }
-.viz-unit { font-size: 0.75rem; color: var(--text-dim); }
-.viz-help { font-size: 0.8125rem; line-height: 1.45; color: var(--text-dim); }
+.viz-field-label output {
+  margin-left: auto;
+  color: var(--accent-hi);
+}
+.viz-unit {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.viz-help {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
 
-.viz input[type='range'] { width: 100%; margin: 2px 0; accent-color: var(--accent); }
+.viz input[type='range'] {
+  width: 100%;
+  margin: 2px 0;
+  accent-color: var(--accent);
+}
 .viz select,
 .viz input[type='text'] {
   width: 100%;
@@ -210,45 +377,134 @@ body.hud-off .viz-hud { display: none; }
   color: var(--c-bone);
 }
 .viz select:hover,
-.viz input[type='text']:hover { box-shadow: 0 0 0 1px var(--accent); }
-.viz input[type='text']::placeholder { color: color-mix(in srgb, var(--c-bone) 45%, var(--c-void)); }
+.viz input[type='text']:hover {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.viz input[type='text']::placeholder {
+  color: color-mix(in srgb, var(--c-bone) 45%, var(--c-void));
+}
 
-.viz-check { display: flex; align-items: flex-start; gap: 9px; font-size: 0.9375rem; line-height: 1.4; color: var(--text-dim); cursor: pointer; }
-.viz-check input { flex: none; margin: 3px 0 0; accent-color: var(--accent); }
-.viz-check:hover { color: var(--c-bone); }
-.viz-checks { display: flex; flex-wrap: wrap; gap: 8px 18px; }
-.viz-settings .viz-checks { margin-top: 6px; }
+.viz-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.viz-check input {
+  flex: none;
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+.viz-check:hover {
+  color: var(--c-bone);
+}
+.viz-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.viz-settings .viz-checks {
+  margin-top: 6px;
+}
 /* Effect switches (Off / In the mix / Always), one per effect, in a grid. */
-.viz-modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 7px 20px; margin-top: 6px; }
-.viz-mode { display: flex; align-items: center; gap: 8px; font-size: 0.9375rem; color: var(--text-dim); }
-.viz-mode > span:first-child { flex: 1; min-width: 0; }
-.viz-mode:hover { color: var(--c-bone); }
-.viz .viz-mode select { flex: none; width: 8.4em; padding: 4px 6px; font-size: 0.875rem; }
-.viz-mode .viz-tip { flex: none; }
+.viz-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 7px 20px;
+  margin-top: 6px;
+}
+.viz-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9375rem;
+  color: var(--text-dim);
+}
+.viz-mode > span:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.viz-mode:hover {
+  color: var(--c-bone);
+}
+.viz .viz-mode select {
+  flex: none;
+  width: 8.4em;
+  padding: 4px 6px;
+  font-size: 0.875rem;
+}
+.viz-mode .viz-tip {
+  flex: none;
+}
 
-.viz-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
-.viz-title-fields { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px 18px; }
-@media (max-width: 640px) { .viz-title-fields { grid-template-columns: 1fr; } }
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+.viz-title-fields {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 12px 18px;
+}
+@media (max-width: 640px) {
+  .viz-title-fields {
+    grid-template-columns: 1fr;
+  }
+}
 
-.viz-source-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.875rem; color: var(--text-dim); }
-.viz-source-line span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-
+.viz-source-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+.viz-source-line span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 /* ---------- Start screen on narrower screens ---------- */
 
 @media (max-width: 1099px) {
   /* A compact panel along the bottom-left, so the fire (framed aside) stays in view. Each
      source's description is its tip (src/ui/tooltip.js), beside it where there's room. */
-  .viz-start { align-items: flex-end; justify-content: flex-start; }
-  .viz-start-copy { width: min(100%, 520px); margin-inline: 0; }
-  .viz-start .hero-name { font-size: clamp(1.75rem, 6vw, 2.5rem); }
-  .viz-start .hero-value { font-size: 0.9375rem; }
+  .viz-start {
+    align-items: flex-end;
+    justify-content: flex-start;
+  }
+  .viz-start-copy {
+    width: min(100%, 520px);
+    margin-inline: 0;
+  }
+  .viz-start .hero-name {
+    font-size: clamp(1.75rem, 6vw, 2.5rem);
+  }
+  .viz-start .hero-value {
+    font-size: 0.9375rem;
+  }
 }
 
 /* ---------- The HUD in groups ---------- */
 
-.viz-hud { gap: 10px 18px; }
-.viz-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.viz-hud {
+  gap: 10px 18px;
+}
+.viz-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
 .viz-group-label {
   font-family: var(--font-pixel);
   font-size: 0.75rem;
@@ -257,9 +513,16 @@ body.hud-off .viz-hud { display: none; }
   color: var(--text-dim);
   margin-right: 2px;
 }
-.viz-group + .viz-group { padding-left: 16px; box-shadow: -1px 0 0 var(--line); }
-.viz-readout { flex: 1 1 280px; }
-.viz-beat .viz-bpm { min-width: 7.5em; }
+.viz-group + .viz-group {
+  padding-left: 16px;
+  box-shadow: -1px 0 0 var(--line);
+}
+.viz-readout {
+  flex: 1 1 280px;
+}
+.viz-beat .viz-bpm {
+  min-width: 7.5em;
+}
 .viz-bpm-set {
   width: 5.2em;
   padding: 4px 6px;
@@ -269,12 +532,25 @@ body.hud-off .viz-hud { display: none; }
   font: 400 0.875rem/1.2 var(--font-body);
   color: var(--c-bone);
 }
-.viz-bpm-set:focus-visible { outline: 2px solid var(--accent); }
-.viz-beat .pix-btn { padding: 4px 8px; font-size: 0.875rem; }
-.viz-beat kbd { min-width: 0; font-size: 0.625rem; }
+.viz-bpm-set:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.viz-beat .pix-btn {
+  padding: 4px 8px;
+  font-size: 0.875rem;
+}
+.viz-beat kbd {
+  min-width: 0;
+  font-size: 0.625rem;
+}
 @media (max-width: 759px) {
-  .viz-group + .viz-group { padding-left: 0; box-shadow: none; }
-  .viz-group-label { width: 100%; }
+  .viz-group + .viz-group {
+    padding-left: 0;
+    box-shadow: none;
+  }
+  .viz-group-label {
+    width: 100%;
+  }
 }
 
 /* ---------- Settings: header, search, tabs, sections, footer ---------- */
@@ -285,13 +561,39 @@ body.hud-off .viz-hud { display: none; }
   align-items: center;
   gap: 10px 20px;
 }
-.viz-settings-head .rest-menu-title { margin: 0; }
-.viz-search { position: relative; min-width: 0; }
+.viz-settings-head .rest-menu-title {
+  margin: 0;
+}
+.viz-search {
+  position: relative;
+  min-width: 0;
+}
 /* (Its count is read out; on screen the tab bar's counts and the empty note say it.) */
-.viz-search .settings-search-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.viz-view-switch { display: flex; gap: 14px; font-family: var(--font-pixel); font-size: 0.875rem; color: var(--text-dim); }
-.viz-view-switch label { display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
-.viz-view-switch input { accent-color: var(--accent); }
+.viz-search .settings-search-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.viz-view-switch {
+  display: flex;
+  gap: 14px;
+  font-family: var(--font-pixel);
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+.viz-view-switch label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.viz-view-switch input {
+  accent-color: var(--accent);
+}
 .viz-close {
   display: grid;
   place-items: center;
@@ -304,8 +606,14 @@ body.hud-off .viz-hud { display: none; }
   box-shadow: 0 0 0 1px var(--line-strong);
   cursor: pointer;
 }
-.viz-close:hover { color: var(--c-bone); box-shadow: 0 0 0 1px var(--accent); }
-.viz-close:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 2px; }
+.viz-close:hover {
+  color: var(--c-bone);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.viz-close:focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 2px;
+}
 
 .viz-tabs {
   display: flex;
@@ -331,23 +639,68 @@ body.hud-off .viz-hud { display: none; }
   cursor: pointer;
   box-shadow: inset 0 -2px 0 transparent;
 }
-.viz-tab:hover { color: var(--c-bone); }
-.viz-tab[aria-selected='true'] { color: var(--accent-hi); box-shadow: inset 0 -2px 0 var(--accent); }
-.viz-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.viz-tab-count { min-width: 1.5em; padding: 1px 4px; font: 400 0.75rem/1.2 var(--font-body); text-align: center; color: var(--c-void); background: var(--accent-hi); }
-.viz-tab-count[hidden] { display: none; }
-.viz-tab.is-empty { opacity: 0.45; }
-.viz-tab.is-empty .viz-tab-count { color: var(--text-dim); background: none; box-shadow: 0 0 0 1px var(--line-strong); }
+.viz-tab:hover {
+  color: var(--c-bone);
+}
+.viz-tab[aria-selected='true'] {
+  color: var(--accent-hi);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.viz-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.viz-tab-count {
+  min-width: 1.5em;
+  padding: 1px 4px;
+  font: 400 0.75rem/1.2 var(--font-body);
+  text-align: center;
+  color: var(--c-void);
+  background: var(--accent-hi);
+}
+.viz-tab-count[hidden] {
+  display: none;
+}
+.viz-tab.is-empty {
+  opacity: 0.45;
+}
+.viz-tab.is-empty .viz-tab-count {
+  color: var(--text-dim);
+  background: none;
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
 /* (While searching, every tab with finds shows: none is the one picked, each counts its finds.) */
-[data-searching] .viz-tab[aria-selected='true'] { color: var(--text-dim); box-shadow: inset 0 -2px 0 transparent; }
-[data-searching] .viz-tab[aria-selected='true']:hover { color: var(--c-bone); }
-.viz-tab-panel[hidden] { display: none; }
-.viz-tri-help { max-width: 60rem; margin: 0 0 18px; }
+[data-searching] .viz-tab[aria-selected='true'] {
+  color: var(--text-dim);
+  box-shadow: inset 0 -2px 0 transparent;
+}
+[data-searching] .viz-tab[aria-selected='true']:hover {
+  color: var(--c-bone);
+}
+.viz-tab-panel[hidden] {
+  display: none;
+}
+.viz-tri-help {
+  max-width: 60rem;
+  margin: 0 0 18px;
+}
 
 /* A section: its settings, then how many more All Settings has, and Reset Section. */
-.viz-settings .viz-section > legend { display: flex; gap: 0.4em; }
-.viz-crumb { display: none; color: var(--text-dim); }
-.viz-section-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.viz-settings .viz-section > legend {
+  display: flex;
+  gap: 0.4em;
+}
+.viz-crumb {
+  display: none;
+  color: var(--text-dim);
+}
+.viz-section-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
 .viz-more-cue {
   padding: 0;
   border: 0;
@@ -358,12 +711,20 @@ body.hud-off .viz-hud { display: none; }
   text-underline-offset: 3px;
   cursor: pointer;
 }
-.viz-more-cue:hover { color: var(--accent-hi); }
-[data-view='all'] .viz-more-cue { display: none; }
-.viz-reset-section { margin-left: auto; }
+.viz-more-cue:hover {
+  color: var(--accent-hi);
+}
+[data-view='all'] .viz-more-cue {
+  display: none;
+}
+.viz-reset-section {
+  margin-left: auto;
+}
 
 /* Simple view: only the settings that matter most. */
-[data-view='simple'] [data-adv] { display: none !important; }
+[data-view='simple'] [data-adv] {
+  display: none !important;
+}
 .viz-adv-badge {
   display: none;
   margin-bottom: 4px;
@@ -376,49 +737,116 @@ body.hud-off .viz-hud { display: none; }
 }
 /* A row only All Settings has, shown in the Simple view by a search (or revealed by one). */
 [data-view='simple'][data-searching] [data-row][data-adv]:not(.is-miss),
-[data-view='simple'] [data-row][data-adv].is-revealed { display: revert !important; }
+[data-view='simple'] [data-row][data-adv].is-revealed {
+  display: revert !important;
+}
 [data-view='simple'][data-searching] [data-row][data-adv] > .viz-adv-badge,
-[data-view='simple'] [data-row].is-revealed > .viz-adv-badge { display: inline-block; }
+[data-view='simple'] [data-row].is-revealed > .viz-adv-badge {
+  display: inline-block;
+}
 .viz-setting[data-blocked='true'] .viz-field-label > label,
 .viz-setting[data-blocked='true'] .viz-field-label > [data-name],
 .viz-setting[data-blocked='true'] .tri-name,
 .viz-setting[data-blocked='true'] .viz-check > label,
-.viz-setting[data-blocked='true'] label.viz-check { opacity: 0.55; }
-.viz-setting[data-blocked='true'] .bulk-btn:disabled { opacity: 0.45; pointer-events: none; }
+.viz-setting[data-blocked='true'] label.viz-check {
+  opacity: 0.55;
+}
+.viz-setting[data-blocked='true'] .bulk-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
 /* (A top-level three-way switch's name reads like the other fields' labels.) */
-.viz-setting > fieldset.tri .tri-name { font-family: var(--font-pixel); font-size: 0.9375rem; color: var(--c-bone); }
+.viz-setting > fieldset.tri .tri-name {
+  font-family: var(--font-pixel);
+  font-size: 0.9375rem;
+  color: var(--c-bone);
+}
 
 /* Searching: every tab with something found, one after another, each section headed
    "Tab › Section"; what isn't found goes. */
-[data-searching] .viz-tab-panel + .viz-tab-panel:not(.is-miss) { margin-top: 26px; }
-[data-searching] .is-miss { display: none !important; }
-[data-searching] .viz-crumb { display: inline; }
+[data-searching] .viz-tab-panel + .viz-tab-panel:not(.is-miss) {
+  margin-top: 26px;
+}
+[data-searching] .is-miss {
+  display: none !important;
+}
+[data-searching] .viz-crumb {
+  display: inline;
+}
 [data-searching] .viz-tri-help,
-[data-searching] .viz-section-foot { display: none; }
-.viz-preset.is-hit { outline: 2px dashed var(--accent-hi); outline-offset: 2px; }
-.viz-search-empty { display: grid; justify-items: start; gap: 10px; padding: 8px 0; }
-.viz-search-empty[hidden] { display: none; }
-.viz-search-empty .bulk-btn { margin: 2px 4px 2px 0; }
-.viz-keys-results { margin-top: 26px; }
-.viz-keys-results[hidden] { display: none; }
+[data-searching] .viz-section-foot {
+  display: none;
+}
+.viz-preset.is-hit {
+  outline: 2px dashed var(--accent-hi);
+  outline-offset: 2px;
+}
+.viz-search-empty {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 8px 0;
+}
+.viz-search-empty[hidden] {
+  display: none;
+}
+.viz-search-empty .bulk-btn {
+  margin: 2px 4px 2px 0;
+}
+.viz-keys-results {
+  margin-top: 26px;
+}
+.viz-keys-results[hidden] {
+  display: none;
+}
 .viz-keys-results-title {
   margin: 0 0 12px;
   font: 400 0.8125rem/1.3 var(--font-pixel);
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
-.viz-keys-results .viz-crumb { display: inline; color: var(--accent); }
-.viz-keys-results dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 6px 24px; margin: 0 0 12px; }
-.viz-keys-results dl > div { display: flex; gap: 12px; font-size: 0.875rem; color: var(--text-dim); }
-.viz-keys-results dt { flex: none; min-width: 5em; }
+.viz-keys-results .viz-crumb {
+  display: inline;
+  color: var(--accent);
+}
+.viz-keys-results dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 6px 24px;
+  margin: 0 0 12px;
+}
+.viz-keys-results dl > div {
+  display: flex;
+  gap: 12px;
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+.viz-keys-results dt {
+  flex: none;
+  min-width: 5em;
+}
 /* A result stepped to with ↓ / ↑ has the focus itself (not its field): ringed. */
-.viz-settings [data-result-focus]:focus { outline: none; }
-.viz-settings [data-result-focus]:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 4px; }
+.viz-settings [data-result-focus]:focus {
+  outline: none;
+}
+.viz-settings [data-result-focus]:focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 4px;
+}
 /* Revealed (Enter on a single result): a short flash round the row. */
-.is-found { animation: viz-found 1.2s steps(6) both; }
+.is-found {
+  animation: viz-found 1.2s steps(6) both;
+}
 @keyframes viz-found {
-  0%, 50% { box-shadow: 0 0 0 2px var(--accent-hi), 0 0 18px -2px var(--accent); }
-  100% { box-shadow: 0 0 0 2px transparent; }
+  0%,
+  50% {
+    box-shadow:
+      0 0 0 2px var(--accent-hi),
+      0 0 18px -2px var(--accent);
+  }
+  100% {
+    box-shadow: 0 0 0 2px transparent;
+  }
 }
 
 /* The footer: the shortcuts, what just changed many settings (and its Undo), Reset, Close. */
@@ -430,117 +858,386 @@ body.hud-off .viz-hud { display: none; }
   padding: 12px var(--pad-x) 14px;
   box-shadow: inset 0 1px 0 var(--line);
 }
-.viz-settings-foot .pix-btn { flex: none; white-space: nowrap; }
-.viz-toast { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; min-height: 28px; margin: 0; font-size: 0.875rem; line-height: 1.3; color: var(--accent-hi); }
-.viz-toast [hidden] { display: none; }
-.viz-toast > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.viz-toast > span:focus { outline: none; }
-.viz-toast > span:focus-visible { outline: 1px dotted var(--accent-hi); outline-offset: 2px; }
-.viz-settings-foot kbd { margin-right: 6px; font-size: 0.625rem; }
+.viz-settings-foot .pix-btn {
+  flex: none;
+  white-space: nowrap;
+}
+.viz-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 28px;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.3;
+  color: var(--accent-hi);
+}
+.viz-toast [hidden] {
+  display: none;
+}
+.viz-toast > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.viz-toast > span:focus {
+  outline: none;
+}
+.viz-toast > span:focus-visible {
+  outline: 1px dotted var(--accent-hi);
+  outline-offset: 2px;
+}
+.viz-settings-foot kbd {
+  margin-right: 6px;
+  font-size: 0.625rem;
+}
 @media (max-width: 759px) {
   /* (One row: the shortcuts button down to its key, the toast's words smaller.) */
-  .viz-settings-foot { gap: 6px; padding-block: 10px 12px; }
-  .viz-settings-foot .pix-btn { padding: 6px 9px; font-size: 0.8125rem; }
-  .viz-keys-btn kbd { margin: 0; }
-  .viz-keys-btn span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .viz-toast { font-size: 0.75rem; }
+  .viz-settings-foot {
+    gap: 6px;
+    padding-block: 10px 12px;
+  }
+  .viz-settings-foot .pix-btn {
+    padding: 6px 9px;
+    font-size: 0.8125rem;
+  }
+  .viz-keys-btn kbd {
+    margin: 0;
+  }
+  .viz-keys-btn span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .viz-toast {
+    font-size: 0.75rem;
+  }
   /* (Saying something, the toast takes a line of its own above the buttons: read whole.) */
-  .viz-settings-foot:has(.viz-toast.is-on) { flex-wrap: wrap; }
-  .viz-toast.is-on { flex-basis: 100%; order: -1; }
-  .viz-toast.is-on > span { white-space: normal; }
-  .viz-toast.is-on ~ [data-reset-all] { margin-left: auto; }
+  .viz-settings-foot:has(.viz-toast.is-on) {
+    flex-wrap: wrap;
+  }
+  .viz-toast.is-on {
+    flex-basis: 100%;
+    order: -1;
+  }
+  .viz-toast.is-on > span {
+    white-space: normal;
+  }
+  .viz-toast.is-on ~ [data-reset-all] {
+    margin-left: auto;
+  }
 }
 
 @media (max-width: 759px) {
-  .viz-settings-top { padding-top: 14px; }
-  .viz-settings-head { grid-template-columns: minmax(0, 1fr) auto; }
-  .viz-search { grid-column: 1 / -1; grid-row: 2; }
-  .viz-view-switch { grid-column: 1 / -1; grid-row: 3; }
-  .viz-close { grid-column: 2; grid-row: 1; }
-  .viz-settings-body { padding-top: 14px; }
+  .viz-settings-top {
+    padding-top: 14px;
+  }
+  .viz-settings-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .viz-search {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .viz-view-switch {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .viz-close {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .viz-settings-body {
+    padding-top: 14px;
+  }
 }
 
-.viz-link-help { font-size: 0.875rem; color: var(--text-dim); }
-.viz-link-help summary { cursor: pointer; font-family: var(--font-pixel); color: var(--c-bone); }
-.viz-link-help ol { margin: 8px 0 0 18px; display: grid; gap: 4px; list-style: decimal; }
-.viz-link-help a { color: var(--accent-hi); }
-.viz-link-help code { font-size: 0.8125rem; color: var(--c-bone); }
+.viz-link-help {
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+.viz-link-help summary {
+  cursor: pointer;
+  font-family: var(--font-pixel);
+  color: var(--c-bone);
+}
+.viz-link-help ol {
+  margin: 8px 0 0 18px;
+  display: grid;
+  gap: 4px;
+  list-style: decimal;
+}
+.viz-link-help a {
+  color: var(--accent-hi);
+}
+.viz-link-help code {
+  font-size: 0.8125rem;
+  color: var(--c-bone);
+}
 
-.viz-cards { display: grid; gap: 8px; margin: 10px 0; }
-.viz-card { display: grid; grid-template-columns: auto 1fr 1.3fr auto auto auto; gap: 8px; align-items: center; }
-.viz-card-key { font-family: var(--font-pixel); font-size: 0.875rem; color: var(--accent-hi); min-width: 2em; }
-.viz-card .pix-btn { padding: 5px 9px; font-size: 0.875rem; }
-@media (max-width: 720px) { .viz-card { grid-template-columns: auto 1fr; } }
+.viz-cards {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+}
+.viz-card {
+  display: grid;
+  grid-template-columns: auto 1fr 1.3fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.viz-card-key {
+  font-family: var(--font-pixel);
+  font-size: 0.875rem;
+  color: var(--accent-hi);
+  min-width: 2em;
+}
+.viz-card .pix-btn {
+  padding: 5px 9px;
+  font-size: 0.875rem;
+}
+@media (max-width: 720px) {
+  .viz-card {
+    grid-template-columns: auto 1fr;
+  }
+}
 
-.viz-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
-.viz-preset { display: grid; gap: 4px; padding: 12px; text-align: left; }
-.viz-preset b { font-family: var(--font-pixel); font-weight: 400; font-size: 1rem; color: var(--accent-hi); }
-.viz-preset span { font-family: var(--font-body); font-size: 0.8125rem; line-height: 1.4; color: var(--text-dim); letter-spacing: 0; text-transform: none; }
-.viz-preset[aria-pressed='true'] { --b: var(--accent-hi); }
-.viz-preset[aria-pressed='true'] b::after { content: ' \25C6'; font-size: 0.75em; }
+.viz-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.viz-preset {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  text-align: left;
+}
+.viz-preset b {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  font-size: 1rem;
+  color: var(--accent-hi);
+}
+.viz-preset span {
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.viz-preset[aria-pressed='true'] {
+  --b: var(--accent-hi);
+}
+.viz-preset[aria-pressed='true'] b::after {
+  content: ' \25C6';
+  font-size: 0.75em;
+}
 /* Presets lead the dialog: a kind of night in one click, above the tabs (on a phone, their
    names only: each one's tip says what it does). */
-.viz-presets-top { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-top: 14px; }
-.viz-presets-top .viz-preset { padding: 8px 10px; }
-.viz-presets-top .viz-preset span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.viz-preset-note { display: none; }
+.viz-presets-top {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-top: 14px;
+}
+.viz-presets-top .viz-preset {
+  padding: 8px 10px;
+}
+.viz-presets-top .viz-preset span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.viz-preset-note {
+  display: none;
+}
 @media (max-width: 759px) {
-  .viz-presets-top { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding: 2px; }
-  .viz-presets-top .viz-preset { flex: none; padding: 4px 10px; }
-  .viz-presets-top .viz-preset span { display: none; }
-  .viz-presets-top .viz-preset b { font-size: 0.875rem; }
+  .viz-presets-top {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding: 2px;
+  }
+  .viz-presets-top .viz-preset {
+    flex: none;
+    padding: 4px 10px;
+  }
+  .viz-presets-top .viz-preset span {
+    display: none;
+  }
+  .viz-presets-top .viz-preset b {
+    font-size: 0.875rem;
+  }
   /* (Names only here: the line under them says what the one in use, or pointed at, does.) */
-  .viz-preset-note:not(:empty) { display: block; margin: 6px 0 0; font-size: 0.75rem; line-height: 1.4; color: var(--text-dim); }
-  .viz-preset-note b { margin-right: 4px; font: 400 0.75rem/1.4 var(--font-pixel); color: var(--accent-hi); }
+  .viz-preset-note:not(:empty) {
+    display: block;
+    margin: 6px 0 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--text-dim);
+  }
+  .viz-preset-note b {
+    margin-right: 4px;
+    font: 400 0.75rem/1.4 var(--font-pixel);
+    color: var(--accent-hi);
+  }
 }
 
 /* A short screen (a phone on its side, a small laptop, a small phone under its browser's bars):
    the header closes up (the presets as names, under them a note saying what the one in use
    does), so the settings keep most of the height. */
 @media (max-height: 600px) {
-  .viz-settings-inner { height: calc(100dvh - 12px); max-height: 900px; }
-  .viz-settings-top { padding-top: 10px; }
-  .viz-presets-top { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; scrollbar-width: thin; padding: 2px; }
-  .viz-presets-top .viz-preset { flex: none; padding: 3px 10px; }
-  .viz-presets-top .viz-preset span { display: none; }
-  .viz-presets-top .viz-preset b { font-size: 0.875rem; }
-  .viz-tabs { margin-top: 6px; }
-  .viz-tab { padding-block: 5px; }
-  .viz-settings-body { padding-top: 12px; }
-  .viz-settings-foot { padding-block: 6px 8px; }
-  .viz-settings-foot .pix-btn { padding-block: 4px; }
+  .viz-settings-inner {
+    height: calc(100dvh - 12px);
+    max-height: 900px;
+  }
+  .viz-settings-top {
+    padding-top: 10px;
+  }
+  .viz-presets-top {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding: 2px;
+  }
+  .viz-presets-top .viz-preset {
+    flex: none;
+    padding: 3px 10px;
+  }
+  .viz-presets-top .viz-preset span {
+    display: none;
+  }
+  .viz-presets-top .viz-preset b {
+    font-size: 0.875rem;
+  }
+  .viz-tabs {
+    margin-top: 6px;
+  }
+  .viz-tab {
+    padding-block: 5px;
+  }
+  .viz-settings-body {
+    padding-top: 12px;
+  }
+  .viz-settings-foot {
+    padding-block: 6px 8px;
+  }
+  .viz-settings-foot .pix-btn {
+    padding-block: 4px;
+  }
 }
 /* (Wide enough as well, the search and the view switch go on the title's line, and the note
    on the presets' line if two lines there hold any preset's description, else on a line of its
    own, still two: a touch screen has no tip to read the rest in. A phone held upright keeps the
    phone's header, stacked, with the whole note.) */
 @media (max-height: 600px) and (min-width: 561px) {
-  .viz-settings-top { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; }
+  .viz-settings-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 12px;
+  }
   .viz-settings-head,
-  .viz-tabs { flex: 1 1 100%; }
-  .viz-settings-head { grid-template-columns: auto minmax(120px, 1fr) auto auto; gap: 8px 14px; }
+  .viz-tabs {
+    flex: 1 1 100%;
+  }
+  .viz-settings-head {
+    grid-template-columns: auto minmax(120px, 1fr) auto auto;
+    gap: 8px 14px;
+  }
   .viz-search,
   .viz-view-switch,
-  .viz-close { grid-column: auto; grid-row: auto; }
-  .viz-close { width: 28px; height: 28px; }
-  .viz-presets-top { flex: none; max-width: 100%; }
-  .viz-preset-note:not(:empty) { flex: 1 1 28rem; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 8px 0 0; font-size: 0.75rem; line-height: 1.4; color: var(--text-dim); }
-  .viz-preset-note b { margin-right: 4px; font: 400 0.75rem/1.4 var(--font-pixel); color: var(--accent-hi); }
+  .viz-close {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .viz-close {
+    width: 28px;
+    height: 28px;
+  }
+  .viz-presets-top {
+    flex: none;
+    max-width: 100%;
+  }
+  .viz-preset-note:not(:empty) {
+    flex: 1 1 28rem;
+    min-width: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 8px 0 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--text-dim);
+  }
+  .viz-preset-note b {
+    margin-right: 4px;
+    font: 400 0.75rem/1.4 var(--font-pixel);
+    color: var(--accent-hi);
+  }
 }
 /* The start screen's presets: the same, as small pills. */
-.viz-feel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 18px; }
-.viz-feel .viz-group-label { margin-right: 4px; }
-.viz-feel .viz-preset { display: inline-flex; padding: 4px 10px; }
-.viz-feel .viz-preset span { display: none; }
-.viz-feel .viz-preset b { font-size: 0.9375rem; }
-.viz-setup-save input { flex: 1; min-width: 200px; }
-.viz-setups { display: grid; gap: 6px; margin: 10px 0; }
-.viz-setups li { display: flex; align-items: center; gap: 8px; }
-.viz-setups li > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.viz-setups .pix-btn { padding: 4px 9px; font-size: 0.875rem; }
+.viz-feel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 18px;
+}
+.viz-feel .viz-group-label {
+  margin-right: 4px;
+}
+.viz-feel .viz-preset {
+  display: inline-flex;
+  padding: 4px 10px;
+}
+.viz-feel .viz-preset span {
+  display: none;
+}
+.viz-feel .viz-preset b {
+  font-size: 0.9375rem;
+}
+.viz-setup-save input {
+  flex: 1;
+  min-width: 200px;
+}
+.viz-setups {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+.viz-setups li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.viz-setups li > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viz-setups .pix-btn {
+  padding: 4px 9px;
+  font-size: 0.875rem;
+}
 @media (min-width: 1100px) {
   /* A soft shade behind the start menu's text, so it reads over the scenery. */
-  .viz-start { background: linear-gradient(90deg, color-mix(in srgb, var(--c-void) 78%, transparent) 0, transparent 52%); }
+  .viz-start {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--c-void) 78%, transparent) 0, transparent 52%);
+  }
 }
 
 /* ---------- Back to the portfolio (start screen) ---------- */
@@ -551,33 +1248,85 @@ body.hud-off .viz-hud { display: none; }
   left: var(--gutter);
   z-index: 11;
 }
-body[data-mode='live'] .viz-home { display: none; }
+body[data-mode='live'] .viz-home {
+  display: none;
+}
 
 /* ---------- The pack (ui/pack.js; styles.css): above the HUD, fading with it ---------- */
 
-body.viz .pack { bottom: calc(var(--hud-h, 0px) + 24px); z-index: 21; transition: opacity 360ms steps(3); }
-body[data-mode='start'] .pack { bottom: 14px; }
-body.is-idle .pack:not(.is-open) { opacity: 0; pointer-events: none; }
-body.hud-off .pack:not(.is-open) { display: none; }
+body.viz .pack {
+  bottom: calc(var(--hud-h, 0px) + 24px);
+  z-index: 21;
+  transition: opacity 360ms steps(3);
+}
+body[data-mode='start'] .pack {
+  bottom: 14px;
+}
+body.is-idle .pack:not(.is-open) {
+  opacity: 0;
+  pointer-events: none;
+}
+body.hud-off .pack:not(.is-open) {
+  display: none;
+}
 
 /* ---------- The render menu (P; ui/renderMenu.js, styled in styles.css): top right, over
    the picture, fading with the HUD when the mouse rests (and gone with it on H). ---------- */
 
-.viz-render-menu { top: 14px; z-index: 22; transition: opacity 360ms steps(3); }
-body.is-idle .viz-render-menu:not(:focus-within) { opacity: 0; pointer-events: none; }
-body.hud-off .viz-render-menu:not(:focus-within) { display: none; }
+.viz-render-menu {
+  top: 14px;
+  z-index: 22;
+  transition: opacity 360ms steps(3);
+}
+body.is-idle .viz-render-menu:not(:focus-within) {
+  opacity: 0;
+  pointer-events: none;
+}
+body.hud-off .viz-render-menu:not(:focus-within) {
+  display: none;
+}
 
 /* Recording a clip (V): the button burns red and blinks while it records. */
-body.is-recording .viz-record { --b: #e03a3a; color: #ff8a8a; }
-body.is-recording .viz-record [data-record-label]::before { content: '\25CF\00A0'; animation: blink 1s steps(1) infinite; }
+body.is-recording .viz-record {
+  --b: #e03a3a;
+  color: #ff8a8a;
+}
+body.is-recording .viz-record [data-record-label]::before {
+  content: '\25CF\00A0';
+  animation: blink 1s steps(1) infinite;
+}
 
 /* MIDI controller mapping (settings, Sound tab). */
-.viz-midi { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 16px; margin-top: 10px; }
-.viz-midi li { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.viz-midi li > span:first-child { flex: 1; font-family: var(--font-pixel); color: var(--c-bone); }
-.viz-midi-key { font-size: 0.8125rem; color: var(--text-dim); white-space: nowrap; }
-.viz-midi .pix-btn { padding: 3px 8px; font-size: 0.8125rem; }
-.viz-midi .pix-btn:disabled { opacity: 0.4; cursor: default; }
+.viz-midi {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 4px 16px;
+  margin-top: 10px;
+}
+.viz-midi li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.viz-midi li > span:first-child {
+  flex: 1;
+  font-family: var(--font-pixel);
+  color: var(--c-bone);
+}
+.viz-midi-key {
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.viz-midi .pix-btn {
+  padding: 3px 8px;
+  font-size: 0.8125rem;
+}
+.viz-midi .pix-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 
 /* ---------- Preset scenes ---------- */
 
@@ -599,57 +1348,159 @@ body.is-recording .viz-record [data-record-label]::before { content: '\25CF\00A0
   cursor: pointer;
   text-align: left;
 }
-.viz-scene-line[hidden] { display: none; }
-.viz-scene-label { font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); }
-.viz-scene-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--accent-hi); }
-.viz-scene-line.is-free .viz-scene-name { color: var(--text-dim); }
-.viz-scene-line:hover .viz-scene-name,
-.viz-scene-line:focus-visible .viz-scene-name { animation: viz-scene-pulse 900ms steps(4) infinite; }
-.viz-scene-line:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-@keyframes viz-scene-pulse {
-  0%, 100% { color: var(--accent-hi); text-shadow: 0 0 0 transparent; box-shadow: inset 0 -1px 0 var(--accent-lo); }
-  50% { color: var(--accent-core); text-shadow: 0 0 2px var(--accent-hi), 0 0 12px var(--accent); box-shadow: inset 0 -2px 0 var(--accent-hi); }
+.viz-scene-line[hidden] {
+  display: none;
 }
-.viz-scene-line:hover .viz-scene-label { color: var(--accent); }
+.viz-scene-label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.viz-scene-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--accent-hi);
+}
+.viz-scene-line.is-free .viz-scene-name {
+  color: var(--text-dim);
+}
+.viz-scene-line:hover .viz-scene-name,
+.viz-scene-line:focus-visible .viz-scene-name {
+  animation: viz-scene-pulse 900ms steps(4) infinite;
+}
+.viz-scene-line:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@keyframes viz-scene-pulse {
+  0%,
+  100% {
+    color: var(--accent-hi);
+    text-shadow: 0 0 0 transparent;
+    box-shadow: inset 0 -1px 0 var(--accent-lo);
+  }
+  50% {
+    color: var(--accent-core);
+    text-shadow:
+      0 0 2px var(--accent-hi),
+      0 0 12px var(--accent);
+    box-shadow: inset 0 -2px 0 var(--accent-hi);
+  }
+}
+.viz-scene-line:hover .viz-scene-label {
+  color: var(--accent);
+}
 
 /* The start screen's chips: a scene's colors, then its name; pointed at, the colors shimmer. */
-.viz-scene-chips[hidden] { display: none; }
-.viz-scene-chips { margin-top: 10px; }
-.viz-scene-chip { align-items: center; gap: 7px; }
-.viz-feel .viz-scene-chip b { font-size: 0.875rem; }
+.viz-scene-chips[hidden] {
+  display: none;
+}
+.viz-scene-chips {
+  margin-top: 10px;
+}
+.viz-scene-chip {
+  align-items: center;
+  gap: 7px;
+}
+.viz-feel .viz-scene-chip b {
+  font-size: 0.875rem;
+}
 .viz-chip-swatches,
-.viz-feel .viz-preset .viz-chip-swatches { display: inline-flex; gap: 1px; }
-.viz-chip-swatches i { width: 4px; height: 12px; background: var(--sw0); }
-.viz-chip-swatches i:nth-child(2) { background: var(--sw1); }
-.viz-chip-swatches i:nth-child(3) { background: var(--sw2); }
-.viz-chip-swatches i:nth-child(4) { background: var(--sw3); }
-.viz-chip-swatches i:nth-child(5) { background: var(--sw4); }
+.viz-feel .viz-preset .viz-chip-swatches {
+  display: inline-flex;
+  gap: 1px;
+}
+.viz-chip-swatches i {
+  width: 4px;
+  height: 12px;
+  background: var(--sw0);
+}
+.viz-chip-swatches i:nth-child(2) {
+  background: var(--sw1);
+}
+.viz-chip-swatches i:nth-child(3) {
+  background: var(--sw2);
+}
+.viz-chip-swatches i:nth-child(4) {
+  background: var(--sw3);
+}
+.viz-chip-swatches i:nth-child(5) {
+  background: var(--sw4);
+}
 .viz-scene-chip:hover .viz-chip-swatches i,
 .viz-scene-chip:focus-visible .viz-chip-swatches i,
-.viz-scene-chip[aria-pressed='true'] .viz-chip-swatches i { animation: viz-shimmer 720ms steps(3) infinite; }
-.viz-chip-swatches i:nth-child(2) { animation-delay: -120ms !important; }
-.viz-chip-swatches i:nth-child(3) { animation-delay: -240ms !important; }
-.viz-chip-swatches i:nth-child(4) { animation-delay: -360ms !important; }
-.viz-chip-swatches i:nth-child(5) { animation-delay: -480ms !important; }
-@keyframes viz-shimmer {
-  0%, 100% { transform: translateY(0); filter: none; }
-  50% { transform: translateY(-3px); filter: brightness(1.6); }
+.viz-scene-chip[aria-pressed='true'] .viz-chip-swatches i {
+  animation: viz-shimmer 720ms steps(3) infinite;
 }
-.viz-scene-chip[aria-pressed='true'] { --b: var(--accent-hi); }
-.viz-scenes-all b { color: var(--text-dim); }
-.viz-scenes-all:hover b { color: var(--accent-hi); }
-.viz-solo { max-width: 34rem; margin-top: 10px; font-size: 0.875rem; color: var(--accent-hi); }
-.viz-solo[hidden] { display: none; }
+.viz-chip-swatches i:nth-child(2) {
+  animation-delay: -120ms !important;
+}
+.viz-chip-swatches i:nth-child(3) {
+  animation-delay: -240ms !important;
+}
+.viz-chip-swatches i:nth-child(4) {
+  animation-delay: -360ms !important;
+}
+.viz-chip-swatches i:nth-child(5) {
+  animation-delay: -480ms !important;
+}
+@keyframes viz-shimmer {
+  0%,
+  100% {
+    transform: translateY(0);
+    filter: none;
+  }
+  50% {
+    transform: translateY(-3px);
+    filter: brightness(1.6);
+  }
+}
+.viz-scene-chip[aria-pressed='true'] {
+  --b: var(--accent-hi);
+}
+.viz-scenes-all b {
+  color: var(--text-dim);
+}
+.viz-scenes-all:hover b {
+  color: var(--accent-hi);
+}
+.viz-solo {
+  max-width: 34rem;
+  margin-top: 10px;
+  font-size: 0.875rem;
+  color: var(--accent-hi);
+}
+.viz-solo[hidden] {
+  display: none;
+}
 
 /* A scene's title card: the checkpoint band, smaller, lower. */
-.viz-title-card.is-scene { padding-top: max(calc(var(--header-h, 0px) + 24px), 22vh); }
-.viz-title-card.is-scene .kindled-band { padding: 14px var(--gutter); }
-.viz-title-card.is-scene .kindled-title { font-size: clamp(1.1rem, 3.2vw, 2rem); letter-spacing: 0.2em; }
+.viz-title-card.is-scene {
+  padding-top: max(calc(var(--header-h, 0px) + 24px), 22vh);
+}
+.viz-title-card.is-scene .kindled-band {
+  padding: 14px var(--gutter);
+}
+.viz-title-card.is-scene .kindled-title {
+  font-size: clamp(1.1rem, 3.2vw, 2rem);
+  letter-spacing: 0.2em;
+}
 
 /* The Scenes tab's loop: a row per scene. Pointed at, a row glows in its flame's color and
    its picture lifts; left out of the loop, it dims; the one playing wears the accent. */
-.viz-painter-link { flex: none; }
-.viz-scenes { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.viz-painter-link {
+  flex: none;
+}
+.viz-scenes {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
 .viz-scene-row {
   display: grid;
   grid-template-columns: auto 96px minmax(0, 1fr) auto auto auto;
@@ -657,14 +1508,24 @@ body.is-recording .viz-record [data-record-label]::before { content: '\25CF\00A0
   gap: 10px;
   padding: 6px 8px;
   box-shadow: 0 0 0 1px var(--line);
-  transition: box-shadow 200ms steps(2), background-color 200ms steps(2);
+  transition:
+    box-shadow 200ms steps(2),
+    background-color 200ms steps(2);
 }
 .viz-scene-row:hover,
 .viz-scene-row:focus-within {
   background: color-mix(in srgb, var(--scene-glow) 9%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--scene-glow) 70%, transparent), 0 0 14px -4px var(--scene-glow);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--scene-glow) 70%, transparent),
+    0 0 14px -4px var(--scene-glow);
 }
-.viz-scene-row input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; cursor: pointer; }
+.viz-scene-row input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
 .viz-scene-thumb {
   display: flex;
   width: 96px;
@@ -674,12 +1535,43 @@ body.is-recording .viz-record [data-record-label]::before { content: '\25CF\00A0
   box-shadow: 0 0 0 1px var(--line-strong);
   transition: transform 160ms steps(2);
 }
-.viz-scene-thumb img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
-.viz-scene-thumb i { flex: 1; }
-.viz-scene-row:hover .viz-scene-thumb { transform: translateY(-2px); box-shadow: 0 0 0 1px var(--scene-glow), 0 3px 0 -1px color-mix(in srgb, var(--scene-glow) 50%, var(--c-void)); }
-.viz-scene-text { display: grid; gap: 2px; min-width: 0; }
-.viz-scene-text b { font-family: var(--font-pixel); font-weight: 400; font-size: 0.9375rem; color: var(--c-bone); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.viz-scene-text span { font-size: 0.8125rem; line-height: 1.35; color: var(--text-dim); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.viz-scene-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+.viz-scene-thumb i {
+  flex: 1;
+}
+.viz-scene-row:hover .viz-scene-thumb {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px var(--scene-glow),
+    0 3px 0 -1px color-mix(in srgb, var(--scene-glow) 50%, var(--c-void));
+}
+.viz-scene-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.viz-scene-text b {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  font-size: 0.9375rem;
+  color: var(--c-bone);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.viz-scene-text span {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--text-dim);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .viz-scene-badge {
   padding: 2px 7px;
   font-family: var(--font-pixel);
@@ -690,26 +1582,68 @@ body.is-recording .viz-record [data-record-label]::before { content: '\25CF\00A0
   box-shadow: 0 0 0 1px var(--line-strong);
   white-space: nowrap;
 }
-.viz-scene-badge.is-mine { color: var(--accent-hi); box-shadow: 0 0 0 1px var(--accent-lo); }
-.viz-scene-row .pix-btn { padding: 4px 9px; font-size: 0.8125rem; white-space: nowrap; }
+.viz-scene-badge.is-mine {
+  color: var(--accent-hi);
+  box-shadow: 0 0 0 1px var(--accent-lo);
+}
+.viz-scene-row .pix-btn {
+  padding: 4px 9px;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
 .viz-scene-row.is-out .viz-scene-thumb,
-.viz-scene-row.is-out .viz-scene-text { opacity: 0.45; }
-.viz-scene-row.is-playing { box-shadow: inset 3px 0 0 var(--accent), 0 0 0 1px var(--accent-lo); }
-.viz-scene-row.is-playing .viz-scene-text b { color: var(--accent-hi); }
-.viz-scenes-empty { padding: 10px 0; }
+.viz-scene-row.is-out .viz-scene-text {
+  opacity: 0.45;
+}
+.viz-scene-row.is-playing {
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    0 0 0 1px var(--accent-lo);
+}
+.viz-scene-row.is-playing .viz-scene-text b {
+  color: var(--accent-hi);
+}
+.viz-scenes-empty {
+  padding: 10px 0;
+}
 @media (max-width: 720px) {
   /* Two lines: the switch, picture and name; then where it's from and the buttons. */
-  .viz-scene-row { grid-template-columns: auto 72px auto minmax(0, 1fr); gap: 8px; }
-  .viz-scene-row .pix-btn { padding: 4px 7px; }
-  .viz-scene-thumb { width: 72px; height: 40px; }
-  .viz-scene-text { grid-column: 3 / -1; }
-  .viz-scene-badge { grid-column: 2; justify-self: start; }
-  .viz-scene-row .pix-btn { justify-self: start; }
+  .viz-scene-row {
+    grid-template-columns: auto 72px auto minmax(0, 1fr);
+    gap: 8px;
+  }
+  .viz-scene-row .pix-btn {
+    padding: 4px 7px;
+  }
+  .viz-scene-thumb {
+    width: 72px;
+    height: 40px;
+  }
+  .viz-scene-text {
+    grid-column: 3 / -1;
+  }
+  .viz-scene-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .viz-scene-row .pix-btn {
+    justify-self: start;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .viz-scene-line:hover .viz-scene-name,
-  .viz-scene-line:focus-visible .viz-scene-name { animation: none; color: var(--accent-core); text-shadow: 0 0 8px var(--accent); }
-  .viz-scene-chip .viz-chip-swatches i { animation: none !important; }
-  .viz-scene-chip:hover .viz-chip-swatches i { filter: brightness(1.5); }
-  .viz-scene-row:hover .viz-scene-thumb { transform: none; }
+  .viz-scene-line:focus-visible .viz-scene-name {
+    animation: none;
+    color: var(--accent-core);
+    text-shadow: 0 0 8px var(--accent);
+  }
+  .viz-scene-chip .viz-chip-swatches i {
+    animation: none !important;
+  }
+  .viz-scene-chip:hover .viz-chip-swatches i {
+    filter: brightness(1.5);
+  }
+  .viz-scene-row:hover .viz-scene-thumb {
+    transform: none;
+  }
 }

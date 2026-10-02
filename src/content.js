@@ -38,8 +38,21 @@
 import content from './content.json' with { type: 'json' };
 
 export const {
-  site, screens, weapons, weaponDraw = {}, startingEquipment, hero, sections,
-  about, experience, leadership, education, skills, contact, ui, notFound,
+  site,
+  screens,
+  weapons,
+  weaponDraw = {},
+  startingEquipment,
+  hero,
+  sections,
+  about,
+  experience,
+  leadership,
+  education,
+  skills,
+  contact,
+  ui,
+  notFound,
 } = content;
 
 const withShownImages = (p) => (Array.isArray(p.images) ? { ...p, images: p.images.filter((im) => !im.hidden) } : p);

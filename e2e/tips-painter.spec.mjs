@@ -26,7 +26,13 @@ function fullScene() {
   s.details = { ghostKeep: 0.9, glowSize: 3, grad: [0, 6, 8], paintR: 3, scan: 1, mirror: 2, flicker: 1, chroma: 2 };
   s.look = { name: 'kaleido', amount: 1.2, params: { segments: 8 } };
   s.render.palette = [0, 6, 8];
-  s.knights = { ...s.knights, count: 4, helmets: ['great', null, 'armet', null], moves: ['nod', 'defaultDance'], style: 'mix' };
+  s.knights = {
+    ...s.knights,
+    count: 4,
+    helmets: ['great', null, 'armet', null],
+    moves: ['nod', 'defaultDance'],
+    style: 'mix',
+  };
   s.fireflies.moves = ['swing'];
   s.camera.move = { kind: 'push', amount: 0.5, bars: 8 };
   return s;
@@ -40,7 +46,13 @@ test.use({ launchOptions: { args: ['--disable-3d-apis', '--disable-webgl'] } });
  * and redo both on (an edit, another, one undone) so their tips can show.
  */
 async function ready(page) {
-  await page.addInitScript((open) => { try { localStorage.setItem('bonfire-painter-panel', JSON.stringify(open)); } catch { /* none */ } }, SECTIONS);
+  await page.addInitScript((open) => {
+    try {
+      localStorage.setItem('bonfire-painter-panel', JSON.stringify(open));
+    } catch {
+      /* none */
+    }
+  }, SECTIONS);
   await page.goto(`/painter/#scene=${encodeSceneHash(fullScene())}`);
   await expect(page.locator('html')).toHaveClass(/no-webgl/, { timeout: 30_000 }); // (no stage: see the top)
   await page.addStyleTag({ content: '[data-error] { display: none !important; }' }); // (its note would sit over the banner)
@@ -65,10 +77,14 @@ async function ready(page) {
 async function dismiss(page) {
   const was = await tipOf(page).textContent();
   await page.keyboard.press('Escape');
-  await page.waitForFunction((text) => {
-    const t = document.querySelector('.ui-tip');
-    return !t || !t.getClientRects().length || t.textContent !== text;
-  }, was, { timeout: 15_000 });
+  await page.waitForFunction(
+    (text) => {
+      const t = document.querySelector('.ui-tip');
+      return !t || !t.getClientRects().length || t.textContent !== text;
+    },
+    was,
+    { timeout: 15_000 },
+  );
 }
 
 /**
@@ -86,7 +102,10 @@ async function checkAll(page, triggers, how) {
     let r = await checkTip(page, t, { mode, timeout: 5000 });
     if (!r.shown) r = await checkTip(page, t, { mode, timeout: 5000 });
     const what = (await t.getAttribute('aria-label')) ?? (await t.getAttribute('data-tip'))?.slice(0, 40);
-    if (!r.shown) { missing.push(`${mode}: ${what}`); continue; }
+    if (!r.shown) {
+      missing.push(`${mode}: ${what}`);
+      continue;
+    }
     assertInViewport(r.rect, r.viewport, 8);
     expect(r.coversTrigger, `${what}: the tip covers what opened it`).toBe(false);
     await dismiss(page);
@@ -96,7 +115,10 @@ async function checkAll(page, triggers, how) {
 /** Sections with so many tips they're checked in parts (each a test: they run side by side). */
 const PARTS = { layers: 3 };
 
-for (const [label, viewport, touch] of [['laptop', { width: 1280, height: 720 }, false], ['phone', { width: 390, height: 844 }, true]]) {
+for (const [label, viewport, touch] of [
+  ['laptop', { width: 1280, height: 720 }, false],
+  ['phone', { width: 390, height: 844 }, true],
+]) {
   test.describe(`the Painter's tooltips (${label})`, () => {
     test.use({ viewport, hasTouch: touch });
     test.describe.configure({ mode: 'parallel' });
@@ -106,7 +128,7 @@ for (const [label, viewport, touch] of [['laptop', { width: 1280, height: 720 },
       test(`the bar (${how}): undo, redo, Tools, the previews, Play and the banner’s close`, async ({ page }) => {
         test.setTimeout(240_000);
         await ready(page);
-        const triggers = [...await collectTips(page, '[data-bar]'), ...await collectTips(page, '.pnt-banners')];
+        const triggers = [...(await collectTips(page, '[data-bar]')), ...(await collectTips(page, '.pnt-banners'))];
         expect(triggers.length).toBeGreaterThanOrEqual(touch ? 6 : 8);
         await checkAll(page, triggers, how);
       });
@@ -137,7 +159,11 @@ for (const [label, viewport, touch] of [['laptop', { width: 1280, height: 720 },
       await page.keyboard.press('l'); // (the library's cards too)
       await expect(page.locator('[data-library]')).toBeVisible();
       // (The pack's toggle is the site's shared pack, src/ui/pack.js: its title is another package's to take out.)
-      const titled = await page.evaluate(() => [...document.querySelectorAll('[title]')].filter((el) => !el.closest('.pack')).map((el) => el.outerHTML.slice(0, 80)));
+      const titled = await page.evaluate(() =>
+        [...document.querySelectorAll('[title]')]
+          .filter((el) => !el.closest('.pack'))
+          .map((el) => el.outerHTML.slice(0, 80)),
+      );
       expect(titled).toEqual([]);
     });
   });

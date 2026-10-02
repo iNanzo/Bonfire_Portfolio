@@ -23,7 +23,13 @@ function load(e) {
   Object.assign(base, e.colors);
   for (const k of Object.keys(flames)) delete flames[k];
   for (const f of e.flames) {
-    flames[f.id] = { name: f.name, ramp: [f.lo, f.mid, f.hi, f.core], shade: f.shade, light: f.light ?? 0.34, hidden: !!f.hidden };
+    flames[f.id] = {
+      name: f.name,
+      ramp: [f.lo, f.mid, f.hi, f.core],
+      shade: f.shade,
+      light: f.light ?? 0.34,
+      hidden: !!f.hidden,
+    };
   }
 }
 load(effects);
@@ -41,7 +47,14 @@ export function scenePalette(flame) {
 }
 
 const toRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-const toHex = (c) => `#${c.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('')}`;
+const toHex = (c) =>
+  `#${c
+    .map((v) =>
+      Math.round(Math.min(255, Math.max(0, v)))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
 /** Blend two sRGB hex colors. */
 export function mixHex(a, b, t) {
   const x = toRgb(a);

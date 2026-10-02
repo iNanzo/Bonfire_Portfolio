@@ -41,7 +41,15 @@ const EASE_LET_GO = 0.25;
 // (Which part each channel of a pose moves: 0 his body (how his hips, back, neck and head turn:
 // a lean), 1 his left arm, 2 his right, 3 his legs (where his hips are and each foot goes: his
 // footwork getting up and sitting down, over whatever he steps across).)
-const PART_OF = Uint8Array.from({ length: POSE_SIZE }, (_, i) => (i < POSE.hips || i >= POSE.legL ? 3 : i >= POSE.armL && i < POSE.armL + 7 ? 1 : i >= POSE.armR && i < POSE.armR + 7 ? 2 : 0));
+const PART_OF = Uint8Array.from({ length: POSE_SIZE }, (_, i) =>
+  i < POSE.hips || i >= POSE.legL
+    ? 3
+    : i >= POSE.armL && i < POSE.armL + 7
+      ? 1
+      : i >= POSE.armR && i < POSE.armR + 7
+        ? 2
+        : 0,
+);
 const PARTS = 4;
 // (What's found in, as marginOf() has it: each part, then each pauldron's dome, left and right.)
 const FLAGS = PARTS + 2;
@@ -49,7 +57,11 @@ const FLAGS = PARTS + 2;
 // (The way out of a shape outOf() finds, reused: keepClear.)
 const _rn = [0, 0, 0];
 // (Where the knight being checked stands, and which way he's turned: place().)
-let gx = 0, gy = 0, gz = 0, gc = 1, gs = 0;
+let gx = 0,
+  gy = 0,
+  gz = 0,
+  gc = 1,
+  gs = 0;
 /** Check knight k where he stands now (within(), nearestIn()). */
 export function place(k) {
   ({ x: gx, y: gy, z: gz } = k.group.position);
@@ -61,16 +73,42 @@ export function place(k) {
 const _m = new Float64Array(12);
 /** Piece i of a solved pose (`s`) into _m, where he stands (place()). */
 function frameOf(s, i) {
-  const { x, y, z, w } = s.q[i], o = s.p[i];
-  const x2 = x + x, y2 = y + y, z2 = z + z;
-  const xx = x * x2, xy = x * y2, xz = x * z2, yy = y * y2, yz = y * z2, zz = z * z2, wx = w * x2, wy = w * y2, wz = w * z2;
+  const { x, y, z, w } = s.q[i],
+    o = s.p[i];
+  const x2 = x + x,
+    y2 = y + y,
+    z2 = z + z;
+  const xx = x * x2,
+    xy = x * y2,
+    xz = x * z2,
+    yy = y * y2,
+    yz = y * z2,
+    zz = z * z2,
+    wx = w * x2,
+    wy = w * y2,
+    wz = w * z2;
   // (The piece's turn, as three.js makes it from a quaternion, then his.)
-  const r00 = 1 - (yy + zz), r01 = xy - wz, r02 = xz + wy;
-  const r10 = xy + wz, r11 = 1 - (xx + zz), r12 = yz - wx;
-  const r20 = xz - wy, r21 = yz + wx, r22 = 1 - (xx + yy);
-  _m[0] = gc * r00 + gs * r20; _m[1] = gc * r01 + gs * r21; _m[2] = gc * r02 + gs * r22; _m[3] = gx + o.x * gc + o.z * gs;
-  _m[4] = r10; _m[5] = r11; _m[6] = r12; _m[7] = gy + o.y;
-  _m[8] = gc * r20 - gs * r00; _m[9] = gc * r21 - gs * r01; _m[10] = gc * r22 - gs * r02; _m[11] = gz - o.x * gs + o.z * gc;
+  const r00 = 1 - (yy + zz),
+    r01 = xy - wz,
+    r02 = xz + wy;
+  const r10 = xy + wz,
+    r11 = 1 - (xx + zz),
+    r12 = yz - wx;
+  const r20 = xz - wy,
+    r21 = yz + wx,
+    r22 = 1 - (xx + yy);
+  _m[0] = gc * r00 + gs * r20;
+  _m[1] = gc * r01 + gs * r21;
+  _m[2] = gc * r02 + gs * r22;
+  _m[3] = gx + o.x * gc + o.z * gs;
+  _m[4] = r10;
+  _m[5] = r11;
+  _m[6] = r12;
+  _m[7] = gy + o.y;
+  _m[8] = gc * r20 - gs * r00;
+  _m[9] = gc * r21 - gs * r01;
+  _m[10] = gc * r22 - gs * r02;
+  _m[11] = gz - o.x * gs + o.z * gc;
 }
 export const _shapes = [];
 /**
@@ -94,18 +132,33 @@ const found = { d: 0, col: null, x: 0, y: 0, z: 0, j: 0 };
 export function nearestIn(pc, shapes, under) {
   found.d = under;
   found.col = null;
-  const m = _m, P = pc.pts, C = pc.clumps;
+  const m = _m,
+    P = pc.pts,
+    C = pc.clumps;
   for (let q = 0; q < C.length; q += 6) {
-    const ax = C[q], ay = C[q + 1], az = C[q + 2];
-    const cx = m[0] * ax + m[1] * ay + m[2] * az + m[3], cy = m[4] * ax + m[5] * ay + m[6] * az + m[7], cz = m[8] * ax + m[9] * ay + m[10] * az + m[11];
+    const ax = C[q],
+      ay = C[q + 1],
+      az = C[q + 2];
+    const cx = m[0] * ax + m[1] * ay + m[2] * az + m[3],
+      cy = m[4] * ax + m[5] * ay + m[6] * az + m[7],
+      cz = m[8] * ax + m[9] * ay + m[10] * az + m[11];
     for (const col of shapes) {
       if (distanceTo(col, cx, cy, cz) - col.lip * C[q + 3] >= found.d) continue;
       for (let j = C[q + 4], end = C[q + 5]; j < end; j += 3) {
-        const px = P[j], py = P[j + 1], pz = P[j + 2];
-        const x = m[0] * px + m[1] * py + m[2] * pz + m[3], y = m[4] * px + m[5] * py + m[6] * pz + m[7], z = m[8] * px + m[9] * py + m[10] * pz + m[11];
+        const px = P[j],
+          py = P[j + 1],
+          pz = P[j + 2];
+        const x = m[0] * px + m[1] * py + m[2] * pz + m[3],
+          y = m[4] * px + m[5] * py + m[6] * pz + m[7],
+          z = m[8] * px + m[9] * py + m[10] * pz + m[11];
         const d = distanceTo(col, x, y, z);
         if (d >= found.d) continue;
-        found.d = d; found.col = col; found.x = x; found.y = y; found.z = z; found.j = j;
+        found.d = d;
+        found.col = col;
+        found.x = x;
+        found.y = y;
+        found.z = z;
+        found.j = j;
       }
     }
   }
@@ -128,7 +181,8 @@ const isHome = (k) => !!k.home && Math.hypot(k.group.position.x - k.home.x, k.gr
  * standing for its middle, eased in and out as he gets up and sits down.
  */
 export function danceUp(k) {
-  const t = k.gestureT, T = GESTURE_TIME.dance;
+  const t = k.gestureT,
+    T = GESTURE_TIME.dance;
   return smooth(clamp01(Math.min(t, T - t) / RISE_TIME));
 }
 const _rest = newPose();
@@ -161,7 +215,10 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
   // (Every pose is solved through here, counted: k.solves is how many his last step took,
   // test/knightClearance.test.mjs holds it to EASE_SOLVES.)
   let solves = 0;
-  const solve = (pose, ground = null, helmet = null) => { solves++; return solver.solve(pose, ground, helmet); };
+  const solve = (pose, ground = null, helmet = null) => {
+    solves++;
+    return solver.solve(pose, ground, helmet);
+  };
   const _kn = new THREE.Vector3();
   const _kx = new THREE.Vector3();
   const _karm = new THREE.Vector3();
@@ -176,16 +233,26 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
     place(k);
     near.d = CLEAR_MARGIN;
     near.hit = null;
-    let piece = -1, at = 0;
+    let piece = -1,
+      at = 0;
     for (const i of ARM_OF[side]) {
       const pc = probes.get(i);
       const shapes = within(s, i, pc.r, near.d, cs);
       if (!shapes.length || !nearestIn(pc, shapes, near.d).col) continue;
-      near.d = found.d; near.hit = found.col;
-      near.at[0] = found.x; near.at[1] = found.y; near.at[2] = found.z;
-      piece = i; at = found.j;
+      near.d = found.d;
+      near.hit = found.col;
+      near.at[0] = found.x;
+      near.at[1] = found.y;
+      near.at[2] = found.z;
+      piece = i;
+      at = found.j;
     }
-    if (near.hit) near.arm.fromArray(probes.get(piece).pts, at).applyQuaternion(s.q[piece]).add(s.p[piece]).sub(s.p[SHOULDER[side]]);
+    if (near.hit)
+      near.arm
+        .fromArray(probes.get(piece).pts, at)
+        .applyQuaternion(s.q[piece])
+        .add(s.p[piece])
+        .sub(s.p[SHOULDER[side]]);
     return near;
   }
   // (How near each arm, [left, right], comes to the scenery as keepClear() left it, out to
@@ -204,7 +271,8 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
     const cs = nearOf(k);
     armNear[0] = armNear[1] = CLEAR_MARGIN;
     if (!cs.length) return;
-    const c = Math.cos(k.yaw), sn = Math.sin(k.yaw);
+    const c = Math.cos(k.yaw),
+      sn = Math.sin(k.yaw);
     const mid = s.p[BONE_INDEX.chest];
     let swung = false;
     for (let j = 0; j < 2; j++) {
@@ -228,7 +296,11 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
           const angle = Math.min(CLEAR_TURN, (CLEAR_MARGIN - before) / lever);
           solver.swingArm(side, axis, angle);
           n = nearest(k, s, cs, side);
-          if (!n.hit || n.d >= before + 0.002) { helped = true; swung = true; break; }
+          if (!n.hit || n.d >= before + 0.002) {
+            helped = true;
+            swung = true;
+            break;
+          }
           solver.swingArm(side, axis, -angle);
         }
         if (!helped) break;
@@ -275,7 +347,12 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
   // (The poses looked at this step, each as solved and kept clear: the ease may end on one
   // before the last, and the solver holds only the last.)
   const looked = Array.from({ length: EASE_SOLVES }, () => ({
-    f: NaN, pose: newPose(), q: BONES.map(() => new THREE.Quaternion()), p: BONES.map(() => new THREE.Vector3()), knee: [0, 0], elbow: [0, 0],
+    f: NaN,
+    pose: newPose(),
+    q: BONES.map(() => new THREE.Quaternion()),
+    p: BONES.map(() => new THREE.Vector3()),
+    knee: [0, 0],
+    elbow: [0, 0],
   }));
   let nLooked = 0;
   let budget = 0; // (the solves count this step's may reach)
@@ -284,12 +361,19 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
     const o = looked[nLooked++];
     o.f = f;
     o.pose.set(_eased);
-    for (let i = 0; i < o.q.length; i++) { o.q[i].copy(s.q[i]); o.p[i].copy(s.p[i]); }
-    o.knee[0] = s.knee[0]; o.knee[1] = s.knee[1]; o.elbow[0] = s.elbow[0]; o.elbow[1] = s.elbow[1];
+    for (let i = 0; i < o.q.length; i++) {
+      o.q[i].copy(s.q[i]);
+      o.p[i].copy(s.p[i]);
+    }
+    o.knee[0] = s.knee[0];
+    o.knee[1] = s.knee[1];
+    o.elbow[0] = s.elbow[0];
+    o.elbow[1] = s.elbow[1];
   }
   /** k.work with the parts in _bad eased toward `base` by `f` (into _eased), solved and kept clear (noted): how clear (marginOf; _now the parts in). */
   function easeTo(k, base, cs, f) {
-    for (let i = 0; i < POSE_SIZE; i++) _eased[i] = _bad[PART_OF[i]] ? k.work[i] + (base[i] - k.work[i]) * f : k.work[i];
+    for (let i = 0; i < POSE_SIZE; i++)
+      _eased[i] = _bad[PART_OF[i]] ? k.work[i] + (base[i] - k.work[i]) * f : k.work[i];
     const s = solve(_eased, null, k.helmet);
     keepClear(k, s);
     note(f, s);
@@ -301,8 +385,14 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
     while (j > 0 && looked[j].f !== f) j--;
     const o = looked[j];
     if (j < nLooked - 1) {
-      for (let i = 0; i < o.q.length; i++) { s.q[i].copy(o.q[i]); s.p[i].copy(o.p[i]); }
-      s.knee[0] = o.knee[0]; s.knee[1] = o.knee[1]; s.elbow[0] = o.elbow[0]; s.elbow[1] = o.elbow[1];
+      for (let i = 0; i < o.q.length; i++) {
+        s.q[i].copy(o.q[i]);
+        s.p[i].copy(o.p[i]);
+      }
+      s.knee[0] = o.knee[0];
+      s.knee[1] = o.knee[1];
+      s.elbow[0] = o.elbow[0];
+      s.elbow[1] = o.elbow[1];
     }
     k.work.set(o.pose);
   }
@@ -370,12 +460,22 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
    * snapping back for nothing).
    */
   function easeBack(k, base, cs, was, m0) {
-    let a = 0, ma = m0, b = 1, mb = NaN;
+    let a = 0,
+      ma = m0,
+      b = 1,
+      mb = NaN;
     // (The look before a, where he was in too: with a's, how fast he comes out there.)
-    let a0 = NaN, ma0 = NaN;
-    const inAt = (f, m) => { a0 = a; ma0 = ma; a = f; ma = m; };
+    let a0 = NaN,
+      ma0 = NaN;
+    const inAt = (f, m) => {
+      a0 = a;
+      ma0 = ma;
+      a = f;
+      ma = m;
+    };
     // (Where he'd stay, and how far in that leaves him.)
-    let stay = 0, mStay = m0;
+    let stay = 0,
+      mStay = m0;
     if (was > 0) {
       const mw = easeTo(k, base, cs, was);
       if (mw >= 0) {
@@ -397,7 +497,10 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
       // would leave the looks left between all and nothing, the arm thrown back toward its
       // rest in one step.)
       const mh = easeTo(k, base, cs, 0.5);
-      if (mh >= 0) { b = 0.5; mb = mh; } else inAt(0.5, mh);
+      if (mh >= 0) {
+        b = 0.5;
+        mb = mh;
+      } else inAt(0.5, mh);
     }
     if (Number.isNaN(mb)) {
       mb = easeTo(k, base, cs, 1);
@@ -425,7 +528,10 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
         f = a + Math.min(Math.max(on, 0.1 * (b - a)), (b - a) / 2, EASE_LET_GO);
       }
       const m = easeTo(k, base, cs, f);
-      if (m >= 0) { b = f; mb = m; } else inAt(f, m);
+      if (m >= 0) {
+        b = f;
+        mb = m;
+      } else inAt(f, m);
     }
     return b;
   }
@@ -437,7 +543,11 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
   function more() {
     let added = false;
     for (let j = 0; j < PARTS; j++) {
-      const want = _now[j] || (j === 0 && (_now[1] || _now[2])) || (j === 3 && _now[0]) || ((j === 1 || j === 2) && _now[PARTS + j - 1]);
+      const want =
+        _now[j] ||
+        (j === 0 && (_now[1] || _now[2])) ||
+        (j === 3 && _now[0]) ||
+        ((j === 1 || j === 2) && _now[PARTS + j - 1]);
       if (want && !_bad[j]) _bad[j] = added = true;
     }
     return added;

@@ -18,12 +18,7 @@
 // more gather in a loose ring, and the rest carry on roaming, different every time.
 import { shuffle, TAU, wrap } from '../math.js';
 
-const SPECIES = [
-  [0],
-  [0, 0.35],
-  [0, 0.28, 0.56],
-  [0, 4],
-];
+const SPECIES = [[0], [0, 0.35], [0, 0.28, 0.56], [0, 4]];
 
 export function createFireflyShow({ reducedMotion = false } = {}) {
   let pattern = 'blink';
@@ -31,12 +26,20 @@ export function createFireflyShow({ reducedMotion = false } = {}) {
   let fade = 1;
   let strobe = 0;
   let rolesFor = null; // which section the roles were dealt for
-  const flies = [];    // per firefly: { species, shift, on (s left lit), flick, role, ringR, ringY }
+  const flies = []; // per firefly: { species, shift, on (s left lit), flick, role, ringR, ringY }
 
   function ensure(n) {
     while (flies.length < n) {
       const i = flies.length;
-      flies.push({ species: SPECIES[i % SPECIES.length], shift: Math.floor(Math.random() * 8) + Math.random() * 0.2, on: 0, flick: 0, role: 'free', ringR: Math.random(), ringY: Math.random() });
+      flies.push({
+        species: SPECIES[i % SPECIES.length],
+        shift: Math.floor(Math.random() * 8) + Math.random() * 0.2,
+        on: 0,
+        flick: 0,
+        role: 'free',
+        ringR: Math.random(),
+        ringY: Math.random(),
+      });
     }
   }
 
@@ -45,7 +48,9 @@ export function createFireflyShow({ reducedMotion = false } = {}) {
     const order = shuffle([...Array(n).keys()]);
     const blade = holding ? 2 + Math.floor(Math.random() * Math.max(2, Math.round(n * 0.4) - 1)) : 0;
     const ring = Math.floor(Math.random() * Math.round(n * 0.35));
-    order.forEach((idx, k) => { flies[idx].role = k < blade ? 'blade' : k < blade + ring ? 'ring' : 'free'; });
+    order.forEach((idx, k) => {
+      flies[idx].role = k < blade ? 'blade' : k < blade + ring ? 'ring' : 'free';
+    });
   }
 
   // A firefly's light under a pattern: 0 (out) or about 1 (on). `c.beatPos` is in beats.
@@ -85,7 +90,9 @@ export function createFireflyShow({ reducedMotion = false } = {}) {
   }
 
   return {
-    get pattern() { return pattern; },
+    get pattern() {
+      return pattern;
+    },
     /** Change pattern, crossfading over about a beat. */
     set(name) {
       if (name === pattern) return;
@@ -147,7 +154,11 @@ export function createFireflyShow({ reducedMotion = false } = {}) {
         f.heat = g > 0.5 ? Math.min(1, f.vel.length() * 0.35 + (pattern === 'strobe' ? 0.5 : 0)) : 0;
 
         // Movement.
-        if (reducedMotion) { f.orbit = null; f.leash = null; return; }
+        if (reducedMotion) {
+          f.orbit = null;
+          f.leash = null;
+          return;
+        }
         if (s.role === 'blade') {
           const r = (0.5 + 0.45 * s.ringR) * (1 - 0.3 * c.build);
           const w = (TAU / (Math.max(0.25, c.period || 0.5) * 8)) * (1 + 2.5 * c.build) * (i % 4 === 0 ? -1 : 1);
@@ -166,7 +177,12 @@ export function createFireflyShow({ reducedMotion = false } = {}) {
     /** Hand the fireflies back to their own ways (no music, or the show turned off). */
     release(fl) {
       if (!fl) return;
-      for (const f of fl.flies) { f.show = null; f.heat = 0; f.orbit = null; f.leash = null; }
+      for (const f of fl.flies) {
+        f.show = null;
+        f.heat = 0;
+        f.orbit = null;
+        f.leash = null;
+      }
       rolesFor = null;
     },
   };

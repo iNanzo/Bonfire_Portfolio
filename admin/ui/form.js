@@ -16,8 +16,25 @@
 // (the shared tooltip, src/ui/tooltip.js), never title. Styles go through el()'s style object
 // (el.js): the deployed admin's policy blocks style attributes.
 import {
-  ADD_LABELS, COLUMNS, FIXED, HELP, LABELS, MULTILINE, MULTILINE_LISTS, NULLABLE, READONLY, SELECTS, SHORT, SWATCH_KEYS,
-  TEMPLATES, TITLE_KEYS, hint, moreFor, rangeFor, resolveHelp, subgroupsOf,
+  ADD_LABELS,
+  COLUMNS,
+  FIXED,
+  HELP,
+  LABELS,
+  MULTILINE,
+  MULTILINE_LISTS,
+  NULLABLE,
+  READONLY,
+  SELECTS,
+  SHORT,
+  SWATCH_KEYS,
+  TEMPLATES,
+  TITLE_KEYS,
+  hint,
+  moreFor,
+  rangeFor,
+  resolveHelp,
+  subgroupsOf,
 } from './schema.js';
 import { HEX_RE, ID_RE, shownImages, slugify } from '../../src/contentRules.js';
 import { newImageSrc, processImage } from './images.js';
@@ -29,9 +46,14 @@ import { el } from './el.js';
 import { getAt, keyOf, patternOf } from './paths.js';
 
 export { el, getAt, keyOf, patternOf };
-const setAt = (obj, path, value) => { getAt(obj, path.slice(0, -1))[path.at(-1)] = value; };
+const setAt = (obj, path, value) => {
+  getAt(obj, path.slice(0, -1))[path.at(-1)] = value;
+};
 
-const humanize = (key) => String(key).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
+const humanize = (key) =>
+  String(key)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^./, (c) => c.toUpperCase());
 export const labelFor = (path) => titleCase(hint(LABELS, patternOf(path)) ?? humanize(path.at(-1)));
 const addLabel = (path) => titleCase(hint(ADD_LABELS, patternOf(path)) ?? 'entry');
 
@@ -53,8 +75,18 @@ export function helpFor(path, ctx) {
  */
 export function moreBox(text, about = '') {
   const lines = String(text).split('\n').filter(Boolean);
-  return el('details', { class: 'viz-more' }, el('summary', {}, 'More', about ? el('span', { class: 'visually-hidden', text: ` about ${about}` }) : null),
-    lines.length > 1 ? el('ul', {}, lines.map((line) => el('li', { text: line }))) : el('p', { text: lines[0] ?? '' }));
+  return el(
+    'details',
+    { class: 'viz-more' },
+    el('summary', {}, 'More', about ? el('span', { class: 'visually-hidden', text: ` about ${about}` }) : null),
+    lines.length > 1
+      ? el(
+          'ul',
+          {},
+          lines.map((line) => el('li', { text: line })),
+        )
+      : el('p', { text: lines[0] ?? '' }),
+  );
 }
 
 /**
@@ -66,7 +98,11 @@ export function moreBox(text, about = '') {
  * @param {{ labelOf?: (key: string) => string }} [ctx]
  */
 export function subgroupHeading(group, path, ctx) {
-  const plain = (s) => String(s ?? '').toLowerCase().replace(/^the\s+/, '').trim();
+  const plain = (s) =>
+    String(s ?? '')
+      .toLowerCase()
+      .replace(/^the\s+/, '')
+      .trim();
   const label = titleCase(group.label);
   const above = ctx?.labelOf ? ctx.labelOf(keyOf(path)) : labelFor(path);
   if (plain(label) === plain(above)) return null;
@@ -74,15 +110,38 @@ export function subgroupHeading(group, path, ctx) {
   return label;
 }
 
-const CATEGORIES = [['featured', 'Featured'], ['projects', 'Projects'], ['archive', 'Earlier Explorations']];
+const CATEGORIES = [
+  ['featured', 'Featured'],
+  ['projects', 'Projects'],
+  ['archive', 'Earlier Explorations'],
+];
 
 // ---- buttons ------------------------------------------------------------------------
 // (A disabled button gets no hover or focus, so no tip: one could never show.)
-const iconButton = (label, glyph, onclick, extra = {}) => el('button', { type: 'button', class: 'icon', 'data-tip': extra.disabled ? null : label, 'aria-label': label, onclick, ...extra }, glyph);
-const eyeButton = (item, onToggle, { on = 'Show on the site', off = 'Hide from the site' } = {}) => iconButton(item.hidden ? on : off, item.hidden ? '◌' : '◉', () => {
-  if (item.hidden) delete item.hidden; else item.hidden = true;
-  onToggle();
-}, { 'aria-pressed': String(!!item.hidden), class: `icon eye${item.hidden ? ' is-off' : ''}` });
+const iconButton = (label, glyph, onclick, extra = {}) =>
+  el(
+    'button',
+    {
+      type: 'button',
+      class: 'icon',
+      'data-tip': extra.disabled ? null : label,
+      'aria-label': label,
+      onclick,
+      ...extra,
+    },
+    glyph,
+  );
+const eyeButton = (item, onToggle, { on = 'Show on the site', off = 'Hide from the site' } = {}) =>
+  iconButton(
+    item.hidden ? on : off,
+    item.hidden ? '◌' : '◉',
+    () => {
+      if (item.hidden) delete item.hidden;
+      else item.hidden = true;
+      onToggle();
+    },
+    { 'aria-pressed': String(!!item.hidden), class: `icon eye${item.hidden ? ' is-off' : ''}` },
+  );
 
 // ---- entry titles -------------------------------------------------------------------
 export function titleOf(item, index) {
@@ -90,7 +149,8 @@ export function titleOf(item, index) {
   for (const k of TITLE_KEYS) if (typeof item?.[k] === 'string' && item[k].trim()) return item[k];
   return `Entry ${index + 1}`;
 }
-const autoRows = (text) => Math.min(12, Math.max(2, Math.ceil(String(text ?? '').length / 70) + String(text ?? '').split('\n').length - 1));
+const autoRows = (text) =>
+  Math.min(12, Math.max(2, Math.ceil(String(text ?? '').length / 70) + String(text ?? '').split('\n').length - 1));
 
 // ---- values ------------------------------------------------------------------------
 /**
@@ -125,7 +185,9 @@ const isShort = (value, path) => {
  * Long text, for a textarea: a long value, or a field named for prose (a project's Problem;
  * not the interface's heading of that name, ui.problem, a word or two).
  */
-const isProse = (value, path) => (MULTILINE.has(path.at(-1)) && !(path[0] === 'ui' && path.length === 2)) || (typeof value === 'string' && value.length > 90);
+const isProse = (value, path) =>
+  (MULTILINE.has(path.at(-1)) && !(path[0] === 'ui' && path.length === 2)) ||
+  (typeof value === 'string' && value.length > 90);
 
 let uid = 0;
 /**
@@ -144,9 +206,18 @@ function renderObject(obj, path, ctx, level = 3) {
   for (const g of groups) {
     const heading = subgroupHeading(g, path, ctx);
     const id = heading ? `f${++uid}-sub` : null;
-    box.append(el('div', { class: 'subgroup', 'data-subgroup': g.label, role: heading ? 'group' : null, 'aria-labelledby': id },
-      heading ? el(`h${Math.min(level, 6)}`, { class: 'subgroup-label', id, text: heading }) : null,
-      el('div', { class: 'fields' }, g.keys.map((k) => renderField(obj[k], [...path, k], ctx, undefined, heading ? level + 1 : level)))));
+    box.append(
+      el(
+        'div',
+        { class: 'subgroup', 'data-subgroup': g.label, role: heading ? 'group' : null, 'aria-labelledby': id },
+        heading ? el(`h${Math.min(level, 6)}`, { class: 'subgroup-label', id, text: heading }) : null,
+        el(
+          'div',
+          { class: 'fields' },
+          g.keys.map((k) => renderField(obj[k], [...path, k], ctx, undefined, heading ? level + 1 : level)),
+        ),
+      ),
+    );
   }
   return box;
 }
@@ -157,7 +228,10 @@ function renderObject(obj, path, ctx, level = 3) {
  */
 export function renderField(value, path, ctx, label = labelFor(path), level = 3) {
   const group = value !== null && typeof value === 'object';
-  const wrap = el('div', { class: `${group ? 'group' : 'field'}${!group && isShort(value, path) ? ' is-short' : ''}`, 'data-path': keyOf(path) });
+  const wrap = el('div', {
+    class: `${group ? 'group' : 'field'}${!group && isShort(value, path) ? ' is-short' : ''}`,
+    'data-path': keyOf(path),
+  });
   const id = `f${++uid}`;
   const { help, more } = helpFor(path, ctx);
   const helpId = help ? `${id}-help` : null;
@@ -175,7 +249,9 @@ export function renderField(value, path, ctx, label = labelFor(path), level = 3)
   if (!group) {
     (control.querySelector?.('[data-main]') ?? control).id = id;
     // The help is what the input reads out (a slider's number box and a color's picker too).
-    if (helpId) for (const input of [control, ...control.querySelectorAll('input, select, textarea')]) if (/^(INPUT|SELECT|TEXTAREA)$/.test(input.tagName)) input.setAttribute('aria-describedby', helpId);
+    if (helpId)
+      for (const input of [control, ...control.querySelectorAll('input, select, textarea')])
+        if (/^(INPUT|SELECT|TEXTAREA)$/.test(input.tagName)) input.setAttribute('aria-describedby', helpId);
   }
   wrap.append(control, el('p', { class: 'error', role: 'alert' }));
   if (isElementPath(path)) wrap.append(elementFoot(path.at(-1), ctx));
@@ -183,25 +259,36 @@ export function renderField(value, path, ctx, label = labelFor(path), level = 3)
 }
 
 // ---- elements ------------------------------------------------------------------------
-const isElementPath = (path) => path.length === 3 && path[0] === 'effects' && path[1] === 'elements' && ELEMENT_IDS.includes(path[2]);
+const isElementPath = (path) =>
+  path.length === 3 && path[0] === 'effects' && path[1] === 'elements' && ELEMENT_IDS.includes(path[2]);
 
 /** Each element's share of the draws, from the draft's weights (only elements in rotation count). */
 function chances(draft) {
   const els = draft.effects?.elements ?? {};
-  const w = (id) => (els[id]?.rotation !== false && typeof els[id]?.weight === 'number' ? Math.max(0, els[id].weight) : 0);
+  const w = (id) =>
+    els[id]?.rotation !== false && typeof els[id]?.weight === 'number' ? Math.max(0, els[id].weight) : 0;
   const total = ELEMENT_IDS.reduce((sum, id) => sum + w(id), 0);
   return Object.fromEntries(ELEMENT_IDS.map((id) => [id, total ? w(id) / total : 0]));
 }
 const chanceText = (p) => (p > 0 ? `≈ ${Math.round(p * 100)}% of draws` : 'Never drawn');
 function refreshChances(ctx) {
   const c = chances(ctx.draft);
-  for (const n of document.querySelectorAll('[data-chance]')) n.textContent = chanceText(c[/** @type {HTMLElement} */ (n).dataset.chance]);
+  for (const n of document.querySelectorAll('[data-chance]'))
+    n.textContent = chanceText(c[/** @type {HTMLElement} */ (n).dataset.chance]);
 }
 
 function elementFoot(id, ctx) {
-  return el('div', { class: 'card-foot' },
+  return el(
+    'div',
+    { class: 'card-foot' },
     el('span', { class: 'chance', 'data-chance': id, text: chanceText(chances(ctx.draft)[id]) }),
-    el('button', { type: 'button', class: 'button small', text: '▶ Try It in the Preview', onclick: () => ctx.preview?.element(id) }));
+    el('button', {
+      type: 'button',
+      class: 'button small',
+      text: '▶ Try It in the Preview',
+      onclick: () => ctx.preview?.element(id),
+    }),
+  );
 }
 
 /**
@@ -213,26 +300,40 @@ function renderScalar(value, path, ctx, { nullable = hint(NULLABLE, patternOf(pa
   const key = path.at(-1);
   const options = SELECTS[pattern]?.(ctx.draft);
   if (options) {
-    const select = el('select', { onchange: () => update(path, typeof value === 'number' ? Number(select.value) : select.value, ctx) },
-      options.map((o) => el('option', { value: String(o.value), text: o.label })));
+    const select = el(
+      'select',
+      { onchange: () => update(path, typeof value === 'number' ? Number(select.value) : select.value, ctx) },
+      options.map((o) => el('option', { value: String(o.value), text: o.label })),
+    );
     select.value = String(value);
     return select;
   }
   if (typeof value === 'boolean') {
-    const box = el('input', { type: 'checkbox', class: 'switch', role: 'switch', onchange: () => update(path, box.checked, ctx) });
+    const box = el('input', {
+      type: 'checkbox',
+      class: 'switch',
+      role: 'switch',
+      onchange: () => update(path, box.checked, ctx),
+    });
     box.checked = value;
     return box;
   }
   const range = rangeFor(pattern);
   if (typeof value === 'number' && range) return renderSlider(value, path, range, ctx);
   if (typeof value === 'number') {
-    const input = el('input', { type: 'number', inputmode: 'numeric', oninput: () => update(path, input.value === '' ? value : Number(input.value), ctx) });
+    const input = el('input', {
+      type: 'number',
+      inputmode: 'numeric',
+      oninput: () => update(path, input.value === '' ? value : Number(input.value), ctx),
+    });
     input.value = String(value);
     return input;
   }
   if (typeof value === 'string' && HEX_RE.test(value)) return renderColor(value, path, ctx);
   multiline ??= isProse(value, path);
-  const input = multiline ? el('textarea', { rows: autoRows(value) }) : el('input', { type: 'text', spellcheck: key === 'id' || key === 'href' || key === 'src' ? 'false' : undefined });
+  const input = multiline
+    ? el('textarea', { rows: autoRows(value) })
+    : el('input', { type: 'text', spellcheck: key === 'id' || key === 'href' || key === 'src' ? 'false' : undefined });
   input.value = value ?? '';
   if (hint(READONLY, pattern)) input.readOnly = true;
   if (nullable) input.placeholder = '(none)';
@@ -271,7 +372,10 @@ function renderColor(value, path, ctx) {
   const text = el('input', { type: 'text', class: 'hex', spellcheck: 'false', maxlength: 7, 'data-main': true });
   picker.value = value.toLowerCase();
   text.value = value;
-  picker.addEventListener('input', () => { text.value = picker.value; update(path, picker.value, ctx); });
+  picker.addEventListener('input', () => {
+    text.value = picker.value;
+    update(path, picker.value, ctx);
+  });
   text.addEventListener('input', () => {
     const v = text.value.trim();
     if (HEX_RE.test(v)) picker.value = v.toLowerCase();
@@ -304,12 +408,15 @@ function update(path, value, ctx) {
   // A new entry's id follows its name until you edit the id yourself.
   if (key === 'name' && parent && ctx.fresh.has(parent) && 'id' in parent) {
     parent.id = uniqueId(slugify(value) || scopeIds(ctx, parent).fallback, ctx, parent);
-    const idField = /** @type {HTMLInputElement | null} */ (document.querySelector(`[data-path="${CSS.escape(keyOf([...parentPath, 'id']))}"] input`));
+    const idField = /** @type {HTMLInputElement | null} */ (
+      document.querySelector(`[data-path="${CSS.escape(keyOf([...parentPath, 'id']))}"] input`)
+    );
     if (idField) idField.value = parent.id;
   }
   if (key === 'id' && parent) ctx.fresh.delete(parent);
   if (TITLE_KEYS.includes(key)) {
-    for (const t of document.querySelectorAll(`[data-title-for="${CSS.escape(keyOf(parentPath))}"]`)) t.textContent = titleOf(parent, 0);
+    for (const t of document.querySelectorAll(`[data-title-for="${CSS.escape(keyOf(parentPath))}"]`))
+      t.textContent = titleOf(parent, 0);
   }
   if (path[0] === 'effects' && path[1] === 'elements' && (key === 'weight' || key === 'rotation')) refreshChances(ctx);
   if (SWATCH_KEYS.includes(key) && HEX_RE.test(value)) {
@@ -320,10 +427,21 @@ function update(path, value, ctx) {
 }
 
 function renderTodo(obj, path, ctx) {
-  return el('div', { class: 'todo' },
+  return el(
+    'div',
+    { class: 'todo' },
     el('span', { class: 'todo-mark', text: 'To Confirm' }),
     el('span', { class: 'todo-text', text: obj.todo }),
-    el('button', { type: 'button', class: 'link-button', text: 'Mark Done', onclick: () => { delete obj.todo; ctx.changed({ rerender: true }); } }));
+    el('button', {
+      type: 'button',
+      class: 'link-button',
+      text: 'Mark Done',
+      onclick: () => {
+        delete obj.todo;
+        ctx.changed({ rerender: true });
+      },
+    }),
+  );
 }
 
 // ---- lists -----------------------------------------------------------------------
@@ -348,7 +466,8 @@ function sortable(container, list, ctx) {
     const row = e.target.closest?.('[data-index]');
     if (ctx.drag?.list !== list || !row || row.parentElement !== container) return;
     e.preventDefault();
-    for (const r of container.querySelectorAll(':scope > .drop-before, :scope > .drop-after')) r.classList.remove('drop-before', 'drop-after');
+    for (const r of container.querySelectorAll(':scope > .drop-before, :scope > .drop-after'))
+      r.classList.remove('drop-before', 'drop-after');
     const box = row.getBoundingClientRect();
     const horizontal = getComputedStyle(container).display.includes('grid') && container.classList.contains('images');
     const after = horizontal ? e.clientX > box.left + box.width / 2 : e.clientY > box.top + box.height / 2;
@@ -365,7 +484,8 @@ function sortable(container, list, ctx) {
   });
   container.addEventListener('dragend', () => {
     ctx.drag = null;
-    for (const r of container.querySelectorAll('.is-dragging, .drop-before, .drop-after')) r.classList.remove('is-dragging', 'drop-before', 'drop-after');
+    for (const r of container.querySelectorAll('.is-dragging, .drop-before, .drop-after'))
+      r.classList.remove('is-dragging', 'drop-before', 'drop-after');
   });
 }
 
@@ -378,7 +498,12 @@ function orderButtons(list, i, ctx) {
 
 const blank = (sample) => {
   if (Array.isArray(sample)) return [];
-  if (sample && typeof sample === 'object') return Object.fromEntries(Object.entries(sample).filter(([k]) => k !== 'hidden' && k !== 'todo').map(([k, v]) => [k, blank(v)]));
+  if (sample && typeof sample === 'object')
+    return Object.fromEntries(
+      Object.entries(sample)
+        .filter(([k]) => k !== 'hidden' && k !== 'todo')
+        .map(([k, v]) => [k, blank(v)]),
+    );
   return typeof sample === 'number' ? 0 : typeof sample === 'boolean' ? false : sample === null ? null : '';
 };
 
@@ -388,7 +513,10 @@ function addEntry(list, path, ctx) {
   list.push(entry);
   if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
     ctx.open.add(entry);
-    if ('id' in entry) { ctx.fresh.add(entry); entry.id = uniqueId(slugify(entry.name ?? '') || scopeIds(ctx, entry).fallback, ctx, entry); }
+    if ('id' in entry) {
+      ctx.fresh.add(entry);
+      entry.id = uniqueId(slugify(entry.name ?? '') || scopeIds(ctx, entry).fallback, ctx, entry);
+    }
   }
   ctx.focus = keyOf([...path, list.length - 1]);
   ctx.changed({ rerender: true });
@@ -401,7 +529,14 @@ function renderCollection(list, path, ctx, level = 3) {
   list.forEach((item, i) => box.append(renderCard(list, i, path, ctx, fixed, level)));
   if (!fixed) {
     sortable(box, list, ctx);
-    box.append(el('button', { type: 'button', class: 'add', text: `+ Add ${addLabel(path)}`, onclick: () => addEntry(list, path, ctx) }));
+    box.append(
+      el('button', {
+        type: 'button',
+        class: 'add',
+        text: `+ Add ${addLabel(path)}`,
+        onclick: () => addEntry(list, path, ctx),
+      }),
+    );
   }
   return box;
 }
@@ -414,49 +549,83 @@ function cardMeta(item, path) {
   if (isProjectPath(path) || path[0] === 'featured') {
     const n = shownImages(item).length;
     const hiddenN = (item.images?.length ?? 0) - n;
-    return [item.kind, item.year, item.status, `${n} image${n === 1 ? '' : 's'}${hiddenN ? ` (+${hiddenN} hidden)` : ''}`].filter(Boolean).join(' · ');
+    return [
+      item.kind,
+      item.year,
+      item.status,
+      `${n} image${n === 1 ? '' : 's'}${hiddenN ? ` (+${hiddenN} hidden)` : ''}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
   }
   return '';
 }
 
 function swatches(item, ipath) {
-  return el('span', { class: 'swatches', 'aria-hidden': 'true' },
-    SWATCH_KEYS.map((k) => el('span', { class: 'swatch', 'data-swatch': keyOf([...ipath, k]), style: { background: HEX_RE.test(item[k] ?? '') ? item[k] : 'transparent' } })));
+  return el(
+    'span',
+    { class: 'swatches', 'aria-hidden': 'true' },
+    SWATCH_KEYS.map((k) =>
+      el('span', {
+        class: 'swatch',
+        'data-swatch': keyOf([...ipath, k]),
+        style: { background: HEX_RE.test(item[k] ?? '') ? item[k] : 'transparent' },
+      }),
+    ),
+  );
 }
 
 /** The collapsible card head shared by list cards and the featured card (`body`: its own, in place of every field). */
-function cardShell(item, ipath, ctx, { title, meta, thumb, lead = null, actions, badges, foot = null, body: custom = null, open, level = 3 }) {
+function cardShell(
+  item,
+  ipath,
+  ctx,
+  { title, meta, thumb, lead = null, actions, badges, foot = null, body: custom = null, open, level = 3 },
+) {
   const key = keyOf(ipath);
   const card = el('section', { class: `card${item.hidden ? ' is-hidden' : ''}`, 'data-path': key });
   const body = el('div', { class: 'card-body', hidden: !open });
-  const toggle = el('button', {
-    type: 'button', class: 'card-toggle', 'aria-expanded': String(open),
-    onclick: () => {
-      const now = body.hidden;
-      body.hidden = !now;
-      toggle.setAttribute('aria-expanded', String(now));
-      if (now) ctx.open.add(item); else ctx.open.delete(item);
+  const toggle = el(
+    'button',
+    {
+      type: 'button',
+      class: 'card-toggle',
+      'aria-expanded': String(open),
+      onclick: () => {
+        const now = body.hidden;
+        body.hidden = !now;
+        toggle.setAttribute('aria-expanded', String(now));
+        if (now) ctx.open.add(item);
+        else ctx.open.delete(item);
+      },
     },
-  },
-  el('span', { class: 'chevron', 'aria-hidden': 'true' }),
-  thumb,
-  el('span', { class: 'card-titles' },
-    el('span', { class: 'card-title', 'data-title-for': key, text: title }),
-    meta ? el('span', { class: 'card-meta', text: meta }) : null));
+    el('span', { class: 'chevron', 'aria-hidden': 'true' }),
+    thumb,
+    el(
+      'span',
+      { class: 'card-titles' },
+      el('span', { class: 'card-title', 'data-title-for': key, text: title }),
+      meta ? el('span', { class: 'card-meta', text: meta }) : null,
+    ),
+  );
   card.append(
     el('div', { class: 'card-head' }, lead, toggle, badges, el('span', { class: 'card-actions' }, actions)),
     el('p', { class: 'error', role: 'alert' }),
-    body);
+    body,
+  );
   body.append(custom ?? renderObject(item, ipath, ctx, level));
   if (foot) body.append(foot);
   return card;
 }
 
 function badgesFor(item) {
-  return el('span', { class: 'badges' },
+  return el(
+    'span',
+    { class: 'badges' },
     item.hidden ? el('span', { class: 'badge', text: 'Hidden' }) : null,
     typeof item.todo === 'string' ? el('span', { class: 'badge badge-todo', text: 'To Confirm' }) : null,
-    el('span', { class: 'badge badge-error', text: 'Needs Fixing' }));
+    el('span', { class: 'badge badge-error', text: 'Needs Fixing' }),
+  );
 }
 
 function renderCard(list, i, path, ctx, fixed, level = 3) {
@@ -466,24 +635,50 @@ function renderCard(list, i, path, ctx, fixed, level = 3) {
   const isFlame = isFlamePath(path);
   const isScene = isScenePath(path);
   const cover = isProject ? shownImages(item)[0] : null;
-  const eyeWords = isFlame ? { on: 'Put back in rotation', off: 'Take out of rotation' } : isScene ? { on: 'Put Back in the Loop', off: 'Take Out of the Loop' } : undefined;
-  const actions = fixed ? [] : [
-    isFlame ? flameQuickRoll(item, ctx) : null,
-    ...orderButtons(list, i, ctx),
-    eyeButton(item, () => ctx.changed({ rerender: true }), eyeWords),
-    iconButton('Delete', '✕', () => {
-      const extra = isProject && item.images?.length ? ' Its images are removed from the site when you save.' : '';
-      if (!confirm(`Delete “${titleOf(item, i)}”?${extra}`)) return;
-      list.splice(i, 1);
-      ctx.changed({ rerender: true });
-    }, { class: 'icon danger' }),
-  ];
+  const eyeWords = isFlame
+    ? { on: 'Put back in rotation', off: 'Take out of rotation' }
+    : isScene
+      ? { on: 'Put Back in the Loop', off: 'Take Out of the Loop' }
+      : undefined;
+  const actions = fixed
+    ? []
+    : [
+        isFlame ? flameQuickRoll(item, ctx) : null,
+        ...orderButtons(list, i, ctx),
+        eyeButton(item, () => ctx.changed({ rerender: true }), eyeWords),
+        iconButton(
+          'Delete',
+          '✕',
+          () => {
+            const extra =
+              isProject && item.images?.length ? ' Its images are removed from the site when you save.' : '';
+            if (!confirm(`Delete “${titleOf(item, i)}”?${extra}`)) return;
+            list.splice(i, 1);
+            ctx.changed({ rerender: true });
+          },
+          { class: 'icon danger' },
+        ),
+      ];
   const card = cardShell(item, ipath, ctx, {
     title: titleOf(item, i),
     meta: isScene ? sceneMeta(item) : cardMeta(item, path),
-    thumb: isProject && cover ? el('img', { class: 'card-thumb', alt: '', src: ctx.thumb(cover.src), loading: 'lazy' })
-      : isFlame ? swatches(item, ipath) : isScene ? sceneThumb(item) : null,
-    lead: fixed ? null : el('span', { class: 'handle', draggable: 'true', 'data-tip': 'Drag to reorder', 'aria-hidden': 'true', text: '⋮⋮' }),
+    thumb:
+      isProject && cover
+        ? el('img', { class: 'card-thumb', alt: '', src: ctx.thumb(cover.src), loading: 'lazy' })
+        : isFlame
+          ? swatches(item, ipath)
+          : isScene
+            ? sceneThumb(item)
+            : null,
+    lead: fixed
+      ? null
+      : el('span', {
+          class: 'handle',
+          draggable: 'true',
+          'data-tip': 'Drag to reorder',
+          'aria-hidden': 'true',
+          text: '⋮⋮',
+        }),
     actions,
     badges: badgesFor(item),
     foot: isProject ? projectActions(item, path[0], i, ctx) : isFlame ? flameActions(item, ctx) : null,
@@ -505,12 +700,22 @@ function moveProject(item, from, index, to, ctx) {
     const old = d.featured;
     d.featured = item;
     d[from][index] = old;
-    ctx.toast(`“${item.name}” is now featured; “${old.name}” took its place in ${from === 'projects' ? 'Projects' : 'Earlier Explorations'}.`);
+    ctx.toast(
+      `“${item.name}” is now featured; “${old.name}” took its place in ${from === 'projects' ? 'Projects' : 'Earlier Explorations'}.`,
+    );
   } else if (from === 'featured') {
     const pool = [...d.projects.map((p, i) => ['projects', i, p]), ...d.archive.map((p, i) => ['archive', i, p])];
     const [list, i, next] = pool.find(([, , p]) => !p.hidden && shownImages(p).length) ?? pool[0] ?? [];
-    if (!next) { ctx.toast('There’s no other project to feature in its place.', 'error'); return; }
-    if (!confirm(`Move “${item.name}” to ${to === 'projects' ? 'Projects' : 'Earlier Explorations'}? “${next.name}” becomes the featured project.`)) return;
+    if (!next) {
+      ctx.toast('There’s no other project to feature in its place.', 'error');
+      return;
+    }
+    if (
+      !confirm(
+        `Move “${item.name}” to ${to === 'projects' ? 'Projects' : 'Earlier Explorations'}? “${next.name}” becomes the featured project.`,
+      )
+    )
+      return;
     d[list].splice(i, 1);
     d.featured = next;
     d[to].unshift(item);
@@ -522,24 +727,58 @@ function moveProject(item, from, index, to, ctx) {
 }
 
 function moveMenu(item, from, index, ctx) {
-  const select = el('select', { class: 'move-select', 'aria-label': 'Move to', onchange: () => moveProject(item, from, index, select.value, ctx) },
-    CATEGORIES.map(([value, label]) => el('option', { value, text: value === from ? `${label} (here)` : label })));
+  const select = el(
+    'select',
+    {
+      class: 'move-select',
+      'aria-label': 'Move to',
+      onchange: () => moveProject(item, from, index, select.value, ctx),
+    },
+    CATEGORIES.map(([value, label]) => el('option', { value, text: value === from ? `${label} (here)` : label })),
+  );
   select.value = from;
   return el('label', { class: 'move' }, el('span', { text: 'Move To' }), select);
 }
 
 function projectActions(item, where, i, ctx) {
-  return el('div', { class: 'card-foot' },
+  return el(
+    'div',
+    { class: 'card-foot' },
     moveMenu(item, where, i, ctx),
-    ctx.siteUrl && ID_RE.test(item.id ?? '') ? el('a', { class: 'link-button', href: `${ctx.siteUrl}projects/${item.id}/`, target: '_blank', rel: 'noopener', text: 'Open Its Page ↗' }) : null);
+    ctx.siteUrl && ID_RE.test(item.id ?? '')
+      ? el('a', {
+          class: 'link-button',
+          href: `${ctx.siteUrl}projects/${item.id}/`,
+          target: '_blank',
+          rel: 'noopener',
+          text: 'Open Its Page ↗',
+        })
+      : null,
+  );
 }
 
 function flameActions(item, ctx) {
-  return el('div', { class: 'flame-foot' },
+  return el(
+    'div',
+    { class: 'flame-foot' },
     flameTools(item, ctx),
-    el('div', { class: 'card-foot' },
-      el('button', { type: 'button', class: 'button small', text: '▶ Forge It in the Preview', onclick: () => ctx.preview?.flame(item.id) }),
-      el('button', { type: 'button', class: 'link-button', text: 'Just Show Its Colors', onclick: () => ctx.preview?.show(item.id) })));
+    el(
+      'div',
+      { class: 'card-foot' },
+      el('button', {
+        type: 'button',
+        class: 'button small',
+        text: '▶ Forge It in the Preview',
+        onclick: () => ctx.preview?.flame(item.id),
+      }),
+      el('button', {
+        type: 'button',
+        class: 'link-button',
+        text: 'Just Show Its Colors',
+        onclick: () => ctx.preview?.show(item.id),
+      }),
+    ),
+  );
 }
 
 /** The featured project: one collapsible card (closed by default). */
@@ -565,19 +804,39 @@ function renderStrings(list, path, ctx) {
   const multiline = hint(MULTILINE_LISTS, patternOf(path));
   list.forEach((value, i) => {
     const ipath = [...path, i];
-    box.append(el('div', { class: 'row', 'data-index': i, 'data-path': keyOf(ipath) },
-      el('span', { class: 'handle', draggable: 'true', 'aria-hidden': 'true', text: '⋮⋮' }),
-      renderScalar(value, ipath, ctx, { multiline }),
-      ...orderButtons(list, i, ctx),
-      iconButton('Remove', '✕', () => { list.splice(i, 1); ctx.changed({ rerender: true }); }, { class: 'icon danger' }),
-      el('p', { class: 'error', role: 'alert' })));
+    box.append(
+      el(
+        'div',
+        { class: 'row', 'data-index': i, 'data-path': keyOf(ipath) },
+        el('span', { class: 'handle', draggable: 'true', 'aria-hidden': 'true', text: '⋮⋮' }),
+        renderScalar(value, ipath, ctx, { multiline }),
+        ...orderButtons(list, i, ctx),
+        iconButton(
+          'Remove',
+          '✕',
+          () => {
+            list.splice(i, 1);
+            ctx.changed({ rerender: true });
+          },
+          { class: 'icon danger' },
+        ),
+        el('p', { class: 'error', role: 'alert' }),
+      ),
+    );
   });
   sortable(box, list, ctx);
-  box.append(el('button', { type: 'button', class: 'add', text: `+ Add ${addLabel(path)}`, onclick: () => {
-    list.push('');
-    ctx.focus = keyOf([...path, list.length - 1]);
-    ctx.changed({ rerender: true });
-  } }));
+  box.append(
+    el('button', {
+      type: 'button',
+      class: 'add',
+      text: `+ Add ${addLabel(path)}`,
+      onclick: () => {
+        list.push('');
+        ctx.focus = keyOf([...path, list.length - 1]);
+        ctx.changed({ rerender: true });
+      },
+    }),
+  );
   return box;
 }
 
@@ -586,25 +845,55 @@ function renderRows(list, path, ctx) {
   const pattern = patternOf(path);
   const cols = COLUMNS[pattern] ?? (list[0] ?? []).map((_, c) => `Column ${c + 1}`);
   const box = el('div', { class: 'rows table', style: { '--cols': cols.length } });
-  box.append(el('div', { class: 'row row-head', 'aria-hidden': 'true' }, el('span'), ...cols.map((c) => el('span', { text: titleCase(c) }))));
+  box.append(
+    el(
+      'div',
+      { class: 'row row-head', 'aria-hidden': 'true' },
+      el('span'),
+      ...cols.map((c) => el('span', { text: titleCase(c) })),
+    ),
+  );
   list.forEach((row, i) => {
     const ipath = [...path, i];
-    box.append(el('div', { class: 'row', 'data-index': i, 'data-path': keyOf(ipath) },
-      el('span', { class: 'handle', draggable: 'true', 'aria-hidden': 'true', text: '⋮⋮' }),
-      ...cols.map((c, col) => {
-        const cell = renderScalar(row[col] ?? '', [...ipath, col], ctx, { nullable: hint(NULLABLE, `${pattern}[][${col}]`), multiline: false });
-        cell.setAttribute('aria-label', `${c}, row ${i + 1}`);
-        return cell;
-      }),
-      ...orderButtons(list, i, ctx),
-      iconButton('Remove', '✕', () => { list.splice(i, 1); ctx.changed({ rerender: true }); }, { class: 'icon danger' }),
-      el('p', { class: 'error', role: 'alert' })));
+    box.append(
+      el(
+        'div',
+        { class: 'row', 'data-index': i, 'data-path': keyOf(ipath) },
+        el('span', { class: 'handle', draggable: 'true', 'aria-hidden': 'true', text: '⋮⋮' }),
+        ...cols.map((c, col) => {
+          const cell = renderScalar(row[col] ?? '', [...ipath, col], ctx, {
+            nullable: hint(NULLABLE, `${pattern}[][${col}]`),
+            multiline: false,
+          });
+          cell.setAttribute('aria-label', `${c}, row ${i + 1}`);
+          return cell;
+        }),
+        ...orderButtons(list, i, ctx),
+        iconButton(
+          'Remove',
+          '✕',
+          () => {
+            list.splice(i, 1);
+            ctx.changed({ rerender: true });
+          },
+          { class: 'icon danger' },
+        ),
+        el('p', { class: 'error', role: 'alert' }),
+      ),
+    );
   });
   sortable(box, list, ctx);
-  box.append(el('button', { type: 'button', class: 'add', text: `+ Add ${addLabel(path)}`, onclick: () => {
-    list.push(hint(TEMPLATES, pattern)?.() ?? cols.map(() => ''));
-    ctx.changed({ rerender: true });
-  } }));
+  box.append(
+    el('button', {
+      type: 'button',
+      class: 'add',
+      text: `+ Add ${addLabel(path)}`,
+      onclick: () => {
+        list.push(hint(TEMPLATES, pattern)?.() ?? cols.map(() => ''));
+        ctx.changed({ rerender: true });
+      },
+    }),
+  );
   return box;
 }
 
@@ -616,74 +905,138 @@ function renderImages(list, path, ctx) {
   list.forEach((im, i) => {
     const ipath = [...path, i];
     const pending = ctx.uploads.get(im.src);
-    const pixel = el('input', { type: 'checkbox', onchange: async () => {
-      if (pixel.checked) im.pixel = true; else delete im.pixel;
-      if (pending?.file) { // re-convert a new upload with the other scaling
-        ctx.busy(true);
-        try { Object.assign(pending, await processImage(pending.file, { pixel: pixel.checked })); } finally { ctx.busy(false); }
-      }
-      ctx.changed({ rerender: true });
-    } });
+    const pixel = el('input', {
+      type: 'checkbox',
+      onchange: async () => {
+        if (pixel.checked) im.pixel = true;
+        else delete im.pixel;
+        if (pending?.file) {
+          // re-convert a new upload with the other scaling
+          ctx.busy(true);
+          try {
+            Object.assign(pending, await processImage(pending.file, { pixel: pixel.checked }));
+          } finally {
+            ctx.busy(false);
+          }
+        }
+        ctx.changed({ rerender: true });
+      },
+    });
     pixel.checked = !!im.pixel;
     // A clip: the site plays <src>.mp4 (added to the repo by hand) with this image as its poster.
-    const video = el('input', { type: 'checkbox', onchange: () => {
-      if (video.checked) im.video = true; else delete im.video;
-      ctx.changed({ rerender: true });
-    } });
+    const video = el('input', {
+      type: 'checkbox',
+      onchange: () => {
+        if (video.checked) im.video = true;
+        else delete im.video;
+        ctx.changed({ rerender: true });
+      },
+    });
     video.checked = !!im.video;
     // (A switch's name and tip are the schema's, as the search finds it; data-path lets a result land on it.)
-    const check = (key, input) => el('label', { class: 'check', 'data-path': keyOf([...ipath, key]), 'data-tip': helpFor([...ipath, key], ctx).help || null },
-      input, ` ${labelFor([...ipath, key])}`);
-    box.append(el('figure', { class: `image-tile${im.hidden ? ' is-hidden' : ''}`, 'data-index': i, 'data-path': keyOf(ipath) },
-      el('div', { class: 'image-frame', draggable: 'true', 'data-tip': 'Drag to reorder' },
-        el('img', { alt: im.alt || '', src: pending?.preview ?? ctx.thumb(im.src), loading: 'lazy' }),
-        im === icon ? el('span', { class: 'image-tag', text: 'Icon' }) : null,
-        im.hidden ? el('span', { class: 'image-tag image-hidden', text: 'Hidden' }) : null,
-        pending ? el('span', { class: 'image-tag image-new', text: 'New' }) : null),
-      el('code', { class: 'image-src', text: im.src }),
-      renderField(im.alt ?? '', [...ipath, 'alt'], ctx),
-      renderField(im.caption ?? '', [...ipath, 'caption'], ctx),
-      check('pixel', pixel),
-      check('video', video),
-      el('div', { class: 'image-actions' },
-        iconButton('Move earlier', '←', () => moveItem(list, i, i - 1, ctx), { disabled: i === 0 }),
-        iconButton('Move later', '→', () => moveItem(list, i, i + 1, ctx), { disabled: i === list.length - 1 }),
-        eyeButton(im, () => ctx.changed({ rerender: true }), { on: 'Show this image on the site', off: 'Hide this image from the site' }),
-        iconButton('Remove image', '✕', () => {
-          if (!pending && !confirm('Remove this image? It’s deleted from the site when you save. (◉ hides it instead.)')) return;
-          if (pending) { URL.revokeObjectURL(pending.preview); ctx.uploads.delete(im.src); }
-          list.splice(i, 1);
-          ctx.changed({ rerender: true });
-        }, { class: 'icon danger' })),
-      el('p', { class: 'error', role: 'alert' })));
+    const check = (key, input) =>
+      el(
+        'label',
+        { class: 'check', 'data-path': keyOf([...ipath, key]), 'data-tip': helpFor([...ipath, key], ctx).help || null },
+        input,
+        ` ${labelFor([...ipath, key])}`,
+      );
+    box.append(
+      el(
+        'figure',
+        { class: `image-tile${im.hidden ? ' is-hidden' : ''}`, 'data-index': i, 'data-path': keyOf(ipath) },
+        el(
+          'div',
+          { class: 'image-frame', draggable: 'true', 'data-tip': 'Drag to reorder' },
+          el('img', { alt: im.alt || '', src: pending?.preview ?? ctx.thumb(im.src), loading: 'lazy' }),
+          im === icon ? el('span', { class: 'image-tag', text: 'Icon' }) : null,
+          im.hidden ? el('span', { class: 'image-tag image-hidden', text: 'Hidden' }) : null,
+          pending ? el('span', { class: 'image-tag image-new', text: 'New' }) : null,
+        ),
+        el('code', { class: 'image-src', text: im.src }),
+        renderField(im.alt ?? '', [...ipath, 'alt'], ctx),
+        renderField(im.caption ?? '', [...ipath, 'caption'], ctx),
+        check('pixel', pixel),
+        check('video', video),
+        el(
+          'div',
+          { class: 'image-actions' },
+          iconButton('Move earlier', '←', () => moveItem(list, i, i - 1, ctx), { disabled: i === 0 }),
+          iconButton('Move later', '→', () => moveItem(list, i, i + 1, ctx), { disabled: i === list.length - 1 }),
+          eyeButton(im, () => ctx.changed({ rerender: true }), {
+            on: 'Show this image on the site',
+            off: 'Hide this image from the site',
+          }),
+          iconButton(
+            'Remove image',
+            '✕',
+            () => {
+              if (
+                !pending &&
+                !confirm('Remove this image? It’s deleted from the site when you save. (◉ hides it instead.)')
+              )
+                return;
+              if (pending) {
+                URL.revokeObjectURL(pending.preview);
+                ctx.uploads.delete(im.src);
+              }
+              list.splice(i, 1);
+              ctx.changed({ rerender: true });
+            },
+            { class: 'icon danger' },
+          ),
+        ),
+        el('p', { class: 'error', role: 'alert' }),
+      ),
+    );
   });
   sortable(box, list, ctx);
 
   const idOk = ID_RE.test(project?.id ?? '');
-  const picker = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif,image/avif', multiple: true, hidden: true, onchange: async () => {
-    const files = [...picker.files];
-    picker.value = '';
-    if (!files.length) return;
-    ctx.busy(true, `Converting ${files.length} image${files.length > 1 ? 's' : ''}…`);
-    try {
-      for (const file of files) {
-        const taken = new Set([...ctx.uploads.keys(), ...allImageSrcs(ctx.draft)]);
-        const src = newImageSrc(project.id, file.name, taken);
-        const out = await processImage(file);
-        ctx.uploads.set(src, { ...out, file });
-        list.push({ src, alt: '', caption: '' });
+  const picker = el('input', {
+    type: 'file',
+    accept: 'image/png,image/jpeg,image/webp,image/gif,image/avif',
+    multiple: true,
+    hidden: true,
+    onchange: async () => {
+      const files = [...picker.files];
+      picker.value = '';
+      if (!files.length) return;
+      ctx.busy(true, `Converting ${files.length} image${files.length > 1 ? 's' : ''}…`);
+      try {
+        for (const file of files) {
+          const taken = new Set([...ctx.uploads.keys(), ...allImageSrcs(ctx.draft)]);
+          const src = newImageSrc(project.id, file.name, taken);
+          const out = await processImage(file);
+          ctx.uploads.set(src, { ...out, file });
+          list.push({ src, alt: '', caption: '' });
+        }
+      } catch (e) {
+        ctx.toast(e.message, 'error');
+      } finally {
+        ctx.busy(false);
+        ctx.changed({ rerender: true });
       }
-    } catch (e) {
-      ctx.toast(e.message, 'error');
-    } finally {
-      ctx.busy(false);
-      ctx.changed({ rerender: true });
-    }
-  } });
-  const tile = el('div', { class: 'image-add' },
+    },
+  });
+  const tile = el(
+    'div',
+    { class: 'image-add' },
     picker,
-    el('button', { type: 'button', class: 'add', disabled: !idOk, text: '+ Add Images', onclick: () => picker.click() }),
-    el('p', { class: 'help', text: idOk ? 'PNG, JPG, WebP or GIF. Converted to WebP here, uploaded when you save.' : 'Give the project a valid ID first — images are stored under it.' }));
+    el('button', {
+      type: 'button',
+      class: 'add',
+      disabled: !idOk,
+      text: '+ Add Images',
+      onclick: () => picker.click(),
+    }),
+    el('p', {
+      class: 'help',
+      text: idOk
+        ? 'PNG, JPG, WebP or GIF. Converted to WebP here, uploaded when you save.'
+        : 'Give the project a valid ID first — images are stored under it.',
+    }),
+  );
   return el('div', { class: 'image-manager' }, box, tile);
 }
 
@@ -698,12 +1051,14 @@ function allImageSrcs(d) {
  * it is listed on the card, each with where it is (look.name: …).
  */
 export function showErrors(root, errors) {
-  for (const n of root.querySelectorAll('.has-error, .has-inner-error')) n.classList.remove('has-error', 'has-inner-error');
+  for (const n of root.querySelectorAll('.has-error, .has-inner-error'))
+    n.classList.remove('has-error', 'has-inner-error');
   for (const p of root.querySelectorAll('.error')) p.textContent = '';
   for (const { path, message } of errors) {
     let p = path;
     let target = root.querySelector(`[data-path="${CSS.escape(p)}"]`);
-    while (!target) { // climb to the nearest rendered ancestor: a.b[2].c → a.b[2] → a.b → a
+    while (!target) {
+      // climb to the nearest rendered ancestor: a.b[2].c → a.b[2] → a.b → a
       const up = p.replace(/(\.[^.[\]]+|\[\d+\])$/, '');
       if (!up || up === p) break;
       p = up;
@@ -712,7 +1067,8 @@ export function showErrors(root, errors) {
     if (target) {
       target.classList.add('has-error');
       const slot = target.querySelector(':scope > .error');
-      if (slot && p !== path && /^scenes\[\d+\]$/.test(p)) slot.textContent += `${slot.textContent ? '\n' : ''}${path.slice(p.length + 1)}: ${message}`;
+      if (slot && p !== path && /^scenes\[\d+\]$/.test(p))
+        slot.textContent += `${slot.textContent ? '\n' : ''}${path.slice(p.length + 1)}: ${message}`;
       else if (slot && !slot.textContent) slot.textContent = message;
     }
     for (const card of root.querySelectorAll('.card[data-path]')) {

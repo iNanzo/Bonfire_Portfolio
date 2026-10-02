@@ -23,7 +23,11 @@ test('Frame Rate’s batch: every beat and event heard between drawn frames reac
   batch.add(tick({ hat: 0.6 }));
   batch.add(tick({ beats: [{ beat: 2 }], level: 0.8 }));
   f = batch.take();
-  assert.deepEqual(f.beats.map((b) => b.beat), [1, 2], 'both beats');
+  assert.deepEqual(
+    f.beats.map((b) => b.beat),
+    [1, 2],
+    'both beats',
+  );
   assert.deepEqual(f.events, ['drop'], 'the drop, though it came two ticks ago');
   assert.equal(f.drop, 'big', 'with its size');
   assert.equal(f.kick, 0.9);
@@ -34,7 +38,11 @@ test('Frame Rate’s batch: every beat and event heard between drawn frames reac
   batch.add(tick({}));
   const g = batch.take();
   assert.deepEqual([g.beats.length, g.events.length, g.kick, g.drop], [0, 0, 0, null]);
-  assert.deepEqual(handed.map((b) => b.beat), [], 'the lists are reused (nothing allocated frame to frame)');
+  assert.deepEqual(
+    handed.map((b) => b.beat),
+    [],
+    'the lists are reused (nothing allocated frame to frame)',
+  );
   batch.add(tick({ beats: [{ beat: 3 }] }));
   batch.clear();
   assert.equal(batch.take(), null, 'a new source: forgotten');

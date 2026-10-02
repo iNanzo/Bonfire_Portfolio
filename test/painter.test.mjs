@@ -19,7 +19,13 @@ import { keepInClearing } from '../src/visualizer/clearing.js';
 import { suggestFlames, suggestScenes } from '../src/paletteGen.js';
 
 /** Every attribute value `name` in the markup. */
-const attrs = (html, name) => [...html.matchAll(new RegExp(`${name}="([^"]*)"`, 'g'))].map((m) => m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#39;/g, '\''));
+const attrs = (html, name) =>
+  [...html.matchAll(new RegExp(`${name}="([^"]*)"`, 'g'))].map((m) =>
+    m[1]
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&#39;/g, "'"),
+  );
 /** A scene with every optional part filled: its own scenery colors and drop hits, every layer on, every detail pinned, a few-color palette, four knights with moves. */
 function fullScene() {
   const s = defaultScene('Everything');
@@ -63,7 +69,10 @@ test('panel: suggested flames and scenery are valid scene colors', () => {
     assert.deepEqual(errors, []);
     assert.equal(next.colors.flame.light, 0.3);
   }
-  for (const v of attrs(sceneryChips(suggestScenes('#3fa7ff', { flames: [{ hi: s.colors.flame.hi }] })), 'data-value').map((x) => JSON.parse(x))) {
+  for (const v of attrs(
+    sceneryChips(suggestScenes('#3fa7ff', { flames: [{ hi: s.colors.flame.hi }] })),
+    'data-value',
+  ).map((x) => JSON.parse(x))) {
     const errors = [];
     validateScene(normalizeScene(withPath(s, 'colors.scenery', v)), (p, m) => errors.push(`${p}: ${m}`));
     assert.deepEqual(errors, []);
@@ -86,27 +95,44 @@ test('history: a drag is one step; undo and redo walk back and forth; a new edit
   let t = 0;
   const h = createHistory({ limit: 5, coalesceMs: 600, now: () => t });
   let s = { v: 0 };
-  const edit = (v, key) => { h.push(s, key); s = { v }; };
+  const edit = (v, key) => {
+    h.push(s, key);
+    s = { v };
+  };
   edit(1, 'glow');
-  t += 100; edit(2, 'glow');
-  t += 100; edit(3, 'glow');   // (the same slider, close together: one step)
+  t += 100;
+  edit(2, 'glow');
+  t += 100;
+  edit(3, 'glow'); // (the same slider, close together: one step)
   assert.equal(h.size, 1);
-  t += 1000; edit(4, 'glow'); // (a pause: a new step)
-  t += 50; edit(5, 'grain');  // (another field: a new step)
+  t += 1000;
+  edit(4, 'glow'); // (a pause: a new step)
+  t += 50;
+  edit(5, 'grain'); // (another field: a new step)
   assert.equal(h.size, 3);
-  s = h.undo(s); assert.equal(s.v, 4);
-  s = h.undo(s); assert.equal(s.v, 3);
-  s = h.undo(s); assert.equal(s.v, 0);
+  s = h.undo(s);
+  assert.equal(s.v, 4);
+  s = h.undo(s);
+  assert.equal(s.v, 3);
+  s = h.undo(s);
+  assert.equal(s.v, 0);
   assert.equal(h.undo(s), null);
   assert.ok(!h.canUndo && h.canRedo);
-  s = h.redo(s); assert.equal(s.v, 3);
+  s = h.redo(s);
+  assert.equal(s.v, 3);
   edit(9, null);
   assert.ok(!h.canRedo, 'a new edit drops what could be redone');
   // seal(): the next edit is a step of its own even on the same field.
-  edit(10, 'x'); h.seal(); t += 10; edit(11, 'x');
+  edit(10, 'x');
+  h.seal();
+  t += 10;
+  edit(11, 'x');
   const before = h.size;
   // The limit: the oldest go.
-  for (let i = 0; i < 20; i++) { t += 1000; edit(20 + i, null); }
+  for (let i = 0; i < 20; i++) {
+    t += 1000;
+    edit(20 + i, null);
+  }
   assert.equal(h.size, 5);
   assert.ok(before >= 3);
   // Kept states are copies.
@@ -150,7 +176,24 @@ test('beat: a groove at 124 BPM, a beat every period, bars counted, beat 1 on ea
   assert.ok(frames.filter((f) => f.kick > 0).length >= 15);
   assert.ok(frames.filter((f) => f.hat > 0).length >= 14);
   // The shape the director reads.
-  for (const k of ['time', 'rms', 'level', 'kick', 'hat', 'beats', 'events', 'bands', 'bpm', 'locked', 'strength', 'state', 'build', 'intensity', 'drop']) assert.ok(k in frames[0], k);
+  for (const k of [
+    'time',
+    'rms',
+    'level',
+    'kick',
+    'hat',
+    'beats',
+    'events',
+    'bands',
+    'bpm',
+    'locked',
+    'strength',
+    'state',
+    'build',
+    'intensity',
+    'drop',
+  ])
+    assert.ok(k in frames[0], k);
   assert.deepEqual(Object.keys(silentFrame().bands), Object.keys(frames[0].bands));
   // Early by the lead.
   const lead = run(createBeatFeed({ bpm: 124, start: 0, lead: 0.1 }), 0, 2).beats;
@@ -170,10 +213,14 @@ test('beat: the drop loop runs groove → breakdown → build → the drop, the 
   assert.equal(at('drop').bar, 0);
   assert.equal(at('drop').drop, 'big');
   // (Beat 0 falls 50 ms after the start.)
-  assert.ok(Math.abs(at('drop').at - (0.05 + loop)) < 0.03, `the drop at ${at('drop').at.toFixed(2)} s (a loop is ${loop.toFixed(2)} s)`);
+  assert.ok(
+    Math.abs(at('drop').at - (0.05 + loop)) < 0.03,
+    `the drop at ${at('drop').at.toFixed(2)} s (a loop is ${loop.toFixed(2)} s)`,
+  );
   // The build climbs through the breakdown and the build, past the stages the director counts.
   const low = frames.filter((f) => f.state === 'breakdown' || f.state === 'build');
-  for (let i = 1; i < low.length; i++) if (low[i].time - low[i - 1].time < 0.1) assert.ok(low[i].build >= low[i - 1].build - 1e-9);
+  for (let i = 1; i < low.length; i++)
+    if (low[i].time - low[i - 1].time < 0.1) assert.ok(low[i].build >= low[i - 1].build - 1e-9);
   assert.ok(Math.max(...low.map((f) => f.build)) > 0.95);
   assert.ok(frames.filter((f) => f.state === 'breakdown').every((f) => f.kick === 0 && f.bands.bass < 0.2));
   // The count starts again at each drop: bar 0, beat 1.
@@ -195,9 +242,15 @@ test('beat: a drop by hand lands on the next frame and the count starts again on
 });
 
 test('orbit: a pose and its orbit go both ways; drags, zooms and slides keep to their limits', () => {
-  const rnd = ((seed) => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; })(7);
+  const rnd = ((seed) => () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  })(7);
   for (let i = 0; i < 500; i++) {
-    const pose = { pos: [(rnd() - 0.5) * 12, rnd() * 6 + 0.2, (rnd() - 0.5) * 12], target: [(rnd() - 0.5) * 2, rnd(), (rnd() - 0.5) * 2] };
+    const pose = {
+      pos: [(rnd() - 0.5) * 12, rnd() * 6 + 0.2, (rnd() - 0.5) * 12],
+      target: [(rnd() - 0.5) * 2, rnd(), (rnd() - 0.5) * 2],
+    };
     const back = orbitPose(poseToOrbit(pose));
     for (let k = 0; k < 3; k++) {
       assert.ok(Math.abs(back.pos[k] - pose.pos[k]) < 1e-9);
@@ -222,26 +275,40 @@ test('orbit: a pose and its orbit go both ways; drags, zooms and slides keep to 
   const dot = view.reduce((s, x, i) => s + x * moved[i], 0);
   assert.ok(Math.abs(dot) < 1e-9, 'the slide is across the view');
   assert.ok(Math.hypot(...moved) > 0.05);
-  assert.ok(Math.abs(Math.hypot(...after.pos.map((x, i) => x - after.target[i])) - v.dist) < 1e-9, 'the distance is kept');
+  assert.ok(
+    Math.abs(Math.hypot(...after.pos.map((x, i) => x - after.target[i])) - v.dist) < 1e-9,
+    'the distance is kept',
+  );
 });
 
 test('the camera by hand stays in the clearing, and what it looks at near the fire', () => {
   const cam = defaultScene().camera;
-  const rnd = ((seed) => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; })(3);
+  const rnd = ((seed) => () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  })(3);
   for (let i = 0; i < 400; i++) {
-    const view = { yaw: (rnd() - 0.5) * 8, pitch: PAINT_LIMITS.pitch[0] + rnd() * (PAINT_LIMITS.pitch[1] - PAINT_LIMITS.pitch[0]), dist: PAINT_LIMITS.dist[0] + rnd() * 12, target: [(rnd() - 0.5) * 12, rnd() * 8 - 2, (rnd() - 0.5) * 12] };
+    const view = {
+      yaw: (rnd() - 0.5) * 8,
+      pitch: PAINT_LIMITS.pitch[0] + rnd() * (PAINT_LIMITS.pitch[1] - PAINT_LIMITS.pitch[0]),
+      dist: PAINT_LIMITS.dist[0] + rnd() * 12,
+      target: [(rnd() - 0.5) * 12, rnd() * 8 - 2, (rnd() - 0.5) * 12],
+    };
     const c = cameraAt(cam, view);
     const k = keepInClearing({ x: c.pos[0], y: c.pos[1], z: c.pos[2] });
     assert.ok(Math.hypot(k.x - c.pos[0], k.y - c.pos[1], k.z - c.pos[2]) < 1e-9);
     const errors = [];
     validateScene(normalizeScene({ ...defaultScene(), camera: c }), (p, m) => errors.push(`${p}: ${m}`));
-    assert.deepEqual(errors.filter((e) => e.startsWith('scene.camera.pos')), []);
+    assert.deepEqual(
+      errors.filter((e) => e.startsWith('scene.camera.pos')),
+      [],
+    );
     assert.equal(c.fov, cam.fov);
     assert.deepEqual(c.move, cam.move);
   }
 });
 
-test('the stage: the Painter\'s director and bonfire keep the look being painted under reduced motion (paintedLook)', () => {
+test("the stage: the Painter's director and bonfire keep the look being painted under reduced motion (paintedLook)", () => {
   // (main.js is the page itself, so its calls are read: under reduced motion, a director made
   // without paintedLook plays every scene's look as Ember, and a bonfire made without it keeps
   // every effect that isn't a still one off the stage, so the Painter would paint blind. What

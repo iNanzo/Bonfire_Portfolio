@@ -19,7 +19,14 @@ async function decoder() {
   if (draco) return draco;
   const src = fs.readFileSync(DECODER, 'utf8');
   const require = createRequire(import.meta.url);
-  const make = new Function('module', 'exports', 'require', '__dirname', '__filename', `${src};return DracoDecoderModule;`);
+  const make = new Function(
+    'module',
+    'exports',
+    'require',
+    '__dirname',
+    '__filename',
+    `${src};return DracoDecoderModule;`,
+  );
   draco = await make(undefined, undefined, require, '.', 'draco_decoder.js')({});
   return draco;
 }
@@ -37,10 +44,17 @@ export async function loadGlb(file) {
   const dec = new M.Decoder();
   /** @type {Map<string, { name: string, translation: number[], rotation: number[], scale: number[], parent: string | null, children: string[], mesh?: number }>} */
   const nodes = new Map();
-  gltf.nodes.forEach((n) => nodes.set(n.name, {
-    name: n.name, translation: n.translation ?? [0, 0, 0], rotation: n.rotation ?? [0, 0, 0, 1], scale: n.scale ?? [1, 1, 1],
-    parent: null, children: (n.children ?? []).map((c) => gltf.nodes[c].name), mesh: n.mesh,
-  }));
+  gltf.nodes.forEach((n) =>
+    nodes.set(n.name, {
+      name: n.name,
+      translation: n.translation ?? [0, 0, 0],
+      rotation: n.rotation ?? [0, 0, 0, 1],
+      scale: n.scale ?? [1, 1, 1],
+      parent: null,
+      children: (n.children ?? []).map((c) => gltf.nodes[c].name),
+      mesh: n.mesh,
+    }),
+  );
   for (const n of nodes.values()) for (const c of n.children) nodes.get(c).parent = n.name;
   /** A plain accessor's values. */
   const read = (a) => {
@@ -61,7 +75,10 @@ export async function loadGlb(file) {
       const ext = prim.extensions?.KHR_draco_mesh_compression;
       if (!ext) {
         const pos = Float32Array.from(read(prim.attributes.POSITION));
-        const idx = prim.indices != null ? Uint32Array.from(read(prim.indices)) : Uint32Array.from({ length: pos.length / 3 }, (_, i) => i);
+        const idx =
+          prim.indices != null
+            ? Uint32Array.from(read(prim.indices))
+            : Uint32Array.from({ length: pos.length / 3 }, (_, i) => i);
         out.push({ pos, idx, material });
         continue;
       }
@@ -82,9 +99,14 @@ export async function loadGlb(file) {
       const idx = new Uint32Array(faces * 3);
       for (let f = 0; f < faces; f++) {
         dec.GetFaceFromMesh(g, f, tri);
-        idx[f * 3] = tri.GetValue(0); idx[f * 3 + 1] = tri.GetValue(1); idx[f * 3 + 2] = tri.GetValue(2);
+        idx[f * 3] = tri.GetValue(0);
+        idx[f * 3 + 1] = tri.GetValue(1);
+        idx[f * 3 + 2] = tri.GetValue(2);
       }
-      M.destroy(tri); M.destroy(arr); M.destroy(g); M.destroy(db);
+      M.destroy(tri);
+      M.destroy(arr);
+      M.destroy(g);
+      M.destroy(db);
       out.push({ pos, idx, material });
     }
     cache.set(meshIndex, out);
@@ -94,13 +116,20 @@ export async function loadGlb(file) {
   function matrix(name) {
     const m = new THREE.Matrix4();
     for (let n = nodes.get(name); n; n = n.parent ? nodes.get(n.parent) : null) {
-      const own = new THREE.Matrix4().compose(new THREE.Vector3(...n.translation), new THREE.Quaternion(...n.rotation), new THREE.Vector3(...n.scale));
+      const own = new THREE.Matrix4().compose(
+        new THREE.Vector3(...n.translation),
+        new THREE.Quaternion(...n.rotation),
+        new THREE.Vector3(...n.scale),
+      );
       m.premultiply(own);
     }
     return m;
   }
   const glb = {
-    gltf, nodes, primitives, matrix,
+    gltf,
+    nodes,
+    primitives,
+    matrix,
     /** A node's mesh's vertices in the world ([] for a node without one). */
     worldPoints(name) {
       const n = nodes.get(name);
@@ -108,7 +137,14 @@ export async function loadGlb(file) {
       const m = matrix(name);
       const v = new THREE.Vector3();
       const out = [];
-      for (const { pos } of primitives(n.mesh)) for (let i = 0; i < pos.length; i += 3) out.push(v.set(pos[i], pos[i + 1], pos[i + 2]).applyMatrix4(m).toArray());
+      for (const { pos } of primitives(n.mesh))
+        for (let i = 0; i < pos.length; i += 3)
+          out.push(
+            v
+              .set(pos[i], pos[i + 1], pos[i + 2])
+              .applyMatrix4(m)
+              .toArray(),
+          );
       return out;
     },
   };

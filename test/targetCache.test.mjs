@@ -10,7 +10,11 @@ function cache(keep) {
   const freed = [];
   const c = createSetCache(keep, (value, key) => freed.push(`${key}:${value.n}`));
   let n = 0;
-  const get = (key) => c.get(key, () => { made.push(key); return { n: n++ }; });
+  const get = (key) =>
+    c.get(key, () => {
+      made.push(key);
+      return { n: n++ };
+    });
   return { c, get, made, freed };
 }
 
@@ -27,7 +31,9 @@ test('a size used lately is swapped back in, not made again', () => {
 
 test('past `keep` sizes, the one used longest ago is freed (once), and a later visit makes it again', () => {
   const { c, get, made, freed } = cache(3);
-  get('a'); get('b'); get('c');
+  get('a');
+  get('b');
+  get('c');
   get('a'); // (now b is the oldest)
   get('d');
   assert.deepEqual(freed, ['b:1']);
@@ -37,7 +43,10 @@ test('past `keep` sizes, the one used longest ago is freed (once), and a later v
   assert.deepEqual(made, ['a', 'b', 'c', 'd', 'b']);
   // A pixel-size shift back and forth between two sizes never frees either.
   const before = freed.length;
-  for (let i = 0; i < 10; i++) { get('b'); get('d'); }
+  for (let i = 0; i < 10; i++) {
+    get('b');
+    get('d');
+  }
   assert.equal(freed.length, before);
 });
 

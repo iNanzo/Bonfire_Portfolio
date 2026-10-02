@@ -61,10 +61,49 @@
 //                      the reactions, getting up, sitting down and walking
 //   knightGestures.js  the gestures and the dance moves
 export {
-  POSE, POSE_SIZE, newPose, BONES, PARENT, BONE_NODES, DEFAULT_REST, SEAT_DEPTH, TASSET_FOLLOW, PAULDRON, SEAT_POSES, measurePlates, measureRig, DEFAULT_RIG,
+  POSE,
+  POSE_SIZE,
+  newPose,
+  BONES,
+  PARENT,
+  BONE_NODES,
+  DEFAULT_REST,
+  SEAT_DEPTH,
+  TASSET_FOLLOW,
+  PAULDRON,
+  SEAT_POSES,
+  measurePlates,
+  measureRig,
+  DEFAULT_RIG,
 } from './knightRig.js';
 export { createSolver } from './knightSolve.js';
 export {
-  lerpPose, mirrorPose, standingPose, seatFeet, feetAt, standBy, seatedPose, accent, idle, look, attend, flinch, shield, hop, RISE_TIME, rise, walk,
+  lerpPose,
+  mirrorPose,
+  standingPose,
+  seatFeet,
+  feetAt,
+  standBy,
+  seatedPose,
+  accent,
+  idle,
+  look,
+  attend,
+  flinch,
+  shield,
+  hop,
+  RISE_TIME,
+  rise,
+  walk,
 } from './knightBody.js';
-export { DANCE_BPM, GESTURE_TIME, DANCE_SEATED_TIME, GESTURES, CHEERS, gesture, MOVE_INFO, MOVES, dance } from './knightGestures.js';
+export {
+  DANCE_BPM,
+  GESTURE_TIME,
+  DANCE_SEATED_TIME,
+  GESTURES,
+  CHEERS,
+  gesture,
+  MOVE_INFO,
+  MOVES,
+  dance,
+} from './knightGestures.js';

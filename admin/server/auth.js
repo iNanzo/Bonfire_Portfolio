@@ -32,8 +32,12 @@ const decode = (part) => JSON.parse(fromUtf8(fromBase64url(part)));
 /** Resolves to { email } for an allowed, signed-in user; throws HttpError(401/403/500) otherwise. */
 export async function verifyAccess(request, env, { fetchImpl = fetch, now = Date.now() } = {}) {
   const team = (env.ACCESS_TEAM_DOMAIN ?? '').replace(/\/+$/, '');
-  if (!team || !env.ACCESS_AUD) throw new HttpError(500, 'The admin isn’t configured: set ACCESS_TEAM_DOMAIN and ACCESS_AUD.');
-  const allowed = (env.ALLOWED_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (!team || !env.ACCESS_AUD)
+    throw new HttpError(500, 'The admin isn’t configured: set ACCESS_TEAM_DOMAIN and ACCESS_AUD.');
+  const allowed = (env.ALLOWED_EMAILS ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
   if (!allowed.length) throw new HttpError(500, 'The admin isn’t configured: set ALLOWED_EMAILS.');
 
   const token = readToken(request);
@@ -52,13 +56,24 @@ export async function verifyAccess(request, env, { fetchImpl = fetch, now = Date
   let jwk = (await signingKeys(team, fetchImpl)).find((k) => k.kid === header.kid);
   if (!jwk) jwk = (await signingKeys(team, fetchImpl, true)).find((k) => k.kid === header.kid); // keys rotate
   if (!jwk) throw new HttpError(401, 'Token signed with an unknown key.');
-  const key = await crypto.subtle.importKey('jwk', { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-  const valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, fromBase64url(parts[2]), utf8(`${parts[0]}.${parts[1]}`));
+  const key = await crypto.subtle.importKey(
+    'jwk',
+    { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['verify'],
+  );
+  const valid = await crypto.subtle.verify(
+    'RSASSA-PKCS1-v1_5',
+    key,
+    fromBase64url(parts[2]),
+    utf8(`${parts[0]}.${parts[1]}`),
+  );
   if (!valid) throw new HttpError(401, 'Bad token signature.');
 
   const t = Math.floor(now / 1000);
-  if (typeof payload.exp !== 'number' || payload.exp <= t) throw new HttpError(401, 'Your session expired. Reload to sign in again.');
+  if (typeof payload.exp !== 'number' || payload.exp <= t)
+    throw new HttpError(401, 'Your session expired. Reload to sign in again.');
   if (typeof payload.nbf === 'number' && payload.nbf > t + 60) throw new HttpError(401, 'Token not valid yet.');
   if (payload.iss !== team) throw new HttpError(401, 'Token from a different Access team.');
   const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];

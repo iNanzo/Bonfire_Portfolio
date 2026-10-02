@@ -13,7 +13,9 @@ import { defaultScene, normalizeScene } from '../src/scenes.js';
 function watch(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
   return errors;
 }
 
@@ -24,17 +26,33 @@ function mine(name, id, edit = () => {}) {
   edit(s);
   return normalizeScene(s);
 }
-const ONE = mine('Test Scene', 'test', (s) => { s.place.scenery = 'shrine'; s.look = { name: 'kaleido', amount: 1, params: {} }; });
-const TWO = mine('Second Scene', 'second', (s) => { s.place.scenery = 'forge'; s.look = { name: 'mosaic', amount: 1, params: {} }; });
+const ONE = mine('Test Scene', 'test', (s) => {
+  s.place.scenery = 'shrine';
+  s.look = { name: 'kaleido', amount: 1, params: {} };
+});
+const TWO = mine('Second Scene', 'second', (s) => {
+  s.place.scenery = 'forge';
+  s.look = { name: 'mosaic', amount: 1, params: {} };
+});
 
 /** Seed this browser's scenes (and settings) before the page's scripts run. */
 async function seed(page, scenes, settings = null) {
-  await page.addInitScript(({ scenes, settings }) => {
-    if (sessionStorage.getItem('seeded')) return;
-    sessionStorage.setItem('seeded', '1');
-    localStorage.setItem('bonfire-scenes', JSON.stringify({ v: 1, order: scenes.map((s) => s.id), scenes: Object.fromEntries(scenes.map((s) => [s.id, s])) }));
-    if (settings) localStorage.setItem('bonfire-live', JSON.stringify(settings));
-  }, { scenes, settings });
+  await page.addInitScript(
+    ({ scenes, settings }) => {
+      if (sessionStorage.getItem('seeded')) return;
+      sessionStorage.setItem('seeded', '1');
+      localStorage.setItem(
+        'bonfire-scenes',
+        JSON.stringify({
+          v: 1,
+          order: scenes.map((s) => s.id),
+          scenes: Object.fromEntries(scenes.map((s) => [s.id, s])),
+        }),
+      );
+      if (settings) localStorage.setItem('bonfire-live', JSON.stringify(settings));
+    },
+    { scenes, settings },
+  );
 }
 
 test('?scene= opens on a scene of mine behind the start menu', async ({ page }) => {
@@ -88,10 +106,15 @@ test('Scenes & Cards lists the loop; a switch keeps a scene out, and it’s reme
   const rows = page.locator('#viz-tab-scenes [data-scene-row^="m:"]');
   await expect(rows).toHaveCount(2);
   await expect(rows.first().locator('.viz-scene-badge')).toHaveText('Mine');
-  await expect(rows.first().locator('a', { hasText: 'Edit In Painter' })).toHaveAttribute('href', /painter\/\?scene=m:test$/);
+  await expect(rows.first().locator('a', { hasText: 'Edit In Painter' })).toHaveAttribute(
+    'href',
+    /painter\/\?scene=m:test$/,
+  );
   await page.locator('[data-scene-toggle="m:second"]').uncheck();
   // (Saving waits for a burst of changes to settle: a moment later it's kept.)
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? '{}').sceneList)).toEqual({ 'm:second': false });
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? '{}').sceneList))
+    .toEqual({ 'm:second': false });
   // Play Now closes the settings and plays it (behind the start menu here).
   await page.locator('[data-scene-play="m:test"]').click();
   await expect(page.locator('[data-settings]')).toBeHidden();
@@ -120,7 +143,10 @@ test('the built-in scenes are on the start screen and in the loop; ?scene=b: ope
   const rows = page.locator('#viz-tab-scenes [data-scene-row^="b:"]');
   await expect(rows).toHaveCount(inLoop.length);
   await expect(rows.first().locator('.viz-scene-badge')).toHaveText('Built-In');
-  await expect(rows.first().locator('a', { hasText: 'Edit In Painter' })).toHaveAttribute('href', new RegExp(`painter/\\?scene=b:${first.id}$`));
+  await expect(rows.first().locator('a', { hasText: 'Edit In Painter' })).toHaveAttribute(
+    'href',
+    new RegExp(`painter/\\?scene=b:${first.id}$`),
+  );
   expect(errors).toEqual([]);
 });
 

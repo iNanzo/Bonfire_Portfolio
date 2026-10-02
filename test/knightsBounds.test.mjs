@@ -31,7 +31,8 @@ function reach(nodeName) {
   let r = 0;
   for (const prim of mesh.primitives) {
     const { min, max } = gltf.accessors[prim.attributes.POSITION];
-    for (const x of [min[0], max[0]]) for (const y of [min[1], max[1]]) for (const z of [min[2], max[2]]) r = Math.max(r, Math.hypot(x, y, z));
+    for (const x of [min[0], max[0]])
+      for (const y of [min[1], max[1]]) for (const z of [min[2], max[2]]) r = Math.max(r, Math.hypot(x, y, z));
   }
   return r;
 }
@@ -45,7 +46,10 @@ function realRig() {
     g.name = name;
     const t = byName.get(name)?.translation;
     if (t) g.position.set(...t);
-    const piece = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.04), Object.assign(new THREE.MeshStandardMaterial(), { name: 'K_Plate' }));
+    const piece = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.04, 0.04),
+      Object.assign(new THREE.MeshStandardMaterial(), { name: 'K_Plate' }),
+    );
     piece.name = `${name}_Mesh`;
     g.add(piece);
     return g;
@@ -68,10 +72,11 @@ test('every pose stays inside the fixed culling sphere, with room to spare [slow
   const k = createKnights(realRig(), { armor: armor(), max: 2 });
   const sphere = k.knights[0].body.boundingSphere;
   assert.ok(sphere && sphere.radius > 0, 'a fixed sphere, not computed from the first pose');
-  for (const n of k.knights) for (const m of n.meshes) {
-    assert.ok(m.frustumCulled, `${m.name} is culled`);
-    assert.ok(m.boundingSphere.equals(sphere), `${m.name} has the same bounds`);
-  }
+  for (const n of k.knights)
+    for (const m of n.meshes) {
+      assert.ok(m.frustumCulled, `${m.name} is culled`);
+      assert.ok(m.boundingSphere.equals(sphere), `${m.name} has the same bounds`);
+    }
   const reaches = Object.fromEntries(Object.entries(NODE_OF).map(([b, node]) => [b, reach(node)]));
   assert.ok(reaches.chest > 0.1 && reaches.helm_great > 0.1, 'the pieces were read from the model');
   let worst = { d: 0, what: '' };
@@ -99,15 +104,32 @@ test('every pose stays inside the fixed culling sphere, with room to spare [slow
   for (const name of Object.keys(SEATS)) {
     k.setScenery(name, flatAt(name));
     k.summon(0, { instant: true });
-    for (const h of HELMETS) { k.setHelmet(h, { index: 0, instant: true }); run(0, 0.2, `${name} seated, ${h}`); }
+    for (const h of HELMETS) {
+      k.setHelmet(h, { index: 0, instant: true });
+      run(0, 0.2, `${name} seated, ${h}`);
+    }
     // Every gesture and reaction, seated.
-    for (const g of GESTURES) { k.gesture(g, { index: 0 }); run(0, 2.4, `${name} seated ${g}`); }
-    for (const r of ['impact', 'stoke', 'ring']) { k.react(r, 1); run(0, 1.5, `${name} seated ${r}`); }
+    for (const g of GESTURES) {
+      k.gesture(g, { index: 0 });
+      run(0, 2.4, `${name} seated ${g}`);
+    }
+    for (const r of ['impact', 'stoke', 'ring']) {
+      k.react(r, 1);
+      run(0, 1.5, `${name} seated ${r}`);
+    }
     // Up from the seat (standing in front of it), then seated dancing.
-    k.stand(0); run(0, 1.5, `${name} standing at the seat`);
-    for (const g of GESTURES) { k.gesture(g, { index: 0 }); run(0, 2.4, `${name} standing at the seat ${g}`); }
-    for (const r of ['impact', 'stoke', 'ring']) { k.react(r, 1); run(0, 1.5, `${name} standing ${r}`); }
-    k.sit(0); run(0, 1.5, `${name} sitting down`);
+    k.stand(0);
+    run(0, 1.5, `${name} standing at the seat`);
+    for (const g of GESTURES) {
+      k.gesture(g, { index: 0 });
+      run(0, 2.4, `${name} standing at the seat ${g}`);
+    }
+    for (const r of ['impact', 'stoke', 'ring']) {
+      k.react(r, 1);
+      run(0, 1.5, `${name} standing ${r}`);
+    }
+    k.sit(0);
+    run(0, 1.5, `${name} sitting down`);
     for (const move of MOVES) {
       k.dance(0, { move, energy: 1, seated: true });
       run(0, 4, `${name} seated ${move}`, (t) => k.clock(t * 2, 0.5));
@@ -121,8 +143,12 @@ test('every pose stays inside the fixed culling sphere, with room to spare [slow
   for (const move of MOVES) {
     k.dance(1, { move, energy: 1, position: place, facing: 'fire' });
     run(1, 4, `standing ${move}`, (t) => k.clock(t * 2, 0.5));
-    for (const g of ['praise', 'hurrah', 'beckon']) { k.gesture(g, { index: 1 }); run(1, 2.4, `standing ${move} ${g}`, (t) => k.clock(t * 2, 0.5)); }
-    k.react('ring', 1); run(1, 1, `standing ${move} hop`, (t) => k.clock(t * 2, 0.5));
+    for (const g of ['praise', 'hurrah', 'beckon']) {
+      k.gesture(g, { index: 1 });
+      run(1, 2.4, `standing ${move} ${g}`, (t) => k.clock(t * 2, 0.5));
+    }
+    k.react('ring', 1);
+    run(1, 1, `standing ${move} hop`, (t) => k.clock(t * 2, 0.5));
   }
   // Walking off to another place, and turning.
   k.dance(1, { move: 'nod', position: slotPlaces(ringOf('ruins'), 3)[2], facing: 'out' });
@@ -147,7 +173,10 @@ test('every pose stays inside the fixed culling sphere, with room to spare [slow
   }
   assert.ok(worst.d > 1.2, `the poses reached well out (${worst.d.toFixed(2)} m): the check means something`);
   const room = sphere.radius - worst.d;
-  assert.ok(room > 0.1, `the farthest piece (${worst.what}, ${worst.d.toFixed(2)} m) is inside ${sphere.radius} m with room (${room.toFixed(2)} m)`);
+  assert.ok(
+    room > 0.1,
+    `the farthest piece (${worst.what}, ${worst.d.toFixed(2)} m) is inside ${sphere.radius} m with room (${room.toFixed(2)} m)`,
+  );
 });
 
 test('on the real model, the plates swing on their springs and settle, the same every time, and stay out of the helmet [slow]', async () => {
@@ -159,19 +188,35 @@ test('on the real model, the plates swing on their springs and settle, the same 
   k.summon(0, { instant: true });
   const n = k.knights[0];
   const bone = (name) => n.bones.find((b) => b.name === name);
-  const run = (seconds, each = null) => { for (let t = 0; t < seconds; t += 1 / 60) { k.update(1 / 60); if (each) each(); } };
+  const run = (seconds, each = null) => {
+    for (let t = 0; t < seconds; t += 1 / 60) {
+      k.update(1 / 60);
+      if (each) each();
+    }
+  };
   run(1);
   // At rest the plates hang still: no redraws.
   let redraws = 0;
-  run(2, () => { if (k.moving) redraws++; });
+  run(2, () => {
+    if (k.moving) redraws++;
+  });
   assert.equal(redraws, 0, 'resting, no redraws');
   // Through Praise the Sun the pauldrons swing off their pose (a lag, an overshoot: never
   // further than their straps allow), the shadow redrawn meanwhile, and settle after it.
   const strays = () => n.spring.map((x) => x.q.angleTo(x.pose));
-  let most = 0, last = -1, f = 0;
+  let most = 0,
+    last = -1,
+    f = 0;
   k.gesture('praise', { index: 0 });
-  run(GESTURE_TIME.praise + 1.5, () => { f++; if (k.moving) last = f; most = Math.max(most, ...strays()); });
-  assert.ok(most > 0.02 && most <= 0.13 + 1e-6, `the plates swing up to ${(most * 180 / Math.PI).toFixed(1)}° off their pose`);
+  run(GESTURE_TIME.praise + 1.5, () => {
+    f++;
+    if (k.moving) last = f;
+    most = Math.max(most, ...strays());
+  });
+  assert.ok(
+    most > 0.02 && most <= 0.13 + 1e-6,
+    `the plates swing up to ${((most * 180) / Math.PI).toFixed(1)}° off their pose`,
+  );
   const after = last / 60 - GESTURE_TIME.praise;
   assert.ok(after > 0.1 && after < 0.8, `the plates settle ${after.toFixed(2)} s after the gesture ends`);
   assert.ok(Math.max(...strays()) < 0.01, 'settled on their pose');
@@ -182,21 +227,35 @@ test('on the real model, the plates swing on their springs and settle, the same 
     for (let t = 0; t < 1; t += 1 / 60) e.update(1 / 60);
     e.gesture('hurrah', { index: 0 });
     const out = [];
-    for (let t = 0; t < 2.5; t += 1 / 60) { e.update(1 / 60); out.push(e.knights[0].bones.find((b) => b.name === 'pauldronL').quaternion.clone()); }
+    for (let t = 0; t < 2.5; t += 1 / 60) {
+      e.update(1 / 60);
+      out.push(e.knights[0].bones.find((b) => b.name === 'pauldronL').quaternion.clone());
+    }
     return out;
   };
-  const a = drive(make()), b = drive(make());
+  const a = drive(make()),
+    b = drive(make());
   // (Exactly: a quaternion's angleTo itself comes to ~4e-8 rad, the rounding of its acos.)
-  assert.ok(a.every((q, i) => q.equals(b[i])), 'the same steps, the same swing');
+  assert.ok(
+    a.every((q, i) => q.equals(b[i])),
+    'the same steps, the same swing',
+  );
   // Sprung, the pauldrons still stay out of the helmet he wears.
   const HELMS = { great: 'K_Helm_Great', armet: 'K_Helm_Armet', bascinet: 'K_Helm_Bascinet' };
   const soft = { skip: ['K_Mail'] };
   const pts = { dome: model.surface('K_Shoulder_L', 0.03), lames: model.surface('K_Pauldron_L', 0.03) };
   const mirror = (list) => list.map(([x, y, z]) => [-x, y, z]);
-  const pieces = [['shoulderL', pts.dome], ['pauldronL', pts.lames], ['shoulderR', mirror(pts.dome)], ['pauldronR', mirror(pts.lames)]];
-  const v = new THREE.Vector3(), inv = new THREE.Matrix4();
+  const pieces = [
+    ['shoulderL', pts.dome],
+    ['pauldronL', pts.lames],
+    ['shoulderR', mirror(pts.dome)],
+    ['pauldronR', mirror(pts.lames)],
+  ];
+  const v = new THREE.Vector3(),
+    inv = new THREE.Matrix4();
   for (const helm of HELMETS) {
-    const inside = model.inside(HELMS[helm], soft), dist = model.distance(HELMS[helm], soft);
+    const inside = model.inside(HELMS[helm], soft),
+      dist = model.distance(HELMS[helm], soft);
     k.setHelmet(helm, { index: 0, instant: true });
     const deepest = () => {
       n.group.updateMatrixWorld(true);
@@ -215,25 +274,39 @@ test('on the real model, the plates swing on their springs and settle, the same 
     run(2);
     const rest = deepest();
     let worst = { d: 0, what: '' };
-    const check = (what) => { const d = deepest(); if (d > worst.d) worst = { d, what }; };
+    const check = (what) => {
+      const d = deepest();
+      if (d > worst.d) worst = { d, what };
+    };
     for (const g of ['praise', 'shrug', 'hurrah', 'joy', 'dance']) {
       k.gesture(g, { index: 0 });
       let i = 0;
-      run(GESTURE_TIME[g] + 0.5, () => { if (i++ % 5 === 0) check(`seated ${g}`); });
+      run(GESTURE_TIME[g] + 0.5, () => {
+        if (i++ % 5 === 0) check(`seated ${g}`);
+      });
     }
     // (The site's dance in his seat: a phone's view.)
     k.headroom = false;
     k.gesture('dance', { index: 0 });
     let j = 0;
-    run(DANCE_SEATED_TIME + 0.5, () => { if (j++ % 5 === 0) check('the dance in his seat'); });
+    run(DANCE_SEATED_TIME + 0.5, () => {
+      if (j++ % 5 === 0) check('the dance in his seat');
+    });
     k.headroom = true;
     for (const move of ['headbang', 'swayArms', 'fistPump', 'defaultDance']) {
       k.dance(0, { move, energy: 1, seated: true });
-      let i = 0, beat = 0;
-      run(3, () => { k.clock((beat += 1 / 30), 0.5); if (i++ % 5 === 0) check(`seated ${move}`); });
+      let i = 0,
+        beat = 0;
+      run(3, () => {
+        k.clock((beat += 1 / 30), 0.5);
+        if (i++ % 5 === 0) check(`seated ${move}`);
+      });
     }
     k.sit(0);
     run(1.5);
-    assert.ok(worst.d <= Math.max(rest, 0.03) + 0.012, `${helm}: sprung, the deepest a pauldron goes is ${worst.d.toFixed(3)} m (${worst.what}; ${rest.toFixed(3)} at rest)`);
+    assert.ok(
+      worst.d <= Math.max(rest, 0.03) + 0.012,
+      `${helm}: sprung, the deepest a pauldron goes is ${worst.d.toFixed(3)} m (${worst.what}; ${rest.toFixed(3)} at rest)`,
+    );
   }
 });

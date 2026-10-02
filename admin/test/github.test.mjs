@@ -31,7 +31,11 @@ function fakeGitHub({ files }) {
   const blobs = new Map();
   let n = 0;
   const sha = () => (++n).toString(16).padStart(40, '0');
-  const blobOf = (bytes) => { const s = sha(); blobs.set(s, bytes); return s; };
+  const blobOf = (bytes) => {
+    const s = sha();
+    blobs.set(s, bytes);
+    return s;
+  };
   const tree = new Map(Object.entries(files).map(([p, text]) => [p, blobOf(utf8(text))]));
   const trees = new Map([['t0', tree]]);
   const commits = new Map([['c0', { tree: 't0', parents: [] }]]);
@@ -59,16 +63,23 @@ function fakeGitHub({ files }) {
       return json({ type: 'file', sha: s, content: toBase64(blobs.get(s)) });
     }
     if (method === 'GET' && m === '/git/ref/heads/main') return json({ object: { sha: state.head } });
-    if (method === 'GET' && m.startsWith('/git/commits/')) return json({ tree: { sha: commits.get(m.split('/').pop()).tree } });
+    if (method === 'GET' && m.startsWith('/git/commits/'))
+      return json({ tree: { sha: commits.get(m.split('/').pop()).tree } });
     if (method === 'GET' && m.startsWith('/git/trees/')) {
       const t = trees.get(m.split('/').pop());
       return json({ truncated: false, tree: [...t].map(([path, s]) => ({ path, type: 'blob', sha: s })) });
     }
-    if (method === 'POST' && m === '/git/blobs') { assert.equal(body.encoding, 'base64'); return json({ sha: blobOf(fromBase64(body.content)) }, 201); }
+    if (method === 'POST' && m === '/git/blobs') {
+      assert.equal(body.encoding, 'base64');
+      return json({ sha: blobOf(fromBase64(body.content)) }, 201);
+    }
     if (method === 'POST' && m === '/git/trees') {
       const next = new Map(trees.get(body.base_tree));
       for (const e of body.tree) {
-        if (e.sha === null) { assert.ok(next.has(e.path), `deleting missing ${e.path}`); next.delete(e.path); } else next.set(e.path, e.sha);
+        if (e.sha === null) {
+          assert.ok(next.has(e.path), `deleting missing ${e.path}`);
+          next.delete(e.path);
+        } else next.set(e.path, e.sha);
       }
       const s = sha();
       trees.set(s, next);
@@ -81,18 +92,30 @@ function fakeGitHub({ files }) {
     }
     if (method === 'PATCH' && m === '/git/refs/heads/main') {
       assert.equal(body.force, false);
-      if (state.moveRefBeforePatch || commits.get(body.sha).parents[0] !== state.head) return json({ message: 'Update is not a fast forward' }, 422);
+      if (state.moveRefBeforePatch || commits.get(body.sha).parents[0] !== state.head)
+        return json({ message: 'Update is not a fast forward' }, 422);
       state.head = body.sha;
       return json({ object: { sha: body.sha } });
     }
     if (method === 'GET' && m === '/actions/runs') return json({ workflow_runs: state.runs });
     return json({ message: `unhandled ${method} ${m}` }, 500);
   };
-  const fileAt = (path) => { const s = trees.get(commits.get(state.head).tree).get(path); return s && fromUtf8(blobs.get(s)); };
+  const fileAt = (path) => {
+    const s = trees.get(commits.get(state.head).tree).get(path);
+    return s && fromUtf8(blobs.get(s));
+  };
   return { fetchImpl, calls, state, fileAt, commits };
 }
 
-const env = { GITHUB_OWNER: 'me', GITHUB_REPO: 'site', GITHUB_BRANCH: 'main', GITHUB_API: 'https://gh.test', GITHUB_APP_ID: '42', GITHUB_APP_INSTALLATION_ID: '7', GITHUB_APP_PRIVATE_KEY: keys.privateKey };
+const env = {
+  GITHUB_OWNER: 'me',
+  GITHUB_REPO: 'site',
+  GITHUB_BRANCH: 'main',
+  GITHUB_API: 'https://gh.test',
+  GITHUB_APP_ID: '42',
+  GITHUB_APP_INSTALLATION_ID: '7',
+  GITHUB_APP_PRIVATE_KEY: keys.privateKey,
+};
 const start = {
   'src/content.json': '{"v":1}\n',
   'public/assets/projects/a/old.webp': 'x',
@@ -116,8 +139,15 @@ test('saves content, adds and removes images in one commit', async () => {
   const { sha } = await store.read('src/content.json');
   const res = await store.commit({
     baseSha: sha,
-    files: [{ path: 'src/content.json', bytes: utf8('{"v":2}\n') }, { path: 'public/assets/projects/a/new.webp', bytes: utf8('webp') }],
-    deletes: ['public/assets/projects/a/old.webp', 'public/assets/projects/a/old-card.webp', 'public/never/existed.webp'],
+    files: [
+      { path: 'src/content.json', bytes: utf8('{"v":2}\n') },
+      { path: 'public/assets/projects/a/new.webp', bytes: utf8('webp') },
+    ],
+    deletes: [
+      'public/assets/projects/a/old.webp',
+      'public/assets/projects/a/old-card.webp',
+      'public/never/existed.webp',
+    ],
     message: 'Admin: edit projects',
   });
   assert.equal(gh.fileAt('src/content.json'), '{"v":2}\n');
@@ -134,10 +164,16 @@ test('refuses to save over newer content, or when the branch moves mid-save', as
   const gh = fakeGitHub({ files: start });
   const store = createGitHubStore(env, { fetchImpl: gh.fetchImpl });
   const stale = '0'.repeat(40);
-  await assert.rejects(store.commit({ baseSha: stale, files: [{ path: 'src/content.json', bytes: utf8('{}') }], message: 'x' }), (e) => e.status === 409);
+  await assert.rejects(
+    store.commit({ baseSha: stale, files: [{ path: 'src/content.json', bytes: utf8('{}') }], message: 'x' }),
+    (e) => e.status === 409,
+  );
   const { sha } = await store.read('src/content.json');
   gh.state.moveRefBeforePatch = true;
-  await assert.rejects(store.commit({ baseSha: sha, files: [{ path: 'src/content.json', bytes: utf8('{}') }], message: 'x' }), (e) => e.status === 409);
+  await assert.rejects(
+    store.commit({ baseSha: sha, files: [{ path: 'src/content.json', bytes: utf8('{}') }], message: 'x' }),
+    (e) => e.status === 409,
+  );
   assert.equal(gh.fileAt('src/content.json'), '{"v":1}\n');
 });
 

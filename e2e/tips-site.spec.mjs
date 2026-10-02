@@ -17,7 +17,9 @@ const SIZES = [
 function watch(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
   return errors;
 }
 const ready = (page) => expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
@@ -41,7 +43,10 @@ async function checkAll(page, root, { touch, label }) {
       await closeTip(page, root);
       // (The menu puts focus on its first tool as it opens: let go of it first, or focusing it
       // again would be no focus at all, and so no tip.)
-      if (mode === 'focus') await trigger.evaluate((el) => { if (el === document.activeElement) /** @type {HTMLElement} */ (el).blur(); });
+      if (mode === 'focus')
+        await trigger.evaluate((el) => {
+          if (el === document.activeElement) /** @type {HTMLElement} */ (el).blur();
+        });
       const r = await checkTip(page, trigger, { mode, timeout: TIP_WAIT });
       expect(r.shown, `${name} (${mode}) shows its tip`).toBe(true);
       assertInViewport(r.rect, r.viewport, 8);
@@ -68,13 +73,22 @@ async function closeTip(page, root) {
  * its trigger's description (aria-describedby), or it only says the trigger's name and key.
  */
 async function assertHeard(page, root) {
-  const unheard = await page.evaluate((sel) => [...document.querySelectorAll(`${sel} [data-tip]`)].filter((el) => {
-    const tip = el.getAttribute('data-tip') ?? '';
-    const ids = (el.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
-    if (ids.some((id) => document.getElementById(id)?.textContent === tip)) return false;
-    const name = (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim();
-    return !(name === tip || (name.startsWith(tip.replace(/\s*\([^)]*\)$/, '')) && el.hasAttribute('aria-keyshortcuts')));
-  }).map((el) => el.getAttribute('data-tip')), root);
+  const unheard = await page.evaluate(
+    (sel) =>
+      [...document.querySelectorAll(`${sel} [data-tip]`)]
+        .filter((el) => {
+          const tip = el.getAttribute('data-tip') ?? '';
+          const ids = (el.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+          if (ids.some((id) => document.getElementById(id)?.textContent === tip)) return false;
+          const name = (el.getAttribute('aria-label') ?? el.textContent ?? '').replace(/\s+/g, ' ').trim();
+          return !(
+            name === tip ||
+            (name.startsWith(tip.replace(/\s*\([^)]*\)$/, '')) && el.hasAttribute('aria-keyshortcuts'))
+          );
+        })
+        .map((el) => el.getAttribute('data-tip')),
+    root,
+  );
   expect(unheard, `${root}: every tip is heard too`).toEqual([]);
 }
 
@@ -83,7 +97,10 @@ const noTitles = (page, where) => expect(page.locator('body [title]'), `${where}
 
 /** A context at this size (touch where it says so), and its page. */
 async function open(browser, size) {
-  const context = await browser.newContext({ viewport: size.viewport, ...(size.touch ? { isMobile: true, hasTouch: true } : {}) });
+  const context = await browser.newContext({
+    viewport: size.viewport,
+    ...(size.touch ? { isMobile: true, hasTouch: true } : {}),
+  });
   const page = await context.newPage();
   return { context, page, errors: watch(page), tap: (loc) => (size.touch ? loc.tap() : loc.click()) };
 }
@@ -100,7 +117,9 @@ for (const size of SIZES) {
       await ready(page);
       await noTitles(page, 'the page');
       // The header: Q / E (where the tabs show) and Sound.
-      expect(await checkAll(page, '[data-header]', { ...size, label: 'header' })).toBeGreaterThanOrEqual(size.touch ? 1 : 3);
+      expect(await checkAll(page, '[data-header]', { ...size, label: 'header' })).toBeGreaterThanOrEqual(
+        size.touch ? 1 : 3,
+      );
       await assertHeard(page, '[data-header]');
       await assertHeard(page, '[data-pack]');
       // The rest menu's tools (no keyboard shortcuts on a touch screen).
@@ -139,18 +158,28 @@ for (const size of SIZES) {
       await context.close();
     });
 
-    test('the pack’s lists: the living weapon, the ring and elements, the knight’s styles and why his finishes are off', async ({ browser }) => {
+    test('the pack’s lists: the living weapon, the ring and elements, the knight’s styles and why his finishes are off', async ({
+      browser,
+    }) => {
       const { context, page, errors, tap } = await open(browser, size);
       await page.goto('/');
       await ready(page);
       await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 30_000 }); // (his model is its own file)
       await tap(page.locator('[data-pack-toggle]'));
-      await page.waitForFunction(() => document.querySelector('.pack-items').getAnimations({ subtree: true }).every((a) => a.playState !== 'running'));
+      await page.waitForFunction(() =>
+        document
+          .querySelector('.pack-items')
+          .getAnimations({ subtree: true })
+          .every((a) => a.playState !== 'running'),
+      );
       await noTitles(page, 'the pack');
       for (const id of ['anvil', 'tome']) {
         await tap(page.locator(`[data-pack-slot="${id}"]`));
         await expect(page.locator(`[data-pack-list="${id}"]`)).toBeVisible();
-        expect(await checkAll(page, `[data-pack-list="${id}"]`, { ...size, label: id }), `${id} has tips`).toBeGreaterThan(0);
+        expect(
+          await checkAll(page, `[data-pack-list="${id}"]`, { ...size, label: id }),
+          `${id} has tips`,
+        ).toBeGreaterThan(0);
         await assertHeard(page, `[data-pack-list="${id}"]`);
       }
       // The knight: summoned, then dressed in Black & Gold (whose finishes are off, and say why).
@@ -165,8 +194,14 @@ for (const size of SIZES) {
       // (He's drawn anew in it, ~1.2 s, and then the list is drawn again: a tip showing then
       // would go with the option it was on. Measured once that's done, when the options
       // marked now are gone; on a slow machine it may be done already, and this waits 8 s.)
-      await page.evaluate(() => document.querySelector('[data-pack-list="knight"] [data-pack-options] > *')?.setAttribute('data-stale', ''));
-      await page.waitForFunction(() => !document.querySelector('[data-pack-list="knight"] [data-stale]'), null, { timeout: 8000 }).catch(() => {});
+      await page.evaluate(() =>
+        document.querySelector('[data-pack-list="knight"] [data-pack-options] > *')?.setAttribute('data-stale', ''),
+      );
+      await page
+        .waitForFunction(() => !document.querySelector('[data-pack-list="knight"] [data-stale]'), null, {
+          timeout: 8000,
+        })
+        .catch(() => {});
       const knight = page.locator('[data-pack-list="knight"]');
       await expect(knight.getByRole('group', { name: 'Finish', exact: true })).toContainText('wear their own colors');
       expect(await checkAll(page, '[data-pack-list="knight"]', { ...size, label: 'knight' })).toBe(10); // (6 styles, 4 finishes)
@@ -180,7 +215,9 @@ for (const size of SIZES) {
       await page.goto('/skills/');
       await ready(page);
       await noTitles(page, 'the skills');
-      expect(await checkAll(page, '[data-skill-grid] li:is(:first-child, :last-child)', { ...size, label: 'skills' })).toBeGreaterThanOrEqual(6);
+      expect(
+        await checkAll(page, '[data-skill-grid] li:is(:first-child, :last-child)', { ...size, label: 'skills' }),
+      ).toBeGreaterThanOrEqual(6);
       await assertHeard(page, '[data-skill-grid]');
       expect(errors).toEqual([]);
       await context.close();

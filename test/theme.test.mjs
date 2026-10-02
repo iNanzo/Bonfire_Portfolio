@@ -10,16 +10,33 @@ before(() => {
   // (A page's bits theme.js touches: the clock, timers, the favicon's link.)
   globalThis.document = { querySelector: () => null, documentElement: null };
   performance.now = () => now;
-  globalThis.setTimeout = (fn, ms) => { timers.push({ fn, at: now + ms }); return timers.length; };
+  globalThis.setTimeout = (fn, ms) => {
+    timers.push({ fn, at: now + ms });
+    return timers.length;
+  };
   globalThis.clearTimeout = () => {};
 });
-const runTimers = () => { for (const t of timers.splice(0)) if (t.at <= now) t.fn(); else timers.push(t); };
+const runTimers = () => {
+  for (const t of timers.splice(0))
+    if (t.at <= now) t.fn();
+    else timers.push(t);
+};
 
 /** A root element's inline style that counts its writes. */
 function root() {
   const props = new Map();
   const writes = [];
-  return { writes, props, style: { getPropertyValue: (k) => props.get(k) ?? '', setProperty: (k, v) => { writes.push([k, v]); props.set(k, v); } } };
+  return {
+    writes,
+    props,
+    style: {
+      getPropertyValue: (k) => props.get(k) ?? '',
+      setProperty: (k, v) => {
+        writes.push([k, v]);
+        props.set(k, v);
+      },
+    },
+  };
 }
 const RAMP_A = ['#2a0f08', '#c2410c', '#fb923c', '#fff1d6'];
 const RAMP_B = ['#2a0f08', '#c2410c', '#fdba74', '#fff1d6'];

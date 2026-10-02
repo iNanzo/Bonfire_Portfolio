@@ -10,8 +10,11 @@ const ARTICLES = new Set(['a', 'an', 'the']);
  * @returns {string}
  */
 export function titleCase(text) {
-  return String(text).split(' ').map((word, i) => {
-    if (i > 0 && ARTICLES.has(word.toLowerCase())) return word.toLowerCase();
-    return word.replace(/\p{L}/u, (c) => c.toUpperCase());
-  }).join(' ');
+  return String(text)
+    .split(' ')
+    .map((word, i) => {
+      if (i > 0 && ARTICLES.has(word.toLowerCase())) return word.toLowerCase();
+      return word.replace(/\p{L}/u, (c) => c.toUpperCase());
+    })
+    .join(' ');
 }

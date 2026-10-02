@@ -1,7 +1,19 @@
 // HTML templates. All text comes from content.js.
 import {
-  site, screens, hero, sections, items, archive, about,
-  experience, leadership, education, skills, contact, ui, shown,
+  site,
+  screens,
+  hero,
+  sections,
+  items,
+  archive,
+  about,
+  experience,
+  leadership,
+  education,
+  skills,
+  contact,
+  ui,
+  shown,
 } from './content.js';
 
 const BASE = import.meta.env?.BASE_URL ?? '/'; // (outside Vite, e.g. under node --test: the root)
@@ -172,11 +184,15 @@ export function renderHome() {
         <p class="hero-value">${esc(hero.value)}</p>
         <nav class="title-menu" aria-label="${esc(hero.menuLabel)}">
           <ul role="list" data-title-menu>
-            ${menu.map((s) => `
+            ${menu
+              .map(
+                (s) => `
               <li><a class="title-item" href="#/${s.id}" data-title-item>
                 <span class="cursor" aria-hidden="true"></span>
                 <span class="title-label">${esc(s.label)}</span>
-              </a></li>`).join('')}
+              </a></li>`,
+              )
+              .join('')}
           </ul>
         </nav>
         <button class="pix-btn stoke-btn" type="button" data-stoke>
@@ -217,15 +233,21 @@ export function renderProjects() {
   return `
     <section class="screen screen-projects" data-screen="projects" data-mode="browse" aria-labelledby="projects-title" hidden>
       <div class="inv-layout">
-        ${panel('glance', `
+        ${panel(
+          'glance',
+          `
           <div class="glance-media"><img data-g="img" alt="" width="720" height="450"><span class="veil" aria-hidden="true"></span></div>
           <p class="glance-meta" data-g="meta"></p>
           <h2 class="glance-title" data-g="name"></h2>
           <p class="glance-summary" data-g="summary"></p>
           <ul class="tags" role="list" data-g="tags"></ul>
           <a class="pix-btn glance-inspect" data-g="inspect" href="#/projects" tabindex="-1">${esc(ui.inspect)} <kbd>Enter</kbd></a>
-        `, 'data-glance aria-hidden="true"')}
-        ${panel('detail', `
+        `,
+          'data-glance aria-hidden="true"',
+        )}
+        ${panel(
+          'detail',
+          `
           <div class="detail-top">
             <a class="pix-btn" href="#/projects" data-back>&lt; ${esc(ui.back)} <kbd>Esc</kbd></a>
             <div class="detail-nav">
@@ -259,7 +281,9 @@ export function renderProjects() {
             <div><dt>${esc(ui.role)}</dt><dd data-d="role"></dd></div>
           </dl>
           <p class="detail-note" data-d="note"></p>
-        `, 'data-detail role="region" aria-labelledby="detail-title"')}
+        `,
+          'data-detail role="region" aria-labelledby="detail-title"',
+        )}
         <dialog class="gallery" data-gallery aria-label="${esc(ui.gallery)}">
           <figure class="gallery-figure">
             <img data-gl="img" alt="">
@@ -273,7 +297,9 @@ export function renderProjects() {
             <button class="pix-btn" type="button" data-gl-close>${esc(ui.close)} <kbd>Esc</kbd></button>
           </div>
         </dialog>
-        ${panel('inv-panel', `
+        ${panel(
+          'inv-panel',
+          `
           ${screenHead('projects')}
           <div class="inv-box">
             <span class="inv-cursor" data-inv-cursor aria-hidden="true" hidden></span>
@@ -288,7 +314,8 @@ export function renderProjects() {
           </div>
           <p class="inv-count"><span>${list.length} ${esc(list.length === 1 ? ui.item : ui.items)}</span><span data-equipped-line></span></p>
           ${tabletop ? `<p class="inv-also">Also: <a ${linkAttrs(tabletop.href)}>${esc(tabletop.name)}</a> — ${esc(tabletop.summary)}</p>` : ''}
-        `)}
+        `,
+        )}
       </div>
     </section>`;
 }
@@ -298,39 +325,60 @@ export function renderProjects() {
 export function renderExperience() {
   return `
     <section class="screen screen-experience side-right" data-screen="experience" aria-labelledby="experience-title" hidden>
-      ${panel('page-panel', `
+      ${panel(
+        'page-panel',
+        `
         ${screenHead('experience')}
-        ${shown(experience).filter((org) => shown(org.roles).length).map((org) => `
+        ${shown(experience)
+          .filter((org) => shown(org.roles).length)
+          .map(
+            (org) => `
           <div class="org">
             <div class="org-head"><h2>${esc(org.org)}</h2><span>${esc(org.location)}</span></div>
             <ol class="roles" role="list">
-              ${shown(org.roles).map((r) => `
+              ${shown(org.roles)
+                .map(
+                  (r) => `
                 <li class="role">
                   <p class="role-dates">${esc(r.dates)}</p>
                   <h3 class="role-title">${esc(r.title)}</h3>
                   <ul>${r.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>
-                </li>`).join('')}
+                </li>`,
+                )
+                .join('')}
             </ol>
-          </div>`).join('')}
+          </div>`,
+          )
+          .join('')}
         <div class="leadership">
           <div class="subhead"><h2>${esc(leadership.title)}</h2><p>${esc(leadership.flavor)}</p></div>
           <div class="lead-grid">
-            ${shown(leadership.items).map((l) => `
+            ${shown(leadership.items)
+              .map(
+                (l) => `
               <article class="lead-item">
                 <h3>${esc(l.org)}</h3>
                 <p class="lead-role">${esc(l.role)}</p>
                 <p class="lead-dates">${esc(l.dates)}</p>
                 <p>${esc(l.text)}</p>
-              </article>`).join('')}
+              </article>`,
+              )
+              .join('')}
           </div>
         </div>
         <div class="education">
           <div class="subhead"><h2>Education & certificates</h2></div>
           <ul class="edu-list" role="list">
-            ${shown(education).map((e) => `<li class="edu-row"><strong>${esc(e.name)}</strong><span class="edu-dates">${esc(e.dates)}</span><span>${esc(e.org)}</span></li>`).join('')}
+            ${shown(education)
+              .map(
+                (e) =>
+                  `<li class="edu-row"><strong>${esc(e.name)}</strong><span class="edu-dates">${esc(e.dates)}</span><span>${esc(e.org)}</span></li>`,
+              )
+              .join('')}
           </ul>
         </div>
-      `)}
+      `,
+      )}
     </section>`;
 }
 
@@ -343,16 +391,22 @@ export function renderSkills() {
   let n = 0;
   return `
     <section class="screen screen-skills side-left" data-screen="skills" aria-labelledby="skills-title" hidden>
-      ${panel('page-panel', `
+      ${panel(
+        'page-panel',
+        `
         ${screenHead('skills')}
         <div class="skill-groups" data-skill-grid>
-          ${shown(skills).filter((g) => shown(g.items).length).map((g) => `
+          ${shown(skills)
+            .filter((g) => shown(g.items).length)
+            .map(
+              (g) => `
             <div class="skill-group">
               <h2>${esc(g.group)}</h2>
               <ul class="slots" role="list">
-                ${shown(g.items).map((s) => {
-                  const id = `skill-flavor-${++n}`;
-                  return `
+                ${shown(g.items)
+                  .map((s) => {
+                    const id = `skill-flavor-${++n}`;
+                    return `
                   <li data-nav-item>
                     <button class="slot" type="button" data-skill="${esc(s.name)}" data-tip-title="${esc(s.name)}" data-tip="${esc(s.flavor)}" data-tip-tap aria-describedby="${id}">
                       <span class="slot-glyph" aria-hidden="true">${esc(s.glyph)}</span>
@@ -360,11 +414,15 @@ export function renderSkills() {
                     </button>
                     <span class="visually-hidden" id="${id}">${esc(s.flavor)}</span>
                   </li>`;
-                }).join('')}
+                  })
+                  .join('')}
               </ul>
-            </div>`).join('')}
+            </div>`,
+            )
+            .join('')}
         </div>
-      `)}
+      `,
+      )}
     </section>`;
 }
 
@@ -373,7 +431,9 @@ export function renderSkills() {
 export function renderAbout() {
   return `
     <section class="screen screen-about side-right" data-screen="about" aria-labelledby="about-title" hidden>
-      ${panel('page-panel', `
+      ${panel(
+        'page-panel',
+        `
         ${screenHead('about')}
         <div class="about-copy">${about.paragraphs.map((p) => `<p>${esc(p)}</p>`).join('')}</div>
         <aside class="stat-sheet" aria-label="At a glance">
@@ -383,7 +443,8 @@ export function renderAbout() {
             <div class="stat-row"><dt>${esc(ui.wields)}</dt><dd data-equip-label></dd></div>
           </dl>
         </aside>
-      `)}
+      `,
+      )}
     </section>`;
 }
 
@@ -392,27 +453,38 @@ export function renderAbout() {
 export function renderContact() {
   return `
     <section class="screen screen-contact side-left" data-screen="contact" aria-labelledby="contact-title" hidden>
-      ${panel('page-panel', `
+      ${panel(
+        'page-panel',
+        `
         ${screenHead('contact')}
         <p class="contact-heading">${esc(contact.heading)}</p>
         <p class="contact-body">${esc(contact.body)}</p>
         <ul class="contact-links" role="list">
-          ${shown(contact.links).map((l) => `
+          ${shown(contact.links)
+            .map(
+              (l) => `
             <li><a class="contact-link" ${linkAttrs(l.href)}>
               <span class="contact-label">${esc(l.label)}</span>
               <span class="contact-value">${esc(l.value)}</span>
               <span class="contact-arrow" aria-hidden="true">&gt;</span>
-            </a></li>`).join('')}
-          ${site.resumeUrl ? `<li data-resume hidden><a class="contact-link" ${resumeAttrs()}>
+            </a></li>`,
+            )
+            .join('')}
+          ${
+            site.resumeUrl
+              ? `<li data-resume hidden><a class="contact-link" ${resumeAttrs()}>
               <span class="contact-label">${esc(ui.resume)}</span>
               <span class="contact-value">PDF</span>
               <span class="contact-arrow" aria-hidden="true">&gt;</span>
-            </a></li>` : ''}
+            </a></li>`
+              : ''
+          }
         </ul>
         <footer class="site-footer">
           <p>${esc(contact.footer)}</p>
           <a href="#/" class="text-link">${esc(contact.backToTop)}</a>
         </footer>
-      `)}
+      `,
+      )}
     </section>`;
 }

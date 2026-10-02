@@ -15,7 +15,9 @@ test.describe.configure({ mode: 'parallel' });
 function watch(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
   return errors;
 }
 
@@ -28,16 +30,21 @@ const TABS = ['sound', 'show', 'drops', 'picture', 'effects', 'camera', 'cast', 
 /** Bonfire Live's settings open on `tab`, All Settings showing (saved as the view). */
 async function openTab(page, tab, { touch = false } = {}) {
   await page.addInitScript(() => {
-    if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('bonfire-live', JSON.stringify({ view: 'all' })); }
+    if (!sessionStorage.getItem('seeded')) {
+      sessionStorage.setItem('seeded', '1');
+      localStorage.setItem('bonfire-live', JSON.stringify({ view: 'all' }));
+    }
   });
   await page.goto('/visualizer/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   const settings = page.locator('[data-start] [data-act="settings"]');
-  if (touch) await settings.tap(); else await settings.click();
+  if (touch) await settings.tap();
+  else await settings.click();
   await expect(page.locator('[data-settings]')).toBeVisible();
   await expect(page.locator('[data-settings] form')).toHaveAttribute('data-view', 'all');
   const button = page.locator(`[data-tab="${tab}"]`);
-  if (touch) await button.tap(); else await button.click();
+  if (touch) await button.tap();
+  else await button.click();
   await expect(page.locator(`#viz-tab-${tab}`)).toBeVisible();
 }
 
@@ -56,8 +63,16 @@ async function settle(page, via) {
   if (!(await tip.isVisible())) return;
   if (via !== 'tap') {
     await page.mouse.move(0, 0);
-    await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
-    if (await tip.waitFor({ state: 'hidden', timeout: SLOW }).then(() => true, () => false)) return;
+    await page.evaluate(() => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    });
+    if (
+      await tip.waitFor({ state: 'hidden', timeout: SLOW }).then(
+        () => true,
+        () => false,
+      )
+    )
+      return;
   }
   if (await tip.isVisible()) await page.keyboard.press('Escape');
   await expect(tip).toBeHidden({ timeout: SLOW });
@@ -77,13 +92,21 @@ async function sweep(page, root, modes) {
       // (A tap opens a "?"; other triggers say their piece to a pointer or the keyboard. The
       // HUD's meter and beat pips are pictures, hidden from screen readers: a pointer's only.)
       if (mode === 'tap' && !(await trigger.evaluate((el) => el.matches('.viz-tip')))) continue;
-      if (mode === 'focus' && (await trigger.evaluate((el) => el.closest('[aria-hidden="true"]') && el.tabIndex < 0))) continue;
+      if (mode === 'focus' && (await trigger.evaluate((el) => el.closest('[aria-hidden="true"]') && el.tabIndex < 0)))
+        continue;
       await settle(page, via);
       const r = await checkTip(page, trigger, { mode, timeout: SLOW });
       via = r.via;
-      if (!r.shown) { bad.push(`${mode} ${what}: didn't show`); continue; }
+      if (!r.shown) {
+        bad.push(`${mode} ${what}: didn't show`);
+        continue;
+      }
       const { rect, viewport } = r;
-      const inside = rect.x >= 7.5 && rect.y >= 7.5 && rect.x + rect.width <= viewport.width - 7.5 && rect.y + rect.height <= viewport.height - 7.5;
+      const inside =
+        rect.x >= 7.5 &&
+        rect.y >= 7.5 &&
+        rect.x + rect.width <= viewport.width - 7.5 &&
+        rect.y + rect.height <= viewport.height - 7.5;
       if (!inside) bad.push(`${mode} ${what}: outside the window (${JSON.stringify(rect)})`);
       if (r.coversTrigger) bad.push(`${mode} ${what}: covers its trigger`);
     }
@@ -104,7 +127,8 @@ for (const [size, opts] of Object.entries(SIZES)) {
         expect(count, `${tab} has tips`).toBeGreaterThan(tab === 'setups' ? 1 : 3);
         expect(bad).toEqual([]);
         // Esc hides a tip and leaves the dialog open.
-        const first = (await collectTips(page, `#viz-tab-${tab} .viz-tip`))[0] ?? (await collectTips(page, `#viz-tab-${tab}`))[0];
+        const first =
+          (await collectTips(page, `#viz-tab-${tab} .viz-tip`))[0] ?? (await collectTips(page, `#viz-tab-${tab}`))[0];
         const tappable = await first.evaluate((el) => el.matches('.viz-tip'));
         await settle(page, via);
         const r = await checkTip(page, first, { mode: touch && tappable ? 'tap' : 'hover', timeout: SLOW });
@@ -119,7 +143,9 @@ for (const [size, opts] of Object.entries(SIZES)) {
   });
 }
 
-test('the dialog’s header tips, the start screen’s and the HUD’s: on screen, clear of their triggers', async ({ page }) => {
+test('the dialog’s header tips, the start screen’s and the HUD’s: on screen, clear of their triggers', async ({
+  page,
+}) => {
   test.setTimeout(240_000);
   const errors = watch(page);
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -164,7 +190,11 @@ test('no native title tooltips anywhere in Bonfire Live’s own UI', async ({ pa
   await page.locator('[data-tab="scenes"]').click();
   await page.locator('[data-card-add]').click();
   // (The pack is the site's, checked with the site's tips.)
-  const titled = await page.evaluate(() => [...document.querySelectorAll('[title]')].filter((el) => !el.closest('.pack')).map((el) => el.outerHTML.slice(0, 80)));
+  const titled = await page.evaluate(() =>
+    [...document.querySelectorAll('[title]')]
+      .filter((el) => !el.closest('.pack'))
+      .map((el) => el.outerHTML.slice(0, 80)),
+  );
   expect(titled).toEqual([]);
   expect(errors).toEqual([]);
 });

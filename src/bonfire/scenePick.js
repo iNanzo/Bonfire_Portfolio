@@ -87,7 +87,12 @@ export function createScenePick(ctx) {
     return ctx.knights ? pickAt(clientX, clientY).onKnight : -1;
   }
   /** The cursor left the scene: no hint. */
-  function hoverOff() { if (ctx.weapons) ctx.weapons.hovered = false; if (ctx.sign) ctx.sign.hovered = false; if (ctx.knights) ctx.knights.hovered = -1; ctx.hoverFlare = 0; }
+  function hoverOff() {
+    if (ctx.weapons) ctx.weapons.hovered = false;
+    if (ctx.sign) ctx.sign.hovered = false;
+    if (ctx.knights) ctx.knights.hovered = -1;
+    ctx.hoverFlare = 0;
+  }
 
   /**
    * A click anywhere makes the fireflies flash (brightest near the click), and a soft gust
@@ -105,17 +110,20 @@ export function createScenePick(ctx) {
     const { origin: o, direction: d } = gustRay.ray;
     const R = 0.5;
     for (const set of ctx.sets) {
-      const P = set.pos, V = set.vel;
+      const P = set.pos,
+        V = set.vel;
       const cap = set.maxV ?? 2;
       for (let i = 0; i < set.n; i++) {
         const ix = i * 3;
-        const px = P[ix] - o.x, py = P[ix + 1] - o.y, pz = P[ix + 2] - o.z;
+        const px = P[ix] - o.x,
+          py = P[ix + 1] - o.y,
+          pz = P[ix + 2] - o.z;
         const along = px * d.x + py * d.y + pz * d.z;
         if (along <= 0) continue;
         gustAt.set(px - d.x * along, py - d.y * along, pz - d.z * along); // from the ray to the particle
         const dist = gustAt.length();
         if (dist > R || dist < 1e-4) continue;
-        const k = 1.1 * (1 - dist / R) ** 2 / dist;
+        const k = (1.1 * (1 - dist / R) ** 2) / dist;
         V[ix] = Math.max(-cap, Math.min(cap, V[ix] + gustAt.x * k));
         V[ix + 1] = Math.max(-cap, Math.min(cap, V[ix + 1] + gustAt.y * k + 0.15 * (1 - dist / R)));
         V[ix + 2] = Math.max(-cap, Math.min(cap, V[ix + 2] + gustAt.z * k));

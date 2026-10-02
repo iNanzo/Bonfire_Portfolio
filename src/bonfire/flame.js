@@ -124,8 +124,12 @@ export const STRETCH = 0.045;
 export function createParticleMaterial(depthTexture, resolution) {
   return new THREE.ShaderMaterial({
     uniforms: {
-      tDepth: { value: depthTexture }, resolution: { value: resolution }, sizeScale: { value: 6 }, uHot: { value: 1 },
-      uShape: { value: SHAPE.square }, uStretch: { value: STRETCH },
+      tDepth: { value: depthTexture },
+      resolution: { value: resolution },
+      sizeScale: { value: 6 },
+      uHot: { value: 1 },
+      uShape: { value: SHAPE.square },
+      uStretch: { value: STRETCH },
     },
     // Point sets without an `alpha` attribute (the bonfire, sparks) draw fully opaque;
     // without `vel`, they don't streak.
@@ -155,7 +159,6 @@ export function createEffectMaterial(fireMaterial, { shape = SHAPE.square } = {}
   m.uniforms = { ...fireMaterial.uniforms, uHot: { value: 0 }, uShape: { value: shape } };
   return m;
 }
-
 
 /**
  * @param {object} o
@@ -190,7 +193,7 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
   const tmp = new THREE.Color();
 
   const params = {
-    level: 1,          // stoke level (1 = resting)
+    level: 1, // stoke level (1 = resting)
     rise: 0.62,
     curlAmp: 0.42,
     curlFreq: 2.6,
@@ -198,8 +201,8 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
     lifeMin: 0.55,
     lifeMax: 1.25,
     brightness: 0.3,
-    spawn: 1,          // chance a dead flame particle is reborn
-    sparks: 1,         // same, for sparks
+    spawn: 1, // chance a dead flame particle is reborn
+    sparks: 1, // same, for sparks
   };
 
   const wind = new THREE.Vector3();
@@ -220,7 +223,10 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
     age[i] = 0;
     life[i] = (params.lifeMin + Math.random() * (params.lifeMax - params.lifeMin)) * (0.85 + params.level * 0.15);
   }
-  for (let i = 0; i < count; i++) { spawn(i); age[i] = Math.random() * life[i]; }
+  for (let i = 0; i < count; i++) {
+    spawn(i);
+    age[i] = Math.random() * life[i];
+  }
 
   function spawnSpark(i, burst = 0) {
     const a = Math.random() * Math.PI * 2;
@@ -236,7 +242,10 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
     // Resting fire: only a few sparks drift up at a time.
     sLife[i] = burst ? 0.9 + Math.random() * 1.2 : Math.random() < 0.4 ? 0.7 + Math.random() * 1.1 : 0.0001;
   }
-  for (let i = 0; i < sparkCount; i++) { spawnSpark(i); sAge[i] = Math.random() * sLife[i]; }
+  for (let i = 0; i < sparkCount; i++) {
+    spawnSpark(i);
+    sAge[i] = Math.random() * sLife[i];
+  }
 
   function sampleRamp(heat, out) {
     // heat 0..1 → lo..core (piecewise linear)
@@ -255,11 +264,18 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
       const push = Math.hypot(EXT[ix], EXT[ix + 2]);
       age[i] += dt * (1 + Math.min(1.5, push * 0.5)); // stirred flame burns out sooner
       if (age[i] >= life[i]) {
-        if (Math.random() >= params.spawn) { S[i] = 0; continue; }
+        if (Math.random() >= params.spawn) {
+          S[i] = 0;
+          continue;
+        }
         spawn(i);
       }
-      const x = P[ix], y = P[ix + 1], z = P[ix + 2];
-      const lx = x - origin.x, ly = y - origin.y, lz = z - origin.z;
+      const x = P[ix],
+        y = P[ix + 1],
+        z = P[ix + 2];
+      const lx = x - origin.x,
+        ly = y - origin.y,
+        lz = z - origin.z;
       const k = age[i] / life[i];
 
       // Flow field: buoyancy that grows as the gas heats and rises, curl noise
@@ -288,7 +304,9 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
       // Fade decay: the last third of a particle's life dims smoothly to nothing.
       const fade = Math.min(1, (1 - k) * 3);
       sampleRamp(heat, tmp).multiplyScalar(params.brightness * (0.4 + heat) * fade * fade);
-      C[ix] = tmp.r; C[ix + 1] = tmp.g; C[ix + 2] = tmp.b;
+      C[ix] = tmp.r;
+      C[ix + 1] = tmp.g;
+      C[ix + 2] = tmp.b;
       S[i] = fade < 0.08 ? 0 : heat > 0.5 ? 2 : 1;
     }
     flame.geometry.attributes.position.needsUpdate = true;
@@ -301,11 +319,16 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
       sAge[i] += dt;
       const ix = i * 3;
       if (sAge[i] >= sLife[i]) {
-        if (Math.random() >= params.sparks) { SS[i] = 0; continue; }
+        if (Math.random() >= params.sparks) {
+          SS[i] = 0;
+          continue;
+        }
         spawnSpark(i);
       }
       const sdrag = 1 - dt * 0.9; // sparks slow as they rise
-      SV[ix] *= sdrag; SV[ix + 1] *= sdrag; SV[ix + 2] *= sdrag;
+      SV[ix] *= sdrag;
+      SV[ix + 1] *= sdrag;
+      SV[ix + 2] *= sdrag;
       const c = curlAt(SP[ix] * 1.2, SP[ix + 1] * 1.2 - t * 0.6, SP[ix + 2] * 1.2);
       SP[ix] += (SV[ix] + c.x * 0.25 + wind.x * 0.6) * dt;
       SP[ix + 1] += SV[ix + 1] * dt;
@@ -314,7 +337,9 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
       // Fire's signature: embers cool core → lo as they rise, and twinkle as they tumble.
       const twinkle = 0.7 + 0.3 * Math.sin(sAge[i] * 23 + i * 2.3);
       tmp.copy(ramp[k < 0.3 ? 3 : k < 0.6 ? 2 : k < 0.85 ? 1 : 0]).multiplyScalar(Math.min(1, (1 - k) * 4) * twinkle);
-      SC[ix] = tmp.r; SC[ix + 1] = tmp.g; SC[ix + 2] = tmp.b;
+      SC[ix] = tmp.r;
+      SC[ix + 1] = tmp.g;
+      SC[ix + 2] = tmp.b;
       SS[i] = sLife[i] < 0.01 ? 0 : k < 0.15 ? 2 : 1;
     }
     spark.geometry.attributes.position.needsUpdate = true;
@@ -335,8 +360,12 @@ export function createFlame({ count, sparks: sparkCount, material, origin, field
     for (const s of list) {
       const i = sparkCursor++ % sparkCount;
       spawnSpark(i, 1);
-      SP[i * 3] = s.x; SP[i * 3 + 1] = s.y; SP[i * 3 + 2] = s.z;
-      SV[i * 3] = s.vx; SV[i * 3 + 1] = s.vy; SV[i * 3 + 2] = s.vz;
+      SP[i * 3] = s.x;
+      SP[i * 3 + 1] = s.y;
+      SP[i * 3 + 2] = s.z;
+      SV[i * 3] = s.vx;
+      SV[i * 3 + 1] = s.vy;
+      SV[i * 3 + 2] = s.vz;
       sLife[i] = 0.5 + Math.random() * 0.6;
     }
   }

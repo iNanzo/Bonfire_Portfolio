@@ -134,9 +134,16 @@ export function notesFor(hidden) {
   /** @type {Map<string, PanelFound['hidden']>} */
   const by = new Map();
   for (const h of hidden) by.set(h.why, [...(by.get(h.why) ?? []), h]);
-  return [...by.entries()].flatMap(([why, list]) => (list.length > SHARED_NOTE
-    ? [`${list.slice(0, SHARED_NOTE).map((h) => h.label).join(', ')} and ${list.length - SHARED_NOTE} more: ${why}`]
-    : list.map((h) => h.note)));
+  return [...by.entries()].flatMap(([why, list]) =>
+    list.length > SHARED_NOTE
+      ? [
+          `${list
+            .slice(0, SHARED_NOTE)
+            .map((h) => h.label)
+            .join(', ')} and ${list.length - SHARED_NOTE} more: ${why}`,
+        ]
+      : list.map((h) => h.note),
+  );
 }
 
 /**
@@ -151,7 +158,7 @@ export function notesFor(hidden) {
 export function createPanelSearch({ input, status, notes, panel, scene, ctx = {}, folded = () => false }) {
   const match = buildMatcher(searchEntries(ctx), { synonyms: PAINTER_SYNONYMS });
   let query = '';
-  let shown = '';  // the notes as last listed (so a redraw that changes nothing leaves them be)
+  let shown = ''; // the notes as last listed (so a redraw that changes nothing leaves them be)
   const doc = notes.ownerDocument;
   // The list: a fold (its count the summary), so it can give its room to the rows found; it
   // stays as it was left from one query to the next.
@@ -169,14 +176,22 @@ export function createPanelSearch({ input, status, notes, panel, scene, ctx = {}
     if (key === shown) return;
     shown = key;
     notes.hidden = !hidden.length;
-    if (!hidden.length) { notes.replaceChildren(); return; }
-    if (!opened) { fold.open = !folded(); opened = true; }
+    if (!hidden.length) {
+      notes.replaceChildren();
+      return;
+    }
+    if (!opened) {
+      fold.open = !folded();
+      opened = true;
+    }
     title.textContent = `Not shown now (${hidden.length})`; // (how many: the list scrolls)
-    ul.replaceChildren(...notesFor(hidden).map((text) => {
-      const li = doc.createElement('li');
-      li.textContent = text;
-      return li;
-    }));
+    ul.replaceChildren(
+      ...notesFor(hidden).map((text) => {
+        const li = doc.createElement('li');
+        li.textContent = text;
+        return li;
+      }),
+    );
     if (fold.parentNode !== notes) notes.replaceChildren(fold);
   }
   /**
@@ -199,12 +214,21 @@ export function createPanelSearch({ input, status, notes, panel, scene, ctx = {}
   }
   const box = createSearchBox({ input, status, onQuery: (q) => run(q), noun: 'setting' });
   // (Esc in an empty box: back to the page, so its keys work again.)
-  input.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !input.value && !e.defaultPrevented) input.blur(); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !input.value && !e.defaultPrevented) input.blur();
+  });
   return {
     /** Search again (the scene's shape changed what the panel shows). */
-    refresh() { if (query.trim()) run(query, { again: true }); },
-    focus() { input.focus(); input.select(); },
+    refresh() {
+      if (query.trim()) run(query, { again: true });
+    },
+    focus() {
+      input.focus();
+      input.select();
+    },
     clear: () => box.clear(),
-    get query() { return query; },
+    get query() {
+      return query;
+    },
   };
 }

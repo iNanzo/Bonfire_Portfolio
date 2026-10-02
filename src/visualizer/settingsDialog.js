@@ -29,10 +29,35 @@ import { BULK_ACTIONS } from '../ui/fields.js';
 import { isHelpKey } from '../ui/keysOverlay.js';
 import { sceneSummary } from '../scenes.js';
 import {
-  NUMERIC, AT_LEAST_ONE, RANDOM, PRESETS, applyPreset, presetOf, resetSettings, flushSettings, scenesFrom, setInLoop, inLoop,
-  readSetups, saveSetup, loadSetup, deleteSetup, exportSetups, importSetups,
+  NUMERIC,
+  AT_LEAST_ONE,
+  RANDOM,
+  PRESETS,
+  applyPreset,
+  presetOf,
+  resetSettings,
+  flushSettings,
+  scenesFrom,
+  setInLoop,
+  inLoop,
+  readSetups,
+  saveSetup,
+  loadSetup,
+  deleteSetup,
+  exportSetups,
+  importSetups,
 } from './settings.js';
-import { CONTROLS, BLOCKS, row, kindOf, presetButtons, sceneListMarkup, cardsMarkup, setupsMarkup, keysResultsMarkup } from './settingsControls.js';
+import {
+  CONTROLS,
+  BLOCKS,
+  row,
+  kindOf,
+  presetButtons,
+  sceneListMarkup,
+  cardsMarkup,
+  setupsMarkup,
+  keysResultsMarkup,
+} from './settingsControls.js';
 import { bulkPlan, sectionPlan, sectionKeys, getPath, setPath, createBatch } from './settingsBulk.js';
 import { createLiveSearch, focusIn } from './settingsSearchUi.js';
 
@@ -47,7 +72,8 @@ const tabOf = (id) => TABS.find((t) => t.id === id);
 /** Mark the preset in use (aria-pressed) on every preset button under `root`. */
 export function markPreset(root, settings) {
   const on = presetOf(settings);
-  for (const b of root.querySelectorAll('[data-preset]')) b.setAttribute('aria-pressed', String(/** @type {HTMLElement} */ (b).dataset.preset === on));
+  for (const b of root.querySelectorAll('[data-preset]'))
+    b.setAttribute('aria-pressed', String(/** @type {HTMLElement} */ (b).dataset.preset === on));
 }
 
 /**
@@ -62,15 +88,20 @@ export function markPreset(root, settings) {
 function sectionMarkup(s, settings, base) {
   const entries = entriesFor('live').filter((e) => e.section === s.id);
   const block = BLOCKS[s.id]?.({ base }) ?? {};
-  const rows = entries.map((e) => {
-    const m = meta('live', e.live);
-    return row(e.live, m, CONTROLS[e.live](settings, m)) + (block.after?.[e.live] ?? '');
-  }).join('');
+  const rows = entries
+    .map((e) => {
+      const m = meta('live', e.live);
+      return row(e.live, m, CONTROLS[e.live](settings, m)) + (block.after?.[e.live] ?? '');
+    })
+    .join('');
   const adv = entries.filter((e) => !e.simple);
   const hidden = adv.length > 0 && adv.length === entries.length && !block.start && !block.end;
-  const cue = !adv.length ? ''
+  const cue = !adv.length
+    ? ''
     : `<button type="button" class="viz-more-cue" data-show-all="${s.id}">${hidden ? `Only In All Settings: ${esc(adv.map((e) => meta('live', e.live).label).join(', '))}` : `${adv.length} More In All Settings`}</button>`;
-  const reset = sectionKeys(s.id).length ? `<button type="button" class="bulk-btn viz-reset-section" data-reset-section="${s.id}" aria-label="Reset Section: ${esc(s.label)}"${hidden ? ' data-adv' : ''}>Reset Section</button>` : '';
+  const reset = sectionKeys(s.id).length
+    ? `<button type="button" class="bulk-btn viz-reset-section" data-reset-section="${s.id}" aria-label="Reset Section: ${esc(s.label)}"${hidden ? ' data-adv' : ''}>Reset Section</button>`
+    : '';
   return `
         <fieldset class="viz-section${WIDE.has(s.id) ? ' viz-span' : ''}" data-section="${s.id}">
           <legend><span class="viz-crumb">${esc(tabOf(s.tab)?.label ?? '')} › </span>${esc(s.label)}</legend>
@@ -90,15 +121,23 @@ export function settingsMarkup(settings, keys = [], { base = '/' } = {}) {
   const sections = /** @type {Section[]} */ (sectionsFor('live'));
   // (What Off, In the Mix and Always mean: once on a tab with three-way switches, and in the
   // Simple view only if it shows one.)
-  const tris = (tab) => entriesFor('live').filter((e) => sections.find((s) => s.id === e.section)?.tab === tab && ['tri', 'grid'].includes(kindOf(e.live)));
+  const tris = (tab) =>
+    entriesFor('live').filter(
+      (e) => sections.find((s) => s.id === e.section)?.tab === tab && ['tri', 'grid'].includes(kindOf(e.live)),
+    );
   const triHelp = (tab) => {
     const all = tris(tab);
-    return all.length ? `<p class="viz-help viz-tri-help"${all.some((e) => e.simple) ? '' : ' data-adv'}>${esc(TRI_HELP)}</p>` : '';
+    return all.length
+      ? `<p class="viz-help viz-tri-help"${all.some((e) => e.simple) ? '' : ' data-adv'}>${esc(TRI_HELP)}</p>`
+      : '';
   };
   const panel = (t) => `
       <div class="viz-tab-panel" role="tabpanel" id="viz-tab-${t.id}" aria-labelledby="viz-tabbtn-${t.id}" data-tab-panel="${t.id}" hidden>
         ${triHelp(t.id)}
-        <div class="viz-settings-grid">${sections.filter((s) => s.tab === t.id).map((s) => sectionMarkup(s, settings, base)).join('')}</div>
+        <div class="viz-settings-grid">${sections
+          .filter((s) => s.tab === t.id)
+          .map((s) => sectionMarkup(s, settings, base))
+          .join('')}</div>
       </div>`;
   return `
   <dialog class="rest-menu viz-settings" data-settings aria-labelledby="viz-settings-title">
@@ -140,7 +179,10 @@ export function settingsMarkup(settings, keys = [], { base = '/' } = {}) {
 }
 
 /** The words a bulk button's toast says ("Looks: All Off"). */
-const actionName = (action) => Object.values(BULK_ACTIONS).flat().find(([a]) => a === action)?.[1] ?? action;
+const actionName = (action) =>
+  Object.values(BULK_ACTIONS)
+    .flat()
+    .find(([a]) => a === action)?.[1] ?? action;
 
 /**
  * Wire the dialog to `settings` (see the top of this file). `midi()`: the MIDI actions'
@@ -158,18 +200,39 @@ const actionName = (action) => Object.values(BULK_ACTIONS).flat().find(([a]) => 
  *   keys?: [string, string][], onKeys?: () => void,
  * }} o
  */
-export function bindSettings(dialog, settings, { onChange, onNote = () => {}, scenes = () => [], thumb = () => null, onPlayScene = () => {}, base = '/', midi = () => ({}), keys = [], onKeys = () => {} }) {
+export function bindSettings(
+  dialog,
+  settings,
+  {
+    onChange,
+    onNote = () => {},
+    scenes = () => [],
+    thumb = () => null,
+    onPlayScene = () => {},
+    base = '/',
+    midi = () => ({}),
+    keys = [],
+    onKeys = () => {},
+  },
+) {
   const form = /** @type {HTMLFormElement} */ (dialog.querySelector('form'));
   const q = (s) => /** @type {HTMLElement} */ (dialog.querySelector(s));
   // (The settings' fields never change: found once. The lists' are drawn again.)
   const fields = /** @type {(HTMLInputElement | HTMLSelectElement)[]} */ ([...dialog.querySelectorAll('[data-set]')]);
-  const outputs = new Map([...dialog.querySelectorAll('[data-out]')].map((o) => [/** @type {HTMLElement} */ (o).dataset.out, o]));
+  const outputs = new Map(
+    [...dialog.querySelectorAll('[data-out]')].map((o) => [/** @type {HTMLElement} */ (o).dataset.out, o]),
+  );
 
   function showOutput(key) {
     const out = outputs.get(key);
     if (!out) return;
     const v = getPath(settings, key);
-    const text = key === 'offset' || key === 'linkPort' ? String(v) : key === 'volume' ? `${Math.round(v * 100)}%` : Number(v).toFixed(2);
+    const text =
+      key === 'offset' || key === 'linkPort'
+        ? String(v)
+        : key === 'volume'
+          ? `${Math.round(v * 100)}%`
+          : Number(v).toFixed(2);
     if (out.textContent !== text) out.textContent = text;
   }
   /** The fields show the settings (only the fields: the lists are drawn on their own). */
@@ -182,7 +245,8 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
       showOutput(el.dataset.set);
     }
     form.dataset.view = settings.view;
-    for (const r of dialog.querySelectorAll('[data-view-pick]')) /** @type {HTMLInputElement} */ (r).checked = /** @type {HTMLInputElement} */ (r).value === settings.view;
+    for (const r of dialog.querySelectorAll('[data-view-pick]'))
+      /** @type {HTMLInputElement} */ (r).checked = /** @type {HTMLInputElement} */ (r).value === settings.view;
     markPresets();
     applyDeps();
   }
@@ -212,13 +276,23 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     markPreset(dialog, settings);
     notePreset();
   }
-  const presetUnder = (e) => /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest?.('[data-preset]'));
-  presetsEl.addEventListener('pointerover', (e) => { const b = presetUnder(e); if (b) notePreset(b.dataset.preset); });
-  presetsEl.addEventListener('focusin', (e) => { const b = presetUnder(e); if (b?.matches(':focus-visible')) notePreset(b.dataset.preset); });
+  const presetUnder = (e) =>
+    /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest?.('[data-preset]'));
+  presetsEl.addEventListener('pointerover', (e) => {
+    const b = presetUnder(e);
+    if (b) notePreset(b.dataset.preset);
+  });
+  presetsEl.addEventListener('focusin', (e) => {
+    const b = presetUnder(e);
+    if (b?.matches(':focus-visible')) notePreset(b.dataset.preset);
+  });
   for (const type of ['pointerout', 'focusout']) presetsEl.addEventListener(type, () => notePreset());
 
   // --- needs: a setting that does nothing as things stand is off, saying why
-  const needs = entriesFor('live').filter((e) => e.needs?.live).map((e) => ({ key: e.live, row: q(`[data-row="${e.live}"]`), why: q(`#viz-why-${e.live}`) })).filter((n) => n.row && n.why);
+  const needs = entriesFor('live')
+    .filter((e) => e.needs?.live)
+    .map((e) => ({ key: e.live, row: q(`[data-row="${e.live}"]`), why: q(`#viz-why-${e.live}`) }))
+    .filter((n) => n.row && n.why);
   const describedBy = (el) => (el.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
   function applyDeps() {
     for (const { key, row: r, why } of needs) {
@@ -228,7 +302,9 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
       r.dataset.blocked = String(off);
       why.textContent = reason ?? '';
       why.hidden = !off;
-      for (const el of r.querySelectorAll('select[data-set], input[data-set]:not(fieldset.tri input), fieldset.tri, .bulk-btn')) {
+      for (const el of r.querySelectorAll(
+        'select[data-set], input[data-set]:not(fieldset.tri input), fieldset.tri, .bulk-btn',
+      )) {
         /** @type {HTMLInputElement} */ (el).disabled = off;
         if (el.matches('.bulk-btn')) continue;
         const ids = describedBy(el).filter((id) => id !== why.id);
@@ -251,13 +327,19 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
       if (on && focus) t.focus();
       if (on) t.scrollIntoView?.({ block: 'nearest', inline: 'nearest' }); // (a phone's tab bar scrolls)
     }
-    for (const p of dialog.querySelectorAll('[data-tab-panel]')) /** @type {HTMLElement} */ (p).hidden = /** @type {HTMLElement} */ (p).dataset.tabPanel !== id;
+    for (const p of dialog.querySelectorAll('[data-tab-panel]'))
+      /** @type {HTMLElement} */ (p).hidden = /** @type {HTMLElement} */ (p).dataset.tabPanel !== id;
   }
   q('.viz-tabs').addEventListener('keydown', (e) => {
     const i = tabs.indexOf(/** @type {HTMLElement} */ (document.activeElement));
     if (i < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
     e.preventDefault();
-    const next = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    const next =
+      e.key === 'Home'
+        ? 0
+        : e.key === 'End'
+          ? tabs.length - 1
+          : (i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
     showTab(tabs[next].dataset.tab, true);
   });
   showTab(TABS[0].id);
@@ -273,7 +355,10 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
   function quiet() {
     clearTimeout(toastTimer);
     // (Never pulled from under the keyboard: it waits while Undo has the focus.)
-    if (document.activeElement === undoBtn) { toastTimer = window.setTimeout(quiet, 2000); return; }
+    if (document.activeElement === undoBtn) {
+      toastTimer = window.setTimeout(quiet, 2000);
+      return;
+    }
     toastText.textContent = '';
     undoBtn.hidden = true;
     undoing = null;
@@ -289,8 +374,13 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     toastTimer = window.setTimeout(quiet, 8000);
   }
   /** Whether the focus can go back to `el`: still there, shown and usable. */
-  const usable = (el) => el instanceof HTMLElement && el !== undoBtn && el.isConnected && dialog.contains(el)
-    && el.getClientRects().length > 0 && !el.matches(':disabled');
+  const usable = (el) =>
+    el instanceof HTMLElement &&
+    el !== undoBtn &&
+    el.isConnected &&
+    dialog.contains(el) &&
+    el.getClientRects().length > 0 &&
+    !el.matches(':disabled');
   function undo() {
     const fn = undoing;
     const back = undoFrom;
@@ -300,7 +390,8 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     // (Its button gone with it, the focus goes back to what made the change, else to the
     // toast's words: never out of the dialog, where its keys stop working.)
     const now = document.activeElement;
-    if (!now || now === undoBtn || now === document.body || !dialog.contains(now)) (usable(back) ? back : toastText).focus();
+    if (!now || now === undoBtn || now === document.body || !dialog.contains(now))
+      (usable(back) ? back : toastText).focus();
   }
   // Many settings changed at once, as one change (settingsBulk.js): the fields (and the
   // loop, which a Reset Section can change) shown again, one onChange, and an Undo.
@@ -309,7 +400,13 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     onChange,
     flush: flushSettings,
     toast,
-    refresh: (all) => { if (all) fillNow(); else { fillFields(); drawScenes(); } },
+    refresh: (all) => {
+      if (all) fillNow();
+      else {
+        fillFields();
+        drawScenes();
+      }
+    },
   });
   /** Everything as it was (a preset, a setup or Reset To Defaults undone). */
   const restoreAll = (before) => () => {
@@ -339,7 +436,9 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
   function drawScenes() {
     if (!dialog.open) return; // (drawn as it opens)
     const lib = scenes();
-    const sig = `${settings.sceneFrom}|${scenesFrom(lib, settings).map(({ ref, scene }) => `${ref}:${scene.name}:${thumb(ref) ? 1 : 0}:${inLoop(settings, ref) ? 1 : 0}`).join(',')}`;
+    const sig = `${settings.sceneFrom}|${scenesFrom(lib, settings)
+      .map(({ ref, scene }) => `${ref}:${scene.name}:${thumb(ref) ? 1 : 0}:${inLoop(settings, ref) ? 1 : 0}`)
+      .join(',')}`;
     if (sig === scenesDrawn) return;
     scenesDrawn = sig;
     scenesEl.innerHTML = sceneListMarkup(lib, settings, { playing, thumb, base });
@@ -355,7 +454,9 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
 
   // --- setups
   const setupsEl = q('[data-setups]');
-  const drawSetups = () => { setupsEl.innerHTML = setupsMarkup(Object.keys(readSetups())); };
+  const drawSetups = () => {
+    setupsEl.innerHTML = setupsMarkup(Object.keys(readSetups()));
+  };
   const fileInput = /** @type {HTMLInputElement} */ (q('[data-setup-file]'));
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files?.[0];
@@ -366,7 +467,9 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
       drawSetups();
       search.refresh();
       onNote(n ? `Imported ${n} setup${n === 1 ? '' : 's'}` : 'No setups in that file');
-    } catch { onNote('That file isn’t a Bonfire Live setups file'); }
+    } catch {
+      onNote('That file isn’t a Bonfire Live setups file');
+    }
   });
 
   // --- a field changed
@@ -388,7 +491,15 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     // (A port typed in: only a whole number in range; until then, the last good one stands.)
     if (key === 'linkPort' && !(Number.isInteger(v) && v >= 1024 && v <= 65535)) return;
     const group = key.split('.')[0];
-    if (AT_LEAST_ONE.has(group) && key.includes('.') && !v && Object.values(settings[group]).filter(Boolean).length <= 1) { el.checked = true; return; }
+    if (
+      AT_LEAST_ONE.has(group) &&
+      key.includes('.') &&
+      !v &&
+      Object.values(settings[group]).filter(Boolean).length <= 1
+    ) {
+      el.checked = true;
+      return;
+    }
     setPath(settings, key, v);
     showOutput(key);
     applyDeps();
@@ -411,8 +522,13 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
       // is Link): never out of the dialog, where its keys stop working.)
       const sec = q(`[data-section="${b.dataset.showAll}"]`);
       sec?.scrollIntoView({ block: 'start' });
-      const first = /** @type {HTMLElement[]} */ ([...(sec?.querySelectorAll('[data-row][data-adv]') ?? [])]).find((r) => r.getClientRects().length);
-      if (first) { focusIn(first, { preventScroll: true }); first.scrollIntoView({ block: 'nearest' }); }
+      const first = /** @type {HTMLElement[]} */ ([...(sec?.querySelectorAll('[data-row][data-adv]') ?? [])]).find(
+        (r) => r.getClientRects().length,
+      );
+      if (first) {
+        focusIn(first, { preventScroll: true });
+        first.scrollIntoView({ block: 'nearest' });
+      }
     },
     '[data-bulk]': (/** @type {HTMLElement} */ b) => {
       if (b.getAttribute('aria-disabled') === 'true') return; // (None, where one has to stay: its tip says why)
@@ -427,7 +543,10 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     '[data-reset-all]': () => {
       const before = structuredClone(settings);
       resetSettings(settings);
-      changed('Every setting is back to its default', Object.keys(settings), restoreAll(before), { flush: true, all: true });
+      changed('Every setting is back to its default', Object.keys(settings), restoreAll(before), {
+        flush: true,
+        all: true,
+      });
     },
     '[data-preset]': (/** @type {HTMLElement} */ b) => {
       const p = PRESETS[b.dataset.preset];
@@ -447,11 +566,22 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
       settings.cards.splice(i, 1);
       drawCards();
       // (Its button went with it: the focus goes to the card now in its place, else Add a Card.)
-      /** @type {HTMLElement | null} */ (cardsEl.querySelector(`[data-card="${Math.min(i, settings.cards.length - 1)}"] [data-card-remove]`) ?? q('[data-card-add]'))?.focus();
+      /** @type {HTMLElement | null} */ (
+        cardsEl.querySelector(`[data-card="${Math.min(i, settings.cards.length - 1)}"] [data-card-remove]`) ??
+          q('[data-card-add]')
+      )?.focus();
       onChange();
     },
-    '[data-card-show]': (/** @type {HTMLElement} */ b) => dialog.dispatchEvent(new CustomEvent('show-card', { detail: Number(/** @type {HTMLElement} */ (b.closest('[data-card]')).dataset.card) + 1 })),
-    '[data-scene-play]': (/** @type {HTMLElement} */ b) => { dialog.close(); onPlayScene(b.dataset.scenePlay); },
+    '[data-card-show]': (/** @type {HTMLElement} */ b) =>
+      dialog.dispatchEvent(
+        new CustomEvent('show-card', {
+          detail: Number(/** @type {HTMLElement} */ (b.closest('[data-card]')).dataset.card) + 1,
+        }),
+      ),
+    '[data-scene-play]': (/** @type {HTMLElement} */ b) => {
+      dialog.close();
+      onPlayScene(b.dataset.scenePlay);
+    },
     '[data-setup-save]': () => {
       const input = /** @type {HTMLInputElement} */ (q('[data-setup-name]'));
       const name = saveSetup(settings, input.value);
@@ -476,12 +606,19 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
       // (Its row went with it: the focus goes to the next setup's ✕, else the name box.)
       const rest = setupsEl.querySelectorAll('[data-setup-delete]');
       /** @type {HTMLElement} */ (rest[Math.min(at, rest.length - 1)] ?? q('[data-setup-name]')).focus();
-      toast(`Deleted “${name}”`, kept ? () => {
-        saveSetup(kept, name);
-        drawSetups();
-        /** @type {HTMLElement | null} */ (setupsEl.querySelector(`[data-setup-delete="${CSS.escape(name)}"]`))?.focus();
-        toast(`Deleted “${name}”: undone`);
-      } : null);
+      toast(
+        `Deleted “${name}”`,
+        kept
+          ? () => {
+              saveSetup(kept, name);
+              drawSetups();
+              /** @type {HTMLElement | null} */ (
+                setupsEl.querySelector(`[data-setup-delete="${CSS.escape(name)}"]`)
+              )?.focus();
+              toast(`Deleted “${name}”: undone`);
+            }
+          : null,
+      );
     },
     '[data-setup-export]': () => {
       const a = document.createElement('a');
@@ -493,7 +630,10 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     '[data-setup-import]': () => fileInput.click(),
   };
   dialog.addEventListener('click', (e) => {
-    if (e.target === dialog) { dialog.close(); return; }
+    if (e.target === dialog) {
+      dialog.close();
+      return;
+    }
     const t = /** @type {Element} */ (e.target);
     const tab = /** @type {HTMLElement | null} */ (t.closest('[data-tab]'));
     if (tab) {
@@ -504,7 +644,10 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     }
     for (const [sel, run] of Object.entries(ACTIONS)) {
       const b = /** @type {HTMLElement | null} */ (t.closest(sel));
-      if (b && dialog.contains(b)) { run(b); return; }
+      if (b && dialog.contains(b)) {
+        run(b);
+        return;
+      }
     }
   });
 
@@ -515,7 +658,11 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
     showTab,
     onKeys,
     dynamic: () => ({
-      scenes: scenesFrom(scenes(), settings).map(({ ref, scene }) => ({ ref, name: scene.name, summary: sceneSummary(scene) })),
+      scenes: scenesFrom(scenes(), settings).map(({ ref, scene }) => ({
+        ref,
+        name: scene.name,
+        summary: sceneSummary(scene),
+      })),
       cards: settings.cards,
       setups: Object.keys(readSetups()),
       midi: midi(),
@@ -550,7 +697,11 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
       if (toSearch) search.focus();
     },
     /** Draw the loop again (the library changed: a scene saved in the Painter, say). */
-    drawScenes() { scenesDrawn = ''; drawScenes(); search.refresh(); },
+    drawScenes() {
+      scenesDrawn = '';
+      drawScenes();
+      search.refresh();
+    },
     /** The scene playing now (its row is marked), or null for the free show. */
     markScene(ref) {
       if (ref === playing) return;
@@ -558,11 +709,14 @@ export function bindSettings(dialog, settings, { onChange, onNote = () => {}, sc
       for (const r of scenesEl.querySelectorAll('[data-scene-row]')) {
         const on = r.getAttribute('data-scene-row') === playing;
         r.classList.toggle('is-playing', on);
-        if (on) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current');
+        if (on) r.setAttribute('aria-current', 'true');
+        else r.removeAttribute('aria-current');
       }
     },
     /** A line of status under the Beat From setting (the Link bridge's state). */
-    set linkStatus(text) { q('[data-link-status]').textContent = text; },
+    set linkStatus(text) {
+      q('[data-link-status]').textContent = text;
+    },
     /** Open the dialog on a setting's row (a settings key, or a group's item: 'looks.echo'), shown and focused. */
     reveal(key) {
       if (!dialog.open) this.open();

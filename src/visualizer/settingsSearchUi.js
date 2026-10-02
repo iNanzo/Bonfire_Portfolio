@@ -44,12 +44,48 @@ const sectionById = (id) => SECTIONS.find((s) => s.id === id);
  * @type {[string, string, string, string, string[]][]}
  */
 const BLOCK_ROWS = [
-  ['block:source', 'source', 'Sound Source', 'What the fire is listening to now; Change picks another source.', ['input', 'microphone', 'line in', 'file', 'demo']],
-  ['block:link', 'beat', 'Setting Up Ableton Link', 'Carabiner, the Link bridge (npm run link) and Link in your DJ software, step by step.', ['carabiner', 'bridge', 'ableton', 'djay', 'rekordbox', 'traktor']],
-  ['block:midi', 'midi', 'Connect MIDI', 'Play the moments from a pad controller: connect it, press Learn beside an action, then the pad.', ['controller', 'pads', 'learn', 'mapping']],
-  ['block:loop', 'loop', 'Make a Scene In the Painter', 'Opens the Painter, where preset scenes are made and saved for the loop.', ['painter', 'new scene']],
-  ['block:cards', 'moreCards', 'Add a Card', 'More title cards: shout-outs, the next act, a hashtag, each on drops, every 32 bars or on its key.', ['title card', 'shout-out']],
-  ['block:setups', 'setups', 'Save a Setup', 'Saves everything as it is now under a name, to load again, export or import.', ['save', 'export', 'import', 'snapshot']],
+  [
+    'block:source',
+    'source',
+    'Sound Source',
+    'What the fire is listening to now; Change picks another source.',
+    ['input', 'microphone', 'line in', 'file', 'demo'],
+  ],
+  [
+    'block:link',
+    'beat',
+    'Setting Up Ableton Link',
+    'Carabiner, the Link bridge (npm run link) and Link in your DJ software, step by step.',
+    ['carabiner', 'bridge', 'ableton', 'djay', 'rekordbox', 'traktor'],
+  ],
+  [
+    'block:midi',
+    'midi',
+    'Connect MIDI',
+    'Play the moments from a pad controller: connect it, press Learn beside an action, then the pad.',
+    ['controller', 'pads', 'learn', 'mapping'],
+  ],
+  [
+    'block:loop',
+    'loop',
+    'Make a Scene In the Painter',
+    'Opens the Painter, where preset scenes are made and saved for the loop.',
+    ['painter', 'new scene'],
+  ],
+  [
+    'block:cards',
+    'moreCards',
+    'Add a Card',
+    'More title cards: shout-outs, the next act, a hashtag, each on drops, every 32 bars or on its key.',
+    ['title card', 'shout-out'],
+  ],
+  [
+    'block:setups',
+    'setups',
+    'Save a Setup',
+    'Saves everything as it is now under a name, to load again, export or import.',
+    ['save', 'export', 'import', 'snapshot'],
+  ],
 ];
 
 /**
@@ -66,7 +102,13 @@ export function staticEntries(settings) {
     const sec = sectionById(e.section);
     const tab = tabLabel(sec?.tab);
     out.push({
-      id: e.live, key: e.live, label: m.label, keywords: m.keywords, section: sec?.label ?? '', tab, tabId: sec?.tab,
+      id: e.live,
+      key: e.live,
+      label: m.label,
+      keywords: m.keywords,
+      section: sec?.label ?? '',
+      tab,
+      tabId: sec?.tab,
       options: kindOf(e.live) === 'select' ? OPTIONS[e.live].map(([, text]) => text) : [],
       hint: m.more ? `${m.hint} ${m.more.replace(/\n/g, ' ')}` : m.hint,
     });
@@ -74,9 +116,18 @@ export function staticEntries(settings) {
     // (A group's items: each its own row, in the group's section, under the group's name.)
     const names = itemNames(e.live, settings);
     const keys = GRID_KEYS[e.live] ?? Object.keys(names).map((id) => `${e.live}.${id}`);
-    Object.keys(names).forEach((id, i) => out.push({
-      id: keys[i], key: keys[i], label: names[id], section: m.label, tab, tabId: sec?.tab, hint: itemHint(e.live, id), parent: e.live,
-    }));
+    Object.keys(names).forEach((id, i) =>
+      out.push({
+        id: keys[i],
+        key: keys[i],
+        label: names[id],
+        section: m.label,
+        tab,
+        tabId: sec?.tab,
+        hint: itemHint(e.live, id),
+        parent: e.live,
+      }),
+    );
   }
   for (const [id, section, label, hint, keywords] of BLOCK_ROWS) {
     const sec = sectionById(section);
@@ -93,15 +144,49 @@ export function staticEntries(settings) {
  * @returns {RowEntry[]}
  */
 export function dynamicEntries({ scenes = [], cards = [], setups = [], midi = {}, presets = {}, keys = [] } = {}) {
-  const at = (section) => { const s = sectionById(section); return { section: s?.label ?? '', tab: tabLabel(s?.tab), tabId: s?.tab }; };
+  const at = (section) => {
+    const s = sectionById(section);
+    return { section: s?.label ?? '', tab: tabLabel(s?.tab), tabId: s?.tab };
+  };
   return [
-    ...scenes.map((s) => ({ id: `scene:${s.ref}`, label: s.name, hint: s.summary ?? '', keywords: ['scene'], ...at('loop') })),
-    ...cards.map((c, i) => ({ id: `card:${i}`, label: c.title.trim() || `Card ${i + 2}`, hint: c.subtitle ?? '', keywords: ['card', `shift ${i + 2}`], ...at('moreCards') })),
+    ...scenes.map((s) => ({
+      id: `scene:${s.ref}`,
+      label: s.name,
+      hint: s.summary ?? '',
+      keywords: ['scene'],
+      ...at('loop'),
+    })),
+    ...cards.map((c, i) => ({
+      id: `card:${i}`,
+      label: c.title.trim() || `Card ${i + 2}`,
+      hint: c.subtitle ?? '',
+      keywords: ['card', `shift ${i + 2}`],
+      ...at('moreCards'),
+    })),
     ...setups.map((name) => ({ id: `setup:${name}`, label: name, keywords: ['setup'], ...at('setups') })),
-    ...Object.entries(midi).map(([id, name]) => ({ id: `midi:${id}`, label: name, keywords: ['midi', 'pad'], ...at('midi') })),
-    ...Object.entries(presets).map(([id, p]) => ({ id: `preset:${id}`, label: p.name, hint: p.hint, keywords: ['preset'], section: 'Presets', tab: '' })),
+    ...Object.entries(midi).map(([id, name]) => ({
+      id: `midi:${id}`,
+      label: name,
+      keywords: ['midi', 'pad'],
+      ...at('midi'),
+    })),
+    ...Object.entries(presets).map(([id, p]) => ({
+      id: `preset:${id}`,
+      label: p.name,
+      hint: p.hint,
+      keywords: ['preset'],
+      section: 'Presets',
+      tab: '',
+    })),
     // (A shortcut is named by its keys; what it does is its hint, so a synonym doesn't find it.)
-    ...keys.map(([k, what], i) => ({ id: `key:${i}`, label: k, hint: what, keywords: ['key', 'shortcut'], section: 'Keyboard Shortcuts', tab: '' })),
+    ...keys.map(([k, what], i) => ({
+      id: `key:${i}`,
+      label: k,
+      hint: what,
+      keywords: ['key', 'shortcut'],
+      section: 'Keyboard Shortcuts',
+      tab: '',
+    })),
   ];
 }
 
@@ -115,17 +200,22 @@ export function dynamicEntries({ scenes = [], cards = [], setups = [], midi = {}
  */
 export function matcherFor(entries) {
   const plain = buildMatcher(entries);
-  const named = buildMatcher(entries.map((e) => ({ ...e, hint: '' })), { synonyms: SYNONYMS });
+  const named = buildMatcher(
+    entries.map((e) => ({ ...e, hint: '' })),
+    { synonyms: SYNONYMS },
+  );
   const order = new Map(entries.map((e, i) => [e.id, i]));
   return (query) => {
     /** @type {Map<string, Hit>} */
     const best = new Map();
     for (const hit of [...plain(query), ...named(query)]) {
       const had = best.get(hit.entry.id);
-      if (!had || hit.score > had.score) best.set(hit.entry.id, had && !hit.ranges.length ? { ...hit, ranges: had.ranges } : hit);
+      if (!had || hit.score > had.score)
+        best.set(hit.entry.id, had && !hit.ranges.length ? { ...hit, ranges: had.ranges } : hit);
     }
     // (Back to the entries' own objects, in score order; ties in the given order.)
-    return [...best.values()].map((h) => ({ ...h, entry: entries[order.get(h.entry.id)] }))
+    return [...best.values()]
+      .map((h) => ({ ...h, entry: entries[order.get(h.entry.id)] }))
       .sort((a, b) => b.score - a.score || order.get(a.entry.id) - order.get(b.entry.id));
   };
 }
@@ -185,8 +275,13 @@ export function suggestFor(query) {
 
 /** What a revealed row focuses, the first there is in this order. */
 const FOCUS = [
-  'input:checked:not(:disabled)', 'input:not([type="hidden"]):not([type="radio"]):not(:disabled)', 'select:not(:disabled)',
-  'textarea:not(:disabled)', 'button:not(:disabled):not(.viz-tip)', 'a[href]', 'summary',
+  'input:checked:not(:disabled)',
+  'input:not([type="hidden"]):not([type="radio"]):not(:disabled)',
+  'select:not(:disabled)',
+  'textarea:not(:disabled)',
+  'button:not(:disabled):not(.viz-tip)',
+  'a[href]',
+  'summary',
 ];
 const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 /** Whether `el` shows (a closed details block's insides don't, though Chrome lays them out). @param {Element} el */
@@ -217,11 +312,21 @@ function focusTarget(row) {
  */
 export function focusIn(row, options) {
   const to = focusTarget(row);
-  if (to) { to.focus(options); return; }
+  if (to) {
+    to.focus(options);
+    return;
+  }
   if (!row.hasAttribute('tabindex')) {
     row.tabIndex = -1;
     row.dataset.resultFocus = '';
-    row.addEventListener('blur', () => { row.removeAttribute('tabindex'); row.removeAttribute('data-result-focus'); }, { once: true });
+    row.addEventListener(
+      'blur',
+      () => {
+        row.removeAttribute('tabindex');
+        row.removeAttribute('data-result-focus');
+      },
+      { once: true },
+    );
   }
   row.focus(options);
 }
@@ -251,13 +356,24 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
 
   const rowEl = (id) => form.querySelector(`[data-row="${CSS.escape(id)}"]`);
   /** A row's name, where its matched words are marked. */
-  const nameOf = (row) => (row.matches('fieldset.tri, .viz-check') ? row.querySelector('.tri-name, label > span') : row.querySelector('[data-name]'));
+  const nameOf = (row) =>
+    row.matches('fieldset.tri, .viz-check')
+      ? row.querySelector('.tri-name, label > span')
+      : row.querySelector('[data-name]');
   const parentRow = (row) => row.parentElement?.closest('[data-row]') ?? null;
   /** An item whose whole group was found (the group counts for it). */
-  const inWhole = (row) => { const up = parentRow(row); return !!up && !!last?.plan.whole.has(/** @type {HTMLElement} */ (up).dataset.row); };
+  const inWhole = (row) => {
+    const up = parentRow(row);
+    return !!up && !!last?.plan.whole.has(/** @type {HTMLElement} */ (up).dataset.row);
+  };
   /** The rows found that show: the tabs' in the dialog's order, then the presets (in the header). */
-  const results = () => /** @type {HTMLElement[]} */ ([...form.querySelectorAll('.viz-settings-body [data-row].is-hit'), ...form.querySelectorAll('.viz-settings-top [data-row].is-hit')]
-    .filter((r) => !r.closest('.is-miss, [hidden]:not([data-tab-panel])')));
+  const results = () =>
+    /** @type {HTMLElement[]} */ (
+      [
+        ...form.querySelectorAll('.viz-settings-body [data-row].is-hit'),
+        ...form.querySelectorAll('.viz-settings-top [data-row].is-hit'),
+      ].filter((r) => !r.closest('.is-miss, [hidden]:not([data-tab-panel])'))
+    );
   /**
    * A result takes the focus itself (focusable for now, if it isn't anyway): ↓ or ↑ on its
    * field would change the setting.
@@ -275,18 +391,25 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
   function unmark() {
     for (const { el, text } of marked) el.textContent = text;
     marked = [];
-    for (const el of form.querySelectorAll('.is-hit, .is-miss, .is-partly')) el.classList.remove('is-hit', 'is-miss', 'is-partly');
+    for (const el of form.querySelectorAll('.is-hit, .is-miss, .is-partly'))
+      el.classList.remove('is-hit', 'is-miss', 'is-partly');
   }
 
   /** The dialog as it is without a query: one tab, every row, nothing marked. */
   function reset() {
     unmark();
     // (The rows made focusable as results aren't any more.)
-    for (const el of form.querySelectorAll('[data-result-focus]')) { el.removeAttribute('tabindex'); el.removeAttribute('data-result-focus'); }
+    for (const el of form.querySelectorAll('[data-result-focus]')) {
+      el.removeAttribute('tabindex');
+      el.removeAttribute('data-result-focus');
+    }
     delete form.dataset.searching;
     emptyEl.hidden = true;
     keysEl.hidden = true;
-    for (const b of form.querySelectorAll('[data-tab-count]')) { b.textContent = ''; /** @type {HTMLElement} */ (b).hidden = true; }
+    for (const b of form.querySelectorAll('[data-tab-count]')) {
+      b.textContent = '';
+      /** @type {HTMLElement} */ (b).hidden = true;
+    }
     for (const t of form.querySelectorAll('[data-tab].is-empty')) t.classList.remove('is-empty');
     const on = form.querySelector('[data-tab][aria-selected="true"]');
     showTab(/** @type {HTMLElement} */ (on)?.dataset.tab ?? TABS[0].id);
@@ -295,7 +418,10 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
 
   /** Filter the dialog to `query`: how many rows it found. */
   function apply(query) {
-    if (!query.trim()) { reset(); return 0; }
+    if (!query.trim()) {
+      reset();
+      return 0;
+    }
     unmark();
     for (const el of form.querySelectorAll('.is-revealed')) el.classList.remove('is-revealed');
     const extra = dynamicEntries(dynamic());
@@ -334,7 +460,10 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
       panel.classList.toggle('is-miss', !n && ![...panel.querySelectorAll('[data-row]')].some(visible));
       const tab = form.querySelector(`[data-tab="${id}"]`);
       const count = tab?.querySelector('[data-tab-count]');
-      if (count) { count.textContent = String(n); /** @type {HTMLElement} */ (count).hidden = false; }
+      if (count) {
+        count.textContent = String(n);
+        /** @type {HTMLElement} */ (count).hidden = false;
+      }
       tab?.classList.toggle('is-empty', !n);
     }
     keysEl.hidden = ![...keysEl.querySelectorAll('[data-row]')].some((r) => !r.classList.contains('is-miss'));
@@ -344,12 +473,18 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
     if (!total) {
       emptyEl.querySelector('[data-search-query]').textContent = query.trim();
       emptyEl.querySelector('[data-search-suggest]').innerHTML = suggestFor(query)
-        .map((w) => `<button type="button" class="bulk-btn" data-suggest="${esc(w)}">${esc(w)}</button>`).join(' ');
+        .map((w) => `<button type="button" class="bulk-btn" data-suggest="${esc(w)}">${esc(w)}</button>`)
+        .join(' ');
     }
     return total;
   }
 
-  const box = createSearchBox({ input, status: dialog.querySelector('[data-settings-search] [data-search-status]'), onQuery: apply, noun: 'setting' });
+  const box = createSearchBox({
+    input,
+    status: dialog.querySelector('[data-settings-search] [data-search-status]'),
+    onQuery: apply,
+    noun: 'setting',
+  });
 
   /**
    * Show a row: the search cleared, its tab, scrolled to the middle and focused, a short
@@ -360,7 +495,10 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
   function reveal(id) {
     let row = rowEl(id);
     if (!row) return false;
-    if (id.startsWith('key:')) { onKeys(); return true; }
+    if (id.startsWith('key:')) {
+      onKeys();
+      return true;
+    }
     if (input.value) box.clear();
     row = rowEl(id) ?? row;
     const panel = row.closest('[data-tab-panel]');
@@ -374,7 +512,7 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
     focusIn(/** @type {HTMLElement} */ (row), { preventScroll: true });
     if (!still) {
       row.classList.remove('is-found');
-      void (/** @type {HTMLElement} */ (row)).offsetWidth;
+      void (/** @type {HTMLElement} */ (row).offsetWidth);
       row.classList.add('is-found');
       setTimeout(() => row.classList.remove('is-found'), 1400);
     }
@@ -386,8 +524,10 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
     const found = results().filter((r) => !inWhole(r));
     if (found.length <= 1) return found[0] ?? null;
     const typed = wordsOf(input.value);
-    const named = last?.hits.find((h) => wordsOf(h.entry.label) === typed && found.some((r) => r.dataset.row === h.entry.id));
-    return named ? found.find((r) => r.dataset.row === named.entry.id) ?? null : null;
+    const named = last?.hits.find(
+      (h) => wordsOf(h.entry.label) === typed && found.some((r) => r.dataset.row === h.entry.id),
+    );
+    return named ? (found.find((r) => r.dataset.row === named.entry.id) ?? null) : null;
   }
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -399,7 +539,10 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
     } else if (e.key === 'ArrowDown' && input.value.trim()) {
       box.run();
       const first = results()[0];
-      if (first) { e.preventDefault(); focusRow(first); }
+      if (first) {
+        e.preventDefault();
+        focusRow(first);
+      }
     }
   });
   // On a result (the row itself, not a field in it): ↓ / ↑ step through them (↑ from the
@@ -428,7 +571,10 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
   let cleared = false;
   dialog.addEventListener('keydown', (e) => {
     if (e.target === input) return;
-    if ((e.key === '/' && !typing(e.target) && !e.ctrlKey && !e.metaKey && !e.altKey) || ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'f')) {
+    if (
+      (e.key === '/' && !typing(e.target) && !e.ctrlKey && !e.metaKey && !e.altKey) ||
+      ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'f')
+    ) {
       e.preventDefault();
       input.focus();
       input.select();
@@ -439,13 +585,28 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
       input.focus();
     }
   });
-  dialog.addEventListener('keyup', (e) => { if (e.key === 'Escape') cleared = false; });
-  dialog.addEventListener('cancel', (e) => { if (cleared) { cleared = false; e.preventDefault(); } });
+  dialog.addEventListener('keyup', (e) => {
+    if (e.key === 'Escape') cleared = false;
+  });
+  dialog.addEventListener('cancel', (e) => {
+    if (cleared) {
+      cleared = false;
+      e.preventDefault();
+    }
+  });
   dialog.addEventListener('click', (e) => {
     const t = /** @type {Element} */ (e.target);
     const word = t.closest?.('[data-suggest]');
-    if (word) { input.value = /** @type {HTMLElement} */ (word).dataset.suggest; box.run(); input.focus(); return; }
-    if (t.closest?.('[data-search-clear]')) { box.clear(); input.focus(); }
+    if (word) {
+      input.value = /** @type {HTMLElement} */ (word).dataset.suggest;
+      box.run();
+      input.focus();
+      return;
+    }
+    if (t.closest?.('[data-search-clear]')) {
+      box.clear();
+      input.focus();
+    }
   });
   dialog.addEventListener('close', () => {
     for (const el of form.querySelectorAll('.is-revealed')) el.classList.remove('is-revealed');
@@ -453,12 +614,22 @@ export function createLiveSearch({ dialog, settings, dynamic, showTab, onKeys = 
 
   return {
     /** Search for `query` now (as if typed), or clear with ''. */
-    run(query) { input.value = query; box.run(query); },
+    run(query) {
+      input.value = query;
+      box.run(query);
+    },
     clear: () => box.clear(),
     reveal,
-    focus() { input.focus(); input.select(); },
-    get active() { return !!input.value.trim(); },
+    focus() {
+      input.focus();
+      input.select();
+    },
+    get active() {
+      return !!input.value.trim();
+    },
     /** The query again (the rows it reads changed: a scene saved, a card added). */
-    refresh() { if (input.value.trim()) box.run(); },
+    refresh() {
+      if (input.value.trim()) box.run();
+    },
   };
 }

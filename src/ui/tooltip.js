@@ -38,8 +38,10 @@ const WARM_MS = 300;
  * @type {Record<string, ('top' | 'bottom' | 'left' | 'right')[]>}
  */
 const SIDES = {
-  top: ['top', 'bottom', 'left', 'right'], bottom: ['bottom', 'top', 'left', 'right'],
-  left: ['left', 'right', 'top', 'bottom'], right: ['right', 'left', 'top', 'bottom'],
+  top: ['top', 'bottom', 'left', 'right'],
+  bottom: ['bottom', 'top', 'left', 'right'],
+  left: ['left', 'right', 'top', 'bottom'],
+  right: ['right', 'left', 'top', 'bottom'],
 };
 
 /**
@@ -65,7 +67,12 @@ export function place(a, tip, view, { prefer = 'top', gap = 8, margin = MARGIN }
     right: view.width - margin - a.right - gap,
   };
   const tall = h <= view.height - 2 * margin;
-  const fits = { top: room.top >= h, bottom: room.bottom >= h, left: tall && room.left >= w, right: tall && room.right >= w };
+  const fits = {
+    top: room.top >= h,
+    bottom: room.bottom >= h,
+    left: tall && room.left >= w,
+    right: tall && room.right >= w,
+  };
   const side = (SIDES[prefer] ?? SIDES.top).find((s) => fits[s]) ?? (room.top >= room.bottom ? 'top' : 'bottom');
   const clampX = (x) => Math.max(margin, Math.min(x, view.width - margin - w));
   const clampY = (y) => Math.max(margin, Math.min(y, view.height - margin - h));
@@ -91,7 +98,12 @@ function boxOf(els) {
   const shown = all.filter((r) => r.width || r.height); // (one not drawn would stretch it to the corner)
   const rects = shown.length ? shown : all;
   const own = rects[0];
-  return { left: own.left, right: own.right, top: Math.min(...rects.map((r) => r.top)), bottom: Math.max(...rects.map((r) => r.bottom)) };
+  return {
+    left: own.left,
+    right: own.right,
+    top: Math.min(...rects.map((r) => r.top)),
+    bottom: Math.max(...rects.map((r) => r.bottom)),
+  };
 }
 
 const installed = new WeakMap();
@@ -121,22 +133,34 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
   /** @type {{ trigger: Element, how: 'hover' | 'focus' | 'click', anchor: Element[] } | null} */
   let current = null;
   /** @type {Element | null} */
-  let pending = null;  // the trigger a pointer rests on, its tip on the way
+  let pending = null; // the trigger a pointer rests on, its tip on the way
   let showTimer = 0;
   let hideTimer = 0;
   let lastShown = -Infinity;
-  let frame = 0;       // a re-place waiting for the next frame (scroll, resize)
-  let watch = 0;       // the frame loop that notices a trigger gone (only while a tip shows)
+  let frame = 0; // a re-place waiting for the next frame (scroll, resize)
+  let watch = 0; // the frame loop that notices a trigger gone (only while a tip shows)
   let escaped = false; // Esc just closed a tip: the dialog's cancel that follows is stopped
 
   const now = () => win.performance.now();
   const viewSize = () => ({ width: doc.documentElement.clientWidth, height: doc.documentElement.clientHeight });
 
   function open() {
-    if (popover) { try { tip.showPopover(); } catch { /* already showing */ } } else tip.hidden = false;
+    if (popover) {
+      try {
+        tip.showPopover();
+      } catch {
+        /* already showing */
+      }
+    } else tip.hidden = false;
   }
   function close() {
-    if (popover) { try { tip.hidePopover(); } catch { /* not showing */ } } else tip.hidden = true;
+    if (popover) {
+      try {
+        tip.hidePopover();
+      } catch {
+        /* not showing */
+      }
+    } else tip.hidden = true;
   }
 
   /**
@@ -188,7 +212,9 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
     tip.style.setProperty('left', '0px');
     tip.style.setProperty('top', '0px');
     const size = tip.getBoundingClientRect();
-    const at = place(boxOf(current.anchor), { width: size.width, height: size.height }, view, { prefer: sideOf(current.trigger) });
+    const at = place(boxOf(current.anchor), { width: size.width, height: size.height }, view, {
+      prefer: sideOf(current.trigger),
+    });
     tip.style.setProperty('left', `${at.x}px`);
     tip.style.setProperty('top', `${at.y}px`);
     tip.dataset.side = at.side;
@@ -209,7 +235,8 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
   function inView(el) {
     const r = el.getBoundingClientRect();
     const view = viewSize();
-    if ((!r.width && !r.height) || r.bottom <= 0 || r.right <= 0 || r.top >= view.height || r.left >= view.width) return false;
+    if ((!r.width && !r.height) || r.bottom <= 0 || r.right <= 0 || r.top >= view.height || r.left >= view.width)
+      return false;
     for (let p = el.parentElement; p && p !== doc.body && p !== doc.documentElement; p = p.parentElement) {
       const s = win.getComputedStyle(p);
       if (s.overflowX === 'visible' && s.overflowY === 'visible') continue;
@@ -222,7 +249,10 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
   /** Every frame a tip shows: is its trigger still on the page (a panel redrawn under it)? */
   function check() {
     if (!current) return;
-    if (!current.trigger.isConnected || !current.anchor.every((el) => el.isConnected)) { hide(); return; }
+    if (!current.trigger.isConnected || !current.anchor.every((el) => el.isConnected)) {
+      hide();
+      return;
+    }
     watch = win.requestAnimationFrame(check);
   }
   /** Scrolled or resized: placed again on the next frame, or gone if its trigger went out of sight. */
@@ -258,10 +288,16 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
     if (e.pointerType === 'touch') return;
     const t = element(e.target);
     if (!t) return;
-    if (tip.contains(t)) { win.clearTimeout(hideTimer); return; }
+    if (tip.contains(t)) {
+      win.clearTimeout(hideTimer);
+      return;
+    }
     const trigger = t.closest('[data-tip]');
     if (!trigger) return;
-    if (current?.trigger === trigger) { win.clearTimeout(hideTimer); return; }
+    if (current?.trigger === trigger) {
+      win.clearTimeout(hideTimer);
+      return;
+    }
     if (pending === trigger) return;
     win.clearTimeout(showTimer);
     pending = trigger;
@@ -285,7 +321,11 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
     const el = element(e.target);
     if (!el || tip.contains(el)) return;
     let ring = true;
-    try { ring = el.matches(':focus-visible'); } catch { /* an old browser: as if it had one */ }
+    try {
+      ring = el.matches(':focus-visible');
+    } catch {
+      /* an old browser: as if it had one */
+    }
     if (!ring) return;
     const found = triggerFor(el);
     if (found) show(found.trigger, 'focus', found.anchor);
@@ -300,7 +340,10 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
     // (A "?", or a trigger a tap does nothing else with that asks for this: data-tip-tap.)
     const mark = element(e.target)?.closest('.viz-tip[data-tip], [data-tip][data-tip-tap]');
     if (!mark) return;
-    if (current?.trigger === mark && current.how === 'click') { hide(); return; }
+    if (current?.trigger === mark && current.how === 'click') {
+      hide();
+      return;
+    }
     show(mark, 'click', [mark]);
   }
   function onDown(e) {
@@ -309,8 +352,14 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
     // doesn't come up over what the press opened. A "?"'s own click opens or closes it.)
     const pressed = t?.closest('[data-tip]');
     if (pressed && !pressed.matches('.viz-tip')) {
-      if (pending === pressed) { win.clearTimeout(showTimer); pending = null; }
-      if (current?.trigger === pressed) { hide(); return; }
+      if (pending === pressed) {
+        win.clearTimeout(showTimer);
+        pending = null;
+      }
+      if (current?.trigger === pressed) {
+        hide();
+        return;
+      }
     }
     if (!current || (t && (tip.contains(t) || current.trigger.contains(t)))) return;
     hide();
@@ -322,21 +371,33 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
     e.stopPropagation();
     escaped = true;
   }
-  function onKeyUp(e) { if (e.key === 'Escape') escaped = false; }
+  function onKeyUp(e) {
+    if (e.key === 'Escape') escaped = false;
+  }
   function onCancel(e) {
     if (!escaped) return;
     escaped = false;
     e.preventDefault();
   }
-  function onClose(e) { if (current && e.target === tip.parentNode) hide(); }
+  function onClose(e) {
+    if (current && e.target === tip.parentNode) hide();
+  }
 
   const capture = { capture: true };
   const passive = { capture: true, passive: true };
   /** @type {[string, (e: any) => void, AddEventListenerOptions][]} */
   const listeners = [
-    ['pointerover', onOver, passive], ['pointerout', onOut, passive], ['focusin', onFocusIn, capture], ['focusout', onFocusOut, capture],
-    ['click', onClick, capture], ['pointerdown', onDown, passive], ['keydown', onKey, capture], ['keyup', onKeyUp, capture],
-    ['cancel', onCancel, capture], ['close', onClose, capture], ['scroll', replace, passive],
+    ['pointerover', onOver, passive],
+    ['pointerout', onOut, passive],
+    ['focusin', onFocusIn, capture],
+    ['focusout', onFocusOut, capture],
+    ['click', onClick, capture],
+    ['pointerdown', onDown, passive],
+    ['keydown', onKey, capture],
+    ['keyup', onKeyUp, capture],
+    ['cancel', onCancel, capture],
+    ['close', onClose, capture],
+    ['scroll', replace, passive],
   ];
   for (const [type, fn, opts] of listeners) doc.addEventListener(type, fn, opts);
   win.addEventListener('resize', replace);

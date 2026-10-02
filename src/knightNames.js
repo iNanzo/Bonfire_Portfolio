@@ -16,13 +16,22 @@ export const HELMET_NAMES = { great: 'Great Helm', armet: 'Armet', bascinet: 'Ba
  * 'dance' is the Default Dance: on the site he stands, dances two bars and sits back down.
  */
 export const GESTURE_NAMES = {
-  praise: 'Praise the Sun', wave: 'Wave', bow: 'Bow', point: 'Point Forward',
-  beckon: 'Beckon', shrug: 'Shrug', hurrah: 'Hurrah', joy: 'Joy', dance: 'Default Dance',
+  praise: 'Praise the Sun',
+  wave: 'Wave',
+  bow: 'Bow',
+  point: 'Point Forward',
+  beckon: 'Beckon',
+  shrug: 'Shrug',
+  hurrah: 'Hurrah',
+  joy: 'Joy',
+  dance: 'Default Dance',
 };
 
 // Praise the Sun comes up four times as often as any other gesture. (The Default Dance is
 // asked for from the pack, never a click's answer: it's a whole performance.)
-const GREETINGS = Object.keys(GESTURE_NAMES).filter((g) => g !== 'dance').flatMap((g) => (g === 'praise' ? [g, g, g, g] : [g]));
+const GREETINGS = Object.keys(GESTURE_NAMES)
+  .filter((g) => g !== 'dance')
+  .flatMap((g) => (g === 'praise' ? [g, g, g, g] : [g]));
 /**
  * The knight's answer when he's greeted (a click on him on the site): Praise the Sun the
  * first time and most often after that, never the gesture he made last, never the dance.

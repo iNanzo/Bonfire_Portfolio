@@ -41,7 +41,10 @@ export function onsetDetector({ refractory, history = 0.8 }) {
       const n = times.length;
       const t = new Float64Array(n * 2);
       const v = new Float64Array(n * 2);
-      for (let i = 0; i < n; i++) { t[i] = times[(first + i) % n]; v[i] = values[(first + i) % n]; }
+      for (let i = 0; i < n; i++) {
+        t[i] = times[(first + i) % n];
+        v[i] = values[(first + i) % n];
+      }
       times = t;
       values = v;
       first = 0;
@@ -53,7 +56,10 @@ export function onsetDetector({ refractory, history = 0.8 }) {
   }
   return (now, dt, rate, sensitivity) => {
     push(now, rate);
-    while (size && now - times[first] > history) { first = (first + 1) % times.length; size--; }
+    while (size && now - times[first] > history) {
+      first = (first + 1) % times.length;
+      size--;
+    }
     const n = times.length;
     let mean = 0;
     for (let i = 0; i < size; i++) mean += values[(first + i) % n];
@@ -101,8 +107,17 @@ export function createFeatures({ sampleRate, fftSize = FFT }) {
   const bins = fftSize / 2;
   const hz = sampleRate / fftSize;
   const binOf = (f) => Math.max(1, Math.min(bins - 1, Math.round(f / hz)));
-  const range = (a, b) => { const lo = binOf(a); return [lo, Math.max(lo + 1, binOf(b))]; };
-  const BANDS = { bass: range(30, 150), lowMid: range(150, 500), mid: range(500, 2000), highMid: range(2000, 6000), high: range(6000, 16000) };
+  const range = (a, b) => {
+    const lo = binOf(a);
+    return [lo, Math.max(lo + 1, binOf(b))];
+  };
+  const BANDS = {
+    bass: range(30, 150),
+    lowMid: range(150, 500),
+    mid: range(500, 2000),
+    highMid: range(2000, 6000),
+    high: range(6000, 16000),
+  };
   const KICK = range(40, 150);
   const HAT = range(7000, 16000);
 
@@ -130,13 +145,27 @@ export function createFeatures({ sampleRate, fftSize = FFT }) {
   // How hard the kicks land on the beat grid: the strongest onset near each beat.
   let beatMemory = 0;
   let lastBeatTime = -Infinity;
-  let hitNow = 0;   // onset credited to the last emitted beat
-  let hitNext = 0;  // one that arrived just before its beat was emitted
+  let hitNow = 0; // onset credited to the last emitted beat
+  let hitNext = 0; // one that arrived just before its beat was emitted
 
   const features = {
-    time: 0, rms: 0, level: 0, kick: 0, hat: 0, beats: [], events: [],
-    bands: { ...env }, bpm: 0, locked: false, strength: 0, state, build: 0, breakdownFor: 0,
-    intensity: 1, drop: null, dropScore: 0,
+    time: 0,
+    rms: 0,
+    level: 0,
+    kick: 0,
+    hat: 0,
+    beats: [],
+    events: [],
+    bands: { ...env },
+    bpm: 0,
+    locked: false,
+    strength: 0,
+    state,
+    build: 0,
+    breakdownFor: 0,
+    intensity: 1,
+    drop: null,
+    dropScore: 0,
   };
 
   /**
@@ -152,7 +181,9 @@ export function createFeatures({ sampleRate, fftSize = FFT }) {
     // Log-magnitude flux, whole spectrum and per detector band; band powers. Magnitudes
     // are taken relative to the running peak first (the loudest bin lands near 200), so
     // a quiet line in and a hot master compress alike.
-    let full = 0, kick = 0, hat = 0;
+    let full = 0,
+      kick = 0,
+      hat = 0;
     for (const b of BAND_NAMES) power[b] = 0;
     let kickPower = 0;
     let maxA = 0;
@@ -170,7 +201,11 @@ export function createFeatures({ sampleRate, fftSize = FFT }) {
       }
       const p = a * a;
       if (k >= KICK[0] && k < KICK[1]) kickPower += p;
-      for (const b of BAND_NAMES) if (k >= BANDS[b][0] && k < BANDS[b][1]) { power[b] += p; break; }
+      for (const b of BAND_NAMES)
+        if (k >= BANDS[b][0] && k < BANDS[b][1]) {
+          power[b] += p;
+          break;
+        }
     }
     // The reference follows the input level (not the arrangement): up at once, down slowly.
     specRef = Math.max(maxA, specRef * Math.exp(-dt / 25), 1e-7);
@@ -202,8 +237,10 @@ export function createFeatures({ sampleRate, fftSize = FFT }) {
     if (k.onset) kickCandidate = { strength: k.onset, until: now + 0.05 };
     let kickNow = 0;
     if (kickCandidate) {
-      if (kickAmp >= kickLevelPeak * 0.063) { kickNow = kickCandidate.strength; kickCandidate = null; }
-      else if (now > kickCandidate.until) kickCandidate = null;
+      if (kickAmp >= kickLevelPeak * 0.063) {
+        kickNow = kickCandidate.strength;
+        kickCandidate = null;
+      } else if (now > kickCandidate.until) kickCandidate = null;
     }
     features.kick = live ? kickNow : 0;
     features.hat = live ? h.onset : 0;
@@ -233,12 +270,22 @@ export function createFeatures({ sampleRate, fftSize = FFT }) {
     // Sections.
     const bassAmp = kickAmp;
     const highAmp = Math.sqrt(power.high / (BANDS.high[1] - BANDS.high[0]));
-    const sec = sections.update(now, dt, { rms, low: bassAmp, high: highAmp, kick: kickNow, onset: f.onset, flux: rate(full), beats, period: tempo.period });
+    const sec = sections.update(now, dt, {
+      rms,
+      low: bassAmp,
+      high: highAmp,
+      kick: kickNow,
+      onset: f.onset,
+      flux: rate(full),
+      beats,
+      period: tempo.period,
+    });
     const was = state;
     state = sec.state;
     if ((state === 'breakdown' || state === 'build') && was !== 'breakdown' && was !== 'build') lowSince = now;
     for (const e of sec.events) {
-      if (e === 'start') tempo.anchor(now - 0.25); // when the sound began
+      if (e === 'start')
+        tempo.anchor(now - 0.25); // when the sound began
       else if (e === 'drop') tempo.anchor(now);
     }
     features.events = sec.events;

@@ -14,7 +14,9 @@ import { test, expect } from '@playwright/test';
 function watch(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
   return errors;
 }
 
@@ -23,7 +25,10 @@ async function open(page, query = '') {
   await page.addInitScript(() => {
     window.__writes = [];
     const set = Storage.prototype.setItem;
-    Storage.prototype.setItem = function (k, v) { window.__writes.push(k); return set.call(this, k, v); };
+    Storage.prototype.setItem = function (k, v) {
+      window.__writes.push(k);
+      return set.call(this, k, v);
+    };
   });
   await page.goto(`/visualizer/${query}`);
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
@@ -31,10 +36,15 @@ async function open(page, query = '') {
 const dialog = (page) => page.locator('[data-settings]');
 const box = (page) => page.locator('#viz-settings-search');
 /** The rows a search shows (found, not hidden). */
-const shown = (page) => page.locator('[data-settings] [data-row].is-hit').evaluateAll((rows) => rows.filter((r) => r.getClientRects().length).map((r) => r.dataset.row));
+const shown = (page) =>
+  page
+    .locator('[data-settings] [data-row].is-hit')
+    .evaluateAll((rows) => rows.filter((r) => r.getClientRects().length).map((r) => r.dataset.row));
 const count = (page, tab) => page.locator(`[data-tab="${tab}"] [data-tab-count]`);
 
-test('search: "strobe" finds the flashes in every tab, each tab counting its finds; Esc clears, then closes', async ({ page }) => {
+test('search: "strobe" finds the flashes in every tab, each tab counting its finds; Esc clears, then closes', async ({
+  page,
+}) => {
   const errors = watch(page);
   await open(page);
   // / on the page opens the settings with the box focused.
@@ -44,7 +54,9 @@ test('search: "strobe" finds the flashes in every tab, each tab counting its fin
   await page.keyboard.type('strobe');
   await expect(page.locator('[data-settings] form')).toHaveAttribute('data-searching', '');
   // (A pass takes a few ms; the time allowed is for a runner starved by software-rendered WebGL.)
-  await expect.poll(() => shown(page), { timeout: 15_000 }).toEqual(expect.arrayContaining(['flash', 'flicker', 'hitFlash']));
+  await expect
+    .poll(() => shown(page), { timeout: 15_000 })
+    .toEqual(expect.arrayContaining(['flash', 'flicker', 'hitFlash']));
   for (const id of ['flash', 'hitFlash', 'flicker']) await expect(page.locator(`[data-row="${id}"]`)).toBeVisible();
   // Each tab with finds says how many; the rest are greyed at 0.
   expect(Number(await count(page, 'drops').textContent())).toBeGreaterThanOrEqual(2);
@@ -66,7 +78,9 @@ test('search: "strobe" finds the flashes in every tab, each tab counting its fin
   expect(errors).toEqual([]);
 });
 
-test('search: a row only All Settings has shows in the Simple view, badged; ↓ goes into the results; Enter reveals one', async ({ page }) => {
+test('search: a row only All Settings has shows in the Simple view, badged; ↓ goes into the results; Enter reveals one', async ({
+  page,
+}) => {
   const errors = watch(page);
   await open(page);
   await page.keyboard.press('s');
@@ -137,7 +151,8 @@ test('search: an imported setup named like markup is found and marked as text, n
   await page.locator('[data-tab="setups"]').click();
   const name = '<img src=x onerror="window.__xss=1">';
   await page.locator('[data-setup-file]').setInputFiles({
-    name: 'setups.json', mimeType: 'application/json',
+    name: 'setups.json',
+    mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'bonfire-live', setups: { [name]: { glitch: 0.5 } } })),
   });
   await expect(page.locator('[data-setups] [data-name]')).toHaveText(name);
@@ -167,7 +182,9 @@ test('bulk buttons: All Off on the Looks is one change and one save; Undo puts e
   await page.locator('[data-tab="effects"]').click();
   const looks = () => page.evaluate(() => JSON.stringify(window.__viz.settings.looks));
   const before = await looks();
-  await page.evaluate(() => { window.__writes.length = 0; });
+  await page.evaluate(() => {
+    window.__writes.length = 0;
+  });
   await page.locator('[data-bulk-group="looks"][data-bulk="off"]').click();
   expect(Object.values(JSON.parse(await looks())).every((v) => v === 'off')).toBe(true);
   // Each switch shows it.
@@ -210,7 +227,9 @@ test('bulk buttons: All Off on the Looks is one change and one save; Undo puts e
   expect(errors).toEqual([]);
 });
 
-test('a setting that does nothing as things stand is disabled, saying why; Edge Glow back on brings it back', async ({ page }) => {
+test('a setting that does nothing as things stand is disabled, saying why; Edge Glow back on brings it back', async ({
+  page,
+}) => {
   const errors = watch(page);
   await open(page);
   await page.keyboard.press('s');
@@ -240,7 +259,14 @@ test('a setting that does nothing as things stand is disabled, saying why; Edge 
   }
   for (const b of await fly.locator('.bulk-btn').all()) await expect(b).toBeDisabled();
   // (Dimmed, its name too.)
-  expect(Number(await fly.locator('.viz-field-label [data-name]').first().evaluate((el) => getComputedStyle(el.closest('.viz-field-label > *')).opacity))).toBeLessThan(1);
+  expect(
+    Number(
+      await fly
+        .locator('.viz-field-label [data-name]')
+        .first()
+        .evaluate((el) => getComputedStyle(el.closest('.viz-field-label > *')).opacity),
+    ),
+  ).toBeLessThan(1);
   await page.locator('[data-set="blink"]').check();
   for (const item of await fly.locator('input[data-set]').all()) await expect(item).toBeEnabled();
   await expect(fly.locator('#viz-why-flyMoves')).toBeHidden();
@@ -275,7 +301,10 @@ async function groupsInSight(page) {
   for (const title of await keys.locator('.keys-group-title').all()) {
     await title.evaluate((t) => t.scrollIntoView({ block: 'nearest' }));
     const [t, g] = [await title.boundingBox(), await groups.boundingBox()];
-    expect(t.x >= g.x - 1 && t.x + t.width <= g.x + g.width + 1 && t.y >= g.y - 1 && t.y + t.height <= g.y + g.height + 1, `${await title.textContent()} in sight`).toBe(true);
+    expect(
+      t.x >= g.x - 1 && t.x + t.width <= g.x + g.width + 1 && t.y >= g.y - 1 && t.y + t.height <= g.y + g.height + 1,
+      `${await title.textContent()} in sight`,
+    ).toBe(true);
   }
 }
 
@@ -321,36 +350,58 @@ test('? lists the keyboard shortcuts in groups, from the page and from the setti
 });
 
 /** The presets' note read whole: as tall as it is with no line limit, and no line cut short. */
-const noteWhole = (page) => page.locator('[data-preset-note]').evaluate((el) => {
-  const h = el.getBoundingClientRect().height;
-  el.style.webkitLineClamp = 'none';
-  const all = el.getBoundingClientRect().height;
-  el.style.webkitLineClamp = '';
-  return h > 0 && Math.abs(h - all) < 1 && el.scrollWidth <= el.clientWidth + 1;
-});
+const noteWhole = (page) =>
+  page.locator('[data-preset-note]').evaluate((el) => {
+    const h = el.getBoundingClientRect().height;
+    el.style.webkitLineClamp = 'none';
+    const all = el.getBoundingClientRect().height;
+    el.style.webkitLineClamp = '';
+    return h > 0 && Math.abs(h - all) < 1 && el.scrollWidth <= el.clientWidth + 1;
+  });
 /** Nothing off the dialog's sides: its ✕ and both views in it. */
-const headerFits = (page) => page.evaluate(() => {
-  const inner = document.querySelector('.viz-settings-inner');
-  const edge = inner.getBoundingClientRect();
-  const inside = (el) => { const r = el.getBoundingClientRect(); return r.left >= edge.left - 1 && r.right <= edge.right + 1; };
-  return { wide: inner.scrollWidth <= inner.clientWidth + 1, close: inside(document.querySelector('.viz-close')), views: [...document.querySelectorAll('.viz-view-switch label')].every(inside) };
-});
+const headerFits = (page) =>
+  page.evaluate(() => {
+    const inner = document.querySelector('.viz-settings-inner');
+    const edge = inner.getBoundingClientRect();
+    const inside = (el) => {
+      const r = el.getBoundingClientRect();
+      return r.left >= edge.left - 1 && r.right <= edge.right + 1;
+    };
+    return {
+      wide: inner.scrollWidth <= inner.clientWidth + 1,
+      close: inside(document.querySelector('.viz-close')),
+      views: [...document.querySelectorAll('.viz-view-switch label')].every(inside),
+    };
+  });
 
-test('a short screen keeps most of the dialog for the settings; a phone reads the toast whole, the presets’ note and every shortcut group', async ({ browser }) => {
+test('a short screen keeps most of the dialog for the settings; a phone reads the toast whole, the presets’ note and every shortcut group', async ({
+  browser,
+}) => {
   const baseURL = test.info().project.use.baseURL;
   const fits = { wide: true, close: true, views: true };
   // A phone on its side: the note beside the presets' names (two lines hold it), then, a
   // narrower one, on a line of its own.
-  const land = await browser.newPage({ baseURL, viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  const land = await browser.newPage({
+    baseURL,
+    viewport: { width: 844, height: 390 },
+    hasTouch: true,
+    isMobile: true,
+  });
   const errors = watch(land);
   await open(land);
   await land.locator('[data-start] [data-act="settings"]').click();
   await expect(dialog(land)).toBeVisible();
-  const [body, whole] = await land.evaluate(() => [document.querySelector('[data-settings-body]').clientHeight, document.querySelector('.viz-settings-inner').clientHeight]);
+  const [body, whole] = await land.evaluate(() => [
+    document.querySelector('[data-settings-body]').clientHeight,
+    document.querySelector('.viz-settings-inner').clientHeight,
+  ]);
   expect(body / whole, `${body} of ${whole} px for the settings`).toBeGreaterThan(0.5);
   await expect(land.locator('[data-preset-note]')).toContainText('Club');
   expect(await headerFits(land)).toEqual(fits);
-  for (const [width, height] of [[844, 390], [667, 375]]) {
+  for (const [width, height] of [
+    [844, 390],
+    [667, 375],
+  ]) {
     await land.setViewportSize({ width, height });
     for (const id of ['chill', 'club', 'rave', 'safe']) {
       await land.locator(`.viz-presets-top [data-preset="${id}"]`).dispatchEvent('pointerover');
@@ -359,7 +410,12 @@ test('a short screen keeps most of the dialog for the settings; a phone reads th
   }
   await land.close();
   // A phone.
-  const phone = await browser.newPage({ baseURL, viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const phone = await browser.newPage({
+    baseURL,
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
   const phoneErrors = watch(phone);
   await open(phone);
   await phone.locator('[data-start] [data-act="settings"]').click();
@@ -393,7 +449,9 @@ test('a short screen keeps most of the dialog for the settings; a phone reads th
   expect([...errors, ...phoneErrors]).toEqual([]);
 });
 
-test('Frame Rate 30 caps how often the picture is drawn; Display takes the cap off; it isn’t in a setup', async ({ page }) => {
+test('Frame Rate 30 caps how often the picture is drawn; Display takes the cap off; it isn’t in a setup', async ({
+  page,
+}) => {
   const errors = watch(page);
   await open(page, '?bench');
   expect(await page.evaluate(() => window.__viz.fire.maxFps)).toBe(0);
@@ -402,11 +460,19 @@ test('Frame Rate 30 caps how often the picture is drawn; Display takes the cap o
   await page.locator('[data-set="frameRate"]').selectOption('30');
   expect(await page.evaluate(() => window.__viz.fire.maxFps)).toBe(30);
   // Frames drawn in two seconds: at most 30 a second.
-  const fps = await page.evaluate(() => new Promise((resolve) => {
-    let n = 0;
-    const off = window.__viz.fire.onRendered(() => { n++; });
-    setTimeout(() => { off(); resolve(n / 2); }, 2000);
-  }));
+  const fps = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        let n = 0;
+        const off = window.__viz.fire.onRendered(() => {
+          n++;
+        });
+        setTimeout(() => {
+          off();
+          resolve(n / 2);
+        }, 2000);
+      }),
+  );
   expect(fps).toBeLessThanOrEqual(31.5);
   await page.locator('[data-set="frameRate"]').selectOption('display');
   expect(await page.evaluate(() => window.__viz.fire.maxFps)).toBe(0);
@@ -416,6 +482,8 @@ test('Frame Rate 30 caps how often the picture is drawn; Display takes the cap o
   await page.locator('[data-setup-save]').click();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live-setups')).Capped);
   expect(saved).not.toHaveProperty('frameRate');
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? '{}').frameRate)).toBe('60');
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? '{}').frameRate))
+    .toBe('60');
   expect(errors).toEqual([]);
 });

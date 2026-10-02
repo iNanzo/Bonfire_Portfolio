@@ -16,12 +16,20 @@
 import { pick } from '../math.js';
 
 /** The moves, as the menus name them (the settings' Firefly Dances). */
-export const FLY_MOVES = { swing: 'Swing', bounce: 'Bounce', dart: 'Dart', anyway: 'Dart Any Way', compass: 'Compass', zigzag: 'Zigzag', scatter: 'Scatter' };
+export const FLY_MOVES = {
+  swing: 'Swing',
+  bounce: 'Bounce',
+  dart: 'Dart',
+  anyway: 'Dart Any Way',
+  compass: 'Compass',
+  zigzag: 'Zigzag',
+  scatter: 'Scatter',
+};
 const CARDINAL = ['up', 'down', 'left', 'right', 'toward', 'away'];
 const COMPASS = ['right', 'up', 'left', 'down'];
 const MAX_SPEED = 4; // m/s at the start of a dash
-const STRAY = 1.9;    // m from the fire (on the ground) past which a dash leans back in
-const LOW = 0.35;     // m: below this a dash leans upward, so it doesn't drive into the ground
+const STRAY = 1.9; // m from the fire (on the ground) past which a dash leans back in
+const LOW = 0.35; // m: below this a dash leans upward, so it doesn't drive into the ground
 
 /**
  * A direction for 'anyway': uniform over the whole sphere, leaned back toward the fire past
@@ -33,12 +41,18 @@ export function anyDirection(pos, center, rand = Math.random) {
   const a = rand() * Math.PI * 2;
   const r = Math.sqrt(1 - y * y);
   const d = { x: Math.cos(a) * r, y, z: Math.sin(a) * r };
-  const ox = pos.x - center.x, oz = pos.z - center.z;
+  const ox = pos.x - center.x,
+    oz = pos.z - center.z;
   const out = Math.hypot(ox, oz);
-  if (out > STRAY && d.x * ox + d.z * oz > 0) { d.x -= (1.4 * ox) / out; d.z -= (1.4 * oz) / out; }
+  if (out > STRAY && d.x * ox + d.z * oz > 0) {
+    d.x -= (1.4 * ox) / out;
+    d.z -= (1.4 * oz) / out;
+  }
   if (pos.y < LOW && d.y < 0) d.y = -d.y * 0.5 + 0.3;
   const len = Math.hypot(d.x, d.y, d.z) || 1;
-  d.x /= len; d.y /= len; d.z /= len;
+  d.x /= len;
+  d.y /= len;
+  d.z /= len;
   return d;
 }
 
@@ -56,11 +70,17 @@ export function createFireflyMoves({ reducedMotion = false } = {}) {
     p.side = Math.random() < 0.5 ? -1 : 1;
   }
   function ensure(n) {
-    while (per.length < n) { const p = {}; deal(p); per.push(p); }
+    while (per.length < n) {
+      const p = {};
+      deal(p);
+      per.push(p);
+    }
   }
 
   return {
-    get move() { return move; },
+    get move() {
+      return move;
+    },
     set(name) {
       if (!FLY_MOVES[name] || name === move) return;
       move = name;
@@ -82,7 +102,10 @@ export function createFireflyMoves({ reducedMotion = false } = {}) {
       if (!fl || move === 'swing' || !c.period || reducedMotion) return;
       ensure(fl.flies.length);
       // A new move takes some of the resting ones up to join in.
-      if (fresh) { fresh = false; fl.lift(() => Math.random() < 0.5); }
+      if (fresh) {
+        fresh = false;
+        fl.lift(() => Math.random() < 0.5);
+      }
       const beat = Math.floor(c.beatPos + 1e-3);
       fl.flies.forEach((f, i) => {
         if (f.orbit || f.mode !== 'fly') return;
@@ -100,9 +123,12 @@ export function createFireflyMoves({ reducedMotion = false } = {}) {
         if (move === 'bounce') fl.dart(f, 'up', { dist: dist * 0.6, dur: span * 0.85, bounce: true });
         else if (move === 'dart') fl.dart(f, pick(CARDINAL), { dist, dur });
         else if (move === 'anyway') fl.dart(f, anyDirection(f.pos, fl.center), { dist, dur });
-        else if (move === 'compass') fl.dart(f, COMPASS[((beat % 4) + 4) % 4], { dist: 0.3, dur: Math.max(0.23, span * 0.5) });
-        else if (move === 'zigzag') { p.side = -p.side; fl.dart(f, p.side > 0 ? 'right' : 'left', { dist, dur }); }
-        else if (move === 'scatter') {
+        else if (move === 'compass')
+          fl.dart(f, COMPASS[((beat % 4) + 4) % 4], { dist: 0.3, dur: Math.max(0.23, span * 0.5) });
+        else if (move === 'zigzag') {
+          p.side = -p.side;
+          fl.dart(f, p.side > 0 ? 'right' : 'left', { dist, dur });
+        } else if (move === 'scatter') {
           const out = Math.hypot(f.pos.x - fl.center.x, f.pos.z - fl.center.z);
           fl.dart(f, out > STRAY ? 'in' : pick(['out', 'left', 'right', 'up', 'toward', 'away']), { dist, dur });
         }

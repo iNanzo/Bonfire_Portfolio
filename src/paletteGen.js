@@ -56,10 +56,12 @@ const inGamut = (rgb) => rgb.every((v) => v >= -1e-4 && v <= 1 + 1e-4);
 
 /** The most chroma sRGB can show at this lightness and hue. */
 function maxChroma(L, h) {
-  let lo = 0, hi = 0.4;
+  let lo = 0,
+    hi = 0.4;
   for (let i = 0; i < 18; i++) {
     const mid = (lo + hi) / 2;
-    if (inGamut(oklchToLinear(L, mid, h))) lo = mid; else hi = mid;
+    if (inGamut(oklchToLinear(L, mid, h))) lo = mid;
+    else hi = mid;
   }
   return lo;
 }
@@ -69,7 +71,13 @@ export function oklchToHex(L, C, h) {
   L = Math.min(1, Math.max(0, L));
   let rgb = oklchToLinear(L, C, h);
   if (!inGamut(rgb)) rgb = oklchToLinear(L, Math.min(C, maxChroma(L, h)), h);
-  return `#${rgb.map((v) => Math.round(Math.min(1, Math.max(0, toGamma(Math.min(1, Math.max(0, v))))) * 255).toString(16).padStart(2, '0')).join('')}`;
+  return `#${rgb
+    .map((v) =>
+      Math.round(Math.min(1, Math.max(0, toGamma(Math.min(1, Math.max(0, v))))) * 255)
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
 }
 
 const wrap = (h) => ((h % 360) + 360) % 360;
@@ -87,12 +95,17 @@ const RAMP = ['lo', 'mid', 'hi', 'core'];
 const BANDS = { lo: [0.36, 0.44], mid: [0.6, 0.7], hi: [0.83, 0.9], core: [0.955, 0.975] };
 const CHROMA = { lo: 0.82, mid: 0.95, hi: 0.9, core: 0.42 };
 const COOL = 285; // blue-violet: where shadows lean
-const WARM = 95;  // yellow: where highlights lean
+const WARM = 95; // yellow: where highlights lean
 
 /** Hue of each ramp step for a base hue. `shift` = how far (degrees) the scheme bends hues; `dir` = ±1. */
 const SCHEME_HUES = {
   shift: (h, s) => ({ lo: toward(h, COOL, s), mid: h, hi: toward(h, WARM, s * 1.2), core: toward(h, WARM, s * 1.5) }),
-  analogous: (h, s, dir) => ({ lo: wrap(h - dir * (s + 10)), mid: h, hi: wrap(h + dir * s), core: wrap(h + dir * (s + 15)) }),
+  analogous: (h, s, dir) => ({
+    lo: wrap(h - dir * (s + 10)),
+    mid: h,
+    hi: wrap(h + dir * s),
+    core: wrap(h + dir * (s + 15)),
+  }),
   mono: (h) => ({ lo: h, mid: h, hi: h, core: h }),
   complementary: (h) => ({ lo: wrap(h + 180), mid: h, hi: wrap(h + 12), core: wrap(h + 20) }),
   split: (h, s, dir) => ({ lo: wrap(h + dir * 150), mid: h, hi: wrap(h - dir * 25), core: wrap(h - dir * 210) }),
@@ -104,14 +117,22 @@ export const SCHEMES = [
   { id: 'analogous', label: 'Analogous', blurb: 'Neighboring hues, sliding one way up the ramp.', weight: 3 },
   { id: 'mono', label: 'Monochrome', blurb: 'One hue, from deep to pale.', weight: 1 },
   { id: 'complementary', label: 'Complementary', blurb: 'Embers in the opposite hue.', weight: 1.5 },
-  { id: 'split', label: 'Split Complementary', blurb: 'Embers and core in the two hues beside the opposite.', weight: 1 },
+  {
+    id: 'split',
+    label: 'Split Complementary',
+    blurb: 'Embers and core in the two hues beside the opposite.',
+    weight: 1,
+  },
   { id: 'triadic', label: 'Triadic', blurb: 'Body, embers and core a third of the wheel apart.', weight: 0.8 },
 ];
 
 function pickScheme(rng) {
   const total = SCHEMES.reduce((sum, s) => sum + s.weight, 0);
   let r = rng() * total;
-  for (const s of SCHEMES) { r -= s.weight; if (r < 0) return s.id; }
+  for (const s of SCHEMES) {
+    r -= s.weight;
+    if (r < 0) return s.id;
+  }
   return SCHEMES[0].id;
 }
 
@@ -139,7 +160,16 @@ function readableOn(hex, bg, min = 4.6) {
  * @param {string} o.voidHex  the page background (for the text-contrast rule)
  * @returns {{ lo: string, mid: string, hi: string, core: string, shade: string }}
  */
-export function makeFlame({ hue, scheme = 'shift', vivid = 0.85, shift = 25, dir = 1, lightness = [0.5, 0.5, 0.5, 0.5], L: fixedL = null, voidHex }) {
+export function makeFlame({
+  hue,
+  scheme = 'shift',
+  vivid = 0.85,
+  shift = 25,
+  dir = 1,
+  lightness = [0.5, 0.5, 0.5, 0.5],
+  L: fixedL = null,
+  voidHex,
+}) {
   const hues = SCHEME_HUES[scheme](wrap(hue), shift, dir);
   /** @type {any} */
   const out = {};
@@ -162,7 +192,9 @@ export function makeFlame({ hue, scheme = 'shift', vivid = 0.85, shift = 25, dir
 export function harmoniousFlame(rng, { voidHex, scheme = 'auto', hue = rng() * 360 } = {}) {
   const id = scheme === 'auto' ? pickScheme(rng) : scheme;
   const colors = makeFlame({
-    hue, scheme: id, voidHex,
+    hue,
+    scheme: id,
+    voidHex,
     vivid: 0.62 + rng() * 0.38,
     shift: 16 + rng() * 22,
     dir: rng() < 0.5 ? -1 : 1,
@@ -171,7 +203,10 @@ export function harmoniousFlame(rng, { voidHex, scheme = 'auto', hue = rng() * 3
   return { colors, scheme: id };
 }
 
-const randomHex = (rng) => `#${Math.floor(rng() * 0x1000000).toString(16).padStart(6, '0')}`;
+const randomHex = (rng) =>
+  `#${Math.floor(rng() * 0x1000000)
+    .toString(16)
+    .padStart(6, '0')}`;
 
 /** Anything goes: five random colors. Only the tips are lightened if they'd be unreadable as text. */
 export function wildFlame(rng, { voidHex }) {
@@ -183,9 +218,11 @@ export function wildFlame(rng, { voidHex }) {
 /** A whole set of flames with their hues spread round the wheel, so each one looks different. */
 export function flameSet(count, rng, { voidHex, wild = false }) {
   const start = rng() * 360;
-  return Array.from({ length: count }, (_, i) => (wild
-    ? wildFlame(rng, { voidHex })
-    : harmoniousFlame(rng, { voidHex, hue: start + (i * 360) / count + (rng() - 0.5) * (180 / count) }).colors));
+  return Array.from({ length: count }, (_, i) =>
+    wild
+      ? wildFlame(rng, { voidHex })
+      : harmoniousFlame(rng, { voidHex, hue: start + (i * 360) / count + (rng() - 0.5) * (180 / count) }).colors,
+  );
 }
 
 /** Which ramp step a color would naturally be, by its lightness. */
@@ -230,7 +267,13 @@ export function suggestFlames(seedHex, { voidHex }) {
 
 // ---- scene colors -------------------------------------------------------------------------
 export const SCENE_KEYS = ['void', 'shadow', 'stone', 'wood', 'bone'];
-const SCENE_L = { void: [0.1, 0.125], shadow: [0.19, 0.215], stone: [0.31, 0.345], wood: [0.4, 0.46], bone: [0.9, 0.93] };
+const SCENE_L = {
+  void: [0.1, 0.125],
+  shadow: [0.19, 0.215],
+  stone: [0.31, 0.345],
+  wood: [0.4, 0.46],
+  bone: [0.9, 0.93],
+};
 
 /** Darken the background until every flame's text color reads on it. */
 function keepFlamesReadable(scene, flames) {
@@ -273,17 +316,22 @@ export function harmoniousScene(rng, { flames = [] } = {}) {
  */
 export function vividScene(rng, { flames = [], hue } = {}) {
   const turns = [0, 30, -30, 180, 120, -120];
-  const h = hue === undefined || rng() < 0.2 ? rng() * 360 : wrap(hue + turns[Math.floor(rng() * turns.length)] + (rng() - 0.5) * 20);
+  const h =
+    hue === undefined || rng() < 0.2
+      ? rng() * 360
+      : wrap(hue + turns[Math.floor(rng() * turns.length)] + (rng() - 0.5) * 20);
   const accent = wrap(h + (rng() < 0.5 ? 180 : rng() < 0.5 ? 40 : -40) + (rng() - 0.5) * 30);
   return makeScene({ hue: h, accent, tint: 0.035 + rng() * 0.05, lightness: SCENE_KEYS.map(() => rng()) }, flames);
 }
 
 /** Random hues and strengths for every scene color; lightness stays in order (the background darkest, bone lightest) so the site stays readable. */
 export function wildScene(rng, { flames = [] } = {}) {
-  const scene = Object.fromEntries(SCENE_KEYS.map((k) => {
-    const L = lerp(SCENE_L[k][0], SCENE_L[k][1], rng());
-    return [k, oklchToHex(L, rng() * 0.12, rng() * 360)];
-  }));
+  const scene = Object.fromEntries(
+    SCENE_KEYS.map((k) => {
+      const L = lerp(SCENE_L[k][0], SCENE_L[k][1], rng());
+      return [k, oklchToHex(L, rng() * 0.12, rng() * 360)];
+    }),
+  );
   return keepFlamesReadable(scene, flames);
 }
 
@@ -299,4 +347,3 @@ export function suggestScenes(seedHex, { flames = [] } = {}) {
     { label: 'As the Accent', colors: makeScene({ hue: wrap(h + 180), accent: h, tint: tint * 0.7 }, flames) },
   ];
 }
-

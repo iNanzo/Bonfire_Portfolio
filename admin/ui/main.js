@@ -26,14 +26,42 @@ import { resetMessage, resetSection } from './reset.js';
 
 const DRAFT_KEY = 'nh-admin-draft';
 const local = {
-  get() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY)); } catch { return null; } },
-  set(v) { try { localStorage.setItem(DRAFT_KEY, JSON.stringify(v)); } catch { /* storage full or blocked: drafts are a convenience */ } },
-  clear() { try { localStorage.removeItem(DRAFT_KEY); } catch { /* blocked */ } },
+  get() {
+    try {
+      return JSON.parse(localStorage.getItem(DRAFT_KEY));
+    } catch {
+      return null;
+    }
+  },
+  set(v) {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(v));
+    } catch {
+      /* storage full or blocked: drafts are a convenience */
+    }
+  },
+  clear() {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      /* blocked */
+    }
+  },
 };
 /** replaceChildren, skipping empty slots (the DOM would print them as "null"). */
-const fill = (node, ...kids) => node.replaceChildren(...kids.flat().filter((k) => k !== null && k !== undefined && k !== false));
+const fill = (node, ...kids) =>
+  node.replaceChildren(...kids.flat().filter((k) => k !== null && k !== undefined && k !== false));
 
-const state = { session: null, original: null, sha: null, errors: [], warnings: [], saving: false, deploy: null, deployTimer: 0 };
+const state = {
+  session: null,
+  original: null,
+  sha: null,
+  errors: [],
+  warnings: [],
+  saving: false,
+  deploy: null,
+  deployTimer: 0,
+};
 const ctx = {
   draft: null,
   uploads: new Map(), // src → { full, card, preview, file }: converted, not yet saved
@@ -54,9 +82,18 @@ const ctx = {
 async function api(path, init) {
   const res = await fetch(path, { credentials: 'same-origin', ...init });
   let data = null;
-  try { data = await res.json(); } catch { /* not JSON (e.g. an Access sign-in page) */ }
+  try {
+    data = await res.json();
+  } catch {
+    /* not JSON (e.g. an Access sign-in page) */
+  }
   if (!res.ok || !data) {
-    const e = new Error(data?.error ?? (res.status === 401 || res.redirected ? 'Your sign-in expired. Reload the page.' : `Request failed (${res.status}).`));
+    const e = new Error(
+      data?.error ??
+        (res.status === 401 || res.redirected
+          ? 'Your sign-in expired. Reload the page.'
+          : `Request failed (${res.status}).`),
+    );
     e.status = res.status;
     e.data = data;
     throw e;
@@ -69,7 +106,8 @@ const labelOf = (key) => ctx.draft?.admin?.labels?.[key] || defaultLabel(key);
 
 function setLabel(key, value) {
   const labels = { ...(ctx.draft.admin?.labels ?? {}) };
-  if (!value || value === defaultLabel(key)) delete labels[key]; else labels[key] = value.slice(0, 60);
+  if (!value || value === defaultLabel(key)) delete labels[key];
+  else labels[key] = value.slice(0, 60);
   if (Object.keys(labels).length) ctx.draft.admin = { ...(ctx.draft.admin ?? {}), labels };
   else if (ctx.draft.admin) {
     delete ctx.draft.admin.labels;
@@ -84,9 +122,19 @@ function renameable(tag, cls, key, id) {
   const heading = el(tag, { class: cls, id, text: labelOf(key) });
   const row = el('div', { class: 'title-row' }, heading);
   const button = el('button', {
-    type: 'button', class: 'rename', 'data-tip': 'Rename', 'aria-label': `Rename “${labelOf(key)}”`, text: '✎',
+    type: 'button',
+    class: 'rename',
+    'data-tip': 'Rename',
+    'aria-label': `Rename “${labelOf(key)}”`,
+    text: '✎',
     onclick: () => {
-      const input = el('input', { type: 'text', class: `rename-input ${cls}`, maxlength: 60, 'aria-label': 'New name (empty resets it)', placeholder: defaultLabel(key) });
+      const input = el('input', {
+        type: 'text',
+        class: `rename-input ${cls}`,
+        maxlength: 60,
+        'aria-label': 'New name (empty resets it)',
+        placeholder: defaultLabel(key),
+      });
       input.value = labelOf(key);
       let done = false;
       const finish = (commit) => {
@@ -96,8 +144,14 @@ function renameable(tag, cls, key, id) {
         else row.replaceChildren(heading, button);
       };
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-        if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          finish(true);
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          finish(false);
+        }
       });
       input.addEventListener('blur', () => finish(true));
       row.replaceChildren(input);
@@ -114,12 +168,32 @@ const search = createSearch({ entries: () => buildIndex(ctx.draft, { labelOf }),
 
 function renderNav() {
   const groups = [...new Set(PAGES.map((p) => p.group))];
-  fill(q('[data-nav-list]'), groups.map((g) => el('li', { class: 'nav-group' },
-    el('p', { class: 'nav-group-label', text: titleCase(g) }),
-    el('ul', { role: 'list' }, PAGES.filter((p) => p.group === g).map((p) => el('li', {},
-      el('a', { href: `#${p.id}`, 'data-nav': p.id, 'aria-current': currentPage() === p ? 'page' : null },
-        el('span', { text: labelOf(`page:${p.id}`) }),
-        el('span', { class: 'nav-count', 'data-count': p.id }))))))));
+  fill(
+    q('[data-nav-list]'),
+    groups.map((g) =>
+      el(
+        'li',
+        { class: 'nav-group' },
+        el('p', { class: 'nav-group-label', text: titleCase(g) }),
+        el(
+          'ul',
+          { role: 'list' },
+          PAGES.filter((p) => p.group === g).map((p) =>
+            el(
+              'li',
+              {},
+              el(
+                'a',
+                { href: `#${p.id}`, 'data-nav': p.id, 'aria-current': currentPage() === p ? 'page' : null },
+                el('span', { text: labelOf(`page:${p.id}`) }),
+                el('span', { class: 'nav-count', 'data-count': p.id }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
   countErrors();
   search.refresh();
 }
@@ -130,20 +204,66 @@ function shell() {
   brand.innerHTML = logoMark('brand-mark'); // static markup from src/ui/logo.js, no user data
   brand.append(el('span', { class: 'brand-text', text: 'Admin' }));
   app.replaceChildren(
-    el('header', { class: 'topbar' },
+    el(
+      'header',
+      { class: 'topbar' },
       brand,
       el('p', { class: 'status', 'data-status': true, role: 'status', 'aria-live': 'polite' }),
-      el('div', { class: 'top-actions' },
-        el('a', { class: 'button ghost', 'data-view-site': true, target: '_blank', rel: 'noopener', text: 'View Site ↗' }),
-        el('button', { type: 'button', class: 'button ghost', 'data-discard': true, text: 'Discard', onclick: discard }),
-        el('button', { type: 'button', class: 'button primary', 'data-save': true, onclick: save }, 'Save', el('kbd', { text: 'Ctrl S' })))),
+      el(
+        'div',
+        { class: 'top-actions' },
+        el('a', {
+          class: 'button ghost',
+          'data-view-site': true,
+          target: '_blank',
+          rel: 'noopener',
+          text: 'View Site ↗',
+        }),
+        el('button', {
+          type: 'button',
+          class: 'button ghost',
+          'data-discard': true,
+          text: 'Discard',
+          onclick: discard,
+        }),
+        el(
+          'button',
+          { type: 'button', class: 'button primary', 'data-save': true, onclick: save },
+          'Save',
+          el('kbd', { text: 'Ctrl S' }),
+        ),
+      ),
+    ),
     el('div', { class: 'notice', 'data-notice': true, hidden: true }),
-    el('div', { class: 'layout', 'data-layout': true },
-      el('nav', { class: 'sidebar', 'aria-label': 'Sections' }, search.root, el('ul', { role: 'list', class: 'nav', 'data-nav-list': true }), el('div', { class: 'who', 'data-who': true })),
-      el('main', { class: 'page', 'data-page': true, tabindex: '-1' }, el('p', { class: 'loading', text: 'Loading content…' })),
-      el('div', { class: 'preview-slot', 'data-preview-slot': true, hidden: true })),
+    el(
+      'div',
+      { class: 'layout', 'data-layout': true },
+      el(
+        'nav',
+        { class: 'sidebar', 'aria-label': 'Sections' },
+        search.root,
+        el('ul', { role: 'list', class: 'nav', 'data-nav-list': true }),
+        el('div', { class: 'who', 'data-who': true }),
+      ),
+      el(
+        'main',
+        { class: 'page', 'data-page': true, tabindex: '-1' },
+        el('p', { class: 'loading', text: 'Loading content…' }),
+      ),
+      el('div', { class: 'preview-slot', 'data-preview-slot': true, hidden: true }),
+    ),
     el('div', { class: 'toasts', 'data-toasts': true, 'aria-live': 'polite' }),
-    el('div', { class: 'busy', 'data-busy': true, hidden: true }, el('div', { class: 'busy-box' }, el('span', { class: 'spinner', 'aria-hidden': 'true' }), el('span', { 'data-busy-text': true }))));
+    el(
+      'div',
+      { class: 'busy', 'data-busy': true, hidden: true },
+      el(
+        'div',
+        { class: 'busy-box' },
+        el('span', { class: 'spinner', 'aria-hidden': 'true' }),
+        el('span', { 'data-busy-text': true }),
+      ),
+    ),
+  );
   watchSticky();
 }
 
@@ -167,19 +287,37 @@ function toast(message, kind = 'info', action = null, { focus = false, back = ()
     t.remove();
     if (had) back()?.focus();
   };
-  const wait = () => { clearTimeout(timer); timer = setTimeout(done, life); };
+  const wait = () => {
+    clearTimeout(timer);
+    timer = setTimeout(done, life);
+  };
   if (action) {
     const button = el('button', {
-      type: 'button', class: 'link-button toast-action', text: action[0], 'aria-describedby': text.id,
-      onclick: () => { action[1](); done(); },
+      type: 'button',
+      class: 'link-button toast-action',
+      text: action[0],
+      'aria-describedby': text.id,
+      onclick: () => {
+        action[1]();
+        done();
+      },
     });
     t.append(button);
     const held = () => t.matches(':hover') || t.contains(document.activeElement);
     t.addEventListener('pointerenter', () => clearTimeout(timer));
     t.addEventListener('focusin', () => clearTimeout(timer));
-    t.addEventListener('pointerleave', () => { if (!held()) wait(); });
-    t.addEventListener('focusout', (e) => { if (!t.contains(/** @type {Node | null} */ (e.relatedTarget)) && !t.matches(':hover')) wait(); });
-    t.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); done(); } });
+    t.addEventListener('pointerleave', () => {
+      if (!held()) wait();
+    });
+    t.addEventListener('focusout', (e) => {
+      if (!t.contains(/** @type {Node | null} */ (e.relatedTarget)) && !t.matches(':hover')) wait();
+    });
+    t.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        done();
+      }
+    });
   }
   q('[data-toasts]').append(t);
   wait();
@@ -193,9 +331,18 @@ function busy(on, message = 'Working…') {
 
 function notice(message, actions = []) {
   const n = q('[data-notice]');
-  if (!message) { n.hidden = true; n.replaceChildren(); return; }
+  if (!message) {
+    n.hidden = true;
+    n.replaceChildren();
+    return;
+  }
   n.hidden = false;
-  n.replaceChildren(el('span', { text: message }), ...actions.map(([label, fn, cls = 'button ghost small']) => el('button', { type: 'button', class: cls, text: label, onclick: fn })));
+  n.replaceChildren(
+    el('span', { text: message }),
+    ...actions.map(([label, fn, cls = 'button ghost small']) =>
+      el('button', { type: 'button', class: cls, text: label, onclick: fn }),
+    ),
+  );
 }
 
 /**
@@ -254,18 +401,33 @@ function block(key) {
   const path = parsePath(key);
   const value = getAt(ctx.draft, path);
   const effectsKey = key.startsWith('effects.') ? key.slice(8) : null;
-  const reset = effectsKey && el('button', {
-    // (Its name starts with the words it shows, for voice control; then which section.)
-    type: 'button', class: 'link-button', 'data-reset': true, text: 'Reset Section', 'aria-label': `Reset Section: ${labelOf(key)}`,
-    'data-tip': 'Back to the site’s defaults; Undo brings yours back (so does Discard, until you save).',
-    onclick: () => resetBlock(key, effectsKey),
-  });
-  return el('section', { class: 'block', 'data-path': key, id: anchorOf(key), 'aria-labelledby': `${anchorOf(key)}-title` },
+  const reset =
+    effectsKey &&
+    el('button', {
+      // (Its name starts with the words it shows, for voice control; then which section.)
+      type: 'button',
+      class: 'link-button',
+      'data-reset': true,
+      text: 'Reset Section',
+      'aria-label': `Reset Section: ${labelOf(key)}`,
+      'data-tip': 'Back to the site’s defaults; Undo brings yours back (so does Discard, until you save).',
+      onclick: () => resetBlock(key, effectsKey),
+    });
+  return el(
+    'section',
+    { class: 'block', 'data-path': key, id: anchorOf(key), 'aria-labelledby': `${anchorOf(key)}-title` },
     el('div', { class: 'block-head' }, renameable('h2', 'block-title', key, `${anchorOf(key)}-title`), reset),
     ...blockHelp(key),
-    key === 'effects.flames' ? flamesBlockTools(ctx) : key === 'effects.colors' ? sceneBlockTools(ctx) : key === 'scenes' ? scenesBlockTools(ctx) : null,
+    key === 'effects.flames'
+      ? flamesBlockTools(ctx)
+      : key === 'effects.colors'
+        ? sceneBlockTools(ctx)
+        : key === 'scenes'
+          ? scenesBlockTools(ctx)
+          : null,
     el('p', { class: 'error', role: 'alert' }),
-    key === 'featured' ? renderFeatured(ctx) : value === undefined ? missing(key) : renderValue(value, path, ctx));
+    key === 'featured' ? renderFeatured(ctx) : value === undefined ? missing(key) : renderValue(value, path, ctx),
+  );
 }
 
 /**
@@ -279,23 +441,42 @@ function resetBlock(key, effectsKey) {
   ctx.draft.effects[effectsKey] = result.value;
   changed({ rerender: true });
   const back = () => q(`[data-path="${CSS.escape(key)}"] > .block-head [data-reset]`);
-  toast(resetMessage(labelOf(key), result), 'info', ['Undo', () => {
-    ctx.draft.effects[effectsKey] = before;
-    changed({ rerender: true });
-    toast(`“${labelOf(key)}” is as it was.`);
-  }], { focus: true, back });
+  toast(
+    resetMessage(labelOf(key), result),
+    'info',
+    [
+      'Undo',
+      () => {
+        ctx.draft.effects[effectsKey] = before;
+        changed({ rerender: true });
+        toast(`“${labelOf(key)}” is as it was.`);
+      },
+    ],
+    { focus: true, back },
+  );
 }
 
 /** A section content.json doesn't have yet: the optional scenes start as an empty list on the first add. */
 function missing(key) {
   if (key !== 'scenes') return el('p', { class: 'help', text: 'Missing from content.json.' });
-  return el('div', { class: 'collection' },
-    el('p', { class: 'help', text: 'No scenes yet: Bonfire Live plays its free show. Import some from the Painter, or add one.' }),
-    el('button', { type: 'button', class: 'add', text: '+ Add Scene', onclick: () => {
-      ctx.draft.scenes = [];
-      ctx.changed({ rerender: true });
-      q('[data-path="scenes"] .collection > .add')?.click();
-    } }));
+  return el(
+    'div',
+    { class: 'collection' },
+    el('p', {
+      class: 'help',
+      text: 'No scenes yet: Bonfire Live plays its free show. Import some from the Painter, or add one.',
+    }),
+    el('button', {
+      type: 'button',
+      class: 'add',
+      text: '+ Add Scene',
+      onclick: () => {
+        ctx.draft.scenes = [];
+        ctx.changed({ rerender: true });
+        q('[data-path="scenes"] .collection > .add')?.click();
+      },
+    }),
+  );
 }
 
 function renderPage({ keepScroll = true } = {}) {
@@ -303,23 +484,50 @@ function renderPage({ keepScroll = true } = {}) {
   const main = q('[data-page]');
   const y = window.scrollY;
   const warnings = state.warnings.filter((w) => pageOf(w.path) === page);
-  fill(main,
-    el('header', { class: 'page-head' },
+  fill(
+    main,
+    el(
+      'header',
+      { class: 'page-head' },
       renameable('h1', 'page-title', `page:${page.id}`),
       el('p', { class: 'page-blurb', text: page.blurb }),
-      page.keys.length > 1 ? el('nav', { class: 'jump', 'aria-label': 'On this page' },
-        page.keys.map((k) => el('a', { href: `#${anchorOf(k)}`, text: labelOf(k), onclick: (e) => { e.preventDefault(); q(`#${anchorOf(k)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }))) : null),
-    warnings.length ? el('ul', { class: 'warnings', role: 'list' }, warnings.map((w) => el('li', { text: w.message }))) : null,
-    ...page.keys.map(block));
+      page.keys.length > 1
+        ? el(
+            'nav',
+            { class: 'jump', 'aria-label': 'On this page' },
+            page.keys.map((k) =>
+              el('a', {
+                href: `#${anchorOf(k)}`,
+                text: labelOf(k),
+                onclick: (e) => {
+                  e.preventDefault();
+                  q(`#${anchorOf(k)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                },
+              }),
+            ),
+          )
+        : null,
+    ),
+    warnings.length
+      ? el(
+          'ul',
+          { class: 'warnings', role: 'list' },
+          warnings.map((w) => el('li', { text: w.message })),
+        )
+      : null,
+    ...page.keys.map(block),
+  );
   showErrors(main, state.errors);
   for (const a of document.querySelectorAll('[data-nav]')) {
-    if (a.dataset.nav === page.id) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    if (a.dataset.nav === page.id) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
   }
   showPreview(!!page.preview);
   if (ctx.focus) {
     let key = ctx.focus;
     let target = main.querySelector(`[data-path="${CSS.escape(key)}"]`);
-    while (!target && parentKey(key)) { // nearest rendered ancestor
+    while (!target && parentKey(key)) {
+      // nearest rendered ancestor
       key = parentKey(key);
       target = main.querySelector(`[data-path="${CSS.escape(key)}"]`);
     }
@@ -339,7 +547,9 @@ function renderPage({ keepScroll = true } = {}) {
 /** Focus what a revealed field or card offers: its input, or its card's toggle. */
 function focusIn(target) {
   const own = target.matches('.card') ? target.querySelector(':scope > .card-head .card-toggle') : null;
-  (own ?? target.querySelector('input:not([type=file]):not([type=color]), textarea, select, .card-toggle'))?.focus({ preventScroll: true });
+  (own ?? target.querySelector('input:not([type=file]):not([type=color]), textarea, select, .card-toggle'))?.focus({
+    preventScroll: true,
+  });
 }
 
 /** A brief highlight on what a search or a jump landed on (none with reduced motion: no animation, no class left behind). */
@@ -364,7 +574,8 @@ function reveal(key, { flash = true } = {}) {
   for (const node of opens) ctx.open.add(node);
   ctx.focus = key;
   ctx.flash = flash;
-  if (currentPage() !== page) location.hash = page.id; // hashchange renders
+  if (currentPage() !== page)
+    location.hash = page.id; // hashchange renders
   else renderPage();
 }
 const goToError = (error) => reveal(error.path, { flash: false });
@@ -408,20 +619,33 @@ function changed({ rerender = false } = {}) {
 
 function countErrors() {
   const counts = {};
-  for (const e of state.errors) { const id = pageOf(e.path).id; counts[id] = (counts[id] ?? 0) + 1; }
-  for (const c of document.querySelectorAll('[data-count]')) c.textContent = counts[c.dataset.count] ? String(counts[c.dataset.count]) : '';
+  for (const e of state.errors) {
+    const id = pageOf(e.path).id;
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  for (const c of document.querySelectorAll('[data-count]'))
+    c.textContent = counts[c.dataset.count] ? String(counts[c.dataset.count]) : '';
 }
 
 function validate() {
   const { errors, warnings } = validateContent(ctx.draft);
   // New images whose converted upload is gone (the page was reloaded before saving).
   const saved = imageRefs(state.original);
-  for (const [name, list] of [['featured', [ctx.draft.featured]], ['projects', ctx.draft.projects], ['archive', ctx.draft.archive]]) {
-    list.forEach((p, i) => (p?.images ?? []).forEach((im, j) => {
-      if (!saved.has(im.src) && !ctx.uploads.has(im.src)) {
-        errors.push({ path: `${name === 'featured' ? 'featured' : `${name}[${i}]`}.images[${j}]`, message: 'This new image’s upload was lost (the page reloaded before saving). Remove it and add it again.' });
-      }
-    }));
+  for (const [name, list] of [
+    ['featured', [ctx.draft.featured]],
+    ['projects', ctx.draft.projects],
+    ['archive', ctx.draft.archive],
+  ]) {
+    list.forEach((p, i) =>
+      (p?.images ?? []).forEach((im, j) => {
+        if (!saved.has(im.src) && !ctx.uploads.has(im.src)) {
+          errors.push({
+            path: `${name === 'featured' ? 'featured' : `${name}[${i}]`}.images[${j}]`,
+            message: 'This new image’s upload was lost (the page reloaded before saving). Remove it and add it again.',
+          });
+        }
+      }),
+    );
   }
   state.errors = errors;
   state.warnings = warnings;
@@ -446,17 +670,39 @@ function updateStatus() {
   let text = 'All changes saved';
   let link = null;
   let tone = 'ok';
-  if (state.saving) { text = 'Saving…'; tone = 'busy'; }
-  else if (dirty && state.errors.length) { text = `Unsaved · ${state.errors.length} field${state.errors.length > 1 ? 's need' : ' needs'} fixing`; tone = 'bad'; }
-  else if (dirty) { text = 'Unsaved changes'; tone = 'warn'; }
-  else if (d?.state === 'local') text = 'Saved to your files';
-  else if (d?.state === 'pending') { text = 'Saved · waiting for the deploy to start…'; tone = 'busy'; link = d.commit?.url && ['commit', d.commit.url]; }
-  else if (d?.state === 'deploying') { text = 'Saved · publishing to the site…'; tone = 'busy'; link = d.url && ['progress', d.url]; }
-  else if (d?.state === 'live') { text = 'Live on the site'; link = state.session?.siteUrl && ['view', state.session.siteUrl]; }
-  else if (d?.state === 'failed') { text = 'Saved, but the deploy failed'; tone = 'bad'; link = d.url && ['details', d.url]; }
+  if (state.saving) {
+    text = 'Saving…';
+    tone = 'busy';
+  } else if (dirty && state.errors.length) {
+    text = `Unsaved · ${state.errors.length} field${state.errors.length > 1 ? 's need' : ' needs'} fixing`;
+    tone = 'bad';
+  } else if (dirty) {
+    text = 'Unsaved changes';
+    tone = 'warn';
+  } else if (d?.state === 'local') text = 'Saved to your files';
+  else if (d?.state === 'pending') {
+    text = 'Saved · waiting for the deploy to start…';
+    tone = 'busy';
+    link = d.commit?.url && ['commit', d.commit.url];
+  } else if (d?.state === 'deploying') {
+    text = 'Saved · publishing to the site…';
+    tone = 'busy';
+    link = d.url && ['progress', d.url];
+  } else if (d?.state === 'live') {
+    text = 'Live on the site';
+    link = state.session?.siteUrl && ['view', state.session.siteUrl];
+  } else if (d?.state === 'failed') {
+    text = 'Saved, but the deploy failed';
+    tone = 'bad';
+    link = d.url && ['details', d.url];
+  }
   status.dataset.tone = tone;
-  fill(status, el('span', { class: 'dot', 'aria-hidden': 'true' }), el('span', { text }),
-    link ? el('a', { href: link[1], target: '_blank', rel: 'noopener', text: `${link[0]} ↗` }) : null);
+  fill(
+    status,
+    el('span', { class: 'dot', 'aria-hidden': 'true' }),
+    el('span', { text }),
+    link ? el('a', { href: link[1], target: '_blank', rel: 'noopener', text: `${link[0]} ↗` }) : null,
+  );
 }
 
 // ---- save --------------------------------------------------------------------------------
@@ -464,7 +710,10 @@ function summarize(uploadCount) {
   const differs = (k) => JSON.stringify(ctx.draft[k]) !== JSON.stringify(state.original[k]);
   const changedKeys = SECTIONS.filter(differs);
   const parts = [];
-  if (changedKeys.length) parts.push(`edit ${changedKeys.map((k) => (k === 'effects' ? 'effects' : (LABELS[k] ?? k).toLowerCase())).join(', ')}`);
+  if (changedKeys.length)
+    parts.push(
+      `edit ${changedKeys.map((k) => (k === 'effects' ? 'effects' : (LABELS[k] ?? k).toLowerCase())).join(', ')}`,
+    );
   if (differs('scenes')) parts.push('edit scenes');
   if (differs('admin')) parts.push('rename admin labels');
   if (uploadCount) parts.push(`add ${uploadCount} image${uploadCount > 1 ? 's' : ''}`);
@@ -479,12 +728,17 @@ async function save() {
   clearTimeout(validateTimer);
   validate();
   if (state.errors.length) {
-    toast(`${state.errors.length} field${state.errors.length > 1 ? 's need' : ' needs'} fixing before saving.`, 'error');
+    toast(
+      `${state.errors.length} field${state.errors.length > 1 ? 's need' : ' needs'} fixing before saving.`,
+      'error',
+    );
     goToError(state.errors[0]);
     return;
   }
   const refs = imageRefs(ctx.draft);
-  const uploads = [...ctx.uploads].filter(([src]) => refs.has(src)).map(([src, u]) => ({ src, full: u.full, card: u.card }));
+  const uploads = [...ctx.uploads]
+    .filter(([src]) => refs.has(src))
+    .map(([src, u]) => ({ src, full: u.full, card: u.card }));
   state.saving = true;
   updateStatus();
   try {
@@ -509,8 +763,12 @@ async function save() {
     renderPage();
   } catch (e) {
     if (e.status === 409) conflict(e.message);
-    else if (e.status === 422 && e.data?.errors) { state.errors = e.data.errors; showErrors(q('[data-page]'), state.errors); goToError(state.errors[0]); toast(e.message, 'error'); }
-    else toast(e.message, 'error');
+    else if (e.status === 422 && e.data?.errors) {
+      state.errors = e.data.errors;
+      showErrors(q('[data-page]'), state.errors);
+      goToError(state.errors[0]);
+      toast(e.message, 'error');
+    } else toast(e.message, 'error');
   } finally {
     state.saving = false;
     updateStatus();
@@ -523,7 +781,11 @@ function followDeploy() {
   const tick = async () => {
     const commit = state.deploy?.commit;
     if (!commit) return;
-    try { state.deploy = { ...state.deploy, ...(await api(`/api/deploy?commit=${commit.sha}`)) }; } catch { /* try again */ }
+    try {
+      state.deploy = { ...state.deploy, ...(await api(`/api/deploy?commit=${commit.sha}`)) };
+    } catch {
+      /* try again */
+    }
     updateStatus();
     if (state.deploy.state === 'live') toast('Your changes are live.');
     if (['live', 'failed'].includes(state.deploy.state) || Date.now() - started > 10 * 60 * 1000) return;
@@ -541,21 +803,27 @@ async function load() {
 
 function conflict(message) {
   notice(message, [
-    ['Load the latest (drop my edits)', async () => {
-      notice(null);
-      await load();
-      ctx.uploads.clear();
-      local.clear();
-      validate();
-      renderNav();
-      renderPage({ keepScroll: false });
-    }],
-    ['Save mine over it', async () => {
-      notice(null);
-      const { sha } = await api('/api/content');
-      state.sha = sha;
-      save();
-    }],
+    [
+      'Load the latest (drop my edits)',
+      async () => {
+        notice(null);
+        await load();
+        ctx.uploads.clear();
+        local.clear();
+        validate();
+        renderNav();
+        renderPage({ keepScroll: false });
+      },
+    ],
+    [
+      'Save mine over it',
+      async () => {
+        notice(null);
+        const { sha } = await api('/api/content');
+        state.sha = sha;
+        save();
+      },
+    ],
   ]);
 }
 
@@ -583,10 +851,21 @@ function offerDraft() {
     renderPage();
     toast('Draft restored. New images from that session need adding again.');
   };
-  notice(same
-    ? `You have unsaved edits from ${when}.`
-    : `You have unsaved edits from ${when}, made before the content last changed. Restoring them would undo the newer changes.`,
-  [[same ? 'Restore them' : 'Restore anyway', restore, 'button primary small'], ['Discard them', () => { local.clear(); notice(null); }]]);
+  notice(
+    same
+      ? `You have unsaved edits from ${when}.`
+      : `You have unsaved edits from ${when}, made before the content last changed. Restoring them would undo the newer changes.`,
+    [
+      [same ? 'Restore them' : 'Restore anyway', restore, 'button primary small'],
+      [
+        'Discard them',
+        () => {
+          local.clear();
+          notice(null);
+        },
+      ],
+    ],
+  );
 }
 
 // ---- boot --------------------------------------------------------------------------------
@@ -609,10 +888,15 @@ async function boot() {
   }
   const s = state.session;
   q('[data-view-site]').href = s.siteUrl || '/';
-  fill(q('[data-who]'),
+  fill(
+    q('[data-who]'),
     el('p', { text: s.mode === 'local' ? 'Local Mode' : s.email }),
-    el('p', { class: 'muted', text: s.mode === 'local' ? 'Saves write to your files; nothing is committed.' : `Saves to ${s.store}` }),
-    s.mode === 'local' ? null : el('a', { href: '/cdn-cgi/access/logout', text: 'Sign Out' }));
+    el('p', {
+      class: 'muted',
+      text: s.mode === 'local' ? 'Saves write to your files; nothing is committed.' : `Saves to ${s.store}`,
+    }),
+    s.mode === 'local' ? null : el('a', { href: '/cdn-cgi/access/logout', text: 'Sign Out' }),
+  );
   if (!canonicalHash()) history.replaceState(null, '', `#${PAGES[0].id}`);
   renderNav();
   validate();
@@ -628,11 +912,20 @@ async function boot() {
   });
   window.addEventListener('keydown', (e) => {
     const mod = e.ctrlKey || e.metaKey;
-    if (mod && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
-    else if (mod && !e.altKey && e.key.toLowerCase() === 'k') { e.preventDefault(); search.focus(); }
-    else if (e.key === '/' && !mod && !e.altKey && !typing(e.target) && !document.querySelector('dialog[open]')) { e.preventDefault(); search.focus(); }
+    if (mod && !e.altKey && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      save();
+    } else if (mod && !e.altKey && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      search.focus();
+    } else if (e.key === '/' && !mod && !e.altKey && !typing(e.target) && !document.querySelector('dialog[open]')) {
+      e.preventDefault();
+      search.focus();
+    }
   });
-  window.addEventListener('beforeunload', (e) => { if (isDirty()) e.preventDefault(); });
+  window.addEventListener('beforeunload', (e) => {
+    if (isDirty()) e.preventDefault();
+  });
 }
 
 installTooltips();

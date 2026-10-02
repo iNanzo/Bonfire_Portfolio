@@ -13,15 +13,29 @@ import { easeInOut } from '../math.js';
 
 const VIEW_AXIS = new THREE.Vector3(0, 0, 1);
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
-const toPose = (p) => ({ pos: new THREE.Vector3(...p.pos), target: new THREE.Vector3(...p.target), fov: p.fov, sx: p.sx ?? 0, sy: p.sy ?? 0, roll: p.roll ?? 0 });
-const clonePose = (p) => ({ pos: p.pos.clone(), target: p.target.clone(), fov: p.fov, sx: p.sx, sy: p.sy, roll: p.roll });
+const toPose = (p) => ({
+  pos: new THREE.Vector3(...p.pos),
+  target: new THREE.Vector3(...p.target),
+  fov: p.fov,
+  sx: p.sx ?? 0,
+  sy: p.sy ?? 0,
+  roll: p.roll ?? 0,
+});
+const clonePose = (p) => ({
+  pos: p.pos.clone(),
+  target: p.target.clone(),
+  fov: p.fov,
+  sx: p.sx,
+  sy: p.sy,
+  roll: p.roll,
+});
 
 /** @param {THREE.PerspectiveCamera} camera  @param {object} o  `sway`: how far it leans toward the cursor (0: not at all) */
 export function createView(camera, { reducedMotion = false, sway: swayAmount = 1 } = {}) {
   let layout = 'wide';
   const view = { name: 'home', cur: toPose(getPov('home', layout)), from: null, to: null, t: 1, dur: 1.25 };
-  let trauma = 0;   // 0..1, see above
-  let shakeT = 0;   // time along the shake's noise
+  let trauma = 0; // 0..1, see above
+  let shakeT = 0; // time along the shake's noise
   const sway = { x: 0, y: 0 };
   const right = new THREE.Vector3();
   const up = new THREE.Vector3();
@@ -53,7 +67,10 @@ export function createView(camera, { reducedMotion = false, sway: swayAmount = 1
      */
     setPose(p, { instant = false, duration = 1.25 } = {}) {
       view.name = null;
-      if (!instant && !reducedMotion) { moveTo(toPose(p), false, duration); return; }
+      if (!instant && !reducedMotion) {
+        moveTo(toPose(p), false, duration);
+        return;
+      }
       const c = view.cur;
       c.pos.fromArray(p.pos);
       c.target.fromArray(p.target);
@@ -86,11 +103,17 @@ export function createView(camera, { reducedMotion = false, sway: swayAmount = 1
       layout = next;
       if (view.name) setView(view.name, { instant: true });
     },
-    get layout() { return layout; },
+    get layout() {
+      return layout;
+    },
     /** A jolt: `amount` (about 0.04 for a flick, 0.3 for a slam) adds trauma. */
-    shake(amount) { trauma = Math.min(1, trauma + amount * 1.6); },
+    shake(amount) {
+      trauma = Math.min(1, trauma + amount * 1.6);
+    },
     /** 0..1: how much trauma the camera is carrying (for tests and debugging). */
-    get trauma() { return trauma; },
+    get trauma() {
+      return trauma;
+    },
     /** Ease toward the pose it's headed for. */
     step(dt) {
       if (view.t >= 1) return;
@@ -126,7 +149,8 @@ export function createView(camera, { reducedMotion = false, sway: swayAmount = 1
         trauma = Math.max(0, trauma - dt * 1.4);
         shakeT += dt;
         const k = trauma * trauma;
-        const n = (a, b, c) => (Math.sin(shakeT * a) + Math.sin(shakeT * b + 1.3) * 0.6 + Math.sin(shakeT * c + 2.1) * 0.3) / 1.9;
+        const n = (a, b, c) =>
+          (Math.sin(shakeT * a) + Math.sin(shakeT * b + 1.3) * 0.6 + Math.sin(shakeT * c + 2.1) * 0.3) / 1.9;
         ox += n(37, 59, 83) * k * texel * 7;
         oy += n(43, 67, 97) * k * texel * 7;
         shakeRoll = n(29, 53, 71) * k * 0.035;

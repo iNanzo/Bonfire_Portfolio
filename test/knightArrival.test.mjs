@@ -21,8 +21,16 @@ function standInModel() {
   const knight = new THREE.Group();
   knight.name = 'Knight';
   const nodes = {};
-  for (const [bone, name] of Object.entries(BONE_NODES)) { const g = new THREE.Group(); g.name = name; nodes[bone] = g; }
-  const box = (mat) => new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), Object.assign(new THREE.MeshStandardMaterial(), { name: mat }));
+  for (const [bone, name] of Object.entries(BONE_NODES)) {
+    const g = new THREE.Group();
+    g.name = name;
+    nodes[bone] = g;
+  }
+  const box = (mat) =>
+    new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.08, 0.08),
+      Object.assign(new THREE.MeshStandardMaterial(), { name: mat }),
+    );
   for (const [bone, g] of Object.entries(nodes)) {
     const par = PARENT[bone];
     const at = new THREE.Vector3(...DEFAULT_REST[bone]);
@@ -33,18 +41,31 @@ function standInModel() {
     piece.name = `${g.name}_Mesh`;
     g.add(piece);
   }
-  for (const h of ['Great', 'Armet', 'Bascinet']) { const helm = new THREE.Group(); helm.name = `K_Helm_${h}`; helm.add(box('K_Plate')); nodes.head.add(helm); }
+  for (const h of ['Great', 'Armet', 'Bascinet']) {
+    const helm = new THREE.Group();
+    helm.name = `K_Helm_${h}`;
+    helm.add(box('K_Plate'));
+    nodes.head.add(helm);
+  }
   const root = new THREE.Group();
   root.add(knight);
   return root;
 }
-const fxMaterial = () => new THREE.ShaderMaterial({ uniforms: { tDepth: { value: null }, resolution: { value: new THREE.Vector2(1, 1) } } });
+const fxMaterial = () =>
+  new THREE.ShaderMaterial({ uniforms: { tDepth: { value: null }, resolution: { value: new THREE.Vector2(1, 1) } } });
 const field = { fire: () => ({ x: 0, y: 0, z: 0 }), noise: { noise3d: () => 0 } };
-const ground = (name) => ({ height: () => 0, top: (x, z) => (Math.hypot(x - SEATS[name].x, z - SEATS[name].z) < 0.15 ? SEATS[name].top : 0) });
+const ground = (name) => ({
+  height: () => 0,
+  top: (x, z) => (Math.hypot(x - SEATS[name].x, z - SEATS[name].z) < 0.15 ? SEATS[name].top : 0),
+});
 const RAMP = ['#8c1d2f', '#e0582a', '#ffc76a', '#fff1d0'];
 
 function make({ reducedMotion = false, rest = [2, 3], busy = null } = {}) {
-  const knights = createKnights(standInModel(), { armor: createArmorShared({ fireAt: new THREE.Vector3(0, 0.95, 0.28), exposure: { value: 1.45 } }), max: 1, reducedMotion });
+  const knights = createKnights(standInModel(), {
+    armor: createArmorShared({ fireAt: new THREE.Vector3(0, 0.95, 0.28), exposure: { value: 1.45 } }),
+    max: 1,
+    reducedMotion,
+  });
   knights.setScenery('ruins', ground('ruins'));
   const mat = fxMaterial();
   const sign = createSummonSign({ layer: 2, layerFx: 1, moteMaterial: mat, exposure: { value: 1.45 }, reducedMotion });
@@ -53,16 +74,39 @@ function make({ reducedMotion = false, rest = [2, 3], busy = null } = {}) {
   const events = [];
   const hooks = { formed: [], strikes: 0 };
   const arrival = createKnightArrival({
-    knights, sign, particleMaterial: mat, layerFx: 1, field, anchor: new THREE.Vector3(0.04, 0, 0.03), count: 200, reducedMotion,
-    now: () => ({ element, ramp: RAMP }), rest: () => rest,
+    knights,
+    sign,
+    particleMaterial: mat,
+    layerFx: 1,
+    field,
+    anchor: new THREE.Vector3(0.04, 0, 0.03),
+    count: 200,
+    reducedMotion,
+    now: () => ({ element, ramp: RAMP }),
+    rest: () => rest,
     // (As sceneKnight.js has it: he's busy mid-gesture, mid-swap.)
     busy: busy ?? (() => knights.busyAt(0)),
     hooks: { onFormed: (which) => hooks.formed.push(which), onForgeStrike: () => hooks.strikes++ },
   });
   arrival.onPresence((p) => events.push(p));
   arrival.setScenery({ ...SEATS.ruins.sign, y: 0 });
-  const run = (s) => { for (let t = 0; t < s; t += 1 / 60) { knights.update(1 / 60); arrival.update(1 / 60); } };
-  return { knights, sign, arrival, events, hooks, run, setElement: (e) => { element = e; } };
+  const run = (s) => {
+    for (let t = 0; t < s; t += 1 / 60) {
+      knights.update(1 / 60);
+      arrival.update(1 / 60);
+    }
+  };
+  return {
+    knights,
+    sign,
+    arrival,
+    events,
+    hooks,
+    run,
+    setElement: (e) => {
+      element = e;
+    },
+  };
 }
 const total = Object.values(ARRIVAL_TIMES).reduce((a, b) => a + b, 0);
 
@@ -71,26 +115,43 @@ test('the monogram’s strokes come from the header mark’s own path, and make 
   assert.deepEqual(LOGO_STROKES[1], [-15, 27, -4.5, 68], 'the N’s diagonal');
   assert.deepEqual(LOGO_STROKES[5], [-27.5, 47, 27.5, 47], 'the crossbar');
   assert.deepEqual(LOGO_BOUNDS, [-27.5, 2, 27.5, 78]);
-  assert.deepEqual(strokesOf('M0 0H10V5L2 3'), [[0, 0, 10, 0], [10, 0, 10, 5], [10, 5, 2, 3]]);
+  assert.deepEqual(strokesOf('M0 0H10V5L2 3'), [
+    [0, 0, 10, 0],
+    [10, 0, 10, 5],
+    [10, 5, 2, 3],
+  ]);
   const bars = logoBars(0.76, 0.03);
   assert.equal(bars.length, 6);
   const tall = bars[2];
-  assert.ok(Math.abs(tall.len - 0.66) < 1e-9 && Math.abs(Math.abs(tall.angle) - Math.PI / 2) < 1e-9, 'the N’s inner stem, upright');
+  assert.ok(
+    Math.abs(tall.len - 0.66) < 1e-9 && Math.abs(Math.abs(tall.angle) - Math.PI / 2) < 1e-9,
+    'the N’s inner stem, upright',
+  );
   assert.ok(Math.abs(bars[5].len - 0.55) < 1e-9 && bars[5].angle === 0, 'the crossbar, level');
   for (const b of bars) assert.ok(Math.abs(b.u) <= 0.28 && Math.abs(b.v) <= 0.38 && b.width === 0.03);
 });
 
 test('the summon sign: flat on the ground in front of his seat, lit while he’s away, hit by a ray, a forge subject', () => {
-  const sign = createSummonSign({ layer: 2, layerSolid: 0, layerFx: 1, moteMaterial: fxMaterial(), exposure: { value: 1.45 } });
+  const sign = createSummonSign({
+    layer: 2,
+    layerSolid: 0,
+    layerFx: 1,
+    moteMaterial: fxMaterial(),
+    exposure: { value: 1.45 },
+  });
   assert.ok(SIGN_STROKE >= 0.03 && SIGN_HEIGHT >= 0.45, 'bars at least 3 cm wide, the glyph at least 0.45 m tall');
   assert.equal(sign.group.visible, false, 'nothing until it’s lit');
   sign.place({ x: -1, y: 0.02, z: -0.5, yaw: Math.PI });
   sign.mode = 'lit';
   assert.ok(sign.group.visible);
   // Lit, on the solid layer (the stones under it don't outline through it); in the forge, the ghost layer.
-  sign.group.traverse((o) => { if (o.isMesh) assert.equal(o.layers.mask, 1 << 0, 'lit: on the solid layer'); });
+  sign.group.traverse((o) => {
+    if (o.isMesh) assert.equal(o.layers.mask, 1 << 0, 'lit: on the solid layer');
+  });
   sign.mode = 'forge';
-  sign.group.traverse((o) => { if (o.isMesh) assert.equal(o.layers.mask, 1 << 2, 'forging: on the ghost layer'); });
+  sign.group.traverse((o) => {
+    if (o.isMesh) assert.equal(o.layers.mask, 1 << 2, 'forging: on the ghost layer');
+  });
   sign.mode = 'lit';
   // A ray from above onto its middle hits it; one a metre off doesn't.
   const down = new THREE.Vector3(0, -1, 0);
@@ -98,7 +159,10 @@ test('the summon sign: flat on the ground in front of his seat, lit while he’s
   assert.equal(sign.hit(new THREE.Ray(new THREE.Vector3(0, 3, -0.5), down)), -1);
   // The breath rolls up the letters now and then; hovered, it brightens and every mote rises.
   let breathed = false;
-  for (let f = 0; f < 60 * 7; f++) { sign.update(1 / 60); if (sign.uniforms.uBreath.value >= 0) breathed = true; }
+  for (let f = 0; f < 60 * 7; f++) {
+    sign.update(1 / 60);
+    if (sign.uniforms.uBreath.value >= 0) breathed = true;
+  }
   assert.ok(breathed, 'it breathes');
   const motes = () => sign.motes.geometry.attributes.size.array.filter((s) => s > 0).length;
   const calm = motes();
@@ -120,28 +184,78 @@ test('the summon sign: flat on the ground in front of his seat, lit while he’s
 
 test('the forge runs on any two subjects: dissolve, swirl, gather, form, hold, in order, with each element’s strikes', () => {
   const box = (y) => {
-    const u = { uDissolve: { value: 0 }, uEdge: { value: new THREE.Color() }, uEdgeHot: { value: new THREE.Color() }, uGlow: { value: 0 }, uFlip: { value: 0 }, uFrost: { value: 0 }, uFrostColor: { value: new THREE.Color() } };
+    const u = {
+      uDissolve: { value: 0 },
+      uEdge: { value: new THREE.Color() },
+      uEdgeHot: { value: new THREE.Color() },
+      uGlow: { value: 0 },
+      uFlip: { value: 0 },
+      uFrost: { value: 0 },
+      uFrostColor: { value: new THREE.Color() },
+    };
     const m = new THREE.Matrix4().makeTranslation(0, y, 0);
     const n = 100;
     return {
-      matrixWorld: m, samples: Float32Array.from({ length: n * 3 }, (_, i) => (i % 3 === 1 ? (i / 3 / n) : 0.05)), heights: Float32Array.from({ length: n }, (_, i) => i / n),
-      span: new THREE.Vector2(0, 1), silhouette: () => ({ verts: new Float32Array([0, 0, 1, 0, 1, 1]), normals: new Float32Array(6), segs: new Uint32Array([0, 1, 1, 2]), useX: true, depth: 0, center: [0.5, 0.5], profile: { y0: 0, y1: 1, rx: new Float32Array(64).fill(0.1), rz: new Float32Array(64).fill(0.1) } }),
-      uniforms: u, shown: true, show(on) { this.shown = on; }, ghost() {},
+      matrixWorld: m,
+      samples: Float32Array.from({ length: n * 3 }, (_, i) => (i % 3 === 1 ? i / 3 / n : 0.05)),
+      heights: Float32Array.from({ length: n }, (_, i) => i / n),
+      span: new THREE.Vector2(0, 1),
+      silhouette: () => ({
+        verts: new Float32Array([0, 0, 1, 0, 1, 1]),
+        normals: new Float32Array(6),
+        segs: new Uint32Array([0, 1, 1, 2]),
+        useX: true,
+        depth: 0,
+        center: [0.5, 0.5],
+        profile: { y0: 0, y1: 1, rx: new Float32Array(64).fill(0.1), rz: new Float32Array(64).fill(0.1) },
+      }),
+      uniforms: u,
+      shown: true,
+      show(on) {
+        this.shown = on;
+      },
+      ghost() {},
     };
   };
   for (const element of ['fire', 'lightning', 'ice']) {
-    const particles = createForgeParticles({ count: 100, material: fxMaterial(), layer: 1, field, anchor: new THREE.Vector3() });
+    const particles = createForgeParticles({
+      count: 100,
+      material: fxMaterial(),
+      layer: 1,
+      field,
+      anchor: new THREE.Vector3(),
+    });
     const calls = [];
     let clock = 0;
     const r = createForgeRun({
-      particles, fx: null, arcs: null, times: FORGE_TIMES, reducedMotion: false, clock: () => clock, groundPoint: (rng, out) => out.set(0, 0, 0),
-      hooks: { onFormed: () => calls.push('formed'), onForgeStrike: (w) => calls.push(`strike ${w}`), onHold: (t) => { if (t > FORGE_TIMES.hold) { r.finish(); calls.push('done'); } } },
+      particles,
+      fx: null,
+      arcs: null,
+      times: FORGE_TIMES,
+      reducedMotion: false,
+      clock: () => clock,
+      groundPoint: (rng, out) => out.set(0, 0, 0),
+      hooks: {
+        onFormed: () => calls.push('formed'),
+        onForgeStrike: (w) => calls.push(`strike ${w}`),
+        onHold: (t) => {
+          if (t > FORGE_TIMES.hold) {
+            r.finish();
+            calls.push('done');
+          }
+        },
+      },
     });
-    const a = box(0), b = box(2);
+    const a = box(0),
+      b = box(2);
     r.begin({ from: a, to: b, fromRamp: RAMP, toRamp: RAMP, element });
     r.start();
     const phases = [];
-    for (let f = 0; f < 60 * 5; f++) { clock += 1 / 60; r.step(1 / 60); if (phases.at(-1) !== r.phase) phases.push(r.phase); }
+    for (let f = 0; f < 60 * 5; f++) {
+      clock += 1 / 60;
+      r.step(1 / 60);
+      if (phases.at(-1) !== r.phase) phases.push(r.phase);
+    }
     assert.deepEqual(phases, ['dissolve', 'swirl', 'gather', 'form', 'hold', 'idle'], element);
     assert.equal(a.uniforms.uDissolve.value, 1, `${element}: the old one burnt away`);
     assert.equal(a.shown, false);
@@ -149,7 +263,12 @@ test('the forge runs on any two subjects: dissolve, swirl, gather, form, hold, i
     assert.equal(calls.filter((c) => c === 'formed').length, 1);
     if (element === 'fire') assert.ok(!calls.some((c) => c.startsWith('strike')), 'fire: no strikes');
     // (Strikes need the arcs: without them lightning's bolts aren't drawn, but its flashes still land.)
-    if (element === 'ice') assert.deepEqual(calls.filter((c) => c.startsWith('strike')), ['strike 0.45', 'strike 0.4'], 'ice: the shatter, the cocoon cracking off');
+    if (element === 'ice')
+      assert.deepEqual(
+        calls.filter((c) => c.startsWith('strike')),
+        ['strike 0.45', 'strike 0.4'],
+        'ice: the shatter, the cocoon cracking off',
+      );
     if (element === 'ice') assert.equal(b.uniforms.uFlip.value, 1, 'ice grows it from the bottom up');
   }
 });
@@ -171,7 +290,10 @@ test('he isn’t there at first: his sign is; summoned he forms out of it, rests
   assert.equal(knights.list[0].state, 'sitting');
   assert.equal(sign.mode, 'off');
   assert.deepEqual(hooks.formed, ['knight']);
-  assert.ok(arrival.restLeft >= 1.5 && arrival.restLeft <= 3, `his rest is rolled in [2, 3] s (${arrival.restLeft.toFixed(2)} left)`);
+  assert.ok(
+    arrival.restLeft >= 1.5 && arrival.restLeft <= 3,
+    `his rest is rolled in [2, 3] s (${arrival.restLeft.toFixed(2)} left)`,
+  );
   run(3.2);
   assert.equal(arrival.presence, 'leaving', 'his rest is over: he goes');
   assert.equal(knights.list[0].state, 'leaving');
@@ -203,8 +325,13 @@ test('his rest running out waits for what he’s doing (the dance, a new style),
   r.run(0.3);
   r.arrival.restLeft = 0.01;
   const u = r.knights.knights[0].bodyMat.userData.uniforms.uDissolve;
-  let last = u.value, pop = 0;
-  for (let i = 0; i < 150; i++) { r.run(1 / 60); pop = Math.max(pop, last - u.value); last = u.value; }
+  let last = u.value,
+    pop = 0;
+  for (let i = 0; i < 150; i++) {
+    r.run(1 / 60);
+    pop = Math.max(pop, last - u.value);
+    last = u.value;
+  }
   assert.ok(pop < 0.1, `his dissolve never snaps back (the most in a frame: ${pop.toFixed(2)})`);
   assert.equal(r.knights.restyling, false);
   assert.equal(r.arrival.presence, 'leaving');
@@ -241,9 +368,17 @@ test('sent off mid-helmet-swap, he burns away whole in the new helmet, held as t
   assert.equal(n.swap, null);
   assert.equal(n.helmet, 'bascinet');
   assert.equal(n.helms.bascinet.visible, true);
-  const q = n.bones[0].quaternion.clone(), hand = n.bones.find((b) => b.name === 'handR').getWorldPosition(new THREE.Vector3());
+  const q = n.bones[0].quaternion.clone(),
+    hand = n.bones.find((b) => b.name === 'handR').getWorldPosition(new THREE.Vector3());
   s.run(0.6);
-  assert.ok(n.bones[0].quaternion.angleTo(q) < 1e-9 && n.bones.find((b) => b.name === 'handR').getWorldPosition(new THREE.Vector3()).distanceTo(hand) < 1e-9, 'held still while he burns away');
+  assert.ok(
+    n.bones[0].quaternion.angleTo(q) < 1e-9 &&
+      n.bones
+        .find((b) => b.name === 'handR')
+        .getWorldPosition(new THREE.Vector3())
+        .distanceTo(hand) < 1e-9,
+    'held still while he burns away',
+  );
   s.run(total);
   assert.equal(s.arrival.presence, 'away');
 });
@@ -253,7 +388,10 @@ test('lightning’s jumps flash him in his own tones (uLift), never washed flat 
   setElement('lightning');
   arrival.summon();
   const u = knights.knights[0].bodyMat.userData.uniforms;
-  let glow = 0, lift = 0, flashes = 0, was = 0;
+  let glow = 0,
+    lift = 0,
+    flashes = 0,
+    was = 0;
   for (let t = 0; t < total + 0.2; t += 1 / 60) {
     run(1 / 60);
     glow = Math.max(glow, u.uGlow.value);

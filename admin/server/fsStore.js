@@ -15,8 +15,12 @@ export function createFsStore(root) {
     return full;
   };
   const readBytes = async (p) => {
-    try { return new Uint8Array(await fs.readFile(abs(p))); }
-    catch (e) { if (e.code === 'ENOENT') throw new HttpError(404, `${p} not found.`); throw e; }
+    try {
+      return new Uint8Array(await fs.readFile(abs(p)));
+    } catch (e) {
+      if (e.code === 'ENOENT') throw new HttpError(404, `${p} not found.`);
+      throw e;
+    }
   };
   return {
     mode: 'local',
@@ -38,6 +42,8 @@ export function createFsStore(root) {
       const content = files.find((f) => f.path === CONTENT_PATH);
       return { commit: { sha: null, url: null }, contentSha: content ? await gitBlobSha(content.bytes) : baseSha };
     },
-    async deployStatus() { return { state: 'local' }; },
+    async deployStatus() {
+      return { state: 'local' };
+    },
   };
 }

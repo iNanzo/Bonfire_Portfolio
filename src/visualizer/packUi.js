@@ -18,12 +18,18 @@ export function createPackUi(ctx) {
   const pack = createPack({
     label: ui.pack,
     items: bonfireItems({
-      state: () => (ctx.fire ? {
-        scenery: ctx.fire.scenery, weapon: ctx.fire.weapon, element: ctx.fire.element, flame: ctx.fire.flame,
-        helmet: ctx.fire.knights?.present ? ctx.fire.knights.helmet : null,
-        style: ctx.fire.knights?.present ? ctx.fire.knights.style ?? null : null,
-        finish: ctx.fire.knights?.present ? ctx.fire.knights.finish ?? null : null,
-      } : null),
+      state: () =>
+        ctx.fire
+          ? {
+              scenery: ctx.fire.scenery,
+              weapon: ctx.fire.weapon,
+              element: ctx.fire.element,
+              flame: ctx.fire.flame,
+              helmet: ctx.fire.knights?.present ? ctx.fire.knights.helmet : null,
+              style: ctx.fire.knights?.present ? (ctx.fire.knights.style ?? null) : null,
+              finish: ctx.fire.knights?.present ? (ctx.fire.knights.finish ?? null) : null,
+            }
+          : null,
       busy: () => !ctx.fire || ctx.fire.forging,
       reducedMotion,
       onScene: (key) => {
@@ -32,16 +38,24 @@ export function createPackUi(ctx) {
       },
       onWeapon: (key) => {
         if (!ctx.fire || key === ctx.fire.weapon) return;
-        if (ctx.fire.forging) { ctx.note('The forge is busy', 1.5); return; }
+        if (ctx.fire.forging) {
+          ctx.note('The forge is busy', 1.5);
+          return;
+        }
         ctx.fire.equip(key, ctx.fire.flame, { element: ctx.fire.element }).catch(() => {});
         ctx.note(`Forging the ${weapons[key]}`, 2);
       },
       onRing: () => ctx.director?.ring(1),
       onLiving: () => ctx.actions.combo(),
-      onElement: (key) => { if (!ctx.director?.hit({ element: key })) ctx.note('The forge is busy', 1.5); },
+      onElement: (key) => {
+        if (!ctx.director?.hit({ element: key })) ctx.note('The forge is busy', 1.5);
+      },
       onFlame: (key) => {
         if (!ctx.fire || key === ctx.fire.flame) return;
-        if (ctx.fire.forging) { ctx.note('The forge is busy', 1.5); return; }
+        if (ctx.fire.forging) {
+          ctx.note('The forge is busy', 1.5);
+          return;
+        }
         ctx.fire.equip(ctx.fire.weapon, key, { element: ctx.fire.element }).catch(() => {});
       },
       // The knights (every one by the fire): a new helmet (hands to the helm), a gesture.
@@ -50,7 +64,9 @@ export function createPackUi(ctx) {
         ctx.fire.knights.setHelmet(key);
         ctx.note(`Helmet: ${HELMETS[key] ?? key}`, 1.5);
       },
-      onGesture: (name) => { ctx.fire?.knights?.gesture(name, { index: 'all' }); },
+      onGesture: (name) => {
+        ctx.fire?.knights?.gesture(name, { index: 'all' });
+      },
       // ...their style and the color of their steel, for them all (the Knights tab's Style and
       // Finish roll them again at the hidden moments when they're in the mix).
       onStyle: (key) => {

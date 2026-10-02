@@ -17,7 +17,10 @@ function reference({ refractory, history = 0.8 }) {
   return (now, dt, rate, sensitivity) => {
     times.push(now);
     values.push(rate);
-    while (times.length && now - times[0] > history) { times.shift(); values.shift(); }
+    while (times.length && now - times[0] > history) {
+      times.shift();
+      values.shift();
+    }
     let mean = 0;
     for (const v of values) mean += v;
     mean /= values.length;
@@ -39,11 +42,19 @@ function reference({ refractory, history = 0.8 }) {
 }
 
 function rng(seed) {
-  return () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+  return () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
 }
 
 test('the ring gives exactly what the arrays gave: 60, 144 and 1000 fps, a growth, gaps', () => {
-  for (const [fps, seconds, history] of [[60, 20, 0.8], [144, 10, 0.8], [1000, 3, 0.8], [240, 5, 0.5]]) {
+  for (const [fps, seconds, history] of [
+    [60, 20, 0.8],
+    [144, 10, 0.8],
+    [1000, 3, 0.8],
+    [240, 5, 0.5],
+  ]) {
     const r = rng(fps);
     const ring = onsetDetector({ refractory: 0.1, history });
     const ref = reference({ refractory: 0.1, history });

@@ -8,14 +8,25 @@ import { createResourceScope } from '../src/bonfire/resources.js';
 
 function tracker() {
   const log = [];
-  const resource = (name) => ({ name, dispose() { log.push(name); } });
+  const resource = (name) => ({
+    name,
+    dispose() {
+      log.push(name);
+    },
+  });
   return { log, resource };
 }
 /** A tiny stand-in for an Object3D tree: traverse() over a mesh and its children. */
 function mesh(name, geometry, material, children = []) {
   return {
-    name, geometry, material, children,
-    traverse(fn) { fn(this); for (const c of this.children) c.traverse(fn); },
+    name,
+    geometry,
+    material,
+    children,
+    traverse(fn) {
+      fn(this);
+      for (const c of this.children) c.traverse(fn);
+    },
   };
 }
 
