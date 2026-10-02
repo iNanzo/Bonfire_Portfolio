@@ -135,7 +135,7 @@ function analyse(audio, opts = {}) {
 const barTime = (bar) => LEAD_IN + bar * BAR;
 
 for (const [label, gain] of [['a hot master', 1], ['a quiet line in (-24 dB)', 10 ** (-24 / 20)]]) {
-  test(`sections, tempo and beats on ${label}`, () => {
+  test(`sections, tempo and beats on ${label} [slow]`, () => {
     const seen = analyse(synthesize(gain));
     const at = (name) => seen.events.filter((x) => x.e === name).map((x) => x.t);
 
@@ -188,7 +188,7 @@ for (const [label, gain] of [['a hot master', 1], ['a quiet line in (-24 dB)', 1
   });
 }
 
-test('no drop without a breakdown: a steady groove only starts', () => {
+test('no drop without a breakdown: a steady groove only starts [slow]', () => {
   const audio = synthesize(1);
   // Keep only the groove, then the drop section spliced right after it.
   const cut = Math.round(barTime(BREAKDOWN[0]) * SR);
