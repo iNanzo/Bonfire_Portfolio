@@ -22,20 +22,30 @@ const fragmentShader = /* glsl */ `
 `;
 
 /**
+ * The material the heights are drawn with. A scene that makes several height maps (one per
+ * scenery) keeps one and passes it to each createTerrain: its shader is then built once, not
+ * again for every map (a new material each time, freed after, took its program with it).
+ */
+export function createTerrainMaterial() {
+  return new THREE.ShaderMaterial({ vertexShader, fragmentShader, side: THREE.DoubleSide });
+}
+
+/**
  * @param {THREE.WebGLRenderer} renderer
  * @param {THREE.Mesh[]} meshes  solid scenery (world matrices up to date)
  * @param {object} o
  * @param {number} o.size   side of the square area covered, centered on the origin (m)
  * @param {number} o.res    height map resolution (cells per side)
  * @param {number} o.pad    cells to grow obstacles by for flight clearance
+ * @param {THREE.ShaderMaterial} [o.material]  createTerrainMaterial(), kept by the caller (one is made and freed here without it)
  */
-export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2 } = {}) {
+export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2, material: shared = null } = {}) {
   const half = size / 2;
   const cell = size / res;
 
   // --- render heights from above
   const scene = new THREE.Scene();
-  const material = new THREE.ShaderMaterial({ vertexShader, fragmentShader, side: THREE.DoubleSide });
+  const material = shared ?? createTerrainMaterial();
   for (const m of meshes) {
     const c = new THREE.Mesh(m.geometry, material);
     c.matrixAutoUpdate = false;
@@ -62,7 +72,7 @@ export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2 
   renderer.setRenderTarget(prevTarget);
   renderer.setClearColor(prevClear, prevAlpha);
   rt.dispose();
-  material.dispose();
+  if (!shared) material.dispose();
 
   // H: raw heights (row 0 = +z edge). D: heights grown by `pad` cells.
   const H = new Float32Array(res * res);

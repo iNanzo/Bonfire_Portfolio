@@ -39,7 +39,7 @@ import { createFrameGate } from './frameGate.js';
 import { createFlame, createParticleMaterial, createEffectMaterial, SHAPE } from './flame.js';
 import { createInteraction, MODES } from './interaction.js';
 import { createFireflies } from './fireflies.js';
-import { createTerrain } from './terrain.js';
+import { createTerrain, createTerrainMaterial } from './terrain.js';
 import { createImpactFx, createSmokeMaterial } from './impact.js';
 import { createCurlField } from './curl.js';
 import { createWeapons } from './weapons.js';
@@ -621,7 +621,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     ruinsOnly = statics.filter((o) => /Static_(Pillar|Mortar|Wax)/.test(o.name));
     baseStatics = statics.filter((o) => !ruinsOnly.includes(o));
     liveStatics = statics;
-    terrains.ruins = createTerrain(renderer, statics);
+    terrains.ruins = createTerrain(renderer, statics, { material: terrainMaterial });
     // The fireflies (and the strikes, mist and debris) read whichever scenery's height map is current.
     const now = () => terrains[sceneryKey];
     const terrain = {
@@ -924,15 +924,38 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   /** Something happened at the fire (knights.js react), if the knights mind it (reacts). */
   function reactKnights(kind, strength, where) { if (knights && reacts()) knights.react(kind, strength, where); }
 
-  // --- Scenery (scenery.js): the ruins, the forge or the shrine around the fire. Built on
-  // first use; each has its own height map for the fireflies.
+  // --- Scenery (scenery.js): the ruins, the forge or the shrine around the fire. Each has
+  // its own height map for the fireflies. The other places and their height maps are built
+  // in idle moments once the fire is up (prepareSceneries, below), so the first visit to one
+  // only puts it in the scene: built then, a place and its map (a draw of the whole place
+  // read back from the GPU) froze the frame it came on. (Still built then if it's asked for
+  // before they're ready.)
   let sceneryKey = 'ruins';
   let ruinsOnly = [];
   let baseStatics = [];
   let liveStatics = [];
   const terrains = {};
+  const terrainMaterial = scope.own(createTerrainMaterial()); // (one for every height map: its shader built once)
   const sceneryMaterials = {};
   const sceneries = {};
+  /** A place's pieces (scenery.js), built once (prepareSceneries, or its first visit), not yet in the scene. */
+  function sceneryOf(name) {
+    if (sceneries[name]) return sceneries[name];
+    const s = buildScenery(name, sceneryMaterials, () => new THREE.MeshBasicMaterial({ color: currentRamp[1], fog: false }));
+    s.group.traverse((o) => { if (o.isMesh) { o.layers.set(s.glows.includes(o) ? LAYER_GHOST : LAYER_SOLID); scope.trackTree(o); } });
+    s.group.updateMatrixWorld(true);
+    s.solids = [];
+    s.group.traverse((o) => { if (o.isMesh && !s.glows.includes(o)) s.solids.push(o); });
+    s.shown = false;
+    sceneries[name] = s;
+    return s;
+  }
+  /** The height map the fireflies (and the strikes, the mist, the debris) read in a place. */
+  function terrainOf(name) {
+    const statics = name === 'ruins' ? [...baseStatics, ...ruinsOnly.filter((o) => o.name.startsWith('Static_'))] : [...baseStatics, ...sceneryOf(name).solids];
+    terrains[name] ??= createTerrain(renderer, statics, { material: terrainMaterial });
+    return terrains[name];
+  }
   /** Move the fire to another place (SCENERIES). `flash`: the change lands like a hit, a flash hiding the cut. */
   function setScenery(name, { flash = false } = {}) {
     if (!ready || !SCENERIES[name] || name === sceneryKey) return false;
@@ -941,18 +964,17 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       if (key === 'ruins') { for (const o of ruinsOnly) o.visible = on; return; }
       sceneries[key].group.visible = on;
     };
-    const revisit = !!sceneries[name];
-    if (name !== 'ruins' && !sceneries[name]) {
-      const s = buildScenery(name, sceneryMaterials, () => new THREE.MeshBasicMaterial({ color: currentRamp[1], fog: false }));
-      s.group.traverse((o) => { if (o.isMesh) { o.layers.set(s.glows.includes(o) ? LAYER_GHOST : LAYER_SOLID); scope.trackTree(o); } });
+    const revisit = !!sceneries[name]?.shown;
+    if (name !== 'ruins' && !revisit) {
+      // First shown: its glows join the recolored ones (their numbers, in the order the places
+      // are first shown, pick each one's flicker), in the flame's color of this moment.
+      const s = sceneryOf(name);
+      for (const g of s.glows) g.material.color.set(currentRamp[1]);
       s.glowFrom = glows.length;
       glows.push(...s.glows);
       s.glowTo = glows.length;
       scene.add(s.group);
-      s.group.updateMatrixWorld(true);
-      s.solids = [];
-      s.group.traverse((o) => { if (o.isMesh && !s.glows.includes(o)) s.solids.push(o); });
-      sceneries[name] = s;
+      s.shown = true;
     }
     show(sceneryKey, false);
     show(name, true);
@@ -970,7 +992,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       if (d) { l.position.copy(d.at); l.distance = d.distance; }
     });
     liveStatics = name === 'ruins' ? [...baseStatics, ...ruinsOnly.filter((o) => o.name.startsWith('Static_'))] : [...baseStatics, ...sceneries[name].solids];
-    terrains[name] ??= createTerrain(renderer, liveStatics);
+    terrainOf(name);
     // His sign moves to the seat there (a summoning or a leaving under way ends at once), and
     // the knights take their places there, forming out of embers.
     arrival?.setScenery(signPlace(name));
@@ -1636,6 +1658,19 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // (Bonfire Live and the Painter can roll a style with its own model at any moment: its
   // template is built beforehand, in idle moments once the knights are in.)
   if (fxLayer) knightsIn.then(() => { if (knights) for (const file of new Set(Object.values(MODELS))) prepareStyleModel(file); }, () => {});
+  // Every other place, and its height map, built beforehand in idle moments once the fire is
+  // up (a step each), so the first visit to one doesn't freeze the show (setScenery). Its
+  // materials are set up for drawing too (frame.prepare: the cult's 46 glows, each its own
+  // material, took a frame's worth of setting up the first time they were drawn).
+  function* prepareSceneries() {
+    for (const name of Object.keys(SCENERIES)) {
+      if (name === 'ruins' || !ready) continue;
+      if (!sceneries[name]) { frame.prepare([sceneryOf(name).group]).catch(() => {}); yield; }
+      if (!terrains[name]) { terrainOf(name); yield; }
+    }
+  }
+  loaded.then(() => (ready && !scope.disposed ? inSteps(prepareSceneries()) : null), () => null)
+    .catch((error) => console.warn('The places could not be built beforehand; each is built when first shown.', error));
 
   // fire.knights: what knights.js offers, forwarded once they exist.
   const knightsApi = {
