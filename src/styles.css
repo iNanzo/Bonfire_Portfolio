@@ -1412,6 +1412,9 @@ body[data-screen='home'] .prompt[data-prompt='Back'] {
 
 .title-menu {
   margin-top: 28px;
+  /* Its box hugs its items, so the stage takes the pointer beside them: a longer name
+     (the admin's) widens the copy, and a full-width menu box covered the summon sign. */
+  width: fit-content;
 }
 .title-menu ul {
   display: grid;

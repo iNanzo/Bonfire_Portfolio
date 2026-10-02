@@ -1,7 +1,8 @@
 // Smoke tests: every screen and Bonfire Live load in a real browser with no errors, the
 // bonfire draws, and the main controls answer (Q/E, Esc, the pack, the breakdown and its
 // render settings, the knight's model, his summon sign and his pack item, the demo track). Plus layout and
-// focus checks: the pack's lists on screen at phone to desktop sizes, focus back after the
+// focus checks: the pack's lists on screen at phone to desktop sizes, the title menu's box
+// no wider than its items (the sign beside it takes the pointer), focus back after the
 // breakdown, and no render HUD left behind on touch screens.
 import { test, expect } from '@playwright/test';
 import { content, screenLabel, startsWith } from './lib/content.mjs';
@@ -147,6 +148,12 @@ test('the knight isn’t there on first load: his sign glows, and a click on it 
   const label = page.locator('#scene-label');
   await expect(label).toContainText(SIGN, { timeout: 30_000 }); // (his model is in: the sign waits)
   await expect(label).not.toContainText(KNIGHT_HERE);
+  // The title menu's box ends with its widest item: beside them the stage takes the pointer,
+  // however wide a longer name makes the copy above (it covered the sign).
+  const menuRight = await page.locator('.title-menu').evaluate((m) => m.getBoundingClientRect().right);
+  const items = page.locator('.title-menu [data-title-item]');
+  const itemsRight = Math.max(...(await items.evaluateAll((as) => as.map((a) => a.getBoundingClientRect().right))));
+  expect(menuRight).toBeLessThanOrEqual(itemsRight + 1);
   const sign = await findSign(page);
   expect(sign, 'the sign is on the ground, and hovering it says so').not.toBeNull();
   expect(await page.locator('[data-stage]').evaluate((s) => getComputedStyle(s).cursor)).toBe('pointer');
