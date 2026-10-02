@@ -492,6 +492,7 @@ body.pnt.panel-off .pack { right: var(--gutter); }
 .pnt-error { position: fixed; top: calc(var(--bar-h) + 16px); left: 16px; z-index: 40; }
 
 /* ---------- Phones: the panel is a bottom sheet with a strip of section tabs ---------- */
+/* (Under 760px wide: NARROW in src/ui/breakpoints.js, which the page's script reads too.) */
 @media (max-width: 759px) {
   /* The bar in two rows, tighter. */
   .pnt-bar { gap: 6px 6px; padding: 6px 8px; }

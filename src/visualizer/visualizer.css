@@ -128,7 +128,9 @@ body.hud-off .viz-hud { display: none; }
 .viz-actions .pix-btn { padding: 5px 10px; font-size: 0.875rem; }
 .viz-actions kbd { min-width: 0; font-size: 0.625rem; }
 
-@media (max-width: 760px) {
+/* Phones are under 760px wide (every max-width: 759px here): NARROW in src/ui/breakpoints.js,
+   the width the page's script tests too. */
+@media (max-width: 759px) {
   .viz-hud { left: 8px; right: 8px; bottom: 8px; gap: 10px; }
   .viz-readout { flex-wrap: wrap; gap: 10px 14px; }
   .viz-actions { margin-left: 0; }
@@ -270,7 +272,7 @@ body.hud-off .viz-hud { display: none; }
 .viz-bpm-set:focus-visible { outline: 2px solid var(--accent); }
 .viz-beat .pix-btn { padding: 4px 8px; font-size: 0.875rem; }
 .viz-beat kbd { min-width: 0; font-size: 0.625rem; }
-@media (max-width: 760px) {
+@media (max-width: 759px) {
   .viz-group + .viz-group { padding-left: 0; box-shadow: none; }
   .viz-group-label { width: 100%; }
 }
@@ -435,7 +437,7 @@ body.hud-off .viz-hud { display: none; }
 .viz-toast > span:focus { outline: none; }
 .viz-toast > span:focus-visible { outline: 1px dotted var(--accent-hi); outline-offset: 2px; }
 .viz-settings-foot kbd { margin-right: 6px; font-size: 0.625rem; }
-@media (max-width: 760px) {
+@media (max-width: 759px) {
   /* (One row: the shortcuts button down to its key, the toast's words smaller.) */
   .viz-settings-foot { gap: 6px; padding-block: 10px 12px; }
   .viz-settings-foot .pix-btn { padding: 6px 9px; font-size: 0.8125rem; }
@@ -449,7 +451,7 @@ body.hud-off .viz-hud { display: none; }
   .viz-toast.is-on ~ [data-reset-all] { margin-left: auto; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 759px) {
   .viz-settings-top { padding-top: 14px; }
   .viz-settings-head { grid-template-columns: minmax(0, 1fr) auto; }
   .viz-search { grid-column: 1 / -1; grid-row: 2; }
@@ -482,7 +484,7 @@ body.hud-off .viz-hud { display: none; }
 .viz-presets-top .viz-preset { padding: 8px 10px; }
 .viz-presets-top .viz-preset span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .viz-preset-note { display: none; }
-@media (max-width: 760px) {
+@media (max-width: 759px) {
   .viz-presets-top { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding: 2px; }
   .viz-presets-top .viz-preset { flex: none; padding: 4px 10px; }
   .viz-presets-top .viz-preset span { display: none; }

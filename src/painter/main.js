@@ -46,6 +46,7 @@ import { installTooltips } from '../ui/tooltip.js';
 import { createKeysOverlay, isHelpKey } from '../ui/keysOverlay.js';
 import { searchBoxMarkup } from '../ui/settingsSearch.js';
 import { failScene as markSceneFailed, q, qa, toggleFullscreen, typing } from '../ui/shell.js';
+import { NARROW } from '../ui/breakpoints.js';
 import { applyFlame, setAccentRamp } from '../ui/theme.js';
 import { esc } from '../html.js';
 import { logoMark } from '../ui/logo.js';
@@ -584,7 +585,7 @@ search = createPanelSearch({
   panel,
   scene: () => scene,
   ctx: panelCtx(),
-  folded: () => innerWidth < 760, // (a phone's bottom sheet: its room for the rows found)
+  folded: () => innerWidth < NARROW, // (a phone's bottom sheet: its room for the rows found)
 });
 
 // --- The camera by hand ------------------------------------------------------------------------
@@ -758,7 +759,7 @@ let panelShown = true;
  * but the panel's column (or, on phones, its bottom sheet). The fire is framed in its middle.
  */
 function visibleArea() {
-  const phone = innerWidth < 760;
+  const phone = innerWidth < NARROW;
   const w = panelShown && !phone ? panelEl.offsetWidth : 0;
   const h = panelShown && phone ? panelEl.offsetHeight : 0;
   return { x: 0, y: 0, w: 1 - w / innerWidth, h: 1 - h / innerHeight };

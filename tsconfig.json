@@ -52,6 +52,7 @@
     "src/ui/settingsSearch.js",
     "src/ui/keysOverlay.js",
     "src/ui/shell.js",
+    "src/ui/breakpoints.js",
     "src/painter/history.js",
     "src/painter/beat.js",
     "src/painter/panel.js",
