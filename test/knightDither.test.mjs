@@ -137,7 +137,7 @@ test("the pass: still no dither of its own over his tones; round 9's terminator"
 
 test("scene.js hands the armor the pass's dither uniforms", () => {
   const src = fs.readFileSync(new URL('../src/bonfire/scene.js', import.meta.url), 'utf8');
-  const call = src.match(/createArmorShared\(\{[\s\S]*?\n {2}\}\);/)?.[0] ?? '';
+  const call = src.match(/createArmorShared\(\{[\s\S]*?\n\s*\}\);/)?.[0] ?? ''; // (at any indent)
   assert.match(call, /dither: pass\.uniforms\.ditherStrength/);
   assert.match(call, /ditherScale: pass\.uniforms\.ditherScale/);
   assert.match(call, /exposure: pass\.uniforms\.exposure/);

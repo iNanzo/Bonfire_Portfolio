@@ -248,13 +248,14 @@ test('the stage: the Painter\'s director and bonfire keep the look being painted
   // paintedLook does is tested with the director, scenePlayer.test.mjs, and the pass's gate,
   // stillFx.test.mjs.)
   const src = readFileSync(new URL('../src/painter/main.js', import.meta.url), 'utf8');
-  const call = /createDirector\(candidate, \{([^}]*)\}\)/.exec(src);
+  // (Each call on one line or wrapped over several.)
+  const call = /createDirector\(candidate,\s*\{([^}]*)\}\)/.exec(src);
   assert.ok(call, 'the Painter makes its director');
   assert.match(call[1], /\breducedMotion\b/);
   assert.match(call[1], /\bpaintedLook: true\b/);
-  const bonfire = /createBonfire\(stage, \{(.*)\}\);/.exec(src);
+  const bonfire = /createBonfire\(stage,\s*\{([\s\S]*?)\}\);/.exec(src);
   assert.ok(bonfire, 'the Painter makes its bonfire');
-  assert.match(bonfire[1], /^ reducedMotion, paintedLook: true,/);
+  assert.match(bonfire[1], /^\s*reducedMotion,\s*paintedLook: true,/);
   // (Bonfire Live and the site don't: their reduced motion keeps only the still effects.)
   for (const page of ['../src/visualizer/main.js', '../src/main.js']) {
     assert.doesNotMatch(readFileSync(new URL(page, import.meta.url), 'utf8'), /paintedLook/, page);
