@@ -13,19 +13,36 @@ export function createLinkClient({ port, onStatus = () => {} }) {
   let retryAt = 0;
   let last = null; // { bpm, beat, peers, at (s, performance clock) }
   let status = '';
-  const say = (text) => { if (text !== status) { status = text; onStatus(text); } };
+  const say = (text) => {
+    if (text !== status) {
+      status = text;
+      onStatus(text);
+    }
+  };
 
   function connect(now) {
     retryAt = now + 3;
-    try { ws = new WebSocket(`ws://127.0.0.1:${port()}`); } catch { ws = null; return; }
+    try {
+      ws = new WebSocket(`ws://127.0.0.1:${port()}`);
+    } catch {
+      ws = null;
+      return;
+    }
     say(`Looking for the Link bridge on port ${port()}…`);
     ws.onmessage = (e) => {
       try {
         const m = JSON.parse(e.data);
-        if (m.bpm > 0 && Number.isFinite(m.beat)) last = { bpm: m.bpm, beat: m.beat, peers: m.peers ?? 0, at: performance.now() / 1000 };
-      } catch { /* not ours */ }
+        if (m.bpm > 0 && Number.isFinite(m.beat))
+          last = { bpm: m.bpm, beat: m.beat, peers: m.peers ?? 0, at: performance.now() / 1000 };
+      } catch {
+        /* not ours */
+      }
     };
-    ws.onclose = () => { ws = null; last = null; say(`No Link bridge on port ${port()}. Is it running (npm run link)?`); };
+    ws.onclose = () => {
+      ws = null;
+      last = null;
+      say(`No Link bridge on port ${port()}. Is it running (npm run link)?`);
+    };
     ws.onerror = () => {};
   }
 
@@ -43,12 +60,17 @@ export function createLinkClient({ port, onStatus = () => {} }) {
     },
     /** Let go (Link switched off). */
     close() {
-      if (ws) { ws.onclose = null; ws.close(); }
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
       ws = null;
       last = null;
       retryAt = 0;
       say('');
     },
-    get bpm() { return last?.bpm ?? 0; },
+    get bpm() {
+      return last?.bpm ?? 0;
+    },
   };
 }

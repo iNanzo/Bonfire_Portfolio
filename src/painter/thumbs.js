@@ -12,10 +12,11 @@ export const THUMB_W = 192;
 export const THUMB_H = 108;
 
 /** Resolves after `n` frames (an edit made just before is on the stage by then). */
-const frames = (n) => new Promise((resolve) => {
-  const step = () => (n-- <= 0 ? resolve() : requestAnimationFrame(step));
-  requestAnimationFrame(step);
-});
+const frames = (n) =>
+  new Promise((resolve) => {
+    const step = () => (n-- <= 0 ? resolve() : requestAnimationFrame(step));
+    requestAnimationFrame(step);
+  });
 
 /**
  * The part of a frame the thumbnail is cut from: the largest 16:9 box centered in the

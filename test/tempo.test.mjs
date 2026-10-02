@@ -159,9 +159,15 @@ test('manual tempo, phase nudges and an outside beat (Link) own the grid', async
   // A typed-in 128 BPM: beats every 60/128 s from the first.
   t.setManual(128, 10);
   let beats = [];
-  for (let now = 10; now < 14; now += 1 / 60) { t.push(now, 0); beats.push(...t.tick(now)); }
+  for (let now = 10; now < 14; now += 1 / 60) {
+    t.push(now, 0);
+    beats.push(...t.tick(now));
+  }
   const gaps = beats.slice(1).map((b, i) => b.time - beats[i].time);
-  assert.ok(gaps.every((g) => Math.abs(g - 60 / 128) < 1e-6), 'steady at the typed tempo');
+  assert.ok(
+    gaps.every((g) => Math.abs(g - 60 / 128) < 1e-6),
+    'steady at the typed tempo',
+  );
   assert.equal(t.manual, 'manual');
   // A nudge moves the next beats later by exactly that much.
   const last = beats.at(-1).time;

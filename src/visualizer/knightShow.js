@@ -64,24 +64,51 @@
 // Moves are functions of the beat (knightPose.js): the director hands the knights the beat
 // position every frame, and they only dance while the tempo holds. Reduced motion: they sit.
 import { modeOf } from './looks.js';
-import { sideArcs, ringPlaces, slotPlaces, restPlaces, FRONT } from '../bonfire/knightPlaces.js';
+import { sideArcs, ringPlaces, slotPlaces, restPlaces, facingYaw, FRONT } from '../bonfire/knightPlaces.js';
+import { createFits } from '../bonfire/colliders.js';
 import { FINISHES } from '../bonfire/steel.js';
 import { DEFAULT_STYLE, STYLES, STYLE_KEYS, STYLE_NAMES } from '../bonfire/knightStyles.js';
+import { HELMET_NAMES } from '../knightNames.js';
+import { clamp01 } from '../math.js';
 
 // (The ring's places are the engine's too: knights.js homes the others where they rest.)
 export { sideArcs, ringPlaces, slotPlaces, restPlaces, FRONT };
 
 export const MAX_KNIGHTS = 4;
-/** The helmets (knights.js HELMETS), as the settings name them. */
-export const HELMETS = { great: 'Great Helm', armet: 'Armet', bascinet: 'Bascinet' };
+/** The helmets (knights.js HELMETS), as the settings name them: the names every menu uses (knightNames.js). */
+export const HELMETS = HELMET_NAMES;
 /** The dance moves (knightPose.js MOVES), as the settings name them. */
 export const KNIGHT_MOVES = {
-  nod: 'Nod', stepTouch: 'Step Touch', fistPump: 'Fist Pump', headbang: 'Headbang', swayArms: 'Sway', march: 'March',
-  spin: 'Spin', jump: 'Jump', jumpingJack: 'Jumping Jacks', clap: 'Clap', stomp: 'Stomp', praise: 'Praise the Sun',
+  nod: 'Nod',
+  stepTouch: 'Step Touch',
+  fistPump: 'Fist Pump',
+  headbang: 'Headbang',
+  swayArms: 'Sway',
+  march: 'March',
+  spin: 'Spin',
+  jump: 'Jump',
+  jumpingJack: 'Jumping Jacks',
+  clap: 'Clap',
+  stomp: 'Stomp',
+  praise: 'Praise the Sun',
   defaultDance: 'Default Dance',
 };
 /** Each move's cycle in beats (knightPose.js MOVE_INFO): a canon spaces its dancers by it. */
-export const MOVE_CYCLE = { nod: 2, stepTouch: 2, fistPump: 8, headbang: 2, swayArms: 2, march: 2, spin: 4, jump: 2, jumpingJack: 2, clap: 2, stomp: 2, praise: 1, defaultDance: 8 };
+export const MOVE_CYCLE = {
+  nod: 2,
+  stepTouch: 2,
+  fistPump: 8,
+  headbang: 2,
+  swayArms: 2,
+  march: 2,
+  spin: 4,
+  jump: 2,
+  jumpingJack: 2,
+  clap: 2,
+  stomp: 2,
+  praise: 1,
+  defaultDance: 8,
+};
 export const FORMATIONS = { ring: 'Round the Fire', line: 'Line', solo: 'Solo', canon: 'Canon' };
 /** How they sit (knightPose.js seatedPose variants; fire.knights.setSeatPose). */
 export const SEAT_POSES = { resting: 'Resting', watchful: 'Watchful' };
@@ -92,7 +119,19 @@ export const SEAT_POSES = { resting: 'Resting', watchful: 'Watchful' };
 export const KNIGHT_STYLES = /* @__PURE__ */ (() => ({ site: 'The Site’s Own', ...STYLE_NAMES }))();
 // The moves for the bars right after a drop, and for the groove after that.
 const BIG = ['jump', 'jumpingJack', 'spin', 'praise', 'fistPump', 'headbang'];
-const GROOVE = ['nod', 'stepTouch', 'fistPump', 'headbang', 'swayArms', 'march', 'clap', 'stomp', 'spin', 'jumpingJack', 'defaultDance'];
+const GROOVE = [
+  'nod',
+  'stepTouch',
+  'fistPump',
+  'headbang',
+  'swayArms',
+  'march',
+  'clap',
+  'stomp',
+  'spin',
+  'jumpingJack',
+  'defaultDance',
+];
 // Gestures (knightPose.js GESTURES) for a big drop (Praise the Sun most of all) and a small one.
 const DROP_GESTURES = ['praise', 'praise', 'praise', 'hurrah', 'joy', 'point'];
 const CHEERS = ['hurrah', 'joy', 'wave', 'praise'];
@@ -118,7 +157,6 @@ const RIM_ON = 0.75;
 const RIM_SPREAD = [0.6, 1.4];
 const RAD = Math.PI / 180;
 
-const clamp01 = (x) => Math.min(1, Math.max(0, x));
 /** Every order of 0..n-1 (n ≤ 4: at most 24). */
 function orders(n) {
   if (n <= 1) return [[...Array(n).keys()]];
@@ -128,11 +166,14 @@ function orders(n) {
 /** The least distance between any two places (m). */
 const closest = (places) => {
   let d = Infinity;
-  for (let i = 0; i < places.length; i++) for (let j = i + 1; j < places.length; j++) d = Math.min(d, Math.hypot(places[i].x - places[j].x, places[i].z - places[j].z));
+  for (let i = 0; i < places.length; i++)
+    for (let j = i + 1; j < places.length; j++)
+      d = Math.min(d, Math.hypot(places[i].x - places[j].x, places[i].z - places[j].z));
   return d;
 };
 /** The places in order, less any closer than APART to one kept before it. */
-const apartOnly = (places) => places.reduce((kept, p) => (kept.every((q) => Math.hypot(p.x - q.x, p.z - q.z) >= APART) ? [...kept, p] : kept), []);
+const apartOnly = (places) =>
+  places.reduce((kept, p) => (kept.every((q) => Math.hypot(p.x - q.x, p.z - q.z) >= APART) ? [...kept, p] : kept), []);
 
 /**
  * A ring's clear arcs ([[from°, to°], …], `to` may pass 360) less `cuts` ([lo°, hi°], any
@@ -146,7 +187,14 @@ export function cutArcs(free, cuts) {
     arcs = arcs.flatMap(([a, b]) => {
       let parts = [[a, b]];
       for (const k of [-360, 0, 360, 720]) {
-        parts = parts.flatMap(([p, q]) => (hi + k <= p || lo + k >= q ? [[p, q]] : [[p, lo + k], [hi + k, q]].filter(([x, y]) => y > x)));
+        parts = parts.flatMap(([p, q]) =>
+          hi + k <= p || lo + k >= q
+            ? [[p, q]]
+            : [
+                [p, lo + k],
+                [hi + k, q],
+              ].filter(([x, y]) => y > x),
+        );
       }
       return parts;
     });
@@ -163,7 +211,8 @@ export function ringAround(ring, sitters) {
   const r = ring.radius;
   const cuts = [];
   for (const s of sitters) {
-    const dx = s.x - ring.center.x, dz = s.z - ring.center.z;
+    const dx = s.x - ring.center.x,
+      dz = s.z - ring.center.z;
     const rs = Math.hypot(dx, dz);
     // (A place at bearing b is APART from him when cos(b − his bearing) ≤ c.)
     const c = rs > 1e-6 ? (rs * rs + r * r - APART * APART) / (2 * rs * r) : -1;
@@ -177,7 +226,47 @@ export function ringAround(ring, sitters) {
 }
 
 /** How many of `n` knights dance with the director's `budget` (0..1). */
-export const dancersFor = (n, budget = 1) => (n < 1 ? 0 : Math.min(n, Math.max(1, Math.round(n * (0.4 + 0.6 * clamp01(budget))))));
+export const dancersFor = (n, budget = 1) =>
+  n < 1 ? 0 : Math.min(n, Math.max(1, Math.round(n * (0.4 + 0.6 * clamp01(budget)))));
+
+/**
+ * A value asked for every frame, made again only when what it's made from has changed:
+ * `read(note)` notes each of its inputs (note(v), in the same order each time; an array's or
+ * object's members one by one, so one changed in place counts), and `make()` makes it. The
+ * function returned hands back the same value until an input isn't what it was (Object.is),
+ * so asking every frame makes nothing new (createKnightShow's knightSettings).
+ * @template T
+ * @param {(note: (v: unknown) => void) => void} read
+ * @param {() => T} make
+ * @returns {() => T}
+ */
+export function memoOn(read, make) {
+  const was = [];
+  let n = 0;
+  let changed = true;
+  let value;
+  const note = (v) => {
+    if (n >= was.length || !Object.is(was[n], v)) {
+      was[n] = v;
+      changed = true;
+    }
+    n++;
+  };
+  return () => {
+    n = 0;
+    read(note);
+    if (n !== was.length) {
+      was.length = n;
+      changed = true;
+    }
+    if (changed) {
+      value = make();
+      changed = false;
+    }
+    return value;
+  };
+}
+const HELMET_KEYS = Object.keys(HELMETS);
 
 /**
  * The knights' show. `settings` is read live (the Knights tab: knights, knightCount,
@@ -191,57 +280,80 @@ export const dancersFor = (n, budget = 1) => (n < 1 ? 0 : Math.min(n, Math.max(1
  */
 export function createKnightShow(settings, { clock = null, reducedMotion = false, rng = Math.random } = {}) {
   const pickR = (a) => a[Math.floor(rng() * a.length)];
-  const shuffleR = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const shuffleR = (a) => {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
   // What each knight is doing, as far as the show asked: away | sit | nod (seated, nodding
   // along) | ready (up for the drop) | dance; and how.
   const K = Array.from({ length: MAX_KNIGHTS }, (_, i) => ({
-    want: i === 0 ? 'sit' : 'away', move: 'nod', place: null, facing: 'front', offset: 0, seed: i * 7 + 3, energy: 0.7,
+    want: i === 0 ? 'sit' : 'away',
+    move: 'nod',
+    place: null,
+    facing: 'front',
+    offset: 0,
+    seed: i * 7 + 3,
+    energy: 0.7,
   }));
   let inited = false;
-  let started = false;     // the music has started (the start screen only has the resting knight)
-  let inn = true;          // the knights are by the fire
-  let cast = 1;            // how many, while they are
-  let mode = 'rest';       // rest | watch (a breakdown stopped the dance) | ready (up for a drop) | dance
-  let fromDrop = false;    // this dance began on a big drop (its first two bars are big moves)
+  // (Which moves fit at which places, when the scene's knights don't say: colliders.js.)
+  const ownFits = createFits();
+  let started = false; // the music has started (the start screen only has the resting knight)
+  let inn = true; // the knights are by the fire
+  let cast = 1; // how many, while they are
+  let mode = 'rest'; // rest | watch (a breakdown stopped the dance) | ready (up for a drop) | dance
+  let fromDrop = false; // this dance began on a big drop (its first two bars are big moves)
   let sinceBig = Infinity; // bars since the last big drop
-  let danceBars = 0, danceLen = 16, moveBars = 0, lowBars = 0, highBars = 0, grooveBars = 0, offBars = 0;
-  let dancers = 0;         // how many are up, counted again on phrase lines
-  let forced = false;      // K: this dance runs its phrase whatever the energy
+  let danceBars = 0,
+    danceLen = 16,
+    moveBars = 0,
+    lowBars = 0,
+    highBars = 0,
+    grooveBars = 0,
+    offBars = 0;
+  let dancers = 0; // how many are up, counted again on phrase lines
+  let forced = false; // K: this dance runs its phrase whatever the energy
   let formation = 'line';
   let facing = 'front';
   let ringStep = 0;
   let ringDir = 1;
-  let camOn = false;       // the cuts visit the dancers this dance (Knight Cameras)
-  let tremble = 1;         // the ready bounce's speed (2: the build's last stretch)
-  let strong = 0;          // strong beats in a row (the seated nods start after two)
-  let weak = 0;            // ...and weak ones (they stop after two)
+  let camOn = false; // the cuts visit the dancers this dance (Knight Cameras)
+  let tremble = 1; // the ready bounce's speed (2: the build's last stretch)
+  let strong = 0; // strong beats in a row (the seated nods start after two)
+  let weak = 0; // ...and weak ones (they stop after two)
   let nodding = false;
-  let pendingSit = false;  // a breakdown began: stop dancing on the next downbeat
-  let watchBars = 0;       // bars they've watched a breakdown
+  let pendingSit = false; // a breakdown began: stop dancing on the next downbeat
+  let watchBars = 0; // bars they've watched a breakdown
   let pendingStart = false; // the energy came back without a drop: up on the next downbeat
-  let pendingIn = null;    // Shift+K with a drop coming: in (true) or out (false) on its flash
-  let dropFrame = false;   // a big drop this frame (a scenery change with it is part of it)
+  let pendingIn = null; // Shift+K with a drop coming: in (true) or out (false) on its flash
+  let dropFrame = false; // a big drop this frame (a scenery change with it is part of it)
   let scenery = null;
   let beatNow = 0;
   let period = 0.5;
-  let t = 0;               // seconds (the show's own clock, for gestures going round)
-  let dropT = -Infinity;   // when the last big drop landed (s)
+  let t = 0; // seconds (the show's own clock, for gestures going round)
+  let dropT = -Infinity; // when the last big drop landed (s)
   let lastFlinch = -Infinity;
   let lastBudget = 1;
   let shine = { rest: true, flares: true }; // the armor's sweeps, as last rolled (Armor Shine)
-  let reacting = true;     // they react to the fire and the blade (Reactions), as last rolled
-  let finish = null;       // the armor's finish (Armor Finish), as last rolled
-  let seatPose = null;     // how they sit (Seat Pose), as last rolled
-  let rim = null;          // how strongly their edges glow (Edge Glow), as last rolled
-  let style;               // their style (Style), as last rolled (null: the site's own)
-  let last = null;         // the knight settings last acted on
-  const gestures = [];     // a gesture going round the dancers on the beat: [{ i, name, at (s) }]
+  let reacting = true; // they react to the fire and the blade (Reactions), as last rolled
+  let finish = null; // the armor's finish (Armor Finish), as last rolled
+  let seatPose = null; // how they sit (Seat Pose), as last rolled
+  let rim = null; // how strongly their edges glow (Edge Glow), as last rolled
+  let style; // their style (Style), as last rolled (null: the site's own)
+  let last = null; // the knight settings last acted on
+  const gestures = []; // a gesture going round the dancers on the beat: [{ i, name, at (s) }]
 
   const ready = (kn) => !!kn && kn.max > 0;
   const maxOf = (kn) => Math.min(MAX_KNIGHTS, kn.max || MAX_KNIGHTS);
   const danceMode = () => (reducedMotion ? 'off' : modeOf(settings.knightDance));
   /** A switch is on this time: always, or in the mix and rolled on (`chance`). */
-  const active = (key, chance) => { const m = modeOf(settings[key]); return m === 'on' || (m === 'mix' && rng() < chance); };
+  const active = (key, chance) => {
+    const m = modeOf(settings[key]);
+    return m === 'on' || (m === 'mix' && rng() < chance);
+  };
   const here = (e) => !!e?.present && e.state !== 'leaving';
   // (Not there, or burning away because the show sent him: an ember walk to a far place
   // burns away too, but he's still coming.)
@@ -264,7 +376,8 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
    * Knight i's helmet: the scene's for him; else the one he wears if it's still switched on
    * (unless re-rolled), else a new draw.
    */
-  const helmetFor = (e, reroll, i) => orderFor(i) ?? (!reroll && here(e) && helmetsOn().includes(e.helmet) ? e.helmet : pickR(helmetsOn()));
+  const helmetFor = (e, reroll, i) =>
+    orderFor(i) ?? (!reroll && here(e) && helmetsOn().includes(e.helmet) ? e.helmet : pickR(helmetsOn()));
   /** In the mix: stay (or come) by the fire this time? Up for a drop they mostly stay. */
   const rollIn = () => (inn ? rng() < (mode === 'rest' ? 0.75 : 0.9) : rng() < 0.6);
   function movePool(big) {
@@ -299,7 +412,10 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
     }
     if (all || which === 'shine') {
       const m = modeOf(settings.knightShine);
-      shine = m === 'mix' ? { rest: rng() < SHINE_REST, flares: rng() < SHINE_FLARES } : { rest: m === 'on', flares: m === 'on' };
+      shine =
+        m === 'mix'
+          ? { rest: rng() < SHINE_REST, flares: rng() < SHINE_FLARES }
+          : { rest: m === 'on', flares: m === 'on' };
       kn.setShine?.(shine);
     }
     if (all || which === 'reactions') {
@@ -346,7 +462,9 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
   function restFor(kn, n, i) {
     const ring = kn.slots?.(scenery ?? undefined);
     const seat = kn.list[0];
-    return ring ? restPlaces(ring, n, seat?.present && seat.state === 'sitting' ? seat.position : null)[i - 1] ?? null : null;
+    return ring
+      ? (restPlaces(ring, n, seat?.present && seat.state === 'sitting' ? seat.position : null)[i - 1] ?? null)
+      : null;
   }
   /**
    * Knight i by the fire, seated: the first on his seat; the others form at their places on
@@ -354,7 +472,10 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
    * for the show's own count of the cast) and sit down there.
    */
   function bringSeated(kn, i, n, { instant = false, at = i > 0 ? restFor(kn, n, i) : null } = {}) {
-    if (!at) { kn.summon(i, { instant }); return; }
+    if (!at) {
+      kn.summon(i, { instant });
+      return;
+    }
     kn.summon(i, { instant, at: { x: at.x, z: at.z }, facing: 'fire' });
     kn.sit(i);
   }
@@ -370,13 +491,26 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
     for (let i = 0; i < maxOf(kn); i++) {
       const e = list[i];
       const k = K[i];
-      if (i >= n) { if (e?.present) kn.dismiss(i, { instant }); k.want = 'away'; continue; }
+      if (i >= n) {
+        if (e?.present) kn.dismiss(i, { instant });
+        k.want = 'away';
+        continue;
+      }
       const away = gone(e, i);
       const up = k.want === 'dance' || k.want === 'ready' || k.want === 'watch';
       const helmet = helmetFor(e, away || rng() < reroll, i);
       if (helmet !== e?.helmet) kn.setHelmet(helmet, { index: i, instant: true });
-      if (away) { bringSeated(kn, i, n, { instant }); k.want = 'sit'; continue; }
-      if (replace && i > 0 && !(keepUp && up)) { kn.dismiss(i, { instant: true }); bringSeated(kn, i, n, { instant }); k.want = 'sit'; continue; }
+      if (away) {
+        bringSeated(kn, i, n, { instant });
+        k.want = 'sit';
+        continue;
+      }
+      if (replace && i > 0 && !(keepUp && up)) {
+        kn.dismiss(i, { instant: true });
+        bringSeated(kn, i, n, { instant });
+        k.want = 'sit';
+        continue;
+      }
       if (e?.state === 'leaving') kn.summon(i);
       if (up && keepUp) continue;
       if (up) kn.sit(i);
@@ -402,7 +536,10 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
   function sitAll(kn) {
     for (let i = 0; i < maxOf(kn); i++) {
       const k = K[i];
-      if (k.want === 'dance' || k.want === 'ready' || k.want === 'nod' || k.want === 'watch') { kn.sit(i); k.want = 'sit'; }
+      if (k.want === 'dance' || k.want === 'ready' || k.want === 'nod' || k.want === 'watch') {
+        kn.sit(i);
+        k.want = 'sit';
+      }
     }
     mode = 'rest';
     tremble = 1;
@@ -470,8 +607,12 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
     let bestD = Infinity;
     for (const o of orders(places.length)) {
       let d = 0;
-      for (let i = 0; i < Math.min(m, o.length); i++) if (from[i]) d += Math.hypot(places[o[i]].x - from[i].x, places[o[i]].z - from[i].z);
-      if (d < bestD - 1e-9) { bestD = d; best = o; }
+      for (let i = 0; i < Math.min(m, o.length); i++)
+        if (from[i]) d += Math.hypot(places[o[i]].x - from[i].x, places[o[i]].z - from[i].z);
+      if (d < bestD - 1e-9) {
+        bestD = d;
+        best = o;
+      }
     }
     return from.map((_, i) => (best[i] != null ? { ...places[best[i]], ring } : null));
   }
@@ -508,7 +649,10 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
           if (!e?.present) kn.setHelmet(helmetFor(e, true, i), { index: i, instant: true });
           bringSeated(kn, i, cast, { at: sitters.get(i) ?? null });
           k.want = 'sit';
-        } else if (k.want === 'dance' || k.want === 'ready') { kn.sit(i); k.want = 'sit'; }
+        } else if (k.want === 'dance' || k.want === 'ready') {
+          kn.sit(i);
+          k.want = 'sit';
+        }
         continue;
       }
       const joining = k.want !== 'dance';
@@ -518,10 +662,34 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
         k.seed = Math.floor(rng() * 64);
       }
       // (Up for the drop already, they leap facing the way they stood; they turn on the next bar.)
-      const f = k.want === 'ready' && fromDrop && sinceBig === 0 ? k.facing
-        : formation === 'solo' ? (joining || moves !== 'keep' ? pickR(['front', 'front', 'fire']) : k.facing) : facing;
-      const offset = formation === 'canon' ? i * (MOVE_CYCLE[move] >= 4 ? 1 : 0.5) : 0;
+      let f =
+        k.want === 'ready' && fromDrop && sinceBig === 0
+          ? k.facing
+          : formation === 'solo'
+            ? joining || moves !== 'keep'
+              ? pickR(['front', 'front', 'fire'])
+              : k.facing
+            : facing;
       const place = places[i];
+      // (A move too wide for his place, a lantern or a pew within its reach, gives way to one
+      // of the pool's that fits there, or he turns to the fire for one: fire.knights.fits, or
+      // the same question put to colliders.js here where the scene doesn't pass it on. Which
+      // one by his seed: nothing else the show rolls changes for it.)
+      const fits = (mv, way) =>
+        kn.fits
+          ? kn.fits(mv, place, way, scenery ?? undefined)
+          : !scenery || ownFits.fits(scenery, mv, place.x, place.z, facingYaw(place.x, place.z, way));
+      if (move && !fits(move, f)) {
+        for (const way of f === 'fire' ? ['fire'] : [f, 'fire']) {
+          const ok = pool.filter((mv) => fits(mv, way));
+          if (ok.length) {
+            move = ok[k.seed % ok.length];
+            f = way;
+            break;
+          }
+        }
+      }
+      const offset = formation === 'canon' ? i * (MOVE_CYCLE[move] >= 4 ? 1 : 0.5) : 0;
       if (gone(e, i)) {
         if (!e?.present) kn.setHelmet(helmetFor(e, true, i), { index: i, instant: true });
         else kn.summon(i); // (sent away, burning out: back)
@@ -534,7 +702,15 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
       }
       Object.assign(k, { want: 'dance', move, place, facing: f, offset, energy: energy ?? k.energy });
       // (On his feet: the knights module keeps a dance seated unless told, and he may be nodding in his seat.)
-      kn.dance(i, { move, energy: k.energy, position: { x: place.x, z: place.z }, facing: f, offset, seed: k.seed, seated: false });
+      kn.dance(i, {
+        move,
+        energy: k.energy,
+        position: { x: place.x, z: place.z },
+        facing: f,
+        offset,
+        seed: k.seed,
+        seated: false,
+      });
     }
   }
   function startDance(kn, { drop = false, force = false, budget = 1, keep = false, leapIn = false } = {}) {
@@ -555,7 +731,10 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
   /** A drop's gesture: all at once, or going round the dancers a beat apart. */
   function dropGesture(kn) {
     const name = pickR(DROP_GESTURES);
-    if (rng() < 0.6) { kn.gesture(name, { index: 'all' }); return; }
+    if (rng() < 0.6) {
+      kn.gesture(name, { index: 'all' });
+      return;
+    }
     const order = K.map((k, i) => i).filter((i) => K[i].want === 'dance' || K[i].want === 'sit');
     order.forEach((i, j) => gestures.push({ i, name, at: t + j * period }));
   }
@@ -564,7 +743,13 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
     for (let i = 0; i < maxOf(kn); i++) {
       const k = K[i];
       if (k.want !== 'dance' && k.want !== 'ready') continue;
-      if (i === 0) { kn.stand(0); k.want = 'watch'; } else { kn.sit(i); k.want = 'sit'; }
+      if (i === 0) {
+        kn.stand(0);
+        k.want = 'watch';
+      } else {
+        kn.sit(i);
+        k.want = 'sit';
+      }
     }
     mode = 'watch';
     watchBars = 0;
@@ -585,7 +770,15 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
       const place = places[i];
       if (gone(list[i], i) || !place) continue;
       Object.assign(K[i], { want: 'ready', move: 'nod', place, facing: 'fire', offset: 0, energy: 0.3 });
-      kn.dance(i, { move: 'nod', energy: 0.3, position: { x: place.x, z: place.z }, facing: 'fire', offset: 0, seed: K[i].seed, seated: false });
+      kn.dance(i, {
+        move: 'nod',
+        energy: 0.3,
+        position: { x: place.x, z: place.z },
+        facing: 'fire',
+        offset: 0,
+        seed: K[i].seed,
+        seated: false,
+      });
     }
     return true;
   }
@@ -601,17 +794,54 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
     rollArmor(kn);
     last = knightSettings();
   }
-  const knightSettings = () => ({
-    k: modeOf(settings.knights), c: String(settings.knightCount), d: danceMode(), h: helmetsOn().join(),
-    o: (settings.knightHelmetOrder ?? []).join(), s: modeOf(settings.knightShine), r: modeOf(settings.knightReactions),
-    f: String(settings.knightFinish), rim: `${glowMode()} ${rimOf()}`, seat: String(settings.knightSeat), st: String(settings.knightStyle),
-  });
+  // (The Knights settings as sync() compares them, asked for every frame: made again only when
+  // one of the settings they're made from changed, each helmet's switch and each place in the
+  // helmet order counted on its own, as a menu may change them in place.)
+  const knightSettings = memoOn(
+    (note) => {
+      note(settings.knights);
+      note(settings.knightCount);
+      note(settings.knightDance);
+      const on = settings.knightHelmets;
+      for (let i = 0; i < HELMET_KEYS.length; i++) note(on?.[HELMET_KEYS[i]]);
+      const order = settings.knightHelmetOrder;
+      note(order?.length);
+      for (let i = 0; i < (order?.length ?? 0); i++) note(order[i]);
+      note(settings.knightShine);
+      note(settings.knightReactions);
+      note(settings.knightFinish);
+      note(settings.knightGlow);
+      note(settings.knightRim);
+      note(settings.knightSeat);
+      note(settings.knightStyle);
+    },
+    () => ({
+      k: modeOf(settings.knights),
+      c: String(settings.knightCount),
+      d: danceMode(),
+      h: helmetsOn().join(),
+      o: (settings.knightHelmetOrder ?? []).join(),
+      s: modeOf(settings.knightShine),
+      r: modeOf(settings.knightReactions),
+      f: String(settings.knightFinish),
+      rim: `${glowMode()} ${rimOf()}`,
+      seat: String(settings.knightSeat),
+      st: String(settings.knightStyle),
+    }),
+  );
   /** The Knights settings changed (by hand): act at once. */
   function sync(kn) {
     const now = knightSettings();
     if (now.k !== last.k) {
-      if (now.k === 'off' && inn) { inn = false; pendingIn = null; goAway(kn); }
-      else if (now.k === 'on' && !inn) { inn = true; cast = countFor(kn); seat(kn, cast); }
+      if (now.k === 'off' && inn) {
+        inn = false;
+        pendingIn = null;
+        goAway(kn);
+      } else if (now.k === 'on' && !inn) {
+        inn = true;
+        cast = countFor(kn);
+        seat(kn, cast);
+      }
     }
     if (now.c !== last.c && inn) {
       cast = countFor(kn);
@@ -657,10 +887,23 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
       const m = modeOf(settings.knights);
       const next = pendingIn ?? (m === 'mix' ? rollIn() : m === 'on');
       pendingIn = null;
-      if (!next) { if (inn) { inn = false; goAway(kn); } took(); return; }
-      if (!inn) { inn = true; cast = countFor(kn); }
+      if (!next) {
+        if (inn) {
+          inn = false;
+          goAway(kn);
+        }
+        took();
+        return;
+      }
+      if (!inn) {
+        inn = true;
+        cast = countFor(kn);
+      }
     }
-    if (!inn) { took(); return; }
+    if (!inn) {
+      took();
+      return;
+    }
     if (String(settings.knightCount) !== last.c) cast = countFor(kn);
     fixHelmets(kn);
     if (mode === 'dance' && (danceMode() !== 'off' || forced)) arrange(kn, {});
@@ -687,7 +930,10 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
       beatNow = beatPos;
       t += dt;
       if (p > 0) period = p;
-      if (!inited) { scenery = sc; init(kn); }
+      if (!inited) {
+        scenery = sc;
+        init(kn);
+      }
       if (live) started = true;
       sync(kn);
       if (sc && sc !== scenery) {
@@ -700,7 +946,8 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
       // The last stretch of a build: the ready bounce at double speed (on the grid: its
       // beats land on the eighths).
       if (tremble > 1 && mode === 'ready') {
-        for (let i = 0; i < maxOf(kn); i++) if (K[i].want === 'ready') kn.dance(i, { offset: -(tremble - 1) * beatPos, energy: 0.5 });
+        for (let i = 0; i < maxOf(kn); i++)
+          if (K[i].want === 'ready') kn.dance(i, { offset: -(tremble - 1) * beatPos, energy: 0.5 });
       }
       for (let j = gestures.length - 1; j >= 0; j--) {
         if (t < gestures[j].at) continue;
@@ -744,7 +991,15 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
       pendingStart = false;
       fromDrop = false;
       strong = 0;
-      if (nodding) { nodding = false; K.forEach((k, i) => { if (k.want === 'nod') { kn.sit(i); k.want = 'sit'; } }); }
+      if (nodding) {
+        nodding = false;
+        K.forEach((k, i) => {
+          if (k.want === 'nod') {
+            kn.sit(i);
+            k.want = 'sit';
+          }
+        });
+      }
     },
     /** The energy came back without a drop: up on the next downbeat if it's strong. */
     back(kn, { intensity = 0 } = {}) {
@@ -770,7 +1025,8 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
     drop(kn, kind = 'big', { budget = 1, scenery: sc = null } = {}) {
       if (!ready(kn) || !inited) return;
       if (kind === 'small') {
-        if (!reducedMotion && inn && danceMode() !== 'off' && active('knightGestures', 0.6)) kn.gesture(pickR(CHEERS), { index: 'all' });
+        if (!reducedMotion && inn && danceMode() !== 'off' && active('knightGestures', 0.6))
+          kn.gesture(pickR(CHEERS), { index: 'all' });
         return;
       }
       if (sc) scenery = sc;
@@ -789,7 +1045,8 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
         inn = false;
         goAway(kn);
       } else {
-        if (!inn || (settings.knightCount === 'random' && !wasReady) || String(settings.knightCount) !== last.c) cast = countFor(kn);
+        if (!inn || (settings.knightCount === 'random' && !wasReady) || String(settings.knightCount) !== last.c)
+          cast = countFor(kn);
         inn = true;
         fixHelmets(kn);
         if (danceMode() === 'off') {
@@ -819,7 +1076,10 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
         // (Up on his feet, the first is re-placed on his seat too: no walk back after the flash.)
         const up = K[0].want === 'dance' || K[0].want === 'ready' || K[0].want === 'watch';
         sitAll(kn);
-        if (up && kn.list[0]?.present) { kn.dismiss(0, { instant: true }); K[0].want = 'away'; }
+        if (up && kn.list[0]?.present) {
+          kn.dismiss(0, { instant: true });
+          K[0].want = 'away';
+        }
       }
       rollArmor(kn);
       const m = modeOf(settings.knights);
@@ -842,8 +1102,13 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
       const energy = 0.35 + 0.6 * clamp01(strength);
       for (let i = 0; i < maxOf(kn); i++) {
         const k = K[i];
-        if (k.want === 'sit' && nodding) { k.want = 'nod'; kn.dance(i, { seated: true, move: 'nod', energy, seed: k.seed }); }
-        else if (k.want === 'nod' && !nodding) { k.want = 'sit'; kn.sit(i); }
+        if (k.want === 'sit' && nodding) {
+          k.want = 'nod';
+          kn.dance(i, { seated: true, move: 'nod', energy, seed: k.seed });
+        } else if (k.want === 'nod' && !nodding) {
+          k.want = 'sit';
+          kn.sit(i);
+        }
       }
     },
     /**
@@ -865,28 +1130,46 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
       if (reducedMotion || !inn || !started) return;
       const dm = danceMode();
       const phrase = bar % 8 === 0;
-      if (pendingSit) { if (mode === 'dance') watch(kn); pendingSit = false; return; }
+      if (pendingSit) {
+        if (mode === 'dance') watch(kn);
+        pendingSit = false;
+        return;
+      }
       // Watching a breakdown that ends with no drop (or goes on and on): sit down.
-      if (mode === 'watch' && (!low || ++watchBars > 16) && !pendingStart) { sitAll(kn); return; }
+      if (mode === 'watch' && (!low || ++watchBars > 16) && !pendingStart) {
+        sitAll(kn);
+        return;
+      }
       if (mode === 'dance') {
         danceBars++;
         moveBars++;
         // (K's dance runs its phrase whatever the switch says: with Dance off too.)
-        const over = forced ? danceBars >= danceLen
-          : dm === 'off' ? true
-          : dm === 'on' ? offBars >= 2
-          : lowBars >= 2 || danceBars >= danceLen || offBars >= 2;
-        if (over && (phrase || (!forced && dm === 'off') || offBars >= 2)) { sitAll(kn); return; }
+        const over = forced
+          ? danceBars >= danceLen
+          : dm === 'off'
+            ? true
+            : dm === 'on'
+              ? offBars >= 2
+              : lowBars >= 2 || danceBars >= danceLen || offBars >= 2;
+        if (over && (phrase || (!forced && dm === 'off') || offBars >= 2)) {
+          sitAll(kn);
+          return;
+        }
         let moves = 'keep';
         if (fromDrop && sinceBig === 1) moves = 'big';
-        else if (fromDrop && sinceBig === 2) { moves = 'groove'; moveBars = 0; }
-        else if (moveBars >= (clock?.bars('danceBars') || 4)) {
+        else if (fromDrop && sinceBig === 2) {
+          moves = 'groove';
+          moveBars = 0;
+        } else if (moveBars >= (clock?.bars('danceBars') || 4)) {
           moves = 'groove';
           moveBars = 0;
           clock?.reroll('danceBars');
           if (settings.knightFormation === 'mix' && rng() < 0.3) rollFormation();
         }
-        if (formation === 'ring' && danceBars % 2 === 0) { if (phrase) ringDir = -ringDir; ringStep += ringDir; }
+        if (formation === 'ring' && danceBars % 2 === 0) {
+          if (phrase) ringDir = -ringDir;
+          ringStep += ringDir;
+        }
         const energy = fromDrop && sinceBig < 2 ? 1 : 0.45 + 0.55 * clamp01(intensity);
         arrange(kn, { budget, moves, energy, recount: phrase });
         return;
@@ -897,23 +1180,42 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
         startDance(kn, { budget });
         return;
       }
-      if ((mode === 'ready' || mode === 'watch') && !low) { sitAll(kn); }
+      if ((mode === 'ready' || mode === 'watch') && !low) {
+        sitAll(kn);
+      }
     },
     /**
      * The living blade struck near `point` ({ x, z }, world): whoever's within reach flinches
      * (with Reactions on for this stretch).
      */
     near(kn, point) {
-      if (!ready(kn) || !point || reducedMotion || !reacting || typeof kn.react !== 'function' || beatNow - lastFlinch < 2) return false;
+      if (
+        !ready(kn) ||
+        !point ||
+        reducedMotion ||
+        !reacting ||
+        typeof kn.react !== 'function' ||
+        beatNow - lastFlinch < 2
+      )
+        return false;
       const close = kn.list.some((e) => here(e) && Math.hypot(e.position.x - point.x, e.position.z - point.z) < 1.1);
-      if (close) { kn.react('impact', 0.5, { at: point, radius: 1.1 }); lastFlinch = beatNow; }
+      if (close) {
+        kn.react('impact', 0.5, { at: point, radius: 1.1 });
+        lastFlinch = beatNow;
+      }
       return close;
     },
     /** K: dance now (for a phrase, whatever Dance says), or sit back down. Returns 'dance', 'sit' or null. */
     danceNow(kn, { budget = 1 } = {}) {
       if (!ready(kn) || !inited || reducedMotion) return null;
-      if (mode !== 'rest') { sitAll(kn); return 'sit'; }
-      if (!inn) { inn = true; cast = countFor(kn); }
+      if (mode !== 'rest') {
+        sitAll(kn);
+        return 'sit';
+      }
+      if (!inn) {
+        inn = true;
+        cast = countFor(kn);
+      }
       started = true;
       startDance(kn, { force: true, budget });
       return 'dance';
@@ -926,10 +1228,16 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
     toggle(kn, { holding = false } = {}) {
       if (!ready(kn) || !inited) return null;
       const next = !(pendingIn ?? inn);
-      if (holding) { pendingIn = next; return next ? 'in-next' : 'out-next'; }
+      if (holding) {
+        pendingIn = next;
+        return next ? 'in-next' : 'out-next';
+      }
       pendingIn = null;
       inn = next;
-      if (inn) { cast = countFor(kn); seat(kn, cast); } else goAway(kn);
+      if (inn) {
+        cast = countFor(kn);
+        seat(kn, cast);
+      } else goAway(kn);
       return inn ? 'in' : 'out';
     },
     /** For the page: { present, dancing, mode, text } ('' when none are by the fire). */
@@ -937,31 +1245,68 @@ export function createKnightShow(settings, { clock = null, reducedMotion = false
       const n = inited ? K.filter((k) => k.want !== 'away').length : 0;
       const up = K.filter((k) => k.want === 'dance').length;
       const one = n === 1;
-      const text = !n ? ''
-        : mode === 'dance' ? (up === n ? (one ? 'the knight dances' : `${n} knights dance`) : `${up} of ${n} knights dance`)
-        : mode === 'ready' ? (one ? 'the knight is up' : 'the knights are up')
-        : mode === 'watch' ? (one ? 'the knight watches the blade' : 'the knights watch the blade')
-        : nodding ? (one ? 'the knight nods along' : 'the knights nod along')
-        : one ? 'the knight rests' : `${n} knights rest`;
+      const text = !n
+        ? ''
+        : mode === 'dance'
+          ? up === n
+            ? one
+              ? 'the knight dances'
+              : `${n} knights dance`
+            : `${up} of ${n} knights dance`
+          : mode === 'ready'
+            ? one
+              ? 'the knight is up'
+              : 'the knights are up'
+            : mode === 'watch'
+              ? one
+                ? 'the knight watches the blade'
+                : 'the knights watch the blade'
+              : nodding
+                ? one
+                  ? 'the knight nods along'
+                  : 'the knights nod along'
+                : one
+                  ? 'the knight rests'
+                  : `${n} knights rest`;
       return { present: n, dancing: up, mode, text };
     },
     /** How many are dancing now. */
-    get dancing() { return K.filter((k) => k.want === 'dance').length; },
+    get dancing() {
+      return K.filter((k) => k.want === 'dance').length;
+    },
     /** The cuts may visit the dancers (Knight Cameras, rolled each dance). */
-    get camOn() { return camOn && mode === 'dance'; },
-    get formation() { return formation; },
+    get camOn() {
+      return camOn && mode === 'dance';
+    },
+    get formation() {
+      return formation;
+    },
     /** A Shift+K waiting for the next drop: true (in), false (out) or null. */
-    get pendingIn() { return pendingIn; },
+    get pendingIn() {
+      return pendingIn;
+    },
     /** Armor Shine as last rolled: { rest, flares } (the sweeps the armor runs). */
-    get shine() { return { ...shine }; },
+    get shine() {
+      return { ...shine };
+    },
     /** Reactions as last rolled: whether they react to the fire and the blade. */
-    get reactions() { return reacting; },
+    get reactions() {
+      return reacting;
+    },
     /** The armor's finish as last rolled (steel.js FINISHES), and how they sit (SEAT_POSES). */
-    get finish() { return finish; },
-    get seatPose() { return seatPose; },
+    get finish() {
+      return finish;
+    },
+    get seatPose() {
+      return seatPose;
+    },
     /** Edge Glow as last rolled: the strength their edges glow at (0: none). */
-    get rim() { return rim; },
+    get rim() {
+      return rim;
+    },
     /** Their style as last rolled (knightStyles.js STYLES), or null: the site's own. */
-    get style() { return style ?? null; },
+    get style() {
+      return style ?? null;
+    },
   };
 }

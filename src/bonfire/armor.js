@@ -34,14 +34,21 @@
 //                        edge, crease and overlap; a slight surface small on screen takes its
 //                        neighbour's id, so a gauntlet's fingers or a fauld's hoops aren't a
 //                        scribble far off), the fire's color just inside his outline on the
-//                        fire's side (pixelPass.js). Dither only in a thin checker seam on a
-//                        wide band's edge.
+//                        fire's side (pixelPass.js). The band edges are dithered: near one,
+//                        each texel's ordered threshold (the pass's own Bayer matrix, texel
+//                        for texel with the scene's) steps the wider band's texels across
+//                        into the narrower, so the band breaks into the next in the scene's
+//                        pattern and a thin one grows teeth rather than breaking up (the lit
+//                        bands always step down into the steel); how far follows the Dither
+//                        setting (uDither, uDitherScale: the pass's own, shared) times the
+//                        style's amount (uCelDither, knightStyles.js), and a band too thin on
+//                        screen gives up none (no speckle on a limb).
 //                        cel: four bands and a highlight, near-black ink (a dark warm ink over
 //                        the lit tones). painterly: shadows hue-shifted toward the flame's
 //                        shade, lips a little further round, a lighter ink over the lit
-//                        tones, the flame's dark shade on the terminator, wider seams.
-//                        chiaroscuro: a hard key, three bands (the dark, mid steel, the
-//                        fire's body) and the highlight, near-black backs, black ink.
+//                        tones, the flame's dark shade on the terminator. chiaroscuro: a
+//                        hard key, three bands (the dark, mid steel, the fire's body) and the
+//                        highlight, near-black backs, black ink, a little dither.
 //   0 gunmetal           round 9's first look: natural light on gunmetal steel (below: the
 //                        rest of this header)
 //   4 blackgold          round 8's: blackened plate in the scene's stone, shadow and void by
@@ -158,27 +165,52 @@ export const FIRE_FLOOR = 0.8;
  *                                   1 where a lit band meets the dark steel)
  * @param {{ value: THREE.Vector2 }} [o.resolution]  the pixel pass's size (texels; kept by
  *                                   reference): how big his plates are drawn
+ * @param {{ value: number }} [o.dither]       the pixel pass's dither strength (shared, like
+ *                                   the exposure): the pixel styles dither their band edges
+ *                                   with it (0 none; the site's 0.08 the style's own amount)
+ * @param {{ value: number }} [o.ditherScale]  ...and its matrix (shared: 4 or 8)
  */
-export function createArmorShared({ fireAt, exposure, resolution = { value: new THREE.Vector2(640, 360) }, moonAt = new THREE.Vector3(-3, 5, -4), reducedMotion = false, finish = 'gunmetal', rim = 0.5, style = undefined, onSteel = null }) {
+export function createArmorShared({
+  fireAt,
+  exposure,
+  resolution = { value: new THREE.Vector2(640, 360) },
+  dither = { value: 0.08 },
+  ditherScale = { value: 4 },
+  moonAt = new THREE.Vector3(-3, 5, -4),
+  reducedMotion = false,
+  finish = 'gunmetal',
+  rim = 0.5,
+  style = undefined,
+  onSteel = null,
+}) {
   const uniforms = {
     uFireWorld: { value: fireAt },
-    uFire: { value: 1 },       // the fire's light now, 1 = its resting glow
-    uFireLit: { value: 1 },    // ...as the armor is lit by it (smoothed and floored: step())
-    uTime: { value: 0 },       // seconds (the flames' sway in the reflection; knights.js keeps it)
+    uFire: { value: 1 }, // the fire's light now, 1 = its resting glow
+    uFireLit: { value: 1 }, // ...as the armor is lit by it (smoothed and floored: step())
+    uTime: { value: 0 }, // seconds (the flames' sway in the reflection; knights.js keeps it)
     uExposure: exposure,
-    uRes: resolution,          // the pixel pass's size (texels; shared): how big a plate is on screen
-    uLo: { value: new THREE.Color() }, uMid: { value: new THREE.Color() }, uHi: { value: new THREE.Color() }, uCore: { value: new THREE.Color() },
+    uRes: resolution, // the pixel pass's size (texels; shared): how big a plate is on screen
+    uDither: dither, // the pass's dither strength (shared): the pixel styles' band edges follow it
+    uDitherScale: ditherScale, // ...and its Bayer matrix (shared: 4 or 8)
+    uLo: { value: new THREE.Color() },
+    uMid: { value: new THREE.Color() },
+    uHi: { value: new THREE.Color() },
+    uCore: { value: new THREE.Color() },
     uShade: { value: new THREE.Color() },
-    uVoid: { value: new THREE.Color() }, uShadow: { value: new THREE.Color() }, uStone: { value: new THREE.Color() }, uWood: { value: new THREE.Color() },
+    uVoid: { value: new THREE.Color() },
+    uShadow: { value: new THREE.Color() },
+    uStone: { value: new THREE.Color() },
+    uWood: { value: new THREE.Color() },
     uSteel: { value: Array.from({ length: 5 }, () => new THREE.Color()) }, // (linear, dark to light)
-    uLook: { value: 0 },       // the style's look (knightStyles.js): 0 gunmetal, 1..3 the pixel styles, 4 blackgold, 5 first
-    uCel: { value: Array.from({ length: 8 }, () => new THREE.Color()) },   // the pixel styles' tones (steel.js CEL_TONES, linear)
-    uKeyLift: { value: 0.4 },  // the pixel styles' key light: the fire lifted to its flames' body (m)
-    uBias: { value: 0 },       // the finish: tones up (or down) its ramp
-    uPolish: { value: 1 },     // ...and how strongly it mirrors
+    uLook: { value: 0 }, // the style's look (knightStyles.js): 0 gunmetal, 1..3 the pixel styles, 4 blackgold, 5 first
+    uCel: { value: Array.from({ length: 8 }, () => new THREE.Color()) }, // the pixel styles' tones (steel.js CEL_TONES, linear)
+    uCelDither: { value: 0 }, // ...how far they dither across their band edges (the style's: knightStyles.js dither)
+    uKeyLift: { value: 0.4 }, // the pixel styles' key light: the fire lifted to its flames' body (m)
+    uBias: { value: 0 }, // the finish: tones up (or down) its ramp
+    uPolish: { value: 1 }, // ...and how strongly it mirrors
     uMoonDir: { value: moonAt.clone().normalize() },
-    uGlint: { value: 0 },      // a beat: the flame's reflection widens for a moment
-    uReflect: { value: 1 },    // how strongly the plate mirrors the fire (0: not at all)
+    uGlint: { value: 0 }, // a beat: the flame's reflection widens for a moment
+    uReflect: { value: 1 }, // how strongly the plate mirrors the fire (0: not at all)
     // The sweep: x its front and y its half-width (radians from its axis, measured on each
     // facet's mirror), z its strength 0..1, w 1 when its leading edge is the flame's core.
     uSweep: { value: new THREE.Vector4(0, 0.3, 0, 0) },
@@ -189,16 +221,28 @@ export function createArmorShared({ fireAt, exposure, resolution = { value: new 
   // fire's light (steel.js litRamp), the pixel styles' six tones (celRamp), or none (the
   // black-and-gold styles are drawn in the scene's own palette)
   const clamp01 = (v) => Math.min(1, Math.max(0, Number(v) || 0));
-  const look = { style: styleOr(style), finish: finishOr(finish), light: null, mix: 0.34, steel: [], rim: clamp01(rim), flame: { ramp: [], shade: undefined }, sent: '' };
+  const look = {
+    style: styleOr(style),
+    finish: finishOr(finish),
+    light: null,
+    mix: 0.34,
+    steel: [],
+    rim: clamp01(rim),
+    flame: { ramp: [], shade: undefined },
+    sent: '',
+  };
   const lookOf = () => STYLES[look.style].look;
   function writeSteel() {
     const lk = lookOf();
     uniforms.uLook.value = lk;
+    uniforms.uCelDither.value = STYLES[look.style].dither;
     const steelRamp = litRamp(look.finish, look.light);
     steelRamp.forEach((h, i) => uniforms.uSteel.value[i].set(h));
-    const cel = CEL_LOOKS[lk] ? celRamp(CEL_LOOKS[lk], look.finish, { ...look.flame, light: look.light ?? undefined }) : null;
+    const cel = CEL_LOOKS[lk]
+      ? celRamp(CEL_LOOKS[lk], look.finish, { ...look.flame, light: look.light ?? undefined })
+      : null;
     if (cel) cel.forEach((h, i) => uniforms.uCel.value[i].set(h));
-    look.steel = lk === 0 ? steelRamp : cel ?? [];
+    look.steel = lk === 0 ? steelRamp : (cel ?? []);
     const f = FINISH_LOOK[look.finish];
     uniforms.uBias.value = f.bias;
     uniforms.uPolish.value = f.polish;
@@ -219,20 +263,30 @@ export function createArmorShared({ fireAt, exposure, resolution = { value: new 
   const shine = { rest: true, flares: true };
   let sweep = null; // { kind, level, t, dur, s, hot, from, to, w, axis: [x, y, z, w] }
   let restIn = 1.5 + Math.random() * 2;
-  const REST_AXES = [[0, 0, 0, 1], [0, 0, 0, 1], [0, -1, 0, 0], [-1, 0, 0, 2], [1, 0, 0, 2]];
+  const REST_AXES = [
+    [0, 0, 0, 1],
+    [0, 0, 0, 1],
+    [0, -1, 0, 0],
+    [-1, 0, 0, 2],
+    [1, 0, 0, 2],
+  ];
   function begin(o) {
     sweep = { t: 0, ...o };
     uniforms.uSweepAxis.value.set(...o.axis);
   }
   function write() {
     const u = uniforms.uSweep.value;
-    if (!sweep) { u.z = 0; return; }
+    if (!sweep) {
+      u.z = 0;
+      return;
+    }
     const t = Math.floor(sweep.t * 12) / 12; // (stepped, like the flames)
     const k = Math.min(1, t / sweep.dur);
     u.x = sweep.from + (sweep.to - sweep.from) * (sweep.kind === 'flare' ? 1 - (1 - k) ** 1.6 : k); // (a flare bursts out, then slows)
     u.y = sweep.w;
     // A flare hits at once and fades as it goes; a rest sweep comes and goes.
-    u.z = sweep.kind === 'flare' ? sweep.s * (1 - k) ** 0.5 : sweep.s * Math.sin(Math.PI * Math.min(1, k * 1.15)) ** 0.5;
+    u.z =
+      sweep.kind === 'flare' ? sweep.s * (1 - k) ** 0.5 : sweep.s * Math.sin(Math.PI * Math.min(1, k * 1.15)) ** 0.5;
     u.w = sweep.hot ? 1 : 0;
   }
   return {
@@ -246,7 +300,17 @@ export function createArmorShared({ fireAt, exposure, resolution = { value: new 
       if (reducedMotion || !shine.flares) return;
       const s = Math.min(1, Math.max(0, strength));
       if (sweep?.kind === 'flare' && sweep.t < 0.2 && sweep.level >= s) return;
-      begin({ kind: 'flare', level: s, dur: 0.6 + 0.35 * s, s: 0.55 + 0.45 * s, hot: s > 0.35, from: 0, to: 3, w: 0.2 + 0.1 * s, axis: [0, 0, 0, 1] });
+      begin({
+        kind: 'flare',
+        level: s,
+        dur: 0.6 + 0.35 * s,
+        s: 0.55 + 0.45 * s,
+        hot: s > 0.35,
+        from: 0,
+        to: 3,
+        w: 0.2 + 0.1 * s,
+        axis: [0, 0, 0, 1],
+      });
       restIn = Math.max(restIn, 2.5);
     },
     /** Which sweeps run: `rest` (now and then, at rest) and `flares` (the fire flaring). */
@@ -256,7 +320,9 @@ export function createArmorShared({ fireAt, exposure, resolution = { value: new 
       if (sweep && !shine[sweep.kind === 'flare' ? 'flares' : 'rest']) sweep = null;
       write();
     },
-    get shine() { return { ...shine }; },
+    get shine() {
+      return { ...shine };
+    },
     /** The style (knightStyles.js STYLES; anything else the default): how the shader draws him. The model is knights.js's. */
     setStyle(name) {
       const s = styleOr(name);
@@ -264,7 +330,9 @@ export function createArmorShared({ fireAt, exposure, resolution = { value: new 
       look.style = s;
       writeSteel();
     },
-    get style() { return look.style; },
+    get style() {
+      return look.style;
+    },
     /** The finish (steel.js FINISHES: 'gunmetal', 'blackened', 'polished', 'burnished'; anything else gunmetal). */
     setFinish(name) {
       const f = finishOr(name);
@@ -272,7 +340,9 @@ export function createArmorShared({ fireAt, exposure, resolution = { value: new 
       look.finish = f;
       writeSteel();
     },
-    get finish() { return look.finish; },
+    get finish() {
+      return look.finish;
+    },
     /** The fire's color on his silhouette (the pass draws it, pixelPass.js): 0 none, 0.5 subtle (the default), wider and brighter at every step up to 1 (three texels, the flame's hi, the pixel styles' outline glowing on the fire's side). */
     setRim(v) {
       const r = clamp01(v);
@@ -280,20 +350,36 @@ export function createArmorShared({ fireAt, exposure, resolution = { value: new 
       look.rim = r;
       writeSteel();
     },
-    get rim() { return look.rim; },
+    get rim() {
+      return look.rim;
+    },
     /** The colors his steel is drawn in now (sRGB hexes, dark to light: the finish by the fire's light, the pixel styles' six tones, or none). */
-    get steel() { return [...look.steel]; },
+    get steel() {
+      return [...look.steel];
+    },
     /** Advance the sweeps and the light he's lit by (s of simulation time; knights.js, every frame). */
     step(dt) {
       const want = Math.max(FIRE_FLOOR, Math.min(1.6, uniforms.uFire.value));
       lit += (want - lit) * (1 - Math.exp(-Math.max(0, dt) / (want > lit ? 0.08 : 0.6)));
       uniforms.uFireLit.value = lit;
-      if (sweep) { sweep.t += dt; if (sweep.t >= sweep.dur) sweep = null; }
+      if (sweep) {
+        sweep.t += dt;
+        if (sweep.t >= sweep.dur) sweep = null;
+      }
       if (!sweep && shine.rest && !reducedMotion && (restIn -= dt) <= 0) {
         restIn = 4 + Math.random() * 4;
         const axis = REST_AXES[Math.floor(Math.random() * REST_AXES.length)];
         // (Out from the fire, up from below or across: each runs over the whole of him.)
-        begin({ kind: 'rest', dur: 1.1 + Math.random() * 0.4, s: 0.6, hot: false, from: -0.2, to: axis[3] === 1 ? 2.8 : 3.1, w: 0.12, axis });
+        begin({
+          kind: 'rest',
+          dur: 1.1 + Math.random() * 0.4,
+          s: 0.6,
+          hot: false,
+          from: -0.2,
+          to: axis[3] === 1 ? 2.8 : 3.1,
+          w: 0.12,
+          axis,
+        });
       }
       write();
     },
@@ -338,19 +424,28 @@ export function createArmorShared({ fireAt, exposure, resolution = { value: new 
  */
 export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
   const own = {
-    uDissolve: { value: 0 }, uFlip: { value: 0 }, uEdge: { value: new THREE.Color() }, uEdgeHot: { value: new THREE.Color() },
-    uSpan: { value: new THREE.Vector2(span[0], span[1]) }, uGlow: { value: 0 }, uLift: { value: 0 }, uHover: { value: 0 },
-    uFrost: { value: 0 }, uFrostColor: { value: new THREE.Color('#e8f4ff') },
+    uDissolve: { value: 0 },
+    uFlip: { value: 0 },
+    uEdge: { value: new THREE.Color() },
+    uEdgeHot: { value: new THREE.Color() },
+    uSpan: { value: new THREE.Vector2(span[0], span[1]) },
+    uGlow: { value: 0 },
+    uLift: { value: 0 },
+    uHover: { value: 0 },
+    uFrost: { value: 0 },
+    uFrostColor: { value: new THREE.Color('#e8f4ff') },
     uCenter: { value: new THREE.Vector3() }, // (world: where he is, for the flame's reflection)
   };
   const mat = new THREE.MeshPhongMaterial({ color: 0xffffff, specular: 0xffffff, shininess: 24, flatShading: true });
   mat.name = 'KnightArmor';
   mat.userData.uniforms = own;
-  mat.customProgramCacheKey = () => 'knight-armor-7';
+  mat.customProgramCacheKey = () => 'knight-armor-8';
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, shared.uniforms, own);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>
+      .replace(
+        '#include <common>',
+        `#include <common>
         attribute float aRole;
         attribute float aPiece;
         attribute vec3 aSmooth;
@@ -366,9 +461,12 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
         varying vec3 vPatchN;
         varying vec4 vPatch;
         varying float vOcc;
-        varying float vPx;`)
+        varying float vPx;`,
+      )
       // (The plate's smooth normal, skinned and into view space like the normal.)
-      .replace('#include <defaultnormal_vertex>', `#include <defaultnormal_vertex>
+      .replace(
+        '#include <defaultnormal_vertex>',
+        `#include <defaultnormal_vertex>
         vec3 aSm = aSmooth;
         #ifdef USE_SKINNING
           aSm = (skinMatrix * vec4(aSm, 0.0)).xyz;
@@ -380,12 +478,21 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
         #endif
         vPatchN = normalMatrix * aPn;
         vPatch = aPatch;
-        vOcc = aOcc;`)
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = position;\nvRestN = normal;\nvRole = aRole;\nvPiece = aPiece;')
+        vOcc = aOcc;`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\nvRest = position;\nvRestN = normal;\nvRole = aRole;\nvPiece = aPiece;',
+      )
       // (Texels a meter on screen there: how big his plates are drawn.)
-      .replace('#include <project_vertex>', '#include <project_vertex>\nvPx = projectionMatrix[1][1] * uRes.y * 0.5 / max(-mvPosition.z, 0.05);');
+      .replace(
+        '#include <project_vertex>',
+        '#include <project_vertex>\nvPx = projectionMatrix[1][1] * uRes.y * 0.5 / max(-mvPosition.z, 0.05);',
+      );
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>
+      .replace(
+        '#include <common>',
+        `#include <common>
         varying float vRole;
         varying float vPiece;
         varying vec3 vRest;
@@ -400,6 +507,7 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
         uniform vec3 uVoid; uniform vec3 uShadow; uniform vec3 uStone; uniform vec3 uWood;
         uniform vec3 uSteel[5];
         uniform float uLook; uniform vec3 uCel[8]; uniform float uKeyLift;
+        uniform float uDither; uniform float uDitherScale; uniform float uCelDither;
         uniform float uBias; uniform float uPolish;
         uniform vec3 uMoonDir; uniform float uGlint; uniform float uReflect;
         uniform vec4 uSweep; uniform vec4 uSweepAxis;
@@ -420,6 +528,30 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
         const float ROUND_GAIN = 2.0;
         const float ROUND_SKY = 0.2;
         const float ROUND_HOT = 1.1; // (the heart of its lit crescent: its small highlight)
+        // The pixel styles' dithered band edges: how far a texel's Bayer threshold thr moves a
+        // value v (the key, the fill, the turn) across the edge e nearest it, between a band wd
+        // wide below it and wu above (in v's units), where v changes vw a texel (its
+        // gradient's length: texels straight across the edge, whichever way it runs on
+        // screen). Only one band's texels step across, into the other (up: the band below the
+        // edge's; the caller picks: the wider band's), so a thin band is never broken into
+        // dots, only toothed. a is the style's amount at this Dither: the window takes that
+        // share of twice the band stepped into (all of it at most: a texel lands in it, never
+        // past it) and at most a * reach texels (celReach); none from a band under DITHER_MIN
+        // texels across (a thin limb's bands stay flat), fading in over a texel more, so a
+        // band widening as he turns doesn't pop.
+        const float DITHER_MIN = 2.0;
+        float celDither(float v, float vw, float e, float wd, float wu, bool up, float thr, float a, float reach) {
+          if (up ? (v >= e || thr <= 0.0) : (v < e || thr >= 0.0)) return 0.0;
+          vw = max(vw, 1e-4);
+          return thr * smoothstep(DITHER_MIN, DITHER_MIN + 1.0, (up ? wd : wu) / vw) * min(min(a, 1.0) * 2.0 * (up ? wu : wd), a * reach * vw);
+        }
+        // ...the reach, in texels: DITHER_MAX on a knight drawn up to DITHER_PX texels a
+        // metre (the site's home view at 1920 and anything smaller), a little less as he's
+        // drawn bigger, down to 3.4 (more of his bands are wide enough to dither there, and
+        // their dots would add up to speckle).
+        const float DITHER_MAX = 4.6;
+        const float DITHER_PX = 87.0;
+        float celReach(float px) { return clamp(DITHER_MAX * DITHER_PX / max(px, 1.0), 3.4, DITHER_MAX); }
         // The steel ramp's tone i (-1: the void).
         vec3 aSteel(int i) {
           vec3 c = uVoid;
@@ -440,8 +572,11 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
           else if (i >= 5) c = uCel[5];
           return c;
         }
-        ${DISSOLVE_CHUNK}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>
+        ${DISSOLVE_CHUNK}`,
+      )
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
         int role = int(vRole + 0.5);
         int look = int(uLook + 0.5);
         if (role == 2 && look < 4) role = 1; // (round 8's gilt: raised steel, but in the black-and-gold styles)
@@ -452,13 +587,19 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
           vec3 mq = vRest * 30.0;
           float ring = fract(mq.x + mq.z + floor(mq.y) * 0.5);
           aLink = step(0.25, ring) * step(ring, 0.8) * step(0.2, fract(mq.y));
-        }`)
-      .replace('#include <lights_phong_fragment>', `BlinnPhongMaterial material;
+        }`,
+      )
+      .replace(
+        '#include <lights_phong_fragment>',
+        `BlinnPhongMaterial material;
         material.diffuseColor = diffuseColor.rgb;
         material.specularColor = R_SPEC[role];
         material.specularShininess = R_SHINE[role];
-        material.specularStrength = 1.0;`)
-      .replace('#include <opaque_fragment>', `
+        material.specularStrength = 1.0;`,
+      )
+      .replace(
+        '#include <opaque_fragment>',
+        `
         vec3 aV = normalize(vViewPosition); // (to the camera)
         vec3 aPos = -vViewPosition;
         vec3 aF = (viewMatrix * vec4(uFireWorld, 1.0)).xyz;
@@ -532,8 +673,11 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
         if (aGlints > 0.9 && R_POLISH[role] > 0.0) aFlash = max(aFlash, (aGlints - 0.9) * 0.6);
         float aGraze = 1.0 - abs(dot(aN, aV));
         outgoingLight = vec3(0.0);
-        #include <opaque_fragment>`)
-      .replace('#include <dithering_fragment>', `#include <dithering_fragment>
+        #include <opaque_fragment>`,
+      )
+      .replace(
+        '#include <dithering_fragment>',
+        `#include <dithering_fragment>
         {
           float fogK = 0.0;
           #ifdef USE_FOG
@@ -626,20 +770,54 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
             // (The dim cool fill on the far side: the moon, the sky.)
             float fillL = (0.55 * max(dot(aN, normalize((viewMatrix * vec4(uMoonDir, 0.0)).xyz)), 0.0) + 0.3 * max(dot(aN, aUp), 0.0)) * (1.0 - occ);
             bool hard = look == 3;
-            // The checker seam: pixels on the checker cross a band's edge a pixel early (a
-            // thin seam of dither along it), only where the band is wide (a big plate turning
-            // slowly: a thin limb's bands are a few pixels, a seam there would be all dither).
-            float chk = mod(floor(gl_FragCoord.x) + floor(gl_FragCoord.y), 2.0);
-            float kw = fwidth(key);
-            float seam = chk * (look == 2 ? (kw < 0.05 ? 1.5 : 0.0) : look == 1 ? (kw < 0.03 ? 1.0 : 0.0) : 0.0);
-            float kv = key + seam * kw;
+            // The dither on the band edges: near an edge, each texel's ordered threshold (the
+            // pass's own Bayer matrix and size, so it lines up texel for texel with the scene's
+            // dither) steps it across (celDither): the wider band's texels into the narrower,
+            // fewer the further from the edge, so a thin band (the light steel on the turn)
+            // grows teeth from both sides rather than breaking up. The lit bands always step
+            // down into the steel, never out over it, so the dither makes no lone lit texel for
+            // the pass's terminator to ring. Its amount is the style's at the site's Dither
+            // (0.08), twice it from 0.16 on (Bonfire Live's slider goes to 0.4: capped, so it
+            // can't turn to speckle), none at 0 (the flat bands exactly). The far side's edges
+            // (the fill, the turn past the light) and a rounded plate's dark bands dither the
+            // same way; the highlight, the lips, the flame's flash and the sweeps, a flash of
+            // his own (uLift), the frost and the dissolve don't.
+            float dA = uCelDither * clamp(uDither / 0.08, 0.0, 2.0);
+            float kv = key;
+            float fv = fillL;
+            float nv = nl;
+            if (dA > 0.0) {
+              float thr = (uDitherScale > 6.0 ? wBayer8(gl_FragCoord.xy) : wBayer4(gl_FragCoord.xy)) - 0.5;
+              float reach = celReach(vPx);
+              float kw = length(vec2(dFdx(key), dFdy(key)));
+              float fw = length(vec2(dFdx(fillL), dFdy(fillL)));
+              float nw = length(vec2(dFdx(nl), dFdy(nl)));
+              // (The key's edge nearest it and the bands either side, in its units: 0.32, 0.55
+              // and 0.72 (the body: about 0.3 up to its peak); chiaroscuro's 0.38 and 0.76; a
+              // rounded plate's -0.1, 0.12, 0.55 and 0.72, chiaroscuro's 0.05, 0.38 and 0.76.)
+              float e = 0.72, wd = 0.17, wu = 0.3;
+              if (curved > 0.5) {
+                if (hard) { if (key < 0.215) { e = 0.05; wd = 0.3; wu = 0.33; } else if (key < 0.57) { e = 0.38; wd = 0.33; wu = 0.38; } else { e = 0.76; wd = 0.38; wu = 0.3; } }
+                else if (key < 0.01) { e = -0.1; wd = 0.3; wu = 0.22; }
+                else if (key < 0.335) { e = 0.12; wd = 0.22; wu = 0.43; }
+                else if (key < 0.635) { e = 0.55; wd = 0.43; wu = 0.17; }
+              } else if (hard) { if (key < 0.57) { e = 0.38; wd = 0.38; wu = 0.38; } else { e = 0.76; wd = 0.38; wu = 0.29; } }
+              else if (key < 0.435) { e = 0.32; wd = 0.32; wu = 0.23; }
+              else if (key < 0.635) { e = 0.55; wd = 0.23; wu = 0.17; }
+              kv += celDither(key, kw, e, wd, wu, e < 0.7 && wd > wu, thr, dA, reach);
+              // (The fill's at 0.1 and 0.42, chiaroscuro's at 0.45; the turn's at -0.3.)
+              if (hard) fv += celDither(fillL, fw, 0.45, 0.45, 0.4, true, thr, dA, reach);
+              else if (fillL < 0.26) fv += celDither(fillL, fw, 0.1, 0.1, 0.32, false, thr, dA, reach);
+              else fv += celDither(fillL, fw, 0.42, 0.32, 0.43, false, thr, dA, reach);
+              nv += celDither(nl, nw, -0.3, 0.7, 0.3, true, thr, dA, reach);
+            }
             // The bands (steel.js CEL_TONES): the fire's body only where a plate squarely faces
             // the fire, a light steel on the turn, mid steel as it turns away; the far side
             // and the gaps dark (the moon's and the sky's fill: shadow; else near-black).
             // Chiaroscuro: the body, mid steel, the dark.
             float b;
-            if (hard) b = kv > 0.76 ? 4.0 : kv > 0.38 ? 2.0 : fillL > 0.45 ? 1.0 : 0.0;
-            else b = kv > 0.72 ? 4.0 : kv > 0.55 ? 3.0 : kv > 0.32 ? 2.0 : fillL > 0.42 ? 2.0 : (fillL > 0.1 || nl > -0.3) ? 1.0 : 0.0;
+            if (hard) b = kv > 0.76 ? 4.0 : kv > 0.38 ? 2.0 : fv > 0.45 ? 1.0 : 0.0;
+            else b = kv > 0.72 ? 4.0 : kv > 0.55 ? 3.0 : kv > 0.32 ? 2.0 : fv > 0.42 ? 2.0 : (fv > 0.1 || nv > -0.3) ? 1.0 : 0.0;
             // (A rounded plate's far side steps down its own dark bands, not by the fill.)
             if (curved > 0.5 && kv <= 0.32) b = hard ? (kv > 0.05 ? 1.0 : 0.0) : kv > 0.12 ? 2.0 : kv > -0.1 ? 1.0 : 0.0;
             if (vOcc > 0.7) b = 0.0; else if (vOcc > 0.55) b = min(b, 1.0);
@@ -650,7 +828,7 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
             // camera (on its fire-side curve), a small glint where it mirrors the fire, and on
             // a rounded plate the heart of its lit crescent.
             float spec = pow(max(dot(aN, normalize(kL + aV)), 0.0), 70.0) * kAtt * (1.0 - occ);
-            if (role != 3 && ((kv > (hard ? 0.6 : 0.55) && dot(aN, aV) < 0.5) || spec > 0.9 || (curved > 0.5 && kv > ROUND_HOT))) b = 5.0;
+            if (role != 3 && ((key > (hard ? 0.6 : 0.55) && dot(aN, aV) < 0.5) || spec > 0.9 || (curved > 0.5 && key > ROUND_HOT))) b = 5.0;
             // Bright lips: the raised edges the fire lights catch it a band up (painterly's a
             // little further round, never on the far side).
             if (role == 1 && key > (look == 2 ? 0.55 : 0.68)) b = min(5.0, b + 1.0);
@@ -679,7 +857,8 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
             else if (role == 5) col = b > 2.5 ? uShadow : uVoid;
             // The mark: 0.62 + 0.002 the smooth surface's id (0..63), 0.14 more on the fire's
             // side, so the pass draws a line where two surfaces meet, snaps him to the tones
-            // without its dither and rims his silhouette on that side. A slight surface drawn
+            // without a dither of its own (his is drawn above, on the band edges) and rims his
+            // silhouette on that side. A slight surface drawn
             // under 6 texels across marks the id of the one it merges into (no line between
             // them: a finger's faces, a fauld's hoops, a visor's breaths).
             float pid = vPatch.z * vPx < 6.0 ? vPatch.y : vPatch.x;
@@ -747,7 +926,8 @@ export function createArmorMaterial(shared, { span = [0, 1.78] } = {}) {
             else if (e > 0.19 && e < 0.215) { gl_FragColor.rgb = mix(gl_FragColor.rgb, uEdge / ex, 0.6); aMark = 0.2; }
           }
           gl_FragColor.a = aMark;
-        }`);
+        }`,
+      );
   };
   return mat;
 }

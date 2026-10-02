@@ -27,9 +27,15 @@ function tile(w, h, color, coverage) {
 
 export function installDitherPatterns(colors, root = document.documentElement) {
   for (let n = 0; n <= 16; n++) {
-    root.style.setProperty(`--dv-${n}`, tile(4, 4, colors.void, () => n / 16));
+    root.style.setProperty(
+      `--dv-${n}`,
+      tile(4, 4, colors.void, () => n / 16),
+    );
   }
   for (const name of ['void', 'shadow']) {
-    root.style.setProperty(`--dg-${name}`, tile(4, 16, colors[name], (x, y) => (y + 0.5) / 16));
+    root.style.setProperty(
+      `--dg-${name}`,
+      tile(4, 16, colors[name], (x, y) => (y + 0.5) / 16),
+    );
   }
 }

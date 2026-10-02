@@ -20,7 +20,8 @@ async function encode(bitmap, width, crisp, quality) {
   g.imageSmoothingQuality = 'high';
   g.drawImage(bitmap, 0, 0, width, height);
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
-  if (!blob || blob.type !== 'image/webp') throw new Error('This browser can’t save WebP images. Try Chrome, Edge or Firefox.');
+  if (!blob || blob.type !== 'image/webp')
+    throw new Error('This browser can’t save WebP images. Try Chrome, Edge or Firefox.');
   return blob;
 }
 
@@ -47,7 +48,13 @@ export async function processImage(file, { pixel = false } = {}) {
 
 /** A name for a new image in `folder` from its file name, not clashing with `taken` srcs. */
 export function newImageSrc(folder, fileName, taken) {
-  const stem = fileName.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'image';
+  const stem =
+    fileName
+      .replace(/\.[^.]+$/, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40) || 'image';
   let src = `assets/projects/${folder}/${stem}`;
   for (let n = 2; taken.has(src); n++) src = `assets/projects/${folder}/${stem}-${n}`;
   return src;

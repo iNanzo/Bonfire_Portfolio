@@ -20,7 +20,10 @@ function seeded(seed) {
 // A sword about 1.2 m long, planted point-down with the portfolio's lean, and a camera in front.
 const LEN = 1.2;
 const blade = { grip: new THREE.Vector3(0, 1.0 - 0.12 * LEN, 0), tip: new THREE.Vector3(0, -0.2, 0), len: LEN };
-const home = { pos: new THREE.Vector3(0.04, 0, 0.03), quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.07, 0.16, -0.05)) };
+const home = {
+  pos: new THREE.Vector3(0.04, 0, 0.03),
+  quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.07, 0.16, -0.05)),
+};
 const center = new THREE.Vector3(0.04, 1.1, 0.03);
 const camPos = new THREE.Vector3(0.3, 1.3, 3.2);
 const camTarget = new THREE.Vector3(0, 0.9, 0);
@@ -35,7 +38,15 @@ function plan(seed, { beat = 0.47, beats = 4, moves, alive = true, rests = [] } 
   for (let k = 1; k < beats; k++) if (!rests.includes(k)) hits.push(0.2 + k * beat);
   const onMove = [];
   const routine = createRoutine({
-    blade, home, center, basis, hits, plunge: 0.2 + beats * beat, moves, alive, rng: seeded(seed),
+    blade,
+    home,
+    center,
+    basis,
+    hits,
+    plunge: 0.2 + beats * beat,
+    moves,
+    alive,
+    rng: seeded(seed),
     onMove: (k, kind) => onMove.push([k, kind]),
   });
   return { routine, hits, onMove };
@@ -91,9 +102,18 @@ test('the motion is smooth: speeds change without jolts', () => {
     const { v, w } = rates(path);
     for (let i = 2; i < path.length; i++) {
       // Per 1/480 s: a jump in position or rotation shows as a spike far past these.
-      assert.ok(Math.abs(v[i] - v[i - 1]) < 6, `seed ${seed}: the tip jolted at ${path[i].t.toFixed(3)} s (${v[i - 1].toFixed(1)} → ${v[i].toFixed(1)} m/s)`);
-      assert.ok(Math.abs(w[i] - w[i - 1]) < 8, `seed ${seed}: the turn jolted at ${path[i].t.toFixed(3)} s (${w[i - 1].toFixed(1)} → ${w[i].toFixed(1)} rad/s)`);
-      assert.ok(v[i] < 45 && w[i] < 60, `seed ${seed}: too fast at ${path[i].t.toFixed(3)} s (${v[i].toFixed(1)} m/s, ${w[i].toFixed(1)} rad/s)`);
+      assert.ok(
+        Math.abs(v[i] - v[i - 1]) < 6,
+        `seed ${seed}: the tip jolted at ${path[i].t.toFixed(3)} s (${v[i - 1].toFixed(1)} → ${v[i].toFixed(1)} m/s)`,
+      );
+      assert.ok(
+        Math.abs(w[i] - w[i - 1]) < 8,
+        `seed ${seed}: the turn jolted at ${path[i].t.toFixed(3)} s (${w[i - 1].toFixed(1)} → ${w[i].toFixed(1)} rad/s)`,
+      );
+      assert.ok(
+        v[i] < 45 && w[i] < 60,
+        `seed ${seed}: too fast at ${path[i].t.toFixed(3)} s (${v[i].toFixed(1)} m/s, ${w[i].toFixed(1)} rad/s)`,
+      );
     }
   }
 });
@@ -112,9 +132,15 @@ test('slashes and spins are fastest right on their beat', () => {
       for (let i = 1; i < path.length; i++) {
         if (Math.abs(path[i].t - hit.t) > 0.12) continue;
         const v = speed(i);
-        if (v > best) { best = v; bestT = path[i].t; }
+        if (v > best) {
+          best = v;
+          bestT = path[i].t;
+        }
       }
-      assert.ok(Math.abs(bestT - hit.t) < 0.006, `seed ${seed}: ${hit.kind} peaked ${((bestT - hit.t) * 1000).toFixed(1)} ms off the beat`);
+      assert.ok(
+        Math.abs(bestT - hit.t) < 0.006,
+        `seed ${seed}: ${hit.kind} peaked ${((bestT - hit.t) * 1000).toFixed(1)} ms off the beat`,
+      );
       assert.ok(best > 4, `seed ${seed}: a ${hit.kind} should cut fast (${best.toFixed(1)} m/s)`);
       checked++;
     }
@@ -133,7 +159,10 @@ test('thrusts drive hardest into the hit, then stop dead', () => {
       const v = (t) => at(t).grip.distanceTo(at(t - dt).grip) / dt;
       const into = v(hit.t);
       assert.ok(into > 3, `seed ${seed}: the thrust lands at ${into.toFixed(1)} m/s`);
-      assert.ok(v(hit.t - 0.03) < into && v(hit.t + 0.05) < into * 0.35, `seed ${seed}: it should accelerate in and stop dead`);
+      assert.ok(
+        v(hit.t - 0.03) < into && v(hit.t + 0.05) < into * 0.35,
+        `seed ${seed}: it should accelerate in and stop dead`,
+      );
       checked++;
     }
   }
@@ -145,7 +174,10 @@ test('out of the fire, the blade stays above the ground and off the camera', () 
     const { routine, hits } = plan(seed, { beats: 8 });
     for (const p of trace(routine)) {
       if (p.t < hits[0] - 0.05 || p.t > hits.at(-1) + 0.2) continue; // (rising out of the ashes, plunging back in)
-      assert.ok(p.tip.y > 0.15, `seed ${seed}: the tip went into the ground at ${p.t.toFixed(3)} s (${p.tip.y.toFixed(2)})`);
+      assert.ok(
+        p.tip.y > 0.15,
+        `seed ${seed}: the tip went into the ground at ${p.t.toFixed(3)} s (${p.tip.y.toFixed(2)})`,
+      );
       assert.ok(p.tip.distanceTo(camPos) > 0.6, `seed ${seed}: the tip nearly hit the camera`);
     }
   }
@@ -154,7 +186,10 @@ test('out of the fire, the blade stays above the ground and off the camera', () 
 test('each move takes its plane once, in order, and rests leave room to hover', () => {
   const { routine, onMove, hits } = plan(7, { beats: 8, rests: [3, 4] });
   trace(routine);
-  assert.deepEqual(onMove.map(([k]) => k), hits.map((_, k) => k));
+  assert.deepEqual(
+    onMove.map(([k]) => k),
+    hits.map((_, k) => k),
+  );
   assert.equal(routine.hits.length, 5);
 });
 

@@ -20,12 +20,32 @@ import { applyCssPalette, base, flames, mixHex, rotation } from '../palette.js';
 import { harmoniousFlame, hexToOklch, SCHEMES, vividScene, wildFlame, wildScene } from '../paletteGen.js';
 import { modeOf } from './looks.js';
 
-export const COLOR_MODES = { site: 'The Site’s Palettes', harmonious: 'Harmonious Random', wild: 'Fully Random', mix: 'A Mix of All Three' };
+/** Where a new flame's colors come from (the settings' Flame Colors), as the menus name them. */
+export const COLOR_MODES = {
+  site: 'The Site’s Palettes',
+  harmonious: 'Harmonious Random',
+  wild: 'Fully Random',
+  mix: 'A Mix, New Each Flame',
+};
 export const COLOR_SCHEMES = { auto: 'Any Scheme', ...Object.fromEntries(SCHEMES.map((s) => [s.id, s.label])) };
 
 // Hue names by OKLCH hue (each entry: up to this angle).
-const HUES = [[18, 'Rose'], [42, 'Crimson'], [62, 'Ember'], [82, 'Amber'], [104, 'Gold'], [128, 'Lime'], [158, 'Verdant'], [184, 'Jade'],
-  [212, 'Teal'], [244, 'Azure'], [274, 'Cobalt'], [304, 'Violet'], [334, 'Orchid'], [361, 'Rose']];
+const HUES = [
+  [18, 'Rose'],
+  [42, 'Crimson'],
+  [62, 'Ember'],
+  [82, 'Amber'],
+  [104, 'Gold'],
+  [128, 'Lime'],
+  [158, 'Verdant'],
+  [184, 'Jade'],
+  [212, 'Teal'],
+  [244, 'Azure'],
+  [274, 'Cobalt'],
+  [304, 'Violet'],
+  [334, 'Orchid'],
+  [361, 'Rose'],
+];
 /** A name for a color: its hue family ("Ashen" when it's nearly gray). */
 export function colorName(hex) {
   const { C, h } = hexToOklch(hex);
@@ -44,37 +64,54 @@ export function createColors(settings) {
   const made = [];
   let count = 0;
   let sceneBlend = null; // { from, to, t, dur }
-  let scenery = null;    // the colors the scenery is on (or heading to); null: the site's
-  let held = false;      // a scene's scenery colors: landings leave them alone
+  let scenery = null; // the colors the scenery is on (or heading to); null: the site's
+  let held = false; // a scene's scenery colors: landings leave them alone
   const registered = new Map(); // key → a scene's flame (never pruned)
 
   function add(colors) {
     const key = `live-${++count}`;
-    flames[key] = { name: `${colorName(colors.mid)} Flame`, ramp: [colors.lo, colors.mid, colors.hi, colors.core], shade: colors.shade, light: 0.34, hidden: true };
+    flames[key] = {
+      name: `${colorName(colors.mid)} Flame`,
+      ramp: [colors.lo, colors.mid, colors.hi, colors.core],
+      shade: colors.shade,
+      light: 0.34,
+      hidden: true,
+    };
     made.push(key);
     while (made.length > KEEP) delete flames[made.shift()];
     return key;
   }
   function make(mode) {
     const voidHex = siteBase.void;
-    return add(mode === 'wild' ? wildFlame(Math.random, { voidHex }) : harmoniousFlame(Math.random, { voidHex, scheme: settings.scheme }).colors);
+    return add(
+      mode === 'wild'
+        ? wildFlame(Math.random, { voidHex })
+        : harmoniousFlame(Math.random, { voidHex, scheme: settings.scheme }).colors,
+    );
   }
   /** New scenery for a flame: around its hue (or any), sometimes fully random; its tips stay readable. */
   function sceneFor(flame) {
     const readable = [{ hi: flame.ramp[2] }];
     const wild = settings.colors === 'wild' ? 0.5 : 0.15;
-    return Math.random() < wild ? wildScene(Math.random, { flames: readable }) : vividScene(Math.random, { flames: readable, hue: hexToOklch(flame.ramp[1]).h });
+    return Math.random() < wild
+      ? wildScene(Math.random, { flames: readable })
+      : vividScene(Math.random, { flames: readable, hue: hexToOklch(flame.ramp[1]).h });
   }
   const siteKeys = () => Object.keys(flames).filter((k) => !k.startsWith('live-') && !registered.has(k));
   /** Blend the scenery to `want` over `seconds` (nothing to do if it's there already). */
   function blendTo(want, seconds) {
-    if (SCENE_KEYS.every((k) => base[k] === want[k])) { sceneBlend = null; return; }
+    if (SCENE_KEYS.every((k) => base[k] === want[k])) {
+      sceneBlend = null;
+      return;
+    }
     sceneBlend = { from: { ...base }, to: { ...want }, t: 0, dur: Math.max(0.001, seconds) };
   }
 
   return {
     /** The scenery colors now showing or blending in (null: the site's own). */
-    get scenery() { return scenery; },
+    get scenery() {
+      return scenery;
+    },
     /**
      * The next flame for a swap (other than `current`). `step` ±1 walks the site's
      * palettes in order instead (the arrow keys).
@@ -108,7 +145,13 @@ export function createColors(settings) {
      * @param {FlameColors} flame
      */
     register(key, flame, name = `${colorName(flame.mid)} Flame`) {
-      const entry = { name, ramp: [flame.lo, flame.mid, flame.hi, flame.core], shade: flame.shade, light: flame.light ?? 0.34, hidden: true };
+      const entry = {
+        name,
+        ramp: [flame.lo, flame.mid, flame.hi, flame.core],
+        shade: flame.shade,
+        light: flame.light ?? 0.34,
+        hidden: true,
+      };
       registered.set(key, entry);
       flames[key] = entry;
       return key;
@@ -119,7 +162,9 @@ export function createColors(settings) {
       delete flames[key];
     },
     /** The scene flames registered now. */
-    get registered() { return [...registered.keys()]; },
+    get registered() {
+      return [...registered.keys()];
+    },
     /**
      * Blend the scenery to a scene's colors (null: the site's own) over `seconds`. Held,
      * landings leave them alone until release() (or a pin with `hold: false`, which the
@@ -132,9 +177,13 @@ export function createColors(settings) {
       blendTo(scenery ?? siteBase, seconds);
     },
     /** Whether a scene holds the scenery colors. */
-    get held() { return held; },
+    get held() {
+      return held;
+    },
     /** Let go of a scene's scenery colors: the next landing recolors as the settings say. */
-    release() { held = false; },
+    release() {
+      held = false;
+    },
     /** Per frame: step a scenery blend. True if the scenery colors changed. */
     update(dt) {
       if (!sceneBlend) return false;
@@ -142,7 +191,10 @@ export function createColors(settings) {
       b.t = Math.min(1, b.t + dt / b.dur);
       const k = b.t * b.t * (3 - 2 * b.t);
       for (const key of SCENE_KEYS) base[key] = mixHex(b.from[key], b.to[key], k);
-      if (b.t >= 1) { sceneBlend = null; applyCssPalette(); }
+      if (b.t >= 1) {
+        sceneBlend = null;
+        applyCssPalette();
+      }
       return true;
     },
   };

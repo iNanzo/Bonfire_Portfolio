@@ -6,17 +6,36 @@
 // over 32 bars of any move.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CLEARING, MOVE_KINDS, MOVE_BARS, keepInClearing, movePose, fitMove, poseOnCycle } from '../src/visualizer/clearing.js';
+import {
+  CLEARING,
+  MOVE_KINDS,
+  MOVE_BARS,
+  keepInClearing,
+  movePose,
+  fitMove,
+  poseOnCycle,
+} from '../src/visualizer/clearing.js';
 import { createCamera, SHOTS } from '../src/visualizer/camera.js';
 
 const inside = ([x, y, z]) => {
   const p = keepInClearing({ x, y, z });
   return Math.hypot(p.x - x, p.y - y, p.z - z) < 1e-6;
 };
-const seeded = (seed = 5) => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+const seeded =
+  (seed = 5) =>
+  () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
 const [FX, , FZ] = CLEARING.fire;
 /** A framing at `bearing` (radians from straight in front), `r` out and `y` up, looking at the fire. */
-const at = (bearing, r, y, move) => ({ pos: [FX + Math.sin(bearing) * r, y, FZ + Math.cos(bearing) * r], target: [0, 0.6, 0], fov: 36, roll: 0.05, move });
+const at = (bearing, r, y, move) => ({
+  pos: [FX + Math.sin(bearing) * r, y, FZ + Math.cos(bearing) * r],
+  target: [0, 0.6, 0],
+  fov: 36,
+  roll: 0.05,
+  move,
+});
 
 test('keepInClearing: idempotent, and anything it returns is inside', () => {
   const rnd = seeded();
@@ -32,7 +51,14 @@ test('keepInClearing: idempotent, and anything it returns is inside', () => {
 });
 
 test('every move over a whole cycle stays in the clearing and comes back to the framing', () => {
-  const bases = [at(0, 4, 1.5), at(1.2, 5.8, 2.5), at(-1.7, 3, 1), at(1.74, 2, 0.6), at(0.3, 1.1, 0.4), at(-0.5, 6.4, 6)];
+  const bases = [
+    at(0, 4, 1.5),
+    at(1.2, 5.8, 2.5),
+    at(-1.7, 3, 1),
+    at(1.74, 2, 0.6),
+    at(0.3, 1.1, 0.4),
+    at(-0.5, 6.4, 6),
+  ];
   const beat = 60 / 124;
   for (const base of bases) {
     for (const kind of MOVE_KINDS) {
@@ -46,7 +72,10 @@ test('every move over a whole cycle stays in the clearing and comes back to the 
           assert.ok(inside(start.pos), `${kind}: the framing itself is kept inside`);
           for (let s = 0; s <= 200; s++) {
             const p = movePose(pin, (s / 200) * cycle * 1.5, beat);
-            assert.ok(inside(p.pos), `${kind} ${amount} at ${base.pos.map((v) => v.toFixed(2))}: step ${s} outside (${p.pos.map((v) => v.toFixed(3))})`);
+            assert.ok(
+              inside(p.pos),
+              `${kind} ${amount} at ${base.pos.map((v) => v.toFixed(2))}: step ${s} outside (${p.pos.map((v) => v.toFixed(3))})`,
+            );
             assert.ok(p.fov >= 10 && p.fov <= 80, `${kind}: lens ${p.fov}`);
             assert.deepEqual(p.target, start.target);
           }
@@ -64,7 +93,10 @@ test('a sweep at the clearing’s edge swings the other way, and still sweeps', 
       const p = poseOnCycle(pin, i / 64);
       return Math.atan2(p.pos[0] - FX, p.pos[2] - FZ);
     });
-    assert.ok(bearings.every((b) => Math.sign(edge) * b <= Math.abs(edge) + 1e-6), 'away from the edge');
+    assert.ok(
+      bearings.every((b) => Math.sign(edge) * b <= Math.abs(edge) + 1e-6),
+      'away from the edge',
+    );
     const arc = Math.max(...bearings) - Math.min(...bearings);
     assert.ok(arc > 1, `a real sweep (${arc.toFixed(2)} rad)`);
   }
@@ -82,10 +114,17 @@ test('a sweep at the clearing’s edge swings the other way, and still sweeps', 
 /** A stand-in scene for the camera: records every pose it's sent. */
 function fakeFire() {
   const poses = [];
-  return { poses, blade: null, setPose: (p) => poses.push({ pos: [...p.pos], target: [...p.target], fov: p.fov, roll: p.roll, sx: p.sx, sy: p.sy }) };
+  return {
+    poses,
+    blade: null,
+    setPose: (p) =>
+      poses.push({ pos: [...p.pos], target: [...p.target], fov: p.fov, roll: p.roll, sx: p.sx, sy: p.sy }),
+  };
 }
 const settingsFor = (over = {}) => ({ camera: 'cuts', shot: 'clearing', transition: 'cut', cutBars: 2, ...over });
-const tick = (camera, n = 1, period = 0.5) => { for (let i = 0; i < n; i++) camera.update(1 / 60, { period, punch: 0, holding: false, build: 0, breath: 0 }); };
+const tick = (camera, n = 1, period = 0.5) => {
+  for (let i = 0; i < n; i++) camera.update(1 / 60, { period, punch: 0, holding: false, build: 0, breath: 0 });
+};
 
 test('camera: a held pin refuses the show’s cuts and setShot; a pin that doesn’t hold hands back at the next cut', () => {
   const fire = fakeFire();
@@ -96,7 +135,11 @@ test('camera: a held pin refuses the show’s cuts and setShot; a pin that doesn
   camera.pin(pin);
   assert.equal(camera.held, true);
   tick(camera);
-  assert.deepEqual(fire.poses.at(-1).pos.map((v) => +v.toFixed(4)), pin.pos.map((v) => +v.toFixed(4)), 'the painted framing');
+  assert.deepEqual(
+    fire.poses.at(-1).pos.map((v) => +v.toFixed(4)),
+    pin.pos.map((v) => +v.toFixed(4)),
+    'the painted framing',
+  );
   assert.equal(fire.poses.at(-1).fov, 36);
   assert.equal(camera.cut('hearth'), null, 'a cut is refused');
   assert.equal(camera.cut('follow'), null, 'a rig too');
@@ -145,7 +188,10 @@ test('camera: the move plays on the beat and comes round; pause freezes it; fram
   const cam2 = createCamera(still, settingsFor({ camera: 'still' }));
   cam2.pin(pin);
   tick(cam2, 120);
-  assert.deepEqual(still.poses.at(-1).pos.map((v) => +v.toFixed(4)), keepInClearingArr(pin.pos));
+  assert.deepEqual(
+    still.poses.at(-1).pos.map((v) => +v.toFixed(4)),
+    keepInClearingArr(pin.pos),
+  );
 });
 const keepInClearingArr = ([x, y, z]) => {
   const p = keepInClearing({ x, y, z });
@@ -158,10 +204,15 @@ test('camera: 32 bars of each move from framings all round the clearing never le
     for (let k = 0; k < 4; k++) {
       const fire = fakeFire();
       const camera = createCamera(fire, settingsFor({ camera: 'drift' }));
-      const pin = at((rnd() * 2 - 1) * 1.8, 1 + rnd() * 5.5, 0.3 + rnd() * 4, { kind, amount: 0.5 + rnd() * 0.5, bars: MOVE_BARS[Math.floor(rnd() * MOVE_BARS.length)] });
+      const pin = at((rnd() * 2 - 1) * 1.8, 1 + rnd() * 5.5, 0.3 + rnd() * 4, {
+        kind,
+        amount: 0.5 + rnd() * 0.5,
+        bars: MOVE_BARS[Math.floor(rnd() * MOVE_BARS.length)],
+      });
       camera.pin(pin);
       const period = 60 / 128;
-      for (let f = 0; f < 32 * 4 * period * 30; f++) camera.update(1 / 30, { period, punch: 0, holding: false, build: 0, breath: 0 });
+      for (let f = 0; f < 32 * 4 * period * 30; f++)
+        camera.update(1 / 30, { period, punch: 0, holding: false, build: 0, breath: 0 });
       for (const p of fire.poses) assert.ok(inside(p.pos), `${kind}: ${p.pos.map((v) => v.toFixed(2))}`);
     }
   }

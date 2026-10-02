@@ -31,10 +31,8 @@ const candidates = [
 const blender = candidates.find((p) => p === 'blender' || fs.existsSync(p));
 
 const root = process.cwd();
-const run = spawnSync(
-  blender,
-  ['--background', '--factory-startup', '--python', script, '--', root, ...extra],
-  { stdio: 'inherit' },
-);
+const run = spawnSync(blender, ['--background', '--factory-startup', '--python', script, '--', root, ...extra], {
+  stdio: 'inherit',
+});
 if (run.status !== 0) process.exit(run.status ?? 1);
 console.log(`✓ ${OUTPUTS[name] ?? script}`);

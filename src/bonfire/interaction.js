@@ -17,6 +17,7 @@
 //
 // The individual ingredients stay available for comparison (?lab, or P then 6).
 import * as THREE from 'three';
+import { smoothstep } from '../math.js';
 
 export const MODES = {
   ember: { name: 'Ember', blurb: 'The mix: stir + a soft part + a gentle lean, with a slash only on fast swings.' },
@@ -27,12 +28,10 @@ export const MODES = {
   slash: { name: 'Slash', blurb: 'The original: the cursor path knocks particles along the swing.' },
 };
 
-const CELL = 24;          // stir grid cell size (px)
-const VORTEX_CORE = 24;   // wake vortex core radius (px)
-const VORTEX_LIFE = 0.9;  // seconds
-const VORTEX_GAP = 22;    // px of cursor travel between vortex pairs
-
-const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const CELL = 24; // stir grid cell size (px)
+const VORTEX_CORE = 24; // wake vortex core radius (px)
+const VORTEX_LIFE = 0.9; // seconds
+const VORTEX_GAP = 22; // px of cursor travel between vortex pairs
 
 export function createInteraction({ reducedMotion = false } = {}) {
   let mode = 'ember';
@@ -63,23 +62,36 @@ export function createInteraction({ reducedMotion = false } = {}) {
   }
 
   // --- stir: coarse velocity grid ---------------------------------------------------
-  let gw = 0, gh = 0, GX, GY, TX, TY;
+  let gw = 0,
+    gh = 0,
+    GX,
+    GY,
+    TX,
+    TY;
   function ensureGrid() {
-    const nw = Math.ceil(W / CELL) + 2, nh = Math.ceil(H / CELL) + 2;
+    const nw = Math.ceil(W / CELL) + 2,
+      nh = Math.ceil(H / CELL) + 2;
     if (nw === gw && nh === gh) return;
-    gw = nw; gh = nh;
-    GX = new Float32Array(gw * gh); GY = new Float32Array(gw * gh);
-    TX = new Float32Array(gw * gh); TY = new Float32Array(gw * gh);
+    gw = nw;
+    gh = nh;
+    GX = new Float32Array(gw * gh);
+    GY = new Float32Array(gw * gh);
+    TX = new Float32Array(gw * gh);
+    TY = new Float32Array(gw * gh);
   }
   function sampleGrid(A, x, y) {
     const fx = Math.min(gw - 1.001, Math.max(0, x / CELL));
     const fy = Math.min(gh - 1.001, Math.max(0, y / CELL));
-    const i = Math.floor(fx), j = Math.floor(fy), u = fx - i, v = fy - j;
+    const i = Math.floor(fx),
+      j = Math.floor(fy),
+      u = fx - i,
+      v = fy - j;
     const k = j * gw + i;
     return (A[k] * (1 - u) + A[k + 1] * u) * (1 - v) + (A[k + gw] * (1 - u) + A[k + gw + 1] * u) * v;
   }
   function segDist(px, py, c) {
-    const sx = c.bx - c.ax, sy = c.by - c.ay;
+    const sx = c.bx - c.ax,
+      sy = c.by - c.ay;
     const t = Math.max(0, Math.min(1, ((px - c.ax) * sx + (py - c.ay) * sy) / (sx * sx + sy * sy || 1)));
     return [px - (c.ax + sx * t), py - (c.ay + sy * t)];
   }
@@ -87,33 +99,43 @@ export function createInteraction({ reducedMotion = false } = {}) {
     ensureGrid();
     if (Math.abs(vx) + Math.abs(vy) > 20) {
       const sig2 = 2 * (R * 0.45) ** 2;
-      const i0 = Math.max(0, Math.floor((Math.min(c.ax, c.bx) - R) / CELL)), i1 = Math.min(gw - 1, Math.ceil((Math.max(c.ax, c.bx) + R) / CELL));
-      const j0 = Math.max(0, Math.floor((Math.min(c.ay, c.by) - R) / CELL)), j1 = Math.min(gh - 1, Math.ceil((Math.max(c.ay, c.by) + R) / CELL));
-      const cx = Math.max(-2400, Math.min(2400, vx)), cy = Math.max(-2400, Math.min(2400, vy));
-      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-        const [dx, dy] = segDist(i * CELL, j * CELL, c);
-        const d2 = dx * dx + dy * dy;
-        if (d2 > R * R) continue;
-        const w = Math.exp(-d2 / sig2) * strength;
-        const k = j * gw + i;
-        GX[k] += (cx - GX[k]) * w;
-        GY[k] += (cy - GY[k]) * w;
-      }
+      const i0 = Math.max(0, Math.floor((Math.min(c.ax, c.bx) - R) / CELL)),
+        i1 = Math.min(gw - 1, Math.ceil((Math.max(c.ax, c.bx) + R) / CELL));
+      const j0 = Math.max(0, Math.floor((Math.min(c.ay, c.by) - R) / CELL)),
+        j1 = Math.min(gh - 1, Math.ceil((Math.max(c.ay, c.by) + R) / CELL));
+      const cx = Math.max(-2400, Math.min(2400, vx)),
+        cy = Math.max(-2400, Math.min(2400, vy));
+      for (let j = j0; j <= j1; j++)
+        for (let i = i0; i <= i1; i++) {
+          const [dx, dy] = segDist(i * CELL, j * CELL, c);
+          const d2 = dx * dx + dy * dy;
+          if (d2 > R * R) continue;
+          const w = Math.exp(-d2 / sig2) * strength;
+          const k = j * gw + i;
+          GX[k] += (cx - GX[k]) * w;
+          GY[k] += (cy - GY[k]) * w;
+        }
     }
     // Advect the field through itself (semi-Lagrangian), then diffuse and fade.
-    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
-      const k = j * gw + i;
-      const x = i * CELL - GX[k] * dt, y = j * CELL - GY[k] * dt;
-      TX[k] = sampleGrid(GX, x, y);
-      TY[k] = sampleGrid(GY, x, y);
-    }
+    for (let j = 0; j < gh; j++)
+      for (let i = 0; i < gw; i++) {
+        const k = j * gw + i;
+        const x = i * CELL - GX[k] * dt,
+          y = j * CELL - GY[k] * dt;
+        TX[k] = sampleGrid(GX, x, y);
+        TY[k] = sampleGrid(GY, x, y);
+      }
     const fade = Math.exp(-dt * 1.5);
-    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
-      const k = j * gw + i;
-      const l = i > 0 ? k - 1 : k, r = i < gw - 1 ? k + 1 : k, u = j > 0 ? k - gw : k, d = j < gh - 1 ? k + gw : k;
-      GX[k] = (TX[k] * 0.6 + (TX[l] + TX[r] + TX[u] + TX[d]) * 0.1) * fade;
-      GY[k] = (TY[k] * 0.6 + (TY[l] + TY[r] + TY[u] + TY[d]) * 0.1) * fade;
-    }
+    for (let j = 0; j < gh; j++)
+      for (let i = 0; i < gw; i++) {
+        const k = j * gw + i;
+        const l = i > 0 ? k - 1 : k,
+          r = i < gw - 1 ? k + 1 : k,
+          u = j > 0 ? k - gw : k,
+          d = j < gh - 1 ? k + gw : k;
+        GX[k] = (TX[k] * 0.6 + (TX[l] + TX[r] + TX[u] + TX[d]) * 0.1) * fade;
+        GY[k] = (TY[k] * 0.6 + (TY[l] + TY[r] + TY[u] + TY[d]) * 0.1) * fade;
+      }
   }
 
   // --- wake: shed vortex pairs --------------------------------------------------------
@@ -121,15 +143,18 @@ export function createInteraction({ reducedMotion = false } = {}) {
   let travel = 0;
   function stepWake(c, dt) {
     if (c.moving) {
-      const sx = c.bx - c.ax, sy = c.by - c.ay;
+      const sx = c.bx - c.ax,
+        sy = c.by - c.ay;
       const len = Math.hypot(sx, sy);
       const speed = Math.min(2200, Math.hypot(c.vx, c.vy));
-      const nx = -sy / (len || 1), ny = sx / (len || 1);
+      const nx = -sy / (len || 1),
+        ny = sx / (len || 1);
       const g = 2 * Math.PI * VORTEX_CORE * 0.55 * speed;
       let s = VORTEX_GAP - travel;
       while (s <= len) {
         const t = s / (len || 1);
-        const x = c.ax + sx * t, y = c.ay + sy * t;
+        const x = c.ax + sx * t,
+          y = c.ay + sy * t;
         vortices.push({ x: x + nx * 26, y: y + ny * 26, g, age: 0, dx: c.vx * 0.25, dy: c.vy * 0.25 });
         vortices.push({ x: x - nx * 26, y: y - ny * 26, g: -g, age: 0, dx: c.vx * 0.25, dy: c.vy * 0.25 });
         s += VORTEX_GAP;
@@ -140,7 +165,10 @@ export function createInteraction({ reducedMotion = false } = {}) {
     for (let i = vortices.length - 1; i >= 0; i--) {
       const v = vortices[i];
       v.age += dt;
-      if (v.age > VORTEX_LIFE) { vortices.splice(i, 1); continue; }
+      if (v.age > VORTEX_LIFE) {
+        vortices.splice(i, 1);
+        continue;
+      }
       v.x += v.dx * dt;
       v.y += (v.dy - 40) * dt;
       v.dx *= 1 - dt * 3;
@@ -163,7 +191,8 @@ export function createInteraction({ reducedMotion = false } = {}) {
   }
   function draw(px, py, c, out, k = 1, reach = 650) {
     if (!c.present) return;
-    const dx = c.bx - px, dy = c.by - py;
+    const dx = c.bx - px,
+      dy = c.by - py;
     const d = Math.hypot(dx, dy) || 1;
     const r = Math.max(0, 1 - d / reach);
     const pull = Math.min(d, 260) * 0.75 * r * r * k;
@@ -187,7 +216,8 @@ export function createInteraction({ reducedMotion = false } = {}) {
   let slashK = 0;
   let lastHit = 0;
   function flowAt(px, py, c) {
-    flow[0] = 0; flow[1] = 0;
+    flow[0] = 0;
+    flow[1] = 0;
     lastHit = 0;
     if (mode === 'ember') {
       flow[0] = sampleGrid(GX, px, py);
@@ -201,7 +231,8 @@ export function createInteraction({ reducedMotion = false } = {}) {
     } else if (mode === 'wake') {
       const c2 = VORTEX_CORE * VORTEX_CORE;
       for (const v of vortices) {
-        const dx = px - v.x, dy = py - v.y;
+        const dx = px - v.x,
+          dy = py - v.y;
         const r2 = dx * dx + dy * dy;
         if (r2 > 36 * c2) continue;
         const k = (v.g * (1 - v.age / VORTEX_LIFE) ** 1.5) / (2 * Math.PI * (r2 + c2));
@@ -228,25 +259,35 @@ export function createInteraction({ reducedMotion = false } = {}) {
     if (!c.moving || speed < 30) return false;
     const radius = 22 + Math.min(46, speed * 0.018);
     const cap = Math.min(1, 7000 / speed);
-    const vx = c.vx * cap, vy = c.vy * cap;
+    const vx = c.vx * cap,
+      vy = c.vy * cap;
     const { pos, vel, n } = set;
     let hit = false;
     for (let i = 0; i < n; i++) {
       const ix = i * 3;
-      const x = pos[ix], y = pos[ix + 1], z = pos[ix + 2];
+      const x = pos[ix],
+        y = pos[ix + 1],
+        z = pos[ix + 2];
       const cw = e[3] * x + e[7] * y + e[11] * z + e[15];
       if (cw <= 0.01) continue;
-      const px = ((e[0] * x + e[4] * y + e[8] * z + e[12]) / cw * 0.5 + 0.5) * W;
-      const py = (0.5 - (e[1] * x + e[5] * y + e[9] * z + e[13]) / cw * 0.5) * H;
+      const px = (((e[0] * x + e[4] * y + e[8] * z + e[12]) / cw) * 0.5 + 0.5) * W;
+      const py = (0.5 - ((e[1] * x + e[5] * y + e[9] * z + e[13]) / cw) * 0.5) * H;
       const [dx, dy] = segDist(px, py, c);
       const d2 = dx * dx + dy * dy;
       if (d2 > radius * radius) continue;
       const fall = (1 - Math.sqrt(d2) / radius) ** 2 * 0.55 * gain;
       const wpp = (2 * cw * tanHalf) / H;
-      const kx = vx * wpp * fall, ky = -vy * wpp * fall;
-      const wx = right.x * kx + up.x * ky, wy = right.y * kx + up.y * ky, wz = right.z * kx + up.z * ky;
-      vel[ix] += wx; vel[ix + 1] += wy; vel[ix + 2] += wz;
-      pos[ix] += wx * 0.03; pos[ix + 1] += wy * 0.03; pos[ix + 2] += wz * 0.03;
+      const kx = vx * wpp * fall,
+        ky = -vy * wpp * fall;
+      const wx = right.x * kx + up.x * ky,
+        wy = right.y * kx + up.y * ky,
+        wz = right.z * kx + up.z * ky;
+      vel[ix] += wx;
+      vel[ix + 1] += wy;
+      vel[ix + 2] += wz;
+      pos[ix] += wx * 0.03;
+      pos[ix + 1] += wy * 0.03;
+      pos[ix + 2] += wz * 0.03;
       hit = true;
     }
     return hit;
@@ -255,14 +296,21 @@ export function createInteraction({ reducedMotion = false } = {}) {
   // Screen flow → world velocity at depth cw, soft-clamped to maxV (m/s).
   function toWorld(fx, fy, cw, maxV, out) {
     const wpp = ((2 * cw * tanHalf) / H) * gain;
-    const kx = fx * wpp, ky = -fy * wpp;
-    let wx = right.x * kx + up.x * ky, wy = right.y * kx + up.y * ky, wz = right.z * kx + up.z * ky;
+    const kx = fx * wpp,
+      ky = -fy * wpp;
+    let wx = right.x * kx + up.x * ky,
+      wy = right.y * kx + up.y * ky,
+      wz = right.z * kx + up.z * ky;
     const m = Math.hypot(wx, wy, wz);
     if (m > 1e-6) {
       const s = (maxV * Math.tanh(m / maxV)) / m;
-      wx *= s; wy *= s; wz *= s;
+      wx *= s;
+      wy *= s;
+      wz *= s;
     }
-    out[0] = wx; out[1] = wy; out[2] = wz;
+    out[0] = wx;
+    out[1] = wy;
+    out[2] = wz;
     return out;
   }
 
@@ -280,7 +328,8 @@ export function createInteraction({ reducedMotion = false } = {}) {
   const sparks = [];
   function update(camera, c, sets, dt) {
     cur = c;
-    W = c.width; H = c.height;
+    W = c.width;
+    H = c.height;
     vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     e = vp.elements;
     right.setFromMatrixColumn(camera.matrixWorld, 0);
@@ -312,16 +361,22 @@ export function createInteraction({ reducedMotion = false } = {}) {
       let moved = false;
       for (let i = 0; i < n; i++) {
         const ix = i * 3;
-        const x = pos[ix], y = pos[ix + 1], z = pos[ix + 2];
+        const x = pos[ix],
+          y = pos[ix + 1],
+          z = pos[ix + 2];
         const cw = e[3] * x + e[7] * y + e[11] * z + e[15];
-        let wx = 0, wy = 0, wz = 0;
+        let wx = 0,
+          wy = 0,
+          wz = 0;
         if (cw > 0.01) {
-          const px = ((e[0] * x + e[4] * y + e[8] * z + e[12]) / cw * 0.5 + 0.5) * W;
-          const py = (0.5 - (e[1] * x + e[5] * y + e[9] * z + e[13]) / cw * 0.5) * H;
+          const px = (((e[0] * x + e[4] * y + e[8] * z + e[12]) / cw) * 0.5 + 0.5) * W;
+          const py = (0.5 - ((e[1] * x + e[5] * y + e[9] * z + e[13]) / cw) * 0.5) * H;
           const [fx, fy] = flowAt(px, py, c);
           if (fx || fy) {
             toWorld(fx, fy, cw, maxV, w3);
-            wx = w3[0]; wy = w3[1]; wz = w3[2];
+            wx = w3[0];
+            wy = w3[1];
+            wz = w3[2];
             // A fast cut through the flame throws off the odd spark.
             if (ext && lastHit > 0.5 && sparks.length < 6 && Math.random() < 0.02) {
               sparks.push({ x, y, z, vx: wx * 1.3, vy: wy * 1.3 + 0.4, vz: wz * 1.3 });
@@ -336,8 +391,14 @@ export function createInteraction({ reducedMotion = false } = {}) {
           ext[ix + 1] += (wy - ext[ix + 1]) * k;
           ext[ix + 2] += (wz - ext[ix + 2]) * k;
         } else if (wx || wy || wz) {
-          pos[ix] += wx * dt * 0.6; pos[ix + 1] += wy * dt * 0.6; pos[ix + 2] += wz * dt * 0.6;
-          if (s.vel) { s.vel[ix] += wx * dt * 2; s.vel[ix + 1] += wy * dt * 2; s.vel[ix + 2] += wz * dt * 2; }
+          pos[ix] += wx * dt * 0.6;
+          pos[ix + 1] += wy * dt * 0.6;
+          pos[ix + 2] += wz * dt * 0.6;
+          if (s.vel) {
+            s.vel[ix] += wx * dt * 2;
+            s.vel[ix + 1] += wy * dt * 2;
+            s.vel[ix + 2] += wz * dt * 2;
+          }
           moved = true;
         }
       }
@@ -354,19 +415,28 @@ export function createInteraction({ reducedMotion = false } = {}) {
     const cw = e[3] * x + e[7] * y + e[11] * z + e[15];
     if (cw <= 0.01) return out;
     pv.set(x, y, z);
-    const px = ((e[0] * x + e[4] * y + e[8] * z + e[12]) / cw * 0.5 + 0.5) * W;
-    const py = (0.5 - (e[1] * x + e[5] * y + e[9] * z + e[13]) / cw * 0.5) * H;
+    const px = (((e[0] * x + e[4] * y + e[8] * z + e[12]) / cw) * 0.5 + 0.5) * W;
+    const py = (0.5 - ((e[1] * x + e[5] * y + e[9] * z + e[13]) / cw) * 0.5) * H;
     const [fx, fy] = flowAt(px, py, cur);
-    if (fx || fy) { toWorld(fx, fy, cw, 1.5, w3); out.set(w3[0], w3[1], w3[2]); }
+    if (fx || fy) {
+      toWorld(fx, fy, cw, 1.5, w3);
+      out.set(w3[0], w3[1], w3[2]);
+    }
     return out;
   }
 
   return {
     update,
     flowWorld,
-    get mode() { return mode; },
-    set mode(m) { if (Object.hasOwn(MODES, m)) mode = m; },
+    get mode() {
+      return mode;
+    },
+    set mode(m) {
+      if (Object.hasOwn(MODES, m)) mode = m;
+    },
     /** How hard the cursor pushes the fire (1 = as tuned). */
-    set strength(s) { gain = (reducedMotion ? 0.5 : 1) * s; },
+    set strength(s) {
+      gain = (reducedMotion ? 0.5 : 1) * s;
+    },
   };
 }

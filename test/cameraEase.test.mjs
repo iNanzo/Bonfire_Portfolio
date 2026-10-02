@@ -10,7 +10,10 @@ test('camera feels: every follower reaches its target, stable at any frame rate'
       const f = createFollower(key);
       const st = { x: 0 };
       let peak = 0;
-      for (let t = 0; t < 3; t += dt) { f.num(st, 'x', 1, 0.07, dt); peak = Math.max(peak, st.x); }
+      for (let t = 0; t < 3; t += dt) {
+        f.num(st, 'x', 1, 0.07, dt);
+        peak = Math.max(peak, st.x);
+      }
       assert.ok(Math.abs(st.x - 1) < 0.02, `${key} at ${dt}: ${st.x}`);
       if (SWING_EASES[key].zeta < 1) assert.ok(peak > 1.02, `${key} overshoots`);
       else assert.ok(peak < 1.005, `${key} doesn't overshoot (${peak})`);

@@ -30,7 +30,12 @@ export const FINISHES = {
 };
 
 /** Their names for people (Title Case, for the admin, the pack and Bonfire Live). */
-export const FINISH_NAMES = { gunmetal: 'Gunmetal', blackened: 'Blackened', polished: 'Polished Steel', burnished: 'Burnished' };
+export const FINISH_NAMES = {
+  gunmetal: 'Gunmetal',
+  blackened: 'Blackened',
+  polished: 'Polished Steel',
+  burnished: 'Burnished',
+};
 
 /**
  * How each finish takes the light: `bias` moves every facet up or down its ramp (tones),
@@ -50,7 +55,14 @@ export const finishOr = (name) => (Object.hasOwn(FINISHES, name) ? name : 'gunme
 const LEAN = [0, 0, 0.02, 0.04, 0.07];
 
 const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-const hex = (c) => `#${c.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('')}`;
+const hex = (c) =>
+  `#${c
+    .map((v) =>
+      Math.round(Math.min(255, Math.max(0, v)))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
 
 const mix = (a, b, t) => hex(rgb(a).map((v, k) => v + (rgb(b)[k] - v) * t));
 const isHex = (h) => typeof h === 'string' && /^#[0-9a-f]{6}$/i.test(h);
@@ -74,7 +86,12 @@ export const CEL_TONES = ['deep', 'shadow', 'mid', 'steel', 'body', 'highlight',
  * polished a bright cool silver, more contrast; burnished a warm bronze-brown.
  */
 export const CEL_STEEL = {
-  gunmetal: [FINISHES.gunmetal[0], FINISHES.gunmetal[1], mix(FINISHES.gunmetal[2], FINISHES.gunmetal[3], 0.3), mix(FINISHES.gunmetal[3], FINISHES.gunmetal[4], 0.15)],
+  gunmetal: [
+    FINISHES.gunmetal[0],
+    FINISHES.gunmetal[1],
+    mix(FINISHES.gunmetal[2], FINISHES.gunmetal[3], 0.3),
+    mix(FINISHES.gunmetal[3], FINISHES.gunmetal[4], 0.15),
+  ],
   blackened: ['#101013', '#1f2024', '#303137', '#474950'],
   polished: ['#17191e', '#3a3e48', '#6a707c', '#858c98'],
   burnished: ['#21170f', '#4a372a', '#7a5d45', '#9f8065'],
@@ -90,8 +107,9 @@ export const CEL_STEEL = {
  * flame's color where it lights him and recolors with it. `terminator` is the flame's dark,
  * saturated shade, one texel where a lit band gives way to the steel (the warm edge
  * between light and shadow); `ink` the line art over his lit tones (the void elsewhere).
- * The armor draws each band in one of these (armor.js), the pass snaps his pixels to them
- * (pixelPass.js setSteel), with no dither of its own.
+ * The armor draws each band in one of these (armor.js), dithering the band edges itself (a
+ * band's texels stepping into the next, in the pass's own Bayer pattern), and the pass
+ * snaps his pixels to them (pixelPass.js setSteel), with no dither of its own.
  *   cel          near-black backs, dark and mid gunmetal, a light steel between, the flame's
  *                body and cream tips; a dark warm ink on the lit side
  *   painterly    the cel tones with the shadows hue-shifted toward the flame's shade (as dark),
@@ -119,10 +137,28 @@ export function celRamp(look, finishName, { ramp = [], shade } = {}) {
   const highlight = mix(hi, core, 0.55);
   const terminator = mix(mix(lo, mid, 0.35), VOID, 0.12);
   if (look === 'painterly') {
-    return [lean(deep, sh, 0.5), lean(s0, sh, 0.45), lean(midSteel, sh, 0.25), lean(lightSteel, hi, 0.24), body, highlight, terminator, mix(s0, sh, 0.55)];
+    return [
+      lean(deep, sh, 0.5),
+      lean(s0, sh, 0.45),
+      lean(midSteel, sh, 0.25),
+      lean(lightSteel, hi, 0.24),
+      body,
+      highlight,
+      terminator,
+      mix(s0, sh, 0.55),
+    ];
   }
   if (look === 'chiaroscuro') {
-    return [mix(d0, VOID, 0.6), s0, midSteel, lightSteel, mix(mix(mid, hi, 0.35), f[4], 0.06), mix(hi, core, 0.45), terminator, VOID];
+    return [
+      mix(d0, VOID, 0.6),
+      s0,
+      midSteel,
+      lightSteel,
+      mix(mix(mid, hi, 0.35), f[4], 0.06),
+      mix(hi, core, 0.45),
+      terminator,
+      VOID,
+    ];
   }
   return [deep, s0, midSteel, lightSteel, body, highlight, terminator, mix(VOID, sh, 0.5)];
 }

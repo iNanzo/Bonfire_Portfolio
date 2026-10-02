@@ -27,7 +27,9 @@ function fakeStorage({ capacity = Infinity, failFrom = Infinity } = {}) {
   const size = () => [...m].reduce((n, [k, v]) => n + k.length + v.length, 0);
   return {
     map: m,
-    get writes() { return writes; },
+    get writes() {
+      return writes;
+    },
     getItem: (k) => (m.has(k) ? m.get(k) : null),
     setItem(k, v) {
       writes++;
@@ -35,15 +37,22 @@ function fakeStorage({ capacity = Infinity, failFrom = Infinity } = {}) {
       if (writes >= failFrom) throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' });
       m.set(k, String(v));
       if (size() > capacity) {
-        if (was === undefined) m.delete(k); else m.set(k, was);
+        if (was === undefined) m.delete(k);
+        else m.set(k, was);
         throw Object.assign(new Error('QuotaExceededError'), { name: 'QuotaExceededError' });
       }
     },
-    removeItem: (k) => { m.delete(k); },
+    removeItem: (k) => {
+      m.delete(k);
+    },
   };
 }
 const thumbOf = (n, size = 4000) => `data:image/webp;base64,${String(n).padStart(size, 'A')}`;
-const valid = (s) => { const out = []; validateScene(s, (p) => out.push(p)); return out; };
+const valid = (s) => {
+  const out = [];
+  validateScene(s, (p) => out.push(p));
+  return out;
+};
 const quiet = (o = {}) => createSceneStore({ BroadcastChannel: null, events: null, ...o });
 
 test('saving: normalized, in order; the same id replaces; fresh ones get their own id', () => {
@@ -58,11 +67,17 @@ test('saving: normalized, in order; the same id replaces; fresh ones get their o
   assert.equal(a.fire.level, 1);
   assert.deepEqual(valid(a), []);
   const b = store.save(defaultScene('Forge Rave'));
-  assert.deepEqual(store.list().map((s) => s.id), ['moonlit-ruins', 'forge-rave']);
+  assert.deepEqual(
+    store.list().map((s) => s.id),
+    ['moonlit-ruins', 'forge-rave'],
+  );
 
   // Saving the same id again is an edit.
   store.save({ ...b, name: 'Forge Rave II' });
-  assert.deepEqual(store.list().map((s) => s.name), ['Moonlit Ruins', 'Forge Rave II']);
+  assert.deepEqual(
+    store.list().map((s) => s.name),
+    ['Moonlit Ruins', 'Forge Rave II'],
+  );
   // A copy (fresh) or a scene without an id never overwrites one.
   const copy = store.save(b, { fresh: true });
   assert.equal(copy.id, 'forge-rave-2');
@@ -77,10 +92,16 @@ test('saving: normalized, in order; the same id replaces; fresh ones get their o
   assert.equal(store.get('nope'), null);
 
   store.reorder(['forge-rave-2', 'nope', 'moonlit-ruins']);
-  assert.deepEqual(store.list().map((s) => s.id), ['forge-rave-2', 'moonlit-ruins', 'forge-rave', 'moonlit-ruins-2']);
+  assert.deepEqual(
+    store.list().map((s) => s.id),
+    ['forge-rave-2', 'moonlit-ruins', 'forge-rave', 'moonlit-ruins-2'],
+  );
   store.setThumb('m:forge-rave', thumbOf(1));
   store.remove('forge-rave');
-  assert.deepEqual(store.list().map((s) => s.id), ['forge-rave-2', 'moonlit-ruins', 'moonlit-ruins-2']);
+  assert.deepEqual(
+    store.list().map((s) => s.id),
+    ['forge-rave-2', 'moonlit-ruins', 'moonlit-ruins-2'],
+  );
   assert.equal(store.thumb('m:forge-rave'), null, 'its thumbnail goes with it');
 
   // What's stored: { v, order, scenes }.
@@ -95,9 +116,20 @@ test('corrupt or hand-edited storage reads as far as it can, and saving still wo
   storage.setItem(SCENES_KEY, '{oops');
   const store = quiet({ storage });
   assert.deepEqual(store.list(), []);
-  storage.setItem(SCENES_KEY, JSON.stringify({ v: 1, order: ['b', 'ghost', 'b'], scenes: { a: { name: 'A', look: { name: 'disco' } }, b: { name: 'B' }, 'Bad Id': { name: 'C' }, c: 'nope' } }));
+  storage.setItem(
+    SCENES_KEY,
+    JSON.stringify({
+      v: 1,
+      order: ['b', 'ghost', 'b'],
+      scenes: { a: { name: 'A', look: { name: 'disco' } }, b: { name: 'B' }, 'Bad Id': { name: 'C' }, c: 'nope' },
+    }),
+  );
   const list = store.list();
-  assert.deepEqual(list.map((s) => s.id), ['b', 'a'], 'the order kept, the rest after, junk skipped');
+  assert.deepEqual(
+    list.map((s) => s.id),
+    ['b', 'a'],
+    'the order kept, the rest after, junk skipped',
+  );
   assert.equal(list[1].look.name, 'ember', 'normalized on the way out');
   for (const s of list) assert.deepEqual(valid(s), []);
   store.save(defaultScene('Fresh'));
@@ -135,9 +167,13 @@ test('thumbnails are parsed once per stored text: a list asks per row for free; 
   for (let i = 0; i < 48; i++) store.setThumb(`m:s-${i}`, thumbOf(i, 2000));
   const parse = JSON.parse;
   let parsed = 0;
-  JSON.parse = (...a) => { parsed++; return parse(...a); };
+  JSON.parse = (...a) => {
+    parsed++;
+    return parse(...a);
+  };
   try {
-    for (let redraw = 0; redraw < 3; redraw++) for (let i = 0; i < 48; i++) assert.equal(store.thumb(`m:s-${i}`), thumbOf(i, 2000));
+    for (let redraw = 0; redraw < 3; redraw++)
+      for (let i = 0; i < 48; i++) assert.equal(store.thumb(`m:s-${i}`), thumbOf(i, 2000));
     assert.equal(Object.keys(store.thumbs()).length, 48, 'or all at once');
     assert.ok(parsed <= 1, `parsed ${parsed} times`);
     // Another tab (or store) writes: the new text is read.
@@ -150,7 +186,8 @@ test('thumbnails are parsed once per stored text: a list asks per row for free; 
     JSON.parse = parse;
   }
   // Only its own refs: never what every object inherits.
-  for (const ref of ['constructor', 'toString', '__proto__', 'm:constructor']) assert.equal(store.thumb(ref), null, ref);
+  for (const ref of ['constructor', 'toString', '__proto__', 'm:constructor'])
+    assert.equal(store.thumb(ref), null, ref);
   assert.ok(Object.isFrozen(store.thumbs()), 'the snapshot is read-only');
 });
 
@@ -178,7 +215,11 @@ test('a full storage: thumbnails go first, then the save is refused and nothing 
   // Keep saving until even with every thumbnail gone it doesn't fit: refused, the rest intact.
   let refused = null;
   for (let i = 0; i < 100 && !refused; i++) {
-    try { store.save(defaultScene(`More ${i}`)); } catch (e) { refused = e; }
+    try {
+      store.save(defaultScene(`More ${i}`));
+    } catch (e) {
+      refused = e;
+    }
   }
   assert.ok(refused, 'eventually the storage is full');
   assert.equal(refused.name, 'StorageFull');
@@ -196,7 +237,10 @@ test('a storage that throws on the Nth write: that save fails cleanly, reads sti
   store.save(defaultScene('One'));
   store.save(defaultScene('Two'));
   assert.throws(() => store.save(defaultScene('Three')), { name: 'StorageFull' });
-  assert.deepEqual(store.list().map((s) => s.id), ['one', 'two']);
+  assert.deepEqual(
+    store.list().map((s) => s.id),
+    ['one', 'two'],
+  );
   assert.equal(store.setThumb('m:one', thumbOf(1)), false);
   assert.throws(() => store.remove('one'), { name: 'StorageFull' });
   assert.equal(store.list().length, 2);
@@ -261,7 +305,9 @@ test('Play in Bonfire Live: answered within the window, or false', async () => {
   const live = createSceneStore({ storage, channelName, events: null });
   assert.equal(await painter.play('m:anything'), false, 'no Bonfire Live listening');
   const played = [];
-  const off = live.onPlay((ref) => { played.push(ref); });
+  const off = live.onPlay((ref) => {
+    played.push(ref);
+  });
   assert.equal(await painter.play('m:frozen-shrine'), true);
   assert.equal(await painter.play('b:forge-rave'), true);
   assert.deepEqual(played, ['m:frozen-shrine', 'b:forge-rave']);

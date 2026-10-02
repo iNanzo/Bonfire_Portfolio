@@ -69,20 +69,32 @@ export function parseStatus(line) {
 const clients = new Set();
 function frame(text) {
   const data = Buffer.from(text);
-  const head = data.length < 126 ? Buffer.from([0x81, data.length]) : Buffer.from([0x81, 126, data.length >> 8, data.length & 255]);
+  const head =
+    data.length < 126
+      ? Buffer.from([0x81, data.length])
+      : Buffer.from([0x81, 126, data.length >> 8, data.length & 255]);
   return Buffer.concat([head, data]);
 }
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end(`Bonfire Live's Link bridge. ${latest ? `Link: ${latest.bpm.toFixed(1)} BPM, ${latest.peers} peer(s).` : 'Waiting for Carabiner…'}\n`);
+  res.end(
+    `Bonfire Live's Link bridge. ${latest ? `Link: ${latest.bpm.toFixed(1)} BPM, ${latest.peers} peer(s).` : 'Waiting for Carabiner…'}\n`,
+  );
 });
 server.on('upgrade', (req, socket) => {
   const key = req.headers['sec-websocket-key'];
   if (!key) return socket.destroy();
-  const accept = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
-  socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
+  const accept = crypto
+    .createHash('sha1')
+    .update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')
+    .digest('base64');
+  socket.write(
+    `HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`,
+  );
   clients.add(socket);
-  socket.on('data', (d) => { if ((d[0] & 0x0f) === 0x8) socket.end(); }); // a close frame
+  socket.on('data', (d) => {
+    if ((d[0] & 0x0f) === 0x8) socket.end();
+  }); // a close frame
   socket.on('close', () => clients.delete(socket));
   socket.on('error', () => clients.delete(socket));
   console.log('Bonfire Live connected.');
@@ -94,13 +106,17 @@ function poll() {
   carabiner?.write('status\n');
   if (!latest || !clients.size) return;
   const age = (performance.now() - latest.at) / 1000;
-  const msg = frame(JSON.stringify({ bpm: latest.bpm, beat: latest.beat + age * (latest.bpm / 60), peers: latest.peers }));
+  const msg = frame(
+    JSON.stringify({ bpm: latest.bpm, beat: latest.beat + age * (latest.bpm / 60), peers: latest.peers }),
+  );
   for (const c of clients) c.write(msg);
 }
 
 // (Run as a script; importing it, e.g. from a test, starts nothing.)
 if (process.argv[1]?.endsWith('link-bridge.mjs')) {
-  server.listen(PORT, '127.0.0.1', () => console.log(`Link bridge on ws://127.0.0.1:${PORT} (Carabiner on port ${CARABINER}).`));
+  server.listen(PORT, '127.0.0.1', () =>
+    console.log(`Link bridge on ws://127.0.0.1:${PORT} (Carabiner on port ${CARABINER}).`),
+  );
   connect();
   setInterval(poll, POLL_MS);
 }

@@ -16,6 +16,12 @@ export const smoothstep = (a, b, x) => smooth(clamp01((x - a) / (b - a)));
 export const smoother = (t) => t * t * t * (t * (t * 6 - 15) + 10);
 /** Cubic ease in and out. */
 export const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+/**
+ * Ease out past 1 and settle back (0 → 1 with an overshoot): `c` sets how far it
+ * overshoots (the lightning ball grows with 1.6, ice snaps up with 1.9).
+ * @param {number} t @param {number} c
+ */
+export const easeOutBack = (t, c) => 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2;
 
 // --- over time ------------------------------------------------------------------------
 /**

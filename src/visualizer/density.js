@@ -22,7 +22,12 @@ export function densityCounts(base, level = 'more') {
   const k = Object.hasOwn(DENSITY, level) ? DENSITY[level] : DENSITY.more;
   const p = base.particles;
   return {
-    particles: { fire: Math.round(p.fire * k.fire), sparks: Math.round(p.sparks * k.sparks), forge: Math.round(p.forge * k.forge), impact: p.impact * k.impact },
+    particles: {
+      fire: Math.round(p.fire * k.fire),
+      sparks: Math.round(p.sparks * k.sparks),
+      forge: Math.round(p.forge * k.forge),
+      impact: p.impact * k.impact,
+    },
     fireflies: { count: Math.round(base.fireflies.count * k.flies), lights: base.fireflies.lights },
   };
 }

@@ -35,9 +35,13 @@ export function createLayered(base) {
   return {
     view,
     /** Lay a scene's settings over the user's (null: take it away). */
-    set(o) { over = o ? { ...o } : null; },
+    set(o) {
+      over = o ? { ...o } : null;
+    },
     /** The overlay as it stands (null: none). */
-    get over() { return over; },
+    get over() {
+      return over;
+    },
     /** The user's hand wins for these keys until the next overlay. */
     release(keys) {
       if (!over) return;

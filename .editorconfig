@@ -1,0 +1,18 @@
+# Editor settings for every file: UTF-8, LF line endings (.gitattributes keeps LF in git
+# too), two-space indents, a final newline and no trailing spaces. Markdown keeps its
+# trailing spaces (two of them are a line break there); the Blender scripts indent by four.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.py]
+indent_size = 4

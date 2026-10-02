@@ -1,22 +1,40 @@
 // Smoke tests: every screen and Bonfire Live load in a real browser with no errors, the
 // bonfire draws, and the main controls answer (Q/E, Esc, the pack, the breakdown and its
 // render settings, the knight's model, his summon sign and his pack item, the demo track). Plus layout and
-// focus checks: the pack's lists on screen at phone to desktop sizes, focus back after the
+// focus checks: the pack's lists on screen at phone to desktop sizes, the title menu's box
+// no wider than its items (the sign beside it takes the pointer), focus back after the
 // breakdown, and no render HUD left behind on touch screens.
 import { test, expect } from '@playwright/test';
+import { content, screenLabel, startsWith } from './lib/content.mjs';
+
+// The words checked for are content.json's, which the admin edits (CONTRIBUTING.md): read
+// here, not pinned. The scene's description (#scene-label): the scene, then the knight's
+// sentence while he's by the fire or his summon sign's while he's away.
+const { sceneLabel: SCENE, sceneKnight: KNIGHT_HERE, sceneSign: SIGN } = content.hero;
+/** The Portfolio page's link that opens the breakdown (its href is #how-its-made), by its name. */
+const TAKE_APART = startsWith(
+  content.projects.find((p) => p.id === 'portfolio').links.find((l) => l.href === '#how-its-made').label,
+);
 
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
 function watch(page) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
   return errors;
 }
 
 /** Open the pack (a click pins it open) and the Knight item's list. */
 async function knightList(page) {
   await page.click('[data-pack-toggle]');
-  await page.waitForFunction(() => document.querySelector('.pack-items').getAnimations({ subtree: true }).every((a) => a.playState !== 'running'));
+  await page.waitForFunction(() =>
+    document
+      .querySelector('.pack-items')
+      .getAnimations({ subtree: true })
+      .every((a) => a.playState !== 'running'),
+  );
   await page.click('[data-pack-slot="knight"]');
   await expect(page.locator('[data-pack-list="knight"]')).toBeVisible();
 }
@@ -27,27 +45,31 @@ async function knightList(page) {
  */
 async function findSign(page) {
   const { width, height } = page.viewportSize();
-  const cx = Math.round(width * 0.49), cy = Math.round(height * 0.574);
+  const cx = Math.round(width * 0.49),
+    cy = Math.round(height * 0.574);
   for (const r of [0, 30, 60, 90, 120]) {
     for (let dx = -r; dx <= r; dx += 30) {
       for (let dy = -r; dy <= r; dy += 30) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
         await page.mouse.move(cx + dx, cy + dy);
         await page.waitForTimeout(130); // (hover is checked ~12 times a second)
-        if (await page.locator('[data-stage]').getAttribute('data-hover') === 'sign') return { x: cx + dx, y: cy + dy };
+        if ((await page.locator('[data-stage]').getAttribute('data-hover')) === 'sign')
+          return { x: cx + dx, y: cy + dy };
       }
     }
   }
   return null;
 }
 
+/** A screen's heading: the site's name on the title screen, else its section's title (or its name). */
+const titleOf = (id) => (id === 'home' ? content.site.name : (content.sections[id]?.title ?? screenLabel(id)));
 const SCREENS = [
-  ['/', 'Newton Hoang'],
-  ['/projects/', 'Project Inventory'],
-  ['/experience/', 'Journey'],
-  ['/skills/', 'Skills'],
-  ['/about/', 'About'],
-  ['/contact/', 'Contact'],
+  ['/', titleOf('home')],
+  ['/projects/', titleOf('projects')],
+  ['/experience/', titleOf('experience')],
+  ['/skills/', titleOf('skills')],
+  ['/about/', titleOf('about')],
+  ['/contact/', titleOf('contact')],
 ];
 
 for (const [path, heading] of SCREENS) {
@@ -80,7 +102,10 @@ test('Q and E step through the screens; the tabs stay centered', async ({ page }
   await page.keyboard.press('q');
   await page.keyboard.press('q');
   await expect(page).toHaveURL(/\/projects\/$/);
-  const { mid, vw } = await page.locator('.tabs').evaluate((t) => { const r = t.getBoundingClientRect(); return { mid: r.left + r.width / 2, vw: innerWidth }; });
+  const { mid, vw } = await page.locator('.tabs').evaluate((t) => {
+    const r = t.getBoundingClientRect();
+    return { mid: r.left + r.width / 2, vw: innerWidth };
+  });
   expect(Math.abs(mid - vw / 2)).toBeLessThan(2);
 });
 
@@ -90,7 +115,12 @@ test('the pack opens and its Map fast travels to another place', async ({ page }
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   await page.hover('[data-pack-toggle]');
   // The items rise in stepped frames (which can look settled mid-rise): let them land first.
-  await page.waitForFunction(() => document.querySelector('.pack-items').getAnimations({ subtree: true }).every((a) => a.playState !== 'running'));
+  await page.waitForFunction(() =>
+    document
+      .querySelector('.pack-items')
+      .getAnimations({ subtree: true })
+      .every((a) => a.playState !== 'running'),
+  );
   await page.hover('[data-pack-slot="map"]');
   const shrine = page.locator('[data-pack-option="shrine"]');
   await expect(shrine).toBeVisible();
@@ -116,20 +146,28 @@ test('the knight isn’t there on first load: his sign glows, and a click on it 
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   const label = page.locator('#scene-label');
-  await expect(label).toContainText(/summon sign/i, { timeout: 15_000 }); // (his model is in: the sign waits)
-  await expect(label).not.toContainText(/knight in steel plate sits/i);
+  await expect(label).toContainText(SIGN, { timeout: 30_000 }); // (his model is in: the sign waits)
+  await expect(label).not.toContainText(KNIGHT_HERE);
+  // The title menu's box ends with its widest item: beside them the stage takes the pointer,
+  // however wide a longer name makes the copy above (it covered the sign).
+  const menuRight = await page.locator('.title-menu').evaluate((m) => m.getBoundingClientRect().right);
+  const items = page.locator('.title-menu [data-title-item]');
+  const itemsRight = Math.max(...(await items.evaluateAll((as) => as.map((a) => a.getBoundingClientRect().right))));
+  expect(menuRight).toBeLessThanOrEqual(itemsRight + 1);
   const sign = await findSign(page);
   expect(sign, 'the sign is on the ground, and hovering it says so').not.toBeNull();
   expect(await page.locator('[data-stage]').evaluate((s) => getComputedStyle(s).cursor)).toBe('pointer');
   await page.mouse.click(sign.x, sign.y);
   // He forms out of it in the fire's element (~3 s), then rests.
-  await expect(label).toContainText(/knight in steel plate sits/i, { timeout: 15_000 });
+  await expect(label).toContainText(KNIGHT_HERE, { timeout: 15_000 });
   await page.mouse.move(5, 5);
   await page.waitForTimeout(500);
   expect(errors).toEqual([]);
 });
 
-test('the pack’s knight item summons him, swaps his helmet and style (remembered), asks for a gesture and sends him off', async ({ page }) => {
+test('the pack’s knight item summons him, swaps his helmet and style (remembered), asks for a gesture and sends him off', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   const errors = watch(page);
   await page.goto('/');
@@ -168,12 +206,14 @@ test('the pack’s knight item summons him, swaps his helmet and style (remember
   // Sent off: he burns away into his sign, and the pack offers the summons again.
   await dismiss.click();
   await expect(summon).toBeEnabled({ timeout: 15_000 });
-  await expect(page.locator('#scene-label')).toContainText(/summon sign/i);
+  await expect(page.locator('#scene-label')).toContainText(SIGN);
   await page.keyboard.press('Escape');
   expect(errors).toEqual([]);
 });
 
-test('the pack keeps the keyboard: Summon and Send Him Off picked with Enter leave focus in it, and Esc closes it, not the page', async ({ page }) => {
+test('the pack keeps the keyboard: Summon and Send Him Off picked with Enter leave focus in it, and Esc closes it, not the page', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   const errors = watch(page);
   await page.goto('/projects/portfolio/'); // (a project page: an Esc that got past the pack would go back to the inventory)
@@ -184,7 +224,7 @@ test('the pack keeps the keyboard: Summon and Send Him Off picked with Enter lea
     await page.locator('[data-pack-slot="knight"]').focus();
     await page.keyboard.press('ArrowLeft');
   };
-  await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 15_000 }); // (his model is in)
+  await expect(page.locator('#scene-label')).toContainText(SIGN, { timeout: 30_000 }); // (his model is in)
   await page.keyboard.press('i');
   await intoKnight();
   const summon = page.locator('[data-pack-option="summon"]');
@@ -228,7 +268,7 @@ test('the Portfolio’s page takes this one apart: the breakdown, its render set
   const errors = watch(page);
   await page.goto('/projects/portfolio/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
-  await page.getByRole('link', { name: /Take This Page Apart/ }).click();
+  await page.getByRole('link', { name: TAKE_APART }).click();
   await expect(page.locator('html')).toHaveClass(/is-breakdown/);
   // The pack stays, and its key works with focus on the panel's views.
   await expect(page.locator('[data-pack-toggle]')).toBeVisible();
@@ -247,23 +287,37 @@ test('the Portfolio’s page takes this one apart: the breakdown, its render set
   // B leaves it, and focus goes back to the link that opened it.
   await page.keyboard.press('b');
   await expect(page.locator('html')).not.toHaveClass(/is-breakdown/);
-  await expect(page.getByRole('link', { name: /Take This Page Apart/ })).toBeFocused();
+  await expect(page.getByRole('link', { name: TAKE_APART })).toBeFocused();
   expect(errors).toEqual([]);
 });
 
 // Every list the pack has, opened one by one: all of it in the window and below the header
 // (which is over the pack outside the breakdown), phones to desktops, the breakdown open
 // (the pack steps aside, over its sheet on phones) and closed.
-const SIZES = [[390, 844], [768, 1024], [844, 390], [1024, 768], [1280, 800], [1920, 1080]];
+const SIZES = [
+  [390, 844],
+  [768, 1024],
+  [844, 390],
+  [1024, 768],
+  [1280, 800],
+  [1920, 1080],
+];
 test('the pack’s lists stay on screen at every size, with the breakdown open and closed', async ({ page }) => {
   test.setTimeout(180_000);
   const errors = watch(page);
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   // (The Knight item is there once his model is in: it's its own file, after the scene.)
-  await expect(page.locator('#scene-label')).toContainText(/summon sign/i, { timeout: 15_000 });
+  await expect(page.locator('#scene-label')).toContainText(SIGN, { timeout: 30_000 });
   // (The items rising and the list sliding in have landed; the icons' own loops don't end.)
-  const settled = () => page.waitForFunction(() => document.querySelector('[data-pack]').getAnimations({ subtree: true }).filter((a) => a.effect?.getTiming().iterations !== Infinity).every((a) => a.playState !== 'running'));
+  const settled = () =>
+    page.waitForFunction(() =>
+      document
+        .querySelector('[data-pack]')
+        .getAnimations({ subtree: true })
+        .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+        .every((a) => a.playState !== 'running'),
+    );
   const off = [];
   for (const [width, height] of SIZES) {
     await page.setViewportSize({ width, height });
@@ -276,7 +330,9 @@ test('the pack’s lists stay on screen at every size, with the breakdown open a
       await expect(page.locator('.pack-items')).toBeVisible();
       await page.waitForTimeout(260); // (the pack glides to its corner)
       await settled();
-      const ids = await page.locator('.pack-item:not([hidden])').evaluateAll((els) => els.map((e) => e.dataset.packItem));
+      const ids = await page
+        .locator('.pack-item:not([hidden])')
+        .evaluateAll((els) => els.map((e) => e.dataset.packItem));
       expect(ids).toEqual(['map', 'anvil', 'tome', 'knight']);
       for (const id of ids) {
         await page.locator(`[data-pack-slot="${id}"]`).click();
@@ -286,7 +342,15 @@ test('the pack’s lists stay on screen at every size, with the breakdown open a
         const box = await list.evaluate((l) => {
           const r = l.getBoundingClientRect();
           const header = document.querySelector('[data-header]').getBoundingClientRect().bottom;
-          return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, vw: document.documentElement.clientWidth, vh: document.documentElement.clientHeight, header };
+          return {
+            left: r.left,
+            top: r.top,
+            right: r.right,
+            bottom: r.bottom,
+            vw: document.documentElement.clientWidth,
+            vh: document.documentElement.clientHeight,
+            header,
+          };
         });
         const inside = box.left >= 0 && box.right <= box.vw && box.top >= box.header && box.bottom <= box.vh;
         if (!inside) off.push({ size: `${width}x${height}`, inBreakdown, id, box });
@@ -303,13 +367,14 @@ test('the pack’s lists stay on screen at every size, with the breakdown open a
   expect(errors).toEqual([]);
 });
 
-test('no knight (his model doesn’t load): no Knight item in the pack, nor a word of him in the scene’s description', async ({ page }) => {
+test('no knight (his model doesn’t load): no Knight item in the pack, nor a word of him in the scene’s description', async ({
+  page,
+}) => {
   const errors = watch(page);
   await page.route('**/models/knight.glb', (r) => r.abort());
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
-  await expect(page.locator('#scene-label')).not.toContainText(/knight/i);
-  await expect(page.locator('#scene-label')).toContainText(/bonfire/i);
+  await expect(page.locator('#scene-label'), 'the scene alone').toHaveText(SCENE);
   await page.locator('[data-pack-toggle]').click();
   await expect(page.locator('[data-pack-slot="map"]')).toBeVisible();
   await expect(page.locator('[data-pack-item="knight"]')).toBeHidden();
@@ -323,7 +388,7 @@ test('touch screens: closing the breakdown folds its render settings away (no st
   await page.goto('/projects/portfolio/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   await expect(page.locator('html')).toHaveClass(/\btouch\b/);
-  await page.getByRole('link', { name: /Take This Page Apart/ }).tap();
+  await page.getByRole('link', { name: TAKE_APART }).tap();
   await expect(page.locator('html')).toHaveClass(/is-breakdown/);
   await page.locator('.breakdown [data-render-head]').tap();
   await expect(page.locator('.breakdown [data-render-row="outlines"]')).toBeVisible();
@@ -334,12 +399,14 @@ test('touch screens: closing the breakdown folds its render settings away (no st
   await context.close();
 });
 
-test('a link to #how-its-made opens the breakdown on arrival; Bonfire Live’s page points at the Portfolio', async ({ page }) => {
+test('a link to #how-its-made opens the breakdown on arrival; Bonfire Live’s page points at the Portfolio', async ({
+  page,
+}) => {
   const errors = watch(page);
   await page.goto('/#how-its-made');
   await expect(page.locator('html')).toHaveClass(/is-breakdown/, { timeout: 30_000 });
   await page.goto('/projects/bonfire-live/');
-  await expect(page.getByRole('link', { name: /Take This Page Apart/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: TAKE_APART })).toHaveCount(0);
   await expect(page.locator('.detail-link[href$="/projects/portfolio/"]')).toBeVisible();
   expect(errors).toEqual([]);
 });

@@ -22,20 +22,61 @@ const fragmentShader = /* glsl */ `
 `;
 
 /**
+ * The material the heights are drawn with. A scene that makes several height maps (one per
+ * scenery) keeps one and passes it to each createTerrain: its shader is then built once, not
+ * again for every map (a new material each time, freed after, took its program with it).
+ */
+export function createTerrainMaterial() {
+  return new THREE.ShaderMaterial({ vertexShader, fragmentShader, side: THREE.DoubleSide });
+}
+
+/**
  * @param {THREE.WebGLRenderer} renderer
  * @param {THREE.Mesh[]} meshes  solid scenery (world matrices up to date)
  * @param {object} o
  * @param {number} o.size   side of the square area covered, centered on the origin (m)
  * @param {number} o.res    height map resolution (cells per side)
  * @param {number} o.pad    cells to grow obstacles by for flight clearance
+ * @param {THREE.ShaderMaterial} [o.material]  createTerrainMaterial(), kept by the caller (one is made and freed here without it)
  */
-export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2 } = {}) {
-  const half = size / 2;
-  const cell = size / res;
+export function createTerrain(renderer, meshes, o = {}) {
+  const h = drawHeights(renderer, meshes, o);
+  renderer.readRenderTargetPixels(h.rt, 0, 0, h.res, h.res, h.px);
+  h.done();
+  const steps = heightSteps(h.px, h);
+  let r = steps.next();
+  while (!r.done) r = steps.next();
+  return r.value;
+}
 
-  // --- render heights from above
+/**
+ * createTerrain in two parts, for a height map made ahead of time (sceneScenery.js builds the other
+ * places' in idle moments). The heights are drawn now and read back without waiting on the
+ * GPU (a fence, polled): a blocking read stalls the page until the GPU has finished all it
+ * was given before, the frame just drawn too (in software rendering, 70 ms and more). It
+ * resolves with the steps that make the height map from them (heightSteps: a generator
+ * whose value at the end is the map, as createTerrain returns it): the CPU part, a few ms
+ * in all, for the caller to run a little at a time.
+ * @param {THREE.WebGLRenderer} renderer
+ * @param {THREE.Mesh[]} meshes  as createTerrain's
+ * @param {object} [o]  as createTerrain's
+ * @returns {Promise<Generator<void, ReturnType<typeof createTerrain>, void>>}
+ */
+export async function readTerrain(renderer, meshes, o = {}) {
+  const h = drawHeights(renderer, meshes, o);
+  try {
+    await renderer.readRenderTargetPixelsAsync(h.rt, 0, 0, h.res, h.res, h.px);
+  } finally {
+    h.done();
+  }
+  return heightSteps(h.px, h);
+}
+
+/** Draw the meshes' heights from straight above into a target of their own, to be read into `px` (then done()). */
+function drawHeights(renderer, meshes, { size = 12, res = 320, pad = 2, material: shared = null } = {}) {
+  const half = size / 2;
   const scene = new THREE.Scene();
-  const material = new THREE.ShaderMaterial({ vertexShader, fragmentShader, side: THREE.DoubleSide });
+  const material = shared ?? createTerrainMaterial();
   for (const m of meshes) {
     const c = new THREE.Mesh(m.geometry, material);
     c.matrixAutoUpdate = false;
@@ -57,16 +98,34 @@ export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2 
   renderer.setClearColor(0x000000, 1);
   renderer.clear();
   renderer.render(scene, cam);
-  const px = new Uint8Array(res * res * 4);
-  renderer.readRenderTargetPixels(rt, 0, 0, res, res, px);
   renderer.setRenderTarget(prevTarget);
   renderer.setClearColor(prevClear, prevAlpha);
-  rt.dispose();
-  material.dispose();
+  const done = () => {
+    rt.dispose();
+    if (!shared) material.dispose();
+  };
+  return { rt, px: new Uint8Array(res * res * 4), done, size, res, pad };
+}
+
+/** Rows of the height map worked through between two steps of heightSteps (a ms or so). */
+const ROWS_A_STEP = 64;
+
+/**
+ * The height map's queries, from the heights drawn (`px`, two bytes a cell), made a few rows
+ * at a time: it yields between them (createTerrain runs it through at once) and returns the map.
+ * @param {Uint8Array} px
+ * @param {{ size: number, res: number, pad: number }} o
+ */
+export function* heightSteps(px, { size, res, pad }) {
+  const half = size / 2;
+  const cell = size / res;
 
   // H: raw heights (row 0 = +z edge). D: heights grown by `pad` cells.
   const H = new Float32Array(res * res);
-  for (let k = 0; k < res * res; k++) H[k] = ((px[k * 4] * 256 + px[k * 4 + 1]) / 65535) * MAX_H;
+  for (let j = 0; j < res; j++) {
+    for (let k = j * res; k < (j + 1) * res; k++) H[k] = ((px[k * 4] * 256 + px[k * 4 + 1]) / 65535) * MAX_H;
+    if (j % ROWS_A_STEP === ROWS_A_STEP - 1) yield;
+  }
   const rowMax = new Float32Array(res * res);
   const D = new Float32Array(res * res);
   for (let j = 0; j < res; j++) {
@@ -75,6 +134,7 @@ export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2 
       for (let a = Math.max(0, i - pad); a <= Math.min(res - 1, i + pad); a++) m = Math.max(m, H[j * res + a]);
       rowMax[j * res + i] = m;
     }
+    if (j % ROWS_A_STEP === ROWS_A_STEP - 1) yield;
   }
   for (let j = 0; j < res; j++) {
     for (let i = 0; i < res; i++) {
@@ -82,6 +142,7 @@ export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2 
       for (let b = Math.max(0, j - pad); b <= Math.min(res - 1, j + pad); b++) m = Math.max(m, rowMax[b * res + i]);
       D[j * res + i] = m;
     }
+    if (j % ROWS_A_STEP === ROWS_A_STEP - 1) yield;
   }
 
   const ci = (x) => Math.floor((x + half) / cell);
@@ -92,10 +153,14 @@ export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2 
   function height(x, z) {
     const fx = (x + half) / cell - 0.5;
     const fz = (half - z) / cell - 0.5;
-    const i = Math.floor(fx), j = Math.floor(fz);
-    const u = fx - i, v = fz - j;
-    return (at(H, i, j) * (1 - u) + at(H, i + 1, j) * u) * (1 - v)
-      + (at(H, i, j + 1) * (1 - u) + at(H, i + 1, j + 1) * u) * v;
+    const i = Math.floor(fx),
+      j = Math.floor(fz);
+    const u = fx - i,
+      v = fz - j;
+    return (
+      (at(H, i, j) * (1 - u) + at(H, i + 1, j) * u) * (1 - v) +
+      (at(H, i, j + 1) * (1 - u) + at(H, i + 1, j + 1) * u) * v
+    );
   }
   /** Raw surface height of the cell under (x, z) — steps stay sharp. */
   const top = (x, z) => at(H, ci(x), cj(z));
@@ -103,16 +168,28 @@ export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2 
   const solid = (x, z) => at(D, ci(x), cj(z));
   /** Uphill direction of the raw heights around (x, z) (world x/z, unnormalized). */
   function slope(x, z, out) {
-    const i = ci(x), j = cj(z);
-    const gx = (at(H, i + 2, j) - at(H, i - 2, j)) + 0.5 * (at(H, i + 2, j - 1) - at(H, i - 2, j - 1) + at(H, i + 2, j + 1) - at(H, i - 2, j + 1));
-    const gz = (at(H, i, j - 2) - at(H, i, j + 2)) + 0.5 * (at(H, i - 1, j - 2) - at(H, i - 1, j + 2) + at(H, i + 1, j - 2) - at(H, i + 1, j + 2));
+    const i = ci(x),
+      j = cj(z);
+    const gx =
+      at(H, i + 2, j) -
+      at(H, i - 2, j) +
+      0.5 * (at(H, i + 2, j - 1) - at(H, i - 2, j - 1) + at(H, i + 2, j + 1) - at(H, i - 2, j + 1));
+    const gz =
+      at(H, i, j - 2) -
+      at(H, i, j + 2) +
+      0.5 * (at(H, i - 1, j - 2) - at(H, i - 1, j + 2) + at(H, i + 1, j - 2) - at(H, i + 1, j + 2));
     return out.set(gx, 0, gz);
   }
 
   // --- vertical faces worth landing on: steps of 25 cm or more
   const wallSpots = [];
   const g = new THREE.Vector3();
-  const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const N4 = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ];
   for (let j = 1; j < res - 1; j++) {
     for (let i = 1; i < res - 1; i++) {
       const h = H[j * res + i];
@@ -124,12 +201,14 @@ export function createTerrain(renderer, meshes, { size = 12, res = 320, pad = 2 
         const z = half - (j + 0.5 + dj * 0.5) * cell;
         // outward normal: downhill, but always toward the low side
         slope(x, z, g).negate();
-        const ox = di, oz = -dj;
+        const ox = di,
+          oz = -dj;
         if (g.lengthSq() < 1e-6 || (g.x * ox + g.z * oz) / g.length() < 0.35) g.set(ox, 0, oz);
         g.normalize();
         wallSpots.push({ x, z, lo, hi: h, nx: g.x, nz: g.z });
       }
     }
+    if (j % ROWS_A_STEP === ROWS_A_STEP - 1) yield;
   }
 
   return { height, top, solid, slope, wallSpots, cell };

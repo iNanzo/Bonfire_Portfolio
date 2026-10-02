@@ -41,7 +41,7 @@ import { modeOf } from './looks.js';
 // In the mix: how likely a scene hands over to a stretch of the free show, and how likely
 // a free stretch hands back to a scene.
 export const FREE_AFTER_SCENE = 0.3;
-export const SCENE_AFTER_FREE = 0.7;
+const SCENE_AFTER_FREE = 0.7;
 
 /**
  * The library's scenes that are in the loop: from where Scenes From says (sceneFrom:
@@ -74,13 +74,13 @@ export function loopEntries(entries, settings) {
  */
 export function createSceneLoop(settings, { library = () => [], clock = null, rng = Math.random } = {}) {
   /** @type {SceneEntry | 'free' | null} */
-  let current = null;   // what the loop has playing (null: nothing yet)
+  let current = null; // what the loop has playing (null: nothing yet)
   /** @type {SceneEntry | 'free' | null} */
-  let upcoming = null;  // peek()'s answer, kept until advance() hands it out
-  let deck = [];        // Shuffled: the refs still to be dealt
-  let lastRef = null;   // the last scene that played (never twice running)
-  let since = 0;        // bars since the last change
-  let locked = null;    // ?scene=…&solo: only this ref
+  let upcoming = null; // peek()'s answer, kept until advance() hands it out
+  let deck = []; // Shuffled: the refs still to be dealt
+  let lastRef = null; // the last scene that played (never twice running)
+  let since = 0; // bars since the last change
+  let locked = null; // ?scene=…&solo: only this ref
 
   const mode = () => modeOf(settings.scenes, 'mix');
   const entries = () => loopEntries(library(), settings);
@@ -89,7 +89,7 @@ export function createSceneLoop(settings, { library = () => [], clock = null, rn
     return Number.isFinite(n) && n > 0 ? n : 0;
   };
   const refOf = (e) => (e && e !== 'free' ? e.ref : null);
-  const find = (ref, list = library()) => (ref ? list.find((e) => e?.ref === ref) ?? null : null);
+  const find = (ref, list = library()) => (ref ? (list.find((e) => e?.ref === ref) ?? null) : null);
 
   /** The next scene after `lastRef` in the order the settings say (null: none in the loop). */
   function nextEntry() {
@@ -101,7 +101,10 @@ export function createSceneLoop(settings, { library = () => [], clock = null, rn
       deck = deck.filter((r) => refs.includes(r) && r !== lastRef);
       if (!deck.length) {
         deck = refs.slice();
-        for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
+        for (let i = deck.length - 1; i > 0; i--) {
+          const j = Math.floor(rng() * (i + 1));
+          [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
         // (Never the one that just played first: it goes to the back of the new deck.)
         if (deck[0] === lastRef) deck.push(deck.shift());
       }
@@ -136,11 +139,17 @@ export function createSceneLoop(settings, { library = () => [], clock = null, rn
 
   return {
     /** What's playing as far as the loop knows: an entry, 'free' or null. */
-    get current() { return current; },
+    get current() {
+      return current;
+    },
     /** The ref locked for the session (?scene=…&solo), or null. */
-    get locked() { return locked; },
+    get locked() {
+      return locked;
+    },
     /** Bars since the last change. */
-    get since() { return since; },
+    get since() {
+      return since;
+    },
     /**
      * The music starts: the scene to open with. A scene already playing (picked by hand,
      * ?scene=, locked) carries on; otherwise Always opens with the first (or the deck's
@@ -166,7 +175,9 @@ export function createSceneLoop(settings, { library = () => [], clock = null, rn
       return take('free');
     },
     /** A bar went by (the director's downbeat). */
-    bar() { since++; },
+    bar() {
+      since++;
+    },
     /**
      * Is a scene change due on the phrase line at `bar` (the downbeat it would land on, the
      * grid's count from the drop)? Change Every's multiples, once half a stretch has played.
@@ -201,7 +212,9 @@ export function createSceneLoop(settings, { library = () => [], clock = null, rn
       return n === 0 || current === null || since >= n / 4;
     },
     /** The scene handed out has arrived (its swap landed): its stretch counts from now. */
-    arrived() { since = 0; },
+    arrived() {
+      since = 0;
+    },
     /** What advance() will hand out, without moving on (null: nothing). */
     peek() {
       if (!active()) return null;

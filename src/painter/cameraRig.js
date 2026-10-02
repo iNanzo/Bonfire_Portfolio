@@ -15,10 +15,10 @@
 import { dragOrbit, orbitPose, panOrbit, poseToOrbit, zoomOrbit } from '../ui/orbit.js';
 import { keepInClearing } from '../visualizer/clearing.js';
 import { SCENE_RANGES, TARGET_BOX } from '../scenes.js';
+import { clamp } from '../math.js';
 
 /** How far a painted camera may tilt up or down and come in or go out. */
 export const PAINT_LIMITS = { pitch: [-0.35, 1.45], dist: [0.6, 9] };
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /**
  * A scene camera moved to an orbit: the position kept in the clearing, the point it looks at
@@ -44,8 +44,8 @@ export function cameraAt(cam, view) {
  */
 export function createCameraRig(stage, { get, onFrame, pause, onDragEnd = () => {} }) {
   const pointers = new Map(); // id → { x, y }
-  let drag = null;            // { x, y, from: Orbit, pan }
-  let pinch = null;           // { d, from: Orbit }
+  let drag = null; // { x, y, from: Orbit, pan }
+  let pinch = null; // { d, from: Orbit }
   const [fovMin, fovMax] = SCENE_RANGES['camera.fov'];
   const [rollMin, rollMax] = SCENE_RANGES['camera.roll'];
 
@@ -93,7 +93,11 @@ export function createCameraRig(stage, { get, onFrame, pause, onDragEnd = () => 
     if (!drag) return;
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
-    send(drag.pan ? panOrbit(drag.from, dx, dy, { fov: get().fov, height: stage.clientHeight }) : dragOrbit(drag.from, dx, dy, PAINT_LIMITS));
+    send(
+      drag.pan
+        ? panOrbit(drag.from, dx, dy, { fov: get().fov, height: stage.clientHeight })
+        : dragOrbit(drag.from, dx, dy, PAINT_LIMITS),
+    );
   });
   const up = (e) => {
     pointers.delete(e.pointerId);
@@ -103,13 +107,20 @@ export function createCameraRig(stage, { get, onFrame, pause, onDragEnd = () => 
   stage.addEventListener('pointercancel', up);
   stage.addEventListener('contextmenu', (e) => e.preventDefault()); // (right-drag slides)
   let wheelTimer = 0;
-  stage.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    pause(true);
-    send(zoomOrbit(orbit(), e.deltaY, PAINT_LIMITS));
-    clearTimeout(wheelTimer);
-    wheelTimer = setTimeout(() => { pause(false); onDragEnd(); }, 250);
-  }, { passive: false });
+  stage.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      pause(true);
+      send(zoomOrbit(orbit(), e.deltaY, PAINT_LIMITS));
+      clearTimeout(wheelTimer);
+      wheelTimer = setTimeout(() => {
+        pause(false);
+        onDragEnd();
+      }, 250);
+    },
+    { passive: false },
+  );
 
   return {
     /**
@@ -125,17 +136,25 @@ export function createCameraRig(stage, { get, onFrame, pause, onDragEnd = () => 
       if (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'ArrowUp' || k === 'ArrowDown') {
         const dx = k === 'ArrowLeft' ? -step : k === 'ArrowRight' ? step : 0;
         const dy = k === 'ArrowUp' ? -step : k === 'ArrowDown' ? step : 0;
-        send(e.shiftKey ? panOrbit(view, dx, dy, { fov: cam.fov, height: stage.clientHeight }) : dragOrbit(view, dx, dy, PAINT_LIMITS));
+        send(
+          e.shiftKey
+            ? panOrbit(view, dx, dy, { fov: cam.fov, height: stage.clientHeight })
+            : dragOrbit(view, dx, dy, PAINT_LIMITS),
+        );
       } else if (k === '+' || k === '=') send(zoomOrbit(view, -120, PAINT_LIMITS));
       else if (k === '-' || k === '_') send(zoomOrbit(view, 120, PAINT_LIMITS));
-      else if (k === 'q' || k === 'Q') onFrame({ ...cam, roll: clamp(cam.roll - 0.02, rollMin, rollMax) }, 'camera.roll');
-      else if (k === 'e' || k === 'E') onFrame({ ...cam, roll: clamp(cam.roll + 0.02, rollMin, rollMax) }, 'camera.roll');
+      else if (k === 'q' || k === 'Q')
+        onFrame({ ...cam, roll: clamp(cam.roll - 0.02, rollMin, rollMax) }, 'camera.roll');
+      else if (k === 'e' || k === 'E')
+        onFrame({ ...cam, roll: clamp(cam.roll + 0.02, rollMin, rollMax) }, 'camera.roll');
       else if (k === '[') onFrame({ ...cam, fov: clamp(cam.fov - 2, fovMin, fovMax) }, 'camera.fov');
       else if (k === ']') onFrame({ ...cam, fov: clamp(cam.fov + 2, fovMin, fovMax) }, 'camera.fov');
       else return false;
       return true;
     },
     /** Whether a drag (or pinch) is going on. */
-    get dragging() { return !!(drag || pinch); },
+    get dragging() {
+      return !!(drag || pinch);
+    },
   };
 }

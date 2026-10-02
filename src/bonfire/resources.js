@@ -5,8 +5,12 @@
 // render target; trackTree(object) for an object and everything under it (geometries,
 // materials and their textures, shadow maps); cleanup(fn) for anything else (listeners,
 // the animation loop). dispose() runs the cleanups in reverse, then frees each resource
-// exactly once. Trees are collected again at dispose time, so materials swapped in after
-// tracking are freed too.
+// exactly once, also in reverse: the last made first, the first made last. Trees are
+// collected again at dispose time, so materials swapped in after tracking are freed too.
+//
+// (The reverse order matters for the renderer, which a scene owns first: its dispose()
+// forgets every material's and texture's GL objects, so anything disposed after it would
+// leave its shader programs and textures behind on the GPU. Last, it goes after them.)
 export function createResourceScope() {
   const resources = new Set();
   const trees = new Set();
@@ -23,17 +27,30 @@ export function createResourceScope() {
     });
   }
   return {
-    get disposed() { return disposed; },
-    own(resource) { resources.add(resource); return resource; },
-    trackTree(root) { trees.add(root); collect(root); return root; },
-    cleanup(fn) { cleanups.push(fn); },
+    get disposed() {
+      return disposed;
+    },
+    own(resource) {
+      resources.add(resource);
+      return resource;
+    },
+    trackTree(root) {
+      trees.add(root);
+      collect(root);
+      return root;
+    },
+    cleanup(fn) {
+      cleanups.push(fn);
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
       for (const root of trees) collect(root);
       for (const fn of cleanups.reverse()) fn();
-      for (const resource of resources) resource.dispose();
-      resources.clear(); trees.clear(); cleanups.length = 0;
+      for (const resource of [...resources].reverse()) resource.dispose();
+      resources.clear();
+      trees.clear();
+      cleanups.length = 0;
     },
   };
 }

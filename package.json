@@ -2,6 +2,9 @@
   "name": "newton-hoang-portfolio",
   "private": true,
   "version": "2.0.0",
+  "description": "Newton Hoang's portfolio: a pixel-art bonfire site, the Bonfire Live music visualizer and the Bonfire Painter, on one Three.js engine.",
+  "license": "UNLICENSED",
+  "repository": "github:iNanzo/Bonfire_Portfolio",
   "type": "module",
   "engines": {
     "node": ">=22.12"
@@ -12,17 +15,27 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "model": "node tools/build-model.mjs",
     "model:knight": "node tools/build-model.mjs knight",
     "screenshots": "node tools/import-screenshots.mjs",
     "link": "node tools/link-bridge.mjs",
     "admin": "vite --config admin/vite.config.js",
     "admin:build": "vite build --config admin/vite.config.js",
+    "admin:preview": "vite build --config admin/vite.config.js && vite preview --config admin/vite.config.js",
     "admin:deploy": "npm run admin:build && npx --yes wrangler@4 deploy --config admin/wrangler.toml",
     "admin:test": "node --test \"admin/test/*.test.mjs\"",
     "test": "node --test \"test/*.test.mjs\"",
+    "test:fast": "node --test --test-skip-pattern=\"\\[slow\\]\" \"test/*.test.mjs\" \"admin/test/*.test.mjs\"",
+    "test:all": "node --test \"test/*.test.mjs\" \"admin/test/*.test.mjs\"",
+    "coverage": "c8 node --test \"test/*.test.mjs\" \"admin/test/*.test.mjs\"",
+    "coverage:ratchet": "node tools/coverage-ratchet.mjs",
     "e2e": "playwright test",
-    "check": "npm run lint && npm run typecheck && npm test && npm run admin:test"
+    "bench": "node tools/bench-viz.mjs",
+    "bench:compare": "node tools/bench-compare.mjs",
+    "check": "npm run lint && npm run typecheck && npm run format:check && npm run test:all",
+    "prepare": "simple-git-hooks"
   },
   "dependencies": {
     "@fontsource/cinzel": "^5.3.0",
@@ -31,12 +44,26 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
-    "eslint": "10.11.0",
-    "globals": "17.12.0",
+    "c8": "^12.0.0",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.9.9",
     "sharp": "^0.35.4",
+    "simple-git-hooks": "^2.14.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.1"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{css,html,json,yml,yaml}": "prettier --write"
   }
 }

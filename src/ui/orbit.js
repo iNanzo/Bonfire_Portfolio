@@ -11,6 +11,7 @@
 //   panOrbit(view, dx, dy, lens)  the point it looks at slid across the screen with the cursor
 //
 // Pure: no DOM, no three.js (arrays [x, y, z], meters and radians).
+import { clamp } from '../math.js';
 
 /** The fire, a little above the ground: what photo mode circles. */
 export const ORBIT_TARGET = [0.02, 0.55, 0.02];
@@ -25,9 +26,6 @@ export const DRAG_RATE = { yaw: 0.006, pitch: 0.004, zoom: 0.001 };
  * @typedef {{ pitch: number[], dist: number[] }} OrbitLimits
  */
 
-/** @type {(v: number, range: number[]) => number} */
-const clamp = (v, range) => Math.min(range[1], Math.max(range[0], v));
-
 /**
  * The camera's place and aim for an orbit.
  * @param {Orbit} view
@@ -36,7 +34,11 @@ const clamp = (v, range) => Math.min(range[1], Math.max(range[0], v));
 export function orbitPose({ yaw, pitch, dist, target = ORBIT_TARGET }) {
   const cp = Math.cos(pitch);
   return {
-    pos: [target[0] + Math.sin(yaw) * cp * dist, target[1] + Math.sin(pitch) * dist, target[2] + Math.cos(yaw) * cp * dist],
+    pos: [
+      target[0] + Math.sin(yaw) * cp * dist,
+      target[1] + Math.sin(pitch) * dist,
+      target[2] + Math.cos(yaw) * cp * dist,
+    ],
     target: [...target],
   };
 }
@@ -64,7 +66,11 @@ export function poseToOrbit({ pos, target }) {
  * @returns {Orbit}
  */
 export function dragOrbit(view, dx, dy, limits = PHOTO_LIMITS) {
-  return { ...view, yaw: view.yaw - dx * DRAG_RATE.yaw, pitch: clamp(view.pitch + dy * DRAG_RATE.pitch, limits.pitch) };
+  return {
+    ...view,
+    yaw: view.yaw - dx * DRAG_RATE.yaw,
+    pitch: clamp(view.pitch + dy * DRAG_RATE.pitch, limits.pitch[0], limits.pitch[1]),
+  };
 }
 
 /**
@@ -75,7 +81,7 @@ export function dragOrbit(view, dx, dy, limits = PHOTO_LIMITS) {
  * @returns {Orbit}
  */
 export function zoomOrbit(view, dy, limits = PHOTO_LIMITS) {
-  return { ...view, dist: clamp(view.dist * Math.exp(dy * DRAG_RATE.zoom), limits.dist) };
+  return { ...view, dist: clamp(view.dist * Math.exp(dy * DRAG_RATE.zoom), limits.dist[0], limits.dist[1]) };
 }
 
 /**

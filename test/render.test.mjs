@@ -6,8 +6,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createLooks, LOOKS, CHANCE } from '../src/visualizer/looks.js';
 import {
-  applyRenderSettings, createRenderShow, renderState, shiftSize, stepRender, renderText, forgetApplied,
-  FEW_PALETTES, PIXEL_SIZES, XRAY_VIEWS, RENDER_STEPS,
+  applyRenderSettings,
+  createRenderShow,
+  renderState,
+  shiftSize,
+  stepRender,
+  renderText,
+  forgetApplied,
+  FEW_PALETTES,
+  PIXEL_SIZES,
+  XRAY_VIEWS,
+  RENDER_STEPS,
 } from '../src/visualizer/render.js';
 
 const every = (mode, names) => Object.fromEntries(Object.keys(names).map((k) => [k, mode]));
@@ -15,13 +24,30 @@ const every = (mode, names) => Object.fromEntries(Object.keys(names).map((k) => 
 function fakeFire() {
   const calls = [];
   const fire = { calls };
-  for (const name of ['setRender', 'setPalette', 'setFog', 'setShadows', 'setXray']) fire[name] = (v) => calls.push([name, v]);
+  for (const name of ['setRender', 'setPalette', 'setFog', 'setShadows', 'setXray'])
+    fire[name] = (v) => calls.push([name, v]);
   return fire;
 }
 const SETTINGS = () => ({
-  pixelSize: 4, pixelShift: 'off', dither: 0.08, ditherMatrix: '4', outlines: 'on', palette: 'flame', fewColors: 'off',
-  vignette: 0.85, exposure: 1.45, fog: 'light', shadows: true, flameFps: 12, colorChange: 0.34,
-  xray: 'off', xrayViews: every(true, XRAY_VIEWS), hitStop: 'on', hitFlash: 'on', debris: 'on', marks: 'on',
+  pixelSize: 4,
+  pixelShift: 'off',
+  dither: 0.08,
+  ditherMatrix: '4',
+  outlines: 'on',
+  palette: 'flame',
+  fewColors: 'off',
+  vignette: 0.85,
+  exposure: 1.45,
+  fog: 'light',
+  shadows: true,
+  flameFps: 12,
+  colorChange: 0.34,
+  xray: 'off',
+  xrayViews: every(true, XRAY_VIEWS),
+  hitStop: 'on',
+  hitFlash: 'on',
+  debris: 'on',
+  marks: 'on',
   looks: every('mix', LOOKS),
 });
 
@@ -32,7 +58,20 @@ test('render settings: everything once for a new scene, then only what changed',
   const names = fire.calls.map(([n]) => n).sort();
   assert.deepEqual(names, ['setFog', 'setPalette', 'setRender', 'setShadows', 'setXray']);
   const partial = fire.calls.find(([n]) => n === 'setRender')[1];
-  assert.deepEqual(partial, { pixelSize: 4, dither: 0.08, ditherMatrix: 4, outlines: true, vignette: 0.85, exposure: 1.45, colorChange: 0.34, flameFps: 12, hitStop: true, hitFlash: true, debris: true, marks: true });
+  assert.deepEqual(partial, {
+    pixelSize: 4,
+    dither: 0.08,
+    ditherMatrix: 4,
+    outlines: true,
+    vignette: 0.85,
+    exposure: 1.45,
+    colorChange: 0.34,
+    flameFps: 12,
+    hitStop: true,
+    hitFlash: true,
+    debris: true,
+    marks: true,
+  });
   fire.calls.length = 0;
   applyRenderSettings(fire, s);
   assert.deepEqual(fire.calls, [], 'nothing changed: nothing sent');
@@ -40,7 +79,11 @@ test('render settings: everything once for a new scene, then only what changed',
   s.fog = 'thick';
   s.shadows = false;
   applyRenderSettings(fire, s);
-  assert.deepEqual(fire.calls, [['setRender', { dither: 0.4 }], ['setFog', 'thick'], ['setShadows', false]]);
+  assert.deepEqual(fire.calls, [
+    ['setRender', { dither: 0.4 }],
+    ['setFog', 'thick'],
+    ['setShadows', false],
+  ]);
   // Another scene (a rebuild) gets everything again.
   const other = fakeFire();
   applyRenderSettings(other, s);
@@ -48,7 +91,15 @@ test('render settings: everything once for a new scene, then only what changed',
 });
 
 test('render state: unknown saved values fall back; switches in the mix rest where the site is', () => {
-  const s = { ...SETTINGS(), palette: 'bogus', fog: 'soup', ditherMatrix: 'mix', outlines: 'mix', hitStop: 'mix', xray: 'on' };
+  const s = {
+    ...SETTINGS(),
+    palette: 'bogus',
+    fog: 'soup',
+    ditherMatrix: 'mix',
+    outlines: 'mix',
+    hitStop: 'mix',
+    xray: 'on',
+  };
   const r = renderState(s);
   assert.equal(r.palette, 'flame');
   assert.equal(r.fog, 'light');
@@ -82,7 +133,10 @@ function runShow(settings, { turns = 60, bars = 4, reducedMotion = false, onBar 
     show.update(t);
     seen.push({ ...show.live });
     for (let b = 0; b < bars * 8; b++) {
-      if (b % 8 === 0) { show.bar(t, { period, sinceDrop: 4, budget: 1 }); onBar?.(show, t); }
+      if (b % 8 === 0) {
+        show.bar(t, { period, sinceDrop: 4, budget: 1 });
+        onBar?.(show, t);
+      }
       t += period / 2;
       show.update(t);
       if (show.live.xray) seen.at(-1).flipped = show.live.xray;
@@ -92,8 +146,14 @@ function runShow(settings, { turns = 60, bars = 4, reducedMotion = false, onBar 
 }
 
 test('outlines and few colors: off never, always every look, in the mix some looks', () => {
-  for (const [key, field] of [['outlines', 'outlines'], ['fewColors', 'few']]) {
-    const count = (mode) => runShow({ ...SETTINGS(), [key]: mode }, { bars: 0 }).seen.filter((l) => (field === 'few' ? l.few !== null : l[field])).length;
+  for (const [key, field] of [
+    ['outlines', 'outlines'],
+    ['fewColors', 'few'],
+  ]) {
+    const count = (mode) =>
+      runShow({ ...SETTINGS(), [key]: mode }, { bars: 0 }).seen.filter((l) =>
+        field === 'few' ? l.few !== null : l[field],
+      ).length;
     assert.equal(count('off'), 0, `${key} off`);
     assert.equal(count('on'), 60, `${key} always`);
     const mix = count('mix');
@@ -126,7 +186,10 @@ test('few colors in the mix: never on the opening look (the start screen and the
 
 test('pixel shifts: a rolled size with each look, a jump on drops, the size set when off', () => {
   const { seen } = runShow({ ...SETTINGS(), pixelShift: 'on' }, { bars: 0 });
-  assert.ok(seen.every((l) => l.pixelSize !== 4 && l.pixelSize >= 2 && l.pixelSize <= 8), 'always: never the size set');
+  assert.ok(
+    seen.every((l) => l.pixelSize !== 4 && l.pixelSize >= 2 && l.pixelSize <= 8),
+    'always: never the size set',
+  );
   assert.ok(new Set(seen.map((l) => l.pixelSize)).size >= 3);
   assert.ok(seen.every((l) => PIXEL_SIZES.includes(l.pixelSize)));
   const s = { ...SETTINGS(), pixelShift: 'on' };
@@ -145,7 +208,12 @@ test('pixel shifts: a rolled size with each look, a jump on drops, the size set 
   show.update(0);
   assert.equal(show.live.pixelSize, null, 'off: the size set');
   assert.equal(renderState(s, show.live).pixelSize, 4);
-  assert.equal(runShow({ ...SETTINGS(), pixelShift: 'on' }, { bars: 0, reducedMotion: true }).seen.filter((l) => l.pixelSize).length, 0, 'none under reduced motion');
+  assert.equal(
+    runShow({ ...SETTINGS(), pixelShift: 'on' }, { bars: 0, reducedMotion: true }).seen.filter((l) => l.pixelSize)
+      .length,
+    0,
+    'none under reduced motion',
+  );
   for (let i = 0; i < 200; i++) {
     const n = shiftSize(2);
     assert.ok([3, 4].includes(n), 'half to twice the size set');
@@ -166,10 +234,14 @@ test('x-ray flips: on the beat, a beat, two or a bar, from the views switched on
   show.update(t);
   for (let bar = 0; bar < 400; bar++) {
     show.bar(t, { period, sinceDrop: 3, budget: 1 });
-    for (let k = 0; k < 64; k++) { // 4 beats in 1/16ths
+    for (let k = 0; k < 64; k++) {
+      // 4 beats in 1/16ths
       show.update(t);
       if (show.live.xray && !on) on = { view: show.live.xray, from: t };
-      if (!show.live.xray && on) { flips.push({ ...on, to: t }); on = null; }
+      if (!show.live.xray && on) {
+        flips.push({ ...on, to: t });
+        on = null;
+      }
       t += period / 16;
     }
   }
@@ -179,7 +251,10 @@ test('x-ray flips: on the beat, a beat, two or a bar, from the views switched on
   for (const f of flips) {
     assert.ok(Math.abs(beats(f.from) - Math.round(beats(f.from))) < 0.07, 'starts on a beat');
     const len = Math.round(beats(f.to - f.from));
-    assert.ok([1, 2, 4].includes(len) && Math.abs(beats(f.to - f.from) - len) < 0.07, `lasts a beat, two or a bar (${beats(f.to - f.from)})`);
+    assert.ok(
+      [1, 2, 4].includes(len) && Math.abs(beats(f.to - f.from) - len) < 0.07,
+      `lasts a beat, two or a bar (${beats(f.to - f.from)})`,
+    );
     assert.ok(['normals', 'particles'].includes(f.view), 'only the views switched on');
   }
   // Not on the drop's bar; a drop clears one; the drop's own X-Ray hit lasts a beat.
@@ -199,7 +274,10 @@ test('x-ray flips: on the beat, a beat, two or a bar, from the views switched on
   assert.equal(show.live.xray, null, 'a drop brings the picture back');
   // Off: never; reduced motion: never.
   assert.equal(runShow({ ...SETTINGS(), xray: 'off' }, { turns: 20 }).seen.filter((l) => l.flipped).length, 0);
-  assert.equal(runShow({ ...SETTINGS(), xray: 'on' }, { turns: 20, reducedMotion: true }).seen.filter((l) => l.flipped).length, 0);
+  assert.equal(
+    runShow({ ...SETTINGS(), xray: 'on' }, { turns: 20, reducedMotion: true }).seen.filter((l) => l.flipped).length,
+    0,
+  );
   // In the mix: some looks flip, some don't.
   const mixed = runShow({ ...SETTINGS(), xray: 'mix' }, { turns: 80, bars: 16 }).seen.filter((l) => l.flipped).length;
   assert.ok(mixed > 5 && mixed < 70, `in the mix: some looks (${mixed}/80)`);
@@ -207,7 +285,8 @@ test('x-ray flips: on the beat, a beat, two or a bar, from the views switched on
 
 test('hits: hit-stop, flash, debris and marks switch off, always, or in the mix', () => {
   for (const k of ['hitStop', 'hitFlash', 'debris', 'marks']) {
-    const count = (mode) => runShow({ ...SETTINGS(), [k]: mode }, { turns: 60, bars: 0 }).seen.filter((l) => l[k]).length;
+    const count = (mode) =>
+      runShow({ ...SETTINGS(), [k]: mode }, { turns: 60, bars: 0 }).seen.filter((l) => l[k]).length;
     assert.equal(count('off'), 0);
     assert.equal(count('on'), 60);
     const mix = count('mix');
@@ -229,9 +308,13 @@ test('a render menu steps each setting through its values and shows it as text',
     assert.equal(seen.size, RENDER_STEPS[key].length, `${key} reaches every step`);
     assert.ok(renderText(s, key).length > 0);
   }
-  assert.equal(renderText({ palette: 'moonlit' }, 'palette'), 'Moonlit (4 colors)');
-  assert.equal(renderText({ xray: 'mix' }, 'xray'), 'in the mix');
-  assert.equal(renderText({ dither: 0 }, 'dither'), 'off');
+  // (In the menus' words: Title Case, and the switch's Off / In the Mix / Always.)
+  assert.equal(renderText({ palette: 'moonlit' }, 'palette'), 'Moonlit (4 Colors)');
+  assert.equal(renderText({ xray: 'mix' }, 'xray'), 'In the Mix');
+  assert.equal(renderText({ outlines: 'on' }, 'outlines'), 'Always');
+  assert.equal(renderText({ dither: 0 }, 'dither'), 'Off');
+  assert.equal(renderText({ fog: 'mix' }, 'fog'), 'A Mix');
+  assert.equal(renderText({ fog: 'light' }, 'fog'), 'Light');
 });
 
 test('a scene’s render: a few slots of the palette, one x-ray view held, and forgetApplied re-sends everything', () => {
@@ -240,8 +323,9 @@ test('a scene’s render: a few slots of the palette, one x-ray view held, and f
   assert.deepEqual(renderState(s).palette, [0, 6, 8]);
   applyRenderSettings(fire, s);
   assert.deepEqual(fire.calls.find(([n]) => n === 'setPalette')[1], [0, 6, 8]);
-  for (const bad of [[0], [0, 12], ['0', 6], [0.5, 6]]) assert.equal(renderState({ ...s, palette: bad }).palette, 'flame', `${bad}: not slots`);
-  assert.equal(renderText(s, 'palette'), 'A scene’s 3 colors');
+  for (const bad of [[0], [0, 12], ['0', 6], [0.5, 6]])
+    assert.equal(renderState({ ...s, palette: bad }).palette, 'flame', `${bad}: not slots`);
+  assert.equal(renderText(s, 'palette'), 'A Scene’s 3 Colors');
   // The show's own roll still wins while it's live (a few colors in the mix).
   assert.equal(renderState(s, { few: 'ashen' }).palette, 'ashen');
   // A held x-ray view (a scene's xrayView), under any flip of the show's.

@@ -17,7 +17,10 @@ function paths(rows) {
     if (row.length !== SIZE) throw new Error(`pixel icon row ${y} is ${row.length} wide, not ${SIZE}: "${row}"`);
     for (let x = 0; x < SIZE;) {
       const ink = row[x];
-      if (!(ink in out)) { x++; continue; }
+      if (!(ink in out)) {
+        x++;
+        continue;
+      }
       let end = x;
       while (end < SIZE && row[end] === ink) end++;
       out[ink] += `M${x} ${y}h${end - x}v1h${x - end}z`;
@@ -32,10 +35,12 @@ function paths(rows) {
  * carry px-f1, px-f2… for CSS to swap in).
  */
 export function pixelSvg(frames, cls = '') {
-  const groups = frames.map((rows, i) => {
-    const p = paths(rows);
-    return `<g class="px-f${i}">${p['#'] ? `<path class="px-line" d="${p['#']}"/>` : ''}${p['+'] ? `<path class="px-accent" d="${p['+']}"/>` : ''}</g>`;
-  }).join('');
+  const groups = frames
+    .map((rows, i) => {
+      const p = paths(rows);
+      return `<g class="px-f${i}">${p['#'] ? `<path class="px-line" d="${p['#']}"/>` : ''}${p['+'] ? `<path class="px-accent" d="${p['+']}"/>` : ''}</g>`;
+    })
+    .join('');
   return `<svg class="px-icon ${cls}" viewBox="0 0 ${SIZE} ${SIZE}" width="${SIZE * 2}" height="${SIZE * 2}" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${groups}</svg>`;
 }
 
@@ -136,18 +141,8 @@ export const ICONS = {
   ],
   // An anvil with a hot bar on its face; on hover the bar is struck and throws sparks.
   anvil: [
-    [
-      '................',
-      '................',
-      '......++++......',
-      ...ANVIL_BODY,
-    ],
-    [
-      '....+......+....',
-      '.......+........',
-      '..+...++++...+..',
-      ...ANVIL_BODY,
-    ],
+    ['................', '................', '......++++......', ...ANVIL_BODY],
+    ['....+......+....', '.......+........', '..+...++++...+..', ...ANVIL_BODY],
   ],
   // The knight's helm: the great helm, its eye slit lit by the fire; on hover it swaps with
   // the pointed bascinet and back (its two slits and cross-shaped breaths).

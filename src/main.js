@@ -3,14 +3,26 @@ import { applyCssPalette, base, flames, flameOr, rotation } from './palette.js';
 import { site, screens, hero, ui, weapons, startingEquipment, items, drawnWeapons } from './content.js';
 import { effects, onEffects, setEffects } from './effects.js';
 import { drawElement, elementOr, flameTitle } from './elements.js';
-import { STRUCTURAL } from './effectsDefaults.js';
+import { STRUCTURAL, ELEMENT_IDS } from './effectsDefaults.js';
 import {
-  renderChrome, renderHome, renderProjects, renderExperience,
-  renderSkills, renderAbout, renderContact, sceneLabel,
+  renderChrome,
+  renderHome,
+  renderProjects,
+  renderExperience,
+  renderSkills,
+  renderAbout,
+  renderContact,
+  sceneLabel,
+  MENU_TEXT,
 } from './render.js';
 import { installDitherPatterns } from './ui/dither.js';
+import { installTooltips } from './ui/tooltip.js';
+import { failScene as markSceneFailed, q, qa, typing } from './ui/shell.js';
+import { createKeysOverlay, isHelpKey } from './ui/keysOverlay.js';
+import { SITE_KEYS } from './ui/siteKeys.js';
 import { setSound, blip, forgeHum } from './ui/audio.js';
 import { gridNav, listNav } from './ui/spatial.js';
+import { setupRestMenu } from './ui/restMenu.js';
 import { setupInventory } from './ui/inventory.js';
 import { createDiscoveries } from './ui/discoveries.js';
 import { createPhotoMode } from './ui/photo.js';
@@ -20,7 +32,7 @@ import { createPack, bonfireItems } from './ui/pack.js';
 import { HELMET_NAMES, GESTURE_NAMES, STYLE_NAMES, FINISH_NAMES, greeting } from './knightNames.js';
 import { SCENERIES } from './sceneries.js';
 import { applyFlame, setAccentRamp } from './ui/theme.js';
-import { parseRoute, readRoute, routePath, isEditing } from './routes.js';
+import { parseRoute, readRoute, routePath } from './routes.js';
 import { updateMetadata } from './seo.js';
 import { pick } from './math.js';
 import { esc } from './html.js';
@@ -31,17 +43,35 @@ const touch = matchMedia('(hover: none)').matches;
 /** The admin's live preview: this page in its frame, the draft's effects streamed in (the end of this file). */
 const previewing = new URLSearchParams(location.search).has('preview') && window.parent !== window;
 const store = {
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
+  get(k) {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  },
+  set(k, v) {
+    try {
+      localStorage.setItem(k, v);
+    } catch {
+      /* private mode */
+    }
+  },
+  remove(k) {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      /* private mode */
+    }
+  },
 };
-const q = (s, r = document) => r.querySelector(s);
-const qa = (s, r = document) => [...r.querySelectorAll(s)];
 
 document.documentElement.classList.add('js');
 if (touch) document.documentElement.classList.add('touch');
 applyCssPalette();
 applyFlame(startingEquipment.flame);
 installDitherPatterns(base);
+installTooltips();
 
 // --- Render ---------------------------------------------------------------------------
 const app = document.getElementById('app');
@@ -72,7 +102,9 @@ function showToast(kicker, text) {
   void toast.offsetWidth; // (restart the entrance)
   toast.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.hidden = true; }, 3200);
+  toastTimer = setTimeout(() => {
+    toast.hidden = true;
+  }, 3200);
 }
 const discoveries = createDiscoveries({
   onNew: (d, n, total) => {
@@ -83,19 +115,26 @@ const discoveries = createDiscoveries({
 });
 const discover = (id) => discoveries.discover(id);
 function drawDiscoveryCount() {
-  qa('[data-discovery-count]').forEach((el) => { el.textContent = `${discoveries.count} / ${discoveries.total}`; });
+  qa('[data-discovery-count]').forEach((el) => {
+    el.textContent = `${discoveries.count} / ${discoveries.total}`;
+  });
 }
 drawDiscoveryCount();
 const discoveriesDialog = q('[data-discoveries]');
 function openDiscoveries() {
-  q('[data-discovery-list]', discoveriesDialog).innerHTML = discoveries.list.map((d) => {
-    const found = discoveries.has(d.id);
-    return `<li class="discovery${found ? ' is-found' : ''}"><span class="discovery-mark" aria-hidden="true">${found ? '&#9670;' : '&#9671;'}</span>
+  q('[data-discovery-list]', discoveriesDialog).innerHTML = discoveries.list
+    .map((d) => {
+      const found = discoveries.has(d.id);
+      return `<li class="discovery${found ? ' is-found' : ''}"><span class="discovery-mark" aria-hidden="true">${found ? '&#9670;' : '&#9671;'}</span>
       <span><b>${found ? esc(d.name) : '???'}</b>${found ? '' : `<span class="discovery-hint">${esc(d.hint)}</span>`}</span>
       <span class="visually-hidden">${found ? 'found' : 'not found yet'}</span></li>`;
-  }).join('');
+    })
+    .join('');
   discoveriesDialog.showModal();
-  q('[data-discoveries-close]', discoveriesDialog).focus();
+  // Focus on Close (the one thing to press), but the list from its top: its title, the count
+  // and the first ones in sight, not scrolled down to where Close is.
+  q('[data-discoveries-close]', discoveriesDialog).focus({ preventScroll: true });
+  q('[data-discoveries-scroll]', discoveriesDialog).scrollTop = 0;
 }
 discoveriesDialog.addEventListener('click', (e) => {
   if (e.target === discoveriesDialog || e.target.closest('[data-discoveries-close]')) discoveriesDialog.close();
@@ -112,30 +151,63 @@ function sawFlame(key) {
 // --- The render settings (P: ui/renderMenu.js) --------------------------------------------
 // One menu in two places: a HUD in the corner, or folded into the breakdown's panel while
 // that's open (the HUD would sit behind it). Opening one while the other shows hands over.
+// The cursor's pick (how the pointer stirs the fire) is remembered in this browser, in the
+// same place ?lab keeps its pick; the rest is the site's look again on a reload.
+const CURSOR_KEY = 'fireInteraction';
 const renderSettings = {
-  title: ui.renderMenu ?? 'Render settings',
+  title: ui.renderMenu ?? 'Render Settings',
   read: () => fire?.describe() ?? null,
-  pick: (id) => fire?.cycle(id),
-  // Back to the site's own look (the effects in content.json). Not mid-swap: it would also
-  // settle the colors the new weapon is bringing in.
-  reset: { key: '0', label: ui.renderReset ?? 'Reset', run: () => fire?.applyEffects(), disabled: () => !fire || fire.forging },
+  pick: (id, dir) => {
+    const values = fire?.cycle(id, dir);
+    if (id === 'interaction' && fire) store.set(CURSOR_KEY, fire.interaction);
+    return values;
+  },
+  // Back to the site's own look (the effects in content.json; the cursor's pick forgotten).
+  // Not mid-swap: it would also settle the colors the new weapon is bringing in.
+  reset: {
+    key: '0',
+    label: ui.renderReset ?? 'Reset Render Settings',
+    hint: 'the site’s look',
+    run: () => {
+      fire?.applyEffects();
+      store.remove(CURSOR_KEY);
+    },
+    disabled: () => !fire || fire.forging,
+  },
   onSound: (what) => blip(what === 'open' ? 'select' : what),
-  onToggle: (open) => { if (open) discover('render'); },
+  onToggle: (open) => {
+    if (open) discover('render');
+  },
 };
 const hud = createRenderMenu({ ...renderSettings, className: 'debug-hud' });
 app.append(hud.el);
+/** Render Settings from the rest menu (a touch screen's way in): the breakdown's fold while that's open, else the HUD. */
+function openRenderSettings() {
+  if (!fire) return;
+  (breakdown.active ? breakdown.render : hud).open({ focus: true });
+}
+
+// --- Keyboard shortcuts (?): every key the site answers, in one list (ui/siteKeys.js) -------
+const keysOverlay = createKeysOverlay({ title: MENU_TEXT.keys, groups: SITE_KEYS });
 
 // --- Photo mode and "How it's made" (ui/photo.js, ui/breakdown.js). Created before the
 // page's own keys, so their Esc closes them without also going back a screen.
 const photo = createPhotoMode({
   getFire: () => fire,
   onExit: () => fire?.setView(route.screen === 'projects' && route.item ? 'inspect' : route.screen),
-  onColors: () => { const fresh = rotation().filter((k) => k !== equipment.flame); equip(equipment.weapon, pick(fresh), equipment.item, { instant: true }); },
+  onColors: () => {
+    const fresh = rotation().filter((k) => k !== equipment.flame);
+    equip(equipment.weapon, pick(fresh), equipment.item, { instant: true });
+  },
   onElement: () => {
-    const next = ['fire', 'lightning', 'ice'][(['fire', 'lightning', 'ice'].indexOf(equipment.element) + 1) % 3];
+    const next = ELEMENT_IDS[(ELEMENT_IDS.indexOf(equipment.element) + 1) % ELEMENT_IDS.length]; // (in the order its tooltip names them)
     equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, { element: next });
   },
-  onEnter: () => { breakdown.exit(); discover('photo'); },
+  onEnter: () => {
+    breakdown.exit();
+    discover('photo');
+  },
+  touch,
 });
 // Closing the breakdown hands its open render settings back to the HUD only where P can
 // close that again: on touch screens there's no key for it, so they just fold away.
@@ -144,7 +216,10 @@ const breakdown = createBreakdown({
   render: renderSettings,
   onEnter: () => {
     photo.exit();
-    if (hud.isOpen) { hud.close({ quiet: true }); breakdown.render.open({ quiet: true }); }
+    if (hud.isOpen) {
+      hud.close({ quiet: true });
+      breakdown.render.open({ quiet: true });
+    }
     pack.refresh(); // (it steps aside: its list, if one's showing, fits where it goes)
     discover('breakdown');
   },
@@ -180,7 +255,9 @@ const equipLabel = () => `${weapons[displayedEquipment.weapon]} · ${fireName(di
 function refreshEquipLabels() {
   inventory.markEquipped(equipment.item);
   inventory.setWield(equipLabel());
-  qa('[data-equip-label]').forEach((el) => { el.textContent = equipLabel(); });
+  qa('[data-equip-label]').forEach((el) => {
+    el.textContent = equipLabel();
+  });
 }
 refreshEquipLabels();
 
@@ -218,7 +295,10 @@ const goHome = () => equip(startingEquipment.weapon, startingEquipment.flame, nu
 
 function onImpact(flame, _from, instant, selection) {
   displayedEquipment = { ...selection };
-  if (!instant) { discover(selection.element ?? 'fire'); sawFlame(flame); } // (not the page's own first setup)
+  if (!instant) {
+    discover(selection.element ?? 'fire');
+    sawFlame(flame);
+  } // (not the page's own first setup)
   document.documentElement.dataset.flame = flame;
   document.documentElement.dataset.element = selection.element ?? 'fire';
   if (instant) applyFlame(flame); // otherwise the scene eases the accents via onRamp
@@ -352,7 +432,17 @@ window.addEventListener('popstate', () => syncRoute());
 window.addEventListener('hashchange', () => syncRoute());
 document.addEventListener('click', (event) => {
   const a = event.target.closest('a');
-  if (!a || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || a.target || a.hasAttribute('download')) return;
+  if (
+    !a ||
+    event.button !== 0 ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    event.altKey ||
+    a.target ||
+    a.hasAttribute('download')
+  )
+    return;
   // A link to #how-its-made (the Portfolio project's page) opens the breakdown in place.
   if (a.hash === BREAKDOWN_HASH) {
     event.preventDefault();
@@ -376,13 +466,29 @@ document.addEventListener('click', (event) => {
 });
 syncRoute(false);
 
-// --- Keyboard: Q/E switch screens, Esc goes back ------------------------------------------
+// --- Keyboard: Q/E switch screens, Esc goes back, ? lists every key -------------------------
+// (Shift with a letter isn't one of the site's keys: only ?, which is Shift+/ on most keyboards.)
 window.addEventListener('keydown', (e) => {
-  if (e.altKey || e.ctrlKey || e.metaKey || isEditing(e.target) || document.querySelector('dialog[open]')) return;
+  if (e.altKey || e.ctrlKey || e.metaKey || typing(e.target) || document.querySelector('dialog[open]')) return;
+  if (isHelpKey(e)) {
+    e.preventDefault();
+    keysOverlay.open();
+    return;
+  }
+  if (e.shiftKey) return;
   const k = e.key.toLowerCase();
-  if (k === 'f') { photo.toggle(); return; }
-  if (k === 'b') { breakdown.toggle(); return; }
-  if (k === 'i' && !photo.active) { pack.toggle(); return; } // (the pack stays in the breakdown)
+  if (k === 'f') {
+    photo.toggle();
+    return;
+  }
+  if (k === 'b') {
+    breakdown.toggle();
+    return;
+  }
+  if (k === 'i' && !photo.active) {
+    pack.toggle();
+    return;
+  } // (the pack stays in the breakdown)
   if (photo.active || breakdown.active) return;
   if (k === 'q' || k === 'e') step(k === 'e' ? 1 : -1);
   else if (e.key === 'Escape') {
@@ -390,6 +496,13 @@ window.addEventListener('keydown', (e) => {
     if (route.screen === 'projects' && route.item) go('#/projects');
     else if (route.screen !== 'home') go('#/');
   }
+});
+// The render settings' keys (P, and while it's open 1–6 and 0): listened for from the start,
+// and nothing until the scene is there. The breakdown takes them first while it's open (its
+// own fold of the menu).
+window.addEventListener('keydown', (e) => {
+  if (!fire || breakdown.active || typing(e.target) || document.querySelector('dialog[open]')) return;
+  if (hud.handleKey(e)) e.preventDefault();
 });
 
 // --- Header, rest menu, sound ---------------------------------------------------------------
@@ -400,15 +513,23 @@ const onScroll = () => header.classList.toggle('is-scrolled', window.scrollY > 2
 // scroll, like home), the page's own scroll on touch screens. Not in photo mode (there the
 // wheel zooms), and not for the jump to the top when the screen changes (render()).
 lastScrollY = window.scrollY;
-window.addEventListener('wheel', (e) => {
-  if (touch || photo.active) return;
-  fire?.scroll(e.deltaMode === 1 ? e.deltaY * 32 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY);
-}, { passive: true });
-window.addEventListener('scroll', () => {
-  const dy = window.scrollY - lastScrollY;
-  lastScrollY = window.scrollY;
-  if (touch && dy) fire?.scroll(dy);
-}, { passive: true });
+window.addEventListener(
+  'wheel',
+  (e) => {
+    if (touch || photo.active) return;
+    fire?.scroll(e.deltaMode === 1 ? e.deltaY * 32 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY);
+  },
+  { passive: true },
+);
+window.addEventListener(
+  'scroll',
+  () => {
+    const dy = window.scrollY - lastScrollY;
+    lastScrollY = window.scrollY;
+    if (touch && dy) fire?.scroll(dy);
+  },
+  { passive: true },
+);
 
 // The current tab's underline glides from tab to tab (hidden on home, where no tab is current).
 function placeTabCursor() {
@@ -429,26 +550,22 @@ onScroll();
 listNav(q('.tabs'), 'a', { horizontal: true, onMove: () => blip('move') });
 listNav(q('[data-title-menu]'), '[data-title-item]', { onMove: () => blip('move') });
 
-const menu = q('[data-menu]');
-q('[data-menu-open]').addEventListener('click', () => {
-  menu.showModal();
-  q('[data-menu-item]', menu).focus();
-  blip('select');
+// The rest menu (ui/restMenu.js; the Menu button, at every width): Go To and Tools. Not the
+// keyboard shortcuts on a touch screen: a list of keys there are none of to press (and its
+// filter would bring up the on-screen keyboard over it).
+if (touch) q('[data-menu-action="keys"]').closest('li').hidden = true;
+setupRestMenu({
+  menu: q('[data-menu]'),
+  opener: q('[data-menu-open]'),
+  onSound: blip,
+  actions: {
+    photo: () => photo.enter(),
+    breakdown: () => breakdown.enter(),
+    render: openRenderSettings,
+    discoveries: openDiscoveries,
+    keys: () => keysOverlay.open(),
+  },
 });
-menu.addEventListener('click', (e) => {
-  if (e.target === menu || e.target.closest('[data-menu-close]')) return menu.close();
-  const action = e.target.closest('[data-menu-action]')?.dataset.menuAction;
-  if (action) {
-    menu.close();
-    if (action === 'photo') photo.enter();
-    else if (action === 'breakdown') breakdown.enter();
-    else if (action === 'discoveries') openDiscoveries();
-    return;
-  }
-  if (e.target.closest('a[data-menu-item]')) menu.close();
-});
-menu.addEventListener('close', () => blip('back'));
-listNav(menu, '[data-menu-item]', { onMove: () => blip('move') });
 
 // The Q / E keys are buttons too (the same step through the screens).
 function step(dir) {
@@ -457,83 +574,90 @@ function step(dir) {
   stepDir = dir;
   go(nextId === 'home' ? '#/' : `#/${nextId}`);
 }
-qa('[data-step]').forEach((b) => b.addEventListener('click', () => { step(Number(b.dataset.step)); blip('select'); }));
+qa('[data-step]').forEach((b) =>
+  b.addEventListener('click', () => {
+    step(Number(b.dataset.step));
+    blip('select');
+  }),
+);
 
-// Sound: the label says what it is now ("Sound: off"), the tooltip what a click does.
+// Sound: the label says what it is now ("Sound: Off"), the tooltip what a click does.
 const soundButtons = qa('[data-sound]');
 function applySound(on) {
   on = setSound(on);
   soundButtons.forEach((b) => {
     b.setAttribute('aria-pressed', String(on));
-    b.title = ui.soundHint ?? '';
     q('[data-sound-label]', b).textContent = on ? ui.soundOn : ui.soundOff;
   });
   store.set('sound', on ? '1' : '0');
 }
-soundButtons.forEach((b) => b.addEventListener('click', () => {
-  const on = b.getAttribute('aria-pressed') !== 'true';
-  applySound(on);
-  if (on) { blip('select'); discover('sound'); }
-}));
+soundButtons.forEach((b) =>
+  b.addEventListener('click', () => {
+    const on = b.getAttribute('aria-pressed') !== 'true';
+    applySound(on);
+    if (on) {
+      blip('select');
+      discover('sound');
+    }
+  }),
+);
 if (store.get('sound') === '1') {
   // Remembered as on: the switch says so at once; browsers only let the audio itself start
   // with the first click or key press.
   soundButtons.forEach((b) => {
     b.setAttribute('aria-pressed', 'true');
-    b.title = ui.soundHint ?? '';
     q('[data-sound-label]', b).textContent = ui.soundOn;
   });
-  const resume = () => { applySound(true); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
+  const resume = () => {
+    applySound(true);
+    window.removeEventListener('pointerdown', resume);
+    window.removeEventListener('keydown', resume);
+  };
   window.addEventListener('pointerdown', resume, { once: true });
   window.addEventListener('keydown', resume, { once: true });
 }
 
 // --- The résumé: its links show once there's a file to open (public/resume.pdf, or a link) --
 if (site.resumeUrl) {
-  // (The menu's arrow keys take its link only once it shows: a hidden one would stop them.)
   const show = () => {
-    qa('[data-resume]').forEach((el) => { el.hidden = false; });
-    qa('[data-menu-item-later]').forEach((a) => a.setAttribute('data-menu-item', ''));
+    qa('[data-resume]').forEach((el) => {
+      el.hidden = false;
+    });
   };
   if (/^https?:/i.test(site.resumeUrl)) show();
   else {
     // (The dev server answers any path with the page itself, so check it's really a PDF.)
     fetch(BASE + site.resumeUrl, { method: 'HEAD' })
-      .then((r) => { if (r.ok && /pdf/i.test(r.headers.get('content-type') ?? '')) show(); })
+      .then((r) => {
+        if (r.ok && /pdf/i.test(r.headers.get('content-type') ?? '')) show();
+      })
       .catch(() => {});
   }
 }
 
 // --- Grids: arrow keys / WASD like a game menu ---------------------------------------------
-gridNav(q('[data-inv-grid]'), '.slot-item', (el) => el.closest('[data-nav-item]'), () => blip('move'));
-gridNav(q('[data-skill-grid]'), '.slot', (el) => el.closest('[data-nav-item]'), () => blip('move'));
-
-// Skill tooltips.
-const tooltip = q('[data-tooltip]');
-function showTip(slot) {
-  q('.tooltip-name', tooltip).textContent = slot.dataset.skill;
-  q('.tooltip-flavor', tooltip).textContent = slot.dataset.flavor;
-  tooltip.hidden = false;
-  const r = slot.getBoundingClientRect();
-  const t = tooltip.getBoundingClientRect();
-  const left = Math.min(Math.max(8, r.left + r.width / 2 - t.width / 2), window.innerWidth - t.width - 8);
-  const top = r.top - t.height - 10 < 8 ? r.bottom + 10 : r.top - t.height - 10;
-  tooltip.style.left = `${Math.round(left)}px`;
-  tooltip.style.top = `${Math.round(top)}px`;
-}
-const hideTip = () => { tooltip.hidden = true; };
-qa('.slot').forEach((s) => {
-  s.addEventListener('mouseenter', () => showTip(s));
-  s.addEventListener('mouseleave', () => { if (document.activeElement !== s) hideTip(); });
-  s.addEventListener('focus', () => showTip(s));
-  s.addEventListener('blur', hideTip);
-});
-window.addEventListener('scroll', hideTip, { passive: true });
+gridNav(
+  q('[data-inv-grid]'),
+  '.slot-item',
+  (el) => el.closest('[data-nav-item]'),
+  () => blip('move'),
+);
+gridNav(
+  q('[data-skill-grid]'),
+  '.slot',
+  (el) => el.closest('[data-nav-item]'),
+  () => blip('move'),
+);
+// (A skill's flavor is its tooltip: the shared one, installTooltips above.)
 
 // --- Clicks: UI "hit" feedback, and the fire answers ----------------------------------------
 const kindled = q('[data-kindled]');
 let kindleTimer = null;
-function hideKindled() { kindled.hidden = true; kindled.classList.remove('is-preview'); clearTimeout(kindleTimer); }
+function hideKindled() {
+  kindled.hidden = true;
+  kindled.classList.remove('is-preview');
+  clearTimeout(kindleTimer);
+}
 function showKindled({ hold = false } = {}) {
   clearTimeout(kindleTimer);
   // Re-show restarts the fade even if it's already up.
@@ -546,7 +670,9 @@ function showKindled({ hold = false } = {}) {
   if (!hold) kindleTimer = setTimeout(hideKindled, Number(hero.kindled.duration) || 2600);
 }
 if (new URLSearchParams(location.search).has('kindled')) showKindled({ hold: true });
-window.addEventListener('keydown', (e) => { if (!kindled.hidden && e.key === 'Escape') hideKindled(); });
+window.addEventListener('keydown', (e) => {
+  if (!kindled.hidden && e.key === 'Escape') hideKindled();
+});
 kindled.addEventListener('click', hideKindled);
 
 function stoke() {
@@ -571,18 +697,27 @@ document.addEventListener('click', (e) => {
     // A click on the knight's summon sign (he's away) summons him.
     if (fire && e.target.closest('[data-stage]') && fire.signAt(e.clientX, e.clientY) && summonKnight()) return;
     // A click while a new weapon is being forged skips ahead to its impact.
-    if (fire?.forging && !fire.swinging && fire.hurry()) { blip('select'); discover('hurry'); return; }
+    if (fire?.forging && !fire.swinging && fire.hurry()) {
+      blip('select');
+      discover('hurry');
+      return;
+    }
     // A click on the planted weapon wakes it: it pulls free for a flourish and plunges back.
     if (fire && !fire.forging && !reducedMotion && fire.weaponAt(e.clientX, e.clientY)) {
       blip('pull');
-      fire.flourish().then((ok) => { if (ok) blip('stab'); });
+      fire.flourish().then((ok) => {
+        if (ok) blip('stab');
+      });
       discover('flourish');
       return;
     }
     // A click on the knight greets him: he answers with a gesture (and the fire isn't stoked).
     if (fire && greets()) {
       const index = fire.knightAt(e.clientX, e.clientY);
-      if (index >= 0) { greet(index); return; }
+      if (index >= 0) {
+        greet(index);
+        return;
+      }
     }
     stoke();
     if (route.screen !== 'projects') rollFor(null);
@@ -677,7 +812,8 @@ let styleGoal = null;
 const knightStyle = () => styleGoal ?? fire?.knights.style ?? null;
 /** His style (the pack): he burns away and forms again in it. Remembered for the next visit. False if nothing changes. */
 function changeStyle(key, { remember = true } = {}) {
-  if (!fire || !Object.hasOwn(STYLE_NAMES, key) || key === knightStyle() || knightPresence() !== 'resting') return false;
+  if (!fire || !Object.hasOwn(STYLE_NAMES, key) || key === knightStyle() || knightPresence() !== 'resting')
+    return false;
   if (remember) store.set(KNIGHT_STYLE, key);
   styleGoal = key;
   const now = fire;
@@ -691,7 +827,8 @@ function changeStyle(key, { remember = true } = {}) {
 }
 /** His armor's finish (the pack): the steel's color changes at once. Remembered for the next visit. False if nothing changes. */
 function changeFinish(key, { remember = true } = {}) {
-  if (!fire || !Object.hasOwn(FINISH_NAMES, key) || key === fire.knights.finish || knightPresence() !== 'resting') return false;
+  if (!fire || !Object.hasOwn(FINISH_NAMES, key) || key === fire.knights.finish || knightPresence() !== 'resting')
+    return false;
   if (remember) store.set(KNIGHT_FINISH, key);
   fire.knights.setFinish(key);
   live.textContent = `His armor turns ${FINISH_NAMES[key]}.`;
@@ -740,16 +877,26 @@ function leaveHover() {
   hoverInScene = false;
   setHover(null);
 }
-window.addEventListener('pointermove', (e) => {
-  if (e.pointerType === 'touch' || !fire) return;
-  const onStage = e.target.closest?.('[data-stage]') && !photo.active && !breakdown.active;
-  if (!onStage) { if (hoverInScene || hoverWhat) leaveHover(); return; }
-  clearTimeout(hoverTimer);
-  const wait = 80 - (performance.now() - hoverAt);
-  const { clientX: x, clientY: y } = e;
-  if (wait > 0) hoverTimer = setTimeout(() => { if (fire) checkHover(x, y); }, wait); // (the last move counts too)
-  else checkHover(x, y);
-}, { passive: true });
+window.addEventListener(
+  'pointermove',
+  (e) => {
+    if (e.pointerType === 'touch' || !fire) return;
+    const onStage = e.target.closest?.('[data-stage]') && !photo.active && !breakdown.active;
+    if (!onStage) {
+      if (hoverInScene || hoverWhat) leaveHover();
+      return;
+    }
+    clearTimeout(hoverTimer);
+    const wait = 80 - (performance.now() - hoverAt);
+    const { clientX: x, clientY: y } = e;
+    if (wait > 0)
+      hoverTimer = setTimeout(() => {
+        if (fire) checkHover(x, y);
+      }, wait); // (the last move counts too)
+    else checkHover(x, y);
+  },
+  { passive: true },
+);
 document.documentElement.addEventListener('pointerleave', leaveHover);
 
 // --- The pack (ui/pack.js): fast travel, swap the weapon, cast a spell, or tend the knight --
@@ -758,10 +905,19 @@ document.documentElement.addEventListener('pointerleave', leaveHover);
 const pack = createPack({
   label: ui.pack,
   items: bonfireItems({
-    state: () => (fire ? {
-      scenery: fire.scenery, weapon: equipment.weapon, element: equipment.element, flame: equipment.flame,
-      helmet: knightHelmet(), presence: knightPresence(), style: knightStyle(), finish: fire.knights.finish,
-    } : null),
+    state: () =>
+      fire
+        ? {
+            scenery: fire.scenery,
+            weapon: equipment.weapon,
+            element: equipment.element,
+            flame: equipment.flame,
+            helmet: knightHelmet(),
+            presence: knightPresence(),
+            style: knightStyle(),
+            finish: fire.knights.finish,
+          }
+        : null,
     busy: () => !fire || fire.forging,
     reducedMotion,
     onScene: (key) => {
@@ -770,7 +926,9 @@ const pack = createPack({
       discover('scenery');
       live.textContent = `The fire burns in ${SCENERIES[key]}.`;
     },
-    onWeapon: (key) => { if (key !== equipment.weapon) equip(key, equipment.flame, equipment.item); },
+    onWeapon: (key) => {
+      if (key !== equipment.weapon) equip(key, equipment.flame, equipment.item);
+    },
     onRing: () => {
       fire?.ring(1.2);
       blip(fire?.element === 'lightning' ? 'zap' : fire?.element === 'ice' ? 'chime' : 'stoke');
@@ -779,11 +937,14 @@ const pack = createPack({
     onLiving: () => {
       if (!fire || fire.forging) return;
       blip('pull');
-      fire.flourish().then((ok) => { if (ok) blip('stab'); });
+      fire.flourish().then((ok) => {
+        if (ok) blip('stab');
+      });
       discover('flourish');
       discover('spell');
     },
     // A new spell forges a new weapon in that element (the swap takes after it).
+    elementTip: 'Also forges a new weapon.',
     onElement: (key) => {
       if (key === equipment.element) return;
       equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, { element: key });
@@ -802,9 +963,15 @@ const pack = createPack({
     // pack leaves the item out.
     onSummon: () => summonKnight(),
     onDismiss: () => dismissKnight(),
-    onHelmet: (key) => { if (changeHelmet(key)) discover('helm'); },
-    onStyle: (key) => { if (changeStyle(key)) discover('style'); },
-    onFinish: (key) => { if (changeFinish(key)) discover('style'); },
+    onHelmet: (key) => {
+      if (changeHelmet(key)) discover('helm');
+    },
+    onStyle: (key) => {
+      if (changeStyle(key)) discover('style');
+    },
+    onFinish: (key) => {
+      if (changeFinish(key)) discover('style');
+    },
     onGesture: (name) => {
       if (!fire?.knights.gesture(name, { index: 0 })) return; // (false: he didn't start it, e.g. mid-swap)
       lastGreeting = name;
@@ -828,97 +995,128 @@ function failScene(error) {
   fire?.dispose();
   fire = null;
   delete window.__fire;
-  document.documentElement.classList.add('no-webgl');
+  markSceneFailed(null, error, { log: 'Bonfire unavailable; showing the static portfolio.' });
   q('[data-stage]').classList.remove('is-ready');
   hud.close({ quiet: true });
   breakdown.exit();
   photo.exit();
   wantsBreakdown = false;
-  for (const b of qa('[data-menu-action="photo"], [data-menu-action="breakdown"]')) {
-    b.closest('li').hidden = true;
-    b.removeAttribute('data-menu-item'); // (out of the menu's arrow keys too)
+  for (const b of qa('[data-menu-action="photo"], [data-menu-action="breakdown"], [data-menu-action="render"]')) {
+    b.closest('li').hidden = true; // (and so out of the menu's arrow keys)
   }
   knightModel = false;
   knightChanged();
   displayedEquipment = { ...equipment };
   applyFlame(equipment.flame);
   refreshEquipLabels();
-  console.warn('Bonfire unavailable; showing the static portfolio.', error);
 }
 
 // Construct the real renderer once instead of probing with a second WebGL context.
 let sceneGeneration = 0;
 function startScene() {
   const generation = ++sceneGeneration;
-  return import('./bonfire/scene.js').then(async ({ createBonfire }) => {
-    const stage = q('[data-stage]');
-    const candidate = createBonfire(stage, {
-      reducedMotion, knightHelmet: store.get(KNIGHT_HELMET), onImpact, onFormed: () => blip('form'), onRamp: setAccentRamp, onError: failScene,
-    });
-    await candidate.ready;
-    if (generation !== sceneGeneration) { candidate.dispose(); return; } // superseded by a newer rebuild
-    fire = candidate;
-    styleGoal = null; // (a style change under way was the last scene's)
-    if (import.meta.env.DEV) window.__fire = fire;
-    // (His model comes with the scene's: known now, or at once after.)
-    fire.knights.ready.then((ok) => { if (fire === candidate) { knightModel = ok; knightChanged(); } });
-    // (He comes and goes: the page follows.)
-    fire.knights.onPresence(() => { if (fire === candidate) knightChanged(); });
-    // (A visitor's style and finish from an earlier visit; the admin's preview shows the draft's.)
-    if (!previewing) {
-      const style = store.get(KNIGHT_STYLE);
-      const finish = store.get(KNIGHT_FINISH);
-      if (Object.hasOwn(STYLE_NAMES, style)) fire.knights.setStyle(style, { instant: true });
-      if (Object.hasOwn(FINISH_NAMES, finish)) fire.knights.setFinish(finish);
-    }
-    fire.setView(route.screen === 'projects' && route.item ? 'inspect' : route.screen, { instant: true });
-    // Navigation during loading only changes requested state; initialize with its latest value.
-    await fire.equip(equipment.weapon, equipment.flame, { instant: true, item: equipment.item, element: equipment.element });
-    stage.classList.add('is-ready');
-  }).catch(failScene);
+  return import('./bonfire/scene.js')
+    .then(async ({ createBonfire }) => {
+      const stage = q('[data-stage]');
+      const candidate = createBonfire(stage, {
+        reducedMotion,
+        knightHelmet: store.get(KNIGHT_HELMET),
+        onImpact,
+        onFormed: () => blip('form'),
+        onRamp: setAccentRamp,
+        onError: failScene,
+      });
+      await candidate.ready;
+      if (generation !== sceneGeneration) {
+        candidate.dispose();
+        return;
+      } // superseded by a newer rebuild
+      fire = candidate;
+      styleGoal = null; // (a style change under way was the last scene's)
+      if (import.meta.env.DEV) window.__fire = fire;
+      // (His model comes with the scene's: known now, or at once after.)
+      fire.knights.ready.then((ok) => {
+        if (fire === candidate) {
+          knightModel = ok;
+          knightChanged();
+        }
+      });
+      // (He comes and goes: the page follows.)
+      fire.knights.onPresence(() => {
+        if (fire === candidate) knightChanged();
+      });
+      // (A visitor's style and finish from an earlier visit; the admin's preview shows the draft's.)
+      // (And the cursor's pick from the render settings or ?lab: the setter takes only a real one.)
+      if (!previewing) {
+        const style = store.get(KNIGHT_STYLE);
+        const finish = store.get(KNIGHT_FINISH);
+        const cursor = store.get(CURSOR_KEY);
+        if (Object.hasOwn(STYLE_NAMES, style)) fire.knights.setStyle(style, { instant: true });
+        if (Object.hasOwn(FINISH_NAMES, finish)) fire.knights.setFinish(finish);
+        if (cursor) fire.interaction = cursor;
+      }
+      fire.setView(route.screen === 'projects' && route.item ? 'inspect' : route.screen, { instant: true });
+      // Navigation during loading only changes requested state; initialize with its latest value.
+      await fire.equip(equipment.weapon, equipment.flame, {
+        instant: true,
+        item: equipment.item,
+        element: equipment.element,
+      });
+      stage.classList.add('is-ready');
+    })
+    .catch(failScene);
 }
 
 startScene().then(async () => {
-    if (!fire) return;
-    if (wantsBreakdown) { wantsBreakdown = false; breakdown.enter(); }
+  if (!fire) return;
+  if (wantsBreakdown) {
+    wantsBreakdown = false;
+    breakdown.enter();
+  }
 
-    // Cursor-interaction lab (prototype picker): open the site with ?lab.
-    if (new URLSearchParams(location.search).has('lab')) {
-      const saved = store.get('fireInteraction');
-      if (saved) fire.interaction = saved;
-      await import('./bonfire/interaction.js').then(({ MODES }) => {
-        const lab = document.createElement('aside');
-        lab.className = 'lab';
-        lab.setAttribute('aria-label', 'Fire interaction prototypes');
-        lab.innerHTML = `<p class="lab-title">Cursor → fire <span>prototypes</span></p>
-          ${Object.entries(MODES).map(([k, m]) => `
+  // Cursor-interaction lab (prototype picker): open the site with ?lab. (Its pick is the
+  // render settings' Cursor row's, kept in the same place: startScene put it on.)
+  if (new URLSearchParams(location.search).has('lab')) {
+    await import('./bonfire/interaction.js').then(({ MODES }) => {
+      const lab = document.createElement('aside');
+      lab.className = 'lab';
+      lab.setAttribute('aria-label', 'Fire interaction prototypes');
+      lab.innerHTML = `<p class="lab-title">Cursor → fire <span>prototypes</span></p>
+          ${Object.entries(MODES)
+            .map(
+              ([k, m]) => `
             <label class="lab-option"><input type="radio" name="lab-mode" value="${k}"${fire.interaction === k ? ' checked' : ''}>
-              <span><b>${m.name}</b> ${m.blurb}</span></label>`).join('')}
+              <span><b>${m.name}</b> ${m.blurb}</span></label>`,
+            )
+            .join('')}
           <p class="lab-note">Move the cursor through the fire. Your pick is remembered in this browser.</p>`;
-        lab.addEventListener('change', (e) => {
-          fire.interaction = e.target.value;
-          store.set('fireInteraction', e.target.value);
-        });
-        document.body.appendChild(lab);
+      lab.addEventListener('change', (e) => {
+        fire.interaction = e.target.value;
+        store.set(CURSOR_KEY, e.target.value);
       });
-    }
-    // The render settings' keys (P, and while it's open 1–6 and 0). The breakdown takes
-    // them first while it's open (its own fold of the menu).
-    window.addEventListener('keydown', (e) => {
-      if (!fire || breakdown.active || isEditing(e.target) || document.querySelector('dialog[open]')) return;
-      if (hud.handleKey(e)) e.preventDefault();
+      document.body.appendChild(lab);
     });
-  });
+  }
+});
 
 // --- Admin live preview ------------------------------------------------------------------
-// The admin's Effects page embeds this site as ?preview and streams its draft in.
+// The admin's Look & Feel pages (Colors, Fire & Elements, Picture, Knight) embed this site
+// as ?preview and stream their draft in.
 // Only the parent frame is listened to, and every payload is validated first; the
 // changes live in this page only (nothing is saved from here).
-const changedAt = (a, b, path) => JSON.stringify(path.split('.').reduce((o, k) => o?.[k], a)) !== JSON.stringify(path.split('.').reduce((o, k) => o?.[k], b));
+const changedAt = (a, b, path) =>
+  JSON.stringify(path.split('.').reduce((o, k) => o?.[k], a)) !==
+  JSON.stringify(path.split('.').reduce((o, k) => o?.[k], b));
 let rebuildTimer = 0;
 onEffects((next, prev) => {
-  if (changedAt(next, prev, 'colors')) { applyCssPalette(); installDitherPatterns(base); }
-  for (const eq of [equipment, displayedEquipment]) { eq.flame = flameOr(eq.flame); eq.element = elementOr(eq.element); }
+  if (changedAt(next, prev, 'colors')) {
+    applyCssPalette();
+    installDitherPatterns(base);
+  }
+  for (const eq of [equipment, displayedEquipment]) {
+    eq.flame = flameOr(eq.flame);
+    eq.element = elementOr(eq.element);
+  }
   applyFlame(displayedEquipment.flame);
   refreshEquipLabels();
   if (STRUCTURAL.some((p) => changedAt(next, prev, p))) {
@@ -944,17 +1142,27 @@ if (previewing) {
     if (e.source !== window.parent || typeof e.data?.type !== 'string') return;
     const msg = e.data;
     if (msg.type === 'nh:effects') {
-      rulesReady.then(({ validateEffects }) => {
-        let ok = true;
-        validateEffects(msg.effects, () => { ok = false; });
-        if (ok) setEffects(msg.effects);
-      }, () => { /* the rules didn't load: the draft isn't shown */ });
+      rulesReady.then(
+        ({ validateEffects }) => {
+          let ok = true;
+          validateEffects(msg.effects, () => {
+            ok = false;
+          });
+          if (ok) setEffects(msg.effects);
+        },
+        () => {
+          /* the rules didn't load: the draft isn't shown */
+        },
+      );
     } else if (msg.type === 'nh:flame' && Object.hasOwn(flames, msg.id)) {
       // Forge it (a new weapon, the full swap), or just show it: recolor in place.
-      if (msg.instant) { if (equipment.flame !== msg.id) equip(equipment.weapon, msg.id, equipment.item, { instant: true }); }
-      else equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), msg.id, equipment.item);
+      if (msg.instant) {
+        if (equipment.flame !== msg.id) equip(equipment.weapon, msg.id, equipment.item, { instant: true });
+      } else equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), msg.id, equipment.item);
     } else if (msg.type === 'nh:element' && elementOr(msg.id) === msg.id) {
-      equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, { element: msg.id });
+      equip(pick(weaponKeys.filter((k) => k !== equipment.weapon)), equipment.flame, equipment.item, {
+        element: msg.id,
+      });
     } else if (msg.type === 'nh:stoke') {
       stoke();
     } else if (msg.type === 'nh:roll') {
@@ -978,4 +1186,3 @@ if (previewing) {
   });
   window.parent.postMessage({ type: 'nh:ready' }, '*');
 }
-

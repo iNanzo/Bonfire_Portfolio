@@ -3,8 +3,7 @@
 // setEffects() and subscribers (palette, scene) pick the change up.
 import content from './content.json' with { type: 'json' };
 import { DEFAULT_EFFECTS } from './effectsDefaults.js';
-
-const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+import { isObj } from './ruleBasics.js';
 
 /** `src` over `into`, recursing into groups (so a saved `elements.ice` keeps any keys it lacks). */
 function merge(into, src) {
@@ -28,7 +27,10 @@ export function resolveEffects(saved) {
 export const effects = resolveEffects(content.effects);
 
 const listeners = new Set();
-export const onEffects = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
+export const onEffects = (fn) => {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+};
 
 /** Replace the live effects (preview only). `prev` is handed to subscribers. */
 export function setEffects(next) {

@@ -13,7 +13,7 @@ let crackleTimer = null;
 
 function ensureContext() {
   if (ctx) return ctx;
-  const AC = window.AudioContext || window.webkitAudioContext;
+  const AC = window.AudioContext || /** @type {any} */ (window).webkitAudioContext; // (older Safari)
   if (!AC) return null;
   ctx = new AC();
   master = ctx.createGain();
@@ -51,11 +51,14 @@ function startAmbience() {
 
 function scheduleCrackle() {
   clearTimeout(crackleTimer);
-  crackleTimer = setTimeout(() => {
-    if (!enabled) return;
-    pop(0.02 + Math.random() * 0.05);
-    scheduleCrackle();
-  }, 60 + Math.random() * 420);
+  crackleTimer = setTimeout(
+    () => {
+      if (!enabled) return;
+      pop(0.02 + Math.random() * 0.05);
+      scheduleCrackle();
+    },
+    60 + Math.random() * 420,
+  );
 }
 
 function pop(vol) {
@@ -110,10 +113,15 @@ function tone(freq, start, dur, vol, type = 'square') {
 export function setSound(on) {
   enabled = on;
   if (on) {
-    if (!ensureContext()) { enabled = false; return false; }
+    if (!ensureContext()) {
+      enabled = false;
+      return false;
+    }
     // The loop is reusable, but muting cancels its timer. Restart scheduling on
     // every enable; scheduleCrackle first clears the previous timer.
-    ctx.resume().catch(() => { /* A later user gesture can retry suspended audio. */ });
+    ctx.resume().catch(() => {
+      /* A later user gesture can retry suspended audio. */
+    });
     startAmbience();
     scheduleCrackle();
     master.gain.setTargetAtTime(0.6, ctx.currentTime, 0.1);
@@ -149,14 +157,19 @@ export function forgeHum(seconds) {
   g.gain.exponentialRampToValueAtTime(0.03, t + 0.4);
   g.gain.setValueAtTime(0.03, t + Math.max(0.4, seconds - 0.2));
   g.gain.exponentialRampToValueAtTime(0.0001, t + seconds + 0.1);
-  o.connect(lp); o2.connect(lp); lp.connect(g).connect(master);
-  o.start(t); o2.start(t);
-  o.stop(t + seconds + 0.2); o2.stop(t + seconds + 0.2);
+  o.connect(lp);
+  o2.connect(lp);
+  lp.connect(g).connect(master);
+  o.start(t);
+  o2.start(t);
+  o.stop(t + seconds + 0.2);
+  o2.stop(t + seconds + 0.2);
   return () => {
     const now = ctx.currentTime;
     g.gain.cancelScheduledValues(now);
     g.gain.setTargetAtTime(0.0001, now, 0.03);
-    o.stop(now + 0.2); o2.stop(now + 0.2);
+    o.stop(now + 0.2);
+    o2.stop(now + 0.2);
   };
 }
 
@@ -164,10 +177,16 @@ export function blip(kind = 'move') {
   if (!enabled || !ctx) return;
   const t = ctx.currentTime;
   if (kind === 'move') tone(660, t, 0.05, 0.05);
-  else if (kind === 'select') { tone(523, t, 0.06, 0.06); tone(784, t + 0.06, 0.09, 0.06); }
-  else if (kind === 'back') { tone(523, t, 0.06, 0.05); tone(392, t + 0.06, 0.08, 0.05); }
-  else if (kind === 'pack') { tone(196, t, 0.08, 0.08, 'triangle'); tone(587, t + 0.05, 0.07, 0.04); }
-  else if (kind === 'stoke') {
+  else if (kind === 'select') {
+    tone(523, t, 0.06, 0.06);
+    tone(784, t + 0.06, 0.09, 0.06);
+  } else if (kind === 'back') {
+    tone(523, t, 0.06, 0.05);
+    tone(392, t + 0.06, 0.08, 0.05);
+  } else if (kind === 'pack') {
+    tone(196, t, 0.08, 0.08, 'triangle');
+    tone(587, t + 0.05, 0.07, 0.04);
+  } else if (kind === 'stoke') {
     tone(110, t, 0.25, 0.18, 'triangle');
     for (let i = 0; i < 6; i++) setTimeout(() => enabled && pop(0.08), i * 40 + Math.random() * 30);
   } else if (kind === 'pull') {
@@ -209,7 +228,8 @@ export function blip(kind = 'move') {
     tone(70, t, 0.25, 0.16, 'triangle');
     [1568, 2349, 3322].forEach((f, i) => tone(f, t + i * 0.015, 0.9 - i * 0.2, 0.025, 'sine'));
     hiss(t, 0.6, 0.05, 6000, 2500, 2);
-    for (let i = 0; i < 5; i++) tone(2600 + Math.random() * 1800, t + 0.15 + i * 0.07 + Math.random() * 0.05, 0.12, 0.012, 'sine');
+    for (let i = 0; i < 5; i++)
+      tone(2600 + Math.random() * 1800, t + 0.15 + i * 0.07 + Math.random() * 0.05, 0.12, 0.012, 'sine');
   } else if (kind === 'form') {
     // The new blade takes shape: a quick rising shimmer.
     [523, 784, 1047, 1568].forEach((f, i) => tone(f, t + i * 0.04, 0.25, 0.018, 'triangle'));

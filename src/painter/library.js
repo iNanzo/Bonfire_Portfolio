@@ -9,12 +9,15 @@
 //                   (or a scene's JSON from the admin), ids that clash saved as copies;
 //                   every one of mine in one file (bonfire-scenes.json).
 // A card lifts on hover with a dithered glow in its own flame's color (an effect, no text).
+// A box over the lists filters both by name as you type (/ goes to it; Esc clears it, a
+// second Esc closes the drawer), and keeps filtering as the lists change.
 // The drawer lists what the store has each time it opens, and again when another tab
 // changes it; a redraw keeps the keyboard's place (the same button on the same card, or
 // the next card's when that one's gone). Opening a scene or starting a new one while the
 // one being painted has unsaved changes asks first, in place (Discard and Open / Keep
 // Painting). Esc closes the drawer wherever the focus is.
 import { esc } from '../html.js';
+import { createSearchBox, normalize, searchBoxMarkup } from '../ui/settingsSearch.js';
 import { readSceneFile, sceneFile, sceneRef, sceneSummary, sceneSwatches } from '../scenes.js';
 import { swatches } from './panel.js';
 
@@ -32,7 +35,7 @@ export function downloadJson(name, data) {
  * One scene's card (pure markup).
  * @param {any} scene @param {string} ref @param {{ thumb?: string | null, current?: boolean, mine?: boolean }} o
  */
-export function cardMarkup(scene, ref, { thumb = null, current = false, mine = false } = {}) {
+function cardMarkup(scene, ref, { thumb = null, current = false, mine = false } = {}) {
   const sw = sceneSwatches(scene);
   const picture = thumb ? `<img src="${esc(thumb)}" alt="" width="192" height="108" loading="lazy">` : swatches(sw);
   return `
@@ -60,7 +63,7 @@ export function cardMarkup(scene, ref, { thumb = null, current = false, mine = f
     </li>`;
 }
 /** The question asked before unsaved changes are dropped. */
-export const discardText = (name) => `Discard the unsaved changes to “${name}”?`;
+const discardText = (name) => `Discard the unsaved changes to “${name}”?`;
 
 /**
  * @param {HTMLElement} el  the drawer (empty: it's filled here)
@@ -80,7 +83,22 @@ export const discardText = (name) => `Discard the unsaved changes to “${name}�
  *   `unsaved`: the name of the scene being painted when it has changes that aren't saved
  *   (opening another or a new one asks first), else null.
  */
-export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, onNew, onPlay, onRenamed = () => {}, onDeleted = () => {}, onToggle = () => {}, unsaved = () => null }) {
+export function createLibrary(
+  el,
+  {
+    store,
+    builtIns,
+    current,
+    voidHex,
+    onOpen,
+    onNew,
+    onPlay,
+    onRenamed = () => {},
+    onDeleted = () => {},
+    onToggle = () => {},
+    unsaved = () => null,
+  },
+) {
   el.innerHTML = `
     <div class="pnt-lib-inner" role="dialog" aria-modal="false" aria-labelledby="pnt-lib-title">
       <header class="pnt-lib-head">
@@ -97,6 +115,7 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
           <button type="button" class="pix-btn" data-lib="keep">Keep Painting</button>
         </div>
         <input type="file" accept="application/json,.json" data-lib-file hidden>
+        ${searchBoxMarkup({ id: 'pnt-lib-filter', label: 'Filter Scenes by Name', placeholder: 'Filter by name  /' }).replace('class="settings-search"', 'class="settings-search pnt-lib-search"')}
       </header>
       <p class="pnt-lib-note" role="status" data-lib-note></p>
       <h3 class="pnt-lib-sub">My Scenes</h3>
@@ -111,9 +130,13 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
   const builtEl = el.querySelector('[data-lib-built]');
   const noteEl = el.querySelector('[data-lib-note]');
   const fileEl = /** @type {HTMLInputElement} */ (el.querySelector('[data-lib-file]'));
+  const filterEl = /** @type {HTMLInputElement} */ (el.querySelector('#pnt-lib-filter'));
   let opener = null;
+  let query = '';
 
-  const note = (text) => { noteEl.textContent = text; };
+  const note = (text) => {
+    noteEl.textContent = text;
+  };
   /** A scene by its ref ('m:' mine, 'b:' built-in). */
   function find(ref) {
     const [src, id] = [ref.slice(0, 1), ref.slice(2)];
@@ -135,24 +158,70 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
   function draw({ focus = focusedOn() } = {}) {
     const cur = current();
     const mine = store.list();
-    const order = focus ? [...el.querySelectorAll('[data-card]')].map((c) => /** @type {HTMLElement} */ (c).dataset.card) : [];
-    mineEl.innerHTML = mine.map((s) => cardMarkup(s, sceneRef('m', s.id), { thumb: store.thumb(sceneRef('m', s.id)), current: cur === sceneRef('m', s.id), mine: true })).join('');
+    const order = focus
+      ? [...el.querySelectorAll('[data-card]')].map((c) => /** @type {HTMLElement} */ (c).dataset.card)
+      : [];
+    mineEl.innerHTML = mine
+      .map((s) =>
+        cardMarkup(s, sceneRef('m', s.id), {
+          thumb: store.thumb(sceneRef('m', s.id)),
+          current: cur === sceneRef('m', s.id),
+          mine: true,
+        }),
+      )
+      .join('');
     el.querySelector('[data-lib-empty]').hidden = mine.length > 0;
-    builtEl.innerHTML = builtIns().map((s) => cardMarkup(s, sceneRef('b', s.id), { thumb: store.thumb(sceneRef('b', s.id)), current: cur === sceneRef('b', s.id) })).join('')
-      || '<li class="pnt-help">No built-in scenes yet.</li>';
+    builtEl.innerHTML =
+      builtIns()
+        .map((s) =>
+          cardMarkup(s, sceneRef('b', s.id), {
+            thumb: store.thumb(sceneRef('b', s.id)),
+            current: cur === sceneRef('b', s.id),
+          }),
+        )
+        .join('') || '<li class="pnt-help">No built-in scenes yet.</li>';
+    filter();
     if (!focus) return;
     const [ref, act] = focus;
     const cardOf = (r) => /** @type {HTMLElement | null} */ (el.querySelector(`[data-card="${CSS.escape(r)}"]`));
-    let target = /** @type {HTMLElement | null} */ (cardOf(ref)?.querySelector(`[data-lib="${CSS.escape(act)}"]:not([hidden] *)`) ?? cardOf(ref)?.querySelector('.pnt-card-open'));
+    let target = /** @type {HTMLElement | null} */ (
+      cardOf(ref)?.querySelector(`[data-lib="${CSS.escape(act)}"]:not([hidden] *)`) ??
+        cardOf(ref)?.querySelector('.pnt-card-open')
+    );
     if (!target) {
       // (Gone: the nearest card still here, after it first.)
       const at = order.indexOf(ref);
       const near = [...order.slice(at + 1), ...order.slice(0, Math.max(0, at)).reverse()].map(cardOf).find(Boolean);
-      target = /** @type {HTMLElement | null} */ (near?.querySelector('.pnt-card-open') ?? el.querySelector('[data-lib="new"]'));
+      target = /** @type {HTMLElement | null} */ (
+        near?.querySelector('.pnt-card-open') ?? el.querySelector('[data-lib="new"]')
+      );
     }
     target?.focus();
   }
-  store.onChange(() => { if (!el.hidden) draw(); });
+  store.onChange(() => {
+    if (!el.hidden) draw();
+  });
+
+  /** Only the cards whose names have every word typed (anywhere in them); how many. */
+  function filter() {
+    const words = normalize(query).split(/\s+/).filter(Boolean);
+    let n = 0;
+    for (const card of /** @type {NodeListOf<HTMLElement>} */ (el.querySelectorAll('[data-card]'))) {
+      const name = normalize(card.querySelector('[data-card-name]')?.textContent ?? '');
+      card.hidden = !words.every((w) => name.includes(w));
+      if (!card.hidden) n++;
+    }
+    return n;
+  }
+  createSearchBox({
+    input: filterEl,
+    status: el.querySelector('[data-search-status]'),
+    noun: 'scene',
+    onQuery: (q) => {
+      query = q;
+      return filter();
+    },
+  });
 
   function open() {
     if (!el.hidden) return;
@@ -163,7 +232,9 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
     el.hidden = false;
     document.body.classList.add('lib-open');
     document.addEventListener('keydown', onKey);
-    /** @type {HTMLElement} */ (el.querySelector('.pnt-card.is-current .pnt-card-open') ?? el.querySelector('[data-lib="new"]'))?.focus();
+    /** @type {HTMLElement} */ (
+      el.querySelector('.pnt-card.is-current .pnt-card-open') ?? el.querySelector('[data-lib="new"]')
+    )?.focus();
     onToggle(true);
   }
   function close() {
@@ -194,12 +265,16 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
     const box = /** @type {HTMLElement} */ (card.querySelector('[data-discard]'));
     if (show) box.querySelector('[data-discard-text]').textContent = discardText(unsaved());
     box.hidden = !show;
-    /** @type {HTMLElement} */ (card.querySelector(show ? '[data-discard] [data-lib="keep"]' : '.pnt-card-open')).focus();
+    /** @type {HTMLElement} */ (
+      card.querySelector(show ? '[data-discard] [data-lib="keep"]' : '.pnt-card-open')
+    ).focus();
   }
 
   /** Save, telling the note when the browser's storage is full. */
   function save(scene, o) {
-    try { return store.save(scene, o); } catch (e) {
+    try {
+      return store.save(scene, o);
+    } catch (e) {
       note(e?.name === 'StorageFull' ? e.message : 'That couldn’t be saved in this browser.');
       return null;
     }
@@ -213,29 +288,61 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
     const ref = card?.dataset.card ?? null;
     const scene = ref ? find(ref) : null;
     if (act === 'close') close();
-    else if (act === 'new') { if (unsaved()) askNew(true); else { onNew(); close(); } }
-    else if (act === 'new-yes') { askNew(false); onNew(); close(); }
-    else if (act === 'keep' && !card) { askNew(false); /** @type {HTMLElement} */ (el.querySelector('[data-lib="new"]')).focus(); }
-    else if (act === 'import') fileEl.click();
+    else if (act === 'new') {
+      if (unsaved()) askNew(true);
+      else {
+        onNew();
+        close();
+      }
+    } else if (act === 'new-yes') {
+      askNew(false);
+      onNew();
+      close();
+    } else if (act === 'keep' && !card) {
+      askNew(false);
+      /** @type {HTMLElement} */ (el.querySelector('[data-lib="new"]')).focus();
+    } else if (act === 'import') fileEl.click();
     else if (act === 'export-all') {
       const all = store.list();
-      if (!all.length) { note('Nothing saved yet to export.'); return; }
+      if (!all.length) {
+        note('Nothing saved yet to export.');
+        return;
+      }
       downloadJson('bonfire-scenes.json', sceneFile(all));
       note(`Exported ${all.length} scene${all.length > 1 ? 's' : ''} to bonfire-scenes.json.`);
     } else if (!scene) return;
-    else if (act === 'open') { if (unsaved()) askOpen(card, true); else { onOpen(scene, ref); close(); } }
-    else if (act === 'open-yes') { onOpen(scene, ref); close(); }
-    else if (act === 'keep') askOpen(card, false);
+    else if (act === 'open') {
+      if (unsaved()) askOpen(card, true);
+      else {
+        onOpen(scene, ref);
+        close();
+      }
+    } else if (act === 'open-yes') {
+      onOpen(scene, ref);
+      close();
+    } else if (act === 'keep') askOpen(card, false);
     else if (act === 'play') onPlay(scene, ref);
     else if (act === 'export') downloadJson(`${scene.id}.json`, sceneFile([scene]));
     else if (act === 'duplicate') {
       const copy = save({ ...scene, name: `${scene.name.slice(0, 34)} (Copy)` }, { fresh: true });
-      if (copy) { note(`Saved “${copy.name}” in My Scenes.`); draw(); } // (the focus stays on this card’s Duplicate)
+      if (copy) {
+        note(`Saved “${copy.name}” in My Scenes.`);
+        draw();
+      } // (the focus stays on this card’s Duplicate)
     } else if (act === 'rename') rename(card, scene);
-    else if (act === 'delete') { card.querySelector('[data-confirm]').hidden = false; /** @type {HTMLElement} */ (card.querySelector('[data-lib="delete-no"]')).focus(); }
-    else if (act === 'delete-no') { card.querySelector('[data-confirm]').hidden = true; /** @type {HTMLElement} */ (card.querySelector('[data-lib="delete"]')).focus(); }
-    else if (act === 'delete-yes') {
-      try { store.remove(scene.id); } catch (err) { note(err?.message ?? 'That couldn’t be deleted.'); return; }
+    else if (act === 'delete') {
+      card.querySelector('[data-confirm]').hidden = false;
+      /** @type {HTMLElement} */ (card.querySelector('[data-lib="delete-no"]')).focus();
+    } else if (act === 'delete-no') {
+      card.querySelector('[data-confirm]').hidden = true;
+      /** @type {HTMLElement} */ (card.querySelector('[data-lib="delete"]')).focus();
+    } else if (act === 'delete-yes') {
+      try {
+        store.remove(scene.id);
+      } catch (err) {
+        note(err?.message ?? 'That couldn’t be deleted.');
+        return;
+      }
       note(`Deleted “${scene.name}”.`);
       onDeleted(ref);
       draw(); // (its card gone: the focus goes to the next one’s)
@@ -261,15 +368,25 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
       const name = input.value.trim();
       if (keep && name && name !== scene.name) {
         const saved = save({ ...scene, name });
-        if (saved) { note(`Renamed to “${saved.name}”.`); onRenamed(saved, sceneRef('m', saved.id)); }
+        if (saved) {
+          note(`Renamed to “${saved.name}”.`);
+          onRenamed(saved, sceneRef('m', saved.id));
+        }
       }
       // (Back on its Rename button, unless the focus went somewhere else on purpose.)
-      const away = document.activeElement && document.activeElement !== input && document.activeElement !== document.body;
+      const away =
+        document.activeElement && document.activeElement !== input && document.activeElement !== document.body;
       draw({ focus: away ? focusedOn() : [ref, 'rename'] });
     };
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        finish(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        finish(false);
+      }
     });
     input.addEventListener('blur', () => finish(true));
     input.addEventListener('click', (e) => e.stopPropagation());
@@ -292,10 +409,23 @@ export function createLibrary(el, { store, builtIns, current, voidHex, onOpen, o
   });
 
   return {
-    open, close,
-    toggle() { if (el.hidden) open(); else close(); },
-    refresh() { if (!el.hidden) draw(); },
-    get isOpen() { return !el.hidden; },
+    open,
+    close,
+    toggle() {
+      if (el.hidden) open();
+      else close();
+    },
+    refresh() {
+      if (!el.hidden) draw();
+    },
+    get isOpen() {
+      return !el.hidden;
+    },
     note,
+    /** Focus the name filter (the drawer open). */
+    focusFilter() {
+      filterEl.focus();
+      filterEl.select();
+    },
   };
 }

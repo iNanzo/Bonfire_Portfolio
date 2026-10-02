@@ -4,23 +4,38 @@
 // burning away) between the seat and the ring, the others at home on the ring's clear
 // sides, each knight's own pose for the cameras and the blade, the shadow redrawn whenever
 // what casts it changes, the show's comings and goings (a new scenery, an ember walk, the
-// cast's count), reactions that leave a dance alone, and nothing left behind.
+// cast's count), reactions that leave a dance alone, the room for his arms at home and
+// where a dance move fits (from the scenery's shapes), and nothing left behind.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { createKnights, HELMETS } from '../src/bonfire/knights.js';
+import { createKnights, HELMETS, MOVES } from '../src/bonfire/knights.js';
 import { createArmorShared } from '../src/bonfire/armor.js';
-import { BONES, BONE_NODES, PARENT, DEFAULT_REST, TASSET_FOLLOW, SEAT_DEPTH, SEAT_POSES, GESTURE_TIME, DANCE_SEATED_TIME } from '../src/bonfire/knightPose.js';
+import {
+  BONES,
+  BONE_NODES,
+  PARENT,
+  DEFAULT_REST,
+  TASSET_FOLLOW,
+  SEAT_DEPTH,
+  SEAT_POSES,
+  GESTURE_TIME,
+  DANCE_SEATED_TIME,
+} from '../src/bonfire/knightPose.js';
 import { createResourceScope } from '../src/bonfire/resources.js';
 import { SEATS, DANCE_RING } from '../src/bonfire/scenery.js';
-import { restPlaces, ringOf, sideArcs, slotPlaces, FRONT } from '../src/bonfire/knightPlaces.js';
+import { restPlaces, ringOf, sideArcs, slotPlaces, FRONT, FIRE_AT } from '../src/bonfire/knightPlaces.js';
 
 /** The model's rig as plain groups (docs/knight.md), a box on every joint, three helmets on the head. */
 function standInModel() {
   const knight = new THREE.Group();
   knight.name = 'Knight';
   const nodes = {};
-  const box = (mat) => new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.06), Object.assign(new THREE.MeshStandardMaterial(), { name: mat }));
+  const box = (mat) =>
+    new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.06, 0.06),
+      Object.assign(new THREE.MeshStandardMaterial(), { name: mat }),
+    );
   for (const [bone, name] of Object.entries(BONE_NODES)) {
     const g = new THREE.Group();
     g.name = name;
@@ -61,7 +76,12 @@ const flatAt = (name) => ({
   top: (x, z) => (Math.hypot(x - SEATS[name].x, z - SEATS[name].z) < 0.15 ? SEATS[name].top : 0.02),
 });
 const make = (o = {}) => createKnights(standInModel(), { armor: armor(), max: 3, castShadows: true, ...o });
-const run = (k, seconds, dt = 1 / 60) => { for (let t = 0; t < seconds; t += dt) { k.update(dt); k.group.updateMatrixWorld(true); } };
+const run = (k, seconds, dt = 1 / 60) => {
+  for (let t = 0; t < seconds; t += dt) {
+    k.update(dt);
+    k.group.updateMatrixWorld(true);
+  }
+};
 const bone = (k, i, name) => k.knights[i].bones.find((b) => b.name === name);
 
 test('each knight is one skinned body and a mesh for each helmet, sharing geometry, on one skeleton', () => {
@@ -78,7 +98,8 @@ test('each knight is one skinned body and a mesh for each helmet, sharing geomet
   for (let j = 1; j < 4; j++) assert.equal(meshes[0][j].geometry, meshes[2][j].geometry, 'helmet geometry shared');
   assert.notEqual(meshes[0][1].geometry, meshes[0][2].geometry, 'a geometry for each helmet');
   const body = meshes[0][0].geometry;
-  for (const name of ['position', 'normal', 'skinIndex', 'skinWeight', 'aRole']) assert.ok(body.attributes[name], `has ${name}`);
+  for (const name of ['position', 'normal', 'skinIndex', 'skinWeight', 'aRole'])
+    assert.ok(body.attributes[name], `has ${name}`);
   // Rigid: every vertex fully on one bone.
   const w = body.attributes.skinWeight;
   for (let i = 0; i < w.count; i++) assert.equal(w.getX(i), 1);
@@ -127,9 +148,15 @@ test('seated at the fire: the feet on the ground, facing the fire (turned a litt
   const toFire = Math.atan2(0.02 - n.group.position.x, 0.02 - n.group.position.z);
   assert.ok(Math.abs(n.yaw - SEATS.ruins.yaw) < 1e-6, 'sits the way his seat says');
   const off = Math.atan2(Math.sin(n.yaw - toFire), Math.cos(n.yaw - toFire));
-  assert.ok(off < 0 && off > -0.6, `turned from the fire toward the cameras by ${((off * 180) / Math.PI).toFixed(0)}°, not away from it`);
+  assert.ok(
+    off < 0 && off > -0.6,
+    `turned from the fire toward the cameras by ${((off * 180) / Math.PI).toFixed(0)}°, not away from it`,
+  );
   const foot = bone(k, 0, 'footL').getWorldPosition(new THREE.Vector3());
-  assert.ok(Math.abs(foot.y - (0.02 + DEFAULT_REST.footL[1])) < 0.01, `left ankle at ${foot.y.toFixed(3)}, on the ground`);
+  assert.ok(
+    Math.abs(foot.y - (0.02 + DEFAULT_REST.footL[1])) < 0.01,
+    `left ankle at ${foot.y.toFixed(3)}, on the ground`,
+  );
   const hips = bone(k, 0, 'hips').getWorldPosition(new THREE.Vector3());
   assert.ok(Math.abs(hips.y - (0.28 + SEAT_DEPTH)) < 0.01, `hips on the seat (${hips.y.toFixed(3)})`);
   // The tasset turns about TASSET_FOLLOW of the way from the hips to the thigh.
@@ -152,7 +179,10 @@ test('dancing: up, over to the slot and on the clock; shadows redraw only when a
   run(k, 1);
   // Sitting still, breathing: never a shadow redraw.
   let moved = 0;
-  for (let f = 0; f < 120; f++) { k.update(1 / 60); if (k.moving) moved++; }
+  for (let f = 0; f < 120; f++) {
+    k.update(1 / 60);
+    if (k.moving) moved++;
+  }
   assert.equal(moved, 0, 'idle motion leaves the shadow alone');
   assert.ok(k.dance(0, { move: 'jump', slot: 1, facing: 'front' }));
   for (let f = 0; f < 60 * 8 && k.list[0].state !== 'dancing'; f++) k.update(1 / 60);
@@ -167,11 +197,16 @@ test('dancing: up, over to the slot and on the clock; shadows redraw only when a
     if (k.moving) moved++;
     steps = f;
   }
-  assert.ok(moved >= 10 && moved <= 13, `the shadow redraws at the pose's 12 steps a second (${moved} of ${steps + 1} frames)`);
+  assert.ok(
+    moved >= 10 && moved <= 13,
+    `the shadow redraws at the pose's 12 steps a second (${moved} of ${steps + 1} frames)`,
+  );
   // On the beat the jump lands (hips low); half a beat later he's in the air.
-  k.clock(40, 0.5); run(k, 1 / 12);
+  k.clock(40, 0.5);
+  run(k, 1 / 12);
   const low = bone(k, 0, 'hips').getWorldPosition(new THREE.Vector3()).y;
-  k.clock(40.5, 0.5); run(k, 1 / 12);
+  k.clock(40.5, 0.5);
+  run(k, 1 / 12);
   const high = bone(k, 0, 'hips').getWorldPosition(new THREE.Vector3()).y;
   assert.ok(high - low > 0.15, `a big jump (${(high - low).toFixed(2)} m)`);
   // Called again every bar (the visualizer): the move changes in place, no new trip.
@@ -229,7 +264,10 @@ test('from his seat to the ring and back is a walk in every scenery, never a tri
     run(k, 0.3);
     const seat = { ...k.list[0].position };
     // The first dancer's place in a line (the show's usual), then Round the Fire's.
-    for (const place of [slotPlaces(ringOf(name), 1)[0], ...slotPlaces(ringOf(name), 3).filter((p) => p.bearing > 180)]) {
+    for (const place of [
+      slotPlaces(ringOf(name), 1)[0],
+      ...slotPlaces(ringOf(name), 3).filter((p) => p.bearing > 180),
+    ]) {
       assert.ok(k.dance(0, { move: 'clap', position: { x: place.x, z: place.z }, facing: 'fire' }));
       const states = new Set();
       let dissolved = 0;
@@ -241,7 +279,10 @@ test('from his seat to the ring and back is a walk in every scenery, never a tri
       assert.equal(k.list[0].state, 'dancing', `${name}: dancing at ${place.bearing.toFixed(0)}°`);
       assert.ok(states.has('walk'), `${name}: walked there (${[...states]})`);
       assert.equal(dissolved, 0, `${name}: never burnt away on the way to ${place.bearing.toFixed(0)}°`);
-      assert.ok(Math.hypot(k.list[0].position.x - place.x, k.list[0].position.z - place.z) < 0.02, `${name}: at the place`);
+      assert.ok(
+        Math.hypot(k.list[0].position.x - place.x, k.list[0].position.z - place.z) < 0.02,
+        `${name}: at the place`,
+      );
       // Back to the seat, walking.
       k.sit(0);
       for (let f = 0; f < 60 * 8 && k.list[0].state !== 'sitting'; f++) {
@@ -253,7 +294,10 @@ test('from his seat to the ring and back is a walk in every scenery, never a tri
       }
       assert.equal(k.list[0].state, 'sitting', `${name}: back on his seat`);
       assert.equal(dissolved, 0, `${name}: walked back from ${place.bearing.toFixed(0)}°`);
-      assert.ok(Math.hypot(k.list[0].position.x - seat.x, k.list[0].position.z - seat.z) < 0.02, `${name}: on the seat again`);
+      assert.ok(
+        Math.hypot(k.list[0].position.x - seat.x, k.list[0].position.z - seat.z) < 0.02,
+        `${name}: on the seat again`,
+      );
     }
   }
 });
@@ -274,8 +318,14 @@ test('the others are at home on the ring’s clear sides, where the show rests t
         assert.equal(k.list[i].state, 'arriving');
         // Sitting a step out from the place, feet on it, facing the fire.
         const b = ((Math.atan2(p.x - 0.02, p.z - 0.02) * 180) / Math.PI + 360) % 360;
-        assert.ok(Math.abs(b - want[i - 1].bearing) < 1, `${name} ×${n}: knight ${i} at ${b.toFixed(0)}° (the show's ${want[i - 1].bearing.toFixed(0)}°)`);
-        assert.ok(arcs.some(([lo, hi]) => (b >= lo && b <= hi) || (b + 360 >= lo && b + 360 <= hi)), `${name}: ${b.toFixed(0)}° is on a clear side`);
+        assert.ok(
+          Math.abs(b - want[i - 1].bearing) < 1,
+          `${name} ×${n}: knight ${i} at ${b.toFixed(0)}° (the show's ${want[i - 1].bearing.toFixed(0)}°)`,
+        );
+        assert.ok(
+          arcs.some(([lo, hi]) => (b >= lo && b <= hi) || (b + 360 >= lo && b + 360 <= hi)),
+          `${name}: ${b.toFixed(0)}° is on a clear side`,
+        );
         assert.ok(Math.min(b, 360 - b) >= FRONT, `${name}: ${b.toFixed(0)}° isn't in front of the fire`);
       }
     }
@@ -287,7 +337,10 @@ test('cast, summon and dismiss; reactions; a knight picked by a ray; capsules fo
   k.setScenery('ruins', flat());
   k.setCast({ count: 3, helmets: ['great', 'armet', 'bascinet'], instant: true });
   assert.equal(k.present, 3);
-  assert.deepEqual(k.list.map((n) => n.helmet), ['great', 'armet', 'bascinet']);
+  assert.deepEqual(
+    k.list.map((n) => n.helmet),
+    ['great', 'armet', 'bascinet'],
+  );
   run(k, 0.2);
   const caps = k.capsules();
   assert.equal(caps.length, 3);
@@ -301,14 +354,19 @@ test('cast, summon and dismiss; reactions; a knight picked by a ray; capsules fo
   // A flinch is real motion: the shadow redraws while it plays.
   k.react('impact', 1);
   let moved = 0;
-  for (let f = 0; f < 30; f++) { k.update(1 / 60); if (k.moving) moved++; }
+  for (let f = 0; f < 30; f++) {
+    k.update(1 / 60);
+    if (k.moving) moved++;
+  }
   assert.ok(moved > 3, 'flinching moves him');
 });
 
 test('the fire’s reflection sweeps the armor when the fire flares, now and then at rest, never under reduced motion', () => {
   const a = armor();
   const u = a.uniforms.uSweep.value;
-  const step = (s) => { for (let t = 0; t < s; t += 1 / 60) a.step(1 / 60); };
+  const step = (s) => {
+    for (let t = 0; t < s; t += 1 / 60) a.step(1 / 60);
+  };
   a.setShine({ rest: false });
   step(12);
   assert.equal(u.z, 0, 'rest sweeps off: nothing');
@@ -323,21 +381,35 @@ test('the fire’s reflection sweeps the armor when the fire flares, now and the
   step(0.7);
   assert.equal(u.z, 0, 'done within a second');
   // A weaker flare doesn't cut a strong one short; a stronger one takes over.
-  a.flare(1); step(0.05); const s1 = u.z;
-  a.flare(0.3); step(1 / 60);
+  a.flare(1);
+  step(0.05);
+  const s1 = u.z;
+  a.flare(0.3);
+  step(1 / 60);
   assert.ok(u.z >= s1 - 0.05, 'the strong one runs on');
   // At rest: a gentler one (no core) within a few seconds.
   step(1.2);
   a.setShine({ rest: true });
   let seen = 0;
-  for (let t = 0; t < 10; t += 1 / 60) { a.step(1 / 60); if (u.z > 0) { seen = Math.max(seen, u.z); assert.equal(u.w, 0, 'rest sweeps stay in hi'); } }
+  for (let t = 0; t < 10; t += 1 / 60) {
+    a.step(1 / 60);
+    if (u.z > 0) {
+      seen = Math.max(seen, u.z);
+      assert.equal(u.w, 0, 'rest sweeps stay in hi');
+    }
+  }
   assert.ok(seen > 0.3 && seen < 0.8, `a rest sweep ran (${seen.toFixed(2)})`);
   // Switched off, or reduced motion: none.
-  a.setShine({ flares: false }); a.flare(1); step(1 / 12);
+  a.setShine({ flares: false });
+  a.flare(1);
+  step(1 / 12);
   assert.ok(u.w === 0, 'flares off');
   const still = createArmorShared({ fireAt: new THREE.Vector3(), exposure: { value: 1 }, reducedMotion: true });
   still.flare(1);
-  for (let t = 0; t < 10; t += 1 / 60) { still.step(1 / 60); assert.equal(still.uniforms.uSweep.value.z, 0); }
+  for (let t = 0; t < 10; t += 1 / 60) {
+    still.step(1 / 60);
+    assert.equal(still.uniforms.uSweep.value.z, 0);
+  }
 });
 
 test('disposing frees the shared geometry, the materials and the skeletons', () => {
@@ -346,10 +418,22 @@ test('disposing frees the shared geometry, the materials and the skeletons', () 
   scope.trackTree(k.group);
   for (const r of [...k.materials, ...k.geometries]) scope.own(r);
   let freed = 0;
-  for (const s of k.skeletons) { const d = s.dispose.bind(s); s.dispose = () => { freed++; d(); }; }
+  for (const s of k.skeletons) {
+    const d = s.dispose.bind(s);
+    s.dispose = () => {
+      freed++;
+      d();
+    };
+  }
   scope.cleanup(() => k.skeletons.forEach((s) => s.dispose()));
   let geo = 0;
-  for (const g of k.geometries) { const d = g.dispose.bind(g); g.dispose = () => { geo++; d(); }; }
+  for (const g of k.geometries) {
+    const d = g.dispose.bind(g);
+    g.dispose = () => {
+      geo++;
+      d();
+    };
+  }
   scope.dispose();
   assert.equal(freed, 3);
   assert.equal(geo, 4, 'each shared geometry once (the body, the three helmets)');
@@ -363,25 +447,41 @@ test('the living blade fights clear of a knight (the capsules basis() hands over
   const len = 1.2;
   const blade = { grip: new THREE.Vector3(0, 1.0 - 0.12 * len, 0), tip: new THREE.Vector3(0, -0.2, 0), len };
   const home = { pos: new THREE.Vector3(0.04, 0, 0.03), quat: new THREE.Quaternion() };
-  const seg = new THREE.Vector3(), tmp = new THREE.Vector3();
+  const seg = new THREE.Vector3(),
+    tmp = new THREE.Vector3();
   const inside = (p) => {
     seg.subVectors(knight.b, knight.a);
     const u = Math.min(1, Math.max(0, tmp.subVectors(p, knight.a).dot(seg) / seg.lengthSq()));
     return p.distanceTo(tmp.copy(knight.a).addScaledVector(seg, u)) < knight.r;
   };
-  const pos = new THREE.Vector3(), quat = new THREE.Quaternion();
+  const pos = new THREE.Vector3(),
+    quat = new THREE.Quaternion();
   /** How often the tip or grip is inside him around the hits, over 30 routines. */
   function cuts(avoid) {
     let s = 7;
-    const rng = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const rng = () => {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
     const basis = () => {
-      const toCam = camPos.clone().sub(new THREE.Vector3(0, 0.9, 0)).normalize();
+      const toCam = camPos
+        .clone()
+        .sub(new THREE.Vector3(0, 0.9, 0))
+        .normalize();
       const right = new THREE.Vector3(0, 1, 0).cross(toCam).normalize();
       return { right, up: new THREE.Vector3().crossVectors(toCam, right), toCam, pos: camPos.clone(), avoid };
     };
     let n = 0;
     for (let run = 0; run < 30; run++) {
-      const r = createRoutine({ blade, home, center: new THREE.Vector3(0.04, 1.1, 0.03), basis, hits: [0.6, 1.1, 1.6, 2.1], plunge: 2.8, rng });
+      const r = createRoutine({
+        blade,
+        home,
+        center: new THREE.Vector3(0.04, 1.1, 0.03),
+        basis,
+        hits: [0.6, 1.1, 1.6, 2.1],
+        plunge: 2.8,
+        rng,
+      });
       for (const h of r.hits) {
         for (let t = h.t - 0.08; t <= h.t + 0.04; t += 0.02) {
           r.pose(t, pos, quat);
@@ -403,7 +503,10 @@ test('knights sent away as the scenery changes stay gone (the show’s drop that
   assert.ok(k.dance(1, { move: 'jump', position: a, facing: 'fire' }));
   assert.ok(k.dance(2, { move: 'jump', position: b, facing: 'fire' }));
   run(k, 1);
-  assert.deepEqual(k.list.slice(1, 3).map((n) => n.state), ['dancing', 'dancing']);
+  assert.deepEqual(
+    k.list.slice(1, 3).map((n) => n.state),
+    ['dancing', 'dancing'],
+  );
   assert.equal(k.count, 3);
   // The same frame: sent away, then the new scenery.
   k.dismiss(1);
@@ -411,12 +514,19 @@ test('knights sent away as the scenery changes stay gone (the show’s drop that
   assert.equal(k.count, 1, 'the cast is down to the one staying');
   k.setScenery('forge', flatAt('forge'));
   for (let bar = 0; bar < 6; bar++) run(k, 1);
-  assert.deepEqual(k.list.map((n) => n.state), ['sitting', 'away', 'away', 'away'], 'only the seated one re-forms there');
+  assert.deepEqual(
+    k.list.map((n) => n.state),
+    ['sitting', 'away', 'away', 'away'],
+    'only the seated one re-forms there',
+  );
   assert.equal(k.present, 1);
   assert.equal(k.positions.length, 1, 'the cameras get no heads of knights who left');
   assert.equal(k.knights[1].group.visible, false);
   const seat = SEATS.forge;
-  assert.ok(Math.hypot(k.list[0].position.x - seat.x, k.list[0].position.z - seat.z) < 0.02, 'knight 0 on the forge’s seat');
+  assert.ok(
+    Math.hypot(k.list[0].position.x - seat.x, k.list[0].position.z - seat.z) < 0.02,
+    'knight 0 on the forge’s seat',
+  );
 });
 
 test('each knight keeps his own solved pose: head positions and blade capsules are his, not the last one solved', () => {
@@ -425,14 +535,20 @@ test('each knight keeps his own solved pose: head positions and blade capsules a
   k.summon(0, { instant: true });
   const place = slotPlaces(ringOf('ruins'), 1)[0];
   assert.ok(k.dance(1, { move: 'jump', position: place, facing: 'fire' }));
-  for (let f = 0; f < 90; f++) { k.clock(f / 30, 0.5); k.update(1 / 60); }
+  for (let f = 0; f < 90; f++) {
+    k.clock(f / 30, 0.5);
+    k.update(1 / 60);
+  }
   k.group.updateMatrixWorld(true);
   const heads = k.positions;
   const caps = k.capsules();
   assert.equal(heads.length, 2);
   for (const i of [0, 1]) {
     const head = bone(k, i, 'head').getWorldPosition(new THREE.Vector3());
-    assert.ok(heads[i].distanceTo(head) < 0.01, `knight ${i}'s head (${heads[i].y.toFixed(2)} vs ${head.y.toFixed(2)})`);
+    assert.ok(
+      heads[i].distanceTo(head) < 0.01,
+      `knight ${i}'s head (${heads[i].y.toFixed(2)} vs ${head.y.toFixed(2)})`,
+    );
     assert.ok(Math.abs(caps[i].b.y - (head.y + 0.12)) < 0.01, `knight ${i}'s capsule reaches his own head`);
   }
   assert.ok(heads[1].y - heads[0].y > 0.3, 'the dancer stands taller than the seated knight');
@@ -443,7 +559,14 @@ test('the shadow is redrawn whenever what casts it changes: forming, burning awa
   k.setScenery('ruins', flat());
   k.summon(0, { instant: true });
   run(k, 1);
-  const frames = (n) => { const m = []; for (let f = 0; f < n; f++) { k.update(1 / 60); m.push(k.moving); } return m; };
+  const frames = (n) => {
+    const m = [];
+    for (let f = 0; f < n; f++) {
+      k.update(1 / 60);
+      m.push(k.moving);
+    }
+    return m;
+  };
   assert.ok(!frames(60).some(Boolean), 'sitting still: never');
   // Burning away: at once (he stops casting), and not again while he's gone.
   k.dismiss(0);
@@ -453,19 +576,29 @@ test('the shadow is redrawn whenever what casts it changes: forming, burning awa
   assert.ok(!frames(30).some(Boolean), 'gone: nothing more to redraw');
   // Forming: redrawn when he's solid again (his shadow's back).
   k.summon(0);
-  let solidAt = -1, redrawn = false;
+  let solidAt = -1,
+    redrawn = false;
   for (let f = 0; f < 90; f++) {
     k.update(1 / 60);
-    if (solidAt < 0 && !k.knights[0].ghost) { solidAt = f; redrawn = k.moving; }
+    if (solidAt < 0 && !k.knights[0].ghost) {
+      solidAt = f;
+      redrawn = k.moving;
+    }
   }
   assert.ok(solidAt > 0 && redrawn, 'the frame he forms, the shadow is redrawn');
   // A gesture: redrawn while it plays, and while his pauldrons and tassets settle after it
   // (the plates' spring: well under a second), then not.
   assert.ok(k.gesture('wave', { index: 0 }));
   let last = -1;
-  for (let f = 0; f < 60 * 3; f++) { k.update(1 / 60); if (k.moving) last = f; }
+  for (let f = 0; f < 60 * 3; f++) {
+    k.update(1 / 60);
+    if (k.moving) last = f;
+  }
   const ended = Math.ceil(2 * 60); // (GESTURE_TIME.wave: 2 s)
-  assert.ok(last >= ended - 1 && last <= ended + 40, `the last redraw is once the wave has ended and his plates settled (frame ${last}, ends ~${ended})`);
+  assert.ok(
+    last >= ended - 1 && last <= ended + 40,
+    `the last redraw is once the wave has ended and his plates settled (frame ${last}, ends ~${ended})`,
+  );
   // Put somewhere new at once (reduced motion: no dissolve): redrawn.
   const still = make({ reducedMotion: true });
   still.setScenery('ruins', flat());
@@ -496,7 +629,10 @@ test('summoned mid-way through an ember walk, he carries on and dances where he 
   assert.equal(k.summon(0), true, 'he is on his way already');
   for (f = 0; f < 60 * 4 && k.list[0].state !== 'dancing'; f++) k.update(1 / 60);
   assert.equal(k.list[0].state, 'dancing');
-  assert.ok(Math.hypot(k.list[0].position.x - far.x, k.list[0].position.z - far.z) < 0.02, 'at the place he was going to');
+  assert.ok(
+    Math.hypot(k.list[0].position.x - far.x, k.list[0].position.z - far.z) < 0.02,
+    'at the place he was going to',
+  );
   // Burning away, then asked to dance: he forms again and dances.
   k.dismiss(0);
   run(k, 0.2);
@@ -522,7 +658,10 @@ test('the cast shrinks as knights are sent away, so a new scenery rests the othe
   for (let i = 1; i < 3; i++) {
     const p = k.list[i].position;
     const b = ((Math.atan2(p.x - 0.02, p.z - 0.02) * 180) / Math.PI + 360) % 360;
-    assert.ok(Math.abs(b - want[i - 1].bearing) < 1, `knight ${i} rests at ${b.toFixed(0)}° (three's place: ${want[i - 1].bearing.toFixed(0)}°)`);
+    assert.ok(
+      Math.abs(b - want[i - 1].bearing) < 1,
+      `knight ${i} rests at ${b.toFixed(0)}° (three's place: ${want[i - 1].bearing.toFixed(0)}°)`,
+    );
   }
   k.dismiss(0, { instant: true });
   assert.equal(k.count, 3, 'the highest one staying sets the count');
@@ -604,7 +743,8 @@ test('summoned and sent off by the forge: he waits burnt away, hands over his po
   const n = k.knights[0];
   assert.equal(k.list[0].state, 'arriving');
   assert.ok(n.group.visible && n.ghost, 'shown on the ghost layer (no outline, no shadow of the holes)');
-  for (const m of [n.bodyMat, n.helmMat]) assert.equal(m.userData.uniforms.uDissolve.value, 1, 'burnt away until the forge builds him');
+  for (const m of [n.bodyMat, n.helmMat])
+    assert.equal(m.userData.uniforms.uDissolve.value, 1, 'burnt away until the forge builds him');
   run(k, 0.5);
   assert.equal(n.bodyMat.userData.uniforms.uDissolve.value, 1, 'nothing but the forge touches his dissolve');
   assert.equal(k.list[0].state, 'arriving');
@@ -621,7 +761,11 @@ test('summoned and sent off by the forge: he waits burnt away, hands over his po
     assert.equal(m.userData.uniforms.uDissolve.value, 0.5, 'both his materials burn together');
     assert.equal(m.userData.uniforms.uEdge.value.r, 1);
   }
-  assert.deepEqual(n.helmMat.userData.uniforms.uSpan.value.toArray(), n.bodyMat.userData.uniforms.uSpan.value.toArray(), 'his helmet burns over his whole height, last');
+  assert.deepEqual(
+    n.helmMat.userData.uniforms.uSpan.value.toArray(),
+    n.bodyMat.userData.uniforms.uSpan.value.toArray(),
+    'his helmet burns over his whole height, last',
+  );
   s.show(false);
   assert.equal(n.group.visible, false, 'the strobe hides him');
   s.show(true);
@@ -629,7 +773,11 @@ test('summoned and sent off by the forge: he waits burnt away, hands over his po
   assert.equal(k.list[0].state, 'sitting');
   assert.ok(!n.ghost && n.body.castShadow, 'solid again, casting his shadow');
   assert.equal(n.bodyMat.userData.uniforms.uDissolve.value, 0);
-  assert.notDeepEqual(n.helmMat.userData.uniforms.uSpan.value.toArray(), n.bodyMat.userData.uniforms.uSpan.value.toArray(), 'the helmet has its own span back (for its swaps)');
+  assert.notDeepEqual(
+    n.helmMat.userData.uniforms.uSpan.value.toArray(),
+    n.bodyMat.userData.uniforms.uSpan.value.toArray(),
+    'the helmet has its own span back (for its swaps)',
+  );
   // Sent off: still there, leaving, till the forge is done with him.
   assert.ok(k.dismiss(0, { forge: true }));
   assert.equal(k.list[0].state, 'leaving');
@@ -657,7 +805,10 @@ function realRig(model) {
     g.name = name;
     const t = model.nodes.get(name)?.translation;
     if (t) g.position.set(...t);
-    const piece = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.04), Object.assign(new THREE.MeshStandardMaterial(), { name: 'K_Plate' }));
+    const piece = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.04, 0.04),
+      Object.assign(new THREE.MeshStandardMaterial(), { name: 'K_Plate' }),
+    );
     piece.name = `${name}_Mesh`;
     g.add(piece);
     return g;
@@ -672,13 +823,15 @@ function realRig(model) {
 
 /**
  * The 390×844 phone's home view (the site: tall layout) and where on it (px from the top) the
- * highest point of knight 0's helmet comes over `seconds` of `k.update` (every 6th frame).
+ * highest point of knight 0's helmet comes over `seconds` of `k.update` (every 6th frame); and
+ * (frame()) how far left and right on it (px) any piece of him comes, with that helmet.
  */
 async function phoneView() {
   const { loadKnightMesh } = await import('./lib/knightMesh.mjs');
   const { getPov } = await import('../src/bonfire/povs.js');
   const model = await loadKnightMesh();
-  const W = 390, H = 844;
+  const W = 390,
+    H = 844;
   const pov = getPov('home', 'tall');
   const cam = new THREE.PerspectiveCamera(pov.fov, W / H, 0.1, 50);
   cam.position.set(...pov.pos);
@@ -686,9 +839,37 @@ async function phoneView() {
   cam.updateMatrixWorld(true);
   const v = new THREE.Vector3();
   const helmPoints = (helmet) => model.points(`K_Helm_${helmet[0].toUpperCase()}${helmet.slice(1)}`);
+  const piecePoints = Object.fromEntries(Object.entries(BONE_NODES).map(([b, node]) => [b, model.points(node)]));
   return {
-    model, helmPoints,
+    model,
+    helmPoints,
+    W,
     HEADER: 64, // (the site header's bottom there, px)
+    /** The helmet's top (px from the top) and his silhouette's left and right (px) over `seconds`. */
+    frame(k, helmet, seconds) {
+      const helm = helmPoints(helmet);
+      let top = Infinity,
+        left = Infinity,
+        right = -Infinity;
+      for (let f = 0; f < 60 * seconds; f++) {
+        k.update(1 / 60);
+        if (f % 6) continue;
+        k.group.updateMatrixWorld(true);
+        for (const b of k.knights[0].bones) {
+          const pts = b.name === 'head' ? [...piecePoints.head, ...helm] : piecePoints[b.name];
+          for (const p of pts ?? []) {
+            v.set(...p)
+              .applyMatrix4(b.matrixWorld)
+              .project(cam);
+            const x = ((v.x + 2 * pov.sx + 1) / 2) * W;
+            left = Math.min(left, x);
+            right = Math.max(right, x);
+            top = Math.min(top, ((1 - (v.y + 2 * pov.sy)) / 2) * H);
+          }
+        }
+      }
+      return { top, left, right };
+    },
     helmetTop(k, helmet, seconds) {
       const pts = helmPoints(helmet);
       let top = Infinity;
@@ -698,7 +879,9 @@ async function phoneView() {
         k.group.updateMatrixWorld(true);
         const head = k.knights[0].bones.find((x) => x.name === 'head');
         for (const p of pts) {
-          v.set(...p).applyMatrix4(head.matrixWorld).project(cam);
+          v.set(...p)
+            .applyMatrix4(head.matrixWorld)
+            .project(cam);
           top = Math.min(top, ((1 - (v.y + 2 * pov.sy)) / 2) * H);
         }
       }
@@ -707,25 +890,59 @@ async function phoneView() {
   };
 }
 
-test('the settings’ helmets are his (effectsDefaults KNIGHT_HELMETS, less random: scene.js reads them before his code loads)', async () => {
+test('his room for each arm at home comes from the scenery’s shapes; a dance move fits a place only with room for its reach', () => {
+  const k = make();
+  // The cult's standing stones stand at his left on his seat (colliders.js): less room there.
+  k.setScenery('cult', flatAt('cult'));
+  k.summon(0, { instant: true });
+  run(k, 0.3);
+  const [left, right] = k.knights[0].home.room;
+  assert.ok(left < 0.6 && left < right, `seated in the cult: room ${left.toFixed(2)} left, ${right.toFixed(2)} right`);
+  // On the open ground of the ring (a knight at home there), nothing in an arm's reach.
+  k.setScenery('ruins', flatAt('ruins'));
+  k.setCast({ count: 2, instant: true });
+  run(k, 0.3);
+  assert.deepEqual(k.knights[1].home.room, [1, 1], 'the others at home on the ring: all the room');
+  // A spin's arms all round don't fit beside the shrine's front lantern; on the open side of
+  // the ring every move does.
+  const ring = k.slots('shrine');
+  const tight = slotPlaces(ring, 1)[0];
+  assert.equal(k.fits('spin', tight, 'front', 'shrine'), false, `a spin by the lantern (${tight.bearing}°)`);
+  const open = {
+    x: FIRE_AT.x + Math.sin((70 * Math.PI) / 180) * 1.2,
+    z: FIRE_AT.z + Math.cos((70 * Math.PI) / 180) * 1.2,
+  };
+  for (const move of MOVES) assert.ok(k.fits(move, open, 'fire', 'shrine'), `${move} at 70°`);
+});
+
+test('the settings’ helmets are his (effectsDefaults KNIGHT_HELMETS, less random: sceneKnight.js reads them before his code loads)', async () => {
   const { KNIGHT_HELMETS } = await import('../src/effectsDefaults.js');
-  assert.deepEqual(KNIGHT_HELMETS.filter((h) => h !== 'random'), HELMETS);
+  assert.deepEqual(
+    KNIGHT_HELMETS.filter((h) => h !== 'random'),
+    HELMETS,
+  );
 });
 
 test('his template built a step at a time (templateSteps) is the one built at once, and createKnights takes it', async () => {
   const { templateSteps } = await import('../src/bonfire/knights.js');
   const model = standInModel();
   const steps = templateSteps(model);
-  let r = steps.next(), n = 0;
-  while (!r.done) { r = steps.next(); n++; }
+  let r = steps.next(),
+    n = 0;
+  while (!r.done) {
+    r = steps.next();
+    n++;
+  }
   assert.ok(n > 5, `it yields between its parts (${n} steps)`);
   const t = r.value;
   assert.equal(t.root, model);
   const k = createKnights(model, { armor: armor(), max: 1, template: t });
   assert.equal(k.knights[0].body.geometry, t.bodyGeo, 'built from the template given, not again');
   const fresh = createKnights(standInModel(), { armor: armor(), max: 1 });
-  const a = t.bodyGeo.attributes, b = fresh.knights[0].body.geometry.attributes;
-  for (const name of ['position', 'aPiece', 'aSmooth', 'aPatch', 'aOcc']) assert.deepEqual([...a[name].array], [...b[name].array], name);
+  const a = t.bodyGeo.attributes,
+    b = fresh.knights[0].body.geometry.attributes;
+  for (const name of ['position', 'aPiece', 'aSmooth', 'aPatch', 'aOcc'])
+    assert.deepEqual([...a[name].array], [...b[name].array], name);
   // Another model's, adopted beforehand: setStyle with it needn't build it.
   const other = standInModel();
   const steps2 = templateSteps(other);
@@ -736,7 +953,7 @@ test('his template built a step at a time (templateSteps) is the one built at on
   assert.equal(k.hasTemplate(other), true);
 });
 
-test('seated at every seat (either seat pose), his helmet stays under the page header on a 390×844 phone (the home view)', async () => {
+test('seated at every seat (either seat pose), his helmet stays under the page header on a 390×844 phone (the home view), and all of him 10 px inside its sides', async () => {
   const view = await phoneView();
   for (const pose of SEAT_POSES) {
     for (const name of Object.keys(SEATS)) {
@@ -748,9 +965,17 @@ test('seated at every seat (either seat pose), his helmet stays under the page h
         k.setHelmet(helmet, { index: 0, instant: true });
         k.summon(0, { instant: true });
         // (Over his idle: breathing, the doze and its start, the glances, a shift of his weight.)
-        const top = view.helmetTop(k, helmet, 14);
+        const { top, left, right } = view.frame(k, helmet, 14);
         // (Scrolled, the header's bar covers its 64 px: his helmet stays clear of it.)
-        assert.ok(top >= view.HEADER + 1, `${pose}, ${name}, ${helmet}: his helmet's top comes to ${top.toFixed(1)} px (the header ends at ${view.HEADER})`);
+        assert.ok(
+          top >= view.HEADER + 1,
+          `${pose}, ${name}, ${helmet}: his helmet's top comes to ${top.toFixed(1)} px (the header ends at ${view.HEADER})`,
+        );
+        // (Seated left of the fire, his far shoulder nears the frame's left edge.)
+        assert.ok(
+          left >= 10 && right <= view.W - 10,
+          `${pose}, ${name}, ${helmet}: he spans ${left.toFixed(1)}–${right.toFixed(1)} px of the phone's ${view.W}`,
+        );
       }
     }
   }
@@ -769,7 +994,10 @@ test('the site’s dance on a phone (no headroom): he dances it in his seat, his
       assert.equal(k.gesture('dance'), true, 'he dances');
       const n = k.knights[0];
       const top = view.helmetTop(k, helmet, DANCE_SEATED_TIME + 0.2);
-      assert.ok(top >= view.HEADER + 1, `${name}, ${helmet}: dancing, his helmet's top comes to ${top.toFixed(1)} px (the header ends at ${view.HEADER})`);
+      assert.ok(
+        top >= view.HEADER + 1,
+        `${name}, ${helmet}: dancing, his helmet's top comes to ${top.toFixed(1)} px (the header ends at ${view.HEADER})`,
+      );
       // (Seated all through, and done in the seated dance's own time.)
       assert.equal(n.mode, 'sit');
       assert.equal(n.gestureName, null);
@@ -804,7 +1032,10 @@ test('seated at every scenery’s seat (either seat pose), his boots stay well o
       g.name = name;
       const t = model.nodes.get(name)?.translation;
       if (t) g.position.set(...t);
-      const piece = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.04), Object.assign(new THREE.MeshStandardMaterial(), { name: 'K_Plate' }));
+      const piece = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.04, 0.04),
+        Object.assign(new THREE.MeshStandardMaterial(), { name: 'K_Plate' }),
+      );
       piece.name = `${name}_Mesh`;
       g.add(piece);
       return g;
@@ -832,7 +1063,10 @@ test('seated at every scenery’s seat (either seat pose), his boots stay well o
       k.group.updateMatrixWorld(true);
       for (const [b, pts] of Object.entries(boots)) {
         const bone = k.knights[0].bones.find((x) => x.name === b);
-        for (const p of pts) { v.set(...p).applyMatrix4(bone.matrixWorld); near = Math.min(near, Math.hypot(v.x - 0.02, v.z - 0.02)); }
+        for (const p of pts) {
+          v.set(...p).applyMatrix4(bone.matrixWorld);
+          near = Math.min(near, Math.hypot(v.x - 0.02, v.z - 0.02));
+        }
       }
     }
     assert.ok(near >= 1.05, `${pose}, ${name}: his boots come to ${near.toFixed(2)} m from the fire's middle`);

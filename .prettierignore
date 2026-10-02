@@ -1,0 +1,20 @@
+# Prettier formats the code and config (npm run format). Left alone:
+# - src/content.json: the admin writes it with JSON.stringify on every save, so formatting
+#   it here would only be undone (and fail format:check) after the next save;
+# - Markdown: the docs are wrapped by hand;
+# - assets, the public folder (it holds a built single-file game), the lockfile;
+# - build, test and coverage output, and local scratch.
+# (index.html is formatted too: the build's withMeta in src/seoPages.js finds its <meta> tags
+# however their attributes are wrapped, and test/site.test.mjs checks it on a formatted copy.)
+src/content.json
+*.md
+public/
+assets/
+package-lock.json
+dist/
+admin/dist/
+coverage/
+test-results/
+playwright-report/
+.scratch/
+review/

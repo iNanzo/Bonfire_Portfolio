@@ -72,8 +72,18 @@ export function pressDetector() {
 export function createMidi({ onAction, onStatus, onChange = () => {} }) {
   /** @type {Record<string, string>} action → control key */
   let map = {};
-  try { map = JSON.parse(localStorage.getItem(STORE) ?? '{}') ?? {}; } catch { /* storage off */ }
-  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(map)); } catch { /* storage off */ } };
+  try {
+    map = JSON.parse(localStorage.getItem(STORE) ?? '{}') ?? {};
+  } catch {
+    /* storage off */
+  }
+  const save = () => {
+    try {
+      localStorage.setItem(STORE, JSON.stringify(map));
+    } catch {
+      /* storage off */
+    }
+  };
   const isPress = pressDetector();
   let access = null;
   let learning = null;
@@ -99,10 +109,15 @@ export function createMidi({ onAction, onStatus, onChange = () => {} }) {
   }
 
   return {
-    get connected() { return !!access; },
+    get connected() {
+      return !!access;
+    },
     /** Ask for MIDI (the browser asks the user the first time). */
     async connect() {
-      if (!navigator.requestMIDIAccess) { onStatus('This browser has no MIDI. Try Chrome or Edge.'); return false; }
+      if (!navigator.requestMIDIAccess) {
+        onStatus('This browser has no MIDI. Try Chrome or Edge.');
+        return false;
+      }
       try {
         access = await navigator.requestMIDIAccess();
         access.onstatechange = listen;
@@ -119,8 +134,14 @@ export function createMidi({ onAction, onStatus, onChange = () => {} }) {
       learning = action;
       onStatus(`Press a pad or button for ${MIDI_ACTIONS[action]}…`);
     },
-    forget(action) { delete map[action]; save(); onChange(); },
+    forget(action) {
+      delete map[action];
+      save();
+      onChange();
+    },
     /** action → the control's name, for the list. */
-    get mapping() { return Object.fromEntries(Object.entries(map).map(([a, k]) => [a, controlName(k)])); },
+    get mapping() {
+      return Object.fromEntries(Object.entries(map).map(([a, k]) => [a, controlName(k)]));
+    },
   };
 }

@@ -33,7 +33,7 @@ fluted plate with gold trim, an armet).
 | K16 | Round 9: "a nice neutral texture … lean towards a gunmetal grey … best practices for material metal in a 3d pixelart pipeline" | A steel ramp of his own (`steel.js`), metal as reflection, texture at the scale of the plates (a fine noise judged and dropped: **Material**) |
 | K17 | Round 9 (after the Variante references): "render it more like a 2d pixel art character", "it still doesn't look like that knight is reflecting the color of the bonfire" | The pixel styles, *Pixel Cel* the default: smooth plates in flat bands with line art, the lit planes in the flame's own colors (**Knight Styles**) |
 | K18 | Round 9: "knight options overall for the portfolio and visualizer", "knight model version options based on what we've generated already" | Every look he has had is a Knight Style (`knightStyles.js`); style, finish, edge glow, seat pose and helmet in the admin (`effects.knight`), the pack (a visitor's picks) and Bonfire Live's Knights tab; a Painter scene sets them for its knights |
-| K19 | Round 9: "pauldron movement is lacking" | The lames on their own nodes (`K_Pauldron_*`), a swing-twist follow of the arm with a lift and roll above level, kept out of the helmets (`knightPose.js` `PAULDRON`, `clampPlates`), and a spring on the plates (`knights.js` `SPRUNG`) |
+| K19 | Round 9: "pauldron movement is lacking" | The lames on their own nodes (`K_Pauldron_*`), a swing-twist follow of the arm with a lift and roll above level, kept out of the helmets (`knightPose.js` `PAULDRON`, `clampPlates`), and a spring on the plates (`knightPlates.js` `SPRUNG`) |
 | K20 | Round 9: "some sitting animations especially don't look good" | Seated gestures sit up first and aim in the room (no cocked helm, no facepalm), a shallower bow, Praise thrown up over four steps, feet stepped (never slid), a softer doze; the seat poses *Resting* and *Watchful* |
 | K21 | Round 9: "Can we add the fortnite default dance to dance options?" | `defaultDance` (8 beats, a seated version) among Bonfire Live's moves; on the site a pack gesture: he stands, dances two bars and sits back down (`dance`); on a phone's tall view, which frames his seat right under the page's header, he dances it in his seat (`headroom`) |
 
@@ -78,8 +78,9 @@ a few flat tones per material, so it reads as a hand-made sprite. For the knight
   across its curve like the references' metal: a lit crescent toward the fire with a
   small highlight at its heart, then steel, mids and a dark far side, never one flat disc
   of the flame's color; a crescent of cream on a rounded plate's fire-side curve, small
-  glints, bright lips only on the raised edges the fire lights; dither only in a thin
-  checker seam on a wide band's edge. **The key light's color is the fire's**: only the
+  glints, bright lips only on the raised edges the fire lights; the wide bands' edges
+  dithered in the scene's own Bayer pattern, following the Dither setting (round 10).
+  **The key light's color is the fire's**: only the
   planes squarely facing it leave the steel, and those are the flame's own body and cream
   tips, so every flame recolors his lit side while the shadows and mids stay cool
   gunmetal: grey plate lit by that fire, not painted armor. The light falls off steeply
@@ -217,10 +218,18 @@ oversized, like the references'. Each is a closed shell whose bottom cap is `K_C
 
 ## In the scene
 
-Built in `src/bonfire/knights.js` (loading, skinning, placing, the API), `knightPose.js`
-(every pose, pure and unit-tested), `knightPlaces.js` (the seats, the dance ring, its
-places and the walks between them; pure and unit-tested, shared with the visualizer's
-`knightShow.js`) and `armor.js` (the material); wired up in `scene.js`.
+Built in `src/bonfire/knights.js` (loading, skinning, placing, the API) with the modules
+beside it: `knightMesh.js` (the model's template: its pieces merged and marked, the points
+he's checked at; `templateSteps`), `knightClear.js` (keeping him out of the scenery:
+`keepClear`, the ease back, `solveClear`) and `knightPlates.js` (the plates' springs).
+`knightPose.js` hands out every pose, pure and unit-tested, from `knightRig.js` (the pose
+layout, the rig, the plates' collision data), `knightSolve.js` (`createSolver`: the IK and
+the pauldrons), `knightBody.js` (writing poses, aiming, the base poses, idle, looking,
+reactions, getting up, sitting down and walking) and `knightGestures.js` (the gestures and
+the dance moves). With them: `knightPlaces.js` (the seats, the dance ring, its places and
+the walks between them; pure and unit-tested, shared with the visualizer's `knightShow.js`),
+`colliders.js` (the scenery's solid pieces as simple shapes, for keeping him out of them;
+pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`.
 
 - **Loading.** `knight.glb` is fetched alongside `bonfire.glb` with the same loader (one
   Draco decoder), and preloaded by both pages. If it fails, or lacks `Knight`/`K_Hips`,
@@ -230,8 +239,9 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   on its piece's joint) and one for each helmet, sharing one skeleton; the geometry is
   shared between knights. Only the helmet he wears is drawn (the others are hidden, not
   skinned), so two draw calls a knight, and two per shadow cube face he's in: his meshes
-  are culled by one fixed sphere in his own space (`BOUNDS`: 1.6 m round a point 1.05 m
-  up and 0.15 m forward), which every pose stays inside with 0.2 m to spare
+  are culled by one fixed sphere in his own space (`BOUNDS`: 1.9 m round a point 1.05 m
+  up and 0.15 m forward; round 9's 1.6, before he stood up across the ruins' drum and
+  kicked out in the site's dance there), which every pose stays inside with 0.1 m to spare
   (`test/knightsBounds.test.mjs` checks the moves, gestures, reactions, seats and walks on
   the real model's pieces). The material role rides on each vertex (`aRole`, from the
   material names). Tassets follow their thighs by the tasset node's `follow` (0.85).
@@ -242,43 +252,177 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   riding up over the shoulder. A dome or lame is never pushed deeper into the helmet than
   the model has it at rest: a head tilted onto a shoulder or an arm swinging them up
   against it shoves the pauldron out from the neck instead (`clampPlates`, at most 5 cm).
-  On top, `knights.js` gives the shoulders, lames and tassets a spring (`SPRUNG`, 2.6 Hz,
+  On top, `knightPlates.js` gives the shoulders, lames and tassets a spring (`SPRUNG`, 2.6 Hz,
   damping 0.38, four substeps a 12 fps step, each plate's lag capped at 0.09–0.13 rad): they
   lag, overshoot a little and settle ~0.4 s after a move stops (`moving` stays true while
   they swing, so the shadow follows), then are clamped again.
 - **Seats** (`SEATS` in `knightPlaces.js`, re-exported by `scenery.js`). Round 9 moved
   them all back ("his feet are in the bonfire": round 8's were 1.1–1.4 m from the fire's
-  middle, his boots on the ring stones at the flames' edge): now behind the fire on the
-  left, his hips 1.69–1.78 m from its middle at bearings 208–217° (straighter behind it
-  than the plan's 225–240°, so he stays in the phone's narrow frame), his boots 1.31–1.54
-  m out (≥ 1.05 m on the real sabatons over his whole idle: `test/knights.test.mjs`; the
-  ring stones reach 0.78, the flames 0.45), never over the flames from the home, projects
-  or inspect views at 1920, 1280 or 390 wide. The seats are low, 0.21–0.23 m (knees up,
-  as a knight rests at a Dark Souls bonfire): that far back, round 8's 0.32–0.40 m seats
-  lifted his helmet 7–11 px into the page's header on a 390×844 phone (its bar, 64 px,
-  shows once the page scrolls); now the great helm's top stays at 65.8–67.7 px over his
-  whole idle (`test/knights.test.mjs`, on the real helmets). The seats: a drum fallen from
-  the ruins' pillar, lying half sunk by its plinth (0.21 m; built by `scenery.js` for the
-  ruins, the one piece it adds to the model's, named `Static_PillarDrum` so it's a solid,
-  casts its shadow and is in the fireflies' height map), a low stump by the forge's anvil
-  (0.21; its barrel moved behind the anvil), a low resting stone at the shrine (0.21), the
-  cathedral's fallen nave drum, half sunk (0.22; the rubble and floor candles by it moved
-  clear of his boots) and the cult's fallen standing stone (0.23; the two black candles
-  nearest him stand past his seat). Every moved or new piece keeps its place in its builder, so the seeded rng draws
-  the same numbers and nothing else in any scenery moves (checked piece by piece against
-  round 8's builder). Each seat's height is checked against the
+  middle, his boots on the ring stones at the flames' edge). Round 10 cleared him of what
+  stands beside them ("the knight is clipping with the pillar"): in the ruins, the
+  cathedral and the cult he overlapped the pillar, the right nave column and a standing
+  stone just sitting still (the ruins' right pauldron 12 cm into the pillar, the
+  cathedral's column through his hips, stone C through his left side), and the ruins' old
+  seat also stood his left boot in the model's fallen drum and placed him 18 cm up on the
+  plinth's edge (where his feet would go fell on it). The ruins' seat moved right of the
+  pillar (its face 0.48 m from his hips), his boots up on the model's fallen drum in front
+  of him (a seated boot rests on the highest ground under its sole, ankle to pointed toe,
+  up to 0.42 m up). The cathedral's and the cult's seats stayed (2 cm and a 3° turn from
+  round 9's): no seat on a 5 cm grid round them is clear of the column or the stone and
+  still in the phone's frame, under its header and out of the fire, so the scenery made
+  room instead: the right nave column (with its half of the arch) stands 0.5 m further
+  along its row and stone C 0.3 m, away from him (`colliders.js` `CATHEDRAL.nave`,
+  `CULT.stones`, which `scenery.js` builds them from); the forge's anvil (its barrel and
+  bar stock with it) turns 0.3 rad further, its horn pointing back past his right shoulder
+  instead of at it (`FORGE.anvil`). The column's last 0.2 m and the anvil's turn are for
+  his arms: a seated Praise the Sun goes all the way up there. Now behind the fire
+  on the left, his hips 1.69–1.78 m from its middle at bearings 206–217° (straighter
+  behind it than the plan's 225–240°, so he stays in the phone's narrow frame: every piece
+  of him at least 17 px inside a 390×844 phone's home view, with every helmet, in either
+  seat pose, over his idle: `test/knights.test.mjs` asks 10), at least 4 cm clear of every
+  piece of the scenery in either seat pose over his whole idle
+  (`test/knightClearance.test.mjs`), his boots 1.06–1.15 m out on the real sabatons over
+  his whole idle (≥ 1.05: `test/knights.test.mjs`; the ring stones reach 0.78, the flames
+  0.45), never over the flames from the home, projects or inspect views at 1920, 1280 or
+  390 wide. The seats are low, 0.21–0.23 m (knees up, as a knight rests at a Dark Souls
+  bonfire): that far back, round 8's 0.32–0.40 m seats lifted his helmet 7–11 px into the
+  page's header on a 390×844 phone (its bar, 64 px, shows once the page scrolls); now the
+  top of every helmet stays at 65.2–67.3 px over his whole idle (`test/knights.test.mjs`,
+  on the real helmets). The seats: a drum fallen from the ruins' pillar, lying half sunk
+  across his way (0.21 m; built by `scenery.js` for the ruins, the one piece it adds to
+  the model's, named `Static_PillarDrum` so it's a solid, casts its shadow and is in the
+  fireflies' height map), a low stump by the forge's anvil (0.21; its barrel moved behind the anvil), a low
+  resting stone at the shrine (0.21), the cathedral's fallen nave drum in front of the
+  columns, half sunk (0.22; the rubble and floor candles moved clear of his boots) and the
+  cult's fallen standing stone (0.23; the two black candles nearest him stand past his
+  seat). Every moved or new piece keeps its place in its builder, so the seeded rng draws
+  the same numbers and nothing else in any scenery moves (round 10: the meshes compared
+  byte for byte with round 9's; only the ruins' and the cathedral's seats, that column and
+  its arch, stone C with its sigil, and the anvil with its hammer, barrel and bar stock
+  moved). Each seat's height is checked against the
   scenery's height map when he sits (the table's value if the map disagrees by more than
   10 cm), and each foot's ground under him. The hips joint sits 0.162 m above the seat;
   two-bone IK puts the feet on the ground in front of it, the knees forward and up.
   Every seat is on a blocked arc of the dance ring (`DANCE_RING.blocked`, measured on the
-  height maps with his legs), so nobody dances on it; standing up he's 1.32–1.39 m from
-  the fire's middle (round 8: 0.74), and every walk from there to the dancers' places on
-  his side is clear of the pit.
+  height maps with his legs in either seat pose, and in the ruins where he stands up to),
+  so nobody dances on it. Standing up he's 1.34–1.43 m from the fire's middle (round 8:
+  0.74), on a spot in front of his seat level and open under each whole sole, each boot a
+  hand's breadth (10 cm) from the scenery's shapes and his chest, head and pauldrons'
+  domes 6 cm (room for a dome to ride up with a raised arm: the shrine's lantern roof is
+  at his right shoulder; `standSpot`); in the ruins it's looked for round to his right
+  (`SEATS` `standAside`), across the fallen drum in front of the pillar's plinth: straight
+  up from that seat he'd stand behind the flames, the sword across him, on the home view.
+  At the shrine it's a little to his right too (0.2 m), so his gestures up there stay left
+  of the sword. Stood up or dancing the site's dance in front of any seat he stays left of
+  the planted sword's blade at 1920 and 1280 wide (at 1920, dancing, 35–100 px clear;
+  round 9: 11–139; `test/knightClearance.test.mjs` asks a hundredth of the width), and so
+  do the Praise, joy and hurrah Bonfire Live's breakdown has him throw up there (at the
+  forge, where round 9's already went over the blade, they go no further than round 9's
+  did). Every walk from there to the dancers' places on his side is clear of the pit.
 - **His summon sign** lies in front of each seat (`SEATS[name].sign`: 0.55 m along his
-  way, or where that ground is taken, a spot of its own: the ruins' is left of his boots,
-  clear of the model's fallen drum), on open ground clear of the ring stones, turned to
-  read from the home view, and in view from it on wide screens and phones
-  (`test/knightPlaces.test.mjs`).
+  way, or where that ground is taken, a spot of its own: the ruins' is in front of the
+  pillar's plinth, where his boots go when he stands up (0.18 m from them) and 1.03 m from
+  his seat, the open ground nearer the seat being under the drum, on the plinth or behind
+  the flames from the home camera: every spot within 0.93 m that passes the sign's other
+  checks is hidden behind the flames, so the test allows the ruins 1.05 m and the other
+  seats 0.95; the cathedral's and the cult's at his left, clear of their seats), on open
+  ground clear of the ring stones, turned to read from the home view, and in view from it
+  on wide screens and phones (`test/knightPlaces.test.mjs`).
+- **Keeping out of the scenery** (round 10). `colliders.js` describes each scenery's
+  solid pieces near his seat and the dancers' ring as simple shapes: upright cylinders
+  (the pillar, columns, posts, stumps), turned boxes (stones, lanterns, the anvil, the
+  pew) and drums lying on their side (the ruins' fallen drum, the anvil's horn), built
+  from the same constants `scenery.js` builds the pieces from (and the ruins' from
+  `tools/bonfire.py`'s numbers: the test decodes `bonfire.glb` and checks them to 2 cm).
+  - *Room.* At home (his seat, or where he sits on the ground) `roomOf` measures the room
+    each arm has, seated and standing up in front of the seat: from each shoulder to the
+    nearest shape not across on his other side, at any height; 0.12 m or less leaves
+    none, 0.57 m or more all of it. Every gesture, dance move and reaction there gets it
+    (`room`, `knightBody.js` `hem`): a hemmed-in arm's reach behind him scales with it and
+    what it would swing out to that side swings forward instead, so it goes up or out in
+    front of him (Praise the Sun's arm, hemmed in by the ruins' pillar, goes up in front).
+    Only what the gesture adds is hemmed: as far out and back as his arm at rest already
+    is (clear, where he sits) it's left alone, so the resting arm never jumps as a gesture
+    starts or ends, and on its way between the two it swings out no further than that.
+    Getting up and sitting down he has the less of his seated and standing room; the site's
+    dance up from his seat has that on its way up and down and the standing room while
+    he's up (`danceUp`), so an arm with room up there swings as far as round 9's.
+  - *After the solve* (on steps with real motion; his resting pose is clear by its seat),
+    each arm's pieces (the pauldron's lames, the arm, the gauntlet: its surface every
+    3 cm, a gauntlet's every 2 cm, and its farthest corners) are checked against the
+    shapes within 1.4 m: an arm nearer one than 2 cm turns about its shoulder away from it
+    (toward the way out of it, or inward to his middle; as far as clears it, up to 10°,
+    three tries; `keepClear`). At home, whatever of him would still go in (his body and
+    helmet too, a raised boot resting on something allowed a centimetre) eases back toward
+    his resting pose there as little as clears it, so he slides along what he meets
+    instead of jumping back from it, and lets go of it a quarter of the way a step after
+    (`solveClear`). What eases is the part that's in: his lean (hips, back, neck and head
+    turning), an arm, or his legs (where his hips are and each foot goes: the footwork
+    getting up over the ruins' drum stays as planned while his lean eases). A pauldron's
+    dome eases his lean first and its arm only if that isn't enough, so a seated Praise
+    arching back into a stone arches less and keeps both arms up; whatever is still in all
+    the way back brings in what puts it there (an arm, the body leaning it; the body, his
+    legs). His resting pose there blends from seated to standing as he gets up or sits
+    down, so what's eased moves on smoothly with him. It's deterministic. The plates on
+    their springs lag and overshoot after that: one whose swing would take it into a shape
+    stops where his pose has it (clear) and goes on with the pose from there.
+  - *Cost.* The ease is looked for from the step before's: let go as far as he may if
+    that clears him, else held, else further back (just touching something, halfway back
+    first, all the way only if that isn't enough), between where he's in and where he's
+    clear by the margins each pose leaves him (regula falsi; where they can't say, since
+    the margin is the nearest piece's and further back another piece may be the nearest,
+    as far on as the two looks he was still in at say he was coming out, a quarter
+    further back than where he's in at most). So an arm that first touches something eases
+    back about as little as clears it, not most of the way to its rest in one step. Never
+    more than four poses are solved a step (`EASE_SOLVES`; `k.solves` counts them, the
+    test holds every action at every seat to it; most steps solve one, as round 9's
+    did). Each piece's points sit in
+    6 cm clumps, passed over whole when their ball can't reach a shape (each shape's
+    distance changes no faster than its `lip`), and are placed by one matrix a piece; the
+    pauldrons' helmet check is a matrix too. In GPU Chrome on the dev site (its quiet
+    windows, at 144 fps), `knights.update` while the knight at home gestures, dances the
+    site's dance, gets up or sits down costs about what round 9's did: at most 1.6 ms a
+    frame in the best of a few tries at any seat, 2.2 once getting up (round 9's: 1.6),
+    95% of frames 0.6 ms or less (round 9's: 0.4); four knights dancing on the ring in
+    Bonfire Live, at most 1.2 ms, 95% of frames 0.6 or less (round 9's: 3.3 and 1.6).
+  - *Getting up across something.* A foot stepping between where it rests seated and where
+    he stands up to lifts over what lies on its way (`rise()`'s `over`, measured against
+    the shapes once a seat), and where one has to clear more than 6 cm (the ruins' drum,
+    his boots up on it) he pushes up over his feet where they rest first, then steps
+    across it, right foot then left (sitting down, back across, then down).
+  - *Smooth.* Nothing he does at his seat (every gesture seated and standing, the site's
+    dance, the reactions, getting up and sitting down) steps his head or hands further at a
+    time than round 9's did in the same thing, give or take half, and a step past round
+    9's goes at most a quarter further (and 1 cm) than the same step does with nothing
+    there to keep clear of (`test/knightClearance.test.mjs`, at the fire's 12 fps, each
+    from six moments in his idle; round 10: a fifth at the most, a seated beckon's or
+    Point's first touch of the ruins' pillar, the Point's hand 38 cm where round 9's went
+    28 and it goes 32–33 with nothing there; before the ease looked halfway first, up to
+    44). In the ruins his hands start up on knees raised over the fallen drum, so a
+    gesture's start takes them further than round 9's anywhere (watchful, a beckon's free
+    hand 30 cm a step, round 9's 20), kept clear or not: there the step with nothing to
+    keep clear of is the measure.
+  - *Dancers.* The show leaves out a dance move whose reach (`MOVE_REACH`: measured on
+    the real model, by height band and in front, aside and behind) doesn't clear the
+    shapes round the dancer's place with 5 cm to spare (`fire.knights.fits`, or, where the
+    scene doesn't pass it on, the same question put to `colliders.js` by the show itself:
+    `createFits`), taking another of the pool's (by the dancer's seed, so nothing else the
+    show rolls changes), or turning to the fire for one if nothing fits facing the cameras
+    (the cult's watcher, the shrine's front lantern and the cathedral's pew stand by the
+    front-left places).
+  - *Checked* on the real model at the fire's 12 fps (`test/knightClearance.test.mjs`):
+    every seat sitting still (≥ 4 cm); every gesture seated and standing at the seat, the
+    site's dance on a desktop and a phone, reactions, seated moves, getting up and sitting
+    down (in the ruins with every helmet: the bascinet's visor juts over the drum as he
+    gets up); every dancer place, move and facing with the drop gestures over it; nothing
+    deeper than 1.5 cm (round 10: 0.8 cm at the most, whatever his idle was doing when the
+    action started, a seated shrug's lames at the cult's stone C; round 9: up to 23 cm into
+    the ruins' pillar), and still or standing at
+    his seat nothing at all (his boot resting on the ruins' drum aside). Keeping out costs
+    the gestures little: a seated Praise the Sun at every seat in either seat pose throws
+    each hand at least 90% as high over his hips as round 9's (it's the site's first
+    click), and in the site's dance an arm with all the room it wants swings at least 90%
+    as far.
 - **The others** (Bonfire Live) sit on the ground where the visualizer rests them
   (`restPlaces`: the layout for the whole cast less the place nearest the seat, on the
   ring's clear sides, never in front of the fire), their feet on the ring, facing the
@@ -310,11 +454,20 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   blade's capsules and his glances are his own.
 - **At rest** he breathes, his head sinks over several seconds and lifts with a start,
   he glances about, and every ~12 s shifts his weight, a hand or a foot.
-- **Reactions** (from `scene.js`): while a weapon is being forged or the living blade
+- **Reactions** (from `sceneFire.js` and `sceneKnight.js`): while a weapon is being forged or the living blade
   flies he sits up and watches it (chest up, head turned to it); `impact()` → a flinch
   (jerks back, head turned away, forearms up, ~1 s); `stoke()` → he leans away, an arm up
   against the heat; `ring()` (and the impact's ring) → he lifts his feet (standing: a
-  hop) as the ring's front reaches him. A knight dancing on his feet (or on his way to),
+  hop) as the ring's front reaches him, each foot 20 cm, or less where that would take its
+  ankle more than 12 cm over its hip joint (`HOP_TOP`, `riseOf`): from about 18 cm up the
+  ankle comes round to where the knee bends toward, and the knee folds down through under
+  the leg for a step. At the seats his feet rest well under his hips and lift the whole
+  way, as round 9's did; in the ruins his boots rest up on the fallen drum, so his left
+  lifts 7–11 cm and his right stays on it; the others in Bonfire Live, sitting on the
+  ground with their feet up level with their hips, lift theirs 10–19 cm (round 9's lifted
+  20 and folded a knee on every ring; `test/knightClearance.test.mjs` checks every seat in
+  either seat pose, and the ground, through a ring, an impact with it, and every seated
+  gesture and move with one). A knight dancing on his feet (or on his way to),
   or throwing his arms up in a cheer (`praise`, `hurrah`, `joy`), doesn't flinch or lean
   away, so the drop's leap and Praise the Sun read whole; he still hops the ring. The
   site's knight reacts by `effects.knight.reactions`; Bonfire Live switches its knights'
@@ -325,16 +478,18 @@ places and the walks between them; pure and unit-tested, shared with the visuali
 - **Seated gestures** sit him up first, then aim the arms and head in the room (`gesture`
   with `stand` and `room`): the helmet gesture puts his hands at the helm's sides, the bow
   is shallower seated, Praise the Sun throws up over four steps, a seated joy keeps his
-  hips on the stone. Where something tall stands at his side (`knights.js` `roomOf`, from
-  the height map: the ruins' pillar) Praise and joy throw the arm up in front of him
-  instead and the wave changes hands. The head aims in his own space, level with the
-  world (split 0.4 neck, 0.6 head), so a hover or a flinch never cocks the helmet.
+  hips on the stone. Where something stands at his side (`roomOf`: *Keeping out of the
+  scenery*) the arm on that side goes up or forward instead (Praise and joy throw it up
+  in front of him) and the wave changes hands. The head aims in his own space, level with
+  the world (split 0.4 neck, 0.6 head), so a hover or a flinch never cocks the helmet.
 - **Transitions.** Standing up (1.2 s): a lean with hands to the knees, a push-off, a
   small overshoot as he straightens, the feet moved in small lifted steps (never slid) to
-  a level, open spot in front of his seat (`standSpot`). Sitting down: a bend, the hips
-  reaching back, a settle. The idle's weight shift lifts the foot it moves too. Walking: 0.95 m/s with a 12 fps gait, along the way `planWalk` finds: straight
+  a level, open spot in front of his seat (`standSpot`); where his feet have something to
+  cross on the way (the ruins' fallen drum, his boots up on it), he pushes up over them
+  first and then steps across (*Getting up across something*). Sitting down: a bend, the
+  hips reaching back, a settle. The idle's weight shift lifts the foot it moves too. Walking: 0.95 m/s with a 12 fps gait, along the way `planWalk` finds: straight
   where that's clear of the fire pit (0.72 m) and keeps 0.85 m from the fire (or no nearer
-  than his seat's step, where he stands up 1.32–1.39 m from it), and of anything the
+  than his seat's step, where he stands up 1.34–1.43 m from it), and of anything the
   height map says is taller than a step (0.16 m; a hand either side of his path);
   otherwise round the fire, easing out from one end's distance to the other's. Only a
   way longer than 2.4 m or blocked both ways goes by ember: he burns away and forms at
@@ -348,15 +503,19 @@ places and the walks between them; pure and unit-tested, shared with the visuali
 - **Knight Styles** (`src/bonfire/knightStyles.js`, pure): every look he has had, one
   name each, selectable at any time; how the armor draws him (`armor.js`, the shader's
   `uLook`), which model he's built from, and which colors the pass snaps his steel to.
-  `STYLES` (`look`, `model`, `finish`, `hint`), `STYLE_KEYS` (menu order), `STYLE_NAMES`
-  (Title Case labels), `DEFAULT_STYLE`, `MODELS`, `styleOr(name)`, `styleModel(name)`.
+  `STYLES` (`look`, `model`, `finish`, `dither`, `hint`), `STYLE_KEYS` (menu order),
+  `STYLE_NAMES` (Title Case labels), `DEFAULT_STYLE`, `MODELS`, `styleOr(name)`,
+  `styleModel(name)`. `dither` is how far a pixel style dithers its band edges at the
+  site's Dither (0..1; **Dither** below): Pixel Cel 1, Pixel Painterly 0.8, Pixel
+  Chiaroscuro 0.4, the rest 0. The hints are one short sentence each (Bonfire Live joins
+  them into one tip).
 
   | Key | Name | What |
   | --- | --- | --- |
-  | `pixel-cel` | Pixel Cel | **the default**: the sprite, four flat bands and a highlight on smooth plates (cool gunmetal darks and mids, the flame's body and cream tips only where it faces the fire), near-black ink with a dark warm ink over the lit tones, the fire on his outline's fire side |
-  | `pixel-painterly` | Pixel Painterly | the sprite with a painter's touch: shadows hue-shifted toward the flame's shade (as dark), lips a little further round the lit edges, a lighter ink over the lit tones, the flame's dark shade on the terminator, wider checker seams |
-  | `pixel-chiaroscuro` | Pixel Chiaroscuro | hard firelight: the dark, mid steel and the fire's body (and the highlight), near-black backs and gaps, black ink, the terminator |
-  | `gunmetal` | Gunmetal | round 9's natural light on gunmetal steel (below) |
+  | `pixel-cel` | Pixel Cel | **the default**: the sprite, four flat bands and a highlight on smooth plates (cool gunmetal darks and mids, the flame's body and cream tips only where it faces the fire), the band edges dithered, near-black ink with a dark warm ink over the lit tones, the fire on his outline's fire side |
+  | `pixel-painterly` | Pixel Painterly | the sprite with a painter's touch: shadows hue-shifted toward the flame's shade (as dark), lips a little further round the lit edges, a lighter ink over the lit tones, the flame's dark shade on the terminator, the band edges dithered a little less than Pixel Cel's |
+  | `pixel-chiaroscuro` | Pixel Chiaroscuro | hard firelight: the dark, mid steel and the fire's body (and the highlight), near-black backs and gaps, black ink, the terminator, a little dither |
+  | `gunmetal` | Smooth Steel | round 9's natural light on gunmetal steel (below). Shown as Smooth Steel since round 10, so it isn't taken for the Gunmetal finish; the key stays (saved settings and scenes name it) |
   | `blackgold` | Black & Gold | round 8's final: blackened plate in the scene's stone, shadow and void by each facet's turn to the fire, dark gilt trim (wood and shadow) that catches the flame's mid, hi and core only in its reflection, rims a step up; no steel ramp, no fire rim |
   | `first` | First Build | round 8's first build: its own boxy model (`public/models/knight-first.glb`, no `K_Pauldron` joints: its lames ride the dome), fetched only when chosen; the same blackened plate, its trim at least the flame's `lo`, so it glows in the flame's color |
 
@@ -370,7 +529,7 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   into the flame's only on the side facing it, fading in ~0.5 s), never a wash of one
   color over him (the forge's lightning `uGlow` ends as he stands whole): no flat
   silhouette at the end of a swap. A style with its own model fetches it first and builds
-  its template once (`knights.js` `templateSteps`, a step at a time in idle moments, then
+  its template once (`knightMesh.js` `templateSteps`, a step at a time in idle moments, then
   `adoptTemplate`: on the same rig, each piece moved from its joint's rest place there to
   the knight's; the rig, the solver and the plates' collision data stay the knight's).
   Asked for at once (`instant`, as Bonfire Live does at a hidden moment) before that's
@@ -378,8 +537,9 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   repeat call while it loads waits on the same swap. Bonfire Live and the Painter get every
   such model ready in idle moments once their knights are in, and
   `fire.knights.prepareStyle(name)` does it on demand. The steel finishes are the color
-  option within the styles that draw steel (`finish: true`: the pixel styles and Gunmetal).
-  **The pixel styles** (`uLook` 1..3; `knights.js` builds their data from the model,
+  option within the styles that draw steel (`finish: true`: the pixel styles and Smooth
+  Steel).
+  **The pixel styles** (`uLook` 1..3; `knightMesh.js` builds their data from the model,
   once per model, ~0.1 s). Faces are joined into smooth surfaces across every edge turning
   less than 64° (the model's facets bend up to ~60° round a curve, its creases and box
   edges 70° and more), welded by position across materials. Per corner: `aSmooth`, the
@@ -414,7 +574,48 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   as a whole into the lit bands (its heart to the highlight; a curved plate a band or two
   up, keeping its curve), and the sweeps glide over the plates facing the fire the same
   way; the far side never lights. Fog takes a far knight's bands a step down, toward the
-  steel. **Line art** (`pixelPass.js` `celLine`): a line only where both surfaces are at
+  steel. **Dither** (round 10; the user: "i dont really see the dithering effect on him"):
+  the pass dithers the scenery's continuous color, but his pixels arrive in exact tones
+  and it leaves them alone (`if (!celHere)`), so the armor dithers his band edges itself,
+  in the pass's own Bayer matrix (`dissolve.js` `wBayer4`/`wBayer8`, the pass's `bayer4`/
+  `bayer8`: the color target is the pass's size, so `gl_FragCoord` is the pass's texel and
+  his pattern lines up with the scene's). The pass's `ditherStrength` and `ditherScale`
+  are shared with the armor by reference (`uDither`, `uDitherScale`, like the exposure),
+  so the render menu's Dither and Pattern rows and Bonfire Live's slider move him with the
+  scene. Near a band edge each texel's threshold steps it across (`celDither`, on the key,
+  the far side's fill and turn, and a curved plate's dark bands), fewer the further from
+  the edge, toward the edge nearest it only. Only one band's texels step, the wider band's,
+  into the narrower: a thin band (the light steel on the turn, often 1–2 texels) grows
+  teeth from both sides instead of breaking into dots. The lit bands always step down into
+  the steel, never out over it, so the dither makes no lone lit texel, and the pass's
+  terminator is round 9's (a terminator rings a lone lit texel). The window: the style's
+  amount `a` (`uCelDither`) times the Dither over the site's 0.08, at most 2x (Live's
+  slider goes to 0.4); `min(a, 1)` of twice the band stepped into (a texel lands in it,
+  never past it: the threshold is under 0.5 from its middle) and at most `a` times the
+  reach (`celReach`): 4.6 texels (`DITHER_MAX`) on a knight drawn up to 87 texels a metre
+  (`DITHER_PX`: the home view at 1920 and everything smaller), less as he's drawn bigger,
+  down to 3.4 (the projects and inspect views, where more of his bands are wide enough to
+  dither and the dots would add up); none from a band under 2 texels across on screen
+  (`DITHER_MIN`, measured along the value's gradient), fading in over a texel more. At
+  Dither 0 there's no offset at all: exactly the flat bands. Not dithered: the highlight,
+  the lips, the flame's flash and the sweeps, his own flash (`uLift`), the frost and the
+  dissolve. The old checker seam (a band edge a texel early on alternate texels, only where
+  the key changed under 0.03 a texel) is gone: it moved 0.2–2 texels a frame. The first
+  cut (one window both sides, sized by the narrower band, so the edges beside the thin
+  light steel hardly dithered) flipped 2–3 % of the plate texels at 1920 and 1–1.5 % at
+  1280 and 390: it didn't read, and its pass guard (no terminator beside a lone lit texel)
+  took 10–22 % of the real terminators. Measured in pairs (the same frame drawn with round
+  9's shaders, the first cut's and these; 4 bursts of 20 frames a second apart; Pixel
+  Cel, Dither 0.08): home at 1920, the dither moves 118–125 texels of his ~3,300 a frame
+  and flips 4.7–4.9 % of the breastplate's, pauldrons' and cuisses' band texels; texels
+  between two of another tone there (an alternating pattern) 9.2–10.3 % (round 9 4.3–5.0 %,
+  its staircase edges); single-texel speckle +1.1 to +1.35 points (round 9's method below;
+  ~9.5 % before); crawl at rest +0.02 at most; projects and inspect +1.15 to +1.4; at 1280
+  and 390, 53–57 texels a frame, 4.0–4.9 % flipped, +0.9 to +1.1. Pixel Painterly (0.8)
+  +0.7 to +1.3, Pixel Chiaroscuro (0.4: its bands are twice as wide) +0.45 to +0.8. At 0.16
+  and 0.4 (2x) the bands step further, +1.3 to +2.7 (the scene is dithered as hard there).
+  The terminators stay within 3 % of round 9's.
+  **Line art** (`pixelPass.js` `celLine`): a line only where both surfaces are at
   least two texels thick across the edge and one of them more (`CEL_THICK`: no outline
   round a one-texel sliver, a corner poking through, a finger peeking from a gauntlet in
   his lap far off, nor between two thin strips such as a fauld's hoops, which show in
@@ -471,7 +672,7 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   stone, fights the ordered dither and adds single-texel speckle (steel texels unlike all
   four neighbours: 9.5 → 12.0 % at 1280, 10.1 → 12.3 % at 390) that crawls as he
   breathes. C won, modestly: each plate a touch lighter or darker than the next (a piece
-  id per connected plate, `aPiece`, computed from the model in `knights.js`), the raised
+  id per connected plate, `aPiece`, computed from the model in `knightMesh.js`), the raised
   rims and ridges worn bright, the undersides where plates overlap a step darker; it
   separates the overlapping lames, hoops and bands without adding speckle (7.6 % against
   A's 8.2 % at home 1920) or crawl. So the idea was half right: a texture does help the
@@ -486,7 +687,7 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   black-and-gold styles gild it).
   **Sweeps**: when the fire flares (a stoke 1, an impact 1, a weapon forming 0.8, a ring
   0.45–0.85, the cursor coming onto the fire 0.7; `armor.flare(strength)` from
-  `scene.js`) its reflection sweeps across the whole armor: a band of facets, the leading
+  `sceneFire.js`) its reflection sweeps across the whole armor: a band of facets, the leading
   edge in the flame's `core` and the rest in `hi`, rolls out from the facets that mirror
   the fire to those turned furthest from it in 0.6–0.95 s, fading as it goes. At rest a
   gentler band in `hi` runs over him every 4–8 s (out from the fire, up from below, or
@@ -506,7 +707,8 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   his plate and the rim keep their flat tone). The pixel styles mark 0.62 + 0.002 the
   smooth surface's id (or the id it merges into, small on screen), 0.14 more on the fire's
   side: their pixels snap to the style's eight tones (`CEL_TONES`) without the pass's
-  dither and get no facet creases; the pass draws their line art: a 1-texel line wherever
+  dither (the armor dithers their band edges itself: **Dither** above) and get no facet
+  creases; the pass draws their line art: a 1-texel line wherever
   two surfaces meet on screen or he meets what's behind him, on the nearer surface's pixel
   (the same depth: the higher id's), so every plate edge, crease and overlap gets exactly
   one, but not a lone texel of it (a line texel with no line beside it); the void, or over
@@ -534,9 +736,9 @@ places and the walks between them; pure and unit-tested, shared with the visuali
   3.4 s → 0.3–0.5 s, the first scenery change 2.2 s → none over 100 ms, the first shadows
   toggle 2.1 s → none; round 9's review: no shader built at his first summon (19 programs
   before and after).
-- **Loading.** His code (`knights.js`, `knightPose.js`, `knightArrival.js`,
-  `summonSign.js`) is a chunk of its own (`knightBundle.js`, ~80 kB), fetched with
-  `knight.glb`, not with the fire's. On the site, when he isn't there at load (the sign
+- **Loading.** His code (`knights.js`, `knightPose.js` and the modules beside them,
+  `knightArrival.js`, `summonSign.js`) is a chunk of its own (`knightBundle.js`, ~80 kB),
+  fetched with `knight.glb`, not with the fire's. On the site, when he isn't there at load (the sign
   waits, or he isn't allowed), the fire's first frame doesn't wait for him: after it, his
   template is built in idle moments (`templateSteps`: each joint's plates and surfaces and
   the occlusion's pieces a step), then he and his sign are made, their shaders compiled
@@ -554,7 +756,7 @@ too distracting. His **summon sign** glows on the ground in front of his seat in
 a click on it brings him; coming and going are the weapon swap's own dissolve, in the
 current element's way. Bonfire Live is unchanged: its show casts its own knights.
 
-- **Presence** (`src/bonfire/knightArrival.js`, wired up in `scene.js`): `away` (the sign
+- **Presence** (`src/bonfire/knightArrival.js`, wired up in `sceneKnight.js`): `away` (the sign
   lit) → `arriving` (~3.6 s) → `resting` (a rest rolled between `effects.knight.restMin`
   and `restMax`, 3–5 minutes by default, each time he comes) → `leaving` (~3.6 s, the same
   forge the other way) → `away`. His rest never runs out mid-action: while he's gesturing
@@ -630,7 +832,7 @@ touch devices) have no seat and sit on the ground at home (see *The others* abov
 | `ready` | resolves `true` once there are knights (`false` without the model); on the site, when he's away at load, a moment after the first frame (see *Loading*) |
 | `count`, `present`, `max` | knights in the cast (up to the highest one here and staying: it drops as knights are sent away), how many are showing, the most allowed |
 | `list` | `[{ index, present, state, position, facing, helmet, move }]`; `state` is `sitting`, `standing`, `dancing`, the act he's in (`rise`, `lower`, `walk`, `turn`, `place`: settling onto his seat, a frame), `arriving`, `leaving` (burning away for good), `ember` (going somewhere by ember: still in the cast) or `away` |
-| `positions` | each present knight's head (world `Vector3`s), for cameras |
+| `positions` | each present knight's head (world `Vector3`s), for cameras: one array, its vectors updated in place on each read (copy what you keep) |
 | `helmet`, `setHelmet(name, { index, instant })` | `'great'`, `'armet'`, `'bascinet'`: hands to the helm, the old one burns away in ember edges, the new one forms, a flash and a puff of sparks (1.6 s); resolves when done. The setter swaps every knight's |
 | `setCast({ count, helmets, instant })` | how many knights are there (the rest are summoned or dismissed); `helmets` a name, a list (per knight) or `'random'` |
 | `summon(i, { instant })`, `dismiss(i, { instant })` | forming out of embers feet first (0.55 s) at his seat or home (or standing `at` a place); burning away. With `forge: true`: handed to the forge instead (`forgeSubject`, `forged`) |
@@ -651,7 +853,8 @@ touch devices) have no seat and sit on the ground at home (see *The others* abov
 | `clock(beatPos, period)` | the beat, every frame: `beatPos` in beats, `period` s a beat. Moves are pure functions of it, so they stay on the beat through hit-stops and tempo jumps. Without it he dances on at the last tempo |
 | `gesture(name, { index })` | `praise`, `wave`, `bow`, `point`, `beckon`, `shrug`, `hurrah`, `joy` (1.6–2.3 s), over whatever he's doing, and `dance` (~7.3 s: seated, he stands, turns to the front, dances the Default Dance for two bars at 118 BPM on his own clock and sits back down; on the site's tall view, ~4.8 s in his seat: the Default Dance's arm swings and head bob leaning in over his knees, his helmet under the page's header all through); `index: 'all'` for everyone. `true` only if someone started it (a knight changing helmets has his hands full) |
 | `lookAt(point or null, { index })` | he turns chest, neck and head toward a world point (e.g. the cursor), or stops |
-| `slots(scenery?)` | `{ center, radius, free, slots }`: the dance ring (1.2 m round the fire), its clear arcs in degrees (0° toward the camera, 90° to +x; the arc 258°→360°→96° is clear everywhere) and the slots `[{ x, z, bearing }]`: 1 (270°), 2 (310°), 3 (50°), 4 (88°), 5 (168°, not in the cult). Dancing with no place given, 1 knight takes slot 1; 2 take 1 and 4; 3 take 1–3; 4 take 1–4 |
+| `slots(scenery?)` | `{ center, radius, free, slots }`: the dance ring (1.2 m round the fire), its clear arcs in degrees (0° toward the camera, 90° to +x; the arc 253°→360°→96° is clear everywhere) and the slots `[{ x, z, bearing }]`: 1 (270°), 2 (310°), 3 (50°), 4 (88°), 5 (168°, not in the cult). Dancing with no place given, 1 knight takes slot 1; 2 take 1 and 4; 3 take 1–3; 4 take 1–4 |
+| `fits(move, at, facing, scenery?)` | whether a dance move has room at a place on the ground `{ x, z }` facing that way: its reach (`colliders.js` `MOVE_REACH`) clear of the scenery's shapes there with 5 cm to spare; Bonfire Live's show leaves out one that doesn't (*Keeping out of the scenery*) |
 | `moving` | a pose stepped this frame with real motion, or he formed, burnt away or was put somewhere new (the shadow's redrawn) |
 
 The moves (`MOVES` in `knightPose.js`, each with its cycle in beats; the seated ones work

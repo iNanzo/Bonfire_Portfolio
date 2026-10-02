@@ -11,7 +11,8 @@
 // few-color or debug palette, the x-ray and the breakdown's passes draw him as they are.
 // The pixel styles (knightStyles.js) mark each of his smooth surfaces with its id instead:
 // their pixels snap to the style's tones (steel.js CEL_TONES) without the dither (the armor
-// draws its own seams) and their facet creases aren't drawn; the line art is drawn here: a
+// dithers his band edges itself, with this pass's strength and Bayer matrix, texel for texel
+// with the scene's) and their facet creases aren't drawn; the line art is drawn here: a
 // 1-texel line wherever two surfaces meet on screen (or he meets what's behind him), on the
 // nearer one's pixel, so every plate edge, crease and overlap gets exactly one, and a lone
 // texel of it (a corner, a sliver) or a dash on its own, shorter than five texels as it
@@ -416,7 +417,8 @@ const fragmentShader = /* glsl */ `
     // The terminator: a dark steel texel (not the light steel on the turn) beside a lit one
     // of its own surface takes the flame's dark shade: one texel, the warm edge between the
     // light and the shadow; only where the dark goes on past it (a band, not a sliver of a
-    // small part).
+    // small part). (The armor's dither steps his lit bands down into the steel, never out
+    // over it, so it makes no lone lit texels for this to ring.)
     vec3 dk = col - steel[3];
     if (cel && !outlined && steelSize > 6 && celTerm > 0.5 && !litTone(col) && dot(dk, dk) > 0.0006) {
       float id = celId(c4.a);
@@ -703,7 +705,8 @@ const fragmentShader = /* glsl */ `
   #endif
 
     // The knight's steel snaps to its own ramp (not in the x-ray); the pixel styles' tones
-    // without the dither (the armor draws its own seams).
+    // without the dither (the armor dithers their band edges itself, in this same pattern,
+    // so their flat bands stay clean).
     bool steelHere = false;
     bool celHere = false;
     if (steelSize > 0) {
@@ -895,7 +898,15 @@ export function createPixelPass({ effects = false } = {}) {
   };
   // One uniforms object for every stage (each reads what it needs).
   const fx = effects ? { FX: '' } : {};
-  const make = (shader, defines = {}) => new THREE.ShaderMaterial({ uniforms, vertexShader, fragmentShader: shader, defines: { ...fx, ...defines }, depthTest: false, depthWrite: false });
+  const make = (shader, defines = {}) =>
+    new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader,
+      fragmentShader: shader,
+      defines: { ...fx, ...defines },
+      depthTest: false,
+      depthWrite: false,
+    });
   const materials = {
     single: make(fragmentShader),
     scene: make(fragmentShader, { SCENE_ONLY: '' }),
@@ -932,7 +943,10 @@ export function createPixelPass({ effects = false } = {}) {
   // lit tone meets the dark steel (1 drawn, 0 not).
   let steelOn = false;
   let steelCount = 0;
-  function setSteel(hexes = [], { rim = uniforms.steelRim.value, lines = uniforms.celLines.value, terminator = uniforms.celTerm.value } = {}) {
+  function setSteel(
+    hexes = [],
+    { rim = uniforms.steelRim.value, lines = uniforms.celLines.value, terminator = uniforms.celTerm.value } = {},
+  ) {
     uniforms.steelRim.value = Math.min(1, Math.max(0, rim));
     uniforms.celLines.value = lines;
     uniforms.celTerm.value = terminator;
@@ -946,7 +960,9 @@ export function createPixelPass({ effects = false } = {}) {
   }
 
   /** Which stage the next render of `scene` draws: single (all in one: the site's), scene, style, ghost, final. */
-  function use(stage) { quad.material = materials[stage]; }
+  function use(stage) {
+    quad.material = materials[stage];
+  }
 
   return { scene, camera, uniforms, setPalette, setSteel, materials, use };
 }

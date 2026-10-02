@@ -38,15 +38,30 @@ export function buildTrack(bars, { bpm = 126, leadIn = 1, tail = 3, gain = 1, se
   };
   const hat = (t0, g) => {
     let prev = 0;
-    add(t0, 0.06, (t) => { const n = noise(); const hp = n - prev; prev = n; return g * 0.18 * hp * Math.exp(-t / 0.018); });
+    add(t0, 0.06, (t) => {
+      const n = noise();
+      const hp = n - prev;
+      prev = n;
+      return g * 0.18 * hp * Math.exp(-t / 0.018);
+    });
   };
   const clap = (t0, g) => {
-    let a = 0, b = 0;
-    add(t0, 0.12, (t) => { const n = noise(); a += (n - a) * 0.3; b += (a - b) * 0.3; return g * 0.35 * (a - b) * Math.exp(-t / 0.03); });
+    let a = 0,
+      b = 0;
+    add(t0, 0.12, (t) => {
+      const n = noise();
+      a += (n - a) * 0.3;
+      b += (a - b) * 0.3;
+      return g * 0.35 * (a - b) * Math.exp(-t / 0.03);
+    });
   };
   const bass = (t0, g) => {
     let lp = 0;
-    add(t0, 0.22, (t) => { const saw = ((t * 55) % 1) * 2 - 1; lp += (saw - lp) * 0.04; return g * 0.5 * lp * Math.exp(-t / 0.09); });
+    add(t0, 0.22, (t) => {
+      const saw = ((t * 55) % 1) * 2 - 1;
+      lp += (saw - lp) * 0.04;
+      return g * 0.5 * lp * Math.exp(-t / 0.09);
+    });
   };
   bars.forEach((spec, i) => {
     const s = { kick: 1, bass: true, hats: true, ...spec };
@@ -55,7 +70,8 @@ export function buildTrack(bars, { bpm = 126, leadIn = 1, tail = 3, gain = 1, se
     const beats = s.gapLastBeat ? 3 : 4;
     for (let b = 0; b < beats; b++) {
       const t = barT + b * beat;
-      if (s.kick && !(s.halfTime && b !== 0)) for (let k = 0; k < s.kick; k++) kick(t + (k * beat) / s.kick, g * (s.kickGain ?? 1), s.thin);
+      if (s.kick && !(s.halfTime && b !== 0))
+        for (let k = 0; k < s.kick; k++) kick(t + (k * beat) / s.kick, g * (s.kickGain ?? 1), s.thin);
       if (s.halfTime && b === 2) clap(t, g * 1.5);
       if (s.boom && b === 0) kick(t, g);
       if (s.hats) hat(t + beat / 2, g);
@@ -63,15 +79,23 @@ export function buildTrack(bars, { bpm = 126, leadIn = 1, tail = 3, gain = 1, se
     }
     const len = bar - (s.gapLastBeat ? beat : 0);
     if (s.pad) {
-      const chord = (t) => 0.05 * (Math.sin(2 * Math.PI * 220 * t) + Math.sin(2 * Math.PI * 261.6 * t) + Math.sin(2 * Math.PI * 329.6 * t));
+      const chord = (t) =>
+        0.05 *
+        (Math.sin(2 * Math.PI * 220 * t) + Math.sin(2 * Math.PI * 261.6 * t) + Math.sin(2 * Math.PI * 329.6 * t));
       add(barT, len, (t) => g * chord(barT + t)); // continuous phase: no click at each bar line
     }
     if (s.sub) add(barT, len, (t) => g * 0.3 * Math.sin(2 * Math.PI * 45 * (barT + t)));
     if (s.riser) {
       let prev = 0;
-      add(barT, len, (t) => { const n = noise(); const hp = n - prev; prev = n; return g * hp * 0.2 * s.riser * (0.6 + 0.4 * t / bar); });
+      add(barT, len, (t) => {
+        const n = noise();
+        const hp = n - prev;
+        prev = n;
+        return g * hp * 0.2 * s.riser * (0.6 + (0.4 * t) / bar);
+      });
     }
-    if (s.roll) for (let k = 0; k < (s.gapLastBeat ? (s.roll * 3) / 4 : s.roll); k++) clap(barT + (k * bar) / s.roll, g);
+    if (s.roll)
+      for (let k = 0; k < (s.gapLastBeat ? (s.roll * 3) / 4 : s.roll); k++) clap(barT + (k * bar) / s.roll, g);
   });
   return { audio: out, barTime: (n) => leadIn + n * bar, beat, bar, end };
 }
@@ -83,22 +107,33 @@ function fft(re, im) {
     let bit = n >> 1;
     for (; j & bit; bit >>= 1) j ^= bit;
     j ^= bit;
-    if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+    if (i < j) {
+      [re[i], re[j]] = [re[j], re[i]];
+      [im[i], im[j]] = [im[j], im[i]];
+    }
   }
   for (let len = 2; len <= n; len <<= 1) {
     const ang = (-2 * Math.PI) / len;
     for (let i = 0; i < n; i += len) {
       for (let k = 0; k < len / 2; k++) {
-        const wr = Math.cos(ang * k), wi = Math.sin(ang * k);
-        const a = i + k, b = i + k + len / 2;
-        const xr = re[b] * wr - im[b] * wi, xi = re[b] * wi + im[b] * wr;
-        re[b] = re[a] - xr; im[b] = im[a] - xi;
-        re[a] += xr; im[a] += xi;
+        const wr = Math.cos(ang * k),
+          wi = Math.sin(ang * k);
+        const a = i + k,
+          b = i + k + len / 2;
+        const xr = re[b] * wr - im[b] * wi,
+          xi = re[b] * wi + im[b] * wr;
+        re[b] = re[a] - xr;
+        im[b] = im[a] - xi;
+        re[a] += xr;
+        im[a] += xi;
       }
     }
   }
 }
-const blackman = Float64Array.from({ length: N }, (_, n) => 0.42 - 0.5 * Math.cos((2 * Math.PI * n) / N) + 0.08 * Math.cos((4 * Math.PI * n) / N));
+const blackman = Float64Array.from(
+  { length: N },
+  (_, n) => 0.42 - 0.5 * Math.cos((2 * Math.PI * n) / N) + 0.08 * Math.cos((4 * Math.PI * n) / N),
+);
 
 /** Run the analysis over `audio` at a jittery ~60 fps; returns what it saw. */
 export function analyse(audio, opts = {}) {
@@ -124,7 +159,15 @@ export function analyse(audio, opts = {}) {
     for (const b of out.beats) seen.beats.push({ ...b, locked: out.locked });
     if (out.kick) seen.kicks.push(t);
     if (out.hat) seen.hats++;
-    seen.frames.push({ t, bpm: out.bpm, locked: out.locked, state: out.state, build: out.build, intensity: out.intensity, dropScore: out.dropScore });
+    seen.frames.push({
+      t,
+      bpm: out.bpm,
+      locked: out.locked,
+      state: out.state,
+      build: out.build,
+      intensity: out.intensity,
+      dropScore: out.dropScore,
+    });
   }
   return seen;
 }

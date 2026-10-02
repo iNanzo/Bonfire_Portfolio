@@ -49,7 +49,10 @@ export function estimateTempo(x, { min = 70, max = 185, center = 125, width = 0.
   let bestS = -Infinity;
   for (let L = lo; L <= hi; L++) {
     const s = score(L);
-    if (s > bestS) { bestS = s; best = L; }
+    if (s > bestS) {
+      bestS = s;
+      best = L;
+    }
   }
   // Refine on the raw autocorrelation around the pick.
   const a = ac[best - 1] ?? ac[best];
@@ -61,7 +64,7 @@ export function estimateTempo(x, { min = 70, max = 185, center = 125, width = 0.
 }
 
 /** Time since the most recent beat (s), from a comb over `x` (oldest → newest) at `period` s. */
-export function estimatePhase(x, period) {
+function estimatePhase(x, period) {
   const L = period * RATE;
   const n = x.length;
   let best = 0;
@@ -77,7 +80,10 @@ export function estimatePhase(x, period) {
       w *= 0.85; // recent beats count most, so a slightly-off tempo doesn't drag the phase
     }
     sums.push(s);
-    if (s > bestS) { bestS = s; best = phi; }
+    if (s > bestS) {
+      bestS = s;
+      best = phi;
+    }
   }
   const m = sums.length;
   const a = sums[(best - 1 + m) % m];
@@ -89,21 +95,21 @@ export function estimatePhase(x, period) {
 
 export function createTempoTracker({ min = 70, max = 185 } = {}) {
   const env = new Float32Array(BUFFER);
-  let head = 0;       // next slot to write
+  let head = 0; // next slot to write
   let filled = 0;
-  let slotTime = -1;  // time at the start of the slot being accumulated
+  let slotTime = -1; // time at the start of the slot being accumulated
   let acc = 0;
   let lastEstimate = -1;
 
   // Beat grid.
-  let period = 0;      // s; 0 while unknown
-  let grid = 0;        // time of a beat on the grid
+  let period = 0; // s; 0 while unknown
+  let grid = 0; // time of a beat on the grid
   let strength = 0;
   let tempoMiss = 0;
   let phaseMiss = 0;
   let pendingPeriod = 0;
   let lastBeat = -Infinity;
-  let count = 0;       // beats since the anchor; count % 4 === 0 is a downbeat
+  let count = 0; // beats since the anchor; count % 4 === 0 is a downbeat
   let anchoredAt = -Infinity;
   let anchorPending = false; // anchored before the tempo was known: count from it once it is
   let manualUntil = -Infinity;
@@ -158,12 +164,19 @@ export function createTempoTracker({ min = 70, max = 185 } = {}) {
 
     // Tempo: ease small changes in; a different tempo must hold for a second first.
     if (!manual && !steady && (clear || !period)) {
-      if (!period) { period = est.period; phaseMiss = 99; } // first lock: take the comb's phase outright
+      if (!period) {
+        period = est.period;
+        phaseMiss = 99;
+      } // first lock: take the comb's phase outright
       // Close to the current tempo, the phase loop below fine-tunes it (the autocorrelation
       // peak is a little broad to trust for the last fraction of a percent).
-      else if (Math.abs(est.period / period - 1) < 0.015) { period += (est.period - period) * 0.03; tempoMiss = 0; }
-      else if (Math.abs(est.period / period - 1) < 0.04) { period += (est.period - period) * 0.25; tempoMiss = 0; }
-      else if (pendingPeriod && Math.abs(est.period / pendingPeriod - 1) < 0.03) {
+      else if (Math.abs(est.period / period - 1) < 0.015) {
+        period += (est.period - period) * 0.03;
+        tempoMiss = 0;
+      } else if (Math.abs(est.period / period - 1) < 0.04) {
+        period += (est.period - period) * 0.25;
+        tempoMiss = 0;
+      } else if (pendingPeriod && Math.abs(est.period / pendingPeriod - 1) < 0.03) {
         if (++tempoMiss >= 4) {
           period = est.period;
           tempoMiss = 0;
@@ -171,7 +184,10 @@ export function createTempoTracker({ min = 70, max = 185 } = {}) {
           // Bars counted at the old tempo mean nothing at the new one: count again from the anchor.
           if (anchoredAt > -Infinity) anchorPending = true;
         }
-      } else { pendingPeriod = est.period; tempoMiss = 1; }
+      } else {
+        pendingPeriod = est.period;
+        tempoMiss = 1;
+      }
     }
     if (!period) return;
 
@@ -187,8 +203,10 @@ export function createTempoTracker({ min = 70, max = 185 } = {}) {
       // A grid that keeps running late or early has the wrong tempo: nudge it.
       if (!manual && !steady && clear) period += err * 0.04;
       phaseMiss = 0;
+    } else if (!steady && ++phaseMiss >= 4) {
+      grid = beatAt;
+      phaseMiss = 0;
     }
-    else if (!steady && ++phaseMiss >= 4) { grid = beatAt; phaseMiss = 0; }
   }
 
   /**
@@ -210,7 +228,10 @@ export function createTempoTracker({ min = 70, max = 185 } = {}) {
       const k = Math.ceil((from - grid) / period);
       const time = grid + k * period;
       if (time > now + lead) break;
-      if (anchorPending) { count = Math.max(0, Math.round((time - anchoredAt) / period)); anchorPending = false; }
+      if (anchorPending) {
+        count = Math.max(0, Math.round((time - anchoredAt) / period));
+        anchorPending = false;
+      }
       if (wrap(count, 4) === 0) chooseDownbeat(now);
       const c = count++;
       out.push({ time, count: c, beat: wrap(c, 4), bar: Math.floor(c / 4) });
@@ -237,7 +258,11 @@ export function createTempoTracker({ min = 70, max = 185 } = {}) {
   function anchor(time) {
     anchoredAt = time;
     slotChange.fill(0);
-    if (!period || lastBeat === -Infinity) { count = 0; anchorPending = true; return; }
+    if (!period || lastBeat === -Infinity) {
+      count = 0;
+      anchorPending = true;
+      return;
+    }
     // The next emitted beat's count follows from how far it is from `time`.
     const nextBeat = lastBeat + period;
     const beatsAhead = Math.round((nextBeat - time) / period);
@@ -277,7 +302,11 @@ export function createTempoTracker({ min = 70, max = 185 } = {}) {
     taps = [];
   }
   /** Back to following the music. */
-  function clearManual() { manualUntil = -Infinity; mode = null; taps = []; }
+  function clearManual() {
+    manualUntil = -Infinity;
+    mode = null;
+    taps = [];
+  }
   /** Shift the beat grid by `seconds` (a phase nudge: positive = beats land later). */
   function nudge(seconds) {
     if (!period) return;
@@ -300,28 +329,63 @@ export function createTempoTracker({ min = 70, max = 185 } = {}) {
       anchoredAt = time;
     }
     // Keep the bar where the session has it.
-    const want = ((whole + 1) % quantum + quantum) % quantum;
+    const want = (((whole + 1) % quantum) + quantum) % quantum;
     const have = ((count % 4) + 4) % 4;
-    if (want !== have) count += ((want - have) % 4 + 4) % 4;
+    if (want !== have) count += (((want - have) % 4) + 4) % 4;
     manualUntil = time + 2;
     mode = 'link';
   }
 
   function reset() {
-    env.fill(0); head = 0; filled = 0; slotTime = -1; acc = 0; lastEstimate = -1;
-    period = 0; grid = 0; strength = 0; tempoMiss = 0; phaseMiss = 0; pendingPeriod = 0;
-    lastBeat = -Infinity; count = 0; anchoredAt = -Infinity; anchorPending = false; manualUntil = -Infinity; taps = []; mode = null;
+    env.fill(0);
+    head = 0;
+    filled = 0;
+    slotTime = -1;
+    acc = 0;
+    lastEstimate = -1;
+    period = 0;
+    grid = 0;
+    strength = 0;
+    tempoMiss = 0;
+    phaseMiss = 0;
+    pendingPeriod = 0;
+    lastBeat = -Infinity;
+    count = 0;
+    anchoredAt = -Infinity;
+    anchorPending = false;
+    manualUntil = -Infinity;
+    taps = [];
+    mode = null;
     slotChange.fill(0);
   }
 
   return {
-    push, estimate, tick, anchor, tap, reset, setManual, clearManual, nudge, external,
-    get bpm() { return period ? 60 / period : 0; },
-    get period() { return period; },
+    push,
+    estimate,
+    tick,
+    anchor,
+    tap,
+    reset,
+    setManual,
+    clearManual,
+    nudge,
+    external,
+    get bpm() {
+      return period ? 60 / period : 0;
+    },
+    get period() {
+      return period;
+    },
     /** 0..1: how periodic the onsets are (≥ ~0.2 reads as a steady beat). */
-    get strength() { return strength; },
+    get strength() {
+      return strength;
+    },
     /** Who's setting the tempo instead of the music ('tap', 'manual', 'link'), or null. */
-    get manual() { return mode && slotTime < manualUntil ? mode : null; },
-    get count() { return count; },
+    get manual() {
+      return mode && slotTime < manualUntil ? mode : null;
+    },
+    get count() {
+      return count;
+    },
   };
 }

@@ -17,13 +17,22 @@ const PATH = 'M-15 78V27M-15 27L-4.5 68M-4.5 68V2M4.5 2V68M15 27V78M-27.5 47H27.
  */
 export function strokesOf(d) {
   const out = [];
-  let x = 0, y = 0;
+  let x = 0,
+    y = 0;
   for (const [, cmd, args] of d.matchAll(/([MLHV])([^MLHV]*)/g)) {
-    const n = args.trim().split(/[\s,]+/).filter(Boolean).map(Number);
-    if (cmd === 'M') { [x, y] = n; continue; }
+    const n = args
+      .trim()
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map(Number);
+    if (cmd === 'M') {
+      [x, y] = n;
+      continue;
+    }
     const [nx, ny] = cmd === 'L' ? n : cmd === 'H' ? [n[0], y] : [x, n[0]];
     out.push([x, y, nx, ny]);
-    x = nx; y = ny;
+    x = nx;
+    y = ny;
   }
   return out;
 }
@@ -32,7 +41,12 @@ export function strokesOf(d) {
 export const LOGO_STROKES = strokesOf(PATH);
 /** The strokes' extent in the path's units: [xMin, yMin, xMax, yMax]. */
 export const LOGO_BOUNDS = LOGO_STROKES.reduce(
-  (b, [x0, y0, x1, y1]) => [Math.min(b[0], x0, x1), Math.min(b[1], y0, y1), Math.max(b[2], x0, x1), Math.max(b[3], y0, y1)],
+  (b, [x0, y0, x1, y1]) => [
+    Math.min(b[0], x0, x1),
+    Math.min(b[1], y0, y1),
+    Math.max(b[2], x0, x1),
+    Math.max(b[3], y0, y1),
+  ],
   [Infinity, Infinity, -Infinity, -Infinity],
 );
 
@@ -48,10 +62,20 @@ export const LOGO_BOUNDS = LOGO_STROKES.reduce(
 export function logoBars(height, stroke) {
   const [x0, y0, x1, y1] = LOGO_BOUNDS;
   const k = height / (y1 - y0);
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const cx = (x0 + x1) / 2,
+    cy = (y0 + y1) / 2;
   return LOGO_STROKES.map(([ax, ay, bx, by]) => {
-    const u0 = (ax - cx) * k, v0 = (cy - ay) * k, u1 = (bx - cx) * k, v1 = (cy - by) * k;
-    return { u: (u0 + u1) / 2, v: (v0 + v1) / 2, len: Math.hypot(u1 - u0, v1 - v0), angle: Math.atan2(v1 - v0, u1 - u0), width: stroke };
+    const u0 = (ax - cx) * k,
+      v0 = (cy - ay) * k,
+      u1 = (bx - cx) * k,
+      v1 = (cy - by) * k;
+    return {
+      u: (u0 + u1) / 2,
+      v: (v0 + v1) / 2,
+      len: Math.hypot(u1 - u0, v1 - v0),
+      angle: Math.atan2(v1 - v0, u1 - u0),
+      width: stroke,
+    };
   });
 }
 

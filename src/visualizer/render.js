@@ -24,14 +24,26 @@ import { modeOf } from './looks.js';
 import { pick } from '../math.js';
 
 /** The palettes the picture can be drawn in (the scene's setPalette). */
-export const PALETTES = { flame: 'The flame’s colors', ashen: 'Ashen (3 colors)', moonlit: 'Moonlit (4 colors)' };
+export const PALETTES = { flame: 'The Flame’s Colors', ashen: 'Ashen (3 Colors)', moonlit: 'Moonlit (4 Colors)' };
 /**
  * Few-color palettes the Few Colors switch rolls: the two fixed ones, or a few of the
  * flame's own, as slots of the scene palette (0 void, 1 shadow, 2 stone, 3 wood, 4 bone,
  * 5–8 the flame's ramp lo → core, 9 its shade; the first is the darkest, for the outlines).
  */
-export const FEW_PALETTES = ['ashen', 'moonlit', [0, 6, 8], [0, 5, 7], [0, 9, 7], [0, 1, 6, 8], [0, 2, 7, 8], [0, 5, 6, 8], [0, 7]];
-export const FOGS = { off: 'Off', light: 'Light (as on the site)', thick: 'Thick' };
+export const FEW_PALETTES = [
+  'ashen',
+  'moonlit',
+  [0, 6, 8],
+  [0, 5, 7],
+  [0, 9, 7],
+  [0, 1, 6, 8],
+  [0, 2, 7, 8],
+  [0, 5, 6, 8],
+  [0, 7],
+];
+/** The fog's kinds (Light is the site's: the settings' hints say so). */
+export const FOGS = { off: 'Off', light: 'Light', thick: 'Thick' };
+/** The pixel sizes a menu offers: one list for every app (import it rather than keeping another). */
 export const PIXEL_SIZES = [2, 3, 4, 6, 8];
 export const FLAME_FPS = [8, 12, 24, 60];
 /** The x-ray's views (the scene's setXray). */
@@ -47,11 +59,14 @@ const FLIP_START = [0, 0, 0, 1, 2];
  */
 export function renderState(s, live = null) {
   const lit = (key) => live?.[key] ?? modeOf(s[key]) !== 'off';
-  const slots = Array.isArray(s.palette) && s.palette.length >= 2 && s.palette.every((i) => Number.isInteger(i) && i >= 0 && i <= 9);
+  const slots =
+    Array.isArray(s.palette) &&
+    s.palette.length >= 2 &&
+    s.palette.every((i) => Number.isInteger(i) && i >= 0 && i <= 9);
   return {
     pixelSize: live?.pixelSize ?? s.pixelSize,
     dither: s.dither,
-    ditherMatrix: s.ditherMatrix === 'mix' ? live?.matrix ?? 4 : String(s.ditherMatrix) === '8' ? 8 : 4,
+    ditherMatrix: s.ditherMatrix === 'mix' ? (live?.matrix ?? 4) : String(s.ditherMatrix) === '8' ? 8 : 4,
     outlines: lit('outlines'),
     vignette: s.vignette,
     exposure: s.exposure,
@@ -62,23 +77,83 @@ export function renderState(s, live = null) {
     debris: lit('debris'),
     marks: lit('marks'),
     palette: live?.few ?? (slots ? [...s.palette] : PALETTES[s.palette] ? s.palette : 'flame'),
-    fog: s.fog === 'mix' ? live?.fog ?? 'light' : FOGS[s.fog] ? s.fog : 'light',
+    fog: s.fog === 'mix' ? (live?.fog ?? 'light') : FOGS[s.fog] ? s.fog : 'light',
     shadows: s.shadows !== false,
     xray: live?.xray ?? (XRAY_VIEWS[s.xrayView] ? s.xrayView : null),
   };
 }
 
-const SET_RENDER = ['pixelSize', 'dither', 'ditherMatrix', 'outlines', 'vignette', 'exposure', 'colorChange', 'flameFps', 'hitStop', 'hitFlash', 'debris', 'marks'];
-const applied = new WeakMap(); // per scene: the state it was last sent
+const SET_RENDER = [
+  'pixelSize',
+  'dither',
+  'ditherMatrix',
+  'outlines',
+  'vignette',
+  'exposure',
+  'colorChange',
+  'flameFps',
+  'hitStop',
+  'hitFlash',
+  'debris',
+  'marks',
+];
+/**
+ * Everything renderState reads: the settings' keys and the render show's rolls (exported for
+ * the tests, which hold renderState to it).
+ */
+export const RENDER_READS = {
+  settings: [
+    'pixelSize',
+    'dither',
+    'ditherMatrix',
+    'outlines',
+    'vignette',
+    'exposure',
+    'colorChange',
+    'flameFps',
+    'hitStop',
+    'hitFlash',
+    'debris',
+    'marks',
+    'palette',
+    'fog',
+    'shadows',
+    'xrayView',
+  ],
+  live: ['outlines', 'hitStop', 'hitFlash', 'debris', 'marks', 'pixelSize', 'matrix', 'few', 'fog', 'xray'],
+};
+// (A value as it was read: a list of palette slots is copied, so one changed in place shows.)
+const same = (a, b) => {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
+function unchanged(seen, settings, live) {
+  if (seen.live !== !!live) return false;
+  for (const k of RENDER_READS.settings) if (!same(seen.settings[k], settings[k])) return false;
+  if (live) for (const k of RENDER_READS.live) if (!same(seen.rolls[k], live[k])) return false;
+  return true;
+}
+function remember(seen, settings, live) {
+  seen.live = !!live;
+  for (const k of RENDER_READS.settings) seen.settings[k] = Array.isArray(settings[k]) ? [...settings[k]] : settings[k];
+  if (live) for (const k of RENDER_READS.live) seen.rolls[k] = Array.isArray(live[k]) ? [...live[k]] : live[k];
+}
+const applied = new WeakMap(); // per scene: { state: the state it was last sent, seen: what that was worked out from }
 /**
  * Every Render setting onto the scene (`live`: the render show's current rolls; without,
  * each switch in the mix rests as renderState says). Only what changed since the last call
- * for this scene is sent, so it's cheap every frame and a new scene gets everything.
+ * for this scene is sent, so a new scene gets everything. The render show calls it every
+ * frame, and most frames nothing it reads has changed: then it's done before working out
+ * anything (no state, no strings to compare).
  */
 export function applyRenderSettings(fire, settings, live = null) {
   if (!fire) return;
+  const last = applied.get(fire);
+  if (last && unchanged(last.seen, settings, live)) return;
   const want = renderState(settings, live);
-  const was = applied.get(fire) ?? {};
+  const was = last?.state ?? {};
   const changed = (k) => String(want[k]) !== String(was[k]);
   const partial = Object.fromEntries(SET_RENDER.filter(changed).map((k) => [k, want[k]]));
   if (Object.keys(partial).length) fire.setRender(partial);
@@ -86,7 +161,9 @@ export function applyRenderSettings(fire, settings, live = null) {
   if (changed('fog')) fire.setFog(want.fog);
   if (changed('shadows')) fire.setShadows(want.shadows);
   if (changed('xray')) fire.setXray(want.xray);
-  applied.set(fire, want);
+  const seen = last?.seen ?? { live: false, settings: {}, rolls: {} };
+  remember(seen, settings, live);
+  applied.set(fire, { state: want, seen });
 }
 /**
  * Forget what the scene was last sent, so the next apply sends everything (after anything
@@ -97,7 +174,7 @@ export function forgetApplied(fire) {
 }
 
 // The steps a render menu (P) walks each setting through, and how it shows them.
-const SWITCH = { off: 'off', mix: 'in the mix', on: 'always' };
+const SWITCH = { off: 'Off', mix: 'In the Mix', on: 'Always' };
 export const RENDER_STEPS = {
   pixelSize: PIXEL_SIZES,
   palette: Object.keys(PALETTES),
@@ -138,10 +215,10 @@ export function stepRender(settings, key, dir = 1) {
 export function renderText(settings, key) {
   const v = settings[key];
   if (key === 'pixelSize') return `${v} px`;
-  if (key === 'palette') return Array.isArray(v) ? `A scene’s ${v.length} colors` : PALETTES[v] ?? PALETTES.flame;
-  if (key === 'dither') return v ? Number(v).toFixed(2) : 'off';
+  if (key === 'palette') return Array.isArray(v) ? `A Scene’s ${v.length} Colors` : (PALETTES[v] ?? PALETTES.flame);
+  if (key === 'dither') return v ? Number(v).toFixed(2) : 'Off';
   if (key === 'ditherMatrix') return v === 'mix' ? '4×4 / 8×8' : `${v}×${v}`;
-  if (key === 'fog') return v === 'mix' ? 'a mix' : FOGS[v] ?? FOGS.light;
+  if (key === 'fog') return v === 'mix' ? 'A Mix' : (FOGS[v] ?? FOGS.light);
   if (key === 'flameFps') return `${v} fps`;
   return SWITCH[modeOf(v)] ?? String(v);
 }
@@ -160,12 +237,23 @@ export function shiftSize(base, not = base, rng = Math.random) {
  * xrayHit() when it throws the X-Ray hit. Times are in seconds (performance time).
  */
 export function createRenderShow(fire, settings, { looks, reducedMotion = false }) {
-  const live = { outlines: true, few: null, pixelSize: null, matrix: 4, fog: 'light', hitStop: true, hitFlash: true, debris: true, marks: true, xray: null };
+  const live = {
+    outlines: true,
+    few: null,
+    pixelSize: null,
+    matrix: 4,
+    fog: 'light',
+    hitStop: true,
+    hitFlash: true,
+    debris: true,
+    marks: true,
+    xray: null,
+  };
   const rolled = { few: FEW_PALETTES[0], matrix: 4, fog: 'light', xrayRate: 0.4 };
-  let turn = -1;        // the look's turn the details were rolled for
-  let firstTurn = -1;   // ...and the opening look's (the start screen and the intro)
+  let turn = -1; // the look's turn the details were rolled for
+  let firstTurn = -1; // ...and the opening look's (the start screen and the intro)
   let base = settings.pixelSize;
-  let flip = null;      // an x-ray flip: { view, start, end, hit (the drop's) }
+  let flip = null; // an x-ray flip: { view, start, end, hit (the drop's) }
   let lastView = null;
   const on = (key) => looks.active(key, settings[key]);
   const moving = () => !reducedMotion;
@@ -188,11 +276,18 @@ export function createRenderShow(fire, settings, { looks, reducedMotion = false 
 
   return {
     /** The current rolls (what renderState reads for the switches in the mix). */
-    get live() { return live; },
+    get live() {
+      return live;
+    },
     /** Send the scene everything as it stands now. */
-    apply() { applyRenderSettings(fire, settings, live); },
+    apply() {
+      applyRenderSettings(fire, settings, live);
+    },
     update(t) {
-      if (settings.pixelSize !== base) { base = settings.pixelSize; live.pixelSize = null; }
+      if (settings.pixelSize !== base) {
+        base = settings.pixelSize;
+        live.pixelSize = null;
+      }
       if (looks.turn !== turn) {
         const first = turn < 0;
         turn = looks.turn;
@@ -216,7 +311,8 @@ export function createRenderShow(fire, settings, { looks, reducedMotion = false 
      * and less in calm parts (`budget`, the director's).
      */
     bar(t, { period, sinceDrop, budget = 1 }) {
-      if (!moving() || !period || flip || sinceDrop < 1 || looks.turn !== turn || !on('xray') || !views().length) return;
+      if (!moving() || !period || flip || sinceDrop < 1 || looks.turn !== turn || !on('xray') || !views().length)
+        return;
       if (Math.random() > rolled.xrayRate * (0.4 + 0.6 * budget)) return;
       const beats = pick(FLIP_BEATS);
       flipTo(t + (beats === 4 ? 0 : pick(FLIP_START)) * period, beats, period);

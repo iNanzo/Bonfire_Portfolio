@@ -20,7 +20,15 @@
 // that leaves it more room.
 
 /** The clearing (meters, radians): the fire, the bearing limit, the radius and height limits. */
-export const CLEARING = { fire: [0.02, 0, 0.02], bearing: 1.75, maxR: 6.5, minR: 0.9, lowY: 1.7, minY: 0.25, maxY: 6.5 };
+export const CLEARING = {
+  fire: [0.02, 0, 0.02],
+  bearing: 1.75,
+  maxR: 6.5,
+  minR: 0.9,
+  lowY: 1.7,
+  minY: 0.25,
+  maxY: 6.5,
+};
 /** The camera moves a scene can have (their labels: scenes.js CAMERA_MOVES). */
 export const MOVE_KINDS = ['still', 'sway', 'sweep', 'push', 'crane', 'vertigo'];
 /** How many bars a move's cycle may take. */
@@ -88,7 +96,9 @@ function poseAt(base, kind, reach, side, u) {
     [dx, dz] = [dx * c - dz * s, dx * s + dz * c];
   } else if (kind === 'push' || kind === 'vertigo') {
     const k = 1 - reach * outBack(u);
-    dx *= k; dy *= k; dz *= k;
+    dx *= k;
+    dy *= k;
+    dz *= k;
     if (kind === 'vertigo') fov = (2 * Math.atan(Math.tan((base.fov * Math.PI) / 360) / k) * 180) / Math.PI;
   } else if (kind === 'crane') dy += reach * outBack(u);
   return { pos: [tx + dx, ty + dy, tz + dz], target: [tx, ty, tz], fov, roll: base.roll };
@@ -168,6 +178,7 @@ export function movePose(pin, t, beat) {
  */
 export function poseOnCycle(pin, u) {
   const m = fitMove(pin);
-  if (m.kind === 'still') return { pos: [...m.base.pos], target: [...m.base.target], fov: m.base.fov, roll: m.base.roll };
+  if (m.kind === 'still')
+    return { pos: [...m.base.pos], target: [...m.base.target], fov: m.base.fov, roll: m.base.roll };
   return poseAt(m.base, m.kind, m.reach, m.side, ((u % 1) + 1) % 1);
 }

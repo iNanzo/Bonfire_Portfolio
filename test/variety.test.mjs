@@ -55,7 +55,9 @@ test('recolored scenery: any flame, new colors each landing, readable; off bring
   const settings = { colors: 'site', scheme: 'auto', sceneColors: 'on' };
   const colors = createColors(settings);
   const site = { ...base };
-  const settle = () => { while (colors.update(0.05)); };
+  const settle = () => {
+    while (colors.update(0.05));
+  };
   const voids = new Set();
   for (const key of ['ember', 'ember', Object.keys(flames).find((k) => k !== 'ember')]) {
     colors.landed(key);
@@ -74,7 +76,11 @@ test('recolored scenery: any flame, new colors each landing, readable; off bring
   assert.deepEqual({ ...base }, site);
   settings.sceneColors = 'mix';
   let recolored = 0;
-  for (let i = 0; i < 60; i++) { colors.landed('ember'); settle(); if (colors.scenery) recolored++; }
+  for (let i = 0; i < 60; i++) {
+    colors.landed('ember');
+    settle();
+    if (colors.scenery) recolored++;
+  }
   assert.ok(recolored > 12 && recolored < 48, `in the mix: some flames (${recolored}/60)`);
   settings.sceneColors = 'off';
   colors.landed('ember');
@@ -85,7 +91,9 @@ test('a scene’s flame: registered, hidden, never pruned; its scenery colors he
   const settings = { colors: 'harmonious', scheme: 'auto', sceneColors: 'on' };
   const colors = createColors(settings);
   const site = { ...base };
-  const settle = () => { while (colors.update(0.05)); };
+  const settle = () => {
+    while (colors.update(0.05));
+  };
   const ramp = { lo: '#1a3050', mid: '#3070b0', hi: '#90d0ff', core: '#f0faff', shade: '#202838', light: 0.3 };
   const key = colors.register('scene-b-frozen', ramp);
   assert.equal(key, 'scene-b-frozen');
@@ -156,7 +164,8 @@ test('drops draw a different set of hits each time, only from those switched on'
 test('a drop hit shows up in the pixel pass, then clears', () => {
   const g = {};
   const looks = createLooks(g);
-  const frame = () => looks.update(1 / 60, { amt: 1, build: 0, low: false, energy: 0.5, mirror: 'off', scanlines: 'off' });
+  const frame = () =>
+    looks.update(1 / 60, { amt: 1, build: 0, low: false, energy: 0.5, mirror: 'off', scanlines: 'off' });
   frame();
   looks.drop({ iris: true }, 1);
   frame();
@@ -170,7 +179,8 @@ test('a drop hit shows up in the pixel pass, then clears', () => {
 
 const every = (mode, names) => Object.fromEntries(Object.keys(names).map((k) => [k, mode]));
 const offLayers = every('off', LAYERS);
-const frame = (looks, modes, dt = 0) => looks.update(dt, { amt: 1, build: 0, low: false, energy: 0.5, modes: { ...offLayers, ...modes } });
+const frame = (looks, modes, dt = 0) =>
+  looks.update(dt, { amt: 1, build: 0, low: false, energy: 0.5, modes: { ...offLayers, ...modes } });
 
 test('mirror and scanlines: off, in the mix, always', () => {
   const g = {};
@@ -260,7 +270,14 @@ test('layers: off, always, and a mix that re-rolls with each look, at most two h
   const looks = createLooks(g);
   const turns = { ...every('mix', LOOKS) };
   const heavy = { ghost: 'ghost', blur: 'blur', glow: 'glow', gradient: 'grad', flicker: 'flicker' };
-  const on = (k) => (k === 'paint' ? g.style === 1 : k === 'wash' ? g.style === 2 : k === 'flicker' ? g.flickerMode >= 0 && g.flicker > 0 : g[heavy[k]] > 0);
+  const on = (k) =>
+    k === 'paint'
+      ? g.style === 1
+      : k === 'wash'
+        ? g.style === 2
+        : k === 'flicker'
+          ? g.flickerMode >= 0 && g.flicker > 0
+          : g[heavy[k]] > 0;
   // Always: on every turn (the beat dip flicker needs a beat).
   for (let i = 0; i < 20; i++) {
     looks.next(turns);
@@ -286,7 +303,11 @@ test('layers: off, always, and a mix that re-rolls with each look, at most two h
   for (const [k, n] of Object.entries(seen)) assert.ok(n > 15 && n < 200, `${k} comes and goes (${n}/300)`);
   // The details change from turn to turn.
   const sizes = new Set();
-  for (let i = 0; i < 10; i++) { looks.next(turns); frame(looks, { looks: turns, glow: 'on' }); sizes.add(g.glowSize.toFixed(3)); }
+  for (let i = 0; i < 10; i++) {
+    looks.next(turns);
+    frame(looks, { looks: turns, glow: 'on' });
+    sizes.add(g.glowSize.toFixed(3));
+  }
   assert.ok(sizes.size > 5);
 });
 
@@ -297,7 +318,10 @@ test('blend modes: classic when off, rolled when on', () => {
   for (let i = 0; i < 10; i++) {
     looks.next(turns);
     frame(looks, { looks: turns, blend: 'off' });
-    assert.deepEqual([g.feedMode, g.ghostMode, g.warpMode, g.warpMix, g.inkMode, g.invertMode, g.scanBlend, g.glowMode], [BLEND.lighten, BLEND.normal, BLEND.normal, 1, BLEND.normal, BLEND.normal, BLEND.multiply, BLEND.add]);
+    assert.deepEqual(
+      [g.feedMode, g.ghostMode, g.warpMode, g.warpMix, g.inkMode, g.invertMode, g.scanBlend, g.glowMode],
+      [BLEND.lighten, BLEND.normal, BLEND.normal, 1, BLEND.normal, BLEND.normal, BLEND.multiply, BLEND.add],
+    );
   }
   const feeds = new Set();
   const warps = new Set();
@@ -306,7 +330,10 @@ test('blend modes: classic when off, rolled when on', () => {
     frame(looks, { looks: turns, blend: 'on' });
     feeds.add(g.feedMode);
     warps.add(g.warpMode);
-    assert.ok([BLEND.lighten, BLEND.screen, BLEND.difference, BLEND.exclusion].includes(g.feedMode), 'echoes only blend where black changes nothing');
+    assert.ok(
+      [BLEND.lighten, BLEND.screen, BLEND.difference, BLEND.exclusion].includes(g.feedMode),
+      'echoes only blend where black changes nothing',
+    );
     assert.ok(g.warpMix > 0.4 && g.warpMix < 1);
   }
   assert.ok(feeds.size >= 3 && warps.size >= 4);
@@ -327,22 +354,37 @@ test('the director’s effect switches: off, in the mix, always', () => {
 
 test('firefly moves: each keeps its own time, on the beat grid', () => {
   const darts = [];
-  const flies = Array.from({ length: 12 }, (_, i) => ({ mode: 'fly', orbit: null, pos: { x: Math.cos(i), y: 1, z: Math.sin(i) } }));
+  const flies = Array.from({ length: 12 }, (_, i) => ({
+    mode: 'fly',
+    orbit: null,
+    pos: { x: Math.cos(i), y: 1, z: Math.sin(i) },
+  }));
   const fl = {
-    flies, center: { x: 0, z: 0 },
-    dart: (f, dir, o) => { darts.push({ i: flies.indexOf(f), dir, ...o }); return true; },
-    dance() { darts.push({ dance: true }); },
+    flies,
+    center: { x: 0, z: 0 },
+    dart: (f, dir, o) => {
+      darts.push({ i: flies.indexOf(f), dir, ...o });
+      return true;
+    },
+    dance() {
+      darts.push({ dance: true });
+    },
     lift() {},
   };
   const moves = createFireflyMoves();
   const period = 0.5;
-  const run = (from, to) => { for (let b = from; b < to; b += 0.05) moves.update(fl, { beatPos: b, period, energy: 0.5 }); };
+  const run = (from, to) => {
+    for (let b = from; b < to; b += 0.05) moves.update(fl, { beatPos: b, period, energy: 0.5 });
+  };
   for (const name of Object.keys(FLY_MOVES).filter((k) => k !== 'swing')) {
     moves.set(name);
     darts.length = 0;
     run(0, 8);
     assert.ok(darts.length > 10, `${name} moves them`);
-    assert.ok(darts.every((d) => d.dur > 0 && d.dur <= 2 * period && d.dist > 0), `${name}: dashes fit the beat`);
+    assert.ok(
+      darts.every((d) => d.dur > 0 && d.dur <= 2 * period && d.dist > 0),
+      `${name}: dashes fit the beat`,
+    );
     if (name === 'compass') {
       const dirs = [...new Set(darts.map((d) => d.dir))];
       assert.deepEqual(dirs.sort(), ['down', 'left', 'right', 'up']);
@@ -360,7 +402,9 @@ test('firefly moves: each keeps its own time, on the beat grid', () => {
 
 test('firefly darts any way: every direction on the sphere, leaned back in when they stray', () => {
   const center = { x: 0, z: 0 };
-  let up = 0, down = 0, diagonal = 0;
+  let up = 0,
+    down = 0,
+    diagonal = 0;
   const headings = new Set();
   for (let i = 0; i < 2000; i++) {
     const d = anyDirection({ x: 0.5, y: 1, z: 0.3 }, center);
@@ -387,8 +431,15 @@ test('grain, cinema bars, spotlight and chroma split: off, always, in the mix, e
   const looks = createLooks(g);
   const turns = { ...every('mix', LOOKS), glitch: 'off', prism: 'off' }; // (their own tears and splits aside)
   const NEW = ['grain', 'cinema', 'spotlight', 'chroma'];
-  const settle = (modes) => { for (let i = 0; i < 90; i++) frame(looks, { looks: turns, ...modes }, 1 / 30); };
-  const lit = { grain: () => g.noise > 0.05, cinema: () => g.letterbox > 0.05, spotlight: () => g.iris < 1, chroma: () => g.split >= 1 };
+  const settle = (modes) => {
+    for (let i = 0; i < 90; i++) frame(looks, { looks: turns, ...modes }, 1 / 30);
+  };
+  const lit = {
+    grain: () => g.noise > 0.05,
+    cinema: () => g.letterbox > 0.05,
+    spotlight: () => g.iris < 1,
+    chroma: () => g.split >= 1,
+  };
   for (const k of NEW) {
     looks.next(turns);
     settle({ [k]: 'on' });
@@ -415,13 +466,27 @@ test('the new framing layers keep the breakdown’s bars and the drop’s snaps'
   const looks = createLooks(g);
   const turns = { ...every('mix', LOOKS) };
   looks.next(turns);
-  for (let i = 0; i < 90; i++) looks.update(1 / 30, { amt: 1, build: 0.9, low: true, energy: 0.5, modes: { ...offLayers, looks: turns } });
+  for (let i = 0; i < 90; i++)
+    looks.update(1 / 30, { amt: 1, build: 0.9, low: true, energy: 0.5, modes: { ...offLayers, looks: turns } });
   const barsOnly = g.letterbox;
   assert.ok(barsOnly > 0.05 && g.iris < 1, 'a breakdown frames itself');
-  for (let i = 0; i < 90; i++) looks.update(1 / 30, { amt: 1, build: 0.9, low: true, energy: 0.5, modes: { ...offLayers, looks: turns, cinema: 'on', spotlight: 'on' } });
+  for (let i = 0; i < 90; i++)
+    looks.update(1 / 30, {
+      amt: 1,
+      build: 0.9,
+      low: true,
+      energy: 0.5,
+      modes: { ...offLayers, looks: turns, cinema: 'on', spotlight: 'on' },
+    });
   assert.ok(g.letterbox >= barsOnly - 1e-9, 'whichever bars are taller win');
   looks.drop({ iris: 'on' }, 1);
-  looks.update(1 / 60, { amt: 1, build: 0, low: false, energy: 0.5, modes: { ...offLayers, looks: turns, spotlight: 'on' } });
+  looks.update(1 / 60, {
+    amt: 1,
+    build: 0,
+    low: false,
+    energy: 0.5,
+    modes: { ...offLayers, looks: turns, spotlight: 'on' },
+  });
   assert.ok(g.iris < 0.2, 'the drop’s iris snap still shuts it');
 });
 

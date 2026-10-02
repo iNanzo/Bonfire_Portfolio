@@ -22,7 +22,12 @@ export function createDemo(ctx, output) {
   const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const nd = noise.getChannelData(0);
   for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-  const noiseSource = () => { const s = ctx.createBufferSource(); s.buffer = noise; s.loop = true; return s; };
+  const noiseSource = () => {
+    const s = ctx.createBufferSource();
+    s.buffer = noise;
+    s.loop = true;
+    return s;
+  };
 
   function env(gain, t, peak, attack, decay) {
     gain.gain.setValueAtTime(0.0001, t);
@@ -36,41 +41,54 @@ export function createDemo(ctx, output) {
     o.frequency.exponentialRampToValueAtTime(46, t + 0.11);
     env(g, t, 1, 0.002, 0.32);
     o.connect(g).connect(master);
-    o.start(t); o.stop(t + 0.4);
+    o.start(t);
+    o.stop(t + 0.4);
   }
   function hat(t, open = false) {
     const s = noiseSource();
     const f = ctx.createBiquadFilter();
-    f.type = 'highpass'; f.frequency.value = 7500;
+    f.type = 'highpass';
+    f.frequency.value = 7500;
     const g = ctx.createGain();
     env(g, t, open ? 0.22 : 0.16, 0.001, open ? 0.22 : 0.035);
     s.connect(f).connect(g).connect(master);
-    s.start(t, Math.random()); s.stop(t + 0.3);
+    s.start(t, Math.random());
+    s.stop(t + 0.3);
   }
   function clap(t) {
     const s = noiseSource();
     const f = ctx.createBiquadFilter();
-    f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 0.9;
+    f.type = 'bandpass';
+    f.frequency.value = 1400;
+    f.Q.value = 0.9;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    for (const [dt, v] of [[0, 0.5], [0.012, 0.35], [0.024, 0.55]]) {
+    for (const [dt, v] of [
+      [0, 0.5],
+      [0.012, 0.35],
+      [0.024, 0.55],
+    ]) {
       g.gain.exponentialRampToValueAtTime(v, t + dt + 0.001);
       g.gain.exponentialRampToValueAtTime(0.05, t + dt + 0.01);
     }
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
     s.connect(f).connect(g).connect(master);
-    s.start(t, Math.random()); s.stop(t + 0.25);
+    s.start(t, Math.random());
+    s.stop(t + 0.25);
   }
   function bass(t, freq) {
     const o = ctx.createOscillator();
     o.type = 'sawtooth';
     o.frequency.value = freq;
     const f = ctx.createBiquadFilter();
-    f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(180, t + 0.18);
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(900, t);
+    f.frequency.exponentialRampToValueAtTime(180, t + 0.18);
     const g = ctx.createGain();
     env(g, t, 0.32, 0.005, 0.2);
     o.connect(f).connect(g).connect(master);
-    o.start(t); o.stop(t + 0.25);
+    o.start(t);
+    o.stop(t + 0.25);
   }
   function pad(t, dur) {
     const g = ctx.createGain();
@@ -79,21 +97,27 @@ export function createDemo(ctx, output) {
     g.gain.setValueAtTime(0.09, t + dur - 0.3);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     const f = ctx.createBiquadFilter();
-    f.type = 'lowpass'; f.frequency.setValueAtTime(700, t); f.frequency.exponentialRampToValueAtTime(2600, t + dur);
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(700, t);
+    f.frequency.exponentialRampToValueAtTime(2600, t + dur);
     f.connect(g).connect(master);
     for (const hz of [220, 261.63, 329.63, 440]) {
       for (const det of [-7, 7]) {
         const o = ctx.createOscillator();
-        o.type = 'sawtooth'; o.frequency.value = hz; o.detune.value = det;
+        o.type = 'sawtooth';
+        o.frequency.value = hz;
+        o.detune.value = det;
         o.connect(f);
-        o.start(t); o.stop(t + dur);
+        o.start(t);
+        o.stop(t + dur);
       }
     }
   }
   function riser(t, dur) {
     const s = noiseSource();
     const f = ctx.createBiquadFilter();
-    f.type = 'bandpass'; f.Q.value = 2;
+    f.type = 'bandpass';
+    f.Q.value = 2;
     f.frequency.setValueAtTime(300, t);
     f.frequency.exponentialRampToValueAtTime(9000, t + dur);
     const g = ctx.createGain();
@@ -101,7 +125,8 @@ export function createDemo(ctx, output) {
     g.gain.exponentialRampToValueAtTime(0.3, t + dur);
     g.gain.linearRampToValueAtTime(0, t + dur + 0.01);
     s.connect(f).connect(g).connect(master);
-    s.start(t); s.stop(t + dur + 0.02);
+    s.start(t);
+    s.stop(t + dur + 0.02);
   }
 
   const BASSLINE = [55, 55, 65.41, 49];

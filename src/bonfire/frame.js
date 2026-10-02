@@ -1,4 +1,4 @@
-// Drawing a frame (scene.js calls draw() once per frame), all at low resolution:
+// Drawing a frame (sceneUpdate.js calls draw() once per frame), all at low resolution:
 //   1. normals — outlined solid geometry → view-space normals + depth
 //   2. color   — solid geometry + "ghost" emissives (candle flames, dissolving weapons)
 //                → linear color + depth
@@ -8,19 +8,21 @@
 // With `effects` (the visualizer) the pixel pass carries its effects layer and the stages
 // the heavier effects need: frame feedback for the echo (the pass reads the last frame
 // from one buffer while writing the other, then a copy puts it on screen), and the scene
-// drawn into its own image (mipmapped, for the glow), maybe repainted, with a ghost trail
-// kept beside it. With the effects the scene is always drawn into that image first and the
-// final pass reads it (never the all-in-one pass: with the effects' warps and splits it
-// builds the scene four times over, and its shader takes seconds to compile). Without them
-// (the site) none of those buffers is sized or drawn: the one pass does it all.
+// drawn into its own image (mipmapped for the glow, the mipmaps made only while it shows),
+// maybe repainted, with a ghost trail kept beside it. With the effects the scene is always
+// drawn into that image first and the final pass reads it (never the all-in-one pass: with
+// the effects' warps and splits it builds the scene four times over, and its shader takes
+// seconds to compile). Without them (the site) none of those buffers is sized or drawn: the
+// one pass does it all.
 //
-// After the last pass, while the canvas still holds the frame, photo mode's captures
-// are taken and onRendered's listeners run (recording a clip). Before the first frame,
-// compile() builds the shaders in parallel (where the browser can), so it doesn't stall:
-// the ones the first frame draws with are waited for, the rest (the effects' other stages,
-// the knight's shadow for when he first comes) build on in the background.
+// After the last pass, while the canvas still holds the frame, photo mode's captures and
+// scene thumbnails are taken and onRendered's listeners run (recording a clip). Before the
+// first frame, compile() builds the shaders in parallel (where the browser can), so it
+// doesn't stall: the ones the first frame draws with are waited for, the rest (the effects'
+// other stages, the knight's shadow for when he first comes) build on in the background.
 import * as THREE from 'three';
 import { createPixelPass } from './pixelPass.js';
+import { createSetCache, KEEP_SETS } from './targetCache.js';
 
 /**
  * @param {object} o
@@ -36,58 +38,138 @@ import { createPixelPass } from './pixelPass.js';
 export function createFrame({ renderer, scene, camera, layers, voidColor, effects = false, own, track }) {
   const canvas = renderer.domElement;
   const rtOpts = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter };
-  const colorRT = own(new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(1, 1) }));
-  const normalRT = own(new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, depthTexture: new THREE.DepthTexture(1, 1) }));
-  const fxRT = own(new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, type: THREE.HalfFloatType, depthBuffer: false }));
+  // The render targets come in sets, one per size (makeTargets, setSize): these are the
+  // current set's.
+  let colorRT, normalRT, fxRT;
+  // The scene's world matrices are brought up to date once a frame, at the start of draw(),
+  // not by each of its three renders (and the scene itself never moves): nothing moves
+  // between the passes, and three.js walked the whole graph again for each one.
+  scene.matrixAutoUpdate = false;
+  scene.matrixWorldAutoUpdate = false;
   const normalMaterial = own(new THREE.MeshNormalMaterial({ flatShading: true }));
   const pass = createPixelPass({ effects });
   for (const m of Object.values(pass.materials)) own(m);
   track(pass.scene);
   const u = pass.uniforms;
-  u.tColor.value = colorRT.texture;
-  u.tDepth.value = colorRT.depthTexture;
-  u.tNormal.value = normalRT.texture;
-  u.tNormalDepth.value = normalRT.depthTexture;
-  u.tFx.value = fxRT.texture;
   u.cameraNear.value = camera.near;
   u.cameraFar.value = camera.far;
 
   // --- The visualizer's stages (only with `effects`).
   const fx = effects ? createStages() : null;
   function createStages() {
-    const feedbackRT = [0, 1].map(() => own(new THREE.WebGLRenderTarget(1, 1, { ...rtOpts, depthBuffer: false })));
     const copyScene = new THREE.Scene();
-    const copyMaterial = own(new THREE.ShaderMaterial({
-      uniforms: { map: { value: null }, resolution: u.resolution },
-      vertexShader: 'void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
-      fragmentShader: 'uniform sampler2D map; uniform vec2 resolution; void main() { gl_FragColor = texture2D(map, gl_FragCoord.xy / resolution); }',
-      depthTest: false, depthWrite: false,
-    }));
+    const copyMaterial = own(
+      new THREE.ShaderMaterial({
+        uniforms: { map: { value: null }, resolution: u.resolution },
+        vertexShader: 'void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
+        fragmentShader:
+          'uniform sampler2D map; uniform vec2 resolution; void main() { gl_FragColor = texture2D(map, gl_FragCoord.xy / resolution); }',
+        depthTest: false,
+        depthWrite: false,
+      }),
+    );
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), copyMaterial);
     quad.frustumCulled = false;
     copyScene.add(quad);
     track(copyScene);
-    const stageOpts = { type: THREE.HalfFloatType, depthBuffer: false };
-    const sceneRT = own(new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter }));
-    const styleRT = own(new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, ...rtOpts }));
-    const ghostRT = [0, 1].map(() => own(new THREE.WebGLRenderTarget(1, 1, { ...stageOpts, ...rtOpts })));
     return {
-      feedbackRT, copyScene, copyMaterial, sceneRT, styleRT, ghostRT,
-      feedbackFlip: 0, feedbackLive: false, ghostFlip: 0, ghostLive: false,
+      // (The current set's targets: targetsFor, setSize.)
+      feedbackRT: null,
+      sceneRT: null,
+      styleRT: null,
+      ghostRT: null,
+      copyScene,
+      copyMaterial,
+      feedbackFlip: 0,
+      feedbackLive: false,
+      ghostFlip: 0,
+      ghostLive: false,
       // Motion blur compares each frame's camera with the last one's.
-      lastViewProj: new THREE.Matrix4(), viewProj: new THREE.Matrix4(),
-      lastCamPos: new THREE.Vector3(Infinity, 0, 0), lastCamQuat: new THREE.Quaternion(),
-      all: () => [...feedbackRT, sceneRT, styleRT, ...ghostRT],
+      lastViewProj: new THREE.Matrix4(),
+      viewProj: new THREE.Matrix4(),
+      lastCamPos: new THREE.Vector3(Infinity, 0, 0),
+      lastCamQuat: new THREE.Quaternion(),
     };
   }
+
+  // --- The render targets, a set per size. Bonfire Live's pixel size shifts (a new look, a
+  // drop) jump between a few sizes over and over; making a size's targets again each time
+  // (nine of them with the effects, each freed and allocated again on the GPU) stalled the
+  // frame of every shift. The last KEEP_SETS sizes' sets are kept (targetCache.js), so a
+  // shift back to one of them only swaps them in. What a set holds from its last use never
+  // shows: the passes clear or overwrite their targets each frame, and the trails start
+  // over on a shift (feedback cleared, the ghost's old image mixed in at 0), as they did.
+  const stageOpts = { type: THREE.HalfFloatType, depthBuffer: false };
+  /** A set of render targets at w×h texels. */
+  function makeTargets(w, h) {
+    const set = {
+      colorRT: new THREE.WebGLRenderTarget(w, h, {
+        ...rtOpts,
+        type: THREE.HalfFloatType,
+        depthTexture: new THREE.DepthTexture(w, h),
+      }),
+      normalRT: new THREE.WebGLRenderTarget(w, h, { ...rtOpts, depthTexture: new THREE.DepthTexture(w, h) }),
+      fxRT: new THREE.WebGLRenderTarget(w, h, { ...rtOpts, type: THREE.HalfFloatType, depthBuffer: false }),
+      feedbackRT: null,
+      sceneRT: null,
+      styleRT: null,
+      ghostRT: null,
+    };
+    if (fx) {
+      set.feedbackRT = [0, 1].map(() => new THREE.WebGLRenderTarget(w, h, { ...rtOpts, depthBuffer: false }));
+      set.sceneRT = new THREE.WebGLRenderTarget(w, h, {
+        ...stageOpts,
+        generateMipmaps: true,
+        minFilter: THREE.LinearMipmapLinearFilter,
+        magFilter: THREE.LinearFilter,
+      });
+      set.styleRT = new THREE.WebGLRenderTarget(w, h, { ...stageOpts, ...rtOpts });
+      set.ghostRT = [0, 1].map(() => new THREE.WebGLRenderTarget(w, h, { ...stageOpts, ...rtOpts }));
+    }
+    return set;
+  }
+  const targetsOf = (set) =>
+    [
+      set.colorRT,
+      set.normalRT,
+      set.fxRT,
+      ...(set.feedbackRT ?? []),
+      set.sceneRT,
+      set.styleRT,
+      ...(set.ghostRT ?? []),
+    ].filter(Boolean);
+  const sets = createSetCache(KEEP_SETS, (set) => {
+    for (const rt of targetsOf(set)) rt.dispose();
+  });
+  own({ dispose: () => sets.clear() });
+  /** Make `set` the one drawn with: the passes' targets and what the pixel pass reads. */
+  function useTargets(set) {
+    ({ colorRT, normalRT, fxRT } = set);
+    if (fx)
+      Object.assign(fx, {
+        feedbackRT: set.feedbackRT,
+        sceneRT: set.sceneRT,
+        styleRT: set.styleRT,
+        ghostRT: set.ghostRT,
+      });
+    u.tColor.value = colorRT.texture;
+    u.tDepth.value = colorRT.depthTexture;
+    u.tNormal.value = normalRT.texture;
+    u.tNormalDepth.value = normalRT.depthTexture;
+    u.tFx.value = fxRT.texture;
+  }
+  useTargets(sets.get('1×1', () => makeTargets(1, 1))); // (compile() draws into these before the first setSize)
 
   let size = { w: 1, h: 1, pd: 4 };
   /** Size every buffer to w×h texels (each drawn pd device pixels wide). */
   function setSize(w, h, pd) {
     size = { w, h, pd };
     renderer.setSize(w, h, false);
-    for (const rt of [colorRT, normalRT, fxRT, ...(fx ? fx.all() : [])]) rt.setSize(w, h);
-    if (fx) { fx.feedbackLive = false; fx.ghostLive = false; }
+    useTargets(sets.get(`${w}×${h}`, () => makeTargets(w, h)));
+    if (fx) {
+      fx.feedbackLive = false;
+      fx.ghostLive = false;
+    }
     u.resolution.value.set(w, h);
   }
 
@@ -97,7 +179,10 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
    * pass does it all.)
    */
   function renderStages() {
-    if (!fx) { pass.use('single'); return; }
+    if (!fx) {
+      pass.use('single');
+      return;
+    }
     // Motion blur: this frame's view space → last frame's clip space. A cut (the camera
     // jumping) starts over instead of smearing the whole frame.
     camera.updateMatrixWorld();
@@ -116,7 +201,15 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
       renderer.setRenderTarget(target);
       renderer.render(pass.scene, pass.camera);
     };
-    draw('scene', fx.sceneRT);
+    // The scene's image keeps its mipmaps' storage (it's allocated with them), but they're
+    // only made in the frames the glow reads them (tSceneMip): everything else reads its top
+    // level. (Switched off only for the render itself, after the target is set: a target
+    // allocated without mipmaps would have none to make later.)
+    pass.use('scene');
+    renderer.setRenderTarget(fx.sceneRT);
+    fx.sceneRT.texture.generateMipmaps = u.uGlow.value > 0;
+    renderer.render(pass.scene, pass.camera);
+    fx.sceneRT.texture.generateMipmaps = true;
     u.tScene.value = fx.sceneRT.texture;
     u.tSceneMip.value = fx.sceneRT.texture;
     if (style) {
@@ -142,13 +235,28 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
   // keeps, WebGLShadowMap, a shader for each kind of mesh). warm() builds the last two for the
   // kinds among `roots` not built yet: the normals with the pass's own material, the shadow's
   // with a stand-in on the shadow map's settings (kept: the shader stays the one it uses).
-  const SHADOW_SIDE = { [THREE.FrontSide]: THREE.BackSide, [THREE.BackSide]: THREE.FrontSide, [THREE.DoubleSide]: THREE.DoubleSide };
+  const SHADOW_SIDE = {
+    [THREE.FrontSide]: THREE.BackSide,
+    [THREE.BackSide]: THREE.FrontSide,
+    [THREE.DoubleSide]: THREE.DoubleSide,
+  };
   const warmed = new Set(); // the kinds of mesh whose normals / shadow shaders are built
   /** A stand-in for the shadow map's distance material over `m` (WebGLShadowMap getDepthMaterial's settings). */
   function distanceFor(m) {
     const d = own(new THREE.MeshDistanceMaterial());
     d.side = m.shadowSide ?? SHADOW_SIDE[m.side];
-    for (const key of ['alphaMap', 'map', 'displacementMap', 'displacementScale', 'displacementBias', 'clipShadows', 'clippingPlanes', 'clipIntersection', 'wireframe']) d[key] = m[key];
+    for (const key of [
+      'alphaMap',
+      'map',
+      'displacementMap',
+      'displacementScale',
+      'displacementBias',
+      'clipShadows',
+      'clippingPlanes',
+      'clipIntersection',
+      'wireframe',
+    ])
+      d[key] = m[key];
     d.alphaTest = m.alphaToCoverage ? 0.5 : m.alphaTest;
     return d;
   }
@@ -221,7 +329,12 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
         return renderer.compileAsync(pass.scene, pass.camera);
       };
       built.push(stage('scene', fx.sceneRT), stage('final', null));
-      const later = [stage('style', fx.styleRT), stage('ghost', fx.ghostRT[0]), stage('final', fx.feedbackRT[0]), renderer.compileAsync(fx.copyScene, pass.camera)];
+      const later = [
+        stage('style', fx.styleRT),
+        stage('ghost', fx.ghostRT[0]),
+        stage('final', fx.feedbackRT[0]),
+        renderer.compileAsync(fx.copyScene, pass.camera),
+      ];
       Promise.all(later).catch(() => {});
       pass.use('final');
     }
@@ -229,7 +342,9 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
     let timer = 0;
     return Promise.race([
       Promise.all(built),
-      new Promise((resolve) => { timer = setTimeout(resolve, timeout); }),
+      new Promise((resolve) => {
+        timer = setTimeout(resolve, timeout);
+      }),
     ]).finally(() => clearTimeout(timer));
   }
 
@@ -250,7 +365,9 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
     let timer = 0;
     return Promise.race([
       Promise.all(built),
-      new Promise((resolve) => { timer = setTimeout(resolve, timeout); }),
+      new Promise((resolve) => {
+        timer = setTimeout(resolve, timeout);
+      }),
     ]).finally(() => clearTimeout(timer));
   }
 
@@ -259,6 +376,7 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
 
   /** Draw this frame. `shadows`: whether the fire's shadow must be redrawn this frame. */
   function draw({ shadows = false } = {}) {
+    scene.updateMatrixWorld(); // (once for the three passes: see the top)
     scene.overrideMaterial = normalMaterial;
     camera.layers.set(layers.solid);
     renderer.setRenderTarget(normalRT);
@@ -284,7 +402,11 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
     renderStages();
     if (fx && u.uFeedback.value > 0) {
       if (!fx.feedbackLive) {
-        for (const rt of fx.feedbackRT) { renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 1); renderer.clear(); }
+        for (const rt of fx.feedbackRT) {
+          renderer.setRenderTarget(rt);
+          renderer.setClearColor(0x000000, 1);
+          renderer.clear();
+        }
         fx.feedbackLive = true;
       }
       const write = fx.feedbackRT[fx.feedbackFlip];
@@ -314,23 +436,77 @@ export function createFrame({ renderer, scene, camera, layers, voidColor, effect
       ctx.drawImage(canvas, 0, 0, out.width, out.height);
       for (const done of captures.splice(0)) out.toBlob(done, 'image/png');
     }
+    // (Guarded like the captures: splice(0) makes a new array every frame, even an empty one.)
+    if (thumbs.length) for (const t of thumbs.splice(0)) t.done(thumbCanvas(t.w, t.h));
     for (const fn of rendered) fn();
+  }
+
+  // Thumbnails (thumb): the middle of the frame at w:h, copied straight from the canvas, which
+  // is texel-sized (each texel one canvas pixel: setSize), with hard edges. No screen-sized
+  // copy, no PNG to encode and decode again.
+  const thumbs = [];
+  function thumbCanvas(w, h) {
+    const out = document.createElement('canvas');
+    out.width = w;
+    out.height = h;
+    const ctx = out.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    const k = Math.max(w / canvas.width, h / canvas.height);
+    ctx.drawImage(canvas, (w - canvas.width * k) / 2, (h - canvas.height * k) / 2, canvas.width * k, canvas.height * k);
+    return out;
+  }
+  /** The next frame as a w×h WebP data URL (resolves null if it can't be made). */
+  function thumb(w, h, quality = 0.7) {
+    return new Promise((resolve) => {
+      thumbs.push({
+        w: Math.max(1, Math.round(w)),
+        h: Math.max(1, Math.round(h)),
+        done: (out) =>
+          out.toBlob(
+            (blob) => {
+              if (!blob) {
+                resolve(null);
+                return;
+              }
+              const reader = new FileReader();
+              reader.onload = () => resolve(/** @type {string} */ (reader.result));
+              reader.onerror = () => resolve(null);
+              reader.readAsDataURL(blob);
+            },
+            'image/webp',
+            quality,
+          ),
+      });
+    });
   }
 
   return {
     pass,
-    /** The color pass's depth (the particles test themselves against it). */
-    depthTexture: colorRT.depthTexture,
+    /** The color pass's depth (the particles test themselves against it): the current size's, so it changes with setSize. */
+    get depthTexture() {
+      return colorRT.depthTexture;
+    },
     setSize,
     draw,
     compile,
     prepare,
-    get size() { return size; },
+    get size() {
+      return size;
+    },
     /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
     capture: () => new Promise((resolve) => captures.push(resolve)),
+    thumb,
     /** Call `fn` right after every frame is drawn. Returns an unsubscribe. */
-    onRendered(fn) { rendered.add(fn); return () => rendered.delete(fn); },
+    onRendered(fn) {
+      rendered.add(fn);
+      return () => rendered.delete(fn);
+    },
     /** (Feedback and ghost trails start over: the picture jumped.) */
-    reset() { if (fx) { fx.feedbackLive = false; fx.ghostLive = false; } },
+    reset() {
+      if (fx) {
+        fx.feedbackLive = false;
+        fx.ghostLive = false;
+      }
+    },
   };
 }

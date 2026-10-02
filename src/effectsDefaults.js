@@ -37,7 +37,18 @@ export const DEFAULT_EFFECTS = {
     flame('phosphor', 'Phosphor Flame', ['#4a4538', '#bdb49c', '#fffaf0', '#ffffff'], '#35332d'),
     flame('umbral', 'Umbral Flame', ['#1c1a4a', '#5b5bd6', '#b0afff', '#ecebff'], '#24233f'),
   ],
-  fire: { brightness: 0.3, size: 0.27, height: 0.62, turbulence: 0.42, swirl: 2.6, lifeMin: 0.55, lifeMax: 1.25, glow: 9, fps: 12, stoke: 0.9 },
+  fire: {
+    brightness: 0.3,
+    size: 0.27,
+    height: 0.62,
+    turbulence: 0.42,
+    swirl: 2.6,
+    lifeMin: 0.55,
+    lifeMax: 1.25,
+    glow: 9,
+    fps: 12,
+    stoke: 0.9,
+  },
   particles: { fire: 2200, sparks: 48, forge: 640, impact: 1, touchScale: 0.5 },
   fireflies: { count: 18, lit: 9, lights: 9, speed: 1, touchScale: 0.67 },
   cursor: { mode: 'ember', strength: 1 },
@@ -49,15 +60,64 @@ export const DEFAULT_EFFECTS = {
   },
   // Lightning: a tesla ball with no glass set in the core of the bonfire, lashing strikes
   // out between the logs at the ground around it (src/bonfire/plasma.js); impacts crackle a lightning ring across the ground (lightningRing.js).
-  lightning: { size: 0.44, height: 0.3, filaments: 12, strikes: 4, boltWidth: 3, jag: 0.45, branches: 0.5, crackle: 20, drift: 1, brightness: 1.1, cursorPull: 0.8, flicker: 0.6, ringSpeed: 1, ringArcs: 0.6 },
+  lightning: {
+    size: 0.44,
+    height: 0.3,
+    filaments: 12,
+    strikes: 4,
+    boltWidth: 3,
+    jag: 0.45,
+    branches: 0.5,
+    crackle: 20,
+    drift: 1,
+    brightness: 1.1,
+    cursorPull: 0.8,
+    flicker: 0.6,
+    ringSpeed: 1,
+    ringArcs: 0.6,
+  },
   // Ice: a translucent crystal cluster grows out of the ground around a banked fire
   // (ice.js); impacts send a ring of shards out that spike up and sink back, with chill.
-  ice: { pulse: 3.5, shards: 28, height: 1.05, spread: 0.36, thickness: 1, clarity: 0.28, glow: 1, shimmer: 0.5, innerFire: 0.45, frost: 60, growTime: 1.4, ringSpeed: 1, ringHeight: 1, ringHold: 0.08 },
-  // How hits land (src/bonfire/scene.js, marks.js, debris.js): a freeze frame, a flash, the
+  ice: {
+    pulse: 3.5,
+    shards: 28,
+    height: 1.05,
+    spread: 0.36,
+    thickness: 1,
+    clarity: 0.28,
+    glow: 1,
+    shimmer: 0.5,
+    innerFire: 0.45,
+    frost: 60,
+    growTime: 1.4,
+    ringSpeed: 1,
+    ringHeight: 1,
+    ringHold: 0.08,
+  },
+  // How hits land (src/bonfire/sceneFire.js, marks.js, debris.js): a freeze frame, a flash, the
   // ground scorched / frosted / scarred where they struck (fading away), debris, lightning's
   // afterimages and strikes on fireflies, and how much busy moments thin the extras out.
-  impact: { hitStop: 0.06, flash: 0.5, marks: true, markLife: 20, debris: 1, afterimages: 0.6, fireflyStrikes: 0.5, budget: 0.6 },
-  render: { pixelSize: 4, pixelSizeSmall: 3, dither: 0.16, ditherMatrix: 4, outlines: true, vignette: 0.85, exposure: 1, colorChange: 1.25, shake: true },
+  impact: {
+    hitStop: 0.06,
+    flash: 0.5,
+    marks: true,
+    markLife: 20,
+    debris: 1,
+    afterimages: 0.6,
+    fireflyStrikes: 0.5,
+    budget: 0.6,
+  },
+  render: {
+    pixelSize: 4,
+    pixelSizeSmall: 3,
+    dither: 0.16,
+    ditherMatrix: 4,
+    outlines: true,
+    vignette: 0.85,
+    exposure: 1,
+    colorChange: 1.25,
+    shake: true,
+  },
   // The knight who comes to the fire (src/bonfire/knights.js, knightArrival.js): whether he
   // may come at all; how (his summon sign on the ground, or there from the start); how long
   // he rests before he burns away into the sign again (minutes, rolled between the two on
@@ -69,12 +129,25 @@ export const DEFAULT_EFFECTS = {
   // to what the fire does (flinching at impacts, leaning away from a stoke, watching a
   // weapon rise). Bonfire Live casts its own knights (its Knights settings).
   knight: {
-    show: true, arrival: 'sign', restMin: 3, restMax: 5, helmet: 'random', style: DEFAULT_STYLE, finish: 'gunmetal',
-    rim: 0.5, shine: true, seat: 'resting', gestures: true, reactions: true,
+    show: true,
+    arrival: 'sign',
+    restMin: 3,
+    restMax: 5,
+    helmet: 'random',
+    style: DEFAULT_STYLE,
+    finish: 'gunmetal',
+    rim: 0.5,
+    shine: true,
+    seat: 'resting',
+    gestures: true,
+    reactions: true,
   },
 };
 
-/** [min, max, step, unit?] per number, keyed by path pattern (`flames[].light`). */
+/**
+ * [min, max, step, unit?] per number, keyed by path pattern (`flames[].light`). A number
+ * Bonfire Live and the Painter have too keeps the same range here (settingsMap.js).
+ */
 export const RANGES = {
   'flames[].light': [0, 1, 0.01],
   'fire.brightness': [0.05, 1, 0.01],
@@ -100,9 +173,9 @@ export const RANGES = {
   'cursor.strength': [0, 2, 0.05, '×'],
   'render.pixelSize': [2, 8, 1, 'px'],
   'render.pixelSizeSmall': [2, 8, 1, 'px'],
-  'render.dither': [0, 0.5, 0.01],
+  'render.dither': [0, 0.4, 0.02],
   'render.vignette': [0, 1.5, 0.05],
-  'render.exposure': [0.3, 2, 0.05],
+  'render.exposure': [0.5, 2, 0.05, '×'],
   'render.colorChange': [0.2, 4, 0.05, 's'],
   'impact.hitStop': [0, 0.15, 0.01, 's'],
   'impact.flash': [0, 1, 0.05],

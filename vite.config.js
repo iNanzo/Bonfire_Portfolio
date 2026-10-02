@@ -27,7 +27,10 @@ function routePages() {
   return {
     name: 'route-pages',
     apply: 'build',
-    configResolved(config) { outDir = resolve(config.root, config.build.outDir); root = config.root; },
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+      root = config.root;
+    },
     async closeBundle() {
       const template = readFileSync(resolve(outDir, 'index.html'), 'utf8');
       const ids = [featured, ...projects, ...archive.filter((a) => a.images?.length)].map((p) => p.id);
@@ -43,10 +46,17 @@ function routePages() {
       mkdirSync(resolve(outDir, 'og'), { recursive: true });
       await socialImage(resolve(root, 'assets/source/bonfire-preview.png'), site.name, resolve(outDir, 'og/home.jpg'));
       for (const p of items()) {
-        await socialImage(resolve(root, 'public', `${p.images[0].src}.webp`), p.name, resolve(outDir, `og/project-${p.id}.jpg`));
+        await socialImage(
+          resolve(root, 'public', `${p.images[0].src}.webp`),
+          p.name,
+          resolve(outDir, `og/project-${p.id}.jpg`),
+        );
       }
       writeFileSync(resolve(outDir, 'sitemap.xml'), sitemap(publicRoutes(), ['/visualizer/', '/painter/']));
-      writeFileSync(resolve(outDir, 'robots.txt'), `User-agent: *\nAllow: /\nDisallow: /admin/\n\nSitemap: ${new URL('sitemap.xml', site.url).href}\n`);
+      writeFileSync(
+        resolve(outDir, 'robots.txt'),
+        `User-agent: *\nAllow: /\nDisallow: /admin/\n\nSitemap: ${new URL('sitemap.xml', site.url).href}\n`,
+      );
     },
   };
 }
@@ -59,9 +69,11 @@ async function socialImage(src, title, out) {
     <text x="56" y="560" font-family="Georgia, 'DejaVu Serif', serif" font-size="64" fill="#e9e3d2">${esc(title)}</text>
     <text x="58" y="598" font-family="Verdana, 'DejaVu Sans', sans-serif" font-size="22" fill="#b9b3a4" letter-spacing="3">${esc(new URL(site.url).host.toUpperCase())}</text>
   </svg>`;
-  await sharp(src).resize(1200, 630, { fit: 'cover', kernel: 'nearest' })
+  await sharp(src)
+    .resize(1200, 630, { fit: 'cover', kernel: 'nearest' })
     .composite([{ input: Buffer.from(band) }])
-    .jpeg({ quality: 84 }).toFile(out);
+    .jpeg({ quality: 84 })
+    .toFile(out);
 }
 
 // The portfolio's first load (index.html's script and its modulepreloads) is the site's
@@ -72,7 +84,11 @@ async function socialImage(src, title, out) {
 // (contentRules.js does) adds ~20 kB gzip to every visit. The site imports those lazily
 // (`import()`); this check says so at build time if one comes back.
 const SHOW_ONLY = /[\\/]src[\\/]((scenes|sceneStore|paletteGen)\.js|visualizer[\\/]|painter[\\/])/;
-const shortId = (id) => id.split('\\').join('/').replace(/^.*?\/src\//, 'src/');
+const shortId = (id) =>
+  id
+    .split('\\')
+    .join('/')
+    .replace(/^.*?\/src\//, 'src/');
 /**
  * The modules (with code in the bundle) a page's entry chunk loads before it runs: the
  * chunk and every chunk it imports statically, all the way down.
@@ -89,7 +105,11 @@ export function firstLoadModules(bundle, entry) {
     seen.add(file);
     stack.push(...bundle[file].imports);
   }
-  return [...seen].flatMap((file) => Object.entries(bundle[file].modules).filter(([, m]) => m.renderedLength > 0).map(([id]) => id));
+  return [...seen].flatMap((file) =>
+    Object.entries(bundle[file].modules)
+      .filter(([, m]) => m.renderedLength > 0)
+      .map(([id]) => id),
+  );
 }
 function firstLoadGuard() {
   return {
@@ -97,7 +117,10 @@ function firstLoadGuard() {
     apply: 'build',
     generateBundle(_, bundle) {
       const stray = firstLoadModules(bundle, 'main').filter((id) => SHOW_ONLY.test(id));
-      if (stray.length) this.warn(`The portfolio's first load carries Bonfire Live / Painter modules: ${stray.map(shortId).join(', ')}. Import what pulls them in lazily (import()) from the site.`);
+      if (stray.length)
+        this.warn(
+          `The portfolio's first load carries Bonfire Live / Painter modules: ${stray.map(shortId).join(', ')}. Import what pulls them in lazily (import()) from the site.`,
+        );
     },
   };
 }
@@ -126,7 +149,11 @@ export default defineConfig({
             // own size. three's core, which Bonfire Live and the Painter load up front, is
             // left out of the group (and its dependencies with it): it stays where Rolldown
             // puts it, shared.
-            { name: 'three', test: /[\\/]node_modules[\\/]three[\\/](build[\\/]three\.module\.js|examples[\\/])/, includeDependenciesRecursively: false },
+            {
+              name: 'three',
+              test: /[\\/]node_modules[\\/]three[\\/](build[\\/]three\.module\.js|examples[\\/])/,
+              includeDependenciesRecursively: false,
+            },
           ],
         },
       },

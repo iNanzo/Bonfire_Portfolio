@@ -1,0 +1,141 @@
+name: CI
+
+# The checks every change goes through, shared by checks.yml (pull requests) and deploy.yml
+# (main). Lint and types, the unit and admin tests under coverage (on each Node the site
+# supports) and the build run side by side; the build is uploaded once as `site-dist`, the
+# browser tests run against it in five shards, and that same build is what a deploy ships.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  SKIP_SIMPLE_GIT_HOOKS: 1 # CI commits nothing; the git hooks are for local commits.
+
+jobs:
+  static:
+    name: Lint and types
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run format:check
+
+  unit:
+    name: Unit tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      # Every unit and admin test, slow ones included, under c8. It fails if coverage
+      # drops under the thresholds in .c8rc.json.
+      - run: npm run coverage
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        run: node tools/coverage-summary.mjs
+      # The report, lcov and the summary; not coverage/tmp, c8's raw V8 data (about 20 MB).
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-node${{ matrix.node }}
+          path: |
+            coverage/
+            !coverage/tmp/
+          retention-days: 14
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Dotfiles too (upload-artifact leaves them out by default), so a later
+      # public/.well-known/ still ships.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-dist
+          path: dist/
+          include-hidden-files: true
+          retention-days: 7
+
+  e2e:
+    name: Browser tests (${{ matrix.name }})
+    needs: build
+    runs-on: ubuntu-latest
+    # The whole suite is 30 to 40 minutes of software-rendered browser time; the biggest
+    # shard's share is about 11, which leaves room for a slower runner and a retry.
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # Playwright's --shard deals tests out by count, in file order, but Bonfire Live's
+        # tooltip sweeps (e2e/tips-live.spec.mjs) take a third of the time in a ninth of the
+        # tests. So they get two shards of their own, and every other spec (a new one too)
+        # shares three.
+        include:
+          - { id: rest-1, name: 'all but Live tips, 1 of 3', args: '--grep-invert tips-live --shard=1/3' }
+          - { id: rest-2, name: 'all but Live tips, 2 of 3', args: '--grep-invert tips-live --shard=2/3' }
+          - { id: rest-3, name: 'all but Live tips, 3 of 3', args: '--grep-invert tips-live --shard=3/3' }
+          - { id: tips-live-1, name: 'Live tips, 1 of 2', args: 'tips-live --shard=1/2' }
+          - { id: tips-live-2, name: 'Live tips, 2 of 2', args: 'tips-live --shard=2/2' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Playwright's browsers are cached per Playwright version (the one the lockfile pins).
+      - name: Playwright version
+        id: playwright
+        run: |
+          version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      # A cache hit has the browser but not the system libraries it needs.
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      # The build job's dist/, served as it is (PW_PREBUILT): every shard tests the one build.
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-dist
+          path: dist
+      - run: npm run e2e -- ${{ matrix.args }}
+        env:
+          CI: true
+          PW_PREBUILT: 1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.id }}
+          path: test-results/
+          retention-days: 7

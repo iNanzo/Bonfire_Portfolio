@@ -18,8 +18,11 @@
 // height map when he's placed, so his feet meet the ground and he sits on the stone, not
 // above it: each boot rests on whatever is under it where the seated pose puts it (one up
 // on the seat's log, say). He stands up to a level, open spot in front of the seat (never
-// up on the log or in the pit), and his seated gestures know how much room he has on each
-// side (a pillar at his shoulder: the cheer goes up, not into it; a wave changes hands).
+// up on the log or in the pit). At home he knows how much room he has for each arm, seated
+// and standing up in front of his seat (roomOf, from the scenery's shapes: colliders.js), and
+// every gesture and dance there keeps its arms within it (a pillar at his shoulder: the
+// cheer goes up, not into it; a wave changes hands). Wherever he is, each solved pose's arms
+// are then checked against the shapes near him and turned clear of them (keepClear).
 // Dancers stand on a ring round the fire, in the arcs each scenery leaves clear
 // (DANCE_RING); the others (Bonfire Live) are at home sitting on its clear sides, where the
 // show rests them (restPlaces). He walks from place to place: straight, or round the fire
@@ -33,6 +36,10 @@
 // and Praise the Sun read whole; he still hops the ring); hovered, his rim warms and he
 // looks at you.
 //
+// Beside this module: knightMesh.js builds the model's template (its pieces merged and
+// marked, the points he's checked at), knightClear.js keeps him out of the scenery
+// (keepClear, the ease back) and knightPlates.js swings his plates on their springs.
+//
 // The API (scene.js hands it out as fire.knights; every method is safe with no model; the
 // full table is in docs/knight.md):
 //   ready                      resolves true once there are knights (scene.js)
@@ -41,7 +48,8 @@
 //                              state: away, arriving, leaving, ember (going somewhere by
 //                              ember), sitting, standing, dancing, or the act he's in (rise,
 //                              lower, walk, turn, place)
-//   positions                  where each present knight's head is (world): for cameras
+//   positions                  where each present knight's head is (world): for cameras (one
+//                              array, its vectors updated in place each read)
 //   helmet / setHelmet(name, { index, instant })  'great' | 'armet' | 'bascinet': hands to
 //                              the helm, the old one burns away, the new one forms, a puff
 //                              of sparks (1.6 s), or at once
@@ -60,543 +68,101 @@
 //   busyAt(i)                  mid-gesture, mid-dance, mid-swap: knightArrival.js holds his leaving
 //   adoptTemplate(t)           another style's model's template, built beforehand (templateSteps)
 //   slots(scenery)             { center, radius, free: [[from°, to°], …], slots: [{ x, z, bearing }] }
+//   fits(move, at, facing, scenery?)  whether a dance move has room at a place, facing that
+//                              way (its reach clear of the scenery's shapes: colliders.js)
 //   moving                     a pose stepped this frame, or he formed, burnt away or was
 //                              placed somewhere new (the shadow needs redrawing)
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { createArmorMaterial, roleOf } from './armor.js';
+import { createArmorMaterial } from './armor.js';
 import {
-  BONES, BONE_NODES, PARENT, DEFAULT_REST, measureRig, measurePlates, createSolver, newPose, lerpPose, seatedPose, standingPose, seatFeet, feetAt,
-  idle, look, attend, flinch, shield, hop, rise, walk, gesture, dance, RISE_TIME, GESTURE_TIME, DANCE_SEATED_TIME, GESTURES, MOVES, CHEERS, SEAT_POSES,
+  BONES,
+  POSE,
+  measureRig,
+  createSolver,
+  newPose,
+  lerpPose,
+  seatedPose,
+  standingPose,
+  seatFeet,
+  feetAt,
+  idle,
+  look,
+  attend,
+  flinch,
+  shield,
+  hop,
+  rise,
+  walk,
+  gesture,
+  dance,
+  RISE_TIME,
+  GESTURE_TIME,
+  DANCE_SEATED_TIME,
+  GESTURES,
+  MOVES,
+  CHEERS,
+  SEAT_POSES,
 } from './knightPose.js';
-import { SEATS, danceSlots, ringOf, restPlaces, planWalk, FIRE_AT } from './knightPlaces.js';
+import { SEATS, danceSlots, ringOf, restPlaces, planWalk, facingYaw, FIRE_AT } from './knightPlaces.js';
+import { collidersNear, distanceTo, outOf, createFits } from './colliders.js';
 import { weaponSilhouette } from './forgeFx.js';
+import {
+  HELMETS,
+  ALL_BONES,
+  BONE_INDEX,
+  PARENT_ALL,
+  templateSteps,
+  probesOf,
+  drain,
+  buildTemplate,
+  platesOf,
+} from './knightMesh.js';
+import { CLEAR_NEAR, SIDES, SHOULDER, danceUp, createClearance } from './knightClear.js';
+import { STEP_FPS, createPlateSprings } from './knightPlates.js';
 
 export { GESTURES, MOVES, SEAT_POSES };
-export const HELMETS = ['great', 'armet', 'bascinet'];
-const HELM_NODES = { great: 'K_Helm_Great', armet: 'K_Helm_Armet', bascinet: 'K_Helm_Bascinet' };
-const ALL_BONES = [...BONES, ...HELMETS.map((h) => 'helm_' + h)];
-const NODE_BONE = Object.fromEntries([
-  ...Object.entries(BONE_NODES).map(([b, n]) => [n, b]),
-  ...HELMETS.map((h) => [HELM_NODES[h], 'helm_' + h]),
-]);
-const BONE_INDEX = Object.fromEntries(ALL_BONES.map((b, i) => [b, i]));
-const PARENT_ALL = { ...PARENT, ...Object.fromEntries(HELMETS.map((h) => ['helm_' + h, 'head'])) };
+export { HELMETS, templateSteps };
 
-const STEP_FPS = 12;
 const FIRE = new THREE.Vector3(FIRE_AT.x, 0, FIRE_AT.z);
-const FADE_TIME = 0.55;  // summoning or dismissing (s)
-const HELM_TIME = 1.6;   // the helmet swap
+const FADE_TIME = 0.55; // summoning or dismissing (s)
+const HELM_TIME = 1.6; // the helmet swap
 const WALK_SPEED = 0.95; // m/s
-const TURN_SPEED = 5;    // rad/s
+const TURN_SPEED = 5; // rad/s
 const CROSSFADE = 0.2;
 const STEP_OVER = 0.16; // m: what a walking knight steps over (a fire pit's stone, a spare log)
 // His meshes' bounds (his own space: the ground under him, turned with him), for culling:
-// every pose he takes stays inside with 0.2 m to spare (the farthest reach, 1.39 m from
-// here, is his hand thrown up in a cheer standing in front of his seat; the leaps, Praise
-// the Sun and the rest are inside too: test/knightsBounds.test.mjs, on the real model).
-const BOUNDS = new THREE.Sphere(new THREE.Vector3(0, 1.05, 0.15), 1.6);
+// every pose he takes stays inside with 0.1 m to spare (the farthest reach, 1.76 m from
+// here, is a boot kicked out in the site's dance where he stands up to, to his right across
+// the ruins' fallen drum; the leaps, Praise the Sun and the rest are inside too:
+// test/knightsBounds.test.mjs, on the real model).
+const BOUNDS = new THREE.Sphere(new THREE.Vector3(0, 1.05, 0.15), 1.9);
 // Gestures that throw the arms up (or dance): a flinch or a lean over one would hide it.
 const CHEERING = new Set(CHEERS);
-// The plates on straps: the pauldrons (dome and lames, on the chest) and the tassets (on the
-// hips) lag their pose a moment and overshoot a little before they settle. A spring each,
-// stepped with the pose at twelve steps a second (in substeps, so it's steady; the same
-// steps always swing the same way): `hz` its frequency, `damp` its damping ratio (0.38: a
-// quarter's overshoot), `max` how far (rad) a plate may stray from its pose.
-const SPRUNG = [
-  ['shoulderL', 'chest', 0.1], ['pauldronL', 'chest', 0.13], ['shoulderR', 'chest', 0.1], ['pauldronR', 'chest', 0.13],
-  ['tassetL', 'hips', 0.09], ['tassetR', 'hips', 0.09],
-];
-const SPRING = { hz: 2.6, damp: 0.38, substeps: 4 };
-
-/**
- * Each plate's id (`aPiece`, 0..1 per vertex, armor.js: each plate a touch lighter or darker
- * than its neighbours): the connected parts of each joint's geometry, welded by position
- * across its materials (a plate and its raised rim are one part; two lames that only
- * overlap are two), a well-spread value from where each part sits. A step (yield) a joint.
- * @param {[string, THREE.BufferGeometry][]} list  [bone, non-indexed geometry] pairs
- */
-function* markPlates(list) {
-  const byBone = new Map();
-  for (const [bone, g] of list) byBone.set(bone, [...(byBone.get(bone) ?? []), g]);
-  for (const geos of byBone.values()) {
-    const ids = new Map(); // welded position -> vertex id
-    const parent = [];
-    const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
-    const at = geos.map((g) => {
-      const p = g.attributes.position;
-      const out = new Int32Array(p.count);
-      for (let i = 0; i < p.count; i++) {
-        const key = `${Math.round(p.getX(i) * 500)},${Math.round(p.getY(i) * 500)},${Math.round(p.getZ(i) * 500)}`;
-        let id = ids.get(key);
-        if (id === undefined) { id = parent.length; parent.push(id); ids.set(key, id); }
-        out[i] = id;
-      }
-      for (let i = 0; i + 2 < p.count; i += 3) {
-        const a = find(out[i]);
-        for (const j of [out[i + 1], out[i + 2]]) { const b = find(j); if (b !== a) parent[b] = a; }
-      }
-      return out;
-    });
-    // (Each part's value from its centre: the same model always gets the same plates.)
-    const sums = new Map();
-    geos.forEach((g, k) => {
-      const p = g.attributes.position;
-      for (let i = 0; i < p.count; i++) {
-        const r = find(at[k][i]);
-        const s = sums.get(r) ?? [0, 0, 0, 0];
-        s[0] += p.getX(i); s[1] += p.getY(i); s[2] += p.getZ(i); s[3]++;
-        sums.set(r, s);
-      }
-    });
-    const value = new Map([...sums].map(([r, [x, y, z, n]]) => {
-      const h = Math.sin((x / n) * 127.1 + (y / n) * 311.7 + (z / n) * 74.7) * 43758.5453;
-      return [r, h - Math.floor(h)];
-    }));
-    geos.forEach((g, k) => {
-      const v = new Float32Array(g.attributes.position.count);
-      for (let i = 0; i < v.length; i++) v[i] = value.get(find(at[k][i]));
-      g.setAttribute('aPiece', new THREE.Float32BufferAttribute(v, 1));
-    });
-    yield;
-  }
-}
-
-// A plate turns less than this across an edge: one smooth surface there (the pixel styles; the
-// model's facets bend up to ~60° round a curve, its creases and box edges 70° and more).
-const SMOOTH_COS = Math.cos((64 * Math.PI) / 180);
-// How close two corners are to be the same point (Draco quantizes each material's positions
-// on its own grid, so a plate's corners in two materials can be a hair apart).
-const WELD = 0.0012;
-// How far a smooth surface's corners on its crease turn toward the surface across it: every
-// plate shades as a rounded shape (a flat crown rolls toward the fire at its front and away
-// at its back), not a flat one with a hard band across it.
-const PILLOW = 0.55;
-// A surface this slight (m, twice its area over its perimeter: a strip's width, half a
-// square's side) has a neighbour it merges into when it's small on screen (armor.js: no line
-// between a finger's faces, a fauld's hoops, a visor's breaths), and how near that
-// neighbour's corners must come (m): the pieces beside it, not only those it's welded to.
-const MERGE_SIZE = 0.07;
-const MERGE_NEAR = 0.02;
-// (A grid cell's key, from its three integer coordinates: a hash; two cells sharing one only
-// share a bucket, every lookup checks the distance.)
-const cellKey = (x, y, z) => (Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791)) | 0;
-const push = (map, key, v) => { const l = map.get(key); if (l) l.push(v); else map.set(key, [v]); };
-
-/**
- * Each plate's smooth surfaces, for the pixel styles (armor.js): the faces of each joint's
- * pieces (welded by position across their materials) joined across every edge where they
- * turn less than 64°, each such surface a patch. Per corner:
- *   aSmooth  its normal averaged (by area) over its patch's faces round that corner, and at
- *            a crease turned a little toward the patches beyond (PILLOW), so a curved plate
- *            shades as one smooth, rounded surface and its edges roll
- *   aPatchN  the patch's own mean normal (the fire flashes in a plate as a whole)
- *   aPatch   x the patch's id, 0..63, different from every patch it touches (the pass draws a
- *            line wherever two ids meet on screen: every plate edge, crease and overlap; the
- *            ids start at a different place for each joint, so plates that only overlap
- *            rarely share one); y the id it takes when it's small on screen (a slight patch:
- *            the biggest one's of its joint's patches it merges with; else its own); z its
- *            size (m, MERGE_SIZE); w how flat it is (its face normals summed by area, over
- *            its area: 1 a flat plate, ~0.5 a pauldron's dome, ~0 a ring round a limb: the
- *            pixel styles shade a plate that isn't a ring across itself, armor.js)
- * A step (yield) a joint, and one for the merges.
- * @param {[string, THREE.BufferGeometry][]} list  [bone, non-indexed geometry] pairs
- */
-function* markPatches(list) {
-  const byBone = new Map();
-  for (const [bone, g] of list) push(byBone, bone, g);
-  let boneNo = 0;
-  const all = []; // every patch: { bone, id, area, size, flat, pts: [x, y, z, ...], faces }
-  for (const [bone, geos] of byBone) {
-    // Weld the corners: a grid of cells, each point matched to one within WELD nearby.
-    const cells = new Map();
-    const pts = [];
-    const weld = (x, y, z) => {
-      const cx = Math.floor(x / (WELD * 2)), cy = Math.floor(y / (WELD * 2)), cz = Math.floor(z / (WELD * 2));
-      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
-        for (const i of cells.get(cellKey(cx + dx, cy + dy, cz + dz)) ?? []) {
-          if (Math.abs(pts[i * 3] - x) < WELD && Math.abs(pts[i * 3 + 1] - y) < WELD && Math.abs(pts[i * 3 + 2] - z) < WELD) return i;
-        }
-      }
-      const i = pts.length / 3;
-      pts.push(x, y, z);
-      push(cells, cellKey(cx, cy, cz), i);
-      return i;
-    };
-    // Every face: its welded corners and its normal (length: twice its area).
-    const faces = []; // { g, i (first corner), v: [a, b, c], n: [x, y, z], len }
-    for (const g of geos) {
-      const p = g.attributes.position;
-      for (let i = 0; i + 2 < p.count; i += 3) {
-        const v = [weld(p.getX(i), p.getY(i), p.getZ(i)), weld(p.getX(i + 1), p.getY(i + 1), p.getZ(i + 1)), weld(p.getX(i + 2), p.getY(i + 2), p.getZ(i + 2))];
-        const ax = p.getX(i + 1) - p.getX(i), ay = p.getY(i + 1) - p.getY(i), az = p.getZ(i + 1) - p.getZ(i);
-        const bx = p.getX(i + 2) - p.getX(i), by = p.getY(i + 2) - p.getY(i), bz = p.getZ(i + 2) - p.getZ(i);
-        const n = [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx];
-        faces.push({ g, i, v, n, len: Math.hypot(n[0], n[1], n[2]) });
-      }
-    }
-    const M = pts.length / 3 + 1; // (a pair of corners, or a patch and a corner, as one number)
-    // Faces meeting across an edge at less than the smooth angle are one surface.
-    const parent = faces.map((_, f) => f);
-    const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
-    const edges = new Map(); // corner pair -> faces
-    faces.forEach((f, fi) => {
-      for (let e = 0; e < 3; e++) {
-        const a = f.v[e], b = f.v[(e + 1) % 3];
-        if (a !== b) push(edges, a < b ? a * M + b : b * M + a, fi);
-      }
-    });
-    for (const fs of edges.values()) {
-      if (fs.length !== 2) continue;
-      const f = faces[fs[0]], g = faces[fs[1]];
-      if (f.len < 1e-12 || g.len < 1e-12) continue;
-      if ((f.n[0] * g.n[0] + f.n[1] * g.n[1] + f.n[2] * g.n[2]) / (f.len * g.len) > SMOOTH_COS) {
-        const a = find(fs[0]), b = find(fs[1]);
-        if (a !== b) parent[b] = a;
-      }
-    }
-    // Each patch: its area, perimeter (the edges it doesn't share with itself) and mean normal.
-    const patch = new Map(); // root -> { area, perim, n: [x, y, z], corners: Set, faces: [] }
-    faces.forEach((f, fi) => {
-      const r = find(fi);
-      let P = patch.get(r);
-      if (!P) patch.set(r, (P = { area: 0, perim: 0, n: [0, 0, 0], corners: new Set(), faces: [] }));
-      P.area += f.len / 2;
-      for (let k = 0; k < 3; k++) P.n[k] += f.n[k];
-      for (const v of f.v) P.corners.add(v);
-      P.faces.push(f);
-    });
-    for (const [key, fs] of edges) {
-      const a = Math.floor(key / M), b = key % M;
-      const l = Math.hypot(pts[a * 3] - pts[b * 3], pts[a * 3 + 1] - pts[b * 3 + 1], pts[a * 3 + 2] - pts[b * 3 + 2]);
-      const roots = fs.map(find);
-      for (const r of new Set(roots)) if (roots.filter((x) => x === r).length < 2) patch.get(r).perim += l;
-    }
-    // Each corner's smooth normal: its patch's faces round it, summed (by area)...
-    const sums = new Map(); // patch * M + corner -> [x, y, z]
-    faces.forEach((f, fi) => {
-      const r = find(fi);
-      for (const v of f.v) {
-        const s = sums.get(r * M + v);
-        if (s) { s[0] += f.n[0]; s[1] += f.n[1]; s[2] += f.n[2]; } else sums.set(r * M + v, [...f.n]);
-      }
-    });
-    const unit = (s) => { const l = Math.hypot(s[0], s[1], s[2]); return l > 1e-12 ? [s[0] / l, s[1] / l, s[2] / l] : null; };
-    // ...and at a crease, turned toward the patches across it (PILLOW).
-    const touching = new Map(); // welded corner -> patches there
-    for (const [r, P] of patch) for (const v of P.corners) push(touching, v, r);
-    const smooth = new Map();
-    for (const [key, s] of sums) {
-      const r = Math.floor(key / M), v = key % M;
-      const own = unit(s);
-      if (!own) continue;
-      const out = [...own];
-      for (const o of touching.get(v)) {
-        if (o === r) continue;
-        const n = unit(sums.get(o * M + v));
-        if (n) for (let k = 0; k < 3; k++) out[k] += PILLOW * n[k];
-      }
-      smooth.set(key, unit(out) ?? own);
-    }
-    // Each patch's id: the first not taken by a patch it touches (sharing a corner).
-    const ids = new Map();
-    const start = (boneNo++ * 23) % 64;
-    let order = 0;
-    faces.forEach((f, fi) => {
-      const r = find(fi);
-      if (ids.has(r)) return;
-      const taken = new Set();
-      for (const v of patch.get(r).corners) for (const o of touching.get(v)) if (ids.has(o)) taken.add(ids.get(o));
-      let id = (start + order++ * 11) % 64;
-      for (let k = 0; k < 64 && taken.has(id); k++) id = (id + 1) % 64;
-      ids.set(r, id);
-    });
-    // Onto the corners (the merge ids come once every joint's patches are known).
-    for (const g of geos) {
-      const n = g.attributes.position.count;
-      g.setAttribute('aSmooth', new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3));
-      g.setAttribute('aPatchN', new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3));
-      g.setAttribute('aPatch', new THREE.Float32BufferAttribute(new Float32Array(n * 4), 4));
-    }
-    for (const [r, P] of patch) {
-      const mean = unit(P.n) ?? [0, 1, 0];
-      const size = P.perim > 1e-9 ? (2 * P.area) / P.perim : Math.sqrt(P.area);
-      // (How flat it is: its faces' normals summed by area over its area; 1 a flat plate,
-      // about 0.5 a dome, near 0 a ring round a limb.)
-      const flat = P.area > 1e-12 ? Math.min(1, Math.hypot(P.n[0], P.n[1], P.n[2]) / (2 * P.area)) : 1;
-      const rec = { bone, id: ids.get(r), area: P.area, size, flat, pts: [], faces: P.faces };
-      for (const v of P.corners) rec.pts.push(pts[v * 3], pts[v * 3 + 1], pts[v * 3 + 2]);
-      for (const f of P.faces) {
-        const sm = f.g.attributes.aSmooth, pn = f.g.attributes.aPatchN;
-        f.v.forEach((v, k) => {
-          const n = smooth.get(r * M + v) ?? (f.len > 1e-12 ? f.n.map((c) => c / f.len) : [0, 1, 0]);
-          sm.setXYZ(f.i + k, n[0], n[1], n[2]);
-          pn.setXYZ(f.i + k, mean[0], mean[1], mean[2]);
-        });
-      }
-      all.push(rec);
-    }
-    yield;
-  }
-  // The merges: each slight patch joins the biggest patch of its joint whose corners come
-  // near its own; a group of them takes its biggest one's id.
-  const near = new Map(); // grid cell -> patches with a corner there
-  const cell = (c) => Math.floor(c / MERGE_NEAR);
-  all.forEach((P, pi) => {
-    for (let j = 0; j < P.pts.length; j += 3) {
-      const key = cellKey(cell(P.pts[j]), cell(P.pts[j + 1]), cell(P.pts[j + 2]));
-      const l = near.get(key);
-      if (!l) near.set(key, [pi]); else if (l[l.length - 1] !== pi) l.push(pi);
-    }
-  });
-  const up = all.map((_, i) => i);
-  const top = (a) => { while (up[a] !== a) { up[a] = up[up[a]]; a = up[a]; } return a; };
-  all.forEach((P, pi) => {
-    if (P.size >= MERGE_SIZE) return;
-    let best = -1;
-    for (let j = 0; j < P.pts.length; j += 3) {
-      const x = P.pts[j], y = P.pts[j + 1], z = P.pts[j + 2];
-      const cx = cell(x), cy = cell(y), cz = cell(z);
-      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
-        for (const o of near.get(cellKey(cx + dx, cy + dy, cz + dz)) ?? []) {
-          const Q = all[o];
-          if (o === pi || Q.bone !== P.bone || (best >= 0 && Q.area <= all[best].area)) continue;
-          for (let q = 0; q < Q.pts.length; q += 3) {
-            if (Math.hypot(Q.pts[q] - x, Q.pts[q + 1] - y, Q.pts[q + 2] - z) < MERGE_NEAR) { best = o; break; }
-          }
-        }
-      }
-    }
-    if (best >= 0) { const a = top(pi), b = top(best); if (a !== b) up[a] = b; }
-  });
-  const biggest = new Map(); // group root -> its biggest patch
-  all.forEach((P, pi) => { const r = top(pi); if (!biggest.has(r) || all[biggest.get(r)].area < P.area) biggest.set(r, pi); });
-  all.forEach((P, pi) => {
-    const merge = all[biggest.get(top(pi))].id;
-    for (const f of P.faces) for (let k = 0; k < 3; k++) f.g.attributes.aPatch.setXYZW(f.i + k, P.id, merge, P.size, P.flat);
-  });
-}
-
-// Occlusion (the pixel styles): the model voxelized at VOX (m); from each corner, OCC_DIRS
-// rays over its smooth normal's side, from OCC_FROM out to OCC_REACH (m), a hit counting
-// the more the nearer it is.
-const VOX = 0.015;
-const OCC_FROM = 0.02;
-const OCC_REACH = 0.1;
-// (Cosine-weighted directions round +z: a spiral, the same every time; x, y, z each.)
-const OCC_DIRS = Float32Array.from({ length: 12 * 3 }, (_, k) => {
-  const i = Math.floor(k / 3), r = Math.sqrt((i + 0.5) / 12), a = i * 2.39996323;
-  return [r * Math.cos(a), r * Math.sin(a), Math.sqrt(1 - r * r)][k % 3];
-});
-
-/**
- * How buried each corner is (`aOcc`, 0 open .. 1 buried: the pixel styles keep the fire out
- * of it and darken it; armor.js): the rays from it over its side of the plate that meet the
- * knight close by (under the helm, beneath the pauldrons, where plates overlap, between the
- * legs). Measured in the rest pose, so only against the pieces that stay put relative to
- * it: its own joint, its parent, its children and its siblings; the helmets count as the
- * head (the great helm for the body's own), a helmet against the head and the neck. A step
- * (yield) every few pieces voxelized, and every piece's rays.
- * @param {[string, THREE.BufferGeometry][]} list  [bone, non-indexed geometry] pairs (with aSmooth)
- */
-function* markOcclusion(list) {
-  const box = new THREE.Box3();
-  for (const [, g] of list) { g.computeBoundingBox(); box.union(g.boundingBox); }
-  box.expandByScalar(OCC_REACH + VOX);
-  const ox = box.min.x, oy = box.min.y, oz = box.min.z;
-  const nx = Math.ceil((box.max.x - ox) / VOX), ny = Math.ceil((box.max.y - oy) / VOX), nz = Math.ceil((box.max.z - oz) / VOX);
-  // Two occupants a cell (the joint's index + 1); a third (at a joint) is left out.
-  const cellA = new Uint8Array(nx * ny * nz), cellB = new Uint8Array(nx * ny * nz);
-  const cellAt = (x, y, z) => {
-    const i = Math.floor((x - ox) / VOX), j = Math.floor((y - oy) / VOX), k = Math.floor((z - oz) / VOX);
-    return i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz ? -1 : (k * ny + j) * nx + i;
-  };
-  const boneNo = (b) => BONE_INDEX[b] + 1;
-  let piece = 0;
-  for (const [bone, g] of list) {
-    if (++piece % 8 === 0) yield;
-    const p = g.attributes.position.array;
-    const b = boneNo(bone);
-    for (let i = 0; i + 8 < p.length; i += 9) {
-      const ax = p[i], ay = p[i + 1], az = p[i + 2];
-      const ux = p[i + 3] - ax, uy = p[i + 4] - ay, uz = p[i + 5] - az, wx = p[i + 6] - ax, wy = p[i + 7] - ay, wz = p[i + 8] - az;
-      const steps = Math.max(1, Math.ceil(Math.max(Math.hypot(ux, uy, uz), Math.hypot(wx, wy, wz)) / (VOX * 0.8)));
-      for (let s = 0; s <= steps; s++) for (let t = 0; t <= steps - s; t++) {
-        const c = cellAt(ax + (ux * s + wx * t) / steps, ay + (uy * s + wy * t) / steps, az + (uz * s + wz * t) / steps);
-        if (c < 0 || cellA[c] === b || cellB[c] === b) continue;
-        if (!cellA[c]) cellA[c] = b;
-        else if (!cellB[c]) cellB[c] = b;
-      }
-    }
-  }
-  // Who can bury whom.
-  const kin = (bone) => {
-    const par = PARENT_ALL[bone];
-    const out = new Set([bone, par]);
-    for (const b of ALL_BONES) if (PARENT_ALL[b] === bone || (par && PARENT_ALL[b] === par)) out.add(b);
-    const helm = bone.startsWith('helm_');
-    if (helm) out.add('neck');
-    else if (out.has('head')) out.add('helm_great');
-    for (const h of HELMETS) if (out.has('helm_' + h) && 'helm_' + h !== bone && (helm || h !== 'great')) out.delete('helm_' + h);
-    const mask = new Uint8Array(ALL_BONES.length + 1);
-    for (const b of out) if (b && BONE_INDEX[b] !== undefined) mask[boneNo(b)] = 1;
-    return mask;
-  };
-  const seen = new Map(); // (a hash of the corner and its normal) -> its occlusion
-  const n3 = OCC_DIRS.length / 3, step = VOX * 0.7;
-  for (const [bone, g] of list) {
-    const mask = kin(bone);
-    const p = g.attributes.position.array, sm = g.attributes.aSmooth.array;
-    const occ = new Float32Array(p.length / 3);
-    for (let v = 0; v < occ.length; v++) {
-      const x = p[v * 3], y = p[v * 3 + 1], z = p[v * 3 + 2], nX = sm[v * 3], nY = sm[v * 3 + 1], nZ = sm[v * 3 + 2];
-      const key = (cellKey(Math.round(x * 2000), Math.round(y * 2000), Math.round(z * 2000)) ^ cellKey(Math.round(nX * 50), Math.round(nY * 50) + 7, Math.round(nZ * 50) + 13) * 31 ^ boneNo(bone)) | 0;
-      const had = seen.get(key);
-      if (had !== undefined) { occ[v] = had; continue; }
-      // (A frame round the normal.)
-      const hx = Math.abs(nY) < 0.9 ? 0 : 1, hy = 1 - hx;
-      let tx = hy * nZ, ty = -hx * nZ, tz = hx * nY - hy * nX;
-      const tl = Math.hypot(tx, ty, tz) || 1;
-      tx /= tl; ty /= tl; tz /= tl;
-      const bx = nY * tz - nZ * ty, by = nZ * tx - nX * tz, bz = nX * ty - nY * tx;
-      let hits = 0;
-      for (let r = 0; r < n3; r++) {
-        const a = OCC_DIRS[r * 3], b = OCC_DIRS[r * 3 + 1], c = OCC_DIRS[r * 3 + 2];
-        const dx = tx * a + bx * b + nX * c, dy = ty * a + by * b + nY * c, dz = tz * a + bz * b + nZ * c;
-        for (let t = OCC_FROM; t <= OCC_REACH; t += step) {
-          const q = cellAt(x + dx * t, y + dy * t, z + dz * t);
-          if (q >= 0 && (mask[cellA[q]] || mask[cellB[q]])) { hits += 1 - (t - OCC_FROM) / (OCC_REACH - OCC_FROM); break; }
-        }
-      }
-      occ[v] = hits / n3;
-      seen.set(key, occ[v]);
-    }
-    g.setAttribute('aOcc', new THREE.Float32BufferAttribute(occ, 1));
-    yield;
-  }
-}
-
-/**
- * The model's pieces, merged: the body's and each helmet's geometry in rest space, with bone,
- * role and plate per vertex (a template: createKnights builds his knights from it). A step at
- * a time: a generator that yields between its parts (each joint's plates and surfaces, the
- * occlusion's pieces: tens of ms in all on a desktop, several times that on a phone), so the
- * caller can spread it over idle moments (scene.js); its return value is the template
- * (`root`: the model it's from). buildTemplate() runs it through at once.
- * @param {THREE.Object3D} gltfRoot  a knight model's loaded scene
- */
-export function* templateSteps(gltfRoot) {
-  const knight = gltfRoot.getObjectByName('Knight') ?? gltfRoot.getObjectByName('K_Hips')?.parent ?? null;
-  if (!knight) throw new Error('Model is missing required node: Knight');
-  if (!knight.getObjectByName('K_Hips')) throw new Error('Model is missing required node: K_Hips');
-  knight.updateMatrixWorld(true);
-  const toKnight = knight.matrixWorld.clone().invert();
-  const restPos = {};
-  const restQuat = {};
-  const m = new THREE.Matrix4();
-  const pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
-  knight.traverse((o) => {
-    const b = NODE_BONE[o.name];
-    if (!b) return;
-    m.multiplyMatrices(toKnight, o.matrixWorld).decompose(pos, quat, scl);
-    restPos[b] = pos.toArray();
-    restQuat[b] = quat.clone();
-  });
-  for (const b of ALL_BONES) {
-    if (restPos[b]) continue;
-    // (A joint the model lacks: the default place, or a helmet on the head.)
-    restPos[b] = b.startsWith('helm_') ? restPos.head ?? DEFAULT_REST.head : DEFAULT_REST[b];
-    restQuat[b] = new THREE.Quaternion();
-  }
-  const body = [];
-  const helm = Object.fromEntries(HELMETS.map((h) => ['helm_' + h, []]));
-  const pieces = []; // [bone, geometry] (for markPlates)
-  knight.traverse((o) => {
-    if (!o.isMesh) return;
-    let j = o;
-    while (j && j !== knight && !NODE_BONE[j.name]) j = j.parent;
-    const bone = j && NODE_BONE[j.name];
-    if (!bone) return;
-    const src = o.geometry;
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', src.attributes.position.clone());
-    if (src.attributes.normal) g.setAttribute('normal', src.attributes.normal.clone());
-    if (src.index) g.setIndex(src.index.clone());
-    g.applyMatrix4(m.multiplyMatrices(toKnight, o.matrixWorld));
-    if (!g.attributes.normal) g.computeVertexNormals();
-    const flat = g.index ? g.toNonIndexed() : g;
-    const n = flat.attributes.position.count;
-    const skinIndex = new Uint16Array(n * 4);
-    const skinWeight = new Float32Array(n * 4);
-    const aRole = new Float32Array(n).fill(roleOf([o.material].flat()[0]?.name ?? ''));
-    for (let i = 0; i < n; i++) { skinIndex[i * 4] = BONE_INDEX[bone]; skinWeight[i * 4] = 1; }
-    flat.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinIndex, 4));
-    flat.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWeight, 4));
-    flat.setAttribute('aRole', new THREE.Float32BufferAttribute(aRole, 1));
-    (helm[bone] ?? body).push(flat);
-    pieces.push([bone, flat]);
-  });
-  if (!body.length) throw new Error('Model has no knight pieces');
-  yield;
-  yield* markPlates(pieces);
-  yield* markPatches(pieces);
-  yield* markOcclusion(pieces);
-  const merge = (list) => {
-    const g = list.length ? mergeGeometries(list, false) : new THREE.BufferGeometry();
-    for (const x of list) x.dispose();
-    g.computeBoundingSphere?.();
-    return g;
-  };
-  const bodyGeo = merge(body);
-  const helmGeos = HELMETS.map((h) => merge(helm['helm_' + h]));
-  /** The heights (rest space) the geometries span: [lo, hi], or the defaults. */
-  const span = (list, lo, hi) => {
-    const box = new THREE.Box3();
-    for (const g of list) { g.computeBoundingBox?.(); if (g.boundingBox) box.union(g.boundingBox); }
-    return Number.isFinite(box.min.y) ? [box.min.y, box.max.y] : [lo, hi];
-  };
-  const follow = knight.getObjectByName('K_Tasset_L')?.userData?.follow;
-  return {
-    root: gltfRoot,
-    // (The dissolve runs over all three helmets' heights, so each burns the same way.)
-    restPos, restQuat, bodyGeo, helmGeos, bodySpan: span([bodyGeo], 0, 1.72), helmSpan: span(helmGeos, 1.4, 1.75),
-    tassetFollow: Number.isFinite(follow) ? follow : null,
-  };
-}
-/** A knight model's template (templateSteps), built at once. */
-function buildTemplate(gltfRoot) {
-  const steps = templateSteps(gltfRoot);
-  let r = steps.next();
-  while (!r.done) r = steps.next();
-  return r.value;
-}
-
-/**
- * The pauldrons' collision data (knightPose.js measurePlates) from the model: each helmet's
- * pieces (the bascinet's mail aventail too: a dome may sit in it no deeper than the model
- * has it at rest) in the head's space, and the left dome's and lames' triangles in their
- * joints' space; null when the model has no dome.
- * `lamesNode`: the lames are on their own node (K_Pauldron_*), not riding the dome.
- */
-function platesOf(T) {
-  const tris = (g, keep, o) => {
-    const p = g.attributes.position;
-    const out = [];
-    if (!p) return out;
-    for (let i = 0; i + 2 < p.count; i += 3) {
-      if (!keep(i)) continue;
-      for (let j = i; j < i + 3; j++) out.push(p.getX(j) - o[0], p.getY(j) - o[1], p.getZ(j) - o[2]);
-    }
-    return out;
-  };
-  const bone = T.bodyGeo.attributes.skinIndex;
-  const on = (b) => (i) => bone.getX(i) === BONE_INDEX[b];
-  const dome = tris(T.bodyGeo, on('shoulderL'), T.restPos.shoulderL);
-  if (!dome.length) return null;
-  const lames = tris(T.bodyGeo, on('pauldronL'), T.restPos.pauldronL);
-  const helmets = Object.fromEntries(HELMETS.map((h, j) => [h, tris(T.helmGeos[j], () => true, T.restPos.head)]));
-  return { plates: measurePlates({ helmets, dome, lames }), lamesNode: lames.length > 0 };
-}
+// Room on both sides (gesture()'s and dance()'s `room`).
+const FREE = [1, 1];
+// A seated ring lifts each foot at most this high over its hip joint (m; at the seats round
+// 9's came to 7 cm): one already up near there (on the ruins' fallen drum) lifts less, or not
+// at all. From about 18 cm up the ankle comes round to where the knee bends toward and the
+// knee folds down under the leg for a step (round 9's knights sitting on the ground, their
+// feet up level with their hips, did on every ring). hop(), riseOf().
+const HOP_TOP = 0.12;
+// (A seated foot's way to where he stands up to, checked at OVER_POINTS points for what it
+// steps over: it passes OVER_CLEAR (m) over the scenery's shapes, lifted at most OVER_MOST;
+// with more than OVER_CROSS to clear, he stands up over his feet first, then steps across.)
+const OVER_POINTS = 17;
+const OVER_CLEAR = 0.015;
+const OVER_MOST = 0.5;
+const OVER_CROSS = 0.06;
+// (Where he stands up to in front of his seat, each boot this far (m) from the scenery's shapes,
+// and his upper body (UPPER: his chest, head and pauldrons' domes) UPPER_CLEAR: room for a
+// dome to ride up with a raised arm (the shrine's lantern roof is at his shoulder): standSpot.)
+const STAND_CLEAR = 0.1;
+const UPPER = new Set(['chest', 'neck', 'head', 'shoulderL', 'shoulderR'].map((b) => BONE_INDEX[b]));
+const UPPER_CLEAR = 0.06;
+// (Standing where he's placed, and the channels standing in front of his seat moves: his root
+// and his feet, sideways, up to their ground and ahead.)
+const STANDING = standingPose();
+const STAND_OFFSET = [0, 2, POSE.legL, POSE.legL + 1, POSE.legL + 2, POSE.legR, POSE.legR + 1, POSE.legR + 2];
 
 /**
  * @param {THREE.Object3D} gltfRoot  the loaded knight.glb scene (a "Knight" node with the K_ joints)
@@ -610,7 +176,19 @@ function platesOf(T) {
  * @param {object} [o.template]      the model's template, built beforehand (templateSteps: in
  *   idle moments); without it, it's built here at once
  */
-export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castShadows = true, armor, max = 4, reducedMotion = false, onSparks = null, template = null } = {}) {
+export function createKnights(
+  gltfRoot,
+  {
+    layerSolid = 0,
+    layerGhost = 2,
+    castShadows = true,
+    armor,
+    max = 4,
+    reducedMotion = false,
+    onSparks = null,
+    template = null,
+  } = {},
+) {
   // The template he's built from now: the knight's own, or another style's model on the same
   // rig (setStyle). The rig, the solver and the plates' collision data are the knight's own.
   let T = template?.root === gltfRoot ? template : buildTemplate(gltfRoot);
@@ -619,9 +197,19 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   const armorPlates = platesOf(T);
   const rig = measureRig(T.restPos, {
     ...(T.tassetFollow ? { tassetFollow: T.tassetFollow } : {}),
-    plates: armorPlates?.plates ?? null, lamesNode: armorPlates?.lamesNode ?? false,
+    plates: armorPlates?.plates ?? null,
+    lamesNode: armorPlates?.lamesNode ?? false,
   });
   const solver = createSolver(rig);
+  // The points his arms and body are checked at against the scenery (keepClear, solveClear):
+  // the template's, built in its steps (or here, at once). Every style's model is moved onto
+  // this one's joints, so its points serve them all.
+  const { arms: probes, body: bodyProbes, helms: helmProbes } = T.probes ?? drain(probesOf(T));
+  // Every pose solved and kept out of the scenery (knightClear.js), and the plates' springs
+  // (knightPlates.js), with this knight's rig and points.
+  const { solve, solveClear } = createClearance(solver, { probes, bodyProbes, helmProbes, nearOf });
+  const springPlates = createPlateSprings({ probes, bodyProbes, nearOf });
+  const FEET = [bodyProbes.find((b) => b.i === BONE_INDEX.footL), bodyProbes.find((b) => b.i === BONE_INDEX.footR)];
   const restPos = ALL_BONES.map((b) => new THREE.Vector3(...T.restPos[b]));
   const restQuat = ALL_BONES.map((b) => T.restQuat[b]);
   const restLocalPos = ALL_BONES.map((b, i) => {
@@ -630,7 +218,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const pi = BONE_INDEX[par];
     return restPos[i].clone().sub(restPos[pi]).applyQuaternion(restQuat[pi].clone().invert());
   });
-  const boneInverses = ALL_BONES.map((b, i) => new THREE.Matrix4().compose(restPos[i], restQuat[i], new THREE.Vector3(1, 1, 1)).invert());
+  const boneInverses = ALL_BONES.map((b, i) =>
+    new THREE.Matrix4().compose(restPos[i], restQuat[i], new THREE.Vector3(1, 1, 1)).invert(),
+  );
   const root = new THREE.Group();
   root.name = 'Knights';
   const materials = [];
@@ -645,8 +235,14 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       bone.quaternion.copy(par ? restQuat[BONE_INDEX[par]].clone().invert().multiply(restQuat[i]) : restQuat[i]);
       return bone;
     });
-    ALL_BONES.forEach((b, i) => { const par = PARENT_ALL[b]; if (par) bones[BONE_INDEX[par]].add(bones[i]); });
-    const skeleton = new THREE.Skeleton(bones, boneInverses.map((mm) => mm.clone()));
+    ALL_BONES.forEach((b, i) => {
+      const par = PARENT_ALL[b];
+      if (par) bones[BONE_INDEX[par]].add(bones[i]);
+    });
+    const skeleton = new THREE.Skeleton(
+      bones,
+      boneInverses.map((mm) => mm.clone()),
+    );
     const bodyMat = createArmorMaterial(armor, { span: T.bodySpan });
     const helmMat = createArmorMaterial(armor, { span: T.helmSpan });
     materials.push(bodyMat, helmMat);
@@ -671,22 +267,48 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     root.add(group);
     const helms = Object.fromEntries(HELMETS.map((h, j) => [h, meshes[j + 1]]));
     return {
-      index, group, bones, skeleton, body: meshes[0], helms, meshes, bodyMat, helmMat,
-      pose: newPose(), from: newPose(), blend: 1, sit: newPose(), stand: newPose(), work: newPose(),
-      present: false, fade: null, ghost: false,
-      forging: null,     // 'in' | 'out': the forge is summoning or sending him off (forgeSubject)
-      mode: 'sit', act: null, queue: [],
-      home: null,        // where he sits: { x, z, yaw, h, feet: [gL, gR], y } (world)
-      yaw: 0, lastStep: -1, clock: 0,
+      index,
+      group,
+      bones,
+      skeleton,
+      body: meshes[0],
+      helms,
+      meshes,
+      bodyMat,
+      helmMat,
+      pose: newPose(),
+      from: newPose(),
+      blend: 1,
+      sit: newPose(),
+      stand: newPose(),
+      work: newPose(),
+      present: false,
+      fade: null,
+      ghost: false,
+      forging: null, // 'in' | 'out': the forge is summoning or sending him off (forgeSubject)
+      mode: 'sit',
+      act: null,
+      queue: [],
+      home: null, // where he sits: { x, z, yaw, h, feet: [gL, gR], y } (world)
+      yaw: 0,
+      lastStep: -1,
+      clock: 0,
       react: { flinch: -9, flinchK: 0, stoke: -9, hop: -9 },
-      lookAt: null, lookW: 0, lookYaw: 0, lookPitch: 0, attn: 0, attnMoving: false,
-      helmet: 'great', swap: null,
-      dancing: null,     // { move, energy, offset, seed, seated }: the dance he's doing
-      nextDance: null,   // ...or the one he's on his way to
-      danceAt: null,     // where he dances: { x, z, yaw, seated }
+      lookAt: null,
+      lookW: 0,
+      lookYaw: 0,
+      lookPitch: 0,
+      attn: 0,
+      attnMoving: false,
+      helmet: 'great',
+      swap: null,
+      dancing: null, // { move, energy, offset, seed, seated }: the dance he's doing
+      nextDance: null, // ...or the one he's on his way to
+      danceAt: null, // where he dances: { x, z, yaw, seated }
       seed: index * 7 + 3,
-      wasBig: false,     // (his last pose step was real motion)
-      solved: null,      // his solved pose's joints (knight space): { p: [Vector3 by BONES index] }
+      wasBig: false, // (his last pose step was real motion)
+      solves: 0, // (how many poses his last step solved: solveClear)
+      solved: null, // his solved pose's joints (knight space): { p: [Vector3 by BONES index] }
       own: { p: BONES.map(() => new THREE.Vector3()) }, // (his own copy: the solver's is shared)
     };
   }
@@ -706,6 +328,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   let headroom = true;
   let beat = { pos: 0, period: 0.5, at: -1 };
   let simT = 0;
+  const fitsAt = createFits(); // (the room round each place fits() was asked about, until a new scenery)
 
   // --- placement --------------------------------------------------------------------------------
   const heightAt = (x, z) => terrain?.height(x, z) ?? 0;
@@ -732,16 +355,28 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         const p = new THREE.Vector3(side * 0.17, 0, seatFeet(top)).applyAxisAngle(Y_AXIS, yaw);
         return heightAt(seat.x + p.x, seat.z + p.z);
       };
-      const gL = ground(1), gR = ground(-1);
+      const gL = ground(1),
+        gR = ground(-1);
       const y = Math.max(0, Math.min(gL, gR));
-      return { x: seat.x, z: seat.z, yaw, h: Math.max(0.15, top - y), feet: [gL - y, gR - y], y, seat: true };
+      return {
+        x: seat.x,
+        z: seat.z,
+        yaw,
+        h: Math.max(0.15, top - y),
+        feet: [gL - y, gR - y],
+        y,
+        seat: true,
+        aside: seat.standAside ?? 0,
+      };
     }
     // The others sit on the ground where the visualizer rests them (knightPlaces.js
     // restPlaces: the ring's clear sides, never in front of the fire), their feet on the ring.
-    const place = restPlaces(ringOf(sceneryName), Math.max(cast, i + 1), seat)[i - 1] ?? danceSlots(sceneryName)[slotOf(i)];
+    const place =
+      restPlaces(ringOf(sceneryName), Math.max(cast, i + 1), seat)[i - 1] ?? danceSlots(sceneryName)[slotOf(i)];
     const out = Math.hypot(place.x - FIRE.x, place.z - FIRE.z) || 1;
     const back = seatFeet(0) - 0.03;
-    const x = place.x + ((place.x - FIRE.x) / out) * back, z = place.z + ((place.z - FIRE.z) / out) * back;
+    const x = place.x + ((place.x - FIRE.x) / out) * back,
+      z = place.z + ((place.z - FIRE.z) / out) * back;
     return { x, z, yaw: faceFire(x, z), h: 0, feet: [0, 0], y: Math.max(0, heightAt(x, z)), seat: false };
   }
   /** Put knight k seated at home now. */
@@ -752,6 +387,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     k.group.rotation.y = k.yaw;
     seatPoseOf(k);
     standAtSeat(k);
+    // (His feet's way up over what's in front of his seat, worked out now: not in the step he
+    // gets up on, the site's first click away.)
+    overOf(k);
     k.mode = 'sit';
     k.act = null;
     k.queue.length = 0;
@@ -775,11 +413,34 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   // --- the ground round his seat (his feet, standing up, room for his arms) ----------------------
   const _hw = new THREE.Vector3();
   /** A place in his own space at `home` ({ x, z, yaw }: x his left, z ahead), in the world (reused). */
-  const atHome = (home, x, z) => { _hw.set(x, 0, z).applyAxisAngle(Y_AXIS, home.yaw); _hw.x += home.x; _hw.z += home.z; return _hw; };
+  const atHome = (home, x, z) => {
+    _hw.set(x, 0, z).applyAxisAngle(Y_AXIS, home.yaw);
+    _hw.x += home.x;
+    _hw.z += home.z;
+    return _hw;
+  };
   /** The ground at a place in his own space at `home`, above the ground he's placed on (m). */
-  const groundUnder = (home, x, z) => { const w = atHome(home, x, z); return THREE.MathUtils.clamp(heightAt(w.x, w.z) - home.y, -0.1, 0.35); };
+  const groundUnder = (home, x, z) => {
+    const w = atHome(home, x, z);
+    return THREE.MathUtils.clamp(heightAt(w.x, w.z) - home.y, -0.1, 0.42);
+  };
+  /**
+   * The ground a seated boot rests on at a place in his own space at `home` (its ankle at x, z):
+   * the highest under its sole from the ankle to the pointed toe (0.3 m ahead), so the toe
+   * never sinks into whatever it reaches over (the ruins' fallen drum: he rests his foot up on
+   * it). (Not the heel's: a foot drawn in tucks its heel under the seat's edge.)
+   */
+  const soleUnder = (home, x, z) => {
+    let g = -Infinity;
+    for (const dz of [0, 0.1, 0.2, 0.28])
+      for (const dx of [-0.05, 0.05]) g = Math.max(g, groundUnder(home, x + dx, z + dz));
+    return g;
+  };
   /** What stands at a place in his own space at `home` (its top), above the ground he's placed on (m). */
-  const topUnder = (home, x, z) => { const w = atHome(home, x, z); return topAt(w.x, w.z) - home.y; };
+  const topUnder = (home, x, z) => {
+    const w = atHome(home, x, z);
+    return topAt(w.x, w.z) - home.y;
+  };
   /**
    * His seated pose at home (into k.sit), each foot on the ground where the pose rests it
    * (a foot up on the seat's log, or down a slope), and the room he has for his arms.
@@ -788,30 +449,79 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const h = k.home;
     seatedPose(k.sit, h.h, rig, style);
     const [fl, fr] = feetAt(k.sit, rig);
-    h.feet = [groundUnder(h, fl[0], fl[1]), groundUnder(h, fr[0], fr[1])];
+    h.feet = [soleUnder(h, fl[0], fl[1]), soleUnder(h, fr[0], fr[1])];
     seatedPose(k.sit, h.h, rig, style, h.feet);
-    h.room ??= roomOf(h);
+    h.room = roomOf(h, k.sit);
+    h.roomLess = null;
+    h.rise = riseOf(k.sit);
     return k.sit;
   }
+  /** How far each foot of a seated pose may lift when a ring passes under him (hop()'s `rise`), [left, right] (m): up to HOP_TOP over its hip joint. */
+  function riseOf(pose) {
+    const s = solve(pose);
+    return SIDES.map((side) =>
+      Math.max(0, HOP_TOP - (s.p[BONE_INDEX['foot' + side]].y - s.p[BONE_INDEX['thigh' + side]].y)),
+    );
+  }
+  const _rn = [0, 0, 0];
   /**
-   * How much room he has out to each side on his seat, [left, right] 0..1 (gesture()'s
-   * `room`): something taller than his shoulders within an arm's throw of them (a pillar, a
-   * standing stone, a lantern) leaves less, and a cheer goes up instead of out. (The height
-   * map only has tops: one far over his head is taken for an arch he sits under, not a wall.)
+   * How much room he has for each arm at home in a pose (`pose`: seated, or standing up in
+   * front of his seat), [left, right] 0..1 (gesture()'s and dance()'s `room`): from each
+   * shoulder to the nearest of the scenery's shapes near him (colliders.js), out to that side,
+   * behind him or in front, at any height (not one across on his other side): 0.12 m or less
+   * leaves none, 0.57 m or more all of it. A pillar at his shoulder leaves little, and a cheer
+   * goes up instead of out.
    */
-  function roomOf(h) {
-    if (!h.seat || !terrain) return [1, 1];
-    const tall = h.h + 0.55, over = h.h + 2.2; // (his shoulders, seated; well over his reach)
-    return [1, -1].map((sg) => {
-      let free = 0.8;
-      for (const r of [0.3, 0.4, 0.5, 0.6, 0.7]) {
-        for (const z of [-0.2, -0.05]) {
-          const top = topUnder(h, sg * r, z);
-          if (r < free && top > tall && top < over) free = r;
+  function roomOf(h, pose) {
+    const cs = collidersNear(sceneryName, h.x, h.z, CLEAR_NEAR + 0.2);
+    if (!cs.length) return FREE;
+    const s = solve(pose);
+    const hipsX = s.p[BONE_INDEX.hips].x;
+    const c = Math.cos(h.yaw),
+      sn = Math.sin(h.yaw);
+    return ['L', 'R'].map((side, i) => {
+      const sg = i ? -1 : 1;
+      const at = s.p[SHOULDER[side]];
+      const wx = h.x + at.x * c + at.z * sn,
+        wy = h.y + at.y,
+        wz = h.z - at.x * sn + at.z * c;
+      let d = Infinity;
+      for (const col of cs) {
+        const e = distanceTo(col, wx, wy, wz);
+        if (e >= d) continue;
+        if (e > 0) {
+          // (Where it's nearest, in his own space: across on his other side, it isn't in this arm's way.)
+          outOf(col, wx, wy, wz, _rn);
+          const lx = (wx - _rn[0] * e - h.x) * c - (wz - _rn[2] * e - h.z) * sn;
+          if ((lx - hipsX) * sg < -0.05) continue;
         }
+        d = e;
       }
-      return Math.min(1, Math.max(0, (free - 0.3) / 0.45));
+      return THREE.MathUtils.clamp((d - 0.12) / 0.45, 0, 1);
     });
+  }
+  /**
+   * The room he has for his arms now: at home (his seat, or where he sat down on the ground)
+   * the room there, seated or standing up in front of it (the less of the two while he gets
+   * up or sits down; the site's dance up from his seat has that on its way up and down, and
+   * the room up there while he's up: danceUp); elsewhere all of it (a dancer's place is picked
+   * with room for its moves: fits()). keepClear() catches the rest.
+   */
+  function roomNow(k) {
+    const h = k.home;
+    if (!h?.room || Math.hypot(k.group.position.x - h.x, k.group.position.z - h.z) > 0.05) return FREE;
+    const a = k.act?.kind;
+    const up = h.roomUp ?? h.room;
+    const less = (h.roomLess ??= [Math.min(h.room[0], up[0]), Math.min(h.room[1], up[1])]);
+    if (k.mode === 'sit' && !a) {
+      if (k.gestureName !== 'dance' || k.danceInPlace) return h.room;
+      const u = danceUp(k),
+        r = (k.roomNow ??= [0, 0]);
+      for (let j = 0; j < 2; j++) r[j] = less[j] + (up[j] - less[j]) * u;
+      return r;
+    }
+    if (k.mode === 'stand' && !a) return up;
+    return less;
   }
   /**
    * Where he stands up to in front of his seat (his own space, the hips over it): a stride
@@ -822,31 +532,84 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   function standSpot(h) {
     const z0 = seatFeet(h.h) - 0.03;
     if (!h.seat || !terrain) return { x: 0, z: z0 };
-    const fx = rig.pos.footL.x + 0.03, fz = rig.pos.footL.z + 0.02;
-    /** The ground under a boot there if it's level and open (nothing on it, out of the fire), else NaN. */
+    const fx = rig.pos.footL.x + 0.03,
+      fz = rig.pos.footL.z + 0.02;
+    const cs = collidersNear(sceneryName, h.x, h.z, CLEAR_NEAR);
+    const upper = upperBody();
+    /** Whether his upper body standing at (x, z), the ground `g` up, keeps UPPER_CLEAR from the shapes. */
+    const roomAbove = (x, z, g) => {
+      for (let j = 0; j < upper.length; j += 3) {
+        const w = atHome(h, x + upper[j], z + upper[j + 2]);
+        for (const c of cs) if (distanceTo(c, w.x, h.y + g + upper[j + 1], w.z) < UPPER_CLEAR) return false;
+      }
+      return true;
+    };
+    /**
+     * The ground under a boot there if it's level and open (nothing on it, out of the fire, a
+     * hand's breadth from the scenery's shapes: room for the dance's steps), else NaN.
+     */
     const level = (x, z) => {
-      let lo = Infinity, hi = -Infinity;
-      for (const [dx, dz] of [[0, 0], [0.06, 0], [-0.06, 0], [0, 0.12], [0, -0.06]]) {
+      let lo = Infinity,
+        hi = -Infinity;
+      // (Its sole, heel to its pointed toe and either side; the boot, toe aside, out of the fire.)
+      for (const [dx, dz] of [
+        [0, 0],
+        [0.07, 0],
+        [-0.07, 0],
+        [0, 0.12],
+        [0, 0.24],
+        [0.06, 0.18],
+        [-0.06, 0.18],
+        [0, -0.06],
+      ]) {
         const g = groundUnder(h, x + dx, z + dz);
         const w = atHome(h, x + dx, z + dz);
-        if (topUnder(h, x + dx, z + dz) - g > 0.05 || Math.hypot(w.x - FIRE.x, w.z - FIRE.z) < 1.05) return NaN;
-        lo = Math.min(lo, g); hi = Math.max(hi, g);
+        if (topUnder(h, x + dx, z + dz) - g > 0.05 || (dz <= 0.12 && Math.hypot(w.x - FIRE.x, w.z - FIRE.z) < 1.05))
+          return NaN;
+        for (const c of cs)
+          if (
+            distanceTo(c, w.x, h.y + g + 0.05, w.z) < STAND_CLEAR ||
+            distanceTo(c, w.x, h.y + g + 0.3, w.z) < STAND_CLEAR
+          )
+            return NaN;
+        lo = Math.min(lo, g);
+        hi = Math.max(hi, g);
       }
-      return hi - lo < 0.04 ? (lo + hi) / 2 : NaN;
+      return hi - lo < 0.05 ? (lo + hi) / 2 : NaN;
     };
     let best = null;
+    // (Round the seat's own way aside, if it has one: SEATS standAside.)
+    const aside = h.aside ?? 0;
     for (let dz = 0; dz < 0.36; dz += 0.05) {
       for (let dx = 0; dx < 0.41; dx += 0.05) {
-        for (const x of dx ? [-dx, dx] : [0]) {
-          const score = Math.abs(x) + 0.8 * dz;
+        for (const x of dx ? [aside - dx, aside + dx] : [aside]) {
+          const score = Math.abs(x - aside) + 0.8 * dz;
           if (best && score >= best.score) continue;
-          const gl = level(x + fx, z0 + dz + fz), gr = level(x - fx, z0 + dz + fz);
-          // (Both boots level with each other, not up on anything or down a hole.)
-          if (Math.abs(gl - gr) < 0.04 && gl > -0.12 && gl < 0.06) best = { x, z: z0 + dz, score };
+          const gl = level(x + fx, z0 + dz + fz),
+            gr = level(x - fx, z0 + dz + fz);
+          // (Both boots level with each other, not up on anything or down a hole; room above.)
+          if (Math.abs(gl - gr) < 0.04 && gl > -0.12 && gl < 0.06 && roomAbove(x, z0 + dz, (gl + gr) / 2))
+            best = { x, z: z0 + dz, score };
         }
       }
     }
     return best ?? { x: 0, z: z0 };
+  }
+  let upperPts = null;
+  /** His upper body's points (UPPER) standing where he's placed, in his own space: x, y, z, … (once). */
+  function upperBody() {
+    if (upperPts) return upperPts;
+    const s = solve(standingPose(newPose()));
+    const out = [],
+      v = new THREE.Vector3();
+    for (const b of bodyProbes) {
+      if (!UPPER.has(b.i)) continue;
+      for (let j = 0; j < b.pts.length; j += 3) {
+        v.fromArray(b.pts, j).applyQuaternion(s.q[b.i]).add(s.p[b.i]);
+        out.push(v.x, v.y, v.z);
+      }
+    }
+    return (upperPts = Float32Array.from(out));
   }
   /** His standing pose in front of his seat (standSpot), over his feet, each on its ground. */
   function standAtSeat(k) {
@@ -855,22 +618,131 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const s = h ? (h.stand ??= standSpot(h)) : { x: 0, z: 0 };
     k.stand[0] = s.x;
     k.stand[2] = s.z;
-    k.stand[32] += s.x; k.stand[37] -= s.x; // (legs: x is out to each side)
+    k.stand[32] += s.x;
+    k.stand[37] -= s.x; // (legs: x is out to each side)
     k.stand[32 + 2] = s.z + 0.02;
     k.stand[37 + 2] = s.z + 0.02;
     if (h) {
       const [fl, fr] = feetAt(k.stand, rig);
       k.stand[33] += groundUnder(h, fl[0], fl[1]);
       k.stand[38] += groundUnder(h, fr[0], fr[1]);
+      if (!h.roomUp) {
+        h.roomUp = roomOf(h, k.stand);
+        h.roomLess = null;
+      }
     }
     return k.stand;
+  }
+  const _feet = new Float64Array(8);
+  /** A pose's feet (feetAt: x his left, z ahead) into _feet from `j`: left x, z, right x, z. */
+  function feetInto(p, j) {
+    const L = rig.pos.footL,
+      R = rig.pos.footR;
+    _feet[j] = L.x + p[POSE.legL];
+    _feet[j + 1] = L.z + p[POSE.legL + 2];
+    _feet[j + 2] = R.x - p[POSE.legR];
+    _feet[j + 3] = R.z + p[POSE.legR + 2];
+  }
+  /**
+   * Whether a foot comes nearer any of the scenery's shapes `cs` than `under` (m) with its joint
+   * at (x, y, z) in his own space at his home `h`, level (its points: `foot`; a clump of them
+   * that can't come that near passed over whole).
+   */
+  function footIn(h, foot, x, y, z, cs, under) {
+    const c = Math.cos(h.yaw),
+      sn = Math.sin(h.yaw);
+    const gx = h.x + x * c + z * sn,
+      gy = h.y + y,
+      gz = h.z - x * sn + z * c;
+    const P = foot.pts,
+      C = foot.clumps;
+    for (const col of cs) {
+      if (distanceTo(col, gx, gy, gz) - col.lip * foot.r >= under) continue;
+      for (let q = 0; q < C.length; q += 6) {
+        if (
+          distanceTo(col, gx + C[q] * c + C[q + 2] * sn, gy + C[q + 1], gz - C[q] * sn + C[q + 2] * c) -
+            col.lip * C[q + 3] >=
+          under
+        )
+          continue;
+        for (let j = C[q + 4], end = C[q + 5]; j < end; j += 3) {
+          if (distanceTo(col, gx + P[j] * c + P[j + 2] * sn, gy + P[j + 1], gz - P[j] * sn + P[j + 2] * c) < under)
+            return true;
+        }
+      }
+    }
+    return false;
+  }
+  /**
+   * How much higher each foot has to go on its way between where it rests seated and where
+   * it stands up to (rise()'s `over`, at OVER_POINTS points along the straight way from the
+   * seated end): as much as keeps it OVER_CLEAR clear of the scenery's shapes there (his boot
+   * resting up on the ruins' fallen drum steps up and off it, not down through it), and
+   * whether either has more than OVER_CROSS to clear (`cross`: he stands up over his feet
+   * first, then steps). Kept with him until his seat, his seat pose or where he stands up to
+   * changes; null away from a seat.
+   */
+  function overOf(k) {
+    const h = k.home;
+    if (!h?.seat) return null;
+    const o = (k.over ??= {
+      L: new Float32Array(OVER_POINTS),
+      R: new Float32Array(OVER_POINTS),
+      cross: false,
+      key: new Float64Array(8),
+      home: null,
+    });
+    // (Each foot's place seated, then standing, as feetAt has them: x his left, z ahead.)
+    feetInto(k.sit, 0);
+    feetInto(k.stand, 4);
+    let same = o.home === h;
+    for (let i = 0; i < 8; i++) if (o.key[i] !== _feet[i]) same = false;
+    if (same) return o;
+    o.key.set(_feet);
+    o.home = h;
+    const cs = nearOf(k);
+    for (let f = 0; f < 2; f++) {
+      const out = f ? o.R : o.L;
+      out.fill(0);
+      if (!cs.length) continue;
+      const foot = FEET[f],
+        leg = f ? POSE.legR : POSE.legL;
+      const ax = _feet[2 * f],
+        az = _feet[2 * f + 1],
+        bx = _feet[4 + 2 * f],
+        bz = _feet[5 + 2 * f];
+      const ay = k.sit[leg + 1] + rig.ankleY,
+        by = k.stand[leg + 1] + rig.ankleY;
+      for (let i = 1; i < OVER_POINTS - 1; i++) {
+        const e = i / (OVER_POINTS - 1);
+        const x = ax + (bx - ax) * e,
+          y = ay + (by - ay) * e,
+          z = az + (bz - az) * e;
+        if (!footIn(h, foot, x, y, z, cs, OVER_CLEAR)) continue;
+        // (As little higher as clears it, to a centimetre.)
+        let lo = 0,
+          hi = OVER_MOST;
+        while (hi - lo > 0.01) {
+          const m = (lo + hi) / 2;
+          if (!footIn(h, foot, x, y + m, z, cs, OVER_CLEAR)) hi = m;
+          else lo = m;
+        }
+        out[i] = hi;
+      }
+    }
+    // (Something to step over on the way, not just a step down: he stands up first, rise().)
+    o.cross = Math.max(...o.L, ...o.R) > OVER_CROSS;
+    return o;
   }
 
   // --- presence (the dissolve) --------------------------------------------------------------------
   function setGhost(k, on) {
     if (k.ghost === on) return;
     k.ghost = on;
-    for (const mesh of k.meshes) { mesh.layers.set(on ? layerGhost : layerSolid); mesh.castShadow = castShadows && !on; }
+    for (const mesh of k.meshes) {
+      mesh.layers.set(on ? layerGhost : layerSolid);
+      mesh.castShadow = castShadows && !on;
+    }
     shadowDirty = true;
   }
   /** Shown or hidden (his group), and the shadow redrawn for it. */
@@ -888,7 +760,12 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     k.fade = null;
     endForge(k);
     setShown(k, false);
-    if (k.swap) { const s = k.swap; k.swap = null; wear(k, s.to); s.resolve(true); }
+    if (k.swap) {
+      const s = k.swap;
+      k.swap = null;
+      wear(k, s.to);
+      s.resolve(true);
+    }
     k.gestureName = null;
     setGhost(k, false);
     setHelmGhost(k, false);
@@ -900,7 +777,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   /** The cast is as many as the highest knight who's here and staying (setCast sets it outright). */
   function recount() {
     cast = 0;
-    knights.forEach((k, i) => { if (k.present && !leaving(k)) cast = i + 1; });
+    knights.forEach((k, i) => {
+      if (k.present && !leaving(k)) cast = i + 1;
+    });
   }
   /** Burn away (to 1) or form (to 0) over FADE_TIME, with an ember edge; then `done`. */
   function fade(k, to, done = null) {
@@ -923,12 +802,17 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     k.fade = null;
     // (Gone, unless he's only going somewhere else: `done` brings him back.)
     if (f.to >= 1 && !f.done) vanish(k);
-    else if (f.to < 1) { setGhost(k, false); flash(k, 0.7); }
+    else if (f.to < 1) {
+      setGhost(k, false);
+      flash(k, 0.7);
+    }
     f.done?.();
   }
   // A flash over him (formed, or a new helmet), fading: in his own tones (the armor's uLift),
   // never a wash of the edge color (that turns him into a flat cut-out of one color).
-  function flash(k, amount, helmOnly = false) { k.glow = { v: amount, helmOnly }; }
+  function flash(k, amount, helmOnly = false) {
+    k.glow = { v: amount, helmOnly };
+  }
 
   // --- summoned and sent off by the forge (the site's knight: knightArrival.js) ----------------
   // summon(i, { forge: true }) seats him burnt away on the ghost layer and leaves his dissolve
@@ -937,7 +821,12 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   // it: whole and solid again, or gone. Meanwhile his helmet burns with his body (its dissolve
   // runs over his whole height, not the helmet's own) and nothing else touches his dissolve.
   function beginForge(k, dir) {
-    if (k.swap) { const s = k.swap; k.swap = null; wear(k, s.to); s.resolve(true); }
+    if (k.swap) {
+      const s = k.swap;
+      k.swap = null;
+      wear(k, s.to);
+      s.resolve(true);
+    }
     k.fade = null;
     k.glow = null;
     for (const m of [k.bodyMat, k.helmMat]) m.userData.uniforms.uLift.value = 0;
@@ -949,7 +838,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     if (!k.forging) return;
     k.forging = null;
     k.helmMat.userData.uniforms.uSpan.value.set(T.helmSpan[0], T.helmSpan[1]);
-    for (const m of [k.bodyMat, k.helmMat]) { m.userData.uniforms.uFrost && (m.userData.uniforms.uFrost.value = 0); }
+    for (const m of [k.bodyMat, k.helmMat]) {
+      m.userData.uniforms.uFrost && (m.userData.uniforms.uFrost.value = 0);
+    }
   }
   /**
    * Knight i as the forge sees him (forgeRun.js ForgeSubject), posed as he is now: `n` points
@@ -971,27 +862,44 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const restY = new Float32Array(count);
     const v = new THREE.Vector3();
     let o = 0;
-    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    let x0 = Infinity,
+      x1 = -Infinity,
+      z0 = Infinity,
+      z1 = -Infinity;
     for (const g of geos) {
-      const p = g.attributes.position, s = g.attributes.skinIndex;
+      const p = g.attributes.position,
+        s = g.attributes.skinIndex;
       for (let j = 0; j < p.count; j++, o++) {
         v.fromBufferAttribute(p, j);
         restY[o] = v.y;
         v.applyMatrix4(M[s.getX(j)]);
-        posed[o * 3] = v.x; posed[o * 3 + 1] = v.y; posed[o * 3 + 2] = v.z;
-        x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); z0 = Math.min(z0, v.z); z1 = Math.max(z1, v.z);
+        posed[o * 3] = v.x;
+        posed[o * 3 + 1] = v.y;
+        posed[o * 3 + 2] = v.z;
+        x0 = Math.min(x0, v.x);
+        x1 = Math.max(x1, v.x);
+        z0 = Math.min(z0, v.z);
+        z1 = Math.max(z1, v.z);
       }
     }
     // (His own axis: the middle of him from above, so the helix winds round all of him.)
-    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-    for (let j = 0; j < count; j++) { posed[j * 3] -= cx; posed[j * 3 + 2] -= cz; }
+    const cx = (x0 + x1) / 2,
+      cz = (z0 + z1) / 2;
+    for (let j = 0; j < count; j++) {
+      posed[j * 3] -= cx;
+      posed[j * 3 + 2] -= cz;
+    }
     const [lo, hi] = T.bodySpan;
     const tris = count / 3;
     const cum = new Float32Array(tris);
-    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    const a = new THREE.Vector3(),
+      b = new THREE.Vector3(),
+      c = new THREE.Vector3();
     let total = 0;
     for (let t = 0; t < tris; t++) {
-      a.fromArray(posed, t * 9); b.fromArray(posed, t * 9 + 3); c.fromArray(posed, t * 9 + 6);
+      a.fromArray(posed, t * 9);
+      b.fromArray(posed, t * 9 + 3);
+      c.fromArray(posed, t * 9 + 6);
       total += b.sub(a).cross(c.sub(a)).length() / 2;
       cum[t] = total;
     }
@@ -999,11 +907,24 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const heights = new Float32Array(n);
     for (let s = 0; s < n; s++) {
       const r = Math.random() * total;
-      let l = 0, h = tris - 1;
-      while (l < h) { const mid = (l + h) >> 1; if (cum[mid] < r) l = mid + 1; else h = mid; }
-      let u = Math.random(), w = Math.random();
-      if (u + w > 1) { u = 1 - u; w = 1 - w; }
-      for (let d = 0; d < 3; d++) samples[s * 3 + d] = posed[l * 9 + d] + (posed[l * 9 + 3 + d] - posed[l * 9 + d]) * u + (posed[l * 9 + 6 + d] - posed[l * 9 + d]) * w;
+      let l = 0,
+        h = tris - 1;
+      while (l < h) {
+        const mid = (l + h) >> 1;
+        if (cum[mid] < r) l = mid + 1;
+        else h = mid;
+      }
+      let u = Math.random(),
+        w = Math.random();
+      if (u + w > 1) {
+        u = 1 - u;
+        w = 1 - w;
+      }
+      for (let d = 0; d < 3; d++)
+        samples[s * 3 + d] =
+          posed[l * 9 + d] +
+          (posed[l * 9 + 3 + d] - posed[l * 9 + d]) * u +
+          (posed[l * 9 + 6 + d] - posed[l * 9 + d]) * w;
       const y = restY[l * 3] + (restY[l * 3 + 1] - restY[l * 3]) * u + (restY[l * 3 + 2] - restY[l * 3]) * w;
       heights[s] = THREE.MathUtils.clamp((y - lo) / (hi - lo), 0, 1);
     }
@@ -1011,19 +932,58 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const offset = new THREE.Matrix4().makeTranslation(cx, 0, cz);
     const matrixWorld = () => frame.multiplyMatrices(k.group.matrixWorld, offset);
     let silhouette = null;
-    const A = k.bodyMat.userData.uniforms, B = k.helmMat.userData.uniforms;
-    const both = (name, k = 1) => ({ get value() { return A[name].value / k; }, set value(x) { A[name].value = x * k; B[name].value = x * k; } });
-    const bothColor = (name) => ({ value: { copy(x) { A[name].value.copy(x); B[name].value.copy(x); return A[name].value; } } });
+    const A = k.bodyMat.userData.uniforms,
+      B = k.helmMat.userData.uniforms;
+    const both = (name, k = 1) => ({
+      get value() {
+        return A[name].value / k;
+      },
+      set value(x) {
+        A[name].value = x * k;
+        B[name].value = x * k;
+      },
+    });
+    const bothColor = (name) => ({
+      value: {
+        copy(x) {
+          A[name].value.copy(x);
+          B[name].value.copy(x);
+          return A[name].value;
+        },
+      },
+    });
     // (The armor's frost glaze if it has one; otherwise the frost washes him in the edge's
     // pale tone, the dissolve's glow.)
     let frost = 0;
-    const frosty = A.uFrost ? both('uFrost') : { get value() { return frost; }, set value(x) { frost = x; A.uGlow.value = B.uGlow.value = x * 0.85; } };
+    const frosty = A.uFrost
+      ? both('uFrost')
+      : {
+          get value() {
+            return frost;
+          },
+          set value(x) {
+            frost = x;
+            A.uGlow.value = B.uGlow.value = x * 0.85;
+          },
+        };
     const head = new THREE.Vector3();
     return {
-      get matrixWorld() { return matrixWorld(); },
-      samples, heights,
+      get matrixWorld() {
+        return matrixWorld();
+      },
+      samples,
+      heights,
       span: new THREE.Vector2(lo, hi),
-      silhouette: () => (silhouette ??= weaponSilhouette(new Map([[{ geometry: new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(posed, 3)) }, new THREE.Matrix4()]]), 0.02)),
+      silhouette: () =>
+        (silhouette ??= weaponSilhouette(
+          new Map([
+            [
+              { geometry: new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(posed, 3)) },
+              new THREE.Matrix4(),
+            ],
+          ]),
+          0.02,
+        )),
       helixWide: (s) => 0.42 + 0.16 * Math.sin(Math.PI * s),
       formsUp: true, // (from his boots up, whatever the element)
       formGlow: false, // (in his own steel behind the burning edge: see uGlow)
@@ -1036,7 +996,8 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         return out.copy(head).setY(head.y + (s > 0.8 ? 0.3 : 0));
       },
       ground(rng, out) {
-        const ang = rng() * Math.PI * 2, r = 0.45 + rng() * 0.35;
+        const ang = rng() * Math.PI * 2,
+          r = 0.45 + rng() * 0.35;
         return out.set(Math.cos(ang) * r, 0.05, Math.sin(ang) * r).applyMatrix4(matrixWorld());
       },
       uniforms: {
@@ -1044,13 +1005,23 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         // in it reads as a flat cut-out, not as him. He forms in his own steel behind the
         // burning edge, each of the lightning's jumps flashing him up his own ramp (uLift, as a
         // new helmet does); formed, the fire's reflection sweeps him: scene.js.)
-        uDissolve: both('uDissolve'), uGlow: both('uGlow', 0.5), uFlip: both('uFlip'), uLift: both('uLift'),
-        uEdge: bothColor('uEdge'), uEdgeHot: bothColor('uEdgeHot'),
-        uFrost: frosty, uFrostColor: A.uFrostColor ? bothColor('uFrostColor') : { value: new THREE.Color() },
+        uDissolve: both('uDissolve'),
+        uGlow: both('uGlow', 0.5),
+        uFlip: both('uFlip'),
+        uLift: both('uLift'),
+        uEdge: bothColor('uEdge'),
+        uEdgeHot: bothColor('uEdgeHot'),
+        uFrost: frosty,
+        uFrostColor: A.uFrostColor ? bothColor('uFrostColor') : { value: new THREE.Color() },
       },
       // (A ghost casts no shadow: the lightning's strobe needn't redraw it.)
-      show(on) { if (k.ghost) k.group.visible = on; else setShown(k, on); },
-      ghost(on) { setGhost(k, on); },
+      show(on) {
+        if (k.ghost) k.group.visible = on;
+        else setShown(k, on);
+      },
+      ghost(on) {
+        setGhost(k, on);
+      },
     };
   }
   /**
@@ -1073,14 +1044,22 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     if (!valid(i)) return false;
     const k = knights[i];
     if (!k.forging) return false;
-    if (k.forging === 'out') { vanish(k); recount(); return true; }
+    if (k.forging === 'out') {
+      vanish(k);
+      recount();
+      return true;
+    }
     const glow = k.bodyMat.userData.uniforms.uGlow.value;
     endForge(k);
     k.group.visible = true;
     setShown(k, true);
     setGhost(k, false);
     // (The forge's wash ends as he stands whole; what's left of it flashes in his own tones.)
-    for (const m of [k.bodyMat, k.helmMat]) { m.userData.uniforms.uDissolve.value = 0; m.userData.uniforms.uFlip.value = 0; m.userData.uniforms.uGlow.value = 0; }
+    for (const m of [k.bodyMat, k.helmMat]) {
+      m.userData.uniforms.uDissolve.value = 0;
+      m.userData.uniforms.uFlip.value = 0;
+      m.userData.uniforms.uGlow.value = 0;
+    }
     if (glow > 0.02) flash(k, Math.min(1, glow));
     shadowDirty = true;
     return true;
@@ -1093,7 +1072,14 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     for (let j = 0; j < n; j++) {
       const b = bone ?? Math.floor(Math.random() * BONES.length);
       k.bones[b].getWorldPosition(sparkAt);
-      list.push({ x: sparkAt.x + (Math.random() - 0.5) * 0.15, y: sparkAt.y + (Math.random() - 0.3) * 0.12, z: sparkAt.z + (Math.random() - 0.5) * 0.15, vx: (Math.random() - 0.5) * 0.5, vy: 0.5 + Math.random() * 0.9, vz: (Math.random() - 0.5) * 0.5 });
+      list.push({
+        x: sparkAt.x + (Math.random() - 0.5) * 0.15,
+        y: sparkAt.y + (Math.random() - 0.3) * 0.12,
+        z: sparkAt.z + (Math.random() - 0.5) * 0.15,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: 0.5 + Math.random() * 0.9,
+        vz: (Math.random() - 0.5) * 0.5,
+      });
     }
     onSparks(list);
   }
@@ -1118,17 +1104,26 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   function adopt(t) {
     if (templates.has(t.root)) return templates.get(t.root);
     for (const g of [t.bodyGeo, ...t.helmGeos]) {
-      const p = g.attributes.position, si = g.attributes.skinIndex;
+      const p = g.attributes.position,
+        si = g.attributes.skinIndex;
       if (!p || !si) continue;
       for (let i = 0; i < p.count; i++) {
         const b = ALL_BONES[si.getX(i)];
-        const from = t.restPos[b], to = T0.restPos[b];
+        const from = t.restPos[b],
+          to = T0.restPos[b];
         p.setXYZ(i, p.getX(i) + to[0] - from[0], p.getY(i) + to[1] - from[1], p.getZ(i) + to[2] - from[2]);
       }
       p.needsUpdate = true;
       g.computeBoundingSphere();
     }
-    const out = { ...T0, root: t.root, bodyGeo: t.bodyGeo, helmGeos: t.helmGeos, bodySpan: t.bodySpan, helmSpan: t.helmSpan };
+    const out = {
+      ...T0,
+      root: t.root,
+      bodyGeo: t.bodyGeo,
+      helmGeos: t.helmGeos,
+      bodySpan: t.bodySpan,
+      helmSpan: t.helmSpan,
+    };
     templates.set(t.root, out);
     return out;
   }
@@ -1139,7 +1134,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     T = next;
     for (const k of knights) {
       k.body.geometry = T.bodyGeo;
-      HELMETS.forEach((h, j) => { k.helms[h].geometry = T.helmGeos[j]; });
+      HELMETS.forEach((h, j) => {
+        k.helms[h].geometry = T.helmGeos[j];
+      });
       k.bodyMat.userData.uniforms.uSpan.value.set(T.bodySpan[0], T.bodySpan[1]);
       const hs = k.forging || restyle?.ks.includes(k) ? T.bodySpan : T.helmSpan;
       k.helmMat.userData.uniforms.uSpan.value.set(hs[0], hs[1]);
@@ -1177,7 +1174,12 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       restyle = { t: 0, name, T: next, switched: false, flashed: false, resolve, ks };
       for (const k of ks) {
         // (A helmet swap in the way is done at once: the whole of him burns now.)
-        if (k.swap) { const s = k.swap; k.swap = null; wear(k, s.to); s.resolve(true); }
+        if (k.swap) {
+          const s = k.swap;
+          k.swap = null;
+          wear(k, s.to);
+          s.resolve(true);
+        }
         k.helmMat.userData.uniforms.uSpan.value.set(T.bodySpan[0], T.bodySpan[1]);
         setGhost(k, true);
       }
@@ -1189,7 +1191,11 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     r.t += dt;
     const t = r.t;
     const burning = t < RESTYLE_BURN;
-    const d = burning ? t / RESTYLE_BURN : t < RESTYLE_BURN + RESTYLE_GAP ? 1 : Math.max(0, 1 - (t - RESTYLE_BURN - RESTYLE_GAP) / RESTYLE_BURN);
+    const d = burning
+      ? t / RESTYLE_BURN
+      : t < RESTYLE_BURN + RESTYLE_GAP
+        ? 1
+        : Math.max(0, 1 - (t - RESTYLE_BURN - RESTYLE_GAP) / RESTYLE_BURN);
     if (!r.switched && !burning) {
       r.switched = true;
       switchStyle(r.name, r.T);
@@ -1202,7 +1208,12 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         m.userData.uniforms.uDissolve.value = formed ? 0 : d;
       }
       if (!formed && Math.random() < 0.6) sparksFrom(k, 1);
-      if (formed && !r.flashed) { setGhost(k, false); setHelmGhost(k, false); flash(k, 0.9); sparksFrom(k, 14); }
+      if (formed && !r.flashed) {
+        setGhost(k, false);
+        setHelmGhost(k, false);
+        flash(k, 0.9);
+        sparksFrom(k, 14);
+      }
     }
     if (formed) r.flashed = true;
     if (t >= RESTYLE_TIME) endRestyle(true);
@@ -1217,13 +1228,23 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   }
   function setHelmetOf(k, name, instant) {
     if (!HELMETS.includes(name)) return Promise.resolve(false);
-    if (k.swap) { k.swap.resolve(false); k.swap = null; setHelmGhost(k, false); }
+    if (k.swap) {
+      k.swap.resolve(false);
+      k.swap = null;
+      setHelmGhost(k, false);
+    }
     if (name === k.helmet && !k.swap) return Promise.resolve(true);
-    if (instant || reducedMotion || !k.present || k.fade) { wear(k, name); return Promise.resolve(true); }
+    if (instant || reducedMotion || !k.present || k.fade) {
+      wear(k, name);
+      return Promise.resolve(true);
+    }
     return new Promise((resolve) => {
       k.swap = { t: 0, from: k.helmet, to: name, switched: false, resolve };
       // (Dancing, he changes it without stopping: the helm burns and forms on its own.)
-      if (k.gestureName !== 'dance') { k.gestureName = 'helm'; k.gestureT = 0; }
+      if (k.gestureName !== 'dance') {
+        k.gestureName = 'helm';
+        k.gestureT = 0;
+      }
     });
   }
   function setHelmGhost(k, on) {
@@ -1243,17 +1264,42 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const u = k.helmMat.userData.uniforms;
     if (s.t < 0.3) return;
     if (s.t < 1.2) setHelmGhost(k, true);
-    if (s.t < 0.75) { u.uFlip.value = 1; u.uDissolve.value = (s.t - 0.3) / 0.45; if (Math.random() < 0.6) sparksFrom(k, 1, BONE_INDEX.head); return; }
-    if (!s.switched) { s.switched = true; wear(k, s.to); u.uFlip.value = 0; }
-    if (s.t < 1.2) { u.uDissolve.value = 1 - (s.t - 0.75) / 0.45; return; }
-    if (!s.puffed) { s.puffed = true; u.uDissolve.value = 0; setHelmGhost(k, false); flash(k, 0.9, true); sparksFrom(k, 14, BONE_INDEX.head); }
-    if (s.t >= HELM_TIME) { k.swap = null; s.resolve(true); }
+    if (s.t < 0.75) {
+      u.uFlip.value = 1;
+      u.uDissolve.value = (s.t - 0.3) / 0.45;
+      if (Math.random() < 0.6) sparksFrom(k, 1, BONE_INDEX.head);
+      return;
+    }
+    if (!s.switched) {
+      s.switched = true;
+      wear(k, s.to);
+      u.uFlip.value = 0;
+    }
+    if (s.t < 1.2) {
+      u.uDissolve.value = 1 - (s.t - 0.75) / 0.45;
+      return;
+    }
+    if (!s.puffed) {
+      s.puffed = true;
+      u.uDissolve.value = 0;
+      setHelmGhost(k, false);
+      flash(k, 0.9, true);
+      sparksFrom(k, 14, BONE_INDEX.head);
+    }
+    if (s.t >= HELM_TIME) {
+      k.swap = null;
+      s.resolve(true);
+    }
   }
 
   // --- actions ----------------------------------------------------------------------------------------
   // A knight runs one action at a time (getting up, walking, turning, sitting down, settling
   // onto his seat, starting a dance); what he was asked to do next waits in his queue.
-  function startCrossfade(k, dur = CROSSFADE) { k.from.set(k.pose); k.blend = 0; k.blendRate = 1 / dur; }
+  function startCrossfade(k, dur = CROSSFADE) {
+    k.from.set(k.pose);
+    k.blend = 0;
+    k.blendRate = 1 / dur;
+  }
   function run(k) {
     while (!k.act && k.queue.length) {
       const next = k.queue.shift();
@@ -1261,20 +1307,49 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       if (k.act) k.act.t = 0;
     }
   }
-  function enqueue(k, ...acts) { k.queue.push(...acts); run(k); }
-  function clearActs(k) { k.act = null; k.queue.length = 0; }
+  function enqueue(k, ...acts) {
+    k.queue.push(...acts);
+    run(k);
+  }
+  function clearActs(k) {
+    k.act = null;
+    k.queue.length = 0;
+  }
   /** Asked for something new halfway through an ember walk: he forms again where he is. */
-  function stayPut(k) { if (k.fade?.done) fade(k, 0); }
+  function stayPut(k) {
+    if (k.fade?.done) fade(k, 0);
+  }
 
   const act = {
-    rise: (k) => ({ kind: 'rise', dur: RISE_TIME, start: () => { if (k.mode !== 'sit') return false; standAtSeat(k); }, end: () => { k.mode = 'stand'; } }),
-    lower: (k) => ({ kind: 'lower', dur: RISE_TIME, start: () => { if (k.mode === 'sit') return false; }, end: () => { k.mode = 'sit'; k.dancing = null; } }),
+    rise: (k) => ({
+      kind: 'rise',
+      dur: RISE_TIME,
+      start: () => {
+        if (k.mode !== 'sit') return false;
+        standAtSeat(k);
+      },
+      end: () => {
+        k.mode = 'stand';
+      },
+    }),
+    lower: (k) => ({
+      kind: 'lower',
+      dur: RISE_TIME,
+      start: () => {
+        if (k.mode === 'sit') return false;
+      },
+      end: () => {
+        k.mode = 'sit';
+        k.dancing = null;
+      },
+    }),
     /**
      * Walk to x, z (knightPlaces.js planWalk): straight, or round the fire when the straight
      * way passes it; too far or blocked, he burns away and forms there.
      */
     go: (k, x, z) => ({
-      kind: 'walk', dur: 0,
+      kind: 'walk',
+      dur: 0,
       start() {
         reroot(k);
         const p = k.group.position;
@@ -1295,30 +1370,46 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         this.dur = this.teleport ? 2 * FADE_TIME + 0.05 : this.length / WALK_SPEED;
         this.heading = this.teleport ? k.yaw : Math.atan2(this.pts[1].x - p.x, this.pts[1].z - p.z);
         k.mode = 'stand';
-        if (this.teleport) fade(k, 1, () => { k.group.position.copy(this.to); fade(k, 0); });
+        if (this.teleport)
+          fade(k, 1, () => {
+            k.group.position.copy(this.to);
+            fade(k, 0);
+          });
       },
       /** Where he is `s` m along the walk (into `out`), and which way it goes there. */
       along(s, out) {
         let i = 1;
         while (i < this.pts.length - 1 && this.at[i] < s) i++;
-        const a = this.pts[i - 1], b = this.pts[i];
+        const a = this.pts[i - 1],
+          b = this.pts[i];
         const u = Math.min(1, Math.max(0, (s - this.at[i - 1]) / Math.max(1e-6, this.at[i] - this.at[i - 1])));
         out.lerpVectors(a, b, u);
         this.heading = Math.atan2(b.x - a.x, b.z - a.z);
         return out;
       },
-      end() { if (!this.teleport) k.group.position.copy(this.to); },
+      end() {
+        if (!this.teleport) k.group.position.copy(this.to);
+      },
     }),
     turn: (k, yaw) => ({
-      kind: 'turn', dur: 0,
+      kind: 'turn',
+      dur: 0,
       start() {
         reroot(k);
         let d = (yaw - k.yaw) % (Math.PI * 2);
-        if (d > Math.PI) d -= Math.PI * 2; else if (d < -Math.PI) d += Math.PI * 2;
-        if (Math.abs(d) < 0.08) { k.yaw = yaw; return false; }
-        this.from = k.yaw; this.d = d; this.dur = Math.abs(d) / TURN_SPEED + 0.15;
+        if (d > Math.PI) d -= Math.PI * 2;
+        else if (d < -Math.PI) d += Math.PI * 2;
+        if (Math.abs(d) < 0.08) {
+          k.yaw = yaw;
+          return false;
+        }
+        this.from = k.yaw;
+        this.d = d;
+        this.dur = Math.abs(d) / TURN_SPEED + 0.15;
       },
-      end() { k.yaw = this.from + this.d; },
+      end() {
+        k.yaw = this.from + this.d;
+      },
     }),
   };
   /** Move where he's placed without moving him: his pose takes up the difference. */
@@ -1326,14 +1417,28 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const d = new THREE.Vector3().subVectors(k.group.position, to).applyAxisAngle(Y_AXIS, -k.yaw);
     k.group.position.copy(to);
     for (const p of [k.pose, k.from, k.work]) {
-      p[0] += d.x; p[1] += d.y; p[2] += d.z;
-      p[32] += d.x; p[33] += d.y; p[34] += d.z; // (legs: x is outward, so the right one's goes the other way)
-      p[37] -= d.x; p[38] += d.y; p[39] += d.z;
+      p[0] += d.x;
+      p[1] += d.y;
+      p[2] += d.z;
+      p[32] += d.x;
+      p[33] += d.y;
+      p[34] += d.z; // (legs: x is outward, so the right one's goes the other way)
+      p[37] -= d.x;
+      p[38] += d.y;
+      p[39] += d.z;
     }
+  }
+  /**
+   * Pose `p` moved by `sign` times how far knight k's standing pose (k.stand) is from
+   * standing where he's placed (standingPose): his root and his feet, each on its ground.
+   */
+  function standOffset(p, k, sign) {
+    for (const i of STAND_OFFSET) p[i] += sign * (k.stand[i] - STANDING[i]);
   }
   /** Standing up in front of his seat, his pose is offset from where he's placed: move the place under him instead. */
   function reroot(k) {
-    const x = k.stand[0], z = k.stand[2];
+    const x = k.stand[0],
+      z = k.stand[2];
     if (Math.abs(x) < 1e-4 && Math.abs(z) < 1e-4) return;
     const to = new THREE.Vector3(x, 0, z).applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position);
     to.y = Math.max(0, heightAt(to.x, to.z));
@@ -1355,7 +1460,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const dt = Math.min(0.5, Math.max(0, k.clock - (k.evalAt ?? k.clock)));
     k.evalAt = k.clock;
     if (a?.kind === 'rise' || a?.kind === 'lower') {
-      rise(p, k.sit, k.stand, a.t, a.kind === 'lower');
+      rise(p, k.sit, k.stand, a.t, a.kind === 'lower', overOf(k));
       big = true;
     } else if (a?.kind === 'walk' && !a.teleport) {
       const moved = Math.min(a.length, a.t * WALK_SPEED);
@@ -1370,7 +1475,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       const b = beatNow() - d.offset;
       // (The show sets the energy every beat: it eases from beat to beat instead of stepping.)
       k.energy = k.energy == null ? d.energy : k.energy + (d.energy - k.energy) * Math.min(1, dt * 2.5);
-      dance(p, d.move, b, { period: beat.period, energy: k.energy, seed: d.seed, seated: d.seated });
+      dance(p, d.move, b, { period: beat.period, energy: k.energy, seed: d.seed, seated: d.seated, room: roomNow(k) });
       big = true;
     } else {
       k.energy = null;
@@ -1381,27 +1486,43 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     // with no headroom when it started, he dances it in his seat).
     if (k.gestureName) {
       const inPlace = k.gestureName === 'dance' && k.danceInPlace;
-      const T = inPlace ? DANCE_SEATED_TIME : GESTURE_TIME[k.gestureName] ?? 1.5;
+      const T = inPlace ? DANCE_SEATED_TIME : (GESTURE_TIME[k.gestureName] ?? 1.5);
       if (k.gestureT >= T) k.gestureName = null;
       else {
         const rising = k.gestureName === 'dance' && seated && !inPlace;
         const front = facingFor(k.group.position.x, k.group.position.z, 'front') - k.yaw;
+        // (Up in front of his seat, his standing pose is offset from where he's placed (reroot):
+        // the gesture is made over it moved back under him, then moved out again, so one
+        // that plants his feet plants them where he stands, not back at his seat.)
+        const offset = !seated && !k.dancing?.seated && k.gestureName !== 'dance';
+        if (offset) standOffset(p, k, -1);
         gesture(p, k.gestureName, k.gestureT, seated || !!k.dancing?.seated, k.seed, {
           turn: rising ? Math.atan2(Math.sin(front), Math.cos(front)) : 0,
-          // (Up from his seat to the level spot in front of it; the room he has there.)
+          // (Up from his seat to the level spot in front of it; the room he has for his arms.)
           stand: rising && k.home ? standAtSeat(k) : null,
-          room: seated && k.home?.room ? k.home.room : undefined,
+          over: rising ? overOf(k) : null,
+          room: roomNow(k),
           inPlace,
         });
+        if (offset) standOffset(p, k, 1);
         big = true;
       }
     }
     // Reactions.
     if (!reducedMotion) {
       const t = k.clock;
-      if (t - k.react.flinch < 1.4) { flinch(p, t - k.react.flinch, k.react.flinchK, seated); big = true; }
-      if (t - k.react.stoke < 1.3) { shield(p, t - k.react.stoke, 1, seated); big = true; }
-      if (t - k.react.hop >= 0 && t - k.react.hop < 0.6) { hop(p, t - k.react.hop, 1, seated); big = true; }
+      if (t - k.react.flinch < 1.4) {
+        flinch(p, t - k.react.flinch, k.react.flinchK, seated);
+        big = true;
+      }
+      if (t - k.react.stoke < 1.3) {
+        shield(p, t - k.react.stoke, 1, seated);
+        big = true;
+      }
+      if (t - k.react.hop >= 0 && t - k.react.hop < 0.6) {
+        hop(p, t - k.react.hop, 1, seated, k.home?.rise);
+        big = true;
+      }
     }
     // Watching something: he straightens up and turns to it. Hovered (seated, at rest), he
     // sits up a little to look at you.
@@ -1412,70 +1533,32 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     if (k.attnMoving || Math.abs(hover - k.hoverUp) > 0.03) big = true;
     if (k.lookW > 0.01) look(p, k.lookYaw, k.lookPitch, k.lookW);
     // Crossfading from where he was.
-    if (k.blend < 1) { lerpPose(p, k.from, p, k.blend); big = true; }
+    if (k.blend < 1) {
+      lerpPose(p, k.from, p, k.blend);
+      big = true;
+    }
     return big;
   }
-  // --- the plates' spring ---------------------------------------------------------------------------
-  const sq = new THREE.Quaternion();
-  const tq = new THREE.Quaternion();
-  const dq = new THREE.Quaternion();
-  const ev = new THREE.Vector3();
-  const vt = new THREE.Vector3();
-  const tv = new THREE.Vector3();
-  const rel = new THREE.Vector3();
-  /** A unit quaternion as a rotation vector (axis × angle, the short way round), into `out`. */
-  function logQ(r, out) {
-    const sgn = r.w < 0 ? -1 : 1;
-    const half = Math.acos(Math.min(1, sgn * r.w)), sn = Math.sin(half);
-    return sn < 1e-9 ? out.set(0, 0, 0) : out.set(r.x, r.y, r.z).multiplyScalar((sgn * 2 * half) / sn);
-  }
-  /** A rotation vector as a quaternion, into `out`. */
-  function expQ(v, out) {
-    const a = v.length();
-    return a < 1e-9 ? out.identity() : out.setFromAxisAngle(tv.copy(v).divideScalar(a), a);
-  }
-  /**
-   * The plates (SPRUNG) swung one pose step toward where the solver put them (`s.q`, turned
-   * from their parents), written back into `s.q`; `snap` puts them there at once (he was just
-   * placed somewhere, or sits still). The spring damps against how fast the pose itself
-   * turns, so a plate moving steadily with him keeps up and only a stop or a jolt swings it.
-   * Returns whether any is still swinging (its shadow wants redrawing).
-   */
-  function springPlates(k, s, snap) {
-    const st = k.spring ??= SPRUNG.map(() => ({ q: new THREE.Quaternion(), v: new THREE.Vector3(), pose: new THREE.Quaternion(), set: false }));
-    const h = 1 / STEP_FPS / SPRING.substeps;
-    const w0 = 2 * Math.PI * SPRING.hz;
-    let swinging = false;
-    SPRUNG.forEach(([bone, par, max], j) => {
-      const i = BONE_INDEX[bone], pi = BONE_INDEX[par];
-      const x = st[j];
-      tq.copy(s.q[pi]).invert().multiply(s.q[i]);
-      if (snap || !x.set) { x.q.copy(tq); x.pose.copy(tq); x.v.set(0, 0, 0); x.set = true; return; }
-      logQ(dq.copy(tq).multiply(sq.copy(x.pose).invert()), vt).multiplyScalar(STEP_FPS);
-      x.pose.copy(tq);
-      for (let n = 0; n < SPRING.substeps; n++) {
-        logQ(dq.copy(x.q).multiply(sq.copy(tq).invert()), ev);
-        x.v.addScaledVector(ev, -w0 * w0 * h).addScaledVector(rel.copy(x.v).sub(vt), -2 * SPRING.damp * w0 * h);
-        x.q.premultiply(expQ(rel.copy(x.v).multiplyScalar(h), dq)).normalize();
-      }
-      // (Never further than `max` from the pose: the strap holds.)
-      const off = logQ(dq.copy(x.q).multiply(sq.copy(tq).invert()), ev).length();
-      if (off > max) {
-        x.q.copy(expQ(ev.multiplyScalar(max / off), dq)).multiply(tq);
-        const out = x.v.dot(ev.normalize());
-        if (out > 0) x.v.addScaledVector(ev, -out);
-      }
-      if (off > 0.014 || rel.copy(x.v).sub(vt).length() > 0.3) swinging = true;
-      s.q[i].copy(s.q[pi]).multiply(x.q);
-    });
-    return swinging;
+
+  // --- keeping his arms out of the scenery -----------------------------------------------------------
+  // (knightClear.js does it, createClearance above; the shapes it's asked about are this scenery's.)
+  /** The scenery's shapes near where knight k stands (kept until he moves). */
+  function nearOf(k) {
+    const { x, z } = k.group.position;
+    const n = k.near;
+    if (n && n.scenery === sceneryName && Math.abs(n.x - x) < 0.05 && Math.abs(n.z - z) < 0.05) return n.list;
+    k.near = { scenery: sceneryName, x, z, list: collidersNear(sceneryName, x, z, CLEAR_NEAR) };
+    return k.near.list;
   }
 
   const lp = new THREE.Vector3();
-  /** The solved pose onto the bones (the plates swung on their springs, clear of the helmet). */
-  function apply(k) {
+  /**
+   * The solved pose onto the bones (the plates swung on their springs, clear of the helmet), and
+   * out of the scenery if he's `moving` (solveClear).
+   */
+  function apply(k, moving = true) {
     // (Each foot's ground is in the pose itself: seatPoseOf, standAtSeat.)
-    const s = solver.solve(k.work, null, k.helmet);
+    const s = solveClear(k, moving);
     k.settling = springPlates(k, s, k.lastStep < 0 || reducedMotion);
     solver.clampPlates(k.helmet);
     // (The solver's output is reused for every knight: keep his own joints.)
@@ -1511,7 +1594,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     armor.uniforms.uGlint.value *= Math.exp(-dt / 0.12);
     armor.uniforms.uTime.value = simT;
     armor.step?.(dt); // (the fire's reflection sweeping over the armor)
-    stepRestyle(dt);  // (a style swap burning through them)
+    stepRestyle(dt); // (a style swap burning through them)
     // Without a clock from outside, the beat runs on at its last tempo.
     if (beat.at < 0 || simT - beat.at > 0.5) beat.pos += dt / beat.period;
     moving = false;
@@ -1543,12 +1626,17 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         } else if (a.kind === 'turn') {
           k.yaw = a.from + a.d * Math.min(1, a.t / Math.max(1e-3, a.dur - 0.15));
         }
-        if (a.t >= a.dur) { a.end?.(); k.act = null; startCrossfade(k); run(k); }
+        if (a.t >= a.dur) {
+          a.end?.();
+          k.act = null;
+          startCrossfade(k);
+          run(k);
+        }
       }
       if (k.blend < 1) k.blend = Math.min(1, k.blend + dt * (k.blendRate ?? 1 / CROSSFADE));
       // Where he looks: the cursor on him (the camera), what he was asked to, or the moment's
       // attention (a rising or flying weapon).
-      const target = hovered === k.index ? ctx.cameraAt : k.lookAt ?? (reducedMotion ? null : ctx.lookAt);
+      const target = hovered === k.index ? ctx.cameraAt : (k.lookAt ?? (reducedMotion ? null : ctx.lookAt));
       k.lookW += ((target ? 1 : 0) - k.lookW) * Math.min(1, dt * 5);
       // The moment's attention (a weapon in flight) sits him up; a glance (the cursor) doesn't.
       const attn = target && target === ctx.lookAt ? 1 : 0;
@@ -1565,7 +1653,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       if (step === k.lastStep || k.forging === 'out') continue;
       k.lastStep = step;
       const big = evaluate(k);
-      apply(k);
+      apply(k, big);
       const pos = k.act?.kind === 'walk' && !k.act.teleport && k.act.pos ? k.act.pos : null;
       if (pos) k.group.position.copy(pos);
       k.group.rotation.y = k.yaw;
@@ -1579,7 +1667,10 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       k.helmMat.userData.uniforms.uCenter.value.copy(c);
     }
     // (Changes since the last frame, or in this one, to what casts his shadow.)
-    if (shadowDirty) { moving = true; shadowDirty = false; }
+    if (shadowDirty) {
+      moving = true;
+      shadowDirty = false;
+    }
   }
 
   // --- the API -------------------------------------------------------------------------------------------------
@@ -1603,11 +1694,17 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     setShown(k, true);
     k.work.set(k.mode === 'sit' ? k.sit : k.stand);
     apply(k);
-    if (instant || reducedMotion) { k.fade = null; setGhost(k, false); for (const m of [k.bodyMat, k.helmMat]) m.userData.uniforms.uDissolve.value = 0; }
-    else if (forge) {
+    if (instant || reducedMotion) {
+      k.fade = null;
+      setGhost(k, false);
+      for (const m of [k.bodyMat, k.helmMat]) m.userData.uniforms.uDissolve.value = 0;
+    } else if (forge) {
       beginForge(k, 'in');
       setGhost(k, true);
-      for (const m of [k.bodyMat, k.helmMat]) { m.userData.uniforms.uDissolve.value = 1; m.userData.uniforms.uGlow.value = 0; }
+      for (const m of [k.bodyMat, k.helmMat]) {
+        m.userData.uniforms.uDissolve.value = 1;
+        m.userData.uniforms.uGlow.value = 0;
+      }
     } else fade(k, 0);
     cast = Math.max(cast, i + 1);
     return true;
@@ -1641,25 +1738,45 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     if (home.seat) {
       k.home = home;
       seatPoseOf(k);
-      const spot = home.stand ??= standSpot(home);
+      const spot = (home.stand ??= standSpot(home));
       const front = new THREE.Vector3(spot.x, 0, spot.z).applyAxisAngle(Y_AXIS, home.yaw);
-      enqueue(k, act.go(k, home.x + front.x, home.z + front.z), act.turn(k, home.yaw), {
-        kind: 'place', dur: 0, start() { shiftPlace(k, new THREE.Vector3(home.x, home.y, home.z)); standAtSeat(k); },
-      }, act.lower(k));
+      enqueue(
+        k,
+        act.go(k, home.x + front.x, home.z + front.z),
+        act.turn(k, home.yaw),
+        {
+          kind: 'place',
+          dur: 0,
+          start() {
+            shiftPlace(k, new THREE.Vector3(home.x, home.y, home.z));
+            standAtSeat(k);
+          },
+        },
+        act.lower(k),
+      );
     } else {
       const p = k.group.position;
       k.home = { x: p.x, z: p.z, yaw: faceFire(p.x, p.z), h: 0, feet: [0, 0], y: p.y, seat: false };
       seatPoseOf(k);
-      enqueue(k, act.turn(k, k.home.yaw), {
-        kind: 'place', dur: 0,
-        start() {
-          // (He sits down where he stands: his seat is a step behind his feet.)
-          const back = new THREE.Vector3(0, 0, -(seatFeet(0) - 0.03)).applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position);
-          shiftPlace(k, back);
-          k.home.x = back.x; k.home.z = back.z;
-          standAtSeat(k);
+      enqueue(
+        k,
+        act.turn(k, k.home.yaw),
+        {
+          kind: 'place',
+          dur: 0,
+          start() {
+            // (He sits down where he stands: his seat is a step behind his feet.)
+            const back = new THREE.Vector3(0, 0, -(seatFeet(0) - 0.03))
+              .applyAxisAngle(Y_AXIS, k.yaw)
+              .add(k.group.position);
+            shiftPlace(k, back);
+            k.home.x = back.x;
+            k.home.z = back.z;
+            standAtSeat(k);
+          },
         },
-      }, act.lower(k));
+        act.lower(k),
+      );
     }
     return true;
   }
@@ -1682,12 +1799,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const s = slot == null ? slots[slotOf(i)] : slots[(slot - 1 + slots.length) % slots.length];
     return { x: s.x, z: s.z };
   }
+  /** Which way to face at (x, z): a yaw, or 'fire', 'out' or 'front' (knightPlaces.js facingYaw). */
   function facingFor(x, z, facing) {
-    if (typeof facing === 'number') return facing;
-    if (facing === 'fire') return faceFire(x, z);
-    if (facing === 'out') return faceFire(x, z) + Math.PI;
-    // 'front': toward where the cameras usually are, turned a little toward the fire.
-    return Math.atan2(0 - x, 5 - z) * 0.75 + faceFire(x, z) * 0.25;
+    return facingYaw(x, z, facing);
   }
   function danceFn(i, opts = {}) {
     if (!valid(i) || reducedMotion) return false;
@@ -1695,8 +1809,11 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     const prev = k.nextDance ?? k.dancing;
     const seated = opts.seated ?? prev?.seated ?? false;
     const next = {
-      move: opts.move ?? prev?.move ?? 'nod', energy: opts.energy ?? prev?.energy ?? 0.7,
-      offset: opts.offset ?? prev?.offset ?? 0, seed: opts.seed ?? prev?.seed ?? k.seed, seated,
+      move: opts.move ?? prev?.move ?? 'nod',
+      energy: opts.energy ?? prev?.energy ?? 0.7,
+      offset: opts.offset ?? prev?.offset ?? 0,
+      seed: opts.seed ?? prev?.seed ?? k.seed,
+      seated,
     };
     const where = opts.slot != null || opts.position ? placeFor(i, opts) : null;
     // Burning away, or on an ember walk: he comes back (forming where he is) and goes to
@@ -1705,7 +1822,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     else stayPut(k);
     // Not here yet: he forms right there, on his feet and dancing (or seated, to dance sitting).
     if (!k.present) {
-      const to = seated ? null : where ?? placeFor(i);
+      const to = seated ? null : (where ?? placeFor(i));
       summon(i, seated ? {} : { at: to, facing: opts.facing ?? 'front' });
       k.dancing = k.nextDance = next;
       k.danceAt = seated ? { seated } : { x: to.x, z: to.z, yaw: k.yaw, seated };
@@ -1715,8 +1832,10 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     // and the offset just change. (The visualizer can call this every bar.)
     const at = k.danceAt;
     if (at && at.seated === seated) {
-      const same = seated || ((!where || Math.hypot(where.x - at.x, where.z - at.z) < 0.05)
-        && (opts.facing == null || Math.abs(Math.sin((facingFor(at.x, at.z, opts.facing) - at.yaw) / 2)) < 0.03));
+      const same =
+        seated ||
+        ((!where || Math.hypot(where.x - at.x, where.z - at.z) < 0.05) &&
+          (opts.facing == null || Math.abs(Math.sin((facingFor(at.x, at.z, opts.facing) - at.yaw) / 2)) < 0.03));
       if (same) {
         if (k.dancing && k.dancing.move !== next.move) startCrossfade(k);
         if (k.dancing) k.dancing = next;
@@ -1727,16 +1846,35 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     // Somewhere else: sit (to dance seated), or get up, go there, turn, and dance. (The dance
     // is noted before anything is queued: when he's already up, there and turned, the queue
     // runs straight through to `start` at once, which takes up whatever is noted.)
-    const start = { kind: 'dance', dur: 0, start() { k.mode = seated ? 'sit' : 'stand'; k.dancing = k.nextDance; return false; } };
+    const start = {
+      kind: 'dance',
+      dur: 0,
+      start() {
+        k.mode = seated ? 'sit' : 'stand';
+        k.dancing = k.nextDance;
+        return false;
+      },
+    };
     if (seated) {
-      if (k.mode !== 'sit') { sit(i); k.nextDance = next; k.danceAt = { seated }; enqueue(k, start); }
-      else { clearActs(k); startCrossfade(k, 0.5); k.dancing = k.nextDance = next; k.danceAt = { seated }; }
+      if (k.mode !== 'sit') {
+        sit(i);
+        k.nextDance = next;
+        k.danceAt = { seated };
+        enqueue(k, start);
+      } else {
+        clearActs(k);
+        startCrossfade(k, 0.5);
+        k.dancing = k.nextDance = next;
+        k.danceAt = { seated };
+      }
       return true;
     }
     clearActs(k);
     startCrossfade(k);
     k.dancing = null;
-    const to = where ?? (at && !at.seated ? at : k.mode === 'sit' ? placeFor(i) : { x: k.group.position.x, z: k.group.position.z });
+    const to =
+      where ??
+      (at && !at.seated ? at : k.mode === 'sit' ? placeFor(i) : { x: k.group.position.x, z: k.group.position.z });
     const yaw = facingFor(to.x, to.z, opts.facing ?? 'front');
     k.nextDance = next;
     k.danceAt = { x: to.x, z: to.z, yaw, seated };
@@ -1750,13 +1888,19 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       if (i < n) summon(i, { instant });
       else dismiss(i, { instant });
       if (i < n && helmets) {
-        const h = helmets === 'random' ? HELMETS[Math.floor(Math.random() * HELMETS.length)] : Array.isArray(helmets) ? helmets[i % helmets.length] : helmets;
+        const h =
+          helmets === 'random'
+            ? HELMETS[Math.floor(Math.random() * HELMETS.length)]
+            : Array.isArray(helmets)
+              ? helmets[i % helmets.length]
+              : helmets;
         setHelmetOf(k, h, instant || !k.present);
       }
     });
   }
   function setHelmet(name, { index = null, instant = false } = {}) {
-    const list = index == null ? knights.filter((k) => k.present || k.index < cast) : valid(index) ? [knights[index]] : [];
+    const list =
+      index == null ? knights.filter((k) => k.present || k.index < cast) : valid(index) ? [knights[index]] : [];
     return Promise.all(list.map((k) => setHelmetOf(k, name, instant))).then((r) => r.every(Boolean));
   }
   /**
@@ -1765,7 +1909,12 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
    */
   function gestureFn(name, { index = 0 } = {}) {
     if (!GESTURE_TIME[name] || reducedMotion) return false;
-    const ks = index === 'all' ? knights.filter((k) => k.present) : valid(index) && knights[index].present ? [knights[index]] : [];
+    const ks =
+      index === 'all'
+        ? knights.filter((k) => k.present)
+        : valid(index) && knights[index].present
+          ? [knights[index]]
+          : [];
     let n = 0;
     for (const k of ks) {
       if (k.swap || k.gestureName === 'dance') continue;
@@ -1800,9 +1949,13 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   function setScenery(name, heights) {
     sceneryName = name;
     terrain = heights;
+    fitsAt.clear();
     let left = false;
     for (const k of knights) {
-      if (leaving(k)) { vanish(k); left = true; }
+      if (leaving(k)) {
+        vanish(k);
+        left = true;
+      }
     }
     if (left) recount();
     for (const k of knights) {
@@ -1834,7 +1987,9 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       const feet = k.group.position.clone();
       const head = k.solved.p[BONE_INDEX.head].clone().applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position);
       up.copy(k.solved.p[0]).applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position);
-      feet.x = feet.x * 0.5 + up.x * 0.5; feet.z = feet.z * 0.5 + up.z * 0.5; feet.y += 0.25;
+      feet.x = feet.x * 0.5 + up.x * 0.5;
+      feet.z = feet.z * 0.5 + up.z * 0.5;
+      feet.y += 0.25;
       head.y += 0.12;
       out.push({ a: feet, b: head, r: 0.32, index: k.index });
     }
@@ -1844,12 +1999,16 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   const seg = new THREE.Vector3();
   /** The knight a ray passes through (index), or -1; `out.distance` how far along the ray he is. */
   function pick(ray, out = null) {
-    let best = -1, bestD = Infinity;
+    let best = -1,
+      bestD = Infinity;
     for (const c of capsules()) {
       const d = ray.distanceSqToSegment(c.a, c.b, hit, seg);
       if (d < c.r * c.r * 0.7) {
         const along = hit.distanceTo(ray.origin);
-        if (along < bestD) { bestD = along; best = c.index; }
+        if (along < bestD) {
+          bestD = along;
+          best = c.index;
+        }
       }
     }
     if (out) out.distance = bestD;
@@ -1859,7 +2018,8 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
    * Dancing on his feet (or on his way to), or cheering: a flinch or a lean would bury the
    * move (the drop's leap, Praise the Sun), so he doesn't. He still hops a ring.
    */
-  const performing = (k) => !!((k.nextDance ?? k.dancing) && !(k.nextDance ?? k.dancing).seated) || CHEERING.has(k.gestureName);
+  const performing = (k) =>
+    !!((k.nextDance ?? k.dancing) && !(k.nextDance ?? k.dancing).seated) || CHEERING.has(k.gestureName);
   /**
    * Something happened: 'impact' (a weapon lands; strength 0..1), 'stoke', 'ring' (a ring
    * races out). With `at` ({ x, z }) it happened there (the living blade swinging close):
@@ -1872,10 +2032,13 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       const near = !!at;
       if (near && Math.hypot(k.group.position.x - at.x, k.group.position.z - at.z) > radius) continue;
       if (kind === 'impact') {
-        if (near || !performing(k)) { k.react.flinch = k.clock + Math.random() * 0.05; k.react.flinchK = Math.min(1, strength) * (near && performing(k) ? 0.6 : 1); }
-      }
-      else if (kind === 'stoke') { if (!performing(k)) k.react.stoke = k.clock; }
-      else if (kind === 'ring') {
+        if (near || !performing(k)) {
+          k.react.flinch = k.clock + Math.random() * 0.05;
+          k.react.flinchK = Math.min(1, strength) * (near && performing(k) ? 0.6 : 1);
+        }
+      } else if (kind === 'stoke') {
+        if (!performing(k)) k.react.stoke = k.clock;
+      } else if (kind === 'ring') {
         // The ring's front reaches him a moment later (about 4 m/s).
         const r = Math.hypot(k.group.position.x - FIRE.x, k.group.position.z - FIRE.z);
         k.react.hop = k.clock + Math.max(0, r - 0.3) / 4;
@@ -1895,36 +2058,51 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
 
   // Start: the first knight at his seat, in the great helm.
   for (const k of knights) wear(k, 'great');
-  const helmPos = new THREE.Vector3();
+  // (positions, read every frame for the cameras: one array, a vector a knight, filled in
+  // place each read instead of built anew.)
+  const heads = knights.map(() => new THREE.Vector3());
+  const headList = [];
 
   return {
     group: root,
     materials,
     /** Every template's geometry (the knight's own and any other style's model built since). */
-    get geometries() { return [...templates.values()].flatMap((t) => [t.bodyGeo, ...t.helmGeos]); },
+    get geometries() {
+      return [...templates.values()].flatMap((t) => [t.bodyGeo, ...t.helmGeos]);
+    },
     skeletons: knights.map((k) => k.skeleton),
     rig,
     update,
     setRamp,
     /** The armor's finish (steel.js FINISHES) and the fire's rim on his edges (0..1): armor.js. */
     setFinish: (name) => armor.setFinish?.(name),
-    get finish() { return armor.finish ?? 'gunmetal'; },
+    get finish() {
+      return armor.finish ?? 'gunmetal';
+    },
     setRim: (v) => armor.setRim?.(v),
-    get rim() { return armor.rim ?? 0.5; },
+    get rim() {
+      return armor.rim ?? 0.5;
+    },
     /**
      * The style (knightStyles.js): its shader, from the model `model` (its loaded scene; null
      * the knight's own). Knights who are here burn away and form again in it (~1.2 s;
      * `instant`: at once). Resolves true once it shows.
      */
     setStyle,
-    get style() { return armor.style; },
+    get style() {
+      return armor.style;
+    },
     /** A style swap is burning through them. */
-    get restyling() { return !!restyle; },
+    get restyling() {
+      return !!restyle;
+    },
     /**
      * Another style's model, its template built beforehand (templateSteps over its scene, in
      * idle moments: scene.js): setStyle() with it then needn't build it on the spot.
      */
-    adoptTemplate(t) { if (t?.root) adopt(t); },
+    adoptTemplate(t) {
+      if (t?.root) adopt(t);
+    },
     /** Whether a model's template is built yet (null: the knight's own, always). */
     hasTemplate: (root) => !root || templates.has(root),
     /**
@@ -1935,56 +2113,135 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     busyAt(i) {
       if (!valid(i) || !knights[i].present) return false;
       const k = knights[i];
-      return !!(k.gestureName || k.swap || k.act || k.queue.length || k.dancing || k.nextDance || restyle?.ks.includes(k));
+      return !!(
+        k.gestureName ||
+        k.swap ||
+        k.act ||
+        k.queue.length ||
+        k.dancing ||
+        k.nextDance ||
+        restyle?.ks.includes(k)
+      );
     },
     setScenery,
     react,
     capsules,
     pick,
-    summon, dismiss, sit, stand, dance: danceFn, setCast, setHelmet, gesture: gestureFn,
+    summon,
+    dismiss,
+    sit,
+    stand,
+    dance: danceFn,
+    setCast,
+    setHelmet,
+    gesture: gestureFn,
     setSeatPose,
     /** How they sit (setSeatPose): 'resting' | 'watchful'. */
-    get seatPose() { return seatStyle; },
+    get seatPose() {
+      return seatStyle;
+    },
     /**
      * Whether the view has room over his seat for him to stand up in (scene.js sets it: not
      * on a phone's tall view, which frames his seat right under the page's header). Without
      * it, the site's dance (gesture 'dance') is danced in his seat; one under way keeps its way.
      */
-    get headroom() { return headroom; },
-    set headroom(on) { headroom = !!on; },
+    get headroom() {
+      return headroom;
+    },
+    set headroom(on) {
+      headroom = !!on;
+    },
     /** The forge's side of summon/dismiss({ forge: true }): his posed body as a forge subject, and the end. */
-    forgeSubject, forged,
+    forgeSubject,
+    forged,
     /** The beat (every frame, from the music): `beatPos` in beats, `period` s a beat. */
-    clock(beatPos, period = beat.period) { beat = { pos: beatPos, period: Math.max(0.2, period), at: simT }; },
+    clock(beatPos, period = beat.period) {
+      beat = { pos: beatPos, period: Math.max(0.2, period), at: simT };
+    },
     lookAt(point, { index = null } = {}) {
-      for (const k of index == null ? knights : valid(index) ? [knights[index]] : []) k.lookAt = point ? new THREE.Vector3().copy(point) : null;
+      for (const k of index == null ? knights : valid(index) ? [knights[index]] : [])
+        k.lookAt = point ? new THREE.Vector3().copy(point) : null;
     },
     slots: (name = sceneryName) => ringOf(name),
+    /**
+     * Whether a dance move (MOVES) has room at a place on the ground ({ x, z }) facing `facing`
+     * (as dance() takes it) in a scenery (this one by default): its reach (colliders.js
+     * MOVE_REACH) clear of the scenery's shapes there, with 5 cm to spare. The show leaves out
+     * one that doesn't.
+     */
+    fits: (move, at, facing = 'fire', name = sceneryName) =>
+      fitsAt.fits(name, move, at.x, at.z, facingFor(at.x, at.z, facing)),
     /** A beat (0..1): the armor glints, a step up the ramp for a moment. */
-    beat(s = 1) { if (!reducedMotion) armor.uniforms.uGlint.value = Math.max(armor.uniforms.uGlint.value, 0.25 * s); },
-    set hovered(i) { hovered = valid(i) && knights[i].present ? i : -1; },
-    get hovered() { return hovered; },
-    get moving() { return moving; },
-    get count() { return cast; },
-    get present() { return knights.filter((k) => k.present).length; },
+    beat(s = 1) {
+      if (!reducedMotion) armor.uniforms.uGlint.value = Math.max(armor.uniforms.uGlint.value, 0.25 * s);
+    },
+    set hovered(i) {
+      hovered = valid(i) && knights[i].present ? i : -1;
+    },
+    get hovered() {
+      return hovered;
+    },
+    get moving() {
+      return moving;
+    },
+    get count() {
+      return cast;
+    },
+    get present() {
+      return knights.filter((k) => k.present).length;
+    },
     max: knights.length,
-    get helmet() { return knights[0].helmet; },
-    set helmet(name) { setHelmet(name); },
+    get helmet() {
+      return knights[0].helmet;
+    },
+    set helmet(name) {
+      setHelmet(name);
+    },
     get list() {
       return knights.map((k) => ({
-        index: k.index, present: k.present,
-        state: !k.present ? 'away' : k.forging ? (k.forging === 'in' ? 'arriving' : 'leaving')
-          : k.fade ? (k.fade.done ? 'ember' : k.fade.to ? 'leaving' : 'arriving')
-          : k.act?.kind ?? (k.dancing ? 'dancing' : k.mode === 'sit' ? 'sitting' : 'standing'),
-        position: k.group.position.clone(), facing: k.yaw, helmet: k.helmet, move: k.dancing?.move ?? null,
+        index: k.index,
+        present: k.present,
+        state: !k.present
+          ? 'away'
+          : k.forging
+            ? k.forging === 'in'
+              ? 'arriving'
+              : 'leaving'
+            : k.fade
+              ? k.fade.done
+                ? 'ember'
+                : k.fade.to
+                  ? 'leaving'
+                  : 'arriving'
+              : (k.act?.kind ?? (k.dancing ? 'dancing' : k.mode === 'sit' ? 'sitting' : 'standing')),
+        position: k.group.position.clone(),
+        facing: k.yaw,
+        helmet: k.helmet,
+        move: k.dancing?.move ?? null,
       }));
     },
+    /**
+     * Where each present knight's head is (world), in knight order. The same array each read,
+     * and the same vector for each knight, updated in place: good until the next read (the
+     * director reads it once a frame for the cameras); copy what you keep longer.
+     */
     get positions() {
-      return knights.filter((k) => k.present && k.solved).map((k) => helmPos.copy(k.solved.p[BONE_INDEX.head]).applyAxisAngle(Y_AXIS, k.yaw).add(k.group.position).clone());
+      let n = 0;
+      for (const k of knights) {
+        if (k.present && k.solved)
+          headList[n++] = heads[k.index]
+            .copy(k.solved.p[BONE_INDEX.head])
+            .applyAxisAngle(Y_AXIS, k.yaw)
+            .add(k.group.position);
+      }
+      headList.length = n;
+      return headList;
     },
     /** (Internals, for tests and debugging.) */
     knights,
-    get terrain() { return terrain; },
+    get terrain() {
+      return terrain;
+    },
   };
 }
 const Y_AXIS = new THREE.Vector3(0, 1, 0);

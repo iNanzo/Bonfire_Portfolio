@@ -13,7 +13,18 @@
 // brings back the user's place and knights (at once: their look and framing too).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sceneOverrides, looksPin, cameraPin, sceneFlameKey, sceneElement, FLASHY, FLASHY_DROPS, FLASHY_LOOKS, MOVING_LAYERS, NO_OFFSETS } from '../src/visualizer/scenePlayer.js';
+import {
+  sceneOverrides,
+  looksPin,
+  cameraPin,
+  sceneFlameKey,
+  sceneElement,
+  FLASHY,
+  FLASHY_DROPS,
+  FLASHY_LOOKS,
+  MOVING_LAYERS,
+  NO_OFFSETS,
+} from '../src/visualizer/scenePlayer.js';
 import { createDirector } from '../src/visualizer/director.js';
 import { defaultScene, normalizeScene } from '../src/scenes.js';
 import { LAYERS, LOOKS, DROP_FX } from '../src/visualizer/looks.js';
@@ -30,50 +41,123 @@ function shrine(o = {}) {
   s.colors.flame = { lo: '#12305a', mid: '#2a7fd4', hi: '#bfe8ff', core: '#f4fbff', shade: '#0b1830', light: 0.5 };
   s.colors.scenery = { void: '#05070d', shadow: '#0e1624', stone: '#27354a', wood: '#3a3a44', bone: '#b8c8d8' };
   s.fire = { ...NO_OFFSETS, height: 0.4, windX: -0.2 };
-  s.camera = { pos: [1.2, 1.6, 4.4], target: [0, 0.7, 0], fov: 36, roll: 0.05, move: { kind: 'sway', amount: 0.6, bars: 8 } };
+  s.camera = {
+    pos: [1.2, 1.6, 4.4],
+    target: [0, 0.7, 0],
+    fov: 36,
+    roll: 0.05,
+    move: { kind: 'sway', amount: 0.6, bars: 8 },
+  };
   s.look = { name: 'kaleido', amount: 1.2, params: { segments: 8 } };
   s.layers = { glow: 'on', grain: 'on', flicker: 'on', mirror: 'mix' };
   s.details = { glowSize: 2.4 };
   s.drops = { fx: { shatter: 'on', xray: 'on', ink: 'mix' }, count: 3 };
   s.render = { ...s.render, pixelSize: 6, palette: [0, 6, 8], fog: 'thick', xray: 'normals', outlines: 'on' };
-  s.knights = { ...s.knights, count: 3, helmets: ['armet', null, 'bascinet'], dance: 'on', formation: 'line', shine: 'on', finish: 'blackened', seat: 'watchful', glow: 'on', rim: 0.8, style: 'blackgold' };
+  s.knights = {
+    ...s.knights,
+    count: 3,
+    helmets: ['armet', null, 'bascinet'],
+    dance: 'on',
+    formation: 'line',
+    shine: 'on',
+    finish: 'blackened',
+    seat: 'watchful',
+    glow: 'on',
+    rim: 0.8,
+    style: 'blackgold',
+  };
   s.fireflies = { lit: 5, show: 'chase', moves: ['bounce', 'dart'], speed: 1.5 };
   return normalizeScene({ ...s, ...o });
 }
 const LOW_FLASH = () => settingsWith(PRESETS.safe.values);
 /** Every setting as a preset leaves them, from the defaults (the dialog's way). */
-const presetUser = (id) => { const u = defaults(); applyPreset(u, id); return u; };
+const presetUser = (id) => {
+  const u = defaults();
+  applyPreset(u, id);
+  return u;
+};
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 test('sceneOverrides: every part in the settings’ own terms; Base keeps the place, render, knights and fireflies only', () => {
   const s = shrine();
   const o = sceneOverrides(s, 'hold', settingsWith());
   assert.equal(o.scenery, 'shrine');
-  assert.deepEqual([o.pixelSize, o.palette, o.fog, o.ditherMatrix, o.pixelShift, o.fewColors, o.xray, o.xrayView], [6, [0, 6, 8], 'thick', '4', 'off', 'off', 'off', 'normals']);
-  assert.deepEqual([o.knights, o.knightCount, o.knightFormation, o.knightDance, o.knightFinish, o.knightSeat, o.knightRim, o.knightStyle], ['on', 3, 'line', 'on', 'blackened', 'watchful', 0.8, 'blackgold']);
+  assert.deepEqual(
+    [o.pixelSize, o.palette, o.fog, o.ditherMatrix, o.pixelShift, o.fewColors, o.xray, o.xrayView],
+    [6, [0, 6, 8], 'thick', '4', 'off', 'off', 'off', 'normals'],
+  );
+  assert.deepEqual(
+    [
+      o.knights,
+      o.knightCount,
+      o.knightFormation,
+      o.knightDance,
+      o.knightFinish,
+      o.knightSeat,
+      o.knightRim,
+      o.knightStyle,
+    ],
+    ['on', 3, 'line', 'on', 'blackened', 'watchful', 0.8, 'blackgold'],
+  );
   assert.deepEqual(o.knightHelmetOrder, ['armet', null, 'bascinet']);
   assert.equal(o.knightMoves, undefined, 'moves null: the show’s own');
   assert.equal(o.blink, true);
-  assert.deepEqual(Object.keys(o.flyMoves).filter((k) => o.flyMoves[k]), ['bounce', 'dart']);
+  assert.deepEqual(
+    Object.keys(o.flyMoves).filter((k) => o.flyMoves[k]),
+    ['bounce', 'dart'],
+  );
   assert.deepEqual([o.phraseBars, o.sceneColors, o.camera], [0, 'off', 'drift']);
   for (const k of Object.keys(LAYERS)) assert.equal(o[k], s.layers[k] ?? 'off', `layer ${k}`);
   assert.deepEqual(Object.keys(o.dropFx).sort(), Object.keys(DROP_FX).sort());
-  assert.deepEqual([o.dropFx.shatter, o.dropFx.xray, o.dropFx.ink, o.dropFx.spiral, o.dropCount], ['on', 'on', 'mix', 'off', 2], 'its hits; its count up to the user’s (2)');
-  assert.equal(sceneOverrides(s, 'hold', settingsWith({ dropCount: 3 })).dropCount, 3, 'its count of 3 when the user allows three');
+  assert.deepEqual(
+    [o.dropFx.shatter, o.dropFx.xray, o.dropFx.ink, o.dropFx.spiral, o.dropCount],
+    ['on', 'on', 'mix', 'off', 2],
+    'its hits; its count up to the user’s (2)',
+  );
+  assert.equal(
+    sceneOverrides(s, 'hold', settingsWith({ dropCount: 3 })).dropCount,
+    3,
+    'its count of 3 when the user allows three',
+  );
   assert.equal(o.knightGlow, 'on', 'its Edge Glow as painted (Always: at its own strength)');
   for (const glow of ['off', 'mix', 'on']) {
-    assert.equal(sceneOverrides(shrine({ knights: { ...s.knights, glow } }), 'base', settingsWith({ knightGlow: 'off' })).knightGlow, glow, `its Edge Glow ${glow}, whatever the user's`);
+    assert.equal(
+      sceneOverrides(shrine({ knights: { ...s.knights, glow } }), 'base', settingsWith({ knightGlow: 'off' }))
+        .knightGlow,
+      glow,
+      `its Edge Glow ${glow}, whatever the user's`,
+    );
   }
   const b = sceneOverrides(s, 'base', settingsWith());
-  for (const k of ['phraseBars', 'sceneColors', 'camera', 'dropFx', 'dropCount', ...Object.keys(LAYERS)]) assert.ok(!(k in b), `base leaves ${k} to the show`);
+  for (const k of ['phraseBars', 'sceneColors', 'camera', 'dropFx', 'dropCount', ...Object.keys(LAYERS)])
+    assert.ok(!(k in b), `base leaves ${k} to the show`);
   for (const k of ['scenery', 'pixelSize', 'knights', 'knightCount', 'blink']) assert.ok(k in b, `base keeps ${k}`);
   // No knights: off; a still camera: still; no style: Bonfire Live's own.
-  const none = sceneOverrides(shrine({ knights: { ...s.knights, count: 0, helmets: [], style: null }, camera: { ...s.camera, move: { kind: 'still', amount: 0, bars: 8 } } }), 'hold', settingsWith());
-  assert.deepEqual([none.knights, 'knightCount' in none, 'knightStyle' in none, none.camera], ['off', false, false, 'still']);
+  const none = sceneOverrides(
+    shrine({
+      knights: { ...s.knights, count: 0, helmets: [], style: null },
+      camera: { ...s.camera, move: { kind: 'still', amount: 0, bars: 8 } },
+    }),
+    'hold',
+    settingsWith(),
+  );
+  assert.deepEqual(
+    [none.knights, 'knightCount' in none, 'knightStyle' in none, none.camera],
+    ['off', false, false, 'still'],
+  );
   // The pins.
   const p = looksPin(s);
-  assert.deepEqual([p.look, p.amount, p.params, p.details, p.layers.glow, p.layers.ghost], ['kaleido', 1.2, { segments: 8 }, { glowSize: 2.4 }, 'on', 'off']);
-  assert.deepEqual(cameraPin(s), { pos: [1.2, 1.6, 4.4], target: [0, 0.7, 0], fov: 36, roll: 0.05, move: { kind: 'sway', amount: 0.6, bars: 8 } });
+  assert.deepEqual(
+    [p.look, p.amount, p.params, p.details, p.layers.glow, p.layers.ghost],
+    ['kaleido', 1.2, { segments: 8 }, { glowSize: 2.4 }, 'on', 'off'],
+  );
+  assert.deepEqual(cameraPin(s), {
+    pos: [1.2, 1.6, 4.4],
+    target: [0, 0.7, 0],
+    fov: 36,
+    roll: 0.05,
+    move: { kind: 'sway', amount: 0.6, bars: 8 },
+  });
   assert.equal(sceneFlameKey(s, 'b:frozen-shrine'), 'scene-b-frozen-shrine');
   assert.equal(sceneFlameKey(s, 'm:frozen-shrine'), 'scene-m-frozen-shrine');
   assert.equal(sceneFlameKey(s), 'scene-p-frozen-shrine', 'the Painter’s, no ref');
@@ -85,18 +169,31 @@ test('a scene’s Edge Glow: Off none, Always at its strength, In the mix rolled
     const { director, kn } = directorFor({ knights: 'on', knightGlow: 'on', knightRim: 0.2 });
     const out = [];
     for (let i = 0; i < n; i++) {
-      const s = shrine({ id: `glow-${i % 2}`, name: `Glow ${i % 2}`, knights: { ...shrine().knights, glow, rim: 0.8 } });
+      const s = shrine({
+        id: `glow-${i % 2}`,
+        name: `Glow ${i % 2}`,
+        knights: { ...shrine().knights, glow, rim: 0.8 },
+      });
       director.scene({ ref: `b:${s.id}`, scene: s }, { instant: true });
       out.push(kn.rim);
     }
     return out;
   };
-  assert.ok(rims('off').every((r) => r === 0), 'Off: no glow (not the user’s Always)');
-  assert.ok(rims('on').every((r) => r === 0.8), 'Always: its own strength (not the user’s 0.2)');
+  assert.ok(
+    rims('off').every((r) => r === 0),
+    'Off: no glow (not the user’s Always)',
+  );
+  assert.ok(
+    rims('on').every((r) => r === 0.8),
+    'Always: its own strength (not the user’s 0.2)',
+  );
   const mix = rims('mix');
   const lit = mix.filter((r) => r > 0);
   assert.ok(lit.length > 0 && lit.length < mix.length, `In the mix: some arrivals glow, some don't (${mix.join(' ')})`);
-  assert.ok(lit.every((r) => r >= 0.47 && r <= 1), `…each round its strength, 0.6× to 1.4× (${lit.join(' ')})`);
+  assert.ok(
+    lit.every((r) => r >= 0.47 && r <= 1),
+    `…each round its strength, 0.6× to 1.4× (${lit.join(' ')})`,
+  );
   assert.ok(new Set(lit).size > 2, 'rolled, not one strength');
 });
 
@@ -105,11 +202,17 @@ test('the flashy clamp: Low Flash (or reduced motion) keeps a flashy scene’s f
   const user = LOW_FLASH();
   user.dropFx = { ...user.dropFx, ink: 'off' };
   const o = sceneOverrides(s, 'hold', user);
-  assert.deepEqual([o.flicker, o.xrayView, o.dropFx.xray, o.dropFx.ink, o.knightShine], ['off', null, 'off', 'off', 'off']);
+  assert.deepEqual(
+    [o.flicker, o.xrayView, o.dropFx.xray, o.dropFx.ink, o.knightShine],
+    ['off', null, 'off', 'off', 'off'],
+  );
   assert.equal(o.glow, 'on', 'the rest as painted');
   assert.equal(looksPin(s, user).layers.flicker, 'off', 'the pinned look too');
   const reduced = sceneOverrides(s, 'hold', settingsWith(), { reducedMotion: true });
-  assert.deepEqual([reduced.flicker, reduced.xrayView, reduced.dropFx.xray, reduced.dropFx.ink, reduced.knightShine], ['off', null, 'off', 'off', 'off']);
+  assert.deepEqual(
+    [reduced.flicker, reduced.xrayView, reduced.dropFx.xray, reduced.dropFx.ink, reduced.knightShine],
+    ['off', null, 'off', 'off', 'off'],
+  );
   for (const k of FLASHY) if (k in o) assert.equal(o[k], 'off', k);
   // With the user’s switches on, the scene’s own.
   const free = sceneOverrides(s, 'hold', settingsWith());
@@ -152,25 +255,41 @@ test('a scene arrives in one moment: every part applied in the same call, the pl
   assert.equal(looks.held, true);
   assert.deepEqual(camera.pinned.pos, s.camera.pos, 'the framing');
   assert.equal(camera.held, true);
-  assert.deepEqual(kn.list.map((e) => e.present), [true, true, true, false], 'the knights');
-  assert.deepEqual([kn.list[0].helmet, kn.list[2].helmet, kn.finish, kn.seatPose, kn.rim, kn.style], ['armet', 'bascinet', 'blackened', 'watchful', 0.8, 'blackgold']);
+  assert.deepEqual(
+    kn.list.map((e) => e.present),
+    [true, true, true, false],
+    'the knights',
+  );
+  assert.deepEqual(
+    [kn.list[0].helmet, kn.list[2].helmet, kn.finish, kn.seatPose, kn.rim, kn.style],
+    ['armet', 'bascinet', 'blackened', 'watchful', 0.8, 'blackgold'],
+  );
   assert.equal(show.pattern, 'chase', 'the fireflies’ show');
   assert.deepEqual(director.parts.player.offsets, s.fire);
   const moved = fire.calls.find((c) => c[0] === 'setScenery');
   const firstKnight = kn.log.findIndex((e) => e[2] === 'scene' || e[3] === 'scene');
   assert.ok(moved[2] <= firstKnight, 'the place changed before the knights were placed');
-  assert.deepEqual(events.filter((e) => e[0] === 'scene').map((e) => e[1]), [{ name: 'Frozen Shrine', ref: 'b:frozen-shrine', mode: 'hold' }]);
+  assert.deepEqual(
+    events.filter((e) => e[0] === 'scene').map((e) => e[1]),
+    [{ name: 'Frozen Shrine', ref: 'b:frozen-shrine', mode: 'hold' }],
+  );
   assert.equal(director.sceneName, 'Frozen Shrine');
   // The weapon, flame and element: its impact where it stands (a new weapon at once under it).
   await tick();
   assert.deepEqual([fire.weapon, fire.flame, fire.element], ['greatsword', key, 'ice']);
-  assert.ok(fire.impacts.some((i) => i.flame === key && !i.instant), 'with an impact (its flash)');
+  assert.ok(
+    fire.impacts.some((i) => i.flame === key && !i.instant),
+    'with an impact (its flash)',
+  );
   // Nothing arranged a second time a frame later.
   const mark = kn.log.length;
   kn.moment = 'later';
   for (let i = 0; i < 10; i++) director.update(FRAME, 0.016);
   assert.deepEqual(ins(kn.log.slice(mark)), [], 'no one comes or goes after the moment');
-  assert.deepEqual(kn.log.slice(mark).filter((e) => ['finish', 'seat', 'rim', 'style', 'shine'].includes(e[0])), []);
+  assert.deepEqual(
+    kn.log.slice(mark).filter((e) => ['finish', 'seat', 'rim', 'style', 'shine'].includes(e[0])),
+    [],
+  );
 });
 
 test('re-applying the same scene does nothing; an instant edit touches only its part and keeps the rest of the rolls', () => {
@@ -205,7 +324,14 @@ test('re-applying the same scene does nothing; an instant edit touches only its 
 });
 
 test('holding: no phrase swaps, no cuts or scenery mix, the look timer only re-rolls, the swaps forge the scene’s flame', async () => {
-  const { director, fire, shots, settings } = directorFor({ phraseBars: 8, camera: 'cuts', cutBars: 1, scenery: 'mix', lookBars: 8, knights: 'off' });
+  const { director, fire, shots, settings } = directorFor({
+    phraseBars: 8,
+    camera: 'cuts',
+    cutBars: 1,
+    scenery: 'mix',
+    lookBars: 8,
+    knights: 'off',
+  });
   const { looks } = director.parts;
   const s = shrine({ place: { scenery: 'forge', weapon: null, element: null } });
   director.scene({ ref: 'm:forge', scene: s });
@@ -255,7 +381,15 @@ test('release(): a setting the user touches is theirs again until the next scene
   const s = shrine();
   director.scene({ ref: 'b:frozen-shrine', scene: s }, { instant: true });
   assert.equal(layers.view.pixelSize, 6);
-  assert.deepEqual([director.sceneSets('pixelSize'), director.sceneSets('glitch'), director.sceneHolds('camera'), director.sceneHolds('render')], [true, false, true, true]);
+  assert.deepEqual(
+    [
+      director.sceneSets('pixelSize'),
+      director.sceneSets('glitch'),
+      director.sceneHolds('camera'),
+      director.sceneHolds('render'),
+    ],
+    [true, false, true, true],
+  );
   director.releaseScene(['pixelSize', 'glow', 'shot']);
   assert.equal(director.sceneSets('pixelSize'), false, 'theirs again');
   assert.equal(layers.view.pixelSize, 3, 'the user’s pixel size');
@@ -274,7 +408,13 @@ test('release(): a setting the user touches is theirs again until the next scene
 });
 
 test('Hold vs Base: Base opens the stretch, then the show takes the look, the framing and the colors back', () => {
-  const { director, fire, shots } = directorFor({ camera: 'cuts', cutBars: 1, lookBars: 8, phraseBars: 8, knights: 'off' });
+  const { director, fire, shots } = directorFor({
+    camera: 'cuts',
+    cutBars: 1,
+    lookBars: 8,
+    phraseBars: 8,
+    knights: 'off',
+  });
   const { looks, camera, colors, layers } = director.parts;
   director.scene({ ref: 'b:frozen-shrine', scene: shrine() }, { mode: 'base' });
   assert.equal(director.sceneMode, 'base');
@@ -288,7 +428,10 @@ test('Hold vs Base: Base opens the stretch, then the show takes the look, the fr
   bars(director, 24);
   assert.ok(shots.length > 0, 'the cuts take over');
   assert.equal(looks.pinned, null, 'the look’s turn handed back');
-  assert.ok(fire.calls.slice(calls).some((c) => c[0] === 'equip'), 'the phrase swaps');
+  assert.ok(
+    fire.calls.slice(calls).some((c) => c[0] === 'equip'),
+    'the phrase swaps',
+  );
   assert.equal(layers.view.pixelSize, 6, 'its render stays');
   assert.equal(fire.scenery, 'shrine', 'its place stays');
   // With the Music set to Hold overrides a scene that says Base.
@@ -301,13 +444,19 @@ test('Base: the scene’s own flame landing (its arrival) keeps its scenery colo
   const { director } = directorFor({ sceneColors: 'on', knights: 'off' });
   const { colors } = director.parts;
   const s = shrine({ music: 'base' });
-  const settle = () => { for (let i = 0; i < 20; i++) colors.update(0.1); };
+  const settle = () => {
+    for (let i = 0; i < 20; i++) colors.update(0.1);
+  };
   director.scene({ ref: 'b:frozen-shrine', scene: s });
   assert.deepEqual([director.sceneMode, colors.held], ['base', false]);
   // Its flame lands where it stands (the arrival's impact): its colors stay, they aren't rolled anew.
   director.landed('scene-b-frozen-shrine');
   settle();
-  assert.deepEqual([sceneryNow.void, sceneryNow.stone], [s.colors.scenery.void, s.colors.scenery.stone], 'the scene’s own colors');
+  assert.deepEqual(
+    [sceneryNow.void, sceneryNow.stone],
+    [s.colors.scenery.void, s.colors.scenery.stone],
+    'the scene’s own colors',
+  );
   // The show plays on: its next flame brings colors of its own (Recolor the Scenery: every flame).
   director.landed(colors.next('ember'));
   settle();
@@ -322,9 +471,20 @@ test('Base: the scene’s own flame landing (its arrival) keeps its scenery colo
 
 test('the loop at a drop: the breakdown forges the next scene’s blade, the scene lands in the strike, the knights in its places', async () => {
   const A = shrine();
-  const B = shrine({ id: 'forge-rave', name: 'Forge Rave', place: { scenery: 'forge', weapon: 'warhammer', element: 'lightning' }, knights: { ...A.knights, count: 2, helmets: [null, null], dance: 'on', formation: 'line' } });
-  const lib = [{ ref: 'b:frozen-shrine', scene: A }, { ref: 'b:forge-rave', scene: B }];
-  const { director, fire, kn, events } = directorFor({ scenes: 'on', sceneBars: 0, knights: 'on', knightCount: 1, knightDance: 'on' }, { scenes: () => lib });
+  const B = shrine({
+    id: 'forge-rave',
+    name: 'Forge Rave',
+    place: { scenery: 'forge', weapon: 'warhammer', element: 'lightning' },
+    knights: { ...A.knights, count: 2, helmets: [null, null], dance: 'on', formation: 'line' },
+  });
+  const lib = [
+    { ref: 'b:frozen-shrine', scene: A },
+    { ref: 'b:forge-rave', scene: B },
+  ];
+  const { director, fire, kn, events } = directorFor(
+    { scenes: 'on', sceneBars: 0, knights: 'on', knightCount: 1, knightDance: 'on' },
+    { scenes: () => lib },
+  );
   bars(director, 1, { first: ['start'] });
   assert.equal(director.sceneName, 'Frozen Shrine', 'the first at the start');
   await tick();
@@ -332,7 +492,10 @@ test('the loop at a drop: the breakdown forges the next scene’s blade, the sce
   // The breakdown: the next scene’s weapon, flame and element forged and held.
   director.update({ ...FRAME, state: 'breakdown', events: ['breakdown'] }, 0.016);
   const armed = fire.calls.filter((c) => c[0] === 'equip').at(-1);
-  assert.deepEqual([armed[1], armed[2], armed[3].element, armed[3].hold], ['warhammer', 'scene-b-forge-rave', 'lightning', true]);
+  assert.deepEqual(
+    [armed[1], armed[2], armed[3].element, armed[3].hold],
+    ['warhammer', 'scene-b-forge-rave', 'lightning', true],
+  );
   assert.equal(director.sceneName, 'Frozen Shrine', 'not yet');
   bars(director, 4, { state: 'breakdown' });
   assert.equal(director.sceneName, 'Frozen Shrine', 'still not: it waits for the drop');
@@ -352,13 +515,19 @@ test('the loop at a drop: the breakdown forges the next scene’s blade, the sce
   kn.moment = 'later';
   for (let i = 0; i < 10; i++) director.update(FRAME, 0.016);
   assert.deepEqual(ins(kn.log.slice(after)), [], 'no second arrangement');
-  assert.deepEqual(events.filter((e) => e[0] === 'scene').map((e) => e[1].name), ['Frozen Shrine', 'Forge Rave']);
+  assert.deepEqual(
+    events.filter((e) => e[0] === 'scene').map((e) => e[1].name),
+    ['Frozen Shrine', 'Forge Rave'],
+  );
 });
 
 test('the loop on a phrase line: the swap is forged to land on the downbeat, the scene arrives with its impact', async () => {
   const A = shrine({ place: { scenery: 'shrine', weapon: null, element: null } });
   const B = shrine({ id: 'moonlit', name: 'Moonlit Ruins', place: { scenery: 'ruins', weapon: null, element: null } });
-  const lib = [{ ref: 'm:a', scene: A }, { ref: 'm:b', scene: B }];
+  const lib = [
+    { ref: 'm:a', scene: A },
+    { ref: 'm:b', scene: B },
+  ];
   const { director, fire } = directorFor({ scenes: 'on', sceneBars: 16, knights: 'off' }, { scenes: () => lib });
   bars(director, 1, { from: 0, first: ['start'] });
   await tick();
@@ -383,9 +552,21 @@ test('the loop on a phrase line: the swap is forged to land on the downbeat, the
 /** Three scenes with their own weapons (so every change forges), for the loop's timing tests. */
 function trio() {
   const A = shrine({ place: { scenery: 'shrine', weapon: 'greatsword', element: 'ice' } });
-  const B = shrine({ id: 'moonlit', name: 'Moonlit Ruins', place: { scenery: 'ruins', weapon: 'warhammer', element: 'fire' } });
-  const C = shrine({ id: 'forge-rave', name: 'Forge Rave', place: { scenery: 'forge', weapon: 'katana', element: 'lightning' } });
-  return [{ ref: 'm:a', scene: A }, { ref: 'm:b', scene: B }, { ref: 'm:c', scene: C }];
+  const B = shrine({
+    id: 'moonlit',
+    name: 'Moonlit Ruins',
+    place: { scenery: 'ruins', weapon: 'warhammer', element: 'fire' },
+  });
+  const C = shrine({
+    id: 'forge-rave',
+    name: 'Forge Rave',
+    place: { scenery: 'forge', weapon: 'katana', element: 'lightning' },
+  });
+  return [
+    { ref: 'm:a', scene: A },
+    { ref: 'm:b', scene: B },
+    { ref: 'm:c', scene: C },
+  ];
 }
 const BREAKDOWN = { ...FRAME, state: 'breakdown', events: ['breakdown'] };
 const DROP = { ...FRAME, state: 'groove', drop: 'big', events: ['drop'] };
@@ -412,13 +593,21 @@ test('16 bars: a scene landing on the line where the breakdown begins gives way 
   assert.equal(fire.flame, 'scene-m-c', 'its own flame, from its own blade');
   // A breakdown that turns out short (2 bars after an arrival): the drop doesn't end the scene.
   director.update(BREAKDOWN, 0.016);
-  assert.equal(fire.calls.filter((c) => c[0] === 'equip').at(-1)[2], 'scene-m-a', 'the forecast forges the next one’s blade');
+  assert.equal(
+    fire.calls.filter((c) => c[0] === 'equip').at(-1)[2],
+    'scene-m-a',
+    'the forecast forges the next one’s blade',
+  );
   bars(director, 2, { from: 1, state: 'breakdown' });
   director.update(DROP, 0.016);
   assert.equal(director.sceneName, 'Forge Rave', 'two bars in: it stays');
   assert.equal(director.upNext.ref, 'm:a', 'the next one stays next');
   director.landed(fire.land());
-  assert.deepEqual([fire.weapon, fire.flame, fire.element], ['katana', 'scene-m-c', 'lightning'], 'the struck blade takes the playing scene’s own weapon, flame and element');
+  assert.deepEqual(
+    [fire.weapon, fire.flame, fire.element],
+    ['katana', 'scene-m-c', 'lightning'],
+    'the struck blade takes the playing scene’s own weapon, flame and element',
+  );
 });
 
 test('Only on Drops: a breakdown that ends with no drop brings no scene (the blade strikes in the playing scene’s colors); the real drop does', async () => {
@@ -438,7 +627,11 @@ test('Only on Drops: a breakdown that ends with no drop brings no scene (the bla
   assert.equal(fire.holding, false, 'struck on the downbeat');
   assert.equal(director.sceneName, 'Frozen Shrine', 'no drop, no scene (bar 11)');
   director.landed(fire.land());
-  assert.deepEqual([fire.weapon, fire.flame, fire.element], ['greatsword', 'scene-m-a', 'ice'], 'its own weapon, flame and element back with the impact');
+  assert.deepEqual(
+    [fire.weapon, fire.flame, fire.element],
+    ['greatsword', 'scene-m-a', 'ice'],
+    'its own weapon, flame and element back with the impact',
+  );
   assert.equal(director.upNext.ref, 'm:b', 'the one forged for is still next');
   // No phrase lines either.
   bars(director, 20, { from: 12 });
@@ -456,7 +649,10 @@ test('Only on Drops: a breakdown that ends with no drop brings no scene (the bla
   bars(director, 8, { from: 16, state: 'breakdown' });
   director.update(DROP, 0.016);
   assert.equal(director.sceneName, 'Moonlit Ruins');
-  assert.deepEqual(events.filter((e) => e[0] === 'scene').map((e) => e[1].name), ['Frozen Shrine', 'Moonlit Ruins']);
+  assert.deepEqual(
+    events.filter((e) => e[0] === 'scene').map((e) => e[1].name),
+    ['Frozen Shrine', 'Moonlit Ruins'],
+  );
 });
 
 test('a blade forged for a scene that didn’t come never shows its colors: a Base scene (or the free show) takes the show’s next flame', async () => {
@@ -479,9 +675,17 @@ test('a blade forged for a scene that didn’t come never shows its colors: a Ba
 
 test('a phrase line with the same weapon (or the forge busy) lands on the downbeat with a flash; N on the next downbeat', async () => {
   const A = shrine({ place: { scenery: 'shrine', weapon: 'greatsword', element: null } });
-  const B = shrine({ id: 'b2', name: 'Same Blade', place: { scenery: 'cathedral', weapon: 'greatsword', element: null } });
+  const B = shrine({
+    id: 'b2',
+    name: 'Same Blade',
+    place: { scenery: 'cathedral', weapon: 'greatsword', element: null },
+  });
   const C = shrine({ id: 'c3', name: 'Third', place: { scenery: 'cult', weapon: null, element: null } });
-  const lib = [{ ref: 'm:a', scene: A }, { ref: 'm:b2', scene: B }, { ref: 'm:c3', scene: C }];
+  const lib = [
+    { ref: 'm:a', scene: A },
+    { ref: 'm:b2', scene: B },
+    { ref: 'm:c3', scene: C },
+  ];
   const { director, fire } = directorFor({ scenes: 'on', sceneBars: 16, knights: 'off' }, { scenes: () => lib });
   bars(director, 1, { from: 0, first: ['start'] });
   await tick();
@@ -492,7 +696,10 @@ test('a phrase line with the same weapon (or the forge busy) lands on the downbe
   bars(director, 1, { from: 16 });
   assert.equal(director.sceneName, 'Same Blade', 'on the phrase line’s downbeat');
   await tick();
-  assert.ok(fire.calls.slice(calls).some((c) => c[0] === 'equip' && !c[3].instant && c[1] === 'greatsword'), 'an impact where it stands: its flash');
+  assert.ok(
+    fire.calls.slice(calls).some((c) => c[0] === 'equip' && !c[3].instant && c[1] === 'greatsword'),
+    'an impact where it stands: its flash',
+  );
   // N: the next on the next downbeat.
   const next = director.nextScene();
   assert.equal(next.ref, 'm:c3');
@@ -503,7 +710,10 @@ test('a phrase line with the same weapon (or the forge busy) lands on the downbe
 
 test('Scenes switched off: the loop’s scene gives way to the free show on a downbeat; a hand-picked one stays', () => {
   const lib = [{ ref: 'm:a', scene: shrine() }];
-  const { director, settings, fire } = directorFor({ scenes: 'on', sceneBars: 16, knights: 'off', scenery: 'ruins' }, { scenes: () => lib });
+  const { director, settings, fire } = directorFor(
+    { scenes: 'on', sceneBars: 16, knights: 'off', scenery: 'ruins' },
+    { scenes: () => lib },
+  );
   bars(director, 1, { from: 0, first: ['start'] });
   assert.equal(director.sceneName, 'Frozen Shrine');
   settings.scenes = 'off';
@@ -532,7 +742,14 @@ test('the Painter’s way: no library, the scene held by hand survives the music
 
 test('fire offsets are added to the drive, in silence too; the fireflies fly at the scene’s speed and count', () => {
   const { director, fire } = directorFor({ knights: 'off' });
-  const flies = { flies: Array.from({ length: effects.fireflies.count }, () => ({})), lit: null, speed: 1, setLit(n) { flies.lit = n; } };
+  const flies = {
+    flies: Array.from({ length: effects.fireflies.count }, () => ({})),
+    lit: null,
+    speed: 1,
+    setLit(n) {
+      flies.lit = n;
+    },
+  };
   fire.fireflies = flies;
   for (let i = 0; i < 60; i++) director.update({ ...FRAME, state: 'silent' }, 0.016);
   const before = { ...fire.drive };
@@ -551,22 +768,41 @@ test('fire offsets are added to the drive, in silence too; the fireflies fly at 
 test('reduced motion: a scene’s look holds still (Ember, no layer that moves, no kicks); the Painter’s plays as painted', () => {
   const s = shrine({
     look: { name: 'kaleido', amount: 1.2, params: { segments: 8 } },
-    layers: { ghost: 'on', blur: 'on', flicker: 'on', chroma: 'on', grain: 'on', glow: 'on', gradient: 'on', spotlight: 'on' },
+    layers: {
+      ghost: 'on',
+      blur: 'on',
+      flicker: 'on',
+      chroma: 'on',
+      grain: 'on',
+      glow: 'on',
+      gradient: 'on',
+      spotlight: 'on',
+    },
     details: { chroma: 2, chromaKick: 4, grain: 0.2, grainKick: 0.3, spotBreath: 0.2, glowAmt: 1 },
   });
   // The pin and the overlay: the clean look, no layer that moves, the still ones as painted.
   const pin = looksPin(s, settingsWith(), { reducedMotion: true });
   assert.equal(pin.look, 'ember');
   for (const k of MOVING_LAYERS) assert.equal(pin.layers[k], 'off', k);
-  assert.deepEqual([pin.layers.chroma, pin.layers.grain, pin.layers.glow, pin.layers.gradient], ['on', 'on', 'on', 'on']);
+  assert.deepEqual(
+    [pin.layers.chroma, pin.layers.grain, pin.layers.glow, pin.layers.gradient],
+    ['on', 'on', 'on', 'on'],
+  );
   const o = sceneOverrides(s, 'hold', settingsWith(), { reducedMotion: true });
   for (const k of MOVING_LAYERS) assert.equal(o[k], 'off', k);
   for (const name of Object.keys(LOOKS)) {
-    assert.equal(looksPin(shrine({ look: { name, amount: 1, params: {} } }), settingsWith(), { reducedMotion: true }).look, 'ember', `${name}: every look moves`);
+    assert.equal(
+      looksPin(shrine({ look: { name, amount: 1, params: {} } }), settingsWith(), { reducedMotion: true }).look,
+      'ember',
+      `${name}: every look moves`,
+    );
   }
   // (The Painter: the look it's painting, as painted; only the flashes clamped.)
   const painted = looksPin(s, settingsWith(), { reducedMotion: true, paintedLook: true });
-  assert.deepEqual([painted.look, painted.layers.ghost, painted.layers.blur, painted.layers.flicker], ['kaleido', 'on', 'on', 'off']);
+  assert.deepEqual(
+    [painted.look, painted.layers.ghost, painted.layers.blur, painted.layers.flicker],
+    ['kaleido', 'on', 'on', 'off'],
+  );
 
   // End to end, through the start, beats, a breakdown and a drop: nothing that moves shows,
   // and the still layers hold steady (no kick, no breath).
@@ -585,9 +821,28 @@ test('reduced motion: a scene’s look holds still (Ember, no layer that moves, 
   director.update(DROP, 0.016);
   director.glitchHit();
   bars(director, 2, { from: 5 });
-  const moving = ['kaleido', 'feedback', 'ghost', 'blur', 'flicker', 'slice', 'rippleAmp', 'cycle', 'ink', 'invert', 'wave'];
-  for (const k of moving) assert.ok(seen.every((f) => !f[k]), `${k} stays 0 (${[...new Set(seen.map((f) => f[k]))].join(', ')})`);
-  assert.ok(seen.every((f) => f.block === 1), 'no crunch');
+  const moving = [
+    'kaleido',
+    'feedback',
+    'ghost',
+    'blur',
+    'flicker',
+    'slice',
+    'rippleAmp',
+    'cycle',
+    'ink',
+    'invert',
+    'wave',
+  ];
+  for (const k of moving)
+    assert.ok(
+      seen.every((f) => !f[k]),
+      `${k} stays 0 (${[...new Set(seen.map((f) => f[k]))].join(', ')})`,
+    );
+  assert.ok(
+    seen.every((f) => f.block === 1),
+    'no crunch',
+  );
   const steady = (k) => [...new Set(seen.slice(2).map((f) => f[k]))];
   assert.deepEqual(steady('split'), [2], 'the chroma’s split, painted and steady');
   assert.deepEqual(steady('noise'), [0.2], 'the grain, steady');
@@ -599,15 +854,28 @@ test('reduced motion: a scene’s look holds still (Ember, no layer that moves, 
     const d = directorFor({ knights: 'off', looks: echoOnly }, { reducedMotion });
     const out = [];
     const upd = d.director.update;
-    d.director.update = (f, dt) => { upd(f, dt); out.push(d.fire.glitch.cycle); };
+    d.director.update = (f, dt) => {
+      upd(f, dt);
+      out.push(d.fire.glitch.cycle);
+    };
     bars(d.director, 4, { first: ['start'] });
     return out;
   };
-  assert.ok(cycles(true).every((c) => !c), 'no color cycle');
-  assert.ok(cycles(false).some((c) => c > 0), '(without reduced motion it cycles)');
+  assert.ok(
+    cycles(true).every((c) => !c),
+    'no color cycle',
+  );
+  assert.ok(
+    cycles(false).some((c) => c > 0),
+    '(without reduced motion it cycles)',
+  );
   // The Painter (paintedLook): the look being painted shows, even with reduced motion.
   const pf = fakeFire(fakeKnights());
-  const painter = createDirector(pf, { settings: settingsWith({ knights: 'off' }), reducedMotion: true, paintedLook: true });
+  const painter = createDirector(pf, {
+    settings: settingsWith({ knights: 'off' }),
+    reducedMotion: true,
+    paintedLook: true,
+  });
   painter.scene(s, { mode: 'hold', instant: true });
   for (let i = 0; i < 10; i++) painter.update({ ...FRAME, state: 'silent' }, 0.016);
   assert.equal(pf.glitch.kaleido, 8, 'its kaleidoscope, painted');
@@ -615,7 +883,10 @@ test('reduced motion: a scene’s look holds still (Ember, no layer that moves, 
   assert.equal(pf.glitch.flicker ?? 0, 0, 'still no flicker');
   // …but its palette never cycles under reduced motion: an Echo look painted with the Color
   // Cycle hit Always, through the Beat and Drop previews' music (downbeats, a breakdown, drops).
-  const echo = shrine({ look: { name: 'echo', amount: 1.2, params: {} }, drops: { fx: { cycle: 'on', shatter: 'on' }, count: 3 } });
+  const echo = shrine({
+    look: { name: 'echo', amount: 1.2, params: {} },
+    drops: { fx: { cycle: 'on', shatter: 'on' }, count: 3 },
+  });
   const paintedRun = (reducedMotion) => {
     const d = directorFor({ knights: 'off' }, { reducedMotion, paintedLook: true });
     d.director.scene(echo, { mode: 'hold', instant: true });
@@ -647,9 +918,13 @@ test('reduced motion: a scene’s look holds still (Ember, no layer that moves, 
 });
 
 test('a scene due on a downbeat while a blade is held for the drop lands in its strike, never cutting the blade down', () => {
-  const mk = (id, name, weapon) => normalizeScene({ ...defaultScene(name), id, place: { scenery: 'ruins', weapon, element: null } });
+  const mk = (id, name, weapon) =>
+    normalizeScene({ ...defaultScene(name), id, place: { scenery: 'ruins', weapon, element: null } });
   // N in a breakdown.
-  const lib = [{ ref: 'b:a', scene: mk('a', 'A', 'katana') }, { ref: 'b:b', scene: mk('b', 'B', 'mace') }];
+  const lib = [
+    { ref: 'b:a', scene: mk('a', 'A', 'katana') },
+    { ref: 'b:b', scene: mk('b', 'B', 'mace') },
+  ];
   const { director, fire } = directorFor({ scenes: 'off', autoDrops: true, knights: 'off' }, { scenes: () => lib });
   bars(director, 2, { first: ['start'] });
   if (fire.forging && !fire.holding) fire.land();
@@ -660,15 +935,26 @@ test('a scene due on a downbeat while a blade is held for the drop lands in its 
   assert.equal(director.sceneWhen, 'drop', 'the page can say it plays at the drop');
   bars(director, 3, { from: 5, state: 'breakdown', level: 0.2 });
   assert.deepEqual([fire.holding, director.sceneName], [true, null], 'the downbeats pass; the blade stays held');
-  assert.deepEqual(fire.calls.slice(calls).filter((c) => c[0] === 'equip'), [], 'nothing equipped under it');
+  assert.deepEqual(
+    fire.calls.slice(calls).filter((c) => c[0] === 'equip'),
+    [],
+    'nothing equipped under it',
+  );
   director.update(DROP, 0.016);
   assert.equal(fire.holding, false, 'the drop strikes it');
   assert.equal(director.sceneName, 'A', 'the scene lands in the strike');
   director.landed(fire.land());
-  assert.deepEqual([fire.weapon, fire.flame], ['katana', 'scene-b-a'], 'the struck blade takes its weapon and flame at the impact');
+  assert.deepEqual(
+    [fire.weapon, fire.flame],
+    ['katana', 'scene-b-a'],
+    'the struck blade takes its weapon and flame at the impact',
+  );
   assert.equal(director.sceneWhen, null);
   // The loop's own: a phrase line's scene (the same weapon: due on the downbeat) with a breakdown begun a bar before it.
-  const lib2 = [{ ref: 'b:a', scene: mk('a', 'A', null) }, { ref: 'b:b', scene: mk('b', 'B', 'longsword') }];
+  const lib2 = [
+    { ref: 'b:a', scene: mk('a', 'A', null) },
+    { ref: 'b:b', scene: mk('b', 'B', 'longsword') },
+  ];
   const two = directorFor({ scenes: 'on', sceneBars: 16, autoDrops: true, knights: 'off' }, { scenes: () => lib2 });
   bars(two.director, 1, { first: ['start'] });
   if (two.fire.forging && !two.fire.holding) two.fire.land();
@@ -709,13 +995,26 @@ test('back to the free show: the user’s place and knights come back with it; a
 });
 
 test('the user’s Camera: Still and unchecked Elements win over a Hold scene’s move and element', async () => {
-  const cam = { pos: [2.5, 1.2, 3.5], target: [0, 0.8, 0], fov: 50, roll: 0, move: { kind: 'sweep', amount: 1, bars: 4 } };
+  const cam = {
+    pos: [2.5, 1.2, 3.5],
+    target: [0, 0.8, 0],
+    fov: 50,
+    roll: 0,
+    move: { kind: 'sweep', amount: 1, bars: 4 },
+  };
   const s = shrine({ place: { scenery: 'shrine', weapon: 'greatsword', element: 'lightning' }, camera: cam });
   const user = settingsWith({ camera: 'still', elements: { fire: true, ice: true, lightning: false } });
   assert.equal(sceneOverrides(s, 'hold', user).camera, 'still');
   assert.equal(sceneOverrides(s, 'hold', settingsWith()).camera, 'drift', 'the scene’s move otherwise');
-  assert.deepEqual([sceneElement(s, user), sceneElement(s, settingsWith()), sceneElement(null)], [null, 'lightning', null]);
-  const { director, fire } = directorFor({ camera: 'still', knights: 'off', elements: { fire: true, ice: true, lightning: false } });
+  assert.deepEqual(
+    [sceneElement(s, user), sceneElement(s, settingsWith()), sceneElement(null)],
+    [null, 'lightning', null],
+  );
+  const { director, fire } = directorFor({
+    camera: 'still',
+    knights: 'off',
+    elements: { fire: true, ice: true, lightning: false },
+  });
   director.scene({ ref: 'b:sweep', scene: s }, { instant: true });
   await tick();
   assert.equal(director.parts.layers.view.camera, 'still');
@@ -741,7 +1040,10 @@ test('the user’s Camera: Still and unchecked Elements win over a Hold scene’
 });
 
 test('Low Flash and Chill keep their promises with a scene playing: no Color Cycle hit, no more hits at once than theirs, an Echo look without its palette steps', () => {
-  const s = shrine({ look: { name: 'echo', amount: 1.2, params: {} }, drops: { fx: { cycle: 'on', shatter: 'on', burst: 'mix' }, count: 3 } });
+  const s = shrine({
+    look: { name: 'echo', amount: 1.2, params: {} },
+    drops: { fx: { cycle: 'on', shatter: 'on', burst: 'mix' }, count: 3 },
+  });
   assert.ok(FLASHY_DROPS.includes('cycle'), 'the Color Cycle is a flashy drop hit');
   for (const id of ['safe', 'chill']) {
     const user = presetUser(id);
@@ -752,10 +1054,25 @@ test('Low Flash and Chill keep their promises with a scene playing: no Color Cyc
     assert.equal(o.dropCount, user.dropCount, `${id}: never more hits at once than the user's ${user.dropCount}`);
   }
   // The user's count caps the scene's whatever it is (a scene may ask for fewer); the Painter shows it as painted.
-  assert.deepEqual([1, 2, 3].map((n) => sceneOverrides(s, 'hold', settingsWith({ dropCount: n })).dropCount), [1, 2, 3]);
-  assert.equal(sceneOverrides(shrine({ drops: { fx: { shatter: 'on' }, count: 1 } }), 'hold', settingsWith({ dropCount: 3 })).dropCount, 1);
-  assert.equal(sceneOverrides(s, 'hold', settingsWith({ dropCount: 1 }), { paintedLook: true }).dropCount, 3, 'the Painter: as painted');
-  assert.equal(sceneOverrides(s, 'hold', settingsWith()).dropFx.cycle, 'on', 'the user’s Color Cycle in the mix: the scene’s own');
+  assert.deepEqual(
+    [1, 2, 3].map((n) => sceneOverrides(s, 'hold', settingsWith({ dropCount: n })).dropCount),
+    [1, 2, 3],
+  );
+  assert.equal(
+    sceneOverrides(shrine({ drops: { fx: { shatter: 'on' }, count: 1 } }), 'hold', settingsWith({ dropCount: 3 }))
+      .dropCount,
+    1,
+  );
+  assert.equal(
+    sceneOverrides(s, 'hold', settingsWith({ dropCount: 1 }), { paintedLook: true }).dropCount,
+    3,
+    'the Painter: as painted',
+  );
+  assert.equal(
+    sceneOverrides(s, 'hold', settingsWith()).dropFx.cycle,
+    'on',
+    'the user’s Color Cycle in the mix: the scene’s own',
+  );
   assert.equal(looksPin(s, presetUser('chill')).look, 'echo', 'the Echo look itself isn’t a flash: it plays');
 
   // End to end, through the music: the start, the groove, a breakdown, the drop, rings and G.
@@ -788,10 +1105,17 @@ test('Low Flash and Chill keep their promises with a scene playing: no Color Cyc
   assert.equal(shrineScene?.look.name, 'echo', 'Frozen Shrine, a built-in held Echo scene');
   const echoOnly = { ...Object.fromEntries(Object.keys(LOOKS).map((k) => [k, 'off'])), echo: 'on' };
   for (const id of ['safe', 'chill']) {
-    for (const [what, scene, over] of [['an Echo scene', s, {}], ['Frozen Shrine', shrineScene, {}], ['the free show’s Echo', null, { looks: echoOnly }]]) {
+    for (const [what, scene, over] of [
+      ['an Echo scene', s, {}],
+      ['Frozen Shrine', shrineScene, {}],
+      ['the free show’s Echo', null, { looks: echoOnly }],
+    ]) {
       const seen = run({ ...presetUser(id), ...over }, scene);
       assert.equal(seen.look, 'echo', `${id}, ${what}: the Echo look plays`);
-      assert.ok(seen.echoed > seen.frames / 2, `${id}, ${what}: its echo shows (${seen.echoed} of ${seen.frames} frames)`);
+      assert.ok(
+        seen.echoed > seen.frames / 2,
+        `${id}, ${what}: its echo shows (${seen.echoed} of ${seen.frames} frames)`,
+      );
       assert.equal(seen.cycled, 0, `${id}, ${what}: no palette cycling (${seen.cycled} of ${seen.frames} frames)`);
     }
   }

@@ -13,7 +13,12 @@ test('Normal is the siteâ€™s own counts; More and Max grow every one; the siteâ€
   const base = site();
   const before = JSON.stringify(base);
   const normal = densityCounts(base, 'normal');
-  assert.deepEqual(normal.particles, { fire: base.particles.fire, sparks: base.particles.sparks, forge: base.particles.forge, impact: base.particles.impact });
+  assert.deepEqual(normal.particles, {
+    fire: base.particles.fire,
+    sparks: base.particles.sparks,
+    forge: base.particles.forge,
+    impact: base.particles.impact,
+  });
   assert.deepEqual(normal.fireflies, { count: base.fireflies.count, lights: base.fireflies.lights });
   const more = densityCounts(base, 'more');
   const max = densityCounts(base, 'max');

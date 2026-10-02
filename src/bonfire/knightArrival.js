@@ -1,4 +1,4 @@
-// The site's knight comes and goes (scene.js wires it up; knights.js places and poses him):
+// The site's knight comes and goes (sceneKnight.js wires it up; knights.js places and poses him):
 //   away      he isn't there: his summon sign glows on the ground in front of his seat
 //             (summonSign.js), and a click on it (or the pack) summons him
 //   arriving  the sign burns away and its soul becomes him, in the current element's own way:
@@ -34,8 +34,6 @@ export const ARRIVAL_TIMES = { dissolve: 1.2, swirl: 0.3, gather: 0.6, form: 1.1
 export const REST = [180, 300];
 /** How long (s) past the end of his rest he may stay to finish what he's doing (`busy`). */
 export const BUSY_HOLD = 15;
-/** The presence states, in order. */
-export const PRESENCE = ['away', 'arriving', 'resting', 'leaving'];
 
 /**
  * @param {object} o
@@ -55,7 +53,21 @@ export const PRESENCE = ['away', 'arriving', 'resting', 'leaving'];
  *   his rest running out waits for it to end (BUSY_HOLD s at most)
  * @param {object} [o.hooks]      onForgeStrike(weight), onFormed(which: 'knight' | 'sign')
  */
-export function createKnightArrival({ knights, sign, particleMaterial, materials = null, layerFx, field, anchor, count, reducedMotion = false, now, rest = () => REST, busy = () => false, hooks = {} }) {
+export function createKnightArrival({
+  knights,
+  sign,
+  particleMaterial,
+  materials = null,
+  layerFx,
+  field,
+  anchor,
+  count,
+  reducedMotion = false,
+  now,
+  rest = () => REST,
+  busy = () => false,
+  hooks = {},
+}) {
   const N = reducedMotion ? 0 : count;
   const forge = createForgeParticles({ count: N, material: particleMaterial, layer: layerFx, field, anchor });
   forge.points.name = 'Summoning (the knight)';
@@ -67,8 +79,8 @@ export function createKnightArrival({ knights, sign, particleMaterial, materials
   let clock = 0;
   let presence = 'away';
   let restLeft = 0;
-  let resting = true;   // (whether his rest runs out: 'sign'; 'start' keeps him)
-  let allowed = true;   // effects.knight.show
+  let resting = true; // (whether his rest runs out: 'sign'; 'start' keeps him)
+  let allowed = true; // effects.knight.show
   const listeners = new Set();
   let signSubject = null;
   const anchorWorld = new THREE.Vector3();
@@ -81,20 +93,31 @@ export function createKnightArrival({ knights, sign, particleMaterial, materials
   function rollRest() {
     // (Either end not given: the default's.)
     const [a, b] = (rest() ?? REST).map((v, i) => (Number.isFinite(v) ? v : REST[i]));
-    const lo = Math.max(1, Math.min(a, b)), hi = Math.max(a, b);
+    const lo = Math.max(1, Math.min(a, b)),
+      hi = Math.max(a, b);
     restLeft = lo + Math.random() * (hi - lo);
   }
 
   const run = createForgeRun({
-    particles: forge, fx, arcs, materials, particleMaterial, times: ARRIVAL_TIMES, reducedMotion,
+    particles: forge,
+    fx,
+    arcs,
+    materials,
+    particleMaterial,
+    times: ARRIVAL_TIMES,
+    reducedMotion,
     clock: () => clock,
     groundPoint: (rng, out) => {
       anchorWorld.copy(anchor);
-      const a = rng() * Math.PI * 2, r = 0.45 + rng() * 0.35;
+      const a = rng() * Math.PI * 2,
+        r = 0.45 + rng() * 0.35;
       return out.set(anchorWorld.x + Math.cos(a) * r, 0.12 + rng() * 0.14, anchorWorld.z + Math.sin(a) * r);
     },
     hooks: {
-      updateMatrices: () => { knights.group.updateMatrixWorld(true); sign.group.updateMatrixWorld(true); },
+      updateMatrices: () => {
+        knights.group.updateMatrixWorld(true);
+        sign.group.updateMatrixWorld(true);
+      },
       onForgeStrike: (w) => hooks.onForgeStrike?.(w * 0.7),
       onFormed: () => hooks.onFormed?.(presence === 'arriving' ? 'knight' : 'sign'),
       // Formed: the sign flashes in the edge's color and settles (he's swept by the fire's
@@ -182,11 +205,18 @@ export function createKnightArrival({ knights, sign, particleMaterial, materials
   return {
     /** Everything to add to the scene (the fx layer): the particles, the lines, the arcs. */
     objects: [forge.points, ...(fx ? [fx.lines] : []), ...(arcs?.objects ?? [])],
-    get presence() { return presence; },
+    get presence() {
+      return presence;
+    },
     /** Seconds of his rest left (while resting and it runs out), else Infinity. */
-    get restLeft() { return presence === 'resting' && resting ? restLeft : Infinity; },
+    get restLeft() {
+      return presence === 'resting' && resting ? restLeft : Infinity;
+    },
     /** Call `fn(presence)` whenever it changes. Returns an unsubscribe. */
-    onPresence(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    onPresence(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
     summon,
     dismiss,
     /** Whether he's allowed at all (effects.knight.show): not, he goes at once and the sign with him. */
@@ -194,10 +224,18 @@ export function createKnightArrival({ knights, sign, particleMaterial, materials
       on = !!on;
       if (on === allowed) return;
       allowed = on;
-      if (!on) { finishNow(); if (presence !== 'away') { knights.dismiss(0, { instant: true }); set('away'); } sign.mode = 'off'; }
-      else if (presence === 'away') sign.mode = 'lit';
+      if (!on) {
+        finishNow();
+        if (presence !== 'away') {
+          knights.dismiss(0, { instant: true });
+          set('away');
+        }
+        sign.mode = 'off';
+      } else if (presence === 'away') sign.mode = 'lit';
     },
-    get allowed() { return allowed; },
+    get allowed() {
+      return allowed;
+    },
     /** Whether his rest runs out ('sign': he leaves after it) or he stays until sent off ('start'). */
     set resting(on) {
       on = !!on;
@@ -222,14 +260,20 @@ export function createKnightArrival({ knights, sign, particleMaterial, materials
       if (presence === 'resting' && resting && (restLeft -= dt) <= 0 && (restLeft < -BUSY_HOLD || !busy())) dismiss();
     },
     /** Shorten (or lengthen) the rest under way (s): for tests and the admin preview. */
-    set restLeft(s) { restLeft = s; },
+    set restLeft(s) {
+      restLeft = s;
+    },
     /**
      * The visitor is doing something with him (a gesture from the pack, a click on him, a new
      * helmet): his rest under way is topped up to at least `s` seconds, so he doesn't leave
      * right after.
      */
-    extendRest(s = 60) { if (presence === 'resting' && resting) restLeft = Math.max(restLeft, s); },
+    extendRest(s = 60) {
+      if (presence === 'resting' && resting) restLeft = Math.max(restLeft, s);
+    },
     /** Moving (the shadow's worth redrawing): he's being forged. */
-    get busy() { return run.busy; },
+    get busy() {
+      return run.busy;
+    },
   };
 }

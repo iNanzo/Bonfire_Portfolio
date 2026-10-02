@@ -31,7 +31,10 @@ test('MIDI: Next Scene is an action a pad can learn, and a press plays it', asyn
   globalThis.localStorage = { getItem: (k) => saved.get(k) ?? null, setItem: (k, v) => saved.set(k, String(v)) };
   const input = { name: 'Pads', onmidimessage: null };
   const access = { inputs: new Map([['1', input]]), onstatechange: null };
-  Object.defineProperty(globalThis, 'navigator', { value: { requestMIDIAccess: async () => access }, configurable: true });
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { requestMIDIAccess: async () => access },
+    configurable: true,
+  });
   const played = [];
   const midi = createMidi({ onAction: (a) => played.push(a), onStatus: () => {} });
   assert.equal(await midi.connect(), true);

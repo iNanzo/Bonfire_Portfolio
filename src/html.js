@@ -4,8 +4,11 @@
 // Keep escaping separate from URL construction: attributes need both.
 
 /** Text made safe to put in HTML, attributes included (& < > " ' escaped). */
-export const esc = (value = '') => String(value).replace(/[&<>"']/g,
-  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+export const esc = (value = '') =>
+  String(value).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+  );
 /**
  * Whether a link from content may be used: an https/http URL (no user:password@), a
  * mailto: with one @, or a plain relative path on this site (no leading slash, no "..",
@@ -14,11 +17,20 @@ export const esc = (value = '') => String(value).replace(/[&<>"']/g,
 export function isSafeUrl(value) {
   if (typeof value !== 'string' || !value || /[\s<>"'\\]/.test(value)) return false;
   if (/^https?:\/\//i.test(value)) {
-    try { const u = new URL(value); return !!u.hostname && !u.username && !u.password; } catch { return false; }
+    try {
+      const u = new URL(value);
+      return !!u.hostname && !u.username && !u.password;
+    } catch {
+      return false;
+    }
   }
   if (/^mailto:[^@]+@[^@]+$/i.test(value)) return true;
-  return !value.startsWith('/') && !value.includes(':') &&
-    !value.split(/[/?#]/).some((part) => part === '..' || part === '.') && !/%/i.test(value);
+  return (
+    !value.startsWith('/') &&
+    !value.includes(':') &&
+    !value.split(/[/?#]/).some((part) => part === '..' || part === '.') &&
+    !/%/i.test(value)
+  );
 }
 /**
  * A project image's URL: `src` is "assets/projects/<folder>/<name>" (checked), served as
@@ -34,4 +46,5 @@ export function videoUrl(src, base = '/') {
 }
 
 /** The four ornate corner brackets of a `.frame` panel (styles.css). */
-export const corners = '<span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>';
+export const corners =
+  '<span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>';

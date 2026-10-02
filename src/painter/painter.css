@@ -2,8 +2,9 @@
    The Bonfire Painter: the stage full-bleed, a top bar, the scene's panel on the right
    (a bottom sheet on phones) and the library as a drawer on the left. The site's pixel
    primitives (styles.css) and Bonfire Live's fields (visualizer.css) underneath; accents
-   follow the flame being painted. Hover is an effect (a glow, a lift, the stage itself
-   auditioning what's hovered), never a label popping up.
+   follow the flame being painted. Hover on a choice is an effect (a glow, a lift, the
+   stage itself auditioning what's hovered), never a label popping up; the "?" hints, the
+   icon buttons and the preview buttons show the shared tooltip (src/ui/tooltip.js).
    ========================================================================== */
 
 .pnt {
@@ -13,16 +14,23 @@
 }
 
 /* ---------- The stage ---------- */
-.pnt-stage { cursor: grab; }
-.pnt-stage.is-orbiting { cursor: grabbing; }
-.pnt-stage.is-panning { cursor: move; }
+.pnt-stage {
+  cursor: grab;
+}
+.pnt-stage.is-orbiting {
+  cursor: grabbing;
+}
+.pnt-stage.is-panning {
+  cursor: move;
+}
 
 /* ---------- The top bar ----------
    One row where it fits, the name taking what the buttons leave (never under them): the
    full labels from 1700px; narrower, the beat's words go (its pips stay), then the app's
-   name and the preview's long labels; below 1240px, two rows (the scene and its commands,
-   then the preview and Play); phones, further down. It wraps rather than run off-screen
-   whatever the width or the text size. (main.js keeps --bar-h at its height.) */
+   name and the long labels (the preview's, Play's); below 1240px, two rows (the scene and
+   its commands, then the preview and Play); phones, further down, Tools its ▾ alone. It
+   wraps rather than run off-screen whatever the width or the text size. (main.js keeps
+   --bar-h at its height.) */
 .pnt-bar {
   position: fixed;
   inset: 0 0 auto;
@@ -37,8 +45,18 @@
   background: color-mix(in srgb, var(--c-void) 88%, transparent);
   box-shadow: 0 1px 0 var(--line);
 }
-.pnt-home .brand-mark { height: 32px; }
-.pnt-title { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; overflow: hidden; }
+.pnt-home .brand-mark {
+  height: 32px;
+}
+/* (Its base is small: the buttons claim their room first, then it takes what's left.) */
+.pnt-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 260px;
+  overflow: hidden;
+}
 .pnt-app {
   flex: none;
   font-family: var(--font-pixel);
@@ -47,7 +65,11 @@
   text-transform: uppercase;
   color: var(--accent);
 }
-.pnt-name { flex: 1 1 200px; min-width: 12ch; max-width: 320px; }
+.pnt-name {
+  flex: 1 1 200px;
+  min-width: 12ch;
+  max-width: 320px;
+}
 .pnt-name input {
   width: 100%;
   padding: 4px 6px;
@@ -58,52 +80,221 @@
   letter-spacing: 0.03em;
   color: var(--c-bone);
 }
-.pnt-name input:hover { box-shadow: inset 0 -1px 0 var(--line-strong); }
-.pnt-name input:focus-visible { outline: none; box-shadow: inset 0 -2px 0 var(--accent); background: color-mix(in srgb, var(--c-shadow) 60%, transparent); }
+.pnt-name input:hover {
+  box-shadow: inset 0 -1px 0 var(--line-strong);
+}
+.pnt-name input:focus-visible {
+  outline: none;
+  box-shadow: inset 0 -2px 0 var(--accent);
+  background: color-mix(in srgb, var(--c-shadow) 60%, transparent);
+}
 /* Saved / unsaved: a dot and a word. */
-.pnt-dot { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 0.8125rem; color: var(--text-dim); white-space: nowrap; }
-.pnt-dot::before { content: ''; width: 8px; height: 8px; box-shadow: inset 0 0 0 2px var(--text-dim); }
-.pnt-dot[data-state='saved']::before { background: var(--accent-hi); box-shadow: none; }
-.pnt-dot[data-state='unsaved'] { color: var(--c-bone); }
-.pnt-dot[data-state='unsaved']::before { box-shadow: inset 0 0 0 2px var(--accent); animation: pnt-breathe 1.6s steps(4) infinite; }
-.pnt-dot[data-state='builtin']::before { background: var(--c-stone); box-shadow: inset 0 0 0 1px var(--line-strong); }
-@keyframes pnt-breathe { 50% { box-shadow: inset 0 0 0 2px var(--accent-lo); } }
+.pnt-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.pnt-dot::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  box-shadow: inset 0 0 0 2px var(--text-dim);
+}
+.pnt-dot[data-state='saved']::before {
+  background: var(--accent-hi);
+  box-shadow: none;
+}
+.pnt-dot[data-state='unsaved'] {
+  color: var(--c-bone);
+}
+.pnt-dot[data-state='unsaved']::before {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  animation: pnt-breathe 1.6s steps(4) infinite;
+}
+.pnt-dot[data-state='builtin']::before {
+  background: var(--c-stone);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+@keyframes pnt-breathe {
+  50% {
+    box-shadow: inset 0 0 0 2px var(--accent-lo);
+  }
+}
 
-.pnt-bar-group { display: flex; align-items: center; gap: 6px; flex: none; }
-.pnt-bar .pix-btn { padding: 5px 10px; font-size: 0.875rem; }
-.pnt-bar .pix-btn kbd { font-size: 0.625rem; }
-.pnt-bar .pix-btn:disabled { opacity: 0.4; cursor: default; --b: var(--line); color: var(--text-dim); }
-.pnt-icon { min-width: 32px; justify-content: center; font-family: var(--font-body) !important; }
-.pnt-preview .pix-btn[aria-pressed='true'] { color: var(--accent-hi); background: color-mix(in srgb, var(--accent-lo) 35%, var(--c-void)); }
-.pnt-play { color: var(--accent-hi); --b: var(--accent); }
-.pnt-short { display: none; }
-.pnt-play:hover { background: color-mix(in srgb, var(--accent-lo) 40%, var(--c-void)); }
+.pnt-bar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.pnt-bar .pix-btn {
+  padding: 5px 10px;
+  font-size: 0.875rem;
+}
+.pnt-bar .pix-btn kbd {
+  font-size: 0.625rem;
+}
+.pnt-bar .pix-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  --b: var(--line);
+  color: var(--text-dim);
+}
+.pnt-icon {
+  min-width: 32px;
+  justify-content: center;
+  font-family: var(--font-body) !important;
+}
+.pnt-preview .pix-btn[aria-pressed='true'] {
+  color: var(--accent-hi);
+  background: color-mix(in srgb, var(--accent-lo) 35%, var(--c-void));
+}
+.pnt-play {
+  color: var(--accent-hi);
+  --b: var(--accent);
+}
+.pnt-short {
+  display: none;
+}
+.pnt-play:hover {
+  background: color-mix(in srgb, var(--accent-lo) 40%, var(--c-void));
+}
 @media (max-width: 1699px) {
-  .pnt-beat b { display: none; }
+  .pnt-beat b {
+    display: none;
+  }
 }
 @media (max-width: 1499px) {
-  .pnt-app { display: none; }
-  .pnt-preview .pnt-long { display: none; }
-  .pnt-preview .pnt-short { display: inline; }
+  .pnt-app {
+    display: none;
+  }
+  .pnt-preview .pnt-long,
+  .pnt-play .pnt-long {
+    display: none;
+  }
+  .pnt-preview .pnt-short,
+  .pnt-play .pnt-short {
+    display: inline;
+  }
 }
 /* Two rows: the scene and its commands, then (after a break) the preview and Play. */
 @media (max-width: 1239px) {
-  .pnt-bar::after { content: ''; order: 2; flex-basis: 100%; height: 0; }
-  .pnt-preview { order: 3; }
-  .pnt-bar-group:last-child { order: 4; margin-left: auto; }
-  .pnt-bar .pnt-long { display: none; }
-  .pnt-bar .pnt-short { display: inline; }
+  .pnt-bar::after {
+    content: '';
+    order: 2;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .pnt-preview {
+    order: 3;
+  }
+  .pnt-bar-group:last-child {
+    order: 4;
+    margin-left: auto;
+  }
+  .pnt-bar .pnt-long {
+    display: none;
+  }
+  .pnt-bar .pnt-short {
+    display: inline;
+  }
+}
+
+/* Tools ▾: what only a key reached (toolbar.js), a menu under its button. */
+.pnt-tools {
+  position: relative;
+}
+.pnt-caret {
+  margin-left: 4px;
+  font-size: 0.75em;
+}
+/* (Hung from its button's right edge: on a phone the button is at the window's.) */
+.pnt-tools-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  min-width: 15rem;
+  padding: 4px 0;
+  background: var(--c-void);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 8px 24px rgb(0 0 0 / 0.5);
+}
+.pnt-tools-menu[hidden] {
+  display: none;
+}
+.pnt-tools-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 12px;
+  border: 0;
+  background: none;
+  font: 400 0.875rem/1.3 var(--font-pixel);
+  color: var(--c-bone);
+  text-align: left;
+  cursor: pointer;
+}
+.pnt-tools-item kbd {
+  font-size: 0.6875rem;
+  color: var(--text-dim);
+}
+.pnt-tools-item:hover,
+.pnt-tools-item:focus-visible {
+  color: var(--accent-hi);
+  background: color-mix(in srgb, var(--accent-lo) 30%, var(--c-void));
+  outline: none;
 }
 
 /* The beat: four pips (beat 1 outlined), the drop loop's place in its 16 bars. */
-.pnt-beat { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
-.pnt-beat i { width: 8px; height: 8px; box-shadow: inset 0 0 0 1px var(--line-strong); }
-.pnt-beat i.is-down { box-shadow: inset 0 0 0 1px var(--accent); }
-.pnt-beat i.is-on { background: var(--accent-hi); }
-.pnt-beat b { min-width: 11em; margin-left: 6px; font: 400 0.75rem/1 var(--font-pixel); letter-spacing: 0.06em; color: var(--text-dim); white-space: nowrap; }
-.pnt-beat.is-off i { opacity: 0.35; background: none; }
-.pnt-beat.is-drop b { animation: pnt-drop 900ms steps(6) both; }
-@keyframes pnt-drop { 0% { color: var(--accent-core); text-shadow: 0 0 8px var(--accent); } 100% { color: var(--text-dim); } }
+.pnt-beat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+.pnt-beat i {
+  width: 8px;
+  height: 8px;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.pnt-beat i.is-down {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.pnt-beat i.is-on {
+  background: var(--accent-hi);
+}
+.pnt-beat b {
+  min-width: 11em;
+  margin-left: 6px;
+  font: 400 0.75rem/1 var(--font-pixel);
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.pnt-beat.is-off i {
+  opacity: 0.35;
+  background: none;
+}
+.pnt-beat.is-drop b {
+  animation: pnt-drop 900ms steps(6) both;
+}
+@keyframes pnt-drop {
+  0% {
+    color: var(--accent-core);
+    text-shadow: 0 0 8px var(--accent);
+  }
+  100% {
+    color: var(--text-dim);
+  }
+}
 
 /* ---------- The banners (a scene from the admin; unsaved changes set aside), stacked ---------- */
 /* (Over the part of the stage the panel leaves showing; put away while the library's open.) */
@@ -118,8 +309,13 @@
   transform: translateX(-50%);
   pointer-events: none;
 }
-body.panel-off .pnt-banners { left: 50%; width: min(720px, calc(100vw - 2 * var(--gutter))); }
-body.lib-open .pnt-banners { display: none; }
+body.panel-off .pnt-banners {
+  left: 50%;
+  width: min(720px, calc(100vw - 2 * var(--gutter)));
+}
+body.lib-open .pnt-banners {
+  display: none;
+}
 .pnt-banner {
   display: flex;
   flex-wrap: wrap;
@@ -127,14 +323,22 @@ body.lib-open .pnt-banners { display: none; }
   gap: 8px 12px;
   padding: 10px 12px;
   background: var(--c-void);
-  box-shadow: 0 0 0 1px var(--accent), inset 2px 0 0 var(--accent);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    inset 2px 0 0 var(--accent);
   font-size: 0.9375rem;
   pointer-events: auto;
 }
-.pnt-banner p { flex: 1 1 280px; }
-.pnt-banner[hidden] { display: none; }
+.pnt-banner p {
+  flex: 1 1 280px;
+}
+.pnt-banner[hidden] {
+  display: none;
+}
 
 /* ---------- The panel ---------- */
+/* The search over the sections (outside what's drawn again: it keeps its focus), then the
+   sections, which scroll. */
 .pnt-panel {
   position: fixed;
   top: var(--bar-h);
@@ -142,18 +346,83 @@ body.lib-open .pnt-banners { display: none; }
   bottom: 0;
   z-index: 20;
   width: var(--panel-w);
-  overflow: hidden auto;
-  overscroll-behavior: contain;
-  padding: 6px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: color-mix(in srgb, var(--c-void) 90%, transparent);
   box-shadow: -1px 0 0 var(--line);
+}
+.pnt-panel[hidden] {
+  display: none;
+}
+.pnt-panel-head {
+  flex: none;
+  padding: 10px 16px 8px;
+  box-shadow: 0 1px 0 var(--line);
+}
+/* (Positioned: the hints' hidden text, absolutely placed, then scrolls inside it. Held by
+   the panel instead, it ran past the panel's foot, and a field focused or scrolled into view
+   slid the whole panel up under the bar, the search box with it.) */
+.pnt-panel-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  padding: 0 16px 40px;
   scrollbar-width: thin;
   scrollbar-color: var(--c-stone) transparent;
 }
-.pnt-panel[hidden] { display: none; }
-.pnt-tabs { display: none; }
-.pnt-sec + .pnt-sec { box-shadow: 0 -1px 0 var(--line); }
-.pnt-sec-head { margin: 0; }
+/* What the search found that the scene's shape leaves out, and how to bring it back. */
+.pnt-search-notes {
+  max-height: 7.5em;
+  overflow: auto;
+  margin-top: 6px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.pnt-search-notes[hidden] {
+  display: none;
+}
+/* (A fold, its count the summary: a phone's starts folded.) */
+.pnt-search-notes-title {
+  margin: 0 0 2px;
+  font: 400 0.6875rem/1.4 var(--font-pixel);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  cursor: pointer;
+}
+.pnt-search-notes-title:hover {
+  color: var(--accent-hi);
+}
+.pnt-search-notes ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pnt-search-notes li {
+  padding-left: 10px;
+  box-shadow: inset 1px 0 0 var(--line-strong);
+}
+/* While searching: only the rows found (and the sections and groups they're in). */
+.pnt-panel-body[data-searching] .is-miss,
+.pnt-panel-body[data-searching] .pnt-sec-body > :not([data-row]):not(.pnt-group),
+.pnt-panel-body[data-searching] .pnt-group > :not([data-row]):not(.pnt-subhead) {
+  display: none !important;
+}
+.pnt-tabs {
+  display: none;
+}
+.pnt-sec + .pnt-sec {
+  box-shadow: 0 -1px 0 var(--line);
+}
+.pnt-sec-head {
+  margin: 0;
+}
 .pnt-sec-head button {
   display: flex;
   align-items: center;
@@ -169,23 +438,113 @@ body.lib-open .pnt-banners { display: none; }
   color: var(--accent);
   cursor: pointer;
 }
-.pnt-sec-head button:hover { color: var(--accent-hi); }
-.pnt-sec-head svg { width: 10px; height: 10px; fill: currentColor; transform: rotate(-90deg); transition: transform var(--snap) steps(2); }
-.pnt-sec[data-open] .pnt-sec-head svg { transform: none; }
-.pnt-sec-body { display: grid; gap: 14px; padding: 0 0 18px; }
-.pnt-sec-body[hidden] { display: none; }
-.pnt-sub { display: grid; gap: 12px; padding: 10px 0 0 10px; box-shadow: inset 1px 0 0 var(--line); }
-.pnt-help { font-size: 0.8125rem; line-height: 1.5; color: var(--text-dim); }
-.pnt-note { font-size: 0.8125rem; color: var(--accent-hi); }
-.pnt-note[hidden] { display: none; }
-.pnt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.pnt-inline select { width: auto; padding: 5px 8px; font-size: 0.875rem; }
-.pnt-panel .viz-field-label { font-size: 0.875rem; }
-.pnt-panel .viz-field-label + * { margin-top: 6px; }
+.pnt-sec-head button:hover {
+  color: var(--accent-hi);
+}
+.pnt-sec-head svg {
+  width: 10px;
+  height: 10px;
+  fill: currentColor;
+  transform: rotate(-90deg);
+  transition: transform var(--snap) steps(2);
+}
+.pnt-sec[data-open] .pnt-sec-head svg {
+  transform: none;
+}
+.pnt-sec-body {
+  display: grid;
+  gap: 14px;
+  padding: 0 0 18px;
+}
+.pnt-sec-body[hidden] {
+  display: none;
+}
+.pnt-sub {
+  display: grid;
+  gap: 12px;
+  padding: 10px 0 0 10px;
+  box-shadow: inset 1px 0 0 var(--line);
+}
+/* The Knights' groups, each under its sub-heading. */
+.pnt-group {
+  display: grid;
+  gap: 14px;
+}
+.pnt-subhead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding-top: 10px;
+  box-shadow: 0 -1px 0 var(--line);
+  font: 400 0.75rem/1.3 var(--font-pixel);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 70%, var(--c-bone));
+}
+.pnt-group:first-child .pnt-subhead {
+  margin-top: 0;
+  padding-top: 0;
+  box-shadow: none;
+}
+.pnt-subhead .viz-tip {
+  letter-spacing: 0;
+}
+.pnt-field {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+.pnt-field > .viz-more {
+  margin-top: 6px;
+}
+.pnt-help {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.pnt-note {
+  font-size: 0.8125rem;
+  color: var(--accent-hi);
+}
+.pnt-note[hidden] {
+  display: none;
+}
+.pnt-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.pnt-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+.pnt-inline label {
+  cursor: pointer;
+}
+.pnt-inline select {
+  width: auto;
+  padding: 5px 8px;
+  font-size: 0.875rem;
+}
+.pnt-panel .viz-field-label {
+  font-size: 0.875rem;
+}
+.pnt-panel .viz-field-label + * {
+  margin-top: 6px;
+}
 
 /* Chips: a choice as a button. Pressed: the accent. Hovered: a lift and a glow (and the
    stage auditions it). */
-.pnt-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pnt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 .pnt-chip {
   --b: var(--line-strong);
   position: relative;
@@ -195,19 +554,31 @@ body.lib-open .pnt-banners { display: none; }
   padding: 5px 9px;
   border: 0;
   background: color-mix(in srgb, var(--c-shadow) 70%, transparent);
-  box-shadow: 0 -1px 0 var(--b), 0 1px 0 var(--b), -1px 0 0 var(--b), 1px 0 0 var(--b);
+  box-shadow:
+    0 -1px 0 var(--b),
+    0 1px 0 var(--b),
+    -1px 0 0 var(--b),
+    1px 0 0 var(--b);
   font-family: var(--font-pixel);
   font-size: 0.875rem;
   line-height: 1.2;
   color: var(--text-dim);
   cursor: pointer;
-  transition: transform var(--snap) steps(2), box-shadow var(--snap) steps(2);
+  transition:
+    transform var(--snap) steps(2),
+    box-shadow var(--snap) steps(2);
 }
-.pnt-chip:hover, .pnt-chip:focus-visible {
+.pnt-chip:hover,
+.pnt-chip:focus-visible {
   --b: var(--accent);
   color: var(--c-bone);
   transform: translateY(-1px);
-  box-shadow: 0 -1px 0 var(--b), 0 1px 0 var(--b), -1px 0 0 var(--b), 1px 0 0 var(--b), 0 4px 14px -4px color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow:
+    0 -1px 0 var(--b),
+    0 1px 0 var(--b),
+    -1px 0 0 var(--b),
+    1px 0 0 var(--b),
+    0 4px 14px -4px color-mix(in srgb, var(--accent) 70%, transparent);
   outline: none;
 }
 .pnt-chip[aria-pressed='true'] {
@@ -225,38 +596,75 @@ body.lib-open .pnt-banners { display: none; }
   background: var(--accent-hi);
 }
 /* The scenery: click only (a place takes a moment to build), so its hover is a glow alone. */
-.pnt-place:hover { transform: none; }
+.pnt-place:hover {
+  transform: none;
+}
 /* The looks: a tidy grid of ten. */
-.pnt-looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
-.pnt-looks .pnt-chip { justify-content: center; }
+.pnt-looks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+}
+.pnt-looks .pnt-chip {
+  justify-content: center;
+}
 
 /* Swatches: a flame's ramp or a scenery's colors, side by side. */
-.pnt-sw { display: inline-flex; flex: none; box-shadow: 0 0 0 1px var(--c-void); }
-.pnt-sw i { width: 9px; height: 14px; background: var(--c); }
-.pnt-flames .pnt-chip { padding: 4px 8px 4px 5px; }
+.pnt-sw {
+  display: inline-flex;
+  flex: none;
+  box-shadow: 0 0 0 1px var(--c-void);
+}
+.pnt-sw i {
+  width: 9px;
+  height: 14px;
+  background: var(--c);
+}
+.pnt-flames .pnt-chip {
+  padding: 4px 8px 4px 5px;
+}
 
-/* Off / In the Mix / Always, three chips joined. */
-.pnt-mode { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.pnt-mode-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 0.9375rem; color: var(--c-bone); }
-.pnt-seg { display: inline-flex; flex: none; }
-.pnt-seg .pnt-chip { padding: 4px 7px; font-size: 0.75rem; }
-.pnt-seg .pnt-chip + .pnt-chip { margin-left: 1px; }
+/* Off / In the Mix / Always (fields.js tri(): radios, one keyboard stop): the name and its
+   "?" on the left, the three choices joined on the right. */
+.pnt-panel fieldset.tri {
+  color: var(--c-bone);
+}
+.pnt-panel fieldset.tri .tri-opt span {
+  padding: 4px 7px;
+  font-size: 0.75rem;
+}
 
 /* The layers: a row each, its details under it while it's on. */
-.pnt-layer { padding: 6px 0 6px 10px; box-shadow: inset 2px 0 0 transparent; }
-.pnt-layer.is-on { box-shadow: inset 2px 0 0 var(--accent); }
-.pnt-details { display: grid; gap: 10px; padding: 10px 0 4px; }
-.pnt-pin-all { gap: 6px; }
-
-/* The "?" hints stay inside the panel (it clips what's outside it): bindPanel shifts one
-   near the right edge left (--tip-x) and opens one near the top downward. */
-.pnt-panel .viz-tip::after { left: var(--tip-x, -10px); }
-.pnt-panel .viz-tip[data-tip-below]::after { top: calc(100% + 8px); bottom: auto; }
+.pnt-layer {
+  padding: 6px 0 6px 10px;
+  box-shadow: inset 2px 0 0 transparent;
+}
+.pnt-layer.is-on {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.pnt-details {
+  display: grid;
+  gap: 10px;
+  padding: 10px 0 4px;
+}
+.pnt-pin-all {
+  gap: 6px;
+}
 
 /* A detail and its lock: pinned (a pin) or left to the dice (a die, the field dimmed). */
-.pnt-detail { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 10px; }
-.pnt-detail.is-rolled > :first-child { opacity: 0.62; }
-.pnt-detail.is-rolled output::after { content: ' · rolled'; color: var(--text-dim); font-size: 0.75rem; }
+.pnt-detail {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 10px;
+}
+.pnt-detail.is-rolled > :first-child {
+  opacity: 0.62;
+}
+.pnt-detail.is-rolled output::after {
+  content: ' · rolled';
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
 .pnt-lock {
   --b: var(--line-strong);
   display: grid;
@@ -267,19 +675,51 @@ body.lib-open .pnt-banners { display: none; }
   padding: 0;
   border: 0;
   background: var(--c-shadow);
-  box-shadow: 0 -1px 0 var(--b), 0 1px 0 var(--b), -1px 0 0 var(--b), 1px 0 0 var(--b);
+  box-shadow:
+    0 -1px 0 var(--b),
+    0 1px 0 var(--b),
+    -1px 0 0 var(--b),
+    1px 0 0 var(--b);
   color: var(--text-dim);
   cursor: pointer;
 }
-.pnt-lock svg { width: 14px; height: 14px; fill: currentColor; }
-.pnt-lock[aria-pressed='true'] { --b: var(--accent); color: var(--accent-hi); }
-.pnt-lock:hover { --b: var(--accent); color: var(--c-bone); }
-.pnt-slots3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-.pnt-slots3 select { padding: 5px 4px; font-size: 0.8125rem; }
+.pnt-lock svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+.pnt-lock[aria-pressed='true'] {
+  --b: var(--accent);
+  color: var(--accent-hi);
+}
+.pnt-lock:hover {
+  --b: var(--accent);
+  color: var(--c-bone);
+}
+.pnt-slots3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.pnt-slots3 select {
+  padding: 5px 4px;
+  font-size: 0.8125rem;
+}
 
 /* The flame's and the scenery's colors: a swatch each, its name under it. */
-.pnt-ramp { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.pnt-swatch { display: grid; gap: 4px; justify-items: center; font-size: 0.75rem; color: var(--text-dim); cursor: pointer; }
+.pnt-ramp {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.pnt-swatch {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
 .pnt-swatch input,
 .pnt-color {
   width: 100%;
@@ -290,31 +730,98 @@ body.lib-open .pnt-banners { display: none; }
   box-shadow: 0 0 0 1px var(--line-strong);
   cursor: pointer;
 }
-.pnt-color { width: 64px; }
-.pnt-swatch input::-webkit-color-swatch-wrapper, .pnt-color::-webkit-color-swatch-wrapper { padding: 0; }
-.pnt-swatch input::-webkit-color-swatch, .pnt-color::-webkit-color-swatch { border: 0; }
-.pnt-swatch input::-moz-color-swatch, .pnt-color::-moz-color-swatch { border: 0; }
-.pnt-swatch:hover input, .pnt-color:hover { box-shadow: 0 0 0 1px var(--accent), 0 0 10px -2px var(--accent); }
+.pnt-color {
+  width: 64px;
+}
+.pnt-swatch input::-webkit-color-swatch-wrapper,
+.pnt-color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.pnt-swatch input::-webkit-color-swatch,
+.pnt-color::-webkit-color-swatch {
+  border: 0;
+}
+.pnt-swatch input::-moz-color-swatch,
+.pnt-color::-moz-color-swatch {
+  border: 0;
+}
+.pnt-swatch:hover input,
+.pnt-color:hover {
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 10px -2px var(--accent);
+}
 
 /* The few colors: the scene palette's ten slots to pick from. */
-.pnt-slots { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
-.pnt-slot { height: 26px; padding: 2px; border: 0; background: none; box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
-.pnt-slot i { display: block; height: 100%; background: var(--c); }
-.pnt-slot[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--accent-hi); }
-.pnt-slot:disabled { cursor: default; }
-.pnt-slot:not(:disabled):hover { box-shadow: 0 0 0 1px var(--accent), 0 0 10px -2px var(--accent); }
+.pnt-slots {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+}
+.pnt-slot {
+  height: 26px;
+  padding: 2px;
+  border: 0;
+  background: none;
+  box-shadow: 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+.pnt-slot i {
+  display: block;
+  height: 100%;
+  background: var(--c);
+}
+.pnt-slot[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px var(--accent-hi);
+}
+.pnt-slot:disabled {
+  cursor: default;
+}
+.pnt-slot:not(:disabled):hover {
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 10px -2px var(--accent);
+}
 
-.pnt-helmets { display: grid; gap: 8px; }
-.pnt-helmet[hidden] { display: none; }
-.pnt-list .viz-checks { margin-top: 8px; }
+.pnt-helmets {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+.pnt-helmet[hidden] {
+  display: none;
+}
+.pnt-list {
+  gap: 6px;
+}
+.pnt-list .viz-field-label + * {
+  margin-top: 0;
+}
+.pnt-list .bulk {
+  margin: 2px 0 0;
+}
+.pnt-list .viz-checks {
+  margin-top: 2px;
+}
 
 /* ---------- The render menu (P): to the panel's left ---------- */
-.pnt-render-menu { top: calc(var(--bar-h) + 10px); right: calc(var(--panel-w) + 14px); z-index: 25; }
-body.panel-off .pnt-render-menu { right: var(--gutter); }
+.pnt-render-menu {
+  top: calc(var(--bar-h) + 10px);
+  right: calc(var(--panel-w) + 14px);
+  z-index: 25;
+}
+body.panel-off .pnt-render-menu {
+  right: var(--gutter);
+}
 
 /* ---------- The pack: to the panel's left ---------- */
-body.pnt .pack { right: calc(var(--panel-w) + 18px); bottom: 16px; }
-body.pnt.panel-off .pack { right: var(--gutter); }
+body.pnt .pack {
+  right: calc(var(--panel-w) + 18px);
+  bottom: 16px;
+}
+body.pnt.panel-off .pack {
+  right: var(--gutter);
+}
 
 /* ---------- The library: a drawer on the left ---------- */
 .pnt-lib {
@@ -328,16 +835,57 @@ body.pnt.panel-off .pack { right: var(--gutter); }
   overscroll-behavior: contain;
   padding: 16px 18px 40px;
   background: color-mix(in srgb, var(--c-void) 95%, transparent);
-  box-shadow: 1px 0 0 var(--line), 24px 0 48px -24px var(--c-void);
+  box-shadow:
+    1px 0 0 var(--line),
+    24px 0 48px -24px var(--c-void);
   animation: pnt-drawer 200ms steps(4) both;
 }
-.pnt-lib[hidden] { display: none; }
-@keyframes pnt-drawer { from { transform: translateX(-24px); opacity: 0; } }
-.pnt-lib-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
-.pnt-lib-title { font: 500 1.5rem/1.2 var(--font-name); letter-spacing: 0.04em; }
-.pnt-lib-note { min-height: 1.4em; margin: 10px 0 0; font-size: 0.875rem; color: var(--accent-hi); }
-.pnt-lib-sub { margin: 18px 0 8px; font: 400 0.8125rem/1 var(--font-pixel); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); }
-.pnt-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-top: 10px; }
+.pnt-lib[hidden] {
+  display: none;
+}
+@keyframes pnt-drawer {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}
+.pnt-lib-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pnt-lib-title {
+  font: 500 1.5rem/1.2 var(--font-name);
+  letter-spacing: 0.04em;
+}
+.pnt-lib-note {
+  min-height: 1.4em;
+  margin: 10px 0 0;
+  font-size: 0.875rem;
+  color: var(--accent-hi);
+}
+.pnt-lib-search {
+  flex-basis: 100%;
+  max-width: 360px;
+}
+.pnt-card[hidden] {
+  display: none;
+}
+.pnt-lib-sub {
+  margin: 18px 0 8px;
+  font: 400 0.8125rem/1 var(--font-pixel);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.pnt-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 10px;
+}
 .pnt-card {
   position: relative;
   isolation: isolate;
@@ -351,7 +899,11 @@ body.pnt.panel-off .pack { right: var(--gutter); }
 /* The card's own ground, and under it, hovered, a dithered glow in its own flame's color
    round it (the card lifts too). */
 .pnt-card::before,
-.pnt-card::after { content: ''; position: absolute; z-index: -1; }
+.pnt-card::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+}
 .pnt-card::before {
   inset: -7px;
   background: var(--glow);
@@ -360,10 +912,22 @@ body.pnt.panel-off .pack { right: var(--gutter); }
   opacity: 0;
   transition: opacity 200ms steps(3);
 }
-.pnt-card::after { inset: 0; background: var(--c-shadow); }
-.pnt-card:hover, .pnt-card:focus-within { transform: translateY(-2px); box-shadow: 0 0 0 1px var(--glow-hi); }
-.pnt-card:hover::before, .pnt-card:focus-within::before { opacity: 1; }
-.pnt-card.is-current { box-shadow: 0 0 0 2px var(--accent); }
+.pnt-card::after {
+  inset: 0;
+  background: var(--c-shadow);
+}
+.pnt-card:hover,
+.pnt-card:focus-within {
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 1px var(--glow-hi);
+}
+.pnt-card:hover::before,
+.pnt-card:focus-within::before {
+  opacity: 1;
+}
+.pnt-card.is-current {
+  box-shadow: 0 0 0 2px var(--accent);
+}
 .pnt-card-open {
   display: grid;
   aspect-ratio: 16 / 9;
@@ -374,20 +938,76 @@ body.pnt.panel-off .pack { right: var(--gutter); }
   box-shadow: 0 0 0 1px var(--line);
   cursor: pointer;
 }
-.pnt-card-open:focus-visible { outline: 2px solid var(--glow-hi); outline-offset: 2px; }
-.pnt-card-open img { width: 100%; height: 100%; object-fit: cover; }
-.pnt-card-open .pnt-sw { display: flex; box-shadow: none; }
-.pnt-card-open .pnt-sw i { flex: 1; width: auto; height: auto; }
-.pnt-card-name { font: 500 1.0625rem/1.3 var(--font-name); color: var(--c-bone); cursor: pointer; }
-.pnt-card:hover .pnt-card-name { color: var(--glow-hi); }
-.pnt-card-sum { font-size: 0.8125rem; line-height: 1.45; color: var(--text-dim); }
-.pnt-card-acts { display: flex; flex-wrap: wrap; gap: 5px; }
-.pnt-card-acts .pix-btn, .pnt-card-confirm .pix-btn { padding: 3px 7px; font-size: 0.75rem; }
-.pnt-card-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px; font-size: 0.875rem; background: var(--c-void); box-shadow: inset 2px 0 0 #e03a3a; }
-.pnt-card-confirm[hidden] { display: none; }
-.pnt-lib-confirm { flex-basis: 100%; }
-.pnt-card-rename { width: 100%; padding: 3px 6px; border: 0; background: var(--c-void); box-shadow: 0 0 0 1px var(--accent); font: 500 1rem/1.3 var(--font-name); color: var(--c-bone); }
-.pnt-danger:hover { --b: #e03a3a; color: #ff8a8a; }
+.pnt-card-open:focus-visible {
+  outline: 2px solid var(--glow-hi);
+  outline-offset: 2px;
+}
+.pnt-card-open img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pnt-card-open .pnt-sw {
+  display: flex;
+  box-shadow: none;
+}
+.pnt-card-open .pnt-sw i {
+  flex: 1;
+  width: auto;
+  height: auto;
+}
+.pnt-card-name {
+  font: 500 1.0625rem/1.3 var(--font-name);
+  color: var(--c-bone);
+  cursor: pointer;
+}
+.pnt-card:hover .pnt-card-name {
+  color: var(--glow-hi);
+}
+.pnt-card-sum {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.pnt-card-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.pnt-card-acts .pix-btn,
+.pnt-card-confirm .pix-btn {
+  padding: 3px 7px;
+  font-size: 0.75rem;
+}
+.pnt-card-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  font-size: 0.875rem;
+  background: var(--c-void);
+  box-shadow: inset 2px 0 0 #e03a3a;
+}
+.pnt-card-confirm[hidden] {
+  display: none;
+}
+.pnt-lib-confirm {
+  flex-basis: 100%;
+}
+.pnt-card-rename {
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  background: var(--c-void);
+  box-shadow: 0 0 0 1px var(--accent);
+  font: 500 1rem/1.3 var(--font-name);
+  color: var(--c-bone);
+}
+.pnt-danger:hover {
+  --b: #e03a3a;
+  color: #ff8a8a;
+}
 
 /* ---------- Notes ---------- */
 .pnt-toast {
@@ -398,39 +1018,97 @@ body.pnt.panel-off .pack { right: var(--gutter); }
   max-width: min(520px, calc(100vw - 32px));
   padding: 8px 12px;
   background: var(--c-void);
-  box-shadow: 0 0 0 1px var(--line-strong), inset 2px 0 0 var(--accent);
+  box-shadow:
+    0 0 0 1px var(--line-strong),
+    inset 2px 0 0 var(--accent);
   font-size: 0.9375rem;
   opacity: 0;
   transform: translateY(6px);
-  transition: opacity 240ms steps(3), transform 240ms steps(3);
+  transition:
+    opacity 240ms steps(3),
+    transform 240ms steps(3);
   pointer-events: none;
 }
-.pnt-toast.is-on { opacity: 1; transform: none; }
+.pnt-toast.is-on {
+  opacity: 1;
+  transform: none;
+}
 /* (A note with a link to click: Bonfire Live's tab when the browser blocked it.) */
-.pnt-toast.has-link.is-on { pointer-events: auto; }
-.pnt-toast a { color: var(--accent-hi); text-decoration: underline; text-underline-offset: 3px; }
-.pnt-toast a:hover { color: var(--accent-core); }
-.pnt-error { position: fixed; top: calc(var(--bar-h) + 16px); left: 16px; z-index: 40; }
+.pnt-toast.has-link.is-on {
+  pointer-events: auto;
+}
+.pnt-toast a {
+  color: var(--accent-hi);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.pnt-toast a:hover {
+  color: var(--accent-core);
+}
+.pnt-error {
+  position: fixed;
+  top: calc(var(--bar-h) + 16px);
+  left: 16px;
+  z-index: 40;
+}
 
 /* ---------- Phones: the panel is a bottom sheet with a strip of section tabs ---------- */
+/* (Under 760px wide: NARROW in src/ui/breakpoints.js, which the page's script reads too.) */
 @media (max-width: 759px) {
   /* The bar in two rows, tighter. */
-  .pnt-bar { gap: 6px 6px; padding: 6px 8px; }
-  .pnt-banners, body.panel-off .pnt-banners { left: 50%; width: calc(100vw - 2 * var(--gutter)); }
-  .pnt-bar kbd { display: none; }
-  .pnt-home .brand-mark { height: 26px; }
-  .pnt-title { flex: 1 1 90px; }
-  .pnt-name { flex: 1 1 auto; min-width: 80px; }
-  .pnt-dot { font-size: 0; gap: 0; }
-  .pnt-bar .pix-btn { padding: 4px 7px; font-size: 0.8125rem; }
-  .pnt-beat { display: none; }
+  .pnt-bar {
+    gap: 6px 6px;
+    padding: 6px 8px;
+  }
+  .pnt-banners,
+  body.panel-off .pnt-banners {
+    left: 50%;
+    width: calc(100vw - 2 * var(--gutter));
+  }
+  .pnt-bar kbd {
+    display: none;
+  }
+  .pnt-home .brand-mark {
+    height: 26px;
+  }
+  .pnt-title {
+    flex: 1 1 90px;
+  }
+  /* (Tools by its word, its ▾ left out to keep the name in sight: a finger can't hover for
+     its tooltip, so the word says what it is.) */
+  .pnt-tools .pnt-caret {
+    display: none;
+  }
+  .pnt-name {
+    flex: 1 1 auto;
+    min-width: 80px;
+  }
+  .pnt-dot {
+    font-size: 0;
+    gap: 0;
+  }
+  .pnt-bar .pix-btn {
+    padding: 4px 7px;
+    font-size: 0.8125rem;
+  }
+  .pnt-beat {
+    display: none;
+  }
   .pnt-panel {
     top: auto;
     left: 0;
     width: auto;
     height: 46vh;
-    padding: 0 12px 28px;
     box-shadow: 0 -1px 0 var(--line);
+  }
+  .pnt-panel-head {
+    padding: 8px 12px 6px;
+  }
+  .pnt-panel-body {
+    padding: 0 12px 28px;
+  }
+  .pnt-search-notes {
+    max-height: 4.5em;
   }
   .pnt-tabs {
     position: sticky;
@@ -445,20 +1123,64 @@ body.pnt.panel-off .pack { right: var(--gutter); }
     background: var(--c-void);
     box-shadow: 0 1px 0 var(--line);
   }
-  .pnt-tabs button { flex: none; padding: 6px 9px; border: 0; background: none; font: 400 0.8125rem/1 var(--font-pixel); color: var(--text-dim); white-space: nowrap; cursor: pointer; }
-  .pnt-tabs button[aria-pressed='true'] { color: var(--accent-hi); box-shadow: inset 0 -2px 0 var(--accent); }
-  .pnt-sec-head { display: none; }
-  .pnt-sec + .pnt-sec { box-shadow: none; }
-  .pnt-sec:not([data-open]) { display: none; }
-  .pnt-sec-body { padding-top: 6px; }
-  .pnt-lib { top: var(--bar-h); width: 100vw; }
-  .pnt-render-menu { right: 8px; }
-  body.pnt .pack { right: 10px; bottom: calc(46vh + 10px); }
-  body.pnt.panel-off .pack { bottom: 16px; }
-  .pnt-toast { bottom: calc(46vh + 12px); }
-  body.panel-off .pnt-toast { bottom: 16px; }
+  .pnt-tabs button {
+    flex: none;
+    padding: 6px 9px;
+    border: 0;
+    background: none;
+    font: 400 0.8125rem/1 var(--font-pixel);
+    color: var(--text-dim);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .pnt-tabs button[aria-pressed='true'] {
+    color: var(--accent-hi);
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+  .pnt-tabs button.is-miss {
+    display: none;
+  }
+  .pnt-sec-head {
+    display: none;
+  }
+  .pnt-sec + .pnt-sec {
+    box-shadow: none;
+  }
+  .pnt-sec:not([data-open]) {
+    display: none;
+  }
+  .pnt-sec-body {
+    padding-top: 6px;
+  }
+  .pnt-lib {
+    top: var(--bar-h);
+    width: 100vw;
+  }
+  .pnt-render-menu {
+    right: 8px;
+  }
+  body.pnt .pack {
+    right: 10px;
+    bottom: calc(46vh + 10px);
+  }
+  body.pnt.panel-off .pack {
+    bottom: 16px;
+  }
+  .pnt-toast {
+    bottom: calc(46vh + 12px);
+  }
+  body.panel-off .pnt-toast {
+    bottom: 16px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pnt-lib, .pnt-beat.is-drop b, .pnt-dot::before { animation: none; }
-  .pnt-chip, .pnt-card { transition: none; }
+  .pnt-lib,
+  .pnt-beat.is-drop b,
+  .pnt-dot::before {
+    animation: none;
+  }
+  .pnt-chip,
+  .pnt-card {
+    transition: none;
+  }
 }

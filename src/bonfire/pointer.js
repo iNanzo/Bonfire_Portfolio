@@ -7,18 +7,31 @@ import * as THREE from 'three';
 /** @param {THREE.Timer} timer  the scene's timer  @param {object} o  `signal`: removes the listeners */
 export function createPointer(timer, { signal }) {
   const ptr = { x: 0, y: 0, sx: 0, sy: 0, px: null, py: null, lastMove: -10, inside: false };
-  window.addEventListener('pointermove', (e) => {
-    // A new burst of movement (or the cursor entering) starts where the cursor is, so it
-    // never reads as one huge swing from wherever it last was.
-    if (timer.getElapsed() - ptr.lastMove > 0.2 || !ptr.inside) { ptr.px = e.clientX; ptr.py = e.clientY; }
-    ptr.x = e.clientX;
-    ptr.y = e.clientY;
-    ptr.sx = (e.clientX / window.innerWidth - 0.5) * 2;
-    ptr.sy = (e.clientY / window.innerHeight - 0.5) * 2;
-    ptr.lastMove = timer.getElapsed();
-    ptr.inside = true;
-  }, { passive: true, signal });
-  document.documentElement.addEventListener('pointerleave', () => { ptr.inside = false; }, { signal });
+  window.addEventListener(
+    'pointermove',
+    (e) => {
+      // A new burst of movement (or the cursor entering) starts where the cursor is, so it
+      // never reads as one huge swing from wherever it last was.
+      if (timer.getElapsed() - ptr.lastMove > 0.2 || !ptr.inside) {
+        ptr.px = e.clientX;
+        ptr.py = e.clientY;
+      }
+      ptr.x = e.clientX;
+      ptr.y = e.clientY;
+      ptr.sx = (e.clientX / window.innerWidth - 0.5) * 2;
+      ptr.sy = (e.clientY / window.innerHeight - 0.5) * 2;
+      ptr.lastMove = timer.getElapsed();
+      ptr.inside = true;
+    },
+    { passive: true, signal },
+  );
+  document.documentElement.addEventListener(
+    'pointerleave',
+    () => {
+      ptr.inside = false;
+    },
+    { signal },
+  );
 
   // This frame's cursor, in canvas CSS px: { ax, ay → bx, by } the path, { vx, vy } px/s.
   const cursor = { ax: 0, ay: 0, bx: 0, by: 0, vx: 0, vy: 0, moving: false, present: false, width: 1, height: 1 };
@@ -31,18 +44,29 @@ export function createPointer(timer, { signal }) {
   return {
     cursor,
     /** Where the cursor is across the window, -1..1. */
-    get sx() { return ptr.sx; },
-    get sy() { return ptr.sy; },
+    get sx() {
+      return ptr.sx;
+    },
+    get sy() {
+      return ptr.sy;
+    },
     /** Re-measure the canvas (after a resize). */
-    measure(canvas) { rect = canvas.getBoundingClientRect(); },
+    measure(canvas) {
+      rect = canvas.getBoundingClientRect();
+    },
     /** This frame's cursor (see `cursor`). */
     update(dt, t) {
       const r = rect;
-      if (ptr.px === null) { ptr.px = ptr.x; ptr.py = ptr.y; }
+      if (ptr.px === null) {
+        ptr.px = ptr.x;
+        ptr.py = ptr.y;
+      }
       const step = Math.max(dt, 1 / 240);
       const moving = t - ptr.lastMove < 0.12 && (ptr.px !== ptr.x || ptr.py !== ptr.y);
-      cursor.ax = ptr.px - r.left; cursor.ay = ptr.py - r.top;
-      cursor.bx = ptr.x - r.left; cursor.by = ptr.y - r.top;
+      cursor.ax = ptr.px - r.left;
+      cursor.ay = ptr.py - r.top;
+      cursor.bx = ptr.x - r.left;
+      cursor.by = ptr.y - r.top;
       cursor.vx = moving ? (ptr.x - ptr.px) / step : 0;
       cursor.vy = moving ? (ptr.y - ptr.py) / step : 0;
       cursor.moving = moving;

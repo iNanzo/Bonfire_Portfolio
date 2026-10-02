@@ -29,7 +29,10 @@
 //             offers it back until it's restored or discarded.
 //   keys      H the panel, L the library, P the render menu (bound to the scene), I the
 //             pack (it paints into the scene), F full screen, Space the beat, D a drop,
-//             C a picture of the stage, and the camera's (cameraRig.js).
+//             C a picture of the stage, and the camera's (cameraRig.js); / searches the
+//             panel and ? lists them all (toolbar.js PAINTER_KEYS). The Tools menu in the
+//             bar reaches the ones only a key did before (Render Settings, Pack, Capture,
+//             Full Screen, the keys).
 // Reduced motion: the Still preview to start with.
 import '../styles.css';
 import '../visualizer/visualizer.css';
@@ -39,6 +42,11 @@ import { effects } from '../effects.js';
 import { scenes as builtInScenes, site, startingEquipment, ui, weapons } from '../content.js';
 import { elements, elementOr } from '../elements.js';
 import { installDitherPatterns } from '../ui/dither.js';
+import { installTooltips } from '../ui/tooltip.js';
+import { createKeysOverlay, isHelpKey } from '../ui/keysOverlay.js';
+import { searchBoxMarkup } from '../ui/settingsSearch.js';
+import { failScene as markSceneFailed, q, qa, toggleFullscreen, typing } from '../ui/shell.js';
+import { NARROW } from '../ui/breakpoints.js';
 import { applyFlame, setAccentRamp } from '../ui/theme.js';
 import { esc } from '../html.js';
 import { logoMark } from '../ui/logo.js';
@@ -50,12 +58,23 @@ import { SHOTS } from '../visualizer/camera.js';
 import { createAnalyser } from '../visualizer/analyser.js';
 import { createDemo } from '../visualizer/demo.js';
 import { densityCounts } from '../visualizer/density.js';
-import { FLAME_FPS, FOGS, PALETTES, PIXEL_SIZES, RENDER_STEPS, XRAY_VIEWS } from '../visualizer/render.js';
+import { FLAME_FPS, FOGS, PALETTES, PIXEL_SIZES, RENDER_STEPS, XRAY_VIEWS, renderText } from '../visualizer/render.js';
 import { LAYER_DETAILS, LAYERS, LOOK_PARAMS } from '../visualizer/looks.js';
 import { defaultScene, decodeSceneHash, normalizeScene, parseRef, sceneRef, uniqueSceneId } from '../scenes.js';
 import { createSceneStore } from '../sceneStore.js';
-import { harmoniousFlame, harmoniousScene, hexToOklch, suggestFlames, suggestScenes, vividScene, wildFlame, wildScene } from '../paletteGen.js';
+import {
+  harmoniousFlame,
+  harmoniousScene,
+  hexToOklch,
+  suggestFlames,
+  suggestScenes,
+  vividScene,
+  wildFlame,
+  wildScene,
+} from '../paletteGen.js';
 import { bindPanel, flameChips, getPath, sceneryChips, withPath } from './panel.js';
+import { createPanelSearch } from './panelSearch.js';
+import { bindTools, PAINTER_KEYS, TIPS, toolsMarkup } from './toolbar.js';
 import { createHistory } from './history.js';
 import { createBeatFeed, silentFrame } from './beat.js';
 import { createCameraRig } from './cameraRig.js';
@@ -66,13 +85,13 @@ import { captureThumb } from './thumbs.js';
 createDiscoveries().discover('painter');
 
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const q = (s, r = document) => r.querySelector(s);
-const qa = (s, r = document) => [...r.querySelectorAll(s)];
 const DRAFT = 'bonfire-painter-draft';
 /** A draft with unsaved changes that a link to another scene took the place of. */
 const DRAFT_ASIDE = 'bonfire-painter-draft-aside';
 /** Bonfire Live's tab, by name: Play finds the one it opened. */
 const LIVE_TAB = 'bonfire-live';
+/** Which of the panel's sections are open, kept for the next visit. */
+const PANEL_KEY = 'bonfire-painter-panel';
 const BASE_URL = import.meta.env.BASE_URL;
 const voidHex = effects.colors.void;
 const siteBase = { ...base }; // (the site's own scenery colors, before a scene recolors them)
@@ -83,6 +102,7 @@ document.documentElement.classList.add('js');
 applyCssPalette();
 applyFlame(startingEquipment.flame);
 installDitherPatterns(base);
+const tips = installTooltips();
 
 // --- The scene being painted --------------------------------------------------------------
 const store = createSceneStore({ voidHex });
@@ -90,10 +110,10 @@ const store = createSceneStore({ voidHex });
 const builtIns = () => (Array.isArray(builtInScenes) ? builtInScenes : []).map((s) => normalizeScene(s, { voidHex }));
 const steps = createHistory({ limit: 150 });
 let scene = defaultScene('New Scene');
-let ref = null;       // 'm:<id>' saved in My Scenes, 'b:<id>' a built-in as it came, null: not saved
-let origin = null;    // the ref it was opened from (kept when painting a built-in makes it a copy)
-let dirty = false;    // changed since it was saved (or opened)
-let edits = 0;        // every change to the scene on the stage (a thumbnail taken after one is dropped)
+let ref = null; // 'm:<id>' saved in My Scenes, 'b:<id>' a built-in as it came, null: not saved
+let origin = null; // the ref it was opened from (kept when painting a built-in makes it a copy)
+let dirty = false; // changed since it was saved (or opened)
+let edits = 0; // every change to the scene on the stage (a thumbnail taken after one is dropped)
 let fromAdmin = false;
 let restored = false; // the draft's unsaved changes came back over a link to their scene
 let auditionScene = null;
@@ -105,14 +125,24 @@ function readDraft(key = DRAFT) {
   try {
     const d = JSON.parse(localStorage.getItem(key) ?? 'null');
     if (!d || typeof d !== 'object' || !d.scene) return null;
-    return { scene: normalizeScene(d.scene, { voidHex }), ref: refOr(d.ref), origin: refOr(d.origin) ?? refOr(d.ref), dirty: !!d.dirty };
-  } catch { return null; }
+    return {
+      scene: normalizeScene(d.scene, { voidHex }),
+      ref: refOr(d.ref),
+      origin: refOr(d.origin) ?? refOr(d.ref),
+      dirty: !!d.dirty,
+    };
+  } catch {
+    return null;
+  }
 }
 function writeDraftTo(key, d) {
   try {
-    if (d) localStorage.setItem(key, JSON.stringify({ v: 2, scene: d.scene, ref: d.ref, origin: d.origin, dirty: d.dirty }));
+    if (d)
+      localStorage.setItem(key, JSON.stringify({ v: 2, scene: d.scene, ref: d.ref, origin: d.origin, dirty: d.dirty }));
     else localStorage.removeItem(key);
-  } catch { /* private mode: no draft */ }
+  } catch {
+    /* private mode: no draft */
+  }
 }
 let draftTimer = 0;
 /** Write the draft now (a change waiting to be written, or the page going away). */
@@ -128,8 +158,12 @@ function saveDraft() {
 }
 // Closing the tab, reloading or switching away writes what's waiting at once. (Only what's
 // waiting: a Painter left in another tab doesn't write over this one's draft.)
-window.addEventListener('pagehide', () => { if (draftTimer) writeDraft(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && draftTimer) writeDraft(); });
+window.addEventListener('pagehide', () => {
+  if (draftTimer) writeDraft();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && draftTimer) writeDraft();
+});
 
 /** Whether a scene is a new one no one has painted on yet (nothing to lose). */
 const pristine = (s) => JSON.stringify(s) === JSON.stringify(normalizeScene(defaultScene('New Scene'), { voidHex }));
@@ -160,7 +194,10 @@ function startingScene() {
   if (source) {
     const want = sceneRef(source, id);
     // (A reload, or a link back to what's being painted: the unsaved changes, not the saved scene.)
-    if (unsavedWork(draft) && (draft.ref === want || draft.origin === want)) { restored = true; return draft; }
+    if (unsavedWork(draft) && (draft.ref === want || draft.origin === want)) {
+      restored = true;
+      return draft;
+    }
     const s = source === 'm' ? store.get(id) : builtIns().find((b) => b.id === id);
     if (s) {
       setAside(draft);
@@ -174,13 +211,37 @@ function startingScene() {
 
 // --- Markup ---------------------------------------------------------------------------------
 const PREVIEWS = [
-  ['still', 'Still', 'Still', 'Silence: the look at its painted strength, the framing held still, the knights resting.'],
+  [
+    'still',
+    'Still',
+    'Still',
+    'Silence: the look at its painted strength, the framing held still, the knights resting.',
+  ],
   ['beat', 'Beat', 'Beat', 'A silent 124 BPM groove: the scene as it plays on the music (Space).'],
   ['drop', 'Drop Loop', 'Drop', 'A silent 16 bars: groove, breakdown, build, and the drop landing in the scene.'],
   ['demo', 'Demo Track', 'Demo', 'Bonfire Live’s demo track, with sound.'],
 ];
+/** The panel's sections left open last time (the page's own: a scene doesn't keep them). */
+function readOpen() {
+  try {
+    const open = JSON.parse(localStorage.getItem(PANEL_KEY) ?? 'null');
+    return Array.isArray(open) && open.every((id) => typeof id === 'string') ? open : ['place'];
+  } catch {
+    return ['place'];
+  }
+}
+function saveOpen(open) {
+  try {
+    localStorage.setItem(PANEL_KEY, JSON.stringify(open));
+  } catch {
+    /* private mode: not kept */
+  }
+}
 /** A label with a shorter one for phones. */
-const label = (long, short) => (short === long ? esc(long) : `<span class="pnt-long">${esc(long)}</span><span class="pnt-short">${esc(short)}</span>`);
+const label = (long, short) =>
+  short === long ? esc(long) : `<span class="pnt-long">${esc(long)}</span><span class="pnt-short">${esc(short)}</span>`;
+/** A phone or tablet: no keyboard to name keys on (the search's "/", the bulk note's Ctrl+Z). */
+const coarse = matchMedia('(pointer: coarse)').matches;
 const app = document.getElementById('painter');
 app.innerHTML = `
   <div class="stage viz-stage pnt-stage" data-stage></div>
@@ -194,15 +255,16 @@ app.innerHTML = `
     <div class="pnt-bar-group">
       <button type="button" class="pix-btn" data-cmd="library" aria-keyshortcuts="L"><kbd>L</kbd>Library</button>
       <button type="button" class="pix-btn" data-cmd="save" aria-keyshortcuts="Control+S">Save</button>
-      <button type="button" class="pix-btn pnt-icon" data-cmd="undo" aria-label="Undo (Ctrl+Z)" aria-keyshortcuts="Control+Z">↶</button>
-      <button type="button" class="pix-btn pnt-icon" data-cmd="redo" aria-label="Redo (Ctrl+Shift+Z)" aria-keyshortcuts="Control+Shift+Z">↷</button>
+      <button type="button" class="pix-btn pnt-icon" data-cmd="undo" aria-label="Undo" aria-keyshortcuts="Control+Z" ${TIPS.undo.attrs}>↶</button>${TIPS.undo.note}
+      <button type="button" class="pix-btn pnt-icon" data-cmd="redo" aria-label="Redo" aria-keyshortcuts="Control+Shift+Z Control+Y" ${TIPS.redo.attrs}>↷</button>${TIPS.redo.note}
+      ${toolsMarkup()}
     </div>
     <div class="pnt-bar-group pnt-preview" role="group" aria-label="Preview">
-      ${PREVIEWS.map(([id, name, short, hint]) => `<button type="button" class="pix-btn" data-preview="${id}" aria-pressed="false" aria-label="${esc(name)}" aria-describedby="pnt-pv-${id}">${label(name, short)}</button><span class="visually-hidden" id="pnt-pv-${id}">${esc(hint)}</span>`).join('')}
+      ${PREVIEWS.map(([id, name, short, hint]) => `<button type="button" class="pix-btn" data-preview="${id}" aria-pressed="false" aria-label="${esc(name)}" aria-describedby="pnt-pv-${id}" data-tip="${esc(hint)}" data-tip-side="bottom">${label(name, short)}</button><span class="visually-hidden" id="pnt-pv-${id}">${esc(hint)}</span>`).join('')}
       <span class="pnt-beat" aria-hidden="true" data-beat><i></i><i></i><i></i><i></i><b data-beat-label></b></span>
     </div>
     <div class="pnt-bar-group">
-      <button type="button" class="pix-btn pnt-play" data-cmd="play" aria-label="Play in Bonfire Live (opens it)">${label('Play in Bonfire Live ↗', 'Play ↗')}</button>
+      <button type="button" class="pix-btn pnt-play" data-cmd="play" aria-label="Play in Bonfire Live (opens it)" ${TIPS.play.attrs} data-tip-side="bottom">${label('Play in Bonfire Live ↗', 'Play ↗')}</button>${TIPS.play.note}
       <button type="button" class="pix-btn" data-cmd="panel" aria-keyshortcuts="H" aria-controls="pnt-panel" aria-expanded="true"><kbd>H</kbd><span data-panel-label>Hide Panel</span></button>
     </div>
   </header>
@@ -211,7 +273,7 @@ app.innerHTML = `
       <p>Opened from the admin. Save it here, or copy its JSON back into the admin’s Scenes page (Import From Painter).</p>
       <button type="button" class="pix-btn" data-cmd="banner-save">Save to My Scenes</button>
       <button type="button" class="pix-btn" data-cmd="banner-copy">Copy JSON for the Admin</button>
-      <button type="button" class="pix-btn pnt-icon" data-cmd="banner-close" aria-label="Close">✕</button>
+      <button type="button" class="pix-btn pnt-icon" data-cmd="banner-close" aria-label="Close" ${TIPS.close.attrs}>✕</button>${TIPS.close.note}
     </div>
     <div class="pnt-banner" data-aside hidden>
       <p data-aside-text></p>
@@ -219,13 +281,20 @@ app.innerHTML = `
       <button type="button" class="pix-btn pnt-danger" data-cmd="aside-discard">Discard It</button>
     </div>
   </div>
-  <aside class="pnt-panel frame" id="pnt-panel" data-panel aria-label="Scene"></aside>
+  <aside class="pnt-panel frame" id="pnt-panel" data-panel aria-label="Scene">
+    <div class="pnt-panel-head">
+      ${searchBoxMarkup({ id: 'pnt-search', label: 'Search the Scene’s Settings', placeholder: coarse ? 'Search settings' : 'Search settings  /' })}
+      <div class="pnt-search-notes" data-search-notes hidden></div>
+    </div>
+    <div class="pnt-panel-body" data-panel-body></div>
+  </aside>
   <div class="pnt-lib" data-library></div>
   <p class="pnt-toast" role="status" aria-live="polite" data-note></p>
   <p class="viz-error pnt-error" role="alert" data-error hidden></p>
 `;
 const stage = q('[data-stage]');
 const panelEl = q('[data-panel]');
+const panelBody = /** @type {HTMLElement} */ (q('[data-panel-body]'));
 const nameInput = /** @type {HTMLInputElement} */ (q('[data-name]'));
 const noteEl = q('[data-note]');
 let noteTimer = 0;
@@ -250,7 +319,15 @@ function note(text, seconds = 2.4, link = null) {
 // --- The bonfire and the show ----------------------------------------------------------------
 // The show's own settings under the scene: Bonfire Live's defaults, without what would take
 // the painting away (the living blade, phrase swaps, the scene loop).
-const settings = { ...structuredClone(DEFAULT_SETTINGS), combos: -1, phraseBars: 0, scenes: 'off', title: '', colors: 'site', sceneColors: 'off' };
+const settings = {
+  ...structuredClone(DEFAULT_SETTINGS),
+  combos: -1,
+  phraseBars: 0,
+  scenes: 'off',
+  title: '',
+  colors: 'site',
+  sceneColors: 'off',
+};
 // As many particles as Bonfire Live at its default (density.js): the counts size the scene's buffers.
 {
   const counts = densityCounts({ particles: effects.particles, fireflies: effects.fireflies }, settings.particles);
@@ -276,42 +353,77 @@ function onFrame(dt) {
   let f;
   if (preview === 'demo' && demo) f = demo.analyser.update(now, dt, { sensitivity: 1, lead: settings.offset / 1000 });
   else if (feed) f = feed.frame(now, dt);
-  else { f = silentFrame(silenceNext ? ['silence'] : []); silenceNext = false; }
+  else {
+    f = silentFrame(silenceNext ? ['silence'] : []);
+    silenceNext = false;
+  }
   director.update(f, dt);
   drawBeat(f);
 }
 function failScene(error) {
   fire?.dispose();
   fire = null;
-  document.documentElement.classList.add('no-webgl');
-  const el = q('[data-error]');
-  el.textContent = 'This browser couldn’t start WebGL, so the bonfire can’t render here. Try Chrome or Edge with hardware acceleration on.';
-  el.hidden = false;
-  console.warn('Bonfire unavailable.', error);
+  markSceneFailed(q('[data-error]'), error);
 }
 
-import('../bonfire/scene.js').then(async ({ createBonfire }) => {
-  // (paintedLook, the bonfire's and the director's: under reduced motion the look being
-  // painted still shows, held still, only its flashes and jitters kept off, so what's painted
-  // and its thumbnail are the scene's own look, not Ember; stillFx.js.)
-  const candidate = createBonfire(stage, { reducedMotion, paintedLook: true, sway: 0, lightTrails: settings.trails, effects: true, onImpact, onRamp: setAccentRamp, onError: failScene, onFrame: (dt) => { if (fire === candidate) onFrame(dt); } });
-  director = createDirector(candidate, { settings, reducedMotion, paintedLook: true, onEvent });
-  await candidate.ready;
-  fire = candidate;
-  const eq = startingEquipment;
-  await fire.equip(scene.place.weapon ?? eq.weapon, eq.flame, { instant: true, element: scene.place.element ?? elementOr(eq.element) });
-  show(scene, { open: true });
-  setPreview(preview);
-  frameFire();
-  stage.classList.add('is-ready');
-  if (import.meta.env.DEV) {
-    window.__painter = {
-      fire, director, settings, store, steps, panel,
-      get scene() { return scene; }, get ref() { return ref; }, get dirty() { return dirty; }, get preview() { return preview; },
-      edit, setPreview, save, open: openScene,
-    };
-  }
-}).catch(failScene);
+import('../bonfire/scene.js')
+  .then(async ({ createBonfire }) => {
+    // (paintedLook, the bonfire's and the director's: under reduced motion the look being
+    // painted still shows, held still, only its flashes and jitters kept off, so what's painted
+    // and its thumbnail are the scene's own look, not Ember; stillFx.js.)
+    const candidate = createBonfire(stage, {
+      reducedMotion,
+      paintedLook: true,
+      sway: 0,
+      lightTrails: settings.trails,
+      effects: true,
+      onImpact,
+      onRamp: setAccentRamp,
+      onError: failScene,
+      onFrame: (dt) => {
+        if (fire === candidate) onFrame(dt);
+      },
+    });
+    director = createDirector(candidate, { settings, reducedMotion, paintedLook: true, onEvent });
+    await candidate.ready;
+    fire = candidate;
+    const eq = startingEquipment;
+    await fire.equip(scene.place.weapon ?? eq.weapon, eq.flame, {
+      instant: true,
+      element: scene.place.element ?? elementOr(eq.element),
+    });
+    show(scene, { open: true });
+    setPreview(preview);
+    frameFire();
+    stage.classList.add('is-ready');
+    if (import.meta.env.DEV) {
+      window.__painter = {
+        fire,
+        director,
+        settings,
+        store,
+        steps,
+        panel,
+        get scene() {
+          return scene;
+        },
+        get ref() {
+          return ref;
+        },
+        get dirty() {
+          return dirty;
+        },
+        get preview() {
+          return preview;
+        },
+        edit,
+        setPreview,
+        save,
+        open: openScene,
+      };
+    }
+  })
+  .catch(failScene);
 
 function onEvent(type) {
   if (type === 'drop' && preview !== 'still') flashBeat();
@@ -336,7 +448,10 @@ function queueApply() {
     applyQueued = false;
     if (!fire) return;
     show(auditionScene ?? scene);
-    if (burst) { burst = false; director.glitchHit(); }
+    if (burst) {
+      burst = false;
+      director.glitchHit();
+    }
   });
 }
 let fillQueued = false;
@@ -360,7 +475,10 @@ function queueFill({ force = false } = {}) {
  */
 function commit(next, key = null) {
   const norm = normalizeScene(next, { voidHex });
-  if (JSON.stringify(norm) === JSON.stringify(scene)) { queueFill(); return false; }
+  if (JSON.stringify(norm) === JSON.stringify(scene)) {
+    queueFill();
+    return false;
+  }
   steps.push(scene, key);
   if (ref?.startsWith('b:')) {
     // (The address stops naming the built-in: a reload brings back the copy, from the draft.)
@@ -388,8 +506,9 @@ function edit(path, value, { key = path } = {}) {
   // (And the background kept the darkest scenery color.)
   if (path.startsWith('colors.')) {
     const norm = normalizeScene(next, { voidHex });
-    panelEl.dataset.lightened = getPath(next, 'colors.flame.hi') !== norm.colors.flame.hi ? '1' : '';
-    panelEl.dataset.darkened = next.colors.scenery && next.colors.scenery.void !== norm.colors.scenery?.void ? '1' : '';
+    panelBody.dataset.lightened = getPath(next, 'colors.flame.hi') !== norm.colors.flame.hi ? '1' : '';
+    panelBody.dataset.darkened =
+      next.colors.scenery && next.colors.scenery.void !== norm.colors.scenery?.void ? '1' : '';
   }
   return commit(next, key);
 }
@@ -405,14 +524,24 @@ function audition(s) {
 function undo() {
   const s = steps.undo(scene);
   if (!s) return;
-  scene = s; dirty = true; edits++; auditionScene = null;
-  queueApply(); queueFill({ force: true }); saveDraft();
+  scene = s;
+  dirty = true;
+  edits++;
+  auditionScene = null;
+  queueApply();
+  queueFill({ force: true });
+  saveDraft();
 }
 function redo() {
   const s = steps.redo(scene);
   if (!s) return;
-  scene = s; dirty = true; edits++; auditionScene = null;
-  queueApply(); queueFill({ force: true }); saveDraft();
+  scene = s;
+  dirty = true;
+  edits++;
+  auditionScene = null;
+  queueApply();
+  queueFill({ force: true });
+  saveDraft();
 }
 
 /**
@@ -439,7 +568,8 @@ function drawAside() {
   const box = /** @type {HTMLElement} */ (q('[data-aside]'));
   box.hidden = !aside;
   if (!aside) return;
-  q('[data-aside-text]').textContent = `“${aside.scene.name}” had unsaved changes when this scene opened. They’re kept until you restore or discard them.`;
+  q('[data-aside-text]').textContent =
+    `“${aside.scene.name}” had unsaved changes when this scene opened. They’re kept until you restore or discard them.`;
   q('[data-aside-restore]').textContent = `Restore “${aside.scene.name}”`;
 }
 /** Bring the set-aside draft back (what's here now, if unsaved, goes aside in its place). */
@@ -466,8 +596,13 @@ const unsavedName = () => (unsavedWork({ scene, dirty }) ? scene.name : null);
 function syncUrl() {
   const url = new URL(location.href);
   url.hash = '';
-  if (ref) url.searchParams.set('scene', ref); else url.searchParams.delete('scene');
-  try { window.history.replaceState(null, '', url); } catch { /* sandboxed */ }
+  if (ref) url.searchParams.set('scene', ref);
+  else url.searchParams.delete('scene');
+  try {
+    window.history.replaceState(null, '', url);
+  } catch {
+    /* sandboxed */
+  }
 }
 
 // --- The panel ------------------------------------------------------------------------------
@@ -478,16 +613,27 @@ function shotCamera(s) {
   if (s.dolly) move = { kind: 'vertigo', amount: Math.min(1, s.dolly / 0.5), bars: 8 };
   else if (s.crane) move = { kind: 'crane', amount: Math.min(1, s.crane / 1.8), bars: 8 };
   else if (s.spin) move = { kind: 'sweep', amount: 0.6, bars: 16 };
-  else if (s.yaw) move = s.yaw > 0.4 ? { kind: 'sweep', amount: Math.min(1, s.yaw / 1.2), bars: 8 } : { kind: 'sway', amount: Math.min(1, s.yaw / 0.35), bars: 4 };
-  return normalizeScene({ ...scene, camera: { pos: s.pos, target: s.target, fov: s.fov, roll: s.roll ?? 0, move } }, { voidHex }).camera;
+  else if (s.yaw)
+    move =
+      s.yaw > 0.4
+        ? { kind: 'sweep', amount: Math.min(1, s.yaw / 1.2), bars: 8 }
+        : { kind: 'sway', amount: Math.min(1, s.yaw / 0.35), bars: 4 };
+  return normalizeScene(
+    { ...scene, camera: { pos: s.pos, target: s.target, fov: s.fov, roll: s.roll ?? 0, move } },
+    { voidHex },
+  ).camera;
 }
-const flameColors = (key) => { const f = flames[key]; return { lo: f.ramp[0], mid: f.ramp[1], hi: f.ramp[2], core: f.ramp[3], shade: f.shade, light: f.light }; };
+const flameColors = (key) => {
+  const f = flames[key];
+  return { lo: f.ramp[0], mid: f.ramp[1], hi: f.ramp[2], core: f.ramp[3], shade: f.shade, light: f.light };
+};
 const panelCtx = () => ({
   weapons,
   elements: elementNames,
   flames: rotation().map((key) => ({ key, name: flames[key].name, colors: flameColors(key) })),
   shots: Object.entries(SHOTS).map(([key, s]) => ({ key, name: s.name, camera: shotCamera(s) })),
   siteBase,
+  site: { pixelSize: effects.render.pixelSize, ditherMatrix: effects.render.ditherMatrix, flameFps: effects.fire.fps },
 });
 let flameScheme = 'auto';
 const sceneVoid = () => scene.colors.scenery?.void ?? siteBase.void;
@@ -514,36 +660,74 @@ function pinWhatYouSee() {
 }
 function act(name, el) {
   const light = scene.colors.flame.light;
-  if (name === 'flame-harmonious') edit('colors.flame', { ...harmoniousFlame(Math.random, { voidHex: sceneVoid(), scheme: flameScheme }).colors, light }, { key: null });
-  else if (name === 'flame-random') edit('colors.flame', { ...wildFlame(Math.random, { voidHex: sceneVoid() }), light }, { key: null });
+  if (name === 'flame-harmonious')
+    edit(
+      'colors.flame',
+      { ...harmoniousFlame(Math.random, { voidHex: sceneVoid(), scheme: flameScheme }).colors, light },
+      { key: null },
+    );
+  else if (name === 'flame-random')
+    edit('colors.flame', { ...wildFlame(Math.random, { voidHex: sceneVoid() }), light }, { key: null });
   else if (name === 'flame-scheme') flameScheme = /** @type {HTMLSelectElement} */ (el).value;
   else if (name === 'seed-flame') {
     const list = suggestFlames(/** @type {HTMLInputElement} */ (el).value, { voidHex: sceneVoid() });
-    panel.suggest('flame', flameChips(list.map((s) => ({ label: s.label, colors: s.colors })), light));
+    panel.suggest(
+      'flame',
+      flameChips(
+        list.map((s) => ({ label: s.label, colors: s.colors })),
+        light,
+      ),
+    );
     panel.fill();
   } else if (name === 'seed-scenery') {
     const list = suggestScenes(/** @type {HTMLInputElement} */ (el).value, { flames: [{ hi: scene.colors.flame.hi }] });
     panel.suggest('scenery', sceneryChips(list));
     panel.fill();
-  } else if (name === 'scenery-harmonious') edit('colors.scenery', harmoniousScene(Math.random, { flames: [{ hi: scene.colors.flame.hi }] }), { key: null });
-  else if (name === 'scenery-vivid') edit('colors.scenery', vividScene(Math.random, { flames: [{ hi: scene.colors.flame.hi }], hue: hexToOklch(scene.colors.flame.mid).h }), { key: null });
-  else if (name === 'scenery-random') edit('colors.scenery', wildScene(Math.random, { flames: [{ hi: scene.colors.flame.hi }] }), { key: null });
+  } else if (name === 'scenery-harmonious')
+    edit('colors.scenery', harmoniousScene(Math.random, { flames: [{ hi: scene.colors.flame.hi }] }), { key: null });
+  else if (name === 'scenery-vivid')
+    edit(
+      'colors.scenery',
+      vividScene(Math.random, { flames: [{ hi: scene.colors.flame.hi }], hue: hexToOklch(scene.colors.flame.mid).h }),
+      { key: null },
+    );
+  else if (name === 'scenery-random')
+    edit('colors.scenery', wildScene(Math.random, { flames: [{ hi: scene.colors.flame.hi }] }), { key: null });
   else if (name === 'pin-all') pinWhatYouSee();
-  else if (name === 'drops-own') { if (!scene.drops) edit('drops', { fx: {}, count: 2 }, { key: null }); }
-  else if (name === 'gesture') {
+  else if (name === 'drops-own') {
+    if (!scene.drops) edit('drops', { fx: {}, count: 2 }, { key: null });
+  } else if (name === 'gesture') {
     const g = el.dataset.gesture;
-    if (!fire?.knights?.gesture(g, { index: 'all' })) note(reducedMotion ? 'The knights keep still (reduced motion).' : 'No knight free to do that right now.', 1.6);
+    if (!fire?.knights?.gesture(g, { index: 'all' }))
+      note(reducedMotion ? 'The knights keep still (reduced motion).' : 'No knight free to do that right now.', 1.6);
   }
 }
-const panel = bindPanel(panelEl, {
+/** @type {ReturnType<typeof createPanelSearch> | null} */
+let search = null;
+const panel = bindPanel(panelBody, {
   get: () => scene,
   edit,
   audition,
   act,
   live: () => director?.parts.looks.details ?? null,
   ctx: panelCtx,
+  open: readOpen(),
+  onSection: saveOpen,
+  onBulk: (text) => note(`${text} ${coarse ? 'Undo (↶) puts it back.' : 'Ctrl+Z undoes it.'}`, 3),
+  onDraw: () => search?.refresh(),
 });
-setInterval(() => { if (!panelEl.hidden) panel.refreshLive(); }, 700);
+setInterval(() => {
+  if (!panelEl.hidden) panel.refreshLive();
+}, 700);
+search = createPanelSearch({
+  input: /** @type {HTMLInputElement} */ (q('#pnt-search')),
+  status: q('[data-panel] [data-search-status]'),
+  notes: q('[data-search-notes]'),
+  panel,
+  scene: () => scene,
+  ctx: panelCtx(),
+  folded: () => innerWidth < NARROW, // (a phone's bottom sheet: its room for the rows found)
+});
 
 // --- The camera by hand ------------------------------------------------------------------------
 const rig = createCameraRig(stage, {
@@ -559,22 +743,36 @@ function drawBar() {
   if (document.activeElement !== nameInput) nameInput.value = scene.name;
   const state = ref?.startsWith('b:') ? 'builtin' : ref && !dirty ? 'saved' : 'unsaved';
   savedEl.dataset.state = state;
-  savedEl.textContent = { builtin: 'Built-In', saved: 'Saved', unsaved: ref ? 'Unsaved Changes' : 'Not Saved Yet' }[state];
+  savedEl.textContent = { builtin: 'Built-In', saved: 'Saved', unsaved: ref ? 'Unsaved Changes' : 'Not Saved Yet' }[
+    state
+  ];
   q('[data-cmd="undo"]').disabled = !steps.canUndo;
   q('[data-cmd="redo"]').disabled = !steps.canRedo;
   document.title = `${scene.name} — Bonfire Painter`;
 }
 nameInput.addEventListener('input', () => edit('name', nameInput.value || scene.name, { key: 'name' }));
-nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); nameInput.blur(); } });
-nameInput.addEventListener('blur', () => { steps.seal(); drawBar(); });
+nameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === 'Escape') {
+    e.preventDefault();
+    nameInput.blur();
+  }
+});
+nameInput.addEventListener('blur', () => {
+  steps.seal();
+  drawBar();
+});
 
 /** Save to My Scenes (a new one gets its own id; a built-in, a copy), with a thumbnail. */
 function save({ quiet = false } = {}) {
   let saved;
   const mine = ref?.startsWith('m:') ? parseRef(ref).id : null;
   // (A scene saved the first time takes its id from its name: "Frozen Shrine" → frozen-shrine.)
-  const fresh = mine ? { ...scene, id: mine } : { ...scene, id: uniqueSceneId(scene.name, new Set(store.list().map((s) => s.id))) };
-  try { saved = store.save(fresh, { fresh: !mine }); } catch (e) {
+  const fresh = mine
+    ? { ...scene, id: mine }
+    : { ...scene, id: uniqueSceneId(scene.name, new Set(store.list().map((s) => s.id))) };
+  try {
+    saved = store.save(fresh, { fresh: !mine });
+  } catch (e) {
     note(e?.name === 'StorageFull' ? e.message : 'That couldn’t be saved in this browser.', 5);
     return null;
   }
@@ -585,7 +783,12 @@ function save({ quiet = false } = {}) {
   drawBar();
   writeDraft();
   syncUrl();
-  if (!quiet) note(store.persistent ? `Saved “${saved.name}” in My Scenes.` : `Saved “${saved.name}” for this visit (this browser keeps nothing).`);
+  if (!quiet)
+    note(
+      store.persistent
+        ? `Saved “${saved.name}” in My Scenes.`
+        : `Saved “${saved.name}” for this visit (this browser keeps nothing).`,
+    );
   takeThumb(ref);
   return saved;
 }
@@ -598,9 +801,11 @@ function save({ quiet = false } = {}) {
 function takeThumb(r) {
   if (!fire) return;
   const at = edits;
-  captureThumb(fire, visibleArea()).then((url) => {
-    if (url && at === edits && ref === r) store.setThumb(r, url);
-  }).catch(() => {});
+  captureThumb(fire, visibleArea())
+    .then((url) => {
+      if (url && at === edits && ref === r) store.setThumb(r, url);
+    })
+    .catch(() => {});
 }
 
 // Play in Bonfire Live. The scene goes by its ref: an untouched built-in or a saved scene
@@ -633,19 +838,46 @@ async function playInLive(s = scene, r = null) {
     note('The browser blocked Bonfire Live’s tab.', 10, { href: url, text: 'Open Bonfire Live ↗' });
     return;
   }
-  try { w.opener = null; } catch { /* (another page's by now) */ }
+  try {
+    w.opener = null;
+  } catch {
+    /* (another page's by now) */
+  }
   w.focus?.();
   note(`Opened Bonfire Live with “${s.name}”.`);
 }
 
 const library = createLibrary(q('[data-library]'), {
-  store, builtIns, voidHex,
+  store,
+  builtIns,
+  voidHex,
   current: () => ref,
-  onOpen: (s, r) => { openScene(s, r); note(`Opened “${s.name}”.`); },
-  onNew: () => { openScene(defaultScene('New Scene'), null, { isDirty: true }); note('A new scene.'); },
+  onOpen: (s, r) => {
+    openScene(s, r);
+    note(`Opened “${s.name}”.`);
+  },
+  onNew: () => {
+    openScene(defaultScene('New Scene'), null, { isDirty: true });
+    note('A new scene.');
+  },
   onPlay: (s, r) => playInLive(s, r),
-  onRenamed: (s, r) => { if (r === ref) { scene = { ...scene, name: s.name }; drawBar(); saveDraft(); } },
-  onDeleted: (r) => { if (r === ref) { ref = null; origin = null; dirty = true; drawBar(); syncUrl(); saveDraft(); } },
+  onRenamed: (s, r) => {
+    if (r === ref) {
+      scene = { ...scene, name: s.name };
+      drawBar();
+      saveDraft();
+    }
+  },
+  onDeleted: (r) => {
+    if (r === ref) {
+      ref = null;
+      origin = null;
+      dirty = true;
+      drawBar();
+      syncUrl();
+      saveDraft();
+    }
+  },
   unsaved: unsavedName,
 });
 
@@ -668,15 +900,31 @@ async function startDemo() {
   const track = createDemo(ctx, bus);
   await ctx.resume();
   track.start();
-  demo = { ctx, analyser, monitor, stop() { track.stop(); bus.disconnect(); ctx.close().catch(() => {}); } };
+  demo = {
+    ctx,
+    analyser,
+    monitor,
+    stop() {
+      track.stop();
+      bus.disconnect();
+      ctx.close().catch(() => {});
+    },
+  };
 }
 function setPreview(mode) {
   if (mode !== 'demo') stopDemo();
   const now = performance.now() / 1000;
   const lead = settings.offset / 1000;
-  feed = mode === 'beat' ? createBeatFeed({ shape: 'groove', start: now, lead })
-    : mode === 'drop' ? createBeatFeed({ shape: 'dropLoop', start: now, lead }) : null;
-  if (mode === 'still' || mode === 'demo') { silenceNext = preview !== 'still'; director?.silence(); }
+  feed =
+    mode === 'beat'
+      ? createBeatFeed({ shape: 'groove', start: now, lead })
+      : mode === 'drop'
+        ? createBeatFeed({ shape: 'dropLoop', start: now, lead })
+        : null;
+  if (mode === 'still' || mode === 'demo') {
+    silenceNext = preview !== 'still';
+    director?.silence();
+  }
   preview = mode;
   // Still is a still picture: the framing as painted, its move paused (it plays with the music).
   const cam = director?.parts.camera;
@@ -684,17 +932,26 @@ function setPreview(mode) {
     if (mode === 'still' && cam.pinned) cam.pin(cam.pinned, { hold: true, move: 'cut' });
     cam.pause(mode === 'still');
   }
-  if (mode === 'demo' && !demo) startDemo().catch(() => { note('The demo track couldn’t start here.', 3); setPreview('still'); });
+  if (mode === 'demo' && !demo)
+    startDemo().catch(() => {
+      note('The demo track couldn’t start here.', 3);
+      setPreview('still');
+    });
   for (const b of qa('[data-preview]')) b.setAttribute('aria-pressed', String(b.dataset.preview === mode));
   q('[data-beat]').classList.toggle('is-off', mode === 'still');
-  beatLabel.textContent = mode === 'demo' ? 'Listening…' : mode === 'still' ? '' : mode === 'drop' ? 'Groove · Bar 1/16' : '124 BPM';
+  beatLabel.textContent =
+    mode === 'demo' ? 'Listening…' : mode === 'still' ? '' : mode === 'drop' ? 'Groove · Bar 1/16' : '124 BPM';
 }
 // The beat's pips (and the drop loop's place in its 16 bars).
 const pips = qa('[data-beat] i');
 const beatLabel = q('[data-beat-label]');
 const SECTION_NAMES = { groove: 'Groove', breakdown: 'Breakdown', build: 'Build', silent: '' };
 function drawBeat(f) {
-  for (const b of f.beats) pips.forEach((p, i) => { p.classList.toggle('is-on', i === b.beat); p.classList.toggle('is-down', i === 0); });
+  for (const b of f.beats)
+    pips.forEach((p, i) => {
+      p.classList.toggle('is-on', i === b.beat);
+      p.classList.toggle('is-down', i === 0);
+    });
   if (!f.beats.length && f.state === 'silent') pips.forEach((p) => p.classList.remove('is-on'));
   const last = f.beats.at(-1);
   if (preview === 'drop' && last) beatLabel.textContent = `${SECTION_NAMES[f.state] ?? ''} · Bar ${last.bar + 1}/16`;
@@ -716,7 +973,7 @@ let panelShown = true;
  * but the panel's column (or, on phones, its bottom sheet). The fire is framed in its middle.
  */
 function visibleArea() {
-  const phone = innerWidth < 760;
+  const phone = innerWidth < NARROW;
   const w = panelShown && !phone ? panelEl.offsetWidth : 0;
   const h = panelShown && phone ? panelEl.offsetHeight : 0;
   return { x: 0, y: 0, w: 1 - w / innerWidth, h: 1 - h / innerHeight };
@@ -729,7 +986,9 @@ function frameFire(instant = false) {
 window.addEventListener('resize', () => frameFire());
 new ResizeObserver(() => frameFire()).observe(panelEl);
 // (The bar wraps into two rows on phones: what sits under it follows its height.)
-new ResizeObserver(() => document.body.style.setProperty('--bar-h', `${q('[data-bar]').offsetHeight}px`)).observe(q('[data-bar]'));
+new ResizeObserver(() => document.body.style.setProperty('--bar-h', `${q('[data-bar]').offsetHeight}px`)).observe(
+  q('[data-bar]'),
+);
 function togglePanel(show = !panelShown) {
   panelShown = show;
   panelEl.hidden = !show;
@@ -751,25 +1010,24 @@ const RENDER_ROWS = [
   { key: '8', id: 'xray', label: 'X-Ray View' },
 ];
 const STEPS = {
-  pixelSize: PIXEL_SIZES, palette: Object.keys(PALETTES), dither: RENDER_STEPS.dither, ditherMatrix: [4, 8],
-  outlines: ['on', 'mix', 'off'], fog: Object.keys(FOGS), flameFps: FLAME_FPS, xray: [null, ...Object.keys(XRAY_VIEWS)],
+  pixelSize: PIXEL_SIZES,
+  palette: Object.keys(PALETTES),
+  dither: RENDER_STEPS.dither,
+  ditherMatrix: [4, 8],
+  outlines: ['on', 'mix', 'off'],
+  fog: Object.keys(FOGS),
+  flameFps: FLAME_FPS,
+  xray: [null, ...Object.keys(XRAY_VIEWS)],
 };
-const SWITCH_TEXT = { on: 'always', mix: 'in the mix', off: 'off' };
+/** The scene's render as the menu shows it: Bonfire Live's words (render.js renderText). */
 function renderValues() {
   const r = scene.render;
-  return {
-    pixelSize: `${r.pixelSize} px`,
-    palette: Array.isArray(r.palette) ? `${r.palette.length} of the scene’s colors` : PALETTES[r.palette],
-    dither: r.dither ? r.dither.toFixed(2) : 'off',
-    ditherMatrix: `${r.ditherMatrix}×${r.ditherMatrix}`,
-    outlines: SWITCH_TEXT[r.outlines],
-    fog: FOGS[r.fog],
-    flameFps: `${r.flameFps} fps`,
-    xray: r.xray ? XRAY_VIEWS[r.xray] : 'off',
-  };
+  const values = Object.fromEntries(RENDER_ROWS.map(({ id }) => [id, renderText(r, id)]));
+  values.xray = XRAY_VIEWS[r.xray] ?? 'Off'; // (a view held for the scene, not a switch)
+  return values;
 }
 const renderMenu = createRenderMenu({
-  title: 'Render',
+  title: 'Render Settings',
   rows: RENDER_ROWS,
   className: 'debug-hud pnt-render-menu',
   read: renderValues,
@@ -781,35 +1039,59 @@ const renderMenu = createRenderMenu({
     edit(`render.${id}`, steps[(((i + dir) % steps.length) + steps.length) % steps.length], { key: null });
     return renderValues();
   },
-  reset: { key: '0', label: 'Reset These', hint: 'a new scene’s', run: () => edit('render', defaultScene().render, { key: null }) },
+  reset: {
+    key: '0',
+    label: 'Reset Render Settings',
+    hint: 'As a New Scene',
+    run: () => edit('render', defaultScene().render, { key: null }),
+  },
 });
 app.append(renderMenu.el);
 
 // --- The pack (I): it paints into the scene (the place, the weapon, the element, the flame,
 // the first knight's helmet, the knights' style and finish); its gestures are previews. ---------
-const siteFlameOf = () => rotation().find((k) => { const c = flameColors(k); return ['lo', 'mid', 'hi', 'core'].every((x) => c[x] === scene.colors.flame[x]); }) ?? null;
+const siteFlameOf = () =>
+  rotation().find((k) => {
+    const c = flameColors(k);
+    return ['lo', 'mid', 'hi', 'core'].every((x) => c[x] === scene.colors.flame[x]);
+  }) ?? null;
 const pack = createPack({
   label: ui.pack,
   items: bonfireItems({
-    state: () => (fire ? {
-      scenery: scene.place.scenery, weapon: fire.weapon, element: fire.element, flame: siteFlameOf(),
-      helmet: scene.knights.count ? scene.knights.helmets[0] ?? fire.knights?.helmet ?? 'great' : null,
-      presence: scene.knights.count ? 'resting' : 'away',
-      style: scene.knights.style && scene.knights.style !== 'mix' ? scene.knights.style : fire.knights?.style ?? null,
-      finish: scene.knights.finish !== 'mix' ? scene.knights.finish : fire.knights?.finish ?? null,
-    } : null),
+    state: () =>
+      fire
+        ? {
+            scenery: scene.place.scenery,
+            weapon: fire.weapon,
+            element: fire.element,
+            flame: siteFlameOf(),
+            helmet: scene.knights.count ? (scene.knights.helmets[0] ?? fire.knights?.helmet ?? 'great') : null,
+            presence: scene.knights.count ? 'resting' : 'away',
+            style:
+              scene.knights.style && scene.knights.style !== 'mix'
+                ? scene.knights.style
+                : (fire.knights?.style ?? null),
+            finish: scene.knights.finish !== 'mix' ? scene.knights.finish : (fire.knights?.finish ?? null),
+          }
+        : null,
     busy: () => !fire || fire.forging,
     reducedMotion,
     onScene: (key) => edit('place.scenery', key, { key: null }),
     onWeapon: (key) => edit('place.weapon', key, { key: null }),
     onRing: () => director?.ring(1),
-    onLiving: () => { if (!director?.combo()) note('The blade moves on a beat: start the Beat preview.', 2); },
+    onLiving: () => {
+      if (!director?.combo()) note('The blade moves on a beat: start the Beat preview.', 2);
+    },
     onElement: (key) => edit('place.element', key, { key: null }),
     onFlame: (key) => edit('colors.flame', flameColors(key), { key: null }),
-    onHelmet: (key) => { if (scene.knights.count) edit('knights.helmets.0', key, { key: null }); },
+    onHelmet: (key) => {
+      if (scene.knights.count) edit('knights.helmets.0', key, { key: null });
+    },
     onStyle: (key) => edit('knights.style', key, { key: null }),
     onFinish: (key) => edit('knights.finish', key, { key: null }),
-    onGesture: (name) => { fire?.knights?.gesture(name, { index: 'all' }); },
+    onGesture: (name) => {
+      fire?.knights?.gesture(name, { index: 'all' });
+    },
     hasKnight: () => scene.knights.count > 0,
   }),
 });
@@ -827,60 +1109,129 @@ function capture() {
     note('Saved a picture of the stage.');
   });
 }
-function toggleFullscreen() {
-  if (document.fullscreenElement) document.exitFullscreen?.();
-  else document.documentElement.requestFullscreen?.().catch(() => {});
+const keysOverlay = createKeysOverlay({ title: 'Keyboard Shortcuts', groups: PAINTER_KEYS });
+/** The Tools menu's items (toolbar.js TOOLS). */
+const tool = {
+  render: () => renderMenu.open({ focus: true }),
+  pack: () => pack.toggle(),
+  capture: () => capture(),
+  fullscreen: () => toggleFullscreen(),
+  keys: () => keysOverlay.open(),
+};
+const tools = bindTools(q('[data-tools]'), (cmd) => tool[cmd]?.(), { hideTip: tips.hide });
+/** `/`: the panel's search (the panel shown first if it's hidden). */
+function focusSearch() {
+  if (!panelShown) togglePanel(true);
+  search.focus();
 }
 const commands = {
+  tools: () => tools.toggle(),
   library: () => library.toggle(),
   save: () => save(),
-  undo, redo,
+  undo,
+  redo,
   play: () => playInLive(),
   panel: () => togglePanel(),
-  'banner-save': async () => { if (await save()) q('[data-banner]').hidden = true; },
+  'banner-save': async () => {
+    if (await save()) q('[data-banner]').hidden = true;
+  },
   'banner-copy': () => {
     navigator.clipboard?.writeText(JSON.stringify(scene, null, 2)).then(
       () => note('Copied: paste it into the admin’s Scenes page (Import From Painter).', 3.5),
-      () => { downloadJson(`${scene.id}.json`, scene); note('Couldn’t copy here: downloaded the JSON instead.', 3.5); },
+      () => {
+        downloadJson(`${scene.id}.json`, scene);
+        note('Couldn’t copy here: downloaded the JSON instead.', 3.5);
+      },
     );
   },
-  'banner-close': () => { q('[data-banner]').hidden = true; },
+  'banner-close': () => {
+    q('[data-banner]').hidden = true;
+  },
   'aside-restore': restoreAside,
   'aside-discard': discardAside,
 };
 document.addEventListener('click', (e) => {
   const t = /** @type {HTMLElement} */ (e.target);
   const cmd = /** @type {HTMLElement} */ (t.closest('[data-cmd]'));
-  if (cmd) { commands[cmd.dataset.cmd]?.(); return; }
+  if (cmd) {
+    commands[cmd.dataset.cmd]?.();
+    return;
+  }
   const pv = /** @type {HTMLElement} */ (t.closest('[data-preview]'));
   if (pv) setPreview(pv.dataset.preview);
 });
-const typing = (el) => el?.closest?.('input:not([type="range"]):not([type="checkbox"]):not([type="color"]), select, textarea, [contenteditable]');
 /** Where Space is the page's (the beat), not a focused control's own (a button presses). */
 const spaceIsOurs = (el) => el === document.body || el === document.documentElement || stage.contains(el);
 window.addEventListener('keydown', (e) => {
-  if (e.defaultPrevented) return; // (a drawer or a menu took it)
+  if (e.defaultPrevented || keysOverlay.el.open) return; // (a drawer, a menu or the keys' list took it)
   const mod = e.ctrlKey || e.metaKey;
-  if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); save(); return; }
+  if (mod && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    save();
+    return;
+  }
   if (typing(e.target)) return;
-  if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
-  if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
+  if (mod && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    if (e.shiftKey) redo();
+    else undo();
+    return;
+  }
+  if (mod && e.key.toLowerCase() === 'y') {
+    e.preventDefault();
+    redo();
+    return;
+  }
   if (mod || e.altKey) return;
   const k = e.key.toLowerCase();
-  // The library open: L closes it (Esc is its own); the stage's keys wait.
-  if (library.isOpen) { if (k === 'l') { e.preventDefault(); library.close(); } return; }
-  if (renderMenu.handleKey(e)) { e.preventDefault(); return; }
-  if (e.key === 'Escape' && renderMenu.isOpen) { renderMenu.close(); return; }
+  // (A key the page answers, off the panel: what it opens comes up clear of a tip left
+  // showing by the bar's focus. A panel field's keys move it, and keep its tip.)
+  if (!panelEl.contains(/** @type {Node} */ (e.target))) tips.hide();
+  if (isHelpKey(e)) {
+    e.preventDefault();
+    tools.close();
+    keysOverlay.open();
+    return;
+  }
+  // The library open: L closes it (Esc is its own), / filters it; the stage's keys wait.
+  if (library.isOpen) {
+    if (k === 'l') {
+      e.preventDefault();
+      library.close();
+    } else if (e.key === '/') {
+      e.preventDefault();
+      library.focusFilter();
+    }
+    return;
+  }
+  if (e.key === '/') {
+    e.preventDefault();
+    focusSearch();
+    return;
+  }
+  if (renderMenu.handleKey(e)) {
+    e.preventDefault();
+    return;
+  }
+  if (e.key === 'Escape' && renderMenu.isOpen) {
+    renderMenu.close();
+    return;
+  }
   // The camera's keys act on the stage (not while a panel field has the arrows).
   const onPanel = panelEl.contains(/** @type {Node} */ (e.target));
-  if (!onPanel && rig.handleKey(e)) { e.preventDefault(); return; }
+  if (!onPanel && rig.handleKey(e)) {
+    e.preventDefault();
+    return;
+  }
   if (k === 'h') togglePanel();
   else if (k === 'l') library.toggle();
   else if (k === 'i') pack.toggle();
   else if (k === 'f') toggleFullscreen();
   else if (k === 'c') capture();
-  else if (e.key === ' ' && spaceIsOurs(e.target)) { e.preventDefault(); setPreview(preview === 'beat' ? 'still' : 'beat'); }
-  else if (k === 'd') {
+  else if (e.key === ' ' && spaceIsOurs(e.target)) {
+    e.preventDefault();
+    setPreview(preview === 'beat' ? 'still' : 'beat');
+  } else if (k === 'd') {
     if (feed) feed.drop();
     else director?.strike();
     flashBeat();

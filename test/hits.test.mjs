@@ -22,7 +22,10 @@ test('debris: every element bounces, settles on the ground and is gone by the en
         assert.ok(Number.isFinite(P[i * 3]), `${kind}: finite`);
       }
     }
-    assert.ok(S.every((s) => s === 0), `${kind}: all gone after their life`);
+    assert.ok(
+      S.every((s) => s === 0),
+      `${kind}: all gone after their life`,
+    );
   }
 });
 
@@ -35,10 +38,15 @@ test('trauma: hits stack (capped), shake grows with it, and it settles to nothin
   const rest = camera.position.clone();
   view.shake(0.04);
   const small = view.trauma;
-  view.shake(0.3); view.shake(0.3); view.shake(0.3);
+  view.shake(0.3);
+  view.shake(0.3);
+  view.shake(0.3);
   assert.ok(view.trauma > small && view.trauma <= 1, 'stacks and caps');
   let moved = 0;
-  for (let i = 0; i < 20; i++) { view.apply(1 / 60, size, pointer); moved = Math.max(moved, camera.position.distanceTo(rest)); }
+  for (let i = 0; i < 20; i++) {
+    view.apply(1 / 60, size, pointer);
+    moved = Math.max(moved, camera.position.distanceTo(rest));
+  }
   assert.ok(moved > 0, 'it shakes');
   for (let i = 0; i < 120; i++) view.apply(1 / 60, size, pointer);
   assert.equal(view.trauma, 0);

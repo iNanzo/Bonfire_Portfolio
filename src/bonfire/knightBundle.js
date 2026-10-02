@@ -1,4 +1,4 @@
-// What scene.js loads of the knight when it fetches his model: the knights themselves
+// What sceneModel.js loads of the knight when it fetches his model: the knights themselves
 // (knights.js, and his poses, knightPose.js), his comings and goings (knightArrival.js) and
 // his summon sign (summonSign.js). One dynamic import, so they're a chunk of their own that
 // loads alongside knight.glb, off the fire's own first load (the fire burns without him if

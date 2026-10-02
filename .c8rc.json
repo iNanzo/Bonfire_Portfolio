@@ -1,0 +1,12 @@
+{
+  "all": true,
+  "include": ["src/**/*.js", "admin/**/*.js"],
+  "exclude": ["test/**", "admin/test/**", "dist/**", "admin/dist/**"],
+  "reporter": ["text", "text-summary", "lcov", "json-summary"],
+  "report-dir": "coverage",
+  "check-coverage": true,
+  "lines": 59.5,
+  "statements": 59.5,
+  "functions": 79.6,
+  "branches": 88.3
+}

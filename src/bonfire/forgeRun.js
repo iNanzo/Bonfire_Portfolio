@@ -70,7 +70,7 @@ import { smoothstep } from '../math.js';
 // average, so particles can shed / fade exactly where the edge is.
 export const edgeAt = (h, jitter) => THREE.MathUtils.clamp((0.3925 + 0.3 * h + jitter) / 1.15, 0, 1);
 /** Where the edge is on a subject (0 bottom → 1 top) at dissolve amount `u` (see edgeAt). */
-export const edgeHeight = (u) => THREE.MathUtils.clamp((1.15 * u - 0.3925) / 0.3, 0, 1);
+const edgeHeight = (u) => THREE.MathUtils.clamp((1.15 * u - 0.3925) / 0.3, 0, 1);
 
 export const ease = {
   inQuad: (t) => t * t,
@@ -109,11 +109,22 @@ const COCOON = { n: 6, size: 0.1, spread: 0.06, out: 0.18 };
  *   holdSpin(dt)            how fast the helix turns in the hold (rad/s; default 10)
  *   holdAlpha(t)            the helix lines' strength in the hold (default: fading over it)
  */
-export function createForgeRun({ particles, fx, arcs, materials = null, particleMaterial = null, times: D, reducedMotion, clock, groundPoint, hooks = {} }) {
-  const FORGE = D.dissolve + D.swirl + D.gather;  // time over which the color turns old → new
-  const TURNED = FORGE * 0.5;                      // the particles' color has swapped: the helix lines start
-  const FORMED = FORGE + D.form;                   // ...and meet here
-  const TIGHTEN_FROM = D.dissolve + D.swirl;       // the gather: the particles start collapsing
+export function createForgeRun({
+  particles,
+  fx,
+  arcs,
+  materials = null,
+  particleMaterial = null,
+  times: D,
+  reducedMotion,
+  clock,
+  groundPoint,
+  hooks = {},
+}) {
+  const FORGE = D.dissolve + D.swirl + D.gather; // time over which the color turns old → new
+  const TURNED = FORGE * 0.5; // the particles' color has swapped: the helix lines start
+  const FORMED = FORGE + D.form; // ...and meet here
+  const TIGHTEN_FROM = D.dissolve + D.swirl; // the gather: the particles start collapsing
   // Ice: the frozen subject shatters this far into the dissolve (s).
   const SHATTER = Math.min(0.6, D.dissolve * 0.43);
 
@@ -131,15 +142,15 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
   const rampNew = [];
   let helixSpin = 0; // the helix's turn (the particles and the lines share it)
   let shattered = false;
-  let formSteps = 0;   // lightning: the form's jumps so far...
-  let stepGlow = 0;    // ...each one flashes it...
+  let formSteps = 0; // lightning: the form's jumps so far...
+  let stepGlow = 0; // ...each one flashes it...
   let groundArcT = -1; // ...and throws an arc to the ground for a moment
-  let cocoonT = -1;    // ice: the cocoon's burst (s), or -1 while it grows
-  let strikeT = -1;    // a strike's age (s), or -1
+  let cocoonT = -1; // ice: the cocoon's burst (s), or -1 while it grows
+  let strikeT = -1; // a strike's age (s), or -1
   let strikeLen = 0.16;
   const strikeTop = new THREE.Vector3();
   const strikeEnd = new THREE.Vector3();
-  const cocoon = [];   // ice: { s (up it from the bottom), a (around it), tilt, size, twist }
+  const cocoon = []; // ice: { s (up it from the bottom), a (around it), tilt, size, twist }
   let burstT = -1;
   let burstSil = null;
   let burstEl = 'fire'; // the element the echo takes after
@@ -214,16 +225,22 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
     const profile = profileOf(to);
     if (!profile) return;
     const burst = cocoonT >= 0 ? Math.min(1, (cocoonT += dt) / 0.45) : 0;
-    if (burst >= 1) { cocoonT = -1; return; }
+    if (burst >= 1) {
+      cocoonT = -1;
+      return;
+    }
     const front = phase === 'form' ? 1 - edgeHeight(to.uniforms.uDissolve.value) : 1;
     const len = profile.y1 - profile.y0;
     const out = (to.cocoon ?? COCOON).out;
     for (const c of cocoon) {
       const grow = phase === 'form' ? smoothstep(c.s - 0.04, c.s + 0.16, front) : 1;
       if (grow <= 0.01) continue;
-      const rx = profileAt(profile.rx, c.s), rz = profileAt(profile.rz, c.s);
+      const rx = profileAt(profile.rx, c.s),
+        rz = profileAt(profile.rz, c.s);
       cDir.set(Math.cos(c.a) * Math.sin(c.tilt), Math.cos(c.tilt), Math.sin(c.a) * Math.sin(c.tilt));
-      cBase.set(Math.cos(c.a) * rx, profile.y0 + c.s * len, Math.sin(c.a) * rz).addScaledVector(cDir, out * ease.outCubic(burst));
+      cBase
+        .set(Math.cos(c.a) * rx, profile.y0 + c.s * len, Math.sin(c.a) * rz)
+        .addScaledVector(cDir, out * ease.outCubic(burst));
       cQ.setFromUnitVectors(UP, cDir).multiply(cTwist.setFromAxisAngle(UP, c.twist));
       const size = c.size * grow * (1 + 0.8 * ease.outCubic(burst));
       cM.compose(cBase, cQ, cS.set(size, size * 1.9, size)).premultiply(to.matrixWorld);
@@ -233,7 +250,18 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
       for (const [p, q] of CRYSTAL_EDGES) {
         cA.copy(p).applyMatrix4(cM);
         cB.copy(q).applyMatrix4(cM);
-        arcs.segment(cA.x, cA.y, cA.z, cB.x, cB.y, cB.z, p.y > 0.5 ? colB : colA, q.y > 0.5 ? colB : colA, alpha, alpha);
+        arcs.segment(
+          cA.x,
+          cA.y,
+          cA.z,
+          cB.x,
+          cB.y,
+          cB.z,
+          p.y > 0.5 ? colB : colA,
+          q.y > 0.5 ? colB : colA,
+          alpha,
+          alpha,
+        );
       }
     }
   }
@@ -267,7 +295,10 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
       for (let j = 0; j < count; j++) {
         if (!sampleNear(obj, h, arcA) || !sampleNear(obj, h, arcB) || arcA.distanceToSquared(arcB) < 0.0009) continue;
         arcs.bolt(arcA.x, arcA.y, arcA.z, arcB.x, arcB.y, arcB.z, {
-          rng, depth: 3, jag: 0.35, alpha: 0.9,
+          rng,
+          depth: 3,
+          jag: 0.35,
+          alpha: 0.9,
           color: (s, out) => out.copy(ramp[3]).lerp(ramp[2], Math.abs(s - 0.5) * 2),
         });
       }
@@ -278,10 +309,15 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
       const rng = seeded(hashSeed(Math.floor(time * 12), 17));
       const n = phase === 'gather' ? 2 : 1;
       for (let j = 0; j < n; j++) {
-        axisPoint(to, 0.15 + rng() * 0.7, rng() * Math.PI * 2, phase === 'form' ? 0.02 : to.cloud ?? 0.24, arcA);
+        axisPoint(to, 0.15 + rng() * 0.7, rng() * Math.PI * 2, phase === 'form' ? 0.02 : (to.cloud ?? 0.24), arcA);
         (to.ground ?? groundPoint)(rng, arcB);
         arcs.bolt(arcA.x, arcA.y, arcA.z, arcB.x, arcB.y, arcB.z, {
-          rng, depth: 4, jag: 0.28, width: (s) => 2.2 - 1.2 * s, heat: 1.3, alpha: 0.95,
+          rng,
+          depth: 4,
+          jag: 0.28,
+          width: (s) => 2.2 - 1.2 * s,
+          heat: 1.3,
+          alpha: 0.95,
           color: (s, out) => out.copy(rampNew[3]).lerp(rampNew[2], s),
         });
       }
@@ -295,13 +331,21 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
         const k = strikeT / strikeLen;
         arcCol.copy(rampNew[3]);
         arcs.bolt(strikeTop.x, strikeTop.y, strikeTop.z, strikeEnd.x, strikeEnd.y, strikeEnd.z, {
-          rng, depth: 5, jag: 0.14, width: (s) => 1.5 + 4 * s * (1 - k * 0.7), heat: 1.7,
+          rng,
+          depth: 5,
+          jag: 0.14,
+          width: (s) => 1.5 + 4 * s * (1 - k * 0.7),
+          heat: 1.7,
           alpha: (s) => (1 - k * 0.5) * Math.min(1, 0.35 + s * 1.5),
           color: (s, out) => out.copy(rampNew[2]).lerp(arcCol, s),
           each: (x, y, z, s) => {
             if (s > 0.2 && s < 0.7 && rng() < 0.22) {
               arcs.bolt(x, y, z, x + (rng() - 0.5) * 0.7, y - 0.2 - rng() * 0.35, z + (rng() - 0.5) * 0.7, {
-                rng, depth: 2, jag: 0.4, alpha: (b) => (1 - b) * 0.7, color: (b, out) => out.copy(rampNew[2]),
+                rng,
+                depth: 2,
+                jag: 0.4,
+                alpha: (b) => (1 - b) * 0.7,
+                color: (b, out) => out.copy(rampNew[2]),
               });
             }
           },
@@ -350,9 +394,20 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
         lineTrail.copy(rampNew[pale ? 2 : 1]).multiplyScalar(0.65);
         lineHot.copy(rampNew[3]);
         fx.helix({
-          matrix: to.matrixWorld, y0: lineProfile.y0, y1: lineProfile.y1, spin: helixSpin, turns: HELIX_TURNS,
-          growth, alpha: phase === 'hold' ? (hooks.holdAlpha ? hooks.holdAlpha(t) : 1 - Math.min(1, t / D.hold)) : 1, radiusX: lineRX, radiusZ: lineRZ,
-          lead: lineLead, trail: lineTrail, head: lineHot, t: time, style: element,
+          matrix: to.matrixWorld,
+          y0: lineProfile.y0,
+          y1: lineProfile.y1,
+          spin: helixSpin,
+          turns: HELIX_TURNS,
+          growth,
+          alpha: phase === 'hold' ? (hooks.holdAlpha ? hooks.holdAlpha(t) : 1 - Math.min(1, t / D.hold)) : 1,
+          radiusX: lineRX,
+          radiusZ: lineRZ,
+          lead: lineLead,
+          trail: lineTrail,
+          head: lineHot,
+          t: time,
+          style: element,
         });
       }
     }
@@ -368,9 +423,18 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
         lineTrail.copy(rampNew[pale ? 2 : 1]).multiplyScalar(0.7);
         lineHot.copy(rampNew[3]);
         fx.outline({
-          sil: burstSil, matrix: burstMatrix, dilate: 0.02 + 0.07 * grown, scale: 1 + 0.55 * grown,
-          wobble: burstEl === 'ice' ? 0 : 0.01 + 0.025 * k, alpha: on ? (1 - k) ** 1.2 : 0,
-          lead: lineLead, trail: lineTrail, hot: lineHot, t: time, seed: 3, facet: burstEl === 'ice' ? 0.03 : 0,
+          sil: burstSil,
+          matrix: burstMatrix,
+          dilate: 0.02 + 0.07 * grown,
+          scale: 1 + 0.55 * grown,
+          wobble: burstEl === 'ice' ? 0 : 0.01 + 0.025 * k,
+          alpha: on ? (1 - k) ** 1.2 : 0,
+          lead: lineLead,
+          trail: lineTrail,
+          hot: lineHot,
+          t: time,
+          seed: 3,
+          facet: burstEl === 'ice' ? 0.03 : 0,
         });
       } else burstT = -1;
     }
@@ -391,7 +455,12 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
       formU: phase === 'form' ? to.uniforms.uDissolve.value : 1,
       pulling: phase === 'gather' || phase === 'form',
       blend: p * p * (3 - 2 * p), // current color → next color
-      spin: helixSpin, from, to, time: clock(), colorsFrom: rampOld, colorsTo: rampNew,
+      spin: helixSpin,
+      from,
+      to,
+      time: clock(),
+      colorsFrom: rampOld,
+      colorsTo: rampNew,
       element,
     });
   }
@@ -436,7 +505,12 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
           u.uDissolve.value = t < SHATTER ? 0 : Math.min(1, (t - SHATTER) / 0.12);
           if (!shattered && t >= SHATTER) {
             shattered = true;
-            if (fx) { burstT = 0; burstEl = 'ice'; burstSil = from.silhouette(); burstMatrix.copy(silMatrixOf(from)); }
+            if (fx) {
+              burstT = 0;
+              burstEl = 'ice';
+              burstSil = from.silhouette();
+              burstMatrix.copy(silMatrixOf(from));
+            }
             hooks.onForgeStrike?.(0.45);
           }
         } else {
@@ -469,7 +543,11 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
         flickerEdge(u, rampNew);
         const jump = Math.ceil(k * 5);
         kk = Math.min(1, jump / 5);
-        if (jump > formSteps) { formSteps = jump; stepGlow = 1; groundArcT = 0.09; }
+        if (jump > formSteps) {
+          formSteps = jump;
+          stepGlow = 1;
+          groundArcT = 0.09;
+        }
       }
       stepGlow *= Math.exp(-dt / 0.08);
       const glows = to.formGlow !== false;
@@ -485,10 +563,21 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
         u.uGlow.value = glows ? 1 : 0;
         if (!glows && u.uLift) u.uLift.value = 0;
         particles.clear();
-        if (fx) { burstT = 0; burstEl = element; burstSil = to.silhouette(); burstMatrix.copy(silMatrixOf(to)); }
+        if (fx) {
+          burstT = 0;
+          burstEl = element;
+          burstSil = to.silhouette();
+          burstMatrix.copy(silMatrixOf(to));
+        }
         updateMatrices();
-        if (zap) { strike(to, 1, 0.3); hooks.onForgeStrike?.(0.8); }
-        if (element === 'ice') { cocoonT = 0; hooks.onForgeStrike?.(0.4); } // the cocoon cracks off
+        if (zap) {
+          strike(to, 1, 0.3);
+          hooks.onForgeStrike?.(0.8);
+        }
+        if (element === 'ice') {
+          cocoonT = 0;
+          hooks.onForgeStrike?.(0.4);
+        } // the cocoon cracks off
         hooks.onFormed?.();
         next('hold', t - D.form);
       }
@@ -499,14 +588,26 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
 
   return {
     /** Where the forge is: dissolve | swirl | gather | form | hold | idle. */
-    get phase() { return phase; },
+    get phase() {
+      return phase;
+    },
     /** Seconds into the phase. */
-    get t() { return t; },
-    get from() { return from; },
-    get to() { return to; },
-    get element() { return element; },
+    get t() {
+      return t;
+    },
+    get from() {
+      return from;
+    },
+    get to() {
+      return to;
+    },
+    get element() {
+      return element;
+    },
     /** The new colors ([lo, mid, hi, core] THREE.Colors): a held weapon's aura burns in them. */
-    get colorsTo() { return rampNew; },
+    get colorsTo() {
+      return rampNew;
+    },
     /** Seconds from begin() to the end of the form, at pace 1. */
     formedAt: FORGE + D.form,
     /**
@@ -526,7 +627,8 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
       edgeNewHot.set(toRamp[e + 1]);
       particles.points.material = materials?.[element] ?? particleMaterial ?? particles.points.material;
       strikeT = -1;
-      rampOld.length = 0; rampNew.length = 0;
+      rampOld.length = 0;
+      rampNew.length = 0;
       fromRamp.forEach((h) => rampOld.push(new THREE.Color(h)));
       toRamp.forEach((h) => rampNew.push(new THREE.Color(h)));
       return this;
@@ -568,9 +670,14 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
     stepElement,
     stepLines,
     /** The hold is over (the owner's call): the forge is idle, its echo and a strike finish on their own. */
-    finish() { phase = 'idle'; },
+    finish() {
+      phase = 'idle';
+    },
     /** Done with the subjects (the weapon has landed): nothing more is drawn round them. */
-    forget() { from = null; to = null; },
+    forget() {
+      from = null;
+      to = null;
+    },
     /** Stop everything at once. */
     cancel() {
       phase = 'idle';
@@ -585,9 +692,14 @@ export function createForgeRun({ particles, fx, arcs, materials = null, particle
       to = null;
     },
     /** Clear the lines (the helix and any echo). */
-    clearLines() { burstT = -1; fx?.clear(); },
+    clearLines() {
+      burstT = -1;
+      fx?.clear();
+    },
     /** Lines still drawing (an echo) or arcs (a strike, the cocoon cracking off). */
-    get busy() { return phase !== 'idle' || burstT >= 0 || strikeT >= 0 || cocoonT >= 0; },
+    get busy() {
+      return phase !== 'idle' || burstT >= 0 || strikeT >= 0 || cocoonT >= 0;
+    },
     /** An echo of `subject`'s silhouette bursts out of it, in `ramp`'s colors, after `el`'s ways. */
     echo(subject, ramp, el = 'fire') {
       burstEl = el;

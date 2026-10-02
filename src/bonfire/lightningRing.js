@@ -27,12 +27,30 @@ const UP = new THREE.Vector3(0, 1, 0);
 const STRIKE_LIGHTS = 4;
 
 /** @param {(x:number, z:number)=>number} [o.ground]  height of the scenery at (x, z), for where strikes land */
-export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, origin, field, reach, ground = () => 0, emitters = 96, sparks = 260, lights: lightCount = 6, reducedMotion = false }) {
-  const bolts = createBoltLines(fxMaterial, emitters * 22 + 420, emitters * 8 + 900, { afterimage: () => (reducedMotion ? 0 : effects.impact.afterimages) });
+export function createLightningRing({
+  fxMaterial,
+  sparkMaterial = fxMaterial,
+  origin,
+  field,
+  reach,
+  ground = () => 0,
+  emitters = 96,
+  sparks = 260,
+  lights: lightCount = 6,
+  reducedMotion = false,
+}) {
+  const bolts = createBoltLines(fxMaterial, emitters * 22 + 420, emitters * 8 + 900, {
+    afterimage: () => (reducedMotion ? 0 : effects.impact.afterimages),
+  });
   const kVel = new Float32Array(sparks * 3);
   const sparkPts = createPoints(sparks, sparkMaterial, { vel: kVel }); // cross-shaped flashes that streak (signatures.js)
   const g = sparkPts.geometry;
-  const K = { pos: g.attributes.position.array, col: g.attributes.color.array, size: g.attributes.size.array, alpha: g.attributes.alpha.array };
+  const K = {
+    pos: g.attributes.position.array,
+    col: g.attributes.color.array,
+    size: g.attributes.size.array,
+    alpha: g.attributes.alpha.array,
+  };
   const kAge = new Float32Array(sparks).fill(1);
   const kLife = new Float32Array(sparks).fill(0);
   let kNext = 0;
@@ -51,11 +69,20 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
   let seed = 0;
   let ballHeight = 0.58;
   // The crackle out of the bonfire: how long it lasts, how many bolts at a time.
-  let crackleT = 1e3, crackleFor = 0, crackleBolts = 0, crackleStep = -1;
-  const strikeLights = Array.from({ length: reducedMotion ? 0 : STRIKE_LIGHTS }, () => new THREE.PointLight(0x8cc8ff, 0, 2.6, 2));
+  let crackleT = 1e3,
+    crackleFor = 0,
+    crackleBolts = 0,
+    crackleStep = -1;
+  const strikeLights = Array.from(
+    { length: reducedMotion ? 0 : STRIKE_LIGHTS },
+    () => new THREE.PointLight(0x8cc8ff, 0, 2.6, 2),
+  );
   const targets = []; // this crackle's strike points: { x, y, z }
 
-  const lights = Array.from({ length: reducedMotion ? 0 : lightCount }, () => new THREE.PointLight(0x8cc8ff, 0, 2.6, 2));
+  const lights = Array.from(
+    { length: reducedMotion ? 0 : lightCount },
+    () => new THREE.PointLight(0x8cc8ff, 0, 2.6, 2),
+  );
   const lightR = new Float32Array(lightCount);
   const lightHeat = new Float32Array(lightCount);
   const lc = new Float32Array(lightCount);
@@ -110,7 +137,9 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
     const i = kNext;
     kNext = (kNext + 1) % sparks;
     const ix = i * 3;
-    K.pos[ix] = x; K.pos[ix + 1] = y; K.pos[ix + 2] = z;
+    K.pos[ix] = x;
+    K.pos[ix + 1] = y;
+    K.pos[ix + 2] = z;
     const out = (0.2 + Math.random() * 0.9) * (0.6 + heat * 0.5);
     const side = (Math.random() - 0.5) * 1.2;
     kVel[ix] = Math.cos(ang) * out - Math.sin(ang) * side;
@@ -128,7 +157,9 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
     // --- the front
     if (active) {
       let any = false;
-      lightR.fill(0); lightHeat.fill(0); lc.fill(0);
+      lightR.fill(0);
+      lightHeat.fill(0);
+      lc.fill(0);
       for (let i = 0; i < emitters; i++) {
         if (eAge[i] > eLife[i]) continue;
         any = true;
@@ -147,13 +178,21 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
         const flare = eHit[i] >= 0 ? Math.max(0, 1 - eHit[i] / 0.45) : 0;
         eHeat[i] = (1 - k) ** 1.1 + flare * 0.5;
         eAcc[i] += dt * 16 * eHeat[i];
-        while (eAcc[i] >= 1) { eAcc[i] -= 1; emitSpark(px(i), pz(i), eAng[i], eHeat[i]); }
+        while (eAcc[i] >= 1) {
+          eAcc[i] -= 1;
+          emitSpark(px(i), pz(i), eAng[i], eHeat[i]);
+        }
         if (lightCount) {
           const s = Math.floor((eAng[i] / TAU) * lightCount + lightCount) % lightCount;
-          lightR[s] += eR[i]; lightHeat[s] += eHeat[i]; lc[s] += 1;
+          lightR[s] += eR[i];
+          lightHeat[s] += eHeat[i];
+          lc[s] += 1;
         }
       }
-      if (!any) { active = false; for (const l of lights) l.intensity = 0; }
+      if (!any) {
+        active = false;
+        for (const l of lights) l.intensity = 0;
+      }
     }
 
     // --- the bolts: shapes re-roll on every crackle, positions follow the front
@@ -174,21 +213,35 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
           const k = (0.55 + 0.45 * heat) * fade;
           // The lead strand: a hot, glowing jagged line hugging the ground.
           bolts.bolt(px(i), 0.035, pz(i), px(j), 0.035, pz(j), {
-            rng, depth: 2, jag, up: UP, width: 1 + 1.5 * heat, heat: 1.1,
+            rng,
+            depth: 2,
+            jag,
+            up: UP,
+            width: 1 + 1.5 * heat,
+            heat: 1.1,
             color: (tt, out) => sample(0.68 + hot + flare * 0.2, out).multiplyScalar(k),
           });
           // A dimmer strand trailing behind it.
           bolts.bolt(px(i, -0.07), 0.05, pz(i, -0.07), px(j, -0.07), 0.05, pz(j, -0.07), {
-            rng, depth: 1, jag: jag * 1.3, up: UP, color: (tt, out) => sample(0.42, out).multiplyScalar(k * 0.6),
+            rng,
+            depth: 1,
+            jag: jag * 1.3,
+            up: UP,
+            color: (tt, out) => sample(0.42, out).multiplyScalar(k * 0.6),
           });
         }
         // Forks skittering off along the ground.
         if (rng() < 0.16 * L.ringArcs * heat) {
           const a = eAng[i] + (rng() - 0.5) * 1.6 + (rng() < 0.3 ? Math.PI : 0);
           const len = 0.1 + rng() * 0.3;
-          const x = px(i), z = pz(i);
+          const x = px(i),
+            z = pz(i);
           bolts.bolt(x, 0.03, z, x + Math.cos(a) * len, 0.02, z + Math.sin(a) * len, {
-            rng, depth: 2, jag: jag * 1.2, up: UP, color: (tt, out) => sample(0.55 - tt * 0.25, out).multiplyScalar(0.8 * heat * fade),
+            rng,
+            depth: 2,
+            jag: jag * 1.2,
+            up: UP,
+            color: (tt, out) => sample(0.55 - tt * 0.25, out).multiplyScalar(0.8 * heat * fade),
           });
         }
         // An arc leaping off the ring and landing further round.
@@ -196,7 +249,8 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
           const o = (i + 3 + Math.floor(rng() * 4)) % emitters;
           if (alive(o)) {
             const h = (0.1 + rng() * 0.25) * (0.6 + heat * 0.6);
-            const mx = (px(i) + px(o)) / 2, mz = (pz(i) + pz(o)) / 2;
+            const mx = (px(i) + px(o)) / 2,
+              mz = (pz(i) + pz(o)) / 2;
             const col = (tt, out) => sample(0.72, out).multiplyScalar(0.9 * heat);
             bolts.bolt(px(i), 0.03, pz(i), mx, h, mz, { rng, depth: 2, jag, color: col, width: 2 });
             bolts.bolt(mx, h, mz, px(o), 0.03, pz(o), { rng, depth: 2, jag, color: col, width: 2 });
@@ -204,10 +258,15 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
         }
         // Stopped by something: the lightning climbs it while it flares.
         if (flare > 0) {
-          const x = px(i, -0.02), z = pz(i, -0.02);
+          const x = px(i, -0.02),
+            z = pz(i, -0.02);
           const h = 0.15 + 0.5 * flare * (0.6 + rng() * 0.6);
           bolts.bolt(x, 0.03, z, x - Math.cos(eAng[i]) * 0.03, h, z - Math.sin(eAng[i]) * 0.03, {
-            rng, depth: 3, jag: jag * 0.8, width: (tt) => 2.5 - tt * 1.5, heat: 1.3,
+            rng,
+            depth: 3,
+            jag: jag * 0.8,
+            width: (tt) => 2.5 - tt * 1.5,
+            heat: 1.3,
             color: (tt, out) => sample(0.9 - tt * 0.35, out).multiplyScalar(0.7 + flare * 0.5),
           });
         }
@@ -227,7 +286,8 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
             } else {
               const ang = rng() * TAU;
               const r = Math.min(0.45 + rng() * 1.5, (reach ? reach(ang) : 4.6) - 0.05);
-              const x = origin.x + Math.cos(ang) * r, z = origin.z + Math.sin(ang) * r;
+              const x = origin.x + Math.cos(ang) * r,
+                z = origin.z + Math.sin(ang) * r;
               targets.push({ x, y: ground(x, z) + 0.01, z, ang });
             }
             const tg = targets.at(-1);
@@ -238,32 +298,59 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
         for (const tg of targets) {
           // A heavy bolt from the ball, tapering as it goes, forking on the way…
           bolts.bolt(origin.x, ballHeight, origin.z, tg.x, tg.y, tg.z, {
-            rng, depth: 5, jag: 0.14 + 0.18 * L.jag, width: (tt) => (W + 1) * (1 - tt * 0.5), heat: 1.8,
+            rng,
+            depth: 5,
+            jag: 0.14 + 0.18 * L.jag,
+            width: (tt) => (W + 1) * (1 - tt * 0.5),
+            heat: 1.8,
             color: (tt, out) => sample(1 - tt * 0.3, out).multiplyScalar(k * 1.15),
             each: (x, y, z, tt) => {
               if (tt < 0.2 || rng() > 0.1 * L.ringArcs + 0.06) return;
               const len = 0.14 + rng() * 0.3;
               const a = rng() * TAU;
-              bolts.bolt(x, y, z, x + Math.cos(a) * len, Math.max(ground(x, z) + 0.02, y - len * 0.6), z + Math.sin(a) * len, {
-                rng, depth: 3, jag: 0.3, width: (t2) => Math.max(1, W * 0.6 * (1 - t2)), heat: 1.2,
-                color: (t2, out) => sample(0.72 - t2 * 0.2, out).multiplyScalar(k * 0.8), alpha: (t2) => 1 - t2 * t2,
-              });
+              bolts.bolt(
+                x,
+                y,
+                z,
+                x + Math.cos(a) * len,
+                Math.max(ground(x, z) + 0.02, y - len * 0.6),
+                z + Math.sin(a) * len,
+                {
+                  rng,
+                  depth: 3,
+                  jag: 0.3,
+                  width: (t2) => Math.max(1, W * 0.6 * (1 - t2)),
+                  heat: 1.2,
+                  color: (t2, out) => sample(0.72 - t2 * 0.2, out).multiplyScalar(k * 0.8),
+                  alpha: (t2) => 1 - t2 * t2,
+                },
+              );
             },
           });
           // …and where it lands it crawls away along the ground.
           for (let c = 0; c < 3; c++) {
             const h = tg.ang + (rng() - 0.5) * 2.2;
             const len = 0.2 + rng() * 0.4;
-            const ex = tg.x + Math.cos(h) * len, ez = tg.z + Math.sin(h) * len;
+            const ex = tg.x + Math.cos(h) * len,
+              ez = tg.z + Math.sin(h) * len;
             bolts.bolt(tg.x, tg.y + 0.01, tg.z, ex, ground(ex, ez) + 0.015, ez, {
-              rng, depth: 3, jag: 0.32, up: UP, width: (t2) => 2.4 - t2 * 1.6, heat: 1.1,
-              color: (t2, out) => sample(0.75 - t2 * 0.3, out).multiplyScalar(k * 0.9), alpha: (t2) => 1 - t2 * t2,
+              rng,
+              depth: 3,
+              jag: 0.32,
+              up: UP,
+              width: (t2) => 2.4 - t2 * 1.6,
+              heat: 1.1,
+              color: (t2, out) => sample(0.75 - t2 * 0.3, out).multiplyScalar(k * 0.9),
+              alpha: (t2) => 1 - t2 * t2,
             });
           }
         }
         strikeLights.forEach((l, s) => {
           const tg = targets[s];
-          if (!tg) { l.intensity = 0; return; }
+          if (!tg) {
+            l.intensity = 0;
+            return;
+          }
           l.position.set(tg.x, tg.y + 0.15, tg.z);
           l.color.copy(ramp[2]).lerp(white, 0.4);
           l.intensity = 6 * k * (0.6 + 0.4 * seeded(hashSeed(s, cs, 9))());
@@ -285,7 +372,10 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
         for (let s = 0; s < lightCount; s++) strobe[s] = 0.35 + Math.random() * (0.6 + L.flicker);
       }
       lights.forEach((l, s) => {
-        if (!lc[s]) { l.intensity = 0; return; }
+        if (!lc[s]) {
+          l.intensity = 0;
+          return;
+        }
         const a = ((s + 0.5) / lightCount) * TAU;
         const r = lightR[s] / lc[s];
         l.position.set(origin.x + Math.cos(a) * r, 0.3, origin.z + Math.sin(a) * r);
@@ -297,22 +387,39 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
 
     // --- sparks: kicked up by the front, bouncing as they cool
     for (let i = 0; i < sparks; i++) {
-      if (kAge[i] >= kLife[i]) { K.size[i] = 0; continue; }
+      if (kAge[i] >= kLife[i]) {
+        K.size[i] = 0;
+        continue;
+      }
       anySpark = true;
       kAge[i] += dt;
       const ix = i * 3;
       const drag = Math.exp(-dt * 1.6);
       if (!reducedMotion) arcJitter(kVel, ix, dt);
-      kVel[ix] *= drag; kVel[ix + 1] = kVel[ix + 1] * drag - 3.2 * dt; kVel[ix + 2] *= drag;
-      K.pos[ix] += kVel[ix] * dt; K.pos[ix + 1] += kVel[ix + 1] * dt; K.pos[ix + 2] += kVel[ix + 2] * dt;
-      if (K.pos[ix + 1] < 0.02) { K.pos[ix + 1] = 0.02; kVel[ix + 1] *= -0.35; kVel[ix] *= 0.6; kVel[ix + 2] *= 0.6; }
+      kVel[ix] *= drag;
+      kVel[ix + 1] = kVel[ix + 1] * drag - 3.2 * dt;
+      kVel[ix + 2] *= drag;
+      K.pos[ix] += kVel[ix] * dt;
+      K.pos[ix + 1] += kVel[ix + 1] * dt;
+      K.pos[ix + 2] += kVel[ix + 2] * dt;
+      if (K.pos[ix + 1] < 0.02) {
+        K.pos[ix + 1] = 0.02;
+        kVel[ix + 1] *= -0.35;
+        kVel[ix] *= 0.6;
+        kVel[ix + 2] *= 0.6;
+      }
       const k = Math.min(1, kAge[i] / kLife[i]);
-      sample(0.9 - k * 0.6, tmp).multiplyScalar(0.8).lerp(white, arcHeat(kAge[i]));
-      K.col[ix] = tmp.r; K.col[ix + 1] = tmp.g; K.col[ix + 2] = tmp.b;
+      sample(0.9 - k * 0.6, tmp)
+        .multiplyScalar(0.8)
+        .lerp(white, arcHeat(kAge[i]));
+      K.col[ix] = tmp.r;
+      K.col[ix + 1] = tmp.g;
+      K.col[ix + 2] = tmp.b;
       K.size[i] = kAge[i] < ARC_FLASH ? 3 : 1;
       K.alpha[i] = Math.min(1, (1 - k) * 2) * (0.6 + 0.4 * Math.sin(kAge[i] * 40 + i));
     }
-    if (anySpark || active) for (const k of ['position', 'color', 'size', 'alpha', 'vel']) g.attributes[k].needsUpdate = true;
+    if (anySpark || active)
+      for (const k of ['position', 'color', 'size', 'alpha', 'vel']) g.attributes[k].needsUpdate = true;
   }
 
   return {
@@ -322,6 +429,8 @@ export function createLightningRing({ fxMaterial, sparkMaterial = fxMaterial, or
     crackle,
     step,
     sets: [{ pos: K.pos, vel: kVel, n: sparks, geo: g, maxV: 2 }],
-    setRamp(hexes) { setRampColors(ramp, hexes); },
+    setRamp(hexes) {
+      setRampColors(ramp, hexes);
+    },
   };
 }

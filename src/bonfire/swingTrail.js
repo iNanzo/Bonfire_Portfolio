@@ -42,7 +42,9 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
   let live = 0;
 
   // Lightning's sheet: five trails of up to four segments a step, plus the bolts.
-  const arcs = createBoltLines(fxMaterial, HISTORY * 20 + 96, HISTORY * 8 + 48, { afterimage: () => (reducedMotion ? 0 : effects.impact.afterimages) });
+  const arcs = createBoltLines(fxMaterial, HISTORY * 20 + 96, HISTORY * 8 + 48, {
+    afterimage: () => (reducedMotion ? 0 : effects.impact.afterimages),
+  });
   const rng = seeded(7);
   // The blade's recent path: [grip x, y, z, tip x, y, z, time]. A point partway up the
   // blade (0 at the grip, 1 at the point) is read off it.
@@ -70,8 +72,12 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
     for (let k = 0; k < n; k++) {
       const s = zap ? 0.93 + Math.random() * 0.07 : Math.random() ** 0.55; // toward the tip (lightning: only off the point)
       const lam = Math.random();
-      const ax = g0.x + (t0.x - g0.x) * s, ay = g0.y + (t0.y - g0.y) * s, az = g0.z + (t0.z - g0.z) * s;
-      const bx = g1.x + (t1.x - g1.x) * s, by = g1.y + (t1.y - g1.y) * s, bz = g1.z + (t1.z - g1.z) * s;
+      const ax = g0.x + (t0.x - g0.x) * s,
+        ay = g0.y + (t0.y - g0.y) * s,
+        az = g0.z + (t0.z - g0.z) * s;
+      const bx = g1.x + (t1.x - g1.x) * s,
+        by = g1.y + (t1.y - g1.y) * s,
+        bz = g1.z + (t1.z - g1.z) * s;
       const i = next;
       next = (next + 1) % N;
       P[i * 3] = ax + (bx - ax) * lam;
@@ -84,7 +90,9 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
         const u = Math.random() * 2 - 1;
         const a = Math.random() * Math.PI * 2;
         const r = Math.sqrt(1 - u * u) * (0.5 + Math.random());
-        V[i * 3] = Math.cos(a) * r; V[i * 3 + 1] = u; V[i * 3 + 2] = Math.sin(a) * r;
+        V[i * 3] = Math.cos(a) * r;
+        V[i * 3 + 1] = u;
+        V[i * 3 + 2] = Math.sin(a) * r;
         life[i] = 0.06 + Math.random() * 0.1;
         heat0[i] = 1;
       } else if (element === 'ice') {
@@ -128,7 +136,9 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
       along(hist[j], s, pa);
       along(hist[j - 1], s, pb);
       arcs.bolt(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, {
-        rng, depth: zap ? 2 : 1, jag: zap ? 0.35 : 0,
+        rng,
+        depth: zap ? 2 : 1,
+        jag: zap ? 0.35 : 0,
         color: (t, out) => sampleRamp(hot - (ka + (kb - ka) * t) * 0.8, out),
         alpha: (t) => alpha * Math.max(0, 1 - (ka + (kb - ka) * t)),
         width: (t) => 1 + width * Math.max(0, 1 - (ka + (kb - ka) * t)),
@@ -143,17 +153,25 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
   function drawLightning(eye) {
     const now = hist.at(-1);
     along(now, 0.5, pa);
-    if (eye) toEye.copy(eye).sub(pa).setLength(0.05); else toEye.set(0, 0, 0);
+    if (eye) toEye.copy(eye).sub(pa).setLength(0.05);
+    else toEye.set(0, 0, 0);
     // Bolts running up both edges of the blade (just outside them, as seen from the
     // camera), re-striking each frame, brighter and wider toward the point.
     side.set(now[3] - now[0], now[4] - now[1], now[5] - now[2]).cross(toEye);
     if (side.lengthSq() > 1e-8) side.setLength(0.05);
     for (const k of [1, -1]) {
       if (k < 0 && Math.random() < 0.4) continue; // (the far edge flickers)
-      along(now, 0.1, pa).add(toEye).addScaledVector(side, k * 0.6);
-      along(now, 1, pb).add(toEye).addScaledVector(side, k * 0.2);
+      along(now, 0.1, pa)
+        .add(toEye)
+        .addScaledVector(side, k * 0.6);
+      along(now, 1, pb)
+        .add(toEye)
+        .addScaledVector(side, k * 0.2);
       arcs.bolt(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, {
-        rng, depth: 4, jag: 0.08, heat: 1.3,
+        rng,
+        depth: 4,
+        jag: 0.08,
+        heat: 1.3,
         color: (t, out) => sampleRamp(0.5 + 0.45 * t, out),
         alpha: (t) => (0.25 + 0.75 * t) * (k > 0 ? 1 : 0.7),
         width: (t) => 1 + 1.4 * t * t,
@@ -164,8 +182,20 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
       if (Math.random() < 0.4) continue;
       const s = 0.55 + 0.45 * Math.random();
       along(now, s, pa).add(toEye);
-      pb.set(pa.x + (Math.random() - 0.5) * 0.22 * s, pa.y + (Math.random() - 0.5) * 0.22 * s, pa.z + (Math.random() - 0.5) * 0.22 * s);
-      arcs.bolt(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, { rng, depth: 2, jag: 0.5, width: 1, heat: 1.2, color: (t, out) => sampleRamp(0.95, out), alpha: (t) => s * (1 - t) });
+      pb.set(
+        pa.x + (Math.random() - 0.5) * 0.22 * s,
+        pa.y + (Math.random() - 0.5) * 0.22 * s,
+        pa.z + (Math.random() - 0.5) * 0.22 * s,
+      );
+      arcs.bolt(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, {
+        rng,
+        depth: 2,
+        jag: 0.5,
+        width: 1,
+        heat: 1.2,
+        color: (t, out) => sampleRamp(0.95, out),
+        alpha: (t) => s * (1 - t),
+      });
     }
     // The sheet: trails from points up the blade, fainter, thinner and shorter-lived toward the guard.
     for (const s of SHEET) drawArc(s, 3 * s * s, s ** 1.6, 0.6 + 0.4 * s, 0.07 + 0.09 * s);
@@ -177,8 +207,13 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
         along(h, 0.9 + 0.1 * Math.random(), pa);
         along(h, 0.2 + 0.35 * Math.random(), pb);
         arcs.bolt(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, {
-          rng, depth: 3, jag: 0.4, width: 1, heat: 1.2,
-          color: (t, out) => sampleRamp(0.95 - 0.35 * t, out), alpha: (t) => 0.9 * (1 - 0.8 * t),
+          rng,
+          depth: 3,
+          jag: 0.4,
+          width: 1,
+          heat: 1.2,
+          color: (t, out) => sampleRamp(0.95 - 0.35 * t, out),
+          alpha: (t) => 0.9 * (1 - 0.8 * t),
         });
       }
     }
@@ -192,7 +227,10 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
       let any = 0;
       const drag = Math.exp(-dt * 2.6);
       for (let i = 0; i < N; i++) {
-        if (age[i] >= life[i]) { S[i] = 0; continue; }
+        if (age[i] >= life[i]) {
+          S[i] = 0;
+          continue;
+        }
         any++;
         age[i] += dt;
         const k = Math.min(1, age[i] / life[i]);
@@ -200,12 +238,16 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
         if (element === 'lightning') {
           // Snap and jitter, no rise; white-hot to the flame's bright tone, flickering.
           const d = Math.exp(-dt * 7);
-          V[ix] *= d; V[ix + 1] *= d; V[ix + 2] *= d;
+          V[ix] *= d;
+          V[ix + 1] *= d;
+          V[ix + 2] *= d;
           P[ix] += V[ix] * dt + (Math.random() - 0.5) * 0.02;
           P[ix + 1] += V[ix + 1] * dt + (Math.random() - 0.5) * 0.02;
           P[ix + 2] += V[ix + 2] * dt + (Math.random() - 0.5) * 0.02;
           sampleRamp(1 - 0.35 * k, tmp).multiplyScalar(1.1 - 0.5 * k);
-          C[ix] = tmp.r; C[ix + 1] = tmp.g; C[ix + 2] = tmp.b;
+          C[ix] = tmp.r;
+          C[ix + 1] = tmp.g;
+          C[ix + 2] = tmp.b;
           S[i] = Math.random() < 0.25 ? 0 : k < 0.3 ? 1.5 : 1;
           A[i] = 1;
         } else if (element === 'ice') {
@@ -215,10 +257,14 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
           V[ix] = (V[ix] + c.x * 0.25 * dt) * d;
           V[ix + 1] = (V[ix + 1] - 0.5 * dt) * d;
           V[ix + 2] = (V[ix + 2] + c.z * 0.25 * dt) * d;
-          P[ix] += V[ix] * dt; P[ix + 1] += V[ix + 1] * dt; P[ix + 2] += V[ix + 2] * dt;
+          P[ix] += V[ix] * dt;
+          P[ix + 1] += V[ix + 1] * dt;
+          P[ix + 2] += V[ix + 2] * dt;
           const glint = Math.sin(t * 17 + i * 1.7) > 0.7;
           sampleRamp(heat0[i] * (glint ? 1 : 0.85), tmp).multiplyScalar((glint ? 1 : 0.6) * (1 - 0.6 * k));
-          C[ix] = tmp.r; C[ix + 1] = tmp.g; C[ix + 2] = tmp.b;
+          C[ix] = tmp.r;
+          C[ix + 1] = tmp.g;
+          C[ix + 2] = tmp.b;
           S[i] = glint ? 1.6 : 1;
           A[i] = 0.4 + 0.6 * (1 - k);
         } else {
@@ -226,10 +272,14 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
           V[ix] = (V[ix] + c.x * 1.1 * dt) * drag;
           V[ix + 1] = (V[ix + 1] + (0.9 * (1 - k) + c.y * 0.5) * dt) * drag;
           V[ix + 2] = (V[ix + 2] + c.z * 1.1 * dt) * drag;
-          P[ix] += V[ix] * dt; P[ix + 1] += V[ix + 1] * dt; P[ix + 2] += V[ix + 2] * dt;
+          P[ix] += V[ix] * dt;
+          P[ix + 1] += V[ix + 1] * dt;
+          P[ix + 2] += V[ix + 2] * dt;
           const h = heat0[i] * (1 - k) ** 1.2;
           sampleRamp(h, tmp).multiplyScalar(0.55 + 0.6 * h);
-          C[ix] = tmp.r; C[ix + 1] = tmp.g; C[ix + 2] = tmp.b;
+          C[ix] = tmp.r;
+          C[ix + 1] = tmp.g;
+          C[ix + 2] = tmp.b;
           S[i] = grain[i] * (h > 0.6 ? 0.8 : 1 + 0.6 * k);
           A[i] = h > 0.6 ? 1 : 0.35 + 0.65 * (1 - k);
         }
@@ -260,7 +310,9 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
     for (let k = 0; k < n; k++) {
       const i = next;
       next = (next + 1) % N;
-      P[i * 3] = tipPos.x; P[i * 3 + 1] = tipPos.y; P[i * 3 + 2] = tipPos.z;
+      P[i * 3] = tipPos.x;
+      P[i * 3 + 1] = tipPos.y;
+      P[i * 3 + 2] = tipPos.z;
       // Mostly along the motion, fanning out.
       const sp = (zap ? 1.4 : ice ? 1.2 : 2.2) * (0.4 + Math.random());
       V[i * 3] = (dir.x + (Math.random() - 0.5) * 1.2) * sp;
@@ -279,9 +331,13 @@ export function createSwingTrail({ fxMaterial, field, count = 1600, reducedMotio
     emit,
     step,
     hit,
-    setRamp(hexes) { setRampColors(ramp, hexes); },
+    setRamp(hexes) {
+      setRampColors(ramp, hexes);
+    },
     /** fire | lightning | ice */
-    setElement(key) { element = key; },
+    setElement(key) {
+      element = key;
+    },
     clear() {
       age.fill(1e3);
       S.fill(0);

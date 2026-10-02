@@ -1,0 +1,5 @@
+# Commits git blame skips (git config blame.ignoreRevsFile .git-blame-ignore-revs; GitHub reads
+# this file on its own). Formatting only: nothing in them changes what the code does.
+
+# Format the repo with Prettier (round 10)
+dc42f158c69af4e00790ba5576eecab7967b8a2a

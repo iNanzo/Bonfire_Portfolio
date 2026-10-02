@@ -37,7 +37,10 @@ function slope(ys) {
   const my = mean(ys);
   let num = 0;
   let den = 0;
-  for (let i = 0; i < n; i++) { num += (i - mx) * (ys[i] - my); den += (i - mx) ** 2; }
+  for (let i = 0; i < n; i++) {
+    num += (i - mx) * (ys[i] - my);
+    den += (i - mx) ** 2;
+  }
   return num / den;
 }
 
@@ -46,19 +49,19 @@ export function createSections() {
   let quietFor = 10;
   let loudFor = 0;
   let stateSince = 0;
-  let hist = [];            // closed windows, newest last
-  let ref = null;           // full-energy levels (dB): low, tot, high
-  let win = null;           // the window being summed
+  let hist = []; // closed windows, newest last
+  let ref = null; // full-energy levels (dB): low, tot, high
+  let win = null; // the window being summed
   let lowFast = 0;
   let totFast = 0;
   let highFast = 0;
   let tension = 0;
-  let settle = 0;           // windows to wait after a drop before judging sections again
+  let settle = 0; // windows to wait after a drop before judging sections again
   let lowSince = -Infinity; // when the current breakdown/build began
   let lastKick = -Infinity;
   let gapUntil = -Infinity;
-  let lastBeat = null;      // { time, beat, bar }
-  let pending = null;       // a borderline drop waiting for the next beat
+  let lastBeat = null; // { time, beat, bar }
+  let pending = null; // a borderline drop waiting for the next beat
   let returnUntil = -Infinity; // the kick just came back after an absence
   let dropScore = 0;
 
@@ -89,7 +92,11 @@ export function createSections() {
     const low = state === 'breakdown' || state === 'build';
     if (!ref) ref = { low: w.lowDb, tot: w.totDb, high: w.highDb };
     else {
-      for (const [k, v] of /** @type {[string, number][]} */ ([['low', w.lowDb], ['tot', w.totDb], ['high', w.highDb]])) {
+      for (const [k, v] of /** @type {[string, number][]} */ ([
+        ['low', w.lowDb],
+        ['tot', w.totDb],
+        ['high', w.highDb],
+      ])) {
         if (v > ref[k]) ref[k] += (v - ref[k]) * (low ? 0.1 : 0.35);
         else if (!low) ref[k] += (v - ref[k]) * 0.01;
       }
@@ -113,22 +120,40 @@ export function createSections() {
     // A silence gap: a whole beat far quieter than the breakdown around it (the mix cut
     // right before the drop). Hats or a pad keep each beat's level, so they don't count.
     const inLow = hist.slice(-5, -1);
-    if (low && inLow.length === 4 && inLow.every((x) => x.t0 >= lowSince) && w.totDb < mean(inLow.map((x) => x.totDb)) - 10) {
+    if (
+      low &&
+      inLow.length === 4 &&
+      inLow.every((x) => x.t0 >= lowSince) &&
+      w.totDb < mean(inLow.map((x) => x.totDb)) - 10
+    ) {
       gapUntil = now + (now - w.t0) * 2;
     }
 
-    if (settle > 0) { settle--; return; }
+    if (settle > 0) {
+      settle--;
+      return;
+    }
     // (The kick has to have been there to be gone: an ambient intro isn't a breakdown.)
-    const kickless = hist.length >= 6 && hist.slice(-6).every((x) => x.kicks === 0) && hist.slice(-16, -6).some((x) => x.kicks > 0) && w.totDb > ref.tot - 30;
+    const kickless =
+      hist.length >= 6 &&
+      hist.slice(-6).every((x) => x.kicks === 0) &&
+      hist.slice(-16, -6).some((x) => x.kicks > 0) &&
+      w.totDb > ref.tot - 30;
     const tense = hist.length >= 3 && hist.slice(-3).every((x) => x.tension > 0.5);
     if (state === 'groove') {
-      if (kickless) { enter('breakdown', now, events); lowSince = hist.at(-6).t0; }
-      else if (tense) { enter('build', now, events); lowSince = hist.at(-3).t0; }
+      if (kickless) {
+        enter('breakdown', now, events);
+        lowSince = hist.at(-6).t0;
+      } else if (tense) {
+        enter('build', now, events);
+        lowSince = hist.at(-3).t0;
+      }
     } else if (low) {
       if (state === 'breakdown' && tension > 0.45) enter('build', now, events);
       // Back without a drop: the kick and the energy crept back in.
       const back = hist.slice(-4);
-      if (back.length === 4 && back.every((x) => x.kicks > 0 && x.I > 0.65) && tension < 0.4) enter('groove', now, events, 'return');
+      if (back.length === 4 && back.every((x) => x.kicks > 0 && x.I > 0.65) && tension < 0.4)
+        enter('groove', now, events, 'return');
     }
   }
 
@@ -159,7 +184,13 @@ export function createSections() {
     dt = Math.max(1 / 240, Math.min(0.1, dt));
     const events = [];
     let drop = null;
-    if (m.rms < SILENT_RMS) { quietFor += dt; loudFor = 0; } else { loudFor += dt; quietFor = 0; }
+    if (m.rms < SILENT_RMS) {
+      quietFor += dt;
+      loudFor = 0;
+    } else {
+      loudFor += dt;
+      quietFor = 0;
+    }
     if (!win) openWindow(now);
 
     if (state === 'silent') {
@@ -180,7 +211,8 @@ export function createSections() {
     totFast = approach(totFast, m.rms, m.rms > totFast ? 0.015 : 0.15, dt);
     highFast = approach(highFast, m.high, m.high > highFast ? 0.015 : 0.15, dt);
     const kickNow = m.kick > 0;
-    if (kickNow && hist.length >= 6 && hist.slice(-6).every((x) => x.kicks === 0) && win.kicks === 0) returnUntil = now + 0.15;
+    if (kickNow && hist.length >= 6 && hist.slice(-6).every((x) => x.kicks === 0) && win.kicks === 0)
+      returnUntil = now + 0.15;
     const kickReturn = now < returnUntil;
     if (kickNow) lastKick = now;
     for (const b of m.beats) lastBeat = { time: b.time, beat: b.beat, bar: b.bar };
@@ -212,7 +244,8 @@ export function createSections() {
         if (now > pending.until) pending = null;
         else {
           if (kickNow && now - pending.t > period * 0.6) pending.kickAt = now;
-          if (now - (pending.kickAt ?? -Infinity) < 0.12 && lowNow > pending.preLow + 3 && totNow > pending.preTot) drop = dropNow(now, events, period);
+          if (now - (pending.kickAt ?? -Infinity) < 0.12 && lowNow > pending.preLow + 3 && totNow > pending.preTot)
+            drop = dropNow(now, events, period);
         }
       }
       // Scored every frame; a borderline score gets 120 ms to clear the bar (the levels
@@ -236,30 +269,57 @@ export function createSections() {
         const jumpTot = totNow - preTot;
         const jumpTilt = lowNow - dB(highFast) - preTilt;
         const tensionBefore = Math.max(...pre.map((x) => x.tension));
-        dropScore = 0.3 * clamp01((jumpLow - 3) / 9) + 0.15 * clamp01((jumpTot - 1.5) / 6) + 0.15 * clamp01((jumpTilt - 3) / 9)
-          + (kickReturn ? 0.25 : now - lastKick < 0.08 ? 0.1 : 0)
-          + (downbeat ? 0.12 : beatNear ? 0.05 : 0) + (phrase ? 0.08 : 0)
-          + 0.12 * clamp01(tensionBefore / 0.6) + (now < gapUntil ? 0.12 : 0);
+        dropScore =
+          0.3 * clamp01((jumpLow - 3) / 9) +
+          0.15 * clamp01((jumpTot - 1.5) / 6) +
+          0.15 * clamp01((jumpTilt - 3) / 9) +
+          (kickReturn ? 0.25 : now - lastKick < 0.08 ? 0.1 : 0) +
+          (downbeat ? 0.12 : beatNear ? 0.05 : 0) +
+          (phrase ? 0.08 : 0) +
+          0.12 * clamp01(tensionBefore / 0.6) +
+          (now < gapUntil ? 0.12 : 0);
         const restored = lowNow > ref.low - 10;
         // Firing at once needs a reason to expect a drop here: a phrase boundary, a build
         // before it or a gap. Otherwise even a clear hit waits a beat for the next kick
         // (an impact boom mid-breakdown has none).
         const expected = phrase || tensionBefore >= 0.4 || now < gapUntil;
         if (restored && dropScore >= 0.7 && expected) drop = dropNow(now, events, period);
-        else if (!pending && restored && dropScore >= 0.5 && now - lastKick < 0.08) pending = { t: now, until: now + period * 1.6, preLow, preTot };
+        else if (!pending && restored && dropScore >= 0.5 && now - lastKick < 0.08)
+          pending = { t: now, until: now + period * 1.6, preLow, preTot };
       }
     }
 
     const I = hist.length ? hist.at(-1).I : 1;
-    return { state, events, intensity: I, tension: low ? tension : Math.min(tension, 0.4), drop, dropScore, since: now - stateSince };
+    return {
+      state,
+      events,
+      intensity: I,
+      tension: low ? tension : Math.min(tension, 0.4),
+      drop,
+      dropScore,
+      since: now - stateSince,
+    };
   }
 
   return {
     update,
-    get state() { return state; },
+    get state() {
+      return state;
+    },
     reset() {
-      state = 'silent'; quietFor = 10; loudFor = 0; hist = []; ref = null; win = null;
-      tension = 0; settle = 0; lastKick = -Infinity; gapUntil = -Infinity; lastBeat = null; pending = null; returnUntil = -Infinity;
+      state = 'silent';
+      quietFor = 10;
+      loudFor = 0;
+      hist = [];
+      ref = null;
+      win = null;
+      tension = 0;
+      settle = 0;
+      lastKick = -Infinity;
+      gapUntil = -Infinity;
+      lastBeat = null;
+      pending = null;
+      returnUntil = -Infinity;
     },
   };
 }
