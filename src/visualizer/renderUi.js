@@ -14,7 +14,6 @@ import { defaults } from './settings.js';
 export function createRenderUi(ctx) {
   const { settings } = ctx;
 
-  // --- Render Settings (P; ui/renderMenu.js, as on the site): the Picture tab's switches --------
   // Each row steps its setting (render.js RENDER_STEPS) and the picture follows at once. What
   // a switch in the mix is doing right now shows after it.
   const RENDER_ROWS = [

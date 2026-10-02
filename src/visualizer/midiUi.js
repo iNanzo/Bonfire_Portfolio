@@ -13,7 +13,6 @@ import { esc } from '../html.js';
 export function createMidiUi(ctx) {
   const settingsDialog = q('[data-settings]');
 
-  // --- A MIDI controller (midi.js): pads for the moments, mapped by learning -----------------
   const midiList = q('[data-midi-list]');
   const midiStatus = q('[data-midi-status]');
   // (The X moment is the Living Weapon everywhere people read it.)

@@ -18,7 +18,6 @@ export function createStart(ctx) {
   const errorEl = q('[data-error]');
   const settingsDialog = q('[data-settings]');
 
-  // --- Start screen ----------------------------------------------------------------------------
   const fileInput = q('[data-file]');
   qa('[data-source]').forEach((btn) => {
     btn.addEventListener('click', () => {

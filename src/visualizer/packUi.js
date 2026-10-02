@@ -15,7 +15,6 @@ import { FINISH_NAMES } from '../bonfire/steel.js';
 export function createPackUi(ctx) {
   const { reducedMotion } = ctx;
 
-  // --- The pack (ui/pack.js, the same as the site's): scene, weapon and spells by hand -----------
   const pack = createPack({
     label: ui.pack,
     items: bonfireItems({

@@ -26,7 +26,6 @@ export function createHud(ctx) {
   let stateNote = null; // a transient HUD line: { text, until }
   function note(text, seconds = 2) { stateNote = { text, until: performance.now() / 1000 + seconds }; }
 
-  // --- HUD -------------------------------------------------------------------------------------
   // (Written only when what it shows changes: each write would restyle the HUD.)
   const bandEls = BAND_NAMES.map((b) => q(`[data-band="${b}"]`));
   const bandShown = BAND_NAMES.map(() => '');

@@ -11,9 +11,6 @@ import { q } from '../ui/shell.js';
 export function createOutput(ctx) {
   const stage = q('[data-stage]');
 
-  // --- The output window: just the picture, for a projector ----------------------------------
-  // The canvas is streamed into a second window (so it can go full screen on another display)
-  // while this one keeps the controls. A rebuilt scene (new particle counts) streams again.
   const titleCard = q('[data-title-card]'); // (cards.js shows it here; it's copied there)
   let output = null;
   function streamInto(win) {

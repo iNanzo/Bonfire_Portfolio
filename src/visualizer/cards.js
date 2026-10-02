@@ -11,7 +11,6 @@ import { q } from '../ui/shell.js';
 export function createCards(ctx) {
   const { settings } = ctx;
 
-  // --- Title cards ----------------------------------------------------------------------------
   // Card 0 is the main one (settings.title/subtitle); 1… are settings.cards. `show` says when
   // each of the others comes up: on drops (taking turns with the main one, if it shows on
   // drops), every 32 bars, or only on its key.

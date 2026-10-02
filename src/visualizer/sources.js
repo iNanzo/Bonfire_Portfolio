@@ -16,7 +16,6 @@ import { esc } from '../html.js';
 export function createSources(ctx) {
   const { settings } = ctx;
 
-  // --- Audio ---------------------------------------------------------------------------------
   function openEngine() {
     if (!ctx.engine) {
       const AC = window.AudioContext || window.webkitAudioContext;

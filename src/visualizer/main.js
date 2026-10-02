@@ -1,42 +1,48 @@
-// Bonfire Live: the portfolio's bonfire as an audio-reactive visualizer for DJ sets.
+// Bonfire Live: the portfolio's bonfire as an audio-reactive visualizer for DJ sets. This
+// file builds the page: the markup, the scene and its director, and the parts that make up
+// the rest, each a module made with the page's shared `ctx` (context.js says what's in it).
 //
-//   start     pick a sound source: a line in / mic (an audio interface or a mixer's
-//             record out), a shared tab or the whole system's audio (DJ software on
-//             this computer), a file, or the synthesized demo track.
+//   start     pick a sound source (start.js, sources.js): a line in / mic (an audio
+//             interface or a mixer's record out), a shared tab or the whole system's audio
+//             (DJ software on this computer), a file, or the synthesized demo track.
 //   live      the analyser (analyser.js) reads the sound every frame, inside the
 //             bonfire's own render loop; the director (director.js) turns it into the
-//             fire's drive, beats, swaps and camera. The HUD shows what it hears and
-//             hides itself (and the cursor) when the mouse rests.
+//             fire's drive, beats, swaps and camera. The HUD (hud.js) shows what it hears
+//             and hides itself (and the cursor) when the mouse rests.
 //   settings  kept in this browser (settings.js), shown in a dialog (settingsDialog.js) in
-//             tabs, with a search (/), presets and saved setups. Saving waits for a burst of
-//             changes to settle, and is done at once as the page is hidden or left.
-//   keys      ? lists every shortcut (keys.js, the shared keys overlay).
+//             tabs, with a search (/), presets and saved setups; what a change does to the
+//             show is dialogs.js. Saving waits for a burst of changes to settle, and is done
+//             at once as the page is hidden or left.
+//   keys      ? lists every shortcut (keys.js, the shared keys overlay); what each key and
+//             button does is actions.js.
 //   frames    Frame Rate (a setting of this computer's) caps how often the picture is drawn;
 //             the analyser still hears every frame the display shows (createBonfire's
 //             onTick), and what it heard in between reaches the director with the next drawn
 //             frame (tickBatch.js).
-//   beat      from the music, or set by hand (a BPM, nudges, "this is beat 1"), or from an
-//             Ableton Link session through the bridge (tools/link-bridge.mjs).
+//   beat      from the music, or set by hand (actions.js: a BPM, nudges, "this is beat 1"),
+//             or from an Ableton Link session through the bridge (tools/link-bridge.mjs).
 //   output    a second window with just the picture, for a projector (the canvas is
-//             streamed into it), while this one keeps the controls.
-//   cards     title cards: the main one as an intro and on drops, more that take turns on
-//             drops, show every 32 bars, or on a key (Shift+1…9).
-//   render    P opens Render Settings (ui/renderMenu.js, the site's): the Picture tab's
-//             pixel size, palette, dither, outlines, fog and x-ray, a digit a step, on the
-//             start screen too. (Flame Colors are on Shift+P.)
+//             streamed into it), while this one keeps the controls (output.js).
+//   cards     title cards (cards.js): the main one as an intro and on drops, more that take
+//             turns on drops, show every 32 bars, or on a key (Shift+1…9).
+//   render    P opens Render Settings (renderUi.js, on the site's ui/renderMenu.js): the
+//             Picture tab's pixel size, palette, dither, outlines, fog and x-ray, a digit a
+//             step, on the start screen too. (Flame Colors are on Shift+P.)
 //   knights   K: the knights dance now, or sit; Shift+K: they come or go (knightShow.js).
 //             Their style, finish, edge glow and seat pose are in the Cast tab; the pack
-//             swaps the style and the finish by hand.
-//   scenes    preset scenes (the director's scene loop and player): the site's built-in
-//             ones (content.json `scenes`, hidden = out of the loop) and this browser's own
-//             from the Painter (sceneStore.js), filtered by the loop's Scenes From. The HUD
-//             names the one playing (a click opens Scenes & Cards); the start screen's chips
-//             play one behind the menu (it's the first when the music starts); N plays the
-//             next (at once on the start screen, else on the next downbeat, in a flash);
-//             Shift+N switches them off / in the mix / always. ?scene=<ref> opens on one
-//             (&solo: only that one, the Painter's "Play in Bonfire Live"), and a Painter
-//             tab can hand one over (store.onPlay). What the user touches by hand (the
-//             dialog, the P menu, a preset) wins over the scene until the next one.
+//             (packUi.js) swaps the style and the finish by hand.
+//   midi      a MIDI controller's pads play the moments, each learned (midiUi.js, midi.js).
+//   scenes    preset scenes (scenesUi.js; the director's scene loop and player): the site's
+//             built-in ones (content.json `scenes`, hidden = out of the loop) and this
+//             browser's own from the Painter (sceneStore.js), filtered by the loop's Scenes
+//             From. The HUD names the one playing (a click opens Scenes & Cards); the start
+//             screen's chips play one behind the menu (it's the first when the music
+//             starts); N plays the next (at once on the start screen, else on the next
+//             downbeat, in a flash); Shift+N switches them off / in the mix / always.
+//             ?scene=<ref> opens on one (&solo: only that one, the Painter's "Play in Bonfire
+//             Live"), and a Painter tab can hand one over (store.onPlay). What the user
+//             touches by hand (the dialog, the P menu, a preset) wins over the scene until
+//             the next one.
 import '../styles.css';
 import './visualizer.css';
 import { applyCssPalette, base } from '../palette.js';
