@@ -172,7 +172,11 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
   until they're fixed; the sidebar counts problems per page.
 - **One save = one commit:** content plus new images, and images nothing uses anymore
   are removed. The commit message summarizes the edit. The panel then follows the
-  GitHub Pages deploy until it reports **Live on the site** (about a minute).
+  GitHub Pages deploy until it reports **Live on the site**. That takes about 13–15
+  minutes: the deploy waits for the whole CI run (the build, five browser-test shards,
+  then the deploy). It checks every 15 s for the first 5 minutes, then every 30 s; if
+  the run still hasn't finished after 45 minutes it stops and says **Still deploying —
+  check progress**, with a link to the run (`admin/ui/deployFollow.js`).
 - **Safety nets:**
   - Unsaved edits survive a closed tab: they're kept in this browser, and the panel
     offers them back.
@@ -183,7 +187,7 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
 
 | Piece | File |
 | --- | --- |
-| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `el.js` its DOM builder, `paths.js` content paths, `schema.js` pages, labels, help, sub-groups, `search.js` the search, `reset.js` Reset, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case, `paletteTools.js` the palette buttons (the generators are `src/paletteGen.js`), `sceneTools.js` the Scenes page's cards and Painter tools) |
+| The page (vanilla JS, same palette as the site) | `admin/ui/` (`main.js` app, `form.js` generic editor, `el.js` its DOM builder, `paths.js` content paths, `schema.js` pages, labels, help, sub-groups, `search.js` the search, `reset.js` Reset, `deployFollow.js` how often it checks on a deploy, `images.js` WebP conversion, `preview.js` live preview, `text.js` Title Case, `paletteTools.js` the palette buttons (the generators are `src/paletteGen.js`), `sceneTools.js` the Scenes page's cards and Painter tools) |
 | Effects defaults, ranges, runtime | `src/effectsDefaults.js`, `src/effects.js`, `src/elements.js` (design notes: `docs/design/admin-v2.md`, `docs/elements.md`) |
 | The scene format (Painter, Bonfire Live, the Scenes page) | `src/scenes.js` (design notes: `docs/painter.md`, `docs/design/visualizer.md`) |
 | API: session, content, save, deploy status, image thumbnails | `admin/server/api.js` |

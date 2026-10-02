@@ -23,6 +23,7 @@ import { titleCase } from './text.js';
 import { parsePath, parentKey, within } from './paths.js';
 import { buildIndex, createSearch, pageById, pageOf, revealPlan } from './search.js';
 import { resetMessage, resetSection } from './reset.js';
+import { FIRST_CHECK, nextDeployCheck } from './deployFollow.js';
 
 const DRAFT_KEY = 'nh-admin-draft';
 const local = {
@@ -680,7 +681,12 @@ function updateStatus() {
     text = 'Unsaved changes';
     tone = 'warn';
   } else if (d?.state === 'local') text = 'Saved to your files';
-  else if (d?.state === 'pending') {
+  else if (d?.state === 'slow') {
+    // (No longer followed: it's taken far longer than a deploy does. Not busy for ever.)
+    text = 'Still deploying —';
+    tone = 'warn';
+    link = d.url && ['check progress', d.url];
+  } else if (d?.state === 'pending') {
     text = 'Saved · waiting for the deploy to start…';
     tone = 'busy';
     link = d.commit?.url && ['commit', d.commit.url];
@@ -755,7 +761,7 @@ async function save() {
     if (result.commit?.sha) {
       state.deploy = { state: 'pending', commit: result.commit };
       followDeploy();
-      toast('Saved. Publishing to the site — usually about a minute.');
+      toast('Saved. Publishing to the site once its checks pass — usually about 15 minutes.');
     } else {
       state.deploy = { state: 'local' };
       toast('Saved to your files.');
@@ -775,6 +781,9 @@ async function save() {
   }
 }
 
+// Follows the deploy until the run completes (its schedule: deployFollow.js). The run waits
+// for all of CI, about 13–15 minutes; past FOLLOW_FOR the status says it's still deploying,
+// with a link to the run, instead of staying busy.
 function followDeploy() {
   clearTimeout(state.deployTimer);
   const started = Date.now();
@@ -786,12 +795,14 @@ function followDeploy() {
     } catch {
       /* try again */
     }
-    updateStatus();
     if (state.deploy.state === 'live') toast('Your changes are live.');
-    if (['live', 'failed'].includes(state.deploy.state) || Date.now() - started > 10 * 60 * 1000) return;
-    state.deployTimer = setTimeout(tick, 5000);
+    const done = ['live', 'failed'].includes(state.deploy.state);
+    const wait = done ? null : nextDeployCheck(Date.now() - started);
+    if (!done && wait === null) state.deploy = { ...state.deploy, state: 'slow', url: state.deploy.url || commit.url };
+    updateStatus();
+    if (wait !== null) state.deployTimer = setTimeout(tick, wait);
   };
-  state.deployTimer = setTimeout(tick, 4000);
+  state.deployTimer = setTimeout(tick, FIRST_CHECK);
 }
 
 async function load() {
