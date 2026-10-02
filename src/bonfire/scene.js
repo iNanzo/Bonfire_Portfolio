@@ -533,8 +533,9 @@ export function createBonfire(
     const { renderFrame } = ctx;
 
     // ?perf in the page's address (the site, Bonfire Live and the Painter alike): a small
-    // overlay (ui/perfOverlay.js) with the frame rate and times (the page's part, the scene's
-    // update, the draw), the draw calls, the shadow's redraws and the GPU's programs and
+    // overlay (ui/perfOverlay.js) with the frame rate and times (the page's onTick, on every
+    // frame the display shows: Bonfire Live's audio analysis; the page's onFrame; the scene's
+    // update; the draw), the draw calls, the shadow's redraws and the GPU's programs and
     // textures, and the same times as performance.measure entries for the browser's profiler.
     // Without it nothing is timed, and the overlay's code isn't even loaded.
     ctx.perf = null;
@@ -573,7 +574,11 @@ export function createBonfire(
               const tickMs = lastTick < 0 ? 0 : now - lastTick;
               lastTick = now;
               try {
-                onTick?.(Math.min(tickMs / 1000, 0.1));
+                if (onTick) {
+                  const t0 = ctx.perf ? performance.now() : 0;
+                  onTick(Math.min(tickMs / 1000, 0.1));
+                  ctx.perf?.tick(t0, performance.now()); // (outside renderFrame's parts: its own)
+                }
                 if (!gate.due(tickMs)) return;
                 timer.update(); // (performance.now(), like reset(): never a negative step)
                 renderFrame(Math.min(timer.getDelta(), 0.1));

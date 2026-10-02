@@ -15,24 +15,30 @@ updates twice a second:
 
 ```
 fps 144   frame p50 6.9  p95 9.7 ms
-page 0.36  update 1.06  draw 2.84 ms
+tick 0.18  page 0.08  update 1.06  draw 2.84 ms
 draws 190  shadows 12/s
 programs 24  textures 12  geometries 104
 ```
 
 - **fps** — frames drawn per second, and the cap when one is set (`cap 60`).
 - **frame p50 / p95** — the time between drawn frames, over the last 256.
-- **page / update / draw** — a frame's parts on average: the page's own `onFrame` (Bonfire
-  Live's analyser, director and HUD), the scene's update (the particle sims, knights,
-  fireflies, lights), and the draw (three.js's passes, as the CPU sees them).
+- **tick / page / update / draw** — a drawn frame's parts on average:
+  - **tick** — the page's `onTick`, which runs on every frame the display shows, drawn or
+    not: Bonfire Live's audio analysis (the analyser, and the Link bridge when it's on). A
+    drawn frame's tick is every `onTick` since the last drawn frame, so with a Frame Rate
+    cap it holds two or three of them. Only a page with an `onTick` shows it (the site and
+    the Painter have none).
+  - **page** — the page's own `onFrame` (Bonfire Live's director and HUD).
+  - **update** — the scene's update (the particle sims, knights, fireflies, lights).
+  - **draw** — three.js's passes, as the CPU sees them.
 - **draws** — draw calls in the last frame, all passes together (`renderer.info`).
 - **shadows** — how often the fire's shadow (a six-face cube map) was redrawn, per second.
 - **programs / textures / geometries** — what the renderer holds on the GPU.
 
-The same three parts are written as `performance.measure` entries (`bonfire: page`,
-`bonfire: update`, `bonfire: draw`), so a recording in the browser's Performance panel
-shows them on the timeline. Without `?perf` nothing is timed and the overlay's code isn't
-loaded.
+The same parts are written as `performance.measure` entries (`bonfire: tick`, one per
+`onTick`; `bonfire: page`, `bonfire: update`, `bonfire: draw`), so a recording in the
+browser's Performance panel shows them on the timeline. Without `?perf` nothing is timed
+and the overlay's code isn't loaded.
 
 ## The benchmark: `tools/bench-viz.mjs`
 
