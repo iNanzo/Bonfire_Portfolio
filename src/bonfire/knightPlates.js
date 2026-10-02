@@ -12,6 +12,7 @@ export const STEP_FPS = 12;
 // stepped with the pose at twelve steps a second (in substeps, so it's steady; the same
 // steps always swing the same way): `hz` its frequency, `damp` its damping ratio (0.38: a
 // quarter's overshoot), `max` how far (rad) a plate may stray from its pose.
+/** @type {[string, string, number][]} */
 const SPRUNG = [
   ['shoulderL', 'chest', 0.1], ['pauldronL', 'chest', 0.13], ['shoulderR', 'chest', 0.1], ['pauldronR', 'chest', 0.13],
   ['tassetL', 'hips', 0.09], ['tassetR', 'hips', 0.09],
