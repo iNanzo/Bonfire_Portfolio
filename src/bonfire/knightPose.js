@@ -45,13 +45,13 @@
 // roll outward, riding up over the shoulder. Given the model's helmets (measurePlates), a
 // dome or lame is never pushed further into the helmet he wears than the model sits at rest:
 // a head tilted onto a shoulder, or an arm swinging the plates up against it, shoves the
-// pauldron out from the neck instead (clampPlates). knights.js adds a spring on top (they
-// lag and overshoot a little) and clamps again.
+// pauldron out from the neck instead (clampPlates). knightPlates.js adds a spring on top
+// (they lag and overshoot a little) and knights.js clamps again.
 //
 // Room for the arms. Hemmed in at a side (`room`, knights.js: a pillar at his shoulder, a
 // standing stone, a lantern; 0..1 a side), every gesture and dance move keeps that arm's swing
 // out to the side and back behind him within it (hem): the arm goes up or forward instead.
-// knights.js then checks the solved arm against the scenery's shapes and turns it clear
+// knightClear.js then checks the solved arm against the scenery's shapes and turns it clear
 // (swingArm).
 //
 // It lives in four modules, each on those before it only; this one hands all of it out:

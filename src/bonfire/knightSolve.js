@@ -55,9 +55,9 @@ function twoBone(S, T, a, b, pole, mid, end, bendOut) {
  * bone's rotation from its rest orientation (knight space, a "world delta") and its position
  * (knight space), by BONES index; `ground` [left, right] raises each foot's floor (m);
  * `helmet` (with the rig's plates) keeps the pauldrons out of it. clampPlates(helmet) does
- * that again on the last solve's plates (after knights.js springs them); swingArm(side, axis,
- * angle, helmet) turns an arm of the last solve about its shoulder. The arrays are reused:
- * copy what you keep.
+ * that again on the last solve's plates (after knightPlates.js springs them);
+ * swingArm(side, axis, angle, helmet) turns an arm of the last solve about its shoulder. The
+ * arrays are reused: copy what you keep.
  */
 export function createSolver(rig = DEFAULT_RIG) {
   const n = BONES.length;
@@ -186,8 +186,8 @@ export function createSolver(rig = DEFAULT_RIG) {
   /**
    * Turn side s's arm as last solved (the upper arm, forearm, hand and fingers, about its
    * shoulder socket) by `angle` (rad) about `axis` (knight space, unit): its pauldron rides it
-   * again (kept out of `helmet`'s way if given: clampPlates). (knights.js: an arm turned out
-   * of a pillar.)
+   * again (kept out of `helmet`'s way if given: clampPlates). (knightClear.js keepClear: an
+   * arm turned out of a pillar.)
    */
   function swingArm(s, axis, angle, helmet = null) {
     turnQ.setFromAxisAngle(axis, angle);

@@ -496,7 +496,7 @@ export function* templateSteps(gltfRoot) {
     return Number.isFinite(box.min.y) ? [box.min.y, box.max.y] : [lo, hi];
   };
   const follow = knight.getObjectByName('K_Tasset_L')?.userData?.follow;
-  // (The points he's checked at against the scenery: knights.js keepClear, solveClear.)
+  // (The points he's checked at against the scenery: knightClear.js keepClear, solveClear.)
   const probes = yield* probesOf({ bodyGeo, helmGeos, restPos });
   return {
     root: gltfRoot,

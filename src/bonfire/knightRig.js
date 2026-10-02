@@ -56,7 +56,7 @@ export const IDX = Object.fromEntries(BONES.map((b, i) => [b, i]));
 
 /**
  * The model's intended proportions (a 1.72 m knight in a great helm): each joint's rest
- * position in knight space, feet on y = 0, facing +z, his left at +x. knights.js measures
+ * position in knight space, feet on y = 0, facing +z, his left at +x. knightMesh.js measures
  * the real ones from the model; this is for tests and a missing joint.
  */
 export const DEFAULT_REST = {
@@ -98,7 +98,7 @@ const Z_STEP = 0.04;
 const ZN = 13;
 
 /**
- * The plates' collision data from the model's pieces (knights.js reads them from the loaded
+ * The plates' collision data from the model's pieces (knightMesh.js reads them from the loaded
  * model; the tests from knight.glb): `helmets` { great, armet, bascinet }, `dome` and
  * `lames` as flat triangle lists (x, y, z, three points a triangle), the helmets in the
  * head's space, the dome and lames (the left pauldron's) in their joints' (the right is
