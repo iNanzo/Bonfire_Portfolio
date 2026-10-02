@@ -110,6 +110,12 @@
  */
 
 /**
+ * The pack (packUi.js).
+ * @typedef {object} PackPart
+ * @property {any} pack  ui/pack.js: the pack (I)
+ */
+
+/**
  * What main.js gives the parts: building the scene, and the parts it still holds itself.
  * @typedef {object} MainPart
  * @property {() => Promise<void>} startScene  build the scene (again: a setting it's built with changed)
@@ -117,9 +123,8 @@
  * @property {Record<string, string>} midiNames  the MIDI pads' moments, as the settings list them
  * @property {() => void} mirrorCard  copy the title card into the output window
  * @property {() => void} openOutput  the output window, for a projector (O)
- * @property {any} pack  ui/pack.js: the pack (I)
  */
 
-/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & DialogsPart & RenderPart & MainPart} LiveContext */
+/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & DialogsPart & RenderPart & PackPart & MainPart} LiveContext */
 
 export {};
