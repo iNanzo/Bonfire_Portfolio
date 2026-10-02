@@ -142,6 +142,11 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
 
   const camera = new THREE.PerspectiveCamera(30, 16 / 9, 0.1, 40);
 
+  // The state the scene's parts share (sceneContext.js lists it): each value that more than
+  // one of them reads or changes lives on `ctx`, and only there.
+  /** @type {import('./sceneContext.js').SceneContext} */
+  const ctx = /** @type {any} */ ({});
+
   // --- Lights
   scene.add(new THREE.HemisphereLight(0x3a3f58, 0x07070b, 0.18));
   const moon = new THREE.DirectionalLight(0x6f7fb0, 0.22);
@@ -222,56 +227,56 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     lightning: createDebris({ kind: 'lightning', material: crossMaterial, count: pCount(160), reducedMotion }),
   };
   for (const d of Object.values(debris)) { scope.trackTree(d.points); d.points.layers.set(LAYER_FX); scene.add(d.points); }
-  let terrainTop = null; // the scenery's height at (x, z), once the model has loaded
+  ctx.terrainTop = null; // the scenery's height at (x, z), once the model has loaded
 
   // --- Hit feel. `busy` (0..1) rises with every big moment and drains over a second or
   // so; `ambient()` is how much of the background extras to keep (see the header).
-  let busy = 0;
-  let hitStop = 0;   // seconds of freeze left
-  let timeDebt = 0;  // frozen time still to be repaid
-  let simT = 0;      // the simulation's clock (real time minus the freezes still owed)
-  let flashAmt = 0;  // the impact flash, 0..1
+  ctx.busy = 0;
+  ctx.hitStop = 0;   // seconds of freeze left
+  ctx.timeDebt = 0;  // frozen time still to be repaid
+  ctx.simT = 0;      // the simulation's clock (real time minus the freezes still owed)
+  ctx.flashAmt = 0;  // the impact flash, 0..1
   let lastFlash = -1;
-  let strikeAt = -1; // (simulation time) a firefly strike waiting for the ball to grow in
-  const ambient = () => 1 - busy * effects.impact.budget;
+  ctx.strikeAt = -1; // (simulation time) a firefly strike waiting for the ball to grow in
+  const ambient = () => 1 - ctx.busy * effects.impact.budget;
   /**
    * A hit: `weight` 0..1 (a flick ... a weapon landing). Freezes, flashes (at most a couple
    * a second), adds camera trauma and makes the scene busy.
    */
   function hit(weight, { freeze = true, flash = true, shake = true } = {}) {
     const I = effects.impact;
-    busy = Math.min(1, busy + weight * 0.8);
+    ctx.busy = Math.min(1, ctx.busy + weight * 0.8);
     if (shake) jolt(0.3 * weight);
     if (reducedMotion) return;
-    if (freeze && I.hitStop > 0) hitStop = Math.max(hitStop, I.hitStop * weight);
+    if (freeze && I.hitStop > 0) ctx.hitStop = Math.max(ctx.hitStop, I.hitStop * weight);
     const now = performance.now() / 1000;
-    if (flash && I.flash > 0 && weight >= 0.5 && now - lastFlash > 0.45) { flashAmt = Math.max(flashAmt, I.flash * weight); lastFlash = now; }
+    if (flash && I.flash > 0 && weight >= 0.5 && now - lastFlash > 0.45) { ctx.flashAmt = Math.max(ctx.flashAmt, I.flash * weight); lastFlash = now; }
   }
-  const rampNow = () => currentRamp.map((h) => new THREE.Color(h));
+  const rampNow = () => ctx.currentRamp.map((h) => new THREE.Color(h));
   /** Mark the ground and throw debris for the current element at (x, z). `size` 0..1+. */
   function scar(x, z, size = 1, { ring = false } = {}) {
-    if (!ready) return;
-    const kind = elementKey;
+    if (!ctx.ready) return;
+    const kind = ctx.elementKey;
     const colors = rampNow();
     marks.stamp(kind, x, z, ring ? 1.5 : 0.22 + 0.18 * size, colors, { strength: Math.min(1, 0.6 + 0.4 * size), ring });
     const n = Math.round((kind === 'lightning' ? 16 : 10) * size * effects.impact.debris);
     if (n > 0 && !ring) {
       const d = debris[kind];
       d.setRamp(colors);
-      d.throw(x, (terrainTop?.(x, z) ?? 0) + 0.08, z, n, { power: 0.6 + 0.5 * size });
+      d.throw(x, (ctx.terrainTop?.(x, z) ?? 0) + 0.08, z, n, { power: 0.6 + 0.5 * size });
     }
   }
 
-  let elementKey = elementOr(startingEquipment.element);
+  ctx.elementKey = elementOr(startingEquipment.element);
   const presence = Object.fromEntries(ELEMENT_IDS.map((id) => [id, 0]));
   function setElement(key, instant = false) {
-    elementKey = elementOr(key);
-    plasma.setActive(elementKey === 'lightning', instant);
-    crystals.setActive(elementKey === 'ice', instant);
-    swingTrail.setElement(elementKey);
+    ctx.elementKey = elementOr(key);
+    plasma.setActive(ctx.elementKey === 'lightning', instant);
+    crystals.setActive(ctx.elementKey === 'ice', instant);
+    swingTrail.setElement(ctx.elementKey);
     if (!instant) return;
-    for (const id of ELEMENT_IDS) presence[id] = id === elementKey ? 1 : 0;
-    if (elementKey !== 'fire') fire.extinguish();
+    for (const id of ELEMENT_IDS) presence[id] = id === ctx.elementKey ? 1 : 0;
+    if (ctx.elementKey !== 'fire') fire.extinguish();
   }
   /** How much of the fire burns for an element: all of it, a banked glow in the ice, none in the ball. */
   const flameShare = (key) => (key === 'fire' ? 1 : key === 'ice' ? effects.ice.innerFire : 0);
@@ -308,18 +313,18 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   const boost = (v) => Math.max(0.1, 1 + v);
   // The site's hover on the fire (hoverAt, below): 1 while the cursor is on it, and eased,
   // how far the fire has risen, brightened and started sparking to meet it (update).
-  let hoverFlare = 0;
-  let hoverGlow = 0;
+  ctx.hoverFlare = 0;
+  ctx.hoverGlow = 0;
   // The page's scrolling (scroll(), below): an impulse that fades in a moment, sweeping the
   // particles and the fireflies a little the way the page moves (-1..1, + up).
-  let sweep = 0;
+  ctx.sweep = 0;
 
   function applyFireParams() {
     const f = effects.fire;
     // Inside the ice the fire burns low, narrow and slow.
     const banked = presence.ice / Math.max(1e-3, presence.fire + presence.ice);
     Object.assign(fire.params, {
-      brightness: f.brightness * (1 - 0.25 * banked) * boost(drive.brightness) * (1 + 0.45 * hoverGlow),
+      brightness: f.brightness * (1 - 0.25 * banked) * boost(drive.brightness) * (1 + 0.45 * ctx.hoverGlow),
       radius: f.size * (1 - 0.3 * banked) * boost(drive.size),
       rise: f.height * (1 - 0.5 * banked) * boost(drive.height),
       curlAmp: f.turbulence * (1 - 0.55 * banked) * (reducedMotion ? 0.83 : 1) * boost(drive.turbulence),
@@ -328,7 +333,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       sparks: presence.fire,
     });
   }
-  setElement(elementKey, true);
+  setElement(ctx.elementKey, true);
   applyFireParams();
   fire.flame.layers.set(LAYER_FX);
   fire.spark.layers.set(LAYER_FX);
@@ -338,17 +343,17 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   scope.trackTree(flowView.object);
   flowView.object.layers.set(LAYER_FX);
   scene.add(flowView.object);
-  let fireflies = null; // created once the model (and the firefly model) loads
-  let fx = null;        // ground flames, smoke and ash for weapon impacts
-  let zap = null;       // the lightning ring (lightning impacts)
-  let frostRing = null; // the ring of ice shards (ice impacts)
+  ctx.fireflies = null; // created once the model (and the firefly model) loads
+  ctx.fx = null;        // ground flames, smoke and ash for weapon impacts
+  ctx.zap = null;       // the lightning ring (lightning impacts)
+  ctx.frostRing = null; // the ring of ice shards (ice impacts)
   const smokeMaterial = scope.own(createSmokeMaterial());
   const interaction = createInteraction({ reducedMotion });
   interaction.mode = effects.cursor.mode;
   interaction.strength = effects.cursor.strength;
 
-  let weapons = null; // set once the model loads
-  let knights = null; // ...and the knights, once theirs does (knights.js)
+  ctx.weapons = null; // set once the model loads
+  ctx.knights = null; // ...and the knights, once theirs does (knights.js)
   // The armor's shared uniforms: the fire's place and light, the exposure, the flame's ramp,
   // its style, finish and rim (the settings', effects.knight, or Bonfire Live's: applyArmor);
   // the colors his steel snaps to and the style's line art go to the pass (pixelPass.js
@@ -362,12 +367,12 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   });
 
   // --- Flame color state: eased blends between flames (see flameEase)
-  let flameKey = flameOr(startingEquipment.flame);
-  let blend = null; // { from, to, t }
-  let blendMul = 1;
-  let debugPaletteIndex = 0;
-  let fewStale = true; // (the palette was set since a few colors were last put over it: keepPalette)
-  let currentRamp = flames[flameKey].ramp;
+  ctx.flameKey = flameOr(startingEquipment.flame);
+  ctx.blend = null; // { from, to, t }
+  ctx.blendMul = 1;
+  ctx.debugPaletteIndex = 0;
+  ctx.fewStale = true; // (the palette was set since a few colors were last put over it: keepPalette)
+  ctx.currentRamp = flames[ctx.flameKey].ramp;
   const blendTime = () => (reducedMotion ? 0.4 : effects.render.colorChange);
   const white = new THREE.Color('#ffffff');
   const lightBase = new THREE.Color(); // the cast light's color before the temperature
@@ -378,33 +383,33 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // While a weapon is being forged, the next flame's colors join the palette so
   // the forge particles and the new weapon's glow can actually show them; after
   // the impact, the flame being blended to stays in until the blend is done.
-  let forgeFlame = null;
-  const paletteExtra = () => flames[forgeFlame] ?? (blend ? flames[blend.to] : null);
-  let currentShade = flames[flameKey].shade;
-  let currentMix = lightMix(flameKey);
+  ctx.forgeFlame = null;
+  const paletteExtra = () => flames[ctx.forgeFlame] ?? (ctx.blend ? flames[ctx.blend.to] : null);
+  ctx.currentShade = flames[ctx.flameKey].shade;
+  ctx.currentMix = lightMix(ctx.flameKey);
   // Everything that burns in the flame's colors as they blend. (The impact rings take the
   // new colors at once instead, when a weapon lands: see impact().)
   const tinted = [fire, flowView, plasma, crystals, chill, swingTrail];
   function applyColors(f, mix) {
-    currentRamp = f.ramp;
-    currentShade = f.shade;
-    currentMix = mix;
+    ctx.currentRamp = f.ramp;
+    ctx.currentShade = f.shade;
+    ctx.currentMix = mix;
     for (const s of tinted) s.setRamp(f.ramp);
     // (The armor: the flame's ramp, its shade for the rim and the warm ground he mirrors, and
     // its light, which his steel's lit tones lean toward.)
     armor.setRamp(f.ramp, { shade: f.shade, mix });
     pass.uniforms.uCore.value.set(f.ramp[3]);
-    if (debugPaletteIndex === 0) {
+    if (ctx.debugPaletteIndex === 0) {
       const extra = paletteExtra();
       pass.setPalette(extra ? [...scenePalette(f), ...extra.ramp, extra.shade] : scenePalette(f), { steel: true });
-      fewStale = true;
+      ctx.fewStale = true;
     }
     fireLight.color.set(f.ramp[1]).lerp(white, mix);
     lightBase.copy(fireLight.color);
     lightWarm.set(f.ramp[0]);
     onRamp?.(f.ramp);
   }
-  applyColors(flames[flameKey], lightMix(flameKey));
+  applyColors(flames[ctx.flameKey], lightMix(ctx.flameKey));
   // The armor's style, finish and rim: the settings' (effects.knight), or Bonfire Live's over
   // them (fire.knights.setStyle / setFinish / setRim; null gives the settings' back).
   const armorOverride = { style: null, finish: null, rim: null };
@@ -443,10 +448,10 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   function prepareStyleModel(file) {
     if (file === MODELS.main) return Promise.resolve(null);
     if (!styleTemplates.has(file)) {
-      const ready = styleScene(file).then((root) => (root && !scope.disposed ? knightsIn.then(() => (knights && bundle ? inSteps(bundle.templateSteps(root)) : null)) : null)).then((t) => {
-        if (!t || !knights || scope.disposed) { styleTemplates.delete(file); return null; }
-        knights.adoptTemplate(t);
-        for (const g of knights.geometries) scope.own(g);
+      const ready = styleScene(file).then((root) => (root && !scope.disposed ? knightsIn.then(() => (ctx.knights && ctx.bundle ? inSteps(ctx.bundle.templateSteps(root)) : null)) : null)).then((t) => {
+        if (!t || !ctx.knights || scope.disposed) { styleTemplates.delete(file); return null; }
+        ctx.knights.adoptTemplate(t);
+        for (const g of ctx.knights.geometries) scope.own(g);
         styleReady.set(file, t.root);
         return t.root;
       }, (error) => {
@@ -461,7 +466,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   let stylePending = null; // { name, promise }: a style asked for whose model isn't ready yet
   function applyStyle({ instant = false } = {}) {
     const name = styleOr(armorOverride.style ?? effects.knight?.style);
-    if (!knights) {
+    if (!ctx.knights) {
       // (Not there yet: the shader takes it now, the model when they come: addKnights.)
       styleGoal = name;
       if (styleModel(name) === MODELS.main) armor.setStyle(name);
@@ -469,20 +474,20 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     }
     // (Asked for again while its model is on its way: the same wait, not a second swap.)
     if (stylePending?.name === name) { styleGoal = name; return stylePending.promise; }
-    if (name === styleGoal && (name === knights.style || knights.restyling)) return Promise.resolve(true);
+    if (name === styleGoal && (name === ctx.knights.style || ctx.knights.restyling)) return Promise.resolve(true);
     styleGoal = name;
     const file = styleModel(name);
     const root = file === MODELS.main ? null : styleReady.get(file);
     if (file === MODELS.main || root) {
       stylePending = null;
-      return knights.setStyle(name, { model: root, instant });
+      return ctx.knights.setStyle(name, { model: root, instant });
     }
     const promise = prepareStyleModel(file).then((scene) => {
       if (stylePending?.promise === promise) stylePending = null;
-      if (styleGoal !== name || !knights || scope.disposed) return false;
-      if (!scene) { styleGoal = knights.style; return false; }
+      if (styleGoal !== name || !ctx.knights || scope.disposed) return false;
+      if (!scene) { styleGoal = ctx.knights.style; return false; }
       // (Late: he burns away and forms in it, the swap's own way, whatever was asked.)
-      return knights.setStyle(name, { model: scene });
+      return ctx.knights.setStyle(name, { model: scene });
     });
     stylePending = { name, promise };
     return promise;
@@ -565,9 +570,9 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // model's own (the coals in the ash) come first and burn in every place; each place's join
   // them as it's first built (setScenery), and only the current place's are recolored.
   const glows = [];
-  let sharedGlows = 0; // (how many are the model's)
-  let ready = false;
-  let targetLevel = 1;
+  ctx.sharedGlows = 0; // (how many are the model's)
+  ctx.ready = false;
+  ctx.targetLevel = 1;
 
   const draco = scope.own(new DRACOLoader());
   const loader = new GLTFLoader().setDRACOLoader(draco);
@@ -575,10 +580,10 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // own); either failing only leaves him out. On the site, when he isn't there from the start
   // (his sign waits for him, or he isn't allowed), the fire doesn't wait for him: he's built
   // after its first frame (knightsIn).
-  let bundle = null; // knightBundle.js, once loaded
-  let knightsShown = true; // (false while he and his sign are made but not yet in the scene: knightsIn)
+  ctx.bundle = null; // knightBundle.js, once loaded
+  ctx.knightsShown = true; // (false while he and his sign are made but not yet in the scene: knightsIn)
   const knightLoaded = Promise.all([loader.loadAsync(`${BASE}models/knight.glb`), import('./knightBundle.js')]).then(([gltf, code]) => {
-    bundle = code;
+    ctx.bundle = code;
     return gltf.scene;
   }).catch((error) => {
     console.warn('The knight did not load; the fire burns without him.', error);
@@ -608,7 +613,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     ruinsSeat.group.traverse((o) => { if (o.isMesh) o.name = 'Static_PillarDrum'; });
     root.add(ruinsSeat.group);
     root.updateMatrixWorld(true);
-    weapons = createWeapons(root, {
+    ctx.weapons = createWeapons(root, {
       anchor: WEAPON_ANCHOR,
       layerSolid: LAYER_SOLID,
       layerGhost: LAYER_GHOST,
@@ -624,13 +629,13 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
         // The fire sinks while the weapon is forged, and every firefly lights up.
         onSwapStart: (selection) => {
           const nextFlame = selection.flame;
-          weapons.auraElement = selection.element ?? elementKey;
-          targetLevel = 0.6;
-          forgeFlame = nextFlame;
+          ctx.weapons.auraElement = selection.element ?? ctx.elementKey;
+          ctx.targetLevel = 0.6;
+          ctx.forgeFlame = nextFlame;
           // A blend still running from the last swap finishes quickly, so the
           // palette has room for the next flame.
-          if (blend) blend.fast = true;
-          applyColors({ ramp: currentRamp, shade: currentShade }, currentMix);
+          if (ctx.blend) ctx.blend.fast = true;
+          applyColors({ ramp: ctx.currentRamp, shade: ctx.currentShade }, ctx.currentMix);
         },
         // The new weapon finishing its form lands like a hit: a jolt and a flare.
         onFormed: () => {
@@ -654,23 +659,23 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
           swingTrail.hit(tip, dir, kind === 'thrust' ? 1 : 0.6);
           hit(kind === 'slash' ? 0.15 : 0.3, { flash: false });
           // A blow that reaches the ground marks it and kicks up debris.
-          if (tip.y - (terrainTop?.(tip.x, tip.z) ?? 0) < 0.3) scar(tip.x, tip.z, 0.5);
+          if (tip.y - (ctx.terrainTop?.(tip.x, tip.z) ?? 0) < 0.3) scar(tip.x, tip.z, 0.5);
         },
         onSwingImpact: () => {
           ring(1.2);
-          fire.burst(1.1 * flameShare(elementKey));
+          fire.burst(1.1 * flameShare(ctx.elementKey));
           hit(1);
           scar(FIRE_ORIGIN.x, FIRE_ORIGIN.z, 1);
-          swingDone?.();
-          swingDone = null;
+          ctx.swingDone?.();
+          ctx.swingDone = null;
         },
       },
     });
 
-    scope.trackTree(weapons.holder); scope.trackTree(weapons.forge);
-    if (weapons.lines) { scope.trackTree(weapons.lines); scene.add(weapons.lines); }
-    for (const o of weapons.extras) { scope.trackTree(o); scene.add(o); }
-    scope.cleanup(() => weapons.cancel());
+    scope.trackTree(ctx.weapons.holder); scope.trackTree(ctx.weapons.forge);
+    if (ctx.weapons.lines) { scope.trackTree(ctx.weapons.lines); scene.add(ctx.weapons.lines); }
+    for (const o of ctx.weapons.extras) { scope.trackTree(o); scene.add(o); }
+    scope.cleanup(() => ctx.weapons.cancel());
     const flyTemplate = root.getObjectByName('Firefly');
     flyTemplate.removeFromParent();
     // Solid scenery: fireflies steer around it with a height map and land on its
@@ -678,12 +683,12 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     const statics = [];
     root.traverse((o) => { if (o.isMesh && o.name.startsWith('Static_')) statics.push(o); });
     // The ruins' own pieces (hidden in the other sceneries: scenery.js).
-    ruinsOnly = statics.filter((o) => /Static_(Pillar|Mortar|Wax)/.test(o.name));
-    baseStatics = statics.filter((o) => !ruinsOnly.includes(o));
-    liveStatics = statics;
+    ctx.ruinsOnly = statics.filter((o) => /Static_(Pillar|Mortar|Wax)/.test(o.name));
+    ctx.baseStatics = statics.filter((o) => !ctx.ruinsOnly.includes(o));
+    ctx.liveStatics = statics;
     terrains.ruins = createTerrain(renderer, statics, { material: terrainMaterial });
     // The fireflies (and the strikes, mist and debris) read whichever scenery's height map is current.
-    const now = () => terrains[sceneryKey];
+    const now = () => terrains[ctx.sceneryKey];
     const terrain = {
       height: (x, z) => now().height(x, z),
       top: (x, z) => now().top(x, z),
@@ -697,13 +702,13 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     const raycast = (origin, dir, far) => {
       ray.set(origin, dir);
       ray.far = far;
-      const hit = ray.intersectObjects(liveStatics, false)[0];
+      const hit = ray.intersectObjects(ctx.liveStatics, false)[0];
       if (!hit?.face) return null;
       const normal = hit.face.normal.clone().applyMatrix3(normalMatrix.getNormalMatrix(hit.object.matrixWorld)).normalize();
       if (normal.dot(dir) > 0) normal.negate();
       return { point: hit.point.clone(), normal };
     };
-    fireflies = createFireflies(flyTemplate, {
+    ctx.fireflies = createFireflies(flyTemplate, {
       count: fCount(F.count),
       litCount: fCount(F.lit),
       lightCount: fCount(F.lights),
@@ -715,10 +720,10 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       reducedMotion,
       trailMaterial: lightTrails ? effectMaterial : null,
     });
-    scope.trackTree(fireflies.group);
-    if (fireflies.trails) { scope.trackTree(fireflies.trails); fireflies.trails.layers.set(LAYER_FX); scene.add(fireflies.trails); }
-    fireflies.setRamp(currentRamp);
-    scene.add(fireflies.group);
+    scope.trackTree(ctx.fireflies.group);
+    if (ctx.fireflies.trails) { scope.trackTree(ctx.fireflies.trails); ctx.fireflies.trails.layers.set(LAYER_FX); scene.add(ctx.fireflies.trails); }
+    ctx.fireflies.setRamp(ctx.currentRamp);
+    scene.add(ctx.fireflies.group);
 
     const candlePos = new THREE.Vector3();
     root.traverse((o) => {
@@ -740,9 +745,9 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
         o.receiveShadow = true;
       }
     });
-    sharedGlows = glows.length;
+    ctx.sharedGlows = glows.length;
     candleLight.position.copy(candlePos).add(new THREE.Vector3(0.1, 0.25, 0.3));
-    ruinsOnly.push(...candleFlames.map((c) => c.mesh));
+    ctx.ruinsOnly.push(...candleFlames.map((c) => c.mesh));
     // The model's materials, for the other sceneries.
     for (const [key, name] of [['stone', 'Stone'], ['pillar', 'Pillar'], ['wood', 'Wood'], ['char', 'Charred'], ['wax', 'Wax'], ['mortar', 'Mortar']]) {
       sceneryMaterials[key] = root.getObjectByName(`Static_${name}`)?.material;
@@ -770,7 +775,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       reachDist[b] = d;
     }
     const reach = (a) => reachDist[Math.round((((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2) * BINS) % BINS];
-    fx = createImpactFx({
+    ctx.fx = createImpactFx({
       fireMaterial: effectMaterial,
       smokeMaterial,
       origin: new THREE.Vector3(FIRE_ORIGIN.x, 0, FIRE_ORIGIN.z),
@@ -785,48 +790,48 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       lights: coarse ? 4 : 6,
       reducedMotion,
     });
-    for (const object of [fx.ring, fx.embers, fx.wave, fx.haze, fx.puff, fx.flecks]) scope.trackTree(object);
-    for (const l of fx.lights) scene.add(l);
-    fx.ring.layers.set(LAYER_FX);
-    fx.embers.layers.set(LAYER_FX);
-    fx.wave.layers.set(LAYER_FX);
-    fx.haze.layers.set(LAYER_GHOST);
-    fx.puff.layers.set(LAYER_GHOST);
-    fx.flecks.layers.set(LAYER_GHOST);
-    fx.setRamp(currentRamp);
-    scene.add(fx.ring, fx.embers, fx.wave, fx.haze, fx.puff, fx.flecks, weapons.forge);
+    for (const object of [ctx.fx.ring, ctx.fx.embers, ctx.fx.wave, ctx.fx.haze, ctx.fx.puff, ctx.fx.flecks]) scope.trackTree(object);
+    for (const l of ctx.fx.lights) scene.add(l);
+    ctx.fx.ring.layers.set(LAYER_FX);
+    ctx.fx.embers.layers.set(LAYER_FX);
+    ctx.fx.wave.layers.set(LAYER_FX);
+    ctx.fx.haze.layers.set(LAYER_GHOST);
+    ctx.fx.puff.layers.set(LAYER_GHOST);
+    ctx.fx.flecks.layers.set(LAYER_GHOST);
+    ctx.fx.setRamp(ctx.currentRamp);
+    scene.add(ctx.fx.ring, ctx.fx.embers, ctx.fx.wave, ctx.fx.haze, ctx.fx.puff, ctx.fx.flecks, ctx.weapons.forge);
     const ground = new THREE.Vector3(FIRE_ORIGIN.x, 0, FIRE_ORIGIN.z);
     // Lightning strikes and cold mist follow the scenery's surface (the fireflies' height map).
     plasma.setGround(terrain.top);
     chill.setGround(terrain.top);
-    terrainTop = terrain.top;
+    ctx.terrainTop = terrain.top;
     for (const d of Object.values(debris)) d.setGround(terrain.top);
-    zap = createLightningRing({ fxMaterial: effectMaterial, sparkMaterial: crossMaterial, origin: ground, field, reach, ground: terrain.top, emitters: coarse ? 72 : 96, sparks: impactCount(260), lights: coarse ? 4 : 6, reducedMotion });
-    frostRing = createIceRing({ fxMaterial: effectMaterial, glintMaterial: diamondMaterial, origin: ground, field, reach, chill, chips: impactCount(320), lights: coarse ? 4 : 6, reducedMotion });
-    for (const o of [...zap.objects, ...frostRing.objects]) { scope.trackTree(o); o.layers.set(LAYER_FX); scene.add(o); }
-    frostRing.solid.layers.set(LAYER_SOLID);
-    for (const l of [...zap.lights, ...frostRing.lights]) scene.add(l);
-    zap.setRamp(currentRamp);
-    frostRing.setRamp(currentRamp);
-    sets = [...fire.sets, ...plasma.sets, ...crystals.sets, ...chill.sets, ...fx.sets, ...zap.sets, ...frostRing.sets];
-    named([fx.ring], 'Ring of fire');
-    named([fx.embers], 'Embers');
-    named([fx.haze, fx.puff], 'Smoke');
-    named([fx.flecks], 'Ash');
-    named(zap.objects, 'Lightning ring');
-    named(frostRing.objects, 'Ice ring');
-    named([weapons.forge], 'Forge (weapon swap)');
-    if (fireflies.trails) named([fireflies.trails], 'Firefly trails');
+    ctx.zap = createLightningRing({ fxMaterial: effectMaterial, sparkMaterial: crossMaterial, origin: ground, field, reach, ground: terrain.top, emitters: coarse ? 72 : 96, sparks: impactCount(260), lights: coarse ? 4 : 6, reducedMotion });
+    ctx.frostRing = createIceRing({ fxMaterial: effectMaterial, glintMaterial: diamondMaterial, origin: ground, field, reach, chill, chips: impactCount(320), lights: coarse ? 4 : 6, reducedMotion });
+    for (const o of [...ctx.zap.objects, ...ctx.frostRing.objects]) { scope.trackTree(o); o.layers.set(LAYER_FX); scene.add(o); }
+    ctx.frostRing.solid.layers.set(LAYER_SOLID);
+    for (const l of [...ctx.zap.lights, ...ctx.frostRing.lights]) scene.add(l);
+    ctx.zap.setRamp(ctx.currentRamp);
+    ctx.frostRing.setRamp(ctx.currentRamp);
+    ctx.sets = [...fire.sets, ...plasma.sets, ...crystals.sets, ...chill.sets, ...ctx.fx.sets, ...ctx.zap.sets, ...ctx.frostRing.sets];
+    named([ctx.fx.ring], 'Ring of fire');
+    named([ctx.fx.embers], 'Embers');
+    named([ctx.fx.haze, ctx.fx.puff], 'Smoke');
+    named([ctx.fx.flecks], 'Ash');
+    named(ctx.zap.objects, 'Lightning ring');
+    named(ctx.frostRing.objects, 'Ice ring');
+    named([ctx.weapons.forge], 'Forge (weapon swap)');
+    if (ctx.fireflies.trails) named([ctx.fireflies.trails], 'Firefly trails');
 
-    scene.add(root, weapons.holder);
-    weapons.setRim(currentRamp[2]);
-    weapons.set(startingEquipment.weapon);
+    scene.add(root, ctx.weapons.holder);
+    ctx.weapons.setRim(ctx.currentRamp[2]);
+    ctx.weapons.set(startingEquipment.weapon);
     if (knightScene) addKnights(knightScene);
     // Every light on every layer: each pass (frame.js) then sees the same lights, so the lit
     // materials aren't re-set-up for a different light count every frame (the particles'
     // pass has no lit materials: they change nothing there).
     scene.traverse((o) => { if (o.isLight) o.layers.enableAll(); });
-    ready = true;
+    ctx.ready = true;
 
   });
 
@@ -840,27 +845,27 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   function addKnights(model, { template = null, attach = true } = {}) {
     scope.trackTree(model);
     try {
-      knights = bundle.createKnights(model, {
+      ctx.knights = ctx.bundle.createKnights(model, {
         layerSolid: LAYER_SOLID, layerGhost: LAYER_GHOST, castShadows: renderer.shadowMap.enabled, armor,
         max: coarse ? 2 : 4, reducedMotion, template,
         onSparks: (list) => fire.emitSparks(list),
       });
     } catch (error) {
       console.warn('The knight model is unusable; the fire burns without him.', error);
-      knights = null;
+      ctx.knights = null;
       return [];
     }
-    for (const r of [...knights.materials, ...knights.geometries]) scope.own(r);
-    scope.trackTree(knights.group);
-    const skeletons = knights.skeletons;
+    for (const r of [...ctx.knights.materials, ...ctx.knights.geometries]) scope.own(r);
+    scope.trackTree(ctx.knights.group);
+    const skeletons = ctx.knights.skeletons;
     scope.cleanup(() => skeletons.forEach((s) => s.dispose()));
-    const objects = [knights.group];
-    tinted.push(knights);
-    knights.setRamp(currentRamp);
+    const objects = [ctx.knights.group];
+    tinted.push(ctx.knights);
+    ctx.knights.setRamp(ctx.currentRamp);
     // (His style's model, if it isn't the knight's own: as he first comes, at once.)
     styleGoal = null;
     applyStyle({ instant: true });
-    knights.setScenery(sceneryKey, terrains[sceneryKey]);
+    ctx.knights.setScenery(ctx.sceneryKey, terrains[ctx.sceneryKey]);
     fitKnights();
     if (siteKnight) objects.push(...addArrival());
     applyKnight(true);
@@ -880,24 +885,24 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // leaves all this alone.
   const siteKnight = !fxLayer;
   let knightSetting = null; // the helmet setting last applied (null: none yet)
-  let helmetGoal = null;    // the helmet knight 0 has on or is putting on (fire.knights.helmet)
-  let visitorHelmet = HELMETS.includes(knightHelmet) ? knightHelmet : null;
+  ctx.helmetGoal = null;    // the helmet knight 0 has on or is putting on (fire.knights.helmet)
+  ctx.visitorHelmet = HELMETS.includes(knightHelmet) ? knightHelmet : null;
   let arrivalSetting = null; // effects.knight.arrival as last applied
   let showSetting = null;    // ...and effects.knight.show
-  let sign = null;          // his summon sign (summonSign.js), on the site
-  let arrival = null;       // ...and his comings and goings (knightArrival.js)
+  ctx.sign = null;          // his summon sign (summonSign.js), on the site
+  ctx.arrival = null;       // ...and his comings and goings (knightArrival.js)
   const presenceListeners = new Set();
   function wearHelmet(name, o = {}) {
-    if (!knights || !HELMETS.includes(name)) return Promise.resolve(false);
-    if (o.index == null || o.index === 0) helmetGoal = name;
-    return knights.setHelmet(name, o);
+    if (!ctx.knights || !HELMETS.includes(name)) return Promise.resolve(false);
+    if (o.index == null || o.index === 0) ctx.helmetGoal = name;
+    return ctx.knights.setHelmet(name, o);
   }
   /** The helmet he comes in: the setting's, the visitor's pick, or a new one at random. */
   function helmetForSummon() {
     const setting = effects.knight.helmet;
     if (HELMETS.includes(setting)) return setting;
-    if (visitorHelmet) return visitorHelmet;
-    const others = HELMETS.filter((h) => h !== helmetGoal);
+    if (ctx.visitorHelmet) return ctx.visitorHelmet;
+    const others = HELMETS.filter((h) => h !== ctx.helmetGoal);
     return others[Math.floor(Math.random() * others.length)];
   }
   /** Where his sign lies in a scenery: in front of the seat (knightPlaces.js), on the ground there. */
@@ -910,38 +915,38 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   }
   /** The sign and the arrival (the site's knight), once there are knights. Returns their objects (for the scene). */
   function addArrival() {
-    sign = bundle.createSummonSign({ layer: LAYER_GHOST, layerSolid: LAYER_SOLID, layerFx: LAYER_FX, moteMaterial: effectMaterial, exposure: pass.uniforms.exposure, reducedMotion });
-    for (const r of [...sign.geometries, ...sign.materials]) scope.own(r);
-    scope.trackTree(sign.group); scope.trackTree(sign.motes);
-    sign.setRamp(currentRamp);
-    tinted.push(sign);
-    arrival = bundle.createKnightArrival({
-      knights, sign, particleMaterial: effectMaterial,
+    ctx.sign = ctx.bundle.createSummonSign({ layer: LAYER_GHOST, layerSolid: LAYER_SOLID, layerFx: LAYER_FX, moteMaterial: effectMaterial, exposure: pass.uniforms.exposure, reducedMotion });
+    for (const r of [...ctx.sign.geometries, ...ctx.sign.materials]) scope.own(r);
+    scope.trackTree(ctx.sign.group); scope.trackTree(ctx.sign.motes);
+    ctx.sign.setRamp(ctx.currentRamp);
+    tinted.push(ctx.sign);
+    ctx.arrival = ctx.bundle.createKnightArrival({
+      knights: ctx.knights, sign: ctx.sign, particleMaterial: effectMaterial,
       materials: { fire: effectMaterial, lightning: crossMaterial, ice: diamondMaterial },
       layerFx: LAYER_FX, field, anchor: WEAPON_ANCHOR, count: pCount(P.forge), reducedMotion,
-      now: () => ({ element: elementKey, ramp: currentRamp }),
+      now: () => ({ element: ctx.elementKey, ramp: ctx.currentRamp }),
       // (effects.knight's rest is in minutes, rolled between the two on each arrival; one not
       // set: knightArrival.js REST's.)
       rest: () => [effects.knight.restMin, effects.knight.restMax].map((m) => m * 60),
       // (His rest running out waits while he's mid-gesture, changing his helmet or style, or
       // looking at the cursor on him.)
-      busy: () => !!knights?.busyAt(0) || knights?.hovered === 0,
+      busy: () => !!ctx.knights?.busyAt(0) || ctx.knights?.hovered === 0,
       hooks: {
         onForgeStrike: (w) => hit(w, { freeze: false }),
         // He's whole: a light hit, and the fire's reflection sweeps his new armor.
         onFormed: (which) => {
           hit(which === 'knight' ? 0.35 : 0.2, { freeze: false });
-          if (which === 'knight') { armor.flare(0.8); fire.burst(0.3 * flameShare(elementKey)); }
+          if (which === 'knight') { armor.flare(0.8); fire.burst(0.3 * flameShare(ctx.elementKey)); }
         },
       },
     });
-    for (const o of arrival.objects) scope.trackTree(o);
-    arrival.onPresence((p) => { for (const fn of presenceListeners) fn(p); });
-    arrival.setScenery(signPlace(sceneryKey));
-    return [sign.group, sign.motes, ...arrival.objects];
+    for (const o of ctx.arrival.objects) scope.trackTree(o);
+    ctx.arrival.onPresence((p) => { for (const fn of presenceListeners) fn(p); });
+    ctx.arrival.setScenery(signPlace(ctx.sceneryKey));
+    return [ctx.sign.group, ctx.sign.motes, ...ctx.arrival.objects];
   }
   function applyKnight(first = false) {
-    if (!knights || !siteKnight) return;
+    if (!ctx.knights || !siteKnight) return;
     const { show, helmet } = effects.knight;
     const mode = effects.knight.arrival ?? 'sign';
     // The fire's reflection sweeping his armor, at rest now and then and when the fire flares.
@@ -949,14 +954,14 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     armor.setShine({ rest: shine, flares: shine });
     // How he sits: resting (the Dark Souls rest) or watchful (only a change eases him over).
     const seat = effects.knight.seat ?? 'resting';
-    if (knights.seatPose !== undefined && seat !== knights.seatPose) knights.setSeatPose(seat);
-    arrival.allowed = !!show;
-    arrival.resting = mode !== 'start';
+    if (ctx.knights.seatPose !== undefined && seat !== ctx.knights.seatPose) ctx.knights.setSeatPose(seat);
+    ctx.arrival.allowed = !!show;
+    ctx.arrival.resting = mode !== 'start';
     // There from the start: at load, or the moment the settings say so (the admin's preview:
     // arrival turned to it, or Show turned back on with it).
-    if (show && mode === 'start' && (arrivalSetting !== 'start' || !showSetting) && arrival.presence === 'away') {
+    if (show && mode === 'start' && (arrivalSetting !== 'start' || !showSetting) && ctx.arrival.presence === 'away') {
       wearHelmet(helmetForSummon(), { index: 0, instant: true });
-      arrival.summon({ instant: true });
+      ctx.arrival.summon({ instant: true });
     }
     arrivalSetting = mode;
     showSetting = !!show;
@@ -964,25 +969,25 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     const was = knightSetting;
     knightSetting = helmet;
     // (A fixed helmet set in the admin shows at once; 'random' waits for the next summon.)
-    if (!first && was !== null && HELMETS.includes(helmet)) wearHelmet(helmet, { index: 0, instant: arrival.presence !== 'resting' });
+    if (!first && was !== null && HELMETS.includes(helmet)) wearHelmet(helmet, { index: 0, instant: ctx.arrival.presence !== 'resting' });
   }
   /**
    * The visitor did something with the site's knight (a gesture from the pack or a click on
    * him, a new helmet): his rest is topped up so he doesn't leave right after (a minute at least).
    */
-  const busyWithHim = (index = 0) => { if (index == null || index === 0 || index === 'all') arrival?.extendRest(60); };
+  const busyWithHim = (index = 0) => { if (index == null || index === 0 || index === 'all') ctx.arrival?.extendRest(60); };
   /** Summon the site's knight (through the forge from his sign; `instant`: at once). False if he can't come now. */
   function summonKnight({ instant = false } = {}) {
-    if (!arrival || !knightsShown || arrival.presence !== 'away' || !arrival.allowed) return false;
+    if (!ctx.arrival || !ctx.knightsShown || ctx.arrival.presence !== 'away' || !ctx.arrival.allowed) return false;
     wearHelmet(helmetForSummon(), { index: 0, instant: true });
-    return arrival.summon({ instant });
+    return ctx.arrival.summon({ instant });
   }
   // Whether the knights react (flinch, lean, hop, watch a weapon in flight): the site's
   // follows effects.knight.reactions; Bonfire Live switches its own (setReactions).
-  let liveReactions = true;
-  const reacts = () => (siteKnight ? effects.knight.reactions : liveReactions);
+  ctx.liveReactions = true;
+  const reacts = () => (siteKnight ? effects.knight.reactions : ctx.liveReactions);
   /** Something happened at the fire (knights.js react), if the knights mind it (reacts). */
-  function reactKnights(kind, strength, where) { if (knights && reacts()) knights.react(kind, strength, where); }
+  function reactKnights(kind, strength, where) { if (ctx.knights && reacts()) ctx.knights.react(kind, strength, where); }
 
   // --- Scenery (scenery.js): the ruins, the forge or the shrine around the fire. Each has
   // its own height map for the fireflies. In Bonfire Live and the Painter the other places
@@ -990,10 +995,10 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // (prepareSceneries, below), so the first visit to one only puts it in the scene: built
   // then, a place and its map (a draw of the whole place read back from the GPU) froze the
   // frame it came on. (Still built then if it's asked for before they're ready, and on the site.)
-  let sceneryKey = 'ruins';
-  let ruinsOnly = [];
-  let baseStatics = [];
-  let liveStatics = [];
+  ctx.sceneryKey = 'ruins';
+  ctx.ruinsOnly = [];
+  ctx.baseStatics = [];
+  ctx.liveStatics = [];
   const terrains = {};
   const terrainMaterial = scope.own(createTerrainMaterial()); // (one for every height map: its shader built once)
   const sceneryMaterials = {};
@@ -1013,7 +1018,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
    * (sceneryMerge.js), then readied to show. Not in sceneries till the last step.
    */
   function* sceneryParts(name) {
-    const s = buildScenery(name, sceneryMaterials, () => new THREE.MeshBasicMaterial({ color: currentRamp[1], fog: false }), { merge: false });
+    const s = buildScenery(name, sceneryMaterials, () => new THREE.MeshBasicMaterial({ color: ctx.currentRamp[1], fog: false }), { merge: false });
     yield;
     yield* mergeSteps(s.group, s.glows);
     s.group.traverse((o) => { if (o.isMesh) { o.layers.set(s.glows.includes(o) ? LAYER_GHOST : LAYER_SOLID); scope.trackTree(o); } });
@@ -1028,7 +1033,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     delete building[name];
   }
   /** What a place's height map is drawn from: the model's ground and stones, and the place's solids. */
-  const staticsOf = (name) => (name === 'ruins' ? [...baseStatics, ...ruinsOnly.filter((o) => o.name.startsWith('Static_'))] : [...baseStatics, ...sceneryOf(name).solids]);
+  const staticsOf = (name) => (name === 'ruins' ? [...ctx.baseStatics, ...ctx.ruinsOnly.filter((o) => o.name.startsWith('Static_'))] : [...ctx.baseStatics, ...sceneryOf(name).solids]);
   /** The height map the fireflies (and the strikes, the mist, the debris) read in a place. */
   function terrainOf(name) {
     terrains[name] ??= createTerrain(renderer, staticsOf(name), { material: terrainMaterial });
@@ -1036,12 +1041,12 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   }
   /** Move the fire to another place (SCENERIES). `flash`: the change lands like a hit, a flash hiding the cut. */
   function setScenery(name, { flash = false } = {}) {
-    if (!ready || !SCENERIES[name] || name === sceneryKey) return false;
-    if (flash) { hit(0.6, { freeze: false }); fire.burst(0.6 * flameShare(elementKey)); }
+    if (!ctx.ready || !SCENERIES[name] || name === ctx.sceneryKey) return false;
+    if (flash) { hit(0.6, { freeze: false }); fire.burst(0.6 * flameShare(ctx.elementKey)); }
     // (A place not shown is out of the scene, so no pass walks its pieces; the ruins' own are
     // the model's, hidden.)
     const show = (key, on) => {
-      if (key === 'ruins') { for (const o of ruinsOnly) o.visible = on; return; }
+      if (key === 'ruins') { for (const o of ctx.ruinsOnly) o.visible = on; return; }
       if (on) scene.add(sceneries[key].group);
       else sceneries[key].group.removeFromParent();
     };
@@ -1050,18 +1055,18 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       // First shown: its glows join the recolored ones (their numbers, in the order the places
       // are first shown, pick each one's flicker), in the flame's color of this moment.
       const s = sceneryOf(name);
-      for (const g of s.glows) g.material.color.set(currentRamp[1]);
+      for (const g of s.glows) g.material.color.set(ctx.currentRamp[1]);
       s.glowFrom = glows.length;
       glows.push(...s.glows);
       s.glowTo = glows.length;
       s.shown = true;
     }
-    show(sceneryKey, false);
+    show(ctx.sceneryKey, false);
     show(name, true);
     // (A place shown again takes the colors its glows would have had at the last flame step,
     // as if they'd been recolored all along while it was hidden.)
-    if (revisit && flameStep >= 0) recolorGlows(sceneries[name].glowFrom, sceneries[name].glowTo, flameStep);
-    sceneryKey = name;
+    if (revisit && ctx.flameStep >= 0) recolorGlows(sceneries[name].glowFrom, sceneries[name].glowTo, ctx.flameStep);
+    ctx.sceneryKey = name;
     // Its lamps take the pool's lights (the rest go dark; the candle's is the ruins' own: see update()).
     const list = sceneries[name]?.lights ?? [];
     if (name !== 'ruins') candleLight.intensity = 0;
@@ -1071,13 +1076,13 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       l.intensity = l.userData.base;
       if (d) { l.position.copy(d.at); l.distance = d.distance; }
     });
-    liveStatics = staticsOf(name);
+    ctx.liveStatics = staticsOf(name);
     terrainOf(name);
     // His sign moves to the seat there (a summoning or a leaving under way ends at once), and
     // the knights take their places there, forming out of embers.
-    arrival?.setScenery(signPlace(name));
-    knights?.setScenery(name, terrains[name]);
-    shadowFrames = 2;
+    ctx.arrival?.setScenery(signPlace(name));
+    ctx.knights?.setScenery(name, terrains[name]);
+    ctx.shadowFrames = 2;
     return true;
   }
 
@@ -1086,14 +1091,14 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   function stoke() {
     fire.params.level = Math.min(2.4, fire.params.level + effects.fire.stoke);
     fire.burst(Math.min(1.5, effects.fire.stoke / 0.9));
-    if (elementKey === 'lightning') { plasma.discharge(0.5); zap?.crackle(0.35, 3); }
-    if (elementKey === 'ice') { crystals.burst(0.6); crystals.beat(0.8); crystals.echo(); }
+    if (ctx.elementKey === 'lightning') { plasma.discharge(0.5); ctx.zap?.crackle(0.35, 3); }
+    if (ctx.elementKey === 'ice') { crystals.burst(0.6); crystals.beat(0.8); crystals.echo(); }
     // Every stoke throws a smaller ring of the element too (skipped under reduced motion).
     ring(0.6, { quiet: true });
-    weapons?.beat(1); // the planted weapon shudders
+    ctx.weapons?.beat(1); // the planted weapon shudders
     hit(0.4, { freeze: false });
     // Lightning reaches for the nearest firefly.
-    if (elementKey === 'lightning') strikeFirefly(1);
+    if (ctx.elementKey === 'lightning') strikeFirefly(1);
     reactKnights('stoke');
     armor.flare(1); // (the flare's reflection sweeps across the knights' armor)
     const wasFirst = firstStoke;
@@ -1106,32 +1111,32 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   }
   function impact(selection, weaponKey, stationary = false) {
     const nextFlame = selection.flame;
-    const old = flameKey;
-    flameKey = nextFlame ?? flameKey;
-    blend = { from: old, to: flameKey, t: 0 };
-    forgeFlame = null;
-    const ramp = flames[flameKey].ramp;
-    for (const r of [fx, zap, frostRing]) r.setRamp(ramp);
-    weapons.setRim(ramp[2]); // the new weapon arrives rimmed in its new color
+    const old = ctx.flameKey;
+    ctx.flameKey = nextFlame ?? ctx.flameKey;
+    ctx.blend = { from: old, to: ctx.flameKey, t: 0 };
+    ctx.forgeFlame = null;
+    const ramp = flames[ctx.flameKey].ramp;
+    for (const r of [ctx.fx, ctx.zap, ctx.frostRing]) r.setRamp(ramp);
+    ctx.weapons.setRim(ramp[2]); // the new weapon arrives rimmed in its new color
     // The bonfire takes the new element. The fire erupts (or the ball discharges,
     // or the ice flashes), a ring races across the ground — flame with a puff of
     // smoke and ash, lightning, or ice shards — and the fireflies scatter.
-    setElement(selection.element ?? elementKey);
+    setElement(selection.element ?? ctx.elementKey);
     fire.params.level = reducedMotion || stationary ? 2 : 3.2;
-    targetLevel = 1;
-    fire.burst((reducedMotion ? 0.8 : 1.7) * flameShare(elementKey));
-    if (elementKey === 'lightning') { zap.burst(effects.lightning.height); plasma.discharge(1); }
-    else if (elementKey === 'ice') { frostRing.burst(); crystals.burst(1); }
-    else fx.burst();
-    fireflies.burst(flames[flameKey].ramp);
+    ctx.targetLevel = 1;
+    fire.burst((reducedMotion ? 0.8 : 1.7) * flameShare(ctx.elementKey));
+    if (ctx.elementKey === 'lightning') { ctx.zap.burst(effects.lightning.height); plasma.discharge(1); }
+    else if (ctx.elementKey === 'ice') { ctx.frostRing.burst(); crystals.burst(1); }
+    else ctx.fx.burst();
+    ctx.fireflies.burst(flames[ctx.flameKey].ramp);
     reactKnights('impact', stationary ? 0.5 : 1);
     reactKnights('ring');
     armor.flare(1);
     hit(stationary ? 0.5 : 1);
     scar(FIRE_ORIGIN.x, FIRE_ORIGIN.z, 1.2);
     // The new ball needs a moment to grow in before it can reach for a firefly.
-    if (elementKey === 'lightning') strikeAt = simT + 0.5;
-    onImpact?.(flameKey, old, stationary, { ...selection, weapon: weaponKey });
+    if (ctx.elementKey === 'lightning') ctx.strikeAt = ctx.simT + 0.5;
+    onImpact?.(ctx.flameKey, old, stationary, { ...selection, weapon: weaponKey });
   }
 
   /**
@@ -1139,25 +1144,25 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
    * (see weapons.js): the visualizer times the impact to the beat, or holds the new
    * weapon over the fire until release().
    */
-  function equip(weaponKey, key, { instant = false, item = null, element = elementKey, pace = 1, hold = false, rush = false } = {}) {
+  function equip(weaponKey, key, { instant = false, item = null, element = ctx.elementKey, pace = 1, hold = false, rush = false } = {}) {
     return loaded.then(() => {
       if (scope.disposed) return { status: 'cancelled' };
       if (!Object.hasOwn(flames, key)) throw new Error('Unknown flame: ' + key);
       const selection = { weapon: weaponKey, flame: key, item, element: elementOr(element) };
       if (instant) {
-        weapons.set(weaponKey);
+        ctx.weapons.set(weaponKey);
         setElement(selection.element, true);
-        flameKey = key;
-        blend = null;
-        forgeFlame = null;
+        ctx.flameKey = key;
+        ctx.blend = null;
+        ctx.forgeFlame = null;
         applyColors(flames[key], lightMix(key));
-        weapons.setRim(flames[key].ramp[2]);
-        fireflies?.setRamp(flames[key].ramp);
-        targetLevel = 1;
+        ctx.weapons.setRim(flames[key].ramp[2]);
+        ctx.fireflies?.setRamp(flames[key].ramp);
+        ctx.targetLevel = 1;
         onImpact?.(key, key, true, selection);
         return { status: 'applied' };
       }
-      return weapons.swap(weaponKey, flames[flameKey].ramp, flames[key].ramp, selection, { pace, hold, rush });
+      return ctx.weapons.swap(weaponKey, flames[ctx.flameKey].ramp, flames[key].ramp, selection, { pace, hold, rush });
     });
   }
 
@@ -1167,32 +1172,32 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
    * unless `blink` is off.
    */
   function pulse(strength = 1, { accent = false, blink = true } = {}) {
-    if (!ready || reducedMotion) return;
+    if (!ctx.ready || reducedMotion) return;
     const s = Math.min(1, Math.max(0, strength));
-    fire.burst(0.45 * s * (accent ? 1.5 : 1) * flameShare(elementKey));
-    if (elementKey === 'lightning') {
-      zap.crackle(0.12 + 0.15 * s, Math.round(2 + 3 * s + (accent ? 3 : 0)));
+    fire.burst(0.45 * s * (accent ? 1.5 : 1) * flameShare(ctx.elementKey));
+    if (ctx.elementKey === 'lightning') {
+      ctx.zap.crackle(0.12 + 0.15 * s, Math.round(2 + 3 * s + (accent ? 3 : 0)));
       if (accent) { plasma.discharge(0.35 * s); if (Math.random() < effects.impact.fireflyStrikes) strikeFirefly(s); }
-    } else if (elementKey === 'ice') {
+    } else if (ctx.elementKey === 'ice') {
       crystals.burst(0.4 * s * (accent ? 1.5 : 1));
       crystals.beat(s * (accent ? 1 : 0.7));
     }
-    if (blink) fireflies.pulse(accent ? s : s * 0.45);
-    weapons.beat(s * (accent ? 1 : 0.6));
-    knights?.beat(s * (accent ? 1 : 0.6));
+    if (blink) ctx.fireflies.pulse(accent ? s : s * 0.45);
+    ctx.weapons.beat(s * (accent ? 1 : 0.6));
+    ctx.knights?.beat(s * (accent ? 1 : 0.6));
   }
   /**
    * The current element's ring, without a new weapon or colors: a ring of fire, of
    * lightning or of ice shards races out across the ground (the visualizer's extra hits).
    */
   function ring(strength = 1, { quiet = false } = {}) {
-    if (!ready || reducedMotion) return;
+    if (!ctx.ready || reducedMotion) return;
     const s = Math.min(1.5, Math.max(0, strength));
     if (!quiet) hit(0.35 * s, { freeze: false, flash: false, shake: false });
     scar(FIRE_ORIGIN.x, FIRE_ORIGIN.z, s, { ring: true });
-    if (elementKey === 'lightning') { zap.burst(effects.lightning.height); plasma.discharge(0.6 * s); }
-    else if (elementKey === 'ice') { frostRing.burst(); crystals.burst(0.8 * s); crystals.beat(1); crystals.echo(); }
-    else { fx.burst(); fire.burst(0.9 * s); }
+    if (ctx.elementKey === 'lightning') { ctx.zap.burst(effects.lightning.height); plasma.discharge(0.6 * s); }
+    else if (ctx.elementKey === 'ice') { ctx.frostRing.burst(); crystals.burst(0.8 * s); crystals.beat(1); crystals.echo(); }
+    else { ctx.fx.burst(); fire.burst(0.9 * s); }
     fire.params.level = Math.max(fire.params.level, 1.6 + s);
     reactKnights('ring', s);
     armor.flare(0.45 + 0.4 * Math.min(1, s));
@@ -1200,17 +1205,17 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   }
   /** Lightning jumps from the ball to the nearest firefly within reach, which flickers hot. */
   function strikeFirefly(power = 1) {
-    if (!fireflies || elementKey !== 'lightning' || reducedMotion || effects.impact.fireflyStrikes <= 0) return false;
-    const f = fireflies.nearest(plasma.center, 1.4 + effects.lightning.size * 2);
+    if (!ctx.fireflies || ctx.elementKey !== 'lightning' || reducedMotion || effects.impact.fireflyStrikes <= 0) return false;
+    const f = ctx.fireflies.nearest(plasma.center, 1.4 + effects.lightning.size * 2);
     if (!f || !plasma.jump(f.pos)) return false;
-    fireflies.zap(f, plasma.center, power);
+    ctx.fireflies.zap(f, plasma.center, power);
     return true;
   }
   /** An echo of the planted weapon's silhouette bursts out of it (and in ice, the crystals' outlines). */
   function echo() {
-    if (!ready) return;
-    weapons.echo(currentRamp, elementKey);
-    if (elementKey === 'ice') crystals.echo();
+    if (!ctx.ready) return;
+    ctx.weapons.echo(ctx.currentRamp, ctx.elementKey);
+    if (ctx.elementKey === 'ice') crystals.echo();
   }
   /**
    * The living blade (the visualizer): the planted weapon leaves the fire for a routine of
@@ -1219,14 +1224,14 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
    * its plane from the camera (`basis`, by default where the camera is headed) as it
    * begins. Resolves when the blade is back in the fire (false if it can't swing).
    */
-  let swingDone = null;
+  ctx.swingDone = null;
   function swing(plan) {
-    if (!ready || reducedMotion) return Promise.resolve(false);
+    if (!ctx.ready || reducedMotion) return Promise.resolve(false);
     // (It fights clear of the knights: each move's shape avoids them where they are then.)
     const basis = plan.basis ?? view.axes;
-    const clearOfKnights = () => Object.assign(basis(), { avoid: knights?.capsules() ?? [] });
-    if (!weapons.swing({ ...plan, basis: clearOfKnights })) return Promise.resolve(false);
-    return new Promise((resolve) => { swingDone = () => resolve(true); });
+    const clearOfKnights = () => Object.assign(basis(), { avoid: ctx.knights?.capsules() ?? [] });
+    if (!ctx.weapons.swing({ ...plan, basis: clearOfKnights })) return Promise.resolve(false);
+    return new Promise((resolve) => { ctx.swingDone = () => resolve(true); });
   }
   /** Where the blade is (world): { mid, tip, grip, normal, quat, len, swinging, free }, or null. */
   const bladeState = { mid: new THREE.Vector3(), tip: new THREE.Vector3(), grip: new THREE.Vector3(), normal: new THREE.Vector3(), quat: new THREE.Quaternion(), len: 1, swinging: false, free: false };
@@ -1257,7 +1262,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   }
   /** A few sparks off the flame (hi-hats). */
   function sparkle(n = 3) {
-    if (!ready || reducedMotion) return;
+    if (!ctx.ready || reducedMotion) return;
     fire.sparkle(Math.round(n * ambient()));
   }
 
@@ -1266,11 +1271,11 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   const view = createView(camera, { reducedMotion, sway: swayAmount });
   const timer = new THREE.Timer(); // (advanced once per rendered frame; paused time is skipped)
   const pointer = createPointer(timer, { signal: events.signal });
-  let sets = [...fire.sets, ...plasma.sets, ...crystals.sets, ...chill.sets]; // particle sets the cursor moves (the rings join on load)
+  ctx.sets = [...fire.sets, ...plasma.sets, ...crystals.sets, ...chill.sets]; // particle sets the cursor moves (the rings join on load)
 
   // --- Sizing (fixed on-screen pixel size; the render target scales instead)
   const settings = { pixelSize: null };
-  let size = { w: 1, h: 1, pd: 4 };
+  ctx.size = { w: 1, h: 1, pd: 4 };
   const isSmall = () => container.clientWidth < 700;
   const pixelSize = () => settings.pixelSize ?? (isSmall() ? effects.render.pixelSizeSmall : effects.render.pixelSize);
   // --- Render options: the settings' own (effects.render), or absolute values over them
@@ -1333,7 +1338,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // 'flame' (always the flame's own), a debug palette ('ashen', 'moonlit'), or a few of the
   // flame's own colors ([slot, …] of scenePalette, e.g. [0, 6, 8]), which follow the flame
   // as it changes (keepPalette, every frame).
-  let paletteOverride = null;
+  ctx.paletteOverride = null;
   const paletteIndex = (id) => Math.max(0, DEBUG_PALETTES.findIndex((n) => n.toLowerCase().startsWith(id)));
   // (A few colors are put over the palette again only when something they come from changed:
   // the slots, the flame's colors (applyColors, which puts the full palette back: fewStale),
@@ -1341,68 +1346,68 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   let fewSlots = null;
   const fewBase = { void: '', shadow: '', stone: '', wood: '', bone: '' };
   function fewChanged(slots) {
-    let changed = fewStale || slots !== fewSlots;
+    let changed = ctx.fewStale || slots !== fewSlots;
     for (const k in fewBase) if (fewBase[k] !== base[k]) { fewBase[k] = base[k]; changed = true; }
-    fewStale = false;
+    ctx.fewStale = false;
     fewSlots = slots;
     return changed;
   }
   function keepPalette(force = false) {
-    const p = paletteOverride;
+    const p = ctx.paletteOverride;
     if (p === null) return;
     if (Array.isArray(p)) {
       if (!fewChanged(p) && !force) return;
-      const all = scenePalette({ ramp: currentRamp, shade: currentShade });
+      const all = scenePalette({ ramp: ctx.currentRamp, shade: ctx.currentShade });
       pass.setPalette(p.map((i) => all[i] ?? all[0]));
       return;
     }
     const index = paletteIndex(p);
-    if (!force && index === debugPaletteIndex) return;
-    debugPaletteIndex = index;
+    if (!force && index === ctx.debugPaletteIndex) return;
+    ctx.debugPaletteIndex = index;
     if (index) pass.setPalette(debugPalettes[DEBUG_PALETTES[index]]);
-    else applyColors({ ramp: currentRamp, shade: currentShade }, currentMix);
+    else applyColors({ ramp: ctx.currentRamp, shade: ctx.currentShade }, ctx.currentMix);
   }
   function setPalette(p = null) {
-    const was = paletteOverride;
+    const was = ctx.paletteOverride;
     const slots = Array.isArray(p) ? p.filter((i) => Number.isInteger(i) && i >= 0) : null;
-    paletteOverride = slots ? (slots.length ? slots : null) : p ?? null;
-    if (paletteOverride === null) {
-      if (was !== null) { debugPaletteIndex = 0; applyColors({ ramp: currentRamp, shade: currentShade }, currentMix); }
+    ctx.paletteOverride = slots ? (slots.length ? slots : null) : p ?? null;
+    if (ctx.paletteOverride === null) {
+      if (was !== null) { ctx.debugPaletteIndex = 0; applyColors({ ramp: ctx.currentRamp, shade: ctx.currentShade }, ctx.currentMix); }
       return;
     }
     // (A few of the flame's colors go over the flame's own palette, which stays the one
     // applyColors keeps, so going back to it is immediate.)
-    if (slots) debugPaletteIndex = 0;
+    if (slots) ctx.debugPaletteIndex = 0;
     keepPalette(true);
   }
   // Fog: the scene's own (light), none, or thick (near and far, meters from the camera).
   const FOGS = { light: [scene.fog.near, scene.fog.far], thick: [3.2, 8], off: [1000, 1001] };
-  let fogKind = 'light';
+  ctx.fogKind = 'light';
   function setFog(kind = 'light') {
-    fogKind = FOGS[kind] ? kind : 'light';
-    [scene.fog.near, scene.fog.far] = FOGS[fogKind];
+    ctx.fogKind = FOGS[kind] ? kind : 'light';
+    [scene.fog.near, scene.fog.far] = FOGS[ctx.fogKind];
   }
   /**
    * The fire's shadow on or off, only where shadows are drawn at all. Its strength, not
    * whether the light casts one: no shader changes (none is rebuilt), and while it's off the
    * shadow map isn't redrawn either (shadowNeedsUpdate), so it's lighter on the card.
    */
-  let shadowsOn = true;
+  ctx.shadowsOn = true;
   function setShadows(on = true) {
-    if (!!on === shadowsOn) return;
-    shadowsOn = !!on;
-    fireLight.shadow.intensity = shadowsOn ? 1 : 0;
-    if (shadowsOn) shadowFrames = Math.max(shadowFrames, 1); // (it's stale: redraw it now)
+    if (!!on === ctx.shadowsOn) return;
+    ctx.shadowsOn = !!on;
+    fireLight.shadow.intensity = ctx.shadowsOn ? 1 : 0;
+    if (ctx.shadowsOn) ctx.shadowFrames = Math.max(ctx.shadowFrames, 1); // (it's stale: redraw it now)
   }
   // X-ray (the visualizer): one of the passes the picture is built from, in place of the
   // scene but carried on through the effects and the palette (pixelPass.js uXray), or the
   // flow field over the fire. null: the picture.
   const XRAY = { normals: 1, lighting: 2, particles: 3, flow: 0 };
-  let xrayView = null;
+  ctx.xrayView = null;
   function setXray(view = null) {
-    xrayView = view in XRAY ? view : null;
-    pass.uniforms.uXray.value = XRAY[xrayView] ?? 0;
-    flowView.visible = xrayView === 'flow';
+    ctx.xrayView = view in XRAY ? view : null;
+    pass.uniforms.uXray.value = XRAY[ctx.xrayView] ?? 0;
+    flowView.visible = ctx.xrayView === 'flow';
   }
   function resize() {
     if (scope.disposed) return;
@@ -1411,7 +1416,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     const pd = Math.max(1, Math.round(cssPx * dpr));
     const w = Math.max(1, Math.ceil((container.clientWidth * dpr) / pd));
     const h = Math.max(1, Math.ceil((container.clientHeight * dpr) / pd));
-    size = { w, h, pd };
+    ctx.size = { w, h, pd };
     frame.setSize(w, h, pd);
     // (Each size has its own targets, the color pass's depth among them: the particles, all
     // sharing this uniform, test themselves against the current one.)
@@ -1425,13 +1430,13 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   }
   // The site's tall layout (a phone) frames his seat right under the page's header, with no
   // room over him to stand up in: the dance from the pack is danced in his seat there.
-  function fitKnights() { if (knights && siteKnight) knights.headroom = view.layout === 'wide'; }
+  function fitKnights() { if (ctx.knights && siteKnight) ctx.knights.headroom = view.layout === 'wide'; }
   const observer = new ResizeObserver(resize);
   observer.observe(container);
   scope.cleanup(() => observer.disconnect());
 
   // --- Per-frame update
-  let flameStep = -1;
+  ctx.flameStep = -1;
   let lightStep = -1;
   let lightFlicker = 1;
   const fireOnScreen = new THREE.Vector3();
@@ -1471,46 +1476,46 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // `dt`, `t`: the simulation's step and clock (they stop during a hit-stop); `realDt`:
   // the frame's own step (the camera, the cursor and the fades of the hit itself).
   function update(dt, t, realDt) {
-    busy = Math.max(0, busy - realDt * 0.8);
-    flashAmt *= Math.exp(-realDt / 0.05);
+    ctx.busy = Math.max(0, ctx.busy - realDt * 0.8);
+    ctx.flashAmt *= Math.exp(-realDt / 0.05);
     // Hovered (the site), the fire eases up to meet the cursor: taller, brighter, a trickle of sparks.
-    hoverGlow += ((hoverFlare ? 1 : 0) - hoverGlow) * Math.min(1, realDt * 6);
-    if (hoverGlow > 0.3 && Math.random() < realDt * 30 * hoverGlow) fire.sparkle(2);
-    fire.params.level += (targetLevel + drive.level + 1.1 * hoverGlow - fire.params.level) * Math.min(1, dt * 1.1);
+    ctx.hoverGlow += ((ctx.hoverFlare ? 1 : 0) - ctx.hoverGlow) * Math.min(1, realDt * 6);
+    if (ctx.hoverGlow > 0.3 && Math.random() < realDt * 30 * ctx.hoverGlow) fire.sparkle(2);
+    fire.params.level += (ctx.targetLevel + drive.level + 1.1 * ctx.hoverGlow - fire.params.level) * Math.min(1, dt * 1.1);
     fire.wind.set(drive.windX, 0, drive.windZ);
     // Scrolling: the loose particles and the fireflies are swept along with the page, a little.
-    sweep *= Math.exp(-realDt / 0.3);
-    if (Math.abs(sweep) > 0.004) {
-      const push = sweep * 2.6 * realDt;
-      for (const set of sets) {
+    ctx.sweep *= Math.exp(-realDt / 0.3);
+    if (Math.abs(ctx.sweep) > 0.004) {
+      const push = ctx.sweep * 2.6 * realDt;
+      for (const set of ctx.sets) {
         const V = set.vel;
         const cap = set.maxV ?? 2;
         for (let i = 0; i < set.n; i++) V[i * 3 + 1] = Math.max(-cap, Math.min(cap, V[i * 3 + 1] + push));
       }
-      fireflies.drift.set(0, sweep * 0.55, 0);
-    } else if (fireflies.drift.y) fireflies.drift.set(0, 0, 0);
+      ctx.fireflies.drift.set(0, ctx.sweep * 0.55, 0);
+    } else if (ctx.fireflies.drift.y) ctx.fireflies.drift.set(0, 0, 0);
     for (const id of ELEMENT_IDS) {
-      const d = (id === elementKey ? 1 : 0) - presence[id];
+      const d = (id === ctx.elementKey ? 1 : 0) - presence[id];
       presence[id] += Math.sign(d) * Math.min(Math.abs(d), dt / 0.6);
     }
     applyFireParams();
 
-    const sparks = interaction.update(camera, pointer.update(realDt, timer.getElapsed()), sets, dt);
+    const sparks = interaction.update(camera, pointer.update(realDt, timer.getElapsed()), ctx.sets, dt);
     if (sparks.length) fire.emitSparks(sparks);
 
     // Stepped simulation for a hand-animated look.
     const fps = effects.fire.fps;
     const fs = Math.floor(t * fps);
-    if (fs !== flameStep) {
-      const steps = flameStep < 0 || fs < flameStep ? 1 : Math.min(3, fs - flameStep);
-      flameStep = fs;
+    if (fs !== ctx.flameStep) {
+      const steps = ctx.flameStep < 0 || fs < ctx.flameStep ? 1 : Math.min(3, fs - ctx.flameStep);
+      ctx.flameStep = fs;
       for (let i = 0; i < steps; i++) fire.stepFlame(1 / fps, t);
       candleFlames.forEach((c, i) => c.mesh.scale.set(c.scale.x, c.scale.y * (0.8 + hash(fs * 1.7 + i * 9.1) * 0.4), c.scale.z));
       // The glows: the model's coals, and the current place's (the others are hidden, and
       // catch up if they're shown again: setScenery).
-      for (let i = 0; i < 4; i++) glowRamp[i].set(currentRamp[i]);
-      recolorGlows(0, sharedGlows, fs);
-      const place = sceneries[sceneryKey];
+      for (let i = 0; i < 4; i++) glowRamp[i].set(ctx.currentRamp[i]);
+      recolorGlows(0, ctx.sharedGlows, fs);
+      const place = sceneries[ctx.sceneryKey];
       if (place) recolorGlows(place.glowFrom, place.glowTo, fs);
     }
     fire.stepSparks(dt, t);
@@ -1520,30 +1525,30 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     crystals.step(dt, t, fire.params.level);
     chill.step(dt, t);
     swingTrail.step(dt, t, camera.position);
-    fx.step(dt, t);
-    zap.step(dt, t);
-    frostRing.step(dt, t);
+    ctx.fx.step(dt, t);
+    ctx.zap.step(dt, t);
+    ctx.frostRing.step(dt, t);
     for (const d of Object.values(debris)) d.step(dt);
     flowView.step(t);
     marks.step(realDt);
-    fireflies.update(dt, t, camera, pointer.cursor, interaction.flowWorld);
-    if (strikeAt >= 0 && t >= strikeAt) { strikeAt = -1; strikeFirefly(1); }
+    ctx.fireflies.update(dt, t, camera, pointer.cursor, interaction.flowWorld);
+    if (ctx.strikeAt >= 0 && t >= ctx.strikeAt) { ctx.strikeAt = -1; strikeFirefly(1); }
     // Now and then the ball reaches for a firefly on its own (more when stoked).
-    if (elementKey === 'lightning' && Math.random() < dt * effects.impact.fireflyStrikes * 0.25 * ambient() * Math.max(0.5, fire.params.level)) strikeFirefly(0.6);
+    if (ctx.elementKey === 'lightning' && Math.random() < dt * effects.impact.fireflyStrikes * 0.25 * ambient() * Math.max(0.5, fire.params.level)) strikeFirefly(0.6);
 
     // After a weapon lands: ease from the old flame into the new one, with the
     // light swelling and settling as the color turns over.
-    if (blend) {
-      blend.t = Math.min(1, blend.t + (dt / blendTime()) * (blend.fast ? 4 : 1));
-      const k = flameEase(blend.t);
-      applyColors(mixFlame(flames[blend.from], flames[blend.to], k),
-        THREE.MathUtils.lerp(lightMix(blend.from), lightMix(blend.to), k));
-      blendMul = 1 + Math.sin(blend.t * Math.PI) * 0.35;
-      if (blend.t >= 1) {
-        blend = null;
-        blendMul = 1;
-        applyColors(flames[flameKey], lightMix(flameKey));
-        fireflies?.setRamp(flames[flameKey].ramp);
+    if (ctx.blend) {
+      ctx.blend.t = Math.min(1, ctx.blend.t + (dt / blendTime()) * (ctx.blend.fast ? 4 : 1));
+      const k = flameEase(ctx.blend.t);
+      applyColors(mixFlame(flames[ctx.blend.from], flames[ctx.blend.to], k),
+        THREE.MathUtils.lerp(lightMix(ctx.blend.from), lightMix(ctx.blend.to), k));
+      ctx.blendMul = 1 + Math.sin(ctx.blend.t * Math.PI) * 0.35;
+      if (ctx.blend.t >= 1) {
+        ctx.blend = null;
+        ctx.blendMul = 1;
+        applyColors(flames[ctx.flameKey], lightMix(ctx.flameKey));
+        ctx.fireflies?.setRamp(flames[ctx.flameKey].ramp);
       }
     }
 
@@ -1551,8 +1556,8 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     if (ls !== lightStep) {
       lightStep = ls;
       lightFlicker = 0.82 + Math.random() * 0.3;
-      candleLight.intensity = sceneryKey === 'ruins' ? 0.28 + Math.random() * 0.12 : 0;
-      lampColor.set(currentRamp[1]).lerp(white, 0.3);
+      candleLight.intensity = ctx.sceneryKey === 'ruins' ? 0.28 + Math.random() * 0.12 : 0;
+      lampColor.set(ctx.currentRamp[1]).lerp(white, 0.3);
       for (const l of lamps) {
         if (!l.userData.base) continue;
         l.intensity = l.userData.base * (0.8 + Math.random() * 0.3);
@@ -1572,22 +1577,22 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     const flash = reducedMotion ? 0 : plasma.flash;
     pass.uniforms.exposure.value = (renderOverride.exposure ?? effects.render.exposure) * (1 + flash * 0.45) * boost(drive.exposure);
     keepPalette();
-    pass.uniforms.uFlash.value = reducedMotion ? 0 : flashAmt;
+    pass.uniforms.uFlash.value = reducedMotion ? 0 : ctx.flashAmt;
     // The music's color temperature (the visualizer) tints the cast light too.
     const temp = glitch.temp;
     fireLight.color.copy(lightBase);
     if (temp > 0) fireLight.color.lerp(white, temp * 0.45);
     else if (temp < 0) fireLight.color.lerp(lightWarm, -temp * 0.35);
-    fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * flicker * blendMul * (1 + flash * 1.5) * boost(drive.glow) * (1 + 0.6 * hoverGlow);
+    fireLight.intensity = effects.fire.glow * Math.min(2.6, Math.max(0.3, fire.params.level)) ** 1.3 * flicker * ctx.blendMul * (1 + flash * 1.5) * boost(drive.glow) * (1 + 0.6 * ctx.hoverGlow);
 
-    weapons.update(dt);
-    if (knights) {
+    ctx.weapons.update(dt);
+    if (ctx.knights) {
       // The armor mirrors the fire as it flickers; the knights glance at a weapon in flight.
       armor.uniforms.uFire.value = Math.min(1.6, fireLight.intensity / Math.max(0.1, effects.fire.glow));
-      const b = weapons.busy ? weapons.blade(bladeState) : null;
-      knights.update(dt, { lookAt: b && reacts() ? (b.free ? b.tip : b.mid) : null, cameraAt: camera.position });
+      const b = ctx.weapons.busy ? ctx.weapons.blade(bladeState) : null;
+      ctx.knights.update(dt, { lookAt: b && reacts() ? (b.free ? b.tip : b.mid) : null, cameraAt: camera.position });
       // (The site's: his sign, and his coming and going, after his pose.)
-      arrival?.update(dt);
+      ctx.arrival?.update(dt);
     }
 
     view.step(realDt);
@@ -1607,60 +1612,60 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // constant shudders that flicker would be gone. (Sampled at 12 fps, the blade's 8.75 Hz
   // wobble shows in the shadow as a slower, stepped one, not the blade's own rhythm.)
   const shadowLightAt = new THREE.Vector3(Infinity, 0, 0);
-  let shadowFrames = 0;
+  ctx.shadowFrames = 0;
   let shuddering = false;
   let shadowStep = -1; // (the light step of the last redraw)
   function shadowNeedsUpdate() {
-    if (!shadowsOn) return false;
-    const shudder = !!weapons?.moving && !weapons.movingForShadow;
-    const step = Math.floor(simT * LIGHT_FPS);
-    if (weapons?.movingForShadow) shadowFrames = 2;
-    else if (knights?.moving || (shudder && step !== shadowStep) || (shuddering && !shudder)) shadowFrames = Math.max(shadowFrames, 1);
+    if (!ctx.shadowsOn) return false;
+    const shudder = !!ctx.weapons?.moving && !ctx.weapons.movingForShadow;
+    const step = Math.floor(ctx.simT * LIGHT_FPS);
+    if (ctx.weapons?.movingForShadow) ctx.shadowFrames = 2;
+    else if (ctx.knights?.moving || (shudder && step !== shadowStep) || (shuddering && !shudder)) ctx.shadowFrames = Math.max(ctx.shadowFrames, 1);
     shuddering = shudder;
-    const stale = shadowFrames > 0 || !fireLight.position.equals(shadowLightAt);
-    shadowFrames = Math.max(0, shadowFrames - 1);
+    const stale = ctx.shadowFrames > 0 || !fireLight.position.equals(shadowLightAt);
+    ctx.shadowFrames = Math.max(0, ctx.shadowFrames - 1);
     shadowLightAt.copy(fireLight.position);
     if (stale) shadowStep = step;
     return stale;
   }
 
   function renderFrame(dt) {
-    const t0 = perf ? performance.now() : 0;
+    const t0 = ctx.perf ? performance.now() : 0;
     renderer.info.reset();
     const t = timer.getElapsed();
     // The visualizer drives the fire from here, so its changes land in this frame.
-    if (ready) onFrame?.(dt, t);
-    const t1 = perf ? performance.now() : 0;
+    if (ctx.ready) onFrame?.(dt, t);
+    const t1 = ctx.perf ? performance.now() : 0;
     // Hit-stop: most of a freeze's time is held back from the simulation, then repaid a
     // little faster than real time, so everything ends up where the music expects it.
     let simDt = dt;
-    if (hitStop > 0) {
-      const frozen = Math.min(hitStop, dt);
-      hitStop -= frozen;
+    if (ctx.hitStop > 0) {
+      const frozen = Math.min(ctx.hitStop, dt);
+      ctx.hitStop -= frozen;
       simDt = dt - frozen * 0.92;
-      timeDebt += frozen * 0.92;
-    } else if (timeDebt > 0) {
-      const pay = Math.min(timeDebt, dt * 0.5);
-      timeDebt -= pay;
+      ctx.timeDebt += frozen * 0.92;
+    } else if (ctx.timeDebt > 0) {
+      const pay = Math.min(ctx.timeDebt, dt * 0.5);
+      ctx.timeDebt -= pay;
       simDt = dt + pay;
     }
-    simT += simDt;
-    if (ready) update(simDt, simT, dt);
-    view.apply(dt, size, pointer);
+    ctx.simT += simDt;
+    if (ctx.ready) update(simDt, ctx.simT, dt);
+    view.apply(dt, ctx.size, pointer);
     for (const [k, u] of GLITCH_ENTRIES) pass.uniforms[u].value = passValue(k, glitch[k], stillOpts);
     pass.uniforms.uTime.value = stillClock(stillOpts) ? 0 : t;
     // The ripple is sized to the screen: radius as a fraction of the height, push per 270 rows.
-    pass.uniforms.uRippleR.value = glitch.rippleR * size.h;
-    pass.uniforms.uRippleAmp.value = reducedMotion ? 0 : (glitch.rippleAmp * size.h) / 270;
+    pass.uniforms.uRippleR.value = glitch.rippleR * ctx.size.h;
+    pass.uniforms.uRippleAmp.value = reducedMotion ? 0 : (glitch.rippleAmp * ctx.size.h) / 270;
     // Where the fire is on screen (texels): the ripple, the iris and the echoes center on it.
     fireOnScreen.set(FIRE_ORIGIN.x, 0.55, FIRE_ORIGIN.z).project(camera);
-    pass.uniforms.uCenter.value.set((fireOnScreen.x * 0.5 + 0.5) * size.w, (fireOnScreen.y * 0.5 + 0.5) * size.h);
+    pass.uniforms.uCenter.value.set((fireOnScreen.x * 0.5 + 0.5) * ctx.size.w, (fireOnScreen.y * 0.5 + 0.5) * ctx.size.h);
 
-    const t2 = perf ? performance.now() : 0;
+    const t2 = ctx.perf ? performance.now() : 0;
     const shadows = renderer.shadowMap.enabled && shadowNeedsUpdate();
-    fireflies?.place(camera); // (their instances, for the camera as it is now: fireflies.js)
+    ctx.fireflies?.place(camera); // (their instances, for the camera as it is now: fireflies.js)
     frame.draw({ shadows });
-    perf?.frame(t0, t1, t2, performance.now(), shadows);
+    ctx.perf?.frame(t0, t1, t2, performance.now(), shadows);
   }
 
   // ?perf in the page's address (the site, Bonfire Live and the Painter alike): a small
@@ -1668,12 +1673,12 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // update, the draw), the draw calls, the shadow's redraws and the GPU's programs and
   // textures, and the same times as performance.measure entries for the browser's profiler.
   // Without it nothing is timed, and the overlay's code isn't even loaded.
-  let perf = null;
+  ctx.perf = null;
   if (new URLSearchParams(location.search).has('perf')) {
     import('../ui/perfOverlay.js').then(({ createPerfOverlay }) => {
       if (scope.disposed) return;
-      perf = createPerfOverlay({ info: renderer.info, maxFps: () => gate.maxFps });
-      scope.cleanup(() => { perf?.dispose(); perf = null; });
+      ctx.perf = createPerfOverlay({ info: renderer.info, maxFps: () => gate.maxFps });
+      scope.cleanup(() => { ctx.perf?.dispose(); ctx.perf = null; });
     }, (error) => console.warn('The ?perf overlay did not load.', error));
   }
 
@@ -1685,7 +1690,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   let lastTick = -1;
   let running = false;
   function syncRunning() {
-    const should = ready && !scope.disposed && !document.hidden;
+    const should = ctx.ready && !scope.disposed && !document.hidden;
     if (should === running) return;
     running = should;
     if (running) { timer.reset(); lastTick = -1; } // (the time it was paused doesn't count)
@@ -1705,7 +1710,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // shaders are built before the first frame (frame.compile: in parallel where the browser
   // can), so drawing it doesn't stall on them.
   const loaded = modelLoaded
-    .then(() => (ready && !scope.disposed ? frame.compile().catch(() => {}) : null))
+    .then(() => (ctx.ready && !scope.disposed ? frame.compile().catch(() => {}) : null))
     .then(() => { resize(); syncRunning(); })
     .catch((error) => {
       scope.dispose();
@@ -1722,22 +1727,22 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // won't be).
   const knightsIn = !knightLater ? loaded : loaded
     .then(() => Promise.all([knightLoaded, nextFrame()]))
-    .then(([model]) => (model && ready && !scope.disposed ? inSteps(bundle.templateSteps(model)).then((template) => [model, template]) : null))
+    .then(([model]) => (model && ctx.ready && !scope.disposed ? inSteps(ctx.bundle.templateSteps(model)).then((template) => [model, template]) : null))
     .then((got) => {
       if (!got || !got[1] || scope.disposed) return null;
-      knightsShown = false; // (his sign can't be clicked, nor he summoned, till they're in)
+      ctx.knightsShown = false; // (his sign can't be clicked, nor he summoned, till they're in)
       const objects = addKnights(got[0], { template: got[1], attach: false });
       return objects.length ? frame.prepare(objects).catch(() => {}).then(() => {
         if (scope.disposed) return;
         scene.add(...objects);
-        knightsShown = true;
-        if (sign?.mode === 'lit') sign.uniforms.uGlow.value = 1.2;
+        ctx.knightsShown = true;
+        if (ctx.sign?.mode === 'lit') ctx.sign.uniforms.uGlow.value = 1.2;
       }) : null;
     })
     .catch((error) => { console.warn('The knight could not be built; the fire burns without him.', error); });
   // (Bonfire Live and the Painter can roll a style with its own model at any moment: its
   // template is built beforehand, in idle moments once the knights are in.)
-  if (fxLayer) knightsIn.then(() => { if (knights) for (const file of new Set(Object.values(MODELS))) prepareStyleModel(file); }, () => {});
+  if (fxLayer) knightsIn.then(() => { if (ctx.knights) for (const file of new Set(Object.values(MODELS))) prepareStyleModel(file); }, () => {});
   // Bonfire Live and the Painter: every other place, and its height map, built beforehand, so
   // the first visit to one doesn't freeze the show (setScenery). Not in the show's first
   // seconds (they have enough to do: PREBUILD_AFTER_MS), and then only in time the page has
@@ -1747,7 +1752,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   // site, where a visitor seldom changes place, each is built on its first visit.
   function* prepareSceneries() {
     for (const name of Object.keys(SCENERIES)) {
-      if (name === 'ruins' || !ready) continue;
+      if (name === 'ruins' || !ctx.ready) continue;
       if (!sceneries[name]) {
         yield BIG_STEP_MS;
         if (!sceneries[name]) yield* (building[name] ??= sceneryParts(name));
@@ -1768,51 +1773,51 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   if (fxLayer && typeof requestIdleCallback === 'function') {
     knightsIn
       .then(() => new Promise((resolve) => setTimeout(resolve, PREBUILD_AFTER_MS)), () => null)
-      .then(() => (ready && !scope.disposed ? inIdle(prepareSceneries()) : null))
+      .then(() => (ctx.ready && !scope.disposed ? inIdle(prepareSceneries()) : null))
       .catch((error) => console.warn('The places could not be built beforehand; each is built when first shown.', error));
   }
 
   // fire.knights: what knights.js offers, forwarded once they exist.
   const knightsApi = {
     /** Resolves true once there are knights (on the site, when he's away at load, a moment after the first frame). */
-    ready: knightsIn.then(() => !!knights, () => false),
-    get count() { return knights?.count ?? 0; },
-    get present() { return knights?.present ?? 0; },
-    get max() { return knights?.max ?? 0; },
-    get list() { return knights?.list ?? []; },
-    get positions() { return knights?.positions ?? []; },
-    get moving() { return knights?.moving ?? false; },
+    ready: knightsIn.then(() => !!ctx.knights, () => false),
+    get count() { return ctx.knights?.count ?? 0; },
+    get present() { return ctx.knights?.present ?? 0; },
+    get max() { return ctx.knights?.max ?? 0; },
+    get list() { return ctx.knights?.list ?? []; },
+    get positions() { return ctx.knights?.positions ?? []; },
+    get moving() { return ctx.knights?.moving ?? false; },
     /** Knight 0's helmet: the one he has on, or the one he's putting on mid-swap. */
-    get helmet() { return knights ? helmetGoal ?? knights.helmet : null; },
+    get helmet() { return ctx.knights ? ctx.helmetGoal ?? ctx.knights.helmet : null; },
     set helmet(name) { wearHelmet(name); },
     /** (On the site, knight 0's helmet asked for here, the visitor's pick in the pack, holds for the visit: he comes in it.) */
     setHelmet: (name, o) => {
-      if (o?.index == null || o.index === 0) visitorHelmet = HELMETS.includes(name) ? name : visitorHelmet;
+      if (o?.index == null || o.index === 0) ctx.visitorHelmet = HELMETS.includes(name) ? name : ctx.visitorHelmet;
       busyWithHim(o?.index);
       return wearHelmet(name, o);
     },
-    setCast: (o) => { if (o?.helmets) helmetGoal = null; knights?.setCast(o); },
+    setCast: (o) => { if (o?.helmets) ctx.helmetGoal = null; ctx.knights?.setCast(o); },
     /**
      * The site's knight's presence (knightArrival.js): 'away' (his sign waits on the ground),
      * 'arriving', 'resting', 'leaving'. Bonfire Live: 'resting' while knight 0 is there.
      */
-    get presence() { return arrival?.presence ?? (knights?.list[0]?.present ? 'resting' : 'away'); },
+    get presence() { return ctx.arrival?.presence ?? (ctx.knights?.list[0]?.present ? 'resting' : 'away'); },
     /** Summon him (the site: from his sign, through the forge; `instant`: at once). False if he can't come now. */
     summonKnight: (o) => summonKnight(o),
     /** Send him off (the site: he burns away into his sign; `instant`: at once). False if he isn't there. */
-    dismissKnight: (o) => arrival?.dismiss(o) ?? false,
+    dismissKnight: (o) => ctx.arrival?.dismiss(o) ?? false,
     /** Call `fn(presence)` whenever the site's knight comes or goes. Returns an unsubscribe. */
     onPresence: (fn) => { presenceListeners.add(fn); return () => presenceListeners.delete(fn); },
     /** Seconds of his rest left (the site), Infinity if it doesn't run out; settable (for tests). */
-    get restLeft() { return arrival?.restLeft ?? Infinity; },
-    set restLeft(sec) { if (arrival) arrival.restLeft = sec; },
-    summon: (i, o) => knights?.summon(i, o) ?? false,
-    dismiss: (i, o) => knights?.dismiss(i, o) ?? false,
-    sit: (i = 0) => knights?.sit(i) ?? false,
-    stand: (i = 0) => knights?.stand(i) ?? false,
-    dance: (i, o) => knights?.dance(i, o) ?? false,
+    get restLeft() { return ctx.arrival?.restLeft ?? Infinity; },
+    set restLeft(sec) { if (ctx.arrival) ctx.arrival.restLeft = sec; },
+    summon: (i, o) => ctx.knights?.summon(i, o) ?? false,
+    dismiss: (i, o) => ctx.knights?.dismiss(i, o) ?? false,
+    sit: (i = 0) => ctx.knights?.sit(i) ?? false,
+    stand: (i = 0) => ctx.knights?.stand(i) ?? false,
+    dance: (i, o) => ctx.knights?.dance(i, o) ?? false,
     gesture: (name, o) => {
-      const on = knights?.gesture(name, o) ?? false;
+      const on = ctx.knights?.gesture(name, o) ?? false;
       if (on) busyWithHim(o?.index ?? 0);
       return on;
     },
@@ -1823,7 +1828,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
      * impacts and rings) and sit up to watch a weapon in flight. The site's knight follows
      * effects.knight.reactions instead.
      */
-    setReactions: (on) => { liveReactions = !!on; },
+    setReactions: (on) => { ctx.liveReactions = !!on; },
     get reactions() { return reacts(); },
     /**
      * The fire's reflection sweeping over the armor (armor.js): `rest` (now and then) and
@@ -1844,7 +1849,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
      */
     prepareStyle: (name) => prepareStyleModel(styleModel(styleOr(name))).then((root) => styleModel(styleOr(name)) === MODELS.main || !!root),
     /** The style he's drawn in now (knightStyles.js key). */
-    get style() { return knights?.style ?? armor.style; },
+    get style() { return ctx.knights?.style ?? armor.style; },
     /** The armor's finish (steel.js FINISHES; null: the settings'), and the one he wears. */
     setFinish: (name = null) => { armorOverride.finish = name ?? null; applyArmor(); },
     get finish() { return armor.finish; },
@@ -1852,12 +1857,12 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     setRim: (v = null) => { armorOverride.rim = v ?? null; applyArmor(); },
     get rim() { return armor.rim; },
     /** How they sit (knights.js setSeatPose): 'resting' | 'watchful'; `{ index }` for one knight. The site's follows effects.knight.seat. */
-    setSeatPose: (name, o) => knights?.setSeatPose?.(name, o),
-    get seatPose() { return knights?.seatPose ?? 'resting'; },
-    lookAt: (point, o) => knights?.lookAt(point, o),
-    clock: (beatPos, period) => knights?.clock(beatPos, period),
-    slots: (name) => knights?.slots(name ?? sceneryKey) ?? null,
-    fits: (move, at, facing, name) => knights?.fits(move, at, facing, name ?? sceneryKey) ?? true,
+    setSeatPose: (name, o) => ctx.knights?.setSeatPose?.(name, o),
+    get seatPose() { return ctx.knights?.seatPose ?? 'resting'; },
+    lookAt: (point, o) => ctx.knights?.lookAt(point, o),
+    clock: (beatPos, period) => ctx.knights?.clock(beatPos, period),
+    slots: (name) => ctx.knights?.slots(name ?? ctx.sceneryKey) ?? null,
+    fits: (move, at, facing, name) => ctx.knights?.fits(move, at, facing, name ?? ctx.sceneryKey) ?? true,
   };
 
   // --- The render settings (the site's P menu, ui/renderMenu.js): cycle() steps one
@@ -1875,10 +1880,10 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       settings.pixelSize = stepIn(PIXEL_SIZES, pixelSize(), dir);
       resize();
     } else if (what === 'palette') {
-      debugPaletteIndex = (debugPaletteIndex + dir + DEBUG_PALETTES.length) % DEBUG_PALETTES.length;
-      const debug = debugPalettes[DEBUG_PALETTES[debugPaletteIndex]];
-      pass.setPalette(debug ?? scenePalette({ ramp: currentRamp, shade: flames[flameKey].shade }), { steel: !debug });
-      fewStale = true;
+      ctx.debugPaletteIndex = (ctx.debugPaletteIndex + dir + DEBUG_PALETTES.length) % DEBUG_PALETTES.length;
+      const debug = debugPalettes[DEBUG_PALETTES[ctx.debugPaletteIndex]];
+      pass.setPalette(debug ?? scenePalette({ ramp: ctx.currentRamp, shade: flames[ctx.flameKey].shade }), { steel: !debug });
+      ctx.fewStale = true;
     } else if (what === 'dither') {
       // (Up a level from what's showing now, the settings' own included, then back to none;
       // back, down a level from it, from none to the strongest.)
@@ -1899,8 +1904,8 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   /** The values as the menu shows them (Title Case, as its options are: "Off", "Ashen (3 Colors)"). */
   function describe() {
     return {
-      pixel: `${pixelSize()} px (${size.w}×${size.h})`,
-      palette: debugPaletteIndex === 0 ? flames[flameKey].name : DEBUG_PALETTES[debugPaletteIndex].replace(/(\d) color\)$/, '$1 Colors)'),
+      pixel: `${pixelSize()} px (${ctx.size.w}×${ctx.size.h})`,
+      palette: ctx.debugPaletteIndex === 0 ? flames[ctx.flameKey].name : DEBUG_PALETTES[ctx.debugPaletteIndex].replace(/(\d) color\)$/, '$1 Colors)'),
       dither: pass.uniforms.ditherStrength.value ? pass.uniforms.ditherStrength.value.toFixed(2) : 'Off',
       matrix: `${pass.uniforms.ditherScale.value}×${pass.uniforms.ditherScale.value}`,
       outlines: pass.uniforms.outlines.value ? 'On' : 'Off',
@@ -1912,7 +1917,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   const pickRay = new THREE.Raycaster();
   const pickNdc = new THREE.Vector2();
   function weaponAt(clientX, clientY) {
-    const w = weapons?.planted;
+    const w = ctx.weapons?.planted;
     if (!w) return false;
     const r = canvas.getBoundingClientRect();
     pickNdc.set(((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
@@ -1938,12 +1943,12 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       const r = canvas.getBoundingClientRect();
       pickNdc.set(((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
       pickRay.setFromCamera(pickNdc, camera);
-      onKnight = knights && knight ? knights.pick(pickRay.ray, knightHit) : -1;
+      onKnight = ctx.knights && knight ? ctx.knights.pick(pickRay.ray, knightHit) : -1;
       // (Whichever is nearest: the fire in front of him, him in front of the fire, or his sign.)
       const fireHit = pickRay.ray.intersectSphere(fireBounds, fireHitAt);
       const fireD = fireHit ? fireHit.distanceTo(pickRay.ray.origin) : Infinity;
       const knightD = onKnight >= 0 ? knightHit.distance : Infinity;
-      const signHit = sign && knightsShown ? sign.hit(pickRay.ray) : -1;
+      const signHit = ctx.sign && ctx.knightsShown ? ctx.sign.hit(pickRay.ray) : -1;
       const signD = signHit >= 0 ? signHit : Infinity;
       const nearest = Math.min(fireD, knightD, signD);
       onFire = nearest < Infinity && nearest === fireD;
@@ -1963,27 +1968,27 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
    */
   function hoverAt(clientX, clientY, { knight = true } = {}) {
     const { onWeapon, onKnight, onFire, onSign } = pickAt(clientX, clientY, { knight });
-    if (weapons) weapons.hovered = onWeapon;
-    if (sign) sign.hovered = onSign;
+    if (ctx.weapons) ctx.weapons.hovered = onWeapon;
+    if (ctx.sign) ctx.sign.hovered = onSign;
     // A hovered knight's rim warms and he turns his head to you.
-    if (knights) knights.hovered = onKnight;
-    if (onFire && !hoverFlare) armor.flare(0.7); // (the fire rises to meet the cursor: its reflection sweeps the armor)
-    hoverFlare = onFire ? 1 : 0;
+    if (ctx.knights) ctx.knights.hovered = onKnight;
+    if (onFire && !ctx.hoverFlare) armor.flare(0.7); // (the fire rises to meet the cursor: its reflection sweeps the armor)
+    ctx.hoverFlare = onFire ? 1 : 0;
     return onWeapon ? 'weapon' : onSign ? 'sign' : onKnight >= 0 ? 'knight' : onFire ? 'fire' : null;
   }
   /** Whether the knight's summon sign is under the point (client px), as hoverAt sees it: a click there summons him. */
   function signAt(clientX, clientY) {
-    return !!sign && pickAt(clientX, clientY, { knight: false }).onSign;
+    return !!ctx.sign && pickAt(clientX, clientY, { knight: false }).onSign;
   }
   /**
    * Which knight is under the point (client px): his index, or -1 (also when the weapon or
    * the fire is in front of him there, as hoverAt sees it: a click on those isn't for him).
    */
   function knightAt(clientX, clientY) {
-    return knights ? pickAt(clientX, clientY).onKnight : -1;
+    return ctx.knights ? pickAt(clientX, clientY).onKnight : -1;
   }
   /** The cursor left the scene: no hint. */
-  function hoverOff() { if (weapons) weapons.hovered = false; if (sign) sign.hovered = false; if (knights) knights.hovered = -1; hoverFlare = 0; }
+  function hoverOff() { if (ctx.weapons) ctx.weapons.hovered = false; if (ctx.sign) ctx.sign.hovered = false; if (ctx.knights) ctx.knights.hovered = -1; ctx.hoverFlare = 0; }
 
   /**
    * The living blade's flourish (the site): the planted weapon pulls free, cuts a couple of
@@ -2024,8 +2029,8 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       systems.set(o.name, s);
     });
     // (The site's one knight is a row of the breakdown's own; Bonfire Live's cast counts here.)
-    if (knights && !siteKnight) systems.set('Knights', { name: 'Knights', live: knights.present, total: knights.max });
-    return { drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, texels: `${size.w}×${size.h}`, systems: [...systems.values()] };
+    if (ctx.knights && !siteKnight) systems.set('Knights', { name: 'Knights', live: ctx.knights.present, total: ctx.knights.max });
+    return { drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, texels: `${ctx.size.w}×${ctx.size.h}`, systems: [...systems.values()] };
   }
 
   /**
@@ -2035,15 +2040,15 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   const gustRay = new THREE.Raycaster();
   const gustAt = new THREE.Vector3();
   function flash(clientX, clientY) {
-    if (!fireflies) return;
+    if (!ctx.fireflies) return;
     const r = canvas.getBoundingClientRect();
-    fireflies.flash(clientX - r.left, clientY - r.top, camera, r.width, r.height);
+    ctx.fireflies.flash(clientX - r.left, clientY - r.top, camera, r.width, r.height);
     if (reducedMotion) return;
     pickNdc.set(((clientX - r.left) / r.width) * 2 - 1, 1 - ((clientY - r.top) / r.height) * 2);
     gustRay.setFromCamera(pickNdc, camera);
     const { origin: o, direction: d } = gustRay.ray;
     const R = 0.5;
-    for (const set of sets) {
+    for (const set of ctx.sets) {
       const P = set.pos, V = set.vel;
       const cap = set.maxV ?? 2;
       for (let i = 0; i < set.n; i++) {
@@ -2063,8 +2068,8 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
   }
   /** The page scrolled by `dy` CSS px (+ down): everything loose is swept a little the way the page moved. */
   function scroll(dy) {
-    if (!ready || reducedMotion || !dy) return;
-    sweep = Math.max(-1, Math.min(1, sweep + Math.max(-150, Math.min(150, dy)) / 420));
+    if (!ctx.ready || reducedMotion || !dy) return;
+    ctx.sweep = Math.max(-1, Math.min(1, ctx.sweep + Math.max(-150, Math.min(150, dy)) / 420));
   }
 
   // (The scenery colors as last taken up. Bonfire Live blends them (colors.js) and asks every
@@ -2078,7 +2083,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     if (!moved) return;
     voidColor.set(base.void);
     scene.fog.color.set(base.void);
-    applyColors({ ramp: currentRamp, shade: currentShade }, currentMix);
+    applyColors({ ramp: ctx.currentRamp, shade: ctx.currentShade }, ctx.currentMix);
   }
 
   /**
@@ -2095,26 +2100,26 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     scene.fog.color.set(base.void);
     applyArmor();
     resize();
-    if (!ready) return;
-    fireflies.setLit(fCount(effects.fireflies.lit));
-    fireflies.speed = effects.fireflies.speed;
-    shadowFrames = 2;
+    if (!ctx.ready) return;
+    ctx.fireflies.setLit(fCount(effects.fireflies.lit));
+    ctx.fireflies.speed = effects.fireflies.speed;
+    ctx.shadowFrames = 2;
     // Colors: a flame may have been edited or deleted mid-blend, so settle on the current one.
-    flameKey = flameOr(flameKey);
-    blend = null;
-    blendMul = 1;
-    forgeFlame = null;
-    debugPaletteIndex = 0;
-    applyColors(flames[flameKey], lightMix(flameKey));
-    fireflies.setRamp(currentRamp);
-    for (const r of [fx, zap, frostRing]) r.setRamp(currentRamp);
-    weapons.setRim(currentRamp[2]);
+    ctx.flameKey = flameOr(ctx.flameKey);
+    ctx.blend = null;
+    ctx.blendMul = 1;
+    ctx.forgeFlame = null;
+    ctx.debugPaletteIndex = 0;
+    applyColors(flames[ctx.flameKey], lightMix(ctx.flameKey));
+    ctx.fireflies.setRamp(ctx.currentRamp);
+    for (const r of [ctx.fx, ctx.zap, ctx.frostRing]) r.setRamp(ctx.currentRamp);
+    ctx.weapons.setRim(ctx.currentRamp[2]);
     applyKnight();
   }
 
   return {
     stoke, puff, equip, weaponAt, knightAt, signAt, hoverAt, hoverOff, flourish, breakdown, stats, setScenery, scroll,
-    get scenery() { return sceneryKey; },
+    get scenery() { return ctx.sceneryKey; },
     /** This frame as a PNG (resolves with a Blob), at the screen's size with hard pixel edges. */
     capture: frame.capture, setView: view.setView,
     /**
@@ -2138,16 +2143,16 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     /** A jolt of the camera (0..~0.3), if screen shake is on. */
     shake: (amount) => jolt(amount),
     /** Skip ahead: a running weapon swap plays fast up to its impact. False if none is running. */
-    hurry: (factor = 4) => weapons?.hurry(factor) ?? false,
+    hurry: (factor = 4) => ctx.weapons?.hurry(factor) ?? false,
     dispose: () => scope.dispose(),
     /** Let a weapon held over the fire strike (equip with `hold`). False if none is held. */
-    release: (strikePace = 1) => weapons?.release(strikePace) ?? false,
+    release: (strikePace = 1) => ctx.weapons?.release(strikePace) ?? false,
     /** 0..1: how hard a held weapon glows. */
-    set charge(v) { if (weapons) weapons.charge = v; },
+    set charge(v) { if (ctx.weapons) ctx.weapons.charge = v; },
     /** The blade moves as if alive (the visualizer): flourishes, shudders, a held one's sway. */
-    set alive(v) { if (weapons) weapons.alive = v; },
+    set alive(v) { if (ctx.weapons) ctx.weapons.alive = v; },
     /** Where the blade is (see bladeState), or null before the model loads. */
-    get blade() { return weapons?.blade(bladeState) ?? null; },
+    get blade() { return ctx.weapons?.blade(bladeState) ?? null; },
     /** Render pixel size in CSS px (null: the settings' size). */
     setPixelSize(px) { settings.pixelSize = px; resize(); },
     /** Render options over the settings (see setRender); the palette, the fog, the shadow and the x-ray view. */
@@ -2157,26 +2162,26 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
       return {
         ...effects.render, ...renderOverride, pixelSize: pixelSize(), flameFps: effects.fire.fps,
         hitStop: effects.impact.hitStop, hitFlash: effects.impact.flash, debris: effects.impact.debris, marks: effects.impact.marks,
-        palette: paletteOverride ?? 'flame', fog: fogKind, shadows: shadowsOn && renderer.shadowMap.enabled, xray: xrayView,
+        palette: ctx.paletteOverride ?? 'flame', fog: ctx.fogKind, shadows: ctx.shadowsOn && renderer.shadowMap.enabled, xray: ctx.xrayView,
       };
     },
-    get flame() { return flameKey; },
-    get element() { return elementKey; },
-    get weapon() { return weapons?.currentKey ?? null; },
+    get flame() { return ctx.flameKey; },
+    get element() { return ctx.elementKey; },
+    get weapon() { return ctx.weapons?.currentKey ?? null; },
     /**
      * The knights (knights.js has the whole API): safe before the model loads and without
      * it (no knights, nothing happens). `ready` resolves true once there are knights.
      */
     knights: knightsApi,
     /** A weapon swap is running (or a weapon is held, waiting to strike, or swinging). */
-    get forging() { return weapons?.busy ?? false; },
-    get swinging() { return weapons?.swinging ?? false; },
-    get holding() { return weapons?.holding ?? false; },
+    get forging() { return ctx.weapons?.busy ?? false; },
+    get swinging() { return ctx.weapons?.swinging ?? false; },
+    get holding() { return ctx.weapons?.holding ?? false; },
     /** Seconds from equip() to impact at pace 1. */
-    get swapTime() { return weapons?.impactTime ?? 3.58; },
-    get fireflies() { return fireflies; },
+    get swapTime() { return ctx.weapons?.impactTime ?? 3.58; },
+    get fireflies() { return ctx.fireflies; },
     /** Internals for debugging (dev builds expose this as window.__fire). */
-    get debug() { return { weapons, knights, sign, arrival, armor, frame, fx, plasma, zap, frostRing, crystals, chill, marks, debris, view, hit: { get busy() { return busy; }, get flash() { return flashAmt; }, get debt() { return timeDebt; } } }; },
+    get debug() { return { weapons: ctx.weapons, knights: ctx.knights, sign: ctx.sign, arrival: ctx.arrival, armor, frame, fx: ctx.fx, plasma, zap: ctx.zap, frostRing: ctx.frostRing, crystals, chill, marks, debris, view, hit: { get busy() { return ctx.busy; }, get flash() { return ctx.flashAmt; }, get debt() { return ctx.timeDebt; } } }; },
     get interaction() { return interaction.mode; },
     set interaction(m) { interaction.mode = m; },
   };
