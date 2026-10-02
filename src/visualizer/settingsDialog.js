@@ -464,8 +464,17 @@ export function bindSettings(
 
   // --- setups
   const setupsEl = q('[data-setups]');
+  // (Drawn again with the focus on a setup's Load or ✕, say by that Load, the same button for
+  // the same setup gets it back: never <body>, where the dialog's keys stop working. A setup
+  // that's gone leaves it to whoever drew: Delete puts it on the next one.)
   const drawSetups = () => {
+    const had = /** @type {HTMLElement | null} */ (
+      setupsEl.contains(document.activeElement) ? document.activeElement : null
+    );
+    const attr = ['data-setup-load', 'data-setup-delete'].find((a) => had?.hasAttribute(a));
+    const name = attr && had.getAttribute(attr);
     setupsEl.innerHTML = setupsMarkup(Object.keys(readSetups()));
+    if (attr) /** @type {HTMLElement | null} */ (setupsEl.querySelector(`[${attr}="${CSS.escape(name)}"]`))?.focus();
   };
   const fileInput = /** @type {HTMLInputElement} */ (q('[data-setup-file]'));
   fileInput.addEventListener('change', async () => {

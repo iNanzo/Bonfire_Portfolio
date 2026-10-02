@@ -233,6 +233,41 @@ test('search: an imported setup named like markup is found and marked as text, n
   expect(errors).toEqual([]);
 });
 
+test('setups: Load (by key or click) keeps the focus on its button, so the dialog’s keys still work; and its Undo', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await open(page);
+  await page.keyboard.press('s');
+  await page.locator('[data-tab="setups"]').click();
+  await page.locator('[data-setup-name]').fill('Mine');
+  await page.locator('[data-setup-save]').click();
+  const load = page.locator('[data-setups] [data-setup-load="Mine"]');
+  await load.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-toast-text]')).toHaveText('Loaded “Mine”');
+  await expect(load).toBeFocused(); // (the list drawn again: the new Load for Mine)
+  await page.keyboard.press('?');
+  await expect(page.locator('.keys-overlay')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.keys-overlay')).toBeHidden();
+  await expect(dialog(page)).toBeVisible();
+  await load.click();
+  await expect(load).toBeFocused();
+  await page.keyboard.press('Control+f');
+  await expect(box(page)).toBeFocused();
+  // Undo draws the list again too: the focus stays in the dialog.
+  await page.locator('[data-toast-undo]').click();
+  await expect(page.locator('[data-toast-undo]')).toBeHidden();
+  expect(
+    await page.evaluate(() => document.querySelector('[data-settings]').contains(document.activeElement)),
+    'the focus in the dialog',
+  ).toBe(true);
+  await page.keyboard.press('/');
+  await expect(box(page)).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
 test('bulk buttons: All Off on the Looks is one change and one save; Undo puts every look back', async ({ page }) => {
   const errors = watch(page);
   await open(page, '?bench');
