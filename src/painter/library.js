@@ -35,7 +35,7 @@ export function downloadJson(name, data) {
  * One scene's card (pure markup).
  * @param {any} scene @param {string} ref @param {{ thumb?: string | null, current?: boolean, mine?: boolean }} o
  */
-export function cardMarkup(scene, ref, { thumb = null, current = false, mine = false } = {}) {
+function cardMarkup(scene, ref, { thumb = null, current = false, mine = false } = {}) {
   const sw = sceneSwatches(scene);
   const picture = thumb ? `<img src="${esc(thumb)}" alt="" width="192" height="108" loading="lazy">` : swatches(sw);
   return `
@@ -63,7 +63,7 @@ export function cardMarkup(scene, ref, { thumb = null, current = false, mine = f
     </li>`;
 }
 /** The question asked before unsaved changes are dropped. */
-export const discardText = (name) => `Discard the unsaved changes to “${name}”?`;
+const discardText = (name) => `Discard the unsaved changes to “${name}”?`;
 
 /**
  * @param {HTMLElement} el  the drawer (empty: it's filled here)

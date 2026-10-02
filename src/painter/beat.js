@@ -23,8 +23,6 @@ const BANDS = ['bass', 'lowMid', 'mid', 'highMid', 'high'];
 export const DROP_LOOP = { groove: 8, breakdown: 4, build: 4 };
 /** Bars in one turn of the drop loop. */
 export const LOOP_BARS = DROP_LOOP.groove + DROP_LOOP.breakdown + DROP_LOOP.build;
-/** The preview's shapes. */
-export const FEED_SHAPES = ['groove', 'dropLoop'];
 
 /**
  * The features of silence (the Still preview): nothing heard, no beats.

@@ -10,7 +10,7 @@ export { esc } from './html.js';
 import { esc, isSafeUrl, assetUrl, videoUrl, corners } from './html.js';
 import { logoMark } from './ui/logo.js';
 import { describedTip } from './ui/describedTip.js';
-export const isExternal = (href) => /^(https?:|mailto:)/i.test(href);
+const isExternal = (href) => /^(https?:|mailto:)/i.test(href);
 export const url = (href) => {
   if (!isSafeUrl(href)) throw new Error('Invalid link: ' + href);
   return isExternal(href) ? href : BASE + href;

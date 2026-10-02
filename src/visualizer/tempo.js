@@ -61,7 +61,7 @@ export function estimateTempo(x, { min = 70, max = 185, center = 125, width = 0.
 }
 
 /** Time since the most recent beat (s), from a comb over `x` (oldest → newest) at `period` s. */
-export function estimatePhase(x, period) {
+function estimatePhase(x, period) {
   const L = period * RATE;
   const n = x.length;
   let best = 0;

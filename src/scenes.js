@@ -68,9 +68,9 @@ export const KNIGHT_STYLE_KEYS = /* @__PURE__ */ (() => [...STYLE_KEYS, 'mix'])(
 /** The fire's shape, added to the music's drive (fractions, -1..1). */
 export const FIRE_KEYS = ['level', 'size', 'height', 'turbulence', 'glow', 'windX', 'windZ'];
 /** The flame's colors (palette.js flames: the ramp lo → core, and the shade). */
-export const RAMP_KEYS = ['lo', 'mid', 'hi', 'core', 'shade'];
+const RAMP_KEYS = ['lo', 'mid', 'hi', 'core', 'shade'];
 /** Slots a few-color palette may use (palette.js scenePalette: 0 void … 9 shade). */
-export const PALETTE_SLOTS = 10;
+const PALETTE_SLOTS = 10;
 
 // (The tables built from others are pure: a page that imports contentRules.js for
 // something else, like the site's validateEffects, leaves all of this out of its bundle.)

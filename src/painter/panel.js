@@ -93,10 +93,10 @@ export function withPath(obj, path, value) {
 }
 
 /** The flame's colors: [key, label]. */
-export const RAMP_LABELS = { lo: 'Embers', mid: 'Body', hi: 'Tips', core: 'Core', shade: 'Shade' };
-export const SCENE_LABELS = { void: 'Background', shadow: 'Shadow', stone: 'Stone', wood: 'Wood', bone: 'Bone' };
+const RAMP_LABELS = { lo: 'Embers', mid: 'Body', hi: 'Tips', core: 'Core', shade: 'Shade' };
+const SCENE_LABELS = { void: 'Background', shadow: 'Shadow', stone: 'Stone', wood: 'Wood', bone: 'Bone' };
 /** The scene palette's slots (palette.js scenePalette), as the slot picker and the gradient name them. */
-export const SLOT_NAMES = ['Background', 'Shadow', 'Stone', 'Wood', 'Bone', 'Embers', 'Body', 'Tips', 'Core', 'Shade'];
+const SLOT_NAMES = ['Background', 'Shadow', 'Stone', 'Wood', 'Bone', 'Embers', 'Body', 'Tips', 'Core', 'Shade'];
 /** What a detail's lock says it does, pinned and left to the dice. */
 export const LOCK_TIPS = { pinned: 'Pinned: stays as painted', rolled: 'Rolled each time: click to pin' };
 

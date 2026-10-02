@@ -16,7 +16,7 @@ import { CONTENT_PATH } from '../../src/contentRules.js';
 const tokens = new Map(); // installation id → { token, exp } (reused across requests in one isolate)
 
 /** PEM → PKCS#8 DER. GitHub hands out PKCS#1 ("BEGIN RSA PRIVATE KEY"); WebCrypto wants PKCS#8, so wrap it. */
-export function pemToPkcs8(pem) {
+function pemToPkcs8(pem) {
   const text = String(pem).replace(/\\n/g, '\n');
   const der = fromBase64(text.replace(/-----[^-]+-----/g, '').replace(/\s+/g, ''));
   if (!/BEGIN RSA PRIVATE KEY/.test(text)) return der;

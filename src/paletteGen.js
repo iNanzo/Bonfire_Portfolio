@@ -55,7 +55,7 @@ function oklchToLinear(L, C, h) {
 const inGamut = (rgb) => rgb.every((v) => v >= -1e-4 && v <= 1 + 1e-4);
 
 /** The most chroma sRGB can show at this lightness and hue. */
-export function maxChroma(L, h) {
+function maxChroma(L, h) {
   let lo = 0, hi = 0.4;
   for (let i = 0; i < 18; i++) {
     const mid = (lo + hi) / 2;
@@ -116,7 +116,7 @@ function pickScheme(rng) {
 }
 
 /** Lighten a text color until it reads on the background (4.5:1, with a hair of margin). */
-export function readableOn(hex, bg, min = 4.6) {
+function readableOn(hex, bg, min = 4.6) {
   let { L, C, h } = hexToOklch(hex);
   let out = hex;
   while (contrast(out, bg) < min && L < 1) {
@@ -246,7 +246,7 @@ function keepFlamesReadable(scene, flames) {
  * Tinted neutrals with a warm (or complementary) accent: the background, shadow and
  * stone share one faint hue; wood and bone take the accent.
  */
-export function makeScene({ hue, accent, tint = 0.02, lightness = [0.5, 0.5, 0.5, 0.5, 0.5] }, flames = []) {
+function makeScene({ hue, accent, tint = 0.02, lightness = [0.5, 0.5, 0.5, 0.5, 0.5] }, flames = []) {
   const Ls = SCENE_KEYS.map((k, i) => lerp(SCENE_L[k][0], SCENE_L[k][1], lightness[i]));
   const scene = {
     void: oklchToHex(Ls[0], tint * 0.8, hue),

@@ -20,23 +20,23 @@ export const CONTENT_PATH = 'src/content.json';
 export const SECTIONS = ['site', 'screens', 'weapons', 'weaponDraw', 'startingEquipment', 'hero', 'sections', 'featured', 'projects',
   'archive', 'about', 'experience', 'leadership', 'education', 'skills', 'contact', 'ui', 'notFound', 'effects'];
 /** Screens are wired into the layout and camera; their ids can't change. */
-export const SCREEN_IDS = ['home', 'projects', 'experience', 'skills', 'about', 'contact'];
+const SCREEN_IDS = ['home', 'projects', 'experience', 'skills', 'about', 'contact'];
 /** The fewest weapons a random draw may pick from. */
-export const MIN_WEAPONS = 3;
-export const flameIds = (c) => (Array.isArray(c?.effects?.flames) ? c.effects.flames.map((f) => f?.id) : []);
+const MIN_WEAPONS = 3;
+const flameIds = (c) => (Array.isArray(c?.effects?.flames) ? c.effects.flames.map((f) => f?.id) : []);
 /** Flames a random draw can pick from: it skips the current and the starting flame. */
-export const MIN_ROTATION = 3;
+const MIN_ROTATION = 3;
 export const KINDLED_SHOW = ['first', 'always', 'never'];
 /** An image's `src`: public/<src>.webp and public/<src>-card.webp. */
 export const IMAGE_RE = /^assets\/projects\/[a-z0-9-]+\/[a-z0-9-]+$/;
 /** More slots than this and the inventory grid overflows its 4×4 box. */
-export const GRID_SLOTS = 16;
+const GRID_SLOTS = 16;
 /** The `ui` texts that head a group in a menu (the pack's lists): each must say something. */
 export const UI_HEADINGS = ['packSwords', 'packGreatswords', 'packPolearms', 'packAxes', 'packSpells', 'packColors',
   'packGestures', 'packHelmets', 'packStyles', 'packFinishes'];
 
 /** Every project-like entry, in inventory order. */
-export const inventoryEntries = (c) => [c.featured, ...(c.projects ?? []), ...(c.archive ?? [])].filter(Boolean);
+const inventoryEntries = (c) => [c.featured, ...(c.projects ?? []), ...(c.archive ?? [])].filter(Boolean);
 
 /** A project's images the site shows (hidden ones stay in the repo, off the site). */
 export const shownImages = (p) => (Array.isArray(p?.images) ? p.images.filter((im) => !im?.hidden) : []);

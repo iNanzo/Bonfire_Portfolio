@@ -34,8 +34,6 @@ export const ARRIVAL_TIMES = { dissolve: 1.2, swirl: 0.3, gather: 0.6, form: 1.1
 export const REST = [180, 300];
 /** How long (s) past the end of his rest he may stay to finish what he's doing (`busy`). */
 export const BUSY_HOLD = 15;
-/** The presence states, in order. */
-export const PRESENCE = ['away', 'arriving', 'resting', 'leaving'];
 
 /**
  * @param {object} o

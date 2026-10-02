@@ -70,7 +70,7 @@ import { smoothstep } from '../math.js';
 // average, so particles can shed / fade exactly where the edge is.
 export const edgeAt = (h, jitter) => THREE.MathUtils.clamp((0.3925 + 0.3 * h + jitter) / 1.15, 0, 1);
 /** Where the edge is on a subject (0 bottom → 1 top) at dissolve amount `u` (see edgeAt). */
-export const edgeHeight = (u) => THREE.MathUtils.clamp((1.15 * u - 0.3925) / 0.3, 0, 1);
+const edgeHeight = (u) => THREE.MathUtils.clamp((1.15 * u - 0.3925) / 0.3, 0, 1);
 
 export const ease = {
   inQuad: (t) => t * t,

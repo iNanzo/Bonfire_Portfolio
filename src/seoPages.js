@@ -13,7 +13,7 @@ const clean = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
 const abs = (path) => new URL(path.replace(/^\//, ''), site.url.endsWith('/') ? site.url : `${site.url}/`).href;
 
 /** The social preview image of a page, as a path under the site ("og/<name>.jpg"). */
-export const ogImagePath = (name) => `og/${name}.jpg`;
+const ogImagePath = (name) => `og/${name}.jpg`;
 
 /**
  * Metadata for one route: { path, title, description, image, type, jsonLd }. `route`:

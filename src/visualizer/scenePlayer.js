@@ -68,8 +68,6 @@ export const FLASHY_LOOKS = ['ink'];
  * steady split, grain, bars, a repaint), shown as painted and held still.
  */
 export const MOVING_LAYERS = ['ghost', 'blur', 'flicker'];
-/** A scene's parts (holds()). */
-export const SCENE_PARTS = ['place', 'colors', 'camera', 'look', 'render', 'knights', 'fireflies'];
 /** No offsets: the fire as the music drives it. */
 export const NO_OFFSETS = Object.freeze(Object.fromEntries(FIRE_KEYS.map((k) => [k, 0])));
 

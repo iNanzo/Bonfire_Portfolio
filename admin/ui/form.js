@@ -132,7 +132,7 @@ let uid = 0;
  * An object's fields (`level`: the heading level its groups take), under its sub-headings
  * where SUBGROUPS has some for it.
  */
-export function renderObject(obj, path, ctx, level = 3) {
+function renderObject(obj, path, ctx, level = 3) {
   const box = el('div', { class: 'fields' });
   if (typeof obj.todo === 'string') box.append(renderTodo(obj, path, ctx));
   const keys = Object.keys(obj).filter((k) => k !== 'hidden' && k !== 'todo');

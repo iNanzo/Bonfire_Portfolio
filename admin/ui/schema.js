@@ -611,8 +611,8 @@ const pixelSizes = (current) => [...new Set([...PIXEL_SIZES, ...(Number.isIntege
   .sort((a, b) => Number(a) - Number(b))
   .map((n) => ({ value: n, label: PIXEL_SIZES.includes(Number(n)) ? `${n} px` : `${n} px (not in the menus)` }));
 /** The knight's arrivals and seat poses, as the Knight page names them. */
-export const ARRIVAL_NAMES = { sign: 'Summon Sign', start: 'There From the Start' };
-export const SEAT_NAMES = { resting: 'Resting', watchful: 'Watchful' };
+const ARRIVAL_NAMES = { sign: 'Summon Sign', start: 'There From the Start' };
+const SEAT_NAMES = { resting: 'Resting', watchful: 'Watchful' };
 /** Dropdowns: (draft) → [{ value, label }]. */
 export const SELECTS = {
   'hero.kindled.show': () => opts(KINDLED_SHOW),

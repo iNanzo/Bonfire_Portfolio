@@ -39,7 +39,7 @@ export const GROUPS = ['elements', 'moves', 'flyMoves', 'mirrors', 'xrayViews', 
 // Groups that always keep at least one switch on.
 export const AT_LEAST_ONE = new Set(['elements', 'moves', 'flyMoves', 'mirrors', 'xrayViews', 'knightMoves', 'knightHelmets']);
 // Effect switches (off | mix | on): groups with one per effect, and single ones.
-export const MODE_GROUPS = ['looks', 'dropFx'];
+const MODE_GROUPS = ['looks', 'dropFx'];
 export const MODE_KEYS = new Set([
   'sparks', 'echo', 'punch', 'temperature', 'breathe', 'blackout', 'flash', 'sceneColors', ...Object.keys(LAYERS),
   'pixelShift', 'outlines', 'fewColors', 'xray', 'hitStop', 'hitFlash', 'debris', 'marks',

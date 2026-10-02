@@ -41,7 +41,7 @@ import { modeOf } from './looks.js';
 // In the mix: how likely a scene hands over to a stretch of the free show, and how likely
 // a free stretch hands back to a scene.
 export const FREE_AFTER_SCENE = 0.3;
-export const SCENE_AFTER_FREE = 0.7;
+const SCENE_AFTER_FREE = 0.7;
 
 /**
  * The library's scenes that are in the loop: from where Scenes From says (sceneFrom:

@@ -166,7 +166,7 @@ export const select = (key, label, opts, { hint = '', adv = false } = {}) => {
 const ownHints = (items) => items.some(([, , itemHint]) => !!itemHint);
 
 // Effect switches: Off / In the Mix / Always.
-export const MIX_HINT = 'In the Mix: it comes and goes, rolled again each time the look changes. Always: on the whole time.';
+const MIX_HINT = 'In the Mix: it comes and goes, rolled again each time the look changes. Always: on the whole time.';
 
 /**
  * One effect's switch (a select of MODES, like any other), its hint ending with what the
