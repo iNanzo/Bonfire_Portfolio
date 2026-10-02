@@ -816,6 +816,11 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
   // this one's joints, so its points serve them all.
   const { arms: probes, body: bodyProbes, helms: helmProbes } = T.probes ?? drain(probesOf(T));
   const FEET = [bodyProbes.find((b) => b.i === BONE_INDEX.footL), bodyProbes.find((b) => b.i === BONE_INDEX.footR)];
+  // (The sprung plates' points, SPRUNG's order, and how near a shape each may come: springPlates.)
+  const SPRUNG_PROBES = SPRUNG.map(([bone]) => {
+    const b = bodyProbes.find((q) => q.i === BONE_INDEX[bone]);
+    return b ? { pc: b, depth: b.depth } : { pc: probes.get(BONE_INDEX[bone]), depth: DEPTH };
+  });
   const restPos = ALL_BONES.map((b) => new THREE.Vector3(...T.restPos[b]));
   const restQuat = ALL_BONES.map((b) => T.restQuat[b]);
   const restLocalPos = ALL_BONES.map((b, i) => {
@@ -1812,10 +1817,14 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
    * from their parents), written back into `s.q`; `snap` puts them there at once (he was just
    * placed somewhere, or sits still). The spring damps against how fast the pose itself
    * turns, so a plate moving steadily with him keeps up and only a stop or a jolt swings it.
-   * Returns whether any is still swinging (its shadow wants redrawing).
+   * A plate it would swing into the scenery stops where his pose has it (that's clear:
+   * solveClear) and goes on from there. Returns whether any is still swinging (its shadow
+   * wants redrawing).
    */
   function springPlates(k, s, snap) {
     const st = k.spring ??= SPRUNG.map(() => ({ q: new THREE.Quaternion(), v: new THREE.Vector3(), pose: new THREE.Quaternion(), set: false }));
+    const cs = snap ? null : nearOf(k);
+    if (cs?.length) place(k);
     const h = 1 / STEP_FPS / SPRING.substeps;
     const w0 = 2 * Math.PI * SPRING.hz;
     let swinging = false;
@@ -1838,8 +1847,16 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
         const out = x.v.dot(ev.normalize());
         if (out > 0) x.v.addScaledVector(ev, -out);
       }
-      if (off > 0.014 || rel.copy(x.v).sub(vt).length() > 0.3) swinging = true;
       s.q[i].copy(s.q[pi]).multiply(x.q);
+      // (Its lag or overshoot taking it into a shape: where his pose has it, moving with it.)
+      const pr = SPRUNG_PROBES[j];
+      if (cs?.length && within(s, i, pr.pc.r, pr.depth, cs).length && nearestIn(pr.pc, _shapes, pr.depth).col) {
+        x.q.copy(tq);
+        x.v.copy(vt);
+        s.q[i].copy(s.q[pi]).multiply(tq);
+        return;
+      }
+      if (off > 0.014 || rel.copy(x.v).sub(vt).length() > 0.3) swinging = true;
     });
     return swinging;
   }
