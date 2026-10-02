@@ -9,6 +9,8 @@
 //     finds nothing says so on a phone too;
 //   • #effects still opens (on Colors); Reset Flame Colors keeps your palettes, with Undo,
 //     which the focus goes to (and back to Reset from);
+//   • a deploy check for an older save that answers after a newer save is dropped: the
+//     status follows the newer save's commit, with one "live" toast and one loop;
 //   • every page's hover tips stay inside the window at 1280×720 and 390×844, and no title
 //     attribute is left (the shared tooltip shows hints).
 import { test, expect } from '@playwright/test';
@@ -264,6 +266,56 @@ test('#effects opens Colors; Reset Flame Colors keeps your palettes, and Undo pu
   await expect(reset, 'back on Reset').toBeFocused();
   await cards.first().locator('.card-toggle').click();
   await expect(cards.first().locator('[data-path$=".mid"] input.hex')).toHaveValue('#123456');
+});
+
+test('a deploy check that answers after a newer save is dropped: the status follows the newer save', async ({
+  page,
+}) => {
+  // Two saves "to GitHub" (the API here is read-only: the save is answered by the test), and
+  // the first one's check still out when the second save starts following its own commit.
+  await page.clock.install();
+  const commits = ['aaa111', 'bbb222'];
+  await page.route('**/api/save', (route) => {
+    const sha = commits.shift();
+    return route.fulfill({ json: { contentSha: `c-${sha}`, commit: { sha, url: `https://example.test/c/${sha}` } } });
+  });
+  const asked = [];
+  let firstAsked;
+  const firstOut = new Promise((resolve) => (firstAsked = resolve));
+  let answerFirst;
+  const firstHeld = new Promise((resolve) => (answerFirst = resolve));
+  await page.route(/\/api\/deploy\?/, async (route) => {
+    const sha = new URL(route.request().url()).searchParams.get('commit');
+    asked.push(sha);
+    if (sha !== 'aaa111') return route.fulfill({ json: { state: 'live' } });
+    firstAsked();
+    await firstHeld; // (the newer push cancels this run: it answers "failed")
+    return route.fulfill({ json: { state: 'failed', url: 'https://example.test/run/a' } });
+  });
+  await open(page, 'home');
+  const field = page.locator('[data-path="hero.eyebrow"]').locator('input, textarea').first();
+  const status = page.locator('[data-status]');
+
+  await field.fill('First save');
+  await page.locator('[data-save]').click();
+  await expect(status).toContainText('waiting for the deploy');
+  await page.clock.fastForward(4000); // (the first check)
+  await firstOut;
+  await field.fill('Second save');
+  await page.locator('[data-save]').click();
+  await expect(status.getByRole('link', { name: 'commit' })).toHaveAttribute('href', /bbb222$/);
+  const late = page.waitForResponse(/commit=aaa111/);
+  answerFirst();
+  await late;
+  await page.waitForTimeout(300); // (time for the page to read it, if it were going to)
+  await expect(status, 'not the older run’s result').toContainText('waiting for the deploy');
+  await expect(status.getByRole('link', { name: 'commit' })).toHaveAttribute('href', /bbb222$/);
+
+  await page.clock.fastForward(4000); // (the newer save's first check)
+  await expect(status).toContainText('Live on the site');
+  await expect(page.locator('.toast', { hasText: 'Your changes are live.' })).toHaveCount(1);
+  await page.clock.fastForward(60_000);
+  expect(asked, 'one check each: nothing left following the older commit').toEqual(['aaa111', 'bbb222']);
 });
 
 for (const [w, h] of [

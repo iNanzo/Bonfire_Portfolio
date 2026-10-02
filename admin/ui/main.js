@@ -62,6 +62,7 @@ const state = {
   saving: false,
   deploy: null,
   deployTimer: 0,
+  deployRun: 0, // which save's deploy is being followed (followDeploy)
 };
 const ctx = {
   draft: null,
@@ -783,18 +784,24 @@ async function save() {
 
 // Follows the deploy until the run completes (its schedule: deployFollow.js). The run waits
 // for all of CI, about 13–15 minutes; past FOLLOW_FOR the status says it's still deploying,
-// with a link to the run, instead of staying busy.
+// with a link to the run, instead of staying busy. A newer save follows its own commit: a
+// check for the older one still out then is dropped when it answers, or it would show the
+// older run's result (cancelled by the newer push: "failed") and start a second loop.
 function followDeploy() {
   clearTimeout(state.deployTimer);
+  const run = ++state.deployRun;
+  const commit = state.deploy?.commit;
+  if (!commit) return;
   const started = Date.now();
   const tick = async () => {
-    const commit = state.deploy?.commit;
-    if (!commit) return;
+    let answer = null;
     try {
-      state.deploy = { ...state.deploy, ...(await api(`/api/deploy?commit=${commit.sha}`)) };
+      answer = await api(`/api/deploy?commit=${commit.sha}`);
     } catch {
       /* try again */
     }
+    if (run !== state.deployRun) return;
+    if (answer) state.deploy = { ...state.deploy, ...answer };
     if (state.deploy.state === 'live') toast('Your changes are live.');
     const done = ['live', 'failed'].includes(state.deploy.state);
     const wait = done ? null : nextDeployCheck(Date.now() - started);
