@@ -76,13 +76,19 @@
  */
 
 /**
- * What main.js still gives the parts (until each moves into one of its own).
- * @typedef {object} MainPart
- * @property {() => void} mirrorCard  copy the title card into the output window
+ * The start screen (start.js).
+ * @typedef {object} StartPart
+ * @property {() => void} frameFire  the fire moves aside for the start menu, or back
  * @property {(text: string) => void} showError  the start screen's error line says `text`
  * @property {() => void} hideError
  * @property {(message?: string) => void} showStart  back to the start screen (saying why, if `message`)
  * @property {() => void} goLive  the music started: the HUD instead of the start screen
+ */
+
+/**
+ * What main.js still gives the parts (until each moves into one of its own).
+ * @typedef {object} MainPart
+ * @property {() => void} mirrorCard  copy the title card into the output window
  * @property {(tab?: string, o?: { search?: boolean }) => void} openSettings
  * @property {(key: string | string[]) => void} applySettings  a setting (or the ones a preset changed) changed
  * @property {any} settingsPanel  settingsDialog.js bindSettings: the settings dialog
@@ -90,6 +96,6 @@
  * @property {any} renderMenu  ui/renderMenu.js: Render Settings (P)
  */
 
-/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & HudPart & MainPart} LiveContext */
+/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & MainPart} LiveContext */
 
 export {};

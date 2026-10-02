@@ -54,7 +54,7 @@ import { SHOTS } from './camera.js';
 import { MODES, modeOf } from './looks.js';
 import { COLOR_MODES } from './colors.js';
 import { densityCounts } from './density.js';
-import { loadSettings, saveSettings, flushSettings, applyPreset, PRESETS, defaults, frameCap } from './settings.js';
+import { loadSettings, saveSettings, flushSettings, defaults, frameCap } from './settings.js';
 import { bindSettings, markPreset } from './settingsDialog.js';
 import { KEY_GROUPS, keyList } from './keys.js';
 import { createTickBatch } from './tickBatch.js';
@@ -69,7 +69,8 @@ import { createScenesUi } from './scenesUi.js';
 import { createCards } from './cards.js';
 import { createSources } from './sources.js';
 import { createHud, wieldLabel } from './hud.js';
-import { q, qa, typing, toggleFullscreen, failScene } from '../ui/shell.js';
+import { createStart } from './start.js';
+import { q, typing, toggleFullscreen, failScene } from '../ui/shell.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
 import { createPack, bonfireItems } from '../ui/pack.js';
@@ -125,7 +126,7 @@ const askedScene = params.get('scene');
 ctx.firstScene = askedScene ? ctx.findScene(askedScene) : null;
 ctx.solo = ctx.firstScene && params.has('solo') ? ctx.firstScene.ref : null;
 // (What main.js still gives the parts, until each moves out.)
-Object.assign(ctx, { openSettings, applySettings, mirrorCard, showError, hideError, showStart, goLive });
+Object.assign(ctx, { openSettings, applySettings, mirrorCard });
 
 // --- The bonfire ---------------------------------------------------------------------------
 const IDLE = { state: 'silent', bands: Object.fromEntries(BAND_NAMES.map((b) => [b, 0])), level: 0, beats: [], events: [], kick: 0, hat: 0, bpm: 0, locked: false, build: 0 };
@@ -196,7 +197,7 @@ function startScene() {
     recorder?.stop(); // (a clip ends with the scene it was recording)
     ctx.fire = candidate;
     ctx.director = nextDirector;
-    frameFire();
+    ctx.frameFire();
     applyFrameRate();
     // (Dev builds, and any build with ?bench in its address: tools/bench-viz.mjs drives the show through it.)
     if (import.meta.env.DEV || new URLSearchParams(location.search).has('bench')) window.__viz = { fire: ctx.fire, director: ctx.director, settings, get engine() { return ctx.engine; }, get features() { return ctx.lastFeatures; } };
@@ -242,70 +243,11 @@ Object.assign(ctx, createCards(ctx));
 // --- The sound (sources.js): a line in, a shared tab or the system, a file, the demo ----------
 Object.assign(ctx, createSources(ctx));
 
-// --- Start screen ----------------------------------------------------------------------------
-const fileInput = q('[data-file]');
-qa('[data-source]').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    if (btn.dataset.source === 'file') fileInput.click();
-    else ctx.useSource(btn.dataset.source);
-  });
-});
-fileInput.addEventListener('change', () => {
-  const file = fileInput.files?.[0];
-  fileInput.value = '';
-  if (file) ctx.useSource('file', { file });
-});
-// Drop a file anywhere.
-window.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.items ?? [])].some((i) => i.kind === 'file')) e.preventDefault(); });
-window.addEventListener('drop', (e) => {
-  const file = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith('audio/') || /\.(mp3|wav|flac|aac|m4a|ogg|opus|aiff?)$/i.test(f.name));
-  if (!file) return;
-  e.preventDefault();
-  ctx.useSource('file', { file });
-});
-if (navigator.mediaDevices?.enumerateDevices) ctx.listDevices();
-
-// On the start screen the fire moves aside for the menu: to its right on a landscape
-// screen (further on a narrower one, where the menu takes more of it), above it on a tall one.
-function frameFire() {
-  if (!ctx.director) return;
-  const menu = document.body.dataset.mode === 'start';
-  const side = innerWidth >= 760 && innerWidth > innerHeight;
-  ctx.director.frame(menu && side ? (innerWidth >= 1100 ? 0.2 : 0.36) : 0, menu && !side ? 0.24 : 0);
-}
-window.addEventListener('resize', frameFire);
-
-function showError(text) { errorEl.textContent = text; errorEl.hidden = false; }
-function hideError() { errorEl.hidden = true; }
-
-function showStart(message) {
-  document.body.dataset.mode = 'start';
-  start.hidden = false;
-  hud.hidden = true;
-  if (settingsDialog.open) settingsDialog.close();
-  if (message) showError(message);
-  frameFire();
-  q('#viz-title').focus({ preventScroll: true });
-}
-function goLive() {
-  document.body.dataset.mode = 'live';
-  start.hidden = true;
-  hud.hidden = false;
-  const s = ctx.engine.source;
-  q('[data-source-name]').textContent = `${{ input: 'Line in', capture: 'Shared audio', file: 'File', demo: 'Demo' }[s.kind]}: ${s.name}`;
-  q('[data-transport]').hidden = !s.media;
-  q('[data-track]').textContent = s.media ? s.name : '';
-  q('[data-volume-row]').hidden = !s.playback;
-  if (ctx.fire) q('[data-wield]').textContent = wieldLabel({ weapon: ctx.fire.weapon, flame: ctx.fire.flame, element: ctx.fire.element });
-  live.textContent = `Listening to ${s.name}.`;
-  frameFire();
-  ctx.keepAwake();
-  ctx.wake();
-}
+// --- Start screen (start.js): the sources, the presets; to the show and back --------------------
+Object.assign(ctx, createStart(ctx));
 
 // --- HUD (hud.js): what it hears, the beat, the state line, the labels that change; idle -------
 Object.assign(ctx, createHud(ctx));
-
 
 // --- Actions ---------------------------------------------------------------------------------
 document.addEventListener('fullscreenchange', () => {
@@ -356,7 +298,7 @@ const actions = {
     if (m.paused) m.play(); else m.pause();
     q('[data-act="play"]').textContent = m.paused ? 'Play' : 'Pause';
   },
-  'change-source': () => { ctx.stopSource(); showStart(); },
+  'change-source': () => { ctx.stopSource(); ctx.showStart(); },
   'show-title': () => { if (!settings.title.trim()) q('[data-set="title"]').focus(); else { settingsDialog.close(); ctx.showCard(0); } },
   output: () => openOutput(),
   record: () => recorder.toggle(),
@@ -668,18 +610,9 @@ settingsDialog.addEventListener('click', async (e) => {
   if (forget) midi.forget(forget.dataset.midiForget);
 });
 
-// The start screen's presets: a kind of night in one click, before the music starts.
-q('[data-feel]').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-preset]');
-  if (!b) return;
-  applyPreset(settings, b.dataset.preset);
-  applySettings(Object.keys(PRESETS[b.dataset.preset].values));
-  flushSettings();
-  ctx.note(`Preset: ${PRESETS[b.dataset.preset].name}`, 1.5);
-});
 markPreset(start, settings);
 ctx.drawChips();
-if (askedScene && !ctx.firstScene) showError('That scene isn’t in this browser (it may have been made in another one). Pick another below, or make one in the Painter.');
+if (askedScene && !ctx.firstScene) ctx.showError('That scene isn’t in this browser (it may have been made in another one). Pick another below, or make one in the Painter.');
 
 // --- Beat by hand: a typed BPM, nudges -----------------------------------------------------
 const bpmInput = q('[data-bpm-set]');
