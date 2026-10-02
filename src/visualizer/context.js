@@ -32,6 +32,7 @@
  * @property {Record<string, any> | null} lastFeatures  what the director was last handed (analyser.js features)
  * @property {SceneEntry | null} firstScene  the preset scene the show opens on (?scene=, a chip, N on the start screen)
  * @property {string | null} solo  the ref of the scene playing on its own (the Painter's "Play in Bonfire Live"), or null
+ * @property {any} recorder  record.js: a clip of the picture and the sound (V)
  */
 
 /**
@@ -86,16 +87,25 @@
  */
 
 /**
+ * What the page does when it's asked (actions.js).
+ * @typedef {object} ActionsPart
+ * @property {Record<string, () => void>} actions  each button's action, by its data-act (the pack and the MIDI pads use them too)
+ */
+
+/**
  * What main.js still gives the parts (until each moves into one of its own).
  * @typedef {object} MainPart
  * @property {() => void} mirrorCard  copy the title card into the output window
  * @property {(tab?: string, o?: { search?: boolean }) => void} openSettings
+ * @property {() => void} openKeys  the keyboard shortcuts (?)
+ * @property {() => void} openOutput  the output window, for a projector (O)
+ * @property {any} pack  ui/pack.js: the pack (I)
  * @property {(key: string | string[]) => void} applySettings  a setting (or the ones a preset changed) changed
  * @property {any} settingsPanel  settingsDialog.js bindSettings: the settings dialog
  * @property {any} keysOverlay  ui/keysOverlay.js: every shortcut (?)
  * @property {any} renderMenu  ui/renderMenu.js: Render Settings (P)
  */
 
-/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & MainPart} LiveContext */
+/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & MainPart} LiveContext */
 
 export {};
