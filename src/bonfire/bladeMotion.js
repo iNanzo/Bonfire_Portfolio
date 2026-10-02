@@ -48,7 +48,7 @@ const _bx = new THREE.Vector3();
 const _by = new THREE.Vector3();
 const _bz = new THREE.Vector3();
 /** World rotation pointing the blade along d (grip → tip) with its flat facing n. */
-export function orient(d, n, out) {
+function orient(d, n, out) {
   _by.copy(d).negate();
   _bz.copy(n).addScaledVector(d, -n.dot(d));
   if (_bz.lengthSq() < 1e-8) _bz.set(0, 0, 1).addScaledVector(d, -d.z);
