@@ -92,12 +92,20 @@ export async function checkTip(page, trigger, { mode = 'hover', timeout = 2000 }
     await page.mouse.move(0, 0);
     await trigger.hover();
   } else if (via === 'tap') await trigger.tap();
-  // This trigger's tip: showing, with its words (not one still going from before).
-  const shown = await page.waitForFunction((w) => {
+  // This trigger's tip: showing, with its words (not one still going from before). A label
+  // that changes on its own while it's checked (Bonfire Live's Forge / Strike, as the demo
+  // holds a weapon over the fire and strikes it) counts with either words: the ones it had when
+  // the check began, or the ones it has now.
+  const el = await trigger.elementHandle();
+  const shown = await page.waitForFunction(([node, w]) => {
     const t = document.querySelector('.ui-tip');
     if (!t || !t.getClientRects().length) return false;
-    return t.querySelector('.ui-tip-text')?.textContent === w.text && (t.querySelector('.ui-tip-title')?.textContent ?? '') === w.title;
-  }, want, { timeout }).then(() => true, () => false);
+    const text = t.querySelector('.ui-tip-text')?.textContent;
+    const title = t.querySelector('.ui-tip-title')?.textContent ?? '';
+    const now = { text: node.getAttribute('data-tip') ?? '', title: node.getAttribute('data-tip-title') ?? '' };
+    return [w, now].some((words) => text === words.text && title === words.title);
+  }, [el, want], { timeout }).then(() => true, () => false);
+  await el.dispose();
   const viewport = page.viewportSize() ?? await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
   if (!shown) return { shown, rect: null, viewport, coversTrigger: false, text: '', via };
   const rect = await tip.boundingBox();

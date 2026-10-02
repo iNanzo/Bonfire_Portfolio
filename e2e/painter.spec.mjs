@@ -321,8 +321,9 @@ test('a bulk toolbar sets every layer at once, and one Ctrl+Z puts them all back
   await page.click('[data-bulk="on"][data-bulk-group="layers"]');
   const radios = page.locator('[data-sec="layers"] fieldset.tri input:checked');
   await expect(radios).toHaveCount(14);
-  const values = await radios.evaluateAll((els) => els.map((el) => /** @type {HTMLInputElement} */ (el).value));
-  expect(values.filter((v) => v === 'on').length).toBe(13); // (Painterly and Watercolor never both Always)
+  // (The Painter fills its panel again on the next animation frame: the radios are read until they show it.)
+  await expect.poll(() => radios.evaluateAll((els) => els.filter((el) => /** @type {HTMLInputElement} */ (el).checked && /** @type {HTMLInputElement} */ (el).value === 'on').length))
+    .toBe(13); // (Painterly and Watercolor never both Always)
   await expect(page.locator('[data-note]')).toContainText('Layers: All Always');
   await page.keyboard.press('Control+z');
   await expect.poll(() => radios.evaluateAll((els) => els.every((el) => /** @type {HTMLInputElement} */ (el).value === 'off'))).toBe(true);
