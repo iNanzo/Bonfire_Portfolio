@@ -151,6 +151,13 @@ export function createActions(ctx) {
       ctx.renderMenu.close();
       return;
     }
+    // In the show, Shift+1…9 shows a title card by the key's place, whatever it types: before
+    // ? and /, which are what Shift+7 types on German, Spanish, Italian or Russian keyboards.
+    const live = document.body.dataset.mode === 'live' && !!ctx.fire;
+    if (live && e.shiftKey && /^Digit[1-9]$/.test(e.code)) {
+      ctx.showCard(Number(e.code.slice(5)) - 1);
+      return;
+    }
     // ? lists the shortcuts; / opens the settings at their search box.
     if (isHelpKey(e)) {
       e.preventDefault();
@@ -175,7 +182,7 @@ export function createActions(ctx) {
       if (e.shiftKey) ctx.cycleScenes();
       else ctx.nextScene();
       ctx.wake();
-    } else if (document.body.dataset.mode !== 'live' || !ctx.fire) return;
+    } else if (!live) return;
     else if (e.key === ' ') {
       e.preventDefault();
       actions.drop();
@@ -187,7 +194,6 @@ export function createActions(ctx) {
     else if (e.key === ']') nudge(0.01);
     else if (k === 'o') ctx.openOutput();
     else if (k === 'v') actions.record();
-    else if (e.shiftKey && /^Digit[1-9]$/.test(e.code)) ctx.showCard(Number(e.code.slice(5)) - 1);
     else if (k === 'c') actions.cut();
     else if (k === 'r') ctx.director.ring(1);
     else if (k === 'x') actions.combo();

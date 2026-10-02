@@ -770,3 +770,51 @@ test('the keyboard shortcuts: the same keys as ever, in four groups, plus ? and 
       assert.ok(row.label.length <= 120 && !/blade/i.test(row.label), `${row.keys}: "${row.label}"`);
   assert.match(html, /data-row="key:\d+"/, 'the search finds them');
 });
+
+test('the keyboard shortcuts: Shift+7 is title card 7 in the show even where it types / or ?; / and ? still work', async () => {
+  // The page's keydown (src/visualizer/actions.js) on a stand-in page: what each press did.
+  const did = [];
+  let onKey = null;
+  const node = () => ({ addEventListener() {}, open: false, focus() {} });
+  const saved = { document: globalThis.document, window: globalThis.window };
+  const body = { dataset: { mode: 'live' }, classList: { toggle() {}, remove() {} } };
+  globalThis.document = /** @type {any} */ ({ addEventListener() {}, querySelector: node, body });
+  globalThis.window = /** @type {any} */ ({
+    addEventListener: (type, fn) => {
+      if (type === 'keydown') onKey = fn;
+    },
+  });
+  try {
+    const { createActions } = await import('../src/visualizer/actions.js');
+    createActions(
+      /** @type {any} */ ({
+        settings: {},
+        fire: {},
+        renderMenu: { handleKey: () => false, isOpen: false },
+        keysOverlay: { el: { open: false } },
+        openKeys: () => did.push('keys'),
+        openSettings: (tab, o) => did.push(o?.search ? 'search' : 'settings'),
+        showCard: (i) => did.push(`card ${i + 1}`),
+        wake() {},
+      }),
+    );
+    const press = (key, code, shiftKey = false) => {
+      did.length = 0;
+      onKey({ key, code, shiftKey, target: null, preventDefault() {} });
+      return [...did];
+    };
+    assert.deepEqual(press('&', 'Digit7', true), ['card 7'], 'US: Shift+7 types &');
+    assert.deepEqual(press('/', 'Digit7', true), ['card 7'], 'German, Spanish, Italian: Shift+7 types /');
+    assert.deepEqual(press('?', 'Digit7', true), ['card 7'], 'Russian: Shift+7 types ?');
+    assert.deepEqual(press('/', 'Slash'), ['search']);
+    assert.deepEqual(press('?', 'Slash', true), ['keys']);
+    assert.deepEqual(press('?', 'Minus', true), ['keys'], 'German: ? is Shift+ß');
+    // Before the show (the start screen) there are no cards: / and ? are the search and the list.
+    body.dataset.mode = 'start';
+    assert.deepEqual(press('/', 'Digit7', true), ['search']);
+    assert.deepEqual(press('?', 'Digit7', true), ['keys']);
+  } finally {
+    globalThis.document = saved.document;
+    globalThis.window = saved.window;
+  }
+});
