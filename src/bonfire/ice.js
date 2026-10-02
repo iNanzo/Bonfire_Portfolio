@@ -34,12 +34,13 @@ import * as THREE from 'three';
 import { effects } from '../effects.js';
 import { createBoltLines, seeded } from './bolts.js';
 import { ringNoise } from './rings.js';
-import { clamp01, TAU } from '../math.js';
+import { clamp01, easeOutBack, TAU } from '../math.js';
 import { createPoints, rampColors, setRampColors } from './points.js';
 import { iceGlint } from './signatures.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
-const easeOutBack = (t) => { const c = 1.9; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; };
+/** How far ice overshoots as it pops up (easeOutBack's `c`). */
+const OVERSHOOT = 1.9;
 
 // A crystal: hexagonal prism, slightly irregular and tapering, with an off-center point.
 // Radius ~1, base at y = −0.15, tip at y = 1.
@@ -309,7 +310,7 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
     }
     for (const tf of tufts) {
       if (tf.t <= 0) continue;
-      const env = tf.t < TUFT_RISE ? easeOutBack(tf.t / TUFT_RISE)
+      const env = tf.t < TUFT_RISE ? easeOutBack(tf.t / TUFT_RISE, OVERSHOOT)
         : tf.t < TUFT_RISE + tf.hold ? 1
           : 1 - clamp01((tf.t - TUFT_RISE - tf.hold) / TUFT_SINK) ** 2;
       if (!tf.chipped) {
@@ -432,7 +433,7 @@ export function createCrystals({ fxMaterial, glintMaterial = fxMaterial, origin,
       const p = clamp01((grow - sDelay[i] * 0.6) / 0.45);
       if (p <= 0) continue;
       slotOf[i] = n;
-      const g = active ? easeOutBack(p) : p * p * (3 - 2 * p);
+      const g = active ? easeOutBack(p, OVERSHOOT) : p * p * (3 - 2 * p);
       if (i < crystals) {
         const h = sH[i] * g * (1 + pulse * 0.05);
         const w = 0.55 + 0.45 * Math.min(1, g);
@@ -690,7 +691,7 @@ export function createIceRing({ fxMaterial, glintMaterial = fxMaterial, origin, 
         if (tau <= 0) continue;
         const RISE = 0.07, SINK = 0.16;
         let env;
-        if (tau < RISE) env = easeOutBack(tau / RISE);
+        if (tau < RISE) env = easeOutBack(tau / RISE, OVERSHOOT);
         else if (tau < RISE + S.hold[i]) env = 1;
         else env = 1 - clamp01((tau - RISE - S.hold[i]) / SINK) ** 2;
         if (env <= 0.001) continue;

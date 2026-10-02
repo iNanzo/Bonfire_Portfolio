@@ -15,10 +15,10 @@
 import { dragOrbit, orbitPose, panOrbit, poseToOrbit, zoomOrbit } from '../ui/orbit.js';
 import { keepInClearing } from '../visualizer/clearing.js';
 import { SCENE_RANGES, TARGET_BOX } from '../scenes.js';
+import { clamp } from '../math.js';
 
 /** How far a painted camera may tilt up or down and come in or go out. */
 export const PAINT_LIMITS = { pitch: [-0.35, 1.45], dist: [0.6, 9] };
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /**
  * A scene camera moved to an orbit: the position kept in the clearing, the point it looks at

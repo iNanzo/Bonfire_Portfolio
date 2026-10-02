@@ -17,6 +17,7 @@
 //
 // The individual ingredients stay available for comparison (?lab, or P then 6).
 import * as THREE from 'three';
+import { smoothstep } from '../math.js';
 
 export const MODES = {
   ember: { name: 'Ember', blurb: 'The mix: stir + a soft part + a gentle lean, with a slash only on fast swings.' },
@@ -31,8 +32,6 @@ const CELL = 24;          // stir grid cell size (px)
 const VORTEX_CORE = 24;   // wake vortex core radius (px)
 const VORTEX_LIFE = 0.9;  // seconds
 const VORTEX_GAP = 22;    // px of cursor travel between vortex pairs
-
-const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export function createInteraction({ reducedMotion = false } = {}) {
   let mode = 'ember';

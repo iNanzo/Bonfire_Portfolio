@@ -27,7 +27,7 @@ import * as THREE from 'three';
 import { effects } from '../effects.js';
 import { createBoltLines, hashSeed, seeded } from './bolts.js';
 import { DITHER_GLSL } from './flame.js';
-import { smoothstep, TAU } from '../math.js';
+import { easeOutBack, smoothstep, TAU } from '../math.js';
 import { createPoints, rampColors, setRampColors } from './points.js';
 import { arcJitter, arcHeat, ARC_FLASH } from './signatures.js';
 
@@ -39,7 +39,8 @@ const FLASH = MAX_FILAMENTS * 3;
 const CONTACT_LIGHTS = 4;
 const IMPACT_GLOWS = 6;
 const UP = new THREE.Vector3(0, 1, 0);
-const easeOutBack = (t) => { const c = 1.6; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; };
+/** How far the ball overshoots as it grows (easeOutBack's `c`). */
+const OVERSHOOT = 1.6;
 
 // A glow: a camera-facing disc, depth-tested like the particles, stepping inner → mid
 // → outer with a dithered falloff. Its middle carries "heat" so the pixel pass burns
@@ -253,7 +254,7 @@ export function createPlasma({ fxMaterial, hotMaterial, sparkMaterial = fxMateri
     }
     live = true;
     const stoked = Math.max(0, Math.min(2.2, level - 1)); // 0 at rest, up to 2.2 on an impact
-    const grow = easeOutBack(amount);
+    const grow = easeOutBack(amount, OVERSHOOT);
     const R = L.size * grow * (1 + stoked * 0.08);
     const crackle = reducedMotion ? Math.min(6, L.crackle) : L.crackle;
     const cs = Math.floor(t * crackle);
@@ -551,7 +552,7 @@ export function createPlasma({ fxMaterial, hotMaterial, sparkMaterial = fxMateri
     discharge,
     /** Where the ball hangs (world), and its radius now. */
     center,
-    get radius() { return effects.lightning.size * easeOutBack(amount); },
+    get radius() { return effects.lightning.size * easeOutBack(amount, OVERSHOOT); },
     /** A bolt jumps from the ball to `to` (a position it follows, e.g. a firefly's) for `duration` s. */
     jump(to, duration = 0.16) {
       if (reducedMotion || amount < 0.3 || jumps.length >= 3) return false;
