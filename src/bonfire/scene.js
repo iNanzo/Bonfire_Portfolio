@@ -15,6 +15,23 @@
 //
 // A knight rests at the fire and reacts to it (sceneKnight.js); on the site he comes and goes
 // from his summon sign, and in Bonfire Live a few dance round the fire.
+//
+// createBonfire builds it all and returns its API. It makes the renderer and its passes, the
+// flame, the elements and their particles, the flame's colors, the frame loop and the moment
+// the scene is ready; the rest are parts of their own, each made with the one `ctx` they
+// share (sceneContext.js says what's in it), in this order:
+//   sceneIdle.js     work spread over idle moments (a knight's template, the places ahead)
+//   sceneModel.js    the model, and the weapons, the fireflies and the rings made from it
+//   sceneScenery.js  the places around the fire and their height maps
+//   sceneFire.js     hits, stokes, impacts, beats, rings, the living blade
+//   sceneRender.js   render options over the settings, the size, the P menu, the breakdown
+//   sceneUpdate.js   the per-frame update, the shadow's redraws, the frame itself
+//   sceneKnight.js   the knights' style, the site's knight, fire.knights
+//   scenePick.js     what's under the cursor, a click's gust, the scroll's sweep
+// (and the lights, sceneLights.js, made first). Each is made at its own point in the build:
+// what it makes, fetches or hangs on a promise as it's made keeps its place among the rest
+// (three.js numbers its objects and materials as they're made, and sorts what it draws by
+// those numbers where nothing else decides).
 import * as THREE from 'three';
 import { createResourceScope } from './resources.js';
 import { startingEquipment } from '../content.js';
@@ -49,7 +66,6 @@ import { createSceneRender } from './sceneRender.js';
 import { createSceneUpdate } from './sceneUpdate.js';
 import { createScenePick } from './scenePick.js';
 import { createSceneKnight, createKnightsApi } from './sceneKnight.js';
-
 
 export function createBonfire(container, { reducedMotion = false, paintedLook = false, sway: swayAmount = 1, lightTrails = false, effects: fxLayer = false, knightHelmet = null, onImpact, onFormed, onRamp, onError, onFrame, onTick } = {}) {
   const scope = createResourceScope();
@@ -103,8 +119,9 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
 
   const camera = new THREE.PerspectiveCamera(30, 16 / 9, 0.1, 40);
 
-  // The state the scene's parts share (sceneContext.js lists it): each value that more than
-  // one of them reads or changes lives on `ctx`, and only there.
+  // What the scene's parts share (sceneContext.js lists it): each value that more than one of
+  // them reads or changes lives on `ctx`, and only there; what's made here and never replaced
+  // is handed to it before the first part that needs it.
   /** @type {import('./sceneContext.js').SceneContext} */
   const ctx = /** @type {any} */ ({ scope });
 
@@ -189,11 +206,11 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     style: 0, styleR: 3, styleMix: 1, paintAngle: 0, paintAspect: 1, washEdge: 0, flicker: 0, flickerMode: 0,
     feedMode: 6, ghostMode: 0, warpMode: 0, warpMix: 1, inkMode: 0, invertMode: 0, scanBlend: 3, glowMode: 1, gradMode: 0,
   };
-  // The site's hover on the fire (hoverAt, below): 1 while the cursor is on it, and eased,
-  // how far the fire has risen, brightened and started sparking to meet it (update).
+  // The site's hover on the fire (scenePick.js hoverAt): 1 while the cursor is on it, and eased,
+  // how far the fire has risen, brightened and started sparking to meet it (sceneUpdate.js).
   ctx.hoverFlare = 0;
   ctx.hoverGlow = 0;
-  // The page's scrolling (scroll(), below): an impulse that fades in a moment, sweeping the
+  // The page's scrolling (scenePick.js scroll): an impulse that fades in a moment, sweeping the
   // particles and the fireflies a little the way the page moves (-1..1, + up).
   ctx.sweep = 0;
 

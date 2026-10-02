@@ -1,8 +1,11 @@
-// What the bonfire's parts share. scene.js (createBonfire) makes one `ctx` and keeps on it
-// every value that more than one part of the scene reads or changes, so each lives in one
-// place: the hit's weight, the flame's colors, the weapons and the knights once they're in,
-// the place the fire is in. Here: the constants and the small helpers more than one part
-// uses, and the list of what's in `ctx` (typedefs only, for the reader and the type check).
+// What the bonfire's parts share. scene.js (createBonfire) makes one `ctx` and hands it to
+// each part it builds (sceneLights.js … sceneKnight.js); every value that more than one part
+// reads or changes lives on it, so each lives in one place: the hit's weight, the flame's
+// colors, the weapons and the knights once they're in, the place the fire is in. A part that
+// the others call adds those functions to `ctx` as it's made (scene.js: `Object.assign(ctx,
+// createPart(ctx))`), so a call between two parts reads `ctx.name(…)`. Here: the constants
+// and the small helpers more than one part uses, and the list of what's in `ctx` (typedefs,
+// for the reader and the type check).
 import * as THREE from 'three';
 import { effects } from '../effects.js';
 import { flames } from '../palette.js';
@@ -24,52 +27,45 @@ export const lightMix = (key) => flames[key]?.light ?? 0.34;
 export const boost = (v) => Math.max(0.1, 1 + v);
 
 /**
- * What createBonfire makes first and never replaces (a part may keep these from `ctx` as
- * it's made).
+ * What createBonfire makes first and never replaces: the page's options and counts, the
+ * renderer, the lights, the fire and its particles, the flame's colors. scene.js hands each to
+ * `ctx` before the first part that needs it is made, and a part may keep them as it's made.
  * @typedef {object} SceneGivens
- * @property {any} scope  resources.js: everything the scene owns, given back when it's disposed
  * @property {HTMLElement} container  what the canvas fills
  * @property {boolean} reducedMotion
  * @property {boolean} paintedLook  the Painter's: under reduced motion the look being painted still shows, held still (stillFx.js)
  * @property {boolean} lightTrails  the fireflies leave trails of light (Bonfire Live's Trails)
  * @property {boolean} fxLayer  the pixel pass's effects layer and stages (Bonfire Live and the Painter; not the site)
- * @property {(() => void) | undefined} onFormed  createBonfire's: a new weapon finished forming
+ * @property {boolean} siteKnight  the site's knight (sceneKnight.js); Bonfire Live (`fxLayer`) casts its own
+ * @property {string | null} knightHelmet  createBonfire's: the helmet the visitor picked on an earlier visit (main.js)
  * @property {((flame: string, from: string, instant: boolean, selection: any) => void) | undefined} onImpact  createBonfire's: a weapon landed (or was set at once)
+ * @property {(() => void) | undefined} onFormed  createBonfire's: a new weapon finished forming
  * @property {((dt: number, t: number) => void) | undefined} onFrame  createBonfire's: the page's part of each drawn frame (Bonfire Live's director)
- * @property {(amount: number) => void} jolt  a jolt of the camera, if screen shake is on
- * @property {any} view  the camera's framing, sway and shake (view.js)
  * @property {boolean} coarse  a touch screen: the scaled-down counts
  * @property {any} P  effects.particles
  * @property {any} F  effects.fireflies
  * @property {(n: number) => number} pCount  a particle count for this device
  * @property {(n: number) => number} fCount  a firefly count for this device
  * @property {(n: number) => number} impactCount  an impact's particle count for this device
- * @property {boolean} siteKnight  the site's knight (sceneKnight.js); Bonfire Live (`fxLayer`) casts its own
- * @property {string | null} knightHelmet  createBonfire's: the helmet the visitor picked on an earlier visit (main.js)
- * @property {any[]} tinted  everything that burns in the flame's colors as they blend (the knights and the sign join)
+ * @property {any} scope  resources.js: everything the scene owns, given back when it's disposed
  * @property {any} renderer  the THREE.WebGLRenderer
  * @property {HTMLCanvasElement} canvas  the renderer's (low resolution: sceneRender.js resize)
  * @property {any} scene
  * @property {any} camera
+ * @property {any} frame  the passes and their buffers (frame.js)
  * @property {any} pass  the pixel pass (pixelPass.js): its uniforms, palette and steel
- * @property {any} fireLight  the fire's light, the one that casts the shadow (sceneLights.js)
- * @property {any} particleMaterial  the flame's particles' material (flame.js), whose depth texture follows the size
- * @property {any} flowView  breakdown mode's flow field over the fire (flowView.js)
- * @property {any} interaction  how the cursor moves flames, sparks and fireflies (interaction.js)
- * @property {any} pointer  the cursor's path, and its ray (pointer.js)
  * @property {any} timer  the scene's clock (THREE.Timer: advanced once per drawn frame)
+ * @property {any} view  the camera's framing, sway and shake (view.js)
+ * @property {(amount: number) => void} jolt  a jolt of the camera, if screen shake is on
+ * @property {any} pointer  the cursor's path, and its ray (pointer.js)
+ * @property {any} interaction  how the cursor moves flames, sparks and fireflies (interaction.js)
+ * @property {any} fireLight  the fire's light, the one that casts the shadow (sceneLights.js)
  * @property {any} FIRE_LIGHT_AT  where the fire's light hangs (sceneLights.js), and where it goes for the lightning ball:
  * @property {any} ballLightAt
  * @property {number} BALL_LIGHT_MIN_Y
- * @property {Record<string, number>} drive  live modulation from outside (Bonfire Live writes it every frame)
- * @property {Record<string, number>} glitch  the pixel pass's effects layer's values (Bonfire Live's looks)
- * @property {Record<string, number>} presence  each element eased in (1) and out (0)
- * @property {any} white  (a THREE.Color, never changed)
- * @property {any} lightBase  the cast light's color before the temperature
- * @property {any} lightWarm  ...and what a warm temperature leans it toward
- * @property {any} frame  the passes and their buffers (frame.js)
  * @property {any} candleLight  the ruins' candle's light (sceneLights.js)
  * @property {any[]} lamps  the pool of lights the places' lamps take (sceneLights.js)
+ * @property {any} particleMaterial  the flame's particles' material (flame.js), whose depth texture follows the size
  * @property {any} effectMaterial  the loose particles' material (flame.js), and their two other shapes:
  * @property {any} crossMaterial  lightning's sparks
  * @property {any} diamondMaterial  ice's glints
@@ -82,12 +78,21 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {any} marks  the marks hits leave on the ground (marks.js)
  * @property {Record<string, any>} debris  each element's bouncing debris (debris.js)
  * @property {any} smokeMaterial  the impacts' smoke
+ * @property {any} flowView  breakdown mode's flow field over the fire (flowView.js)
  * @property {any} armor  the knights' shared armor uniforms (armor.js)
+ * @property {any} white  (a THREE.Color, never changed)
+ * @property {any} lightBase  the cast light's color before the temperature
+ * @property {any} lightWarm  ...and what a warm temperature leans it toward
+ * @property {any[]} tinted  everything that burns in the flame's colors as they blend (the knights and the sign join)
+ * @property {Record<string, number>} presence  each element eased in (1) and out (0)
+ * @property {Record<string, number>} drive  live modulation from outside (Bonfire Live writes it every frame)
+ * @property {Record<string, number>} glitch  the pixel pass's effects layer's values (Bonfire Live's looks)
  */
 
 /**
- * What the scene is doing. Each value is set where its part of the scene says what it is
- * (scene.js, with the comment that explains it), and read from `ctx` whenever it's needed.
+ * What the scene is doing. Each value is set first where the part it belongs to says what it
+ * is (scene.js or its module, with the comment that explains it), and read from `ctx`
+ * whenever it's needed, never kept.
  * @typedef {object} SceneState
  * @property {((x: number, z: number) => number) | null} terrainTop  the scenery's height at (x, z), once the model has loaded
  * @property {number} busy  0..1: rises with every big moment and drains over a second or so (the hit feel)
