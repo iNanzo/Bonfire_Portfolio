@@ -48,12 +48,11 @@ import { installTooltips } from '../ui/tooltip.js';
 import { createKeysOverlay, isHelpKey } from '../ui/keysOverlay.js';
 import { applyFlame, setAccentRamp, setAccentRate } from '../ui/theme.js';
 import { esc } from '../html.js';
-import { createAnalyser, BAND_NAMES } from './analyser.js';
+import { BAND_NAMES } from './analyser.js';
 import { createDirector } from './director.js';
 import { SHOTS } from './camera.js';
 import { MODES, modeOf } from './looks.js';
 import { COLOR_MODES } from './colors.js';
-import { createDemo, DEMO_BPM } from './demo.js';
 import { densityCounts } from './density.js';
 import { loadSettings, saveSettings, flushSettings, applyPreset, PRESETS, defaults, frameCap } from './settings.js';
 import { bindSettings, markPreset } from './settingsDialog.js';
@@ -68,6 +67,7 @@ import { focusedNow } from '../ui/focus.js';
 import { pageMarkup, HUD_TIPS, relabel } from './markup.js';
 import { createScenesUi } from './scenesUi.js';
 import { createCards } from './cards.js';
+import { createSources } from './sources.js';
 import { q, qa, typing, toggleFullscreen, failScene } from '../ui/shell.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
@@ -92,7 +92,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) flush
 // The scene, its director and the sound come and go while the page is open (a rebuilt scene,
 // another source), so each part reads them from here when it needs them.
 /** @type {import('./context.js').LiveContext} */
-const ctx = { settings, reducedMotion, fire: null, director: null, engine: null, lastFeatures: null, firstScene: null, solo: null };
+const ctx = { settings, reducedMotion, fire: null, director: null, engine: null, heard: createTickBatch(), lastFeatures: null, firstScene: null, solo: null };
 
 document.documentElement.classList.add('js');
 applyCssPalette();
@@ -124,7 +124,7 @@ const askedScene = params.get('scene');
 ctx.firstScene = askedScene ? ctx.findScene(askedScene) : null;
 ctx.solo = ctx.firstScene && params.has('solo') ? ctx.firstScene.ref : null;
 // (What main.js still gives the parts, until each moves out.)
-Object.assign(ctx, { note, openSettings, applySettings, mirrorCard });
+Object.assign(ctx, { note, openSettings, applySettings, mirrorCard, showError, hideError, showStart, goLive });
 
 // --- The bonfire ---------------------------------------------------------------------------
 const IDLE = { state: 'silent', bands: Object.fromEntries(BAND_NAMES.map((b) => [b, 0])), level: 0, beats: [], events: [], kick: 0, hat: 0, bpm: 0, locked: false, build: 0 };
@@ -144,16 +144,15 @@ function onImpact(flameKey, _from, instant, selection) {
 const link = createLinkClient({ port: () => settings.linkPort, onStatus: (text) => { if (settingsPanel) settingsPanel.linkStatus = text; } });
 // The sound is analysed on every frame the display shows (onTick), whatever Frame Rate
 // draws; the director and the HUD go with the drawn frames (onFrame), taking all it heard
-// since the last one (tickBatch.js).
-const heard = createTickBatch();
+// since the last one (ctx.heard: tickBatch.js).
 function onTick(dt) {
   const now = performance.now() / 1000;
   if (settings.beatFrom === 'link' && ctx.engine?.source) link.update(now, ctx.engine.analyser.tempo);
   else link.close();
-  if (ctx.engine?.source) heard.add(ctx.engine.analyser.update(now, dt, { sensitivity: settings.sensitivity, lead: settings.offset / 1000 }));
+  if (ctx.engine?.source) ctx.heard.add(ctx.engine.analyser.update(now, dt, { sensitivity: settings.sensitivity, lead: settings.offset / 1000 }));
 }
 function onFrame(dt) {
-  const f = (ctx.engine?.source && heard.take()) || IDLE;
+  const f = (ctx.engine?.source && ctx.heard.take()) || IDLE;
   ctx.lastFeatures = f;
   ctx.director.update(f, dt);
   if (ctx.engine?.source) drawHud(f, dt);
@@ -244,172 +243,21 @@ function note(text, seconds = 2) { stateNote = { text, until: performance.now() 
 // --- Title cards (cards.js) ------------------------------------------------------------------
 Object.assign(ctx, createCards(ctx));
 
-// --- Audio ---------------------------------------------------------------------------------
-function openEngine() {
-  if (!ctx.engine) {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    const audio = new AC({ latencyHint: 'interactive' });
-    const analyser = createAnalyser(audio);
-    const delay = audio.createDelay(1);
-    delay.connect(analyser.node);
-    const monitor = audio.createGain();
-    monitor.gain.value = settings.volume;
-    monitor.connect(audio.destination);
-    ctx.engine = { ctx: audio, analyser, delay, monitor, source: null };
-  }
-  return ctx.engine;
-}
-
-const NO_PROCESSING = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
-
-async function openInput(e, deviceId) {
-  const constraints = (id) => ({ audio: { ...NO_PROCESSING, channelCount: { ideal: 2 }, ...(id ? { deviceId: { exact: id } } : {}) } });
-  let stream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia(constraints(deviceId));
-  } catch (error) {
-    if (!deviceId || error.name !== 'OverconstrainedError') throw error;
-    stream = await navigator.mediaDevices.getUserMedia(constraints(''));
-  }
-  const node = e.ctx.createMediaStreamSource(stream);
-  node.connect(e.delay);
-  const track = stream.getAudioTracks()[0];
-  settings.deviceId = track?.getSettings?.().deviceId ?? deviceId ?? '';
-  saveSettings(settings);
-  return {
-    kind: 'input', name: track?.label || 'Audio input', track,
-    stop() { node.disconnect(); stream.getTracks().forEach((t) => t.stop()); },
-  };
-}
-
-async function openCapture(e) {
-  if (!navigator.mediaDevices?.getDisplayMedia) throw new Error('This browser can’t share tab or system audio. Try Chrome or Edge on a computer.');
-  const stream = await navigator.mediaDevices.getDisplayMedia({
-    video: true,
-    audio: { ...NO_PROCESSING, suppressLocalAudioPlayback: false },
-    systemAudio: 'include',
-    selfBrowserSurface: 'exclude',
-    surfaceSwitching: 'include',
-  });
-  const track = stream.getAudioTracks()[0];
-  if (!track) {
-    stream.getTracks().forEach((t) => t.stop());
-    throw new Error('No sound was shared. Share again, and turn on “Share tab audio” (for a tab) or “Share system audio” (for your screen).');
-  }
-  stream.getVideoTracks().forEach((t) => t.stop()); // only the sound is needed
-  const node = e.ctx.createMediaStreamSource(new MediaStream([track]));
-  node.connect(e.delay);
-  return {
-    kind: 'capture', name: track.label || 'Shared audio', track,
-    stop() { node.disconnect(); track.stop(); },
-  };
-}
-
-function openFile(e, file) {
-  const media = new Audio();
-  media.src = URL.createObjectURL(file);
-  const node = e.ctx.createMediaElementSource(media);
-  node.connect(e.delay);
-  node.connect(e.monitor);
-  return media.play().then(() => ({
-    kind: 'file', name: file.name.replace(/\.[a-z0-9]+$/i, ''), media, playback: true,
-    stop() { media.pause(); node.disconnect(); URL.revokeObjectURL(media.src); },
-  }));
-}
-
-function openDemo(e) {
-  const bus = e.ctx.createGain();
-  bus.connect(e.delay);
-  bus.connect(e.monitor);
-  const demo = createDemo(e.ctx, bus);
-  demo.start();
-  return { kind: 'demo', name: `Demo Track · ${DEMO_BPM} BPM`, demo, playback: true, stop() { demo.stop(); bus.disconnect(); } };
-}
-
-/** The sound goes (Change, a shared track ending, another source): the show as if it fell silent. */
-function stopSource() {
-  if (!ctx.engine?.source) return;
-  ctx.engine.source.stop();
-  ctx.engine.source = null;
-  ctx.engine.analyser.reset(); // (silent again, without a 'silence' event of its own)
-  heard.clear();
-  ctx.director?.silence();
-}
-
-let busy = false;
-async function useSource(kind, { file = null } = {}) {
-  if (busy) return;
-  busy = true;
-  hideError();
-  const e = openEngine(); // created inside the click, so the browser lets it play
-  try {
-    const resumed = e.ctx.resume();
-    stopSource();
-    const source = kind === 'input' ? await openInput(e, settings.deviceId)
-      : kind === 'capture' ? await openCapture(e)
-      : kind === 'file' ? await openFile(e, file)
-      : openDemo(e);
-    await resumed;
-    // What plays through the speakers is heard after the output latency; delay the
-    // analysis by as much so the fire moves with what the room hears.
-    const latency = source.playback ? Math.min(0.5, e.ctx.outputLatency || e.ctx.baseLatency || 0.02) : 0;
-    e.delay.delayTime.value = latency;
-    e.analyser.reset();
-    heard.clear();
-    e.source = source;
-    source.track?.addEventListener('ended', () => {
-      if (e.source !== source) return;
-      stopSource();
-      showStart('The shared sound stopped. Pick a source to carry on.');
-    });
-    if (kind === 'input') await listDevices();
-    goLive();
-  } catch (error) {
-    showError(describeError(error, kind));
-  } finally {
-    busy = false;
-  }
-}
-
-function describeError(error, kind) {
-  if (error?.name === 'NotAllowedError') {
-    return kind === 'capture' ? 'Sharing was cancelled or blocked.' : 'The browser wasn’t allowed to use the microphone or line in. Allow it in the address bar’s site settings and try again.';
-  }
-  if (error?.name === 'NotFoundError') return 'No audio input was found. Plug in your interface or mic and try again.';
-  if (error?.name === 'NotReadableError') return 'That input is busy or unavailable (another app may have it exclusively).';
-  if (kind === 'file') return error?.name === 'NotAllowedError' ? 'The browser held the sound back. Click the page once, then try the file again.' : 'That file couldn’t be played. Try an MP3, WAV, AAC or FLAC file.';
-  return error?.message || 'Something went wrong starting the sound.';
-}
-
-async function listDevices() {
-  const row = q('[data-device-row]');
-  const sel = q('[data-device]');
-  try {
-    const inputs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput' && d.deviceId);
-    if (!inputs.length || !inputs[0].label) { row.hidden = true; return; }
-    sel.innerHTML = inputs.map((d) => `<option value="${esc(d.deviceId)}">${esc(d.label)}</option>`).join('');
-    sel.value = settings.deviceId && inputs.some((d) => d.deviceId === settings.deviceId) ? settings.deviceId : inputs[0].deviceId;
-    row.hidden = false;
-  } catch { row.hidden = true; }
-}
-q('[data-device]').addEventListener('change', (e) => {
-  settings.deviceId = e.target.value;
-  saveSettings(settings);
-  if (ctx.engine?.source?.kind === 'input') useSource('input');
-});
+// --- The sound (sources.js): a line in, a shared tab or the system, a file, the demo ----------
+Object.assign(ctx, createSources(ctx));
 
 // --- Start screen ----------------------------------------------------------------------------
 const fileInput = q('[data-file]');
 qa('[data-source]').forEach((btn) => {
   btn.addEventListener('click', () => {
     if (btn.dataset.source === 'file') fileInput.click();
-    else useSource(btn.dataset.source);
+    else ctx.useSource(btn.dataset.source);
   });
 });
 fileInput.addEventListener('change', () => {
   const file = fileInput.files?.[0];
   fileInput.value = '';
-  if (file) useSource('file', { file });
+  if (file) ctx.useSource('file', { file });
 });
 // Drop a file anywhere.
 window.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.items ?? [])].some((i) => i.kind === 'file')) e.preventDefault(); });
@@ -417,9 +265,9 @@ window.addEventListener('drop', (e) => {
   const file = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith('audio/') || /\.(mp3|wav|flac|aac|m4a|ogg|opus|aiff?)$/i.test(f.name));
   if (!file) return;
   e.preventDefault();
-  useSource('file', { file });
+  ctx.useSource('file', { file });
 });
-if (navigator.mediaDevices?.enumerateDevices) listDevices();
+if (navigator.mediaDevices?.enumerateDevices) ctx.listDevices();
 
 // On the start screen the fire moves aside for the menu: to its right on a landscape
 // screen (further on a narrower one, where the menu takes more of it), above it on a tall one.
@@ -599,7 +447,7 @@ const actions = {
     if (m.paused) m.play(); else m.pause();
     q('[data-act="play"]').textContent = m.paused ? 'Play' : 'Pause';
   },
-  'change-source': () => { stopSource(); showStart(); },
+  'change-source': () => { ctx.stopSource(); showStart(); },
   'show-title': () => { if (!settings.title.trim()) q('[data-set="title"]').focus(); else { settingsDialog.close(); ctx.showCard(0); } },
   output: () => openOutput(),
   record: () => recorder.toggle(),

@@ -28,6 +28,7 @@
  * @property {any} fire  the bonfire (scene.js createBonfire), once built; null until then, or if it couldn't start
  * @property {any} director  director.js: turns the sound into the show; null until the scene is built
  * @property {LiveEngine | null} engine  the sound, once a source was picked
+ * @property {ReturnType<typeof import('./tickBatch.js').createTickBatch>} heard  what the analyser heard since the last drawn frame (tickBatch.js)
  * @property {Record<string, any> | null} lastFeatures  what the director was last handed (analyser.js features)
  * @property {SceneEntry | null} firstScene  the preset scene the show opens on (?scene=, a chip, N on the start screen)
  * @property {string | null} solo  the ref of the scene playing on its own (the Painter's "Play in Bonfire Live"), or null
@@ -58,15 +59,27 @@
  */
 
 /**
+ * The sound (sources.js).
+ * @typedef {object} SourcesPart
+ * @property {(kind: 'input' | 'capture' | 'file' | 'demo', o?: { file?: File | null }) => Promise<void>} useSource  start a source (the last one stops)
+ * @property {() => void} stopSource  the sound goes: the show as if it fell silent
+ * @property {() => Promise<void>} listDevices  the start screen's list of inputs, again
+ */
+
+/**
  * What main.js still gives the parts (until each moves into one of its own).
  * @typedef {object} MainPart
  * @property {(text: string, seconds?: number) => void} note  a passing line in the HUD
  * @property {() => void} mirrorCard  copy the title card into the output window
+ * @property {(text: string) => void} showError  the start screen's error line says `text`
+ * @property {() => void} hideError
+ * @property {(message?: string) => void} showStart  back to the start screen (saying why, if `message`)
+ * @property {() => void} goLive  the music started: the HUD instead of the start screen
  * @property {(tab?: string, o?: { search?: boolean }) => void} openSettings
  * @property {(key: string | string[]) => void} applySettings  a setting (or the ones a preset changed) changed
  * @property {any} settingsPanel  settingsDialog.js bindSettings: the settings dialog
  */
 
-/** @typedef {LiveState & ScenesPart & CardsPart & MainPart} LiveContext */
+/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & MainPart} LiveContext */
 
 export {};
