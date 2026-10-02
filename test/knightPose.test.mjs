@@ -75,7 +75,7 @@ test('the rest-like standing pose barely bends anything, and a mirrored pose mir
   assert.deepEqual([...m], [...p]);
 });
 
-test('every move gives a sound pose in its limits over 64 beats, standing and (where it can) seated', () => {
+test('[slow] every move gives a sound pose in its limits over 64 beats, standing and (where it can) seated', () => {
   const stand = standingPose();
   const sit = seatedPose(newPose(), 0.36);
   for (const move of MOVES) {

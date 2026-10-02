@@ -1718,6 +1718,7 @@ export function createBonfire(container, { reducedMotion = false, paintedLook = 
     lookAt: (point, o) => knights?.lookAt(point, o),
     clock: (beatPos, period) => knights?.clock(beatPos, period),
     slots: (name) => knights?.slots(name ?? sceneryKey) ?? null,
+    fits: (move, at, facing, name) => knights?.fits(move, at, facing, name ?? sceneryKey) ?? true,
   };
 
   // --- The render settings (the site's P menu, ui/renderMenu.js): cycle() steps one

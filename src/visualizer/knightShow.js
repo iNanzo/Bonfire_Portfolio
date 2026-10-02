@@ -69,6 +69,7 @@ import { createFits } from '../bonfire/colliders.js';
 import { FINISHES } from '../bonfire/steel.js';
 import { DEFAULT_STYLE, STYLES, STYLE_KEYS, STYLE_NAMES } from '../bonfire/knightStyles.js';
 import { HELMET_NAMES } from '../knightNames.js';
+import { clamp01 } from '../math.js';
 
 // (The ring's places are the engine's too: knights.js homes the others where they rest.)
 export { sideArcs, ringPlaces, slotPlaces, restPlaces, FRONT };
@@ -120,7 +121,6 @@ const RIM_ON = 0.75;
 const RIM_SPREAD = [0.6, 1.4];
 const RAD = Math.PI / 180;
 
-const clamp01 = (x) => Math.min(1, Math.max(0, x));
 /** Every order of 0..n-1 (n ≤ 4: at most 24). */
 function orders(n) {
   if (n <= 1) return [[...Array(n).keys()]];

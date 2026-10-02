@@ -896,7 +896,7 @@ test('without fire.knights.fits (a scene that doesn’t pass it on), the show as
   assert.ok(swapped > 0, `some places are too tight for a spin (${swapped}): the filter had work to do`);
 });
 
-test('scene.js passes the engine’s fits() on in its knights API (the show’s move filter asks it)', { todo: 'scene.js line added at merge' }, async () => {
+test('scene.js passes the engine’s fits() on in its knights API (the show’s move filter asks it)', async () => {
   const src = await readFile(new URL('../src/bonfire/scene.js', import.meta.url), 'utf8');
   const api = src.slice(src.indexOf('slots: (name) => knights?.slots('), src.indexOf('// --- Debug HUD'));
   const line = 'fits: (move, at, facing, name) => knights?.fits(move, at, facing, name ?? sceneryKey) ?? true,';
