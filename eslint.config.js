@@ -35,6 +35,12 @@ export default [
       'max-depth': ['warn', 4],
     },
   },
+  // The settings map is one table (every setting's label, hint, place and range, for Bonfire
+  // Live, the Painter and the admin); splitting it would only add imports between its halves.
+  {
+    files: ['src/settingsMap.js'],
+    rules: { 'max-lines': 'off' },
+  },
   // Node: tests, build tools and config.
   {
     files: ['test/**', 'admin/test/**', 'e2e/**', 'tools/**', '*.config.js', '*.config.mjs', 'admin/vite.config.js'],
