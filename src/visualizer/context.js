@@ -116,15 +116,20 @@
  */
 
 /**
+ * The MIDI controller (midiUi.js).
+ * @typedef {object} MidiPart
+ * @property {Record<string, string>} midiNames  the moments a pad can play, as the settings list them
+ */
+
+/**
  * What main.js gives the parts: building the scene, and the parts it still holds itself.
  * @typedef {object} MainPart
  * @property {() => Promise<void>} startScene  build the scene (again: a setting it's built with changed)
  * @property {() => void} applyFrameRate  Frame Rate as the scene's cap
- * @property {Record<string, string>} midiNames  the MIDI pads' moments, as the settings list them
  * @property {() => void} mirrorCard  copy the title card into the output window
  * @property {() => void} openOutput  the output window, for a projector (O)
  */
 
-/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & DialogsPart & RenderPart & PackPart & MainPart} LiveContext */
+/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & StartPart & HudPart & ActionsPart & DialogsPart & RenderPart & PackPart & MidiPart & MainPart} LiveContext */
 
 export {};

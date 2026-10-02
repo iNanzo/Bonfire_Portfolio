@@ -46,7 +46,6 @@ import { elementOr } from '../elements.js';
 import { installDitherPatterns } from '../ui/dither.js';
 import { installTooltips } from '../ui/tooltip.js';
 import { applyFlame, setAccentRamp, setAccentRate } from '../ui/theme.js';
-import { esc } from '../html.js';
 import { BAND_NAMES } from './analyser.js';
 import { createDirector } from './director.js';
 import { densityCounts } from './density.js';
@@ -63,11 +62,11 @@ import { createActions } from './actions.js';
 import { createDialogs } from './dialogs.js';
 import { createRenderUi } from './renderUi.js';
 import { createPackUi } from './packUi.js';
+import { createMidiUi } from './midiUi.js';
 import { q, failScene } from '../ui/shell.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
 import { createRecorder } from './record.js';
-import { createMidi, MIDI_ACTIONS } from './midi.js';
 
 // Finding this page is one of the site's discoveries (counted when you're back on the site).
 createDiscoveries().discover('visualizer');
@@ -104,7 +103,6 @@ const hud = q('[data-hud]');
 const start = q('[data-start]');
 const live = q('[data-live]');
 const errorEl = q('[data-error]');
-const settingsDialog = q('[data-settings]');
 document.body.dataset.mode = 'start';
 
 // --- Preset scenes (scenesUi.js): the library, playing one, naming it, the start screen's chips
@@ -268,39 +266,9 @@ app.append(ctx.pack.el);
 // It sits just above the HUD while the HUD is up. (On the page's own box, not the body: a
 // change restyles only what's in it.)
 new ResizeObserver(() => app.style.setProperty('--hud-h', `${hud.hidden ? 0 : hud.offsetHeight}px`)).observe(hud);
-// --- A MIDI controller (midi.js): pads for the moments, mapped by learning -----------------
-const midiList = q('[data-midi-list]');
-const midiStatus = q('[data-midi-status]');
-// (The X moment is the Living Weapon everywhere people read it.)
-const MIDI_NAMES = { ...MIDI_ACTIONS, combo: 'Living Weapon' };
-ctx.midiNames = MIDI_NAMES;
-function drawMidi() {
-  const map = midi.mapping;
-  midiList.innerHTML = Object.entries(MIDI_NAMES).map(([id, name]) => `
-    <li data-row="midi:${id}"><span data-name>${esc(name)}</span><span class="viz-midi-key">${esc(map[id] ?? '—')}</span>
-      <button class="pix-btn" type="button" data-midi-learn="${id}"${midi.connected ? '' : ' disabled'} aria-label="Learn ${esc(name)}">Learn</button>
-      ${map[id] ? `<button class="pix-btn" type="button" data-midi-forget="${id}" aria-label="Forget ${esc(name)}" data-tip="Forget this pad">✕</button>` : ''}</li>`).join('');
-}
-const midiActions = {
-  drop: () => ctx.actions.drop(), arm: () => ctx.actions.arm(), ring: () => ctx.actions.ring(), combo: () => ctx.actions.combo(),
-  cut: () => ctx.actions.cut(), look: () => ctx.note(`Look: ${ctx.director?.nextLook()}`, 1.5), scene: () => ctx.nextScene(), burst: () => ctx.director?.glitchHit(),
-  fire: () => ctx.director?.hit({ element: 'fire' }), lightning: () => ctx.director?.hit({ element: 'lightning' }), ice: () => ctx.director?.hit({ element: 'ice' }),
-  record: () => ctx.actions.record(),
-  knightsDance: () => ctx.actions.dance(), knights: () => ctx.actions.knights(),
-};
-const midi = createMidi({
-  onAction: (id) => { if (document.body.dataset.mode === 'live' && ctx.fire) { midiActions[id]?.(); ctx.wake(); } },
-  onStatus: (text) => { midiStatus.textContent = text; },
-  onChange: drawMidi,
-});
-drawMidi();
-settingsDialog.addEventListener('click', async (e) => {
-  if (e.target.closest('[data-midi-connect]')) { if (await midi.connect()) drawMidi(); return; }
-  const learn = e.target.closest('[data-midi-learn]');
-  if (learn) { midi.learn(learn.dataset.midiLearn); return; }
-  const forget = e.target.closest('[data-midi-forget]');
-  if (forget) midi.forget(forget.dataset.midiForget);
-});
+
+// --- A MIDI controller (midiUi.js): pads for the moments, mapped by learning -------------------
+Object.assign(ctx, createMidiUi(ctx));
 
 markPreset(start, settings);
 ctx.drawChips();
