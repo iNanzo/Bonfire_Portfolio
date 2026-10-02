@@ -10,14 +10,58 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
 
 ### Menus, search and readability
 
-- _To be written when round 10 lands._
+- One settings map (`src/settingsMap.js`) names, describes and places every setting for
+  Bonfire Live, the Painter and the admin, so the same thing has the same name everywhere
+  (Place, Flame Colors, Place Colors, Living Weapon, Edge Glow…). Labels are Title Case;
+  hints are short sentences that say what a setting does, with longer notes under More.
+- Search: Bonfire Live's settings (`/` or Ctrl+F; it finds synonyms like "strobe" or
+  "brightness", shows advanced matches in the Simple view and goes to the one you pick),
+  the Painter's panel (including fields the scene hides, with what turns them on) and the
+  admin (Ctrl+K or `/`, any field on any page).
+- One tooltip for every app: it stays on screen (it flips and shifts at any edge, above
+  dialogs and scroll areas), shows on hover, keyboard focus and tap, and Esc hides it. The
+  "?" is a button beside its label, so clicking it no longer toggles a checkbox.
+- Bonfire Live's settings in 9 tabs (Sound, Show, Drops, Picture, Effects, Camera, Cast,
+  Scenes & Cards, My Setups) with every setting where you'd look for it, three-way switches
+  as Off / In the Mix / Always buttons, bulk All Off / All In the Mix / All Always /
+  Shuffle / Defaults on every grid (All / None / Defaults on checklists), Reset Section,
+  Undo, settings that do nothing right now greyed with the reason, a Keyboard Shortcuts
+  list (`?`) and a Frame Rate setting (Display / 60 / 30). Every keyboard shortcut is the
+  same.
+- The Painter: sections in the same order and words as Bonfire Live, the fire's shape in
+  its own section, bulk tools, a Tools menu (Render Settings, Pack, Capture, Full Screen,
+  Keys), tooltips on its icon buttons, open sections remembered, and only the section that
+  changed redrawn.
+- The admin: Effects split into Colors, Fire & Elements, Picture and Knight; every
+  Interface text named; Reset Section with Undo (your own palettes kept). Its color
+  swatches and table layout work under its security policy again.
+- The site: the Menu at every width (Discoveries can be reached on a desktop), Go To and
+  Tools groups, the pack's weapons grouped (Swords, Greatswords, Polearms, Axes & Hammers)
+  with the Living Weapon on the Anvil, the render settings grouped and openable from the
+  menu, and a Keyboard Shortcuts list.
 
 ### The knight
 
-- _To be written when round 10 lands._
+- He no longer goes through the scenery: the seats in the ruins, cathedral and cult moved
+  clear (and the cathedral's right column, the cult's third stone and the forge's anvil
+  moved back a little), each place has collision shapes, and every arm movement at his
+  seat keeps out of them, with a test over every action at every seat. He stays left of
+  the fire and the sword, inside a phone's frame, and as smooth as before.
+- His dither shows: his shading bands' edges take the scene's Bayer dither and follow the
+  Dither setting (Off turns it off), while flat plates stay clean.
+- The style "Gunmetal" is shown as "Smooth Steel" (the Gunmetal finish keeps its name).
 
 ### Hygiene, coverage and performance
 
+- Bonfire Live's lag: the fire's shadow no longer redraws on every beat, scene rebuilds
+  stop leaking WebGL programs and contexts, still scenery is drawn one mesh per material,
+  the fireflies are instanced, render targets are kept per pixel size, places are built
+  ahead in spare time (no freeze on a first visit), and per-frame garbage and DOM writes
+  are gone. A benchmark (`npm run bench`) and a `?perf` overlay measure it
+  ([docs/performance.md](docs/performance.md)).
+- Big files split into modules along their sections: `scene.js`, `knights.js`,
+  `knightPose.js` and Bonfire Live's `main.js`; shared helpers in `src/ui/shell.js` and
+  `src/math.js`; unused exports and code removed.
 - Coverage for every file in `src/` and `admin/` (`npm run coverage`), with thresholds that
   only go up (`npm run coverage:ratchet`) and a summary on each CI run.
 - A fast test lane (`npm run test:fast`) that skips the tests tagged `[slow]`.
