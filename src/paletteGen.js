@@ -1,6 +1,6 @@
-// Palette generators, shared by the admin's Effects page and the visualizer's random
-// colors: harmonious random flames, fully random ones, and suggestions built around a
-// color you pick. Pure functions (no DOM), so they're unit-tested
+// Palette generators, shared by the admin's Colors page, the Painter's color tools and the
+// visualizer's random colors: harmonious random flames, fully random ones, and suggestions
+// built around a color you pick. Pure functions (no DOM), so they're unit-tested
 // (admin/test/palettes.test.mjs).
 //
 // The harmony rules work in OKLCH — perceptual lightness, chroma and hue — so a

@@ -25,9 +25,11 @@ The [README](README.md) lists every script; [docs/](docs/) has how each app beha
 | `npm run e2e` | Before a pull request: the production build in a real browser. |
 | `npm run coverage` | When you've added tests: `test:all` under c8, with the coverage report. |
 
-- **Slow tests.** A test that takes more than about 2.5 s ends its title with `[slow]`, as in
-  `test('… stay out of the helmet [slow]', …)`. `test:fast` skips those; `test:all`,
-  `check`, `coverage` and CI run them.
+- **Slow tests (the slow lane).** A test that takes more than about 2.5 s ends its title
+  with `[slow]`, as in `test('… stay out of the helmet [slow]', …)`. `test:fast` skips
+  those; `test:all`, `check`, `coverage` and CI run them. Time a file on its own
+  (`node --test --test-reporter=spec test/<file>`): files run side by side slow each
+  other down.
 - **Coverage.** `npm run coverage` counts every file in `src/` and `admin/`, the ones no test
   loads included, and fails if it drops under the thresholds in `.c8rc.json`. When new
   tests raise it, run `npm run coverage:ratchet` and commit the raised thresholds with
@@ -52,9 +54,10 @@ differs. `.editorconfig` sets the basics for any editor.
 `src/content.json` is never formatted: the admin writes it with `JSON.stringify` on every
 save, so hand-formatting would only be undone. Edit it through the admin
 ([docs/admin.md](docs/admin.md)) when you can. Markdown is wrapped by hand. The root
-`index.html` keeps each `<meta>` tag on one line: the build copies it for every page and
-swaps in that page's description and preview tags with one-line patterns
-(`withMeta` in `src/seoPages.js`).
+`index.html` is formatted like the rest: the build copies it for every page and swaps in
+that page's description and preview tags (`withMeta` in `src/seoPages.js`), which finds
+each `<meta>` tag however its attributes are wrapped; `test/site.test.mjs` checks it on
+a Prettier-wrapped copy.
 
 ## Rules that keep things working
 

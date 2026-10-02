@@ -208,7 +208,7 @@ Bonfire Live's are in [design/visualizer.md](design/visualizer.md), the Painter'
 
 The neutral base palette and the flame ramps (`[lo, mid, hi, core]` + a dark `shade` for
 firelit stone) live in `src/content.json` under `effects` (edit them on the admin's
-Effects page); `src/palette.js` turns them into `base` and `flames`. The 3D renderer
+Colors page); `src/palette.js` turns them into `base` and `flames`. The 3D renderer
 quantizes every pixel to base + current ramp; the UI reads the same ramp as CSS
 variables (`--accent-hi` for text — every `hi` must be ≥ 4.5:1 on the background, and
 `src/contentRules.js` enforces it).
@@ -491,7 +491,7 @@ the site (`src/main.js`, `src/bonfire/scene.js`, `src/bonfire/knightArrival.js`)
   New Helm* and *A New Style* (a style or a finish). Where he can't come (no model,
   switched off, no WebGL) they leave the count. The Painter's own, *The Fire, Painted*, is
   found on `/painter/`.
-- **The admin** (*The Knight* on the Effects page): Show, Arrival (Summon Sign / There From
+- **The admin** (its Knight page): Show, Arrival (Summon Sign / There From
   the Start: resting from the first frame, staying until sent off), Shortest and Longest
   Rest, Helmet, Style, Armor Finish, Edge Glow, Armor Shine, Seat Pose (Resting /
   Watchful), Answers a Click, Reactions (docs/admin.md has the table). `applyArmor` and
@@ -538,7 +538,7 @@ above and `docs/knight.md`). On the site (`src/main.js`, `src/bonfire/scene.js`)
   and *A New Helm* leave the discoveries' count (unless found before; for reduced
   motion, *Greeted the Knight* is out too: `setOut` in `src/ui/discoveries.js`). All of
   it comes back if the admin turns him on again.
-- **Settings** (`effects.knight`, the admin's Effects page, *The Knight*; every key with
+- **Settings** (`effects.knight`, the admin's Knight page; every key with
   its range and default is in [docs/admin.md](admin.md)'s knight table): `show`,
   `arrival` (`sign`: his summon sign waits and a click calls him; `start`: there from the
   start), `restMin` / `restMax` (how long he rests before he burns away, minutes),

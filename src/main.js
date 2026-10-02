@@ -905,7 +905,8 @@ startScene().then(async () => {
   });
 
 // --- Admin live preview ------------------------------------------------------------------
-// The admin's Effects page embeds this site as ?preview and streams its draft in.
+// The admin's Look & Feel pages (Colors, Fire & Elements, Picture, Knight) embed this site
+// as ?preview and stream their draft in.
 // Only the parent frame is listened to, and every payload is validated first; the
 // changes live in this page only (nothing is saved from here).
 const changedAt = (a, b, path) => JSON.stringify(path.split('.').reduce((o, k) => o?.[k], a)) !== JSON.stringify(path.split('.').reduce((o, k) => o?.[k], b));

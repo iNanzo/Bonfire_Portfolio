@@ -28,6 +28,8 @@ npm run check         # lint, type check, every unit test (site, visualizer, adm
 npm run test:fast     # the unit tests minus the [slow] ones, while you work
 npm run coverage      # the unit tests with coverage (see Testing and coverage)
 npm run e2e           # the production build in a real browser (Playwright)
+npm run bench         # Bonfire Live's frame times on the demo track, in GPU Chrome: add
+                      # -- --url <a running dev server> (docs/performance.md)
 npm run format        # Prettier, with .prettierrc.json's settings
 npm run admin         # the admin panel, editing your local files: http://127.0.0.1:5175
 npm run build         # outputs dist/
@@ -84,7 +86,7 @@ src/content.json ──► content.js ──► render.js (HTML) ──► main.
 | `npm test` | the unit tests (`test/`) |
 | `npm run admin:test` | the admin's tests (`admin/test/`) |
 | `npm run test:all` | both at once; `npm run check` runs it after lint and types |
-| `npm run test:fast` | both, minus the tests whose titles end in `[slow]` (the knight on his real model, the longest drop tracks) |
+| `npm run test:fast` | both, minus the tests whose titles end in `[slow]` (the knight on his real model, the longest synthesized tracks) |
 | `npm run coverage` | `test:all` under [c8](https://github.com/bcoe/c8), with a coverage report |
 | `npm run e2e` | the production build in a real browser (`e2e/`, Playwright) |
 
@@ -126,6 +128,8 @@ How to make and commit a change: [CONTRIBUTING.md](CONTRIBUTING.md). What change
 - [docs/painter.md](docs/painter.md): the Bonfire Painter, making preset scenes
 - [docs/admin.md](docs/admin.md): editing content, by hand or in the admin
 - [docs/knight.md](docs/knight.md): the knight: model, rig, styles, poses, arrival, places and API
+- [docs/performance.md](docs/performance.md): measuring the bonfire: the `?perf` overlay, the
+  benchmark (`npm run bench`) and comparing two runs (`npm run bench:compare`)
 - [docs/elements.md](docs/elements.md): design notes for the elements and the palette tools
 - [docs/design/](docs/design/): the design logs, [Bonfire Live's](docs/design/visualizer.md)
   and [the admin's](docs/design/admin-v2.md)
@@ -137,7 +141,9 @@ take the page apart, P for the render settings) and announces its changes to scr
 readers. `prefers-reduced-motion` gets instant camera cuts and a calmer, still-dithered
 fire. The scene renders at 3–4 CSS pixels a texel, pauses in a hidden tab, and uses fewer
 particles and no shadows on touch devices; Three.js loads after the page content, and
-fonts are served from the site itself.
+fonts are served from the site itself. Add `?perf` to any page's address for a frame-time
+overlay; `npm run bench` measures Bonfire Live on the demo track, and `npm run bench:compare`
+puts two runs side by side ([docs/performance.md](docs/performance.md)).
 
 ## License
 
