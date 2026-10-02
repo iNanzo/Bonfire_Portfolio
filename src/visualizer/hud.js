@@ -117,7 +117,9 @@ export function createHud(ctx) {
     }
   }
 
-  // Idle: the controls and cursor fade when the mouse rests (unless hidden or in use).
+  // Idle: the controls and cursor fade when the mouse rests (unless hidden or in use). A mouse
+  // resting on the HUD itself is in use: someone reading a button's tooltip mustn't have the
+  // button and its tip fade out from under the pointer. (Moving off it wakes the timer again.)
   let idleTimer = 0;
   function wake() {
     document.body.classList.remove('is-idle');
@@ -127,6 +129,7 @@ export function createHud(ctx) {
         document.body.dataset.mode !== 'live' ||
         settingsDialog.open ||
         ctx.keysOverlay.el.open ||
+        hud.matches(':hover') ||
         hud.contains(document.activeElement) ||
         ctx.renderMenu.el.contains(document.activeElement)
       )

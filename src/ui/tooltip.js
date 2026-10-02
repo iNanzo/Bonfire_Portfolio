@@ -189,19 +189,25 @@ export function installTooltips({ doc = document, delay = 400, warm = 100, grace
     watch = win.requestAnimationFrame(check);
   }
 
-  function hide() {
-    win.clearTimeout(showTimer);
+  /** The tip showing goes; a tip on its way to another trigger still comes. */
+  function hideCurrent() {
     win.clearTimeout(hideTimer);
-    pending = null;
     if (!current) return;
     current = null;
     lastShown = now();
     win.cancelAnimationFrame(watch);
     close();
   }
+  function hide() {
+    win.clearTimeout(showTimer);
+    pending = null;
+    hideCurrent();
+  }
+  // (Only the tip the pointer left: if it has already come to rest on another trigger in the
+  // grace, that one's tip is on its way and must still come.)
   const hideSoon = () => {
     win.clearTimeout(hideTimer);
-    hideTimer = win.setTimeout(hide, grace);
+    hideTimer = win.setTimeout(hideCurrent, grace);
   };
 
   function position() {

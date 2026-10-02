@@ -361,6 +361,27 @@ test('installTooltips: leaving hides after the grace, not while the pointer is o
   assert.equal(p.shown(), false);
 });
 
+test('installTooltips: leaving one tip across a gap for another in its grace, the other still comes', () => {
+  const p = page();
+  installTooltips({ doc: p.doc });
+  const a = p.field();
+  const b = p.field(p.doc.body, { top: 400 });
+  p.fire('pointerover', { target: a.mark, pointerType: 'mouse' });
+  p.tick(400);
+  const tip = p.tip();
+  assert.equal(tip.children[1].textContent, 'What field 1 does.');
+  // Off it over the page (the picture between two buttons), then onto the other 60 ms on:
+  // the first tip's grace ends before the second one's warm delay does.
+  p.fire('pointerout', { target: a.mark, relatedTarget: p.doc.body, pointerType: 'mouse' });
+  p.tick(60);
+  p.fire('pointerover', { target: b.mark, pointerType: 'mouse' });
+  p.tick(90);
+  assert.equal(p.shown(), false, 'the first one gone at the end of its grace');
+  p.tick(10);
+  assert.equal(p.shown(), true, 'the second one still on its way, and here');
+  assert.equal(tip.children[1].textContent, 'What field 2 does.');
+});
+
 test('installTooltips: keyboard focus on a field shows its "?"’s tip at once, beside both; a click’s focus doesn’t', () => {
   const p = page();
   installTooltips({ doc: p.doc });

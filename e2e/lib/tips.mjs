@@ -106,7 +106,18 @@ export async function checkTip(page, trigger, { mode = 'hover', timeout = 2000 }
   }
   if (via === 'hover') {
     await page.mouse.move(0, 0);
-    await trigger.hover();
+    // A pointer move onto the trigger first, a little off its centre: Bonfire Live fades its HUD
+    // and lets clicks through to the picture once the mouse has rested 3 s off it
+    // (body.is-idle), and only a pointer move wakes it. Then hover() makes the last move, to
+    // the centre, once the trigger stands still (a pack list slides into place as it opens):
+    // a real move, so if the trigger was drawn anew meanwhile (the knight's list is, after
+    // he changes style) the new one hears the pointer arrive. Should it never stand still
+    // (the HUD's labels and beat pips shift with the music, slowly on CI's software-rendered
+    // browser), the pointer goes to where it is now; whether this trigger's own tip shows is
+    // checked below either way.
+    const box = await trigger.boundingBox();
+    if (box) await page.mouse.move(box.x + box.width / 2 - Math.min(2, box.width / 4), box.y + box.height / 2);
+    await trigger.hover({ timeout: 10_000 }).catch(() => trigger.hover({ force: true }));
   } else if (via === 'tap') await trigger.tap();
   // This trigger's tip: showing, with its words (not one still going from before). A label
   // that changes on its own while it's checked (Bonfire Live's Forge / Strike, as the demo
