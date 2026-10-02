@@ -198,7 +198,7 @@ function startScene() {
     const opening = prev ? playing : playing ?? ctx.firstScene;
     if (opening) ctx.playScene(opening, { instant: true, lock: opening.ref === ctx.solo });
     stage.classList.add('is-ready');
-    if (output && !output.closed) streamInto(output);
+    streamOutput();
   }).catch(sceneFailed);
 }
 startScene();
@@ -286,6 +286,10 @@ function streamInto(win) {
   video.srcObject?.getTracks().forEach((t) => t.stop());
   video.srcObject = canvas.captureStream(60);
   return true;
+}
+/** A rebuilt scene has a canvas of its own: the output window, if it's open, streams it now. */
+function streamOutput() {
+  if (output && !output.closed) streamInto(output);
 }
 /** Copies the title card (and the flame colors and dither tiles it draws with) into the output window. */
 function mirrorCard() {
