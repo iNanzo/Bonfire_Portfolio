@@ -298,3 +298,98 @@ export function createSceneKnight(ctx) {
   if (fxLayer) knightsIn.then(() => { if (ctx.knights) for (const file of new Set(Object.values(MODELS))) prepareStyleModel(file); }, () => {});
   return { knightsIn, applyArmor, applyStyle, prepareStyleModel, armorOverride, addKnights, signPlace, wearHelmet, applyKnight, busyWithHim, summonKnight, presenceListeners, reacts, reactKnights };
 }
+
+/**
+ * fire.knights: what knights.js offers, forwarded once they exist (scene.js makes it last, so
+ * its `ready` waits on knightsIn after everything else that does).
+ * @param {import('./sceneContext.js').SceneContext} ctx
+ */
+export function createKnightsApi(ctx) {
+  const { armor, knightsIn, armorOverride, applyArmor, applyStyle, prepareStyleModel, wearHelmet, busyWithHim, summonKnight, presenceListeners, reacts, reactKnights } = ctx;
+  return {
+    /** Resolves true once there are knights (on the site, when he's away at load, a moment after the first frame). */
+    ready: knightsIn.then(() => !!ctx.knights, () => false),
+    get count() { return ctx.knights?.count ?? 0; },
+    get present() { return ctx.knights?.present ?? 0; },
+    get max() { return ctx.knights?.max ?? 0; },
+    get list() { return ctx.knights?.list ?? []; },
+    get positions() { return ctx.knights?.positions ?? []; },
+    get moving() { return ctx.knights?.moving ?? false; },
+    /** Knight 0's helmet: the one he has on, or the one he's putting on mid-swap. */
+    get helmet() { return ctx.knights ? ctx.helmetGoal ?? ctx.knights.helmet : null; },
+    set helmet(name) { wearHelmet(name); },
+    /** (On the site, knight 0's helmet asked for here, the visitor's pick in the pack, holds for the visit: he comes in it.) */
+    setHelmet: (name, o) => {
+      if (o?.index == null || o.index === 0) ctx.visitorHelmet = HELMETS.includes(name) ? name : ctx.visitorHelmet;
+      busyWithHim(o?.index);
+      return wearHelmet(name, o);
+    },
+    setCast: (o) => { if (o?.helmets) ctx.helmetGoal = null; ctx.knights?.setCast(o); },
+    /**
+     * The site's knight's presence (knightArrival.js): 'away' (his sign waits on the ground),
+     * 'arriving', 'resting', 'leaving'. Bonfire Live: 'resting' while knight 0 is there.
+     */
+    get presence() { return ctx.arrival?.presence ?? (ctx.knights?.list[0]?.present ? 'resting' : 'away'); },
+    /** Summon him (the site: from his sign, through the forge; `instant`: at once). False if he can't come now. */
+    summonKnight: (o) => summonKnight(o),
+    /** Send him off (the site: he burns away into his sign; `instant`: at once). False if he isn't there. */
+    dismissKnight: (o) => ctx.arrival?.dismiss(o) ?? false,
+    /** Call `fn(presence)` whenever the site's knight comes or goes. Returns an unsubscribe. */
+    onPresence: (fn) => { presenceListeners.add(fn); return () => presenceListeners.delete(fn); },
+    /** Seconds of his rest left (the site), Infinity if it doesn't run out; settable (for tests). */
+    get restLeft() { return ctx.arrival?.restLeft ?? Infinity; },
+    set restLeft(sec) { if (ctx.arrival) ctx.arrival.restLeft = sec; },
+    summon: (i, o) => ctx.knights?.summon(i, o) ?? false,
+    dismiss: (i, o) => ctx.knights?.dismiss(i, o) ?? false,
+    sit: (i = 0) => ctx.knights?.sit(i) ?? false,
+    stand: (i = 0) => ctx.knights?.stand(i) ?? false,
+    dance: (i, o) => ctx.knights?.dance(i, o) ?? false,
+    gesture: (name, o) => {
+      const on = ctx.knights?.gesture(name, o) ?? false;
+      if (on) busyWithHim(o?.index ?? 0);
+      return on;
+    },
+    /** 'impact' (strength 0..1: a flinch), 'stoke' (he leans away), 'ring' (he lifts his feet as it passes). */
+    react: (kind, strength, where) => reactKnights(kind, strength, where),
+    /**
+     * Bonfire Live: whether the knights react at all (react(), and the fire's own stokes,
+     * impacts and rings) and sit up to watch a weapon in flight. The site's knight follows
+     * effects.knight.reactions instead.
+     */
+    setReactions: (on) => { ctx.liveReactions = !!on; },
+    get reactions() { return reacts(); },
+    /**
+     * The fire's reflection sweeping over the armor (armor.js): `rest` (now and then) and
+     * `flares` (when the fire flares) on or off; `shine` reads them back.
+     */
+    setShine: (o) => armor.setShine(o),
+    get shine() { return armor.shine; },
+    /**
+     * The knight's style (knightStyles.js STYLES; null: the settings', effects.knight.style):
+     * knights who are here burn away and form again in it (~1.2 s; `{ instant: true }` at
+     * once). Resolves true once it shows (a style with its own model fetches it first).
+     */
+    setStyle: (name = null, { instant = false } = {}) => { armorOverride.style = name ?? null; return applyStyle({ instant }); },
+    /**
+     * Get a style's model ready beforehand (fetched, its template built in idle moments), so a
+     * change to it later shows at once. Resolves true once it's ready (a style on the knight's
+     * own model always is).
+     */
+    prepareStyle: (name) => prepareStyleModel(styleModel(styleOr(name))).then((root) => styleModel(styleOr(name)) === MODELS.main || !!root),
+    /** The style he's drawn in now (knightStyles.js key). */
+    get style() { return ctx.knights?.style ?? armor.style; },
+    /** The armor's finish (steel.js FINISHES; null: the settings'), and the one he wears. */
+    setFinish: (name = null) => { armorOverride.finish = name ?? null; applyArmor(); },
+    get finish() { return armor.finish; },
+    /** The fire's color on his edges, 0..1 (null: the settings'), and how strong it is. */
+    setRim: (v = null) => { armorOverride.rim = v ?? null; applyArmor(); },
+    get rim() { return armor.rim; },
+    /** How they sit (knights.js setSeatPose): 'resting' | 'watchful'; `{ index }` for one knight. The site's follows effects.knight.seat. */
+    setSeatPose: (name, o) => ctx.knights?.setSeatPose?.(name, o),
+    get seatPose() { return ctx.knights?.seatPose ?? 'resting'; },
+    lookAt: (point, o) => ctx.knights?.lookAt(point, o),
+    clock: (beatPos, period) => ctx.knights?.clock(beatPos, period),
+    slots: (name) => ctx.knights?.slots(name ?? ctx.sceneryKey) ?? null,
+    fits: (move, at, facing, name) => ctx.knights?.fits(move, at, facing, name ?? ctx.sceneryKey) ?? true,
+  };
+}
