@@ -106,6 +106,18 @@ export async function checkTip(page, trigger, { mode = 'hover', timeout = 2000 }
   }
   if (via === 'hover') {
     await page.mouse.move(0, 0);
+    // The pointer travels onto the trigger as a hand would, before Playwright's hover: Bonfire
+    // Live fades its HUD and lets clicks through to the picture when the mouse has rested 3 s
+    // (body.is-idle), and only a pointer move wakes it. hover() waits for the trigger to be
+    // hit-testable before moving the mouse at all, so on a slow machine (CI's software-rendered
+    // browser), where a check takes over 3 s, it would wait for a wake that never comes.
+    const box = await trigger.boundingBox();
+    if (box) {
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      await page.mouse.move(x - 2, y);
+      await page.mouse.move(x, y);
+    }
     await trigger.hover();
   } else if (via === 'tap') await trigger.tap();
   // This trigger's tip: showing, with its words (not one still going from before). A label
