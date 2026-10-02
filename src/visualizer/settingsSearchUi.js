@@ -199,7 +199,7 @@ const shows = (el) => el.checkVisibility?.() ?? el.getClientRects().length > 0;
  * @param {Element} row
  * @returns {HTMLElement | null}
  */
-export function focusTarget(row) {
+function focusTarget(row) {
   for (const s of FOCUS) {
     const el = /** @type {HTMLElement | undefined} */ ([...row.querySelectorAll(s)].find(shows));
     if (el) return el;

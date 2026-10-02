@@ -108,7 +108,7 @@ export const toolsMarkup = (id = 'pnt-tools-menu') => `
   </div>`;
 
 /** The Tools item a key picks (its letter in either case, or ?), or undefined. */
-export const toolForKey = (key) => TOOLS.find((t) => t.key.toLowerCase() === String(key).toLowerCase());
+const toolForKey = (key) => TOOLS.find((t) => t.key.toLowerCase() === String(key).toLowerCase());
 
 /**
  * Wire the Tools menu drawn by toolsMarkup into `el`. `run(cmd)` does an item (after the

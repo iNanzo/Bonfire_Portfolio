@@ -112,18 +112,18 @@ const BLEND_LAYERS = { feed: 'Echoes', ghost: 'Ghost Trail', warp: 'Warps', ink:
  * How Each Layer Blends' rows: "Glow Blend", not "Glow" (the layer's own row in Layers is
  * Glow: two rows of one name would read as one in the search's list).
  */
-export const BLEND_LABELS = Object.fromEntries(Object.entries(BLEND_LAYERS).map(([k, name]) => [k, `${name} Blend`]));
+const BLEND_LABELS = Object.fromEntries(Object.entries(BLEND_LAYERS).map(([k, name]) => [k, `${name} Blend`]));
 /** The blend modes, as the selects name them. */
-export const BLEND_NAMES = {
+const BLEND_NAMES = {
   normal: 'Normal', add: 'Add', subtract: 'Subtract', multiply: 'Multiply', screen: 'Screen', darken: 'Darken', lighten: 'Lighten',
   overlay: 'Overlay', hardLight: 'Hard Light', softLight: 'Soft Light', difference: 'Difference', exclusion: 'Exclusion',
 };
 /** A blend select's hint. */
-export const blendHint = (id) => `How the ${BLEND_LAYERS[id]} layer lies over the picture; Rolled Each Turn picks a new way each time the look comes round.`;
+const blendHint = (id) => `How the ${BLEND_LAYERS[id]} layer lies over the picture; Rolled Each Turn picks a new way each time the look comes round.`;
 
 // --- The choices a row offers ----------------------------------------------------------
 /** A scene's few-color palette, as Palette's last choice. */
-export const FEW_COLORS = 'A Few Of the Scene’s Colors';
+const FEW_COLORS = 'A Few Of the Scene’s Colors';
 const DRAWN = 'Drawn By the Show';
 const SITE_MARK = ' (The Site’s)';
 const named = (id) => id.charAt(0).toUpperCase() + id.slice(1);

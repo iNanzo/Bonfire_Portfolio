@@ -25,7 +25,7 @@ export function recordType(isSupported = (t) => globalThis.MediaRecorder?.isType
 export const recordScale = (height) => Math.max(1, Math.round(1080 / Math.max(1, height)));
 
 /** The clip's frame rate: the most frames a second it copies. */
-export const RECORD_FPS = 60;
+const RECORD_FPS = 60;
 
 /**
  * A gate that lets a frame through at most `fps` times a second (`now` in ms): each one is due

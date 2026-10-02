@@ -3,7 +3,7 @@
 // mergeInto), saving, the presets (many settings at once, for a kind of night) and the setups
 // (your own saved snapshots, which can be exported to a file and imported on another
 // computer). The dialog that shows them is settingsDialog.js (its fields: settingsControls.js;
-// their names, hints and places: src/settingsMap.js); main.js decides what a change does.
+// their names, hints and places: src/settingsMap.js); dialogs.js decides what a change does.
 //
 // Saving waits for the changes to settle (a slider dragged writes once, SAVE_MS after it
 // stops); flushSettings() writes at once, and the page calls it as it's hidden or left.

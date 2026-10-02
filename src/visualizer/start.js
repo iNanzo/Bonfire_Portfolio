@@ -3,6 +3,7 @@
 // and the show (goLive, showStart). While it's up the fire moves aside for the menu
 // (frameFire).
 import { q, qa } from '../ui/shell.js';
+import { NARROW } from '../ui/breakpoints.js';
 import { wieldLabel } from './hud.js';
 import { applyPreset, PRESETS, flushSettings } from './settings.js';
 
@@ -45,7 +46,7 @@ export function createStart(ctx) {
   function frameFire() {
     if (!ctx.director) return;
     const menu = document.body.dataset.mode === 'start';
-    const side = innerWidth >= 760 && innerWidth > innerHeight;
+    const side = innerWidth >= NARROW && innerWidth > innerHeight;
     ctx.director.frame(menu && side ? (innerWidth >= 1100 ? 0.2 : 0.36) : 0, menu && !side ? 0.24 : 0);
   }
   window.addEventListener('resize', frameFire);

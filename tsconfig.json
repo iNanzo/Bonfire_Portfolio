@@ -112,7 +112,7 @@
     "src/visualizer/cards.js",
     "src/visualizer/hud.js",
     "src/visualizer/midiUi.js",
-    "src/visualizer/output.js"
+    "src/visualizer/output.js",
     "src/bonfire/flame.js",
     "src/bonfire/flowView.js",
     "src/bonfire/forgeFx.js",

@@ -276,7 +276,7 @@ bonfire's design, assets and code, then three rounds of feedback:
   forever.
 - **Density is a rebuild.** Particle counts size GPU buffers, so changing *Particles*
   (or the fireflies' *Light Trails*, made with the scene) rebuilds the scene and keeps
-  the current weapon, flame and element (`main.js` `REBUILD`).
+  the current weapon, flame and element (`dialogs.js` `REBUILD`).
 - **Render options are overrides, not settings edits.** The Render tab never writes the
   site's `effects`; the scene keeps its own overrides over them and clears back to them.
   Three values the scene reads where they're used (the flame's frame rate, the color

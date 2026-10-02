@@ -438,12 +438,13 @@ style, the finish, seat and edge glow in the mix (the glow round 0.5).
 
 | Piece | File |
 | --- | --- |
-| Page, sources, HUD | `visualizer/index.html`, `src/visualizer/main.js`, `src/visualizer/visualizer.css` |
+| Page, start screen, sources, HUD | `visualizer/index.html`, `src/visualizer/main.js` (wires the parts below together), `markup.js`, `start.js`, `sources.js`, `hud.js`, `src/visualizer/visualizer.css` |
+| Keys and buttons, dialogs, title cards, output window, pack, MIDI (the page's parts) | `src/visualizer/actions.js`, `dialogs.js`, `cards.js`, `output.js`, `packUi.js`, `midiUi.js` (their shared state: `context.js`) |
 | Keyboard shortcuts (the ? list) | `src/visualizer/keys.js` (shown by `src/ui/keysOverlay.js`) |
 | Settings: the values, saving, presets and setups | `src/visualizer/settings.js` |
 | The settings dialog: its layout and what its controls do; each setting's control; the search; bulk buttons and Reset Section (names, hints and places: `src/settingsMap.js`; the fields and "?" hints: `src/ui/fields.js`, shared with the Painter; the tooltip: `src/ui/tooltip.js`) | `src/visualizer/settingsDialog.js`, `settingsControls.js`, `settingsSearchUi.js`, `settingsBulk.js` |
 | Frame Rate: what's heard between drawn frames | `src/visualizer/tickBatch.js` (the cap: `scene.js` `setMaxFps`) |
-| Preset scenes: the format, the browser's own, the loop and the player | `src/scenes.js`, `src/sceneStore.js`, `src/visualizer/sceneLoop.js`, `src/visualizer/scenePlayer.js`, `src/visualizer/layered.js` (the loop in Scenes & Cards and the HUD line: `settingsControls.js`, `main.js`) |
+| Preset scenes: the format, the browser's own, the loop and the player | `src/scenes.js`, `src/sceneStore.js`, `src/visualizer/sceneLoop.js`, `src/visualizer/scenePlayer.js`, `src/visualizer/layered.js` (the loop in Scenes & Cards and the HUD line: `settingsControls.js`, `scenesUi.js`) |
 | Bands, onsets | `src/visualizer/analyser.js` |
 | Sections: groove, breakdown, build, drop, silence | `src/visualizer/sections.js` |
 | Tempo, beat grid, bars, tap tempo | `src/visualizer/tempo.js` |
@@ -452,7 +453,7 @@ style, the finish, seat and edge glow in the mix (the glow round 0.5).
 | Colors: site or made palettes, scenery | `src/visualizer/colors.js` (the generator: `src/paletteGen.js`) |
 | Firefly light show; firefly moves | `src/visualizer/fireflyShow.js`, `src/visualizer/fireflyMoves.js` |
 | The knights: presence, dancing, formations, the Cast tab's switches | `src/visualizer/knightShow.js` (the scene's side: `src/bonfire/knights.js`, `knightPose.js`; `docs/knight.md`) |
-| Render Settings (P) | `src/ui/renderMenu.js` (shared with the site), rows in `src/visualizer/main.js` |
+| Render Settings (P) | `src/ui/renderMenu.js` (shared with the site), rows in `src/visualizer/renderUi.js` |
 | Looks (effects that take turns), drop hits | `src/visualizer/looks.js` |
 | The render settings: render options, few colors, pixel size shifts, x-ray flips | `src/visualizer/render.js` (the scene's side: `scene.js` render overrides, `pixelPass.js` `uXray`) |
 | The living weapon's moves | `src/bonfire/bladeMotion.js` |

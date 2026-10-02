@@ -3,5 +3,5 @@
 // (visualizer/render.js PIXEL_SIZES, which a test keeps equal to this). It lives apart
 // from both so the scene engine needn't import Bonfire Live's modules for it.
 
-/** Smallest to largest; the site's own size (effects.render) needn't be one of them. */
+/** Smallest to largest; the site's own sizes (effects.render) are among them too (contentRules checks). */
 export const PIXEL_SIZES = [2, 3, 4, 6, 8];

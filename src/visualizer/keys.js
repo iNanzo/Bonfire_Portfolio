@@ -1,6 +1,6 @@
 // Bonfire Live's keyboard shortcuts, as people read them: in four groups (the moments you
 // play, the beat, the show's switches, the view and the menus) for the keys overlay (?,
-// src/ui/keysOverlay.js) and the settings search. What each key does is main.js's keydown;
+// src/ui/keysOverlay.js) and the settings search. What each key does is actions.js's keydown;
 // this is only what the list says. No key is remapped by being listed here: the test keeps
 // this list and the handler's keys the same.
 
