@@ -45,7 +45,7 @@ const nearestShape = (cs, x, y, z) => cs.reduce((m, c) => Math.min(m, distanceTo
 // --- the shapes ---------------------------------------------------------------------------------
 test('every piece scenery.js builds in a knight’s reach is inside its shapes (to 2 cm), the stones leaning as it draws them', () => {
   for (const name of NAMES.filter((n) => n !== 'ruins')) {
-    const s = buildScenery(name, MAT, () => new THREE.MeshBasicMaterial());
+    const s = buildScenery(name, MAT, () => new THREE.MeshBasicMaterial(), { merge: false }); // (each piece on its own: the drawn scenery merges them)
     s.group.updateMatrixWorld(true);
     const cs = collidersOf(name);
     const seat = SEATS[name];
@@ -73,7 +73,7 @@ test('every piece scenery.js builds in a knight’s reach is inside its shapes (
     assert.ok(pieces > 8, `${name}: ${pieces} pieces in reach`);
   }
   // The cult's standing stones turn and tip by the seeded draws colliders.js has written down.
-  const s = buildScenery('cult', MAT, () => new THREE.MeshBasicMaterial());
+  const s = buildScenery('cult', MAT, () => new THREE.MeshBasicMaterial(), { merge: false });
   const stones = [];
   s.group.traverse((m) => { if (m.isMesh && m.geometry.type === 'BoxGeometry' && m.geometry.parameters.depth === CULT.stones.depth && m.geometry.parameters.height > 1) stones.push(m.parent); });
   assert.equal(stones.length, 3);
