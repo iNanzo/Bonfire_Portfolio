@@ -992,16 +992,23 @@ export function shield(p, t, k = 1, seated = true) {
   if (!seated) p[2] -= 0.08 * e;
   return p;
 }
+// (How far a seated ring lifts his feet (m).)
+const HOP_FEET = 0.2;
 /**
  * A ground ring passing under him, `t` s after it reaches him: seated, he lifts his feet
- * and leans back; standing, a hop with the knees tucked.
+ * and leans back; standing, a hop with the knees tucked. `rise` (seated) [left, right] (m):
+ * how far each foot may lift; one resting high (up on the ruins' fallen drum) lifts only that
+ * far, or stays put (knights.js riseOf), so its knee keeps its bend.
  */
-export function hop(p, t, k = 1, seated = true) {
+export function hop(p, t, k = 1, seated = true, rise = null) {
   if (t < 0 || t > 0.6) return p;
   if (seated) {
     const e = Math.sin(Math.PI * clamp01(t / 0.55)) * k;
     nudge(p, 'spine', -10 * e); nudge(p, 'chest', -4 * e);
-    for (const s of ['L', 'R']) { const o = legOf(s); p[o + 1] += 0.2 * e; p[o + 2] -= 0.04 * e; p[o + 3] -= 12 * DEG * e; }
+    for (let i = 0; i < 2; i++) {
+      const o = i ? POSE.legR : POSE.legL, f = rise ? e * clamp01(rise[i] / HOP_FEET) : e;
+      p[o + 1] += HOP_FEET * f; p[o + 2] -= 0.04 * f; p[o + 3] -= 12 * DEG * f;
+    }
     p[POSE.armL + 1] -= 12 * DEG * e; p[POSE.armR + 1] -= 12 * DEG * e;
     return p;
   }

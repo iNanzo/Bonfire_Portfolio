@@ -435,7 +435,16 @@ him out of them; pure) and `armor.js` (the material); wired up in `scene.js`.
   flies he sits up and watches it (chest up, head turned to it); `impact()` → a flinch
   (jerks back, head turned away, forearms up, ~1 s); `stoke()` → he leans away, an arm up
   against the heat; `ring()` (and the impact's ring) → he lifts his feet (standing: a
-  hop) as the ring's front reaches him. A knight dancing on his feet (or on his way to),
+  hop) as the ring's front reaches him, each foot 20 cm, or less where that would take its
+  ankle more than 12 cm over its hip joint (`HOP_TOP`, `riseOf`): from about 18 cm up the
+  ankle comes round to where the knee bends toward, and the knee folds down through under
+  the leg for a step. At the seats his feet rest well under his hips and lift the whole
+  way, as round 9's did; in the ruins his boots rest up on the fallen drum, so his left
+  lifts 7–11 cm and his right stays on it; the others in Bonfire Live, sitting on the
+  ground with their feet up level with their hips, lift theirs 10–19 cm (round 9's lifted
+  20 and folded a knee on every ring; `test/knightClearance.test.mjs` checks every seat in
+  either seat pose, and the ground, through a ring, an impact with it, and every seated
+  gesture and move with one). A knight dancing on his feet (or on his way to),
   or throwing his arms up in a cheer (`praise`, `hurrah`, `joy`), doesn't flinch or lean
   away, so the drop's leap and Praise the Sun read whole; he still hops the ring. The
   site's knight reacts by `effects.knight.reactions`; Bonfire Live switches its knights'

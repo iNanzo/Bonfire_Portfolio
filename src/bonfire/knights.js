@@ -118,6 +118,12 @@ const SPRUNG = [
 const SPRING = { hz: 2.6, damp: 0.38, substeps: 4 };
 // Room on both sides (gesture()'s and dance()'s `room`).
 const FREE = [1, 1];
+// A seated ring lifts each foot at most this high over its hip joint (m; at the seats round
+// 9's came to 7 cm): one already up near there (on the ruins' fallen drum) lifts less, or not
+// at all. From about 18 cm up the ankle comes round to where the knee bends toward and the
+// knee folds down under the leg for a step (round 9's knights sitting on the ground, their
+// feet up level with their hips, did on every ring). hop(), riseOf().
+const HOP_TOP = 0.12;
 // Keeping his arms out of the scenery (keepClear): a piece of an arm nearer a shape than
 // CLEAR_MARGIN (m) turns the arm away from it (as far as takes it out to the margin, at most
 // CLEAR_TURN), at most CLEAR_TRIES times an arm; only the shapes within CLEAR_NEAR (m) of
@@ -1007,7 +1013,13 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
     seatedPose(k.sit, h.h, rig, style, h.feet);
     h.room = roomOf(h, k.sit);
     h.roomLess = null;
+    h.rise = riseOf(k.sit);
     return k.sit;
+  }
+  /** How far each foot of a seated pose may lift when a ring passes under him (hop()'s `rise`), [left, right] (m): up to HOP_TOP over its hip joint. */
+  function riseOf(pose) {
+    const s = solve(pose);
+    return SIDES.map((side) => Math.max(0, HOP_TOP - (s.p[BONE_INDEX['foot' + side]].y - s.p[BONE_INDEX['thigh' + side]].y)));
   }
   const _rn = [0, 0, 0];
   /**
@@ -1779,7 +1791,7 @@ export function createKnights(gltfRoot, { layerSolid = 0, layerGhost = 2, castSh
       const t = k.clock;
       if (t - k.react.flinch < 1.4) { flinch(p, t - k.react.flinch, k.react.flinchK, seated); big = true; }
       if (t - k.react.stoke < 1.3) { shield(p, t - k.react.stoke, 1, seated); big = true; }
-      if (t - k.react.hop >= 0 && t - k.react.hop < 0.6) { hop(p, t - k.react.hop, 1, seated); big = true; }
+      if (t - k.react.hop >= 0 && t - k.react.hop < 0.6) { hop(p, t - k.react.hop, 1, seated, k.home?.rise); big = true; }
     }
     // Watching something: he straightens up and turns to it. Hovered (seated, at rest), he
     // sits up a little to look at you.

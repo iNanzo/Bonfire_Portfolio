@@ -12,7 +12,9 @@
 // doesn't cost him his smoothness (getting up, sitting down and the site's dance step no
 // further at a time than round 9's did, give or take half), nor his place on the home view
 // (stood up or dancing there, he stays left of the planted sword), nor much of a frame's time
-// (a step solves at most four poses; round 9's solved one).
+// (a step solves at most four poses; round 9's solved one). Where his feet rest high (up
+// on the ruins' drum, or sitting on the ground), a ring under him doesn't fold a knee down
+// under his leg.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -517,6 +519,71 @@ test('[slow] getting up, sitting down and the site’s dance at every seat move 
   }
   k.setSeatPose('resting');
   assert.deepEqual(bad, [], `more than 1.5× round 9's steps`);
+});
+
+// (Bonfire Live rests the others on the ground round the fire: knightPlaces.js restPlaces.)
+test('[slow] seated at every seat, either seat pose, and on the ground by the fire, his knees keep their bend through a ring under him (an impact with it too) and every seated gesture and move with a ring in it: never down under both his hip and his foot, nor swung round 18 cm a step with his foot all but still', async () => {
+  const env = await realKnights();
+  const { k } = env;
+  const legs = [0, 1].flatMap((i) => ['L', 'R'].map((s) => ({
+    i, s, bones: ['thigh', 'shin', 'foot'].map((b) => k.knights[i].bones.find((x) => x.name === b + s)), knee: null, foot: null,
+  })));
+  let low = { d: Infinity, what: '' };
+  const swung = [];
+  /**
+   * Step `seconds` at 12 fps (`each(t)` first each step), keeping the lowest any knee comes
+   * from under the lower of its hip and foot, and any step a knee swings round its hip 18 cm
+   * or more while its foot moves under 10 cm (it folding through under the leg).
+   */
+  const see = (seconds, what, each = null) => {
+    for (let t = 0; t < seconds; t += 1 / 12) {
+      each?.(t);
+      k.update(1 / 12 + 1e-7);
+      for (const leg of legs) {
+        const { i, s, bones } = leg;
+        k.knights[i].group.updateMatrixWorld(true);
+        const [hip, knee, foot] = bones.map((b) => b.getWorldPosition(new THREE.Vector3()));
+        const which = `${what}: ${i ? 'on the ground' : 'seated'}, his ${s === 'L' ? 'left' : 'right'} knee (${t.toFixed(2)} s)`;
+        const d = knee.y - Math.min(hip.y, foot.y);
+        if (d < low.d) low = { d, what: which };
+        knee.sub(hip);
+        foot.sub(hip);
+        if (leg.knee && knee.distanceTo(leg.knee) >= 0.18 && foot.distanceTo(leg.foot) < 0.1) swung.push(`${which} ${(knee.distanceTo(leg.knee) * 100).toFixed(0)} cm`);
+        leg.knee = knee;
+        leg.foot = foot;
+      }
+    }
+  };
+  for (const name of NAMES) {
+    k.setScenery(name, await terrainOf(name));
+    for (const pose of SEAT_POSES) {
+      k.setSeatPose(pose);
+      for (const i of [0, 1]) k.summon(i, { instant: true });
+      k.update(0.5);
+      const at = (what) => `${name} (${pose}) ${what}`;
+      k.react('ring', 1);
+      see(1.4, at('a ring'));
+      // (The site's weapon swap.)
+      k.react('impact', 1);
+      k.react('ring', 1);
+      see(1.6, at('an impact and a ring'));
+      const ringAt = (t) => { if (Math.abs(t - 0.5) < 0.01) k.react('ring', 1); };
+      for (const g of GESTURES.filter((q) => q !== 'dance')) {
+        for (const i of [0, 1]) k.gesture(g, { index: i });
+        see(GESTURE_TIME[g] + 0.2, at(`seated ${g}, a ring in it`), ringAt);
+      }
+      for (const m of Object.keys(MOVE_INFO).filter((mv) => MOVE_INFO[mv].seated)) {
+        for (const i of [0, 1]) k.dance(i, { move: m, energy: 1, seated: true });
+        let b = 0;
+        see(Math.min(4, MOVE_INFO[m].cycle * 0.5) + 0.25, at(`seated ${m}, a ring in it`), (t) => { ringAt(t); k.clock((b += 1 / 6), 0.5); });
+      }
+      for (const i of [0, 1]) k.dismiss(i, { instant: true });
+      for (const leg of legs) leg.knee = leg.foot = null;
+    }
+  }
+  k.setSeatPose('resting');
+  assert.deepEqual(swung, [], 'a knee folding through');
+  assert.ok(low.d > 0, `${low.what} comes ${(-low.d * 100).toFixed(1)} cm under both his hip and his foot`);
 });
 
 // Round 9's site's dance (no scenery in its way): how far each hand travelled (m), [left,
