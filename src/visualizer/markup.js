@@ -2,12 +2,11 @@
 // the error line), the title card, the HUD (what it hears, the beat, the moments, the view)
 // and the settings dialog, with the tips the HUD's controls show (the shared tooltip, read out
 // as each one's description). main.js writes it into #viz before any part looks for its
-// elements.
+// elements, and hands it what's drawn elsewhere (the settings dialog, the preset buttons), so
+// this is only strings: Node can test it, and it joins the type check.
 import { esc } from '../html.js';
 import { BAND_NAMES } from './analyser.js';
 import { DEMO_BPM } from './demo.js';
-import { settingsMarkup, presetButtons } from './settingsDialog.js';
-import { keyList } from './keys.js';
 import { logoMark } from '../ui/logo.js';
 import { site } from '../content.js';
 
@@ -47,15 +46,20 @@ export const HUD_TIPS = {
 const hudTip = (id, text = HUD_TIPS[id]) => ` data-tip="${esc(text)}" aria-describedby="viz-hud-${id}"`;
 const hudNote = (id, text = HUD_TIPS[id]) => `<span class="visually-hidden" id="viz-hud-${id}">${esc(text)}</span>`;
 
-/** The page's markup, for #viz (the settings dialog showing `settings`). */
-export const pageMarkup = (settings) => `
+/**
+ * The page's markup, for #viz.
+ * @param {{ base: string, presets: string, settingsDialog: string }} parts  the site's base URL
+ *   (the home link), the start screen's preset buttons and the settings dialog (settingsDialog.js
+ *   presetButtons and settingsMarkup)
+ */
+export const pageMarkup = ({ base, presets, settingsDialog }) => `
   <div class="stage viz-stage" data-stage></div>
   <div class="kindled viz-title-card" data-title-card hidden>
     <div class="kindled-band"><p class="kindled-title" data-title-main></p><p class="kindled-sub" data-title-sub></p></div>
   </div>
   <p class="visually-hidden" aria-live="polite" data-live></p>
 
-  <a class="brand viz-home" href="${esc(import.meta.env.BASE_URL)}" aria-label="${esc(site.name)}: back to the portfolio" data-home-link>
+  <a class="brand viz-home" href="${esc(base)}" aria-label="${esc(site.name)}: back to the portfolio" data-home-link>
     ${logoMark('brand-mark')}<span class="brand-name">${esc(site.name)}</span>
   </a>
   <section class="viz-start" data-start aria-labelledby="viz-title">
@@ -77,7 +81,7 @@ export const pageMarkup = (settings) => `
       </label>
       <div class="viz-feel" role="group" aria-label="Presets: a kind of night in one click" data-feel>
         <span class="viz-group-label">Presets</span>
-        ${presetButtons('viz-feel-pick', 'viz-start-preset')}
+        ${presets}
       </div>
       <div class="viz-feel viz-scene-chips" role="group" aria-label="Preset Scenes: play one behind the menu" data-scene-chips hidden></div>
       <p class="viz-solo" data-solo hidden></p>
@@ -135,7 +139,7 @@ export const pageMarkup = (settings) => `
     </div>
   </footer>
 
-  ${settingsMarkup(settings, keyList(), { base: import.meta.env.BASE_URL })}
+  ${settingsDialog}
 `;
 
 /** A HUD button's changing label, and its tip with it (written only when it changes). */

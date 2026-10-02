@@ -56,7 +56,8 @@ import { BAND_NAMES } from './analyser.js';
 import { createDirector } from './director.js';
 import { densityCounts } from './density.js';
 import { loadSettings, flushSettings, frameCap } from './settings.js';
-import { markPreset } from './settingsDialog.js';
+import { markPreset, presetButtons, settingsMarkup } from './settingsDialog.js';
+import { keyList } from './keys.js';
 import { createTickBatch } from './tickBatch.js';
 import { pageMarkup } from './markup.js';
 import { createScenesUi } from './scenesUi.js';
@@ -103,7 +104,11 @@ setAccentRate(125);
 
 // --- Markup ------------------------------------------------------------------------------------
 const app = document.getElementById('viz');
-app.innerHTML = pageMarkup(settings);
+app.innerHTML = pageMarkup({
+  base: import.meta.env.BASE_URL,
+  presets: presetButtons('viz-feel-pick', 'viz-start-preset'),
+  settingsDialog: settingsMarkup(settings, keyList(), { base: import.meta.env.BASE_URL }),
+});
 
 const stage = q('[data-stage]');
 const hud = q('[data-hud]');

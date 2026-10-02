@@ -106,6 +106,7 @@
     "src/painter/toolbar.js",
     "src/visualizer/keys.js",
     "src/visualizer/tickBatch.js",
-    "src/visualizer/context.js"
+    "src/visualizer/context.js",
+    "src/visualizer/markup.js"
   ]
 }
