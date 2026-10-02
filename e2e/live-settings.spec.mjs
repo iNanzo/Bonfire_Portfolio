@@ -2,12 +2,12 @@
 // place, counts each tab's finds, shows an All Settings row in the Simple view, marks the words
 // found without ever running an imported name as markup), its keys (/ from the page, / and
 // Ctrl+F in the dialog, Esc to clear and then to close, ↓ and ↑ through the results without
-// changing them, Enter to reveal the one meant), the bulk buttons and their Undo (one change,
-// one save, the focus kept), a setting that does nothing as things stand (disabled, saying
-// why, the focus still kept in the dialog when it's gone to), the keyboard shortcuts (?, every
-// group in sight), short screens and phones (the header in sight, the presets' note whole and
-// right after an Undo), and Frame Rate capping how often the picture is drawn. No errors
-// anywhere.
+// changing them, Enter to reveal the one meant, the tabs' arrow keys going to each tab's finds
+// and keeping them all), the bulk buttons and their Undo (one change, one save, the focus
+// kept), a setting that does nothing as things stand (disabled, saying why, the focus still
+// kept in the dialog when it's gone to), the keyboard shortcuts (?, every group in sight),
+// short screens and phones (the header in sight, the presets' note whole and right after an
+// Undo), and Frame Rate capping how often the picture is drawn. No errors anywhere.
 import { test, expect } from '@playwright/test';
 
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
@@ -75,6 +75,45 @@ test('search: "strobe" finds the flashes in every tab, each tab counting its fin
   await expect(page.locator('[data-settings] mark')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog(page)).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('search: the arrow keys, Home and End on the tabs go to each tab’s finds and keep every result', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await open(page);
+  await page.keyboard.press('/');
+  await expect(box(page)).toBeFocused();
+  await page.keyboard.type('glow');
+  await expect.poll(async () => (await shown(page)).length, { timeout: 15_000 }).toBeGreaterThan(3);
+  const found = await shown(page);
+  const tab = (id) => page.locator(`[data-tab="${id}"]`);
+  // From Sound (no finds) to Show (none either), then Drops (some): the results all stay.
+  await tab('sound').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(tab('show')).toBeFocused();
+  expect(await shown(page)).toEqual(found);
+  await page.keyboard.press('ArrowRight');
+  await expect(tab('drops')).toBeFocused();
+  await expect(tab('drops')).toHaveAttribute('tabindex', '0');
+  await expect(tab('sound')).toHaveAttribute('tabindex', '-1');
+  await expect(page.locator('[data-tab-panel="drops"] [data-row].is-hit').first()).toBeInViewport();
+  await page.keyboard.press('End');
+  await expect(tab('setups')).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(tab('sound')).toBeFocused();
+  expect(await shown(page)).toEqual(found);
+  await expect(box(page)).toHaveValue('glow');
+  await expect(page.locator('[data-settings] form')).toHaveAttribute('data-searching', '');
+  // With the search cleared, the arrows show one tab at a time again.
+  await box(page).fill('');
+  await expect(page.locator('[data-settings] form')).not.toHaveAttribute('data-searching', '');
+  await tab('sound').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(tab('show')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-tab-panel="show"]')).toBeVisible();
+  await expect(page.locator('[data-tab-panel="sound"]')).toBeHidden();
   expect(errors).toEqual([]);
 });
 

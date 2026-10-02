@@ -340,6 +340,16 @@ export function bindSettings(
         : e.key === 'End'
           ? tabs.length - 1
           : (i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    // (While searching every tab with finds shows: the keys go to a tab's part of the list, as
+    // a click does, and leave the results be. Showing one tab would hide the rest, often
+    // leaving a tab with no finds and an empty dialog.)
+    if (search.active) {
+      for (const t of tabs) t.tabIndex = t === tabs[next] ? 0 : -1;
+      tabs[next].focus();
+      tabs[next].scrollIntoView?.({ block: 'nearest', inline: 'nearest' }); // (a phone's tab bar scrolls)
+      q(`[data-tab-panel="${tabs[next].dataset.tab}"]`)?.scrollIntoView({ block: 'start' });
+      return;
+    }
     showTab(tabs[next].dataset.tab, true);
   });
   showTab(TABS[0].id);
