@@ -33,6 +33,9 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {boolean} lightTrails  the fireflies leave trails of light (Bonfire Live's Trails)
  * @property {boolean} fxLayer  the pixel pass's effects layer and stages (Bonfire Live and the Painter; not the site)
  * @property {(() => void) | undefined} onFormed  createBonfire's: a new weapon finished forming
+ * @property {((flame: string, from: string, instant: boolean, selection: any) => void) | undefined} onImpact  createBonfire's: a weapon landed (or was set at once)
+ * @property {(amount: number) => void} jolt  a jolt of the camera, if screen shake is on
+ * @property {any} view  the camera's framing, sway and shake (view.js)
  * @property {boolean} coarse  a touch screen: the scaled-down counts
  * @property {any} P  effects.particles
  * @property {any} F  effects.fireflies
@@ -144,4 +147,38 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {() => Generator} prepareSceneries  every other place and its height map, a step at a time
  */
 
-/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart & SceneryPart} SceneContext */
+/**
+ * The fire's moments (sceneFire.js).
+ * @typedef {object} FirePart
+ * @property {() => number} ambient  how much of the background extras to keep (1 - busy, by the budget)
+ * @property {(weight: number, o?: { freeze?: boolean, flash?: boolean, shake?: boolean }) => void} hit  a hit: a freeze, a flash, a jolt; the scene goes busy
+ * @property {(x: number, z: number, size?: number, o?: { ring?: boolean }) => void} scar  a mark on the ground and debris, in the element's way
+ * @property {() => boolean} stoke  true the first time
+ * @property {(amount?: number) => void} puff
+ * @property {(selection: any, weaponKey: string, stationary?: boolean) => void} impact  a weapon landed: the new flame and element
+ * @property {(weaponKey: string, flame: string, o?: object) => Promise<any>} equip  swap weapon and flame (resolves at impact)
+ * @property {(strength?: number, o?: { accent?: boolean, blink?: boolean }) => void} pulse  a beat
+ * @property {(strength?: number, o?: { quiet?: boolean }) => void} ring  the element's ring
+ * @property {(power?: number) => boolean} strikeFirefly  lightning reaches for the nearest firefly
+ * @property {() => void} echo  an echo of the planted weapon's silhouette
+ * @property {(plan: any) => Promise<boolean>} swing  the living blade's routine
+ * @property {() => Promise<boolean>} flourish  the site's: a couple of moves and back in
+ * @property {any} bladeState  where the blade is (filled in by weapons.blade)
+ * @property {(g0: any, t0: any, g1: any, t1: any, dt: number) => void} bladeWake  flames near the moving blade knocked along
+ * @property {(n?: number) => void} sparkle  a few sparks off the flame
+ */
+
+/**
+ * What scene.js itself hands the parts.
+ * @typedef {object} MainPart
+ * @property {(key: string, instant?: boolean) => void} setElement  the fire's element (`instant`: no easing)
+ * @property {(f: { ramp: string[], shade: string }, mix: number) => void} applyColors  the flame's colors, everywhere they burn
+ * @property {Promise<void>} loaded  the model is in and the shaders built: the scene's `ready`
+ * @property {(kind: string, strength?: number, where?: any) => void} reactKnights  something happened at the fire, if the knights mind it
+ * @property {(model: any, o?: { template?: any, attach?: boolean }) => any[]} addKnights  the knights, from their model
+ * @property {(name: string) => { x: number, y: number, z: number, yaw: number }} signPlace  where the knight's sign lies in a place
+ * @property {(objects: any[], name: string) => void} named  name point sets for the breakdown's counts
+ * @property {(from: number, to: number, fs: number) => void} recolorGlows  glows[from…to) at flame step `fs`
+ */
+
+/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart & SceneryPart & FirePart & MainPart} SceneContext */

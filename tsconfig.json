@@ -135,6 +135,7 @@
     "src/bonfire/knightGestures.js"
     "src/bonfire/sceneContext.js"
     "src/bonfire/sceneContext.js",
-    "src/bonfire/sceneIdle.js"
+    "src/bonfire/sceneIdle.js",
+    "src/bonfire/sceneFire.js"
   ]
 }
