@@ -89,6 +89,12 @@ const settings = loadSettings();
 addEventListener('pagehide', flushSettings);
 document.addEventListener('visibilitychange', () => { if (document.hidden) flushSettings(); });
 
+// --- What the page's parts share (context.js) ---------------------------------------------------
+// The scene, its director and the sound come and go while the page is open (a rebuilt scene,
+// another source), so each part reads them from here when it needs them.
+/** @type {import('./context.js').LiveContext} */
+const ctx = { settings, reducedMotion, fire: null, director: null, engine: null, lastFeatures: null, firstScene: null, solo: null };
+
 // --- Preset scenes: the library -------------------------------------------------------------
 // The site's built-in scenes (content.json, stored normalized; hidden ones are out of the
 // loop but still play by their ref) and this browser's own, made in the Painter. Entries are
@@ -124,8 +130,8 @@ function findScene(ref) {
 // starts); &solo: only that one this visit (the Painter's "Play in Bonfire Live").
 const params = new URLSearchParams(location.search);
 const askedScene = params.get('scene');
-let firstScene = askedScene ? findScene(askedScene) : null;
-let solo = firstScene && params.has('solo') ? firstScene.ref : null;
+ctx.firstScene = askedScene ? findScene(askedScene) : null;
+ctx.solo = ctx.firstScene && params.has('solo') ? ctx.firstScene.ref : null;
 
 document.documentElement.classList.add('js');
 applyCssPalette();
@@ -282,10 +288,6 @@ const settingsDialog = q('[data-settings]');
 document.body.dataset.mode = 'start';
 
 // --- The bonfire ---------------------------------------------------------------------------
-let fire = null;
-let director = null;
-let engine = null; // { ctx, analyser, delay, monitor, source }
-let lastFeatures = null;
 const IDLE = { state: 'silent', bands: Object.fromEntries(BAND_NAMES.map((b) => [b, 0])), level: 0, beats: [], events: [], kick: 0, hat: 0, bpm: 0, locked: false, build: 0 };
 
 function wieldLabel(sel) {
@@ -296,7 +298,7 @@ function onImpact(flameKey, _from, instant, selection) {
   document.documentElement.dataset.element = elementOr(selection.element);
   q('[data-wield]').textContent = wieldLabel({ ...selection, flame: flameKey });
   if (instant) applyFlame(flameKey);
-  director?.landed(flameKey);
+  ctx.director?.landed(flameKey);
 }
 
 // Ableton Link (link.js): while it's the beat's source, the session sets the grid.
@@ -307,26 +309,26 @@ const link = createLinkClient({ port: () => settings.linkPort, onStatus: (text) 
 const heard = createTickBatch();
 function onTick(dt) {
   const now = performance.now() / 1000;
-  if (settings.beatFrom === 'link' && engine?.source) link.update(now, engine.analyser.tempo);
+  if (settings.beatFrom === 'link' && ctx.engine?.source) link.update(now, ctx.engine.analyser.tempo);
   else link.close();
-  if (engine?.source) heard.add(engine.analyser.update(now, dt, { sensitivity: settings.sensitivity, lead: settings.offset / 1000 }));
+  if (ctx.engine?.source) heard.add(ctx.engine.analyser.update(now, dt, { sensitivity: settings.sensitivity, lead: settings.offset / 1000 }));
 }
 function onFrame(dt) {
-  const f = (engine?.source && heard.take()) || IDLE;
-  lastFeatures = f;
-  director.update(f, dt);
-  if (engine?.source) drawHud(f, dt);
+  const f = (ctx.engine?.source && heard.take()) || IDLE;
+  ctx.lastFeatures = f;
+  ctx.director.update(f, dt);
+  if (ctx.engine?.source) drawHud(f, dt);
 }
 /** Frame Rate as the scene's cap (only when it changed: a new cap starts its count again). */
 function applyFrameRate() {
   const cap = frameCap(settings.frameRate);
-  if (fire && fire.maxFps !== cap) fire.setMaxFps(cap);
+  if (ctx.fire && ctx.fire.maxFps !== cap) ctx.fire.setMaxFps(cap);
 }
 
 /** The scene couldn't start (no WebGL): it's let go, and the start screen says so (ui/shell.js). */
 function sceneFailed(error) {
-  fire?.dispose();
-  fire = null;
+  ctx.fire?.dispose();
+  ctx.fire = null;
   failScene(errorEl, error);
 }
 
@@ -346,30 +348,30 @@ function startScene() {
   return import('../bonfire/scene.js').then(async ({ createBonfire }) => {
     const candidate = createBonfire(stage, {
       reducedMotion, sway: 0, lightTrails: settings.trails, effects: true, onImpact, onRamp: setAccentRamp, onError: sceneFailed,
-      onFrame: (dt) => { if (fire === candidate) onFrame(dt); },
-      onTick: (dt) => { if (fire === candidate) onTick(dt); },
+      onFrame: (dt) => { if (ctx.fire === candidate) onFrame(dt); },
+      onTick: (dt) => { if (ctx.fire === candidate) onTick(dt); },
     });
     const nextDirector = createDirector(candidate, { settings, reducedMotion, onEvent, scenes: loopLibrary });
     await candidate.ready;
     if (generation !== sceneGeneration) { candidate.dispose(); return; }
-    const prev = fire;
+    const prev = ctx.fire;
     // (A rebuilt scene carries on with the preset scene that was playing.)
-    const playing = director?.sceneRef ? findScene(director.sceneRef) : null;
+    const playing = ctx.director?.sceneRef ? findScene(ctx.director.sceneRef) : null;
     recorder?.stop(); // (a clip ends with the scene it was recording)
-    fire = candidate;
-    director = nextDirector;
+    ctx.fire = candidate;
+    ctx.director = nextDirector;
     frameFire();
     applyFrameRate();
     // (Dev builds, and any build with ?bench in its address: tools/bench-viz.mjs drives the show through it.)
-    if (import.meta.env.DEV || new URLSearchParams(location.search).has('bench')) window.__viz = { fire, director, settings, get engine() { return engine; }, get features() { return lastFeatures; } };
-    director.applyRender(); // (the Render tab: render.js)
+    if (import.meta.env.DEV || new URLSearchParams(location.search).has('bench')) window.__viz = { fire: ctx.fire, director: ctx.director, settings, get engine() { return ctx.engine; }, get features() { return ctx.lastFeatures; } };
+    ctx.director.applyRender(); // (the Render tab: render.js)
     const eq = prev ? { weapon: prev.weapon, flame: prev.flame, element: prev.element } : { weapon: startingEquipment.weapon, flame: startingEquipment.flame, element: elementOr(startingEquipment.element) };
     prev?.dispose();
-    await fire.equip(eq.weapon, eq.flame, { instant: true, element: eq.element });
-    fire.setScenery(settings.scenery === 'mix' ? prev?.scenery ?? 'ruins' : settings.scenery);
+    await ctx.fire.equip(eq.weapon, eq.flame, { instant: true, element: eq.element });
+    ctx.fire.setScenery(settings.scenery === 'mix' ? prev?.scenery ?? 'ruins' : settings.scenery);
     // (The first build opens on ?scene= or a chip picked while it loaded.)
-    const opening = prev ? playing : playing ?? firstScene;
-    if (opening) playScene(opening, { instant: true, lock: opening.ref === solo });
+    const opening = prev ? playing : playing ?? ctx.firstScene;
+    if (opening) playScene(opening, { instant: true, lock: opening.ref === ctx.solo });
     stage.classList.add('is-ready');
     if (output && !output.closed) streamInto(output);
   }).catch(sceneFailed);
@@ -390,7 +392,7 @@ function onEvent(type, data = {}) {
     if (settings.intro) showCard(0);
     // (A scene already playing when the music starts, from ?scene=, a chip or N on the start
     // screen, carries on without a new 'scene' event: its picture is kept from here.)
-    if (director?.sceneRef) keepThumb(director.sceneRef);
+    if (ctx.director?.sceneRef) keepThumb(ctx.director.sceneRef);
   } else if (type === 'bar') {
     if (data.bar > 0 && data.bar % 32 === 0) nextCard('phrases');
   } else if (type === 'stage') {
@@ -461,18 +463,18 @@ const SCENE_SWITCH = { off: 'Off (the show plays free)', mix: 'In the Mix', on: 
  * solo); any other pick ends a solo. Null: back to the free show. The loop carries on from it.
  */
 function playScene(entry, { instant = false, lock = false } = {}) {
-  if (!director) return;
-  director.scene(entry, { instant, flash: !instant, onBeat: !instant });
+  if (!ctx.director) return;
+  ctx.director.scene(entry, { instant, flash: !instant, onBeat: !instant });
   const next = lock && entry ? entry.ref : null;
-  if (next !== solo || lock) director.lockScene(next);
-  solo = next;
+  if (next !== ctx.solo || lock) ctx.director.lockScene(next);
+  ctx.solo = next;
   showScene();
 }
 
 /** The director says a scene arrived ({ name, ref }; no name: the free show again). */
 function sceneArrived({ name = null, ref = null } = {}) {
   showScene();
-  if (!name || !engine?.source) return;
+  if (!name || !ctx.engine?.source) return;
   note(`Scene: ${name}`, 2);
   live.textContent = `Scene: ${name}.`;
   const cards = modeOf(settings.sceneCards, 'off');
@@ -486,22 +488,22 @@ const soloFrom = (ref) => (ref.startsWith('m:') ? 'from the Painter' : 'on its o
 
 /** The scene playing, everywhere it shows: the HUD's line, the chips, the Scenes tab, the solo note. */
 function showScene() {
-  const ref = director?.sceneRef ?? null;
-  const name = director?.sceneName ?? null;
+  const ref = ctx.director?.sceneRef ?? null;
+  const name = ctx.director?.sceneName ?? null;
   const some = loopLibrary().length > 0;
-  const key = `${ref}|${name}|${solo}|${modeOf(settings.scenes)}|${some}`;
+  const key = `${ref}|${name}|${ctx.solo}|${modeOf(settings.scenes)}|${some}`;
   if (key === named) return;
   named = key;
   // (The line shows while one plays, or while scenes are on and there are some: the free
   // show in between says so.)
   sceneLine.hidden = !name && (modeOf(settings.scenes) === 'off' || !some);
   sceneLine.classList.toggle('is-free', !name);
-  sceneLine.classList.toggle('is-solo', !!solo);
-  sceneNameEl.textContent = name ? `${name}${solo ? ` · ${soloFrom(solo)}` : ''}` : 'The Free Show';
+  sceneLine.classList.toggle('is-solo', !!ctx.solo);
+  sceneNameEl.textContent = name ? `${name}${ctx.solo ? ` · ${soloFrom(ctx.solo)}` : ''}` : 'The Free Show';
   for (const c of chipsEl.querySelectorAll('[data-scene-chip]')) c.setAttribute('aria-pressed', String(c.dataset.sceneChip === ref));
   settingsPanel.markScene(ref);
-  soloEl.hidden = !(solo && name);
-  soloEl.textContent = solo && name ? `Playing “${name}” ${soloFrom(solo)}. N: back to the loop.` : '';
+  soloEl.hidden = !(ctx.solo && name);
+  soloEl.textContent = ctx.solo && name ? `Playing “${name}” ${soloFrom(ctx.solo)}. N: back to the loop.` : '';
 }
 
 /** The start screen's chips: up to 8 scenes (the loop's first), then All Scenes…. */
@@ -510,7 +512,7 @@ function drawChips() {
   const ordered = [...list.filter((e) => inLoop(settings, e.ref)), ...list.filter((e) => !inLoop(settings, e.ref))];
   const shown = ordered.slice(0, 8);
   // (The one playing always has its chip: a hidden built-in, say, from ?scene=.)
-  const playing = director?.sceneRef ? findScene(director.sceneRef) : firstScene;
+  const playing = ctx.director?.sceneRef ? findScene(ctx.director.sceneRef) : ctx.firstScene;
   if (playing && !shown.some((e) => e.ref === playing.ref)) shown.splice(7, 1, playing);
   chipsEl.hidden = !shown.length;
   chipsEl.innerHTML = shown.length ? `
@@ -529,29 +531,29 @@ chipsEl.addEventListener('click', (e) => {
   if (!chip) return;
   // A click plays it behind the menu (and it opens the show); again: the free show.
   const entry = chip.getAttribute('aria-pressed') === 'true' ? null : findScene(chip.dataset.sceneChip);
-  firstScene = entry;
+  ctx.firstScene = entry;
   playScene(entry, { instant: true });
 });
 sceneLine.addEventListener('click', () => openSettings('scenes'));
 
 /** N: the next scene (at once behind the start menu; live, on the next downbeat in a flash). */
 function nextScene() {
-  if (!director) return;
+  if (!ctx.director) return;
   if (document.body.dataset.mode !== 'live') {
     const inLoopNow = loopLibrary().filter((e) => inLoop(settings, e.ref));
     const list = inLoopNow.length ? inLoopNow : loopLibrary();
     if (!list.length) { live.textContent = 'No scenes yet: make one in the Painter.'; return; }
-    const next = list[(list.findIndex((e) => e.ref === director.sceneRef) + 1) % list.length];
-    firstScene = next;
+    const next = list[(list.findIndex((e) => e.ref === ctx.director.sceneRef) + 1) % list.length];
+    ctx.firstScene = next;
     playScene(next, { instant: true });
     live.textContent = `Scene: ${next.scene.name}.`;
     return;
   }
   // (Out of a solo too: the loop again. With a blade held for the drop, it waits for the
   // drop's strike: the note says so, and the HUD's line keeps saying so until it lands.)
-  const next = director.nextScene();
-  solo = null;
-  const atDrop = !!next && director.sceneWhen === 'drop';
+  const next = ctx.director.nextScene();
+  ctx.solo = null;
+  const atDrop = !!next && ctx.director.sceneWhen === 'drop';
   atDropFor = atDrop ? next.ref : null;
   note(next ? `Next scene: ${next.scene.name}${atDrop ? ', at the drop' : ''}` : 'No scenes yet: make one in the Painter', atDrop ? 3 : 1.8);
   showScene();
@@ -561,8 +563,8 @@ function nextScene() {
  * landed, or something else is coming instead), for the HUD's line.
  */
 function waitingForDrop() {
-  const up = director?.upNext;
-  if (atDropFor && (director?.sceneWhen !== 'drop' || typeof up !== 'object' || up?.ref !== atDropFor)) atDropFor = null;
+  const up = ctx.director?.upNext;
+  if (atDropFor && (ctx.director?.sceneWhen !== 'drop' || typeof up !== 'object' || up?.ref !== atDropFor)) atDropFor = null;
   return atDropFor && typeof up === 'object' ? up?.scene?.name ?? null : null;
 }
 /** Shift+N: Scenes in the mix → always → off. */
@@ -584,13 +586,13 @@ function cycleScenes() {
 const thumbing = new Set(); // (refs with a picture on its way)
 const whenIdle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 1000 }) : setTimeout(fn, 0));
 function keepThumb(ref) {
-  if (!ref.startsWith('b:') || store.thumb(ref) || !fire?.captureThumb || thumbing.has(ref)) return;
+  if (!ref.startsWith('b:') || store.thumb(ref) || !ctx.fire?.captureThumb || thumbing.has(ref)) return;
   thumbing.add(ref);
   setTimeout(() => whenIdle(async () => {
     thumbing.delete(ref);
-    if (director?.sceneRef !== ref || !fire || document.body.dataset.mode !== 'live') return;
+    if (ctx.director?.sceneRef !== ref || !ctx.fire || document.body.dataset.mode !== 'live') return;
     try {
-      const url = await fire.captureThumb(192, 108);
+      const url = await ctx.fire.captureThumb(192, 108);
       if (url?.startsWith('data:image/webp') && url.length <= THUMB_MAX) store.setThumb(ref, url);
     } catch { /* no picture this time */ }
   }), 2500);
@@ -605,27 +607,27 @@ store.onChange(() => {
 });
 store.onPlay((ref) => {
   const entry = findScene(ref);
-  if (!entry || !director) return false;
+  if (!entry || !ctx.director) return false;
   playScene(entry, { instant: document.body.dataset.mode !== 'live' });
-  if (document.body.dataset.mode !== 'live') firstScene = entry;
+  if (document.body.dataset.mode !== 'live') ctx.firstScene = entry;
   note(`Playing “${entry.scene.name}” from the Painter`, 2.5);
   return true;
 });
 
 // --- Audio ---------------------------------------------------------------------------------
 function openEngine() {
-  if (!engine) {
+  if (!ctx.engine) {
     const AC = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AC({ latencyHint: 'interactive' });
-    const analyser = createAnalyser(ctx);
-    const delay = ctx.createDelay(1);
+    const audio = new AC({ latencyHint: 'interactive' });
+    const analyser = createAnalyser(audio);
+    const delay = audio.createDelay(1);
     delay.connect(analyser.node);
-    const monitor = ctx.createGain();
+    const monitor = audio.createGain();
     monitor.gain.value = settings.volume;
-    monitor.connect(ctx.destination);
-    engine = { ctx, analyser, delay, monitor, source: null };
+    monitor.connect(audio.destination);
+    ctx.engine = { ctx: audio, analyser, delay, monitor, source: null };
   }
-  return engine;
+  return ctx.engine;
 }
 
 const NO_PROCESSING = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
@@ -696,12 +698,12 @@ function openDemo(e) {
 
 /** The sound goes (Change, a shared track ending, another source): the show as if it fell silent. */
 function stopSource() {
-  if (!engine?.source) return;
-  engine.source.stop();
-  engine.source = null;
-  engine.analyser.reset(); // (silent again, without a 'silence' event of its own)
+  if (!ctx.engine?.source) return;
+  ctx.engine.source.stop();
+  ctx.engine.source = null;
+  ctx.engine.analyser.reset(); // (silent again, without a 'silence' event of its own)
   heard.clear();
-  director?.silence();
+  ctx.director?.silence();
 }
 
 let busy = false;
@@ -763,7 +765,7 @@ async function listDevices() {
 q('[data-device]').addEventListener('change', (e) => {
   settings.deviceId = e.target.value;
   saveSettings(settings);
-  if (engine?.source?.kind === 'input') useSource('input');
+  if (ctx.engine?.source?.kind === 'input') useSource('input');
 });
 
 // --- Start screen ----------------------------------------------------------------------------
@@ -792,10 +794,10 @@ if (navigator.mediaDevices?.enumerateDevices) listDevices();
 // On the start screen the fire moves aside for the menu: to its right on a landscape
 // screen (further on a narrower one, where the menu takes more of it), above it on a tall one.
 function frameFire() {
-  if (!director) return;
+  if (!ctx.director) return;
   const menu = document.body.dataset.mode === 'start';
   const side = innerWidth >= 760 && innerWidth > innerHeight;
-  director.frame(menu && side ? (innerWidth >= 1100 ? 0.2 : 0.36) : 0, menu && !side ? 0.24 : 0);
+  ctx.director.frame(menu && side ? (innerWidth >= 1100 ? 0.2 : 0.36) : 0, menu && !side ? 0.24 : 0);
 }
 window.addEventListener('resize', frameFire);
 
@@ -815,12 +817,12 @@ function goLive() {
   document.body.dataset.mode = 'live';
   start.hidden = true;
   hud.hidden = false;
-  const s = engine.source;
+  const s = ctx.engine.source;
   q('[data-source-name]').textContent = `${{ input: 'Line in', capture: 'Shared audio', file: 'File', demo: 'Demo' }[s.kind]}: ${s.name}`;
   q('[data-transport]').hidden = !s.media;
   q('[data-track]').textContent = s.media ? s.name : '';
   q('[data-volume-row]').hidden = !s.playback;
-  if (fire) q('[data-wield]').textContent = wieldLabel({ weapon: fire.weapon, flame: fire.flame, element: fire.element });
+  if (ctx.fire) q('[data-wield]').textContent = wieldLabel({ weapon: ctx.fire.weapon, flame: ctx.fire.flame, element: ctx.fire.element });
   live.textContent = `Listening to ${s.name}.`;
   frameFire();
   keepAwake();
@@ -867,11 +869,11 @@ function stateText(f) {
   else if (f.state === 'silent') text = 'Waiting for sound…';
   else if (f.state === 'breakdown' || f.state === 'build') {
     const what = f.state === 'build' ? `Build ${Math.round(f.build * 100)}%` : 'Breakdown';
-    text = fire?.holding ? `${what} · ${waits}` : what;
-  } else if (fire?.holding) text = waiting ? `The weapon waits for the drop: ${waits}` : 'The weapon waits for the drop';
+    text = ctx.fire?.holding ? `${what} · ${waits}` : what;
+  } else if (ctx.fire?.holding) text = waiting ? `The weapon waits for the drop: ${waits}` : 'The weapon waits for the drop';
   else text = f.locked ? 'In the groove' : 'Listening for the beat…';
   // ...and what the knights are doing.
-  const knights = director?.knights;
+  const knights = ctx.director?.knights;
   if (knights?.text && !noting && f.state !== 'silent') text += ` · ${knights.text}`;
   return text;
 }
@@ -880,17 +882,17 @@ function drawHud(f, dt) {
   hudClock += dt;
   if (hudClock < 0.1) return;
   hudClock = 0;
-  const by = engine.analyser.tempo.manual; // tap | manual | link | null (heard)
+  const by = ctx.engine.analyser.tempo.manual; // tap | manual | link | null (heard)
   const tag = { tap: ' · Tap', manual: ' · Set', link: ' · Link' }[by] ?? '';
   setText(bpmEl, f.bpm ? `${f.locked ? '' : '~'}${by === 'link' || by === 'manual' ? f.bpm.toFixed(1) : Math.round(f.bpm)} BPM${tag}` : '--- BPM');
   bpmEl.classList.toggle('is-locked', f.locked);
   setText(stateEl, stateText(f));
-  const holding = !!fire?.holding;
+  const holding = !!ctx.fire?.holding;
   relabel(armLabel, holding ? 'Strike' : 'Forge', 'arm', holding ? HUD_TIPS.strike : HUD_TIPS.forge);
-  const up = !!director?.knights && director.knights.mode !== 'rest';
+  const up = !!ctx.director?.knights && ctx.director.knights.mode !== 'rest';
   relabel(danceLabel, up ? 'Sit' : 'Dance', 'dance-act', up ? HUD_TIPS.sit : HUD_TIPS.dance);
   showScene();
-  const media = engine.source?.media;
+  const media = ctx.engine.source?.media;
   if (media && media.duration) {
     const p = (media.currentTime / media.duration).toFixed(3);
     if (p !== progressShown) { progressShown = p; progress.style.setProperty('--p', p); }
@@ -916,7 +918,7 @@ let wakeLock = null;
 async function keepAwake() {
   try { if (!wakeLock || wakeLock.released) wakeLock = await navigator.wakeLock?.request('screen'); } catch { /* not allowed: fine */ }
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden && engine?.source) keepAwake(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && ctx.engine?.source) keepAwake(); });
 
 // --- Actions ---------------------------------------------------------------------------------
 document.addEventListener('fullscreenchange', () => {
@@ -925,25 +927,25 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 function tap() {
-  if (!engine?.source) return;
-  const bpm = engine.analyser.tempo.tap(performance.now() / 1000);
+  if (!ctx.engine?.source) return;
+  const bpm = ctx.engine.analyser.tempo.tap(performance.now() / 1000);
   note(bpm ? `Tapped ${Math.round(bpm)} BPM` : 'Tap…', 1.2);
 }
 
 const actions = {
-  drop: () => director?.strike(),
-  arm: () => { if (fire?.holding) director.strike(); else director?.arm(); },
-  beat: () => { if (director?.forgeOnBeat(lastFeatures?.bpm ? 60 / lastFeatures.bpm : 0)) note('Swapping on the next downbeat', 2); },
+  drop: () => ctx.director?.strike(),
+  arm: () => { if (ctx.fire?.holding) ctx.director.strike(); else ctx.director?.arm(); },
+  beat: () => { if (ctx.director?.forgeOnBeat(ctx.lastFeatures?.bpm ? 60 / ctx.lastFeatures.bpm : 0)) note('Swapping on the next downbeat', 2); },
   tap,
-  ring: () => director?.ring(1),
-  combo: () => { if (!director?.combo()) note('The weapon is busy (or no beat yet)', 1.5); },
-  cut: () => { director?.cut(); note(`Shot: ${SHOTS[director?.shot]?.name ?? ''}`, 1.5); },
+  ring: () => ctx.director?.ring(1),
+  combo: () => { if (!ctx.director?.combo()) note('The weapon is busy (or no beat yet)', 1.5); },
+  cut: () => { ctx.director?.cut(); note(`Shot: ${SHOTS[ctx.director?.shot]?.name ?? ''}`, 1.5); },
   dance: () => {
-    const r = director?.danceNow();
+    const r = ctx.director?.danceNow();
     note(r === 'dance' ? 'The knights get up to dance' : r === 'sit' ? 'The knights sit back down' : reducedMotion ? 'The knights keep still (reduced motion)' : 'No knights by the fire', 1.5);
   },
   knights: () => {
-    const r = director?.knightsInOut();
+    const r = ctx.director?.knightsInOut();
     note({ in: 'The knights come to the fire', out: 'The knights leave the fire', 'in-next': 'The knights come on the next drop', 'out-next': 'The knights leave on the next drop' }[r] ?? 'No knights here', 1.8);
   },
   colors: () => {
@@ -962,7 +964,7 @@ const actions = {
   keys: () => openKeys(),
   fullscreen: toggleFullscreen,
   play: () => {
-    const m = engine?.source?.media;
+    const m = ctx.engine?.source?.media;
     if (!m) return;
     if (m.paused) m.play(); else m.pause();
     q('[data-act="play"]').textContent = m.paused ? 'Play' : 'Pause';
@@ -974,8 +976,8 @@ const actions = {
   'nudge-early': () => nudge(-0.01),
   'nudge-late': () => nudge(0.01),
   downbeat: () => {
-    if (!engine?.source) return;
-    engine.analyser.tempo.anchor(performance.now() / 1000);
+    if (!ctx.engine?.source) return;
+    ctx.engine.analyser.tempo.anchor(performance.now() / 1000);
     note('This beat is beat 1', 1.2);
   },
 };
@@ -984,7 +986,7 @@ document.addEventListener('click', (e) => {
   if (btn) actions[btn.dataset.act]?.();
 });
 q('[data-progress]').addEventListener('click', (e) => {
-  const m = engine?.source?.media;
+  const m = ctx.engine?.source?.media;
   if (!m?.duration) return;
   const r = e.currentTarget.getBoundingClientRect();
   m.currentTime = ((e.clientX - r.left) / r.width) * m.duration;
@@ -1010,7 +1012,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'h') { document.body.classList.toggle('hud-off'); wake(); }
   else if (k === 'i') { pack.toggle(); wake(); }
   else if (k === 'n') { if (e.shiftKey) cycleScenes(); else nextScene(); wake(); }
-  else if (document.body.dataset.mode !== 'live' || !fire) return;
+  else if (document.body.dataset.mode !== 'live' || !ctx.fire) return;
   else if (e.key === ' ') { e.preventDefault(); actions.drop(); }
   else if (k === 'a') actions.arm();
   else if (k === 'b') actions.beat();
@@ -1022,16 +1024,16 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'v') actions.record();
   else if (e.shiftKey && /^Digit[1-9]$/.test(e.code)) showCard(Number(e.code.slice(5)) - 1);
   else if (k === 'c') actions.cut();
-  else if (k === 'r') director.ring(1);
+  else if (k === 'r') ctx.director.ring(1);
   else if (k === 'x') actions.combo();
-  else if (k === 'g') director.glitchHit();
-  else if (k === 'l') note(`Look: ${director.nextLook()}`, 1.5);
+  else if (k === 'g') ctx.director.glitchHit();
+  else if (k === 'l') note(`Look: ${ctx.director.nextLook()}`, 1.5);
   else if (k === 'm') actions.mirror();
   else if (k === 'p' && e.shiftKey) actions.colors();
   else if (k === 'k') actions[e.shiftKey ? 'knights' : 'dance']();
   else if (k === 'escape') { document.body.classList.remove('hud-off'); wake(); }
-  else if (['1', '2', '3'].includes(e.key)) director.hit({ element: ['fire', 'lightning', 'ice'][Number(e.key) - 1] });
-  else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') director.hit({ step: e.key === 'ArrowRight' ? 1 : -1, element: fire.element });
+  else if (['1', '2', '3'].includes(e.key)) ctx.director.hit({ element: ['fire', 'lightning', 'ice'][Number(e.key) - 1] });
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') ctx.director.hit({ step: e.key === 'ArrowRight' ? 1 : -1, element: ctx.fire.element });
 });
 
 // --- Settings dialog (settingsDialog.js) ---------------------------------------------------------
@@ -1043,7 +1045,7 @@ let built = builtWith();
 let rebuildTimer = 0;
 /** A render setting changed (the P menu): only the picture, the rest of the show as it is. */
 function applyRender() {
-  director?.applyRender();
+  ctx.director?.applyRender();
   saveSettings(settings);
   markPreset(start, settings);
   settingsPanel.fill(); // (only while the dialog is open: it fills as it opens)
@@ -1056,20 +1058,20 @@ function applyRender() {
  */
 function applySettings(key) {
   const keys = [key].flat().filter((k) => typeof k === 'string');
-  if (keys.length) director?.releaseScene(keys.includes('xray') ? [...keys, 'xrayView'] : keys);
+  if (keys.length) ctx.director?.releaseScene(keys.includes('xray') ? [...keys, 'xrayView'] : keys);
   if (builtWith() !== built) {
     built = builtWith();
     clearTimeout(rebuildTimer);
     rebuildTimer = setTimeout(startScene, 200);
   }
-  if (engine) engine.monitor.gain.value = settings.volume;
+  if (ctx.engine) ctx.engine.monitor.gain.value = settings.volume;
   applyFrameRate();
-  director?.applyRender();
-  const held = !!director?.sceneRef;
-  if (settings.scenery !== 'mix' && (!held || keys.includes('scenery'))) fire?.setScenery(settings.scenery);
-  if (!held || keys.includes('shot')) director?.setShot(settings.shot);
+  ctx.director?.applyRender();
+  const held = !!ctx.director?.sceneRef;
+  if (settings.scenery !== 'mix' && (!held || keys.includes('scenery'))) ctx.fire?.setScenery(settings.scenery);
+  if (!held || keys.includes('shot')) ctx.director?.setShot(settings.shot);
   // Scenes switched off: back to the free show now (a solo from the Painter stays).
-  if (keys.includes('scenes') && modeOf(settings.scenes) === 'off' && held && !solo) playScene(null, { instant: !engine?.source });
+  if (keys.includes('scenes') && modeOf(settings.scenes) === 'off' && held && !ctx.solo) playScene(null, { instant: !ctx.engine?.source });
   if (keys.some((k) => k === 'sceneFrom' || k === 'sceneList')) drawChips();
   saveSettings(settings);
   markPreset(start, settings);
@@ -1083,7 +1085,7 @@ const settingsPanel = bindSettings(settingsDialog, settings, {
   onPlayScene: (ref) => {
     const entry = findScene(ref);
     if (!entry) return;
-    if (document.body.dataset.mode !== 'live') firstScene = entry;
+    if (document.body.dataset.mode !== 'live') ctx.firstScene = entry;
     playScene(entry, { instant: document.body.dataset.mode !== 'live' });
   },
   base: import.meta.env.BASE_URL,
@@ -1133,10 +1135,10 @@ const RENDER_ROWS = [
 ];
 function renderValues() {
   // (What shows: a preset scene's own where it sets one, marked "· Scene".)
-  const shown = director?.parts?.layers?.view ?? settings;
-  const over = director?.parts?.layers?.over ?? {};
+  const shown = ctx.director?.parts?.layers?.view ?? settings;
+  const over = ctx.director?.parts?.layers?.over ?? {};
   const v = Object.fromEntries(RENDER_ROWS.map((r) => [r.id, `${renderText(shown, r.id)}${Object.hasOwn(over, r.id) ? ' · Scene' : ''}`]));
-  const live = director?.render;
+  const live = ctx.director?.render;
   if (!live) return v;
   const mix = (key) => modeOf(shown[key]) === 'mix';
   if (live.pixelSize && live.pixelSize !== shown.pixelSize) v.pixelSize += ` · ${live.pixelSize} px Now`;
@@ -1154,9 +1156,9 @@ const renderMenu = createRenderMenu({
   read: renderValues,
   pick: (id, dir) => {
     // (Stepping a row the scene sets takes it back from the scene, from its value.)
-    const over = director?.parts?.layers?.over;
+    const over = ctx.director?.parts?.layers?.over;
     if (over && Object.hasOwn(over, id)) settings[id] = over[id];
-    director?.releaseScene(id === 'xray' ? [id, 'xrayView'] : [id]);
+    ctx.director?.releaseScene(id === 'xray' ? [id, 'xrayView'] : [id]);
     stepRender(settings, /** @type {any} */ (id), dir);
     applyRender();
     return renderValues();
@@ -1166,7 +1168,7 @@ const renderMenu = createRenderMenu({
     run: () => {
       const d = defaults();
       for (const r of RENDER_ROWS) settings[r.id] = d[r.id];
-      director?.releaseScene([...RENDER_ROWS.map((r) => r.id), 'xrayView']);
+      ctx.director?.releaseScene([...RENDER_ROWS.map((r) => r.id), 'xrayView']);
       applyRender();
     },
   },
@@ -1177,8 +1179,8 @@ app.append(renderMenu.el);
 // --- Recording a clip (record.js) -------------------------------------------------------------
 const recordLabel = q('[data-record-label]');
 const recorder = createRecorder({
-  scene: () => fire,
-  audio: () => (engine?.source ? { ctx: engine.ctx, node: engine.delay } : null),
+  scene: () => ctx.fire,
+  audio: () => (ctx.engine?.source ? { ctx: ctx.engine.ctx, node: ctx.engine.delay } : null),
   onState: ({ recording, seconds, saved, error }) => {
     document.body.classList.toggle('is-recording', recording);
     recordLabel.textContent = recording ? `Rec ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : 'Record';
@@ -1191,49 +1193,49 @@ const recorder = createRecorder({
 const pack = createPack({
   label: ui.pack,
   items: bonfireItems({
-    state: () => (fire ? {
-      scenery: fire.scenery, weapon: fire.weapon, element: fire.element, flame: fire.flame,
-      helmet: fire.knights?.present ? fire.knights.helmet : null,
-      style: fire.knights?.present ? fire.knights.style ?? null : null,
-      finish: fire.knights?.present ? fire.knights.finish ?? null : null,
+    state: () => (ctx.fire ? {
+      scenery: ctx.fire.scenery, weapon: ctx.fire.weapon, element: ctx.fire.element, flame: ctx.fire.flame,
+      helmet: ctx.fire.knights?.present ? ctx.fire.knights.helmet : null,
+      style: ctx.fire.knights?.present ? ctx.fire.knights.style ?? null : null,
+      finish: ctx.fire.knights?.present ? ctx.fire.knights.finish ?? null : null,
     } : null),
-    busy: () => !fire || fire.forging,
+    busy: () => !ctx.fire || ctx.fire.forging,
     reducedMotion,
     onScene: (key) => {
-      director?.releaseScene(['scenery']); // (your pick wins over a scene's place)
-      if (fire?.setScenery(key, { flash: true })) note(`Traveled to ${SCENERIES[key]}`, 1.5);
+      ctx.director?.releaseScene(['scenery']); // (your pick wins over a scene's place)
+      if (ctx.fire?.setScenery(key, { flash: true })) note(`Traveled to ${SCENERIES[key]}`, 1.5);
     },
     onWeapon: (key) => {
-      if (!fire || key === fire.weapon) return;
-      if (fire.forging) { note('The forge is busy', 1.5); return; }
-      fire.equip(key, fire.flame, { element: fire.element }).catch(() => {});
+      if (!ctx.fire || key === ctx.fire.weapon) return;
+      if (ctx.fire.forging) { note('The forge is busy', 1.5); return; }
+      ctx.fire.equip(key, ctx.fire.flame, { element: ctx.fire.element }).catch(() => {});
       note(`Forging the ${weapons[key]}`, 2);
     },
-    onRing: () => director?.ring(1),
+    onRing: () => ctx.director?.ring(1),
     onLiving: () => actions.combo(),
-    onElement: (key) => { if (!director?.hit({ element: key })) note('The forge is busy', 1.5); },
+    onElement: (key) => { if (!ctx.director?.hit({ element: key })) note('The forge is busy', 1.5); },
     onFlame: (key) => {
-      if (!fire || key === fire.flame) return;
-      if (fire.forging) { note('The forge is busy', 1.5); return; }
-      fire.equip(fire.weapon, key, { element: fire.element }).catch(() => {});
+      if (!ctx.fire || key === ctx.fire.flame) return;
+      if (ctx.fire.forging) { note('The forge is busy', 1.5); return; }
+      ctx.fire.equip(ctx.fire.weapon, key, { element: ctx.fire.element }).catch(() => {});
     },
     // The knights (every one by the fire): a new helmet (hands to the helm), a gesture.
     onHelmet: (key) => {
-      if (!fire?.knights?.present) return;
-      fire.knights.setHelmet(key);
+      if (!ctx.fire?.knights?.present) return;
+      ctx.fire.knights.setHelmet(key);
       note(`Helmet: ${HELMETS[key] ?? key}`, 1.5);
     },
-    onGesture: (name) => { fire?.knights?.gesture(name, { index: 'all' }); },
+    onGesture: (name) => { ctx.fire?.knights?.gesture(name, { index: 'all' }); },
     // ...their style and the color of their steel, for them all (the Knights tab's Style and
     // Finish roll them again at the hidden moments when they're in the mix).
     onStyle: (key) => {
-      if (!fire?.knights?.present || !fire.knights.setStyle) return;
-      Promise.resolve(fire.knights.setStyle(key)).catch(() => {});
+      if (!ctx.fire?.knights?.present || !ctx.fire.knights.setStyle) return;
+      Promise.resolve(ctx.fire.knights.setStyle(key)).catch(() => {});
       note(`Style: ${STYLE_NAMES[key] ?? key}`, 1.5);
     },
     onFinish: (key) => {
-      if (!fire?.knights?.present || !fire.knights.setFinish) return;
-      fire.knights.setFinish(key);
+      if (!ctx.fire?.knights?.present || !ctx.fire.knights.setFinish) return;
+      ctx.fire.knights.setFinish(key);
       note(`Finish: ${FINISH_NAMES[key] ?? key}`, 1.5);
     },
   }),
@@ -1257,13 +1259,13 @@ function drawMidi() {
 }
 const midiActions = {
   drop: () => actions.drop(), arm: () => actions.arm(), ring: () => actions.ring(), combo: () => actions.combo(),
-  cut: () => actions.cut(), look: () => note(`Look: ${director?.nextLook()}`, 1.5), scene: () => nextScene(), burst: () => director?.glitchHit(),
-  fire: () => director?.hit({ element: 'fire' }), lightning: () => director?.hit({ element: 'lightning' }), ice: () => director?.hit({ element: 'ice' }),
+  cut: () => actions.cut(), look: () => note(`Look: ${ctx.director?.nextLook()}`, 1.5), scene: () => nextScene(), burst: () => ctx.director?.glitchHit(),
+  fire: () => ctx.director?.hit({ element: 'fire' }), lightning: () => ctx.director?.hit({ element: 'lightning' }), ice: () => ctx.director?.hit({ element: 'ice' }),
   record: () => actions.record(),
   knightsDance: () => actions.dance(), knights: () => actions.knights(),
 };
 const midi = createMidi({
-  onAction: (id) => { if (document.body.dataset.mode === 'live' && fire) { midiActions[id]?.(); wake(); } },
+  onAction: (id) => { if (document.body.dataset.mode === 'live' && ctx.fire) { midiActions[id]?.(); wake(); } },
   onStatus: (text) => { midiStatus.textContent = text; },
   onChange: drawMidi,
 });
@@ -1287,21 +1289,21 @@ q('[data-feel]').addEventListener('click', (e) => {
 });
 markPreset(start, settings);
 drawChips();
-if (askedScene && !firstScene) showError('That scene isn’t in this browser (it may have been made in another one). Pick another below, or make one in the Painter.');
+if (askedScene && !ctx.firstScene) showError('That scene isn’t in this browser (it may have been made in another one). Pick another below, or make one in the Painter.');
 
 // --- Beat by hand: a typed BPM, nudges -----------------------------------------------------
 const bpmInput = q('[data-bpm-set]');
 bpmInput.addEventListener('change', () => {
-  if (!engine?.source) return;
+  if (!ctx.engine?.source) return;
   const v = Number(bpmInput.value);
-  const tempo = engine.analyser.tempo;
+  const tempo = ctx.engine.analyser.tempo;
   if (bpmInput.value && v >= 60 && v <= 220) { tempo.setManual(v, performance.now() / 1000); note(`Tempo set to ${v} BPM`, 1.5); }
   else { bpmInput.value = ''; tempo.clearManual(); note('Following the music’s tempo', 1.5); }
 });
 bpmInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') bpmInput.blur(); });
 function nudge(seconds) {
-  if (!engine?.source) return;
-  engine.analyser.tempo.nudge(seconds);
+  if (!ctx.engine?.source) return;
+  ctx.engine.analyser.tempo.nudge(seconds);
   note(`Beat ${seconds < 0 ? 'earlier' : 'later'} by ${Math.abs(seconds * 1000)} ms`, 1);
 }
 
