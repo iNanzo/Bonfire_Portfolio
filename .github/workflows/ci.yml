@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -38,8 +38,8 @@ jobs:
       matrix:
         node: [22, 24]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -51,7 +51,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: node tools/coverage-summary.mjs
       # The report, lcov and the summary; not coverage/tmp, c8's raw V8 data (about 20 MB).
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: coverage-node${{ matrix.node }}
@@ -65,8 +65,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -74,7 +74,7 @@ jobs:
       - run: npm run build
       # Dotfiles too (upload-artifact leaves them out by default), so a later
       # public/.well-known/ still ships.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: site-dist
           path: dist/
@@ -102,8 +102,8 @@ jobs:
           - { id: tips-live-1, name: 'Live tips, 1 of 2', args: 'tips-live --shard=1/2' }
           - { id: tips-live-2, name: 'Live tips, 2 of 2', args: 'tips-live --shard=2/2' }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -114,7 +114,7 @@ jobs:
         run: |
           version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: browsers
         with:
           path: ~/.cache/ms-playwright
@@ -125,7 +125,7 @@ jobs:
       - if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
       # The build job's dist/, served as it is (PW_PREBUILT): every shard tests the one build.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: site-dist
           path: dist
@@ -133,7 +133,7 @@ jobs:
         env:
           CI: true
           PW_PREBUILT: 1
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report-${{ matrix.id }}
