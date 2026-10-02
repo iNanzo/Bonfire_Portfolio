@@ -28,6 +28,33 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * it's made).
  * @typedef {object} SceneGivens
  * @property {any} scope  resources.js: everything the scene owns, given back when it's disposed
+ * @property {HTMLElement} container  what the canvas fills
+ * @property {boolean} reducedMotion
+ * @property {boolean} lightTrails  the fireflies leave trails of light (Bonfire Live's Trails)
+ * @property {boolean} fxLayer  the pixel pass's effects layer and stages (Bonfire Live and the Painter; not the site)
+ * @property {(() => void) | undefined} onFormed  createBonfire's: a new weapon finished forming
+ * @property {boolean} coarse  a touch screen: the scaled-down counts
+ * @property {any} P  effects.particles
+ * @property {any} F  effects.fireflies
+ * @property {(n: number) => number} pCount  a particle count for this device
+ * @property {(n: number) => number} fCount  a firefly count for this device
+ * @property {(n: number) => number} impactCount  an impact's particle count for this device
+ * @property {any} renderer  the THREE.WebGLRenderer
+ * @property {any} scene
+ * @property {any} candleLight  the ruins' candle's light (sceneLights.js)
+ * @property {any} effectMaterial  the loose particles' material (flame.js), and their two other shapes:
+ * @property {any} crossMaterial  lightning's sparks
+ * @property {any} diamondMaterial  ice's glints
+ * @property {any} field  the curl noise the particles ride (curl.js)
+ * @property {any} fire  the flame and its sparks (flame.js)
+ * @property {any} plasma  the lightning ball (plasma.js)
+ * @property {any} chill  the cold mist (chill.js)
+ * @property {any} crystals  the ice's shards (ice.js)
+ * @property {any} swingTrail  the living blade's trail of fire (swingTrail.js)
+ * @property {any} marks  the marks hits leave on the ground (marks.js)
+ * @property {Record<string, any>} debris  each element's bouncing debris (debris.js)
+ * @property {any} smokeMaterial  the impacts' smoke
+ * @property {any} armor  the knights' shared armor uniforms (armor.js)
  */
 
 /**
@@ -93,4 +120,15 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {(steps: Generator) => Promise<any>} inIdle  only in time the page has spare (the places built beforehand)
  */
 
-/** @typedef {SceneGivens & SceneState & IdlePart} SceneContext */
+/**
+ * The model and what's made from it (sceneModel.js).
+ * @typedef {object} ModelPart
+ * @property {any[]} candleFlames  the ruins' candle flames ({ mesh, scale }), flickered each flame step
+ * @property {any[]} glows  every glow recolored each flame step: the model's own first (sharedGlows), then each place's as it's first shown
+ * @property {any} loader  the GLTF loader (with Draco), for the knight's styles' own models too
+ * @property {Promise<any>} knightLoaded  the knight's model (his code with it), or null if either failed
+ * @property {boolean} knightLater  the site's knight isn't there at load: he's built after the fire's first frame
+ * @property {Promise<void>} modelLoaded  the model is in, everything made from it (scene.js draws then)
+ */
+
+/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart} SceneContext */
