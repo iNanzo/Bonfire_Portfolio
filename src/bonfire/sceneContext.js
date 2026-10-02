@@ -24,6 +24,13 @@ export const lightMix = (key) => flames[key]?.light ?? 0.34;
 export const boost = (v) => Math.max(0.1, 1 + v);
 
 /**
+ * What createBonfire makes first and never replaces (a part may keep these from `ctx` as
+ * it's made).
+ * @typedef {object} SceneGivens
+ * @property {any} scope  resources.js: everything the scene owns, given back when it's disposed
+ */
+
+/**
  * What the scene is doing. Each value is set where its part of the scene says what it is
  * (scene.js, with the comment that explains it), and read from `ctx` whenever it's needed.
  * @typedef {object} SceneState
@@ -79,4 +86,11 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {any} perf  the ?perf overlay (ui/perfOverlay.js), or null
  */
 
-/** @typedef {SceneState} SceneContext */
+/**
+ * Building in idle moments (sceneIdle.js).
+ * @typedef {object} IdlePart
+ * @property {(steps: Generator) => Promise<any>} inSteps  a few ms at a time, never stalling the fire (a knight's template)
+ * @property {(steps: Generator) => Promise<any>} inIdle  only in time the page has spare (the places built beforehand)
+ */
+
+/** @typedef {SceneGivens & SceneState & IdlePart} SceneContext */
