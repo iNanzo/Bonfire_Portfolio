@@ -55,7 +55,7 @@ import { MODES, modeOf } from './looks.js';
 import { COLOR_MODES } from './colors.js';
 import { createDemo, DEMO_BPM } from './demo.js';
 import { densityCounts } from './density.js';
-import { loadSettings, saveSettings, flushSettings, applyPreset, PRESETS, defaults, scenesFrom, inLoop, frameCap } from './settings.js';
+import { loadSettings, saveSettings, flushSettings, applyPreset, PRESETS, defaults, frameCap } from './settings.js';
 import { bindSettings, markPreset } from './settingsDialog.js';
 import { KEY_GROUPS, keyList } from './keys.js';
 import { createTickBatch } from './tickBatch.js';
@@ -63,12 +63,10 @@ import { stepRender, renderText, XRAY_VIEWS, FOGS } from './render.js';
 import { HELMETS } from './knightShow.js';
 import { STYLE_NAMES } from '../bonfire/knightStyles.js';
 import { FINISH_NAMES } from '../bonfire/steel.js';
-import { normalizeScene, parseRef, sceneRef, sceneSwatches } from '../scenes.js';
-import { createSceneStore, THUMB_MAX } from '../sceneStore.js';
-import * as siteContent from '../content.js';
 import { createRenderMenu } from '../ui/renderMenu.js';
 import { focusedNow } from '../ui/focus.js';
 import { pageMarkup, HUD_TIPS, relabel } from './markup.js';
+import { createScenesUi } from './scenesUi.js';
 import { q, qa, typing, toggleFullscreen, failScene } from '../ui/shell.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
@@ -95,44 +93,6 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) flush
 /** @type {import('./context.js').LiveContext} */
 const ctx = { settings, reducedMotion, fire: null, director: null, engine: null, lastFeatures: null, firstScene: null, solo: null };
 
-// --- Preset scenes: the library -------------------------------------------------------------
-// The site's built-in scenes (content.json, stored normalized; hidden ones are out of the
-// loop but still play by their ref) and this browser's own, made in the Painter. Entries are
-// { ref: 'b:<id>' | 'm:<id>', scene }; the library is read again when the store changes.
-const store = createSceneStore({ voidHex: effects.colors?.void });
-const builtIns = (siteContent.scenes ?? []).map((s) => normalizeScene(s, { voidHex: effects.colors?.void }));
-let libraryCache = null;
-/** Every scene, the built-in ones first (hidden ones left out). */
-function library() {
-  libraryCache ??= [
-    ...builtIns.filter((s) => !s.hidden).map((scene) => ({ ref: sceneRef('b', scene.id), scene })),
-    ...store.list().map((scene) => ({ ref: sceneRef('m', scene.id), scene })),
-  ];
-  return libraryCache;
-}
-/**
- * The library the loop plays from (Scenes From; its in-or-out switches are the loop's): the
- * same list until the library or Scenes From changes (the HUD asks ten times a second).
- */
-let loopCache = { of: null, from: '', list: [] };
-function loopLibrary() {
-  const all = library();
-  if (loopCache.of !== all || loopCache.from !== settings.sceneFrom) loopCache = { of: all, from: settings.sceneFrom, list: scenesFrom(all, settings) };
-  return loopCache.list;
-}
-/** A scene by its ref (a hidden built-in one too), or null. */
-function findScene(ref) {
-  const { source, id } = parseRef(ref);
-  const scene = source === 'b' ? builtIns.find((s) => s.id === id) : source === 'm' ? store.get(id) : null;
-  return scene ? { ref: sceneRef(source, id), scene } : null;
-}
-// ?scene=<ref>: open on that scene (the start screen's backdrop, and the first when the music
-// starts); &solo: only that one this visit (the Painter's "Play in Bonfire Live").
-const params = new URLSearchParams(location.search);
-const askedScene = params.get('scene');
-ctx.firstScene = askedScene ? findScene(askedScene) : null;
-ctx.solo = ctx.firstScene && params.has('solo') ? ctx.firstScene.ref : null;
-
 document.documentElement.classList.add('js');
 applyCssPalette();
 applyFlame(startingEquipment.flame);
@@ -153,6 +113,17 @@ const live = q('[data-live]');
 const errorEl = q('[data-error]');
 const settingsDialog = q('[data-settings]');
 document.body.dataset.mode = 'start';
+
+// --- Preset scenes (scenesUi.js): the library, playing one, naming it, the start screen's chips
+Object.assign(ctx, createScenesUi(ctx));
+// ?scene=<ref>: open on that scene (the start screen's backdrop, and the first when the music
+// starts); &solo: only that one this visit (the Painter's "Play in Bonfire Live").
+const params = new URLSearchParams(location.search);
+const askedScene = params.get('scene');
+ctx.firstScene = askedScene ? ctx.findScene(askedScene) : null;
+ctx.solo = ctx.firstScene && params.has('solo') ? ctx.firstScene.ref : null;
+// (What main.js still gives the parts, until each moves out.)
+Object.assign(ctx, { note, showCard, openSettings, applySettings });
 
 // --- The bonfire ---------------------------------------------------------------------------
 const IDLE = { state: 'silent', bands: Object.fromEntries(BAND_NAMES.map((b) => [b, 0])), level: 0, beats: [], events: [], kick: 0, hat: 0, bpm: 0, locked: false, build: 0 };
@@ -218,12 +189,12 @@ function startScene() {
       onFrame: (dt) => { if (ctx.fire === candidate) onFrame(dt); },
       onTick: (dt) => { if (ctx.fire === candidate) onTick(dt); },
     });
-    const nextDirector = createDirector(candidate, { settings, reducedMotion, onEvent, scenes: loopLibrary });
+    const nextDirector = createDirector(candidate, { settings, reducedMotion, onEvent, scenes: ctx.loopLibrary });
     await candidate.ready;
     if (generation !== sceneGeneration) { candidate.dispose(); return; }
     const prev = ctx.fire;
     // (A rebuilt scene carries on with the preset scene that was playing.)
-    const playing = ctx.director?.sceneRef ? findScene(ctx.director.sceneRef) : null;
+    const playing = ctx.director?.sceneRef ? ctx.findScene(ctx.director.sceneRef) : null;
     recorder?.stop(); // (a clip ends with the scene it was recording)
     ctx.fire = candidate;
     ctx.director = nextDirector;
@@ -238,7 +209,7 @@ function startScene() {
     ctx.fire.setScenery(settings.scenery === 'mix' ? prev?.scenery ?? 'ruins' : settings.scenery);
     // (The first build opens on ?scene= or a chip picked while it loaded.)
     const opening = prev ? playing : playing ?? ctx.firstScene;
-    if (opening) playScene(opening, { instant: true, lock: opening.ref === ctx.solo });
+    if (opening) ctx.playScene(opening, { instant: true, lock: opening.ref === ctx.solo });
     stage.classList.add('is-ready');
     if (output && !output.closed) streamInto(output);
   }).catch(sceneFailed);
@@ -247,7 +218,6 @@ startScene();
 
 // --- Director events → page ------------------------------------------------------------------
 let stateNote = null; // a transient HUD line: { text, until }
-let atDropFor = null; // the ref of the scene N asked for in a breakdown, waiting for the drop's strike
 function onEvent(type, data = {}) {
   if (type === 'drop') {
     note('Drop!');
@@ -259,13 +229,13 @@ function onEvent(type, data = {}) {
     if (settings.intro) showCard(0);
     // (A scene already playing when the music starts, from ?scene=, a chip or N on the start
     // screen, carries on without a new 'scene' event: its picture is kept from here.)
-    if (ctx.director?.sceneRef) keepThumb(ctx.director.sceneRef);
+    if (ctx.director?.sceneRef) ctx.keepThumb(ctx.director.sceneRef);
   } else if (type === 'bar') {
     if (data.bar > 0 && data.bar % 32 === 0) nextCard('phrases');
   } else if (type === 'stage') {
     note(['', 'Building…', 'Building… halfway', 'Building… three quarters', 'Here it comes'][data.stage] ?? '', 2);
   } else if (type === 'scene') {
-    sceneArrived(data);
+    ctx.sceneArrived(data);
   }
 }
 function note(text, seconds = 2) { stateNote = { text, until: performance.now() / 1000 + seconds }; }
@@ -317,169 +287,6 @@ function showCard(n, { ms = 3600 } = {}) {
   }, ms);
 }
 
-// --- Preset scenes: playing one, naming it, the start screen's chips --------------------------
-const sceneLine = q('[data-scene-line]');
-const sceneNameEl = q('[data-scene-name]');
-const chipsEl = q('[data-scene-chips]');
-const soloEl = q('[data-solo]');
-const SCENE_SWITCH = { off: 'Off (the show plays free)', mix: 'In the Mix', on: 'Always' };
-
-/**
- * Play a scene: at once (`instant`: behind the start menu, a rebuilt scene), or while the
- * music plays on its next downbeat, in a flash. `lock`: only this one until N (the Painter's
- * solo); any other pick ends a solo. Null: back to the free show. The loop carries on from it.
- */
-function playScene(entry, { instant = false, lock = false } = {}) {
-  if (!ctx.director) return;
-  ctx.director.scene(entry, { instant, flash: !instant, onBeat: !instant });
-  const next = lock && entry ? entry.ref : null;
-  if (next !== ctx.solo || lock) ctx.director.lockScene(next);
-  ctx.solo = next;
-  showScene();
-}
-
-/** The director says a scene arrived ({ name, ref }; no name: the free show again). */
-function sceneArrived({ name = null, ref = null } = {}) {
-  showScene();
-  if (!name || !ctx.engine?.source) return;
-  note(`Scene: ${name}`, 2);
-  live.textContent = `Scene: ${name}.`;
-  const cards = modeOf(settings.sceneCards, 'off');
-  if (cards === 'on' || (cards === 'mix' && Math.random() < 0.5)) showCard({ title: name, scene: true }, { ms: 2600 });
-  if (ref) keepThumb(ref);
-}
-
-let named = '';
-/** Where a solo scene came from, for the HUD: one of mine from the Painter, a built-in on its own. */
-const soloFrom = (ref) => (ref.startsWith('m:') ? 'from the Painter' : 'on its own');
-
-/** The scene playing, everywhere it shows: the HUD's line, the chips, the Scenes tab, the solo note. */
-function showScene() {
-  const ref = ctx.director?.sceneRef ?? null;
-  const name = ctx.director?.sceneName ?? null;
-  const some = loopLibrary().length > 0;
-  const key = `${ref}|${name}|${ctx.solo}|${modeOf(settings.scenes)}|${some}`;
-  if (key === named) return;
-  named = key;
-  // (The line shows while one plays, or while scenes are on and there are some: the free
-  // show in between says so.)
-  sceneLine.hidden = !name && (modeOf(settings.scenes) === 'off' || !some);
-  sceneLine.classList.toggle('is-free', !name);
-  sceneLine.classList.toggle('is-solo', !!ctx.solo);
-  sceneNameEl.textContent = name ? `${name}${ctx.solo ? ` · ${soloFrom(ctx.solo)}` : ''}` : 'The Free Show';
-  for (const c of chipsEl.querySelectorAll('[data-scene-chip]')) c.setAttribute('aria-pressed', String(c.dataset.sceneChip === ref));
-  settingsPanel.markScene(ref);
-  soloEl.hidden = !(ctx.solo && name);
-  soloEl.textContent = ctx.solo && name ? `Playing “${name}” ${soloFrom(ctx.solo)}. N: back to the loop.` : '';
-}
-
-/** The start screen's chips: up to 8 scenes (the loop's first), then All Scenes…. */
-function drawChips() {
-  const list = loopLibrary();
-  const ordered = [...list.filter((e) => inLoop(settings, e.ref)), ...list.filter((e) => !inLoop(settings, e.ref))];
-  const shown = ordered.slice(0, 8);
-  // (The one playing always has its chip: a hidden built-in, say, from ?scene=.)
-  const playing = ctx.director?.sceneRef ? findScene(ctx.director.sceneRef) : ctx.firstScene;
-  if (playing && !shown.some((e) => e.ref === playing.ref)) shown.splice(7, 1, playing);
-  chipsEl.hidden = !shown.length;
-  chipsEl.innerHTML = shown.length ? `
-    <span class="viz-group-label">Scenes</span>
-    ${shown.map(({ ref, scene }) => {
-      const sw = sceneSwatches(scene).slice(0, 5);
-      return `<button class="pix-btn viz-preset viz-scene-chip" type="button" data-scene-chip="${esc(ref)}" aria-pressed="${ref === playing?.ref}" style="${sw.map((c, i) => `--sw${i}:${esc(c)}`).join(';')}"><span class="viz-chip-swatches" aria-hidden="true">${sw.map(() => '<i></i>').join('')}</span><b>${esc(scene.name)}</b></button>`;
-    }).join('')}
-    <button class="pix-btn viz-preset viz-scene-chip viz-scenes-all" type="button" data-scenes-all><b>All Scenes…</b></button>` : '';
-  named = '';
-  showScene();
-}
-chipsEl.addEventListener('click', (e) => {
-  if (e.target.closest('[data-scenes-all]')) { openSettings('scenes'); return; }
-  const chip = e.target.closest('[data-scene-chip]');
-  if (!chip) return;
-  // A click plays it behind the menu (and it opens the show); again: the free show.
-  const entry = chip.getAttribute('aria-pressed') === 'true' ? null : findScene(chip.dataset.sceneChip);
-  ctx.firstScene = entry;
-  playScene(entry, { instant: true });
-});
-sceneLine.addEventListener('click', () => openSettings('scenes'));
-
-/** N: the next scene (at once behind the start menu; live, on the next downbeat in a flash). */
-function nextScene() {
-  if (!ctx.director) return;
-  if (document.body.dataset.mode !== 'live') {
-    const inLoopNow = loopLibrary().filter((e) => inLoop(settings, e.ref));
-    const list = inLoopNow.length ? inLoopNow : loopLibrary();
-    if (!list.length) { live.textContent = 'No scenes yet: make one in the Painter.'; return; }
-    const next = list[(list.findIndex((e) => e.ref === ctx.director.sceneRef) + 1) % list.length];
-    ctx.firstScene = next;
-    playScene(next, { instant: true });
-    live.textContent = `Scene: ${next.scene.name}.`;
-    return;
-  }
-  // (Out of a solo too: the loop again. With a blade held for the drop, it waits for the
-  // drop's strike: the note says so, and the HUD's line keeps saying so until it lands.)
-  const next = ctx.director.nextScene();
-  ctx.solo = null;
-  const atDrop = !!next && ctx.director.sceneWhen === 'drop';
-  atDropFor = atDrop ? next.ref : null;
-  note(next ? `Next scene: ${next.scene.name}${atDrop ? ', at the drop' : ''}` : 'No scenes yet: make one in the Painter', atDrop ? 3 : 1.8);
-  showScene();
-}
-/**
- * The name of the scene N asked for while it waits for the drop's strike (null once it has
- * landed, or something else is coming instead), for the HUD's line.
- */
-function waitingForDrop() {
-  const up = ctx.director?.upNext;
-  if (atDropFor && (ctx.director?.sceneWhen !== 'drop' || typeof up !== 'object' || up?.ref !== atDropFor)) atDropFor = null;
-  return atDropFor && typeof up === 'object' ? up?.scene?.name ?? null : null;
-}
-/** Shift+N: Scenes in the mix → always → off. */
-function cycleScenes() {
-  const order = ['mix', 'on', 'off'];
-  settings.scenes = order[(order.indexOf(modeOf(settings.scenes)) + 1) % order.length];
-  settingsPanel.fill();
-  applySettings('scenes');
-  note(`Preset Scenes: ${SCENE_SWITCH[settings.scenes]}`, 1.5);
-}
-
-/**
- * The first time a built-in scene plays live, keep a small picture of it for its row in the
- * loop (192×108 WebP, in the scene store; the Painter keeps one for each of yours): 2.5 s in
- * (it has settled), if it's still the one playing. The scene copies it from its own texels
- * straight to that size (fire.captureThumb), when the page has a moment (idle time). Called
- * when a scene arrives live and when the music starts (the scene it opens on).
- */
-const thumbing = new Set(); // (refs with a picture on its way)
-const whenIdle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 1000 }) : setTimeout(fn, 0));
-function keepThumb(ref) {
-  if (!ref.startsWith('b:') || store.thumb(ref) || !ctx.fire?.captureThumb || thumbing.has(ref)) return;
-  thumbing.add(ref);
-  setTimeout(() => whenIdle(async () => {
-    thumbing.delete(ref);
-    if (ctx.director?.sceneRef !== ref || !ctx.fire || document.body.dataset.mode !== 'live') return;
-    try {
-      const url = await ctx.fire.captureThumb(192, 108);
-      if (url?.startsWith('data:image/webp') && url.length <= THUMB_MAX) store.setThumb(ref, url);
-    } catch { /* no picture this time */ }
-  }), 2500);
-}
-
-// The library changes when a Painter tab saves (or deletes) a scene; and a Painter can hand
-// one over to play now ("Play in Bonfire Live").
-store.onChange(() => {
-  libraryCache = null;
-  settingsPanel.drawScenes();
-  drawChips();
-});
-store.onPlay((ref) => {
-  const entry = findScene(ref);
-  if (!entry || !ctx.director) return false;
-  playScene(entry, { instant: document.body.dataset.mode !== 'live' });
-  if (document.body.dataset.mode !== 'live') ctx.firstScene = entry;
-  note(`Playing “${entry.scene.name}” from the Painter`, 2.5);
-  return true;
-});
 
 // --- Audio ---------------------------------------------------------------------------------
 function openEngine() {
@@ -729,7 +536,7 @@ function stateText(f) {
   const now = performance.now() / 1000;
   const noting = stateNote && now < stateNote.until;
   // (A scene N asked for in a breakdown: the line says it comes with the drop until it lands.)
-  const waiting = waitingForDrop();
+  const waiting = ctx.waitingForDrop();
   const waits = waiting ? `“${waiting}” comes with the drop` : 'the weapon waits for the drop';
   let text;
   if (noting) text = waiting && !stateNote.text.includes(waiting) ? `${stateNote.text} · ${waits}` : stateNote.text;
@@ -758,7 +565,7 @@ function drawHud(f, dt) {
   relabel(armLabel, holding ? 'Strike' : 'Forge', 'arm', holding ? HUD_TIPS.strike : HUD_TIPS.forge);
   const up = !!ctx.director?.knights && ctx.director.knights.mode !== 'rest';
   relabel(danceLabel, up ? 'Sit' : 'Dance', 'dance-act', up ? HUD_TIPS.sit : HUD_TIPS.dance);
-  showScene();
+  ctx.showScene();
   const media = ctx.engine.source?.media;
   if (media && media.duration) {
     const p = (media.currentTime / media.duration).toFixed(3);
@@ -878,7 +685,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === 's') openSettings();
   else if (k === 'h') { document.body.classList.toggle('hud-off'); wake(); }
   else if (k === 'i') { pack.toggle(); wake(); }
-  else if (k === 'n') { if (e.shiftKey) cycleScenes(); else nextScene(); wake(); }
+  else if (k === 'n') { if (e.shiftKey) ctx.cycleScenes(); else ctx.nextScene(); wake(); }
   else if (document.body.dataset.mode !== 'live' || !ctx.fire) return;
   else if (e.key === ' ') { e.preventDefault(); actions.drop(); }
   else if (k === 'a') actions.arm();
@@ -938,28 +745,29 @@ function applySettings(key) {
   if (settings.scenery !== 'mix' && (!held || keys.includes('scenery'))) ctx.fire?.setScenery(settings.scenery);
   if (!held || keys.includes('shot')) ctx.director?.setShot(settings.shot);
   // Scenes switched off: back to the free show now (a solo from the Painter stays).
-  if (keys.includes('scenes') && modeOf(settings.scenes) === 'off' && held && !ctx.solo) playScene(null, { instant: !ctx.engine?.source });
-  if (keys.some((k) => k === 'sceneFrom' || k === 'sceneList')) drawChips();
+  if (keys.includes('scenes') && modeOf(settings.scenes) === 'off' && held && !ctx.solo) ctx.playScene(null, { instant: !ctx.engine?.source });
+  if (keys.some((k) => k === 'sceneFrom' || k === 'sceneList')) ctx.drawChips();
   saveSettings(settings);
   markPreset(start, settings);
-  showScene();
+  ctx.showScene();
 }
 const settingsPanel = bindSettings(settingsDialog, settings, {
   onChange: applySettings,
   onNote: (text) => note(text, 1.5),
-  scenes: library,
-  thumb: (ref) => store.thumb(ref),
+  scenes: ctx.library,
+  thumb: (ref) => ctx.store.thumb(ref),
   onPlayScene: (ref) => {
-    const entry = findScene(ref);
+    const entry = ctx.findScene(ref);
     if (!entry) return;
     if (document.body.dataset.mode !== 'live') ctx.firstScene = entry;
-    playScene(entry, { instant: document.body.dataset.mode !== 'live' });
+    ctx.playScene(entry, { instant: document.body.dataset.mode !== 'live' });
   },
   base: import.meta.env.BASE_URL,
   midi: () => MIDI_NAMES,
   keys: keyList(),
   onKeys: () => openKeys(),
 });
+ctx.settingsPanel = settingsPanel;
 
 // --- The keyboard shortcuts (?): every key, in groups (keys.js) -------------------------------
 const keysOverlay = createKeysOverlay({ title: 'Keyboard Shortcuts', groups: KEY_GROUPS });
@@ -1126,7 +934,7 @@ function drawMidi() {
 }
 const midiActions = {
   drop: () => actions.drop(), arm: () => actions.arm(), ring: () => actions.ring(), combo: () => actions.combo(),
-  cut: () => actions.cut(), look: () => note(`Look: ${ctx.director?.nextLook()}`, 1.5), scene: () => nextScene(), burst: () => ctx.director?.glitchHit(),
+  cut: () => actions.cut(), look: () => note(`Look: ${ctx.director?.nextLook()}`, 1.5), scene: () => ctx.nextScene(), burst: () => ctx.director?.glitchHit(),
   fire: () => ctx.director?.hit({ element: 'fire' }), lightning: () => ctx.director?.hit({ element: 'lightning' }), ice: () => ctx.director?.hit({ element: 'ice' }),
   record: () => actions.record(),
   knightsDance: () => actions.dance(), knights: () => actions.knights(),
@@ -1155,7 +963,7 @@ q('[data-feel]').addEventListener('click', (e) => {
   note(`Preset: ${PRESETS[b.dataset.preset].name}`, 1.5);
 });
 markPreset(start, settings);
-drawChips();
+ctx.drawChips();
 if (askedScene && !ctx.firstScene) showError('That scene isn’t in this browser (it may have been made in another one). Pick another below, or make one in the Painter.');
 
 // --- Beat by hand: a typed BPM, nudges -----------------------------------------------------
