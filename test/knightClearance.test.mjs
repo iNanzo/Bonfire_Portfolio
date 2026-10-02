@@ -159,7 +159,7 @@ async function terrainOf(name) {
       }
     }
   }
-  // (The ruins' own pieces are hidden in the other sceneries: scene.js.)
+  // (The ruins' own pieces are hidden in the other sceneries: sceneScenery.js.)
   const ruinsOnly = (m) => /Static_(Pillar|Mortar|Wax)/.test(m.name);
   const s = buildScenery(name, MAT, () => new THREE.MeshBasicMaterial());
   s.group.updateMatrixWorld(true);
@@ -692,7 +692,7 @@ test('[slow] stood up in front of his seat, and all through the site’s dance, 
   const env = await realKnights();
   const { k, corners } = env;
   const n = k.knights[0];
-  // The planted weapon's blade (scene.js WEAPON_ANCHOR, weapons.js's holder: its lean).
+  // The planted weapon's blade (sceneContext.js WEAPON_ANCHOR, weapons.js's holder: its lean).
   const holder = new THREE.Object3D();
   holder.position.set(0.04, 0, 0.03);
   holder.rotation.set(0.07, 0.16, -0.05);

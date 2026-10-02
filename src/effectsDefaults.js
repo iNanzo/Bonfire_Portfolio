@@ -53,7 +53,7 @@ export const DEFAULT_EFFECTS = {
   // Ice: a translucent crystal cluster grows out of the ground around a banked fire
   // (ice.js); impacts send a ring of shards out that spike up and sink back, with chill.
   ice: { pulse: 3.5, shards: 28, height: 1.05, spread: 0.36, thickness: 1, clarity: 0.28, glow: 1, shimmer: 0.5, innerFire: 0.45, frost: 60, growTime: 1.4, ringSpeed: 1, ringHeight: 1, ringHold: 0.08 },
-  // How hits land (src/bonfire/scene.js, marks.js, debris.js): a freeze frame, a flash, the
+  // How hits land (src/bonfire/sceneFire.js, marks.js, debris.js): a freeze frame, a flash, the
   // ground scorched / frosted / scarred where they struck (fading away), debris, lightning's
   // afterimages and strikes on fireflies, and how much busy moments thin the extras out.
   impact: { hitStop: 0.06, flash: 0.5, marks: true, markLife: 20, debris: 1, afterimages: 0.6, fireflyStrikes: 0.5, budget: 0.6 },

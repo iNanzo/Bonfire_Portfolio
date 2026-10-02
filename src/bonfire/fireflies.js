@@ -570,7 +570,7 @@ export function createFireflies(template, {
 
   /**
    * Write the flies into their instances for the frame about to be drawn with `camera`
-   * (scene.js calls it once the camera has moved, right before the draw): see the top of
+   * (sceneUpdate.js calls it once the camera has moved, right before the draw): see the top of
    * the file for why each part's matrix is in view space.
    */
   function place(camera) {

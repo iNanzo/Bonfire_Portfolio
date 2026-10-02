@@ -10,7 +10,7 @@
 // menu button…: ui/focus.js). It's the Portfolio project's "Take This Page Apart"
 // (BREAKDOWN_HASH), and a link straight to it opens the page with it open.
 //
-// The counts come from fire.stats() (scene.js) every 250 ms: drawCalls, texels, the
+// The counts come from fire.stats() (bonfire/sceneRender.js) every 250 ms: drawCalls, texels, the
 // particle systems, and any `rows` ([label, value] pairs) the scene adds for itself.
 import { ui, weapons } from '../content.js';
 import { esc } from '../html.js';

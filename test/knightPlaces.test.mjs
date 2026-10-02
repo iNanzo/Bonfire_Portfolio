@@ -1,7 +1,7 @@
 // Where the knights sit, stand and walk (src/bonfire/knightPlaces.js): every seat is on a
 // blocked arc of the dance ring (nobody dances on it), walks go straight where that's clear,
 // round the fire where it isn't, and by ember only when they're long or blocked. (And the
-// sceneries' lamps fit scene.js's fixed pool of lights, scenery.js MAX_LAMPS.)
+// sceneries' lamps fit sceneLights.js's fixed pool of lights, scenery.js MAX_LAMPS.)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SEATS, DANCE_RING, FIRE_AT, PIT, CLEAR, MAX_WALK, planWalk, ringOf, slotPlaces, ringPlaces, restPlaces, sideArcs } from '../src/bonfire/knightPlaces.js';
@@ -130,7 +130,7 @@ test('his summon sign lies in front of each seat, on open ground, in view of the
     { min: { x: -1.02, z: -1.18 }, max: { x: -0.52, z: -0.95 } },
     { min: { x: -0.93, z: -0.95 }, max: { x: -0.52, z: -0.72 } },
   ];
-  // The sign's footprint (its letters and halo), every 4 cm, laid as scene.js lays it: its
+  // The sign's footprint (its letters and halo), every 4 cm, laid as sceneKnight.js lays it: its
   // letters' tops pointing `yaw`, away from the home camera.
   const [x0, y0, x1, y1] = LOGO_BOUNDS;
   const w = (SIGN_HEIGHT * (x1 - x0)) / (y1 - y0) + SIGN_STROKE, d = SIGN_HEIGHT + SIGN_STROKE;

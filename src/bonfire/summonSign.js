@@ -14,7 +14,7 @@
 //   breath     every few seconds a band of the flame's `core` rolls up the letters, stepped
 //              at the fire's 12 fps, and a few faint motes drift up off the strokes: alive,
 //              but calm enough not to pull the eye from the page.
-//   hover      the cursor on it (scene.js hoverAt → 'sign'): the bars take the `core`, the
+//   hover      the cursor on it (scenePick.js hoverAt → 'sign'): the bars take the `core`, the
 //              halo the `mid`, and every mote rises, faster: a click will summon him. An
 //              effect, never a label.
 //   the forge  it's a forge subject (forgeRun.js, knightArrival.js): arriving, the sign burns

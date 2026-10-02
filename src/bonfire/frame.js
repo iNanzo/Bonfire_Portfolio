@@ -1,4 +1,4 @@
-// Drawing a frame (scene.js calls draw() once per frame), all at low resolution:
+// Drawing a frame (sceneUpdate.js calls draw() once per frame), all at low resolution:
 //   1. normals — outlined solid geometry → view-space normals + depth
 //   2. color   — solid geometry + "ghost" emissives (candle flames, dissolving weapons)
 //                → linear color + depth

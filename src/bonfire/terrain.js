@@ -50,7 +50,7 @@ export function createTerrain(renderer, meshes, o = {}) {
 }
 
 /**
- * createTerrain in two parts, for a height map made ahead of time (scene.js builds the other
+ * createTerrain in two parts, for a height map made ahead of time (sceneScenery.js builds the other
  * places' in idle moments). The heights are drawn now and read back without waiting on the
  * GPU (a fence, polled): a blocking read stalls the page until the GPU has finished all it
  * was given before, the frame just drawn too (in software rendering, 70 ms and more). It

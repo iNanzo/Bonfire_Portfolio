@@ -673,7 +673,7 @@ export function createWeapons(gltfRoot, {
     get moving() { return phase !== 'idle' || quiver > 0.002; },
     /**
      * ...enough for its shadow to need redrawing every frame: moving, but not just a planted
-     * one's shudder on a hard beat (±0.03 rad at most, fading in a second: scene.js
+     * one's shudder on a hard beat (±0.03 rad at most, fading in a second: sceneUpdate.js
      * shadowNeedsUpdate redraws that at the art's 12 fps).
      */
     get movingForShadow() { return phase !== 'idle'; },

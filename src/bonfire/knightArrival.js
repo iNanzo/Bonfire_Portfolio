@@ -1,4 +1,4 @@
-// The site's knight comes and goes (scene.js wires it up; knights.js places and poses him):
+// The site's knight comes and goes (sceneKnight.js wires it up; knights.js places and poses him):
 //   away      he isn't there: his summon sign glows on the ground in front of his seat
 //             (summonSign.js), and a click on it (or the pack) summons him
 //   arriving  the sign burns away and its soul becomes him, in the current element's own way:

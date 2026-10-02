@@ -22,7 +22,7 @@
 // Values are only ever written as text, so a row keeps focus through a refresh (and the
 // menu refreshes itself while it's open). It doesn't know what a setting does: `read` says
 // what each one is now and `pick` steps one (the site's are fire.describe() and
-// fire.cycle() in bonfire/scene.js). Keys come in through handleKey() from the page's own
+// fire.cycle() in bonfire/sceneRender.js). Keys come in through handleKey() from the page's own
 // keydown, so each page decides when they apply (not while typing, not under a dialog).
 // Closed with focus inside, focus isn't lost to the page: a fold keeps it on its heading, a
 // HUD gives it back to what had it when it opened (ui/focus.js).

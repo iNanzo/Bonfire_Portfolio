@@ -38,7 +38,7 @@
 //     face to face, and glows are drawn a hair in front (polygon offset), so nothing
 //     z-fights
 //   - nothing thinner than a few texels at the usual distance (cords, handles, rope)
-//   - glows have kinds (scene.js): embers flicker like the coals, lamps and candles hold a
+//   - glows have kinds (sceneUpdate.js): embers flicker like the coals, lamps and candles hold a
 //     steady light with an occasional dip, the same for every window of one lamp, stained
 //     glass and runes keep their tone and breathe slowly
 import * as THREE from 'three';
@@ -61,7 +61,7 @@ const RIGHT_TURN = CLEARING.rightTurn;
 const UP = new THREE.Vector3(0, 1, 0);
 const SEEDS = { forge: 7, shrine: 11, cathedral: 23, cult: 31 };
 /**
- * The most small point lights (lamps) a scenery may have: scene.js keeps this many in a
+ * The most small point lights (lamps) a scenery may have: sceneLights.js keeps this many in a
  * fixed pool, so a new place changes no light count and no shader is rebuilt (it lights
  * only this many; test/knightPlaces.test.mjs checks no scenery has more).
  */
@@ -105,7 +105,7 @@ function jag(geo, amount, rand) {
  * material. Returns { group, glows, lights }:
  * each glow carries userData.glow = { kind, id, tone }; `lights` are
  * [{ at: Vector3, intensity, distance }] for small point lights (MAX_LAMPS at most).
- * `merge`: false leaves the still pieces unmerged, for the caller to merge (scene.js does,
+ * `merge`: false leaves the still pieces unmerged, for the caller to merge (sceneScenery.js does,
  * a few at a time, building a place beforehand in idle moments).
  */
 export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
@@ -183,7 +183,7 @@ export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
 
   // ------------------------------------------------------------------------------------
   if (name === 'ruins') {
-    // The ruins are the model's own; only the knight's seat is built here (scene.js adds it to
+    // The ruins are the model's own; only the knight's seat is built here (sceneModel.js adds it to
     // the model's pieces): a drum fallen from the pillar, lying by its plinth, half sunk in
     // the ground (a low seat), across his way to the fire.
     const seat = SEATS.ruins;

@@ -55,7 +55,7 @@ function make({ reducedMotion = false, rest = [2, 3], busy = null } = {}) {
   const arrival = createKnightArrival({
     knights, sign, particleMaterial: mat, layerFx: 1, field, anchor: new THREE.Vector3(0.04, 0, 0.03), count: 200, reducedMotion,
     now: () => ({ element, ramp: RAMP }), rest: () => rest,
-    // (As scene.js has it: he's busy mid-gesture, mid-swap.)
+    // (As sceneKnight.js has it: he's busy mid-gesture, mid-swap.)
     busy: busy ?? (() => knights.busyAt(0)),
     hooks: { onFormed: (which) => hooks.formed.push(which), onForgeStrike: () => hooks.strikes++ },
   });

@@ -753,7 +753,7 @@ test('his room for each arm at home comes from the scenery’s shapes; a dance m
   for (const move of MOVES) assert.ok(k.fits(move, open, 'fire', 'shrine'), `${move} at 70°`);
 });
 
-test('the settings’ helmets are his (effectsDefaults KNIGHT_HELMETS, less random: scene.js reads them before his code loads)', async () => {
+test('the settings’ helmets are his (effectsDefaults KNIGHT_HELMETS, less random: sceneKnight.js reads them before his code loads)', async () => {
   const { KNIGHT_HELMETS } = await import('../src/effectsDefaults.js');
   assert.deepEqual(KNIGHT_HELMETS.filter((h) => h !== 'random'), HELMETS);
 });

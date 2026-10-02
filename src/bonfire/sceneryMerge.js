@@ -1,5 +1,5 @@
 // A scenery's still pieces drawn as one mesh per material (scenery.js buildScenery calls it
-// last, or scene.js in steps). The forge, shrine, cathedral and cult are built from dozens of small pieces (a
+// last, or sceneScenery.js in steps). The forge, shrine, cathedral and cult are built from dozens of small pieces (a
 // course of blocks is a box per block), and every mesh is a draw of its own in each pass
 // that sees it: the normals, the color, and each of the fire's six shadow faces it falls in.
 // Merged, a place costs a handful of draws instead of a hundred or more, every frame.
@@ -7,8 +7,8 @@
 // What changes nothing on screen: each piece's place, turn and scale are baked into its
 // vertices (the same triangles, where they were); the merged mesh keeps the pieces' material,
 // shadow flags and layers, so it outlines, lights and casts as they did; and it stays one of
-// the place's solids (scene.js), so the fireflies' height map and their raycasts still see
-// every face. What isn't merged: the glows (scene.js recolors each one, and the candle
+// the place's solids (sceneScenery.js), so the fireflies' height map and their raycasts still see
+// every face. What isn't merged: the glows (sceneUpdate.js recolors each one, and the candle
 // flames stretch), and anything in `keep`.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -51,7 +51,7 @@ export function mergeStatic(group, keep = []) {
 }
 
 /**
- * mergeStatic a little at a time, for a place built in idle moments (scene.js): it yields
+ * mergeStatic a little at a time, for a place built in idle moments (sceneScenery.js): it yields
  * after each piece and each merge, and returns the merged meshes. Between steps the group is
  * half merged (not to be shown till it's done); the end is mergeStatic's, mesh for mesh.
  * @param {THREE.Object3D} group
