@@ -84,7 +84,7 @@ jobs:
     name: Browser tests (${{ matrix.name }})
     needs: build
     runs-on: ubuntu-latest
-    # The whole suite is about 40 minutes of software-rendered browser time; the biggest
+    # The whole suite is 30 to 40 minutes of software-rendered browser time; the biggest
     # shard's share is about 11, which leaves room for a slower runner and a retry.
     timeout-minutes: 40
     strategy:
