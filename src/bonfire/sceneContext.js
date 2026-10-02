@@ -41,7 +41,9 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {(n: number) => number} impactCount  an impact's particle count for this device
  * @property {any} renderer  the THREE.WebGLRenderer
  * @property {any} scene
+ * @property {any} frame  the passes and their buffers (frame.js)
  * @property {any} candleLight  the ruins' candle's light (sceneLights.js)
+ * @property {any[]} lamps  the pool of lights the places' lamps take (sceneLights.js)
  * @property {any} effectMaterial  the loose particles' material (flame.js), and their two other shapes:
  * @property {any} crossMaterial  lightning's sparks
  * @property {any} diamondMaterial  ice's glints
@@ -131,4 +133,15 @@ export const boost = (v) => Math.max(0.1, 1 + v);
  * @property {Promise<void>} modelLoaded  the model is in, everything made from it (scene.js draws then)
  */
 
-/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart} SceneContext */
+/**
+ * The places around the fire (sceneScenery.js).
+ * @typedef {object} SceneryPart
+ * @property {Record<string, any>} terrains  each place's height map, once made
+ * @property {any} terrainMaterial  the one material every height map is drawn with
+ * @property {Record<string, any>} sceneryMaterials  the model's materials, for the other places
+ * @property {Record<string, any>} sceneries  each place's pieces, once built
+ * @property {(name: string, o?: { flash?: boolean }) => boolean} setScenery  move the fire to another place
+ * @property {() => Generator} prepareSceneries  every other place and its height map, a step at a time
+ */
+
+/** @typedef {SceneGivens & SceneState & IdlePart & ModelPart & SceneryPart} SceneContext */
