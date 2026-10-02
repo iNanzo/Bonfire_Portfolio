@@ -26,7 +26,8 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
 - CI as one reusable workflow: lint and types, unit tests on Node 22 and 24, and the
   browser tests side by side, with Playwright's browsers cached; the deploy ships the
   build the browser tests ran against. Dependabot proposes updates weekly.
-- Prettier, EditorConfig and `.nvmrc`; a license (all rights reserved), contributing
+- Prettier (one reformat commit, skipped by blame; checked in CI and by a pre-commit hook),
+  EditorConfig and `.nvmrc`; a license (all rights reserved), contributing
   guide, security policy, pull request template and code owners.
 - The design logs moved to `docs/design/`.
 
