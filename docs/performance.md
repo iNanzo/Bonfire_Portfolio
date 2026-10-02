@@ -143,7 +143,7 @@ Measured first with the tools above; each change says why in a comment where it'
   33–83 small meshes each, every one a draw in the normals pass, the color pass and each
   shadow face it falls in. A place's still pieces are merged into one mesh per material,
   their transforms baked in (`src/bonfire/sceneryMerge.js`: `buildScenery` does it last, or
-  `scene.js` a few pieces a step, `mergeSteps`, when it builds a place ahead): 48 solid
+  `sceneScenery.js` a few pieces a step, `mergeSteps`, when it builds a place ahead): 48 solid
   meshes become 5 in the forge, 61 become 5 in the cathedral. The glows stay apart (each is
   recolored), and the merged meshes cast and take shadows and stay the place's solids, so
   the fireflies' height map and raycasts see the same faces.
@@ -158,7 +158,7 @@ Measured first with the tools above; each change says why in a comment where it'
   allocating every target again; a shift back to a kept size makes no GL textures or
   framebuffers (6 and 4 before, on its frame).
 - **Places built beforehand** — in Bonfire Live and the Painter, the other places and their
-  height maps are built ahead (`prepareSceneries` in `scene.js`), with their materials set
+  height maps are built ahead (`prepareSceneries` in `sceneScenery.js`), with their materials set
   up for drawing, and every height map is drawn with one shared material (its shader built
   once): a first visit only puts the place in the scene. It starts 4 s after the show is up
   (not in its first seconds, which have enough to do) and runs only in time the page has

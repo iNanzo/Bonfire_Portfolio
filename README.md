@@ -58,7 +58,10 @@ src/content.json ──► content.js ──► render.js (HTML) ──► main.
   knights. The site drives it from the page (`src/main.js`); Bonfire Live drives it
   from the music (`src/visualizer/`); the Painter (`src/painter/`) holds a scene on
   Bonfire Live's own director. The visualizer's extra effects compile in only when asked
-  (`createBonfire({ effects: true })`), so the site ships a lean shader.
+  (`createBonfire({ effects: true })`), so the site ships a lean shader. `createBonfire`
+  (`bonfire/scene.js`) is built from parts, a module each (`sceneModel.js`,
+  `sceneScenery.js`, `sceneFire.js`, `sceneRender.js`, `sceneUpdate.js`, `scenePick.js`,
+  `sceneKnight.js`, …), that share one `ctx` (`sceneContext.js`).
 - **Pixel art from 3D.** Every frame is four low-resolution passes: normals, lit color,
   additive particles, then a pixel pass that draws outlines, orders a Bayer dither and
   snaps every pixel to the current flame's palette (`frame.js`, `pixelPass.js`).
@@ -92,8 +95,8 @@ src/content.json ──► content.js ──► render.js (HTML) ──► main.
 
 The unit tests run in Node, with no browser: the engine's math and motion, the knight on
 his real model, the audio analysis on synthesized tracks, settings, scenes and content
-rules. The modules that need a page and WebGL (the three `main.js`, `scene.js`, the
-particle systems) are exercised by the browser tests instead. Locally,
+rules. The modules that need a page and WebGL (the three `main.js`, `scene.js` and its
+parts, the particle systems) are exercised by the browser tests instead. Locally,
 `PW_CHANNEL=chrome npm run e2e` uses your installed Chrome; `PW_PREBUILT=1` reuses the
 `dist/` you already built, and `PW_PORT` picks another port than 4173.
 

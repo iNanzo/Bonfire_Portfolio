@@ -223,7 +223,16 @@ variables (`--accent-hi` for text — every `hi` must be ≥ 4.5:1 on the backgr
 | Editable source | `assets/source/bonfire.blend` |
 | Preview renders | `assets/source/bonfire-preview.png`, `assets/source/weapons-lineup.png` |
 | Web model (Draco-compressed; only the one decoder the loader picks is ever downloaded) | `public/models/bonfire.glb` |
-| Scene, lights, passes, elements, the per-frame loop | `src/bonfire/scene.js` |
+| Scene: the renderer and its passes, the flame, the elements, the flame's colors, the frame loop; `createBonfire` and its API | `src/bonfire/scene.js` |
+| What the scene's parts share (`ctx`), the layers, the fire's place | `src/bonfire/sceneContext.js` |
+| Lights | `src/bonfire/sceneLights.js` |
+| The model's loading, and the weapons, fireflies and impact rings made from it | `src/bonfire/sceneModel.js` |
+| The places around the fire and their height maps (built ahead in idle time) | `src/bonfire/sceneScenery.js`, `sceneIdle.js` |
+| Hits (hit-stop, flash, debris, marks), stokes, impacts, beats, rings, the living blade | `src/bonfire/sceneFire.js` |
+| Render options over the settings, the render size, the P menu's steps, the breakdown | `src/bonfire/sceneRender.js` |
+| The per-frame update, the fire shadow's redraws, the frame (`renderFrame`) | `src/bonfire/sceneUpdate.js` |
+| What's under the cursor, the hover, a click's gust, the scroll's sweep | `src/bonfire/scenePick.js` |
+| The knights' style, the site's knight, `fire.knights` | `src/bonfire/sceneKnight.js` |
 | Camera: points of view per screen, eased moves, sway, shake | `src/bonfire/povs.js`, `src/bonfire/view.js` |
 | The cursor as the fire sees it (path, speed, ray) | `src/bonfire/pointer.js` |
 | Curl-noise particle fire, sparks | `src/bonfire/flame.js` |
@@ -454,7 +463,7 @@ and `list`/`positions` for cameras. The full list is in the header of `knights.j
 ## The knight comes when summoned (round 9)
 
 He isn't there when a page opens: the user found him too distracting on first load. On
-the site (`src/main.js`, `src/bonfire/scene.js`, `src/bonfire/knightArrival.js`):
+the site (`src/main.js`, `src/bonfire/sceneKnight.js`, `src/bonfire/knightArrival.js`):
 
 - **His summon sign** (`summonSign.js`): the NH monogram (the logo's own strokes,
   `LOGO_STROKES` in `src/ui/logo.js`) glows on the ground in front of his seat in every
@@ -496,7 +505,7 @@ the site (`src/main.js`, `src/bonfire/scene.js`, `src/bonfire/knightArrival.js`)
   the Start: resting from the first frame, staying until sent off), Shortest and Longest
   Rest, Helmet, Style, Armor Finish, Edge Glow, Armor Shine, Seat Pose (Resting /
   Watchful), Answers a Click, Reactions (docs/admin.md has the table). `applyArmor` and
-  `applyKnight` in scene.js apply them as they change; the preview's **Knight…** menu
+  `applyKnight` in sceneKnight.js apply them as they change; the preview's **Knight…** menu
   summons him or sends him off (`nh:knight`).
 - **The breakdown's** *Knight* row says where he is: away (his sign waits), or his helmet,
   style and what he's doing (forming, resting, burning away).
@@ -504,7 +513,7 @@ the site (`src/main.js`, `src/bonfire/scene.js`, `src/bonfire/knightArrival.js`)
 ## The knight on the site (round 8)
 
 The knight rests by the fire on every page once summoned (the scene side is "The knight"
-above and `docs/knight.md`). On the site (`src/main.js`, `src/bonfire/scene.js`):
+above and `docs/knight.md`). On the site (`src/main.js`, `src/bonfire/scenePick.js`, `sceneKnight.js`):
 
 - **Hover** (mouse and pen): his rim warms and he turns his head up to you. That's the
   scene's own effect (`hoverAt` returns `'knight'`, whichever of him and the fire is
@@ -550,7 +559,7 @@ above and `docs/knight.md`). On the site (`src/main.js`, `src/bonfire/scene.js`)
   `watchful`), `gestures` (clicks get gestures), `reactions` (watching a weapon rise,
   flinching, leaning away from a stoke, lifting his feet for a ring), `shine` (*Armor
   Shine*: the fire's reflection sweeping over his plate, now and then and when the fire
-  flares; scene.js `applyKnight` sets `armor.setShine`). The visitor's own picks (helmet,
+  flares; sceneKnight.js `applyKnight` sets `armor.setShine`). The visitor's own picks (helmet,
   style, finish) win over the settings; a changed setting shows at once in the admin
   preview, and **Helmet…** / **Gesture…** there try them (`nh:helmet`, `nh:gesture`).
   Bonfire Live (`effects: true`) casts its own knights with its own Knights tab and
