@@ -141,8 +141,9 @@ Measured first with the tools above; each change says why in a comment where it'
   the canvas's texels, encoded by the browser off the page's thread.
 - **Scenery drawn per material** — the forge, shrine, cathedral and cult were built from
   33–83 small meshes each, every one a draw in the normals pass, the color pass and each
-  shadow face it falls in. `buildScenery` ends by merging a place's still pieces into one
-  mesh per material, their transforms baked in (`src/bonfire/sceneryMerge.js`): 48 solid
+  shadow face it falls in. A place's still pieces are merged into one mesh per material,
+  their transforms baked in (`src/bonfire/sceneryMerge.js`: `buildScenery` does it last, or
+  `scene.js` a few pieces a step, `mergeSteps`, when it builds a place ahead): 48 solid
   meshes become 5 in the forge, 61 become 5 in the cathedral. The glows stay apart (each is
   recolored), and the merged meshes cast and take shadows and stay the place's solids, so
   the fireflies' height map and raycasts see the same faces.
@@ -156,14 +157,21 @@ Measured first with the tools above; each change says why in a comment where it'
   lately (the last three sizes, `src/bonfire/targetCache.js`) instead of freeing and
   allocating every target again; a shift back to a kept size makes no GL textures or
   framebuffers (6 and 4 before, on its frame).
-- **Places built beforehand** — the other places and their height maps are built in idle
-  moments once the fire is up (`prepareSceneries` in `scene.js`), with their materials set
+- **Places built beforehand** — in Bonfire Live and the Painter, the other places and their
+  height maps are built ahead (`prepareSceneries` in `scene.js`), with their materials set
   up for drawing, and every height map is drawn with one shared material (its shader built
-  once): a first visit only puts the place in the scene. The height maps are read back
-  through a fence (`readTerrain` in `terrain.js`), not a blocking read, which waited for
-  the GPU to finish the frame just drawn (75 ms a map in software rendering), and made from
-  the heights in an idle step of their own. It all takes about 4.6 MB more of the JS heap
-  (measured after a GC).
+  once): a first visit only puts the place in the scene. It starts 4 s after the show is up
+  (not in its first seconds, which have enough to do) and runs only in time the page has
+  spare (`inIdle`: idle callbacks with no timeout, and a step starts only with the time it
+  needs still left of the moment, at most 0.6 of the display's frame). The steps are a ms
+  or less (a few pieces merged, `mergeSteps`; 64 rows of a height map, `heightSteps` in
+  `terrain.js`; a map drawn) but for each place's own `buildScenery`, 3–10 ms, which starts
+  at the start of an empty moment. A page with no spare time builds nothing ahead, and a
+  visit before a place is done finishes its build there and then. The height maps are read
+  back through a fence (`readTerrain`), not a blocking read, which waited for the GPU to
+  finish the frame just drawn (75 ms a map in software rendering). It all takes about
+  4.6 MB more of the JS heap (measured after a GC). The site doesn't: a visitor seldom
+  changes place, so each is built on its first visit, as before.
 - **One matrix update a frame** — `frame.draw` brings the scene's world matrices up to date
   once for its three renders (three.js did it in each), a place's still pieces keep the
   matrices made when it's built, and a place not shown is out of the scene, not hidden.
@@ -185,8 +193,9 @@ places in each row are in the order ruins / forge / shrine / cathedral / cult:
 | H CPU ms per frame, against round start (two runs a side, very busy) | 4.7 / 6.3 / 6.1 / 7.0 / 6.2 | | 3.9 / 3.5 / 3.4 / 3.4 / 3.6 |
 | B busy ms per drawn frame (two runs a side) | | 5.0 / 5.7 / 5.7 / 5.9 / 6.3 | 4.1 / 3.7 / 4.6 / 4.8 / 5.4 |
 | A, D busy ms per drawn frame | | 4.7, 5.2 | 3.9, 4.6 |
-| First visit to a place: its frame, GPU finished (median; main thread; over 50 ms) | | 55 ms; 35 ms; 7 of 12 | 11 ms; 10 ms; 1 of 12 |
+| First visit to a place, the places built ahead: its frame, GPU finished (median; main thread; over 50 ms; four runs, interleaved) | | 30 ms; 25 ms; 3 of 16 | 8.3 ms; 8.3 ms; 0 of 16 |
 | A height map made in idle time, main thread (GPU; software rendering) | | 4.8 ms; 75 ms | 0.5 + 2.7 ms; 0.5 + 2.9 ms |
+| The places built ahead, at 144 Hz (three runs): main-thread work; longest step; worst frame gap meanwhile | | (on each first visit) | 60–62 ms; 8.9–9.8 ms; 13.9 ms |
 | A pixel-size shift back to a size used lately: GL textures, framebuffers made | | 6, 4 | 0, 0 |
 | Scene-graph nodes visited per frame (four dancers) | | 1690–2320 | 513–571 |
 | WebGL programs / textures after 6 rebuilds | 161 / 84–85 | 23 / 15–18 | 26 / 23–25 |
@@ -198,6 +207,16 @@ instanced fireflies'; the textures are the kept render target sets.) Frame-inter
 percentiles mostly moved within the runs' noise: at 144 Hz the frames were already on time
 almost always, and the spare time is what grew. A shift's frame took about as long as
 before (its hitch was 2–3 ms either way on this GPU): what went is the allocation.
+
+The places' first build ahead started as soon as the fire was up and ran on the idle
+callbacks' 250 ms timeout, a whole place a step: in the same runs it did its 62–77 ms of
+work 0.06–0.43 s in, in slices of up to 23 ms with up to 4 ms of idle time actually left,
+and frames came up to 28 ms apart; with the CPU throttled 2× or 4× it forced 145–385 ms of
+work through on timeouts, in slices of up to 101 ms. Now it waits 4 s and works only in
+spare time: its frames are at most 13.9 ms apart (one late frame at 144 Hz, a place's
+build), and with the CPU throttled, where Bonfire Live at 1080p already misses frames (at 4×
+every one is a long task), it builds nothing ahead: the first visit builds the place, as
+before tier B.
 
 Where the time goes now (a CPU profile of the cult with four dancers): three.js's draw a
 little under half of it (per-object uniform uploads and state, the shadow cube's redraws),
@@ -217,13 +236,18 @@ is set up after the reseed (a place built in the stepped run, not while the page
 run), and three.js's uuids (four `Math.random` calls for every object it makes) come from a
 stream of their own, so a build that makes more or fewer objects doesn't shift every number
 drawn after it. The cases: each place at rest, and with four dancers, beats and a weapon swap
-moving the shadow; a tour of all five after a flame change; the living blade's flourish;
-pixel-size shifts with the echo and the ghost trail on; the fireflies blinking and dancing.
-The whole of it was then checked against the branch start the same way at pixel sizes 4
-and 2. Everything is identical except where merged scenery is in view: at most 2 texels in a
-frame differ (of 129,600) at size 4, and 14 (of 518,400, 0.003%) at size 2, single texels
-scattered over the place, a dither cell in the dark ground or a spark at the edge of the
-depth test. Baking a piece's transform into its vertices rounds them a float's last bit
+moving the shadow; a tour of all five after a flame change, and one with the ice element
+stoked all the way; the living blade's flourish, and twice in the cult with four dancers and
+a weapon swap; pixel-size shifts with the echo and the ghost trail on; the fireflies
+blinking and dancing. The whole of it was then checked against the branch start the same
+way at pixel sizes 4 and 2, with the places built on their first visit, and at size 4 again
+with them built ahead in idle time first (texel for texel the same frames as built on the
+visit). Everything is identical except where merged scenery is in view: at most 5 texels in
+a frame differ (of 129,600, 0.004%) at size 4, and 15 (of 518,400, 0.003%) at size 2,
+single texels scattered over the place, a dither cell on the stone or in the dark ground,
+or a spark at the edge of the depth test. The worst frames are in the ice element's tour
+(dither cells on the cathedral's pillars) and with the blade swinging by the fire (its
+sparks). Baking a piece's transform into its vertices rounds them a float's last bit
 differently, which moves the shadow's and the depth buffer's values by as much and tips a
 threshold here and there (and 1–3 of the 102,400 height-map cells in the cathedral and the
 cult by one 16-bit step, 0.06 mm). Everything after the merge matches it texel for texel at
