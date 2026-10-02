@@ -39,10 +39,10 @@
 //             dialog, the P menu, a preset) wins over the scene until the next one.
 import '../styles.css';
 import './visualizer.css';
-import { applyCssPalette, base, flames } from '../palette.js';
+import { applyCssPalette, base } from '../palette.js';
 import { effects } from '../effects.js';
 import { startingEquipment, weapons } from '../content.js';
-import { elementOr, flameTitle } from '../elements.js';
+import { elementOr } from '../elements.js';
 import { installDitherPatterns } from '../ui/dither.js';
 import { installTooltips } from '../ui/tooltip.js';
 import { createKeysOverlay, isHelpKey } from '../ui/keysOverlay.js';
@@ -68,6 +68,7 @@ import { pageMarkup, HUD_TIPS, relabel } from './markup.js';
 import { createScenesUi } from './scenesUi.js';
 import { createCards } from './cards.js';
 import { createSources } from './sources.js';
+import { createHud, wieldLabel } from './hud.js';
 import { q, qa, typing, toggleFullscreen, failScene } from '../ui/shell.js';
 import { createLinkClient } from './link.js';
 import { createDiscoveries } from '../ui/discoveries.js';
@@ -124,14 +125,11 @@ const askedScene = params.get('scene');
 ctx.firstScene = askedScene ? ctx.findScene(askedScene) : null;
 ctx.solo = ctx.firstScene && params.has('solo') ? ctx.firstScene.ref : null;
 // (What main.js still gives the parts, until each moves out.)
-Object.assign(ctx, { note, openSettings, applySettings, mirrorCard, showError, hideError, showStart, goLive });
+Object.assign(ctx, { openSettings, applySettings, mirrorCard, showError, hideError, showStart, goLive });
 
 // --- The bonfire ---------------------------------------------------------------------------
 const IDLE = { state: 'silent', bands: Object.fromEntries(BAND_NAMES.map((b) => [b, 0])), level: 0, beats: [], events: [], kick: 0, hat: 0, bpm: 0, locked: false, build: 0 };
 
-function wieldLabel(sel) {
-  return `${weapons[sel.weapon] ?? ''} · ${flameTitle(flames[sel.flame]?.name, sel.element)}`;
-}
 function onImpact(flameKey, _from, instant, selection) {
   document.documentElement.dataset.flame = flameKey;
   document.documentElement.dataset.element = elementOr(selection.element);
@@ -155,7 +153,7 @@ function onFrame(dt) {
   const f = (ctx.engine?.source && ctx.heard.take()) || IDLE;
   ctx.lastFeatures = f;
   ctx.director.update(f, dt);
-  if (ctx.engine?.source) drawHud(f, dt);
+  if (ctx.engine?.source) ctx.drawHud(f, dt);
 }
 /** Frame Rate as the scene's cap (only when it changed: a new cap starts its count again). */
 function applyFrameRate() {
@@ -217,14 +215,13 @@ function startScene() {
 startScene();
 
 // --- Director events → page ------------------------------------------------------------------
-let stateNote = null; // a transient HUD line: { text, until }
 function onEvent(type, data = {}) {
   if (type === 'drop') {
-    note('Drop!');
+    ctx.note('Drop!');
     live.textContent = 'Drop.';
     if (data.title !== false) ctx.nextCard('drops');
   } else if (type === 'arm') {
-    note('Forging a weapon for the drop…', 4);
+    ctx.note('Forging a weapon for the drop…', 4);
   } else if (type === 'start') {
     if (settings.intro) ctx.showCard(0);
     // (A scene already playing when the music starts, from ?scene=, a chip or N on the start
@@ -233,12 +230,11 @@ function onEvent(type, data = {}) {
   } else if (type === 'bar') {
     if (data.bar > 0 && data.bar % 32 === 0) ctx.nextCard('phrases');
   } else if (type === 'stage') {
-    note(['', 'Building…', 'Building… halfway', 'Building… three quarters', 'Here it comes'][data.stage] ?? '', 2);
+    ctx.note(['', 'Building…', 'Building… halfway', 'Building… three quarters', 'Here it comes'][data.stage] ?? '', 2);
   } else if (type === 'scene') {
     ctx.sceneArrived(data);
   }
 }
-function note(text, seconds = 2) { stateNote = { text, until: performance.now() / 1000 + seconds }; }
 
 // --- Title cards (cards.js) ------------------------------------------------------------------
 Object.assign(ctx, createCards(ctx));
@@ -303,100 +299,13 @@ function goLive() {
   if (ctx.fire) q('[data-wield]').textContent = wieldLabel({ weapon: ctx.fire.weapon, flame: ctx.fire.flame, element: ctx.fire.element });
   live.textContent = `Listening to ${s.name}.`;
   frameFire();
-  keepAwake();
-  wake();
+  ctx.keepAwake();
+  ctx.wake();
 }
 
-// --- HUD -------------------------------------------------------------------------------------
-// (Written only when what it shows changes: each write would restyle the HUD.)
-const bandEls = BAND_NAMES.map((b) => q(`[data-band="${b}"]`));
-const bandShown = BAND_NAMES.map(() => '');
-const pips = qa('[data-pips] i');
-const bpmEl = q('[data-bpm]');
-const stateEl = q('[data-state]');
-const armLabel = q('[data-arm-label]');
-const danceLabel = q('[data-dance-label]');
-const progress = q('[data-progress] i');
-let progressShown = '';
-let hudClock = 0;
-let pipOn = -1;
-/** Write `text` into `el` if it isn't there already. */
-const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
-function drawMeter(f) {
-  // (Stepped like everything else: eighths.)
-  BAND_NAMES.forEach((b, i) => {
-    const v = (Math.round(f.bands[b] * 8) / 8).toFixed(3);
-    if (v !== bandShown[i]) { bandShown[i] = v; bandEls[i].style.setProperty('--v', v); }
-  });
-  for (const beat of f.beats) {
-    if (!f.locked) continue;
-    pipOn = beat.beat;
-    pips.forEach((p, i) => { p.classList.toggle('is-on', i === pipOn); p.classList.toggle('is-down', i === 0); });
-  }
-  if (!f.locked && pipOn >= 0) { pips.forEach((p) => p.classList.remove('is-on')); pipOn = -1; }
-}
-/** The HUD's state line: a note, the section, a weapon waiting for the drop, the knights. */
-function stateText(f) {
-  const now = performance.now() / 1000;
-  const noting = stateNote && now < stateNote.until;
-  // (A scene N asked for in a breakdown: the line says it comes with the drop until it lands.)
-  const waiting = ctx.waitingForDrop();
-  const waits = waiting ? `“${waiting}” comes with the drop` : 'the weapon waits for the drop';
-  let text;
-  if (noting) text = waiting && !stateNote.text.includes(waiting) ? `${stateNote.text} · ${waits}` : stateNote.text;
-  else if (f.state === 'silent') text = 'Waiting for sound…';
-  else if (f.state === 'breakdown' || f.state === 'build') {
-    const what = f.state === 'build' ? `Build ${Math.round(f.build * 100)}%` : 'Breakdown';
-    text = ctx.fire?.holding ? `${what} · ${waits}` : what;
-  } else if (ctx.fire?.holding) text = waiting ? `The weapon waits for the drop: ${waits}` : 'The weapon waits for the drop';
-  else text = f.locked ? 'In the groove' : 'Listening for the beat…';
-  // ...and what the knights are doing.
-  const knights = ctx.director?.knights;
-  if (knights?.text && !noting && f.state !== 'silent') text += ` · ${knights.text}`;
-  return text;
-}
-function drawHud(f, dt) {
-  drawMeter(f);
-  hudClock += dt;
-  if (hudClock < 0.1) return;
-  hudClock = 0;
-  const by = ctx.engine.analyser.tempo.manual; // tap | manual | link | null (heard)
-  const tag = { tap: ' · Tap', manual: ' · Set', link: ' · Link' }[by] ?? '';
-  setText(bpmEl, f.bpm ? `${f.locked ? '' : '~'}${by === 'link' || by === 'manual' ? f.bpm.toFixed(1) : Math.round(f.bpm)} BPM${tag}` : '--- BPM');
-  bpmEl.classList.toggle('is-locked', f.locked);
-  setText(stateEl, stateText(f));
-  const holding = !!ctx.fire?.holding;
-  relabel(armLabel, holding ? 'Strike' : 'Forge', 'arm', holding ? HUD_TIPS.strike : HUD_TIPS.forge);
-  const up = !!ctx.director?.knights && ctx.director.knights.mode !== 'rest';
-  relabel(danceLabel, up ? 'Sit' : 'Dance', 'dance-act', up ? HUD_TIPS.sit : HUD_TIPS.dance);
-  ctx.showScene();
-  const media = ctx.engine.source?.media;
-  if (media && media.duration) {
-    const p = (media.currentTime / media.duration).toFixed(3);
-    if (p !== progressShown) { progressShown = p; progress.style.setProperty('--p', p); }
-  }
-}
+// --- HUD (hud.js): what it hears, the beat, the state line, the labels that change; idle -------
+Object.assign(ctx, createHud(ctx));
 
-// Idle: the controls and cursor fade when the mouse rests (unless hidden or in use).
-let idleTimer = 0;
-function wake() {
-  document.body.classList.remove('is-idle');
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => {
-    if (document.body.dataset.mode !== 'live' || settingsDialog.open || keysOverlay.el.open || hud.contains(document.activeElement) || renderMenu.el.contains(document.activeElement)) return;
-    document.body.classList.add('is-idle');
-  }, 3000);
-}
-window.addEventListener('pointermove', wake, { passive: true });
-window.addEventListener('pointerdown', wake, { passive: true });
-hud.addEventListener('focusin', wake);
-
-// Keep the screen on while it's playing.
-let wakeLock = null;
-async function keepAwake() {
-  try { if (!wakeLock || wakeLock.released) wakeLock = await navigator.wakeLock?.request('screen'); } catch { /* not allowed: fine */ }
-}
-document.addEventListener('visibilitychange', () => { if (!document.hidden && ctx.engine?.source) keepAwake(); });
 
 // --- Actions ---------------------------------------------------------------------------------
 document.addEventListener('fullscreenchange', () => {
@@ -407,36 +316,36 @@ document.addEventListener('fullscreenchange', () => {
 function tap() {
   if (!ctx.engine?.source) return;
   const bpm = ctx.engine.analyser.tempo.tap(performance.now() / 1000);
-  note(bpm ? `Tapped ${Math.round(bpm)} BPM` : 'Tap…', 1.2);
+  ctx.note(bpm ? `Tapped ${Math.round(bpm)} BPM` : 'Tap…', 1.2);
 }
 
 const actions = {
   drop: () => ctx.director?.strike(),
   arm: () => { if (ctx.fire?.holding) ctx.director.strike(); else ctx.director?.arm(); },
-  beat: () => { if (ctx.director?.forgeOnBeat(ctx.lastFeatures?.bpm ? 60 / ctx.lastFeatures.bpm : 0)) note('Swapping on the next downbeat', 2); },
+  beat: () => { if (ctx.director?.forgeOnBeat(ctx.lastFeatures?.bpm ? 60 / ctx.lastFeatures.bpm : 0)) ctx.note('Swapping on the next downbeat', 2); },
   tap,
   ring: () => ctx.director?.ring(1),
-  combo: () => { if (!ctx.director?.combo()) note('The weapon is busy (or no beat yet)', 1.5); },
-  cut: () => { ctx.director?.cut(); note(`Shot: ${SHOTS[ctx.director?.shot]?.name ?? ''}`, 1.5); },
+  combo: () => { if (!ctx.director?.combo()) ctx.note('The weapon is busy (or no beat yet)', 1.5); },
+  cut: () => { ctx.director?.cut(); ctx.note(`Shot: ${SHOTS[ctx.director?.shot]?.name ?? ''}`, 1.5); },
   dance: () => {
     const r = ctx.director?.danceNow();
-    note(r === 'dance' ? 'The knights get up to dance' : r === 'sit' ? 'The knights sit back down' : reducedMotion ? 'The knights keep still (reduced motion)' : 'No knights by the fire', 1.5);
+    ctx.note(r === 'dance' ? 'The knights get up to dance' : r === 'sit' ? 'The knights sit back down' : reducedMotion ? 'The knights keep still (reduced motion)' : 'No knights by the fire', 1.5);
   },
   knights: () => {
     const r = ctx.director?.knightsInOut();
-    note({ in: 'The knights come to the fire', out: 'The knights leave the fire', 'in-next': 'The knights come on the next drop', 'out-next': 'The knights leave on the next drop' }[r] ?? 'No knights here', 1.8);
+    ctx.note({ in: 'The knights come to the fire', out: 'The knights leave the fire', 'in-next': 'The knights come on the next drop', 'out-next': 'The knights leave on the next drop' }[r] ?? 'No knights here', 1.8);
   },
   colors: () => {
     const modes = Object.keys(COLOR_MODES);
     settings.colors = modes[(modes.indexOf(settings.colors) + 1) % modes.length];
     saveSettings(settings);
-    note(`Flame Colors: ${COLOR_MODES[settings.colors]}`, 1.5);
+    ctx.note(`Flame Colors: ${COLOR_MODES[settings.colors]}`, 1.5);
   },
   mirror: () => {
     const modes = ['mix', 'on', 'off'];
     settings.mirror = modes[(modes.indexOf(settings.mirror) + 1) % modes.length];
     saveSettings(settings);
-    note(`Mirror: ${Object.fromEntries(MODES)[settings.mirror]}`, 1.2);
+    ctx.note(`Mirror: ${Object.fromEntries(MODES)[settings.mirror]}`, 1.2);
   },
   settings: () => openSettings(),
   keys: () => openKeys(),
@@ -456,7 +365,7 @@ const actions = {
   downbeat: () => {
     if (!ctx.engine?.source) return;
     ctx.engine.analyser.tempo.anchor(performance.now() / 1000);
-    note('This beat is beat 1', 1.2);
+    ctx.note('This beat is beat 1', 1.2);
   },
 };
 document.addEventListener('click', (e) => {
@@ -479,7 +388,7 @@ window.addEventListener('keydown', (e) => {
   if (e.altKey || e.ctrlKey || e.metaKey || typingIn(e.target)) return;
   if (settingsDialog.open || keysOverlay.el.open) return; // each handles its own keys (Esc closes)
   // The render menu first: P, and its digits while it's open (before the element hits).
-  if (renderMenu.handleKey(e)) { e.preventDefault(); wake(); return; }
+  if (renderMenu.handleKey(e)) { e.preventDefault(); ctx.wake(); return; }
   if (e.key === 'Escape' && renderMenu.isOpen) { renderMenu.close(); return; }
   // ? lists the shortcuts; / opens the settings at their search box.
   if (isHelpKey(e)) { e.preventDefault(); openKeys(); return; }
@@ -487,9 +396,9 @@ window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (k === 'f') toggleFullscreen();
   else if (k === 's') openSettings();
-  else if (k === 'h') { document.body.classList.toggle('hud-off'); wake(); }
-  else if (k === 'i') { pack.toggle(); wake(); }
-  else if (k === 'n') { if (e.shiftKey) ctx.cycleScenes(); else ctx.nextScene(); wake(); }
+  else if (k === 'h') { document.body.classList.toggle('hud-off'); ctx.wake(); }
+  else if (k === 'i') { pack.toggle(); ctx.wake(); }
+  else if (k === 'n') { if (e.shiftKey) ctx.cycleScenes(); else ctx.nextScene(); ctx.wake(); }
   else if (document.body.dataset.mode !== 'live' || !ctx.fire) return;
   else if (e.key === ' ') { e.preventDefault(); actions.drop(); }
   else if (k === 'a') actions.arm();
@@ -505,11 +414,11 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'r') ctx.director.ring(1);
   else if (k === 'x') actions.combo();
   else if (k === 'g') ctx.director.glitchHit();
-  else if (k === 'l') note(`Look: ${ctx.director.nextLook()}`, 1.5);
+  else if (k === 'l') ctx.note(`Look: ${ctx.director.nextLook()}`, 1.5);
   else if (k === 'm') actions.mirror();
   else if (k === 'p' && e.shiftKey) actions.colors();
   else if (k === 'k') actions[e.shiftKey ? 'knights' : 'dance']();
-  else if (k === 'escape') { document.body.classList.remove('hud-off'); wake(); }
+  else if (k === 'escape') { document.body.classList.remove('hud-off'); ctx.wake(); }
   else if (['1', '2', '3'].includes(e.key)) ctx.director.hit({ element: ['fire', 'lightning', 'ice'][Number(e.key) - 1] });
   else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') ctx.director.hit({ step: e.key === 'ArrowRight' ? 1 : -1, element: ctx.fire.element });
 });
@@ -557,7 +466,7 @@ function applySettings(key) {
 }
 const settingsPanel = bindSettings(settingsDialog, settings, {
   onChange: applySettings,
-  onNote: (text) => note(text, 1.5),
+  onNote: (text) => ctx.note(text, 1.5),
   scenes: ctx.library,
   thumb: (ref) => ctx.store.thumb(ref),
   onPlayScene: (ref) => {
@@ -575,6 +484,7 @@ ctx.settingsPanel = settingsPanel;
 
 // --- The keyboard shortcuts (?): every key, in groups (keys.js) -------------------------------
 const keysOverlay = createKeysOverlay({ title: 'Keyboard Shortcuts', groups: KEY_GROUPS });
+ctx.keysOverlay = keysOverlay;
 let keysOpener = null;
 function openKeys() {
   keysOpener = focusedNow();
@@ -651,9 +561,10 @@ const renderMenu = createRenderMenu({
       applyRender();
     },
   },
-  onToggle: () => wake(),
+  onToggle: () => ctx.wake(),
 });
 app.append(renderMenu.el);
+ctx.renderMenu = renderMenu;
 
 // --- Recording a clip (record.js) -------------------------------------------------------------
 const recordLabel = q('[data-record-label]');
@@ -663,8 +574,8 @@ const recorder = createRecorder({
   onState: ({ recording, seconds, saved, error }) => {
     document.body.classList.toggle('is-recording', recording);
     recordLabel.textContent = recording ? `Rec ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : 'Record';
-    if (saved) note(`Saved ${saved}`, 3);
-    if (error) note(error, 3);
+    if (saved) ctx.note(`Saved ${saved}`, 3);
+    if (error) ctx.note(error, 3);
   },
 });
 
@@ -682,27 +593,27 @@ const pack = createPack({
     reducedMotion,
     onScene: (key) => {
       ctx.director?.releaseScene(['scenery']); // (your pick wins over a scene's place)
-      if (ctx.fire?.setScenery(key, { flash: true })) note(`Traveled to ${SCENERIES[key]}`, 1.5);
+      if (ctx.fire?.setScenery(key, { flash: true })) ctx.note(`Traveled to ${SCENERIES[key]}`, 1.5);
     },
     onWeapon: (key) => {
       if (!ctx.fire || key === ctx.fire.weapon) return;
-      if (ctx.fire.forging) { note('The forge is busy', 1.5); return; }
+      if (ctx.fire.forging) { ctx.note('The forge is busy', 1.5); return; }
       ctx.fire.equip(key, ctx.fire.flame, { element: ctx.fire.element }).catch(() => {});
-      note(`Forging the ${weapons[key]}`, 2);
+      ctx.note(`Forging the ${weapons[key]}`, 2);
     },
     onRing: () => ctx.director?.ring(1),
     onLiving: () => actions.combo(),
-    onElement: (key) => { if (!ctx.director?.hit({ element: key })) note('The forge is busy', 1.5); },
+    onElement: (key) => { if (!ctx.director?.hit({ element: key })) ctx.note('The forge is busy', 1.5); },
     onFlame: (key) => {
       if (!ctx.fire || key === ctx.fire.flame) return;
-      if (ctx.fire.forging) { note('The forge is busy', 1.5); return; }
+      if (ctx.fire.forging) { ctx.note('The forge is busy', 1.5); return; }
       ctx.fire.equip(ctx.fire.weapon, key, { element: ctx.fire.element }).catch(() => {});
     },
     // The knights (every one by the fire): a new helmet (hands to the helm), a gesture.
     onHelmet: (key) => {
       if (!ctx.fire?.knights?.present) return;
       ctx.fire.knights.setHelmet(key);
-      note(`Helmet: ${HELMETS[key] ?? key}`, 1.5);
+      ctx.note(`Helmet: ${HELMETS[key] ?? key}`, 1.5);
     },
     onGesture: (name) => { ctx.fire?.knights?.gesture(name, { index: 'all' }); },
     // ...their style and the color of their steel, for them all (the Knights tab's Style and
@@ -710,12 +621,12 @@ const pack = createPack({
     onStyle: (key) => {
       if (!ctx.fire?.knights?.present || !ctx.fire.knights.setStyle) return;
       Promise.resolve(ctx.fire.knights.setStyle(key)).catch(() => {});
-      note(`Style: ${STYLE_NAMES[key] ?? key}`, 1.5);
+      ctx.note(`Style: ${STYLE_NAMES[key] ?? key}`, 1.5);
     },
     onFinish: (key) => {
       if (!ctx.fire?.knights?.present || !ctx.fire.knights.setFinish) return;
       ctx.fire.knights.setFinish(key);
-      note(`Finish: ${FINISH_NAMES[key] ?? key}`, 1.5);
+      ctx.note(`Finish: ${FINISH_NAMES[key] ?? key}`, 1.5);
     },
   }),
 });
@@ -738,13 +649,13 @@ function drawMidi() {
 }
 const midiActions = {
   drop: () => actions.drop(), arm: () => actions.arm(), ring: () => actions.ring(), combo: () => actions.combo(),
-  cut: () => actions.cut(), look: () => note(`Look: ${ctx.director?.nextLook()}`, 1.5), scene: () => ctx.nextScene(), burst: () => ctx.director?.glitchHit(),
+  cut: () => actions.cut(), look: () => ctx.note(`Look: ${ctx.director?.nextLook()}`, 1.5), scene: () => ctx.nextScene(), burst: () => ctx.director?.glitchHit(),
   fire: () => ctx.director?.hit({ element: 'fire' }), lightning: () => ctx.director?.hit({ element: 'lightning' }), ice: () => ctx.director?.hit({ element: 'ice' }),
   record: () => actions.record(),
   knightsDance: () => actions.dance(), knights: () => actions.knights(),
 };
 const midi = createMidi({
-  onAction: (id) => { if (document.body.dataset.mode === 'live' && ctx.fire) { midiActions[id]?.(); wake(); } },
+  onAction: (id) => { if (document.body.dataset.mode === 'live' && ctx.fire) { midiActions[id]?.(); ctx.wake(); } },
   onStatus: (text) => { midiStatus.textContent = text; },
   onChange: drawMidi,
 });
@@ -764,7 +675,7 @@ q('[data-feel]').addEventListener('click', (e) => {
   applyPreset(settings, b.dataset.preset);
   applySettings(Object.keys(PRESETS[b.dataset.preset].values));
   flushSettings();
-  note(`Preset: ${PRESETS[b.dataset.preset].name}`, 1.5);
+  ctx.note(`Preset: ${PRESETS[b.dataset.preset].name}`, 1.5);
 });
 markPreset(start, settings);
 ctx.drawChips();
@@ -776,14 +687,14 @@ bpmInput.addEventListener('change', () => {
   if (!ctx.engine?.source) return;
   const v = Number(bpmInput.value);
   const tempo = ctx.engine.analyser.tempo;
-  if (bpmInput.value && v >= 60 && v <= 220) { tempo.setManual(v, performance.now() / 1000); note(`Tempo set to ${v} BPM`, 1.5); }
-  else { bpmInput.value = ''; tempo.clearManual(); note('Following the music’s tempo', 1.5); }
+  if (bpmInput.value && v >= 60 && v <= 220) { tempo.setManual(v, performance.now() / 1000); ctx.note(`Tempo set to ${v} BPM`, 1.5); }
+  else { bpmInput.value = ''; tempo.clearManual(); ctx.note('Following the music’s tempo', 1.5); }
 });
 bpmInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') bpmInput.blur(); });
 function nudge(seconds) {
   if (!ctx.engine?.source) return;
   ctx.engine.analyser.tempo.nudge(seconds);
-  note(`Beat ${seconds < 0 ? 'earlier' : 'later'} by ${Math.abs(seconds * 1000)} ms`, 1);
+  ctx.note(`Beat ${seconds < 0 ? 'earlier' : 'later'} by ${Math.abs(seconds * 1000)} ms`, 1);
 }
 
 // --- The output window: just the picture, for a projector ----------------------------------
@@ -811,9 +722,9 @@ function mirrorCard() {
 }
 function openOutput() {
   if (output && !output.closed) { output.focus(); return; }
-  if (!stage.querySelector('canvas')?.captureStream) { note('This browser can’t send the picture to another window', 3); return; }
+  if (!stage.querySelector('canvas')?.captureStream) { ctx.note('This browser can’t send the picture to another window', 3); return; }
   output = window.open('', 'bonfire-output', 'popup,width=1280,height=720');
-  if (!output) { note('The window was blocked: allow pop-ups for this page', 3); return; }
+  if (!output) { ctx.note('The window was blocked: allow pop-ups for this page', 3); return; }
   output.document.title = 'Bonfire Live — Output';
   // The page's styles come along so the title card (HTML over the canvas, not in the stream)
   // looks the same there.
@@ -844,12 +755,12 @@ function openOutput() {
   mirrorCard();
   output.addEventListener('pagehide', () => { q('[data-output-label]').textContent = 'Output'; });
   q('[data-output-label]').textContent = 'Output (open)';
-  note('Output window open', 2);
+  ctx.note('Output window open', 2);
 }
 /** Open the settings (on `tab`; `search`: with the focus in their search box). */
 let settingsOpener = null;
 function openSettings(tab, { search = false } = {}) {
   if (!settingsDialog.open) settingsOpener = focusedNow();
   settingsPanel.open(tab, { search });
-  wake();
+  ctx.wake();
 }

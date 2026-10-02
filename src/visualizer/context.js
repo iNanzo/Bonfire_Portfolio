@@ -67,9 +67,17 @@
  */
 
 /**
+ * The HUD (hud.js).
+ * @typedef {object} HudPart
+ * @property {(text: string, seconds?: number) => void} note  a passing line in the HUD, for `seconds`
+ * @property {(f: Record<string, any>, dt: number) => void} drawHud  the HUD for a drawn frame (what was heard since the last)
+ * @property {() => void} wake  the controls and the cursor back (they fade again when the mouse rests)
+ * @property {() => Promise<void>} keepAwake  keep the screen on
+ */
+
+/**
  * What main.js still gives the parts (until each moves into one of its own).
  * @typedef {object} MainPart
- * @property {(text: string, seconds?: number) => void} note  a passing line in the HUD
  * @property {() => void} mirrorCard  copy the title card into the output window
  * @property {(text: string) => void} showError  the start screen's error line says `text`
  * @property {() => void} hideError
@@ -78,8 +86,10 @@
  * @property {(tab?: string, o?: { search?: boolean }) => void} openSettings
  * @property {(key: string | string[]) => void} applySettings  a setting (or the ones a preset changed) changed
  * @property {any} settingsPanel  settingsDialog.js bindSettings: the settings dialog
+ * @property {any} keysOverlay  ui/keysOverlay.js: every shortcut (?)
+ * @property {any} renderMenu  ui/renderMenu.js: Render Settings (P)
  */
 
-/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & MainPart} LiveContext */
+/** @typedef {LiveState & ScenesPart & CardsPart & SourcesPart & HudPart & MainPart} LiveContext */
 
 export {};
