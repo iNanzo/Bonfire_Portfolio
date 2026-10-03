@@ -103,17 +103,21 @@ export const SEATS = {
  * scenery (measured on the height maps, a dancer's feet 1.0–1.4 m out and ±0.18 m aside,
  * with a few degrees to spare): the spare logs everywhere, then each scenery's own pieces,
  * and the seated knight's legs, either seat pose (his seat is well back, but his boots reach
- * the ring), and in the ruins where he stands up to. The arc from 253° through 0° to 96° is
- * clear everywhere.
+ * the ring). The arc from 253° through 0° to 96° is clear everywhere.
  */
 export const DANCE_RING = {
   center: [FIRE_AT.x, FIRE_AT.z],
   radius: 1.2,
   blocked: {
+    // (His legs, sitting on the ground. Resting, he stretches one out to the ring, its boot on
+    // it at 253°, and getting up he pushes off the ground near it at 195° (on the real model),
+    // so a dancer's feet would meet him from 188° to 261°, past this arc's ends. The show
+    // stands nobody within 8° of them (sideArcs MARGIN): its nearest place, 262°, clears his
+    // boot by 2 cm, and here four still stand in a row and three go round the fire.)
     ruins: [
       [96, 142],
       [192, 252],
-    ], // (his legs, the model's fallen drum, and where he stands up to)
+    ],
     forge: [
       [96, 142],
       [184, 244],
