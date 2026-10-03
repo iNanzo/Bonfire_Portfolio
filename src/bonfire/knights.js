@@ -137,10 +137,11 @@ const STEP_OVER = 0.16; // m: what a walking knight steps over (a fire pit's sto
 // is untouched)
 const FLOOR_HANDS = 0.19;
 // His meshes' bounds (his own space: the ground under him, turned with him), for culling:
-// every pose he takes stays inside with 0.1 m to spare (the farthest reach, 1.76 m from
-// here, is a boot kicked out in the site's dance where he stands up to, to his right across
-// the ruins' fallen drum; the leaps, Praise the Sun and the rest are inside too:
-// test/knightsBounds.test.mjs, on the real model).
+// every pose he takes stays inside with room to spare (the farthest reach, 1.51 m from
+// here, is the boot of the leg he stretches out resting on the ground in the ruins; the
+// leaps, Praise the Sun and the rest are inside too: test/knightsBounds.test.mjs, on the
+// real model). Round 10 grew it from 1.6 m for a boot kicked out across the ruins' old
+// seat; at 1.6 m the stretched boot would leave 9 cm, under the 10 the test asks for.
 const BOUNDS = new THREE.Sphere(new THREE.Vector3(0, 1.05, 0.15), 1.9);
 // Gestures that throw the arms up (or dance): a flinch or a lean over one would hide it.
 const CHEERING = new Set(CHEERS);
