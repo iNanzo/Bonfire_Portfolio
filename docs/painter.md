@@ -123,7 +123,8 @@ hands the keyboard back to the page. The box stays in sight: only the sections u
 scroll.
 
 **Tools ▾** reaches what only a key did before: *Render Settings* (P), *Pack* (I),
-*Capture* (C), *Full Screen* (F) and *Keyboard Shortcuts* (?). With the menu open, those
+*Capture* (C), the *Stats Overlay* (U, a switch: ticked while it's on), *Full Screen* (F)
+and *Keyboard Shortcuts* (?). With the menu open, those
 keys pick their item (the menu closes first, so what opens isn't under it), and any other
 key the page answers closes it first too; Esc closes it back onto the button. Its tooltip
 steps aside while it's open. On a phone it's the word *Tools* (a finger can't hover for the
@@ -132,6 +133,20 @@ tooltip). Render Settings shows the scene's render in Bonfire Live's words (*Alw
 `?` lists every key below, with a box that filters them. The bar's icon buttons (undo,
 redo, the banner's ✕), Tools, Play and the previews have tooltips that a screen reader
 reads out too (each button's description).
+
+**The Stats Overlay** (Tools, or U) shows, in the stage's top left corner under the bar
+(clear of the panel and the notes; the library covers it), what the stage costs and what's
+live in the scene, twice a second: **Frames** (frames a second, the time between them, the
+draw calls and the shadow's redraws; dimmed, the frame's parts and the GPU's objects),
+**Particles** (each system running, live of how many it has, the fireflies lit), and
+**Scene**: the scene being painted, the preview's section (the Drop Loop goes through a
+breakdown, a build and the drop), the budget, the look and its strength, the layers live
+now, each *(In the Mix)* or *(Always)*, a drop's hits while they fire, the knights and the
+shot. It's the page's, not the scene's: it's kept for the next visit (localStorage
+`bonfire-painter-view`) and never changes or dirties the scene. The panel's search finds it
+by its words ("fps", "stats", "debug"…) and says where it is: *Stats Overlay: turn it on in
+Tools, or press U*. The same overlay as Bonfire Live's (`docs/bonfire-live.md`;
+`docs/performance.md` for the numbers); `?perf` in the address shows it too.
 
 **The preview**
 
@@ -201,6 +216,7 @@ with *Import From Painter*).
 | Space | Beat on or off (Still), from the stage (on a focused button, Space presses it) |
 | D | a drop (on the beat's next frame; in Still, at once) |
 | C | save a picture of the stage (PNG) |
+| U | the Stats Overlay on or off |
 | Ctrl+Z, Ctrl+Shift+Z (Ctrl+Y) | undo, redo |
 | Ctrl+S | save |
 | H | hide or show the panel |
@@ -317,4 +333,5 @@ it with `--write <name>=<png>` without capturing again. The tool's header has th
 | Standing: hover affordances are effects, never text labels | hover auditions on the stage; lifts and glows |
 | Standing: Title Case labels, a "?" on every setting | every field and group (tested in `test/painterPanel.test.mjs`) |
 | Round 10: "optimize our menus … grouped in a UX friendly way", "setting item search", "tooltips should make sense and not cut off on screen" | the sections in the settings map's order and words; the panel's search; the shared tooltip on every "?" and icon button; Tools ▾ and the `?` keys list |
+| Round 11: "You also never added the fps and effect/layer info, unless that was a setting" … "To the visualizer and painter" | the Stats Overlay: Tools (U) here, Picture › Performance (U) in Bonfire Live |
 | The plan: starter scenes made in the Painter | the four built-in scenes (above), painted, saved and exported here; `e2e/scenes.spec.mjs` opens them in the Painter and Bonfire Live |

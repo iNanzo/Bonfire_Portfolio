@@ -6,23 +6,62 @@ cap: `fire.setMaxFps`), so lag shows as frames that take longer than the display
 Bonfire Live is the heaviest of the three front ends (more particles, the effects stages,
 up to four knights); the tools below were built for it, and the overlay works everywhere.
 
-## The `?perf` overlay
+## The stats overlay
 
-Add `?perf` to any page's address: the site (`/?perf`), Bonfire Live (`/visualizer/?perf`)
-or the Painter (`/painter/?perf&scene=b:frozen-shrine`). `createBonfire` mounts a small
-overlay in the bottom-left corner (`src/ui/perfOverlay.js`); it ignores the pointer and
-updates twice a second:
+A readout in a corner of what the picture costs and, in Bonfire Live and the Painter, what
+the show is doing. Three ways to turn it on:
+
+- **Bonfire Live:** Settings › Picture › Performance › **Stats Overlay**, or `U` (on the
+  start screen too). Kept on this computer, like Frame Rate: not in a setup or a preset.
+- **The Painter:** **Tools ▾ › Stats Overlay**, or `U`. Kept for the next visit (the
+  page's, not the scene's).
+- **Any page**, the site too: `?perf` in the address (`/?perf`, `/visualizer/?perf`,
+  `/painter/?perf&scene=b:frozen-shrine`), whatever the setting says. It also writes the
+  frame's parts as `performance.measure` entries for the browser's profiler (below).
+
+`createBonfire` mounts it (`fire.setStats(on)`; `src/ui/perfOverlay.js`, its words in
+`src/ui/statsGroups.js`). Bonfire Live has it top left in the show (the HUD is along the
+bottom, the pack bottom right, Render Settings top right) and top right on the start screen;
+the Painter top left of the stage, under the bar; the site bottom left. It never takes the
+pointer and is hidden from screen readers. It's HTML over the canvas, so it isn't in Bonfire
+Live's output window, a recorded clip, a capture or a scene's thumbnail. On a phone it's
+smaller and leaves out the dimmed rows. Twice a second:
 
 ```
-fps 144   frame p50 6.9  p95 9.7 ms
-tick 0.18  page 0.08  update 1.06  draw 2.84 ms
-draws 190  shadows 12/s
-programs 24  textures 12  geometries 104
+FRAMES
+Rate     132 fps
+Frame    7.6 ms · p95 8.2
+Draws    106 · 10 shadows/s
+Parts    tick 0.17 · page 0.07 · update 3.38 · draw 0.88 ms     (dimmed)
+GPU      27 programs · 21 textures · 111 geometries             (dimmed)
+PARTICLES                                            15,621 live
+Debris           14 / 440
+Bonfire flames   3,157 / 3,200
+Bonfire sparks   598 / 600
+Ring of fire     6,466 / 8,320
+Embers           488 / 536
+Smoke            4,174 / 5,252
+Ash              572 / 572
+Fireflies        16 lit / 18
+SHOW
+Section    Drop · bar 1 of 8
+Budget     100%
+Look       Kaleido · 100% (the scene’s)
+Layers     Ghosting (In the Mix) · Glow (Always)
+Drop Hits  Kaleido Burst, Echo Burst
+Knights    2 · dancing
+Shot       The Scene’s Framing
+Scene      Cathedral Kaleidoscope (Hold)
+Loop       In the Mix
 ```
 
-- **fps** — frames drawn per second, and the cap when one is set (`cap 60`).
-- **frame p50 / p95** — the time between drawn frames, over the last 256.
-- **tick / page / update / draw** — a drawn frame's parts on average:
+**Frames**
+
+- **Rate** — frames drawn per second, and the cap when one is set (`cap 60`).
+- **Frame** — the time between drawn frames, median and 95th percentile, over the last 256.
+- **Draws** — draw calls in the last frame, all passes together (`renderer.info`), and how
+  often the fire's shadow (a six-face cube map) was redrawn, per second.
+- **Parts** — a drawn frame's parts on average:
   - **tick** — the page's `onTick`, which runs on every frame the display shows, drawn or
     not: Bonfire Live's audio analysis (the analyser, and the Link bridge when it's on). A
     drawn frame's tick is every `onTick` since the last drawn frame, so with a Frame Rate
@@ -31,14 +70,61 @@ programs 24  textures 12  geometries 104
   - **page** — the page's own `onFrame` (Bonfire Live's director and HUD).
   - **update** — the scene's update (the particle sims, knights, fireflies, lights).
   - **draw** — three.js's passes, as the CPU sees them.
-- **draws** — draw calls in the last frame, all passes together (`renderer.info`).
-- **shadows** — how often the fire's shadow (a six-face cube map) was redrawn, per second.
-- **programs / textures / geometries** — what the renderer holds on the GPU.
+- **GPU** — the shader programs, textures and geometries the renderer holds.
 
-The same parts are written as `performance.measure` entries (`bonfire: tick`, one per
-`onTick`; `bonfire: page`, `bonfire: update`, `bonfire: draw`), so a recording in the
-browser's Performance panel shows them on the timeline. Without `?perf` nothing is timed
-and the overlay's code isn't loaded.
+**Particles** — the scene's `stats()` (`sceneRender.js`, which the site's *How It's Made*
+counts from too): each point set by name, live (a size above 0) of how many it has, only
+those with any live: the flames, the sparks, the fireflies' light trails, the forge's
+particles during a swap, debris, the cold mist and frost motes, the blade's trail, the
+rings, the impacts' embers, smoke and ash. The **Fireflies** are lit of all of them
+(instanced meshes, not points), and the **Bolts** the lightning ball's and ring's line
+segments drawn this frame, of the room they have. The heading has the total live (points
+only). The counts are read when the text is built, never per frame.
+
+**Show** (Bonfire Live; in the Painter it's **Scene**, the scene being painted, with no
+loop) — the director's `status()`, a snapshot made when asked from what the show already
+keeps (it draws no dice: the show plays the same with the overlay on):
+
+- **Section** — Silence, Groove, Breakdown, Build (with its stage of 4), or Drop and which
+  of the 8 bars after it (when the budget is all-out).
+- **Budget** — how much the effects may do now, as the director has it (Off with Follow
+  the Song's Shape off).
+- **Look** — the look playing (and those Always under it) and the strength it's drawn at;
+  a preset scene's says so.
+- **Layers** — the Effects tab's layers live now, each marked by how it came in: *(In the
+  Mix)* (rolled in for this look's turn) or *(Always)*; *None* when the picture is clean.
+- **X-Ray** — the pass a flip is showing, while it's on.
+- **Drop Hits** — the last drop's hits, for three seconds after they're thrown.
+- **Knights** — how many are by the fire and what they're doing (dancing, up, watching the
+  blade, resting).
+- **Shot** — the camera's shot or rig, or the scene's own framing.
+- **Scene** and **Loop** — the preset scene playing (Hold or Base) or the free show, and
+  the loop's switch (solo with `?scene=…&solo`), with the scene waiting for its moment and
+  when it lands.
+
+### What it costs
+
+Nothing when it's off: no part is timed, nothing is counted, and its code isn't loaded. On,
+a frame writes a few numbers into fixed arrays (and, with `?perf` only, its
+`performance.measure` entries, objects the profiler keeps); the particles, the show's
+snapshot and the text are made twice a second. Measured in Bonfire Live on the demo track
+(dev server, GPU Chrome, 1600×900, uncapped, a machine shared with other work):
+
+| | |
+| --- | --- |
+| One build of the text (the scene's `stats()`, the director's `status()`, the overlay's elements) | 0.1 ms median, 0.2 ms p95 (the page's timer steps by 0.1 ms): `stats()` 0.03 ms, `status()` under 0.01 ms |
+| Main-thread work per drawn frame, on − off, 12 interleaved pairs of 3 s windows (CDP `TaskDuration`) | median −0.10 ms, mean −0.07 ms; the pairs ranged −1.07 to +1.22 ms (the show's own swing from one window to the next) |
+| The same, 4 pairs of 8 s windows (medians) | off 3.03 ms, on 3.19 ms; 132 and 131.8 frames a second, 7.6 ms apart (p50) and 10.0 ms (p95) either way |
+
+So a frame doesn't take measurably longer with it on: spread over the 60-odd frames between
+two builds, a build comes to about two thousandths of a millisecond a frame.
+
+### For the profiler (`?perf`)
+
+With `?perf` the frame's parts are also written as `performance.measure` entries
+(`bonfire: tick`, one per `onTick`; `bonfire: page`, `bonfire: update`, `bonfire: draw`),
+so a recording in the browser's Performance panel shows them on the timeline. The Stats
+Overlay setting alone leaves the profiler's timeline as it is.
 
 ## The benchmark: `tools/bench-viz.mjs`
 
