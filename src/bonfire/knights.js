@@ -136,6 +136,10 @@ const STEP_OVER = 0.16; // m: what a walking knight steps over (a fire pit's sto
 // hangs up to 18 cm below it, limp and open; at rest his wrists are 32 cm up or more, so rest
 // is untouched)
 const FLOOR_HANDS = 0.19;
+// (Where a seated boot's sole is looked at for what it rests on, m ahead of its ankle, either
+// side of it; sitting on the ground, back past its heel too: soleUnder.)
+const SOLE = [0, 0.1, 0.2, 0.28];
+const SOLE_ON_GROUND = [-0.12, -0.06, ...SOLE];
 // His meshes' bounds (his own space: the ground under him, turned with him), for culling:
 // every pose he takes stays inside with room to spare (the farthest reach, 1.51 m from
 // here, is the boot of the leg he stretches out resting on the ground in the ruins; the
@@ -460,11 +464,15 @@ export function createKnights(
    * The ground a seated boot rests on at a place in his own space at `home` (its ankle at x, z):
    * the highest under its sole from the ankle to the pointed toe (0.3 m ahead), so the toe
    * never sinks into whatever it reaches over (a stone or a log he rests his foot up on).
-   * (Not the heel's: a foot drawn in tucks its heel under the seat's edge.)
+   * Sitting on the ground, from behind its heel too (12 cm behind the ankle: its heel is 9 cm
+   * back, and his idle's shift of weight steps it 2.5 back): a leg stretched out along the ground
+   * rests its heel on whatever lies there (the spare log by the fire, for one of Bonfire Live's
+   * knights resting on the ring). On a seat, not the heel's: a foot drawn in tucks its heel
+   * under the seat's edge.
    */
   const soleUnder = (home, x, z) => {
     let g = -Infinity;
-    for (const dz of [0, 0.1, 0.2, 0.28])
+    for (const dz of home.h < 0.12 ? SOLE_ON_GROUND : SOLE)
       for (const dx of [-0.05, 0.05]) g = Math.max(g, groundUnder(home, x + dx, z + dz));
     return g;
   };
