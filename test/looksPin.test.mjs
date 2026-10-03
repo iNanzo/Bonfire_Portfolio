@@ -6,7 +6,8 @@
 // the show; "Pin What You See" pins exactly what's on screen; under reduced motion nothing
 // answers the beat; with `cycles` false (the user's Color Cycle Off) the palette never cycles,
 // a pinned Echo look's steps and spins and the drop's Color Cycle hit alike. And the tables a
-// scene and the Painter read (PARAMS, LOOK_PARAMS, LAYER_DETAILS) hold together.
+// scene and the Painter read (PARAMS, LOOK_PARAMS, LAYER_DETAILS) hold together, and the
+// layers listed live (liveLayers, the stats overlay's) are the ones drawn.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -174,6 +175,29 @@ test('a pinned scene’s layers: on always, off never, in the mix per turn (not 
     if (g.ghost > 0) ghosts++;
   }
   assert.ok(ghosts > 20 && ghosts < 120, `ghosting in the mix comes and goes (${ghosts}/200)`);
+});
+
+test('liveLayers: of Painterly and Watercolor both on, only the one drawn is listed (the turn’s styleFlip picks)', () => {
+  const g = {};
+  const looks = createLooks(g);
+  const off = every('off', LAYERS);
+  for (const [paint, wash] of [
+    ['on', 'on'],
+    ['on', 'mix'],
+    ['mix', 'on'],
+  ]) {
+    const styles = new Set();
+    for (let i = 0; i < 200; i++) {
+      looks.next(SHOW.looks);
+      frame(looks, { modes: { ...SHOW, ...off, paint, wash } });
+      const live = looks.liveLayers().map(([k]) => k);
+      // (The pass draws one restyle, g.style: 1 Painterly, 2 Watercolor.)
+      const drawn = { 1: ['paint'], 2: ['wash'] }[g.style] ?? [];
+      assert.deepEqual(live, drawn, `${paint}/${wash}, turn ${i}: style ${g.style}`);
+      styles.add(g.style);
+    }
+    assert.ok(styles.has(1) && styles.has(2), `${paint}/${wash}: each shows in turn (${[...styles]})`);
+  }
 });
 
 test('in silence a pinned look shows at its painted strength (rest), and still answers the beat', () => {
