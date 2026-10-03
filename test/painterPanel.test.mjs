@@ -699,7 +699,17 @@ test('search: the Stats Overlay, a switch in Tools (not a part of the scene), is
   const tools = buildMatcher(toolEntries(), { synonyms: PAINTER_SYNONYMS });
   const s = normalizeScene(defaultScene());
   const note = `${SETTINGS.stats.label}: turn it on in Tools, or press U`;
-  for (const q of ['fps', 'stats', 'debug', 'performance', 'particles', SETTINGS.stats.label]) {
+  for (const q of [
+    'fps',
+    'stats',
+    'debug',
+    'performance',
+    'particles',
+    'info',
+    'statistics',
+    'fps counter',
+    SETTINGS.stats.label,
+  ]) {
     const f = findInPanel(match, q, s, tools);
     assert.ok(
       f.hidden.some((h) => h.id === 'tool.stats' && h.note === note),

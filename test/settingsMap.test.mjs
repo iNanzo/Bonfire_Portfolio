@@ -440,7 +440,8 @@ test('sections: every entry sits in one, each Live one in a tab, each Painter on
   assert.equal(SETTINGS.stats.simple, true);
   assert.equal(SETTINGS.stats.section, 'performance');
   assert.equal(SETTINGS.stats.live, 'stats');
-  for (const word of ['fps', 'stats', 'debug', 'particles', 'layers', 'effects', 'performance'])
+  // (The user's own word for it, "info", and the long one, "statistics", among them.)
+  for (const word of ['fps', 'stats', 'debug', 'particles', 'layers', 'effects', 'performance', 'info', 'statistics'])
     assert.ok(SETTINGS.stats.keywords.includes(word), word);
 });
 

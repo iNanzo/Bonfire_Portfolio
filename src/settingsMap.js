@@ -749,6 +749,10 @@ export const SETTINGS = {
       'overlay',
       'lag',
       'frame time',
+      'info',
+      'statistics',
+      'counter',
+      'diagnostics',
     ],
   },
 
