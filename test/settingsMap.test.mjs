@@ -427,7 +427,7 @@ test('sections: every entry sits in one, each Live one in a tab, each Painter on
     sound: 4,
     show: 6,
     drops: 4,
-    picture: 10,
+    picture: 11,
     effects: 3,
     camera: 3,
     cast: 9,
@@ -436,6 +436,12 @@ test('sections: every entry sits in one, each Live one in a tab, each Painter on
   });
   assert.equal(SETTINGS.layers.simple, undefined, 'the 14 layers are in All Settings');
   assert.equal(SETTINGS.frameRate.simple, true);
+  // The Stats Overlay beside it (Live's; the Painter's Tools menu has it too, read from here).
+  assert.equal(SETTINGS.stats.simple, true);
+  assert.equal(SETTINGS.stats.section, 'performance');
+  assert.equal(SETTINGS.stats.live, 'stats');
+  for (const word of ['fps', 'stats', 'debug', 'particles', 'layers', 'effects', 'performance'])
+    assert.ok(SETTINGS.stats.keywords.includes(word), word);
 });
 
 test('search words: lowercase, each with somewhere to go', () => {

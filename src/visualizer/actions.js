@@ -86,6 +86,12 @@ export function createActions(ctx) {
       saveSettings(settings);
       ctx.note(`Flame Colors: ${COLOR_MODES[settings.colors]}`, 1.5);
     },
+    stats: () => {
+      settings.stats = !settings.stats;
+      saveSettings(settings);
+      ctx.applyStats();
+      ctx.note(`Stats Overlay: ${settings.stats ? 'On' : 'Off'}`, 1.2);
+    },
     mirror: () => {
       const modes = ['mix', 'on', 'off'];
       settings.mirror = modes[(modes.indexOf(settings.mirror) + 1) % modes.length];
@@ -179,7 +185,8 @@ export function createActions(ctx) {
     } else if (k === 'i') {
       ctx.pack.toggle();
       ctx.wake();
-    } else if (k === 'n') {
+    } else if (k === 'u') actions.stats();
+    else if (k === 'n') {
       if (e.shiftKey) ctx.cycleScenes();
       else ctx.nextScene();
       ctx.wake();

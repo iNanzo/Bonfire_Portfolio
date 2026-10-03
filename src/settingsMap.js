@@ -110,7 +110,7 @@ export const SECTIONS = [
     tab: 'setups',
     label: 'My Setups',
     intro:
-      'Save everything as it is now under a name, to load again later. Your input device, volume and frame rate aren’t part of a setup.',
+      'Save everything as it is now under a name, to load again later. Your input device, volume, frame rate and stats overlay aren’t part of a setup.',
   },
 ];
 
@@ -722,6 +722,34 @@ export const SETTINGS = {
     live: 'particles',
     hint: 'How many particles each effect uses: more looks richer but needs a stronger graphics card. Changing it restarts the scene.',
     keywords: ['gpu', 'lag', 'sparks'],
+  },
+  stats: {
+    section: 'performance',
+    label: 'Stats Overlay',
+    live: 'stats',
+    simple: true,
+    hint: 'A corner readout of the frame rate, the particles in play and which effects are live right now, for finding what slows the picture.',
+    hints: {
+      live: 'A corner readout of the frame rate, the particles and what the show is doing (U). Kept on this computer, not in setups or recordings.',
+    },
+    more: [
+      'Frames: frames a second (and the cap), the time between them, the draw calls and the shadow’s redraws; dimmed under them, the frame’s parts.',
+      'Particles: each system that’s running, live of how many it has, the fireflies lit and the lightning’s bolts.',
+      'Show: the section (a breakdown, a build, the bars after a drop), the budget, the look and its strength, and the layers live (In the Mix or Always).',
+      'Then a drop’s hits as they fire, the knights, the shot, and the preset scene playing with its loop.',
+    ].join('\n'),
+    keywords: [
+      'fps',
+      'stats',
+      'debug',
+      'particles',
+      'layers',
+      'effects',
+      'performance',
+      'overlay',
+      'lag',
+      'frame time',
+    ],
   },
 
   // --- Effects › Strength & Pace

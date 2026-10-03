@@ -1240,6 +1240,28 @@ body.hud-off .viz-hud {
   }
 }
 
+/* ---------- The stats overlay (ui/perfOverlay.js; U, or Picture › Performance) ----------
+   Top left, where nothing else is in the show: the HUD is along the bottom, the pack bottom
+   right, the render menu top right. On the start screen (its words on the left, the home link
+   top left), top right. Over the HUD and the menus, under the dialogs; smaller on a phone,
+   the frame's parts and the GPU folded away. It never takes the pointer. */
+body.viz {
+  --stats-top: 14px;
+  --stats-left: var(--gutter);
+  --stats-bottom: auto;
+  --stats-z: 23;
+}
+body.viz[data-mode='start'] {
+  --stats-left: auto;
+  --stats-right: var(--gutter);
+}
+@media (max-width: 699px) {
+  body.viz {
+    --stats-font: 10px;
+    --stats-detail: none;
+  }
+}
+
 /* ---------- Back to the portfolio (start screen) ---------- */
 
 .viz-home {

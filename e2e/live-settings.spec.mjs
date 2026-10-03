@@ -7,7 +7,8 @@
 // kept), a setting that does nothing as things stand (disabled, saying why, the focus still
 // kept in the dialog when it's gone to), the keyboard shortcuts (?, every group in sight),
 // short screens and phones (the header in sight, the presets' note whole and right after an
-// Undo), and Frame Rate capping how often the picture is drawn. No errors anywhere.
+// Undo), Frame Rate capping how often the picture is drawn, and the Stats Overlay (U, or
+// Picture › Performance; ?perf shows it too). No errors anywhere.
 import { test, expect } from '@playwright/test';
 
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
@@ -578,6 +579,51 @@ test('Frame Rate 30 caps how often the picture is drawn; Display takes the cap o
   await expect
     .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? '{}').frameRate))
     .toBe('60');
+  expect(errors).toEqual([]);
+});
+
+test('Stats Overlay: U shows the frames, the particles and the show in a corner, out of the way; kept here, not in a setup', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await open(page);
+  const overlay = page.locator('.stats-overlay');
+  await expect(overlay).toHaveCount(0);
+  await page.click('[data-source="demo"]');
+  await page.keyboard.press('u');
+  await expect(overlay).toBeVisible();
+  // (Its text is built twice a second.)
+  for (const words of ['Frames', 'fps', 'Particles', 'Bonfire flames', 'Show', 'Section', 'Look', 'Layers', 'Loop'])
+    await expect(overlay).toContainText(words, { timeout: 10_000 });
+  // It never takes the pointer, isn't read out, and sits top left, clear of the HUD below.
+  await expect(overlay).toHaveAttribute('aria-hidden', 'true');
+  expect(await overlay.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none');
+  const corner = await overlay.boundingBox();
+  const hud = await page.locator('[data-hud]').boundingBox();
+  expect(corner.x).toBeLessThan(80);
+  expect(corner.y + corner.height).toBeLessThan(hud.y);
+  // The setting it is: kept on this computer, ticked in Picture › Performance, never in a setup.
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? '{}').stats))
+    .toBe(true);
+  await page.keyboard.press('s');
+  await page.locator('[data-tab="picture"]').click();
+  await expect(page.locator('[data-set="stats"]')).toBeChecked();
+  await page.locator('[data-tab="setups"]').click();
+  await page.locator('[data-setup-name]').fill('Watching');
+  await page.locator('[data-setup-save]').click();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live-setups')).Watching);
+  expect(saved).not.toHaveProperty('stats');
+  // Unticked: gone.
+  await page.locator('[data-tab="picture"]').click();
+  await page.locator('[data-set="stats"]').uncheck();
+  await expect(overlay).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  // ?perf shows the same overlay, the setting off.
+  await page.goto('/visualizer/?perf');
+  await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+  await expect(overlay).toContainText('Frames', { timeout: 10_000 });
+  await expect(overlay).toContainText('Particles');
   expect(errors).toEqual([]);
 });
 
