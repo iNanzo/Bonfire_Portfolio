@@ -732,9 +732,10 @@ const ROUND9_STEP = {
 // step find it to within a few hundredths of all the way back: round 10's seated beckon or
 // Point, first touching the ruins' pillar then at his shoulder, went up to a fifth further.)
 const CLEAR_STEP = 1.25;
-// (Each from six moments in his idle, a quarter second and more apart: where his arms are
-// when it starts, and how the fire's 12 frames a second fall on it, change what he first
-// touches and when.)
+// (Each from six moments in his idle, a quarter second and more apart, from its start: where
+// his arms are when it starts, and how the fire's 12 frames a second fall on it, change what
+// he first touches and when. From where the tests before left him, the moments moved with
+// every test added or changed before this one.)
 const IDLE = [0.5, 0.79, 1.08, 1.37, 1.66, 1.95];
 test('[slow] everything he does at his seat moves on smoothly: no step of his head or hands more than 1.5× round 9’s, and none further than round 9’s a quarter further than with nothing there to keep clear of', async () => {
   const env = await realKnights();
@@ -766,6 +767,8 @@ test('[slow] everything he does at his seat moves on smoothly: no step of his he
           };
           k.dismiss(0, { instant: true });
           k.summon(0, { instant: true });
+          // (His idle from its start, whatever the tests before left his clock at.)
+          n.clock = 0;
           k.update(idle);
           if (standing) {
             k.stand(0);
