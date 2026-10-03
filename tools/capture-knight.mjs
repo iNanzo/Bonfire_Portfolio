@@ -3,8 +3,9 @@
 //
 //   npm run dev                                   (in one terminal)
 //   node tools/capture-knight.mjs [--port 5173] [--out .scratch/knight-shots] [--tag now]
-//                                 [--only seats,gestures,moves,seq,home] [--sceneries ruins,cult]
+//                                 [--only seats,gestures,moves,seq,home,views] [--sceneries ruins,cult]
 //                                 [--helmet bascinet] [--style first] [--standing] [--seqs praise]
+//                                 [--room 1,0]
 //
 //   seats     close-ups of him seated in each scenery, in both seat poses, from his left, from
 //             his right and from above (what stands round his seat in view): <tag>-seats.png
@@ -20,8 +21,13 @@
 //             screencast hands them over, each labelled with when it was drawn.
 //   home      the home view as a visitor sees it (the page on), 1920, 1280 and 390 wide, in
 //             each scenery: <tag>-home-<width>.png
+//   views     the other cameras that frame his seat, 1920 wide: the site's Journey and About
+//             views (the page on), Bonfire Live's Pillar Side shot and the Moonlit Ruins
+//             scene's camera (the page hidden), a row a scenery: <tag>-views.png
 //
-// --helmet and --style dress him first (knights.js HELMETS, knightStyles.js STYLES). Run it
+// --helmet and --style dress him first (knights.js HELMETS, knightStyles.js STYLES). --room
+// gives him that much room for his left and right arm at his seat (0..1 each, as knights.js
+// roomOf measures it), whatever stands there: how a gesture looks hemmed in, or not. Run it
 // against two checkouts on two ports for a before and after.
 import { chromium } from '@playwright/test';
 import sharp from 'sharp';
@@ -41,10 +47,11 @@ const HELMET = opt('helmet', null);
 const STYLE = opt('style', null);
 const STANDING = argv.includes('--standing');
 const SEQ_NAMES = opt('seqs', null)?.split(',') ?? null;
+const ROOM = opt('room', null)?.split(',').map(Number) ?? null;
 fs.mkdirSync(OUT, { recursive: true });
 
 /** GPU Chrome on the dev server's site, the knight there at rest (dressed as asked). */
-async function open({ width = 1280, height = 800, hide = true } = {}) {
+async function open({ width = 1280, height = 800, hide = true, path = '/' } = {}) {
   const browser = await chromium.launch({
     channel: 'chrome',
     args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],
@@ -55,7 +62,7 @@ async function open({ width = 1280, height = 800, hide = true } = {}) {
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(`console: ${m.text()}`);
   });
-  await page.goto(`http://localhost:${PORT}/`);
+  await page.goto(`http://localhost:${PORT}${path}`);
   await page.waitForFunction(() => window.__fire?.knights, null, { timeout: 120000 });
   await page.evaluate(() => window.__fire.knights.ready);
   if (hide)
@@ -79,15 +86,22 @@ async function open({ width = 1280, height = 800, hide = true } = {}) {
 /** The scenery `name`, the knight seated at its seat (or the seat pose `pose`). */
 async function seatIn(page, name, pose = null) {
   await page.evaluate(
-    ([name, pose]) => {
+    ([name, pose, room]) => {
       const F = window.__fire;
       if (F.scenery !== name) F.setScenery(name);
       const k = F.debug.knights;
       if (pose) k.setSeatPose(pose);
       k.setScenery(name, k.terrain); // (formed at the seat at once, sitting)
       F.knights.summon(0, { instant: true });
+      if (room) {
+        // (The room he has at his seat, seated and stood up in front of it: --room.)
+        const h = k.knights[0].home;
+        h.room = [...room];
+        h.roomUp = [...room];
+        h.roomLess = null;
+      }
     },
-    [name, pose],
+    [name, pose, ROOM],
   );
   await page.waitForTimeout(1200);
   return page.evaluate(() => {
@@ -315,10 +329,58 @@ async function home() {
   }
 }
 
+// --- the other cameras that frame his seat ----------------------------------------------------------------
+async function views() {
+  const VIEWS = [
+    ['Journey', { view: 'experience' }],
+    ['About', { view: 'about' }],
+    // (Bonfire Live's shot, visualizer/camera.js SHOTS.pillar, and the built-in scene's camera.)
+    ['Pillar Side', { pose: { pos: [-2.5, 1.35, 3.3], target: [0.15, 0.7, -0.3], fov: 34 } }],
+    ['Moonlit Ruins', { pose: { pos: [-0.6, 0.7, 2.6], target: [-0.85, 0.9, -1.3], fov: 40 } }],
+  ];
+  const tiles = [],
+    labels = [];
+  // (The site's views on their own pages, as a visitor sees them; the others, the page hidden.)
+  for (const [path, hide, list] of [
+    ...VIEWS.filter(([, v]) => v.view).map((view) => [`/${view[1].view}/`, false, [view]]),
+    ['/', true, VIEWS.filter(([, v]) => v.pose)],
+  ]) {
+    const { browser, page, errors } = await open({ width: 1920, height: 1080, hide, path });
+    for (const name of SCENERIES) {
+      await seatIn(page, name, null);
+      for (const [label, v] of list) {
+        if (v.view) await page.evaluate((view) => window.__fire.setView(view, { instant: true }), v.view);
+        else await look(page, v.pose, v.pose.fov);
+        await page.waitForTimeout(1200);
+        tiles.push({
+          at: `${name} ${label}`,
+          buf: await sharp(await page.screenshot())
+            .resize(640, null, { kernel: 'nearest' })
+            .png()
+            .toBuffer(),
+        });
+      }
+    }
+    if (errors.length) console.log(errors.join('\n'));
+    await browser.close();
+  }
+  // (A row a scenery, the views in order.)
+  const order = SCENERIES.flatMap((name) => VIEWS.map(([label]) => `${name} ${label}`));
+  const sorted = order.map((at) => tiles.find((t) => t.at === at));
+  labels.push(...order);
+  await grid(
+    sorted.map((t) => t.buf),
+    VIEWS.length,
+    `${OUT}/${TAG}-views.png`,
+    labels,
+  );
+}
+
 for (const part of ONLY) {
   if (part === 'seats') await seats();
   else if (part === 'gestures') await sheet('gestures');
   else if (part === 'moves') await sheet('moves');
   else if (part === 'seq') await seq();
   else if (part === 'home') await home();
+  else if (part === 'views') await views();
 }
