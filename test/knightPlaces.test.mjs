@@ -19,6 +19,7 @@ import {
   sideArcs,
 } from '../src/bonfire/knightPlaces.js';
 import { seatFeet } from '../src/bonfire/knightPose.js';
+import { collidersOf, clearanceTo } from '../src/bonfire/colliders.js';
 import * as THREE from 'three';
 import * as scenery from '../src/bonfire/scenery.js';
 
@@ -180,13 +181,9 @@ test('his summon sign lies in front of each seat, on open ground, in view of the
     wax: material(),
     mortar: material(),
   };
-  // The ruins' own pieces near his seat (the model's, measured on its height map): the pillar's
-  // plinth, and the fallen drum by the fire (lying aslant: two boxes).
-  const RUINS = [
-    { min: { x: -1.8, z: -1.72 }, max: { x: -1.1, z: -0.98 } },
-    { min: { x: -1.02, z: -1.18 }, max: { x: -0.52, z: -0.95 } },
-    { min: { x: -0.93, z: -0.95 }, max: { x: -0.52, z: -0.72 } },
-  ];
+  // The ruins' own pieces (the model's, not scenery.js's: their shapes, the pillar on its
+  // plinth, its candles, the fallen drum and the wall).
+  const RUINS = collidersOf('ruins');
   // The sign's footprint (its letters and halo), every 4 cm, laid as sceneKnight.js lays it: its
   // letters' tops pointing `yaw`, away from the home camera.
   const [x0, y0, x1, y1] = LOGO_BOUNDS;
@@ -202,17 +199,10 @@ test('his summon sign lies in front of each seat, on open ground, in view of the
     }
     return pts;
   };
-  const inside = (p, b, m = 0.01) => p.x > b.min.x - m && p.x < b.max.x + m && p.z > b.min.z - m && p.z < b.max.z + m;
   for (const [name, s] of Object.entries(SEATS)) {
     const sign = s.sign;
     const out = Math.hypot(sign.x - s.x, sign.z - s.z);
-    // (In the ruins it lies in front of the pillar's plinth, just beyond where he stands up to
-    // across the model's fallen drum: the open ground nearer his seat is under the drum or
-    // behind the flames, out of sight.)
-    assert.ok(
-      out > 0.35 && out < (name === 'ruins' ? 1.05 : 0.95),
-      `${name}: the sign is in front of his seat (${out.toFixed(2)} m)`,
-    );
+    assert.ok(out > 0.35 && out < 0.95, `${name}: the sign is in front of his seat (${out.toFixed(2)} m)`);
     const pts = footprint(sign);
     const near = Math.min(...pts.map(fireDist));
     assert.ok(
@@ -237,7 +227,13 @@ test('his summon sign lies in front of each seat, on open ground, in view of the
       );
     }
     if (name === 'ruins')
-      for (const r of RUINS) assert.ok(!pts.some((p) => inside(p, r)), 'ruins: clear of the model’s plinth and drum');
+      for (const p of pts) {
+        const under = RUINS.find((c) => clearanceTo(c, p.x, p.z, { from: 0, to: 2.6 }) < 0.01);
+        assert.ok(
+          !under,
+          `ruins: the model's ${under?.name} stands over the sign at (${p.x.toFixed(2)}, ${p.z.toFixed(2)})`,
+        );
+      }
     // In view from the home camera, wide (1920×1080) and tall (a phone: above the page's panel,
     // which starts 40% of the way down; the ruins' sign, left of his seat, comes to the edge).
     for (const [layout, wd, ht, top, side] of [
