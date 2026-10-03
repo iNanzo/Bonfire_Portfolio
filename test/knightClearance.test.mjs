@@ -5,16 +5,20 @@
 // at the fire's 12 frames a second, on the scene's own height map (rebuilt here by rays
 // straight down onto the same meshes: terrain.js renders them from above): seated at every
 // seat in either seat pose he's 4 cm clear of everything, his boots resting on what's under
-// them; and nothing he does there, nor any dancer at any place on the ring, goes more than
-// 1.5 cm into a shape (a failure names the action, the piece of him and the shape). Each
-// point is tested against the shapes themselves (no rays: those took minutes), and only the
-// pieces whose joint is within their reach of a shape (a broad phase). Keeping out of it
-// doesn't cost him his smoothness (nothing he does at his seat steps further at a time than
-// round 9's did, give or take half, nor past that a quarter further than it would with nothing
-// there), nor his place on the home view (stood up or dancing there, he stays left of the
-// planted sword), nor much of a frame's time (a step solves at most four poses; round 9's
-// solved one). Where his feet rest high (up on the ruins' drum, or sitting on the ground), a
-// ring under him doesn't fold a knee down under his leg.
+// them, with all the room for his arms there and stood up in front of it (the ruins' seat is
+// the ground itself); and nothing he does there, nor any dancer at any place on the ring,
+// goes more than 1.5 cm into a shape (a failure names the action, the piece of him and the
+// shape), nor anyone sitting on the ground under it. Each point is tested against the shapes
+// themselves (no rays: those took minutes), and only the pieces whose joint is within their
+// reach of a shape (a broad phase). Nothing round a seat hems in his Praise the Sun (it's the
+// one he throws with nothing there), and where something does stand right by him (a knight
+// sat down by a piece), he eases back from it. Keeping out of it doesn't cost him his
+// smoothness (nothing he does at his seat steps further at a time than round 9's did, give or
+// take half, nor past that a quarter further than it would with nothing there), nor his place
+// on the home view (stood up or dancing there, he stays left of the planted sword), nor much
+// of a frame's time (a step solves at most four poses; round 9's solved one). Where his feet
+// rest high (sitting on the ground, his knees up), a ring under him doesn't fold a knee down
+// under his leg.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -1046,4 +1050,60 @@ test('[slow] stood up in front of his seat, and all through the site’s dance, 
     }
     k.dismiss(0, { instant: true });
   }
+});
+
+test('[slow] sitting on the ground, in the ruins and resting on the ring by the fire, either seat pose, nothing of him goes under it (1.5 cm): his idle, every seated gesture, the reactions and the seated moves', async () => {
+  const env = await realKnights();
+  const { k } = env;
+  const terrain = await terrainOf('ruins');
+  const where = ['in the ruins', 'on the ring'];
+  const bad = [];
+  for (const pose of SEAT_POSES) {
+    k.setSeatPose(pose);
+    k.setScenery('ruins', terrain);
+    k.setCast({ count: 2, instant: true });
+    // (A new scenery sends them home: the other one sits down where Bonfire Live rests him.)
+    k.setScenery('ruins', terrain);
+    const low = [{ d: Infinity }, { d: Infinity }];
+    /** Step `seconds` at 12 fps (`each()` first each step), keeping the lowest each knight comes under the ground (the height map's). */
+    const see = (seconds, what, each = null) => {
+      for (let t = 0; t < seconds; t += 1 / 12) {
+        each?.();
+        k.update(1 / 12 + 1e-7);
+        for (const i of [0, 1])
+          eachPoint(env, k.knights[i], (v, bone) => {
+            const d = v.y - terrain.height(v.x, v.z);
+            if (d < low[i].d) low[i] = { d, what, bone, t };
+          });
+      }
+    };
+    see(6, 'his idle');
+    // (The site's dance in his seat: a phone's view.)
+    k.headroom = false;
+    for (const g of GESTURES) {
+      k.gesture(g, { index: 'all' });
+      see((g === 'dance' ? DANCE_SEATED_TIME : GESTURE_TIME[g]) + 0.2, `seated ${g}`);
+    }
+    k.headroom = true;
+    for (const r of ['impact', 'stoke', 'ring']) {
+      k.react(r, 1);
+      see(1.4, `seated ${r}`);
+    }
+    for (const m of Object.keys(MOVE_INFO).filter((mv) => MOVE_INFO[mv].seated)) {
+      for (const i of [0, 1]) k.dance(i, { move: m, energy: 1, seated: true });
+      let b = 0;
+      see(Math.min(4, MOVE_INFO[m].cycle * 0.5) + 0.25, `seated ${m}`, () => k.clock((b += 1 / 6), 0.5));
+    }
+    low.forEach((w, i) => {
+      if (w.d < -0.015)
+        bad.push(
+          `${where[i]} (${pose}), ${w.what}: his ${w.bone} ${(-w.d * 100).toFixed(1)} cm under the ground (${w.t.toFixed(2)} s)`,
+        );
+    });
+    for (const i of [0, 1]) k.dismiss(i, { instant: true });
+  }
+  k.setCast({ count: 1, instant: true });
+  k.dismiss(0, { instant: true });
+  k.setSeatPose('resting');
+  assert.deepEqual(bad, [], 'under the ground');
 });
