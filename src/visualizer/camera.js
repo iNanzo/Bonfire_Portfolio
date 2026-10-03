@@ -61,7 +61,13 @@ export function hidesFire(pos, heads) {
   return false;
 }
 
-// Shots (the fire at the origin; the broken pillar back-left, the wall back-right).
+// Shots (the fire at the origin; the knight's seat back-left, what stands by it further
+// left: the ruins' broken pillar, the forge's anvil, the shrine's back lantern, the
+// cathedral's nave, the cult's stones; the wall, hearth, torii, chancel or altar
+// back-right). Pillar Side looks from the front left at that piece, him on his seat and the
+// fire, all three in a 16:9 frame however far it has swayed and pushed in. (From further
+// round to the left, what stands at the front left, the shrine's front lantern, the
+// cathedral's pew or the cult's watcher, comes between it and him.)
 //   yaw    sway around the target (radians either side), over 16 beats
 //   spin   keep turning (radians per beat) instead
 //   push   dolly in by this fraction over the shot
@@ -73,7 +79,7 @@ export const SHOTS = {
   hearth: { name: 'Hearth', pos: [0.35, 1.25, 3.3], target: [0, 0.85, 0], fov: 38, yaw: 0.35, push: 0.12 },
   low: { name: 'Low', pos: [0.15, 0.5, 3.6], target: [0, 1.05, 0], fov: 46, yaw: 0.25 },
   above: { name: 'Above', pos: [0.3, 5.6, 2.3], target: [0, 0.05, 0], fov: 40, spin: 0.05 },
-  pillar: { name: 'Pillar Side', pos: [-2.5, 1.35, 3.3], target: [0.15, 0.7, -0.3], fov: 34, yaw: 0.2, push: 0.1 },
+  pillar: { name: 'Pillar Side', pos: [-1.3, 1.55, 4.1], target: [-0.55, 0.8, -0.2], fov: 36, yaw: 0.15, push: 0.1 },
   wall: { name: 'Wall Side', pos: [2.3, 1.5, 3.6], target: [-0.2, 0.7, -0.3], fov: 34, yaw: 0.2, push: 0.1 },
   blade: { name: 'Weapon', pos: [0.3, 1.2, 2.2], target: [0, 1.0, 0], fov: 36, yaw: 0.45, push: 0.18 },
   embers: { name: 'Embers', pos: [0.9, 0.2, 2.5], target: [0, 0.6, 0], fov: 50, yaw: 0.3, roll: -0.08 },
