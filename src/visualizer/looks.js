@@ -581,6 +581,7 @@ export function createLooks(g, { reducedMotion = false } = {}) {
   let pinHold = true; // ...held until unpinned (false: for this turn only)
   let P = roll.p; // the details on screen: the turn's, with a pin's laid over them
   let blendsNow = roll.blends;
+  let amtNow = 0; // the strength the last update drew at (0: a clean picture)
 
   function reseed() {
     g.sliceSeed = Math.random() * 100;
@@ -714,6 +715,24 @@ export function createLooks(g, { reducedMotion = false } = {}) {
     /** Whether a pin holds past this turn. */
     get held() {
       return !!pinned && pinHold;
+    },
+    /** A scene's look is pinned (for this turn or held). */
+    get isPinned() {
+      return !!pinned;
+    },
+    /** The strength the effects were last drawn at (0: a clean picture; up to 2). */
+    get strength() {
+      return amtNow;
+    },
+    /**
+     * The layers showing now, as [key, 'mix' | 'on']: rolled in for this turn (In the Mix) or
+     * switched to Always (a pinned scene's own switches), while the look shows at all. Read
+     * when asked (the stats overlay, twice a second), from what the last update kept.
+     * @returns {[string, string][]}
+     */
+    liveLayers() {
+      const live = amtNow > 0 ? Object.keys(LAYERS).filter((k) => active(k, layerMode(k))) : [];
+      return live.map((k) => /** @type {[string, string]} */ ([k, modeOf(layerMode(k))]));
     },
     /**
      * What's on screen now, in a pin's terms ("Pin What You See"): the look and its
@@ -853,6 +872,7 @@ export function createLooks(g, { reducedMotion = false } = {}) {
     update(dt, { amt: amtIn, build, low, energy, modes: m = {}, rest = 0, cycles = true }) {
       modes = m;
       const amt = pinned ? Math.max(amtIn, pinned.amount * rest) : amtIn;
+      amtNow = amt;
       clock += dt;
       kick *= Math.exp(-dt / 0.14);
       dip *= Math.exp(-dt / 0.09);
