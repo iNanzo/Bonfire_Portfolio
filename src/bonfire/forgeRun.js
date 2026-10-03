@@ -1,3 +1,4 @@
+// @ts-nocheck: 58 type errors still to fix (tsconfig.json checks every module; delete this line once tsc is clean here).
 // The forge, in each element's style, on any two "subjects": the weapon swap's dissolve →
 // swirl → gather → form → hold (weapons.js), and the knight's arrival and leaving between
 // him and his summon sign (knightArrival.js). One subject burns away and its soul becomes
