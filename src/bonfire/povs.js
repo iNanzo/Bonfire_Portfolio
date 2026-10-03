@@ -1,5 +1,6 @@
 // Camera points of view, one per screen. The fire sits at the origin; the
-// broken pillar is back-left, the wall back-right.
+// knight's seat is back-left (the ruins' broken pillar further left), the wall
+// back-right.
 //
 //   pos / target  world-space camera position and look-at point
 //   fov           vertical field of view (degrees)

@@ -7,7 +7,8 @@
 // The shapes come from the same numbers that build the pieces: scenery.js imports its
 // placements from here (where each group stands and turns, and each piece's size and place
 // in it), so a piece can't move without its shape moving too. The ruins are the model's own
-// (bonfire.glb, tools/bonfire.py): its pillar, plinth, fallen drum, candles and wall are
+// (bonfire.glb, tools/bonfire.py): its pillar on its plinth with its candles, a metre to the
+// right of the knight sitting on the ground, the drum fallen behind it and the wall are
 // tools/bonfire.py's numbers (test/knightClearance.test.mjs decodes the model and checks
 // them). Only what an arm or a body could meet is here: nothing lower than a shin (steps,
 // daises, bar stock, rubble, floor candles), and none of the seats (he sits on those).
@@ -44,11 +45,12 @@ export const CLEARING = {
 
 /**
  * The ruins (the model's own: tools/bonfire.py, in the clearing's coordinates). The broken
- * column on its plinth at the back left (`at`: tools/bonfire.py PX, PY; `pillar`: an 8-sided
- * shaft, by its corners' radius, its broken top no higher than `top`; the plinth's two
- * tiers), the drum fallen from it (an 8-sided drum lying aslant, `turn` its axis from +z:
- * DRUM_X, DRUM_Y), three candles on the plinth's corner, and the wall at the back right
- * (rows of blocks, broken away in steps).
+ * column on its plinth at the back left, a metre to the right of the knight's seat on the
+ * ground (`at`: tools/bonfire.py PX, PY; `pillar`: an 8-sided shaft, by its corners' radius,
+ * its broken top no higher than `top`; the plinth's two tiers), the drum fallen from it,
+ * lying behind it out of his way and the dancers' (an 8-sided drum lying aslant, `turn` its
+ * axis from +z: DRUM_X, DRUM_Y), three candles on the plinth's corner toward the fire, and
+ * the wall at the back right (rows of blocks, broken away in steps).
  */
 export const RUINS = {
   at: [-2.15, -1.3],
@@ -396,8 +398,8 @@ const BUILDERS = {
     const [px, pz] = R.at;
     const out = [cyl(ROOT, 'pillar', px, pz, R.pillar.r0, R.pillar.r1, R.pillar.y0, R.pillar.top)];
     R.plinth.forEach((t, i) => out.push(box(ROOT, i ? 'plinth (top)' : 'plinth', [px, t.y, pz], t.size)));
-    // (Its corners are jagged a centimetre or two either way: its own radius, as a boot resting
-    // on it meets it.)
+    // (The drum is jagged a centimetre or two either way: its own radius, and a centimetre
+    // longer at each end.)
     out.push(
       /** @type {Collider} */ ({
         kind: 'log',

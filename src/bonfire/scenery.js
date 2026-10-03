@@ -22,11 +22,12 @@
 // In every one there's a seat for the knight (knights.js) behind the fire on the left, well
 // back from it (his boots clear of the ring stones and the flames), where the site's cameras
 // see him three-quarter-on without him covering the fire, the weapon or the page: the bare
-// ground in the ruins (nothing is built here for them), the cathedral's fallen nave drum,
-// the cult's fallen standing stone, a stump by the forge's anvil, a resting stone at the
-// shrine (SEATS, knightPlaces.js). His summon sign lies in front of it
-// (summonSign.js). Dancers (Bonfire Live) stand on a ring round the
-// fire, in the arcs each scenery leaves clear (DANCE_RING, danceSlots).
+// ground in the ruins, the pillar a metre to his right (nothing is built here for them), the
+// cathedral's fallen nave drum, the cult's fallen standing stone, a stump by the forge's
+// anvil, a resting stone at the shrine (SEATS, knightPlaces.js). What stands by each seat
+// has room left round it for his arms (colliders.js). His summon sign lies in front of it
+// (summonSign.js). Dancers (Bonfire Live) stand on a ring round the fire, in the arcs each
+// scenery leaves clear (DANCE_RING, danceSlots).
 //
 // Built so the pixel pass draws it cleanly (the rules the forge and shrine taught):
 //   - faces stay flat: the hand-made look is a slight lean, twist and uneven scale of each

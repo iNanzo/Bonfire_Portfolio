@@ -1,10 +1,10 @@
 // @ts-nocheck: 6 type errors still to fix (tsconfig.json checks every module; delete this line once tsc is clean here).
 // The bonfire's model (public/models/bonfire.glb), fetched with the knight's (his code comes
 // with it: knightBundle.js, a chunk of its own; either failing only leaves him out). Once it's
-// in: the ruins' seat for the knight, the weapons and their swaps (weapons.js, whose hooks are
-// the fire's hits and rings), the fireflies on the ruins' height map, the scenery's own
-// materials, glows and candle flames, and the impacts' rings of fire, lightning and ice, each
-// running only as far as the scenery lets it. scene.js waits on `modelLoaded` to draw.
+// in: the weapons and their swaps (weapons.js, whose hooks are the fire's hits and rings),
+// the fireflies on the ruins' height map, the scenery's own materials, glows and candle
+// flames, and the impacts' rings of fire, lightning and ice, each running only as far as the
+// scenery lets it. scene.js waits on `modelLoaded` to draw.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';

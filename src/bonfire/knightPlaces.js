@@ -63,17 +63,18 @@ function seat(x, z, top, { turn = TURN, signOut = SIGN_OUT, signAt = null, stand
 
 /**
  * The knight's seat in each scenery, behind the fire on the left, 1.69–1.78 m from its middle
- * (bearings 206–217°) so his boots stay well out of it (≥ 1.05 m: test/knights.test.mjs, on
+ * (bearings 208–217°) so his boots stay well out of it (≥ 1.05 m: test/knights.test.mjs, on
  * the real model) and his legs leave the dance ring clear from 253° round the front. The
- * seats are low (the ground in the ruins, 0.21–0.23 m elsewhere, knees up, like a knight
- * resting at a Dark Souls bonfire): that
- * far back a higher one would lift his helmet into the page's header on phones, and further
- * round he'd leave a phone's frame (test/knights.test.mjs); further toward the flames, stood
- * up he'd stand behind them (test/knightClearance.test.mjs). Each keeps him at least 4 cm
- * clear of whatever stands round it (the ruins' pillar, the cathedral's columns, the cult's
- * standing stones, the anvil's horn) in either seat pose, his boots resting on what's under
- * them (test/knightClearance.test.mjs). His sign lies on open ground in front of it, clear
- * of the ring stones and in view of the home camera on wide screens and phones
+ * seats are low, like a knight resting at a Dark Souls bonfire: 0.21–0.23 m, knees up, and
+ * in the ruins the ground itself, one knee up and the other leg stretched out (or both knees
+ * up, watchful). That far back a higher one would lift his helmet into the page's header on
+ * phones, and further round he'd leave a phone's frame (test/knights.test.mjs); further
+ * toward the flames, stood up he'd stand behind them (test/knightClearance.test.mjs). Each
+ * keeps him at least 4 cm clear of whatever stands round it (the anvil's horn, the shrine's
+ * back lantern, the cathedral's columns, the cult's standing stones; the ruins' pillar
+ * stands a metre off) in either seat pose, his boots resting on what's under them
+ * (test/knightClearance.test.mjs). His sign lies on open ground in front of it, clear of the
+ * ring stones and in view of the home camera on wide screens and phones
  * (test/knightPlaces.test.mjs).
  */
 export const SEATS = {

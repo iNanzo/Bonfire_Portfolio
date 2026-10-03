@@ -333,7 +333,8 @@ PX, PY = -2.15, 1.30
 DRUM_X, DRUM_Y, DRUM_TURN = -2.75, 2.05, 35
 SEAT_X, SEAT_Y = -1.02, 1.42
 
-# Broken column on a plinth, back left.
+# Broken column on a plinth, back left, a metre to the right of the knight sitting on the
+# ground.
 bm = bmesh.new()
 box(bm, 0, 0, 0.11, 0.78, 0.78, 0.22)
 box(bm, 0, 0, 0.26, 0.62, 0.62, 0.1)
@@ -346,6 +347,7 @@ for v in res["verts"]:
         v.co.z += random.uniform(-0.35, 0.05)
 to_object("Pillar_Shaft", bm, M["pillar"], (PX, PY, 0.31 + 0.85))
 
+# A drum fallen from it, lying behind it, out of the knight's way and the dancers'.
 bm = bmesh.new()
 bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=0.2, radius2=0.2, depth=0.42)
 jitter(bm, 0.02)
