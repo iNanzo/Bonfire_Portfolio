@@ -1060,6 +1060,12 @@ export function createFireflies(
       pace = (reducedMotion ? 0.5 : 1) * s;
     },
     terrain,
+    /** How many glow now (lit at all): counted when asked (the stats overlay, twice a second). */
+    get lit() {
+      let n = 0;
+      for (const f of flies) if (f.glow > 0.05) n++;
+      return n;
+    },
     /** Counts for debugging/tests. */
     stats() {
       return {

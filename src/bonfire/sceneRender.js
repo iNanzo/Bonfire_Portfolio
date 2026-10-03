@@ -310,9 +310,22 @@ export function createSceneRender(ctx) {
       s.total += size.length;
       systems.set(o.name, s);
     });
-    // (The site's one knight is a row of the breakdown's own; Bonfire Live's cast counts here.)
+    // The fireflies, lit of all of them (instanced meshes, not points), and the lightning's
+    // bolts: line segments drawn this frame (the ball's and its ring's), of the room they have.
+    const flies = ctx.fireflies;
+    if (flies) systems.set('Fireflies', { name: 'Fireflies', live: flies.lit, total: flies.flies.length, unit: 'lit' });
+    const bolts = [plasma.bolts, ctx.zap?.bolts].filter(Boolean);
+    if (bolts.length)
+      systems.set('Bolts', {
+        name: 'Bolts',
+        live: bolts.reduce((n, b) => n + b.count, 0),
+        total: bolts.reduce((n, b) => n + b.cap, 0),
+        unit: 'segments',
+      });
+    // (The site's one knight is a row of the breakdown's own; Bonfire Live's cast counts here,
+    // and the stats overlay leaves them to the show: `cast`.)
     if (ctx.knights && !siteKnight)
-      systems.set('Knights', { name: 'Knights', live: ctx.knights.present, total: ctx.knights.max });
+      systems.set('Knights', { name: 'Knights', live: ctx.knights.present, total: ctx.knights.max, cast: true });
     return {
       drawCalls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
