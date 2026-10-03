@@ -344,11 +344,22 @@ export function createKnights(
     if (i === 0 && seat) {
       const yaw = seat.yaw ?? faceFire(seat.x, seat.z);
       // The seat's real height from the height map (the highest cell under him), and the
-      // ground where each foot lands.
+      // ground where each foot lands. (On the ground: the ground under him, a flagstone and
+      // all, is his seat; he sits on it, h 0, his feet on what's in front of him.)
       let top = 0;
       for (let a = 0; a < 7; a++) {
         const r = a ? 0.07 : 0;
-        top = Math.max(top, topAt(seat.x + Math.sin(a) * r, seat.z + Math.cos(a) * r));
+        const x = seat.x + Math.sin(a) * r,
+          z = seat.z + Math.cos(a) * r;
+        top = Math.max(top, seat.ground ? heightAt(x, z) : topAt(x, z));
+      }
+      if (seat.ground) {
+        const y = Math.max(0, top);
+        const ground = (side) => {
+          const p = new THREE.Vector3(side * 0.17, 0, seatFeet(0)).applyAxisAngle(Y_AXIS, yaw);
+          return heightAt(seat.x + p.x, seat.z + p.z) - y;
+        };
+        return { x: seat.x, z: seat.z, yaw, h: 0, feet: [ground(1), ground(-1)], y, seat: true, aside: 0 };
       }
       if (!terrain || Math.abs(top - seat.top) > 0.1) top = seat.top;
       // (Each foot's ground: his left is +x in his own space.)

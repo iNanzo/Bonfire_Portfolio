@@ -40,12 +40,13 @@ const SIGN_OUT = 0.55;
  * sign's letters read from the home camera): `signOut` along his way (between the seat and
  * the ring stones), or at `signAt` ({ x, z }) where something of the scenery's lies there.
  * knights.js checks the height against the scenery's height map when he sits, and rests his
- * feet on the ground in front of it (or on whatever lies there). `standAside` (m, + his
- * left): where he stands up to is looked for round that far to his side, not straight ahead
- * (knights.js standSpot: in the ruins, straight up he'd stand behind the flames; at the shrine
- * his gestures up there would cross the sword planted in them).
+ * feet on the ground in front of it (or on whatever lies there). `ground`: he sits on the
+ * ground itself (top 0), knees up, wherever it lies (a flagstone under him lifts him; no
+ * seat's height is looked for). `standAside` (m, + his left): where he stands up to is looked
+ * for round that far to his side, not straight ahead (knights.js standSpot: at the shrine his
+ * gestures up there would cross the sword planted in the flames).
  */
-function seat(x, z, top, { turn = TURN, signOut = SIGN_OUT, signAt = null, standAside = 0 } = {}) {
+function seat(x, z, top, { turn = TURN, signOut = SIGN_OUT, signAt = null, standAside = 0, ground = false } = {}) {
   const yaw = Math.atan2(FIRE_AT.x - x, FIRE_AT.z - z) + turn;
   const sx = signAt?.x ?? x + Math.sin(yaw) * signOut,
     sz = signAt?.z ?? z + Math.cos(yaw) * signOut;
@@ -55,6 +56,7 @@ function seat(x, z, top, { turn = TURN, signOut = SIGN_OUT, signAt = null, stand
     top,
     yaw,
     standAside,
+    ground,
     sign: { x: sx, z: sz, yaw: Math.atan2(sx - HOME_CAMERA.x, sz - HOME_CAMERA.z) },
   };
 }
