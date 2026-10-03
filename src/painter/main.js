@@ -30,10 +30,13 @@
 //             offers it back until it's restored or discarded.
 //   keys      H the panel, L the library, P the render menu (bound to the scene), I the
 //             pack (it paints into the scene), F full screen, Space the beat, D a drop,
-//             C a picture of the stage, and the camera's (cameraRig.js); / searches the
-//             panel and ? lists them all (toolbar.js PAINTER_KEYS). The Tools menu in the
-//             bar reaches the ones only a key did before (Render Settings, Pack, Capture,
-//             Full Screen, the keys).
+//             C a picture of the stage, U the stats overlay, and the camera's (cameraRig.js);
+//             / searches the panel and ? lists them all (toolbar.js PAINTER_KEYS). The Tools
+//             menu in the bar reaches the ones only a key did before (Render Settings, Pack,
+//             Capture, the Stats Overlay, Full Screen, the keys).
+//   stats     the Stats Overlay (Tools, U): the stage's frames and particles and the scene
+//             being painted (the director's status()), in the stage's top left corner. Kept
+//             for the next visit, like the panel's open sections: the page's, not the scene's.
 // Reduced motion: the Still preview to start with.
 import '../styles.css';
 import '../visualizer/visualizer.css';
@@ -93,6 +96,8 @@ const DRAFT_ASIDE = 'bonfire-painter-draft-aside';
 const LIVE_TAB = 'bonfire-live';
 /** Which of the panel's sections are open, kept for the next visit. */
 const PANEL_KEY = 'bonfire-painter-panel';
+/** The page's own view (the Stats Overlay on or not), kept for the next visit: { stats }. */
+const VIEW_KEY = 'bonfire-painter-view';
 const BASE_URL = import.meta.env.BASE_URL;
 const voidHex = effects.colors.void;
 const siteBase = { ...base }; // (the site's own scenery colors, before a scene recolors them)
@@ -238,6 +243,23 @@ function saveOpen(open) {
     /* private mode: not kept */
   }
 }
+/** The page's view as kept (the Stats Overlay off to begin with, or with nothing kept). */
+function readView() {
+  try {
+    const v = JSON.parse(localStorage.getItem(VIEW_KEY) ?? 'null');
+    return { stats: v?.stats === true };
+  } catch {
+    return { stats: false };
+  }
+}
+function saveView(view) {
+  try {
+    localStorage.setItem(VIEW_KEY, JSON.stringify(view));
+  } catch {
+    /* private mode: not kept */
+  }
+}
+const view = readView();
 /** A label with a shorter one for phones. */
 const label = (long, short) =>
   short === long ? esc(long) : `<span class="pnt-long">${esc(long)}</span><span class="pnt-short">${esc(short)}</span>`;
@@ -384,10 +406,13 @@ import('../bonfire/scene.js')
       onFrame: (dt) => {
         if (fire === candidate) onFrame(dt);
       },
+      // (The stats overlay's scene: the one being painted, and what the director has live in it.)
+      pageStats: () => (director ? { show: director.status(), painting: scene.name } : null),
     });
     director = createDirector(candidate, { settings, reducedMotion, paintedLook: true, onEvent });
     await candidate.ready;
     fire = candidate;
+    fire.setStats(view.stats);
     const eq = startingEquipment;
     await fire.equip(scene.place.weapon ?? eq.weapon, eq.flame, {
       instant: true,
@@ -1111,15 +1136,25 @@ function capture() {
   });
 }
 const keysOverlay = createKeysOverlay({ title: 'Keyboard Shortcuts', groups: PAINTER_KEYS });
+/** U, or Tools: the Stats Overlay on or off (kept for the next visit). */
+function toggleStats() {
+  view.stats = !view.stats;
+  saveView(view);
+  fire?.setStats(view.stats);
+  tools.setChecked('stats', view.stats);
+  note(`Stats Overlay: ${view.stats ? 'On' : 'Off'}`, 1.2);
+}
 /** The Tools menu's items (toolbar.js TOOLS). */
 const tool = {
   render: () => renderMenu.open({ focus: true }),
   pack: () => pack.toggle(),
   capture: () => capture(),
+  stats: () => toggleStats(),
   fullscreen: () => toggleFullscreen(),
   keys: () => keysOverlay.open(),
 };
 const tools = bindTools(q('[data-tools]'), (cmd) => tool[cmd]?.(), { hideTip: tips.hide });
+tools.setChecked('stats', view.stats);
 /** `/`: the panel's search (the panel shown first if it's hidden). */
 function focusSearch() {
   if (!panelShown) togglePanel(true);
@@ -1229,6 +1264,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'i') pack.toggle();
   else if (k === 'f') toggleFullscreen();
   else if (k === 'c') capture();
+  else if (k === 'u') toggleStats();
   else if (e.key === ' ' && spaceIsOurs(e.target)) {
     e.preventDefault();
     setPreview(preview === 'beat' ? 'still' : 'beat');

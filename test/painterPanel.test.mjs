@@ -41,7 +41,7 @@ import {
   choices,
   sectionOfRow,
 } from '../src/painter/layout.js';
-import { searchEntries, findInPanel, notesFor, PAINTER_SYNONYMS } from '../src/painter/panelSearch.js';
+import { searchEntries, findInPanel, notesFor, toolEntries, PAINTER_SYNONYMS } from '../src/painter/panelSearch.js';
 import { PAINTER_KEYS, TIPS, TOOLS, toolsMarkup } from '../src/painter/toolbar.js';
 import {
   PAINTER_SECTIONS,
@@ -695,6 +695,24 @@ test('search: synonyms, typos, choices and keywords find their rows', () => {
   assert.equal(find('zzqx').rows.size + find('zzqx').hidden.length, 0);
 });
 
+test('search: the Stats Overlay, a switch in Tools (not a part of the scene), is found by its words and says where', () => {
+  const tools = buildMatcher(toolEntries(), { synonyms: PAINTER_SYNONYMS });
+  const s = normalizeScene(defaultScene());
+  const note = `${SETTINGS.stats.label}: turn it on in Tools, or press U`;
+  for (const q of ['fps', 'stats', 'debug', 'performance', 'particles', SETTINGS.stats.label]) {
+    const f = findInPanel(match, q, s, tools);
+    assert.ok(
+      f.hidden.some((h) => h.id === 'tool.stats' && h.note === note),
+      `${q}: ${f.hidden.map((h) => h.note).join(' / ')}`,
+    );
+    assert.ok(!f.rows.has('tool.stats'), 'not a row of the panel');
+  }
+  assert.ok(notesFor(findInPanel(match, 'stats', s, tools).hidden).includes(note));
+  // Without the Tools' index, or for a query that isn't it: no note.
+  assert.ok(!findInPanel(match, 'fps', s).hidden.some((h) => h.id === 'tool.stats'));
+  assert.ok(!findInPanel(match, 'helmet', s, tools).hidden.some((h) => h.id === 'tool.stats'));
+});
+
 // --- the bar ---------------------------------------------------------------------------------
 test('keys: the overlay lists every key the Painter answers (none changed); Tools reaches the key-only ones', () => {
   const listed = PAINTER_KEYS.flatMap((g) => g.keys.map((r) => r.keys.join('+')));
@@ -723,23 +741,30 @@ test('keys: the overlay lists every key the Painter answers (none changed); Tool
     ']',
     '?',
     '/',
+    'U',
   ]) {
     assert.ok(listed.includes(k), `${k} is listed`);
   }
   for (const g of PAINTER_KEYS) assert.equal(titleCase(g.title), g.title);
   // (The page answers them: main.js's keys, the camera's.)
   const main = readFileSync(new URL('../src/painter/main.js', import.meta.url), 'utf8');
-  for (const k of ['h', 'l', 'i', 'f', 'c', 'd']) assert.match(main, new RegExp(`k === '${k}'`), k);
+  for (const k of ['h', 'l', 'i', 'f', 'c', 'd', 'u']) assert.match(main, new RegExp(`k === '${k}'`), k);
   assert.match(main, /isHelpKey\(e\)/);
   assert.match(main, /e\.key === '\/'/);
-  // Tools: Render Settings P, Pack I, Capture C, Full Screen F, Keyboard Shortcuts ?.
+  // Tools: Render Settings P, Pack I, Capture C, the Stats Overlay U (a switch, named by the
+  // settings map as Bonfire Live's is), Full Screen F, Keyboard Shortcuts ? (last).
   assert.deepEqual(
     TOOLS.map((t) => `${t.label} ${t.key}`),
-    ['Render Settings P', 'Pack I', 'Capture C', 'Full Screen F', 'Keyboard Shortcuts ?'],
+    ['Render Settings P', 'Pack I', 'Capture C', `${SETTINGS.stats.label} U`, 'Full Screen F', 'Keyboard Shortcuts ?'],
   );
   const html = toolsMarkup();
   assert.match(html, /data-cmd="tools" aria-label="Tools" aria-haspopup="menu" aria-expanded="false"/);
-  assert.equal([...html.matchAll(/role="menuitem"/g)].length, TOOLS.length);
+  assert.equal([...html.matchAll(/role="menuitem"/g)].length, TOOLS.length - 1);
+  assert.match(
+    html,
+    /role="menuitemcheckbox" aria-checked="false"[^>]*data-tool="stats"|data-tool="stats"[^>]*role="menuitemcheckbox" aria-checked="false"/,
+  );
+  assert.match(html, /aria-keyshortcuts="U"/);
   assert.match(html, /aria-keyshortcuts="Shift\+\?"/);
   assert.doesNotMatch(html, /\stitle="/);
 });

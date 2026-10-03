@@ -12,6 +12,15 @@
   --panel-w: 384px;
   --lib-w: min(640px, 100vw);
 }
+/* The stats overlay (ui/perfOverlay.js, U): the stage's top left, under the bar, clear of the
+   panel and the toasts (bottom left); the library's drawer covers it. (body.pnt: over
+   Bonfire Live's body.viz, which the Painter's page wears too.) */
+body.pnt {
+  --stats-top: calc(var(--bar-h) + 10px);
+  --stats-left: var(--gutter);
+  --stats-bottom: auto;
+  --stats-z: 25;
+}
 
 /* ---------- The stage ---------- */
 .pnt-stage {
@@ -245,6 +254,21 @@
 .pnt-tools-item kbd {
   font-size: 0.6875rem;
   color: var(--text-dim);
+}
+/* A switch (the Stats Overlay): a box before its name, ticked while it's on. */
+.pnt-check {
+  display: inline-block;
+  width: 0.75em;
+  height: 0.75em;
+  margin-right: 8px;
+  vertical-align: -0.05em;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.pnt-tools-item[aria-checked='true'] .pnt-check {
+  background: var(--accent);
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    inset 0 0 0 2px var(--c-void);
 }
 .pnt-tools-item:hover,
 .pnt-tools-item:focus-visible {

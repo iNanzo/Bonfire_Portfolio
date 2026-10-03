@@ -19,11 +19,14 @@
 //               on Glow in Layers to see this" (many left out for one reason share a line); the
 //               row that does (Glow's switch) shows in the panel, one click from the note. On
 //               a phone the list starts folded to its count.
+//   tools       a switch of the page's that isn't a part of the scene (the Stats Overlay, in the
+//               Tools menu) is found by its words from the settings map too, and listed with the
+//               rows left out, saying where it is: "Stats Overlay: turn it on in Tools, or press U".
 //   keys        `/` focuses the box (the page's keys, main.js); Esc clears it, and Esc in an
 //               empty box hands the keyboard back to the page. How many were found is read out
 //               once typing stops.
 import { buildMatcher, createSearchBox } from '../ui/settingsSearch.js';
-import { SECTIONS as MAP_SECTIONS, SYNONYMS } from '../settingsMap.js';
+import { SECTIONS as MAP_SECTIONS, SETTINGS, SYNONYMS } from '../settingsMap.js';
 import { LAYER_BLENDS, LAYER_DETAILS } from '../visualizer/looks.js';
 import { PANEL_SECTIONS, sectionRows, rowText, shownRule, choices } from './layout.js';
 
@@ -79,19 +82,40 @@ export function searchEntries(ctx = {}) {
   return out;
 }
 
+/** The page's switches the search finds (in Tools, not the panel), by the map's words, and where each is. */
+const TOOL_SWITCHES = [{ id: 'tool.stats', entry: SETTINGS.stats, where: 'turn it on in Tools, or press U' }];
+
+/**
+ * The Tools menu's switches as search entries (their own index: they aren't rows of the panel).
+ * @returns {PanelEntry[]}
+ */
+export const toolEntries = () =>
+  TOOL_SWITCHES.map(({ id, entry }) => ({
+    id,
+    label: entry.label,
+    keywords: entry.keywords ?? [],
+    section: 'Tools',
+    tab: '',
+    options: [],
+    hint: entry.hint,
+    key: '',
+  }));
+
 /**
  * What a query finds for `scene`: the rows the panel shows (id → its label and where the
  * query matched in it), and those the scene's shape leaves out, each with how to bring it
  * back. A row found only in its hint or path is left out when any is found by name (its
  * label, words, group or choices). For a row left out, the row that brings it back shows
  * too (`via`: shown for that, not found). `first`: the row the panel scrolls to (the best
- * found, or what brings it back). Pure.
+ * found, or what brings it back). `tools` (buildMatcher's, over toolEntries): a Tools switch
+ * found by name is listed with those left out, saying where it is. Pure.
  * @param {(query: string) => import('../ui/settingsSearch.js').SearchHit[]} match  buildMatcher's, over searchEntries
  * @param {string} query
  * @param {any} scene
+ * @param {((query: string) => import('../ui/settingsSearch.js').SearchHit[]) | null} [tools]
  * @returns {PanelFound}
  */
-export function findInPanel(match, query, scene) {
+export function findInPanel(match, query, scene, tools = null) {
   /** @type {PanelFound} */
   const found = { rows: new Map(), hidden: [], via: new Set(), first: null };
   const hits = match(query);
@@ -116,6 +140,11 @@ export function findInPanel(match, query, scene) {
     if (found.rows.has(id)) continue;
     found.rows.set(id, { ranges: [], label: rowText(id)?.label ?? '' });
     found.via.add(id);
+  }
+  for (const hit of tools?.(query).filter(named) ?? []) {
+    const { id, label } = /** @type {PanelEntry} */ (hit.entry);
+    const where = TOOL_SWITCHES.find((t) => t.id === id)?.where ?? 'in Tools';
+    found.hidden.push({ id, label, why: where, note: `${label}: ${where}` });
   }
   return found;
 }
@@ -157,6 +186,7 @@ export function notesFor(hidden) {
  */
 export function createPanelSearch({ input, status, notes, panel, scene, ctx = {}, folded = () => false }) {
   const match = buildMatcher(searchEntries(ctx), { synonyms: PAINTER_SYNONYMS });
+  const tools = buildMatcher(toolEntries(), { synonyms: PAINTER_SYNONYMS });
   let query = '';
   let shown = ''; // the notes as last listed (so a redraw that changes nothing leaves them be)
   const doc = notes.ownerDocument;
@@ -207,7 +237,7 @@ export function createPanelSearch({ input, status, notes, panel, scene, ctx = {}
       list([]);
       return 0;
     }
-    const found = findInPanel(match, q, scene());
+    const found = findInPanel(match, q, scene(), tools);
     panel.filter(found.rows, { top: typed, to: found.first });
     list(found.hidden);
     return found.rows.size - found.via.size + found.hidden.length;
