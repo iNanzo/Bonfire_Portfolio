@@ -329,13 +329,18 @@ knight comes when summoned" below; design notes and the model's rig: `docs/knigh
 His model is its own file, fetched alongside the scene's; if it fails to load the fire
 burns without him (a console warning, not an error).
 
-- **Where he sits.** Behind the fire on the left, facing it: the ruins' fallen pillar
-  drum, the cathedral's fallen nave drum, the cult's fallen standing stone, and a stump
-  (the forge) or a resting stone (the shrine) added for him at the end of their builders
-  (`SEATS` in `src/bonfire/knightPlaces.js`, re-exported by `scenery.js`). The seat's
-  height is read from the scenery's height map when he sits, and two-bone IK puts his
-  feet on the ground in front of it. The higher the seat, the deeper he slumps, which
-  keeps his helmet under ~1.2 m (clear of the page's header on phones).
+- **Where he sits.** Behind the fire on the left, facing it: on the ground in the ruins,
+  the broken pillar a metre to his right (round 11), the cathedral's fallen nave drum, the
+  cult's fallen standing stone, and a stump (the forge) or a resting stone (the shrine)
+  added for him at the end of their builders (`SEATS` in `src/bonfire/knightPlaces.js`,
+  re-exported by `scenery.js`). A raised seat's height is read from the scenery's height
+  map when he sits; on the ground he sits on whatever lies under him. Two-bone IK puts his
+  feet on the ground in front of him. The higher the seat, the deeper he slumps, which
+  keeps his helmet under ~1.2 m (clear of the page's header on phones); on the ground he
+  rests with one knee drawn up and the other leg stretched out (*Watchful*: both knees
+  up). Nothing stands within his arms' reach at any seat (the anvil, the shrine's back
+  lantern, the cathedral's nave and the cult's stones moved back in round 11), so his
+  gestures go all the way: Praise the Sun is a full V.
 - **One mesh.** Each knight is one rigidly skinned mesh (every vertex on its piece's
   bone) plus one for the helmets, geometry shared between knights: two draw calls. The
   helmets not worn are scaled to nothing. Tassets follow the thighs (the model says how

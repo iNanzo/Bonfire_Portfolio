@@ -90,7 +90,7 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     | Show the Knight | `show` | Off: no knight and no sign. The pack has no Knight item, and the scene description never mentions him. |
     | Arrival | `arrival` | **Summon Sign** (`sign`, the default): he waits to be summoned and leaves after his rest. **There From the Start** (`start`): he rests there from the first frame and stays until a visitor sends him off. |
     | Shortest Rest / Longest Rest | `restMin` / `restMax` | Minutes he rests before he burns away (1–30; each summons rolls between the two; default 3–5). |
-    | Seat Pose | `seat` | **Resting** (slumped) or **Watchful** (leaning in over his knees, forearms on them, head up at the fire). |
+    | Seat Pose | `seat` | **Resting** (slumped; on the ground in the ruins, one knee drawn up with an arm hung over it and the other leg stretched out) or **Watchful** (leaning in over his knees, forearms on them, head up at the fire; on the ground, sitting up with both knees drawn up). |
     | Helmet | `helmet` | **Random Each Summon** (a new one each time he comes), or the Great Helm, Armet or Bascinet. |
     | Style | `style` | How he's drawn (`src/bonfire/knightStyles.js`): Pixel Cel (the default), Pixel Painterly, Pixel Chiaroscuro, Smooth Steel (key `gunmetal`), Black & Gold, First Build. A change burns him away and forms him again in it. |
     | Finish | `finish` | His steel's color (`src/bonfire/steel.js`): Gunmetal, Blackened, Polished Steel or Burnished. Only for the styles that draw steel (all but Black & Gold and First Build). |
