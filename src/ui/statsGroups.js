@@ -42,6 +42,8 @@ const MODE_NAME = Object.fromEntries(MODES);
 const SECTIONS = { silent: 'Silence', groove: 'Groove', breakdown: 'Breakdown', build: 'Build' };
 const KNIGHTS_DOING = { dance: 'dancing', ready: 'up', watch: 'watching the blade', rest: 'resting' };
 const WHEN = { drop: 'at the drop', beat: 'on the downbeat', phrase: 'with the next swap' };
+/** No preset scene playing, by the name the HUD's Scene line gives it (visualizer/scenesUi.js). */
+export const FREE_SHOW = 'The Free Show';
 
 /** A count with its thousands marked: 3,230. */
 const count = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -127,7 +129,7 @@ function knightsDoing(k) {
 function loopLine(l) {
   const parts = [MODE_NAME[l.mode] ?? l.mode];
   if (l.locked) parts.push('solo');
-  if (l.when) parts.push(`next: ${l.next ?? 'the free show'}, ${WHEN[l.when] ?? l.when}`);
+  if (l.when) parts.push(`next: ${l.next ?? FREE_SHOW}, ${WHEN[l.when] ?? l.when}`);
   return parts.join(' · ');
 }
 
@@ -153,7 +155,7 @@ function show(s, painting) {
   if (s.knights.present > 0) rows.push(row('Knights', knightsDoing(s.knights)));
   rows.push(row('Shot', s.shot));
   if (!inPainter) {
-    rows.push(row('Scene', s.scene ? `${s.scene.name} (${s.scene.mode === 'base' ? 'Base' : 'Hold'})` : 'Free show'));
+    rows.push(row('Scene', s.scene ? `${s.scene.name} (${s.scene.mode === 'base' ? 'Base' : 'Hold'})` : FREE_SHOW));
     rows.push(row('Loop', loopLine(s.loop)));
   }
   return { id: 'show', title: inPainter ? 'Scene' : 'Show', rows };

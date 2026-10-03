@@ -7,7 +7,8 @@
 // scene being painted. Pure: the overlay (src/ui/perfOverlay.js) draws what it hands back.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { statsGroups, DROP_HITS_FOR } from '../src/ui/statsGroups.js';
+import { readFileSync } from 'node:fs';
+import { statsGroups, DROP_HITS_FOR, FREE_SHOW } from '../src/ui/statsGroups.js';
 
 const FRAMES = {
   fps: 143.6,
@@ -175,7 +176,11 @@ test('stats: the knights here and what they do (none: no row)', () => {
 
 test('stats: the preset scene playing (or the free show) and the loop, with what comes next', () => {
   const r = rows(group({ frames: FRAMES, show: SHOW }, 'show'));
-  assert.equal(r.Scene, 'Free show');
+  // (By the name the HUD's Scene line gives it, beside the overlay on the same screen.)
+  assert.equal(r.Scene, 'The Free Show');
+  assert.equal(r.Scene, FREE_SHOW);
+  const hud = readFileSync(new URL('../src/visualizer/scenesUi.js', import.meta.url), 'utf8');
+  assert.ok(hud.includes(`'${FREE_SHOW}'`), 'the HUD’s Scene line says the same');
   assert.equal(r.Loop, 'In the Mix');
   const show = (over) => rows(group({ frames: FRAMES, show: { ...SHOW, ...over } }, 'show'));
   assert.equal(show({ scene: { name: 'Frozen Shrine', mode: 'hold' } }).Scene, 'Frozen Shrine (Hold)');
@@ -188,7 +193,7 @@ test('stats: the preset scene playing (or the free show) and the loop, with what
   );
   assert.equal(
     show({ loop: { mode: 'on', locked: false, next: null, when: 'beat' } }).Loop,
-    'Always · next: the free show, on the downbeat',
+    'Always · next: The Free Show, on the downbeat',
   );
 });
 
