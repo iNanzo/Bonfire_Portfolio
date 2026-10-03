@@ -32,6 +32,7 @@ import * as THREE from 'three';
 import { SimplexNoise } from 'three/examples/jsm/math/SimplexNoise.js';
 import { smooth, TAU } from '../math.js';
 import { createPoints, markDirty } from './points.js';
+import { RUINS } from './colliders.js';
 
 const HOVER = 0.15; // hover distance off a surface before settling onto it
 const REST = 0.014; // resting distance off a surface
@@ -40,13 +41,14 @@ const MARGIN = 0.02; // hard floor above the (grown) scenery
 const OUT_TIME = 0.45; // a lit firefly's fade out at rest (s)
 const IN_TIME = 0.6; // an unlit one's fade in (s)
 
-// Points of interest in world space (the fire is at the origin).
+// Points of interest in world space (the fire is at the origin; the ruins' pieces where
+// colliders.js RUINS has them).
 const POIS = [
-  [-1.45, 2.05, -1.35], // top of the broken pillar
-  [-1.2, 0.62, -1.1], // candles on the plinth
+  [RUINS.at[0], 2.05, RUINS.at[1]], // top of the broken pillar
+  [RUINS.at[0] + 0.25, 0.62, RUINS.at[1] + 0.25], // candles on the plinth
   [1.9, 1.7, -1.5], // top of the ruined wall
   [1.15, 0.35, -0.45], // spare logs
-  [-0.75, 0.45, -0.95], // fallen pillar drum
+  [RUINS.drum.at[0], 0.45, RUINS.drum.at[2]], // fallen pillar drum
 ];
 
 /**

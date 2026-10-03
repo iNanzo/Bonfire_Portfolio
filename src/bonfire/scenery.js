@@ -52,10 +52,11 @@ export { SCENERIES } from '../sceneries.js';
 // The knights' seats and the dance ring live in knightPlaces.js (pure: the visualizer uses them too).
 export { SEATS, DANCE_RING, danceSlots } from './knightPlaces.js';
 
-// Where the ruins stand (three.js coordinates: the model's +y is -z here). These and each
+// Where the pieces stand (three.js coordinates: the model's +y is -z here). These and each
 // piece's size and place below come from colliders.js, which makes the knights' shapes of
 // them from the same numbers.
-const LEFT = new THREE.Vector3(CLEARING.left[0], 0, CLEARING.left[1]);
+/** A place on the ground ([x, z]). */
+const onGround = ([x, z]) => new THREE.Vector3(x, 0, z);
 const RIGHT = new THREE.Vector3(CLEARING.right[0], 0, CLEARING.right[1]);
 const FRONT_LEFT = new THREE.Vector3(CLEARING.frontLeft[0], 0, CLEARING.frontLeft[1]);
 const RIGHT_TURN = CLEARING.rightTurn;
@@ -254,7 +255,7 @@ export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
     // --- the anvil, back left
     const A = FORGE.anvil,
       B = FORGE.barrel;
-    const smith = place(LEFT, A.turn);
+    const smith = place(onGround(A.at), A.turn);
     add(cyl(...A.stump.r, A.stump.h, 9), mat.wood, 0, 0.26, 0, { parent: smith }); // the stump
     add(box(...A.foot.size), mat.char, 0, A.foot.y, 0, { parent: smith, rough: 0.004 }); // anvil foot
     add(box(...A.waist.size), mat.char, 0, A.waist.y, 0, { parent: smith, rough: 0 }); // waist
@@ -350,8 +351,7 @@ export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
         distance: 2,
       });
     };
-    const AT = { left: LEFT, frontLeft: FRONT_LEFT };
-    for (const l of SHRINE.lanterns) lantern(AT[l.at], l.turn, l.scale);
+    for (const l of SHRINE.lanterns) lantern(onGround(l.at), l.turn, l.scale);
 
     // --- the knight's seat: a flat resting stone (last, so nothing above moves)
     const seat = SEATS.shrine;
@@ -449,8 +449,10 @@ export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
     // --- the nave, back left: two columns and a broken pointed arch, a fallen drum (the
     // knight's seat: SEATS.cathedral, in the nave's own space)
     const N = C.nave;
-    const nave = place(LEFT, N.turn);
-    const drum = new THREE.Vector3(SEATS.cathedral.x, 0, SEATS.cathedral.z).sub(LEFT).applyAxisAngle(UP, -N.turn);
+    const nave = place(onGround(N.at), N.turn);
+    const drum = new THREE.Vector3(SEATS.cathedral.x, 0, SEATS.cathedral.z)
+      .sub(onGround(N.at))
+      .applyAxisAngle(UP, -N.turn);
     for (const x of N.columns) {
       add(box(...N.base.size), mat.pillar, x, N.base.y, 0, { parent: nave, rough: 0.008 });
       add(cyl(...N.shaft.r, N.shaft.h, 8), mat.pillar, x, N.shaft.y, 0, { parent: nave, rough: 0.006 });
@@ -537,7 +539,7 @@ export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
     light(altar, [0, 1.05, 0.4], 1.1, 2.6);
 
     // --- standing stones, back left, each carved with the sigil
-    const stones = place(LEFT, CULT.stones.turn);
+    const stones = place(onGround(CULT.stones.at), CULT.stones.turn);
     for (const [x, z, w, h, t] of CULT.stones.list) {
       // (The stone leans as a whole, its sigil with it, so the sigil stays on its face.)
       const s = place(new THREE.Vector3(x, -0.04, z), (rand() - 0.5) * 0.3, { parent: stones });
@@ -547,7 +549,9 @@ export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
       sigil(s, 0, h * 0.62, 0.14, Math.min(0.55, (w - 0.05) / 0.72)); // (as wide as the stone allows)
     }
     // A fallen one (the knight's seat: SEATS.cult, in the stones' own space).
-    const fallen = new THREE.Vector3(SEATS.cult.x, 0, SEATS.cult.z).sub(LEFT).applyAxisAngle(UP, -CULT.stones.turn);
+    const fallen = new THREE.Vector3(SEATS.cult.x, 0, SEATS.cult.z)
+      .sub(onGround(CULT.stones.at))
+      .applyAxisAngle(UP, -CULT.stones.turn);
     add(box(0.9, 0.2, 0.3), mat.stone, fallen.x, 0.1, fallen.z, { parent: stones, ry: 0.5, rz: 0.08, rough: 0.03 });
     light(stones, [0, 1.0, 0.5], 0.7, 2.2);
 
