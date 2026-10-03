@@ -1,14 +1,18 @@
-// Pictures of the knight against the scenery, taken from the site on a running dev server
-// (driven through its dev hook, window.__fire, so it has to be `npm run dev`, not a build):
+// Pictures of the knight against the scenery, taken from the site on a dev server (driven
+// through its dev hook, window.__fire, so it has to be the dev server, not a build): one
+// already running on --port, or with --serve its own, started for the run from the folder
+// it's run in (a worktree too) and stopped after:
 //
-//   npm run dev                                   (in one terminal)
-//   node tools/capture-knight.mjs [--port 5173] [--out .scratch/knight-shots] [--tag now]
+//   node tools/capture-knight.mjs [--port 5173] [--serve] [--out .scratch/knight-shots] [--tag now]
 //                                 [--only seats,gestures,moves,seq,home,views] [--sceneries ruins,cult]
 //                                 [--helmet bascinet] [--style first] [--standing] [--seqs praise]
 //                                 [--room 1,0]
 //
 //   seats     close-ups of him seated in each scenery, in both seat poses, from his left, from
 //             his right and from above (what stands round his seat in view): <tag>-seats.png
+//   pose      all of him seated, both seat poses, a row each: three-quarter on from in front,
+//             from his left, from his right, and as the home view frames him (how a seated
+//             pose reads, on a seat or on the ground): <tag>-pose-<scenery>.png
 //   gestures  a contact sheet of every gesture in each scenery, seated (or, --standing, up in
 //             front of his seat, as Bonfire Live's breakdown has him), at real-time moments:
 //             <tag>-gestures-<scenery>.png
@@ -32,6 +36,7 @@
 import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import fs from 'node:fs';
+import { createServer } from 'vite';
 
 const argv = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -49,6 +54,16 @@ const STANDING = argv.includes('--standing');
 const SEQ_NAMES = opt('seqs', null)?.split(',') ?? null;
 const ROOM = opt('room', null)?.split(',').map(Number) ?? null;
 fs.mkdirSync(OUT, { recursive: true });
+
+// --serve: this folder's own dev server for the run. (Its node_modules may be linked from
+// another checkout, as a worktree's is: Vite serves from there too.)
+const server = argv.includes('--serve')
+  ? await createServer({
+      server: { port: PORT, strictPort: true, fs: { allow: [process.cwd(), fs.realpathSync('node_modules')] } },
+      logLevel: 'error',
+    })
+  : null;
+if (server) await server.listen();
 
 /** GPU Chrome on the dev server's site, the knight there at rest (dressed as asked). */
 async function open({ width = 1280, height = 800, hide = true, path = '/' } = {}) {
@@ -204,6 +219,37 @@ async function seats() {
   }
   await page.evaluate(() => window.__fire.debug.knights.setSeatPose('resting'));
   await grid(tiles, 6, `${OUT}/${TAG}-seats.png`, labels);
+  if (errors.length) console.log(errors.join('\n'));
+  await browser.close();
+}
+
+// --- all of him seated, as a pose reads ---------------------------------------------------------------
+async function pose() {
+  const { browser, page, errors } = await open({ width: 1280, height: 800 });
+  for (const name of SCENERIES) {
+    const tiles = [],
+      labels = [];
+    for (const seatPose of ['resting', 'watchful']) {
+      const k = await seatIn(page, name, seatPose);
+      for (const [view, cam, fov] of [
+        ['front', around(k, 2.1, 0.9, 0.95, 0.45), 34],
+        ['his left', around(k, 0.25, 2.2, 0.75, 0.45), 34],
+        ['his right', around(k, 0.25, -2.2, 0.75, 0.45), 34],
+      ]) {
+        await look(page, cam, fov);
+        await page.waitForTimeout(450);
+        tiles.push(await crop(await page.screenshot(), [0.25, 0, 0.75, 1], 380, 380));
+        labels.push(`${name} ${seatPose}: ${view}`);
+      }
+      // (As the home view frames him: round his seat, the page hidden.)
+      await page.evaluate(() => window.__fire.setView('home', { instant: true }));
+      await page.waitForTimeout(600);
+      tiles.push(await crop(await page.screenshot(), [0.3, 0.05, 0.62, 0.55], 380, 380));
+      labels.push(`${name} ${seatPose}: home view`);
+    }
+    await grid(tiles, 4, `${OUT}/${TAG}-pose-${name}.png`, labels);
+  }
+  await page.evaluate(() => window.__fire.debug.knights.setSeatPose('resting'));
   if (errors.length) console.log(errors.join('\n'));
   await browser.close();
 }
@@ -378,9 +424,11 @@ async function views() {
 
 for (const part of ONLY) {
   if (part === 'seats') await seats();
+  else if (part === 'pose') await pose();
   else if (part === 'gestures') await sheet('gestures');
   else if (part === 'moves') await sheet('moves');
   else if (part === 'seq') await seq();
   else if (part === 'home') await home();
   else if (part === 'views') await views();
 }
+await server?.close();
