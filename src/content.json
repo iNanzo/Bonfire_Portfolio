@@ -248,7 +248,7 @@
       "images": [
         {
           "src": "assets/projects/portfolio/final",
-          "alt": "The pixel-art bonfire in the Gothic ruins, a sword planted in its flames and a knight in steel plate and a great helm resting beside it on a low fallen drum by a broken pillar, knees up, the fire lighting his helm, pauldrons and knees in orange and cream; candles at the pillar’s foot, a crumbling wall on the right",
+          "alt": "The pixel-art bonfire in the Gothic ruins, a sword planted in its flames and a knight in steel plate and a great helm resting beside it on the ground, one knee drawn up with an arm hung over it and the other leg stretched out, his head bowed, the fire lighting his helm, pauldrons and knee in orange and cream; a broken pillar a little way off on the left with candles at its foot, a crumbling wall on the right",
           "caption": "The final image",
           "pixel": true
         },
@@ -278,7 +278,7 @@
         },
         {
           "src": "assets/projects/portfolio/knight",
-          "alt": "Close on the knight resting by the bonfire in the Gothic ruins: steel plate and a great helm drawn like a hand-drawn pixel-art sprite, in flat bands of grey, orange and cream, sitting on a low drum with his forearms on his knees, the fire catching the face of his helm, his pauldrons and a greave; candles at the foot of the pillar behind him, the planted sword glowing and the burning logs on the right",
+          "alt": "Close on the knight resting by the bonfire in the Gothic ruins: steel plate and a great helm drawn like a hand-drawn pixel-art sprite, in flat bands of grey, orange and cream, sitting on the ground with one knee drawn up, an arm hung over it and the gauntlet hanging limp, the other leg stretched out and his head bowed, the fire catching his helm, his pauldrons and a greave; candles at the foot of the pillar on the left, the planted sword glowing and the burning logs on the right",
           "caption": "The knight resting by the fire (the great helm, one of his three)",
           "pixel": true
         }
