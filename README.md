@@ -31,6 +31,7 @@ npm run e2e           # the production build in a real browser (Playwright)
 npm run bench         # Bonfire Live's frame times on the demo track, in GPU Chrome: add
                       # -- --url <a running dev server> (docs/performance.md)
 npm run format        # Prettier, with .prettierrc.json's settings
+npm run cleanup       # list the dev servers, test browsers and scripts left running (-- --kill stops them)
 npm run admin         # the admin panel, editing your local files: http://127.0.0.1:5175
 npm run build         # outputs dist/
 npm run model         # rebuild the scene in Blender (tools/*.py → public/models/bonfire.glb)
@@ -39,6 +40,9 @@ npm run screenshots   # pull captures from the old portfolio (tools/import-scree
 node tools/capture-painter.mjs  # the Bonfire Painter project's screenshots, from a running
                                 # `npm run dev` (not a build): --base <url>, --only editor,live,
                                 # --write editor=<png> to keep another candidate (its header)
+node tools/capture-knight.mjs --serve  # the knight against each place (seats, pose, gestures, moves,
+                                       # seq, home, views; --only, --room L,R): its own dev server
+                                       # with --serve, else a running one on --port (its header)
 ```
 
 ## How it's built
