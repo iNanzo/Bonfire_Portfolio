@@ -83,6 +83,7 @@ import {
   newPose,
   lerpPose,
   seatedPose,
+  floorArms,
   standingPose,
   seatFeet,
   feetAt,
@@ -131,6 +132,9 @@ const WALK_SPEED = 0.95; // m/s
 const TURN_SPEED = 5; // rad/s
 const CROSSFADE = 0.2;
 const STEP_OVER = 0.16; // m: what a walking knight steps over (a fire pit's stone, a spare log)
+// m: how low a wrist may go over the ground round him, sitting on the ground (his gauntlet
+// hangs up to 15 cm below it; at rest his wrists are 28 cm up or more, so rest is untouched)
+const FLOOR_HANDS = 0.17;
 // His meshes' bounds (his own space: the ground under him, turned with him), for culling:
 // every pose he takes stays inside with 0.1 m to spare (the farthest reach, 1.76 m from
 // here, is a boot kicked out in the site's dance where he stands up to, to his right across
@@ -448,6 +452,16 @@ export function createKnights(
       for (const dx of [-0.05, 0.05]) g = Math.max(g, groundUnder(home, x + dx, z + dz));
     return g;
   };
+  /**
+   * The highest ground within his arms' reach low down round `home` (m over the ground he's
+   * placed on): a flagstone or a stone by him, not anything taller (a hand goes round that).
+   */
+  function floorOf(home) {
+    let g = 0;
+    for (let x = -0.6; x <= 0.61; x += 0.1)
+      for (let z = -0.3; z <= 0.71; z += 0.1) if (x * x + z * z < 0.5) g = Math.max(g, groundUnder(home, x, z));
+    return Math.min(g, 0.1);
+  }
   /** What stands at a place in his own space at `home` (its top), above the ground he's placed on (m). */
   const topUnder = (home, x, z) => {
     const w = atHome(home, x, z);
@@ -1549,6 +1563,11 @@ export function createKnights(
       lerpPose(p, k.from, p, k.blend);
       big = true;
     }
+    // Sitting on the ground at home (the ruins' seat, the others' places in Bonfire Live): his
+    // gestures and moves were made for a seat, so a hand dropped low is kept off the floor.
+    const h = k.home;
+    if (seated && h && h.h < 0.12 && Math.hypot(k.group.position.x - h.x, k.group.position.z - h.z) < 0.05)
+      floorArms(p, FLOOR_HANDS + (h.floor ??= floorOf(h)), rig);
     return big;
   }
 

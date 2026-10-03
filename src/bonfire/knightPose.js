@@ -85,6 +85,7 @@ export {
   feetAt,
   standBy,
   seatedPose,
+  floorArms,
   accent,
   idle,
   look,

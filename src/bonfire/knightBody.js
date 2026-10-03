@@ -216,6 +216,38 @@ export const hemArms = (p, room, from = null) => {
   if (room[1] < 1) hem(p, 'R', room[1], from);
   return p;
 };
+const _fa = new THREE.Vector3();
+const _fs = new THREE.Vector3();
+const _fi = new THREE.Quaternion();
+/**
+ * Keep the hands off the floor: a wrist that would go lower than `y` (m, knight space: the
+ * ground he's placed on) is lifted to it, its arm turned up about the shoulder no more than
+ * that takes, its reach kept. For a knight sitting on the ground, whose gestures and moves
+ * were made for a seat: a hand dropped to a knee or flung low would go into the floor.
+ */
+export function floorArms(p, y, rig = DEFAULT_RIG) {
+  const f = chestFrame(p, rig);
+  for (const s of ['L', 'R']) {
+    const o = sideOf(s),
+      sg = s === 'L' ? 1 : -1;
+    const len = p[o + 2] * (rig.arm[0] + rig.arm[1]);
+    const sock = _fs
+      .copy(rig.pos['upperArm' + s])
+      .sub(rig.pos.chest)
+      .applyQuaternion(f.q)
+      .add(f.pos);
+    const d = armVec(_fa, p[o], p[o + 1], sg).applyQuaternion(f.q);
+    if (len < 1e-6 || sock.y + d.y * len >= y) continue;
+    // (As far down as reaches `y`; a shoulder lower than that reaches out level, in front.)
+    const down = clamp((y - sock.y) / len, -1, 0);
+    const flat = Math.hypot(d.x, d.z);
+    const k = Math.sqrt(1 - down * down);
+    if (flat > 1e-4) d.set((d.x / flat) * k, down, (d.z / flat) * k);
+    else d.set(0, down, k);
+    setArmDir(p, o, d.applyQuaternion(_fi.copy(f.q).invert()), sg);
+  }
+  return p;
+}
 
 const _ha = new THREE.Vector3();
 /** Where the head joint is (knight space) in a pose. Reused: copy what you keep. */
@@ -401,8 +433,8 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
     joint(p, 'chest', watch ? 4 : 10);
     joint(p, 'neck', watch ? -2 : 4);
     joint(p, 'head', watch ? -8 : 14);
-    leg(p, 'L', 0.05, 0, z, 10, 22);
-    leg(p, 'R', 0.07, 0, z - 0.04, 6, 26);
+    leg(p, 'L', 0.05, 0, z, 0, 22);
+    leg(p, 'R', 0.07, 0, z - 0.04, 0, 26);
     grounded();
     arm(p, 'L', 18, -28, 0.66, 30, 20, 0.6);
     arm(p, 'R', 18, -28, 0.66, 30, 20, 0.6);
