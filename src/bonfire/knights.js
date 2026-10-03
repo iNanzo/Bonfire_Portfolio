@@ -148,7 +148,7 @@ const CHEERING = new Set(CHEERS);
 // Room on both sides (gesture()'s and dance()'s `room`).
 const FREE = [1, 1];
 // A seated ring lifts each foot at most this high over its hip joint (m; at the seats round
-// 9's came to 7 cm): one already up near there (on the ruins' fallen drum) lifts less, or not
+// 9's came to 7 cm): one already up near there (on a stone, say) lifts less, or not
 // at all. From about 18 cm up the ankle comes round to where the knee bends toward and the
 // knee folds down under the leg for a step (round 9's knights sitting on the ground, their
 // feet up level with their hips, did on every ring). hop(), riseOf().
@@ -459,8 +459,8 @@ export function createKnights(
   /**
    * The ground a seated boot rests on at a place in his own space at `home` (its ankle at x, z):
    * the highest under its sole from the ankle to the pointed toe (0.3 m ahead), so the toe
-   * never sinks into whatever it reaches over (the ruins' fallen drum: he rests his foot up on
-   * it). (Not the heel's: a foot drawn in tucks its heel under the seat's edge.)
+   * never sinks into whatever it reaches over (a stone or a log he rests his foot up on).
+   * (Not the heel's: a foot drawn in tucks its heel under the seat's edge.)
    */
   const soleUnder = (home, x, z) => {
     let g = -Infinity;
@@ -718,8 +718,8 @@ export function createKnights(
   /**
    * How much higher each foot has to go on its way between where it rests seated and where
    * it stands up to (rise()'s `over`, at OVER_POINTS points along the straight way from the
-   * seated end): as much as keeps it OVER_CLEAR clear of the scenery's shapes there (his boot
-   * resting up on the ruins' fallen drum steps up and off it, not down through it), and
+   * seated end): as much as keeps it OVER_CLEAR clear of the scenery's shapes there (a boot
+   * resting up on something steps up and off it, not down through it), and
    * whether either has more than OVER_CROSS to clear (`cross`: he stands up over his feet
    * first, then steps). Kept with him until his seat, his seat pose or where he stands up to
    * changes; null away from a seat.

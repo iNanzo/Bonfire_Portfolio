@@ -435,8 +435,8 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
   /**
    * Letting go of an ease back (`was`, the step before's) where he's clear without it: as fast
    * as he may (EASE_LET_GO a step), else holding it (an arm eased part of the way back to its
-   * rest can pass through what the arm going on its way misses: a hand swinging down past the
-   * ruins' plinth), else half as far as he may, else all of it.
+   * rest can pass through what the arm going on its way misses: a hand swinging down past a
+   * plinth's edge), else half as far as he may, else all of it.
    */
   function letGo(k, base, cs, was) {
     const floor = was - EASE_LET_GO;
@@ -455,8 +455,8 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
    * margins say the least that clears him lies (where they can't say, a little further than
    * where he's in, as far as how fast he was coming out there says), as near as the looks
    * left this step get it.
-   * Where even all the way back doesn't clear him (his rest is no way out: a boot by a drum it
-   * stands by), as far back as that if it gets him out further (EASE_GAIN), else as he was (no
+   * Where even all the way back doesn't clear him (his rest is no way out: a boot resting right
+   * by a stone), as far back as that if it gets him out further (EASE_GAIN), else as he was (no
    * snapping back for nothing).
    */
   function easeBack(k, base, cs, was, m0) {

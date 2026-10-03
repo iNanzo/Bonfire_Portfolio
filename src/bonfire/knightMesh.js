@@ -63,7 +63,7 @@ const PART_OF_PIECE = { hips: 3, tassetL: 3, tassetR: 3, thighL: 3, thighR: 3, s
 const DOME_OF = { shoulderL: 1, shoulderR: 2 };
 // (Its points are a few centimetres apart: kept 5 mm out, no point between them goes in far.)
 export const DEPTH = 0.005;
-// (His boots and shins rest on what's under them, a seat's edge or a fallen drum: 1 cm in.)
+// (His boots and shins rest on what's under them, the ground or a seat's edge: 1 cm in.)
 const RESTING = new Set(['shinL', 'shinR', 'footL', 'footR']);
 const DEPTH_RESTING = -0.01;
 

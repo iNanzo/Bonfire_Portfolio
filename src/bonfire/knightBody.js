@@ -643,7 +643,7 @@ const HOP_FEET = 0.2;
 /**
  * A ground ring passing under him, `t` s after it reaches him: seated, he lifts his feet
  * and leans back; standing, a hop with the knees tucked. `rise` (seated) [left, right] (m):
- * how far each foot may lift; one resting high (up on the ruins' fallen drum) lifts only that
+ * how far each foot may lift; one resting high (up on a stone, say) lifts only that
  * far, or stays put (knights.js riseOf), so its knee keeps its bend.
  */
 export function hop(p, t, k = 1, seated = true, rise = null) {
@@ -775,7 +775,7 @@ function standOver(out, sit, stand) {
  * seat and settle, then the feet step out to where they rest. `over` ({ L, R, cross }, each
  * foot's extra lift (m) at evenly spaced points from its seated place to its standing one,
  * 0 at both ends; knights.js, from the scenery's shapes): a foot stepping off or over
- * something (the ruins' fallen drum) lifts over it on its way instead of through it, and
+ * something (a stone or a log in his way) lifts over it on its way instead of through it, and
  * where one has to go over something on its way (`cross`) he stands up first, over his feet
  * where they rest, and then steps across (sitting down: steps back across, then sits).
  */
@@ -859,7 +859,7 @@ export function rise(out, sit, stand, t, down = false, over = null) {
 }
 /**
  * rise() where a foot has something to step over on its way (`over.cross`): up, he leans in
- * and pushes up off his seat over his feet where they rest (one up on a fallen drum, say),
+ * and pushes up off his seat over his feet where they rest (one up on a stone, say),
  * then steps across to where he stands, the right foot and then the left, each lifted over
  * what's in its way; down, the other way round: he steps back across, then bends and sits.
  */
