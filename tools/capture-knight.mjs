@@ -26,8 +26,10 @@
 //   home      the home view as a visitor sees it (the page on), 1920, 1280 and 390 wide, in
 //             each scenery: <tag>-home-<width>.png
 //   views     the other cameras that frame his seat, 1920 wide: the site's Journey and About
-//             views (the page on), Bonfire Live's Pillar Side shot and the Moonlit Ruins
-//             scene's camera (the page hidden), a row a scenery: <tag>-views.png
+//             views (the page on), Bonfire Live's Pillar Side shot (visualizer/camera.js
+//             SHOTS.pillar: as it starts, and at either end of its sway pushed all the way in)
+//             and the Moonlit Ruins scene's camera (src/content.json), the page hidden, a row a
+//             scenery: <tag>-views.png
 //
 // --helmet and --style dress him first (knights.js HELMETS, knightStyles.js STYLES). --room
 // gives him that much room for his left and right arm at his seat (0..1 each, as knights.js
@@ -37,6 +39,8 @@ import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import fs from 'node:fs';
 import { createServer } from 'vite';
+import { SHOTS } from '../src/visualizer/camera.js';
+import { keepInClearing } from '../src/visualizer/clearing.js';
 
 const argv = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -376,13 +380,31 @@ async function home() {
 }
 
 // --- the other cameras that frame his seat ----------------------------------------------------------------
+/**
+ * Bonfire Live's shot `s` (camera.js SHOTS) swung `yaw` radians round what it looks at and
+ * pushed all the way in, kept in the clearing, as camera.js shotPose() moves it.
+ */
+function swung(s, yaw) {
+  const [tx, ty, tz] = s.target;
+  const k = 1 - (s.push ?? 0);
+  const [dx, dy, dz] = [(s.pos[0] - tx) * k, (s.pos[1] - ty) * k, (s.pos[2] - tz) * k];
+  const c = Math.cos(yaw),
+    sn = Math.sin(yaw);
+  const p = keepInClearing({ x: tx + dx * c - dz * sn, y: ty + dy, z: tz + dx * sn + dz * c });
+  return { pos: [p.x, p.y, p.z], target: [...s.target], fov: s.fov };
+}
 async function views() {
+  const shot = SHOTS.pillar;
+  // (The built-in scene's camera as the content has it, while it's there.)
+  const content = JSON.parse(fs.readFileSync(new URL('../src/content.json', import.meta.url), 'utf8'));
+  const moonlit = content.scenes?.find((s) => s.id === 'moonlit-ruins');
   const VIEWS = [
     ['Journey', { view: 'experience' }],
     ['About', { view: 'about' }],
-    // (Bonfire Live's shot, visualizer/camera.js SHOTS.pillar, and the built-in scene's camera.)
-    ['Pillar Side', { pose: { pos: [-2.5, 1.35, 3.3], target: [0.15, 0.7, -0.3], fov: 34 } }],
-    ['Moonlit Ruins', { pose: { pos: [-0.6, 0.7, 2.6], target: [-0.85, 0.9, -1.3], fov: 40 } }],
+    [shot.name, { pose: { pos: shot.pos, target: shot.target, fov: shot.fov } }],
+    [`${shot.name}, sway +${shot.yaw}, pushed in`, { pose: swung(shot, shot.yaw ?? 0) }],
+    [`${shot.name}, sway -${shot.yaw}, pushed in`, { pose: swung(shot, -(shot.yaw ?? 0)) }],
+    ...(moonlit?.camera ? [[moonlit.name, { pose: moonlit.camera }]] : []),
   ];
   const tiles = [],
     labels = [];
