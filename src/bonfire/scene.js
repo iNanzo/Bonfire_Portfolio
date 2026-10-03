@@ -83,6 +83,7 @@ export function createBonfire(
     onError,
     onFrame,
     onTick,
+    pageStats = () => null,
   } = {},
 ) {
   const scope = createResourceScope();
@@ -533,26 +534,51 @@ export function createBonfire(
     Object.assign(ctx, createSceneUpdate(ctx));
     const { renderFrame } = ctx;
 
-    // ?perf in the page's address (the site, Bonfire Live and the Painter alike): a small
-    // overlay (ui/perfOverlay.js) with the frame rate and times (the page's onTick, on every
+    // The stats overlay (ui/perfOverlay.js): ?perf in the page's address (the site, Bonfire Live
+    // and the Painter alike), or the page's own switch (setStats: Bonfire Live's Stats Overlay
+    // setting, the Painter's Tools menu). The frame rate and times (the page's onTick, on every
     // frame the display shows: Bonfire Live's audio analysis; the page's onFrame; the scene's
     // update; the draw), the draw calls, the shadow's redraws and the GPU's programs and
-    // textures, and the same times as performance.measure entries for the browser's profiler.
-    // Without it nothing is timed, and the overlay's code isn't even loaded.
+    // textures; the particle systems running (stats()); and the page's own part (pageStats:
+    // Bonfire Live's show, the Painter's scene). With ?perf, the same times as
+    // performance.measure entries for the browser's profiler. Off, nothing is timed or counted,
+    // and the overlay's code isn't even loaded.
     ctx.perf = null;
-    if (new URLSearchParams(location.search).has('perf')) {
+    const perfAsked = new URLSearchParams(location.search).has('perf');
+    let statsWanted = false;
+    let statsLoading = false;
+    const statsOn = () => (perfAsked || statsWanted) && !scope.disposed;
+    function syncStats() {
+      if (!statsOn()) {
+        ctx.perf?.dispose();
+        ctx.perf = null;
+        return;
+      }
+      if (ctx.perf || statsLoading) return;
+      statsLoading = true;
       import('../ui/perfOverlay.js').then(
         ({ createPerfOverlay }) => {
-          if (scope.disposed) return;
-          ctx.perf = createPerfOverlay({ info: renderer.info, maxFps: () => gate.maxFps });
-          scope.cleanup(() => {
-            ctx.perf?.dispose();
-            ctx.perf = null;
+          statsLoading = false;
+          if (!statsOn() || ctx.perf) return;
+          ctx.perf = createPerfOverlay({
+            info: renderer.info,
+            maxFps: () => gate.maxFps,
+            particles: () => stats().systems,
+            page: pageStats,
+            measures: perfAsked,
           });
         },
-        (error) => console.warn('The ?perf overlay did not load.', error),
+        (error) => {
+          statsLoading = false;
+          console.warn('The stats overlay did not load.', error);
+        },
       );
     }
+    scope.cleanup(() => {
+      ctx.perf?.dispose();
+      ctx.perf = null;
+    });
+    syncStats();
 
     // The loop runs at the display's rate. With a cap (setMaxFps; none unless asked: every frame
     // the display shows is drawn), the frames in between are skipped: the scene's clock, the
@@ -719,6 +745,18 @@ export function createBonfire(
       /** The cap setMaxFps set (0: none). */
       get maxFps() {
         return gate.maxFps;
+      },
+      /**
+       * Show the stats overlay or take it away (?perf in the address shows it either way): the
+       * frames, the particles running and the page's own part (createBonfire's pageStats).
+       */
+      setStats(on) {
+        statsWanted = !!on;
+        syncStats();
+      },
+      /** The stats overlay is showing (or on its way). */
+      get statsShown() {
+        return statsOn();
       },
       /** The canvas the scene draws into (low resolution: see resize). */
       get canvas() {
