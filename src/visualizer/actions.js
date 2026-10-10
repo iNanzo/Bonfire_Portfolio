@@ -10,6 +10,7 @@ import { COLOR_MODES } from './colors.js';
 import { saveSettings } from './settings.js';
 import { MODES } from './looks.js';
 import { isHelpKey } from '../ui/keysOverlay.js';
+import { statsNote } from '../settingsMap.js';
 
 /**
  * The actions' part of the page.
@@ -90,7 +91,7 @@ export function createActions(ctx) {
       settings.stats = !settings.stats;
       saveSettings(settings);
       ctx.applyStats();
-      ctx.note(`Stats Overlay: ${settings.stats ? 'On' : 'Off'}`, 1.2);
+      ctx.note(statsNote(settings.stats, ctx.fire?.statsShown ?? settings.stats), 1.2);
     },
     mirror: () => {
       const modes = ['mix', 'on', 'off'];

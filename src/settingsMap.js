@@ -737,6 +737,7 @@ export const SETTINGS = {
       'Particles: each system that’s running, live of how many it has, the fireflies lit and the lightning’s bolts.',
       'Show: the section (a breakdown, a build, the bars after a drop), the budget, the look and its strength, and the layers live (In the Mix or Always).',
       'Then a drop’s hits as they fire, the knights, the shot, and the preset scene playing with its loop.',
+      'With ?perf in the address it shows whatever this says, and the frame’s parts go to the browser’s profiler too.',
     ].join('\n'),
     keywords: [
       'fps',
@@ -1704,4 +1705,16 @@ export function sharedRange(id) {
 export function blockedBy(key, settings) {
   const need = meta('live', key)?.needs;
   return need && need.when(settings?.[need.key], settings ?? {}) ? need.reason : null;
+}
+
+/**
+ * The Stats Overlay's note when it's switched (U, the Painter's Tools): what's on screen. `on`:
+ * the switch; `shown`: the overlay is showing (the scene's statsShown), which ?perf in the
+ * address keeps it whatever the switch says, so switched off there, the note says so.
+ * @param {boolean} on @param {boolean} shown
+ */
+export function statsNote(on, shown) {
+  const { label } = SETTINGS.stats;
+  if (on) return `${label}: On`;
+  return shown ? `${label}: Off (?perf in the address keeps it showing)` : `${label}: Off`;
 }

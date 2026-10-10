@@ -600,6 +600,20 @@ test('Tools: the Stats Overlay (or U) shows the stage’s frames, particles and 
   await page.keyboard.press('/');
   await page.keyboard.type('fps');
   await expect(page.locator('[data-search-notes]')).toContainText('Stats Overlay: turn it on in Tools, or press U');
+  // ?perf shows it whatever the switch says: the menu ticks what's on the stage, and U switched
+  // off says ?perf keeps it showing (it does).
+  await page.goto('/painter/?perf&scene=b:frozen-shrine');
+  await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+  await expect(overlay).toBeVisible();
+  await page.locator('[data-cmd="tools"]').click();
+  await expect(item).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('u');
+  await page.keyboard.press('u');
+  await expect(page.locator('[data-note]')).toContainText('?perf');
+  await expect(overlay).toBeVisible();
+  await page.locator('[data-cmd="tools"]').click();
+  await expect(item).toHaveAttribute('aria-checked', 'true');
   expect(errors).toEqual([]);
 });
 

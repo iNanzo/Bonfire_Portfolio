@@ -328,8 +328,9 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
     scene waiting for its moment).
 
   `?perf` in the address shows the same overlay whatever the setting says (and writes the
-  frame's parts for the browser's profiler). With the overlay on, a frame costs no more
-  (measured on the demo track: `docs/performance.md`).
+  frame's parts for the browser's profiler); `U` there still switches the setting, and
+  switched off, its note says `?perf` keeps it showing. With the overlay on, a frame costs
+  no more (measured on the demo track: `docs/performance.md`).
 - Saving waits for a burst of changes to settle (300 ms: a slider dragged writes once) and
   is done at once as the page is hidden or left, and for a preset, a setup or a reset.
 

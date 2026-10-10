@@ -79,6 +79,7 @@ import {
 import { bindPanel, flameChips, getPath, sceneryChips, withPath } from './panel.js';
 import { createPanelSearch } from './panelSearch.js';
 import { bindTools, PAINTER_KEYS, TIPS, toolsMarkup } from './toolbar.js';
+import { statsNote } from '../settingsMap.js';
 import { createHistory } from './history.js';
 import { createBeatFeed, silentFrame } from './beat.js';
 import { createCameraRig } from './cameraRig.js';
@@ -413,6 +414,7 @@ import('../bonfire/scene.js')
     await candidate.ready;
     fire = candidate;
     fire.setStats(view.stats);
+    tools.setChecked('stats', statsShown());
     const eq = startingEquipment;
     await fire.equip(scene.place.weapon ?? eq.weapon, eq.flame, {
       instant: true,
@@ -1140,13 +1142,15 @@ function capture() {
   });
 }
 const keysOverlay = createKeysOverlay({ title: 'Keyboard Shortcuts', groups: PAINTER_KEYS });
-/** U, or Tools: the Stats Overlay on or off (kept for the next visit). */
+/** Whether the Stats Overlay is on the stage (?perf in the address keeps it there whatever the switch says). */
+const statsShown = () => fire?.statsShown ?? view.stats;
+/** U, or Tools: the Stats Overlay on or off (kept for the next visit); the menu ticks what's shown. */
 function toggleStats() {
   view.stats = !view.stats;
   saveView(view);
   fire?.setStats(view.stats);
-  tools.setChecked('stats', view.stats);
-  note(`Stats Overlay: ${view.stats ? 'On' : 'Off'}`, 1.2);
+  tools.setChecked('stats', statsShown());
+  note(statsNote(view.stats, statsShown()), 1.2);
 }
 /** The Tools menu's items (toolbar.js TOOLS). */
 const tool = {
@@ -1158,7 +1162,7 @@ const tool = {
   keys: () => keysOverlay.open(),
 };
 const tools = bindTools(q('[data-tools]'), (cmd) => tool[cmd]?.(), { hideTip: tips.hide });
-tools.setChecked('stats', view.stats);
+tools.setChecked('stats', statsShown());
 /** `/`: the panel's search (the panel shown first if it's hidden). */
 function focusSearch() {
   if (!panelShown) togglePanel(true);

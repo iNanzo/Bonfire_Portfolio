@@ -624,6 +624,12 @@ test('Stats Overlay: U shows the frames, the particles and the show in a corner,
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   await expect(overlay).toContainText('Frames', { timeout: 10_000 });
   await expect(overlay).toContainText('Particles');
+  // U there switches the setting; switched off, the note says ?perf keeps it showing (it does).
+  await page.click('[data-source="demo"]');
+  await page.keyboard.press('u');
+  await page.keyboard.press('u');
+  await expect(page.locator('[data-state]')).toContainText('?perf');
+  await expect(overlay).toBeVisible();
   expect(errors).toEqual([]);
 });
 

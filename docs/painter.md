@@ -122,17 +122,18 @@ read out once you stop typing; Esc clears it (every section back as it was) and 
 hands the keyboard back to the page. The box stays in sight: only the sections under it
 scroll.
 
-**Tools ▾** reaches what only a key did before: *Render Settings* (P), *Pack* (I),
-*Capture* (C), the *Stats Overlay* (U, a switch: ticked while it's on), *Full Screen* (F)
-and *Keyboard Shortcuts* (?). With the menu open, those
-keys pick their item (the menu closes first, so what opens isn't under it), and any other
-key the page answers closes it first too; Esc closes it back onto the button. Its tooltip
-steps aside while it's open. On a phone it's the word *Tools* (a finger can't hover for the
-tooltip). Render Settings shows the scene's render in Bonfire Live's words (*Always*,
-*Off*, *A Scene's 3 Colors*) and its last row is *Reset Render Settings* (a new scene's).
-`?` lists every key below, with a box that filters them. The bar's icon buttons (undo,
-redo, the banner's ✕), Tools, Play and the previews have tooltips that a screen reader
-reads out too (each button's description).
+**Tools ▾** reaches what only a key did before: *Render Settings* (P), *Pack* (I), *Capture*
+(C), the *Stats Overlay* (U, a switch: ticked while it's on the stage, which `?perf` in the
+address keeps it whatever the switch says; switched off there, the note says so), *Full
+Screen* (F) and *Keyboard Shortcuts* (?). With the menu open, those keys pick their item
+(the menu closes first, so what opens isn't under it), and any other key the page answers
+closes it first too; Esc closes it back onto the button. Its tooltip steps aside while it's
+open. On a phone it's the word *Tools* (a finger can't hover for the tooltip). Render
+Settings shows the scene's render in Bonfire Live's words (*Always*, *Off*, *A Scene's 3
+Colors*) and its last row is *Reset Render Settings* (a new scene's). `?` lists every key
+below, with a box that filters them. The bar's icon buttons (undo, redo, the banner's ✕),
+Tools, Play and the previews have tooltips that a screen reader reads out too (each button's
+description).
 
 **The Stats Overlay** (Tools, or U) shows, in the stage's top left corner under the bar
 (clear of the panel and the notes, under the menus; where Render Settings opens over it, on

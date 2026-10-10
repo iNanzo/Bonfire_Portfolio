@@ -25,6 +25,7 @@ import {
   sharedRange,
   conceptOf,
   blockedBy,
+  statsNote,
 } from '../src/settingsMap.js';
 import { defaults } from '../src/visualizer/settings.js';
 import { LOOKS, LAYERS, DROP_FX, MIRRORS, PARAMS } from '../src/visualizer/looks.js';
@@ -443,6 +444,19 @@ test('sections: every entry sits in one, each Live one in a tab, each Painter on
   // (The user's own word for it, "info", and the long one, "statistics", among them.)
   for (const word of ['fps', 'stats', 'debug', 'particles', 'layers', 'effects', 'performance', 'info', 'statistics'])
     assert.ok(SETTINGS.stats.keywords.includes(word), word);
+});
+
+test('the Stats Overlay’s note (U, Tools) says what’s on screen: off, but kept showing by ?perf, says so', () => {
+  const { label } = SETTINGS.stats;
+  assert.equal(statsNote(true, true), `${label}: On`);
+  assert.equal(statsNote(false, false), `${label}: Off`);
+  // ?perf in the address shows it whatever the switch says: the note doesn't say Off and stop.
+  const kept = statsNote(false, true);
+  assert.ok(kept.startsWith(`${label}: Off`), kept);
+  assert.ok(kept.includes('?perf'), kept);
+  assert.ok(kept.length <= 160, kept);
+  // (On but not showing yet, the scene still loading: On.)
+  assert.equal(statsNote(true, false), `${label}: On`);
 });
 
 test('search words: lowercase, each with somewhere to go', () => {
