@@ -698,29 +698,26 @@ test('search: synonyms, typos, choices and keywords find their rows', () => {
 test('search: the Stats Overlay, a switch in Tools (not a part of the scene), is found by its words and says where', () => {
   const tools = buildMatcher(toolEntries(), { synonyms: PAINTER_SYNONYMS });
   const s = normalizeScene(defaultScene());
-  const note = `${SETTINGS.stats.label}: turn it on in Tools, or press U`;
-  for (const q of [
-    'fps',
-    'stats',
-    'debug',
-    'performance',
-    'particles',
-    'info',
-    'statistics',
-    'fps counter',
-    SETTINGS.stats.label,
-  ]) {
+  const { label } = SETTINGS.stats;
+  const off = `${label}: turn it on in Tools, or press U`;
+  for (const q of ['fps', 'stats', 'debug', 'performance', 'particles', 'info', 'statistics', 'fps counter', label]) {
     const f = findInPanel(match, q, s, tools);
     assert.ok(
-      f.hidden.some((h) => h.id === 'tool.stats' && h.note === note),
-      `${q}: ${f.hidden.map((h) => h.note).join(' / ')}`,
+      f.tools.some((t) => t.id === 'tool.stats' && t.note === off),
+      `${q}: ${f.tools.map((t) => t.note).join(' / ')}`,
     );
     assert.ok(!f.rows.has('tool.stats'), 'not a row of the panel');
+    // (Listed as the Tools' own, not among the rows the scene's shape leaves out.)
+    assert.ok(!f.hidden.some((h) => h.id === 'tool.stats'), q);
   }
-  assert.ok(notesFor(findInPanel(match, 'stats', s, tools).hidden).includes(note));
+  // Switched on, it says so, and how to turn it off: never "turn it on" to someone who has.
+  const on = findInPanel(match, 'fps', s, tools, (key) => key === 'stats').tools.find((t) => t.id === 'tool.stats');
+  assert.ok(on.note.startsWith(`${label}: on`), on.note);
+  assert.match(on.note, /turn it off/);
+  assert.doesNotMatch(on.note, /turn it on/);
   // Without the Tools' index, or for a query that isn't it: no note.
-  assert.ok(!findInPanel(match, 'fps', s).hidden.some((h) => h.id === 'tool.stats'));
-  assert.ok(!findInPanel(match, 'helmet', s, tools).hidden.some((h) => h.id === 'tool.stats'));
+  assert.deepEqual(findInPanel(match, 'fps', s).tools, []);
+  assert.ok(!findInPanel(match, 'helmet', s, tools).tools.some((t) => t.id === 'tool.stats'));
 });
 
 // --- the bar ---------------------------------------------------------------------------------

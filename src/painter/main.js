@@ -755,6 +755,7 @@ search = createPanelSearch({
   scene: () => scene,
   ctx: panelCtx(),
   folded: () => innerWidth < NARROW, // (a phone's bottom sheet: its room for the rows found)
+  on: (key) => key === 'stats' && view.stats, // (the Tools' switches: how each is set now)
 });
 
 // --- The camera by hand ------------------------------------------------------------------------
@@ -1151,6 +1152,7 @@ function toggleStats() {
   fire?.setStats(view.stats);
   tools.setChecked('stats', statsShown());
   note(statsNote(view.stats, statsShown()), 1.2);
+  search?.refresh(); // (a search that found it says how it's set now)
 }
 /** The Tools menu's items (toolbar.js TOOLS). */
 const tool = {

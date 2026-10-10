@@ -596,10 +596,23 @@ test('Tools: the Stats Overlay (or U) shows the stage’s frames, particles and 
   await page.locator('[data-cmd="tools"]').click();
   await expect(item).toHaveAttribute('aria-checked', 'false');
   await page.keyboard.press('Escape');
-  // The panel's search finds it by its words, and says where it is.
+  // The panel's search finds it by its words, and says where it is, as it's set now: under the
+  // Tools' own heading, not among the rows the scene's shape leaves out.
   await page.keyboard.press('/');
   await page.keyboard.type('fps');
-  await expect(page.locator('[data-search-notes]')).toContainText('Stats Overlay: turn it on in Tools, or press U');
+  const notes = page.locator('[data-search-notes]');
+  await expect(notes).toContainText('Stats Overlay: turn it on in Tools, or press U');
+  await expect(notes.locator('.pnt-search-tools')).toContainText('Stats Overlay');
+  await expect(notes.locator('.pnt-search-notes-fold', { hasText: 'Stats Overlay' })).toHaveCount(0);
+  await page.locator('[data-cmd="tools"]').click();
+  await item.click();
+  await expect(overlay).toBeVisible();
+  await expect(notes).toContainText('Stats Overlay: on; turn it off in Tools, or press U');
+  await expect(notes).not.toContainText('turn it on');
+  await page.locator('[data-cmd="tools"]').click();
+  await item.click();
+  await expect(overlay).toHaveCount(0);
+  await expect(notes).toContainText('Stats Overlay: turn it on in Tools, or press U');
   // ?perf shows it whatever the switch says: the menu ticks what's on the stage, and U switched
   // off says ?perf keeps it showing (it does).
   await page.goto('/painter/?perf&scene=b:frozen-shrine');

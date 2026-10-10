@@ -146,10 +146,11 @@ Loop goes through a breakdown, a build and the drop), the budget, the look and i
 the layers live now, each *(In the Mix)* or *(Always)*, a drop's hits while they fire, the
 knights and the shot. It's the page's, not the scene's: it's kept for the next visit
 (localStorage `bonfire-painter-view`) and never changes or dirties the scene. The panel's
-search finds it by its words ("fps", "stats", "debug"…) and says where it is: *Stats
-Overlay: turn it on in Tools, or press U*. The same overlay as Bonfire Live's
-(`docs/bonfire-live.md`; `docs/performance.md` for the numbers); `?perf` in the address
-shows it too.
+search finds it by its words ("fps", "stats", "debug"…) and, under its own heading (*In
+Tools*, not among the rows the scene leaves out), says where it is as it's set now: *Stats
+Overlay: turn it on in Tools, or press U*, or on, how to turn it off. The same overlay as
+Bonfire Live's (`docs/bonfire-live.md`; `docs/performance.md` for the numbers); `?perf` in
+the address shows it too.
 
 **The preview**
 
