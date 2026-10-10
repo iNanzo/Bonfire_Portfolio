@@ -156,15 +156,6 @@ export default defineConfig({
               test: /[\\/]node_modules[\\/]three[\\/](build[\\/]three\.module\.js|examples[\\/])/,
               includeDependenciesRecursively: false,
             },
-            // The site's own modules that every page loads up front (the content, the palette,
-            // the shared UI pieces), in one chunk. The campfire game (larp/) imports a few of
-            // them lazily, and without this group Rolldown splits them by which pages share
-            // them: the portfolio's first load went from 5 requests to 12 for the same bytes.
-            {
-              name: 'site-core',
-              test: /[\\/]src[\\/](content\.(js|json)|palette\.js|effects(Defaults)?\.js|ruleBasics\.js|html\.js|elements\.js|math\.js|sceneries\.js|ui[\\/](logo|theme|shell|focus|keysOverlay|settingsSearch|describedTip|tooltip|dither|renderMenu|discoveries|pixelArt|pack)\.js|knightNames\.js|weaponGroups\.js|bonfire[\\/](knightStyles|steel)\.js)$/,
-              includeDependenciesRecursively: false,
-            },
           ],
         },
       },
