@@ -19,7 +19,8 @@ import { MODES } from '../modes.js';
  *   parts: { tick: number | null, page: number, update: number, draw: number },
  *   gpu: { programs: number | null, textures: number | null, geometries: number | null } }} FrameStats
  * @typedef {{ name: string, live: number, total: number, unit?: string, cast?: boolean }} ParticleStats
- *   a row of the scene's stats().systems (bonfire/sceneRender.js); `cast`: not particles (the knights)
+ *   a row of the scene's stats().systems or its extra, counted in a `unit` (bonfire/sceneRender.js);
+ *   `cast`: not particles (the knights)
  * @typedef {{ section: string, sinceDrop: number | null, stage: number, budget: number | null,
  *   look: { names: string[], strength: number, pinned: boolean },
  *   layers: { name: string, mode: string }[], xray: string | null,

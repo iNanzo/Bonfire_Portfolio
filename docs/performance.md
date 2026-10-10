@@ -81,10 +81,11 @@ Loop       In the Mix
 counts from too): each point set by name, live (a size above 0) of how many it has, only
 those with any live: the flames, the sparks, the fireflies' light trails, the forge's
 particles during a swap, debris, the cold mist and frost motes, the blade's trail, the
-rings, the impacts' embers, smoke and ash. The **Fireflies** are lit of all of them
-(instanced meshes, not points), and the **Bolts** the lightning ball's and ring's line
-segments drawn this frame, of the room they have. The heading has the total live (points
-only). The counts are read when the text is built, never per frame.
+rings, the impacts' embers, smoke and ash. Then its `extra`, counts that aren't points (the
+breakdown leaves them out): the **Fireflies** lit of all of them (instanced meshes), and the
+**Bolts**, the lightning ball's and ring's line segments drawn this frame, of the room they
+have. The heading has the total live (points only). The counts are read when the text is
+built, never per frame.
 
 **Show** (Bonfire Live; in the Painter it's **Scene**, the scene being painted, with no
 loop) — the director's `status()`, a snapshot made when asked from what the show already

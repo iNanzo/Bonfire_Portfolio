@@ -310,27 +310,31 @@ export function createSceneRender(ctx) {
       s.total += size.length;
       systems.set(o.name, s);
     });
-    // The fireflies, lit of all of them (instanced meshes, not points), and the lightning's
-    // bolts: line segments drawn this frame (the ball's and its ring's), of the room they have.
+    // (The site's one knight is a row of the breakdown's own; Bonfire Live's cast counts here,
+    // and the stats overlay leaves them to the show: `cast`.)
+    if (ctx.knights && !siteKnight)
+      systems.set('Knights', { name: 'Knights', live: ctx.knights.present, total: ctx.knights.max, cast: true });
+    // `extra`: what isn't a set of points, counted in its own unit, for the stats overlay (the
+    // site's breakdown keeps to its particle systems): the fireflies, lit of all of them
+    // (instanced meshes), and the lightning's bolts, line segments drawn this frame (the ball's
+    // and its ring's) of the room they have.
+    const extra = [];
     const flies = ctx.fireflies;
-    if (flies) systems.set('Fireflies', { name: 'Fireflies', live: flies.lit, total: flies.flies.length, unit: 'lit' });
+    if (flies) extra.push({ name: 'Fireflies', live: flies.lit, total: flies.flies.length, unit: 'lit' });
     const bolts = [plasma.bolts, ctx.zap?.bolts].filter(Boolean);
     if (bolts.length)
-      systems.set('Bolts', {
+      extra.push({
         name: 'Bolts',
         live: bolts.reduce((n, b) => n + b.count, 0),
         total: bolts.reduce((n, b) => n + b.cap, 0),
         unit: 'segments',
       });
-    // (The site's one knight is a row of the breakdown's own; Bonfire Live's cast counts here,
-    // and the stats overlay leaves them to the show: `cast`.)
-    if (ctx.knights && !siteKnight)
-      systems.set('Knights', { name: 'Knights', live: ctx.knights.present, total: ctx.knights.max, cast: true });
     return {
       drawCalls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
       texels: `${ctx.size.w}×${ctx.size.h}`,
       systems: [...systems.values()],
+      extra,
     };
   }
   return {

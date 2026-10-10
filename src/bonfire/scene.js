@@ -540,7 +540,8 @@ export function createBonfire(
     // setting, the Painter's Tools menu). The frame rate and times (the page's onTick, on every
     // frame the display shows: Bonfire Live's audio analysis; the page's onFrame; the scene's
     // update; the draw), the draw calls, the shadow's redraws and the GPU's programs and
-    // textures; the particle systems running (stats()); and the page's own part (pageStats:
+    // textures; the particle systems running (stats(): its systems, and its extra: the
+    // fireflies lit, the bolts); and the page's own part (pageStats:
     // Bonfire Live's show, the Painter's scene), in statsParent (the page's box, whose CSS
     // variables place it: ui/perfOverlay.js; the body by default). With ?perf, the same times as
     // performance.measure entries for the browser's profiler. Off, nothing is timed or counted,
@@ -565,7 +566,10 @@ export function createBonfire(
           ctx.perf = createPerfOverlay({
             info: renderer.info,
             maxFps: () => gate.maxFps,
-            particles: () => stats().systems,
+            particles: () => {
+              const s = stats();
+              return [...s.systems, ...s.extra];
+            },
             page: pageStats,
             measures: perfAsked,
             ...(statsParent ? { parent: statsParent } : {}),

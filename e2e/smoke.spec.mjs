@@ -291,6 +291,38 @@ test('the Portfolio’s page takes this one apart: the breakdown, its render set
   expect(errors).toEqual([]);
 });
 
+test('the breakdown counts the scene’s particle systems only: the stats overlay’s other counts aren’t among them', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  // (?perf shows the stats overlay on the site too, from the same scene.)
+  await page.goto('/projects/portfolio/?perf');
+  await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+  // The overlay's rows counted in something other than particles: a count of a whole (live of
+  // how many, "x / y") with a unit by it (the fireflies lit), by name.
+  const others = () =>
+    page.locator('.stats-overlay').evaluate((el) =>
+      [...el.firstElementChild.children].flatMap((block) => {
+        const cells = [...(block.children[1]?.children ?? [])];
+        const names = [];
+        for (let i = 0; i < cells.length; i += 2) {
+          const value = cells[i + 1].textContent;
+          if (value.includes(' / ') && /[a-z]/i.test(value)) names.push(cells[i].textContent);
+        }
+        return names;
+      }),
+    );
+  await expect.poll(others, { timeout: 15_000 }).not.toEqual([]);
+  const names = await others();
+  await page.getByRole('link', { name: TAKE_APART }).click();
+  await expect(page.locator('html')).toHaveClass(/is-breakdown/);
+  const rows = page.locator('[data-bd-stats] dt');
+  await expect(rows.first()).toBeVisible();
+  const listed = await rows.allTextContents();
+  for (const name of names) expect(listed, name).not.toContain(name);
+  expect(errors).toEqual([]);
+});
+
 // Every list the pack has, opened one by one: all of it in the window and below the header
 // (which is over the pack outside the breakdown), phones to desktops, the breakdown open
 // (the pack steps aside, over its sheet on phones) and closed.
