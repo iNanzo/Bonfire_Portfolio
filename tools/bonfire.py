@@ -328,10 +328,12 @@ for w in WEAPONS.values():
 
 # Where the ruins' pieces lie (Blender's x, y: the site's x, -z). The pillar and its candles
 # (src/bonfire/colliders.js RUINS.at), the drum fallen from it, on its own (RUINS.drum), and
-# the knight's seat on the ground (knightPlaces.js SEATS.ruins): no rubble where he sits.
+# the knight's seat on the ground (knightPlaces.js SEATS.ruins): no rubble where he sits,
+# nor under the leg he stretches out resting (knightBody.js seatedPose), out to its boot.
 PX, PY = -2.15, 1.30
 DRUM_X, DRUM_Y, DRUM_TURN = -2.75, 2.05, 35
 SEAT_X, SEAT_Y = -1.02, 1.42
+LEG_X, LEG_Y = -1.21, 0.64
 
 # Broken column on a plinth, back left, a metre to the right of the knight sitting on the
 # ground.
@@ -387,24 +389,30 @@ for row in range(ROWS):
 to_object("Wall_Fragment", bm, M["pillar"], (WX, WY, 0), (0, 0, WR))
 to_object("Wall_Mortar", core, M["mortar"], (WX, WY, 0), (0, 0, WR))
 
-def off_seat(x, y, s):
-    """A rock at (x, y), its size s, moved out of where the knight sits: his hips at the seat
-    and his legs out toward the fire (a capsule SEAT_REACH long, SEAT_R round), straight out
-    of its nearest side. Every other rock stays where it falls (the same draws either way)."""
-    fx, fy = FIRE_CENTER[0] - SEAT_X, FIRE_CENTER[1] - SEAT_Y
+def off_capsule(x, y, keep, ex, ey, reach):
+    """(x, y) moved out of a capsule from the seat toward (ex, ey), `reach` long (all the way
+    when None) and `keep` round, straight out of its nearest side."""
+    fx, fy = ex - SEAT_X, ey - SEAT_Y
     n = math.hypot(fx, fy)
     fx, fy = fx / n, fy / n
-    t = max(0.0, min(SEAT_REACH, (x - SEAT_X) * fx + (y - SEAT_Y) * fy))
+    t = max(0.0, min(n if reach is None else reach, (x - SEAT_X) * fx + (y - SEAT_Y) * fy))
     cx, cy = SEAT_X + fx * t, SEAT_Y + fy * t
     d = math.hypot(x - cx, y - cy)
-    keep = SEAT_R + s
     if d >= keep:
         return x, y
     ux, uy = ((x - cx) / d, (y - cy) / d) if d > 1e-6 else (-fy, fx)
     return cx + ux * keep, cy + uy * keep
 
+def off_seat(x, y, s):
+    """A rock at (x, y), its size s, moved out of where the knight sits: his hips at the seat
+    and his legs out toward the fire (a capsule SEAT_REACH long, SEAT_R round), then from under
+    the leg he stretches out (LEG_R round, out to its boot). Every other rock stays where it
+    falls (the same draws either way)."""
+    x, y = off_capsule(x, y, SEAT_R + s, FIRE_CENTER[0], FIRE_CENTER[1], SEAT_REACH)
+    return off_capsule(x, y, LEG_R + s, LEG_X, LEG_Y, None)
+
 # Rubble (none where the knight sits).
-SEAT_REACH, SEAT_R = 0.55, 0.32
+SEAT_REACH, SEAT_R, LEG_R = 0.55, 0.32, 0.2
 for i in range(14):
     ang = random.uniform(0, math.tau)
     d = random.uniform(1.0, 3.0)
