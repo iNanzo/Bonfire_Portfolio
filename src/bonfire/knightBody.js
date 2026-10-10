@@ -407,14 +407,16 @@ const _kR = new THREE.Vector3();
  *               the right leg out with that forearm along the thigh and the hand on the knee,
  *               the head sunk and tipped a little aside (the higher the seat, the deeper the
  *               slump, which keeps his helmet low on tall layouts). On the ground, a knight
- *               spent by the road: the left knee drawn up high with that arm hung over it and
- *               the gauntlet hanging limp past it, the right leg stretched out along the
- *               ground, slumped toward the knee, the head sunk and tipped to it
+ *               spent by the road: the left knee drawn up high with that arm hung over it, the
+ *               forearm across the kneecap and the gauntlet hanging limp inside it, the right
+ *               leg stretched out along the ground, slumped toward the knee, the head sunk and
+ *               tipped to it
  *   'watchful'  leaning in over his knees, forearms on them, both feet planted under them,
  *               the head up watching the fire, awake (no higher at the helmet than the rest:
  *               tall layouts frame his seat right under the page's header). On the ground,
- *               sitting up with both knees drawn up, the left the higher, the forearms over
- *               them and the hands hanging past, the head up and turned a little to the fire
+ *               sitting up with both knees drawn up, the left the higher, the left forearm over
+ *               its knee and the right along its thigh, the hands hanging past them, the chest
+ *               and the head turned to the fire
  * The hips sit over knight-space (0, 0); the hands are placed on his knees (knight space),
  * so they stay there whatever the torso does. `feet` [left, right] (m): the ground under
  * each foot above the ground he's placed on (a foot up on a log), where feetAt() says they
@@ -430,27 +432,30 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
   if (ground && watch) {
     // Sitting up, leaning back a little from the hips, both knees drawn up: the left the
     // higher, its foot near him (the fire is ahead on his left: his boots stay out of it),
-    // the right a little further out. The head up, turned a little toward the fire.
+    // the right a little further out (no further, nor fallen out more: the back of that
+    // thigh would go into the ground as his weight shifts). The chest turned a little to the
+    // fire, the head up and turned to it.
     joint(p, 'hips', -16);
-    joint(p, 'spine', 10);
-    joint(p, 'chest', 4);
-    joint(p, 'neck', -6, 6);
-    joint(p, 'head', -12, 6);
+    joint(p, 'spine', 10, 6);
+    joint(p, 'chest', 4, 8);
+    joint(p, 'neck', -2, 8);
+    joint(p, 'head', 0, 12);
     leg(p, 'L', 0.03, 0, 0.32, 0, 24);
     leg(p, 'R', 0.1, 0, 0.44, 0, 22);
   } else if (ground) {
     // Slumped toward his left knee, drawn up high and fallen out a little, its foot near him
     // (out of the fire, ahead on his left); the right leg stretched out along the ground,
     // away from the fire, the knee a little bent and turned in (the boot out past it, the
-    // knee clear of the stones by his right side in the ruins; no straighter: the back of
-    // the thigh would go into the ground). The head sunk and tipped toward the knee.
+    // knee clear of the stones by his right side in the ruins; no straighter: as his weight
+    // shifts the foot steps out and the leg would lock, the back of the thigh dropping into
+    // the ground and onto the stone by his knee). The head sunk and tipped toward the knee.
     joint(p, 'hips', -16, -6);
     joint(p, 'spine', 20, 4, -3);
-    joint(p, 'chest', 10, 4, -2);
-    joint(p, 'neck', 8, 4);
-    joint(p, 'head', 12, 6, -10);
-    leg(p, 'L', 0.02, 0, 0.38, 0, 36);
-    leg(p, 'R', 0.32, 0, 0.7, 0, -30);
+    joint(p, 'chest', 10, 4, -5);
+    joint(p, 'neck', 12, 4);
+    joint(p, 'head', 17, 8, -13);
+    leg(p, 'L', 0.02, 0, 0.38, 0, 40);
+    leg(p, 'R', 0.32, 0, 0.69, 0, -30);
   } else if (watch) {
     // Leaning in over his knees, the head tipped back up to watch the fire, feet planted a
     // stride apart under his knees. (No higher at the helmet than the rest: a phone frames
@@ -480,13 +485,17 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
   const kL = _kL.copy(s.p[IDX.shinL]),
     kR = _kR.copy(s.p[IDX.shinR]);
   if (ground && watch) {
-    // Forearms over the knees, the elbows on them, the hands hanging past.
+    // His left forearm over the knee, the elbow on it and the hand hanging past; the right
+    // forearm along the thigh, the hand hanging over the knee, bent down at the wrist and
+    // rolled little (a rolled hand points straight down as a gesture blends in: at the stone
+    // by his right knee in the ruins).
     armAt(p, 'L', kL.x, kL.y - 0.09, kL.z + 0.2, -155, -30, 0.3, 0, rig);
-    armAt(p, 'R', kR.x, kR.y - 0.05, kR.z + 0.18, -165, -30, 0.3, 0, rig);
+    armAt(p, 'R', kR.x + 0.02, kR.y + 0.08, kR.z + 0.08, 22, 80, 0.45, -10, rig);
   } else if (ground) {
-    // His left arm hung over the drawn-up knee, the gauntlet hanging limp past it; the right
-    // forearm along the thigh, the hand on the knee.
-    armAt(p, 'L', kL.x, kL.y - 0.09, kL.z + 0.24, -160, -30, 0.3, 0, rig);
+    // His left arm hung over the drawn-up knee, the elbow out over its top and the forearm
+    // across the kneecap, the gauntlet hanging limp inside it; the right forearm along the
+    // stretched thigh, the hand on the knee.
+    armAt(p, 'L', kL.x - 0.09, kL.y - 0.07, kL.z + 0.2, -130, -45, 0.3, 0, rig);
     armAt(p, 'R', kR.x, kR.y + 0.13, kR.z - 0.02, -20, 30, 0.6, 0, rig);
   } else if (watch) {
     // Forearms on the knees, the hands loosely together in front of them.

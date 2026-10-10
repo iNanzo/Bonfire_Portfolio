@@ -529,7 +529,7 @@ test('[slow] no dance move reaches further than colliders.js MOVE_REACH has it, 
   k.dismiss(1, { instant: true });
 });
 
-test('in the ruins he sits on the ground itself, his boots on it out of the fire; he stands straight up, nothing to step across', async () => {
+test('in the ruins he sits on the ground itself, his boots on it out of the fire, the ground under him level to 6 cm; he stands straight up, nothing to step across', async () => {
   const env = await realKnights();
   const { k } = env;
   const terrain = await terrainOf('ruins');
@@ -542,8 +542,12 @@ test('in the ruins he sits on the ground itself, his boots on it out of the fire
     assert.equal(n.home.h, 0, `${at}: no seat under him (${n.home.h} m)`);
     // Over a whole shift of his weight in his idle (12 s, four times a second; it steps his right
     // foot, lifting it): each sabaton's lowest point down on the ground under it (the height
-    // map's, to 1.5 cm) and never into it, all of it out of the fire.
+    // map's, to 1.5 cm) and never into it, all of it out of the fire; and the ground under what
+    // of him rests on it (his seat, the backs of his legs, his soles: within 3 cm of it) no more
+    // than 6 cm from level (tools/bonfire.py keeps the rubble off his place).
     const boots = { footL: { low: Infinity, fire: Infinity }, footR: { low: Infinity, fire: Infinity } };
+    let lo = Infinity,
+      hi = -Infinity;
     for (let t = 0; t < 12.5; t += 0.25) {
       k.update(0.25);
       const low = {};
@@ -551,6 +555,10 @@ test('in the ruins he sits on the ground itself, his boots on it out of the fire
         const g = terrain.height(v.x, v.z);
         low[bone] = Math.min(low[bone] ?? Infinity, v.y - g);
         if (boots[bone]) boots[bone].fire = Math.min(boots[bone].fire, fireDist(v.x, v.z));
+        if (v.y - g < 0.03) {
+          lo = Math.min(lo, g);
+          hi = Math.max(hi, g);
+        }
       });
       for (const [name, boot] of Object.entries(boots)) boot.low = Math.min(boot.low, low[name]);
     }
@@ -561,6 +569,10 @@ test('in the ruins he sits on the ground itself, his boots on it out of the fire
       );
       assert.ok(boot.fire >= 1.05, `${at}: his ${name} comes to ${boot.fire.toFixed(2)} m from the fire's middle`);
     }
+    assert.ok(
+      hi - lo <= 0.06,
+      `${at}: the ground under him from ${(lo * 100).toFixed(1)} to ${(hi * 100).toFixed(1)} cm`,
+    );
     // Up on his feet straight in front of where he sits (nothing aside: SEATS standAside), with
     // nothing in front of him to step across on the way (knightPose.js rise()'s `over`).
     k.stand(0);
