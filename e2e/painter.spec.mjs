@@ -636,6 +636,23 @@ test('Tools: the Stats Overlay stays under Render Settings (P) and clear of it a
   expect(errors).toEqual([]);
 });
 
+test('Tools: the library puts the Stats Overlay away while it’s open (nothing of it shows through)', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await ready(page, '/painter/?scene=b:frozen-shrine');
+  const overlay = page.locator('.stats-overlay');
+  await page.keyboard.press('u');
+  await expect(overlay).toContainText('Frames', { timeout: 10_000 });
+  await page.keyboard.press('l');
+  await expect(page.locator('.pnt-lib')).toBeVisible();
+  await expect(overlay).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.pnt-lib')).toBeHidden();
+  await expect(overlay).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('the library filters its scenes by name', async ({ page }) => {
   const errors = watch(page);
   await ready(page);
