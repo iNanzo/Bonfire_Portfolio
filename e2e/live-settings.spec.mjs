@@ -710,8 +710,11 @@ test('Stats Overlay: on a phone’s start screen it keeps to the room above the 
   // The show: all of it, top left.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.click('[data-source="demo"]');
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'live');
   await expect(overlay).toContainText('Section', { timeout: 10_000 });
-  expect((await overlay.boundingBox()).height).toBeGreaterThan(200);
+  // Section can already be in a clipped group on the start screen. Wait for the
+  // twice-a-second overlay update to restore its rows, not just for that DOM text.
+  await expect.poll(async () => (await overlay.boundingBox())?.height ?? 0).toBeGreaterThan(200);
   expect(errors).toEqual([]);
 });
 

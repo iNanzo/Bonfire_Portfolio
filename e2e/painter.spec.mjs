@@ -653,9 +653,12 @@ test('Tools: the Stats Overlay stays under Render Settings (P) and clear of it a
     await page.setViewportSize({ width, height });
     await page.keyboard.press('p');
     await expect(menu).toBeVisible();
+    // Resizing and opening the menu changes the available room via ResizeObserver;
+    // the overlay fits whole rows on its next sample. A zero-height box is clear of
+    // everything, so wait for usable rows before checking that they do not overlap.
+    await expect.poll(async () => (await overlay.boundingBox())?.height ?? 0).toBeGreaterThan(40);
     await expect.poll(async () => crosses(await overlay.boundingBox(), await menu.boundingBox())).toBe(false);
     expect(crosses(await overlay.boundingBox(), await panel.boundingBox()), `${width}: the panel`).toBe(false);
-    expect((await overlay.boundingBox()).height).toBeGreaterThan(40);
     expect(await zOf(overlay)).toBeLessThan(await zOf(menu));
     await page.keyboard.press('p');
     await expect(menu).toBeHidden();
