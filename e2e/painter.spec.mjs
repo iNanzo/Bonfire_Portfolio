@@ -603,6 +603,39 @@ test('Tools: the Stats Overlay (or U) shows the stage’s frames, particles and 
   expect(errors).toEqual([]);
 });
 
+/** Two boxes (boundingBox's) overlap. */
+const crosses = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+/** The stacking order of an element (its computed z-index). */
+const zOf = (locator) => locator.evaluate((el) => Number(getComputedStyle(el).zIndex));
+
+test('Tools: the Stats Overlay stays under Render Settings (P) and clear of it and the panel, wide and on a phone', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await ready(page, '/painter/?scene=b:frozen-shrine');
+  const overlay = page.locator('.stats-overlay');
+  const menu = page.locator('.pnt-render-menu');
+  const panel = page.locator('[data-panel]');
+  await page.keyboard.press('u');
+  await expect(overlay).toContainText('Frames', { timeout: 10_000 });
+  for (const [width, height] of [
+    [1600, 900],
+    [390, 844],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await page.keyboard.press('p');
+    await expect(menu).toBeVisible();
+    await expect.poll(async () => crosses(await overlay.boundingBox(), await menu.boundingBox())).toBe(false);
+    expect(crosses(await overlay.boundingBox(), await panel.boundingBox()), `${width}: the panel`).toBe(false);
+    expect((await overlay.boundingBox()).height).toBeGreaterThan(40);
+    expect(await zOf(overlay)).toBeLessThan(await zOf(menu));
+    await page.keyboard.press('p');
+    await expect(menu).toBeHidden();
+  }
+  expect(errors).toEqual([]);
+});
+
 test('the library filters its scenes by name', async ({ page }) => {
   const errors = watch(page);
   await ready(page);

@@ -135,18 +135,20 @@ redo, the banner's ✕), Tools, Play and the previews have tooltips that a scree
 reads out too (each button's description).
 
 **The Stats Overlay** (Tools, or U) shows, in the stage's top left corner under the bar
-(clear of the panel and the notes; the library covers it), what the stage costs and what's
-live in the scene, twice a second: **Frames** (frames a second, the time between them, the
-draw calls and the shadow's redraws; dimmed, the frame's parts and the GPU's objects),
-**Particles** (each system running, live of how many it has, the fireflies lit), and
-**Scene**: the scene being painted, the preview's section (the Drop Loop goes through a
-breakdown, a build and the drop), the budget, the look and its strength, the layers live
-now, each *(In the Mix)* or *(Always)*, a drop's hits while they fire, the knights and the
-shot. It's the page's, not the scene's: it's kept for the next visit (localStorage
-`bonfire-painter-view`) and never changes or dirties the scene. The panel's search finds it
-by its words ("fps", "stats", "debug"…) and says where it is: *Stats Overlay: turn it on in
-Tools, or press U*. The same overlay as Bonfire Live's (`docs/bonfire-live.md`;
-`docs/performance.md` for the numbers); `?perf` in the address shows it too.
+(clear of the panel and the notes, under the menus; where Render Settings opens over it, on
+a narrower screen, it steps down under the menu; the library covers it), what the stage
+costs and what's live in the scene, twice a second: **Frames** (frames a second, the time
+between them, the draw calls and the shadow's redraws; dimmed, the frame's parts and the
+GPU's objects), **Particles** (each system running, live of how many it has, the fireflies
+lit), and **Scene**: the scene being painted, the preview's section (the Drop Loop goes
+through a breakdown, a build and the drop), the budget, the look and its strength, the
+layers live now, each *(In the Mix)* or *(Always)*, a drop's hits while they fire, the
+knights and the shot. It's the page's, not the scene's: it's kept for the next visit
+(localStorage `bonfire-painter-view`) and never changes or dirties the scene. The panel's
+search finds it by its words ("fps", "stats", "debug"…) and says where it is: *Stats
+Overlay: turn it on in Tools, or press U*. The same overlay as Bonfire Live's
+(`docs/bonfire-live.md`; `docs/performance.md` for the numbers); `?perf` in the address
+shows it too.
 
 **The preview**
 

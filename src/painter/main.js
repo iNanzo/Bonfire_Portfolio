@@ -1073,6 +1073,10 @@ const renderMenu = createRenderMenu({
   },
 });
 app.append(renderMenu.el);
+// (Where it opens over the stats overlay, the overlay steps down under it: painter.css.)
+new ResizeObserver(() => document.body.style.setProperty('--menu-h', `${renderMenu.el.offsetHeight}px`)).observe(
+  renderMenu.el,
+);
 
 // --- The pack (I): it paints into the scene (the place, the weapon, the element, the flame,
 // the first knight's helmet, the knights' style and finish); its gestures are previews. ---------

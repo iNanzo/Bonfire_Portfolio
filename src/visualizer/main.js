@@ -333,6 +333,10 @@ Object.assign(ctx, createDialogs(ctx));
 // --- Render Settings (renderUi.js): P, the Picture tab's switches, as on the site --------------
 Object.assign(ctx, createRenderUi(ctx));
 app.append(ctx.renderMenu.el);
+// (Where it opens over the stats overlay, the overlay steps down under it: visualizer.css.)
+new ResizeObserver(() => app.style.setProperty('--menu-h', `${ctx.renderMenu.el.offsetHeight}px`)).observe(
+  ctx.renderMenu.el,
+);
 
 // --- Recording a clip (record.js) -------------------------------------------------------------
 const recordLabel = q('[data-record-label]');

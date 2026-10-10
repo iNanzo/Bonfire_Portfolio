@@ -22,10 +22,13 @@ the show is doing. Three ways to turn it on:
 `createBonfire` mounts it (`fire.setStats(on)`; `src/ui/perfOverlay.js`, its words in
 `src/ui/statsGroups.js`). Bonfire Live has it top left in the show (the HUD is along the
 bottom, the pack bottom right, Render Settings top right) and top right on the start screen;
-the Painter top left of the stage, under the bar; the site bottom left. It never takes the
-pointer and is hidden from screen readers. It's HTML over the canvas, so it isn't in Bonfire
-Live's output window, a recorded clip, a capture or a scene's thumbnail. On a phone it's
-smaller and leaves out the dimmed rows. Twice a second:
+the Painter top left of the stage, under the bar; the site bottom left. It's under the
+page's menus and panels, never over them: where Render Settings opens over it, it steps down
+under the menu (the page keeps `--menu-h` at the menu's height; `--stats-max-h` keeps it to
+the room left, its last rows cut off past it). It never takes the pointer and is hidden from
+screen readers. It's HTML over the canvas, so it isn't in Bonfire Live's output window, a
+recorded clip, a capture or a scene's thumbnail. On a phone it's smaller and leaves out the
+dimmed rows. Twice a second:
 
 ```
 FRAMES

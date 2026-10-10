@@ -627,6 +627,42 @@ test('Stats Overlay: U shows the frames, the particles and the show in a corner,
   expect(errors).toEqual([]);
 });
 
+/** Two boxes (boundingBox's) overlap. */
+const crosses = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+/** The stacking order of an element (its computed z-index). */
+const zOf = (locator) => locator.evaluate((el) => Number(getComputedStyle(el).zIndex));
+
+test('Stats Overlay: under Render Settings (P) and clear of it, on the start screen and in the show, wide and on a phone', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await open(page);
+  const overlay = page.locator('.stats-overlay');
+  const menu = page.locator('.viz-render-menu');
+  /** P opens Render Settings: the overlay, still showing, never crosses it (and is under it). */
+  async function clearOfMenu() {
+    await page.keyboard.press('p');
+    await expect(menu).toBeVisible();
+    await expect.poll(async () => crosses(await overlay.boundingBox(), await menu.boundingBox())).toBe(false);
+    expect((await overlay.boundingBox()).height).toBeGreaterThan(40);
+    expect(await zOf(overlay)).toBeLessThan(await zOf(menu));
+    await page.keyboard.press('p');
+    await expect(menu).toBeHidden();
+  }
+  // The start screen (Render Settings works there too), wide.
+  await page.keyboard.press('u');
+  await expect(overlay).toContainText('Frames', { timeout: 10_000 });
+  await clearOfMenu();
+  // The show, wide, then on a phone (where Render Settings takes the width).
+  await page.click('[data-source="demo"]');
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'live');
+  await clearOfMenu();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await clearOfMenu();
+  expect(errors).toEqual([]);
+});
+
 test('the HUD stays while the mouse rests on it (its tip with it), and fades when it rests on the picture', async ({
   page,
 }) => {
