@@ -498,7 +498,13 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   resting (0.78 m) but not watchful (0.755); a boot turned in that way came to 0.743. A
   change of pose where they sit shifts them back or forward to its place as they change
   (`rehome`). The show seats them where a new scenery would, 1.5 cm or more clear of the
-  scenery (`test/knightClearance.test.mjs`).
+  scenery (`test/knightClearance.test.mjs`). A step he sits on can drop away in front of
+  him (the cult's and the shrine's places for three and four, 15.3 and 13 cm up): his
+  boots rest on the ground down there, as far as 16 cm under him (`GROUND_REACH`; the
+  stretched leg's knee still bent 28°), where a seat's go no lower than 10 cm
+  (`SEAT_REACH`). Held to 10 cm there, the stretched boot hung 5 and 3 cm in the air.
+  Sitting still, each boot of theirs rests within 1.5 cm of the ground under it, in
+  every scenery and cast (`test/knightClearance.test.mjs`).
   *Resting only with room for it* (the user's call, round 11): a knight asked to rest on
   the ring rests only where he'd sit as every seat has him, 4 cm or more from the
   scenery's shapes sitting still, his boots and shins resting on what's under them

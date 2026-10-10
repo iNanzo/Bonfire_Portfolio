@@ -152,6 +152,12 @@ const SOLE = [
 // the difference.)
 const TOE_REACH = 0.3;
 const SOLE_ON_GROUND = [[-0.12, 0.05], [-0.06, 0.05], ...SOLE];
+// (How far under the ground he sits on a seated boot may rest, m. On a seat, 10 cm; sitting on
+// the ground, as far as a step he sits on can drop away in front of him: the leg he stretches
+// out resting reaches the ground 15.3 cm below the step he sits on at the cult's ring place for
+// three, its knee still bent 28° (19° at 20 cm). Held to 10 cm, that boot hung 5 cm up.)
+const SEAT_REACH = 0.1;
+const GROUND_REACH = 0.16;
 // (A standing boot's sole, m from its ankle: across it, and from its heel to its pointed toe.)
 const STAND_SOLE = [
   [-0.07, 0, 0.07],
@@ -550,10 +556,10 @@ export function createKnights(
     _hw.z += home.z;
     return _hw;
   };
-  /** The ground at a place in his own space at `home`, above the ground he's placed on (m). */
-  const groundUnder = (home, x, z) => {
+  /** The ground at a place in his own space at `home`, above the ground he's placed on (m; `reach` at most under it). */
+  const groundUnder = (home, x, z, reach = SEAT_REACH) => {
     const w = atHome(home, x, z);
-    return THREE.MathUtils.clamp(heightAt(w.x, w.z) - home.y, -0.1, 0.42);
+    return THREE.MathUtils.clamp(heightAt(w.x, w.z) - home.y, -reach, 0.42);
   };
   /**
    * The ground a seated boot rests on at a place in his own space at `home` (its ankle at x, z,
@@ -563,15 +569,17 @@ export function createKnights(
    * Sitting on the ground, from behind its heel too (12 cm behind the ankle: its heel is 9 cm
    * back, and his idle's shift of weight steps it 2.5 back): a leg stretched out along the ground
    * rests its heel on whatever lies there (the spare log by the fire, for one of Bonfire Live's
-   * knights resting on the ring). On a seat, not the heel's: a foot drawn in tucks its heel
-   * under the seat's edge.
+   * knights resting on the ring), and down off a step he sits on (GROUND_REACH). On a seat,
+   * not the heel's: a foot drawn in tucks its heel under the seat's edge.
    */
   const soleUnder = (home, x, z, turn = 0) => {
     const c = Math.cos(turn),
       sn = Math.sin(turn);
+    const onGround = home.h < 0.12,
+      reach = onGround ? GROUND_REACH : SEAT_REACH;
     let g = -Infinity;
-    for (const [dz, w] of home.h < 0.12 ? SOLE_ON_GROUND : SOLE)
-      for (const dx of [-w, w]) g = Math.max(g, groundUnder(home, x + dx * c + dz * sn, z - dx * sn + dz * c));
+    for (const [dz, w] of onGround ? SOLE_ON_GROUND : SOLE)
+      for (const dx of [-w, w]) g = Math.max(g, groundUnder(home, x + dx * c + dz * sn, z - dx * sn + dz * c, reach));
     return g;
   };
   /**

@@ -1403,3 +1403,46 @@ test('[slow] a knight resting on the ring sits where a seat would have him, 4 cm
   assert.ok(awake.size, 'a knight sat watchful where his rest would meet the scenery, with four out');
   assert.deepEqual(idling, [], 'idling otherwise than his seat pose has him');
 });
+
+// (Round 11's review: turned in, a ring knight's stretched boot hung 9 cm over the ground by the
+// ruins' fire pit with four out, lifted by the pit's rim beside its toe (test/knights.test.mjs);
+// and off the step he sits on at the cult's and the shrine's places for three, 5 and 3 cm,
+// held to 10 cm under him.)
+test('[slow] a knight sitting on the ring rests his boots on the ground under them (the height map’s, to 1.5 cm), sitting still: every scenery and cast, either seat pose, by the pit’s stones and off a step he sits on', async () => {
+  const { pieces } = await realKnights(4);
+  const model = await loadKnightMesh();
+  const k = createKnights(model.scene(), { armor: armor(), max: 4, reducedMotion: true });
+  const env = { k, pieces };
+  const bad = [];
+  let steps = 0;
+  for (const name of NAMES) {
+    const terrain = await terrainOf(name);
+    for (const pose of SEAT_POSES) {
+      k.setSeatPose(pose);
+      for (const cast of [2, 3, 4]) {
+        k.setScenery(name, terrain);
+        k.setCast({ count: cast, instant: true });
+        k.setScenery(name, terrain); // (a new scenery sends them home)
+        k.update(1 / 12 + 1e-7);
+        for (let i = 1; i < cast; i++) {
+          const n = k.knights[i];
+          if (n.home.y > 0.1) steps++;
+          // (Each sabaton's lowest point over the ground under it.)
+          const low = { footL: Infinity, footR: Infinity };
+          eachPoint(env, n, (v, bone) => {
+            if (bone in low) low[bone] = Math.min(low[bone], v.y - terrain.height(v.x, v.z));
+          });
+          for (const [bone, d] of Object.entries(low))
+            if (d > 0.015)
+              bad.push(
+                `${name}, ${cast} out, #${i} (${n.home.style}${n.home.y > 0.1 ? `, on a step ${(n.home.y * 100).toFixed(1)} cm up` : ''}): his ${bone} ${(d * 100).toFixed(1)} cm over the ground`,
+              );
+        }
+        for (let i = 0; i < 4; i++) k.dismiss(i, { instant: true });
+      }
+    }
+  }
+  k.dispose?.();
+  assert.ok(steps > 0, 'a knight sat on a step on the ring');
+  assert.deepEqual(bad, [], 'a boot over the ground under it');
+});
