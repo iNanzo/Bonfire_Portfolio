@@ -266,6 +266,28 @@ test('resting on the ground, the boot of the leg he stretches out turns in towar
   }
 });
 
+test('resting on the ground, the knee of the leg he stretches out faces up and a little out (5° to 25° from straight up, square to the leg), not in toward his other knee', () => {
+  // (The user's Dark Souls reference: that leg lies rolled a little onto its outside. Much
+  // further out, he comes within 10 px of a phone's frame on the home view.)
+  for (const h of [0, 0.06, 0.11]) {
+    for (const feet of [null, [0.03, -0.02]]) {
+      const p = seatedPose(newPose(), h, DEFAULT_RIG, 'resting', feet);
+      const s = solver.solve(p, feet);
+      const [hip, knee, ankle] = ['thighR', 'shinR', 'footR'].map((b) => s.p[I[b]].clone());
+      const along = ankle.sub(hip).normalize();
+      const cap = knee
+        .sub(hip)
+        .projectOnPlane(along)
+        .normalize()
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), -p[POSE.hips + 1]);
+      // (His right is −x: out is the cap's −x, from straight up.)
+      const out = Math.atan2(-cap.x, cap.y) * DEG;
+      const what = `resting on the ground (${h} m${feet ? ', uneven' : ''})`;
+      assert.ok(out >= 5 && out <= 25, `${what}: his right knee faces ${out.toFixed(1)}° out from straight up`);
+    }
+  }
+});
+
 test('[slow] every move gives a sound pose in its limits over 64 beats, standing and (where it can) seated', () => {
   const stand = standingPose();
   const sit = seatedPose(newPose(), 0.36);

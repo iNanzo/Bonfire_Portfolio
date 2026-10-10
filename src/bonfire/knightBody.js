@@ -460,19 +460,20 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
     leg(p, 'R', 0.1, 0, 0.44, 0, 22);
   } else if (ground) {
     // Slumped toward his left knee, drawn up high and fallen out a little, its foot near him
-    // (out of the fire, ahead on his left); the right leg stretched out along the ground,
-    // away from the fire, the knee a little bent and turned in (the boot out past it, the
-    // knee clear of the stones by his right side in the ruins; no straighter: as his weight
-    // shifts the foot steps out and the leg would lock, the back of the thigh dropping into
-    // the ground and onto the stone by his knee), its boot turned in toward his other foot
-    // (the user's Dark Souls reference). The head sunk and tipped toward the knee.
-    joint(p, 'hips', -16, -6);
+    // (out of the fire, ahead on his left), his weight on that side (the hips rolled off the
+    // right, which keeps the back of that rolled-out thigh off the ground); the right leg
+    // stretched out along the ground, away from the fire, the knee a little bent and rolled
+    // a little out, its boot turned in toward his other foot (both as in the user's Dark
+    // Souls reference; the knee no further out: he'd come within 10 px of a phone's frame;
+    // no straighter: as his weight shifts the foot steps out and the leg would lock, the
+    // back of the thigh dropping into the ground). The head sunk and tipped toward the knee.
+    joint(p, 'hips', -16, -6, -3);
     joint(p, 'spine', 20, 4, -3);
     joint(p, 'chest', 10, 4, -5);
     joint(p, 'neck', 12, 4);
     joint(p, 'head', 17, 8, -13);
     leg(p, 'L', 0.02, 0, 0.38, 0, 40);
-    leg(p, 'R', 0.32, 0, 0.69, 0, -30);
+    leg(p, 'R', 0.32, 0, 0.69, 0, 40);
     toeIn(p, 'R', GROUND_TOE_IN);
   } else if (watch) {
     // Leaning in over his knees, the head tipped back up to watch the fire, feet planted a
