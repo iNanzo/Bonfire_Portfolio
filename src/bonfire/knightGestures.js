@@ -80,6 +80,20 @@ const SIT_UP = { praise: 1, wave: 0.8, bow: 0.7, point: 0.9, beckon: 0.7, shrug:
 const RIGHT_HANDED = new Set(['wave']);
 
 /**
+ * Each arm of `p` swung across to its own side of him, as far forward or back and as high:
+ * one hanging nearly straight down from a chest sitting up (Praise the Sun's wind-up, seated)
+ * is tipped across to his other side by the least lean or turn of the chest, and an arm
+ * swinging there sweeps the hand in through his belly.
+ */
+function ownSides(p) {
+  for (const side of ['L', 'R']) {
+    const o = sideOf(side);
+    if (Math.sin(p[o]) < 0) p[o] = Math.atan2(-Math.sin(p[o]), Math.cos(p[o]));
+  }
+  return p;
+}
+
+/**
  * One gesture's pose at `t` into `g` (a copy of the pose it's over); returns its weight.
  * `seated` changes what the legs and hips do (they keep the seat) and a few gestures;
  * `room` [left, right] 0..1: how much room there is out to each side for an arm flung out
@@ -287,6 +301,7 @@ export function gesture(
       nudge(s, 'spine', 10);
       gFrom.copy(chestFrame(s).q);
       reframeArms(wind, gFrom, chestFrame(wind).q);
+      ownSides(wind);
     }
     hemArms(wind, room);
     const w = env(t, 0.36, 0.34, T, 0.5);
