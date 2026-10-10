@@ -105,7 +105,7 @@ import {
   CHEERS,
   SEAT_POSES,
 } from './knightPose.js';
-import { SEATS, danceSlots, ringOf, restPlaces, planWalk, facingYaw, FIRE_AT } from './knightPlaces.js';
+import { SEATS, danceSlots, ringOf, restPlaces, planWalk, facingYaw, FIRE_AT, PIT } from './knightPlaces.js';
 import { collidersNear, distanceTo, outOf, createFits } from './colliders.js';
 import { weaponSilhouette } from './forgeFx.js';
 import {
@@ -342,6 +342,19 @@ export function createKnights(
   /** Something he can't step over stands at (x, z): a seat, a wall, a pile of logs (the height map). */
   const blocked = (x, z) => topAt(x, z) > STEP_OVER;
 
+  // The nearest the fire's middle a knight sits on the ground facing it (m; his hips): each
+  // boot's toe, a sole's length past its ankle, a hand's breadth out of the pit's stones, in
+  // either seat pose (he may change pose where he sits; the resting one stretches a leg out
+  // toward the fire).
+  const NEAR_FIRE = Math.max(
+    ...SEAT_POSES.flatMap((style) =>
+      feetAt(seatedPose(newPose(), 0, rig, style), rig).map(
+        ([x, z]) => z + 0.28 + Math.sqrt(Math.max(0, (PIT + 0.08) ** 2 - x * x)),
+      ),
+    ),
+  );
+  /** How far back from where his feet would be he sits on the ground, `out` m from the fire's middle (m). */
+  const sitBack = (out) => Math.max(seatFeet(0) - 0.03, NEAR_FIRE - out);
   /** Where knight i rests in this scenery: the scenery's seat (the first), or the ground at a ring slot. */
   function homeFor(i) {
     const seat = SEATS[sceneryName];
@@ -386,11 +399,12 @@ export function createKnights(
       };
     }
     // The others sit on the ground where the visualizer rests them (knightPlaces.js
-    // restPlaces: the ring's clear sides, never in front of the fire), their feet on the ring.
+    // restPlaces: the ring's clear sides, never in front of the fire), their feet on the ring
+    // (or out of the fire, a leg stretched out toward it).
     const place =
       restPlaces(ringOf(sceneryName), Math.max(cast, i + 1), seat)[i - 1] ?? danceSlots(sceneryName)[slotOf(i)];
     const out = Math.hypot(place.x - FIRE.x, place.z - FIRE.z) || 1;
-    const back = seatFeet(0) - 0.03;
+    const back = sitBack(out);
     const x = place.x + ((place.x - FIRE.x) / out) * back,
       z = place.z + ((place.z - FIRE.z) / out) * back;
     return { x, z, yaw: faceFire(x, z), h: 0, feet: [0, 0], y: Math.max(0, heightAt(x, z)), seat: false };
@@ -1796,8 +1810,8 @@ export function createKnights(
           kind: 'place',
           dur: 0,
           start() {
-            // (He sits down where he stands: his seat is a step behind his feet.)
-            const back = new THREE.Vector3(0, 0, -(seatFeet(0) - 0.03))
+            // (He sits down where he stands: his seat is a step behind his feet, or more by the fire.)
+            const back = new THREE.Vector3(0, 0, -sitBack(Math.hypot(p.x - FIRE.x, p.z - FIRE.z)))
               .applyAxisAngle(Y_AXIS, k.yaw)
               .add(k.group.position);
             shiftPlace(k, back);

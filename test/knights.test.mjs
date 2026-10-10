@@ -24,7 +24,7 @@ import {
 } from '../src/bonfire/knightPose.js';
 import { createResourceScope } from '../src/bonfire/resources.js';
 import { SEATS, DANCE_RING } from '../src/bonfire/scenery.js';
-import { restPlaces, ringOf, sideArcs, slotPlaces, FRONT, FIRE_AT } from '../src/bonfire/knightPlaces.js';
+import { restPlaces, ringOf, sideArcs, slotPlaces, FRONT, FIRE_AT, PIT } from '../src/bonfire/knightPlaces.js';
 
 /** The model's rig as plain groups (docs/knight.md), a box on every joint, three helmets on the head. */
 function standInModel() {
@@ -1031,7 +1031,11 @@ test('the site’s dance on a phone (no headroom): he dances it in his seat, his
   assert.equal(k.list[0].state, 'sitting');
 });
 
-test('seated at every scenery’s seat (either seat pose), his boots stay well out of the fire (the real sabatons: ≥ 1.05 m from its middle)', async () => {
+/**
+ * The real model's joints (a small box on each) for createKnights, and how near a knight's real
+ * sabatons come to the fire's middle (m).
+ */
+async function realBoots() {
   const { loadKnightMesh } = await import('./lib/knightMesh.mjs');
   const model = await loadKnightMesh();
   const rig = () => {
@@ -1060,7 +1064,25 @@ test('seated at every scenery’s seat (either seat pose), his boots stay well o
   const boots = { footL: model.points('K_Foot_L'), footR: model.points('K_Foot_R') };
   assert.ok(boots.footL.length > 20, 'the sabatons were read from the model');
   const v = new THREE.Vector3();
-  for (const [pose, name] of SEAT_POSES.flatMap((pose) => Object.keys(SEATS).map((name) => [pose, name]))) {
+  const nearFire = (k, i) => {
+    let near = Infinity;
+    k.group.updateMatrixWorld(true);
+    for (const [b, pts] of Object.entries(boots)) {
+      const foot = bone(k, i, b);
+      for (const p of pts) {
+        v.set(...p).applyMatrix4(foot.matrixWorld);
+        near = Math.min(near, Math.hypot(v.x - FIRE_AT.x, v.z - FIRE_AT.z));
+      }
+    }
+    return near;
+  };
+  return { rig, nearFire };
+}
+const everySeating = () => SEAT_POSES.flatMap((pose) => Object.keys(SEATS).map((name) => [pose, name]));
+
+test('seated at every scenery’s seat (either seat pose), his boots stay well out of the fire (the real sabatons: ≥ 1.05 m from its middle)', async () => {
+  const { rig, nearFire } = await realBoots();
+  for (const [pose, name] of everySeating()) {
     const k = createKnights(rig(), { armor: armor(), max: 1 });
     k.setSeatPose(pose);
     k.setScenery(name, flatAt(name));
@@ -1069,16 +1091,29 @@ test('seated at every scenery’s seat (either seat pose), his boots stay well o
     // (Over his idle: breathing, the doze, the glances, a shift of his weight.)
     for (let f = 0; f < 60 * 14; f++) {
       k.update(1 / 60);
-      if (f % 10) continue;
-      k.group.updateMatrixWorld(true);
-      for (const [b, pts] of Object.entries(boots)) {
-        const bone = k.knights[0].bones.find((x) => x.name === b);
-        for (const p of pts) {
-          v.set(...p).applyMatrix4(bone.matrixWorld);
-          near = Math.min(near, Math.hypot(v.x - 0.02, v.z - 0.02));
-        }
-      }
+      if (f % 10 === 0) near = Math.min(near, nearFire(k, 0));
     }
     assert.ok(near >= 1.05, `${pose}, ${name}: his boots come to ${near.toFixed(2)} m from the fire's middle`);
+  }
+});
+
+test('the others resting on the ground round the fire (Bonfire Live), either seat pose, keep their boots out of its pit’s stones (a leg stretched out toward it too)', async () => {
+  const { rig, nearFire } = await realBoots();
+  for (const [pose, name] of everySeating()) {
+    const k = createKnights(rig(), { armor: armor(), max: 4 });
+    k.setSeatPose(pose);
+    k.setScenery(name, flatAt(name));
+    k.setCast({ count: 4, instant: true });
+    k.setScenery(name, flatAt(name));
+    let near = Infinity;
+    // (Over their idle, a shift of the weight and all: the right foot steps out and back.)
+    for (let f = 0; f < 30 * 13; f++) {
+      k.update(1 / 30);
+      if (f % 5 === 0) for (let i = 1; i < 4; i++) near = Math.min(near, nearFire(k, i));
+    }
+    assert.ok(
+      near >= PIT + 0.02,
+      `${pose}, ${name}: the others' boots come to ${near.toFixed(2)} m from the fire's middle`,
+    );
   }
 });
