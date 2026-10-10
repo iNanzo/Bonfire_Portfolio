@@ -958,7 +958,7 @@ test('his room for each arm at home comes from the scenery’s shapes; a dance m
   // right shoulder: less room for that arm, all of it for the other. (Every scenery's seat
   // stands clear of what's round it: all the room there, test/knightClearance.test.mjs. A
   // little further round, at (-1.4, 0.3), his rest would come within 4 cm of the lantern:
-  // he sits watchful there, knights.js restsClear.)
+  // he sits watchful there, knights.js clearAt.)
   const by = { x: -1.45, z: 0.2 };
   const sitDown = (name) => {
     k.setScenery(name, flatAt(name));

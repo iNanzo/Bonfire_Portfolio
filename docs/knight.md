@@ -508,19 +508,29 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   *Resting only with room for it* (the user's call, round 11): a knight asked to rest on
   the ring rests only where he'd sit as every seat has him, 4 cm or more from the
   scenery's shapes sitting still, his boots and shins resting on what's under them
-  (`restsClear`: his resting pose there, solved and checked against the shapes near him,
-  arms, body and every helmet; about 0.1 ms a knight, under 0.3 ms for a new scenery with
-  four out). Where it would meet something he sits watchful there instead (`groundHome`
-  keeps the pose asked for as `want`, the one he sits in as `style`): with the places
-  round 11 has, the cathedral's by the pew for four (resting, he sat up on its kneeler,
-  his chest 2 cm off the pew's end; watchful, beside the pew's end, up 4.6 cm on the
-  kneeler's edge and his left thigh 2.4 cm into it, which as a low piece isn't one of the
-  shapes: 1.4 cm up and 1.4 in before watchful sat 2 cm further back) and the forge's by
-  the hearth for three or four (sitting as far back as his turned-in boot needs, he'd come
-  within 4 cm of it; before the turn he rested 4.2 cm off); every other place rests. It
-  holds for any place a scenery has, a new one too (`test/knightClearance.test.mjs` checks
-  every scenery and cast, sent home, sat down where the show stands him, and back from
-  watchful).
+  (`clearAt`: his resting pose there, solved and checked against the shapes near him,
+  arms, body and every helmet; about 0.1 ms a knight), and his boots lying on the ground:
+  where a boot would rest level on something under its front alone, its heel in the air
+  (a pit stone under its toe: `propOf`, more than 1.5 cm over the ground under its heel
+  and ankle), he sits back from the fire 2 cm at a time, 20 cm at most, to where it lies on
+  the ground and he's as clear (`settleOn`; sitting watchful too, or where he'd sit if no
+  further back is clear). By the pit for four (the ruins, forge and shrine) that's 2 cm
+  back, the stretched boot's heel down from 4.7 cm; at the places for three and four on
+  the far side, 4 cm, the drawn-in boot's from 3.7. A new scenery with four out costs
+  1.1–2.1 ms in all (1.0–1.6 before). Where his rest would meet something, or has nowhere
+  clear to lie on the ground, he sits watchful there instead (`groundHome` keeps the pose
+  asked for as `want`, the one he sits in as `style`): with the places round 11 has, the
+  cathedral's by the pew for four (resting, he sat up on its kneeler, his chest 2 cm off
+  the pew's end; watchful, beside the pew's end, up 4.6 cm on the kneeler's edge and his
+  left thigh 2.4 cm into it, which as a low piece isn't one of the shapes: 1.4 cm up and
+  1.4 in before watchful sat 2 cm further back), the forge's by the hearth for three or
+  four (sitting as far back as his turned-in boot needs, he'd come within 4 cm of it;
+  before the turn he rested 4.2 cm off) and the cult's by the pit for four (his stretched
+  boot's toe on a pit stone, sat back till it lies on the ground he'd come within 4 cm of
+  the hooded watcher behind him); every other place rests. It holds for any place a
+  scenery has, a new one too (`test/knightClearance.test.mjs` checks every scenery and
+  cast, sent home, sat down where the show stands him, and back from watchful, the pose
+  he sits in, and each boot on the ground under it).
 - **The seated rest** is the Dark Souls bonfire rest: slumped forward over his knees
   (spine 27° to 36° from a 0.22 to a 0.40 m seat), his left foot drawn in and that arm
   laid over the knee with the gauntlet hanging past it, the right leg out with that
