@@ -65,7 +65,8 @@ function seat(x, z, top, { turn = TURN, signOut = SIGN_OUT, signAt = null, stand
  * The knight's seat in each scenery, behind the fire on the left, 1.69–1.78 m from its middle
  * (bearings 206–217°) so his boots stay well out of it (≥ 1.05 m: test/knights.test.mjs, on
  * the real model) and his legs leave the dance ring clear from 253° round the front. The
- * seats are low (0.21–0.23 m, knees up, like a knight resting at a Dark Souls bonfire): that
+ * seats are low (the ground in the ruins, 0.21–0.23 m elsewhere, knees up, like a knight
+ * resting at a Dark Souls bonfire): that
  * far back a higher one would lift his helmet into the page's header on phones, and further
  * round he'd leave a phone's frame (test/knights.test.mjs); further toward the flames, stood
  * up he'd stand behind them (test/knightClearance.test.mjs). Each keeps him at least 4 cm
@@ -76,12 +77,10 @@ function seat(x, z, top, { turn = TURN, signOut = SIGN_OUT, signAt = null, stand
  * (test/knightPlaces.test.mjs).
  */
 export const SEATS = {
-  // A drum fallen from the pillar, lying across his way (scenery.js), clear of the pillar at
-  // his right shoulder; his boots rest up on the model's own fallen drum in front of him. He
-  // stands up to his right, across that drum, in front of the pillar's plinth, left of the
-  // flames from the cameras; his sign lies just beyond (the open ground nearer his seat is
-  // under the drum or behind the flames).
-  ruins: seat(-0.75, -1.53, 0.21, { signAt: { x: -1.16, z: -0.58 }, standAside: -0.35 }),
+  // On the ground, the pillar a metre off on his right (colliders.js RUINS.at: room for his
+  // arms whatever he does, and it stands in the fire's light), nothing under his legs
+  // (tools/bonfire.py moves the rubble off his place); his sign on the open ground in front.
+  ruins: seat(-1.02, -1.42, 0, { ground: true, signAt: { x: -1.16, z: -0.58 } }),
   // A stump by the anvil (scenery.js).
   forge: seat(-0.8, -1.52, 0.21),
   // A resting stone (scenery.js). He stands up a little to his right, out of the line between

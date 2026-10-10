@@ -26,6 +26,7 @@ import { getPov } from '../src/bonfire/povs.js';
 import { buildScenery } from '../src/bonfire/scenery.js';
 import {
   CULT,
+  RUINS,
   MOVE_REACH,
   REACH_BANDS,
   collidersOf,
@@ -120,11 +121,12 @@ test('every piece scenery.js builds in a knight’s reach is inside its shapes (
   });
 });
 
-test('the ruins’ shapes are the model’s own (bonfire.glb): the pillar’s bounds to 2 cm, every piece in reach inside them', async () => {
+test('the ruins’ shapes are the model’s own (bonfire.glb): the pillar’s bounds at RUINS.at to 2 cm, every piece in reach inside them', async () => {
   const glb = await loadGlb(new URL('../public/models/bonfire.glb', import.meta.url));
   const cs = collidersOf('ruins');
   const pillar = cs.find((c) => c.name === 'pillar');
-  // The broken shaft: Static_Pillar's points round its axis, above the plinth.
+  assert.deepEqual([pillar.x, pillar.z], RUINS.at, 'the pillar’s shape stands at RUINS.at');
+  // The broken shaft: Static_Pillar's points round its axis (there), above the plinth.
   const pts = glb.worldPoints('Static_Pillar');
   const shaft = pts.filter(([x, y, z]) => y > pillar.y0 - 0.005 && Math.hypot(x - pillar.x, z - pillar.z) < 0.3);
   assert.ok(shaft.length > 16, `the shaft's corners (${shaft.length})`);
@@ -138,8 +140,9 @@ test('the ruins’ shapes are the model’s own (bonfire.glb): the pillar’s bo
       `the shaft's ${'xyz'[k]} ${lo[k].toFixed(3)}..${hi[k].toFixed(3)} (its shape's ${want.lo[k].toFixed(3)}..${want.hi[k].toFixed(3)})`,
     );
   }
-  // Every piece of the model's pillar (plinth, shaft, fallen drum, wall) and its candles above
-  // the rubble, within reach of his seat or a dancer, inside the shapes to 2 cm.
+  // Every piece of the model's pillar (plinth, shaft, wall; the fallen drum lies behind it, out
+  // of anyone's reach) and its candles above the rubble, within reach of his seat or a dancer,
+  // inside the shapes to 2 cm.
   const near = [{ x: SEATS.ruins.x, z: SEATS.ruins.z }, ...placesOf('ruins')];
   let checked = 0;
   for (const node of ['Static_Pillar', 'Static_Wax', 'CandleFlame_0', 'CandleFlame_1', 'CandleFlame_2']) {
@@ -276,6 +279,16 @@ async function realKnights() {
 }
 const _v = new THREE.Vector3();
 const _j = new THREE.Vector3();
+/** Every surface point of knight n as posed now (the helmet he wears, not the others): `fn(point, bone)` (the point reused). */
+function eachPoint(env, n, fn) {
+  n.group.updateMatrixWorld(true);
+  for (const b of n.bones) {
+    const pc = env.pieces[b.name];
+    if (!pc || (b.name.startsWith('helm_') && !n.helms[b.name.slice(5)].visible)) continue;
+    for (let p = 0; p < pc.pts.length; p += 3)
+      fn(_v.set(pc.pts[p], pc.pts[p + 1], pc.pts[p + 2]).applyMatrix4(b.matrixWorld), b.name);
+  }
+}
 /**
  * Knight i as posed now against shapes `cs`: the least distance of any of his pieces (`skip`:
  * pieces left out) to them, { d, bone, shape } (d < 0: that deep in). Only pieces whose joint
@@ -516,36 +529,56 @@ test('[slow] no dance move reaches further than colliders.js MOVE_REACH has it, 
   k.dismiss(1, { instant: true });
 });
 
-test('in the ruins his boots rest up on the model’s fallen drum, well out of the fire; he stands up over them and steps across it', async () => {
+test('in the ruins he sits on the ground itself, his boots on it out of the fire; he stands straight up, nothing to step across', async () => {
   const env = await realKnights();
   const { k } = env;
-  k.setSeatPose('resting');
-  k.setScenery('ruins', await terrainOf('ruins'));
-  k.summon(0, { instant: true });
+  const terrain = await terrainOf('ruins');
+  k.setScenery('ruins', terrain);
   const n = k.knights[0];
-  // His right boot up on the model's drum (his left on its flank); still out of the fire.
-  assert.ok(n.home.feet[1] > 0.3, `his boots rest at ${n.home.feet.map((q) => q.toFixed(2))} m`);
-  k.update(0.5);
-  const foot = n.bones.find((b) => b.name === 'footR');
-  foot.getWorldPosition(_v);
-  assert.ok(
-    fireDist(_v.x, _v.z) > 1.05,
-    `his raised boot is ${fireDist(_v.x, _v.z).toFixed(2)} m from the fire's middle`,
-  );
-  // He stands up to his right, in front of the pillar's plinth (SEATS standAside), across the
-  // drum: up over his boots first, then a step across (knightPose.js rise()'s `over`).
-  k.stand(0);
-  k.update(1 / 12 + 1e-7);
-  assert.ok(n.over?.cross, 'something to step across on his way up');
-  assert.ok(n.home.stand.x < -0.3, `he stands up to his right (${n.home.stand.x.toFixed(2)} m)`);
-  k.dismiss(0, { instant: true });
+  for (const pose of SEAT_POSES) {
+    k.setSeatPose(pose);
+    k.summon(0, { instant: true });
+    const at = `the ruins (${pose})`;
+    assert.equal(n.home.h, 0, `${at}: no seat under him (${n.home.h} m)`);
+    // Over a whole shift of his weight in his idle (12 s, four times a second; it steps his right
+    // foot, lifting it): each sabaton's lowest point down on the ground under it (the height
+    // map's, to 1.5 cm) and never into it, all of it out of the fire.
+    const boots = { footL: { low: Infinity, fire: Infinity }, footR: { low: Infinity, fire: Infinity } };
+    for (let t = 0; t < 12.5; t += 0.25) {
+      k.update(0.25);
+      const low = {};
+      eachPoint(env, n, (v, bone) => {
+        const g = terrain.height(v.x, v.z);
+        low[bone] = Math.min(low[bone] ?? Infinity, v.y - g);
+        if (boots[bone]) boots[bone].fire = Math.min(boots[bone].fire, fireDist(v.x, v.z));
+      });
+      for (const [name, boot] of Object.entries(boots)) boot.low = Math.min(boot.low, low[name]);
+    }
+    for (const [name, boot] of Object.entries(boots)) {
+      assert.ok(
+        Math.abs(boot.low) <= 0.015,
+        `${at}: his ${name}'s sole comes down to ${(boot.low * 100).toFixed(1)} cm over the ground`,
+      );
+      assert.ok(boot.fire >= 1.05, `${at}: his ${name} comes to ${boot.fire.toFixed(2)} m from the fire's middle`);
+    }
+    // Up on his feet straight in front of where he sits (nothing aside: SEATS standAside), with
+    // nothing in front of him to step across on the way (knightPose.js rise()'s `over`).
+    k.stand(0);
+    k.update(1 / 12 + 1e-7);
+    assert.equal(n.home.stand.x, 0, `${at}: he stands up ${n.home.stand.x.toFixed(2)} m to his side`);
+    assert.ok(n.over && !n.over.cross, `${at}: he steps across something on his way up`);
+    k.dismiss(0, { instant: true });
+  }
+  k.setSeatPose('resting');
 });
 
 // Round 9's seated Praise the Sun (the scenery not yet in its way): how high each hand got over
 // his hips (m), [left, right], at each seat in either seat pose. (Its room then raised a hand
 // hemmed in at a side straight up, a little higher.)
+// (The ruins' row is the ground seat's, round 11's: sitting on the ground, he throws it from
+// lower than round 9 did from its drum.)
 const ROUND9_PRAISE = {
-  ruins: { resting: [0.814, 0.897], watchful: [0.822, 0.905] },
+  ruins: { resting: [0.784, 0.784], watchful: [0.784, 0.784] },
   forge: { resting: [0.814, 0.897], watchful: [0.822, 0.905] },
   shrine: { resting: [0.814, 0.897], watchful: [0.822, 0.905] },
   cathedral: { resting: [0.814, 0.814], watchful: [0.822, 0.822] },
@@ -622,8 +655,8 @@ const ROUND9_STEP = {
 // (Kept clear, a step that goes further than round 9's went goes at most this much further
 // than the same step with nothing there to keep clear of, and 1 cm: the step he first touches
 // something, he eases back about as little as clears him, not most of the way. Four poses a
-// step find it to within a few hundredths of all the way back: a seated beckon's or Point's
-// first touch of the ruins' pillar goes up to a fifth further.)
+// step find it to within a few hundredths of all the way back: round 10's seated beckon or
+// Point, first touching the ruins' pillar then at his shoulder, went up to a fifth further.)
 const CLEAR_STEP = 1.25;
 // (Each from six moments in his idle, a quarter second and more apart: where his arms are
 // when it starts, and how the fire's 12 frames a second fall on it, change what he first
@@ -696,8 +729,8 @@ test('[slow] everything he does at his seat moves on smoothly: no step of his he
                 without = free?.most[i] ?? 0;
               const step = `${name} (${pose}) ${what} (${idle} s into his idle): his ${parts[i].name} ${(d * 100).toFixed(1)} cm in a step (${kept.when[i].toFixed(2)} s)`;
               // (Where his seat itself has him go further than round 9's anywhere did, kept clear
-              // or not, that's the measure: in the ruins his hands start up on knees raised over
-              // the fallen drum.)
+              // or not, that's the measure: on the ground in the ruins he rests otherwise than
+              // round 9's did, a knee drawn up high and a leg stretched out.)
               if (d > 1.5 * Math.max(was, without)) bad.push(`${step}; round 9's at most ${(was * 100).toFixed(1)}`);
               if (d > was && d > CLEAR_STEP * without + 0.01)
                 bad.push(`${step}; with nothing to keep clear of ${(without * 100).toFixed(1)}`);

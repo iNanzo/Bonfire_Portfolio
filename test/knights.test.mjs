@@ -138,15 +138,22 @@ test('helmets: only the one worn is drawn; swaps at once or with the gesture', a
   assert.equal(k.gesture('wave', { index: 0 }), true, 'and now he can');
 });
 
-test('seated at the fire: the feet on the ground, facing the fire (turned a little to the cameras), tassets halfway with the thighs', () => {
+test('seated on a raised seat (the forge’s stump): the feet on the ground, facing the fire (turned a little to the cameras), tassets halfway with the thighs', () => {
   const k = make();
-  k.setScenery('ruins', flat(0.28)); // (the height map's seat, within 10 cm of the table's: the map's is taken)
+  // (The height map's stump 5 cm higher than the table's seat: within 10 cm, so the map's is taken.)
+  const seat = SEATS.forge,
+    top = seat.top + 0.05;
+  assert.ok(!seat.ground && seat.top > 0.15, 'the forge’s seat is a raised one');
+  k.setScenery('forge', {
+    height: () => 0.02,
+    top: (x, z) => (Math.hypot(x - seat.x, z - seat.z) < 0.15 ? top : 0.02),
+  });
   k.summon(0, { instant: true });
   run(k, 0.2);
   const n = k.knights[0];
   assert.equal(k.list[0].state, 'sitting');
   const toFire = Math.atan2(0.02 - n.group.position.x, 0.02 - n.group.position.z);
-  assert.ok(Math.abs(n.yaw - SEATS.ruins.yaw) < 1e-6, 'sits the way his seat says');
+  assert.ok(Math.abs(n.yaw - seat.yaw) < 1e-6, 'sits the way his seat says');
   const off = Math.atan2(Math.sin(n.yaw - toFire), Math.cos(n.yaw - toFire));
   assert.ok(
     off < 0 && off > -0.6,
@@ -158,7 +165,10 @@ test('seated at the fire: the feet on the ground, facing the fire (turned a litt
     `left ankle at ${foot.y.toFixed(3)}, on the ground`,
   );
   const hips = bone(k, 0, 'hips').getWorldPosition(new THREE.Vector3());
-  assert.ok(Math.abs(hips.y - (0.28 + SEAT_DEPTH)) < 0.01, `hips on the seat (${hips.y.toFixed(3)})`);
+  assert.ok(
+    Math.abs(hips.y - (top + SEAT_DEPTH)) < 0.01,
+    `hips at ${hips.y.toFixed(3)}, on the stump (its top at ${top.toFixed(2)})`,
+  );
   // The tasset turns about TASSET_FOLLOW of the way from the hips to the thigh.
   const q = (name) => bone(k, 0, name).getWorldQuaternion(new THREE.Quaternion());
   const full = q('hips').angleTo(q('thighL'));

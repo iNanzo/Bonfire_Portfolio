@@ -51,13 +51,13 @@ export const CLEARING = {
  * (rows of blocks, broken away in steps).
  */
 export const RUINS = {
-  at: [-1.45, -1.35],
+  at: [-2.15, -1.3],
   pillar: { r0: 0.24, r1: 0.22, y0: 0.31, top: 2.02 },
   plinth: [
     { size: [0.78, 0.22, 0.78], y: 0.11 },
     { size: [0.62, 0.1, 0.62], y: 0.26 },
   ],
-  drum: { at: [-0.75, 0.19, -0.95], r: 0.2, length: 0.42, turn: 35 * (Math.PI / 180) },
+  drum: { at: [-2.75, 0.19, -2.05], r: 0.2, length: 0.42, turn: 35 * (Math.PI / 180) },
   candles: [
     [0.2, -0.22, 0.2],
     [0.28, -0.08, 0.13],

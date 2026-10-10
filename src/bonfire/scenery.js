@@ -21,10 +21,10 @@
 //
 // In every one there's a seat for the knight (knights.js) behind the fire on the left, well
 // back from it (his boots clear of the ring stones and the flames), where the site's cameras
-// see him three-quarter-on without him covering the fire, the weapon or the page: a drum
-// fallen from the ruins' pillar (the one piece built here for the ruins), the cathedral's
-// fallen nave drum, the cult's fallen standing stone, a stump by the forge's anvil, a
-// resting stone at the shrine (SEATS, knightPlaces.js). His summon sign lies in front of it
+// see him three-quarter-on without him covering the fire, the weapon or the page: the bare
+// ground in the ruins (nothing is built here for them), the cathedral's fallen nave drum,
+// the cult's fallen standing stone, a stump by the forge's anvil, a resting stone at the
+// shrine (SEATS, knightPlaces.js). His summon sign lies in front of it
 // (summonSign.js). Dancers (Bonfire Live) stand on a ring round the
 // fire, in the arcs each scenery leaves clear (DANCE_RING, danceSlots).
 //
@@ -105,7 +105,7 @@ function jag(geo, amount, rand) {
 }
 
 /**
- * Build one scenery (for 'ruins', the model's own, only the knight's seat). `mat`: the model's
+ * Build one scenery (for 'ruins', the model's own: nothing). `mat`: the model's
  * materials by name (stone, pillar, wood, char, wax, mortar), `glowMaterial()`: a new glowing
  * material. Returns { group, glows, lights }:
  * each glow carries userData.glow = { kind, id, tone }; `lights` are
@@ -203,16 +203,7 @@ export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
 
   // ------------------------------------------------------------------------------------
   if (name === 'ruins') {
-    // The ruins are the model's own; only the knight's seat is built here (sceneModel.js adds it to
-    // the model's pieces): a drum fallen from the pillar, lying by its plinth, half sunk in
-    // the ground (a low seat), across his way to the fire.
-    const seat = SEATS.ruins;
-    add(cyl(0.16, 0.155, 0.52, 8), mat.pillar, seat.x, seat.top - 0.16, seat.z, {
-      rz: Math.PI / 2,
-      ry: Math.atan2(seat.x, seat.z) + 0.2,
-      rough: 0.01,
-    });
-
+    // The ruins are the model's own (tools/bonfire.py); the knight sits on the ground there.
     // ------------------------------------------------------------------------------------
   } else if (name === 'forge') {
     // --- the hearth, back right: block courses round a firebox, a slab, a hood, a chimney

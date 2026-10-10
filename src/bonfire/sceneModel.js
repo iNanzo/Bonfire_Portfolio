@@ -17,7 +17,6 @@ import { createImpactFx } from './impact.js';
 import { createWeapons } from './weapons.js';
 import { createLightningRing } from './lightningRing.js';
 import { createIceRing } from './ice.js';
-import { buildScenery } from './scenery.js';
 import { LAYER_SOLID, LAYER_FX, LAYER_GHOST, FIRE_ORIGIN, WEAPON_ANCHOR, flameShare } from './sceneContext.js';
 
 const BASE = import.meta.env.BASE_URL;
@@ -103,17 +102,6 @@ export function createSceneModel(ctx) {
     for (const name of ['Firefly_Lantern', 'Firefly_Wings']) {
       if (!root.getObjectByName(name)) throw new Error('Model is missing required node: ' + name);
     }
-    // The ruins' seat for the knight (scenery.js): a drum fallen from the pillar, one of the
-    // ruins' own pieces from here on (its solid, its shadow, the fireflies' height map).
-    const ruinsSeat = buildScenery(
-      'ruins',
-      { pillar: root.getObjectByName('Static_Pillar')?.material ?? new THREE.MeshLambertMaterial() },
-      () => null,
-    );
-    ruinsSeat.group.traverse((o) => {
-      if (o.isMesh) o.name = 'Static_PillarDrum';
-    });
-    root.add(ruinsSeat.group);
     root.updateMatrixWorld(true);
     ctx.weapons = createWeapons(root, {
       anchor: WEAPON_ANCHOR,
