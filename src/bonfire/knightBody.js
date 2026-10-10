@@ -218,33 +218,31 @@ export const hemArms = (p, room, from = null) => {
 };
 const _fa = new THREE.Vector3();
 const _fs = new THREE.Vector3();
-const _fi = new THREE.Quaternion();
 /**
  * Keep the hands off the floor: a wrist that would go lower than `y` (m, knight space: the
- * ground he's placed on) is lifted to it, its arm turned up about the shoulder no more than
- * that takes, its reach kept. For a knight sitting on the ground, whose gestures and moves
- * were made for a seat: a hand dropped to a knee or flung low would go into the floor.
+ * ground he's placed on) is drawn up to it along its arm's own line, the reach shortened (the
+ * elbow bending), the aim kept. For a knight sitting on the ground, whose gestures and moves
+ * were made for a seat: a hand dropped to a knee or flung low would go into the floor. (Not
+ * turned up about the shoulder, its reach kept: an arm hanging all but straight down points
+ * nowhere in particular, so its hand would be flung a third of a metre out to whichever side
+ * it tipped, then to another the next step, as he leans in to get up.)
  */
 export function floorArms(p, y, rig = DEFAULT_RIG) {
   const f = chestFrame(p, rig);
+  const armLen = rig.arm[0] + rig.arm[1];
   for (const s of ['L', 'R']) {
     const o = sideOf(s),
       sg = s === 'L' ? 1 : -1;
-    const len = p[o + 2] * (rig.arm[0] + rig.arm[1]);
     const sock = _fs
       .copy(rig.pos['upperArm' + s])
       .sub(rig.pos.chest)
       .applyQuaternion(f.q)
       .add(f.pos);
-    const d = armVec(_fa, p[o], p[o + 1], sg).applyQuaternion(f.q);
-    if (len < 1e-6 || sock.y + d.y * len >= y) continue;
-    // (As far down as reaches `y`; a shoulder lower than that reaches out level, in front.)
-    const down = clamp((y - sock.y) / len, -1, 0);
-    const flat = Math.hypot(d.x, d.z);
-    const k = Math.sqrt(1 - down * down);
-    if (flat > 1e-4) d.set((d.x / flat) * k, down, (d.z / flat) * k);
-    else d.set(0, down, k);
-    setArmDir(p, o, d.applyQuaternion(_fi.copy(f.q).invert()), sg);
+    // (How far down the arm goes for each metre it reaches; its reach as the solver takes it.)
+    const fall = -armVec(_fa, p[o], p[o + 1], sg).applyQuaternion(f.q).y;
+    if (sock.y - fall * clamp(p[o + 2], 0.2, 1) * armLen >= y) continue;
+    // (A shoulder that low, or an arm not going down, can only be drawn in as far as it goes.)
+    p[o + 2] = fall > 1e-4 ? Math.max(0.2, (sock.y - y) / fall / armLen) : 0.2;
   }
   return p;
 }

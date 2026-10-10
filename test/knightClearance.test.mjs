@@ -772,10 +772,12 @@ test('[slow] everything he does at his seat moves on smoothly: no step of his he
         // The largest step of his head and each hand (and when) over `seconds` from `start()`,
         // `idle` s after he's seated (or then `standing` up in front of it); `bare`, with
         // nothing near him to keep clear of (knights.js nearOf()'s list, emptied: his room for
-        // his arms is still his seat's).
+        // his arms is still his seat's), nor the ground he sits on (his home's floor, sunk out of
+        // his hands' way: floorArms keeps them over it).
         const steps = (seconds, start, standing, idle, bare) => {
           const tick = () => {
             n.near = bare ? { scenery: name, x: n.group.position.x, z: n.group.position.z, list: [] } : null;
+            if (bare && n.home) n.home.floor = -Infinity;
             k.update(STEP);
           };
           k.dismiss(0, { instant: true });

@@ -392,11 +392,13 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   - *Off the floor* (round 11). His gestures and seated moves were made for a seat, so
     sitting on the ground (the ruins' knight, the others in Bonfire Live) a hand dropped to
     a knee or flung low went up to 16 cm into the floor. There, at home, `floorArms`
-    (`knightBody.js`) turns an arm up about its shoulder just enough to keep the wrist
-    19 cm (`FLOOR_HANDS`: the limp, open gauntlet hangs up to 18 cm below it) over the
-    highest ground within his reach low down (`floorOf`: a flagstone or a stone by him, up
-    to 10 cm), keeping its reach; at rest his wrists are 32 cm up or more, so his rest is
-    untouched. The ground poses' feet lie flat.
+    (`knightBody.js`) draws a wrist that would go lower up its arm's own line, its reach
+    shortened (the elbow bending) just enough to keep it 19 cm (`FLOOR_HANDS`: the limp,
+    open gauntlet hangs up to 18 cm below it) over the highest ground within his reach low
+    down (`floorOf`: a flagstone or a stone by him, up to 10 cm), its aim kept: turned up
+    about the shoulder instead, an arm hanging all but straight down as he leans in to get
+    up had its hand flung a third of a metre out to his side. At rest his wrists are 32 cm
+    up or more, so his rest is untouched. The ground poses' feet lie flat.
   - *After the solve* (on steps with real motion; his resting pose is clear by its seat),
     each arm's pieces (the pauldron's lames, the arm, the gauntlet: its surface every
     3 cm, a gauntlet's every 2 cm, and its farthest corners) are checked against the
