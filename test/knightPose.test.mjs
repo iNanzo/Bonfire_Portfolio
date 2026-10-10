@@ -214,6 +214,58 @@ test('a foot turned in (its toe-in channel) turns that foot alone, about the ver
   assert.ok(Math.abs(turn.yaw + 30 / DEG) < 1e-6, `mirrored, his left toe turns ${(turn.yaw * DEG).toFixed(1)}°`);
 });
 
+test('resting on the ground, the boot of the leg he stretches out turns in toward his other foot (45° to 60° from his hips’ facing), the other as it was; no other base pose turns a foot, and getting up and sitting down it turns only while lifted', () => {
+  // (The user's Dark Souls reference: the stretched leg's sabaton lies turned in toward the
+  // drawn-up one. His hips turn a little to his right sitting so: the toe is turned from them.
+  // Less doesn't read at the home view, which looks almost straight down that leg.)
+  for (const h of [0, 0.06, 0.11]) {
+    for (const feet of [null, [0.03, -0.02]]) {
+      const p = seatedPose(newPose(), h, DEFAULT_RIG, 'resting', feet);
+      const s = solver.solve(p, feet);
+      const hips = p[POSE.hips + 1];
+      const yaw = (side) => {
+        const f = new THREE.Vector3(0, 0, 1).applyQuaternion(s.q[I['foot' + side]]);
+        return Math.atan2(f.x, f.z) - hips;
+      };
+      const what = `resting on the ground (${h} m${feet ? ', uneven' : ''})`;
+      assert.ok(
+        yaw('R') >= 45 / DEG && yaw('R') <= 60 / DEG,
+        `${what}: his right boot turned in ${(yaw('R') * DEG).toFixed(1)}°`,
+      );
+      assert.ok(Math.abs(yaw('L')) < 1e-6, `${what}: his left boot turned ${(yaw('L') * DEG).toFixed(1)}°`);
+    }
+  }
+  const others = [
+    ['standing', standingPose()],
+    ['watchful on the ground', seatedPose(newPose(), 0, DEFAULT_RIG, 'watchful')],
+    ...[0.23, 0.36, 0.42].flatMap((h) =>
+      SEAT_POSES.map((st) => [`${st} on a ${h} m seat`, seatedPose(newPose(), h, DEFAULT_RIG, st)]),
+    ),
+  ];
+  for (const [what, p] of others) assert.ok(p[POSE.toeInL] === 0 && p[POSE.toeInR] === 0, `${what}: a foot turned in`);
+  // (A boot turned on the ground would grind round on its heel: it turns as it steps. As the
+  // feet's places do (the test above), it may start a hair before it's off the ground.)
+  for (const down of [false, true]) {
+    const what = down ? 'sitting down' : 'getting up';
+    const sit = seatedPose(newPose(), 0, DEFAULT_RIG, 'resting'),
+      up = standBy(newPose(), 0);
+    let prev = null,
+      lifted = false,
+      ground = 0;
+    for (let t = 0; t <= RISE_TIME + 1e-9; t += 1 / 120) {
+      const p = rise(newPose(), sit, up, t, down);
+      const s = solver.solve(p);
+      const on = s.p[I.footR].y < DEFAULT_RIG.ankleY + 0.006;
+      if (prev?.on && on) ground += Math.abs(p[POSE.toeInR] - prev.toe);
+      if (!on) lifted = true;
+      prev = { on, toe: p[POSE.toeInR] };
+    }
+    assert.ok(lifted, `${what}: the right boot lifts`);
+    assert.ok(ground < 0.5 / DEG, `${what}: the right boot turns ${(ground * DEG).toFixed(2)}° on the ground`);
+    assert.equal(prev.toe, down ? sit[POSE.toeInR] : 0, `${down ? 'sat down' : 'up'}: the right boot's turn`);
+  }
+});
+
 test('[slow] every move gives a sound pose in its limits over 64 beats, standing and (where it can) seated', () => {
   const stand = standingPose();
   const sit = seatedPose(newPose(), 0.36);

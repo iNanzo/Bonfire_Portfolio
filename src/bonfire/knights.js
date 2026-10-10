@@ -139,6 +139,10 @@ const FLOOR_HANDS = 0.19;
 // (Where a seated boot's sole is looked at for what it rests on, m ahead of its ankle, either
 // side of it; sitting on the ground, back past its heel too: soleUnder.)
 const SOLE = [0, 0.1, 0.2, 0.28];
+// (How far a boot's pointed toe reaches past its ankle, m: the model's sabatons, seated. Until
+// round 11 turned a boot in, NEAR_FIRE took 0.28 straight ahead: the rest's hips' turn made up
+// the difference.)
+const TOE_REACH = 0.3;
 const SOLE_ON_GROUND = [-0.12, -0.06, ...SOLE];
 // (A standing boot's sole, m from its ankle: across it, and from its heel to its pointed toe.)
 const STAND_SOLE = [
@@ -360,18 +364,20 @@ export function createKnights(
   const blocked = (x, z) => topAt(x, z) > STEP_OVER;
 
   // The nearest the fire's middle a knight sits on the ground facing it (m; his hips), in each
-  // seat pose: each boot's toe, a sole's length past its ankle, a hand's breadth out of the
-  // pit's stones. (Resting, he stretches a leg out toward the fire: 1.64 m. Watchful, 1.48:
-  // about where round 10 sat them, clear of what stands behind, which the resting pose's
-  // distance isn't everywhere: the forge's hearth, the cathedral's pew. Each pose sits at its
-  // own, and he shifts between them as his pose changes where he sits: rehome.)
+  // seat pose: each boot's pointed toe (TOE_REACH past its ankle, the way the boot points: his
+  // hips' turn and its toe-in) a hand's breadth out of the pit's stones. (Resting, he
+  // stretches a leg out toward the fire, its boot turned in: 1.66 m. Watchful, 1.50: about
+  // where round 10 sat them, clear of what stands behind, which the resting pose's distance
+  // isn't everywhere: the forge's hearth, the cathedral's pew. Each pose sits at its own, and
+  // he shifts between them as his pose changes where he sits: rehome.)
   const NEAR_FIRE = Object.fromEntries(
     SEAT_POSES.map((style) => [
       style,
       Math.max(
-        ...feetAt(seatedPose(newPose(), 0, rig, style), rig).map(
-          ([x, z]) => z + 0.28 + Math.sqrt(Math.max(0, (PIT + 0.08) ** 2 - x * x)),
-        ),
+        ...feetAt(seatedPose(newPose(), 0, rig, style), rig).map(([x, z, turn]) => {
+          const tx = x + TOE_REACH * Math.sin(turn);
+          return z + TOE_REACH * Math.cos(turn) + Math.sqrt(Math.max(0, (PIT + 0.08) ** 2 - tx * tx));
+        }),
       ),
     ]),
   );
@@ -542,19 +548,22 @@ export function createKnights(
     return THREE.MathUtils.clamp(heightAt(w.x, w.z) - home.y, -0.1, 0.42);
   };
   /**
-   * The ground a seated boot rests on at a place in his own space at `home` (its ankle at x, z):
-   * the highest under its sole from the ankle to the pointed toe (0.3 m ahead), so the toe
-   * never sinks into whatever it reaches over (a stone or a log he rests his foot up on).
+   * The ground a seated boot rests on at a place in his own space at `home` (its ankle at x, z,
+   * its toe turned `turn` from straight ahead, + toward his left: feetAt): the highest under
+   * its sole from the ankle to the pointed toe (0.3 m ahead), so the toe never sinks into
+   * whatever it reaches over (a stone or a log he rests his foot up on).
    * Sitting on the ground, from behind its heel too (12 cm behind the ankle: its heel is 9 cm
    * back, and his idle's shift of weight steps it 2.5 back): a leg stretched out along the ground
    * rests its heel on whatever lies there (the spare log by the fire, for one of Bonfire Live's
    * knights resting on the ring). On a seat, not the heel's: a foot drawn in tucks its heel
    * under the seat's edge.
    */
-  const soleUnder = (home, x, z) => {
+  const soleUnder = (home, x, z, turn = 0) => {
+    const c = Math.cos(turn),
+      sn = Math.sin(turn);
     let g = -Infinity;
     for (const dz of home.h < 0.12 ? SOLE_ON_GROUND : SOLE)
-      for (const dx of [-0.05, 0.05]) g = Math.max(g, groundUnder(home, x + dx, z + dz));
+      for (const dx of [-0.05, 0.05]) g = Math.max(g, groundUnder(home, x + dx * c + dz * sn, z - dx * sn + dz * c));
     return g;
   };
   /**
@@ -587,7 +596,7 @@ export function createKnights(
   function seatOn(p, h, style) {
     seatedPose(p, h.h, rig, style);
     const [fl, fr] = feetAt(p, rig);
-    h.feet = [soleUnder(h, fl[0], fl[1]), soleUnder(h, fr[0], fr[1])];
+    h.feet = [soleUnder(h, ...fl), soleUnder(h, ...fr)];
     return seatedPose(p, h.h, rig, style, h.feet);
   }
   /**

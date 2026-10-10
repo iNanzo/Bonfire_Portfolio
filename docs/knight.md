@@ -481,16 +481,19 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   (`restPlaces`: the layout for the whole cast less the place nearest the seat, on the
   ring's clear sides, never in front of the fire), facing the fire, in the ground poses
   (**The seated rest**); a new scenery, or a new cast, sends them home there. They sit
-  back from the ring as far as their seat pose needs to keep a boot a hand's breadth out
-  of the pit's stones (`knights.js` `NEAR_FIRE`, `groundHome`; the same when a dancer
-  sits down where he stands, on the ground there): resting, a leg stretched out toward the
-  fire, their hips 1.64 m from the fire's middle; watchful, 1.48 (round 10: 1.47, their
-  feet on the ring), clear of what stands behind (the forge's hearth, the cathedral's pew).
-  Their boots come to 0.78 m from it or more resting and 0.91 watchful, the stones
-  reaching 0.72 (`test/knights.test.mjs` asks 0.74); a change of pose where they sit
-  shifts them back or forward to its place as they change (`rehome`). The show seats
-  them where a new scenery would, 1.5 cm or more clear of the scenery
-  (`test/knightClearance.test.mjs`).
+  back from the ring as far as their seat pose needs to keep a boot's pointed toe (0.30 m
+  past its ankle, the model's sabatons, the way the boot points: his hips' turn and its
+  toe-in; `TOE_REACH`) a hand's breadth out of the pit's stones (`knights.js` `NEAR_FIRE`,
+  `groundHome`; the same when a dancer sits down where he stands, on the ground there):
+  resting, a leg stretched out toward the fire, its boot turned in, their hips 1.66 m from
+  the fire's middle; watchful, 1.50 (round 10: 1.47, their feet on the ring). Their boots
+  come to 0.77 m from it or more in either pose, the stones reaching 0.72
+  (`test/knights.test.mjs` asks 0.74, a change of pose where they sit too). Before the
+  boot turned in the toe was taken 0.28 m straight ahead, which the hips' turn made up for
+  resting (0.78 m) but not watchful (0.755); a boot turned in that way came to 0.743. A
+  change of pose where they sit shifts them back or forward to its place as they change
+  (`rehome`). The show seats them where a new scenery would, 1.5 cm or more clear of the
+  scenery (`test/knightClearance.test.mjs`).
   *Resting only with room for it* (the user's call, round 11): a knight asked to rest on
   the ring rests only where he'd sit as every seat has him, 4 cm or more from the
   scenery's shapes sitting still, his boots and shins resting on what's under them
@@ -499,11 +502,13 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   four out). Where it would meet something he sits watchful there instead (`groundHome`
   keeps the pose asked for as `want`, the one he sits in as `style`): with the places
   round 11 has, the cathedral's by the pew for four (resting, he sat up on its kneeler,
-  his chest 2 cm off the pew's end; watchful, beside the pew's end, his left thigh 1.4 cm
-  into the kneeler, which as a low piece isn't one of the shapes); every other place rests
-  (the nearest, the forge's by the hearth for three or four, 4.2 cm off it). It holds for
-  any place a scenery has, a new one too (`test/knightClearance.test.mjs` checks every
-  scenery and cast, sent home, sat down where the show stands him, and back from
+  his chest 2 cm off the pew's end; watchful, beside the pew's end, up 4.6 cm on the
+  kneeler's edge and his left thigh 2.4 cm into it, which as a low piece isn't one of the
+  shapes: 1.4 cm up and 1.4 in before watchful sat 2 cm further back) and the forge's by
+  the hearth for three or four (sitting as far back as his turned-in boot needs, he'd come
+  within 4 cm of it; before the turn he rested 4.2 cm off); every other place rests. It
+  holds for any place a scenery has, a new one too (`test/knightClearance.test.mjs` checks
+  every scenery and cast, sent home, sat down where the show stands him, and back from
   watchful).
 - **The seated rest** is the Dark Souls bonfire rest: slumped forward over his knees
   (spine 27° to 36° from a 0.22 to a 0.40 m seat), his left foot drawn in and that arm
@@ -527,7 +532,9 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   drawn up high and fallen out a little, its foot near him, that arm hung over it, the
   elbow out over its top and the forearm across the kneecap, the gauntlet hanging limp
   inside it; the right leg stretched out along the ground, away from the fire, the knee a
-  little bent and turned in, that forearm along the thigh and the hand on the knee;
+  little bent and turned in, its boot turned in 50° toward the other foot (the user's
+  reference; the home view looks almost straight down that leg, so 35° read as the toe
+  pointing at the camera), that forearm along the thigh and the hand on the knee;
   slumped toward the raised knee, the chest leaning that way, the head sunk and tipped to
   it. (No straighter: as his weight shifts the foot steps out, and a straighter leg would
   lock, the back of the thigh dropping into the ground.) *Watchful* is the FFXIV rest:
@@ -592,7 +599,8 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   under its sole (a flagstone it's half on lifts its heel, not takes its toe:
   `standUnder`); a step longer than 0.3 m (a leg
   stretched out along the ground, drawn in under him) takes longer in proportion, done
-  within the 1.2 s, so the leg draws in rather than snapping (`STEP_LONG`); where his
+  within the 1.2 s, so the leg draws in rather than snapping (`STEP_LONG`), its boot
+  turning out from the rest's toe-in as it goes (never on the ground); where his
   feet have something to cross on the way, he pushes up over them first and then steps
   across (*Getting up across something*). Leaning in to get up or to sit down he looks
   no further down than 50° ahead (`RISE_LOOK`): his head lifts out of a deep bow instead

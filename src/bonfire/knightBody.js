@@ -363,20 +363,30 @@ export function standingPose(p = newPose()) {
   return p;
 }
 
+/**
+ * How far the boot of the leg he stretches out resting on the ground turns in toward his other
+ * foot (degrees, from his hips' facing). That leg points nearly at the home camera, which
+ * foreshortens the turn: at 35° the boot read as pointing straight at it, at 50° in toward
+ * the drawn-up foot, as in the user's reference (round 11's captures).
+ */
+const GROUND_TOE_IN = 50;
 /** Where the feet go in front of a seat of height `h` (m above the ground), knight space z. */
 export const seatFeet = (h) => clamp(0.3 + 0.35 * h, 0.3, 0.46);
 /** The seat's height (m) a seated pose sits on (from where its hips are). */
 export const seatOf = (p, rig = DEFAULT_RIG) => p[1] + rig.hipsY - SEAT_DEPTH;
 /**
- * Where each foot of a pose rests on the ground, knight space: [[x, z] left, [x, z] right]
- * (the ankle's place; knights.js looks up the ground under it).
+ * Where each foot of a pose rests on the ground, knight space: [[x, z, turn] left, [x, z,
+ * turn] right] (the ankle's place, and which way its toe points, rad from straight ahead, +
+ * toward his left: turned with his hips and turned in by its toe-in, as solved; knights.js
+ * looks up the ground under its sole and keeps its toe out of the fire).
  */
 export function feetAt(p, rig = DEFAULT_RIG) {
   const L = rig.pos.footL,
-    R = rig.pos.footR;
+    R = rig.pos.footR,
+    yaw = p[POSE.hips + 1];
   return [
-    [L.x + p[POSE.legL], L.z + p[POSE.legL + 2]],
-    [R.x - p[POSE.legR], R.z + p[POSE.legR + 2]],
+    [L.x + p[POSE.legL], L.z + p[POSE.legL + 2], yaw - p[POSE.toeInL]],
+    [R.x - p[POSE.legR], R.z + p[POSE.legR + 2], yaw + p[POSE.toeInR]],
   ];
 }
 /**
@@ -454,7 +464,8 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
     // away from the fire, the knee a little bent and turned in (the boot out past it, the
     // knee clear of the stones by his right side in the ruins; no straighter: as his weight
     // shifts the foot steps out and the leg would lock, the back of the thigh dropping into
-    // the ground and onto the stone by his knee). The head sunk and tipped toward the knee.
+    // the ground and onto the stone by his knee), its boot turned in toward his other foot
+    // (the user's Dark Souls reference). The head sunk and tipped toward the knee.
     joint(p, 'hips', -16, -6);
     joint(p, 'spine', 20, 4, -3);
     joint(p, 'chest', 10, 4, -5);
@@ -462,6 +473,7 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
     joint(p, 'head', 17, 8, -13);
     leg(p, 'L', 0.02, 0, 0.38, 0, 40);
     leg(p, 'R', 0.32, 0, 0.69, 0, -30);
+    toeIn(p, 'R', GROUND_TOE_IN);
   } else if (watch) {
     // Leaning in over his knees, the head tipped back up to watch the fire, feet planted a
     // stride apart under his knees. (No higher at the helmet than the rest: a phone frames
