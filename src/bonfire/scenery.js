@@ -56,8 +56,11 @@ export { SEATS, DANCE_RING, danceSlots } from './knightPlaces.js';
 // Where the pieces stand (three.js coordinates: the model's +y is -z here). These and each
 // piece's size and place below come from colliders.js, which makes the knights' shapes of
 // them from the same numbers.
-/** A place on the ground ([x, z]). */
-const onGround = ([x, z]) => new THREE.Vector3(x, 0, z);
+/**
+ * A place on the ground.
+ * @param {number[]} at [x, z]
+ */
+const onGround = (at) => new THREE.Vector3(at[0], 0, at[1]);
 const RIGHT = new THREE.Vector3(CLEARING.right[0], 0, CLEARING.right[1]);
 const FRONT_LEFT = new THREE.Vector3(CLEARING.frontLeft[0], 0, CLEARING.frontLeft[1]);
 const RIGHT_TURN = CLEARING.rightTurn;
