@@ -4,9 +4,12 @@
 // it's run in (a worktree too) and stopped after:
 //
 //   node tools/capture-knight.mjs [--port 5173] [--serve] [--out .scratch/knight-shots] [--tag now]
-//                                 [--only seats,gestures,moves,seq,home,views] [--sceneries ruins,cult]
+//                                 [--only seats,pose,gestures,moves,seq,home,views] [--sceneries ruins,cult]
 //                                 [--helmet bascinet] [--style first] [--standing] [--seqs praise]
 //                                 [--room 1,0]
+//
+// --only picks the sheets; left out, it's seats,gestures,moves,seq,home (pose and views only
+// when named):
 //
 //   seats     close-ups of him seated in each scenery, in both seat poses, from his left, from
 //             his right and from above (what stands round his seat in view): <tag>-seats.png
