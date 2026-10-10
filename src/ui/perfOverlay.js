@@ -19,8 +19,11 @@
 // for, and the text built, twice a second. Its styles go through the style object, not an
 // attribute or a style sheet (a page's CSP may refuse those); a page places it with
 // --stats-top, --stats-left, --stats-right, --stats-bottom and --stats-z (bottom left by
-// default), and on a small screen can shrink it (--stats-font) and fold the dimmed rows away
-// (--stats-detail: none).
+// default), keeps it to the room it has (--stats-max-h: the rows past it are cut off, and a
+// box given no room draws nothing), puts it away for a while (--stats-display: none), and on
+// a small screen can shrink it (--stats-font) and fold the dimmed rows away
+// (--stats-detail: none). The variables reach it from its parent (createBonfire's
+// statsParent: Bonfire Live's page box, where the HUD's height is).
 import { statsGroups } from './statsGroups.js';
 
 const RING = 256; // frame intervals kept for the percentiles (about 2 s at 120 fps)
@@ -59,24 +62,26 @@ export function createPerfOverlay({
     top: 'var(--stats-top, auto)',
     bottom: 'var(--stats-bottom, 8px)',
     'z-index': 'var(--stats-z, 2147483647)',
+    display: 'var(--stats-display, block)',
     'pointer-events': 'none',
     'user-select': 'none',
     'box-sizing': 'border-box',
     'max-width': 'min(380px, calc(100vw - 16px))',
-    'max-height': 'calc(100vh - 16px)',
+    'max-height': 'var(--stats-max-h, calc(100vh - 16px))',
     overflow: 'hidden',
     font: 'var(--stats-font, 11px)/1.4 ui-monospace, Consolas, monospace',
     'font-variant-numeric': 'tabular-nums',
     color: INK,
     background: 'rgba(7, 7, 11, 0.84)',
-    'box-shadow': '0 0 0 1px rgba(233, 227, 210, 0.14)',
+    // (Its edge inside, and its padding on what it holds: held to no height, nothing shows.)
+    'box-shadow': 'inset 0 0 0 1px rgba(233, 227, 210, 0.14)',
     'text-shadow': '0 1px 0 #000',
-    padding: '5px 9px 7px',
     'border-radius': '3px',
   });
   el.className = 'stats-overlay';
   el.setAttribute('aria-hidden', 'true');
-  el.textContent = 'Stats…';
+  const text = styled('div', { padding: '5px 9px 7px' }, 'Stats…');
+  el.append(text);
   parent.append(el);
 
   const intervals = new Float64Array(RING);
@@ -120,7 +125,7 @@ export function createPerfOverlay({
       particles: particles(),
       ...page(),
     });
-    draw(el, groups);
+    draw(text, groups);
     frames = 0;
     tickMs = 0;
     pageMs = 0;

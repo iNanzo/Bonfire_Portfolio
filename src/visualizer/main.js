@@ -234,8 +234,10 @@ function startScene() {
         onTick: (dt) => {
           if (ctx.fire === candidate) onTick(dt);
         },
-        // (The stats overlay's show: the director's snapshot, asked for twice a second while it's on.)
+        // (The stats overlay's show: the director's snapshot, asked for twice a second while it's on;
+        // the overlay in the page's box, which places it: visualizer.css, by the HUD's height.)
         pageStats: () => (ctx.fire === candidate && ctx.director ? { show: ctx.director.status() } : null),
+        statsParent: app,
       });
       const nextDirector = createDirector(candidate, { settings, reducedMotion, onEvent, scenes: ctx.loopLibrary });
       await candidate.ready;

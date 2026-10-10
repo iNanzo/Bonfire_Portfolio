@@ -84,6 +84,7 @@ export function createBonfire(
     onFrame,
     onTick,
     pageStats = () => null,
+    statsParent = null,
   } = {},
 ) {
   const scope = createResourceScope();
@@ -540,7 +541,8 @@ export function createBonfire(
     // frame the display shows: Bonfire Live's audio analysis; the page's onFrame; the scene's
     // update; the draw), the draw calls, the shadow's redraws and the GPU's programs and
     // textures; the particle systems running (stats()); and the page's own part (pageStats:
-    // Bonfire Live's show, the Painter's scene). With ?perf, the same times as
+    // Bonfire Live's show, the Painter's scene), in statsParent (the page's box, whose CSS
+    // variables place it: ui/perfOverlay.js; the body by default). With ?perf, the same times as
     // performance.measure entries for the browser's profiler. Off, nothing is timed or counted,
     // and the overlay's code isn't even loaded.
     ctx.perf = null;
@@ -566,6 +568,7 @@ export function createBonfire(
             particles: () => stats().systems,
             page: pageStats,
             measures: perfAsked,
+            ...(statsParent ? { parent: statsParent } : {}),
           });
         },
         (error) => {

@@ -123,3 +123,25 @@ test('stats overlay: it never takes the pointer, isn’t read out, and goes when
   o.dispose();
   assert.equal(node.removed, true);
 });
+
+test('stats overlay: a page keeps it to the room it has and can put it away; held to no room, it draws nothing', () => {
+  const { o, el } = overlay();
+  const node = el();
+  // (The page's variables, with the old defaults where a page sets none: the site's.)
+  assert.match(node.styles.get('max-height'), /^var\(--stats-max-h, /);
+  assert.match(node.styles.get('display'), /^var\(--stats-display, block\)$/);
+  assert.equal(node.styles.get('overflow'), 'hidden');
+  // Its padding is on what it holds and its edge inside, so a box held to no height shows nothing.
+  assert.equal(node.styles.get('padding'), undefined);
+  assert.match(node.styles.get('box-shadow'), /^inset /);
+  assert.equal(node.children.length, 1);
+  const [text] = node.children;
+  assert.ok(text.styles.get('padding'));
+  // The groups are drawn into it.
+  const at = performance.now();
+  o.frame(at, at + 0.1, at + 1, at + 2, false);
+  o.frame(at + 600, at + 600.1, at + 601, at + 602, false);
+  assert.equal(node.children.length, 1);
+  assert.ok(text.children.length >= 1, 'the groups');
+  o.dispose();
+});
