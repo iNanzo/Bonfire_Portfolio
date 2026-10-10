@@ -133,8 +133,9 @@ const TURN_SPEED = 5; // rad/s
 const CROSSFADE = 0.2;
 const STEP_OVER = 0.16; // m: what a walking knight steps over (a fire pit's stone, a spare log)
 // m: how low a wrist may go over the ground round him, sitting on the ground (his gauntlet
-// hangs up to 15 cm below it; at rest his wrists are 28 cm up or more, so rest is untouched)
-const FLOOR_HANDS = 0.17;
+// hangs up to 18 cm below it, limp and open; at rest his wrists are 32 cm up or more, so rest
+// is untouched)
+const FLOOR_HANDS = 0.19;
 // His meshes' bounds (his own space: the ground under him, turned with him), for culling:
 // every pose he takes stays inside with 0.1 m to spare (the farthest reach, 1.76 m from
 // here, is a boot kicked out in the site's dance where he stands up to, to his right across
