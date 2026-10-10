@@ -1,6 +1,9 @@
 # Lửa Trại Nghĩa Sĩ (Nghĩa Sĩ Campfire): design notes
 
-Status: **design only, nothing implemented** (revised 2026-10-10).
+Status: **implemented and verified locally** (2026-10-10): `src/larp/`, the unit tests
+(`test/larp*.test.mjs`) and a browser spec that plays a whole event offline
+(`e2e/larp.spec.mjs`). How to run an event: [../campfire.md](../campfire.md). Not yet
+rehearsed on a real projector with HTs.
 Source: Newton's request for a browser companion to a 50-minute, in-person TNTT Nghĩa Sĩ
 activity, built on the Bonfire Portfolio's scene, look and UI pieces. Revisions, in order:
 
