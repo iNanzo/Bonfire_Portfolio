@@ -281,6 +281,15 @@ async function realKnights() {
   engine = { k, pieces, corners };
   return engine;
 }
+/**
+ * Knight n's clock back to 0: his idle from its start, whatever the tests before left it at.
+ * And the reactions they left him with it: each is kept as when on his clock it started, so
+ * left there, it would start again as his clock came round to it (a flinch out of nowhere).
+ */
+function restartClock(n) {
+  n.clock = 0;
+  Object.assign(n.react, { flinch: -9, stoke: -9, hop: -9 });
+}
 const _v = new THREE.Vector3();
 const _j = new THREE.Vector3();
 /** Every surface point of knight n as posed now (the helmet he wears, not the others): `fn(point, bone)` (the point reused). */
@@ -651,7 +660,7 @@ test('[slow] seated Praise the Sun at every seat, either seat pose, is the Prais
   const praise = (name, terrain) => {
     k.setScenery(name, terrain);
     k.summon(0, { instant: true });
-    n.clock = 0; // (his idle from the same moment every time)
+    restartClock(n); // (his idle from the same moment every time)
     k.update(0.5);
     k.gesture('praise', { index: 0 });
     const steps = [];
@@ -771,8 +780,7 @@ test('[slow] everything he does at his seat moves on smoothly: no step of his he
           };
           k.dismiss(0, { instant: true });
           k.summon(0, { instant: true });
-          // (His idle from its start, whatever the tests before left his clock at.)
-          n.clock = 0;
+          restartClock(n);
           k.update(idle);
           if (standing) {
             k.stand(0);
