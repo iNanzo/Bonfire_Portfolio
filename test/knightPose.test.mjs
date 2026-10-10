@@ -43,6 +43,7 @@ import {
   rise,
   walk,
   mirrorPose,
+  lerpPose,
   RISE_TIME,
 } from '../src/bonfire/knightPose.js';
 import { loadKnightMesh } from './lib/knightMesh.mjs';
@@ -127,6 +128,164 @@ test('the rest-like standing pose barely bends anything, and a mirrored pose mir
     assert.ok(2 * Math.acos(Math.min(1, Math.abs(s.q[I[b]].w))) < 0.35, `${b} barely turned`);
   const m = mirrorPose(mirrorPose(Float32Array.from(p)));
   assert.deepEqual([...m], [...p]);
+});
+
+/** A solve's bones, copied (the solver reuses its arrays). */
+const solved = (p) => {
+  const s = solver.solve(p);
+  return { q: s.q.map((q) => q.clone()), p: s.p.map((v) => v.clone()) };
+};
+/** The turn taking quaternion `a` to `b` (b · a⁻¹): which way it goes about the vertical, and how far off the vertical its axis is. */
+function turnAbout(a, b) {
+  const t = b.clone().multiply(a.clone().invert());
+  if (t.w < 0) t.set(-t.x, -t.y, -t.z, -t.w);
+  const angle = 2 * Math.acos(Math.min(1, t.w));
+  const sn = Math.sqrt(Math.max(0, 1 - t.w * t.w));
+  return { yaw: sn < 1e-9 ? 0 : (angle * t.y) / sn, tilt: sn < 1e-9 ? 0 : Math.hypot(t.x, t.z) / sn };
+}
+test('a foot turned in (its toe-in channel) turns that foot alone, about the vertical, toward his middle, by the angle given; with none every pose solves as before, and poses blend and mirror it', () => {
+  // (Before the channel each foot was flat, turned with his hips and nothing more: knightSolve.js.)
+  const e = new THREE.Euler(),
+    q = new THREE.Quaternion();
+  const poses = [
+    ['standing', standingPose()],
+    ...[0, 0.23, 0.36].flatMap((h) =>
+      SEAT_POSES.map((st) => [`${st}, seat ${h} m`, seatedPose(newPose(), h, DEFAULT_RIG, st)]),
+    ),
+    ['Praise the Sun', gesture(standingPose(), 'praise', 1)],
+    ['walking', walk(newPose(), standingPose(), 0.3)],
+    ['the Default Dance', dance(standingPose(), 'defaultDance', 3.5)],
+    ['a seated hop', hop(seatedPose(newPose(), 0.36), 0.2)],
+  ];
+  for (const [what, base] of poses) {
+    const p = Float32Array.from(base);
+    p[POSE.toeInL] = p[POSE.toeInR] = 0;
+    const s0 = solved(p);
+    for (const [side, o] of [
+      ['L', POSE.legL],
+      ['R', POSE.legR],
+    ]) {
+      q.setFromEuler(e.set(p[o + 3], p[POSE.hips + 1], 0, 'YXZ'));
+      assert.ok(
+        Math.abs(Math.abs(q.dot(s0.q[I['foot' + side]])) - 1) < 1e-6,
+        `${what}: with no toe-in the ${side} foot is turned as before (its pitch, his hips' turn)`,
+      );
+    }
+    for (const [side, inward] of [
+      ['L', -1],
+      ['R', 1],
+    ]) {
+      for (const deg of [20, 35]) {
+        const t = Float32Array.from(p);
+        t[POSE['toeIn' + side]] = deg / DEG;
+        const s = solved(t);
+        BONES.forEach((b, i) => {
+          assert.ok(s.p[i].distanceTo(s0.p[i]) < 1e-6, `${what}, ${side} turned in ${deg}°: the ${b} moved`);
+          if (b !== 'foot' + side)
+            assert.ok(
+              Math.abs(Math.abs(s.q[i].dot(s0.q[i])) - 1) < 1e-6,
+              `${what}, ${side} turned in ${deg}°: the ${b} turned`,
+            );
+        });
+        // (Toward his middle: his left foot's toe toward −x, his right's toward +x.)
+        const turn = turnAbout(s0.q[I['foot' + side]], s.q[I['foot' + side]]);
+        assert.ok(turn.tilt < 1e-6, `${what}, ${side} turned in ${deg}°: the foot tips (${turn.tilt})`);
+        assert.ok(
+          Math.abs(turn.yaw - (inward * deg) / DEG) < 1e-6,
+          `${what}, ${side} turned in ${deg}°: the foot turns ${(turn.yaw * DEG).toFixed(2)}° about the vertical`,
+        );
+      }
+    }
+  }
+  // Blended, half the turn; mirrored, the other foot turned in as far (toward his middle still).
+  const a = seatedPose(newPose(), 0.36),
+    b = Float32Array.from(a);
+  a[POSE.toeInL] = a[POSE.toeInR] = 0;
+  b[POSE.toeInL] = 0;
+  b[POSE.toeInR] = 30 / DEG;
+  assert.ok(Math.abs(lerpPose(newPose(), a, b, 0.5)[POSE.toeInR] - 15 / DEG) < 1e-6, 'lerpPose blends the toe-in');
+  const m = mirrorPose(Float32Array.from(b));
+  assert.ok(
+    Math.abs(m[POSE.toeInL] - 30 / DEG) < 1e-6 && m[POSE.toeInR] === 0,
+    `mirrorPose swaps the feet's toe-in (${[m[POSE.toeInL], m[POSE.toeInR]].map((v) => (v * DEG).toFixed(1))})`,
+  );
+  const ma = mirrorPose(Float32Array.from(a));
+  const turn = turnAbout(solved(ma).q[I.footL], solved(m).q[I.footL]);
+  assert.ok(Math.abs(turn.yaw + 30 / DEG) < 1e-6, `mirrored, his left toe turns ${(turn.yaw * DEG).toFixed(1)}°`);
+});
+
+test('resting on the ground, the boot of the leg he stretches out turns in toward his other foot (45° to 60° from his hips’ facing), the other as it was; no other base pose turns a foot, and getting up and sitting down it turns only while lifted', () => {
+  // (The user's Dark Souls reference: the stretched leg's sabaton lies turned in toward the
+  // drawn-up one. His hips turn a little to his right sitting so: the toe is turned from them.
+  // Less doesn't read at the home view, which looks almost straight down that leg.)
+  for (const h of [0, 0.06, 0.11]) {
+    for (const feet of [null, [0.03, -0.02]]) {
+      const p = seatedPose(newPose(), h, DEFAULT_RIG, 'resting', feet);
+      const s = solver.solve(p, feet);
+      const hips = p[POSE.hips + 1];
+      const yaw = (side) => {
+        const f = new THREE.Vector3(0, 0, 1).applyQuaternion(s.q[I['foot' + side]]);
+        return Math.atan2(f.x, f.z) - hips;
+      };
+      const what = `resting on the ground (${h} m${feet ? ', uneven' : ''})`;
+      assert.ok(
+        yaw('R') >= 45 / DEG && yaw('R') <= 60 / DEG,
+        `${what}: his right boot turned in ${(yaw('R') * DEG).toFixed(1)}°`,
+      );
+      assert.ok(Math.abs(yaw('L')) < 1e-6, `${what}: his left boot turned ${(yaw('L') * DEG).toFixed(1)}°`);
+    }
+  }
+  const others = [
+    ['standing', standingPose()],
+    ['watchful on the ground', seatedPose(newPose(), 0, DEFAULT_RIG, 'watchful')],
+    ...[0.23, 0.36, 0.42].flatMap((h) =>
+      SEAT_POSES.map((st) => [`${st} on a ${h} m seat`, seatedPose(newPose(), h, DEFAULT_RIG, st)]),
+    ),
+  ];
+  for (const [what, p] of others) assert.ok(p[POSE.toeInL] === 0 && p[POSE.toeInR] === 0, `${what}: a foot turned in`);
+  // (A boot turned on the ground would grind round on its heel: it turns as it steps. As the
+  // feet's places do (the test above), it may start a hair before it's off the ground.)
+  for (const down of [false, true]) {
+    const what = down ? 'sitting down' : 'getting up';
+    const sit = seatedPose(newPose(), 0, DEFAULT_RIG, 'resting'),
+      up = standBy(newPose(), 0);
+    let prev = null,
+      lifted = false,
+      ground = 0;
+    for (let t = 0; t <= RISE_TIME + 1e-9; t += 1 / 120) {
+      const p = rise(newPose(), sit, up, t, down);
+      const s = solver.solve(p);
+      const on = s.p[I.footR].y < DEFAULT_RIG.ankleY + 0.006;
+      if (prev?.on && on) ground += Math.abs(p[POSE.toeInR] - prev.toe);
+      if (!on) lifted = true;
+      prev = { on, toe: p[POSE.toeInR] };
+    }
+    assert.ok(lifted, `${what}: the right boot lifts`);
+    assert.ok(ground < 0.5 / DEG, `${what}: the right boot turns ${(ground * DEG).toFixed(2)}° on the ground`);
+    assert.equal(prev.toe, down ? sit[POSE.toeInR] : 0, `${down ? 'sat down' : 'up'}: the right boot's turn`);
+  }
+});
+
+test('resting on the ground, the knee of the leg he stretches out faces up and a little out (5° to 25° from straight up, square to the leg), not in toward his other knee', () => {
+  // (The user's Dark Souls reference: that leg lies rolled a little onto its outside. Much
+  // further out, he comes within 10 px of a phone's frame on the home view.)
+  for (const h of [0, 0.06, 0.11]) {
+    for (const feet of [null, [0.03, -0.02]]) {
+      const p = seatedPose(newPose(), h, DEFAULT_RIG, 'resting', feet);
+      const s = solver.solve(p, feet);
+      const [hip, knee, ankle] = ['thighR', 'shinR', 'footR'].map((b) => s.p[I[b]].clone());
+      const along = ankle.sub(hip).normalize();
+      const cap = knee
+        .sub(hip)
+        .projectOnPlane(along)
+        .normalize()
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), -p[POSE.hips + 1]);
+      // (His right is −x: out is the cap's −x, from straight up.)
+      const out = Math.atan2(-cap.x, cap.y) * DEG;
+      const what = `resting on the ground (${h} m${feet ? ', uneven' : ''})`;
+      assert.ok(out >= 5 && out <= 25, `${what}: his right knee faces ${out.toFixed(1)}° out from straight up`);
+    }
+  }
 });
 
 test('[slow] every move gives a sound pose in its limits over 64 beats, standing and (where it can) seated', () => {

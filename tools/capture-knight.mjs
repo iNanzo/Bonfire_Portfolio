@@ -97,8 +97,13 @@ async function open({ width = 1280, height = 800, hide = true, path = '/' } = {}
   await page.evaluate(
     async ([helmet, style]) => {
       const k = window.__fire.knights;
-      // (Away when the page opens: here at once, for good.)
-      k.summon(0, { instant: true });
+      // (Away when the page opens: here at once, for good, brought as a visitor brings him, so
+      // his summon sign goes out as he comes: the engine's own summon leaves it lit under his
+      // boots, which a visitor never sees while he rests. In the helmet he had, not the new
+      // one a summon rolls: the same knight every run. Where there's no sign, the engine's.)
+      const helm = k.helmet;
+      if (k.summonKnight({ instant: true })) await k.setHelmet(helm, { index: 0, instant: true });
+      else k.summon(0, { instant: true });
       k.restLeft = Infinity;
       if (style) await k.setStyle(style, { instant: true });
       if (helmet) await k.setHelmet(helmet, { index: 0, instant: true });
@@ -117,7 +122,10 @@ async function seatIn(page, name, pose = null) {
       const k = F.debug.knights;
       if (pose) k.setSeatPose(pose);
       k.setScenery(name, k.terrain); // (formed at the seat at once, sitting)
-      F.knights.summon(0, { instant: true });
+      // (Brought as a visitor brings him if he's gone, his sign out, as open() has him, in the
+      // helmet open() kept, the visitor's pick now; his rest rolled anew, so endless again.)
+      if (F.knights.summonKnight({ instant: true })) F.knights.restLeft = Infinity;
+      else F.knights.summon(0, { instant: true });
       if (room) {
         // (The room he has at his seat, seated and stood up in front of it: --room.)
         const h = k.knights[0].home;

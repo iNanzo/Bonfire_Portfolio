@@ -15,6 +15,7 @@ import {
   helmDepth,
   sideOf,
   legOf,
+  toeOf,
   eulerQ,
 } from './knightRig.js';
 
@@ -347,8 +348,9 @@ export function createSolver(rig = DEFAULT_RIG) {
       out.knee[si] = Math.PI - mid.clone().sub(S).angleTo(end.clone().sub(mid).negate());
       const foot = IDX['foot' + s];
       p[foot].copy(end);
-      // Feet stay flat to the ground whatever the leg does, turned with the body.
-      eulerQ(q[foot], pose[o + 3], hipsYaw, 0);
+      // Feet stay flat to the ground whatever the leg does, turned with the body, and the toe
+      // turned in toward his middle by its toe-in (his left foot's toward −x, his right's +x).
+      eulerQ(q[foot], pose[o + 3], hipsYaw - sg * pose[toeOf(s)], 0);
       tassetTurn(q[IDX['tasset' + s]], q[H], q[IDX['thigh' + s]], rig.tassetFollow ?? TASSET_FOLLOW);
       p[IDX['tasset' + s]]
         .copy(off[IDX['tasset' + s]])

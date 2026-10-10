@@ -18,15 +18,20 @@ export const POSE = {
   armR: 25, // yaw, pitch, reach, elbow, wrist pitch, wrist roll, fist
   legL: 32,
   legR: 37, // x (out), y, z, foot pitch, knee out
+  // How far each foot's toe is turned in toward his middle, about the vertical (rad; added in
+  // round 11 after the legs, so no channel before them moved).
+  toeInL: 42,
+  toeInR: 43,
 };
-export const POSE_SIZE = 42;
+export const POSE_SIZE = 44;
 export const AXIAL = ['hips', 'spine', 'chest', 'neck', 'head'];
 
 /** A new pose (every channel 0: the rest pose, standing, arms as modeled). */
 export const newPose = () => new Float32Array(POSE_SIZE);
-/** Where a side's arm (sideOf) or leg (legOf) starts in a pose. */
+/** Where a side's arm (sideOf) or leg (legOf) starts in a pose, and its foot's toe-in (toeOf). */
 export const sideOf = (s) => (s === 'L' ? POSE.armL : POSE.armR);
 export const legOf = (s) => (s === 'L' ? POSE.legL : POSE.legR);
+export const toeOf = (s) => (s === 'L' ? POSE.toeInL : POSE.toeInR);
 const _e = new THREE.Euler();
 /** A joint's turn from its pitch, yaw and roll (radians; YXZ, as every joint takes them). */
 export const eulerQ = (out, pitch, yaw, roll) => out.setFromEuler(_e.set(pitch, yaw, roll, 'YXZ'));
