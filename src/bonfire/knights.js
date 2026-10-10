@@ -84,6 +84,7 @@ import {
   lerpPose,
   seatedPose,
   floorArms,
+  sitOnLowerHip,
   standingPose,
   seatFeet,
   feetAt,
@@ -1763,16 +1764,18 @@ export function createKnights(
     // Sitting on the ground at home (the ruins' seat, the others' places in Bonfire Live), and
     // sitting down onto it: his gestures and moves were made for a seat, and so was the way he
     // lowers himself (his hands dropped to his knees on the way down), so a hand dropped low is
-    // kept off the floor. (Sitting down he's still 'stand' till he's down, but already placed
-    // at home.)
+    // kept off the floor; and as his weight shifts his hips roll on the ground, about the lower
+    // side. (Sitting down he's still 'stand' till he's down, but already placed at home.)
     const h = k.home;
     if (
       (seated || a?.kind === 'lower') &&
       h &&
       h.h < 0.12 &&
       Math.hypot(k.group.position.x - h.x, k.group.position.z - h.z) < 0.05
-    )
+    ) {
+      sitOnLowerHip(p, rig);
       floorArms(p, FLOOR_HANDS + (h.floor ??= floorOf(h)), rig);
+    }
     return big;
   }
 

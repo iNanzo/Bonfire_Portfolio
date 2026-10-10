@@ -1201,6 +1201,52 @@ test('[slow] sitting on the ground, in the ruins and resting on the ring by the 
   assert.deepEqual(bad, [], 'under the ground');
 });
 
+// (Every 12 s his idle shifts his weight, rolling his hips up to 3° either way on top of the
+// pose's: a minute of it is five shifts for each of them. Rolled about their middle, the hips'
+// low side would sink: round 11's resting pose rolled 3° off its stretched leg took a thigh
+// 1.8 cm into flat ground at one, 35 s in, which the test above, a cast of two over 6 s,
+// never reached.)
+test('[slow] Bonfire Live’s cast of four sitting on the ground round the fire, every scenery, either seat pose, over a minute of their idle (every way the shifts of their weight roll their hips): what they sit on (hips, thighs, tassets) goes no more than 1.5 cm under the ground', async () => {
+  const env = await realKnights(4);
+  const { k } = env;
+  const bad = [];
+  const sitsOn = /^(hips|thigh|tasset)/;
+  for (const name of NAMES) {
+    const terrain = await terrainOf(name);
+    for (const pose of SEAT_POSES) {
+      k.setSeatPose(pose);
+      k.setScenery(name, terrain);
+      k.setCast({ count: 4, instant: true });
+      k.setScenery(name, terrain);
+      const on = [0, 1, 2, 3].filter((i) => k.knights[i].home?.h < 0.12);
+      const low = on.map(() => ({ d: Infinity }));
+      for (let t = 0; t < 60; t += 0.25) {
+        k.update(0.25);
+        on.forEach((i, j) => {
+          const floor = k.knights[i].group.position.y;
+          eachPoint(env, k.knights[i], (v, bone) => {
+            if (!sitsOn.test(bone)) return;
+            // (Under the ground he's placed on, or where it's lower, under that: one sat up on a
+            // step hangs a thigh past its edge. Not the height map alone: by a stone, it rises
+            // over him from the stone's edge.)
+            const d = v.y - Math.min(floor, terrain.height(v.x, v.z));
+            if (d < low[j].d) low[j] = { d, bone, t };
+          });
+        });
+      }
+      on.forEach((i, j) => {
+        const w = low[j];
+        if (w.d < -0.015)
+          bad.push(`${name} (${pose}), #${i}: his ${w.bone} ${(-w.d * 100).toFixed(1)} cm under the ground (${w.t} s)`);
+      });
+      for (const i of [0, 1, 2, 3]) k.dismiss(i, { instant: true });
+    }
+  }
+  k.setCast({ count: 1, instant: true });
+  k.setSeatPose('resting');
+  assert.deepEqual(bad, [], 'under the ground');
+});
+
 // (Bonfire Live rests the others on the ground round the fire, knightPlaces.js restPlaces:
 // a cast of four, the most it brings, rests them at every place a smaller cast does.)
 test('[slow] the others resting on the ground round the fire (Bonfire Live), every scenery, either seat pose: sat down where the show stands them, they sit where a new scenery sends them, on the ground there, 1.5 cm clear of the scenery all through their idle', async () => {

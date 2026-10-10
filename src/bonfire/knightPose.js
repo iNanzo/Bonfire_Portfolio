@@ -86,6 +86,7 @@ export {
   standBy,
   seatedPose,
   floorArms,
+  sitOnLowerHip,
   accent,
   idle,
   look,

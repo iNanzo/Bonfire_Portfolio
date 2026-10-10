@@ -255,6 +255,35 @@ export function floorArms(p, y, rig = DEFAULT_RIG) {
   return p;
 }
 
+const _lq = new THREE.Quaternion();
+const _lv = new THREE.Vector3();
+/** How low the lower of his hip sockets sits under the hips joint, turned so (pitch, yaw, roll). */
+function lowerHip(pitch, yaw, roll, rig) {
+  eulerQ(_lq, pitch, yaw, roll);
+  let low = Infinity;
+  for (const s of ['L', 'R'])
+    low = Math.min(
+      low,
+      _lv
+        .copy(rig.pos['thigh' + s])
+        .sub(rig.pos.hips)
+        .applyQuaternion(_lq).y,
+    );
+  return low;
+}
+/**
+ * Sitting on the ground, his hips roll about the lower of his sitting bones, not their middle:
+ * he's raised as far as the roll (the pose's, and his idle's shifts of weight, up to 3° either
+ * way) would have sunk that side below where it sat unrolled, the other side lifting as a
+ * body does. (Rolled about their middle, 6° took a thigh 1 cm further into the ground.)
+ */
+export function sitOnLowerHip(p, rig = DEFAULT_RIG) {
+  const o = POSE.hips;
+  if (Math.abs(p[o + 2]) < 1e-6) return p;
+  p[1] += Math.max(0, lowerHip(p[o], p[o + 1], 0, rig) - lowerHip(p[o], p[o + 1], p[o + 2], rig));
+  return p;
+}
+
 const _ha = new THREE.Vector3();
 /** Where the head joint is (knight space) in a pose. Reused: copy what you keep. */
 export function headAt(p, rig = DEFAULT_RIG) {
@@ -461,12 +490,12 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
   } else if (ground) {
     // Slumped toward his left knee, drawn up high and fallen out a little, its foot near him
     // (out of the fire, ahead on his left), his weight on that side (the hips rolled off the
-    // right, which keeps the back of that rolled-out thigh off the ground); the right leg
-    // stretched out along the ground, away from the fire, the knee a little bent and rolled
-    // a little out, its boot turned in toward his other foot (both as in the user's Dark
-    // Souls reference; the knee no further out: he'd come within 10 px of a phone's frame;
-    // no straighter: as his weight shifts the foot steps out and the leg would lock, the
-    // back of the thigh dropping into the ground). The head sunk and tipped toward the knee.
+    // right, about the left hip at home: sitOnLowerHip, which knights.js applies; it lifts
+    // the back of that rolled-out thigh off the ground); the right leg stretched out along
+    // the ground, away from the fire, the knee a little bent and rolled a little out, its
+    // boot turned in toward his other foot (both as in the user's Dark Souls reference; no
+    // straighter: as his weight shifts the foot steps out and the leg would lock, the back
+    // of the thigh dropping into the ground). The head sunk and tipped toward the knee.
     joint(p, 'hips', -16, -6, -3);
     joint(p, 'spine', 20, 4, -3);
     joint(p, 'chest', 10, 4, -5);

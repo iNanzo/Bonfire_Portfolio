@@ -30,6 +30,7 @@ import {
   measurePlates,
   newPose,
   seatedPose,
+  sitOnLowerHip,
   standingPose,
   standBy,
   seatFeet,
@@ -266,9 +267,33 @@ test('resting on the ground, the boot of the leg he stretches out turns in towar
   }
 });
 
+test('sitting on the ground, his hips roll about the lower sitting bone: whatever the roll (the pose’s and his idle’s weight shift, to 6° either way), the lower hip socket stays where it sat unrolled and the other lifts; unrolled, nothing moves', () => {
+  for (const style of SEAT_POSES) {
+    for (const deg of [-6, -3, -1, 0, 1, 3, 6]) {
+      const base = seatedPose(newPose(), 0, DEFAULT_RIG, style);
+      const flat = base.slice();
+      flat[POSE.hips + 2] = 0;
+      const rolled = base.slice();
+      rolled[POSE.hips + 2] = deg / DEG;
+      const p = sitOnLowerHip(rolled.slice());
+      const low = (pose) => {
+        const s = solver.solve(pose);
+        return Math.min(s.p[I.thighL].y, s.p[I.thighR].y);
+      };
+      const what = `${style}, the hips rolled ${deg}°`;
+      assert.ok(
+        Math.abs(low(p) - low(flat)) < 1e-4,
+        `${what}: the lower socket moves ${((low(p) - low(flat)) * 1000).toFixed(1)} mm`,
+      );
+      // (Only his height changes: raised for a roll, not at all without one.)
+      for (let i = 0; i < POSE_SIZE; i++) if (i !== 1) assert.equal(p[i], rolled[i], `${what}: channel ${i}`);
+      assert.ok(deg === 0 ? p[1] === rolled[1] : p[1] > rolled[1], `${what}: raised ${(p[1] - rolled[1]) * 1000} mm`);
+    }
+  }
+});
+
 test('resting on the ground, the knee of the leg he stretches out faces up and a little out (5° to 25° from straight up, square to the leg), not in toward his other knee', () => {
-  // (The user's Dark Souls reference: that leg lies rolled a little onto its outside. Much
-  // further out, he comes within 10 px of a phone's frame on the home view.)
+  // (The user's Dark Souls reference: that leg lies rolled a little onto its outside.)
   for (const h of [0, 0.06, 0.11]) {
     for (const feet of [null, [0.03, -0.02]]) {
       const p = seatedPose(newPose(), h, DEFAULT_RIG, 'resting', feet);
