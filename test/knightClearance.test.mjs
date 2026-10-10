@@ -24,8 +24,17 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createKnights, GESTURES, SEAT_POSES } from '../src/bonfire/knights.js';
 import { createArmorShared } from '../src/bonfire/armor.js';
-import { BONE_NODES, GESTURE_TIME, DANCE_SEATED_TIME, MOVE_INFO } from '../src/bonfire/knightPose.js';
-import { SEATS, FIRE_AT, ringOf, slotPlaces, ringPlaces, restPlaces } from '../src/bonfire/knightPlaces.js';
+import {
+  BONE_NODES,
+  GESTURE_TIME,
+  DANCE_SEATED_TIME,
+  MOVE_INFO,
+  POSE,
+  idle as idlePose,
+  newPose,
+  seatedPose,
+} from '../src/bonfire/knightPose.js';
+import { SEATS, FIRE_AT, PIT, ringOf, slotPlaces, ringPlaces, restPlaces } from '../src/bonfire/knightPlaces.js';
 import { getPov } from '../src/bonfire/povs.js';
 import { buildScenery } from '../src/bonfire/scenery.js';
 import {
@@ -1256,7 +1265,7 @@ test('[slow] the others resting on the ground round the fire (Bonfire Live), eve
 // (The user's call, round 11: a knight resting on the ring whose rest would meet the scenery
 // sits watchful there instead. In the cathedral with four out, the one by the pew sat up on its
 // kneeler, his chest 2 cm off the pew's end.)
-test('[slow] a knight resting on the ring sits where a seat would have him, 4 cm clear of the scenery sitting still (his boots resting on what’s under them), or sits watchful there: every scenery and cast, sent home, sat down where the show stands him, and back from watchful; by the cathedral’s pew he’s watchful, and with room round him he rests', async () => {
+test('[slow] a knight resting on the ring sits where a seat would have him, 4 cm clear of the scenery sitting still (his boots resting on what’s under them), or sits watchful there, as clear, and idles awake: every scenery and cast, sent home, sat down where the show stands him, and back from watchful, sitting in the pose his home names with his boots out of the fire; by the cathedral’s pew he’s watchful, and with room round him he rests', async () => {
   const { pieces } = await realKnights(4);
   const model = await loadKnightMesh();
   // (Sitting still: no idle to move him nearer or further.)
@@ -1266,7 +1275,10 @@ test('[slow] a knight resting on the ring sits where a seat would have him, 4 cm
   const bad = [],
     sat = [];
   k.setSeatPose('resting');
-  /** Each knight on the ring now: how he sits there, and resting, how near he comes to the shapes. */
+  /**
+   * Each knight on the ring now: how his home has him sit there, the pose he sits in, how near
+   * he comes to the shapes and how near his boots come to the fire.
+   */
   const check = (name, cast, cs, how) => {
     k.update(1 / 12 + 1e-7);
     for (let i = 1; i < cast; i++) {
@@ -1274,17 +1286,32 @@ test('[slow] a knight resting on the ring sits where a seat would have him, 4 cm
         h = n.home;
       const at = `${name}, ${cast} out, #${i} ${how} (${h.x.toFixed(2)}, ${h.z.toFixed(2)})`;
       sat.push({ name, cast, i, how, style: h.style, from: h.from });
-      if (h.style === 'watchful') continue;
-      if (h.style !== 'resting') {
+      if (!SEAT_POSES.includes(h.style)) {
         bad.push(`${at}: sits ${h.style}`);
         continue;
       }
+      // The pose his home names, on the ground under his boots there (watchful where his rest
+      // would meet the scenery: not the rest, its leg stretched out toward the fire, at the
+      // place sat back only as far as watchful needs).
+      const pose = seatedPose(newPose(), h.h, k.rig, h.style, h.feet);
+      const off = pose.findIndex((q, j) => Math.abs(q - n.sit[j]) > 1e-6);
+      if (off >= 0)
+        bad.push(
+          `${at}: his home has him ${h.style}, but he sits otherwise (channel ${off}: ${n.sit[off].toFixed(3)}, not ${pose[off].toFixed(3)})`,
+        );
       const body = nearestOf(env, i, cs, { skip: boots, margin: 0.05 });
       const boot = nearestOf(env, i, cs, { skip: (b) => !boots(b) });
       if (body.d < 0.04)
-        bad.push(`${at}: resting, his ${body.bone} ${(body.d * 100).toFixed(1)} cm from the ${body.shape}`);
+        bad.push(`${at}: ${h.style}, his ${body.bone} ${(body.d * 100).toFixed(1)} cm from the ${body.shape}`);
       if (boot.d < -0.01)
-        bad.push(`${at}: resting, his ${boot.bone} ${(-boot.d * 100).toFixed(1)} cm into the ${boot.shape}`);
+        bad.push(`${at}: ${h.style}, his ${boot.bone} ${(-boot.d * 100).toFixed(1)} cm into the ${boot.shape}`);
+      // (Out of the fire: as knights.test.mjs asks of every boot on the ring, here on the real model.)
+      let fire = Infinity;
+      eachPoint(env, n, (v, bone) => {
+        if (/^foot[LR]$/.test(bone)) fire = Math.min(fire, fireDist(v.x, v.z));
+      });
+      if (fire < PIT + 0.02)
+        bad.push(`${at}: ${h.style}, his boots come to ${fire.toFixed(3)} m from the fire's middle`);
     }
   };
   for (const name of NAMES) {
@@ -1316,7 +1343,7 @@ test('[slow] a knight resting on the ring sits where a seat would have him, 4 cm
     }
   }
   k.dispose?.();
-  assert.deepEqual(bad, [], 'resting nearer the scenery than a seat has him');
+  assert.deepEqual(bad, [], 'not sitting as his home has him, nearer the scenery than a seat has him, or in the fire');
   // (Every way he came to sit there, he sits the same way.)
   for (const s of sat) {
     const same = sat.filter((o) => o.name === s.name && o.cast === s.cast && o.i === s.i);
@@ -1341,4 +1368,38 @@ test('[slow] a knight resting on the ring sits where a seat would have him, 4 cm
     roomy.length && roomy.every((s) => s.style === 'resting'),
     `with room round him he sits ${[...new Set(roomy.filter((s) => s.style !== 'resting').map((s) => `${s.name}, ${s.cast} out, #${s.i}: ${s.style}`))].join('; ')}`,
   );
+  // Sat watchful there, he idles as a watchful knight does, awake (knightPose.js idle's
+  // `alert`: his head up, no dozing off), and resting, as a resting one: each step of his idle
+  // (sat still on his seat pose, nothing else on him) is idle's for the pose he sits in.
+  const live = (await realKnights(4)).k;
+  live.setSeatPose('resting');
+  const idling = [],
+    awake = new Set();
+  for (const name of NAMES) {
+    const terrain = await terrainOf(name);
+    live.setScenery(name, terrain);
+    live.setCast({ count: 4, instant: true });
+    live.setScenery(name, terrain);
+    for (let i = 1; i < 4; i++) restartClock(live.knights[i]);
+    for (let t = 0; t < 4; t += 1 / 12) {
+      live.update(1 / 12 + 1e-7);
+      if (t < 1) continue; // (onto his seat pose: a crossfade)
+      for (let i = 1; i < 4; i++) {
+        const n = live.knights[i],
+          alert = n.home.style === 'watchful' ? 1 : 0;
+        const want = Float32Array.from(n.sit);
+        idlePose(want, n.clock, n.seed, true, alert);
+        const off = [POSE.chest, POSE.neck, POSE.head]
+          .flatMap((c) => [c, c + 1, c + 2])
+          .find((c) => Math.abs(want[c] - n.work[c]) > 1e-5);
+        if (off !== undefined)
+          idling.push(`${name}, 4 out, #${i} (${n.home.style}) at ${t.toFixed(2)} s: channel ${off} off its idle's`);
+        if (alert) awake.add(`${name} #${i}`);
+      }
+    }
+    for (let i = 0; i < 4; i++) live.dismiss(i, { instant: true });
+  }
+  live.setCast({ count: 1, instant: true });
+  assert.ok(awake.size, 'a knight sat watchful where his rest would meet the scenery, with four out');
+  assert.deepEqual(idling, [], 'idling otherwise than his seat pose has him');
 });
