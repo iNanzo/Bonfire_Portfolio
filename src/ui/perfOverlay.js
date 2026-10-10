@@ -20,7 +20,8 @@
 // attribute or a style sheet (a page's CSP may refuse those); a page places it with
 // --stats-top, --stats-left, --stats-right, --stats-bottom and --stats-z (bottom left by
 // default), keeps it to the room it has (--stats-max-h: the rows past it are left out, so it
-// ends on a whole row, and a box given no room draws nothing), puts it away for a while (--stats-display: none), and on
+// ends on a whole row, and a box given no room draws nothing; --stats-max-w: as wide as the
+// room beside it, its gutters and a panel allowed for), puts it away for a while (--stats-display: none), and on
 // a small screen can shrink it (--stats-font) and fold the dimmed rows away
 // (--stats-detail: none). The variables reach it from its parent (createBonfire's
 // statsParent: Bonfire Live's page box, where the HUD's height is).
@@ -67,7 +68,7 @@ export function createPerfOverlay({
     'pointer-events': 'none',
     'user-select': 'none',
     'box-sizing': 'border-box',
-    'max-width': 'min(380px, calc(100vw - 16px))',
+    'max-width': 'var(--stats-max-w, min(380px, calc(100vw - 16px)))',
     'max-height': 'var(--stats-max-h, calc(100vh - 16px))',
     overflow: 'hidden',
     font: 'var(--stats-font, 11px)/1.4 ui-monospace, Consolas, monospace',

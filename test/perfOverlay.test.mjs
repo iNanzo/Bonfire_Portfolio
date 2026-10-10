@@ -129,6 +129,7 @@ test('stats overlay: a page keeps it to the room it has and can put it away; hel
   const node = el();
   // (The page's variables, with the old defaults where a page sets none: the site's.)
   assert.match(node.styles.get('max-height'), /^var\(--stats-max-h, /);
+  assert.match(node.styles.get('max-width'), /^var\(--stats-max-w, /);
   assert.match(node.styles.get('display'), /^var\(--stats-display, block\)$/);
   assert.equal(node.styles.get('overflow'), 'hidden');
   // Its padding is on what it holds and its edge inside, so a box held to no height shows nothing.
