@@ -182,6 +182,57 @@ test('seated on a raised seat (the forge’s stump): the feet on the ground, fac
   assert.equal(k2.rig.tassetFollow, 0.85);
 });
 
+test('seated on the ground (the ruins): on the ground under him, a flagstone lifting him, never up on a stone’s top there; his boots on the ground in front of him', () => {
+  const seat = SEATS.ruins;
+  assert.ok(seat.ground && seat.top === 0, 'the ruins’ seat is the ground itself');
+  const under = (x, z, r) => Math.hypot(x - seat.x, z - seat.z) < r;
+  for (const [what, ground, y] of [
+    // (A stone's top under him that a raised seat would take for its own: within 10 cm of it.)
+    ['a stone’s top under him', { height: () => 0.02, top: (x, z) => (under(x, z, 0.15) ? 0.08 : 0.02) }, 0.02],
+    // (A flagstone under his hips, his boots down off it in front.)
+    [
+      'on a flagstone',
+      { height: (x, z) => (under(x, z, 0.2) ? 0.07 : 0.02), top: (x, z) => (under(x, z, 0.2) ? 0.07 : 0.02) },
+      0.07,
+    ],
+  ]) {
+    for (const pose of SEAT_POSES) {
+      const k = make();
+      k.setSeatPose(pose);
+      k.setScenery('ruins', ground);
+      k.summon(0, { instant: true });
+      run(k, 0.2);
+      const n = k.knights[0];
+      const at = `${what} (${pose})`;
+      assert.equal(k.list[0].state, 'sitting');
+      assert.equal(n.home.h, 0, `${at}: he sits on the ground, no seat under him (${n.home.h} m)`);
+      assert.ok(
+        Math.abs(n.group.position.y - y) < 1e-9,
+        `${at}: placed at ${n.group.position.y.toFixed(3)} m, the ground under him at ${y}`,
+      );
+      const hips = bone(k, 0, 'hips').getWorldPosition(new THREE.Vector3());
+      assert.ok(Math.abs(hips.y - (y + SEAT_DEPTH)) < 0.01, `${at}: his hips at ${hips.y.toFixed(3)} m`);
+      // (His own space: z ahead of him.)
+      const ahead = (v) =>
+        v
+          .clone()
+          .sub(n.group.position)
+          .applyAxisAngle(new THREE.Vector3(0, 1, 0), -n.yaw).z;
+      for (const side of ['L', 'R']) {
+        const foot = bone(k, 0, `foot${side}`).getWorldPosition(new THREE.Vector3());
+        assert.ok(
+          Math.abs(foot.y - (0.02 + DEFAULT_REST[`foot${side}`][1])) < 0.01,
+          `${at}: his ${side === 'L' ? 'left' : 'right'} ankle at ${foot.y.toFixed(3)} m, on the ground (0.02)`,
+        );
+        assert.ok(
+          ahead(foot) > ahead(hips) + 0.25,
+          `${at}: his ${side === 'L' ? 'left' : 'right'} boot ${(ahead(foot) - ahead(hips)).toFixed(2)} m in front of his hips`,
+        );
+      }
+    }
+  }
+});
+
 test('dancing: up, over to the slot and on the clock; shadows redraw only when a pose steps', () => {
   const k = make();
   k.setScenery('ruins', flat());
