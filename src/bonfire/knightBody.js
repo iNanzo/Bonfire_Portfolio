@@ -733,6 +733,18 @@ function steps(out, from, to, t, plan, over = null, back = false) {
 }
 /** Seconds to stand up or sit down. */
 export const RISE_TIME = 1.2;
+/**
+ * The furthest down he looks leaning in to get up from his seat or to sit down on it (rad,
+ * ahead): at the ground in front of him, his head lifted out of a deep slump (which would
+ * curl him into a ball, the top of his helmet to the camera).
+ */
+const RISE_LOOK = 50 * DEG;
+const _hu = new THREE.Vector3();
+/** Lift the head of `p` to look ahead no further down than `pitch` (rad), if it's bowed further. */
+function headUpTo(p, pitch) {
+  if (Math.asin(clamp(-headDir(p, _hu).y, -1, 1)) > pitch) look(p, 0, pitch);
+  return p;
+}
 const riseKeys = Array.from({ length: 5 }, newPose);
 const riseOver = newPose();
 /**
@@ -768,6 +780,7 @@ export function rise(out, sit, stand, t, down = false, over = null) {
     nudge(k1, 'spine', 26);
     nudge(k1, 'chest', 8);
     nudge(k1, 'head', -26);
+    headUpTo(k1, RISE_LOOK);
     arm(k1, 'L', 14, -40, 0.72, 25, 20, 0.6);
     arm(k1, 'R', 12, -40, 0.72, 25, 20, 0.6);
     k1[2] += 0.05;
@@ -777,6 +790,7 @@ export function rise(out, sit, stand, t, down = false, over = null) {
     nudge(k2, 'spine', 24);
     nudge(k2, 'chest', 6);
     nudge(k2, 'head', -18);
+    headUpTo(k2, RISE_LOOK - 10 * DEG);
     arm(k2, 'L', 22, -62, 0.9, 20, 10, 0.7);
     arm(k2, 'R', 22, -62, 0.9, 20, 10, 0.7);
     copy(k3, stand);
@@ -813,6 +827,7 @@ export function rise(out, sit, stand, t, down = false, over = null) {
   nudge(k2, 'hips', 10);
   nudge(k2, 'spine', 18);
   nudge(k2, 'head', -10);
+  headUpTo(k2, RISE_LOOK - 5 * DEG);
   arm(k2, 'L', 40, -60, 0.9, 10, 0, 0.6);
   arm(k2, 'R', 40, -60, 0.9, 10, 0, 0.6);
   copy(k3, sit);
@@ -849,6 +864,7 @@ function riseAcross(out, sit, stand, t, down, over) {
     nudge(k1, 'spine', 26);
     nudge(k1, 'chest', 8);
     nudge(k1, 'head', -26);
+    headUpTo(k1, RISE_LOOK);
     arm(k1, 'L', 14, -40, 0.72, 25, 20, 0.6);
     arm(k1, 'R', 12, -40, 0.72, 25, 20, 0.6);
     k1[2] += 0.04;
@@ -857,6 +873,7 @@ function riseAcross(out, sit, stand, t, down, over) {
     nudge(k2, 'spine', 22);
     nudge(k2, 'chest', 6);
     nudge(k2, 'head', -16);
+    headUpTo(k2, RISE_LOOK - 10 * DEG);
     arm(k2, 'L', 22, -62, 0.9, 20, 10, 0.7);
     arm(k2, 'R', 22, -62, 0.9, 20, 10, 0.7);
     copy(k3, mid);
@@ -894,6 +911,7 @@ function riseAcross(out, sit, stand, t, down, over) {
   nudge(k3, 'hips', 10);
   nudge(k3, 'spine', 18);
   nudge(k3, 'head', -10);
+  headUpTo(k3, RISE_LOOK - 5 * DEG);
   arm(k3, 'L', 40, -60, 0.9, 10, 0, 0.6);
   arm(k3, 'R', 40, -60, 0.9, 10, 0, 0.6);
   copy(k4, sit);
