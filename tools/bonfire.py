@@ -405,11 +405,17 @@ def off_capsule(x, y, keep, ex, ey, reach):
 
 def off_seat(x, y, s):
     """A rock at (x, y), its size s, moved out of where the knight sits: his hips at the seat
-    and his legs out toward the fire (a capsule SEAT_REACH long, SEAT_R round), then from under
-    the leg he stretches out (LEG_R round, out to its boot). Every other rock stays where it
+    and his legs out toward the fire (a capsule SEAT_REACH long, SEAT_R round), and from under
+    the leg he stretches out (LEG_R round, out to its boot), pushed from each in turn till it's
+    out of both (out of one, it can land back in the other). Every other rock stays where it
     falls (the same draws either way)."""
-    x, y = off_capsule(x, y, SEAT_R + s, FIRE_CENTER[0], FIRE_CENTER[1], SEAT_REACH)
-    return off_capsule(x, y, LEG_R + s, LEG_X, LEG_Y, None)
+    for _ in range(32):
+        px, py = x, y
+        x, y = off_capsule(x, y, SEAT_R + s, FIRE_CENTER[0], FIRE_CENTER[1], SEAT_REACH)
+        x, y = off_capsule(x, y, LEG_R + s, LEG_X, LEG_Y, None)
+        if math.hypot(x - px, y - py) < 1e-9:
+            break
+    return x, y
 
 # Rubble (none where the knight sits).
 SEAT_REACH, SEAT_R, LEG_R = 0.55, 0.32, 0.2

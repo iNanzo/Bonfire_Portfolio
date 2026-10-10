@@ -294,9 +294,10 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
     fallen from it lies behind it (`RUINS.drum`: −2.75, −2.05; `DRUM_X, DRUM_Y`), out of
     his way and the dancers'; `tools/bonfire.py` moves any rubble off his place
     (`off_seat`, round `SEAT_X, SEAT_Y`) and from under the leg he stretches out resting
-    (out to its boot, `LEG_X, LEG_Y`). The model was rebuilt with the same seeded draws:
-    only the pillar, its candles, the drum and three rocks moved (and, with the leg's
-    keep-out, the rock under his knee 16 cm out to his right). Round 10's seat
+    (out to its boot, `LEG_X, LEG_Y`), pushing a rock from each in turn till it's out of
+    both. The model was rebuilt with the same seeded draws: only the pillar, its candles,
+    the drum and four rocks moved (and, with the leg's keep-out, the rock under his knee
+    16 cm further out to his right, and one by his boot about 1 cm). Round 10's seat
     drum (`Static_PillarDrum`, built by `scenery.js` and added to the model's pieces by
     `sceneModel.js`) is gone: the ruins are the model's own again.
   - *The other places* keep their seats: a low stump by the forge's anvil (0.21 m; its
