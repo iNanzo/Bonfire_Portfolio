@@ -372,71 +372,122 @@ test('[slow] seated at every seat, either seat pose, he is 4 cm clear of the sce
   k.setSeatPose('resting');
 });
 
-test('[slow] nothing he does at his seat goes into the scenery (every helmet in the ruins): gestures seated and standing, the site’s dance, reactions, seated moves, getting up and sitting down; no step of it solves more than 4 poses', async () => {
+test('at every seat, either seat pose, he has all the room for both arms, seated and stood up in front of it: nothing of the scenery in an arm’s reach', async () => {
+  const env = await realKnights();
+  const { k } = env;
+  const n = k.knights[0];
+  const bad = [];
+  for (const name of NAMES) {
+    k.setScenery(name, await terrainOf(name));
+    for (const pose of SEAT_POSES) {
+      k.setSeatPose(pose);
+      k.summon(0, { instant: true });
+      // (Up on his feet where he stands up to, then back down: both rooms are his home's.)
+      k.stand(0);
+      for (let t = 0; t < 1.8; t += 1 / 12) k.update(1 / 12 + 1e-7);
+      k.sit(0);
+      for (let t = 0; t < 1.8; t += 1 / 12) k.update(1 / 12 + 1e-7);
+      const { room, roomUp } = n.home;
+      if (![...room, ...(roomUp ?? [0, 0])].every((r) => r === 1))
+        bad.push(
+          `${name} (${pose}): seated ${room.map((r) => r.toFixed(2))}, stood up ${roomUp?.map((r) => r.toFixed(2))}`,
+        );
+      k.dismiss(0, { instant: true });
+    }
+  }
+  k.setSeatPose('resting');
+  assert.deepEqual(bad, [], 'less than all the room for an arm (left, right)');
+});
+
+// (A spot right by the shrine's front lantern: sat down there on the ground, a step back from
+// it, he has the lantern behind his left shoulder, as near as no seat has a piece now.)
+const BY_LANTERN = { x: -1.15, z: 0.55 };
+test('[slow] nothing he does at his seat goes into the scenery (every helmet in the ruins): gestures seated and standing, the site’s dance, reactions, seated moves, getting up and sitting down; sat down right by a piece he eases back from it, no step solving more than 4 poses', async () => {
   const env = await realKnights();
   const { k } = env;
   const bad = [];
   const solves = {};
+  /** Everything knight i does where he sits, each step of it seen by `see(seconds, what, each)`. */
+  const everything = (i, see) => {
+    see(1, 'sitting');
+    // Every gesture seated (the site's dance gets up for its two bars and sits back down),
+    // and the site's dance in his seat (a phone's view).
+    for (const g of GESTURES) {
+      k.gesture(g, { index: i });
+      see(GESTURE_TIME[g] + 0.2, `seated ${g}`);
+    }
+    k.headroom = false;
+    k.gesture('dance', { index: i });
+    see(DANCE_SEATED_TIME + 0.2, 'the dance in his seat');
+    k.headroom = true;
+    for (const r of ['impact', 'stoke', 'ring']) {
+      k.react(r, 1);
+      see(1.4, `seated ${r}`);
+    }
+    // Every seated move on a beat clock (two beats a second).
+    for (const m of Object.keys(MOVE_INFO).filter((mv) => MOVE_INFO[mv].seated)) {
+      k.dance(i, { move: m, energy: 1, seated: true });
+      let b = 0;
+      see(Math.min(4, MOVE_INFO[m].cycle * 0.5) + 0.25, `seated ${m}`, () => k.clock((b += 1 / 6), 0.5));
+    }
+    k.sit(i);
+    see(0.6, 'settling');
+    // Up on his feet in front of where he sits (as Bonfire Live's breakdown has him watch),
+    // every gesture there and the reactions, and back down.
+    k.stand(i);
+    see(1.4, 'getting up');
+    for (const g of GESTURES.filter((q) => q !== 'dance')) {
+      k.gesture(g, { index: i });
+      see(GESTURE_TIME[g] + 0.2, `standing ${g}`);
+    }
+    for (const r of ['impact', 'stoke', 'ring']) {
+      k.react(r, 1);
+      see(1.4, `standing ${r}`);
+    }
+    k.sit(i);
+    see(1.6, 'sitting down');
+  };
   for (const name of NAMES) {
     const cs = collidersOf(name);
     k.setScenery(name, await terrainOf(name));
-    // (The helmets reach differently: the bascinet's visor juts, its mail hangs low. In the
-    // ruins he stands up over the drum, his head low over it.)
+    // (The helmets reach differently: the bascinet's visor juts, its mail hangs low. One
+    // seat's enough to see them all.)
     for (const helmet of name === 'ruins' ? ['great', 'armet', 'bascinet'] : ['great']) {
       for (const pose of SEAT_POSES) {
         const log = {};
         const at = (what) => `${name} (${pose}${helmet === 'great' ? '' : `, ${helmet}`}) ${what}`;
-        const see = (seconds, what, each = null) => watch(env, 0, cs, seconds, at(what), log, each, solves);
         k.setSeatPose(pose);
         k.summon(0, { instant: true });
         await k.setHelmet(helmet, { index: 0, instant: true });
-        see(1, 'sitting');
-        // Every gesture seated (the site's dance gets up for its two bars and sits back down),
-        // and the site's dance in his seat (a phone's view).
-        for (const g of GESTURES) {
-          k.gesture(g, { index: 0 });
-          see(GESTURE_TIME[g] + 0.2, `seated ${g}`);
-        }
-        k.headroom = false;
-        k.gesture('dance', { index: 0 });
-        see(DANCE_SEATED_TIME + 0.2, 'the dance in his seat');
-        k.headroom = true;
-        for (const r of ['impact', 'stoke', 'ring']) {
-          k.react(r, 1);
-          see(1.4, `seated ${r}`);
-        }
-        // Every seated move on a beat clock (two beats a second).
-        for (const m of Object.keys(MOVE_INFO).filter((mv) => MOVE_INFO[mv].seated)) {
-          k.dance(0, { move: m, energy: 1, seated: true });
-          let b = 0;
-          see(Math.min(4, MOVE_INFO[m].cycle * 0.5) + 0.25, `seated ${m}`, () => k.clock((b += 1 / 6), 0.5));
-        }
-        k.sit(0);
-        see(0.6, 'settling');
-        // Up on his feet in front of his seat (as Bonfire Live's breakdown has him watch), every
-        // gesture there and the reactions, and back down.
-        k.stand(0);
-        see(1.4, 'getting up');
-        for (const g of GESTURES.filter((q) => q !== 'dance')) {
-          k.gesture(g, { index: 0 });
-          see(GESTURE_TIME[g] + 0.2, `standing ${g}`);
-        }
-        for (const r of ['impact', 'stoke', 'ring']) {
-          k.react(r, 1);
-          see(1.4, `standing ${r}`);
-        }
-        k.sit(0);
-        see(1.6, 'sitting down');
+        everything(0, (seconds, what, each = null) => watch(env, 0, cs, seconds, at(what), log, each, solves));
         bad.push(...report(log));
         k.dismiss(0, { instant: true });
       }
     }
   }
-  k.setSeatPose('resting');
   await k.setHelmet('great', { index: 0, instant: true });
+  // Sat down on the ground by the shrine's front lantern: his left arm hemmed in (knights.js
+  // roomOf), and whatever of him would still go into it eased back.
+  const cramped = {};
+  const cs = collidersOf('shrine');
+  k.setScenery('shrine', await terrainOf('shrine'));
+  for (const pose of SEAT_POSES) {
+    const log = {};
+    k.setSeatPose(pose);
+    k.summon(1, { instant: true, at: BY_LANTERN, facing: 'fire' });
+    k.sit(1);
+    for (let t = 0; t < 2; t += 1 / 12) k.update(1 / 12 + 1e-7);
+    everything(1, (seconds, what, each = null) =>
+      watch(env, 1, cs, seconds, `by the shrine's front lantern (${pose}) ${what}`, log, each, cramped),
+    );
+    bad.push(...report(log));
+    k.dismiss(1, { instant: true });
+  }
+  k.setSeatPose('resting');
   assert.deepEqual(bad, [], `deeper than ${DEEPEST * 100} cm`);
-  assert.ok(solves.n <= MOST_SOLVES, `${solves.what}: a step solved ${solves.n} poses (${solves.t.toFixed(2)} s)`);
-  assert.ok(solves.n > 1, 'he eases back somewhere, a few poses a step');
+  for (const s of [solves, cramped])
+    assert.ok(s.n <= MOST_SOLVES, `${s.what}: a step solved ${s.n} poses (${s.t.toFixed(2)} s)`);
+  assert.ok(cramped.n > 1, `by the lantern he never eases back (a step solves ${cramped.n} poses at most)`);
 });
 
 test('[slow] dancers at every place on the ring, every move that fits there facing the fire or the front, and the drop gestures, stay out of the scenery', async () => {
@@ -584,54 +635,65 @@ test('in the ruins he sits on the ground itself, his boots on it out of the fire
   k.setSeatPose('resting');
 });
 
-// Round 9's seated Praise the Sun (the scenery not yet in its way): how high each hand got over
-// his hips (m), [left, right], at each seat in either seat pose. (Its room then raised a hand
-// hemmed in at a side straight up, a little higher.)
-// (The ruins' row is the ground seat's, round 11's: sitting on the ground, he throws it from
-// lower than round 9 did from its drum.)
-const ROUND9_PRAISE = {
-  ruins: { resting: [0.784, 0.784], watchful: [0.784, 0.784] },
-  forge: { resting: [0.814, 0.897], watchful: [0.822, 0.905] },
-  shrine: { resting: [0.814, 0.897], watchful: [0.822, 0.905] },
-  cathedral: { resting: [0.814, 0.814], watchful: [0.822, 0.822] },
-  cult: { resting: [0.897, 0.897], watchful: [0.905, 0.905] },
-};
-test('[slow] seated Praise the Sun at every seat, either seat pose, throws both arms up: each hand at least 90 % as high over his hips as round 9’s', async () => {
+// (The same seat with nothing round it: a scenery colliders.js has no shapes for, given the
+// seat's own place and height map. Its room for his arms is all of it, and nothing turns them.)
+const BARE = 'bare (a test’s)';
+test('[slow] seated Praise the Sun at every seat, either seat pose, is the Praise he throws there with nothing round him (every joint to 5 mm, each step): nothing there hems it in', async () => {
   const env = await realKnights();
   const { k } = env;
   const n = k.knights[0];
-  const [hips, ...hands] = ['hips', 'handL', 'handR'].map((b) => n.bones.find((x) => x.name === b));
-  const y = (b) => b.getWorldPosition(_v).y;
-  const bad = [];
-  for (const name of NAMES) {
-    k.setScenery(name, await terrainOf(name));
-    for (const pose of SEAT_POSES) {
-      k.setSeatPose(pose);
-      k.summon(0, { instant: true });
-      k.update(0.5);
+  const [head, ...hands] = ['head', 'handL', 'handR'].map((b) => n.bones.findIndex((x) => x.name === b));
+  /** Praise from his seat in scenery `name` (on `terrain`): where each joint is, each step. */
+  const praise = (name, terrain) => {
+    k.setScenery(name, terrain);
+    k.summon(0, { instant: true });
+    n.clock = 0; // (his idle from the same moment every time)
+    k.update(0.5);
+    k.gesture('praise', { index: 0 });
+    const steps = [];
+    for (let t = 0; t < GESTURE_TIME.praise + 0.2; t += 1 / 12) {
+      k.update(1 / 12 + 1e-7);
       n.group.updateMatrixWorld(true);
-      const rest = y(hips);
-      k.gesture('praise', { index: 0 });
-      const top = [-Infinity, -Infinity];
-      for (let t = 0; t < GESTURE_TIME.praise; t += 1 / 12) {
-        k.update(1 / 12 + 1e-7);
-        n.group.updateMatrixWorld(true);
-        hands.forEach((b, i) => {
-          top[i] = Math.max(top[i], y(b) - rest);
-        });
-      }
-      top.forEach((h, i) => {
-        const was = ROUND9_PRAISE[name][pose][i];
-        if (h < 0.9 * was)
-          bad.push(
-            `${name} (${pose}): his ${hands[i].name} ${(h * 100).toFixed(0)} cm over his hips (round 9: ${(was * 100).toFixed(0)})`,
-          );
-      });
-      k.dismiss(0, { instant: true });
+      steps.push(n.bones.map((b) => b.getWorldPosition(new THREE.Vector3())));
     }
+    k.dismiss(0, { instant: true });
+    return steps;
+  };
+  const bad = [];
+  try {
+    for (const name of NAMES) {
+      const terrain = await terrainOf(name);
+      SEATS[BARE] = SEATS[name];
+      for (const pose of SEAT_POSES) {
+        k.setSeatPose(pose);
+        const there = praise(name, terrain),
+          bare = praise(BARE, terrain);
+        // (Both hands thrown up over his head, or there's no Praise to compare.)
+        for (const j of hands) {
+          const over = Math.max(...bare.map((s) => s[j].y)) - bare[0][head].y;
+          assert.ok(
+            over > 0.2,
+            `${name} (${pose}): his ${n.bones[j].name} comes ${over.toFixed(2)} m over his head in Praise`,
+          );
+        }
+        let most = { d: 0, j: 0, t: 0 };
+        there.forEach((step, s) =>
+          step.forEach((v, j) => {
+            const d = v.distanceTo(bare[s][j]);
+            if (d > most.d) most = { d, j, t: s / 12 };
+          }),
+        );
+        if (most.d > 0.005)
+          bad.push(
+            `${name} (${pose}): his ${n.bones[most.j].name} ${(most.d * 1000).toFixed(1)} mm off where it goes with nothing round him (${most.t.toFixed(2)} s)`,
+          );
+      }
+    }
+  } finally {
+    delete SEATS[BARE];
+    k.setSeatPose('resting');
   }
-  k.setSeatPose('resting');
-  assert.deepEqual(bad, [], 'a hand held down');
+  assert.deepEqual(bad, [], 'a Praise held in');
 });
 
 // Round 9's (before the scenery kept him out), measured the same way on the same height maps:

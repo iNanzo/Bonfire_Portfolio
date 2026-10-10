@@ -84,8 +84,10 @@ export const FORGE = {
   },
   anvil: {
     // (Turned 0.3 rad further than round 9's, its horn pointing back past the seated knight's
-    // right shoulder instead of at it: a seated Praise goes all the way up there.)
-    at: [-1.45, -1.35],
+    // right shoulder instead of at it: a seated Praise goes all the way up there. It stands
+    // 0.4 m further back than round 10's, straight away from the fire: all the room his right
+    // arm wants, seated or stood up.)
+    at: [-1.75, -1.6],
     turn: 0.8,
     stump: { r: [0.28, 0.25], h: 0.52 },
     foot: { size: [0.28, 0.1, 0.22], y: 0.565 },
@@ -122,8 +124,10 @@ export const SHRINE = {
     roof: { r: 0.38, h: 0.24, y: 1.44 }, // (four-sided, its corners on the diagonals)
     finial: { r: 0.06, y: 1.59 },
   },
+  // (The back one stands 0.58 m further from the fire than round 10's, out of the way of the
+  // seated knight's right arm.)
   lanterns: [
-    { name: 'back', at: [-1.45, -1.35], turn: 0.3, scale: 1 },
+    { name: 'back', at: [-1.95, -1.65], turn: 0.3, scale: 1 },
     { name: 'front', at: CLEARING.frontLeft, turn: -0.2, scale: 0.8 },
   ],
 };
@@ -167,8 +171,9 @@ export const CATHEDRAL = {
     // (The right column, with its half of the arch, stands 0.5 m further along the row than
     // round 9's: the knight's seat at its foot overlapped it, no seat clear of it kept him in
     // a phone's frame (knightPlaces.js SEATS), and his left arm needs the room for a seated
-    // Praise.)
-    at: [-1.45, -1.35],
+    // Praise. The whole nave stands 0.3 m further back than round 10's, for the rest of that
+    // room.)
+    at: [-1.45, -1.65],
     turn: 0.35,
     columns: [-0.58, 1.08],
     base: { size: [0.5, 0.16, 0.5], y: 0.08 },
@@ -232,13 +237,14 @@ export const CULT = {
   stones: {
     at: [-1.45, -1.35],
     turn: 0.4,
-    // [x, z, width, height, lean] in the stones' own space, each 0.26 deep. (Stone C stands
-    // 0.3 m further along than round 9's, out of the seated knight's way, as the cathedral's
-    // right column does.)
+    // [x, z, width, height, lean] in the stones' own space, each 0.26 deep. (Stone B stands
+    // 0.3 m further back than round 10's, out of the way of the seated knight's right arm;
+    // stone C 0.3 m further along than round 9's and 0.59 m further back, straight away from
+    // the cameras, out of his left arm's: all the room his arms want, where it was on screen.)
     list: [
       [-0.62, 0.12, 0.36, 1.55, 0.06],
-      [0, -0.14, 0.42, 2.05, -0.02],
-      [0.92, 0.12, 0.34, 1.35, -0.08],
+      [0, -0.44, 0.42, 2.05, -0.02],
+      [1.12, -0.43, 0.34, 1.35, -0.08],
     ],
     depth: 0.26,
     // (How each also turns and tips: scenery.js draws these from its seeded rng, after the

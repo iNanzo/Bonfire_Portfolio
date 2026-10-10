@@ -902,12 +902,27 @@ async function phoneView() {
 
 test('his room for each arm at home comes from the scenery’s shapes; a dance move fits a place only with room for its reach', () => {
   const k = make();
-  // The cult's standing stones stand at his left on his seat (colliders.js): less room there.
-  k.setScenery('cult', flatAt('cult'));
-  k.summon(0, { instant: true });
-  run(k, 0.3);
-  const [left, right] = k.knights[0].home.room;
-  assert.ok(left < 0.6 && left < right, `seated in the cult: room ${left.toFixed(2)} left, ${right.toFixed(2)} right`);
+  // Sat down on the ground right by the shrine's front lantern (colliders.js), it behind his
+  // right shoulder: less room for that arm, all of it for the other. (Every scenery's seat
+  // stands clear of what's round it: all the room there, test/knightClearance.test.mjs.)
+  const by = { x: -1.4, z: 0.3 };
+  const sitDown = (name) => {
+    k.setScenery(name, flatAt(name));
+    k.dismiss(1, { instant: true });
+    k.summon(1, { instant: true, at: by, facing: 'fire' });
+    k.sit(1);
+    run(k, 2);
+    assert.equal(k.list[1].state, 'sitting');
+    return k.knights[1].home.room;
+  };
+  const [left, right] = sitDown('shrine');
+  assert.ok(
+    right < 0.7 && left === 1,
+    `sat down by the lantern: room ${left.toFixed(2)} left, ${right.toFixed(2)} right`,
+  );
+  // The same spot in the ruins, nothing there: all the room.
+  assert.deepEqual(sitDown('ruins'), [1, 1], 'sat down there in the ruins');
+  k.dismiss(1, { instant: true });
   // On the open ground of the ring (a knight at home there), nothing in an arm's reach.
   k.setScenery('ruins', flatAt('ruins'));
   k.setCast({ count: 2, instant: true });
