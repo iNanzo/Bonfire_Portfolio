@@ -67,7 +67,10 @@ notes: `docs/design/visualizer.md`.
   - A weapon held for the drop sways and turns as if looking about, trembling harder as
     the build rises.
 - **The knights** (`knightShow.js`, driving the scene's `fire.knights`): the site's
-  resting knight, and up to three more, 1 to 4 (touch screens: 2).
+  resting knight, and up to three more, 1 to 4 (touch screens: 2). The first takes the
+  place's seat (in the ruins, the ground beside the pillar); the others sit on the ground
+  round the fire on the ring's clear sides, far enough back that a leg stretched out
+  toward it keeps its boot out of the pit's stones (`docs/knight.md`, *The others*).
   - **Before the first drop** they rest by the fire and nod along to the strong beats,
     drumming on their thighs.
   - **In a breakdown** they're still and watch the weapon forged over the fire. Dancers
@@ -146,6 +149,12 @@ notes: `docs/design/visualizer.md`.
     the long lens while they dance, and takes *Dancers Wide* only with Knight Shots on
     for that dance.
   - A cut never picks a shot with a knight standing between the lens and the fire.
+  - *Pillar Side* (round 11) looks from the front left at what stands by the seat (the
+    ruins' pillar, the forge's anvil, the shrine's back lantern, the cathedral's nave, the
+    cult's stones), the knight on it and the fire, all three in a 16:9 frame however far
+    it has swayed (0.15 rad either way) and pushed in, in every place. From further round
+    to the left, the front-left piece (the shrine's front lantern, the cathedral's pew, the
+    cult's watcher) would come between it and him.
 - **Colors** (`colors.js`): each new flame is one of the site's palettes, or one made on
   the spot with the admin's palette generator (`src/paletteGen.js`): harmonious (any
   scheme, or the one picked) or fully random, named for its hue ("Cobalt Lightning").
@@ -357,7 +366,7 @@ flash, or on a phrase line as a new weapon lands in its colors, never mid-phrase
 | Cathedral Kaleidoscope | The cathedral's altar folded into a six-way kaleidoscope round an amethyst flame (a flamberge in fire), so its lancet windows become a ring of stained-glass panels, a rose window; a soft glow, trails now and then, a slow sweep that turns the rose; two knights dancing in Pixel Painterly, folded into the pattern as they wheel through it after the drops; the kaleidoscope drop hit | Hold |
 | Frozen Shrine | The shrine seen low past its lantern and gate: ice under an uchigatana, an icy harmonious flame on blue-grey stone, the echo streaming out of the fire, a spotlight and fine grain, the camera still; one knight sitting watchful in Pixel Cel; the drop shatters | Hold |
 | Forge Rave | The forge in lightning: a magenta, cyan and acid-yellow flame, the Glitch look with chroma split and scanlines in the mix, the camera pushing in and out every 4 bars, four knights dancing in Pixel Chiaroscuro and polished steel, a chasing firefly show; shatter, shockwaves and more on the drops | Start from the scene |
-| Moonlit Ruins | The ruins in the Moonlit palette's four colors under thick fog, a zweihander in a low fire, the Haze look shimmering the pillar, a slow crane up and down; one knight resting in Black & Gold by the pillar, the fire's reflection sweeping over his plate now and then (Armor Shine), many fireflies twinkling | Hold |
+| Moonlit Ruins | The ruins in the Moonlit palette's four colors under thick fog, a zweihander in a low fire, the Haze look shimmering the pillar, a slow crane up and down; one knight resting in Black & Gold on the ground beside the pillar, the fire's reflection sweeping over his plate now and then (Armor Shine), many fireflies twinkling | Hold |
 
 Each leaves something to the dice (a layer in the mix, the details it doesn't pin, the
 show's own drop hits where it has none), so it plays a little differently every time.
@@ -416,9 +425,9 @@ Pose, Style, Finish, Edge Glow and its Edge Glow Strength, and Dance.
 | Setting | What it does | Values (default first) |
 | --- | --- | --- |
 | Knights | Knights by the fire. In the mix they come and go where it's hidden (the start, a big drop's flash, a new scenery) | In the mix · Off · Always |
-| How Many | How many come to the fire: the first takes the seat, the others sit on the ground round it. How many get up to dance follows the song | Random (1–4, one or two more often) · 1 · 2 · 3 · 4 |
+| How Many | How many come to the fire: the first takes the seat (in the ruins, the ground beside the pillar), the others sit on the ground round it, back from the fire. How many get up to dance follows the song | Random (1–4, one or two more often) · 1 · 2 · 3 · 4 |
 | Helmets | The helmets they may wear; each knight draws one as he arrives, some again at a new scenery | the great helm, the armet, the bascinet |
-| Seat Pose | How they sit: *Resting* (the bonfire rest, slumped over the knees, dozing now and then) or *Watchful* (leaning in over his knees, forearms on them, head up at the fire) (`fire.knights.setSeatPose`) | a mix (rolled where it's hidden) · Resting · Watchful |
+| Seat Pose | How they sit: *Resting* (the bonfire rest, slumped over the knees, dozing now and then; on the ground, one knee drawn up with an arm hung over it and the other leg stretched out) or *Watchful* (leaning in over his knees, forearms on them, head up at the fire; on the ground, sitting up with both knees drawn up, turned to the fire) (`fire.knights.setSeatPose`) | a mix (rolled where it's hidden) · Resting · Watchful |
 | Style | How they're drawn (`src/bonfire/knightStyles.js`, `fire.knights.setStyle`): the site's own (the admin's pick), Pixel Cel, Pixel Painterly, Pixel Chiaroscuro, Smooth Steel (the `gunmetal` style), Black & Gold or First Build (the boxy original model, loaded when it's first picked). A new style at a hidden moment is there in the flash | The Site's Own · each style · a mix |
 | Finish | The steel's color for the styles that draw steel (`src/bonfire/steel.js`, `fire.knights.setFinish`): Gunmetal, Blackened, Polished Steel, Burnished | a mix (leaning to gunmetal) · each finish |
 | Edge Glow | The armor's edges catching the fire's color, fading toward their backs (`fire.knights.setRim`). In the mix, rolled where it's hidden: some stretches glow, each at a strength rolled round the Edge Glow Strength (0.6× to 1.4× of it), some don't. Always: at the Edge Glow Strength. A scene's knights glow as it's painted (its own Edge Glow switch and strength) | In the mix · Off · Always |

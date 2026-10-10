@@ -326,8 +326,15 @@ for w in WEAPONS.values():
 
 # --- Gothic ruins ------------------------------------------------------------
 
-# Broken column on a plinth, back left.
-PX, PY = -1.45, 1.35
+# Where the ruins' pieces lie (Blender's x, y: the site's x, -z). The pillar and its candles
+# (src/bonfire/colliders.js RUINS.at), the drum fallen from it, on its own (RUINS.drum), and
+# the knight's seat on the ground (knightPlaces.js SEATS.ruins): no rubble where he sits.
+PX, PY = -2.15, 1.30
+DRUM_X, DRUM_Y, DRUM_TURN = -2.75, 2.05, 35
+SEAT_X, SEAT_Y = -1.02, 1.42
+
+# Broken column on a plinth, back left, a metre to the right of the knight sitting on the
+# ground.
 bm = bmesh.new()
 box(bm, 0, 0, 0.11, 0.78, 0.78, 0.22)
 box(bm, 0, 0, 0.26, 0.62, 0.62, 0.1)
@@ -340,11 +347,12 @@ for v in res["verts"]:
         v.co.z += random.uniform(-0.35, 0.05)
 to_object("Pillar_Shaft", bm, M["pillar"], (PX, PY, 0.31 + 0.85))
 
+# A drum fallen from it, lying behind it, out of the knight's way and the dancers'.
 bm = bmesh.new()
 bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=0.2, radius2=0.2, depth=0.42)
 jitter(bm, 0.02)
-to_object("Pillar_Fallen", bm, M["pillar"], (PX + 0.7, PY - 0.4, 0.19),
-          (math.radians(90), 0, math.radians(35)))
+to_object("Pillar_Fallen", bm, M["pillar"], (DRUM_X, DRUM_Y, 0.19),
+          (math.radians(90), 0, math.radians(DRUM_TURN)))
 
 # Candles on the plinth.
 for i, (dx, dy, h) in enumerate(((0.2, -0.22, 0.2), (0.28, -0.08, 0.13), (0.12, -0.28, 0.09))):
@@ -379,12 +387,30 @@ for row in range(ROWS):
 to_object("Wall_Fragment", bm, M["pillar"], (WX, WY, 0), (0, 0, WR))
 to_object("Wall_Mortar", core, M["mortar"], (WX, WY, 0), (0, 0, WR))
 
-# Rubble.
+def off_seat(x, y, s):
+    """A rock at (x, y), its size s, moved out of where the knight sits: his hips at the seat
+    and his legs out toward the fire (a capsule SEAT_REACH long, SEAT_R round), straight out
+    of its nearest side. Every other rock stays where it falls (the same draws either way)."""
+    fx, fy = FIRE_CENTER[0] - SEAT_X, FIRE_CENTER[1] - SEAT_Y
+    n = math.hypot(fx, fy)
+    fx, fy = fx / n, fy / n
+    t = max(0.0, min(SEAT_REACH, (x - SEAT_X) * fx + (y - SEAT_Y) * fy))
+    cx, cy = SEAT_X + fx * t, SEAT_Y + fy * t
+    d = math.hypot(x - cx, y - cy)
+    keep = SEAT_R + s
+    if d >= keep:
+        return x, y
+    ux, uy = ((x - cx) / d, (y - cy) / d) if d > 1e-6 else (-fy, fx)
+    return cx + ux * keep, cy + uy * keep
+
+# Rubble (none where the knight sits).
+SEAT_REACH, SEAT_R = 0.55, 0.32
 for i in range(14):
     ang = random.uniform(0, math.tau)
     d = random.uniform(1.0, 3.0)
     s = random.uniform(0.05, 0.11)
-    rock(f"Rubble_{i:02d}", M["stone"], (math.cos(ang) * d, math.sin(ang) * d, s * 0.4), (s, s * 0.9, s * 0.7), 0.25)
+    x, y = off_seat(math.cos(ang) * d, math.sin(ang) * d, s)
+    rock(f"Rubble_{i:02d}", M["stone"], (x, y, s * 0.4), (s, s * 0.9, s * 0.7), 0.25)
 for i in range(6):
     s = random.uniform(0.07, 0.14)
     rock(f"Rubble_Wall_{i}", M["pillar"], (WX + random.uniform(-1.1, 0.6), WY - random.uniform(0.3, 0.8), s * 0.4),

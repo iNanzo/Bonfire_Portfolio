@@ -7,7 +7,8 @@
 // The shapes come from the same numbers that build the pieces: scenery.js imports its
 // placements from here (where each group stands and turns, and each piece's size and place
 // in it), so a piece can't move without its shape moving too. The ruins are the model's own
-// (bonfire.glb, tools/bonfire.py): its pillar, plinth, fallen drum, candles and wall are
+// (bonfire.glb, tools/bonfire.py): its pillar on its plinth with its candles, a metre to the
+// right of the knight sitting on the ground, the drum fallen behind it and the wall are
 // tools/bonfire.py's numbers (test/knightClearance.test.mjs decodes the model and checks
 // them). Only what an arm or a body could meet is here: nothing lower than a shin (steps,
 // daises, bar stock, rubble, floor candles), and none of the seats (he sits on those).
@@ -30,11 +31,13 @@
 
 // --- where things stand ------------------------------------------------------------------
 /**
- * The clearing's corners where each scenery's pieces stand (world x, z): the ruins' pillar
- * at the back left, their wall at the back right (turned `rightTurn`), and the front left.
+ * The clearing's corners where each scenery's big pieces stand (world x, z): the ruins' wall
+ * at the back right (turned `rightTurn`), and the front left. What stands at the back left,
+ * by the knight's seat, has a place of its own (`at`: the ruins' pillar, the forge's anvil,
+ * the shrine's back lantern, the cathedral's nave, the cult's stones), so each can move
+ * clear of him without the others.
  */
 export const CLEARING = {
-  left: [-1.45, -1.35],
   right: [1.9, -1.5],
   frontLeft: [-1.9, 0.6],
   rightTurn: -28 * (Math.PI / 180),
@@ -42,18 +45,21 @@ export const CLEARING = {
 
 /**
  * The ruins (the model's own: tools/bonfire.py, in the clearing's coordinates). The broken
- * column on its plinth at the back left (`pillar`: an 8-sided shaft, by its corners' radius,
- * its broken top no higher than `top`; the plinth's two tiers), the drum fallen from it
- * toward the fire (an 8-sided drum lying aslant, `turn` its axis from +z), three candles on
- * the plinth's corner, and the wall at the back right (rows of blocks, broken away in steps).
+ * column on its plinth at the back left, a metre to the right of the knight's seat on the
+ * ground (`at`: tools/bonfire.py PX, PY; `pillar`: an 8-sided shaft, by its corners' radius,
+ * its broken top no higher than `top`; the plinth's two tiers), the drum fallen from it,
+ * lying behind it out of his way and the dancers' (an 8-sided drum lying aslant, `turn` its
+ * axis from +z: DRUM_X, DRUM_Y), three candles on the plinth's corner toward the fire, and
+ * the wall at the back right (rows of blocks, broken away in steps).
  */
 export const RUINS = {
+  at: [-2.15, -1.3],
   pillar: { r0: 0.24, r1: 0.22, y0: 0.31, top: 2.02 },
   plinth: [
     { size: [0.78, 0.22, 0.78], y: 0.11 },
     { size: [0.62, 0.1, 0.62], y: 0.26 },
   ],
-  drum: { at: [-0.75, 0.19, -0.95], r: 0.2, length: 0.42, turn: 35 * (Math.PI / 180) },
+  drum: { at: [-2.75, 0.19, -2.05], r: 0.2, length: 0.42, turn: 35 * (Math.PI / 180) },
   candles: [
     [0.2, -0.22, 0.2],
     [0.28, -0.08, 0.13],
@@ -80,7 +86,10 @@ export const FORGE = {
   },
   anvil: {
     // (Turned 0.3 rad further than round 9's, its horn pointing back past the seated knight's
-    // right shoulder instead of at it: a seated Praise goes all the way up there.)
+    // right shoulder instead of at it: a seated Praise goes all the way up there. It stands
+    // 0.4 m further back than round 10's, straight away from the fire: all the room his right
+    // arm wants, seated or stood up.)
+    at: [-1.75, -1.6],
     turn: 0.8,
     stump: { r: [0.28, 0.25], h: 0.52 },
     foot: { size: [0.28, 0.1, 0.22], y: 0.565 },
@@ -117,9 +126,11 @@ export const SHRINE = {
     roof: { r: 0.38, h: 0.24, y: 1.44 }, // (four-sided, its corners on the diagonals)
     finial: { r: 0.06, y: 1.59 },
   },
+  // (The back one stands 0.58 m further from the fire than round 10's, out of the way of the
+  // seated knight's right arm.)
   lanterns: [
-    { at: 'left', turn: 0.3, scale: 1 },
-    { at: 'frontLeft', turn: -0.2, scale: 0.8 },
+    { name: 'back', at: [-1.95, -1.65], turn: 0.3, scale: 1 },
+    { name: 'front', at: CLEARING.frontLeft, turn: -0.2, scale: 0.8 },
   ],
 };
 
@@ -162,7 +173,9 @@ export const CATHEDRAL = {
     // (The right column, with its half of the arch, stands 0.5 m further along the row than
     // round 9's: the knight's seat at its foot overlapped it, no seat clear of it kept him in
     // a phone's frame (knightPlaces.js SEATS), and his left arm needs the room for a seated
-    // Praise.)
+    // Praise. The whole nave stands 0.3 m further back than round 10's, for the rest of that
+    // room.)
+    at: [-1.45, -1.65],
     turn: 0.35,
     columns: [-0.58, 1.08],
     base: { size: [0.5, 0.16, 0.5], y: 0.08 },
@@ -224,14 +237,16 @@ export const CULT = {
     ],
   },
   stones: {
+    at: [-1.45, -1.35],
     turn: 0.4,
-    // [x, z, width, height, lean] in the stones' own space, each 0.26 deep. (Stone C stands
-    // 0.3 m further along than round 9's, out of the seated knight's way, as the cathedral's
-    // right column does.)
+    // [x, z, width, height, lean] in the stones' own space, each 0.26 deep. (Stone B stands
+    // 0.3 m further back than round 10's, out of the way of the seated knight's right arm;
+    // stone C 0.3 m further along than round 9's and 0.59 m further back, straight away from
+    // the cameras, out of his left arm's: all the room his arms want, where it was on screen.)
     list: [
       [-0.62, 0.12, 0.36, 1.55, 0.06],
-      [0, -0.14, 0.42, 2.05, -0.02],
-      [0.92, 0.12, 0.34, 1.35, -0.08],
+      [0, -0.44, 0.42, 2.05, -0.02],
+      [1.12, -0.43, 0.34, 1.35, -0.08],
     ],
     depth: 0.26,
     // (How each also turns and tips: scenery.js draws these from its seeded rng, after the
@@ -327,8 +342,11 @@ function box(f, name, at, size, rot = {}) {
     m,
   };
 }
-const at2 = (key) => CLEARING[key];
-const ground = (key, turn = 0, scale = 1) => frame(ROOT, [at2(key)[0], 0, at2(key)[1]], { y: turn, scale });
+/** A group standing on the ground at `at` ([x, z], or a CLEARING corner's name), turned and scaled. */
+const ground = (at, turn = 0, scale = 1) => {
+  const [x, z] = typeof at === 'string' ? CLEARING[at] : at;
+  return frame(ROOT, [x, 0, z], { y: turn, scale });
+};
 
 /** A stone lantern's pieces (SHRINE.lantern) in its frame. */
 function lantern(f, name) {
@@ -377,11 +395,11 @@ function hooded(f, name) {
 const BUILDERS = {
   ruins() {
     const R = RUINS;
-    const [px, pz] = CLEARING.left;
+    const [px, pz] = R.at;
     const out = [cyl(ROOT, 'pillar', px, pz, R.pillar.r0, R.pillar.r1, R.pillar.y0, R.pillar.top)];
     R.plinth.forEach((t, i) => out.push(box(ROOT, i ? 'plinth (top)' : 'plinth', [px, t.y, pz], t.size)));
-    // (Its corners are jagged a centimetre or two either way: its own radius, as a boot resting
-    // on it meets it.)
+    // (The drum is jagged a centimetre or two either way: its own radius, and a centimetre
+    // longer at each end.)
     out.push(
       /** @type {Collider} */ ({
         kind: 'log',
@@ -426,7 +444,7 @@ const BUILDERS = {
     const h = ground('right', CLEARING.rightTurn);
     const top = H.courses.at(-1)[0] + H.courses.at(-1)[1];
     const hood = (r) => r * Math.SQRT1_2 * 2; // (a four-sided cone turned 45°: a square)
-    const s = ground('left', A.turn);
+    const s = ground(A.at, A.turn);
     const b = frame(s, [B.at[0], 0, B.at[1]]);
     return [
       box(h, 'hearth', [0, top / 2, 0], [2 * H.half, top, H.depth]),
@@ -509,8 +527,7 @@ const BUILDERS = {
     out.push(
       cyl(g, 'offering stone', o.at[0], o.at[2], o.r + 0.03, o.r + 0.03, o.at[1] - o.r - 0.03, o.at[1] + o.r + 0.03),
     );
-    for (const l of SHRINE.lanterns)
-      out.push(...lantern(ground(l.at, l.turn, l.scale), `${l.at === 'left' ? 'back' : 'front'} lantern`));
+    for (const l of SHRINE.lanterns) out.push(...lantern(ground(l.at, l.turn, l.scale), `${l.name} lantern`));
     return out;
   },
   cathedral() {
@@ -574,7 +591,7 @@ const BUILDERS = {
       );
     }
     const N = C.nave;
-    const nave = ground('left', N.turn);
+    const nave = ground(N.at, N.turn);
     for (const x of N.columns) {
       out.push(box(nave, 'nave base', [x, N.base.y, 0], N.base.size));
       out.push(
@@ -657,7 +674,7 @@ const BUILDERS = {
     );
     for (const [x, z, turn] of A.figures) out.push(...hooded(frame(al, [x, 0, z], { y: turn }), 'hooded figure'));
     const S = CULT.stones;
-    const st = ground('left', S.turn);
+    const st = ground(S.at, S.turn);
     S.list.forEach(([x, z, w, h, lean], i) => {
       const [turn, tip] = S.drawn[i];
       const f = frame(st, [x, -0.04, z], { x: tip, y: turn, z: lean });

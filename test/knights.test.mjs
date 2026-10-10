@@ -24,7 +24,7 @@ import {
 } from '../src/bonfire/knightPose.js';
 import { createResourceScope } from '../src/bonfire/resources.js';
 import { SEATS, DANCE_RING } from '../src/bonfire/scenery.js';
-import { restPlaces, ringOf, sideArcs, slotPlaces, FRONT, FIRE_AT } from '../src/bonfire/knightPlaces.js';
+import { restPlaces, ringOf, sideArcs, slotPlaces, FRONT, FIRE_AT, PIT } from '../src/bonfire/knightPlaces.js';
 
 /** The model's rig as plain groups (docs/knight.md), a box on every joint, three helmets on the head. */
 function standInModel() {
@@ -138,15 +138,22 @@ test('helmets: only the one worn is drawn; swaps at once or with the gesture', a
   assert.equal(k.gesture('wave', { index: 0 }), true, 'and now he can');
 });
 
-test('seated at the fire: the feet on the ground, facing the fire (turned a little to the cameras), tassets halfway with the thighs', () => {
+test('seated on a raised seat (the forge’s stump): the feet on the ground, facing the fire (turned a little to the cameras), tassets halfway with the thighs', () => {
   const k = make();
-  k.setScenery('ruins', flat(0.28)); // (the height map's seat, within 10 cm of the table's: the map's is taken)
+  // (The height map's stump 5 cm higher than the table's seat: within 10 cm, so the map's is taken.)
+  const seat = SEATS.forge,
+    top = seat.top + 0.05;
+  assert.ok(!seat.ground && seat.top > 0.15, 'the forge’s seat is a raised one');
+  k.setScenery('forge', {
+    height: () => 0.02,
+    top: (x, z) => (Math.hypot(x - seat.x, z - seat.z) < 0.15 ? top : 0.02),
+  });
   k.summon(0, { instant: true });
   run(k, 0.2);
   const n = k.knights[0];
   assert.equal(k.list[0].state, 'sitting');
   const toFire = Math.atan2(0.02 - n.group.position.x, 0.02 - n.group.position.z);
-  assert.ok(Math.abs(n.yaw - SEATS.ruins.yaw) < 1e-6, 'sits the way his seat says');
+  assert.ok(Math.abs(n.yaw - seat.yaw) < 1e-6, 'sits the way his seat says');
   const off = Math.atan2(Math.sin(n.yaw - toFire), Math.cos(n.yaw - toFire));
   assert.ok(
     off < 0 && off > -0.6,
@@ -158,7 +165,10 @@ test('seated at the fire: the feet on the ground, facing the fire (turned a litt
     `left ankle at ${foot.y.toFixed(3)}, on the ground`,
   );
   const hips = bone(k, 0, 'hips').getWorldPosition(new THREE.Vector3());
-  assert.ok(Math.abs(hips.y - (0.28 + SEAT_DEPTH)) < 0.01, `hips on the seat (${hips.y.toFixed(3)})`);
+  assert.ok(
+    Math.abs(hips.y - (top + SEAT_DEPTH)) < 0.01,
+    `hips at ${hips.y.toFixed(3)}, on the stump (its top at ${top.toFixed(2)})`,
+  );
   // The tasset turns about TASSET_FOLLOW of the way from the hips to the thigh.
   const q = (name) => bone(k, 0, name).getWorldQuaternion(new THREE.Quaternion());
   const full = q('hips').angleTo(q('thighL'));
@@ -170,6 +180,57 @@ test('seated at the fire: the feet on the ground, facing the fire (turned a litt
   model.getObjectByName('K_Tasset_L').userData.follow = 0.85;
   const k2 = createKnights(model, { armor: armor(), max: 1 });
   assert.equal(k2.rig.tassetFollow, 0.85);
+});
+
+test('seated on the ground (the ruins): on the ground under him, a flagstone lifting him, never up on a stone’s top there; his boots on the ground in front of him', () => {
+  const seat = SEATS.ruins;
+  assert.ok(seat.ground && seat.top === 0, 'the ruins’ seat is the ground itself');
+  const under = (x, z, r) => Math.hypot(x - seat.x, z - seat.z) < r;
+  for (const [what, ground, y] of [
+    // (A stone's top under him that a raised seat would take for its own: within 10 cm of it.)
+    ['a stone’s top under him', { height: () => 0.02, top: (x, z) => (under(x, z, 0.15) ? 0.08 : 0.02) }, 0.02],
+    // (A flagstone under his hips, his boots down off it in front.)
+    [
+      'on a flagstone',
+      { height: (x, z) => (under(x, z, 0.2) ? 0.07 : 0.02), top: (x, z) => (under(x, z, 0.2) ? 0.07 : 0.02) },
+      0.07,
+    ],
+  ]) {
+    for (const pose of SEAT_POSES) {
+      const k = make();
+      k.setSeatPose(pose);
+      k.setScenery('ruins', ground);
+      k.summon(0, { instant: true });
+      run(k, 0.2);
+      const n = k.knights[0];
+      const at = `${what} (${pose})`;
+      assert.equal(k.list[0].state, 'sitting');
+      assert.equal(n.home.h, 0, `${at}: he sits on the ground, no seat under him (${n.home.h} m)`);
+      assert.ok(
+        Math.abs(n.group.position.y - y) < 1e-9,
+        `${at}: placed at ${n.group.position.y.toFixed(3)} m, the ground under him at ${y}`,
+      );
+      const hips = bone(k, 0, 'hips').getWorldPosition(new THREE.Vector3());
+      assert.ok(Math.abs(hips.y - (y + SEAT_DEPTH)) < 0.01, `${at}: his hips at ${hips.y.toFixed(3)} m`);
+      // (His own space: z ahead of him.)
+      const ahead = (v) =>
+        v
+          .clone()
+          .sub(n.group.position)
+          .applyAxisAngle(new THREE.Vector3(0, 1, 0), -n.yaw).z;
+      for (const side of ['L', 'R']) {
+        const foot = bone(k, 0, `foot${side}`).getWorldPosition(new THREE.Vector3());
+        assert.ok(
+          Math.abs(foot.y - (0.02 + DEFAULT_REST[`foot${side}`][1])) < 0.01,
+          `${at}: his ${side === 'L' ? 'left' : 'right'} ankle at ${foot.y.toFixed(3)} m, on the ground (0.02)`,
+        );
+        assert.ok(
+          ahead(foot) > ahead(hips) + 0.25,
+          `${at}: his ${side === 'L' ? 'left' : 'right'} boot ${(ahead(foot) - ahead(hips)).toFixed(2)} m in front of his hips`,
+        );
+      }
+    }
+  }
 });
 
 test('dancing: up, over to the slot and on the clock; shadows redraw only when a pose steps', () => {
@@ -892,12 +953,27 @@ async function phoneView() {
 
 test('his room for each arm at home comes from the scenery’s shapes; a dance move fits a place only with room for its reach', () => {
   const k = make();
-  // The cult's standing stones stand at his left on his seat (colliders.js): less room there.
-  k.setScenery('cult', flatAt('cult'));
-  k.summon(0, { instant: true });
-  run(k, 0.3);
-  const [left, right] = k.knights[0].home.room;
-  assert.ok(left < 0.6 && left < right, `seated in the cult: room ${left.toFixed(2)} left, ${right.toFixed(2)} right`);
+  // Sat down on the ground right by the shrine's front lantern (colliders.js), it behind his
+  // right shoulder: less room for that arm, all of it for the other. (Every scenery's seat
+  // stands clear of what's round it: all the room there, test/knightClearance.test.mjs.)
+  const by = { x: -1.4, z: 0.3 };
+  const sitDown = (name) => {
+    k.setScenery(name, flatAt(name));
+    k.dismiss(1, { instant: true });
+    k.summon(1, { instant: true, at: by, facing: 'fire' });
+    k.sit(1);
+    run(k, 2);
+    assert.equal(k.list[1].state, 'sitting');
+    return k.knights[1].home.room;
+  };
+  const [left, right] = sitDown('shrine');
+  assert.ok(
+    right < 0.7 && left === 1,
+    `sat down by the lantern: room ${left.toFixed(2)} left, ${right.toFixed(2)} right`,
+  );
+  // The same spot in the ruins, nothing there: all the room.
+  assert.deepEqual(sitDown('ruins'), [1, 1], 'sat down there in the ruins');
+  k.dismiss(1, { instant: true });
   // On the open ground of the ring (a knight at home there), nothing in an arm's reach.
   k.setScenery('ruins', flatAt('ruins'));
   k.setCast({ count: 2, instant: true });
@@ -1021,7 +1097,11 @@ test('the site’s dance on a phone (no headroom): he dances it in his seat, his
   assert.equal(k.list[0].state, 'sitting');
 });
 
-test('seated at every scenery’s seat (either seat pose), his boots stay well out of the fire (the real sabatons: ≥ 1.05 m from its middle)', async () => {
+/**
+ * The real model's joints (a small box on each) for createKnights, and how near a knight's real
+ * sabatons come to the fire's middle (m).
+ */
+async function realBoots() {
   const { loadKnightMesh } = await import('./lib/knightMesh.mjs');
   const model = await loadKnightMesh();
   const rig = () => {
@@ -1050,7 +1130,25 @@ test('seated at every scenery’s seat (either seat pose), his boots stay well o
   const boots = { footL: model.points('K_Foot_L'), footR: model.points('K_Foot_R') };
   assert.ok(boots.footL.length > 20, 'the sabatons were read from the model');
   const v = new THREE.Vector3();
-  for (const [pose, name] of SEAT_POSES.flatMap((pose) => Object.keys(SEATS).map((name) => [pose, name]))) {
+  const nearFire = (k, i) => {
+    let near = Infinity;
+    k.group.updateMatrixWorld(true);
+    for (const [b, pts] of Object.entries(boots)) {
+      const foot = bone(k, i, b);
+      for (const p of pts) {
+        v.set(...p).applyMatrix4(foot.matrixWorld);
+        near = Math.min(near, Math.hypot(v.x - FIRE_AT.x, v.z - FIRE_AT.z));
+      }
+    }
+    return near;
+  };
+  return { rig, nearFire };
+}
+const everySeating = () => SEAT_POSES.flatMap((pose) => Object.keys(SEATS).map((name) => [pose, name]));
+
+test('seated at every scenery’s seat (either seat pose), his boots stay well out of the fire (the real sabatons: ≥ 1.05 m from its middle)', async () => {
+  const { rig, nearFire } = await realBoots();
+  for (const [pose, name] of everySeating()) {
     const k = createKnights(rig(), { armor: armor(), max: 1 });
     k.setSeatPose(pose);
     k.setScenery(name, flatAt(name));
@@ -1059,16 +1157,50 @@ test('seated at every scenery’s seat (either seat pose), his boots stay well o
     // (Over his idle: breathing, the doze, the glances, a shift of his weight.)
     for (let f = 0; f < 60 * 14; f++) {
       k.update(1 / 60);
-      if (f % 10) continue;
-      k.group.updateMatrixWorld(true);
-      for (const [b, pts] of Object.entries(boots)) {
-        const bone = k.knights[0].bones.find((x) => x.name === b);
-        for (const p of pts) {
-          v.set(...p).applyMatrix4(bone.matrixWorld);
-          near = Math.min(near, Math.hypot(v.x - 0.02, v.z - 0.02));
-        }
-      }
+      if (f % 10 === 0) near = Math.min(near, nearFire(k, 0));
     }
     assert.ok(near >= 1.05, `${pose}, ${name}: his boots come to ${near.toFixed(2)} m from the fire's middle`);
+  }
+});
+
+test('the others resting on the ground round the fire (Bonfire Live), either seat pose, keep their boots out of its pit’s stones (a leg stretched out toward it too): sent home, sat down where they stand, and changing pose where they sit', async () => {
+  const { rig, nearFire } = await realBoots();
+  const other = (pose) => SEAT_POSES.find((q) => q !== pose);
+  for (const [pose, name] of everySeating()) {
+    const k = createKnights(rig(), { armor: armor(), max: 4 });
+    /** The nearest the others' boots come to the fire's middle over `seconds` of their idle. */
+    const nearest = (seconds) => {
+      let near = Infinity;
+      for (let f = 0; f < 30 * seconds; f++) {
+        k.update(1 / 30);
+        if (f % 5 === 0) for (let i = 1; i < 4; i++) near = Math.min(near, nearFire(k, i));
+      }
+      return near;
+    };
+    const out = (near, how) =>
+      assert.ok(
+        near >= PIT + 0.02,
+        `${pose}, ${name}, ${how}: the others' boots come to ${near.toFixed(2)} m from the fire's middle`,
+      );
+    k.setSeatPose(pose);
+    k.setScenery(name, flatAt(name));
+    k.setCast({ count: 4, instant: true });
+    k.setScenery(name, flatAt(name));
+    // (Over their idle, a shift of the weight and all: the right foot steps out and back.)
+    out(nearest(13), 'sent home');
+    // As the show seats them (knightShow.js bringSeated): standing at their places on the ring,
+    // facing the fire, then sitting down where they stand.
+    const places = restPlaces(ringOf(name), 4, SEATS[name]);
+    for (let i = 1; i < 4; i++) k.dismiss(i, { instant: true });
+    for (let i = 1; i < 4; i++) {
+      k.summon(i, { instant: true, at: places[i - 1], facing: 'fire' });
+      k.sit(i);
+    }
+    out(nearest(6), 'sat down where they stood');
+    // Sitting there, the other pose (In the Mix rolls it, or it's changed by hand), and back.
+    k.setSeatPose(other(pose));
+    out(nearest(6), `then ${other(pose)}`);
+    k.setSeatPose(pose);
+    out(nearest(6), `then ${pose} again`);
   }
 });

@@ -1,13 +1,21 @@
-// Pictures of the knight against the scenery, taken from the site on a running dev server
-// (driven through its dev hook, window.__fire, so it has to be `npm run dev`, not a build):
+// Pictures of the knight against the scenery, taken from the site on a dev server (driven
+// through its dev hook, window.__fire, so it has to be the dev server, not a build): one
+// already running on --port, or with --serve its own, started for the run from the folder
+// it's run in (a worktree too) and stopped after:
 //
-//   npm run dev                                   (in one terminal)
-//   node tools/capture-knight.mjs [--port 5173] [--out .scratch/knight-shots] [--tag now]
-//                                 [--only seats,gestures,moves,seq,home] [--sceneries ruins,cult]
+//   node tools/capture-knight.mjs [--port 5173] [--serve] [--out .scratch/knight-shots] [--tag now]
+//                                 [--only seats,pose,gestures,moves,seq,home,views] [--sceneries ruins,cult]
 //                                 [--helmet bascinet] [--style first] [--standing] [--seqs praise]
+//                                 [--room 1,0]
+//
+// --only picks the sheets; left out, it's seats,gestures,moves,seq,home (pose and views only
+// when named):
 //
 //   seats     close-ups of him seated in each scenery, in both seat poses, from his left, from
 //             his right and from above (what stands round his seat in view): <tag>-seats.png
+//   pose      all of him seated, both seat poses, a row each: three-quarter on from in front,
+//             from his left, from his right, and as the home view frames him (how a seated
+//             pose reads, on a seat or on the ground): <tag>-pose-<scenery>.png
 //   gestures  a contact sheet of every gesture in each scenery, seated (or, --standing, up in
 //             front of his seat, as Bonfire Live's breakdown has him), at real-time moments:
 //             <tag>-gestures-<scenery>.png
@@ -20,12 +28,22 @@
 //             screencast hands them over, each labelled with when it was drawn.
 //   home      the home view as a visitor sees it (the page on), 1920, 1280 and 390 wide, in
 //             each scenery: <tag>-home-<width>.png
+//   views     the other cameras that frame his seat, 1920 wide: the site's Journey and About
+//             views (the page on), Bonfire Live's Pillar Side shot (visualizer/camera.js
+//             SHOTS.pillar: as it starts, and at either end of its sway pushed all the way in)
+//             and the Moonlit Ruins scene's camera (src/content.json), the page hidden, a row a
+//             scenery: <tag>-views.png
 //
-// --helmet and --style dress him first (knights.js HELMETS, knightStyles.js STYLES). Run it
+// --helmet and --style dress him first (knights.js HELMETS, knightStyles.js STYLES). --room
+// gives him that much room for his left and right arm at his seat (0..1 each, as knights.js
+// roomOf measures it), whatever stands there: how a gesture looks hemmed in, or not. Run it
 // against two checkouts on two ports for a before and after.
 import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import fs from 'node:fs';
+import { createServer } from 'vite';
+import { SHOTS } from '../src/visualizer/camera.js';
+import { keepInClearing } from '../src/visualizer/clearing.js';
 
 const argv = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -41,10 +59,24 @@ const HELMET = opt('helmet', null);
 const STYLE = opt('style', null);
 const STANDING = argv.includes('--standing');
 const SEQ_NAMES = opt('seqs', null)?.split(',') ?? null;
+const ROOM = opt('room', null)?.split(',').map(Number) ?? null;
 fs.mkdirSync(OUT, { recursive: true });
 
+// --serve: this folder's own dev server for the run. (Its node_modules may be linked from
+// another checkout, as a worktree's is: Vite serves from there too, and keeps its prebundled
+// deps in this folder's .scratch, not in the shared node_modules/.vite, where re-optimizing
+// would reload the other checkout's running servers.)
+const server = argv.includes('--serve')
+  ? await createServer({
+      server: { port: PORT, strictPort: true, fs: { allow: [process.cwd(), fs.realpathSync('node_modules')] } },
+      cacheDir: '.scratch/.vite',
+      logLevel: 'error',
+    })
+  : null;
+if (server) await server.listen();
+
 /** GPU Chrome on the dev server's site, the knight there at rest (dressed as asked). */
-async function open({ width = 1280, height = 800, hide = true } = {}) {
+async function open({ width = 1280, height = 800, hide = true, path = '/' } = {}) {
   const browser = await chromium.launch({
     channel: 'chrome',
     args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],
@@ -55,7 +87,7 @@ async function open({ width = 1280, height = 800, hide = true } = {}) {
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(`console: ${m.text()}`);
   });
-  await page.goto(`http://localhost:${PORT}/`);
+  await page.goto(`http://localhost:${PORT}${path}`);
   await page.waitForFunction(() => window.__fire?.knights, null, { timeout: 120000 });
   await page.evaluate(() => window.__fire.knights.ready);
   if (hide)
@@ -79,15 +111,22 @@ async function open({ width = 1280, height = 800, hide = true } = {}) {
 /** The scenery `name`, the knight seated at its seat (or the seat pose `pose`). */
 async function seatIn(page, name, pose = null) {
   await page.evaluate(
-    ([name, pose]) => {
+    ([name, pose, room]) => {
       const F = window.__fire;
       if (F.scenery !== name) F.setScenery(name);
       const k = F.debug.knights;
       if (pose) k.setSeatPose(pose);
       k.setScenery(name, k.terrain); // (formed at the seat at once, sitting)
       F.knights.summon(0, { instant: true });
+      if (room) {
+        // (The room he has at his seat, seated and stood up in front of it: --room.)
+        const h = k.knights[0].home;
+        h.room = [...room];
+        h.roomUp = [...room];
+        h.roomLess = null;
+      }
     },
-    [name, pose],
+    [name, pose, ROOM],
   );
   await page.waitForTimeout(1200);
   return page.evaluate(() => {
@@ -190,6 +229,37 @@ async function seats() {
   }
   await page.evaluate(() => window.__fire.debug.knights.setSeatPose('resting'));
   await grid(tiles, 6, `${OUT}/${TAG}-seats.png`, labels);
+  if (errors.length) console.log(errors.join('\n'));
+  await browser.close();
+}
+
+// --- all of him seated, as a pose reads ---------------------------------------------------------------
+async function pose() {
+  const { browser, page, errors } = await open({ width: 1280, height: 800 });
+  for (const name of SCENERIES) {
+    const tiles = [],
+      labels = [];
+    for (const seatPose of ['resting', 'watchful']) {
+      const k = await seatIn(page, name, seatPose);
+      for (const [view, cam, fov] of [
+        ['front', around(k, 2.1, 0.9, 0.95, 0.45), 34],
+        ['his left', around(k, 0.25, 2.2, 0.75, 0.45), 34],
+        ['his right', around(k, 0.25, -2.2, 0.75, 0.45), 34],
+      ]) {
+        await look(page, cam, fov);
+        await page.waitForTimeout(450);
+        tiles.push(await crop(await page.screenshot(), [0.25, 0, 0.75, 1], 380, 380));
+        labels.push(`${name} ${seatPose}: ${view}`);
+      }
+      // (As the home view frames him: round his seat, the page hidden.)
+      await page.evaluate(() => window.__fire.setView('home', { instant: true }));
+      await page.waitForTimeout(600);
+      tiles.push(await crop(await page.screenshot(), [0.3, 0.05, 0.62, 0.55], 380, 380));
+      labels.push(`${name} ${seatPose}: home view`);
+    }
+    await grid(tiles, 4, `${OUT}/${TAG}-pose-${name}.png`, labels);
+  }
+  await page.evaluate(() => window.__fire.debug.knights.setSeatPose('resting'));
   if (errors.length) console.log(errors.join('\n'));
   await browser.close();
 }
@@ -315,10 +385,78 @@ async function home() {
   }
 }
 
+// --- the other cameras that frame his seat ----------------------------------------------------------------
+/**
+ * Bonfire Live's shot `s` (camera.js SHOTS) swung `yaw` radians round what it looks at and
+ * pushed all the way in, kept in the clearing, as camera.js shotPose() moves it.
+ */
+function swung(s, yaw) {
+  const [tx, ty, tz] = s.target;
+  const k = 1 - (s.push ?? 0);
+  const [dx, dy, dz] = [(s.pos[0] - tx) * k, (s.pos[1] - ty) * k, (s.pos[2] - tz) * k];
+  const c = Math.cos(yaw),
+    sn = Math.sin(yaw);
+  const p = keepInClearing({ x: tx + dx * c - dz * sn, y: ty + dy, z: tz + dx * sn + dz * c });
+  return { pos: [p.x, p.y, p.z], target: [...s.target], fov: s.fov };
+}
+async function views() {
+  const shot = SHOTS.pillar;
+  // (The built-in scene's camera as the content has it, while it's there.)
+  const content = JSON.parse(fs.readFileSync(new URL('../src/content.json', import.meta.url), 'utf8'));
+  const moonlit = content.scenes?.find((s) => s.id === 'moonlit-ruins');
+  const VIEWS = [
+    ['Journey', { view: 'experience' }],
+    ['About', { view: 'about' }],
+    [shot.name, { pose: { pos: shot.pos, target: shot.target, fov: shot.fov } }],
+    [`${shot.name}, sway +${shot.yaw}, pushed in`, { pose: swung(shot, shot.yaw ?? 0) }],
+    [`${shot.name}, sway -${shot.yaw}, pushed in`, { pose: swung(shot, -(shot.yaw ?? 0)) }],
+    ...(moonlit?.camera ? [[moonlit.name, { pose: moonlit.camera }]] : []),
+  ];
+  const tiles = [],
+    labels = [];
+  // (The site's views on their own pages, as a visitor sees them; the others, the page hidden.)
+  for (const [path, hide, list] of [
+    ...VIEWS.filter(([, v]) => v.view).map((view) => [`/${view[1].view}/`, false, [view]]),
+    ['/', true, VIEWS.filter(([, v]) => v.pose)],
+  ]) {
+    const { browser, page, errors } = await open({ width: 1920, height: 1080, hide, path });
+    for (const name of SCENERIES) {
+      await seatIn(page, name, null);
+      for (const [label, v] of list) {
+        if (v.view) await page.evaluate((view) => window.__fire.setView(view, { instant: true }), v.view);
+        else await look(page, v.pose, v.pose.fov);
+        await page.waitForTimeout(1200);
+        tiles.push({
+          at: `${name} ${label}`,
+          buf: await sharp(await page.screenshot())
+            .resize(640, null, { kernel: 'nearest' })
+            .png()
+            .toBuffer(),
+        });
+      }
+    }
+    if (errors.length) console.log(errors.join('\n'));
+    await browser.close();
+  }
+  // (A row a scenery, the views in order.)
+  const order = SCENERIES.flatMap((name) => VIEWS.map(([label]) => `${name} ${label}`));
+  const sorted = order.map((at) => tiles.find((t) => t.at === at));
+  labels.push(...order);
+  await grid(
+    sorted.map((t) => t.buf),
+    VIEWS.length,
+    `${OUT}/${TAG}-views.png`,
+    labels,
+  );
+}
+
 for (const part of ONLY) {
   if (part === 'seats') await seats();
+  else if (part === 'pose') await pose();
   else if (part === 'gestures') await sheet('gestures');
   else if (part === 'moves') await sheet('moves');
   else if (part === 'seq') await seq();
   else if (part === 'home') await home();
+  else if (part === 'views') await views();
 }
+await server?.close();
