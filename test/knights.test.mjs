@@ -1210,7 +1210,7 @@ test('the others resting on the ground round the fire (Bonfire Live), either sea
 
 // (Round 11's ring knight by the ruins' fire pit, four out, hung his stretched boot 9 cm over the
 // ground: what lifted it was looked for 5 cm beside its pointed toe, on the pit's rim.)
-test('a seated boot rests on what lies under its sabaton, the way it points: a stone just beside its pointed toe doesn’t lift it, a flat one under its sole does', () => {
+test('a seated boot rests on what lies under its sabaton, the way it points: a stone just beside its pointed toe doesn’t lift it, nor one where it would point had it not turned in; a flat one under its sole does', () => {
   const k = make({ max: 2 });
   k.setSeatPose('resting');
   k.setScenery('ruins', flatAt('ruins'));
@@ -1238,13 +1238,25 @@ test('a seated boot rests on what lies under its sabaton, the way it points: a s
     assert.ok(Math.hypot(m.x - h.x, m.z - h.z) < 1e-6, 'the same home');
     return m;
   };
-  // Two stones 12 cm high, 2 cm round, either side of the toe 0.28 m along it (the sabaton is
+  // Two stones 12 cm high, 4 cm across, either side of the toe 0.28 m along it (the sabaton is
   // under 5 cm across there, its point 0.31 m along): his boot lies on the ground between them.
   const stones = [-0.06, 0.06].map((left) => along(0.28, left));
   const beside = home(ground((x, z) => stones.some(([sx, sz]) => Math.hypot(x - sx, z - sz) < 0.02), 0.14));
   assert.ok(
     Math.abs(beside.feet[1]) < 1e-6,
     `beside his toe: his boot rests ${(beside.feet[1] * 100).toFixed(1)} cm up`,
+  );
+  // A stone 8 cm across straight ahead of the ankle, 0.25 m on, where the toe would be had the
+  // boot not turned in: 6 cm clear of the turned sabaton.
+  assert.ok(Math.abs(turn) > 0.5, `the stretched boot turned in (${((turn * 180) / Math.PI).toFixed(0)}°)`);
+  const [ux, uz] = [
+    h.x + (ax * Math.cos(h.yaw) + (az + 0.25) * Math.sin(h.yaw)),
+    h.z + (-ax * Math.sin(h.yaw) + (az + 0.25) * Math.cos(h.yaw)),
+  ];
+  const unturned = home(ground((x, z) => Math.hypot(x - ux, z - uz) < 0.04, 0.14));
+  assert.ok(
+    Math.abs(unturned.feet[1]) < 1e-6,
+    `where an unturned toe would be: his boot rests ${(unturned.feet[1] * 100).toFixed(1)} cm up`,
   );
   // A flat stone 5 cm high under all of his sole, heel to toe (its back on the ground).
   const under = (x, z) => {
