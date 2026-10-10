@@ -334,7 +334,12 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   map when he sits (the table's value if the map disagrees by more than 10 cm), and each
   foot's ground under him. The hips joint sits 0.162 m above the seat (above the ground,
   in the ruins); two-bone IK puts the feet on the ground in front of it, the knees forward
-  and up.
+  and up. Each boot rests on the highest ground under its sabaton, the way it points
+  (`soleUnder`: from its ankle to its pointed toe, inside the model's outline, 10 cm
+  across to 0.2 m along and 3 cm at 0.28; sitting on the ground, from behind its heel
+  too). Round 11 first looked 5 cm either side all the way to the toe, past the sabaton:
+  a ring knight's boot hung 9 cm over the ground, lifted by the pit's rim beside its toe
+  (`test/knights.test.mjs`: a stone just beside the toe doesn't lift it).
   Every seat is on a blocked arc of the dance ring (`DANCE_RING.blocked`, measured on the
   height maps with his legs in either seat pose), so nobody dances on it. In the ruins he
   reaches past it: resting, the boot of his stretched leg lies on the ring at 253°, and

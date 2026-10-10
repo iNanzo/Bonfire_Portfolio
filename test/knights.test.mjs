@@ -21,6 +21,7 @@ import {
   SEAT_POSES,
   GESTURE_TIME,
   DANCE_SEATED_TIME,
+  feetAt,
 } from '../src/bonfire/knightPose.js';
 import { createResourceScope } from '../src/bonfire/resources.js';
 import { SEATS, DANCE_RING } from '../src/bonfire/scenery.js';
@@ -1205,4 +1206,60 @@ test('the others resting on the ground round the fire (Bonfire Live), either sea
     k.setSeatPose(pose);
     out(nearest(6), `then ${pose} again`);
   }
+});
+
+// (Round 11's ring knight by the ruins' fire pit, four out, hung his stretched boot 9 cm over the
+// ground: what lifted it was looked for 5 cm beside its pointed toe, on the pit's rim.)
+test('a seated boot rests on what lies under its sabaton, the way it points: a stone just beside its pointed toe doesn’t lift it, a flat one under its sole does', () => {
+  const k = make({ max: 2 });
+  k.setSeatPose('resting');
+  k.setScenery('ruins', flatAt('ruins'));
+  k.setCast({ count: 2, instant: true });
+  k.setScenery('ruins', flatAt('ruins'));
+  const n = k.knights[1],
+    h = n.home;
+  assert.equal(h.style, 'resting');
+  // His stretched boot (his right) as he rests on the ring: its ankle and the way it points.
+  const [, [ax, az, turn]] = feetAt(n.sit, k.rig);
+  /** A place `ahead` m along that boot from its ankle, `left` m to its left, in the world. */
+  const along = (ahead, left) => {
+    const x = ax + left * Math.cos(turn) + ahead * Math.sin(turn),
+      z = az - left * Math.sin(turn) + ahead * Math.cos(turn);
+    return [h.x + x * Math.cos(h.yaw) + z * Math.sin(h.yaw), h.z - x * Math.sin(h.yaw) + z * Math.cos(h.yaw)];
+  };
+  /** Flat ground (2 cm, as flatAt), `high` m where `on(x, z)`. */
+  const ground = (on, high) => ({
+    height: (x, z) => (on(x, z) ? high : 0.02),
+    top: (x, z) => (on(x, z) ? high : flatAt('ruins').top(x, z)),
+  });
+  const home = (terrain) => {
+    k.setScenery('ruins', terrain);
+    const m = k.knights[1].home;
+    assert.ok(Math.hypot(m.x - h.x, m.z - h.z) < 1e-6, 'the same home');
+    return m;
+  };
+  // Two stones 12 cm high, 2 cm round, either side of the toe 0.28 m along it (the sabaton is
+  // under 5 cm across there, its point 0.31 m along): his boot lies on the ground between them.
+  const stones = [-0.06, 0.06].map((left) => along(0.28, left));
+  const beside = home(ground((x, z) => stones.some(([sx, sz]) => Math.hypot(x - sx, z - sz) < 0.02), 0.14));
+  assert.ok(
+    Math.abs(beside.feet[1]) < 1e-6,
+    `beside his toe: his boot rests ${(beside.feet[1] * 100).toFixed(1)} cm up`,
+  );
+  // A flat stone 5 cm high under all of his sole, heel to toe (its back on the ground).
+  const under = (x, z) => {
+    const dx = x - h.x,
+      dz = z - h.z;
+    // (Back into his own space, then along the boot.)
+    const ox = dx * Math.cos(h.yaw) - dz * Math.sin(h.yaw) - ax,
+      oz = dx * Math.sin(h.yaw) + dz * Math.cos(h.yaw) - az;
+    const ahead = ox * Math.sin(turn) + oz * Math.cos(turn),
+      left = ox * Math.cos(turn) - oz * Math.sin(turn);
+    return ahead > -0.03 && ahead < 0.33 && Math.abs(left) < 0.07;
+  };
+  const on = home(ground(under, 0.07));
+  assert.ok(
+    Math.abs(on.feet[1] - 0.05) < 1e-6,
+    `on a flat stone: his boot rests ${(on.feet[1] * 100).toFixed(1)} cm up`,
+  );
 });

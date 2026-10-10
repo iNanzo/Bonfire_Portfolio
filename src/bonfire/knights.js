@@ -136,14 +136,22 @@ const STEP_OVER = 0.16; // m: what a walking knight steps over (a fire pit's sto
 // hangs up to 18 cm below it, limp and open; at rest his wrists are 32 cm up or more, so rest
 // is untouched)
 const FLOOR_HANDS = 0.19;
-// (Where a seated boot's sole is looked at for what it rests on, m ahead of its ankle, either
-// side of it; sitting on the ground, back past its heel too: soleUnder.)
-const SOLE = [0, 0.1, 0.2, 0.28];
+// (Where a seated boot's sole is looked at for what it rests on: [m ahead of its ankle, m either
+// side of it], inside the model's sabaton, which is 16 cm across to 0.2 m ahead, then narrows
+// to its pointed toe (TOE_REACH): 4 cm across at 0.28. Sitting on the ground, back past its heel
+// too: soleUnder. A look 5 cm aside at the toe reached past it, onto a stone it never touches:
+// a ring knight's boot hung 9 cm over the ground, propped on the pit's rim beside its toe.)
+const SOLE = [
+  [0, 0.05],
+  [0.1, 0.05],
+  [0.2, 0.05],
+  [0.28, 0.015],
+];
 // (How far a boot's pointed toe reaches past its ankle, m: the model's sabatons, seated. Until
 // round 11 turned a boot in, NEAR_FIRE took 0.28 straight ahead: the rest's hips' turn made up
 // the difference.)
 const TOE_REACH = 0.3;
-const SOLE_ON_GROUND = [-0.12, -0.06, ...SOLE];
+const SOLE_ON_GROUND = [[-0.12, 0.05], [-0.06, 0.05], ...SOLE];
 // (A standing boot's sole, m from its ankle: across it, and from its heel to its pointed toe.)
 const STAND_SOLE = [
   [-0.07, 0, 0.07],
@@ -562,8 +570,8 @@ export function createKnights(
     const c = Math.cos(turn),
       sn = Math.sin(turn);
     let g = -Infinity;
-    for (const dz of home.h < 0.12 ? SOLE_ON_GROUND : SOLE)
-      for (const dx of [-0.05, 0.05]) g = Math.max(g, groundUnder(home, x + dx * c + dz * sn, z - dx * sn + dz * c));
+    for (const [dz, w] of home.h < 0.12 ? SOLE_ON_GROUND : SOLE)
+      for (const dx of [-w, w]) g = Math.max(g, groundUnder(home, x + dx * c + dz * sn, z - dx * sn + dz * c));
     return g;
   };
   /**
