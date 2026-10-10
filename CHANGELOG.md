@@ -29,10 +29,11 @@ knight's fixes, hygiene and performance.
   he kicks with a knee drawn up; Praise the Sun's seated wind-up no longer sweeps a hand
   through his belly; getting up, a stretched leg draws in instead of snapping, and his
   head lifts out of its bow instead of curling him into a ball.
-- Bonfire Live: the knights resting round the fire sit back far enough that a leg
-  stretched toward it stays out of the pit's stones, and the *Pillar Side* shot looks from
-  the front left at what stands by his seat, him and the fire, all three in frame in every
-  place.
+- Bonfire Live: the knights resting round the fire sit back as far as their pose needs
+  for a leg stretched toward it to stay out of the pit's stones (watchful, where round 10
+  sat them, clear of the forge's hearth and the cathedral's pew), shifting as their pose
+  changes, on the ground where they sit; and the *Pillar Side* shot looks from the front
+  left at what stands by his seat, him and the fire, all three in frame in every place.
 
 ### Checks and tools (round 11)
 

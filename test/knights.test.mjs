@@ -1163,23 +1163,44 @@ test('seated at every scenery’s seat (either seat pose), his boots stay well o
   }
 });
 
-test('the others resting on the ground round the fire (Bonfire Live), either seat pose, keep their boots out of its pit’s stones (a leg stretched out toward it too)', async () => {
+test('the others resting on the ground round the fire (Bonfire Live), either seat pose, keep their boots out of its pit’s stones (a leg stretched out toward it too): sent home, sat down where they stand, and changing pose where they sit', async () => {
   const { rig, nearFire } = await realBoots();
+  const other = (pose) => SEAT_POSES.find((q) => q !== pose);
   for (const [pose, name] of everySeating()) {
     const k = createKnights(rig(), { armor: armor(), max: 4 });
+    /** The nearest the others' boots come to the fire's middle over `seconds` of their idle. */
+    const nearest = (seconds) => {
+      let near = Infinity;
+      for (let f = 0; f < 30 * seconds; f++) {
+        k.update(1 / 30);
+        if (f % 5 === 0) for (let i = 1; i < 4; i++) near = Math.min(near, nearFire(k, i));
+      }
+      return near;
+    };
+    const out = (near, how) =>
+      assert.ok(
+        near >= PIT + 0.02,
+        `${pose}, ${name}, ${how}: the others' boots come to ${near.toFixed(2)} m from the fire's middle`,
+      );
     k.setSeatPose(pose);
     k.setScenery(name, flatAt(name));
     k.setCast({ count: 4, instant: true });
     k.setScenery(name, flatAt(name));
-    let near = Infinity;
     // (Over their idle, a shift of the weight and all: the right foot steps out and back.)
-    for (let f = 0; f < 30 * 13; f++) {
-      k.update(1 / 30);
-      if (f % 5 === 0) for (let i = 1; i < 4; i++) near = Math.min(near, nearFire(k, i));
+    out(nearest(13), 'sent home');
+    // As the show seats them (knightShow.js bringSeated): standing at their places on the ring,
+    // facing the fire, then sitting down where they stand.
+    const places = restPlaces(ringOf(name), 4, SEATS[name]);
+    for (let i = 1; i < 4; i++) k.dismiss(i, { instant: true });
+    for (let i = 1; i < 4; i++) {
+      k.summon(i, { instant: true, at: places[i - 1], facing: 'fire' });
+      k.sit(i);
     }
-    assert.ok(
-      near >= PIT + 0.02,
-      `${pose}, ${name}: the others' boots come to ${near.toFixed(2)} m from the fire's middle`,
-    );
+    out(nearest(6), 'sat down where they stood');
+    // Sitting there, the other pose (In the Mix rolls it, or it's changed by hand), and back.
+    k.setSeatPose(other(pose));
+    out(nearest(6), `then ${other(pose)}`);
+    k.setSeatPose(pose);
+    out(nearest(6), `then ${pose} again`);
   }
 });

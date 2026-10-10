@@ -25,7 +25,7 @@ import * as THREE from 'three';
 import { createKnights, GESTURES, SEAT_POSES } from '../src/bonfire/knights.js';
 import { createArmorShared } from '../src/bonfire/armor.js';
 import { BONE_NODES, GESTURE_TIME, DANCE_SEATED_TIME, MOVE_INFO } from '../src/bonfire/knightPose.js';
-import { SEATS, FIRE_AT, ringOf, slotPlaces, ringPlaces } from '../src/bonfire/knightPlaces.js';
+import { SEATS, FIRE_AT, ringOf, slotPlaces, ringPlaces, restPlaces } from '../src/bonfire/knightPlaces.js';
 import { getPov } from '../src/bonfire/povs.js';
 import { buildScenery } from '../src/bonfire/scenery.js';
 import {
@@ -261,12 +261,12 @@ async function terrainOf(name) {
   };
 }
 
-let engine = null;
-/** The engine on the real model, and each of its pieces' surface (its own space) and reach. */
-async function realKnights() {
-  if (engine) return engine;
+const engines = new Map();
+/** The engine on the real model (`max` knights), and each of its pieces' surface (its own space) and reach. */
+async function realKnights(max = 2) {
+  if (engines.has(max)) return engines.get(max);
   const model = await loadKnightMesh();
-  const k = createKnights(model.scene(), { armor: armor(), max: 2 });
+  const k = createKnights(model.scene(), { armor: armor(), max });
   const pieces = {},
     corners = {};
   for (const b of k.knights[0].bones) {
@@ -278,7 +278,8 @@ async function realKnights() {
     const vs = model.points(node);
     if (vs.length) corners[b.name] = Float32Array.from(vs.flat());
   }
-  engine = { k, pieces, corners };
+  const engine = { k, pieces, corners };
+  engines.set(max, engine);
   return engine;
 }
 /**
@@ -1152,4 +1153,65 @@ test('[slow] sitting on the ground, in the ruins and resting on the ring by the 
   k.dismiss(0, { instant: true });
   k.setSeatPose('resting');
   assert.deepEqual(bad, [], 'under the ground');
+});
+
+// (Bonfire Live rests the others on the ground round the fire, knightPlaces.js restPlaces:
+// a cast of four, the most it brings, rests them at every place a smaller cast does.)
+test('[slow] the others resting on the ground round the fire (Bonfire Live), every scenery, either seat pose: sat down where the show stands them, they sit where a new scenery sends them, on the ground there, 1.5 cm clear of the scenery all through their idle', async () => {
+  const env = await realKnights(4);
+  const { k } = env;
+  const bad = [];
+  const others = [1, 2, 3];
+  for (const name of NAMES) {
+    const terrain = await terrainOf(name);
+    const cs = collidersOf(name);
+    for (const pose of SEAT_POSES) {
+      /** The least each of them comes to the scenery's shapes over `seconds` of their idle (four times a second). */
+      const idle = (seconds, how) => {
+        const least = others.map(() => ({ d: Infinity }));
+        for (let t = 0; t < seconds; t += 0.25) {
+          k.update(0.25);
+          others.forEach((i, j) => {
+            const w = nearestOf(env, i, cs, { margin: 0.05 });
+            if (w.d < least[j].d) least[j] = w;
+          });
+        }
+        others.forEach((i, j) => {
+          const w = least[j];
+          if (w.d < 0.015)
+            bad.push(`${name} (${pose}), ${how}: #${i}'s ${w.bone} ${(w.d * 100).toFixed(1)} cm from the ${w.shape}`);
+        });
+      };
+      k.setSeatPose(pose);
+      k.setScenery(name, terrain);
+      k.setCast({ count: 4, instant: true });
+      // (A new scenery sends them home.)
+      k.setScenery(name, terrain);
+      const homes = others.map((i) => ({ ...k.knights[i].home }));
+      idle(3, 'sent home');
+      // As the show seats them (knightShow.js bringSeated): standing at their places on the
+      // ring, facing the fire, then sitting down where they stand.
+      const places = restPlaces(ringOf(name), 4, SEATS[name]);
+      for (const i of others) k.dismiss(i, { instant: true });
+      for (const i of others) {
+        k.summon(i, { instant: true, at: places[i - 1], facing: 'fire' });
+        k.sit(i);
+      }
+      for (let t = 0; t < 2.5; t += 1 / 12) k.update(1 / 12 + 1e-7);
+      others.forEach((i, j) => {
+        const n = k.knights[i],
+          h = homes[j];
+        const at = n.group.position;
+        if (Math.hypot(at.x - h.x, at.y - h.y, at.z - h.z) > 0.01)
+          bad.push(
+            `${name} (${pose}): #${i} sat down at (${[at.x, at.y, at.z].map((q) => q.toFixed(2))}), sent home at (${[h.x, h.y, h.z].map((q) => q.toFixed(2))})`,
+          );
+      });
+      idle(3, 'sat down where he stood');
+      for (const i of [0, ...others]) k.dismiss(i, { instant: true });
+    }
+  }
+  k.setCast({ count: 1, instant: true });
+  k.setSeatPose('resting');
+  assert.deepEqual(bad, [], 'not where a new scenery sits them, or not clear of the scenery');
 });

@@ -481,12 +481,18 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   (`restPlaces`: the layout for the whole cast less the place nearest the seat, on the
   ring's clear sides, never in front of the fire), facing the fire, in the ground poses
   (**The seated rest**); a new scenery, or a new cast, sends them home there. They sit
-  back from the ring far enough that a leg stretched out toward the fire keeps its boot a
-  hand's breadth out of the pit's stones, in either seat pose (`knights.js` `NEAR_FIRE`,
-  `sitBack`; the same when a dancer sits down where he stands): their hips 1.64 m from
-  the fire's middle (round 10: 1.47, their feet on the ring), their boots 0.78 m from it
-  or more resting and 0.91 watchful, the stones reaching 0.72 (`test/knights.test.mjs`
-  asks 0.74).
+  back from the ring as far as their seat pose needs to keep a boot a hand's breadth out
+  of the pit's stones (`knights.js` `NEAR_FIRE`, `groundHome`; the same when a dancer
+  sits down where he stands, on the ground there): resting, a leg stretched out toward the
+  fire, their hips 1.64 m from the fire's middle; watchful, 1.48 (round 10: 1.47, their
+  feet on the ring), clear of what stands behind (the forge's hearth, the cathedral's pew).
+  Their boots come to 0.78 m from it or more resting and 0.91 watchful, the stones
+  reaching 0.72 (`test/knights.test.mjs` asks 0.74); a change of pose where they sit
+  shifts them back or forward to its place as they change (`rehome`). The show seats
+  them where a new scenery would, 1.5 cm or more clear of the scenery
+  (`test/knightClearance.test.mjs`); resting in the cathedral with a cast of four, the
+  one by the pew sits up on its kneeler (no place near his on the ring has room for the
+  leg he stretches out).
 - **The seated rest** is the Dark Souls bonfire rest: slumped forward over his knees
   (spine 27° to 36° from a 0.22 to a 0.40 m seat), his left foot drawn in and that arm
   laid over the knee with the gauntlet hanging past it, the right leg out with that
