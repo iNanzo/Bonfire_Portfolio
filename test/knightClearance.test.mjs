@@ -649,6 +649,42 @@ test('in the ruins he sits on the ground itself, his boots on it out of the fire
   k.setSeatPose('resting');
 });
 
+test('[slow] stood up in front of his seat, at every seat in either seat pose, his boots stand on the ground there (the height map’s): none of either sole goes into it (1.5 cm), a flagstone it’s half on too', async () => {
+  const env = await realKnights();
+  const { k } = env;
+  const n = k.knights[0];
+  const bad = [];
+  for (const name of NAMES) {
+    const terrain = await terrainOf(name);
+    k.setScenery(name, terrain);
+    for (const pose of SEAT_POSES) {
+      k.setSeatPose(pose);
+      k.summon(0, { instant: true });
+      k.update(0.5);
+      k.stand(0);
+      for (let t = 0; t < 1.8; t += 1 / 12) k.update(1 / 12 + 1e-7);
+      // (Standing there a while, at the fire's 12 frames a second: his idle shifts his weight.)
+      const low = { footL: { d: Infinity }, footR: { d: Infinity } };
+      for (let t = 0; t < 3; t += 1 / 12) {
+        k.update(1 / 12 + 1e-7);
+        eachPoint(env, n, (v, bone) => {
+          if (!low[bone]) return;
+          const d = v.y - terrain.height(v.x, v.z);
+          if (d < low[bone].d) low[bone] = { d, t };
+        });
+      }
+      for (const [bone, w] of Object.entries(low))
+        if (w.d < -0.015)
+          bad.push(
+            `${name} (${pose}): his ${bone} ${(-w.d * 100).toFixed(1)} cm into the ground (${w.t.toFixed(2)} s)`,
+          );
+      k.dismiss(0, { instant: true });
+    }
+  }
+  k.setSeatPose('resting');
+  assert.deepEqual(bad, [], 'a boot into the ground');
+});
+
 // (The same seat with nothing round it: a scenery colliders.js has no shapes for, given the
 // seat's own place and height map. Its room for his arms is all of it, and nothing turns them.)
 const BARE = 'bare (a test’s)';

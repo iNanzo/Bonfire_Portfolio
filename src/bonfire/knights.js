@@ -140,6 +140,11 @@ const FLOOR_HANDS = 0.19;
 // side of it; sitting on the ground, back past its heel too: soleUnder.)
 const SOLE = [0, 0.1, 0.2, 0.28];
 const SOLE_ON_GROUND = [-0.12, -0.06, ...SOLE];
+// (A standing boot's sole, m from its ankle: across it, and from its heel to its pointed toe.)
+const STAND_SOLE = [
+  [-0.07, 0, 0.07],
+  [-0.08, 0, 0.1, 0.2, 0.29],
+];
 // His meshes' bounds (his own space: the ground under him, turned with him), for culling:
 // every pose he takes stays inside with room to spare (the farthest reach, 1.51 m from
 // here, is the boot of the leg he stretches out resting on the ground in the ruins; the
@@ -529,6 +534,17 @@ export function createKnights(
       for (let z = -0.3; z <= 0.71; z += 0.1) if (x * x + z * z < 0.5) g = Math.max(g, groundUnder(home, x, z));
     return Math.min(g, 0.1);
   }
+  /**
+   * The ground a standing boot rests on at a place in his own space at `home` (its ankle at x,
+   * z): the highest under its sole, heel to pointed toe and either side (STAND_SOLE), so none
+   * of it sinks into a flagstone it stands half on (the ground under the ankle alone left the
+   * toe 5 cm into one, stood up in front of the ruins' seat).
+   */
+  const standUnder = (home, x, z) => {
+    let g = -Infinity;
+    for (const dz of STAND_SOLE[1]) for (const dx of STAND_SOLE[0]) g = Math.max(g, groundUnder(home, x + dx, z + dz));
+    return g;
+  };
   /** What stands at a place in his own space at `home` (its top), above the ground he's placed on (m). */
   const topUnder = (home, x, z) => {
     const w = atHome(home, x, z);
@@ -717,8 +733,8 @@ export function createKnights(
     k.stand[37 + 2] = s.z + 0.02;
     if (h) {
       const [fl, fr] = feetAt(k.stand, rig);
-      k.stand[33] += groundUnder(h, fl[0], fl[1]);
-      k.stand[38] += groundUnder(h, fr[0], fr[1]);
+      k.stand[33] += standUnder(h, fl[0], fl[1]);
+      k.stand[38] += standUnder(h, fr[0], fr[1]);
       if (!h.roomUp) {
         h.roomUp = roomOf(h, k.stand);
         h.roomLess = null;

@@ -573,7 +573,9 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   floor*).
 - **Transitions.** Standing up (1.2 s): a lean with hands to the knees, a push-off, a
   small overshoot as he straightens, the feet moved in small lifted steps (never slid) to
-  a level, open spot in front of his seat (`standSpot`); a step longer than 0.3 m (a leg
+  a level, open spot in front of his seat (`standSpot`), each boot on the highest ground
+  under its sole (a flagstone it's half on lifts its heel, not takes its toe:
+  `standUnder`); a step longer than 0.3 m (a leg
   stretched out along the ground, drawn in under him) takes longer in proportion, done
   within the 1.2 s, so the leg draws in rather than snapping (`STEP_LONG`); where his
   feet have something to cross on the way, he pushes up over them first and then steps
