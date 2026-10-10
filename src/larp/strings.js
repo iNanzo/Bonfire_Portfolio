@@ -4,7 +4,7 @@
 //   STRINGS          key → { vi, en }, written out in full (Vietnamese is never title-cased by
 //                    code); English labels in Title Case, hints in sentences (CONTRIBUTING.md).
 //                    Keys are namespaced: app. round. phase. status. role. mode. scenery.
-//                    emblem. action. tab. label. unit. word. (labels, Title Case in both
+//                    emblem. action. tab. label. unit. word. key. (labels, Title Case in both
 //                    languages) and hint. check. error. (sentences, 160 characters or fewer).
 //                    `{name}` placeholders are filled with fill().
 //   t(key, lang)     the string, or the key itself when it's missing (never throws); `lang` may
@@ -37,6 +37,15 @@ const JOIN = ' · ';
 /** @param {string} vi @param {string} en */
 const pair = (vi, en) => Object.freeze({ vi, en });
 
+/** The Vietnamese of each round's default prompt (ROUND_CATEGORIES.prompt is the English). */
+const DEFAULT_PROMPTS_VI = /** @type {Record<string, string>} */ ({
+  faith: 'Hãy kể một điều về thánh quan thầy của đội và một cách chúng ta có thể noi gương ngài trong tuần này.',
+  dance: 'Sáng tạo bốn động tác có thể lặp lại, kể một câu chuyện về tinh thần cùng nhau làm việc.',
+  prayer: 'Chuẩn bị một lời cầu nguyện tạ ơn hoặc một câu Kinh Thánh về lòng tin cậy Chúa.',
+  skit: 'Diễn lại một khoảnh khắc trong dụ ngôn Người Samari nhân hậu và kết bằng một câu về việc làm người thân cận.',
+  cheer: 'Có tên đội, một giá trị đội muốn sống, và một câu đáp mà mọi người cùng hô theo.',
+});
+
 /**
  * The string map: key → its Vietnamese and English text.
  * @type {Record<string, { vi: string, en: string }>}
@@ -48,6 +57,10 @@ export const STRINGS = Object.freeze({
 
   // The five rounds (from the contract's table, so the words never drift)
   ...Object.fromEntries(ROUND_CATEGORIES.map((c) => [`round.${c.key}`, pair(c.vi, c.en)])),
+  // The rounds' default prompts (types.js holds the English): the Vietnamese the display shows for them.
+  ...Object.fromEntries(
+    ROUND_CATEGORIES.map((c) => [`hint.defaultPrompt.${c.key}`, pair(DEFAULT_PROMPTS_VI[c.key] ?? c.prompt, c.prompt)]),
+  ),
 
   // Event and round phases
   'phase.setup': pair('Thiết Lập', 'Setup'),
@@ -297,6 +310,161 @@ export const STRINGS = Object.freeze({
   'word.teamSpirit': pair('Tinh Thần Đồng Đội', 'Team Spirit'),
   'word.overTime': pair('Quá Giờ', 'Over Time'),
 
+  // The host console's shell (Stage 2): the next action, the top bar, the lock, the shortcuts
+  'action.startRoundN': pair('Bắt Đầu Vòng {n}', 'Start Round {n}'),
+  'action.startPerformances': pair('Bắt Đầu Trình Diễn', 'Start Performances'),
+  'action.showResults': pair('Xem Kết Quả', 'Show Results'),
+  'action.hidePreview': pair('Ẩn Xem Trước', 'Hide Preview'),
+  'label.event': pair('Sự Kiện', 'Event'),
+  'label.estOver': pair('Dự Kiến +{over}', 'Est. +{over}'),
+  'label.webglOff': pair('Màn Chiếu Không Có WebGL', 'Display Without WebGL'),
+  'label.otherHost': pair('Quản Trò Đang Mở Ở Thẻ Khác', 'Host Open In Another Tab'),
+  'key.toggleTimer': pair('Tạm Dừng Hoặc Tiếp Tục Đồng Hồ', 'Pause Or Resume the Timer'),
+  'key.showKeys': pair('Hiện Phím Tắt', 'Show Keyboard Shortcuts'),
+  'key.groupJudging': pair('Chấm Điểm', 'Judging'),
+
+  // The Run tab (hostRun.js): the queue, the turn timer, Add Award, this round's entries, Projected
+  'label.statusFor': pair('Trạng Thái · {team}', 'Status · {team}'),
+  'label.turnOf': pair('Lượt · {team}', 'Turn · {team}'),
+  'label.editAward': pair('Sửa Điểm', 'Edit Award'),
+  'label.findRecipient': pair('Tìm Người Nhận', 'Find Recipient'),
+  'label.awards': pair('Điều Chỉnh', 'Awards'),
+  'label.projectedLegend': pair('Hoàn Thành + Điều Chỉnh = Điểm Vòng', 'Completion + Awards = Round Score'),
+  'label.bannerOf': pair('Băng Rôn {step}/{total}', 'Banner {step} Of {total}'),
+  'label.keptDuplicate': pair('Giữ Lại Dù Trùng', 'Kept Duplicate'),
+  'label.largeValue': pair('Giá Trị Lớn', 'Large Value'),
+  'action.replayReveal': pair('Trình Chiếu Lại', 'Replay Reveal'),
+  'action.removeTemplate': pair('Xóa Mẫu {name}', 'Remove Template {name}'),
+  'hint.pickTeam': pair('Chọn đội này làm người nhận điểm.', 'Make this team the award recipient.'),
+  'hint.runIdle': pair(
+    'Khi một vòng bắt đầu, thứ tự trình diễn, đồng hồ và điểm sẽ hiện ở đây.',
+    'Once a round starts, its queue, timer and awards appear here.',
+  ),
+  'hint.awardsClosed': pair(
+    'Có thể ghi điểm khi vòng bắt đầu chuẩn bị.',
+    "Awards open when the round's preparation starts.",
+  ),
+  'hint.roundPublished': pair(
+    'Vòng này đã công bố; hãy thêm đính chính ở tab Lịch Sử nếu cần sửa.',
+    'This round is published; add a correction in History to change it.',
+  ),
+  'hint.roundSkipped': pair('Vòng này đã được bỏ qua và tính 0 điểm.', 'This round was skipped and counts zero.'),
+  'hint.noTimer': pair('Giai đoạn này không có đồng hồ.', 'No timer runs in this phase.'),
+  'hint.noEntries': pair('Chưa có điểm nào trong vòng này.', 'No awards this round yet.'),
+  'hint.noMatches': pair('Không có kết quả phù hợp.', 'Nothing matches that search.'),
+  'hint.noRoster': pair('Danh sách chưa có đoàn sinh.', 'The roster has no members yet.'),
+  'hint.removed': pair('Đã xóa “{name}”.', 'Removed “{name}”.'),
+
+  // The Setup and Teams & Roster tabs (hostSetup.js): teams, roster, co-GMs, rounds, display, data, offline
+  'label.eventDetails': pair('Thông Tin Sự Kiện', 'Event Details'),
+  'label.eventTitle': pair('Tên Sự Kiện', 'Event Title'),
+  'label.schedule': pair('Lịch Trình', 'Schedule'),
+  'label.search': pair('Tìm Kiếm', 'Search'),
+  'label.teamsN': pair('{n} Đội', '{n} Teams'),
+  'label.membersN': pair('{n} Đoàn Sinh', '{n} Members'),
+  'label.lateTeam': pair('Thêm Đội Giữa Chừng', 'Add a Team During Play'),
+  'label.namesOnePerLine': pair('Tên, Mỗi Dòng Một Người', 'Names, One Per Line'),
+  'label.moveTo': pair('Chuyển Sang Đội', 'Move To Team'),
+  'label.data': pair('Dữ Liệu', 'Data'),
+  'label.cardsAndData': pair('Thẻ Chấm Điểm Và Dữ Liệu', 'Award Cards And Data'),
+  'label.offlinePage': pair('Tệp Của Trang', 'Page Files'),
+  'label.offlineDisplay': pair('Đã Mở Cửa Sổ Màn Chiếu', 'Display Window Opened'),
+  'label.offlineBonfire': pair('Mô Hình Lửa Trại', 'Bonfire Model'),
+  'label.offlineKnight': pair('Mô Hình Hiệp Sĩ', 'Knight Model'),
+  'label.fontInter': pair('Phông Chữ Inter', 'Inter Font'),
+  'label.fontCinzel': pair('Phông Chữ Cinzel', 'Cinzel Font'),
+  'label.fontPixelify': pair('Phông Chữ Pixelify Sans', 'Pixelify Sans Font'),
+  'status.ready': pair('Sẵn Sàng', 'Ready'),
+  'status.missing': pair('Còn Thiếu', 'Missing'),
+  'status.notChecked': pair('Chưa Kiểm Tra', 'Not Checked'),
+  'action.removeTeam': pair('Xóa Đội', 'Remove Team'),
+  'action.addLateTeam': pair('Thêm Đội Đến Muộn', 'Add Late Team'),
+  'action.showDetails': pair('Hiện Chi Tiết', 'Show Details'),
+  'action.hideDetails': pair('Ẩn Chi Tiết', 'Hide Details'),
+  'action.chooseBackup': pair('Chọn Tệp Sao Lưu', 'Choose Backup File'),
+  'action.exportResultsCsv': pair('Xuất Kết Quả CSV', 'Export Results CSV'),
+  'action.checkAgain': pair('Kiểm Tra Lại', 'Check Again'),
+  'hint.faceFallback': pair(
+    'Màn chiếu dùng Inter cho tên này vì Cinzel không có chữ tiếng Việt.',
+    'The display sets this name in Inter: Cinzel has no Vietnamese letters.',
+  ),
+  'hint.faceCinzel': pair('Màn chiếu dùng Cinzel cho tên này.', 'The display sets this name in Cinzel.'),
+  'hint.noTeamsYet': pair('Chưa có đội nào. Hãy thêm đội đầu tiên.', 'No teams yet. Add the first one.'),
+  'hint.noMembers': pair('Đội này chưa có đoàn sinh.', 'No members on this team yet.'),
+  'hint.namesOnePerLine': pair(
+    'Dán danh sách, mỗi dòng một tên. Chỉ tên hiển thị, không cần tuổi hay liên lạc.',
+    'Paste a list, one name per line. Display names only: no ages or contact details.',
+  ),
+  'hint.midGamePerforming': pair(
+    'Đội mới vào cuối hàng trình diễn của vòng này, bắt đầu từ 0 điểm.',
+    "A new team joins the end of this round's queue and starts at 0 points.",
+  ),
+  'hint.midGameNext': pair(
+    'Đội mới bắt đầu từ vòng sau, với 0 điểm.',
+    'A new team starts with the next round, at 0 points.',
+  ),
+  'hint.coGms': pair(
+    'Chỉ cần tên, không có tài khoản hay mật khẩu.',
+    'Names only: there are no accounts or passwords.',
+  ),
+  'hint.confirmRemoveTeam': pair(
+    'Xóa {team}? {n} đoàn sinh của đội cũng bị xóa khỏi danh sách.',
+    'Remove {team}? Its {n} roster names are removed too.',
+  ),
+  'hint.baseLocked': pair(
+    'Điểm hoàn thành bị khóa khi sự kiện đã bắt đầu.',
+    'Completion points are locked once the event starts.',
+  ),
+  'hint.roundStarted': pair(
+    'Vòng này đã bắt đầu nên không sửa được nữa.',
+    'This round has started, so it can no longer be changed.',
+  ),
+  'hint.estimateTeams': pair('Tính cho {n} đội.', 'Worked out for {n} teams.'),
+  'hint.duration': pair('Thời gian ghi phút:giây, ví dụ 1:30.', 'Times are minutes and seconds, such as 1:30.'),
+  'hint.reducedMotion': pair(
+    'Không có vòng sáng, chớp hay cử chỉ; băng rôn hiện mờ dần.',
+    'No rings, flashes or gestures; banners cross-fade.',
+  ),
+  'hint.sound': pair(
+    'Tắt theo mặc định. Vòng cầu nguyện luôn im lặng.',
+    'Off by default. The prayer round is always silent.',
+  ),
+  'hint.showMembers': pair(
+    'Màn chào mừng liệt kê đoàn sinh của từng đội.',
+    "The Welcome screen lists each team's members.",
+  ),
+  'hint.hostPin': pair(
+    'Để trống là tắt. Chỉ hỏi khi rời Chế Độ Giám Khảo; không phải để bảo mật.',
+    "Leave it blank for none. It is asked only when leaving Judge Mode; it isn't security.",
+  ),
+  'hint.awardCards': pair(
+    'Thẻ giấy để Giám Khảo ghi điểm rồi đưa cho Quản Trò.',
+    'Paper cards for co-GMs to note awards on and hand to the host.',
+  ),
+  'hint.printCards': pair('Nhấn Ctrl+P (hoặc ⌘P) để in.', 'Press Ctrl+P (or ⌘P) to print.'),
+  'hint.popupBlocked': pair(
+    'Trình duyệt đã chặn trang in. Hãy cho phép cửa sổ bật lên cho trang này.',
+    'The browser blocked the print page. Allow pop-ups for this site.',
+  ),
+  'hint.imported': pair('Đã nhập bản sao lưu.', 'The backup is imported.'),
+  'hint.deleteData': pair(
+    'Xóa sự kiện đã lưu khỏi máy này. Hãy xuất bản sao lưu trước nếu cần giữ lại.',
+    'Removes the saved event from this laptop. Export a backup first to keep it.',
+  ),
+  'hint.deleted': pair(
+    'Đã xóa dữ liệu sự kiện; một sự kiện mới đã bắt đầu.',
+    'The event data is deleted; a fresh event has started.',
+  ),
+  'hint.offlineNotChecked': pair(
+    'Chưa kiểm tra. Hãy mở màn chiếu một lần trước.',
+    'Not checked yet. Open the display once first.',
+  ),
+  'hint.offlineReady': pair(
+    'Mọi thứ đã tải xong để chạy không cần mạng.',
+    'Everything is loaded to run without the network.',
+  ),
+  'hint.offlineMissing': pair('Còn thiếu: {items}.', 'Still missing: {items}.'),
+
   // Hints and messages (sentences)
   'hint.reviewing': pair('Ban Giám Khảo đang duyệt điểm', 'HTs are reviewing'),
   'hint.projected': pair('Dự kiến · chưa công bố', 'Projected · not published'),
@@ -341,6 +509,14 @@ export const STRINGS = Object.freeze({
   'hint.otherHost': pair(
     'Bảng điều khiển Quản Trò đang mở ở một thẻ khác.',
     'The host console is already open in another tab.',
+  ),
+  'hint.takenOver': pair(
+    'Bảng điều khiển Quản Trò đã được tiếp quản ở một thẻ khác.',
+    'Another tab took over the host console.',
+  ),
+  'hint.otherHostGone': pair(
+    'Thẻ Quản Trò kia đã đóng. Hãy tiếp quản để tiếp tục.',
+    'The other host tab has closed. Take over to carry on.',
   ),
   'hint.importSummary': pair(
     'Bản sao lưu có {teams} đội và {published} vòng đã công bố. Nhập sẽ thay thế sự kiện hiện tại.',
@@ -437,6 +613,168 @@ export const STRINGS = Object.freeze({
   'error.newer_version': pair(
     'Bản sao lưu này được tạo bởi phiên bản mới hơn.',
     'This backup was saved by a newer version of the game.',
+  ),
+
+  // Judge Mode (judge.js)
+  'label.whoIsJudging': pair('Ai Đang Chấm Điểm?', 'Who Is Judging?'),
+  'label.judgeLocked': pair('Chế Độ Giám Khảo Đã Khóa', 'Judge Mode Is Locked'),
+  'label.chooseRecipient': pair('Chọn Người Nhận', 'Choose a Recipient'),
+  'action.continueAs': pair('Tiếp Tục Với {name}', 'Continue As {name}'),
+  'action.changeGm': pair('Đổi Người Chấm', 'Change Name'),
+  'action.returnToConsole': pair('Về Bảng Điều Khiển', 'Return To Console'),
+  'hint.pickGm': pair(
+    'Chọn tên của bạn để điểm bạn cho được ghi đúng người.',
+    'Pick your name so the awards you give are credited to you.',
+  ),
+  'hint.noCoGms': pair(
+    'Chưa có giám khảo nào. Quản Trò thêm giám khảo ở tab Đội & Danh Sách.',
+    'No co-GMs yet. The host adds them in Teams & Roster.',
+  ),
+  'hint.judgeRoundOver': pair(
+    'Đã chấm xong vòng này. Chế Độ Giám Khảo mở lại khi vòng sau bắt đầu chuẩn bị.',
+    "This round's judging is over. Judge Mode opens again when the next round's preparation starts.",
+  ),
+  'hint.noMyAwards': pair('Bạn chưa cho điểm nào trong vòng này.', "You haven't given any awards this round."),
+  'hint.noOthersAwards': pair('Chưa có điểm nào khác trong vòng này.', 'No other awards this round yet.'),
+  'hint.pinToLeave': pair(
+    'Nhập mã PIN của Quản Trò để trở về bảng điều khiển.',
+    'Enter the host PIN to return to the host console.',
+  ),
+  'hint.wrongPin': pair('Mã PIN không đúng. Hãy thử lại.', "That PIN isn't right. Try again."),
+  // The Review and History tabs (hostReview.js): teams side by side, flags, publishing, corrections, totals
+  'label.flags': pair('Cần Xem Lại', 'Flags'),
+  'label.duplicate': pair('Trùng Tên', 'Duplicate'),
+  'label.keptBecause': pair('Giữ Lại: {reason}', 'Kept: {reason}'),
+  'label.statusCount': pair('{done}/{total} Đội Đã Có Trạng Thái', '{done} Of {total} Teams Have a Status'),
+  'label.teamAwards': pair('Điều Chỉnh Cho Đội', 'Team Awards'),
+  'label.individualAwards': pair('Điều Chỉnh Cá Nhân', 'Individual Awards'),
+  'label.fromName': pair('Từ {name}', 'From {name}'),
+  'label.otherRecipients': pair('Người Nhận Khác', 'Other Recipients'),
+  'label.publishedRounds': pair('Các Vòng Đã Công Bố', 'Published Rounds'),
+  'label.atEventTime': pair('Phút {time} Của Sự Kiện', 'At {time} Into the Event'),
+  'label.recipient': pair('Người Nhận', 'Recipient'),
+  'label.difference': pair('Chênh Lệch', 'Difference'),
+  'label.publicReason': pair('Lý Do Công Khai', 'Public Reason'),
+  'label.noRound': pair('Không Gắn Với Vòng', 'No Round'),
+  'label.noOriginal': pair('Không Có Mục Gốc', 'No Original Entry'),
+  'label.chooseOne': pair('Chọn…', 'Choose…'),
+  'label.totalChange': pair('Tổng: {before} → {after}', 'Total: {before} → {after}'),
+  'label.correctsEntry': pair('Đính Chính Cho: {name}', 'Corrects: {name}'),
+  'label.removedMember': pair('Đã Rời Danh Sách', 'Removed From Roster'),
+  'hint.reviewIdle': pair(
+    'Khi một vòng bắt đầu, các đội sẽ hiện ở đây cạnh nhau để so sánh.',
+    'Once a round starts, its teams appear here side by side.',
+  ),
+  'hint.reviewNotYet': pair(
+    'Chọn Duyệt Điểm Vòng để khóa Chế Độ Giám Khảo rồi công bố.',
+    'Choose Review Round to lock Judge Mode, then publish.',
+  ),
+  'hint.reviewClear': pair('Không có gì cần xem lại.', 'Nothing is flagged.'),
+  'hint.reopen': pair(
+    'Mở lại để Giám Khảo tiếp tục ghi điểm; điểm đã thêm vẫn được giữ.',
+    'Reopen so co-GMs can add awards again; nothing added is lost.',
+  ),
+  'hint.noStatus': pair('Chưa có trạng thái: {teams}.', 'No status yet: {teams}.'),
+  'hint.duplicateGroup': pair('{name} có {n} điểm trùng tên “{award}”.', '{name} has {n} awards named “{award}”.'),
+  'hint.largeAward': pair(
+    '{name}: {points} lớn hơn {base} điểm hoàn thành.',
+    '{name}: {points} is more than the {base} completion points.',
+  ),
+  'hint.historyEmpty': pair('Chưa có vòng nào được công bố.', 'No round is published yet.'),
+  'hint.noCorrections': pair('Chưa có đính chính nào.', 'No corrections yet.'),
+  'hint.correction': pair(
+    'Đính chính cộng hoặc trừ phần chênh lệch; điểm hoàn thành không bao giờ được tính lại.',
+    'A correction adds or subtracts the difference; completion points are never applied again.',
+  ),
+  'hint.correctionsLater': pair('Có thể đính chính khi sự kiện đã bắt đầu.', 'Corrections open once the event starts.'),
+  'hint.correctionAdded': pair('Đã thêm đính chính cho {name}.', 'Correction added for {name}.'),
+  'hint.originalEntry': pair(
+    'Tùy chọn: điểm đã công bố mà đính chính này sửa.',
+    'Optional: the published award this corrects.',
+  ),
+  'hint.hostOnlyRanking': pair(
+    'Chỉ Quản Trò thấy bảng này; màn chiếu chỉ tôn vinh các cá nhân dẫn đầu.',
+    'Only the host sees this list; the display celebrates the leading individuals only.',
+  ),
+
+  // The shared display (display.js): Welcome, the standings' movement, the test pattern, waiting
+  'label.roundsN': pair('{n} Vòng', '{n} Rounds'),
+  'label.movedUp': pair('Lên {n} Hạng', 'Up {n}'),
+  'label.movedDown': pair('Xuống {n} Hạng', 'Down {n}'),
+  'label.noMove': pair('Giữ Hạng', 'No Change'),
+  'label.testPattern': pair('Mẫu Kiểm Tra', 'Test Pattern'),
+  'label.sampleTeam': pair('Đội Phaolô', 'Team Paul'),
+  'label.sampleAward': pair('Cùng Nhau Tỏa Sáng', 'Shine Together'),
+  'hint.displayWaiting': pair('Đang chờ bảng điều khiển của Quản Trò.', 'Waiting for the host console.'),
+
+  // The host console put together (host.js): resuming, Skip Round, the projector checklist
+  'action.hideTestPattern': pair('Ẩn Mẫu Kiểm Tra', 'Hide Test Pattern'),
+  'hint.resumeTimeUp': pair(
+    'Tiếp tục sự kiện: {round}, {phase}. Đồng hồ đã hết giờ trong lúc đóng trang.',
+    'Resume the event: {round}, {phase}. The timer ran out while the console was closed.',
+  ),
+  'hint.skipRound': pair(
+    'Bỏ qua vòng này: vòng tính 0 điểm và không có phần công bố.',
+    'Skip this round: it counts zero and has no reveal.',
+  ),
+  'hint.checklist': pair(
+    'Làm theo các bước này một lần, khi màn chiếu đã mở.',
+    'Go through these steps once the display is open.',
+  ),
+  'hint.testPattern': pair(
+    'Đứng ở cuối phòng và kiểm tra xem tiêu đề, băng rôn và đồng hồ có đọc được không.',
+    'Stand at the back of the room and check the title, the banner and the timer are readable.',
+  ),
+
+  // Review fixes: Enter, the reveal's end, warnings, unreadable saves, accessible names
+  'label.minus': pair('Dấu Trừ', 'Minus'),
+  'label.plus': pair('Dấu Cộng', 'Plus'),
+  'label.filterShortcuts': pair('Lọc Phím Tắt', 'Filter Shortcuts'),
+  'action.downloadUnreadable': pair('Tải Bản Lưu Không Đọc Được', 'Download Unreadable Save'),
+  'hint.storageWarning': pair(
+    'Chưa lưu được: trình duyệt từ chối lưu (cửa sổ ẩn danh hoặc bộ nhớ đầy). Trò chơi vẫn tiếp tục; hãy xuất bản sao lưu trước khi đóng thẻ.',
+    'Not saved: this browser refused storage (private browsing, or full). Play continues; export a backup before closing the tab.',
+  ),
+  'hint.unsavedHere': pair(
+    'Cửa sổ này có thay đổi chưa được lưu. Hãy xuất bản sao lưu trước khi đóng.',
+    'This tab has changes that were never saved. Export a backup before closing it.',
+  ),
+  'hint.offlineKeepOpen': pair(
+    'Hãy mở trang khi có mạng, rồi đừng đóng trình duyệt hay cửa sổ màn chiếu.',
+    'Load the page while online, then close neither the browser nor the display.',
+  ),
+  'hint.reopenNeedsNetwork': pair('Mở lại màn chiếu cần có mạng.', 'Reopening the display needs the network.'),
+  'hint.reopenDisplay': pair(
+    'Cửa sổ màn chiếu đã đóng. Mở Cửa Sổ Màn Chiếu để hiện lại đúng chỗ sự kiện đang diễn ra.',
+    'The display was closed. Open Display Window brings it back where the event is.',
+  ),
+  'check.keepOpen': pair(
+    'Đừng đóng cửa sổ màn chiếu: khi mất mạng sẽ không mở lại được',
+    "Don't close the display: without the network it can't be reopened",
+  ),
+  'hint.unreadable.newer_version': pair(
+    'Sự kiện đã lưu được tạo bởi một phiên bản mới hơn nên không đọc được ở đây.',
+    "The saved event was written by a newer version and can't be read here.",
+  ),
+  'hint.unreadable.bad_json': pair(
+    'Sự kiện đã lưu bị hỏng nên không đọc được.',
+    "The saved event is damaged and can't be read.",
+  ),
+  'hint.unreadable.bad_backup': pair(
+    'Dữ liệu đã lưu không phải là một sự kiện lửa trại.',
+    "The saved data isn't a campfire event.",
+  ),
+  'hint.unreadableKept': pair(
+    '{why} Bản lưu được giữ nguyên ở một chỗ khác; đây là sự kiện mới.',
+    '{why} It was kept aside, untouched; this is a new event.',
+  ),
+  'hint.unreadableHeld': pair(
+    '{why} Bản lưu được giữ nguyên nên sự kiện mới này chưa được lưu. Hãy tải nó xuống, hoặc Xóa Dữ Liệu Sự Kiện để lưu tiếp.',
+    "{why} It is kept untouched, so this new event isn't saved. Download it, or Delete Event Data to start saving.",
+  ),
+  'hint.eventFinished': pair(
+    'Sự kiện đã kết thúc. Hãy xuất kết quả và bản sao lưu; xóa dữ liệu khi không còn cần.',
+    'The event is finished. Export the results and a backup; delete the event data once it is no longer needed.',
   ),
 });
 
