@@ -221,7 +221,7 @@ test('resting on the ground, the boot of the leg he stretches out turns in towar
   for (const h of [0, 0.06, 0.11]) {
     for (const feet of [null, [0.03, -0.02]]) {
       const p = seatedPose(newPose(), h, DEFAULT_RIG, 'resting', feet);
-      const s = solver.solve(p, feet);
+      const s = solver.solve(p);
       const hips = p[POSE.hips + 1];
       const yaw = (side) => {
         const f = new THREE.Vector3(0, 0, 1).applyQuaternion(s.q[I['foot' + side]]);
@@ -272,7 +272,7 @@ test('resting on the ground, the knee of the leg he stretches out faces up and a
   for (const h of [0, 0.06, 0.11]) {
     for (const feet of [null, [0.03, -0.02]]) {
       const p = seatedPose(newPose(), h, DEFAULT_RIG, 'resting', feet);
-      const s = solver.solve(p, feet);
+      const s = solver.solve(p);
       const [hip, knee, ankle] = ['thighR', 'shinR', 'footR'].map((b) => s.p[I[b]].clone());
       const along = ankle.sub(hip).normalize();
       const cap = knee
