@@ -21,13 +21,17 @@ body.is-idle .viz-stage {
 
 /* ---------- Start screen (like the site's title screen) ---------- */
 
+/* (The room under the start menu: the stats overlay keeps above the menu by it.) */
+#viz {
+  --start-pad: clamp(40px, 8vh, 88px);
+}
 .viz-start {
   position: fixed;
   inset: 0;
   z-index: 10;
   display: flex;
   align-items: flex-end;
-  padding: 24px var(--gutter) clamp(40px, 8vh, 88px);
+  padding: 24px var(--gutter) var(--start-pad);
   pointer-events: none;
 }
 .viz-start[hidden] {
@@ -1245,7 +1249,9 @@ body.hud-off .viz-hud {
    where none of them is: it never draws over them, and never takes the pointer. In the show,
    top left: the HUD is along the bottom, the pack bottom right, Render Settings top right.
    On the start screen (its words on the left, the home link top left), top right, clear of
-   the pack below. Where Render Settings opens over it (the start screen; a narrow screen,
+   the pack below; where the start menu reaches across under it (a phone, a narrow window),
+   only the room above the menu (main.js keeps --start-h at its height), which on a small
+   phone is none: nothing shows until the show. Where Render Settings opens over it (the start screen; a narrow screen,
    where it takes the width), it steps down under the menu while that's open (main.js keeps
    --menu-h at the menu's height). Smaller on a phone, the frame's parts and the GPU folded
    away. (--stats-below: the room it leaves under it; past that, its last rows are cut off.) */
@@ -1268,6 +1274,11 @@ body[data-mode='start']:has(.viz-render-menu:not([hidden])) #viz {
 @media (max-width: 799px) {
   body:has(.viz-render-menu:not([hidden])) #viz {
     --stats-top: calc(var(--menu-h, 0px) + 24px);
+  }
+}
+@media (max-width: 959px) {
+  body[data-mode='start'] #viz {
+    --stats-below: calc(var(--start-pad) + var(--start-h, 100dvh) + 10px);
   }
 }
 @media (max-width: 699px) {

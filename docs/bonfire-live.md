@@ -304,11 +304,12 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
   what the picture costs and what the show is doing, updated twice a second. Off to begin
   with; like Frame Rate it stays with this computer (not in a setup or a preset). It sits
   where nothing else is (the HUD is along the bottom, the pack bottom right, Render Settings
-  top right; on the start screen, top right), under everything but the picture: where Render
-  Settings opens over it (the start screen, a phone) it steps down under the menu while
-  that's open. It stays when the HUD fades, never takes the pointer and isn't read out. It's
-  HTML over the picture, so it isn't in the output window or a recorded clip. Smaller on a
-  phone, without the dimmed rows. Three groups:
+  top right; on the start screen, top right, and where the start menu reaches across under
+  it, on a phone or a narrow window, only what fits above the menu), under everything but
+  the picture: where Render Settings opens over it (the start screen, a phone) it steps down
+  under the menu while that's open. It stays when the HUD fades, never takes the pointer and
+  isn't read out. It's HTML over the picture, so it isn't in the output window or a recorded
+  clip. Smaller on a phone, without the dimmed rows. Three groups:
   - **Frames:** frames a second (and the cap), the time between them (median and p95), the
     draw calls and the shadow's redraws a second; dimmed, the frame's parts (tick, page,
     update, draw) and the GPU's programs, textures and geometries (`docs/performance.md`).

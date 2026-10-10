@@ -320,6 +320,9 @@ Object.assign(ctx, createSources(ctx));
 
 // --- Start screen (start.js): the sources, the presets; to the show and back --------------------
 Object.assign(ctx, createStart(ctx));
+// (Where the start menu reaches across under the stats overlay, the overlay keeps above it: visualizer.css.)
+const startCopy = q('.viz-start-copy');
+new ResizeObserver(() => app.style.setProperty('--start-h', `${startCopy.offsetHeight}px`)).observe(startCopy);
 
 // --- HUD (hud.js): what it hears, the beat, the state line, the labels that change; idle -------
 Object.assign(ctx, createHud(ctx));

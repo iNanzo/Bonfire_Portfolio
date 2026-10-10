@@ -663,6 +663,43 @@ test('Stats Overlay: under Render Settings (P) and clear of it, on the start scr
   expect(errors).toEqual([]);
 });
 
+test('Stats Overlay: on a phone’s start screen it keeps to the room above the start menu, clear of its words', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  const overlay = page.locator('.stats-overlay');
+  const copy = page.locator('.viz-start-copy');
+  const home = page.locator('.viz-home');
+  /** What the overlay shows (nothing, held to no room, counts as clear) crosses none of these. */
+  const clearOf = async (...others) => {
+    const o = await overlay.boundingBox();
+    if (!o?.height) return true;
+    for (const other of others) if (crosses(o, await other.boundingBox())) return false;
+    return true;
+  };
+  await page.keyboard.press('u');
+  await expect(overlay).toContainText('Frames', { timeout: 10_000 });
+  await expect.poll(() => clearOf(copy, home)).toBe(true);
+  // (Its first rows, the frame rate, fit above the start menu here.)
+  expect((await overlay.boundingBox()).height).toBeGreaterThan(40);
+  // A smaller phone, where the start menu takes the whole screen; a tablet, beside it.
+  for (const [width, height] of [
+    [360, 640],
+    [800, 900],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await expect.poll(() => clearOf(copy, home), { message: `${width}×${height}` }).toBe(true);
+  }
+  // The show: all of it, top left.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.click('[data-source="demo"]');
+  await expect(overlay).toContainText('Section', { timeout: 10_000 });
+  expect((await overlay.boundingBox()).height).toBeGreaterThan(200);
+  expect(errors).toEqual([]);
+});
+
 test('the HUD stays while the mouse rests on it (its tip with it), and fades when it rests on the picture', async ({
   page,
 }) => {
