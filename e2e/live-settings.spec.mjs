@@ -631,6 +631,14 @@ test('Stats Overlay: U shows the frames, the particles and the show in a corner,
 const crosses = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 /** The stacking order of an element (its computed z-index). */
 const zOf = (locator) => locator.evaluate((el) => Number(getComputedStyle(el).zIndex));
+/** The stats overlay, kept to less room than its rows need, ends on a whole row: none is cut through. */
+const wholeRows = (overlay) =>
+  overlay.evaluate((el) => {
+    const end = el.getBoundingClientRect().bottom;
+    return [...el.querySelectorAll('span')].every(
+      (s) => !s.getClientRects().length || s.getBoundingClientRect().bottom <= end,
+    );
+  });
 
 test('Stats Overlay: under Render Settings (P) and clear of it, on the start screen and in the show, wide and on a phone', async ({
   page,
@@ -682,8 +690,9 @@ test('Stats Overlay: on a phone’s start screen it keeps to the room above the 
   await page.keyboard.press('u');
   await expect(overlay).toContainText('Frames', { timeout: 10_000 });
   await expect.poll(() => clearOf(copy, home)).toBe(true);
-  // (Its first rows, the frame rate, fit above the start menu here.)
+  // (Its first rows, the frame rate, fit above the start menu here; the rest are left out.)
   expect((await overlay.boundingBox()).height).toBeGreaterThan(40);
+  await expect.poll(() => wholeRows(overlay)).toBe(true);
   // A smaller phone, where the start menu takes the whole screen; a tablet, beside it.
   for (const [width, height] of [
     [360, 640],
@@ -724,6 +733,7 @@ test('Stats Overlay: on a phone held sideways it keeps above the HUD while the H
     await page.touchscreen.tap(width / 2, height / 3);
     await expect(hud).toHaveCSS('opacity', '1');
     await expect.poll(above, { message: `${width}×${height}` }).toBe(true);
+    await expect.poll(() => wholeRows(overlay), { message: `${width}×${height}: whole rows` }).toBe(true);
   }
   // The HUD fades: the overlay has the screen's height again.
   await page.setViewportSize({ width: 844, height: 390 });

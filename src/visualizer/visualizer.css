@@ -1257,7 +1257,7 @@ body.hud-off .viz-hud {
    where it takes the width), it steps down under the menu while that's open (main.js keeps
    --menu-h at the menu's height). Smaller on a phone (held either way), the frame's parts
    and the GPU folded away. (--stats-below: the room it leaves under it; past that, its last
-   rows are cut off.) */
+   rows are left out, so it ends on a whole row.) */
 #viz {
   --stats-top: 14px;
   --stats-left: var(--gutter);

@@ -26,10 +26,11 @@ bottom, the pack bottom right, Render Settings top right) and top right on the s
 top left of the stage, under the bar; the site bottom left. It's under the page's menus and
 panels, never over them: where Render Settings opens over it, it steps down under the menu
 (the page keeps `--menu-h` at the menu's height; `--stats-max-h` keeps it to the room left,
-its last rows cut off past it), and in Bonfire Live it keeps above the HUD while that's up.
-It never takes the pointer and is hidden from screen readers. It's HTML over the canvas, so
-it isn't in Bonfire Live's output window, a recorded clip, a capture or a scene's thumbnail.
-On a phone (held either way) it's smaller and leaves out the dimmed rows. Twice a second:
+the rows past it left out, so it ends on a whole row), and in Bonfire Live it keeps above
+the HUD while that's up. It never takes the pointer and is hidden from screen readers. It's
+HTML over the canvas, so it isn't in Bonfire Live's output window, a recorded clip, a
+capture or a scene's thumbnail. On a phone (held either way) it's smaller and leaves out the
+dimmed rows. Twice a second:
 
 ```
 FRAMES
@@ -117,6 +118,7 @@ snapshot and the text are made twice a second. Measured in Bonfire Live on the d
 | | |
 | --- | --- |
 | One build of the text (the scene's `stats()`, the director's `status()`, the overlay's elements) | 0.1 ms median, 0.2 ms p95 (the page's timer steps by 0.1 ms): `stats()` 0.03 ms, `status()` under 0.01 ms |
+| The same, kept to less room than its rows need (a phone held sideways, under the HUD) | about 1 ms more: it reads where its rows end to stop on a whole row, which lays the page out then (only while the room cuts through a row: a ResizeObserver says so, for free) |
 | Main-thread work per drawn frame, on − off, 12 interleaved pairs of 3 s windows (CDP `TaskDuration`) | median −0.10 ms, mean −0.07 ms; the pairs ranged −1.07 to +1.22 ms (the show's own swing from one window to the next) |
 | The same, 4 pairs of 8 s windows (medians) | off 3.03 ms, on 3.19 ms; 132 and 131.8 frames a second, 7.6 ms apart (p50) and 10.0 ms (p95) either way |
 

@@ -19,8 +19,8 @@
 // for, and the text built, twice a second. Its styles go through the style object, not an
 // attribute or a style sheet (a page's CSP may refuse those); a page places it with
 // --stats-top, --stats-left, --stats-right, --stats-bottom and --stats-z (bottom left by
-// default), keeps it to the room it has (--stats-max-h: the rows past it are cut off, and a
-// box given no room draws nothing), puts it away for a while (--stats-display: none), and on
+// default), keeps it to the room it has (--stats-max-h: the rows past it are left out, so it
+// ends on a whole row, and a box given no room draws nothing), puts it away for a while (--stats-display: none), and on
 // a small screen can shrink it (--stats-font) and fold the dimmed rows away
 // (--stats-detail: none). The variables reach it from its parent (createBonfire's
 // statsParent: Bonfire Live's page box, where the HUD's height is).
@@ -28,6 +28,7 @@ import { statsGroups } from './statsGroups.js';
 
 const RING = 256; // frame intervals kept for the percentiles (about 2 s at 120 fps)
 const SHOW_MS = 500;
+const PAD_BOTTOM = 7; // (what it holds: its padding under the last row)
 const PARTS = ['bonfire: page', 'bonfire: update', 'bonfire: draw'];
 const TICK = 'bonfire: tick';
 
@@ -80,9 +81,27 @@ export function createPerfOverlay({
   });
   el.className = 'stats-overlay';
   el.setAttribute('aria-hidden', 'true');
-  const text = styled('div', { padding: '5px 9px 7px' }, 'Stats…');
+  const text = styled('div', { padding: `5px 9px ${PAD_BOTTOM}px` }, 'Stats…');
   el.append(text);
   parent.append(el);
+  // How tall the box and what it holds were last laid out (a ResizeObserver's, read for free):
+  // what it holds taller than the box, the room cuts through a row, and the next text is fit
+  // to it (fit: that reads the page's layout then, so only when it's needed); `snug`: the
+  // last text was, so the next is too (the room may have grown).
+  let boxH = 0;
+  let textH = 0;
+  let snug = false;
+  const sizes =
+    typeof ResizeObserver === 'function'
+      ? new ResizeObserver((entries) => {
+          for (const e of entries) {
+            if (e.target === el) boxH = e.contentRect.height;
+            else textH = e.contentRect.height;
+          }
+        })
+      : null;
+  sizes?.observe(el);
+  sizes?.observe(text);
 
   const intervals = new Float64Array(RING);
   const sorted = new Float64Array(RING);
@@ -126,6 +145,7 @@ export function createPerfOverlay({
       ...page(),
     });
     draw(text, groups);
+    if (snug || textH > boxH + 0.5) snug = fit(el, text);
     frames = 0;
     tickMs = 0;
     pageMs = 0;
@@ -175,6 +195,7 @@ export function createPerfOverlay({
       return groups;
     },
     dispose() {
+      sizes?.disconnect();
       el.remove();
       if (measures) for (const name of [TICK, ...PARTS]) performance.clearMeasures(name);
     },
@@ -190,6 +211,48 @@ function styled(tag, styles, text) {
   for (const [k, v] of Object.entries(styles)) node.style.setProperty(k, v);
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+/**
+ * Leave out the rows the room doesn't hold (a page's --stats-max-h), so the box ends on a
+ * whole row rather than through one: a group with none of its rows left goes too, and with
+ * no room for the first, nothing shows. Whether it left any out.
+ * @param {HTMLElement} el  the overlay (held to the room)  @param {HTMLElement} text  what it holds
+ */
+function fit(el, text) {
+  text.style.setProperty('display', '');
+  const room = el.clientHeight;
+  if (!(text.offsetHeight > room)) return false; // (it all fits)
+  const limit = room - PAD_BOTTOM;
+  const bottom = (/** @type {HTMLElement} */ node) => node.offsetTop + node.offsetHeight;
+  // (Where everything ends, read first; then what's left out: one layout.)
+  const blocks = [...text.children].map((block) => {
+    const [heading, rows] = /** @type {HTMLElement[]} */ ([...block.children]);
+    const cells = /** @type {HTMLElement[]} */ ([...rows.children]);
+    const pairs = [];
+    for (let i = 0; i < cells.length; i += 2) {
+      const pair = cells.slice(i, i + 2);
+      pairs.push({ cells: pair, end: Math.max(...pair.map(bottom)) }); // (a folded row: 0)
+    }
+    return { block: /** @type {HTMLElement} */ (block), headingEnd: bottom(heading), pairs };
+  });
+  const hide = (/** @type {HTMLElement} */ node) => node.style.setProperty('display', 'none');
+  let full = false;
+  let kept = 0;
+  for (const { block, headingEnd, pairs } of blocks) {
+    const over = full ? 0 : pairs.findIndex((p) => p.end > limit);
+    const cut = over < 0 ? pairs.length : over;
+    if (headingEnd > limit || !pairs.slice(0, cut).some((p) => p.end > 0)) {
+      hide(block);
+      full = true;
+      continue;
+    }
+    kept++;
+    if (cut < pairs.length) full = true;
+    for (const p of pairs.slice(cut)) p.cells.forEach(hide);
+  }
+  if (!kept) hide(text);
+  return true;
 }
 
 /**
