@@ -173,6 +173,10 @@ const OVER_CROSS = 0.06;
 // and his upper body (UPPER: his chest, head and pauldrons' domes) UPPER_CLEAR: room for a
 // dome to ride up with a raised arm (the shrine's lantern roof is at his shoulder): standSpot.)
 const STAND_CLEAR = 0.1;
+// (A knight resting on the ground with no seat (Bonfire Live's others, on the ring) rests only
+// where he'd sit as every seat has him, this far (m) from the scenery's shapes sitting still:
+// restsClear. Elsewhere he sits watchful.)
+const SIT_CLEAR = 0.04;
 const UPPER = new Set(['chest', 'neck', 'head', 'shoulderL', 'shoulderR'].map((b) => BONE_INDEX[b]));
 const UPPER_CLEAR = 0.06;
 // (What of him rests on the ground, sitting on it: groundHome's seatPatch.)
@@ -225,7 +229,7 @@ export function createKnights(
   const { arms: probes, body: bodyProbes, helms: helmProbes } = T.probes ?? drain(probesOf(T));
   // Every pose solved and kept out of the scenery (knightClear.js), and the plates' springs
   // (knightPlates.js), with this knight's rig and points.
-  const { solve, solveClear } = createClearance(solver, { probes, bodyProbes, helmProbes, nearOf });
+  const { solve, solveClear, keepsFrom } = createClearance(solver, { probes, bodyProbes, helmProbes, nearOf });
   const springPlates = createPlateSprings({ probes, bodyProbes, nearOf });
   const FEET = [bodyProbes.find((b) => b.i === BONE_INDEX.footL), bodyProbes.find((b) => b.i === BONE_INDEX.footR)];
   const restPos = ALL_BONES.map((b) => new THREE.Vector3(...T.restPos[b]));
@@ -374,12 +378,30 @@ export function createKnights(
   /** How knight k sits (SEAT_POSES): his own, or everyone's. */
   const styleOf = (k) => k.seatPose ?? seatStyle;
   /**
+   * How he sits at home `h` asked to sit `style`: so, unless it's on the ground with no seat and
+   * he's resting where that would meet the scenery (groundHome: watchful there instead).
+   */
+  const sitsAs = (h, style) => (h && !h.seat && h.want === style ? h.style : style);
+  /**
    * Sitting down on the ground with no seat where he stands at (x, z) (Bonfire Live's others,
-   * on the ring): his home a step back from it, away from the fire, as far as seat pose
-   * `style` needs, on the ground there (a low dais or step under him is what he sits on).
-   * `from` and `style` keep where he sat down from and how, for rehome.
+   * on the ring, or a dancer sat down where he danced): his home there in seat pose `style`
+   * (onGround), but resting only where he would sit as a seat has him, clear of the scenery
+   * (restsClear): where his rest would meet something (the cathedral's pew, by its place for
+   * four), he sits watchful there. `want` keeps the pose asked for, `style` the one he sits in.
    */
   function groundHome(x, z, style) {
+    let h = onGround(x, z, style);
+    if (style === 'resting' && !restsClear(h)) h = onGround(x, z, 'watchful');
+    h.want = style;
+    return h;
+  }
+  /**
+   * His home on the ground with no seat where he stands at (x, z): a step back from it, away
+   * from the fire, as far as seat pose `style` needs, on the ground there (a low dais or step
+   * under him is what he sits on). `from` and `style` keep where he sat down from and how, for
+   * rehome.
+   */
+  function onGround(x, z, style) {
     const out = Math.hypot(x - FIRE.x, z - FIRE.z) || 1;
     const back = Math.max(seatFeet(0) - 0.03, NEAR_FIRE[style] - out);
     const hx = x + ((x - FIRE.x) / out) * back,
@@ -412,6 +434,17 @@ export function createKnights(
       }
     }
     return (patches[style] = [[0, 0], ...cells.values()]);
+  }
+  const restP = newPose();
+  /**
+   * Whether he'd rest at home `h` on the ground as a seat has him (every seat: test/
+   * knightClearance.test.mjs): resting there sitting still, his boots on the ground under
+   * them, nothing of him nearer the scenery's shapes than SIT_CLEAR, his boots and shins
+   * resting on what's under them. (A solve and the shapes near him: about 0.1 ms.)
+   */
+  function restsClear(h) {
+    const cs = collidersNear(sceneryName, h.x, h.z, CLEAR_NEAR);
+    return !cs.length || keepsFrom(solve(seatOn(restP, h, 'resting')), h, cs, SIT_CLEAR);
   }
   /** Where knight i rests in this scenery: the scenery's seat (the first), or the ground at a ring slot. */
   function homeFor(i) {
@@ -550,16 +583,21 @@ export function createKnights(
     const w = atHome(home, x, z);
     return topAt(w.x, w.z) - home.y;
   };
+  /** Seat pose `style` at home `h` into `p`, each foot on the ground under its sole there (into h.feet). */
+  function seatOn(p, h, style) {
+    seatedPose(p, h.h, rig, style);
+    const [fl, fr] = feetAt(p, rig);
+    h.feet = [soleUnder(h, fl[0], fl[1]), soleUnder(h, fr[0], fr[1])];
+    return seatedPose(p, h.h, rig, style, h.feet);
+  }
   /**
    * His seated pose at home (into k.sit), each foot on the ground where the pose rests it
-   * (a foot up on the seat's log, or down a slope), and the room he has for his arms.
+   * (a foot up on the seat's log, or down a slope), and the room he has for his arms. (Asked
+   * to rest where his home on the ground has no room for it, watchful: sitsAs.)
    */
-  function seatPoseOf(k, style = k.seatPose ?? seatStyle) {
+  function seatPoseOf(k, style = styleOf(k)) {
     const h = k.home;
-    seatedPose(k.sit, h.h, rig, style);
-    const [fl, fr] = feetAt(k.sit, rig);
-    h.feet = [soleUnder(h, fl[0], fl[1]), soleUnder(h, fr[0], fr[1])];
-    seatedPose(k.sit, h.h, rig, style, h.feet);
+    seatOn(k.sit, h, sitsAs(h, style));
     h.room = roomOf(h, k.sit);
     h.roomLess = null;
     h.rise = riseOf(k.sit);
@@ -1600,7 +1638,7 @@ export function createKnights(
     } else {
       k.energy = null;
       p.set(seated ? k.sit : k.stand);
-      if (!reducedMotion) idle(p, k.clock, k.seed, seated, (k.seatPose ?? seatStyle) === 'watchful' ? 1 : 0);
+      if (!reducedMotion) idle(p, k.clock, k.seed, seated, sitsAs(k.home, styleOf(k)) === 'watchful' ? 1 : 0);
     }
     // A gesture over whatever he's doing (the site's dance faces the front: the cameras;
     // with no headroom when it started, he dances it in his seat).
@@ -2058,15 +2096,16 @@ export function createKnights(
     return true;
   }
   /**
-   * Knight k on the ground with no seat, whose home was made for another seat pose than he
-   * sits in now: his home where this one sits (groundHome, from where he sat down from). Sat
-   * there, he's moved to it, his pose kept where it was (shiftPlace): eased over by the pose's
-   * crossfade, he shifts back (or forward) as he changes how he sits. Whether he was moved.
+   * Knight k on the ground with no seat, whose home was made for another seat pose than he's
+   * asked to sit in now: his home where this one sits (groundHome, from where he sat down
+   * from). Sat there, he's moved to it, his pose kept where it was (shiftPlace): eased over by
+   * the pose's crossfade, he shifts back (or forward) as he changes how he sits. Whether he
+   * was moved.
    */
   function rehome(k) {
     const h = k.home,
       style = styleOf(k);
-    if (!h || h.seat || !h.from || h.style === style) return false;
+    if (!h || h.seat || !h.from || h.want === style) return false;
     const there = Math.hypot(k.group.position.x - h.x, k.group.position.z - h.z) < 0.05;
     k.home = groundHome(h.from.x, h.from.z, style);
     if (there) shiftPlace(k, new THREE.Vector3(k.home.x, k.home.y, k.home.z));

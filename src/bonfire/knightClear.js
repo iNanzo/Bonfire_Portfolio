@@ -63,12 +63,16 @@ let gx = 0,
   gz = 0,
   gc = 1,
   gs = 0;
-/** Check knight k where he stands now (within(), nearestIn()). */
-export function place(k) {
-  ({ x: gx, y: gy, z: gz } = k.group.position);
-  gc = Math.cos(k.yaw);
-  gs = Math.sin(k.yaw);
+/** Check a knight placed at (x, y, z), turned `yaw` (within(), nearestIn()). */
+export function placeAt(x, y, z, yaw) {
+  gx = x;
+  gy = y;
+  gz = z;
+  gc = Math.cos(yaw);
+  gs = Math.sin(yaw);
 }
+/** Check knight k where he stands now. */
+export const place = (k) => placeAt(k.group.position.x, k.group.position.y, k.group.position.z, k.yaw);
 // (Piece i of a solved pose in the world, where he stands: a point of it (its own space) at
 // x, y, z goes to m[0]x + m[1]y + m[2]z + m[3], m[4]x + … + m[7], m[8]x + … + m[11]; reused.)
 const _m = new Float64Array(12);
@@ -210,7 +214,8 @@ function restOf(k) {
  * createSolver), the points they're checked at (knightMesh.js probesOf: `probes` each arm
  * piece's, `bodyProbes` his body's, `helmProbes` each helmet's) and `nearOf(k)`, the scenery's
  * shapes near where knight k stands. Returns solve(pose, ground, helmet), through which every
- * pose is solved (counted), and solveClear(k, moving): knight k's pose solved and kept clear.
+ * pose is solved (counted), solveClear(k, moving): knight k's pose solved and kept clear, and
+ * keepsFrom(s, at, cs, under): whether a solved pose placed somewhere keeps clear of shapes.
  */
 export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf }) {
   // (Every pose is solved through here, counted: k.solves is how many his last step took,
@@ -553,5 +558,19 @@ export function createClearance(solver, { probes, bodyProbes, helmProbes, nearOf
     }
     return added;
   }
-  return { solve, solveClear };
+  /**
+   * Whether a solved pose (`s`) placed at `at` ({ x, y, z, yaw }: where he'd be, turned that
+   * way) keeps `under` (m) from the shapes `cs`, every piece of him (his arms, his body, and
+   * whichever helmet he wears), his boots and shins only as far in as they may rest on things
+   * (their depth: a centimetre in).
+   */
+  function keepsFrom(s, at, cs, under) {
+    placeAt(at.x, at.y, at.z, at.yaw);
+    const clear = (i, pc, u) => !within(s, i, pc.r, u, cs).length || !nearestIn(pc, _shapes, u).col;
+    for (const [i, pc] of probes) if (!clear(i, pc, under)) return false;
+    for (const b of bodyProbes) if (!clear(b.i, b, b.depth < 0 ? b.depth : under)) return false;
+    for (const helm of Object.values(helmProbes)) if (!clear(BONE_INDEX.head, helm, under)) return false;
+    return true;
+  }
+  return { solve, solveClear, keepsFrom };
 }

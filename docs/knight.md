@@ -490,9 +490,21 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   reaching 0.72 (`test/knights.test.mjs` asks 0.74); a change of pose where they sit
   shifts them back or forward to its place as they change (`rehome`). The show seats
   them where a new scenery would, 1.5 cm or more clear of the scenery
-  (`test/knightClearance.test.mjs`); resting in the cathedral with a cast of four, the
-  one by the pew sits up on its kneeler (no place near his on the ring has room for the
-  leg he stretches out).
+  (`test/knightClearance.test.mjs`).
+  *Resting only with room for it* (the user's call, round 11): a knight asked to rest on
+  the ring rests only where he'd sit as every seat has him, 4 cm or more from the
+  scenery's shapes sitting still, his boots and shins resting on what's under them
+  (`restsClear`: his resting pose there, solved and checked against the shapes near him,
+  arms, body and every helmet; about 0.1 ms a knight, under 0.3 ms for a new scenery with
+  four out). Where it would meet something he sits watchful there instead (`groundHome`
+  keeps the pose asked for as `want`, the one he sits in as `style`): with the places
+  round 11 has, the cathedral's by the pew for four (resting, he sat up on its kneeler,
+  his chest 2 cm off the pew's end; watchful, beside the pew's end, his left thigh 1.4 cm
+  into the kneeler, which as a low piece isn't one of the shapes); every other place rests
+  (the nearest, the forge's by the hearth for three or four, 4.2 cm off it). It holds for
+  any place a scenery has, a new one too (`test/knightClearance.test.mjs` checks every
+  scenery and cast, sent home, sat down where the show stands him, and back from
+  watchful).
 - **The seated rest** is the Dark Souls bonfire rest: slumped forward over his knees
   (spine 27° to 36° from a 0.22 to a 0.40 m seat), his left foot drawn in and that arm
   laid over the knee with the gauntlet hanging past it, the right leg out with that

@@ -29,6 +29,7 @@ import { SEATS, FIRE_AT, ringOf, slotPlaces, ringPlaces, restPlaces } from '../s
 import { getPov } from '../src/bonfire/povs.js';
 import { buildScenery } from '../src/bonfire/scenery.js';
 import {
+  CLEARING,
   CULT,
   RUINS,
   MOVE_REACH,
@@ -1250,4 +1251,94 @@ test('[slow] the others resting on the ground round the fire (Bonfire Live), eve
   k.setCast({ count: 1, instant: true });
   k.setSeatPose('resting');
   assert.deepEqual(bad, [], 'not where a new scenery sits them, or not clear of the scenery');
+});
+
+// (The user's call, round 11: a knight resting on the ring whose rest would meet the scenery
+// sits watchful there instead. In the cathedral with four out, the one by the pew sat up on its
+// kneeler, his chest 2 cm off the pew's end.)
+test('[slow] a knight resting on the ring sits where a seat would have him, 4 cm clear of the scenery sitting still (his boots resting on what’s under them), or sits watchful there: every scenery and cast, sent home, sat down where the show stands him, and back from watchful; by the cathedral’s pew he’s watchful, and with room round him he rests', async () => {
+  const { pieces } = await realKnights(4);
+  const model = await loadKnightMesh();
+  // (Sitting still: no idle to move him nearer or further.)
+  const k = createKnights(model.scene(), { armor: armor(), max: 4, reducedMotion: true });
+  const env = { k, pieces };
+  const boots = (b) => /^(foot|shin)[LR]$/.test(b);
+  const bad = [],
+    sat = [];
+  k.setSeatPose('resting');
+  /** Each knight on the ring now: how he sits there, and resting, how near he comes to the shapes. */
+  const check = (name, cast, cs, how) => {
+    k.update(1 / 12 + 1e-7);
+    for (let i = 1; i < cast; i++) {
+      const n = k.knights[i],
+        h = n.home;
+      const at = `${name}, ${cast} out, #${i} ${how} (${h.x.toFixed(2)}, ${h.z.toFixed(2)})`;
+      sat.push({ name, cast, i, how, style: h.style, from: h.from });
+      if (h.style === 'watchful') continue;
+      if (h.style !== 'resting') {
+        bad.push(`${at}: sits ${h.style}`);
+        continue;
+      }
+      const body = nearestOf(env, i, cs, { skip: boots, margin: 0.05 });
+      const boot = nearestOf(env, i, cs, { skip: (b) => !boots(b) });
+      if (body.d < 0.04)
+        bad.push(`${at}: resting, his ${body.bone} ${(body.d * 100).toFixed(1)} cm from the ${body.shape}`);
+      if (boot.d < -0.01)
+        bad.push(`${at}: resting, his ${boot.bone} ${(-boot.d * 100).toFixed(1)} cm into the ${boot.shape}`);
+    }
+  };
+  for (const name of NAMES) {
+    const terrain = await terrainOf(name);
+    const cs = collidersOf(name);
+    for (const cast of [1, 2, 3, 4]) {
+      k.setScenery(name, terrain);
+      k.setCast({ count: cast, instant: true });
+      // (A new scenery sends them home.)
+      k.setScenery(name, terrain);
+      check(name, cast, cs, 'sent home');
+      // As the show seats them (knightShow.js bringSeated): standing at their places on the
+      // ring, facing the fire, then sitting down where they stand.
+      const places = restPlaces(ringOf(name), cast, SEATS[name]);
+      for (let i = 1; i < cast; i++) k.dismiss(i, { instant: true });
+      for (let i = 1; i < cast; i++) {
+        k.summon(i, { instant: true, at: places[i - 1], facing: 'fire' });
+        k.sit(i);
+      }
+      for (let t = 0; t < 2.5; t += 1 / 12) k.update(1 / 12 + 1e-7);
+      check(name, cast, cs, 'sat down where he stood');
+      // Watchful where they sit, then resting again (In the Mix rolls it).
+      k.setSeatPose('watchful');
+      for (let t = 0; t < 1.5; t += 1 / 12) k.update(1 / 12 + 1e-7);
+      k.setSeatPose('resting');
+      for (let t = 0; t < 1.5; t += 1 / 12) k.update(1 / 12 + 1e-7);
+      check(name, cast, cs, 'resting again');
+      for (let i = 0; i < 4; i++) k.dismiss(i, { instant: true });
+    }
+  }
+  k.dispose?.();
+  assert.deepEqual(bad, [], 'resting nearer the scenery than a seat has him');
+  // (Every way he came to sit there, he sits the same way.)
+  for (const s of sat) {
+    const same = sat.filter((o) => o.name === s.name && o.cast === s.cast && o.i === s.i);
+    assert.ok(
+      same.every((o) => o.style === s.style),
+      `${s.name}, ${s.cast} out, #${s.i}: ${same.map((o) => `${o.style} ${o.how}`).join(', ')}`,
+    );
+  }
+  // By the cathedral's pew (its front-left place for four), watchful.
+  const [px, pz] = CLEARING.frontLeft;
+  const byPew = sat
+    .filter((s) => s.name === 'cathedral' && s.cast === 4 && s.how === 'sent home')
+    .sort((a, b) => Math.hypot(a.from.x - px, a.from.z - pz) - Math.hypot(b.from.x - px, b.from.z - pz))[0];
+  assert.equal(
+    byPew?.style,
+    'watchful',
+    `in the cathedral with four out, #${byPew?.i} by the pew sits ${byPew?.style}`,
+  );
+  // With room round him, resting: everywhere in the ruins, and at each scenery's place for two.
+  const roomy = sat.filter((s) => s.name === 'ruins' || s.cast === 2);
+  assert.ok(
+    roomy.length && roomy.every((s) => s.style === 'resting'),
+    `with room round him he sits ${[...new Set(roomy.filter((s) => s.style !== 'resting').map((s) => `${s.name}, ${s.cast} out, #${s.i}: ${s.style}`))].join('; ')}`,
+  );
 });
