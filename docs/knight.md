@@ -391,7 +391,8 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
     see a gesture hemmed in beside the same one free.
   - *Off the floor* (round 11). His gestures and seated moves were made for a seat, so
     sitting on the ground (the ruins' knight, the others in Bonfire Live) a hand dropped to
-    a knee or flung low went up to 16 cm into the floor. There, at home, `floorArms`
+    a knee or flung low went up to 16 cm into the floor. There, at home and sitting down
+    onto it (lowering himself as onto a seat, his hands to his knees), `floorArms`
     (`knightBody.js`) draws a wrist that would go lower up its arm's own line, its reach
     shortened (the elbow bending) just enough to keep it 19 cm (`FLOOR_HANDS`: the limp,
     open gauntlet hangs up to 18 cm below it) over the highest ground within his reach low

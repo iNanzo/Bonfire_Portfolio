@@ -1062,7 +1062,7 @@ test('[slow] stood up in front of his seat, and all through the site’s dance, 
   }
 });
 
-test('[slow] sitting on the ground, in the ruins and resting on the ring by the fire, either seat pose, nothing of him goes under it (1.5 cm): his idle, every seated gesture, the reactions and the seated moves', async () => {
+test('[slow] sitting on the ground, in the ruins and resting on the ring by the fire, either seat pose, nothing of him goes under it (1.5 cm): his idle, every seated gesture, the reactions and the seated moves; nor his hands getting up from it and sitting back down', async () => {
   const env = await realKnights();
   const { k } = env;
   const terrain = await terrainOf('ruins');
@@ -1075,13 +1075,17 @@ test('[slow] sitting on the ground, in the ruins and resting on the ring by the 
     // (A new scenery sends them home: the other one sits down where Bonfire Live rests him.)
     k.setScenery('ruins', terrain);
     const low = [{ d: Infinity }, { d: Infinity }];
-    /** Step `seconds` at 12 fps (`each()` first each step), keeping the lowest each knight comes under the ground (the height map's). */
-    const see = (seconds, what, each = null) => {
+    /**
+     * Step `seconds` at 12 fps (`each()` first each step), keeping the lowest each knight comes
+     * under the ground (the height map's); `hands`, of his hands alone.
+     */
+    const see = (seconds, what, each = null, hands = false) => {
       for (let t = 0; t < seconds; t += 1 / 12) {
         each?.();
         k.update(1 / 12 + 1e-7);
         for (const i of [0, 1])
           eachPoint(env, k.knights[i], (v, bone) => {
+            if (hands && !/^(hand|fingers)/.test(bone)) return;
             const d = v.y - terrain.height(v.x, v.z);
             if (d < low[i].d) low[i] = { d, what, bone, t };
           });
@@ -1104,6 +1108,13 @@ test('[slow] sitting on the ground, in the ruins and resting on the ring by the 
       let b = 0;
       see(Math.min(4, MOVE_INFO[m].cycle * 0.5) + 0.25, `seated ${m}`, () => k.clock((b += 1 / 6), 0.5));
     }
+    // Up on their feet and back down onto the ground (Bonfire Live stands them up to dance or
+    // watch, and sits them back down), lowering themselves as onto a seat: their hands kept off
+    // the ground all the way (knights.js floorArms; on his feet he's out of its reach).
+    for (const i of [0, 1]) k.stand(i);
+    see(1.6, 'getting up', null, true);
+    for (const i of [0, 1]) k.sit(i);
+    see(1.8, 'sitting down', null, true);
     low.forEach((w, i) => {
       if (w.d < -0.015)
         bad.push(
