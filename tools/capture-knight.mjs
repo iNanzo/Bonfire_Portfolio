@@ -63,10 +63,13 @@ const ROOM = opt('room', null)?.split(',').map(Number) ?? null;
 fs.mkdirSync(OUT, { recursive: true });
 
 // --serve: this folder's own dev server for the run. (Its node_modules may be linked from
-// another checkout, as a worktree's is: Vite serves from there too.)
+// another checkout, as a worktree's is: Vite serves from there too, and keeps its prebundled
+// deps in this folder's .scratch, not in the shared node_modules/.vite, where re-optimizing
+// would reload the other checkout's running servers.)
 const server = argv.includes('--serve')
   ? await createServer({
       server: { port: PORT, strictPort: true, fs: { allow: [process.cwd(), fs.realpathSync('node_modules')] } },
+      cacheDir: '.scratch/.vite',
       logLevel: 'error',
     })
   : null;
