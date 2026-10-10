@@ -12,6 +12,8 @@ export default [
       'public/',
       'coverage/',
       '.scratch/',
+      // (This machine's Claude Code skills and settings: local, git-ignored, never in CI.)
+      '.claude/',
       'review/',
       'test-results/',
       'playwright-report/',

@@ -34,6 +34,14 @@ The [README](README.md) lists every script; [docs/](docs/) has how each app beha
   loads included, and fails if it drops under the thresholds in `.c8rc.json`. When new
   tests raise it, run `npm run coverage:ratchet` and commit the raised thresholds with
   them. The report is in `coverage/` (open `coverage/lcov-report/index.html`).
+- **Types.** `npm run typecheck` checks every module in `src/` and `admin/`, a new one too:
+  nothing to list. A module that doesn't check clean yet says so on its first line
+  (`// @ts-nocheck: N type errors still to fix`); fixing one means deleting that line and
+  lowering `MOST` in `test/typecheckDebt.test.mjs`, which keeps the count from growing.
+- **Leftover servers.** `npm run cleanup` lists the dev and preview servers, test browsers and
+  scripts left running by agents and test runs (they hold files in `node_modules`, so an
+  `npm ci` fails half done, and keep ports taken); `npm run cleanup -- --kill` stops them. The
+  servers on `.claude/launch.json`'s ports are yours and stay unless you add `--all`.
 - **Content wording.** Tests must not pin `src/content.json` wording: the admin edits it and a
   save deploys only if the tests pass, so read the text from the content (`src/content.js`,
   `e2e/lib/content.mjs`) or set it on the test's own fixture.

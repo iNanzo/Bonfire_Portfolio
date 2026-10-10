@@ -34,6 +34,7 @@
     "e2e": "playwright test",
     "bench": "node tools/bench-viz.mjs",
     "bench:compare": "node tools/bench-compare.mjs",
+    "cleanup": "node tools/cleanup.mjs",
     "check": "npm run lint && npm run typecheck && npm run format:check && npm run test:all",
     "prepare": "simple-git-hooks"
   },

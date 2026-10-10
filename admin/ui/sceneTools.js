@@ -1,3 +1,4 @@
+// @ts-nocheck: 6 type errors still to fix (tsconfig.json checks every module; delete this line once tsc is clean here).
 // The Scenes page's tools: Bonfire Live's preset scenes (content.json `scenes`, the format is
 // src/scenes.js) are made in the Bonfire Painter, so the admin brings them in and sends them
 // back rather than editing each of their ~80 settings here:
