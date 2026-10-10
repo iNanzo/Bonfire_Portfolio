@@ -694,6 +694,8 @@ function spline(out, keys, ts, t) {
 }
 /** How high a stepping foot lifts (m). */
 const STEP_LIFT = 0.06;
+/** A step up to this long (m) takes the time it's given; a longer one, longer in proportion. */
+const STEP_LONG = 0.3;
 /**
  * How much higher a foot stepping between its seated and its standing place has to go, `e`
  * 0..1 of the way from the seated end (`h`: rise()'s `over`, at evenly spaced points; 0 at
@@ -706,14 +708,17 @@ function overAt(h, e) {
   return h[i] + (h[i + 1] - h[i]) * (f - i);
 }
 /**
- * The feet of `out` stepping from `from` to `to` (poses), each over its own [t0, t1] (s):
- * planted before and after, lifted on the way (over what lies there: `over`, rise()'s, from
- * the seated end, `back` when `from` is the standing one), the toes dipping. (Only the legs.)
+ * The feet of `out` stepping from `from` to `to` (poses), each over its own [t0, t1] (s), or
+ * longer for a long step (a leg stretched out along the ground drawn in under him), done by
+ * RISE_TIME: planted before and after, lifted on the way (over what lies there: `over`,
+ * rise()'s, from the seated end, `back` when `from` is the standing one), the toes dipping.
+ * (Only the legs.)
  */
 function steps(out, from, to, t, plan, over = null, back = false) {
   for (const [s, t0, t1] of plan) {
     const o = legOf(s);
-    const u = clamp01((t - t0) / (t1 - t0));
+    const long = Math.max(1, Math.hypot(to[o] - from[o], to[o + 2] - from[o + 2]) / STEP_LONG);
+    const u = clamp01((t - t0) / (Math.min(RISE_TIME, t0 + (t1 - t0) * long) - t0));
     if (u >= 1) {
       for (let i = 0; i < 5; i++) out[o + i] = to[o + i];
       continue;
