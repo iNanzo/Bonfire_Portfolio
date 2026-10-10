@@ -700,6 +700,42 @@ test('Stats Overlay: on a phone’s start screen it keeps to the room above the 
   expect(errors).toEqual([]);
 });
 
+test('Stats Overlay: on a phone held sideways it keeps above the HUD while the HUD is up, all of it once it fades', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  const errors = watch(page);
+  await page.addInitScript(() => localStorage.setItem('bonfire-live', JSON.stringify({ stats: true })));
+  await open(page);
+  await page.locator('[data-source="demo"]').tap();
+  const overlay = page.locator('.stats-overlay');
+  const hud = page.locator('[data-hud]');
+  await expect(overlay).toContainText('Section', { timeout: 10_000 });
+  const above = async () => {
+    const o = await overlay.boundingBox();
+    return !o?.height || o.y + o.height <= (await hud.boundingBox()).y;
+  };
+  for (const [width, height] of [
+    [844, 390],
+    [740, 360],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await page.touchscreen.tap(width / 2, height / 3);
+    await expect(hud).toHaveCSS('opacity', '1');
+    await expect.poll(above, { message: `${width}×${height}` }).toBe(true);
+  }
+  // The HUD fades: the overlay has the screen's height again.
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.touchscreen.tap(422, 130);
+  await expect.poll(above).toBe(true);
+  const capped = (await overlay.boundingBox()).height;
+  await expect(hud).toHaveCSS('opacity', '0', { timeout: 10_000 });
+  await expect.poll(async () => (await overlay.boundingBox()).height).toBeGreaterThan(capped);
+  await context.close();
+  expect(errors).toEqual([]);
+});
+
 test('the HUD stays while the mouse rests on it (its tip with it), and fades when it rests on the picture', async ({
   page,
 }) => {

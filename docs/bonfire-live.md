@@ -307,9 +307,11 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
   top right; on the start screen, top right, and where the start menu reaches across under
   it, on a phone or a narrow window, only what fits above the menu), under everything but
   the picture: where Render Settings opens over it (the start screen, a phone) it steps down
-  under the menu while that's open. It stays when the HUD fades, never takes the pointer and
-  isn't read out. It's HTML over the picture, so it isn't in the output window or a recorded
-  clip. Smaller on a phone, without the dimmed rows. Three groups:
+  under the menu while that's open. While the HUD is up it keeps to the room above it (a
+  phone held sideways shows what fits there, and all of it once the HUD fades). It never
+  takes the pointer and isn't read out. It's HTML over the picture, so it isn't in the
+  output window or a recorded clip. Smaller on a phone (held either way), without the dimmed
+  rows. Three groups:
   - **Frames:** frames a second (and the cap), the time between them (median and p95), the
     draw calls and the shadow's redraws a second; dimmed, the frame's parts (tick, page,
     update, draw) and the GPU's programs, textures and geometries (`docs/performance.md`).

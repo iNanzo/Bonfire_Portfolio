@@ -26,10 +26,10 @@ bottom, the pack bottom right, Render Settings top right) and top right on the s
 top left of the stage, under the bar; the site bottom left. It's under the page's menus and
 panels, never over them: where Render Settings opens over it, it steps down under the menu
 (the page keeps `--menu-h` at the menu's height; `--stats-max-h` keeps it to the room left,
-its last rows cut off past it). It never takes the pointer and is hidden from screen
-readers. It's HTML over the canvas, so it isn't in Bonfire Live's output window, a recorded
-clip, a capture or a scene's thumbnail. On a phone it's smaller and leaves out the dimmed
-rows. Twice a second:
+its last rows cut off past it), and in Bonfire Live it keeps above the HUD while that's up.
+It never takes the pointer and is hidden from screen readers. It's HTML over the canvas, so
+it isn't in Bonfire Live's output window, a recorded clip, a capture or a scene's thumbnail.
+On a phone (held either way) it's smaller and leaves out the dimmed rows. Twice a second:
 
 ```
 FRAMES
