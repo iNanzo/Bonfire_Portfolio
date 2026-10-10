@@ -371,8 +371,9 @@ test('sent off mid-helmet-swap, he burns away whole in the new helmet, held as t
   const q = n.bones[0].quaternion.clone(),
     hand = n.bones.find((b) => b.name === 'handR').getWorldPosition(new THREE.Vector3());
   s.run(0.6);
+  // (1e-6 rad: angleTo() of a rotation with itself comes to 3e-8 when it isn't exactly unit length.)
   assert.ok(
-    n.bones[0].quaternion.angleTo(q) < 1e-9 &&
+    n.bones[0].quaternion.angleTo(q) < 1e-6 &&
       n.bones
         .find((b) => b.name === 'handR')
         .getWorldPosition(new THREE.Vector3())

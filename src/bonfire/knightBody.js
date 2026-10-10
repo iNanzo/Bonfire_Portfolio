@@ -400,16 +400,21 @@ const _kL = new THREE.Vector3();
 const _kR = new THREE.Vector3();
 
 /**
- * Sitting on a seat `h` m above the ground (0.23–0.42 for the sceneries' seats; 0 sits on
- * the ground, knees up). `style`:
+ * Sitting on a seat `h` m above the ground (0.23–0.42 for the sceneries' seats; under 0.12 he
+ * sits on the ground itself). `style`:
  *   'resting'   the Dark Souls bonfire rest: slumped forward over his knees, his left foot
  *               drawn in and that arm laid over the knee with the gauntlet hanging past it,
  *               the right leg out with that forearm along the thigh and the hand on the knee,
  *               the head sunk and tipped a little aside (the higher the seat, the deeper the
- *               slump, which keeps his helmet low on tall layouts)
+ *               slump, which keeps his helmet low on tall layouts). On the ground, a knight
+ *               spent by the road: the left knee drawn up high with that arm hung over it and
+ *               the gauntlet hanging limp past it, the right leg stretched out along the
+ *               ground, slumped toward the knee, the head sunk and tipped to it
  *   'watchful'  leaning in over his knees, forearms on them, both feet planted under them,
  *               the head up watching the fire, awake (no higher at the helmet than the rest:
- *               tall layouts frame his seat right under the page's header)
+ *               tall layouts frame his seat right under the page's header). On the ground,
+ *               sitting up with both knees drawn up, the left the higher, the forearms over
+ *               them and the hands hanging past, the head up and turned a little to the fire
  * The hips sit over knight-space (0, 0); the hands are placed on his knees (knight space),
  * so they stay there whatever the torso does. `feet` [left, right] (m): the ground under
  * each foot above the ground he's placed on (a foot up on a log), where feetAt() says they
@@ -419,33 +424,34 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
   p.fill(0);
   root(p, 0, h + SEAT_DEPTH - rig.hipsY, 0);
   const watch = style === 'watchful';
+  const ground = h < 0.12;
   const z = seatFeet(h);
-  const grounded = () => {
-    if (feet) {
-      p[POSE.legL + 1] += feet[0];
-      p[POSE.legR + 1] += feet[1];
-    }
-  };
-  if (h < 0.12) {
-    // On the ground: knees drawn up, forearms across them (watchful: sitting up, head up).
-    joint(p, 'hips', -14);
-    joint(p, 'spine', watch ? 12 : 20);
-    joint(p, 'chest', watch ? 4 : 10);
-    joint(p, 'neck', watch ? -2 : 4);
-    joint(p, 'head', watch ? -8 : 14);
-    leg(p, 'L', 0.05, 0, z, 0, 22);
-    leg(p, 'R', 0.07, 0, z - 0.04, 0, 26);
-    grounded();
-    arm(p, 'L', 18, -28, 0.66, 30, 20, 0.6);
-    arm(p, 'R', 18, -28, 0.66, 30, 20, 0.6);
-    if (watch) {
-      p[POSE.armL + 1] += 6 * DEG;
-      p[POSE.armR + 1] += 6 * DEG;
-    }
-    return p;
-  }
   const k = clamp01((h - 0.22) / 0.18);
-  if (watch) {
+  if (ground && watch) {
+    // Sitting up, leaning back a little from the hips, both knees drawn up: the left the
+    // higher, its foot near him (the fire is ahead on his left: his boots stay out of it),
+    // the right a little further out. The head up, turned a little toward the fire.
+    joint(p, 'hips', -16);
+    joint(p, 'spine', 10);
+    joint(p, 'chest', 4);
+    joint(p, 'neck', -6, 6);
+    joint(p, 'head', -12, 6);
+    leg(p, 'L', 0.03, 0, 0.32, 0, 24);
+    leg(p, 'R', 0.1, 0, 0.44, 0, 22);
+  } else if (ground) {
+    // Slumped toward his left knee, drawn up high and fallen out a little, its foot near him
+    // (out of the fire, ahead on his left); the right leg stretched out along the ground,
+    // away from the fire, the knee a little bent and turned in (the boot out past it, the
+    // knee clear of the stones by his right side in the ruins; no straighter: the back of
+    // the thigh would go into the ground). The head sunk and tipped toward the knee.
+    joint(p, 'hips', -16, -6);
+    joint(p, 'spine', 20, 4, -3);
+    joint(p, 'chest', 10, 4, -2);
+    joint(p, 'neck', 8, 4);
+    joint(p, 'head', 12, 6, -10);
+    leg(p, 'L', 0.02, 0, 0.38, 0, 36);
+    leg(p, 'R', 0.32, 0, 0.7, 0, -30);
+  } else if (watch) {
     // Leaning in over his knees, the head tipped back up to watch the fire, feet planted a
     // stride apart under his knees. (No higher at the helmet than the rest: a phone frames
     // his seat right under the page's header. His boots stay as far out of the fire.)
@@ -465,12 +471,24 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
     leg(p, 'L', 0.03, 0, Math.max(0.22, z - 0.2), 0, 10);
     leg(p, 'R', 0.1, 0, z + 0.12, 0, 26);
   }
-  grounded();
+  if (feet) {
+    p[POSE.legL + 1] += feet[0];
+    p[POSE.legR + 1] += feet[1];
+  }
   // The knees, where the hands go.
   const s = solverOf(rig).solve(p);
   const kL = _kL.copy(s.p[IDX.shinL]),
     kR = _kR.copy(s.p[IDX.shinR]);
-  if (watch) {
+  if (ground && watch) {
+    // Forearms over the knees, the elbows on them, the hands hanging past.
+    armAt(p, 'L', kL.x, kL.y - 0.09, kL.z + 0.2, -155, -30, 0.3, 0, rig);
+    armAt(p, 'R', kR.x, kR.y - 0.05, kR.z + 0.18, -165, -30, 0.3, 0, rig);
+  } else if (ground) {
+    // His left arm hung over the drawn-up knee, the gauntlet hanging limp past it; the right
+    // forearm along the thigh, the hand on the knee.
+    armAt(p, 'L', kL.x, kL.y - 0.09, kL.z + 0.24, -160, -30, 0.3, 0, rig);
+    armAt(p, 'R', kR.x, kR.y + 0.13, kR.z - 0.02, -20, 30, 0.6, 0, rig);
+  } else if (watch) {
     // Forearms on the knees, the hands loosely together in front of them.
     armAt(p, 'L', kL.x - 0.05, kL.y + 0.05, kL.z + 0.14, 55, 25, 0.55, 0, rig);
     armAt(p, 'R', kR.x + 0.05, kR.y + 0.05, kR.z + 0.14, 55, 25, 0.55, 0, rig);
