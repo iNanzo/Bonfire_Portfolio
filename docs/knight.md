@@ -528,8 +528,11 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
 - **Poses** (`knightPose.js`) are flat arrays that blend with a lerp: the hips' offset;
   turns for hips, spine, chest, neck and head; each hand as a direction and reach from
   its shoulder in the chest's frame, with the elbow's turn, the wrist and a fist; each
-  ankle as an offset, with the foot's pitch and the knee's turn out. `solve()` does the
-  IK (feet stay flat whatever the leg does). They step at the fire's 12 fps; the fire's
+  ankle as an offset, with the foot's pitch and the knee's turn out; and, last (round 11,
+  so no channel before them moved), how far each toe turns in toward his middle about the
+  vertical (`POSE.toeInL`, `toeInR`; `mirrorPose` swaps them, inward stays inward).
+  `solve()` does the IK (feet stay flat whatever the leg does, turned with his hips and by
+  their toe-in). They step at the fire's 12 fps; the fire's
   shadow is redrawn (once, in that frame) only on steps with real motion, never for idle,
   and once whenever what casts it changes: he forms or burns away, is put somewhere new
   (a new scenery), or his helmet changes at once (`knights.moving`). Each knight keeps his

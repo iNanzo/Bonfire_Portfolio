@@ -104,6 +104,7 @@ function gestureTarget(g, p, name, t, seated, room = FREE) {
   const keepLegs = () => {
     if (seated) {
       for (let i = 0; i < 3; i++) g[i] = p[i];
+      // (The legs and the feet's toe-in, the pose's last channels.)
       for (let i = POSE.legL; i < POSE_SIZE; i++) g[i] = p[i];
       g[POSE.hips] = p[POSE.hips];
     }

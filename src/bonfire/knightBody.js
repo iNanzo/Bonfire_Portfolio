@@ -16,6 +16,7 @@ import {
   DEFAULT_RIG,
   sideOf,
   legOf,
+  toeOf,
   eulerQ,
 } from './knightRig.js';
 import { createSolver } from './knightSolve.js';
@@ -55,6 +56,10 @@ export function leg(p, s, x, y, z, pitch = 0, knee = 8) {
   p[o + 3] = pitch * DEG;
   p[o + 4] = knee * DEG;
 }
+/** A foot's toe turned in toward his middle, about the vertical (degrees). */
+export function toeIn(p, s, deg) {
+  p[toeOf(s)] = deg * DEG;
+}
 export function root(p, x, y, z) {
   p[0] = x;
   p[1] = y;
@@ -77,7 +82,7 @@ function lerpArms(out, b, t, s = null) {
     for (let i = 0; i < 7; i++) out[o + i] += (b[o + i] - out[o + i]) * t;
   }
 }
-/** Swap a pose's sides: his left does what his right did. */
+/** Swap a pose's sides: his left does what his right did (a toe turned in stays turned in). */
 export function mirrorPose(p) {
   for (let i = 0; i < 7; i++) {
     const t = p[POSE.armL + i];
@@ -89,6 +94,9 @@ export function mirrorPose(p) {
     p[POSE.legL + i] = p[POSE.legR + i];
     p[POSE.legR + i] = t;
   }
+  const toe = p[POSE.toeInL];
+  p[POSE.toeInL] = p[POSE.toeInR];
+  p[POSE.toeInR] = toe;
   for (const j of AXIAL) {
     p[POSE[j] + 1] *= -1;
     p[POSE[j] + 2] *= -1;
@@ -718,21 +726,24 @@ function overAt(h, e) {
  * The feet of `out` stepping from `from` to `to` (poses), each over its own [t0, t1] (s), or
  * longer for a long step (a leg stretched out along the ground drawn in under him), done by
  * RISE_TIME: planted before and after, lifted on the way (over what lies there: `over`,
- * rise()'s, from the seated end, `back` when `from` is the standing one), the toes dipping.
- * (Only the legs.)
+ * rise()'s, from the seated end, `back` when `from` is the standing one), the toes dipping and
+ * turning (a toe turned in turns out on the way: never on the ground). (Only the legs.)
  */
 function steps(out, from, to, t, plan, over = null, back = false) {
   for (const [s, t0, t1] of plan) {
-    const o = legOf(s);
+    const o = legOf(s),
+      toe = toeOf(s);
     const long = Math.max(1, Math.hypot(to[o] - from[o], to[o + 2] - from[o + 2]) / STEP_LONG);
     const u = clamp01((t - t0) / (Math.min(RISE_TIME, t0 + (t1 - t0) * long) - t0));
     if (u >= 1) {
       for (let i = 0; i < 5; i++) out[o + i] = to[o + i];
+      out[toe] = to[toe];
       continue;
     }
     const e = smooth(u),
       lift = Math.sin(Math.PI * u);
     for (let i = 0; i < 5; i++) out[o + i] = from[o + i] + (to[o + i] - from[o + i]) * e;
+    out[toe] = from[toe] + (to[toe] - from[toe]) * e;
     out[o + 1] += STEP_LIFT * lift + overAt(over?.[s], back ? 1 - e : e);
     out[o + 3] += 10 * DEG * lift;
   }
@@ -761,6 +772,8 @@ const riseOver = newPose();
 function standOver(out, sit, stand) {
   copy(out, stand);
   for (const o of [POSE.legL, POSE.legR]) for (let i = 0; i < 3; i++) out[o + i] = sit[o + i];
+  out[POSE.toeInL] = sit[POSE.toeInL];
+  out[POSE.toeInR] = sit[POSE.toeInR];
   out[0] = (sit[POSE.legL] - sit[POSE.legR]) / 2;
   out[2] = (sit[POSE.legL + 2] + sit[POSE.legR + 2]) / 2 - 0.02;
   return out;

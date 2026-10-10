@@ -43,6 +43,7 @@ import {
   rise,
   walk,
   mirrorPose,
+  lerpPose,
   RISE_TIME,
 } from '../src/bonfire/knightPose.js';
 import { loadKnightMesh } from './lib/knightMesh.mjs';
@@ -127,6 +128,90 @@ test('the rest-like standing pose barely bends anything, and a mirrored pose mir
     assert.ok(2 * Math.acos(Math.min(1, Math.abs(s.q[I[b]].w))) < 0.35, `${b} barely turned`);
   const m = mirrorPose(mirrorPose(Float32Array.from(p)));
   assert.deepEqual([...m], [...p]);
+});
+
+/** A solve's bones, copied (the solver reuses its arrays). */
+const solved = (p) => {
+  const s = solver.solve(p);
+  return { q: s.q.map((q) => q.clone()), p: s.p.map((v) => v.clone()) };
+};
+/** The turn taking quaternion `a` to `b` (b · a⁻¹): which way it goes about the vertical, and how far off the vertical its axis is. */
+function turnAbout(a, b) {
+  const t = b.clone().multiply(a.clone().invert());
+  if (t.w < 0) t.set(-t.x, -t.y, -t.z, -t.w);
+  const angle = 2 * Math.acos(Math.min(1, t.w));
+  const sn = Math.sqrt(Math.max(0, 1 - t.w * t.w));
+  return { yaw: sn < 1e-9 ? 0 : (angle * t.y) / sn, tilt: sn < 1e-9 ? 0 : Math.hypot(t.x, t.z) / sn };
+}
+test('a foot turned in (its toe-in channel) turns that foot alone, about the vertical, toward his middle, by the angle given; with none every pose solves as before, and poses blend and mirror it', () => {
+  // (Before the channel each foot was flat, turned with his hips and nothing more: knightSolve.js.)
+  const e = new THREE.Euler(),
+    q = new THREE.Quaternion();
+  const poses = [
+    ['standing', standingPose()],
+    ...[0, 0.23, 0.36].flatMap((h) =>
+      SEAT_POSES.map((st) => [`${st}, seat ${h} m`, seatedPose(newPose(), h, DEFAULT_RIG, st)]),
+    ),
+    ['Praise the Sun', gesture(standingPose(), 'praise', 1)],
+    ['walking', walk(newPose(), standingPose(), 0.3)],
+    ['the Default Dance', dance(standingPose(), 'defaultDance', 3.5)],
+    ['a seated hop', hop(seatedPose(newPose(), 0.36), 0.2)],
+  ];
+  for (const [what, base] of poses) {
+    const p = Float32Array.from(base);
+    p[POSE.toeInL] = p[POSE.toeInR] = 0;
+    const s0 = solved(p);
+    for (const [side, o] of [
+      ['L', POSE.legL],
+      ['R', POSE.legR],
+    ]) {
+      q.setFromEuler(e.set(p[o + 3], p[POSE.hips + 1], 0, 'YXZ'));
+      assert.ok(
+        Math.abs(Math.abs(q.dot(s0.q[I['foot' + side]])) - 1) < 1e-6,
+        `${what}: with no toe-in the ${side} foot is turned as before (its pitch, his hips' turn)`,
+      );
+    }
+    for (const [side, inward] of [
+      ['L', -1],
+      ['R', 1],
+    ]) {
+      for (const deg of [20, 35]) {
+        const t = Float32Array.from(p);
+        t[POSE['toeIn' + side]] = deg / DEG;
+        const s = solved(t);
+        BONES.forEach((b, i) => {
+          assert.ok(s.p[i].distanceTo(s0.p[i]) < 1e-6, `${what}, ${side} turned in ${deg}°: the ${b} moved`);
+          if (b !== 'foot' + side)
+            assert.ok(
+              Math.abs(Math.abs(s.q[i].dot(s0.q[i])) - 1) < 1e-6,
+              `${what}, ${side} turned in ${deg}°: the ${b} turned`,
+            );
+        });
+        // (Toward his middle: his left foot's toe toward −x, his right's toward +x.)
+        const turn = turnAbout(s0.q[I['foot' + side]], s.q[I['foot' + side]]);
+        assert.ok(turn.tilt < 1e-6, `${what}, ${side} turned in ${deg}°: the foot tips (${turn.tilt})`);
+        assert.ok(
+          Math.abs(turn.yaw - (inward * deg) / DEG) < 1e-6,
+          `${what}, ${side} turned in ${deg}°: the foot turns ${(turn.yaw * DEG).toFixed(2)}° about the vertical`,
+        );
+      }
+    }
+  }
+  // Blended, half the turn; mirrored, the other foot turned in as far (toward his middle still).
+  const a = seatedPose(newPose(), 0.36),
+    b = Float32Array.from(a);
+  a[POSE.toeInL] = a[POSE.toeInR] = 0;
+  b[POSE.toeInL] = 0;
+  b[POSE.toeInR] = 30 / DEG;
+  assert.ok(Math.abs(lerpPose(newPose(), a, b, 0.5)[POSE.toeInR] - 15 / DEG) < 1e-6, 'lerpPose blends the toe-in');
+  const m = mirrorPose(Float32Array.from(b));
+  assert.ok(
+    Math.abs(m[POSE.toeInL] - 30 / DEG) < 1e-6 && m[POSE.toeInR] === 0,
+    `mirrorPose swaps the feet's toe-in (${[m[POSE.toeInL], m[POSE.toeInR]].map((v) => (v * DEG).toFixed(1))})`,
+  );
+  const ma = mirrorPose(Float32Array.from(a));
+  const turn = turnAbout(solved(ma).q[I.footL], solved(m).q[I.footL]);
+  assert.ok(Math.abs(turn.yaw + 30 / DEG) < 1e-6, `mirrored, his left toe turns ${(turn.yaw * DEG).toFixed(1)}°`);
 });
 
 test('[slow] every move gives a sound pose in its limits over 64 beats, standing and (where it can) seated', () => {

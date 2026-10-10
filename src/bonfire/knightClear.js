@@ -39,8 +39,9 @@ const EASE_GAIN = 0.01;
 // goes at most this much further back than where he's still in: easeBack().)
 const EASE_LET_GO = 0.25;
 // (Which part each channel of a pose moves: 0 his body (how his hips, back, neck and head turn:
-// a lean), 1 his left arm, 2 his right, 3 his legs (where his hips are and each foot goes: his
-// footwork getting up and sitting down, over whatever he steps across).)
+// a lean), 1 his left arm, 2 his right, 3 his legs (where his hips are and each foot goes, and
+// how far its toe turns in: his footwork getting up and sitting down, over whatever he steps
+// across).)
 const PART_OF = Uint8Array.from({ length: POSE_SIZE }, (_, i) =>
   i < POSE.hips || i >= POSE.legL
     ? 3
