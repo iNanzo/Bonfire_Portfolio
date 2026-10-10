@@ -11,14 +11,14 @@
 // shape), nor anyone sitting on the ground under it. Each point is tested against the shapes
 // themselves (no rays: those took minutes), and only the pieces whose joint is within their
 // reach of a shape (a broad phase). Nothing round a seat hems in his Praise the Sun (it's the
-// one he throws with nothing there), and where something does stand right by him (a knight
-// sat down by a piece), he eases back from it. Keeping out of it doesn't cost him his
-// smoothness (nothing he does at his seat steps further at a time than round 9's did, give or
-// take half, nor past that a quarter further than it would with nothing there), nor his place
-// on the home view (stood up or dancing there, he stays left of the planted sword), nor much
-// of a frame's time (a step solves at most four poses; round 9's solved one). Where his feet
-// rest high (sitting on the ground, his knees up), a ring under him doesn't fold a knee down
-// under his leg.
+// one he throws with nothing there, as high as round 11's), and where something does stand
+// right by him (a knight sat down by a piece), he eases back from it. Keeping out of it
+// doesn't cost him his smoothness (nothing he does at his seat steps further at a time than
+// round 9's did, give or take half, nor past that a quarter further than it would with
+// nothing there, the floor included), nor his place on the home view (stood up or dancing
+// there, he stays left of the planted sword), nor much of a frame's time (a step solves at
+// most four poses; round 9's solved one). Where his feet rest high (sitting on the ground,
+// his knees up), a ring under him doesn't fold a knee down under his leg.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -651,17 +651,32 @@ test('in the ruins he sits on the ground itself, his boots on it out of the fire
 // (The same seat with nothing round it: a scenery colliders.js has no shapes for, given the
 // seat's own place and height map. Its room for his arms is all of it, and nothing turns them.)
 const BARE = 'bare (a test’s)';
-test('[slow] seated Praise the Sun at every seat, either seat pose, is the Praise he throws there with nothing round him (every joint to 5 mm, each step): nothing there hems it in', async () => {
+// Round 11's seated Praise the Sun (measured as round 10 measured round 9's, the scenery kept
+// out of its way): how high each hand gets over his hips (m), [left, right], at each seat in
+// either seat pose. (Round 9's right hand went to 0.90 at the raised seats: its room then
+// raised a hand hemmed in at a side straight up. On the ground in the ruins he throws them
+// from lower, sitting lower.)
+const ROUND11_PRAISE = {
+  ruins: { resting: [0.784, 0.784], watchful: [0.784, 0.784] },
+  forge: { resting: [0.814, 0.814], watchful: [0.822, 0.822] },
+  shrine: { resting: [0.814, 0.814], watchful: [0.822, 0.822] },
+  cathedral: { resting: [0.814, 0.814], watchful: [0.822, 0.822] },
+  cult: { resting: [0.814, 0.814], watchful: [0.822, 0.822] },
+};
+test('[slow] seated Praise the Sun at every seat, either seat pose, is the Praise he throws there with nothing round him (every joint to 5 mm, each step): nothing there hems it in; each hand at least 90 % as high over his hips as round 11’s', async () => {
   const env = await realKnights();
   const { k } = env;
   const n = k.knights[0];
   const [head, ...hands] = ['head', 'handL', 'handR'].map((b) => n.bones.findIndex((x) => x.name === b));
-  /** Praise from his seat in scenery `name` (on `terrain`): where each joint is, each step. */
+  const hips = n.bones.find((b) => b.name === 'hips');
+  /** Praise from his seat in scenery `name` (on `terrain`): where each joint is, each step, and his hips' height before it. */
   const praise = (name, terrain) => {
     k.setScenery(name, terrain);
     k.summon(0, { instant: true });
     restartClock(n); // (his idle from the same moment every time)
     k.update(0.5);
+    n.group.updateMatrixWorld(true);
+    const rest = hips.getWorldPosition(new THREE.Vector3()).y;
     k.gesture('praise', { index: 0 });
     const steps = [];
     for (let t = 0; t < GESTURE_TIME.praise + 0.2; t += 1 / 12) {
@@ -670,7 +685,7 @@ test('[slow] seated Praise the Sun at every seat, either seat pose, is the Prais
       steps.push(n.bones.map((b) => b.getWorldPosition(new THREE.Vector3())));
     }
     k.dismiss(0, { instant: true });
-    return steps;
+    return { steps, rest };
   };
   const bad = [];
   try {
@@ -679,8 +694,18 @@ test('[slow] seated Praise the Sun at every seat, either seat pose, is the Prais
       SEATS[BARE] = SEATS[name];
       for (const pose of SEAT_POSES) {
         k.setSeatPose(pose);
-        const there = praise(name, terrain),
-          bare = praise(BARE, terrain);
+        const { steps: there, rest } = praise(name, terrain),
+          { steps: bare } = praise(BARE, terrain);
+        // (A Praise that sank everywhere, with nothing round him too, would still be the one he
+        // throws with nothing round him: it's held to round 11's height as well.)
+        hands.forEach((j, i) => {
+          const top = Math.max(...there.map((s) => s[j].y)) - rest;
+          const was = ROUND11_PRAISE[name][pose][i];
+          if (top < 0.9 * was)
+            bad.push(
+              `${name} (${pose}): his ${n.bones[j].name} ${(top * 100).toFixed(0)} cm over his hips (round 11: ${(was * 100).toFixed(0)})`,
+            );
+        });
         // (Both hands thrown up over his head, or there's no Praise to compare.)
         for (const j of hands) {
           const over = Math.max(...bare.map((s) => s[j].y)) - bare[0][head].y;

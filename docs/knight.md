@@ -471,9 +471,12 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
     cult's stone C; round 9: up to 23 cm into the ruins' pillar), and still or standing at
     his seat nothing at all (a boot or shin resting on what's under it, the ground or a
     seat's edge, aside: a centimetre in). Keeping out costs the gestures little: a seated
-    Praise the Sun at every seat in either seat pose throws each hand at least 90% as high
-    over his hips as round 9's (it's the site's first click), and in the site's dance an arm
-    with all the room it wants swings at least 90% as far.
+    Praise the Sun (the site's first click) at every seat in either seat pose is the one he
+    throws at the same seat with nothing round it (every joint to 5 mm), each hand at least
+    90% as high over his hips as round 11's there: 0.78 m in the ruins, thrown from the
+    ground, and 0.81 resting or 0.82 watchful at the raised seats (round 9's right hand
+    reached 0.90 at those, its room raising a hand hemmed in at a side straight up). In the
+    site's dance an arm with all the room it wants swings at least 90% as far.
 - **The others** (Bonfire Live) sit on the ground where the visualizer rests them
   (`restPlaces`: the layout for the whole cast less the place nearest the seat, on the
   ring's clear sides, never in front of the fire), facing the fire, in the ground poses
