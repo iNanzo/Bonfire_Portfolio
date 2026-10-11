@@ -83,6 +83,7 @@ import {
   newPose,
   lerpPose,
   seatedPose,
+  floorArms,
   standingPose,
   seatFeet,
   feetAt,
@@ -104,7 +105,7 @@ import {
   CHEERS,
   SEAT_POSES,
 } from './knightPose.js';
-import { SEATS, danceSlots, ringOf, restPlaces, planWalk, facingYaw, FIRE_AT } from './knightPlaces.js';
+import { SEATS, danceSlots, ringOf, restPlaces, planWalk, facingYaw, FIRE_AT, PIT } from './knightPlaces.js';
 import { collidersNear, distanceTo, outOf, createFits } from './colliders.js';
 import { weaponSilhouette } from './forgeFx.js';
 import {
@@ -131,18 +132,62 @@ const WALK_SPEED = 0.95; // m/s
 const TURN_SPEED = 5; // rad/s
 const CROSSFADE = 0.2;
 const STEP_OVER = 0.16; // m: what a walking knight steps over (a fire pit's stone, a spare log)
+// m: how low a wrist may go over the ground round him, sitting on the ground (his gauntlet
+// hangs up to 18 cm below it, limp and open; at rest his wrists are 32 cm up or more, so rest
+// is untouched)
+const FLOOR_HANDS = 0.19;
+// (Where a seated boot's sole is looked at for what it rests on: [m ahead of its ankle, m either
+// side of it], inside the model's sabaton, which is 16 cm across to 0.2 m ahead, then narrows
+// to its pointed toe (TOE_REACH): 4 cm across at 0.28. Sitting on the ground, back past its heel
+// too: soleUnder. A look 5 cm aside at the toe reached past it, onto a stone it never touches:
+// a ring knight's boot hung 9 cm over the ground, propped on the pit's rim beside its toe.)
+const SOLE = [
+  [0, 0.05],
+  [0.1, 0.05],
+  [0.2, 0.05],
+  [0.28, 0.015],
+];
+// (How far a boot's pointed toe reaches past its ankle, m: the model's sabatons, seated. Until
+// round 11 turned a boot in, NEAR_FIRE took 0.28 straight ahead: the rest's hips' turn made up
+// the difference.)
+const TOE_REACH = 0.3;
+const SOLE_ON_GROUND = [[-0.12, 0.05], [-0.06, 0.05], ...SOLE];
+// (How far under the ground he sits on a seated boot may rest, m. On a seat, 10 cm; sitting on
+// the ground, as far as a step he sits on can drop away in front of him: the leg he stretches
+// out resting reaches the ground 15.3 cm below the step he sits on at the cult's ring place for
+// three, its knee still bent 28° (19° at 20 cm). Held to 10 cm, that boot hung 5 cm up.)
+const SEAT_REACH = 0.1;
+const GROUND_REACH = 0.16;
+// (A boot's sole from its heel to its ankle, inside the sabaton: what it rests on there, propOf.
+// Sitting on the ground, a boot whose ground is more than PROPPED (m) over that rests on
+// something under its front alone, level, its heel in the air: the ring knight by the ruins'
+// pit with four out had his stretched boot's toe on a pit stone and its heel 4.7 cm up. He
+// sits back from the fire, BACK_STEP (m) at a time, BACK_MOST at most, till it isn't: settleOn.)
+const HEEL_ON_GROUND = [
+  [-0.06, 0.05],
+  [0, 0.05],
+];
+const PROPPED = 0.015;
+const BACK_STEP = 0.02;
+const BACK_MOST = 0.2;
+// (A standing boot's sole, m from its ankle: across it, and from its heel to its pointed toe.)
+const STAND_SOLE = [
+  [-0.07, 0, 0.07],
+  [-0.08, 0, 0.1, 0.2, 0.29],
+];
 // His meshes' bounds (his own space: the ground under him, turned with him), for culling:
-// every pose he takes stays inside with 0.1 m to spare (the farthest reach, 1.76 m from
-// here, is a boot kicked out in the site's dance where he stands up to, to his right across
-// the ruins' fallen drum; the leaps, Praise the Sun and the rest are inside too:
-// test/knightsBounds.test.mjs, on the real model).
+// every pose he takes stays inside with room to spare (the farthest reach, 1.51 m from
+// here, is the boot of the leg he stretches out resting on the ground in the ruins; the
+// leaps, Praise the Sun and the rest are inside too: test/knightsBounds.test.mjs, on the
+// real model). Round 10 grew it from 1.6 m for a boot kicked out across the ruins' old
+// seat; at 1.6 m the stretched boot would leave 9 cm, under the 10 the test asks for.
 const BOUNDS = new THREE.Sphere(new THREE.Vector3(0, 1.05, 0.15), 1.9);
 // Gestures that throw the arms up (or dance): a flinch or a lean over one would hide it.
 const CHEERING = new Set(CHEERS);
 // Room on both sides (gesture()'s and dance()'s `room`).
 const FREE = [1, 1];
 // A seated ring lifts each foot at most this high over its hip joint (m; at the seats round
-// 9's came to 7 cm): one already up near there (on the ruins' fallen drum) lifts less, or not
+// 9's came to 7 cm): one already up near there (on a stone, say) lifts less, or not
 // at all. From about 18 cm up the ankle comes round to where the knee bends toward and the
 // knee folds down under the leg for a step (round 9's knights sitting on the ground, their
 // feet up level with their hips, did on every ring). hop(), riseOf().
@@ -158,8 +203,14 @@ const OVER_CROSS = 0.06;
 // and his upper body (UPPER: his chest, head and pauldrons' domes) UPPER_CLEAR: room for a
 // dome to ride up with a raised arm (the shrine's lantern roof is at his shoulder): standSpot.)
 const STAND_CLEAR = 0.1;
+// (A knight resting on the ground with no seat (Bonfire Live's others, on the ring) rests only
+// where he'd sit as every seat has him, this far (m) from the scenery's shapes sitting still:
+// clearAt. Elsewhere he sits watchful.)
+const SIT_CLEAR = 0.04;
 const UPPER = new Set(['chest', 'neck', 'head', 'shoulderL', 'shoulderR'].map((b) => BONE_INDEX[b]));
 const UPPER_CLEAR = 0.06;
+// (What of him rests on the ground, sitting on it: groundHome's seatPatch.)
+const SEAT_PIECES = new Set(['hips', 'thighL', 'thighR', 'tassetL', 'tassetR'].map((b) => BONE_INDEX[b]));
 // (Standing where he's placed, and the channels standing in front of his seat moves: his root
 // and his feet, sideways, up to their ground and ahead.)
 const STANDING = standingPose();
@@ -208,7 +259,7 @@ export function createKnights(
   const { arms: probes, body: bodyProbes, helms: helmProbes } = T.probes ?? drain(probesOf(T));
   // Every pose solved and kept out of the scenery (knightClear.js), and the plates' springs
   // (knightPlates.js), with this knight's rig and points.
-  const { solve, solveClear } = createClearance(solver, { probes, bodyProbes, helmProbes, nearOf });
+  const { solve, solveClear, keepsFrom } = createClearance(solver, { probes, bodyProbes, helmProbes, nearOf });
   const springPlates = createPlateSprings({ probes, bodyProbes, nearOf });
   const FEET = [bodyProbes.find((b) => b.i === BONE_INDEX.footL), bodyProbes.find((b) => b.i === BONE_INDEX.footR)];
   const restPos = ALL_BONES.map((b) => new THREE.Vector3(...T.restPos[b]));
@@ -338,17 +389,145 @@ export function createKnights(
   /** Something he can't step over stands at (x, z): a seat, a wall, a pile of logs (the height map). */
   const blocked = (x, z) => topAt(x, z) > STEP_OVER;
 
+  // The nearest the fire's middle a knight sits on the ground facing it (m; his hips), in each
+  // seat pose: each boot's pointed toe (TOE_REACH past its ankle, the way the boot points: his
+  // hips' turn and its toe-in) a hand's breadth out of the pit's stones. (Resting, he
+  // stretches a leg out toward the fire, its boot turned in: 1.66 m. Watchful, 1.50: about
+  // where round 10 sat them, clear of what stands behind, which the resting pose's distance
+  // isn't everywhere: the forge's hearth, the cathedral's pew. Each pose sits at its own, and
+  // he shifts between them as his pose changes where he sits: rehome.)
+  const NEAR_FIRE = Object.fromEntries(
+    SEAT_POSES.map((style) => [
+      style,
+      Math.max(
+        ...feetAt(seatedPose(newPose(), 0, rig, style), rig).map(([x, z, turn]) => {
+          const tx = x + TOE_REACH * Math.sin(turn);
+          return z + TOE_REACH * Math.cos(turn) + Math.sqrt(Math.max(0, (PIT + 0.08) ** 2 - tx * tx));
+        }),
+      ),
+    ]),
+  );
+  /** How knight k sits (SEAT_POSES): his own, or everyone's. */
+  const styleOf = (k) => k.seatPose ?? seatStyle;
+  /**
+   * How he sits at home `h` asked to sit `style`: so, unless it's on the ground with no seat and
+   * he's resting where that would meet the scenery (groundHome: watchful there instead).
+   */
+  const sitsAs = (h, style) => (h && !h.seat && h.want === style ? h.style : style);
+  /**
+   * Sitting down on the ground with no seat where he stands at (x, z) (Bonfire Live's others,
+   * on the ring, or a dancer sat down where he danced): his home there in seat pose `style`
+   * (settleOn). Resting, only where he'd sit as a seat has him, clear of the scenery, his boots
+   * on the ground: where his rest would meet something (the cathedral's pew, by its place for
+   * four) or has nowhere clear to lie on the ground, he sits watchful there. `want` keeps the
+   * pose asked for, `style` the one he sits in.
+   */
+  function groundHome(x, z, style) {
+    const h = settleOn(x, z, style) ?? settleOn(x, z, 'watchful');
+    h.want = style;
+    return h;
+  }
+  /**
+   * His home on the ground at (x, z) in seat pose `style`: sat back from the fire as far as the
+   * pose needs (onGround), and further where a boot of his would rest on something under its
+   * front alone, its heel in the air (a pit stone under its toe: propOf), till it lies on the
+   * ground (BACK_STEP at a time, BACK_MOST at most) where he sits as a seat has him (clearAt).
+   * Resting, only where he sits as a seat has him (null where nowhere is); watchful, where he'd
+   * sit if no further back is clear.
+   */
+  function settleOn(x, z, style) {
+    const first = onGround(x, z, style);
+    if (propOf(first, style) <= PROPPED) return style !== 'resting' || clearAt(first, style) ? first : null;
+    for (let more = BACK_STEP; more < BACK_MOST + 1e-6; more += BACK_STEP) {
+      const h = onGround(x, z, style, more);
+      if (propOf(h, style) <= PROPPED && clearAt(h, style)) return h;
+    }
+    return style === 'resting' ? null : first;
+  }
+  /**
+   * His home on the ground with no seat where he stands at (x, z): a step back from it, away
+   * from the fire, as far as seat pose `style` needs (and `more`), on the ground there (a low
+   * dais or step under him is what he sits on). `from` and `style` keep where he sat down from
+   * and how, for rehome.
+   */
+  function onGround(x, z, style, more = 0) {
+    const out = Math.hypot(x - FIRE.x, z - FIRE.z) || 1;
+    const back = Math.max(seatFeet(0) - 0.03, NEAR_FIRE[style] - out) + more;
+    const hx = x + ((x - FIRE.x) / out) * back,
+      hz = z + ((z - FIRE.z) / out) * back;
+    const yaw = faceFire(hx, hz);
+    // (On the highest of the ground where his seat rests on it: a flagstone under a thigh
+    // lifts him, as a seat would, instead of the thigh sinking into it.)
+    const c = Math.cos(yaw),
+      sn = Math.sin(yaw);
+    let y = 0;
+    for (const [sx, sz] of seatPatch(style)) y = Math.max(y, heightAt(hx + sx * c + sz * sn, hz - sx * sn + sz * c));
+    return { x: hx, z: hz, yaw, h: 0, feet: [0, 0], y, seat: false, from: { x, z }, style };
+  }
+  const propP = newPose();
+  /**
+   * How far up seat pose `style` at home `h` on the ground would rest a boot on something under
+   * its front alone (m): its ground over the ground under its heel and ankle, the more of either.
+   */
+  function propOf(h, style) {
+    seatedPose(propP, h.h, rig, style);
+    let most = 0;
+    for (const f of feetAt(propP, rig)) most = Math.max(most, soleUnder(h, ...f) - soleUnder(h, ...f, HEEL_ON_GROUND));
+    return most;
+  }
+  const patches = {};
+  /**
+   * Where his seat rests on the ground sitting on it in seat pose `style` (his own space: [x,
+   * z] every 5 cm under his hips, thighs and tassets where they come within 4 cm of it; once
+   * each).
+   */
+  function seatPatch(style) {
+    if (patches[style]) return patches[style];
+    const s = solve(seatedPose(newPose(), 0, rig, style));
+    const cells = new Map(),
+      v = new THREE.Vector3();
+    for (const b of bodyProbes) {
+      if (!SEAT_PIECES.has(b.i)) continue;
+      for (let j = 0; j < b.pts.length; j += 3) {
+        v.fromArray(b.pts, j).applyQuaternion(s.q[b.i]).add(s.p[b.i]);
+        if (v.y < 0.04) cells.set(`${Math.round(v.x / 0.05)},${Math.round(v.z / 0.05)}`, [v.x, v.z]);
+      }
+    }
+    return (patches[style] = [[0, 0], ...cells.values()]);
+  }
+  const clearP = newPose();
+  /**
+   * Whether he'd sit at home `h` on the ground in seat pose `style` as a seat has him (every
+   * seat: test/knightClearance.test.mjs): sitting still, his boots on the ground under them,
+   * nothing of him nearer the scenery's shapes than SIT_CLEAR, his boots and shins resting on
+   * what's under them. (A solve and the shapes near him: about 0.1 ms.)
+   */
+  function clearAt(h, style) {
+    const cs = collidersNear(sceneryName, h.x, h.z, CLEAR_NEAR);
+    return !cs.length || keepsFrom(solve(seatOn(clearP, h, style)), h, cs, SIT_CLEAR);
+  }
   /** Where knight i rests in this scenery: the scenery's seat (the first), or the ground at a ring slot. */
   function homeFor(i) {
     const seat = SEATS[sceneryName];
     if (i === 0 && seat) {
       const yaw = seat.yaw ?? faceFire(seat.x, seat.z);
       // The seat's real height from the height map (the highest cell under him), and the
-      // ground where each foot lands.
+      // ground where each foot lands. (On the ground: the ground under him, a flagstone and
+      // all, is his seat; he sits on it, h 0, his feet on what's in front of him.)
       let top = 0;
       for (let a = 0; a < 7; a++) {
         const r = a ? 0.07 : 0;
-        top = Math.max(top, topAt(seat.x + Math.sin(a) * r, seat.z + Math.cos(a) * r));
+        const x = seat.x + Math.sin(a) * r,
+          z = seat.z + Math.cos(a) * r;
+        top = Math.max(top, seat.ground ? heightAt(x, z) : topAt(x, z));
+      }
+      if (seat.ground) {
+        const y = Math.max(0, top);
+        const ground = (side) => {
+          const p = new THREE.Vector3(side * 0.17, 0, seatFeet(0)).applyAxisAngle(Y_AXIS, yaw);
+          return heightAt(seat.x + p.x, seat.z + p.z) - y;
+        };
+        return { x: seat.x, z: seat.z, yaw, h: 0, feet: [ground(1), ground(-1)], y, seat: true, aside: 0 };
       }
       if (!terrain || Math.abs(top - seat.top) > 0.1) top = seat.top;
       // (Each foot's ground: his left is +x in his own space.)
@@ -371,14 +550,11 @@ export function createKnights(
       };
     }
     // The others sit on the ground where the visualizer rests them (knightPlaces.js
-    // restPlaces: the ring's clear sides, never in front of the fire), their feet on the ring.
+    // restPlaces: the ring's clear sides, never in front of the fire), their feet on the ring
+    // (or out of the fire, a leg stretched out toward it).
     const place =
       restPlaces(ringOf(sceneryName), Math.max(cast, i + 1), seat)[i - 1] ?? danceSlots(sceneryName)[slotOf(i)];
-    const out = Math.hypot(place.x - FIRE.x, place.z - FIRE.z) || 1;
-    const back = seatFeet(0) - 0.03;
-    const x = place.x + ((place.x - FIRE.x) / out) * back,
-      z = place.z + ((place.z - FIRE.z) / out) * back;
-    return { x, z, yaw: faceFire(x, z), h: 0, feet: [0, 0], y: Math.max(0, heightAt(x, z)), seat: false };
+    return groundHome(place.x, place.z, styleOf(knights[i]));
   }
   /** Put knight k seated at home now. */
   function seatNow(k) {
@@ -420,21 +596,51 @@ export function createKnights(
     _hw.z += home.z;
     return _hw;
   };
-  /** The ground at a place in his own space at `home`, above the ground he's placed on (m). */
-  const groundUnder = (home, x, z) => {
+  /** The ground at a place in his own space at `home`, above the ground he's placed on (m; `reach` at most under it). */
+  const groundUnder = (home, x, z, reach = SEAT_REACH) => {
     const w = atHome(home, x, z);
-    return THREE.MathUtils.clamp(heightAt(w.x, w.z) - home.y, -0.1, 0.42);
+    return THREE.MathUtils.clamp(heightAt(w.x, w.z) - home.y, -reach, 0.42);
   };
   /**
-   * The ground a seated boot rests on at a place in his own space at `home` (its ankle at x, z):
-   * the highest under its sole from the ankle to the pointed toe (0.3 m ahead), so the toe
-   * never sinks into whatever it reaches over (the ruins' fallen drum: he rests his foot up on
-   * it). (Not the heel's: a foot drawn in tucks its heel under the seat's edge.)
+   * The ground a seated boot rests on at a place in his own space at `home` (its ankle at x, z,
+   * its toe turned `turn` from straight ahead, + toward his left: feetAt): the highest under
+   * its sole from the ankle to the pointed toe (0.3 m ahead), so the toe never sinks into
+   * whatever it reaches over (a stone or a log he rests his foot up on).
+   * Sitting on the ground, from behind its heel too (12 cm behind the ankle: its heel is 9 cm
+   * back, and his idle's shift of weight steps it 2.5 back): a leg stretched out along the ground
+   * rests its heel on whatever lies there (the spare log by the fire, for one of Bonfire Live's
+   * knights resting on the ring), and down off a step he sits on (GROUND_REACH). On a seat,
+   * not the heel's: a foot drawn in tucks its heel under the seat's edge.
    */
-  const soleUnder = (home, x, z) => {
+  const soleUnder = (home, x, z, turn = 0, sole = null) => {
+    const c = Math.cos(turn),
+      sn = Math.sin(turn);
+    const onGround = home.h < 0.12,
+      reach = onGround ? GROUND_REACH : SEAT_REACH;
     let g = -Infinity;
-    for (const dz of [0, 0.1, 0.2, 0.28])
-      for (const dx of [-0.05, 0.05]) g = Math.max(g, groundUnder(home, x + dx, z + dz));
+    for (const [dz, w] of sole ?? (onGround ? SOLE_ON_GROUND : SOLE))
+      for (const dx of [-w, w]) g = Math.max(g, groundUnder(home, x + dx * c + dz * sn, z - dx * sn + dz * c, reach));
+    return g;
+  };
+  /**
+   * The highest ground within his arms' reach low down round `home` (m over the ground he's
+   * placed on): a flagstone or a stone by him, not anything taller (a hand goes round that).
+   */
+  function floorOf(home) {
+    let g = 0;
+    for (let x = -0.6; x <= 0.61; x += 0.1)
+      for (let z = -0.3; z <= 0.71; z += 0.1) if (x * x + z * z < 0.5) g = Math.max(g, groundUnder(home, x, z));
+    return Math.min(g, 0.1);
+  }
+  /**
+   * The ground a standing boot rests on at a place in his own space at `home` (its ankle at x,
+   * z): the highest under its sole, heel to pointed toe and either side (STAND_SOLE), so none
+   * of it sinks into a flagstone it stands half on (the ground under the ankle alone left the
+   * toe 5 cm into one, stood up in front of the ruins' seat).
+   */
+  const standUnder = (home, x, z) => {
+    let g = -Infinity;
+    for (const dz of STAND_SOLE[1]) for (const dx of STAND_SOLE[0]) g = Math.max(g, groundUnder(home, x + dx, z + dz));
     return g;
   };
   /** What stands at a place in his own space at `home` (its top), above the ground he's placed on (m). */
@@ -442,16 +648,21 @@ export function createKnights(
     const w = atHome(home, x, z);
     return topAt(w.x, w.z) - home.y;
   };
+  /** Seat pose `style` at home `h` into `p`, each foot on the ground under its sole there (into h.feet). */
+  function seatOn(p, h, style) {
+    seatedPose(p, h.h, rig, style);
+    const [fl, fr] = feetAt(p, rig);
+    h.feet = [soleUnder(h, ...fl), soleUnder(h, ...fr)];
+    return seatedPose(p, h.h, rig, style, h.feet);
+  }
   /**
    * His seated pose at home (into k.sit), each foot on the ground where the pose rests it
-   * (a foot up on the seat's log, or down a slope), and the room he has for his arms.
+   * (a foot up on the seat's log, or down a slope), and the room he has for his arms. (Asked
+   * to rest where his home on the ground has no room for it, watchful: sitsAs.)
    */
-  function seatPoseOf(k, style = k.seatPose ?? seatStyle) {
+  function seatPoseOf(k, style = styleOf(k)) {
     const h = k.home;
-    seatedPose(k.sit, h.h, rig, style);
-    const [fl, fr] = feetAt(k.sit, rig);
-    h.feet = [soleUnder(h, fl[0], fl[1]), soleUnder(h, fr[0], fr[1])];
-    seatedPose(k.sit, h.h, rig, style, h.feet);
+    seatOn(k.sit, h, sitsAs(h, style));
     h.room = roomOf(h, k.sit);
     h.roomLess = null;
     h.rise = riseOf(k.sit);
@@ -625,8 +836,8 @@ export function createKnights(
     k.stand[37 + 2] = s.z + 0.02;
     if (h) {
       const [fl, fr] = feetAt(k.stand, rig);
-      k.stand[33] += groundUnder(h, fl[0], fl[1]);
-      k.stand[38] += groundUnder(h, fr[0], fr[1]);
+      k.stand[33] += standUnder(h, fl[0], fl[1]);
+      k.stand[38] += standUnder(h, fr[0], fr[1]);
       if (!h.roomUp) {
         h.roomUp = roomOf(h, k.stand);
         h.roomLess = null;
@@ -677,8 +888,8 @@ export function createKnights(
   /**
    * How much higher each foot has to go on its way between where it rests seated and where
    * it stands up to (rise()'s `over`, at OVER_POINTS points along the straight way from the
-   * seated end): as much as keeps it OVER_CLEAR clear of the scenery's shapes there (his boot
-   * resting up on the ruins' fallen drum steps up and off it, not down through it), and
+   * seated end): as much as keeps it OVER_CLEAR clear of the scenery's shapes there (a boot
+   * resting up on something steps up and off it, not down through it), and
    * whether either has more than OVER_CROSS to clear (`cross`: he stands up over his feet
    * first, then steps). Kept with him until his seat, his seat pose or where he stands up to
    * changes; null away from a seat.
@@ -1342,6 +1553,11 @@ export function createKnights(
       end: () => {
         k.mode = 'sit';
         k.dancing = null;
+        // (His seat pose changed as he sat down: he eases over to where it sits.)
+        if (rehome(k)) {
+          startCrossfade(k, 0.9);
+          seatPoseOf(k);
+        }
       },
     }),
     /**
@@ -1413,10 +1629,16 @@ export function createKnights(
       },
     }),
   };
-  /** Move where he's placed without moving him: his pose takes up the difference. */
+  /**
+   * Move where he's placed without moving him: his pose takes up the difference. (His pose is
+   * stepped again at once, not at the fire's next frame: till then his bones would be posed
+   * as before, from the new place.)
+   */
   function shiftPlace(k, to) {
     const d = new THREE.Vector3().subVectors(k.group.position, to).applyAxisAngle(Y_AXIS, -k.yaw);
     k.group.position.copy(to);
+    k.lastStep = -1;
+    shadowDirty = true;
     for (const p of [k.pose, k.from, k.work]) {
       p[0] += d.x;
       p[1] += d.y;
@@ -1481,7 +1703,7 @@ export function createKnights(
     } else {
       k.energy = null;
       p.set(seated ? k.sit : k.stand);
-      if (!reducedMotion) idle(p, k.clock, k.seed, seated, (k.seatPose ?? seatStyle) === 'watchful' ? 1 : 0);
+      if (!reducedMotion) idle(p, k.clock, k.seed, seated, sitsAs(k.home, styleOf(k)) === 'watchful' ? 1 : 0);
     }
     // A gesture over whatever he's doing (the site's dance faces the front: the cameras;
     // with no headroom when it started, he dances it in his seat).
@@ -1538,6 +1760,19 @@ export function createKnights(
       lerpPose(p, k.from, p, k.blend);
       big = true;
     }
+    // Sitting on the ground at home (the ruins' seat, the others' places in Bonfire Live), and
+    // sitting down onto it: his gestures and moves were made for a seat, and so was the way he
+    // lowers himself (his hands dropped to his knees on the way down), so a hand dropped low is
+    // kept off the floor. (Sitting down he's still 'stand' till he's down, but already placed
+    // at home.)
+    const h = k.home;
+    if (
+      (seated || a?.kind === 'lower') &&
+      h &&
+      h.h < 0.12 &&
+      Math.hypot(k.group.position.x - h.x, k.group.position.z - h.z) < 0.05
+    )
+      floorArms(p, FLOOR_HANDS + (h.floor ??= floorOf(h)), rig);
     return big;
   }
 
@@ -1734,51 +1969,30 @@ export function createKnights(
     k.dancing = k.nextDance = k.danceAt = null;
     startCrossfade(k);
     if (k.mode === 'sit') return true;
-    const home = homeFor(i);
-    // Back in front of the seat (or down where he stands, for a knight with no seat).
-    if (home.seat) {
-      k.home = home;
-      seatPoseOf(k);
-      const spot = (home.stand ??= standSpot(home));
-      const front = new THREE.Vector3(spot.x, 0, spot.z).applyAxisAngle(Y_AXIS, home.yaw);
-      enqueue(
-        k,
-        act.go(k, home.x + front.x, home.z + front.z),
-        act.turn(k, home.yaw),
-        {
-          kind: 'place',
-          dur: 0,
-          start() {
-            shiftPlace(k, new THREE.Vector3(home.x, home.y, home.z));
-            standAtSeat(k);
-          },
+    // Back in front of his seat; with none, down on the ground where he stands, a step behind
+    // his feet or more by the fire (groundHome). (Up in front of where he sat, he's placed
+    // where he sat: his place is moved under his feet first, or he'd sit down a step further
+    // back each time.)
+    reroot(k);
+    const p = k.group.position;
+    const home = (k.home = i === 0 && SEATS[sceneryName] ? homeFor(i) : groundHome(p.x, p.z, styleOf(k)));
+    seatPoseOf(k);
+    const spot = (home.stand ??= standSpot(home));
+    const front = new THREE.Vector3(spot.x, 0, spot.z).applyAxisAngle(Y_AXIS, home.yaw);
+    enqueue(
+      k,
+      ...(home.seat ? [act.go(k, home.x + front.x, home.z + front.z)] : []),
+      act.turn(k, home.yaw),
+      {
+        kind: 'place',
+        dur: 0,
+        start() {
+          shiftPlace(k, new THREE.Vector3(home.x, home.y, home.z));
+          standAtSeat(k);
         },
-        act.lower(k),
-      );
-    } else {
-      const p = k.group.position;
-      k.home = { x: p.x, z: p.z, yaw: faceFire(p.x, p.z), h: 0, feet: [0, 0], y: p.y, seat: false };
-      seatPoseOf(k);
-      enqueue(
-        k,
-        act.turn(k, k.home.yaw),
-        {
-          kind: 'place',
-          dur: 0,
-          start() {
-            // (He sits down where he stands: his seat is a step behind his feet.)
-            const back = new THREE.Vector3(0, 0, -(seatFeet(0) - 0.03))
-              .applyAxisAngle(Y_AXIS, k.yaw)
-              .add(k.group.position);
-            shiftPlace(k, back);
-            k.home.x = back.x;
-            k.home.z = back.z;
-            standAtSeat(k);
-          },
-        },
-        act.lower(k),
-      );
-    }
+      },
+      act.lower(k),
+    );
     return true;
   }
   function stand(i) {
@@ -1938,10 +2152,29 @@ export function createKnights(
     for (const k of index == null ? knights : valid(index) ? [knights[index]] : []) {
       k.seatPose = index == null ? null : name;
       if (!k.home) continue;
-      seatPoseOf(k, name);
+      // (Only a change eases him over, where he sits: on the ground with no seat, to where the
+      // new pose sits. Getting up or down, he's re-placed when he's down: act.lower.)
       if (k.present && k.mode === 'sit' && !k.act) startCrossfade(k, 0.9);
+      if (!k.act) rehome(k);
+      seatPoseOf(k, name);
     }
     return true;
+  }
+  /**
+   * Knight k on the ground with no seat, whose home was made for another seat pose than he's
+   * asked to sit in now: his home where this one sits (groundHome, from where he sat down
+   * from). Sat there, he's moved to it, his pose kept where it was (shiftPlace): eased over by
+   * the pose's crossfade, he shifts back (or forward) as he changes how he sits. Whether he
+   * was moved.
+   */
+  function rehome(k) {
+    const h = k.home,
+      style = styleOf(k);
+    if (!h || h.seat || !h.from || h.want === style) return false;
+    const there = Math.hypot(k.group.position.x - h.x, k.group.position.z - h.z) < 0.05;
+    k.home = groundHome(h.from.x, h.from.z, style);
+    if (there) shiftPlace(k, new THREE.Vector3(k.home.x, k.home.y, k.home.z));
+    return there;
   }
   /**
    * The scenery changed: every knight is back where he belongs there, forming out of embers.

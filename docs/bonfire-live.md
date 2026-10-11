@@ -67,7 +67,10 @@ notes: `docs/design/visualizer.md`.
   - A weapon held for the drop sways and turns as if looking about, trembling harder as
     the build rises.
 - **The knights** (`knightShow.js`, driving the scene's `fire.knights`): the site's
-  resting knight, and up to three more, 1 to 4 (touch screens: 2).
+  resting knight, and up to three more, 1 to 4 (touch screens: 2). The first takes the
+  place's seat (in the ruins, the ground beside the pillar); the others sit on the ground
+  round the fire on the ring's clear sides, far enough back that a leg stretched out
+  toward it keeps its boot out of the pit's stones (`docs/knight.md`, *The others*).
   - **Before the first drop** they rest by the fire and nod along to the strong beats,
     drumming on their thighs.
   - **In a breakdown** they're still and watch the weapon forged over the fire. Dancers
@@ -146,6 +149,12 @@ notes: `docs/design/visualizer.md`.
     the long lens while they dance, and takes *Dancers Wide* only with Knight Shots on
     for that dance.
   - A cut never picks a shot with a knight standing between the lens and the fire.
+  - *Pillar Side* (round 11) looks from the front left at what stands by the seat (the
+    ruins' pillar, the forge's anvil, the shrine's back lantern, the cathedral's nave, the
+    cult's stones), the knight on it and the fire, all three in a 16:9 frame however far
+    it has swayed (0.15 rad either way) and pushed in, in every place. From further round
+    to the left, the front-left piece (the shrine's front lantern, the cathedral's pew, the
+    cult's watcher) would come between it and him.
 - **Colors** (`colors.js`): each new flame is one of the site's palettes, or one made on
   the spot with the admin's palette generator (`src/paletteGen.js`): harmonious (any
   scheme, or the one picked) or fully random, named for its hue ("Cobalt Lightning").
@@ -208,7 +217,8 @@ keys overlay; the HUD's **Keys** button opens it too, and in Settings `?` or the
   random, a mix) · `Shift+1…9` a title card.
 - **View & Menus:** `P` Render Settings (below) · `C` cut · `H` hide the controls (`Esc`
   brings them back) · `F` full screen · `O` the output window · `V` record · `S` settings ·
-  `/` the settings' search · `I` the pack · `?` the shortcuts.
+  `/` the settings' search · `I` the pack · `U` the stats overlay (below; on the start
+  screen too) · `?` the shortcuts.
 
 The controls and cursor hide when the mouse rests on the picture (not while it rests on the
 controls, so a tooltip stays to be read). The HUD's *Moments* have **Living
@@ -241,7 +251,7 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
 | Sound | Source (sensitivity, visual lead, playback volume) · Beat (Beat From, the Link bridge's port and its setup) · MIDI Controller |
 | Show | Reaction (reactivity, the song's shape, build-ups in stages, hi-hat sparks, color temperature, sub-bass breathing) · Weapons (forge and strike on drops, how often a new weapon comes, its elements, extra rings, the outline burst) · Living Weapon (how often it comes out and for how long, its attacks, its rhythm, alive between attacks) |
 | Drops | The Drop (the black beat, the negative flash, the drop hits, how many at once) · Hits (hit-stop, hit flash, debris, ground marks) |
-| Picture | Place & Atmosphere (place, fog, exposure, vignette, fire shadows) · Colors (flame colors, harmony, place colors, blend time, palette, few colors) · Pixel Art (below) · Performance (**Frame Rate**, particles) |
+| Picture | Place & Atmosphere (place, fog, exposure, vignette, fire shadows) · Colors (flame colors, harmony, place colors, blend time, palette, few colors) · Pixel Art (below) · Performance (**Frame Rate**, particles, **Stats Overlay**) |
 | Effects | Strength & Pace (effects strength, how often the look changes) · Looks · Layers (all 14, and the mirror kinds) · X-Ray (the flips and their views) |
 | Camera | Camera (movement, starting shot, zoom punch & shake) · Cuts (cut every, between shots, knight shots) · Weapon Shots (while it fights, camera feel, while it's held) |
 | Cast | Knights · Armor · Dancing · Behavior (below) · Fireflies (blink and dance on the beat, their dances and how often they change, light trails) |
@@ -299,6 +309,37 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
   The sound is still analysed on every frame the display shows, so beats land as precisely
   when it's capped (`createBonfire`'s `onTick`; what's heard between drawn frames reaches
   the director with the next one: `tickBatch.js`).
+- **Stats Overlay** (Picture › Performance, or `U`): a readout in the top left corner of
+  what the picture costs and what the show is doing, updated twice a second. Off to begin
+  with; like Frame Rate it stays with this computer (not in a setup or a preset). It sits
+  where nothing else is (the HUD is along the bottom, the pack bottom right, Render Settings
+  top right; on the start screen, top right, and where the start menu reaches across under
+  it, on a phone or a narrow window, only what fits above the menu), under everything but
+  the picture: where Render Settings opens over it (the start screen, a phone) it steps down
+  under the menu while that's open. While the HUD is up it keeps to the room above it (a
+  phone held sideways shows what fits there, and all of it once the HUD fades). It never
+  takes the pointer and isn't read out. It's HTML over the picture, so it isn't in the
+  output window or a recorded clip. Smaller on a phone (held either way), without the dimmed
+  rows. Three groups:
+  - **Frames:** frames a second (and the cap), the time between them (median and p95), the
+    draw calls and the shadow's redraws a second; dimmed, the frame's parts (tick, page,
+    update, draw) and the GPU's programs, textures and geometries (`docs/performance.md`).
+  - **Particles:** each particle system running, live of how many it has (the flames,
+    sparks, ash and smoke, the forge's particles during a swap, debris, the cold mist, the
+    blade's trail, the rings…), the fireflies lit of all of them and the lightning's bolts
+    (segments). A system with nothing live isn't listed; the heading has the total live.
+  - **Show:** the section (Silence, Groove, Breakdown, Build with its stage, Drop and the bar
+    of the 8 after it), the budget (as the director has it; Off with Follow the Song’s
+    Shape off), the look playing and its strength (a preset scene's says so), the layers live
+    now, each marked *(In the Mix)* or *(Always)*, an x-ray flip while it's on, a drop's
+    hits while they fire, the knights here and what they're doing, the shot, and the preset
+    scene playing (or the free show) with its loop (In the Mix, Always, Off, solo, and the
+    scene waiting for its moment).
+
+  `?perf` in the address shows the same overlay whatever the setting says (and writes the
+  frame's parts for the browser's profiler); `U` there still switches the setting, and
+  switched off, its note says `?perf` keeps it showing. With the overlay on, a frame costs
+  no more (measured on the demo track: `docs/performance.md`).
 - Saving waits for a burst of changes to settle (300 ms: a slider dragged writes once) and
   is done at once as the page is hidden or left, and for a preset, a setup or a reset.
 
@@ -357,7 +398,7 @@ flash, or on a phrase line as a new weapon lands in its colors, never mid-phrase
 | Cathedral Kaleidoscope | The cathedral's altar folded into a six-way kaleidoscope round an amethyst flame (a flamberge in fire), so its lancet windows become a ring of stained-glass panels, a rose window; a soft glow, trails now and then, a slow sweep that turns the rose; two knights dancing in Pixel Painterly, folded into the pattern as they wheel through it after the drops; the kaleidoscope drop hit | Hold |
 | Frozen Shrine | The shrine seen low past its lantern and gate: ice under an uchigatana, an icy harmonious flame on blue-grey stone, the echo streaming out of the fire, a spotlight and fine grain, the camera still; one knight sitting watchful in Pixel Cel; the drop shatters | Hold |
 | Forge Rave | The forge in lightning: a magenta, cyan and acid-yellow flame, the Glitch look with chroma split and scanlines in the mix, the camera pushing in and out every 4 bars, four knights dancing in Pixel Chiaroscuro and polished steel, a chasing firefly show; shatter, shockwaves and more on the drops | Start from the scene |
-| Moonlit Ruins | The ruins in the Moonlit palette's four colors under thick fog, a zweihander in a low fire, the Haze look shimmering the pillar, a slow crane up and down; one knight resting in Black & Gold by the pillar, the fire's reflection sweeping over his plate now and then (Armor Shine), many fireflies twinkling | Hold |
+| Moonlit Ruins | The ruins in the Moonlit palette's four colors under thick fog, a zweihander in a low fire, the Haze look shimmering the pillar, a slow crane up and down; one knight resting in Black & Gold on the ground beside the pillar, the fire's reflection sweeping over his plate now and then (Armor Shine), many fireflies twinkling | Hold |
 
 Each leaves something to the dice (a layer in the mix, the details it doesn't pin, the
 show's own drop hits where it has none), so it plays a little differently every time.
@@ -416,9 +457,9 @@ Pose, Style, Finish, Edge Glow and its Edge Glow Strength, and Dance.
 | Setting | What it does | Values (default first) |
 | --- | --- | --- |
 | Knights | Knights by the fire. In the mix they come and go where it's hidden (the start, a big drop's flash, a new scenery) | In the mix · Off · Always |
-| How Many | How many come to the fire: the first takes the seat, the others sit on the ground round it. How many get up to dance follows the song | Random (1–4, one or two more often) · 1 · 2 · 3 · 4 |
+| How Many | How many come to the fire: the first takes the seat (in the ruins, the ground beside the pillar), the others sit on the ground round it, back from the fire. How many get up to dance follows the song | Random (1–4, one or two more often) · 1 · 2 · 3 · 4 |
 | Helmets | The helmets they may wear; each knight draws one as he arrives, some again at a new scenery | the great helm, the armet, the bascinet |
-| Seat Pose | How they sit: *Resting* (the bonfire rest, slumped over the knees, dozing now and then) or *Watchful* (leaning in over his knees, forearms on them, head up at the fire) (`fire.knights.setSeatPose`) | a mix (rolled where it's hidden) · Resting · Watchful |
+| Seat Pose | How they sit: *Resting* (the bonfire rest, slumped over the knees, dozing now and then; on the ground, one knee drawn up with an arm hung over it and the other leg stretched out) or *Watchful* (leaning in over his knees, forearms on them, head up at the fire; on the ground, sitting up with both knees drawn up, turned to the fire) (`fire.knights.setSeatPose`) | a mix (rolled where it's hidden) · Resting · Watchful |
 | Style | How they're drawn (`src/bonfire/knightStyles.js`, `fire.knights.setStyle`): the site's own (the admin's pick), Pixel Cel, Pixel Painterly, Pixel Chiaroscuro, Smooth Steel (the `gunmetal` style), Black & Gold or First Build (the boxy original model, loaded when it's first picked). A new style at a hidden moment is there in the flash | The Site's Own · each style · a mix |
 | Finish | The steel's color for the styles that draw steel (`src/bonfire/steel.js`, `fire.knights.setFinish`): Gunmetal, Blackened, Polished Steel, Burnished | a mix (leaning to gunmetal) · each finish |
 | Edge Glow | The armor's edges catching the fire's color, fading toward their backs (`fire.knights.setRim`). In the mix, rolled where it's hidden: some stretches glow, each at a strength rolled round the Edge Glow Strength (0.6× to 1.4× of it), some don't. Always: at the Edge Glow Strength. A scene's knights glow as it's painted (its own Edge Glow switch and strength) | In the mix · Off · Always |
@@ -448,6 +489,7 @@ style, the finish, seat and edge glow in the mix (the glow round 0.5).
 | Settings: the values, saving, presets and setups | `src/visualizer/settings.js` |
 | The settings dialog: its layout and what its controls do; each setting's control; the search; bulk buttons and Reset Section (names, hints and places: `src/settingsMap.js`; the fields and "?" hints: `src/ui/fields.js`, shared with the Painter; the tooltip: `src/ui/tooltip.js`) | `src/visualizer/settingsDialog.js`, `settingsControls.js`, `settingsSearchUi.js`, `settingsBulk.js` |
 | Frame Rate: what's heard between drawn frames | `src/visualizer/tickBatch.js` (the cap: `scene.js` `setMaxFps`) |
+| Stats Overlay: the overlay, its words, the show's snapshot | `src/ui/perfOverlay.js`, `src/ui/statsGroups.js`, the director's `status()` (`src/visualizer/director.js`); the scene's `setStats` and `stats()` (`scene.js`, `sceneRender.js`) |
 | Preset scenes: the format, the browser's own, the loop and the player | `src/scenes.js`, `src/sceneStore.js`, `src/visualizer/sceneLoop.js`, `src/visualizer/scenePlayer.js`, `src/visualizer/layered.js` (the loop in Scenes & Cards and the HUD line: `settingsControls.js`, `scenesUi.js`) |
 | Bands, onsets | `src/visualizer/analyser.js` |
 | Sections: groove, breakdown, build, drop, silence | `src/visualizer/sections.js` |

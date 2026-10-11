@@ -6,9 +6,49 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 
 ## [Unreleased]
 
-Round 10: menus and search, the knight's fixes, hygiene and performance.
+Round 11: the knight at home in every place, every module type-checked, and a cleanup for
+what agents and test runs leave running. Round 10, below it: menus and search, the
+knight's fixes, hygiene and performance.
 
-### Menus, search and readability
+### The knight at home (round 11)
+
+- In the ruins he rests on the ground, where round 9 had him, instead of hunched on a drum
+  with his boots up on another: the broken pillar stands a metre to his right in the
+  firelight, the drum fallen from it lies behind it, and no rubble lies where he sits
+  (the ruins' model rebuilt; the seat drum built in code is gone).
+- A new rest on the ground, after the Dark Souls and FFXIV bonfire rests. *Resting*: one
+  knee drawn up with an arm hung over it and the gauntlet hanging limp, the other leg
+  stretched out, his head bowed toward the knee. *Watchful*: sitting up with both knees
+  drawn up, his forearms over them, turned to the fire. Bonfire Live's other knights rest
+  the same way.
+- All the room his arms want at every place: the forge's anvil, the shrine's back lantern,
+  the cathedral's nave and the cult's standing stones moved back, so Praise the Sun is a
+  full V wherever he sits, seated or stood up.
+- Fixes sitting on the ground: a hand dropped to a knee or flung low stays off the floor
+  and the feet lie flat; a tasset no longer swings round behind him into the ground when
+  he kicks with a knee drawn up; Praise the Sun's seated wind-up no longer sweeps a hand
+  through his belly; getting up, a stretched leg draws in instead of snapping, and his
+  head lifts out of its bow instead of curling him into a ball.
+- Bonfire Live: the knights resting round the fire sit back as far as their pose needs
+  for a leg stretched toward it to stay out of the pit's stones (watchful, where round 10
+  sat them, clear of the forge's hearth and the cathedral's pew), shifting as their pose
+  changes, on the ground where they sit; and the *Pillar Side* shot looks from the front
+  left at what stands by his seat, him and the fire, all three in frame in every place.
+
+### Checks and tools (round 11)
+
+- Every module in `src/` and `admin/` is type-checked, new ones too (`tsconfig.json` no
+  longer lists them by hand). The 45 that don't check clean yet say so on their first
+  line, with their error count, and a test keeps that number from growing.
+- `npm run cleanup` lists the dev and preview servers, test browsers and scripts left
+  running by agents and test runs, which hold files in `node_modules` (so `npm ci` fails
+  half done) and keep ports taken; `-- --kill` stops them.
+- `tools/capture-knight.mjs` serves itself (`--serve`: a dev server for the run, from the
+  folder it's run in), shows all of a seated pose (`pose`), the other cameras that frame
+  his seat (`views`: Journey, About, Pillar Side at either end of its sway, the Moonlit
+  Ruins camera) and a gesture with his room set by hand (`--room L,R`).
+
+### Menus, search and readability (round 10)
 
 - One settings map (`src/settingsMap.js`) names, describes and places every setting for
   Bonfire Live, the Painter and the admin, so the same thing has the same name everywhere
@@ -40,7 +80,7 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
   with the Living Weapon on the Anvil, the render settings grouped and openable from the
   menu, and a Keyboard Shortcuts list.
 
-### The knight
+### The knight (round 10)
 
 - He no longer goes through the scenery: the seats in the ruins, cathedral and cult moved
   clear (and the cathedral's right column, the cult's third stone and the forge's anvil
@@ -51,7 +91,7 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
   Dither setting (Off turns it off), while flat plates stay clean.
 - The style "Gunmetal" is shown as "Smooth Steel" (the Gunmetal finish keeps its name).
 
-### Hygiene, coverage and performance
+### Hygiene, coverage and performance (round 10)
 
 - Bonfire Live's lag: the fire's shadow no longer redraws on every beat, scene rebuilds
   stop leaking WebGL programs and contexts, still scenery is drawn one mesh per material,

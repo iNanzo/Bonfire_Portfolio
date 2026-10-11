@@ -1,15 +1,18 @@
 // The knight's body language (src/bonfire/knightPose.js): seated legs meet the ground at any
 // seat height (resting or watchful), every move and gesture gives a sound pose, the moves
 // keep to the beat, the joints stay within what a body (in plate) can do, the head looks
-// level, the feet step instead of sliding, the pauldrons ride the arms and stay out of every
-// helmet (on the real model's pieces), an arm hemmed in at a side keeps to it, and the
-// Default Dance and the site's dance read.
+// level, the feet step instead of sliding (a leg stretched out along the ground drawn in, not
+// snapped, his head lifted out of its bow), Praise winds each arm up on its own side, a
+// tasset swings forward with a knee drawn up past straight up, the pauldrons ride the arms
+// and stay out of every helmet (on the real model's pieces), an arm hemmed in at a side
+// keeps to it, and the Default Dance and the site's dance read.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
   BONES,
   BONE_NODES,
+  POSE,
   POSE_SIZE,
   DEFAULT_RIG,
   DEFAULT_REST,
@@ -40,6 +43,7 @@ import {
   rise,
   walk,
   mirrorPose,
+  lerpPose,
   RISE_TIME,
 } from '../src/bonfire/knightPose.js';
 import { loadKnightMesh } from './lib/knightMesh.mjs';
@@ -124,6 +128,164 @@ test('the rest-like standing pose barely bends anything, and a mirrored pose mir
     assert.ok(2 * Math.acos(Math.min(1, Math.abs(s.q[I[b]].w))) < 0.35, `${b} barely turned`);
   const m = mirrorPose(mirrorPose(Float32Array.from(p)));
   assert.deepEqual([...m], [...p]);
+});
+
+/** A solve's bones, copied (the solver reuses its arrays). */
+const solved = (p) => {
+  const s = solver.solve(p);
+  return { q: s.q.map((q) => q.clone()), p: s.p.map((v) => v.clone()) };
+};
+/** The turn taking quaternion `a` to `b` (b · a⁻¹): which way it goes about the vertical, and how far off the vertical its axis is. */
+function turnAbout(a, b) {
+  const t = b.clone().multiply(a.clone().invert());
+  if (t.w < 0) t.set(-t.x, -t.y, -t.z, -t.w);
+  const angle = 2 * Math.acos(Math.min(1, t.w));
+  const sn = Math.sqrt(Math.max(0, 1 - t.w * t.w));
+  return { yaw: sn < 1e-9 ? 0 : (angle * t.y) / sn, tilt: sn < 1e-9 ? 0 : Math.hypot(t.x, t.z) / sn };
+}
+test('a foot turned in (its toe-in channel) turns that foot alone, about the vertical, toward his middle, by the angle given; with none every pose solves as before, and poses blend and mirror it', () => {
+  // (Before the channel each foot was flat, turned with his hips and nothing more: knightSolve.js.)
+  const e = new THREE.Euler(),
+    q = new THREE.Quaternion();
+  const poses = [
+    ['standing', standingPose()],
+    ...[0, 0.23, 0.36].flatMap((h) =>
+      SEAT_POSES.map((st) => [`${st}, seat ${h} m`, seatedPose(newPose(), h, DEFAULT_RIG, st)]),
+    ),
+    ['Praise the Sun', gesture(standingPose(), 'praise', 1)],
+    ['walking', walk(newPose(), standingPose(), 0.3)],
+    ['the Default Dance', dance(standingPose(), 'defaultDance', 3.5)],
+    ['a seated hop', hop(seatedPose(newPose(), 0.36), 0.2)],
+  ];
+  for (const [what, base] of poses) {
+    const p = Float32Array.from(base);
+    p[POSE.toeInL] = p[POSE.toeInR] = 0;
+    const s0 = solved(p);
+    for (const [side, o] of [
+      ['L', POSE.legL],
+      ['R', POSE.legR],
+    ]) {
+      q.setFromEuler(e.set(p[o + 3], p[POSE.hips + 1], 0, 'YXZ'));
+      assert.ok(
+        Math.abs(Math.abs(q.dot(s0.q[I['foot' + side]])) - 1) < 1e-6,
+        `${what}: with no toe-in the ${side} foot is turned as before (its pitch, his hips' turn)`,
+      );
+    }
+    for (const [side, inward] of [
+      ['L', -1],
+      ['R', 1],
+    ]) {
+      for (const deg of [20, 35]) {
+        const t = Float32Array.from(p);
+        t[POSE['toeIn' + side]] = deg / DEG;
+        const s = solved(t);
+        BONES.forEach((b, i) => {
+          assert.ok(s.p[i].distanceTo(s0.p[i]) < 1e-6, `${what}, ${side} turned in ${deg}°: the ${b} moved`);
+          if (b !== 'foot' + side)
+            assert.ok(
+              Math.abs(Math.abs(s.q[i].dot(s0.q[i])) - 1) < 1e-6,
+              `${what}, ${side} turned in ${deg}°: the ${b} turned`,
+            );
+        });
+        // (Toward his middle: his left foot's toe toward −x, his right's toward +x.)
+        const turn = turnAbout(s0.q[I['foot' + side]], s.q[I['foot' + side]]);
+        assert.ok(turn.tilt < 1e-6, `${what}, ${side} turned in ${deg}°: the foot tips (${turn.tilt})`);
+        assert.ok(
+          Math.abs(turn.yaw - (inward * deg) / DEG) < 1e-6,
+          `${what}, ${side} turned in ${deg}°: the foot turns ${(turn.yaw * DEG).toFixed(2)}° about the vertical`,
+        );
+      }
+    }
+  }
+  // Blended, half the turn; mirrored, the other foot turned in as far (toward his middle still).
+  const a = seatedPose(newPose(), 0.36),
+    b = Float32Array.from(a);
+  a[POSE.toeInL] = a[POSE.toeInR] = 0;
+  b[POSE.toeInL] = 0;
+  b[POSE.toeInR] = 30 / DEG;
+  assert.ok(Math.abs(lerpPose(newPose(), a, b, 0.5)[POSE.toeInR] - 15 / DEG) < 1e-6, 'lerpPose blends the toe-in');
+  const m = mirrorPose(Float32Array.from(b));
+  assert.ok(
+    Math.abs(m[POSE.toeInL] - 30 / DEG) < 1e-6 && m[POSE.toeInR] === 0,
+    `mirrorPose swaps the feet's toe-in (${[m[POSE.toeInL], m[POSE.toeInR]].map((v) => (v * DEG).toFixed(1))})`,
+  );
+  const ma = mirrorPose(Float32Array.from(a));
+  const turn = turnAbout(solved(ma).q[I.footL], solved(m).q[I.footL]);
+  assert.ok(Math.abs(turn.yaw + 30 / DEG) < 1e-6, `mirrored, his left toe turns ${(turn.yaw * DEG).toFixed(1)}°`);
+});
+
+test('resting on the ground, the boot of the leg he stretches out turns in toward his other foot (45° to 60° from his hips’ facing), the other as it was; no other base pose turns a foot, and getting up and sitting down it turns only while lifted', () => {
+  // (The user's Dark Souls reference: the stretched leg's sabaton lies turned in toward the
+  // drawn-up one. His hips turn a little to his right sitting so: the toe is turned from them.
+  // Less doesn't read at the home view, which looks almost straight down that leg.)
+  for (const h of [0, 0.06, 0.11]) {
+    for (const feet of [null, [0.03, -0.02]]) {
+      const p = seatedPose(newPose(), h, DEFAULT_RIG, 'resting', feet);
+      const s = solver.solve(p, feet);
+      const hips = p[POSE.hips + 1];
+      const yaw = (side) => {
+        const f = new THREE.Vector3(0, 0, 1).applyQuaternion(s.q[I['foot' + side]]);
+        return Math.atan2(f.x, f.z) - hips;
+      };
+      const what = `resting on the ground (${h} m${feet ? ', uneven' : ''})`;
+      assert.ok(
+        yaw('R') >= 45 / DEG && yaw('R') <= 60 / DEG,
+        `${what}: his right boot turned in ${(yaw('R') * DEG).toFixed(1)}°`,
+      );
+      assert.ok(Math.abs(yaw('L')) < 1e-6, `${what}: his left boot turned ${(yaw('L') * DEG).toFixed(1)}°`);
+    }
+  }
+  const others = [
+    ['standing', standingPose()],
+    ['watchful on the ground', seatedPose(newPose(), 0, DEFAULT_RIG, 'watchful')],
+    ...[0.23, 0.36, 0.42].flatMap((h) =>
+      SEAT_POSES.map((st) => [`${st} on a ${h} m seat`, seatedPose(newPose(), h, DEFAULT_RIG, st)]),
+    ),
+  ];
+  for (const [what, p] of others) assert.ok(p[POSE.toeInL] === 0 && p[POSE.toeInR] === 0, `${what}: a foot turned in`);
+  // (A boot turned on the ground would grind round on its heel: it turns as it steps. As the
+  // feet's places do (the test above), it may start a hair before it's off the ground.)
+  for (const down of [false, true]) {
+    const what = down ? 'sitting down' : 'getting up';
+    const sit = seatedPose(newPose(), 0, DEFAULT_RIG, 'resting'),
+      up = standBy(newPose(), 0);
+    let prev = null,
+      lifted = false,
+      ground = 0;
+    for (let t = 0; t <= RISE_TIME + 1e-9; t += 1 / 120) {
+      const p = rise(newPose(), sit, up, t, down);
+      const s = solver.solve(p);
+      const on = s.p[I.footR].y < DEFAULT_RIG.ankleY + 0.006;
+      if (prev?.on && on) ground += Math.abs(p[POSE.toeInR] - prev.toe);
+      if (!on) lifted = true;
+      prev = { on, toe: p[POSE.toeInR] };
+    }
+    assert.ok(lifted, `${what}: the right boot lifts`);
+    assert.ok(ground < 0.5 / DEG, `${what}: the right boot turns ${(ground * DEG).toFixed(2)}° on the ground`);
+    assert.equal(prev.toe, down ? sit[POSE.toeInR] : 0, `${down ? 'sat down' : 'up'}: the right boot's turn`);
+  }
+});
+
+test('resting on the ground, the knee of the leg he stretches out faces up and a little out (5° to 25° from straight up, square to the leg), not in toward his other knee', () => {
+  // (The user's Dark Souls reference: that leg lies rolled a little onto its outside. Much
+  // further out, he comes within 10 px of a phone's frame on the home view.)
+  for (const h of [0, 0.06, 0.11]) {
+    for (const feet of [null, [0.03, -0.02]]) {
+      const p = seatedPose(newPose(), h, DEFAULT_RIG, 'resting', feet);
+      const s = solver.solve(p, feet);
+      const [hip, knee, ankle] = ['thighR', 'shinR', 'footR'].map((b) => s.p[I[b]].clone());
+      const along = ankle.sub(hip).normalize();
+      const cap = knee
+        .sub(hip)
+        .projectOnPlane(along)
+        .normalize()
+        .applyAxisAngle(new THREE.Vector3(0, 1, 0), -p[POSE.hips + 1]);
+      // (His right is −x: out is the cap's −x, from straight up.)
+      const out = Math.atan2(-cap.x, cap.y) * DEG;
+      const what = `resting on the ground (${h} m${feet ? ', uneven' : ''})`;
+      assert.ok(out >= 5 && out <= 25, `${what}: his right knee faces ${out.toFixed(1)}° out from straight up`);
+    }
+  }
 });
 
 test('[slow] every move gives a sound pose in its limits over 64 beats, standing and (where it can) seated', () => {
@@ -352,6 +514,33 @@ test('standing up and sitting down, and the idle shifts, the feet step (lifted) 
   );
 });
 
+test('getting up from the ground and sitting back down onto it, either seat pose: the leg stretched out along it draws in (no step of a foot over 22 cm at 12 a second), and his head bows no further than 58°', () => {
+  // (Round 11's ground rest stretches the right leg out; the step that draws it in under him
+  // takes longer in proportion (STEP_LONG), or it snapped in at 27 to 29 cm a step. Leaning
+  // in, his head lifts out of its bow (RISE_LOOK), or it curled him into a ball, 62°.)
+  for (const style of SEAT_POSES) {
+    const sit = seatedPose(newPose(), 0, DEFAULT_RIG, style),
+      up = standBy(newPose(), 0);
+    for (const down of [false, true]) {
+      const what = `${style}, ${down ? 'sitting down' : 'getting up'}`;
+      let prev = null;
+      for (let t = 0; t <= RISE_TIME + 1e-9; t += 1 / 12) {
+        const s = solver.solve(rise(newPose(), sit, up, t, down));
+        const feet = ['footL', 'footR'].map((b) => s.p[I[b]].clone());
+        if (prev)
+          feet.forEach((v, j) => {
+            const d = v.distanceTo(prev[j]);
+            assert.ok(d <= 0.22, `${what}: a foot steps ${(d * 100).toFixed(1)} cm at ${t.toFixed(2)} s`);
+          });
+        prev = feet;
+        const ahead = new THREE.Vector3(0, 0, 1).applyQuaternion(s.q[I.head]);
+        const bow = Math.asin(-ahead.y) * DEG;
+        assert.ok(bow <= 58, `${what}: his head bows ${bow.toFixed(1)}° at ${t.toFixed(2)} s`);
+      }
+    }
+  }
+});
+
 test('seated gestures sit up first and throw the arms where they would standing (in the room)', () => {
   const sit = seatedPose(newPose(), 0.4);
   const at = (name, t) => solver.solve(gesture(Float32Array.from(sit), name, t, true));
@@ -401,6 +590,67 @@ test('seated gestures sit up first and throw the arms where they would standing 
     biggest < range * 0.55,
     `praise: the biggest step moves the hand ${biggest.toFixed(2)} of ${range.toFixed(2)} m`,
   );
+});
+
+test('seated Praise the Sun, on the ground and on a seat, either seat pose: each hand winds up on its own side of him, 10 cm or more out from the line through his hips, spine and chest', () => {
+  // (Its wind-up turns the arms with his chest as he sits up: an arm turned past straight
+  // ahead would cross to his other side, the hand through his belly, unless kept to its own
+  // side (knightGestures.js ownSides). On the ground it came within 2 cm of his middle.)
+  for (const style of SEAT_POSES) {
+    for (const h of [0, 0.22]) {
+      const sit = seatedPose(newPose(), h, DEFAULT_RIG, style);
+      for (let t = 0; t <= GESTURE_TIME.praise + 1e-9; t += 1 / 12) {
+        const s = solver.solve(gesture(Float32Array.from(sit), 'praise', t, true));
+        const middle = (s.p[I.hips].x + s.p[I.spine].x + s.p[I.chest].x) / 3;
+        for (const [side, sg] of [
+          ['L', 1],
+          ['R', -1],
+        ]) {
+          const out = sg * (s.p[I['hand' + side]].x - middle);
+          assert.ok(
+            out >= 0.1,
+            `${style}, seat ${h} m, ${t.toFixed(2)} s: his ${side} hand ${(out * 100).toFixed(1)} cm out on its own side`,
+          );
+        }
+      }
+    }
+  }
+});
+
+test('a tasset swings on forward with its thigh drawn up past straight up from his hips (a knee pulled in high, sat on the ground), never round behind him', () => {
+  // (Its turn is a share of the thigh's from the hips; past straight up the short way round
+  // is backward, which swung it round behind him and into the ground: knightSolve.js
+  // tassetTurn takes the long way, forward, past 120°.)
+  for (const [y, z] of [
+    [0.05, 0.1],
+    [0.1, 0.15],
+    [0.3, 0.35],
+  ]) {
+    const p = seatedPose(newPose(), 0, DEFAULT_RIG, 'watchful');
+    p[POSE.hips] = p[POSE.hips + 1] = p[POSE.hips + 2] = 0;
+    for (const o of [POSE.legL, POSE.legR]) {
+      p[o] = 0;
+      p[o + 1] = y;
+      p[o + 2] = z;
+      p[o + 4] = 0;
+    }
+    const s = solver.solve(p);
+    const inHips = s.q[I.hips].clone().invert();
+    for (const side of ['L', 'R']) {
+      const what = `ankles ${y} m up, ${z} m ahead: the ${side} `;
+      const thigh = s.p[I['shin' + side]]
+        .clone()
+        .sub(s.p[I['thigh' + side]])
+        .normalize()
+        .applyQuaternion(inHips);
+      assert.ok(
+        thigh.y > 0.9 && thigh.z < 0,
+        `${what}thigh is past straight up (${thigh.toArray().map((v) => v.toFixed(2))})`,
+      );
+      const down = new THREE.Vector3(0, -1, 0).applyQuaternion(inHips.clone().multiply(s.q[I['tasset' + side]]));
+      assert.ok(down.z > 0.5, `${what}tasset hangs ${down.toArray().map((v) => v.toFixed(2))} from the hips`);
+    }
+  }
 });
 
 test('the pauldrons swing with the arm (no twist), a raise to the side more than one forward, the lames more than the dome', () => {

@@ -10,6 +10,7 @@ import { COLOR_MODES } from './colors.js';
 import { saveSettings } from './settings.js';
 import { MODES } from './looks.js';
 import { isHelpKey } from '../ui/keysOverlay.js';
+import { statsNote } from '../settingsMap.js';
 
 /**
  * The actions' part of the page.
@@ -85,6 +86,12 @@ export function createActions(ctx) {
       settings.colors = modes[(modes.indexOf(settings.colors) + 1) % modes.length];
       saveSettings(settings);
       ctx.note(`Flame Colors: ${COLOR_MODES[settings.colors]}`, 1.5);
+    },
+    stats: () => {
+      settings.stats = !settings.stats;
+      saveSettings(settings);
+      ctx.applyStats();
+      ctx.note(statsNote(settings.stats, ctx.fire?.statsShown ?? settings.stats), 1.2);
     },
     mirror: () => {
       const modes = ['mix', 'on', 'off'];
@@ -179,7 +186,8 @@ export function createActions(ctx) {
     } else if (k === 'i') {
       ctx.pack.toggle();
       ctx.wake();
-    } else if (k === 'n') {
+    } else if (k === 'u') actions.stats();
+    else if (k === 'n') {
       if (e.shiftKey) ctx.cycleScenes();
       else ctx.nextScene();
       ctx.wake();

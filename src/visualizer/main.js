@@ -20,6 +20,8 @@
 //             the analyser still hears every frame the display shows (createBonfire's
 //             onTick), and what it heard in between reaches the director with the next drawn
 //             frame (tickBatch.js).
+//   stats     the Stats Overlay (U; this computer's too): the scene's corner readout of its
+//             frames and particles, with the show's part from the director's status().
 //   beat      from the music, or set by hand (actions.js: a BPM, nudges, "this is beat 1"),
 //             or from an Ableton Link session through the bridge (tools/link-bridge.mjs).
 //   output    a second window with just the picture, for a projector (the canvas is
@@ -191,6 +193,10 @@ function applyFrameRate() {
   const cap = frameCap(settings.frameRate);
   if (ctx.fire && ctx.fire.maxFps !== cap) ctx.fire.setMaxFps(cap);
 }
+/** The Stats Overlay, shown or not (the scene's: ?perf in the address shows it anyway). */
+function applyStats() {
+  ctx.fire?.setStats(settings.stats);
+}
 
 /** The scene couldn't start (no WebGL): it's let go, and the start screen says so (ui/shell.js). */
 function sceneFailed(error) {
@@ -228,6 +234,10 @@ function startScene() {
         onTick: (dt) => {
           if (ctx.fire === candidate) onTick(dt);
         },
+        // (The stats overlay's show: the director's snapshot, asked for twice a second while it's on;
+        // the overlay in the page's box, which places it: visualizer.css, by the HUD's height.)
+        pageStats: () => (ctx.fire === candidate && ctx.director ? { show: ctx.director.status() } : null),
+        statsParent: app,
       });
       const nextDirector = createDirector(candidate, { settings, reducedMotion, onEvent, scenes: ctx.loopLibrary });
       await candidate.ready;
@@ -243,6 +253,7 @@ function startScene() {
       ctx.director = nextDirector;
       ctx.frameFire();
       applyFrameRate();
+      applyStats();
       // (Dev builds, and any build with ?bench in its address: tools/bench-viz.mjs drives the show through it.)
       if (import.meta.env.DEV || new URLSearchParams(location.search).has('bench'))
         window.__viz = {
@@ -275,8 +286,8 @@ function startScene() {
     })
     .catch(sceneFailed);
 }
-// (A settings change rebuilds the scene, or caps its frame rate: dialogs.js.)
-Object.assign(ctx, { startScene, applyFrameRate });
+// (A settings change rebuilds the scene, caps its frame rate or shows its stats: dialogs.js, actions.js.)
+Object.assign(ctx, { startScene, applyFrameRate, applyStats });
 startScene();
 
 // --- Director events → page ------------------------------------------------------------------
@@ -309,6 +320,9 @@ Object.assign(ctx, createSources(ctx));
 
 // --- Start screen (start.js): the sources, the presets; to the show and back --------------------
 Object.assign(ctx, createStart(ctx));
+// (Where the start menu reaches across under the stats overlay, the overlay keeps above it: visualizer.css.)
+const startCopy = q('.viz-start-copy');
+new ResizeObserver(() => app.style.setProperty('--start-h', `${startCopy.offsetHeight}px`)).observe(startCopy);
 
 // --- HUD (hud.js): what it hears, the beat, the state line, the labels that change; idle -------
 Object.assign(ctx, createHud(ctx));
@@ -322,6 +336,10 @@ Object.assign(ctx, createDialogs(ctx));
 // --- Render Settings (renderUi.js): P, the Picture tab's switches, as on the site --------------
 Object.assign(ctx, createRenderUi(ctx));
 app.append(ctx.renderMenu.el);
+// (Where it opens over the stats overlay, the overlay steps down under it: visualizer.css.)
+new ResizeObserver(() => app.style.setProperty('--menu-h', `${ctx.renderMenu.el.offsetHeight}px`)).observe(
+  ctx.renderMenu.el,
+);
 
 // --- Recording a clip (record.js) -------------------------------------------------------------
 const recordLabel = q('[data-record-label]');

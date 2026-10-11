@@ -15,6 +15,7 @@ import {
   helmDepth,
   sideOf,
   legOf,
+  toeOf,
   eulerQ,
 } from './knightRig.js';
 
@@ -29,6 +30,30 @@ const _m = new THREE.Matrix4();
 const X = new THREE.Vector3(1, 0, 0);
 const Y = new THREE.Vector3(0, 1, 0);
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
+const _tq = new THREE.Quaternion();
+const _ta = new THREE.Vector3();
+/**
+ * A tasset's turn into `out`: `f` of the way from the hips' turn `qh` to its thigh's `qt`, as a
+ * slerp goes, the short way round. Except a knee drawn up past straight up from the hips (sat
+ * on the ground, knees up, then a kick): the short way round would swing the plate round
+ * behind him into the ground, so past 120° a forward swing keeps going forward (the long way:
+ * no leg swings back that far).
+ */
+function tassetTurn(out, qh, qt, f) {
+  _tq.copy(qh).invert().multiply(qt);
+  if (_tq.w < 0) _tq.set(-_tq.x, -_tq.y, -_tq.z, -_tq.w);
+  const half = Math.acos(clamp(_tq.w, -1, 1));
+  const sn = Math.sin(half);
+  if (sn < 1e-6) return out.copy(qh);
+  let angle = 2 * half;
+  _ta.set(_tq.x / sn, _tq.y / sn, _tq.z / sn);
+  // (A forward swing turns about −x, his right: the thigh's way down swung on toward his front.)
+  if (angle > (2 * Math.PI) / 3 && _ta.x > 0) {
+    angle = 2 * Math.PI - angle;
+    _ta.negate();
+  }
+  return out.copy(qh).multiply(_tq.setFromAxisAngle(_ta, angle * f));
+}
 
 /** A frame whose y is `dir` and whose x is `hinge` (made square to it). */
 function frame(out, dir, hinge) {
@@ -323,9 +348,10 @@ export function createSolver(rig = DEFAULT_RIG) {
       out.knee[si] = Math.PI - mid.clone().sub(S).angleTo(end.clone().sub(mid).negate());
       const foot = IDX['foot' + s];
       p[foot].copy(end);
-      // Feet stay flat to the ground whatever the leg does, turned with the body.
-      eulerQ(q[foot], pose[o + 3], hipsYaw, 0);
-      q[IDX['tasset' + s]].copy(q[H]).slerp(q[IDX['thigh' + s]], rig.tassetFollow ?? TASSET_FOLLOW);
+      // Feet stay flat to the ground whatever the leg does, turned with the body, and the toe
+      // turned in toward his middle by its toe-in (his left foot's toward −x, his right's +x).
+      eulerQ(q[foot], pose[o + 3], hipsYaw - sg * pose[toeOf(s)], 0);
+      tassetTurn(q[IDX['tasset' + s]], q[H], q[IDX['thigh' + s]], rig.tassetFollow ?? TASSET_FOLLOW);
       p[IDX['tasset' + s]]
         .copy(off[IDX['tasset' + s]])
         .applyQuaternion(q[H])

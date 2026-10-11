@@ -16,6 +16,7 @@ import {
   DEFAULT_RIG,
   sideOf,
   legOf,
+  toeOf,
   eulerQ,
 } from './knightRig.js';
 import { createSolver } from './knightSolve.js';
@@ -55,6 +56,10 @@ export function leg(p, s, x, y, z, pitch = 0, knee = 8) {
   p[o + 3] = pitch * DEG;
   p[o + 4] = knee * DEG;
 }
+/** A foot's toe turned in toward his middle, about the vertical (degrees). */
+export function toeIn(p, s, deg) {
+  p[toeOf(s)] = deg * DEG;
+}
 export function root(p, x, y, z) {
   p[0] = x;
   p[1] = y;
@@ -77,7 +82,7 @@ function lerpArms(out, b, t, s = null) {
     for (let i = 0; i < 7; i++) out[o + i] += (b[o + i] - out[o + i]) * t;
   }
 }
-/** Swap a pose's sides: his left does what his right did. */
+/** Swap a pose's sides: his left does what his right did (a toe turned in stays turned in). */
 export function mirrorPose(p) {
   for (let i = 0; i < 7; i++) {
     const t = p[POSE.armL + i];
@@ -89,6 +94,9 @@ export function mirrorPose(p) {
     p[POSE.legL + i] = p[POSE.legR + i];
     p[POSE.legR + i] = t;
   }
+  const toe = p[POSE.toeInL];
+  p[POSE.toeInL] = p[POSE.toeInR];
+  p[POSE.toeInR] = toe;
   for (const j of AXIAL) {
     p[POSE[j] + 1] *= -1;
     p[POSE[j] + 2] *= -1;
@@ -216,6 +224,36 @@ export const hemArms = (p, room, from = null) => {
   if (room[1] < 1) hem(p, 'R', room[1], from);
   return p;
 };
+const _fa = new THREE.Vector3();
+const _fs = new THREE.Vector3();
+/**
+ * Keep the hands off the floor: a wrist that would go lower than `y` (m, knight space: the
+ * ground he's placed on) is drawn up to it along its arm's own line, the reach shortened (the
+ * elbow bending), the aim kept. For a knight sitting on the ground, whose gestures and moves
+ * were made for a seat: a hand dropped to a knee or flung low would go into the floor. (Not
+ * turned up about the shoulder, its reach kept: an arm hanging all but straight down points
+ * nowhere in particular, so its hand would be flung a third of a metre out to whichever side
+ * it tipped, then to another the next step, as he leans in to get up.)
+ */
+export function floorArms(p, y, rig = DEFAULT_RIG) {
+  const f = chestFrame(p, rig);
+  const armLen = rig.arm[0] + rig.arm[1];
+  for (const s of ['L', 'R']) {
+    const o = sideOf(s),
+      sg = s === 'L' ? 1 : -1;
+    const sock = _fs
+      .copy(rig.pos['upperArm' + s])
+      .sub(rig.pos.chest)
+      .applyQuaternion(f.q)
+      .add(f.pos);
+    // (How far down the arm goes for each metre it reaches; its reach as the solver takes it.)
+    const fall = -armVec(_fa, p[o], p[o + 1], sg).applyQuaternion(f.q).y;
+    if (sock.y - fall * clamp(p[o + 2], 0.2, 1) * armLen >= y) continue;
+    // (A shoulder that low, or an arm not going down, can only be drawn in as far as it goes.)
+    p[o + 2] = fall > 1e-4 ? Math.max(0.2, (sock.y - y) / fall / armLen) : 0.2;
+  }
+  return p;
+}
 
 const _ha = new THREE.Vector3();
 /** Where the head joint is (knight space) in a pose. Reused: copy what you keep. */
@@ -325,20 +363,30 @@ export function standingPose(p = newPose()) {
   return p;
 }
 
+/**
+ * How far the boot of the leg he stretches out resting on the ground turns in toward his other
+ * foot (degrees, from his hips' facing). That leg points nearly at the home camera, which
+ * foreshortens the turn: at 35° the boot read as pointing straight at it, at 50° in toward
+ * the drawn-up foot, as in the user's reference (round 11's captures).
+ */
+const GROUND_TOE_IN = 50;
 /** Where the feet go in front of a seat of height `h` (m above the ground), knight space z. */
 export const seatFeet = (h) => clamp(0.3 + 0.35 * h, 0.3, 0.46);
 /** The seat's height (m) a seated pose sits on (from where its hips are). */
 export const seatOf = (p, rig = DEFAULT_RIG) => p[1] + rig.hipsY - SEAT_DEPTH;
 /**
- * Where each foot of a pose rests on the ground, knight space: [[x, z] left, [x, z] right]
- * (the ankle's place; knights.js looks up the ground under it).
+ * Where each foot of a pose rests on the ground, knight space: [[x, z, turn] left, [x, z,
+ * turn] right] (the ankle's place, and which way its toe points, rad from straight ahead, +
+ * toward his left: turned with his hips and turned in by its toe-in, as solved; knights.js
+ * looks up the ground under its sole and keeps its toe out of the fire).
  */
 export function feetAt(p, rig = DEFAULT_RIG) {
   const L = rig.pos.footL,
-    R = rig.pos.footR;
+    R = rig.pos.footR,
+    yaw = p[POSE.hips + 1];
   return [
-    [L.x + p[POSE.legL], L.z + p[POSE.legL + 2]],
-    [R.x - p[POSE.legR], R.z + p[POSE.legR + 2]],
+    [L.x + p[POSE.legL], L.z + p[POSE.legL + 2], yaw - p[POSE.toeInL]],
+    [R.x - p[POSE.legR], R.z + p[POSE.legR + 2], yaw + p[POSE.toeInR]],
   ];
 }
 /**
@@ -368,16 +416,23 @@ const _kL = new THREE.Vector3();
 const _kR = new THREE.Vector3();
 
 /**
- * Sitting on a seat `h` m above the ground (0.23–0.42 for the sceneries' seats; 0 sits on
- * the ground, knees up). `style`:
+ * Sitting on a seat `h` m above the ground (0.23–0.42 for the sceneries' seats; under 0.12 he
+ * sits on the ground itself). `style`:
  *   'resting'   the Dark Souls bonfire rest: slumped forward over his knees, his left foot
  *               drawn in and that arm laid over the knee with the gauntlet hanging past it,
  *               the right leg out with that forearm along the thigh and the hand on the knee,
  *               the head sunk and tipped a little aside (the higher the seat, the deeper the
- *               slump, which keeps his helmet low on tall layouts)
+ *               slump, which keeps his helmet low on tall layouts). On the ground, a knight
+ *               spent by the road: the left knee drawn up high with that arm hung over it, the
+ *               forearm across the kneecap and the gauntlet hanging limp inside it, the right
+ *               leg stretched out along the ground, slumped toward the knee, the head sunk and
+ *               tipped to it
  *   'watchful'  leaning in over his knees, forearms on them, both feet planted under them,
  *               the head up watching the fire, awake (no higher at the helmet than the rest:
- *               tall layouts frame his seat right under the page's header)
+ *               tall layouts frame his seat right under the page's header). On the ground,
+ *               sitting up with both knees drawn up, the left the higher, the left forearm over
+ *               its knee and the right along its thigh, the hands hanging past them, the chest
+ *               and the head turned to the fire
  * The hips sit over knight-space (0, 0); the hands are placed on his knees (knight space),
  * so they stay there whatever the torso does. `feet` [left, right] (m): the ground under
  * each foot above the ground he's placed on (a foot up on a log), where feetAt() says they
@@ -387,33 +442,40 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
   p.fill(0);
   root(p, 0, h + SEAT_DEPTH - rig.hipsY, 0);
   const watch = style === 'watchful';
+  const ground = h < 0.12;
   const z = seatFeet(h);
-  const grounded = () => {
-    if (feet) {
-      p[POSE.legL + 1] += feet[0];
-      p[POSE.legR + 1] += feet[1];
-    }
-  };
-  if (h < 0.12) {
-    // On the ground: knees drawn up, forearms across them (watchful: sitting up, head up).
-    joint(p, 'hips', -14);
-    joint(p, 'spine', watch ? 12 : 20);
-    joint(p, 'chest', watch ? 4 : 10);
-    joint(p, 'neck', watch ? -2 : 4);
-    joint(p, 'head', watch ? -8 : 14);
-    leg(p, 'L', 0.05, 0, z, 10, 22);
-    leg(p, 'R', 0.07, 0, z - 0.04, 6, 26);
-    grounded();
-    arm(p, 'L', 18, -28, 0.66, 30, 20, 0.6);
-    arm(p, 'R', 18, -28, 0.66, 30, 20, 0.6);
-    if (watch) {
-      p[POSE.armL + 1] += 6 * DEG;
-      p[POSE.armR + 1] += 6 * DEG;
-    }
-    return p;
-  }
   const k = clamp01((h - 0.22) / 0.18);
-  if (watch) {
+  if (ground && watch) {
+    // Sitting up, leaning back a little from the hips, both knees drawn up: the left the
+    // higher, its foot near him (the fire is ahead on his left: his boots stay out of it),
+    // the right a little further out (no further, nor fallen out more: the back of that
+    // thigh would go into the ground as his weight shifts). The chest turned a little to the
+    // fire, the head up and turned to it.
+    joint(p, 'hips', -16);
+    joint(p, 'spine', 10, 6);
+    joint(p, 'chest', 4, 8);
+    joint(p, 'neck', -2, 8);
+    joint(p, 'head', 0, 12);
+    leg(p, 'L', 0.03, 0, 0.32, 0, 24);
+    leg(p, 'R', 0.1, 0, 0.44, 0, 22);
+  } else if (ground) {
+    // Slumped toward his left knee, drawn up high and fallen out a little, its foot near him
+    // (out of the fire, ahead on his left), his weight on that side (the hips rolled off the
+    // right, which keeps the back of that rolled-out thigh off the ground); the right leg
+    // stretched out along the ground, away from the fire, the knee a little bent and rolled
+    // a little out, its boot turned in toward his other foot (both as in the user's Dark
+    // Souls reference; the knee no further out: he'd come within 10 px of a phone's frame;
+    // no straighter: as his weight shifts the foot steps out and the leg would lock, the
+    // back of the thigh dropping into the ground). The head sunk and tipped toward the knee.
+    joint(p, 'hips', -16, -6, -3);
+    joint(p, 'spine', 20, 4, -3);
+    joint(p, 'chest', 10, 4, -5);
+    joint(p, 'neck', 12, 4);
+    joint(p, 'head', 17, 8, -13);
+    leg(p, 'L', 0.02, 0, 0.38, 0, 40);
+    leg(p, 'R', 0.32, 0, 0.69, 0, 40);
+    toeIn(p, 'R', GROUND_TOE_IN);
+  } else if (watch) {
     // Leaning in over his knees, the head tipped back up to watch the fire, feet planted a
     // stride apart under his knees. (No higher at the helmet than the rest: a phone frames
     // his seat right under the page's header. His boots stay as far out of the fire.)
@@ -433,12 +495,28 @@ export function seatedPose(p = newPose(), h = 0.36, rig = DEFAULT_RIG, style = '
     leg(p, 'L', 0.03, 0, Math.max(0.22, z - 0.2), 0, 10);
     leg(p, 'R', 0.1, 0, z + 0.12, 0, 26);
   }
-  grounded();
+  if (feet) {
+    p[POSE.legL + 1] += feet[0];
+    p[POSE.legR + 1] += feet[1];
+  }
   // The knees, where the hands go.
   const s = solverOf(rig).solve(p);
   const kL = _kL.copy(s.p[IDX.shinL]),
     kR = _kR.copy(s.p[IDX.shinR]);
-  if (watch) {
+  if (ground && watch) {
+    // His left forearm over the knee, the elbow on it and the hand hanging past; the right
+    // forearm along the thigh, the hand hanging over the knee, bent down at the wrist and
+    // rolled little (a rolled hand points straight down as a gesture blends in: at the stone
+    // by his right knee in the ruins).
+    armAt(p, 'L', kL.x, kL.y - 0.09, kL.z + 0.2, -155, -30, 0.3, 0, rig);
+    armAt(p, 'R', kR.x + 0.02, kR.y + 0.08, kR.z + 0.08, 22, 80, 0.45, -10, rig);
+  } else if (ground) {
+    // His left arm hung over the drawn-up knee, the elbow out over its top and the forearm
+    // across the kneecap, the gauntlet hanging limp inside it; the right forearm along the
+    // stretched thigh, the hand on the knee.
+    armAt(p, 'L', kL.x - 0.09, kL.y - 0.07, kL.z + 0.2, -130, -45, 0.3, 0, rig);
+    armAt(p, 'R', kR.x, kR.y + 0.13, kR.z - 0.02, -20, 30, 0.6, 0, rig);
+  } else if (watch) {
     // Forearms on the knees, the hands loosely together in front of them.
     armAt(p, 'L', kL.x - 0.05, kL.y + 0.05, kL.z + 0.14, 55, 25, 0.55, 0, rig);
     armAt(p, 'R', kR.x + 0.05, kR.y + 0.05, kR.z + 0.14, 55, 25, 0.55, 0, rig);
@@ -584,7 +662,7 @@ const HOP_FEET = 0.2;
 /**
  * A ground ring passing under him, `t` s after it reaches him: seated, he lifts his feet
  * and leans back; standing, a hop with the knees tucked. `rise` (seated) [left, right] (m):
- * how far each foot may lift; one resting high (up on the ruins' fallen drum) lifts only that
+ * how far each foot may lift; one resting high (up on a stone, say) lifts only that
  * far, or stays put (knights.js riseOf), so its knee keeps its bend.
  */
 export function hop(p, t, k = 1, seated = true, rise = null) {
@@ -644,6 +722,8 @@ function spline(out, keys, ts, t) {
 }
 /** How high a stepping foot lifts (m). */
 const STEP_LIFT = 0.06;
+/** A step up to this long (m) takes the time it's given; a longer one, longer in proportion. */
+const STEP_LONG = 0.3;
 /**
  * How much higher a foot stepping between its seated and its standing place has to go, `e`
  * 0..1 of the way from the seated end (`h`: rise()'s `over`, at evenly spaced points; 0 at
@@ -656,21 +736,27 @@ function overAt(h, e) {
   return h[i] + (h[i + 1] - h[i]) * (f - i);
 }
 /**
- * The feet of `out` stepping from `from` to `to` (poses), each over its own [t0, t1] (s):
- * planted before and after, lifted on the way (over what lies there: `over`, rise()'s, from
- * the seated end, `back` when `from` is the standing one), the toes dipping. (Only the legs.)
+ * The feet of `out` stepping from `from` to `to` (poses), each over its own [t0, t1] (s), or
+ * longer for a long step (a leg stretched out along the ground drawn in under him), done by
+ * RISE_TIME: planted before and after, lifted on the way (over what lies there: `over`,
+ * rise()'s, from the seated end, `back` when `from` is the standing one), the toes dipping and
+ * turning (a toe turned in turns out on the way: never on the ground). (Only the legs.)
  */
 function steps(out, from, to, t, plan, over = null, back = false) {
   for (const [s, t0, t1] of plan) {
-    const o = legOf(s);
-    const u = clamp01((t - t0) / (t1 - t0));
+    const o = legOf(s),
+      toe = toeOf(s);
+    const long = Math.max(1, Math.hypot(to[o] - from[o], to[o + 2] - from[o + 2]) / STEP_LONG);
+    const u = clamp01((t - t0) / (Math.min(RISE_TIME, t0 + (t1 - t0) * long) - t0));
     if (u >= 1) {
       for (let i = 0; i < 5; i++) out[o + i] = to[o + i];
+      out[toe] = to[toe];
       continue;
     }
     const e = smooth(u),
       lift = Math.sin(Math.PI * u);
     for (let i = 0; i < 5; i++) out[o + i] = from[o + i] + (to[o + i] - from[o + i]) * e;
+    out[toe] = from[toe] + (to[toe] - from[toe]) * e;
     out[o + 1] += STEP_LIFT * lift + overAt(over?.[s], back ? 1 - e : e);
     out[o + 3] += 10 * DEG * lift;
   }
@@ -678,6 +764,18 @@ function steps(out, from, to, t, plan, over = null, back = false) {
 }
 /** Seconds to stand up or sit down. */
 export const RISE_TIME = 1.2;
+/**
+ * The furthest down he looks leaning in to get up from his seat or to sit down on it (rad,
+ * ahead): at the ground in front of him, his head lifted out of a deep slump (which would
+ * curl him into a ball, the top of his helmet to the camera).
+ */
+const RISE_LOOK = 50 * DEG;
+const _hu = new THREE.Vector3();
+/** Lift the head of `p` to look ahead no further down than `pitch` (rad), if it's bowed further. */
+function headUpTo(p, pitch) {
+  if (Math.asin(clamp(-headDir(p, _hu).y, -1, 1)) > pitch) look(p, 0, pitch);
+  return p;
+}
 const riseKeys = Array.from({ length: 5 }, newPose);
 const riseOver = newPose();
 /**
@@ -687,6 +785,8 @@ const riseOver = newPose();
 function standOver(out, sit, stand) {
   copy(out, stand);
   for (const o of [POSE.legL, POSE.legR]) for (let i = 0; i < 3; i++) out[o + i] = sit[o + i];
+  out[POSE.toeInL] = sit[POSE.toeInL];
+  out[POSE.toeInR] = sit[POSE.toeInR];
   out[0] = (sit[POSE.legL] - sit[POSE.legR]) / 2;
   out[2] = (sit[POSE.legL + 2] + sit[POSE.legR + 2]) / 2 - 0.02;
   return out;
@@ -699,7 +799,7 @@ function standOver(out, sit, stand) {
  * seat and settle, then the feet step out to where they rest. `over` ({ L, R, cross }, each
  * foot's extra lift (m) at evenly spaced points from its seated place to its standing one,
  * 0 at both ends; knights.js, from the scenery's shapes): a foot stepping off or over
- * something (the ruins' fallen drum) lifts over it on its way instead of through it, and
+ * something (a stone or a log in his way) lifts over it on its way instead of through it, and
  * where one has to go over something on its way (`cross`) he stands up first, over his feet
  * where they rest, and then steps across (sitting down: steps back across, then sits).
  */
@@ -713,6 +813,7 @@ export function rise(out, sit, stand, t, down = false, over = null) {
     nudge(k1, 'spine', 26);
     nudge(k1, 'chest', 8);
     nudge(k1, 'head', -26);
+    headUpTo(k1, RISE_LOOK);
     arm(k1, 'L', 14, -40, 0.72, 25, 20, 0.6);
     arm(k1, 'R', 12, -40, 0.72, 25, 20, 0.6);
     k1[2] += 0.05;
@@ -722,6 +823,7 @@ export function rise(out, sit, stand, t, down = false, over = null) {
     nudge(k2, 'spine', 24);
     nudge(k2, 'chest', 6);
     nudge(k2, 'head', -18);
+    headUpTo(k2, RISE_LOOK - 10 * DEG);
     arm(k2, 'L', 22, -62, 0.9, 20, 10, 0.7);
     arm(k2, 'R', 22, -62, 0.9, 20, 10, 0.7);
     copy(k3, stand);
@@ -758,6 +860,7 @@ export function rise(out, sit, stand, t, down = false, over = null) {
   nudge(k2, 'hips', 10);
   nudge(k2, 'spine', 18);
   nudge(k2, 'head', -10);
+  headUpTo(k2, RISE_LOOK - 5 * DEG);
   arm(k2, 'L', 40, -60, 0.9, 10, 0, 0.6);
   arm(k2, 'R', 40, -60, 0.9, 10, 0, 0.6);
   copy(k3, sit);
@@ -780,7 +883,7 @@ export function rise(out, sit, stand, t, down = false, over = null) {
 }
 /**
  * rise() where a foot has something to step over on its way (`over.cross`): up, he leans in
- * and pushes up off his seat over his feet where they rest (one up on a fallen drum, say),
+ * and pushes up off his seat over his feet where they rest (one up on a stone, say),
  * then steps across to where he stands, the right foot and then the left, each lifted over
  * what's in its way; down, the other way round: he steps back across, then bends and sits.
  */
@@ -794,6 +897,7 @@ function riseAcross(out, sit, stand, t, down, over) {
     nudge(k1, 'spine', 26);
     nudge(k1, 'chest', 8);
     nudge(k1, 'head', -26);
+    headUpTo(k1, RISE_LOOK);
     arm(k1, 'L', 14, -40, 0.72, 25, 20, 0.6);
     arm(k1, 'R', 12, -40, 0.72, 25, 20, 0.6);
     k1[2] += 0.04;
@@ -802,6 +906,7 @@ function riseAcross(out, sit, stand, t, down, over) {
     nudge(k2, 'spine', 22);
     nudge(k2, 'chest', 6);
     nudge(k2, 'head', -16);
+    headUpTo(k2, RISE_LOOK - 10 * DEG);
     arm(k2, 'L', 22, -62, 0.9, 20, 10, 0.7);
     arm(k2, 'R', 22, -62, 0.9, 20, 10, 0.7);
     copy(k3, mid);
@@ -839,6 +944,7 @@ function riseAcross(out, sit, stand, t, down, over) {
   nudge(k3, 'hips', 10);
   nudge(k3, 'spine', 18);
   nudge(k3, 'head', -10);
+  headUpTo(k3, RISE_LOOK - 5 * DEG);
   arm(k3, 'L', 40, -60, 0.9, 10, 0, 0.6);
   arm(k3, 'R', 40, -60, 0.9, 10, 0, 0.6);
   copy(k4, sit);

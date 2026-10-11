@@ -7,7 +7,8 @@
 // kept), a setting that does nothing as things stand (disabled, saying why, the focus still
 // kept in the dialog when it's gone to), the keyboard shortcuts (?, every group in sight),
 // short screens and phones (the header in sight, the presets' note whole and right after an
-// Undo), and Frame Rate capping how often the picture is drawn. No errors anywhere.
+// Undo), Frame Rate capping how often the picture is drawn, and the Stats Overlay (U, or
+// Picture › Performance; ?perf shows it too). No errors anywhere.
 import { test, expect } from '@playwright/test';
 
 /** Collect the page's errors (uncaught ones and console errors) for the test to check. */
@@ -578,6 +579,179 @@ test('Frame Rate 30 caps how often the picture is drawn; Display takes the cap o
   await expect
     .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? '{}').frameRate))
     .toBe('60');
+  expect(errors).toEqual([]);
+});
+
+test('Stats Overlay: U shows the frames, the particles and the show in a corner, out of the way; kept here, not in a setup', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await open(page);
+  const overlay = page.locator('.stats-overlay');
+  await expect(overlay).toHaveCount(0);
+  await page.click('[data-source="demo"]');
+  await page.keyboard.press('u');
+  await expect(overlay).toBeVisible();
+  // (Its text is built twice a second.)
+  for (const words of ['Frames', 'fps', 'Particles', 'Bonfire flames', 'Show', 'Section', 'Look', 'Layers', 'Loop'])
+    await expect(overlay).toContainText(words, { timeout: 10_000 });
+  // It never takes the pointer, isn't read out, and sits top left, clear of the HUD below.
+  await expect(overlay).toHaveAttribute('aria-hidden', 'true');
+  expect(await overlay.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none');
+  const corner = await overlay.boundingBox();
+  const hud = await page.locator('[data-hud]').boundingBox();
+  expect(corner.x).toBeLessThan(80);
+  expect(corner.y + corner.height).toBeLessThan(hud.y);
+  // The setting it is: kept on this computer, ticked in Picture › Performance, never in a setup.
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live') ?? '{}').stats))
+    .toBe(true);
+  await page.keyboard.press('s');
+  await page.locator('[data-tab="picture"]').click();
+  await expect(page.locator('[data-set="stats"]')).toBeChecked();
+  await page.locator('[data-tab="setups"]').click();
+  await page.locator('[data-setup-name]').fill('Watching');
+  await page.locator('[data-setup-save]').click();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('bonfire-live-setups')).Watching);
+  expect(saved).not.toHaveProperty('stats');
+  // Unticked: gone.
+  await page.locator('[data-tab="picture"]').click();
+  await page.locator('[data-set="stats"]').uncheck();
+  await expect(overlay).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  // ?perf shows the same overlay, the setting off.
+  await page.goto('/visualizer/?perf');
+  await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+  await expect(overlay).toContainText('Frames', { timeout: 10_000 });
+  await expect(overlay).toContainText('Particles');
+  // U there switches the setting; switched off, the note says ?perf keeps it showing (it does).
+  await page.click('[data-source="demo"]');
+  await page.keyboard.press('u');
+  await page.keyboard.press('u');
+  await expect(page.locator('[data-state]')).toContainText('?perf');
+  await expect(overlay).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+/** Two boxes (boundingBox's) overlap. */
+const crosses = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+/** The stacking order of an element (its computed z-index). */
+const zOf = (locator) => locator.evaluate((el) => Number(getComputedStyle(el).zIndex));
+/** The stats overlay, kept to less room than its rows need, ends on a whole row: none is cut through. */
+const wholeRows = (overlay) =>
+  overlay.evaluate((el) => {
+    const end = el.getBoundingClientRect().bottom;
+    return [...el.querySelectorAll('span')].every(
+      (s) => !s.getClientRects().length || s.getBoundingClientRect().bottom <= end,
+    );
+  });
+
+test('Stats Overlay: under Render Settings (P) and clear of it, on the start screen and in the show, wide and on a phone', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await open(page);
+  const overlay = page.locator('.stats-overlay');
+  const menu = page.locator('.viz-render-menu');
+  /** P opens Render Settings: the overlay, still showing, never crosses it (and is under it). */
+  async function clearOfMenu() {
+    await page.keyboard.press('p');
+    await expect(menu).toBeVisible();
+    await expect.poll(async () => crosses(await overlay.boundingBox(), await menu.boundingBox())).toBe(false);
+    expect((await overlay.boundingBox()).height).toBeGreaterThan(40);
+    expect(await zOf(overlay)).toBeLessThan(await zOf(menu));
+    await page.keyboard.press('p');
+    await expect(menu).toBeHidden();
+  }
+  // The start screen (Render Settings works there too), wide.
+  await page.keyboard.press('u');
+  await expect(overlay).toContainText('Frames', { timeout: 10_000 });
+  await clearOfMenu();
+  // The show, wide, then on a phone (where Render Settings takes the width).
+  await page.click('[data-source="demo"]');
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'live');
+  await clearOfMenu();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await clearOfMenu();
+  expect(errors).toEqual([]);
+});
+
+test('Stats Overlay: on a phone’s start screen it keeps to the room above the start menu, clear of its words', async ({
+  page,
+}) => {
+  const errors = watch(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  const overlay = page.locator('.stats-overlay');
+  const copy = page.locator('.viz-start-copy');
+  const home = page.locator('.viz-home');
+  /** What the overlay shows (nothing, held to no room, counts as clear) crosses none of these. */
+  const clearOf = async (...others) => {
+    const o = await overlay.boundingBox();
+    if (!o?.height) return true;
+    for (const other of others) if (crosses(o, await other.boundingBox())) return false;
+    return true;
+  };
+  await page.keyboard.press('u');
+  await expect(overlay).toContainText('Frames', { timeout: 10_000 });
+  await expect.poll(() => clearOf(copy, home)).toBe(true);
+  // (Its first rows, the frame rate, fit above the start menu here; the rest are left out.)
+  expect((await overlay.boundingBox()).height).toBeGreaterThan(40);
+  await expect.poll(() => wholeRows(overlay)).toBe(true);
+  // A smaller phone, where the start menu takes the whole screen; a tablet, beside it.
+  for (const [width, height] of [
+    [360, 640],
+    [800, 900],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await expect.poll(() => clearOf(copy, home), { message: `${width}×${height}` }).toBe(true);
+  }
+  // The show: all of it, top left.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.click('[data-source="demo"]');
+  await expect(page.locator('body')).toHaveAttribute('data-mode', 'live');
+  await expect(overlay).toContainText('Section', { timeout: 10_000 });
+  // Section can already be in a clipped group on the start screen. Wait for the
+  // twice-a-second overlay update to restore its rows, not just for that DOM text.
+  await expect.poll(async () => (await overlay.boundingBox())?.height ?? 0).toBeGreaterThan(200);
+  expect(errors).toEqual([]);
+});
+
+test('Stats Overlay: on a phone held sideways it keeps above the HUD while the HUD is up, all of it once it fades', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  const errors = watch(page);
+  await page.addInitScript(() => localStorage.setItem('bonfire-live', JSON.stringify({ stats: true })));
+  await open(page);
+  await page.locator('[data-source="demo"]').tap();
+  const overlay = page.locator('.stats-overlay');
+  const hud = page.locator('[data-hud]');
+  await expect(overlay).toContainText('Section', { timeout: 10_000 });
+  const above = async () => {
+    const o = await overlay.boundingBox();
+    return !o?.height || o.y + o.height <= (await hud.boundingBox()).y;
+  };
+  for (const [width, height] of [
+    [844, 390],
+    [740, 360],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await page.touchscreen.tap(width / 2, height / 3);
+    await expect(hud).toHaveCSS('opacity', '1');
+    await expect.poll(above, { message: `${width}×${height}` }).toBe(true);
+    await expect.poll(() => wholeRows(overlay), { message: `${width}×${height}: whole rows` }).toBe(true);
+  }
+  // The HUD fades: the overlay has the screen's height again.
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.touchscreen.tap(422, 130);
+  await expect.poll(above).toBe(true);
+  const capped = (await overlay.boundingBox()).height;
+  await expect(hud).toHaveCSS('opacity', '0', { timeout: 10_000 });
+  await expect.poll(async () => (await overlay.boundingBox()).height).toBeGreaterThan(capped);
+  await context.close();
   expect(errors).toEqual([]);
 });
 
