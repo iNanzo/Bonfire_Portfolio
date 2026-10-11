@@ -15,8 +15,8 @@ exported Setups, Painter scenes (v: 1), src/content.json. A stored key is never 
 without a migration; say how old data still loads. Write "None" if nothing stored changes. -->
 
 - [ ] The content's shape changed (a key added, renamed or removed in `src/content.json`
-      or the admin's schema). After merging, run `npm run admin:deploy` so the admin
-      knows the new shape.
+      or the admin's schema). After merging, verify **Deploy admin** passes so the admin
+      knows the new shape (see `docs/admin.md` for configuration and manual fallback).
 
 ## Checks run
 
