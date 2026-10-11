@@ -6,9 +6,9 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 
 ## [Unreleased]
 
-Round 11: the knight at home in every place, every module type-checked, and a cleanup for
-what agents and test runs leave running. Round 10, below it: menus and search, the
-knight's fixes, hygiene and performance.
+Round 11: the knight at home in every place, a campfire game on the bonfire, every module
+type-checked, and a cleanup for what agents and test runs leave running. Round 10, below
+it: menus and search, the knight's fixes, hygiene and performance.
 
 ### The knight at home (round 11)
 
@@ -34,6 +34,24 @@ knight's fixes, hygiene and performance.
   sat them, clear of the forge's hearth and the cathedral's pew), shifting as their pose
   changes, on the ground where they sit; and the *Pillar Side* shot looks from the front
   left at what stands by his seat, him and the fire, all three in frame in every place.
+
+### The campfire game (round 11)
+
+- The Campfire Game at `/larp/`: a game night on the bonfire, set up like Bonfire Live. The
+  fire fills the screen with the scores and the round's timer over it; the host's controls
+  are a bar along the bottom that fades when the mouse rests, and Output opens the same
+  picture without them for a projector.
+- Rounds each play their own scene (one of the site's, one from the Painter, or the plain
+  fire) and have a timer: Space starts and pauses it, + adds a minute.
+- Modifiers give points, a multiplier for the rest of the round, or both. Each brings up
+  the site's own banner with its title, subtitle and what it gave ("+50 · Red Team"), and
+  the fire answers it with a stoke, a ring, a flash or a new element, rolled fresh each time
+  unless the modifier names one. A Special modifier calls the knights to the fire, and they
+  cheer every banner after it.
+- Teams are a name and a color; Undo takes the last points back; a game exports to a file
+  and imports on another laptop. A game saved by the first version (with rosters and two
+  languages) carries over its teams, rounds and points. How to run a night:
+  [docs/campfire.md](docs/campfire.md).
 
 ### Checks and tools (round 11)
 
