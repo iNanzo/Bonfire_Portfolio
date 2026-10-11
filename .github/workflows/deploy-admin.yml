@@ -1,0 +1,87 @@
+name: Deploy admin
+
+on:
+  workflow_run:
+    workflows: ['Deploy to GitHub Pages']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  admin:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.repository.full_name == github.repository &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    # Only eligible jobs join the lock; a non-main dispatch cannot displace a queued job.
+    # All main completions (even failures) reconcile current main, never an old event SHA.
+    # Covers checkout through publish so an old run cannot overwrite a newer deployment.
+    concurrency:
+      group: admin-production
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SKIP_SIMPLE_GIT_HOOKS: 1
+    steps:
+      # A rerun or delayed completion is only a wake-up. Never check out event.head_sha
+      # or a manual run's historical github.sha, and never use a PR artifact/cache.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Verify existing CI for the current checkout
+        id: gate
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { deploymentGate } = await import(`${process.env.GITHUB_WORKSPACE}/tools/admin-deploy.mjs`);
+            const sha = require('node:child_process').execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+            const result = await deploymentGate({ github, repository: context.repo, sha });
+            core.setOutput('deploy', String(result.deploy));
+            core.setOutput('sha', sha);
+            core.notice(result.reason);
+            await core.summary.addHeading('Admin deployment gate').addRaw(JSON.stringify(result)).write();
+      - uses: actions/setup-node@v7
+        if: steps.gate.outputs.deploy == 'true'
+        with:
+          node-version-file: .nvmrc
+      - if: steps.gate.outputs.deploy == 'true'
+        run: npm ci
+      - name: Build the tested admin sources
+        if: steps.gate.outputs.deploy == 'true'
+        run: npm run admin:build
+      - name: Prepare deployment CLI without credentials
+        if: steps.gate.outputs.deploy == 'true'
+        run: npx --yes wrangler@4 --version
+      - name: Recheck main and CI immediately before publishing
+        if: steps.gate.outputs.deploy == 'true'
+        id: publish
+        uses: actions/github-script@v8
+        env:
+          TESTED_SHA: ${{ steps.gate.outputs.sha }}
+        with:
+          script: |
+            const { deploymentGate } = await import(`${process.env.GITHUB_WORKSPACE}/tools/admin-deploy.mjs`);
+            const result = await deploymentGate({ github, repository: context.repo, sha: process.env.TESTED_SHA });
+            core.setOutput('deploy', String(result.deploy));
+            core.notice(result.reason);
+            await core.summary.addHeading('Final publication gate').addRaw(JSON.stringify(result)).write();
+      - name: Publish admin
+        if: steps.publish.outputs.deploy == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Admin deployment requires CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID."
+            exit 1
+          fi
+          npx --yes wrangler@4 deploy --config admin/wrangler.toml

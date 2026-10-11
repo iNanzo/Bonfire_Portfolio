@@ -86,8 +86,9 @@ a Prettier-wrapped copy.
   reads the old one (Bonfire Live's is `mergeInto` in `src/visualizer/settings.js`, scenes
   step through `MIGRATIONS` in `src/scenes.js`), and add a test that loads the old shape.
 - **A change to the content's shape** (a key added, renamed or removed in
-  `src/content.json` or `admin/ui/schema.js`) needs `npm run admin:deploy` after it merges,
-  so the deployed admin knows the new shape. The pull request template has a box for it.
+  `src/content.json` or `admin/ui/schema.js`) triggers the admin deployment workflow after it merges and all CI passes,
+  so the deployed admin knows the new shape. Check that workflow is green; see
+  `docs/admin.md` for required credentials and the manual fallback.
 - **Every Bonfire Live effect is optional.** Each one gets the three-way switch: Off, In the
   Mix, Always. The aim is endless variations, so nothing is forced on.
 - **Look at it at real speed.** An effect has to read at normal speed from the site's own
