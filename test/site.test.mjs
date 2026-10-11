@@ -138,7 +138,7 @@ test('first load: the site’s static imports carry none of Bonfire Live’s, th
   const files = [...seen].map((f) => path.relative(src, f).replaceAll('\\', '/'));
   assert.ok(files.includes('render.js') && files.includes('ui/pack.js'), 'the walk follows the site’s imports');
   for (const f of files) {
-    assert.ok(!/^(visualizer|painter)\//.test(f), `${f}: Bonfire Live’s or the Painter’s`);
+    assert.ok(!/^(visualizer|painter|larp)\//.test(f), `${f}: Bonfire Live’s, the Painter’s or the campfire game’s`);
     assert.ok(
       !['scenes.js', 'contentRules.js', 'sceneStore.js', 'scenePlayer.js'].includes(f),
       `${f}: the scene format or the content rules`,

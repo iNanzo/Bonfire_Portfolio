@@ -55,7 +55,7 @@ function routePages() {
       writeFileSync(resolve(outDir, 'sitemap.xml'), sitemap(publicRoutes(), ['/visualizer/', '/painter/']));
       writeFileSync(
         resolve(outDir, 'robots.txt'),
-        `User-agent: *\nAllow: /\nDisallow: /admin/\n\nSitemap: ${new URL('sitemap.xml', site.url).href}\n`,
+        `User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /larp/\n\nSitemap: ${new URL('sitemap.xml', site.url).href}\n`,
       );
     },
   };
@@ -78,12 +78,12 @@ async function socialImage(src, title, out) {
 
 // The portfolio's first load (index.html's script and its modulepreloads) is the site's
 // alone. Bonfire Live's and the Painter's modules (the scene format, the looks, the scene
-// store, the palette maker) only ever reach it through a static import from the site: the
-// four pages are built together, and Rolldown puts a module every page reaches into the
-// chunk they share, so one `import` in src/main.js of something that imports scenes.js
-// (contentRules.js does) adds ~20 kB gzip to every visit. The site imports those lazily
-// (`import()`); this check says so at build time if one comes back.
-const SHOW_ONLY = /[\\/]src[\\/]((scenes|sceneStore|paletteGen)\.js|visualizer[\\/]|painter[\\/])/;
+// store, the palette maker) and the campfire game's (src/larp/) only ever reach it through a
+// static import from the site: the pages are built together, and Rolldown puts a module
+// every page reaches into the chunk they share, so one `import` in src/main.js of something
+// that imports scenes.js (contentRules.js does) adds ~20 kB gzip to every visit. The site
+// imports those lazily (`import()`); this check says so at build time if one comes back.
+const SHOW_ONLY = /[\\/]src[\\/]((scenes|sceneStore|paletteGen)\.js|visualizer[\\/]|painter[\\/]|larp[\\/])/;
 const shortId = (id) =>
   id
     .split('\\')
@@ -119,7 +119,7 @@ function firstLoadGuard() {
       const stray = firstLoadModules(bundle, 'main').filter((id) => SHOW_ONLY.test(id));
       if (stray.length)
         this.warn(
-          `The portfolio's first load carries Bonfire Live / Painter modules: ${stray.map(shortId).join(', ')}. Import what pulls them in lazily (import()) from the site.`,
+          `The portfolio's first load carries Bonfire Live / Painter / campfire game modules: ${stray.map(shortId).join(', ')}. Import what pulls them in lazily (import()) from the site.`,
         );
     },
   };
@@ -139,6 +139,8 @@ export default defineConfig({
         notFound: resolve(import.meta.dirname, '404.html'),
         visualizer: resolve(import.meta.dirname, 'visualizer/index.html'),
         painter: resolve(import.meta.dirname, 'painter/index.html'),
+        // The campfire game (/larp/): noindex, left out of the sitemap, Disallow'd in robots.txt.
+        larp: resolve(import.meta.dirname, 'larp/index.html'),
       },
       output: {
         codeSplitting: {

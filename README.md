@@ -17,13 +17,16 @@ One engine, three apps:
 - **[Bonfire Painter](https://nhoang.dev/painter/)**: a scene editor for Bonfire Live.
   Paint a scene (place, colors, framing, look, knights), watch it play to a silent beat,
   and send it to Bonfire Live.
+- **Lửa Trại Nghĩa Sĩ** (`/larp/`): a campfire game for a TNTT youth activity. Teams perform,
+  leaders award named points, and a projector window reveals them as banners around the
+  bonfire. It runs on one laptop with no network ([docs/campfire.md](docs/campfire.md)).
 
 Vite and plain JavaScript (type-checked through JSDoc), Three.js, Blender-built models,
 and a content admin on a Cloudflare Worker. Node 22.12 or later.
 
 ```bash
 npm install
-npm run dev           # the site: http://localhost:5173 (Bonfire Live at /visualizer/, the Painter at /painter/)
+npm run dev           # the site: http://localhost:5173 (Bonfire Live at /visualizer/, the Painter at /painter/, the game at /larp/)
 npm run check         # lint, type check, every unit test (site, visualizer, admin)
 npm run test:fast     # the unit tests minus the [slow] ones, while you work
 npm run coverage      # the unit tests with coverage (see Testing and coverage)
@@ -134,12 +137,13 @@ How to make and commit a change: [CONTRIBUTING.md](CONTRIBUTING.md). What change
 - [docs/bonfire-live.md](docs/bonfire-live.md): running Bonfire Live at a show
 - [docs/painter.md](docs/painter.md): the Bonfire Painter, making preset scenes
 - [docs/admin.md](docs/admin.md): editing content, by hand or in the admin
+- [docs/campfire.md](docs/campfire.md): running the campfire game (Lửa Trại Nghĩa Sĩ) at an event
 - [docs/knight.md](docs/knight.md): the knight: model, rig, styles, poses, arrival, places and API
 - [docs/performance.md](docs/performance.md): measuring the bonfire: the `?perf` overlay, the
   benchmark (`npm run bench`) and comparing two runs (`npm run bench:compare`)
 - [docs/elements.md](docs/elements.md): design notes for the elements and the palette tools
-- [docs/design/](docs/design/): the design logs, [Bonfire Live's](docs/design/visualizer.md)
-  and [the admin's](docs/design/admin-v2.md)
+- [docs/design/](docs/design/): the design logs: [Bonfire Live's](docs/design/visualizer.md),
+  [the admin's](docs/design/admin-v2.md) and [the campfire game's](docs/design/nghia-si-campfire.md)
 
 ## Accessibility and performance
 

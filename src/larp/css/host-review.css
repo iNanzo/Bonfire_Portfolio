@@ -1,0 +1,380 @@
+/* The host console's Review and History tabs (hostReview.js). Scoped under .larp-review and .larp-history.
+   Owned by that screen; shared primitives live in base.css.
+   Review: the summary (publish, flags, reveal length) above the teams side by side; the columns wrap
+   (any number of teams), each edged in its team's color (never colored text).
+   History: published rounds and corrections | Add Correction and the totals, from 1200 px; stacked below. */
+
+/* ---------- Review ---------- */
+
+.larp-review {
+  display: grid;
+  gap: var(--larp-gap);
+  align-items: start;
+}
+.larp-review-idle {
+  max-width: 40rem;
+}
+.larp-review-summary {
+  display: grid;
+  gap: 8px;
+}
+.larp-review-summary > * {
+  margin: 0;
+}
+/* Wide: what to do on the left, the flags on the right. */
+@media (min-width: 1000px) {
+  .larp-review-summary {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 32px;
+  }
+  .larp-review-summary > :not(.larp-review-flagbox) {
+    grid-column: 1;
+  }
+  .larp-review-flagbox {
+    grid-column: 2;
+    grid-row: 1 / span 8;
+  }
+}
+.larp-review-flagbox {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+.larp-review-flagbox > * {
+  margin: 0;
+}
+.larp-review-count,
+.larp-review-reveal {
+  font-size: 0.9375rem;
+}
+.larp-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.larp-review-why {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--accent-hi);
+}
+.larp-review-flags {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+.larp-review-flags li {
+  padding-left: 1.25rem;
+  position: relative;
+}
+/* A sign before each flag, so the meaning never rests on color. */
+.larp-review-flags li::before {
+  content: '!';
+  position: absolute;
+  left: 0;
+  width: 1rem;
+  text-align: center;
+  font-weight: 700;
+  color: var(--accent-hi);
+}
+.larp-review-flags li.is-noIndividual::before {
+  content: '○';
+  font-weight: 400;
+  color: var(--text-dim);
+}
+.larp-review-undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+}
+
+/* The teams side by side: as many columns as fit, wrapping for long queues. */
+.larp-review-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--larp-gap);
+  align-items: start;
+}
+.larp-review-col {
+  --team: var(--line-strong);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  box-shadow: inset 3px 0 0 var(--team);
+}
+.larp-review-col > * {
+  margin: 0;
+}
+.larp-review-col-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.larp-review-status {
+  width: auto;
+  min-width: 7.5rem;
+}
+/* No status yet: an outlined dash (it blocks publishing). */
+.larp-review-status.is-unset {
+  box-shadow: 0 0 0 1px var(--accent-hi);
+  background: transparent;
+  color: var(--text-dim);
+}
+.larp-review-score {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.875rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.larp-review-round {
+  flex-basis: 100%;
+  color: var(--text);
+}
+.larp-review-round b {
+  font-size: 1.125rem;
+}
+.larp-review-total {
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+.larp-review-col h4.larp-label {
+  margin: 6px 0 0;
+}
+.larp-review-awards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+.larp-review-award {
+  display: grid;
+  gap: 2px;
+  padding: 6px 0;
+  box-shadow: 0 1px 0 var(--line);
+}
+.larp-review-award > * {
+  margin: 0;
+}
+.larp-review-award-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.larp-review-award-actions .larp-btn {
+  min-height: 32px;
+  padding: 2px 10px;
+  font-size: 0.8125rem;
+}
+.larp-review-name {
+  overflow-wrap: anywhere;
+}
+.larp-review-trans,
+.larp-review-meta,
+.larp-review-kept,
+.larp-review-note {
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}
+.larp-review-trans {
+  display: block;
+}
+.larp-review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.larp-review-note {
+  overflow-wrap: anywhere;
+}
+.larp-review-note .larp-label-inline,
+.larp-history-note .larp-label-inline {
+  font-weight: 600;
+  margin-right: 4px;
+}
+.larp-review-tag {
+  font-size: 0.75rem;
+  padding: 1px 6px;
+  box-shadow: 0 0 0 1px var(--line-strong);
+  color: var(--text-dim);
+}
+.larp-review-tag.is-warn {
+  box-shadow: 0 0 0 1px var(--accent-hi);
+  color: var(--text);
+}
+.larp-review-noind {
+  margin-top: 4px;
+}
+.larp-review-edit {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  background: var(--inset-bg);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* ---------- History ---------- */
+
+.larp-history {
+  display: grid;
+  gap: var(--larp-gap);
+  align-items: start;
+}
+@media (min-width: 1200px) {
+  .larp-history {
+    grid-template-columns: minmax(0, 1.5fr) minmax(20rem, 1fr);
+  }
+  .larp-host-main:has(.larp-preview) .larp-history {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.larp-history-main,
+.larp-history-side {
+  display: grid;
+  gap: var(--larp-gap);
+  min-width: 0;
+}
+.larp-history-round {
+  box-shadow: 0 1px 0 var(--line);
+  padding: 6px 0;
+}
+.larp-history-round-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.larp-history-round.is-skipped .larp-history-round-title {
+  color: var(--text-dim);
+  cursor: default;
+}
+.larp-history-at {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+.larp-history-teams,
+.larp-history-awards,
+.larp-history-corrections {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.larp-history-teams {
+  margin-top: 8px;
+}
+.larp-history-team {
+  padding: 4px 0;
+}
+.larp-history-team-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.larp-history-status {
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+.larp-history-score {
+  margin-left: auto;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+.larp-history-awards {
+  padding-left: 1.5rem;
+  font-size: 0.875rem;
+}
+.larp-history-round h4.larp-label {
+  margin: 8px 0 4px;
+}
+.larp-history-name,
+.larp-history-reason {
+  overflow-wrap: anywhere;
+}
+.larp-history-trans,
+.larp-history-meta,
+.larp-history-note,
+.larp-history-who {
+  color: var(--text-dim);
+}
+.larp-history-trans,
+.larp-history-meta,
+.larp-history-note {
+  font-size: 0.8125rem;
+}
+.larp-history-awards .larp-history-meta,
+.larp-history-awards .larp-history-note {
+  margin-left: 6px;
+}
+.larp-history-correction {
+  padding: 6px 0;
+  box-shadow: 0 1px 0 var(--line);
+}
+.larp-history-correction p {
+  margin: 2px 0 0;
+}
+.larp-history-form {
+  display: grid;
+  gap: 10px;
+}
+.larp-history-form > * {
+  margin: 0;
+}
+.larp-history-actions {
+  display: flex;
+  gap: 8px;
+}
+.larp-history-totals .larp-h2:not(:first-child) {
+  margin-top: 16px;
+}
+.larp-history-scroll {
+  max-height: 28rem;
+  overflow: auto;
+}
+.larp-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+.larp-history-table th {
+  text-align: left;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 4px 6px;
+  box-shadow: 0 1px 0 var(--line-strong);
+  position: sticky;
+  top: 0;
+  background: var(--panel-solid);
+}
+.larp-history-table td {
+  padding: 4px 6px;
+  box-shadow: 0 1px 0 var(--line);
+  overflow-wrap: anywhere;
+}
+.larp-history-place {
+  width: 3rem;
+  color: var(--text-dim);
+}
+.larp-history-table .larp-history-num {
+  text-align: right;
+  white-space: nowrap;
+}
+.larp-history-table tr.is-removed td {
+  color: var(--text-dim);
+}
