@@ -581,6 +581,7 @@ export function createLooks(g, { reducedMotion = false } = {}) {
   let pinHold = true; // ...held until unpinned (false: for this turn only)
   let P = roll.p; // the details on screen: the turn's, with a pin's laid over them
   let blendsNow = roll.blends;
+  let amtNow = 0; // the strength the last update drew at (0: a clean picture)
 
   function reseed() {
     g.sliceSeed = Math.random() * 100;
@@ -637,6 +638,11 @@ export function createLooks(g, { reducedMotion = false } = {}) {
     pinned?.params.segments !== undefined && !(fx.kaleido > 0) ? pinned.params.segments : kaleSeg;
   const mirrorNow = (kinds) => P.mirror ?? mirrorMode(kinds, ...roll.mirror);
   const scanNow = () => P.scan ?? roll.scan;
+  /**
+   * The one restyle drawn (the pass has one): 1 Painterly, 2 Watercolor, 0 neither. With both
+   * on, the turn's styleFlip picks.
+   */
+  const restyle = (paint, wash) => (paint && wash ? (P.styleFlip ? 1 : 2) : paint ? 1 : wash ? 2 : 0);
 
   return {
     get look() {
@@ -714,6 +720,28 @@ export function createLooks(g, { reducedMotion = false } = {}) {
     /** Whether a pin holds past this turn. */
     get held() {
       return !!pinned && pinHold;
+    },
+    /** A scene's look is pinned (for this turn or held). */
+    get isPinned() {
+      return !!pinned;
+    },
+    /** The strength the effects were last drawn at (0: a clean picture; up to 2). */
+    get strength() {
+      return amtNow;
+    },
+    /**
+     * The layers showing now, as [key, 'mix' | 'on']: rolled in for this turn (In the Mix) or
+     * switched to Always (a pinned scene's own switches), while the look shows at all. Read
+     * when asked (the stats overlay, twice a second), from what the last update kept. Of
+     * Painterly and Watercolor both on, only the one drawn (update's restyle).
+     * @returns {[string, string][]}
+     */
+    liveLayers() {
+      const live = amtNow > 0 ? Object.keys(LAYERS).filter((k) => active(k, layerMode(k))) : [];
+      const drawn = restyle(live.includes('paint'), live.includes('wash'));
+      return live
+        .filter((k) => (k === 'paint' ? drawn === 1 : k === 'wash' ? drawn === 2 : true))
+        .map((k) => /** @type {[string, string]} */ ([k, modeOf(layerMode(k))]));
     },
     /**
      * What's on screen now, in a pin's terms ("Pin What You See"): the look and its
@@ -853,6 +881,7 @@ export function createLooks(g, { reducedMotion = false } = {}) {
     update(dt, { amt: amtIn, build, low, energy, modes: m = {}, rest = 0, cycles = true }) {
       modes = m;
       const amt = pinned ? Math.max(amtIn, pinned.amount * rest) : amtIn;
+      amtNow = amt;
       clock += dt;
       kick *= Math.exp(-dt / 0.14);
       dip *= Math.exp(-dt / 0.09);
@@ -953,7 +982,7 @@ export function createLooks(g, { reducedMotion = false } = {}) {
       [g.gradA, g.gradB, g.gradC] = P.grad;
       const paint = layer('paint');
       const wash = layer('wash');
-      g.style = paint && wash ? (P.styleFlip ? 1 : 2) : paint ? 1 : wash ? 2 : 0;
+      g.style = restyle(paint, wash);
       g.styleR = g.style === 1 ? P.paintR : P.washR;
       g.styleMix = a * P.styleMix;
       g.paintAngle = P.paintAngle;

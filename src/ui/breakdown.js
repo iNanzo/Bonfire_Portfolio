@@ -12,7 +12,8 @@
 // (BREAKDOWN_HASH), and a link straight to it opens the page with it open.
 //
 // The counts come from fire.stats() (bonfire/sceneRender.js) every 250 ms: drawCalls, texels, the
-// particle systems, and any `rows` ([label, value] pairs) the scene adds for itself.
+// particle systems, and any `rows` ([label, value] pairs) the scene adds for itself (not its
+// `extra`, the stats overlay's counts in other units: the fireflies lit, the bolts' segments).
 import { ui, weapons } from '../content.js';
 import { esc } from '../html.js';
 import { flames } from '../palette.js';

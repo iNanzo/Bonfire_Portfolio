@@ -242,6 +242,7 @@ export function createDirector(
   let heldSince = -1;
   let wantArm = false; // a breakdown wants a blade forged as soon as the fire is free
   let phase = 'rest'; // rest | groove | breakdown (for the HUD)
+  let heard = 'silent'; // the analyser's section as of the last frame: silent | groove | breakdown | build
   let lastBeat = null;
   let sinceDrop = Infinity; // bars since the last drop
   let swingCam = null; // how the camera covers the blade while it's out
@@ -253,6 +254,8 @@ export function createDirector(
   let dropBig = true; // ...and whether it's a big one (a small one, a short cut coming back, brings no scene)
   let budget = 0.6; // 0..1: how much the effects may do right now (the song's shape)
   let bigDrops = 0; // (for the scenery mix: a new place every other big drop)
+  let lastHits = null; // the last drop's hits, by name (the stats overlay's), and when they were thrown
+  let lastHitsAt = 0;
   const clock = createBarClock(settings); // the "every N bars" settings, rolled when on Random (bars.js)
   const show = createFireflyShow({ reducedMotion });
   const flyMoves = createFireflyMoves({ reducedMotion });
@@ -460,7 +463,11 @@ export function createDirector(
     if (reducedMotion || !settings.glitch) return;
     const names = looks.drop(settings.dropFx, Math.max(1, Math.round(settings.dropCount * (0.5 + 0.5 * budget))));
     if (names.includes(DROP_FX.xray)) render.xrayHit(now(), lastPeriod);
-    if (names.length) onEvent('dropfx', { names });
+    if (names.length) {
+      lastHits = names;
+      lastHitsAt = now();
+      onEvent('dropfx', { names });
+    }
   }
   /**
    * A full swap timed so the impact lands `beats` beats after the beat at `from` (grid
@@ -668,6 +675,7 @@ export function createDirector(
   // --- per frame ------------------------------------------------------------------------
   function update(f, dt) {
     const live = f.state !== 'silent';
+    heard = f.state;
     presence = approach(presence, live ? 1 : 0, live ? 0.4 : 1.5, dt);
     const r = settings.reactivity * presence;
     const b = f.bands;
@@ -1212,6 +1220,38 @@ export function createDirector(
     /** The user's hand wins for these settings until the next scene (the P menu, the dialog). */
     releaseScene(keys) {
       player.release(keys);
+    },
+    /**
+     * What the show is doing now, for the stats overlay (ui/statsGroups.js turns it into rows):
+     * the section, the budget, the look and its strength, the layers live and each one's
+     * switch, the last drop's hits, the knights, the shot, the scene playing and the loop. A
+     * snapshot made when asked (twice a second while the overlay is on), from what the show
+     * already keeps: it draws no dice and changes nothing, so the show plays the same either way.
+     */
+    status() {
+      const k = knights.status;
+      const waiting = pending?.entry;
+      return {
+        section:
+          phase === 'rest' ? 'silent' : phase === 'breakdown' ? (heard === 'build' ? 'build' : 'breakdown') : 'groove',
+        sinceDrop: Number.isFinite(sinceDrop) ? sinceDrop : null,
+        stage,
+        budget: settings.budget ? budget : null,
+        look: { names: looks.playing.map((n) => LOOKS[n]), strength: looks.strength, pinned: looks.isPinned },
+        layers: looks.liveLayers().map(([key, mode]) => ({ name: LAYERS[key], mode })),
+        xray: render.live.xray ? (XRAY_VIEWS[render.live.xray] ?? render.live.xray) : null,
+        dropHits: lastHits ? { names: lastHits, ago: now() - lastHitsAt } : null,
+        knights: { present: k.present, dancing: k.dancing, mode: k.mode },
+        shot: camera.shotName,
+        scene: player.scene ? { name: player.scene.name, mode: player.mode } : null,
+        loop: {
+          mode: modeOf(settings.scenes, 'mix'),
+          locked: !!loop.locked,
+          // (What's waiting for its moment, if anything: a scene by name, or null for the free show.)
+          next: waiting && waiting !== 'free' ? waiting.scene.name : null,
+          when: waiting ? (pending.how === 'drop' || fire.holding ? 'drop' : pending.how) : null,
+        },
+      };
     },
     /** The show's parts, for the Painter (the camera's pin and pause, the looks' details) and the dev tools. */
     get parts() {

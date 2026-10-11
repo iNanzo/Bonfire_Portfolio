@@ -217,7 +217,8 @@ keys overlay; the HUD's **Keys** button opens it too, and in Settings `?` or the
   random, a mix) · `Shift+1…9` a title card.
 - **View & Menus:** `P` Render Settings (below) · `C` cut · `H` hide the controls (`Esc`
   brings them back) · `F` full screen · `O` the output window · `V` record · `S` settings ·
-  `/` the settings' search · `I` the pack · `?` the shortcuts.
+  `/` the settings' search · `I` the pack · `U` the stats overlay (below; on the start
+  screen too) · `?` the shortcuts.
 
 The controls and cursor hide when the mouse rests on the picture (not while it rests on the
 controls, so a tooltip stays to be read). The HUD's *Moments* have **Living
@@ -250,7 +251,7 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
 | Sound | Source (sensitivity, visual lead, playback volume) · Beat (Beat From, the Link bridge's port and its setup) · MIDI Controller |
 | Show | Reaction (reactivity, the song's shape, build-ups in stages, hi-hat sparks, color temperature, sub-bass breathing) · Weapons (forge and strike on drops, how often a new weapon comes, its elements, extra rings, the outline burst) · Living Weapon (how often it comes out and for how long, its attacks, its rhythm, alive between attacks) |
 | Drops | The Drop (the black beat, the negative flash, the drop hits, how many at once) · Hits (hit-stop, hit flash, debris, ground marks) |
-| Picture | Place & Atmosphere (place, fog, exposure, vignette, fire shadows) · Colors (flame colors, harmony, place colors, blend time, palette, few colors) · Pixel Art (below) · Performance (**Frame Rate**, particles) |
+| Picture | Place & Atmosphere (place, fog, exposure, vignette, fire shadows) · Colors (flame colors, harmony, place colors, blend time, palette, few colors) · Pixel Art (below) · Performance (**Frame Rate**, particles, **Stats Overlay**) |
 | Effects | Strength & Pace (effects strength, how often the look changes) · Looks · Layers (all 14, and the mirror kinds) · X-Ray (the flips and their views) |
 | Camera | Camera (movement, starting shot, zoom punch & shake) · Cuts (cut every, between shots, knight shots) · Weapon Shots (while it fights, camera feel, while it's held) |
 | Cast | Knights · Armor · Dancing · Behavior (below) · Fireflies (blink and dance on the beat, their dances and how often they change, light trails) |
@@ -308,6 +309,37 @@ the Painter and the admin use. The header stays put as the tab scrolls: the sear
   The sound is still analysed on every frame the display shows, so beats land as precisely
   when it's capped (`createBonfire`'s `onTick`; what's heard between drawn frames reaches
   the director with the next one: `tickBatch.js`).
+- **Stats Overlay** (Picture › Performance, or `U`): a readout in the top left corner of
+  what the picture costs and what the show is doing, updated twice a second. Off to begin
+  with; like Frame Rate it stays with this computer (not in a setup or a preset). It sits
+  where nothing else is (the HUD is along the bottom, the pack bottom right, Render Settings
+  top right; on the start screen, top right, and where the start menu reaches across under
+  it, on a phone or a narrow window, only what fits above the menu), under everything but
+  the picture: where Render Settings opens over it (the start screen, a phone) it steps down
+  under the menu while that's open. While the HUD is up it keeps to the room above it (a
+  phone held sideways shows what fits there, and all of it once the HUD fades). It never
+  takes the pointer and isn't read out. It's HTML over the picture, so it isn't in the
+  output window or a recorded clip. Smaller on a phone (held either way), without the dimmed
+  rows. Three groups:
+  - **Frames:** frames a second (and the cap), the time between them (median and p95), the
+    draw calls and the shadow's redraws a second; dimmed, the frame's parts (tick, page,
+    update, draw) and the GPU's programs, textures and geometries (`docs/performance.md`).
+  - **Particles:** each particle system running, live of how many it has (the flames,
+    sparks, ash and smoke, the forge's particles during a swap, debris, the cold mist, the
+    blade's trail, the rings…), the fireflies lit of all of them and the lightning's bolts
+    (segments). A system with nothing live isn't listed; the heading has the total live.
+  - **Show:** the section (Silence, Groove, Breakdown, Build with its stage, Drop and the bar
+    of the 8 after it), the budget (as the director has it; Off with Follow the Song’s
+    Shape off), the look playing and its strength (a preset scene's says so), the layers live
+    now, each marked *(In the Mix)* or *(Always)*, an x-ray flip while it's on, a drop's
+    hits while they fire, the knights here and what they're doing, the shot, and the preset
+    scene playing (or the free show) with its loop (In the Mix, Always, Off, solo, and the
+    scene waiting for its moment).
+
+  `?perf` in the address shows the same overlay whatever the setting says (and writes the
+  frame's parts for the browser's profiler); `U` there still switches the setting, and
+  switched off, its note says `?perf` keeps it showing. With the overlay on, a frame costs
+  no more (measured on the demo track: `docs/performance.md`).
 - Saving waits for a burst of changes to settle (300 ms: a slider dragged writes once) and
   is done at once as the page is hidden or left, and for a preset, a setup or a reset.
 
@@ -457,6 +489,7 @@ style, the finish, seat and edge glow in the mix (the glow round 0.5).
 | Settings: the values, saving, presets and setups | `src/visualizer/settings.js` |
 | The settings dialog: its layout and what its controls do; each setting's control; the search; bulk buttons and Reset Section (names, hints and places: `src/settingsMap.js`; the fields and "?" hints: `src/ui/fields.js`, shared with the Painter; the tooltip: `src/ui/tooltip.js`) | `src/visualizer/settingsDialog.js`, `settingsControls.js`, `settingsSearchUi.js`, `settingsBulk.js` |
 | Frame Rate: what's heard between drawn frames | `src/visualizer/tickBatch.js` (the cap: `scene.js` `setMaxFps`) |
+| Stats Overlay: the overlay, its words, the show's snapshot | `src/ui/perfOverlay.js`, `src/ui/statsGroups.js`, the director's `status()` (`src/visualizer/director.js`); the scene's `setStats` and `stats()` (`scene.js`, `sceneRender.js`) |
 | Preset scenes: the format, the browser's own, the loop and the player | `src/scenes.js`, `src/sceneStore.js`, `src/visualizer/sceneLoop.js`, `src/visualizer/scenePlayer.js`, `src/visualizer/layered.js` (the loop in Scenes & Cards and the HUD line: `settingsControls.js`, `scenesUi.js`) |
 | Bands, onsets | `src/visualizer/analyser.js` |
 | Sections: groove, breakdown, build, drop, silence | `src/visualizer/sections.js` |

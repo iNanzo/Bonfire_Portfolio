@@ -501,6 +501,12 @@ export function createCamera(fire, settings, { reducedMotion = false, onShot = (
     get shot() {
       return rig ? rig.name : pinned ? 'scene' : shot;
     },
+    /** The shot (or rig) as people read it, for the stats overlay; a scene's own framing says so. */
+    get shotName() {
+      if (rig) return RIGS[rig.name]?.name ?? rig.name;
+      if (pinned) return 'The Scene’s Framing';
+      return (SHOTS[shot] ?? COMBO_SHOTS[shot] ?? KNIGHT_SHOTS[shot])?.name ?? shot;
+    },
     /** The knight shots (and the dancer rig) with nobody standing between them and the fire now. */
     knightShots: () => [...Object.keys(KNIGHT_SHOTS).filter((n) => !hidesFire(KNIGHT_SHOTS[n].pos, heads)), 'dancer'],
     /**
