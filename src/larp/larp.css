@@ -1,0 +1,515 @@
+/* The campfire game (/larp/): the site's look over its own bonfire. The show (scoreboard,
+   clock, banner) is drawn for a projector: big, high-contrast, on dithered panels, readable from
+   the back of a room. The controls are Bonfire Live's: a bar along the bottom that fades when
+   the mouse rests, and a dialog for the setup. Sizes are in rem with a clamp on the viewport, so
+   the output window (any size, often full screen) and the laptop both read well. */
+
+body.larp {
+  --header-h: 0px;
+  margin: 0;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--c-void);
+  color: var(--text);
+}
+body.larp.is-idle {
+  cursor: none;
+}
+.larp-stage {
+  cursor: default;
+}
+.larp-stage.is-failed {
+  background:
+    radial-gradient(ellipse at 50% 70%, color-mix(in srgb, var(--accent-lo) 40%, transparent), transparent 60%),
+    var(--c-void);
+}
+
+/* ---------- The show (also in the output window) ---------- */
+
+.larp-show {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+.larp-board,
+.larp-clock {
+  position: fixed;
+  top: clamp(12px, 2.5vh, 32px);
+  z-index: 10;
+  font-family: var(--font-pixel);
+  background: var(--dv-12) repeat left top / calc(var(--dp) * 4);
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.larp-board {
+  left: clamp(12px, 2vw, 32px);
+  display: grid;
+  gap: 2px;
+  min-width: min(30vw, 340px);
+  max-width: 34vw;
+  padding: 8px;
+  pointer-events: auto;
+}
+.larp-board:empty {
+  display: none;
+}
+.larp-row {
+  display: grid;
+  grid-template-columns: 1.6em 0.9em 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: clamp(1rem, 2.1vw, 1.75rem);
+  line-height: 1.15;
+  text-align: left;
+  color: var(--c-bone);
+  cursor: pointer;
+}
+.larp-row:hover,
+.larp-row:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.larp-row-place {
+  color: var(--text-dim);
+  font-size: 0.75em;
+  text-align: right;
+}
+.larp-row:first-child .larp-row-place {
+  color: var(--accent-hi);
+}
+.larp-row-pip {
+  width: 0.7em;
+  height: 0.7em;
+  background: var(--team, var(--accent));
+  box-shadow: 0 0 0 2px var(--c-void);
+}
+.larp-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.larp-row-score {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-hi);
+}
+
+.larp-clock {
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 11ch;
+  padding: 8px 22px 10px;
+  text-align: center;
+}
+.larp-clock-round {
+  margin: 0;
+  font-size: clamp(0.8125rem, 1.3vw, 1.125rem);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.larp-clock-time {
+  margin: 0;
+  font-size: clamp(2.25rem, 6.2vw, 5.5rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-bone);
+}
+.larp-clock[data-state='idle'] .larp-clock-time,
+.larp-clock[data-state='paused'] .larp-clock-time {
+  color: var(--text-dim);
+}
+.larp-clock[data-state='low'] .larp-clock-time {
+  color: var(--accent-hi);
+}
+.larp-clock[data-state='out'] .larp-clock-time {
+  color: var(--accent-hi);
+  animation: larp-out 1s steps(1) infinite;
+}
+@keyframes larp-out {
+  50% {
+    opacity: 0.25;
+  }
+}
+.larp-mults {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.larp-mults:empty {
+  display: none;
+}
+.larp-mult {
+  margin-top: 6px;
+  padding: 2px 8px;
+  font-size: clamp(0.8125rem, 1.2vw, 1rem);
+  color: var(--c-void);
+  background: var(--team, var(--accent));
+}
+
+/* The banner: the site's .kindled, a little lower (under the clock), with the points line. */
+.larp-banner {
+  z-index: 15;
+  align-items: center;
+  padding-top: 0;
+}
+.larp-banner .kindled-band {
+  pointer-events: none;
+}
+.larp-banner .kindled-sub {
+  font-size: clamp(1rem, 2vw, 1.625rem);
+  color: var(--c-bone);
+}
+.larp-banner .kindled-sub[hidden] {
+  display: none;
+}
+.larp-banner-points {
+  margin: 10px 0 0;
+  font-family: var(--font-pixel);
+  font-size: clamp(1.25rem, 3.4vw, 2.75rem);
+  letter-spacing: 0.06em;
+  color: var(--team, var(--accent-hi));
+  text-shadow: 0 2px 0 var(--c-void);
+}
+
+/* ---------- The controls (never in the output window) ---------- */
+
+.larp-hud {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--c-void) 82%, transparent);
+  box-shadow: 0 0 0 1px var(--line);
+  transition: opacity 360ms steps(3);
+}
+body.is-idle .larp-hud,
+body.is-idle .larp-picker {
+  opacity: 0;
+  pointer-events: none;
+}
+body.hud-off .larp-hud {
+  display: none;
+}
+.larp-hud-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.larp-hud-round {
+  min-width: 8ch;
+  max-width: 18ch;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-pixel);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.larp-hud-mods {
+  display: flex;
+  flex: 1 1 320px;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.larp-mod kbd,
+.larp-pick kbd {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.larp-mod-tag {
+  color: var(--accent-hi);
+}
+.larp-mod.is-special {
+  --b: var(--accent);
+}
+.larp-note {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  z-index: 25;
+  margin: 0;
+  padding: 6px 12px;
+  transform: translateX(-50%);
+  font-family: var(--font-pixel);
+  background: color-mix(in srgb, var(--c-void) 85%, transparent);
+  box-shadow: 0 0 0 1px var(--line);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms steps(3);
+}
+.larp-note.is-on {
+  opacity: 1;
+}
+
+.larp-picker {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  z-index: 30;
+  width: min(92vw, 560px);
+  padding: 18px 20px 16px;
+  transform: translateX(-50%);
+  background: var(--c-void);
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+.larp-picker[hidden] {
+  display: none;
+}
+.larp-picker-title {
+  margin: 0 0 12px;
+  font-family: var(--font-pixel);
+  color: var(--accent-hi);
+}
+.larp-picker-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.larp-pick {
+  --b: var(--team, var(--line-strong));
+}
+.larp-picker-close {
+  margin-top: 14px;
+}
+
+/* ---------- Setup ---------- */
+
+.larp-setup-inner {
+  display: flex;
+  flex-direction: column;
+  width: min(94vw, 920px);
+  height: min(90vh, 860px);
+  height: min(90dvh, 860px);
+  overflow: hidden;
+  padding: 0;
+  --pad-x: clamp(16px, 3vw, 32px);
+}
+.larp-setup-top {
+  flex: none;
+  padding: 20px var(--pad-x) 0;
+}
+.larp-setup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.larp-setup-head .rest-menu-title {
+  margin: 0;
+}
+.larp-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  cursor: pointer;
+}
+.larp-close:hover {
+  color: var(--c-bone);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.larp-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 14px;
+  overflow-x: auto;
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.larp-tab {
+  flex: none;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  font-family: var(--font-pixel);
+  font-size: 0.9375rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.larp-tab:hover {
+  color: var(--c-bone);
+}
+.larp-tab[aria-selected='true'] {
+  color: var(--accent-hi);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.larp-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.larp-setup-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  padding: 18px var(--pad-x) 24px;
+}
+.larp-setup-foot {
+  display: flex;
+  justify-content: flex-end;
+  flex: none;
+  padding: 12px var(--pad-x) 16px;
+  box-shadow: inset 0 1px 0 var(--line);
+}
+/* The fields (src/ui/fields.js), drawn as in Bonfire Live's settings. */
+.larp-setup .viz-field {
+  display: grid;
+  gap: 5px;
+}
+.larp-setup .viz-field-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--font-pixel);
+  font-size: 0.9375rem;
+  color: var(--c-bone);
+}
+.larp-setup .viz-unit {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+.larp-setup select,
+.larp-setup input[type='text'] {
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 0;
+  background: var(--c-shadow);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  font: 400 0.9375rem/1.3 var(--font-body);
+  color: var(--c-bone);
+}
+.larp-setup select:hover,
+.larp-setup input[type='text']:hover {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.larp-setup .viz-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 8px;
+  font-size: 0.9375rem;
+}
+.larp-setup .viz-check > label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+}
+.larp-setup input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+.larp-help {
+  margin: 0 0 14px;
+  color: var(--text-dim);
+}
+.larp-item {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-items: end;
+  gap: 12px 16px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 0;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.larp-item-mod {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+.larp-item-mod > .viz-field:has([data-set$='.subtitle']) {
+  grid-column: span 2;
+}
+.larp-item .viz-field {
+  min-width: 0;
+}
+.larp-setup input[type='text'],
+.larp-setup input[type='number'],
+.larp-setup select {
+  box-sizing: border-box;
+  max-width: none;
+}
+.larp-color input[type='color'] {
+  width: 100%;
+  height: 34px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.larp-row-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.larp-add {
+  margin-top: 4px;
+}
+.larp-game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: end;
+  gap: 18px 24px;
+}
+.larp-game-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+}
+.larp-import {
+  cursor: pointer;
+}
+
+@media (max-width: 759px) {
+  .larp-board {
+    left: 8px;
+    min-width: 0;
+    max-width: calc(100vw - 16px - 13ch);
+    padding: 4px;
+  }
+  .larp-row {
+    gap: 6px;
+    padding: 4px 6px;
+  }
+  .larp-clock {
+    left: auto;
+    right: 8px;
+    min-width: 0;
+    padding: 6px 10px 8px;
+    transform: none;
+  }
+  .larp-hud {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    gap: 8px;
+    padding: 8px;
+    max-height: 46vh;
+    overflow-y: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .larp-clock[data-state='out'] .larp-clock-time {
+    animation: none;
+  }
+}
