@@ -1,22 +1,42 @@
-// The "Soft" look preset (data only): Webfishing by way of Wild World, chunkier pixels (about
-// 150 texels on the short side at DS), 20 levels a channel with a visible Bayer dither, a pastel
-// grade, warm coloured outlines and a softer, dithered shadow. Every look value lives here so the
-// look designer edits data, never code (src/invitation/look.js has the shape, LookPreset).
+// The "Soft" look preset (data only): Webfishing by way of Wild World on a white page. About 184
+// texels on the short side, a little chunkier than DS's where whole device pixels allow (his
+// head keeps room for a face: at 180 a 390-wide phone at DPR 3 rounds up to 7-pixel texels, 168
+// across, and his eyes flicker into his hair as he turns); 28 levels a channel with a Bayer dither that stays in his soft gradients, not over his dark
+// hair and clothes; a pastel grade that keeps him peachy and his eyes near black; coloured
+// outlines, a darker plum shade of the colour beside them, drawn on the paper just outside his
+// silhouette like a sprite's (never on his face); his textures a mip and a half coarser, so the
+// toon bands shade him rather than his shirt's pattern; and a soft shadow, its edge spread over
+// one texel and dithered into two tones on a warm white page; no blob under him while he
+// stands (only a flat one while he's lifted). Every look value lives here so the look designer
+// edits data, never code (look.js has the shape, LookPreset; retro.js the pass's own extras,
+// RetroExtras).
 
-/** @type {import('../look.js').LookPreset} */
+/** @type {import('../look.js').LookPreset & import('../retro.js').RetroExtras} */
 export default {
   label: 'Soft',
-  texels: { fine: 216, ds: 150, chunky: 120 },
-  levels: 20,
-  dither: 1,
-  outline: { darken: 0.3, tint: '#c49a8a', depth: 0.002 },
-  grade: { lift: 0.06, gamma: 1.05, saturation: 0.86, tint: '#fff4ec', exposure: 1 },
-  toon: [0.55, 0.8, 1],
-  shadow: { type: 'pcf', mapSize: 1024, bias: -0.0008, normalBias: 0.02, radius: 3 },
+  texels: { fine: 244, ds: 184, chunky: 138 },
+  levels: 28,
+  dither: 0.35,
+  outline: { darken: 0.35, tint: '#a0607a', depth: 0.015, outside: true },
+  grade: { lift: 0.02, gamma: 1.05, saturation: 0.95, tint: '#fff2ea', exposure: 1.02 },
+  toon: [0.5, 0.5, 0.5, 0.5, 0.85, 0.85, 0.85, 1],
+  background: 0xfdfaf4,
+  shadow: {
+    type: 'basic',
+    mapSize: 1024,
+    bias: -0.0008,
+    normalBias: 0.02,
+    radius: 1,
+    color: 0x9a7f9a,
+    opacity: 0.6,
+    soft: 1,
+    steps: 2,
+    dither: 1,
+  },
   sun: { dir: [-0.6, 1, 0.9], color: '#fff0de', intensity: 2.4 },
-  hemi: { sky: '#fdf8ff', ground: '#e6dccb', intensity: 1.3 },
-  room: { background: '#f6efe6', floor: '#eadfce', wall: '#fbf6ef', side: '#f3ece3', baseboard: '#d8c8b4' },
-  blob: { color: '#6b5a52', opacity: 0.2, lifted: 0.34 },
+  hemi: { sky: '#fdf8ff', ground: '#e6c8c0', intensity: 1.3 },
+  blob: { opacity: 0, lifted: 0.34 },
   marker: { color: '#a3826f' },
+  texture: { mipBias: 1.5 },
   animFps: 0,
 };
