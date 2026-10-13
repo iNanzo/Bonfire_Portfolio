@@ -343,6 +343,10 @@ TOE_TIP = (-0.826, -0.417)  # the sole's front edge from the ankle (y, z), the f
 HEEL_TIP = (0.437, -0.417)  # the heel's back edge, likewise
 STANCE = (0.6, 0.06, ANKLE)  # Idle's ankle, his left (+X); the right mirrors it
 WIDE = (1.0, -0.08, ANKLE)  # Land's: where Fall's spread feet touch down
+# StandUp's: where the feet set down to take his weight. Nearer his hips, his short thighs would
+# fold the knees back behind them while he's still sitting. A touch high: the deeply bent calves
+# pull the half-weighted heels down.
+STAND_FEET = (0.72, -0.35, ANKLE + 0.03)
 FALL_Z = 0.02  # Fall's hips over rest: its lowest sole meets the floor where Land begins
 
 ARM_RELAXED = {'shoulder': (0, 0), 'upper': (4, 19), 'lower': (16, 15), 'twist': 0}
@@ -358,12 +362,13 @@ IDLE = {
 }
 
 SIT = {
-    'hips': {'loc': (0, 0, -1.58), 'rot': (-22, 0, 0)},
-    'chest': (-4, 0, 0),
+    'hips': {'loc': (0, 0, -1.58), 'rot': (-16, 0, 0)},
+    'chest': (-2, 0, 0),
     'neck': (2, 0, 0),
     'head': (0, 0, 0),
-    'armL': {'shoulder': (8, -6), 'upper': (-28, 24), 'lower': (-20, 18), 'twist': 0},
-    'armR': {'shoulder': (8, -6), 'upper': (-28, 24), 'lower': (-20, 18), 'twist': 0},
+    # the hands down on the floor beside his hips, where the high camera sees them peek out
+    'armL': {'shoulder': (-14, 0), 'upper': (-5, 30), 'lower': (1, 34), 'twist': 0},
+    'armR': {'shoulder': (-14, 0), 'upper': (-5, 30), 'lower': (1, 34), 'twist': 0},
     'legL': {'at': (0.78, -1.4, 0.7), 'pitch': -55, 'yaw': 12},
     'legR': {'at': (0.78, -1.4, 0.7), 'pitch': -55, 'yaw': 12},
 }
@@ -395,15 +400,24 @@ FALL = {
 }
 
 
+def smooth(u):
+    """0 below 0, 1 above 1, eased in between."""
+    u = min(1.0, max(0.0, u))
+    return u * u * (3 - 2 * u)
+
+
 def idle(t):
-    """Idle at t (0..1 of its loop): breathing twice, a small sway once."""
+    """Idle at t (0..1 of its loop): breathing twice, a small sway once, and one glance to his left
+    (turning f12-f18, held, back by f30), so frame 0 stays the pose every clip blends from."""
     br = math.sin(2 * math.pi * 2 * t)
     sw = math.sin(2 * math.pi * t)
+    f = t * CLIPS['Idle'][0]
+    glance = smooth((f - 12) / 6) - smooth((f - 24) / 6)
     p = merge(
         IDLE,
         hips={'loc': (0.0, 0, -0.06 - 0.025 * br), 'rot': (0, 2.4 * sw, 0)},
-        chest=(2 + 1.8 * br, -1.2 * sw, 0),
-        head=(-1.2 * br, -2.2 * sw, 0),
+        chest=(2 + 2.0 * br, -1.2 * sw, 0),
+        head=(-1.2 * br, -2.2 * sw + 3 * glance, 10 * glance),
     )
     up, out = ARM_RELAXED['upper']
     lo, out2 = ARM_RELAXED['lower']
@@ -701,54 +715,75 @@ TABLES = {
     'SitDown': keys(
         (0, IDLE),
         (6, merge(
-            CROUCH,
+            CROUCH,  # the feet stay planted where Idle has them
             hips={'loc': (0, 0, -0.55), 'rot': (14, 0, 0)},
             armL={'shoulder': (6, 8), 'upper': (50, 20), 'lower': (70, 10), 'twist': 0},
             armR={'shoulder': (6, 8), 'upper': (50, 20), 'lower': (70, 10), 'twist': 0},
         )),
         (12, merge(SIT, hips={'loc': (0, 0, -1.3), 'rot': (-10, 0, 0)}, legL={'at': (0.7, -1.1, 0.75), 'pitch': -30}, legR={'at': (0.7, -1.1, 0.75), 'pitch': -30})),
-        (15, merge(SIT, hips={'loc': (0, 0, -1.64), 'rot': (-26, 0, 0)})),
-        (19, merge(SIT, hips={'loc': (0, 0, -1.54), 'rot': (-20, 0, 0)})),
+        # the bump: the bottom stops at the floor, the chest and head carry on forward
+        (15, merge(SIT, hips={'loc': (0, 0, -1.6), 'rot': (-16, 0, 0)}, chest=(4, 0, 0), head=(5, 0, 0))),
+        (19, merge(SIT, hips={'loc': (0, 0, -1.55), 'rot': (-18, 0, 0)}, chest=(-4, 0, 0), head=(-3, 0, 0))),
         (24, SIT),
     ),
     'StandUp': keys(
         (0, SIT),
-        (3, merge(SIT, hips={'loc': (0, 0, -1.58), 'rot': (-14, 0, 0)}, chest=(4, 0, 0), legL={'at': (0.76, -1.0, 0.56), 'pitch': -30}, legR={'at': (0.76, -1.0, 0.56), 'pitch': -30})),
+        (3, merge(SIT, hips={'loc': (0, 0, -1.58), 'rot': (-10, 0, 0)}, chest=(4, 0, 0), legL={'at': (0.74, -0.75, 0.62), 'pitch': -20, 'knee': (0.8, -0.3, 1)}, legR={'at': (0.74, -0.75, 0.62), 'pitch': -20, 'knee': (0.8, -0.3, 1)})),
         (6, merge(
-            SIT,  # knees up, feet pulled in flat, rocking forward
-            hips={'loc': (0, 0, -1.52), 'rot': (4, 0, 0)},
-            chest=(12, 0, 0),
+            SIT,  # the feet set down flat just in front of him, the knees up and open, rocking forward
+            hips={'loc': (0, 0, -1.42), 'rot': (10, 0, 0)},
+            chest=(20, 0, 0),
             neck=(4, 0, 0),
-            head=(-6, 0, 0),
+            head=(-8, 0, 0),
             armL={'shoulder': (4, 6), 'upper': (30, 30), 'lower': (50, 20), 'twist': 0},
             armR={'shoulder': (4, 6), 'upper': (30, 30), 'lower': (50, 20), 'twist': 0},
-            legL={'at': (0.7, -0.55, ANKLE), 'pitch': 0, 'knee': (0.4, -1, 0.3)},
-            legR={'at': (0.7, -0.55, ANKLE), 'pitch': 0, 'knee': (0.4, -1, 0.3)},
+            legL={'at': STAND_FEET, 'pitch': -6, 'yaw': 0, 'knee': (0.9, -0.3, 1)},  # toes up a little: the
+            legR={'at': STAND_FEET, 'pitch': -6, 'yaw': 0, 'knee': (0.9, -0.3, 1)},  # bent calf pulls the sole down
         )),
         (10, merge(
-            CROUCH,  # weight over the feet, pushing off, arms forward for balance
-            hips={'loc': (0, 0, -0.95), 'rot': (30, 0, 0)},
-            chest=(14, 0, 0),
+            CROUCH,  # the head's weight over the feet (leaning 50 degrees), pushing off, arms forward
+            hips={'loc': (0, -0.1, -0.95), 'rot': (30, 0, 0)},
+            chest=(20, 0, 0),
             neck=(-4, 0, 0),
-            head=(-10, 0, 0),
+            head=(-12, 0, 0),
             armL={'shoulder': (6, 10), 'upper': (70, 26), 'lower': (85, 14), 'twist': 0},
             armR={'shoulder': (6, 10), 'upper': (70, 26), 'lower': (85, 14), 'twist': 0},
-            legL={'at': (0.66, -0.2, ANKLE), 'pitch': 0},
-            legR={'at': (0.66, -0.2, ANKLE), 'pitch': 0},
+            legL={'at': STAND_FEET, 'pitch': -2, 'yaw': 0, 'knee': (0.9, -0.8, 0.5)},
+            legR={'at': STAND_FEET, 'pitch': -2, 'yaw': 0, 'knee': (0.9, -0.8, 0.5)},
         )),
-        (15, merge(IDLE, hips={'loc': (0, 0, 0.0), 'rot': (-4, 0, 0)}, chest=(-3, 0, 0), head=(-4, 0, 0))),
-        (19, merge(IDLE, hips={'loc': (0, 0, -0.1), 'rot': (2, 0, 0)}, head=(3, 0, 0))),
+        (13, merge(
+            IDLE,
+            hips={'loc': (0, -0.05, -0.4), 'rot': (14, 0, 0)},
+            chest=(8, 0, 0),
+            head=(-6, 0, 0),
+            legL={'at': STAND_FEET, 'pitch': 0, 'knee': (0.5, -1, 0)},
+            legR={'at': STAND_FEET, 'pitch': 0, 'knee': (0.5, -1, 0)},
+        )),
+        (15, merge(IDLE, hips={'loc': (0, 0, -0.04), 'rot': (-4, 0, 0)}, chest=(-3, 0, 0), head=(-4, 0, 0), legL={'at': STAND_FEET, 'pitch': 0}, legR={'at': STAND_FEET, 'pitch': 0})),
+        # two small steps back to where Idle stands, one foot at a time
+        (17, merge(IDLE, hips={'loc': (-0.04, 0, -0.06), 'rot': (0, -2, 0)}, legL={'at': (0.66, -0.14, ANKLE + 0.16), 'pitch': 6}, legR={'at': STAND_FEET, 'pitch': 0})),
+        (18, merge(IDLE, hips={'loc': (-0.02, 0, -0.08), 'rot': (0, 0, 0)}, legR={'at': STAND_FEET, 'pitch': 0})),
+        (20, merge(IDLE, hips={'loc': (0.04, 0, -0.06), 'rot': (0, 2, 0)}, legR={'at': (0.66, -0.14, ANKLE + 0.16), 'pitch': 6})),
+        (21, merge(IDLE, hips={'loc': (0.02, 0, -0.08), 'rot': (0, 0, 0)})),
         (24, IDLE),
     ),
 }
 
 
 def sit(t):
-    """Sitting: legs out, leaning back on his hands; the head sways, the feet wiggle."""
+    """Sitting: legs out, hands on the floor at his sides; breathing (twice a loop), the head
+    sways, the feet wiggle."""
     sw = math.sin(2 * math.pi * t)
     wig = math.sin(2 * math.pi * 3 * t)
     bob = math.sin(2 * math.pi * 2 * t)
-    p = merge(SIT, head=(-2 * bob, 10 * sw, 5 * sw), neck=(2, 3 * sw, 0), chest=(-4 + 1.5 * bob, 0, 0))
+    (x, y, z), rot = SIT['hips']['loc'], SIT['hips']['rot']
+    p = merge(
+        SIT,
+        hips={'loc': (x, y, z + 0.01 * bob), 'rot': rot},
+        head=(-2 * bob, 10 * sw, 5 * sw),
+        neck=(2, 3 * sw, 0),
+        chest=(SIT['chest'][0] + 2 * bob, 0, 0),
+    )
     p['legL'] = merge(SIT['legL'], pitch=-55 + 12 * wig, yaw=12 + 6 * wig)
     p['legR'] = merge(SIT['legR'], pitch=-55 - 12 * wig, yaw=12 - 6 * wig)
     return p
