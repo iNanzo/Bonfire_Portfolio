@@ -19,8 +19,13 @@
 // surface id (ID.floor + SHADE_SPAN × coverage, over ID_SCALE) and white into the colour, so
 // the post shader composes the shadow itself. Pixel Size Off skips the pass and draws the scene
 // straight to the canvas at native size, the ShadowMaterial as it is (the paper as the clear
-// colour). The toon materials write their surface id into alpha too (markId); things drawn over
-// the floor (the blob, the marker) write no depth and keep the id under them (decalMaterial).
+// colour). The toon materials write their surface id into alpha too (markId), and in the colour
+// target sample their textures a coarser mip by the preset's `texture.mipBias` (at a few hundred
+// texels his shirt's pattern aliases into a grey patchwork; the toon bands should shade him, not
+// the texture's noise). Things drawn over the floor (the blob, the marker) write no depth and
+// keep the id under them (decalMaterial); in the colour target they're flat pixel shapes, their
+// map's alpha cut at DECAL_CUT and drawn at the material's opacity, like his hard shadow (a
+// smooth falloff reads as a smudge on the white page).
 import * as THREE from 'three';
 import { floorLook } from './floor.js';
 import { BAYER4 } from './pixels.js';
@@ -38,6 +43,10 @@ export const MAX_SOFT = 3;
  * show through: three's canvas always has an alpha channel.
  */
 const ID_ON = { value: 1 };
+/** How many mip levels coarser his textures are sampled (one uniform every marked material shares). */
+const MAP_BIAS = { value: 0 };
+/** A decal's map alpha under this is outside its shape (in the colour target). */
+export const DECAL_CUT = 0.3;
 
 /**
  * The pass's own optional knobs a look preset may carry beside LookPreset's (looks/*.js type
@@ -47,10 +56,13 @@ const ID_ON = { value: 1 };
  *   shadow's edge spreads over (0: hard); steps: tones it's dithered into (0: smooth);
  *   dither: how much the Bayer dither moves those steps, 0..1
  * @property {{outside?: boolean}} outline  lines on the paper just outside NEWT, not on his edge
+ * @property {{mipBias?: number}} [texture]  mipBias: how many mip levels coarser his textures
+ *   are sampled with the pixel filter on (0: as three picks)
  */
 
 /**
- * Make a material write its surface id into the colour's alpha (for the retro pass's lines).
+ * Make a material write its surface id into the colour's alpha (for the retro pass's lines),
+ * and sample its map MAP_BIAS mip levels coarser (0 unless the pass sets it).
  * @template T
  * @param {T} material  a built-in three.js material
  * @param {number} id  ID's
@@ -61,8 +73,16 @@ export function markId(material, id) {
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uSurfaceId = { value: id / ID_SCALE };
     shader.uniforms.uIdOn = ID_ON;
+    shader.uniforms.uMapBias = MAP_BIAS;
     shader.fragmentShader = shader.fragmentShader
-      .replace('void main() {', 'uniform float uSurfaceId;\nuniform float uIdOn;\nvoid main() {')
+      .replace(
+        'void main() {',
+        'uniform float uMapBias;\nuniform float uSurfaceId;\nuniform float uIdOn;\nvoid main() {',
+      )
+      .replace(
+        '#include <map_fragment>',
+        '#ifdef USE_MAP\n\tvec4 sampledDiffuseColor = texture2D( map, vMapUv, uMapBias );\n\tdiffuseColor *= sampledDiffuseColor;\n#endif',
+      )
       .replace(
         '#include <dithering_fragment>',
         '#include <dithering_fragment>\n\tgl_FragColor.a = mix(1.0, uSurfaceId, uIdOn);',
@@ -76,11 +96,13 @@ export function markId(material, id) {
 
 /**
  * A material for what's drawn over the floor: blended, no depth written, the colour target's
- * alpha (the surface id under it) left as it was.
+ * alpha (the surface id under it) left as it was. In the colour target it's a flat pixel shape:
+ * where its map's alpha reaches DECAL_CUT, at the material's opacity, nothing elsewhere (drawn
+ * straight to the canvas, Pixel Size Off, its map's falloff stays).
  * @param {object} params  MeshBasicMaterial's
  */
 export function decalMaterial(params) {
-  return new THREE.MeshBasicMaterial({
+  const m = new THREE.MeshBasicMaterial({
     transparent: true,
     depthWrite: false,
     blending: THREE.CustomBlending,
@@ -93,6 +115,17 @@ export function decalMaterial(params) {
     polygonOffsetUnits: -2,
     ...params,
   });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uIdOn = ID_ON;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('void main() {', 'uniform float uIdOn;\nvoid main() {')
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>\n#ifdef USE_MAP\n\tif ( uIdOn > 0.5 ) {\n\t\tif ( sampledDiffuseColor.a < ${DECAL_CUT.toFixed(2)} ) discard;\n\t\tdiffuseColor.a = opacity;\n\t}\n#endif`,
+      );
+  };
+  m.customProgramCacheKey = () => 'invitation-decal';
+  return m;
 }
 
 /** The line in three's ShadowMaterial shader that the catcher rewrites. */
@@ -268,9 +301,12 @@ const fragmentShader = /* glsl */ `
       gl_FragColor = vec4(quantize(col, d * uDither), 1.0);
       return;
     }
-    // The paper, or the floor: the paper under his shadow and what's drawn over it.
+    // The paper, or the floor: the paper under his shadow and what's drawn over it, quantized
+    // without the dither (the shadow's flat tones stay flat as the camera turns: a screen-space
+    // pattern over them would crawl), or a line just outside him, dithered as he is.
     vec3 col = uPaper;
     bool marked = false;
+    float dd = 0.0;
     float own = shadeOf(src);
     if (own >= 0.0) {
       float amount = softShade(p, own);
@@ -285,10 +321,11 @@ const fragmentShader = /* glsl */ `
         if (!isNewt(n)) continue;
         col = grade(at(n).rgb) * uInk * (1.0 - uDarken);
         marked = true;
+        dd = d * uDither;
         break;
       }
-    // (Untouched paper stays exactly the paper: a dither over it would show as a pattern.)
-    gl_FragColor = vec4(marked ? quantize(col, d * uDither) : col, 1.0);
+    // (Untouched paper stays exactly the paper.)
+    gl_FragColor = vec4(marked ? quantize(col, dd) : col, 1.0);
   }
 `;
 
@@ -391,6 +428,7 @@ export function createRetro(renderer) {
     // (Dithering off: the steps stay, undithered, so the shadow keeps its tones.)
     u.uShadeSteps.value = Math.max(0, Math.round(shadow.steps ?? 0));
     u.uShadeDither.value = look.dither ? (shadow.dither ?? 1) : 0;
+    MAP_BIAS.value = pixel ? Math.max(0, preset.texture?.mipBias ?? 0) : 0;
     background.setHex(scene.background, THREE.SRGBColorSpace);
   }
 
