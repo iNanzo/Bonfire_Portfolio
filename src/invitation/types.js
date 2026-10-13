@@ -76,7 +76,10 @@
  * @property {'Wave'|'Spook'|null} reaction  the reaction under way (react only), turn included
  */
 
-/** @typedef {{x: number, z: number, yaw: number, speed: number}} Body  NEWT's root on the floor */
+/**
+ * @typedef {{x: number, z: number, yaw: number, speed: number, run?: XZ}} Body  NEWT's root on the
+ *   floor; `run`, while he flees: the way he runs (a unit direction, smoothed: steer.js)
+ */
 /** @typedef {typeof import('./brain.js').TUNE} Tune  the brain's numbers (createBrain's `tune` overrides any of them) */
 
 /**

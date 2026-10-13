@@ -1,6 +1,8 @@
 // Moves NEWT's root across the invitation toy's floor: walking to a goal (slowing to arrive),
 // running away from the pointer or the play area's centre (choosing the open direction most
-// away from it, so its edges push him off and a corner slides him along an edge, never stuck),
+// away from it, so its edges push him off and a corner slides him along an edge, never stuck;
+// the way he runs, Body.run, settles toward that choice over a quarter of a second, faster with
+// an edge close ahead, so his heading curves instead of zig-zagging between neighbours),
 // and turning to face the camera, all with acceleration and a capped turn rate. Also picks his
 // wander goals. The play area (Bounds) is a box, a box that widens toward the back, or a disc
 // (Bounds.r: the toy's, around its box's centre): xRange gives its sides at a depth, clampTo
@@ -15,8 +17,10 @@
  * accel/decel: units/s²; turnRate: rad/s; arrive: a goto stops inside this radius; slowRadius:
  * he slows over this last stretch, to no less than minApproach of his speed. Flee: fleeDirs
  * directions tried, room counted up to fleeRoom ahead (weighted fleeRoomWeight), a direction
- * with less than fleeBlocked of room is out, fleeKeep favours the way he faces, and fleeMinPace
- * of his speed is kept while he turns. wanderMin: a wander goal is at least this far;
+ * with less than fleeBlocked of room is out, fleeKeep favours the way he runs, the way he runs
+ * settles toward the best direction with a time constant of fleeSmooth s (fleeSmoothNear with
+ * less than fleeNear of room ahead, so he still turns off an edge in time), and fleeMinPace of
+ * his speed is kept while he turns. wanderMin: a wander goal is at least this far;
  * wanderMargin: and this far inside the bounds.
  */
 export const STEER = {
@@ -31,6 +35,9 @@ export const STEER = {
   fleeRoomWeight: 1,
   fleeBlocked: 0.35,
   fleeKeep: 0.15,
+  fleeSmooth: 0.25,
+  fleeSmoothNear: 0.08,
+  fleeNear: 0.6,
   fleeMinPace: 0.3,
   wanderMin: 1,
   wanderMargin: 0.1,
@@ -125,6 +132,8 @@ export function steer(body, move, pointer, bounds, dt) {
   let want = 0;
   let aim = yaw;
   let room = Infinity;
+  /** @type {XZ|undefined} the way he runs, fleeing */
+  let run;
   const mode = move?.mode ?? 'stay';
   if (mode === 'goto' && move.goal) {
     const g = bounds ? clampTo(bounds, move.goal) : move.goal;
@@ -138,8 +147,17 @@ export function steer(body, move, pointer, bounds, dt) {
       room = d;
     }
   } else if (mode === 'flee') {
-    const dir = fleeDirection({ x, z }, yaw, pointer ?? move.goal ?? centreOf(bounds), bounds);
-    aim = Math.atan2(dir.x, dir.z);
+    const keep = body.run ?? { x: Math.sin(yaw), z: Math.cos(yaw) };
+    const best = fleeDirection({ x, z }, keep, pointer ?? move.goal ?? centreOf(bounds), bounds);
+    // (The way he runs settles toward the best one over fleeSmooth s: picked afresh each frame
+    // from a ring of directions, it flicked between neighbours several times a second.)
+    const near = bounds && body.run ? roomAlong({ x, z }, keep.x, keep.z, bounds) < STEER.fleeNear : false;
+    const k = body.run ? 1 - Math.exp(-dt / (near ? STEER.fleeSmoothNear : STEER.fleeSmooth)) : 1;
+    const rx = keep.x + (best.x - keep.x) * k;
+    const rz = keep.z + (best.z - keep.z) * k;
+    const len = Math.hypot(rx, rz);
+    run = len > 1e-6 ? { x: rx / len, z: rz / len } : best;
+    aim = Math.atan2(run.x, run.z);
     const err = Math.abs(wrapAngle(aim - yaw));
     want = move.speed * (STEER.fleeMinPace + (1 - STEER.fleeMinPace) * Math.max(0, Math.cos(err)));
   } else if (mode === 'face') {
@@ -156,25 +174,25 @@ export function steer(body, move, pointer, bounds, dt) {
     // Pressed against an edge, he only goes as fast as he really moves.
     if (dt > 0 && step > 0) speed = Math.min(speed, Math.hypot(nx - x, nz - z) / dt);
   }
-  return { x: nx, z: nz, yaw, speed };
+  return run ? { x: nx, z: nz, yaw, speed, run } : { x: nx, z: nz, yaw, speed };
 }
 
 /**
  * The way to run: of a ring of directions (and straight away), the one that best mixes "away
- * from the threat", "open room ahead" and "the way he already faces"; one with almost no room
- * is out, so he turns along a wall before he meets it.
+ * from the threat", "open room ahead" and "the way he already runs" (`keep`, a unit
+ * direction); one with almost no room is out, so he turns along a wall before he meets it.
  * @param {XZ} p
- * @param {number} yaw
+ * @param {XZ} keep
  * @param {XZ} threat
  * @param {Bounds|null} bounds
  * @returns {XZ}
  */
-function fleeDirection(p, yaw, threat, bounds) {
+function fleeDirection(p, keep, threat, bounds) {
   let ax = p.x - threat.x;
   let az = p.z - threat.z;
   const n = Math.hypot(ax, az);
-  const fx = Math.sin(yaw);
-  const fz = Math.cos(yaw);
+  const fx = keep.x;
+  const fz = keep.z;
   if (n < 1e-6) {
     ax = fx;
     az = fz;

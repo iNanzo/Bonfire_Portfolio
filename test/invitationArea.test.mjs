@@ -4,7 +4,8 @@
 // Size, with NEWT still about a fifth of the screen's short side tall; on a phone he's drawn about
 // 30% bigger, the disc no longer all fits, and the camera follows him softly (camera.js) so a
 // dash to the rim, or round it, never takes him off the screen; walking, wandering, fleeing
-// (sliding along the rim when cornered) and carrying (the anchor, the toss and the fall's bounces)
+// (sliding along the rim when cornered, his heading turning smoothly as he goes round it, no
+// zig-zag) and carrying (the anchor, the toss and the fall's bounces)
 // stay inside it (steer.js and carry.js read a disc's radius from its Bounds); and the light's
 // shadow camera (floor.js fitShadow) covers the disc up to the highest he's lifted, wherever the
 // camera has turned the light (camera.js lightDir).
@@ -224,6 +225,37 @@ test('fleeing stays inside the disc; cornered at the rim he slides along it and 
     inDisc(c, 'chased');
     still = dist(c, a) < 0.2 * DT ? still + 1 : 0;
     assert.ok(still < 30, `stuck for half a second at ${(i * DT).toFixed(1)} s`);
+  }
+});
+
+test('fleeing round the disc for 6 s, his heading turns smoothly: no zig-zag (at most 1.5 turn reversals a second), little hard turning, and he never slows against the rim', () => {
+  const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+  for (const fps of [30, 60, 120]) {
+    for (const yaw of [0, 1, -1.5, 3]) {
+      const dt = 1 / fps;
+      // The Run button: he runs from the disc's centre, out to the rim and round it.
+      let body = { x: 0, z: 0, yaw, speed: 0 };
+      let fast = 0;
+      let slow = 0;
+      let reversals = 0;
+      let turning = 0;
+      for (let i = 0; i < 6 * fps; i++) {
+        const next = steer(body, { mode: 'flee', goal: null, speed: GAIT.run }, null, AREA, dt);
+        const rate = wrapA(next.yaw - body.yaw) / dt;
+        if (Math.abs(rate) > 3) fast += dt;
+        if (Math.abs(rate) > 0.5) {
+          if (turning && Math.sign(rate) !== turning) reversals++;
+          turning = Math.sign(rate);
+        }
+        if (i * dt > 0.6 && next.speed < GAIT.run / 3) slow += dt;
+        inDisc(next, 'fleeing');
+        body = next;
+      }
+      const at = `${fps} fps from yaw ${yaw}`;
+      assert.ok(reversals <= 9, `${at}: his turn changed way ${reversals} times in 6 s`);
+      assert.ok(fast < 0.8, `${at}: ${fast.toFixed(2)} s turning faster than 3 rad/s`);
+      assert.ok(slow < 0.2, `${at}: ${slow.toFixed(2)} s held up against the rim`);
+    }
   }
 });
 
