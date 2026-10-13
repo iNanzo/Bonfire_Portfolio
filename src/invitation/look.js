@@ -13,7 +13,6 @@ import soft from './looks/soft.js';
 /**
  * @typedef {object} LookPreset  every look value, as data (looks/*.js)
  * @property {string} label  its name in the Look menu
- * @property {import('./pixels.js').TexelTable} texels  target texels on the short side, per Pixel Size
  * @property {number} levels  colour levels a channel (64: 18-bit colour)
  * @property {number} dither  Bayer dither strength with Dithering on, 0..1
  * @property {{darken: number, tint: string, depth: number}} outline  a line's pixel: darkened by

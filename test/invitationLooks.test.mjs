@@ -4,7 +4,7 @@
 // shadow; the blob only shows, as a flat pixel shape, while he's lifted), a coarser texture mip
 // so his shirt doesn't alias into a patchwork, dithers light enough not to crawl over him as he
 // moves, and a soft shadow's edge no wider than a texel, so it doesn't shimmer as the camera
-// turns.
+// turns. Neither sets the grid: the Pixel Size alone does (pixels.js), whatever the Style.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_STYLE, PRESETS } from '../src/invitation/looks/index.js';
@@ -41,8 +41,6 @@ test('dithers light enough not to crawl over him at real speed; soft shadows a t
   }
 });
 
-test('Soft’s head has room for a face: more texels than DS’s three quarters', () => {
-  // (main.js frames NEWT by DS's texel count; Soft's head is DS's × soft / ds texels wide.)
-  for (const size of ['fine', 'ds', 'chunky'])
-    assert.ok(PRESETS.soft.texels[size] >= 0.9 * PRESETS.ds.texels[size], `Soft ${size}: ${PRESETS.soft.texels[size]}`);
+test('no preset sets the grid: the Pixel Size alone does, so every Style gives NEWT the same texels', () => {
+  for (const [name, p] of Object.entries(PRESETS)) assert.equal('texels' in p, false, `${name} carries a texel table`);
 });

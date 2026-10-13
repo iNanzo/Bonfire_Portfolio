@@ -234,9 +234,6 @@ test('every look preset carries every look value (a designer edits data, never c
   for (const [name, p] of Object.entries(LOOKS)) {
     const at = (k) => `${name}: ${k}`;
     assert.ok(typeof p.label === 'string' && p.label.length > 0, at('label'));
-    for (const size of ['fine', 'ds', 'chunky'])
-      assert.ok(p.texels[size] >= 64 && p.texels[size] <= 400, at(`texels.${size}`));
-    assert.ok(p.texels.fine > p.texels.ds && p.texels.ds > p.texels.chunky, at('texels: fine > ds > chunky'));
     assert.ok(Number.isInteger(p.levels) && p.levels >= 2 && p.levels <= 256, at('levels'));
     assert.ok(p.dither >= 0 && p.dither <= 1, at('dither'));
     assert.ok(p.outline.darken >= 0 && p.outline.darken <= 1, at('outline.darken'));

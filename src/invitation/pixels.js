@@ -22,7 +22,6 @@
 // makes chunkier pixels, and a bigger screen gives him more texels.
 
 /** @typedef {'off'|'2'|'3'|'4'} PixelSize  Off, or N× (a texel N×N CSS px) */
-/** @typedef {{fine: number, ds: number, chunky: number}} TexelTable  target texels on the short side */
 /**
  * @typedef {object} Grid  the canvas in texels
  * @property {number} pd  device pixels per texel (1 at native size)

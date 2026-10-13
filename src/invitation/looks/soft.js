@@ -1,20 +1,17 @@
-// The "Soft" look preset (data only): Webfishing by way of Wild World on a white page. About 184
-// texels on the short side, a little chunkier than DS's where whole device pixels allow (his
-// head keeps room for a face: at 180 a 390-wide phone at DPR 3 rounds up to 7-pixel texels, 168
-// across, and his eyes flicker into his hair as he turns); 28 levels a channel with a Bayer dither that stays in his soft gradients, not over his dark
-// hair and clothes; a pastel grade that keeps him peachy and his eyes near black; coloured
-// outlines, a darker plum shade of the colour beside them, drawn on the paper just outside his
-// silhouette like a sprite's (never on his face); his textures a mip and a half coarser, so the
-// toon bands shade him rather than his shirt's pattern; and a soft shadow, its edge spread over
-// one texel and dithered into two tones on a warm white page; no blob under him while he
-// stands (only a flat one while he's lifted). Every look value lives here so the look designer
-// edits data, never code (look.js has the shape, LookPreset; retro.js the pass's own extras,
-// RetroExtras).
+// The "Soft" look preset (data only): Webfishing by way of Wild World on a white page, on the same
+// grid as DS (the Pixel Size's: no preset sets the grid); 28 levels a channel with a Bayer dither
+// that stays in his soft gradients, not over his dark hair and clothes; a pastel grade that keeps
+// him peachy and his eyes near black; coloured outlines, a darker plum shade of the colour beside
+// them, drawn on the paper just outside his silhouette like a sprite's (never on his face); his
+// textures a mip and a half coarser, so the toon bands shade him rather than his shirt's pattern;
+// and a soft shadow, its edge spread over one texel and dithered into two tones on a warm white
+// page; no blob under him while he stands (only a flat one while he's lifted). Every look value
+// lives here so the look designer edits data, never code (look.js has the shape, LookPreset;
+// retro.js the pass's own extras, RetroExtras).
 
 /** @type {import('../look.js').LookPreset & import('../retro.js').RetroExtras} */
 export default {
   label: 'Soft',
-  texels: { fine: 244, ds: 184, chunky: 138 },
   levels: 28,
   dither: 0.35,
   outline: { darken: 0.35, tint: '#a0607a', depth: 0.015, outside: true },

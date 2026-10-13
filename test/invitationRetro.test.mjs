@@ -14,7 +14,6 @@ const LOOK = { pixelSize: '2', dither: true, outlines: true, style: 'ds' };
 /** A whole preset as the pass reads it (the presets' own values are tested on their own). */
 const PRESET = {
   label: 'Test',
-  texels: { fine: 270, ds: 192, chunky: 150 },
   levels: 63,
   dither: 0.3,
   outline: { darken: 0.4, tint: '#ffffff', depth: 0.002 },

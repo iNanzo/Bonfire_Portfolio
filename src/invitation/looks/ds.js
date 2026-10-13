@@ -1,21 +1,20 @@
-// The "DS" look preset (data only): the old handheld's 3D on a white page. About 192 texels on
-// the short side (the DS's own screen height); 18-bit colour (64 levels a channel, 6 bits)
-// under a light Bayer dither (light enough not to crawl over him as he moves); the DS's edge
-// marking (a 1-texel line on NEWT's own edge texels, where the surface or the depth jumps: none
-// on the floor or in his shadow), dark enough to show on his skin and clothes; two toon bands
-// and a highlight, the shade band and the fill high enough that his black hair keeps two tones,
-// warmed toward Animal Crossing: Wild World by a peach fill and a little more saturation; his
-// textures a mip and a half coarser, so the toon bands shade him rather than his shirt's
-// pattern; a hard BasicShadowMap shadow, one flat warm lavender grey on the white, lighter than
-// him; no blob under him while he stands (only a flat one while he's lifted). Every look value
-// lives here so the look designer edits data, never code: retro.js, stage.js, floor.js and
-// character.js read it (look.js has the shape, LookPreset; retro.js the pass's own extras,
-// RetroExtras).
+// The "DS" look preset (data only): the old handheld's 3D on a white page, on the Pixel Size's grid
+// (2× by default: 195 texels across a 390-wide phone, near the DS's own 192 lines; no preset sets
+// the grid); 18-bit colour (64 levels a channel, 6 bits) under a light Bayer dither (light enough
+// not to crawl over him as he moves); the DS's edge marking (a 1-texel line on NEWT's own edge
+// texels, where the surface or the depth jumps: none on the floor or in his shadow), dark enough to
+// show on his skin and clothes; two toon bands and a highlight, the shade band and the fill high
+// enough that his black hair keeps two tones, warmed toward Animal Crossing: Wild World by a peach
+// fill and a little more saturation; his textures a mip and a half coarser, so the toon bands shade
+// him rather than his shirt's pattern; a hard BasicShadowMap shadow, one flat warm lavender grey on
+// the white, lighter than him; no blob under him while he stands (only a flat one while he's
+// lifted). Every look value lives here so the look designer edits data, never code: retro.js,
+// stage.js, floor.js and character.js read it (look.js has the shape, LookPreset; retro.js the
+// pass's own extras, RetroExtras).
 
 /** @type {import('../look.js').LookPreset & import('../retro.js').RetroExtras} */
 export default {
   label: 'DS',
-  texels: { fine: 256, ds: 192, chunky: 144 },
   levels: 64,
   dither: 0.25,
   outline: { darken: 0.6, tint: '#ffffff', depth: 0.015 },
