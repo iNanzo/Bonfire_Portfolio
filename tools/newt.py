@@ -10,6 +10,9 @@ Run it either way:
       blender --background --factory-startup --python tools/newt.py -- <repo root>):
       opens $NEWT_BLEND (default C:/Users/newto/Documents/NEWT_optimized.blend), builds, exports
       and saves NEWT_animated.blend next to it. The source .blend is never written.
+      NEWT_BLEND=C:/Users/newto/Documents/NEWT_animated.blend npm run model -- newt rebuilds the
+      committed glb byte for byte: the live file carries a small head fix NEWT_optimized.blend
+      doesn't have (one chin quad of the face split in two), so the default differs there.
   In the live Blender (through the Blender MCP):
       exec(open(r'<repo>/tools/newt.py').read(), {'__name__': '__main__', '__file__': r'<repo>/tools/newt.py'})
       builds on the open file, exports, and saves it as NEWT_animated.blend beside it.
