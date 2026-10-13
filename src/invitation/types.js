@@ -40,14 +40,15 @@
  * @property {XZ|null} pointer  the pointer on the floor, null when there's none
  * @property {{x: number, z: number, yaw: number, grounded: boolean}} newt
  * @property {{name: string, time: number, remaining: number}|null} clip  the playing one-shot or loop (not the gait)
- * @property {{dragSpeed: number, shake: number}|null} carry  while he's held
+ * @property {{dragSpeed: number, shake: number}|null} carry  while he's held (carry.js `carryFeel`)
+ * @property {XZ|null} [camera]  the camera's spot on the floor: a reaction turns him toward it (without it, toward +z)
  */
 /**
  * @typedef {object} BrainOut
  * @property {string} state  idle, walk, react, flee, held, fall, land, sitDown, sit, standUp
  * @property {string} clip  'gait' (Idle/Walk/Run by speed) or a clip name
  * @property {boolean} restart  start `clip` from 0 this frame
- * @property {{mode: 'stay'|'goto'|'flee'|'face', goal: XZ|null, speed: number}} move
+ * @property {{mode: 'stay'|'goto'|'flee'|'face', goal: XZ|null, speed: number}} move  goal: where a goto goes, the camera's spot to face, or where a flee's threat was last seen (with no pointer); speed: the target speed (steer ramps to it)
  * @property {import('./clips.js').FaceName} face  the base face (faces.js adds blinks)
  * @property {import('./clips.js').BlinkMode} blink
  * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number}} look
@@ -56,9 +57,51 @@
  * @property {boolean} wander
  * @property {'Sit'|'Stand'} sitLabel
  * @property {boolean} buttonsEnabled
+ * @property {'Wave'|'Spook'|null} reaction  the reaction under way (react only), turn included
  */
 
 /** @typedef {{x: number, z: number, yaw: number, speed: number}} Body  NEWT's root on the floor */
+/** @typedef {typeof import('./brain.js').TUNE} Tune  the brain's numbers (createBrain's `tune` overrides any of them) */
+
+/**
+ * @typedef {object} CarryState  carry.js: NEWT held by the collar (holdStep updates it in place)
+ * @property {number} t0  when he was grabbed
+ * @property {number} t  the last step
+ * @property {XYZ} from  the collar when he was grabbed: the anchor eases from here
+ * @property {XYZ} anchor  where the collar goes this frame (world)
+ * @property {XYZ} vel  the anchor's velocity
+ * @property {{x: number, z: number}} tilt  the root's swing in radians: root.rotation.x and .z (positive z puts his feet toward +x, positive x toward −z)
+ * @property {{x: number, z: number}} tiltVel
+ * @property {Array<{t: number, x: number, y: number, z: number}>} samples  the anchor over the last ~80 ms
+ * @property {number} dragSpeed  the anchor's speed, world units/s
+ * @property {number} shake  the anchor's acceleration, smoothed, world units/s²
+ */
+
+/** @typedef {{yaw: number, pitch: number}} Aim  radians from his body's facing: yaw + turns toward +x when he faces +z (like root.rotation.y), pitch + looks up */
+/**
+ * @typedef {object} LookState  lookAt.js (lookStep updates it in place)
+ * @property {number} yaw  the eased look, radians
+ * @property {number} pitch
+ * @property {number} vyaw
+ * @property {number} vpitch
+ * @property {number} weight  eased toward the brain's look weight
+ * @property {Aim} target  what it's easing toward this frame
+ * @property {string|null} mode
+ * @property {Aim|null} lastAim  the pointer's last aim
+ * @property {number} lastAimT
+ * @property {Aim|null} glance  a glance under way
+ * @property {number} glanceUntil
+ * @property {number|null} nextGlance
+ * @property {number} glances  how many glances so far
+ */
+
+/**
+ * @typedef {object} FaceState  faces.js (faceStep updates it in place)
+ * @property {string|null} mode  the blink mode last seen
+ * @property {number|null} next  when the next blink starts
+ * @property {number} until  the blink on now ends
+ * @property {number|null} again  a double blink's second one starts
+ */
 
 /**
  * @typedef {object} Character  what character.js hands main.js
