@@ -1,10 +1,10 @@
 // How NEWT moves in the invitation toy, from the pure modules: steer.js walks him to a goal,
-// turns him to the camera and runs him away from the pointer (pushed off the walls, sliding
-// along one when he's cornered, never stuck) with a capped turn rate, and picks wander goals
-// inside the room's bounds (the invisible front edge too). carry.js holds him by the collar:
-// the anchor eases in and stays in the room, a damped pendulum swings his root and settles, a
-// toss uses the last 80 ms, and a fall bounces softly off the walls and lands when his lowest
-// foot reaches the floor. blend.js keeps clip weights normalised, runs Idle/Walk/Run on one
+// turns him to the camera and runs him away from the pointer (pushed off the play area's edges,
+// the screen's, sliding along one when he's cornered, never stuck) with a capped turn rate, and
+// picks wander goals inside the bounds (the front edge over the toolbar too). carry.js holds
+// him by the collar: the anchor eases in and stays in the play area, a damped pendulum swings
+// his root and settles, a toss uses the last 80 ms, and a fall bounces softly off the edges and
+// lands when his lowest foot reaches the floor. blend.js keeps clip weights normalised, runs Idle/Walk/Run on one
 // shared phase, and starts a one-shot's fade-out before it ends. lookAt.js clamps and eases
 // his look without overshoot, glances by a seeded rng, and the brain zeroes the look's weight
 // in Spook, Fall and Land. Last, all of them together under two minutes of rough random play.
@@ -64,7 +64,7 @@ test('wander goals stay inside the bounds, the invisible front edge included, at
   assert.deepEqual(ga, gb, 'seeded');
 });
 
-test('fleeing grows the distance from the pointer, or from the room centre without one', () => {
+test('fleeing grows the distance from the pointer, or from the play area’s centre without one', () => {
   const flee = { mode: 'flee', goal: null, speed: GAIT.run };
   const pointer = { x: 0.3, z: 0.2 };
   let body = { x: 0, z: 0, yaw: 0, speed: 0 };
@@ -135,7 +135,7 @@ test('goto arrives inside the arrive radius and stops; face turns him toward the
   assert.ok(body.speed < 0.05);
   close(top, GAIT.walk, 0.02, 'walks at walking speed');
 
-  // A goal outside the room is clamped to it.
+  // A goal outside the play area is clamped to it.
   body = drive({ x: 0, z: 0, yaw: 0, speed: 0 }, { mode: 'goto', goal: { x: 0, z: 9 }, speed: GAIT.walk }, null, 4);
   assert.ok(inside(BOUNDS, body));
   assert.ok(BOUNDS.maxZ - body.z <= STEER.arrive + 1e-6);
@@ -152,7 +152,7 @@ test('goto arrives inside the arrive radius and stops; face turns him toward the
 
 // ---- carry --------------------------------------------------------------------------------
 
-test('carrying: the anchor eases in over about 0.15 s and stays inside the room', () => {
+test('carrying: the anchor eases in over about 0.15 s and stays inside the play area', () => {
   const c = grab({ x: 0, y: 0.6, z: 0 }, 10);
   const target = { x: 1, y: 1.2, z: 0 };
   holdStep(c, target, 0.05, BOUNDS, 10.05);
@@ -598,7 +598,7 @@ function moveNewt(w, out, t) {
   w.body = steer(w.body, out.move, w.pointer, BOUNDS, DT);
 }
 
-test('two minutes of rough random play: valid states and clips, always in the room, weights summing to 1', () => {
+test('two minutes of rough random play: valid states and clips, always in the play area, weights summing to 1', () => {
   const STATES = ['idle', 'walk', 'react', 'flee', 'held', 'fall', 'land', 'sitDown', 'sit', 'standUp'];
   for (const seed of [1, 2, 3]) {
     const r = createRng(seed * 101);
@@ -631,7 +631,7 @@ test('two minutes of rough random play: valid states and clips, always in the ro
       if (out.clip === 'gait') w.clip = null;
       else if (out.restart || out.clip !== w.clip) [w.clip, w.start] = [out.clip, t];
       moveNewt(w, out, t);
-      assert.ok(inside(BOUNDS, w.body), `left the room at ${JSON.stringify(w.body)}`);
+      assert.ok(inside(BOUNDS, w.body), `left the play area at ${JSON.stringify(w.body)}`);
       assert.ok([w.body.x, w.body.z, w.body.yaw, w.body.speed].every(Number.isFinite));
       const now = mainClip(out.clip, w.body.speed);
       weights = blendStep(weights, blendTarget(out.clip, w.body.speed), fadeFor(main, now), DT);

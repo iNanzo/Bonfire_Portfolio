@@ -99,7 +99,7 @@ export function centreOf(b) {
  *   (goto: where to; face: the camera's spot, or null for +z; flee: where the threat was last
  *   seen, used when there's no pointer)
  * @param {XZ|null} pointer  the pointer on the floor (flee runs from it, else from move.goal,
- *   else from the room's centre)
+ *   else from the play area's centre)
  * @param {Bounds|null} bounds
  * @param {number} dt
  * @returns {Body}

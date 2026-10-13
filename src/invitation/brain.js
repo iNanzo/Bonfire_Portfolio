@@ -198,7 +198,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
   /**
    * @param {number} minFor
    * @param {boolean} fromThreat  stress: from the pointer, or where it was last seen; the Run
-   *   button: from the pointer, or the room's centre
+   *   button: from the pointer, or the play area's centre
    */
   function flee(minFor, fromThreat) {
     if (m.state === 'flee') {

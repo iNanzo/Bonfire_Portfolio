@@ -1,10 +1,11 @@
 # The Invitation: playing with NEWT
 
-A small toy at `/invitation/`: NEWT, Newton's low-poly chibi, stands in a plain white room seen
-through its missing front wall, and you can play with him. It's made for a phone first and works
-with a mouse too. It has its own look (off-white and warm greys, chunky buttons, pixel art drawn
-like an old handheld's 3D), not the bonfire site's. The page is unlisted: nothing links to it
-and search engines are asked not to index it.
+A small toy at `/invitation/`: NEWT, Newton's low-poly chibi, stands on a plain white
+background, on a floor you can't see that only shows his shadow, and you can play with him. He
+can go anywhere on the screen above the toolbar; the screen's edges are his walls. It's made for
+a phone first and works with a mouse too. It has its own look (off-white and warm greys, chunky
+buttons, pixel art drawn like an old handheld's 3D), not the bonfire site's. The page is
+unlisted: nothing links to it and search engines are asked not to index it.
 
 ## What You Can Do
 
@@ -13,13 +14,13 @@ and search engines are asked not to index it.
 - **Drag him** to pick him up by the collar. He dangles and swings; let go and he falls, lands
   and gets back up.
 - **Tap the floor** and he walks there. A ring on the floor shows where your finger or cursor is.
-- **Point around the room** and he looks where you point.
+- **Point anywhere on the floor** and he looks where you point. Otherwise he looks at you.
 - **Leave him alone** for about 20 seconds and he sits down.
 - **The toolbar:** Wave, Spook, Sit (Stand once he's sitting), Run (he runs off for a few
   seconds), Wander (on: he strolls around by himself) and Look. The buttons rest while he's
   being held or falling.
 
-(The page draws NEWT and his room now; tapping, carrying, walking and the buttons come with the
+(The page draws NEWT on his floor now; tapping, carrying, walking and the buttons come with the
 next step of the round.)
 
 ## The Look Menu
@@ -31,7 +32,7 @@ visit (in this browser).
 | --- | --- | --- |
 | Pixel Size | Off, Fine, DS, Chunky | How big the pixels are: Fine about 270 across the short side of the screen, DS about 200, Chunky about 150 (Soft is chunkier). Off draws at the screen's own resolution, smooth. |
 | Dithering | On, Off | The checkered blend between colours. |
-| Outlines | On, Off | A one-pixel line around NEWT and where the walls meet the floor. |
+| Outlines | On, Off | A one-pixel line around NEWT (none in his shadow). |
 | Style | DS, Soft | DS: crisp, many colours, a hard shadow. Soft: chunkier, fewer colours with a visible dither, pastel, warm outlines and a softer shadow. |
 
 Dithering and outlines are part of the pixel look, so they rest while Pixel Size is Off.
@@ -41,12 +42,18 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
 - **Code** (`src/invitation/`): the page imports only three.js, its GLTFLoader and its own
   modules (a shared `src/` module would share a chunk with the portfolio's first load).
   - Browser-only and thin: `main.js` (boot, the loop, the wiring), `stage.js` (renderer at
-    texel size, camera, lights and shadows, the blob shadow and the floor marker), `room.js`,
-    `character.js` (NEWT's materials, clips, look-at and faces), `retro.js` (the pixel pass),
-    `ui.js` (the toolbar and the Look sheet as markup, plus a thin binding), `invitation.css`.
-  - Pure and unit-tested: `pixels.js` (the texel grid and the camera framing), `look.js` (the
-    Look settings under `invitation.look.v1`, and the presets), `looks/ds.js` and
-    `looks/soft.js` (every look value, as data: a designer edits these, never code).
+    texel size, camera, lights and shadows, the blob shadow and the floor marker), `floor.js`
+    (no room: an invisible floor that only catches his shadows, a `ShadowMaterial`, over the
+    preset's background), `character.js` (NEWT's materials, clips, look-at and faces),
+    `retro.js` (the pixel pass), `ui.js` (the toolbar and the Look sheet as markup, plus a thin
+    binding), `invitation.css`.
+  - Pure and unit-tested: `pixels.js` (the texel grid and the camera framing: 20° of view, 36°
+    up, NEWT 38 texels tall in the middle of the space over the toolbar), `area.js` (the play
+    area: the floor on screen over the toolbar, inset from the edges, a trapezoid wider at the
+    back, worked out again at every resize), `look.js` (the Look settings under
+    `invitation.look.v1`, and the presets), `looks/ds.js` and `looks/soft.js` (every look
+    value, as data: a designer edits these, never code; among them the background, the
+    shadow's colour and strength, and the blob shadow).
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
     `faces.js`, `gesture.js`, `rng.js`) are pure too; `types.js` lists the shapes they pass
     and the order a frame runs in.

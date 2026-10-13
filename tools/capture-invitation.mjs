@@ -15,7 +15,7 @@
 //   idle      three seconds of him standing (Idle, or the placeholder's T-pose)
 //   clips     every clip in turn (--clips for some), forced through play(): one WebP each
 //   tap       a tap on his head (a touch on a phone size, a click on a desktop one)
-//   drag      a press on his body dragged up and across the room, then let go (a touch drag
+//   drag      a press on his body dragged up and across the screen, then let go (a touch drag
 //             on a phone size, a mouse drag on a desktop one)
 //   buttons   Wave, Spook, Sit, Run and Wander pressed in turn
 //   floor     a tap on the floor in front of him

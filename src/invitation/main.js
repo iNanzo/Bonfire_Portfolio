@@ -1,5 +1,5 @@
-// The invitation toy (/invitation/): NEWT in a plain white room, to play with. This page boots
-// it: the controls (ui.js), the stage (stage.js: renderer, camera, room, lights, retro pass),
+// The invitation toy (/invitation/): NEWT on a plain white floor, to play with. This page boots
+// it: the controls (ui.js), the stage (stage.js: renderer, camera, floor, lights, retro pass),
 // NEWT (character.js, from models/newt.glb), the Look menu wired to all three (switched live,
 // kept in localStorage: look.js), the render loop (stopped while the page is hidden, steps of at
 // most 0.05 s, a lost WebGL context told), and the pointer on the canvas (the first one only,
@@ -75,7 +75,7 @@ if (webgl2()) {
 if (!stage) {
   stageEl.dataset.webgl = 'off';
   ui.setToolbar(false);
-  ui.setStatus('NEWT needs WebGL 2 to draw his room, and this browser has it turned off.');
+  ui.setStatus('NEWT needs WebGL 2 to draw, and this browser has it turned off.');
 } else {
   start(stage);
 }

@@ -539,7 +539,7 @@ test('company resets the 20 s sit timer: a press, a button, or the pointer movin
   close(buttoned, 15 + TUNE.sitAfter, 0.1, 'a button');
 });
 
-test('a floor tap makes him walk there, clamped to the room', () => {
+test('a floor tap makes him walk there, clamped to the play area', () => {
   const s = sim();
   let out = s.floorTap(1.2, -1);
   assert.equal(out.state, 'walk');
