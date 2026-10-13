@@ -1,4 +1,4 @@
-// The "DS" look preset (data only): the old handheld's 3D, about 192 texels on the short side,
+// The "DS" look preset (data only): the old handheld's 3D, about 200 texels on the short side,
 // 18-bit colour (64 levels a channel, barely dithered), a 1-texel line where depth or the
 // surface changes, two toon bands and a highlight, a hard shadow. Every look value lives here
 // so the look designer edits data, never code; retro.js, stage.js, room.js and character.js
@@ -7,7 +7,7 @@
 /** @type {import('../look.js').LookPreset} */
 export default {
   label: 'DS',
-  texels: { fine: 270, ds: 192, chunky: 150 },
+  texels: { fine: 270, ds: 200, chunky: 150 },
   levels: 64,
   dither: 0.35,
   outline: { darken: 0.42, tint: '#ffffff', depth: 0.002 },

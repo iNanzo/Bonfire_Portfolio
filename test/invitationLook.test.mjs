@@ -77,17 +77,18 @@ test('NEWT is 36 to 40 texels tall at the default size, on a phone and on a desk
     assert.ok(tall >= 36 && tall <= 40, `${at}: NEWT is ${tall.toFixed(1)} texels tall`);
     assert.ok(headTexels(view, grid) > 10, `${at}: his head is ${headTexels(view, grid).toFixed(1)} texels wide`);
     assert.ok(view.roomWidth >= ROOM.minWidth && view.roomWidth <= ROOM.maxWidth, `${at}: room ${view.roomWidth}`);
-    // The floor stays clear of the side edges and the toolbar; the back wall's top stays on screen.
+    // The floor stays clear of the side edges and the toolbar; a third of the back wall at least
+    // shows (on a wide screen its top runs off the top, as an Animal Crossing room's does).
     const front = ROOM.depth / 2;
     const left = project(view, { x: -view.roomWidth / 2, y: 0, z: front });
     const right = project(view, { x: view.roomWidth / 2, y: 0, z: front });
-    const top = project(view, { x: 0, y: ROOM.wall, z: -front });
+    const top = project(view, { x: 0, y: ROOM.wall / 3, z: -front });
     assert.ok(
       left.x >= INSETS.left - 0.5 && right.x <= cssW - INSETS.right + 0.5,
       `${at}: floor ${left.x}..${right.x}`,
     );
     assert.ok(left.y <= cssH - INSETS.bottom + 0.5, `${at}: the floor's front edge (${left.y}) is over the toolbar`);
-    assert.ok(top.y >= INSETS.top - 0.5, `${at}: the back wall's top (${top.y}) is on screen`);
+    assert.ok(top.y >= INSETS.top - 0.5, `${at}: a third of the back wall (${top.y}) shows`);
     assert.ok(view.elevation === 48 && Math.abs(view.fov - 30) < 1e-6, 'about 30° of view, 48° up');
   }
 });

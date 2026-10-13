@@ -29,7 +29,7 @@ visit (in this browser).
 
 | Setting | Choices | What it does |
 | --- | --- | --- |
-| Pixel Size | Off, Fine, DS, Chunky | How big the pixels are: Fine about 270 across the short side of the screen, DS about 192, Chunky about 150 (Soft is chunkier). Off draws at the screen's own resolution, smooth. |
+| Pixel Size | Off, Fine, DS, Chunky | How big the pixels are: Fine about 270 across the short side of the screen, DS about 200, Chunky about 150 (Soft is chunkier). Off draws at the screen's own resolution, smooth. |
 | Dithering | On, Off | The checkered blend between colours. |
 | Outlines | On, Off | A one-pixel line around NEWT and where the walls meet the floor. |
 | Style | DS, Soft | DS: crisp, many colours, a hard shadow. Soft: chunkier, fewer colours with a visible dither, pastel, warm outlines and a softer shadow. |
