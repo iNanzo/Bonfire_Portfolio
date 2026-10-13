@@ -1,12 +1,13 @@
 // The invitation toy's page around the canvas: the status line ("Loading…", or what went wrong),
 // the toolbar along the bottom (Wave, Spook, Sit or Stand, Run, Wander, Look: every button a
 // thumb's height, labelled, never a tooltip) and the Look menu, a bottom sheet (Pixel Size, a
-// slider over NEWT's sprite resolutions, 16×16 to 256×256, then Off at its fine end, with a
-// button at each end and a line saying how many pixels tall he is on this screen; Dithering,
-// Outlines, Style, Motion (Smooth or Choppy), and Reset Camera with a line on turning and
-// zooming the view). The slider's steps are the screen's (pixels.js pixelSteps: two
-// resolutions that come to the same block there are one step), set by main.js as the stage is
-// measured (setPixelSteps); every Pixel Size is a step until then. The sheet is a modal dialog: it opens on
+// slider over NEWT's sprite resolutions, 16×16 to 256×256, then Native (a texel a device pixel)
+// and Off at its fine end, with a button at each end and a line saying how many pixels tall he
+// is on this screen; Dithering, Outlines, Style, Motion (Smooth or Choppy), and Reset Camera
+// with a line on turning and zooming the view). The slider's steps are the screen's (pixels.js
+// pixelSteps: two resolutions that come to the same block there are one step, and one that
+// comes to 1 px is Native), set by main.js as the stage is measured (setPixelSteps); every
+// Pixel Size is a step until then. The sheet is a modal dialog: it opens on
 // Done, Tab goes round inside it, the toolbar it covers is inert while it's open, and Escape
 // closes it wherever focus is; the canvas stays live (turning the camera while choosing a look).
 // Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
@@ -21,22 +22,24 @@ import { LOOKS, MOTIONS, STYLES, validLook } from './look.js';
 
 /** The toolbar's action buttons, in order (Look comes last, on its own). */
 export const BUTTONS = /** @type {const} */ (['Wave', 'Spook', 'Sit', 'Run', 'Wander']);
+/** @type {Record<string, string>} the Pixel Sizes named by a word, not N×N */
+const PIXEL_WORDS = { native: 'Native', off: 'Off' };
 /**
- * A Pixel Size's label: N×N (NEWT about N texels tall), or Off.
+ * A Pixel Size's label: N×N (NEWT about N texels tall), Native or Off.
  * @param {import('./pixels.js').PixelSize} p
  */
-export const pixelLabel = (p) => (p === 'off' ? 'Off' : `${p}×${p}`);
+export const pixelLabel = (p) => PIXEL_WORDS[p] ?? `${p}×${p}`;
 /**
- * A Pixel Size as a screen reader says it: "N by N", or Off.
+ * A Pixel Size as a screen reader says it: "N by N", Native or Off.
  * @param {import('./pixels.js').PixelSize} p
  */
-export const pixelSpoken = (p) => (p === 'off' ? 'Off' : `${p} by ${p}`);
+export const pixelSpoken = (p) => PIXEL_WORDS[p] ?? `${p} by ${p}`;
 /** @type {import('./pixels.js').PixelStep[]} every Pixel Size a step of its own (no screen measured yet) */
 const ALL_STEPS = PIXEL_SIZES.map((p) => ({ value: p, n: resolutionOf(p), pd: 0, texels: 0, covers: [p] }));
 
 /**
- * The line under Pixel Size: how many texels tall NEWT is at `step` on this screen ('' at Off,
- * and before the screen's measured).
+ * The line under Pixel Size: how many texels tall NEWT is at `step` on this screen (every pixel
+ * there is at Native; '' at Off, and before the screen's measured).
  * @param {import('./pixels.js').PixelStep} step
  */
 export function pixelNote(step) {

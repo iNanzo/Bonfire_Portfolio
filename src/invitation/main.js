@@ -46,7 +46,7 @@ import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createFaceState, faceStep } from './faces.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
-import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf } from './pixels.js';
+import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
 import { animFps, loadLook, motionStep, presetOf, saveLook } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
@@ -129,7 +129,7 @@ if (webgl2()) {
       focus: focusInsets,
       onResize: ({ grid, view }) => {
         // (Pixel Size's steps are this screen's: two resolutions that draw alike here are one.)
-        ui.setPixelSteps(pixelSteps(stageEl.clientWidth, stageEl.clientHeight, window.devicePixelRatio || 1));
+        ui.setPixelSteps(screenSteps());
         // (His shirt's plaid by how many texels tall he is, once he's in.)
         character?.setResolution(newtTexels(view, grid));
         if (!orbit) return;
@@ -152,6 +152,16 @@ if (!stage) {
 /** The stage's size, CSS px (a drag across it turns the camera the same share of a turn anywhere). */
 function stageSize() {
   return { w: stageEl.clientWidth, h: stageEl.clientHeight };
+}
+
+/** Pixel Size's steps on this screen (pixels.js pixelSteps: two that draw alike here are one). */
+function screenSteps() {
+  return pixelSteps(stageEl.clientWidth, stageEl.clientHeight, window.devicePixelRatio || 1);
+}
+
+/** Whether the slider shows Native: the Pixel Size is Native, or a resolution at 1 px a texel here. */
+function shownNative() {
+  return stepFor(look.pixelSize, screenSteps()).value === 'native';
 }
 
 /** Where the default view keeps clear of: a top margin, the toolbar, the side edges (and the safe areas). */
@@ -646,8 +656,9 @@ function start(s) {
         buttonsEnabled: out?.buttonsEnabled ?? true,
         // (CSS px a texel: his height on screen over his texels; 1 over the capped DPR at Off.)
         pixelScale: s.grid.pd / s.grid.dpr,
-        // (The Pixel Size's sprite resolution N, null at Off, and his height in texels.)
-        resolution: resolutionOf(look.pixelSize),
+        // (The Pixel Size's sprite resolution N, 'native' where the slider shows Native (a
+        // resolution that comes to 1 px here too), null at Off; and his height in texels.)
+        resolution: shownNative() ? 'native' : resolutionOf(look.pixelSize),
         newtTexels: s.view ? newtTexels(s.view, s.grid) : 0,
         button: lastButton,
         texels: { w: s.grid.w, h: s.grid.h },

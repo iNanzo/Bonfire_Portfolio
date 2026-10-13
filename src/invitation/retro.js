@@ -18,8 +18,8 @@
 // pass's catcher, which writes the shadow's coverage into the colour's alpha beside the floor's
 // surface id (ID.floor + SHADE_SPAN × coverage, over ID_SCALE) and white into the colour, so
 // the post shader composes the shadow itself. Pixel Size Off skips the pass and draws the scene
-// straight to the canvas at native size, the ShadowMaterial as it is (the paper as the clear
-// colour). The toon materials write their surface id into alpha too (markId), and in the colour
+// straight to the canvas at the screen's resolution, the ShadowMaterial as it is (the paper as
+// the clear colour); Native keeps the pass, a texel a device pixel. The toon materials write their surface id into alpha too (markId), and in the colour
 // target sample their textures a coarser mip by the preset's `texture.mipBias` (at a few hundred
 // texels his shirt's pattern aliases into a grey patchwork; the toon bands should shade him, not
 // the texture's noise). Things drawn over the floor (the blob, the marker) write no depth and

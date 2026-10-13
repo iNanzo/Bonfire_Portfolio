@@ -1,7 +1,9 @@
 // The invitation toy (/invitation/) in a real browser, on the production build: on a phone
 // (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT on his
-// floor (not a blank canvas) in 2×2 CSS px texels; it's unlisted (noindex); a Look change (4×: 4×4
-// CSS px texels) survives a reload and Pixel Size Off draws at native size; and the portfolio's
+// floor (not a blank canvas) in 2×2 CSS px texels; it's unlisted (noindex); a Look change (24×24:
+// 4×4 CSS px texels) survives a reload, Pixel Size Native draws a texel a device pixel at a phone's
+// full DPR with the pixel look on (and survives a reload), and Off draws smooth at the screen's
+// resolution (its smooth face reported as such); and the portfolio's
 // first load carries none of its code; the pixel atlas and face load alongside the glb and the
 // first frame waits for them. NEWT stands about a quarter of a phone's short side tall
 // (a fifth of a desktop's), and running off to the rim never takes him off a phone's screen.
@@ -248,6 +250,52 @@ test.describe('on a phone', () => {
     expect((await snapshot(page)).resolution).toBe(24);
     expect((await snapshot(page)).pixelScale).toBe(4);
     await expect(sheet.getByRole('radio', { name: 'Soft' })).toBeChecked();
+    expect(errors).toEqual([]);
+  });
+
+  test('Pixel Size Native, the step before Off, draws a texel a device pixel (a third of a CSS px here) with the pixel look on, and survives a reload', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await ready(page);
+    await page.getByRole('button', { name: 'Look' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    const pixel = sheet.getByRole('slider', { name: 'Pixel Size' });
+    await pixel.focus();
+    await page.keyboard.press('End');
+    await expect(pixel).toHaveAttribute('aria-valuetext', 'Off');
+    await page.keyboard.press('ArrowLeft');
+    await expect(pixel).toHaveAttribute('aria-valuetext', 'Native');
+    await expect(sheet.locator('[data-pixel-value]')).toHaveText('Native');
+    await expect(sheet.locator('[data-pixel-note]')).toHaveText(
+      'NEWT is about 298 pixels tall: every pixel this screen has.',
+    );
+    // 256×256 is already a device pixel a texel here: it's Native, so the step before is 128×128.
+    await page.keyboard.press('ArrowLeft');
+    await expect(pixel).toHaveAttribute('aria-valuetext', '128 by 128');
+    await page.keyboard.press('ArrowRight');
+    await expect(pixel).toHaveAttribute('aria-valuetext', 'Native');
+    await expect.poll(async () => (await snapshot(page)).resolution).toBe('native');
+    const snap = await snapshot(page);
+    expect(snap.pixelScale, 'a texel a device pixel: no DPR cap').toBeCloseTo(1 / 3, 6);
+    expect(snap.newtTexels).toBeCloseTo(298, 0);
+    // The pixel look stays on: Dithering and Outlines still apply, no Off hint, the canvas is
+    // every device pixel of the stage, stretched nearest.
+    await expect(sheet.getByRole('switch', { name: 'Dithering' })).toBeEnabled();
+    await expect(sheet.getByRole('switch', { name: 'Outlines' })).toBeEnabled();
+    await expect(sheet.locator('[data-off-hint]')).toBeHidden();
+    const canvas = await page
+      .locator('[data-stage] canvas')
+      .evaluate((c) => [c.width, c.height, getComputedStyle(c).imageRendering]);
+    expect(canvas).toEqual([1170, 2532, 'pixelated']);
+    await page.reload();
+    await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('invitation.look.v1') ?? '{}').pixelSize)).toBe(
+      'native',
+    );
+    expect((await snapshot(page)).resolution).toBe('native');
+    await page.getByRole('button', { name: 'Look' }).click();
+    await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', 'Native');
     expect(errors).toEqual([]);
   });
 
@@ -507,7 +555,7 @@ test.describe('on a desktop', () => {
     expect(errors).toEqual([]);
   });
 
-  test('Pixel Size Off, one press at the slider’s end, draws at native size', async ({ page }) => {
+  test('Pixel Size Off, one press at the slider’s end, draws smooth at the screen’s resolution', async ({ page }) => {
     await ready(page);
     await page.getByRole('button', { name: 'Look' }).click();
     const sheet = page.getByRole('dialog', { name: 'Look' });
