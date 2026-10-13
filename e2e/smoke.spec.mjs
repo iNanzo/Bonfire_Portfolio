@@ -124,6 +124,12 @@ test('the pack opens and its Map fast travels to another place', async ({ page }
   await page.hover('[data-pack-slot="map"]');
   const shrine = page.locator('[data-pack-option="shrine"]');
   await expect(shrine).toBeVisible();
+  // The list has its own stepped entrance after the items land. Keep the pointer on
+  // Map until that finishes, so the click targets its settled option rather than a
+  // transient frame that can move the pointer out of the hover-open pack.
+  await page.locator('[data-pack-list="map"]').evaluate(async (list) => {
+    await Promise.all(list.getAnimations({ subtree: true }).map((animation) => animation.finished));
+  });
   await shrine.click();
   await expect(page.locator('[data-pack-option="shrine"]')).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('Escape');

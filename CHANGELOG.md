@@ -10,6 +10,13 @@ Round 11: the knight at home in every place, every module type-checked, and a cl
 what agents and test runs leave running. Round 10, below it: menus and search, the
 knight's fixes, hygiene and performance.
 
+### Admin deployment
+
+- Add an automatic admin deployment workflow that publishes current main only after
+  its existing Pages CI and deployment succeed. It rechecks main before publishing,
+  serializes deployments, and recovers changes from earlier failed pushes. Activation
+  requires the documented Cloudflare configuration; manual deployment remains available.
+
 ### The knight at home (round 11)
 
 - In the ruins he rests on the ground, where round 9 had him, instead of hunched on a drum

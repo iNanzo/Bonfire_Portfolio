@@ -287,3 +287,57 @@ and validates them first; nothing is stored.
    tag of `public/admin/index.html`, so `nhoang.dev/admin` forwards to it. If you ever
    move `nhoang.dev`'s DNS to Cloudflare, you can route the Worker at
    `nhoang.dev/admin*` directly instead.
+
+## Automatic admin updates
+
+`.github/workflows/deploy-admin.yml` reconciles the current `main` checkout when
+**Deploy to GitHub Pages** completes for a push to main. It reuses that
+workflow's full CI (lint/types, Node 22/24 coverage, build, all five browser shards)
+and waits for its Pages deployment too; it does not launch a second CI suite.
+
+Every main completion is a wake-up, including failed runs and documentation-only changes.
+There is deliberately no path filter or last-commit diff: an admin change in a failed
+push must still ship when a later unrelated change restores CI. This also covers
+shared content rules, settings, scenes, UI, fonts, lockfiles and future transitive
+dependencies without maintaining an incomplete allowlist. The tradeoff is an admin
+build/deploy for each successful current main, even when admin output is unchanged.
+
+The workflow checks out current main, resolves its full SHA, and requires the newest
+existing push run of `deploy.yml` for that exact SHA to be completed and successful.
+It validates the source repository, branch and workflow path, and fetches the run's
+current status so a failed or active rerun cannot reuse an earlier success. Missing,
+pending, failed, cancelled or skipped CI prevents publishing; API errors fail closed.
+PRs, forks and manual dispatches on other branches cannot deploy.
+
+One job-level `admin-production` concurrency group serializes checkout through publication;
+running deployments are not cancelled. A queued old completion or manual rerun
+reconciles today's main, never its historical event SHA. If main moves during the
+build, the final SHA/CI check skips publication; the newer successful main completion
+will reconcile again. Replacing queued events cannot lose a change because each
+surviving run checks the whole current tree. A delayed failed event also reconciles
+current main, so it cannot displace a queued success without doing that work. Ineligible
+jobs (such as a non-main dispatch) never join the lock. No previously deployed SHA marker or
+GitHub write permission is needed.
+
+The last freshness check runs immediately before Wrangler publishes the already-built
+admin. GitHub and Cloudflare do not share a transaction: main can still advance while
+the Cloudflare request is in flight. Serialization prevents an older workflow from
+overwriting a newer deployment from this workflow; it cannot lock GitHub main or
+coordinate a separate local/operator deployment. A new main commit is reconciled
+after its own CI succeeds. This is convergence, not atomic synchronization.
+
+A manual **Run workflow** on main or rerun retries deployment of current main using
+its existing successful push CI; it never bypasses CI or rolls back to an old run's
+SHA. If no qualifying CI exists, the job reports a skip reason. After a Cloudflare
+failure, use this manual retry or wait for the next successful main push. Summaries
+record the selected SHA, CI run ID and gate decision. The workflow must be merged
+onto the default branch before completion events can trigger it.
+
+Activation requires a repository secret `CLOUDFLARE_API_TOKEN` authorized
+to deploy the intended Worker and repository variable `CLOUDFLARE_ACCOUNT_ID` for its
+account. Neither is created by this change. Missing configuration fails visibly.
+The token is available only to the publication step, not dependency installation or
+the admin build. GitHub permissions are only `contents: read` and `actions: read`.
+Keep Cloudflare Access and the Worker's runtime secrets unchanged. Review authorization
+separately before creating credentials or expanding access. `npm run admin:deploy`
+remains the separately authorized local manual route, outside the workflow lock.
