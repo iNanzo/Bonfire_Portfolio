@@ -7,7 +7,7 @@
 // grab working in every state, sitting after 20 s alone and getting up before obeying, floor
 // taps, the buttons (and their being off while he's held or falling), the Sit/Stand label,
 // faces from FACE_TRACK with blinks from faces.js, no reaction three times running, and the
-// turn to the camera before a reaction. The seeded rng (rng.js) is checked here too.
+// turn to the camera before a reaction or a sit. The seeded rng (rng.js) is checked here too.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CLIPS, FACE_TRACK, GAIT, fadeFor } from '../src/invitation/clips.js';
@@ -467,9 +467,9 @@ test('in fall and land taps are ignored, but a grab still works', () => {
 
 test('after 20 s alone he sits by himself, and gets up before obeying a tap or a floor tap', () => {
   const s = sim({ calm: false, seed: 2 });
-  let out = s.until((o) => o.state === 'sitDown', 40);
+  let out = s.until((o) => o.clip === 'SitDown', 40); // (once he's turned to the camera)
   assert.ok(s.w.t >= TUNE.sitAfter && s.w.t <= TUNE.sitAfter + 8, `sat at ${s.w.t}`);
-  assert.equal(out.clip, 'SitDown');
+  assert.equal(out.state, 'sitDown');
   assert.equal(out.restart, true);
   assert.equal(out.sitLabel, 'Stand');
   out = s.until((o) => o.state === 'sit', 3);
@@ -502,6 +502,34 @@ test('after 20 s alone he sits by himself, and gets up before obeying a tap or a
   const d = sim({ calm: false, tune: { sitAfter: 1, idleMin: 99, idleMax: 99 } });
   d.until((o) => o.state === 'sitDown', 5);
   assert.equal(d.tap().state, 'standUp');
+});
+
+test('sitting down, by the button or by himself, he turns to face the camera first, then sits facing it with his happy face', () => {
+  const alone = { calm: false, x: 1.5, yaw: 2.5, tune: { sitAfter: 2, idleMin: 99, idleMax: 99 } };
+  const cases = { 'the button': [{ yaw: 2 }, null], 'by himself': [alone, { x: 0, z: 6 }] };
+  // Facing away: the Sit button with no camera spot (+z), and by himself with one off to the side.
+  for (const [how, [opts, camera]] of Object.entries(cases)) {
+    const s = sim({ ...opts, camera });
+    const off = () => Math.abs(wrapAngle(s.w.body.yaw - (camera ? Math.atan2(-1.5, 6) : 0)));
+    let out = camera ? s.until((o) => o.state === 'sitDown', 4) : s.button('Sit');
+    const first = [out.state, out.clip, out.faceCamera, out.move.mode, out.move.goal, out.sitLabel, out.face];
+    assert.deepEqual(first, ['sitDown', 'gait', true, 'face', camera, 'Stand', 'happy'], `${how}: a turn first`);
+    out = s.until((o) => o.clip !== 'gait', 1);
+    assert.deepEqual([out.state, out.clip, out.restart, out.faceCamera], ['sitDown', 'SitDown', true, false], how);
+    assert.ok(off() <= TUNE.facedEnough + 1e-6, `${how}: facing the camera before sitting (${off()} rad off)`);
+    out = s.until((o) => o.state === 'sit', 3);
+    assert.ok(off() < 0.05 && out.face === 'happy', `${how}: sitting facing it, happy (${off()} rad off)`);
+  }
+  // Already facing it: SitDown at once.
+  const out = sim({ yaw: 0.05 }).button('Sit');
+  assert.deepEqual([out.state, out.clip, out.restart, out.faceCamera], ['sitDown', 'SitDown', true, false]);
+  // During the turn he hasn't begun to sit: a tap reacts, a floor tap walks, Stand calls it off.
+  const pokes = { react: (s) => s.tap(), walk: (s) => s.floorTap(1, 0), idle: (s) => s.button('Sit') };
+  for (const [state, poke] of Object.entries(pokes)) {
+    const s = sim({ yaw: 2 });
+    s.button('Sit');
+    assert.equal(poke(s).state, state, `no getting up from a sit that never began: ${state}`);
+  }
 });
 
 test('company resets the 20 s sit timer: a press, a button, or the pointer moving more than 30 px', () => {
@@ -705,6 +733,9 @@ test('faces follow FACE_TRACK', () => {
     if (out.state === 'react') {
       name = out.reaction;
       since = out.clip === 'gait' ? 0 : s.w.t - s.w.clipStart;
+    } else if (out.state === 'sitDown' && out.clip === 'gait') {
+      name = 'SitDown'; // (turning to the camera first)
+      since = 0;
     } else if (out.clip === 'gait') {
       name = GAIT_TRACK[out.state];
       since = 0;

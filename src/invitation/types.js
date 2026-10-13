@@ -68,7 +68,7 @@
  * @property {import('./clips.js').FaceName} face  the base face (faces.js adds blinks)
  * @property {import('./clips.js').BlinkMode} blink
  * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number}} look
- * @property {boolean} faceCamera  turn to the camera first (a reaction)
+ * @property {boolean} faceCamera  turning to the camera first (a reaction, or sitting down)
  * @property {number} stress
  * @property {boolean} wander
  * @property {'Sit'|'Stand'} sitLabel

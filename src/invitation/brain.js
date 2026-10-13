@@ -2,7 +2,9 @@
 // land, sitDown, sit, standUp) that owns every timer and every change of state. Each frame it
 // turns gestures and buttons into what he does, keeps his stress (taps, rough handling; it
 // decays), and says which clip plays, how he moves, his face, where he looks and what the
-// buttons show. No three.js and no clock: time comes in as t, randomness from rng.js.
+// buttons show. A reaction and a sit (by the button or by himself) first turn him to face the
+// camera, so his face shows; a sit's turn isn't sitting yet (a tap reacts, a floor tap walks,
+// Stand calls it off). No three.js and no clock: time comes in as t, randomness from rng.js.
 
 import { CLIPS, FACE_TRACK, GAIT } from './clips.js';
 import { createRng, between } from './rng.js';
@@ -34,6 +36,8 @@ export const TUNE = {
   faceTurn: 0.2,
   /** …unless he's already within this many radians of facing it. */
   facedEnough: 0.15,
+  /** Sitting down, he turns to face the camera first, until he does or for this long at most. */
+  sitTurnMax: 0.6,
   /** A tap in this first share of a reaction only adds stress. */
   reactLock: 0.6,
   /** Fleeing from stress lasts at least this long. */
@@ -88,8 +92,8 @@ const STATE_CLIP = {
   sit: 'Sit',
   standUp: 'StandUp',
 };
-/** The FACE_TRACK entry for the gait states. */
-const GAIT_FACE = { idle: 'Idle', walk: 'Walk', flee: 'Run' };
+/** The FACE_TRACK entry for the gait states (sitDown: while he turns to the camera first). */
+const GAIT_FACE = { idle: 'Idle', walk: 'Walk', flee: 'Run', sitDown: 'SitDown' };
 const SITTING = new Set(['sitDown', 'sit']);
 const EPS = 1e-9;
 
@@ -166,15 +170,35 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
     return c && n ? Math.atan2(c.x - n.x, c.z - n.z) : 0;
   }
 
+  /** Whether he faces the camera, within facedEnough. */
+  function facingCamera() {
+    const yaw = m.input?.newt?.yaw ?? 0;
+    return Math.abs(wrapAngle(yaw - cameraYaw())) <= T.facedEnough;
+  }
+
   /** @param {Reaction} which */
   function react(which) {
     m.history.push(which);
     if (m.history.length > 4) m.history.shift();
     enter('react');
     m.reaction = which;
-    const yaw = m.input?.newt?.yaw ?? 0;
-    if (Math.abs(wrapAngle(yaw - cameraYaw())) > T.facedEnough) m.turning = true;
+    if (!facingCamera()) m.turning = true;
     else startClip(which);
+  }
+
+  /** Sit down, turned to the camera first unless he faces it already (so his happy face shows). */
+  function sitDown() {
+    enter('sitDown');
+    if (facingCamera()) return;
+    m.turning = true;
+    m.clip = 'gait';
+    m.restart = false;
+  }
+
+  /** Sitting, or on the way down or up (a sit's turn to the camera isn't: he still stands). */
+  function seated() {
+    const st = m.state;
+    return st === 'sit' || st === 'standUp' || (st === 'sitDown' && !m.turning);
   }
 
   function startClip(name) {
@@ -251,7 +275,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
     if (st === 'fall' || st === 'land' || st === 'held') return;
     addStress(T.stressTap);
     if (m.stress >= T.stressFlee && st !== 'flee') {
-      if (SITTING.has(st) || st === 'standUp') afterStanding({ do: 'flee', for: T.fleeMin, fromThreat: true });
+      if (seated()) afterStanding({ do: 'flee', for: T.fleeMin, fromThreat: true });
       else flee(T.fleeMin, true);
       return;
     }
@@ -260,7 +284,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
       if (!m.turning && reactProgress() >= T.reactLock) react(pick());
       return;
     }
-    if (SITTING.has(st) || st === 'standUp') afterStanding({ do: 'react', which: pick() });
+    if (seated()) afterStanding({ do: 'react', which: pick() });
     else react(pick());
   }
 
@@ -268,8 +292,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
   function onFloorTap(floor) {
     if (!floor) return;
     const st = m.state;
-    if (st === 'idle' || st === 'walk') walk(floor, false);
-    else if (SITTING.has(st) || st === 'standUp') afterStanding({ do: 'walk', goal: { x: floor.x, z: floor.z } });
+    if (seated()) afterStanding({ do: 'walk', goal: { x: floor.x, z: floor.z } });
+    else if (st === 'idle' || st === 'walk' || st === 'sitDown') walk(floor, false);
   }
 
   /** @param {GestureEvent} e */
@@ -309,7 +333,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
     const st = m.state;
     if (st === 'held' || st === 'fall') return;
     company();
-    const sitting = SITTING.has(st) || st === 'standUp';
+    const sitting = seated();
     switch (name) {
       case 'Wave':
       case 'Spook':
@@ -317,8 +341,9 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
         else react(name);
         break;
       case 'Sit':
-        if (SITTING.has(st)) afterStanding(null);
-        else enter('sitDown');
+        if (st === 'sitDown' && m.turning) enter('idle');
+        else if (SITTING.has(st)) afterStanding(null);
+        else sitDown();
         break;
       case 'Run':
         if (sitting) afterStanding({ do: 'flee', for: T.runFor, fromThreat: false });
@@ -385,7 +410,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
   const TIMERS = {
     /** @param {number} age @param {BrainIn['newt']} n */
     idle(age, n) {
-      if (!calm && m.t - m.aloneSince >= T.sitAfter - EPS) enter('sitDown');
+      if (!calm && m.t - m.aloneSince >= T.sitAfter - EPS) sitDown();
       else if (m.wander && bounds && n && age >= m.idleFor - EPS) walk(wanderGoal(rng, bounds, n), true);
     },
     /** @param {number} age @param {BrainIn['newt']} n */
@@ -412,8 +437,11 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
       if (stressed) flee(T.fleeMin, true);
       else enter('idle');
     },
-    sitDown() {
-      if (fadeOutDue('SitDown', clipTime().remaining, 'Sit')) enter('sit');
+    /** @param {number} age */
+    sitDown(age) {
+      if (m.turning) {
+        if (facingCamera() || age >= T.sitTurnMax - EPS) startClip('SitDown');
+      } else if (fadeOutDue('SitDown', clipTime().remaining, 'Sit')) enter('sit');
     },
     sit() {},
     held() {},
@@ -430,7 +458,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
   function face() {
     const st = m.state;
     const name = st === 'react' ? m.reaction : m.clip === 'gait' ? GAIT_FACE[st] : m.clip;
-    const since = st === 'react' && m.turning ? 0 : m.t - m.clipStart;
+    const since = m.turning ? 0 : m.t - m.clipStart;
     const tr = FACE_TRACK[name] ?? FACE_TRACK.Idle;
     let f = tr.face;
     for (const [at, g] of tr.at ?? []) if (since >= at - EPS) f = g;
@@ -458,7 +486,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
         const recent = m.fleeFromThreat && !m.input?.pointer && th && m.t - th.t <= T.threatMemory + EPS;
         return { mode: 'flee', goal: recent ? { x: th.x, z: th.z } : null, speed: T.runSpeed };
       }
-      case 'react': {
+      case 'react':
+      case 'sitDown': {
         const c = m.input?.camera;
         return { mode: 'face', goal: c ? { x: c.x, z: c.z } : null, speed: 0 };
       }
@@ -479,7 +508,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
       face: /** @type {import('./clips.js').FaceName} */ (f),
       blink: /** @type {import('./clips.js').BlinkMode} */ (blink),
       look: look(),
-      faceCamera: st === 'react' && m.turning,
+      faceCamera: m.turning,
       stress: m.stress,
       wander: m.wander,
       sitLabel: SITTING.has(st) ? 'Stand' : 'Sit',
