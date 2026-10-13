@@ -25,7 +25,7 @@ import {
   mainClip,
   NEXT_CLIP,
 } from '../src/invitation/blend.js';
-import { aimAngles, lookStep, createLook, splitLook, LIMIT, SPLIT, LOOK } from '../src/invitation/lookAt.js';
+import { aimAngles, lookStep, createLook, splitLook, viewerAim, LIMIT, SPLIT, LOOK } from '../src/invitation/lookAt.js';
 import { createBrain } from '../src/invitation/brain.js';
 
 const BOUNDS = { minX: -2, maxX: 2, minZ: -2, maxZ: 1.4 };
@@ -722,4 +722,57 @@ test('in a widening play area, walking, fleeing and carrying stay inside its sla
     vel = r.vel;
   }
   assert.ok(bounced, 'bounced off the side');
+});
+
+// ---- looking at the viewer ------------------------------------------------------------------
+// From the toy's camera (36° up) his cap's brim hides his face unless he lifts his head, so
+// "ahead" means toward the viewer: the camera, faded back to straight ahead as he turns away.
+
+test('ahead means toward the viewer: up at the camera, fading to straight ahead as he turns away from it', () => {
+  const D = Math.PI / 180;
+  const head = { x: 0, y: 0.8, z: 0 };
+  const cam = { x: 0, y: 10, z: 15 };
+  let a = viewerAim(head, 0, cam);
+  close(a.yaw, 0);
+  close(a.pitch, Math.atan2(9.2, 15), 1e-9, 'up at the camera');
+  // Facing +x the camera is a quarter turn to his right: as far as his neck goes.
+  a = viewerAim(head, Math.PI / 2, cam);
+  close(a.yaw, -LIMIT.yaw);
+  close(a.pitch, Math.atan2(9.2, 15), 1e-9);
+  // Facing away: straight ahead (no cricked neck, no looking at the sky).
+  assert.deepEqual(viewerAim(head, Math.PI, cam), { yaw: 0, pitch: 0 });
+  // Half way through the fade, half the look.
+  a = viewerAim(head, 125 * D, cam);
+  close(a.pitch, Math.atan2(9.2, 15) / 2, 1e-9);
+  close(a.yaw, -LIMIT.yaw / 2, 1e-9);
+  // The floor bias: a pitch added before the clamp.
+  const plain = aimAngles(head, 0, { x: 0, y: 0, z: 2 });
+  close(aimAngles(head, 0, { x: 0, y: 0, z: 2 }, 10 * D).pitch, plain.pitch + 10 * D, 1e-9);
+  close(aimAngles(head, 0, { x: 0, y: 0, z: 0.1 }, 10 * D).pitch, LIMIT.pitchMin, 1e-9, 'still clamped');
+});
+
+test('looking ahead, around and back: forward and an idle pointer aim at "ahead", glances go around it; fleeing still looks where he runs', () => {
+  const ahead = { yaw: 0.2, pitch: 0.5 };
+  const rng = createRng(4);
+  let s = createLook();
+  let t = 0;
+  let glanced = 0;
+  for (let i = 0; i < 20 * 60; i++) {
+    s = lookStep(s, 'forward', null, DT, (t += DT), rng, 1, ahead);
+    if (s.glance) {
+      glanced++;
+      assert.ok(Math.abs(s.target.yaw - ahead.yaw) > 0.1 * LIMIT.yaw, 'a glance looks off to one side');
+      assert.ok(Math.abs(s.target.yaw) <= LIMIT.yaw + 1e-9);
+    } else {
+      close(s.target.yaw, ahead.yaw, 1e-9);
+      close(s.target.pitch, ahead.pitch, 1e-9);
+    }
+  }
+  assert.ok(glanced > 0, 'he still glances around');
+  close(lookStep(createLook(), 'camera', null, DT, 1, rng, 1, ahead).target.pitch, ahead.pitch, 1e-9);
+  close(lookStep(createLook(), 'pointer', null, DT, 1, rng, 1, ahead).target.pitch, ahead.pitch, 1e-9);
+  const back = lookStep(createLook(), 'back', null, DT, 0.01, rng, 1, ahead);
+  assert.deepEqual(back.target, { yaw: 0, pitch: 0 }, 'running away, he looks where he runs');
+  // Without `ahead`, ahead is straight ahead, as before.
+  close(lookStep(createLook(), 'forward', null, DT, 0.01, createRng(1)).target.pitch, 0);
 });

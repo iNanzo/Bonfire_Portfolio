@@ -3,11 +3,13 @@
 // of the saved animation pose, so it never adds up from frame to frame (three's PropertyMixer
 // skips writing a channel whose value didn't change, as a clamped one-shot's doesn't); weights
 // go to the actions as given; Walk and Run follow the shared step phase while Idle keeps its
-// own clock; the collar is read from the current matrices, so carrying can anchor him by it.
+// own clock; restarting a clip that still shows hands its old pose to a twin that fades out (no
+// pop); the collar is read from the current matrices, so carrying can anchor him by it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createCharacter } from '../src/invitation/character.js';
+import { TWIN } from '../src/invitation/play.js';
 import { BONES, COLLAR, SCALE } from '../src/invitation/clips.js';
 
 const DEG = Math.PI / 180;
@@ -218,6 +220,38 @@ test('a one-shot restarts from its start', () => {
   assert.equal(ch.timeOf('Spook'), 0);
   ch.update(0.1);
   assert.ok(Math.abs(ch.timeOf('Spook') - 0.1) < 1e-6, 'and plays again');
+});
+
+test('restarting a clip that still shows plays it again from its start while its old pose fades out as its twin', () => {
+  const wave = clip('Wave', 1.5, BONES.head, [0, 1.5], [q(X, 0), q(X, 60)]);
+  const idle = still('Idle', 2, BONES.head, q(X, 0));
+  const { gltf, bones } = standIn([wave, idle]);
+  const ch = createCharacter(gltf);
+  const head = bones[BONES.head];
+  ch.setWeights({ Idle: 1 }, 0);
+  assert.equal(ch.restart('Wave'), false, 'not showing: just restarted');
+  ch.setWeights({ Wave: 1 }, 0);
+  for (let i = 0; i < 45; i++) ch.update(1 / 60);
+  const before = head.quaternion.clone();
+  assert.ok(angle(before, q(X, 30)) < 1e-3, 'half way through');
+  // Showing: restarted from its start, the old one carries on as `Wave~`.
+  assert.equal(ch.restart('Wave'), true);
+  assert.equal(ch.timeOf('Wave'), 0);
+  assert.ok(Math.abs(ch.timeOf(`Wave${TWIN}`) - 0.75) < 1e-6, 'the old one where it was');
+  ch.setWeights({ Wave: 0, [`Wave${TWIN}`]: 1 }, 0);
+  ch.update(0);
+  assert.ok(angle(head.quaternion, before) < 1e-6, 'no pop: the pose is the old one');
+  assert.equal(ch.weightOf(`Wave${TWIN}`), 1);
+  ch.setWeights({ Wave: 0.5, [`Wave${TWIN}`]: 0.5 }, 0);
+  assert.equal(ch.weightOf('Wave'), 0.5);
+  ch.update(1 / 60);
+  const mid = angle(head.quaternion, q(X, 0));
+  assert.ok(mid > 1 * DEG && mid < 30 * DEG, `between the new start and the old pose (${mid / DEG}°)`);
+  // Restarted again: they swap back, each keeping its own clock.
+  assert.equal(ch.restart('Wave'), true);
+  assert.equal(ch.timeOf('Wave'), 0);
+  assert.ok(Math.abs(ch.timeOf(`Wave${TWIN}`) - 1 / 60) < 1e-6);
+  assert.equal(ch.has(`Wave${TWIN}`), false, 'the twin is no clip of its own');
 });
 
 test('the collar’s bonePos reads the current matrices, so carrying can anchor him by it', () => {
