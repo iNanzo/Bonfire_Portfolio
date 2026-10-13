@@ -29,10 +29,12 @@ performance.
 - The Look menu: Pixel Size, Dithering, Outlines, Motion (Smooth, or Choppy at 15 fps),
   Style and Reset Camera, remembered for the next visit. Pixel Size is NEWT's sprite
   resolution, a slider from 16×16 to 256×256 (he's drawn about that many pixels tall on any
-  screen; 48×48 by default), or Off. DS, the default style, draws him like an old handheld:
-  low resolution, 1-pixel outlines, toon bands and a hard shadow. Soft is warmer, with a
-  dithered shadow. At the coarser resolutions his plaid shirt and his face are drawn as
-  pixel art so they still read; at the finest, his real plaid and smooth face return.
+  screen; 48×48 by default), then Native, a pixel for every one of the screen's own, the
+  pixel look kept, and Off, smooth with no pixel look. DS, the default style, draws him like
+  an old handheld: low resolution, 1-pixel outlines, toon bands and a hard shadow. Soft is
+  warmer, with a dithered shadow. At the coarser resolutions his plaid shirt and his face
+  are drawn as pixel art so they still read; at the finest, his real plaid and smooth face
+  return.
 - Phones first: he's drawn about 30% bigger there and the camera keeps him in frame; the
   page keeps clear of the notch and home bar, and never zooms or scrolls under a finger.
 - How it works and how to rebuild it: [docs/invitation.md](docs/invitation.md).
