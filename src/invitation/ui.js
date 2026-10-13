@@ -7,9 +7,9 @@
 // with a line on turning and zooming the view). The slider's steps are the screen's (pixels.js
 // pixelSteps: two resolutions that come to the same block there are one step, and one that
 // comes to 1 px is Native), set by main.js as the stage is measured (setPixelSteps); every
-// Pixel Size is a step until then. The sheet is a modal dialog: it opens on
-// Done, Tab goes round inside it, the toolbar it covers is inert while it's open, and Escape
-// closes it wherever focus is; the canvas stays live (turning the camera while choosing a look).
+// Pixel Size is a step until then. The sheet is a modal dialog: it opens on Done, Tab goes
+// round inside it, the toolbar it covers is inert while it's open, and Escape closes it
+// wherever focus is; the canvas stays live (turning the camera while choosing a look).
 // Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
 // reports presses; main.js decides what they do.
 //

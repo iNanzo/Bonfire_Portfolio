@@ -1,6 +1,7 @@
 // The invitation toy's Look settings and presets (pure: no three.js, no DOM). The settings are what
 // the Look menu sets: Pixel Size (NEWT's sprite resolution, 16×16 to 256×256, Native or Off,
-// stored as '16' ... '256', 'native' or 'off': pixels.js PIXEL_SIZES), Dithering, Outlines, Style (a preset in looks/: the list and the Style the menu starts on come from
+// stored as '16' ... '256', 'native' or 'off': pixels.js PIXEL_SIZES), Dithering, Outlines,
+// Style (a preset in looks/: the list and the Style the menu starts on come from
 // looks/index.js, PRESETS and DEFAULT_STYLE) and Motion ('smooth', or 'choppy': his animation
 // stepped at CHOPPY_FPS while the camera and the rest stay smooth; motionStep is its clock).
 // They're kept in localStorage under `invitation.look.v1`, every read and write in try/catch:
