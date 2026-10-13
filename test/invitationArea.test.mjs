@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { AREA_RADIUS, NEWT_HEIGHT, NEWT_RADIUS, playArea } from '../src/invitation/area.js';
 import { centreOf, clampTo, steer, wanderGoal, xRange } from '../src/invitation/steer.js';
-import { fallStep, grab, holdStep } from '../src/invitation/carry.js';
+import { CARRY, fallStep, grab, holdStep } from '../src/invitation/carry.js';
 import { fitShadow } from '../src/invitation/floor.js';
 import {
   NEWT_SHARE,
@@ -283,6 +283,28 @@ test('carrying stays inside the disc: the anchor, and a toss that bounces softly
   const hit = fallStep({ x: R - 0.01, y: 1, z: 0 }, { x: 2, y: 0, z: 1 }, 0.9, DT, AREA);
   assert.ok(hit.vel.x < 0 && hit.vel.x > -1, `off the rim at ${hit.vel.x.toFixed(2)}`);
   close(hit.vel.z, 1, 0.2, 'along it');
+});
+
+test('a fall that starts outside the rim, where the swing hung him, eases back in instead of jumping', () => {
+  // (Held, only his collar is kept inside the disc: the swing's tilt can hang his root up to a
+  // third of a unit past the rim. Let go there, he used to land back on it in one frame.)
+  let root = { x: R + 0.33, y: 1.2, z: 0 };
+  let vel = { x: 0.5, y: 0, z: 0.4 };
+  let inside = false;
+  for (let i = 0; i < 60; i++) {
+    const f = fallStep(root, vel, root.y - 0.6, DT, AREA);
+    const step = Math.hypot(f.root.x - root.x, f.root.z - root.z);
+    assert.ok(
+      step <= CARRY.rimEase * DT + Math.hypot(vel.x, vel.z) * DT + 1e-9,
+      `frame ${i}: moved ${step.toFixed(3)}`,
+    );
+    if (radius(root) > R) assert.ok(radius(f.root) <= radius(root) + 1e-9, `frame ${i}: never further out`);
+    root = f.root;
+    vel = f.vel;
+    if (radius(root) <= R + 1e-6) inside = true;
+    if (f.landed) break;
+  }
+  assert.ok(inside, `back inside by the time he lands (at ${radius(root).toFixed(3)} of ${R})`);
 });
 
 test('the light’s shadow camera covers the disc, up to the highest he’s lifted, for every look and wherever the camera has turned the light', () => {
