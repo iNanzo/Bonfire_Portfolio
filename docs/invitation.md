@@ -2,8 +2,9 @@
 
 A small toy at `/invitation/`: NEWT, Newton's low-poly chibi, stands on a plain white
 background, on a floor you can't see that only shows his shadow, and you can play with him. He
-can go anywhere on the screen above the toolbar; the screen's edges are his walls. It's made for
-a phone first and works with a mouse too. It has its own look (off-white and warm greys, chunky
+stays inside a round patch of that floor, about as wide as a phone shows; its edge is his wall.
+You can turn the camera round him and zoom in and out. It's made for a phone first and works
+with a mouse too. It has its own look (off-white and warm greys, chunky
 buttons, pixel art drawn like an old handheld's 3D), not the bonfire site's. The page is
 unlisted: nothing links to it and search engines are asked not to index it.
 
@@ -14,14 +15,15 @@ unlisted: nothing links to it and search engines are asked not to index it.
 - **Drag him** to pick him up by the collar. He dangles and swings; let go and he falls, lands
   and gets back up.
 - **Tap the floor** and he walks there. A ring on the floor shows where your finger or cursor is.
-- **Point anywhere on the floor** and he looks where you point. Otherwise he looks at you.
+- **Point anywhere on the floor** and he looks where you point (on a phone, while your finger
+  is down; with a mouse, wherever the cursor is). Otherwise he looks at you.
+- **Drag empty space** to turn the camera: across to go round him, up and down to look from
+  higher or lower. **Pinch** with two fingers, or use the mouse wheel, to zoom. Zoomed in, the
+  camera follows him.
 - **Leave him alone** for about 20 seconds and he sits down.
 - **The toolbar:** Wave, Spook, Sit (Stand once he's sitting), Run (he runs off for a few
   seconds), Wander (on: he strolls around by himself) and Look. The buttons rest while he's
   being held or falling.
-
-(The page draws NEWT on his floor now; tapping, carrying, walking and the buttons come with the
-next step of the round.)
 
 ## The Look Menu
 
@@ -36,21 +38,27 @@ visit (in this browser).
 | Style | DS, Soft | DS: crisp, many colours, a hard shadow. Soft: chunkier, fewer colours with a visible dither, pastel, warm outlines and a softer shadow. |
 
 Dithering and outlines are part of the pixel look, so they rest while Pixel Size is Off.
+**Reset Camera**, under the settings, eases the camera back to where it started.
 
 ## For Developers
 
 - **Code** (`src/invitation/`): the page imports only three.js, its GLTFLoader and its own
   modules (a shared `src/` module would share a chunk with the portfolio's first load).
-  - Browser-only and thin: `main.js` (boot, the loop, the wiring), `stage.js` (renderer at
-    texel size, camera, lights and shadows, the blob shadow and the floor marker), `floor.js`
-    (no room: an invisible floor that only catches his shadows, a `ShadowMaterial`, over the
-    preset's background), `character.js` (NEWT's materials, clips, look-at and faces),
+  - Browser-only and thin: `main.js` (boot, the loop, the wiring in `types.js`'s frame
+    order), `stage.js` (renderer at texel size, the camera with its off-centre projection,
+    lights and shadows, the blob shadow and the floor marker), `floor.js` (no room: an
+    invisible floor that only catches his shadows, a `ShadowMaterial`, over the preset's
+    background; and the shadow camera's fit), `character.js` (NEWT's materials, clips with
+    twins for restarts, look-at and faces),
     `retro.js` (the pixel pass), `ui.js` (the toolbar and the Look sheet as markup, plus a thin
     binding), `invitation.css`.
-  - Pure and unit-tested: `pixels.js` (the texel grid and the camera framing: 20° of view, 36°
-    up, NEWT 38 texels tall in the middle of the space over the toolbar), `area.js` (the play
-    area: the floor on screen over the toolbar, inset from the edges, a trapezoid wider at the
-    back, worked out again at every resize), `look.js` (the Look settings under
+  - Pure and unit-tested: `pixels.js` (the texel grid and the default view: 20° of view, 36°
+    up, NEWT 38 texels tall, the whole play area in sight, the point it looks at shown in the
+    middle of the space over the toolbar), `camera.js` (the orbit camera: yaw all the way
+    round, 12° to 70° up, half to twice the default distance, eased with a little coast,
+    following NEWT as it zooms in), `area.js` (the play area: a fixed disc of radius 2.0 round the
+    middle), `play.js` (the frame's decisions: who moves his root, the clip mix, where he
+    looks), `look.js` (the Look settings under
     `invitation.look.v1`, and the presets), `looks/ds.js` and `looks/soft.js` (every look
     value, as data: a designer edits these, never code; among them the background, the
     shadow's colour and strength, and the blob shadow).
@@ -67,15 +75,18 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
   `node tools/newt-face.mjs` redraws the glb's face sheet as `public/models/newt-face.png`,
   four small pixel cells with the features kept at least 2 px thick (`--cell`, `--min`,
   `--preview` to look at it). The page uses it while the pixel filter is on.
-- **Tests:** `test/invitationCharacter.test.mjs` and `test/invitationLook.test.mjs` (with
-  `invitationBrain`, `invitationMotion`, `invitationGesture` and `invitationModel`), and
+- **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationArea`,
+  `invitationCamera` and `invitationPlay` (with `invitationBrain`, `invitationMotion`,
+  `invitationGesture` and `invitationModel`), and
   `e2e/invitation.spec.mjs` (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
-  without WebGL. `?test` adds `window.__invitation`: `snapshot()`, `screen('head'|'body')` (a
-  point on him in client px, to tap) and `play(clip)`. `?seed=N` makes the randomness
+  without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
+  position, head turn, the camera's yaw, elevation and distance, the states he went through),
+  `screen('head'|'body')` (a point on him in client px, to tap), `floorAt(x, y)`, `feet()` (his
+  ankles, to measure foot slide) and `play(clip)`. `?seed=N` makes the randomness
   repeatable; `?calm` stops him wandering and sitting by himself.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
-  of taps, drags, buttons and floor taps at phone and desktop sizes (animated WebP plus a
+  of taps, drags, buttons, floor taps, a chase and the camera at phone and desktop sizes (animated WebP plus a
   contact sheet; `--look`, `--pixel`, `--sizes`, `--acts`). One GPU capture at a time.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
   `vite.config.js`, `test/site.test.mjs` and the spec's last test check it).
