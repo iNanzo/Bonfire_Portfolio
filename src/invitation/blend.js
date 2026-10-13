@@ -1,8 +1,9 @@
 // NEWT's animation blending for the invitation toy, done by hand rather than with three's
 // crossFade or warp: every clip's weight moves toward its target at 1/fade per second with the
 // sum kept at 1 (applied with setEffectiveWeight); Idle, Walk and Run are one blend by speed on
-// a single shared step phase; and a one-shot starts fading out when its time left equals the
-// next clip's fade. Pure: no three.js.
+// a single shared step phase (it goes quicker while Walk and Run are only part of the mix,
+// starting off and slowing down, so a planted foot keeps pace with the floor); and a one-shot
+// starts fading out when its time left equals the next clip's fade. Pure: no three.js.
 
 import { GAIT, STRIDE, fadeFor } from './clips.js';
 
@@ -10,6 +11,12 @@ import { GAIT, STRIDE, fadeFor } from './clips.js';
 export const NEXT_CLIP = { Wave: 'Idle', Spook: 'Idle', Land: 'Idle', SitDown: 'Sit', StandUp: 'Idle' };
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
+
+/**
+ * The least share of the mix Walk and Run are counted at for the step phase (below it the steps
+ * would get frantic for a stride too small to see).
+ */
+export const STEP_SHARE_MIN = 0.3;
 
 /**
  * Idle, Walk and Run weights for a speed: Idle at 0, Walk at GAIT.walk, Run at GAIT.run,
@@ -79,18 +86,30 @@ export function blendStep(weights, target, fades, dt) {
 
 /**
  * Advances the one step phase in [0, 1) that Walk and Run both play from: by dt·speed over a
- * stride blended from Walk's to Run's by the run share. Standing still holds it.
+ * stride blended from Walk's to Run's by the run share, at the share of the mix they have
+ * (`moving`, at least STEP_SHARE_MIN): mixed with Idle, which steps nowhere, their stride
+ * shrinks with their weight, so the steps come quicker and a planted foot still keeps pace with
+ * the floor. Standing still holds it.
  * @param {number} phase
  * @param {number} dt
  * @param {number} speed  world units/s
  * @param {number} wRun  Run's share of the moving weight (runShare)
+ * @param {number} [moving]  Walk's and Run's share of the whole mix (movingShare; 1 by default)
  */
-export function gaitPhase(phase, dt, speed, wRun) {
+export function gaitPhase(phase, dt, speed, wRun, moving = 1) {
   if (!(speed > 0) || !(dt > 0)) return phase;
   const r = clamp01(wRun);
-  const stride = STRIDE.Walk + (STRIDE.Run - STRIDE.Walk) * r;
+  const stride = (STRIDE.Walk + (STRIDE.Run - STRIDE.Walk) * r) * Math.max(STEP_SHARE_MIN, Math.min(1, moving));
   const p = (phase + (dt * speed) / stride) % 1;
   return p < 0 ? p + 1 : p;
+}
+
+/**
+ * Walk's and Run's share of the whole mix (the weights sum to 1).
+ * @param {Record<string, number>} weights
+ */
+export function movingShare(weights) {
+  return (weights.Walk ?? 0) + (weights.Run ?? 0);
 }
 
 /**

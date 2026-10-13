@@ -18,7 +18,8 @@ import {
   mixStep,
   twinWeights,
 } from '../src/invitation/play.js';
-import { CLIPS, STRIDE, fadeFor } from '../src/invitation/clips.js';
+import { CLIPS, GAIT, STRIDE, fadeFor } from '../src/invitation/clips.js';
+import { STEP_SHARE_MIN, gaitPhase } from '../src/invitation/blend.js';
 import { CARRY } from '../src/invitation/carry.js';
 import { LIMIT, LOOK, aimAngles } from '../src/invitation/lookAt.js';
 import { xRange } from '../src/invitation/steer.js';
@@ -134,17 +135,41 @@ test('the mix: weights move toward the brain’s clip at clips.js’s fades and 
   }
   close(m.weights.Wave, 1, 1e-9);
   close(m.weights.Idle, 0, 1e-9);
-  // Back to the gait, walking: Walk takes over at Walk's fade; the phase moves by speed/stride.
+  // Back to the gait, walking: Walk takes over at Walk's fade; the phase moves by speed over
+  // the stride Walk's share of the mix makes (a slight share: STEP_SHARE_MIN's).
   const p0 = m.phase;
   mixStep(m, { clip: 'gait', speed: 0.7, dt: DT });
   close(m.fade, fadeFor('Wave', 'Walk'));
-  close(m.phase, p0 + (DT * 0.7) / STRIDE.Walk, 1e-9);
+  close(m.phase, p0 + (DT * 0.7) / (STRIDE.Walk * Math.max(STEP_SHARE_MIN, m.weights.Walk)), 1e-9);
   for (let i = 0; i < 60; i++) mixStep(m, { clip: 'gait', speed: 0.7, dt: DT });
   close(m.weights.Walk, 1, 1e-9);
   // Standing still holds the phase.
   const held = m.phase;
   mixStep(m, { clip: 'gait', speed: 0, dt: DT });
   assert.equal(m.phase, held);
+});
+
+test('starting off and slowing to a stop, the step phase quickens as Walk’s share of the mix falls, so a planted foot keeps pace with the floor instead of skating', () => {
+  const s = createBody();
+  const m = createMix();
+  let t = 0;
+  let partial = 0;
+  for (let i = 0; i < 240; i++) {
+    const move = { mode: 'goto', goal: { x: 1.2, z: 0.4 }, speed: GAIT.walk };
+    bodyStep(s, { state: 'walk', move, pointer: null, bounds: BOUNDS, dt: DT, t: (t += DT) });
+    const before = m.phase;
+    mixStep(m, { clip: 'gait', speed: s.body.speed, dt: DT });
+    const walk = m.weights.Walk ?? 0;
+    if (s.body.speed > 0.01 && walk >= STEP_SHARE_MIN && !m.weights.Run) {
+      // Walk's stride at its share of the mix, times the share of a step taken: the floor covered.
+      const advance = (m.phase - before + 1) % 1;
+      close(advance * STRIDE.Walk * walk, s.body.speed * DT, 1e-9, `frame ${i}`);
+      if (walk < 0.95) partial++;
+    }
+  }
+  assert.ok(partial > 10, `${partial} frames with Walk only part of the mix (starting off, slowing down)`);
+  assert.ok(Math.hypot(s.root.x - 1.2, s.root.z - 0.4) < 0.1, 'and he got there');
+  close(gaitPhase(0.2, DT, 0.7, 0), gaitPhase(0.2, DT, 0.7, 0, 1), 1e-12, 'all Walk: as before');
 });
 
 test('a restart of a clip still showing hands its weight to the clip’s twin, so its pose fades out instead of popping', () => {

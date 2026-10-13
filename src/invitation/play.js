@@ -9,7 +9,8 @@
 //                           his root is snapped to the floor and steer takes him from there
 //   createMix / mixStep     the clip weights: each one moves toward what the brain plays at
 //                           clips.js's fade for the change (fadeFor of the leading clips), the
-//                           gait's step phase advancing by speed over stride
+//                           gait's step phase advancing by speed over the stride Walk and Run
+//                           make at their share of the mix (quicker steps starting and stopping)
 //   twinWeights             a restart of a clip that still shows: its weight goes to its twin
 //                           (character.js keeps the old pose playing there), so it fades out
 //                           while the new start fades in, never a pop
@@ -20,7 +21,7 @@
 //                           face themselves (Wave, the Sit trio) take only HEAD_SHARE of it, so
 //                           the look never cricks it back further
 
-import { blendStep, blendTarget, gaitPhase, mainClip, runShare } from './blend.js';
+import { blendStep, blendTarget, gaitPhase, mainClip, movingShare, runShare } from './blend.js';
 import { CARRY, fallStep, grab, holdStep, toss } from './carry.js';
 import { fadeFor } from './clips.js';
 import { LOOK, aimAngles, viewerAim } from './lookAt.js';
@@ -141,8 +142,9 @@ export function createMix() {
 
 /**
  * One frame of the mix: a change of leading clip sets the fade (clips.js fadeFor), the weights
- * move toward what the brain plays, and the step phase advances by speed over stride. Updates
- * `m` in place and returns it.
+ * move toward what the brain plays, and the step phase advances by speed over the stride Walk
+ * and Run make at their share of the new weights (blend.js gaitPhase). Updates `m` in place and
+ * returns it.
  * @param {Mix} m
  * @param {{clip: string, speed: number, dt: number}} o  clip: BrainOut.clip; speed: steer's
  *   body.speed (it ramps, as his feet do)
@@ -155,7 +157,7 @@ export function mixStep(m, { clip, speed, dt }) {
     m.main = main;
   }
   m.weights = blendStep(m.weights, blendTarget(clip, speed), m.fade, dt);
-  m.phase = gaitPhase(m.phase, dt, speed, runShare(m.weights));
+  m.phase = gaitPhase(m.phase, dt, speed, runShare(m.weights), movingShare(m.weights));
   return m;
 }
 
