@@ -16,6 +16,8 @@
 //   idle      three seconds of him standing (Idle, or the placeholder's T-pose)
 //   clips     every clip in turn (--clips for some), forced through play() after 0.4 s of the
 //             brain's own idle: one WebP each, a looping clip played twice, a one-shot once
+//             (Walk and Run hold one pose there: their time is the step phase, which only the
+//             brain's gait moves; floor and button-Run show them as he plays them)
 //   tap       a tap on his head (a touch on a phone size, a click on a desktop one)
 //   taps      two taps on his head 2.6 s apart (a Wave and a Spook when the --seed gives both)
 //   drag      a press on his body dragged up and across the screen, then let go (a touch drag
@@ -24,6 +26,7 @@
 //             back to the middle, held still and let go (he falls and lands)
 //   hover     (desktop sizes) the cursor circling him, then on him and off again: his head follows
 //   buttons   Wave, Spook, Sit, Run and Wander pressed in turn
+//   button-X  the toolbar's X button pressed once (button-Run: he runs for 3 s), 3.5 s
 //   floor     a tap on the floor in front of him
 //   chase     four quick taps on him (he runs off), then a press that catches him mid-run (the
 //             finger or cursor follows him until it's a grab), carries him a little and lets go
@@ -283,19 +286,22 @@ function setAnimFps(page, fps) {
     for (const p of Object.values(PRESETS)) p.animFps = f;
   }, fps);
 }
-/** How many times a second his pose changes with Walk forced in place (his ankles, a second of frames). */
+/**
+ * How many times a second his pose changes with Wave forced (his forearms from his root, a
+ * second of frames; Wave runs on the clock, so it steps at animFps when that's set).
+ */
 function poseRate(page) {
   return page.evaluate(
     () =>
       new Promise((done) => {
         const inv = /** @type {any} */ (window).__invitation;
-        inv.play('Walk');
+        inv.play('Wave');
         let prev = '';
         let n = -1;
         const t0 = performance.now();
         const tick = (now) => {
-          const f = inv.feet();
-          const k = [f.l.x, f.l.y, f.l.z, f.r.x, f.r.y, f.r.z].map((v) => v.toFixed(5)).join();
+          const b = inv.bones();
+          const k = [b.ForeArmL, b.ForeArmR].flatMap((p) => [p.x, p.y, p.z].map((v) => v.toFixed(5))).join();
           if (k !== prev) {
             n++;
             prev = k;
@@ -406,7 +412,8 @@ async function until(page, want, ms) {
 
 /**
  * The acts, each {name, run(page), tail ms, setup?(page) (before the recording starts), full?
- * (the act's sheet shows whole frames, not him cropped)}.
+ * (the act's sheet shows whole frames, not him cropped), from? (ms: the act's sheet starts
+ * there, not at the lead)}.
  */
 function actsFor(size) {
   const list = [];
@@ -423,6 +430,7 @@ function actsFor(size) {
           await sleep(((c?.length ?? 1.5) * (c?.loop ? 2 : 1) + 0.6) * 1000);
         },
         0,
+        { from: 380 },
       );
   if (ACTS.includes('tap')) act('tap', async (page) => tapAt(page, size, await point(page, 'head')), 2200);
   if (ACTS.includes('taps'))
@@ -499,6 +507,17 @@ function actsFor(size) {
         }
       },
       600,
+    );
+  for (const name of ACTS.filter((a) => a.startsWith('button-')).map((a) => a.slice(7)))
+    act(
+      `button-${name}`,
+      async (page) => {
+        const b = page.locator(`[data-button="${name}"]`);
+        if (size.phone) await b.tap();
+        else await b.click();
+        await sleep(3500);
+      },
+      0,
     );
   if (ACTS.includes('floor'))
     act(
@@ -614,7 +633,7 @@ for (const size of SIZES) {
   }
   const sheet = [];
   const labels = [];
-  for (const { name, run, tail, setup, full } of actsFor(size)) {
+  for (const { name, run, tail, setup, full, from } of actsFor(size)) {
     await ready(page);
     if (setup) await setup(page);
     const taken = await realTime(page, () => run(page), tail);
@@ -642,11 +661,14 @@ for (const size of SIZES) {
     // The act's own sheet: him cropped (or whole frames), --sheet frames from its start to its end.
     const own = [];
     const ownLabels = [];
+    const span = shot.filter((f) => f.t >= (from ?? -Infinity));
     for (let i = 0; i < SHEET; i++) {
-      const f = shot[Math.round((i / Math.max(1, SHEET - 1)) * (shot.length - 1))];
+      const f = span[Math.round((i / Math.max(1, SHEET - 1)) * (span.length - 1))];
       own.push(await tile(size, f.data, latest(taken.pos, f.drawn), full));
+      // (His state, and the clip leading when it isn't the state's own name.)
       const l = latest(taken.line, f.drawn);
-      ownLabels.push(`${f.drawn} ms ${l ? `${l.state}${l.reaction ? ` ${l.reaction}` : ''}` : ''}`);
+      const clip = l?.clip && l.clip.toLowerCase() !== l.state.toLowerCase() ? ` ${l.clip}` : '';
+      ownLabels.push(`${f.drawn} ms ${l ? `${l.state}${clip}` : ''}`);
     }
     // (Whole phone frames are narrow: one row; crops and desktop frames: two rows past four.)
     const cols = (full && size.phone) || SHEET <= 4 ? SHEET : Math.ceil(SHEET / 2);
