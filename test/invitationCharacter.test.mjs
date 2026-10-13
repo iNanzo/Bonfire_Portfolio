@@ -14,8 +14,17 @@ const DEG = Math.PI / 180;
 const Y = new THREE.Vector3(0, 1, 0);
 const X = new THREE.Vector3(1, 0, 0);
 const q = (axis, deg) => new THREE.Quaternion().setFromAxisAngle(axis, deg * DEG);
-/** The angle between two rotations, in radians. */
-const angle = (a, b) => 2 * Math.acos(Math.min(1, Math.abs(a.dot(b))));
+/**
+ * The angle between two rotations, in radians: from the chord between the unit quaternions
+ * (|a − b| = 2 sin(θ/4)), which holds up for tiny angles where acos of the dot doesn't (a
+ * clip's keys are 32-bit floats, a hair off unit length).
+ */
+function angle(a, b) {
+  const u = a.clone().normalize();
+  const v = b.clone().normalize();
+  const d = (s) => Math.hypot(u.x - s * v.x, u.y - s * v.y, u.z - s * v.z, u.w - s * v.w);
+  return 4 * Math.asin(Math.min(1, Math.min(d(1), d(-1)) / 2));
+}
 
 /**
  * A stand-in for newt.glb's scene: a Hip group holding the 17 bones (three's names, model
