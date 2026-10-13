@@ -414,52 +414,75 @@ CROUCH = merge(
     armR={'shoulder': (12, 6), 'upper': (18, 22), 'lower': (40, 12), 'twist': 0},
 )
 
-WAVE_UP = {'shoulder': (14, 0), 'upper': (150, 74), 'lower': (176, 24), 'twist': 0}
+WAVE_UP = {'shoulder': (16, 0), 'upper': (160, 70), 'lower': (178, 24), 'twist': 0}
 
 
 def wave_arm(w):
-    return merge(WAVE_UP, lower=(176, 24 + 26 * w))
+    """The waving forearm: w = 1 swings it out, w = -0.4 back toward the head (never into it)."""
+    return merge(WAVE_UP, lower=(178, 22 + 28 * w))
+
+
+def waving(w, lean=1.0):
+    """Wave's body: tipped toward the waving arm, the head tilted the other way and back, so
+    the high camera sees his face."""
+    return merge(
+        IDLE,
+        hips={'loc': (0, 0, -0.06), 'rot': (-3 * lean, -2 * lean, 0)},
+        chest=(-4 * lean, -4 * lean, 0),
+        neck=(-5 * lean, 0, 0),
+        head=(-8 * lean, 10 * lean, -4 * lean),
+        armR=wave_arm(w),
+        armL=merge(ARM_RELAXED, upper=(6, 24), lower=(20, 20)),
+    )
 
 
 TABLES = {
     'Wave': keys(
         (0, IDLE),
-        (6, merge(IDLE, chest=(0, -4, 0), head=(0, 6, 0), armR=merge(WAVE_UP, lower=(150, 10)))),
-        (9, merge(IDLE, chest=(0, -5, 0), head=(0, 8, 0), armR=wave_arm(1))),
-        (13, merge(IDLE, chest=(0, -5, 0), head=(0, 9, 0), armR=wave_arm(-0.2))),
-        (17, merge(IDLE, chest=(0, -5, 0), head=(0, 8, 0), armR=wave_arm(1))),
-        (21, merge(IDLE, chest=(0, -5, 0), head=(0, 9, 0), armR=wave_arm(-0.2))),
-        (25, merge(IDLE, chest=(0, -5, 0), head=(0, 8, 0), armR=wave_arm(1))),
-        (29, merge(IDLE, chest=(0, -4, 0), head=(0, 6, 0), armR=wave_arm(0))),
-        (34, merge(IDLE, armR=merge(ARM_RELAXED, upper=(6, 18)))),
+        (5, merge(waving(0.4, 0.7), armR=merge(WAVE_UP, upper=(120, 60), lower=(150, 20)))),
+        (8, waving(1.0)),
+        (12, waving(-0.4)),
+        (16, waving(1.0)),
+        (20, waving(-0.4)),
+        (24, waving(1.0)),
+        (28, waving(0.0, 0.8)),
+        (32, merge(IDLE, chest=(1, -1, 0), head=(-2, 3, 0), armR=merge(ARM_RELAXED, upper=(10, 26), lower=(24, 20)))),
         (36, IDLE),
     ),
     'Spook': keys(
         (0, IDLE),
-        (2, CROUCH),
+        (2, CROUCH),  # the two-frame flinch
         (5, merge(
-            IDLE,
-            hips={'loc': (0, 0, 0.7), 'rot': (-6, 0, 0)},
-            chest=(-6, 0, 0),
-            head=(-10, 0, 0),
+            IDLE,  # the hop's top: arms flung up, head thrown back (the high camera sees his face)
+            hips={'loc': (0, 0, 0.75), 'rot': (-8, 0, 0)},
+            chest=(-8, 0, 0),
+            neck=(-6, 0, 0),
+            head=(-12, 0, 0),
             armL=ARM_UP,
             armR=ARM_UP,
-            legL={'at': (0.6, 0.1, ANKLE + 0.8), 'pitch': 30},
-            legR={'at': (0.6, 0.1, ANKLE + 0.8), 'pitch': 30},
+            legL={'at': (0.66, 0.12, ANKLE + 0.85), 'pitch': 35, 'knee': (0.5, -1, 0)},
+            legR={'at': (0.66, 0.12, ANKLE + 0.85), 'pitch': 35, 'knee': (0.5, -1, 0)},
         )),
         (8, merge(
             IDLE,
-            hips={'loc': (0, 0, 0.35), 'rot': (-3, 0, 0)},
-            chest=(-4, 0, 0),
-            head=(-6, 0, 0),
-            armL=ARM_UP,
-            armR=ARM_UP,
-            legL={'at': (0.6, 0.06, ANKLE + 0.36), 'pitch': 18},
-            legR={'at': (0.6, 0.06, ANKLE + 0.36), 'pitch': 18},
+            hips={'loc': (0, 0, 0.32), 'rot': (-4, 0, 0)},
+            chest=(-5, 0, 0),
+            neck=(-4, 0, 0),
+            head=(-10, 0, 0),
+            armL={'shoulder': (16, 0), 'upper': (130, 62), 'lower': (150, 48), 'twist': 0},
+            armR={'shoulder': (16, 0), 'upper': (130, 62), 'lower': (150, 48), 'twist': 0},
+            legL={'at': (0.64, 0.08, ANKLE + 0.36), 'pitch': 20},
+            legR={'at': (0.64, 0.08, ANKLE + 0.36), 'pitch': 20},
         )),
-        (10, merge(CROUCH, hips={'loc': (0, 0, -0.3), 'rot': (6, 0, 0)})),
-        (13, merge(IDLE, hips={'loc': (0, 0, 0.02), 'rot': (-2, 0, 0)})),
-        (16, merge(IDLE, hips={'loc': (0, 0, -0.1), 'rot': (1, 0, 0)})),
+        (10, merge(
+            CROUCH,  # lands
+            hips={'loc': (0, 0, -0.34), 'rot': (6, 0, 0)},
+            head=(2, 0, 0),
+            armL={'shoulder': (8, 0), 'upper': (40, 52), 'lower': (60, 40), 'twist': 0},
+            armR={'shoulder': (8, 0), 'upper': (40, 52), 'lower': (60, 40), 'twist': 0},
+        )),
+        (13, merge(IDLE, hips={'loc': (0, 0, 0.02), 'rot': (-2, 0, 0)}, head=(-4, 0, 0), armL=merge(ARM_RELAXED, upper=(4, 28)), armR=merge(ARM_RELAXED, upper=(4, 28)))),
+        (16, merge(IDLE, hips={'loc': (0, 0, -0.1), 'rot': (1, 0, 0)}, head=(2, 0, 0))),
         (20, IDLE),
     ),
     'Land': keys(
