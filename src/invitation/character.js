@@ -12,7 +12,10 @@
 // setWeights gives it (blend.js works the weights out: three's fades aren't used). Walk and
 // Run follow the shared step phase (time = phase × length, their own clocks stopped); Idle and
 // the rest run on the clock. A one-shot holds its last frame once it ends, until restart().
-// A glb without clips (the placeholder) or without some of them just has nothing to play.
+// Restarting a clip that still shows (a second Wave mid-wave) plays it from its start while
+// the old one carries on as its twin, `Wave~` (play.js TWIN: a second action on the same
+// keys), which play.js's mix fades out: the pose never pops. A glb without clips (the
+// placeholder) or without some of them just has nothing to play.
 //
 // The look goes on top of the animation (types.js's frame order): update() puts back the
 // head's saved animation pose before mixer.update and saves the new one after, because three's
@@ -30,6 +33,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BONES, CLIPS, FACES, SCALE } from './clips.js';
 import { LOOKS, DEFAULT_LOOK } from './look.js';
+import { TWIN } from './play.js';
 import { ID, markId, toonGradient } from './retro.js';
 
 /** The clips that follow the step phase (blend.js gaitPhase); Idle breathes on its own clock. */
@@ -123,6 +127,8 @@ export function createCharacter(gltf, opts = {}) {
   const mixer = new THREE.AnimationMixer(root);
   /** @type {Map<string, any>} */
   const actions = new Map();
+  /** @type {Map<string, any>} each restarted clip's twin: the old start, fading out */
+  const twins = new Map();
   for (const clip of gltf.animations ?? []) {
     const action = mixer.clipAction(clip);
     if (CLIPS[clip.name] && !CLIPS[clip.name].loop) {
@@ -177,6 +183,9 @@ export function createCharacter(gltf, opts = {}) {
   const UP = new THREE.Vector3(0, 1, 0);
   const SIDE = new THREE.Vector3(-1, 0, 0);
 
+  /** A clip's twin by its name (`Wave~`), or undefined. */
+  const twinOf = (name) => (name.endsWith(TWIN) ? twins.get(name.slice(0, -TWIN.length)) : undefined);
+
   /** A world point on screen, client px. */
   function toScreen(p, camera, rect) {
     w2.copy(p).project(camera);
@@ -200,9 +209,36 @@ export function createCharacter(gltf, opts = {}) {
         action.setEffectiveWeight(weights[name] ?? 0);
         if (PHASED.includes(name)) action.time = f * action.getClip().duration;
       }
+      for (const [name, twin] of twins) twin.setEffectiveWeight(weights[`${name}${TWIN}`] ?? 0);
     },
+    /**
+     * Play `clip` from its start; true when it still showed, its old start now playing on as
+     * its twin (whose weight setWeights reads as `clip` + TWIN).
+     * @param {string} clip
+     */
     restart(clip) {
-      actions.get(clip)?.reset().play();
+      const action = actions.get(clip);
+      if (!action) return false;
+      if (!(action.getEffectiveWeight() > 0)) {
+        action.reset().play();
+        return false;
+      }
+      let twin = twins.get(clip);
+      if (!twin) {
+        const copy = action.getClip().clone();
+        copy.name = `${clip}${TWIN}`;
+        twin = mixer.clipAction(copy);
+        twin.setLoop(action.loop, action.repetitions);
+        twin.clampWhenFinished = action.clampWhenFinished;
+        twin.timeScale = action.timeScale;
+        twin.play();
+      }
+      // (The two swap: the old start keeps its clock as the twin, the twin starts afresh.)
+      twins.set(clip, action);
+      actions.set(clip, twin);
+      twin.reset().play();
+      twin.setEffectiveWeight(0);
+      return true;
     },
     update(dt) {
       neck.forEach((b, i) => b?.quaternion.copy(saved[i]));
@@ -279,8 +315,8 @@ export function createCharacter(gltf, opts = {}) {
         },
       };
     },
-    weightOf: (clip) => actions.get(clip)?.getEffectiveWeight() ?? 0,
-    timeOf: (clip) => actions.get(clip)?.time ?? 0,
+    weightOf: (clip) => (actions.get(clip) ?? twinOf(clip))?.getEffectiveWeight() ?? 0,
+    timeOf: (clip) => (actions.get(clip) ?? twinOf(clip))?.time ?? 0,
     dispose() {
       mixer.stopAllAction();
       mixer.uncacheRoot(root);

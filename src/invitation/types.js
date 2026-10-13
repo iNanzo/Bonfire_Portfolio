@@ -120,7 +120,7 @@
  * @property {(clip: string) => boolean} has
  * @property {(clip: string) => number} clipLength  seconds, 0 when it's missing
  * @property {(weights: Record<string, number>, phase: number) => void} setWeights
- * @property {(clip: string) => void} restart
+ * @property {(clip: string) => boolean} restart  play it from its start: true when it still showed, its old start fading out as its twin (play.js TWIN)
  * @property {(dt: number) => void} update
  * @property {(yaw: number, pitch: number, weight: number) => void} applyLook
  * @property {(face: import('./clips.js').FaceName) => void} setFace
