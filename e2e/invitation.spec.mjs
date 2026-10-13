@@ -157,7 +157,10 @@ test.describe('on a phone', () => {
     await expect(page).toHaveTitle('Invitation');
     const snap = await snapshot(page);
     expect(snap.ready).toBe(true);
-    expect(snap.pixelScale, '2× by default: a texel is 2×2 CSS px').toBe(2);
+    // 48×48 by default: NEWT about 48 texels tall, a texel 6 device px (2×2 CSS px) here.
+    expect(snap.resolution).toBe(48);
+    expect(snap.pixelScale, 'a texel is 2×2 CSS px').toBe(2);
+    expect(snap.newtTexels).toBeCloseTo(49.7, 0);
     // Not a blank canvas: NEWT on the plain background, far from one flat colour.
     const pic = await picture(page);
     expect(apart(pic, flat(pic))).toBeGreaterThan(3);
@@ -477,7 +480,10 @@ test.describe('on a desktop', () => {
     const errors = watch(page);
     await ready(page);
     const snap = await snapshot(page);
-    expect(snap.pixelScale, '2× by default').toBe(2);
+    // 48×48 by default: NEWT 156 CSS px tall, so a texel is 3 px and he's 52 texels tall.
+    expect(snap.resolution).toBe(48);
+    expect(snap.pixelScale).toBe(3);
+    expect(snap.newtTexels).toBeCloseTo(52, 0);
     expect(
       snap.newtTall / 800,
       `NEWT is ${snap.newtTall.toFixed(1)} CSS px tall: a fifth of the short side`,

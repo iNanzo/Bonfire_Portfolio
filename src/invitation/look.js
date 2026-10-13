@@ -1,12 +1,14 @@
 // The invitation toy's Look settings and presets (pure: no three.js, no DOM). The settings are what
-// the Look menu sets: Pixel Size (Off, 2×, 3×, 4×, stored as 'off', '2', '3', '4'), Dithering,
+// the Look menu sets: Pixel Size (NEWT's sprite resolution, 16×16 to 256×256, or Off, stored as
+// '16' ... '256' or 'off': pixels.js PIXEL_SIZES), Dithering,
 // Outlines, Style (a preset in looks/: the list and the Style the menu starts on come from
 // looks/index.js, PRESETS and DEFAULT_STYLE) and Motion ('smooth', or 'choppy': his animation
 // stepped at CHOPPY_FPS while the camera and the rest stay smooth; motionStep is its clock).
 // They're kept in localStorage under `invitation.look.v1`, every read and write in try/catch:
 // storage that's empty, broken, refused or missing gives the defaults, and each value is checked
-// on its own, so one bad value never costs the others (a Pixel Size from before the steps, 'fine',
-// 'ds' or 'chunky', loads as the default: the page never shipped with them; a look stored before
+// on its own, so one bad value never costs the others (a Pixel Size from before the resolutions
+// loads as the nearest one: 2×, 3× and 4× as they looked on a 390-wide phone, OLD_PIXEL, and
+// 'fine', 'ds' or 'chunky' as the default; the page never shipped with them; a look stored before
 // Motion loads as Smooth with its other values kept).
 
 import { DEFAULT_PIXEL, PIXEL_SIZES } from './pixels.js';
@@ -47,6 +49,12 @@ export const LOOKS = PRESETS;
 export const STYLES = Object.keys(LOOKS);
 /** @type {Motion[]} */
 export const MOTIONS = ['smooth', 'choppy'];
+/**
+ * Pixel Sizes stored before the sprite resolutions (N×: a texel N×N CSS px) and the resolution
+ * nearest what each drew on a 390-wide phone (NEWT 99 CSS px tall: 50, 33 and 25 texels).
+ * @type {Record<string, import('./pixels.js').PixelSize>}
+ */
+export const OLD_PIXEL = { 2: '48', 3: '32', 4: '24' };
 /** Motion Choppy: his animation steps this many times a second. */
 export const CHOPPY_FPS = 15;
 /** @type {Look} */
@@ -66,7 +74,11 @@ export const DEFAULT_LOOK = Object.freeze({
 export function validLook(raw) {
   const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   return {
-    pixelSize: PIXEL_SIZES.includes(o.pixelSize) ? o.pixelSize : DEFAULT_LOOK.pixelSize,
+    pixelSize: PIXEL_SIZES.includes(o.pixelSize)
+      ? o.pixelSize
+      : typeof o.pixelSize === 'string' && Object.hasOwn(OLD_PIXEL, o.pixelSize)
+        ? OLD_PIXEL[o.pixelSize]
+        : DEFAULT_LOOK.pixelSize,
     dither: typeof o.dither === 'boolean' ? o.dither : DEFAULT_LOOK.dither,
     outlines: typeof o.outlines === 'boolean' ? o.outlines : DEFAULT_LOOK.outlines,
     style: Object.hasOwn(LOOKS, o.style) ? o.style : DEFAULT_LOOK.style,

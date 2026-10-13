@@ -20,7 +20,7 @@ import {
   snapShift,
 } from '../src/invitation/retro.js';
 
-const LOOK = { pixelSize: '2', dither: true, outlines: true, style: 'ds' };
+const LOOK = { pixelSize: '48', dither: true, outlines: true, style: 'ds' };
 /** A whole preset as the pass reads it (the presets' own values are tested on their own). */
 const PRESET = {
   label: 'Test',

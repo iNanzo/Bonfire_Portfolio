@@ -1,10 +1,14 @@
 // The invitation toy's pixel grid and camera framing (pure: no three.js, no DOM).
 //
 // The grid: the scene is drawn at texel size and CSS `image-rendering: pixelated` stretches it.
-// Pixel Size is an explicit step, Off, 2×, 3× or 4× (2× by default): at N× a texel is N×N CSS
-// px, as a whole number of device pixels, pd = round(N × dpr) (6, 9 or 12 on a phone at DPR 3).
-// The canvas is w × h texels, just covering the stage, and its CSS size w × pd / dpr is a
-// little larger than the stage (which hides the overhang). Pixel Size Off draws at native
+// Pixel Size is NEWT's sprite resolution, N×N for N in RESOLUTIONS (16×16 to 256×256; 48×48 by
+// default, DEFAULT_PIXEL), or Off: at N×N he's about N texels tall in the default view on any
+// screen. A texel is a whole number of device pixels, pd = max(1, round(his default height in
+// device px ÷ N)) (blockFor: 19 at 16×16 down to 1 at 256×256 on a 390-wide phone at DPR 3, 6
+// at 48×48), so it stays crisp; the finest steps reach the screen's own pixels, and two steps
+// that come to the same block on a screen are one step there (pixelSteps, which the Look menu
+// lists). The canvas is w × h texels, just covering the stage, and its CSS size w × pd / dpr is
+// a little larger than the stage (which hides the overhang). Pixel Size Off draws at native
 // size, its DPR capped at 2.
 //
 // The framing: a camera 36° up, low enough that his cap's brim leaves his face showing once he
@@ -16,7 +20,7 @@
 // NEWT_SHARE of the stage's short side tall on a desktop (his height as the camera sees it:
 // NEWT_SIDE), further back only where the play area (a disc, area.js) wouldn't all show; on a
 // phone (a short side under PHONE_SIDE) he's PHONE_SHARE of it, about 30% bigger (99 CSS px on
-// a 390-wide phone, 50 texels at the default size there), and the view never backs off for the
+// a 390-wide phone, 50 texels at the default 48×48 there), and the view never backs off for the
 // disc (the camera follows him there instead, so he stays on screen at its rim). The point the
 // camera looks at (his middle, at the origin) sits in the middle of the space over the
 // toolbar: the view is shifted
@@ -24,9 +28,19 @@
 // there however the camera turns. While the Look sheet is open it sits in the middle of the
 // clear space the sheet leaves instead (clearInsets: above it, or beside it on a phone held
 // sideways), just as big, so a look's changes show on him. The framing never reads the Pixel
-// Size: a bigger block only makes chunkier pixels, and a bigger screen gives him more texels.
+// Size: a coarser resolution only makes chunkier pixels (the block comes from his height on
+// screen, never the other way round).
 
-/** @typedef {'off'|'2'|'3'|'4'} PixelSize  Off, or N× (a texel N×N CSS px) */
+/** @typedef {'16'|'24'|'32'|'48'|'64'|'96'|'128'|'192'|'256'|'off'} PixelSize  N×N (NEWT about N texels tall), or Off */
+/**
+ * @typedef {object} PixelStep  one Pixel Size a screen lists
+ * @property {PixelSize} value
+ * @property {number|null} n  the resolution (null: Off)
+ * @property {number} pd  device px a texel (1 at Off)
+ * @property {number} texels  NEWT's height in texels in the default view (0 at Off)
+ * @property {PixelSize[]} covers  every Pixel Size it stands for here (itself, and any coarser
+ *   or finer resolution that comes to the same block)
+ */
 /**
  * @typedef {object} Grid  the canvas in texels
  * @property {number} pd  device pixels per texel (1 at native size)
@@ -55,10 +69,16 @@
  * @property {number} canvasH
  */
 
-/** @type {PixelSize[]} */
-export const PIXEL_SIZES = ['off', '2', '3', '4'];
-/** @type {PixelSize} */
-export const DEFAULT_PIXEL = '2';
+/** NEWT's sprite resolutions: about this many texels tall in the default view. */
+export const RESOLUTIONS = [16, 24, 32, 48, 64, 96, 128, 192, 256];
+/** @type {PixelSize[]} Pixel Size's values, coarse to fine, then Off (the screen's own pixels, smooth) */
+export const PIXEL_SIZES = [.../** @type {PixelSize[]} */ (RESOLUTIONS.map(String)), 'off'];
+/**
+ * The Pixel Size until the user picks one: 48×48, the 2× look a 390-wide phone had (6 device px
+ * a texel). Changing the default is this one line.
+ * @type {PixelSize}
+ */
+export const DEFAULT_PIXEL = '48';
 /** Pixel Size Off draws at the device's pixels, up to this ratio. */
 export const NATIVE_DPR = 2;
 /**
@@ -85,6 +105,72 @@ export const compactStage = (cssW, cssH) => Math.min(cssW, cssH) < PHONE_SIDE;
  * @param {number} cssH
  */
 export const newtShare = (cssW, cssH) => (compactStage(cssW, cssH) ? PHONE_SHARE : NEWT_SHARE);
+/**
+ * NEWT's height in the default view, device px: his share of the short side (the framing's,
+ * frameView; a desktop's view can back off a little further for the play area, never on the
+ * screens the round checks).
+ * @param {number} cssW
+ * @param {number} cssH
+ * @param {number} dpr
+ */
+export const newtDevicePx = (cssW, cssH, dpr) =>
+  newtShare(cssW, cssH) * Math.min(Math.max(1, cssW), Math.max(1, cssH)) * (dpr || 1);
+
+/**
+ * A Pixel Size's resolution N, or null (Off, or not a step).
+ * @param {unknown} pixelSize
+ */
+export const resolutionOf = (pixelSize) =>
+  pixelSize !== 'off' && PIXEL_SIZES.includes(/** @type {PixelSize} */ (pixelSize)) ? Number(pixelSize) : null;
+
+/**
+ * Device px a texel at resolution `n` on a stage `cssW` × `cssH` at `dpr`: whole pixels, so NEWT
+ * is about `n` texels tall (every pixel there is, once that would be under 1).
+ * @param {number} n
+ * @param {number} cssW
+ * @param {number} cssH
+ * @param {number} dpr
+ */
+export const blockFor = (n, cssW, cssH, dpr) => Math.max(1, Math.round(newtDevicePx(cssW, cssH, dpr) / n));
+
+/**
+ * The Pixel Sizes a stage `cssW` × `cssH` at `dpr` lists, coarse to fine, then Off: one a block
+ * size. Two resolutions that come to the same block here draw the same picture, so they're one
+ * step, shown as the one whose N is nearest (by ratio) NEWT's real height in texels there.
+ * @param {number} cssW
+ * @param {number} cssH
+ * @param {number} dpr
+ * @returns {PixelStep[]}
+ */
+export function pixelSteps(cssW, cssH, dpr) {
+  const tall = newtDevicePx(cssW, cssH, dpr);
+  const off = (n) => Math.abs(Math.log(n / tall) + Math.log(blockFor(n, cssW, cssH, dpr)));
+  /** @type {PixelStep[]} */
+  const steps = [];
+  for (const n of RESOLUTIONS) {
+    const pd = blockFor(n, cssW, cssH, dpr);
+    const value = /** @type {PixelSize} */ (String(n));
+    const last = steps.at(-1);
+    if (last?.pd === pd) {
+      last.covers.push(value);
+      if (off(n) < off(/** @type {number} */ (last.n))) Object.assign(last, { value, n });
+    } else steps.push({ value, n, pd, texels: tall / pd, covers: [value] });
+  }
+  steps.push({ value: 'off', n: null, pd: 1, texels: 0, covers: ['off'] });
+  return steps;
+}
+
+/**
+ * The listed step a Pixel Size shows as on a screen (one of its pixelSteps): the one that
+ * stands for it (the step with its block; the default's for anything else).
+ * @param {unknown} pixelSize
+ * @param {PixelStep[]} steps
+ */
+export const stepFor = (pixelSize, steps) =>
+  steps.find((s) => s.covers.includes(/** @type {PixelSize} */ (pixelSize))) ??
+  steps.find((s) => s.covers.includes(DEFAULT_PIXEL)) ??
+  steps[0];
+
 /** The camera: vertical field of view and elevation in degrees, near and far in world units. */
 export const VIEW = { fov: 20, elevation: 36, near: 1, far: 120 };
 /**
@@ -126,16 +212,16 @@ const RAD = Math.PI / 180;
 export function texelGrid({ cssW, cssH, dpr, pixelSize, devW, devH }) {
   cssW = Math.max(1, cssW);
   cssH = Math.max(1, cssH);
-  // (The step: N CSS px a texel at N×; Off, or anything else, draws natively.)
-  const step = PIXEL_SIZES.includes(pixelSize) ? Number(pixelSize) : NaN;
-  const native = !(step >= 1);
+  // (The resolution: NEWT about N texels tall; Off, or anything else, draws natively.)
+  const n = resolutionOf(pixelSize);
+  const native = n === null;
   const d = native ? Math.min(dpr || 1, NATIVE_DPR) : dpr || 1;
   // (The browser's measured device pixels only hold at the real DPR, not a capped one, and
   // only when they agree with it: an emulated DPR leaves them at CSS size.)
   const near = (dev, css) => !native && dev > 0 && Math.abs(dev - css * d) <= Math.max(2, d);
   const dw = near(devW, cssW) ? devW : cssW * d;
   const dh = near(devH, cssH) ? devH : cssH * d;
-  const pd = native ? 1 : Math.max(1, Math.round(step * d));
+  const pd = n === null ? 1 : blockFor(n, cssW, cssH, d);
   const w = Math.max(1, Math.ceil(dw / pd - 1e-6));
   const h = Math.max(1, Math.ceil(dh / pd - 1e-6));
   return { pd, w, h, dpr: d, canvasW: (w * pd) / d, canvasH: (h * pd) / d, native };

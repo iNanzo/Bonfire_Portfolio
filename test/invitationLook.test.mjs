@@ -1,9 +1,10 @@
-// The invitation toy's look (pure parts): the pixel grid (src/invitation/pixels.js) in explicit
-// steps (at 2×, 3× and 4× a texel is N×N CSS px, in whole device pixels) on the phones and the
-// desktop the round checks, Pixel Size Off at native size (its DPR capped at 2), the camera framing
-// NEWT about a quarter of a phone's short side tall and a fifth of a desktop's whatever the Pixel
-// Size (99 CSS px on a 390-wide phone: 50 texels at the default size), low enough to see his face, standing in the
-// middle of the space over the toolbar (in the clear space beside the open Look sheet, just as
+// The invitation toy's look (pure parts): the pixel grid (src/invitation/pixels.js) at NEWT's
+// sprite resolutions (at N×N he's about N texels tall, a texel whole device pixels; the steps a
+// screen lists, two that come to the same block there shown as one) on the phones and the desktop
+// the round checks, Pixel Size Off at native size (its DPR capped at 2), the camera framing NEWT
+// about a quarter of a phone's short side tall and a fifth of a desktop's whatever the Pixel Size
+// (99 CSS px on a 390-wide phone: 50 texels at the default 48×48), low enough to see his face,
+// standing in the middle of the space over the toolbar (in the clear space beside the open Look sheet, just as
 // big), the Bayer matrix the retro pass dithers with, the Look
 // settings (src/invitation/look.js) surviving any storage, and the presets (src/invitation/looks/)
 // carrying every look value, so a designer only ever edits data. With three.js in Node: the floor
@@ -20,8 +21,14 @@ import {
   PHONE_SHARE,
   PHONE_SIDE,
   PIXEL_SIZES,
+  RESOLUTIONS,
+  blockFor,
   compactStage,
+  newtDevicePx,
   newtShare,
+  pixelSteps,
+  resolutionOf,
+  stepFor,
   VIEW,
   clearInsets,
   frameView,
@@ -37,6 +44,7 @@ import {
   LOOKS,
   LOOK_KEY,
   MOTIONS,
+  OLD_PIXEL,
   STYLES,
   animFps,
   loadLook,
@@ -63,32 +71,86 @@ const AREA = (playArea().r ?? 0) + NEWT_RADIUS;
 const cssTall = (view, grid) => (newtTexels(view, grid) * grid.pd) / grid.dpr;
 const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: ${a} should be ${b} (±${tol})`);
 
-test('the pixel grid: at N× a texel is N×N CSS px in whole device pixels, at 390x844@3, 412x915@2.625 and 1280x800@1', () => {
-  assert.deepEqual(PIXEL_SIZES, ['off', '2', '3', '4']);
-  assert.equal(DEFAULT_PIXEL, '2');
+test('the pixel grid: at a sprite resolution N NEWT is about N texels tall in the default view, a texel max(1, round(his height in device px ÷ N)) whole device pixels, at 390x844@3, 412x915@2.625 and 1280x800@1', () => {
+  assert.deepEqual(RESOLUTIONS, [16, 24, 32, 48, 64, 96, 128, 192, 256]);
+  assert.deepEqual(
+    PIXEL_SIZES,
+    ['16', '24', '32', '48', '64', '96', '128', '192', '256', 'off'],
+    'Off at the fine end',
+  );
+  assert.equal(DEFAULT_PIXEL, '48', 'the 2× look a phone had');
+  assert.deepEqual(
+    PIXEL_SIZES.map((p) => resolutionOf(p)),
+    [...RESOLUTIONS, null],
+  );
+  assert.equal(resolutionOf('2'), null, 'not a step');
   for (const [cssW, cssH, dpr] of SIZES) {
+    const tallPx = newtShare(cssW, cssH) * Math.min(cssW, cssH) * dpr;
+    close(newtDevicePx(cssW, cssH, dpr), tallPx, 1e-9, `${cssW}x${cssH}@${dpr}: his height in device px`);
     for (const pixelSize of PIXEL_SIZES.filter((p) => p !== 'off')) {
       const n = Number(pixelSize);
       const g = texelGrid({ cssW, cssH, dpr, pixelSize });
-      const at = `${cssW}x${cssH}@${dpr} ${pixelSize}×`;
-      assert.equal(g.pd, Math.round(n * dpr), `${at}: a texel is round(${n} × ${dpr}) device pixels`);
-      assert.ok(Math.abs(g.pd / dpr - n) <= 0.5 / dpr + 1e-9, `${at}: a texel is about ${n} CSS px (${g.pd / dpr})`);
+      const at = `${cssW}x${cssH}@${dpr} ${n}×${n}`;
+      assert.equal(
+        g.pd,
+        Math.max(1, Math.round(tallPx / n)),
+        `${at}: a texel is round(${tallPx.toFixed(1)} / ${n}) device px`,
+      );
+      assert.equal(blockFor(n, cssW, cssH, dpr), g.pd);
+      assert.ok(Number.isInteger(g.pd) && g.pd >= 1);
       assert.equal(g.dpr, dpr);
       assert.ok(g.w * g.pd >= cssW * dpr && (g.w - 1) * g.pd < cssW * dpr, `${at}: the width just covers the stage`);
       assert.ok(g.h * g.pd >= cssH * dpr && (g.h - 1) * g.pd < cssH * dpr, `${at}: the height just covers the stage`);
       assert.ok(Math.abs(g.canvasW * dpr - g.w * g.pd) < 1e-6, `${at}: the canvas is whole device pixels wide`);
       assert.ok(Math.abs(g.canvasH * dpr - g.h * g.pd) < 1e-6, `${at}: and tall`);
       assert.equal(g.native, false);
+      // NEWT's height in texels in the default view: his device px over the block, so about N
+      // (within a quarter while the block is 2 px or more; at 1 px he has every pixel there is).
+      const view = frameView({ cssW, cssH, grid: g, insets: INSETS, area: AREA });
+      const tall = newtTexels(view, g);
+      close(tall, tallPx / g.pd, 0.5, `${at}: NEWT's texels`);
+      if (tallPx / n >= 1.5) assert.ok(tall / n >= 0.75 && tall / n <= 1.25, `${at}: ${tall.toFixed(1)} texels`);
+      else assert.ok(g.pd === 1 && tall < 1.5 * n, `${at}: native pixels (${tall.toFixed(1)} texels)`);
     }
   }
-  // The phone the round checks, exactly: 6, 9 and 12 device pixels a texel.
-  const phone = (pixelSize) => {
-    const { pd, w, h } = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize });
-    return { pd, w, h };
-  };
-  assert.deepEqual(phone('2'), { pd: 6, w: 195, h: 422 });
-  assert.deepEqual(phone('3'), { pd: 9, w: 130, h: 282 });
-  assert.deepEqual(phone('4'), { pd: 12, w: 98, h: 211 });
+  // The phones and the desktop the round checks, exactly: device px a texel at 16..256.
+  const pds = (cssW, cssH, dpr) => RESOLUTIONS.map((n) => texelGrid({ cssW, cssH, dpr, pixelSize: String(n) }).pd);
+  assert.deepEqual(pds(390, 844, 3), [19, 12, 9, 6, 5, 3, 2, 2, 1]);
+  assert.deepEqual(pds(412, 915, 2.625), [17, 11, 9, 6, 4, 3, 2, 1, 1]);
+  assert.deepEqual(pds(1280, 800, 1), [10, 7, 5, 3, 2, 2, 1, 1, 1]);
+  // The default is the old 2× on a 390-wide phone: 6 device px a texel, 195 × 422 texels.
+  const phone = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: DEFAULT_PIXEL });
+  assert.deepEqual([phone.pd, phone.w, phone.h], [6, 195, 422]);
+});
+
+test("Pixel Size's steps on a screen: each one a different block (two steps that come to the same block here are one, the one nearest NEWT's real height in texels), coarse to fine, then Off", () => {
+  const values = (cssW, cssH, dpr) => pixelSteps(cssW, cssH, dpr).map((s) => s.value);
+  // 390x844@3: 128 and 192 both come to 2 device px (149 texels): 128 is nearer.
+  assert.deepEqual(values(390, 844, 3), ['16', '24', '32', '48', '64', '96', '128', '256', 'off']);
+  // 412x915@2.625: 192 and 256 both native (276 texels): 256 is nearer.
+  assert.deepEqual(values(412, 915, 2.625), ['16', '24', '32', '48', '64', '96', '128', '256', 'off']);
+  // 1280x800@1: 64 and 96 at 2 px (78 texels): 64; 128, 192, 256 native (156): 128.
+  assert.deepEqual(values(1280, 800, 1), ['16', '24', '32', '48', '64', '128', 'off']);
+  for (const [cssW, cssH, dpr] of [...SIZES, [360, 780, 3], [1920, 1080, 2]]) {
+    const steps = pixelSteps(cssW, cssH, dpr);
+    const at = `${cssW}x${cssH}@${dpr}`;
+    assert.equal(steps.at(-1).value, 'off', `${at}: Off at the fine end`);
+    const blocks = steps.slice(0, -1).map((s) => s.pd);
+    for (let i = 1; i < blocks.length; i++) assert.ok(blocks[i] < blocks[i - 1], `${at}: ${blocks} coarse to fine`);
+    for (const s of steps.slice(0, -1)) {
+      assert.equal(s.pd, texelGrid({ cssW, cssH, dpr, pixelSize: s.value }).pd);
+      close(s.texels, newtDevicePx(cssW, cssH, dpr) / s.pd, 1e-9, `${at} ${s.value}: his texels`);
+    }
+    // Every step, listed or not, shows as the listed one with its block.
+    for (const p of PIXEL_SIZES) {
+      const shown = stepFor(p, steps);
+      assert.ok(steps.includes(shown), `${at} ${p}`);
+      if (p === 'off') assert.equal(shown.value, 'off');
+      else assert.equal(shown.pd, texelGrid({ cssW, cssH, dpr, pixelSize: p }).pd, `${at} ${p}: the same block`);
+    }
+  }
+  assert.equal(stepFor('192', pixelSteps(390, 844, 3)).value, '128');
+  assert.equal(stepFor('96', pixelSteps(1280, 800, 1)).value, '64');
 });
 
 test('Pixel Size Off draws at native size, its DPR capped at 2', () => {
@@ -106,7 +168,7 @@ test('Pixel Size Off draws at native size, its DPR capped at 2', () => {
   const d = at(1280, 800, 1);
   assert.deepEqual([d.w, d.h, d.pd, d.dpr, d.canvasW, d.canvasH], [1280, 800, 1, 1, 1280, 800]);
   // A device-pixel box the browser measured wins over CSS × DPR (where it can say).
-  const m = texelGrid({ cssW: 390, cssH: 844, dpr: 3, devW: 1171, devH: 2532, pixelSize: '2' });
+  const m = texelGrid({ cssW: 390, cssH: 844, dpr: 3, devW: 1171, devH: 2532, pixelSize: '48' });
   assert.deepEqual([m.pd, m.w], [6, Math.ceil(1171 / 6)]);
 });
 
@@ -148,13 +210,13 @@ test('NEWT is about a quarter of the short side on a phone (99 CSS px, 50 texels
     assert.ok(view.fov === VIEW.fov && view.fov >= 15 && view.fov <= 30, `a narrow view (${view.fov}°)`);
     assert.equal('roomWidth' in view, false, 'no room');
   }
-  // On the phones the round checks, at the default size: 99 CSS px and 50 texels at 390x844@3
-  // (2 CSS px a texel), 105 CSS px and 55 texels at 412x915@2.625 (5 device px a texel); on the
-  // desktop, 156 CSS px and 78 texels.
+  // On the phones the round checks, at the default 48×48: 99 CSS px and 50 texels at 390x844@3
+  // (6 device px a texel), 105 CSS px and 46 texels at 412x915@2.625 (6 device px a texel); on
+  // the desktop, 156 CSS px and 52 texels (3 px a texel).
   for (const [cssW, cssH, dpr, css, texels] of [
     [390, 844, 3, 99.5, 49.7],
-    [412, 915, 2.625, 105.1, 55.2],
-    [1280, 800, 1, 156, 78],
+    [412, 915, 2.625, 105.1, 46.0],
+    [1280, 800, 1, 156, 52],
   ]) {
     const at = `${cssW}x${cssH}@${dpr}`;
     const grid = texelGrid({ cssW, cssH, dpr, pixelSize: DEFAULT_LOOK.pixelSize });
@@ -206,7 +268,7 @@ test('with the Look sheet open the camera shows NEWT in the clear space it leave
   assert.deepEqual(none, INSETS);
 });
 
-test('the framing stays the same whatever the pixel size: NEWT just has more or fewer texels', () => {
+test('the framing stays the same whatever the sprite resolution: NEWT just has more or fewer texels', () => {
   for (const [cssW, cssH, dpr] of SIZES) {
     const at = `${cssW}x${cssH}@${dpr}`;
     const css = [];
@@ -219,9 +281,10 @@ test('the framing stays the same whatever the pixel size: NEWT just has more or 
     }
     const sizes = css.map((v) => v.toFixed(1)).join(', ');
     assert.ok(Math.max(...css) - Math.min(...css) < 0.5, `${at}: NEWT is ${sizes} CSS px tall at ${PIXEL_SIZES}`);
-    // Off first, then bigger and bigger blocks: fewer and fewer texels.
-    for (let i = 1; i < tall.length; i++)
-      assert.ok(tall[i] < tall[i - 1], `${at}: ${tall.map((v) => v.toFixed(1))} texels at ${PIXEL_SIZES}`);
+    // 16×16 first, then finer and finer: never fewer texels.
+    for (let i = 1; i < RESOLUTIONS.length; i++)
+      assert.ok(tall[i] >= tall[i - 1] - 1e-9, `${at}: ${tall.map((v) => v.toFixed(1))} texels at ${PIXEL_SIZES}`);
+    assert.ok(tall[RESOLUTIONS.length - 1] > 2.5 * tall[0], `${at}: 256×256 much finer than 16×16`);
   }
 });
 
@@ -267,7 +330,7 @@ test('Look settings survive storage that is empty, broken or throws', () => {
   // Saving: the key, the round trip, and a storage that refuses.
   let saved = null;
   const ok = saveLook(
-    { ...DEFAULT_LOOK, pixelSize: '4' },
+    { ...DEFAULT_LOOK, pixelSize: '128' },
     store(
       () => saved,
       (k, v) => (saved = [k, v]),
@@ -276,7 +339,7 @@ test('Look settings survive storage that is empty, broken or throws', () => {
   assert.equal(ok, true);
   assert.equal(saved[0], LOOK_KEY);
   assert.equal(LOOK_KEY, 'invitation.look.v1');
-  assert.deepEqual(loadLook(store(() => saved[1])), { ...DEFAULT_LOOK, pixelSize: '4' });
+  assert.deepEqual(loadLook(store(() => saved[1])), { ...DEFAULT_LOOK, pixelSize: '128' });
   const refused = saveLook(
     DEFAULT_LOOK,
     store(
@@ -291,26 +354,43 @@ test('Look settings survive storage that is empty, broken or throws', () => {
   assert.ok(PIXEL_SIZES.includes(DEFAULT_LOOK.pixelSize) && STYLES.includes(DEFAULT_LOOK.style));
 });
 
-test('a Pixel Size saved before the steps (Fine, DS, Chunky) loads as the default, the other settings kept', () => {
-  for (const old of ['fine', 'ds', 'chunky']) {
+test('a Pixel Size saved before the sprite resolutions loads as the nearest one (2×, 3×, 4× as they looked on a phone), Fine, DS and Chunky as the default, the other settings kept', () => {
+  for (const [old, now] of [
+    ['fine', DEFAULT_PIXEL],
+    ['ds', DEFAULT_PIXEL],
+    ['chunky', DEFAULT_PIXEL],
+    ['2', '48'],
+    ['3', '32'],
+    ['4', '24'],
+  ]) {
     const saved = JSON.stringify({ pixelSize: old, dither: false, outlines: true, style: 'soft' });
     assert.deepEqual(
       loadLook(store(() => saved)),
-      { pixelSize: DEFAULT_PIXEL, dither: false, outlines: true, style: 'soft', motion: 'smooth' },
+      { pixelSize: now, dither: false, outlines: true, style: 'soft', motion: 'smooth' },
       old,
     );
   }
+  // (Each old step's texels on a 390-wide phone, where 2× was drawn: the nearest resolution.)
+  for (const [old, now] of Object.entries(OLD_PIXEL)) {
+    const texels = (PHONE_SHARE * 390) / Number(old);
+    const nearest = RESOLUTIONS.reduce((a, b) =>
+      Math.abs(Math.log(b / texels)) < Math.abs(Math.log(a / texels)) ? b : a,
+    );
+    assert.equal(now, String(nearest), `${old}×: ${texels.toFixed(1)} texels`);
+  }
   for (const pixelSize of PIXEL_SIZES)
     assert.equal(loadLook(store(() => JSON.stringify({ pixelSize }))).pixelSize, pixelSize, `${pixelSize} is kept`);
-  assert.equal(DEFAULT_LOOK.pixelSize, '2', '2× by default');
+  for (const pixelSize of ['8', '512', 48, 'Off', '48x48', null])
+    assert.equal(validLook({ pixelSize }).pixelSize, DEFAULT_PIXEL, `${JSON.stringify(pixelSize)}: the default`);
+  assert.equal(DEFAULT_LOOK.pixelSize, '48', '48×48 by default');
 });
 
 test('a stored look from before Motion loads with Motion Smooth and keeps its other values; Smooth and Choppy are kept, anything else is Smooth', () => {
   assert.deepEqual(MOTIONS, ['smooth', 'choppy']);
   assert.equal(DEFAULT_LOOK.motion, 'smooth', 'smooth by default');
-  const before = JSON.stringify({ pixelSize: '3', dither: false, outlines: false, style: 'soft' });
+  const before = JSON.stringify({ pixelSize: '32', dither: false, outlines: false, style: 'soft' });
   assert.deepEqual(loadLook(store(() => before)), {
-    pixelSize: '3',
+    pixelSize: '32',
     dither: false,
     outlines: false,
     style: 'soft',
@@ -510,19 +590,14 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
   const bar = toolbarHtml();
   for (const name of [...BUTTONS, 'Look']) assert.match(bar, new RegExp(`>${name}</button>`), name);
   assert.match(bar, /data-button="Wander" aria-pressed="false"/);
-  const sheet = sheetHtml({ pixelSize: '4', dither: false, outlines: true, style: 'soft' });
+  const sheet = sheetHtml({ pixelSize: '24', dither: false, outlines: true, style: 'soft' });
   assert.match(sheet, /role="dialog" aria-modal="true"/, 'a modal dialog: what lies behind it is out of reach');
-  assert.match(sheet, /value="4" data-look="pixelSize" checked/);
-  // Pixel Size in explicit steps, in order.
+  assert.match(sheet, /value="24" data-look="pixelSize" checked/);
+  // Pixel Size: NEWT's sprite resolutions, coarse to fine, then Off.
   const steps = [...sheet.matchAll(/name="inv-pixel" value="([^"]+)"[^>]*><span>([^<]+)<\/span>/g)];
   assert.deepEqual(
     steps.map((m) => [m[1], m[2]]),
-    [
-      ['off', 'Off'],
-      ['2', '2×'],
-      ['3', '3×'],
-      ['4', '4×'],
-    ],
+    PIXEL_SIZES.map((p) => [p, p === 'off' ? 'Off' : `${p}×${p}`]),
   );
   assert.match(sheet, /value="soft" data-look="style" checked/);
   // Motion: Smooth or Choppy, the stored one checked (Smooth for a look from before it).

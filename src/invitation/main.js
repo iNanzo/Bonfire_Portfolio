@@ -46,7 +46,7 @@ import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createFaceState, faceStep } from './faces.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
-import { clearInsets, newtShare, newtTexels } from './pixels.js';
+import { clearInsets, newtShare, newtTexels, resolutionOf } from './pixels.js';
 import { animFps, loadLook, motionStep, presetOf, saveLook } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
@@ -634,8 +634,11 @@ function start(s) {
         stress: out?.stress ?? 0,
         states: [...states],
         buttonsEnabled: out?.buttonsEnabled ?? true,
-        // (CSS px a texel: N at N×, 1 over the capped DPR at Off.)
+        // (CSS px a texel: his height on screen over his texels; 1 over the capped DPR at Off.)
         pixelScale: s.grid.pd / s.grid.dpr,
+        // (The Pixel Size's sprite resolution N, null at Off, and his height in texels.)
+        resolution: resolutionOf(look.pixelSize),
+        newtTexels: s.view ? newtTexels(s.view, s.grid) : 0,
         button: lastButton,
         texels: { w: s.grid.w, h: s.grid.h },
         // (CSS px he stands tall in the default view, where he starts.)

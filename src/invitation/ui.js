@@ -17,8 +17,11 @@ import { LOOKS, MOTIONS, STYLES, validLook } from './look.js';
 
 /** The toolbar's action buttons, in order (Look comes last, on its own). */
 export const BUTTONS = /** @type {const} */ (['Wave', 'Spook', 'Sit', 'Run', 'Wander']);
-/** @type {Record<import('./pixels.js').PixelSize, string>} Pixel Size's labels: Off, then N× (a texel N×N CSS px) */
-export const PIXEL_LABELS = { off: 'Off', 2: '2×', 3: '3×', 4: '4×' };
+/**
+ * A Pixel Size's label: N×N (NEWT about N texels tall), or Off.
+ * @param {import('./pixels.js').PixelSize} p
+ */
+export const pixelLabel = (p) => (p === 'off' ? 'Off' : `${p}×${p}`);
 /** @type {Record<import('./look.js').Motion, string>} Motion's labels */
 export const MOTION_LABELS = { smooth: 'Smooth', choppy: 'Choppy' };
 
@@ -73,9 +76,7 @@ const toggle = (key, label, on) =>
  */
 export function sheetHtml(look) {
   const l = validLook(look);
-  const sizes = PIXEL_SIZES.map((p) => segment('inv-pixel', 'pixelSize', p, PIXEL_LABELS[p], l.pixelSize === p)).join(
-    '',
-  );
+  const sizes = PIXEL_SIZES.map((p) => segment('inv-pixel', 'pixelSize', p, pixelLabel(p), l.pixelSize === p)).join('');
   const styles = STYLES.map((s) => segment('inv-style', 'style', s, LOOKS[s].label, l.style === s)).join('');
   const motions = MOTIONS.map((m) => segment('inv-motion', 'motion', m, MOTION_LABELS[m], l.motion === m)).join('');
   return `<section class="inv-sheet" id="inv-look" role="dialog" aria-modal="true" aria-labelledby="inv-look-title" hidden>
