@@ -180,8 +180,9 @@ function face(name, w, h, c) {
       }
     browLine(p.brow);
     if (w >= 8) for (let x = eye.left; x < eye.left + Math.max(2, eye.w); x++) put(x, eye.top + eye.h, BLUSH);
-    // (A smile a pixel taller, where it stays clear of the ^ beside it.)
-    const smile = Math.max(eye.top + 1, p.mouthTop - 1);
+    // (A smile a pixel taller, where it stays clear of the ^ beside it and the cell is big
+    // enough that two rows don't read as an open mouth.)
+    const smile = w >= 8 ? Math.max(eye.top + 1, p.mouthTop - 1) : p.mouthTop;
     mouth(left > p.mw || eye.top + ah <= smile ? smile : p.mouthTop, p.mouthBottom, p.mw, MOUTH.line);
   } else {
     // Surprised: the eye a pixel bigger up and out, the brow raised with it, the mouth open.
