@@ -1,7 +1,11 @@
-// Pointer gestures for the invitation toy. Only the first pointer counts: a short, still press
-// is a tap (on NEWT or on the floor); a press on NEWT that moves more than moveTol CSS px or
-// lasts longer than holdMs is a grab, then drags, then a release; a cancel (pointercancel or
-// lostpointercapture) drops him and never taps. Plus where a ray meets a level plane, and
+// Pointer gestures for the invitation toy. One finger (or the mouse): a short, still press is a
+// tap (on NEWT or on the floor); a press on NEWT that moves more than moveTol CSS px or lasts
+// longer than holdMs is a grab, then drags, then a release; a press on empty space that moves
+// more than moveTol orbits the camera (each move's dx, dy), then a release; a cancel
+// (pointercancel or lostpointercapture) drops him and never taps. Two fingers pinch (the change
+// in their spread): a second finger landing on a press or an orbit turns it into a pinch, two-
+// finger gestures never tap or grab, and once one lifts the other does nothing until it lifts
+// too. While NEWT is held, other fingers are ignored. Plus where a ray meets a level plane, and
 // whether a point is on his screen shape (a head circle and a body capsule). Pure: CSS px and
 // seconds in, events out; the page owns the DOM and pointer capture.
 
@@ -24,34 +28,69 @@ export function createGesture(opts = {}) {
   const moveTol = opts.moveTol ?? GESTURE.moveTol;
   const holdMs = opts.holdMs ?? GESTURE.holdMs;
   const floorHoldMs = opts.floorHoldMs ?? GESTURE.floorHoldMs;
-  /** @type {{id: number, on: 'newt'|'floor', x0: number, y0: number, t0: number, x: number, y: number, grabbed: boolean, moved: boolean}|null} */
+  /**
+   * The press being tracked. mode: 'press' (one finger), 'pinch' (two: `second` is the other),
+   * 'spent' (a finger left over from a pinch: it does nothing). ox, oy: an orbit's last point.
+   * @type {{id: number, on: 'newt'|'floor', mode: 'press'|'pinch'|'spent', x0: number, y0: number, t0: number, x: number, y: number, ox: number, oy: number, grabbed: boolean, moved: boolean, second: {id: number, x: number, y: number}|null, spread: number}|null}
+   */
   let press = null;
 
   /** @returns {GestureEvent} */
-  const ev = (type, on, x, y, t) => ({ type, on, x, y, t });
+  const ev = (type, on, x, y, t, extra = {}) => ({ type, on, x, y, t, ...extra });
   // (A whisker of slack: 1.28 − 1 is 0.28000000000000025 in floats.)
   const outlasts = (t0, t, ms) => (t - t0) * 1000 > ms + 1e-6;
   const strays = (x0, y0, x, y) => Math.hypot(x - x0, y - y0) > moveTol;
+  /** The pinch's fingers apart (at least a pixel) and their middle. */
+  const spreadOf = (q) => Math.max(1, Math.hypot(q.second.x - q.x, q.second.y - q.y));
+  const middle = (q) => ({ x: (q.x + q.second.x) / 2, y: (q.y + q.second.y) / 2 });
+  /** @returns {GestureEvent} */
+  const pinch = (q, scale, t) => {
+    const m = middle(q);
+    return ev('pinch', 'floor', m.x, m.y, t, { scale });
+  };
+  /** One of a pinch's fingers lifts: the other is left, spent. */
+  const lift = (id) => {
+    const q = press;
+    if (!q?.second) return;
+    if (id === q.second.id) q.second = null;
+    else if (id === q.id) {
+      Object.assign(q, { id: q.second.id, x: q.second.x, y: q.second.y });
+      q.second = null;
+    } else return;
+    q.mode = 'spent';
+  };
 
   return {
     /**
-     * A pointerdown; `onNewt` from the page's pick.
+     * A pointerdown; `onNewt` from the page's pick. A second finger on a press that isn't
+     * holding NEWT starts a pinch.
      * @param {Ptr} p
      * @param {boolean} onNewt
      * @returns {GestureEvent[]}
      */
     down(p, onNewt) {
-      if (press) return [];
+      if (press) {
+        if (press.mode === 'pinch' || press.grabbed || p.id === press.id) return [];
+        press.mode = 'pinch';
+        press.second = { id: p.id, x: p.x, y: p.y };
+        press.spread = spreadOf(press);
+        return [pinch(press, 1, p.t)];
+      }
       press = {
         id: p.id,
         on: onNewt ? 'newt' : 'floor',
+        mode: 'press',
         x0: p.x,
         y0: p.y,
         t0: p.t,
         x: p.x,
         y: p.y,
+        ox: p.x,
+        oy: p.y,
         grabbed: false,
         moved: false,
+        second: null,
+        spread: 1,
       };
       return [];
     },
@@ -65,9 +104,20 @@ export function createGesture(opts = {}) {
     move(p, onNewt = false) {
       if (!press)
         return p.kind !== 'touch' && !p.buttons ? [ev('hover', onNewt ? 'newt' : 'floor', p.x, p.y, p.t)] : [];
+      if (press.mode === 'pinch') {
+        const f = p.id === press.id ? press : p.id === press.second?.id ? press.second : null;
+        if (!f) return [];
+        f.x = p.x;
+        f.y = p.y;
+        const spread = spreadOf(press);
+        const scale = spread / press.spread;
+        press.spread = spread;
+        return [pinch(press, scale, p.t)];
+      }
       if (p.id !== press.id) return [];
       press.x = p.x;
       press.y = p.y;
+      if (press.mode === 'spent') return [];
       const out = [];
       if (press.on === 'newt') {
         if (!press.grabbed && (strays(press.x0, press.y0, p.x, p.y) || outlasts(press.t0, p.t, holdMs))) {
@@ -77,7 +127,11 @@ export function createGesture(opts = {}) {
         if (press.grabbed) out.push(ev('drag', 'newt', p.x, p.y, p.t));
       } else {
         if (strays(press.x0, press.y0, p.x, p.y)) press.moved = true;
-        if (press.moved) out.push(ev('drag', 'floor', p.x, p.y, p.t));
+        if (press.moved) {
+          out.push(ev('orbit', 'floor', p.x, p.y, p.t, { dx: p.x - press.ox, dy: p.y - press.oy }));
+          press.ox = p.x;
+          press.oy = p.y;
+        }
       }
       return out;
     },
@@ -87,9 +141,15 @@ export function createGesture(opts = {}) {
      * @returns {GestureEvent[]}
      */
     up(p) {
-      if (!press || p.id !== press.id) return [];
+      if (!press) return [];
+      if (press.mode === 'pinch') {
+        lift(p.id);
+        return [];
+      }
+      if (p.id !== press.id) return [];
       const q = press;
       press = null;
+      if (q.mode === 'spent') return [];
       const far = strays(q.x0, q.y0, p.x, p.y);
       if (q.on === 'newt') {
         if (q.grabbed) return [ev('release', 'newt', p.x, p.y, p.t)];
@@ -102,16 +162,21 @@ export function createGesture(opts = {}) {
       return [ev('tap', 'floor', p.x, p.y, p.t)];
     },
     /**
-     * pointercancel or lostpointercapture: a drop, never a tap.
+     * pointercancel or lostpointercapture: a drop, never a tap (in a pinch, a finger lifting).
      * @param {number} id
      * @param {number} t
      * @returns {GestureEvent[]}
      */
     cancel(id, t) {
-      if (!press || id !== press.id) return [];
+      if (!press) return [];
+      if (press.mode === 'pinch') {
+        lift(id);
+        return [];
+      }
+      if (id !== press.id) return [];
       const q = press;
       press = null;
-      return [ev('cancel', q.on, q.x, q.y, t)];
+      return q.mode === 'spent' ? [] : [ev('cancel', q.on, q.x, q.y, t)];
     },
     /**
      * Each frame: a press on NEWT held still past holdMs becomes a grab.
@@ -119,13 +184,27 @@ export function createGesture(opts = {}) {
      * @returns {GestureEvent[]}
      */
     tick(t) {
-      if (!press || press.on !== 'newt' || press.grabbed || !outlasts(press.t0, t, holdMs)) return [];
+      if (!press || press.mode !== 'press' || press.on !== 'newt' || press.grabbed || !outlasts(press.t0, t, holdMs))
+        return [];
       press.grabbed = true;
       return [ev('grab', 'newt', press.x, press.y, t)];
     },
-    /** The press being tracked, or null. */
+    /**
+     * The press being tracked, or null: its first finger, what it started on, whether it holds
+     * NEWT, orbits or pinches, and where it is (a pinch's middle).
+     */
     current() {
-      return press ? { id: press.id, on: press.on, grabbed: press.grabbed } : null;
+      if (!press) return null;
+      const at = press.mode === 'pinch' ? middle(press) : { x: press.x, y: press.y };
+      return {
+        id: press.id,
+        on: press.on,
+        grabbed: press.grabbed,
+        orbit: press.mode === 'press' && press.on === 'floor' && press.moved,
+        pinch: press.mode === 'pinch',
+        x: at.x,
+        y: at.y,
+      };
     },
   };
 }

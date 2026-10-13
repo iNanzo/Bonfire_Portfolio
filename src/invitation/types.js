@@ -32,12 +32,15 @@
 /** @typedef {{id: number, x: number, y: number, t: number, kind: string, buttons: number}} Ptr  a pointer sample, client px and seconds */
 /**
  * @typedef {object} GestureEvent
- * @property {'tap'|'grab'|'drag'|'release'|'cancel'|'hover'} type
- * @property {'newt'|'floor'} on  what the press started on
- * @property {number} x  client px
+ * @property {'tap'|'grab'|'drag'|'release'|'cancel'|'hover'|'orbit'|'pinch'} type  orbit: a drag on empty space (it turns the camera); pinch: two fingers (they zoom it)
+ * @property {'newt'|'floor'} on  what the press started on ('floor' for empty space and pinches)
+ * @property {number} x  client px (a pinch: its fingers' middle)
  * @property {number} y
  * @property {number} t  seconds
  * @property {XZ|null} [floor]  where it meets the floor (filled in by the page)
+ * @property {number} [dx]  an orbit's move since its last, CSS px
+ * @property {number} [dy]
+ * @property {number} [scale]  a pinch's spread over its last (above 1: the fingers moved apart)
  */
 
 /** @typedef {'Wave'|'Spook'|'Sit'|'Run'|'Wander'} ButtonName */
