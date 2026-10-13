@@ -1,8 +1,11 @@
 // Where NEWT looks in the invitation toy: the yaw and pitch toward a target, clamped to what a
 // neck can do (yaw ±70°, pitch −30°…+35°) and split 30/70 between Neck and Neck001, eased by a
 // critically damped spring (no overshoot). With no pointer for 1.5 s he looks ahead and glances
-// about every 3–7 s; running away, he glances over his shoulder about every 1.2 s. Pure: time
-// comes in as t, randomness from rng.js; the state object is updated in place.
+// about every 3–7 s; running away, he glances over his shoulder about every 1.2 s. "Ahead" is
+// the viewer (viewerAim): up at the camera, which is what shows his face under his cap's brim,
+// faded back to straight ahead as he turns away from it. Looking at the floor, his head is
+// lifted by LOOK.floorBias for the same reason. Pure: time comes in as t, randomness from
+// rng.js; the state object is updated in place.
 
 import { between } from './rng.js';
 import { wrapAngle } from './steer.js';
@@ -21,7 +24,9 @@ export const SPLIT = { neck: 0.3, head: 0.7 };
  * pointer before he looks ahead. Idle glances: every glanceMin–glanceMax s, held
  * glanceHoldMin–glanceHoldMax s, up to glanceYaw of the yaw limit. Back glances: every
  * backEvery ± backJitter s, held backHold s, at backYaw of the yaw limit. weightRate: the look's
- * weight eases at this much per second.
+ * weight eases at this much per second. The viewer: looked at fully while the camera is within
+ * viewerFull of the way he faces, not at all past viewerNone (radians). floorBias: the pitch
+ * added to a look at the floor (radians).
  */
 export const LOOK = {
   omega: 10,
@@ -36,6 +41,9 @@ export const LOOK = {
   backHold: 0.4,
   backYaw: 0.95,
   weightRate: 5,
+  viewerFull: (100 * Math.PI) / 180,
+  viewerNone: (150 * Math.PI) / 180,
+  floorBias: (10 * Math.PI) / 180,
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -74,13 +82,36 @@ export function clampAim(a) {
  * @param {XYZ} headPos
  * @param {number} bodyYaw  root.rotation.y (0 faces +z)
  * @param {XYZ} target
+ * @param {number} [pitchBias]  added to the pitch before the clamp (LOOK.floorBias for the floor)
  * @returns {Aim}
  */
-export function aimAngles(headPos, bodyYaw, target) {
+export function aimAngles(headPos, bodyYaw, target, pitchBias = 0) {
   const dx = target.x - headPos.x;
   const dy = target.y - headPos.y;
   const dz = target.z - headPos.z;
-  return clampAim({ yaw: wrapAngle(Math.atan2(dx, dz) - bodyYaw), pitch: Math.atan2(dy, Math.hypot(dx, dz)) });
+  return clampAim({
+    yaw: wrapAngle(Math.atan2(dx, dz) - bodyYaw),
+    pitch: Math.atan2(dy, Math.hypot(dx, dz)) + pitchBias,
+  });
+}
+
+/**
+ * "Ahead": toward the viewer. The look at the camera (clamped), all of it while the camera is
+ * within LOOK.viewerFull of the way he faces, fading to straight ahead by LOOK.viewerNone (he
+ * doesn't crick his neck or look at the sky walking away).
+ * @param {XYZ} headPos
+ * @param {number} bodyYaw
+ * @param {XYZ} camera
+ * @returns {Aim}
+ */
+export function viewerAim(headPos, bodyYaw, camera) {
+  const dx = camera.x - headPos.x;
+  const dz = camera.z - headPos.z;
+  const off = Math.abs(wrapAngle(Math.atan2(dx, dz) - bodyYaw));
+  const k = clamp((LOOK.viewerNone - off) / (LOOK.viewerNone - LOOK.viewerFull), 0, 1);
+  if (k <= 0) return { yaw: 0, pitch: 0 };
+  const a = aimAngles(headPos, bodyYaw, camera);
+  return { yaw: a.yaw * k, pitch: a.pitch * k };
 }
 
 /**
@@ -97,11 +128,11 @@ export function splitLook(yaw, pitch) {
 
 /**
  * One frame of looking.
- * - 'camera': at `aim` (the page aims at the camera), ahead when it's null.
+ * - 'camera': at `aim` (the page aims at the camera), `ahead` when it's null.
  * - 'pointer': at `aim` (the surface under the pointer, or the camera when the pointer is on
- *   him); when it goes, the last aim for LOOK.idleAfter, then ahead with idle glances.
- * - 'forward': ahead with idle glances.
- * - 'back': ahead, glancing over a shoulder about every LOOK.backEvery s.
+ *   him); when it goes, the last aim for LOOK.idleAfter, then `ahead` with idle glances.
+ * - 'forward': `ahead` with idle glances around it.
+ * - 'back': straight ahead (where he runs), glancing over a shoulder about every LOOK.backEvery s.
  * @param {LookState} s
  * @param {'pointer'|'camera'|'forward'|'back'} mode  BrainOut.look.mode
  * @param {Aim|null} aim
@@ -109,16 +140,17 @@ export function splitLook(yaw, pitch) {
  * @param {number} t
  * @param {() => number} rng
  * @param {number} [weight]  BrainOut.look.weight; s.weight eases toward it
+ * @param {Aim} [ahead]  where "ahead" is (viewerAim; straight ahead by default)
  * @returns {LookState}
  */
-export function lookStep(s, mode, aim, dt, t, rng, weight = 1) {
+export function lookStep(s, mode, aim, dt, t, rng, weight = 1, ahead = AHEAD) {
   if (mode !== s.mode) {
     s.mode = mode;
     s.glance = null;
     s.nextGlance = null;
   }
   let target;
-  if (mode === 'camera') target = aim ?? AHEAD;
+  if (mode === 'camera') target = aim ?? ahead;
   else if (mode === 'pointer' && aim) {
     s.lastAim = { yaw: aim.yaw, pitch: aim.pitch };
     s.lastAimT = t;
@@ -127,7 +159,7 @@ export function lookStep(s, mode, aim, dt, t, rng, weight = 1) {
     target = aim;
   } else if (mode === 'pointer' && s.lastAim && t - s.lastAimT < LOOK.idleAfter) target = s.lastAim;
   else if (mode === 'back') target = backGlance(s, t, rng);
-  else target = idleGlance(s, t, rng);
+  else target = idleGlance(s, t, rng, ahead);
   s.target = clampAim(target);
   [s.yaw, s.vyaw] = spring(s.yaw, s.vyaw, s.target.yaw, dt);
   [s.pitch, s.vpitch] = spring(s.pitch, s.vpitch, s.target.pitch, dt);
@@ -150,18 +182,23 @@ function spring(x, v, target, dt) {
   return [target + (e + j) * k, (v - w * j) * k];
 }
 
-/** Ahead, with a glance to one side every glanceMin–glanceMax s. */
-function idleGlance(s, t, rng) {
+/**
+ * `ahead`, with a glance to one side every glanceMin–glanceMax s (s.glance: the glance's turn
+ * away from `ahead`, toward the side with room for it).
+ */
+function idleGlance(s, t, rng, ahead) {
   if (s.nextGlance == null) s.nextGlance = t + between(rng, LOOK.glanceMin, LOOK.glanceMax);
   if (s.glance && t >= s.glanceUntil) s.glance = null;
   if (!s.glance && t >= s.nextGlance) {
-    const side = rng() < 0.5 ? -1 : 1;
-    s.glance = { yaw: side * between(rng, 0.3, LOOK.glanceYaw) * LIMIT.yaw, pitch: between(rng, -0.15, 0.25) };
+    let side = rng() < 0.5 ? -1 : 1;
+    const yaw = between(rng, 0.3, LOOK.glanceYaw) * LIMIT.yaw;
+    if (Math.abs(ahead.yaw + side * yaw) > LIMIT.yaw) side = -side;
+    s.glance = { yaw: side * yaw, pitch: between(rng, -0.15, 0.25) };
     s.glanceUntil = t + between(rng, LOOK.glanceHoldMin, LOOK.glanceHoldMax);
     s.nextGlance = t + between(rng, LOOK.glanceMin, LOOK.glanceMax);
     s.glances++;
   }
-  return s.glance ?? AHEAD;
+  return s.glance ? { yaw: ahead.yaw + s.glance.yaw, pitch: ahead.pitch + s.glance.pitch } : ahead;
 }
 
 /** Ahead, with a look over one shoulder about every backEvery s (the first one sooner). */
