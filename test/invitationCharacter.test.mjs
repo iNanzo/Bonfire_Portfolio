@@ -6,8 +6,9 @@
 // own clock; restarting a clip that still shows hands its old pose to a twin that fades out (no
 // pop); the collar is read from the current matrices, so carrying can anchor him by it. With
 // the pixel filter on: his face's sheet is picked by his half face in texels (held through a
-// small change), all of him moves onto the texel grid by his head's centre, and his atlas is
-// the pixel one (nearest, no mipmaps), the glb's own at Off.
+// small change), what's on his head moves onto the texel grid by his head's centre and the
+// rest of him by his feet, and his atlas is the pixel one (nearest, no mipmaps), the glb's
+// own at Off.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -367,41 +368,47 @@ test('the face sheet: picked by his half face in texels at his head (camera, gri
   ch.dispose();
 });
 
-test('the texel snap: with the pixel filter on, his head’s centre lands on a texel’s centre; Off moves nothing', () => {
+test('the texel snap: what’s on his head moves by his head’s centre, the rest of him by his feet, each onto a texel’s centre; Off moves nothing', () => {
   const { gltf, face, mesh } = withFace();
   const ch = createCharacter(gltf);
   ch.root.position.set(0.0123, 0, -0.0456);
   ch.root.updateMatrixWorld(true);
   const head = ch.root.getObjectByName(BONES.head);
   const c = head.localToWorld(new THREE.Vector3(0, 1, 0));
+  const feet = ch.root.getWorldPosition(new THREE.Vector3());
   const camera = cameraAt(new THREE.Vector3(0.0371, c.y + 0.0219, 0), 9);
   const [w, h] = [195, 422];
   mesh.onBeforeRender(viewportOf(w, h), null, camera, mesh.geometry, mesh.material, null);
-  const snap = ch.texelSnap;
-  const p = c.clone().project(camera);
-  const px = ((p.x + snap.x + 1) / 2) * w;
-  const py = ((p.y + snap.y + 1) / 2) * h;
-  assert.ok(Math.abs(px - Math.floor(px) - 0.5) < 1e-4, `on a texel's centre across (${px})`);
-  assert.ok(Math.abs(py - Math.floor(py) - 0.5) < 1e-4, `and down (${py})`);
-  assert.ok(Math.abs(snap.x) > 0 || Math.abs(snap.y) > 0, 'it moved');
-  // Every one of his materials shares it (retro.js markId's snap).
-  const shader = {
-    uniforms: {},
-    vertexShader: THREE.ShaderLib.toon.vertexShader,
-    fragmentShader: THREE.ShaderLib.toon.fragmentShader,
+  const snaps = ch.texelSnap;
+  const onCentre = (point, snap, what) => {
+    const p = point.clone().project(camera);
+    const px = ((p.x + snap.x + 1) / 2) * w;
+    const py = ((p.y + snap.y + 1) / 2) * h;
+    assert.ok(Math.abs(px - Math.floor(px) - 0.5) < 1e-4, `${what}: on a texel's centre across (${px})`);
+    assert.ok(Math.abs(py - Math.floor(py) - 0.5) < 1e-4, `${what}: and down (${py})`);
   };
-  mesh.material.onBeforeCompile(shader, null);
-  assert.equal(shader.uniforms.uTexelSnap.value, snap, 'his materials read this shift');
-  const faceShader = {
-    uniforms: {},
-    vertexShader: THREE.ShaderLib.toon.vertexShader,
-    fragmentShader: THREE.ShaderLib.toon.fragmentShader,
+  onCentre(c, snaps.head, 'his head’s centre');
+  onCentre(feet, snaps.body, 'his feet');
+  assert.ok(Math.abs(snaps.head.x) > 0 || Math.abs(snaps.head.y) > 0, 'it moved');
+  // His materials read their part's shift (retro.js markId's snap): the face's is the head's.
+  const uniformOf = (material) => {
+    const shader = {
+      uniforms: {},
+      vertexShader: THREE.ShaderLib.toon.vertexShader,
+      fragmentShader: THREE.ShaderLib.toon.fragmentShader,
+    };
+    material.onBeforeCompile(shader, null);
+    return shader.uniforms.uTexelSnap.value;
   };
-  face.material.onBeforeCompile(faceShader, null);
-  assert.equal(faceShader.uniforms.uTexelSnap, shader.uniforms.uTexelSnap, 'his face too');
+  assert.equal(uniformOf(mesh.material), snaps.body, 'his body: the feet’s shift (planted feet stay put)');
+  assert.equal(uniformOf(face.material), snaps.head, 'his face: the head’s (its features keep their texels)');
   ch.setStyle(LOOKS.ds, false);
   face.onBeforeRender(viewportOf(w, h), null, camera, face.geometry, face.material, null);
-  assert.deepEqual([snap.x, snap.y], [0, 0], 'Pixel Size Off: drawn where he is');
+  assert.deepEqual(
+    [snaps.head.x, snaps.head.y, snaps.body.x, snaps.body.y],
+    [0, 0, 0, 0],
+    'Pixel Size Off: drawn where he is',
+  );
   ch.dispose();
 });
 
@@ -442,7 +449,7 @@ test('the texel snap holds his texel while his head wobbles across an edge (no s
     ch.root.updateMatrixWorld(true);
     mesh.onBeforeRender(viewportOf(w, h), null, camera, mesh.geometry, mesh.material, null);
     const p = head.localToWorld(new THREE.Vector3(0, 1, 0)).project(camera);
-    return { at: ((p.x + ch.texelSnap.x + 1) / 2) * w, raw: ((p.x + 1) / 2) * w };
+    return { at: ((p.x + ch.texelSnap.head.x + 1) / 2) * w, raw: ((p.x + 1) / 2) * w };
   };
   // A texel in world units at his head, across.
   const texel = (drawnAt(1).raw - drawnAt(0).raw) ** -1;

@@ -34,10 +34,12 @@
 // small changes (pickFaceSize), so a 2-pixel eye stays 2 texels as he moves.
 //
 // The texel snap (pixel filter on): as each of his meshes is drawn, the shift that puts his
-// head's centre on a texel's centre is worked out (retro.js snapShift) and all his materials
-// move by it (markId's snap), so his head draws the same texels while it drifts within one,
-// and steps a whole texel once it's clearly in the next, like a sprite (held a quarter texel
-// past the edge, so his breathing never steps him back and forth).
+// head's centre on a texel's centre is worked out (retro.js snapShift) and the materials of
+// what rides on his head (face, hair, cap: onHead) move by it (markId's snap), so his head
+// draws the same texels while it drifts within one, and steps a whole texel once it's clearly
+// in the next, like a sprite's (held a quarter texel past the edge, so his breathing never
+// steps it back and forth); the rest of him moves the same way by his feet, which stay put
+// while he stands (snapped by his head, they bobbed a texel with each breath on a desktop).
 //
 // The pixel atlas (pixel filter on): models/newt-atlas-pixel.png beside the glb
 // (tools/newt-atlas.mjs: his atlas in flat colours, the plaid redrawn in big black-and-white
@@ -59,6 +61,8 @@ const SPLIT = [0.3, 0.7];
 const HEAD = { up: 1.0, r: 1.65 };
 /** His body's capsule radius (model units), from between his feet to his collar. */
 const BODY_R = 1.25;
+/** A skinned mesh rides on his head when this share of its vertices are mostly on the head bone. */
+const HEAD_SHARE = 0.6;
 /** The least a part's radius may be on screen, CSS px (22 px across: a fingertip). */
 const MIN_R = 11;
 
@@ -72,7 +76,7 @@ const MIN_R = 11;
  *   atlasReady: Promise<void>,
  *   faceSize: number|null,
  *   faceTexels: number,
- *   texelSnap: {x: number, y: number},
+ *   texelSnap: {head: {x: number, y: number}, body: {x: number, y: number}},
  * }} PageCharacter
  */
 
@@ -104,50 +108,33 @@ export function createCharacter(gltf, opts = {}) {
   let preset = opts.preset ?? LOOKS[DEFAULT_LOOK.style];
   let pixel = opts.pixel ?? true;
   let gradient = toonGradient(preset.toon);
-  /** @type {Map<any, any>} the glb's materials → his toon ones */
+  /** @type {Map<any, Record<string, any>>} the glb's materials → his toon ones, one a part (PARTS) */
   const made = new Map();
+  /** @type {any[]} every toon material of his */
+  const toons = [];
   const textures = new Set();
   let skeleton = null;
   let faceMaterial = null;
   /** @type {any} the mesh his face is drawn on */
   let faceMesh = null;
-  /** His materials' shared texel snap (NDC; retro.js markId), and the texel it holds to. */
-  const snap = { value: new THREE.Vector2() };
-  const snapHold = { x: Number.NaN, y: Number.NaN };
+  /**
+   * Each part's texel snap (NDC; retro.js markId), shared by its materials, and the texel it
+   * holds to: what's on his head by his head's centre, the rest of him by his feet.
+   */
+  const snaps = { head: { value: new THREE.Vector2() }, body: { value: new THREE.Vector2() } };
+  const holds = { head: { x: Number.NaN, y: Number.NaN }, body: { x: Number.NaN, y: Number.NaN } };
   /** @type {Array<{material: any, map: any}>} his atlas materials and the glb's map on each */
   const atlased = [];
   /** @type {any} */
   let pixelAtlas = null;
   /** @type {any[]} every mesh of his */
   const meshes = [];
-
-  const toon = (src) => {
-    if (made.has(src)) return made.get(src);
-    const m = markId(
-      new THREE.MeshToonMaterial({
-        name: src?.name ?? '',
-        map: src?.map ?? null,
-        color: src?.color ? src.color.clone() : new THREE.Color(1, 1, 1),
-        gradientMap: gradient,
-      }),
-      ID.newt,
-      { snap },
-    );
-    if (src?.map) textures.add(src.map);
-    if (src?.name === 'NEWT_Face') faceMaterial = m;
-    else if (src?.map) atlased.push({ material: m, map: src.map });
-    src?.dispose?.();
-    made.set(src, m);
-    return m;
-  };
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.frustumCulled = false;
     o.castShadow = true;
     o.receiveShadow = false;
     if (o.isSkinnedMesh && !skeleton) skeleton = o.skeleton;
-    o.material = Array.isArray(o.material) ? o.material.map(toon) : toon(o.material);
-    if (faceMaterial && !faceMesh && [o.material].flat().includes(faceMaterial)) faceMesh = o;
     meshes.push(o);
   });
 
@@ -161,6 +148,40 @@ export function createCharacter(gltf, opts = {}) {
     });
     return found;
   };
+  const headBone = bone(BONES.head);
+
+  /**
+   * @param {any} src  a glb material
+   * @param {'head'|'body'} part
+   */
+  const toon = (src, part) => {
+    const parts = made.get(src) ?? {};
+    if (parts[part]) return parts[part];
+    const m = markId(
+      new THREE.MeshToonMaterial({
+        name: src?.name ?? '',
+        map: src?.map ?? null,
+        color: src?.color ? src.color.clone() : new THREE.Color(1, 1, 1),
+        gradientMap: gradient,
+      }),
+      ID.newt,
+      { snap: snaps[part] },
+    );
+    if (src?.map) textures.add(src.map);
+    if (src?.name === 'NEWT_Face') faceMaterial = m;
+    else if (src?.map) atlased.push({ material: m, map: src.map });
+    parts[part] = m;
+    made.set(src, parts);
+    toons.push(m);
+    return m;
+  };
+  for (const o of meshes) {
+    const part = onHead(o, headBone) ? 'head' : 'body';
+    o.material = Array.isArray(o.material) ? o.material.map((m) => toon(m, part)) : toon(o.material, part);
+    if (faceMaterial && !faceMesh && [o.material].flat().includes(faceMaterial)) faceMesh = o;
+  }
+  for (const src of made.keys()) src?.dispose?.();
+
   const neck = [bone(BONES.neck), bone(BONES.head)];
   const saved = neck.map((b) => (b ? b.quaternion.clone() : new THREE.Quaternion()));
 
@@ -272,23 +293,25 @@ export function createCharacter(gltf, opts = {}) {
   const centre = new THREE.Vector3();
   const ndc = new THREE.Vector3();
   const scale = new THREE.Vector3();
-  const headBone = bone(BONES.head);
 
   /**
    * As each of his meshes is drawn (onBeforeRender: the camera and the target it's drawn into
-   * are the frame's): the texel snap for his head's centre, and the face sheet for his half
-   * face in texels there.
+   * are the frame's): the texel snaps (his head's centre for what's on his head, his feet for
+   * the rest), and the face sheet for his half face in texels at his head.
    * @param {any} renderer
    * @param {any} _scene
    * @param {any} camera
    */
   function beforeDraw(renderer, _scene, camera) {
     renderer.getCurrentViewport(viewport);
+    for (const part of /** @type {const} */ (['head', 'body'])) {
+      if (part === 'head' && headBone) headBone.localToWorld(centre.set(0, HEAD.up, 0));
+      else root.getWorldPosition(centre);
+      ndc.copy(centre).project(camera);
+      if (pixel) snapShift(ndc.x, ndc.y, viewport.z, viewport.w, snaps[part].value, holds[part]);
+      else snaps[part].value.set(0, 0);
+    }
     if (headBone) headBone.localToWorld(centre.set(0, HEAD.up, 0));
-    else root.getWorldPosition(centre);
-    ndc.copy(centre).project(camera);
-    if (pixel) snapShift(ndc.x, ndc.y, viewport.z, viewport.w, snap.value, snapHold);
-    else snap.value.set(0, 0);
     if (!span || !faceMesh) return;
     // Texels a world unit at his head: the projection's vertical scale over the depth there.
     const depth = camera.isOrthographicCamera ? 1 : -ndc.copy(centre).applyMatrix4(camera.matrixWorldInverse).z;
@@ -403,18 +426,20 @@ export function createCharacter(gltf, opts = {}) {
       return faceTexels;
     },
     get texelSnap() {
-      return snap.value;
+      return { head: snaps.head.value, body: snaps.body.value };
     },
     setStyle(next, pixelOn) {
       preset = next;
       pixel = pixelOn;
       const g = toonGradient(preset.toon);
-      for (const m of made.values()) m.gradientMap = g;
+      for (const m of toons) m.gradientMap = g;
       gradient.dispose();
       gradient = g;
-      if (!pixel) snap.value.set(0, 0);
-      snapHold.x = Number.NaN;
-      snapHold.y = Number.NaN;
+      for (const part of /** @type {const} */ (['head', 'body'])) {
+        if (!pixel) snaps[part].value.set(0, 0);
+        holds[part].x = Number.NaN;
+        holds[part].y = Number.NaN;
+      }
       showFace();
       showAtlas();
     },
@@ -456,12 +481,37 @@ export function createCharacter(gltf, opts = {}) {
       mixer.stopAllAction();
       mixer.uncacheRoot(root);
       root.traverse((o) => o.geometry?.dispose());
-      for (const m of made.values()) m.dispose();
+      for (const m of toons) m.dispose();
       for (const t of textures) t.dispose();
       for (const set of [sheetFaces, ...pixelSets.values()]) for (const t of Object.values(set ?? {})) t.dispose();
       gradient.dispose();
     },
   };
+}
+
+/**
+ * Whether a mesh of his rides on his head: under the head bone, or skinned with most of its
+ * vertices on it (his face, hair and cap; his body, hands and neck aren't).
+ * @param {any} o
+ * @param {any} head  the head bone
+ */
+function onHead(o, head) {
+  if (!head) return false;
+  if (!o.isSkinnedMesh) {
+    for (let p = o.parent; p; p = p.parent) if (p === head) return true;
+    return false;
+  }
+  const at = o.skeleton.bones.indexOf(head);
+  const index = o.geometry.attributes.skinIndex;
+  const weight = o.geometry.attributes.skinWeight;
+  if (at < 0 || !index || !weight) return false;
+  let n = 0;
+  for (let i = 0; i < index.count; i++) {
+    let k = 0;
+    for (let j = 1; j < 4; j++) if (weight.getComponent(i, j) > weight.getComponent(i, k)) k = j;
+    if (index.getComponent(i, k) === at) n++;
+  }
+  return n >= HEAD_SHARE * index.count;
 }
 
 /**
