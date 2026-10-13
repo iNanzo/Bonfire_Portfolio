@@ -101,7 +101,7 @@ test('NEWT is 36 to 40 texels tall at the default size, on a phone and on a desk
     );
     assert.equal(view.elevation, VIEW.elevation);
     assert.ok(view.elevation >= 30 && view.elevation <= 36, `about 30–36° up (${view.elevation}°)`);
-    assert.ok(Math.abs(view.fov - 30) < 1e-6, 'about 30° of view');
+    assert.ok(view.fov === VIEW.fov && view.fov >= 15 && view.fov <= 30, `a narrow view (${view.fov}°)`);
     assert.equal('roomWidth' in view, false, 'no room');
   }
 });

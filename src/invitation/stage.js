@@ -1,6 +1,6 @@
 // The invitation toy's stage: the renderer (no antialiasing, drawn at texel size: pixels.js
-// texelGrid, the canvas stretched by CSS), the camera (pixels.js frameView: about 30° of view,
-// NEWT 38 texels tall at the default size, in the middle of the space over the toolbar), the
+// texelGrid, the canvas stretched by CSS), the camera (pixels.js frameView: 20° of view, 36°
+// up, NEWT 38 texels tall at the default size, in the middle of the space over the toolbar), the
 // floor (floor.js: no room, the preset's background and an invisible floor that only catches
 // his shadows), the lights and shadows of the look preset, the blob shadow and the floor
 // marker, and the retro pass. A ResizeObserver refits it all (in device pixels where the
