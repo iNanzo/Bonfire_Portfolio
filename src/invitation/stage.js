@@ -1,16 +1,19 @@
 // The invitation toy's stage: the renderer (no antialiasing, drawn at texel size: pixels.js
 // texelGrid, the canvas stretched by CSS), the camera (20° of view; main.js's orbit camera,
 // camera.js, moves it with setCamera; pixels.js frameView gives its default view: 36° up, NEWT
-// about a fifth of the short side tall, the whole play area in sight, and the point it looks at
-// shown in the middle of the space over the toolbar, by an off-centre projection that holds
-// however it turns), the floor (floor.js: no room, the preset's background and an invisible
-// floor that only catches his shadows), the lights and shadows of the look preset, the blob
+// about a fifth of a desktop's short side tall with the whole play area in sight, or a quarter
+// of a phone's (the camera follows him there), and the point it looks at shown in the middle of
+// the space over the toolbar, by an off-centre projection that holds however it turns), the
+// floor (floor.js: no room, the preset's background and an invisible floor that only catches
+// his shadows), the lights and shadows of the look preset, the blob
 // shadow and the floor marker, and the retro pass. A ResizeObserver refits it all (in device
 // pixels where the browser measures them, devicePixelContentBoxSize), and so does refit()
 // (main.js calls it when the toolbar resizes).
 //
-// Lights: a faint HemisphereLight and one DirectionalLight that casts, its shadow camera fitted
-// to the play area plus the highest he's lifted (floor.js fitShadow). The shadow map type is
+// Lights: a faint HemisphereLight and one DirectionalLight that casts, turned with the camera's
+// yaw (camera.js lightDir: his shadow falls the same way on screen, back and to one side, after
+// any orbit), its shadow camera refitted as it turns to the play area plus the highest he's
+// lifted (floor.js fitShadow). The shadow map type is
 // the preset's (BasicShadowMap for DS: three 0.186 has no PCFSoftShadowMap), drawn once a frame
 // (autoUpdate off, needsUpdate before the colour pass), on phones too.
 //
@@ -20,6 +23,7 @@
 // meets the floor). `bounds` is the play area (area.js: a fixed disc on the floor).
 import * as THREE from 'three';
 import { NEWT_HEIGHT, NEWT_RADIUS, playArea } from './area.js';
+import { lightDir } from './camera.js';
 import { frameView, texelGrid } from './pixels.js';
 import { FLOOR_SIZE, createFloor, fitShadow, floorLook } from './floor.js';
 import { createRetro, decalMaterial } from './retro.js';
@@ -145,6 +149,16 @@ export function createStage(container, { preset, look, insets, onResize }) {
   let pose = null;
   /** The blob shadow's strength standing and lifted. */
   let blobOpacity = { opacity: 0.16, lifted: 0.3 };
+  /** The camera's yaw the light was last turned to. */
+  let lightYaw = 0;
+
+  /** The sun where the look puts it, turned with the camera's yaw, and its shadow camera fitted. */
+  function placeSun() {
+    const d = lightDir(current.preset.sun.dir, lightYaw);
+    sun.target.position.set(0, 0, 0);
+    sun.position.set(d.x, d.y, d.z).normalize().multiplyScalar(12);
+    fitShadow(sun, bounds, LIFT + NEWT_HEIGHT);
+  }
 
   /** The look preset's lights, shadows, background, floor, decals and pass. */
   function applyLook() {
@@ -154,9 +168,6 @@ export function createStage(container, { preset, look, insets, onResize }) {
     hemi.intensity = p.hemi.intensity;
     sun.color.setStyle(p.sun.color, THREE.SRGBColorSpace);
     sun.intensity = p.sun.intensity;
-    const dir = new THREE.Vector3(...p.sun.dir).normalize();
-    sun.target.position.set(0, 0, 0);
-    sun.position.copy(dir).multiplyScalar(12);
     // (three recompiles the materials when the type changes; a new size needs new maps.)
     renderer.shadowMap.type = SHADOW_TYPES[p.shadow.type] ?? THREE.BasicShadowMap;
     if (sun.shadow.mapSize.x !== p.shadow.mapSize) {
@@ -178,7 +189,7 @@ export function createStage(container, { preset, look, insets, onResize }) {
     marker.material.color.setStyle(p.marker.color, THREE.SRGBColorSpace);
     retro.setParams(p, l);
     container.dataset.pixel = l.pixelSize;
-    fitShadow(sun, bounds, LIFT + NEWT_HEIGHT);
+    placeSun();
   }
 
   /**
@@ -191,6 +202,11 @@ export function createStage(container, { preset, look, insets, onResize }) {
     camera.position.set(p.position.x, p.position.y, p.position.z);
     camera.lookAt(p.target.x, p.target.y, p.target.z);
     camera.updateMatrixWorld();
+    const yaw = Math.atan2(p.position.x - p.target.x, p.position.z - p.target.z);
+    if (Math.abs(yaw - lightYaw) > 1e-5) {
+      lightYaw = yaw;
+      placeSun();
+    }
   }
 
   /** Size the canvas, the pass and the camera to the stage. */
@@ -204,7 +220,7 @@ export function createStage(container, { preset, look, insets, onResize }) {
     canvas.style.width = `${grid.canvasW}px`;
     canvas.style.height = `${grid.canvasH}px`;
     retro.setSize(grid.w, grid.h);
-    // (The play area and his body at its rim all show.)
+    // (On a desktop the play area and his body at its rim all show.)
     const area = (bounds.r ?? 0) + NEWT_RADIUS;
     view = frameView({ cssW, cssH, grid, insets: insets(), area });
     camera.fov = view.fov;

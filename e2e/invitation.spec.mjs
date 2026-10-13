@@ -2,7 +2,9 @@
 // (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT on his
 // floor (not a blank canvas) in 2×2 CSS px texels; it's unlisted (noindex); a Look change (4×: 4×4
 // CSS px texels) survives a reload and Pixel Size Off draws at native size; and the portfolio's
-// first load carries none of its code. Playing with him: a tap makes him wave or start, a touch
+// first load carries none of its code. NEWT stands about a quarter of a phone's short side tall
+// (a fifth of a desktop's), and running off to the rim never takes him off a phone's screen.
+// Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
 // turns his head, each button plays its clip, a floor tap walks him there, and the cursor turns his
 // head on a desktop. The camera: a drag on empty space turns it, the wheel and a two-finger pinch
@@ -69,6 +71,33 @@ async function toucher(page) {
     });
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/**
+ * His bones (from his root) every frame the page draws for `ms`: how many frames, how many of
+ * them showed a new pose, the seconds it took, and his feet's spread each frame (world units).
+ */
+const poses = (page, ms) =>
+  page.evaluate(
+    (span) =>
+      new Promise((done) => {
+        const inv = window.__invitation;
+        let last = '';
+        const out = { frames: 0, changes: 0, secs: 0, spread: [] };
+        const t0 = performance.now();
+        const tick = () => {
+          const b = inv.bones();
+          const key = JSON.stringify(b);
+          out.frames++;
+          if (key !== last) out.changes++;
+          last = key;
+          out.spread.push(Math.hypot(b.FootL.x - b.FootR.x, b.FootL.z - b.FootR.z));
+          out.secs = (performance.now() - t0) / 1000;
+          if (out.secs * 1000 < span) requestAnimationFrame(tick);
+          else done(out);
+        };
+        requestAnimationFrame(tick);
+      }),
+    ms,
+  );
 
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
@@ -84,11 +113,13 @@ test.describe('on a phone', () => {
     // Not a blank canvas: NEWT on the plain background, far from one flat colour.
     const pic = await picture(page);
     expect(apart(pic, flat(pic))).toBeGreaterThan(3);
-    // NEWT stands where the hooks say, clear of the screen's edges.
+    // NEWT stands where the hooks say, clear of the screen's edges, about a quarter of the
+    // phone's short side tall (99 CSS px of its 390).
     const head = await page.evaluate(() => window.__invitation.screen('head'));
     const box = await page.locator('[data-stage]').boundingBox();
     expect(head.x).toBeGreaterThan(box.x + 24);
     expect(head.x).toBeLessThan(box.x + box.width - 24);
+    expect(snap.newtTall / 390, `NEWT is ${snap.newtTall.toFixed(1)} CSS px tall`).toBeCloseTo(0.255, 2);
     // The toolbar: every button a thumb's height, labelled.
     for (const name of ['Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look']) {
       const b = page.getByRole('button', { name, exact: true });
@@ -122,6 +153,44 @@ test.describe('on a phone', () => {
     expect((await snapshot(page)).pixelScale).toBe(4);
     await expect(sheet.getByRole('radio', { name: 'Soft' })).toBeChecked();
     expect(errors).toEqual([]);
+  });
+
+  test('Motion Choppy steps his pose at most about 15 times a second, Smooth every frame, and it stays for the next visit', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    const smooth = await poses(page, 1200);
+    expect(smooth.changes, `Smooth: ${smooth.changes} new poses in ${smooth.frames} frames`).toBeGreaterThanOrEqual(
+      0.8 * smooth.frames,
+    );
+    await page.getByRole('button', { name: 'Look' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await sheet.getByRole('radio', { name: 'Choppy', exact: true }).check();
+    await sheet.getByRole('button', { name: 'Done' }).click();
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('invitation.look.v1') ?? '{}'));
+    expect(stored.motion).toBe('choppy');
+    const choppy = await poses(page, 1500);
+    const rate = choppy.changes / choppy.secs;
+    expect(rate, `Choppy: ${choppy.changes} new poses in ${choppy.secs.toFixed(2)} s`).toBeLessThanOrEqual(16.5);
+    expect(rate, 'he still moves').toBeGreaterThan(2);
+    await page.reload();
+    await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+    await page.getByRole('button', { name: 'Look' }).click();
+    await expect(sheet.getByRole('radio', { name: 'Choppy', exact: true })).toBeChecked();
+    expect(errors).toEqual([]);
+  });
+
+  test('play() forces Walk and Run as they play: his feet go round the step, not one frozen pose', async ({ page }) => {
+    await calm(page);
+    for (const clip of ['Walk', 'Run']) {
+      expect(await page.evaluate((c) => window.__invitation.play(c), clip)).toBe(true);
+      await until(page, (s) => s.clip === clip, clip);
+      const { spread } = await poses(page, 1200);
+      const swing = Math.max(...spread) - Math.min(...spread);
+      expect(swing, `${clip}: his feet's spread changes by ${swing.toFixed(3)}`).toBeGreaterThan(0.08);
+    }
+    await page.evaluate(() => window.__invitation.play(null));
   });
 
   test('tapping NEWT plays Wave or Spook', async ({ page }) => {
@@ -194,6 +263,47 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
+  test('running off to the rim never takes him off the screen: the camera follows him', async ({ page }) => {
+    const errors = watch(page);
+    await calm(page);
+    const box = await page.locator('[data-stage]').boundingBox();
+    const bar = await page.locator('.inv-toolbar').boundingBox();
+    await page.locator('[data-button="Run"]').tap();
+    await until(page, (s) => s.state === 'flee', 'running');
+    // Every frame of the run: his head, middle and feet on the screen, over the toolbar.
+    const seen = await page.evaluate(
+      () =>
+        new Promise((done) => {
+          const inv = window.__invitation;
+          const out = [];
+          const t0 = performance.now();
+          const tick = () => {
+            const s = inv.snapshot();
+            out.push({
+              head: inv.screen('head'),
+              body: inv.screen('body'),
+              feet: inv.screen('feet'),
+              state: s.state,
+              r: Math.hypot(s.pos.x, s.pos.z),
+            });
+            if (performance.now() - t0 < 3500) requestAnimationFrame(tick);
+            else done(out);
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
+    expect(Math.max(...seen.map((f) => f.r)), 'he got out to the rim').toBeGreaterThan(1.6);
+    for (const [i, f] of seen.entries()) {
+      for (const part of ['head', 'body', 'feet']) {
+        expect(f[part].x, `frame ${i}: his ${part} across`).toBeGreaterThan(box.x);
+        expect(f[part].x, `frame ${i}: his ${part} across`).toBeLessThan(box.x + box.width);
+      }
+      expect(f.head.y, `frame ${i}: his head under the top`).toBeGreaterThan(box.y);
+      expect(f.feet.y, `frame ${i}: his feet over the toolbar`).toBeLessThan(bar.y);
+    }
+    expect(errors).toEqual([]);
+  });
+
   test('a floor tap walks him there', async ({ page }) => {
     await calm(page);
     const body = await on(page, 'body');
@@ -239,7 +349,12 @@ test.describe('on a desktop', () => {
   test('loads to ready with no errors and draws', async ({ page }) => {
     const errors = watch(page);
     await ready(page);
-    expect((await snapshot(page)).pixelScale, '2× by default').toBe(2);
+    const snap = await snapshot(page);
+    expect(snap.pixelScale, '2× by default').toBe(2);
+    expect(
+      snap.newtTall / 800,
+      `NEWT is ${snap.newtTall.toFixed(1)} CSS px tall: a fifth of the short side`,
+    ).toBeCloseTo(0.195, 2);
     const pic = await picture(page);
     expect(apart(pic, flat(pic))).toBeGreaterThan(3);
     await page.waitForTimeout(500);
@@ -282,6 +397,18 @@ test.describe('on a desktop', () => {
     await page.mouse.up();
     await until(page, (s) => Math.abs(s.camera.yaw) > 0.5, 'turned');
     await until(page, (s) => s.camera.elevation > home.elevation + 0.05, 'tilted up a little');
+    // By the stage's width: 240 of its 1280 px turn it about 0.88 rad (three quarters of a turn
+    // across the whole width), plus a little coast; never the 2.2 rad of 2π per 700 px.
+    let settled = NaN;
+    await expect
+      .poll(async () => {
+        const was = settled;
+        settled = (await snapshot(page)).camera.yaw;
+        return Math.abs(settled - was) < 1e-4;
+      }, 'the turn settles')
+      .toBe(true);
+    expect(Math.abs(settled), `turned ${settled.toFixed(2)} rad`).toBeGreaterThan(0.7);
+    expect(Math.abs(settled), `turned ${settled.toFixed(2)} rad`).toBeLessThan(1.6);
     let s = await snapshot(page);
     expect(s.state).toBe('idle');
     expect(s.held).toBe(false);

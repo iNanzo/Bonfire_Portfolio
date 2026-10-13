@@ -12,14 +12,16 @@
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
-// → the blob shadow, the marker, the toolbar → render. The lift height comes from the Held clip
-// at load (his collar over his lowest sole, plus a gap).
+// → the blob shadow, the marker, the toolbar → render. With Motion Choppy (look.js) his pose
+// (the update and applyLook) only moves on the clock's steps, 15 a second; his root, the
+// camera and the rest move every frame. The lift height comes from the Held clip at load (his
+// collar over his lowest sole, plus a gap).
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
-// (a point on NEWT in client px), floorAt(x, y), feet() and bones() (his ankles in the world,
-// his bones from his root) and play(clip) (forces a clip); `?seed=N` and `?calm` go to the
-// brain.
+// (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
+// (his ankles in the world, his bones from his root) and play(clip) (forces a clip, Walk and
+// Run going round their step at their own pace); `?seed=N` and `?calm` go to the brain.
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
@@ -32,6 +34,7 @@ import {
   orbitPose,
   orbitRelease,
   orbitReset,
+  orbitSpan,
   orbitSpot,
   orbitStep,
   orbitWheel,
@@ -40,7 +43,8 @@ import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createFaceState, faceStep } from './faces.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
-import { loadLook, presetOf, saveLook } from './look.js';
+import { newtTexels } from './pixels.js';
+import { animFps, loadLook, motionStep, presetOf, saveLook } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
 import { createRng } from './rng.js';
@@ -109,7 +113,9 @@ if (webgl2()) {
       look,
       insets,
       onResize: ({ view }) => {
-        if (orbit) orbitHome(orbit, view.distance);
+        if (!orbit) return;
+        orbitHome(orbit, view.distance);
+        orbitSpan(orbit, stageSize());
       },
     });
   } catch {
@@ -122,6 +128,11 @@ if (!stage) {
   ui.setStatus('NEWT needs WebGL 2 to draw, and this browser has it turned off.');
 } else {
   start(stage);
+}
+
+/** The stage's size, CSS px (a drag across it turns the camera the same share of a turn anywhere). */
+function stageSize() {
+  return { w: stageEl.clientWidth, h: stageEl.clientHeight };
 }
 
 /** Where the default view keeps clear of: a top margin, the toolbar, the side edges (and the safe areas). */
@@ -150,7 +161,7 @@ function start(s) {
   const mix = createMix();
   const gaze = createLook();
   const faces = createFaceState();
-  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(s.bounds) });
+  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(s.bounds), span: stageSize() });
   const cam = orbit;
   s.setCamera(orbitPose(cam));
 
@@ -160,7 +171,8 @@ function start(s) {
   let last = -1;
   /** The toy's clock, seconds (the sum of the frames' steps). */
   let t = 0;
-  let choppy = 0;
+  /** Motion Choppy: the time his pose has waited since its last step, seconds. */
+  let waiting = 0;
   /** A clip forced by ?test's play(), else null (the brain decides). */
   let forced = null;
   /** @type {import('./types.js').ButtonName|null} the last button the loop took (for ?test) */
@@ -347,9 +359,12 @@ function start(s) {
     if (pressed) lastButton = pressed;
     pressed = null;
     if (forced) {
+      // (Walk and Run take their time from the step phase: it goes round at the clip's own pace.)
+      const len = c.clipLength(forced);
+      if (len > 0) mix.phase = (mix.phase + dt / len) % 1;
       c.setWeights({ [forced]: 1 }, mix.phase);
-      animate(c, dt);
-      finish(c, ptr, pose, dt, { mode: 'camera', weight: 1 }, FACE_TRACK[forced]?.face ?? 'neutral', 'normal');
+      const moved = animate(c, dt);
+      finish(c, ptr, pose, dt, { mode: 'camera', weight: 1 }, FACE_TRACK[forced]?.face ?? 'neutral', 'normal', moved);
       return;
     }
     // 2. The brain.
@@ -364,10 +379,11 @@ function start(s) {
     mixStep(mix, { clip: o.clip, speed: body.body.speed, dt });
     c.setWeights(mix.weights, mix.phase);
     // 5. The animation; 6. held, his collar hung from the anchor.
-    animate(c, dt);
+    const moved = animate(c, dt);
     hang(c);
     // 7–8. The look and the face; the toolbar.
-    finish(c, ptr, pose, dt, { mode: o.look.mode, weight: o.look.weight * lookShare(mix.weights) }, o.face, o.blink);
+    const want = { mode: o.look.mode, weight: o.look.weight * lookShare(mix.weights) };
+    finish(c, ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
   }
 
@@ -476,16 +492,19 @@ function start(s) {
     if (o.buttonsEnabled !== shown.enabled) ui.setEnabled((shown.enabled = o.buttonsEnabled));
   }
 
-  /** Step the animation (choppy motion: at the preset's animFps when it's set). */
+  /**
+   * Step the animation: every frame, or with Motion Choppy on the clock's steps (look.js
+   * motionStep, whole ticks of 1/15 s). True when his pose moved this frame.
+   * @param {NonNullable<typeof character>} c
+   * @param {number} dt
+   */
   function animate(c, dt) {
-    const fps = presetOf(look).animFps;
-    if (fps > 0) {
-      choppy += dt;
-      if (choppy >= 1 / fps) {
-        c.update(choppy);
-        choppy = 0;
-      }
-    } else c.update(dt);
+    const fps = animFps(look);
+    const m = motionStep(waiting, dt, fps);
+    waiting = m.acc;
+    if (fps > 0 && !(m.step > 0)) return false;
+    c.update(m.step);
+    return true;
   }
 
   /**
@@ -497,8 +516,9 @@ function start(s) {
    * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number}} want
    * @param {import('./clips.js').FaceName} face
    * @param {import('./clips.js').BlinkMode} blink
+   * @param {boolean} moved  his pose stepped this frame (the look goes on with it)
    */
-  function finish(c, ptr, pose, dt, want, face, blink) {
+  function finish(c, ptr, pose, dt, want, face, blink, moved) {
     const root = c.root;
     const head = c.bonePos(BONES.head, { x: 0, y: 0, z: 0 });
     head.y += 0.12; // (his eyes, over the head bone's base)
@@ -509,7 +529,7 @@ function start(s) {
       pointer: ptr && !ptr.pinch ? { floor: ptr.floor, onNewt: ptr.onNewt } : null,
     });
     lookStep(gaze, want.mode, aim, dt, t, rng, want.weight, ahead);
-    c.applyLook(gaze.yaw, gaze.pitch, gaze.weight);
+    if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight);
     c.setFace(faceStep(faces, face, blink, t, rng));
     s.setBlob(root.position.x, root.position.z, body.mode === 'ground' ? 0 : Math.min(1, root.position.y / 0.5));
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;
@@ -576,14 +596,17 @@ function start(s) {
         pixelScale: s.grid.pd / s.grid.dpr,
         button: lastButton,
         texels: { w: s.grid.w, h: s.grid.h },
+        // (CSS px he stands tall in the default view, where he starts.)
+        newtTall: s.view ? (newtTexels(s.view, s.grid) * s.grid.pd) / s.grid.dpr : 0,
         camera: { yaw: cam.yaw, elevation: cam.elevation, distance: cam.distance },
         cameraHome: { ...cam.home },
         options,
       }),
-      /** @param {'head'|'body'} part */
+      /** @param {'head'|'body'|'feet'} part */
       screen(part) {
         const sh = shape();
         if (part === 'head') return { x: sh.head.x, y: sh.head.y };
+        if (part === 'feet') return { x: sh.body.a.x, y: sh.body.a.y };
         return { x: (sh.body.a.x + sh.body.b.x) / 2, y: (sh.body.a.y + sh.body.b.y) / 2 };
       },
       /** @param {number} x @param {number} y */

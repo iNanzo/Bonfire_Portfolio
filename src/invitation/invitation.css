@@ -162,6 +162,9 @@ body {
   box-sizing: border-box;
   width: 100%;
   max-width: 520px;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   margin: 0 auto;
   padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
   border: 3px solid var(--inv-ink);

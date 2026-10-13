@@ -1,15 +1,15 @@
 // The invitation toy's page around the canvas: the status line ("Loading…", or what went wrong),
 // the toolbar along the bottom (Wave, Spook, Sit or Stand, Run, Wander, Look: every button a
 // thumb's height, labelled, never a tooltip) and the Look menu, a bottom sheet (Pixel Size in
-// steps, Off, 2×, 3× and 4×; Dithering, Outlines, Style, and Reset Camera with a line on
-// turning and zooming the view).
+// steps, Off, 2×, 3× and 4×; Dithering, Outlines, Style, Motion (Smooth or Choppy), and Reset
+// Camera with a line on turning and zooming the view).
 // Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
 // reports presses; main.js decides what they do.
 //
 //   parseQuery(search)   ?test (the window.__invitation hooks), ?seed=N, ?calm, ?perf
 
 import { PIXEL_SIZES } from './pixels.js';
-import { LOOKS, STYLES, validLook } from './look.js';
+import { LOOKS, MOTIONS, STYLES, validLook } from './look.js';
 
 /** @typedef {import('./types.js').ButtonName} ButtonName */
 
@@ -17,6 +17,8 @@ import { LOOKS, STYLES, validLook } from './look.js';
 export const BUTTONS = /** @type {const} */ (['Wave', 'Spook', 'Sit', 'Run', 'Wander']);
 /** @type {Record<import('./pixels.js').PixelSize, string>} Pixel Size's labels: Off, then N× (a texel N×N CSS px) */
 export const PIXEL_LABELS = { off: 'Off', 2: '2×', 3: '3×', 4: '4×' };
+/** @type {Record<import('./look.js').Motion, string>} Motion's labels */
+export const MOTION_LABELS = { smooth: 'Smooth', choppy: 'Choppy' };
 
 /**
  * The page's options from the query string.
@@ -73,6 +75,7 @@ export function sheetHtml(look) {
     '',
   );
   const styles = STYLES.map((s) => segment('inv-style', 'style', s, LOOKS[s].label, l.style === s)).join('');
+  const motions = MOTIONS.map((m) => segment('inv-motion', 'motion', m, MOTION_LABELS[m], l.motion === m)).join('');
   return `<section class="inv-sheet" id="inv-look" role="dialog" aria-labelledby="inv-look-title" hidden>
   <header class="inv-sheet-head"><h2 id="inv-look-title">Look</h2><button type="button" class="inv-btn inv-btn-done" data-look-close>Done</button></header>
   <p class="inv-hint">Changes show right away and stay for your next visit.</p>
@@ -80,6 +83,7 @@ export function sheetHtml(look) {
   <div class="inv-switches">${toggle('dither', 'Dithering', l.dither)}${toggle('outlines', 'Outlines', l.outlines)}</div>
   <p class="inv-hint inv-hint-off" data-off-hint${l.pixelSize === 'off' ? '' : ' hidden'}>Dithering and outlines are part of the pixel look: pick a pixel size to see them.</p>
   <fieldset class="inv-field"><legend>Style</legend><div class="inv-segs">${styles}</div></fieldset>
+  <fieldset class="inv-field"><legend>Motion</legend><div class="inv-segs">${motions}</div></fieldset>
   <div class="inv-camera"><p class="inv-hint">Drag empty space to turn the view, and pinch or scroll to zoom.</p><button type="button" class="inv-btn" data-reset-camera>Reset Camera</button></div>
 </section>`;
 }

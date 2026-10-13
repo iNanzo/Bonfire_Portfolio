@@ -17,10 +17,14 @@ unlisted: nothing links to it and search engines are asked not to index it.
 - **Tap the floor** and he walks there. A ring on the floor shows where your finger or cursor is.
 - **Point anywhere on the floor** and he looks where you point (on a phone, while your finger
   is down; with a mouse, wherever the cursor is). Otherwise he looks at you.
-- **Drag empty space** to turn the camera: across to go round him, up and down to look from
-  higher or lower. **Pinch** with two fingers, or use the mouse wheel, to zoom. Zoomed in, the
-  camera follows him.
-- **Leave him alone** for about 20 seconds and he sits down.
+- **Drag empty space** to turn the camera: across to go round him (a drag across the whole
+  screen goes about three quarters of the way round, on a phone or a computer alike), up and
+  down to look from higher or lower. **Pinch** with two fingers, or use the mouse wheel, to zoom.
+  The light turns with the camera, so his shadow always falls behind him and to one side.
+- **On a phone** he's drawn about 30% bigger than on a computer, so the camera follows him
+  softly, and he never runs off the screen. Zoomed in, it follows him on a computer too.
+- **Leave him alone** for about 20 seconds and he turns to face you and sits down (the Sit
+  button turns him to you first too, so you see his happy face).
 - **The toolbar:** Wave, Spook, Sit (Stand once he's sitting), Run (he runs off for a few
   seconds), Wander (on: he strolls around by himself) and Look. The buttons rest while he's
   being held or falling.
@@ -36,6 +40,7 @@ visit (in this browser).
 | Dithering | On, Off | The checkered blend between colours. |
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow). |
 | Style | DS, Soft | DS: crisp, many colours, a hard shadow. Soft: fewer colours with a visible dither, pastel, warm outlines and a softer shadow. |
+| Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 
 Dithering and outlines are part of the pixel look, so they rest while Pixel Size is Off.
 **Reset Camera**, under the settings, eases the camera back to where it started.
@@ -53,15 +58,20 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
     `retro.js` (the pixel pass), `ui.js` (the toolbar and the Look sheet as markup, plus a thin
     binding), `invitation.css`.
   - Pure and unit-tested: `pixels.js` (the texel grid, N×N CSS px a texel at N×, in whole
-    device pixels, and the default view: 20° of view, 36° up, NEWT about a fifth of the
-    screen's short side tall whatever the Pixel Size (76 CSS px on a 390-wide phone), the whole
-    play area in sight, the point it looks at shown in the middle of the space over the
-    toolbar), `camera.js` (the orbit camera: yaw all the way round, 12° to 70° up, half to
-    twice the default distance, eased with a little coast, following NEWT as it zooms in),
+    device pixels, and the default view: 20° of view, 36° up, NEWT 0.195 of a desktop's short
+    side tall with the whole play area in sight, or 0.255 of a phone's, a stage whose short side
+    is under 600 CSS px (99 CSS px and 50 texels on a 390-wide phone), whatever the Pixel Size,
+    the point it looks at shown in the middle of the space over the toolbar), `camera.js` (the
+    orbit camera: yaw all the way round, three quarters of a turn for a drag across the whole
+    stage and half a turn of tilt down its whole height, 12° to 70° up, half to twice the
+    default distance, eased with a little coast, following NEWT as it zooms in, and 0.8 of the
+    way at the default zoom on a phone; `lightDir` turns the look's sun with the camera's yaw),
     `area.js` (the play area: a fixed disc of radius 2.0 round the middle), `play.js` (the
     frame's decisions: who moves his root, the clip mix, where he looks), `look.js` (the Look
     settings under `invitation.look.v1`, Pixel Size stored as `'off'`, `'2'`, `'3'` or
-    `'4'`, and the presets), `looks/ds.js` and `looks/soft.js` (every look value, as data: a
+    `'4'`, Motion as `'smooth'` or `'choppy'` (a look stored before Motion loads as Smooth),
+    `motionStep`, Choppy's 15 fps clock, and the presets), `looks/ds.js` and `looks/soft.js`
+    (every look value, as data: a
     designer edits these, never code; among them the background, the shadow's colour and
     strength, and the blob shadow).
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
@@ -84,13 +94,14 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
-  `pixelScale`: CSS px a texel, N at N×),
-  `screen('head'|'body')` (a point on him in client px, to tap), `floorAt(x, y)`, `feet()` (his
-  ankles, to measure foot slide) and `play(clip)`. `?seed=N` makes the randomness
+  `pixelScale`: CSS px a texel, N at N×, `newtTall`: CSS px he stands tall in the default view),
+  `screen('head'|'body'|'feet')` (a point on him in client px, to tap), `floorAt(x, y)`,
+  `feet()` (his ankles, to measure foot slide), `bones()` (his bones from his root) and
+  `play(clip)` (Walk and Run step in place at their own pace). `?seed=N` makes the randomness
   repeatable; `?calm` stops him wandering and sitting by himself.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
   of taps, drags, buttons, floor taps, a chase and the camera at phone and desktop sizes (animated WebP plus a
-  contact sheet; `--look`, `--pixel`, `--sizes`, `--acts`). One GPU capture at a time.
+  contact sheet; `--look`, `--pixel`, `--motion`, `--sizes`, `--acts`). One GPU capture at a time.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
   `vite.config.js`, `test/site.test.mjs` and the spec's last test check it).
 - **Unlisted:** `noindex, nofollow`, left out of the sitemap and the README, and not
