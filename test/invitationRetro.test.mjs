@@ -2,11 +2,13 @@
 // Node and a stand-in renderer: the floor's ShadowMaterial drawn through the pass's catcher
 // (white, its shadow's coverage beside the floor's id) only into the colour target and put back
 // after, never on the canvas; and the paper, the shadow (colour, strength, softness, dithered
-// tones) and the lines (on his edge or just outside it) taken from the look preset.
+// tones) and the lines (on his edge or just outside it) taken from the look preset; his
+// textures sampled a coarser mip by the preset’s bias, and the decals (the blob, the marker)
+// drawn as flat pixel shapes, both only in the colour target.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { ID, MAX_SOFT, catcherMaterial, createRetro } from '../src/invitation/retro.js';
+import { ID, MAX_SOFT, catcherMaterial, createRetro, decalMaterial, markId } from '../src/invitation/retro.js';
 
 const LOOK = { pixelSize: 'ds', dither: true, outlines: true, style: 'ds' };
 /** A whole preset as the pass reads it (the presets' own values are tested on their own). */
@@ -119,5 +121,59 @@ test('the paper, the shadow and the lines come from the preset; Dithering off le
   assert.equal(u.uShadeSteps.value, 2, '…but the shadow keeps its tones');
   retro.setParams(soft, { ...LOOK, outlines: false });
   assert.equal(u.uOutline.value, 0);
+  retro.dispose();
+});
+
+/** A material's fragment shader as onBeforeCompile leaves it (`lib`: three's ShaderLib entry). */
+function compiled(material, lib) {
+  const shader = { uniforms: {}, vertexShader: '', fragmentShader: THREE.ShaderLib[lib].fragmentShader };
+  material.onBeforeCompile(shader, null);
+  return shader;
+}
+
+test('his textures sample a coarser mip by the preset’s bias in the colour target, none at Off', () => {
+  // (At a few hundred texels his shirt's pattern aliases into a grey patchwork: a coarser mip
+  // flattens it, so the toon bands shade him, not the texture's noise.)
+  const a = compiled(markId(new THREE.MeshToonMaterial(), ID.newt), 'toon');
+  const b = compiled(markId(new THREE.MeshToonMaterial(), ID.newt), 'toon');
+  assert.doesNotMatch(a.fragmentShader, /#include <map_fragment>/, 'three’s own map sampling is replaced');
+  assert.match(a.fragmentShader, /texture2D\( map, vMapUv, uMapBias \)/);
+  assert.match(a.fragmentShader, /uniform float uMapBias;/);
+  assert.equal(a.uniforms.uMapBias, b.uniforms.uMapBias, 'one bias every marked material shares');
+  const scene = new THREE.Scene();
+  const { renderer } = standIn(scene, new THREE.Mesh());
+  const retro = createRetro(renderer);
+  retro.setParams({ ...PRESET, texture: { mipBias: 1.5 } }, LOOK);
+  assert.equal(a.uniforms.uMapBias.value, 1.5);
+  retro.setParams({ ...PRESET, texture: { mipBias: 1.5 } }, { ...LOOK, pixelSize: 'off' });
+  assert.equal(a.uniforms.uMapBias.value, 0, 'Pixel Size Off: his textures as they are');
+  retro.setParams(PRESET, LOOK);
+  assert.equal(a.uniforms.uMapBias.value, 0, 'no bias unless the preset asks');
+  retro.dispose();
+});
+
+test('decals: a flat pixel shape in the colour target (their map’s alpha cut, the material’s opacity), smooth at Off', () => {
+  const map = new THREE.DataTexture(new Uint8Array(4).fill(255), 1, 1);
+  const decal = decalMaterial({ map, opacity: 0.3 });
+  const s = compiled(decal, 'basic');
+  assert.match(s.fragmentShader, /uniform float uIdOn;\s*void main\(\) \{/);
+  assert.match(
+    s.fragmentShader,
+    /#include <map_fragment>[\s\S]*if \( uIdOn > 0\.5 \) \{\s*if \( sampledDiffuseColor\.a < [0-9.]+ \) discard;\s*diffuseColor\.a = opacity;/,
+    'in the colour target: inside the shape at the material’s opacity, nothing outside it',
+  );
+  assert.equal(decal.customProgramCacheKey(), 'invitation-decal');
+  // The switch is the pass's own: on while it draws into the colour target, off straight to the canvas.
+  const scene = new THREE.Scene();
+  const { renderer } = standIn(scene, new THREE.Mesh());
+  const retro = createRetro(renderer);
+  const camera = new THREE.PerspectiveCamera(30, 1, 1, 80);
+  retro.setSize(64, 64);
+  retro.setParams(PRESET, LOOK);
+  retro.render(scene, camera);
+  assert.equal(s.uniforms.uIdOn.value, 1);
+  retro.setParams(PRESET, { ...LOOK, pixelSize: 'off' });
+  retro.render(scene, camera);
+  assert.equal(s.uniforms.uIdOn.value, 0, 'Pixel Size Off: the blob’s soft falloff as it is');
   retro.dispose();
 });

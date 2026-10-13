@@ -2,7 +2,8 @@
 // layout clips.js FACES reads, cells about as many pixels as his half face covers texels on a
 // phone (so nearest sampling neither drops nor doubles a feature), no lone dark pixel and every
 // feature at least 2 px each way (it survives a texel's rounding), solid eyes in the open
-// faces, and four faces that differ from each other.
+// faces, a mouth in each (darker than the skin, under the eyes, apart from them), and four
+// faces that differ from each other.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
@@ -92,4 +93,35 @@ test('the pixel face: no lone dark pixel, every feature at least 2 px each way; 
   const ink = (c) => c.dark.filter(Boolean).length;
   assert.ok(ink(out.neutral) > ink(out.blink), 'an open eye holds more ink than a closed one');
   assert.ok(ink(out.surprised) >= ink(out.neutral), 'a surprised eye is at least as big as a neutral one');
+});
+
+test('the pixel face: a mouth in every face, darker than the skin, under the eyes and apart from them', async () => {
+  const { out } = await cells();
+  for (const [name, { px, dark, w, h }] of Object.entries(out)) {
+    const at = (x, y) => px[y * w + x];
+    const skin = luma(...at(w - 1, 0).slice(0, 3)); // (a corner: the skin)
+    // The mouth: a warm dark, clearly darker than the skin; the eyes: the neutral ink.
+    const isMouth = (x, y) => {
+      const [r, g, b] = at(x, y);
+      return luma(r, g, b) < skin - 0.25 && r - b > 25;
+    };
+    const isEye = (x, y) => x >= 0 && y >= 0 && x < w && y < h && dark[y * w + x] && !isMouth(x, y);
+    let eyeTop = h;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (isEye(x, y)) eyeTop = Math.min(eyeTop, y);
+    assert.ok(eyeTop < h, `${name}: eyes`);
+    // In the middle column (the cell's left edge is the middle of his face: mirrored, at least
+    // 2 px wide), at least 1 px tall, below the top of the eyes.
+    const rows = [];
+    for (let y = 0; y < h; y++) if (isMouth(0, y)) rows.push(y);
+    assert.ok(rows.length >= 1, `${name}: a mouth at least 1 px tall and 2 px wide (mirrored)`);
+    assert.ok(
+      rows.every((y) => y > eyeTop),
+      `${name}: the mouth (rows ${rows}) sits under the top of the eyes (row ${eyeTop})`,
+    );
+    // Apart from the eyes: no mouth pixel touches an eye's (it would read as one blob).
+    const mouth = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (isMouth(x, y)) mouth.push([x, y]);
+    const touches = ([x, y]) => isEye(x + 1, y) || isEye(x - 1, y) || isEye(x, y + 1) || isEye(x, y - 1);
+    assert.deepEqual(mouth.filter(touches), [], `${name}: no mouth pixel touches an eye`);
+  }
 });
