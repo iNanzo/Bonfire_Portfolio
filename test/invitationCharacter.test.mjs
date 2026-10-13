@@ -432,6 +432,21 @@ test('the pixel atlas: on his atlas material while the pixel filter is on (neare
   assert.equal(plain.mesh.material.map, plain.map, 'no pixel atlas: the glb’s');
 });
 
+test('a pixel atlas still on its way (a promise) goes on him when it comes; one that fails leaves the glb’s', async () => {
+  const late = standIn();
+  const atlas = new THREE.Texture();
+  let arrive = () => {};
+  const ch = createCharacter(late.gltf, { pixelAtlas: new Promise((done) => (arrive = () => done(atlas))) });
+  assert.equal(late.mesh.material.map, late.map, 'the glb’s atlas until it comes');
+  arrive();
+  await ch.atlasReady;
+  assert.equal(late.mesh.material.map, atlas, 'then the pixel atlas');
+  const failed = standIn();
+  const none = createCharacter(failed.gltf, { pixelAtlas: Promise.resolve(null) });
+  await none.atlasReady;
+  assert.equal(failed.mesh.material.map, failed.map);
+});
+
 test('the pixel atlas sits beside the glb: loadCharacter derives its address from the glb’s', () => {
   assert.equal(pixelAtlasUrl('/invitation/models/newt.glb'), '/invitation/models/newt-atlas-pixel.png');
   assert.equal(pixelAtlasUrl('models/newt.glb?v=2'), 'models/newt-atlas-pixel.png');

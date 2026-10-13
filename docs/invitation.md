@@ -91,7 +91,9 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
 - **The pixel face:** at the toy's pixel sizes his head is only a dozen or two texels wide, so
   `node tools/newt-face.mjs` redraws the glb's face sheet as `public/models/newt-face.png`,
   four small pixel cells with the features kept at least 2 px thick (`--cell`, `--min`,
-  `--preview` to look at it). The page uses it while the pixel filter is on.
+  `--preview` to look at it). The page uses it while the pixel filter is on. It and the pixel
+  atlas (`newt-atlas-pixel.png`) are asked for at the same time as the glb, and the first frame
+  waits for them (up to 3 s more), so NEWT never shows the blurred atlas and a blank face first.
 - **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationArea`,
   `invitationCamera` and `invitationPlay` (with `invitationBrain`, `invitationMotion`,
   `invitationGesture` and `invitationModel`), and

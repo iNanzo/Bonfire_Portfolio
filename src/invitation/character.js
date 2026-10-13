@@ -1,7 +1,10 @@
 // NEWT, the invitation toy's character: his glb dressed for the retro look, his clips on one
 // mixer, his face and his look-at, in the Character shape types.js gives main.js.
 //
-//   loadCharacter(url, opts)       GLTFLoader, then createCharacter
+//   loadCharacter(url, opts)       GLTFLoader and the two pixel images at once (the images never
+//                                  wait for the glb), then createCharacter once the glb is in and
+//                                  the images too (or TEXTURE_GRACE s more), so the first frame
+//                                  already wears them
 //   createCharacter(gltf, opts)    any {scene, animations} (the tests pass a stand-in skeleton
 //                                  and synthetic clips): scaled by SCALE; toon materials (the
 //                                  map kept, a nearest gradient map with the preset's bands)
@@ -86,20 +89,41 @@ const MIN_R = 11;
  */
 export const pixelAtlasUrl = (url) => url.replace(/[^/?#]*([?#].*)?$/, 'newt-atlas-pixel.png');
 
+/** Seconds the first frame waits for the pixel images once the glb is in (then they come in late). */
+export const TEXTURE_GRACE = 3;
+
 /**
- * Load the glb at `url` and dress it (the pixel atlas from beside it, unless opts name one).
- * @param {string} url
- * @param {Parameters<typeof createCharacter>[1]} [opts]
+ * A texture from `url`, or null when it fails (or there's no url).
+ * @param {string|undefined} url
+ * @returns {Promise<any>}
  */
-export async function loadCharacter(url, opts = {}) {
+const loadTexture = (url) => (url ? new THREE.TextureLoader().loadAsync(url).catch(() => null) : Promise.resolve(null));
+
+/**
+ * Load the glb at `url` and dress it: the pixel atlas (from beside it, unless opts name one) and
+ * the pixel face are asked for at the same time as the glb, not after it (on a slow phone the
+ * first frames showed the glb's blurred atlas and a blank face, then swapped), and it's dressed
+ * once they're in too, or TEXTURE_GRACE s after the glb (a slower one goes on when it comes).
+ * @param {string} url
+ * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFaceUrl?: string, pixelAtlasUrl?: string}} [opts]
+ */
+export async function loadCharacter(url, { pixelAtlasUrl: atlasUrl = pixelAtlasUrl(url), pixelFaceUrl, ...opts } = {}) {
+  const atlas = loadTexture(atlasUrl);
+  const face = loadTexture(pixelFaceUrl);
   const gltf = await new GLTFLoader().loadAsync(url);
-  return createCharacter(gltf, { pixelAtlasUrl: pixelAtlasUrl(url), ...opts });
+  /** @type {Promise<null>} */
+  const grace = new Promise((done) => setTimeout(() => done(null), TEXTURE_GRACE * 1000));
+  // (A texture in time goes on before the first frame; a late one, as its promise settles.)
+  const late = Symbol('late');
+  const [a, f] = await Promise.all([atlas, face].map((p) => Promise.race([p, grace.then(() => late)])));
+  return createCharacter(gltf, { ...opts, pixelAtlas: a === late ? atlas : a, pixelFace: f === late ? face : f });
 }
 
 /**
  * @param {{scene: any, animations?: any[]}} gltf
- * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFaceUrl?: string,
- *   pixelAtlasUrl?: string, pixelAtlas?: any}} [opts]  pixelAtlas: the pixel atlas, loaded
+ * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelAtlas?: any, pixelFace?: any}} [opts]
+ *   pixelAtlas: the pixel atlas and pixelFace: the pixel face sheet (models/newt-face.png), each a
+ *   texture (on him at once), a promise of one (on him when it settles; null: none) or nothing
  * @returns {PageCharacter}
  */
 export function createCharacter(gltf, opts = {}) {
@@ -248,14 +272,13 @@ export function createCharacter(gltf, opts = {}) {
     textures.add(t);
     showAtlas();
   };
-  if (opts.pixelAtlas) usePixelAtlas(opts.pixelAtlas);
-  const atlasReady =
-    !opts.pixelAtlas && atlased.length && opts.pixelAtlasUrl && typeof document !== 'undefined'
-      ? new THREE.TextureLoader()
-          .loadAsync(opts.pixelAtlasUrl)
-          .then(usePixelAtlas)
-          .catch(() => {}) // (without it the glb's atlas stays, its mip a little coarser)
-      : Promise.resolve();
+  /** A texture now, or a promise of one later (null: none). */
+  const isPromise = (t) => typeof t?.then === 'function';
+  if (opts.pixelAtlas && !isPromise(opts.pixelAtlas)) usePixelAtlas(opts.pixelAtlas);
+  // (Without it the glb's atlas stays, its mip a little coarser.)
+  const atlasReady = isPromise(opts.pixelAtlas)
+    ? opts.pixelAtlas.then((t) => t && atlased.length && usePixelAtlas(t)).catch(() => {})
+    : Promise.resolve();
   if (faceMaterial?.map?.image && typeof document !== 'undefined') {
     sheetFaces = splitSheet(faceMaterial.map.image, false);
     faceMaterial.map.image.close?.(); // (an ImageBitmap: its pixels are in the cells now)
@@ -263,20 +286,19 @@ export function createCharacter(gltf, opts = {}) {
     textures.delete(faceMaterial.map);
     showFace();
   }
-  const faceReady =
-    faceMaterial && opts.pixelFaceUrl && typeof document !== 'undefined'
-      ? new THREE.TextureLoader()
-          .loadAsync(opts.pixelFaceUrl)
-          .then((t) => {
-            pixelImage = t.image;
-            // (An image that isn't the ladder, an older one cached: one 2×2 sheet.)
-            if (pixelImage.width !== FACE_IMAGE.w || pixelImage.height !== FACE_IMAGE.h)
-              pixelLayout = [{ w: Math.floor(pixelImage.width / 2), h: Math.floor(pixelImage.height / 2), x: 0, y: 0 }];
-            t.dispose();
-            showFace();
-          })
-          .catch(() => {}) // (without it the 1024 sheet stays: a softer face, still his)
-      : Promise.resolve();
+  /** @param {any} t  the pixel face sheet */
+  const usePixelFace = (t) => {
+    if (!t || !faceMaterial || !t.image) return;
+    pixelImage = t.image;
+    // (An image that isn't the ladder, an older one cached: one 2×2 sheet.)
+    if (pixelImage.width !== FACE_IMAGE.w || pixelImage.height !== FACE_IMAGE.h)
+      pixelLayout = [{ w: Math.floor(pixelImage.width / 2), h: Math.floor(pixelImage.height / 2), x: 0, y: 0 }];
+    t.dispose();
+    showFace();
+  };
+  if (opts.pixelFace && !isPromise(opts.pixelFace)) usePixelFace(opts.pixelFace);
+  // (Without it the 1024 sheet stays: a softer face, still his.)
+  const faceReady = isPromise(opts.pixelFace) ? opts.pixelFace.then(usePixelFace).catch(() => {}) : Promise.resolve();
 
   // --- Scratch.
   const v = new THREE.Vector3();

@@ -2,7 +2,8 @@
 // (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT on his
 // floor (not a blank canvas) in 2×2 CSS px texels; it's unlisted (noindex); a Look change (4×: 4×4
 // CSS px texels) survives a reload and Pixel Size Off draws at native size; and the portfolio's
-// first load carries none of its code. NEWT stands about a quarter of a phone's short side tall
+// first load carries none of its code; the pixel atlas and face load alongside the glb and the
+// first frame waits for them. NEWT stands about a quarter of a phone's short side tall
 // (a fifth of a desktop's), and running off to the rim never takes him off a phone's screen.
 // Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
@@ -176,6 +177,38 @@ test.describe('on a phone', () => {
     await expect(page.getByRole('button', { name: 'Wander' })).toHaveAttribute('aria-pressed', /true|false/);
     await expect(page.locator('[title]')).toHaveCount(0);
     await page.waitForTimeout(500);
+    expect(errors).toEqual([]);
+  });
+
+  test('the pixel atlas and the pixel face load alongside the glb, and the first frame waits for them', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    /** @type {number|null} when the glb was let through (it's held a while, as on a slow phone) */
+    let glbAt = null;
+    const asked = {};
+    await page.route('**/models/newt.glb', async (route) => {
+      await sleep(1000);
+      glbAt = Date.now();
+      await route.continue();
+    });
+    await page.route(/\/models\/newt-(atlas-pixel|face)\.png$/, async (route) => {
+      const name = /newt-[a-z-]+\.png/.exec(route.request().url())[0];
+      asked[name] = { at: Date.now(), glbThen: glbAt };
+      // Held until a while after the glb: the page doesn't draw until they're in.
+      while (glbAt === null) await sleep(20);
+      await sleep(Math.max(0, glbAt + 600 - Date.now()));
+      asked[name].readyBefore = await page.evaluate(() =>
+        document.querySelector('[data-stage]').classList.contains('is-ready'),
+      );
+      await route.continue();
+    });
+    await ready(page);
+    expect(Object.keys(asked).sort()).toEqual(['newt-atlas-pixel.png', 'newt-face.png']);
+    for (const [name, a] of Object.entries(asked)) {
+      expect(a.glbThen, `${name} asked for while the glb was still on its way`).toBeNull();
+      expect(a.readyBefore, `the first frame waited for ${name}`).toBe(false);
+    }
     expect(errors).toEqual([]);
   });
 
