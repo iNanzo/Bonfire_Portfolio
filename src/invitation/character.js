@@ -37,7 +37,11 @@
 // head's centre on a texel's centre is worked out (retro.js snapShift) and all his materials
 // move by it (markId's snap), so his head draws the same texels while it drifts within one,
 // and steps a whole texel when it crosses one, like a sprite.
-
+//
+// The pixel atlas (pixel filter on): models/newt-atlas-pixel.png beside the glb
+// (tools/newt-atlas.mjs: his atlas in flat colours, the plaid redrawn in big black-and-white
+// checks), nearest and no mipmaps, on his atlas material; the glb's own atlas at Off, where
+// it's sharp enough (at a few hundred texels its plaid blurs into grey-brown mush).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BONES, CLIPS, FACES, SCALE } from './clips.js';
@@ -64,6 +68,7 @@ const MIN_R = 11;
  *   timeOf(clip: string): number,
  *   face: import('./clips.js').FaceName,
  *   faceReady: Promise<void>,
+ *   atlasReady: Promise<void>,
  *   faceSize: number|null,
  *   faceTexels: number,
  *   texelSnap: {x: number, y: number},
@@ -71,18 +76,25 @@ const MIN_R = 11;
  */
 
 /**
- * Load the glb at `url` and dress it.
+ * The pixel atlas's address: models/newt-atlas-pixel.png beside the glb at `url`.
+ * @param {string} url
+ */
+export const pixelAtlasUrl = (url) => url.replace(/[^/?#]*([?#].*)?$/, 'newt-atlas-pixel.png');
+
+/**
+ * Load the glb at `url` and dress it (the pixel atlas from beside it, unless opts name one).
  * @param {string} url
  * @param {Parameters<typeof createCharacter>[1]} [opts]
  */
 export async function loadCharacter(url, opts = {}) {
   const gltf = await new GLTFLoader().loadAsync(url);
-  return createCharacter(gltf, opts);
+  return createCharacter(gltf, { pixelAtlasUrl: pixelAtlasUrl(url), ...opts });
 }
 
 /**
  * @param {{scene: any, animations?: any[]}} gltf
- * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFaceUrl?: string}} [opts]
+ * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFaceUrl?: string,
+ *   pixelAtlasUrl?: string, pixelAtlas?: any}} [opts]  pixelAtlas: the pixel atlas, loaded
  * @returns {PageCharacter}
  */
 export function createCharacter(gltf, opts = {}) {
@@ -100,6 +112,10 @@ export function createCharacter(gltf, opts = {}) {
   let faceMesh = null;
   /** His materials' shared texel snap (NDC; retro.js markId). */
   const snap = { value: new THREE.Vector2() };
+  /** @type {Array<{material: any, map: any}>} his atlas materials and the glb's map on each */
+  const atlased = [];
+  /** @type {any} */
+  let pixelAtlas = null;
   /** @type {any[]} every mesh of his */
   const meshes = [];
 
@@ -117,6 +133,7 @@ export function createCharacter(gltf, opts = {}) {
     );
     if (src?.map) textures.add(src.map);
     if (src?.name === 'NEWT_Face') faceMaterial = m;
+    else if (src?.map) atlased.push({ material: m, map: src.map });
     src?.dispose?.();
     made.set(src, m);
     return m;
@@ -189,6 +206,33 @@ export function createCharacter(gltf, opts = {}) {
     const set = pixel && pixelImage ? pixelFacesAt(faceSize) : sheetFaces;
     if (faceMaterial && set) faceMaterial.map = set[face];
   };
+  const showAtlas = () => {
+    for (const { material, map } of atlased) material.map = pixel && pixelAtlas ? pixelAtlas : map;
+  };
+  /** @param {any} t  the pixel atlas */
+  const usePixelAtlas = (t) => {
+    t.flipY = false;
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
+    if (atlased[0]) {
+      t.wrapS = atlased[0].map.wrapS;
+      t.wrapT = atlased[0].map.wrapT;
+    }
+    t.needsUpdate = true;
+    pixelAtlas = t;
+    textures.add(t);
+    showAtlas();
+  };
+  if (opts.pixelAtlas) usePixelAtlas(opts.pixelAtlas);
+  const atlasReady =
+    !opts.pixelAtlas && atlased.length && opts.pixelAtlasUrl && typeof document !== 'undefined'
+      ? new THREE.TextureLoader()
+          .loadAsync(opts.pixelAtlasUrl)
+          .then(usePixelAtlas)
+          .catch(() => {}) // (without it the glb's atlas stays, its mip a little coarser)
+      : Promise.resolve();
   if (faceMaterial?.map?.image && typeof document !== 'undefined') {
     sheetFaces = splitSheet(faceMaterial.map.image, false);
     faceMaterial.map.image.close?.(); // (an ImageBitmap: its pixels are in the cells now)
@@ -349,6 +393,7 @@ export function createCharacter(gltf, opts = {}) {
       return face;
     },
     faceReady,
+    atlasReady,
     get faceSize() {
       return faceSize;
     },
@@ -367,6 +412,7 @@ export function createCharacter(gltf, opts = {}) {
       gradient = g;
       if (!pixel) snap.value.set(0, 0);
       showFace();
+      showAtlas();
     },
     bonePos(name, out) {
       const b = bone(name);

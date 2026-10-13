@@ -6,11 +6,12 @@
 // own clock; restarting a clip that still shows hands its old pose to a twin that fades out (no
 // pop); the collar is read from the current matrices, so carrying can anchor him by it. With
 // the pixel filter on: his face's sheet is picked by his half face in texels (held through a
-// small change) and all of him moves onto the texel grid by his head's centre.
+// small change), all of him moves onto the texel grid by his head's centre, and his atlas is
+// the pixel one (nearest, no mipmaps), the glb's own at Off.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { createCharacter } from '../src/invitation/character.js';
+import { createCharacter, pixelAtlasUrl } from '../src/invitation/character.js';
 import { pickFaceSize } from '../src/invitation/faceSheets.js';
 import { LOOKS } from '../src/invitation/look.js';
 import { TWIN } from '../src/invitation/play.js';
@@ -402,4 +403,29 @@ test('the texel snap: with the pixel filter on, his head’s centre lands on a t
   face.onBeforeRender(viewportOf(w, h), null, camera, face.geometry, face.material, null);
   assert.deepEqual([snap.x, snap.y], [0, 0], 'Pixel Size Off: drawn where he is');
   ch.dispose();
+});
+
+test('the pixel atlas: on his atlas material while the pixel filter is on (nearest, no mipmaps), the glb’s own at Off', () => {
+  const { gltf, mesh, map } = standIn();
+  const pixelAtlas = new THREE.Texture();
+  const ch = createCharacter(gltf, { pixelAtlas });
+  assert.equal(mesh.material.map, pixelAtlas, 'the pixel filter is on by default: the pixel atlas');
+  assert.equal(pixelAtlas.magFilter, THREE.NearestFilter);
+  assert.equal(pixelAtlas.minFilter, THREE.NearestFilter);
+  assert.equal(pixelAtlas.generateMipmaps, false);
+  assert.equal(pixelAtlas.flipY, false, 'the glb’s UVs (v down the image)');
+  assert.equal(pixelAtlas.colorSpace, THREE.SRGBColorSpace);
+  ch.setStyle(LOOKS.ds, false);
+  assert.equal(mesh.material.map, map, 'Off: the glb’s atlas as it was');
+  ch.setStyle(LOOKS.soft, true);
+  assert.equal(mesh.material.map, pixelAtlas, 'on again, whatever the Style');
+  ch.dispose();
+  const plain = standIn();
+  createCharacter(plain.gltf, { pixel: true });
+  assert.equal(plain.mesh.material.map, plain.map, 'no pixel atlas: the glb’s');
+});
+
+test('the pixel atlas sits beside the glb: loadCharacter derives its address from the glb’s', () => {
+  assert.equal(pixelAtlasUrl('/invitation/models/newt.glb'), '/invitation/models/newt-atlas-pixel.png');
+  assert.equal(pixelAtlasUrl('models/newt.glb?v=2'), 'models/newt-atlas-pixel.png');
 });
