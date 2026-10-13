@@ -4,7 +4,8 @@
 // with NEWT still about a fifth of the screen's short side tall; walking, wandering, fleeing
 // (sliding along the rim when cornered) and carrying (the anchor, the toss and the fall's bounces)
 // stay inside it (steer.js and carry.js read a disc's radius from its Bounds); and the light's
-// shadow camera (floor.js fitShadow) covers the disc up to the highest he's lifted.
+// shadow camera (floor.js fitShadow) covers the disc up to the highest he's lifted, wherever the
+// camera has turned the light (camera.js lightDir).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -13,6 +14,7 @@ import { centreOf, clampTo, steer, wanderGoal, xRange } from '../src/invitation/
 import { fallStep, grab, holdStep } from '../src/invitation/carry.js';
 import { fitShadow } from '../src/invitation/floor.js';
 import { NEWT_SHARE, PIXEL_SIZES, frameView, newtTexels, project, texelGrid } from '../src/invitation/pixels.js';
+import { lightDir } from '../src/invitation/camera.js';
 import { DEFAULT_LOOK, LOOKS } from '../src/invitation/look.js';
 import { GAIT } from '../src/invitation/clips.js';
 import { createRng } from '../src/invitation/rng.js';
@@ -171,30 +173,33 @@ test('carrying stays inside the disc: the anchor, and a toss that bounces softly
   close(hit.vel.z, 1, 0.2, 'along it');
 });
 
-test('the light’s shadow camera covers the disc, up to the highest he’s lifted, for every look', () => {
+test('the light’s shadow camera covers the disc, up to the highest he’s lifted, for every look and wherever the camera has turned the light', () => {
   const top = 2.2 + NEWT_HEIGHT;
-  for (const [name, p] of Object.entries(LOOKS)) {
-    const sun = new THREE.DirectionalLight(0xffffff, 1);
-    sun.position.copy(new THREE.Vector3(...p.sun.dir).normalize().multiplyScalar(12));
-    sun.target.position.set(0, 0, 0);
-    fitShadow(sun, AREA, top);
-    sun.updateMatrixWorld();
-    sun.target.updateMatrixWorld();
-    sun.shadow.updateMatrices(sun);
-    const cam = sun.shadow.camera;
-    const reach = R + NEWT_RADIUS;
-    for (let i = 0; i < 24; i++) {
-      const a = (i / 24) * 2 * Math.PI;
-      for (const y of [0, top / 2, top]) {
-        const q = new THREE.Vector3(reach * Math.sin(a), y, reach * Math.cos(a)).project(cam);
-        for (const k of ['x', 'y', 'z'])
-          assert.ok(
-            Math.abs(q[k]) <= 1 + 1e-6,
-            `${name}: (${i * 15}°, ${y}) is outside the shadow camera (${k} ${q[k]})`,
-          );
+  for (const [look, p] of Object.entries(LOOKS))
+    for (const yaw of [0, 1.1, -2.4, Math.PI]) {
+      const name = `${look} at yaw ${yaw.toFixed(2)}`;
+      const sun = new THREE.DirectionalLight(0xffffff, 1);
+      const d = lightDir(p.sun.dir, yaw);
+      sun.position.copy(new THREE.Vector3(d.x, d.y, d.z).normalize().multiplyScalar(12));
+      sun.target.position.set(0, 0, 0);
+      fitShadow(sun, AREA, top);
+      sun.updateMatrixWorld();
+      sun.target.updateMatrixWorld();
+      sun.shadow.updateMatrices(sun);
+      const cam = sun.shadow.camera;
+      const reach = R + NEWT_RADIUS;
+      for (let i = 0; i < 24; i++) {
+        const a = (i / 24) * 2 * Math.PI;
+        for (const y of [0, top / 2, top]) {
+          const q = new THREE.Vector3(reach * Math.sin(a), y, reach * Math.cos(a)).project(cam);
+          for (const k of ['x', 'y', 'z'])
+            assert.ok(
+              Math.abs(q[k]) <= 1 + 1e-6,
+              `${name}: (${i * 15}°, ${y}) is outside the shadow camera (${k} ${q[k]})`,
+            );
+        }
       }
+      // Snug: not much more than the disc and its shadows.
+      assert.ok(cam.right - cam.left < 4 * reach + 2 * top, `${name}: ${(cam.right - cam.left).toFixed(1)} wide`);
     }
-    // Snug: not much more than the disc and its shadows.
-    assert.ok(cam.right - cam.left < 4 * reach + 2 * top, `${name}: ${(cam.right - cam.left).toFixed(1)} wide`);
-  }
 });

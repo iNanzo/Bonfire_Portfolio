@@ -11,8 +11,10 @@
 // coasts a little once the finger lifts. The point it orbits sits at NEWT's middle height
 // over the play area's centre at the default zoom (the whole play area in view) and follows
 // NEWT softly the closer it zooms, all the way at the closest, so he stays in frame. Reset
-// Camera eases back to the default view, the short way round. Angles in radians (yaw 0: the
-// camera on the +z side, + toward +x), distances in world units, drags in CSS px.
+// Camera eases back to the default view, the short way round. The light goes round with it
+// (lightDir: the look's sun turned by the camera's yaw), so his shadow always falls the same way
+// on screen, back and to one side. Angles in radians (yaw 0: the camera on the +z side, +
+// toward +x), distances in world units, drags in CSS px.
 
 import { FOCUS_Y, VIEW } from './pixels.js';
 
@@ -299,4 +301,20 @@ export function orbitPose(s) {
 export function orbitSpot(s) {
   const { position } = orbitPose(s);
   return { x: position.x, z: position.z };
+}
+
+/**
+ * The light turned with the camera: the look's sun direction (`dir`, toward the light, as at the
+ * default view's yaw 0) turned round the vertical axis by the camera's yaw, so his shadow falls
+ * the same way on screen however far round the camera has gone.
+ * @param {number[]} dir  [x, y, z]
+ * @param {number} yaw
+ * @returns {XYZ}
+ */
+export function lightDir(dir, yaw) {
+  const [x, y, z] = dir;
+  if (!yaw) return { x, y, z };
+  const c = Math.cos(yaw);
+  const s = Math.sin(yaw);
+  return { x: x * c + z * s, y, z: z * c - x * s };
 }

@@ -6,7 +6,8 @@
 // pinch zoom between half and twice the default distance; the point it orbits stays on the
 // play area's centre at the default zoom (the whole play area in view) and follows NEWT softly
 // as it zooms in, so he stays in frame; Reset Camera eases back to the default the short way
-// round; a resize keeps the zoom.
+// round; a resize keeps the zoom; and the light turns with it, so his shadow falls the same way
+// on screen after any orbit.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -14,6 +15,7 @@ import {
   ORBIT,
   createOrbit,
   followShare,
+  lightDir,
   orbitDrag,
   orbitEvents,
   orbitHome,
@@ -29,6 +31,7 @@ import {
   turnPerPx,
 } from '../src/invitation/camera.js';
 import { VIEW } from '../src/invitation/pixels.js';
+import { LOOKS } from '../src/invitation/look.js';
 
 const D = Math.PI / 180;
 const DT = 1 / 60;
@@ -256,4 +259,32 @@ test('the gestures move it: an orbit turns it, a pinch zooms it, letting go of a
     { type: 'grab', on: 'newt', x: 0, y: 0, t: 2 },
   ]);
   assert.deepEqual(o.goal, before, 'his own gestures leave it be');
+});
+
+test('the light turns with the camera’s yaw, so his shadow falls the same way on screen (back and to one side) after any orbit', () => {
+  for (const [name, p] of Object.entries(LOOKS)) {
+    /** Where his shadow falls (away from the light), across and into the screen, with the camera at `yaw`. */
+    const onScreen = (yaw) => {
+      const o = createOrbit({ distance: HOME, yaw });
+      const { position, target } = orbitPose(o);
+      const into = { x: target.x - position.x, z: target.z - position.z };
+      const n = Math.hypot(into.x, into.z);
+      const fwd = { x: into.x / n, z: into.z / n };
+      const right = { x: -fwd.z, z: fwd.x };
+      const l = lightDir(p.sun.dir, yaw);
+      close(l.y, p.sun.dir[1], 1e-12, `${name}: as high as ever`);
+      close(Math.hypot(l.x, l.z), Math.hypot(p.sun.dir[0], p.sun.dir[2]), 1e-12, `${name}: only turned`);
+      const fall = { x: -l.x, z: -l.z };
+      return { across: fall.x * right.x + fall.z * right.z, into: fall.x * fwd.x + fall.z * fwd.z };
+    };
+    const home = onScreen(0);
+    assert.deepEqual(lightDir(p.sun.dir, 0), { x: p.sun.dir[0], y: p.sun.dir[1], z: p.sun.dir[2] });
+    assert.ok(home.into > 0, `${name}: at the default view it falls back, away from the camera`);
+    assert.ok(Math.abs(home.across) > 0.3 * home.into, `${name}: and to one side`);
+    for (const yaw of [0.4, 1.7, -2.3, Math.PI, 5.5]) {
+      const at = onScreen(yaw);
+      close(at.across, home.across, 1e-9, `${name} at yaw ${yaw}: across`);
+      close(at.into, home.into, 1e-9, `${name} at yaw ${yaw}: into the screen`);
+    }
+  }
 });
