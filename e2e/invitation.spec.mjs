@@ -222,8 +222,20 @@ test.describe('on a phone', () => {
     await page.getByRole('button', { name: 'Look' }).click();
     const sheet = page.getByRole('dialog', { name: 'Look' });
     await expect(sheet).toBeVisible();
-    await sheet.getByRole('radio', { name: '4×', exact: true }).check();
-    await expect.poll(async () => (await snapshot(page)).pixelScale).toBe(4);
+    // Pixel Size, a slider: from the coarse end one step finer by the keyboard, 24×24 (NEWT about
+    // 24 texels tall: 12 device px, 4 CSS px a texel here).
+    const pixel = sheet.getByRole('slider', { name: 'Pixel Size' });
+    await expect(pixel).toHaveAttribute('aria-valuetext', '48 by 48');
+    await pixel.focus();
+    await page.keyboard.press('Home');
+    await expect(pixel).toHaveAttribute('aria-valuetext', '16 by 16');
+    await page.keyboard.press('ArrowRight');
+    await expect(pixel).toHaveAttribute('aria-valuetext', '24 by 24');
+    await expect(sheet.locator('[data-pixel-value]')).toHaveText('24×24');
+    await expect.poll(async () => (await snapshot(page)).resolution).toBe(24);
+    const coarse = await snapshot(page);
+    expect(coarse.pixelScale).toBe(4);
+    expect(coarse.newtTexels).toBeCloseTo(24.9, 0);
     await sheet.getByRole('radio', { name: 'Soft' }).check();
     await sheet.getByRole('button', { name: 'Done' }).click();
     await expect(sheet).toBeHidden();
@@ -232,7 +244,8 @@ test.describe('on a phone', () => {
     await page.reload();
     await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
     await page.getByRole('button', { name: 'Look' }).click();
-    await expect(sheet.getByRole('radio', { name: '4×', exact: true })).toBeChecked();
+    await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', '24 by 24');
+    expect((await snapshot(page)).resolution).toBe(24);
     expect((await snapshot(page)).pixelScale).toBe(4);
     await expect(sheet.getByRole('radio', { name: 'Soft' })).toBeChecked();
     expect(errors).toEqual([]);
@@ -494,11 +507,14 @@ test.describe('on a desktop', () => {
     expect(errors).toEqual([]);
   });
 
-  test('Pixel Size Off draws at native size', async ({ page }) => {
+  test('Pixel Size Off, one press at the slider’s end, draws at native size', async ({ page }) => {
     await ready(page);
     await page.getByRole('button', { name: 'Look' }).click();
-    await page.getByRole('dialog', { name: 'Look' }).getByRole('radio', { name: 'Off', exact: true }).check();
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await sheet.getByRole('button', { name: 'Off', exact: true }).click();
+    await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', 'Off');
     await expect.poll(async () => (await snapshot(page)).pixelScale).toBe(1);
+    expect((await snapshot(page)).resolution).toBeNull();
     const size = await page
       .locator('[data-stage] canvas')
       .evaluate((c) => [c.width, c.height, Math.min(devicePixelRatio, 2), innerWidth, innerHeight]);

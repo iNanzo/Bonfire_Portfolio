@@ -46,7 +46,7 @@ import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createFaceState, faceStep } from './faces.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
-import { clearInsets, newtShare, newtTexels, resolutionOf } from './pixels.js';
+import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf } from './pixels.js';
 import { animFps, loadLook, motionStep, presetOf, saveLook } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
@@ -128,6 +128,8 @@ if (webgl2()) {
       insets,
       focus: focusInsets,
       onResize: ({ view }) => {
+        // (Pixel Size's steps are this screen's: two resolutions that draw alike here are one.)
+        ui.setPixelSteps(pixelSteps(stageEl.clientWidth, stageEl.clientHeight, window.devicePixelRatio || 1));
         if (!orbit) return;
         orbitHome(orbit, view.distance);
         orbitSpan(orbit, stageSize());

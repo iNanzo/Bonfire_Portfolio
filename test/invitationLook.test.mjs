@@ -55,7 +55,15 @@ import {
 } from '../src/invitation/look.js';
 import { FLOOR_SIZE, createFloor, floorLook } from '../src/invitation/floor.js';
 import { ID, createRetro, decalMaterial, markId } from '../src/invitation/retro.js';
-import { BUTTONS, parseQuery, sheetHtml, statusHtml, toolbarHtml } from '../src/invitation/ui.js';
+import {
+  BUTTONS,
+  parseQuery,
+  pixelLabel,
+  pixelSpoken,
+  sheetHtml,
+  statusHtml,
+  toolbarHtml,
+} from '../src/invitation/ui.js';
 import { NEWT_RADIUS, playArea } from '../src/invitation/area.js';
 
 const SIZES = [
@@ -592,13 +600,36 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
   assert.match(bar, /data-button="Wander" aria-pressed="false"/);
   const sheet = sheetHtml({ pixelSize: '24', dither: false, outlines: true, style: 'soft' });
   assert.match(sheet, /role="dialog" aria-modal="true"/, 'a modal dialog: what lies behind it is out of reach');
-  assert.match(sheet, /value="24" data-look="pixelSize" checked/);
-  // Pixel Size: NEWT's sprite resolutions, coarse to fine, then Off.
-  const steps = [...sheet.matchAll(/name="inv-pixel" value="([^"]+)"[^>]*><span>([^<]+)<\/span>/g)];
+  // Pixel Size: a slider over NEWT's sprite resolutions, coarse to fine, then Off at its end;
+  // its value shown as N×N and spoken as "N by N", and a button at each end (Off one press away).
+  const range = /<input type="range"[^>]*>/.exec(sheet)?.[0] ?? '';
+  assert.match(range, /id="inv-pixel-range"/);
+  assert.match(range, /min="0"/);
+  assert.match(range, new RegExp(`max="${PIXEL_SIZES.length - 1}"`));
+  assert.match(range, /step="1"/);
+  assert.match(range, new RegExp(`value="${PIXEL_SIZES.indexOf('24')}"`));
+  assert.match(range, /aria-valuetext="24 by 24"/);
+  assert.match(range, /data-look="pixelSize"/);
+  assert.match(sheet, /<label[^>]*for="inv-pixel-range"[^>]*>Pixel Size<\/label>/, 'labelled Pixel Size');
+  assert.match(sheet, /data-pixel-value[^>]*>24×24</, 'its value, N×N');
+  assert.match(sheet, /<button type="button"[^>]*data-pixel-end="first"[^>]*>16×16<\/button>/);
+  assert.match(sheet, /<button type="button"[^>]*data-pixel-end="last"[^>]*>Off<\/button>/);
   assert.deepEqual(
-    steps.map((m) => [m[1], m[2]]),
-    PIXEL_SIZES.map((p) => [p, p === 'off' ? 'Off' : `${p}×${p}`]),
+    PIXEL_SIZES.map((p) => [pixelLabel(p), pixelSpoken(p)]),
+    PIXEL_SIZES.map((p) => (p === 'off' ? ['Off', 'Off'] : [`${p}×${p}`, `${p} by ${p}`])),
   );
+  // A screen's own steps (two that come to the same block there are one): the stored value
+  // shows as the step that stands for it, and NEWT's height in texels there is said under it.
+  const phone = sheetHtml({ ...DEFAULT_LOOK, pixelSize: '192' }, pixelSteps(390, 844, 3));
+  const onPhone = /<input type="range"[^>]*>/.exec(phone)?.[0] ?? '';
+  assert.match(onPhone, /max="8"/, '9 steps on a 390-wide phone at DPR 3');
+  assert.match(onPhone, /value="6"/, '192×192 draws as 128×128 there');
+  assert.match(onPhone, /aria-valuetext="128 by 128"/);
+  assert.match(phone, /data-pixel-note>NEWT is about 149 pixels tall on this screen\.</);
+  const native = sheetHtml({ ...DEFAULT_LOOK, pixelSize: '256' }, pixelSteps(390, 844, 3));
+  assert.match(native, /data-pixel-note>NEWT is about 298 pixels tall: every pixel this screen has\.</);
+  assert.match(sheetHtml(DEFAULT_LOOK), /data-pixel-note hidden>/, 'no screen measured yet: no height');
+  assert.match(sheetHtml({ ...DEFAULT_LOOK, pixelSize: 'off' }, pixelSteps(390, 844, 3)), /data-pixel-note hidden>/);
   assert.match(sheet, /value="soft" data-look="style" checked/);
   // Motion: Smooth or Choppy, the stored one checked (Smooth for a look from before it).
   const motions = [
@@ -617,7 +648,7 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
   assert.match(sheet, /data-look="outlines" checked/);
   assert.match(sheet, /data-off-hint hidden/, 'the Off hint only shows at Pixel Size Off');
   assert.doesNotMatch(sheetHtml({ ...DEFAULT_LOOK, pixelSize: 'off' }), /data-off-hint hidden/);
-  assert.equal([...sheet.matchAll(/data-look="pixelSize"/g)].length, PIXEL_SIZES.length);
+  assert.equal([...sheet.matchAll(/data-look="pixelSize"/g)].length, 1, 'one control');
   // The camera: a button that eases it back to the default view, and a hint on moving it.
   assert.match(sheet, /<button type="button" class="inv-btn[^"]*" data-reset-camera>Reset Camera<\/button>/);
   assert.match(

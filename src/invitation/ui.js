@@ -1,8 +1,12 @@
 // The invitation toy's page around the canvas: the status line ("Loading…", or what went wrong),
 // the toolbar along the bottom (Wave, Spook, Sit or Stand, Run, Wander, Look: every button a
-// thumb's height, labelled, never a tooltip) and the Look menu, a bottom sheet (Pixel Size in
-// steps, Off, 2×, 3× and 4×; Dithering, Outlines, Style, Motion (Smooth or Choppy), and Reset
-// Camera with a line on turning and zooming the view). The sheet is a modal dialog: it opens on
+// thumb's height, labelled, never a tooltip) and the Look menu, a bottom sheet (Pixel Size, a
+// slider over NEWT's sprite resolutions, 16×16 to 256×256, then Off at its fine end, with a
+// button at each end and a line saying how many pixels tall he is on this screen; Dithering,
+// Outlines, Style, Motion (Smooth or Choppy), and Reset Camera with a line on turning and
+// zooming the view). The slider's steps are the screen's (pixels.js pixelSteps: two
+// resolutions that come to the same block there are one step), set by main.js as the stage is
+// measured (setPixelSteps); every Pixel Size is a step until then. The sheet is a modal dialog: it opens on
 // Done, Tab goes round inside it, the toolbar it covers is inert while it's open, and Escape
 // closes it wherever focus is; the canvas stays live (turning the camera while choosing a look).
 // Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
@@ -10,7 +14,7 @@
 //
 //   parseQuery(search)   ?test (the window.__invitation hooks), ?seed=N, ?calm, ?perf
 
-import { PIXEL_SIZES } from './pixels.js';
+import { PIXEL_SIZES, resolutionOf, stepFor } from './pixels.js';
 import { LOOKS, MOTIONS, STYLES, validLook } from './look.js';
 
 /** @typedef {import('./types.js').ButtonName} ButtonName */
@@ -22,6 +26,42 @@ export const BUTTONS = /** @type {const} */ (['Wave', 'Spook', 'Sit', 'Run', 'Wa
  * @param {import('./pixels.js').PixelSize} p
  */
 export const pixelLabel = (p) => (p === 'off' ? 'Off' : `${p}×${p}`);
+/**
+ * A Pixel Size as a screen reader says it: "N by N", or Off.
+ * @param {import('./pixels.js').PixelSize} p
+ */
+export const pixelSpoken = (p) => (p === 'off' ? 'Off' : `${p} by ${p}`);
+/** @type {import('./pixels.js').PixelStep[]} every Pixel Size a step of its own (no screen measured yet) */
+const ALL_STEPS = PIXEL_SIZES.map((p) => ({ value: p, n: resolutionOf(p), pd: 0, texels: 0, covers: [p] }));
+
+/**
+ * The line under Pixel Size: how many texels tall NEWT is at `step` on this screen ('' at Off,
+ * and before the screen's measured).
+ * @param {import('./pixels.js').PixelStep} step
+ */
+export function pixelNote(step) {
+  if (step.value === 'off' || !(step.texels > 0)) return '';
+  const tall = Math.round(step.texels);
+  return step.pd === 1
+    ? `NEWT is about ${tall} pixels tall: every pixel this screen has.`
+    : `NEWT is about ${tall} pixels tall on this screen.`;
+}
+
+/**
+ * Pixel Size: the slider over the screen's steps (the stored value at the step that stands for
+ * it), its value as N×N, a button at each end, and the line under it.
+ * @param {import('./pixels.js').PixelSize} value
+ * @param {import('./pixels.js').PixelStep[]} steps
+ */
+function pixelHtml(value, steps) {
+  const step = stepFor(value, steps);
+  const note = pixelNote(step);
+  return `<div class="inv-field inv-pixel">
+    <div class="inv-pixel-head"><label for="inv-pixel-range">Pixel Size</label><output class="inv-pixel-value" for="inv-pixel-range" data-pixel-value aria-hidden="true">${pixelLabel(step.value)}</output></div>
+    <div class="inv-pixel-row"><button type="button" class="inv-btn inv-pixel-end" data-pixel-end="first">${pixelLabel(steps[0].value)}</button><input type="range" class="inv-range" id="inv-pixel-range" min="0" max="${steps.length - 1}" step="1" value="${steps.indexOf(step)}" aria-valuetext="${pixelSpoken(step.value)}" data-look="pixelSize"><button type="button" class="inv-btn inv-pixel-end" data-pixel-end="last">${pixelLabel(steps[steps.length - 1].value)}</button></div>
+    <p class="inv-hint" data-pixel-note${note ? '' : ' hidden'}>${note}</p>
+  </div>`;
+}
 /** @type {Record<import('./look.js').Motion, string>} Motion's labels */
 export const MOTION_LABELS = { smooth: 'Smooth', choppy: 'Choppy' };
 
@@ -73,16 +113,17 @@ const toggle = (key, label, on) =>
 /**
  * The Look menu, a bottom sheet (hidden until Look opens it).
  * @param {import('./look.js').Look} look
+ * @param {import('./pixels.js').PixelStep[]} [steps]  Pixel Size's steps on this screen (pixels.js
+ *   pixelSteps; every Pixel Size its own step by default)
  */
-export function sheetHtml(look) {
+export function sheetHtml(look, steps = ALL_STEPS) {
   const l = validLook(look);
-  const sizes = PIXEL_SIZES.map((p) => segment('inv-pixel', 'pixelSize', p, pixelLabel(p), l.pixelSize === p)).join('');
   const styles = STYLES.map((s) => segment('inv-style', 'style', s, LOOKS[s].label, l.style === s)).join('');
   const motions = MOTIONS.map((m) => segment('inv-motion', 'motion', m, MOTION_LABELS[m], l.motion === m)).join('');
   return `<section class="inv-sheet" id="inv-look" role="dialog" aria-modal="true" aria-labelledby="inv-look-title" hidden>
   <header class="inv-sheet-head"><h2 id="inv-look-title">Look</h2><button type="button" class="inv-btn inv-btn-done" data-look-close>Done</button></header>
   <p class="inv-hint">Changes show right away and stay for your next visit.</p>
-  <fieldset class="inv-field"><legend>Pixel Size</legend><div class="inv-segs">${sizes}</div></fieldset>
+  ${pixelHtml(l.pixelSize, steps)}
   <div class="inv-switches">${toggle('dither', 'Dithering', l.dither)}${toggle('outlines', 'Outlines', l.outlines)}</div>
   <p class="inv-hint inv-hint-off" data-off-hint${l.pixelSize === 'off' ? '' : ' hidden'}>Dithering and outlines are part of the pixel look: pick a pixel size to see them.</p>
   <fieldset class="inv-field"><legend>Style</legend><div class="inv-segs">${styles}</div></fieldset>
@@ -116,6 +157,35 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
   const last = $('[data-reset-camera]');
   const status = $('.inv-status');
   let current = validLook(look);
+  let steps = ALL_STEPS;
+  const range = /** @type {HTMLInputElement} */ ($('#inv-pixel-range'));
+
+  /** Pixel Size's slider, value, ends and line, from the current look and the screen's steps. */
+  const syncPixel = () => {
+    const step = stepFor(current.pixelSize, steps);
+    range.max = String(steps.length - 1);
+    range.value = String(steps.indexOf(step));
+    range.setAttribute('aria-valuetext', pixelSpoken(step.value));
+    $('[data-pixel-value]').textContent = pixelLabel(step.value);
+    $('[data-pixel-end="first"]').textContent = pixelLabel(steps[0].value);
+    $('[data-pixel-end="last"]').textContent = pixelLabel(steps[steps.length - 1].value);
+    const note = $('[data-pixel-note]');
+    note.textContent = pixelNote(step);
+    note.hidden = !note.textContent;
+  };
+  /**
+   * The slider moved (dragged, a key, an end's button): its step is the Pixel Size, at once.
+   * @param {number} index
+   */
+  const pickPixel = (index) => {
+    const step = steps[Math.min(steps.length - 1, Math.max(0, Math.round(index)))];
+    if (!step) return;
+    const changed = step.value !== current.pixelSize;
+    current = validLook({ ...current, pixelSize: step.value });
+    syncPixel();
+    syncOff();
+    if (changed) onLook(current);
+  };
 
   const syncOff = () => {
     $('[data-off-hint]').hidden = current.pixelSize !== 'off';
@@ -164,10 +234,16 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
     else if (el.matches('[data-look-close]')) openSheet(false);
     else if (el.matches('[data-reload]')) location.reload();
     else if (el.matches('[data-reset-camera]')) onResetCamera?.();
+    else if (el.matches('[data-pixel-end]')) pickPixel(el.dataset.pixelEnd === 'first' ? 0 : steps.length - 1);
     else if (el.dataset.button) onButton(/** @type {ButtonName} */ (el.dataset.button));
+  });
+  // (The slider while it's dragged, not only once it's let go: each step shows as it's passed.)
+  hud.addEventListener('input', (e) => {
+    if (e.target === range) pickPixel(Number(range.value));
   });
   hud.addEventListener('change', (e) => {
     const input = /** @type {HTMLInputElement} */ (e.target);
+    if (input === range) return pickPixel(Number(range.value));
     const key = input.dataset.look;
     if (!key) return;
     current = validLook({ ...current, [key]: input.type === 'checkbox' ? input.checked : input.value });
@@ -184,6 +260,15 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
       status.hidden = text === null;
       $('.inv-status-text').textContent = text ?? '';
       $('[data-reload]').hidden = !reload;
+    },
+    /**
+     * Pixel Size's steps on this screen (pixels.js pixelSteps), as the stage is measured.
+     * @param {import('./pixels.js').PixelStep[]} next
+     */
+    setPixelSteps(next) {
+      if (!next.length) return;
+      steps = next;
+      syncPixel();
     },
     /** @param {'Sit'|'Stand'} label */
     setSitLabel(label) {

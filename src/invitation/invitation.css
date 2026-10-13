@@ -131,6 +131,7 @@ body {
   cursor: default;
 }
 .inv-btn:focus-visible,
+.inv-range:focus-visible,
 .inv-seg input:focus-visible + span,
 .inv-switch input:focus-visible ~ .inv-knob {
   outline: 3px solid var(--inv-focus);
@@ -242,6 +243,80 @@ body {
   background: var(--inv-on);
   transform: translateY(2px);
   box-shadow: 0 1px 0 var(--inv-ink);
+}
+
+/* Pixel Size: a chunky slider between its two ends' buttons, its value over it on the right. */
+.inv-pixel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.inv-pixel-value {
+  font-variant-numeric: tabular-nums;
+}
+.inv-pixel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.inv-pixel-end {
+  flex: 0 0 auto;
+  min-width: 56px;
+  min-height: 44px;
+  padding: 0 8px;
+  font-size: 14px;
+}
+.inv-range {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  /* (A drag along it moves it, never the sheet.) */
+  touch-action: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.inv-range::-webkit-slider-runnable-track {
+  height: 12px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 999px;
+  background: var(--inv-grey);
+}
+.inv-range::-moz-range-track {
+  height: 12px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 999px;
+  background: var(--inv-grey);
+}
+.inv-range::-webkit-slider-thumb {
+  width: 28px;
+  height: 28px;
+  margin-top: -11px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 9px;
+  background: var(--inv-on);
+  box-shadow: 0 2px 0 var(--inv-ink);
+  -webkit-appearance: none;
+}
+.inv-range::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--inv-ink);
+  border-radius: 9px;
+  background: var(--inv-on);
+  box-shadow: 0 2px 0 var(--inv-ink);
+}
+.inv-range:focus-visible {
+  border-radius: 12px;
+}
+.inv-pixel .inv-hint {
+  margin-bottom: 0;
 }
 
 .inv-switches {
