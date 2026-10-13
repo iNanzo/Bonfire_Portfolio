@@ -39,9 +39,11 @@ forward-kinematics solver (Solver) turns it into each bone's local quaternion:
 Angles are degrees. Pitch + leans forward, roll + tips toward his left (+X), yaw + turns his
 face toward his left. Values given for L mirror onto R by the same numbers.
 
-Each clip is a list of (frame, pose) keys, or a function of the frame for the cycles (Walk and
-Run are keyed on every frame from a few step parameters). Loops end on an exact copy of frame 0;
-quaternion signs stay continuous. Held pins the collar (the Neck bone's head) where it rests.
+Each clip is a table of (frame, pose) key poses, or a function of the frame for the cycles (Walk
+and Run from a few step parameters). Every frame is keyed: a table's key poses are eased number by
+number along a monotone cubic (tween), so the legs' IK runs on each frame and a planted foot stays
+put. Loops end on an exact copy of frame 0; quaternion signs stay continuous. Held pins the collar
+(the Neck bone's head) where it rests.
 """
 
 import math
@@ -228,18 +230,109 @@ def lerp(a, b, t):
     return tuple(x + (y - x) * t for x, y in zip(a, b))
 
 
-def blend(p, q, t):
-    """Blend two poses part by part (both must list the same parts, as the presets do)."""
-    out = {}
-    for k in set(p) | set(q):
-        a, b = p.get(k), q.get(k)
-        if a is None or b is None or isinstance(a, (bool, str)):
-            out[k] = b if t >= 0.5 and b is not None else (a if a is not None else b)
-        elif isinstance(a, dict):
-            out[k] = {kk: lerp(a[kk], b[kk], t) if kk in a and kk in b else (b.get(kk, a.get(kk))) for kk in set(a) | set(b)}
-        else:
-            out[k] = lerp(a, b, t)
+ARM_DEFAULT = {'shoulder': (0, 0), 'upper': (0, 90), 'lower': (0, 90), 'twist': 0, 'twist2': 0}
+LEG_DEFAULT = {'pitch': 0, 'yaw': 0, 'knee': (0.25, -1, 0)}
+
+
+def planted(S, pose):
+    """The pose with any dangling ('rel') leg written as the same leg placed by its ankle ('at'),
+    so a key-pose table can ease from a dangling leg to a planted one number by number."""
+    if not any('rel' in pose.get('leg' + side, {}) for side, _ in SIDES):
+        return pose
+    apply(S, pose)
+    out = dict(pose)
+    hip_yaw = pose.get('hips', {}).get('rot', (0, 0, 0))[2]
+
+    def angles(d):  # below the horizontal, and the heading toward his left
+        return math.degrees(math.atan2(-d.z, math.hypot(d.x, d.y))), math.degrees(math.atan2(d.x, -d.y))
+
+    for side, s in SIDES:
+        leg = pose.get('leg' + side, {})
+        if 'rel' not in leg:
+            continue
+        a = S.head('Foot.' + side)
+        down, heading = angles(S.M['Foot.' + side].to_quaternion() @ Vector((0, 1, 0)))
+        down0, heading0 = angles(S.rest['Foot.' + side].to_quaternion() @ Vector((0, 1, 0)))
+        out['leg' + side] = {
+            'at': (s * a.x, a.y, a.z),
+            'pitch': down - down0,
+            'yaw': s * (heading - heading0 - hip_yaw),
+            'knee': leg.get('knee', LEG_DEFAULT['knee']),
+        }
     return out
+
+
+def flat(S, pose):
+    """A pose as one list of numbers, every part and default spelled out (see unflat)."""
+    v = []
+    hips = pose.get('hips', {})
+    v += hips.get('loc', (0, 0, 0))
+    v += hips.get('rot', (0, 0, 0))
+    for part in ('chest', 'neck', 'head'):
+        v += pose.get(part, (0, 0, 0))
+    for side, _ in SIDES:
+        a = dict(ARM_DEFAULT, **pose.get('arm' + side, {}))
+        v += [*a['shoulder'], *a['upper'], *a['lower'], a['twist'], a['twist2']]
+    for side, _ in SIDES:
+        leg = dict(LEG_DEFAULT, **pose.get('leg' + side, {}))
+        rest = S.rest['Foot.' + side].translation
+        v += [*leg.get('at', (abs(rest.x), rest.y, rest.z)), leg['pitch'], leg['yaw'], *leg['knee']]
+    return v
+
+
+def unflat(v):
+    """flat's list back into a pose."""
+    it = iter(v)
+
+    def take(n):
+        return tuple(next(it) for _ in range(n))
+
+    p = {'hips': {'loc': take(3), 'rot': take(3)}, 'chest': take(3), 'neck': take(3), 'head': take(3)}
+    for side, _ in SIDES:
+        sh, up, lo, tw = take(2), take(2), take(2), take(2)
+        p['arm' + side] = {'shoulder': sh, 'upper': up, 'lower': lo, 'twist': tw[0], 'twist2': tw[1]}
+    for side, _ in SIDES:
+        at, (pitch, yaw), knee = take(3), take(2), take(3)
+        p['leg' + side] = {'at': at, 'pitch': pitch, 'yaw': yaw, 'knee': knee}
+    return p
+
+
+def monotone(xs, ys):
+    """A monotone cubic through (xs, ys) (Fritsch-Carlson), flat at the ends: it eases through the
+    keys, never overshoots them, and stays put between two equal ones."""
+    n = len(xs)
+    h = [xs[i + 1] - xs[i] for i in range(n - 1)]
+    d = [(ys[i + 1] - ys[i]) / h[i] for i in range(n - 1)]
+    m = [0.0] * n
+    for i in range(1, n - 1):
+        if d[i - 1] * d[i] > 0:
+            w1, w2 = 2 * h[i] + h[i - 1], h[i] + 2 * h[i - 1]
+            m[i] = (w1 + w2) / (w1 / d[i - 1] + w2 / d[i])
+
+    def at(x):
+        i = max(j for j in range(n - 1) if xs[j] <= x) if x > xs[0] else 0
+        t = (x - xs[i]) / h[i]
+        t2, t3 = t * t, t * t * t
+        return (
+            (2 * t3 - 3 * t2 + 1) * ys[i]
+            + (t3 - 2 * t2 + t) * h[i] * m[i]
+            + (3 * t2 - 2 * t3) * ys[i + 1]
+            + (t3 - t2) * h[i] * m[i + 1]
+        )
+
+    return at
+
+
+def tween(S, table, last):
+    """Every frame 0..last of a key-pose table: each key as given, and between keys every number of
+    the pose eased along a monotone cubic, so the legs' IK runs on each frame and a foot held
+    between two keys stays exactly where it is (keying only the keys let rotations interpolate
+    and the feet slid and sank)."""
+    xs = [f for f, _ in table]
+    rows = [flat(S, planted(S, p)) for _, p in table]
+    curves = [monotone(xs, [r[i] for r in rows]) for i in range(len(rows[0]))]
+    exact = dict(table)
+    return [(f, exact[f] if f in exact else unflat([c(f) for c in curves])) for f in range(last + 1)]
 
 
 # ---------------------------------------------------------------------------------------------
@@ -250,6 +343,7 @@ TOE_TIP = (-0.826, -0.417)  # the sole's front edge from the ankle (y, z), the f
 HEEL_TIP = (0.437, -0.417)  # the heel's back edge, likewise
 STANCE = (0.6, 0.06, ANKLE)  # Idle's ankle, his left (+X); the right mirrors it
 WIDE = (1.0, -0.08, ANKLE)  # Land's: where Fall's spread feet touch down
+FALL_Z = 0.02  # Fall's hips over rest: its lowest sole meets the floor where Land begins
 
 ARM_RELAXED = {'shoulder': (0, 0), 'upper': (4, 19), 'lower': (16, 15), 'twist': 0}
 IDLE = {
@@ -278,23 +372,26 @@ HELD = {
     'pin': True,
     'hips': {'loc': (0, 0, 0), 'rot': (-6, 0, 0)},
     'chest': (-2, 0, 0),
-    'neck': (10, 0, 0),
-    'head': (12, 0, 0),
-    'armL': {'shoulder': (20, 6), 'upper': (22, 17), 'lower': (36, 12), 'twist': 0},
-    'armR': {'shoulder': (20, 6), 'upper': (22, 17), 'lower': (36, 12), 'twist': 0},
-    'legL': {'rel': (-0.2, -0.22, 0.06), 'pitch': 62, 'yaw': -8, 'knee': (0.1, -1, 0)},
-    'legR': {'rel': (-0.2, -0.22, 0.06), 'pitch': 62, 'yaw': -8, 'knee': (0.1, -1, 0)},
+    'neck': (4, 0, 0),
+    'head': (9, 0, 0),  # drooping about 5 degrees in all, so the camera still sees his face
+    # limp: shoulders dropped, the upper arms hanging straight down (the chest tilts back), the
+    # elbows nearly straight, the hands at about (+-1.0, -0.25, 1.9)
+    'armL': {'shoulder': (-14, 0), 'upper': (0, 16), 'lower': (4, 18), 'twist': 0},
+    'armR': {'shoulder': (-14, 0), 'upper': (0, 16), 'lower': (4, 18), 'twist': 0},
+    'legL': {'rel': (0.04, -0.22, 0.06), 'pitch': 62, 'yaw': -8, 'knee': (0.1, -1, 0)},  # feet apart, x +-0.75
+    'legR': {'rel': (0.04, -0.22, 0.06), 'pitch': 62, 'yaw': -8, 'knee': (0.1, -1, 0)},
 }
 
 FALL = {
-    'hips': {'loc': (0, 0, -0.22), 'rot': (-6, 0, 0)},
+    'hips': {'loc': (0, 0, FALL_Z), 'rot': (-6, 0, 0)},
     'chest': (-6, 0, 0),
     'neck': (-4, 0, 0),
     'head': (-6, 0, 0),
-    'armL': {'shoulder': (14, 0), 'upper': (150, 48), 'lower': (165, 30), 'twist': 0},
-    'armR': {'shoulder': (14, 0), 'upper': (150, 48), 'lower': (165, 30), 'twist': 0},
-    'legL': {'rel': (0.32, -0.1, 0.22), 'pitch': 25, 'knee': (0.6, -1, 0)},
-    'legR': {'rel': (0.32, -0.1, 0.22), 'pitch': 25, 'knee': (0.6, -1, 0)},
+    # arms up in front of the head (not behind the ears, where the sleeves went into it)
+    'armL': {'shoulder': (14, 0), 'upper': (137, 48), 'lower': (150, 30), 'twist': 0},
+    'armR': {'shoulder': (14, 0), 'upper': (137, 48), 'lower': (150, 30), 'twist': 0},
+    'legL': {'rel': (0.32, -0.1, 0.32), 'pitch': 25, 'knee': (0.6, -1, 0)},
+    'legR': {'rel': (0.32, -0.1, 0.32), 'pitch': 25, 'knee': (0.6, -1, 0)},
 }
 
 
@@ -412,30 +509,37 @@ RUN = {
 
 
 def held(t):
-    """Dangling by the collar: a gentle sway the limbs follow late, and one small kick."""
+    """Dangling by the collar: a gentle sway the limp arms, the head and the legs follow late, and one
+    small kick, itself late."""
     tau = 2 * math.pi
     sw = math.sin(tau * t)
-    lag = math.sin(tau * (t - 0.08))  # the arms and legs follow the body's swing late
-    kick = math.sin(math.pi * (t - 0.5) / 0.22) if 0.5 <= t <= 0.72 else 0.0
+    lag = math.sin(tau * (t - 0.08))  # the legs follow the body's swing late
+    late = tau * (t - 3.5 / 36)  # the arms dangle 3-4 frames behind it, the head 4
+    nod = math.sin(tau * (t - 4 / 36))
+    kick = math.sin(math.pi * (t - 0.56) / 0.22) if 0.56 <= t <= 0.78 else 0.0
     p = merge(HELD, hips={'loc': (0, 0, 0), 'rot': (-6 + 2 * math.cos(tau * t), 4 * sw, 0)})
     p['chest'] = (-2, -1.5 * lag, 0)
-    p['head'] = (12 + 3 * math.cos(tau * t), -4 * lag, 2 * lag)
+    p['head'] = (9 + 2 * math.cos(tau * t), 12 * nod, 3 * nod)
     for side, s in SIDES:
+        # a +-8 degree pendulum, fore and aft and side to side, that trails the body's own swing
         arm = HELD['arm' + side]
-        p['arm' + side] = merge(arm, upper=(22 + 5 * s * lag, 17 - 4 * s * lag), lower=(36 + 8 * s * lag, 12))
-    p['legL'] = merge(HELD['legL'], rel=(-0.2 + 0.05 * lag, -0.22 - 0.6 * kick, 0.06 + 0.45 * kick), pitch=62 - 30 * kick)
-    p['legR'] = merge(HELD['legR'], rel=(-0.2 - 0.05 * lag, -0.22 + 0.08 * lag, 0.06))
+        (fu, ou), (fl, ol) = arm['upper'], arm['lower']
+        fwd, out = -8 * math.cos(late), -s * 8 * math.sin(late)
+        p['arm' + side] = merge(arm, upper=(fu + fwd, ou + out), lower=(fl + 1.2 * fwd, ol + 1.2 * out))
+    p['legL'] = merge(HELD['legL'], rel=(0.04 + 0.05 * lag, -0.22 - 0.6 * kick, 0.06 + 0.45 * kick), pitch=62 - 30 * kick)
+    p['legR'] = merge(HELD['legR'], rel=(0.04 - 0.05 * lag, -0.22 + 0.08 * lag, 0.06))
     return p
 
 
 def fall(t):
-    """Falling: arms up flailing, legs apart, kicking."""
-    w = math.sin(2 * math.pi * t)
+    """Falling: arms up, the forearms flapping (left and right in turn), legs apart, pedalling."""
+    w, c = math.sin(2 * math.pi * t), math.cos(2 * math.pi * t)
     p = merge(FALL)
-    p['armL'] = merge(FALL['armL'], upper=(150 + 12 * w, 48), lower=(165 + 10 * w, 30))
-    p['armR'] = merge(FALL['armR'], upper=(150 - 12 * w, 48), lower=(165 - 10 * w, 30))
-    p['legL'] = merge(FALL['legL'], rel=(0.32, -0.1 - 0.12 * w, 0.22 + 0.06 * w))
-    p['legR'] = merge(FALL['legR'], rel=(0.32, -0.1 + 0.12 * w, 0.22 - 0.06 * w))
+    for side, s in SIDES:
+        (fu, ou), (fl, ol) = FALL['arm' + side]['upper'], FALL['arm' + side]['lower']
+        p['arm' + side] = merge(FALL['arm' + side], upper=(fu + 10 * s * w, ou + 6 * s * w), lower=(fl + 12 * s * w, ol + 25 * s * w))
+        dx, dy, dz = FALL['leg' + side]['rel']
+        p['leg' + side] = merge(FALL['leg' + side], rel=(dx, dy - 0.32 * s * w, dz + 0.2 * s * c), pitch=25 + 10 * s * c)
     return p
 
 
@@ -528,12 +632,13 @@ TABLES = {
     'Land': keys(
         (0, 'fall@0'),  # where Fall loops from: the page lands him when a foot touches
         (2, merge(
-            FALL,
-            hips={'loc': (0, 0, -0.5), 'rot': (6, 0, 0)},
-            chest=(4, 0, 0),
+            IDLE,  # touchdown: both feet flat, the legs still nearly straight, only the chest dips
+            hips={'loc': (0, 0, -0.22), 'rot': (0, 0, 0)},
+            chest=(10, 0, 0),
+            neck=(-4, 0, 0),
             head=(-8, 0, 0),
-            armL={'shoulder': (16, 0), 'upper': (125, 58), 'lower': (150, 40), 'twist': 0},
-            armR={'shoulder': (16, 0), 'upper': (125, 58), 'lower': (150, 40), 'twist': 0},
+            armL={'shoulder': (16, 0), 'upper': (125, 58), 'lower': (140, 40), 'twist': 0},
+            armR={'shoulder': (16, 0), 'upper': (125, 58), 'lower': (140, 40), 'twist': 0},
             legL={'at': WIDE, 'pitch': 0, 'knee': (0.8, -1, 0)},
             legR={'at': WIDE, 'pitch': 0, 'knee': (0.8, -1, 0)},
         )),
@@ -557,8 +662,11 @@ TABLES = {
             legL={'at': WIDE, 'pitch': 0, 'knee': (0.6, -1, 0)},
             legR={'at': WIDE, 'pitch': 0, 'knee': (0.6, -1, 0)},
         )),
+        # steps the wide feet back under him, one at a time: the right stays planted until the
+        # left is down
         (9, merge(IDLE, hips={'loc': (0, 0, -0.1), 'rot': (0, -3, 0)}, legL={'at': (0.8, 0.0, ANKLE + 0.3), 'pitch': 10}, legR={'at': WIDE, 'pitch': 0, 'knee': (0.6, -1, 0)})),
-        (11, merge(IDLE, hips={'loc': (0, 0, -0.08), 'rot': (0, 3, 0)}, legR={'at': (0.78, 0.02, ANKLE + 0.25), 'pitch': 8})),
+        (10, merge(IDLE, hips={'loc': (0, 0, -0.1), 'rot': (0, -1, 0)}, legR={'at': WIDE, 'pitch': 0, 'knee': (0.6, -1, 0)})),
+        (12, merge(IDLE, hips={'loc': (0, 0, -0.08), 'rot': (0, 3, 0)}, legR={'at': (0.78, 0.02, ANKLE + 0.25), 'pitch': 8})),
         (14, IDLE),
     ),
     'SitDown': keys(
@@ -627,14 +735,15 @@ CYCLES = {
 }
 
 
-def clip_keys(name):
-    """[(frame, pose)] for a clip: every frame of a cycle (the last a copy of 0), or its table."""
+def clip_keys(name, S):
+    """[(frame, pose)] for every frame of a clip: a cycle's (the last a copy of 0), or its key-pose
+    table tweened."""
     last, loop = CLIPS[name]
     if name in CYCLES:
         f = CYCLES[name]
         out = [(i, f(i / last)) for i in range(last)]
         return out + [(last, out[0][1])]
-    return [(f, cycle_pose(p) if isinstance(p, str) else p) for f, p in TABLES[name]]
+    return tween(S, [(f, cycle_pose(p) if isinstance(p, str) else p) for f, p in TABLES[name]], last)
 
 
 def cycle_pose(ref):
@@ -674,7 +783,7 @@ def build_action(arm, S, name):
     slot = act.slots.new(id_type='OBJECT', name=ARMATURE)
     strip = act.layers.new('Layer').strips.new(type='KEYFRAME')
     bag = strip.channelbag(slot, ensure=True)
-    frames = clip_keys(name)
+    frames = clip_keys(name, S)
     # Every bone's quaternion at every key, signs kept continuous.
     rot = {n: [] for n in ORDER}
     loc = []
@@ -744,7 +853,7 @@ def show(arm, name, frame):
     """Pose the rig at one frame of a clip without keying (for looking)."""
     prepare(arm)
     S = Solver(arm)
-    ks = clip_keys(name)
+    ks = clip_keys(name, S)
     f, pose = min(ks, key=lambda k: abs(k[0] - frame))
     arm.animation_data_create().action = None
     apply(S, pose)
