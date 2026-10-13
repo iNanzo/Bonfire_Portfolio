@@ -32,10 +32,10 @@ visit (in this browser).
 
 | Setting | Choices | What it does |
 | --- | --- | --- |
-| Pixel Size | Off, Fine, DS, Chunky | How big the pixels are: Fine about 270 across the short side of the screen, DS about 200, Chunky about 150 (Soft is chunkier). Off draws at the screen's own resolution, smooth. |
+| Pixel Size | Off, 2×, 3×, 4× | How big the pixels are: at 2× (the default) each one is 2 by 2 of the page's pixels (a 6 by 6 block of a phone's own pixels), at 3× 3 by 3, at 4× 4 by 4. NEWT stays the same size on screen, so bigger pixels only make him chunkier, and a bigger screen gives him more of them. Off draws at the screen's own resolution, smooth. |
 | Dithering | On, Off | The checkered blend between colours. |
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow). |
-| Style | DS, Soft | DS: crisp, many colours, a hard shadow. Soft: chunkier, fewer colours with a visible dither, pastel, warm outlines and a softer shadow. |
+| Style | DS, Soft | DS: crisp, many colours, a hard shadow. Soft: fewer colours with a visible dither, pastel, warm outlines and a softer shadow. |
 
 Dithering and outlines are part of the pixel look, so they rest while Pixel Size is Off.
 **Reset Camera**, under the settings, eases the camera back to where it started.
@@ -52,17 +52,18 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
     twins for restarts, look-at and faces),
     `retro.js` (the pixel pass), `ui.js` (the toolbar and the Look sheet as markup, plus a thin
     binding), `invitation.css`.
-  - Pure and unit-tested: `pixels.js` (the texel grid and the default view: 20° of view, 36°
-    up, NEWT about a fifth of the screen's short side tall whatever the Pixel Size (76 CSS px on
-    a 390-wide phone), the whole play area in sight, the point it looks at shown in the middle
-    of the space over the toolbar), `camera.js` (the orbit camera: yaw all the way
-    round, 12° to 70° up, half to twice the default distance, eased with a little coast,
-    following NEWT as it zooms in), `area.js` (the play area: a fixed disc of radius 2.0 round the
-    middle), `play.js` (the frame's decisions: who moves his root, the clip mix, where he
-    looks), `look.js` (the Look settings under
-    `invitation.look.v1`, and the presets), `looks/ds.js` and `looks/soft.js` (every look
-    value, as data: a designer edits these, never code; among them the background, the
-    shadow's colour and strength, and the blob shadow).
+  - Pure and unit-tested: `pixels.js` (the texel grid, N×N CSS px a texel at N×, in whole
+    device pixels, and the default view: 20° of view, 36° up, NEWT about a fifth of the
+    screen's short side tall whatever the Pixel Size (76 CSS px on a 390-wide phone), the whole
+    play area in sight, the point it looks at shown in the middle of the space over the
+    toolbar), `camera.js` (the orbit camera: yaw all the way round, 12° to 70° up, half to
+    twice the default distance, eased with a little coast, following NEWT as it zooms in),
+    `area.js` (the play area: a fixed disc of radius 2.0 round the middle), `play.js` (the
+    frame's decisions: who moves his root, the clip mix, where he looks), `look.js` (the Look
+    settings under `invitation.look.v1`, Pixel Size stored as `'off'`, `'2'`, `'3'` or
+    `'4'`, and the presets), `looks/ds.js` and `looks/soft.js` (every look value, as data: a
+    designer edits these, never code; among them the background, the shadow's colour and
+    strength, and the blob shadow).
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
     `faces.js`, `gesture.js`, `rng.js`) are pure too; `types.js` lists the shapes they pass
     and the order a frame runs in.
@@ -82,7 +83,8 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
   `e2e/invitation.spec.mjs` (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
-  position, head turn, the camera's yaw, elevation and distance, the states he went through),
+  position, head turn, the camera's yaw, elevation and distance, the states he went through,
+  `pixelScale`: CSS px a texel, N at N×),
   `screen('head'|'body')` (a point on him in client px, to tap), `floorAt(x, y)`, `feet()` (his
   ankles, to measure foot slide) and `play(clip)`. `?seed=N` makes the randomness
   repeatable; `?calm` stops him wandering and sitting by himself.

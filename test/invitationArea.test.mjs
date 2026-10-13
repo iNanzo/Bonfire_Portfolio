@@ -24,7 +24,6 @@ const SIZES = [
 ];
 /** The stage's insets: a top margin, the toolbar, the side edges. */
 const INSETS = { top: 16, bottom: 72, left: 24, right: 24 };
-const preset = LOOKS[DEFAULT_LOOK.style];
 const DT = 1 / 60;
 const AREA = playArea();
 const R = AREA.r ?? NaN;
@@ -35,7 +34,7 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 /** The default camera for a screen at a Pixel Size, as the stage frames it. */
 function viewFor(cssW, cssH, dpr, pixelSize = DEFAULT_LOOK.pixelSize) {
-  const grid = texelGrid({ cssW, cssH, dpr, pixelSize, texels: preset.texels });
+  const grid = texelGrid({ cssW, cssH, dpr, pixelSize });
   const view = frameView({ cssW, cssH, grid, insets: INSETS, area: R + NEWT_RADIUS });
   return { grid, view };
 }

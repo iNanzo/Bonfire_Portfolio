@@ -1,8 +1,10 @@
 // The invitation toy's Look settings and presets (pure: no three.js, no DOM). The settings are
-// what the Look menu sets: Pixel Size (Off, Fine, DS, Chunky), Dithering, Outlines and Style
-// (a preset in looks/). They're kept in localStorage under `invitation.look.v1`, every read
-// and write in try/catch: storage that's empty, broken, refused or missing gives the defaults,
-// and each value is checked on its own, so one bad value never costs the others.
+// what the Look menu sets: Pixel Size (Off, 2×, 3×, 4×, stored as 'off', '2', '3', '4'),
+// Dithering, Outlines and Style (a preset in looks/). They're kept in localStorage under
+// `invitation.look.v1`, every read and write in try/catch: storage that's empty, broken,
+// refused or missing gives the defaults, and each value is checked on its own, so one bad value
+// never costs the others (a Pixel Size from before the steps, 'fine', 'ds' or 'chunky', loads as
+// the default: the page never shipped with them).
 
 import { DEFAULT_PIXEL, PIXEL_SIZES } from './pixels.js';
 import ds from './looks/ds.js';

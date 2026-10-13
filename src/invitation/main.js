@@ -572,7 +572,8 @@ function start(s) {
         stress: out?.stress ?? 0,
         states: [...states],
         buttonsEnabled: out?.buttonsEnabled ?? true,
-        pixelScale: s.grid.pd,
+        // (CSS px a texel: N at N×, 1 over the capped DPR at Off.)
+        pixelScale: s.grid.pd / s.grid.dpr,
         button: lastButton,
         texels: { w: s.grid.w, h: s.grid.h },
         camera: { yaw: cam.yaw, elevation: cam.elevation, distance: cam.distance },

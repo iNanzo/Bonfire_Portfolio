@@ -1,7 +1,8 @@
 // The invitation toy's page around the canvas: the status line ("Loading…", or what went wrong),
 // the toolbar along the bottom (Wave, Spook, Sit or Stand, Run, Wander, Look: every button a
-// thumb's height, labelled, never a tooltip) and the Look menu, a bottom sheet (Pixel Size,
-// Dithering, Outlines, Style, and Reset Camera with a line on turning and zooming the view).
+// thumb's height, labelled, never a tooltip) and the Look menu, a bottom sheet (Pixel Size in
+// steps, Off, 2×, 3× and 4×; Dithering, Outlines, Style, and Reset Camera with a line on
+// turning and zooming the view).
 // Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
 // reports presses; main.js decides what they do.
 //
@@ -14,7 +15,8 @@ import { LOOKS, STYLES, validLook } from './look.js';
 
 /** The toolbar's action buttons, in order (Look comes last, on its own). */
 export const BUTTONS = /** @type {const} */ (['Wave', 'Spook', 'Sit', 'Run', 'Wander']);
-export const PIXEL_LABELS = { off: 'Off', fine: 'Fine', ds: 'DS', chunky: 'Chunky' };
+/** @type {Record<import('./pixels.js').PixelSize, string>} Pixel Size's labels: Off, then N× (a texel N×N CSS px) */
+export const PIXEL_LABELS = { off: 'Off', 2: '2×', 3: '3×', 4: '4×' };
 
 /**
  * The page's options from the query string.

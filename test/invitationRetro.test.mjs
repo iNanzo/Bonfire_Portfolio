@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ID, MAX_SOFT, catcherMaterial, createRetro, decalMaterial, markId } from '../src/invitation/retro.js';
 
-const LOOK = { pixelSize: 'ds', dither: true, outlines: true, style: 'ds' };
+const LOOK = { pixelSize: '2', dither: true, outlines: true, style: 'ds' };
 /** A whole preset as the pass reads it (the presets' own values are tested on their own). */
 const PRESET = {
   label: 'Test',

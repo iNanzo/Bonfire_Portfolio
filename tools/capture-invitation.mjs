@@ -9,7 +9,7 @@
 //
 //   node tools/capture-invitation.mjs [--sizes 390x844@3,412x915@2.625,1280x800@1]
 //        [--acts idle,clips,tap,drag,buttons,floor,chase,orbit] [--clips Wave,Spook] [--look ds|soft]
-//        [--pixel off|fine|ds|chunky] [--fps 15] [--scale 1] [--port 5340] [--url <origin>]
+//        [--pixel off|2|3|4] [--fps 15] [--scale 1] [--port 5340] [--url <origin>]
 //        [--out .scratch/invitation-shots] [--tag now]
 //
 //   idle      three seconds of him standing (Idle, or the placeholder's T-pose)

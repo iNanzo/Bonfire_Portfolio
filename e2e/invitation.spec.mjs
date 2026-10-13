@@ -1,14 +1,14 @@
 // The invitation toy (/invitation/) in a real browser, on the production build: on a phone
-// (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT on
-// his floor (not a blank canvas); it's unlisted (noindex); a Look change survives a reload and
-// Pixel Size Off draws at native size; and the portfolio's first load carries none of its
-// code. Playing with him: a tap makes him wave or start, a touch drag holds him by the collar
-// and letting go drops him (fall, then land), a finger on the floor turns his head, each
-// button plays its clip, a floor tap walks him there, and the cursor turns his head on a
-// desktop. The camera: a drag on empty space turns it, the wheel and a two-finger pinch zoom
-// it, and Reset Camera brings it back. Every wait is on a state through `?test`'s
-// window.__invitation, never on a duration (CI's software WebGL runs slower than real time),
-// and touches are real ones (CDP Input.dispatchTouchEvent).
+// (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT on his
+// floor (not a blank canvas) in 2×2 CSS px texels; it's unlisted (noindex); a Look change (4×: 4×4
+// CSS px texels) survives a reload and Pixel Size Off draws at native size; and the portfolio's
+// first load carries none of its code. Playing with him: a tap makes him wave or start, a touch
+// drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
+// turns his head, each button plays its clip, a floor tap walks him there, and the cursor turns his
+// head on a desktop. The camera: a drag on empty space turns it, the wheel and a two-finger pinch
+// zoom it, and Reset Camera brings it back. Every wait is on a state through `?test`'s
+// window.__invitation, never on a duration (CI's software WebGL runs slower than real time), and
+// touches are real ones (CDP Input.dispatchTouchEvent).
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
@@ -80,7 +80,7 @@ test.describe('on a phone', () => {
     await expect(page).toHaveTitle('Invitation');
     const snap = await snapshot(page);
     expect(snap.ready).toBe(true);
-    expect(snap.pixelScale).toBeGreaterThan(1);
+    expect(snap.pixelScale, '2× by default: a texel is 2×2 CSS px').toBe(2);
     // Not a blank canvas: NEWT on the plain background, far from one flat colour.
     const pic = await picture(page);
     expect(apart(pic, flat(pic))).toBeGreaterThan(3);
@@ -108,8 +108,8 @@ test.describe('on a phone', () => {
     await page.getByRole('button', { name: 'Look' }).click();
     const sheet = page.getByRole('dialog', { name: 'Look' });
     await expect(sheet).toBeVisible();
-    await sheet.getByRole('radio', { name: 'Chunky' }).check();
-    await expect.poll(async () => (await snapshot(page)).pixelScale).toBeGreaterThan(6);
+    await sheet.getByRole('radio', { name: '4×', exact: true }).check();
+    await expect.poll(async () => (await snapshot(page)).pixelScale).toBe(4);
     await sheet.getByRole('radio', { name: 'Soft' }).check();
     await sheet.getByRole('button', { name: 'Done' }).click();
     await expect(sheet).toBeHidden();
@@ -118,7 +118,8 @@ test.describe('on a phone', () => {
     await page.reload();
     await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
     await page.getByRole('button', { name: 'Look' }).click();
-    await expect(sheet.getByRole('radio', { name: 'Chunky' })).toBeChecked();
+    await expect(sheet.getByRole('radio', { name: '4×', exact: true })).toBeChecked();
+    expect((await snapshot(page)).pixelScale).toBe(4);
     await expect(sheet.getByRole('radio', { name: 'Soft' })).toBeChecked();
     expect(errors).toEqual([]);
   });
@@ -238,6 +239,7 @@ test.describe('on a desktop', () => {
   test('loads to ready with no errors and draws', async ({ page }) => {
     const errors = watch(page);
     await ready(page);
+    expect((await snapshot(page)).pixelScale, '2× by default').toBe(2);
     const pic = await picture(page);
     expect(apart(pic, flat(pic))).toBeGreaterThan(3);
     await page.waitForTimeout(500);
@@ -247,7 +249,7 @@ test.describe('on a desktop', () => {
   test('Pixel Size Off draws at native size', async ({ page }) => {
     await ready(page);
     await page.getByRole('button', { name: 'Look' }).click();
-    await page.getByRole('dialog', { name: 'Look' }).getByRole('radio', { name: 'Off' }).check();
+    await page.getByRole('dialog', { name: 'Look' }).getByRole('radio', { name: 'Off', exact: true }).check();
     await expect.poll(async () => (await snapshot(page)).pixelScale).toBe(1);
     const size = await page
       .locator('[data-stage] canvas')

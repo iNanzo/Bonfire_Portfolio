@@ -1,11 +1,11 @@
 // The invitation toy's pixel grid and camera framing (pure: no three.js, no DOM).
 //
 // The grid: the scene is drawn at texel size and CSS `image-rendering: pixelated` stretches it.
-// A texel is a whole number of device pixels, pd = round(cssPx × dpr), where cssPx makes the
-// short side about the Pixel Size's target count (Fine ~270, DS ~200, Chunky ~150 texels: each
-// look preset carries its own table). The canvas is w × h texels, just covering the stage, and
-// its CSS size w × pd / dpr is a little larger than the stage (which hides the overhang). Pixel
-// Size Off draws at native size, its DPR capped at 2.
+// Pixel Size is an explicit step, Off, 2×, 3× or 4× (2× by default): at N× a texel is N×N CSS
+// px, as a whole number of device pixels, pd = round(N × dpr) (6, 9 or 12 on a phone at DPR 3).
+// The canvas is w × h texels, just covering the stage, and its CSS size w × pd / dpr is a
+// little larger than the stage (which hides the overhang). Pixel Size Off draws at native
+// size, its DPR capped at 2.
 //
 // The framing: a camera 36° up, low enough that his cap's brim leaves his face showing once he
 // looks toward the camera (from 48° it hid the whole face; at 36° his look lifts his head the
@@ -21,7 +21,7 @@
 // there however the camera turns. The framing never reads the Pixel Size: a bigger block only
 // makes chunkier pixels, and a bigger screen gives him more texels.
 
-/** @typedef {'off'|'fine'|'ds'|'chunky'} PixelSize */
+/** @typedef {'off'|'2'|'3'|'4'} PixelSize  Off, or N× (a texel N×N CSS px) */
 /** @typedef {{fine: number, ds: number, chunky: number}} TexelTable  target texels on the short side */
 /**
  * @typedef {object} Grid  the canvas in texels
@@ -52,11 +52,9 @@
  */
 
 /** @type {PixelSize[]} */
-export const PIXEL_SIZES = ['off', 'fine', 'ds', 'chunky'];
-/** @type {TexelTable} */
-export const TEXELS = { fine: 270, ds: 200, chunky: 150 };
+export const PIXEL_SIZES = ['off', '2', '3', '4'];
 /** @type {PixelSize} */
-export const DEFAULT_PIXEL = 'ds';
+export const DEFAULT_PIXEL = '2';
 /** Pixel Size Off draws at the device's pixels, up to this ratio. */
 export const NATIVE_DPR = 2;
 /**
@@ -99,20 +97,22 @@ const RAD = Math.PI / 180;
 /**
  * The canvas's texel grid for a stage `cssW` × `cssH` at `dpr` (`devW`/`devH`: the stage in
  * device pixels where the browser measured them, devicePixelContentBoxSize).
- * @param {{cssW: number, cssH: number, dpr: number, pixelSize: PixelSize, texels?: TexelTable, devW?: number, devH?: number}} o
+ * @param {{cssW: number, cssH: number, dpr: number, pixelSize: PixelSize, devW?: number, devH?: number}} o
  * @returns {Grid}
  */
-export function texelGrid({ cssW, cssH, dpr, pixelSize, texels = TEXELS, devW, devH }) {
+export function texelGrid({ cssW, cssH, dpr, pixelSize, devW, devH }) {
   cssW = Math.max(1, cssW);
   cssH = Math.max(1, cssH);
-  const native = pixelSize === 'off' || !texels[pixelSize];
+  // (The step: N CSS px a texel at N×; Off, or anything else, draws natively.)
+  const step = PIXEL_SIZES.includes(pixelSize) ? Number(pixelSize) : NaN;
+  const native = !(step >= 1);
   const d = native ? Math.min(dpr || 1, NATIVE_DPR) : dpr || 1;
   // (The browser's measured device pixels only hold at the real DPR, not a capped one, and
   // only when they agree with it: an emulated DPR leaves them at CSS size.)
   const near = (dev, css) => !native && dev > 0 && Math.abs(dev - css * d) <= Math.max(2, d);
   const dw = near(devW, cssW) ? devW : cssW * d;
   const dh = near(devH, cssH) ? devH : cssH * d;
-  const pd = native ? 1 : Math.max(1, Math.round((Math.min(cssW, cssH) / texels[pixelSize]) * d));
+  const pd = native ? 1 : Math.max(1, Math.round(step * d));
   const w = Math.max(1, Math.ceil(dw / pd - 1e-6));
   const h = Math.max(1, Math.ceil(dh / pd - 1e-6));
   return { pd, w, h, dpr: d, canvasW: (w * pd) / d, canvasH: (h * pd) / d, native };

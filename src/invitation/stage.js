@@ -134,7 +134,7 @@ export function createStage(container, { preset, look, insets, onResize }) {
   const retro = createRetro(renderer);
   let current = { preset, look };
   /** @type {import('./pixels.js').Grid} */
-  let grid = texelGrid({ cssW: 1, cssH: 1, dpr: 1, pixelSize: look.pixelSize, texels: preset.texels });
+  let grid = texelGrid({ cssW: 1, cssH: 1, dpr: 1, pixelSize: look.pixelSize });
   /** @type {import('./pixels.js').View|null} */
   let view = null;
   /** @type {{w: number, h: number}|null} the stage in device pixels, as the browser measured it */
@@ -199,8 +199,7 @@ export function createStage(container, { preset, look, insets, onResize }) {
     const cssH = container.clientHeight;
     if (!cssW || !cssH) return;
     const dpr = window.devicePixelRatio || 1;
-    const { preset: p, look: l } = current;
-    grid = texelGrid({ cssW, cssH, dpr, pixelSize: l.pixelSize, texels: p.texels, devW: device?.w, devH: device?.h });
+    grid = texelGrid({ cssW, cssH, dpr, pixelSize: current.look.pixelSize, devW: device?.w, devH: device?.h });
     renderer.setSize(grid.w, grid.h, false);
     canvas.style.width = `${grid.canvasW}px`;
     canvas.style.height = `${grid.canvasH}px`;
@@ -280,7 +279,8 @@ export function createStage(container, { preset, look, insets, onResize }) {
      * @param {import('./look.js').Look} l
      */
     setLook(p, l) {
-      const resized = l.pixelSize !== current.look.pixelSize || p.texels !== current.preset.texels;
+      // (Only the Pixel Size changes the grid: every Style draws on the same one.)
+      const resized = l.pixelSize !== current.look.pixelSize;
       current = { preset: p, look: l };
       applyLook();
       if (resized) resize();
