@@ -9,7 +9,7 @@
 //
 //   node tools/capture-invitation.mjs [--sizes 390x844@3,412x915@2.625,1280x800@1]
 //        [--acts idle,clips,tap,drag,buttons,floor,chase,orbit] [--clips Wave,Spook] [--look ds|soft]
-//        [--pixel off|2|3|4] [--dither on|off] [--outlines on|off] [--motion smooth|choppy]
+//        [--pixel off|16|24|32|48|64|96|128|192|256] [--dither on|off] [--outlines on|off] [--motion smooth|choppy]
 //        [--anim-fps 15] [--seed 3] [--calm on|off] [--lead 300] [--fps 15] [--scale 1] [--sheet 8] [--crop 200]
 //        [--port 5340] [--url <origin>] [--out .scratch/invitation-shots] [--tag now]
 //
@@ -50,7 +50,7 @@
 // `track`, those points, the camera's yaw and his root, frame by frame). --look, --pixel,
 // --dither, --outlines and --motion set the Look menu first (its stored settings,
 // invitation.look.v1; with --motion the report and the console say how many times a second his
-// pose changed). --anim-fps sets every preset's animFps (choppy motion) in the page after each
+// pose changed; --pixel is NEWT's sprite resolution, N or N×N such as 64 or 64x64, or off). --anim-fps sets every preset's animFps (choppy motion) in the page after each
 // load, through the dev server's own looks/index.js module; nothing is written to the code.
 // --seed and --calm go to the page's query (?calm is on unless --calm off). --lead keeps that
 // many ms from before each act begins. --scale multiplies the CSS size of the output.
@@ -60,6 +60,7 @@ import fs from 'node:fs';
 import { createServer } from 'vite';
 import { ORBIT } from '../src/invitation/camera.js';
 import { CLIP_NAMES, CLIPS } from '../src/invitation/clips.js';
+import { PIXEL_SIZES } from '../src/invitation/pixels.js';
 
 const argv = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -76,7 +77,17 @@ const SIZES = opt('sizes', '390x844@3,412x915@2.625,1280x800@1')
 const ACTS = opt('acts', 'idle,clips,tap,drag,buttons,floor,chase,orbit').split(',');
 const ONLY_CLIPS = opt('clips', null)?.split(',') ?? CLIP_NAMES;
 const LOOK = opt('look', null);
-const PIXEL = opt('pixel', null);
+/** --pixel as a Pixel Size: 64, 64x64 and 64×64 are 64×64; off is Off. */
+const PIXEL = (() => {
+  const raw = opt('pixel', null);
+  if (raw === null) return null;
+  const v = String(raw)
+    .toLowerCase()
+    .replace(/^(\d+)[x×]\1$/, '$1');
+  if (!PIXEL_SIZES.includes(/** @type {any} */ (v)))
+    throw new Error(`--pixel ${raw}: one of ${PIXEL_SIZES.join(', ')} (or N×N)`);
+  return v;
+})();
 const DITHER = opt('dither', null);
 const OUTLINES = opt('outlines', null);
 const MOTION = opt('motion', null);
