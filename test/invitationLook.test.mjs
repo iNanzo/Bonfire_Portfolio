@@ -4,7 +4,7 @@
 // Native) on the phones and the desktop the round checks, Native at the device's own pixels (a
 // texel a device pixel, no DPR cap), Off smooth at the screen's (its DPR capped at 2), the camera framing NEWT
 // about a quarter of a phone's short side tall and a fifth of a desktop's whatever the Pixel Size
-// (99 CSS px on a 390-wide phone: 50 texels at the default 48×48), low enough to see his face,
+// (99 CSS px on a 390-wide phone: 99 texels at the default 96×96), low enough to see his face,
 // standing in the middle of the space over the toolbar (in the clear space beside the open Look sheet, just as
 // big), the Bayer matrix the retro pass dithers with, the Look
 // settings (src/invitation/look.js) surviving any storage, and the presets (src/invitation/looks/)
@@ -89,7 +89,7 @@ test('the pixel grid: at a sprite resolution N NEWT is about N texels tall in th
     ['16', '24', '32', '48', '64', '96', '128', '192', '256', 'native', 'off'],
     'Native, then Off, at the fine end',
   );
-  assert.equal(DEFAULT_PIXEL, '48', 'the 2× look a phone had');
+  assert.equal(DEFAULT_PIXEL, '96', 'the user’s pick from the resolution ladder');
   assert.deepEqual(
     PIXEL_SIZES.map((p) => resolutionOf(p)),
     [...RESOLUTIONS, null, null],
@@ -129,9 +129,9 @@ test('the pixel grid: at a sprite resolution N NEWT is about N texels tall in th
   assert.deepEqual(pds(390, 844, 3), [19, 12, 9, 6, 5, 3, 2, 2, 1]);
   assert.deepEqual(pds(412, 915, 2.625), [17, 11, 9, 6, 4, 3, 2, 1, 1]);
   assert.deepEqual(pds(1280, 800, 1), [10, 7, 5, 3, 2, 2, 1, 1, 1]);
-  // The default is the old 2× on a 390-wide phone: 6 device px a texel, 195 × 422 texels.
+  // The default, 96×96, on a 390-wide phone: 3 device px a texel (a CSS px), 390 × 844 texels.
   const phone = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: DEFAULT_PIXEL });
-  assert.deepEqual([phone.pd, phone.w, phone.h], [6, 195, 422]);
+  assert.deepEqual([phone.pd, phone.w, phone.h], [3, 390, 844]);
 });
 
 test("Pixel Size's steps on a screen: each one a different block (two steps that come to the same block here are one, the one nearest NEWT's real height in texels), coarse to fine, then Native (any resolution that comes to 1 device px here is Native), then Off", () => {
@@ -222,7 +222,7 @@ test('Pixel Size Off draws smooth at the screen’s resolution, its DPR capped a
   assert.deepEqual([m.pd, m.w], [6, Math.ceil(1171 / 6)]);
 });
 
-test('NEWT is about a quarter of the short side on a phone (99 CSS px, 50 texels at the default size on a 390-wide phone) and about a fifth on a desktop', () => {
+test('NEWT is about a quarter of the short side on a phone (99 CSS px, 99 texels at the default size on a 390-wide phone) and about a fifth on a desktop', () => {
   assert.ok(NEWT_SHARE >= 0.18 && NEWT_SHARE <= 0.21, `a desktop share of ${NEWT_SHARE}`);
   assert.ok(Math.abs(PHONE_SHARE / NEWT_SHARE - 1.3) < 0.03, `a phone's is about 30% bigger (${PHONE_SHARE})`);
   assert.equal(PHONE_SIDE, 600);
@@ -260,13 +260,13 @@ test('NEWT is about a quarter of the short side on a phone (99 CSS px, 50 texels
     assert.ok(view.fov === VIEW.fov && view.fov >= 15 && view.fov <= 30, `a narrow view (${view.fov}°)`);
     assert.equal('roomWidth' in view, false, 'no room');
   }
-  // On the phones the round checks, at the default 48×48: 99 CSS px and 50 texels at 390x844@3
-  // (6 device px a texel), 105 CSS px and 46 texels at 412x915@2.625 (6 device px a texel); on
-  // the desktop, 156 CSS px and 52 texels (3 px a texel).
+  // On the phones the round checks, at the default 96×96: 99 CSS px and 99 texels at 390x844@3
+  // (3 device px a texel), 105 CSS px and 92 texels at 412x915@2.625 (3 device px a texel); on
+  // the desktop, 156 CSS px and 78 texels (2 px a texel: 96×96 and 64×64 are one step there).
   for (const [cssW, cssH, dpr, css, texels] of [
-    [390, 844, 3, 99.5, 49.7],
-    [412, 915, 2.625, 105.1, 46.0],
-    [1280, 800, 1, 156, 52],
+    [390, 844, 3, 99.5, 99.45],
+    [412, 915, 2.625, 105.1, 91.9],
+    [1280, 800, 1, 156, 78],
   ]) {
     const at = `${cssW}x${cssH}@${dpr}`;
     const grid = texelGrid({ cssW, cssH, dpr, pixelSize: DEFAULT_LOOK.pixelSize });
@@ -442,7 +442,7 @@ test('a Pixel Size saved before the sprite resolutions loads as the nearest one 
     assert.equal(loadLook(store(() => JSON.stringify({ pixelSize }))).pixelSize, pixelSize, `${pixelSize} is kept`);
   for (const pixelSize of ['8', '512', 48, 'Off', 'Native', 'native ', '48x48', null])
     assert.equal(validLook({ pixelSize }).pixelSize, DEFAULT_PIXEL, `${JSON.stringify(pixelSize)}: the default`);
-  assert.equal(DEFAULT_LOOK.pixelSize, '48', '48×48 by default');
+  assert.equal(DEFAULT_LOOK.pixelSize, '96', '96×96 by default');
 });
 
 test('a stored look from before Motion loads with Motion Smooth and keeps its other values; Smooth and Choppy are kept, anything else is Smooth', () => {

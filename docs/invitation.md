@@ -40,7 +40,7 @@ space still turns the camera.
 
 | Setting | Choices | What it does |
 | --- | --- | --- |
-| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn about 64 pixels tall, on any screen. A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 48×48 is the default (the old 2× look on a phone). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there. **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier. From 128 pixels tall his shirt shows its real plaid (bolder pixel checks below that), and at the finest steps zoomed in his face is the smooth one. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
+| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn about 64 pixels tall, on any screen. A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 96×96 is the default (on a 1280×800 desktop it draws as 64×64, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there. **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier. From 128 pixels tall his shirt shows its real plaid (bolder pixel checks below that), and at the finest steps zoomed in his face is the smooth one. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
 | Dithering | On, Off | The checkered blend between colours. |
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow). |
 | Style | DS, Soft | DS: crisp, many colours, a hard shadow. Soft: fewer colours with a visible dither, pastel, warm outlines and a softer shadow. |
@@ -66,9 +66,9 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
     `blockFor`, so he's about N texels tall; Native, a texel a device pixel at the real DPR
     with no cap; Off, the screen's pixels with the DPR capped at `OFF_DPR` (2); `pixelSteps`, a
     screen's steps, one a block size, the resolutions that come to 1 px folded into Native;
-    `DEFAULT_PIXEL`, the one line that sets the default; and the default view: 20° of view, 36° up, NEWT 0.195 of a desktop's short
+    `DEFAULT_PIXEL`, the one line that sets the default, `'96'`; and the default view: 20° of view, 36° up, NEWT 0.195 of a desktop's short
     side tall with the whole play area in sight, or 0.255 of a phone's, a stage whose short side
-    is under 600 CSS px (99 CSS px, and 50 texels at 48×48, on a 390-wide phone), whatever the Pixel Size,
+    is under 600 CSS px (99 CSS px, and 99 texels at the default 96×96, on a 390-wide phone), whatever the Pixel Size,
     the point it looks at shown in the middle of the space over the toolbar, or of the clear
     space above or beside the open Look sheet, `clearInsets`), `camera.js` (the
     orbit camera: yaw all the way round, three quarters of a turn for a drag across the whole

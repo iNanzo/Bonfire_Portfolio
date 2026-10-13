@@ -1,11 +1,11 @@
 // The invitation toy's pixel grid and camera framing (pure: no three.js, no DOM).
 //
 // The grid: the scene is drawn at texel size and CSS `image-rendering: pixelated` stretches it.
-// Pixel Size is NEWT's sprite resolution, N×N for N in RESOLUTIONS (16×16 to 256×256; 48×48 by
+// Pixel Size is NEWT's sprite resolution, N×N for N in RESOLUTIONS (16×16 to 256×256; 96×96 by
 // default, DEFAULT_PIXEL), Native or Off: at N×N he's about N texels tall in the default view on
 // any screen. A texel is a whole number of device pixels, pd = max(1, round(his default height
 // in device px ÷ N)) (blockFor: 19 at 16×16 down to 1 at 256×256 on a 390-wide phone at DPR 3,
-// 6 at 48×48), so it stays crisp, and two steps that come to the same block on a screen are one
+// 3 at 96×96), so it stays crisp, and two steps that come to the same block on a screen are one
 // step there (pixelSteps, which the Look menu lists). Native is a texel a device pixel at the
 // device's own DPR, uncapped (a DPR 3 phone's true pixels), with the pixel look still on; any
 // resolution that comes to 1 px on a screen is Native there. The canvas is w × h texels, just
@@ -22,7 +22,7 @@
 // NEWT_SHARE of the stage's short side tall on a desktop (his height as the camera sees it:
 // NEWT_SIDE), further back only where the play area (a disc, area.js) wouldn't all show; on a
 // phone (a short side under PHONE_SIDE) he's PHONE_SHARE of it, about 30% bigger (99 CSS px on
-// a 390-wide phone, 50 texels at the default 48×48 there), and the view never backs off for the
+// a 390-wide phone, 99 texels at the default 96×96 there), and the view never backs off for the
 // disc (the camera follows him there instead, so he stays on screen at its rim). The point the
 // camera looks at (his middle, at the origin) sits in the middle of the space over the
 // toolbar: the view is shifted
@@ -84,11 +84,12 @@ const RESOLUTION_SIZES = /** @type {PixelSize[]} */ (RESOLUTIONS.map(String));
  */
 export const PIXEL_SIZES = [...RESOLUTION_SIZES, 'native', 'off'];
 /**
- * The Pixel Size until the user picks one: 48×48, the 2× look a 390-wide phone had (6 device px
- * a texel). Changing the default is this one line.
+ * The Pixel Size until the user picks one: 96×96, the user's pick from the resolution ladder (3
+ * device px, a CSS px, a texel on a 390-wide phone at DPR 3; on a 1280×800 desktop it comes to
+ * 64×64's 2 px). Changing the default is this one line.
  * @type {PixelSize}
  */
-export const DEFAULT_PIXEL = '48';
+export const DEFAULT_PIXEL = '96';
 /** Pixel Size Off draws at the device's pixels up to this ratio (Native's DPR is never capped). */
 export const OFF_DPR = 2;
 /**

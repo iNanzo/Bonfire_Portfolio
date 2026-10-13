@@ -1,6 +1,6 @@
 // The invitation toy (/invitation/) in a real browser, on the production build: on a phone
 // (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT on his
-// floor (not a blank canvas) in 2×2 CSS px texels; it's unlisted (noindex); a Look change (24×24:
+// floor (not a blank canvas) at 96×96 (1×1 CSS px texels on the phone); it's unlisted (noindex); a Look change (24×24:
 // 4×4 CSS px texels) survives a reload, Pixel Size Native draws a texel a device pixel at a phone's
 // full DPR with the pixel look on (and survives a reload), and Off draws smooth at the screen's
 // resolution (its smooth face reported as such); and the portfolio's
@@ -196,10 +196,10 @@ test.describe('on a phone', () => {
     await expect(page).toHaveTitle('Invitation');
     const snap = await snapshot(page);
     expect(snap.ready).toBe(true);
-    // 48×48 by default: NEWT about 48 texels tall, a texel 6 device px (2×2 CSS px) here.
-    expect(snap.resolution).toBe(48);
-    expect(snap.pixelScale, 'a texel is 2×2 CSS px').toBe(2);
-    expect(snap.newtTexels).toBeCloseTo(49.7, 0);
+    // 96×96 by default: NEWT about 96 texels tall, a texel 3 device px (a CSS px) here.
+    expect(snap.resolution).toBe(96);
+    expect(snap.pixelScale, 'a texel is a CSS px').toBe(1);
+    expect(snap.newtTexels).toBeCloseTo(99.4, 0);
     // Not a blank canvas: NEWT on the plain background, far from one flat colour.
     const pic = await picture(page);
     expect(apart(pic, flat(pic))).toBeGreaterThan(3);
@@ -264,7 +264,7 @@ test.describe('on a phone', () => {
     // Pixel Size, a slider: from the coarse end one step finer by the keyboard, 24×24 (NEWT about
     // 24 texels tall: 12 device px, 4 CSS px a texel here).
     const pixel = sheet.getByRole('slider', { name: 'Pixel Size' });
-    await expect(pixel).toHaveAttribute('aria-valuetext', '48 by 48');
+    await expect(pixel).toHaveAttribute('aria-valuetext', '96 by 96');
     await pixel.focus();
     await page.keyboard.press('Home');
     await expect(pixel).toHaveAttribute('aria-valuetext', '16 by 16');
@@ -663,10 +663,11 @@ test.describe('on a desktop', () => {
     const errors = watch(page);
     await ready(page);
     const snap = await snapshot(page);
-    // 48×48 by default: NEWT 156 CSS px tall, so a texel is 3 px and he's 52 texels tall.
-    expect(snap.resolution).toBe(48);
-    expect(snap.pixelScale).toBe(3);
-    expect(snap.newtTexels).toBeCloseTo(52, 0);
+    // 96×96 by default: NEWT 156 CSS px tall, so a texel is 2 px (96×96 and 64×64 are one step
+    // here) and he's 78 texels tall.
+    expect(snap.resolution).toBe(96);
+    expect(snap.pixelScale).toBe(2);
+    expect(snap.newtTexels).toBeCloseTo(78, 0);
     expect(
       snap.newtTall / 800,
       `NEWT is ${snap.newtTall.toFixed(1)} CSS px tall: a fifth of the short side`,
