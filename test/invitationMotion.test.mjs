@@ -7,7 +7,7 @@
 // foot reaches the floor. blend.js keeps clip weights normalised, runs Idle/Walk/Run on one
 // shared phase, and starts a one-shot's fade-out before it ends. lookAt.js clamps and eases
 // his look without overshoot, glances by a seeded rng, and the brain zeroes the look's weight
-// in Spook, Fall and Land.
+// in Spook, Fall and Land. Last, all of them together under two minutes of rough random play.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CLIPS, GAIT, STRIDE, fadeFor } from '../src/invitation/clips.js';
@@ -22,6 +22,7 @@ import {
   gaitTimes,
   runShare,
   fadeOutDue,
+  mainClip,
   NEXT_CLIP,
 } from '../src/invitation/blend.js';
 import { aimAngles, lookStep, createLook, splitLook, LIMIT, SPLIT, LOOK } from '../src/invitation/lookAt.js';
@@ -77,6 +78,12 @@ test('fleeing grows the distance from the pointer, or from the room centre witho
   const c0 = dist(alone, centre);
   alone = drive(alone, flee, null, 1, (b) => assert.ok(inside(BOUNDS, b)));
   assert.ok(dist(alone, centre) > c0 + 0.6);
+
+  // With no pointer, move.goal (where the brain last saw it) is what he runs from.
+  const seen = { x: 0.6, z: -0.3 };
+  let lifted = { x: 0.3, z: -0.3, yaw: Math.PI / 2, speed: 0 };
+  lifted = drive(lifted, { mode: 'flee', goal: seen, speed: GAIT.run }, null, 1);
+  assert.ok(lifted.x < 0.3 - 0.6, `ran from the last-seen spot (x = ${lifted.x.toFixed(2)})`);
 });
 
 test('cornered, he slides along the wall away from the pointer and never sticks', () => {
@@ -325,6 +332,12 @@ test('the gait phase is shared: one phase, a stride blended by the run share, he
   close(times.Walk, 0.25 * CLIPS.Walk.length);
   close(times.Run, 0.25 * CLIPS.Run.length);
   close(runShare({ Idle: 0.2, Walk: 0.4, Run: 0.4 }), 0.5);
+  assert.deepEqual(
+    [0, 0.3, GAIT.walk, 1.5, GAIT.run].map((v) => mainClip('gait', v)),
+    ['Idle', 'Idle', 'Walk', 'Run', 'Run'],
+  );
+  assert.equal(mainClip('Held', 1), 'Held');
+  close(fadeFor(mainClip('gait', GAIT.walk), mainClip('gait', GAIT.run)), CLIPS.Run.fadeIn);
   assert.equal(runShare({ Idle: 1 }), 0);
 });
 
@@ -462,6 +475,9 @@ test('look-at glances are seeded: forward 1.5 s after the pointer goes, every 3â
       else if (t - gone > LOOK.idleAfter + DT && starts.length === 0) close(s.target.yaw, 0, 1e-6, 'then forward');
       glances = s.glances;
     }
+    const first = starts[0] - gone;
+    assert.ok(first >= LOOK.idleAfter + LOOK.glanceMin - DT, `the first glance ${first} s after the pointer went`);
+    assert.ok(first <= LOOK.idleAfter + LOOK.glanceMax + DT);
     return starts;
   }
   const a = idle(5);
@@ -539,4 +555,89 @@ test('the look weight is 0 in Spook, Fall and Land; camera while held or waving;
   out = step({ button: 'Run' });
   assert.equal(out.state, 'flee');
   assert.deepEqual(out.look, { mode: 'back', weight: 1 });
+});
+
+// ---- all together -------------------------------------------------------------------------
+
+/** Random input: busy for 14 s, then quiet for 11 s (long enough to sit down by himself). */
+function rollInput(r, t, holding) {
+  const BUTTONS = ['Wave', 'Spook', 'Sit', 'Run', 'Wander'];
+  if (t % 25 >= 14) return { events: [], button: null, pointer: null, quiet: true };
+  const roll = r();
+  const at = (type, on, more = {}) => [{ type, on, x: 0, y: 0, t, ...more }];
+  let events = [];
+  if (roll < 0.004) events = at('tap', 'newt');
+  else if (roll < 0.008) events = at('tap', 'floor', { floor: { x: r() * 6 - 3, z: r() * 6 - 3 } });
+  else if (roll < 0.01) events = at('grab', 'newt');
+  else if (holding && roll < 0.05) events = at(r() < 0.5 ? 'release' : 'cancel', 'newt');
+  const button = roll > 0.996 ? BUTTONS[Math.floor(r() * BUTTONS.length)] : null;
+  const pointer = r() < 0.01 ? (r() < 0.3 ? null : { x: r() * 4 - 2, z: r() * 3.4 - 2 }) : undefined;
+  return { events, button, pointer, quiet: false };
+}
+
+/** Moves NEWT the way main.js does: carried, falling or steered. */
+function moveNewt(w, out, t) {
+  if (out.state === 'held') {
+    w.carry ??= grab({ x: w.body.x, y: 0.9, z: w.body.z }, t);
+    holdStep(w.carry, { x: Math.sin(t * 3) * 3, y: 1.2, z: Math.cos(t * 2) }, DT, BOUNDS, t);
+    w.body = { ...w.body, x: w.carry.anchor.x, z: w.carry.anchor.z, speed: 0 };
+    return;
+  }
+  if (out.state === 'fall') {
+    if (w.carry)
+      w.fall = { root: { x: w.carry.anchor.x, y: w.carry.anchor.y - 0.9, z: w.carry.anchor.z }, vel: toss(w.carry) };
+    w.carry = null;
+    if (!w.fall) return;
+    const f = fallStep(w.fall.root, w.fall.vel, w.fall.root.y, DT, BOUNDS);
+    w.fall = f.landed ? null : { root: f.root, vel: f.vel };
+    w.body = { ...w.body, x: f.root.x, z: f.root.z };
+    return;
+  }
+  w.carry = null;
+  w.fall = null;
+  w.body = steer(w.body, out.move, w.pointer, BOUNDS, DT);
+}
+
+test('two minutes of rough random play: valid states and clips, always in the room, weights summing to 1', () => {
+  const STATES = ['idle', 'walk', 'react', 'flee', 'held', 'fall', 'land', 'sitDown', 'sit', 'standUp'];
+  for (const seed of [1, 2, 3]) {
+    const r = createRng(seed * 101);
+    const brain = createBrain({ seed, calm: false, bounds: BOUNDS, tune: { sitAfter: 6 } });
+    const w = { body: { x: 0, z: 0, yaw: 0, speed: 0 }, carry: null, fall: null, pointer: null, clip: null, start: 0 };
+    let weights = { Idle: 1 };
+    let main = 'Idle';
+    let t = 0;
+    const visited = new Set();
+    for (let i = 0; i < 120 * 60; i++) {
+      t += DT;
+      const input = rollInput(r, t, w.carry && t - w.carry.t0 > 0.8);
+      if (input.quiet) w.pointer = null;
+      else if (input.pointer !== undefined) w.pointer = input.pointer;
+      const out = brain.step({
+        t,
+        dt: DT,
+        events: input.events,
+        button: input.button,
+        pointer: w.pointer,
+        newt: { x: w.body.x, z: w.body.z, yaw: w.body.yaw, grounded: !w.carry && !w.fall },
+        clip: w.clip ? { name: w.clip, time: t - w.start, remaining: CLIPS[w.clip].length - (t - w.start) } : null,
+        carry: w.carry ? carryFeel(w.carry) : null,
+      });
+      visited.add(out.state);
+      assert.ok(STATES.includes(out.state), out.state);
+      assert.ok(out.clip === 'gait' || out.clip in CLIPS, out.clip);
+      assert.ok(out.stress >= 0 && out.stress <= 6 + 1e-6);
+      assert.equal(out.buttonsEnabled, out.state !== 'held' && out.state !== 'fall');
+      if (out.clip === 'gait') w.clip = null;
+      else if (out.restart || out.clip !== w.clip) [w.clip, w.start] = [out.clip, t];
+      moveNewt(w, out, t);
+      assert.ok(inside(BOUNDS, w.body), `left the room at ${JSON.stringify(w.body)}`);
+      assert.ok([w.body.x, w.body.z, w.body.yaw, w.body.speed].every(Number.isFinite));
+      const now = mainClip(out.clip, w.body.speed);
+      weights = blendStep(weights, blendTarget(out.clip, w.body.speed), fadeFor(main, now), DT);
+      main = now;
+      close(sum(weights), 1, 1e-6, 'weights');
+    }
+    for (const st of STATES) assert.ok(visited.has(st), `seed ${seed} never reached ${st}`);
+  }
 });
