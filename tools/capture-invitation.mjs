@@ -8,7 +8,7 @@
 // at a time on the machine):
 //
 //   node tools/capture-invitation.mjs [--sizes 390x844@3,412x915@2.625,1280x800@1]
-//        [--acts idle,clips,tap,drag,buttons,floor] [--clips Wave,Spook] [--look ds|soft]
+//        [--acts idle,clips,tap,drag,buttons,floor,chase,orbit] [--clips Wave,Spook] [--look ds|soft]
 //        [--pixel off|fine|ds|chunky] [--fps 15] [--scale 1] [--port 5340] [--url <origin>]
 //        [--out .scratch/invitation-shots] [--tag now]
 //
@@ -19,6 +19,9 @@
 //             on a phone size, a mouse drag on a desktop one)
 //   buttons   Wave, Spook, Sit, Run and Wander pressed in turn
 //   floor     a tap on the floor in front of him
+//   chase     four quick taps on him (he runs off), then a touch or mouse drag catching him
+//   orbit     a drag across empty space (the camera turns), then a pinch or the wheel zooming
+//             in and out, then Reset Camera from the Look sheet
 //
 // Files: <out>/<tag>-<act>-<W>x<H>.webp and <out>/<tag>-sheet-<W>x<H>.png (six frames an act,
 // each labelled with when it was drawn). --look and --pixel set the Look menu first (its
@@ -41,7 +44,7 @@ const SIZES = opt('sizes', '390x844@3,412x915@2.625,1280x800@1')
     const [w, h] = wh.split('x').map(Number);
     return { w, h, dpr: Number(dpr), phone: w < 768 };
   });
-const ACTS = opt('acts', 'idle,clips,tap,drag,buttons,floor').split(',');
+const ACTS = opt('acts', 'idle,clips,tap,drag,buttons,floor,chase,orbit').split(',');
 const ONLY_CLIPS = opt('clips', null)?.split(',') ?? CLIP_NAMES;
 const LOOK = opt('look', null);
 const PIXEL = opt('pixel', null);
@@ -173,6 +176,52 @@ async function mouseDrag(page, from, to, ms = 1200) {
   }
   await page.mouse.up();
 }
+/** Two fingers through CDP spreading from `d0` to `d1` px apart about `at`, `ms` long. */
+async function pinch(page, at, d0, d1, ms = 600) {
+  const cdp = await page.context().newCDPSession(page);
+  const points = (d) => [
+    { x: at.x - d / 2, y: at.y, id: 1 },
+    { x: at.x + d / 2, y: at.y, id: 2 },
+  ];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(d0) });
+  const steps = Math.round(ms / 16);
+  for (let i = 1; i <= steps; i++) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: points(d0 + ((d1 - d0) * i) / steps),
+    });
+    await sleep(16);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}
+/** A drag on empty space, straight, with no hold first (a touch through CDP on a phone size). */
+async function sweep(page, size, from, to, ms = 800) {
+  const steps = Math.round(ms / 16);
+  if (size.phone) {
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type, p) =>
+      cdp.send('Input.dispatchTouchEvent', { type, touchPoints: p ? [{ x: p.x, y: p.y, id: 1 }] : [] });
+    await touch('touchStart', from);
+    for (let i = 1; i <= steps; i++) {
+      await touch('touchMove', {
+        x: from.x + ((to.x - from.x) * i) / steps,
+        y: from.y + ((to.y - from.y) * i) / steps,
+      });
+      await sleep(16);
+    }
+    await touch('touchEnd', null);
+    await cdp.detach();
+    return;
+  }
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  for (let i = 1; i <= steps; i++) {
+    await page.mouse.move(from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
+    await sleep(16);
+  }
+  await page.mouse.up();
+}
 async function tapAt(page, size, p) {
   if (size.phone) await page.touchscreen.tap(p.x, p.y);
   else await page.mouse.click(p.x, p.y);
@@ -224,6 +273,53 @@ function actsFor(size) {
         await tapAt(page, size, { x: body.x - size.w * 0.15, y: body.y + size.h * 0.12 });
       },
       2600,
+    ]);
+  if (ACTS.includes('chase'))
+    list.push([
+      'chase',
+      async (page) => {
+        for (let i = 0; i < 4; i++) {
+          await tapAt(page, size, await point(page, 'head'));
+          await sleep(180);
+        }
+        await sleep(1400);
+        const from = await point(page, 'body');
+        const to = { x: from.x - size.w * 0.12, y: from.y - size.h * 0.06 };
+        await (size.phone ? touchDrag(page, from, to, 700) : mouseDrag(page, from, to, 700));
+      },
+      2400,
+    ]);
+  if (ACTS.includes('orbit'))
+    list.push([
+      'orbit',
+      async (page) => {
+        const body = await point(page, 'body');
+        const from = { x: size.w * 0.15, y: Math.min(size.h * 0.8, body.y + size.h * 0.2) };
+        await sweep(page, size, from, { x: size.w * 0.7, y: from.y + 30 });
+        await sleep(900);
+        if (size.phone) {
+          await pinch(page, { x: size.w / 2, y: from.y }, 60, 220);
+          await sleep(700);
+          await pinch(page, { x: size.w / 2, y: from.y }, 220, 80);
+        } else {
+          await page.mouse.move(size.w / 2, from.y);
+          for (let i = 0; i < 6; i++) {
+            await page.mouse.wheel(0, -120);
+            await sleep(60);
+          }
+          await sleep(700);
+          for (let i = 0; i < 8; i++) {
+            await page.mouse.wheel(0, 120);
+            await sleep(60);
+          }
+        }
+        await sleep(800);
+        await page.locator('[data-look-open]').click();
+        await page.locator('[data-reset-camera]').click();
+        await sleep(300);
+        await page.locator('[data-look-close]').click();
+      },
+      1600,
     ]);
   return list;
 }
