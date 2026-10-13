@@ -2,12 +2,12 @@
 // the toolbar along the bottom (Wave, Spook, Sit or Stand, Run, Wander, Look: every button a
 // thumb's height, labelled, never a tooltip) and the Look menu, a bottom sheet (Pixel Size, a
 // slider over NEWT's sprite resolutions, 16×16 to 256×256, then Native (a texel a device pixel)
-// and Off at its fine end, with a button at each end and a line saying how many pixels tall he
-// is on this screen; Dithering, Outlines, Style, Motion (Smooth or Choppy), and Reset Camera
-// with a line on turning and zooming the view). The slider's steps are the screen's (pixels.js
-// pixelSteps: two resolutions that come to the same block there are one step, and one that
-// comes to 1 px is Native), set by main.js as the stage is measured (setPixelSteps); every
-// Pixel Size is a step until then. The sheet is a modal dialog: it opens on Done, Tab goes
+// and Off at its fine end, with a button at each end (named for what it sets: "Pixel Size
+// Off") and a line saying how many pixels tall he is on this screen; Dithering, Outlines,
+// Style, Motion (Smooth or Choppy), and Reset Camera with a line on turning and zooming the
+// view). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
+// to the same block there are one step, and one that comes to 1 px is Native), set by main.js
+// as the stage is measured (setPixelSteps); every Pixel Size is a step until then. The sheet is a modal dialog: it opens on Done, Tab goes
 // round inside it, the toolbar it covers is inert while it's open, and Escape closes it
 // wherever focus is; the canvas stays live (turning the camera while choosing a look). A finger
 // on a slider only moves it once it goes along it (slideIntent): a swipe up or down that starts
@@ -51,6 +51,12 @@ export const pixelLabel = (p) => PIXEL_WORDS[p] ?? `${p}×${p}`;
  * @param {import('./pixels.js').PixelSize} p
  */
 export const pixelSpoken = (p) => PIXEL_WORDS[p] ?? `${p} by ${p}`;
+/**
+ * The name a button at an end of Pixel Size's slider goes by: what it sets, as a screen reader
+ * says it ("Pixel Size 16 by 16", "Pixel Size Off"), where it shows only the step.
+ * @param {import('./pixels.js').PixelSize} p
+ */
+export const pixelEndName = (p) => `Pixel Size ${pixelSpoken(p)}`;
 /** @type {import('./pixels.js').PixelStep[]} every Pixel Size a step of its own (no screen measured yet) */
 const ALL_STEPS = PIXEL_SIZES.map((p) => ({ value: p, n: resolutionOf(p), pd: 0, texels: 0, covers: [p] }));
 
@@ -78,7 +84,7 @@ function pixelHtml(value, steps) {
   const note = pixelNote(step);
   return `<div class="inv-field inv-pixel">
     <div class="inv-pixel-head"><label for="inv-pixel-range">Pixel Size</label><output class="inv-pixel-value" for="inv-pixel-range" data-pixel-value aria-hidden="true">${pixelLabel(step.value)}</output></div>
-    <div class="inv-pixel-row"><button type="button" class="inv-btn inv-pixel-end" data-pixel-end="first">${pixelLabel(steps[0].value)}</button><input type="range" class="inv-range" id="inv-pixel-range" min="0" max="${steps.length - 1}" step="1" value="${steps.indexOf(step)}" aria-valuetext="${pixelSpoken(step.value)}" data-look="pixelSize"><button type="button" class="inv-btn inv-pixel-end" data-pixel-end="last">${pixelLabel(steps[steps.length - 1].value)}</button></div>
+    <div class="inv-pixel-row"><button type="button" class="inv-btn inv-pixel-end" data-pixel-end="first" aria-label="${pixelEndName(steps[0].value)}">${pixelLabel(steps[0].value)}</button><input type="range" class="inv-range" id="inv-pixel-range" min="0" max="${steps.length - 1}" step="1" value="${steps.indexOf(step)}" aria-valuetext="${pixelSpoken(step.value)}" data-look="pixelSize"><button type="button" class="inv-btn inv-pixel-end" data-pixel-end="last" aria-label="${pixelEndName(steps[steps.length - 1].value)}">${pixelLabel(steps[steps.length - 1].value)}</button></div>
     <p class="inv-hint" data-pixel-note${note ? '' : ' hidden'}>${note}</p>
   </div>`;
 }
@@ -187,8 +193,14 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
     range.value = String(steps.indexOf(step));
     range.setAttribute('aria-valuetext', pixelSpoken(step.value));
     $('[data-pixel-value]').textContent = pixelLabel(step.value);
-    $('[data-pixel-end="first"]').textContent = pixelLabel(steps[0].value);
-    $('[data-pixel-end="last"]').textContent = pixelLabel(steps[steps.length - 1].value);
+    for (const [end, at] of /** @type {const} */ ([
+      ['first', steps[0]],
+      ['last', steps[steps.length - 1]],
+    ])) {
+      const button = $(`[data-pixel-end="${end}"]`);
+      button.textContent = pixelLabel(at.value);
+      button.setAttribute('aria-label', pixelEndName(at.value));
+    }
     const note = $('[data-pixel-note]');
     note.textContent = pixelNote(step);
     note.hidden = !note.textContent;

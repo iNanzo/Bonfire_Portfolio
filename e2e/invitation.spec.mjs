@@ -652,7 +652,9 @@ test.describe('on a desktop', () => {
     await ready(page);
     await page.getByRole('button', { name: 'Look' }).click();
     const sheet = page.getByRole('dialog', { name: 'Look' });
-    await sheet.getByRole('button', { name: 'Off', exact: true }).click();
+    // (The buttons at its ends say what they set.)
+    await expect(sheet.getByRole('button', { name: 'Pixel Size 16 by 16', exact: true })).toBeVisible();
+    await sheet.getByRole('button', { name: 'Pixel Size Off', exact: true }).click();
     await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', 'Off');
     await expect.poll(async () => (await snapshot(page)).pixelScale).toBe(1);
     expect((await snapshot(page)).resolution).toBeNull();

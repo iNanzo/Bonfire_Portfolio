@@ -674,6 +674,9 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
   assert.match(sheet, /data-pixel-value[^>]*>24×24</, 'its value, N×N');
   assert.match(sheet, /<button type="button"[^>]*data-pixel-end="first"[^>]*>16×16<\/button>/);
   assert.match(sheet, /<button type="button"[^>]*data-pixel-end="last"[^>]*>Off<\/button>/);
+  // (Each named for what it sets, as a screen reader says it: never a bare "16×16" or "Off".)
+  assert.match(sheet, /data-pixel-end="first" aria-label="Pixel Size 16 by 16"/);
+  assert.match(sheet, /data-pixel-end="last" aria-label="Pixel Size Off"/);
   assert.deepEqual(
     PIXEL_SIZES.map((p) => [pixelLabel(p), pixelSpoken(p)]),
     PIXEL_SIZES.map((p) =>
