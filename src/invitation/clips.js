@@ -39,7 +39,7 @@ export const GAIT = { walk: 0.9, run: 1.9 };
  * World units covered by one cycle at timeScale 1 (measured from the clips by forward
  * kinematics; tools/newt.py's author keeps these true, the model test checks them).
  */
-export const STRIDE = { Walk: 0.75, Run: 1.11 };
+export const STRIDE = { Walk: 0.51, Run: 0.85 };
 
 /** Fades that differ from the target clip's own `fadeIn`, keyed `from>to`. */
 export const FADE_OVERRIDES = { 'Land>Idle': 0.3, 'Fall>Land': 0.05 };
