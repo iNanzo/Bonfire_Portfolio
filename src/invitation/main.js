@@ -17,8 +17,9 @@
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
-// (a point on NEWT in client px), floorAt(x, y), feet() (his ankles in the world) and
-// play(clip) (forces a clip); `?seed=N` and `?calm` go to the brain.
+// (a point on NEWT in client px), floorAt(x, y), feet() and bones() (his ankles in the world,
+// his bones from his root) and play(clip) (forces a clip); `?seed=N` and `?calm` go to the
+// brain.
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
@@ -594,6 +595,18 @@ function start(s) {
           l: character.bonePos(BONES.footL, { x: 0, y: 0, z: 0 }),
           r: character.bonePos(BONES.footR, { x: 0, y: 0, z: 0 }),
         },
+      /** Every bone's head from his root, world units: for catching a pose that pops. */
+      bones: () => {
+        if (!character) return null;
+        const r = character.root.position;
+        /** @type {Record<string, import('./types.js').XYZ>} */
+        const at = {};
+        for (const name of Object.values(BONES)) {
+          const p = character.bonePos(name, { x: 0, y: 0, z: 0 });
+          at[name] = { x: p.x - r.x, y: p.y - r.y, z: p.z - r.z };
+        }
+        return at;
+      },
       /** @param {string|null} clip */
       play(clip) {
         forced = clip;
