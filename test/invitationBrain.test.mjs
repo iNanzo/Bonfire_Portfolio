@@ -539,6 +539,30 @@ test('company resets the 20 s sit timer: a press, a button, or the pointer movin
   close(buttoned, 15 + TUNE.sitAfter, 0.1, 'a button');
 });
 
+test('turning or zooming the camera is company too, and never moves him or reacts', () => {
+  const quiet = { calm: false, tune: { idleMin: 999, idleMax: 999 } };
+  const sitsAt = (poke) => {
+    const s = sim(quiet);
+    s.run(15);
+    const before = s.w.out.state;
+    poke(s);
+    assert.equal(s.w.out.state, before, 'still where he was');
+    s.until((o) => o.state === 'sitDown', 40);
+    return s.w.t;
+  };
+  const orbited = sitsAt((s) => {
+    s.frame({ events: [{ type: 'orbit', on: 'floor', x: 100, y: 100, dx: 12, dy: 0 }] });
+    s.frame({ events: [{ type: 'orbit', on: 'floor', x: 140, y: 100, dx: 40, dy: 0 }] });
+    s.frame({ events: [{ type: 'release', on: 'floor', x: 140, y: 100 }] });
+  });
+  assert.ok(orbited >= 15 + TUNE.sitAfter - 0.1, `an orbit (${orbited.toFixed(2)} s)`);
+  const pinched = sitsAt((s) => {
+    s.frame({ events: [{ type: 'pinch', on: 'floor', x: 100, y: 100, scale: 1 }] });
+    s.frame({ events: [{ type: 'pinch', on: 'floor', x: 100, y: 100, scale: 1.2 }] });
+  });
+  close(pinched, 15 + TUNE.sitAfter, 0.1, 'a pinch');
+});
+
 test('a floor tap makes him walk there, clamped to the play area', () => {
   const s = sim();
   let out = s.floorTap(1.2, -1);

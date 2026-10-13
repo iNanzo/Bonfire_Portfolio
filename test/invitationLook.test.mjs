@@ -331,6 +331,13 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
   assert.match(sheet, /data-off-hint hidden/, 'the Off hint only shows at Pixel Size Off');
   assert.doesNotMatch(sheetHtml({ ...DEFAULT_LOOK, pixelSize: 'off' }), /data-off-hint hidden/);
   assert.equal([...sheet.matchAll(/data-look="pixelSize"/g)].length, PIXEL_SIZES.length);
+  // The camera: a button that eases it back to the default view, and a hint on moving it.
+  assert.match(sheet, /<button type="button" class="inv-btn[^"]*" data-reset-camera>Reset Camera<\/button>/);
+  assert.match(
+    sheet,
+    /inv-hint[^>]*>[^<]*(drag|Drag)[^<]*(pinch|scroll)[^<]*\./,
+    'how to turn and zoom, in a sentence',
+  );
   for (const html of [bar, sheet, statusHtml()]) assert.doesNotMatch(html, /\stitle=/, 'no title= tooltips');
   // Labels in Title Case (the hints are sentences).
   const labels = [...`${bar}${sheet}`.matchAll(/>([^<>]+)</g)]

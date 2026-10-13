@@ -2,9 +2,12 @@
 // NEWT is a tap and on the floor a floor tap; a press on him that moves more than 10 CSS px or
 // lasts longer than 280 ms is a grab, then drags, then a release when it lets go. A cancelled
 // pointer or a lost capture drops him and never taps him, and only the first pointer counts.
-// Mouse moves without a button hover. Its helpers find where a ray meets a level plane (the
-// floor, or the lift height while he's carried) and whether a point is on his screen shape: a
-// head circle and a body capsule, at least 22 px across, plus some slop.
+// Mouse moves without a button hover. A press on empty space that drags more than 10 px orbits
+// the camera (each move's dx, dy); two fingers pinch (the change in their spread), a second
+// finger landing during a one-finger press or orbit switches to the pinch, and two-finger
+// gestures never tap or grab. Its helpers find where a ray meets a level plane (the floor, or
+// the lift height while he's carried) and whether a point is on his screen shape: a head
+// circle and a body capsule, at least 22 px across, plus some slop.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGesture, rayPlaneY, pickScreen, GESTURE, PICK_MIN_R } from '../src/invitation/gesture.js';
@@ -76,7 +79,7 @@ test('a floor press that moves or lingers is not a floor tap', () => {
   g.down(P(1, 10, 10, 0), false);
   assert.deepEqual(g.move(P(1, 15, 10, 0.02)), []);
   const d = g.move(P(1, 40, 10, 0.05));
-  assert.deepEqual(types(d), ['drag']);
+  assert.deepEqual(types(d), ['orbit']);
   assert.equal(d[0].on, 'floor');
   assert.deepEqual(g.tick(1), [], 'the floor is never grabbed');
   const u = g.up(P(1, 40, 10, 0.1));
@@ -105,19 +108,89 @@ test('a cancel or a lost capture drops him and never taps', () => {
   assert.deepEqual(types(g.up(P(3, 0, 0, 2.1))), ['tap']);
 });
 
-test('only the first pointer counts', () => {
+test('only the first pointer counts while NEWT is held, and once the first lets go the next press is the first', () => {
   const g = createGesture();
   g.down(P(1, 0, 0, 0), true);
-  assert.deepEqual(g.down(P(2, 200, 200, 0.05), false), []);
+  assert.deepEqual(types(g.move(P(1, 30, 0, 0.05))), ['grab', 'drag']);
+  assert.deepEqual(g.down(P(2, 200, 200, 0.06), false), []);
   assert.deepEqual(g.move(P(2, 260, 260, 0.08)), []);
   assert.deepEqual(g.up(P(2, 260, 260, 0.1)), []);
   assert.deepEqual(g.cancel(2, 0.11), []);
-  assert.deepEqual(types(g.up(P(1, 0, 0, 0.15))), ['tap']);
+  assert.deepEqual(types(g.move(P(1, 40, 0, 0.12))), ['drag'], 'still carrying him');
+  assert.deepEqual(types(g.up(P(1, 40, 0, 0.15))), ['release']);
   assert.equal(g.current(), null);
 
   g.down(P(2, 0, 0, 1), false);
   assert.equal(g.current().id, 2, 'once the first lets go, the next press is the first');
   assert.deepEqual(types(g.up(P(2, 0, 0, 1.1))), ['tap']);
+});
+
+test('a press on empty space that drags more than 10 px orbits: each move gives its dx and dy, and letting go releases it', () => {
+  const g = createGesture();
+  g.down({ id: 1, x: 100, y: 100, t: 0, kind: 'mouse', buttons: 1 }, false);
+  assert.deepEqual(g.move({ id: 1, x: 106, y: 104, t: 0.02, kind: 'mouse', buttons: 1 }), [], 'not past 10 px yet');
+  const a = g.move({ id: 1, x: 112, y: 103, t: 0.04, kind: 'mouse', buttons: 1 });
+  assert.deepEqual(types(a), ['orbit']);
+  assert.deepEqual([a[0].dx, a[0].dy, a[0].on, a[0].x, a[0].y], [12, 3, 'floor', 112, 103], 'from the press');
+  const b = g.move({ id: 1, x: 90, y: 110, t: 0.06, kind: 'mouse', buttons: 1 });
+  assert.deepEqual([b[0].type, b[0].dx, b[0].dy], ['orbit', -22, 7], 'then from the last move');
+  assert.deepEqual(g.tick(1), [], 'never a grab');
+  assert.equal(g.current().orbit, true);
+  const u = g.up({ id: 1, x: 90, y: 110, t: 0.08, kind: 'mouse', buttons: 0 });
+  assert.deepEqual(types(u), ['release']);
+  assert.equal(u[0].on, 'floor');
+  // A drag that starts on NEWT grabs him instead, as before; a still floor press is a floor tap.
+  g.down(P(2, 50, 50, 1), true);
+  assert.deepEqual(types(g.move(P(2, 80, 50, 1.05))), ['grab', 'drag']);
+  g.up(P(2, 80, 50, 1.1));
+  g.down(P(3, 50, 50, 2), false);
+  assert.deepEqual(types(g.up(P(3, 52, 51, 2.1))), ['tap']);
+});
+
+test('two fingers pinch: the scale is the change in their spread, and a pinch never taps or grabs', () => {
+  const g = createGesture();
+  g.down(P(1, 100, 300, 0), true); // on NEWT, but not yet a grab
+  const start = g.down(P(2, 200, 300, 0.05), false);
+  assert.deepEqual(types(start), ['pinch']);
+  assert.equal(start[0].scale, 1, 'it starts at scale 1');
+  assert.deepEqual([start[0].x, start[0].y], [150, 300], 'at the middle of the fingers');
+  assert.equal(g.current().pinch, true);
+  const out = g.move(P(2, 300, 300, 0.1));
+  assert.deepEqual(types(out), ['pinch']);
+  close(out[0].scale, 2, 1e-9, 'spread from 100 to 200 px');
+  close(g.move(P(1, 200, 300, 0.15))[0].scale, 0.5, 1e-9, 'then from 200 back to 100');
+  assert.deepEqual([g.current().x, g.current().y], [250, 300]);
+  assert.deepEqual(g.tick(1), [], 'held long, still no grab');
+  // A finger lifts: the pinch ends, and the other finger does nothing until it lifts too.
+  assert.deepEqual(g.up(P(1, 200, 300, 1.1)), []);
+  assert.deepEqual(g.move(P(2, 340, 360, 1.2)), []);
+  assert.deepEqual(g.up(P(2, 340, 360, 1.25)), [], 'no tap, no orbit, no release');
+  assert.equal(g.current(), null);
+  // A cancel ends it the same way.
+  g.down(P(3, 0, 0, 2), false);
+  g.down(P(4, 50, 0, 2.01), false);
+  assert.deepEqual(g.cancel(3, 2.1), []);
+  assert.deepEqual(g.up(P(4, 50, 0, 2.2)), []);
+  assert.equal(g.current(), null);
+});
+
+test('a second finger landing during a one-finger orbit switches to a pinch', () => {
+  const g = createGesture();
+  g.down(P(1, 100, 400, 0), false);
+  assert.deepEqual(types(g.move(P(1, 140, 400, 0.05))), ['orbit']);
+  const p = g.down(P(2, 140, 500, 0.1), false);
+  assert.deepEqual(types(p), ['pinch'], 'the orbit gives way to the pinch');
+  assert.deepEqual(types(g.move(P(1, 140, 380, 0.15))), ['pinch'], 'no more orbiting');
+  close(g.move(P(2, 140, 520, 0.2))[0].scale, 140 / 120, 1e-9);
+  assert.deepEqual(g.up(P(2, 140, 520, 0.3)), []);
+  assert.deepEqual(g.move(P(1, 200, 380, 0.35)), [], 'the finger left behind doesn’t orbit');
+  assert.deepEqual(g.up(P(1, 200, 380, 0.4)), []);
+  // A third finger while pinching is nothing.
+  g.down(P(5, 0, 0, 1), false);
+  g.down(P(6, 100, 0, 1.01), false);
+  assert.deepEqual(g.down(P(7, 50, 50, 1.02), false), []);
+  assert.deepEqual(g.move(P(7, 90, 90, 1.03)), []);
+  close(g.move(P(6, 200, 0, 1.04))[0].scale, 2, 1e-9);
 });
 
 test('mouse moves without a button hover; touches never do', () => {
