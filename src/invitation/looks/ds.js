@@ -1,26 +1,29 @@
-// The "DS" look preset (data only): the old handheld's 3D on a white page, on the Pixel Size's grid
-// (96×96 by default: 390 texels across a 390-wide phone, twice the DS's own 192 lines; no
-// preset sets the grid); 18-bit colour (64 levels a channel, 6 bits) under a light Bayer dither (light enough
-// not to crawl over him as he moves); the DS's edge marking (a 1-texel line on NEWT's own edge
-// texels, where the surface or the depth jumps: none on the floor or in his shadow), dark enough to
-// show on his skin and clothes; two toon bands and a highlight, the shade band and the fill high
-// enough that his black hair keeps two tones, warmed toward Animal Crossing: Wild World by a peach
-// fill, the grade close to neutral (a stronger warm tint and saturation turned his skin orange and
-// his grey trousers brown); his textures a mip and a half coarser where the pixel atlas isn't
-// loaded (character.js; its flat colours have no mips), so the toon bands shade him rather than
-// his shirt's pattern, and half a mip from 128 texels tall, where the glb's own plaid replaces
-// the pixel atlas (at 1.5 its checks blurred into grey, its neighbours streaking his trousers); a hard BasicShadowMap shadow, one flat warm lavender grey on
-// the white, lighter than him; no blob under him while he stands (only a flat one while he's
-// lifted). Every look value lives here so the look designer edits data, never code: retro.js,
-// stage.js, floor.js and character.js read it (look.js has the shape, LookPreset; retro.js the
-// pass's own extras, RetroExtras).
+// The "DS" look preset (data only): the old handheld's 3D on a white page, on the Pixel Size's
+// grid (96×96 by default: 390 texels across a 390-wide phone, twice the DS's own 192 lines; no
+// preset sets the grid); 15-bit colour (32 levels a channel, the DS's own 2D colour) under a
+// Bayer dither of half a level, which shows as a fine checker in his shading (at 64 levels a
+// flipped pixel moved 4/255 and the Dithering switch did nothing you could see) yet stays light
+// enough not to crawl over him as he moves; the DS's edge marking (a 1-texel line on NEWT's own
+// edge texels, where the surface or the depth jumps: none on the floor or in his shadow), dark
+// enough to show on his skin and clothes (Tinted, a Shader option, multiplies it by the
+// lavender of his shadow); two toon bands and a highlight, the shade band and the fill high
+// enough that his black hair keeps two tones, warmed toward Animal Crossing: Wild World by a
+// peach fill, the grade close to neutral (a stronger warm tint and saturation turned his skin
+// orange and his grey trousers brown); his textures a mip and a half coarser where the pixel
+// atlas isn't loaded (character.js; its flat colours have no mips), so the toon bands shade him
+// rather than his shirt's pattern, and half a mip from 128 texels tall, where the glb's own
+// plaid replaces the pixel atlas (at 1.5 its checks blurred into grey, its neighbours streaking
+// his trousers); a hard BasicShadowMap shadow, one flat warm lavender grey on the white,
+// lighter than him; no blob under him while he stands (only a flat one while he's lifted).
+// Every look value lives here so the look designer edits data, never code: retro.js, stage.js,
+// floor.js and character.js read it (look.js has the shape, LookPreset; retro.js the pass's own
+// extras, RetroExtras; shader.js the Shader options it sets).
 
 /** @type {import('../look.js').LookPreset & import('../retro.js').RetroExtras} */
 export default {
   label: 'DS',
-  levels: 64,
-  dither: 0.25,
-  // (Dark lines; Tinted, a Shader option, multiplies them by the lavender of his shadow.)
+  levels: 32,
+  dither: 0.5,
   outline: { darken: 0.6, tint: '#9c88c4', ink: 'dark', depth: 0.015, outside: false },
   grade: { lift: 0, gamma: 1, saturation: 1.04, tint: '#fffdfa', exposure: 1.02, contrast: 1, warmth: 0 },
   // (Over the light's angle: shade on his side away from it, lit facing it, the highlight where

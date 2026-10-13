@@ -2,7 +2,8 @@
 // at real speed on a phone with the orbit camera: the default style in one place
 // (looks/index.js), no smooth blob smear under him while he stands (the cast shadow is his
 // shadow; the blob only shows, as a flat pixel shape, while he's lifted), a coarser texture mip
-// so his shirt doesn't alias into a patchwork, dithers light enough not to crawl over him as he
+// so his shirt doesn't alias into a patchwork, dithers that show (the Dithering switch does
+// something you can see in every style) yet stay light enough not to crawl over him as he
 // moves, and a soft shadow's edge no wider than a texel, so it doesn't shimmer as the camera
 // turns. Neither sets the grid: the Pixel Size alone does (pixels.js), whatever the Style.
 import { test } from 'node:test';
@@ -40,10 +41,16 @@ test('his textures sample a coarser mip, so the toon bands shade him, not the te
   }
 });
 
-test('dithers light enough not to crawl over him at real speed; soft shadows a texel wide at most', () => {
-  assert.ok(PRESETS.ds.dither > 0 && PRESETS.ds.dither <= 0.3, `DS dither ${PRESETS.ds.dither}`);
+test('Dithering shows in every style, yet stays light enough not to crawl over him at real speed; soft shadows a texel wide at most', () => {
+  for (const [name, p] of Object.entries(PRESETS)) {
+    // (A pixel the dither flips moves a whole level: at 64 levels that's 4/255, which no one
+    // sees, and DS's switch did nothing to the eye. A level of 1/40 or more, and a dither that
+    // reaches 0.15 of a level or more either way, show as a fine checker.)
+    assert.ok(p.levels - 1 <= 40, `${name}: a level is ${(255 / (p.levels - 1)).toFixed(1)}/255`);
+    assert.ok(p.dither * 0.47 >= 0.15, `${name}: the dither reaches ${(p.dither * 0.47).toFixed(2)} of a level`);
+    assert.ok(p.dither <= 0.5, `${name}: dither ${p.dither}, light enough not to crawl`);
+  }
   assert.ok(PRESETS.soft.levels >= 24, `Soft keeps its dither in the soft gradients (${PRESETS.soft.levels} levels)`);
-  assert.ok(PRESETS.soft.dither <= 0.4, `Soft dither ${PRESETS.soft.dither}`);
   for (const [name, p] of Object.entries(PRESETS)) {
     assert.ok((p.shadow.soft ?? 0) <= 1, `${name}: a shadow edge of ${p.shadow.soft} texels`);
     assert.equal(p.animFps, 0, `${name}: smooth motion by default (choppy is an option)`);
