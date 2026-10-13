@@ -278,6 +278,9 @@ function start(s) {
   };
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   canvas.addEventListener('pointerdown', (e) => {
+    // (Only the main button presses: a right or middle click, or a pen's barrel button, never
+    // holds him, orbits or walks him.)
+    if (e.pointerType !== 'touch' && e.button !== 0) return;
     const first = !gesture.current();
     if (first) pressKind = e.pointerType;
     try {

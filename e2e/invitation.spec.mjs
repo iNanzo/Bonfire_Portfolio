@@ -8,9 +8,10 @@
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
 // turns his head, each button plays its clip, a floor tap walks him there, and the cursor turns his
 // head on a desktop. The camera: a drag on empty space turns it, the wheel and a two-finger pinch
-// zoom it, and Reset Camera brings it back. Every wait is on a state through `?test`'s
-// window.__invitation, never on a duration (CI's software WebGL runs slower than real time), and
-// touches are real ones (CDP Input.dispatchTouchEvent).
+// zoom it, and Reset Camera brings it back. A pinch over the toolbar or the Look sheet never
+// zooms the page, and only the left mouse button holds or walks him. Every wait is on a state
+// through `?test`'s window.__invitation, never on a duration (CI's software WebGL runs slower
+// than real time), and touches are real ones (CDP Input.dispatchTouchEvent).
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
@@ -71,6 +72,20 @@ async function toucher(page) {
     });
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/**
+ * Waits until the page has drawn frames for `ms` of its own clock, and one more (for a check
+ * that something did not happen: a slow software-rendered frame still counts its time).
+ */
+const framesFor = (page, ms) =>
+  page.evaluate(
+    (span) =>
+      new Promise((done) => {
+        const t0 = performance.now();
+        const tick = (t) => (t - t0 >= span ? requestAnimationFrame(() => done()) : requestAnimationFrame(tick));
+        requestAnimationFrame(tick);
+      }),
+    ms,
+  );
 /**
  * His bones (from his root) every frame the page draws for `ms`: how many frames, how many of
  * them showed a new pose, the seconds it took, and his feet's spread each frame (world units).
@@ -398,6 +413,29 @@ test.describe('on a desktop', () => {
       .evaluate((c) => [c.width, c.height, Math.min(devicePixelRatio, 2), innerWidth, innerHeight]);
     expect(size[0]).toBe(Math.ceil(size[3] * size[2]));
     expect(size[1]).toBe(Math.ceil(size[4] * size[2]));
+  });
+
+  test('only the left mouse button holds or walks him: a right press on him, a right- or middle-click on the floor leave him be', async ({
+    page,
+  }) => {
+    await calm(page);
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x, body.y);
+    await page.mouse.down({ button: 'right' });
+    await framesFor(page, 500); // (longer than a left press takes to grab him)
+    expect((await snapshot(page)).held, 'a right press on him').toBe(false);
+    await page.mouse.up({ button: 'right' });
+    const floor = { x: body.x + 200, y: body.y + 60 };
+    await page.mouse.click(floor.x, floor.y, { button: 'right' });
+    await page.mouse.click(floor.x, floor.y, { button: 'middle' });
+    await framesFor(page, 600);
+    const s = await snapshot(page);
+    expect(s.state).toBe('idle');
+    expect(s.states, 'never held').not.toContain('held');
+    expect(s.states, 'never walked off').not.toContain('walk');
+    // The left button still walks him there.
+    await page.mouse.click(floor.x, floor.y);
+    await until(page, (t) => t.state === 'walk', 'walking after a left click');
   });
 
   test('hovering turns his head', async ({ page }) => {
