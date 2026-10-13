@@ -2,10 +2,13 @@
 // (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT on
 // his floor (not a blank canvas); it's unlisted (noindex); a Look change survives a reload and
 // Pixel Size Off draws at native size; and the portfolio's first load carries none of its
-// code. The behaviour tests (tapping, holding, the head following the finger, the buttons,
-// floor taps, hover) are placeholders the integration step fills in: they wait on states
-// through `?test`'s window.__invitation, never on durations (CI's software WebGL runs slower
-// than real time), and drag with real touches (CDP Input.dispatchTouchEvent).
+// code. Playing with him: a tap makes him wave or start, a touch drag holds him by the collar
+// and letting go drops him (fall, then land), a finger on the floor turns his head, each
+// button plays its clip, a floor tap walks him there, and the cursor turns his head on a
+// desktop. The camera: a drag on empty space turns it, the wheel and a two-finger pinch zoom
+// it, and Reset Camera brings it back. Every wait is on a state through `?test`'s
+// window.__invitation, never on a duration (CI's software WebGL runs slower than real time),
+// and touches are real ones (CDP Input.dispatchTouchEvent).
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
@@ -44,6 +47,28 @@ async function ready(page, path = '/invitation/?test') {
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
 }
 const snapshot = (page) => page.evaluate(() => window.__invitation.snapshot());
+/** A point on NEWT (client px): 'head' or 'body'. */
+const on = (page, part) => page.evaluate((p) => window.__invitation.screen(p), part);
+/** Where a client point meets the floor (world units), or null. */
+const floorAt = (page, p) => page.evaluate(({ x, y }) => window.__invitation.floorAt(x, y), p);
+/** Waits until `pred(snapshot)` holds (states, never durations). */
+const until = (page, pred, message, timeout = 20_000) =>
+  expect.poll(async () => pred(await snapshot(page)), { message, timeout }).toBe(true);
+/** Ready, calm (no wandering, no sitting by himself) and standing still in idle. */
+async function calm(page) {
+  await ready(page, '/invitation/?test&calm&seed=3');
+  await until(page, (s) => s.state === 'idle' && s.clip === 'Idle', 'idle');
+}
+/** Real touches through CDP: `touch(type, [{x, y, id}])`. */
+async function toucher(page) {
+  const cdp = await page.context().newCDPSession(page);
+  return (type, points = []) =>
+    cdp.send('Input.dispatchTouchEvent', {
+      type,
+      touchPoints: points.map((p) => ({ x: p.x, y: p.y, id: p.id ?? 1, radiusX: 2, radiusY: 2, force: 1 })),
+    });
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
@@ -98,11 +123,113 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
-  test.fixme('tapping NEWT plays Wave or Spook', async () => {});
-  test.fixme('a touch drag holds him by the collar, and letting go gives fall, then land', async () => {});
-  test.fixme('a finger moving across the floor turns his head', async () => {});
-  test.fixme('each button plays its clip', async () => {});
-  test.fixme('a floor tap walks him there', async () => {});
+  test('tapping NEWT plays Wave or Spook', async ({ page }) => {
+    const errors = watch(page);
+    await calm(page);
+    const head = await on(page, 'head');
+    await page.touchscreen.tap(head.x, head.y);
+    await until(page, (s) => s.state === 'react' && ['Wave', 'Spook'].includes(s.reaction), 'reacting');
+    await until(page, (s) => ['Wave', 'Spook'].includes(s.clip), 'playing Wave or Spook');
+    await until(page, (s) => s.state === 'idle', 'back to idle', 30_000);
+    expect(errors).toEqual([]);
+  });
+
+  test('a touch drag holds him by the collar, and letting go gives fall, then land', async ({ page }) => {
+    const errors = watch(page);
+    await calm(page);
+    const touch = await toucher(page);
+    const from = await on(page, 'body');
+    await touch('touchStart', [from]);
+    for (let i = 1; i <= 12; i++) {
+      await touch('touchMove', [{ x: from.x + i * 4, y: from.y - i * 9 }]);
+      await sleep(16);
+    }
+    await until(page, (s) => s.state === 'held' && s.held, 'held');
+    expect((await snapshot(page)).lift).toBeGreaterThan(0.1); // off the floor
+    await touch('touchEnd');
+    await until(page, (s) => s.state === 'idle' || s.state === 'flee', 'down again', 30_000);
+    const states = (await snapshot(page)).states;
+    expect(states.slice(states.lastIndexOf('held'), states.lastIndexOf('held') + 3)).toEqual(['held', 'fall', 'land']);
+    expect(errors).toEqual([]);
+  });
+
+  test('a finger on the floor turns his head toward it, left and then right', async ({ page }) => {
+    await calm(page);
+    const touch = await toucher(page);
+    const body = await on(page, 'body');
+    for (const [side, ok] of [
+      [-1, (s) => s.headYaw < -0.15],
+      [1, (s) => s.headYaw > 0.15],
+    ]) {
+      const t0 = Date.now();
+      await touch('touchStart', [{ x: body.x + side * 140, y: body.y + 40 }]);
+      await until(page, ok, `his head turned ${side < 0 ? 'left' : 'right'}`);
+      await sleep(Math.max(0, 650 - (Date.now() - t0))); // (a press held this long is no floor tap)
+      await touch('touchEnd');
+    }
+    expect((await snapshot(page)).state).toBe('idle');
+  });
+
+  test('each button plays its clip', async ({ page }) => {
+    const errors = watch(page);
+    await calm(page);
+    const press = (name) => page.locator(`[data-button="${name}"]`).tap();
+    await press('Wave');
+    await until(page, (s) => s.clip === 'Wave', 'Wave');
+    await press('Spook');
+    await until(page, (s) => s.clip === 'Spook', 'Spook');
+    await press('Sit');
+    await until(page, (s) => s.clip === 'Sit' && s.state === 'sit', 'sitting', 30_000);
+    await expect(page.locator('[data-button="Sit"]')).toHaveText('Stand');
+    await press('Sit');
+    await until(page, (s) => s.clip === 'StandUp', 'standing up');
+    await expect(page.locator('[data-button="Sit"]')).toHaveText('Sit');
+    await press('Run');
+    await until(page, (s) => s.state === 'flee' && s.clip === 'Run', 'running', 30_000);
+    const wander = page.locator('[data-button="Wander"]');
+    const before = await wander.getAttribute('aria-pressed');
+    await press('Wander');
+    await expect(wander).toHaveAttribute('aria-pressed', before === 'true' ? 'false' : 'true');
+    expect(errors).toEqual([]);
+  });
+
+  test('a floor tap walks him there', async ({ page }) => {
+    await calm(page);
+    const body = await on(page, 'body');
+    const at = { x: body.x + 90, y: body.y + 110 };
+    const goal = await floorAt(page, at);
+    expect(goal).not.toBeNull();
+    await page.touchscreen.tap(at.x, at.y);
+    await until(page, (s) => s.state === 'walk', 'walking');
+    await until(
+      page,
+      (s) => s.state === 'idle' && Math.hypot(s.pos.x - goal.x, s.pos.z - goal.z) < 0.25,
+      'there',
+      30_000,
+    );
+  });
+
+  test('a two-finger pinch zooms the camera, and never taps or grabs him', async ({ page }) => {
+    await calm(page);
+    const touch = await toucher(page);
+    const body = await on(page, 'body');
+    const { camera } = await snapshot(page);
+    const at = (d) => [
+      { x: body.x - d, y: body.y + 160, id: 1 },
+      { x: body.x + d, y: body.y + 160, id: 2 },
+    ];
+    await touch('touchStart', at(40));
+    for (let d = 50; d <= 150; d += 10) {
+      await touch('touchMove', at(d));
+      await sleep(16);
+    }
+    await touch('touchEnd');
+    await until(page, (s) => s.camera.distance < camera.distance * 0.8, 'zoomed in');
+    const s = await snapshot(page);
+    expect(s.state).toBe('idle');
+    expect(s.states).not.toContain('walk');
+    expect(s.states).not.toContain('held');
+  });
 });
 
 test.describe('on a desktop', () => {
@@ -129,7 +256,54 @@ test.describe('on a desktop', () => {
     expect(size[1]).toBe(Math.ceil(size[4] * size[2]));
   });
 
-  test.fixme('hovering turns his head', async () => {});
+  test('hovering turns his head', async ({ page }) => {
+    await calm(page);
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x - 220, body.y + 60);
+    await until(page, (s) => s.headYaw < -0.15, 'his head turned left');
+    await page.mouse.move(body.x + 220, body.y + 60, { steps: 4 });
+    await until(page, (s) => s.headYaw > 0.15, 'his head turned right');
+  });
+
+  test('a drag on empty space turns the camera, the wheel zooms it, and Reset Camera brings it back', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    const body = await on(page, 'body');
+    const home = (await snapshot(page)).camera;
+    expect(Math.abs(home.yaw)).toBeLessThan(1e-3);
+    // A drag across empty floor: round it goes, and NEWT stays where he was.
+    await page.mouse.move(body.x + 260, body.y + 80);
+    await page.mouse.down();
+    for (let i = 1; i <= 15; i++) await page.mouse.move(body.x + 260 - i * 16, body.y + 80 + i * 3);
+    await page.mouse.up();
+    await until(page, (s) => Math.abs(s.camera.yaw) > 0.5, 'turned');
+    await until(page, (s) => s.camera.elevation > home.elevation + 0.05, 'tilted up a little');
+    let s = await snapshot(page);
+    expect(s.state).toBe('idle');
+    expect(s.held).toBe(false);
+    // The wheel: toward you further, away from you closer.
+    await page.mouse.move(body.x + 200, body.y);
+    await page.mouse.wheel(0, 400);
+    await until(page, (t) => t.camera.distance > home.distance * 1.3, 'zoomed out');
+    await page.mouse.wheel(0, -1200);
+    await until(page, (t) => t.camera.distance < home.distance * 0.8, 'zoomed in');
+    // Reset Camera: back to the default view.
+    await page.getByRole('button', { name: 'Look' }).click();
+    await page.getByRole('dialog', { name: 'Look' }).getByRole('button', { name: 'Reset Camera' }).click();
+    await until(
+      page,
+      (t) =>
+        Math.abs(t.camera.yaw - home.yaw) < 0.01 &&
+        Math.abs(t.camera.elevation - home.elevation) < 0.01 &&
+        Math.abs(t.camera.distance - home.distance) < home.distance * 0.01,
+      'back to the default view',
+    );
+    s = await snapshot(page);
+    expect(s.states).not.toContain('walk');
+    expect(errors).toEqual([]);
+  });
 });
 
 test("the portfolio's first load carries no invitation code", async ({ page }) => {
