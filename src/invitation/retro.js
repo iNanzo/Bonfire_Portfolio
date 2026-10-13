@@ -6,7 +6,8 @@
 //     the floor never shows an edge or a horizon;
 //   - the floor: the paper again, darkened toward the preset's shadow colour by his shadow (its
 //     coverage softened over `shadow.soft` texels and dithered into `shadow.steps` tones, or
-//     left hard), and by whatever is drawn over it (the blob shadow, the marker);
+//     left hard), and by whatever is drawn over it (the blob shadow, the marker), never
+//     quantized (Colors is his colour depth);
 //   - NEWT: graded (exposure, lift, gamma, contrast, saturation, tint warmed or cooled), lined,
 //     then quantized to `levels` a channel with the 4×4 Bayer dither.
 // Every value comes from the look preset (lookPreset: the style with the user's Shader options
@@ -257,7 +258,8 @@ const srgb = (c) => {
 const vertexShader = /* glsl */ `
   void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }
 `;
-const fragmentShader = /* glsl */ `
+/** The post shader (exported for the tests: which texels it quantizes). */
+export const POST_SHADER = /* glsl */ `
   #include <packing>
   #define ID_SCALE ${ID_SCALE.toFixed(1)}
   #define NEWT ${ID.newt.toFixed(1)}
@@ -372,11 +374,12 @@ const fragmentShader = /* glsl */ `
       gl_FragColor = vec4(quantize(col, d * uDither), 1.0);
       return;
     }
-    // The paper, or the floor: the paper under his shadow and what's drawn over it, quantized
-    // without the dither (the shadow's flat tones stay flat as the camera turns: a screen-space
-    // pattern over them would crawl), or a line just outside him, dithered as he is.
+    // The paper, or the floor: the paper under his shadow and what's drawn over it, never
+    // dithered (the shadow's flat tones stay flat as the camera turns: a screen-space pattern
+    // over them would crawl) nor quantized (Colors is his colour depth: at a few levels the
+    // shadow's lavender turned blue); or a line just outside him, quantized and dithered as he is.
     vec3 col = uPaper;
-    bool marked = false;
+    bool line = false;
     float dd = 0.0;
     float own = shadeOf(src);
     if (own >= 0.0) {
@@ -384,19 +387,18 @@ const fragmentShader = /* glsl */ `
       if (uShadeSteps > 0.5)
         amount = clamp(floor(amount * uShadeSteps + 0.5 + d * uShadeDither) / uShadeSteps, 0.0, 1.0);
       col = mix(col * toSRGB(src.rgb), uShade, amount * uShadeAmount);
-      marked = amount > 0.0 || any(lessThan(src.rgb, vec3(1.0)));
     }
     if (uOutline > 0.5 && uOutside > 0.5)
       for (int k = 0; k < 4; k++) {
         vec2 n = p + STEPS[k];
         if (!isNewt(n)) continue;
         col = grade(at(n).rgb) * uInk * (1.0 - uDarken);
-        marked = true;
+        line = true;
         dd = d * uDither;
         break;
       }
     // (Untouched paper stays exactly the paper.)
-    gl_FragColor = vec4(marked ? quantize(col, dd) : col, 1.0);
+    gl_FragColor = vec4(line ? quantize(col, dd) : col, 1.0);
   }
 `;
 
@@ -437,7 +439,7 @@ export function createRetro(renderer) {
       uShadeDither: { value: 1 },
     },
     vertexShader,
-    fragmentShader,
+    fragmentShader: POST_SHADER,
     depthTest: false,
     depthWrite: false,
   });

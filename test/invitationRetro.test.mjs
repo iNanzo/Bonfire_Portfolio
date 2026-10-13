@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import {
   ID,
   MAX_SOFT,
+  POST_SHADER,
   catcherMaterial,
   createRetro,
   decalMaterial,
@@ -182,6 +183,18 @@ test('the Shader options reach the post shader: Colors, the dither, the lines’
   retro.setParams(lookPreset(full), full);
   assert.equal(u.uLevels.value, 256);
   retro.dispose();
+});
+
+test('Colors quantizes NEWT and the lines round him, never the paper or his shadow on the floor (at a few levels its lavender turned blue)', () => {
+  const main = POST_SHADER.slice(POST_SHADER.indexOf('void main()'));
+  assert.equal([...main.matchAll(/quantize\(/g)].length, 2, 'two places: his texels, and a line outside him');
+  assert.match(main, /gl_FragColor = vec4\(quantize\(col, d \* uDither\), 1\.0\);\s*return;/, 'his texels');
+  assert.match(main, /line = true;/, 'a line just outside him is marked as one');
+  assert.match(
+    main,
+    /gl_FragColor = vec4\(line \? quantize\(col, dd\) : col, 1\.0\);/,
+    'and only it is quantized there',
+  );
 });
 
 /** A material's fragment shader as onBeforeCompile leaves it (`lib`: three's ShaderLib entry). */
