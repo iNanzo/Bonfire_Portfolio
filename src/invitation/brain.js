@@ -295,7 +295,11 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
         break;
       case 'drag':
       case 'hover':
+      case 'orbit':
         pointerPx(e.x, e.y);
+        break;
+      case 'pinch':
+        company();
         break;
     }
   }
