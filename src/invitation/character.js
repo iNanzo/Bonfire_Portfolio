@@ -26,15 +26,25 @@
 //
 // Faces: NEWT_Face's 2×2 sheet split into one clamped texture per cell (clips.js FACES), so
 // swapping material.map never bleeds into the next cell as an offset would (the face's UVs reach
-// a little past the cell). While the pixel filter is on, models/newt-face.png's pixel cells
-// (tools/newt-face.mjs: nearest, no mipmaps) stand in for the 1024 sheet, which mipmaps down to
-// a blank face at a dozen texels.
+// a little past the cell). While the pixel filter is on, a pixel sheet from models/newt-face.png
+// (tools/newt-face.mjs: one 2×2 sheet a cell size, faceSheets.js; nearest, no mipmaps) stands
+// in for the 1024 sheet, which mipmaps down to a blank face at a dozen texels: the one whose
+// cell is as many pixels as his half face covers texels, measured as his meshes are drawn
+// (the camera, the target's texels, his face's span: faceSheets.js faceSpan) and held through
+// small changes (pickFaceSize), so a 2-pixel eye stays 2 texels as he moves.
+//
+// The texel snap (pixel filter on): as each of his meshes is drawn, the shift that puts his
+// head's centre on a texel's centre is worked out (retro.js snapShift) and all his materials
+// move by it (markId's snap), so his head draws the same texels while it drifts within one,
+// and steps a whole texel when it crosses one, like a sprite.
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BONES, CLIPS, FACES, SCALE } from './clips.js';
+import { FACE_IMAGE, FACE_LAYOUT, faceSpan, pickFaceSize } from './faceSheets.js';
 import { LOOKS, DEFAULT_LOOK } from './look.js';
 import { TWIN } from './play.js';
-import { ID, markId, toonGradient } from './retro.js';
+import { ID, markId, snapShift, toonGradient } from './retro.js';
 
 /** The clips that follow the step phase (blend.js gaitPhase); Idle breathes on its own clock. */
 const PHASED = ['Walk', 'Run'];
@@ -54,6 +64,9 @@ const MIN_R = 11;
  *   timeOf(clip: string): number,
  *   face: import('./clips.js').FaceName,
  *   faceReady: Promise<void>,
+ *   faceSize: number|null,
+ *   faceTexels: number,
+ *   texelSnap: {x: number, y: number},
  * }} PageCharacter
  */
 
@@ -83,6 +96,12 @@ export function createCharacter(gltf, opts = {}) {
   const textures = new Set();
   let skeleton = null;
   let faceMaterial = null;
+  /** @type {any} the mesh his face is drawn on */
+  let faceMesh = null;
+  /** His materials' shared texel snap (NDC; retro.js markId). */
+  const snap = { value: new THREE.Vector2() };
+  /** @type {any[]} every mesh of his */
+  const meshes = [];
 
   const toon = (src) => {
     if (made.has(src)) return made.get(src);
@@ -94,6 +113,7 @@ export function createCharacter(gltf, opts = {}) {
         gradientMap: gradient,
       }),
       ID.newt,
+      { snap },
     );
     if (src?.map) textures.add(src.map);
     if (src?.name === 'NEWT_Face') faceMaterial = m;
@@ -108,6 +128,8 @@ export function createCharacter(gltf, opts = {}) {
     o.receiveShadow = false;
     if (o.isSkinnedMesh && !skeleton) skeleton = o.skeleton;
     o.material = Array.isArray(o.material) ? o.material.map(toon) : toon(o.material);
+    if (faceMaterial && !faceMesh && [o.material].flat().includes(faceMaterial)) faceMesh = o;
+    meshes.push(o);
   });
 
   /** A bone by its three.js name (never a mesh that shares it: the glb's "Neck"). */
@@ -144,12 +166,27 @@ export function createCharacter(gltf, opts = {}) {
   // --- Faces.
   /** @type {Record<string, any>|null} */
   let sheetFaces = null;
-  /** @type {Record<string, any>|null} */
-  let pixelFaces = null;
+  /** @type {any} newt-face.png, once loaded (its sheets are split as they're first shown) */
+  let pixelImage = null;
+  /** @type {import('./faceSheets.js').FaceSheet[]} the sheets in it */
+  let pixelLayout = FACE_LAYOUT;
+  /** @type {Map<number, Record<string, any>>} each shown size's cells */
+  const pixelSets = new Map();
   /** @type {import('./clips.js').FaceName} */
   let face = 'neutral';
+  /** The pixel sheet's size for his half face (null until he's drawn), and that measure in texels. */
+  let faceSize = null;
+  let faceTexels = 0;
+  /** His face's width across one cell at the eyes, model units (0: no face to measure). */
+  const span = faceMesh ? spanOf(faceMesh.geometry) : 0;
+  /** The pixel sheet's cells at `size` (the nearest the image has before he's measured). */
+  const pixelFacesAt = (size) => {
+    const sheet = pixelLayout.find((s) => s.w === size) ?? pixelLayout.find((s) => s.w >= 8) ?? pixelLayout[0];
+    if (!pixelSets.has(sheet.w)) pixelSets.set(sheet.w, splitSheet(pixelImage, true, sheet));
+    return pixelSets.get(sheet.w);
+  };
   const showFace = () => {
-    const set = pixel && pixelFaces ? pixelFaces : sheetFaces;
+    const set = pixel && pixelImage ? pixelFacesAt(faceSize) : sheetFaces;
     if (faceMaterial && set) faceMaterial.map = set[face];
   };
   if (faceMaterial?.map?.image && typeof document !== 'undefined') {
@@ -164,7 +201,10 @@ export function createCharacter(gltf, opts = {}) {
       ? new THREE.TextureLoader()
           .loadAsync(opts.pixelFaceUrl)
           .then((t) => {
-            pixelFaces = splitSheet(t.image, true);
+            pixelImage = t.image;
+            // (An image that isn't the ladder, an older one cached: one 2×2 sheet.)
+            if (pixelImage.width !== FACE_IMAGE.w || pixelImage.height !== FACE_IMAGE.h)
+              pixelLayout = [{ w: Math.floor(pixelImage.width / 2), h: Math.floor(pixelImage.height / 2), x: 0, y: 0 }];
             t.dispose();
             showFace();
           })
@@ -182,6 +222,41 @@ export function createCharacter(gltf, opts = {}) {
   const ident = new THREE.Quaternion();
   const UP = new THREE.Vector3(0, 1, 0);
   const SIDE = new THREE.Vector3(-1, 0, 0);
+  const viewport = new THREE.Vector4();
+  const centre = new THREE.Vector3();
+  const ndc = new THREE.Vector3();
+  const scale = new THREE.Vector3();
+  const headBone = bone(BONES.head);
+
+  /**
+   * As each of his meshes is drawn (onBeforeRender: the camera and the target it's drawn into
+   * are the frame's): the texel snap for his head's centre, and the face sheet for his half
+   * face in texels there.
+   * @param {any} renderer
+   * @param {any} _scene
+   * @param {any} camera
+   */
+  function beforeDraw(renderer, _scene, camera) {
+    renderer.getCurrentViewport(viewport);
+    if (headBone) headBone.localToWorld(centre.set(0, HEAD.up, 0));
+    else root.getWorldPosition(centre);
+    ndc.copy(centre).project(camera);
+    if (pixel) snapShift(ndc.x, ndc.y, viewport.z, viewport.w, snap.value);
+    else snap.value.set(0, 0);
+    if (!span || !faceMesh) return;
+    // Texels a world unit at his head: the projection's vertical scale over the depth there.
+    const depth = camera.isOrthographicCamera ? 1 : -ndc.copy(centre).applyMatrix4(camera.matrixWorldInverse).z;
+    if (!(depth > 0)) return;
+    const perUnit = (camera.projectionMatrix.elements[5] * viewport.w) / 2 / depth;
+    faceTexels = span * faceMesh.getWorldScale(scale).x * perUnit;
+    const sizes = pixelLayout.map((s) => s.w);
+    const next = pickFaceSize(faceTexels, faceSize, sizes);
+    if (next !== faceSize) {
+      faceSize = next;
+      showFace();
+    }
+  }
+  for (const o of meshes) o.onBeforeRender = beforeDraw;
 
   /** A clip's twin by its name (`Wave~`), or undefined. */
   const twinOf = (name) => (name.endsWith(TWIN) ? twins.get(name.slice(0, -TWIN.length)) : undefined);
@@ -274,6 +349,15 @@ export function createCharacter(gltf, opts = {}) {
       return face;
     },
     faceReady,
+    get faceSize() {
+      return faceSize;
+    },
+    get faceTexels() {
+      return faceTexels;
+    },
+    get texelSnap() {
+      return snap.value;
+    },
     setStyle(next, pixelOn) {
       preset = next;
       pixel = pixelOn;
@@ -281,6 +365,7 @@ export function createCharacter(gltf, opts = {}) {
       for (const m of made.values()) m.gradientMap = g;
       gradient.dispose();
       gradient = g;
+      if (!pixel) snap.value.set(0, 0);
       showFace();
     },
     bonePos(name, out) {
@@ -323,29 +408,49 @@ export function createCharacter(gltf, opts = {}) {
       root.traverse((o) => o.geometry?.dispose());
       for (const m of made.values()) m.dispose();
       for (const t of textures) t.dispose();
-      for (const set of [sheetFaces, pixelFaces]) for (const t of Object.values(set ?? {})) t.dispose();
+      for (const set of [sheetFaces, ...pixelSets.values()]) for (const t of Object.values(set ?? {})) t.dispose();
       gradient.dispose();
     },
   };
 }
 
 /**
- * The face sheet's four cells as their own textures (clips.js FACES: a cell's texture offset
+ * His face's width across one cell at the eyes (faceSheets.js faceSpan), from its geometry.
+ * @param {any} geometry
+ */
+function spanOf(geometry) {
+  const pos = geometry?.attributes?.position;
+  const uv = geometry?.attributes?.uv;
+  if (!pos || !uv) return 0;
+  const p = [];
+  const t = [];
+  for (let i = 0; i < pos.count; i++) p.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+  for (let i = 0; i < uv.count; i++) t.push(uv.getX(i), uv.getY(i));
+  const index = geometry.index ? Array.from(geometry.index.array) : Array.from({ length: pos.count }, (_, i) => i);
+  return faceSpan(p, t, index);
+}
+
+/**
+ * A face sheet's four cells as their own textures (clips.js FACES: a cell's texture offset
  * on the sheet, glTF's flipY = false, so v runs down the image). Each repeats ×2 so the face's
  * UVs (one cell's worth) span it, clamped at its edges.
  * @param {any} image  an ImageBitmap, image or canvas
  * @param {boolean} nearest  pixel cells: nearest, no mipmaps
+ * @param {{w: number, h: number, x: number, y: number}} [sheet]  where the sheet is in the
+ *   image (a cell w × h): the whole image by default
  */
-function splitSheet(image, nearest) {
-  const w = Math.floor(image.width / 2);
-  const h = Math.floor(image.height / 2);
+function splitSheet(image, nearest, sheet) {
+  const w = sheet?.w ?? Math.floor(image.width / 2);
+  const h = sheet?.h ?? Math.floor(image.height / 2);
+  const x0 = sheet?.x ?? 0;
+  const y0 = sheet?.y ?? 0;
   /** @type {Record<string, any>} */
   const out = {};
   for (const [name, [u, vv]] of Object.entries(FACES)) {
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
-    canvas.getContext('2d').drawImage(image, u * 2 * w, vv * 2 * h, w, h, 0, 0, w, h);
+    canvas.getContext('2d').drawImage(image, x0 + u * 2 * w, y0 + vv * 2 * h, w, h, 0, 0, w, h);
     const t = new THREE.CanvasTexture(canvas);
     t.flipY = false;
     t.colorSpace = THREE.SRGBColorSpace;
