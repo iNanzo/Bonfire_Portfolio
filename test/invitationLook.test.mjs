@@ -1,11 +1,12 @@
 // The invitation toy's look (pure parts): the pixel grid (src/invitation/pixels.js) in whole
 // device pixels on the phones and the desktop the round checks, Pixel Size Off at native size
-// (its DPR capped at 2), the camera framing NEWT 36 to 40 texels tall at the default size with
-// the floor clear of the toolbar and the side edges, the Bayer matrix the retro pass dithers
-// with, the Look settings (src/invitation/look.js) surviving any storage, and the presets
-// (src/invitation/looks/) carrying every look value, so a designer only ever edits data. With
-// three.js in Node: the room (room.js), the surface ids and the retro pass's order and uniforms
-// (retro.js, a stand-in renderer); and the toolbar's and Look sheet's markup (ui.js).
+// (its DPR capped at 2), the camera framing NEWT 36 to 40 texels tall at the default size, low
+// enough to see his face, standing in the middle of the space over the toolbar, the Bayer matrix
+// the retro pass dithers with, the Look settings (src/invitation/look.js) surviving any storage,
+// and the presets (src/invitation/looks/) carrying every look value, so a designer only ever
+// edits data. With three.js in Node: the floor (floor.js: invisible, it only catches his
+// shadows; there's no room), the surface ids and the retro pass's order and uniforms (retro.js,
+// a stand-in renderer); and the toolbar's and Look sheet's markup (ui.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -13,7 +14,7 @@ import {
   DEFAULT_PIXEL,
   NATIVE_DPR,
   PIXEL_SIZES,
-  ROOM,
+  VIEW,
   frameView,
   headTexels,
   newtTexels,
@@ -31,7 +32,7 @@ import {
   saveLook,
   validLook,
 } from '../src/invitation/look.js';
-import { createRoom, roomBounds } from '../src/invitation/floor.js';
+import { FLOOR_SIZE, createFloor, floorLook } from '../src/invitation/floor.js';
 import { ID, createRetro, decalMaterial, markId } from '../src/invitation/retro.js';
 import { BUTTONS, parseQuery, sheetHtml, statusHtml, toolbarHtml } from '../src/invitation/ui.js';
 
@@ -90,20 +91,18 @@ test('NEWT is 36 to 40 texels tall at the default size, on a phone and on a desk
     const tall = newtTexels(view, grid);
     assert.ok(tall >= 36 && tall <= 40, `${at}: NEWT is ${tall.toFixed(1)} texels tall`);
     assert.ok(headTexels(view, grid) > 10, `${at}: his head is ${headTexels(view, grid).toFixed(1)} texels wide`);
-    assert.ok(view.roomWidth >= ROOM.minWidth && view.roomWidth <= ROOM.maxWidth, `${at}: room ${view.roomWidth}`);
-    // The floor stays clear of the side edges and the toolbar; a third of the back wall at least
-    // shows (on a wide screen its top runs off the top, as an Animal Crossing room's does).
-    const front = ROOM.depth / 2;
-    const left = project(view, { x: -view.roomWidth / 2, y: 0, z: front });
-    const right = project(view, { x: view.roomWidth / 2, y: 0, z: front });
-    const top = project(view, { x: 0, y: ROOM.wall / 3, z: -front });
+    // He starts in the middle of the space over the toolbar (the play area is all the floor
+    // around him: area.js), seen from low enough that his cap's brim leaves his face showing.
+    const middle = project(view, { x: 0, y: 0.5, z: 0 });
+    assert.ok(Math.abs(middle.x - cssW / 2) < 1.5, `${at}: centred across (${middle.x})`);
     assert.ok(
-      left.x >= INSETS.left - 0.5 && right.x <= cssW - INSETS.right + 0.5,
-      `${at}: floor ${left.x}..${right.x}`,
+      Math.abs(middle.y - (INSETS.top + cssH - INSETS.bottom) / 2) < 1.5,
+      `${at}: halfway down the space over the toolbar (${middle.y})`,
     );
-    assert.ok(left.y <= cssH - INSETS.bottom + 0.5, `${at}: the floor's front edge (${left.y}) is over the toolbar`);
-    assert.ok(top.y >= INSETS.top - 0.5, `${at}: a third of the back wall (${top.y}) shows`);
-    assert.ok(view.elevation === 48 && Math.abs(view.fov - 30) < 1e-6, 'about 30° of view, 48° up');
+    assert.equal(view.elevation, VIEW.elevation);
+    assert.ok(view.elevation >= 30 && view.elevation <= 36, `about 30–36° up (${view.elevation}°)`);
+    assert.ok(Math.abs(view.fov - 30) < 1e-6, 'about 30° of view');
+    assert.equal('roomWidth' in view, false, 'no room');
   }
 });
 
@@ -210,43 +209,62 @@ test('every look preset carries every look value (a designer edits data, never c
     assert.match(p.hemi.sky, colour, at('hemi.sky'));
     assert.match(p.hemi.ground, colour, at('hemi.ground'));
     assert.ok(p.hemi.intensity >= 0, at('hemi.intensity'));
-    for (const k of ['background', 'floor', 'wall', 'side', 'baseboard'])
-      assert.match(p.room[k], colour, at(`room.${k}`));
-    assert.ok(p.blob.opacity >= 0 && p.blob.lifted >= p.blob.opacity, at('blob'));
+    // The scene: a background, the shadows the invisible floor catches and the blob shadow
+    // (floorLook reads them, with fallbacks while a preset still has the room's colours).
+    const f = floorLook(p);
+    assert.ok(Number.isInteger(f.background) && f.background >= 0 && f.background <= 0xffffff, at('background'));
+    assert.ok(Number.isInteger(f.shadow.color) && f.shadow.opacity > 0 && f.shadow.opacity <= 1, at('shadow'));
+    assert.ok(f.blob.opacity >= 0 && f.blob.lifted >= f.blob.opacity, at('blob'));
     assert.match(p.marker.color, colour, at('marker.color'));
     assert.equal(p.animFps, 0, at('animFps (choppy motion stays off until Stop 1)'));
   }
 });
 
-test('NEWT’s bounds stay inside the walls and the front edge, by his radius', () => {
-  for (const width of [ROOM.minWidth, 4.4, ROOM.maxWidth]) {
-    const b = roomBounds(width);
-    assert.ok(b.minX >= -width / 2 + 0.2 && b.maxX <= width / 2 - 0.2, `width ${width}: x`);
-    assert.ok(b.minZ >= -ROOM.depth / 2 + 0.2 && b.maxZ <= ROOM.depth / 2 - 0.2, `width ${width}: z`);
-    assert.ok(b.maxX - b.minX > 2.5 && b.maxZ - b.minZ > 3, `width ${width}: room to walk`);
-  }
+test('the floor reads the preset’s background, shadow and blob, falling back when one is missing', () => {
+  const full = floorLook({
+    background: 0xfafafa,
+    shadow: { type: 'basic', color: 0x334455, opacity: 0.4 },
+    blob: { opacity: 0.2, lifted: 0.35 },
+  });
+  assert.deepEqual(full, {
+    background: 0xfafafa,
+    shadow: { color: 0x334455, opacity: 0.4 },
+    blob: { color: 0x334455, opacity: 0.2, lifted: 0.35 },
+  });
+  // A preset still carrying the room's colours (as strings), and one with nothing at all.
+  const old = floorLook({ room: { background: '#f3f0ea' }, blob: { color: '#5a5048', opacity: 0.16 } });
+  assert.equal(old.background, 0xf3f0ea);
+  assert.equal(old.shadow.color, 0x5a5048, 'the blob’s colour stands in for the shadow’s');
+  assert.ok(old.blob.lifted > old.blob.opacity, 'stronger while he’s lifted');
+  const none = floorLook(/** @type {any} */ ({}));
+  assert.equal(none.background, 0xffffff, 'white');
+  assert.ok(none.shadow.opacity > 0 && none.shadow.opacity < 1);
+  assert.ok(none.blob.lifted >= none.blob.opacity);
+  assert.equal(floorLook(/** @type {any} */ ({ shadow: { opacity: 7 } })).shadow.opacity, 1, 'clamped');
 });
 
-test('the room: its side walls at the width’s edges, the preset’s colours, shadows taken and never cast', () => {
-  const room = createRoom(LOOKS.ds);
-  room.setWidth(4.2);
-  assert.equal(room.width, 4.2);
-  assert.deepEqual(room.bounds, roomBounds(4.2));
-  const walls = room.group.children.filter((m) => m.geometry.type === 'PlaneGeometry');
-  const sides = walls.filter((m) => Math.abs(m.rotation.y) > 1);
-  assert.deepEqual(
-    sides.map((m) => m.position.x).sort((a, b) => a - b),
-    [-2.1, 2.1],
+test('the floor: no room, an invisible shadow catcher far wider than the view, drawing no lines', () => {
+  const floor = createFloor(LOOKS.ds);
+  const { mesh } = floor;
+  assert.equal(mesh.isMesh, true);
+  assert.equal(mesh.children.length, 0, 'no walls, no baseboard: just the floor');
+  assert.equal(mesh.material.isShadowMaterial, true, 'only his shadows show on it');
+  assert.ok(Math.abs(mesh.rotation.x + Math.PI / 2) < 1e-9, 'level');
+  assert.ok(FLOOR_SIZE >= 100, 'no edge or horizon ever shows');
+  assert.equal(mesh.receiveShadow, true);
+  assert.equal(mesh.castShadow, false);
+  assert.equal(mesh.material.depthWrite, false, 'no depth written: no line where it meets the background');
+  assert.equal(mesh.material.blendSrcAlpha, THREE.ZeroFactor);
+  assert.equal(mesh.material.blendDstAlpha, THREE.OneFactor, 'the surface id under it is kept: no lines in the shadow');
+  const want = floorLook(LOOKS.ds).shadow;
+  assert.equal(mesh.material.color.getHex(), want.color);
+  assert.equal(mesh.material.opacity, want.opacity);
+  floor.setLook(
+    /** @type {any} */ ({ ...LOOKS.soft, shadow: { ...LOOKS.soft.shadow, color: 0x203040, opacity: 0.5 } }),
   );
-  for (const m of room.group.children) {
-    assert.equal(m.receiveShadow, true);
-    assert.equal(m.castShadow, false);
-  }
-  room.setLook(LOOKS.soft);
-  const floor = walls.find((m) => Math.abs(m.rotation.x) > 1);
-  assert.equal(`#${floor.material.color.getHexString()}`, LOOKS.soft.room.floor);
-  assert.equal(floor.material.gradientMap.image.width, LOOKS.soft.toon.length, 'the preset’s toon bands');
-  assert.doesNotThrow(() => room.dispose());
+  assert.equal(mesh.material.color.getHex(), 0x203040);
+  assert.equal(mesh.material.opacity, 0.5);
+  assert.doesNotThrow(() => floor.dispose());
 });
 
 test('surface ids: a marked material writes its id into alpha last; what’s drawn over the floor keeps it', () => {
