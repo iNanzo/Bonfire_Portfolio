@@ -196,11 +196,13 @@ export function quatDistance(a, b) {
 
 /**
  * How far one cycle of an in-place gait would carry him: the mean backward speed of a planted
- * foot (an ankle within `contact` of the lowest ankle height in the clip, not moving forward:
- * a foot just lifting or setting down doesn't count) times the cycle's length, in model units. Forward is glTF +Z (Blender's −Y). Flight phases don't count, so a
+ * foot (an ankle within `contact` of the lowest ankle height in the clip, not moving forward)
+ * times the cycle's length, in model units. Forward is glTF +Z (Blender's −Y). Only a foot lying
+ * flat counts: one rocking onto its heel or peeling off over its toe lifts its ankle, and its
+ * ankle then moves slower than the sole that stays put. Flight phases don't count either, so a
  * run's stride is what keeps its planted feet from sliding.
  */
-export function footStride(glb, anim, { feet = ['Foot.L', 'Foot.R'], contact = 0.08, rate = 240 } = {}) {
+export function footStride(glb, anim, { feet = ['Foot.L', 'Foot.R'], contact = 0.02, rate = 240 } = {}) {
   const n = Math.round(anim.duration * rate);
   const track = feet.map(() => []);
   for (let k = 0; k <= n; k++) {

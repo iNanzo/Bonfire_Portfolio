@@ -246,6 +246,8 @@ def blend(p, q, t):
 # Key poses (armature space; see the docstring for what each number means)
 
 ANKLE = 0.417  # the ankle over the sole (clips.js ANKLE_HEIGHT)
+TOE_TIP = (-0.826, -0.417)  # the sole's front edge from the ankle (y, z), the foot at rest
+HEEL_TIP = (0.437, -0.417)  # the heel's back edge, likewise
 STANCE = (0.6, 0.06, ANKLE)  # Idle's ankle, his left (+X); the right mirrors it
 WIDE = (1.0, -0.08, ANKLE)  # Land's: where Fall's spread feet touch down
 
@@ -319,58 +321,93 @@ def idle(t):
     return p
 
 
+def rolled(point, pitch):
+    """The ankle's (dy, dz) from a sole point (TOE_TIP or HEEL_TIP) that stays put on the floor
+    while the foot pitches about it (pitch as in a leg's: toes down +, from rest)."""
+    y, z = point
+    c, s = math.cos(math.radians(pitch)), math.sin(math.radians(pitch))
+    return (-(y * c - z * s), -(y * s + z * c))
+
+
+def stance(u, g):
+    """A planted foot at u (0..1 of its time down): the ankle (y, z) and the foot's pitch. The sole
+    moves back at the belt's even speed; the foot lands on its heel (toes up), lies flat, then
+    peels off over the toe tip, so neither end of it ever dips into the floor."""
+    belt = -g['step'] / 2 + g['step'] * u
+    if u < g['heel_t']:  # heel strike: rocks down onto the sole about the heel's back edge
+        e = u / g['heel_t']
+        pitch = g['heel'] * (1 - e) * (1 - e)
+        point = HEEL_TIP
+    elif u > 1 - g['toe_t']:  # heel off: the ankle rises, the toe tip stays on the floor
+        e = (u - 1 + g['toe_t']) / g['toe_t']
+        pitch = g['toe'] * e * e
+        point = TOE_TIP
+    else:
+        return belt, ANKLE, 0.0
+    dy, dz = rolled(point, pitch)
+    return belt + point[0] + dy, dz, pitch
+
+
 def gait(t, g):
     """A walk or run cycle at t (0..1); the left foot is forward at 0, as in clips.js."""
     p = merge(IDLE)
     c = g['contact']
-    feet = {}
+    sw = math.cos(2 * math.pi * t)  # +1 when the left foot leads
+    hip_yaw = -g['yaw'] * sw
     for side, s in SIDES:
         ph = (t + (0.0 if s > 0 else 0.5)) % 1.0
-        if ph < c:  # planted: slides back at an even speed
-            u = ph / c
-            y = -g['step'] / 2 + g['step'] * u
-            z = ANKLE
-            pitch = lerp(g['heel'], g['toe'], u)
-        else:  # swing: lifts and comes forward
+        if ph < c:  # planted: rolls heel to toe, its sole never turning or sliding on the floor
+            y, z, pitch = stance(ph / c, g)
+            net_yaw = 0.0
+        else:  # swing: from toe-off, lifts and comes forward to the next heel strike
             u = (ph - c) / (1 - c)
             e = u * u * (3 - 2 * u)
-            y = g['step'] / 2 - g['step'] * e
-            z = ANKLE + g['lift'] * math.sin(math.pi * u ** g['peak'])  # peak < 1 kicks up early
-            pitch = lerp(g['toe'], g['heel'], e) + g['swing_pitch'] * math.sin(math.pi * u)
-        feet[side] = (g['width'], y, z, pitch)
-        p['leg' + side] = {'at': (g['width'], y, z), 'pitch': pitch, 'knee': (0.15, -1, 0)}
+            y0, z0, p0 = stance(1.0, g)
+            y1, z1, p1 = stance(0.0, g)
+            y = lerp(y0, y1, e)
+            z = lerp(z0, z1, e) + g['lift'] * math.sin(math.pi * u ** g['peak'])  # peak < 1 kicks up early
+            pitch = lerp(p0, p1, e) + g['swing_pitch'] * math.sin(math.pi * u)
+            net_yaw = hip_yaw * math.sin(math.pi * u)  # swings round with the hips, lands straight
+        p['leg' + side] = {'at': (g['width'], y, z), 'pitch': pitch, 'yaw': s * (net_yaw - hip_yaw), 'knee': (0.15, -1, 0)}
     bob = math.cos(4 * math.pi * (t - g['low']))  # lowest at g['low'] and half a cycle on
-    sw = math.cos(2 * math.pi * t)  # +1 when the left foot leads
+    shift = math.sin(2 * math.pi * t)  # +1 over the left foot (planted 0..0.5), -1 over the right
     p['hips'] = {
-        'loc': (0.0, 0.0, g['height'] - g['bob'] * bob),
-        'rot': (g['lean'], g['roll'] * math.sin(2 * math.pi * t), -g['yaw'] * sw),
+        'loc': (g['shift'] * shift, 0.0, g['height'] - g['bob'] * bob),
+        'rot': (g['lean'], g['roll'] * shift, hip_yaw),
     }
-    p['chest'] = (g['chest'], 0, g['yaw'] * 1.4 * sw)
-    p['neck'] = (0, 0, -g['yaw'] * 0.3 * sw)
+    p['chest'] = (g['chest'], -g['counter'] * shift, g['yaw'] * 1.4 * sw)
+    p['neck'] = (g.get('neck', 0), 0, -g['yaw'] * 0.3 * sw)
     p['head'] = (g['head'] + g['nod'] * bob, -g['roll'] * 0.6 * math.sin(2 * math.pi * t), 0)
     for side, s in SIDES:
         k = -s * sw  # the arm opposite the leading foot swings forward
         a = g['arm']
         p['arm' + side] = {
             'shoulder': (a['shrug'], a['protract'] + 4 * k),
-            'upper': (a['fwd'] + a['swing'] * k, a['out']),
-            'lower': (a['fwd2'] + a['swing2'] * k, a['out2']),
+            'upper': (a['fwd'] + a['swing'] * k, a['out'] + a.get('swing_out', 0) * k),
+            'lower': (a['fwd2'] + a['swing2'] * k, a['out2'] + a.get('swing_out', 0) * k),
             'twist': 0,
         }
     return p
 
 
+# contact: the share of the cycle a foot is down; heel_t / toe_t: the share of that spent rocking
+# onto the sole from the heel / peeling off over the toe; heel, toe: the foot's pitch at strike
+# and at toe-off; shift: the hips' sway over the planted foot (roll tips them with it, counter
+# rolls the chest back).
 WALK = {
     'contact': 0.5, 'step': 1.85, 'lift': 0.4, 'peak': 0.9, 'low': 0.0, 'width': 0.46, 'height': -0.2, 'bob': 0.09,
-    'heel': -14, 'toe': 18, 'swing_pitch': 8, 'lean': 4, 'roll': 5, 'yaw': 9, 'chest': 2,
-    'head': -2, 'nod': 3,
+    'heel': -10, 'toe': 15, 'heel_t': 0.2, 'toe_t': 0.4, 'swing_pitch': 8, 'lean': 4, 'roll': 4, 'yaw': 9,
+    'shift': 0.06, 'counter': 2, 'chest': 2, 'head': -2, 'nod': 3,
     'arm': {'shrug': 0, 'protract': 0, 'fwd': 2, 'swing': 30, 'out': 20, 'fwd2': 16, 'swing2': 32, 'out2': 14},
 }  # fmt: skip
 RUN = {
-    'contact': 0.3, 'step': 2.0, 'lift': 0.7, 'peak': 0.7, 'low': 0.15, 'width': 0.42, 'height': -0.3, 'bob': 0.15,
-    'heel': -8, 'toe': 26, 'swing_pitch': 18, 'lean': 14, 'roll': 4, 'yaw': 6, 'chest': 4,
-    'head': -12, 'nod': 3,
-    'arm': {'shrug': 18, 'protract': 10, 'fwd': 105, 'swing': 22, 'out': 32, 'fwd2': 125, 'swing2': 20, 'out2': 18},
+    'contact': 0.3, 'step': 2.0, 'lift': 0.45, 'peak': 0.7, 'low': 0.15, 'width': 0.42, 'height': -0.3, 'bob': 0.15,
+    'heel': -6, 'toe': 25, 'heel_t': 0.15, 'toe_t': 0.45, 'swing_pitch': 18, 'lean': 7, 'roll': 4, 'yaw': 6,
+    'shift': 0.03, 'counter': 1, 'chest': 2, 'neck': -12, 'head': -13, 'nod': 3,
+    # the head thrown back (half from the collar, so the back hair digs less into his shirt) so the high
+    # camera sees the scared face; the hands flung up and out past the cap's edge, pumping, the forearms
+    # whipping further than the upper arms
+    'arm': {'shrug': 28, 'protract': 10, 'fwd': 168, 'swing': 26, 'swing_out': 4, 'out': 56, 'fwd2': 174, 'swing2': 48, 'out2': 46},
 }  # fmt: skip
 
 
