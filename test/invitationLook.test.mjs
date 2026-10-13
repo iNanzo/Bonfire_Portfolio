@@ -1,8 +1,8 @@
 // The invitation toy's look (pure parts): the pixel grid (src/invitation/pixels.js) in explicit
 // steps (at 2×, 3× and 4× a texel is N×N CSS px, in whole device pixels) on the phones and the
 // desktop the round checks, Pixel Size Off at native size (its DPR capped at 2), the camera framing
-// NEWT about a fifth of the screen's short side tall whatever the Pixel Size (76 CSS px on a
-// 390-wide phone: 38 texels at the default size), low enough to see his face, standing in the
+// NEWT about a quarter of a phone's short side tall and a fifth of a desktop's whatever the Pixel
+// Size (99 CSS px on a 390-wide phone: 50 texels at the default size), low enough to see his face, standing in the
 // middle of the space over the toolbar, the Bayer matrix the retro pass dithers with, the Look
 // settings (src/invitation/look.js) surviving any storage, and the presets (src/invitation/looks/)
 // carrying every look value, so a designer only ever edits data. With three.js in Node: the floor
@@ -16,7 +16,11 @@ import {
   DEFAULT_PIXEL,
   NATIVE_DPR,
   NEWT_SHARE,
+  PHONE_SHARE,
+  PHONE_SIDE,
   PIXEL_SIZES,
+  compactStage,
+  newtShare,
   VIEW,
   frameView,
   headTexels,
@@ -103,14 +107,30 @@ test('Pixel Size Off draws at native size, its DPR capped at 2', () => {
   assert.deepEqual([m.pd, m.w], [6, Math.ceil(1171 / 6)]);
 });
 
-test('NEWT is about a fifth of the short side on a phone and on a desktop: 76 CSS px and 38 texels at the default size on a 390-wide phone', () => {
-  assert.ok(NEWT_SHARE >= 0.18 && NEWT_SHARE <= 0.21, `a share of ${NEWT_SHARE}`);
+test('NEWT is about a quarter of the short side on a phone (99 CSS px, 50 texels at the default size on a 390-wide phone) and about a fifth on a desktop', () => {
+  assert.ok(NEWT_SHARE >= 0.18 && NEWT_SHARE <= 0.21, `a desktop share of ${NEWT_SHARE}`);
+  assert.ok(Math.abs(PHONE_SHARE / NEWT_SHARE - 1.3) < 0.03, `a phone's is about 30% bigger (${PHONE_SHARE})`);
+  assert.equal(PHONE_SIDE, 600);
+  assert.deepEqual(
+    [
+      compactStage(390, 844),
+      compactStage(844, 390),
+      compactStage(599, 1000),
+      compactStage(600, 900),
+      compactStage(1280, 800),
+    ],
+    [true, true, true, false, false],
+    'a phone: a short side under 600 CSS px',
+  );
+  assert.deepEqual([newtShare(390, 844), newtShare(1280, 800)], [PHONE_SHARE, NEWT_SHARE]);
   for (const [cssW, cssH, dpr] of SIZES) {
     const grid = texelGrid({ cssW, cssH, dpr, pixelSize: DEFAULT_LOOK.pixelSize });
-    const view = frameView({ cssW, cssH, grid, insets: INSETS });
+    // (The play area given too: a phone's default view never backs off for it.)
+    const view = frameView({ cssW, cssH, grid, insets: INSETS, area: AREA });
     const at = `${cssW}x${cssH}@${dpr}`;
     const share = cssTall(view, grid) / Math.min(cssW, cssH);
-    assert.ok(Math.abs(share - NEWT_SHARE) < 0.002, `${at}: NEWT is ${(share * 100).toFixed(1)}% of the short side`);
+    const want = cssW < 600 ? PHONE_SHARE : NEWT_SHARE;
+    assert.ok(Math.abs(share - want) < 0.002, `${at}: NEWT is ${(share * 100).toFixed(1)}% of the short side`);
     assert.ok(headTexels(view, grid) > 10, `${at}: his head is ${headTexels(view, grid).toFixed(1)} texels wide`);
     // He starts in the middle of the space over the toolbar (the play area is all the floor
     // around him: area.js), seen from low enough that his cap's brim leaves his face showing.
@@ -125,12 +145,21 @@ test('NEWT is about a fifth of the short side on a phone and on a desktop: 76 CS
     assert.ok(view.fov === VIEW.fov && view.fov >= 15 && view.fov <= 30, `a narrow view (${view.fov}°)`);
     assert.equal('roomWidth' in view, false, 'no room');
   }
-  // Today's framing on the phone the round checks: 76 CSS px, 38 texels at the default size.
-  const grid = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: DEFAULT_LOOK.pixelSize });
-  const view = frameView({ cssW: 390, cssH: 844, grid, insets: INSETS, area: AREA });
-  assert.ok(Math.abs(cssTall(view, grid) - 76) < 1, `390x844@3: NEWT is ${cssTall(view, grid).toFixed(1)} CSS px tall`);
-  const tall = newtTexels(view, grid);
-  assert.ok(tall >= 37 && tall <= 39, `390x844@3: NEWT is ${tall.toFixed(1)} texels tall at the default size`);
+  // On the phones the round checks, at the default size: 99 CSS px and 50 texels at 390x844@3
+  // (2 CSS px a texel), 105 CSS px and 55 texels at 412x915@2.625 (5 device px a texel); on the
+  // desktop, 156 CSS px and 78 texels.
+  for (const [cssW, cssH, dpr, css, texels] of [
+    [390, 844, 3, 99.5, 49.7],
+    [412, 915, 2.625, 105.1, 55.2],
+    [1280, 800, 1, 156, 78],
+  ]) {
+    const at = `${cssW}x${cssH}@${dpr}`;
+    const grid = texelGrid({ cssW, cssH, dpr, pixelSize: DEFAULT_LOOK.pixelSize });
+    const view = frameView({ cssW, cssH, grid, insets: INSETS, area: AREA });
+    assert.ok(Math.abs(cssTall(view, grid) - css) < 1, `${at}: NEWT is ${cssTall(view, grid).toFixed(1)} CSS px tall`);
+    const tall = newtTexels(view, grid);
+    assert.ok(Math.abs(tall - texels) < 1, `${at}: NEWT is ${tall.toFixed(1)} texels tall at the default size`);
+  }
 });
 
 test('the framing stays the same whatever the pixel size: NEWT just has more or fewer texels', () => {

@@ -1,7 +1,8 @@
 // Where NEWT may go in the invitation toy (pure: no three.js, no DOM). The camera orbits and
 // zooms, so the play area can't be the floor on screen any more: it's a fixed invisible disc on
-// the floor, AREA_RADIUS around the middle, about what a phone shows at the default zoom (the
-// default view, pixels.js frameView, keeps all of it in sight). Its rim is his wall for
+// the floor, AREA_RADIUS around the middle, about what a phone shows at the default zoom (a
+// desktop's default view, pixels.js frameView, keeps all of it in sight; on a phone, where he's
+// drawn bigger, the camera follows him so he stays on screen at its rim). Its rim is his wall for
 // walking, wandering, fleeing (he slides along it when cornered) and carrying (the anchor, the
 // toss and the fall's bounces): steer.js and carry.js read the disc from the Bounds' `r`.
 
@@ -13,8 +14,9 @@ export const NEWT_RADIUS = 0.25;
 export const NEWT_HEIGHT = 1.0;
 /**
  * The play area's radius, world units: where his root may go. A 390 px phone at the default
- * zoom shows about ±2.4 across his middle, edge to edge; 2.0 keeps all of him (his body's 0.25
- * too) on that screen at the rim, whichever way the camera has turned.
+ * zoom shows about ±1.9 across his middle, edge to edge (his size there: pixels.js
+ * PHONE_SHARE), and its camera follows him most of the way (camera.js ORBIT.phoneFollow), which
+ * keeps all of him (his body's 0.25 too) on that screen at the rim, whichever way it has turned.
  */
 export const AREA_RADIUS = 2.0;
 

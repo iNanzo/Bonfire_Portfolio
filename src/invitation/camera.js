@@ -10,13 +10,16 @@
 // view eases toward where the input puts it (`goal`, damped, never overshooting) and a fling
 // coasts a little once the finger lifts. The point it orbits sits at NEWT's middle height
 // over the play area's centre at the default zoom (the whole play area in view) and follows
-// NEWT softly the closer it zooms, all the way at the closest, so he stays in frame. Reset
+// NEWT softly the closer it zooms, all the way at the closest, so he stays in frame. On a
+// phone (pixels.js compactStage), where he's drawn bigger and the play area doesn't all fit,
+// it follows him ORBIT.phoneFollow of the way at the default zoom too, so a dash to the rim
+// never takes him off the screen. Reset
 // Camera eases back to the default view, the short way round. The light goes round with it
 // (lightDir: the look's sun turned by the camera's yaw), so his shadow always falls the same way
 // on screen, back and to one side. Angles in radians (yaw 0: the camera on the +z side, +
 // toward +x), distances in world units, drags in CSS px.
 
-import { FOCUS_Y, VIEW } from './pixels.js';
+import { FOCUS_Y, VIEW, compactStage } from './pixels.js';
 
 /** @typedef {import('./types.js').XZ} XZ */
 /** @typedef {import('./types.js').XYZ} XYZ */
@@ -30,7 +33,8 @@ const RAD = Math.PI / 180;
  * close most of the way to its goal (a time constant); resetEase: the same for Reset Camera.
  * A fling: the drag's speed (at most spinMax rad/s) carries on when the finger lifts within
  * flingWindow s of its last move, slowing at `coast` per second. follow: the time constant of
- * the orbit's point following NEWT. wheel: zoom per px of wheel (a factor of e^(px × wheel)).
+ * the orbit's point following NEWT; phoneFollow: how much of the way it follows him at the
+ * default zoom on a phone's stage. wheel: zoom per px of wheel (a factor of e^(px × wheel)).
  */
 export const ORBIT = {
   elevMin: 12 * RAD,
@@ -45,6 +49,7 @@ export const ORBIT = {
   flingWindow: 0.08,
   coast: 6,
   follow: 0.5,
+  phoneFollow: 0.8,
   wheel: 0.0015,
 };
 export { FOCUS_Y };
@@ -62,6 +67,8 @@ const wrap = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
  * @property {{yaw: number, elevation: number, distance: number}} home  the default view
  * @property {XZ} centre  the play area's centre
  * @property {{w: number, h: number}} span  the stage, CSS px (a drag's turn and tilt scale by it)
+ * @property {number} followHome  how much the orbit follows NEWT at the default zoom (a phone's
+ *   stage: ORBIT.phoneFollow; else 0)
  * @property {{yaw: number, elevation: number}} spin  a fling's coast, rad/s
  * @property {{yaw: number, elevation: number, t: number}|null} drag  a drag under way: its speed and last move
  * @property {boolean} resetting  easing back to the default
@@ -70,7 +77,7 @@ const wrap = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
 /**
  * @param {{distance: number, elevation?: number, yaw?: number, centre?: XZ, span?: {w: number, h: number}}} o
  *   the default view (elevation: VIEW's by default) over the play area's centre, and the stage
- *   it's dragged on (CSS px: a 390×844 phone by default)
+ *   it's dragged on (CSS px: the 1280×800 desktop by default)
  * @returns {OrbitState}
  */
 export function createOrbit({
@@ -78,9 +85,11 @@ export function createOrbit({
   elevation = VIEW.elevation * RAD,
   yaw = 0,
   centre = { x: 0, z: 0 },
-  span = { w: 390, h: 844 },
+  span = { w: 1280, h: 800 },
 }) {
   const home = { yaw, elevation, distance };
+  const w = span.w > 0 ? span.w : 1280;
+  const h = span.h > 0 ? span.h : 800;
   return {
     yaw,
     elevation,
@@ -89,7 +98,8 @@ export function createOrbit({
     goal: { ...home },
     home,
     centre: { x: centre.x, z: centre.z },
-    span: { w: span.w > 0 ? span.w : 390, h: span.h > 0 ? span.h : 844 },
+    span: { w, h },
+    followHome: compactStage(w, h) ? ORBIT.phoneFollow : 0,
     spin: { yaw: 0, elevation: 0 },
     drag: null,
     resetting: false,
@@ -108,14 +118,16 @@ export const turnPerPx = (s) => (ORBIT.turn * 2 * Math.PI) / s.span.w;
 export const tiltPerPx = (s) => ORBIT.tilt / s.span.h;
 
 /**
- * The stage's new size, CSS px (a resize): drags turn and tilt by it from now on. A size that
- * isn't one (0 or less, not a number) keeps the last.
+ * The stage's new size, CSS px (a resize): drags turn and tilt by it from now on, and on a
+ * phone's stage the orbit follows NEWT at the default zoom too. A size that isn't one (0 or
+ * less, not a number) keeps the last.
  * @param {OrbitState} s
  * @param {{w: number, h: number}} span
  */
 export function orbitSpan(s, { w, h }) {
   if (w > 0) s.span.w = w;
   if (h > 0) s.span.h = h;
+  s.followHome = compactStage(s.span.w, s.span.h) ? ORBIT.phoneFollow : 0;
 }
 
 /**
@@ -221,14 +233,15 @@ export function orbitHome(s, distance) {
 }
 
 /**
- * How much the orbit follows NEWT at this zoom: 0 at the default distance or further, 1 at
- * the closest, a straight line between.
+ * How much the orbit follows NEWT at this zoom: `followHome` at the default distance or
+ * further (0 but on a phone), 1 at the closest, a straight line between.
  * @param {OrbitState} s
  */
 export function followShare(s) {
   const h = s.home.distance;
   const span = h * (1 - ORBIT.zoomMin);
-  return span > 0 ? clamp((h - s.distance) / span, 0, 1) : 0;
+  const closer = span > 0 ? clamp((h - s.distance) / span, 0, 1) : 0;
+  return s.followHome + (1 - s.followHome) * closer;
 }
 
 /**

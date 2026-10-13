@@ -13,10 +13,13 @@
 // view: a narrow view keeps him nearly the same size all over his play area. There's no room:
 // NEWT stands on an invisible floor on a plain background, and the camera only places him.
 // This is the default view the orbit camera (camera.js) starts from and comes back to: he's
-// NEWT_SHARE of the stage's short side tall (his height as the camera sees it: NEWT_SIDE; 76
-// CSS px on a 390-wide phone, 38 texels at the default size there), further back only where
-// the play area (a disc, area.js) wouldn't all show, and the point the camera looks at (his
-// middle, at the origin) sits in the middle of the space over the toolbar: the view is shifted
+// NEWT_SHARE of the stage's short side tall on a desktop (his height as the camera sees it:
+// NEWT_SIDE), further back only where the play area (a disc, area.js) wouldn't all show; on a
+// phone (a short side under PHONE_SIDE) he's PHONE_SHARE of it, about 30% bigger (99 CSS px on
+// a 390-wide phone, 50 texels at the default size there), and the view never backs off for the
+// disc (the camera follows him there instead, so he stays on screen at its rim). The point the
+// camera looks at (his middle, at the origin) sits in the middle of the space over the
+// toolbar: the view is shifted
 // there (View.shift, an off-centre projection: stage.js camera.setViewOffset), so it stays
 // there however the camera turns. The framing never reads the Pixel Size: a bigger block only
 // makes chunkier pixels, and a bigger screen gives him more texels.
@@ -57,10 +60,29 @@ export const DEFAULT_PIXEL = '2';
 /** Pixel Size Off draws at the device's pixels, up to this ratio. */
 export const NATIVE_DPR = 2;
 /**
- * NEWT's height in the default view, as a share of the stage's short side: 76 CSS px on a
- * 390-wide phone (38 texels at the default size there), whatever the Pixel Size.
+ * NEWT's height in the default view, as a share of the stage's short side, whatever the Pixel
+ * Size: NEWT_SHARE on a desktop, PHONE_SHARE (about 30% bigger) on a phone, a stage whose short
+ * side is under PHONE_SIDE CSS px (99 CSS px and 50 texels at the default size on a 390-wide
+ * phone).
  */
 export const NEWT_SHARE = 0.195;
+export const PHONE_SHARE = 0.255;
+export const PHONE_SIDE = 600;
+
+/**
+ * Whether a stage `cssW` × `cssH` is a phone's: its short side under PHONE_SIDE CSS px (NEWT is
+ * drawn bigger there, and the camera follows him at the default zoom: camera.js).
+ * @param {number} cssW
+ * @param {number} cssH
+ */
+export const compactStage = (cssW, cssH) => Math.min(cssW, cssH) < PHONE_SIDE;
+
+/**
+ * NEWT's height in the default view as a share of a stage's short side.
+ * @param {number} cssW
+ * @param {number} cssH
+ */
+export const newtShare = (cssW, cssH) => (compactStage(cssW, cssH) ? PHONE_SHARE : NEWT_SHARE);
 /** The camera: vertical field of view and elevation in degrees, near and far in world units. */
 export const VIEW = { fov: 20, elevation: 36, near: 1, far: 120 };
 /**
@@ -193,11 +215,12 @@ function least(lo, hi, ok) {
 
 /**
  * The default camera for a stage `cssW` × `cssH` drawn at `grid` (the camera's aspect and the
- * canvas's CSS size): NEWT `share` of the short side tall, or smaller where a play area of
- * radius `area` around the origin wouldn't all show (its rim over the toolbar and inside the
- * sides, his head at its back under the top), looking at his middle (standing at the origin)
- * from yaw 0, shifted to the middle of the space `insets` leave (over the toolbar). (`fov` and
- * `elevation` default to VIEW's.)
+ * canvas's CSS size): NEWT `share` of the short side tall (newtShare's by default), or on a
+ * desktop smaller where a play area of radius `area` around the origin wouldn't all show (its
+ * rim over the toolbar and inside the sides, his head at its back under the top; a phone's view
+ * never backs off for it), looking at his middle (standing at the origin) from yaw 0, shifted
+ * to the middle of the space `insets` leave (over the toolbar). (`fov` and `elevation` default
+ * to VIEW's.)
  * @param {{cssW: number, cssH: number, grid: Grid, insets: Insets, share?: number, fov?: number, elevation?: number, area?: number}} o
  * @returns {View}
  */
@@ -206,7 +229,7 @@ export function frameView({
   cssH,
   grid,
   insets,
-  share = NEWT_SHARE,
+  share = newtShare(cssW, cssH),
   fov = VIEW.fov,
   elevation = VIEW.elevation,
   area = 0,
@@ -237,8 +260,8 @@ export function frameView({
     const { top, bottom } = newtBox(at(d));
     return bottom - top <= newtCss;
   });
-  // Then back as far as the play area needs to show whole.
-  if (area > 0) {
+  // Then, on a desktop, back as far as the play area needs to show whole.
+  if (area > 0 && !compactStage(cssW, cssH)) {
     const rim = Array.from({ length: 48 }, (_, i) => [
       Math.sin((i / 48) * 2 * Math.PI),
       Math.cos((i / 48) * 2 * Math.PI),

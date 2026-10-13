@@ -1,7 +1,9 @@
 // The invitation toy's play area (src/invitation/area.js): with the camera free to orbit and zoom,
 // it's a fixed invisible disc on the floor, about what a phone shows at the default zoom, the same
-// on every screen. The default view (pixels.js frameView) shows all of it, at every Pixel Size,
-// with NEWT still about a fifth of the screen's short side tall; walking, wandering, fleeing
+// on every screen. A desktop's default view (pixels.js frameView) shows all of it, at every Pixel
+// Size, with NEWT still about a fifth of the screen's short side tall; on a phone he's drawn about
+// 30% bigger, the disc no longer all fits, and the camera follows him softly (camera.js) so a
+// dash to the rim, or round it, never takes him off the screen; walking, wandering, fleeing
 // (sliding along the rim when cornered) and carrying (the anchor, the toss and the fall's bounces)
 // stay inside it (steer.js and carry.js read a disc's radius from its Bounds); and the light's
 // shadow camera (floor.js fitShadow) covers the disc up to the highest he's lifted, wherever the
@@ -13,8 +15,16 @@ import { AREA_RADIUS, NEWT_HEIGHT, NEWT_RADIUS, playArea } from '../src/invitati
 import { centreOf, clampTo, steer, wanderGoal, xRange } from '../src/invitation/steer.js';
 import { fallStep, grab, holdStep } from '../src/invitation/carry.js';
 import { fitShadow } from '../src/invitation/floor.js';
-import { NEWT_SHARE, PIXEL_SIZES, frameView, newtTexels, project, texelGrid } from '../src/invitation/pixels.js';
-import { lightDir } from '../src/invitation/camera.js';
+import {
+  NEWT_SHARE,
+  PHONE_SHARE,
+  PIXEL_SIZES,
+  frameView,
+  newtTexels,
+  project,
+  texelGrid,
+} from '../src/invitation/pixels.js';
+import { createOrbit, lightDir, orbitPose, orbitStep } from '../src/invitation/camera.js';
 import { DEFAULT_LOOK, LOOKS } from '../src/invitation/look.js';
 import { GAIT } from '../src/invitation/clips.js';
 import { createRng } from '../src/invitation/rng.js';
@@ -50,24 +60,25 @@ test('the play area is a fixed disc about 2.4 in radius around the floor’s cen
   assert.ok(NEWT_RADIUS > 0 && NEWT_HEIGHT > 0.9);
 });
 
-test('at the default zoom the whole play area, his body at its rim included, is in view at every Pixel Size and NEWT is still about a fifth of the short side, at 390x844@3, 412x915@2.625 and 1280x800@1', () => {
+test('at a desktop’s default zoom the whole play area, his body at its rim included, is in view at every Pixel Size and NEWT is still about a fifth of the short side, at 1280x800@1; a phone’s default view never backs off for it, NEWT about a quarter of the short side', () => {
   for (const [cssW, cssH, dpr, pixelSize] of SIZES.flatMap((s) => PIXEL_SIZES.map((p) => [...s, p]))) {
     const at = `${cssW}x${cssH}@${dpr} ${pixelSize}`;
     const { grid, view } = viewFor(cssW, cssH, dpr, pixelSize);
-    // (Only ever smaller than his share, and only where the disc needs it.)
     const share = (newtTexels(view, grid) * grid.pd) / grid.dpr / Math.min(cssW, cssH);
+    if (cssW < 600) {
+      // A phone: his size exactly, the disc left to the camera following him (the next test).
+      assert.ok(Math.abs(share - PHONE_SHARE) < 0.002, `${at}: NEWT is ${(share * 100).toFixed(1)}% of the short side`);
+      continue;
+    }
+    // (Only ever smaller than his share, and only where the disc needs it.)
     assert.ok(
       share <= NEWT_SHARE + 0.002 && share >= 0.9 * NEWT_SHARE,
       `${at}: NEWT is ${(share * 100).toFixed(1)}% of the short side`,
     );
-    let left = Infinity;
-    let right = -Infinity;
     for (let i = 0; i < 72; i++) {
       const a = (i / 72) * 2 * Math.PI;
       const rim = { x: (R + NEWT_RADIUS) * Math.sin(a), y: 0, z: (R + NEWT_RADIUS) * Math.cos(a) };
       const p = project(view, rim);
-      left = Math.min(left, p.x);
-      right = Math.max(right, p.x);
       assert.ok(p.x >= -0.5 && p.x <= cssW + 0.5, `${at}: the rim at ${i * 5}° is off the side (${p.x.toFixed(1)})`);
       assert.ok(
         p.y <= cssH - INSETS.bottom + 0.5,
@@ -76,8 +87,74 @@ test('at the default zoom the whole play area, his body at its rim included, is 
       const head = project(view, { ...rim, y: NEWT_HEIGHT });
       assert.ok(head.y >= -0.5, `${at}: his head at the rim at ${i * 5}° is off the top (${head.y.toFixed(1)})`);
     }
-    // About what a phone shows: the disc spans most of a phone's width.
-    if (cssW < 500) assert.ok(right - left > 0.8 * cssW, `${at}: the disc spans ${(right - left).toFixed(0)} px`);
+  }
+});
+
+/**
+ * A point on screen (CSS px from the canvas's top-left) with the camera where orbit `o` has it:
+ * the default view's camera turned by the orbit's yaw round its target, so the point is turned
+ * back by it (pixels.js project looks from yaw 0).
+ */
+function onScreen(view, o, p) {
+  const { target } = orbitPose(o);
+  const c = Math.cos(o.yaw);
+  const s = Math.sin(o.yaw);
+  const dx = p.x - target.x;
+  const dz = p.z - target.z;
+  const e = o.elevation;
+  const camera = { x: target.x, y: target.y + o.distance * Math.sin(e), z: target.z + o.distance * Math.cos(e) };
+  return project(
+    { ...view, elevation: (e * 180) / Math.PI, target, position: camera },
+    { x: target.x + dx * c - dz * s, y: p.y, z: target.z + dx * s + dz * c },
+  );
+}
+
+test('on a phone, at the default zoom, running to the rim, across the disc and round its rim never takes NEWT off the screen: the camera follows him softly', () => {
+  // Portrait and landscape phones, the camera turned three ways.
+  for (const [cssW, cssH, dpr] of [...SIZES.filter(([w]) => w < 600), [360, 740, 3], [844, 390, 3]]) {
+    const { view } = viewFor(cssW, cssH, dpr);
+    for (const yaw of [0, 1, 2.6]) {
+      const at = `${cssW}x${cssH}@${dpr} at yaw ${yaw}`;
+      /** His body (his width across the screen, feet to head) is on the stage and over the toolbar. */
+      const check = (o, n, when) => {
+        const right = { x: Math.cos(o.yaw), z: -Math.sin(o.yaw) };
+        for (const y of [0, NEWT_HEIGHT])
+          for (const k of [-1, 1]) {
+            const p = onScreen(view, o, { x: n.x + k * NEWT_RADIUS * right.x, y, z: n.z + k * NEWT_RADIUS * right.z });
+            const ok = p.x >= 0 && p.x <= cssW && p.y >= 0 && p.y <= cssH - INSETS.bottom;
+            assert.ok(ok, `${at}, ${when}: his ${y ? 'head' : 'feet'} at (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`);
+          }
+      };
+      /** A run at running speed from `a` to `b` (the camera settled on `a`), then 2 s standing. */
+      const run = (a, b, when) => {
+        const o = createOrbit({ distance: view.distance, yaw, span: { w: cssW, h: cssH } });
+        for (let i = 0; i < 6 * 60; i++) orbitStep(o, DT, a);
+        const T = dist(a, b) / GAIT.run;
+        for (let t = 0; t < T + 2; t += DT) {
+          const k = Math.min(1, t / T);
+          const n = { x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k };
+          orbitStep(o, DT, n);
+          check(o, n, when);
+        }
+      };
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * 2 * Math.PI;
+        const rim = { x: R * Math.sin(a), z: R * Math.cos(a) };
+        run({ x: 0, z: 0 }, rim, `to the rim at ${i * 30}°`);
+        run({ x: -rim.x, z: -rim.z }, rim, `across to ${i * 30}°`);
+      }
+      // Round the rim, both ways, for two turns.
+      for (const way of [1, -1]) {
+        const o = createOrbit({ distance: view.distance, yaw, span: { w: cssW, h: cssH } });
+        for (let i = 0; i < 6 * 60; i++) orbitStep(o, DT, { x: 0, z: R });
+        for (let t = 0; t < (4 * Math.PI * R) / GAIT.run; t += DT) {
+          const a = (way * GAIT.run * t) / R;
+          const n = { x: R * Math.sin(a), z: R * Math.cos(a) };
+          orbitStep(o, DT, n);
+          check(o, n, `round the rim at ${((a * 180) / Math.PI).toFixed(0)}°`);
+        }
+      }
+    }
   }
 });
 

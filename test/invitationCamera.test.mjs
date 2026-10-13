@@ -4,8 +4,9 @@
 // (by the stage's height),
 // eased (damped, no jump, no overshoot) with a little coast after a fling; the wheel and a
 // pinch zoom between half and twice the default distance; the point it orbits stays on the
-// play area's centre at the default zoom (the whole play area in view) and follows NEWT softly
-// as it zooms in, so he stays in frame; Reset Camera eases back to the default the short way
+// play area's centre at a desktop's default zoom (the whole play area in view) and follows NEWT
+// softly as it zooms in, so he stays in frame (on a phone, where he's drawn bigger, most of the
+// way at the default zoom too); Reset Camera eases back to the default the short way
 // round; a resize keeps the zoom; and the light turns with it, so his shadow falls the same way
 // on screen after any orbit.
 import { test } from 'node:test';
@@ -172,9 +173,9 @@ test('the wheel and a pinch zoom between half and twice the default distance', (
   close(w.distance, w.goal.distance, 1e-4, 'eased there');
 });
 
-test('the orbit stays on the play area’s centre at the default zoom and follows NEWT softly as it zooms in', () => {
+test('on a desktop the orbit stays on the play area’s centre at the default zoom and follows NEWT softly as it zooms in', () => {
   const newt = { x: 2, z: -1 };
-  const o = createOrbit({ distance: HOME });
+  const o = createOrbit({ distance: HOME, span: { w: 1280, h: 800 } });
   settle(o, 3, newt);
   assert.equal(followShare(o), 0);
   assert.deepEqual(orbitPose(o).target, { x: 0, y: FOCUS_Y, z: 0 }, 'the whole play area stays in view');
@@ -199,6 +200,35 @@ test('the orbit stays on the play area’s centre at the default zoom and follow
   settle(half, 6, newt);
   close(followShare(half), 0.5, 1e-3);
   close(orbitPose(half).target.x, 1, 2e-3);
+});
+
+test('on a phone’s stage the orbit follows NEWT softly most of the way at the default zoom too, all the way zoomed in; a resize to a desktop stops it', () => {
+  const newt = { x: 2, z: -1 };
+  assert.ok(ORBIT.phoneFollow >= 0.6 && ORBIT.phoneFollow <= 1, `${ORBIT.phoneFollow} of the way`);
+  for (const span of [
+    { w: 390, h: 844 },
+    { w: 412, h: 915 },
+    { w: 844, h: 390 },
+  ]) {
+    const o = createOrbit({ distance: HOME, span });
+    close(followShare(o), ORBIT.phoneFollow, 1e-9, `${span.w}x${span.h}: at the default zoom`);
+    orbitStep(o, DT, newt);
+    assert.ok(o.target.x > 0 && o.target.x < 0.2, `softly: a frame moves only a little (${o.target.x})`);
+    settle(o, 4, newt);
+    close(o.target.x, newt.x * ORBIT.phoneFollow, 1e-3, 'most of the way to him');
+    close(o.target.z, newt.z * ORBIT.phoneFollow, 1e-3);
+    orbitZoom(o, 0.6);
+    settle(o, 2, newt);
+    close(followShare(o), ORBIT.phoneFollow, 1e-9, 'zoomed out: the same');
+    orbitZoom(o, 100);
+    settle(o, 4, newt);
+    close(followShare(o), 1, 1e-3, 'zoomed all the way in: all the way');
+  }
+  const o = createOrbit({ distance: HOME, span: { w: 390, h: 844 } });
+  orbitSpan(o, { w: 1280, h: 800 });
+  assert.equal(followShare(o), 0, 'a desktop’s stage: the centre again');
+  orbitSpan(o, { w: 600, h: 599 });
+  close(followShare(o), ORBIT.phoneFollow, 1e-9, 'a short side under 600 px is a phone’s');
 });
 
 test('Reset Camera eases back to the default view, the short way round', () => {

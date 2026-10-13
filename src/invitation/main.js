@@ -19,7 +19,7 @@
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
-// (a point on NEWT in client px), floorAt(x, y), feet() and bones() (his ankles in the world,
+// (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones() (his ankles in the world,
 // his bones from his root) and play(clip) (forces a clip, Walk and Run going round their step
 // at their own pace); `?seed=N` and `?calm` go to the brain.
 import '@fontsource/pixelify-sans/400.css';
@@ -43,6 +43,7 @@ import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createFaceState, faceStep } from './faces.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
+import { newtTexels } from './pixels.js';
 import { animFps, loadLook, motionStep, presetOf, saveLook } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
@@ -595,14 +596,17 @@ function start(s) {
         pixelScale: s.grid.pd / s.grid.dpr,
         button: lastButton,
         texels: { w: s.grid.w, h: s.grid.h },
+        // (CSS px he stands tall in the default view, where he starts.)
+        newtTall: s.view ? (newtTexels(s.view, s.grid) * s.grid.pd) / s.grid.dpr : 0,
         camera: { yaw: cam.yaw, elevation: cam.elevation, distance: cam.distance },
         cameraHome: { ...cam.home },
         options,
       }),
-      /** @param {'head'|'body'} part */
+      /** @param {'head'|'body'|'feet'} part */
       screen(part) {
         const sh = shape();
         if (part === 'head') return { x: sh.head.x, y: sh.head.y };
+        if (part === 'feet') return { x: sh.body.a.x, y: sh.body.a.y };
         return { x: (sh.body.a.x + sh.body.b.x) / 2, y: (sh.body.a.y + sh.body.b.y) / 2 };
       },
       /** @param {number} x @param {number} y */

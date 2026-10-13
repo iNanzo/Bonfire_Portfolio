@@ -1,9 +1,9 @@
 // The invitation toy's stage: the renderer (no antialiasing, drawn at texel size: pixels.js
 // texelGrid, the canvas stretched by CSS), the camera (20° of view; main.js's orbit camera,
 // camera.js, moves it with setCamera; pixels.js frameView gives its default view: 36° up, NEWT
-// about a fifth of the short side tall, the whole play area in sight, and the point it looks at
-// shown in the middle of the space over the toolbar, by an off-centre projection that holds
-// however it turns), the floor (floor.js: no room, the preset's background and an invisible
+// about a fifth of a desktop's short side tall with the whole play area in sight, or a quarter
+// of a phone's (the camera follows him there), and the point it looks at shown in the middle of
+// the space over the toolbar, by an off-centre projection that holds however it turns), the floor (floor.js: no room, the preset's background and an invisible
 // floor that only catches his shadows), the lights and shadows of the look preset, the blob
 // shadow and the floor marker, and the retro pass. A ResizeObserver refits it all (in device
 // pixels where the browser measures them, devicePixelContentBoxSize), and so does refit()
@@ -219,7 +219,7 @@ export function createStage(container, { preset, look, insets, onResize }) {
     canvas.style.width = `${grid.canvasW}px`;
     canvas.style.height = `${grid.canvasH}px`;
     retro.setSize(grid.w, grid.h);
-    // (The play area and his body at its rim all show.)
+    // (On a desktop the play area and his body at its rim all show.)
     const area = (bounds.r ?? 0) + NEWT_RADIUS;
     view = frameView({ cssW, cssH, grid, insets: insets(), area });
     camera.fov = view.fov;
