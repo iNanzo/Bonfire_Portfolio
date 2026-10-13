@@ -61,6 +61,7 @@
  */
 
 /** @typedef {{x: number, z: number, yaw: number, speed: number}} Body  NEWT's root on the floor */
+/** @typedef {typeof import('./brain.js').TUNE} Tune  the brain's numbers (createBrain's `tune` overrides any of them) */
 
 /**
  * @typedef {object} CarryState  carry.js: NEWT held by the collar (holdStep updates it in place)

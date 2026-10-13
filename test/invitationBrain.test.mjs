@@ -291,7 +291,32 @@ test('fleeing: a tap adds stress and he keeps running; a floor tap is ignored', 
   out = s.floorTap(1, 1);
   assert.equal(out.state, 'flee');
   assert.equal(out.move.mode, 'flee');
-  assert.equal(out.move.goal, null);
+  assert.deepEqual(out.move.goal, { x: 1, z: 1 }, 'not a place to walk to: the finger he runs from');
+});
+
+test('fleeing from stress with the finger lifted, he runs from where it was; the Run button from the centre', () => {
+  const s = sim();
+  const at = { x: 0.4, z: 0.2 };
+  s.w.pointer = at;
+  for (let i = 0; i < 3; i++) s.tap();
+  s.w.pointer = null;
+  let out = s.tap();
+  assert.equal(out.state, 'flee');
+  assert.deepEqual(out.move.goal, at, 'the pointer was last seen there');
+  s.run(TUNE.threatMemory + 0.1);
+  assert.equal(s.w.out.state, 'flee');
+  assert.equal(s.w.out.move.goal, null, 'forgotten after a while');
+  s.w.pointer = { x: -1, z: 0 };
+  out = s.frame();
+  assert.equal(out.move.goal, null, 'a live pointer is passed to steer instead');
+
+  const r = sim();
+  r.w.pointer = at;
+  r.frame();
+  r.w.pointer = null;
+  out = r.button('Run');
+  assert.equal(out.state, 'flee');
+  assert.equal(out.move.goal, null, 'the Run button: from the centre when there is no pointer');
 });
 
 test('through gestures: a short press is a tap, a drag is a grab, and a cancel is a drop', () => {
