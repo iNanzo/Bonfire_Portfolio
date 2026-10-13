@@ -1,9 +1,10 @@
 // Moves NEWT's root across the invitation toy's floor: walking to a goal (slowing to arrive),
-// running away from the pointer or the room's centre (choosing the open direction most away
-// from it, so walls push him off and a corner slides him along a wall, never stuck), and
-// turning to face the camera, all with acceleration and a capped turn rate. Also picks his
-// wander goals. Pure: no three.js. NEWT faces +z at yaw 0 (forward is (sin yaw, cos yaw)) and
-// the camera looks in from the +z side.
+// running away from the pointer or the play area's centre (choosing the open direction most
+// away from it, so its edges push him off and a corner slides him along an edge, never stuck),
+// and turning to face the camera, all with acceleration and a capped turn rate. Also picks his
+// wander goals. The play area (Bounds) may widen toward the back, as the floor on screen does:
+// xRange gives its sides at a depth. Pure: no three.js. NEWT faces +z at yaw 0 (forward is
+// (sin yaw, cos yaw)) and the camera looks in from the +z side.
 
 /** @typedef {import('./types.js').Body} Body */
 /** @typedef {import('./types.js').Bounds} Bounds */
@@ -57,13 +58,29 @@ export function turnToward(yaw, target, maxStep) {
 }
 
 /**
- * A point kept inside the bounds.
+ * The bounds' sides at depth `z`: minX/maxX at the front (maxZ), minXBack/maxXBack at the back
+ * (minZ), straight lines between (a box without the back ones).
+ * @param {Bounds} b
+ * @param {number} z
+ * @returns {[number, number]}
+ */
+export function xRange(b, z) {
+  if (b.minXBack === undefined && b.maxXBack === undefined) return [b.minX, b.maxX];
+  const span = b.maxZ - b.minZ;
+  const k = span > 1e-9 ? clamp((b.maxZ - z) / span, 0, 1) : 0;
+  return [b.minX + ((b.minXBack ?? b.minX) - b.minX) * k, b.maxX + ((b.maxXBack ?? b.maxX) - b.maxX) * k];
+}
+
+/**
+ * A point kept inside the bounds: its depth clamped, then its x between the sides there.
  * @param {Bounds} b
  * @param {XZ} p
  * @returns {XZ}
  */
 export function clampTo(b, p) {
-  return { x: clamp(p.x, b.minX, b.maxX), z: clamp(p.z, b.minZ, b.maxZ) };
+  const z = clamp(p.z, b.minZ, b.maxZ);
+  const [lo, hi] = xRange(b, z);
+  return { x: clamp(p.x, lo, hi), z };
 }
 
 /**
@@ -119,9 +136,8 @@ export function steer(body, move, pointer, bounds, dt) {
   let nx = x + Math.sin(yaw) * step;
   let nz = z + Math.cos(yaw) * step;
   if (bounds) {
-    nx = clamp(nx, bounds.minX, bounds.maxX);
-    nz = clamp(nz, bounds.minZ, bounds.maxZ);
-    // Pressed against a wall, he only goes as fast as he really moves.
+    ({ x: nx, z: nz } = clampTo(bounds, { x: nx, z: nz }));
+    // Pressed against an edge, he only goes as fast as he really moves.
     if (dt > 0 && step > 0) speed = Math.min(speed, Math.hypot(nx - x, nz - z) / dt);
   }
   return { x: nx, z: nz, yaw, speed };
@@ -175,19 +191,30 @@ function fleeDirection(p, yaw, threat, bounds) {
   return best;
 }
 
-/** How far he can go from `p` along (dx, dz) before leaving the bounds. */
+/** How far he can go from `p` along (dx, dz) before leaving the bounds (slanted sides too). */
 function roomAlong(p, dx, dz, b) {
   let t = Infinity;
-  if (dx > 1e-9) t = Math.min(t, (b.maxX - p.x) / dx);
-  else if (dx < -1e-9) t = Math.min(t, (b.minX - p.x) / dx);
   if (dz > 1e-9) t = Math.min(t, (b.maxZ - p.z) / dz);
   else if (dz < -1e-9) t = Math.min(t, (b.minZ - p.z) / dz);
+  const span = b.maxZ - b.minZ;
+  // Each side is the line x = front + slope·(z − maxZ); `gap` is how far inside it he is and
+  // `rate` how fast that closes along the direction.
+  for (const [front, back, sign] of [
+    [b.maxX, b.maxXBack ?? b.maxX, 1],
+    [b.minX, b.minXBack ?? b.minX, -1],
+  ]) {
+    const slope = span > 1e-9 ? (front - back) / span : 0;
+    const gap = sign * (front + slope * (p.z - b.maxZ) - p.x);
+    const rate = sign * (dx - slope * dz);
+    if (rate > 1e-9) t = Math.min(t, gap / rate);
+  }
   return Math.max(0, t);
 }
 
 /**
- * Somewhere to wander to: inside the bounds (a little in from them), at least STEER.wanderMin
- * from `from` (in a room too small for that, the farthest of the tries).
+ * Somewhere to wander to: inside the bounds (a little in from them, between the sides at its
+ * depth), at least STEER.wanderMin from `from` (in a play area too small for that, the farthest
+ * of the tries).
  * @param {() => number} rng
  * @param {Bounds} bounds
  * @param {XZ} from
@@ -195,14 +222,15 @@ function roomAlong(p, dx, dz, b) {
  */
 export function wanderGoal(rng, bounds, from) {
   const m = Math.min(STEER.wanderMargin, (bounds.maxX - bounds.minX) / 4, (bounds.maxZ - bounds.minZ) / 4);
-  const x0 = bounds.minX + m;
   const z0 = bounds.minZ + m;
-  const w = bounds.maxX - m - x0;
   const h = bounds.maxZ - m - z0;
-  let best = { x: x0 + w / 2, z: z0 + h / 2 };
+  let best = centreOf(bounds);
   let far = -1;
   for (let i = 0; i < 32; i++) {
-    const g = { x: x0 + rng() * w, z: z0 + rng() * h };
+    const u = rng();
+    const z = z0 + rng() * h;
+    const [lo, hi] = xRange(bounds, z);
+    const g = { x: lo + m + u * (hi - lo - 2 * m), z };
     const d = Math.hypot(g.x - from.x, g.z - from.z);
     if (d >= STEER.wanderMin) return g;
     if (d > far) {

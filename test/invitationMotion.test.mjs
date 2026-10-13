@@ -693,13 +693,14 @@ test('in a widening play area, walking, fleeing and carrying stay inside its sla
   const b = run({ x: 0, z: 0, yaw: 0, speed: 0 }, { mode: 'goto', goal: { x: 6, z: -4 }, speed: GAIT.walk }, null, 8);
   assert.ok(insideTrap(b), JSON.stringify(b));
   assert.ok(b.x > TRAP.maxX + 0.3, `he got out past the front's width (x = ${b.x.toFixed(2)})`);
-  // Fleeing toward a slanted side, then cornered at the front: inside, sliding, never stuck.
+  // Fleeing into a slanted side, he slides along it; cornered at the front, he gets out.
   const flee = { mode: 'flee', goal: null, speed: GAIT.run };
-  const fled = run({ x: 1, z: 3, yaw: 0, speed: 0 }, flee, { x: -0.5, z: 2.5 }, 3, (n, prev, t) => {
+  const threat = { x: 0.6, z: -5.2 };
+  const fled = run({ x: 1.6, z: -5, yaw: Math.PI / 2, speed: 0 }, flee, threat, 2, (n, prev, t) => {
     assert.ok(insideTrap(n), `fled out at ${JSON.stringify(n)}`);
     if (t > 0.6) assert.ok(dist(n, prev) > 0.3 * DT, `stuck at ${t.toFixed(2)} s`);
   });
-  assert.ok(dist(fled, { x: -0.5, z: 2.5 }) > 3, 'got well away');
+  assert.ok(dist(fled, threat) > 2.5, `got well away (${dist(fled, threat).toFixed(2)})`);
   run({ x: 1.25, z: 4.95, yaw: 0, speed: 0 }, flee, { x: 0.8, z: 4.4 }, 2, (n, prev, t) => {
     assert.ok(insideTrap(n), `fled out at ${JSON.stringify(n)}`);
     if (t > 0.6) assert.ok(dist(n, prev) > 0.3 * DT, `stuck in the corner at ${t.toFixed(2)} s`);

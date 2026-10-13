@@ -1,8 +1,11 @@
 // Carrying NEWT by the collar in the invitation toy: the anchor his collar follows (eased in
-// over ~0.15 s, kept inside the room), a damped pendulum that swings his root as the anchor
-// speeds up and slows down (procedural motion never touches his bones), the toss velocity from
-// the last ~80 ms when he's let go, and the fall that follows, with gravity and soft bounces off
-// the walls, until his lowest foot meets the floor. Pure: no three.js.
+// over ~0.15 s, kept inside the play area), a damped pendulum that swings his root as the
+// anchor speeds up and slows down (procedural motion never touches his bones), the toss
+// velocity from the last ~80 ms when he's let go, and the fall that follows, with gravity and
+// soft bounces off the play area's edges (the screen's), until his lowest foot meets the floor.
+// Pure: no three.js.
+
+import { clampTo, xRange } from './steer.js';
 
 /** @typedef {import('./types.js').XYZ} XYZ */
 /** @typedef {import('./types.js').Bounds} Bounds */
@@ -14,7 +17,7 @@
  * `gravity`, `damping` per second, at most `tiltMax` radians, fed accelerations up to
  * `accelMax`, integrated in steps of at most `substep`; `shakeSmooth` smooths the shake reading.
  * A toss is capped at `tossMax` across and `tossUp`/`tossDown` up and down. The fall: `fallGravity`,
- * `restitution` off the walls, the floor at `floorY`, the tilt relaxing at `tiltRelax` per second.
+ * `restitution` off the edges, the floor at `floorY`, the tilt relaxing at `tiltRelax` per second.
  */
 export const CARRY = {
   ease: 0.15,
@@ -75,8 +78,7 @@ export function grab(collar, t) {
  * @returns {CarryState}
  */
 export function holdStep(c, target, dt, bounds, t) {
-  const gx = bounds ? clamp(target.x, bounds.minX, bounds.maxX) : target.x;
-  const gz = bounds ? clamp(target.z, bounds.minZ, bounds.maxZ) : target.z;
+  const { x: gx, z: gz } = bounds ? clampTo(bounds, target) : target;
   const k = CARRY.ease > 0 ? smooth01((t - c.t0) / CARRY.ease) : 1;
   const next = {
     x: c.from.x + (gx - c.from.x) * k,
@@ -163,7 +165,7 @@ export function toss(c) {
 }
 
 /**
- * One frame of falling: gravity, soft bounces off the walls, and a landing once his lowest
+ * One frame of falling: gravity, soft bounces off the edges, and a landing once his lowest
  * foot reaches the floor (the root is then lifted so that foot sits on it, and stops).
  * @param {XYZ} root
  * @param {XYZ} vel
@@ -177,13 +179,14 @@ export function fallStep(root, vel, footY, dt, bounds, tilt = null) {
   const v = { x: vel.x, y: vel.y - CARRY.fallGravity * dt, z: vel.z };
   const r = { x: root.x + v.x * dt, y: root.y + v.y * dt, z: root.z + v.z * dt };
   if (bounds) {
-    if (r.x < bounds.minX || r.x > bounds.maxX) {
-      r.x = clamp(r.x, bounds.minX, bounds.maxX);
-      v.x = (r.x === bounds.minX ? 1 : -1) * Math.abs(v.x) * CARRY.restitution;
-    }
     if (r.z < bounds.minZ || r.z > bounds.maxZ) {
       r.z = clamp(r.z, bounds.minZ, bounds.maxZ);
       v.z = (r.z === bounds.minZ ? 1 : -1) * Math.abs(v.z) * CARRY.restitution;
+    }
+    const [lo, hi] = xRange(bounds, r.z);
+    if (r.x < lo || r.x > hi) {
+      r.x = clamp(r.x, lo, hi);
+      v.x = (r.x === lo ? 1 : -1) * Math.abs(v.x) * CARRY.restitution;
     }
   }
   const relax = Math.exp(-CARRY.tiltRelax * dt);
