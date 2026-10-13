@@ -26,7 +26,8 @@ const PRESET = {
   marker: { color: '#000000' },
   animFps: 0,
 };
-const srgbOf = (hex) => new THREE.Color().setHex(hex, THREE.SRGBColorSpace).convertLinearToSRGB();
+/** A hex colour's sRGB components, as the post shader takes them. */
+const srgbOf = (hex) => ({ r: ((hex >> 16) & 255) / 255, g: ((hex >> 8) & 255) / 255, b: (hex & 255) / 255 });
 const near = (a, b) => Math.abs(a - b) < 1e-6;
 
 /** A stand-in renderer that notes each draw: where, and the floor's material at the time. */
