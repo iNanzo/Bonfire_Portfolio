@@ -1,123 +1,84 @@
-// NEWT's room: a plain box with its front wall missing (the camera looks in through it), a floor,
-// a back wall, two side walls and a baseboard, nothing else. Its depth and wall height are fixed
-// (pixels.js ROOM); its width follows the screen (setWidth). Colours come from the look preset.
-// Every surface is a toon material marking its own id, so the retro pass draws a line where the
-// floor meets a wall; the walls and floor take NEWT's shadow and cast none.
+// NEWT's floor in the invitation toy: there's no room, just the look preset's background and a
+// floor that catches his shadows. The floor itself never shows: it's a ShadowMaterial (only the
+// shadow is drawn, in the preset's shadow colour and strength, over the background the retro
+// pass clears to), far wider than any view, so no edge or horizon shows. It writes no depth and
+// leaves the colour target's alpha (the surface id) alone, so the retro pass draws no line
+// where it meets the background and none in the shadows: the lines stay on NEWT.
 //
-//   roomBounds(width)  where NEWT's root may go: inside the walls and an invisible front edge
-//                      kept clear of the toolbar, less his radius
+//   floorLook(preset)   the preset's background, shadow {color, opacity} and blob {opacity,
+//                       lifted} as numbers, with fallbacks for a preset that lacks them (one
+//                       still carrying the room's colours, or nothing at all)
+//   createFloor(preset) the floor mesh, setLook(preset), dispose()
 import * as THREE from 'three';
-import { ROOM } from './pixels.js';
-import { ID, markId, toonGradient } from './retro.js';
 
-/** NEWT's radius on the floor, world units. */
-export const NEWT_RADIUS = 0.25;
-/** The invisible front edge sits this far inside the floor's front (his toes stay on it). */
-const FRONT_GAP = 0.1;
-const BASEBOARD = { height: 0.07, depth: 0.03 };
+/** World units across: far wider than any view of the floor. */
+export const FLOOR_SIZE = 200;
+const FALLBACK = { background: 0xffffff, shadow: 0x5a5048, opacity: 0.3, blob: 0.16 };
+
+/** A colour as a number: a number kept, '#rrggbb' read, anything else null. */
+function hex(v) {
+  if (typeof v === 'number' && Number.isFinite(v)) return Math.min(0xffffff, Math.max(0, Math.round(v)));
+  if (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)) return Number.parseInt(v.slice(1), 16);
+  return null;
+}
+/** A number in [0, 1], or the fallback. */
+const unit = (v, fallback) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback);
 
 /**
- * Where NEWT's root may go in a room `width` wide.
- * @param {number} width
- * @param {number} [radius]
- * @returns {import('./types.js').Bounds}
+ * The scene's colours from a look preset: `background` (a hex number), `shadow` {color,
+ * opacity} and `blob` {opacity, lifted}; the blob takes the shadow's colour. A preset without
+ * them falls back on its room's background and blob colours (strings), then on white and a
+ * warm grey shadow.
+ * @param {any} preset  a LookPreset (looks/*.js)
+ * @returns {{background: number, shadow: {color: number, opacity: number}, blob: {color: number, opacity: number, lifted: number}}}
  */
-export function roomBounds(width, radius = NEWT_RADIUS) {
-  const half = ROOM.depth / 2;
+export function floorLook(preset) {
+  const p = preset ?? {};
+  const color = hex(p.shadow?.color) ?? hex(p.blob?.color) ?? FALLBACK.shadow;
+  const opacity = unit(p.blob?.opacity, FALLBACK.blob);
   return {
-    minX: -width / 2 + radius,
-    maxX: width / 2 - radius,
-    minZ: -half + radius,
-    maxZ: half - radius - FRONT_GAP,
+    background: hex(p.background) ?? hex(p.room?.background) ?? FALLBACK.background,
+    shadow: { color, opacity: unit(p.shadow?.opacity, FALLBACK.opacity) },
+    blob: { color, opacity, lifted: Math.max(opacity, unit(p.blob?.lifted, Math.min(1, opacity * 1.9))) },
   };
 }
 
 /**
- * The room, as a group to add to the scene.
- * @param {import('./look.js').LookPreset} preset
+ * The floor, a mesh to add to the scene.
+ * @param {any} preset  a LookPreset
  */
-export function createRoom(preset) {
-  const group = new THREE.Group();
-  group.name = 'Room';
-  let gradient = toonGradient(preset.toon);
-  const surface = (id) => markId(new THREE.MeshToonMaterial({ gradientMap: gradient }), id);
-  const mats = {
-    floor: surface(ID.floor),
-    wall: surface(ID.wall),
-    side: surface(ID.side),
-    baseboard: surface(ID.baseboard),
-  };
-  const plane = new THREE.PlaneGeometry(1, 1);
-  const box = new THREE.BoxGeometry(1, 1, 1);
-  const mesh = (geometry, material) => {
-    const m = new THREE.Mesh(geometry, material);
-    m.receiveShadow = true;
-    group.add(m);
-    return m;
-  };
-  const half = ROOM.depth / 2;
-  const floor = mesh(plane, mats.floor);
-  floor.rotation.x = -Math.PI / 2;
-  floor.scale.set(1, ROOM.depth, 1);
-  const back = mesh(plane, mats.wall);
-  back.position.set(0, ROOM.wall / 2, -half);
-  back.scale.set(1, ROOM.wall, 1);
-  const sides = [-1, 1].map((s) => {
-    const m = mesh(plane, mats.side);
-    m.rotation.y = (-s * Math.PI) / 2;
-    m.scale.set(ROOM.depth, ROOM.wall, 1);
-    m.position.set(0, ROOM.wall / 2, 0);
-    return m;
+export function createFloor(preset) {
+  const material = new THREE.ShadowMaterial({
+    transparent: true,
+    depthWrite: false,
+    // (Its colour blends over the background; the target's alpha, the surface id, stays.)
+    blending: THREE.CustomBlending,
+    blendSrc: THREE.SrcAlphaFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
+    blendSrcAlpha: THREE.ZeroFactor,
+    blendDstAlpha: THREE.OneFactor,
   });
-  const backBoard = mesh(box, mats.baseboard);
-  backBoard.position.set(0, BASEBOARD.height / 2, -half + BASEBOARD.depth / 2);
-  const sideBoards = [-1, 1].map(() => {
-    const m = mesh(box, mats.baseboard);
-    m.scale.set(BASEBOARD.depth, BASEBOARD.height, ROOM.depth);
-    m.position.set(0, BASEBOARD.height / 2, 0);
-    return m;
-  });
-  let width = ROOM.minWidth;
+  const geometry = new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'Floor';
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.receiveShadow = true;
+  mesh.castShadow = false;
 
-  /** @param {number} w */
-  function setWidth(w) {
-    width = w;
-    floor.scale.x = w;
-    back.scale.x = w;
-    backBoard.scale.set(w, BASEBOARD.height, BASEBOARD.depth);
-    [-1, 1].forEach((s, i) => {
-      sides[i].position.x = (s * w) / 2;
-      sideBoards[i].position.x = s * (w / 2 - BASEBOARD.depth / 2);
-    });
-  }
-
-  /** @param {import('./look.js').LookPreset} p */
+  /** @param {any} p  a LookPreset */
   function setLook(p) {
-    for (const k of /** @type {const} */ (['floor', 'wall', 'side', 'baseboard']))
-      mats[k].color.setStyle(p.room[k], THREE.SRGBColorSpace);
-    const next = toonGradient(p.toon);
-    for (const m of Object.values(mats)) m.gradientMap = next;
-    gradient.dispose();
-    gradient = next;
+    const { shadow } = floorLook(p);
+    material.color.setHex(shadow.color, THREE.SRGBColorSpace);
+    material.opacity = shadow.opacity;
   }
 
-  setWidth(width);
   setLook(preset);
   return {
-    group,
-    setWidth,
+    mesh,
     setLook,
-    get width() {
-      return width;
-    },
-    get bounds() {
-      return roomBounds(width);
-    },
     dispose() {
-      plane.dispose();
-      box.dispose();
-      for (const m of Object.values(mats)) m.dispose();
-      gradient.dispose();
+      geometry.dispose();
+      material.dispose();
     },
   };
 }
