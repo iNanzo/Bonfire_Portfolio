@@ -10,12 +10,15 @@
 // The framing: a camera 36° up, low enough that his cap's brim leaves his face showing once he
 // looks toward the camera (from 48° it hid the whole face; at 36° his look lifts his head the
 // rest of the way: the highest angle at which his eyes read on a 390×844 phone), and 20° of
-// view: the floor on screen is his play area (area.js), and a narrow view keeps him nearly the
-// same size all over it (32 to 43 texels on a phone at DS, where 30° gave 27 to 46). There's no
-// room: NEWT stands on an invisible floor on a plain background, and the camera only places
-// him. He's 38 texels tall at the default size (DS) whatever the screen (his height as the
-// camera sees it: NEWT_SIDE), standing at the origin in the middle of the space over the
-// toolbar. The framing is the same at every Pixel Size: NEWT just has more or fewer texels.
+// view: a narrow view keeps him nearly the same size all over his play area. There's no room:
+// NEWT stands on an invisible floor on a plain background, and the camera only places him.
+// This is the default view the orbit camera (camera.js) starts from and comes back to: he's 38
+// texels tall at the default size (DS) whatever the screen (his height as the camera sees it:
+// NEWT_SIDE), further back only where the play area (a disc, area.js) wouldn't all show, and
+// the point the camera looks at (his middle, at the origin) sits in the middle of the space
+// over the toolbar: the view is shifted there (View.shift, an off-centre projection: stage.js
+// camera.setViewOffset), so it stays there however the camera turns. The framing is the same
+// at every Pixel Size: NEWT just has more or fewer texels.
 
 /** @typedef {'off'|'fine'|'ds'|'chunky'} PixelSize */
 /** @typedef {{fine: number, ds: number, chunky: number}} TexelTable  target texels on the short side */
@@ -36,8 +39,10 @@
  * @property {number} fov  vertical, degrees
  * @property {number} elevation  degrees up from the floor
  * @property {number} distance  from the target
- * @property {XYZ} target
+ * @property {XYZ} target  the point it looks at
  * @property {XYZ} position
+ * @property {{x: number, y: number}} shift  where the target shows, CSS px from the canvas's
+ *   centre (an off-centre projection: the image moved, the camera not turned)
  * @property {number} aspect
  * @property {number} near
  * @property {number} far
@@ -76,6 +81,10 @@ export const NEWT_SIDE = [
   [-0.13, 0.958],
   [-0.159, 0.924],
 ];
+/** The top of his head, world units (the hull's highest point). */
+const NEWT_TOP = Math.max(...NEWT_SIDE.map(([, y]) => y));
+/** The height the camera looks at: NEWT's middle. */
+export const FOCUS_Y = 0.5;
 /** His head (his hair, which frames his face; the ears reach to 0.237): its centre and half its width. */
 export const HEAD = { y: 0.8, r: 0.195 };
 /** The 4×4 ordered-dither thresholds, row by row: (0..15 + ½) / 16. */
@@ -132,7 +141,8 @@ export function project(view, p) {
   const t = Math.tan((view.fov * RAD) / 2);
   const nx = vx / (depth * t * view.aspect);
   const ny = up / (depth * t);
-  return { x: ((nx + 1) / 2) * view.canvasW, y: ((1 - ny) / 2) * view.canvasH, depth };
+  const shift = view.shift ?? { x: 0, y: 0 };
+  return { x: ((nx + 1) / 2) * view.canvasW + shift.x, y: ((1 - ny) / 2) * view.canvasH + shift.y, depth };
 }
 
 /** NEWT at the origin on screen: his top and bottom, CSS px. */
@@ -179,11 +189,13 @@ function least(lo, hi, ok) {
 }
 
 /**
- * The camera for a stage `cssW` × `cssH` drawn at `grid` (the camera's aspect and the canvas's
- * CSS size): NEWT `newt` texels tall at the default size's grid (`texels` on the short side),
- * standing at the origin in the middle of the space `insets` leave (over the toolbar).
- * (`fov` and `elevation` default to VIEW's.)
- * @param {{cssW: number, cssH: number, dpr: number, grid: Grid, insets: Insets, texels?: number, newt?: number, fov?: number, elevation?: number}} o
+ * The default camera for a stage `cssW` × `cssH` drawn at `grid` (the camera's aspect and the
+ * canvas's CSS size): NEWT `newt` texels tall at the default size's grid (`texels` on the
+ * short side), or smaller where a play area of radius `area` around the origin wouldn't all
+ * show (its rim over the toolbar and inside the sides, his head at its back under the top),
+ * looking at his middle (standing at the origin) from yaw 0, shifted to the middle of the
+ * space `insets` leave (over the toolbar). (`fov` and `elevation` default to VIEW's.)
+ * @param {{cssW: number, cssH: number, dpr: number, grid: Grid, insets: Insets, texels?: number, newt?: number, fov?: number, elevation?: number, area?: number}} o
  * @returns {View}
  */
 export function frameView({
@@ -196,8 +208,15 @@ export function frameView({
   newt = NEWT_TEXELS,
   fov = VIEW.fov,
   elevation = VIEW.elevation,
+  area = 0,
 }) {
-  const base = {
+  const target = { x: 0, y: FOCUS_Y, z: 0 };
+  const shift = {
+    x: (insets.left + cssW - insets.right) / 2 - grid.canvasW / 2,
+    y: (insets.top + cssH - insets.bottom) / 2 - grid.canvasH / 2,
+  };
+  /** The camera `distance` back. */
+  const at = (distance) => ({
     fov,
     elevation,
     near: VIEW.near,
@@ -205,27 +224,34 @@ export function frameView({
     aspect: grid.w / grid.h,
     canvasW: grid.canvasW,
     canvasH: grid.canvasH,
-  };
+    distance,
+    target,
+    position: placed(target, distance, elevation),
+    shift,
+  });
   // NEWT's height at the default size, in CSS px (its texels are whole device pixels too).
   const pd = Math.max(1, Math.round((Math.min(cssW, cssH) / texels) * (dpr || 1)));
   const newtCss = (newt * pd) / (dpr || 1);
-  /** The camera `distance` back, aimed at (tx, 0, tz). */
-  const at = (distance, tx, tz) => {
-    const target = { x: tx, y: 0, z: tz };
-    return { ...base, distance, target, position: placed(target, distance, elevation) };
-  };
   // NEWT's size first: the distance at which he's `newt` texels tall.
-  const distance = least(2, 400, (d) => {
-    const { top, bottom } = newtBox(at(d, 0, 0));
+  let distance = least(2, 400, (d) => {
+    const { top, bottom } = newtBox(at(d));
     return bottom - top <= newtCss;
   });
-  // Then the aim that puts his middle halfway down the free band and across between the side
-  // insets (a target further forward moves him up the screen; one to his left, right).
-  const middle = { x: 0, y: 0.5, z: 0 };
-  const midY = (insets.top + cssH - insets.bottom) / 2;
-  const midX = (insets.left + cssW - insets.right) / 2;
-  const reach = distance / 2;
-  const tz = least(-reach, reach, (z) => project(at(distance, 0, z), middle).y <= midY);
-  const tx = least(-reach, reach, (x) => project(at(distance, x, tz), middle).x <= midX);
-  return at(distance, tx, tz);
+  // Then back as far as the play area needs to show whole.
+  if (area > 0) {
+    const rim = Array.from({ length: 48 }, (_, i) => [
+      Math.sin((i / 48) * 2 * Math.PI),
+      Math.cos((i / 48) * 2 * Math.PI),
+    ]);
+    const shows = (d) => {
+      const v = at(d);
+      return rim.every(([sx, sz]) => {
+        const p = project(v, { x: area * sx, y: 0, z: area * sz });
+        const head = project(v, { x: area * sx, y: NEWT_TOP, z: area * sz });
+        return p.x >= 0 && p.x <= cssW && p.y <= cssH - insets.bottom && head.y >= 0;
+      });
+    };
+    if (!shows(distance)) distance = least(distance, 400, shows);
+  }
+  return at(distance);
 }

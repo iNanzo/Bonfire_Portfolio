@@ -12,7 +12,7 @@
 // Camera eases back to the default view, the short way round. Angles in radians (yaw 0: the
 // camera on the +z side, + toward +x), distances in world units, drags in CSS px.
 
-import { VIEW } from './pixels.js';
+import { FOCUS_Y, VIEW } from './pixels.js';
 
 /** @typedef {import('./types.js').XZ} XZ */
 /** @typedef {import('./types.js').XYZ} XYZ */
@@ -42,8 +42,7 @@ export const ORBIT = {
   follow: 0.5,
   wheel: 0.0015,
 };
-/** The height the camera looks at: NEWT's middle. */
-export const FOCUS_Y = 0.5;
+export { FOCUS_Y };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const wrap = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
