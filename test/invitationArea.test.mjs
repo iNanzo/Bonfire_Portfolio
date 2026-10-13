@@ -252,31 +252,31 @@ test('carrying stays inside the disc: the anchor, and a toss that bounces softly
 
 test('the light’s shadow camera covers the disc, up to the highest he’s lifted, for every look and wherever the camera has turned the light', () => {
   const top = 2.2 + NEWT_HEIGHT;
-  for (const [look, p] of Object.entries(LOOKS))
-    for (const yaw of [0, 1.1, -2.4, Math.PI]) {
-      const name = `${look} at yaw ${yaw.toFixed(2)}`;
-      const sun = new THREE.DirectionalLight(0xffffff, 1);
-      const d = lightDir(p.sun.dir, yaw);
-      sun.position.copy(new THREE.Vector3(d.x, d.y, d.z).normalize().multiplyScalar(12));
-      sun.target.position.set(0, 0, 0);
-      fitShadow(sun, AREA, top);
-      sun.updateMatrixWorld();
-      sun.target.updateMatrixWorld();
-      sun.shadow.updateMatrices(sun);
-      const cam = sun.shadow.camera;
-      const reach = R + NEWT_RADIUS;
-      for (let i = 0; i < 24; i++) {
-        const a = (i / 24) * 2 * Math.PI;
-        for (const y of [0, top / 2, top]) {
-          const q = new THREE.Vector3(reach * Math.sin(a), y, reach * Math.cos(a)).project(cam);
-          for (const k of ['x', 'y', 'z'])
-            assert.ok(
-              Math.abs(q[k]) <= 1 + 1e-6,
-              `${name}: (${i * 15}°, ${y}) is outside the shadow camera (${k} ${q[k]})`,
-            );
-        }
-      }
-      // Snug: not much more than the disc and its shadows.
-      assert.ok(cam.right - cam.left < 4 * reach + 2 * top, `${name}: ${(cam.right - cam.left).toFixed(1)} wide`);
+  const cases = Object.entries(LOOKS).flatMap(([look, p]) => [0, 1.1, -2.4, Math.PI].map((yaw) => ({ look, p, yaw })));
+  const reach = R + NEWT_RADIUS;
+  // (Round the disc's rim, his reach past it, at the floor, half way up and the top.)
+  const points = Array.from({ length: 24 }, (_, i) => i).flatMap((i) => [0, top / 2, top].map((y) => [i, y]));
+  for (const { look, p, yaw } of cases) {
+    const name = `${look} at yaw ${yaw.toFixed(2)}`;
+    const sun = new THREE.DirectionalLight(0xffffff, 1);
+    const d = lightDir(p.sun.dir, yaw);
+    sun.position.copy(new THREE.Vector3(d.x, d.y, d.z).normalize().multiplyScalar(12));
+    sun.target.position.set(0, 0, 0);
+    fitShadow(sun, AREA, top);
+    sun.updateMatrixWorld();
+    sun.target.updateMatrixWorld();
+    sun.shadow.updateMatrices(sun);
+    const cam = sun.shadow.camera;
+    for (const [i, y] of points) {
+      const a = (i / 24) * 2 * Math.PI;
+      const q = new THREE.Vector3(reach * Math.sin(a), y, reach * Math.cos(a)).project(cam);
+      for (const k of ['x', 'y', 'z'])
+        assert.ok(
+          Math.abs(q[k]) <= 1 + 1e-6,
+          `${name}: (${i * 15}°, ${y}) is outside the shadow camera (${k} ${q[k]})`,
+        );
     }
+    // Snug: not much more than the disc and its shadows.
+    assert.ok(cam.right - cam.left < 4 * reach + 2 * top, `${name}: ${(cam.right - cam.left).toFixed(1)} wide`);
+  }
 });
