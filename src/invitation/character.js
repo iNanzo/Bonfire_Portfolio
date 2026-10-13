@@ -34,7 +34,9 @@
 // in for the 1024 sheet, which mipmaps down to a blank face at a dozen texels: the one whose
 // cell is as many pixels as his half face covers texels, measured as his meshes are drawn
 // (the camera, the target's texels, his face's span: faceSheets.js faceSpan) and held through
-// small changes (pickFaceSize), so a 2-pixel eye stays 2 texels as he moves.
+// small changes (pickFaceSize), so a 2-pixel eye stays 2 texels as he moves. Past the largest
+// pixel sheet (zoomed in at the finest resolutions) the 1024 sheet shows again, as at Off, its
+// mips as three picks them (his face takes none of the preset's mipBias: markId's `bias`).
 //
 // The texel snap (pixel filter on): as each of his meshes is drawn, the shift that puts his
 // head's centre on a texel's centre is worked out (retro.js snapShift) and the materials of
@@ -77,7 +79,7 @@ const MIN_R = 11;
  *   face: import('./clips.js').FaceName,
  *   faceReady: Promise<void>,
  *   atlasReady: Promise<void>,
- *   faceSize: number|null,
+ *   faceSize: number|'smooth'|null,
  *   faceTexels: number,
  *   texelSnap: {head: {x: number, y: number}, body: {x: number, y: number}},
  * }} PageCharacter
@@ -189,7 +191,8 @@ export function createCharacter(gltf, opts = {}) {
         gradientMap: gradient,
       }),
       ID.newt,
-      { snap: snaps[part] },
+      // (His face: no coarser mip, so the smooth sheet stays sharp where it shows.)
+      src?.name === 'NEWT_Face' ? { snap: snaps[part], bias: { value: 0 } } : { snap: snaps[part] },
     );
     if (src?.map) textures.add(src.map);
     if (src?.name === 'NEWT_Face') faceMaterial = m;
@@ -238,19 +241,26 @@ export function createCharacter(gltf, opts = {}) {
   const pixelSets = new Map();
   /** @type {import('./clips.js').FaceName} */
   let face = 'neutral';
-  /** The pixel sheet's size for his half face (null until he's drawn), and that measure in texels. */
+  /**
+   * The pixel sheet's size for his half face ('smooth': past the largest, the 1024 sheet; null
+   * until he's drawn), and that measure in texels.
+   * @type {number|'smooth'|null}
+   */
   let faceSize = null;
   let faceTexels = 0;
   /** His face's width across one cell at the eyes, model units (0: no face to measure). */
   const span = faceMesh ? spanOf(faceMesh.geometry) : 0;
-  /** The pixel sheet's cells at `size` (the nearest the image has before he's measured). */
+  /**
+   * The pixel sheet's cells at `size` (the nearest the image has before he's measured).
+   * @param {number|null} size
+   */
   const pixelFacesAt = (size) => {
     const sheet = pixelLayout.find((s) => s.w === size) ?? pixelLayout.find((s) => s.w >= 8) ?? pixelLayout[0];
     if (!pixelSets.has(sheet.w)) pixelSets.set(sheet.w, splitSheet(pixelImage, true, sheet));
     return pixelSets.get(sheet.w);
   };
   const showFace = () => {
-    const set = pixel && pixelImage ? pixelFacesAt(faceSize) : sheetFaces;
+    const set = pixel && pixelImage && faceSize !== 'smooth' ? pixelFacesAt(faceSize) : sheetFaces;
     if (faceMaterial && set) faceMaterial.map = set[face];
   };
   const showAtlas = () => {

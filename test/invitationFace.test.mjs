@@ -18,6 +18,7 @@ import {
   FACE_IMAGE,
   FACE_LAYOUT,
   FACE_SIZES,
+  SMOOTH_FACE_OVER,
   faceSpan,
   pickFaceSize,
 } from '../src/invitation/faceSheets.js';
@@ -199,7 +200,11 @@ test('the pixel faces: a mouth in every face at every size, darker than the skin
 test('the sheet pick: the nearest size to his half face, held until another fits clearly better', () => {
   assert.equal(pickFaceSize(8, null), 8, 'a size that fits exactly');
   assert.equal(pickFaceSize(7.9, null), 8);
-  assert.equal(pickFaceSize(100, null), FACE_SIZES.at(-1), 'past the largest: the largest');
+  assert.equal(
+    pickFaceSize(FACE_SIZES.at(-1) * 1.1, null),
+    FACE_SIZES.at(-1),
+    'a little past the largest: the largest',
+  );
   assert.equal(pickFaceSize(1, null), FACE_SIZES[0], 'under the smallest: the smallest');
   assert.equal(pickFaceSize(Number.NaN, 9), 9, 'no measure: the one showing stays');
   assert.equal(pickFaceSize(0, null), FACE_SIZES[0], 'no measure and none showing: the smallest');
@@ -221,6 +226,29 @@ test('the sheet pick: the nearest size to his half face, held until another fits
     current = next;
   }
   assert.ok(flips <= 1, `a wobble of 2.5% about the middle flips it ${flips} times`);
+});
+
+test('past the largest sheet (zoomed in at the finest resolutions) the face is the smooth sheet, held through a small change; under the smallest, the smallest sheet', () => {
+  const largest = FACE_SIZES.at(-1);
+  const at = largest * SMOOTH_FACE_OVER;
+  assert.ok(
+    SMOOTH_FACE_OVER >= 1.1 && SMOOTH_FACE_OVER <= 1.5,
+    `a quarter or so past the largest (${SMOOTH_FACE_OVER})`,
+  );
+  assert.equal(pickFaceSize(at * 0.98, null), largest, 'just under: the largest pixel sheet');
+  assert.equal(pickFaceSize(at * 1.02, null), 'smooth', 'past it: smooth');
+  assert.equal(pickFaceSize(400, null), 'smooth', 'a face hundreds of texels across (256×256, zoomed in)');
+  // Held both ways: no flicker between the two as he breathes or the camera eases.
+  assert.equal(pickFaceSize(at * 0.97, 'smooth'), 'smooth', 'a little under: it stays smooth');
+  assert.equal(pickFaceSize(at * 1.03, largest), 'smooth');
+  assert.equal(pickFaceSize(at * 0.8, 'smooth'), largest, 'clearly under: pixels again');
+  assert.equal(pickFaceSize(Number.NaN, 'smooth'), 'smooth', 'no measure: the one showing stays');
+  // 16×16: his half face under 3 texels, the smallest sheet.
+  assert.equal(pickFaceSize(2.2, null), FACE_SIZES[0]);
+  assert.equal(pickFaceSize(2.2, 'smooth'), FACE_SIZES[0]);
+  // A one-sheet image (an older one cached): smooth past its own size the same way.
+  assert.equal(pickFaceSize(20, null, [12]), 'smooth');
+  assert.equal(pickFaceSize(13, null, [12]), 12);
 });
 
 test('his face’s span: model units across one cell at the eyes, from the face’s own triangles', () => {

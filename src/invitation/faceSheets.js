@@ -9,7 +9,10 @@
 // texel turns a 2-pixel eye into 1 or 3 texels as his head moves a fraction of a texel, frame to
 // frame (the eyes flicker between shapes). character.js measures his half face in texels each
 // frame and shows the sheet whose cell matches it, holding on to the one showing until another
-// fits clearly better (pickFaceSize), so his breathing never flips it.
+// fits clearly better (pickFaceSize), so his breathing never flips it. Past the largest sheet
+// (zoomed in at the finest sprite resolutions, his half face over 40 texels) a pixel sheet would
+// be stretched, nearest, into blocks: there the face is the smooth 1024 sheet, as at Off
+// ('smooth'); under the smallest (16×16: his half face about 2 texels) it's the smallest sheet.
 
 /** The cells' widths, pixels: a step of at most about 15% between neighbours. */
 export const FACE_SIZES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 23, 26, 30, 34];
@@ -21,6 +24,11 @@ export const FACE_SIZES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 23, 
 export const FACE_ASPECT = 1.75;
 /** How much better (as a log of the size ratio) another size must fit before the sheet switches. */
 export const FACE_HYSTERESIS = 0.06;
+/**
+ * The smooth sheet shows once his half face is this many times the largest sheet's cell (34 px:
+ * past about 42 texels), until it's FACE_HYSTERESIS × 2 (log) under that again.
+ */
+export const SMOOTH_FACE_OVER = 1.25;
 /**
  * The face sheet's eyes, in its UVs (the neutral cell's: u 0..0.5 from the middle of his face
  * to his ear, v down the image): the band where the face's width is measured.
@@ -52,18 +60,22 @@ export const FACE_IMAGE = {
 
 /**
  * The size of sheet to show for a half face `texels` across: the nearest (by ratio), unless
- * `current` fits within FACE_HYSTERESIS of it.
+ * `current` fits within FACE_HYSTERESIS of it; 'smooth' (the 1024 sheet) past SMOOTH_FACE_OVER
+ * times the largest, held until it's clearly under that again.
  * @param {number} texels
- * @param {number|null} current  the size showing, or null
+ * @param {number|'smooth'|null} current  the size showing, or null
  * @param {number[]} [sizes]
  * @param {number} [margin]
+ * @returns {number|'smooth'}
  */
 export function pickFaceSize(texels, current, sizes = FACE_SIZES, margin = FACE_HYSTERESIS) {
   if (!(texels > 0)) return current ?? sizes[0];
+  const smoothAt = Math.max(...sizes) * SMOOTH_FACE_OVER;
+  if (texels > smoothAt || (current === 'smooth' && Math.log(smoothAt / texels) < 2 * margin)) return 'smooth';
   const err = (s) => Math.abs(Math.log(texels / s));
   let best = sizes[0];
   for (const s of sizes) if (err(s) < err(best)) best = s;
-  if (current !== null && sizes.includes(current) && err(current) <= err(best) + margin) return current;
+  if (typeof current === 'number' && sizes.includes(current) && err(current) <= err(best) + margin) return current;
   return best;
 }
 

@@ -62,7 +62,8 @@ export const DECAL_CUT = 0.3;
 
 /**
  * Make a material write its surface id into the colour's alpha (for the retro pass's lines),
- * and sample its map MAP_BIAS mip levels coarser (0 unless the pass sets it). With `snap`, its
+ * and sample its map MAP_BIAS mip levels coarser (0 unless the pass sets it), or by its own
+ * `bias` uniform (his face's: 0, so the smooth face sheet stays sharp). With `snap`, its
  * vertices also move by that uniform's shift (NDC: clip space over w) after three projects
  * them: one shift all of his materials share (character.js sets it each frame from snapShift),
  * so all of him moves onto the texel grid together and a part that only drifts within a texel
@@ -70,12 +71,12 @@ export const DECAL_CUT = 0.3;
  * @template T
  * @param {T} material  a built-in three.js material
  * @param {number} id  ID's
- * @param {{snap?: {value: {x: number, y: number}}}} [opts]
+ * @param {{snap?: {value: {x: number, y: number}}, bias?: {value: number}}} [opts]
  * @returns {T}
  */
 export function markId(material, id, opts = {}) {
   const m = /** @type {any} */ (material);
-  const { snap } = opts;
+  const { snap, bias = MAP_BIAS } = opts;
   m.onBeforeCompile = (shader) => {
     if (snap) {
       shader.uniforms.uTexelSnap = snap;
@@ -88,7 +89,7 @@ export function markId(material, id, opts = {}) {
     }
     shader.uniforms.uSurfaceId = { value: id / ID_SCALE };
     shader.uniforms.uIdOn = ID_ON;
-    shader.uniforms.uMapBias = MAP_BIAS;
+    shader.uniforms.uMapBias = bias;
     shader.fragmentShader = shader.fragmentShader
       .replace(
         'void main() {',

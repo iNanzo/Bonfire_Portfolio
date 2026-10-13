@@ -355,16 +355,22 @@ test('the face sheet: picked by his half face in texels at his head (camera, gri
     face.onBeforeRender(viewportOf(195, h), null, cameraAt(c, d), face.geometry, face.material, null);
   // One cell is 3 model units across, × SCALE in the world; a world unit is h / (2 d tan 10°) texels there.
   const expect = (d, h = 422) => 3 * SCALE * (h / (2 * d * Math.tan(10 * DEG)));
-  draw(20);
-  assert.ok(Math.abs(ch.faceTexels / expect(20) - 1) < 0.02, `half face ${ch.faceTexels} texels (${expect(20)})`);
-  assert.equal(ch.faceSize, pickFaceSize(expect(20), null));
+  draw(40);
+  assert.ok(Math.abs(ch.faceTexels / expect(40) - 1) < 0.02, `half face ${ch.faceTexels} texels (${expect(40)})`);
+  assert.equal(ch.faceSize, pickFaceSize(expect(40), null));
   const size = ch.faceSize;
-  draw(20 * 1.03);
+  draw(40 * 1.03);
   assert.equal(ch.faceSize, size, 'a 3% change keeps the sheet');
-  draw(10);
+  draw(20);
   assert.ok(ch.faceSize > size, `twice as close: a bigger sheet (${ch.faceSize} after ${size})`);
-  draw(10, 211);
-  assert.equal(ch.faceSize, pickFaceSize(expect(10, 211), ch.faceSize), 'half the texels: the grid counts too');
+  draw(20, 211);
+  assert.equal(ch.faceSize, pickFaceSize(expect(20, 211), ch.faceSize), 'half the texels: the grid counts too');
+  // Very close at a fine resolution (256×256 zoomed in): past the largest sheet, the smooth one;
+  // and back to pixels as he's seen from further.
+  draw(0.5, 2532);
+  assert.equal(ch.faceSize, 'smooth', `half face ${ch.faceTexels.toFixed(0)} texels: smooth`);
+  draw(40);
+  assert.equal(ch.faceSize, pickFaceSize(expect(40), null), 'further again: a pixel sheet');
   ch.dispose();
 });
 
@@ -409,6 +415,23 @@ test('the texel snap: what’s on his head moves by his head’s centre, the res
     [0, 0, 0, 0],
     'Pixel Size Off: drawn where he is',
   );
+  ch.dispose();
+});
+
+test('his face samples its sheet at the mip three picks (the smooth sheet stays sharp where it shows), the rest of him at the shared coarser bias', () => {
+  const { gltf, face, mesh } = withFace();
+  const ch = createCharacter(gltf);
+  const biasOf = (material) => {
+    const shader = {
+      uniforms: {},
+      vertexShader: THREE.ShaderLib.toon.vertexShader,
+      fragmentShader: THREE.ShaderLib.toon.fragmentShader,
+    };
+    material.onBeforeCompile(shader, null);
+    return shader.uniforms.uMapBias;
+  };
+  assert.equal(biasOf(face.material).value, 0, 'the face: no bias');
+  assert.notEqual(biasOf(face.material), biasOf(mesh.material), 'its own, not the shared one the preset sets');
   ch.dispose();
 });
 
