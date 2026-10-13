@@ -18,11 +18,13 @@ import soft from './looks/soft.js';
  *   `darken` (0..1) and multiplied by `tint`; `depth`: how far (relative) the depth must jump
  * @property {{lift: number, gamma: number, saturation: number, tint: string, exposure: number}} grade
  * @property {number[]} toon  the toon gradient's bands, dark to light, 0..1 (evenly spaced over the light's angle)
- * @property {{type: 'basic'|'pcf'|'vsm', mapSize: number, bias: number, normalBias: number, radius: number}} shadow
+ * @property {{type: 'basic'|'pcf'|'vsm', mapSize: number, bias: number, normalBias: number, radius: number, color?: number|string, opacity?: number}} shadow
+ *   the shadow map, and the shadow the invisible floor shows (floor.js: its colour and strength)
  * @property {{dir: number[], color: string, intensity: number}} sun  the one light that casts (dir: toward it)
  * @property {{sky: string, ground: string, intensity: number}} hemi  the faint fill
- * @property {{background: string, floor: string, wall: string, side: string, baseboard: string}} room
- * @property {{color: string, opacity: number, lifted: number}} blob  the soft shadow under him (lifted: while he's held)
+ * @property {number} [background]  the page's colour (a hex number; there's no room, just this and the floor's shadows)
+ * @property {{background: string, [k: string]: string}} [room]  the scrapped room's colours (floor.js falls back on its background)
+ * @property {{color?: string, opacity: number, lifted: number}} blob  the soft shadow under him (lifted: while he's held; its colour is the shadow's)
  * @property {{color: string}} marker  the ring under the finger or cursor
  * @property {number} animFps  choppy motion: the animation stepped at this rate (0: smooth)
  */

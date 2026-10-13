@@ -1,6 +1,6 @@
 // The invitation toy (/invitation/) in a real browser, on the production build: on a phone
-// (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT in
-// his room (not a blank canvas); it's unlisted (noindex); a Look change survives a reload and
+// (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT on
+// his floor (not a blank canvas); it's unlisted (noindex); a Look change survives a reload and
 // Pixel Size Off draws at native size; and the portfolio's first load carries none of its
 // code. The behaviour tests (tapping, holding, the head following the finger, the buttons,
 // floor taps, hover) are placeholders the integration step fills in: they wait on states
@@ -48,7 +48,7 @@ const snapshot = (page) => page.evaluate(() => window.__invitation.snapshot());
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
-  test('loads to ready with no errors, draws NEWT in his room, and is unlisted', async ({ page }) => {
+  test('loads to ready with no errors, draws NEWT, and is unlisted', async ({ page }) => {
     const errors = watch(page);
     await ready(page);
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
@@ -56,10 +56,10 @@ test.describe('on a phone', () => {
     const snap = await snapshot(page);
     expect(snap.ready).toBe(true);
     expect(snap.pixelScale).toBeGreaterThan(1);
-    // Not a blank canvas: the room and NEWT in it, far from one flat colour.
+    // Not a blank canvas: NEWT on the plain background, far from one flat colour.
     const pic = await picture(page);
     expect(apart(pic, flat(pic))).toBeGreaterThan(3);
-    // NEWT stands where the hooks say: his head's pixels aren't the wall's.
+    // NEWT stands where the hooks say, clear of the screen's edges.
     const head = await page.evaluate(() => window.__invitation.screen('head'));
     const box = await page.locator('[data-stage]').boundingBox();
     expect(head.x).toBeGreaterThan(box.x + 24);
@@ -100,7 +100,7 @@ test.describe('on a phone', () => {
 
   test.fixme('tapping NEWT plays Wave or Spook', async () => {});
   test.fixme('a touch drag holds him by the collar, and letting go gives fall, then land', async () => {});
-  test.fixme('a finger moving across the room turns his head', async () => {});
+  test.fixme('a finger moving across the floor turns his head', async () => {});
   test.fixme('each button plays its clip', async () => {});
   test.fixme('a floor tap walks him there', async () => {});
 });

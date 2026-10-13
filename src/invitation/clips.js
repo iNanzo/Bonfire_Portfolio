@@ -33,13 +33,16 @@ export const CLIP_NAMES = Object.keys(CLIPS);
 
 /** Idle, Walk and Run play as one blend by speed, on one shared step phase (blend.js). */
 export const GAIT_CLIPS = ['Idle', 'Walk', 'Run'];
-/** World units per second at which Walk, then Run, has the whole weight. */
-export const GAIT = { walk: 0.9, run: 1.9 };
+/**
+ * World units per second at which Walk, then Run, has the whole weight: each clip's own pace
+ * (STRIDE over its length: Walk 0.59 in 0.83 s, Run 1.07 in 0.58 s), so neither plays fast.
+ */
+export const GAIT = { walk: 0.7, run: 1.9 };
 /**
  * World units covered by one cycle at timeScale 1 (measured from the clips by forward
  * kinematics; tools/newt.py's author keeps these true, the model test checks them).
  */
-export const STRIDE = { Walk: 0.75, Run: 1.11 };
+export const STRIDE = { Walk: 0.59, Run: 1.07 };
 
 /** Fades that differ from the target clip's own `fadeIn`, keyed `from>to`. */
 export const FADE_OVERRIDES = { 'Land>Idle': 0.3, 'Fall>Land': 0.05 };
