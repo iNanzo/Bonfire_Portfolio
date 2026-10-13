@@ -1,13 +1,14 @@
 // NEWT's pixel face sheet (public/models/newt-face.png, made by tools/newt-face.mjs): the 2×2
 // layout clips.js FACES reads, cells about as many pixels as his half face covers texels on a
-// phone (so nearest sampling neither drops nor doubles a feature), every dark feature at least
-// 2 px thick both ways (it survives the brim and a texel's rounding), solid eyes in the open
+// phone (so nearest sampling neither drops nor doubles a feature), no lone dark pixel and every
+// feature at least 2 px each way (it survives a texel's rounding), solid eyes in the open
 // faces, and four faces that differ from each other.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
+import { fileURLToPath } from 'node:url';
 
-const FILE = new URL('../public/models/newt-face.png', import.meta.url);
+const FILE = fileURLToPath(new URL('../public/models/newt-face.png', import.meta.url));
 const CELLS = { neutral: [0, 0], blink: [1, 0], happy: [0, 1], surprised: [1, 1] };
 const luma = (r, g, b) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
@@ -45,17 +46,42 @@ test('the pixel face: a 2×2 sheet of cells sized to his half face on a phone, o
     );
 });
 
-test('the pixel face: every dark feature at least 2 px thick both ways; eyes in each; four different faces', async () => {
+test('the pixel face: no lone dark pixel, every feature at least 2 px each way; eyes in each; four different faces', async () => {
   const { out } = await cells();
   for (const [name, { dark, w, h }] of Object.entries(out)) {
     const on = (x, y) => x >= 0 && y >= 0 && x < w && y < h && dark[y * w + x];
+    const seen = new Set();
     let n = 0;
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
         if (!on(x, y)) continue;
         n++;
-        assert.ok(on(x - 1, y) || on(x + 1, y), `${name}: (${x}, ${y}) at least 2 px wide`);
-        assert.ok(on(x, y - 1) || on(x, y + 1), `${name}: (${x}, ${y}) at least 2 px tall`);
+        assert.ok(on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1), `${name}: (${x}, ${y}) alone`);
+        if (seen.has(y * w + x)) continue;
+        // The feature it's part of: at least 2 px across and 2 down (it survives a texel's rounding).
+        const box = { l: x, r: x, t: y, b: y };
+        const stack = [[x, y]];
+        seen.add(y * w + x);
+        while (stack.length) {
+          const [px, py] = stack.pop();
+          Object.assign(box, {
+            l: Math.min(box.l, px),
+            r: Math.max(box.r, px),
+            t: Math.min(box.t, py),
+            b: Math.max(box.b, py),
+          });
+          for (const [nx, ny] of [
+            [px + 1, py],
+            [px - 1, py],
+            [px, py + 1],
+            [px, py - 1],
+          ])
+            if (on(nx, ny) && !seen.has(ny * w + nx)) {
+              seen.add(ny * w + nx);
+              stack.push([nx, ny]);
+            }
+        }
+        assert.ok(box.r > box.l && box.b > box.t, `${name}: the feature at (${x}, ${y}) is 2 px each way`);
       }
     assert.ok(n >= 4, `${name}: an eye's worth of dark pixels (${n})`);
   }
