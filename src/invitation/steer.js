@@ -3,7 +3,8 @@
 // away from it, so its edges push him off and a corner slides him along an edge, never stuck;
 // the way he runs, Body.run, settles toward that choice over a quarter of a second, faster with
 // an edge close ahead, so his heading curves instead of zig-zagging between neighbours),
-// and turning to face the camera, all with acceleration and a capped turn rate. Also picks his
+// and turning to face the camera, all with acceleration and a capped turn rate (slower when he
+// isn't moving: on the spot his feet only glide round, so he pivots, never spins). Also picks his
 // wander goals. The play area (Bounds) is a box, a box that widens toward the back, or a disc
 // (Bounds.r: the toy's, around its box's centre): xRange gives its sides at a depth, clampTo
 // pulls a point inside (a disc's straight in toward its centre). Pure: no three.js. NEWT faces
@@ -14,7 +15,9 @@
 /** @typedef {import('./types.js').XZ} XZ */
 
 /**
- * accel/decel: units/s²; turnRate: rad/s; arrive: a goto stops inside this radius; slowRadius:
+ * accel/decel: units/s²; turnRate: rad/s on the move, from turnStill standing (his feet glide
+ * while he turns on the spot: slowly, they read as a pivot, not a turntable) up to it at
+ * turnFullAt units/s; arrive: a goto stops inside this radius; slowRadius:
  * he slows over this last stretch, to no less than minApproach of his speed. Flee: fleeDirs
  * directions tried, room counted up to fleeRoom ahead (weighted fleeRoomWeight), a direction
  * with less than fleeBlocked of room is out, fleeKeep favours the way he runs, the way he runs
@@ -27,6 +30,8 @@ export const STEER = {
   accel: 5,
   decel: 7,
   turnRate: 9,
+  turnStill: 3.5,
+  turnFullAt: 0.35,
   arrive: 0.06,
   slowRadius: 0.3,
   minApproach: 0.25,
@@ -163,7 +168,8 @@ export function steer(body, move, pointer, bounds, dt) {
   } else if (mode === 'face') {
     aim = move.goal ? Math.atan2(move.goal.x - x, move.goal.z - z) : 0;
   }
-  yaw = turnToward(yaw, aim, STEER.turnRate * dt);
+  const turn = STEER.turnStill + (STEER.turnRate - STEER.turnStill) * clamp(speed / STEER.turnFullAt, 0, 1);
+  yaw = turnToward(yaw, aim, turn * dt);
   const rate = (want > speed ? STEER.accel : STEER.decel) * dt;
   speed = want > speed ? Math.min(want, speed + rate) : Math.max(want, speed - rate);
   const step = Math.min(speed * dt, room);

@@ -127,6 +127,36 @@ test('turn rate is capped', () => {
   assert.ok(flee);
 });
 
+test('turning on the spot he pivots slowly (no faster than STEER.turnStill, about 3.5 rad/s: his feet glide less), and at the full rate once he’s on the move', () => {
+  assert.ok(STEER.turnStill >= 3 && STEER.turnStill <= 4.5, `${STEER.turnStill} rad/s standing`);
+  // Turning to the camera from side-on (a reaction, sitting down): no speed, a slow pivot.
+  let f = { x: 0, z: 0, yaw: Math.PI / 2, speed: 0 };
+  let t = 0;
+  let most = 0;
+  while (Math.abs(wrapAngle(f.yaw)) > 0.01 && t < 2) {
+    const next = steer(f, { mode: 'face', goal: { x: 0, z: 6 }, speed: 0 }, null, BOUNDS, DT);
+    most = Math.max(most, Math.abs(wrapAngle(next.yaw - f.yaw)) / DT);
+    f = next;
+    t += DT;
+  }
+  assert.ok(most <= STEER.turnStill + 1e-6, `pivoted at ${most.toFixed(2)} rad/s`);
+  assert.ok(t > 0.35 && t < 0.6, `a quarter turn in ${t.toFixed(2)} s`);
+  // A floor tap behind him: slow while he can't walk toward it yet, the full rate once walking.
+  let b = { x: 0, z: 0, yaw: 0, speed: 0 };
+  let standing = 0;
+  let moving = 0;
+  for (let i = 0; i < 90; i++) {
+    const next = steer(b, { mode: 'goto', goal: { x: 0.3, z: -1.5 }, speed: GAIT.walk }, null, BOUNDS, DT);
+    const rate = Math.abs(wrapAngle(next.yaw - b.yaw)) / DT;
+    if (b.speed === 0) standing = Math.max(standing, rate);
+    else if (b.speed >= STEER.turnFullAt) moving = Math.max(moving, rate);
+    b = next;
+  }
+  assert.ok(standing <= STEER.turnStill + 1e-6, `standing, he turned at ${standing.toFixed(2)} rad/s`);
+  assert.ok(moving > STEER.turnStill + 1, `walking, he turns faster (${moving.toFixed(2)} rad/s)`);
+  assert.ok(Math.abs(wrapAngle(b.yaw - Math.atan2(0.3, -1.5))) < 0.05, 'and came round to the goal');
+});
+
 test('goto arrives inside the arrive radius and stops; face turns him toward the camera', () => {
   const goal = { x: 1, z: -1 };
   let body = { x: -1, z: 0.5, yaw: 0, speed: 0 };

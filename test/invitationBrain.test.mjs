@@ -168,7 +168,9 @@ test('a tap turns him to face the camera, then plays Wave or Spook, then idle wh
   const t0 = s.w.t;
   out = s.until((o) => o.clip !== 'gait', 1);
   const turn = s.w.t - t0;
-  assert.ok(turn >= TUNE.faceTurn - 1e-6 && turn <= TUNE.faceTurn + DT + 1e-6, `turned for ${turn} s`);
+  // (Until he faces it, a pivot of about 2 rad on the spot, never longer than faceTurn.)
+  assert.ok(turn > 0.3 && turn <= TUNE.faceTurn + DT + 1e-6, `turned for ${turn} s`);
+  assert.ok(Math.abs(wrapAngle(s.w.body.yaw)) <= TUNE.facedEnough + 0.1, 'facing the camera');
   assert.ok(['Wave', 'Spook'].includes(out.clip));
   assert.equal(out.reaction, out.clip);
   assert.equal(out.restart, true);

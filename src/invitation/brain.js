@@ -32,12 +32,15 @@ export const TUNE = {
   sitAfter: 20,
   /** The pointer moving this far (CSS px) counts as company. */
   aloneMove: 30,
-  /** A reaction first turns him to the camera for this long… */
-  faceTurn: 0.2,
-  /** …unless he's already within this many radians of facing it. */
+  /**
+   * A reaction first turns him to the camera, until he's within facedEnough radians of facing
+   * it or for faceTurn s at most (he pivots on the spot at steer.js STEER.turnStill: a quarter
+   * turn takes about 0.45 s).
+   */
+  faceTurn: 0.6,
   facedEnough: 0.15,
-  /** Sitting down, he turns to face the camera first, until he does or for this long at most. */
-  sitTurnMax: 0.6,
+  /** Sitting down, he turns to face the camera first, until he does or for this long at most (a half turn). */
+  sitTurnMax: 1,
   /** A tap in this first share of a reaction only adds stress. */
   reactLock: 0.6,
   /** Fleeing from stress lasts at least this long. */
@@ -421,7 +424,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
     /** @param {number} age */
     react(age) {
       if (m.turning) {
-        if (age >= T.faceTurn - EPS) startClip(m.reaction);
+        if (facingCamera() || age >= T.faceTurn - EPS) startClip(m.reaction);
       } else if (fadeOutDue(m.clip, clipTime().remaining, 'Idle')) enter('idle');
     },
     flee() {
