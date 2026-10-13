@@ -245,7 +245,7 @@ def blend(p, q, t):
 ANKLE = 0.417  # the ankle over the sole (clips.js ANKLE_HEIGHT)
 STANCE = (0.6, 0.06, ANKLE)  # Idle's ankle, his left (+X); the right mirrors it
 
-ARM_RELAXED = {'shoulder': (0, 0), 'upper': (4, 14), 'lower': (16, 10), 'twist': 0}
+ARM_RELAXED = {'shoulder': (0, 0), 'upper': (4, 19), 'lower': (16, 15), 'twist': 0}
 IDLE = {
     'hips': {'loc': (0, 0, -0.06), 'rot': (0, 0, 0)},
     'chest': (2, 0, 0),
@@ -298,12 +298,20 @@ def idle(t):
     sw = math.sin(2 * math.pi * t)
     p = merge(
         IDLE,
-        hips={'loc': (0.0, 0, -0.06 - 0.02 * br), 'rot': (0, 1.6 * sw, 0)},
-        chest=(2 + 1.5 * br, -1.0 * sw, 0),
-        head=(-1.0 * br, -1.2 * sw, 0),
+        hips={'loc': (0.0, 0, -0.06 - 0.025 * br), 'rot': (0, 2.4 * sw, 0)},
+        chest=(2 + 1.8 * br, -1.2 * sw, 0),
+        head=(-1.2 * br, -2.2 * sw, 0),
     )
+    up, out = ARM_RELAXED['upper']
+    lo, out2 = ARM_RELAXED['lower']
     for side, s in SIDES:
-        p['arm' + side] = merge(ARM_RELAXED, shoulder=(1.5 * br, 0), upper=(4, 14 + 1.5 * br - s * 0.6 * sw))
+        lean = -s * sw  # the arms swing a little with the sway
+        p['arm' + side] = merge(
+            ARM_RELAXED,
+            shoulder=(2.0 * br, 0),
+            upper=(up, out + 2.0 * br + 1.5 * lean),
+            lower=(lo + 2 * br, out2 + 1.5 * lean),
+        )
     return p
 
 
@@ -323,11 +331,11 @@ def gait(t, g):
             u = (ph - c) / (1 - c)
             e = u * u * (3 - 2 * u)
             y = g['step'] / 2 - g['step'] * e
-            z = ANKLE + g['lift'] * math.sin(math.pi * u)
+            z = ANKLE + g['lift'] * math.sin(math.pi * u ** g['peak'])  # peak < 1 kicks up early
             pitch = lerp(g['toe'], g['heel'], e) + g['swing_pitch'] * math.sin(math.pi * u)
         feet[side] = (g['width'], y, z, pitch)
         p['leg' + side] = {'at': (g['width'], y, z), 'pitch': pitch, 'knee': (0.15, -1, 0)}
-    bob = math.cos(4 * math.pi * t)  # low at each contact, high at each passing
+    bob = math.cos(4 * math.pi * (t - g['low']))  # lowest at g['low'] and half a cycle on
     sw = math.cos(2 * math.pi * t)  # +1 when the left foot leads
     p['hips'] = {
         'loc': (0.0, 0.0, g['height'] - g['bob'] * bob),
@@ -349,16 +357,16 @@ def gait(t, g):
 
 
 WALK = {
-    'contact': 0.5, 'step': 1.6, 'lift': 0.38, 'width': 0.46, 'height': -0.2, 'bob': 0.07,
-    'heel': -14, 'toe': 18, 'swing_pitch': 8, 'lean': 4, 'roll': 3, 'yaw': 9, 'chest': 2,
-    'head': -2, 'nod': 1.5,
-    'arm': {'shrug': 0, 'protract': 0, 'fwd': 2, 'swing': 26, 'out': 14, 'fwd2': 16, 'swing2': 30, 'out2': 10},
+    'contact': 0.5, 'step': 1.85, 'lift': 0.4, 'peak': 0.9, 'low': 0.0, 'width': 0.46, 'height': -0.2, 'bob': 0.09,
+    'heel': -14, 'toe': 18, 'swing_pitch': 8, 'lean': 4, 'roll': 5, 'yaw': 9, 'chest': 2,
+    'head': -2, 'nod': 3,
+    'arm': {'shrug': 0, 'protract': 0, 'fwd': 2, 'swing': 30, 'out': 20, 'fwd2': 16, 'swing2': 32, 'out2': 14},
 }  # fmt: skip
 RUN = {
-    'contact': 0.32, 'step': 1.8, 'lift': 0.6, 'width': 0.42, 'height': -0.3, 'bob': 0.12,
-    'heel': -8, 'toe': 26, 'swing_pitch': 18, 'lean': 16, 'roll': 2, 'yaw': 6, 'chest': 4,
-    'head': -14, 'nod': 2.5,
-    'arm': {'shrug': 14, 'protract': 10, 'fwd': 78, 'swing': 10, 'out': 18, 'fwd2': 96, 'swing2': 14, 'out2': 8},
+    'contact': 0.3, 'step': 2.0, 'lift': 0.7, 'peak': 0.7, 'low': 0.15, 'width': 0.42, 'height': -0.3, 'bob': 0.15,
+    'heel': -8, 'toe': 26, 'swing_pitch': 18, 'lean': 14, 'roll': 4, 'yaw': 6, 'chest': 4,
+    'head': -12, 'nod': 3,
+    'arm': {'shrug': 18, 'protract': 10, 'fwd': 105, 'swing': 22, 'out': 32, 'fwd2': 125, 'swing2': 20, 'out2': 18},
 }  # fmt: skip
 
 
