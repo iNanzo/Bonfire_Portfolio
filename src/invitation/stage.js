@@ -3,8 +3,9 @@
 // camera.js, moves it with setCamera; pixels.js frameView gives its default view: 36° up, NEWT
 // about a fifth of a desktop's short side tall with the whole play area in sight, or a quarter
 // of a phone's (the camera follows him there), and the point it looks at shown in the middle of
-// the space over the toolbar, by an off-centre projection that holds however it turns), the floor (floor.js: no room, the preset's background and an invisible
-// floor that only catches his shadows), the lights and shadows of the look preset, the blob
+// the space over the toolbar, by an off-centre projection that holds however it turns), the
+// floor (floor.js: no room, the preset's background and an invisible floor that only catches
+// his shadows), the lights and shadows of the look preset, the blob
 // shadow and the floor marker, and the retro pass. A ResizeObserver refits it all (in device
 // pixels where the browser measures them, devicePixelContentBoxSize), and so does refit()
 // (main.js calls it when the toolbar resizes).

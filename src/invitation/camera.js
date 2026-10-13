@@ -29,8 +29,9 @@ const RAD = Math.PI / 180;
 /**
  * elevMin/elevMax: radians up from the floor. zoomMin/zoomMax: the distance's range, × the
  * default. turn: the share of a whole turn for a drag across the stage's whole width; tilt:
- * radians for a drag down its whole height (π: today's feel on a 700 px stage). ease: seconds the view takes to
- * close most of the way to its goal (a time constant); resetEase: the same for Reset Camera.
+ * radians for a drag down its whole height (π: the old feel on a 700 px stage). ease: seconds
+ * the view takes to close most of the way to its goal (a time constant); resetEase: the same
+ * for Reset Camera.
  * A fling: the drag's speed (at most spinMax rad/s) carries on when the finger lifts within
  * flingWindow s of its last move, slowing at `coast` per second. follow: the time constant of
  * the orbit's point following NEWT; phoneFollow: how much of the way it follows him at the

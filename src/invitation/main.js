@@ -14,14 +14,14 @@
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
 // → the blob shadow, the marker, the toolbar → render. With Motion Choppy (look.js) his pose
 // (the update and applyLook) only moves on the clock's steps, 15 a second; his root, the
-// camera and the rest move every frame. The lift height comes from the Held clip
-// at load (his collar over his lowest sole, plus a gap).
+// camera and the rest move every frame. The lift height comes from the Held clip at load (his
+// collar over his lowest sole, plus a gap).
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
-// (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones() (his ankles in the world,
-// his bones from his root) and play(clip) (forces a clip, Walk and Run going round their step
-// at their own pace); `?seed=N` and `?calm` go to the brain.
+// (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
+// (his ankles in the world, his bones from his root) and play(clip) (forces a clip, Walk and
+// Run going round their step at their own pace); `?seed=N` and `?calm` go to the brain.
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
@@ -130,7 +130,7 @@ if (!stage) {
   start(stage);
 }
 
-/** The stage's size, CSS px (a drag across it turns the camera the same share of a turn on any screen). */
+/** The stage's size, CSS px (a drag across it turns the camera the same share of a turn anywhere). */
 function stageSize() {
   return { w: stageEl.clientWidth, h: stageEl.clientHeight };
 }
