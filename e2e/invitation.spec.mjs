@@ -9,10 +9,11 @@
 // turns his head, each button plays its clip, a floor tap walks him there, and the cursor turns his
 // head on a desktop. The camera: a drag on empty space turns it, the wheel and a two-finger pinch
 // zoom it, and Reset Camera brings it back. A pinch over the toolbar or the Look sheet never
-// zooms the page, only the left mouse button holds or walks him, and Escape closes the Look
-// sheet wherever focus is. Every wait is on a state through `?test`'s window.__invitation,
-// never on a duration (CI's software WebGL runs slower than real time), and touches are real
-// ones (CDP Input.dispatchTouchEvent).
+// zooms the page, only the left mouse button holds or walks him, and the Look sheet holds focus
+// (Tab goes round inside it, the toolbar it covers is inert) and closes on Escape wherever focus
+// is. Every wait is on a state through `?test`'s window.__invitation, never on a duration (CI's
+// software WebGL runs slower than real time), and touches are real ones (CDP
+// Input.dispatchTouchEvent).
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
@@ -463,6 +464,49 @@ test.describe('on a desktop', () => {
     await page.keyboard.press('Escape');
     await expect(sheet).toBeHidden();
     await expect(look).toBeFocused();
+  });
+
+  test('the Look sheet holds focus: it opens on Done, Tab goes round inside it, and the toolbar behind it is out of reach', async ({
+    page,
+  }) => {
+    await calm(page);
+    const look = page.getByRole('button', { name: 'Look' });
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    const toolbarInert = () => page.locator('.inv-toolbar').evaluate((el) => el.inert);
+    await look.focus();
+    await page.keyboard.press('Enter');
+    await expect(sheet).toBeVisible();
+    await expect(sheet).toHaveAttribute('aria-modal', 'true');
+    await expect(sheet.getByRole('button', { name: 'Done' })).toBeFocused();
+    expect(await toolbarInert(), 'the toolbar under the sheet is inert').toBe(true);
+    /** What has focus, and whether it's in the sheet. */
+    const focused = () =>
+      page.evaluate(() => {
+        const a = /** @type {HTMLElement} */ (document.activeElement);
+        const what = a.dataset?.look ? `${a.dataset.look}=${a.getAttribute('value') ?? ''}` : a.textContent?.trim();
+        return { inside: Boolean(a.closest('.inv-sheet')), what: `${a.tagName} ${what}` };
+      });
+    const stops = new Set();
+    for (let i = 1; i <= 20; i++) {
+      await page.keyboard.press('Tab');
+      const f = await focused();
+      expect(f.inside, `Tab ${i}: ${f.what}`).toBe(true);
+      stops.add(f.what);
+    }
+    for (let i = 1; i <= 8; i++) {
+      await page.keyboard.press('Shift+Tab');
+      const f = await focused();
+      expect(f.inside, `Shift+Tab ${i}: ${f.what}`).toBe(true);
+    }
+    // Done, Pixel Size, Dithering, Outlines, Style, Motion and Reset Camera.
+    expect(stops.size, [...stops].join(', ')).toBe(7);
+    // Focus on the page (a click on empty space): Tab comes back into the sheet.
+    await page.mouse.click(640, 120);
+    await page.keyboard.press('Tab');
+    expect((await focused()).inside, 'Tab from the page').toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(look).toBeFocused();
+    expect(await toolbarInert(), 'the toolbar back in reach').toBe(false);
   });
 
   test('hovering turns his head', async ({ page }) => {

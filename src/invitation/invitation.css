@@ -154,6 +154,11 @@ body {
   letter-spacing: 0;
 }
 
+/* (Under the open Look sheet the toolbar rests, out of reach: ui.js makes it inert.) */
+.inv-toolbar[inert] {
+  opacity: 0.45;
+}
+
 /* --- The Look sheet: a bottom sheet over the toolbar. */
 .inv-sheet {
   position: absolute;

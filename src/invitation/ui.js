@@ -2,7 +2,9 @@
 // the toolbar along the bottom (Wave, Spook, Sit or Stand, Run, Wander, Look: every button a
 // thumb's height, labelled, never a tooltip) and the Look menu, a bottom sheet (Pixel Size in
 // steps, Off, 2×, 3× and 4×; Dithering, Outlines, Style, Motion (Smooth or Choppy), and Reset
-// Camera with a line on turning and zooming the view).
+// Camera with a line on turning and zooming the view). The sheet is a modal dialog: it opens on
+// Done, Tab goes round inside it, the toolbar it covers is inert while it's open, and Escape
+// closes it wherever focus is; the canvas stays live (turning the camera while choosing a look).
 // Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
 // reports presses; main.js decides what they do.
 //
@@ -76,7 +78,7 @@ export function sheetHtml(look) {
   );
   const styles = STYLES.map((s) => segment('inv-style', 'style', s, LOOKS[s].label, l.style === s)).join('');
   const motions = MOTIONS.map((m) => segment('inv-motion', 'motion', m, MOTION_LABELS[m], l.motion === m)).join('');
-  return `<section class="inv-sheet" id="inv-look" role="dialog" aria-labelledby="inv-look-title" hidden>
+  return `<section class="inv-sheet" id="inv-look" role="dialog" aria-modal="true" aria-labelledby="inv-look-title" hidden>
   <header class="inv-sheet-head"><h2 id="inv-look-title">Look</h2><button type="button" class="inv-btn inv-btn-done" data-look-close>Done</button></header>
   <p class="inv-hint">Changes show right away and stay for your next visit.</p>
   <fieldset class="inv-field"><legend>Pixel Size</legend><div class="inv-segs">${sizes}</div></fieldset>
@@ -106,6 +108,10 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera }) {
   const $ = (sel) => /** @type {HTMLElement} */ (hud.querySelector(sel));
   const sheet = $('.inv-sheet');
   const opener = $('[data-look-open]');
+  const toolbar = $('.inv-toolbar');
+  /** The sheet's first and last stops for Tab. */
+  const first = $('[data-look-close]');
+  const last = $('[data-reset-camera]');
   const status = $('.inv-status');
   let current = validLook(look);
 
@@ -117,22 +123,32 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera }) {
   syncOff();
   /**
    * While the sheet is open, on the whole document: Escape closes it wherever focus is (a click
-   * or a drag on the canvas leaves focus on the page, outside the sheet).
+   * or a drag on the canvas leaves focus on the page, outside the sheet), and Tab goes round
+   * inside it (from its last stop to its first, and back with Shift; from the page, into it).
    * @param {KeyboardEvent} e
    */
   const onKey = (e) => {
-    if (e.key !== 'Escape') return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      openSheet(false);
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const at = document.activeElement;
+    if (at && sheet.contains(at) && at !== (e.shiftKey ? first : last)) return;
     e.preventDefault();
-    openSheet(false);
+    (e.shiftKey ? last : first).focus();
   };
   /** @param {boolean} open */
   const openSheet = (open) => {
     sheet.hidden = !open;
+    // (The toolbar under the sheet: no focus, no presses, hidden from screen readers.)
+    toolbar.inert = open;
     opener.setAttribute('aria-expanded', String(open));
     stage.classList.toggle('is-looking', open);
     if (open) {
       document.addEventListener('keydown', onKey);
-      /** @type {HTMLElement} */ (sheet.querySelector('input:checked') ?? sheet.querySelector('input'))?.focus();
+      first.focus();
     } else {
       document.removeEventListener('keydown', onKey);
       opener.focus();

@@ -467,6 +467,7 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
   for (const name of [...BUTTONS, 'Look']) assert.match(bar, new RegExp(`>${name}</button>`), name);
   assert.match(bar, /data-button="Wander" aria-pressed="false"/);
   const sheet = sheetHtml({ pixelSize: '4', dither: false, outlines: true, style: 'soft' });
+  assert.match(sheet, /role="dialog" aria-modal="true"/, 'a modal dialog: what lies behind it is out of reach');
   assert.match(sheet, /value="4" data-look="pixelSize" checked/);
   // Pixel Size in explicit steps, in order.
   const steps = [...sheet.matchAll(/name="inv-pixel" value="([^"]+)"[^>]*><span>([^<]+)<\/span>/g)];
