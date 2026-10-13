@@ -2,9 +2,10 @@
 // running away from the pointer or the play area's centre (choosing the open direction most
 // away from it, so its edges push him off and a corner slides him along an edge, never stuck),
 // and turning to face the camera, all with acceleration and a capped turn rate. Also picks his
-// wander goals. The play area (Bounds) may widen toward the back, as the floor on screen does:
-// xRange gives its sides at a depth. Pure: no three.js. NEWT faces +z at yaw 0 (forward is
-// (sin yaw, cos yaw)) and the camera looks in from the +z side.
+// wander goals. The play area (Bounds) is a box, a box that widens toward the back, or a disc
+// (Bounds.r: the toy's, around its box's centre): xRange gives its sides at a depth, clampTo
+// pulls a point inside (a disc's straight in toward its centre). Pure: no three.js. NEWT faces
+// +z at yaw 0 (forward is (sin yaw, cos yaw)) and the camera looks in from the +z side.
 
 /** @typedef {import('./types.js').Body} Body */
 /** @typedef {import('./types.js').Bounds} Bounds */
@@ -59,12 +60,19 @@ export function turnToward(yaw, target, maxStep) {
 
 /**
  * The bounds' sides at depth `z`: minX/maxX at the front (maxZ), minXBack/maxXBack at the back
- * (minZ), straight lines between (a box without the back ones).
+ * (minZ), straight lines between (a box without the back ones); a disc's rim at that depth
+ * (its middle alone past the rim).
  * @param {Bounds} b
  * @param {number} z
  * @returns {[number, number]}
  */
 export function xRange(b, z) {
+  if (b.r !== undefined) {
+    const { x: cx, z: cz } = centreOf(b);
+    const u = b.r > 0 ? clamp((z - cz) / b.r, -1, 1) : 1;
+    const half = b.r * Math.sqrt(1 - u * u);
+    return [cx - half, cx + half];
+  }
   if (b.minXBack === undefined && b.maxXBack === undefined) return [b.minX, b.maxX];
   const span = b.maxZ - b.minZ;
   const k = span > 1e-9 ? clamp((b.maxZ - z) / span, 0, 1) : 0;
@@ -72,12 +80,20 @@ export function xRange(b, z) {
 }
 
 /**
- * A point kept inside the bounds: its depth clamped, then its x between the sides there.
+ * A point kept inside the bounds: its depth clamped, then its x between the sides there; for a
+ * disc, pulled straight in toward its centre onto the rim.
  * @param {Bounds} b
  * @param {XZ} p
  * @returns {XZ}
  */
 export function clampTo(b, p) {
+  if (b.r !== undefined) {
+    const c = centreOf(b);
+    const d = Math.hypot(p.x - c.x, p.z - c.z);
+    if (d <= b.r) return { x: p.x, z: p.z };
+    const k = d > 0 ? b.r / d : 0;
+    return { x: c.x + (p.x - c.x) * k, z: c.z + (p.z - c.z) * k };
+  }
   const z = clamp(p.z, b.minZ, b.maxZ);
   const [lo, hi] = xRange(b, z);
   return { x: clamp(p.x, lo, hi), z };
@@ -191,8 +207,16 @@ function fleeDirection(p, yaw, threat, bounds) {
   return best;
 }
 
-/** How far he can go from `p` along (dx, dz) before leaving the bounds (slanted sides too). */
+/** How far he can go from `p` along (dx, dz), a unit direction, before leaving the bounds (slanted sides and a disc's rim too). */
 function roomAlong(p, dx, dz, b) {
+  if (b.r !== undefined) {
+    const c = centreOf(b);
+    const ox = p.x - c.x;
+    const oz = p.z - c.z;
+    const along = ox * dx + oz * dz;
+    const inside = b.r * b.r - (ox * ox + oz * oz);
+    return Math.max(0, -along + Math.sqrt(Math.max(0, along * along + inside)));
+  }
   let t = Infinity;
   if (dz > 1e-9) t = Math.min(t, (b.maxZ - p.z) / dz);
   else if (dz < -1e-9) t = Math.min(t, (b.minZ - p.z) / dz);

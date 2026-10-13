@@ -17,16 +17,18 @@
 /** @typedef {{x: number, z: number}} XZ */
 /** @typedef {{x: number, y: number, z: number}} XYZ */
 /**
- * @typedef {object} Bounds  where NEWT's root may go: the play area (area.js), the floor on
- *   screen, whose edges are his walls. Perspective makes it a trapezoid, wider at the back:
- *   minX/maxX are its sides at the front (maxZ), minXBack/maxXBack at the back (minZ), straight
- *   lines between (steer.js xRange); without the back ones it's a box.
+ * @typedef {object} Bounds  where NEWT's root may go: the play area (area.js), whose edges are
+ *   his walls. A box; or a trapezoid, its sides minX/maxX at the front (maxZ) and
+ *   minXBack/maxXBack at the back (minZ), straight lines between (steer.js xRange); or, with
+ *   `r`, a disc of that radius around the box's centre (the box is its square): the toy's
+ *   play area, a fixed disc on the floor.
  * @property {number} minX
  * @property {number} maxX
  * @property {number} minZ
  * @property {number} maxZ
  * @property {number} [minXBack]
  * @property {number} [maxXBack]
+ * @property {number} [r]
  */
 
 /** @typedef {{id: number, x: number, y: number, t: number, kind: string, buttons: number}} Ptr  a pointer sample, client px and seconds */

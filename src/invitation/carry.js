@@ -2,10 +2,10 @@
 // over ~0.15 s, kept inside the play area), a damped pendulum that swings his root as the
 // anchor speeds up and slows down (procedural motion never touches his bones), the toss
 // velocity from the last ~80 ms when he's let go, and the fall that follows, with gravity and
-// soft bounces off the play area's edges (the screen's), until his lowest foot meets the floor.
-// Pure: no three.js.
+// soft bounces off the play area's edges (a disc's rim, or a box's sides), until his lowest
+// foot meets the floor. Pure: no three.js.
 
-import { clampTo, xRange } from './steer.js';
+import { centreOf, clampTo, xRange } from './steer.js';
 
 /** @typedef {import('./types.js').XYZ} XYZ */
 /** @typedef {import('./types.js').Bounds} Bounds */
@@ -178,7 +178,24 @@ export function toss(c) {
 export function fallStep(root, vel, footY, dt, bounds, tilt = null) {
   const v = { x: vel.x, y: vel.y - CARRY.fallGravity * dt, z: vel.z };
   const r = { x: root.x + v.x * dt, y: root.y + v.y * dt, z: root.z + v.z * dt };
-  if (bounds) {
+  if (bounds?.r !== undefined) {
+    // Off a disc's rim: back inside, the speed out of it reversed and softened, along it kept.
+    const c = centreOf(bounds);
+    const ox = r.x - c.x;
+    const oz = r.z - c.z;
+    const d = Math.hypot(ox, oz);
+    if (d > bounds.r && d > 0) {
+      const nx = ox / d;
+      const nz = oz / d;
+      r.x = c.x + nx * bounds.r;
+      r.z = c.z + nz * bounds.r;
+      const out = v.x * nx + v.z * nz;
+      if (out > 0) {
+        v.x -= (1 + CARRY.restitution) * out * nx;
+        v.z -= (1 + CARRY.restitution) * out * nz;
+      }
+    }
+  } else if (bounds) {
     if (r.z < bounds.minZ || r.z > bounds.maxZ) {
       r.z = clamp(r.z, bounds.minZ, bounds.maxZ);
       v.z = (r.z === bounds.minZ ? 1 : -1) * Math.abs(v.z) * CARRY.restitution;
