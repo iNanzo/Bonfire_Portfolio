@@ -16,6 +16,9 @@
 //   lookAim                 where he looks: the camera when asked or when the pointer is on
 //                           him, the pointer's floor spot (lifted by LOOK.floorBias so his cap
 //                           leaves his face showing), and "ahead" meaning toward the viewer
+//   lookShare               how much of the look goes on: clips that lift his head to show his
+//                           face themselves (Wave, the Sit trio) take only HEAD_SHARE of it, so
+//                           the look never cricks it back further
 
 import { blendStep, blendTarget, gaitPhase, mainClip, runShare } from './blend.js';
 import { CARRY, fallStep, grab, holdStep, toss } from './carry.js';
@@ -186,4 +189,19 @@ export function lookAim(mode, { head, yaw, camera, pointer }) {
   if (pointer.onNewt) return { aim: aimAngles(head, yaw, camera), ahead };
   if (!pointer.floor) return { aim: null, ahead };
   return { aim: aimAngles(head, yaw, { x: pointer.floor.x, y: 0, z: pointer.floor.z }, LOOK.floorBias), ahead };
+}
+
+/** The share of the look the clips that lift his head themselves take (the rest take it all). */
+export const HEAD_SHARE = { Wave: 0.4, Sit: 0.4, SitDown: 0.4, StandUp: 0.4 };
+
+/**
+ * The share of the brain's look weight to apply under the mix `weights`: 1, less each
+ * HEAD_SHARE clip's (and its twin's) weight times what it gives up.
+ * @param {Record<string, number>} weights
+ */
+export function lookShare(weights) {
+  let k = 1;
+  for (const [clip, share] of Object.entries(HEAD_SHARE))
+    k -= ((weights[clip] ?? 0) + (weights[`${clip}${TWIN}`] ?? 0)) * (1 - share);
+  return Math.max(0, k);
 }

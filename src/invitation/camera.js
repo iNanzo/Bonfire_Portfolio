@@ -143,6 +143,20 @@ export function orbitWheel(s, deltaY) {
 }
 
 /**
+ * The frame's gestures (gesture.js): an orbit turns it, a pinch zooms it, an orbit letting go
+ * (a release or cancel on the floor) may fling it; taps and NEWT's own gestures leave it be.
+ * @param {OrbitState} s
+ * @param {import('./types.js').GestureEvent[]} events
+ */
+export function orbitEvents(s, events) {
+  for (const e of events) {
+    if (e.type === 'orbit') orbitDrag(s, e.dx ?? 0, e.dy ?? 0, e.t);
+    else if (e.type === 'pinch' && e.scale && e.scale !== 1) orbitZoom(s, e.scale);
+    else if (e.on === 'floor' && (e.type === 'release' || e.type === 'cancel')) orbitRelease(s, e.t);
+  }
+}
+
+/**
  * Reset Camera: ease back to the default view, the short way round.
  * @param {OrbitState} s
  */
