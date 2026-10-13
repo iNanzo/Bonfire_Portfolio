@@ -549,6 +549,17 @@ def keys(*frames):
 
 
 ARM_UP = {'shoulder': (18, 0), 'upper': (155, 50), 'lower': (170, 32), 'twist': 0}
+SPOOK_TOP = {  # the hop's top: arms flung up, legs tucked, the head back 25 degrees in all (the
+    # high camera sees his surprised face; further back, his hair digs into his shirt)
+    'hips': {'loc': (0, 0, 0.75), 'rot': (-6, 0, 0)},
+    'chest': (-6, 0, 0),
+    'neck': (-5, 0, 0),
+    'head': (-8, 0, 0),
+    'armL': ARM_UP,
+    'armR': ARM_UP,
+    'legL': {'at': (0.66, 0.12, ANKLE + 0.85), 'pitch': 35, 'knee': (0.5, -1, 0)},
+    'legR': {'at': (0.66, 0.12, ANKLE + 0.85), 'pitch': 35, 'knee': (0.5, -1, 0)},
+}
 CROUCH = merge(
     IDLE,
     hips={'loc': (0, 0, -0.38), 'rot': (8, 0, 0)},
@@ -558,75 +569,93 @@ CROUCH = merge(
     armR={'shoulder': (12, 6), 'upper': (18, 22), 'lower': (40, 12), 'twist': 0},
 )
 
-WAVE_UP = {'shoulder': (16, 0), 'upper': (160, 70), 'lower': (178, 24), 'twist': 0}
+# The waving arm: the shoulder shrugged and the upper arm raised out to the side and forward, so
+# the forearm can swing +-30 degrees about the elbow beside the head (the hand from about
+# (-1.2, -0.3, 4.55) to (-1.86, -0.06, 3.96)), in front of the body plane.
+WAVE_UP = {'shoulder': (36, 6), 'upper': (95, 66), 'lower': (155, 50), 'twist': 0}
+WAVE_FROM, WAVE_TO, WAVE_PERIOD = 6, 30, 8  # three waves
 
 
-def wave_arm(w):
-    """The waving forearm: w = 1 swings it out, w = -0.4 back toward the head (never into it)."""
-    return merge(WAVE_UP, lower=(178, 22 + 28 * w))
-
-
-def waving(w, lean=1.0):
-    """Wave's body: tipped toward the waving arm, the head tilted the other way and back, so
-    the high camera sees his face."""
+def waving(w, k=1.0, bob=0.0, drift=0.0):
+    """Wave's pose: the forearm at w (-1 in by the head .. 1 out), k of the way into the body's
+    lean: the chest tipped away from the waving arm, the head cocked toward it and back so the high
+    camera sees his face, a little bounce (bob 0..1), the other arm drifting (drift -1..1)."""
     return merge(
         IDLE,
-        hips={'loc': (0, 0, -0.06), 'rot': (-3 * lean, -2 * lean, 0)},
-        chest=(-4 * lean, -4 * lean, 0),
-        neck=(-5 * lean, 0, 0),
-        head=(-8 * lean, 10 * lean, -4 * lean),
-        armR=wave_arm(w),
-        armL=merge(ARM_RELAXED, upper=(6, 24), lower=(20, 20)),
+        hips={'loc': (0, 0, -0.06 + 0.03 * bob), 'rot': (-3 * k, 0, 0)},
+        chest=(-4 * k, 6 * k, 0),
+        neck=(-5 * k, 0, 0),
+        head=(-8 * k, -14 * k, -4 * k),
+        armR=merge(WAVE_UP, lower=(155, 50 + 30 * w)),
+        armL=merge(ARM_RELAXED, upper=(6 + 3 * drift, 24 + 3 * drift), lower=(20 + 3 * drift, 20)),
     )
 
 
-TABLES = {
-    'Wave': keys(
+def wave_keys():
+    """Wave: up by f6, three waves on an 8-frame period keyed on every frame, down by f36."""
+    out = [
         (0, IDLE),
-        (5, merge(waving(0.4, 0.7), armR=merge(WAVE_UP, upper=(120, 60), lower=(150, 20)))),
-        (8, waving(1.0)),
-        (12, waving(-0.4)),
-        (16, waving(1.0)),
-        (20, waving(-0.4)),
-        (24, waving(1.0)),
-        (28, waving(0.0, 0.8)),
-        (32, merge(IDLE, chest=(1, -1, 0), head=(-2, 3, 0), armR=merge(ARM_RELAXED, upper=(10, 26), lower=(24, 20)))),
+        (3, merge(waving(0.0, 0.6), armR=merge(WAVE_UP, upper=(70, 50), lower=(110, 40)))),
+    ]
+    for f in range(WAVE_FROM, WAVE_TO + 1):
+        ph = 2 * math.pi * (f - WAVE_FROM) / WAVE_PERIOD
+        drift = math.sin(2 * math.pi * (f - WAVE_FROM) / (WAVE_TO - WAVE_FROM))
+        out.append((f, waving(math.sin(ph), 1.0, 0.5 + 0.5 * math.sin(ph), drift)))
+    out += [
+        (33, merge(IDLE, chest=(1, 2, 0), head=(-3, -4, 0), armR=merge(ARM_RELAXED, upper=(30, 40), lower=(50, 30)))),
         (36, IDLE),
-    ),
+    ]
+    return out
+
+
+TABLES = {
+    'Wave': wave_keys(),
     'Spook': keys(
         (0, IDLE),
-        (2, CROUCH),  # the two-frame flinch
-        (5, merge(
-            IDLE,  # the hop's top: arms flung up, head thrown back (the high camera sees his face)
-            hips={'loc': (0, 0, 0.75), 'rot': (-8, 0, 0)},
-            chest=(-8, 0, 0),
-            neck=(-6, 0, 0),
-            head=(-12, 0, 0),
-            armL=ARM_UP,
-            armR=ARM_UP,
-            legL={'at': (0.66, 0.12, ANKLE + 0.85), 'pitch': 35, 'knee': (0.5, -1, 0)},
-            legR={'at': (0.66, 0.12, ANKLE + 0.85), 'pitch': 35, 'knee': (0.5, -1, 0)},
-        )),
-        (8, merge(
+        (1, merge(IDLE, hips={'loc': (0, 0, -0.18), 'rot': (4, 0, 0)}, chest=(3, 0, 0), head=(-2, 0, 0))),  # a one-frame flinch
+        (2, merge(  # pushing off: the heels up, the toe tips still on the floor
             IDLE,
-            hips={'loc': (0, 0, 0.32), 'rot': (-4, 0, 0)},
-            chest=(-5, 0, 0),
-            neck=(-4, 0, 0),
-            head=(-10, 0, 0),
-            armL={'shoulder': (16, 0), 'upper': (130, 62), 'lower': (150, 48), 'twist': 0},
-            armR={'shoulder': (16, 0), 'upper': (130, 62), 'lower': (150, 48), 'twist': 0},
-            legL={'at': (0.64, 0.08, ANKLE + 0.36), 'pitch': 20},
-            legR={'at': (0.64, 0.08, ANKLE + 0.36), 'pitch': 20},
+            hips={'loc': (0, 0, 0.1), 'rot': (0, 0, 0)},
+            head=(-4, 0, 0),
+            armL={'shoulder': (10, 0), 'upper': (60, 40), 'lower': (80, 30), 'twist': 0},
+            armR={'shoulder': (10, 0), 'upper': (60, 40), 'lower': (80, 30), 'twist': 0},
+            legL={'at': (0.61, 0.07, ANKLE + 0.17), 'pitch': 12},
+            legR={'at': (0.61, 0.07, ANKLE + 0.17), 'pitch': 12},
         )),
+        (3, merge(
+            IDLE,  # springing up, the arms flying up
+            hips={'loc': (0, 0, 0.45), 'rot': (-4, 0, 0)},
+            chest=(-4, 0, 0),
+            neck=(-3, 0, 0),
+            head=(-6, 0, 0),
+            armL={'shoulder': (14, 0), 'upper': (120, 50), 'lower': (135, 36), 'twist': 0},
+            armR={'shoulder': (14, 0), 'upper': (120, 50), 'lower': (135, 36), 'twist': 0},
+            legL={'at': (0.64, 0.1, ANKLE + 0.45), 'pitch': 40, 'knee': (0.4, -1, 0)},
+            legR={'at': (0.64, 0.1, ANKLE + 0.45), 'pitch': 40, 'knee': (0.4, -1, 0)},
+        )),
+        (5, SPOOK_TOP),  # held at the top f5-f8, so the startle reads at real speed
+        (7, merge(SPOOK_TOP, hips={'loc': (0, 0, 0.78), 'rot': (-6, 0, 0)}, armL=merge(ARM_UP, upper=(160, 52)), armR=merge(ARM_UP, upper=(160, 52)))),
+        (8, merge(SPOOK_TOP, hips={'loc': (0, 0, 0.62), 'rot': (-5, 0, 0)}, armL=merge(ARM_UP, upper=(140, 56), lower=(175, 40)), armR=merge(ARM_UP, upper=(140, 56), lower=(175, 40)))),
         (10, merge(
-            CROUCH,  # lands
-            hips={'loc': (0, 0, -0.34), 'rot': (6, 0, 0)},
-            head=(2, 0, 0),
-            armL={'shoulder': (8, 0), 'upper': (40, 52), 'lower': (60, 40), 'twist': 0},
-            armR={'shoulder': (8, 0), 'upper': (40, 52), 'lower': (60, 40), 'twist': 0},
+            IDLE,  # coming down, the forearms dragging behind the upper arms
+            hips={'loc': (0, 0, 0.22), 'rot': (-2, 0, 0)},
+            chest=(-3, 0, 0),
+            neck=(-3, 0, 0),
+            head=(-6, 0, 0),
+            armL={'shoulder': (10, 0), 'upper': (80, 58), 'lower': (125, 46), 'twist': 0},
+            armR={'shoulder': (10, 0), 'upper': (80, 58), 'lower': (125, 46), 'twist': 0},
+            legL={'at': (0.62, 0.08, ANKLE + 0.22), 'pitch': 18},
+            legR={'at': (0.62, 0.08, ANKLE + 0.22), 'pitch': 18},
         )),
-        (13, merge(IDLE, hips={'loc': (0, 0, 0.02), 'rot': (-2, 0, 0)}, head=(-4, 0, 0), armL=merge(ARM_RELAXED, upper=(4, 28)), armR=merge(ARM_RELAXED, upper=(4, 28)))),
-        (16, merge(IDLE, hips={'loc': (0, 0, -0.1), 'rot': (1, 0, 0)}, head=(2, 0, 0))),
+        (11, merge(
+            CROUCH,  # lands
+            hips={'loc': (0, 0, -0.32), 'rot': (6, 0, 0)},
+            head=(2, 0, 0),
+            armL={'shoulder': (8, 0), 'upper': (40, 52), 'lower': (72, 40), 'twist': 0},
+            armR={'shoulder': (8, 0), 'upper': (40, 52), 'lower': (72, 40), 'twist': 0},
+        )),
+        (14, merge(IDLE, hips={'loc': (0, 0, -0.02), 'rot': (-2, 0, 0)}, head=(-4, 0, 0), armL=merge(ARM_RELAXED, upper=(4, 28)), armR=merge(ARM_RELAXED, upper=(4, 28)))),
+        (17, merge(IDLE, hips={'loc': (0, 0, -0.1), 'rot': (1, 0, 0)}, head=(2, 0, 0))),
         (20, IDLE),
     ),
     'Land': keys(
