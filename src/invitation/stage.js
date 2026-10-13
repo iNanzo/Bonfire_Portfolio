@@ -337,6 +337,11 @@ export function createStage(container, { preset, look, insets, focus, onResize }
       if (Math.abs(hit.x) > FLOOR_SIZE / 2 || Math.abs(hit.z) > FLOOR_SIZE / 2) return null;
       return { x: hit.x, z: hit.z };
     },
+    /**
+     * Compile ahead the programs of the retro pass's other path (retro.js warm): call once
+     * everything that draws is in the scene. Resolves once they're ready.
+     */
+    warm: () => retro.warm(scene, camera),
     /** Draw a frame: the shadow map once, the colour pass, the retro pass. */
     render() {
       renderer.shadowMap.needsUpdate = true;

@@ -19,7 +19,10 @@
 // surface id (ID.floor + SHADE_SPAN × coverage, over ID_SCALE) and white into the colour, so
 // the post shader composes the shadow itself. Pixel Size Off skips the pass and draws the scene
 // straight to the canvas at the screen's resolution, the ShadowMaterial as it is (the paper as
-// the clear colour); Native keeps the pass, a texel a device pixel. The toon materials write
+// the clear colour); Native keeps the pass, a texel a device pixel. The two paths draw with
+// different programs (the canvas's sRGB output, the floor's own material), so once NEWT is in
+// the page compiles the one not showing ahead (warm), and the first switch never stalls on
+// shader links. The toon materials write
 // their surface id into alpha too (markId), and in the colour target sample their textures a
 // coarser mip by the preset's `texture.mipBias` (at a few hundred texels his shirt's pattern
 // aliases into a grey patchwork; the toon bands should shade him, not the texture's noise).
@@ -383,7 +386,8 @@ const fragmentShader = /* glsl */ `
 /**
  * The pass, on `renderer`: setSize(w, h) in texels, setParams(preset, look), render(scene,
  * camera) (the colour pass into the target, the post pass to the canvas; Pixel Size Off: the
- * scene straight to the canvas), dispose().
+ * scene straight to the canvas), warm(scene, camera) (the other path's programs compiled ahead),
+ * dispose().
  * @param {any} renderer  a THREE.WebGLRenderer
  */
 export function createRetro(renderer) {
@@ -524,10 +528,47 @@ export function createRetro(renderer) {
     renderer.render(post, postCamera);
   }
 
+  /**
+   * Compile the programs of the path the pass isn't drawing now, without stalling a frame (three's
+   * compileAsync, KHR_parallel_shader_compile where the browser has it): while the pixels show,
+   * the canvas's (its sRGB output, the floor's own ShadowMaterial); at Off, the colour target's
+   * (the catcher in) and the post shader's. Without it the first switch either way linked them
+   * mid-drag (about 95 ms on a phone with a cold program cache). Resolves once they're ready.
+   * @param {any} scene
+   * @param {any} camera
+   * @returns {Promise<void>}
+   */
+  function warm(scene, camera) {
+    if (typeof renderer.compileAsync !== 'function' || !target) return Promise.resolve();
+    const was = renderer.getRenderTarget();
+    /** @type {Promise<unknown>[]} */
+    const jobs = [];
+    try {
+      if (pixel) {
+        renderer.setRenderTarget(null);
+        jobs.push(renderer.compileAsync(scene, camera));
+      } else {
+        renderer.setRenderTarget(target);
+        swapCatchers(scene);
+        try {
+          jobs.push(renderer.compileAsync(scene, camera));
+        } finally {
+          restoreCatchers();
+        }
+        renderer.setRenderTarget(null);
+        jobs.push(renderer.compileAsync(post, postCamera));
+      }
+    } finally {
+      renderer.setRenderTarget(was);
+    }
+    return Promise.all(jobs).then(() => undefined);
+  }
+
   return {
     setSize,
     setParams,
     render,
+    warm,
     get pixel() {
       return pixel;
     },

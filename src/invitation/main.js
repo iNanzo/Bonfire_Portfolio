@@ -237,6 +237,8 @@ function start(s) {
   let liftY = 1.1;
   /** @type {import('./types.js').XYZ} where his collar was carried last */
   let target = { x: 0, y: liftY, z: 0 };
+  /** The retro pass's other path is compiled (stage.js warm), for ?test. */
+  let warmed = false;
   /** The toolbar as last set, so the DOM is only touched on a change. */
   const shown = { sit: 'Sit', wander: /** @type {boolean|null} */ (null), enabled: true };
 
@@ -258,6 +260,10 @@ function start(s) {
       liftY = hangHeight(c) + HANG_GAP;
       target = { x: 0, y: liftY, z: 0 };
       sync();
+      // (The pass's other path compiled ahead, so the first switch to Off or back never stalls.)
+      s.warm()
+        .then(() => (warmed = true))
+        .catch(() => {});
     })
     .catch(() => {
       ui.setStatus('NEWT couldn’t load. Check the connection, then reload.', { reload: true });
@@ -665,6 +671,8 @@ function start(s) {
         // (CSS px he stands tall in the default view, where he starts.)
         newtTall: s.view ? (newtTexels(s.view, s.grid) * s.grid.pd) / s.grid.dpr : 0,
         camera: { yaw: cam.yaw, elevation: cam.elevation, distance: cam.distance },
+        // (Both of the retro pass's paths compiled: the first switch to Off or back won't stall.)
+        warmed,
         cameraHome: { ...cam.home },
         options,
       }),

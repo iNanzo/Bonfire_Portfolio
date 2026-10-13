@@ -654,6 +654,44 @@ test('the retro pass: the colour pass then the post pass, Off straight to the ca
   assert.doesNotThrow(() => retro.dispose());
 });
 
+test('the retro pass warms the path it isn’t drawing (the canvas’s while the pixels show; the colour target’s and the post shader’s at Off), so the first switch never stalls on shader links', async () => {
+  let bound = null;
+  const calls = [];
+  const scene = new THREE.Scene();
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial());
+  const own = floor.material;
+  scene.add(floor);
+  const camera = new THREE.PerspectiveCamera(30, 1, 1, 80);
+  const renderer = {
+    getRenderTarget: () => bound,
+    setRenderTarget: (t) => (bound = t),
+    setClearColor: () => {},
+    clear: () => {},
+    render: () => {},
+    compileAsync: (s) => {
+      const what = s === scene ? (floor.material === own ? 'scene, its own floor' : 'scene, the catcher') : 'post';
+      calls.push(`${what} to the ${bound ? 'target' : 'canvas'}`);
+      return Promise.resolve(s);
+    },
+  };
+  const retro = createRetro(renderer);
+  retro.setSize(195, 422);
+  retro.setParams(LOOKS.ds, DEFAULT_LOOK);
+  await retro.warm(scene, camera);
+  assert.deepEqual(calls, ['scene, its own floor to the canvas'], 'pixels showing: Off’s programs');
+  assert.equal(bound, null, 'the render target put back');
+  calls.length = 0;
+  retro.setParams(LOOKS.ds, { ...DEFAULT_LOOK, pixelSize: 'off' });
+  await retro.warm(scene, camera);
+  assert.deepEqual(calls, ['scene, the catcher to the target', 'post to the canvas'], 'at Off: the pixel pass’s');
+  assert.equal(floor.material, own, 'the floor’s own material back');
+  assert.equal(bound, null);
+  // A renderer that can't compile ahead (a stand-in): nothing to warm, nothing thrown.
+  const plain = createRetro({ ...renderer, compileAsync: undefined });
+  plain.setSize(10, 10);
+  await assert.doesNotReject(plain.warm(scene, camera));
+});
+
 test('the toolbar and the Look sheet: every button labelled, the settings checked, no tooltips', () => {
   const bar = toolbarHtml();
   for (const name of [...BUTTONS, 'Look']) assert.match(bar, new RegExp(`>${name}</button>`), name);

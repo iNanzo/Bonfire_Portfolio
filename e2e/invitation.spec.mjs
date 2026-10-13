@@ -696,6 +696,36 @@ test.describe('on a desktop', () => {
     expect(size[1]).toBe(Math.ceil(size[4] * size[2]));
   });
 
+  test('a first sweep of Pixel Size to Off and back links no new shaders: both paths are warmed once NEWT is in', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.__links = 0;
+      const link = WebGL2RenderingContext.prototype.linkProgram;
+      WebGL2RenderingContext.prototype.linkProgram = function (program) {
+        window.__links++;
+        return link.call(this, program);
+      };
+    });
+    await calm(page);
+    await until(page, (s) => s.warmed, 'both paths warmed');
+    await page.getByRole('button', { name: 'Look' }).click();
+    const pixel = page.getByRole('dialog', { name: 'Look' }).getByRole('slider', { name: 'Pixel Size' });
+    await pixel.focus();
+    await page.keyboard.press('Home');
+    await framesFor(page, 100);
+    const before = await page.evaluate(() => window.__links);
+    const max = Number(await pixel.getAttribute('max'));
+    for (const key of ['ArrowRight', 'ArrowLeft'])
+      for (let i = 0; i < max; i++) {
+        await page.keyboard.press(key);
+        await framesFor(page, 60);
+        if (key === 'ArrowRight' && i === max - 1) await expect(pixel).toHaveAttribute('aria-valuetext', 'Off');
+      }
+    await expect(pixel).toHaveAttribute('aria-valuetext', '16 by 16');
+    expect((await page.evaluate(() => window.__links)) - before, 'shaders linked during the sweep').toBe(0);
+  });
+
   test('only the left mouse button holds or walks him: a right press on him, a right- or middle-click on the floor leave him be', async ({
     page,
   }) => {
