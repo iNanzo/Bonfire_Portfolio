@@ -618,6 +618,35 @@ test.describe('on a phone held sideways', () => {
     expect((await sheetScroll(page)).top, 'the sheet stayed put').toBe(top);
   });
 
+  test('scrolled to its end the Look sheet keeps Done in reach, and Look beside it closes it', async ({ page }) => {
+    await calm(page);
+    const look = page.getByRole('button', { name: 'Look' });
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    const touch = await toucher(page);
+    /** A real tap on the middle of `button`, when the page shows it there. */
+    const tap = async (button) => {
+      const shown = await button.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const at = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2, hit: Boolean(at && el.contains(at)) };
+      });
+      expect(shown.hit, `${await button.textContent()} shows at its middle`).toBe(true);
+      await touch('touchStart', [shown]);
+      await touch('touchEnd');
+    };
+    for (const close of ['Done', 'Look']) {
+      await look.click();
+      await expect(sheet).toBeVisible();
+      await page.locator('.inv-sheet').evaluate((el) => (el.scrollTop = el.scrollHeight));
+      await expect.poll(async () => (await sheetScroll(page)).top, 'scrolled to its end').toBeGreaterThan(40);
+      await expect(sheet.getByRole('button', { name: 'Reset Camera' })).toBeInViewport();
+      // Its head, Done with it, stays at its top; Look, pressed beside it, closes it too.
+      await tap(close === 'Done' ? sheet.getByRole('button', { name: 'Done' }) : look);
+      await expect(sheet, `${close} closed it`).toBeHidden();
+      await expect(look).toHaveAttribute('aria-expanded', 'false');
+    }
+  });
+
   test('with the Look sheet open NEWT stays in sight beside it', async ({ page }) => {
     await calm(page);
     const v = await lookOpenWithNewtInSight(page);
@@ -722,13 +751,24 @@ test.describe('on a desktop', () => {
     await calm(page);
     const look = page.getByRole('button', { name: 'Look' });
     const sheet = page.getByRole('dialog', { name: 'Look' });
-    const toolbarInert = () => page.locator('.inv-toolbar').evaluate((el) => el.inert);
+    /** The toolbar's buttons and whether each is inert. */
+    const toolbarInert = () =>
+      page
+        .locator('.inv-toolbar')
+        .evaluate((el) => [...el.querySelectorAll('.inv-btn')].map((b) => `${b.textContent} ${b.inert}`));
     await look.focus();
     await page.keyboard.press('Enter');
     await expect(sheet).toBeVisible();
     await expect(sheet).toHaveAttribute('aria-modal', 'true');
     await expect(sheet.getByRole('button', { name: 'Done' })).toBeFocused();
-    expect(await toolbarInert(), 'the toolbar under the sheet is inert').toBe(true);
+    expect(await toolbarInert(), 'the buttons under the sheet are inert; Look, which closes it, is not').toEqual([
+      'Wave true',
+      'Spook true',
+      'Sit true',
+      'Run true',
+      'Wander true',
+      'Look false',
+    ]);
     /** What has focus, and whether it's in the sheet. */
     const focused = () =>
       page.evaluate(() => {
@@ -757,7 +797,9 @@ test.describe('on a desktop', () => {
     expect((await focused()).inside, 'Tab from the page').toBe(true);
     await page.keyboard.press('Escape');
     await expect(look).toBeFocused();
-    expect(await toolbarInert(), 'the toolbar back in reach').toBe(false);
+    expect(await toolbarInert(), 'the toolbar back in reach').toEqual(
+      ['Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look'].map((name) => `${name} false`),
+    );
   });
 
   test('with the Look sheet open NEWT stays in sight, and Reset Camera eases back where it can be seen', async ({

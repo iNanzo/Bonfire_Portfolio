@@ -155,8 +155,9 @@ body {
   letter-spacing: 0;
 }
 
-/* (Under the open Look sheet the toolbar rests, out of reach: ui.js makes it inert.) */
-.inv-toolbar[inert] {
+/* (Under the open Look sheet the toolbar's action buttons rest, out of reach: ui.js makes them
+   inert. Look stays live, pressed: it closes the sheet, beside it on a phone held sideways.) */
+.inv-toolbar .inv-btn[inert] {
   opacity: 0.45;
 }
 
@@ -181,10 +182,19 @@ body {
   background: var(--inv-paper);
   box-shadow: 0 -6px 0 rgb(58 51 45 / 0.12);
 }
+/* (Its head stays at its top as it scrolls, so Done is always in reach: over the sheet's own
+   top padding, on its paper, the rest scrolling under it. Sticky offsets count from inside the
+   sheet's padding, hence -14px.) */
 .inv-sheet-head {
+  position: sticky;
+  top: -14px;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin: -14px -16px 0;
+  padding: 14px 16px 6px;
+  background: var(--inv-paper);
 }
 .inv-sheet h2 {
   margin: 0;

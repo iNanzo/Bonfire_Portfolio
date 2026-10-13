@@ -8,8 +8,9 @@
 // view). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
 // to the same block there are one step, and one that comes to 1 px is Native), set by main.js
 // as the stage is measured (setPixelSteps); every Pixel Size is a step until then. The sheet is a modal dialog: it opens on Done, Tab goes
-// round inside it, the toolbar it covers is inert while it's open, and Escape closes it
-// wherever focus is; the canvas stays live (turning the camera while choosing a look). A finger
+// round inside it, the toolbar's action buttons are inert while it's open (Look, pressed,
+// closes it, as Done does; the sheet's head with Done stays at its top as it scrolls), and
+// Escape closes it wherever focus is; the canvas stays live (turning the camera while choosing a look). A finger
 // on a slider only moves it once it goes along it (slideIntent): a swipe up or down that starts
 // there scrolls the sheet, and the value the slider jumped to under the finger is put back.
 // Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
@@ -177,7 +178,6 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
   const $ = (sel) => /** @type {HTMLElement} */ (hud.querySelector(sel));
   const sheet = $('.inv-sheet');
   const opener = $('[data-look-open]');
-  const toolbar = $('.inv-toolbar');
   /** The sheet's first and last stops for Tab. */
   const first = $('[data-look-close]');
   const last = $('[data-reset-camera]');
@@ -246,8 +246,9 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
   /** @param {boolean} open */
   const openSheet = (open) => {
     sheet.hidden = !open;
-    // (The toolbar under the sheet: no focus, no presses, hidden from screen readers.)
-    toolbar.inert = open;
+    // (The action buttons under the sheet: no focus, no presses, hidden from screen readers.
+    // Look stays, pressed: another press closes the sheet, as Done does.)
+    for (const name of BUTTONS) /** @type {HTMLElement} */ ($(`[data-button="${name}"]`)).inert = open;
     opener.setAttribute('aria-expanded', String(open));
     if (open) {
       document.addEventListener('keydown', onKey);
