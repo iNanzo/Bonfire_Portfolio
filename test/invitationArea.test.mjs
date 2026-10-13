@@ -1,7 +1,7 @@
 // The invitation toy's play area (src/invitation/area.js): with the camera free to orbit and
 // zoom, it's a fixed invisible disc on the floor, about what a phone shows at the default zoom,
-// the same on every screen. The default view (pixels.js frameView) shows all of it with NEWT
-// still 36 to 40 texels tall; walking, wandering, fleeing (sliding along the rim when cornered)
+// the same on every screen. The default view (pixels.js frameView) shows all of it, at every
+// Pixel Size, with NEWT still about a fifth of the screen's short side tall; walking, wandering, fleeing (sliding along the rim when cornered)
 // and carrying (the anchor, the toss and the fall's bounces) stay inside it (steer.js and
 // carry.js read a disc's radius from its Bounds); and the light's shadow camera (floor.js
 // fitShadow) covers the disc up to the highest he's lifted.
@@ -12,7 +12,7 @@ import { AREA_RADIUS, NEWT_HEIGHT, NEWT_RADIUS, playArea } from '../src/invitati
 import { centreOf, clampTo, steer, wanderGoal, xRange } from '../src/invitation/steer.js';
 import { fallStep, grab, holdStep } from '../src/invitation/carry.js';
 import { fitShadow } from '../src/invitation/floor.js';
-import { DEFAULT_PIXEL, frameView, newtTexels, project, texelGrid } from '../src/invitation/pixels.js';
+import { NEWT_SHARE, PIXEL_SIZES, frameView, newtTexels, project, texelGrid } from '../src/invitation/pixels.js';
 import { DEFAULT_LOOK, LOOKS } from '../src/invitation/look.js';
 import { GAIT } from '../src/invitation/clips.js';
 import { createRng } from '../src/invitation/rng.js';
@@ -33,18 +33,10 @@ const radius = (p) => Math.hypot(p.x, p.z);
 const inDisc = (p, msg = '') => assert.ok(radius(p) <= R + 1e-6, `${msg} ${JSON.stringify(p)} is outside the disc`);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
-/** The default camera for a screen, as the stage frames it. */
-function viewFor(cssW, cssH, dpr) {
-  const grid = texelGrid({ cssW, cssH, dpr, pixelSize: DEFAULT_LOOK.pixelSize, texels: preset.texels });
-  const view = frameView({
-    cssW,
-    cssH,
-    dpr,
-    grid,
-    insets: INSETS,
-    texels: preset.texels[DEFAULT_PIXEL],
-    area: R + NEWT_RADIUS,
-  });
+/** The default camera for a screen at a Pixel Size, as the stage frames it. */
+function viewFor(cssW, cssH, dpr, pixelSize = DEFAULT_LOOK.pixelSize) {
+  const grid = texelGrid({ cssW, cssH, dpr, pixelSize, texels: preset.texels });
+  const view = frameView({ cssW, cssH, grid, insets: INSETS, area: R + NEWT_RADIUS });
   return { grid, view };
 }
 
@@ -57,12 +49,16 @@ test('the play area is a fixed disc about 2.4 in radius around the floor’s cen
   assert.ok(NEWT_RADIUS > 0 && NEWT_HEIGHT > 0.9);
 });
 
-test('at the default zoom the whole play area, his body at its rim included, is in view and NEWT is still 36 to 40 texels tall, at 390x844@3, 412x915@2.625 and 1280x800@1', () => {
-  for (const [cssW, cssH, dpr] of SIZES) {
-    const at = `${cssW}x${cssH}@${dpr}`;
-    const { grid, view } = viewFor(cssW, cssH, dpr);
-    const tall = newtTexels(view, grid);
-    assert.ok(tall >= 36 && tall <= 40, `${at}: NEWT is ${tall.toFixed(1)} texels tall`);
+test('at the default zoom the whole play area, his body at its rim included, is in view at every Pixel Size and NEWT is still about a fifth of the short side, at 390x844@3, 412x915@2.625 and 1280x800@1', () => {
+  for (const [cssW, cssH, dpr, pixelSize] of SIZES.flatMap((s) => PIXEL_SIZES.map((p) => [...s, p]))) {
+    const at = `${cssW}x${cssH}@${dpr} ${pixelSize}`;
+    const { grid, view } = viewFor(cssW, cssH, dpr, pixelSize);
+    // (Only ever smaller than his share, and only where the disc needs it.)
+    const share = (newtTexels(view, grid) * grid.pd) / grid.dpr / Math.min(cssW, cssH);
+    assert.ok(
+      share <= NEWT_SHARE + 0.002 && share >= 0.9 * NEWT_SHARE,
+      `${at}: NEWT is ${(share * 100).toFixed(1)}% of the short side`,
+    );
     let left = Infinity;
     let right = -Infinity;
     for (let i = 0; i < 72; i++) {

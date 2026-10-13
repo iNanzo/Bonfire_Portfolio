@@ -1,7 +1,7 @@
 // The invitation toy's stage: the renderer (no antialiasing, drawn at texel size: pixels.js
 // texelGrid, the canvas stretched by CSS), the camera (20° of view; main.js's orbit camera,
 // camera.js, moves it with setCamera; pixels.js frameView gives its default view: 36° up, NEWT
-// 38 texels tall at the default size, the whole play area in sight, and the point it looks at
+// about a fifth of the short side tall, the whole play area in sight, and the point it looks at
 // shown in the middle of the space over the toolbar, by an off-centre projection that holds
 // however it turns), the floor (floor.js: no room, the preset's background and an invisible
 // floor that only catches his shadows), the lights and shadows of the look preset, the blob
@@ -20,7 +20,7 @@
 // meets the floor). `bounds` is the play area (area.js: a fixed disc on the floor).
 import * as THREE from 'three';
 import { NEWT_HEIGHT, NEWT_RADIUS, playArea } from './area.js';
-import { TEXELS, frameView, texelGrid } from './pixels.js';
+import { frameView, texelGrid } from './pixels.js';
 import { FLOOR_SIZE, createFloor, fitShadow, floorLook } from './floor.js';
 import { createRetro, decalMaterial } from './retro.js';
 
@@ -71,7 +71,6 @@ function ringTexture(n = 16) {
  * @property {import('./look.js').LookPreset} preset
  * @property {import('./look.js').Look} look
  * @property {() => import('./pixels.js').Insets} insets  where the floor keeps clear of, CSS px
- * @property {number} [framingTexels]  the default size's texels on the short side (the framing's)
  * @property {(stage: {grid: import('./pixels.js').Grid, view: import('./pixels.js').View}) => void} [onResize]
  */
 
@@ -80,7 +79,7 @@ function ringTexture(n = 16) {
  * @param {HTMLElement} container
  * @param {StageOptions} o
  */
-export function createStage(container, { preset, look, insets, framingTexels = TEXELS.ds, onResize }) {
+export function createStage(container, { preset, look, insets, onResize }) {
   const renderer = new THREE.WebGLRenderer({
     antialias: false,
     alpha: false,
@@ -208,7 +207,7 @@ export function createStage(container, { preset, look, insets, framingTexels = T
     retro.setSize(grid.w, grid.h);
     // (The play area and his body at its rim all show.)
     const area = (bounds.r ?? 0) + NEWT_RADIUS;
-    view = frameView({ cssW, cssH, dpr, grid, insets: insets(), texels: framingTexels, area });
+    view = frameView({ cssW, cssH, grid, insets: insets(), area });
     camera.fov = view.fov;
     camera.near = view.near;
     camera.far = view.far;

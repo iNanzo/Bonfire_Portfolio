@@ -40,9 +40,8 @@ import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createFaceState, faceStep } from './faces.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
-import { DEFAULT_LOOK, LOOKS, loadLook, presetOf, saveLook } from './look.js';
+import { loadLook, presetOf, saveLook } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
-import { DEFAULT_PIXEL } from './pixels.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
 import { createRng } from './rng.js';
 import { createStage } from './stage.js';
@@ -109,7 +108,6 @@ if (webgl2()) {
       preset: presetOf(look),
       look,
       insets,
-      framingTexels: LOOKS[DEFAULT_LOOK.style].texels[DEFAULT_PIXEL],
       onResize: ({ view }) => {
         if (orbit) orbitHome(orbit, view.distance);
       },

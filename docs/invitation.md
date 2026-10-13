@@ -53,8 +53,9 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
     `retro.js` (the pixel pass), `ui.js` (the toolbar and the Look sheet as markup, plus a thin
     binding), `invitation.css`.
   - Pure and unit-tested: `pixels.js` (the texel grid and the default view: 20° of view, 36°
-    up, NEWT 38 texels tall, the whole play area in sight, the point it looks at shown in the
-    middle of the space over the toolbar), `camera.js` (the orbit camera: yaw all the way
+    up, NEWT about a fifth of the screen's short side tall whatever the Pixel Size (76 CSS px on
+    a 390-wide phone), the whole play area in sight, the point it looks at shown in the middle
+    of the space over the toolbar), `camera.js` (the orbit camera: yaw all the way
     round, 12° to 70° up, half to twice the default distance, eased with a little coast,
     following NEWT as it zooms in), `area.js` (the play area: a fixed disc of radius 2.0 round the
     middle), `play.js` (the frame's decisions: who moves his root, the clip mix, where he

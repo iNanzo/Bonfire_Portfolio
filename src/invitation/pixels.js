@@ -12,13 +12,14 @@
 // rest of the way: the highest angle at which his eyes read on a 390×844 phone), and 20° of
 // view: a narrow view keeps him nearly the same size all over his play area. There's no room:
 // NEWT stands on an invisible floor on a plain background, and the camera only places him.
-// This is the default view the orbit camera (camera.js) starts from and comes back to: he's 38
-// texels tall at the default size (DS) whatever the screen (his height as the camera sees it:
-// NEWT_SIDE), further back only where the play area (a disc, area.js) wouldn't all show, and
-// the point the camera looks at (his middle, at the origin) sits in the middle of the space
-// over the toolbar: the view is shifted there (View.shift, an off-centre projection: stage.js
-// camera.setViewOffset), so it stays there however the camera turns. The framing is the same
-// at every Pixel Size: NEWT just has more or fewer texels.
+// This is the default view the orbit camera (camera.js) starts from and comes back to: he's
+// NEWT_SHARE of the stage's short side tall (his height as the camera sees it: NEWT_SIDE; 76
+// CSS px on a 390-wide phone, 38 texels at the default size there), further back only where
+// the play area (a disc, area.js) wouldn't all show, and the point the camera looks at (his
+// middle, at the origin) sits in the middle of the space over the toolbar: the view is shifted
+// there (View.shift, an off-centre projection: stage.js camera.setViewOffset), so it stays
+// there however the camera turns. The framing never reads the Pixel Size: a bigger block only
+// makes chunkier pixels, and a bigger screen gives him more texels.
 
 /** @typedef {'off'|'fine'|'ds'|'chunky'} PixelSize */
 /** @typedef {{fine: number, ds: number, chunky: number}} TexelTable  target texels on the short side */
@@ -58,8 +59,11 @@ export const TEXELS = { fine: 270, ds: 200, chunky: 150 };
 export const DEFAULT_PIXEL = 'ds';
 /** Pixel Size Off draws at the device's pixels, up to this ratio. */
 export const NATIVE_DPR = 2;
-/** NEWT's height in texels at the default size. */
-export const NEWT_TEXELS = 38;
+/**
+ * NEWT's height in the default view, as a share of the stage's short side: 76 CSS px on a
+ * 390-wide phone (38 texels at the default size there), whatever the Pixel Size.
+ */
+export const NEWT_SHARE = 0.195;
 /** The camera: vertical field of view and elevation in degrees, near and far in world units. */
 export const VIEW = { fov: 20, elevation: 36, near: 1, far: 120 };
 /**
@@ -190,22 +194,20 @@ function least(lo, hi, ok) {
 
 /**
  * The default camera for a stage `cssW` × `cssH` drawn at `grid` (the camera's aspect and the
- * canvas's CSS size): NEWT `newt` texels tall at the default size's grid (`texels` on the
- * short side), or smaller where a play area of radius `area` around the origin wouldn't all
- * show (its rim over the toolbar and inside the sides, his head at its back under the top),
- * looking at his middle (standing at the origin) from yaw 0, shifted to the middle of the
- * space `insets` leave (over the toolbar). (`fov` and `elevation` default to VIEW's.)
- * @param {{cssW: number, cssH: number, dpr: number, grid: Grid, insets: Insets, texels?: number, newt?: number, fov?: number, elevation?: number, area?: number}} o
+ * canvas's CSS size): NEWT `share` of the short side tall, or smaller where a play area of
+ * radius `area` around the origin wouldn't all show (its rim over the toolbar and inside the
+ * sides, his head at its back under the top), looking at his middle (standing at the origin)
+ * from yaw 0, shifted to the middle of the space `insets` leave (over the toolbar). (`fov` and
+ * `elevation` default to VIEW's.)
+ * @param {{cssW: number, cssH: number, grid: Grid, insets: Insets, share?: number, fov?: number, elevation?: number, area?: number}} o
  * @returns {View}
  */
 export function frameView({
   cssW,
   cssH,
-  dpr,
   grid,
   insets,
-  texels = TEXELS[DEFAULT_PIXEL],
-  newt = NEWT_TEXELS,
+  share = NEWT_SHARE,
   fov = VIEW.fov,
   elevation = VIEW.elevation,
   area = 0,
@@ -229,10 +231,9 @@ export function frameView({
     position: placed(target, distance, elevation),
     shift,
   });
-  // NEWT's height at the default size, in CSS px (its texels are whole device pixels too).
-  const pd = Math.max(1, Math.round((Math.min(cssW, cssH) / texels) * (dpr || 1)));
-  const newtCss = (newt * pd) / (dpr || 1);
-  // NEWT's size first: the distance at which he's `newt` texels tall.
+  // NEWT's height, CSS px.
+  const newtCss = share * Math.min(Math.max(1, cssW), Math.max(1, cssH));
+  // NEWT's size first: the distance at which he's that tall.
   let distance = least(2, 400, (d) => {
     const { top, bottom } = newtBox(at(d));
     return bottom - top <= newtCss;

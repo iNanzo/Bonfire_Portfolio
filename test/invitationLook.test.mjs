@@ -1,6 +1,7 @@
 // The invitation toy's look (pure parts): the pixel grid (src/invitation/pixels.js) in whole
 // device pixels on the phones and the desktop the round checks, Pixel Size Off at native size
-// (its DPR capped at 2), the camera framing NEWT 36 to 40 texels tall at the default size, low
+// (its DPR capped at 2), the camera framing NEWT about a fifth of the screen's short side tall
+// whatever the Pixel Size (76 CSS px on a 390-wide phone: 38 texels at the default size), low
 // enough to see his face, standing in the middle of the space over the toolbar, the Bayer matrix
 // the retro pass dithers with, the Look settings (src/invitation/look.js) surviving any storage,
 // and the presets (src/invitation/looks/) carrying every look value, so a designer only ever
@@ -11,8 +12,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BAYER4,
-  DEFAULT_PIXEL,
   NATIVE_DPR,
+  NEWT_SHARE,
   PIXEL_SIZES,
   VIEW,
   frameView,
@@ -35,6 +36,7 @@ import {
 import { FLOOR_SIZE, createFloor, floorLook } from '../src/invitation/floor.js';
 import { ID, createRetro, decalMaterial, markId } from '../src/invitation/retro.js';
 import { BUTTONS, parseQuery, sheetHtml, statusHtml, toolbarHtml } from '../src/invitation/ui.js';
+import { NEWT_RADIUS, playArea } from '../src/invitation/area.js';
 
 const SIZES = [
   [390, 844, 3],
@@ -44,6 +46,10 @@ const SIZES = [
 /** Where the floor must stay: under a top margin, over the toolbar, clear of the side edges. */
 const INSETS = { top: 16, bottom: 72, left: 24, right: 24 };
 const preset = LOOKS[DEFAULT_LOOK.style];
+/** The play area and his body at its rim, as the stage frames it. */
+const AREA = (playArea().r ?? 0) + NEWT_RADIUS;
+/** NEWT's height on screen, CSS px: his texels × a texel's CSS size. */
+const cssTall = (view, grid) => (newtTexels(view, grid) * grid.pd) / grid.dpr;
 
 test('the pixel grid is whole device pixels at 390x844@3, 412x915@2.625 and 1280x800@1', () => {
   for (const [cssW, cssH, dpr] of SIZES) {
@@ -83,13 +89,14 @@ test('Pixel Size Off draws at native size, its DPR capped at 2', () => {
   assert.equal(m.w, Math.ceil(1171 / m.pd));
 });
 
-test('NEWT is 36 to 40 texels tall at the default size, on a phone and on a desktop', () => {
+test('NEWT is about a fifth of the short side on a phone and on a desktop: 76 CSS px and 38 texels at the default size on a 390-wide phone', () => {
+  assert.ok(NEWT_SHARE >= 0.18 && NEWT_SHARE <= 0.21, `a share of ${NEWT_SHARE}`);
   for (const [cssW, cssH, dpr] of SIZES) {
     const grid = texelGrid({ cssW, cssH, dpr, pixelSize: DEFAULT_LOOK.pixelSize, texels: preset.texels });
-    const view = frameView({ cssW, cssH, dpr, grid, insets: INSETS, texels: preset.texels[DEFAULT_PIXEL] });
+    const view = frameView({ cssW, cssH, grid, insets: INSETS });
     const at = `${cssW}x${cssH}@${dpr}`;
-    const tall = newtTexels(view, grid);
-    assert.ok(tall >= 36 && tall <= 40, `${at}: NEWT is ${tall.toFixed(1)} texels tall`);
+    const share = cssTall(view, grid) / Math.min(cssW, cssH);
+    assert.ok(Math.abs(share - NEWT_SHARE) < 0.002, `${at}: NEWT is ${(share * 100).toFixed(1)}% of the short side`);
     assert.ok(headTexels(view, grid) > 10, `${at}: his head is ${headTexels(view, grid).toFixed(1)} texels wide`);
     // He starts in the middle of the space over the toolbar (the play area is all the floor
     // around him: area.js), seen from low enough that his cap's brim leaves his face showing.
@@ -104,17 +111,31 @@ test('NEWT is 36 to 40 texels tall at the default size, on a phone and on a desk
     assert.ok(view.fov === VIEW.fov && view.fov >= 15 && view.fov <= 30, `a narrow view (${view.fov}°)`);
     assert.equal('roomWidth' in view, false, 'no room');
   }
+  // Today's framing on the phone the round checks: 76 CSS px, 38 texels at the default size.
+  const grid = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: DEFAULT_LOOK.pixelSize, texels: preset.texels });
+  const view = frameView({ cssW: 390, cssH: 844, grid, insets: INSETS, area: AREA });
+  assert.ok(Math.abs(cssTall(view, grid) - 76) < 1, `390x844@3: NEWT is ${cssTall(view, grid).toFixed(1)} CSS px tall`);
+  const tall = newtTexels(view, grid);
+  assert.ok(tall >= 37 && tall <= 39, `390x844@3: NEWT is ${tall.toFixed(1)} texels tall at the default size`);
 });
 
 test('the framing stays the same whatever the pixel size: NEWT just has more or fewer texels', () => {
-  const [cssW, cssH, dpr] = SIZES[0];
-  const tall = {};
-  for (const pixelSize of ['fine', 'ds', 'chunky']) {
-    const grid = texelGrid({ cssW, cssH, dpr, pixelSize, texels: preset.texels });
-    const view = frameView({ cssW, cssH, dpr, grid, insets: INSETS, texels: preset.texels[DEFAULT_PIXEL] });
-    tall[pixelSize] = newtTexels(view, grid);
+  for (const [cssW, cssH, dpr] of SIZES) {
+    const at = `${cssW}x${cssH}@${dpr}`;
+    const css = [];
+    const tall = [];
+    for (const pixelSize of PIXEL_SIZES) {
+      const grid = texelGrid({ cssW, cssH, dpr, pixelSize, texels: preset.texels });
+      const view = frameView({ cssW, cssH, grid, insets: INSETS, area: AREA });
+      css.push(cssTall(view, grid));
+      tall.push(newtTexels(view, grid));
+    }
+    const sizes = css.map((v) => v.toFixed(1)).join(', ');
+    assert.ok(Math.max(...css) - Math.min(...css) < 0.5, `${at}: NEWT is ${sizes} CSS px tall at ${PIXEL_SIZES}`);
+    // Off first, then bigger and bigger blocks: fewer and fewer texels.
+    for (let i = 1; i < tall.length; i++)
+      assert.ok(tall[i] < tall[i - 1], `${at}: ${tall.map((v) => v.toFixed(1))} texels at ${PIXEL_SIZES}`);
   }
-  assert.ok(tall.fine > tall.ds && tall.ds > tall.chunky, JSON.stringify(tall));
 });
 
 test('the Bayer matrix is normalised', () => {
