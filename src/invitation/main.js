@@ -47,7 +47,7 @@ import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips
 import { createFaceState, faceStep } from './faces.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
-import { animFps, loadLook, motionStep, presetOf, saveLook } from './look.js';
+import { animFps, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
 import { createRng } from './rng.js';
@@ -92,8 +92,10 @@ function onLook(next) {
   look = next;
   saveLook(look);
   if (!stage) return;
-  stage.setLook(presetOf(look), look);
-  character?.setStyle(presetOf(look), look.pixelSize !== 'off');
+  // (The style with the user's Shader options written in: lookPreset.)
+  const preset = lookPreset(look);
+  stage.setLook(preset, look);
+  character?.setStyle(preset, look.pixelSize !== 'off');
 }
 
 /**
@@ -123,7 +125,7 @@ let orbit = null;
 if (webgl2()) {
   try {
     stage = createStage(stageEl, {
-      preset: presetOf(look),
+      preset: lookPreset(look),
       look,
       insets,
       focus: focusInsets,
@@ -200,6 +202,15 @@ function focusInsets() {
   });
 }
 
+/**
+ * The Look's Shader options for ?test: every value (look.js shaderOf), whether the Style row
+ * shows Custom, and what the renderer has from them (stage.js lookState).
+ * @param {NonNullable<typeof stage>} s
+ */
+function lookSnapshot(s) {
+  return { shader: shaderOf(look), custom: isCustom(look), pass: s.lookState() };
+}
+
 /** @param {NonNullable<typeof stage>} s */
 function start(s) {
   const { canvas } = s;
@@ -248,7 +259,7 @@ function start(s) {
   refit.observe(ui.sheet);
 
   loadCharacter(`${BASE}models/newt.glb`, {
-    preset: presetOf(look),
+    preset: lookPreset(look),
     pixel: look.pixelSize !== 'off',
     pixelFaceUrl: `${BASE}models/newt-face.png`,
   })
@@ -673,6 +684,9 @@ function start(s) {
         camera: { yaw: cam.yaw, elevation: cam.elevation, distance: cam.distance },
         // (Both of the retro pass's paths compiled: the first switch to Off or back won't stall.)
         warmed,
+        // (The Shader options: every value, whether any is the user's own, and what reached
+        // the renderer.)
+        ...lookSnapshot(s),
         cameraHome: { ...cam.home },
         options,
       }),

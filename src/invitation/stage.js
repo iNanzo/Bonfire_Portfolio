@@ -157,9 +157,12 @@ export function createStage(container, { preset, look, insets, focus, onResize }
   /** The camera's yaw the light was last turned to. */
   let lightYaw = 0;
 
-  /** The sun where the look puts it, turned with the camera's yaw, and its shadow camera fitted. */
+  /**
+   * The sun where the look puts it, turned with the camera's yaw and the look's own turn (Light
+   * Angle, a Shader option), and its shadow camera fitted.
+   */
   function placeSun() {
-    const d = lightDir(current.preset.sun.dir, lightYaw);
+    const d = lightDir(current.preset.sun.dir, lightYaw + ((current.preset.sun.turn ?? 0) * Math.PI) / 180);
     sun.target.position.set(0, 0, 0);
     sun.position.set(d.x, d.y, d.z).normalize().multiplyScalar(12);
     fitShadow(sun, bounds, LIFT + NEWT_HEIGHT);
@@ -172,7 +175,7 @@ export function createStage(container, { preset, look, insets, focus, onResize }
     hemi.groundColor.setStyle(p.hemi.ground, THREE.SRGBColorSpace);
     hemi.intensity = p.hemi.intensity;
     sun.color.setStyle(p.sun.color, THREE.SRGBColorSpace);
-    sun.intensity = p.sun.intensity;
+    sun.intensity = p.sun.intensity * (p.sun.strength ?? 1);
     // (three recompiles the materials when the type changes; a new size needs new maps.)
     renderer.shadowMap.type = SHADOW_TYPES[p.shadow.type] ?? THREE.BasicShadowMap;
     if (sun.shadow.mapSize.x !== p.shadow.mapSize) {
@@ -300,7 +303,35 @@ export function createStage(container, { preset, look, insets, focus, onResize }
       blob.material.opacity = blobOpacity.opacity + (blobOpacity.lifted - blobOpacity.opacity) * k;
     },
     /**
-     * Switch the look live (presets, Pixel Size, Dithering, Outlines).
+     * What the look has set live, for ?test: the post shader's values, the light's strength
+     * and its angle round him (degrees, from the camera's yaw: Light Angle), and the shadow's
+     * strength on the floor.
+     */
+    lookState() {
+      const u = retro.uniforms;
+      const d = lightDir(current.preset.sun.dir, 0);
+      const s = sun.position.clone().sub(sun.target.position);
+      const turn = Math.atan2(s.x, s.z) - Math.atan2(d.x, d.z) - lightYaw;
+      const deg = Math.round((((((turn * 180) / Math.PI + 180) % 360) + 360) % 360) - 180);
+      return {
+        levels: u.uLevels.value,
+        dither: u.uDither.value,
+        outline: u.uOutline.value ? u.uDarken.value : 0,
+        ink: u.uInk.value.getHexString(THREE.LinearSRGBColorSpace),
+        ring: u.uOutside.value > 0,
+        shadeSoft: u.uShadeSoft.value,
+        shadeSteps: u.uShadeSteps.value,
+        shadow: floor.mesh.material.opacity,
+        saturation: u.uSat.value,
+        exposure: u.uExposure.value,
+        contrast: u.uContrast.value,
+        tint: u.uTint.value.getHexString(THREE.LinearSRGBColorSpace),
+        light: sun.intensity,
+        turn: deg === -180 ? 180 : deg,
+      };
+    },
+    /**
+     * Switch the look live (presets, Pixel Size, Dithering, Outlines, the Shader options).
      * @param {import('./look.js').LookPreset} p
      * @param {import('./look.js').Look} l
      */

@@ -426,7 +426,7 @@ test('a Pixel Size saved before the sprite resolutions loads as the nearest one 
     const saved = JSON.stringify({ pixelSize: old, dither: false, outlines: true, style: 'soft' });
     assert.deepEqual(
       loadLook(store(() => saved)),
-      { pixelSize: now, dither: false, outlines: true, style: 'soft', motion: 'smooth' },
+      { pixelSize: now, dither: false, outlines: true, style: 'soft', motion: 'smooth', shader: {} },
       old,
     );
   }
@@ -455,6 +455,7 @@ test('a stored look from before Motion loads with Motion Smooth and keeps its ot
     outlines: false,
     style: 'soft',
     motion: 'smooth',
+    shader: {},
   });
   for (const motion of MOTIONS)
     assert.equal(loadLook(store(() => JSON.stringify({ motion }))).motion, motion, `${motion} is kept`);
@@ -527,7 +528,13 @@ test('every look preset carries every look value (a designer edits data, never c
     for (const k of ['lift', 'gamma', 'saturation', 'exposure'])
       assert.equal(typeof p.grade[k], 'number', at(`grade.${k}`));
     assert.match(p.grade.tint, colour, at('grade.tint'));
-    assert.ok(p.toon.length >= 2 && p.toon.every((v) => v >= 0 && v <= 1), at('toon bands'));
+    // (The toon shading as a spec the Shader options set: shader.js toonRamp builds the bands.)
+    assert.ok([0, 2, 3, 4].includes(p.toon.bands) && typeof p.toon.highlight === 'boolean', at('toon'));
+    assert.ok(p.toon.shade >= 0 && p.toon.shade < p.toon.lit && p.toon.lit <= 1, at('toon shade and lit'));
+    assert.ok(['dark', 'tinted'].includes(p.outline.ink), at('outline.ink'));
+    assert.equal(typeof p.outline.outside, 'boolean', at('outline.outside'));
+    for (const k of ['contrast', 'warmth']) assert.equal(typeof p.grade[k], 'number', at(`grade.${k}`));
+    for (const k of ['turn', 'strength']) assert.equal(typeof p.sun[k], 'number', at(`sun.${k}`));
     assert.ok(['basic', 'pcf', 'vsm'].includes(p.shadow.type), at('shadow.type'));
     assert.ok(p.shadow.mapSize >= 256, at('shadow.mapSize'));
     assert.equal(p.sun.dir.length, 3, at('sun.dir'));

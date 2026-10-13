@@ -3,29 +3,41 @@
 // stored as '16' ... '256', 'native' or 'off': pixels.js PIXEL_SIZES), Dithering, Outlines,
 // Style (a preset in looks/: the list and the Style the menu starts on come from
 // looks/index.js, PRESETS and DEFAULT_STYLE) and Motion ('smooth', or 'choppy': his animation
-// stepped at CHOPPY_FPS while the camera and the rest stay smooth; motionStep is its clock).
+// stepped at CHOPPY_FPS while the camera and the rest stay smooth; motionStep is its clock)
+// and the Shader options (shader.js SHADER_CONTROLS: the style sets every one; `shader` keeps
+// only the user's changes, each snapped onto its control or dropped on its own, and a change
+// back to the style's own value is no change; isCustom: the Style row shows Custom; shaderOf:
+// every value; lookPreset: the style with the changes written into a copy, for the renderer).
 // They're kept in localStorage under `invitation.look.v1`, every read and write in try/catch:
 // storage that's empty, broken, refused or missing gives the defaults, and each value is checked
 // on its own, so one bad value never costs the others (a Pixel Size from before the resolutions
 // loads as the nearest one: 2×, 3× and 4× as they looked on a 390-wide phone, OLD_PIXEL, and
 // 'fine', 'ds' or 'chunky' as the default; the page never shipped with them; a look stored before
-// Motion loads as Smooth with its other values kept).
+// Motion loads as Smooth with its other values kept, and one stored before the Shader options as
+// its style).
 
 import { DEFAULT_PIXEL, PIXEL_SIZES } from './pixels.js';
 import { DEFAULT_STYLE, PRESETS } from './looks/index.js';
+import { SHADER_CONTROLS, controlFor, snapShader, styleShader } from './shader.js';
 
 /**
  * @typedef {object} LookPreset  every look value, as data (looks/*.js)
  * @property {string} label  its name in the Look menu
  * @property {number} levels  colour levels a channel (64: 18-bit colour)
  * @property {number} dither  Bayer dither strength with Dithering on, 0..1
- * @property {{darken: number, tint: string, depth: number}} outline  a line's pixel: darkened by
- *   `darken` (0..1) and multiplied by `tint`; `depth`: how far (relative) the depth must jump
- * @property {{lift: number, gamma: number, saturation: number, tint: string, exposure: number}} grade
- * @property {number[]} toon  the toon gradient's bands, dark to light, 0..1 (evenly spaced over the light's angle)
+ * @property {{darken: number, tint: string, depth: number, ink?: 'dark'|'tinted', outside?: boolean}} outline
+ *   a line's pixel: darkened by `darken` (0..1) and, with `ink` 'tinted' (the default),
+ *   multiplied by `tint`; `depth`: how far (relative) the depth must jump; `outside`: on the
+ *   paper just outside him (retro.js RetroExtras)
+ * @property {{lift: number, gamma: number, saturation: number, tint: string, exposure: number, contrast?: number, warmth?: number}} grade
+ *   contrast: about mid grey (1: as it is); warmth: toward warm or cool (shader.js warmthTint)
+ * @property {import('./shader.js').ToonSpec|number[]} toon  the toon shading (shader.js toonRamp;
+ *   an older preset's own bands, dark to light, evenly over the light's angle)
  * @property {{type: 'basic'|'pcf'|'vsm', mapSize: number, bias: number, normalBias: number, radius: number, color?: number|string, opacity?: number}} shadow
  *   the shadow map, and the shadow the invisible floor shows (floor.js: its colour and strength)
- * @property {{dir: number[], color: string, intensity: number}} sun  the one light that casts (dir: toward it)
+ * @property {{dir: number[], color: string, intensity: number, turn?: number, strength?: number}} sun
+ *   the one light that casts (dir: toward it; turn: degrees round him on top of following the
+ *   camera; strength: its intensity's multiplier)
  * @property {{sky: string, ground: string, intensity: number}} hemi  the faint fill
  * @property {number} [background]  the page's colour (a hex number; there's no room, just this and the floor's shadows)
  * @property {{background: string, [k: string]: string}} [room]  the scrapped room's colours (floor.js falls back on its background)
@@ -40,6 +52,8 @@ import { DEFAULT_STYLE, PRESETS } from './looks/index.js';
  * @property {boolean} outlines
  * @property {string} style  a key of LOOKS
  * @property {Motion} motion
+ * @property {import('./shader.js').ShaderValues} shader  the user's changes to the style's
+ *   Shader options (none: the style as it is)
  */
 /** @typedef {'smooth'|'choppy'} Motion  Smooth, or Choppy (his animation at CHOPPY_FPS) */
 
@@ -64,7 +78,28 @@ export const DEFAULT_LOOK = Object.freeze({
   outlines: true,
   style: DEFAULT_STYLE,
   motion: /** @type {Motion} */ ('smooth'),
+  shader: Object.freeze({}),
 });
+
+/**
+ * The user's Shader changes from anything, against the style `style`: each value snapped onto
+ * its control (shader.js snapShader) or dropped on its own, unknown keys dropped, and a value
+ * that's the style's own dropped (no change).
+ * @param {unknown} raw
+ * @param {string} style  a key of LOOKS
+ * @returns {import('./shader.js').ShaderValues}
+ */
+function validShader(raw, style) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const own = styleShader(LOOKS[style]);
+  /** @type {import('./shader.js').ShaderValues} */
+  const out = {};
+  for (const c of SHADER_CONTROLS) {
+    const v = snapShader(c, /** @type {Record<string, unknown>} */ (raw)[c.key]);
+    if (v !== undefined && v !== own[c.key]) out[c.key] = v;
+  }
+  return out;
+}
 
 /**
  * Settings from anything: each value kept when it's valid, the default's otherwise.
@@ -73,6 +108,7 @@ export const DEFAULT_LOOK = Object.freeze({
  */
 export function validLook(raw) {
   const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const style = Object.hasOwn(LOOKS, o.style) ? o.style : DEFAULT_LOOK.style;
   return {
     pixelSize: PIXEL_SIZES.includes(o.pixelSize)
       ? o.pixelSize
@@ -81,8 +117,9 @@ export function validLook(raw) {
         : DEFAULT_LOOK.pixelSize,
     dither: typeof o.dither === 'boolean' ? o.dither : DEFAULT_LOOK.dither,
     outlines: typeof o.outlines === 'boolean' ? o.outlines : DEFAULT_LOOK.outlines,
-    style: Object.hasOwn(LOOKS, o.style) ? o.style : DEFAULT_LOOK.style,
+    style,
     motion: MOTIONS.includes(o.motion) ? o.motion : DEFAULT_LOOK.motion,
+    shader: validShader(o.shader, style),
   };
 }
 
@@ -123,6 +160,40 @@ export function saveLook(look, storage) {
  * @param {Look} look
  */
 export const presetOf = (look) => LOOKS[look.style] ?? LOOKS[DEFAULT_LOOK.style];
+
+/**
+ * Whether the user changed any of the style's Shader options (the Style row shows Custom).
+ * @param {Look} look
+ */
+export const isCustom = (look) => Object.keys(validShader(look.shader, presetKey(look))).length > 0;
+
+/** The key of the style a look names (the default's for anything else). */
+const presetKey = (/** @type {Look} */ look) => (Object.hasOwn(LOOKS, look.style) ? look.style : DEFAULT_LOOK.style);
+
+/**
+ * Every Shader option's value for a look: the style's, with the user's changes.
+ * @param {Look} look
+ * @returns {import('./shader.js').ShaderValues}
+ */
+export const shaderOf = (look) => ({
+  ...styleShader(presetOf(look)),
+  ...validShader(look.shader, presetKey(look)),
+});
+
+/**
+ * The preset the renderer draws a look with: its style, or (with Shader changes) a copy of it
+ * with them written in (the style itself is never changed).
+ * @param {Look} look
+ * @returns {LookPreset}
+ */
+export function lookPreset(look) {
+  const base = presetOf(look);
+  const changes = Object.entries(validShader(look.shader, presetKey(look)));
+  if (!changes.length) return base;
+  const p = structuredClone(base);
+  for (const [key, v] of changes) controlFor(key)?.set(p, v);
+  return p;
+}
 
 /**
  * How many times a second his animation steps: CHOPPY_FPS with Motion Choppy, else the preset's

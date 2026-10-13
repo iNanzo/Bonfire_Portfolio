@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { ORIGINAL_ATLAS_TEXELS, createCharacter, pixelAtlasUrl } from '../src/invitation/character.js';
 import { FACE_IMAGE, pickFaceSize } from '../src/invitation/faceSheets.js';
 import { LOOKS } from '../src/invitation/look.js';
+import { TOON_CELLS, toonRamp } from '../src/invitation/shader.js';
 import { TWIN } from '../src/invitation/play.js';
 import { BONES, COLLAR, SCALE } from '../src/invitation/clips.js';
 
@@ -293,6 +294,31 @@ test('his meshes: toon materials keeping their maps, cast but never receive shad
   assert.equal(mesh.castShadow, true);
   assert.equal(mesh.receiveShadow, false);
   assert.doesNotThrow(() => ch.setFace('happy'), 'no face sheet: setFace does nothing');
+  assert.doesNotThrow(() => ch.dispose());
+});
+
+test('his toon shading is the style’s ramp (shader.js toonRamp), and a new one goes into the same gradient map: no new texture, no new program', () => {
+  const { gltf, mesh } = standIn();
+  const ch = createCharacter(gltf, { preset: LOOKS.ds });
+  const gradient = mesh.material.gradientMap;
+  const cells = () =>
+    Array.from(
+      gradient.image.data.filter((_, i) => i % 4 === 0),
+      (v) => v / 255,
+    );
+  const want = (toon) => toonRamp(toon).map((v) => Math.round(v * 255) / 255);
+  assert.equal(gradient.image.width, TOON_CELLS);
+  assert.deepEqual(cells(), want(LOOKS.ds.toon), 'DS’s two bands and highlight');
+  const version = gradient.version;
+  const four = { ...LOOKS.ds, toon: { ...LOOKS.ds.toon, bands: 4, highlight: false } };
+  ch.setStyle(four, true);
+  assert.equal(mesh.material.gradientMap, gradient, 'the same texture');
+  assert.ok(gradient.version > version, 'uploaded again');
+  assert.deepEqual(cells(), want(four.toon), 'four bands, no highlight');
+  assert.equal(new Set(cells()).size, 4);
+  ch.setStyle({ ...LOOKS.ds, toon: { ...LOOKS.ds.toon, bands: 0 } }, false);
+  assert.equal(mesh.material.gradientMap, gradient, 'Smooth too, at Off');
+  assert.ok(new Set(cells()).size >= 16, 'Smooth: no bands to speak of');
   assert.doesNotThrow(() => ch.dispose());
 });
 

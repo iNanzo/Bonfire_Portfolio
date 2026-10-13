@@ -20,10 +20,12 @@ export default {
   label: 'DS',
   levels: 64,
   dither: 0.25,
-  outline: { darken: 0.6, tint: '#ffffff', depth: 0.015 },
-  grade: { lift: 0, gamma: 1, saturation: 1.04, tint: '#fffdfa', exposure: 1.02 },
-  // (Over the light's angle, -1..1 in eighths: shade below 0, lit to 0.75, the highlight above.)
-  toon: [0.5, 0.5, 0.5, 0.5, 0.8, 0.8, 0.8, 1],
+  // (Dark lines; Tinted, a Shader option, multiplies them by the lavender of his shadow.)
+  outline: { darken: 0.6, tint: '#9c88c4', ink: 'dark', depth: 0.015, outside: false },
+  grade: { lift: 0, gamma: 1, saturation: 1.04, tint: '#fffdfa', exposure: 1.02, contrast: 1, warmth: 0 },
+  // (Over the light's angle: shade on his side away from it, lit facing it, the highlight where
+  // it falls straight, N·L 0.75 on: shader.js toonRamp.)
+  toon: { bands: 2, highlight: true, shade: 0.5, lit: 0.8 },
   background: 0xffffff,
   shadow: {
     type: 'basic',
@@ -36,7 +38,7 @@ export default {
     soft: 0,
     steps: 0,
   },
-  sun: { dir: [-0.55, 1, 0.75], color: '#fff6e8', intensity: 2.6 },
+  sun: { dir: [-0.55, 1, 0.75], color: '#fff6e8', intensity: 2.6, turn: 0, strength: 1 },
   hemi: { sky: '#ffffff', ground: '#e8c8b0', intensity: 1.3 },
   blob: { opacity: 0, lifted: 0.3 },
   marker: { color: '#6f6457' },

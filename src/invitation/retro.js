@@ -7,11 +7,14 @@
 //   - the floor: the paper again, darkened toward the preset's shadow colour by his shadow (its
 //     coverage softened over `shadow.soft` texels and dithered into `shadow.steps` tones, or
 //     left hard), and by whatever is drawn over it (the blob shadow, the marker);
-//   - NEWT: graded (lift, gamma, saturation, tint, exposure), lined, then quantized to
-//     `levels` a channel with the 4×4 Bayer dither.
+//   - NEWT: graded (exposure, lift, gamma, contrast, saturation, tint warmed or cooled), lined,
+//     then quantized to `levels` a channel with the 4×4 Bayer dither.
+// Every value comes from the look preset (lookPreset: the style with the user's Shader options
+// written in), all of them uniforms, so moving a Shader option never builds a new program.
 // Lines (Outlines) are only ever on or around NEWT: on his own edge texels where the surface or
 // the depth changes (the DS's edge marking), or with `outline.outside` on the paper texels
-// just outside his silhouette, as a darker shade of his colour there (a sprite's outline).
+// just outside his silhouette, as a darker shade of his colour there (a sprite's outline);
+// `outline.darken` darker, and multiplied by `outline.tint` unless `outline.ink` is 'dark'.
 // The floor, the shadow and the paper make none.
 //
 // The floor: drawn into the colour target, any ShadowMaterial in the scene is swapped for the
@@ -33,6 +36,7 @@
 import * as THREE from 'three';
 import { floorLook } from './floor.js';
 import { BAYER4 } from './pixels.js';
+import { warmthTint } from './shader.js';
 
 /** Surface ids (written into the colour's alpha as id / ID_SCALE; 0 is nothing drawn). */
 export const ID = { newt: 1, floor: 2 };
@@ -203,24 +207,35 @@ export function catcherMaterial() {
   return m;
 }
 
+/** A toon gradient's cells as RGBA bytes, each cell its value in every channel. */
+function gradientBytes(bands) {
+  const data = new Uint8Array(bands.length * 4);
+  bands.forEach((v, i) => data.fill(Math.round(Math.min(1, Math.max(0, v)) * 255), i * 4, i * 4 + 4));
+  return data;
+}
+
 /**
- * The toon materials' gradient map: one texel a band, nearest, so the light falls in steps.
- * @param {number[]} bands  dark to light, 0..1
+ * The toon materials' gradient map: one texel a cell, nearest, so the light falls in steps.
+ * @param {number[]} bands  dark to light, 0..1 (shader.js toonRamp)
  */
 export function toonGradient(bands) {
-  const data = new Uint8Array(bands.length * 4);
-  bands.forEach((v, i) =>
-    data.set(
-      [1, 1, 1, 1].map((k) => Math.round(Math.min(1, Math.max(0, v * k)) * 255)),
-      i * 4,
-    ),
-  );
-  const t = new THREE.DataTexture(data, bands.length, 1, THREE.RGBAFormat);
+  const t = new THREE.DataTexture(gradientBytes(bands), bands.length, 1, THREE.RGBAFormat);
   t.minFilter = THREE.NearestFilter;
   t.magFilter = THREE.NearestFilter;
   t.generateMipmaps = false;
   t.needsUpdate = true;
   return t;
+}
+
+/**
+ * Rewrite a gradient map's cells with as many new ones (shader.js toonRamp always gives
+ * TOON_CELLS), uploaded again on its next use: the materials keep their texture and program.
+ * @param {any} texture  a toonGradient
+ * @param {number[]} bands  as many as it has cells
+ */
+export function setToonGradient(texture, bands) {
+  texture.image.data.set(gradientBytes(bands).subarray(0, texture.image.data.length));
+  texture.needsUpdate = true;
 }
 
 /**
@@ -266,6 +281,7 @@ const fragmentShader = /* glsl */ `
   uniform float uGamma;
   uniform float uSat;
   uniform float uExposure;
+  uniform float uContrast;
   uniform vec3 uTint;
   uniform vec3 uPaper;
   uniform vec3 uShade;
@@ -302,6 +318,7 @@ const fragmentShader = /* glsl */ `
     vec3 col = toSRGB(rgb * uExposure);
     col = uLift + col * (1.0 - uLift);
     col = pow(max(col, 0.0), vec3(1.0 / uGamma));
+    col = (col - 0.5) * uContrast + 0.5;
     return mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, uSat) * uTint;
   }
   vec3 quantize(vec3 col, float d) {
@@ -410,6 +427,7 @@ export function createRetro(renderer) {
       uGamma: { value: 1 },
       uSat: { value: 1 },
       uExposure: { value: 1 },
+      uContrast: { value: 1 },
       uTint: { value: new THREE.Color(1, 1, 1) },
       uPaper: { value: new THREE.Color(1, 1, 1) },
       uShade: { value: new THREE.Color(0, 0, 0) },
@@ -470,12 +488,16 @@ export function createRetro(renderer) {
     u.uOutside.value = preset.outline.outside ? 1 : 0;
     u.uEdgeDepth.value = preset.outline.depth;
     u.uDarken.value = preset.outline.darken;
-    u.uInk.value.copy(srgb(preset.outline.tint));
+    // (Dark lines are just darker; tinted ones take the style's ink too.)
+    u.uInk.value.copy(srgb(preset.outline.ink === 'dark' ? 0xffffff : preset.outline.tint));
     u.uLift.value = preset.grade.lift;
     u.uGamma.value = preset.grade.gamma;
     u.uSat.value = preset.grade.saturation;
     u.uExposure.value = preset.grade.exposure;
-    u.uTint.value.copy(srgb(preset.grade.tint));
+    u.uContrast.value = preset.grade.contrast ?? 1;
+    const [wr, wg, wb] = warmthTint(preset.grade.warmth ?? 0);
+    const tint = srgb(preset.grade.tint);
+    u.uTint.value.setRGB(tint.r * wr, tint.g * wg, tint.b * wb, THREE.LinearSRGBColorSpace);
     u.uPaper.value.copy(srgb(scene.background));
     u.uShade.value.copy(srgb(scene.shadow.color));
     u.uShadeAmount.value = scene.shadow.opacity;

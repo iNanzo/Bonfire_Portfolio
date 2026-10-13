@@ -1,7 +1,9 @@
 // The invitation toy's look presets in one place: each one a data file here (ds.js, soft.js),
 // and DEFAULT_STYLE, the Style the Look menu starts on: DS, the judge's pick (21 to Soft's 16
 // for likeness, readability on a phone and cost). look.js offers these presets (its LOOKS) and
-// takes its default Style from DEFAULT_STYLE.
+// takes its default Style from DEFAULT_STYLE. Each sets every Shader option the Look menu shows
+// (shader.js SHADER_CONTROLS reads them from its fields: levels, dither, outline, toon, shadow,
+// sun, grade), and the user's changes are written into a copy of it (look.js lookPreset).
 import ds from './ds.js';
 import soft from './soft.js';
 

@@ -7,7 +7,8 @@
 //                                  already wears them
 //   createCharacter(gltf, opts)    any {scene, animations} (the tests pass a stand-in skeleton
 //                                  and synthetic clips): scaled by SCALE; toon materials (the
-//                                  map kept, a nearest gradient map with the preset's bands)
+//                                  map kept, a nearest gradient map with the preset's toon
+//                                  ramp, shader.js toonRamp, rewritten in place by setStyle)
 //                                  marking his surface id for the retro pass's lines; his
 //                                  meshes cast shadows, never receive them, never get culled
 //
@@ -62,7 +63,8 @@ import { BONES, CLIPS, FACES, SCALE } from './clips.js';
 import { FACE_IMAGE, FACE_LAYOUT, faceSpan, pickFaceSize } from './faceSheets.js';
 import { LOOKS, DEFAULT_LOOK } from './look.js';
 import { TWIN } from './play.js';
-import { ID, markId, snapShift, toonGradient } from './retro.js';
+import { ID, markId, setToonGradient, snapShift, toonGradient } from './retro.js';
+import { toonRamp } from './shader.js';
 
 /** The clips that follow the step phase (blend.js gaitPhase); Idle breathes on its own clock. */
 const PHASED = ['Walk', 'Run'];
@@ -149,7 +151,8 @@ export function createCharacter(gltf, opts = {}) {
   root.scale.setScalar(SCALE);
   let preset = opts.preset ?? LOOKS[DEFAULT_LOOK.style];
   let pixel = opts.pixel ?? true;
-  let gradient = toonGradient(preset.toon);
+  // (A new toon shading, a Shader option, only rewrites the gradient map's texels.)
+  let gradient = toonGradient(toonRamp(preset.toon));
   /** @type {Map<any, Record<string, any>>} the glb's materials → his toon ones, one a part (PARTS) */
   const made = new Map();
   /** @type {any[]} every toon material of his */
@@ -521,10 +524,7 @@ export function createCharacter(gltf, opts = {}) {
     setStyle(next, pixelOn) {
       preset = next;
       pixel = pixelOn;
-      const g = toonGradient(preset.toon);
-      for (const m of toons) m.gradientMap = g;
-      gradient.dispose();
-      gradient = g;
+      gradient = retoon(gradient, preset.toon, toons);
       for (const part of /** @type {const} */ (['head', 'body'])) {
         if (!pixel) snaps[part].value.set(0, 0);
         holds[part].x = Number.NaN;
@@ -577,6 +577,26 @@ export function createCharacter(gltf, opts = {}) {
       gradient.dispose();
     },
   };
+}
+
+/**
+ * His toon shading changed: the ramp's cells written into his gradient map (the same texture
+ * and program), or, for another number of cells (an older preset's own bands), a new map of
+ * that size on `toons`. Returns the map they wear.
+ * @param {any} gradient  retro.js toonGradient
+ * @param {import('./shader.js').ToonSpec|number[]} toon
+ * @param {any[]} toons  his toon materials
+ */
+function retoon(gradient, toon, toons) {
+  const bands = toonRamp(toon);
+  if (bands.length === gradient.image.width) {
+    setToonGradient(gradient, bands);
+    return gradient;
+  }
+  const g = toonGradient(bands);
+  for (const m of toons) m.gradientMap = g;
+  gradient.dispose();
+  return g;
 }
 
 /**

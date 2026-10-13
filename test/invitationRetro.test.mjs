@@ -19,6 +19,8 @@ import {
   markId,
   snapShift,
 } from '../src/invitation/retro.js';
+import { LOOKS, lookPreset, validLook } from '../src/invitation/look.js';
+import { warmthTint } from '../src/invitation/shader.js';
 
 const LOOK = { pixelSize: '48', dither: true, outlines: true, style: 'ds' };
 /** A whole preset as the pass reads it (the presets' own values are tested on their own). */
@@ -130,6 +132,55 @@ test('the paper, the shadow and the lines come from the preset; Dithering off le
   assert.equal(u.uShadeSteps.value, 2, '…but the shadow keeps its tones');
   retro.setParams(soft, { ...LOOK, outlines: false });
   assert.equal(u.uOutline.value, 0);
+  retro.dispose();
+});
+
+test('the Shader options reach the post shader: Colors, the dither, the lines’ strength, colour and ring, the shadow’s edge and strength, and the grade, all uniforms', () => {
+  const scene = new THREE.Scene();
+  const { renderer } = standIn(scene, new THREE.Mesh());
+  const retro = createRetro(renderer);
+  const u = retro.uniforms;
+  const look = validLook({
+    style: 'ds',
+    shader: {
+      levels: 8,
+      dither: 0.9,
+      outline: 0.3,
+      ink: 'tinted',
+      ring: true,
+      edge: 'soft',
+      shadow: 0.7,
+      saturation: 1.5,
+      warmth: 1,
+      exposure: 1.2,
+      contrast: 1.3,
+    },
+  });
+  retro.setParams(lookPreset(look), look);
+  assert.equal(u.uLevels.value, 8);
+  assert.equal(u.uDither.value, 0.9);
+  assert.equal(u.uDarken.value, 0.3);
+  const tint = srgbOf(Number.parseInt(LOOKS.ds.outline.tint.slice(1), 16));
+  assert.ok(near(u.uInk.value.r, tint.r) && near(u.uInk.value.b, tint.b), 'Tinted: the style’s ink');
+  assert.equal(u.uOutside.value, 1, 'the ring outside him');
+  assert.ok(u.uShadeSoft.value >= 1 && u.uShadeSteps.value >= 2, 'a soft, stepped shadow');
+  assert.equal(u.uShadeAmount.value, 0.7);
+  assert.equal(u.uSat.value, 1.5);
+  assert.equal(u.uExposure.value, 1.2);
+  assert.equal(u.uContrast.value, 1.3);
+  const grade = srgbOf(Number.parseInt(LOOKS.ds.grade.tint.slice(1), 16));
+  const [wr, wg, wb] = warmthTint(1);
+  assert.ok(near(u.uTint.value.r, grade.r * wr), 'warm: the style’s tint, warmed');
+  assert.ok(near(u.uTint.value.b, grade.b * wb) && u.uTint.value.b < u.uTint.value.g * (wg + 1e-6));
+  // Dark lines: no tint, just darker.
+  const dark = validLook({ style: 'soft', shader: { ink: 'dark' } });
+  retro.setParams(lookPreset(dark), dark);
+  assert.deepEqual([u.uInk.value.r, u.uInk.value.g, u.uInk.value.b], [1, 1, 1]);
+  assert.equal(u.uContrast.value, 1, 'the style’s own contrast');
+  // Full colours: every level an 8-bit channel has.
+  const full = validLook({ style: 'ds', shader: { levels: 256 } });
+  retro.setParams(lookPreset(full), full);
+  assert.equal(u.uLevels.value, 256);
   retro.dispose();
 });
 
