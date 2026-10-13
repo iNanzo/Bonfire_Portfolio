@@ -31,7 +31,7 @@ import {
   saveLook,
   validLook,
 } from '../src/invitation/look.js';
-import { createRoom, roomBounds } from '../src/invitation/room.js';
+import { createRoom, roomBounds } from '../src/invitation/floor.js';
 import { ID, createRetro, decalMaterial, markId } from '../src/invitation/retro.js';
 import { BUTTONS, parseQuery, sheetHtml, statusHtml, toolbarHtml } from '../src/invitation/ui.js';
 

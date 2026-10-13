@@ -15,7 +15,7 @@
 // lines; integration moves them (main.js puts the marker where the pointer meets the floor).
 import * as THREE from 'three';
 import { TEXELS, frameView, texelGrid } from './pixels.js';
-import { createRoom } from './room.js';
+import { createRoom } from './floor.js';
 import { createRetro, decalMaterial } from './retro.js';
 
 export const LAYERS = { decal: 2 };
