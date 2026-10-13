@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CLIPS, GAIT, STRIDE, fadeFor } from '../src/invitation/clips.js';
 import { createRng } from '../src/invitation/rng.js';
-import { steer, wanderGoal, wrapAngle, STEER } from '../src/invitation/steer.js';
+import { steer, wanderGoal, wrapAngle, clampTo, xRange, STEER } from '../src/invitation/steer.js';
 import { grab, holdStep, toss, fallStep, carryFeel, CARRY } from '../src/invitation/carry.js';
 import {
   gaitWeights,
@@ -640,4 +640,85 @@ test('two minutes of rough random play: valid states and clips, always in the ro
     }
     for (const st of STATES) assert.ok(visited.has(st), `seed ${seed} never reached ${st}`);
   }
+});
+
+// ---- a play area that widens toward the back ----------------------------------------------
+// With the room gone the play area is the floor on screen (area.js), which perspective makes a
+// trapezoid: minX/maxX hold at the front (maxZ), minXBack/maxXBack at the back (minZ).
+
+const TRAP = { minX: -1.3, maxX: 1.3, minZ: -10, maxZ: 5, minXBack: -2.8, maxXBack: 2.8 };
+/** Inside the trapezoid: z in range, x between its slanted sides at that z. */
+const insideTrap = (p) => {
+  const [lo, hi] = xRange(TRAP, Math.min(TRAP.maxZ, Math.max(TRAP.minZ, p.z)));
+  return p.z >= TRAP.minZ - 1e-6 && p.z <= TRAP.maxZ + 1e-6 && p.x >= lo - 1e-6 && p.x <= hi + 1e-6;
+};
+
+test('a play area that widens toward the back: its sides slant, and a box is still a box', () => {
+  assert.deepEqual(xRange(TRAP, TRAP.maxZ), [-1.3, 1.3]);
+  assert.deepEqual(xRange(TRAP, TRAP.minZ), [-2.8, 2.8]);
+  const mid = xRange(TRAP, (TRAP.minZ + TRAP.maxZ) / 2);
+  close(mid[0], -2.05, 1e-9);
+  close(mid[1], 2.05, 1e-9);
+  assert.deepEqual(xRange(BOUNDS, 0), [BOUNDS.minX, BOUNDS.maxX], 'no back corners: a box');
+  // Clamped to the slanted side at the point's own depth (after its depth is clamped).
+  const c = clampTo(TRAP, { x: 9, z: -2.5 });
+  close(c.x, xRange(TRAP, -2.5)[1], 1e-9);
+  assert.equal(c.z, -2.5);
+  assert.deepEqual(clampTo(TRAP, { x: -9, z: 20 }), { x: -1.3, z: 5 });
+});
+
+test('in a widening play area, wander goals use its whole width and stay inside it', () => {
+  const rng = createRng(11);
+  let from = { x: 0, z: 0 };
+  let wide = 0;
+  for (let i = 0; i < 400; i++) {
+    const g = wanderGoal(rng, TRAP, from);
+    assert.ok(insideTrap(g), `goal ${JSON.stringify(g)} is outside`);
+    if (Math.abs(g.x) > TRAP.maxX + 0.2) wide++;
+    from = g;
+  }
+  assert.ok(wide > 40, `${wide} goals out past the front's width, toward the back`);
+});
+
+test('in a widening play area, walking, fleeing and carrying stay inside its slanted sides', () => {
+  const run = (body, move, pointer, seconds, each) => {
+    for (let i = 0; i < Math.round(seconds / DT); i++) {
+      const next = steer(body, move, pointer, TRAP, DT);
+      each?.(next, body, i * DT);
+      body = next;
+    }
+    return body;
+  };
+  // A goal out past the slanted side: he walks to the side and stops there, inside.
+  const b = run({ x: 0, z: 0, yaw: 0, speed: 0 }, { mode: 'goto', goal: { x: 6, z: -4 }, speed: GAIT.walk }, null, 8);
+  assert.ok(insideTrap(b), JSON.stringify(b));
+  assert.ok(b.x > TRAP.maxX + 0.3, `he got out past the front's width (x = ${b.x.toFixed(2)})`);
+  // Fleeing toward a slanted side, then cornered at the front: inside, sliding, never stuck.
+  const flee = { mode: 'flee', goal: null, speed: GAIT.run };
+  const fled = run({ x: 1, z: 3, yaw: 0, speed: 0 }, flee, { x: -0.5, z: 2.5 }, 3, (n, prev, t) => {
+    assert.ok(insideTrap(n), `fled out at ${JSON.stringify(n)}`);
+    if (t > 0.6) assert.ok(dist(n, prev) > 0.3 * DT, `stuck at ${t.toFixed(2)} s`);
+  });
+  assert.ok(dist(fled, { x: -0.5, z: 2.5 }) > 3, 'got well away');
+  run({ x: 1.25, z: 4.95, yaw: 0, speed: 0 }, flee, { x: 0.8, z: 4.4 }, 2, (n, prev, t) => {
+    assert.ok(insideTrap(n), `fled out at ${JSON.stringify(n)}`);
+    if (t > 0.6) assert.ok(dist(n, prev) > 0.3 * DT, `stuck in the corner at ${t.toFixed(2)} s`);
+  });
+  // Carried out past a side: the anchor stays inside.
+  const c = grab({ x: 0, y: 0.6, z: -6 }, 0);
+  for (let i = 1; i <= 30; i++) holdStep(c, { x: 9, y: 1.2, z: -6 }, DT, TRAP, i * DT);
+  assert.ok(insideTrap(c.anchor), JSON.stringify(c.anchor));
+  close(c.anchor.x, xRange(TRAP, -6)[1], 1e-6, 'up against the slanted side');
+  // Thrown at the slanted side: he bounces off softly and stays inside.
+  let root = { x: 2, y: 1.2, z: -6 };
+  let vel = { x: 3, y: 0, z: 0 };
+  let bounced = false;
+  for (let i = 0; i < 30; i++) {
+    const r = fallStep(root, vel, root.y - 0.1, DT, TRAP);
+    assert.ok(insideTrap(r.root), JSON.stringify(r.root));
+    if (r.vel.x < 0) bounced = true;
+    root = r.root;
+    vel = r.vel;
+  }
+  assert.ok(bounced, 'bounced off the side');
 });
