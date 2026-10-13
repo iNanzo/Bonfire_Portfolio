@@ -6,14 +6,14 @@
 // own clock; restarting a clip that still shows hands its old pose to a twin that fades out (no
 // pop); the collar is read from the current matrices, so carrying can anchor him by it. With
 // the pixel filter on: his face's sheet is picked by his half face in texels (held through a
-// small change), what's on his head moves onto the texel grid by his head's centre and the
-// rest of him by his feet, and his atlas is the pixel one (nearest, no mipmaps), the glb's
-// own at Off.
+// small change; faceSheet says the smooth one shows at Off), what's on his head moves onto the
+// texel grid by his head's centre and the rest of him by his feet, and his atlas is the pixel
+// one (nearest, no mipmaps), the glb's own at Off.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ORIGINAL_ATLAS_TEXELS, createCharacter, pixelAtlasUrl } from '../src/invitation/character.js';
-import { pickFaceSize } from '../src/invitation/faceSheets.js';
+import { FACE_IMAGE, pickFaceSize } from '../src/invitation/faceSheets.js';
 import { LOOKS } from '../src/invitation/look.js';
 import { TWIN } from '../src/invitation/play.js';
 import { BONES, COLLAR, SCALE } from '../src/invitation/clips.js';
@@ -372,6 +372,52 @@ test('the face sheet: picked by his half face in texels at his head (camera, gri
   draw(40);
   assert.equal(ch.faceSize, pickFaceSize(expect(40), null), 'further again: a pixel sheet');
   ch.dispose();
+});
+
+test('faceSheet says which face sheet shows: the smooth one at Off (whatever size was picked) and without the pixel image, the picked pixel sheet with the pixel filter on', () => {
+  // (Splitting a sheet into cells draws on a canvas: a stand-in document whose canvases only
+  // remember their size, enough for three's CanvasTexture in Node.)
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: { createElement: () => ({ width: 0, height: 0, getContext: () => ({ drawImage() {} }) }) },
+  });
+  try {
+    const { gltf, face } = withFace();
+    // (The glb's own 1024 face sheet on his face material, as the real glb has.)
+    face.material.map = new THREE.Texture({ width: 1024, height: 1024 });
+    const pixelFace = new THREE.Texture({ width: FACE_IMAGE.w, height: FACE_IMAGE.h });
+    const ch = createCharacter(gltf, { pixel: false, pixelFace });
+    ch.root.updateMatrixWorld(true);
+    const c = ch.root.getObjectByName(BONES.head).localToWorld(new THREE.Vector3(0, 1, 0));
+    const toon = /** @type {any} */ (face.material);
+    const draw = (d) => face.onBeforeRender(viewportOf(195, 422), null, cameraAt(c, d), face.geometry, toon, null);
+    assert.equal(ch.faceSheet, 'smooth', 'Off from the start: the smooth face');
+    draw(40);
+    assert.equal(typeof ch.faceSize, 'number', 'a pixel size is still picked by his texels');
+    assert.equal(ch.faceSheet, 'smooth', 'yet Off shows the smooth face, and says so');
+    assert.notEqual(toon.map.magFilter, THREE.NearestFilter, 'the smooth sheet’s cell on his face');
+    ch.setStyle(LOOKS.ds, true);
+    assert.equal(ch.faceSheet, ch.faceSize, 'the pixel filter on: the picked pixel sheet');
+    assert.equal(toon.map.magFilter, THREE.NearestFilter, 'a pixel cell on his face');
+    assert.equal(toon.map.image.width, ch.faceSize, 'that size’s cell');
+    ch.setStyle(LOOKS.ds, false);
+    assert.equal(ch.faceSheet, 'smooth', 'Off again: the smooth face');
+    ch.dispose();
+    // Without the pixel image the smooth sheet stays, pixel filter or not.
+    const bare = withFace();
+    bare.face.material.map = new THREE.Texture({ width: 1024, height: 1024 });
+    const b = createCharacter(bare.gltf, { pixel: true });
+    b.root.updateMatrixWorld(true);
+    const bc = b.root.getObjectByName(BONES.head).localToWorld(new THREE.Vector3(0, 1, 0));
+    const bt = /** @type {any} */ (bare.face.material);
+    bare.face.onBeforeRender(viewportOf(195, 422), null, cameraAt(bc, 40), bare.face.geometry, bt, null);
+    assert.equal(b.faceSheet, 'smooth', 'no pixel image: the smooth face');
+    b.dispose();
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'document', had);
+    else delete (/** @type {any} */ (globalThis).document);
+  }
 });
 
 test('the texel snap: what’s on his head moves by his head’s centre, the rest of him by his feet, each onto a texel’s centre; Off moves nothing', () => {

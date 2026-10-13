@@ -630,9 +630,9 @@ function start(s) {
         clip: shownClip(),
         reaction: out?.reaction ?? null,
         face: character?.face ?? 'neutral',
-        // (The face sheet showing: a pixel sheet's cell width, 'smooth' for the 1024 sheet; his
-        // half face in texels.)
-        faceSheet: character?.faceSize ?? null,
+        // (The face sheet showing: a pixel sheet's cell width, 'smooth' for the 1024 sheet, as at
+        // Off; his half face in texels.)
+        faceSheet: character?.faceSheet ?? null,
         faceTexels: character?.faceTexels ?? 0,
         atlas: character?.atlas ?? null,
         pos: { x: character?.root.position.x ?? 0, z: character?.root.position.z ?? 0 },

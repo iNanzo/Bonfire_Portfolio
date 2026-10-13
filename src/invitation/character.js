@@ -36,7 +36,9 @@
 // (the camera, the target's texels, his face's span: faceSheets.js faceSpan) and held through
 // small changes (pickFaceSize), so a 2-pixel eye stays 2 texels as he moves. Past the largest
 // pixel sheet (zoomed in at the finest resolutions) the 1024 sheet shows again, as at Off, its
-// mips as three picks them (his face takes none of the preset's mipBias: markId's `bias`).
+// mips as three picks them (his face takes none of the preset's mipBias: markId's `bias`). A
+// size is picked by his texels whether the filter is on or not (faceSize); faceSheet says which
+// sheet really shows ('smooth' at Off, whatever was picked).
 //
 // The texel snap (pixel filter on): as each of his meshes is drawn, the shift that puts his
 // head's centre on a texel's centre is worked out (retro.js snapShift) and the materials of
@@ -86,6 +88,7 @@ const MIN_R = 11;
  *   faceReady: Promise<void>,
  *   atlasReady: Promise<void>,
  *   faceSize: number|'smooth'|null,
+ *   faceSheet: number|'smooth'|null,
  *   faceTexels: number,
  *   texelSnap: {head: {x: number, y: number}, body: {x: number, y: number}},
  * }} PageCharacter
@@ -272,20 +275,34 @@ export function createCharacter(gltf, opts = {}) {
    */
   let faceSize = null;
   let faceTexels = 0;
+  /**
+   * The sheet on his face: a pixel sheet's cell width, or 'smooth' for the glb's own 1024 sheet
+   * (null: he has no face material).
+   * @type {number|'smooth'|null}
+   */
+  let faceSheet = faceMaterial ? 'smooth' : null;
   /** His face's width across one cell at the eyes, model units (0: no face to measure). */
   const span = faceMesh ? spanOf(faceMesh.geometry) : 0;
   /**
-   * The pixel sheet's cells at `size` (the nearest the image has before he's measured).
+   * The pixel sheet at `size` (the nearest the image has before he's measured).
    * @param {number|null} size
    */
-  const pixelFacesAt = (size) => {
-    const sheet = pixelLayout.find((s) => s.w === size) ?? pixelLayout.find((s) => s.w >= 8) ?? pixelLayout[0];
+  const pixelSheetAt = (size) =>
+    pixelLayout.find((s) => s.w === size) ?? pixelLayout.find((s) => s.w >= 8) ?? pixelLayout[0];
+  /**
+   * A pixel sheet's cells, split from the image the first time it shows.
+   * @param {import('./faceSheets.js').FaceSheet} sheet
+   */
+  const pixelFacesOf = (sheet) => {
     if (!pixelSets.has(sheet.w)) pixelSets.set(sheet.w, splitSheet(pixelImage, true, sheet));
     return pixelSets.get(sheet.w);
   };
   const showFace = () => {
-    const set = pixel && pixelImage && faceSize !== 'smooth' ? pixelFacesAt(faceSize) : sheetFaces;
-    if (faceMaterial && set) faceMaterial.map = set[face];
+    const sheet = pixel && pixelImage && faceSize !== 'smooth' ? pixelSheetAt(faceSize) : null;
+    const set = sheet ? pixelFacesOf(sheet) : sheetFaces;
+    if (!faceMaterial || !set) return;
+    faceMaterial.map = set[face];
+    faceSheet = sheet ? sheet.w : 'smooth';
   };
   /** Whether his shirt shows the pixel atlas's bold plaid (the pixel filter on, him under ORIGINAL_ATLAS_TEXELS tall). */
   const pixelPlaid = () => pixel && Boolean(pixelAtlas) && !(tall >= ORIGINAL_ATLAS_TEXELS);
@@ -479,8 +496,13 @@ export function createCharacter(gltf, opts = {}) {
     },
     faceReady,
     atlasReady,
+    /** The face sheet size picked for his half face in texels (whether or not it shows). */
     get faceSize() {
       return faceSize;
+    },
+    /** The face sheet showing: a pixel sheet's cell width, or 'smooth' (Off, past the largest, no pixel image). */
+    get faceSheet() {
+      return faceSheet;
     },
     get faceTexels() {
       return faceTexels;

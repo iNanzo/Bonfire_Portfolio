@@ -515,6 +515,8 @@ test.describe('on a desktop', () => {
     await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', 'Off');
     await expect.poll(async () => (await snapshot(page)).pixelScale).toBe(1);
     expect((await snapshot(page)).resolution).toBeNull();
+    // (The smooth face shows at Off, and the snapshot says so: not the pixel sheet his size picks.)
+    expect((await snapshot(page)).faceSheet).toBe('smooth');
     const size = await page
       .locator('[data-stage] canvas')
       .evaluate((c) => [c.width, c.height, Math.min(devicePixelRatio, 2), innerWidth, innerHeight]);
