@@ -3,29 +3,45 @@
 // through CDP Input.dispatchTouchEvent, a mouse drag, the toolbar's buttons), and Chrome's
 // screencast hands over the page's own frames as it draws them (never paused frames). Each act
 // at each size becomes an animated WebP that plays at the speed it ran, plus a labelled contact
-// sheet a size. It starts its own Vite dev server from the folder it's run in (a worktree too)
-// and stops it after, or uses one that's running (--url). Run it alone on the GPU (one capture
-// at a time on the machine):
+// sheet of its own and one a size. It starts its own Vite dev server from the folder it's run in
+// (a worktree too) and stops it after, or uses one that's running (--url). Run it alone on the
+// GPU (one capture at a time on the machine):
 //
 //   node tools/capture-invitation.mjs [--sizes 390x844@3,412x915@2.625,1280x800@1]
 //        [--acts idle,clips,tap,drag,buttons,floor,chase,orbit] [--clips Wave,Spook] [--look ds|soft]
-//        [--pixel off|2|3|4] [--fps 15] [--scale 1] [--port 5340] [--url <origin>]
-//        [--out .scratch/invitation-shots] [--tag now]
+//        [--pixel off|2|3|4] [--dither on|off] [--outlines on|off] [--anim-fps 15]
+//        [--seed 3] [--calm on|off] [--lead 300] [--fps 15] [--scale 1] [--sheet 8] [--crop 200]
+//        [--port 5340] [--url <origin>] [--out .scratch/invitation-shots] [--tag now]
 //
 //   idle      three seconds of him standing (Idle, or the placeholder's T-pose)
-//   clips     every clip in turn (--clips for some), forced through play(): one WebP each
+//   clips     every clip in turn (--clips for some), forced through play() after 0.4 s of the
+//             brain's own idle: one WebP each, a looping clip played twice, a one-shot once
 //   tap       a tap on his head (a touch on a phone size, a click on a desktop one)
+//   taps      two taps on his head 2.6 s apart (a Wave and a Spook when the --seed gives both)
 //   drag      a press on his body dragged up and across the screen, then let go (a touch drag
 //             on a phone size, a mouse drag on a desktop one)
+//   swing     a press on his body held into a grab, lifted, swung left and right twice, brought
+//             back to the middle, held still and let go (he falls and lands)
+//   hover     (desktop sizes) the cursor circling him, then on him and off again: his head follows
 //   buttons   Wave, Spook, Sit, Run and Wander pressed in turn
 //   floor     a tap on the floor in front of him
-//   chase     four quick taps on him (he runs off), then a touch or mouse drag catching him
+//   chase     four quick taps on him (he runs off), then a press that catches him mid-run (the
+//             finger or cursor follows him until it's a grab), carries him a little and lets go
 //   orbit     a drag across empty space (the camera turns), then a pinch or the wheel zooming
 //             in and out, then Reset Camera from the Look sheet
+//   sitalone  no input until he sits by himself (20 s alone; the first 16 s aren't recorded:
+//             needs --calm off), a little of him sitting, then a tap on him stands him up
 //
-// Files: <out>/<tag>-<act>-<W>x<H>.webp and <out>/<tag>-sheet-<W>x<H>.png (six frames an act,
-// each labelled with when it was drawn). --look and --pixel set the Look menu first (its
-// stored settings, invitation.look.v1). --scale multiplies the CSS size of the output.
+// Files: <out>/<tag>-<act>-<W>x<H>.webp; <out>/<tag>-<act>-<W>x<H>-sheet.png (--sheet frames
+// of the act, each a --crop CSS px square around him, the orbit act's whole frames, labelled
+// with when it was drawn and his state then); <out>/<tag>-sheet-<W>x<H>.png (six whole frames
+// an act); <out>/<tag>-<W>x<H>.json (each act's frames, the page's frame times while it ran,
+// and the states and clips he went through, with when). --look, --pixel, --dither and
+// --outlines set the Look menu first (its stored settings, invitation.look.v1). --anim-fps sets
+// every preset's animFps (choppy motion) in the page after each load, through the dev server's
+// own looks/index.js module; nothing is written to the code. --seed and --calm go to the page's
+// query (?calm is on unless --calm off). --lead keeps that many ms from before each act begins.
+// --scale multiplies the CSS size of the output.
 import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import fs from 'node:fs';
@@ -48,11 +64,21 @@ const ACTS = opt('acts', 'idle,clips,tap,drag,buttons,floor,chase,orbit').split(
 const ONLY_CLIPS = opt('clips', null)?.split(',') ?? CLIP_NAMES;
 const LOOK = opt('look', null);
 const PIXEL = opt('pixel', null);
+const DITHER = opt('dither', null);
+const OUTLINES = opt('outlines', null);
+const ANIM_FPS = opt('anim-fps', null);
+const SEED = opt('seed', null);
+const CALM = opt('calm', 'on') !== 'off';
+const LEAD = Number(opt('lead', '300'));
 const FPS = Number(opt('fps', '15'));
 const SCALE = Number(opt('scale', '1'));
+const SHEET = Number(opt('sheet', '8'));
+const CROP = Number(opt('crop', '200'));
 const PORT = Number(opt('port', '5340'));
 const OUT = opt('out', '.scratch/invitation-shots');
 const TAG = opt('tag', `invitation${LOOK ? `-${LOOK}` : ''}${PIXEL ? `-${PIXEL}` : ''}`);
+/** Quiet before he sits by himself that isn't recorded, ms (he sits after 20 s alone). */
+const SIT_QUIET = 16_000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 fs.mkdirSync(OUT, { recursive: true });
@@ -95,9 +121,46 @@ async function grid(tiles, cols, file, labels) {
 }
 
 /**
+ * Starts a record in the page, every frame (requestAnimationFrame, the toy's own cadence): the
+ * time between frames, where he is on screen (his head and the middle of his body, client px),
+ * and each change of his state, clip, reaction or being held. Times are performance.now() ms.
+ */
+function startRecord() {
+  const rec = { on: true, raf: [], pos: [], line: [] };
+  /** @type {any} */ (window).__capture = rec;
+  let last = -1;
+  let prev = '';
+  const tick = (now) => {
+    if (!rec.on) return;
+    if (last >= 0) rec.raf.push([now, now - last]);
+    last = now;
+    const inv = /** @type {any} */ (window).__invitation;
+    const s = inv?.snapshot();
+    if (s?.ready) {
+      const h = inv.screen('head');
+      const b = inv.screen('body');
+      rec.pos.push([now, Math.round(h.x), Math.round(h.y), Math.round(b.x), Math.round(b.y)]);
+      const key = `${s.state}|${s.clip}|${s.reaction}|${s.held}`;
+      if (key !== prev) {
+        prev = key;
+        rec.line.push({ t: now, state: s.state, clip: s.clip, reaction: s.reaction, held: s.held });
+      }
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+function stopRecord() {
+  const rec = /** @type {any} */ (window).__capture;
+  rec.on = false;
+  return { raf: rec.raf, pos: rec.pos, line: rec.line, end: window.__invitation?.snapshot() ?? null };
+}
+
+/**
  * The page's own frames while `act` runs (Chrome's screencast, capture-knight's realTime),
- * each with when it was drawn (ms after the act began); null when the act says it can't run
- * (returns false: a clip the glb doesn't have).
+ * each with when it was drawn (ms after the act began, from --lead ms before it), and the
+ * page's record over the same time (startRecord, in the same ms); null when the act says it
+ * can't run (returns false: a clip the glb doesn't have).
  */
 async function realTime(page, act, tail = 400) {
   const cdp = await page.context().newCDPSession(page);
@@ -107,25 +170,37 @@ async function realTime(page, act, tail = 400) {
     cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {});
   });
   await cdp.send('Page.startScreencast', { format: 'png', everyNthFrame: 1 });
-  await sleep(300);
+  await page.evaluate(startRecord);
+  await sleep(Math.max(300, LEAD));
+  const p0 = await page.evaluate(() => performance.now());
   const t0 = Date.now();
   const ran = await act();
   if (ran === false) {
     await cdp.send('Page.stopScreencast');
     await cdp.detach();
+    await page.evaluate(stopRecord);
     return null;
   }
   await sleep(tail);
   const t1 = Date.now();
   await cdp.send('Page.stopScreencast');
   await cdp.detach();
-  return { frames: frames.map((f) => ({ t: f.t - t0, data: f.data })), length: t1 - t0 };
+  const rec = await page.evaluate(stopRecord);
+  const at = (t) => Math.round(t - p0);
+  return {
+    frames: frames.map((f) => ({ t: f.t - t0, data: f.data })),
+    length: t1 - t0,
+    raf: rec.raf.filter(([t]) => t >= p0).map(([, d]) => d),
+    pos: rec.pos.map(([t, ...p]) => [at(t), ...p]),
+    line: rec.line.map((l) => ({ ...l, t: at(l.t) })),
+    end: rec.end,
+  };
 }
 
-/** The frames at `FPS` from 0 to `length` (the latest drawn by each moment), as PNG buffers. */
+/** The frames at `FPS` from --lead ms before the act to its `length` (the latest drawn by each moment), as PNG buffers. */
 function resample({ frames, length }) {
   const out = [];
-  for (let t = 0; t <= length; t += 1000 / FPS) {
+  for (let t = -LEAD; t <= length; t += 1000 / FPS) {
     const shown = frames.filter((f) => f.t <= t).at(-1) ?? frames[0];
     if (shown) out.push({ t: Math.round(t), drawn: Math.round(shown.t), data: Buffer.from(shown.data, 'base64') });
   }
@@ -139,42 +214,155 @@ const fit = (size, buf) =>
     .png()
     .toBuffer();
 
+/** The record's last entry at or before `t` (ms), or its first. */
+const latest = (list, t) => list.filter((e) => (Array.isArray(e) ? e[0] : e.t) <= t).at(-1) ?? list[0];
+
+/**
+ * One tile of an act's sheet: a `CROP` CSS px square around him (where he was when the frame was
+ * drawn), 2 px a CSS px, nearest; or the whole frame `full`, 480 px tall.
+ */
+async function tile(size, buf, pos, full) {
+  if (full || !pos)
+    return sharp(await fit(size, buf))
+      .resize({ height: 480, kernel: 'nearest' })
+      .png()
+      .toBuffer();
+  const { width } = await sharp(buf).metadata();
+  const k = width / size.w;
+  const side = Math.min(CROP, size.w, size.h);
+  const cx = (pos[1] + pos[3]) / 2;
+  const cy = (pos[2] + pos[4]) / 2;
+  const left = Math.max(0, Math.min(size.w - side, cx - side / 2));
+  const top = Math.max(0, Math.min(size.h - side, cy - side / 2));
+  return sharp(buf)
+    .extract({
+      left: Math.round(left * k),
+      top: Math.round(top * k),
+      width: Math.round(side * k),
+      height: Math.round(side * k),
+    })
+    .resize(side * 2, side * 2, { kernel: 'nearest' })
+    .png()
+    .toBuffer();
+}
+
+/** Frame times, ms: the median, the 95th percentile, the longest, and how many took over 20 ms. */
+function frameTimes(raf) {
+  if (!raf.length) return null;
+  const s = [...raf].sort((a, b) => a - b);
+  const q = (p) => Number(s[Math.min(s.length - 1, Math.floor(p * s.length))].toFixed(1));
+  return {
+    frames: s.length,
+    median: q(0.5),
+    p95: q(0.95),
+    max: Number(s.at(-1).toFixed(1)),
+    over20: s.filter((d) => d > 20).length,
+  };
+}
+
 async function ready(page) {
-  await page.goto(`${origin}/invitation/?test&calm`);
+  const query = ['test', ...(CALM ? ['calm'] : []), ...(SEED !== null ? [`seed=${SEED}`] : [])].join('&');
+  await page.goto(`${origin}/invitation/?${query}`);
   await page.waitForSelector('[data-stage].is-ready', { timeout: 30_000 });
+  if (ANIM_FPS !== null) await setAnimFps(page, Number(ANIM_FPS));
   await sleep(400);
+}
+/**
+ * Every preset's animFps, set in the page: the module the page loaded (the dev server's
+ * looks/index.js, found by its URL among the page's resources), so nothing is written to the
+ * code and a reload undoes it.
+ */
+function setAnimFps(page, fps) {
+  return page.evaluate(async (f) => {
+    const url = performance
+      .getEntriesByType('resource')
+      .map((e) => e.name)
+      .find((n) => /\/src\/invitation\/looks\/index\.js(\?|$)/.test(n));
+    if (!url) throw new Error('looks/index.js is not among the page’s modules (is this the dev server?)');
+    const { PRESETS } = await import(/* @vite-ignore */ url);
+    for (const p of Object.values(PRESETS)) p.animFps = f;
+  }, fps);
+}
+/** How many times a second his pose changes with Walk forced in place (his ankles, a second of frames). */
+function poseRate(page) {
+  return page.evaluate(
+    () =>
+      new Promise((done) => {
+        const inv = /** @type {any} */ (window).__invitation;
+        inv.play('Walk');
+        let prev = '';
+        let n = -1;
+        const t0 = performance.now();
+        const tick = (now) => {
+          const f = inv.feet();
+          const k = [f.l.x, f.l.y, f.l.z, f.r.x, f.r.y, f.r.z].map((v) => v.toFixed(5)).join();
+          if (k !== prev) {
+            n++;
+            prev = k;
+          }
+          if (now - t0 < 1000) requestAnimationFrame(tick);
+          else {
+            inv.play(null);
+            done(n);
+          }
+        };
+        requestAnimationFrame(tick);
+      }),
+  );
 }
 const hook = (page, expr) => page.evaluate(expr);
 const point = (page, part) => page.evaluate((p) => window.__invitation.screen(p), part);
 
-/** A touch drag through CDP (real touches, as a finger makes them), `ms` long. */
-async function touchDrag(page, from, to, ms = 1200) {
+/**
+ * One press: a finger through CDP on a phone size (real touches, as a finger makes them), the
+ * mouse on a desktop one; down, move and up take client px.
+ */
+async function presser(page, size) {
+  if (!size.phone)
+    return {
+      down: async (p) => {
+        await page.mouse.move(p.x, p.y);
+        await page.mouse.down();
+      },
+      move: (p) => page.mouse.move(p.x, p.y),
+      up: () => page.mouse.up(),
+      done: async () => {},
+    };
   const cdp = await page.context().newCDPSession(page);
   const touch = (type, p) =>
     cdp.send('Input.dispatchTouchEvent', { type, touchPoints: p ? [{ x: p.x, y: p.y, id: 1 }] : [] });
-  await touch('touchStart', from);
-  await sleep(320); // (held past the 280 ms that makes it a grab)
-  const steps = Math.round(ms / 16);
-  for (let i = 1; i <= steps; i++) {
-    const k = i / steps;
-    const wave = Math.sin(k * Math.PI * 3) * 30;
-    await touch('touchMove', { x: from.x + (to.x - from.x) * k + wave, y: from.y + (to.y - from.y) * k });
-    await sleep(16);
-  }
-  await touch('touchEnd', null);
-  await cdp.detach();
+  return {
+    down: (p) => touch('touchStart', p),
+    move: (p) => touch('touchMove', p),
+    up: () => touch('touchEnd', null),
+    done: () => cdp.detach(),
+  };
 }
-async function mouseDrag(page, from, to, ms = 1200) {
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  await sleep(320);
-  const steps = Math.round(ms / 16);
-  for (let i = 1; i <= steps; i++) {
-    const k = i / steps;
-    await page.mouse.move(from.x + (to.x - from.x) * k + Math.sin(k * Math.PI * 3) * 30, from.y + (to.y - from.y) * k);
+/**
+ * The press (or the cursor) along `path(k)`, k from 0 to 1 over `ms` by the clock, a move about
+ * every frame (a move waits for the page to take it, so counting steps would run slow).
+ */
+async function along(move, path, ms) {
+  const t0 = Date.now();
+  for (;;) {
+    const k = Math.min(1, (Date.now() - t0) / ms);
+    await move(path(k));
+    if (k >= 1) return;
     await sleep(16);
   }
-  await page.mouse.up();
+}
+/** A press on `from` held into a grab, dragged to `to` with a wobble across, `ms` long, let go. */
+async function holdDrag(page, size, from, to, ms = 1200) {
+  const press = await presser(page, size);
+  await press.down(from);
+  await sleep(320); // (held past the 280 ms that makes it a grab)
+  await along(
+    press.move,
+    (k) => ({ x: from.x + (to.x - from.x) * k + Math.sin(k * Math.PI * 3) * 30, y: from.y + (to.y - from.y) * k }),
+    ms,
+  );
+  await press.up();
+  await press.done();
 }
 /** Two fingers through CDP spreading from `d0` to `d1` px apart about `at`, `ms` long. */
 async function pinch(page, at, d0, d1, ms = 600) {
@@ -184,76 +372,123 @@ async function pinch(page, at, d0, d1, ms = 600) {
     { x: at.x + d / 2, y: at.y, id: 2 },
   ];
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points(d0) });
-  const steps = Math.round(ms / 16);
-  for (let i = 1; i <= steps; i++) {
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: points(d0 + ((d1 - d0) * i) / steps),
-    });
-    await sleep(16);
-  }
+  await along(
+    (d) => cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points(d) }),
+    (k) => d0 + (d1 - d0) * k,
+    ms,
+  );
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
 }
 /** A drag on empty space, straight, with no hold first (a touch through CDP on a phone size). */
 async function sweep(page, size, from, to, ms = 800) {
-  const steps = Math.round(ms / 16);
-  if (size.phone) {
-    const cdp = await page.context().newCDPSession(page);
-    const touch = (type, p) =>
-      cdp.send('Input.dispatchTouchEvent', { type, touchPoints: p ? [{ x: p.x, y: p.y, id: 1 }] : [] });
-    await touch('touchStart', from);
-    for (let i = 1; i <= steps; i++) {
-      await touch('touchMove', {
-        x: from.x + ((to.x - from.x) * i) / steps,
-        y: from.y + ((to.y - from.y) * i) / steps,
-      });
-      await sleep(16);
-    }
-    await touch('touchEnd', null);
-    await cdp.detach();
-    return;
-  }
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  for (let i = 1; i <= steps; i++) {
-    await page.mouse.move(from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
-    await sleep(16);
-  }
-  await page.mouse.up();
+  const press = await presser(page, size);
+  await press.down(from);
+  await along(press.move, (k) => ({ x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k }), ms);
+  await press.up();
+  await press.done();
 }
 async function tapAt(page, size, p) {
   if (size.phone) await page.touchscreen.tap(p.x, p.y);
   else await page.mouse.click(p.x, p.y);
 }
+/** His state now (?test's snapshot). */
+const stateOf = (page) => page.evaluate(() => window.__invitation.snapshot().state);
+/** Wait until his state is `want`, up to `ms`; whether it came. */
+async function until(page, want, ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if ((await stateOf(page)) === want) return true;
+    await sleep(100);
+  }
+  return false;
+}
 
-/** The acts, each a list of [name, run(page, size), tail ms]. */
+/**
+ * The acts, each {name, run(page), tail ms, setup?(page) (before the recording starts), full?
+ * (the act's sheet shows whole frames, not him cropped)}.
+ */
 function actsFor(size) {
   const list = [];
-  if (ACTS.includes('idle')) list.push(['idle', () => sleep(3000), 0]);
+  const act = (name, run, tail, more = {}) => list.push({ name, run, tail, ...more });
+  if (ACTS.includes('idle')) act('idle', () => sleep(3000), 0);
   if (ACTS.includes('clips'))
     for (const clip of ONLY_CLIPS)
-      list.push([
+      act(
         `clip-${clip}`,
         async (page) => {
+          await sleep(400);
           if (!(await hook(page, `window.__invitation.play(${JSON.stringify(clip)})`))) return false;
-          await sleep(((CLIPS[clip]?.length ?? 1.5) + 0.6) * 1000);
+          const c = CLIPS[clip];
+          await sleep(((c?.length ?? 1.5) * (c?.loop ? 2 : 1) + 0.6) * 1000);
         },
         0,
-      ]);
-  if (ACTS.includes('tap')) list.push(['tap', async (page) => tapAt(page, size, await point(page, 'head')), 2200]);
+      );
+  if (ACTS.includes('tap')) act('tap', async (page) => tapAt(page, size, await point(page, 'head')), 2200);
+  if (ACTS.includes('taps'))
+    act(
+      'taps',
+      async (page) => {
+        await tapAt(page, size, await point(page, 'head'));
+        await sleep(2600);
+        await tapAt(page, size, await point(page, 'head'));
+      },
+      2600,
+    );
   if (ACTS.includes('drag'))
-    list.push([
+    act(
       size.phone ? 'touch-drag' : 'mouse-drag',
       async (page) => {
         const from = await point(page, 'body');
         const to = { x: from.x + size.w * 0.18, y: from.y - size.h * 0.12 };
-        await (size.phone ? touchDrag(page, from, to) : mouseDrag(page, from, to));
+        await holdDrag(page, size, from, to);
       },
       2000,
-    ]);
+    );
+  if (ACTS.includes('swing'))
+    act(
+      'swing',
+      async (page) => {
+        const from = await point(page, 'body');
+        const lift = { x: from.x, y: from.y - Math.min(size.h * 0.14, 120) };
+        const amp = Math.min(size.w * 0.26, 220);
+        const press = await presser(page, size);
+        await press.down(from);
+        await sleep(320); // (held past the 280 ms that makes it a grab)
+        await along(press.move, (k) => ({ x: from.x, y: from.y + (lift.y - from.y) * k }), 400);
+        await along(press.move, (k) => ({ x: lift.x + amp * Math.sin(k * Math.PI * 4), y: lift.y }), 2400);
+        await sleep(350);
+        await press.up();
+        await press.done();
+      },
+      2400,
+    );
+  if (ACTS.includes('hover') && !size.phone)
+    act(
+      'hover',
+      async (page) => {
+        const head = await point(page, 'head');
+        const body = await point(page, 'body');
+        const r = Math.min(size.w, size.h) * 0.3;
+        const move = (p) => page.mouse.move(p.x, p.y);
+        await move({ x: body.x + r, y: body.y });
+        await along(
+          move,
+          (k) => ({ x: body.x + r * Math.cos(k * Math.PI * 2), y: body.y + r * 0.7 * Math.sin(k * Math.PI * 2) }),
+          4000,
+        );
+        await along(
+          move,
+          (k) => ({ x: body.x + r + (head.x - body.x - r) * k, y: body.y + (head.y - body.y) * k }),
+          500,
+        );
+        await sleep(1000);
+        await along(move, (k) => ({ x: head.x - r * 1.4 * k, y: head.y + r * 0.5 * k }), 500);
+      },
+      1200,
+    );
   if (ACTS.includes('buttons'))
-    list.push([
+    act(
       'buttons',
       async (page) => {
         for (const name of ['Wave', 'Spook', 'Sit', 'Run', 'Wander']) {
@@ -264,33 +499,46 @@ function actsFor(size) {
         }
       },
       600,
-    ]);
+    );
   if (ACTS.includes('floor'))
-    list.push([
+    act(
       'floor',
       async (page) => {
         const body = await point(page, 'body');
         await tapAt(page, size, { x: body.x - size.w * 0.15, y: body.y + size.h * 0.12 });
       },
       2600,
-    ]);
+    );
   if (ACTS.includes('chase'))
-    list.push([
+    act(
       'chase',
       async (page) => {
         for (let i = 0; i < 4; i++) {
           await tapAt(page, size, await point(page, 'head'));
           await sleep(180);
         }
-        await sleep(1400);
-        const from = await point(page, 'body');
+        await sleep(1000);
+        // Catch him mid-run: down on him, then after him (a press that moves is a grab at once).
+        const press = await presser(page, size);
+        let at = await point(page, 'body');
+        await press.down(at);
+        const t0 = Date.now();
+        while (Date.now() - t0 < 200) {
+          await sleep(16);
+          at = await point(page, 'body');
+          await press.move(at);
+        }
+        const from = at;
         const to = { x: from.x - size.w * 0.12, y: from.y - size.h * 0.06 };
-        await (size.phone ? touchDrag(page, from, to, 700) : mouseDrag(page, from, to, 700));
+        await along(press.move, (k) => ({ x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k }), 700);
+        await sleep(200);
+        await press.up();
+        await press.done();
       },
       2400,
-    ]);
+    );
   if (ACTS.includes('orbit'))
-    list.push([
+    act(
       'orbit',
       async (page) => {
         const body = await point(page, 'body');
@@ -320,7 +568,22 @@ function actsFor(size) {
         await page.locator('[data-look-close]').click();
       },
       1600,
-    ]);
+      { full: true },
+    );
+  if (ACTS.includes('sitalone')) {
+    if (CALM) console.log('- sitalone: skipped (he never sits by himself with ?calm: pass --calm off)');
+    else
+      act(
+        'sitalone',
+        async (page) => {
+          if (!(await until(page, 'sit', 15_000))) console.log('  (sitalone: he didn’t sit within 31 s)');
+          await sleep(2500);
+          await tapAt(page, size, await point(page, 'head'));
+        },
+        3500,
+        { setup: () => sleep(SIT_QUIET) },
+      );
+  }
   return list;
 }
 
@@ -332,17 +595,28 @@ for (const size of SIZES) {
     isMobile: size.phone,
     hasTouch: size.phone,
   });
-  if (LOOK || PIXEL) {
-    const look = { ...(LOOK ? { style: LOOK } : {}), ...(PIXEL ? { pixelSize: PIXEL } : {}) };
+  const look = {
+    ...(LOOK ? { style: LOOK } : {}),
+    ...(PIXEL ? { pixelSize: PIXEL } : {}),
+    ...(DITHER ? { dither: DITHER !== 'off' } : {}),
+    ...(OUTLINES ? { outlines: OUTLINES !== 'off' } : {}),
+  };
+  if (Object.keys(look).length)
     await context.addInitScript((v) => localStorage.setItem('invitation.look.v1', v), JSON.stringify(look));
-  }
   const page = await context.newPage();
   page.on('pageerror', (e) => problems.push(`${size.w}x${size.h}: ${e.message}`));
   page.on('console', (m) => m.type() === 'error' && problems.push(`${size.w}x${size.h}: ${m.text()}`));
+  const report = { size, look, animFps: ANIM_FPS === null ? null : Number(ANIM_FPS), seed: SEED, calm: CALM, acts: {} };
+  if (ANIM_FPS !== null) {
+    await ready(page);
+    report.poseChangesPerSecond = await poseRate(page);
+    console.log(`  animFps ${ANIM_FPS}: his pose changed ${report.poseChangesPerSecond} times in a second`);
+  }
   const sheet = [];
   const labels = [];
-  for (const [name, run, tail] of actsFor(size)) {
+  for (const { name, run, tail, setup, full } of actsFor(size)) {
     await ready(page);
+    if (setup) await setup(page);
     const taken = await realTime(page, () => run(page), tail);
     if (!taken) {
       console.log(`- ${name} at ${size.w}x${size.h}: skipped (not in the glb)`);
@@ -354,12 +628,39 @@ for (const size of SIZES) {
       continue;
     }
     const frames = await Promise.all(shot.map((f) => fit(size, f.data)));
-    const file = `${OUT}/${TAG}-${name}-${size.w}x${size.h}.webp`;
+    const base = `${OUT}/${TAG}-${name}-${size.w}x${size.h}`;
     await sharp(frames, { join: { animated: true } })
       .webp({ quality: 90, loop: 0, delay: frames.map(() => Math.round(1000 / FPS)) })
-      .toFile(file);
+      .toFile(`${base}.webp`);
     const unique = new Set(shot.map((f) => f.drawn)).size;
-    console.log(`✓ ${file}: ${frames.length} frames over ${shot.at(-1).t} ms (${unique} different drawn frames)`);
+    const times = frameTimes(taken.raf);
+    const states = taken.line.map((l) => `${l.state}${l.clip && l.clip !== l.state ? `/${l.clip}` : ''}@${l.t}`);
+    console.log(
+      `✓ ${base}.webp: ${frames.length} frames over ${shot.at(-1).t} ms (${unique} different drawn frames); ` +
+        `frame ms median ${times?.median} p95 ${times?.p95} max ${times?.max}; ${states.join(' → ')}`,
+    );
+    // The act's own sheet: him cropped (or whole frames), --sheet frames from its start to its end.
+    const own = [];
+    const ownLabels = [];
+    for (let i = 0; i < SHEET; i++) {
+      const f = shot[Math.round((i / Math.max(1, SHEET - 1)) * (shot.length - 1))];
+      own.push(await tile(size, f.data, latest(taken.pos, f.drawn), full));
+      const l = latest(taken.line, f.drawn);
+      ownLabels.push(`${f.drawn} ms ${l ? `${l.state}${l.reaction ? ` ${l.reaction}` : ''}` : ''}`);
+    }
+    // (Whole phone frames are narrow: one row; crops and desktop frames: two rows past four.)
+    const cols = (full && size.phone) || SHEET <= 4 ? SHEET : Math.ceil(SHEET / 2);
+    await grid(own, cols, `${base}-sheet.png`, ownLabels);
+    report.acts[name] = {
+      webp: `${base}.webp`,
+      sheet: `${base}-sheet.png`,
+      frames: frames.length,
+      ms: shot.at(-1).t,
+      drawnFrames: unique,
+      frameMs: times,
+      line: taken.line,
+      end: taken.end,
+    };
     for (let i = 0; i < 6; i++) {
       const f = shot[Math.round((i / 5) * (shot.length - 1))];
       sheet.push(
@@ -372,6 +673,7 @@ for (const size of SIZES) {
     }
   }
   if (sheet.length) await grid(sheet, 6, `${OUT}/${TAG}-sheet-${size.w}x${size.h}.png`, labels);
+  fs.writeFileSync(`${OUT}/${TAG}-${size.w}x${size.h}.json`, JSON.stringify(report, null, 1));
   await context.close();
 }
 await browser.close();
