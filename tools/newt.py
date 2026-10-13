@@ -261,8 +261,8 @@ IDLE = {
 SIT = {
     'hips': {'loc': (0, 0, -1.58), 'rot': (-22, 0, 0)},
     'chest': (-4, 0, 0),
-    'neck': (10, 0, 0),
-    'head': (14, 0, 0),
+    'neck': (2, 0, 0),
+    'head': (0, 0, 0),
     'armL': {'shoulder': (8, -6), 'upper': (-28, 24), 'lower': (-20, 18), 'twist': 0},
     'armR': {'shoulder': (8, -6), 'upper': (-28, 24), 'lower': (-20, 18), 'twist': 0},
     'legL': {'at': (0.78, -1.4, 0.7), 'pitch': -55, 'yaw': 12},
@@ -536,16 +536,31 @@ TABLES = {
     ),
     'StandUp': keys(
         (0, SIT),
-        (5, merge(SIT, hips={'loc': (0, 0, -1.56), 'rot': (-8, 0, 0)}, chest=(10, 0, 0), legL={'at': (0.7, -0.6, ANKLE), 'pitch': 0}, legR={'at': (0.7, -0.6, ANKLE), 'pitch': 0})),
-        (11, merge(
-            CROUCH,
-            hips={'loc': (0, 0, -0.75), 'rot': (24, 0, 0)},
+        (3, merge(SIT, hips={'loc': (0, 0, -1.58), 'rot': (-14, 0, 0)}, chest=(4, 0, 0), legL={'at': (0.76, -1.0, 0.56), 'pitch': -30}, legR={'at': (0.76, -1.0, 0.56), 'pitch': -30})),
+        (6, merge(
+            SIT,  # knees up, feet pulled in flat, rocking forward
+            hips={'loc': (0, 0, -1.52), 'rot': (4, 0, 0)},
             chest=(12, 0, 0),
-            armL={'shoulder': (6, 8), 'upper': (40, 20), 'lower': (60, 10), 'twist': 0},
-            armR={'shoulder': (6, 8), 'upper': (40, 20), 'lower': (60, 10), 'twist': 0},
+            neck=(4, 0, 0),
+            head=(-6, 0, 0),
+            armL={'shoulder': (4, 6), 'upper': (30, 30), 'lower': (50, 20), 'twist': 0},
+            armR={'shoulder': (4, 6), 'upper': (30, 30), 'lower': (50, 20), 'twist': 0},
+            legL={'at': (0.7, -0.55, ANKLE), 'pitch': 0, 'knee': (0.4, -1, 0.3)},
+            legR={'at': (0.7, -0.55, ANKLE), 'pitch': 0, 'knee': (0.4, -1, 0.3)},
         )),
-        (17, merge(IDLE, hips={'loc': (0, 0, 0.0), 'rot': (-3, 0, 0)})),
-        (21, merge(IDLE, hips={'loc': (0, 0, -0.08), 'rot': (1, 0, 0)})),
+        (10, merge(
+            CROUCH,  # weight over the feet, pushing off, arms forward for balance
+            hips={'loc': (0, 0, -0.95), 'rot': (30, 0, 0)},
+            chest=(14, 0, 0),
+            neck=(-4, 0, 0),
+            head=(-10, 0, 0),
+            armL={'shoulder': (6, 10), 'upper': (70, 26), 'lower': (85, 14), 'twist': 0},
+            armR={'shoulder': (6, 10), 'upper': (70, 26), 'lower': (85, 14), 'twist': 0},
+            legL={'at': (0.66, -0.2, ANKLE), 'pitch': 0},
+            legR={'at': (0.66, -0.2, ANKLE), 'pitch': 0},
+        )),
+        (15, merge(IDLE, hips={'loc': (0, 0, 0.0), 'rot': (-4, 0, 0)}, chest=(-3, 0, 0), head=(-4, 0, 0))),
+        (19, merge(IDLE, hips={'loc': (0, 0, -0.1), 'rot': (2, 0, 0)}, head=(3, 0, 0))),
         (24, IDLE),
     ),
 }
@@ -555,7 +570,8 @@ def sit(t):
     """Sitting: legs out, leaning back on his hands; the head sways, the feet wiggle."""
     sw = math.sin(2 * math.pi * t)
     wig = math.sin(2 * math.pi * 3 * t)
-    p = merge(SIT, head=(14, 7 * sw, 4 * sw), neck=(10, 2 * sw, 0))
+    bob = math.sin(2 * math.pi * 2 * t)
+    p = merge(SIT, head=(-2 * bob, 10 * sw, 5 * sw), neck=(2, 3 * sw, 0), chest=(-4 + 1.5 * bob, 0, 0))
     p['legL'] = merge(SIT['legL'], pitch=-55 + 12 * wig, yaw=12 + 6 * wig)
     p['legR'] = merge(SIT['legR'], pitch=-55 - 12 * wig, yaw=12 - 6 * wig)
     return p
@@ -578,7 +594,13 @@ def clip_keys(name):
         f = CYCLES[name]
         out = [(i, f(i / last)) for i in range(last)]
         return out + [(last, out[0][1])]
-    return [(f, CYCLES[p.split('@')[0].title()](float(p.split('@')[1])) if isinstance(p, str) else p) for f, p in TABLES[name]]
+    return [(f, cycle_pose(p) if isinstance(p, str) else p) for f, p in TABLES[name]]
+
+
+def cycle_pose(ref):
+    """'fall@0' in a table: the Fall cycle's pose at that point of its loop (0..1)."""
+    clip, at = ref.split('@')
+    return CYCLES[clip.title()](float(at))
 
 
 # ---------------------------------------------------------------------------------------------
