@@ -273,6 +273,10 @@ export function createRetro(renderer) {
     get pixel() {
       return pixel;
     },
+    /** The post shader's uniforms (for the tests and a look at them in the console). */
+    get uniforms() {
+      return u;
+    },
     dispose() {
       target?.depthTexture?.dispose();
       target?.dispose();

@@ -3,7 +3,9 @@
 // (its DPR capped at 2), the camera framing NEWT 36 to 40 texels tall at the default size with
 // the floor clear of the toolbar and the side edges, the Bayer matrix the retro pass dithers
 // with, the Look settings (src/invitation/look.js) surviving any storage, and the presets
-// (src/invitation/looks/) carrying every look value, so a designer only ever edits data.
+// (src/invitation/looks/) carrying every look value, so a designer only ever edits data. With
+// three.js in Node: the room (room.js), the surface ids and the retro pass's order and uniforms
+// (retro.js, a stand-in renderer); and the toolbar's and Look sheet's markup (ui.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -18,8 +20,20 @@ import {
   project,
   texelGrid,
 } from '../src/invitation/pixels.js';
-import { DEFAULT_LOOK, LOOKS, LOOK_KEY, STYLES, loadLook, saveLook, validLook } from '../src/invitation/look.js';
-import { roomBounds } from '../src/invitation/room.js';
+import * as THREE from 'three';
+import {
+  DEFAULT_LOOK,
+  LOOKS,
+  LOOK_KEY,
+  STYLES,
+  loadLook,
+  presetOf,
+  saveLook,
+  validLook,
+} from '../src/invitation/look.js';
+import { createRoom, roomBounds } from '../src/invitation/room.js';
+import { ID, createRetro, decalMaterial, markId } from '../src/invitation/retro.js';
+import { BUTTONS, parseQuery, sheetHtml, statusHtml, toolbarHtml } from '../src/invitation/ui.js';
 
 const SIZES = [
   [390, 844, 3],
@@ -211,4 +225,101 @@ test('NEWT’s bounds stay inside the walls and the front edge, by his radius', 
     assert.ok(b.minZ >= -ROOM.depth / 2 + 0.2 && b.maxZ <= ROOM.depth / 2 - 0.2, `width ${width}: z`);
     assert.ok(b.maxX - b.minX > 2.5 && b.maxZ - b.minZ > 3, `width ${width}: room to walk`);
   }
+});
+
+test('the room: its side walls at the width’s edges, the preset’s colours, shadows taken and never cast', () => {
+  const room = createRoom(LOOKS.ds);
+  room.setWidth(4.2);
+  assert.equal(room.width, 4.2);
+  assert.deepEqual(room.bounds, roomBounds(4.2));
+  const walls = room.group.children.filter((m) => m.geometry.type === 'PlaneGeometry');
+  const sides = walls.filter((m) => Math.abs(m.rotation.y) > 1);
+  assert.deepEqual(
+    sides.map((m) => m.position.x).sort((a, b) => a - b),
+    [-2.1, 2.1],
+  );
+  for (const m of room.group.children) {
+    assert.equal(m.receiveShadow, true);
+    assert.equal(m.castShadow, false);
+  }
+  room.setLook(LOOKS.soft);
+  const floor = walls.find((m) => Math.abs(m.rotation.x) > 1);
+  assert.equal(`#${floor.material.color.getHexString()}`, LOOKS.soft.room.floor);
+  assert.equal(floor.material.gradientMap.image.width, LOOKS.soft.toon.length, 'the preset’s toon bands');
+  assert.doesNotThrow(() => room.dispose());
+});
+
+test('surface ids: a marked material writes its id into alpha last; what’s drawn over the floor keeps it', () => {
+  const m = markId(new THREE.MeshToonMaterial(), ID.floor);
+  const shader = { uniforms: {}, vertexShader: '', fragmentShader: THREE.ShaderLib.toon.fragmentShader };
+  m.onBeforeCompile(shader, null);
+  assert.equal(shader.uniforms.uSurfaceId.value, ID.floor / 16);
+  assert.match(shader.fragmentShader, /uniform float uSurfaceId;\s*uniform float uIdOn;\s*void main\(\) \{/);
+  // (After every include that writes gl_FragColor: three's toon shader still ends that way.)
+  assert.match(
+    shader.fragmentShader,
+    /#include <dithering_fragment>\s*gl_FragColor\.a = mix\(1\.0, uSurfaceId, uIdOn\);\s*\}\s*$/,
+  );
+  assert.equal(m.customProgramCacheKey(), 'invitation-surface-id');
+  const decal = decalMaterial({ opacity: 0.2 });
+  assert.equal(decal.depthWrite, false, 'no depth written: no lines');
+  assert.equal(decal.blendSrcAlpha, THREE.ZeroFactor);
+  assert.equal(decal.blendDstAlpha, THREE.OneFactor, 'the id under it is kept');
+  assert.equal(new Set(Object.values(ID)).size, Object.keys(ID).length, 'every surface its own id');
+});
+
+test('the retro pass: the colour pass then the post pass, Off straight to the canvas, the settings in its uniforms', () => {
+  const calls = [];
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(30, 1, 1, 80);
+  const renderer = {
+    setRenderTarget: (t) => calls.push(t ? 'target' : 'canvas'),
+    setClearColor: (c, alpha) => calls.push(`clear ${alpha}`),
+    clear: () => {},
+    render: (s) => calls.push(s === scene ? 'scene' : 'post'),
+  };
+  const retro = createRetro(renderer);
+  retro.setSize(195, 422);
+  retro.setParams(LOOKS.ds, DEFAULT_LOOK);
+  retro.render(scene, camera);
+  assert.deepEqual(calls, ['target', 'clear 0', 'scene', 'canvas', 'post'], 'nothing drawn is alpha 0: id 0');
+  const u = retro.uniforms;
+  assert.deepEqual([u.uRes.value.x, u.uRes.value.y], [195, 422]);
+  assert.equal(u.uLevels.value, LOOKS.ds.levels);
+  assert.equal(u.uDither.value, LOOKS.ds.dither);
+  assert.equal(u.uOutline.value, 1);
+  assert.equal(u.uBayer.value, BAYER4);
+  retro.setParams(LOOKS.soft, { ...DEFAULT_LOOK, dither: false, outlines: false, style: 'soft' });
+  assert.equal(u.uDither.value, 0, 'Dithering off');
+  assert.equal(u.uOutline.value, 0, 'Outlines off');
+  assert.equal(u.uLevels.value, LOOKS.soft.levels);
+  calls.length = 0;
+  retro.setParams(LOOKS.ds, { ...DEFAULT_LOOK, pixelSize: 'off' });
+  assert.equal(retro.pixel, false);
+  retro.render(scene, camera);
+  assert.deepEqual(calls, ['canvas', 'clear 1', 'scene'], 'Pixel Size Off: the scene straight to the canvas');
+  assert.doesNotThrow(() => retro.dispose());
+});
+
+test('the toolbar and the Look sheet: every button labelled, the settings checked, no tooltips', () => {
+  const bar = toolbarHtml();
+  for (const name of [...BUTTONS, 'Look']) assert.match(bar, new RegExp(`>${name}</button>`), name);
+  assert.match(bar, /data-button="Wander" aria-pressed="false"/);
+  const sheet = sheetHtml({ pixelSize: 'chunky', dither: false, outlines: true, style: 'soft' });
+  assert.match(sheet, /value="chunky" data-look="pixelSize" checked/);
+  assert.match(sheet, /value="soft" data-look="style" checked/);
+  assert.doesNotMatch(sheet, /data-look="dither" checked/);
+  assert.match(sheet, /data-look="outlines" checked/);
+  assert.match(sheet, /data-off-hint hidden/, 'the Off hint only shows at Pixel Size Off');
+  assert.doesNotMatch(sheetHtml({ ...DEFAULT_LOOK, pixelSize: 'off' }), /data-off-hint hidden/);
+  assert.equal([...sheet.matchAll(/data-look="pixelSize"/g)].length, PIXEL_SIZES.length);
+  for (const html of [bar, sheet, statusHtml()]) assert.doesNotMatch(html, /\stitle=/, 'no title= tooltips');
+  // Labels in Title Case (the hints are sentences).
+  const labels = [...`${bar}${sheet}`.matchAll(/>([^<>]+)</g)]
+    .map((m) => m[1].trim())
+    .filter((t) => t && !/[.:]/.test(t));
+  for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( [A-Z][^ ]*)*$/, label);
+  assert.equal(presetOf({ ...DEFAULT_LOOK, style: 'soft' }), LOOKS.soft);
+  assert.deepEqual(parseQuery('?test&seed=42&calm'), { test: true, seed: 42, calm: true, perf: false });
+  assert.deepEqual(parseQuery(''), { test: false, seed: null, calm: false, perf: false });
 });
