@@ -177,6 +177,18 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
+  test('play() forces Walk and Run as they play: his feet go round the step, not one frozen pose', async ({ page }) => {
+    await calm(page);
+    for (const clip of ['Walk', 'Run']) {
+      expect(await page.evaluate((c) => window.__invitation.play(c), clip)).toBe(true);
+      await until(page, (s) => s.clip === clip, clip);
+      const { spread } = await poses(page, 1200);
+      const swing = Math.max(...spread) - Math.min(...spread);
+      expect(swing, `${clip}: his feet's spread changes by ${swing.toFixed(3)}`).toBeGreaterThan(0.08);
+    }
+    await page.evaluate(() => window.__invitation.play(null));
+  });
+
   test('tapping NEWT plays Wave or Spook', async ({ page }) => {
     const errors = watch(page);
     await calm(page);

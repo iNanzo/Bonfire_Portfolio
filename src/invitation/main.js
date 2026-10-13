@@ -20,8 +20,8 @@
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
 // (a point on NEWT in client px), floorAt(x, y), feet() and bones() (his ankles in the world,
-// his bones from his root) and play(clip) (forces a clip); `?seed=N` and `?calm` go to the
-// brain.
+// his bones from his root) and play(clip) (forces a clip, Walk and Run going round their step
+// at their own pace); `?seed=N` and `?calm` go to the brain.
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
@@ -350,6 +350,9 @@ function start(s) {
     if (pressed) lastButton = pressed;
     pressed = null;
     if (forced) {
+      // (Walk and Run take their time from the step phase: it goes round at the clip's own pace.)
+      const len = c.clipLength(forced);
+      if (len > 0) mix.phase = (mix.phase + dt / len) % 1;
       c.setWeights({ [forced]: 1 }, mix.phase);
       const moved = animate(c, dt);
       finish(c, ptr, pose, dt, { mode: 'camera', weight: 1 }, FACE_TRACK[forced]?.face ?? 'neutral', 'normal', moved);

@@ -16,8 +16,8 @@
 //   idle      three seconds of him standing (Idle, or the placeholder's T-pose)
 //   clips     every clip in turn (--clips for some), forced through play() after 0.4 s of the
 //             brain's own idle: one WebP each, a looping clip played twice, a one-shot once
-//             (Walk and Run hold one pose there: their time is the step phase, which only the
-//             brain's gait moves; floor and button-Run show them as he plays them)
+//             (Walk and Run step in place at their own pace; floor and button-Run show them as
+//             he plays them, moving)
 //   tap       a tap on his head (a touch on a phone size, a click on a desktop one)
 //   taps      two taps on his head 2.6 s apart (a Wave and a Spook when the --seed gives both)
 //   drag      a press on his body dragged up and across the screen, then let go (a touch drag
