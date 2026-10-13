@@ -13,6 +13,7 @@ import {
   createOrbit,
   followShare,
   orbitDrag,
+  orbitEvents,
   orbitHome,
   orbitPose,
   orbitRelease,
@@ -203,4 +204,26 @@ test('a resize brings a new home distance and keeps the zoom', () => {
   close(o.distance, 20 / 1.5, 1e-3);
   orbitZoom(o, 100);
   close(o.goal.distance, 10, 1e-9, 'the limits follow the new home');
+});
+
+test('the gestures move it: an orbit turns it, a pinch zooms it, letting go of an orbit flings it; a tap does nothing', () => {
+  const o = createOrbit({ distance: HOME });
+  orbitEvents(o, [
+    { type: 'tap', on: 'floor', x: 0, y: 0, t: 0 },
+    { type: 'orbit', on: 'floor', x: 10, y: 0, t: 0.01, dx: 30, dy: 10 },
+    { type: 'orbit', on: 'floor', x: 20, y: 0, t: 0.03, dx: 20, dy: 0 },
+  ]);
+  close(o.goal.yaw, -50 * ORBIT.turn, 1e-9);
+  close(o.goal.elevation, 36 * D + 10 * ORBIT.tilt, 1e-9);
+  orbitEvents(o, [{ type: 'release', on: 'floor', x: 20, y: 0, t: 0.04 }]);
+  assert.ok(o.spin.yaw < 0, 'a fling');
+  orbitEvents(o, [{ type: 'pinch', on: 'floor', x: 0, y: 0, t: 1, scale: 1.25 }]);
+  close(o.goal.distance, HOME / 1.25, 1e-9);
+  const before = { ...o.goal };
+  orbitEvents(o, [
+    { type: 'pinch', on: 'floor', x: 0, y: 0, t: 1, scale: 1 },
+    { type: 'release', on: 'newt', x: 0, y: 0, t: 2 },
+    { type: 'grab', on: 'newt', x: 0, y: 0, t: 2 },
+  ]);
+  assert.deepEqual(o.goal, before, 'his own gestures leave it be');
 });

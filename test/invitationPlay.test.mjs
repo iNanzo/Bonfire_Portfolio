@@ -7,7 +7,17 @@
 // him, the pointer's floor spot lifted 10°, and ahead meaning toward the viewer).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TWIN, bodyStep, createBody, createMix, lookAim, mixStep, twinWeights } from '../src/invitation/play.js';
+import {
+  HEAD_SHARE,
+  TWIN,
+  bodyStep,
+  createBody,
+  createMix,
+  lookAim,
+  lookShare,
+  mixStep,
+  twinWeights,
+} from '../src/invitation/play.js';
 import { CLIPS, STRIDE, fadeFor } from '../src/invitation/clips.js';
 import { CARRY } from '../src/invitation/carry.js';
 import { LIMIT, LOOK, aimAngles } from '../src/invitation/lookAt.js';
@@ -182,4 +192,15 @@ test('where he looks: the camera when asked or when the pointer is on him, the p
   close(ahead.yaw, 0);
   close(ahead.pitch, Math.min(LIMIT.pitchMax, Math.atan2(16.2, 23)), 1e-9);
   assert.ok(ahead.pitch > 25 * D, 'up toward the camera, so his face shows');
+});
+
+test('clips that lift his head themselves take the look at a share, blended by their weight, twins too', () => {
+  assert.equal(lookShare({ Idle: 1 }), 1);
+  for (const clip of ['Wave', 'Sit', 'SitDown', 'StandUp']) {
+    assert.ok(HEAD_SHARE[clip] > 0 && HEAD_SHARE[clip] < 1, clip);
+    close(lookShare({ [clip]: 1 }), HEAD_SHARE[clip], 1e-12);
+  }
+  assert.equal(HEAD_SHARE.Spook, undefined, 'Spook: the brain gives it no look at all');
+  close(lookShare({ Idle: 0.5, Wave: 0.5 }), 1 - 0.5 * (1 - HEAD_SHARE.Wave), 1e-12);
+  close(lookShare({ Wave: 0.3, [`Wave${TWIN}`]: 0.7 }), HEAD_SHARE.Wave, 1e-12);
 });

@@ -36,7 +36,15 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 /** The default camera for a screen, as the stage frames it. */
 function viewFor(cssW, cssH, dpr) {
   const grid = texelGrid({ cssW, cssH, dpr, pixelSize: DEFAULT_LOOK.pixelSize, texels: preset.texels });
-  const view = frameView({ cssW, cssH, dpr, grid, insets: INSETS, texels: preset.texels[DEFAULT_PIXEL], area: R });
+  const view = frameView({
+    cssW,
+    cssH,
+    dpr,
+    grid,
+    insets: INSETS,
+    texels: preset.texels[DEFAULT_PIXEL],
+    area: R + NEWT_RADIUS,
+  });
   return { grid, view };
 }
 
@@ -49,7 +57,7 @@ test('the play area is a fixed disc about 2.4 in radius around the floor’s cen
   assert.ok(NEWT_RADIUS > 0 && NEWT_HEIGHT > 0.9);
 });
 
-test('at the default zoom the whole play area is in view and NEWT is still 36 to 40 texels tall, at 390x844@3, 412x915@2.625 and 1280x800@1', () => {
+test('at the default zoom the whole play area, his body at its rim included, is in view and NEWT is still 36 to 40 texels tall, at 390x844@3, 412x915@2.625 and 1280x800@1', () => {
   for (const [cssW, cssH, dpr] of SIZES) {
     const at = `${cssW}x${cssH}@${dpr}`;
     const { grid, view } = viewFor(cssW, cssH, dpr);
@@ -59,7 +67,7 @@ test('at the default zoom the whole play area is in view and NEWT is still 36 to
     let right = -Infinity;
     for (let i = 0; i < 72; i++) {
       const a = (i / 72) * 2 * Math.PI;
-      const rim = { x: R * Math.sin(a), y: 0, z: R * Math.cos(a) };
+      const rim = { x: (R + NEWT_RADIUS) * Math.sin(a), y: 0, z: (R + NEWT_RADIUS) * Math.cos(a) };
       const p = project(view, rim);
       left = Math.min(left, p.x);
       right = Math.max(right, p.x);
