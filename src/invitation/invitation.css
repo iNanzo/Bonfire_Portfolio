@@ -3,7 +3,9 @@
    The stage fills the screen (fixed, inset 0; dvh only as a fallback); the canvas inside it is
    drawn at texel size and stretched with nearest-neighbour (auto at Pixel Size Off), a little
    larger than the stage, which hides the overhang. Touch is the toy's own: no page zoom,
-   scrolling, text selection or callouts, and the canvas takes every gesture. */
+   scrolling, text selection or callouts, and the canvas takes every gesture. A pinch anywhere
+   never zooms the page: touch-action none on the page (manipulation still lets Android Chrome
+   pinch-zoom it, over the toolbar too), and only the Look sheet pans, up and down. */
 
 :root {
   --inv-bg: #f3f0ea;
@@ -27,7 +29,7 @@ body {
   background: var(--inv-bg);
   color: var(--inv-ink);
   font-family: var(--inv-font);
-  touch-action: manipulation;
+  touch-action: none;
   overscroll-behavior: none;
   user-select: none;
   -webkit-user-select: none;
@@ -111,7 +113,6 @@ body {
   letter-spacing: 0.02em;
   box-shadow: 0 4px 0 var(--inv-ink);
   cursor: pointer;
-  touch-action: manipulation;
   transition:
     transform 60ms ease-out,
     box-shadow 60ms ease-out,
@@ -165,6 +166,7 @@ body {
   max-height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y;
   margin: 0 auto;
   padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
   border: 3px solid var(--inv-ink);

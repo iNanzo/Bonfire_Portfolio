@@ -341,6 +341,33 @@ test.describe('on a phone', () => {
     expect(s.states).not.toContain('walk');
     expect(s.states).not.toContain('held');
   });
+
+  test('a two-finger pinch over the toolbar or the Look sheet never zooms the page', async ({ page }) => {
+    await calm(page);
+    const touch = await toucher(page);
+    /** Two fingers spreading across the middle of `box`, then a moment for the page to settle. */
+    const spread = async (box) => {
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      const at = (d) => [
+        { x: x - d, y, id: 1 },
+        { x: x + d, y, id: 2 },
+      ];
+      await touch('touchStart', at(20));
+      for (let d = 30; d <= 150; d += 10) {
+        await touch('touchMove', at(d));
+        await sleep(16);
+      }
+      await touch('touchEnd');
+      await sleep(400);
+    };
+    const scale = () => page.evaluate(() => window.visualViewport.scale);
+    await spread(await page.locator('.inv-toolbar').boundingBox());
+    expect(await scale(), 'the page after a pinch over the toolbar').toBe(1);
+    await page.getByRole('button', { name: 'Look' }).click();
+    await spread(await page.locator('.inv-sheet').boundingBox());
+    expect(await scale(), 'the page after a pinch over the Look sheet').toBe(1);
+  });
 });
 
 test.describe('on a desktop', () => {
