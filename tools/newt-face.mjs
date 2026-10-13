@@ -295,14 +295,17 @@ function thickenAlong(vertical, out, dark, darkColour, grow) {
 /**
  * The drawn faces (--mode drawn): pixel-art eyes stamped where the traced neutral eye sits,
  * each at least 2 px each way, with 4+ px of skin between the two (traced, two almond eyes
- * a cell wide meet in the middle and read as sunglasses at this size). Rows top to bottom,
- * x toward his ear (the cell's left edge is the middle of his face): X the eye's ink, m the
- * mouth's colour (its own column at the middle), p the blush.
+ * a cell wide meet in the middle and read as sunglasses at this size), and a mouth in every
+ * face, under the eyes and a pixel apart from them (without one his face read as two eye
+ * blocks, its expression lost). Rows top to bottom, x toward his ear (the cell's left edge is
+ * the middle of his face, so a mouth in the first column is 2 px wide once mirrored): X the
+ * eye's ink, m the open mouth's dark, t a closed mouth's lighter line (a pixel tall, a dark
+ * would read as a hole), p the blush.
  */
 const GLYPHS = {
-  neutral: { eye: ['XX', 'XX', 'XX'] },
-  blink: { eye: ['..', 'XXX', '..X'] },
-  happy: { eye: ['.XX.', 'XXXX', 'X..X'], blush: ['pp'] },
+  neutral: { eye: ['XX', 'XX', 'XX'], mouth: ['t'] },
+  blink: { eye: ['..', 'XXX', '..X'], mouth: ['t'] },
+  happy: { eye: ['.XX.', 'XXXX', 'X..X'], blush: ['pp'], mouth: ['t', 't'] },
   surprised: { eye: ['XXX', 'XXX', 'XXX'], mouth: ['mm', 'mm'] },
 };
 
@@ -336,7 +339,7 @@ function drawn(traced) {
         inkL = lum(c, i);
         ink = [c[i], c[i + 1], c[i + 2]];
       }
-  const MOUTH = [86, 46, 40];
+  const MOUTH = { m: [86, 46, 40], t: [128, 68, 58] };
   const BLUSH = [240, 160, 150];
   /** @type {Record<string, Uint8Array>} */
   const out = {};
@@ -356,7 +359,7 @@ function drawn(traced) {
     glyph.blush?.forEach((row, y) =>
       [...row].forEach((ch, x) => ch === 'p' && put(x0 + w - row.length + x, y0 + rows.length + 1 + y, BLUSH)),
     );
-    glyph.mouth?.forEach((row, y) => [...row].forEach((ch, x) => ch === 'm' && put(x, y0 + rows.length + y, MOUTH)));
+    glyph.mouth?.forEach((row, y) => [...row].forEach((ch, x) => MOUTH[ch] && put(x, y0 + rows.length + y, MOUTH[ch])));
     out[name] = cell;
   }
   return out;
