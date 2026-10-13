@@ -83,9 +83,9 @@ test.describe('on a phone', () => {
     await page.getByRole('button', { name: 'Look' }).click();
     const sheet = page.getByRole('dialog', { name: 'Look' });
     await expect(sheet).toBeVisible();
-    await sheet.getByText('Chunky', { exact: true }).click();
+    await sheet.getByRole('radio', { name: 'Chunky' }).check();
     await expect.poll(async () => (await snapshot(page)).pixelScale).toBeGreaterThan(6);
-    await sheet.getByText('Soft', { exact: true }).click();
+    await sheet.getByRole('radio', { name: 'Soft' }).check();
     await sheet.getByRole('button', { name: 'Done' }).click();
     await expect(sheet).toBeHidden();
     const changed = await picture(page);
@@ -120,7 +120,7 @@ test.describe('on a desktop', () => {
   test('Pixel Size Off draws at native size', async ({ page }) => {
     await ready(page);
     await page.getByRole('button', { name: 'Look' }).click();
-    await page.getByRole('dialog', { name: 'Look' }).getByText('Off', { exact: true }).click();
+    await page.getByRole('dialog', { name: 'Look' }).getByRole('radio', { name: 'Off' }).check();
     await expect.poll(async () => (await snapshot(page)).pixelScale).toBe(1);
     const size = await page
       .locator('[data-stage] canvas')
@@ -134,10 +134,11 @@ test.describe('on a desktop', () => {
 
 test("the portfolio's first load carries no invitation code", async ({ page }) => {
   const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
-  expect(html).not.toMatch(/invitation|newt/i);
+  expect(html).not.toMatch(/invitation|newt\.glb|newt-face/i);
   // By content, not by file name: a shared chunk would pass a name check. Every script the
   // page loads up front, and every chunk those import, carries no invitation marker: the Look
-  // store's key, the test hook, the pixel face sheet or the page's own words.
+  // store's key, the test hook, the pixel face sheet or the page's own words. (Not "newt" alone:
+  // the site is Newton's.)
   const dist = new URL('../dist/', import.meta.url);
   const first = [...html.matchAll(/(?:src|href)="\/?((?:[^"/]+\/)*[^"/]+\.js)"/g)].map((m) => m[1]);
   expect(first.length).toBeGreaterThan(0);
@@ -146,7 +147,7 @@ test("the portfolio's first load carries no invitation code", async ({ page }) =
     if (seen.has(file)) return;
     seen.add(file);
     const code = readFileSync(new URL(file, dist), 'utf8');
-    expect(code, file).not.toMatch(/invitation\.look\.v1|__invitation|newt-face|Pixel Size/);
+    expect(code, file).not.toMatch(/invitation\.look\.v1|__invitation|newt-face|Play With NEWT/);
     for (const m of code.matchAll(/(?:from|import)\s*["']\.\/([^"']+\.js)["']/g)) walk(`assets/${m[1]}`);
   };
   for (const file of first) walk(file.replace(/^.*?(assets\/)/, '$1'));
@@ -154,5 +155,5 @@ test("the portfolio's first load carries no invitation code", async ({ page }) =
   page.on('request', (r) => requested.push(new URL(r.url()).pathname));
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
-  expect(requested.filter((p) => /invitation|newt/i.test(p))).toEqual([]);
+  expect(requested.filter((p) => /invitation|newt\.glb|newt-face/i.test(p))).toEqual([]);
 });
