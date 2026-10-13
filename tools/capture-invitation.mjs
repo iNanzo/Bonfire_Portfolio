@@ -32,6 +32,11 @@
 //             finger or cursor follows him until it's a grab), carries him a little and lets go
 //   orbit     a drag across empty space (the camera turns), then a pinch or the wheel zooming
 //             in and out, then Reset Camera from the Look sheet
+//   turn      drags across empty space, one after another, until the camera has gone a whole
+//             turn round him (whole frames: his shadow should keep its side on screen)
+//   rim       four quick taps on him (he runs off), then a tap on him every 0.8 s for 5 s,
+//             which keeps him running to the play area's rim and along it (it should keep him
+//             on screen), then a press that catches him and carries him a little
 //   sitalone  no input until he sits by himself (20 s alone; the first 16 s aren't recorded:
 //             needs --calm off), a little of him sitting, then a tap on him stands him up
 //
@@ -39,17 +44,21 @@
 // of the act, each a --crop CSS px square around him, the orbit act's whole frames, labelled
 // with when it was drawn and his state then); <out>/<tag>-sheet-<W>x<H>.png (six whole frames
 // an act); <out>/<tag>-<W>x<H>.json (each act's frames, the page's frame times while it ran,
-// and the states and clips he went through, with when). --look, --pixel, --dither, --outlines
-// and --motion set the Look menu first (its stored settings, invitation.look.v1; with --motion
-// the report and the console say how many times a second his pose changed). --anim-fps sets
-// every preset's animFps (choppy motion) in the page after each load, through the dev server's
-// own looks/index.js module; nothing is written to the code. --seed and --calm go to the page's
-// query (?calm is on unless --calm off). --lead keeps that many ms from before each act begins.
-// --scale multiplies the CSS size of the output.
+// the states and clips he went through, with when, and `inFrame`: the closest his head, middle
+// and feet came to the stage's sides and top and to the toolbar, CSS px, how far his root went
+// from the play area's middle, and how far the camera turned, which the console says too; and
+// `track`, those points, the camera's yaw and his root, frame by frame). --look, --pixel,
+// --dither, --outlines and --motion set the Look menu first (its stored settings,
+// invitation.look.v1; with --motion the report and the console say how many times a second his
+// pose changed). --anim-fps sets every preset's animFps (choppy motion) in the page after each
+// load, through the dev server's own looks/index.js module; nothing is written to the code.
+// --seed and --calm go to the page's query (?calm is on unless --calm off). --lead keeps that
+// many ms from before each act begins. --scale multiplies the CSS size of the output.
 import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import fs from 'node:fs';
 import { createServer } from 'vite';
+import { ORBIT } from '../src/invitation/camera.js';
 import { CLIP_NAMES, CLIPS } from '../src/invitation/clips.js';
 
 const argv = process.argv.slice(2);
@@ -144,7 +153,21 @@ function startRecord() {
     if (s?.ready) {
       const h = inv.screen('head');
       const b = inv.screen('body');
-      rec.pos.push([now, Math.round(h.x), Math.round(h.y), Math.round(b.x), Math.round(b.y)]);
+      const f = inv.screen('feet');
+      const r3 = (v) => Math.round(v * 1000) / 1000;
+      // (Client px: head, middle, feet; then the camera's yaw, radians, and his root on the floor.)
+      rec.pos.push([
+        now,
+        Math.round(h.x),
+        Math.round(h.y),
+        Math.round(b.x),
+        Math.round(b.y),
+        Math.round(f.x),
+        Math.round(f.y),
+        r3(s.camera.yaw),
+        r3(s.pos.x),
+        r3(s.pos.z),
+      ]);
       const key = `${s.state}|${s.clip}|${s.reaction}|${s.held}`;
       if (key !== prev) {
         prev = key;
@@ -158,7 +181,9 @@ function startRecord() {
 function stopRecord() {
   const rec = /** @type {any} */ (window).__capture;
   rec.on = false;
-  return { raf: rec.raf, pos: rec.pos, line: rec.line, end: window.__invitation?.snapshot() ?? null };
+  const bar = document.querySelector('.inv-toolbar')?.getBoundingClientRect();
+  const view = { w: innerWidth, h: innerHeight, toolbar: bar && bar.height > 0 ? Math.round(bar.top) : innerHeight };
+  return { raf: rec.raf, pos: rec.pos, line: rec.line, view, end: window.__invitation?.snapshot() ?? null };
 }
 
 /**
@@ -198,6 +223,7 @@ async function realTime(page, act, tail = 400) {
     raf: rec.raf.filter(([t]) => t >= p0).map(([, d]) => d),
     pos: rec.pos.map(([t, ...p]) => [at(t), ...p]),
     line: rec.line.map((l) => ({ ...l, t: at(l.t) })),
+    view: rec.view,
     end: rec.end,
   };
 }
@@ -264,6 +290,33 @@ function frameTimes(raf) {
     over20: s.filter((d) => d > 20).length,
   };
 }
+
+/**
+ * Where he was on screen over an act (from the act's start), from the record: the closest his
+ * head, middle and feet came to the stage's left, right and top and to the toolbar's top, CSS px
+ * (negative: off the screen or behind the toolbar), the farthest his root went from the play
+ * area's middle, world units, and how far the camera turned, degrees (`turned`: last minus
+ * first; `widest`: the farthest it got from where it began).
+ */
+function inFrame(pos, view) {
+  const live = pos.filter(([t]) => t >= 0);
+  if (!live.length || !view) return null;
+  const xs = live.flatMap((p) => [p[1], p[3], p[5]]);
+  // (The page keeps the yaw within half a turn of zero: it's unwound here, frame to frame.)
+  let yaw = 0;
+  const yaws = live.map((p, i) => (yaw += i ? halfTurn(p[7] - live[i - 1][7]) : 0));
+  return {
+    left: Math.min(...xs),
+    right: view.w - Math.max(...xs),
+    top: Math.min(...live.map((p) => p[2])),
+    toolbar: view.toolbar - Math.max(...live.map((p) => p[6])),
+    farthest: Number(Math.max(...live.map((p) => Math.hypot(p[8], p[9]))).toFixed(2)),
+    turned: Math.round((yaws.at(-1) * 180) / Math.PI),
+    widest: Math.round((Math.max(...yaws.map(Math.abs)) * 180) / Math.PI),
+  };
+}
+/** An angle, radians, brought within half a turn of zero. */
+const halfTurn = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
 
 async function ready(page) {
   const query = ['test', ...(CALM ? ['calm'] : []), ...(SEED !== null ? [`seed=${SEED}`] : [])].join('&');
@@ -413,6 +466,60 @@ async function until(page, want, ms) {
 }
 
 /**
+ * Catches him mid-run: down on him, then after him for 0.2 s (a press that moves is a grab at
+ * once), carried up and to the left a little, let go.
+ */
+async function catchHim(page, size) {
+  const press = await presser(page, size);
+  let at = await point(page, 'body');
+  await press.down(at);
+  const t0 = Date.now();
+  while (Date.now() - t0 < 200) {
+    await sleep(16);
+    at = await point(page, 'body');
+    await press.move(at);
+  }
+  const from = at;
+  const to = { x: from.x - size.w * 0.12, y: from.y - size.h * 0.06 };
+  await along(press.move, (k) => ({ x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k }), 700);
+  await sleep(200);
+  await press.up();
+  await press.done();
+}
+/**
+ * Drags across empty space under him, one after another, until the camera has turned a whole
+ * turn: each at most half the stage's width and only as long as the rest of the turn needs
+ * (a drag across the whole width is camera.js ORBIT.turn of a turn), held still before the
+ * lift so it doesn't coast past.
+ */
+async function wholeTurn(page, size) {
+  const yaw = () => page.evaluate(() => window.__invitation.snapshot().camera.yaw);
+  const pxPerTurn = size.w / ORBIT.turn;
+  // (The page keeps the yaw within half a turn of zero, and a drag here turns it less than
+  // that, so the turn so far adds up each drag's change.)
+  let was = await yaw();
+  let turned = 0;
+  for (let i = 0; i < 6; i++) {
+    const now = await yaw();
+    turned += halfTurn(now - was);
+    was = now;
+    const left = 2 * Math.PI - Math.abs(turned);
+    if (left < 0.05) return;
+    const across = Math.min(size.w * 0.5, (left / (2 * Math.PI)) * pxPerTurn);
+    const body = await point(page, 'body');
+    const y = Math.min(size.h * 0.8, body.y + size.h * 0.2);
+    const from = { x: size.w / 2 - across / 2, y };
+    const press = await presser(page, size);
+    await press.down(from);
+    await along(press.move, (k) => ({ x: from.x + across * k, y }), 1000 * (across / (size.w * 0.5)));
+    await sleep(150);
+    await press.up();
+    await press.done();
+    await sleep(600);
+  }
+}
+
+/**
  * The acts, each {name, run(page), tail ms, setup?(page) (before the recording starts), full?
  * (the act's sheet shows whole frames, not him cropped), from? (ms: the act's sheet starts
  * there, not at the lead)}.
@@ -539,22 +646,27 @@ function actsFor(size) {
           await sleep(180);
         }
         await sleep(1000);
-        // Catch him mid-run: down on him, then after him (a press that moves is a grab at once).
-        const press = await presser(page, size);
-        let at = await point(page, 'body');
-        await press.down(at);
-        const t0 = Date.now();
-        while (Date.now() - t0 < 200) {
-          await sleep(16);
-          at = await point(page, 'body');
-          await press.move(at);
+        await catchHim(page, size);
+      },
+      2400,
+    );
+  if (ACTS.includes('rim'))
+    act(
+      'rim',
+      async (page) => {
+        for (let i = 0; i < 4; i++) {
+          await tapAt(page, size, await point(page, 'head'));
+          await sleep(180);
         }
-        const from = at;
-        const to = { x: from.x - size.w * 0.12, y: from.y - size.h * 0.06 };
-        await along(press.move, (k) => ({ x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k }), 700);
-        await sleep(200);
-        await press.up();
-        await press.done();
+        // (A tap on him adds stress, which keeps him running, and puts the threat on the floor
+        // past him from the camera, so he runs on toward the camera's side of the rim.)
+        const t0 = Date.now();
+        while (Date.now() - t0 < 5000) {
+          await sleep(800);
+          await tapAt(page, size, await point(page, 'head'));
+        }
+        await sleep(600);
+        await catchHim(page, size);
       },
       2400,
     );
@@ -591,6 +703,7 @@ function actsFor(size) {
       1600,
       { full: true },
     );
+  if (ACTS.includes('turn')) act('turn', (page) => wholeTurn(page, size), 1200, { full: true });
   if (ACTS.includes('sitalone')) {
     if (CALM) console.log('- sitalone: skipped (he never sits by himself with ?calm: pass --calm off)');
     else
@@ -662,6 +775,13 @@ for (const size of SIZES) {
       `✓ ${base}.webp: ${frames.length} frames over ${shot.at(-1).t} ms (${unique} different drawn frames); ` +
         `frame ms median ${times?.median} p95 ${times?.p95} max ${times?.max}; ${states.join(' → ')}`,
     );
+    const seen = inFrame(taken.pos, taken.view);
+    if (seen)
+      console.log(
+        `  in frame: ${seen.left} px from the left, ${seen.right} from the right, ${seen.top} from the top, ` +
+          `his feet ${seen.toolbar} above the toolbar; root up to ${seen.farthest} u from the middle; ` +
+          `camera turned ${seen.turned}° (${seen.widest}° at the most)`,
+      );
     // The act's own sheet: him cropped (or whole frames), --sheet frames from its start to its end.
     const own = [];
     const ownLabels = [];
@@ -685,6 +805,9 @@ for (const size of SIZES) {
       drawnFrames: unique,
       frameMs: times,
       line: taken.line,
+      inFrame: seen,
+      // (Each frame: ms, his head, middle and feet, client px, the camera's yaw, his root's x, z.)
+      track: taken.pos,
       end: taken.end,
     };
     for (let i = 0; i < 6; i++) {
