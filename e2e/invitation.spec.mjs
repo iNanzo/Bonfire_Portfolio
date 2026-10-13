@@ -862,8 +862,20 @@ test.describe('on a desktop', () => {
     await look.click();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeChecked();
     await expect(sheet.getByRole('slider', { name: 'Colors' })).toHaveAttribute('aria-valuetext', '4 levels');
-    // Reset To Style: DS's own values again, and focus on DS (the button it was on rests now).
+    // Reset To Style: DS's own values again, and focus on DS (the button it was on rests now),
+    // without the sheet jumping away from the Shader controls the user was at.
+    // (Scrolled so Reset To Style sits just under the sheet's sticky header, the Style row out
+    // of sight above it, as when the user has been at the Shader controls.)
+    await page.locator('.inv-sheet').evaluate((el) => {
+      const head = /** @type {HTMLElement} */ (el.querySelector('.inv-sheet-head'));
+      const reset = /** @type {HTMLElement} */ (el.querySelector('[data-shader-reset]'));
+      const top = reset.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+      el.scrollTop = top - head.offsetHeight - 8;
+    });
+    const scrolled = (await sheetScroll(page)).top;
+    expect(scrolled).toBeGreaterThan(40);
     await sheet.getByRole('button', { name: 'Reset To Style' }).click();
+    expect(Math.abs((await sheetScroll(page)).top - scrolled)).toBeLessThan(2);
     await expect(style.getByRole('radio', { name: 'DS' })).toBeChecked();
     await expect(style.getByRole('radio', { name: 'DS' })).toBeFocused();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeDisabled();
