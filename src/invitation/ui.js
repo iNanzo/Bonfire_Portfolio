@@ -449,8 +449,11 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
     else if (el.matches('[data-pixel-end]')) pickPixel(el.dataset.pixelEnd === 'first' ? 0 : steps.length - 1);
     else if (el.matches('[data-shader-reset]')) {
       pickStyle(null);
-      // (The button rests now: focus goes to the style it went back to, still in the sheet.)
-      /** @type {HTMLElement|null} */ (hud.querySelector('input[name="inv-style"]:checked'))?.focus();
+      // (The button rests now: focus goes to the style it went back to, still in the sheet,
+      // without scrolling the sheet away from the Shader controls the user was at.)
+      /** @type {HTMLElement|null} */ (hud.querySelector('input[name="inv-style"]:checked'))?.focus({
+        preventScroll: true,
+      });
     } else if (el.dataset.button) onButton(/** @type {ButtonName} */ (el.dataset.button));
   });
   // (A slider while it's dragged, not only once it's let go: each step shows as it's passed.
