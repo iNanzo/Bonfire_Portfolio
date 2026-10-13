@@ -862,9 +862,10 @@ test.describe('on a desktop', () => {
     await look.click();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeChecked();
     await expect(sheet.getByRole('slider', { name: 'Colors' })).toHaveAttribute('aria-valuetext', '4 levels');
-    // Reset To Style: DS's own values again.
+    // Reset To Style: DS's own values again, and focus on DS (the button it was on rests now).
     await sheet.getByRole('button', { name: 'Reset To Style' }).click();
     await expect(style.getByRole('radio', { name: 'DS' })).toBeChecked();
+    await expect(style.getByRole('radio', { name: 'DS' })).toBeFocused();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeDisabled();
     await expect(sheet.getByRole('button', { name: 'Reset To Style' })).toBeDisabled();
     expect((await snapshot(page)).shader).toEqual(ds);
