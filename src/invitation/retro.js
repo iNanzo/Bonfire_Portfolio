@@ -62,15 +62,30 @@ export const DECAL_CUT = 0.3;
 
 /**
  * Make a material write its surface id into the colour's alpha (for the retro pass's lines),
- * and sample its map MAP_BIAS mip levels coarser (0 unless the pass sets it).
+ * and sample its map MAP_BIAS mip levels coarser (0 unless the pass sets it). With `snap`, its
+ * vertices also move by that uniform's shift (NDC: clip space over w) after three projects
+ * them: one shift all of his materials share (character.js sets it each frame from snapShift),
+ * so all of him moves onto the texel grid together and a part that only drifts within a texel
+ * (his head as he breathes) draws the same texels frame after frame.
  * @template T
  * @param {T} material  a built-in three.js material
  * @param {number} id  ID's
+ * @param {{snap?: {value: {x: number, y: number}}}} [opts]
  * @returns {T}
  */
-export function markId(material, id) {
+export function markId(material, id, opts = {}) {
   const m = /** @type {any} */ (material);
+  const { snap } = opts;
   m.onBeforeCompile = (shader) => {
+    if (snap) {
+      shader.uniforms.uTexelSnap = snap;
+      shader.vertexShader = shader.vertexShader
+        .replace('void main() {', 'uniform vec2 uTexelSnap;\nvoid main() {')
+        .replace(
+          '#include <project_vertex>',
+          '#include <project_vertex>\n\tgl_Position.xy += uTexelSnap * gl_Position.w;',
+        );
+    }
     shader.uniforms.uSurfaceId = { value: id / ID_SCALE };
     shader.uniforms.uIdOn = ID_ON;
     shader.uniforms.uMapBias = MAP_BIAS;
@@ -90,8 +105,28 @@ export function markId(material, id) {
   };
   // (One program for every id: the id is a uniform. Without a key three would share the
   // material type's own program, which has no such uniform.)
-  m.customProgramCacheKey = () => 'invitation-surface-id';
+  m.customProgramCacheKey = () => (snap ? 'invitation-surface-id-snap' : 'invitation-surface-id');
   return material;
+}
+
+/**
+ * The shift (NDC) that moves the point at NDC (x, y) onto the centre of the texel it's in, on
+ * a w × h grid: at most half a texel each way (none without a grid).
+ * @param {number} x
+ * @param {number} y
+ * @param {number} w  texels across
+ * @param {number} h  texels down
+ * @param {{x: number, y: number}} [out]
+ */
+export function snapShift(x, y, w, h, out = { x: 0, y: 0 }) {
+  const shift = (ndc, n) => {
+    if (!(n > 0)) return 0;
+    const p = ((ndc + 1) / 2) * n;
+    return ((Math.floor(p) + 0.5 - p) * 2) / n;
+  };
+  out.x = shift(x, w);
+  out.y = shift(y, h);
+  return out;
 }
 
 /**
