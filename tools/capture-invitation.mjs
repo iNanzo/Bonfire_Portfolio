@@ -11,7 +11,7 @@
 //        [--acts idle,clips,tap,drag,buttons,floor,chase,orbit] [--clips Wave,Spook] [--look ds|soft]
 //        [--pixel off|16|24|32|48|64|96|128|192|256] [--dither on|off] [--outlines on|off] [--motion smooth|choppy]
 //        [--anim-fps 15] [--seed 3] [--calm on|off] [--lead 300] [--fps 15] [--scale 1] [--sheet 8] [--crop 200]
-//        [--port 5340] [--url <origin>] [--out .scratch/invitation-shots] [--tag now]
+//        [--raw] [--port 5340] [--url <origin>] [--out .scratch/invitation-shots] [--tag now]
 //
 //   idle      three seconds of him standing (Idle, or the placeholder's T-pose)
 //   clips     every clip in turn (--clips for some), forced through play() after 0.4 s of the
@@ -47,7 +47,12 @@
 // the states and clips he went through, with when, and `inFrame`: the closest his head, middle
 // and feet came to the stage's sides and top and to the toolbar, CSS px, how far his root went
 // from the play area's middle, and how far the camera turned, which the console says too; and
-// `track`, those points, the camera's yaw and his root, frame by frame). --look, --pixel,
+// `track`, those points, the camera's yaw, his root, his heading and his head's look, frame by
+// frame, and `faces`, each change of his face, blinks too, with when); with --raw,
+// <out>/<tag>-<act>-<W>x<H>-raw/NNN.png, the act's frames at the device's pixels (the WebP's,
+// before they're scaled to the CSS size: one PNG a drawn frame, for crops that show every
+// texel; Chrome runs a size at a time then, its screen at that size's DPR), listed in the
+// report's `raw` with when each was drawn. --look, --pixel,
 // --dither, --outlines and --motion set the Look menu first (its stored settings,
 // invitation.look.v1; with --motion the report and the console say how many times a second his
 // pose changed; --pixel is NEWT's sprite resolution, N or N×N such as 64 or 64x64, or off). --anim-fps sets every preset's animFps (choppy motion) in the page after each
@@ -99,6 +104,7 @@ const FPS = Number(opt('fps', '15'));
 const SCALE = Number(opt('scale', '1'));
 const SHEET = Number(opt('sheet', '8'));
 const CROP = Number(opt('crop', '200'));
+const RAW = argv.includes('--raw');
 const PORT = Number(opt('port', '5340'));
 const OUT = opt('out', '.scratch/invitation-shots');
 const TAG = opt('tag', `invitation${LOOK ? `-${LOOK}` : ''}${PIXEL ? `-${PIXEL}` : ''}${MOTION ? `-${MOTION}` : ''}`);
@@ -117,10 +123,17 @@ const server = opt('url', null)
     });
 if (server) await server.listen();
 const origin = opt('url', `http://localhost:${PORT}`);
-const browser = await chromium.launch({
-  channel: 'chrome',
-  args: ['--use-angle=d3d11', '--ignore-gpu-blocklist'],
-});
+/**
+ * GPU Chrome; at `dpr` (--raw) one whose screen has that many pixels a CSS px, without which
+ * the screencast hands over frames at the CSS size whatever the page's device pixel ratio.
+ * @param {number} [dpr]
+ */
+const launch = (dpr) =>
+  chromium.launch({
+    channel: 'chrome',
+    args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', ...(dpr ? [`--force-device-scale-factor=${dpr}`] : [])],
+  });
+const browser = RAW ? null : await launch();
 
 /** Tiles of one size into a grid, each with its label, written to `file` (capture-knight's). */
 async function grid(tiles, cols, file, labels) {
@@ -151,10 +164,11 @@ async function grid(tiles, cols, file, labels) {
  * and each change of his state, clip, reaction or being held. Times are performance.now() ms.
  */
 function startRecord() {
-  const rec = { on: true, raf: [], pos: [], line: [] };
+  const rec = { on: true, raf: [], pos: [], line: [], faces: [] };
   /** @type {any} */ (window).__capture = rec;
   let last = -1;
   let prev = '';
+  let face = '';
   const tick = (now) => {
     if (!rec.on) return;
     if (last >= 0) rec.raf.push([now, now - last]);
@@ -166,7 +180,9 @@ function startRecord() {
       const b = inv.screen('body');
       const f = inv.screen('feet');
       const r3 = (v) => Math.round(v * 1000) / 1000;
-      // (Client px: head, middle, feet; then the camera's yaw, radians, and his root on the floor.)
+      // (Client px: head, middle, feet; then the camera's yaw, radians, his root on the floor, and
+      // his heading and head's look, yaw and pitch, radians: heading 0 and a look of 0 face the
+      // camera's starting yaw.)
       rec.pos.push([
         now,
         Math.round(h.x),
@@ -178,11 +194,18 @@ function startRecord() {
         r3(s.camera.yaw),
         r3(s.pos.x),
         r3(s.pos.z),
+        r3(s.heading),
+        r3(s.headYaw),
+        r3(s.headPitch),
       ]);
       const key = `${s.state}|${s.clip}|${s.reaction}|${s.held}`;
       if (key !== prev) {
         prev = key;
         rec.line.push({ t: now, state: s.state, clip: s.clip, reaction: s.reaction, held: s.held });
+      }
+      if (s.face !== face) {
+        face = s.face;
+        rec.faces.push({ t: now, face });
       }
     }
     requestAnimationFrame(tick);
@@ -194,7 +217,14 @@ function stopRecord() {
   rec.on = false;
   const bar = document.querySelector('.inv-toolbar')?.getBoundingClientRect();
   const view = { w: innerWidth, h: innerHeight, toolbar: bar && bar.height > 0 ? Math.round(bar.top) : innerHeight };
-  return { raf: rec.raf, pos: rec.pos, line: rec.line, view, end: window.__invitation?.snapshot() ?? null };
+  return {
+    raf: rec.raf,
+    pos: rec.pos,
+    line: rec.line,
+    faces: rec.faces,
+    view,
+    end: window.__invitation?.snapshot() ?? null,
+  };
 }
 
 /**
@@ -210,7 +240,14 @@ async function realTime(page, act, tail = 400) {
     frames.push({ t: f.metadata.timestamp * 1000, data: f.data });
     cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {});
   });
-  await cdp.send('Page.startScreencast', { format: 'png', everyNthFrame: 1 });
+  // (Chrome hands over frames at the CSS size unless asked for more: --raw asks for the device's pixels.)
+  const most = RAW
+    ? await page.evaluate(() => ({
+        maxWidth: Math.round(innerWidth * devicePixelRatio),
+        maxHeight: Math.round(innerHeight * devicePixelRatio),
+      }))
+    : {};
+  await cdp.send('Page.startScreencast', { format: 'png', everyNthFrame: 1, ...most });
   await page.evaluate(startRecord);
   await sleep(Math.max(300, LEAD));
   const p0 = await page.evaluate(() => performance.now());
@@ -234,6 +271,7 @@ async function realTime(page, act, tail = 400) {
     raf: rec.raf.filter(([t]) => t >= p0).map(([, d]) => d),
     pos: rec.pos.map(([t, ...p]) => [at(t), ...p]),
     line: rec.line.map((l) => ({ ...l, t: at(l.t) })),
+    faces: rec.faces.map((f) => ({ ...f, t: at(f.t) })),
     view: rec.view,
     end: rec.end,
   };
@@ -255,6 +293,23 @@ const fit = (size, buf) =>
     .resize(Math.round(size.w * SCALE), Math.round(size.h * SCALE), { kernel: 'nearest', fit: 'fill' })
     .png()
     .toBuffer();
+
+/**
+ * --raw: an act's frames as the page drew them, at the device's pixels (before fit scales them
+ * to the CSS size), one PNG a drawn frame in `dir`; each resampled frame's time, when it was
+ * drawn, and its file.
+ */
+function keepRaw(dir, shot) {
+  fs.mkdirSync(dir, { recursive: true });
+  const files = new Map();
+  for (const f of shot)
+    if (!files.has(f.drawn)) {
+      const file = `${dir}/${String(files.size).padStart(3, '0')}.png`;
+      fs.writeFileSync(file, f.data);
+      files.set(f.drawn, file);
+    }
+  return { dir, frames: shot.map((f) => ({ t: f.t, drawn: f.drawn, file: files.get(f.drawn) })) };
+}
 
 /** The record's last entry at or before `t` (ms), or its first. */
 const latest = (list, t) => list.filter((e) => (Array.isArray(e) ? e[0] : e.t) <= t).at(-1) ?? list[0];
@@ -734,7 +789,8 @@ function actsFor(size) {
 
 const problems = [];
 for (const size of SIZES) {
-  const context = await browser.newContext({
+  const sized = RAW ? await launch(size.dpr) : null;
+  const context = await (sized ?? browser).newContext({
     viewport: { width: size.w, height: size.h },
     deviceScaleFactor: size.dpr,
     isMobile: size.phone,
@@ -817,8 +873,11 @@ for (const size of SIZES) {
       frameMs: times,
       line: taken.line,
       inFrame: seen,
-      // (Each frame: ms, his head, middle and feet, client px, the camera's yaw, his root's x, z.)
+      // (Each frame: ms, his head, middle and feet, client px, the camera's yaw, his root's x, z,
+      // his heading and his head's look yaw and pitch.)
       track: taken.pos,
+      faces: taken.faces,
+      ...(RAW ? { raw: await keepRaw(`${base}-raw`, shot) } : {}),
       end: taken.end,
     };
     for (let i = 0; i < 6; i++) {
@@ -835,7 +894,8 @@ for (const size of SIZES) {
   if (sheet.length) await grid(sheet, 6, `${OUT}/${TAG}-sheet-${size.w}x${size.h}.png`, labels);
   fs.writeFileSync(`${OUT}/${TAG}-${size.w}x${size.h}.json`, JSON.stringify(report, null, 1));
   await context.close();
+  await sized?.close();
 }
-await browser.close();
+await browser?.close();
 await server?.close();
 if (problems.length) console.log(`Problems:\n  ${problems.join('\n  ')}`);
