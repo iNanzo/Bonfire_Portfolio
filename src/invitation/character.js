@@ -48,8 +48,12 @@
 //
 // The pixel atlas (pixel filter on): models/newt-atlas-pixel.png beside the glb
 // (tools/newt-atlas.mjs: his atlas in flat colours, the plaid redrawn in big black-and-white
-// checks), nearest and no mipmaps, on his atlas material; the glb's own atlas at Off, where
-// it's sharp enough (at a few hundred texels its plaid blurs into grey-brown mush).
+// checks), nearest and no mipmaps, on his atlas material while he's under ORIGINAL_ATLAS_TEXELS
+// tall in the default view (setResolution: main.js passes his texels as the grid changes); from
+// there, and at Off, the glb's own atlas, whose real plaid has enough texels to resolve. Under
+// the pixel filter his atlas materials sample it the preset's `texture.mipBias` mip levels
+// coarser (atlasBias: a fallback glb atlas at a low resolution would alias into a patchwork),
+// `texture.fineMipBias` from ORIGINAL_ATLAS_TEXELS (less, or the checks blur into grey); none at Off.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BONES, CLIPS, FACES, SCALE } from './clips.js';
@@ -74,6 +78,8 @@ const MIN_R = 11;
 /**
  * @typedef {import('./types.js').Character & {
  *   setStyle(preset: import('./look.js').LookPreset, pixel: boolean): void,
+ *   setResolution(texelsTall: number): void,
+ *   atlas: 'pixel'|'original',
  *   weightOf(clip: string): number,
  *   timeOf(clip: string): number,
  *   face: import('./clips.js').FaceName,
@@ -90,6 +96,13 @@ const MIN_R = 11;
  * @param {string} url
  */
 export const pixelAtlasUrl = (url) => url.replace(/[^/?#]*([?#].*)?$/, 'newt-atlas-pixel.png');
+
+/**
+ * NEWT's height in texels in the default view from which his shirt shows the glb's own plaid
+ * rather than the pixel atlas's bold checks (which read at low resolutions but look crude once
+ * there are texels enough for the real plaid's checks to resolve).
+ */
+export const ORIGINAL_ATLAS_TEXELS = 128;
 
 /** Seconds the first frame waits for the pixel images once the glb is in (then they come in late). */
 export const TEXTURE_GRACE = 3;
@@ -153,6 +166,17 @@ export function createCharacter(gltf, opts = {}) {
   const atlased = [];
   /** @type {any} */
   let pixelAtlas = null;
+  /** His height in texels in the default view (0: not measured yet). */
+  let tall = 0;
+  /** The mip bias his materials other than the face sample their maps at (markId's `bias`). */
+  const atlasBias = { value: 0 };
+  /** atlasBias for the preset, the pixel filter and his height in texels. */
+  const setBias = () => {
+    const t = /** @type {import('./look.js').LookPreset & import('./retro.js').RetroExtras} */ (preset).texture ?? {};
+    const fine = tall >= ORIGINAL_ATLAS_TEXELS ? (t.fineMipBias ?? t.mipBias) : t.mipBias;
+    atlasBias.value = pixel ? Math.max(0, fine ?? 0) : 0;
+  };
+  setBias();
   /** @type {any[]} every mesh of his */
   const meshes = [];
   root.traverse((o) => {
@@ -192,7 +216,7 @@ export function createCharacter(gltf, opts = {}) {
       }),
       ID.newt,
       // (His face: no coarser mip, so the smooth sheet stays sharp where it shows.)
-      src?.name === 'NEWT_Face' ? { snap: snaps[part], bias: { value: 0 } } : { snap: snaps[part] },
+      { snap: snaps[part], bias: src?.name === 'NEWT_Face' ? { value: 0 } : atlasBias },
     );
     if (src?.map) textures.add(src.map);
     if (src?.name === 'NEWT_Face') faceMaterial = m;
@@ -263,8 +287,12 @@ export function createCharacter(gltf, opts = {}) {
     const set = pixel && pixelImage && faceSize !== 'smooth' ? pixelFacesAt(faceSize) : sheetFaces;
     if (faceMaterial && set) faceMaterial.map = set[face];
   };
+  /** Whether his shirt shows the pixel atlas's bold plaid (the pixel filter on, him under ORIGINAL_ATLAS_TEXELS tall). */
+  const pixelPlaid = () => pixel && Boolean(pixelAtlas) && !(tall >= ORIGINAL_ATLAS_TEXELS);
   const showAtlas = () => {
-    for (const { material, map } of atlased) material.map = pixel && pixelAtlas ? pixelAtlas : map;
+    setBias();
+    const bold = pixelPlaid();
+    for (const { material, map } of atlased) material.map = bold ? pixelAtlas : map;
   };
   /** @param {any} t  the pixel atlas */
   const usePixelAtlas = (t) => {
@@ -456,6 +484,14 @@ export function createCharacter(gltf, opts = {}) {
     },
     get faceTexels() {
       return faceTexels;
+    },
+    /** The atlas on his shirt: the bold pixel plaid, or the glb's own. */
+    get atlas() {
+      return pixelPlaid() ? 'pixel' : 'original';
+    },
+    setResolution(texelsTall) {
+      tall = texelsTall > 0 ? texelsTall : 0;
+      showAtlas();
     },
     get texelSnap() {
       return { head: snaps.head.value, body: snaps.body.value };

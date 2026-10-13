@@ -12,7 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { createCharacter, pixelAtlasUrl } from '../src/invitation/character.js';
+import { ORIGINAL_ATLAS_TEXELS, createCharacter, pixelAtlasUrl } from '../src/invitation/character.js';
 import { pickFaceSize } from '../src/invitation/faceSheets.js';
 import { LOOKS } from '../src/invitation/look.js';
 import { TWIN } from '../src/invitation/play.js';
@@ -453,6 +453,54 @@ test('the pixel atlas: on his atlas material while the pixel filter is on (neare
   const plain = standIn();
   createCharacter(plain.gltf, { pixel: true });
   assert.equal(plain.mesh.material.map, plain.map, 'no pixel atlas: the glb’s');
+});
+
+test('the glb’s own atlas replaces the bold pixel plaid once NEWT is ORIGINAL_ATLAS_TEXELS tall or more (its checks resolve there); the pixel plaid below it, and before he’s measured', () => {
+  assert.ok(
+    ORIGINAL_ATLAS_TEXELS >= 64 && ORIGINAL_ATLAS_TEXELS <= 200,
+    `a fine resolution (${ORIGINAL_ATLAS_TEXELS} texels tall)`,
+  );
+  const { gltf, mesh, map } = standIn();
+  const pixelAtlas = new THREE.Texture();
+  const ch = createCharacter(gltf, { pixelAtlas });
+  assert.equal(mesh.material.map, pixelAtlas, 'not measured yet: the pixel plaid');
+  assert.equal(ch.atlas, 'pixel');
+  ch.setResolution(ORIGINAL_ATLAS_TEXELS - 0.5);
+  assert.equal(mesh.material.map, pixelAtlas, 'just under: the pixel plaid');
+  ch.setResolution(ORIGINAL_ATLAS_TEXELS);
+  assert.equal(mesh.material.map, map, 'there: the glb’s atlas');
+  assert.equal(ch.atlas, 'original');
+  ch.setResolution(16);
+  assert.equal(mesh.material.map, pixelAtlas, '16×16: the pixel plaid again');
+  ch.setResolution(300);
+  ch.setStyle(LOOKS.soft, true);
+  assert.equal(mesh.material.map, map, 'a Style change keeps it');
+  ch.setStyle(LOOKS.ds, false);
+  assert.equal(mesh.material.map, map, 'Off: the glb’s, as ever');
+  ch.setResolution(16);
+  assert.equal(mesh.material.map, map, 'Off at any resolution: the glb’s');
+  ch.dispose();
+});
+
+test('his atlas’s mip bias: the preset’s mipBias under the pixel filter, its fineMipBias once he’s ORIGINAL_ATLAS_TEXELS tall (the real plaid’s checks resolve), none at Off', () => {
+  const { gltf, mesh } = standIn();
+  const preset = { ...LOOKS.ds, texture: { mipBias: 1.5, fineMipBias: 0.5 } };
+  const ch = createCharacter(gltf, { preset, pixel: true, pixelAtlas: new THREE.Texture() });
+  const shader = {
+    uniforms: {},
+    vertexShader: THREE.ShaderLib.toon.vertexShader,
+    fragmentShader: THREE.ShaderLib.toon.fragmentShader,
+  };
+  mesh.material.onBeforeCompile(shader, null);
+  const bias = shader.uniforms.uMapBias;
+  assert.equal(bias.value, 1.5, 'not measured yet (the pixel atlas has no mips; a fallback glb atlas is coarse)');
+  ch.setResolution(ORIGINAL_ATLAS_TEXELS + 10);
+  assert.equal(bias.value, 0.5, 'a fine resolution: the glb’s plaid a mip less blurred');
+  ch.setStyle({ ...preset, texture: { mipBias: 2 } }, true);
+  assert.equal(bias.value, 2, 'a preset without fineMipBias: its mipBias');
+  ch.setStyle(preset, false);
+  assert.equal(bias.value, 0, 'Off: as three picks');
+  ch.dispose();
 });
 
 test('a pixel atlas still on its way (a promise) goes on him when it comes; one that fails leaves the glb’s', async () => {

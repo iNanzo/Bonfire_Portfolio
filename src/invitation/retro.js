@@ -56,8 +56,10 @@ export const DECAL_CUT = 0.3;
  *   shadow's edge spreads over (0: hard); steps: tones it's dithered into (0: smooth);
  *   dither: how much the Bayer dither moves those steps, 0..1
  * @property {{outside?: boolean}} outline  lines on the paper just outside NEWT, not on his edge
- * @property {{mipBias?: number}} [texture]  mipBias: how many mip levels coarser his textures
- *   are sampled with the pixel filter on (0: as three picks)
+ * @property {{mipBias?: number, fineMipBias?: number}} [texture]  mipBias: how many mip levels
+ *   coarser his textures are sampled with the pixel filter on (0: as three picks); fineMipBias:
+ *   his atlas's once he's character.js ORIGINAL_ATLAS_TEXELS tall or more (the glb's plaid at a
+ *   fine resolution; mipBias without it)
  */
 
 /**

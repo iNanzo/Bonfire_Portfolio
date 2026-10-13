@@ -8,7 +8,8 @@
 // fill, the grade close to neutral (a stronger warm tint and saturation turned his skin orange and
 // his grey trousers brown); his textures a mip and a half coarser where the pixel atlas isn't
 // loaded (character.js; its flat colours have no mips), so the toon bands shade him rather than
-// his shirt's pattern; a hard BasicShadowMap shadow, one flat warm lavender grey on
+// his shirt's pattern, and half a mip from 128 texels tall, where the glb's own plaid replaces
+// the pixel atlas (at 1.5 its checks blurred into grey, its neighbours streaking his trousers); a hard BasicShadowMap shadow, one flat warm lavender grey on
 // the white, lighter than him; no blob under him while he stands (only a flat one while he's
 // lifted). Every look value lives here so the look designer edits data, never code: retro.js,
 // stage.js, floor.js and character.js read it (look.js has the shape, LookPreset; retro.js the
@@ -39,7 +40,7 @@ export default {
   hemi: { sky: '#ffffff', ground: '#e8c8b0', intensity: 1.3 },
   blob: { opacity: 0, lifted: 0.3 },
   marker: { color: '#6f6457' },
-  texture: { mipBias: 1.5 },
+  texture: { mipBias: 1.5, fineMipBias: 0.5 },
   // (Choppy motion, for the user to try: 15 steps a second is the choppy option; 0 is smooth.)
   animFps: 0,
 };

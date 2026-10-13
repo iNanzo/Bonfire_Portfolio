@@ -30,9 +30,14 @@ test('no smooth blob under him while he stands; while he’s lifted it shows', (
   }
 });
 
-test('his textures sample a coarser mip, so the toon bands shade him, not the texture’s noise', () => {
-  for (const [name, p] of Object.entries(PRESETS))
+test('his textures sample a coarser mip, so the toon bands shade him, not the texture’s noise; less so at the fine resolutions, where the glb’s plaid has the texels to resolve', () => {
+  for (const [name, p] of Object.entries(PRESETS)) {
     assert.ok(p.texture.mipBias >= 1 && p.texture.mipBias <= 2.5, `${name}: mip bias ${p.texture.mipBias}`);
+    assert.ok(
+      p.texture.fineMipBias >= 0 && p.texture.fineMipBias < p.texture.mipBias && p.texture.fineMipBias <= 1,
+      `${name}: fine mip bias ${p.texture.fineMipBias}`,
+    );
+  }
 });
 
 test('dithers light enough not to crawl over him at real speed; soft shadows a texel wide at most', () => {

@@ -3,7 +3,8 @@
 // that stays in his soft gradients, not over his dark hair and clothes; a pastel grade that keeps
 // him peachy and his eyes near black; coloured outlines, a darker plum shade of the colour beside
 // them, drawn on the paper just outside his silhouette like a sprite's (never on his face); his
-// textures a mip and a half coarser, so the toon bands shade him rather than his shirt's pattern;
+// textures a mip and a half coarser, so the toon bands shade him rather than his shirt's pattern
+// (half a mip from 128 texels tall, where the glb's own plaid shows and has the texels to resolve);
 // and a soft shadow, its edge spread over one texel and dithered into two tones on a warm white
 // page; no blob under him while he stands (only a flat one while he's lifted). Every look value
 // lives here so the look designer edits data, never code (look.js has the shape, LookPreset;
@@ -34,6 +35,6 @@ export default {
   hemi: { sky: '#fdf8ff', ground: '#e6c8c0', intensity: 1.3 },
   blob: { opacity: 0, lifted: 0.34 },
   marker: { color: '#a3826f' },
-  texture: { mipBias: 1.5 },
+  texture: { mipBias: 1.5, fineMipBias: 0.5 },
   animFps: 0,
 };

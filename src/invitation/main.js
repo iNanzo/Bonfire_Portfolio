@@ -127,9 +127,11 @@ if (webgl2()) {
       look,
       insets,
       focus: focusInsets,
-      onResize: ({ view }) => {
+      onResize: ({ grid, view }) => {
         // (Pixel Size's steps are this screen's: two resolutions that draw alike here are one.)
         ui.setPixelSteps(pixelSteps(stageEl.clientWidth, stageEl.clientHeight, window.devicePixelRatio || 1));
+        // (His shirt's plaid by how many texels tall he is, once he's in.)
+        character?.setResolution(newtTexels(view, grid));
         if (!orbit) return;
         orbitHome(orbit, view.distance);
         orbitSpan(orbit, stageSize());
@@ -240,6 +242,7 @@ function start(s) {
   })
     .then((c) => {
       character = c;
+      if (s.view) c.setResolution(newtTexels(s.view, s.grid));
       c.root.rotation.order = 'XZY'; // (the swing tilts him about the world's axes, after his yaw)
       s.scene.add(c.root);
       liftY = hangHeight(c) + HANG_GAP;
@@ -631,6 +634,7 @@ function start(s) {
         // half face in texels.)
         faceSheet: character?.faceSize ?? null,
         faceTexels: character?.faceTexels ?? 0,
+        atlas: character?.atlas ?? null,
         pos: { x: character?.root.position.x ?? 0, z: character?.root.position.z ?? 0 },
         lift: character?.root.position.y ?? 0,
         heading: body.body.yaw,
