@@ -34,6 +34,7 @@ import {
   orbitPose,
   orbitRelease,
   orbitReset,
+  orbitSpan,
   orbitSpot,
   orbitStep,
   orbitWheel,
@@ -111,7 +112,9 @@ if (webgl2()) {
       look,
       insets,
       onResize: ({ view }) => {
-        if (orbit) orbitHome(orbit, view.distance);
+        if (!orbit) return;
+        orbitHome(orbit, view.distance);
+        orbitSpan(orbit, stageSize());
       },
     });
   } catch {
@@ -124,6 +127,11 @@ if (!stage) {
   ui.setStatus('NEWT needs WebGL 2 to draw, and this browser has it turned off.');
 } else {
   start(stage);
+}
+
+/** The stage's size, CSS px (a drag across it turns the camera the same share of a turn on any screen). */
+function stageSize() {
+  return { w: stageEl.clientWidth, h: stageEl.clientHeight };
 }
 
 /** Where the default view keeps clear of: a top margin, the toolbar, the side edges (and the safe areas). */
@@ -152,7 +160,7 @@ function start(s) {
   const mix = createMix();
   const gaze = createLook();
   const faces = createFaceState();
-  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(s.bounds) });
+  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(s.bounds), span: stageSize() });
   const cam = orbit;
   s.setCamera(orbitPose(cam));
 

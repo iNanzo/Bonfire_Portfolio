@@ -347,6 +347,18 @@ test.describe('on a desktop', () => {
     await page.mouse.up();
     await until(page, (s) => Math.abs(s.camera.yaw) > 0.5, 'turned');
     await until(page, (s) => s.camera.elevation > home.elevation + 0.05, 'tilted up a little');
+    // By the stage's width: 240 of its 1280 px turn it about 0.88 rad (three quarters of a turn
+    // across the whole width), plus a little coast; never the 2.2 rad of 2π per 700 px.
+    let settled = NaN;
+    await expect
+      .poll(async () => {
+        const was = settled;
+        settled = (await snapshot(page)).camera.yaw;
+        return Math.abs(settled - was) < 1e-4;
+      }, 'the turn settles')
+      .toBe(true);
+    expect(Math.abs(settled), `turned ${settled.toFixed(2)} rad`).toBeGreaterThan(0.7);
+    expect(Math.abs(settled), `turned ${settled.toFixed(2)} rad`).toBeLessThan(1.6);
     let s = await snapshot(page);
     expect(s.state).toBe('idle');
     expect(s.held).toBe(false);
