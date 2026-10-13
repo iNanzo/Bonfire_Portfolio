@@ -13,10 +13,10 @@ export const NEWT_RADIUS = 0.25;
 export const NEWT_HEIGHT = 1.0;
 /**
  * The play area's radius, world units: where his root may go. A 390 px phone at the default
- * zoom shows about ±2.4 across his middle, edge to edge; 2.2 keeps him (his body's 0.25
- * included) on that screen at the rim.
+ * zoom shows about ±2.4 across his middle, edge to edge; 2.0 keeps all of him (his body's 0.25
+ * too) on that screen at the rim, whichever way the camera has turned.
  */
-export const AREA_RADIUS = 2.2;
+export const AREA_RADIUS = 2.0;
 
 /**
  * The play area: a disc of `radius` around (`x`, `z`), as Bounds (its square, and `r`).

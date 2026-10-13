@@ -19,7 +19,7 @@
 // lines; main.js moves them (setBlob: stronger while he's lifted; the marker where the pointer
 // meets the floor). `bounds` is the play area (area.js: a fixed disc on the floor).
 import * as THREE from 'three';
-import { NEWT_HEIGHT, playArea } from './area.js';
+import { NEWT_HEIGHT, NEWT_RADIUS, playArea } from './area.js';
 import { TEXELS, frameView, texelGrid } from './pixels.js';
 import { FLOOR_SIZE, createFloor, fitShadow, floorLook } from './floor.js';
 import { createRetro, decalMaterial } from './retro.js';
@@ -206,7 +206,9 @@ export function createStage(container, { preset, look, insets, framingTexels = T
     canvas.style.width = `${grid.canvasW}px`;
     canvas.style.height = `${grid.canvasH}px`;
     retro.setSize(grid.w, grid.h);
-    view = frameView({ cssW, cssH, dpr, grid, insets: insets(), texels: framingTexels, area: bounds.r });
+    // (The play area and his body at its rim all show.)
+    const area = (bounds.r ?? 0) + NEWT_RADIUS;
+    view = frameView({ cssW, cssH, dpr, grid, insets: insets(), texels: framingTexels, area });
     camera.fov = view.fov;
     camera.near = view.near;
     camera.far = view.far;
