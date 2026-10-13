@@ -3,11 +3,13 @@
 // those edges are his walls (walking, wandering, fleeing, carrying). It's worked out from the
 // camera (pixels.js frameView) for each screen and toolbar, so it's checked here by projecting
 // its corners back onto the screen: his feet stay over the toolbar and clear of the sides, his
-// head stays under the top margin, the area reaches those limits (it's the most there is), and
-// a screen too small for him still gives a spot to stand on, never NaN.
+// head stays under the top margin, the area reaches those limits (it's the most there is: a
+// trapezoid, wider at the back as the floor on screen is), and a screen too small for him still
+// gives a spot to stand on, never NaN.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NEWT_HEIGHT, NEWT_RADIUS, playArea } from '../src/invitation/area.js';
+import { xRange } from '../src/invitation/steer.js';
 import { DEFAULT_PIXEL, frameView, project, texelGrid } from '../src/invitation/pixels.js';
 import { DEFAULT_LOOK, LOOKS } from '../src/invitation/look.js';
 
@@ -31,8 +33,27 @@ test('the play area is the floor on screen over the toolbar, inset from the edge
     const at = `${cssW}x${cssH}@${dpr}`;
     const view = viewFor(cssW, cssH, dpr);
     const b = playArea(view, { cssW, cssH, insets: INSETS });
-    for (const k of ['minX', 'maxX', 'minZ', 'maxZ']) assert.ok(Number.isFinite(b[k]), `${at}: ${k} is ${b[k]}`);
+    for (const k of ['minX', 'maxX', 'minZ', 'maxZ', 'minXBack', 'maxXBack'])
+      assert.ok(Number.isFinite(b[k]), `${at}: ${k} is ${b[k]}`);
     const r = NEWT_RADIUS;
+    // Its sides follow the screen's edges all the way back: at the back corners too, and in
+    // between (a screen edge is a straight line on the floor), his body stays clear of them
+    // and reaches them.
+    for (const z of [b.minZ, (b.minZ + b.maxZ) / 2, b.maxZ]) {
+      const [lo, hi] = xRange(b, z);
+      for (const [x, side] of [
+        [lo, -1],
+        [hi, 1],
+      ]) {
+        const xs = [0, NEWT_HEIGHT].map((y) => project(view, { x: x + side * r, y, z }).x);
+        const out = side > 0 ? Math.max(...xs) - (cssW - INSETS.right) : INSETS.left - Math.min(...xs);
+        assert.ok(
+          out <= 0.5 && out > -1.5,
+          `${at}: the side at z ${z.toFixed(2)} is ${out.toFixed(2)} px off the margin`,
+        );
+      }
+    }
+    assert.ok(b.maxXBack - b.minXBack > b.maxX - b.minX, `${at}: wider at the back`);
     // His feet at the front corners, his body's edge included, stay over the toolbar and clear
     // of the sides; so does his head there (it leans out further on screen than his feet).
     for (const x of [b.minX, b.maxX]) {
@@ -55,7 +76,7 @@ test('the play area is the floor on screen over the toolbar, inset from the edge
     assert.ok(Math.abs(right.x - (cssW - INSETS.right)) < 1.5, `${at}: the right edge (${right.x}) is the margin's`);
     // Room to play: NEWT starts in it, and it's several of him wide and deep.
     assert.ok(b.minX < 0 && b.maxX > 0 && b.minZ < 0 && b.maxZ > 0, `${at}: he starts inside it`);
-    assert.ok(b.maxX - b.minX >= 3, `${at}: ${(b.maxX - b.minX).toFixed(2)} wide`);
+    assert.ok(b.maxX - b.minX >= 2.5, `${at}: ${(b.maxX - b.minX).toFixed(2)} wide at the front`);
     assert.ok(b.maxZ - b.minZ >= 4, `${at}: ${(b.maxZ - b.minZ).toFixed(2)} deep`);
   }
 });
@@ -77,7 +98,8 @@ test('the play area follows the toolbar and the safe areas: a taller toolbar bri
 test('a screen too small for him still gives a spot to stand on, never NaN', () => {
   const view = viewFor(390, 844, 3);
   const b = playArea(view, { cssW: 390, cssH: 844, insets: { top: 500, bottom: 500, left: 300, right: 300 } });
-  for (const k of ['minX', 'maxX', 'minZ', 'maxZ']) assert.ok(Number.isFinite(b[k]), `${k} is ${b[k]}`);
-  assert.ok(b.minX <= b.maxX && b.minZ <= b.maxZ, JSON.stringify(b));
+  for (const k of ['minX', 'maxX', 'minZ', 'maxZ', 'minXBack', 'maxXBack'])
+    assert.ok(Number.isFinite(b[k]), `${k} is ${b[k]}`);
+  assert.ok(b.minX <= b.maxX && b.minZ <= b.maxZ && b.minXBack <= b.maxXBack, JSON.stringify(b));
   assert.ok(b.maxX - b.minX < 1e-9 && b.maxZ - b.minZ < 1e-9, 'a single spot');
 });
