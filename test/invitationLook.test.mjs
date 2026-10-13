@@ -59,9 +59,11 @@ import { ID, createRetro, decalMaterial, markId } from '../src/invitation/retro.
 import {
   BUTTONS,
   parseQuery,
+  SLIDE_SLOP,
   pixelLabel,
   pixelSpoken,
   sheetHtml,
+  slideIntent,
   statusHtml,
   toolbarHtml,
 } from '../src/invitation/ui.js';
@@ -734,4 +736,16 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
   assert.equal(presetOf({ ...DEFAULT_LOOK, style: 'soft' }), LOOKS.soft);
   assert.deepEqual(parseQuery('?test&seed=42&calm'), { test: true, seed: 42, calm: true, perf: false });
   assert.deepEqual(parseQuery(''), { test: false, seed: null, calm: false, perf: false });
+});
+
+test('a finger on a slider: along it past the slop it drags the slider, up or down it scrolls the sheet, and until then it is neither', () => {
+  assert.ok(SLIDE_SLOP >= 6 && SLIDE_SLOP <= 12, `a fingertip's wobble: ${SLIDE_SLOP} CSS px`);
+  assert.equal(slideIntent(0, 0), null, 'not moved yet');
+  assert.equal(slideIntent(3, -4), null, 'within the slop: a tap, or not decided');
+  assert.equal(slideIntent(SLIDE_SLOP + 1, 2), 'drag', 'along it');
+  assert.equal(slideIntent(-(SLIDE_SLOP + 1), -2), 'drag', 'along it, the other way');
+  assert.equal(slideIntent(2, -(SLIDE_SLOP + 1)), 'swipe', 'up: the sheet scrolls');
+  assert.equal(slideIntent(-3, 40), 'swipe', 'down');
+  assert.equal(slideIntent(10, -10), 'swipe', 'diagonal: the sheet scrolls, the slider keeps its value');
+  assert.equal(slideIntent(12, 11), 'drag', 'mostly along it');
 });

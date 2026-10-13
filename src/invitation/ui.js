@@ -9,7 +9,9 @@
 // comes to 1 px is Native), set by main.js as the stage is measured (setPixelSteps); every
 // Pixel Size is a step until then. The sheet is a modal dialog: it opens on Done, Tab goes
 // round inside it, the toolbar it covers is inert while it's open, and Escape closes it
-// wherever focus is; the canvas stays live (turning the camera while choosing a look).
+// wherever focus is; the canvas stays live (turning the camera while choosing a look). A finger
+// on a slider only moves it once it goes along it (slideIntent): a swipe up or down that starts
+// there scrolls the sheet, and the value the slider jumped to under the finger is put back.
 // Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
 // reports presses; main.js decides what they do.
 //
@@ -19,6 +21,21 @@ import { PIXEL_SIZES, resolutionOf, stepFor } from './pixels.js';
 import { LOOKS, MOTIONS, STYLES, validLook } from './look.js';
 
 /** @typedef {import('./types.js').ButtonName} ButtonName */
+
+/** How far a finger on a slider moves before it's a drag along it or a swipe across it, CSS px. */
+export const SLIDE_SLOP = 8;
+/**
+ * What a finger that went down on a slider and has since moved (dx, dy) CSS px is doing: 'drag'
+ * (mostly along it: it moves the slider), 'swipe' (up or down, or diagonally: the sheet scrolls
+ * and the slider keeps its value), or null (within SLIDE_SLOP: a tap, or not yet known).
+ * @param {number} dx
+ * @param {number} dy
+ * @returns {'drag'|'swipe'|null}
+ */
+export function slideIntent(dx, dy) {
+  if (Math.hypot(dx, dy) < SLIDE_SLOP) return null;
+  return Math.abs(dx) > Math.abs(dy) ? 'drag' : 'swipe';
+}
 
 /** The toolbar's action buttons, in order (Look comes last, on its own). */
 export const BUTTONS = /** @type {const} */ (['Wave', 'Spook', 'Sit', 'Run', 'Wander']);
@@ -230,6 +247,45 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
     onSheet?.(open);
   };
 
+  /**
+   * A finger (or pen) on a slider, from when it goes down until it's let go: which, where it went
+   * down, and what it's doing (slideIntent). Chrome moves a range to where a finger lands as it
+   * lands, so nothing it shows is taken until the finger goes along it, or lifts without moving
+   * (a tap on the track); a swipe puts back the value the look has.
+   * @type {{id: number, x: number, y: number, range: HTMLInputElement, intent: 'drag'|'swipe'|null}|null}
+   */
+  let finger = null;
+  /** A slider's value as the look's (pickPixel: a no-op when it's the look's already). */
+  const takeRange = (/** @type {HTMLInputElement} */ input) => {
+    if (input === range) pickPixel(Number(range.value));
+  };
+  /** Whether a slider's input waits on the finger on it (not yet a drag along it). */
+  const waiting = (/** @type {EventTarget|null} */ input) =>
+    finger !== null && finger.range === input && finger.intent !== 'drag';
+  hud.addEventListener('pointerdown', (e) => {
+    const input = /** @type {HTMLElement} */ (e.target);
+    if (e.pointerType === 'mouse' || !(input instanceof HTMLInputElement) || input.type !== 'range') return;
+    finger = { id: e.pointerId, x: e.clientX, y: e.clientY, range: input, intent: null };
+  });
+  hud.addEventListener('pointermove', (e) => {
+    if (!finger || e.pointerId !== finger.id || finger.intent) return;
+    finger.intent = slideIntent(e.clientX - finger.x, e.clientY - finger.y);
+    if (finger.intent === 'drag') takeRange(finger.range);
+    else if (finger.intent === 'swipe') syncPixel();
+  });
+  /** @param {PointerEvent} e */
+  const fingerUp = (e) => {
+    if (!finger || e.pointerId !== finger.id) return;
+    const { range: input, intent } = finger;
+    finger = null;
+    // (Lifted without moving: a tap on the track, which sets it there. A swipe, or a finger the
+    // browser took for scrolling: the look's value back.)
+    if (e.type === 'pointerup' && intent !== 'swipe') takeRange(input);
+    else syncPixel();
+  };
+  hud.addEventListener('pointerup', fingerUp);
+  hud.addEventListener('pointercancel', fingerUp);
+
   hud.addEventListener('click', (e) => {
     const el = /** @type {HTMLElement} */ (e.target).closest('button');
     if (!el || !hud.contains(el)) return;
@@ -240,13 +296,14 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
     else if (el.matches('[data-pixel-end]')) pickPixel(el.dataset.pixelEnd === 'first' ? 0 : steps.length - 1);
     else if (el.dataset.button) onButton(/** @type {ButtonName} */ (el.dataset.button));
   });
-  // (The slider while it's dragged, not only once it's let go: each step shows as it's passed.)
+  // (The slider while it's dragged, not only once it's let go: each step shows as it's passed.
+  // Under a finger, only once it goes along it.)
   hud.addEventListener('input', (e) => {
-    if (e.target === range) pickPixel(Number(range.value));
+    if (e.target === range && !waiting(range)) pickPixel(Number(range.value));
   });
   hud.addEventListener('change', (e) => {
     const input = /** @type {HTMLInputElement} */ (e.target);
-    if (input === range) return pickPixel(Number(range.value));
+    if (input === range) return waiting(range) ? undefined : pickPixel(Number(range.value));
     const key = input.dataset.look;
     if (!key) return;
     current = validLook({ ...current, [key]: input.type === 'checkbox' ? input.checked : input.value });

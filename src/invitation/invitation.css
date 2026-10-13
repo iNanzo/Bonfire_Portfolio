@@ -276,8 +276,9 @@ body {
   margin: 0;
   background: transparent;
   cursor: pointer;
-  /* (A drag along it moves it, never the sheet.) */
-  touch-action: none;
+  /* (A drag along it moves it; a swipe up or down that starts on it scrolls the sheet: ui.js
+     puts back the value it jumped to under the finger.) */
+  touch-action: pan-y;
   appearance: none;
   -webkit-appearance: none;
 }

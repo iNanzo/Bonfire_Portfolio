@@ -149,6 +149,43 @@ const poses = (page, ms) =>
     ms,
   );
 
+/**
+ * Records every Pixel Size the page saves (invitation.look.v1), in order, in window.__saved:
+ * call before the page loads.
+ */
+const recordSaves = (page) =>
+  page.addInitScript(() => {
+    window.__saved = [];
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'invitation.look.v1') window.__saved.push(JSON.parse(value).pixelSize);
+      return set.call(this, key, value);
+    };
+  });
+/** The Look sheet's scroll: how far down it is and how far it can go, CSS px. */
+const sheetScroll = (page) =>
+  page.locator('.inv-sheet').evaluate((el) => ({ top: el.scrollTop, room: el.scrollHeight - el.clientHeight }));
+/**
+ * A real finger swiping straight up from the Pixel Size slider's track, well away from its thumb
+ * (144 px in 12 moves), with the Look sheet open. Returns the slider's value text before it.
+ */
+async function swipeUpFromSlider(page) {
+  const pixel = page.getByRole('dialog', { name: 'Look' }).getByRole('slider', { name: 'Pixel Size' });
+  const before = await pixel.getAttribute('aria-valuetext');
+  const at = await pixel.evaluate((el) => Number(el.value) / Number(el.max));
+  const box = await pixel.boundingBox();
+  const x = box.x + box.width * (at < 0.5 ? 0.9 : 0.1);
+  const y = box.y + box.height / 2;
+  const touch = await toucher(page);
+  await touch('touchStart', [{ x, y }]);
+  for (let i = 1; i <= 12; i++) {
+    await touch('touchMove', [{ x, y: y - i * 12 }]);
+    await sleep(16);
+  }
+  await touch('touchEnd');
+  return before;
+}
+
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
@@ -513,6 +550,20 @@ test.describe('on a phone', () => {
     expect(await scale(), 'the page after a pinch over the Look sheet').toBe(1);
   });
 
+  test('a swipe up that starts on the Pixel Size slider leaves the Pixel Size as it was', async ({ page }) => {
+    await recordSaves(page);
+    await calm(page);
+    await page.getByRole('button', { name: 'Look' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await expect(sheet).toBeVisible();
+    const was = (await snapshot(page)).resolution;
+    const before = await swipeUpFromSlider(page);
+    await framesFor(page, 300);
+    await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', before);
+    expect(await page.evaluate(() => window.__saved), 'nothing saved').toEqual([]);
+    expect((await snapshot(page)).resolution).toBe(was);
+  });
+
   test('with the Look sheet open NEWT stays in sight above it, so its changes show on him', async ({ page }) => {
     await calm(page);
     const v = await lookOpenWithNewtInSight(page);
@@ -524,6 +575,48 @@ test.describe('on a phone', () => {
 
 test.describe('on a phone held sideways', () => {
   test.use({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+
+  test('a swipe up that starts on the Pixel Size slider scrolls the sheet and leaves the Pixel Size be; a drag along it still passes every step', async ({
+    page,
+  }) => {
+    await recordSaves(page);
+    await calm(page);
+    await page.getByRole('button', { name: 'Look' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await expect(sheet).toBeVisible();
+    const pixel = sheet.getByRole('slider', { name: 'Pixel Size' });
+    expect((await sheetScroll(page)).room, 'the sheet scrolls on a phone held sideways').toBeGreaterThan(40);
+    const was = (await snapshot(page)).resolution;
+    const before = await swipeUpFromSlider(page);
+    await expect.poll(async () => (await sheetScroll(page)).top, 'the sheet scrolled').toBeGreaterThan(40);
+    await framesFor(page, 300);
+    await expect(pixel, 'the slider kept its value').toHaveAttribute('aria-valuetext', before);
+    expect(await page.evaluate(() => window.__saved), 'nothing saved').toEqual([]);
+    expect((await snapshot(page)).resolution).toBe(was);
+    // A drag along it from its coarse end: every step on the way is the Pixel Size in turn, and
+    // the sheet stays where it is.
+    await pixel.focus();
+    await page.keyboard.press('Home');
+    await expect(pixel).toHaveAttribute('aria-valuetext', '16 by 16');
+    await page.evaluate(() => (window.__saved.length = 0));
+    const top = (await sheetScroll(page)).top;
+    const box = await pixel.boundingBox();
+    const y = box.y + box.height / 2;
+    const touch = await toucher(page);
+    await touch('touchStart', [{ x: box.x + 14, y }]);
+    for (let i = 1; i <= 32; i++) {
+      await touch('touchMove', [{ x: box.x + 14 + (i * (box.width - 18)) / 32, y }]);
+      await sleep(16);
+    }
+    await touch('touchEnd');
+    await expect(pixel).toHaveAttribute('aria-valuetext', 'Off');
+    const saved = await page.evaluate(() => window.__saved.filter((v, i, a) => v !== a[i - 1]));
+    const max = Number(await pixel.getAttribute('max'));
+    expect(saved, 'every step after 16×16, in turn').toHaveLength(max);
+    expect(saved.at(-1)).toBe('off');
+    expect(saved.at(-2)).toBe('native');
+    expect((await sheetScroll(page)).top, 'the sheet stayed put').toBe(top);
+  });
 
   test('with the Look sheet open NEWT stays in sight beside it', async ({ page }) => {
     await calm(page);
