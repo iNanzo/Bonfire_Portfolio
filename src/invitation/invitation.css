@@ -282,3 +282,20 @@ body {
 .inv-switch:has(input:disabled) {
   opacity: 0.45;
 }
+
+/* The camera: how to turn and zoom it, and the way back to the default view. */
+.inv-camera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+.inv-camera .inv-hint {
+  flex: 1 1 auto;
+  margin: 0;
+}
+.inv-camera .inv-btn {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 14px;
+}

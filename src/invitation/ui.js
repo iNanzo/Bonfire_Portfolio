@@ -1,8 +1,9 @@
 // The invitation toy's page around the canvas: the status line ("Loading…", or what went wrong),
 // the toolbar along the bottom (Wave, Spook, Sit or Stand, Run, Wander, Look: every button a
 // thumb's height, labelled, never a tooltip) and the Look menu, a bottom sheet (Pixel Size,
-// Dithering, Outlines, Style). Pure markup functions (no DOM) plus a thin binding (bindUi) that
-// puts them in the stage and reports presses; main.js decides what they do.
+// Dithering, Outlines, Style, and Reset Camera with a line on turning and zooming the view).
+// Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
+// reports presses; main.js decides what they do.
 //
 //   parseQuery(search)   ?test (the window.__invitation hooks), ?seed=N, ?calm, ?perf
 
@@ -77,6 +78,7 @@ export function sheetHtml(look) {
   <div class="inv-switches">${toggle('dither', 'Dithering', l.dither)}${toggle('outlines', 'Outlines', l.outlines)}</div>
   <p class="inv-hint inv-hint-off" data-off-hint${l.pixelSize === 'off' ? '' : ' hidden'}>Dithering and outlines are part of the pixel look: pick a pixel size to see them.</p>
   <fieldset class="inv-field"><legend>Style</legend><div class="inv-segs">${styles}</div></fieldset>
+  <div class="inv-camera"><p class="inv-hint">Drag empty space to turn the view, and pinch or scroll to zoom.</p><button type="button" class="inv-btn" data-reset-camera>Reset Camera</button></div>
 </section>`;
 }
 
@@ -88,9 +90,9 @@ export function statusHtml() {
 /**
  * Put the page's controls in the stage and report what's pressed.
  * @param {HTMLElement} stage
- * @param {{look: import('./look.js').Look, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void}} o
+ * @param {{look: import('./look.js').Look, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void, onResetCamera?(): void}} o
  */
-export function bindUi(stage, { look, onButton, onLook }) {
+export function bindUi(stage, { look, onButton, onLook, onResetCamera }) {
   const hud = document.createElement('div');
   hud.className = 'inv-hud';
   hud.innerHTML = statusHtml() + toolbarHtml() + sheetHtml(look);
@@ -122,6 +124,7 @@ export function bindUi(stage, { look, onButton, onLook }) {
     if (el.matches('[data-look-open]')) openSheet(sheet.hidden);
     else if (el.matches('[data-look-close]')) openSheet(false);
     else if (el.matches('[data-reload]')) location.reload();
+    else if (el.matches('[data-reset-camera]')) onResetCamera?.();
     else if (el.dataset.button) onButton(/** @type {ButtonName} */ (el.dataset.button));
   });
   hud.addEventListener('change', (e) => {
