@@ -9,9 +9,10 @@
 // turns his head, each button plays its clip, a floor tap walks him there, and the cursor turns his
 // head on a desktop. The camera: a drag on empty space turns it, the wheel and a two-finger pinch
 // zoom it, and Reset Camera brings it back. A pinch over the toolbar or the Look sheet never
-// zooms the page, and only the left mouse button holds or walks him. Every wait is on a state
-// through `?test`'s window.__invitation, never on a duration (CI's software WebGL runs slower
-// than real time), and touches are real ones (CDP Input.dispatchTouchEvent).
+// zooms the page, only the left mouse button holds or walks him, and Escape closes the Look
+// sheet wherever focus is. Every wait is on a state through `?test`'s window.__invitation,
+// never on a duration (CI's software WebGL runs slower than real time), and touches are real
+// ones (CDP Input.dispatchTouchEvent).
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
@@ -436,6 +437,32 @@ test.describe('on a desktop', () => {
     // The left button still walks him there.
     await page.mouse.click(floor.x, floor.y);
     await until(page, (t) => t.state === 'walk', 'walking after a left click');
+  });
+
+  test('Escape closes the Look sheet after a click or a drag on the canvas too, and focus goes back to Look', async ({
+    page,
+  }) => {
+    await calm(page);
+    const look = page.getByRole('button', { name: 'Look' });
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    // A click on empty space while it's open: focus leaves the sheet for the page.
+    await look.click();
+    await expect(sheet).toBeVisible();
+    await page.mouse.click(640, 120);
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    await expect(look).toBeFocused();
+    // A drag on empty space (turning the camera) while it's open.
+    await look.click();
+    await expect(sheet).toBeVisible();
+    await page.mouse.move(300, 120);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(300 + i * 20, 120 + i * 3);
+    await page.mouse.up();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    await expect(look).toBeFocused();
   });
 
   test('hovering turns his head', async ({ page }) => {

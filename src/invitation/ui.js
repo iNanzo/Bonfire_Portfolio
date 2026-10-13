@@ -115,19 +115,34 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera }) {
       /** @type {HTMLInputElement} */ ($(`input[data-look="${key}"]`)).disabled = current.pixelSize === 'off';
   };
   syncOff();
+  /**
+   * While the sheet is open, on the whole document: Escape closes it wherever focus is (a click
+   * or a drag on the canvas leaves focus on the page, outside the sheet).
+   * @param {KeyboardEvent} e
+   */
+  const onKey = (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    openSheet(false);
+  };
+  /** @param {boolean} open */
   const openSheet = (open) => {
     sheet.hidden = !open;
     opener.setAttribute('aria-expanded', String(open));
     stage.classList.toggle('is-looking', open);
-    if (open)
+    if (open) {
+      document.addEventListener('keydown', onKey);
       /** @type {HTMLElement} */ (sheet.querySelector('input:checked') ?? sheet.querySelector('input'))?.focus();
-    else opener.focus();
+    } else {
+      document.removeEventListener('keydown', onKey);
+      opener.focus();
+    }
   };
 
   hud.addEventListener('click', (e) => {
     const el = /** @type {HTMLElement} */ (e.target).closest('button');
     if (!el || !hud.contains(el)) return;
-    if (el.matches('[data-look-open]')) openSheet(sheet.hidden);
+    if (el.matches('[data-look-open]')) openSheet(Boolean(sheet.hidden));
     else if (el.matches('[data-look-close]')) openSheet(false);
     else if (el.matches('[data-reload]')) location.reload();
     else if (el.matches('[data-reset-camera]')) onResetCamera?.();
@@ -141,13 +156,6 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera }) {
     syncOff();
     onLook(current);
   });
-  hud.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !sheet.hidden) {
-      e.preventDefault();
-      openSheet(false);
-    }
-  });
-
   return {
     /**
      * Show a message in place of the toy ("Loading…", what went wrong), or hide it (null).
@@ -185,6 +193,7 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera }) {
       return !sheet.hidden;
     },
     destroy() {
+      document.removeEventListener('keydown', onKey);
       hud.remove();
     },
   };
