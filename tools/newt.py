@@ -244,6 +244,7 @@ def blend(p, q, t):
 
 ANKLE = 0.417  # the ankle over the sole (clips.js ANKLE_HEIGHT)
 STANCE = (0.6, 0.06, ANKLE)  # Idle's ankle, his left (+X); the right mirrors it
+WIDE = (1.0, -0.08, ANKLE)  # Land's: where Fall's spread feet touch down
 
 ARM_RELAXED = {'shoulder': (0, 0), 'upper': (4, 19), 'lower': (16, 15), 'twist': 0}
 IDLE = {
@@ -270,18 +271,18 @@ SIT = {
 
 HELD = {
     'pin': True,
-    'hips': {'loc': (0, 0, 0), 'rot': (-4, 0, 0)},
-    'chest': (-3, 0, 0),
-    'neck': (8, 0, 0),
-    'head': (10, 0, 0),
-    'armL': {'shoulder': (6, 4), 'upper': (14, 8), 'lower': (24, 6), 'twist': 0},
-    'armR': {'shoulder': (6, 4), 'upper': (14, 8), 'lower': (24, 6), 'twist': 0},
-    'legL': {'rel': (-0.08, -0.12, -0.02), 'pitch': 55, 'knee': (0.2, -1, 0)},
-    'legR': {'rel': (-0.08, -0.12, -0.02), 'pitch': 55, 'knee': (0.2, -1, 0)},
+    'hips': {'loc': (0, 0, 0), 'rot': (-6, 0, 0)},
+    'chest': (-2, 0, 0),
+    'neck': (10, 0, 0),
+    'head': (12, 0, 0),
+    'armL': {'shoulder': (20, 6), 'upper': (22, 17), 'lower': (36, 12), 'twist': 0},
+    'armR': {'shoulder': (20, 6), 'upper': (22, 17), 'lower': (36, 12), 'twist': 0},
+    'legL': {'rel': (-0.2, -0.22, 0.06), 'pitch': 62, 'yaw': -8, 'knee': (0.1, -1, 0)},
+    'legR': {'rel': (-0.2, -0.22, 0.06), 'pitch': 62, 'yaw': -8, 'knee': (0.1, -1, 0)},
 }
 
 FALL = {
-    'hips': {'loc': (0, 0, -0.08), 'rot': (-6, 0, 0)},
+    'hips': {'loc': (0, 0, -0.22), 'rot': (-6, 0, 0)},
     'chest': (-6, 0, 0),
     'neck': (-4, 0, 0),
     'head': (-6, 0, 0),
@@ -371,15 +372,19 @@ RUN = {
 
 
 def held(t):
-    """Dangling by the collar: a gentle sway and one small kick of the left leg mid-loop."""
-    sw = math.sin(2 * math.pi * t)
-    kick = max(0.0, math.sin(2 * math.pi * (t - 0.45) / 0.3)) if 0.45 <= t <= 0.75 else 0.0
-    p = merge(HELD, hips={'loc': (0, 0, 0), 'rot': (-4 + 2 * math.cos(2 * math.pi * t), 3 * sw, 0)})
-    p['head'] = (10 + 2 * math.cos(2 * math.pi * t), -2.5 * sw, 0)
-    p['armL'] = merge(HELD['armL'], upper=(14 + 4 * sw, 8), lower=(24 + 6 * sw, 6))
-    p['armR'] = merge(HELD['armR'], upper=(14 - 4 * sw, 8), lower=(24 - 6 * sw, 6))
-    p['legL'] = merge(HELD['legL'], rel=(-0.08, -0.12 - 0.35 * kick, -0.02 + 0.25 * kick))
-    p['legR'] = merge(HELD['legR'], rel=(-0.08, -0.12 + 0.1 * sw, -0.02))
+    """Dangling by the collar: a gentle sway the limbs follow late, and one small kick."""
+    tau = 2 * math.pi
+    sw = math.sin(tau * t)
+    lag = math.sin(tau * (t - 0.08))  # the arms and legs follow the body's swing late
+    kick = math.sin(math.pi * (t - 0.5) / 0.22) if 0.5 <= t <= 0.72 else 0.0
+    p = merge(HELD, hips={'loc': (0, 0, 0), 'rot': (-6 + 2 * math.cos(tau * t), 4 * sw, 0)})
+    p['chest'] = (-2, -1.5 * lag, 0)
+    p['head'] = (12 + 3 * math.cos(tau * t), -4 * lag, 2 * lag)
+    for side, s in SIDES:
+        arm = HELD['arm' + side]
+        p['arm' + side] = merge(arm, upper=(22 + 5 * s * lag, 17 - 4 * s * lag), lower=(36 + 8 * s * lag, 12))
+    p['legL'] = merge(HELD['legL'], rel=(-0.2 + 0.05 * lag, -0.22 - 0.6 * kick, 0.06 + 0.45 * kick), pitch=62 - 30 * kick)
+    p['legR'] = merge(HELD['legR'], rel=(-0.2 - 0.05 * lag, -0.22 + 0.08 * lag, 0.06))
     return p
 
 
@@ -458,19 +463,39 @@ TABLES = {
         (20, IDLE),
     ),
     'Land': keys(
-        (0, merge(FALL, legL={'at': (0.8, 0.0, ANKLE), 'pitch': 10}, legR={'at': (0.8, 0.0, ANKLE), 'pitch': 10})),
-        (3, merge(
-            IDLE,
-            hips={'loc': (0, 0, -0.55), 'rot': (10, 0, 0)},
-            chest=(8, 0, 0),
-            head=(4, 0, 0),
-            armL={'shoulder': (4, 0), 'upper': (40, 60), 'lower': (60, 40), 'twist': 0},
-            armR={'shoulder': (4, 0), 'upper': (40, 60), 'lower': (60, 40), 'twist': 0},
-            legL={'at': (0.8, 0.0, ANKLE), 'pitch': 0},
-            legR={'at': (0.8, 0.0, ANKLE), 'pitch': 0},
+        (0, 'fall@0'),  # where Fall loops from: the page lands him when a foot touches
+        (2, merge(
+            FALL,
+            hips={'loc': (0, 0, -0.5), 'rot': (6, 0, 0)},
+            chest=(4, 0, 0),
+            head=(-8, 0, 0),
+            armL={'shoulder': (16, 0), 'upper': (125, 58), 'lower': (150, 40), 'twist': 0},
+            armR={'shoulder': (16, 0), 'upper': (125, 58), 'lower': (150, 40), 'twist': 0},
+            legL={'at': WIDE, 'pitch': 0, 'knee': (0.8, -1, 0)},
+            legR={'at': WIDE, 'pitch': 0, 'knee': (0.8, -1, 0)},
         )),
-        (7, merge(IDLE, hips={'loc': (0, 0, 0.0), 'rot': (-2, 0, 0)}, legL={'at': (0.7, 0.03, ANKLE + 0.15), 'pitch': 5})),
-        (10, merge(IDLE, legR={'at': (0.66, 0.05, ANKLE + 0.1), 'pitch': 3})),
+        (4, merge(
+            IDLE,
+            hips={'loc': (0, 0, -0.66), 'rot': (12, 0, 0)},
+            chest=(10, 0, 0),
+            head=(8, 0, 0),
+            armL={'shoulder': (2, 0), 'upper': (40, 58), 'lower': (62, 42), 'twist': 0},
+            armR={'shoulder': (2, 0), 'upper': (40, 58), 'lower': (62, 42), 'twist': 0},
+            legL={'at': WIDE, 'pitch': 0, 'knee': (0.8, -1, 0)},
+            legR={'at': WIDE, 'pitch': 0, 'knee': (0.8, -1, 0)},
+        )),
+        (7, merge(
+            IDLE,
+            hips={'loc': (0, 0, -0.12), 'rot': (-3, 0, 0)},
+            chest=(-2, 0, 0),
+            head=(4, 0, 0),
+            armL={'shoulder': (4, 0), 'upper': (6, 34), 'lower': (14, 30), 'twist': 0},
+            armR={'shoulder': (4, 0), 'upper': (6, 34), 'lower': (14, 30), 'twist': 0},
+            legL={'at': WIDE, 'pitch': 0, 'knee': (0.6, -1, 0)},
+            legR={'at': WIDE, 'pitch': 0, 'knee': (0.6, -1, 0)},
+        )),
+        (9, merge(IDLE, hips={'loc': (0, 0, -0.1), 'rot': (0, -3, 0)}, legL={'at': (0.8, 0.0, ANKLE + 0.3), 'pitch': 10}, legR={'at': WIDE, 'pitch': 0, 'knee': (0.6, -1, 0)})),
+        (11, merge(IDLE, hips={'loc': (0, 0, -0.08), 'rot': (0, 3, 0)}, legR={'at': (0.78, 0.02, ANKLE + 0.25), 'pitch': 8})),
         (14, IDLE),
     ),
     'SitDown': keys(
@@ -530,7 +555,7 @@ def clip_keys(name):
         f = CYCLES[name]
         out = [(i, f(i / last)) for i in range(last)]
         return out + [(last, out[0][1])]
-    return TABLES[name]
+    return [(f, CYCLES[p.split('@')[0].title()](float(p.split('@')[1])) if isinstance(p, str) else p) for f, p in TABLES[name]]
 
 
 # ---------------------------------------------------------------------------------------------
