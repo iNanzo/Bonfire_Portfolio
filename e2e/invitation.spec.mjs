@@ -43,6 +43,27 @@ async function picture(page, frames = 3) {
   }
   return sum;
 }
+/**
+ * NEWT and a little round him (from his head to his feet on screen), small and averaged over a
+ * few frames, as RGB: a change to his look, not diluted by the plain floor round him.
+ */
+async function newtPicture(page, frames = 3) {
+  const head = await page.evaluate(() => window.__invitation.screen('head'));
+  const feet = await page.evaluate(() => window.__invitation.screen('feet'));
+  const h = Math.max(40, feet.y - head.y) * 1.5;
+  const clip = { x: head.x - h / 2, y: head.y - h * 0.3, width: h, height: h * 1.2 };
+  const sum = new Float64Array(24 * 30 * 3);
+  for (let i = 0; i < frames; i++) {
+    const raw = await sharp(await page.screenshot({ clip }))
+      .resize(24, 30, { fit: 'fill' })
+      .removeAlpha()
+      .raw()
+      .toBuffer();
+    for (let k = 0; k < raw.length; k++) sum[k] += raw[k] / frames;
+    await page.waitForTimeout(120);
+  }
+  return sum;
+}
 /** How far apart two pictures are (the mean difference per channel). */
 const apart = (a, b) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.length;
 /** A picture of one flat colour: the mean of `pic`. */
@@ -275,7 +296,7 @@ test.describe('on a phone', () => {
     const coarse = await snapshot(page);
     expect(coarse.pixelScale).toBe(4);
     expect(coarse.newtTexels).toBeCloseTo(24.9, 0);
-    await sheet.getByRole('radio', { name: 'Soft' }).check();
+    await sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Soft' }).check();
     await sheet.getByRole('button', { name: 'Done' }).click();
     await expect(sheet).toBeHidden();
     const changed = await picture(page);
@@ -286,7 +307,7 @@ test.describe('on a phone', () => {
     await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', '24 by 24');
     expect((await snapshot(page)).resolution).toBe(24);
     expect((await snapshot(page)).pixelScale).toBe(4);
-    await expect(sheet.getByRole('radio', { name: 'Soft' })).toBeChecked();
+    await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Soft' })).toBeChecked();
     expect(errors).toEqual([]);
   });
 
@@ -564,6 +585,47 @@ test.describe('on a phone', () => {
     expect((await snapshot(page)).resolution).toBe(was);
   });
 
+  test('the Shader options by touch: a swipe up from the Colors slider scrolls the sheet and leaves it be, a drag along it sets it', async ({
+    page,
+  }) => {
+    await calm(page);
+    await page.getByRole('button', { name: 'Look' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    const colors = sheet.getByRole('slider', { name: 'Colors' });
+    await colors.scrollIntoViewIfNeeded();
+    const was = (await snapshot(page)).shader.levels;
+    const before = await colors.getAttribute('aria-valuetext');
+    const top = (await sheetScroll(page)).top;
+    const box = await colors.boundingBox();
+    const touch = await toucher(page);
+    const x = box.x + box.width * 0.5;
+    const y = box.y + box.height / 2;
+    await touch('touchStart', [{ x, y }]);
+    for (let i = 1; i <= 10; i++) {
+      await touch('touchMove', [{ x, y: y - i * 12 }]);
+      await sleep(16);
+    }
+    await touch('touchEnd');
+    await expect.poll(async () => (await sheetScroll(page)).top, 'the sheet scrolled').not.toBe(top);
+    await framesFor(page, 200);
+    await expect(colors).toHaveAttribute('aria-valuetext', before);
+    expect((await snapshot(page)).shader.levels).toBe(was);
+    expect((await snapshot(page)).custom).toBe(false);
+    // Along it, to its coarse end: Colors 4.
+    await colors.scrollIntoViewIfNeeded();
+    const at = await colors.boundingBox();
+    const yy = at.y + at.height / 2;
+    await touch('touchStart', [{ x: at.x + at.width * 0.6, y: yy }]);
+    for (let i = 1; i <= 16; i++) {
+      await touch('touchMove', [{ x: at.x + at.width * 0.6 - (i * at.width) / 16, y: yy }]);
+      await sleep(16);
+    }
+    await touch('touchEnd');
+    await expect(colors).toHaveAttribute('aria-valuetext', '4 levels');
+    await expect.poll(async () => (await snapshot(page)).pass.levels).toBe(4);
+    expect((await snapshot(page)).custom).toBe(true);
+  });
+
   test('with the Look sheet open NEWT stays in sight above it, so its changes show on him', async ({ page }) => {
     await calm(page);
     const v = await lookOpenWithNewtInSight(page);
@@ -593,8 +655,9 @@ test.describe('on a phone held sideways', () => {
     await expect(pixel, 'the slider kept its value').toHaveAttribute('aria-valuetext', before);
     expect(await page.evaluate(() => window.__saved), 'nothing saved').toEqual([]);
     expect((await snapshot(page)).resolution).toBe(was);
-    // A drag along it from its coarse end: every step on the way is the Pixel Size in turn, and
-    // the sheet stays where it is.
+    // A drag along it from its coarse end (the sheet back at its top, the slider out from under
+    // its head): every step on the way is the Pixel Size in turn, and the sheet stays where it is.
+    await page.locator('.inv-sheet').evaluate((el) => (el.scrollTop = 0));
     await pixel.focus();
     await page.keyboard.press('Home');
     await expect(pixel).toHaveAttribute('aria-valuetext', '16 by 16');
@@ -697,7 +760,7 @@ test.describe('on a desktop', () => {
     expect(size[1]).toBe(Math.ceil(size[4] * size[2]));
   });
 
-  test('a first sweep of Pixel Size to Off and back links no new shaders: both paths are warmed once NEWT is in', async ({
+  test('a first sweep of Pixel Size to Off and back, and every Shader option moved, link no new shaders: both paths are warmed once NEWT is in', async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -725,6 +788,131 @@ test.describe('on a desktop', () => {
       }
     await expect(pixel).toHaveAttribute('aria-valuetext', '16 by 16');
     expect((await page.evaluate(() => window.__links)) - before, 'shaders linked during the sweep').toBe(0);
+    // Every Shader option moved, end to end, its choices and switches each way: uniforms and the
+    // toon ramp's texels only, never a new program.
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    for (const slider of await sheet.locator('input[type="range"][data-shader]').all()) {
+      await slider.focus();
+      for (const key of ['End', 'Home']) {
+        await page.keyboard.press(key);
+        await framesFor(page, 40);
+      }
+    }
+    for (const radio of await sheet.locator('input[type="radio"][data-shader]').all()) {
+      await radio.check({ force: true });
+      await framesFor(page, 40);
+    }
+    for (const box of await sheet.locator('input[type="checkbox"][data-shader]').all())
+      for (let i = 0; i < 2; i++) {
+        await box.click({ force: true });
+        await framesFor(page, 40);
+      }
+    expect((await snapshot(page)).custom, 'the options moved').toBe(true);
+    expect((await page.evaluate(() => window.__links)) - before, 'shaders linked moving the Shader options').toBe(0);
+  });
+
+  test('the Shader options: a control changes NEWT at once, the Style row turns Custom, a reload keeps it, Reset To Style brings the style back, and another Style clears it', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    const look = page.getByRole('button', { name: 'Look' });
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    const style = sheet.getByRole('group', { name: 'Style' });
+    const ds = (await snapshot(page)).shader;
+    const before = await newtPicture(page);
+    await look.click();
+    await expect(style.getByRole('radio', { name: 'DS' })).toBeChecked();
+    await expect(style.getByRole('radio', { name: 'Custom' })).toBeDisabled();
+    await expect(sheet.getByRole('button', { name: 'Reset To Style' })).toBeDisabled();
+    /** A slider by its name, moved by the keyboard. */
+    const keys = async (name, ...presses) => {
+      const slider = sheet.getByRole('slider', { name });
+      await slider.focus();
+      for (const key of presses) await page.keyboard.press(key);
+      return slider;
+    };
+    const colors = await keys('Colors', 'Home');
+    await expect(colors).toHaveAttribute('aria-valuetext', '4 levels');
+    await expect.poll(async () => (await snapshot(page)).pass.levels, 'Colors reach the pass').toBe(4);
+    await keys('Outline Strength', 'End');
+    await expect.poll(async () => (await snapshot(page)).pass.outline).toBe(1);
+    await sheet.getByRole('radiogroup', { name: 'Toon Shading' }).getByRole('radio', { name: '4 Bands' }).check();
+    await sheet.getByRole('radiogroup', { name: 'Shadow' }).getByRole('radio', { name: 'Soft' }).check();
+    await expect.poll(async () => (await snapshot(page)).pass.shadeSoft, 'a soft shadow edge').toBe(1);
+    const angle = await keys('Light Angle', ...Array(6).fill('ArrowRight'));
+    await expect(angle).toHaveAttribute('aria-valuetext', '90 degrees');
+    await expect.poll(async () => (await snapshot(page)).pass.turn, 'the light turned round him').toBe(90);
+    await expect(style.getByRole('radio', { name: 'Custom' })).toBeChecked();
+    await expect(style.getByRole('radio', { name: 'DS' })).not.toBeChecked();
+    const custom = await snapshot(page);
+    expect(custom.custom).toBe(true);
+    expect(custom.shader).toEqual({ ...ds, levels: 4, outline: 1, bands: '4', edge: 'soft', turn: 90 });
+    await sheet.getByRole('button', { name: 'Done' }).click();
+    await expect(sheet).toBeHidden();
+    expect(apart(before, await newtPicture(page)), 'NEWT looks different').toBeGreaterThan(6);
+    // A reload keeps the changes, and only they are stored.
+    await page.reload();
+    await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('invitation.look.v1') ?? '{}'));
+    expect(stored.style).toBe('ds');
+    expect(stored.shader).toEqual({ levels: 4, outline: 1, bands: '4', edge: 'soft', turn: 90 });
+    expect((await snapshot(page)).shader).toEqual(custom.shader);
+    expect((await snapshot(page)).pass.levels).toBe(4);
+    await look.click();
+    await expect(style.getByRole('radio', { name: 'Custom' })).toBeChecked();
+    await expect(sheet.getByRole('slider', { name: 'Colors' })).toHaveAttribute('aria-valuetext', '4 levels');
+    // Reset To Style: DS's own values again.
+    await sheet.getByRole('button', { name: 'Reset To Style' }).click();
+    await expect(style.getByRole('radio', { name: 'DS' })).toBeChecked();
+    await expect(style.getByRole('radio', { name: 'Custom' })).toBeDisabled();
+    await expect(sheet.getByRole('button', { name: 'Reset To Style' })).toBeDisabled();
+    expect((await snapshot(page)).shader).toEqual(ds);
+    expect((await snapshot(page)).custom).toBe(false);
+    await expect(sheet.getByRole('slider', { name: 'Colors' })).toHaveAttribute(
+      'aria-valuetext',
+      `${ds.levels} levels`,
+    );
+    // A change, then another Style: that style's own values, the change cleared.
+    await keys('Saturation', 'Home');
+    await expect(style.getByRole('radio', { name: 'Custom' })).toBeChecked();
+    await style.getByRole('radio', { name: 'Soft' }).check();
+    await expect.poll(async () => (await snapshot(page)).custom).toBe(false);
+    const soft = await snapshot(page);
+    expect(soft.shader.saturation).not.toBe(0);
+    expect(soft.pass.levels).toBe(soft.shader.levels);
+    expect(soft.shader.ring, 'the outer ring Soft draws').toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test('at Pixel Size Off the Shader options of the pixel look rest, and toon shading, the shadow strength and the light still apply', async ({
+    page,
+  }) => {
+    await calm(page);
+    await page.getByRole('button', { name: 'Look' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await sheet.getByRole('button', { name: 'Pixel Size Off', exact: true }).click();
+    await expect(sheet.locator('[data-shader-off-hint]')).toBeVisible();
+    for (const name of [
+      'Colors',
+      'Dither Strength',
+      'Outline Strength',
+      'Saturation',
+      'Warmth',
+      'Brightness',
+      'Contrast',
+    ])
+      await expect(sheet.getByRole('slider', { name }), name).toBeDisabled();
+    for (const name of ['Shadow Strength', 'Light Angle', 'Light Strength'])
+      await expect(sheet.getByRole('slider', { name }), name).toBeEnabled();
+    await expect(sheet.getByRole('switch', { name: 'Highlight' })).toBeEnabled();
+    const strength = sheet.getByRole('slider', { name: 'Light Strength' });
+    await strength.focus();
+    const was = (await snapshot(page)).pass.light;
+    await page.keyboard.press('End');
+    await expect
+      .poll(async () => (await snapshot(page)).pass.light, 'the light twice as strong')
+      .toBeCloseTo(was * 2, 3);
   });
 
   test('only the left mouse button holds or walks him: a right press on him, a right- or middle-click on the floor leave him be', async ({
@@ -804,11 +992,12 @@ test.describe('on a desktop', () => {
     const focused = () =>
       page.evaluate(() => {
         const a = /** @type {HTMLElement} */ (document.activeElement);
-        const what = a.dataset?.look ? `${a.dataset.look}=${a.getAttribute('value') ?? ''}` : a.textContent?.trim();
+        const key = a.dataset?.look ?? a.dataset?.shader;
+        const what = key ? `${key}=${a.getAttribute('value') ?? ''}` : a.textContent?.trim();
         return { inside: Boolean(a.closest('.inv-sheet')), what: `${a.tagName} ${what}` };
       });
     const stops = new Set();
-    for (let i = 1; i <= 20; i++) {
+    for (let i = 1; i <= 30; i++) {
       await page.keyboard.press('Tab');
       const f = await focused();
       expect(f.inside, `Tab ${i}: ${f.what}`).toBe(true);
@@ -820,8 +1009,9 @@ test.describe('on a desktop', () => {
       expect(f.inside, `Shift+Tab ${i}: ${f.what}`).toBe(true);
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
-    // Motion and Reset Camera.
-    expect(stops.size, [...stops].join(', ')).toBe(9);
+    // Motion, the 15 Shader options (Reset To Style rests until one is the user's own) and Reset
+    // Camera.
+    expect(stops.size, [...stops].join(', ')).toBe(24);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');

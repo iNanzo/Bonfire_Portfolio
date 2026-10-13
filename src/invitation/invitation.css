@@ -170,7 +170,9 @@ body {
   box-sizing: border-box;
   width: 100%;
   max-width: 520px;
-  max-height: 100%;
+  /* (Never so tall that NEWT can't show above it, at his size, with room: it scrolls instead.
+     A phone held sideways shows him beside it, so there it may take the whole height.) */
+  max-height: max(55%, 100% - 340px);
   overflow-y: auto;
   overscroll-behavior: contain;
   touch-action: pan-y;
@@ -377,6 +379,70 @@ body {
 }
 .inv-switch:has(input:disabled) {
   opacity: 0.45;
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .inv-sheet {
+    max-height: 100%;
+  }
+}
+
+/* The Shader options: a row each, its label, then a slider with its value beside it (or the
+   row's segments, or a switch), the heading with Reset To Style. */
+.inv-shader-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.inv-shader-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.inv-btn-small {
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+.inv-control {
+  display: grid;
+  grid-template-columns: 8.4em minmax(0, 1fr) 4.4em;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 44px;
+  margin-top: 4px;
+}
+.inv-control-label {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.15;
+}
+.inv-control-value {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.inv-control-choice .inv-segs {
+  grid-column: 2 / -1;
+}
+.inv-control-choice .inv-seg {
+  flex: 1 1 auto;
+}
+.inv-control-choice .inv-seg span {
+  padding: 0 6px;
+  font-size: 14px;
+}
+.inv-control:has(input:disabled),
+.inv-seg:has(input:disabled) {
+  opacity: 0.45;
+}
+.inv-control .inv-seg:has(input:disabled) {
+  opacity: 1;
+}
+.inv-control-switch {
+  margin-top: 6px;
 }
 
 /* The camera: how to turn and zoom it, and the way back to the default view. */

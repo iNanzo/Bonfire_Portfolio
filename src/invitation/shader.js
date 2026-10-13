@@ -39,7 +39,8 @@
  * @property {number} [max]
  * @property {number} [step]
  * @property {number[]} [steps]  a range over these values, in order (the slider's index)
- * @property {Array<{value: string, label: string}>} [options]  a choice's
+ * @property {Array<{value: string, label: string, spoken?: string}>} [options]  a choice's (spoken:
+ *   its name for a screen reader, where the label alone is a bare number)
  * @property {boolean} pixelOnly  part of the pixel look: it rests at Pixel Size Off
  * @property {'dither'|'outlines'} [needs]  the Look menu switch it hangs on
  * @property {(v: any) => [string, string]} text  [shown, spoken]
@@ -146,9 +147,9 @@ export const SHADER_CONTROLS = [
     kind: 'choice',
     options: [
       { value: 'smooth', label: 'Smooth' },
-      { value: '2', label: '2' },
-      { value: '3', label: '3' },
-      { value: '4', label: '4' },
+      { value: '2', label: '2', spoken: '2 Bands' },
+      { value: '3', label: '3', spoken: '3 Bands' },
+      { value: '4', label: '4', spoken: '4 Bands' },
     ],
     pixelOnly: false,
     text: (v) => both(v === 'smooth' ? 'Smooth' : `${v} Bands`),

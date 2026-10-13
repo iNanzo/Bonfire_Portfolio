@@ -4,8 +4,11 @@
 // slider over NEWT's sprite resolutions, 16×16 to 256×256, then Native (a texel a device pixel)
 // and Off at its fine end, with a button at each end (named for what it sets: "Pixel Size
 // Off") and a line saying how many pixels tall he is on this screen; Dithering, Outlines,
-// Style, Motion (Smooth or Choppy), and Reset Camera with a line on turning and zooming the
-// view). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
+// Style (DS, Soft, and Custom, the row's own once a Shader option is the user's), Motion
+// (Smooth or Choppy), Shader (every control in shader.js's table, rendered from it: a slider
+// with its value beside it, a row of segments or a switch; Reset To Style; the pixel look's
+// ones resting at Pixel Size Off, the lines' while Outlines is off, the dither's while
+// Dithering is), and Reset Camera with a line on turning and zooming the view). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
 // to the same block there are one step, and one that comes to 1 px is Native), set by main.js
 // as the stage is measured (setPixelSteps); every Pixel Size is a step until then. The sheet is a modal dialog: it opens on Done, Tab goes
 // round inside it, the toolbar's action buttons are inert while it's open (Look, pressed,
@@ -19,7 +22,8 @@
 //   parseQuery(search)   ?test (the window.__invitation hooks), ?seed=N, ?calm, ?perf
 
 import { PIXEL_SIZES, resolutionOf, stepFor } from './pixels.js';
-import { LOOKS, MOTIONS, STYLES, validLook } from './look.js';
+import { LOOKS, MOTIONS, STYLES, isCustom, shaderOf, validLook } from './look.js';
+import { SHADER_CONTROLS, controlFor, shaderText } from './shader.js';
 
 /** @typedef {import('./types.js').ButtonName} ButtonName */
 
@@ -124,9 +128,73 @@ export function toolbarHtml() {
  * @param {string} value
  * @param {string} label
  * @param {boolean} checked
+ * @param {{disabled?: boolean, attr?: string, spoken?: string}} [o]  attr: its data attribute
+ *   (data-look by default); spoken: its name where the label alone is a bare number
  */
-const segment = (group, key, value, label, checked) =>
-  `<label class="inv-seg"><input type="radio" name="${group}" value="${value}" data-look="${key}"${checked ? ' checked' : ''}><span>${label}</span></label>`;
+const segment = (group, key, value, label, checked, { disabled = false, attr = 'data-look', spoken } = {}) =>
+  `<label class="inv-seg"><input type="radio" name="${group}" value="${value}" ${attr}="${key}"${checked ? ' checked' : ''}${disabled ? ' disabled' : ''}${spoken ? ` aria-label="${spoken}"` : ''}><span>${label}</span></label>`;
+
+/**
+ * Whether a Shader control rests (disabled) under a look: one that's part of the pixel look at
+ * Pixel Size Off, and one that hangs on Dithering or Outlines while that's off.
+ * @param {import('./shader.js').ShaderControl} c
+ * @param {import('./look.js').Look} look
+ */
+export const shaderRests = (c, look) =>
+  (c.pixelOnly && look.pixelSize === 'off') ||
+  (c.needs === 'dither' && !look.dither) ||
+  (c.needs === 'outlines' && !look.outlines);
+
+/**
+ * A slider's position for a Shader value: its index on a list of steps, else the value itself.
+ * @param {import('./shader.js').ShaderControl} c
+ * @param {import('./shader.js').ShaderValue} v
+ */
+const rangeValue = (c, v) => (c.steps ? Math.max(0, c.steps.indexOf(/** @type {number} */ (v))) : v);
+
+/**
+ * One Shader control: a slider with its label and its value beside it, a row of segments, or a
+ * switch.
+ * @param {import('./shader.js').ShaderControl} c
+ * @param {import('./shader.js').ShaderValue} v
+ * @param {boolean} rests
+ */
+function controlHtml(c, v, rests) {
+  const id = `inv-shader-${c.key}`;
+  const off = rests ? ' disabled' : '';
+  if (c.kind === 'switch')
+    return `<label class="inv-switch inv-control-switch"><input type="checkbox" role="switch" data-shader="${c.key}"${v ? ' checked' : ''}${off}><span class="inv-switch-label">${c.label}</span><span class="inv-knob" aria-hidden="true"></span></label>`;
+  if (c.kind === 'choice') {
+    const segs = (c.options ?? [])
+      .map((o) =>
+        segment(id, c.key, o.value, o.label, o.value === v, { disabled: rests, attr: 'data-shader', spoken: o.spoken }),
+      )
+      .join('');
+    return `<div class="inv-control inv-control-choice" role="radiogroup" aria-labelledby="${id}-label"><span class="inv-control-label" id="${id}-label">${c.label}</span><div class="inv-segs">${segs}</div></div>`;
+  }
+  const { shown, spoken } = shaderText(c, v);
+  const range = c.steps
+    ? `min="0" max="${c.steps.length - 1}" step="1"`
+    : `min="${c.min}" max="${c.max}" step="${c.step}"`;
+  return `<div class="inv-control"><label class="inv-control-label" for="${id}">${c.label}</label><input type="range" class="inv-range" id="${id}" ${range} value="${rangeValue(c, v)}" aria-valuetext="${spoken}" data-shader="${c.key}"${off}><output class="inv-control-value" for="${id}" data-shader-value="${c.key}" aria-hidden="true">${shown}</output></div>`;
+}
+
+/**
+ * The Shader section: every control in shader.js's table at the look's value (the style's,
+ * with the user's changes), Reset To Style (on once a value is the user's own), and a line on
+ * the ones resting at Pixel Size Off.
+ * @param {import('./look.js').Look} look
+ */
+function shaderHtml(look) {
+  const values = shaderOf(look);
+  const controls = SHADER_CONTROLS.map((c) => controlHtml(c, values[c.key], shaderRests(c, look))).join('');
+  return `<div class="inv-field inv-shader" role="group" aria-labelledby="inv-shader-title">
+    <div class="inv-shader-head"><h3 id="inv-shader-title">Shader</h3><button type="button" class="inv-btn inv-btn-small" data-shader-reset${isCustom(look) ? '' : ' disabled'}>Reset To Style</button></div>
+    <p class="inv-hint">Each style sets these. Change one and the style becomes Custom.</p>
+    ${controls}
+    <p class="inv-hint inv-hint-off" data-shader-off-hint${look.pixelSize === 'off' ? '' : ' hidden'}>Colors, lines, the shadow’s edge and the grade are part of the pixel look: pick a pixel size to see them.</p>
+  </div>`;
+}
 
 /**
  * An on/off switch.
@@ -145,7 +213,11 @@ const toggle = (key, label, on) =>
  */
 export function sheetHtml(look, steps = ALL_STEPS) {
   const l = validLook(look);
-  const styles = STYLES.map((s) => segment('inv-style', 'style', s, LOOKS[s].label, l.style === s)).join('');
+  const custom = isCustom(l);
+  // (Custom is the style row's own once a Shader value is the user's: it's never picked.)
+  const styles =
+    STYLES.map((s) => segment('inv-style', 'style', s, LOOKS[s].label, !custom && l.style === s)).join('') +
+    segment('inv-style', 'style', 'custom', 'Custom', custom, { disabled: !custom });
   const motions = MOTIONS.map((m) => segment('inv-motion', 'motion', m, MOTION_LABELS[m], l.motion === m)).join('');
   return `<section class="inv-sheet" id="inv-look" role="dialog" aria-modal="true" aria-labelledby="inv-look-title" hidden>
   <header class="inv-sheet-head"><h2 id="inv-look-title">Look</h2><button type="button" class="inv-btn inv-btn-done" data-look-close>Done</button></header>
@@ -155,6 +227,7 @@ export function sheetHtml(look, steps = ALL_STEPS) {
   <p class="inv-hint inv-hint-off" data-off-hint${l.pixelSize === 'off' ? '' : ' hidden'}>Dithering and outlines are part of the pixel look: pick a pixel size to see them.</p>
   <fieldset class="inv-field"><legend>Style</legend><div class="inv-segs">${styles}</div></fieldset>
   <fieldset class="inv-field"><legend>Motion</legend><div class="inv-segs">${motions}</div></fieldset>
+  ${shaderHtml(l)}
   <div class="inv-camera"><p class="inv-hint">Drag empty space to turn the view, and pinch or scroll to zoom.</p><button type="button" class="inv-btn" data-reset-camera>Reset Camera</button></div>
 </section>`;
 }
@@ -219,12 +292,78 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
     if (changed) onLook(current);
   };
 
+  /**
+   * The Shader section from the current look: each control at its value (the style's, with
+   * the user's changes) and resting where it doesn't apply, the Style row's Custom, and Reset
+   * To Style.
+   */
+  const syncShader = () => {
+    const values = shaderOf(current);
+    for (const input of /** @type {NodeListOf<HTMLInputElement>} */ (hud.querySelectorAll('input[data-shader]'))) {
+      const c = /** @type {import('./shader.js').ShaderControl} */ (controlFor(input.dataset.shader ?? ''));
+      const v = values[c.key];
+      input.disabled = shaderRests(c, current);
+      if (c.kind === 'switch') input.checked = v === true;
+      else if (c.kind === 'choice') input.checked = input.value === v;
+      else {
+        const { shown, spoken } = shaderText(c, v);
+        input.value = String(rangeValue(c, v));
+        input.setAttribute('aria-valuetext', spoken);
+        $(`[data-shader-value="${c.key}"]`).textContent = shown;
+      }
+    }
+    const custom = isCustom(current);
+    for (const radio of /** @type {NodeListOf<HTMLInputElement>} */ (hud.querySelectorAll('input[name="inv-style"]'))) {
+      radio.checked = radio.value === 'custom' ? custom : !custom && radio.value === current.style;
+      if (radio.value === 'custom') radio.disabled = !custom;
+    }
+    /** @type {HTMLButtonElement} */ ($('[data-shader-reset]')).disabled = !custom;
+    $('[data-shader-off-hint]').hidden = current.pixelSize !== 'off';
+  };
   const syncOff = () => {
     $('[data-off-hint]').hidden = current.pixelSize !== 'off';
     for (const key of ['dither', 'outlines'])
       /** @type {HTMLInputElement} */ ($(`input[data-look="${key}"]`)).disabled = current.pixelSize === 'off';
+    syncShader();
   };
   syncOff();
+  /** Every control from the current look (a swipe that started on a slider puts its value back). */
+  const syncAll = () => {
+    syncPixel();
+    syncShader();
+  };
+  /**
+   * A Shader control moved: its value is the user's own (or, back at the style's, no change),
+   * at once.
+   * @param {HTMLInputElement} input
+   */
+  const pickShader = (input) => {
+    const c = controlFor(input.dataset.shader ?? '');
+    if (!c || (c.kind === 'choice' && !input.checked)) return;
+    const v =
+      c.kind === 'switch'
+        ? input.checked
+        : c.kind === 'choice'
+          ? input.value
+          : c.steps
+            ? c.steps[Math.round(Number(input.value))]
+            : Number(input.value);
+    const was = JSON.stringify(current.shader);
+    current = validLook({ ...current, shader: { ...current.shader, [c.key]: v } });
+    syncShader();
+    if (JSON.stringify(current.shader) !== was) onLook(current);
+  };
+  /**
+   * A Style picked: the preset's values, the user's Shader changes cleared (Custom is the row's
+   * own, never picked); or Reset To Style (style: null).
+   * @param {string|null} style
+   */
+  const pickStyle = (style) => {
+    if (style === 'custom') return;
+    current = validLook({ ...current, style: style ?? current.style, shader: {} });
+    syncShader();
+    onLook(current);
+  };
   /**
    * While the sheet is open, on the whole document: Escape closes it wherever focus is (a click
    * or a drag on the canvas leaves focus on the page, outside the sheet), and Tab goes round
@@ -268,9 +407,10 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
    * @type {{id: number, x: number, y: number, range: HTMLInputElement, intent: 'drag'|'swipe'|null}|null}
    */
   let finger = null;
-  /** A slider's value as the look's (pickPixel: a no-op when it's the look's already). */
+  /** A slider's value as the look's (a no-op when it's the look's already). */
   const takeRange = (/** @type {HTMLInputElement} */ input) => {
     if (input === range) pickPixel(Number(range.value));
+    else if (input.dataset.shader) pickShader(input);
   };
   /** Whether a slider's input waits on the finger on it (not yet a drag along it). */
   const waiting = (/** @type {EventTarget|null} */ input) =>
@@ -284,7 +424,7 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
     if (!finger || e.pointerId !== finger.id || finger.intent) return;
     finger.intent = slideIntent(e.clientX - finger.x, e.clientY - finger.y);
     if (finger.intent === 'drag') takeRange(finger.range);
-    else if (finger.intent === 'swipe') syncPixel();
+    else if (finger.intent === 'swipe') syncAll();
   });
   /** @param {PointerEvent} e */
   const fingerUp = (e) => {
@@ -294,7 +434,7 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
     // (Lifted without moving: a tap on the track, which sets it there. A swipe, or a finger the
     // browser took for scrolling: the look's value back.)
     if (e.type === 'pointerup' && intent !== 'swipe') takeRange(input);
-    else syncPixel();
+    else syncAll();
   };
   hud.addEventListener('pointerup', fingerUp);
   hud.addEventListener('pointercancel', fingerUp);
@@ -307,18 +447,22 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
     else if (el.matches('[data-reload]')) location.reload();
     else if (el.matches('[data-reset-camera]')) onResetCamera?.();
     else if (el.matches('[data-pixel-end]')) pickPixel(el.dataset.pixelEnd === 'first' ? 0 : steps.length - 1);
+    else if (el.matches('[data-shader-reset]')) pickStyle(null);
     else if (el.dataset.button) onButton(/** @type {ButtonName} */ (el.dataset.button));
   });
-  // (The slider while it's dragged, not only once it's let go: each step shows as it's passed.
+  // (A slider while it's dragged, not only once it's let go: each step shows as it's passed.
   // Under a finger, only once it goes along it.)
   hud.addEventListener('input', (e) => {
-    if (e.target === range && !waiting(range)) pickPixel(Number(range.value));
+    const input = /** @type {HTMLInputElement} */ (e.target);
+    if (input.type === 'range' && !waiting(input)) takeRange(input);
   });
   hud.addEventListener('change', (e) => {
     const input = /** @type {HTMLInputElement} */ (e.target);
-    if (input === range) return waiting(range) ? undefined : pickPixel(Number(range.value));
+    if (input.type === 'range') return waiting(input) ? undefined : takeRange(input);
+    if (input.dataset.shader) return pickShader(input);
     const key = input.dataset.look;
     if (!key) return;
+    if (key === 'style') return pickStyle(input.value);
     current = validLook({ ...current, [key]: input.type === 'checkbox' ? input.checked : input.value });
     syncOff();
     onLook(current);

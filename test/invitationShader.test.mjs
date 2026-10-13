@@ -30,6 +30,7 @@ import {
   shaderOf,
   validLook,
 } from '../src/invitation/look.js';
+import { sheetHtml } from '../src/invitation/ui.js';
 
 const KEYS = SHADER_CONTROLS.map((c) => c.key);
 /** A storage stand-in. */
@@ -277,4 +278,71 @@ test('warmth tints the grade warm or cool, and neutral leaves it be', () => {
   assert.ok(cb === 1 && cr < cg, `cool: less red than green (${[cr, cg, cb]})`);
   const half = warmthTint(0.5);
   assert.ok(half[2] > b && half[2] < 1, 'half way');
+});
+
+/** A string as a RegExp source, literally. */
+const lit = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+test('the Look sheet’s Shader section: every control from the table, labelled, its value shown and spoken; Custom once a value is the user’s, with Reset To Style; the pixel-look ones resting at Off', () => {
+  const html = sheetHtml(DEFAULT_LOOK);
+  assert.match(html, /<h3 id="inv-shader-title">Shader<\/h3>/);
+  const values = shaderOf(DEFAULT_LOOK);
+  for (const c of SHADER_CONTROLS) {
+    const v = values[c.key];
+    const { shown, spoken } = shaderText(c, v);
+    if (c.kind === 'range') {
+      const input = new RegExp(`<input type="range"[^>]*id="inv-shader-${c.key}"[^>]*>`).exec(html)?.[0] ?? '';
+      assert.ok(input, `${c.key}: a slider`);
+      assert.match(html, new RegExp(`<label[^>]*for="inv-shader-${c.key}"[^>]*>${lit(c.label)}</label>`), c.key);
+      assert.match(input, new RegExp(`value="${c.steps ? c.steps.indexOf(v) : v}"`), `${c.key}: the style’s value`);
+      assert.match(input, new RegExp(`aria-valuetext="${lit(spoken)}"`), `${c.key}: spoken`);
+      assert.match(input, new RegExp(`data-shader="${c.key}"`));
+      assert.match(html, new RegExp(`data-shader-value="${c.key}"[^>]*>${lit(shown)}<`), `${c.key}: shown`);
+    } else if (c.kind === 'choice') {
+      assert.match(html, new RegExp(`role="radiogroup" aria-labelledby="inv-shader-${c.key}-label"`), c.key);
+      assert.match(html, new RegExp(`id="inv-shader-${c.key}-label"[^>]*>${lit(c.label)}<`), c.key);
+      for (const o of /** @type {any[]} */ (c.options)) {
+        const radio = new RegExp(`<input type="radio" name="inv-shader-${c.key}" value="${o.value}"[^>]*>`).exec(
+          html,
+        )?.[0];
+        assert.ok(radio, `${c.key} ${o.value}`);
+        assert.equal(/ checked/.test(radio), o.value === v, `${c.key} ${o.value}: checked as the style has it`);
+      }
+    } else {
+      const box = new RegExp(`<input type="checkbox" role="switch" data-shader="${c.key}"[^>]*>`).exec(html)?.[0];
+      assert.ok(box, `${c.key}: a switch`);
+      assert.equal(/ checked/.test(box), v === true, c.key);
+    }
+  }
+  // The style's own values: DS checked, Custom there but not to pick, nothing to reset.
+  assert.match(html, /value="ds" data-look="style" checked/);
+  assert.match(html, /value="custom" data-look="style" disabled/);
+  assert.match(html, /<button type="button" class="inv-btn[^"]*" data-shader-reset disabled>Reset To Style<\/button>/);
+  const custom = sheetHtml(validLook({ ...DEFAULT_LOOK, shader: { levels: 8 } }));
+  assert.match(custom, /value="custom" data-look="style" checked>/, 'a change of the user’s: Custom');
+  assert.doesNotMatch(custom, /value="ds" data-look="style" checked/);
+  assert.match(custom, /data-shader-reset>Reset To Style</);
+  assert.match(custom, /data-shader-value="levels"[^>]*>8</);
+  // At Off the pixel look's controls rest (with a line saying why); toon shading, the shadow's
+  // strength and the light still apply.
+  const off = sheetHtml({ ...DEFAULT_LOOK, pixelSize: 'off' });
+  for (const c of SHADER_CONTROLS) {
+    const tags = [...off.matchAll(new RegExp(`<input[^>]*data-shader="${c.key}"[^>]*>`, 'g'))].map((m) => m[0]);
+    assert.ok(tags.length > 0, c.key);
+    for (const tag of tags) assert.equal(/ disabled/.test(tag), c.pixelOnly, `${c.key} at Off`);
+  }
+  assert.doesNotMatch(off, /data-shader-off-hint hidden/);
+  assert.match(html, /data-shader-off-hint hidden/);
+  // Dithering off: its strength rests. Outlines off: the lines' strength, colour and ring.
+  const plain = sheetHtml({ ...DEFAULT_LOOK, dither: false, outlines: false });
+  for (const c of SHADER_CONTROLS) {
+    const tag = new RegExp(`<input[^>]*data-shader="${c.key}"[^>]*>`).exec(plain)?.[0] ?? '';
+    assert.equal(/ disabled/.test(tag), Boolean(c.needs), `${c.key} with Dithering and Outlines off`);
+  }
+  // House rules: labels in Title Case, hints sentences of at most 160 characters, no title=.
+  assert.doesNotMatch(html, /\stitle=/);
+  for (const hint of [...html.matchAll(/class="inv-hint[^"]*"[^>]*>([^<]+)</g)].map((m) => m[1]))
+    assert.ok(/^[A-Z].*\.$/.test(hint) && hint.length <= 160, hint);
+  const labels = [...html.matchAll(/>([^<>]+)</g)].map((m) => m[1].trim()).filter((t) => t && !/[.:%°]/.test(t));
+  for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( [A-Z0-9][^ ]*)*$/, label);
 });
