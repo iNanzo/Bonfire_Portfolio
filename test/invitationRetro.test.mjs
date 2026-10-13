@@ -4,11 +4,21 @@
 // after, never on the canvas; and the paper, the shadow (colour, strength, softness, dithered
 // tones) and the lines (on his edge or just outside it) taken from the look preset; his
 // textures sampled a coarser mip by the preset’s bias, and the decals (the blob, the marker)
-// drawn as flat pixel shapes, both only in the colour target.
+// drawn as flat pixel shapes, both only in the colour target; his materials can be moved onto
+// the texel grid together (a shift of under half a texel that puts one point of him on a
+// texel's centre), so his head draws the same texels while it only drifts within one.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { ID, MAX_SOFT, catcherMaterial, createRetro, decalMaterial, markId } from '../src/invitation/retro.js';
+import {
+  ID,
+  MAX_SOFT,
+  catcherMaterial,
+  createRetro,
+  decalMaterial,
+  markId,
+  snapShift,
+} from '../src/invitation/retro.js';
 
 const LOOK = { pixelSize: '2', dither: true, outlines: true, style: 'ds' };
 /** A whole preset as the pass reads it (the presets' own values are tested on their own). */
@@ -175,4 +185,73 @@ test('decals: a flat pixel shape in the colour target (their map’s alpha cut, 
   retro.render(scene, camera);
   assert.equal(s.uniforms.uIdOn.value, 0, 'Pixel Size Off: the blob’s soft falloff as it is');
   retro.dispose();
+});
+
+test('the texel snap: a shift of at most half a texel putting a point on its texel’s centre', () => {
+  const w = 195;
+  const h = 422;
+  for (const [x, y] of [
+    [0, 0],
+    [0.1234, -0.5],
+    [-0.99, 0.731],
+    [0.5, 0.25],
+  ]) {
+    const s = snapShift(x, y, w, h);
+    const px = ((x + s.x + 1) / 2) * w;
+    const py = ((y + s.y + 1) / 2) * h;
+    assert.ok(Math.abs(px - Math.floor(px) - 0.5) < 1e-6, `(${x}, ${y}): on a texel's centre across (${px})`);
+    assert.ok(Math.abs(py - Math.floor(py) - 0.5) < 1e-6, `(${x}, ${y}): and down (${py})`);
+    assert.ok(Math.abs(s.x) <= 1 / w + 1e-9 && Math.abs(s.y) <= 1 / h + 1e-9, 'half a texel at most');
+  }
+  const out = { x: 9, y: 9 };
+  assert.equal(snapShift(0, 0, 0, 0, out), out, 'into the object given');
+  assert.deepEqual(out, { x: 0, y: 0 }, 'no grid: no shift');
+});
+
+test('his materials move together by the snap uniform they share, in clip space, after three projects them', () => {
+  const snap = { value: new THREE.Vector2(0.01, -0.02) };
+  const vertex = (m) => {
+    const shader = {
+      uniforms: {},
+      vertexShader: THREE.ShaderLib.toon.vertexShader,
+      fragmentShader: THREE.ShaderLib.toon.fragmentShader,
+    };
+    m.onBeforeCompile(shader, null);
+    return shader;
+  };
+  const a = markId(new THREE.MeshToonMaterial(), ID.newt, { snap });
+  const b = markId(new THREE.MeshToonMaterial(), ID.newt, { snap });
+  const sa = vertex(a);
+  const sb = vertex(b);
+  assert.match(sa.vertexShader, /#include <project_vertex>\s*gl_Position\.xy \+= uTexelSnap \* gl_Position\.w;/);
+  assert.match(sa.vertexShader, /uniform vec2 uTexelSnap;\s*void main\(\) \{/);
+  assert.equal(sa.uniforms.uTexelSnap, snap, 'the uniform given');
+  assert.equal(sa.uniforms.uTexelSnap, sb.uniforms.uTexelSnap, 'one shift for all of him');
+  assert.match(sa.fragmentShader, /uSurfaceId/, 'still marking his surface id');
+  assert.notEqual(a.customProgramCacheKey(), markId(new THREE.MeshToonMaterial(), ID.newt).customProgramCacheKey());
+  // Without one, nothing moves.
+  const plain = vertex(markId(new THREE.MeshToonMaterial(), ID.newt));
+  assert.doesNotMatch(plain.vertexShader, /uTexelSnap/);
+});
+
+test('the texel snap holds on to its texel while the point wobbles across an edge, and moves once it’s clearly in the next', () => {
+  const w = 100;
+  const h = 100;
+  /** NDC for texel coordinate t on a 100-texel axis. */
+  const ndc = (t) => (t / w) * 2 - 1;
+  const hold = { x: Number.NaN, y: Number.NaN };
+  const at = (t) => {
+    const s = snapShift(ndc(t), ndc(t), w, h, { x: 0, y: 0 }, hold);
+    return ((ndc(t) + s.x + 1) / 2) * w; // (where it's drawn, in texels)
+  };
+  const first = at(40.05);
+  assert.ok(Math.abs(first - 40.5) < 1e-6, `first, its own texel's centre (${first})`);
+  // His breathing: back and forth across the edge at 40, a fifth of a texel each way.
+  for (const t of [39.85, 40.2, 39.8, 40.15, 39.9]) assert.ok(Math.abs(at(t) - 40.5) < 1e-6, `${t}: held at 40.5`);
+  assert.ok(Math.abs(at(41.3) - 41.5) < 1e-6, 'a texel and more on: the next texel');
+  assert.ok(Math.abs(at(40.8) - 41.5) < 1e-6, 'and held there on the way back');
+  for (const t of [41.3, 39.0, 40.6]) {
+    const s = snapShift(ndc(t), ndc(t), w, h, { x: 0, y: 0 }, hold);
+    assert.ok(Math.abs(s.x) <= (2 / w) * 0.75 + 1e-9, `${t}: never more than three quarters of a texel off`);
+  }
 });

@@ -62,15 +62,30 @@ export const DECAL_CUT = 0.3;
 
 /**
  * Make a material write its surface id into the colour's alpha (for the retro pass's lines),
- * and sample its map MAP_BIAS mip levels coarser (0 unless the pass sets it).
+ * and sample its map MAP_BIAS mip levels coarser (0 unless the pass sets it). With `snap`, its
+ * vertices also move by that uniform's shift (NDC: clip space over w) after three projects
+ * them: one shift all of his materials share (character.js sets it each frame from snapShift),
+ * so all of him moves onto the texel grid together and a part that only drifts within a texel
+ * (his head as he breathes) draws the same texels frame after frame.
  * @template T
  * @param {T} material  a built-in three.js material
  * @param {number} id  ID's
+ * @param {{snap?: {value: {x: number, y: number}}}} [opts]
  * @returns {T}
  */
-export function markId(material, id) {
+export function markId(material, id, opts = {}) {
   const m = /** @type {any} */ (material);
+  const { snap } = opts;
   m.onBeforeCompile = (shader) => {
+    if (snap) {
+      shader.uniforms.uTexelSnap = snap;
+      shader.vertexShader = shader.vertexShader
+        .replace('void main() {', 'uniform vec2 uTexelSnap;\nvoid main() {')
+        .replace(
+          '#include <project_vertex>',
+          '#include <project_vertex>\n\tgl_Position.xy += uTexelSnap * gl_Position.w;',
+        );
+    }
     shader.uniforms.uSurfaceId = { value: id / ID_SCALE };
     shader.uniforms.uIdOn = ID_ON;
     shader.uniforms.uMapBias = MAP_BIAS;
@@ -90,8 +105,40 @@ export function markId(material, id) {
   };
   // (One program for every id: the id is a uniform. Without a key three would share the
   // material type's own program, which has no such uniform.)
-  m.customProgramCacheKey = () => 'invitation-surface-id';
+  m.customProgramCacheKey = () => (snap ? 'invitation-surface-id-snap' : 'invitation-surface-id');
   return material;
+}
+
+/** How far past a texel's edge (texels) a held snap keeps to its texel (snapShift's `hold`). */
+export const SNAP_HOLD = 0.25;
+
+/**
+ * The shift (NDC) that moves the point at NDC (x, y) onto the centre of the texel it's in, on
+ * a w × h grid: at most half a texel each way (none without a grid). With `hold` (the texel
+ * centres it snapped to last, kept between calls; NaN at first) it keeps to that texel until
+ * the point is SNAP_HOLD past its edge: a point wobbling across an edge (his head as he
+ * breathes) would otherwise step all of him back and forth a texel with every breath.
+ * @param {number} x
+ * @param {number} y
+ * @param {number} w  texels across
+ * @param {number} h  texels down
+ * @param {{x: number, y: number}} [out]
+ * @param {{x: number, y: number}|null} [hold]
+ */
+export function snapShift(x, y, w, h, out = { x: 0, y: 0 }, hold = null) {
+  const shift = (ndc, n, axis) => {
+    if (!(n > 0)) return 0;
+    const p = ((ndc + 1) / 2) * n;
+    let c = Math.floor(p) + 0.5;
+    if (hold) {
+      if (Math.abs(p - hold[axis]) <= 0.5 + SNAP_HOLD) c = hold[axis];
+      else hold[axis] = c;
+    }
+    return ((c - p) * 2) / n;
+  };
+  out.x = shift(x, w, 'x');
+  out.y = shift(y, h, 'y');
+  return out;
 }
 
 /**

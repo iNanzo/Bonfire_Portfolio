@@ -5,8 +5,10 @@
 // texels, where the surface or the depth jumps: none on the floor or in his shadow), dark enough to
 // show on his skin and clothes; two toon bands and a highlight, the shade band and the fill high
 // enough that his black hair keeps two tones, warmed toward Animal Crossing: Wild World by a peach
-// fill and a little more saturation; his textures a mip and a half coarser, so the toon bands shade
-// him rather than his shirt's pattern; a hard BasicShadowMap shadow, one flat warm lavender grey on
+// fill, the grade close to neutral (a stronger warm tint and saturation turned his skin orange and
+// his grey trousers brown); his textures a mip and a half coarser where the pixel atlas isn't
+// loaded (character.js; its flat colours have no mips), so the toon bands shade him rather than
+// his shirt's pattern; a hard BasicShadowMap shadow, one flat warm lavender grey on
 // the white, lighter than him; no blob under him while he stands (only a flat one while he's
 // lifted). Every look value lives here so the look designer edits data, never code: retro.js,
 // stage.js, floor.js and character.js read it (look.js has the shape, LookPreset; retro.js the
@@ -18,7 +20,7 @@ export default {
   levels: 64,
   dither: 0.25,
   outline: { darken: 0.6, tint: '#ffffff', depth: 0.015 },
-  grade: { lift: 0, gamma: 1, saturation: 1.15, tint: '#fff8f0', exposure: 1.05 },
+  grade: { lift: 0, gamma: 1, saturation: 1.04, tint: '#fffdfa', exposure: 1.02 },
   // (Over the light's angle, -1..1 in eighths: shade below 0, lit to 0.75, the highlight above.)
   toon: [0.5, 0.5, 0.5, 0.5, 0.8, 0.8, 0.8, 1],
   background: 0xffffff,

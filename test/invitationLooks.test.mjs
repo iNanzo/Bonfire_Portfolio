@@ -48,3 +48,13 @@ test('dithers light enough not to crawl over him at real speed; soft shadows a t
 test('no preset sets the grid: the Pixel Size alone does, so every Style gives NEWT the same texels', () => {
   for (const [name, p] of Object.entries(PRESETS)) assert.equal('texels' in p, false, `${name} carries a texel table`);
 });
+
+test('DS grades him close to neutral, so his skin and trousers keep their own colours at the pixel sizes', () => {
+  // (Off draws him ungraded; a warm tint and extra saturation turned his skin orange and his
+  // dark grey trousers brown at 2×, 3× and 4×.)
+  const { grade } = PRESETS.ds;
+  const tint = [1, 3, 5].map((i) => Number.parseInt(grade.tint.slice(i, i + 2), 16) / 255);
+  assert.ok(Math.max(...tint) - Math.min(...tint) <= 0.025, `a near-white tint (${grade.tint})`);
+  assert.ok(grade.saturation >= 0.95 && grade.saturation <= 1.06, `saturation ${grade.saturation}`);
+  assert.ok(grade.exposure <= 1.04, `exposure ${grade.exposure}: his skin doesn't clip`);
+});

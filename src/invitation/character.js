@@ -26,15 +26,32 @@
 //
 // Faces: NEWT_Face's 2×2 sheet split into one clamped texture per cell (clips.js FACES), so
 // swapping material.map never bleeds into the next cell as an offset would (the face's UVs reach
-// a little past the cell). While the pixel filter is on, models/newt-face.png's pixel cells
-// (tools/newt-face.mjs: nearest, no mipmaps) stand in for the 1024 sheet, which mipmaps down to
-// a blank face at a dozen texels.
+// a little past the cell). While the pixel filter is on, a pixel sheet from models/newt-face.png
+// (tools/newt-face.mjs: one 2×2 sheet a cell size, faceSheets.js; nearest, no mipmaps) stands
+// in for the 1024 sheet, which mipmaps down to a blank face at a dozen texels: the one whose
+// cell is as many pixels as his half face covers texels, measured as his meshes are drawn
+// (the camera, the target's texels, his face's span: faceSheets.js faceSpan) and held through
+// small changes (pickFaceSize), so a 2-pixel eye stays 2 texels as he moves.
+//
+// The texel snap (pixel filter on): as each of his meshes is drawn, the shift that puts his
+// head's centre on a texel's centre is worked out (retro.js snapShift) and the materials of
+// what rides on his head (face, hair, cap: onHead) move by it (markId's snap), so his head
+// draws the same texels while it drifts within one, and steps a whole texel once it's clearly
+// in the next, like a sprite's (held a quarter texel past the edge, so his breathing never
+// steps it back and forth); the rest of him moves the same way by his feet, which stay put
+// while he stands (snapped by his head, they bobbed a texel with each breath on a desktop).
+//
+// The pixel atlas (pixel filter on): models/newt-atlas-pixel.png beside the glb
+// (tools/newt-atlas.mjs: his atlas in flat colours, the plaid redrawn in big black-and-white
+// checks), nearest and no mipmaps, on his atlas material; the glb's own atlas at Off, where
+// it's sharp enough (at a few hundred texels its plaid blurs into grey-brown mush).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BONES, CLIPS, FACES, SCALE } from './clips.js';
+import { FACE_IMAGE, FACE_LAYOUT, faceSpan, pickFaceSize } from './faceSheets.js';
 import { LOOKS, DEFAULT_LOOK } from './look.js';
 import { TWIN } from './play.js';
-import { ID, markId, toonGradient } from './retro.js';
+import { ID, markId, snapShift, toonGradient } from './retro.js';
 
 /** The clips that follow the step phase (blend.js gaitPhase); Idle breathes on its own clock. */
 const PHASED = ['Walk', 'Run'];
@@ -44,6 +61,8 @@ const SPLIT = [0.3, 0.7];
 const HEAD = { up: 1.0, r: 1.65 };
 /** His body's capsule radius (model units), from between his feet to his collar. */
 const BODY_R = 1.25;
+/** A skinned mesh rides on his head when this share of its vertices are mostly on the head bone. */
+const HEAD_SHARE = 0.6;
 /** The least a part's radius may be on screen, CSS px (22 px across: a fingertip). */
 const MIN_R = 11;
 
@@ -54,22 +73,33 @@ const MIN_R = 11;
  *   timeOf(clip: string): number,
  *   face: import('./clips.js').FaceName,
  *   faceReady: Promise<void>,
+ *   atlasReady: Promise<void>,
+ *   faceSize: number|null,
+ *   faceTexels: number,
+ *   texelSnap: {head: {x: number, y: number}, body: {x: number, y: number}},
  * }} PageCharacter
  */
 
 /**
- * Load the glb at `url` and dress it.
+ * The pixel atlas's address: models/newt-atlas-pixel.png beside the glb at `url`.
+ * @param {string} url
+ */
+export const pixelAtlasUrl = (url) => url.replace(/[^/?#]*([?#].*)?$/, 'newt-atlas-pixel.png');
+
+/**
+ * Load the glb at `url` and dress it (the pixel atlas from beside it, unless opts name one).
  * @param {string} url
  * @param {Parameters<typeof createCharacter>[1]} [opts]
  */
 export async function loadCharacter(url, opts = {}) {
   const gltf = await new GLTFLoader().loadAsync(url);
-  return createCharacter(gltf, opts);
+  return createCharacter(gltf, { pixelAtlasUrl: pixelAtlasUrl(url), ...opts });
 }
 
 /**
  * @param {{scene: any, animations?: any[]}} gltf
- * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFaceUrl?: string}} [opts]
+ * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFaceUrl?: string,
+ *   pixelAtlasUrl?: string, pixelAtlas?: any}} [opts]  pixelAtlas: the pixel atlas, loaded
  * @returns {PageCharacter}
  */
 export function createCharacter(gltf, opts = {}) {
@@ -78,36 +108,34 @@ export function createCharacter(gltf, opts = {}) {
   let preset = opts.preset ?? LOOKS[DEFAULT_LOOK.style];
   let pixel = opts.pixel ?? true;
   let gradient = toonGradient(preset.toon);
-  /** @type {Map<any, any>} the glb's materials → his toon ones */
+  /** @type {Map<any, Record<string, any>>} the glb's materials → his toon ones, one a part (PARTS) */
   const made = new Map();
+  /** @type {any[]} every toon material of his */
+  const toons = [];
   const textures = new Set();
   let skeleton = null;
   let faceMaterial = null;
-
-  const toon = (src) => {
-    if (made.has(src)) return made.get(src);
-    const m = markId(
-      new THREE.MeshToonMaterial({
-        name: src?.name ?? '',
-        map: src?.map ?? null,
-        color: src?.color ? src.color.clone() : new THREE.Color(1, 1, 1),
-        gradientMap: gradient,
-      }),
-      ID.newt,
-    );
-    if (src?.map) textures.add(src.map);
-    if (src?.name === 'NEWT_Face') faceMaterial = m;
-    src?.dispose?.();
-    made.set(src, m);
-    return m;
-  };
+  /** @type {any} the mesh his face is drawn on */
+  let faceMesh = null;
+  /**
+   * Each part's texel snap (NDC; retro.js markId), shared by its materials, and the texel it
+   * holds to: what's on his head by his head's centre, the rest of him by his feet.
+   */
+  const snaps = { head: { value: new THREE.Vector2() }, body: { value: new THREE.Vector2() } };
+  const holds = { head: { x: Number.NaN, y: Number.NaN }, body: { x: Number.NaN, y: Number.NaN } };
+  /** @type {Array<{material: any, map: any}>} his atlas materials and the glb's map on each */
+  const atlased = [];
+  /** @type {any} */
+  let pixelAtlas = null;
+  /** @type {any[]} every mesh of his */
+  const meshes = [];
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.frustumCulled = false;
     o.castShadow = true;
     o.receiveShadow = false;
     if (o.isSkinnedMesh && !skeleton) skeleton = o.skeleton;
-    o.material = Array.isArray(o.material) ? o.material.map(toon) : toon(o.material);
+    meshes.push(o);
   });
 
   /** A bone by its three.js name (never a mesh that shares it: the glb's "Neck"). */
@@ -120,6 +148,40 @@ export function createCharacter(gltf, opts = {}) {
     });
     return found;
   };
+  const headBone = bone(BONES.head);
+
+  /**
+   * @param {any} src  a glb material
+   * @param {'head'|'body'} part
+   */
+  const toon = (src, part) => {
+    const parts = made.get(src) ?? {};
+    if (parts[part]) return parts[part];
+    const m = markId(
+      new THREE.MeshToonMaterial({
+        name: src?.name ?? '',
+        map: src?.map ?? null,
+        color: src?.color ? src.color.clone() : new THREE.Color(1, 1, 1),
+        gradientMap: gradient,
+      }),
+      ID.newt,
+      { snap: snaps[part] },
+    );
+    if (src?.map) textures.add(src.map);
+    if (src?.name === 'NEWT_Face') faceMaterial = m;
+    else if (src?.map) atlased.push({ material: m, map: src.map });
+    parts[part] = m;
+    made.set(src, parts);
+    toons.push(m);
+    return m;
+  };
+  for (const o of meshes) {
+    const part = onHead(o, headBone) ? 'head' : 'body';
+    o.material = Array.isArray(o.material) ? o.material.map((m) => toon(m, part)) : toon(o.material, part);
+    if (faceMaterial && !faceMesh && [o.material].flat().includes(faceMaterial)) faceMesh = o;
+  }
+  for (const src of made.keys()) src?.dispose?.();
+
   const neck = [bone(BONES.neck), bone(BONES.head)];
   const saved = neck.map((b) => (b ? b.quaternion.clone() : new THREE.Quaternion()));
 
@@ -144,14 +206,56 @@ export function createCharacter(gltf, opts = {}) {
   // --- Faces.
   /** @type {Record<string, any>|null} */
   let sheetFaces = null;
-  /** @type {Record<string, any>|null} */
-  let pixelFaces = null;
+  /** @type {any} newt-face.png, once loaded (its sheets are split as they're first shown) */
+  let pixelImage = null;
+  /** @type {import('./faceSheets.js').FaceSheet[]} the sheets in it */
+  let pixelLayout = FACE_LAYOUT;
+  /** @type {Map<number, Record<string, any>>} each shown size's cells */
+  const pixelSets = new Map();
   /** @type {import('./clips.js').FaceName} */
   let face = 'neutral';
+  /** The pixel sheet's size for his half face (null until he's drawn), and that measure in texels. */
+  let faceSize = null;
+  let faceTexels = 0;
+  /** His face's width across one cell at the eyes, model units (0: no face to measure). */
+  const span = faceMesh ? spanOf(faceMesh.geometry) : 0;
+  /** The pixel sheet's cells at `size` (the nearest the image has before he's measured). */
+  const pixelFacesAt = (size) => {
+    const sheet = pixelLayout.find((s) => s.w === size) ?? pixelLayout.find((s) => s.w >= 8) ?? pixelLayout[0];
+    if (!pixelSets.has(sheet.w)) pixelSets.set(sheet.w, splitSheet(pixelImage, true, sheet));
+    return pixelSets.get(sheet.w);
+  };
   const showFace = () => {
-    const set = pixel && pixelFaces ? pixelFaces : sheetFaces;
+    const set = pixel && pixelImage ? pixelFacesAt(faceSize) : sheetFaces;
     if (faceMaterial && set) faceMaterial.map = set[face];
   };
+  const showAtlas = () => {
+    for (const { material, map } of atlased) material.map = pixel && pixelAtlas ? pixelAtlas : map;
+  };
+  /** @param {any} t  the pixel atlas */
+  const usePixelAtlas = (t) => {
+    t.flipY = false;
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
+    if (atlased[0]) {
+      t.wrapS = atlased[0].map.wrapS;
+      t.wrapT = atlased[0].map.wrapT;
+    }
+    t.needsUpdate = true;
+    pixelAtlas = t;
+    textures.add(t);
+    showAtlas();
+  };
+  if (opts.pixelAtlas) usePixelAtlas(opts.pixelAtlas);
+  const atlasReady =
+    !opts.pixelAtlas && atlased.length && opts.pixelAtlasUrl && typeof document !== 'undefined'
+      ? new THREE.TextureLoader()
+          .loadAsync(opts.pixelAtlasUrl)
+          .then(usePixelAtlas)
+          .catch(() => {}) // (without it the glb's atlas stays, its mip a little coarser)
+      : Promise.resolve();
   if (faceMaterial?.map?.image && typeof document !== 'undefined') {
     sheetFaces = splitSheet(faceMaterial.map.image, false);
     faceMaterial.map.image.close?.(); // (an ImageBitmap: its pixels are in the cells now)
@@ -164,7 +268,10 @@ export function createCharacter(gltf, opts = {}) {
       ? new THREE.TextureLoader()
           .loadAsync(opts.pixelFaceUrl)
           .then((t) => {
-            pixelFaces = splitSheet(t.image, true);
+            pixelImage = t.image;
+            // (An image that isn't the ladder, an older one cached: one 2×2 sheet.)
+            if (pixelImage.width !== FACE_IMAGE.w || pixelImage.height !== FACE_IMAGE.h)
+              pixelLayout = [{ w: Math.floor(pixelImage.width / 2), h: Math.floor(pixelImage.height / 2), x: 0, y: 0 }];
             t.dispose();
             showFace();
           })
@@ -182,6 +289,43 @@ export function createCharacter(gltf, opts = {}) {
   const ident = new THREE.Quaternion();
   const UP = new THREE.Vector3(0, 1, 0);
   const SIDE = new THREE.Vector3(-1, 0, 0);
+  const viewport = new THREE.Vector4();
+  const centre = new THREE.Vector3();
+  const ndc = new THREE.Vector3();
+  const scale = new THREE.Vector3();
+
+  /**
+   * As each of his meshes is drawn (onBeforeRender: the camera and the target it's drawn into
+   * are the frame's): the texel snaps (his head's centre for what's on his head, his feet for
+   * the rest), and the face sheet for his half face in texels at his head.
+   * @param {any} renderer
+   * @param {any} _scene
+   * @param {any} camera
+   */
+  function beforeDraw(renderer, _scene, camera) {
+    renderer.getCurrentViewport(viewport);
+    for (const part of /** @type {const} */ (['head', 'body'])) {
+      if (part === 'head' && headBone) headBone.localToWorld(centre.set(0, HEAD.up, 0));
+      else root.getWorldPosition(centre);
+      ndc.copy(centre).project(camera);
+      if (pixel) snapShift(ndc.x, ndc.y, viewport.z, viewport.w, snaps[part].value, holds[part]);
+      else snaps[part].value.set(0, 0);
+    }
+    if (headBone) headBone.localToWorld(centre.set(0, HEAD.up, 0));
+    if (!span || !faceMesh) return;
+    // Texels a world unit at his head: the projection's vertical scale over the depth there.
+    const depth = camera.isOrthographicCamera ? 1 : -ndc.copy(centre).applyMatrix4(camera.matrixWorldInverse).z;
+    if (!(depth > 0)) return;
+    const perUnit = (camera.projectionMatrix.elements[5] * viewport.w) / 2 / depth;
+    faceTexels = span * faceMesh.getWorldScale(scale).x * perUnit;
+    const sizes = pixelLayout.map((s) => s.w);
+    const next = pickFaceSize(faceTexels, faceSize, sizes);
+    if (next !== faceSize) {
+      faceSize = next;
+      showFace();
+    }
+  }
+  for (const o of meshes) o.onBeforeRender = beforeDraw;
 
   /** A clip's twin by its name (`Wave~`), or undefined. */
   const twinOf = (name) => (name.endsWith(TWIN) ? twins.get(name.slice(0, -TWIN.length)) : undefined);
@@ -274,14 +418,30 @@ export function createCharacter(gltf, opts = {}) {
       return face;
     },
     faceReady,
+    atlasReady,
+    get faceSize() {
+      return faceSize;
+    },
+    get faceTexels() {
+      return faceTexels;
+    },
+    get texelSnap() {
+      return { head: snaps.head.value, body: snaps.body.value };
+    },
     setStyle(next, pixelOn) {
       preset = next;
       pixel = pixelOn;
       const g = toonGradient(preset.toon);
-      for (const m of made.values()) m.gradientMap = g;
+      for (const m of toons) m.gradientMap = g;
       gradient.dispose();
       gradient = g;
+      for (const part of /** @type {const} */ (['head', 'body'])) {
+        if (!pixel) snaps[part].value.set(0, 0);
+        holds[part].x = Number.NaN;
+        holds[part].y = Number.NaN;
+      }
       showFace();
+      showAtlas();
     },
     bonePos(name, out) {
       const b = bone(name);
@@ -321,31 +481,76 @@ export function createCharacter(gltf, opts = {}) {
       mixer.stopAllAction();
       mixer.uncacheRoot(root);
       root.traverse((o) => o.geometry?.dispose());
-      for (const m of made.values()) m.dispose();
+      for (const m of toons) m.dispose();
       for (const t of textures) t.dispose();
-      for (const set of [sheetFaces, pixelFaces]) for (const t of Object.values(set ?? {})) t.dispose();
+      for (const set of [sheetFaces, ...pixelSets.values()]) for (const t of Object.values(set ?? {})) t.dispose();
       gradient.dispose();
     },
   };
 }
 
 /**
- * The face sheet's four cells as their own textures (clips.js FACES: a cell's texture offset
+ * Whether a mesh of his rides on his head: under the head bone, or skinned with most of its
+ * vertices on it (his face, hair and cap; his body, hands and neck aren't).
+ * @param {any} o
+ * @param {any} head  the head bone
+ */
+function onHead(o, head) {
+  if (!head) return false;
+  if (!o.isSkinnedMesh) {
+    for (let p = o.parent; p; p = p.parent) if (p === head) return true;
+    return false;
+  }
+  const at = o.skeleton.bones.indexOf(head);
+  const index = o.geometry.attributes.skinIndex;
+  const weight = o.geometry.attributes.skinWeight;
+  if (at < 0 || !index || !weight) return false;
+  let n = 0;
+  for (let i = 0; i < index.count; i++) {
+    let k = 0;
+    for (let j = 1; j < 4; j++) if (weight.getComponent(i, j) > weight.getComponent(i, k)) k = j;
+    if (index.getComponent(i, k) === at) n++;
+  }
+  return n >= HEAD_SHARE * index.count;
+}
+
+/**
+ * His face's width across one cell at the eyes (faceSheets.js faceSpan), from its geometry.
+ * @param {any} geometry
+ */
+function spanOf(geometry) {
+  const pos = geometry?.attributes?.position;
+  const uv = geometry?.attributes?.uv;
+  if (!pos || !uv) return 0;
+  const p = [];
+  const t = [];
+  for (let i = 0; i < pos.count; i++) p.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+  for (let i = 0; i < uv.count; i++) t.push(uv.getX(i), uv.getY(i));
+  const index = geometry.index ? Array.from(geometry.index.array) : Array.from({ length: pos.count }, (_, i) => i);
+  return faceSpan(p, t, index);
+}
+
+/**
+ * A face sheet's four cells as their own textures (clips.js FACES: a cell's texture offset
  * on the sheet, glTF's flipY = false, so v runs down the image). Each repeats ×2 so the face's
  * UVs (one cell's worth) span it, clamped at its edges.
  * @param {any} image  an ImageBitmap, image or canvas
  * @param {boolean} nearest  pixel cells: nearest, no mipmaps
+ * @param {{w: number, h: number, x: number, y: number}} [sheet]  where the sheet is in the
+ *   image (a cell w × h): the whole image by default
  */
-function splitSheet(image, nearest) {
-  const w = Math.floor(image.width / 2);
-  const h = Math.floor(image.height / 2);
+function splitSheet(image, nearest, sheet) {
+  const w = sheet?.w ?? Math.floor(image.width / 2);
+  const h = sheet?.h ?? Math.floor(image.height / 2);
+  const x0 = sheet?.x ?? 0;
+  const y0 = sheet?.y ?? 0;
   /** @type {Record<string, any>} */
   const out = {};
   for (const [name, [u, vv]] of Object.entries(FACES)) {
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
-    canvas.getContext('2d').drawImage(image, u * 2 * w, vv * 2 * h, w, h, 0, 0, w, h);
+    canvas.getContext('2d').drawImage(image, x0 + u * 2 * w, y0 + vv * 2 * h, w, h, 0, 0, w, h);
     const t = new THREE.CanvasTexture(canvas);
     t.flipY = false;
     t.colorSpace = THREE.SRGBColorSpace;

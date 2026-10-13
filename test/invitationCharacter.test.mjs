@@ -4,11 +4,17 @@
 // skips writing a channel whose value didn't change, as a clamped one-shot's doesn't); weights
 // go to the actions as given; Walk and Run follow the shared step phase while Idle keeps its
 // own clock; restarting a clip that still shows hands its old pose to a twin that fades out (no
-// pop); the collar is read from the current matrices, so carrying can anchor him by it.
+// pop); the collar is read from the current matrices, so carrying can anchor him by it. With
+// the pixel filter on: his face's sheet is picked by his half face in texels (held through a
+// small change), what's on his head moves onto the texel grid by his head's centre and the
+// rest of him by his feet, and his atlas is the pixel one (nearest, no mipmaps), the glb's
+// own at Off.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { createCharacter } from '../src/invitation/character.js';
+import { createCharacter, pixelAtlasUrl } from '../src/invitation/character.js';
+import { pickFaceSize } from '../src/invitation/faceSheets.js';
+import { LOOKS } from '../src/invitation/look.js';
 import { TWIN } from '../src/invitation/play.js';
 import { BONES, COLLAR, SCALE } from '../src/invitation/clips.js';
 
@@ -309,4 +315,153 @@ test('his screen shape: a head circle over a body capsule, each at least 11 px',
   const far = ch.screenShape(camera, rect);
   assert.equal(far.head.r, 11, 'far away, the head keeps a finger’s worth');
   assert.equal(far.body.r, 11);
+});
+
+/**
+ * The stand-in with a face: a quad bound to his head bone (a plain mesh under it) in
+ * NEWT_Face's material, 3 model units across one cell of the face sheet at the eyes (u 0..0.5
+ * over x 0..3: faceSheets.js faceSpan), facing +z.
+ */
+function withFace() {
+  const s = standIn();
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 3, 0, 0, 0, -6, 0, 3, -6, 0], 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0.5, 0, 0, 0.5, 0.5, 0.5], 2));
+  geometry.setIndex([0, 1, 2, 1, 3, 2]);
+  const face = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ name: 'NEWT_Face' }));
+  face.name = 'Face';
+  s.bones[BONES.head].add(face);
+  return { ...s, face };
+}
+/** A renderer as onBeforeRender sees it: only its viewport (the colour target's texels). */
+const viewportOf = (w, h) => ({ getCurrentViewport: (v) => v.set(0, 0, w, h) });
+/** The camera `d` world units in front of a point, looking at it (20° of view, a phone's shape). */
+function cameraAt(p, d) {
+  const camera = new THREE.PerspectiveCamera(20, 195 / 422, 0.5, 400);
+  camera.position.set(p.x, p.y, p.z + d);
+  camera.lookAt(p);
+  camera.updateMatrixWorld();
+  return camera;
+}
+
+test('the face sheet: picked by his half face in texels at his head (camera, grid, face span), held through a small change', () => {
+  const { gltf, face } = withFace();
+  const ch = createCharacter(gltf);
+  ch.root.updateMatrixWorld(true);
+  const head = ch.root.getObjectByName(BONES.head);
+  // (His head's centre: a unit up Neck001, character.js HEAD.)
+  const c = head.localToWorld(new THREE.Vector3(0, 1, 0));
+  const draw = (d, h = 422) =>
+    face.onBeforeRender(viewportOf(195, h), null, cameraAt(c, d), face.geometry, face.material, null);
+  // One cell is 3 model units across, × SCALE in the world; a world unit is h / (2 d tan 10°) texels there.
+  const expect = (d, h = 422) => 3 * SCALE * (h / (2 * d * Math.tan(10 * DEG)));
+  draw(20);
+  assert.ok(Math.abs(ch.faceTexels / expect(20) - 1) < 0.02, `half face ${ch.faceTexels} texels (${expect(20)})`);
+  assert.equal(ch.faceSize, pickFaceSize(expect(20), null));
+  const size = ch.faceSize;
+  draw(20 * 1.03);
+  assert.equal(ch.faceSize, size, 'a 3% change keeps the sheet');
+  draw(10);
+  assert.ok(ch.faceSize > size, `twice as close: a bigger sheet (${ch.faceSize} after ${size})`);
+  draw(10, 211);
+  assert.equal(ch.faceSize, pickFaceSize(expect(10, 211), ch.faceSize), 'half the texels: the grid counts too');
+  ch.dispose();
+});
+
+test('the texel snap: what’s on his head moves by his head’s centre, the rest of him by his feet, each onto a texel’s centre; Off moves nothing', () => {
+  const { gltf, face, mesh } = withFace();
+  const ch = createCharacter(gltf);
+  ch.root.position.set(0.0123, 0, -0.0456);
+  ch.root.updateMatrixWorld(true);
+  const head = ch.root.getObjectByName(BONES.head);
+  const c = head.localToWorld(new THREE.Vector3(0, 1, 0));
+  const feet = ch.root.getWorldPosition(new THREE.Vector3());
+  const camera = cameraAt(new THREE.Vector3(0.0371, c.y + 0.0219, 0), 9);
+  const [w, h] = [195, 422];
+  mesh.onBeforeRender(viewportOf(w, h), null, camera, mesh.geometry, mesh.material, null);
+  const snaps = ch.texelSnap;
+  const onCentre = (point, snap, what) => {
+    const p = point.clone().project(camera);
+    const px = ((p.x + snap.x + 1) / 2) * w;
+    const py = ((p.y + snap.y + 1) / 2) * h;
+    assert.ok(Math.abs(px - Math.floor(px) - 0.5) < 1e-4, `${what}: on a texel's centre across (${px})`);
+    assert.ok(Math.abs(py - Math.floor(py) - 0.5) < 1e-4, `${what}: and down (${py})`);
+  };
+  onCentre(c, snaps.head, 'his head’s centre');
+  onCentre(feet, snaps.body, 'his feet');
+  assert.ok(Math.abs(snaps.head.x) > 0 || Math.abs(snaps.head.y) > 0, 'it moved');
+  // His materials read their part's shift (retro.js markId's snap): the face's is the head's.
+  const uniformOf = (material) => {
+    const shader = {
+      uniforms: {},
+      vertexShader: THREE.ShaderLib.toon.vertexShader,
+      fragmentShader: THREE.ShaderLib.toon.fragmentShader,
+    };
+    material.onBeforeCompile(shader, null);
+    return shader.uniforms.uTexelSnap.value;
+  };
+  assert.equal(uniformOf(mesh.material), snaps.body, 'his body: the feet’s shift (planted feet stay put)');
+  assert.equal(uniformOf(face.material), snaps.head, 'his face: the head’s (its features keep their texels)');
+  ch.setStyle(LOOKS.ds, false);
+  face.onBeforeRender(viewportOf(w, h), null, camera, face.geometry, face.material, null);
+  assert.deepEqual(
+    [snaps.head.x, snaps.head.y, snaps.body.x, snaps.body.y],
+    [0, 0, 0, 0],
+    'Pixel Size Off: drawn where he is',
+  );
+  ch.dispose();
+});
+
+test('the pixel atlas: on his atlas material while the pixel filter is on (nearest, no mipmaps), the glb’s own at Off', () => {
+  const { gltf, mesh, map } = standIn();
+  const pixelAtlas = new THREE.Texture();
+  const ch = createCharacter(gltf, { pixelAtlas });
+  assert.equal(mesh.material.map, pixelAtlas, 'the pixel filter is on by default: the pixel atlas');
+  assert.equal(pixelAtlas.magFilter, THREE.NearestFilter);
+  assert.equal(pixelAtlas.minFilter, THREE.NearestFilter);
+  assert.equal(pixelAtlas.generateMipmaps, false);
+  assert.equal(pixelAtlas.flipY, false, 'the glb’s UVs (v down the image)');
+  assert.equal(pixelAtlas.colorSpace, THREE.SRGBColorSpace);
+  ch.setStyle(LOOKS.ds, false);
+  assert.equal(mesh.material.map, map, 'Off: the glb’s atlas as it was');
+  ch.setStyle(LOOKS.soft, true);
+  assert.equal(mesh.material.map, pixelAtlas, 'on again, whatever the Style');
+  ch.dispose();
+  const plain = standIn();
+  createCharacter(plain.gltf, { pixel: true });
+  assert.equal(plain.mesh.material.map, plain.map, 'no pixel atlas: the glb’s');
+});
+
+test('the pixel atlas sits beside the glb: loadCharacter derives its address from the glb’s', () => {
+  assert.equal(pixelAtlasUrl('/invitation/models/newt.glb'), '/invitation/models/newt-atlas-pixel.png');
+  assert.equal(pixelAtlasUrl('models/newt.glb?v=2'), 'models/newt-atlas-pixel.png');
+});
+
+test('the texel snap holds his texel while his head wobbles across an edge (no step back and forth with each breath)', () => {
+  const { gltf, mesh } = withFace();
+  const ch = createCharacter(gltf);
+  const [w, h] = [195, 422];
+  const head = ch.root.getObjectByName(BONES.head);
+  const camera = cameraAt(new THREE.Vector3(0, 0.9, 0), 9);
+  /** Where his head's centre is drawn, texels across, with him moved `dx` world units. */
+  const drawnAt = (dx) => {
+    ch.root.position.x = dx;
+    ch.root.updateMatrixWorld(true);
+    mesh.onBeforeRender(viewportOf(w, h), null, camera, mesh.geometry, mesh.material, null);
+    const p = head.localToWorld(new THREE.Vector3(0, 1, 0)).project(camera);
+    return { at: ((p.x + ch.texelSnap.head.x + 1) / 2) * w, raw: ((p.x + 1) / 2) * w };
+  };
+  // A texel in world units at his head, across.
+  const texel = (drawnAt(1).raw - drawnAt(0).raw) ** -1;
+  // Start just right of an edge, then wobble a fifth of a texel each side of it.
+  const { raw } = drawnAt(0);
+  const edge = Math.floor(raw) + 1;
+  const start = (edge + 0.05 - raw) * texel;
+  ch.setStyle(LOOKS.ds, true); // (a fresh start: the measuring above moved its hold)
+  const first = drawnAt(start).at;
+  assert.ok(Math.abs(first - edge - 0.5) < 1e-3, `first, on its own texel's centre (${first})`);
+  for (const k of [-0.2, 0.15, -0.18, 0.1, -0.2])
+    assert.ok(Math.abs(drawnAt(start + k * texel).at - first) < 1e-3, `${k} texel: drawn on the same texel`);
+  assert.ok(Math.abs(drawnAt(start + 1.4 * texel).at - first - 1) < 1e-3, 'clearly into the next texel: one texel on');
+  ch.dispose();
 });
