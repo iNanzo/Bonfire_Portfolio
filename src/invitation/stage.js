@@ -3,12 +3,14 @@
 // camera.js, moves it with setCamera; pixels.js frameView gives its default view: 36° up, NEWT
 // about a fifth of a desktop's short side tall with the whole play area in sight, or a quarter
 // of a phone's (the camera follows him there), and the point it looks at shown in the middle of
-// the space over the toolbar, by an off-centre projection that holds however it turns), the
+// the space over the toolbar, or of the clear space beside the open Look sheet (`focus`), by an
+// off-centre projection that holds however it turns), the
 // floor (floor.js: no room, the preset's background and an invisible floor that only catches
 // his shadows), the lights and shadows of the look preset, the blob
 // shadow and the floor marker, and the retro pass. A ResizeObserver refits it all (in device
 // pixels where the browser measures them, devicePixelContentBoxSize), and so does refit()
-// (main.js calls it when the toolbar resizes).
+// (main.js calls it when the toolbar resizes and when the Look sheet opens, closes or resizes);
+// the canvas is only resized when its texel grid changes (a resize clears it).
 //
 // Lights: a faint HemisphereLight and one DirectionalLight that casts, turned with the camera's
 // yaw (camera.js lightDir: his shadow falls the same way on screen, back and to one side, after
@@ -75,6 +77,9 @@ function ringTexture(n = 16) {
  * @property {import('./look.js').LookPreset} preset
  * @property {import('./look.js').Look} look
  * @property {() => import('./pixels.js').Insets} insets  where the floor keeps clear of, CSS px
+ * @property {() => import('./pixels.js').Insets} [focus]  where the point the camera looks at
+ *   shows: the middle of the space these leave (`insets` by default; the open Look sheet's clear
+ *   space), how far back it is unchanged
  * @property {(stage: {grid: import('./pixels.js').Grid, view: import('./pixels.js').View}) => void} [onResize]
  */
 
@@ -83,7 +88,7 @@ function ringTexture(n = 16) {
  * @param {HTMLElement} container
  * @param {StageOptions} o
  */
-export function createStage(container, { preset, look, insets, onResize }) {
+export function createStage(container, { preset, look, insets, focus, onResize }) {
   const renderer = new THREE.WebGLRenderer({
     antialias: false,
     alpha: false,
@@ -215,14 +220,19 @@ export function createStage(container, { preset, look, insets, onResize }) {
     const cssH = container.clientHeight;
     if (!cssW || !cssH) return;
     const dpr = window.devicePixelRatio || 1;
+    const was = grid;
     grid = texelGrid({ cssW, cssH, dpr, pixelSize: current.look.pixelSize, devW: device?.w, devH: device?.h });
-    renderer.setSize(grid.w, grid.h, false);
+    // (Setting a canvas's size clears it, even to the same size: a refit that only moves the
+    // view, the Look sheet opening, keeps the picture until the next frame.)
+    if (!view || grid.w !== was.w || grid.h !== was.h) {
+      renderer.setSize(grid.w, grid.h, false);
+      retro.setSize(grid.w, grid.h);
+    }
     canvas.style.width = `${grid.canvasW}px`;
     canvas.style.height = `${grid.canvasH}px`;
-    retro.setSize(grid.w, grid.h);
     // (On a desktop the play area and his body at its rim all show.)
     const area = (bounds.r ?? 0) + NEWT_RADIUS;
-    view = frameView({ cssW, cssH, grid, insets: insets(), area });
+    view = frameView({ cssW, cssH, grid, insets: insets(), focus: focus?.(), area });
     camera.fov = view.fov;
     camera.near = view.near;
     camera.far = view.far;

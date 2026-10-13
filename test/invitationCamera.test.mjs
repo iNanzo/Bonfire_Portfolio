@@ -6,8 +6,8 @@
 // pinch zoom between half and twice the default distance; the point it orbits stays on the
 // play area's centre at a desktop's default zoom (the whole play area in view) and follows NEWT
 // softly as it zooms in, so he stays in frame (on a phone, where he's drawn bigger, most of the
-// way at the default zoom too); Reset Camera eases back to the default the short way
-// round; a resize keeps the zoom; and the light turns with it, so his shadow falls the same way
+// way at the default zoom too, and all the way at any zoom while the Look sheet is open);
+// Reset Camera eases back to the default the short way round; a resize keeps the zoom; and the light turns with it, so his shadow falls the same way
 // on screen after any orbit.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,6 +19,7 @@ import {
   lightDir,
   orbitDrag,
   orbitEvents,
+  orbitFollowAll,
   orbitHome,
   orbitPose,
   orbitRelease,
@@ -229,6 +230,31 @@ test('on a phone’s stage the orbit follows NEWT softly most of the way at the 
   assert.equal(followShare(o), 0, 'a desktop’s stage: the centre again');
   orbitSpan(o, { w: 600, h: 599 });
   close(followShare(o), ORBIT.phoneFollow, 1e-9, 'a short side under 600 px is a phone’s');
+});
+
+test('while the Look sheet is open the orbit follows NEWT all the way, softly, at any zoom, so he stays in the clear space; closed, the usual share again', () => {
+  const newt = { x: 2, z: -1 };
+  for (const span of [
+    { w: 1280, h: 800 },
+    { w: 390, h: 844 },
+  ]) {
+    const o = createOrbit({ distance: HOME, span });
+    const usual = followShare(o);
+    orbitFollowAll(o, true);
+    assert.equal(followShare(o), 1, `${span.w}x${span.h}: all the way at the default zoom`);
+    orbitStep(o, DT, newt);
+    assert.ok(o.target.x > 0 && o.target.x < 0.2, `softly: a frame moves only a little (${o.target.x})`);
+    settle(o, 4, newt);
+    close(o.target.x, newt.x, 1e-3, 'onto him');
+    close(o.target.z, newt.z, 1e-3);
+    orbitZoom(o, 0.6);
+    settle(o, 2, newt);
+    assert.equal(followShare(o), 1, 'zoomed out too');
+    orbitFollowAll(o, false);
+    assert.equal(followShare(o), usual, 'closed: the usual share at this zoom');
+    settle(o, 4, newt);
+    close(o.target.x, newt.x * usual, 1e-3, 'and back to it, softly');
+  }
 });
 
 test('Reset Camera eases back to the default view, the short way round', () => {

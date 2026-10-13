@@ -3,7 +3,8 @@
 // desktop the round checks, Pixel Size Off at native size (its DPR capped at 2), the camera framing
 // NEWT about a quarter of a phone's short side tall and a fifth of a desktop's whatever the Pixel
 // Size (99 CSS px on a 390-wide phone: 50 texels at the default size), low enough to see his face, standing in the
-// middle of the space over the toolbar, the Bayer matrix the retro pass dithers with, the Look
+// middle of the space over the toolbar (in the clear space beside the open Look sheet, just as
+// big), the Bayer matrix the retro pass dithers with, the Look
 // settings (src/invitation/look.js) surviving any storage, and the presets (src/invitation/looks/)
 // carrying every look value, so a designer only ever edits data. With three.js in Node: the floor
 // (floor.js: invisible, it only catches his shadows; there's no room), the surface ids and the
@@ -22,6 +23,7 @@ import {
   compactStage,
   newtShare,
   VIEW,
+  clearInsets,
   frameView,
   headTexels,
   newtTexels,
@@ -59,6 +61,7 @@ const INSETS = { top: 16, bottom: 72, left: 24, right: 24 };
 const AREA = (playArea().r ?? 0) + NEWT_RADIUS;
 /** NEWT's height on screen, CSS px: his texels × a texel's CSS size. */
 const cssTall = (view, grid) => (newtTexels(view, grid) * grid.pd) / grid.dpr;
+const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: ${a} should be ${b} (±${tol})`);
 
 test('the pixel grid: at N× a texel is N×N CSS px in whole device pixels, at 390x844@3, 412x915@2.625 and 1280x800@1', () => {
   assert.deepEqual(PIXEL_SIZES, ['off', '2', '3', '4']);
@@ -160,6 +163,47 @@ test('NEWT is about a quarter of the short side on a phone (99 CSS px, 50 texels
     const tall = newtTexels(view, grid);
     assert.ok(Math.abs(tall - texels) < 1, `${at}: NEWT is ${tall.toFixed(1)} texels tall at the default size`);
   }
+});
+
+test('with the Look sheet open the camera shows NEWT in the clear space it leaves, just as big: above it on a phone or a desktop, beside it on a phone held sideways', () => {
+  // The sheet as ui.js lays it out: full width on a phone, 520 px wide and centred on a wider
+  // stage, from the bottom up, at most the stage's height.
+  const sheetOver = (cssW, cssH, tall) => {
+    const w = Math.min(cssW, 520);
+    return { left: (cssW - w) / 2, right: (cssW + w) / 2, top: Math.max(0, cssH - tall), bottom: cssH };
+  };
+  for (const [cssW, cssH, dpr, sheetTall, where] of [
+    [390, 844, 3, 519, 'above'],
+    [360, 780, 3, 524, 'above'],
+    [1280, 800, 1, 493, 'above'],
+    [1920, 1080, 1, 493, 'above'],
+    [844, 390, 3, 519, 'beside'],
+  ]) {
+    const at = `${cssW}x${cssH}@${dpr}`;
+    const grid = texelGrid({ cssW, cssH, dpr, pixelSize: DEFAULT_LOOK.pixelSize });
+    const view = frameView({ cssW, cssH, grid, insets: INSETS, area: AREA });
+    const cover = sheetOver(cssW, cssH, sheetTall);
+    const tall = newtShare(cssW, cssH) * Math.min(cssW, cssH);
+    const focus = clearInsets({ cssW, cssH, insets: INSETS, cover, tall });
+    const open = frameView({ cssW, cssH, grid, insets: INSETS, focus, area: AREA });
+    assert.equal(open.distance, view.distance, `${at}: just as far away, so just as big`);
+    // His middle in the middle of the clear space, his whole height inside it and off the sheet.
+    const middle = project(open, { x: 0, y: 0.5, z: 0 });
+    close(middle.x, (focus.left + cssW - focus.right) / 2, 1.5, `${at}: across`);
+    close(middle.y, (focus.top + cssH - focus.bottom) / 2, 1.5, `${at}: down`);
+    const top = project(open, { x: 0, y: 1.0, z: 0 }).y;
+    const feet = project(open, { x: 0, y: 0, z: 0 }).y;
+    assert.ok(top > 0, `${at}: his head on the screen (${top.toFixed(0)})`);
+    if (where === 'above') {
+      assert.ok(feet < cover.top, `${at}: his feet over the sheet (${feet.toFixed(0)} < ${cover.top})`);
+    } else {
+      assert.ok(middle.x + tall / 4 < cover.left, `${at}: to the sheet's left (${middle.x.toFixed(0)})`);
+      assert.ok(feet < cssH - INSETS.bottom, `${at}: over the toolbar`);
+    }
+  }
+  // Closed (nothing covering): the default view's own insets.
+  const none = clearInsets({ cssW: 390, cssH: 844, insets: INSETS, cover: null, tall: 99 });
+  assert.deepEqual(none, INSETS);
 });
 
 test('the framing stays the same whatever the pixel size: NEWT just has more or fewer texels', () => {

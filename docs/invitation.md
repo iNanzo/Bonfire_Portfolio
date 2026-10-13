@@ -31,8 +31,11 @@ unlisted: nothing links to it and search engines are asked not to index it.
 
 ## The Look Menu
 
-**Look** opens a sheet along the bottom. Every change shows right away and is kept for your next
-visit (in this browser).
+**Look** opens a sheet along the bottom. NEWT moves into the space above it (beside it on a
+phone held sideways) and the camera keeps him there, so every change shows on him right away;
+each one is kept for your next visit (in this browser). While the sheet is open the toolbar
+rests under it, Tab stays inside the sheet, and **Done** or **Escape** closes it; dragging empty
+space still turns the camera.
 
 | Setting | Choices | What it does |
 | --- | --- | --- |
@@ -61,11 +64,13 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
     device pixels, and the default view: 20° of view, 36° up, NEWT 0.195 of a desktop's short
     side tall with the whole play area in sight, or 0.255 of a phone's, a stage whose short side
     is under 600 CSS px (99 CSS px and 50 texels on a 390-wide phone), whatever the Pixel Size,
-    the point it looks at shown in the middle of the space over the toolbar), `camera.js` (the
+    the point it looks at shown in the middle of the space over the toolbar, or of the clear
+    space above or beside the open Look sheet, `clearInsets`), `camera.js` (the
     orbit camera: yaw all the way round, three quarters of a turn for a drag across the whole
     stage and half a turn of tilt down its whole height, 12° to 70° up, half to twice the
     default distance, eased with a little coast, following NEWT as it zooms in, and 0.8 of the
-    way at the default zoom on a phone; `lightDir` turns the look's sun with the camera's yaw),
+    way at the default zoom on a phone, all the way while the Look sheet is open; `lightDir`
+    turns the look's sun with the camera's yaw),
     `area.js` (the play area: a fixed disc of radius 2.0 round the middle), `play.js` (the
     frame's decisions: who moves his root, the clip mix, where he looks), `look.js` (the Look
     settings under `invitation.look.v1`, Pixel Size stored as `'off'`, `'2'`, `'3'` or

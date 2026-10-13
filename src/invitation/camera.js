@@ -13,7 +13,8 @@
 // NEWT softly the closer it zooms, all the way at the closest, so he stays in frame. On a
 // phone (pixels.js compactStage), where he's drawn bigger and the play area doesn't all fit,
 // it follows him ORBIT.phoneFollow of the way at the default zoom too, so a dash to the rim
-// never takes him off the screen. Reset
+// never takes him off the screen. While the Look sheet is open it follows him all the way at any
+// zoom (orbitFollowAll), so he stays in the clear space the sheet leaves. Reset
 // Camera eases back to the default view, the short way round. The light goes round with it
 // (lightDir: the look's sun turned by the camera's yaw), so his shadow always falls the same way
 // on screen, back and to one side. Angles in radians (yaw 0: the camera on the +z side, +
@@ -70,6 +71,7 @@ const wrap = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
  * @property {{w: number, h: number}} span  the stage, CSS px (a drag's turn and tilt scale by it)
  * @property {number} followHome  how much the orbit follows NEWT at the default zoom (a phone's
  *   stage: ORBIT.phoneFollow; else 0)
+ * @property {boolean} followAll  it follows him all the way, at any zoom (the Look sheet open)
  * @property {{yaw: number, elevation: number}} spin  a fling's coast, rad/s
  * @property {{yaw: number, elevation: number, t: number}|null} drag  a drag under way: its speed and last move
  * @property {boolean} resetting  easing back to the default
@@ -101,6 +103,7 @@ export function createOrbit({
     centre: { x: centre.x, z: centre.z },
     span: { w, h },
     followHome: compactStage(w, h) ? ORBIT.phoneFollow : 0,
+    followAll: false,
     spin: { yaw: 0, elevation: 0 },
     drag: null,
     resetting: false,
@@ -234,11 +237,23 @@ export function orbitHome(s, distance) {
 }
 
 /**
+ * Follow NEWT all the way at any zoom (`on`: the Look sheet is open, and he stays in the clear
+ * space it leaves), or as far as the zoom says again. The orbit's point eases there either way.
+ * @param {OrbitState} s
+ * @param {boolean} on
+ */
+export function orbitFollowAll(s, on) {
+  s.followAll = on;
+}
+
+/**
  * How much the orbit follows NEWT at this zoom: `followHome` at the default distance or
- * further (0 but on a phone), 1 at the closest, a straight line between.
+ * further (0 but on a phone), 1 at the closest, a straight line between; 1 at any zoom while it
+ * follows him all the way (orbitFollowAll).
  * @param {OrbitState} s
  */
 export function followShare(s) {
+  if (s.followAll) return 1;
   const h = s.home.distance;
   const span = h * (1 - ORBIT.zoomMin);
   const closer = span > 0 ? clamp((h - s.distance) / span, 0, 1) : 0;

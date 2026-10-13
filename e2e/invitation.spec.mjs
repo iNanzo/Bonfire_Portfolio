@@ -10,8 +10,8 @@
 // head on a desktop. The camera: a drag on empty space turns it, the wheel and a two-finger pinch
 // zoom it, and Reset Camera brings it back. A pinch over the toolbar or the Look sheet never
 // zooms the page, only the left mouse button holds or walks him, and the Look sheet holds focus
-// (Tab goes round inside it, the toolbar it covers is inert) and closes on Escape wherever focus
-// is. Every wait is on a state through `?test`'s window.__invitation, never on a duration (CI's
+// (Tab goes round inside it, the toolbar it covers is inert), closes on Escape wherever focus
+// is, and leaves NEWT in sight above or beside it (Reset Camera too, on its way back). Every wait is on a state through `?test`'s window.__invitation, never on a duration (CI's
 // software WebGL runs slower than real time), and touches are real ones (CDP
 // Input.dispatchTouchEvent).
 import { test, expect } from '@playwright/test';
@@ -88,6 +88,36 @@ const framesFor = (page, ms) =>
       }),
     ms,
   );
+/**
+ * NEWT's head, middle and feet on screen (client px), and whether the page shows him there: the
+ * canvas, not the Look sheet or the toolbar over it.
+ */
+const inView = (page) =>
+  page.evaluate(() => {
+    const out = {};
+    for (const part of ['head', 'body', 'feet']) {
+      const p = window.__invitation.screen(part);
+      out[part] = {
+        x: Math.round(p.x),
+        y: Math.round(p.y),
+        seen: document.elementFromPoint(p.x, p.y)?.tagName === 'CANVAS',
+      };
+    }
+    return out;
+  });
+const allSeen = (v) => v.head.seen && v.body.seen && v.feet.seen;
+/** Opens the Look sheet and waits until NEWT shows whole beside or above it. */
+async function lookOpenWithNewtInSight(page) {
+  await page.getByRole('button', { name: 'Look' }).click();
+  await expect(page.getByRole('dialog', { name: 'Look' })).toBeVisible();
+  let last = null;
+  await expect
+    .poll(async () => allSeen((last = await inView(page))), {
+      message: 'his head, middle and feet in sight with the Look sheet open',
+    })
+    .toBe(true);
+  return last;
+}
 /**
  * His bones (from his root) every frame the page draws for `ms`: how many frames, how many of
  * them showed a new pose, the seconds it took, and his feet's spread each frame (world units).
@@ -385,6 +415,26 @@ test.describe('on a phone', () => {
     await spread(await page.locator('.inv-sheet').boundingBox());
     expect(await scale(), 'the page after a pinch over the Look sheet').toBe(1);
   });
+
+  test('with the Look sheet open NEWT stays in sight above it, so its changes show on him', async ({ page }) => {
+    await calm(page);
+    const v = await lookOpenWithNewtInSight(page);
+    const sheet = await page.locator('.inv-sheet').boundingBox();
+    expect(v.feet.y, 'his feet over the sheet').toBeLessThan(sheet.y);
+    expect(v.head.y, 'his head on the screen').toBeGreaterThan(0);
+  });
+});
+
+test.describe('on a phone held sideways', () => {
+  test.use({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+
+  test('with the Look sheet open NEWT stays in sight beside it', async ({ page }) => {
+    await calm(page);
+    const v = await lookOpenWithNewtInSight(page);
+    const sheet = await page.locator('.inv-sheet').boundingBox();
+    const beside = v.head.x < sheet.x || v.head.x > sheet.x + sheet.width;
+    expect(beside, `his head at x ${v.head.x}, the sheet from ${sheet.x} to ${sheet.x + sheet.width}`).toBe(true);
+  });
 });
 
 test.describe('on a desktop', () => {
@@ -449,7 +499,7 @@ test.describe('on a desktop', () => {
     // A click on empty space while it's open: focus leaves the sheet for the page.
     await look.click();
     await expect(sheet).toBeVisible();
-    await page.mouse.click(640, 120);
+    await page.mouse.click(200, 120);
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
     await page.keyboard.press('Escape');
     await expect(sheet).toBeHidden();
@@ -501,12 +551,55 @@ test.describe('on a desktop', () => {
     // Done, Pixel Size, Dithering, Outlines, Style, Motion and Reset Camera.
     expect(stops.size, [...stops].join(', ')).toBe(7);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
-    await page.mouse.click(640, 120);
+    await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');
     expect((await focused()).inside, 'Tab from the page').toBe(true);
     await page.keyboard.press('Escape');
     await expect(look).toBeFocused();
     expect(await toolbarInert(), 'the toolbar back in reach').toBe(false);
+  });
+
+  test('with the Look sheet open NEWT stays in sight, and Reset Camera eases back where it can be seen', async ({
+    page,
+  }) => {
+    await calm(page);
+    const body = await on(page, 'body');
+    const home = (await snapshot(page)).camera;
+    // Round and up a long way first.
+    await page.mouse.move(body.x + 300, body.y + 60);
+    await page.mouse.down();
+    for (let i = 1; i <= 20; i++) await page.mouse.move(body.x + 300 - i * 22, body.y + 60 + i * 6);
+    await page.mouse.up();
+    await until(page, (s) => Math.abs(s.camera.yaw) > 0.8, 'turned');
+    await lookOpenWithNewtInSight(page);
+    await page.getByRole('dialog', { name: 'Look' }).getByRole('button', { name: 'Reset Camera' }).click();
+    // Every frame of the way back: his head, middle and feet in sight.
+    const frames = await page.evaluate(
+      (h) =>
+        new Promise((done) => {
+          const inv = window.__invitation;
+          const out = [];
+          const t0 = performance.now();
+          const tick = () => {
+            const s = inv.snapshot();
+            const f = { yaw: s.camera.yaw };
+            for (const part of ['head', 'body', 'feet']) {
+              const p = inv.screen(part);
+              f[part] = document.elementFromPoint(p.x, p.y)?.tagName === 'CANVAS';
+            }
+            out.push(f);
+            const back = Math.abs(s.camera.yaw - h.yaw) < 0.01 && Math.abs(s.camera.elevation - h.elevation) < 0.01;
+            if (!back && performance.now() - t0 < 10_000) requestAnimationFrame(tick);
+            else done(out);
+          };
+          requestAnimationFrame(tick);
+        }),
+      home,
+    );
+    expect(Math.abs(frames.at(-1).yaw - home.yaw), 'back to the default view').toBeLessThan(0.01);
+    expect(frames.length, 'it eased back over several frames').toBeGreaterThan(3);
+    for (const [i, f] of frames.entries())
+      expect(f.head && f.body && f.feet, `frame ${i} (yaw ${f.yaw.toFixed(2)}): ${JSON.stringify(f)}`).toBe(true);
   });
 
   test('hovering turns his head', async ({ page }) => {

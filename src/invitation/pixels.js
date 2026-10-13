@@ -21,8 +21,10 @@
 // camera looks at (his middle, at the origin) sits in the middle of the space over the
 // toolbar: the view is shifted
 // there (View.shift, an off-centre projection: stage.js camera.setViewOffset), so it stays
-// there however the camera turns. The framing never reads the Pixel Size: a bigger block only
-// makes chunkier pixels, and a bigger screen gives him more texels.
+// there however the camera turns. While the Look sheet is open it sits in the middle of the
+// clear space the sheet leaves instead (clearInsets: above it, or beside it on a phone held
+// sideways), just as big, so a look's changes show on him. The framing never reads the Pixel
+// Size: a bigger block only makes chunkier pixels, and a bigger screen gives him more texels.
 
 /** @typedef {'off'|'2'|'3'|'4'} PixelSize  Off, or N× (a texel N×N CSS px) */
 /**
@@ -214,14 +216,36 @@ function least(lo, hi, ok) {
 }
 
 /**
+ * The insets that leave NEWT the clear space beside a panel covering `cover` (the open Look
+ * sheet, CSS px from the stage's top-left; null: nothing covers, `insets` themselves), each
+ * also clear of `insets` and `gap` px from the panel: the space above it where he fits there
+ * with room to spare (1.5 times his height `tall`, CSS px, and as wide), else whichever of above,
+ * left of it and right of it holds him biggest (he's about half as wide as he's tall).
+ * @param {{cssW: number, cssH: number, insets: Insets, cover: {left: number, top: number, right: number, bottom: number}|null, tall: number, gap?: number}} o
+ * @returns {Insets}
+ */
+export function clearInsets({ cssW, cssH, insets, cover, tall, gap = 8 }) {
+  if (!cover) return insets;
+  const above = { ...insets, bottom: Math.max(insets.bottom, cssH - cover.top + gap) };
+  const left = { ...insets, right: Math.max(insets.right, cssW - cover.left + gap) };
+  const right = { ...insets, left: Math.max(insets.left, cover.right + gap) };
+  const w = (i) => cssW - i.left - i.right;
+  const h = (i) => cssH - i.top - i.bottom;
+  if (h(above) >= 1.5 * tall && w(above) >= tall) return above;
+  const room = (i) => Math.min(2 * w(i), h(i));
+  return [above, left, right].reduce((a, b) => (room(b) > room(a) ? b : a));
+}
+
+/**
  * The default camera for a stage `cssW` × `cssH` drawn at `grid` (the camera's aspect and the
  * canvas's CSS size): NEWT `share` of the short side tall (newtShare's by default), or on a
  * desktop smaller where a play area of radius `area` around the origin wouldn't all show (its
  * rim over the toolbar and inside the sides, his head at its back under the top; a phone's view
  * never backs off for it), looking at his middle (standing at the origin) from yaw 0, shifted
- * to the middle of the space `insets` leave (over the toolbar). (`fov` and `elevation` default
- * to VIEW's.)
- * @param {{cssW: number, cssH: number, grid: Grid, insets: Insets, share?: number, fov?: number, elevation?: number, area?: number}} o
+ * to the middle of the space `focus` leaves (`insets` by default: over the toolbar; the clear
+ * space beside the open Look sheet, clearInsets, without changing how far back it is). (`fov`
+ * and `elevation` default to VIEW's.)
+ * @param {{cssW: number, cssH: number, grid: Grid, insets: Insets, focus?: Insets, share?: number, fov?: number, elevation?: number, area?: number}} o
  * @returns {View}
  */
 export function frameView({
@@ -229,18 +253,20 @@ export function frameView({
   cssH,
   grid,
   insets,
+  focus = insets,
   share = newtShare(cssW, cssH),
   fov = VIEW.fov,
   elevation = VIEW.elevation,
   area = 0,
 }) {
   const target = { x: 0, y: FOCUS_Y, z: 0 };
-  const shift = {
-    x: (insets.left + cssW - insets.right) / 2 - grid.canvasW / 2,
-    y: (insets.top + cssH - insets.bottom) / 2 - grid.canvasH / 2,
-  };
-  /** The camera `distance` back. */
-  const at = (distance) => ({
+  /** Where the point it looks at shows, CSS px from the canvas's centre: the middle of the space `i` leaves. */
+  const middleOf = (i) => ({
+    x: (i.left + cssW - i.right) / 2 - grid.canvasW / 2,
+    y: (i.top + cssH - i.bottom) / 2 - grid.canvasH / 2,
+  });
+  /** The camera `distance` back, the point it looks at shown at `shift`. */
+  const at = (distance, shift = middleOf(insets)) => ({
     fov,
     elevation,
     near: VIEW.near,
@@ -276,5 +302,6 @@ export function frameView({
     };
     if (!shows(distance)) distance = least(distance, 400, shows);
   }
-  return at(distance);
+  // (How far back comes from the default view; `focus` only moves where it shows.)
+  return at(distance, middleOf(focus));
 }

@@ -98,9 +98,10 @@ export function statusHtml() {
 /**
  * Put the page's controls in the stage and report what's pressed.
  * @param {HTMLElement} stage
- * @param {{look: import('./look.js').Look, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void, onResetCamera?(): void}} o
+ * @param {{look: import('./look.js').Look, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void, onResetCamera?(): void, onSheet?(open: boolean): void}} o
+ *   onSheet: the Look sheet opened or closed (main.js keeps NEWT in sight beside it)
  */
-export function bindUi(stage, { look, onButton, onLook, onResetCamera }) {
+export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }) {
   const hud = document.createElement('div');
   hud.className = 'inv-hud';
   hud.innerHTML = statusHtml() + toolbarHtml() + sheetHtml(look);
@@ -145,7 +146,6 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera }) {
     // (The toolbar under the sheet: no focus, no presses, hidden from screen readers.)
     toolbar.inert = open;
     opener.setAttribute('aria-expanded', String(open));
-    stage.classList.toggle('is-looking', open);
     if (open) {
       document.addEventListener('keydown', onKey);
       first.focus();
@@ -153,6 +153,7 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera }) {
       document.removeEventListener('keydown', onKey);
       opener.focus();
     }
+    onSheet?.(open);
   };
 
   hud.addEventListener('click', (e) => {
@@ -207,6 +208,9 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera }) {
     },
     get sheetOpen() {
       return !sheet.hidden;
+    },
+    get sheet() {
+      return sheet;
     },
     destroy() {
       document.removeEventListener('keydown', onKey);

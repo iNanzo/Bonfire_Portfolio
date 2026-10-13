@@ -3,7 +3,9 @@
 // retro pass), NEWT (character.js, from models/newt.glb), the Look menu (switched live, kept in
 // localStorage: look.js), the orbit camera (camera.js: a drag on empty space turns it, the
 // wheel or a pinch zooms it, Reset Camera brings it back), and the render loop (stopped while
-// the page is hidden, steps of at most 0.05 s, a lost WebGL context told).
+// the page is hidden, steps of at most 0.05 s, a lost WebGL context told). While the Look sheet
+// is open NEWT stays in sight: the view shows him in the clear space above or beside it
+// (focusInsets, pixels.js clearInsets) and the orbit follows him all the way there.
 //
 // A frame, in types.js's order: the pointers' gestures (gesture.js; taps get their floor spot
 // by ray) and the buttons → the camera moves → brain.step → his root: steer on the ground,
@@ -30,6 +32,7 @@ import { carryFeel } from './carry.js';
 import {
   createOrbit,
   orbitEvents,
+  orbitFollowAll,
   orbitHome,
   orbitPose,
   orbitRelease,
@@ -43,7 +46,7 @@ import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createFaceState, faceStep } from './faces.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
-import { newtTexels } from './pixels.js';
+import { clearInsets, newtShare, newtTexels } from './pixels.js';
 import { animFps, loadLook, motionStep, presetOf, saveLook } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
@@ -81,6 +84,7 @@ const ui = bindUi(stageEl, {
   onResetCamera: () => {
     resetCamera = true;
   },
+  onSheet,
 });
 
 /** @param {import('./look.js').Look} next */
@@ -90,6 +94,16 @@ function onLook(next) {
   if (!stage) return;
   stage.setLook(presetOf(look), look);
   character?.setStyle(presetOf(look), look.pixelSize !== 'off');
+}
+
+/**
+ * The Look sheet opened or closed: the orbit follows NEWT all the way while it's open, and the
+ * view shows him in the clear space it leaves (focusInsets).
+ * @param {boolean} open
+ */
+function onSheet(open) {
+  if (orbit) orbitFollowAll(orbit, open);
+  stage?.refit();
 }
 
 function webgl2() {
@@ -112,6 +126,7 @@ if (webgl2()) {
       preset: presetOf(look),
       look,
       insets,
+      focus: focusInsets,
       onResize: ({ view }) => {
         if (!orbit) return;
         orbitHome(orbit, view.distance);
@@ -148,6 +163,27 @@ function insets() {
     left: 24 + px(pad.paddingLeft),
     right: 24 + px(pad.paddingRight),
   };
+}
+
+/**
+ * Where the point the camera looks at shows: the middle of the space insets() leaves, or, with
+ * the Look sheet open, of the clear space above or beside it, so a look's changes show on NEWT
+ * (and Reset Camera's way back).
+ */
+function focusInsets() {
+  const base = insets();
+  if (!ui.sheetOpen) return base;
+  const cssW = stageEl.clientWidth;
+  const cssH = stageEl.clientHeight;
+  const box = stageEl.getBoundingClientRect();
+  const r = ui.sheet.getBoundingClientRect();
+  return clearInsets({
+    cssW,
+    cssH,
+    insets: base,
+    cover: { left: r.left - box.left, top: r.top - box.top, right: r.right - box.left, bottom: r.bottom - box.top },
+    tall: newtShare(cssW, cssH) * Math.min(cssW, cssH),
+  });
 }
 
 /** @param {NonNullable<typeof stage>} s */
@@ -190,7 +226,10 @@ function start(s) {
   /** The toolbar as last set, so the DOM is only touched on a change. */
   const shown = { sit: 'Sit', wander: /** @type {boolean|null} */ (null), enabled: true };
 
-  new ResizeObserver(() => s.refit()).observe(ui.toolbar);
+  // (The Look sheet too: it changes height with its hint at Pixel Size Off.)
+  const refit = new ResizeObserver(() => s.refit());
+  refit.observe(ui.toolbar);
+  refit.observe(ui.sheet);
 
   loadCharacter(`${BASE}models/newt.glb`, {
     preset: presetOf(look),
