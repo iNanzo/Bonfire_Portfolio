@@ -624,7 +624,7 @@ test('look-at glances are seeded: forward 1.5 s after the pointer goes, every 3�
   );
 });
 
-test('the look weight is 0 in Spook, Fall and Land; camera while held or waving; back while fleeing', () => {
+test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall and Land); camera while held or waving; back while fleeing', () => {
   const brain = createBrain({ seed: 2, calm: true, bounds: BOUNDS });
   let t = 0;
   let grounded = true;
@@ -663,15 +663,77 @@ test('the look weight is 0 in Spook, Fall and Land; camera while held or waving;
   assert.equal(out.state, 'fall');
   for (let i = 0; i < 10; i++) {
     assert.equal(out.look.weight, 0, 'Fall');
+    assert.equal(out.look.ease, TUNE.dropLookEase, 'Fall: slowly');
     out = step();
   }
+  assert.ok(TUNE.dropLookEase > 3 / LOOK.weightRate, `${TUNE.dropLookEase} s, not a fifth of one`);
   grounded = true;
   out = step();
   assert.equal(out.state, 'land');
   assert.equal(out.look.weight, 0, 'Land');
+  assert.equal(out.look.ease, TUNE.dropLookEase, 'Land: slowly');
   out = step({ button: 'Run' });
   assert.equal(out.state, 'flee');
   assert.deepEqual(out.look, { mode: 'back', weight: 1 });
+});
+
+test('dropped facing away, his head comes round over the fall and the landing together, not in the fall’s first fifth of a second', () => {
+  const brain = createBrain({ seed: 2, calm: true, bounds: BOUNDS });
+  const look = createLook();
+  const rng = createRng(4);
+  const D = 180 / Math.PI;
+  // The camera behind him: held, he looks round at it as far as his neck goes.
+  const camera = { yaw: LIMIT.yaw, pitch: 0.3 };
+  let t = 0;
+  let grounded = true;
+  const frame = (extra = {}) => {
+    t += DT;
+    const out = brain.step({
+      t,
+      dt: DT,
+      events: [],
+      button: null,
+      pointer: null,
+      newt: { x: 0, z: 0, yaw: 0, grounded },
+      clip: null,
+      carry: null,
+      ...extra,
+    });
+    const aim = out.look.mode === 'camera' ? camera : null;
+    lookStep(look, out.look.mode, aim, DT, t, rng, out.look.weight, { yaw: 0, pitch: 0 }, out.look.ease);
+    return out;
+  };
+  const turned = () => look.yaw * look.weight;
+  let out = frame({ events: [{ type: 'grab', on: 'newt', x: 0, y: 0, t }] });
+  for (let i = 0; i < 90; i++) out = frame();
+  assert.equal(out.state, 'held');
+  const full = turned();
+  close(full, LIMIT.yaw, 1e-3, 'held, his head turned round to the camera');
+  // Let go: a fall of about 0.23 s (from the hang), then the landing, then idle.
+  grounded = false;
+  out = frame({ events: [{ type: 'release', on: 'newt', x: 0, y: 0, t }] });
+  assert.equal(out.state, 'fall');
+  let last = turned();
+  let fastest = Math.abs(full - last) / DT;
+  for (let i = 0; i < 13; i++) {
+    out = frame();
+    fastest = Math.max(fastest, Math.abs(turned() - last) / DT);
+    last = turned();
+  }
+  const landing = turned();
+  grounded = true;
+  for (let i = 0; i < 60; i++) {
+    out = frame();
+    fastest = Math.max(fastest, Math.abs(turned() - last) / DT);
+    last = turned();
+  }
+  assert.equal(out.state, 'idle');
+  assert.ok(
+    landing >= full / 2,
+    `half his turn or more left as he lands (${(landing * D).toFixed(0)}° of ${(full * D).toFixed(0)}°)`,
+  );
+  assert.ok(fastest * D <= 200, `never faster than 200°/s (${(fastest * D).toFixed(0)}°/s)`);
+  assert.ok(Math.abs(turned()) * D < 5, `round to ahead a second after (${(turned() * D).toFixed(1)}°)`);
 });
 
 // ---- all together -------------------------------------------------------------------------

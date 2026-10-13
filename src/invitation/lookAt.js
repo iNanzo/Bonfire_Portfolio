@@ -4,7 +4,8 @@
 // about every 3–7 s; running away, he glances over his shoulder about every 1.2 s. "Ahead" is
 // the viewer (viewerAim): up at the camera, which is what shows his face under his cap's brim,
 // faded back to straight ahead as he turns away from it. Looking at the floor, his head is
-// lifted by LOOK.floorBias for the same reason. Pure: time comes in as t, randomness from
+// lifted by LOOK.floorBias for the same reason. A slower ease (the brain's, as he's let go)
+// brings the look and its weight round over about a second instead of a fifth. Pure: time comes in as t, randomness from
 // rng.js; the state object is updated in place.
 
 import { between } from './rng.js';
@@ -141,9 +142,11 @@ export function splitLook(yaw, pitch) {
  * @param {() => number} rng
  * @param {number} [weight]  BrainOut.look.weight; s.weight eases toward it
  * @param {Aim} [ahead]  where "ahead" is (viewerAim; straight ahead by default)
+ * @param {number} [ease]  BrainOut.look.ease: a slower look, seconds for it (and its weight) to
+ *   come about 95% of the way round; LOOK.omega's and LOOK.weightRate's pace without it
  * @returns {LookState}
  */
-export function lookStep(s, mode, aim, dt, t, rng, weight = 1, ahead = AHEAD) {
+export function lookStep(s, mode, aim, dt, t, rng, weight = 1, ahead = AHEAD, ease = 0) {
   if (mode !== s.mode) {
     s.mode = mode;
     s.glance = null;
@@ -161,11 +164,13 @@ export function lookStep(s, mode, aim, dt, t, rng, weight = 1, ahead = AHEAD) {
   else if (mode === 'back') target = backGlance(s, t, rng);
   else target = idleGlance(s, t, rng, ahead);
   s.target = clampAim(target);
-  [s.yaw, s.vyaw] = spring(s.yaw, s.vyaw, s.target.yaw, dt);
-  [s.pitch, s.vpitch] = spring(s.pitch, s.vpitch, s.target.pitch, dt);
+  // (A critically damped spring is 95% of the way at omega × t = 4.74.)
+  const omega = ease > 0 ? Math.min(LOOK.omega, 4.74 / ease) : LOOK.omega;
+  [s.yaw, s.vyaw] = spring(s.yaw, s.vyaw, s.target.yaw, dt, omega);
+  [s.pitch, s.vpitch] = spring(s.pitch, s.vpitch, s.target.pitch, dt, omega);
   s.yaw = clamp(s.yaw, -LIMIT.yaw, LIMIT.yaw);
   s.pitch = clamp(s.pitch, LIMIT.pitchMin, LIMIT.pitchMax);
-  const step = LOOK.weightRate * dt;
+  const step = (ease > 0 ? Math.min(LOOK.weightRate, 1 / ease) : LOOK.weightRate) * dt;
   s.weight = s.weight < weight ? Math.min(weight, s.weight + step) : Math.max(weight, s.weight - step);
   return s;
 }
@@ -174,8 +179,7 @@ export function lookStep(s, mode, aim, dt, t, rng, weight = 1, ahead = AHEAD) {
  * The exact critically damped step toward a still target: from rest it never overshoots.
  * @returns {[number, number]}
  */
-function spring(x, v, target, dt) {
-  const w = LOOK.omega;
+function spring(x, v, target, dt, w = LOOK.omega) {
   const e = x - target;
   const k = Math.exp(-w * dt);
   const j = (v + w * e) * dt;

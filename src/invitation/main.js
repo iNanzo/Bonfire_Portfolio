@@ -424,7 +424,7 @@ function start(s) {
     const moved = animate(c, dt);
     hang(c);
     // 7–8. The look and the face; the toolbar.
-    const want = { mode: o.look.mode, weight: o.look.weight * lookShare(mix.weights) };
+    const want = { mode: o.look.mode, weight: o.look.weight * lookShare(mix.weights), ease: o.look.ease };
     finish(c, ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
   }
@@ -555,7 +555,7 @@ function start(s) {
    * @param {ReturnType<typeof pointerNow>} ptr
    * @param {{position: import('./types.js').XYZ}} pose
    * @param {number} dt
-   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number}} want
+   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number}} want
    * @param {import('./clips.js').FaceName} face
    * @param {import('./clips.js').BlinkMode} blink
    * @param {boolean} moved  his pose stepped this frame (the look goes on with it)
@@ -570,7 +570,7 @@ function start(s) {
       camera: pose.position,
       pointer: ptr && !ptr.pinch ? { floor: ptr.floor, onNewt: ptr.onNewt } : null,
     });
-    lookStep(gaze, want.mode, aim, dt, t, rng, want.weight, ahead);
+    lookStep(gaze, want.mode, aim, dt, t, rng, want.weight, ahead, want.ease);
     if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight);
     c.setFace(faceStep(faces, face, blink, t, rng));
     s.setBlob(root.position.x, root.position.z, body.mode === 'ground' ? 0 : Math.min(1, root.position.y / 0.5));

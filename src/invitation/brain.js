@@ -73,6 +73,12 @@ export const TUNE = {
   shakenFor: 0.4,
   /** A fall lasts at least this long (a landing needs a frame of falling). */
   fallMin: 0.05,
+  /**
+   * Let go, his look fades out this slowly, seconds (BrainOut.look.ease): over the fall and the
+   * landing together, so a head turned round to the camera comes back as he lands, not in the
+   * fall's first fifth of a second.
+   */
+  dropLookEase: 1,
   /** A walk has arrived within this distance of its goal. */
   arrive: 0.1,
   /** A walk gives up after its distance at walking speed × walkPatience + walkSlack s. */
@@ -472,8 +478,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
   /** @returns {BrainOut['look']} */
   function look() {
     const st = m.state;
-    if (st === 'fall' || st === 'land' || (st === 'react' && m.reaction === 'Spook'))
-      return { mode: 'forward', weight: 0 };
+    if (st === 'fall' || st === 'land') return { mode: 'forward', weight: 0, ease: T.dropLookEase };
+    if (st === 'react' && m.reaction === 'Spook') return { mode: 'forward', weight: 0 };
     if (st === 'held' || (st === 'react' && m.reaction === 'Wave')) return { mode: 'camera', weight: 1 };
     if (st === 'flee') return { mode: 'back', weight: 1 };
     return { mode: 'pointer', weight: 1 };
