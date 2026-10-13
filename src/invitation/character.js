@@ -36,7 +36,8 @@
 // The texel snap (pixel filter on): as each of his meshes is drawn, the shift that puts his
 // head's centre on a texel's centre is worked out (retro.js snapShift) and all his materials
 // move by it (markId's snap), so his head draws the same texels while it drifts within one,
-// and steps a whole texel when it crosses one, like a sprite.
+// and steps a whole texel once it's clearly in the next, like a sprite (held a quarter texel
+// past the edge, so his breathing never steps him back and forth).
 //
 // The pixel atlas (pixel filter on): models/newt-atlas-pixel.png beside the glb
 // (tools/newt-atlas.mjs: his atlas in flat colours, the plaid redrawn in big black-and-white
@@ -110,8 +111,9 @@ export function createCharacter(gltf, opts = {}) {
   let faceMaterial = null;
   /** @type {any} the mesh his face is drawn on */
   let faceMesh = null;
-  /** His materials' shared texel snap (NDC; retro.js markId). */
+  /** His materials' shared texel snap (NDC; retro.js markId), and the texel it holds to. */
   const snap = { value: new THREE.Vector2() };
+  const snapHold = { x: Number.NaN, y: Number.NaN };
   /** @type {Array<{material: any, map: any}>} his atlas materials and the glb's map on each */
   const atlased = [];
   /** @type {any} */
@@ -285,7 +287,7 @@ export function createCharacter(gltf, opts = {}) {
     if (headBone) headBone.localToWorld(centre.set(0, HEAD.up, 0));
     else root.getWorldPosition(centre);
     ndc.copy(centre).project(camera);
-    if (pixel) snapShift(ndc.x, ndc.y, viewport.z, viewport.w, snap.value);
+    if (pixel) snapShift(ndc.x, ndc.y, viewport.z, viewport.w, snap.value, snapHold);
     else snap.value.set(0, 0);
     if (!span || !faceMesh) return;
     // Texels a world unit at his head: the projection's vertical scale over the depth there.
@@ -411,6 +413,8 @@ export function createCharacter(gltf, opts = {}) {
       gradient.dispose();
       gradient = g;
       if (!pixel) snap.value.set(0, 0);
+      snapHold.x = Number.NaN;
+      snapHold.y = Number.NaN;
       showFace();
       showAtlas();
     },

@@ -109,23 +109,35 @@ export function markId(material, id, opts = {}) {
   return material;
 }
 
+/** How far past a texel's edge (texels) a held snap keeps to its texel (snapShift's `hold`). */
+export const SNAP_HOLD = 0.25;
+
 /**
  * The shift (NDC) that moves the point at NDC (x, y) onto the centre of the texel it's in, on
- * a w × h grid: at most half a texel each way (none without a grid).
+ * a w × h grid: at most half a texel each way (none without a grid). With `hold` (the texel
+ * centres it snapped to last, kept between calls; NaN at first) it keeps to that texel until
+ * the point is SNAP_HOLD past its edge: a point wobbling across an edge (his head as he
+ * breathes) would otherwise step all of him back and forth a texel with every breath.
  * @param {number} x
  * @param {number} y
  * @param {number} w  texels across
  * @param {number} h  texels down
  * @param {{x: number, y: number}} [out]
+ * @param {{x: number, y: number}|null} [hold]
  */
-export function snapShift(x, y, w, h, out = { x: 0, y: 0 }) {
-  const shift = (ndc, n) => {
+export function snapShift(x, y, w, h, out = { x: 0, y: 0 }, hold = null) {
+  const shift = (ndc, n, axis) => {
     if (!(n > 0)) return 0;
     const p = ((ndc + 1) / 2) * n;
-    return ((Math.floor(p) + 0.5 - p) * 2) / n;
+    let c = Math.floor(p) + 0.5;
+    if (hold) {
+      if (Math.abs(p - hold[axis]) <= 0.5 + SNAP_HOLD) c = hold[axis];
+      else hold[axis] = c;
+    }
+    return ((c - p) * 2) / n;
   };
-  out.x = shift(x, w);
-  out.y = shift(y, h);
+  out.x = shift(x, w, 'x');
+  out.y = shift(y, h, 'y');
   return out;
 }
 

@@ -429,3 +429,32 @@ test('the pixel atlas sits beside the glb: loadCharacter derives its address fro
   assert.equal(pixelAtlasUrl('/invitation/models/newt.glb'), '/invitation/models/newt-atlas-pixel.png');
   assert.equal(pixelAtlasUrl('models/newt.glb?v=2'), 'models/newt-atlas-pixel.png');
 });
+
+test('the texel snap holds his texel while his head wobbles across an edge (no step back and forth with each breath)', () => {
+  const { gltf, mesh } = withFace();
+  const ch = createCharacter(gltf);
+  const [w, h] = [195, 422];
+  const head = ch.root.getObjectByName(BONES.head);
+  const camera = cameraAt(new THREE.Vector3(0, 0.9, 0), 9);
+  /** Where his head's centre is drawn, texels across, with him moved `dx` world units. */
+  const drawnAt = (dx) => {
+    ch.root.position.x = dx;
+    ch.root.updateMatrixWorld(true);
+    mesh.onBeforeRender(viewportOf(w, h), null, camera, mesh.geometry, mesh.material, null);
+    const p = head.localToWorld(new THREE.Vector3(0, 1, 0)).project(camera);
+    return { at: ((p.x + ch.texelSnap.x + 1) / 2) * w, raw: ((p.x + 1) / 2) * w };
+  };
+  // A texel in world units at his head, across.
+  const texel = (drawnAt(1).raw - drawnAt(0).raw) ** -1;
+  // Start just right of an edge, then wobble a fifth of a texel each side of it.
+  const { raw } = drawnAt(0);
+  const edge = Math.floor(raw) + 1;
+  const start = (edge + 0.05 - raw) * texel;
+  ch.setStyle(LOOKS.ds, true); // (a fresh start: the measuring above moved its hold)
+  const first = drawnAt(start).at;
+  assert.ok(Math.abs(first - edge - 0.5) < 1e-3, `first, on its own texel's centre (${first})`);
+  for (const k of [-0.2, 0.15, -0.18, 0.1, -0.2])
+    assert.ok(Math.abs(drawnAt(start + k * texel).at - first) < 1e-3, `${k} texel: drawn on the same texel`);
+  assert.ok(Math.abs(drawnAt(start + 1.4 * texel).at - first - 1) < 1e-3, 'clearly into the next texel: one texel on');
+  ch.dispose();
+});

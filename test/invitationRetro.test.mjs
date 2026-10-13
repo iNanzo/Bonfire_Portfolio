@@ -233,3 +233,25 @@ test('his materials move together by the snap uniform they share, in clip space,
   const plain = vertex(markId(new THREE.MeshToonMaterial(), ID.newt));
   assert.doesNotMatch(plain.vertexShader, /uTexelSnap/);
 });
+
+test('the texel snap holds on to its texel while the point wobbles across an edge, and moves once it’s clearly in the next', () => {
+  const w = 100;
+  const h = 100;
+  /** NDC for texel coordinate t on a 100-texel axis. */
+  const ndc = (t) => (t / w) * 2 - 1;
+  const hold = { x: Number.NaN, y: Number.NaN };
+  const at = (t) => {
+    const s = snapShift(ndc(t), ndc(t), w, h, { x: 0, y: 0 }, hold);
+    return ((ndc(t) + s.x + 1) / 2) * w; // (where it's drawn, in texels)
+  };
+  const first = at(40.05);
+  assert.ok(Math.abs(first - 40.5) < 1e-6, `first, its own texel's centre (${first})`);
+  // His breathing: back and forth across the edge at 40, a fifth of a texel each way.
+  for (const t of [39.85, 40.2, 39.8, 40.15, 39.9]) assert.ok(Math.abs(at(t) - 40.5) < 1e-6, `${t}: held at 40.5`);
+  assert.ok(Math.abs(at(41.3) - 41.5) < 1e-6, 'a texel and more on: the next texel');
+  assert.ok(Math.abs(at(40.8) - 41.5) < 1e-6, 'and held there on the way back');
+  for (const t of [41.3, 39.0, 40.6]) {
+    const s = snapShift(ndc(t), ndc(t), w, h, { x: 0, y: 0 }, hold);
+    assert.ok(Math.abs(s.x) <= (2 / w) * 0.75 + 1e-9, `${t}: never more than three quarters of a texel off`);
+  }
+});
