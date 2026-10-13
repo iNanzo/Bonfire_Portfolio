@@ -1,5 +1,7 @@
-// Carrying NEWT by the collar in the invitation toy: the anchor his collar follows (eased in
-// over ~0.15 s, kept inside the play area), a damped pendulum that swings his root as the
+// Carrying NEWT by the collar in the invitation toy: the anchor his collar follows (a critically
+// damped follow of the pointer's spot, kept inside the play area: it eases in over ~0.15 s and
+// moves smoothly whether the pointer's spot changes every frame or only every second or third
+// one, as a 60 Hz finger on a 120 Hz screen does), a damped pendulum that swings his root as the
 // anchor speeds up and slows down (procedural motion never touches his bones), the toss
 // velocity from the last ~80 ms when he's let go, and the fall that follows, with gravity and
 // soft bounces off the play area's edges (a disc's rim, or a box's sides), until his lowest
@@ -12,15 +14,17 @@ import { centreOf, clampTo, xRange } from './steer.js';
 /** @typedef {import('./types.js').CarryState} CarryState */
 
 /**
- * ease: seconds for the anchor to come from his collar to the pointer; window: seconds of
- * samples a toss reads. The swing: a pendulum `length` long (collar to his middle) under
+ * follow: how fast the anchor follows the pointer's spot (rad/s: a critically damped follow,
+ * about 89% of the way from his collar in 0.15 s, 2/follow s behind a steady drag; it smooths
+ * out a spot that only moves on some frames, which read as a hard shake frame by frame);
+ * window: seconds of samples a toss reads. The swing: a pendulum `length` long (collar to his middle) under
  * `gravity`, `damping` per second, at most `tiltMax` radians, fed accelerations up to
  * `accelMax`, integrated in steps of at most `substep`; `shakeSmooth` smooths the shake reading.
  * A toss is capped at `tossMax` across and `tossUp`/`tossDown` up and down. The fall: `fallGravity`,
  * `restitution` off the edges, the floor at `floorY`, the tilt relaxing at `tiltRelax` per second.
  */
 export const CARRY = {
-  ease: 0.15,
+  follow: 25,
   window: 0.08,
   length: 0.55,
   gravity: 9.8,
@@ -39,10 +43,19 @@ export const CARRY = {
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const smooth01 = (x) => {
-  const t = clamp(x, 0, 1);
-  return t * t * (3 - 2 * t);
-};
+
+/**
+ * The exact critically damped step of `x` (velocity `v`) toward a still `goal` over `dt` at
+ * CARRY.follow.
+ * @returns {[number, number]}
+ */
+function follow(x, v, goal, dt) {
+  const w = CARRY.follow;
+  const e = x - goal;
+  const k = Math.exp(-w * dt);
+  const j = (v + w * e) * dt;
+  return [goal + (e + j) * k, (v - w * j) * k];
+}
 
 /**
  * Picks him up by the collar.
@@ -55,7 +68,6 @@ export function grab(collar, t) {
   return {
     t0: t,
     t,
-    from: { ...p },
     anchor: { ...p },
     vel: { x: 0, y: 0, z: 0 },
     tilt: { x: 0, z: 0 },
@@ -67,9 +79,9 @@ export function grab(collar, t) {
 }
 
 /**
- * One frame held: the anchor moves toward `target` (where the pointer's ray meets the lift
- * height), kept inside the bounds, and the swing answers its acceleration. Updates `c` in
- * place and returns it.
+ * One frame held: the anchor follows `target` (where the pointer's ray meets the lift height,
+ * kept inside the bounds), and the swing answers its acceleration. Updates `c` in place and
+ * returns it.
  * @param {CarryState} c
  * @param {XYZ} target
  * @param {number} dt
@@ -79,14 +91,22 @@ export function grab(collar, t) {
  */
 export function holdStep(c, target, dt, bounds, t) {
   const { x: gx, z: gz } = bounds ? clampTo(bounds, target) : target;
-  const k = CARRY.ease > 0 ? smooth01((t - c.t0) / CARRY.ease) : 1;
-  const next = {
-    x: c.from.x + (gx - c.from.x) * k,
-    y: c.from.y + (target.y - c.from.y) * k,
-    z: c.from.z + (gz - c.from.z) * k,
-  };
   if (dt > 0) {
-    const vel = { x: (next.x - c.anchor.x) / dt, y: (next.y - c.anchor.y) / dt, z: (next.z - c.anchor.z) / dt };
+    const [x, vx] = follow(c.anchor.x, c.vel.x, gx, dt);
+    const [y, vy] = follow(c.anchor.y, c.vel.y, target.y, dt);
+    const [z, vz] = follow(c.anchor.z, c.vel.z, gz, dt);
+    const next = { x, y, z };
+    const vel = { x: vx, y: vy, z: vz };
+    if (bounds) {
+      // (A follow that would carry on past the edge stops on it.)
+      const inside = clampTo(bounds, next);
+      if (inside.x !== next.x || inside.z !== next.z) {
+        vel.x = (inside.x - c.anchor.x) / dt;
+        vel.z = (inside.z - c.anchor.z) / dt;
+        next.x = inside.x;
+        next.z = inside.z;
+      }
+    }
     let ax = (vel.x - c.vel.x) / dt;
     let ay = (vel.y - c.vel.y) / dt;
     let az = (vel.z - c.vel.z) / dt;
@@ -101,10 +121,10 @@ export function holdStep(c, target, dt, bounds, t) {
     c.vel = vel;
     c.dragSpeed = Math.hypot(vel.x, vel.y, vel.z);
     c.shake += (Math.min(a, CARRY.accelMax) - c.shake) * Math.min(1, dt / CARRY.shakeSmooth);
+    c.anchor = next;
   }
-  c.anchor = next;
   c.t = t;
-  c.samples.push({ t, ...next });
+  c.samples.push({ t, ...c.anchor });
   while (c.samples.length > 2 && t - c.samples[0].t > CARRY.window + 1e-9) c.samples.shift();
   return c;
 }

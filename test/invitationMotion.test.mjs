@@ -3,7 +3,8 @@
 // the screen's, sliding along one when he's cornered, never stuck) with a capped turn rate, and
 // picks wander goals inside the bounds (the front edge over the toolbar too). carry.js holds
 // him by the collar: the anchor eases in and stays in the play area, a damped pendulum swings
-// his root and settles, a toss uses the last 80 ms, and a fall bounces softly off the edges and
+// his root and settles (as much, and with no hard shake, when the pointer's spot only moves on
+// some frames), a toss uses the last 80 ms, and a fall bounces softly off the edges and
 // lands when his lowest foot reaches the floor. blend.js keeps clip weights normalised, runs Idle/Walk/Run on one
 // shared phase, and starts a one-shot's fade-out before it ends. lookAt.js clamps and eases
 // his look without overshoot, glances by a seeded rng, and the brain zeroes the look's weight
@@ -26,7 +27,7 @@ import {
   NEXT_CLIP,
 } from '../src/invitation/blend.js';
 import { aimAngles, lookStep, createLook, splitLook, viewerAim, LIMIT, SPLIT, LOOK } from '../src/invitation/lookAt.js';
-import { createBrain } from '../src/invitation/brain.js';
+import { TUNE, createBrain } from '../src/invitation/brain.js';
 
 const BOUNDS = { minX: -2, maxX: 2, minZ: -2, maxZ: 1.4 };
 const DT = 1 / 60;
@@ -152,18 +153,70 @@ test('goto arrives inside the arrive radius and stops; face turns him toward the
 
 // ---- carry --------------------------------------------------------------------------------
 
-test('carrying: the anchor eases in over about 0.15 s and stays inside the play area', () => {
+test('carrying: the anchor eases in, most of the way in about 0.15 s, follows the pointer’s spot and stays inside the play area', () => {
   const c = grab({ x: 0, y: 0.6, z: 0 }, 10);
   const target = { x: 1, y: 1.2, z: 0 };
   holdStep(c, target, 0.05, BOUNDS, 10.05);
   assert.ok(c.anchor.x > 0.01 && c.anchor.x < 0.9, `part way at 50 ms (${c.anchor.x})`);
   holdStep(c, target, 0.05, BOUNDS, 10.1);
-  holdStep(c, target, 0.06, BOUNDS, 10.16);
-  close(c.anchor.x, 1);
-  close(c.anchor.y, 1.2);
-  holdStep(c, { x: 9, y: 1.2, z: -9 }, DT, BOUNDS, 10.17);
-  close(c.anchor.x, BOUNDS.maxX);
-  close(c.anchor.z, BOUNDS.minZ);
+  holdStep(c, target, 0.05, BOUNDS, 10.15);
+  assert.ok(c.anchor.x > 0.85 && c.anchor.x <= 1, `most of the way at 150 ms (${c.anchor.x})`);
+  let t = 10.15;
+  for (let i = 0; i < 30; i++) holdStep(c, target, DT, BOUNDS, (t += DT));
+  close(c.anchor.x, 1, 1e-3);
+  close(c.anchor.y, 1.2, 1e-3);
+  for (let i = 0; i < 60; i++) {
+    holdStep(c, { x: 9, y: 1.2, z: -9 }, DT, BOUNDS, (t += DT));
+    assert.ok(inside(BOUNDS, c.anchor), JSON.stringify(c.anchor));
+  }
+  close(c.anchor.x, BOUNDS.maxX, 1e-6);
+  close(c.anchor.z, BOUNDS.minZ, 1e-6);
+});
+
+test('carrying: a swing reads the same when the pointer’s spot only moves every second or third frame (a 60 Hz finger on a 120–144 Hz screen): as big, and no hard shake', () => {
+  /** A gentle swing, ±0.3 units at 1 Hz for 4 s, the spot moving on every `every`th frame. */
+  const swingAt = (fps, every) => {
+    const dt = 1 / fps;
+    const c = grab({ x: 0, y: 1.2, z: 0 }, 0);
+    let target = { x: 0, y: 1.2, z: 0 };
+    let tilt = 0;
+    let shake = 0;
+    for (let i = 1; i <= 4 * fps; i++) {
+      const t = i * dt;
+      if (i % every === 0) target = { x: 0.3 * Math.sin(2 * Math.PI * t), y: 1.2, z: 0 };
+      holdStep(c, target, dt, BOUNDS, t);
+      if (t > 0.3) {
+        tilt = Math.max(tilt, Math.abs(c.tilt.z));
+        shake = Math.max(shake, c.shake);
+      }
+    }
+    return { tilt, shake };
+  };
+  const smooth = swingAt(120, 1);
+  assert.ok(smooth.tilt > 0.5, `a swing with the spot moving every frame (${smooth.tilt.toFixed(2)} rad)`);
+  assert.ok(smooth.shake < TUNE.shakeHard, `and no hard shake (${smooth.shake.toFixed(1)})`);
+  for (const [fps, every] of [
+    [120, 2],
+    [144, 2],
+    [144, 3],
+    [240, 2],
+  ]) {
+    const r = swingAt(fps, every);
+    const at = `${fps} fps, the spot moving every ${every} frames`;
+    assert.ok(r.tilt > 0.9 * smooth.tilt, `${at}: swings ${r.tilt.toFixed(2)} rad (${smooth.tilt.toFixed(2)})`);
+    assert.ok(r.shake < TUNE.shakeHard, `${at}: shake at most ${r.shake.toFixed(1)}, under ${TUNE.shakeHard}`);
+  }
+  // A gentle lift (half a unit in a second) at 131 fps with the spot moving every other frame.
+  const c = grab({ x: 0, y: 0.7, z: 0 }, 0);
+  let target = { x: 0, y: 0.7, z: 0 };
+  let most = 0;
+  for (let i = 1; i <= 131 * 1.2; i++) {
+    const t = i / 131;
+    if (i % 2 === 0) target = { x: 0, y: 0.7 + 0.5 * Math.min(1, t), z: 0 };
+    holdStep(c, target, 1 / 131, BOUNDS, t);
+    if (t > 0.2) most = Math.max(most, c.shake);
+  }
+  assert.ok(most < TUNE.shakeSoft, `a gentle lift is no shake at all (${most.toFixed(1)})`);
 });
 
 test('carrying: a drag swings his root like a pendulum, and the swing settles', () => {
@@ -198,9 +251,13 @@ test('carrying: a drag swings his root like a pendulum, and the swing settles', 
   assert.ok(Math.abs(c.tilt.z) < 0.02 && Math.abs(c.tiltVel.z) < 0.05, `still swinging: ${c.tilt.z}`);
   assert.ok(maxAbs <= CARRY.tiltMax + 1e-6);
   assert.ok(carryFeel(c).dragSpeed < 0.01);
-  // A hard shake reads as one.
-  for (let i = 0; i < 30; i++) holdStep(c, { x: 1 + (i % 2 ? 0.3 : -0.3), y: 1, z: 0 }, DT, BOUNDS, (t += DT));
-  assert.ok(carryFeel(c).shake > 10, `shake ${carryFeel(c).shake}`);
+  // A hard shake (a hand's: ±0.15 units, four times a second) reads as one.
+  let most = 0;
+  for (let i = 0; i < 60; i++) {
+    holdStep(c, { x: 1 + 0.15 * Math.sin(2 * Math.PI * 4 * i * DT), y: 1, z: 0 }, DT, BOUNDS, (t += DT));
+    most = Math.max(most, carryFeel(c).shake);
+  }
+  assert.ok(most > TUNE.shakeHard, `shake ${most}`);
 });
 
 test('a toss uses the last 80 ms of samples, capped', () => {
@@ -209,7 +266,8 @@ test('a toss uses the last 80 ms of samples, capped', () => {
   let x = 0;
   for (let i = 0; i < 30; i++) holdStep(c, { x: 0, y: 1, z: (t += DT) * 0.1 }, DT, BOUNDS, t);
   const z = c.anchor.z;
-  for (let i = 0; i < 8; i++) {
+  // (Long enough for the anchor to have come up to the drag's speed.)
+  for (let i = 0; i < 40; i++) {
     x -= 2 * DT;
     holdStep(c, { x, y: 1, z }, DT, BOUNDS, (t += DT));
   }
@@ -228,7 +286,7 @@ test('a toss uses the last 80 ms of samples, capped', () => {
   assert.ok(Math.hypot(fling.x, fling.z) <= CARRY.tossMax + 1e-6, 'capped');
   assert.ok(Math.hypot(fling.x, fling.z) > CARRY.tossMax - 1e-3);
 
-  for (let i = 0; i < 10; i++) holdStep(c, { x, y: 1, z }, DT, BOUNDS, (t += DT));
+  for (let i = 0; i < 60; i++) holdStep(c, { x, y: 1, z }, DT, BOUNDS, (t += DT));
   const still = toss(c);
   close(Math.hypot(still.x, still.y, still.z), 0, 1e-6, 'a still release drops straight down');
 });
@@ -707,7 +765,7 @@ test('in a widening play area, walking, fleeing and carrying stay inside its sla
   });
   // Carried out past a side: the anchor stays inside.
   const c = grab({ x: 0, y: 0.6, z: -6 }, 0);
-  for (let i = 1; i <= 30; i++) holdStep(c, { x: 9, y: 1.2, z: -6 }, DT, TRAP, i * DT);
+  for (let i = 1; i <= 60; i++) holdStep(c, { x: 9, y: 1.2, z: -6 }, DT, TRAP, i * DT);
   assert.ok(insideTrap(c.anchor), JSON.stringify(c.anchor));
   close(c.anchor.x, xRange(TRAP, -6)[1], 1e-6, 'up against the slanted side');
   // Thrown at the slanted side: he bounces off softly and stays inside.

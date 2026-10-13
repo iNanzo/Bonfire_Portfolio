@@ -83,8 +83,8 @@
  * @typedef {object} CarryState  carry.js: NEWT held by the collar (holdStep updates it in place)
  * @property {number} t0  when he was grabbed
  * @property {number} t  the last step
- * @property {XYZ} from  the collar when he was grabbed: the anchor eases from here
- * @property {XYZ} anchor  where the collar goes this frame (world)
+ * @property {XYZ} anchor  where the collar goes this frame (world): it follows the pointer's
+ *   spot, starting at the collar where he was grabbed
  * @property {XYZ} vel  the anchor's velocity
  * @property {{x: number, z: number}} tilt  the root's swing in radians: root.rotation.x and .z (positive z puts his feet toward +x, positive x toward −z)
  * @property {{x: number, z: number}} tiltVel

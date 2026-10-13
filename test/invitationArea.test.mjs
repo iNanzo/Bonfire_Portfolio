@@ -229,7 +229,10 @@ test('fleeing stays inside the disc; cornered at the rim he slides along it and 
 
 test('carrying stays inside the disc: the anchor, and a toss that bounces softly off the rim', () => {
   const c = grab({ x: 0, y: 0.6, z: 0 }, 0);
-  for (let i = 1; i <= 30; i++) holdStep(c, { x: 9, y: 1.2, z: 9 }, DT, AREA, i * DT);
+  for (let i = 1; i <= 60; i++) {
+    holdStep(c, { x: 9, y: 1.2, z: 9 }, DT, AREA, i * DT);
+    inDisc(c.anchor, 'carried');
+  }
   close(radius(c.anchor), R, 1e-6, 'the anchor on the rim');
   close(c.anchor.y, 1.2, 1e-9);
   let root = { x: R - 0.3, y: 1.2, z: 0 };

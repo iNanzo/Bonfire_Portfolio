@@ -60,7 +60,7 @@ test('the body: steer on the ground, a grab hangs him from the anchor, a release
     bodyStep(s, { state: 'held', move: stay, pointer: null, bounds: BOUNDS, dt: DT, t: (t += DT), collar, target });
     swung = Math.max(swung, Math.hypot(s.tilt.x, s.tilt.z));
   }
-  for (const k of ['x', 'y', 'z']) close(s.carry.anchor[k], target[k], 1e-6, `anchor ${k}`);
+  for (const k of ['x', 'y', 'z']) close(s.carry.anchor[k], target[k], 1e-3, `anchor ${k}`);
   assert.ok(swung > 0.05, `the swing tilts his root (${swung.toFixed(3)} rad)`);
   // Let go: a fall, from where the anchoring left his root, down to the floor.
   s.root = { x: target.x, y: 0.5, z: target.z };
