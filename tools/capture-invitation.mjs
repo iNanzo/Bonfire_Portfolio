@@ -9,7 +9,7 @@
 //
 //   node tools/capture-invitation.mjs [--sizes 390x844@3,412x915@2.625,1280x800@1]
 //        [--acts idle,clips,tap,drag,buttons,floor,chase,orbit] [--clips Wave,Spook] [--look ds|soft]
-//        [--pixel off|2|3|4] [--dither on|off] [--outlines on|off] [--anim-fps 15]
+//        [--pixel off|2|3|4] [--dither on|off] [--outlines on|off] [--motion smooth|choppy] [--anim-fps 15]
 //        [--seed 3] [--calm on|off] [--lead 300] [--fps 15] [--scale 1] [--sheet 8] [--crop 200]
 //        [--port 5340] [--url <origin>] [--out .scratch/invitation-shots] [--tag now]
 //
@@ -39,8 +39,9 @@
 // of the act, each a --crop CSS px square around him, the orbit act's whole frames, labelled
 // with when it was drawn and his state then); <out>/<tag>-sheet-<W>x<H>.png (six whole frames
 // an act); <out>/<tag>-<W>x<H>.json (each act's frames, the page's frame times while it ran,
-// and the states and clips he went through, with when). --look, --pixel, --dither and
-// --outlines set the Look menu first (its stored settings, invitation.look.v1). --anim-fps sets
+// and the states and clips he went through, with when). --look, --pixel, --dither, --outlines
+// and --motion set the Look menu first (its stored settings, invitation.look.v1; with --motion
+// the report and the console say how many times a second his pose changed). --anim-fps sets
 // every preset's animFps (choppy motion) in the page after each load, through the dev server's
 // own looks/index.js module; nothing is written to the code. --seed and --calm go to the page's
 // query (?calm is on unless --calm off). --lead keeps that many ms from before each act begins.
@@ -69,6 +70,7 @@ const LOOK = opt('look', null);
 const PIXEL = opt('pixel', null);
 const DITHER = opt('dither', null);
 const OUTLINES = opt('outlines', null);
+const MOTION = opt('motion', null);
 const ANIM_FPS = opt('anim-fps', null);
 const SEED = opt('seed', null);
 const CALM = opt('calm', 'on') !== 'off';
@@ -79,7 +81,7 @@ const SHEET = Number(opt('sheet', '8'));
 const CROP = Number(opt('crop', '200'));
 const PORT = Number(opt('port', '5340'));
 const OUT = opt('out', '.scratch/invitation-shots');
-const TAG = opt('tag', `invitation${LOOK ? `-${LOOK}` : ''}${PIXEL ? `-${PIXEL}` : ''}`);
+const TAG = opt('tag', `invitation${LOOK ? `-${LOOK}` : ''}${PIXEL ? `-${PIXEL}` : ''}${MOTION ? `-${MOTION}` : ''}`);
 /** Quiet before he sits by himself that isn't recorded, ms (he sits after 20 s alone). */
 const SIT_QUIET = 16_000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -619,6 +621,7 @@ for (const size of SIZES) {
     ...(PIXEL ? { pixelSize: PIXEL } : {}),
     ...(DITHER ? { dither: DITHER !== 'off' } : {}),
     ...(OUTLINES ? { outlines: OUTLINES !== 'off' } : {}),
+    ...(MOTION ? { motion: MOTION } : {}),
   };
   if (Object.keys(look).length)
     await context.addInitScript((v) => localStorage.setItem('invitation.look.v1', v), JSON.stringify(look));
@@ -626,10 +629,11 @@ for (const size of SIZES) {
   page.on('pageerror', (e) => problems.push(`${size.w}x${size.h}: ${e.message}`));
   page.on('console', (m) => m.type() === 'error' && problems.push(`${size.w}x${size.h}: ${m.text()}`));
   const report = { size, look, animFps: ANIM_FPS === null ? null : Number(ANIM_FPS), seed: SEED, calm: CALM, acts: {} };
-  if (ANIM_FPS !== null) {
+  if (ANIM_FPS !== null || MOTION !== null) {
     await ready(page);
     report.poseChangesPerSecond = await poseRate(page);
-    console.log(`  animFps ${ANIM_FPS}: his pose changed ${report.poseChangesPerSecond} times in a second`);
+    const how = MOTION !== null ? `Motion ${MOTION}` : `animFps ${ANIM_FPS}`;
+    console.log(`  ${how}: his pose changed ${report.poseChangesPerSecond} times in a second`);
   }
   const sheet = [];
   const labels = [];
