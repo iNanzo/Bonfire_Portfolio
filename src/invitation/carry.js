@@ -3,9 +3,11 @@
 // moves smoothly whether the pointer's spot changes every frame or only every second or third
 // one, as a 60 Hz finger on a 120 Hz screen does), a damped pendulum that swings his root as the
 // anchor speeds up and slows down (procedural motion never touches his bones), the toss
-// velocity from the last ~80 ms when he's let go, and the fall that follows, with gravity and
-// soft bounces off the play area's edges (a disc's rim, or a box's sides), until his lowest
-// foot meets the floor. Pure: no three.js.
+// velocity from the last ~80 ms when he's let go (none across while the pointer pushes him out
+// against the edge: the rim is invisible, so he drops right there instead of skidding along it or
+// flying back off it), and the fall that follows, with gravity and soft bounces off the play area's edges (a
+// disc's rim, or a box's sides) for a fall that reaches one, until his lowest foot meets the
+// floor. Pure: no three.js.
 
 import { centreOf, clampTo, xRange } from './steer.js';
 
@@ -75,6 +77,7 @@ export function grab(collar, t) {
     samples: [{ t, ...p }],
     dragSpeed: 0,
     shake: 0,
+    push: null,
   };
 }
 
@@ -91,6 +94,11 @@ export function grab(collar, t) {
  */
 export function holdStep(c, target, dt, bounds, t) {
   const { x: gx, z: gz } = bounds ? clampTo(bounds, target) : target;
+  // (The pointer's spot out past the edge: the way it pushes him, out through it.)
+  const px = target.x - gx;
+  const pz = target.z - gz;
+  const pushed = Math.hypot(px, pz);
+  c.push = pushed > 1e-9 ? { x: px / pushed, z: pz / pushed } : null;
   if (dt > 0) {
     const [x, vx] = follow(c.anchor.x, c.vel.x, gx, dt);
     const [y, vy] = follow(c.anchor.y, c.vel.y, target.y, dt);
@@ -164,7 +172,10 @@ export function carryFeel(c) {
 }
 
 /**
- * The velocity he's let go with: across the last ~80 ms of samples, capped.
+ * The velocity he's let go with: across the last ~80 ms of samples, capped; while the pointer
+ * pushes him out against the edge, none across (its samples hold his rush toward the edge and
+ * the clamp's slide along it: tossed with them he'd skid along an edge nobody can see, or
+ * bounce back off it, so he drops right there).
  * @param {CarryState} c
  * @returns {XYZ}
  */
@@ -180,6 +191,10 @@ export function toss(c) {
   if (across > CARRY.tossMax) {
     x *= CARRY.tossMax / across;
     z *= CARRY.tossMax / across;
+  }
+  if (c.push) {
+    x = 0;
+    z = 0;
   }
   return { x, y: clamp((b.y - a.y) / span, CARRY.tossDown, CARRY.tossUp), z };
 }

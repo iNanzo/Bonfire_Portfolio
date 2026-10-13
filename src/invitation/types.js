@@ -91,6 +91,8 @@
  * @property {Array<{t: number, x: number, y: number, z: number}>} samples  the anchor over the last ~80 ms
  * @property {number} dragSpeed  the anchor's speed, world units/s
  * @property {number} shake  the anchor's acceleration, smoothed, world units/s²
+ * @property {XZ|null} push  while the pointer's spot is out past the play area's edge: the way
+ *   it pushes him, out through the edge (unit length; let go then, he's tossed with nothing across)
  */
 
 /** @typedef {{yaw: number, pitch: number}} Aim  radians from his body's facing: yaw + turns toward +x when he faces +z (like root.rotation.y), pitch + looks up */

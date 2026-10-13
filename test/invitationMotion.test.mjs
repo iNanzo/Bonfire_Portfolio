@@ -291,6 +291,35 @@ test('a toss uses the last 80 ms of samples, capped', () => {
   close(Math.hypot(still.x, still.y, still.z), 0, 1e-6, 'a still release drops straight down');
 });
 
+test('let go while the pointer pushes him out against the rim, he drops right there: no toss across, so he never skids along it or flies back off it', () => {
+  const DISC = { minX: -2, maxX: 2, minZ: -2, maxZ: 2, r: 2 };
+  // Flicked out along +x, fast, the pointer's spot ending well past the rim.
+  const c = grab({ x: 1, y: 1.1, z: 0.65 }, 0);
+  let t = 0;
+  for (let i = 1; i <= 12; i++) holdStep(c, { x: 1 + 0.16 * i, y: 1.1, z: 0.65 }, DT, DISC, (t += DT));
+  assert.ok(Math.hypot(c.anchor.x, c.anchor.z) > 1.8, 'he got out near the rim');
+  const v = toss(c);
+  assert.deepEqual([v.x, v.z], [0, 0], `no speed across (${JSON.stringify(v)})`);
+  // The fall that follows never turns back against the flick, and he lands about where he was let go.
+  let root = { x: c.anchor.x, y: 0.8, z: c.anchor.z };
+  const from = { ...root };
+  let vel = v;
+  for (let i = 0; i < 60; i++) {
+    const f = fallStep(root, vel, root.y - 0.55, DT, DISC);
+    assert.ok(f.vel.x >= -1e-9, `frame ${i}: back against the flick at ${f.vel.x.toFixed(2)}`);
+    root = f.root;
+    vel = f.vel;
+    if (f.landed) break;
+  }
+  assert.ok(dist(root, from) < 1e-9, `landed ${dist(root, from).toFixed(2)} from where he was let go`);
+  // Let go inside the disc, the pointer inside too: the whole toss.
+  const d = grab({ x: 0, y: 1.1, z: 0 }, 0);
+  let x = 0;
+  t = 0;
+  for (let i = 0; i < 40; i++) holdStep(d, { x: (x += 2 * DT), y: 1.1, z: 0 }, DT, DISC, (t += DT));
+  close(toss(d).x, 2, 0.05, 'inside, the toss is whole');
+});
+
 test('falling: gravity, soft wall bounces, and he lands when his lowest foot reaches the floor', () => {
   const FOOT = -0.1;
   let root = { x: 0, y: 1.2, z: 0 };

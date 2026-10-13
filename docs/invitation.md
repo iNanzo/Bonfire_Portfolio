@@ -13,7 +13,8 @@ unlisted: nothing links to it and search engines are asked not to index it.
 - **Tap him** and he waves or gets startled (a jump, arms flung up). Tap him a lot and he gets
   stressed and runs away from your finger; he's never too fast to catch.
 - **Drag him** to pick him up by the collar. He dangles and swings; let go and he falls, lands
-  and gets back up.
+  and gets back up. Flick him and he flies a little; let go while pushing him against the edge
+  of his patch and he just drops there.
 - **Tap the floor** and he walks there. A ring on the floor shows where your finger or cursor is.
 - **Point anywhere on the floor** and he looks where you point (on a phone, while your finger
   is down; with a mouse, wherever the cursor is). Otherwise he looks at you.
