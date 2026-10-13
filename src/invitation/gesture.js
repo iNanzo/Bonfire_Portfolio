@@ -1,0 +1,168 @@
+// Pointer gestures for the invitation toy. Only the first pointer counts: a short, still press
+// is a tap (on NEWT or on the floor); a press on NEWT that moves more than moveTol CSS px or
+// lasts longer than holdMs is a grab, then drags, then a release; a cancel (pointercancel or
+// lostpointercapture) drops him and never taps. Plus where a ray meets a level plane, and
+// whether a point is on his screen shape (a head circle and a body capsule). Pure: CSS px and
+// seconds in, events out; the page owns the DOM and pointer capture.
+
+/** @typedef {import('./types.js').Ptr} Ptr */
+/** @typedef {import('./types.js').GestureEvent} GestureEvent */
+
+/**
+ * moveTol: CSS px a press may wander and still be a tap; holdMs: how long a press on NEWT may
+ * last and still be a tap; floorHoldMs: the same for a floor tap (a floor press is never a grab,
+ * but a long one is no tap either).
+ */
+export const GESTURE = { moveTol: 10, holdMs: 280, floorHoldMs: 500 };
+/** NEWT's pick shapes are at least this radius (22 CSS px across), however small he draws. */
+export const PICK_MIN_R = 11;
+
+/**
+ * @param {{moveTol?: number, holdMs?: number, floorHoldMs?: number}} [opts]
+ */
+export function createGesture(opts = {}) {
+  const moveTol = opts.moveTol ?? GESTURE.moveTol;
+  const holdMs = opts.holdMs ?? GESTURE.holdMs;
+  const floorHoldMs = opts.floorHoldMs ?? GESTURE.floorHoldMs;
+  /** @type {{id: number, on: 'newt'|'floor', x0: number, y0: number, t0: number, x: number, y: number, grabbed: boolean, moved: boolean}|null} */
+  let press = null;
+
+  /** @returns {GestureEvent} */
+  const ev = (type, on, x, y, t) => ({ type, on, x, y, t });
+  // (A whisker of slack: 1.28 − 1 is 0.28000000000000025 in floats.)
+  const outlasts = (t0, t, ms) => (t - t0) * 1000 > ms + 1e-6;
+  const strays = (x0, y0, x, y) => Math.hypot(x - x0, y - y0) > moveTol;
+
+  return {
+    /**
+     * A pointerdown; `onNewt` from the page's pick.
+     * @param {Ptr} p
+     * @param {boolean} onNewt
+     * @returns {GestureEvent[]}
+     */
+    down(p, onNewt) {
+      if (press) return [];
+      press = {
+        id: p.id,
+        on: onNewt ? 'newt' : 'floor',
+        x0: p.x,
+        y0: p.y,
+        t0: p.t,
+        x: p.x,
+        y: p.y,
+        grabbed: false,
+        moved: false,
+      };
+      return [];
+    },
+    /**
+     * A pointermove. Without a press, a mouse (or pen) with no button down hovers; `onNewt`
+     * says whether it's over him.
+     * @param {Ptr} p
+     * @param {boolean} [onNewt]
+     * @returns {GestureEvent[]}
+     */
+    move(p, onNewt = false) {
+      if (!press)
+        return p.kind !== 'touch' && !p.buttons ? [ev('hover', onNewt ? 'newt' : 'floor', p.x, p.y, p.t)] : [];
+      if (p.id !== press.id) return [];
+      press.x = p.x;
+      press.y = p.y;
+      const out = [];
+      if (press.on === 'newt') {
+        if (!press.grabbed && (strays(press.x0, press.y0, p.x, p.y) || outlasts(press.t0, p.t, holdMs))) {
+          press.grabbed = true;
+          out.push(ev('grab', 'newt', p.x, p.y, p.t));
+        }
+        if (press.grabbed) out.push(ev('drag', 'newt', p.x, p.y, p.t));
+      } else {
+        if (strays(press.x0, press.y0, p.x, p.y)) press.moved = true;
+        if (press.moved) out.push(ev('drag', 'floor', p.x, p.y, p.t));
+      }
+      return out;
+    },
+    /**
+     * A pointerup.
+     * @param {Ptr} p
+     * @returns {GestureEvent[]}
+     */
+    up(p) {
+      if (!press || p.id !== press.id) return [];
+      const q = press;
+      press = null;
+      const far = strays(q.x0, q.y0, p.x, p.y);
+      if (q.on === 'newt') {
+        if (q.grabbed) return [ev('release', 'newt', p.x, p.y, p.t)];
+        if (far || outlasts(q.t0, p.t, holdMs))
+          return [ev('grab', 'newt', p.x, p.y, p.t), ev('release', 'newt', p.x, p.y, p.t)];
+        return [ev('tap', 'newt', p.x, p.y, p.t)];
+      }
+      if (q.moved || far) return [ev('release', 'floor', p.x, p.y, p.t)];
+      if (outlasts(q.t0, p.t, floorHoldMs)) return [];
+      return [ev('tap', 'floor', p.x, p.y, p.t)];
+    },
+    /**
+     * pointercancel or lostpointercapture: a drop, never a tap.
+     * @param {number} id
+     * @param {number} t
+     * @returns {GestureEvent[]}
+     */
+    cancel(id, t) {
+      if (!press || id !== press.id) return [];
+      const q = press;
+      press = null;
+      return [ev('cancel', q.on, q.x, q.y, t)];
+    },
+    /**
+     * Each frame: a press on NEWT held still past holdMs becomes a grab.
+     * @param {number} t
+     * @returns {GestureEvent[]}
+     */
+    tick(t) {
+      if (!press || press.on !== 'newt' || press.grabbed || !outlasts(press.t0, t, holdMs)) return [];
+      press.grabbed = true;
+      return [ev('grab', 'newt', press.x, press.y, t)];
+    },
+    /** The press being tracked, or null. */
+    current() {
+      return press ? { id: press.id, on: press.on, grabbed: press.grabbed } : null;
+    },
+  };
+}
+
+/**
+ * Where a ray meets the level plane at height `y`, or null when it never does.
+ * @param {import('./types.js').XYZ} o  origin
+ * @param {import('./types.js').XYZ} d  direction (any length)
+ * @param {number} y
+ * @returns {import('./types.js').XZ|null}
+ */
+export function rayPlaneY(o, d, y) {
+  if (Math.abs(d.y) < 1e-9) return null;
+  const s = (y - o.y) / d.y;
+  if (s < 0) return null;
+  return { x: o.x + s * d.x, z: o.z + s * d.z };
+}
+
+/**
+ * Whether a point (CSS px) is on NEWT: his head circle or his body capsule, each at least
+ * PICK_MIN_R in radius, grown by `slop`.
+ * @param {{x: number, y: number}} p
+ * @param {{x: number, y: number, r: number}|null} head
+ * @param {{a: {x: number, y: number}, b: {x: number, y: number}, r: number}|null} body
+ * @param {number} [slop]
+ */
+export function pickScreen(p, head, body, slop = 0) {
+  if (head && Math.hypot(p.x - head.x, p.y - head.y) <= Math.max(head.r, PICK_MIN_R) + slop) return true;
+  if (body && segmentDistance(p, body.a, body.b) <= Math.max(body.r, PICK_MIN_R) + slop) return true;
+  return false;
+}
+
+/** @param {{x: number, y: number}} p @param {{x: number, y: number}} a @param {{x: number, y: number}} b */
+function segmentDistance(p, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  const s = len2 > 0 ? Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
+  return Math.hypot(p.x - (a.x + s * dx), p.y - (a.y + s * dy));
+}
