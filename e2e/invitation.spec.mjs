@@ -69,6 +69,33 @@ async function toucher(page) {
     });
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/**
+ * His bones (from his root) every frame the page draws for `ms`: how many frames, how many of
+ * them showed a new pose, the seconds it took, and his feet's spread each frame (world units).
+ */
+const poses = (page, ms) =>
+  page.evaluate(
+    (span) =>
+      new Promise((done) => {
+        const inv = window.__invitation;
+        let last = '';
+        const out = { frames: 0, changes: 0, secs: 0, spread: [] };
+        const t0 = performance.now();
+        const tick = () => {
+          const b = inv.bones();
+          const key = JSON.stringify(b);
+          out.frames++;
+          if (key !== last) out.changes++;
+          last = key;
+          out.spread.push(Math.hypot(b.FootL.x - b.FootR.x, b.FootL.z - b.FootR.z));
+          out.secs = (performance.now() - t0) / 1000;
+          if (out.secs * 1000 < span) requestAnimationFrame(tick);
+          else done(out);
+        };
+        requestAnimationFrame(tick);
+      }),
+    ms,
+  );
 
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
@@ -121,6 +148,32 @@ test.describe('on a phone', () => {
     await expect(sheet.getByRole('radio', { name: '4×', exact: true })).toBeChecked();
     expect((await snapshot(page)).pixelScale).toBe(4);
     await expect(sheet.getByRole('radio', { name: 'Soft' })).toBeChecked();
+    expect(errors).toEqual([]);
+  });
+
+  test('Motion Choppy steps his pose at most about 15 times a second, Smooth every frame, and it stays for the next visit', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    const smooth = await poses(page, 1200);
+    expect(smooth.changes, `Smooth: ${smooth.changes} new poses in ${smooth.frames} frames`).toBeGreaterThanOrEqual(
+      0.8 * smooth.frames,
+    );
+    await page.getByRole('button', { name: 'Look' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await sheet.getByRole('radio', { name: 'Choppy', exact: true }).check();
+    await sheet.getByRole('button', { name: 'Done' }).click();
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('invitation.look.v1') ?? '{}'));
+    expect(stored.motion).toBe('choppy');
+    const choppy = await poses(page, 1500);
+    const rate = choppy.changes / choppy.secs;
+    expect(rate, `Choppy: ${choppy.changes} new poses in ${choppy.secs.toFixed(2)} s`).toBeLessThanOrEqual(16.5);
+    expect(rate, 'he still moves').toBeGreaterThan(2);
+    await page.reload();
+    await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+    await page.getByRole('button', { name: 'Look' }).click();
+    await expect(sheet.getByRole('radio', { name: 'Choppy', exact: true })).toBeChecked();
     expect(errors).toEqual([]);
   });
 

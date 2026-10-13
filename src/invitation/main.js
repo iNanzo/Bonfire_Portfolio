@@ -12,7 +12,9 @@
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
-// → the blob shadow, the marker, the toolbar → render. The lift height comes from the Held clip
+// → the blob shadow, the marker, the toolbar → render. With Motion Choppy (look.js) his pose
+// (the update and applyLook) only moves on the clock's steps, 15 a second; his root, the
+// camera and the rest move every frame. The lift height comes from the Held clip
 // at load (his collar over his lowest sole, plus a gap).
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
@@ -40,7 +42,7 @@ import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createFaceState, faceStep } from './faces.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
-import { loadLook, presetOf, saveLook } from './look.js';
+import { animFps, loadLook, motionStep, presetOf, saveLook } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
 import { createRng } from './rng.js';
@@ -160,7 +162,8 @@ function start(s) {
   let last = -1;
   /** The toy's clock, seconds (the sum of the frames' steps). */
   let t = 0;
-  let choppy = 0;
+  /** Motion Choppy: the time his pose has waited since its last step, seconds. */
+  let waiting = 0;
   /** A clip forced by ?test's play(), else null (the brain decides). */
   let forced = null;
   /** @type {import('./types.js').ButtonName|null} the last button the loop took (for ?test) */
@@ -348,8 +351,8 @@ function start(s) {
     pressed = null;
     if (forced) {
       c.setWeights({ [forced]: 1 }, mix.phase);
-      animate(c, dt);
-      finish(c, ptr, pose, dt, { mode: 'camera', weight: 1 }, FACE_TRACK[forced]?.face ?? 'neutral', 'normal');
+      const moved = animate(c, dt);
+      finish(c, ptr, pose, dt, { mode: 'camera', weight: 1 }, FACE_TRACK[forced]?.face ?? 'neutral', 'normal', moved);
       return;
     }
     // 2. The brain.
@@ -364,10 +367,11 @@ function start(s) {
     mixStep(mix, { clip: o.clip, speed: body.body.speed, dt });
     c.setWeights(mix.weights, mix.phase);
     // 5. The animation; 6. held, his collar hung from the anchor.
-    animate(c, dt);
+    const moved = animate(c, dt);
     hang(c);
     // 7–8. The look and the face; the toolbar.
-    finish(c, ptr, pose, dt, { mode: o.look.mode, weight: o.look.weight * lookShare(mix.weights) }, o.face, o.blink);
+    const want = { mode: o.look.mode, weight: o.look.weight * lookShare(mix.weights) };
+    finish(c, ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
   }
 
@@ -476,16 +480,19 @@ function start(s) {
     if (o.buttonsEnabled !== shown.enabled) ui.setEnabled((shown.enabled = o.buttonsEnabled));
   }
 
-  /** Step the animation (choppy motion: at the preset's animFps when it's set). */
+  /**
+   * Step the animation: every frame, or with Motion Choppy on the clock's steps (look.js
+   * motionStep, whole ticks of 1/15 s). True when his pose moved this frame.
+   * @param {NonNullable<typeof character>} c
+   * @param {number} dt
+   */
   function animate(c, dt) {
-    const fps = presetOf(look).animFps;
-    if (fps > 0) {
-      choppy += dt;
-      if (choppy >= 1 / fps) {
-        c.update(choppy);
-        choppy = 0;
-      }
-    } else c.update(dt);
+    const fps = animFps(look);
+    const m = motionStep(waiting, dt, fps);
+    waiting = m.acc;
+    if (fps > 0 && !(m.step > 0)) return false;
+    c.update(m.step);
+    return true;
   }
 
   /**
@@ -497,8 +504,9 @@ function start(s) {
    * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number}} want
    * @param {import('./clips.js').FaceName} face
    * @param {import('./clips.js').BlinkMode} blink
+   * @param {boolean} moved  his pose stepped this frame (the look goes on with it)
    */
-  function finish(c, ptr, pose, dt, want, face, blink) {
+  function finish(c, ptr, pose, dt, want, face, blink, moved) {
     const root = c.root;
     const head = c.bonePos(BONES.head, { x: 0, y: 0, z: 0 });
     head.y += 0.12; // (his eyes, over the head bone's base)
@@ -509,7 +517,7 @@ function start(s) {
       pointer: ptr && !ptr.pinch ? { floor: ptr.floor, onNewt: ptr.onNewt } : null,
     });
     lookStep(gaze, want.mode, aim, dt, t, rng, want.weight, ahead);
-    c.applyLook(gaze.yaw, gaze.pitch, gaze.weight);
+    if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight);
     c.setFace(faceStep(faces, face, blink, t, rng));
     s.setBlob(root.position.x, root.position.z, body.mode === 'ground' ? 0 : Math.min(1, root.position.y / 0.5));
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;

@@ -26,11 +26,15 @@ import {
 } from '../src/invitation/pixels.js';
 import * as THREE from 'three';
 import {
+  CHOPPY_FPS,
   DEFAULT_LOOK,
   LOOKS,
   LOOK_KEY,
+  MOTIONS,
   STYLES,
+  animFps,
   loadLook,
+  motionStep,
   presetOf,
   saveLook,
   validLook,
@@ -219,13 +223,81 @@ test('a Pixel Size saved before the steps (Fine, DS, Chunky) loads as the defaul
     const saved = JSON.stringify({ pixelSize: old, dither: false, outlines: true, style: 'soft' });
     assert.deepEqual(
       loadLook(store(() => saved)),
-      { pixelSize: DEFAULT_PIXEL, dither: false, outlines: true, style: 'soft' },
+      { pixelSize: DEFAULT_PIXEL, dither: false, outlines: true, style: 'soft', motion: 'smooth' },
       old,
     );
   }
   for (const pixelSize of PIXEL_SIZES)
     assert.equal(loadLook(store(() => JSON.stringify({ pixelSize }))).pixelSize, pixelSize, `${pixelSize} is kept`);
   assert.equal(DEFAULT_LOOK.pixelSize, '2', '2× by default');
+});
+
+test('a stored look from before Motion loads with Motion Smooth and keeps its other values; Smooth and Choppy are kept, anything else is Smooth', () => {
+  assert.deepEqual(MOTIONS, ['smooth', 'choppy']);
+  assert.equal(DEFAULT_LOOK.motion, 'smooth', 'smooth by default');
+  const before = JSON.stringify({ pixelSize: '3', dither: false, outlines: false, style: 'soft' });
+  assert.deepEqual(loadLook(store(() => before)), {
+    pixelSize: '3',
+    dither: false,
+    outlines: false,
+    style: 'soft',
+    motion: 'smooth',
+  });
+  for (const motion of MOTIONS)
+    assert.equal(loadLook(store(() => JSON.stringify({ motion }))).motion, motion, `${motion} is kept`);
+  for (const motion of ['Choppy', 'fast', 15, true, null])
+    assert.equal(validLook({ ...DEFAULT_LOOK, motion }).motion, 'smooth', `${JSON.stringify(motion)} is not a Motion`);
+  // Saved and read back under the same key.
+  let saved = null;
+  saveLook(
+    { ...DEFAULT_LOOK, motion: 'choppy' },
+    store(
+      () => null,
+      (k, v) => (saved = [k, v]),
+    ),
+  );
+  assert.equal(saved[0], 'invitation.look.v1');
+  assert.equal(JSON.parse(saved[1]).motion, 'choppy');
+  assert.equal(loadLook(store(() => saved[1])).motion, 'choppy');
+});
+
+test('Motion Choppy steps his animation at 15 fps, Smooth every frame (and a preset’s own animFps still counts when Smooth)', () => {
+  assert.equal(CHOPPY_FPS, 15);
+  assert.equal(animFps({ ...DEFAULT_LOOK, motion: 'choppy' }), 15);
+  assert.equal(animFps({ ...DEFAULT_LOOK, motion: 'smooth' }), presetOf(DEFAULT_LOOK).animFps);
+  // Smooth: every frame steps by its own dt, nothing waits.
+  assert.deepEqual(motionStep(0, 0.016, 0), { acc: 0, step: 0.016 });
+  /** Frames of `dts` through motionStep at `fps`: the steps taken and the time stepped. */
+  const run = (dts, fps) => {
+    let acc = 0;
+    let steps = 0;
+    let stepped = 0;
+    for (const dt of dts) {
+      const m = motionStep(acc, dt, fps);
+      acc = m.acc;
+      if (m.step > 0) {
+        steps++;
+        stepped += m.step;
+        assert.ok(Math.abs(m.step * fps - Math.round(m.step * fps)) < 1e-9, `a step is whole ticks (${m.step})`);
+      }
+      assert.ok(acc >= 0 && acc < 1 / fps + 1e-9, `what waits is under a tick (${acc})`);
+    }
+    const total = dts.reduce((s, v) => s + v, 0);
+    assert.ok(Math.abs(stepped + acc - total) < 1e-9, `nothing is lost: ${stepped} + ${acc} = ${total}`);
+    return steps;
+  };
+  // At 60 Hz: one step of 1/15 s every fourth frame, exactly 15 a second (resetting the wait
+  // to 0 instead of taking a tick off it would lose the remainder and run at 12 to 14).
+  assert.equal(run(Array(120).fill(1 / 60), 15), 30, '60 Hz: 15 a second');
+  // At 144 Hz and at uneven frame times too: 15 a second, give or take the last.
+  const at144 = run(Array(288).fill(1 / 144), 15);
+  assert.ok(at144 >= 29 && at144 <= 30, `144 Hz: ${at144} in 2 s`);
+  const uneven = Array.from({ length: 240 }, (_, i) => [0.014, 0.019, 0.016, 0.0177][i % 4]);
+  const n = run(uneven, 15);
+  const secs = uneven.reduce((s, v) => s + v, 0);
+  assert.ok(Math.abs(n / secs - 15) < 0.6, `uneven frames: ${(n / secs).toFixed(2)} a second`);
+  // A slow frame catches up in one step of whole ticks.
+  assert.deepEqual(motionStep(0.05, 0.05, 15).step, 1 / 15);
 });
 
 test('every look preset carries every look value (a designer edits data, never code)', () => {
@@ -379,6 +451,19 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
     ],
   );
   assert.match(sheet, /value="soft" data-look="style" checked/);
+  // Motion: Smooth or Choppy, the stored one checked (Smooth for a look from before it).
+  const motions = [
+    ...sheet.matchAll(/name="inv-motion" value="([^"]+)" data-look="motion"( checked)?><span>([^<]+)<\/span>/g),
+  ];
+  assert.deepEqual(
+    motions.map((m) => [m[1], m[3], Boolean(m[2])]),
+    [
+      ['smooth', 'Smooth', true],
+      ['choppy', 'Choppy', false],
+    ],
+  );
+  assert.match(sheet, /<legend>Motion<\/legend>/);
+  assert.match(sheetHtml({ ...DEFAULT_LOOK, motion: 'choppy' }), /value="choppy" data-look="motion" checked/);
   assert.doesNotMatch(sheet, /data-look="dither" checked/);
   assert.match(sheet, /data-look="outlines" checked/);
   assert.match(sheet, /data-off-hint hidden/, 'the Off hint only shows at Pixel Size Off');

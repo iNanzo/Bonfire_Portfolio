@@ -1,11 +1,13 @@
 // The invitation toy's Look settings and presets (pure: no three.js, no DOM). The settings are what
 // the Look menu sets: Pixel Size (Off, 2×, 3×, 4×, stored as 'off', '2', '3', '4'), Dithering,
-// Outlines and Style (a preset in looks/: the list and the Style the menu starts on come from
-// looks/index.js, PRESETS and DEFAULT_STYLE). They're kept in localStorage under
-// `invitation.look.v1`, every read and write in try/catch: storage that's empty, broken, refused or
-// missing gives the defaults, and each value is checked on its own, so one bad value never costs
-// the others (a Pixel Size from before the steps, 'fine', 'ds' or 'chunky', loads as the default:
-// the page never shipped with them).
+// Outlines, Style (a preset in looks/: the list and the Style the menu starts on come from
+// looks/index.js, PRESETS and DEFAULT_STYLE) and Motion ('smooth', or 'choppy': his animation
+// stepped at CHOPPY_FPS while the camera and the rest stay smooth; motionStep is its clock).
+// They're kept in localStorage under `invitation.look.v1`, every read and write in try/catch:
+// storage that's empty, broken, refused or missing gives the defaults, and each value is checked
+// on its own, so one bad value never costs the others (a Pixel Size from before the steps, 'fine',
+// 'ds' or 'chunky', loads as the default: the page never shipped with them; a look stored before
+// Motion loads as Smooth with its other values kept).
 
 import { DEFAULT_PIXEL, PIXEL_SIZES } from './pixels.js';
 import { DEFAULT_STYLE, PRESETS } from './looks/index.js';
@@ -35,18 +37,25 @@ import { DEFAULT_STYLE, PRESETS } from './looks/index.js';
  * @property {boolean} dither
  * @property {boolean} outlines
  * @property {string} style  a key of LOOKS
+ * @property {Motion} motion
  */
+/** @typedef {'smooth'|'choppy'} Motion  Smooth, or Choppy (his animation at CHOPPY_FPS) */
 
 export const LOOK_KEY = 'invitation.look.v1';
 /** @type {Record<string, LookPreset>} */
 export const LOOKS = PRESETS;
 export const STYLES = Object.keys(LOOKS);
+/** @type {Motion[]} */
+export const MOTIONS = ['smooth', 'choppy'];
+/** Motion Choppy: his animation steps this many times a second. */
+export const CHOPPY_FPS = 15;
 /** @type {Look} */
 export const DEFAULT_LOOK = Object.freeze({
   pixelSize: DEFAULT_PIXEL,
   dither: true,
   outlines: true,
   style: DEFAULT_STYLE,
+  motion: /** @type {Motion} */ ('smooth'),
 });
 
 /**
@@ -61,6 +70,7 @@ export function validLook(raw) {
     dither: typeof o.dither === 'boolean' ? o.dither : DEFAULT_LOOK.dither,
     outlines: typeof o.outlines === 'boolean' ? o.outlines : DEFAULT_LOOK.outlines,
     style: Object.hasOwn(LOOKS, o.style) ? o.style : DEFAULT_LOOK.style,
+    motion: MOTIONS.includes(o.motion) ? o.motion : DEFAULT_LOOK.motion,
   };
 }
 
@@ -101,3 +111,30 @@ export function saveLook(look, storage) {
  * @param {Look} look
  */
 export const presetOf = (look) => LOOKS[look.style] ?? LOOKS[DEFAULT_LOOK.style];
+
+/**
+ * How many times a second his animation steps: CHOPPY_FPS with Motion Choppy, else the preset's
+ * own animFps (0: every frame).
+ * @param {Look} look
+ */
+export const animFps = (look) => (look.motion === 'choppy' ? CHOPPY_FPS : presetOf(look).animFps || 0);
+
+/**
+ * One frame of the stepped animation clock: the frame's `dt` joins the time waiting (`acc`) and,
+ * once that's a tick (1/fps) or more, the animation steps by whole ticks and only they come off,
+ * so the remainder carries and it runs at `fps` exactly, whatever the frame rate. At fps 0 every
+ * frame steps by its own dt.
+ * @param {number} acc  the time waiting since the last step, seconds
+ * @param {number} dt
+ * @param {number} fps
+ * @returns {{acc: number, step: number}}  step: how far to advance the animation (0: hold the pose)
+ */
+export function motionStep(acc, dt, fps) {
+  if (!(fps > 0)) return { acc: 0, step: dt };
+  const tick = 1 / fps;
+  const wait = acc + Math.max(0, dt);
+  // (A hair of slack, so four frames of 1/60 make one tick of 1/15 despite rounding.)
+  const n = Math.floor(wait / tick + 1e-9);
+  if (n < 1) return { acc: wait, step: 0 };
+  return { acc: Math.max(0, wait - n * tick), step: n * tick };
+}
