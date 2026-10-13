@@ -40,7 +40,7 @@ space still turns the camera.
 
 | Setting | Choices | What it does |
 | --- | --- | --- |
-| Pixel Size | Off, 2×, 3×, 4× | How big the pixels are: at 2× (the default) each one is 2 by 2 of the page's pixels (a 6 by 6 block of a phone's own pixels), at 3× 3 by 3, at 4× 4 by 4. NEWT stays the same size on screen, so bigger pixels only make him chunkier, and a bigger screen gives him more of them. Off draws at the screen's own resolution, smooth. |
+| Pixel Size | 16×16 to 256×256, Off | NEWT's sprite resolution: at 64×64 he's drawn about 64 pixels tall, on any screen. A slider, coarse to fine, with Off at its fine end and a button at each end; the line under it says how many pixels tall he really is on this screen. 48×48 is the default (the old 2× look on a phone). Each pixel is a whole number of the screen's own pixels, so the finest steps reach the screen's resolution; two steps that would draw the same picture on a screen show as one there (a 390-wide phone lists 9 steps, a 1280×800 desktop 6). NEWT stays the same size on screen, so a coarser resolution only makes him chunkier. From 128 pixels tall his shirt shows its real plaid (bolder pixel checks below that), and at the finest steps zoomed in his face is the smooth one. Off draws at the screen's own resolution, smooth. |
 | Dithering | On, Off | The checkered blend between colours. |
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow). |
 | Style | DS, Soft | DS: crisp, many colours, a hard shadow. Soft: fewer colours with a visible dither, pastel, warm outlines and a softer shadow. |
@@ -61,10 +61,12 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
     twins for restarts, look-at and faces),
     `retro.js` (the pixel pass), `ui.js` (the toolbar and the Look sheet as markup, plus a thin
     binding), `invitation.css`.
-  - Pure and unit-tested: `pixels.js` (the texel grid, N×N CSS px a texel at N×, in whole
-    device pixels, and the default view: 20° of view, 36° up, NEWT 0.195 of a desktop's short
+  - Pure and unit-tested: `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS`
+    16 to 256, a texel is `max(1, round(NEWT's default height in device px / N))` device pixels,
+    `blockFor`, so he's about N texels tall; `pixelSteps`, a screen's steps, one a block size;
+    `DEFAULT_PIXEL`, the one line that sets the default; and the default view: 20° of view, 36° up, NEWT 0.195 of a desktop's short
     side tall with the whole play area in sight, or 0.255 of a phone's, a stage whose short side
-    is under 600 CSS px (99 CSS px and 50 texels on a 390-wide phone), whatever the Pixel Size,
+    is under 600 CSS px (99 CSS px, and 50 texels at 48×48, on a 390-wide phone), whatever the Pixel Size,
     the point it looks at shown in the middle of the space over the toolbar, or of the clear
     space above or beside the open Look sheet, `clearInsets`), `camera.js` (the
     orbit camera: yaw all the way round, three quarters of a turn for a drag across the whole
@@ -74,8 +76,8 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
     turns the look's sun with the camera's yaw),
     `area.js` (the play area: a fixed disc of radius 2.0 round the middle), `play.js` (the
     frame's decisions: who moves his root, the clip mix, where he looks), `look.js` (the Look
-    settings under `invitation.look.v1`, Pixel Size stored as `'off'`, `'2'`, `'3'` or
-    `'4'`, Motion as `'smooth'` or `'choppy'` (a look stored before Motion loads as Smooth),
+    settings under `invitation.look.v1`, Pixel Size stored as `'16'` to `'256'` or `'off'` (an
+    old `'2'`, `'3'` or `'4'` loads as 48, 32 or 24, what each looked like on a phone), Motion as `'smooth'` or `'choppy'` (a look stored before Motion loads as Smooth),
     `motionStep`, Choppy's 15 fps clock, and the presets), `looks/ds.js` and `looks/soft.js`
     (every look value, as data: a
     designer edits these, never code; among them the background, the shadow's colour and
@@ -89,10 +91,15 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
 - **The model:** `npm run model -- newt` rebuilds `public/models/newt.glb` from `tools/newt.py`
   with headless Blender (`$NEWT_BLEND` names the .blend; it defaults to the user's
   `NEWT_optimized.blend`, which is never overwritten).
-- **The pixel face:** at the toy's pixel sizes his head is only a dozen or two texels wide, so
+- **The pixel face:** at the coarser resolutions his head is only a dozen or two texels wide, so
   `node tools/newt-face.mjs` redraws the glb's face sheet as `public/models/newt-face.png`,
   four small pixel cells with the features kept at least 2 px thick (`--cell`, `--min`,
-  `--preview` to look at it). The page uses it while the pixel filter is on. It and the pixel
+  `--preview` to look at it). The page uses it while the pixel filter is on, the sheet whose cell
+  matches his half face in texels (3 px at 16×16 up to 34); past 1.25 times the largest
+  (`SMOOTH_FACE_OVER`: 256×256 on a phone, or zoomed in) it shows the glb's smooth face again, as
+  at Off. His shirt shows the bold pixel plaid (`newt-atlas-pixel.png`, `tools/newt-atlas.mjs`)
+  until he's `ORIGINAL_ATLAS_TEXELS` (128) texels tall in the default view, then the glb's own
+  plaid, sampled at the preset's `texture.fineMipBias`. It and the pixel
   atlas (`newt-atlas-pixel.png`) are asked for at the same time as the glb, and the first frame
   waits for them (up to 3 s more), so NEWT never shows the blurred atlas and a blank face first.
 - **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationArea`,
@@ -102,14 +109,17 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
-  `pixelScale`: CSS px a texel, N at N×, `newtTall`: CSS px he stands tall in the default view),
+  `pixelScale`: CSS px a texel, `resolution`: the Pixel Size's N (null at Off), `newtTexels`:
+  his height in texels and `newtTall` in CSS px in the default view, `faceSheet`: the face sheet
+  showing (a cell width, or `'smooth'`), `faceTexels`, and `atlas`: `'pixel'` or `'original'`),
   `screen('head'|'body'|'feet')` (a point on him in client px, to tap), `floorAt(x, y)`,
   `feet()` (his ankles, to measure foot slide), `bones()` (his bones from his root) and
   `play(clip)` (Walk and Run step in place at their own pace). `?seed=N` makes the randomness
   repeatable; `?calm` stops him wandering and sitting by himself.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
   of taps, drags, buttons, floor taps, a chase and the camera at phone and desktop sizes (animated WebP plus a
-  contact sheet; `--look`, `--pixel`, `--motion`, `--sizes`, `--acts`). One GPU capture at a time.
+  contact sheet; `--look`, `--pixel` (a resolution such as `64` or `64x64`, or `off`), `--motion`,
+  `--sizes`, `--acts`). One GPU capture at a time.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
   `vite.config.js`, `test/site.test.mjs` and the spec's last test check it).
 - **Unlisted:** `noindex, nofollow`, left out of the sitemap and the README, and not

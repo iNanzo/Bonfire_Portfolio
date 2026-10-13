@@ -1,6 +1,6 @@
 // The "DS" look preset (data only): the old handheld's 3D on a white page, on the Pixel Size's grid
-// (2× by default: 195 texels across a 390-wide phone, near the DS's own 192 lines; no preset sets
-// the grid); 18-bit colour (64 levels a channel, 6 bits) under a light Bayer dither (light enough
+// (48×48 by default: 195 texels across a 390-wide phone, near the DS's own 192 lines; no preset
+// sets the grid); 18-bit colour (64 levels a channel, 6 bits) under a light Bayer dither (light enough
 // not to crawl over him as he moves); the DS's edge marking (a 1-texel line on NEWT's own edge
 // texels, where the surface or the depth jumps: none on the floor or in his shadow), dark enough to
 // show on his skin and clothes; two toon bands and a highlight, the shade band and the fill high

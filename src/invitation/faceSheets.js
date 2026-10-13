@@ -4,8 +4,8 @@
 // screen, and how wide one cell of the face is on his head.
 //
 // Why many: with nearest sampling a feature only keeps its shape when one pixel of the sheet
-// covers about one texel. His half face is about 3 texels across at 4× on a phone, 7 to 10 at
-// 2×, 15 on a desktop and twice that zoomed in; one fixed sheet sampled at 0.8 or 1.3 pixels a
+// covers about one texel. His half face is about 3 texels across at 16×16, 7 to 10 at 48×48,
+// 20 at 96×96, 30 at 128×128 on a phone and more zoomed in; one fixed sheet sampled at 0.8 or 1.3 pixels a
 // texel turns a 2-pixel eye into 1 or 3 texels as his head moves a fraction of a texel, frame to
 // frame (the eyes flicker between shapes). character.js measures his half face in texels each
 // frame and shows the sheet whose cell matches it, holding on to the one showing until another
