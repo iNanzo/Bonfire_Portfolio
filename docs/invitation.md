@@ -34,19 +34,40 @@ unlisted: nothing links to it and search engines are asked not to index it.
 
 **Look** opens a sheet along the bottom. NEWT moves into the space above it (beside it on a
 phone held sideways) and the camera keeps him there, so every change shows on him right away;
-each one is kept for your next visit (in this browser). While the sheet is open the toolbar
-rests under it, Tab stays inside the sheet, and **Done** or **Escape** closes it; dragging empty
-space still turns the camera.
+each one is kept for your next visit (in this browser). While the sheet is open the toolbar's
+buttons rest under it, Tab stays inside the sheet, and **Done** (always at its top as it
+scrolls), **Look** again or **Escape** closes it; dragging empty space still turns the camera.
+A finger moves a slider only by going along it: a swipe up or down that starts on one scrolls
+the sheet and leaves the slider as it was.
 
 | Setting | Choices | What it does |
 | --- | --- | --- |
 | Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn about 64 pixels tall, on any screen. A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 96×96 is the default (on a 1280×800 desktop it draws as 64×64, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there. **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier. From 128 pixels tall his shirt shows its real plaid (bolder pixel checks below that), and at the finest steps zoomed in his face is the smooth one. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
-| Dithering | On, Off | The checkered blend between colours. |
-| Outlines | On, Off | A one-pixel line around NEWT (none in his shadow). |
-| Style | DS, Soft | DS: crisp, many colours, a hard shadow. Soft: fewer colours with a visible dither, pastel, warm outlines and a softer shadow. |
+| Dithering | On, Off | The checkered blend between colours (how strong: Dither Strength, under Shader). |
+| Outlines | On, Off | A one-pixel line around NEWT (none in his shadow; how dark, its colour and where: under Shader). |
+| Style | DS, Soft, Custom | DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose DS or Soft, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 
-Dithering and outlines are part of the pixel look, so they rest while Pixel Size is Off.
+**Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
+and turns the Style to Custom, and **Reset To Style** puts the style's values back.
+
+| Option | Range | What it does |
+| --- | --- | --- |
+| Colors | 4 to 64, Full | Levels in each colour channel (Full: no quantizing). |
+| Dither Strength | Off to 100% | How far the dither moves a colour toward the next level. |
+| Outline Strength | Off to 100% | How much darker the lines are. |
+| Outline Color | Dark, Tinted | Dark lines, or lines tinted with the style's ink. |
+| Outer Ring | On, Off | Lines just outside his outline, like a sprite's, instead of on his edge. |
+| Toon Shading | Smooth, 2, 3, 4 | Smooth light, or that many flat bands of it. |
+| Highlight | On, Off | White where the light falls straight on him. |
+| Shadow | Hard, Soft | A crisp shadow, or one with a dithered, two-tone edge. |
+| Shadow Strength | Off to 100% | How dark his shadow is. |
+| Light Angle | -180° to 180° | Turns the light round him (it still turns with the camera too). |
+| Light Strength | 25% to 200% | How strong the light is. |
+| Saturation, Warmth, Brightness, Contrast | | The grade on him: colour, warm or cool, light, and contrast. |
+
+Dithering, outlines, Colors, the shadow's edge and the grade are part of the pixel look, so they
+rest while Pixel Size is Off (toon shading, the shadow's strength and the light still apply).
 **Reset Camera**, under the settings, eases the camera back to where it started.
 
 ## For Developers
@@ -59,32 +80,38 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
     invisible floor that only catches his shadows, a `ShadowMaterial`, over the preset's
     background; and the shadow camera's fit), `character.js` (NEWT's materials, clips with
     twins for restarts, look-at and faces),
-    `retro.js` (the pixel pass), `ui.js` (the toolbar and the Look sheet as markup, plus a thin
-    binding), `invitation.css`.
-  - Pure and unit-tested: `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS`
-    16 to 256, a texel is `max(1, round(NEWT's default height in device px / N))` device pixels,
-    `blockFor`, so he's about N texels tall; Native, a texel a device pixel at the real DPR
-    with no cap; Off, the screen's pixels with the DPR capped at `OFF_DPR` (2); `pixelSteps`, a
+    `retro.js` (the pixel pass; `warm` compiles the path not showing once NEWT is in, so the
+    first switch to Off or back doesn't stall), `ui.js` (the toolbar and the Look sheet as
+    markup, plus a thin binding), `invitation.css`.
+  - Pure and unit-tested: `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
+    to 256, a texel is `max(1, round(NEWT's default height in device px / N))` device pixels,
+    `blockFor`, so he's about N texels tall; Native, a texel a device pixel at the real DPR with
+    no cap; Off, the screen's pixels with the DPR capped at `OFF_DPR` (2); `pixelSteps`, a
     screen's steps, one a block size, the resolutions that come to 1 px folded into Native;
-    `DEFAULT_PIXEL`, the one line that sets the default, `'96'`; and the default view: 20° of view, 36° up, NEWT 0.195 of a desktop's short
-    side tall with the whole play area in sight, or 0.255 of a phone's, a stage whose short side
-    is under 600 CSS px (99 CSS px, and 99 texels at the default 96×96, on a 390-wide phone), whatever the Pixel Size,
-    the point it looks at shown in the middle of the space over the toolbar, or of the clear
-    space above or beside the open Look sheet, `clearInsets`), `camera.js` (the
-    orbit camera: yaw all the way round, three quarters of a turn for a drag across the whole
-    stage and half a turn of tilt down its whole height, 12° to 70° up, half to twice the
-    default distance, eased with a little coast, following NEWT as it zooms in, and 0.8 of the
-    way at the default zoom on a phone, all the way while the Look sheet is open; `lightDir`
-    turns the look's sun with the camera's yaw),
-    `area.js` (the play area: a fixed disc of radius 2.0 round the middle), `play.js` (the
-    frame's decisions: who moves his root, the clip mix, where he looks), `look.js` (the Look
-    settings under `invitation.look.v1`, Pixel Size stored as `'16'` to `'256'`, `'native'` or
-    `'off'` (an old `'2'`, `'3'` or `'4'` loads as 48, 32 or 24, what each looked like on a
-    phone), Motion as `'smooth'` or `'choppy'` (a look stored before Motion loads as Smooth),
-    `motionStep`, Choppy's 15 fps clock, and the presets), `looks/ds.js` and `looks/soft.js`
-    (every look value, as data: a
-    designer edits these, never code; among them the background, the shadow's colour and
-    strength, and the blob shadow).
+    `DEFAULT_PIXEL`, the one line that sets the default, `'96'`; and the default view: 20° of
+    view, 36° up, NEWT 0.195 of a desktop's short side tall with the whole play area in sight,
+    or 0.255 of a phone's, a stage whose short side is under 600 CSS px (99 CSS px, and 99
+    texels at the default 96×96, on a 390-wide phone), whatever the Pixel Size, the point it
+    looks at shown in the middle of the space over the toolbar, or of the clear space above or
+    beside the open Look sheet, `clearInsets`), `camera.js` (the orbit camera: yaw all the way
+    round, three quarters of a turn for a drag across the whole stage and half a turn of tilt
+    down its whole height, 12° to 70° up, half to twice the default distance, eased with a
+    little coast, following NEWT as it zooms in, and 0.8 of the way at the default zoom on a
+    phone, all the way while the Look sheet is open; `lightDir` turns the look's sun with the
+    camera's yaw), `area.js` (the play area: a fixed disc of radius 2.0 round the middle),
+    `play.js` (the frame's decisions: who moves his root, the clip mix, where he looks),
+    `look.js` (the Look settings under `invitation.look.v1`, Pixel Size stored as `'16'` to
+    `'256'`, `'native'` or `'off'` (an old `'2'`, `'3'` or `'4'` loads as 48, 32 or 24, what
+    each looked like on a phone), Motion as `'smooth'` or `'choppy'` (a look stored before
+    Motion loads as Smooth), `shader`, only the user's changes to the Shader options (each
+    snapped or dropped on its own, a style's own value dropped; a look stored before them loads
+    as its style), `isCustom`, `shaderOf`, `lookPreset` (the style with the changes written into
+    a copy, for the renderer), `motionStep`, Choppy's 15 fps clock, and the presets),
+    `shader.js` (the Shader options as one table, `SHADER_CONTROLS`: each one's label, range or
+    choices, value text and where it lives in a preset, which `ui.js` renders; `toonRamp`, the
+    toon gradient from bands and a highlight; `warmthTint`), `looks/ds.js` and `looks/soft.js`
+    (every look value, as data: a designer edits these, never code; among them the background,
+    the shadow's colour and strength, and the blob shadow).
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
     `faces.js`, `gesture.js`, `rng.js`) are pure too; `types.js` lists the shapes they pass
     and the order a frame runs in.
@@ -105,17 +132,20 @@ Dithering and outlines are part of the pixel look, so they rest while Pixel Size
   plaid, sampled at the preset's `texture.fineMipBias`. It and the pixel
   atlas (`newt-atlas-pixel.png`) are asked for at the same time as the glb, and the first frame
   waits for them (up to 3 s more), so NEWT never shows the blurred atlas and a blank face first.
-- **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationArea`,
-  `invitationCamera` and `invitationPlay` (with `invitationBrain`, `invitationMotion`,
-  `invitationGesture` and `invitationModel`), and
-  `e2e/invitation.spec.mjs` (`npm run e2e -- invitation`).
+- **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationShader`,
+  `invitationArea`, `invitationCamera` and `invitationPlay` (with `invitationBrain`,
+  `invitationMotion`, `invitationGesture` and `invitationModel`), and `e2e/invitation.spec.mjs`
+  (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
   `pixelScale`: CSS px a texel, `resolution`: the Pixel Size's N (`'native'` where the slider
   shows Native, a resolution at 1 px a texel included; null at Off), `newtTexels`: his height in
   texels and `newtTall` in CSS px in the default view, `faceSheet`: the face sheet showing (a
-  cell width, or `'smooth'`, as at Off), `faceTexels`, and `atlas`: `'pixel'` or `'original'`),
+  cell width, or `'smooth'`, as at Off), `faceTexels`, `atlas`: `'pixel'` or `'original'`,
+  `shader`: every Shader option's value, `custom`: whether one is the user's, `pass`: what
+  reached the renderer (the post shader's values, the light's strength and angle, the shadow's
+  strength), and `warmed`: the pass's other path compiled),
   `screen('head'|'body'|'feet')` (a point on him in client px, to tap), `floorAt(x, y)`,
   `feet()` (his ankles, to measure foot slide), `bones()` (his bones from his root) and
   `play(clip)` (Walk and Run step in place at their own pace). `?seed=N` makes the randomness
