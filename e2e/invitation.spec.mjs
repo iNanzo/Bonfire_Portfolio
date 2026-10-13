@@ -603,8 +603,9 @@ test.describe('on a desktop', () => {
       const f = await focused();
       expect(f.inside, `Shift+Tab ${i}: ${f.what}`).toBe(true);
     }
-    // Done, Pixel Size, Dithering, Outlines, Style, Motion and Reset Camera.
-    expect(stops.size, [...stops].join(', ')).toBe(7);
+    // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
+    // Motion and Reset Camera.
+    expect(stops.size, [...stops].join(', ')).toBe(9);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');
