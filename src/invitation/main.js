@@ -17,8 +17,8 @@
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
-// (a point on NEWT in client px), floorAt(x, y) and play(clip) (forces a clip); `?seed=N` and
-// `?calm` go to the brain.
+// (a point on NEWT in client px), floorAt(x, y), feet() (his ankles in the world) and
+// play(clip) (forces a clip); `?seed=N` and `?calm` go to the brain.
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
@@ -588,6 +588,12 @@ function start(s) {
       },
       /** @param {number} x @param {number} y */
       floorAt: (x, y) => s.floorPoint(x, y),
+      /** His ankles (the Foot bones' heads), world units: for measuring foot slide. */
+      feet: () =>
+        character && {
+          l: character.bonePos(BONES.footL, { x: 0, y: 0, z: 0 }),
+          r: character.bonePos(BONES.footR, { x: 0, y: 0, z: 0 }),
+        },
       /** @param {string|null} clip */
       play(clip) {
         forced = clip;
