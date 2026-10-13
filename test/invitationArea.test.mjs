@@ -1,10 +1,10 @@
-// The invitation toy's play area (src/invitation/area.js): with the camera free to orbit and
-// zoom, it's a fixed invisible disc on the floor, about what a phone shows at the default zoom,
-// the same on every screen. The default view (pixels.js frameView) shows all of it, at every
-// Pixel Size, with NEWT still about a fifth of the screen's short side tall; walking, wandering, fleeing (sliding along the rim when cornered)
-// and carrying (the anchor, the toss and the fall's bounces) stay inside it (steer.js and
-// carry.js read a disc's radius from its Bounds); and the light's shadow camera (floor.js
-// fitShadow) covers the disc up to the highest he's lifted.
+// The invitation toy's play area (src/invitation/area.js): with the camera free to orbit and zoom,
+// it's a fixed invisible disc on the floor, about what a phone shows at the default zoom, the same
+// on every screen. The default view (pixels.js frameView) shows all of it, at every Pixel Size,
+// with NEWT still about a fifth of the screen's short side tall; walking, wandering, fleeing
+// (sliding along the rim when cornered) and carrying (the anchor, the toss and the fall's bounces)
+// stay inside it (steer.js and carry.js read a disc's radius from its Bounds); and the light's
+// shadow camera (floor.js fitShadow) covers the disc up to the highest he's lifted.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
