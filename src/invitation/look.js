@@ -1,14 +1,14 @@
-// The invitation toy's Look settings and presets (pure: no three.js, no DOM). The settings are
-// what the Look menu sets: Pixel Size (Off, 2×, 3×, 4×, stored as 'off', '2', '3', '4'),
-// Dithering, Outlines and Style (a preset in looks/). They're kept in localStorage under
-// `invitation.look.v1`, every read and write in try/catch: storage that's empty, broken,
-// refused or missing gives the defaults, and each value is checked on its own, so one bad value
-// never costs the others (a Pixel Size from before the steps, 'fine', 'ds' or 'chunky', loads as
-// the default: the page never shipped with them).
+// The invitation toy's Look settings and presets (pure: no three.js, no DOM). The settings are what
+// the Look menu sets: Pixel Size (Off, 2×, 3×, 4×, stored as 'off', '2', '3', '4'), Dithering,
+// Outlines and Style (a preset in looks/: the list and the Style the menu starts on come from
+// looks/index.js, PRESETS and DEFAULT_STYLE). They're kept in localStorage under
+// `invitation.look.v1`, every read and write in try/catch: storage that's empty, broken, refused or
+// missing gives the defaults, and each value is checked on its own, so one bad value never costs
+// the others (a Pixel Size from before the steps, 'fine', 'ds' or 'chunky', loads as the default:
+// the page never shipped with them).
 
 import { DEFAULT_PIXEL, PIXEL_SIZES } from './pixels.js';
-import ds from './looks/ds.js';
-import soft from './looks/soft.js';
+import { DEFAULT_STYLE, PRESETS } from './looks/index.js';
 
 /**
  * @typedef {object} LookPreset  every look value, as data (looks/*.js)
@@ -39,10 +39,15 @@ import soft from './looks/soft.js';
 
 export const LOOK_KEY = 'invitation.look.v1';
 /** @type {Record<string, LookPreset>} */
-export const LOOKS = { ds, soft };
+export const LOOKS = PRESETS;
 export const STYLES = Object.keys(LOOKS);
 /** @type {Look} */
-export const DEFAULT_LOOK = Object.freeze({ pixelSize: DEFAULT_PIXEL, dither: true, outlines: true, style: 'ds' });
+export const DEFAULT_LOOK = Object.freeze({
+  pixelSize: DEFAULT_PIXEL,
+  dither: true,
+  outlines: true,
+  style: DEFAULT_STYLE,
+});
 
 /**
  * Settings from anything: each value kept when it's valid, the default's otherwise.

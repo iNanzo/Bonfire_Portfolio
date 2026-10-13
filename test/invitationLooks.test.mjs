@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_STYLE, PRESETS } from '../src/invitation/looks/index.js';
-import { LOOKS } from '../src/invitation/look.js';
+import { DEFAULT_LOOK, LOOKS, STYLES } from '../src/invitation/look.js';
 import { floorLook } from '../src/invitation/floor.js';
 
 test('the presets in one place, the default style among them: DS', () => {
@@ -16,6 +16,10 @@ test('the presets in one place, the default style among them: DS', () => {
   assert.equal(DEFAULT_STYLE, 'ds');
   assert.ok(Object.hasOwn(PRESETS, DEFAULT_STYLE));
   for (const [name, p] of Object.entries(PRESETS)) assert.equal(LOOKS[name], p, `look.js offers ${name} as it is`);
+  // look.js reads both from here: the list and the Style the Look menu starts on.
+  assert.equal(LOOKS, PRESETS, 'look.js offers looks/index.js’s presets');
+  assert.deepEqual(STYLES, Object.keys(PRESETS));
+  assert.equal(DEFAULT_LOOK.style, DEFAULT_STYLE);
 });
 
 test('no smooth blob under him while he stands; while he’s lifted it shows', () => {
