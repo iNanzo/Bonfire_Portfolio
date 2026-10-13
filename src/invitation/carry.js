@@ -40,6 +40,7 @@ export const CARRY = {
   tossDown: -3,
   fallGravity: 12,
   restitution: 0.3,
+  rimEase: 1.5,
   floorY: 0,
   tiltRelax: 6,
 };
@@ -213,7 +214,29 @@ export function toss(c) {
 export function fallStep(root, vel, footY, dt, bounds, tilt = null) {
   const v = { x: vel.x, y: vel.y - CARRY.fallGravity * dt, z: vel.z };
   const r = { x: root.x + v.x * dt, y: root.y + v.y * dt, z: root.z + v.z * dt };
-  if (bounds?.r !== undefined) {
+  const c0 = bounds?.r !== undefined ? centreOf(bounds) : null;
+  const d0 = c0 ? Math.hypot(root.x - c0.x, root.z - c0.z) : 0;
+  if (c0 && bounds && d0 > bounds.r) {
+    // Let go past the rim (held, only his collar is kept inside: the swing can hang his root
+    // out past it): no more speed outward, and eased back in at rimEase rather than snapped.
+    const nx = (root.x - c0.x) / d0;
+    const nz = (root.z - c0.z) / d0;
+    const out = v.x * nx + v.z * nz;
+    if (out > 0) {
+      v.x -= out * nx;
+      v.z -= out * nz;
+    }
+    const back = Math.min(d0 - bounds.r, CARRY.rimEase * dt);
+    r.x = root.x + v.x * dt - nx * back;
+    r.z = root.z + v.z * dt - nz * back;
+    // (Never further out than he was; on the frame he reaches the rim, onto it.)
+    const d1 = Math.hypot(r.x - c0.x, r.z - c0.z);
+    const most = back < d0 - bounds.r ? d0 : bounds.r;
+    if (d1 > most) {
+      r.x = c0.x + ((r.x - c0.x) * most) / d1;
+      r.z = c0.z + ((r.z - c0.z) * most) / d1;
+    }
+  } else if (bounds?.r !== undefined) {
     // Off a disc's rim: back inside, the speed out of it reversed and softened, along it kept.
     const c = centreOf(bounds);
     const ox = r.x - c.x;
