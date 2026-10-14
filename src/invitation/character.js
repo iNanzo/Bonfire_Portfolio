@@ -30,8 +30,11 @@
 //
 // Pixel Shirt & Face (a Shader option, the preset's `texture.pixelArt`, off in every style): with
 // it off his face is the glb's smooth sheet and his shirt the glb's own plaid at every resolution
-// (under the pixel filter the face sampled FACE_SHARPEN mip levels sharper, so his eyes and mouth
-// stay, and the plaid at the preset's `texture.fineMipBias`, so its checks don't blur grey); on,
+// (under the pixel filter the face sampled sharper than three picks, the more the fewer texels it
+// has, down to its own pixels at 32×32 and coarser: faceSharpen, so his eyes and mouth stay; and
+// the plaid at the preset's `texture.fineMipBias`, so its checks don't blur grey: under about 100
+// texels tall they're smaller than a texel, and any sample of them dithers to a mottled mix at a
+// few colour levels, coarser mips no less); on,
 // the pixel face and the pixel atlas below take over at the coarser resolutions as follows.
 //
 // Faces: NEWT_Face's 2×2 sheet split into one clamped texture per cell (clips.js FACES), so
@@ -119,9 +122,35 @@ export const ORIGINAL_ATLAS_TEXELS = 128;
 /**
  * Pixel Shirt & Face off, under the pixel filter: the smooth face sheet is sampled this many mip
  * levels sharper than three picks, so his eyes and mouth stay at the coarser resolutions (three's
- * own mip blurs a dozen-texel face into skin).
+ * own mip blurs a dozen-texel face into skin); from FACE_CRISP face texels down, sharper still
+ * (faceSharpen).
  */
 export const FACE_SHARPEN = -1.5;
+/** His half face in texels from which down the smooth sheet is sampled sharper than FACE_SHARPEN. */
+export const FACE_CRISP = 18;
+/**
+ * …and from which down it's sampled at its own pixels (mip 0): at 32×32 (7 face texels) and
+ * coarser, any mip averages his grey iris and black pupil with the white and skin round them
+ * into an olive smudge, so his eyes are gone; its own pixels keep their dark.
+ */
+export const FACE_POINT = 8;
+/** A cell of the glb's 1024 face sheet, pixels (his half face across one). */
+export const FACE_CELL = 512;
+
+/**
+ * The mip bias the smooth face sheet takes with Pixel Shirt & Face off, under the pixel filter,
+ * for his half face `texels` across a sheet cell `cell` px wide: FACE_SHARPEN from FACE_CRISP up,
+ * mip 0 (its own pixels) from FACE_POINT down, the mip level eased between (three picks about
+ * log2(cell / texels)).
+ * @param {number} texels
+ * @param {number} [cell]
+ */
+export function faceSharpen(texels, cell = FACE_CELL) {
+  if (!(texels > 0)) return FACE_SHARPEN;
+  const picked = Math.log2(cell / texels);
+  const k = Math.min(1, Math.max(0, (FACE_CRISP - texels) / (FACE_CRISP - FACE_POINT)));
+  return Math.min(FACE_SHARPEN, (picked + FACE_SHARPEN) * (1 - k) - picked);
+}
 
 /** Seconds the first frame waits for the pixel images once the glb is in (then they come in late). */
 export const TEXTURE_GRACE = 3;
@@ -194,8 +223,15 @@ export function createCharacter(gltf, opts = {}) {
   let tall = 0;
   /** The mip bias his materials other than the face sample their maps at (markId's `bias`). */
   const atlasBias = { value: 0 };
-  /** His face's (the smooth sheet: FACE_SHARPEN with Pixel Shirt & Face off, else as three picks). */
+  /**
+   * His face's (the smooth sheet: faceSharpen's with Pixel Shirt & Face off, sharper the fewer
+   * texels his face has; else as three picks).
+   */
   const faceBias = { value: 0 };
+  /** His half face in texels as last drawn (0: not drawn yet). */
+  let faceTexels = 0;
+  /** A cell of the smooth face sheet, pixels (the glb's: FACE_CELL). */
+  let faceCell = FACE_CELL;
   /**
    * atlasBias and faceBias for the preset, the pixel filter and his height in texels (with Pixel
    * Shirt & Face off, the glb's plaid at fineMipBias at every height: at mipBias it blurred grey).
@@ -205,7 +241,7 @@ export function createCharacter(gltf, opts = {}) {
     const real = !t.pixelArt;
     const fine = real || tall >= ORIGINAL_ATLAS_TEXELS ? (t.fineMipBias ?? t.mipBias) : t.mipBias;
     atlasBias.value = pixel ? Math.max(0, fine ?? 0) : 0;
-    faceBias.value = pixel && real ? FACE_SHARPEN : 0;
+    faceBias.value = pixel && real ? faceSharpen(faceTexels, faceCell) : 0;
   };
   setBias();
   /** @type {any[]} every mesh of his */
@@ -298,11 +334,10 @@ export function createCharacter(gltf, opts = {}) {
   let face = 'neutral';
   /**
    * The pixel sheet's size for his half face ('smooth': past the largest, the 1024 sheet; null
-   * until he's drawn), and that measure in texels.
+   * until he's drawn); that measure in texels is faceTexels.
    * @type {number|'smooth'|null}
    */
   let faceSize = null;
-  let faceTexels = 0;
   /**
    * The sheet on his face: a pixel sheet's cell width, or 'smooth' for the glb's own 1024 sheet
    * (null: he has no face material).
@@ -369,6 +404,7 @@ export function createCharacter(gltf, opts = {}) {
     : Promise.resolve();
   if (faceMaterial?.map?.image && typeof document !== 'undefined') {
     sheetFaces = splitSheet(faceMaterial.map.image, false);
+    faceCell = Math.floor(faceMaterial.map.image.width / 2) || FACE_CELL;
     faceMaterial.map.image.close?.(); // (an ImageBitmap: its pixels are in the cells now)
     faceMaterial.map.dispose();
     textures.delete(faceMaterial.map);
@@ -428,6 +464,8 @@ export function createCharacter(gltf, opts = {}) {
     if (!(depth > 0)) return;
     const perUnit = (camera.projectionMatrix.elements[5] * viewport.w) / 2 / depth;
     faceTexels = span * faceMesh.getWorldScale(scale).x * perUnit;
+    // (The smooth sheet sharper the fewer texels his face has, with the switch off: faceSharpen.)
+    if (pixel && !pixelArt()) faceBias.value = faceSharpen(faceTexels, faceCell);
     const sizes = pixelLayout.map((s) => s.w);
     const next = pickFaceSize(faceTexels, faceSize, sizes);
     if (next !== faceSize) {

@@ -346,6 +346,63 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
+  test('with Pixel Shirt & Face off at 32×32 his smooth face still has its eyes: dark texels inside it, between his cheeks', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32' })));
+    await calm(page);
+    const snap = await snapshot(page);
+    expect(snap.faceSheet).toBe('smooth');
+    const dpr = snap.pass.pd / snap.pixelScale;
+    const canvas = await page.locator('[data-stage] canvas').boundingBox();
+    /**
+     * Dark texels inside his face (between skin on either side), in the middle half of its rows:
+     * each texel read at its middle (the canvas's grid, `pd` device px a texel from its corner).
+     */
+    const eyes = async () => {
+      const head = await on(page, 'head');
+      const clip = { x: Math.round(head.x - 18), y: Math.round(head.y - 14), width: 36, height: 36 };
+      const { data, info } = await sharp(await page.screenshot({ clip }))
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const { pd } = snap.pass;
+      const at = (i, j) => {
+        const x = Math.floor(canvas.x * dpr + (i + 0.5) * pd - clip.x * dpr);
+        const y = Math.floor(canvas.y * dpr + (j + 0.5) * pd - clip.y * dpr);
+        return x >= 0 && y >= 0 && x < info.width && y < info.height
+          ? [0, 1, 2].map((c) => data[(y * info.width + x) * 3 + c])
+          : null;
+      };
+      const i0 = Math.ceil((clip.x * dpr - canvas.x * dpr) / pd);
+      const j0 = Math.ceil((clip.y * dpr - canvas.y * dpr) / pd);
+      const skin = ([r, g, b]) => r > 190 && g > 120 && r - b > 40;
+      const rows = [];
+      for (let j = j0; at(i0, j); j++) {
+        const row = [];
+        for (let i = i0; at(i, j); i++) row.push(at(i, j));
+        if (row.filter(skin).length >= 3) rows.push(row);
+      }
+      let dark = 0;
+      for (const row of rows.slice(Math.floor(rows.length / 4), Math.ceil((rows.length * 3) / 4))) {
+        const isSkin = row.map(skin);
+        for (let x = isSkin.indexOf(true) + 1; x < isSkin.lastIndexOf(true); x++) {
+          const [r, g, b] = row[x];
+          if (!isSkin[x] && 0.299 * r + 0.587 * g + 0.114 * b < 80) dark++;
+        }
+      }
+      return dark;
+    };
+    let most = 0;
+    for (let i = 0; i < 3; i++) {
+      most = Math.max(most, await eyes());
+      await framesFor(page, 200);
+    }
+    // (His pupils and lashes: 5 or 6 dark texels a frame; the mip it was sampled at before left
+    // their olive smudge, and the hair's 2 or 3.)
+    expect(most, `dark texels in his face at ${dpr}×`).toBeGreaterThanOrEqual(4);
+  });
+
   test('a Look change shows at once and survives a reload', async ({ page }) => {
     const errors = watch(page);
     await ready(page);

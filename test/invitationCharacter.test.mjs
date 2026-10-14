@@ -13,7 +13,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { FACE_SHARPEN, ORIGINAL_ATLAS_TEXELS, createCharacter, pixelAtlasUrl } from '../src/invitation/character.js';
+import {
+  FACE_CELL,
+  FACE_CRISP,
+  FACE_POINT,
+  FACE_SHARPEN,
+  ORIGINAL_ATLAS_TEXELS,
+  createCharacter,
+  faceSharpen,
+  pixelAtlasUrl,
+} from '../src/invitation/character.js';
 import { FACE_IMAGE, pickFaceSize } from '../src/invitation/faceSheets.js';
 import { LOOKS, lookPreset, validLook } from '../src/invitation/look.js';
 import { TOON_CELLS, toonRamp } from '../src/invitation/shader.js';
@@ -21,6 +30,7 @@ import { TWIN } from '../src/invitation/play.js';
 import { BONES, COLLAR, SCALE } from '../src/invitation/clips.js';
 
 const DEG = Math.PI / 180;
+const close = (a, b, tol = 1e-6, msg = '') => assert.ok(Math.abs(a - b) <= tol, `${msg} ${a} should be ${b} (±${tol})`);
 /** A style with Pixel Shirt & Face on (a Shader option, off in every style). */
 const pixelArt = (style) => lookPreset(validLook({ style, shader: { pixelArt: true } }));
 const Y = new THREE.Vector3(0, 1, 0);
@@ -525,6 +535,45 @@ test('his face samples its sheet at the mip three picks (the smooth sheet stays 
   assert.equal(biasOf(face.material).value, 0, 'Off: as three picks');
   ch.setStyle(pixelArt('ds'), true);
   assert.equal(biasOf(face.material).value, 0, 'the switch on: the pixel sheets, and the smooth one as three picks');
+  ch.dispose();
+});
+
+test('with Pixel Shirt & Face off, the fewer texels his face has the sharper its smooth sheet is sampled: a little sharper from FACE_CRISP up, its own pixels (mip 0) from FACE_POINT down, so his eyes keep their dark at 32×32 and coarser', () => {
+  const level = (f) => faceSharpen(f, FACE_CELL) + Math.log2(FACE_CELL / f);
+  assert.equal(FACE_CELL, 512, 'a cell of the glb’s 1024 face sheet');
+  for (const f of [FACE_CRISP, 20, 42]) close(faceSharpen(f, FACE_CELL), FACE_SHARPEN, 1e-9, `${f} texels`);
+  for (const f of [FACE_POINT, 5.2, 3.3]) close(level(f), 0, 1e-9, `${f} texels: its own pixels`);
+  let was = -Infinity;
+  for (let f = 2; f <= 16; f += 0.25) {
+    const b = faceSharpen(f, FACE_CELL);
+    assert.ok(b >= was - 1e-9 && b <= FACE_SHARPEN + 1e-9, `${f} texels: ${b}`);
+    assert.ok(level(f) >= -1e-9, `${f}: never past mip 0`);
+    was = b;
+  }
+  assert.equal(faceSharpen(0, FACE_CELL), FACE_SHARPEN, 'not measured yet');
+  // As he's drawn: the bias follows his half face in texels.
+  const { gltf, face } = withFace();
+  const ch = createCharacter(gltf);
+  ch.root.updateMatrixWorld(true);
+  const c = ch.root.getObjectByName(BONES.head).localToWorld(new THREE.Vector3(0, 1, 0));
+  const shader = {
+    uniforms: {},
+    vertexShader: THREE.ShaderLib.toon.vertexShader,
+    fragmentShader: THREE.ShaderLib.toon.fragmentShader,
+  };
+  face.material.onBeforeCompile(shader, null);
+  for (const d of [40, 400, 2000]) {
+    face.onBeforeRender(viewportOf(195, 422), null, cameraAt(c, d), face.geometry, face.material, null);
+    close(
+      shader.uniforms.uMapBias.value,
+      faceSharpen(ch.faceTexels, FACE_CELL),
+      1e-9,
+      `${d} away (${ch.faceTexels.toFixed(1)} texels)`,
+    );
+  }
+  assert.ok(shader.uniforms.uMapBias.value < FACE_SHARPEN, 'far off: sharper still');
+  ch.setStyle(LOOKS.ds, false);
+  assert.equal(shader.uniforms.uMapBias.value, 0, 'Off: as three picks');
   ch.dispose();
 });
 
