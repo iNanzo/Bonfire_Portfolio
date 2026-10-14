@@ -19,7 +19,9 @@
 // back and clears the pan. A mouse drag keeps the point NEWT was grabbed by under the cursor
 // and lifts him higher than the old fixed carry height. He talks: clicked until he speaks, a line
 // of the admin's types out in a bubble over his head, clear of the toolbar (and of the open Look
-// sheet, never over his face), heard whole by a screen reader, gone when its time is up. A pinch over the toolbar or the Look sheet never
+// sheet, never over his face), heard whole by a screen reader, gone when its time is up, on its
+// own time as talk counts it (a hidden tab pauses both); on a phone too, tapped, with the
+// full-width sheet open, and lifted to the top of the screen (beside his head, never over him). A pinch over the toolbar or the Look sheet never
 // zooms the page, only the left mouse button holds or walks him, and the Look sheet holds focus
 // (Tab goes round inside it, the toolbar it covers is inert), closes on Escape wherever focus
 // is, and leaves NEWT in sight above or beside it (Reset Camera too, on its way back). Every wait is on a state through `?test`'s window.__invitation, never on a duration (CI's
@@ -533,6 +535,59 @@ test.describe('on a phone', () => {
     expect(at.box.right).toBeLessThanOrEqual(at.stage.right);
     expect(overlaps(at.box, at.bar), 'clear of the toolbar').toBe(false);
     await touch('touchEnd');
+  });
+
+  test('tapped until he says something, the line types out over his head, clear of the toolbar, and in the stage', async ({
+    page,
+  }) => {
+    const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
+    const tapped = ['wave', 'spook', 'flee'].some((k) => inv.speech?.[k]?.chance > 0 && inv.lines?.[k]?.length);
+    test.skip(!tapped, 'the admin has a tap on him say nothing');
+    await calm(page);
+    const touch = await toucher(page);
+    for (let i = 0; i < 10 && !(await snapshot(page)).talk.showing; i++) {
+      const head = await on(page, 'head');
+      await touch('touchStart', [head]);
+      await touch('touchEnd');
+      await until(page, (s) => s.state !== 'idle' || Boolean(s.talk.showing), 'reacting');
+      await until(page, (s) => s.state === 'idle' || Boolean(s.talk.showing), 'back to idle', 30_000);
+    }
+    const { showing } = (await snapshot(page)).talk;
+    expect(showing, 'he said something').toBeTruthy();
+    await expect(page.locator('.inv-bubble-live')).toHaveText(`NEWT: ${showing.line}`);
+    let at = null;
+    await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
+    expect(at.tail).toBe('down');
+    expect(at.box.bottom, 'over his head').toBeLessThan(at.head.y - at.head.r);
+    expect(at.box.left).toBeLessThan(at.head.x);
+    expect(at.box.right).toBeGreaterThan(at.head.x);
+    expect(overlaps(at.box, at.bar), 'clear of the toolbar').toBe(false);
+    expect(at.box.left).toBeGreaterThanOrEqual(at.stage.left);
+    expect(at.box.right).toBeLessThanOrEqual(at.stage.right);
+    expect(at.box.top).toBeGreaterThanOrEqual(at.stage.top);
+  });
+
+  test('with the Look sheet open (a full-width sheet along the bottom), a line goes over his head above it, clear of the sheet and off his face', async ({
+    page,
+  }) => {
+    await calm(page);
+    await lookOpenWithNewtInSight(page);
+    await page.evaluate(() => window.__invitation.say('A line long enough to wrap onto a second row on a phone.'));
+    let at = null;
+    await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
+    expect(at.sheet, 'the sheet is open').toBeTruthy();
+    expect(at.sheet.left, 'the sheet runs the width of the screen').toBeLessThanOrEqual(at.stage.left + 1);
+    expect(overlaps(at.box, at.sheet), 'clear of the open Look sheet').toBe(false);
+    const face = {
+      left: at.head.x - at.head.r,
+      top: at.head.y - at.head.r,
+      right: at.head.x + at.head.r,
+      bottom: at.head.y + at.head.r,
+    };
+    expect(overlaps(at.box, face), 'never over his face').toBe(false);
+    expect(at.box.top).toBeGreaterThanOrEqual(at.stage.top);
+    expect(at.box.left).toBeGreaterThanOrEqual(at.stage.left);
+    expect(at.box.right).toBeLessThanOrEqual(at.stage.right);
   });
 
   test('a finger on the floor turns his head toward it, left and then right', async ({ page }) => {
