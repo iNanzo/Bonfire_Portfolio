@@ -771,6 +771,8 @@ test.describe('on a desktop', () => {
     expect(snap.resolution).toBe('native');
     expect(snap.pixelScale).toBe(1);
     expect(snap.newtTexels).toBeCloseTo(156, 0);
+    // (The frame-time governor is off under ?test unless ?govern asks for it: the specs measure the grid.)
+    expect(snap.pass.governor).toEqual({ on: false, level: 0, p90: 0 });
     expect(snap.pass.zoom).toBe(1);
     expect(
       snap.newtTall / 800,
@@ -1183,7 +1185,48 @@ test.describe('on a desktop', () => {
 });
 
 test.describe('on a small window', () => {
+  // (Few texels at 32×32, so the frames are quick even on CI's software WebGL: only the busy
+  // page below makes them slow.)
   test.use({ viewport: { width: 640, height: 400 } });
+
+  test('with slow frames the governor makes the texels a device pixel coarser, never finer than the Pixel Size, takes it back when that doesn’t help, and ?perf shows it', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await page.addInitScript(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32' })));
+    await ready(page, '/invitation/?test&calm&seed=3&perf&govern');
+    const base = await snapshot(page);
+    expect(base.pass.governor.on).toBe(true);
+    expect(base.pass.governor.level).toBe(0);
+    const perf = page.locator('.inv-perf');
+    await expect(perf).toContainText('fps');
+    await expect(perf).toContainText(`${base.texels.w}×${base.texels.h} texels`);
+    // A busy page: 35 ms of work every frame, so frames stay slow whatever the grid.
+    await page.evaluate(() => {
+      const spin = () => {
+        if (window.__calm) return;
+        const t = performance.now();
+        while (performance.now() - t < 35);
+        requestAnimationFrame(spin);
+      };
+      requestAnimationFrame(spin);
+    });
+    // One level coarser: a device pixel more a texel, fewer texels.
+    await until(page, (s) => s.pass.governor.level === 1, 'a level coarser', 15_000);
+    const coarse = await snapshot(page);
+    expect(coarse.pass.pd).toBe(base.pass.pd + 1);
+    expect(coarse.pixelScale).toBeCloseTo(base.pixelScale + 1 / devicePixelRatioOf(base), 6);
+    expect(coarse.texels.w).toBeLessThan(base.texels.w);
+    expect(coarse.resolution, 'the Pixel Size stays the user’s').toBe(32);
+    await expect(perf).toContainText('(+1 slow)');
+    // Fewer texels don't help a busy CPU: taken back, never finer than the Pixel Size.
+    await until(page, (s) => s.pass.governor.level === 0, 'taken back', 15_000);
+    const back = await snapshot(page);
+    expect(back.pass.pd).toBe(base.pass.pd);
+    expect(back.pixelScale).toBe(base.pixelScale);
+    await page.evaluate(() => (window.__calm = true));
+    expect(errors).toEqual([]);
+  });
 
   test('zoomed in at 32×32 the texels grow with NEWT, so he stays about 32 pixels tall, and zoomed out they shrink; Native never changes', async ({
     page,
@@ -1226,6 +1269,9 @@ test.describe('on a small window', () => {
     expect(native.pass.pd).toBe(1);
   });
 });
+
+/** The device pixel ratio a snapshot was drawn at (CSS px a texel over device px a texel). */
+const devicePixelRatioOf = (s) => s.pass.pd / s.pixelScale;
 
 test("the portfolio's first load carries no invitation code", async ({ page }) => {
   const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');

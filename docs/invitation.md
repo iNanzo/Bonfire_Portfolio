@@ -69,6 +69,12 @@ and turns the Style to Custom, and **Reset To Style** puts the style's values ba
 
 Dithering, outlines, Colors, the shadow's edge and the grade are part of the pixel look, so they
 rest while Pixel Size is Off (toon shading, the shadow's strength and the light still apply).
+
+On a device that can't keep up, NEWT's pixels get a little chunkier for a while: when frames
+stay slow for a second the page adds a screen pixel to every one of his pixels (up to four), and
+takes them back once frames are quick again. It never draws finer than the Pixel Size you
+picked, and a new Pixel Size starts it afresh. It leaves Off alone, and a screen that's slow for
+another reason (one that only shows 30 frames a second) isn't made chunkier for nothing.
 **Reset Camera**, under the settings, eases the camera back to where it started.
 
 ## For Developers
@@ -80,7 +86,8 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
     lights and shadows, the blob shadow and the floor marker, and each frame the boxes round
     NEWT the retro pass keeps its work to; `setZoomScale(k)`, which main.js calls with the
     orbit's home distance over its distance, sizes the texel to the zoom, refitting the grid only
-    when the block changes), `floor.js` (no room: an
+    when the block changes; the frame-time governor's level added to every texel, and `?perf`'s
+    corner), `floor.js` (no room: an
     invisible floor that only catches his shadows, a `ShadowMaterial`, over the preset's
     background; and the shadow camera's fit), `character.js` (NEWT's materials, clips with
     twins for restarts, look-at and faces),
@@ -124,6 +131,12 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
     `looks/ds.js` and `looks/soft.js` (every look value, as data: a designer edits these, never
     code; among them the background, the shadow's colour and strength, and the blob shadow), and
     `looks/index.js` (their order in the Style row and `DEFAULT_STYLE`, `'default'`).
+  - `governor.js` (pure: the frame-time governor. Each second of frames is judged by its p90:
+    over `GOVERN.slowMs` (20 ms) steps a level coarser, a run of `recover` seconds under
+    `fastMs` (18 ms) a level finer, holding between; a coarser step that doesn't make frames
+    faster is taken back and none tried for `block` seconds, and a relapse doubles the next
+    run. It's on for visitors, off under `?test` unless `?govern`, and `?govern=off` turns it
+    off.)
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
     `faces.js`, `gesture.js`, `rng.js`) are pure too; `types.js` lists the shapes they pass
     and the order a frame runs in.
@@ -160,11 +173,14 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
   cell width, or `'smooth'`, as at Off), `faceTexels`, `atlas`: `'pixel'` or `'original'`,
   `shader`: every Shader option's value, `custom`: whether one is the user's, `pass`: what
   reached the renderer (the post shader's values, the light's strength and angle, the shadow's
-  strength, `zoom`: the zoom the texels follow, `pd`: device px a texel as drawn), and `warmed`: the pass's other path compiled),
+  strength, `zoom`: the zoom the texels follow, `pd`: device px a texel as drawn, `governor`:
+  whether it's on, its level and the last second's p90), and `warmed`: the pass's other path compiled),
   `screen('head'|'body'|'feet')` (a point on him in client px, to tap), `floorAt(x, y)`,
   `feet()` (his ankles, to measure foot slide), `bones()` (his bones from his root) and
   `play(clip)` (Walk and Run step in place at their own pace). `?seed=N` makes the randomness
-  repeatable; `?calm` stops him wandering and sitting by himself.
+  repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
+  (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
+  governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
   of taps, drags, buttons, floor taps, a chase and the camera at phone and desktop sizes
   (animated WebP plus a contact sheet; `--look`, `--pixel` (a resolution such as `64` or

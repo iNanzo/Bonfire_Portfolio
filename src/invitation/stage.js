@@ -35,13 +35,22 @@
 // passes the orbit's home distance over its distance), sizes the texel to follow the zoom
 // (pixels.js blockAt), so he keeps the chosen sprite resolution at any zoom; the grid is only
 // refitted when the block changes. Native and Off never change with it.
-
+//
+// The frame-time governor (governor.js): each frame's interval goes to it, and while frames stay
+// slow it adds device px to every texel (never at Off, never finer than the user's choice), back
+// once they're fast; a new Pixel Size starts it afresh. It's on for visitors and off under ?test
+// unless ?govern asks for it (CI's software WebGL is slow, and the specs measure the grid).
+// ?perf shows the frame times, the GPU's time a frame where the browser can time it
+// (EXT_disjoint_timer_query_webgl2), the grid and the governor's level in a corner; lookState()
+// reports them for ?test.
 import * as THREE from 'three';
 import { NEWT_HEIGHT, NEWT_RADIUS, playArea } from './area.js';
 import { lightDir } from './camera.js';
+import { createGovernor, governReset, governStep, percentile } from './governor.js';
 import { blockAt, frameView, resolutionOf, texelGrid } from './pixels.js';
 import { FLOOR_SIZE, createFloor, fitShadow, floorLook } from './floor.js';
 import { createRetro, decalMaterial, subjectBoxes } from './retro.js';
+import { parseQuery } from './ui.js';
 
 export const LAYERS = { decal: 2 };
 /** The highest NEWT is carried, world units (his root): the shadow camera reaches over it. */
@@ -50,6 +59,9 @@ export const LIFT = 2.2;
 export const SUBJECT = { up: NEWT_HEIGHT / 2, radius: NEWT_HEIGHT / 2 + 0.3 };
 /** The zoom setZoomScale takes, as a range (k: NEWT's size on screen over the default view's). */
 export const ZOOM_RANGE = { min: 0.125, max: 8 };
+/** ?perf: frame intervals kept for its line, and how often the line is rewritten, ms. */
+const PERF_FRAMES = 120;
+const PERF_EVERY = 500;
 const SHADOW_TYPES = { basic: THREE.BasicShadowMap, pcf: THREE.PCFShadowMap, vsm: THREE.VSMShadowMap };
 
 /**
@@ -93,6 +105,8 @@ function ringTexture(n = 16) {
  * @typedef {object} StageOptions
  * @property {import('./look.js').LookPreset} preset
  * @property {import('./look.js').Look} look
+ * @property {boolean} [perf]  show the frame times in a corner (?perf by default)
+ * @property {boolean} [govern]  the frame-time governor (by default on, off under ?test unless ?govern)
  * @property {() => import('./pixels.js').Insets} insets  where the floor keeps clear of, CSS px
  * @property {() => import('./pixels.js').Insets} [focus]  where the point the camera looks at
  *   shows: the middle of the space these leave (`insets` by default; the open Look sheet's clear
@@ -105,7 +119,10 @@ function ringTexture(n = 16) {
  * @param {HTMLElement} container
  * @param {StageOptions} o
  */
-export function createStage(container, { preset, look, insets, focus, onResize }) {
+export function createStage(container, { preset, look, insets, focus, onResize, perf, govern }) {
+  const query = parseQuery(globalThis.location?.search ?? '');
+  const showPerf = perf ?? query.perf;
+  let governOn = govern ?? query.govern ?? !query.test;
   const renderer = new THREE.WebGLRenderer({
     antialias: false,
     alpha: false,
@@ -179,6 +196,9 @@ export function createStage(container, { preset, look, insets, focus, onResize }
   let heldBlock = 0;
   /** The stage as last measured: CSS px and the device pixel ratio. */
   let size = { cssW: 1, cssH: 1, dpr: 1 };
+  const governor = createGovernor();
+  /** performance.now() at the last frame drawn (-1: none yet). */
+  let lastFrame = -1;
   /** NEWT: the scene's child the stage didn't add (setSubject names him). */
   let subject = /** @type {any} */ (null);
   const own = new Set();
@@ -250,7 +270,7 @@ export function createStage(container, { preset, look, insets, focus, onResize }
     }
   }
 
-  /** The grid for the stage as measured, the zoom and the block it holds. */
+  /** The grid for the stage as measured, the zoom, the block it holds and the governor's level. */
   function gridNow() {
     return texelGrid({
       ...size,
@@ -259,6 +279,7 @@ export function createStage(container, { preset, look, insets, focus, onResize }
       devH: device?.h,
       zoom,
       held: heldBlock,
+      coarser: governOn ? governor.level : 0,
     });
   }
 
@@ -271,7 +292,7 @@ export function createStage(container, { preset, look, insets, focus, onResize }
     const was = grid;
     size = { cssW, cssH, dpr };
     grid = gridNow();
-    heldBlock = grid.pd;
+    heldBlock = grid.pd - grid.coarser;
     // (Setting a canvas's size clears it, even to the same size: a refit that only moves the
     // view, the Look sheet opening, keeps the picture until the next frame.)
     if (!view || grid.w !== was.w || grid.h !== was.h) {
@@ -309,6 +330,7 @@ export function createStage(container, { preset, look, insets, focus, onResize }
   const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
   own.add(floor.mesh).add(hemi).add(sun).add(sun.target).add(blob).add(marker);
+  const decals = [blob, marker];
   /** NEWT, once he's in the scene (the one child the stage didn't add), or null. */
   function subjectNow() {
     if (subject?.parent === scene) return subject;
@@ -327,7 +349,8 @@ export function createStage(container, { preset, look, insets, focus, onResize }
     toLight.copy(sun.position).sub(sun.target.position).normalize();
     // (The blob and the marker show over the floor wherever they are: the area takes them in.)
     extra.length = 0;
-    for (const [i, d] of [blob, marker].entries()) {
+    for (let i = 0; i < decals.length; i++) {
+      const d = decals[i];
       if (!d.visible || !(d.material.opacity > 0)) continue;
       const r = /** @type {any} */ (d.geometry).parameters.width / 2;
       for (let j = 0; j < 4; j++)
@@ -338,6 +361,58 @@ export function createStage(container, { preset, look, insets, focus, onResize }
     retro.setBoxes(
       subjectBoxes({ center: centre, radius: SUBJECT.radius, light: toLight, camera, w: grid.w, h: grid.h, extra }),
     );
+  }
+
+  // --- ?perf: the frame times, the GPU's time and the grid in a corner.
+  const perfEl = showPerf ? document.createElement('output') : null;
+  const perfFrames = new Float64Array(PERF_FRAMES);
+  const perfSorted = new Float64Array(PERF_FRAMES);
+  let perfCount = 0;
+  let perfAt = 0;
+  let gpuMs = 0;
+  /** @type {any} */
+  let timerExt = null;
+  /** @type {any[]} the GPU timer queries still to read */
+  const pending = [];
+  const gl = renderer.getContext();
+  if (perfEl) {
+    perfEl.className = 'inv-perf';
+    perfEl.setAttribute('aria-hidden', 'true');
+    container.append(perfEl);
+    timerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+  }
+  /** The frame times of the last PERF_FRAMES frames: their p50 and p90, ms. */
+  function perfTimes() {
+    const n = Math.min(perfCount, PERF_FRAMES);
+    perfSorted.set(perfFrames);
+    return { p50: percentile(perfSorted, n, 0.5), p90: percentile(perfSorted, n, 0.9) };
+  }
+  /** The GPU timer queries that have come back, into gpuMs (eased). */
+  function readTimers() {
+    while (pending.length) {
+      const q = pending[0];
+      if (!gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) break;
+      if (!gl.getParameter(timerExt.GPU_DISJOINT_EXT)) {
+        const ms = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6;
+        gpuMs = gpuMs ? gpuMs + (ms - gpuMs) * 0.1 : ms;
+      }
+      gl.deleteQuery(q);
+      pending.shift();
+    }
+  }
+  /**
+   * ?perf's line, every PERF_EVERY ms.
+   * @param {number} now
+   */
+  function writePerf(now) {
+    if (!perfEl || now - perfAt < PERF_EVERY) return;
+    perfAt = now;
+    const { p50, p90 } = perfTimes();
+    const gpu = timerExt ? ` · GPU ${gpuMs.toFixed(1)} ms` : '';
+    const gov = governOn ? (grid.coarser ? ` (+${grid.coarser} slow)` : '') : ' · governor off';
+    perfEl.textContent =
+      `${p50 > 0 ? Math.round(1000 / p50) : 0} fps · p50 ${p50.toFixed(1)} · p90 ${p90.toFixed(1)} ms${gpu}\n` +
+      `${grid.w}×${grid.h} texels · ${grid.pd} px a texel${gov} · zoom ${zoom.toFixed(2)}`;
   }
 
   applyLook();
@@ -407,7 +482,8 @@ export function createStage(container, { preset, look, insets, focus, onResize }
         tint: u.uTint.value.getHexString(THREE.LinearSRGBColorSpace),
         light: sun.intensity,
         turn: deg === -180 ? 180 : deg,
-        // (The grid as drawn: the zoom it follows, device px a texel.)
+        // (The grid as drawn: the governor's coarser texels and the zoom.)
+        governor: { on: governOn, level: grid.coarser, p90: governor.p90 },
         zoom,
         pd: grid.pd,
       };
@@ -424,6 +500,7 @@ export function createStage(container, { preset, look, insets, focus, onResize }
       current = { preset: p, look: l };
       applyLook();
       if (!resized) return;
+      governReset(governor);
       heldBlock = 0;
       resize();
     },
@@ -452,6 +529,28 @@ export function createStage(container, { preset, look, insets, focus, onResize }
      */
     setSubject(o) {
       subject = o;
+    },
+    /**
+     * Turn the frame-time governor on or off (off: the user's Pixel Size exactly).
+     * @param {boolean} on
+     */
+    setGovern(on) {
+      if (on === governOn) return;
+      governOn = on;
+      governReset(governor);
+      resize();
+    },
+    /** The governor and the frame times, for ?test and ?perf. */
+    perfState() {
+      const { p50, p90 } = perfTimes();
+      return {
+        governor: { on: governOn, level: grid.coarser, p90: governor.p90 },
+        zoom,
+        pd: grid.pd,
+        p50,
+        p90,
+        gpu: timerExt ? gpuMs : null,
+      };
     },
     refit: resize,
     /**
@@ -484,14 +583,40 @@ export function createStage(container, { preset, look, insets, focus, onResize }
      * everything that draws is in the scene. Resolves once they're ready.
      */
     warm: () => retro.warm(scene, camera),
-    /** Draw a frame: the shadow map once, the colour pass, the retro pass (its boxes round NEWT first). */
+    /**
+     * Draw a frame: the shadow map once, the colour pass, the retro pass (its boxes round NEWT
+     * first). The time since the last frame goes to the governor, which may refit the grid.
+     */
     render() {
+      const now = performance.now();
+      if (lastFrame >= 0) {
+        const ms = now - lastFrame;
+        if (perfEl && ms < 250) perfFrames[perfCount++ % PERF_FRAMES] = ms;
+        if (governOn && !grid.off) {
+          const was = governor.level;
+          if (governStep(governor, ms) !== was) resize();
+        }
+      }
+      lastFrame = now;
       placeBoxes();
+      let timer = null;
+      if (timerExt && pending.length < 4) {
+        timer = gl.createQuery();
+        gl.beginQuery(timerExt.TIME_ELAPSED_EXT, timer);
+      }
       renderer.shadowMap.needsUpdate = true;
       retro.render(scene, camera);
+      if (timer) {
+        gl.endQuery(timerExt.TIME_ELAPSED_EXT);
+        pending.push(timer);
+      }
+      if (timerExt) readTimers();
+      writePerf(now);
     },
     dispose() {
       observer.disconnect();
+      perfEl?.remove();
+      for (const q of pending) gl.deleteQuery(q);
       renderer.setAnimationLoop(null);
       retro.dispose();
       floor.dispose();

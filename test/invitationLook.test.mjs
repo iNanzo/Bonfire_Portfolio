@@ -787,8 +787,19 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
     .filter((t) => t && !/[.:]/.test(t));
   for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( ([A-Z][^ ]*|&amp;))*$/, label);
   assert.equal(presetOf({ ...DEFAULT_LOOK, style: 'soft' }), LOOKS.soft);
-  assert.deepEqual(parseQuery('?test&seed=42&calm'), { test: true, seed: 42, calm: true, perf: false });
-  assert.deepEqual(parseQuery(''), { test: false, seed: null, calm: false, perf: false });
+  assert.deepEqual(parseQuery('?test&seed=42&calm'), {
+    test: true,
+    seed: 42,
+    calm: true,
+    perf: false,
+    govern: null,
+  });
+  assert.deepEqual(parseQuery(''), { test: false, seed: null, calm: false, perf: false, govern: null });
+  // ?perf shows the frame times; ?govern turns the frame-time governor on (it's off under ?test
+  // unless asked for), ?govern=off off.
+  assert.equal(parseQuery('?perf').perf, true);
+  assert.equal(parseQuery('?test&govern').govern, true);
+  assert.equal(parseQuery('?govern=off').govern, false);
 });
 
 test('a finger on a slider: along it past the slop it drags the slider, up or down it scrolls the sheet, and until then it is neither', () => {
@@ -843,4 +854,29 @@ test('adaptive pixels: with the camera zoomed (k: NEWT’s size over the default
   // Odd k: a fallback of 1.
   for (const zoom of [0, -1, Number.NaN, Infinity])
     assert.equal(texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: '64', zoom }).pd, 5, `k ${zoom}: as at 1`);
+});
+
+test('the frame-time governor’s coarser texels: `coarser` device px on every texel at a resolution and at Native, never at Off; never finer than the user’s choice', () => {
+  for (const [cssW, cssH, dpr] of SIZES) {
+    for (const pixelSize of /** @type {const} */ (['32', '128', 'native'])) {
+      const base = texelGrid({ cssW, cssH, dpr, pixelSize });
+      for (const coarser of [1, 2, 4]) {
+        const g = texelGrid({ cssW, cssH, dpr, pixelSize, coarser });
+        assert.equal(g.pd, base.pd + coarser, `${cssW}x${cssH}@${dpr} ${pixelSize} +${coarser}`);
+        assert.equal(g.coarser, coarser);
+        assert.ok(g.w < base.w && g.h < base.h, 'fewer texels');
+        assert.ok(g.w * g.pd >= cssW * g.dpr - 1e-6, 'still covers the stage');
+      }
+      assert.equal(texelGrid({ cssW, cssH, dpr, pixelSize, coarser: -3 }).pd, base.pd, 'never finer');
+    }
+    const off = texelGrid({ cssW, cssH, dpr, pixelSize: 'off' });
+    assert.deepEqual(texelGrid({ cssW, cssH, dpr, pixelSize: 'off', coarser: 2 }), { ...off, coarser: 0 });
+  }
+  // His height in texels follows: at the zoom, over the coarser texel.
+  const g = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: '128', coarser: 1 });
+  const view = frameView({ cssW: 390, cssH: 844, grid: g, insets: INSETS, area: AREA });
+  assert.ok(Math.abs(newtTexels(view, g) - 298.35 / 3) < 1, `${newtTexels(view, g)}`);
+  const z = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: '64', zoom: 2 });
+  const zv = frameView({ cssW: 390, cssH: 844, grid: z, insets: INSETS, area: AREA });
+  assert.ok(Math.abs(newtTexels(zv, z) - 64) < 64 * 0.15, `zoomed ×2 at 64×64: ${newtTexels(zv, z)} texels`);
 });

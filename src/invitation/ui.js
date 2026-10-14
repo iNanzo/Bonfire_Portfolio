@@ -19,7 +19,9 @@
 // Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
 // reports presses; main.js decides what they do.
 //
-//   parseQuery(search)   ?test (the window.__invitation hooks), ?seed=N, ?calm, ?perf
+//   parseQuery(search)   ?test (the window.__invitation hooks), ?seed=N, ?calm, ?perf (frame
+//                        times and the governor's level on screen: stage.js), ?govern (the
+//                        frame-time governor on under ?test; ?govern=off, off for anyone)
 
 import { PIXEL_SIZES, resolutionOf, stepFor } from './pixels.js';
 import { LOOKS, MOTIONS, STYLES, isCustom, shaderOf, validLook } from './look.js';
@@ -115,6 +117,8 @@ export function parseQuery(search) {
     seed: Number.isFinite(seed) ? seed : null,
     calm: q.has('calm'),
     perf: q.has('perf'),
+    // (The frame-time governor: on for visitors, off under ?test unless asked for; null: as such.)
+    govern: q.has('govern') ? q.get('govern') !== 'off' : null,
   };
 }
 

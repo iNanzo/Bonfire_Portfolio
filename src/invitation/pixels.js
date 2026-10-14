@@ -17,7 +17,10 @@
 // stage.js setZoomScale) the texel follows, round(his height in device px × k ÷ N) (blockAt), so
 // he keeps the chosen sprite resolution at any zoom, bigger blocks zoomed in, still whole device
 // pixels; a block in use is held until the zoom is clearly past the next one (ZOOM_HOLD), so the
-// grid never flickers at a boundary. Native and Off never change with it.
+// grid never flickers at a boundary. Native and Off never change with it. The frame-time governor
+// (governor.js, in stage.js) adds `coarser` device px to every texel while frames are slow, at a
+// resolution and at Native, never at Off, and never takes one away (never finer than the user's
+// choice).
 //
 // The framing: a camera 36° up, low enough that his cap's brim leaves his face showing once he
 // looks toward the camera (from 48° it hid the whole face; at 36° his look lifts his head the
@@ -54,8 +57,9 @@
  */
 /**
  * @typedef {object} Grid  the canvas in texels
- * @property {number} pd  device pixels per texel (1 at Native and Off)
+ * @property {number} pd  device pixels per texel (1 at Native and Off, before the governor's)
  * @property {number} zoom  the camera's zoom it was sized for (k: 1 in the default view)
+ * @property {number} coarser  device px the governor added to a texel
  * @property {number} w  texels across
  * @property {number} h  texels down
  * @property {number} dpr  the device pixel ratio drawn at (capped at OFF_DPR at Off)
@@ -252,11 +256,12 @@ const RAD = Math.PI / 180;
 /**
  * The canvas's texel grid for a stage `cssW` × `cssH` at `dpr` (`devW`/`devH`: the stage in
  * device pixels where the browser measured them, devicePixelContentBoxSize), with the camera
- * zoomed by `zoom` (blockAt: at a resolution, the texel follows it; `held`, the block in use).
- * @param {{cssW: number, cssH: number, dpr: number, pixelSize: PixelSize, devW?: number, devH?: number, zoom?: number, held?: number}} o
+ * zoomed by `zoom` (blockAt: at a resolution, the texel follows it; `held`, the block in use) and
+ * `coarser` device px added to every texel (the frame-time governor's; never at Off).
+ * @param {{cssW: number, cssH: number, dpr: number, pixelSize: PixelSize, devW?: number, devH?: number, zoom?: number, coarser?: number, held?: number}} o
  * @returns {Grid}
  */
-export function texelGrid({ cssW, cssH, dpr, pixelSize, devW, devH, zoom = 1, held = 0 }) {
+export function texelGrid({ cssW, cssH, dpr, pixelSize, devW, devH, zoom = 1, coarser = 0, held = 0 }) {
   cssW = Math.max(1, cssW);
   cssH = Math.max(1, cssH);
   // (The resolution: NEWT about N texels tall; Native a texel a device pixel at the real DPR;
@@ -270,10 +275,11 @@ export function texelGrid({ cssW, cssH, dpr, pixelSize, devW, devH, zoom = 1, he
   const dw = near(devW, cssW) ? devW : cssW * d;
   const dh = near(devH, cssH) ? devH : cssH * d;
   const k = zoom > 0 && Number.isFinite(zoom) ? zoom : 1;
-  const pd = n === null ? 1 : blockAt(n, cssW, cssH, d, k, held);
+  const more = off ? 0 : Math.max(0, Math.round(coarser || 0));
+  const pd = (n === null ? 1 : blockAt(n, cssW, cssH, d, k, held)) + more;
   const w = Math.max(1, Math.ceil(dw / pd - 1e-6));
   const h = Math.max(1, Math.ceil(dh / pd - 1e-6));
-  return { pd, w, h, dpr: d, canvasW: (w * pd) / d, canvasH: (h * pd) / d, off, zoom: k };
+  return { pd, w, h, dpr: d, canvasW: (w * pd) / d, canvasH: (h * pd) / d, off, zoom: k, coarser: more };
 }
 
 /** Where a camera at `distance` and `elevation` above `target` sits. */
