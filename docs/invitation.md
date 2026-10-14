@@ -1,9 +1,10 @@
 # The Invitation: playing with NEWT
 
 A small toy at `/invitation/`: NEWT, Newton's low-poly chibi, stands on a plain white
-background, on a floor you can't see that only shows his shadow, and you can play with him. He
-stays inside a round patch of that floor, about as wide as a phone shows; its edge is his wall.
-You can turn the camera round him and zoom in and out. It's made for a phone first and works
+background, on a floor you can't see that only shows his shadow, and you can play with him. The
+floor is endless: he stays inside the patch of it the screen shows with the camera zoomed all
+the way out (from where it starts), and that patch's edges are his walls. You can turn the
+camera round him, slide it about and zoom in and out. It's made for a phone first and works
 with a mouse too. It has its own look (off-white and warm greys, chunky
 buttons, pixel art drawn like an old handheld's 3D), not the bonfire site's. The page is
 unlisted: nothing links to it and search engines are asked not to index it.
@@ -12,18 +13,32 @@ unlisted: nothing links to it and search engines are asked not to index it.
 
 - **Tap him** and he waves or gets startled (a jump, arms flung up). Tap him a lot and he gets
   stressed and runs away from your finger; he's never too fast to catch.
-- **Drag him** to pick him up by the collar. He dangles and swings; let go and he falls, lands
-  and gets back up. Flick him and he flies a little; let go while pushing him against the edge
-  of his patch and he just drops there.
-- **Tap the floor** and he walks there. A ring on the floor shows where your finger or cursor is.
-- **Point anywhere on the floor** and he looks where you point (on a phone, while your finger
-  is down; with a mouse, wherever the cursor is). Otherwise he looks at you.
-- **Drag empty space** to turn the camera: across to go round him (a drag across the whole
-  screen goes about three quarters of the way round, on a phone or a computer alike), up and
-  down to look from higher or lower. **Pinch** with two fingers, or use the mouse wheel, to zoom.
-  The light turns with the camera, so his shadow always falls behind him and to one side.
-- **On a phone** he's drawn about 30% bigger than on a computer, so the camera follows him
-  softly, and he never runs off the screen. Zoomed in, it follows him on a computer too.
+- **Drag him** to pick him up by the collar. The spot you grabbed stays right under your
+  cursor (a finger carries him a little above itself, so it doesn't hide him): move up and he
+  rises, high off the floor if you like; move across and he goes across. He dangles and swings;
+  let go and he falls, lands and gets back up. Flick him and he flies a little; let go while
+  pushing him against the edge of his patch and he just drops there. The camera holds still
+  while you carry him.
+- **Tap the floor** (or click it) and he walks there. A ring on the floor shows where your
+  finger or cursor is.
+- **Point anywhere** and he looks where you point (on a phone, while your finger is down; with
+  a mouse, wherever the cursor is): up when you point high over him, round to show his face
+  when you point in front of him, and no further round than side on when you point behind him.
+  Otherwise he looks at you.
+- **Turn the camera:** with a finger, drag empty space; with a mouse, drag with the right
+  button (anywhere, on him too; it never picks him up). Across goes round him (a drag across
+  the whole screen goes about three quarters of the way round, on a phone or a computer alike),
+  up and down looks from higher or lower. The canvas shows no menu for the right button.
+- **Slide the camera:** with a mouse, drag empty space with the left button (or the middle
+  one); with fingers, drag two of them together. The floor under your cursor stays under it.
+  You can't slide his patch off the screen altogether.
+- **Zoom:** pinch with two fingers, or use the mouse wheel. The light turns with the camera, so
+  his shadow always falls behind him and to one side.
+- **He stays on screen:** the camera holds still while he's well inside the screen and moves on
+  with him as he nears an edge, however it's turned. On a phone he's drawn about 30% bigger than
+  on a computer and the camera follows him softly too; zoomed in, it follows him everywhere.
+  Once you've slid the camera it stays where you put it until he walks off the screen himself;
+  **Reset Camera** (in the Look menu) clears the slide and the zoom.
 - **Leave him alone** for about 20 seconds and he turns to face you and sits down (the Sit
   button turns him to you first too, so you see his happy face).
 - **The toolbar:** Wave, Spook, Sit (Stand once he's sitting), Run (he runs off for a few
@@ -96,9 +111,17 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
     beside the open Look sheet, `clearInsets`), `camera.js` (the orbit camera: yaw all the way
     round, three quarters of a turn for a drag across the whole stage and half a turn of tilt
     down its whole height, 12° to 70° up, half to twice the default distance, eased with a
-    little coast, following NEWT as it zooms in, and 0.8 of the way at the default zoom on a
-    phone, all the way while the Look sheet is open; `lightDir` turns the look's sun with the
-    camera's yaw), `area.js` (the play area: a fixed disc of radius 2.0 round the middle),
+    little coast; `orbitPan` slides it at once, the floor under the cursor exactly under it,
+    `floorUnder`, the point it looks at kept in the play area; the point it orbits rests where
+    it is and follows NEWT as it zooms in, 0.8 of the way at the default zoom on a phone, all
+    the way while the Look sheet is open, and moves on with him as he nears the edge of the
+    clear space, `ORBIT.keepIn` (0.6) of it, never letting him past `keepOut` (0.94) once he's
+    on screen, from where `screenOf` puts him; a pan holds it until he walks off the screen;
+    `orbitHold` holds it still while he's held; `lightDir` turns the look's sun with the
+    camera's yaw), `area.js` (`viewArea`, the play area: the floor the default view shows at
+    twice its distance, yaw 0, inside the clear space with him whole 8 px in, `AREA_MARGIN`, a
+    trapezoid widening toward the back; worked out again on a resize, never moved by the camera
+    or the Look sheet; and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight),
     `play.js` (the frame's decisions: who moves his root, the clip mix, where he looks),
     `look.js` (the Look settings under `invitation.look.v1`, Pixel Size stored as `'16'` to
     `'256'`, `'native'` or `'off'` (an old `'2'`, `'3'` or `'4'` loads as 48, 32 or 24, what
@@ -114,7 +137,16 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
     the shadow's colour and strength, and the blob shadow).
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
     `faces.js`, `gesture.js`, `rng.js`) are pure too; `types.js` lists the shapes they pass
-    and the order a frame runs in.
+    and the order a frame runs in. `gesture.js` reads the mouse's buttons apart (left: tap,
+    grab or pan; right: orbit; middle: pan) and two fingers' middle as a pan; `carry.js`
+    drags him on the upright plane facing the camera through where he was grabbed
+    (`dragPlane`, `gripFor`, `dragTarget`: the grab offset kept, his collar between his hang
+    height and `CARRY.liftMax`, 3.4), the anchor the pointer's spot with no lag and the swing
+    driven by a smoothed follow of it; `lookAt.js` `pointerTarget` aims his look where the
+    pointer's ray first meets the floor or the upright plane through his head facing the
+    camera, brought 0.6 toward the camera along the ray (pitch up to 55°), and keeps a target
+    behind him on the side his head is turned to; `floor.js` `fitShadow(…, at)` moves the
+    shadow camera to wherever he is, by whole shadow texels.
 - **The clips contract:** `src/invitation/clips.js` names NEWT's clips (lengths, loops, fades),
   the face each shows, the bones by their three.js names and the step lengths. `tools/newt.py`
   makes the clips in Blender and `test/invitationModel.test.mjs` holds the glb to the contract.
@@ -146,9 +178,12 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
   `shader`: every Shader option's value, `custom`: whether one is the user's, `pass`: what
   reached the renderer (the post shader's values, the light's strength and angle, the shadow's
   strength), and `warmed`: the pass's other path compiled),
-  `screen('head'|'body'|'feet')` (a point on him in client px, to tap), `floorAt(x, y)`,
-  `feet()` (his ankles, to measure foot slide), `bones()` (his bones from his root) and
-  `play(clip)` (Walk and Run step in place at their own pace). `?seed=N` makes the randomness
+  `screen('head'|'body'|'feet')` (a point on him in client px, to tap), `floorAt(x, y)` (the
+  endless floor: null only above the horizon), `feet()` (his ankles, to measure foot slide),
+  `bones()` (his bones from his root), `grabbed()` (while he's held, where the point he was
+  grabbed by shows, client px) and `play(clip)` (Walk and Run step in place at their own
+  pace). The snapshot's `camera` has the point it looks at on the floor (`target`) and whether
+  a pan holds it (`panned`), and `area` is the play area. `?seed=N` makes the randomness
   repeatable; `?calm` stops him wandering and sitting by himself.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
   of taps, drags, buttons, floor taps, a chase and the camera at phone and desktop sizes
