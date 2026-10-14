@@ -580,6 +580,66 @@ test('while NEWT is held the view holds still, zoomed in too, and once he is let
   close(o.target.x, 1, 1e-3, 'let go: after him');
 });
 
+test('let go out near the screen’s edge, past where the view keeps him, the view eases back round him: no jump on the frame he’s let go, zoomed in too', () => {
+  /** NEWT at `n` (his feet `n.y` up) on screen: his box, CSS px from where the target shows. */
+  const boxAt = (o, n) => {
+    const r = { x: Math.cos(o.yaw), z: -Math.sin(o.yaw) };
+    const xs = [];
+    const ys = [];
+    for (const y of [n.y, n.y + NEWT_HEIGHT])
+      for (const k of [-1, 1]) {
+        const s = screenOf(o, { x: n.x + k * NEWT_RADIUS * r.x, y, z: n.z + k * NEWT_RADIUS * r.z });
+        xs.push(s.x);
+        ys.push(s.y);
+      }
+    return { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) };
+  };
+  for (const zoom of [1, 1.5, 2]) {
+    const { frame, make } = stageFor(1280, 800);
+    const o = make();
+    orbitZoom(o, zoom);
+    settle(o, 3, { x: 0, z: 0 });
+    // Held and carried out to the screen's right edge, a little off the floor (his side past the
+    // clear space, as a drag along the edge leaves him): the view holds.
+    orbitHold(o, true);
+    let newt = { x: 0, z: 0, y: 0.4 };
+    while (boxAt(o, newt).right < frame.hw + 20) {
+      newt = { ...newt, x: newt.x + 0.005 };
+      orbitStep(o, DT, newt);
+    }
+    const over = boxAt(o, newt).right - ORBIT.keepOut * frame.hw;
+    assert.ok(over > 50, `zoom ${zoom}: past keepOut by ${over.toFixed(1)} px`);
+    // Let go where he is (he drops there): an ease back, never the whole way at once, each
+    // frame's move no bigger than the last (no jump later on either).
+    orbitHold(o, false);
+    let last = boxAt(o, newt).right;
+    const steps = [];
+    for (let t = 0; t < 1.5; t += DT) {
+      orbitStep(o, DT, newt);
+      const now = boxAt(o, newt).right;
+      steps.push(last - now);
+      last = now;
+    }
+    assert.ok(
+      steps[0] < 0.4 * over,
+      `zoom ${zoom}: the first frame moves him ${steps[0].toFixed(1)} of ${over.toFixed(1)} px`,
+    );
+    steps.forEach((d, i) =>
+      assert.ok(
+        i === 0 || d <= steps[i - 1] + 0.5,
+        `zoom ${zoom}: frame ${i} moves him ${d.toFixed(1)} px, after ${steps[i - 1]?.toFixed(1)}`,
+      ),
+    );
+    assert.ok(last <= ORBIT.keepOut * frame.hw + 0.5, `zoom ${zoom}: back inside keepOut (${last.toFixed(1)})`);
+    // And from there it keeps him in as before: walking out at running speed, never past it.
+    for (let t = 0; t < 1; t += DT) {
+      newt = { x: newt.x + GAIT.run * DT, z: 0, y: 0 };
+      orbitStep(o, DT, newt);
+      assert.ok(boxAt(o, newt).right <= ORBIT.keepOut * frame.hw + 0.5, `zoom ${zoom}: kept in at ${t.toFixed(2)} s`);
+    }
+  }
+});
+
 test('the gestures pan it too: a pan event slides it at once, and letting go ends the pan', () => {
   const { make } = stageFor(1280, 800);
   const o = make();

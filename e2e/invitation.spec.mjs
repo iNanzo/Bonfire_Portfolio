@@ -1461,6 +1461,45 @@ test.describe('on a desktop', () => {
     expect(off, 'the point pressed under the cursor').toBeLessThan(2);
   });
 
+  test('let go out at the screen’s edge, he’s eased back into view: the camera never jumps on the frame he drops', async ({
+    page,
+  }) => {
+    await calm(page);
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x, body.y);
+    await page.mouse.down();
+    await until(page, (s) => s.held, 'held');
+    // Carried to 12 px from the window's right edge (the cursor never leaves it), a little up.
+    const edge = page.viewportSize().width - 12;
+    for (let i = 1; i <= 20; i++)
+      await page.mouse.move(body.x + ((edge - body.x) * i) / 20, body.y - 2 * Math.min(i, 10));
+    await framesFor(page, 300);
+    // His head across the screen every frame from the moment he's let go, for 1.5 s.
+    await page.evaluate(() => {
+      window.__track = new Promise((done) => {
+        const out = [];
+        const t0 = performance.now();
+        const tick = () => {
+          out.push(window.__invitation.screen('head').x);
+          if (performance.now() - t0 < 1500) requestAnimationFrame(tick);
+          else done(out);
+        };
+        requestAnimationFrame(tick);
+      });
+    });
+    await page.mouse.up();
+    const xs = await page.evaluate(() => window.__track);
+    // An ease: no one frame's move far bigger than any other's (a snap moved him 100 to 350 px
+    // in one frame, then 10 to 20 a frame).
+    const steps = xs
+      .slice(1)
+      .map((x, i) => Math.abs(x - xs[i]))
+      .sort((p, q) => q - p);
+    const moved = xs[0] - Math.min(...xs);
+    expect(moved, `the view brought him back in by ${moved.toFixed(1)} px`).toBeGreaterThan(30);
+    expect(steps[0], `${steps[0].toFixed(1)} px in a frame, then ${steps[1].toFixed(1)}`).toBeLessThan(3 * steps[1]);
+  });
+
   test('where he looks with a mouse: up at a cursor high over him, his face toward a cursor in front of him, a profile for one level with his head off to the side', async ({
     page,
   }) => {

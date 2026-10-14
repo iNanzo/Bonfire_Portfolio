@@ -23,7 +23,8 @@
 // ORBIT.keepOut of it once he's on screen (orbitStep, from where screenOf puts him). A pan
 // stops all of that: the view stays where it was put until NEWT himself walks off the screen.
 // While he's held (orbitHold) it holds still, so the point he's grabbed by stays under the
-// cursor. While the Look sheet is open it follows him all the way at any zoom (orbitFollowAll),
+// cursor; let go out past ORBIT.keepOut (carried to the screen's edge), the view eases back
+// round him at ORBIT.settle rather than snapping there in a frame. While the Look sheet is open it follows him all the way at any zoom (orbitFollowAll),
 // so he stays in the clear space the sheet leaves. Reset Camera eases back to the default view,
 // the short way round, and clears the pan. The light goes round with it (lightDir: the look's
 // sun turned by the camera's yaw), so his shadow always falls the same way on screen, back and
@@ -51,7 +52,8 @@ const RAD = Math.PI / 180;
  * the orbit's point following NEWT; phoneFollow: how much of the way it follows him at the
  * default zoom on a phone's stage. wheel: zoom per px of wheel (a factor of e^(px × wheel)).
  * keepIn: the share of the clear space round where the point it looks at shows that NEWT may
- * roam with the view holding still; keepOut: the share he's never let past once he's on screen.
+ * roam with the view holding still; keepOut: the share he's never let past once he's on screen;
+ * settle: the time constant it brings him back inside keepOut at once he's let go out past it.
  */
 export const ORBIT = {
   elevMin: 12 * RAD,
@@ -70,6 +72,7 @@ export const ORBIT = {
   wheel: 0.0015,
   keepIn: 0.6,
   keepOut: 0.94,
+  settle: 0.25,
 };
 export { FOCUS_Y };
 
@@ -98,6 +101,7 @@ const frameOf = (w, h) => ({ hw: Math.max(1, w / 2 - 24), hh: Math.max(1, (h - 8
  * @property {boolean} panned  the user's pan holds the view (until NEWT walks off the screen)
  * @property {boolean} panning  a pan under way
  * @property {boolean} holding  NEWT held: the view holds still
+ * @property {boolean} settling  let go out past keepOut: it eases him back inside, not at once
  * @property {Bounds|null} area  the play area: a pan keeps the point it looks at inside it
  * @property {number} ch  the canvas's CSS height (the field of view spans it)
  * @property {{hw: number, hh: number}} frame  half the clear space round where the point it
@@ -139,6 +143,7 @@ export function createOrbit({
     panned: false,
     panning: false,
     holding: false,
+    settling: false,
     area: null,
     ch: h,
     frame: frameOf(w, h),
@@ -271,11 +276,12 @@ export function orbitPan(s, dx, dy, at = { x: 0, y: 0 }) {
 
 /**
  * NEWT held (`on`): the view holds still, so the point he's grabbed by stays under the cursor;
- * let go, it follows him again.
+ * let go, it follows him again (from out past keepOut, easing him back inside: followStep).
  * @param {OrbitState} s
  * @param {boolean} on
  */
 export function orbitHold(s, on) {
+  if (s.holding && !on) s.settling = true;
   s.holding = on;
 }
 
@@ -578,7 +584,8 @@ export function orbitStep(s, dt, focus) {
 
 /**
  * The orbit's point this frame (orbitStep's second half): toward where it's wanted, softly,
- * never letting NEWT past ORBIT.keepOut of the clear space once he's on screen.
+ * never letting NEWT past ORBIT.keepOut of the clear space once he's on screen (just let go out
+ * past it, carried there: eased back inside at ORBIT.settle, so the view never jumps).
  * @param {OrbitState} s
  * @param {number} dt
  * @param {{x: number, z: number, y?: number}|null} focus
@@ -595,6 +602,7 @@ function followStep(s, dt, focus) {
   if (!focus) return;
   const box = newtBox(s, focus, s.target);
   const out = box ? past(s, box, ORBIT.keepOut) : null;
+  if (!out) s.settling = false;
   if (s.panned) {
     // (Walked off the screen by himself, not panned off it: the follow takes him again, from the
     // edge he went out by.)
@@ -605,7 +613,8 @@ function followStep(s, dt, focus) {
     }
   }
   if (out && box && s.seen && !s.followAll) {
-    const d = stepFor(s, out, box.depth);
+    const k = s.settling ? 1 - Math.exp(-dt / ORBIT.settle) : 1;
+    const d = stepFor(s, { x: out.x * k, y: out.y * k }, box.depth);
     s.target.x += d.x;
     s.target.z += d.z;
     const share = followShare(s);

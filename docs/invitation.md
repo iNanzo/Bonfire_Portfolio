@@ -161,7 +161,9 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
     the way while the Look sheet is open, and moves on with him as he nears the edge of the
     clear space, `ORBIT.keepIn` (0.6) of it, never letting him past `keepOut` (0.94) once he's
     on screen, from where `screenOf` puts him; a pan holds it until he walks off the screen;
-    `orbitHold` holds it still while he's held; `lightDir` turns the look's sun with the
+    `orbitHold` holds it still while he's held, and once he's let go out past `keepOut` (carried
+    to the screen's edge) it eases him back inside at `ORBIT.settle` (0.25 s) rather than
+    jumping there in a frame; `lightDir` turns the look's sun with the
     camera's yaw), `area.js` (`viewArea`, the play area: the floor the default view shows at
     twice its distance, yaw 0, inside the clear space with him whole 8 px in, `AREA_MARGIN`, a
     trapezoid widening toward the back; worked out again on a resize, never moved by the camera
