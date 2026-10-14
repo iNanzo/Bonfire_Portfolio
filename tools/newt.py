@@ -512,13 +512,15 @@ WALK = {
     'arm': {'shrug': 0, 'protract': 0, 'fwd': 2, 'swing': 30, 'out': 20, 'fwd2': 16, 'swing2': 32, 'out2': 14},
 }  # fmt: skip
 RUN = {
-    'contact': 0.3, 'step': 2.0, 'lift': 0.45, 'peak': 0.7, 'low': 0.15, 'width': 0.42, 'height': -0.3, 'bob': 0.15,
-    'heel': -6, 'toe': 25, 'heel_t': 0.15, 'toe_t': 0.45, 'swing_pitch': 18, 'lean': 7, 'roll': 4, 'yaw': 6,
-    'shift': 0.03, 'counter': 1, 'chest': 2, 'neck': -12, 'head': -13, 'nod': 3,
-    # the head thrown back (half from the collar, so the back hair digs less into his shirt) so the high
-    # camera sees the scared face; the hands flung up and out past the cap's edge, pumping, the forearms
-    # whipping further than the upper arms
-    'arm': {'shrug': 28, 'protract': 10, 'fwd': 168, 'swing': 26, 'swing_out': 4, 'out': 56, 'fwd2': 174, 'swing2': 48, 'out2': 46},
+    'contact': 0.3, 'step': 2.3, 'lift': 0.65, 'peak': 0.6, 'low': 0.15, 'width': 0.42, 'height': -0.45, 'bob': 0.15,
+    'heel': -6, 'toe': 25, 'heel_t': 0.15, 'toe_t': 0.45, 'swing_pitch': 18, 'lean': 16, 'roll': 4, 'yaw': 6,
+    'shift': 0.03, 'counter': 1, 'chest': 10, 'neck': -20, 'head': -24, 'nod': 3,
+    # the user's reference (a scared cartoon run): long low strides, the trunk leaning about 24
+    # degrees, the head tipped back (half from the collar, so the back hair digs less into his shirt)
+    # so the high camera sees the screaming face, both arms reaching straight out in front at shoulder
+    # height, a little up, the elbows nearly straight, pumping a little. fwd is in the chest's frame:
+    # 90 + the trunk's lean is level. The hands stay 0.45 below the chin and 1.2 under the cap's brim.
+    'arm': {'shrug': 6, 'protract': 14, 'fwd': 126, 'swing': 4, 'out': 8, 'fwd2': 134, 'swing2': 6, 'out2': 3},
 }  # fmt: skip
 
 
