@@ -225,6 +225,21 @@ export const stepFor = (pixelSize, steps) =>
   steps.find((s) => s.covers.includes(DEFAULT_PIXEL)) ??
   steps[0];
 
+/**
+ * The Pixel Size the slider shows for `pixelSize` on a screen: itself where its step is a
+ * resolution's that stands for it too (128×128 and 96×96 drawing alike on a 1429×1115 desktop:
+ * the step reads as the one picked, not as the other), else the step's own (Native, for the
+ * resolutions that come to 1 px a texel there; the default's step for anything unknown).
+ * @param {unknown} pixelSize
+ * @param {PixelStep[]} steps
+ * @returns {PixelSize}
+ */
+export function shownPixel(pixelSize, steps) {
+  const step = stepFor(pixelSize, steps);
+  const own = /** @type {PixelSize} */ (pixelSize);
+  return step.n !== null && step.covers.includes(own) ? own : step.value;
+}
+
 /** The camera: vertical field of view and elevation in degrees, near and far in world units. */
 export const VIEW = { fov: 20, elevation: 36, near: 1, far: 120 };
 /**

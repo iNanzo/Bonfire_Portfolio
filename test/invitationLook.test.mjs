@@ -29,6 +29,7 @@ import {
   newtDevicePx,
   newtShare,
   pixelSteps,
+  shownPixel,
   resolutionOf,
   stepFor,
   VIEW,
@@ -186,6 +187,17 @@ test("Pixel Size's steps on a screen: each one a different block (two steps that
   assert.equal(stepFor('256', pixelSteps(390, 844, 3)).value, 'native', '256×256 is Native on a DPR 3 phone');
   assert.equal(stepFor('128', pixelSteps(1280, 800, 1)).value, 'native', '128×128 is Native on a DPR 1 desktop');
   assert.equal(stepFor('native', pixelSteps(390, 844, 3)).value, 'native');
+  // What the slider shows for a Pixel Size: itself, where its step is a resolution's that stands
+  // for it too; Native for those Native stands for; the step's own otherwise.
+  const desk = pixelSteps(1429, 1115, 1);
+  assert.equal(stepFor('128', desk).value, '96', '96 and 128 are one step there');
+  assert.equal(shownPixel('128', desk), '128');
+  assert.equal(shownPixel('96', desk), '96');
+  assert.equal(shownPixel('192', pixelSteps(390, 844, 3)), '192');
+  assert.equal(shownPixel('256', pixelSteps(390, 844, 3)), 'native');
+  assert.equal(shownPixel('128', pixelSteps(1280, 800, 1)), 'native');
+  assert.equal(shownPixel('off', desk), 'off');
+  assert.equal(shownPixel('2', desk), stepFor('2', desk).value, 'anything else: the step it shows as');
 });
 
 test('Pixel Size Native draws a texel a device pixel at the device’s own DPR (no cap), the same grid as a resolution that comes to 1 px there', () => {
@@ -733,14 +745,26 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
       p === 'off' ? ['Off', 'Off'] : p === 'native' ? ['Native', 'Native'] : [`${p}×${p}`, `${p} by ${p}`],
     ),
   );
-  // A screen's own steps (two that come to the same block there are one): the stored value
-  // shows as the step that stands for it, and NEWT's height in texels there is said under it.
+  // A screen's own steps (two that come to the same block there are one): the stored value sits
+  // at the step that stands for it, and shows as itself (192×192 and 128×128 draw alike on this
+  // phone: the slider is at their one step, which reads as the one picked); NEWT's height in
+  // texels there is said under it.
   const phone = sheetHtml({ ...DEFAULT_LOOK, pixelSize: '192' }, pixelSteps(390, 844, 3));
   const onPhone = /<input type="range"[^>]*>/.exec(phone)?.[0] ?? '';
   assert.match(onPhone, /max="8"/, '9 steps on a 390-wide phone at DPR 3');
-  assert.match(onPhone, /value="6"/, '192×192 draws as 128×128 there');
-  assert.match(onPhone, /aria-valuetext="128 by 128"/);
+  assert.match(onPhone, /value="6"/, '192×192 at the step it shares with 128×128 there');
+  assert.match(onPhone, /aria-valuetext="192 by 192"/);
+  assert.match(phone, /data-pixel-value[^>]*>192×192</);
   assert.match(phone, /data-pixel-note>NEWT is about 149 pixels tall on this screen\.</);
+  // The default on a 1429×1115 desktop at DPR 1: 96×96 and 128×128 both come to 2 px a texel
+  // there (one step, 96 the nearer his 109 texels), and the first visit's 128×128 reads 128×128.
+  const desk = sheetHtml({ ...DEFAULT_LOOK, pixelSize: '128' }, pixelSteps(1429, 1115, 1));
+  assert.match(desk, /data-pixel-value[^>]*>128×128</);
+  assert.match(desk, /aria-valuetext="128 by 128"/);
+  assert.match(
+    sheetHtml({ ...DEFAULT_LOOK, pixelSize: '96' }, pixelSteps(1429, 1115, 1)),
+    /data-pixel-value[^>]*>96×96</,
+  );
   // Native, the step before Off: a texel a device pixel. 256×256 is 1 px a texel on this phone,
   // so it shows as Native there (never two steps alike); the line still gives his height.
   for (const pixelSize of ['native', '256']) {

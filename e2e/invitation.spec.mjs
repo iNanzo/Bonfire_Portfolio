@@ -1543,6 +1543,22 @@ test.describe('on a desktop', () => {
   });
 });
 
+test.describe('on a 1429×1115 desktop', () => {
+  test.use({ viewport: { width: 1429, height: 1115 } });
+
+  test('a first visit’s Look sheet reads the default 128×128 (it draws as 96×96 does here) and the Default style', async ({
+    page,
+  }) => {
+    await ready(page, '/invitation/?test&calm&seed=3');
+    await page.getByRole('button', { name: 'Look' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await expect(sheet.locator('[data-pixel-value]')).toHaveText('128×128');
+    await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', '128 by 128');
+    await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Default' })).toBeChecked();
+    expect((await snapshot(page)).resolution).toBe(128);
+  });
+});
+
 test.describe('on a small window', () => {
   // (Few texels at 32×32, so the frames are quick even on CI's software WebGL: only the busy
   // page below makes them slow.)
