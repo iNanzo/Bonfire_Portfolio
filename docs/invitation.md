@@ -60,7 +60,7 @@ and turns the Style to Custom, and **Reset To Style** puts the style's values ba
 | Outer Ring | On, Off | Lines just outside his outline, like a sprite's, instead of on his edge. |
 | Toon Shading | Smooth, 2, 3, 4 | Smooth light, or that many flat bands of it. |
 | Highlight | On, Off | White where the light falls straight on him. |
-| Pixel Shirt & Face | On, Off | Off in every style: his real plaid and smooth face at every resolution. On: below 128 pixels tall his shirt shows bold pixel checks, and his face is redrawn in pixels to fit his size (the smooth face again at the finest steps zoomed in). |
+| Pixel Shirt & Face | On, Off | Off in every style: his real plaid and smooth face at every resolution (the face drawn a little sharper with the pixel look on, so his eyes and mouth stay). On: below 128 pixels tall his shirt shows bold pixel checks, and his face is redrawn in pixels to fit his size (the smooth face again at the finest steps zoomed in). |
 | Shadow | Hard, Soft | A crisp shadow, or one with a dithered, two-tone edge. |
 | Shadow Strength | Off to 100% | How dark his shadow is. |
 | Light Angle | -180° to 180° | Turns the light round him (it still turns with the camera too). |

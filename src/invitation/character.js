@@ -29,8 +29,10 @@
 // his root's frame, 30% at Neck and 70% at Neck001, exactly as asked whatever the bones' rolls.
 //
 // Pixel Shirt & Face (a Shader option, the preset's `texture.pixelArt`, off in every style): with
-// it off his face is the glb's smooth sheet and his shirt the glb's own plaid at every resolution;
-// on, the pixel face and the pixel atlas below take over at the coarser resolutions as follows.
+// it off his face is the glb's smooth sheet and his shirt the glb's own plaid at every resolution
+// (under the pixel filter the face sampled FACE_SHARPEN mip levels sharper, so his eyes and mouth
+// stay, and the plaid at the preset's `texture.fineMipBias`, so its checks don't blur grey); on,
+// the pixel face and the pixel atlas below take over at the coarser resolutions as follows.
 //
 // Faces: NEWT_Face's 2×2 sheet split into one clamped texture per cell (clips.js FACES), so
 // swapping material.map never bleeds into the next cell as an offset would (the face's UVs reach
@@ -113,6 +115,13 @@ export const pixelAtlasUrl = (url) => url.replace(/[^/?#]*([?#].*)?$/, 'newt-atl
  */
 export const ORIGINAL_ATLAS_TEXELS = 128;
 
+/**
+ * Pixel Shirt & Face off, under the pixel filter: the smooth face sheet is sampled this many mip
+ * levels sharper than three picks, so his eyes and mouth stay at the coarser resolutions (three's
+ * own mip blurs a dozen-texel face into skin).
+ */
+export const FACE_SHARPEN = -1.5;
+
 /** Seconds the first frame waits for the pixel images once the glb is in (then they come in late). */
 export const TEXTURE_GRACE = 3;
 
@@ -184,11 +193,18 @@ export function createCharacter(gltf, opts = {}) {
   let tall = 0;
   /** The mip bias his materials other than the face sample their maps at (markId's `bias`). */
   const atlasBias = { value: 0 };
-  /** atlasBias for the preset, the pixel filter and his height in texels. */
+  /** His face's (the smooth sheet: FACE_SHARPEN with Pixel Shirt & Face off, else as three picks). */
+  const faceBias = { value: 0 };
+  /**
+   * atlasBias and faceBias for the preset, the pixel filter and his height in texels (with Pixel
+   * Shirt & Face off, the glb's plaid at fineMipBias at every height: at mipBias it blurred grey).
+   */
   const setBias = () => {
     const t = /** @type {import('./look.js').LookPreset & import('./retro.js').RetroExtras} */ (preset).texture ?? {};
-    const fine = tall >= ORIGINAL_ATLAS_TEXELS ? (t.fineMipBias ?? t.mipBias) : t.mipBias;
+    const real = !t.pixelArt;
+    const fine = real || tall >= ORIGINAL_ATLAS_TEXELS ? (t.fineMipBias ?? t.mipBias) : t.mipBias;
     atlasBias.value = pixel ? Math.max(0, fine ?? 0) : 0;
+    faceBias.value = pixel && real ? FACE_SHARPEN : 0;
   };
   setBias();
   /** @type {any[]} every mesh of his */
@@ -229,8 +245,8 @@ export function createCharacter(gltf, opts = {}) {
         gradientMap: gradient,
       }),
       ID.newt,
-      // (His face: no coarser mip, so the smooth sheet stays sharp where it shows.)
-      { snap: snaps[part], bias: src?.name === 'NEWT_Face' ? { value: 0 } : atlasBias },
+      // (His face: no coarser mip, so the smooth sheet stays sharp where it shows: faceBias.)
+      { snap: snaps[part], bias: src?.name === 'NEWT_Face' ? faceBias : atlasBias },
     );
     if (src?.map) textures.add(src.map);
     if (src?.name === 'NEWT_Face') faceMaterial = m;

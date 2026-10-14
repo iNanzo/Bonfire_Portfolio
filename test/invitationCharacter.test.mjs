@@ -13,7 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { ORIGINAL_ATLAS_TEXELS, createCharacter, pixelAtlasUrl } from '../src/invitation/character.js';
+import { FACE_SHARPEN, ORIGINAL_ATLAS_TEXELS, createCharacter, pixelAtlasUrl } from '../src/invitation/character.js';
 import { FACE_IMAGE, pickFaceSize } from '../src/invitation/faceSheets.js';
 import { LOOKS, lookPreset, validLook } from '../src/invitation/look.js';
 import { TOON_CELLS, toonRamp } from '../src/invitation/shader.js';
@@ -516,8 +516,15 @@ test('his face samples its sheet at the mip three picks (the smooth sheet stays 
     material.onBeforeCompile(shader, null);
     return shader.uniforms.uMapBias;
   };
-  assert.equal(biasOf(face.material).value, 0, 'the face: no bias');
   assert.notEqual(biasOf(face.material), biasOf(mesh.material), 'its own, not the shared one the preset sets');
+  // Pixel Shirt & Face off (the default): the smooth face sampled a little sharper under the pixel
+  // filter, so his eyes and mouth stay at the coarser resolutions (three's own mip blurs them away).
+  assert.ok(FACE_SHARPEN < 0 && FACE_SHARPEN >= -2, `${FACE_SHARPEN}`);
+  assert.equal(biasOf(face.material).value, FACE_SHARPEN, 'the switch off: a little sharper');
+  ch.setStyle(LOOKS.ds, false);
+  assert.equal(biasOf(face.material).value, 0, 'Off: as three picks');
+  ch.setStyle(pixelArt('ds'), true);
+  assert.equal(biasOf(face.material).value, 0, 'the switch on: the pixel sheets, and the smooth one as three picks');
   ch.dispose();
 });
 
@@ -583,7 +590,7 @@ test('the glb’s own atlas replaces the bold pixel plaid once NEWT is ORIGINAL_
 
 test('his atlas’s mip bias: the preset’s mipBias under the pixel filter, its fineMipBias once he’s ORIGINAL_ATLAS_TEXELS tall (the real plaid’s checks resolve), none at Off', () => {
   const { gltf, mesh } = standIn();
-  const preset = { ...LOOKS.ds, texture: { mipBias: 1.5, fineMipBias: 0.5 } };
+  const preset = { ...LOOKS.ds, texture: { mipBias: 1.5, fineMipBias: 0.5, pixelArt: true } };
   const ch = createCharacter(gltf, { preset, pixel: true, pixelAtlas: new THREE.Texture() });
   const shader = {
     uniforms: {},
@@ -595,10 +602,18 @@ test('his atlas’s mip bias: the preset’s mipBias under the pixel filter, its
   assert.equal(bias.value, 1.5, 'not measured yet (the pixel atlas has no mips; a fallback glb atlas is coarse)');
   ch.setResolution(ORIGINAL_ATLAS_TEXELS + 10);
   assert.equal(bias.value, 0.5, 'a fine resolution: the glb’s plaid a mip less blurred');
-  ch.setStyle({ ...preset, texture: { mipBias: 2 } }, true);
+  ch.setStyle({ ...preset, texture: { mipBias: 2, pixelArt: true } }, true);
   assert.equal(bias.value, 2, 'a preset without fineMipBias: its mipBias');
   ch.setStyle(preset, false);
   assert.equal(bias.value, 0, 'Off: as three picks');
+  // Pixel Shirt & Face off: the glb's plaid at every resolution, sampled at fineMipBias (at mipBias
+  // its checks blurred into grey).
+  const real = { ...preset, texture: { mipBias: 1.5, fineMipBias: 0.5 } };
+  for (const tall of [16, 64, ORIGINAL_ATLAS_TEXELS + 10]) {
+    ch.setResolution(tall);
+    ch.setStyle(real, true);
+    assert.equal(bias.value, 0.5, `the switch off at ${tall} texels tall`);
+  }
   ch.dispose();
 });
 
