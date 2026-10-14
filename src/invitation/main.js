@@ -554,6 +554,9 @@ function start(s) {
     orbitStep(cam, dt, { x: body.root.x, z: body.root.z, y: Math.max(0, body.root.y) });
     const pose = orbitPose(cam);
     s.setCamera(pose);
+    // (The zoom, for a stage that keeps NEWT's sprite resolution as the camera zooms: the look
+    // package's seam, where the stage has it.)
+    /** @type {{setZoomScale?: (k: number) => void}} */ (s).setZoomScale?.(cam.home.distance / cam.distance);
     return pose;
   }
 
