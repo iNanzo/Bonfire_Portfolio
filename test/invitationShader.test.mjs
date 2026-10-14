@@ -314,13 +314,13 @@ test('the Look sheet’s Shader section: every control from the table, labelled,
       assert.equal(/ checked/.test(box), v === true, c.key);
     }
   }
-  // The style's own values: DS checked, Custom there but not to pick, nothing to reset.
-  assert.match(html, /value="ds" data-look="style" checked/);
+  // The style's own values: Default checked, Custom there but not to pick, nothing to reset.
+  assert.match(html, /value="default" data-look="style" checked/);
   assert.match(html, /value="custom" data-look="style" disabled/);
   assert.match(html, /<button type="button" class="inv-btn[^"]*" data-shader-reset disabled>Reset To Style<\/button>/);
   const custom = sheetHtml(validLook({ ...DEFAULT_LOOK, shader: { levels: 8 } }));
   assert.match(custom, /value="custom" data-look="style" checked>/, 'a change of the user’s: Custom');
-  assert.doesNotMatch(custom, /value="ds" data-look="style" checked/);
+  assert.doesNotMatch(custom, /value="default" data-look="style" checked/);
   assert.match(custom, /data-shader-reset>Reset To Style</);
   assert.match(custom, /data-shader-value="levels"[^>]*>8</);
   // At Off the pixel look's controls rest (with a line saying why); toon shading, the shadow's

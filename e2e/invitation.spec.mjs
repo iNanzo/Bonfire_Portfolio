@@ -1,6 +1,6 @@
 // The invitation toy (/invitation/) in a real browser, on the production build: on a phone
 // (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT on his
-// floor (not a blank canvas) at 96×96 (1×1 CSS px texels on the phone); it's unlisted (noindex); a Look change (24×24:
+// floor (not a blank canvas) in the Default look at 128×128 (2 device px texels on the phone); it's unlisted (noindex); a Look change (24×24:
 // 4×4 CSS px texels) survives a reload, Pixel Size Native draws a texel a device pixel at a phone's
 // full DPR with the pixel look on (and survives a reload), and Off draws smooth at the screen's
 // resolution (its smooth face reported as such); and the portfolio's
@@ -217,10 +217,11 @@ test.describe('on a phone', () => {
     await expect(page).toHaveTitle('Invitation');
     const snap = await snapshot(page);
     expect(snap.ready).toBe(true);
-    // 96×96 by default: NEWT about 96 texels tall, a texel 3 device px (a CSS px) here.
-    expect(snap.resolution).toBe(96);
-    expect(snap.pixelScale, 'a texel is a CSS px').toBe(1);
-    expect(snap.newtTexels).toBeCloseTo(99.4, 0);
+    // 128×128 by default (the Default look): NEWT about 128 texels tall, a texel 2 device px
+    // (two thirds of a CSS px) here, 149 texels.
+    expect(snap.resolution).toBe(128);
+    expect(snap.pixelScale, 'a texel is 2 device px').toBeCloseTo(2 / 3, 6);
+    expect(snap.newtTexels).toBeCloseTo(149.2, 0);
     // Not a blank canvas: NEWT on the plain background, far from one flat colour.
     const pic = await picture(page);
     expect(apart(pic, flat(pic))).toBeGreaterThan(3);
@@ -285,7 +286,12 @@ test.describe('on a phone', () => {
     // Pixel Size, a slider: from the coarse end one step finer by the keyboard, 24×24 (NEWT about
     // 24 texels tall: 12 device px, 4 CSS px a texel here).
     const pixel = sheet.getByRole('slider', { name: 'Pixel Size' });
-    await expect(pixel).toHaveAttribute('aria-valuetext', '96 by 96');
+    await expect(pixel).toHaveAttribute('aria-valuetext', '128 by 128');
+    // A first visit starts on the Default style, never Custom.
+    const styles = sheet.getByRole('group', { name: 'Style' });
+    await expect(styles.getByRole('radio').first()).toHaveAccessibleName('Default');
+    await expect(styles.getByRole('radio', { name: 'Default' })).toBeChecked();
+    await expect(styles.getByRole('radio', { name: 'Custom' })).toBeDisabled();
     await pixel.focus();
     await page.keyboard.press('Home');
     await expect(pixel).toHaveAttribute('aria-valuetext', '16 by 16');
@@ -726,11 +732,11 @@ test.describe('on a desktop', () => {
     const errors = watch(page);
     await ready(page);
     const snap = await snapshot(page);
-    // 96×96 by default: NEWT 156 CSS px tall, so a texel is 2 px (96×96 and 64×64 are one step
-    // here) and he's 78 texels tall.
-    expect(snap.resolution).toBe(96);
-    expect(snap.pixelScale).toBe(2);
-    expect(snap.newtTexels).toBeCloseTo(78, 0);
+    // 128×128 by default: NEWT 156 CSS px tall, so a texel is a device pixel here (128×128 is
+    // Native on this screen) and he's 156 texels tall.
+    expect(snap.resolution).toBe('native');
+    expect(snap.pixelScale).toBe(1);
+    expect(snap.newtTexels).toBeCloseTo(156, 0);
     expect(
       snap.newtTall / 800,
       `NEWT is ${snap.newtTall.toFixed(1)} CSS px tall: a fifth of the short side`,
@@ -819,10 +825,10 @@ test.describe('on a desktop', () => {
     const look = page.getByRole('button', { name: 'Look' });
     const sheet = page.getByRole('dialog', { name: 'Look' });
     const style = sheet.getByRole('group', { name: 'Style' });
-    const ds = (await snapshot(page)).shader;
+    const own = (await snapshot(page)).shader;
     const before = await newtPicture(page);
     await look.click();
-    await expect(style.getByRole('radio', { name: 'DS' })).toBeChecked();
+    await expect(style.getByRole('radio', { name: 'Default' })).toBeChecked();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeDisabled();
     await expect(sheet.getByRole('button', { name: 'Reset To Style' })).toBeDisabled();
     /** A slider by its name, moved by the keyboard. */
@@ -835,19 +841,19 @@ test.describe('on a desktop', () => {
     const colors = await keys('Colors', 'Home');
     await expect(colors).toHaveAttribute('aria-valuetext', '4 levels');
     await expect.poll(async () => (await snapshot(page)).pass.levels, 'Colors reach the pass').toBe(4);
-    await keys('Outline Strength', 'End');
-    await expect.poll(async () => (await snapshot(page)).pass.outline).toBe(1);
+    await keys('Outline Strength', 'Home');
+    await expect.poll(async () => (await snapshot(page)).pass.outline).toBe(0);
     await sheet.getByRole('radiogroup', { name: 'Toon Shading' }).getByRole('radio', { name: '4 Bands' }).check();
-    await sheet.getByRole('radiogroup', { name: 'Shadow' }).getByRole('radio', { name: 'Soft' }).check();
-    await expect.poll(async () => (await snapshot(page)).pass.shadeSoft, 'a soft shadow edge').toBe(1);
+    await sheet.getByRole('radiogroup', { name: 'Shadow' }).getByRole('radio', { name: 'Hard' }).check();
+    await expect.poll(async () => (await snapshot(page)).pass.shadeSoft, 'a hard shadow edge').toBe(0);
     const angle = await keys('Light Angle', ...Array(6).fill('ArrowRight'));
     await expect(angle).toHaveAttribute('aria-valuetext', '90 degrees');
     await expect.poll(async () => (await snapshot(page)).pass.turn, 'the light turned round him').toBe(90);
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeChecked();
-    await expect(style.getByRole('radio', { name: 'DS' })).not.toBeChecked();
+    await expect(style.getByRole('radio', { name: 'Default' })).not.toBeChecked();
     const custom = await snapshot(page);
     expect(custom.custom).toBe(true);
-    expect(custom.shader).toEqual({ ...ds, levels: 4, outline: 1, bands: '4', edge: 'soft', turn: 90 });
+    expect(custom.shader).toEqual({ ...own, levels: 4, outline: 0, bands: '4', edge: 'hard', turn: 90 });
     await sheet.getByRole('button', { name: 'Done' }).click();
     await expect(sheet).toBeHidden();
     expect(apart(before, await newtPicture(page)), 'NEWT looks different').toBeGreaterThan(6);
@@ -855,14 +861,14 @@ test.describe('on a desktop', () => {
     await page.reload();
     await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('invitation.look.v1') ?? '{}'));
-    expect(stored.style).toBe('ds');
-    expect(stored.shader).toEqual({ levels: 4, outline: 1, bands: '4', edge: 'soft', turn: 90 });
+    expect(stored.style).toBe('default');
+    expect(stored.shader).toEqual({ levels: 4, outline: 0, bands: '4', edge: 'hard', turn: 90 });
     expect((await snapshot(page)).shader).toEqual(custom.shader);
     expect((await snapshot(page)).pass.levels).toBe(4);
     await look.click();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeChecked();
     await expect(sheet.getByRole('slider', { name: 'Colors' })).toHaveAttribute('aria-valuetext', '4 levels');
-    // Reset To Style: DS's own values again, and focus on DS (the button it was on rests now),
+    // Reset To Style: Default's own values again, and focus on it (the button it was on rests now),
     // without the sheet jumping away from the Shader controls the user was at.
     // (Scrolled so Reset To Style sits just under the sheet's sticky header, the Style row out
     // of sight above it, as when the user has been at the Shader controls.)
@@ -876,15 +882,15 @@ test.describe('on a desktop', () => {
     expect(scrolled).toBeGreaterThan(40);
     await sheet.getByRole('button', { name: 'Reset To Style' }).click();
     expect(Math.abs((await sheetScroll(page)).top - scrolled)).toBeLessThan(2);
-    await expect(style.getByRole('radio', { name: 'DS' })).toBeChecked();
-    await expect(style.getByRole('radio', { name: 'DS' })).toBeFocused();
+    await expect(style.getByRole('radio', { name: 'Default' })).toBeChecked();
+    await expect(style.getByRole('radio', { name: 'Default' })).toBeFocused();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeDisabled();
     await expect(sheet.getByRole('button', { name: 'Reset To Style' })).toBeDisabled();
-    expect((await snapshot(page)).shader).toEqual(ds);
+    expect((await snapshot(page)).shader).toEqual(own);
     expect((await snapshot(page)).custom).toBe(false);
     await expect(sheet.getByRole('slider', { name: 'Colors' })).toHaveAttribute(
       'aria-valuetext',
-      `${ds.levels} levels`,
+      `${own.levels} levels`,
     );
     // A change, then another Style: that style's own values, the change cleared.
     await keys('Saturation', 'Home');

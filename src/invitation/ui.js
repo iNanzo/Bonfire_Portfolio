@@ -4,7 +4,7 @@
 // slider over NEWT's sprite resolutions, 16×16 to 256×256, then Native (a texel a device pixel)
 // and Off at its fine end, with a button at each end (named for what it sets: "Pixel Size
 // Off") and a line saying how many pixels tall he is on this screen; Dithering, Outlines,
-// Style (DS, Soft, and Custom, the row's own once a Shader option is the user's), Motion
+// Style (Default, DS, Soft, and Custom, the row's own once a Shader option is the user's), Motion
 // (Smooth or Choppy), Shader (every control in shader.js's table, rendered from it: a slider
 // with its value beside it, a row of segments or a switch; Reset To Style; the pixel look's
 // ones resting at Pixel Size Off, the lines' while Outlines is off, the dither's while

@@ -89,7 +89,7 @@ test('the pixel grid: at a sprite resolution N NEWT is about N texels tall in th
     ['16', '24', '32', '48', '64', '96', '128', '192', '256', 'native', 'off'],
     'Native, then Off, at the fine end',
   );
-  assert.equal(DEFAULT_PIXEL, '96', 'the user’s pick from the resolution ladder');
+  assert.equal(DEFAULT_PIXEL, '128', 'the user’s Default look: 128×128');
   assert.deepEqual(
     PIXEL_SIZES.map((p) => resolutionOf(p)),
     [...RESOLUTIONS, null, null],
@@ -129,9 +129,13 @@ test('the pixel grid: at a sprite resolution N NEWT is about N texels tall in th
   assert.deepEqual(pds(390, 844, 3), [19, 12, 9, 6, 5, 3, 2, 2, 1]);
   assert.deepEqual(pds(412, 915, 2.625), [17, 11, 9, 6, 4, 3, 2, 1, 1]);
   assert.deepEqual(pds(1280, 800, 1), [10, 7, 5, 3, 2, 2, 1, 1, 1]);
-  // The default, 96×96, on a 390-wide phone: 3 device px a texel (a CSS px), 390 × 844 texels.
-  const phone = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: DEFAULT_PIXEL });
+  // 96×96 on a 390-wide phone: 3 device px a texel (a CSS px), 390 × 844 texels; the default,
+  // 128×128, 2 device px a texel there (585 × 1266), and 1 on a 1280×800 desktop (Native's grid).
+  const phone = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: '96' });
   assert.deepEqual([phone.pd, phone.w, phone.h], [3, 390, 844]);
+  const byDefault = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: DEFAULT_PIXEL });
+  assert.deepEqual([byDefault.pd, byDefault.w, byDefault.h], [2, 585, 1266]);
+  assert.equal(texelGrid({ cssW: 1280, cssH: 800, dpr: 1, pixelSize: DEFAULT_PIXEL }).pd, 1);
 });
 
 test("Pixel Size's steps on a screen: each one a different block (two steps that come to the same block here are one, the one nearest NEWT's real height in texels), coarse to fine, then Native (any resolution that comes to 1 device px here is Native), then Off", () => {
@@ -260,7 +264,7 @@ test('NEWT is about a quarter of the short side on a phone (99 CSS px, 99 texels
     assert.ok(view.fov === VIEW.fov && view.fov >= 15 && view.fov <= 30, `a narrow view (${view.fov}°)`);
     assert.equal('roomWidth' in view, false, 'no room');
   }
-  // On the phones the round checks, at the default 96×96: 99 CSS px and 99 texels at 390x844@3
+  // On the phones the round checks, at 96×96: 99 CSS px and 99 texels at 390x844@3
   // (3 device px a texel), 105 CSS px and 92 texels at 412x915@2.625 (3 device px a texel); on
   // the desktop, 156 CSS px and 78 texels (2 px a texel: 96×96 and 64×64 are one step there).
   for (const [cssW, cssH, dpr, css, texels] of [
@@ -269,11 +273,11 @@ test('NEWT is about a quarter of the short side on a phone (99 CSS px, 99 texels
     [1280, 800, 1, 156, 78],
   ]) {
     const at = `${cssW}x${cssH}@${dpr}`;
-    const grid = texelGrid({ cssW, cssH, dpr, pixelSize: DEFAULT_LOOK.pixelSize });
+    const grid = texelGrid({ cssW, cssH, dpr, pixelSize: '96' });
     const view = frameView({ cssW, cssH, grid, insets: INSETS, area: AREA });
     assert.ok(Math.abs(cssTall(view, grid) - css) < 1, `${at}: NEWT is ${cssTall(view, grid).toFixed(1)} CSS px tall`);
     const tall = newtTexels(view, grid);
-    assert.ok(Math.abs(tall - texels) < 1, `${at}: NEWT is ${tall.toFixed(1)} texels tall at the default size`);
+    assert.ok(Math.abs(tall - texels) < 1, `${at}: NEWT is ${tall.toFixed(1)} texels tall at 96×96`);
   }
 });
 
@@ -442,7 +446,7 @@ test('a Pixel Size saved before the sprite resolutions loads as the nearest one 
     assert.equal(loadLook(store(() => JSON.stringify({ pixelSize }))).pixelSize, pixelSize, `${pixelSize} is kept`);
   for (const pixelSize of ['8', '512', 48, 'Off', 'Native', 'native ', '48x48', null])
     assert.equal(validLook({ pixelSize }).pixelSize, DEFAULT_PIXEL, `${JSON.stringify(pixelSize)}: the default`);
-  assert.equal(DEFAULT_LOOK.pixelSize, '96', '96×96 by default');
+  assert.equal(DEFAULT_LOOK.pixelSize, '128', '128×128 by default');
 });
 
 test('a stored look from before Motion loads with Motion Smooth and keeps its other values; Smooth and Choppy are kept, anything else is Smooth', () => {

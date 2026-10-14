@@ -42,10 +42,10 @@ the sheet and leaves the slider as it was.
 
 | Setting | Choices | What it does |
 | --- | --- | --- |
-| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn about 64 pixels tall, on any screen. A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 96×96 is the default (on a 1280×800 desktop it draws as 64×64, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there. **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier. From 128 pixels tall his shirt shows its real plaid (bolder pixel checks below that), and at the finest steps zoomed in his face is the smooth one. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
+| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn about 64 pixels tall, on any screen. A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 128×128 is the default (on a 1280×800 desktop it draws as Native, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there. **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier. From 128 pixels tall his shirt shows its real plaid (bolder pixel checks below that), and at the finest steps zoomed in his face is the smooth one. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
 | Dithering | On, Off | The checkered blend between colours (how strong: Dither Strength, under Shader). |
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow; how dark, its colour and where: under Shader). |
-| Style | DS, Soft, Custom | DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose DS or Soft, or Reset To Style, to go back). |
+| Style | Default, DS, Soft, Custom | Default (what a first visit shows): Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight. DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -88,10 +88,10 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
     `blockFor`, so he's about N texels tall; Native, a texel a device pixel at the real DPR with
     no cap; Off, the screen's pixels with the DPR capped at `OFF_DPR` (2); `pixelSteps`, a
     screen's steps, one a block size, the resolutions that come to 1 px folded into Native;
-    `DEFAULT_PIXEL`, the one line that sets the default, `'96'`; and the default view: 20° of
+    `DEFAULT_PIXEL`, the one line that sets the default, `'128'`; and the default view: 20° of
     view, 36° up, NEWT 0.195 of a desktop's short side tall with the whole play area in sight,
-    or 0.255 of a phone's, a stage whose short side is under 600 CSS px (99 CSS px, and 99
-    texels at the default 96×96, on a 390-wide phone), whatever the Pixel Size, the point it
+    or 0.255 of a phone's, a stage whose short side is under 600 CSS px (99 CSS px, and 149
+    texels at the default 128×128, on a 390-wide phone), whatever the Pixel Size, the point it
     looks at shown in the middle of the space over the toolbar, or of the clear space above or
     beside the open Look sheet, `clearInsets`), `camera.js` (the orbit camera: yaw all the way
     round, three quarters of a turn for a drag across the whole stage and half a turn of tilt
@@ -109,9 +109,10 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
     a copy, for the renderer), `motionStep`, Choppy's 15 fps clock, and the presets),
     `shader.js` (the Shader options as one table, `SHADER_CONTROLS`: each one's label, range or
     choices, value text and where it lives in a preset, which `ui.js` renders; `toonRamp`, the
-    toon gradient from bands and a highlight; `warmthTint`), `looks/ds.js` and `looks/soft.js`
-    (every look value, as data: a designer edits these, never code; among them the background,
-    the shadow's colour and strength, and the blob shadow).
+    toon gradient from bands and a highlight; `warmthTint`), `looks/default.js` (Default: Soft with the user's values, spread from `soft.js`),
+    `looks/ds.js` and `looks/soft.js` (every look value, as data: a designer edits these, never
+    code; among them the background, the shadow's colour and strength, and the blob shadow), and
+    `looks/index.js` (their order in the Style row and `DEFAULT_STYLE`, `'default'`).
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
     `faces.js`, `gesture.js`, `rng.js`) are pure too; `types.js` lists the shapes they pass
     and the order a frame runs in.
