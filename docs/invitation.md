@@ -77,12 +77,17 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
   modules (a shared `src/` module would share a chunk with the portfolio's first load).
   - Browser-only and thin: `main.js` (boot, the loop, the wiring in `types.js`'s frame
     order), `stage.js` (renderer at texel size, the camera with its off-centre projection,
-    lights and shadows, the blob shadow and the floor marker), `floor.js` (no room: an
+    lights and shadows, the blob shadow and the floor marker, and each frame the boxes round
+    NEWT the retro pass keeps its work to), `floor.js` (no room: an
     invisible floor that only catches his shadows, a `ShadowMaterial`, over the preset's
     background; and the shadow camera's fit), `character.js` (NEWT's materials, clips with
     twins for restarts, look-at and faces),
     `retro.js` (the pixel pass; `warm` compiles the path not showing once NEWT is in, so the
-    first switch to Off or back doesn't stall), `ui.js` (the toolbar and the Look sheet as
+    first switch to Off or back doesn't stall; `subjectBoxes`: outside the area round NEWT, his
+    shadow and the decals every texel is the paper, so the canvas is only cleared there and both
+    passes draw inside it alone, and the neighbour loops (the outer ring, the soft shadow) run
+    only in the boxes where they can find something: the same picture for a share of the
+    texels), `ui.js` (the toolbar and the Look sheet as
     markup, plus a thin binding), `invitation.css`.
   - Pure and unit-tested: `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
     to 256, a texel is `max(1, round(NEWT's default height in device px / N))` device pixels,

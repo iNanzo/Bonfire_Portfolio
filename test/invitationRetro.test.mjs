@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
+  ALL,
   ID,
   MAX_SOFT,
   POST_SHADER,
@@ -19,6 +20,7 @@ import {
   decalMaterial,
   markId,
   snapShift,
+  subjectBoxes,
 } from '../src/invitation/retro.js';
 import { LOOKS, lookPreset, validLook } from '../src/invitation/look.js';
 import { warmthTint } from '../src/invitation/shader.js';
@@ -318,4 +320,125 @@ test('the texel snap holds on to its texel while the point wobbles across an edg
     const s = snapShift(ndc(t), ndc(t), w, h, { x: 0, y: 0 }, hold);
     assert.ok(Math.abs(s.x) <= (2 / w) * 0.75 + 1e-9, `${t}: never more than three quarters of a texel off`);
   }
+});
+
+test('the pass bounds its costly texel work to where it can matter: the ring checks near NEWT, the soft shadow’s averaging where his shadow can fall, and the same picture everywhere else', () => {
+  // (In the post shader: outside the ring box no texel has NEWT beside it, outside the shade box
+  // no floor texel within MAX_SOFT has any of his shadow, so skipping the loops there is exact.)
+  assert.match(POST_SHADER, /uniform vec4 uRingBox;/);
+  assert.match(POST_SHADER, /uniform vec4 uShadeBox;/);
+  assert.match(POST_SHADER, /if \(uShadeSoft < 0\.5 \|\| !inBox\(p, uShadeBox\)\) return own;/);
+  assert.match(POST_SHADER, /uOutline > 0\.5 && uOutside > 0\.5 && inBox\(p, uRingBox\)/);
+  // The boxes from a camera, his bounding sphere and the light: texels, y up (gl_FragCoord's).
+  const camera = new THREE.PerspectiveCamera(20, 390 / 844, 1, 120);
+  camera.position.set(0, 0.5 + 24 * Math.sin((36 * Math.PI) / 180), 24 * Math.cos((36 * Math.PI) / 180));
+  camera.lookAt(0, 0.5, 0);
+  camera.updateMatrixWorld();
+  const [w, h] = [390, 844];
+  const center = new THREE.Vector3(0, 0.5, 0);
+  const light = new THREE.Vector3(-0.6, 1, 0.9).normalize();
+  const boxes = subjectBoxes({ center, radius: 0.8, light, camera, w, h });
+  const texel = (p) => {
+    const v = p.clone().project(camera);
+    return [((v.x + 1) / 2) * w, ((v.y + 1) / 2) * h];
+  };
+  const inside = (b, [x, y]) => x >= b[0] && y >= b[1] && x <= b[2] && y <= b[3];
+  // Every point of his sphere is in the ring box, and every floor point under its shadow in the shade box.
+  for (let i = 0; i < 200; i++) {
+    const d = new THREE.Vector3(Math.sin(i * 1.3), Math.cos(i * 0.7), Math.sin(i * 2.1)).normalize();
+    const p = center.clone().addScaledVector(d, 0.8);
+    assert.ok(inside(boxes.ring, texel(p)), `his sphere at ${p.toArray()}`);
+    const shade = p.clone().addScaledVector(light, -p.y / light.y);
+    assert.ok(inside(boxes.shade, texel(shade)), `his shadow at ${shade.toArray()}`);
+  }
+  // With room for the line round him and the shadow's softened edge.
+  const c = texel(center);
+  assert.ok(boxes.ring[0] < c[0] - 2 && boxes.ring[2] > c[0] + 2);
+  assert.ok(boxes.shade[2] - boxes.shade[0] > boxes.ring[2] - boxes.ring[0] - 1, 'his shadow reaches further');
+  // A small share of the stage: most texels skip the loops.
+  const area = (b) =>
+    Math.max(0, Math.min(w, b[2]) - Math.max(0, b[0])) * Math.max(0, Math.min(h, b[3]) - Math.max(0, b[1]));
+  assert.ok(area(boxes.ring) + area(boxes.shade) < 0.5 * w * h, 'well under the whole stage');
+  // Behind the camera (or no camera): the whole target, as before.
+  const behind = subjectBoxes({ center: new THREE.Vector3(0, 0.5, 40), radius: 0.8, light, camera, w, h });
+  assert.deepEqual(behind.ring, [-1e9, -1e9, 1e9, 1e9]);
+  assert.deepEqual(behind.shade, [-1e9, -1e9, 1e9, 1e9]);
+  // The pass takes them as uniforms (none set: the whole target).
+  const retro = createRetro({ setRenderTarget() {}, setClearColor() {}, clear() {}, render() {} });
+  assert.deepEqual(retro.uniforms.uRingBox.value.toArray(), [-1e9, -1e9, 1e9, 1e9]);
+  retro.setBoxes(boxes);
+  assert.deepEqual(retro.uniforms.uRingBox.value.toArray(), boxes.ring);
+  assert.deepEqual(retro.uniforms.uShadeBox.value.toArray(), boxes.shade);
+  retro.setBoxes(null);
+  assert.deepEqual(retro.uniforms.uShadeBox.value.toArray(), [-1e9, -1e9, 1e9, 1e9]);
+});
+
+test('outside the area round NEWT, his shadow and the decals, the canvas is the paper: the pass clears it to the paper and draws both its passes only inside that area (a scissor), the same picture for a fraction of the texels', () => {
+  const camera = new THREE.PerspectiveCamera(20, 390 / 844, 1, 120);
+  camera.position.set(0, 0.5 + 24 * Math.sin((36 * Math.PI) / 180), 24 * Math.cos((36 * Math.PI) / 180));
+  camera.lookAt(0, 0.5, 0);
+  camera.updateMatrixWorld();
+  const [w, h] = [390, 844];
+  const light = new THREE.Vector3(-0.6, 1, 0.9).normalize();
+  const marker = new THREE.Vector3(1.5, 0, 1.2);
+  const b = subjectBoxes({ center: new THREE.Vector3(0, 0.5, 0), radius: 0.8, light, camera, w, h, extra: [marker] });
+  const holds = (outer, inner) =>
+    outer[0] <= inner[0] && outer[1] <= inner[1] && outer[2] >= inner[2] && outer[3] >= inner[3];
+  assert.ok(holds(b.area, b.ring) && holds(b.area, b.shade), 'the area holds both boxes');
+  const m = marker.clone().project(camera);
+  const mx = ((m.x + 1) / 2) * w;
+  const my = ((m.y + 1) / 2) * h;
+  assert.ok(b.area[0] <= mx && b.area[2] >= mx && b.area[1] <= my && b.area[3] >= my, 'and the decals');
+  // (Room for the soft shadow's reads past the shade box.)
+  assert.ok(b.area[0] <= b.shade[0] - MAX_SOFT && b.area[3] >= b.shade[3] + MAX_SOFT);
+  const behind = subjectBoxes({
+    center: new THREE.Vector3(0, 0.5, 0),
+    radius: 0.8,
+    light,
+    camera,
+    w,
+    h,
+    extra: [new THREE.Vector3(0, 0, 40)],
+  });
+  assert.deepEqual(behind.area, [...ALL], 'a decal behind the camera: the whole target');
+  // The pass: the canvas cleared to the paper, then both passes only inside the area.
+  const calls = [];
+  const renderer = {
+    setRenderTarget: (t) =>
+      calls.push(t ? `target ${t.scissorTest ? t.scissor.toArray().join(',') : 'whole'}` : 'canvas'),
+    setClearColor: (_c, a) => calls.push(`clear colour alpha ${a}`),
+    clear: () => calls.push('clear'),
+    render: (s) => calls.push(s.isScene && s.children.length === 1 ? 'post' : 'scene'),
+    setScissor: (x, y, sw, sh) => calls.push(`scissor ${[x, y, sw, sh].join(',')}`),
+    setScissorTest: (on) => calls.push(`scissor ${on ? 'on' : 'off'}`),
+  };
+  const retro = createRetro(renderer);
+  retro.setSize(w, h);
+  retro.setParams(PRESET, LOOK);
+  const scene = new THREE.Scene();
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()));
+  scene.add(new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()));
+  retro.setBoxes(b);
+  retro.render(scene, camera);
+  const [x0, y0, x1, y1] = b.area.map((v, i) => Math.min(i % 2 ? h : w, Math.max(0, v)));
+  const rect = [x0, y0, x1 - x0, y1 - y0].join(',');
+  assert.deepEqual(calls, [
+    `target ${rect}`,
+    'clear colour alpha 0',
+    'clear',
+    'scene',
+    'canvas',
+    'scissor off',
+    'clear colour alpha 1',
+    'clear',
+    `scissor ${rect}`,
+    'scissor on',
+    'post',
+    'scissor off',
+  ]);
+  // No area (nothing to bound, or no NEWT yet): the whole target, as before.
+  calls.length = 0;
+  retro.setBoxes(null);
+  retro.render(scene, camera);
+  assert.deepEqual(calls, ['target whole', 'clear colour alpha 0', 'clear', 'scene', 'canvas', 'post']);
 });

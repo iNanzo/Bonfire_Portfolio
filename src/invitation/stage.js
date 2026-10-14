@@ -23,16 +23,26 @@
 // (LAYERS.decal: rays and the shadow pass leave them out) and write no depth, so they make no
 // lines; main.js moves them (setBlob: stronger while he's lifted; the marker where the pointer
 // meets the floor). `bounds` is the play area (area.js: a fixed disc on the floor).
+//
+// Cost (round 14, profiled at 390x844@3 and 1280x800@1 with the CPU slowed 4×): the CPU side is
+// a millisecond or two a frame; the cost is texels, and at Native on a phone there are three
+// million. Each frame the stage hands the retro pass two boxes round NEWT (retro.js
+// subjectBoxes: his bounding sphere on screen, and the floor his shadow can fall on), so the post
+// shader's neighbour loops (the outer ring, the soft shadow) only run there. NEWT is found as
+// the scene's one child the stage didn't add (setSubject names him outright).
+
 import * as THREE from 'three';
 import { NEWT_HEIGHT, NEWT_RADIUS, playArea } from './area.js';
 import { lightDir } from './camera.js';
 import { frameView, texelGrid } from './pixels.js';
 import { FLOOR_SIZE, createFloor, fitShadow, floorLook } from './floor.js';
-import { createRetro, decalMaterial } from './retro.js';
+import { createRetro, decalMaterial, subjectBoxes } from './retro.js';
 
 export const LAYERS = { decal: 2 };
 /** The highest NEWT is carried, world units (his root): the shadow camera reaches over it. */
 export const LIFT = 2.2;
+/** NEWT's bounding sphere from his root: its centre this far up his body, this radius (world units). */
+export const SUBJECT = { up: NEWT_HEIGHT / 2, radius: NEWT_HEIGHT / 2 + 0.3 };
 const SHADOW_TYPES = { basic: THREE.BasicShadowMap, pcf: THREE.PCFShadowMap, vsm: THREE.VSMShadowMap };
 
 /**
@@ -156,6 +166,16 @@ export function createStage(container, { preset, look, insets, focus, onResize }
   let blobOpacity = { opacity: 0.16, lifted: 0.3 };
   /** The camera's yaw the light was last turned to. */
   let lightYaw = 0;
+  /** NEWT: the scene's child the stage didn't add (setSubject names him). */
+  let subject = /** @type {any} */ (null);
+  const own = new Set();
+  const up = new THREE.Vector3();
+  const centre = new THREE.Vector3();
+  const toLight = new THREE.Vector3();
+  /** The visible decals' corners this frame, for the pass's area (scratch: reused). */
+  const corners = Array.from({ length: 8 }, () => new THREE.Vector3());
+  /** @type {any[]} */
+  const extra = [];
 
   /**
    * The sun where the look puts it, turned with the camera's yaw and the look's own turn (Light
@@ -261,6 +281,38 @@ export function createStage(container, { preset, look, insets, focus, onResize }
   const hit = new THREE.Vector3();
   const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
+  own.add(floor.mesh).add(hemi).add(sun).add(sun.target).add(blob).add(marker);
+  /** NEWT, once he's in the scene (the one child the stage didn't add), or null. */
+  function subjectNow() {
+    if (subject?.parent === scene) return subject;
+    subject = null;
+    for (const o of scene.children) if (!own.has(o)) subject = o;
+    return subject;
+  }
+
+  /** The retro pass's boxes round NEWT this frame (retro.js subjectBoxes), or none before he's in. */
+  function placeBoxes() {
+    const s = subjectNow();
+    if (!s) return retro.setBoxes(null);
+    const m = s.matrixWorld.elements;
+    up.set(m[4], m[5], m[6]).normalize();
+    centre.setFromMatrixPosition(s.matrixWorld).addScaledVector(up, SUBJECT.up);
+    toLight.copy(sun.position).sub(sun.target.position).normalize();
+    // (The blob and the marker show over the floor wherever they are: the area takes them in.)
+    extra.length = 0;
+    for (const [i, d] of [blob, marker].entries()) {
+      if (!d.visible || !(d.material.opacity > 0)) continue;
+      const r = /** @type {any} */ (d.geometry).parameters.width / 2;
+      for (let j = 0; j < 4; j++)
+        extra.push(
+          corners[i * 4 + j].set(d.position.x + (j & 1 ? r : -r), d.position.y, d.position.z + (j & 2 ? r : -r)),
+        );
+    }
+    retro.setBoxes(
+      subjectBoxes({ center: centre, radius: SUBJECT.radius, light: toLight, camera, w: grid.w, h: grid.h, extra }),
+    );
+  }
+
   applyLook();
   resize();
 
@@ -342,6 +394,13 @@ export function createStage(container, { preset, look, insets, focus, onResize }
       applyLook();
       if (resized) resize();
     },
+    /**
+     * Name NEWT for the pass's boxes (without it, the one child of the scene the stage didn't add).
+     * @param {any} o  a THREE.Object3D
+     */
+    setSubject(o) {
+      subject = o;
+    },
     refit: resize,
     /**
      * The ray through a client point (on the canvas's own rect, which is larger than the
@@ -373,8 +432,9 @@ export function createStage(container, { preset, look, insets, focus, onResize }
      * everything that draws is in the scene. Resolves once they're ready.
      */
     warm: () => retro.warm(scene, camera),
-    /** Draw a frame: the shadow map once, the colour pass, the retro pass. */
+    /** Draw a frame: the shadow map once, the colour pass, the retro pass (its boxes round NEWT first). */
     render() {
+      placeBoxes();
       renderer.shadowMap.needsUpdate = true;
       retro.render(scene, camera);
     },
