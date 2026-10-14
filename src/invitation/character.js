@@ -58,7 +58,8 @@
 // The pixel atlas (pixel filter on): models/newt-atlas-pixel.png beside the glb
 // (tools/newt-atlas.mjs: his atlas in flat colours, the plaid redrawn in big black-and-white
 // checks), nearest and no mipmaps, on his atlas material while he's under ORIGINAL_ATLAS_TEXELS
-// tall in the default view (setResolution: main.js passes his texels as the grid changes); from
+// tall in the default view (setResolution: main.js passes his texels at the Pixel Size's own
+// grid, so neither the zoom nor the frame-time governor changes his shirt); from
 // there, and at Off, the glb's own atlas, whose real plaid has enough texels to resolve. Under
 // the pixel filter his atlas materials sample it the preset's `texture.mipBias` mip levels
 // coarser (atlasBias: a fallback glb atlas at a low resolution would alias into a patchwork),

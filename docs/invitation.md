@@ -247,8 +247,9 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   sheet whose cell matches his half face in texels (3 px at 16×16 up to 34); past 1.25 times
   the largest (`SMOOTH_FACE_OVER`: Native on a phone, or zoomed in) it shows the glb's smooth
   face again, as at Off. His shirt shows the bold pixel plaid (`newt-atlas-pixel.png`, `tools/newt-atlas.mjs`)
-  until he's `ORIGINAL_ATLAS_TEXELS` (128) texels tall in the default view, then the glb's own
-  plaid, sampled at the preset's `texture.fineMipBias`. It and the pixel
+  until he's `ORIGINAL_ATLAS_TEXELS` (128) texels tall in the default view at the Pixel Size's
+  own grid (stage.js hands main.js that grid as `home`: neither the zoom's bigger blocks nor the
+  governor's coarser ones change his shirt), then the glb's own plaid, sampled at the preset's `texture.fineMipBias`. It and the pixel
   atlas (`newt-atlas-pixel.png`) are asked for at the same time as the glb, and with the switch
   on the first frame waits for them (up to 3 s more), so NEWT never shows the blurred atlas and
   a blank face first; with it off the first frame doesn't wait.

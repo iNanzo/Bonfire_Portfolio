@@ -1559,6 +1559,48 @@ test.describe('on a 1429×1115 desktop', () => {
   });
 });
 
+test.describe('on a hi-DPI desktop', () => {
+  test.use({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+
+  test('with Pixel Shirt & Face on at 128×128 his shirt is the Pixel Size’s to decide: zoomed in (bigger blocks) or with the governor a step coarser, it keeps the real plaid', async ({
+    page,
+  }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '128', shader: { pixelArt: true } })),
+    );
+    await ready(page, '/invitation/?test&calm&seed=3');
+    const base = await snapshot(page);
+    // (He's about 156 texels tall here: the glb's own plaid, over ORIGINAL_ATLAS_TEXELS.)
+    expect(base.atlas).toBe('original');
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x + 200, body.y);
+    for (let i = 0; i < 6; i++) {
+      await page.mouse.wheel(0, -60);
+      await framesFor(page, 250);
+      const s = await snapshot(page);
+      expect(
+        s.atlas,
+        `zoomed ${(s.cameraHome.distance / s.camera.distance).toFixed(2)}×, ${s.pass.pd} px a texel`,
+      ).toBe('original');
+    }
+    expect((await snapshot(page)).pass.pd, 'the blocks grew with the zoom').toBeGreaterThan(base.pass.pd);
+    // The governor a level coarser (a busy page) changes the texels, not the shirt.
+    await ready(page, '/invitation/?test&calm&seed=3&govern');
+    await page.evaluate(() => {
+      const spin = () => {
+        if (window.__calm) return;
+        const t = performance.now();
+        while (performance.now() - t < 35);
+        requestAnimationFrame(spin);
+      };
+      requestAnimationFrame(spin);
+    });
+    await until(page, (s) => s.pass.governor.level === 1, 'a level coarser', 15_000);
+    expect((await snapshot(page)).atlas).toBe('original');
+    await page.evaluate(() => (window.__calm = true));
+  });
+});
+
 test.describe('on a small window', () => {
   // (Few texels at 32×32, so the frames are quick even on CI's software WebGL: only the busy
   // page below makes them slow.)

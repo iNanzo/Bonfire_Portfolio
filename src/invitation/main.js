@@ -158,6 +158,8 @@ let stage = null;
 let character = null;
 /** @type {import('./camera.js').OrbitState|null} */
 let orbit = null;
+/** His height in texels at the Pixel Size's own grid in the default view (his shirt goes by it). */
+let homeTexels = 0;
 if (webgl2()) {
   try {
     stage = createStage(stageEl, {
@@ -165,11 +167,13 @@ if (webgl2()) {
       look,
       insets,
       focus: focusInsets,
-      onResize: ({ grid, view }) => {
+      onResize: ({ view, home }) => {
         // (Pixel Size's steps are this screen's: two resolutions that draw alike here are one.)
         ui.setPixelSteps(screenSteps());
-        // (His shirt's plaid by how many texels tall he is, once he's in.)
-        character?.setResolution(newtTexels(view, grid));
+        // (His shirt's plaid by how many texels tall the Pixel Size makes him in the default
+        // view, once he's in: never the zoom's bigger blocks or the governor's coarser ones.)
+        homeTexels = newtTexels(view, home);
+        character?.setResolution(homeTexels);
         if (!orbit || !stage) return;
         orbitHome(orbit, view.distance);
         orbitSpan(orbit, stageSpan(stage));
@@ -347,7 +351,7 @@ function start(s) {
   })
     .then((c) => {
       character = c;
-      if (s.view) c.setResolution(newtTexels(s.view, s.grid));
+      c.setResolution(homeTexels);
       c.root.rotation.order = 'XZY'; // (the swing tilts him about the world's axes, after his yaw)
       s.scene.add(c.root);
       s.setSubject(c.root); // (the retro pass's boxes go round him: stage.js)
