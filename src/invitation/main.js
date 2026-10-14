@@ -349,9 +349,10 @@ function start(s) {
   };
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   canvas.addEventListener('pointerdown', (e) => {
-    // (Only the main button presses: a right or middle click, or a pen's barrel button, never
-    // holds him, orbits or walks him.)
-    if (e.pointerType !== 'touch' && e.button !== 0) return;
+    // (The mouse's left button holds, walks and pans, its right one orbits, its middle one pans
+    // (no autoscroll); any other button, or a second one, does nothing: gesture.js.)
+    if (e.pointerType !== 'touch' && (e.button > 2 || gesture.current())) return;
+    if (e.pointerType !== 'touch' && e.button === 1) e.preventDefault();
     const first = !gesture.current();
     if (first) pressKind = e.pointerType;
     try {
@@ -360,7 +361,7 @@ function start(s) {
       // (a pointer that's already gone)
     }
     const evs = gesture.down(
-      sample(e),
+      { ...sample(e), button: e.button },
       first && onNewt(e.clientX, e.clientY, e.pointerType === 'touch' ? TOUCH_SLOP : 0),
     );
     if (evs.some((g) => g.type === 'pinch')) orbitRelease(cam, Infinity); // (an orbit gives way to the pinch: no fling)

@@ -1,13 +1,16 @@
-// Pointer gestures for the invitation toy. One finger (or the mouse): a short, still press is a
-// tap (on NEWT or on the floor); a press on NEWT that moves more than moveTol CSS px or lasts
-// longer than holdMs is a grab, then drags, then a release; a press on empty space that moves
-// more than moveTol orbits the camera (each move's dx, dy), then a release; a cancel
-// (pointercancel or lostpointercapture) drops him and never taps. Two fingers pinch (the change
-// in their spread): a second finger landing on a press or an orbit turns it into a pinch, two-
-// finger gestures never tap or grab, and once one lifts the other does nothing until it lifts
-// too. While NEWT is held, other fingers are ignored. Plus where a ray meets a level plane, and
-// whether a point is on his screen shape (a head circle and a body capsule). Pure: CSS px and
-// seconds in, events out; the page owns the DOM and pointer capture.
+// Pointer gestures for the invitation toy. One finger (or the mouse's left button): a short,
+// still press is a tap (on NEWT or on the floor); a press on NEWT that moves more than moveTol
+// CSS px or lasts longer than holdMs is a grab, then drags, then a release; a press on empty
+// space that moves more than moveTol drags the camera (each move's dx, dy), then a release: a
+// finger's orbits it, the mouse's left button pans it. The mouse's right button orbits wherever
+// it's pressed (on NEWT too) and its middle one pans; neither grabs nor taps (a still right or
+// middle click does nothing). A cancel (pointercancel or lostpointercapture) drops him and never
+// taps. Two fingers pinch (the change in their spread) and, once their middle has strayed
+// moveTol, pan with it too: a second finger landing on a press or an orbit turns it into a
+// pinch, two-finger gestures never tap or grab, and once one lifts the other does nothing until
+// it lifts too. While NEWT is held, other fingers are ignored. Plus where a ray meets a level
+// plane or any plane, and whether a point is on his screen shape (a head circle and a body
+// capsule). Pure: CSS px and seconds in, events out; the page owns the DOM and pointer capture.
 
 /** @typedef {import('./types.js').Ptr} Ptr */
 /** @typedef {import('./types.js').GestureEvent} GestureEvent */
@@ -30,8 +33,10 @@ export function createGesture(opts = {}) {
   const floorHoldMs = opts.floorHoldMs ?? GESTURE.floorHoldMs;
   /**
    * The press being tracked. mode: 'press' (one finger), 'pinch' (two: `second` is the other),
-   * 'spent' (a finger left over from a pinch: it does nothing). ox, oy: an orbit's last point.
-   * @type {{id: number, on: 'newt'|'floor', mode: 'press'|'pinch'|'spent', x0: number, y0: number, t0: number, x: number, y: number, ox: number, oy: number, grabbed: boolean, moved: boolean, second: {id: number, x: number, y: number}|null, spread: number}|null}
+   * 'spent' (a finger left over from a pinch: it does nothing). drag: what a drag on empty space
+   * does ('orbit' or 'pan'); taps: whether a still press taps. ox, oy: a drag's last point (a
+   * pinch's: its middle's, once it pans).
+   * @type {{id: number, on: 'newt'|'floor', mode: 'press'|'pinch'|'spent', drag: 'orbit'|'pan', taps: boolean, x0: number, y0: number, t0: number, x: number, y: number, ox: number, oy: number, grabbed: boolean, moved: boolean, second: {id: number, x: number, y: number}|null, spread: number, panning: boolean}|null}
    */
   let press = null;
 
@@ -63,23 +68,33 @@ export function createGesture(opts = {}) {
   return {
     /**
      * A pointerdown; `onNewt` from the page's pick. A second finger on a press that isn't
-     * holding NEWT starts a pinch.
+     * holding NEWT starts a pinch. A mouse's (or pen's) button, `p.button`: the main one (0) is
+     * a finger's press but pans on empty space; the right one (2) orbits wherever it's pressed;
+     * the middle one (1) pans; no other starts anything.
      * @param {Ptr} p
      * @param {boolean} onNewt
      * @returns {GestureEvent[]}
      */
     down(p, onNewt) {
       if (press) {
-        if (press.mode === 'pinch' || press.grabbed || p.id === press.id) return [];
+        if (p.kind !== 'touch' || press.mode === 'pinch' || press.grabbed || p.id === press.id) return [];
         press.mode = 'pinch';
         press.second = { id: p.id, x: p.x, y: p.y };
         press.spread = spreadOf(press);
+        const m = middle(press);
+        press.ox = m.x;
+        press.oy = m.y;
         return [pinch(press, 1, p.t)];
       }
+      const touch = p.kind === 'touch';
+      const button = touch ? 0 : (p.button ?? 0);
+      if (button !== 0 && button !== 1 && button !== 2) return [];
       press = {
         id: p.id,
-        on: onNewt ? 'newt' : 'floor',
+        on: onNewt && button === 0 ? 'newt' : 'floor',
         mode: 'press',
+        drag: touch || button === 2 ? 'orbit' : 'pan',
+        taps: button === 0,
         x0: p.x,
         y0: p.y,
         t0: p.t,
@@ -91,6 +106,7 @@ export function createGesture(opts = {}) {
         moved: false,
         second: null,
         spread: 1,
+        panning: false,
       };
       return [];
     },
@@ -112,7 +128,16 @@ export function createGesture(opts = {}) {
         const spread = spreadOf(press);
         const scale = spread / press.spread;
         press.spread = spread;
-        return [pinch(press, scale, p.t)];
+        const out = [pinch(press, scale, p.t)];
+        // (The fingers' middle: once it strays moveTol from where the pinch began, it pans too.)
+        const m = middle(press);
+        if (!press.panning && strays(press.ox, press.oy, m.x, m.y)) press.panning = true;
+        if (press.panning && (m.x !== press.ox || m.y !== press.oy)) {
+          out.push(ev('pan', 'floor', m.x, m.y, p.t, { dx: m.x - press.ox, dy: m.y - press.oy }));
+          press.ox = m.x;
+          press.oy = m.y;
+        }
+        return out;
       }
       if (p.id !== press.id) return [];
       press.x = p.x;
@@ -128,7 +153,7 @@ export function createGesture(opts = {}) {
       } else {
         if (strays(press.x0, press.y0, p.x, p.y)) press.moved = true;
         if (press.moved) {
-          out.push(ev('orbit', 'floor', p.x, p.y, p.t, { dx: p.x - press.ox, dy: p.y - press.oy }));
+          out.push(ev(press.drag, 'floor', p.x, p.y, p.t, { dx: p.x - press.ox, dy: p.y - press.oy }));
           press.ox = p.x;
           press.oy = p.y;
         }
@@ -158,7 +183,7 @@ export function createGesture(opts = {}) {
         return [ev('tap', 'newt', p.x, p.y, p.t)];
       }
       if (q.moved || far) return [ev('release', 'floor', p.x, p.y, p.t)];
-      if (outlasts(q.t0, p.t, floorHoldMs)) return [];
+      if (!q.taps || outlasts(q.t0, p.t, floorHoldMs)) return [];
       return [ev('tap', 'floor', p.x, p.y, p.t)];
     },
     /**
@@ -191,22 +216,40 @@ export function createGesture(opts = {}) {
     },
     /**
      * The press being tracked, or null: its first finger, what it started on, whether it holds
-     * NEWT, orbits or pinches, and where it is (a pinch's middle).
+     * NEWT, orbits, pans (a two-finger pan too) or pinches, and where it is (a pinch's middle).
      */
     current() {
       if (!press) return null;
       const at = press.mode === 'pinch' ? middle(press) : { x: press.x, y: press.y };
+      const dragging = press.mode === 'press' && press.on === 'floor' && press.moved;
       return {
         id: press.id,
         on: press.on,
         grabbed: press.grabbed,
-        orbit: press.mode === 'press' && press.on === 'floor' && press.moved,
+        orbit: dragging && press.drag === 'orbit',
+        pan: (dragging && press.drag === 'pan') || (press.mode === 'pinch' && press.panning),
         pinch: press.mode === 'pinch',
         x: at.x,
         y: at.y,
       };
     },
   };
+}
+
+/**
+ * Where a ray meets a plane (`point` on it, `normal` across it), or null when it never does
+ * (parallel, or the plane behind the ray's origin).
+ * @param {import('./types.js').XYZ} o  origin
+ * @param {import('./types.js').XYZ} d  direction (any length)
+ * @param {{point: import('./types.js').XYZ, normal: import('./types.js').XYZ}} plane
+ * @returns {import('./types.js').XYZ|null}
+ */
+export function rayPlane(o, d, { point, normal }) {
+  const along = d.x * normal.x + d.y * normal.y + d.z * normal.z;
+  if (Math.abs(along) < 1e-9) return null;
+  const s = ((point.x - o.x) * normal.x + (point.y - o.y) * normal.y + (point.z - o.z) * normal.z) / along;
+  if (s < 0) return null;
+  return { x: o.x + s * d.x, y: o.y + s * d.y, z: o.z + s * d.z };
 }
 
 /**

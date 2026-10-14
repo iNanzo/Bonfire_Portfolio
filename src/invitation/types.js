@@ -31,16 +31,22 @@
  * @property {number} [r]
  */
 
-/** @typedef {{id: number, x: number, y: number, t: number, kind: string, buttons: number}} Ptr  a pointer sample, client px and seconds */
+/**
+ * @typedef {{id: number, x: number, y: number, t: number, kind: string, buttons: number, button?: number}} Ptr  a
+ *   pointer sample, client px and seconds; `button`, on a press: the one pressed (0 main, 1 middle, 2 right)
+ */
 /**
  * @typedef {object} GestureEvent
- * @property {'tap'|'grab'|'drag'|'release'|'cancel'|'hover'|'orbit'|'pinch'} type  orbit: a drag on empty space (it turns the camera); pinch: two fingers (they zoom it)
+ * @property {'tap'|'grab'|'drag'|'release'|'cancel'|'hover'|'orbit'|'pan'|'pinch'} type  orbit: a
+ *   finger's drag on empty space or the mouse's right-drag (it turns the camera); pan: the mouse's
+ *   left- or middle-drag on empty space, or two fingers' middle (it slides the view); pinch: two
+ *   fingers (they zoom it)
  * @property {'newt'|'floor'} on  what the press started on ('floor' for empty space and pinches)
  * @property {number} x  client px (a pinch: its fingers' middle)
  * @property {number} y
  * @property {number} t  seconds
  * @property {XZ|null} [floor]  where it meets the floor (filled in by the page)
- * @property {number} [dx]  an orbit's move since its last, CSS px
+ * @property {number} [dx]  an orbit's or a pan's move since its last, CSS px
  * @property {number} [dy]
  * @property {number} [scale]  a pinch's spread over its last (above 1: the fingers moved apart)
  */

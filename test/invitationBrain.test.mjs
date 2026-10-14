@@ -569,7 +569,7 @@ test('company resets the 20 s sit timer: a press, a button, or the pointer movin
   close(buttoned, 15 + TUNE.sitAfter, 0.1, 'a button');
 });
 
-test('turning or zooming the camera is company too, and never moves him or reacts', () => {
+test('turning, panning or zooming the camera is company too, and never moves him or reacts', () => {
   const quiet = { calm: false, tune: { idleMin: 999, idleMax: 999 } };
   const sitsAt = (poke) => {
     const s = sim(quiet);
@@ -580,12 +580,11 @@ test('turning or zooming the camera is company too, and never moves him or react
     s.until((o) => o.state === 'sitDown', 40);
     return s.w.t;
   };
-  const orbited = sitsAt((s) => {
-    s.frame({ events: [{ type: 'orbit', on: 'floor', x: 100, y: 100, dx: 12, dy: 0 }] });
-    s.frame({ events: [{ type: 'orbit', on: 'floor', x: 140, y: 100, dx: 40, dy: 0 }] });
-    s.frame({ events: [{ type: 'release', on: 'floor', x: 140, y: 100 }] });
-  });
-  assert.ok(orbited >= 15 + TUNE.sitAfter - 0.1, `an orbit (${orbited.toFixed(2)} s)`);
+  // (An orbit's or a pan's moves themselves, 40 px of them, with no release.)
+  for (const type of ['orbit', 'pan']) {
+    const at = sitsAt((s) => [100, 140].forEach((x) => s.frame({ events: [{ type, on: 'floor', x, y: 100 }] })));
+    assert.ok(at >= 15 + TUNE.sitAfter - 0.1, `${type} (${at.toFixed(2)} s)`);
+  }
   const pinched = sitsAt((s) => {
     s.frame({ events: [{ type: 'pinch', on: 'floor', x: 100, y: 100, scale: 1 }] });
     s.frame({ events: [{ type: 'pinch', on: 'floor', x: 100, y: 100, scale: 1.2 }] });
