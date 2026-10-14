@@ -843,14 +843,17 @@ test('adaptive pixels: with the camera zoomed (k: NEWT’s size over the default
     }
   }
   // A held block keeps through a small wobble of the zoom, so the grid doesn't flicker at a boundary.
-  // (390x844@3 at 64×64: 298 device px tall, ideal 4.66 a texel at k 1: 5.)
-  assert.equal(blockAt(64, 390, 844, 3, 1), 5);
-  const k45 = 4.5 / 4.66; // (ideal 4.5: rounds to 5 or 4 either side)
-  assert.equal(blockAt(64, 390, 844, 3, k45 * 0.98), 4, 'no hold: rounded');
-  assert.equal(blockAt(64, 390, 844, 3, k45 * 0.98, 5), 5, 'held at 5 a little past the boundary');
-  assert.equal(blockAt(64, 390, 844, 3, k45 * 0.9, 5), 4, 'clearly past it: 4');
-  assert.equal(blockAt(64, 390, 844, 3, k45 * 1.02, 4), 4, 'and held at 4 coming back');
-  assert.equal(texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: '64', zoom: k45 * 0.98, held: 5 }).pd, 5);
+  // (390x844@3 at 32×32: 298 device px tall, 9.32 a texel at k 1; ideal 6.5 at k 0.697.)
+  const k65 = 6.5 / ((PHONE_SHARE * 390 * 3) / 32);
+  assert.equal(blockAt(32, 390, 844, 3, k65 * 0.99), 6, 'no hold: rounded');
+  assert.equal(blockAt(32, 390, 844, 3, k65 * 0.99, 7), 7, 'held at 7 a little past the boundary');
+  assert.equal(blockAt(32, 390, 844, 3, k65 * 0.95, 7), 6, 'clearly past it: 6');
+  assert.equal(blockAt(32, 390, 844, 3, k65 * 1.01, 6), 6, 'and held at 6 coming back');
+  assert.equal(texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: '32', zoom: k65 * 0.99, held: 7 }).pd, 7);
+  // Back at the default view the grid is the Pixel Size's own, whatever was held on the way
+  // (390x844@3 at 128×128: 2 px a texel, ideal 2.33, a third of a block from 3).
+  for (const held of [1, 2, 3, 4]) assert.equal(blockAt(128, 390, 844, 3, 1, held), 2, `held ${held}`);
+  assert.equal(blockAt(128, 390, 844, 3, 1.005, 3), 2, 'within a hair of the default view too');
   // Odd k: a fallback of 1.
   for (const zoom of [0, -1, Number.NaN, Infinity])
     assert.equal(texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: '64', zoom }).pd, 5, `k ${zoom}: as at 1`);

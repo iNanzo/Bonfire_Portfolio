@@ -156,13 +156,16 @@ export const resolutionOf = (pixelSize) =>
 export const blockFor = (n, cssW, cssH, dpr) => Math.max(1, Math.round(newtDevicePx(cssW, cssH, dpr) / n));
 
 /** How far past a block's boundary (in blocks) the zoom goes before a held block gives way. */
-export const ZOOM_HOLD = 0.2;
+export const ZOOM_HOLD = 0.1;
+/** Within this of k 1 (the default view) the block is the Pixel Size's own, never a held one. */
+const HOME_ZOOM = 0.02;
 
 /**
  * Device px a texel at resolution `n` with the camera zoomed by `zoom` (k: NEWT's size on screen
  * over the default view's), so he stays about `n` texels tall at any zoom: whole pixels, at least
  * one. `held`, the block in use, is kept while the zoom is within ZOOM_HOLD of a block past its
- * boundary (a zoom wobbling across it would otherwise switch the grid back and forth).
+ * boundary (a zoom wobbling across it would otherwise switch the grid back and forth), except in
+ * the default view, which always draws the Pixel Size's own grid.
  * @param {number} n
  * @param {number} cssW
  * @param {number} cssH
@@ -174,7 +177,8 @@ export function blockAt(n, cssW, cssH, dpr, zoom = 1, held = 0) {
   const k = zoom > 0 && Number.isFinite(zoom) ? zoom : 1;
   const ideal = (newtDevicePx(cssW, cssH, dpr) * k) / n;
   const pd = Math.max(1, Math.round(ideal));
-  if (held >= 1 && held !== pd && Math.abs(ideal - held) <= 0.5 + ZOOM_HOLD) return held;
+  const home = Math.abs(k - 1) < HOME_ZOOM;
+  if (!home && held >= 1 && held !== pd && Math.abs(ideal - held) <= 0.5 + ZOOM_HOLD) return held;
   return pd;
 }
 

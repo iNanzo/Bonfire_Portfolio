@@ -110,7 +110,7 @@ another reason (one that only shows 30 frames a second) isn't made chunkier for 
     looks at shown in the middle of the space over the toolbar, or of the clear space above or
     beside the open Look sheet, `clearInsets`; and `blockAt`: zoomed by k, NEWT's size on screen
     over the default view's, a texel is `max(1, round(his height in device px × k / N))`, a block
-    in use held until the zoom is `ZOOM_HOLD` past the next, so it never flickers at a boundary),
+    in use held until the zoom is `ZOOM_HOLD` past the next, so it never flickers at a boundary, and the default view always drawn on the Pixel Size's own grid),
     `camera.js` (the orbit camera: yaw all the way
     round, three quarters of a turn for a drag across the whole stage and half a turn of tilt
     down its whole height, 12° to 70° up, half to twice the default distance, eased with a
