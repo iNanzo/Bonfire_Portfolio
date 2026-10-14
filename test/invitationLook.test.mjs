@@ -23,6 +23,7 @@ import {
   PHONE_SIDE,
   PIXEL_SIZES,
   RESOLUTIONS,
+  blockAt,
   blockFor,
   compactStage,
   newtDevicePx,
@@ -800,4 +801,46 @@ test('a finger on a slider: along it past the slop it drags the slider, up or do
   assert.equal(slideIntent(-3, 40), 'swipe', 'down');
   assert.equal(slideIntent(10, -10), 'swipe', 'diagonal: the sheet scrolls, the slider keeps its value');
   assert.equal(slideIntent(12, 11), 'drag', 'mostly along it');
+});
+
+test('adaptive pixels: with the camera zoomed (k: NEWT’s size over the default view’s) the texel follows, so he keeps the chosen sprite resolution, in whole device pixels; Native and Off never change', () => {
+  for (const [cssW, cssH, dpr] of SIZES) {
+    const at = `${cssW}x${cssH}@${dpr}`;
+    for (const n of [32, 64, 128]) {
+      const pixelSize = String(n);
+      const base = texelGrid({ cssW, cssH, dpr, pixelSize });
+      assert.equal(texelGrid({ cssW, cssH, dpr, pixelSize, zoom: 1 }).pd, base.pd, `${at} ${n}: k 1 is the default`);
+      for (const k of [0.5, 0.75, 1.5, 2, 3]) {
+        const g = texelGrid({ cssW, cssH, dpr, pixelSize, zoom: k });
+        const ideal = (newtDevicePx(cssW, cssH, dpr) * k) / n;
+        assert.ok(Number.isInteger(g.pd) && g.pd >= 1, `${at} ${n} k ${k}: whole device px`);
+        assert.equal(g.pd, Math.max(1, Math.round(ideal)), `${at} ${n} k ${k}`);
+        assert.equal(blockAt(n, cssW, cssH, dpr, k), g.pd);
+        // NEWT, k times as tall on screen, is still about n texels tall (all the pixels there are, under 1 px).
+        const tall = (newtDevicePx(cssW, cssH, dpr) * k) / g.pd;
+        if (ideal >= 1.5) assert.ok(tall / n > 0.7 && tall / n < 1.4, `${at} ${n} k ${k}: ${tall.toFixed(1)} texels`);
+        assert.equal(g.zoom, k);
+      }
+    }
+    // Zoomed in, the blocks are bigger; zoomed out, smaller (never under a device pixel).
+    const p = (k) => texelGrid({ cssW, cssH, dpr, pixelSize: '32', zoom: k }).pd;
+    assert.ok(p(2) > p(1) && p(1) > p(0.5), `${at}: ${p(0.5)} ${p(1)} ${p(2)}`);
+    for (const pixelSize of /** @type {const} */ (['native', 'off'])) {
+      const a = texelGrid({ cssW, cssH, dpr, pixelSize });
+      const b = texelGrid({ cssW, cssH, dpr, pixelSize, zoom: 2.5 });
+      assert.deepEqual([b.pd, b.w, b.h, b.dpr], [a.pd, a.w, a.h, a.dpr], `${at} ${pixelSize}: unaffected`);
+    }
+  }
+  // A held block keeps through a small wobble of the zoom, so the grid doesn't flicker at a boundary.
+  // (390x844@3 at 64×64: 298 device px tall, ideal 4.66 a texel at k 1: 5.)
+  assert.equal(blockAt(64, 390, 844, 3, 1), 5);
+  const k45 = 4.5 / 4.66; // (ideal 4.5: rounds to 5 or 4 either side)
+  assert.equal(blockAt(64, 390, 844, 3, k45 * 0.98), 4, 'no hold: rounded');
+  assert.equal(blockAt(64, 390, 844, 3, k45 * 0.98, 5), 5, 'held at 5 a little past the boundary');
+  assert.equal(blockAt(64, 390, 844, 3, k45 * 0.9, 5), 4, 'clearly past it: 4');
+  assert.equal(blockAt(64, 390, 844, 3, k45 * 1.02, 4), 4, 'and held at 4 coming back');
+  assert.equal(texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: '64', zoom: k45 * 0.98, held: 5 }).pd, 5);
+  // Odd k: a fallback of 1.
+  for (const zoom of [0, -1, Number.NaN, Infinity])
+    assert.equal(texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: '64', zoom }).pd, 5, `k ${zoom}: as at 1`);
 });

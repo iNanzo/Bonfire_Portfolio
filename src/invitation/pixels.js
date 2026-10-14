@@ -13,6 +13,12 @@
 // hides the overhang). Pixel Size Off is the smooth picture without the pixel look, drawn at
 // the screen's resolution with its DPR capped at OFF_DPR.
 //
+// The zoom: with the camera zoomed in or out (k, NEWT's size on screen over the default view's:
+// stage.js setZoomScale) the texel follows, round(his height in device px × k ÷ N) (blockAt), so
+// he keeps the chosen sprite resolution at any zoom, bigger blocks zoomed in, still whole device
+// pixels; a block in use is held until the zoom is clearly past the next one (ZOOM_HOLD), so the
+// grid never flickers at a boundary. Native and Off never change with it.
+//
 // The framing: a camera 36° up, low enough that his cap's brim leaves his face showing once he
 // looks toward the camera (from 48° it hid the whole face; at 36° his look lifts his head the
 // rest of the way: the highest angle at which his eyes read on a 390×844 phone), and 20° of
@@ -49,6 +55,7 @@
 /**
  * @typedef {object} Grid  the canvas in texels
  * @property {number} pd  device pixels per texel (1 at Native and Off)
+ * @property {number} zoom  the camera's zoom it was sized for (k: 1 in the default view)
  * @property {number} w  texels across
  * @property {number} h  texels down
  * @property {number} dpr  the device pixel ratio drawn at (capped at OFF_DPR at Off)
@@ -144,6 +151,29 @@ export const resolutionOf = (pixelSize) =>
  */
 export const blockFor = (n, cssW, cssH, dpr) => Math.max(1, Math.round(newtDevicePx(cssW, cssH, dpr) / n));
 
+/** How far past a block's boundary (in blocks) the zoom goes before a held block gives way. */
+export const ZOOM_HOLD = 0.2;
+
+/**
+ * Device px a texel at resolution `n` with the camera zoomed by `zoom` (k: NEWT's size on screen
+ * over the default view's), so he stays about `n` texels tall at any zoom: whole pixels, at least
+ * one. `held`, the block in use, is kept while the zoom is within ZOOM_HOLD of a block past its
+ * boundary (a zoom wobbling across it would otherwise switch the grid back and forth).
+ * @param {number} n
+ * @param {number} cssW
+ * @param {number} cssH
+ * @param {number} dpr
+ * @param {number} [zoom]
+ * @param {number} [held]
+ */
+export function blockAt(n, cssW, cssH, dpr, zoom = 1, held = 0) {
+  const k = zoom > 0 && Number.isFinite(zoom) ? zoom : 1;
+  const ideal = (newtDevicePx(cssW, cssH, dpr) * k) / n;
+  const pd = Math.max(1, Math.round(ideal));
+  if (held >= 1 && held !== pd && Math.abs(ideal - held) <= 0.5 + ZOOM_HOLD) return held;
+  return pd;
+}
+
 /**
  * The Pixel Sizes a stage `cssW` × `cssH` at `dpr` lists, coarse to fine, then Native, then Off:
  * one a block size. Two resolutions that come to the same block here draw the same picture, so
@@ -221,11 +251,12 @@ const RAD = Math.PI / 180;
 
 /**
  * The canvas's texel grid for a stage `cssW` × `cssH` at `dpr` (`devW`/`devH`: the stage in
- * device pixels where the browser measured them, devicePixelContentBoxSize).
- * @param {{cssW: number, cssH: number, dpr: number, pixelSize: PixelSize, devW?: number, devH?: number}} o
+ * device pixels where the browser measured them, devicePixelContentBoxSize), with the camera
+ * zoomed by `zoom` (blockAt: at a resolution, the texel follows it; `held`, the block in use).
+ * @param {{cssW: number, cssH: number, dpr: number, pixelSize: PixelSize, devW?: number, devH?: number, zoom?: number, held?: number}} o
  * @returns {Grid}
  */
-export function texelGrid({ cssW, cssH, dpr, pixelSize, devW, devH }) {
+export function texelGrid({ cssW, cssH, dpr, pixelSize, devW, devH, zoom = 1, held = 0 }) {
   cssW = Math.max(1, cssW);
   cssH = Math.max(1, cssH);
   // (The resolution: NEWT about N texels tall; Native a texel a device pixel at the real DPR;
@@ -238,10 +269,11 @@ export function texelGrid({ cssW, cssH, dpr, pixelSize, devW, devH }) {
   const near = (dev, css) => !off && dev > 0 && Math.abs(dev - css * d) <= Math.max(2, d);
   const dw = near(devW, cssW) ? devW : cssW * d;
   const dh = near(devH, cssH) ? devH : cssH * d;
-  const pd = n === null ? 1 : blockFor(n, cssW, cssH, d);
+  const k = zoom > 0 && Number.isFinite(zoom) ? zoom : 1;
+  const pd = n === null ? 1 : blockAt(n, cssW, cssH, d, k, held);
   const w = Math.max(1, Math.ceil(dw / pd - 1e-6));
   const h = Math.max(1, Math.ceil(dh / pd - 1e-6));
-  return { pd, w, h, dpr: d, canvasW: (w * pd) / d, canvasH: (h * pd) / d, off };
+  return { pd, w, h, dpr: d, canvasW: (w * pd) / d, canvasH: (h * pd) / d, off, zoom: k };
 }
 
 /** Where a camera at `distance` and `elevation` above `target` sits. */
@@ -288,13 +320,14 @@ function newtBox(view) {
 }
 
 /**
- * NEWT's height in texels, standing where he starts (the origin).
+ * NEWT's height in texels, standing where he starts (the origin), at the camera's zoom the grid
+ * was sized for (`view` is the default view; zoomed by k he's k times as tall on screen).
  * @param {View} view
  * @param {Grid} grid
  */
 export function newtTexels(view, grid) {
   const { top, bottom } = newtBox(view);
-  return ((bottom - top) * grid.h) / view.canvasH;
+  return (((bottom - top) * grid.h) / view.canvasH) * (grid.zoom > 0 ? grid.zoom : 1);
 }
 
 /**

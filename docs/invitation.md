@@ -42,7 +42,7 @@ the sheet and leaves the slider as it was.
 
 | Setting | Choices | What it does |
 | --- | --- | --- |
-| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn about 64 pixels tall, on any screen. A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 128×128 is the default (on a 1280×800 desktop it draws as Native, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there. **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier. His shirt shows its real plaid and his face is the smooth one at every resolution, unless Pixel Shirt & Face (under Shader) is on. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
+| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn about 64 pixels tall, on any screen. A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 128×128 is the default (on a 1280×800 desktop it draws as Native, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there. **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier, and zooming the camera in or out takes his pixels with him (bigger blocks zoomed in), so he keeps the resolution you chose at any zoom; Native and Off don't change with the zoom. His shirt shows its real plaid and his face is the smooth one at every resolution, unless Pixel Shirt & Face (under Shader) is on. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
 | Dithering | On, Off | The checkered blend between colours (how strong: Dither Strength, under Shader). |
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow; how dark, its colour and where: under Shader). |
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows): Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight. DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
@@ -78,7 +78,9 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
   - Browser-only and thin: `main.js` (boot, the loop, the wiring in `types.js`'s frame
     order), `stage.js` (renderer at texel size, the camera with its off-centre projection,
     lights and shadows, the blob shadow and the floor marker, and each frame the boxes round
-    NEWT the retro pass keeps its work to), `floor.js` (no room: an
+    NEWT the retro pass keeps its work to; `setZoomScale(k)`, which main.js calls with the
+    orbit's home distance over its distance, sizes the texel to the zoom, refitting the grid only
+    when the block changes), `floor.js` (no room: an
     invisible floor that only catches his shadows, a `ShadowMaterial`, over the preset's
     background; and the shadow camera's fit), `character.js` (NEWT's materials, clips with
     twins for restarts, look-at and faces),
@@ -99,7 +101,10 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
     or 0.255 of a phone's, a stage whose short side is under 600 CSS px (99 CSS px, and 149
     texels at the default 128×128, on a 390-wide phone), whatever the Pixel Size, the point it
     looks at shown in the middle of the space over the toolbar, or of the clear space above or
-    beside the open Look sheet, `clearInsets`), `camera.js` (the orbit camera: yaw all the way
+    beside the open Look sheet, `clearInsets`; and `blockAt`: zoomed by k, NEWT's size on screen
+    over the default view's, a texel is `max(1, round(his height in device px × k / N))`, a block
+    in use held until the zoom is `ZOOM_HOLD` past the next, so it never flickers at a boundary),
+    `camera.js` (the orbit camera: yaw all the way
     round, three quarters of a turn for a drag across the whole stage and half a turn of tilt
     down its whole height, 12° to 70° up, half to twice the default distance, eased with a
     little coast, following NEWT as it zooms in, and 0.8 of the way at the default zoom on a
@@ -155,7 +160,7 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
   cell width, or `'smooth'`, as at Off), `faceTexels`, `atlas`: `'pixel'` or `'original'`,
   `shader`: every Shader option's value, `custom`: whether one is the user's, `pass`: what
   reached the renderer (the post shader's values, the light's strength and angle, the shadow's
-  strength), and `warmed`: the pass's other path compiled),
+  strength, `zoom`: the zoom the texels follow, `pd`: device px a texel as drawn), and `warmed`: the pass's other path compiled),
   `screen('head'|'body'|'feet')` (a point on him in client px, to tap), `floorAt(x, y)`,
   `feet()` (his ankles, to measure foot slide), `bones()` (his bones from his root) and
   `play(clip)` (Walk and Run step in place at their own pace). `?seed=N` makes the randomness

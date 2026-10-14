@@ -30,11 +30,16 @@
 // subjectBoxes: his bounding sphere on screen, and the floor his shadow can fall on), so the post
 // shader's neighbour loops (the outer ring, the soft shadow) only run there. NEWT is found as
 // the scene's one child the stage didn't add (setSubject names him outright).
+//
+// Adaptive pixels: setZoomScale(k), k NEWT's size on screen over the default view's (main.js
+// passes the orbit's home distance over its distance), sizes the texel to follow the zoom
+// (pixels.js blockAt), so he keeps the chosen sprite resolution at any zoom; the grid is only
+// refitted when the block changes. Native and Off never change with it.
 
 import * as THREE from 'three';
 import { NEWT_HEIGHT, NEWT_RADIUS, playArea } from './area.js';
 import { lightDir } from './camera.js';
-import { frameView, texelGrid } from './pixels.js';
+import { blockAt, frameView, resolutionOf, texelGrid } from './pixels.js';
 import { FLOOR_SIZE, createFloor, fitShadow, floorLook } from './floor.js';
 import { createRetro, decalMaterial, subjectBoxes } from './retro.js';
 
@@ -43,6 +48,8 @@ export const LAYERS = { decal: 2 };
 export const LIFT = 2.2;
 /** NEWT's bounding sphere from his root: its centre this far up his body, this radius (world units). */
 export const SUBJECT = { up: NEWT_HEIGHT / 2, radius: NEWT_HEIGHT / 2 + 0.3 };
+/** The zoom setZoomScale takes, as a range (k: NEWT's size on screen over the default view's). */
+export const ZOOM_RANGE = { min: 0.125, max: 8 };
 const SHADOW_TYPES = { basic: THREE.BasicShadowMap, pcf: THREE.PCFShadowMap, vsm: THREE.VSMShadowMap };
 
 /**
@@ -166,6 +173,12 @@ export function createStage(container, { preset, look, insets, focus, onResize }
   let blobOpacity = { opacity: 0.16, lifted: 0.3 };
   /** The camera's yaw the light was last turned to. */
   let lightYaw = 0;
+  /** The camera's zoom (setZoomScale: NEWT's size on screen over the default view's). */
+  let zoom = 1;
+  /** The block the zoom holds (pixels.js blockAt's `held`: 0, none yet). */
+  let heldBlock = 0;
+  /** The stage as last measured: CSS px and the device pixel ratio. */
+  let size = { cssW: 1, cssH: 1, dpr: 1 };
   /** NEWT: the scene's child the stage didn't add (setSubject names him). */
   let subject = /** @type {any} */ (null);
   const own = new Set();
@@ -237,6 +250,18 @@ export function createStage(container, { preset, look, insets, focus, onResize }
     }
   }
 
+  /** The grid for the stage as measured, the zoom and the block it holds. */
+  function gridNow() {
+    return texelGrid({
+      ...size,
+      pixelSize: current.look.pixelSize,
+      devW: device?.w,
+      devH: device?.h,
+      zoom,
+      held: heldBlock,
+    });
+  }
+
   /** Size the canvas, the pass and the camera to the stage. */
   function resize() {
     const cssW = container.clientWidth;
@@ -244,7 +269,9 @@ export function createStage(container, { preset, look, insets, focus, onResize }
     if (!cssW || !cssH) return;
     const dpr = window.devicePixelRatio || 1;
     const was = grid;
-    grid = texelGrid({ cssW, cssH, dpr, pixelSize: current.look.pixelSize, devW: device?.w, devH: device?.h });
+    size = { cssW, cssH, dpr };
+    grid = gridNow();
+    heldBlock = grid.pd;
     // (Setting a canvas's size clears it, even to the same size: a refit that only moves the
     // view, the Look sheet opening, keeps the picture until the next frame.)
     if (!view || grid.w !== was.w || grid.h !== was.h) {
@@ -380,6 +407,9 @@ export function createStage(container, { preset, look, insets, focus, onResize }
         tint: u.uTint.value.getHexString(THREE.LinearSRGBColorSpace),
         light: sun.intensity,
         turn: deg === -180 ? 180 : deg,
+        // (The grid as drawn: the zoom it follows, device px a texel.)
+        zoom,
+        pd: grid.pd,
       };
     },
     /**
@@ -388,11 +418,33 @@ export function createStage(container, { preset, look, insets, focus, onResize }
      * @param {import('./look.js').Look} l
      */
     setLook(p, l) {
-      // (Only the Pixel Size changes the grid: every Style draws on the same one.)
+      // (Only the Pixel Size changes the grid: every Style draws on the same one. A new one
+      // starts the governor afresh: the user's choice shows first.)
       const resized = l.pixelSize !== current.look.pixelSize;
       current = { preset: p, look: l };
       applyLook();
-      if (resized) resize();
+      if (!resized) return;
+      heldBlock = 0;
+      resize();
+    },
+    /**
+     * The camera's zoom: k, NEWT's size on screen over the default view's (the orbit's home
+     * distance over its distance). At a resolution the texel follows it (pixels.js blockAt), so
+     * he keeps the chosen sprite resolution; the grid is refitted only when the block changes.
+     * Native and Off don't change. Cheap to call every frame.
+     * @param {number} k
+     */
+    setZoomScale(k) {
+      const next = k > 0 && Number.isFinite(k) ? Math.min(ZOOM_RANGE.max, Math.max(ZOOM_RANGE.min, k)) : 1;
+      if (next === zoom) return;
+      zoom = next;
+      const n = resolutionOf(current.look.pixelSize);
+      if (n !== null && blockAt(n, size.cssW, size.cssH, size.dpr, zoom, heldBlock) !== heldBlock) resize();
+      else grid.zoom = zoom;
+    },
+    /** The camera's zoom the stage has (setZoomScale's k). */
+    get zoomScale() {
+      return zoom;
     },
     /**
      * Name NEWT for the pass's boxes (without it, the one child of the scene the stage didn't add).

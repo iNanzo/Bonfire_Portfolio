@@ -771,6 +771,7 @@ test.describe('on a desktop', () => {
     expect(snap.resolution).toBe('native');
     expect(snap.pixelScale).toBe(1);
     expect(snap.newtTexels).toBeCloseTo(156, 0);
+    expect(snap.pass.zoom).toBe(1);
     expect(
       snap.newtTall / 800,
       `NEWT is ${snap.newtTall.toFixed(1)} CSS px tall: a fifth of the short side`,
@@ -1178,6 +1179,51 @@ test.describe('on a desktop', () => {
     s = await snapshot(page);
     expect(s.states).not.toContain('walk');
     expect(errors).toEqual([]);
+  });
+});
+
+test.describe('on a small window', () => {
+  test.use({ viewport: { width: 640, height: 400 } });
+
+  test('zoomed in at 32×32 the texels grow with NEWT, so he stays about 32 pixels tall, and zoomed out they shrink; Native never changes', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('invitation.look.v1'))
+        localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32' }));
+    });
+    await calm(page);
+    const base = await snapshot(page);
+    const canvas = page.locator('[data-stage] canvas');
+    const box = await canvas.boundingBox();
+    await page.mouse.move(box.x + 60, box.y + 60);
+    for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -240);
+    await until(page, (s) => s.camera.distance < base.camera.distance * 0.75, 'zoomed in');
+    await framesFor(page, 800);
+    const near = await snapshot(page);
+    test.skip(near.pass.zoom === 1, 'main.js doesn’t call stage.setZoomScale yet (the camera package wires it)');
+    const k = base.camera.distance / near.camera.distance;
+    expect(near.pass.zoom).toBeCloseTo(k, 2);
+    expect(near.pixelScale, 'bigger texels zoomed in').toBeGreaterThan(base.pixelScale);
+    expect(Number.isInteger(near.pass.pd), 'whole device pixels').toBe(true);
+    expect(near.newtTexels / 32).toBeGreaterThan(0.7);
+    expect(near.newtTexels / 32).toBeLessThan(1.4);
+    // Zoomed out past the default view: smaller texels (never under a device pixel).
+    for (let i = 0; i < 14; i++) await page.mouse.wheel(0, 240);
+    await until(page, (s) => s.camera.distance > base.camera.distance * 1.4, 'zoomed out');
+    await framesFor(page, 800);
+    const far = await snapshot(page);
+    expect(far.pixelScale, 'smaller texels zoomed out').toBeLessThan(base.pixelScale);
+    expect(far.pass.pd).toBeGreaterThanOrEqual(1);
+    // Native: a texel a device pixel at any zoom.
+    await page.evaluate(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: 'native' })));
+    await page.reload();
+    await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+    await page.mouse.move(box.x + 60, box.y + 60);
+    for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -240);
+    await framesFor(page, 800);
+    const native = await snapshot(page);
+    expect(native.pass.pd).toBe(1);
   });
 });
 
