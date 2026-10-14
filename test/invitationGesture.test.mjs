@@ -139,6 +139,24 @@ test('only the first pointer counts while NEWT is held, and once the first lets 
   assert.deepEqual(types(g.up(P(2, 0, 0, 1.1))), ['tap']);
 });
 
+test('the press under way says where it began as well as where it is now: a grab comes only once it has strayed, so the page takes his grip from where it began', () => {
+  const g = createGesture();
+  g.down(M(400, 300, 0), true);
+  assert.deepEqual([g.current().x0, g.current().y0], [400, 300]);
+  assert.deepEqual(types(g.move(M(420, 300, 0.008))), ['grab', 'drag'], 'a quick drag: grabbed 20 px on');
+  g.move(M(440, 296, 0.016));
+  const c = g.current();
+  assert.equal(c.grabbed, true);
+  assert.deepEqual([c.x0, c.y0], [400, 300], 'where the press began');
+  assert.deepEqual([c.x, c.y], [440, 296], 'and where it is');
+  g.up(M(440, 296, 0.02, 0, { buttons: 0 }));
+  // Held still past holdMs instead: the same, where it began.
+  g.down(P(2, 50, 60, 1), true);
+  g.move(P(2, 53, 64, 1.1));
+  assert.deepEqual(types(g.tick(1.3)), ['grab']);
+  assert.deepEqual([g.current().x0, g.current().y0], [50, 60]);
+});
+
 test('a finger on empty space that drags more than 10 px orbits: each move gives its dx and dy, and letting go releases it', () => {
   const g = createGesture();
   g.down(P(1, 100, 100, 0), false);

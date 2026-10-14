@@ -660,8 +660,11 @@ function start(s) {
     const press = gesture.current();
     if (press?.grabbed) {
       if (!grip) {
+        // (The point pressed, where the press began: a grab comes only once the press has strayed
+        // moveTol or more, and nothing moved him before it, so the point under the cursor now is
+        // not the one grabbed. From the press, the first frame carries him the whole way.)
         const collar = c.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
-        grip = gripFor(s.ray(press.x, press.y), dragPlane(s.camera.position, collar), collar, t);
+        grip = gripFor(s.ray(press.x0, press.y0), dragPlane(s.camera.position, collar), collar, t);
       }
       const lift = pressKind === 'touch' ? FINGER_LIFT * Math.min(1, (t - grip.t0) / CARRY.liftIn) : 0;
       target = dragTarget(grip, s.ray(press.x, press.y - lift), t, hangY);

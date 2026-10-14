@@ -1409,6 +1409,42 @@ test.describe('on a desktop', () => {
     expect(errors).toEqual([]);
   });
 
+  test('a quick press-and-drag that never holds still carries him the whole way: the point pressed stays under the cursor, as after a still hold', async ({
+    page,
+  }) => {
+    /**
+     * Presses his body and goes 80 px across in four quick moves (`hold`: once he's held, as a
+     * still press makes him); his head's move once he's settled, and where the grabbed point shows.
+     */
+    const carry = async (hold) => {
+      await calm(page);
+      const body = await on(page, 'body');
+      const head = await on(page, 'head');
+      await page.mouse.move(body.x, body.y);
+      await page.mouse.down();
+      if (hold) await until(page, (s) => s.held, 'held');
+      for (let i = 1; i <= 4; i++) await page.mouse.move(body.x + i * 20, body.y);
+      await until(page, (s) => s.held, 'held');
+      await framesFor(page, 1000);
+      const now = await on(page, 'head');
+      const grabbed = await page.evaluate(() => window.__invitation.grabbed());
+      await page.mouse.up();
+      return { dx: now.x - head.x, dy: now.y - head.y, grabbed, cursor: { x: body.x + 80, y: body.y } };
+    };
+    const still = await carry(true);
+    const quick = await carry(false);
+    expect(
+      Math.abs(quick.dx - still.dx),
+      `quick: ${quick.dx.toFixed(1)} px across; held first: ${still.dx.toFixed(1)}`,
+    ).toBeLessThan(5);
+    expect(
+      Math.abs(quick.dy - still.dy),
+      `quick: ${quick.dy.toFixed(1)} px down; held first: ${still.dy.toFixed(1)}`,
+    ).toBeLessThan(5);
+    const off = Math.hypot(quick.grabbed.x - quick.cursor.x, quick.grabbed.y - quick.cursor.y);
+    expect(off, 'the point pressed under the cursor').toBeLessThan(2);
+  });
+
   test('where he looks with a mouse: up at a cursor high over him, his face toward a cursor in front of him, a profile for one level with his head off to the side', async ({
     page,
   }) => {

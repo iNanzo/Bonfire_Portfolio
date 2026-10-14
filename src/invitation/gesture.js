@@ -216,7 +216,9 @@ export function createGesture(opts = {}) {
     },
     /**
      * The press being tracked, or null: its first finger, what it started on, whether it holds
-     * NEWT, orbits, pans (a two-finger pan too) or pinches, and where it is (a pinch's middle).
+     * NEWT, orbits, pans (a two-finger pan too) or pinches, where it is (a pinch's middle) and
+     * where its first finger pressed (x0, y0: a grab comes only once a press has strayed, so the
+     * point he's held by is the one pressed, not the one it strayed to).
      */
     current() {
       if (!press) return null;
@@ -231,6 +233,8 @@ export function createGesture(opts = {}) {
         pinch: press.mode === 'pinch',
         x: at.x,
         y: at.y,
+        x0: press.x0,
+        y0: press.y0,
       };
     },
   };
