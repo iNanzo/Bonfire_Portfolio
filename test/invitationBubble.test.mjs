@@ -112,6 +112,78 @@ test('wherever he is, the bubble never leaves the space (when it fits)', () => {
   }
 });
 
+/**
+ * A line's size wrapped to at most `maxW` CSS px wide: 178 px of text in 24 px of padding and
+ * border, 20 px a row and 20 px more (bubble.css's 16 px Pixelify Sans, near enough).
+ */
+const fitLine =
+  (text = 178) =>
+  (maxW) => {
+    const w = Math.min(text + 24, Math.floor(maxW));
+    return { w, h: 20 + 20 * Math.ceil(text / Math.max(1, w - 24)) };
+  };
+
+test('lifted to the top of a phone, a line too wide to go beside his head narrows to fit the side with more room (wrapping onto more rows) rather than go over his body; with no room there either, it goes under his feet', () => {
+  const toolbar = { left: 0, top: 774, right: 390, bottom: 844 };
+  const region = clearRegion(PHONE, [toolbar]);
+  const fit = fitLine();
+  const size = fit(Infinity);
+  assert.equal(size.w, 202, 'the line’s own width');
+  // His head at the top (no room above), in the middle: 150 px or so each side, under 202.
+  for (const head of [
+    { x: 200, y: 44, r: 22 },
+    { x: 195, y: 20, r: 16 },
+    { x: 170, y: 70, r: 28 },
+  ]) {
+    const feet = head.y + 120;
+    const b = placeBubble({ point: head, size, region, fit, under: feet });
+    const at = `head at (${head.x}, ${head.y})`;
+    assert.ok(b.tail === 'left' || b.tail === 'right', `${at}: beside him (${b.tail})`);
+    assert.ok(b.w < size.w && b.h > size.h, `${at}: narrower and taller (${b.w}×${b.h})`);
+    assert.equal(b.maxW, b.w, `${at}: the width it was wrapped to`);
+    inside({ x: b.x, y: b.y, w: b.w, h: b.h }, region, at);
+    // Clear of all of him: his head, and his body straight down under it to his feet.
+    const clear = b.tail === 'left' ? b.x >= head.x + head.r : b.x + b.w <= head.x - head.r;
+    assert.ok(clear, `${at}: off his head and body: ${JSON.stringify(b)}`);
+  }
+  // A short line still goes beside him as it is.
+  const short = fitLine(40);
+  const s = placeBubble({ point: { x: 200, y: 44, r: 22 }, size: short(Infinity), region, fit: short, under: 164 });
+  assert.equal(s.w, 64);
+  assert.equal(s.maxW, null, 'its own width');
+  // A stage too narrow even for that: under his feet, its tail up at him, never over him.
+  const narrow = clearRegion({ left: 0, top: 0, right: 260, bottom: 600 }, []);
+  const u = placeBubble({ point: { x: 130, y: 30, r: 20 }, size, region: narrow, fit, under: 140 });
+  assert.equal(u.tail, 'up');
+  assert.equal(u.y, 140 + BUBBLE.gap + BUBBLE.tail, 'under his feet');
+  // Without his feet it goes under his head, as before.
+  assert.equal(
+    placeBubble({ point: { x: 130, y: 30, r: 20 }, size, region: narrow }).y,
+    30 + 20 + BUBBLE.gap + BUBBLE.tail,
+  );
+});
+
+test('wherever he is, with the line wrapping to fit and his feet known, the bubble stays in the space and off him when it can', () => {
+  const rng = createRng(7);
+  const sheet = { left: 0, top: 500, right: 390, bottom: 844 };
+  for (const region of [clearRegion(PHONE, []), clearRegion(PHONE, [sheet])]) {
+    for (let i = 0; i < 500; i++) {
+      const fit = fitLine(30 + rng() * 300);
+      const size = fit(Infinity);
+      const point = { x: rng() * 390, y: -60 + rng() * 600, r: 10 + rng() * 30 };
+      const under = point.y + point.r + 40 + rng() * 200;
+      const b = placeBubble({ point, size, region, fit, under });
+      assert.ok(b.w <= size.w && b.w > 0 && b.h > 0, `${i}: its size`);
+      if (b.tail !== 'none') inside({ x: b.x, y: b.y, w: b.w, h: b.h }, region, `${i}`);
+      if (b.tail === 'down') assert.ok(b.y + b.h + BUBBLE.tail <= point.y - point.r + 0.5);
+      if (b.tail === 'left') assert.ok(b.x >= point.x + point.r - 0.5);
+      if (b.tail === 'right') assert.ok(b.x + b.w <= point.x - point.r + 0.5);
+      if (b.tail === 'up') assert.ok(b.y - BUBBLE.tail >= under - 0.5, `${i}: under his feet`);
+      if (b.maxW !== null) assert.ok(b.maxW >= BUBBLE.minW, `${i}: never narrower than ${BUBBLE.minW}`);
+    }
+  }
+});
+
 test('what it points at: his head, or nothing (out of sight) while something covers his head’s middle', () => {
   const head = { x: 195, y: 300, r: 14 };
   assert.equal(speakerPoint(head), head, 'nothing over him');

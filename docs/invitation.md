@@ -14,7 +14,8 @@ unlisted: nothing links to it and search engines are asked not to index it.
 - **Tap him** and he waves or gets startled (a jump, arms flung up). Tap him a lot and he gets
   stressed and runs away from your finger; he's never too fast to catch.
 - **Drag him** to pick him up by the collar. The spot you grabbed stays right under your
-  cursor (a finger carries him a little above itself, so it doesn't hide him): move up and he
+  cursor (a finger carries him a little above itself, so it doesn't hide him, and near the top
+  of the screen no higher than keeps his head on it): move up and he
   rises, high off the floor if you like; move across and he goes across. He dangles and swings;
   let go and he falls, lands and gets back up. Flick him and he flies a little; let go while
   pushing him against the edge of his patch and he just drops there. The camera holds still
@@ -117,8 +118,9 @@ random, never the line he just said. There's one bubble at a time: while a line 
 moment that matters more replaces it (being caught or shaken first, idle time last). A line
 types out at about 30 characters a second, stays long enough to read, then fades; with
 reduced motion it shows all at once. The bubble follows him and stays on screen, clear of the
-toolbar and the open Look sheet (near the top it goes beside or under his head, never over his
-face), and never takes a tap; a screen reader hears each line once, whole. His lines, how often
+toolbar and the open Look sheet (near the top it goes beside his head, on a phone narrowed to
+fit there with the line on more rows, or else under his feet, never over his face or body), and
+never takes a tap; a screen reader hears each line once, whole. His lines, how often
 he talks and the look a first visit gets are edited in the admin's Invitation page
 ([admin.md](admin.md)).
 
@@ -222,8 +224,9 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   over 0.35 s; `speechFrom` and `linesFrom` read the admin's settings and lines from anything),
   `bubble.js` + `bubble.css` (the bubble: `createBubble({root, before, now}).say(text)`, on
   the toy's clock as talk is (`now`: main.js's frame steps, capped and paused with the tab), then
-  `update(head, avoid)` each frame with his head's circle on screen and the toolbar's and open
-  sheet's rects; `speakerPoint` makes his head null, the bubble out of sight, while the open
+  `update(head, avoid, under)` each frame with his head's circle on screen, the toolbar's and
+  open sheet's rects and his feet's bottom; `placeBubble` narrows it to fit beside his head
+  (`BUBBLE.minW`, 110 px, measured wrapped in 8 px steps) before it would go under him; `speakerPoint` makes his head null, the bubble out of sight, while the open
   sheet covers it; `clearRegion`, `placeBubble`, `bubbleFrame` and `speakerPoint` are pure;
   `main.js` steps talk right after the brain and moves the bubble once he's posed) and `content.js`
   (content.json's `invitation`, which the admin edits, through `virtual:invitation-content`:
@@ -271,7 +274,8 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   reached the renderer (the post shader's values, the light's strength and angle, the shadow's
   strength, `zoom`: the zoom the texels follow, `pd`: device px a texel as drawn, `governor`:
   whether it's on, its level and the last second's p90), and `warmed`: the pass's other path compiled),
-  `screen('head'|'body'|'feet')` (a point on him in client px, to tap), `floorAt(x, y)` (the
+  `screen('head'|'body'|'feet')` (a point on him in client px, to tap; the head's with its
+  radius, `r`), `floorAt(x, y)` (the
   endless floor: null only above the horizon), `feet()` (his ankles, to measure foot slide),
   `bones()` (his bones from his root), `grabbed()` (while he's held, where the point he was
   grabbed by shows, client px), `say(text)` (a line in his bubble now, as talk would show it)

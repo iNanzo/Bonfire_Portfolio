@@ -18,13 +18,14 @@
 // on the ground, carry while he's held (his collar, the Neck bone's head, hung where the
 // pointer's ray meets the camera-facing plane through where he was grabbed, plus the grab
 // offset, so the point grabbed stays under the cursor; 48 CSS px above a finger, coming in as
-// he's picked up: carry.js dragTarget), the fall once he's let go (play.js bodyStep)
+// he's picked up, and near the top of the stage as low as keeps his head on it: carry.js
+// dragTarget), the fall once he's let go (play.js bodyStep)
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
 // → the blob shadow, the marker, the toolbar → the speech bubble (bubble.js: over his head as
 // posed, clear of the toolbar and the open Look sheet, out of sight while the sheet covers his
-// head) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
+// head; near the top, beside his head, narrowed to fit there, or under his feet) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
 // on the clock's steps, 15 a second; his root, the camera and the rest move every frame. The
 // lowest his collar is carried comes from the Held clip at load (his collar over his lowest
 // sole, plus a gap).
@@ -81,6 +82,13 @@ const MAX_DT = 0.05;
 const BASE = import.meta.env.BASE_URL;
 /** A finger carries him this far above itself, CSS px, so it doesn't hide him (a mouse: 0). */
 const FINGER_LIFT = 48;
+/**
+ * A finger carrying him near the top of the stage keeps the top of his head this far inside it,
+ * CSS px: its lift gives way, then the finger's own spot (a mouse is never moved off its point).
+ */
+const HEAD_ROOM = 8;
+/** The time constant his head's height over the point grabbed is followed at, seconds. */
+const HEAD_FOLLOW = 0.1;
 /** His soles hang at least this far over the floor while he's held, world units. */
 const HANG_GAP = 0.06;
 /** Extra reach for a finger picking him, CSS px. */
@@ -340,6 +348,8 @@ function start(s) {
   let hangY = 1.1;
   /** @type {import('./carry.js').Grip|null} how he's held, while he is */
   let grip = null;
+  /** How far the top of his head shows above the point grabbed, CSS px (followed while held). */
+  let headAbove = 0;
   /** @type {import('./types.js').XYZ} where his collar was carried last */
   let target = { x: 0, y: hangY, z: 0 };
   /** The retro pass's other path is compiled (stage.js warm), for ?test. */
@@ -419,6 +429,16 @@ function start(s) {
       s.camera,
       canvas.getBoundingClientRect(),
     );
+  }
+  /**
+   * Where the point he's held by shows, client px: his collar as posed less the grab offset.
+   * @param {import('./carry.js').Grip} g
+   */
+  function grabbedAt(g) {
+    const p = /** @type {NonNullable<typeof character>} */ (character).bonePos(COLLAR, { x: 0, y: 0, z: 0 });
+    const at = new Vector3(p.x - g.offset.x, p.y - g.offset.y, p.z - g.offset.z).project(s.camera);
+    const r = canvas.getBoundingClientRect();
+    return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
   }
   /** Whether a client point is on NEWT. */
   function onNewt(x, y, slop = 0) {
@@ -618,7 +638,10 @@ function start(s) {
     if (bubble.text === null) return;
     const sheet = ui.sheetOpen ? ui.sheet.getBoundingClientRect() : null;
     const avoid = sheet ? [ui.toolbar.getBoundingClientRect(), sheet] : [ui.toolbar.getBoundingClientRect()];
-    bubble.update(speakerPoint(shape().head, [sheet]), avoid);
+    // (His feet's bottom on screen: a bubble with no room over or beside his head goes under him.)
+    const sh = shape();
+    const feet = Math.max(sh.body.a.y, sh.body.b.y) + sh.body.r;
+    bubble.update(speakerPoint(sh.head, [sheet]), avoid, feet);
   }
 
   /**
@@ -701,9 +724,21 @@ function start(s) {
         // not the one grabbed. From the press, the first frame carries him the whole way.)
         const collar = c.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
         grip = gripFor(s.ray(press.x0, press.y0), dragPlane(s.camera.position, collar), collar, t);
+        const head = shape().head;
+        headAbove = press.y0 - (head.y - head.r);
       }
-      const lift = pressKind === 'touch' ? FINGER_LIFT * Math.min(1, (t - grip.t0) / CARRY.liftIn) : 0;
-      target = dragTarget(grip, s.ray(press.x, press.y - lift), hangY);
+      // (A finger's lift over itself, coming in as he's picked up. Near the top of the stage it
+      // gives way, then the finger's own spot, so the top of his head stays on the screen: lifted,
+      // he hangs nearer the camera and his head shows further over the point grabbed, so that's
+      // followed from the last frame's pose. A mouse's point stays under the cursor.)
+      let y = press.y;
+      if (pressKind === 'touch') {
+        y -= FINGER_LIFT * Math.min(1, (t - grip.t0) / CARRY.liftIn);
+        const head = shape().head;
+        headAbove += (grabbedAt(grip).y - (head.y - head.r) - headAbove) * Math.min(1, dt / HEAD_FOLLOW);
+        y = Math.max(y, stageEl.getBoundingClientRect().top + HEAD_ROOM + headAbove);
+      }
+      target = dragTarget(grip, s.ray(press.x, y), hangY);
     } else grip = null;
     bodyStep(body, {
       state: o.state,
@@ -889,7 +924,7 @@ function start(s) {
       /** @param {'head'|'body'|'feet'} part */
       screen(part) {
         const sh = shape();
-        if (part === 'head') return { x: sh.head.x, y: sh.head.y };
+        if (part === 'head') return { x: sh.head.x, y: sh.head.y, r: sh.head.r };
         if (part === 'feet') return { x: sh.body.a.x, y: sh.body.a.y };
         return { x: (sh.body.a.x + sh.body.b.x) / 2, y: (sh.body.a.y + sh.body.b.y) / 2 };
       },
@@ -900,10 +935,7 @@ function start(s) {
        */
       grabbed() {
         if (!grip || !character || body.mode !== 'held') return null;
-        const p = character.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
-        const at = new Vector3(p.x - grip.offset.x, p.y - grip.offset.y, p.z - grip.offset.z).project(s.camera);
-        const r = canvas.getBoundingClientRect();
-        return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
+        return grabbedAt(grip);
       },
       /** His ankles (the Foot bones' heads), world units: for measuring foot slide. */
       feet: () =>

@@ -499,6 +499,42 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
+  test('lifted by a finger to the top of the screen, his head stays on it, and a line he says goes beside his head, never over his body', async ({
+    page,
+  }) => {
+    await calm(page);
+    const touch = await toucher(page);
+    const from = await on(page, 'body');
+    await touch('touchStart', [from]);
+    for (let i = 1; i <= 16; i++) {
+      await touch('touchMove', [{ x: from.x, y: from.y + ((70 - from.y) * i) / 16 }]);
+      await sleep(16);
+    }
+    await until(page, (s) => s.held, 'held');
+    await framesFor(page, 500);
+    const head = await on(page, 'head');
+    expect(head.y - head.r, 'the top of his head on the screen').toBeGreaterThanOrEqual(0);
+    await page.evaluate(() => window.__invitation.say('Whoa there, up we go now!'));
+    let at = null;
+    await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
+    // Off all of him: his head and the line from it down to his feet.
+    const feet = await on(page, 'feet');
+    for (let k = 0; k <= 20; k++) {
+      const p = { x: at.head.x + ((feet.x - at.head.x) * k) / 20, y: at.head.y + ((feet.y - at.head.y) * k) / 20 };
+      const dot = { left: p.x - 1, top: p.y - 1, right: p.x + 1, bottom: p.y + 1 };
+      expect(
+        overlaps(at.box, dot),
+        `off him at (${p.x.toFixed(0)}, ${p.y.toFixed(0)}): ${JSON.stringify(at.box)}`,
+      ).toBe(false);
+    }
+    expect(['left', 'right']).toContain(at.tail);
+    expect(at.box.top).toBeGreaterThanOrEqual(at.stage.top);
+    expect(at.box.left).toBeGreaterThanOrEqual(at.stage.left);
+    expect(at.box.right).toBeLessThanOrEqual(at.stage.right);
+    expect(overlaps(at.box, at.bar), 'clear of the toolbar').toBe(false);
+    await touch('touchEnd');
+  });
+
   test('a finger on the floor turns his head toward it, left and then right', async ({ page }) => {
     await calm(page);
     const touch = await toucher(page);

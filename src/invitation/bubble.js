@@ -3,8 +3,9 @@
 // toward him), above his head and following him. createBubble({root}) gives say(text), then
 // update(head, avoid) once a frame with his head on screen (its middle and radius, client px:
 // character.js screenShape; speakerPoint makes it null while the open Look sheet covers it) and
-// what it must keep clear of (the toolbar, the open Look sheet: client rects). Near the top of the stage it goes beside his head instead, or under it, never
-// over his face. It types the line out at a readable pace, holds it, then fades it, on the timeline
+// what it must keep clear of (the toolbar, the open Look sheet: client rects). Near the top of
+// the stage it goes beside his head instead (narrowed to fit there, its line on more rows, on a
+// phone), or under his feet, never over his face or body. It types the line out at a readable pace, holds it, then fades it, on the timeline
 // speech.js counts (lineDuration; with prefers-reduced-motion the whole line at once, held as
 // long, no fade). It stays on the stage, clear of what it's told to avoid (clearRegion, then
 // placeBubble: pure, tested), never takes a press (pointer-events none) and sits under the
@@ -25,6 +26,8 @@ export const BUBBLE = {
   tail: 10,
   /** The rounded corner the tail keeps clear of. */
   corner: 14,
+  /** The narrowest it's wrapped to, to fit beside his head (bubble.css's padding and a word or two). */
+  minW: 110,
 };
 
 /**
@@ -78,16 +81,30 @@ export function speakerPoint(head, covers = []) {
  * Where the bubble goes, for his head (its middle and radius on screen): centred over it, its
  * tail's length above it, kept inside the region (pushed in from an edge, or up off a bar he's
  * behind). With no room above (his head near the top), beside his head on the side with more
- * room, level with it, its tail pointing across at him; with no room there, under his head, its
- * tail pointing up (over his body, never his face); with no room anywhere, over him, kept on
- * screen, with no tail.
+ * room, level with it, its tail pointing across at him; with no room there for the line as it
+ * is, beside him all the same, narrowed to that side's room (no narrower than BUBBLE.minW),
+ * the line wrapped onto more rows (`fit`: the bubble's size wrapped to a width); with no room
+ * there either, under him (under his feet, `under`, when it's given; else under his head), its
+ * tail pointing up; with no room anywhere, over him, kept on screen, with no tail.
  * @param {{point: {x: number, y: number, r?: number}, size: {w: number, h: number}, region: Rect,
+ *   under?: number|null, fit?: ((maxW: number) => {w: number, h: number, maxW?: number})|null,
  *   gap?: number, tail?: number, corner?: number}} o
- * @returns {{x: number, y: number, tail: 'down'|'up'|'left'|'right'|'none', tailX: number, tailY: number}}
+ * @returns {{x: number, y: number, tail: 'down'|'up'|'left'|'right'|'none', tailX: number, tailY: number,
+ *   w: number, h: number, maxW: number|null}}
  *   x, y: its top left, client px; tail: the way its tail points; tailX, tailY: the tail's middle
- *   from its left and top edges
+ *   from its left and top edges; w, h: its size there; maxW: the width it's wrapped to (null: as
+ *   it is)
  */
-export function placeBubble({ point, size, region, gap = BUBBLE.gap, tail = BUBBLE.tail, corner = BUBBLE.corner }) {
+export function placeBubble({
+  point,
+  size,
+  region,
+  under = null,
+  fit = null,
+  gap = BUBBLE.gap,
+  tail = BUBBLE.tail,
+  corner = BUBBLE.corner,
+}) {
   const { w, h } = size;
   const r = point.r ?? 0;
   const reach = r + gap + tail;
@@ -99,23 +116,56 @@ export function placeBubble({ point, size, region, gap = BUBBLE.gap, tail = BUBB
   const above = point.y - reach - h;
   if (above >= region.top) {
     const y = Math.max(region.top, Math.min(above, region.bottom - h));
-    return { x, y, tail: 'down', tailX: along(point.x - x, w), tailY: h };
+    return { x, y, tail: 'down', tailX: along(point.x - x, w), tailY: h, w, h, maxW: null };
   }
-  const y = clamp(point.y - h / 2, region.top, region.bottom - h);
-  const tailY = along(point.y - y, h);
   // (Off an edge himself, it waits at that edge, its tail toward him.)
   const rightOf = Math.max(point.x + reach, region.left);
   const leftOf = Math.min(point.x - reach, region.right);
   const sides = [
-    { room: region.right - rightOf, x: rightOf, tail: /** @type {'left'} */ ('left'), tailX: 0 },
-    { room: leftOf - region.left, x: leftOf - w, tail: /** @type {'right'} */ ('right'), tailX: w },
-  ]
-    .filter((o) => o.room >= w)
-    .sort((a, b) => b.room - a.room);
-  if (sides.length) return { x: sides[0].x, y, tail: sides[0].tail, tailX: sides[0].tailX, tailY };
-  const below = Math.max(region.top, point.y + reach);
-  if (below + h <= region.bottom) return { x, y: below, tail: 'up', tailX: along(point.x - x, w), tailY: 0 };
-  return { x, y: clamp(above, region.top, region.bottom - h), tail: 'none', tailX: along(point.x - x, w), tailY: 0 };
+    { room: region.right - rightOf, right: true },
+    { room: leftOf - region.left, right: false },
+  ].sort((a, b) => b.room - a.room);
+  /**
+   * Beside him, on that side, level with his head.
+   * @param {{room: number, right: boolean}} side
+   * @param {{w: number, h: number}} at
+   * @param {number|null} maxW
+   */
+  const beside = (side, at, maxW) => {
+    const y = clamp(point.y - at.h / 2, region.top, region.bottom - at.h);
+    return {
+      x: side.right ? rightOf : leftOf - at.w,
+      y,
+      tail: /** @type {'left'|'right'} */ (side.right ? 'left' : 'right'),
+      tailX: side.right ? 0 : at.w,
+      tailY: along(point.y - y, at.h),
+      w: at.w,
+      h: at.h,
+      maxW,
+    };
+  };
+  const roomy = sides.find((o) => o.room >= w);
+  if (roomy) return beside(roomy, size, null);
+  // (Too wide for either side: narrowed to the roomier one, onto more rows.)
+  const most = sides[0];
+  if (fit && most.room >= BUBBLE.minW) {
+    const narrow = fit(most.room);
+    if (narrow.w <= most.room + 0.5 && narrow.h <= region.bottom - region.top)
+      return beside(most, narrow, narrow.maxW ?? Math.floor(most.room));
+  }
+  const below = Math.max(region.top, (under ?? point.y + r) + gap + tail);
+  if (below + h <= region.bottom)
+    return { x, y: below, tail: 'up', tailX: along(point.x - x, w), tailY: 0, w, h, maxW: null };
+  return {
+    x,
+    y: clamp(above, region.top, region.bottom - h),
+    tail: 'none',
+    tailX: along(point.x - x, w),
+    tailY: 0,
+    w,
+    h,
+    maxW: null,
+  };
 }
 
 /**
@@ -136,6 +186,9 @@ export function bubbleFrame(text, elapsed, reduced) {
   if (elapsed >= typing) return { shown: n, phase: 'hold' };
   return { shown: Math.min(n, Math.floor(Math.max(0, elapsed) * TALK.typeCps + 1e-9)), phase: 'type' };
 }
+
+/** The widths a narrowed bubble is wrapped to go in steps of this many CSS px. */
+const FIT_STEP = 8;
 
 /** Whether the visitor asked for less motion (false where it can't be read). */
 function prefersReduced() {
@@ -187,11 +240,35 @@ export function createBubble({
     reduced: false,
     shown: -1,
     size: { w: 0, h: 0 },
+    /** @type {Map<number, {w: number, h: number, maxW: number}>} its size wrapped to each width tried */
+    fits: new Map(),
+    /** @type {number|null} the width it's wrapped to now (null: its own) */
+    maxW: null,
   };
 
   /** The bubble's size with its whole line in (the untyped rest keeps its place, unseen). */
   function measure() {
+    box.style.maxWidth = '';
     s.size = { w: box.offsetWidth, h: box.offsetHeight };
+    s.fits.clear();
+    s.maxW = null;
+  }
+
+  /**
+   * Its size with the line wrapped to at most `maxW` CSS px (in steps of FIT_STEP, each measured
+   * once a line: a narrowed bubble beside his head follows him without a layout every frame).
+   * @param {number} maxW
+   */
+  function fit(maxW) {
+    const key = Math.max(FIT_STEP, Math.floor(maxW / FIT_STEP) * FIT_STEP);
+    let at = s.fits.get(key);
+    if (!at) {
+      box.style.maxWidth = `${key}px`;
+      at = { w: box.offsetWidth, h: box.offsetHeight, maxW: key };
+      box.style.maxWidth = s.maxW === null ? '' : `${s.maxW}px`;
+      s.fits.set(key, at);
+    }
+    return at;
   }
 
   /** @param {number} n */
@@ -237,8 +314,10 @@ export function createBubble({
      * @param {{x: number, y: number, r?: number}|null} point  his head on screen: its middle and
      *   radius, client px (character.js screenShape's head; null: out of sight)
      * @param {Rect[]} [avoid]  client rects to keep clear of
+     * @param {number|null} [under]  the bottom of his feet on screen, client px (a bubble that
+     *   must go under him goes under them)
      */
-    update(point, avoid = []) {
+    update(point, avoid = [], under = null) {
       if (s.text === null) return;
       const f = bubbleFrame(s.text, now() - s.start, s.reduced);
       if (f.phase === 'done') return hide();
@@ -249,7 +328,11 @@ export function createBubble({
         return;
       }
       const area = root.getBoundingClientRect();
-      const p = placeBubble({ point, size: s.size, region: clearRegion(area, avoid) });
+      const p = placeBubble({ point, size: s.size, region: clearRegion(area, avoid), under, fit });
+      if (p.maxW !== s.maxW) {
+        s.maxW = p.maxW;
+        box.style.maxWidth = p.maxW === null ? '' : `${p.maxW}px`;
+      }
       box.style.transform = `translate(${Math.round(p.x - area.left)}px, ${Math.round(p.y - area.top)}px)`;
       box.style.setProperty('--tail-x', `${Math.round(p.tailX)}px`);
       box.style.setProperty('--tail-y', `${Math.round(p.tailY)}px`);
