@@ -667,7 +667,7 @@ function start(s) {
         grip = gripFor(s.ray(press.x0, press.y0), dragPlane(s.camera.position, collar), collar, t);
       }
       const lift = pressKind === 'touch' ? FINGER_LIFT * Math.min(1, (t - grip.t0) / CARRY.liftIn) : 0;
-      target = dragTarget(grip, s.ray(press.x, press.y - lift), t, hangY);
+      target = dragTarget(grip, s.ray(press.x, press.y - lift), hangY);
     } else grip = null;
     bodyStep(body, {
       state: o.state,

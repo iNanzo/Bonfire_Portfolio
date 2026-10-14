@@ -237,16 +237,28 @@ test('dragging: on a camera-facing vertical plane through where he was grabbed, 
   close(grip.offset.x, collar.x - at.x, 1e-6, 'the grab offset: his collar from the grabbed point');
   close(grip.offset.y, collar.y - at.y, 1e-6);
   close(grip.offset.z, collar.z - at.z, 1e-6);
-  // The moment he's grabbed, nothing moves.
-  assert.deepEqual(dragTarget(grip, grabRay, t0, low), collar);
-  // His hang height comes in over CARRY.liftIn (his collar starts lower than it, standing).
-  const half = dragTarget(grip, grabRay, t0 + CARRY.liftIn / 2, low);
-  assert.ok(half.y > collar.y && half.y < low, `part way up (${half.y})`);
-  close(dragTarget(grip, grabRay, t0 + CARRY.liftIn, low).y, low, 1e-6, 'his soles off the floor');
+  // The moment he's grabbed, nothing moves; and held still there, nothing moves frame after
+  // frame (his collar starts lower than his hang height, standing: the point pressed stays under
+  // the cursor all the same, never lifted up off it).
+  for (let frame = 0; frame < 3; frame++)
+    assert.deepEqual(dragTarget(grip, grabRay, low), collar, `frame ${frame}, the cursor still`);
+  // Down from where it pressed: he stays at the height he was grabbed at, his feet where they
+  // stood; up a little, under his hang height, and back: he goes with it, both ways.
+  const below = (dy) => ray({ x: at.x, y: at.y + dy, z: at.z });
+  close(dragTarget(grip, below(-0.3), low).y, collar.y, 1e-6, 'pressed down where he stood');
+  const bit = (low - collar.y) / 2;
+  close(dragTarget(grip, below(bit), low).y, collar.y + bit, 1e-6, 'a little up');
+  close(dragTarget(grip, below(0), low).y, collar.y, 1e-6, 'and back down');
+  // Once lifted clear to his hang height, his soles stay off the floor: down again, he stops there.
+  close(dragTarget(grip, below(low - collar.y + 0.2), low).y, low + 0.2, 1e-6, 'lifted clear');
+  close(dragTarget(grip, below(0), low).y, low, 1e-6, 'his soles off the floor from then on');
+  close(dragTarget(grip, below(-1), low).y, low, 1e-6);
+  // Grabbed higher than his hang height (mid-fall): never under it.
+  const high = gripFor(grabRay, plane, { ...collar, y: low + 0.5 }, t0);
+  close(dragTarget(high, below(-2), low).y, low, 1e-6, 'grabbed high, never under his hang height');
   // Later, anywhere on the plane within the limits: the grabbed point is on the cursor's ray,
   // so under the cursor, and his collar stays on the plane.
   const right = { x: plane.normal.z, z: -plane.normal.x };
-  const t = t0 + 1;
   for (const [across, up] of [
     [0, 1],
     [0.6, 1.2],
@@ -254,7 +266,7 @@ test('dragging: on a camera-facing vertical plane through where he was grabbed, 
     [1.5, 1.6],
   ]) {
     const q = { x: at.x + across * right.x, y: at.y + up, z: at.z + across * right.z };
-    const target = dragTarget(grip, ray(q), t, low);
+    const target = dragTarget(grip, ray(q), low);
     close(target.x - grip.offset.x, q.x, 1e-6, `(${across}, ${up}): under the cursor, across`);
     close(target.y - grip.offset.y, q.y, 1e-6, `(${across}, ${up}): and up`);
     close(target.z - grip.offset.z, q.z, 1e-6);
@@ -262,22 +274,22 @@ test('dragging: on a camera-facing vertical plane through where he was grabbed, 
     close(off, 0, 1e-6, 'on the plane: no nearer the camera, no further');
   }
   // Up lifts him, across moves him across.
-  const a = dragTarget(grip, ray({ x: at.x, y: at.y + 1, z: at.z }), t, low);
-  const b = dragTarget(grip, ray({ x: at.x, y: at.y + 1.5, z: at.z }), t, low);
+  const a = dragTarget(grip, ray({ x: at.x, y: at.y + 1, z: at.z }), low);
+  const b = dragTarget(grip, ray({ x: at.x, y: at.y + 1.5, z: at.z }), low);
   close(b.y - a.y, 0.5, 1e-6);
   close(Math.hypot(b.x - a.x, b.z - a.z), 0, 1e-6);
-  const c = dragTarget(grip, ray({ x: at.x + right.x, y: at.y + 1, z: at.z + right.z }), t, low);
+  const c = dragTarget(grip, ray({ x: at.x + right.x, y: at.y + 1, z: at.z + right.z }), low);
   close(c.y, a.y, 1e-6);
   close(Math.hypot(c.x - a.x, c.z - a.z), 1, 1e-6);
   // Limits: never under his hang height, never over the highest lift, far over the old carry's.
   // (High enough to reach the top of a phone's screen at the default zoom, about 4.3 over him.)
   assert.ok(CARRY.liftMax >= 4.5, `the highest lift ${CARRY.liftMax}`);
-  close(dragTarget(grip, ray({ x: at.x, y: -3, z: at.z }), t, low).y, low, 1e-6, 'pressed into the floor');
-  close(dragTarget(grip, ray({ x: at.x, y: 40, z: at.z }), t, low).y, CARRY.liftMax, 1e-6, 'reaching for the sky');
+  close(dragTarget(grip, ray({ x: at.x, y: -3, z: at.z }), low).y, low, 1e-6, 'pressed into the floor');
+  close(dragTarget(grip, ray({ x: at.x, y: 40, z: at.z }), low).y, CARRY.liftMax, 1e-6, 'reaching for the sky');
   // A ray that never meets the plane keeps the last spot.
   const away = { o: camera, d: { x: 0, y: 1, z: 1 } };
-  assert.deepEqual(dragTarget(grip, away, t, low), dragTarget(grip, away, t, low));
-  assert.ok(Number.isFinite(dragTarget(grip, away, t, low).y));
+  assert.deepEqual(dragTarget(grip, away, low), dragTarget(grip, away, low));
+  assert.ok(Number.isFinite(dragTarget(grip, away, low).y));
   // A camera straight over him still gives an upright plane.
   const top = dragPlane({ x: 0.2, y: 20, z: 0.1 }, collar);
   close(top.normal.y, 0, 1e-6);

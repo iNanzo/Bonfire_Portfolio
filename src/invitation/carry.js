@@ -1,8 +1,9 @@
 // Carrying NEWT by the collar in the invitation toy. He's dragged on a vertical plane facing the
 // camera through where he was grabbed (dragPlane, gripFor: his collar's offset from the point
 // grabbed is kept, so that point stays under the cursor; dragTarget: up the screen lifts him, up
-// to CARRY.liftMax, across moves him across, never with his soles on the floor, that limit
-// coming in over CARRY.liftIn as the Held pose does). The anchor his collar hangs from is the
+// to CARRY.liftMax, across moves him across, never lower than he was grabbed, and once he's been
+// lifted clear of the floor never with his soles back on it: a still cursor never lifts him off
+// it). The anchor his collar hangs from is the
 // pointer's spot each frame, no lag, kept inside the play area; a damped pendulum swings his root
 // as the hold speeds up and slows down (driven by a critically damped follow of the anchor, so
 // it reads the same whether the pointer's spot changes every frame or only every second or third
@@ -23,9 +24,8 @@ import { centreOf, clampTo, xRange } from './steer.js';
 /**
  * follow: how fast the swing's drive follows the anchor (rad/s: a critically damped follow; it
  * smooths out a spot that only moves on some frames, which read as a hard shake frame by frame);
- * window: seconds of samples a toss reads. liftIn: seconds the lowest his collar may go takes to
- * come up to his hang height once he's grabbed; liftMax: the highest his collar is carried,
- * world units. The swing: a pendulum `length` long (collar to his middle) under
+ * window: seconds of samples a toss reads. liftIn: seconds a finger's lift over itself (main.js)
+ * takes to come in once he's grabbed; liftMax: the highest his collar is carried, world units. The swing: a pendulum `length` long (collar to his middle) under
  * `gravity`, `damping` per second, at most `tiltMax` radians, fed accelerations up to
  * `accelMax`, integrated in steps of at most `substep`; `shakeSmooth` smooths the shake reading.
  * A toss is capped at `tossMax` across and `tossUp`/`tossDown` up and down. The fall: `fallGravity`,
@@ -184,11 +184,13 @@ export function dragPlane(camera, through) {
 /**
  * @typedef {object} Grip  how he's held: the plane he's dragged on, his collar's offset from the
  *   point grabbed (kept, so that point stays under the cursor), when, his collar's height then,
- *   and the last spot (for a ray that misses the plane)
+ *   whether he's been lifted clear of the floor since (to his hang height), and the last spot
+ *   (for a ray that misses the plane)
  * @property {{point: XYZ, normal: XYZ}} plane
  * @property {XYZ} offset
  * @property {number} t0
  * @property {number} from
+ * @property {boolean} clear
  * @property {XYZ} last
  */
 
@@ -208,27 +210,30 @@ export function gripFor(ray, plane, collar, t) {
     offset: { x: collar.x - at.x, y: collar.y - at.y, z: collar.z - at.z },
     t0: t,
     from: collar.y,
+    clear: false,
     last: { x: collar.x, y: collar.y, z: collar.z },
   };
 }
 
 /**
  * Where his collar goes this frame: where `ray` meets the grip's plane, plus the grab offset
- * (the point grabbed under the cursor), its height between `low` (his hang height: his soles
- * off the floor; from his collar's height when grabbed, coming up to it over CARRY.liftIn) and
- * CARRY.liftMax. A ray that misses the plane keeps the last spot. Updates `g.last`.
+ * (the point grabbed under the cursor), no higher than CARRY.liftMax and no lower than his
+ * collar was grabbed at, or `low` (his hang height: his soles off the floor) once he's been
+ * lifted to it (grabbed standing, his collar starts under it: held still there he stays put, the
+ * point pressed under the cursor, and he only hangs clear once the cursor lifts him clear). A
+ * ray that misses the plane keeps the last spot. Updates `g.last` and `g.clear`.
  * @param {Grip} g
  * @param {{o: XYZ, d: XYZ}} ray
- * @param {number} t
  * @param {number} low
  * @returns {XYZ}
  */
-export function dragTarget(g, ray, t, low) {
+export function dragTarget(g, ray, low) {
   const at = rayPlane(ray.o, ray.d, g.plane);
   if (!at) return { ...g.last };
-  const k = Math.min(1, Math.max(0, (t - g.t0) / CARRY.liftIn));
-  const floor = g.from < low ? g.from + (low - g.from) * k * k * (3 - 2 * k) : low;
-  const y = Math.min(CARRY.liftMax, Math.max(Math.min(floor, CARRY.liftMax), at.y + g.offset.y));
+  const asked = at.y + g.offset.y;
+  if (asked >= low) g.clear = true;
+  const floor = g.clear ? low : Math.min(g.from, low);
+  const y = Math.min(CARRY.liftMax, Math.max(Math.min(floor, CARRY.liftMax), asked));
   g.last = { x: at.x + g.offset.x, y, z: at.z + g.offset.z };
   return { ...g.last };
 }

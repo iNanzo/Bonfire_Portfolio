@@ -1409,6 +1409,22 @@ test.describe('on a desktop', () => {
     expect(errors).toEqual([]);
   });
 
+  test('grabbed and held still, he stays put: the point pressed stays under the cursor, never lifted up off it', async ({
+    page,
+  }) => {
+    await calm(page);
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x, body.y);
+    await page.mouse.down();
+    await until(page, (s) => s.held, 'held');
+    for (let i = 1; i <= 4; i++) {
+      await framesFor(page, 150);
+      const g = await page.evaluate(() => window.__invitation.grabbed());
+      expect(Math.hypot(g.x - body.x, g.y - body.y), `${i * 150} ms on, the cursor still`).toBeLessThan(1.5);
+    }
+    await page.mouse.up();
+  });
+
   test('a quick press-and-drag that never holds still carries him the whole way: the point pressed stays under the cursor, as after a still hold', async ({
     page,
   }) => {

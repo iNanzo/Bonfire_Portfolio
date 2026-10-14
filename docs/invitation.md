@@ -195,9 +195,11 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
     and the order a frame runs in. `gesture.js` reads the mouse's buttons apart (left: tap,
     grab or pan; right: orbit; middle: pan) and two fingers' middle as a pan; `carry.js`
     drags him on the upright plane facing the camera through where he was grabbed
-    (`dragPlane`, `gripFor`, `dragTarget`: the grab offset kept, his collar between his hang
-    height and `CARRY.liftMax`, 5), the anchor the pointer's spot with no lag and the swing
-    driven by a smoothed follow of it; `lookAt.js` `pointerTarget` aims his look where the
+    (`dragPlane`, `gripFor`, `dragTarget`: the grab offset kept, from where the press began;
+    his collar no lower than it was grabbed at, or his hang height once he's been lifted clear
+    of the floor, so a still cursor never lifts him off it, and no higher than `CARRY.liftMax`,
+    5), the anchor the pointer's spot with no lag and the swing driven by a smoothed follow of
+    it; `lookAt.js` `pointerTarget` aims his look where the
     pointer's ray first meets the floor or the upright plane through his head facing the
     camera, brought 0.6 toward the camera along the ray (pitch up to 55°), and keeps a target
     behind him on the side his head is turned to; `floor.js` `fitShadow(…, at)` moves the
