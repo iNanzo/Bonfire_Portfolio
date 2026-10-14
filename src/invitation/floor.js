@@ -16,8 +16,9 @@
 //                       and to the floor his shadow falls on from up there; with `at`, moved
 //                       to there (where NEWT is in the play area) by whole shadow texels, so
 //                       his shadow keeps its texels as he goes and never shimmers
+//   shadowTop(lift, base)  how high that box reaches: `base`, or over his head carried higher
 import * as THREE from 'three';
-import { rimPoints } from './area.js';
+import { NEWT_HEIGHT, rimPoints } from './area.js';
 
 /** World units across: far wider than any view of the floor. */
 export const FLOOR_SIZE = 200;
@@ -93,6 +94,19 @@ export function createFloor(preset) {
 
 /** How far past his root his shadow's caster reaches (his arms, the swing while he's held). */
 const REACH = 0.7;
+
+/**
+ * How high the shadow camera reaches with his root `lift` over the floor: `base` (the highest
+ * he's lifted most of the time: the box his shadow's texels were tuned for) while that covers
+ * the top of his head, else over it in half-unit steps (so the box, and his shadow's texels,
+ * change only now and then while he's carried up high).
+ * @param {number} lift
+ * @param {number} base
+ */
+export function shadowTop(lift, base) {
+  const head = lift + NEWT_HEIGHT + 0.25;
+  return head <= base ? base : Math.ceil(head * 2) / 2;
+}
 
 /**
  * Fit `sun`'s shadow camera (orthographic, looking from the light at its target) around

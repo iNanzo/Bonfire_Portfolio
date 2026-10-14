@@ -19,7 +19,7 @@ import * as THREE from 'three';
 import { AREA_MARGIN, AREA_RADIUS, NEWT_HEIGHT, NEWT_RADIUS, playArea, viewArea } from '../src/invitation/area.js';
 import { centreOf, clampTo, steer, wanderGoal, xRange } from '../src/invitation/steer.js';
 import { CARRY, fallStep, grab, holdStep } from '../src/invitation/carry.js';
-import { fitShadow } from '../src/invitation/floor.js';
+import { fitShadow, shadowTop } from '../src/invitation/floor.js';
 import {
   NEWT_SHARE,
   PHONE_SHARE,
@@ -563,5 +563,18 @@ test('moved to wherever NEWT is in the play area, the shadow camera covers him a
         assert.ok(most <= 1 + 1e-6, `${name}: his reach at ${a.toFixed(2)} rad, ${y}: ${q.toArray()}`);
       }
     }
+  }
+});
+
+test('the shadow camera reaches as high as before while he stands or is carried low, and over the top of his head however high he is lifted, in half-unit steps', () => {
+  const base = 3.2;
+  for (const lift of [0, 0.4, 1.2, 1.8]) assert.equal(shadowTop(lift, base), base, `his root at ${lift}`);
+  let last = base;
+  for (let lift = 0; lift <= 5; lift += 0.01) {
+    const top = shadowTop(lift, base);
+    assert.ok(top >= lift + NEWT_HEIGHT + 0.2, `his root at ${lift.toFixed(2)}: the top ${top}`);
+    assert.ok(top >= last, 'never lower as he goes up');
+    assert.ok(Number.isInteger(top * 2) || top === base, `in half units (${top})`);
+    last = top;
   }
 });

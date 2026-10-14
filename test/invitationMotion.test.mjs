@@ -270,7 +270,8 @@ test('dragging: on a camera-facing vertical plane through where he was grabbed, 
   close(c.y, a.y, 1e-9);
   close(Math.hypot(c.x - a.x, c.z - a.z), 1, 1e-9);
   // Limits: never under his hang height, never over the highest lift, far over the old carry's.
-  assert.ok(CARRY.liftMax >= 3, `the highest lift ${CARRY.liftMax}`);
+  // (High enough to reach the top of a phone's screen at the default zoom, about 4.3 over him.)
+  assert.ok(CARRY.liftMax >= 4.5, `the highest lift ${CARRY.liftMax}`);
   close(dragTarget(grip, ray({ x: at.x, y: -3, z: at.z }), t, low).y, low, 1e-9, 'pressed into the floor');
   close(dragTarget(grip, ray({ x: at.x, y: 40, z: at.z }), t, low).y, CARRY.liftMax, 1e-9, 'reaching for the sky');
   // A ray that never meets the plane keeps the last spot.

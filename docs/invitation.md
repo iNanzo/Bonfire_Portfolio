@@ -141,7 +141,7 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
     grab or pan; right: orbit; middle: pan) and two fingers' middle as a pan; `carry.js`
     drags him on the upright plane facing the camera through where he was grabbed
     (`dragPlane`, `gripFor`, `dragTarget`: the grab offset kept, his collar between his hang
-    height and `CARRY.liftMax`, 3.4), the anchor the pointer's spot with no lag and the swing
+    height and `CARRY.liftMax`, 5), the anchor the pointer's spot with no lag and the swing
     driven by a smoothed follow of it; `lookAt.js` `pointerTarget` aims his look where the
     pointer's ray first meets the floor or the upright plane through his head facing the
     camera, brought 0.6 toward the camera along the ray (pitch up to 55°), and keeps a target
@@ -188,7 +188,10 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
   of taps, drags, buttons, floor taps, a chase and the camera at phone and desktop sizes
   (animated WebP plus a contact sheet; `--look`, `--pixel` (a resolution such as `64` or
-  `64x64`, `native` or `off`), `--motion`, `--sizes`, `--acts`). One GPU capture at a time.
+  `64x64`, `native` or `off`), `--motion`, `--sizes`, `--acts`); its `pan`, `lift` and
+  `sweep` acts (`tools/capture-invitation-camera.mjs`) slide, turn and zoom the camera, carry
+  him up high (the report says how far the grabbed point strayed from the cursor) and sweep the
+  cursor, or a finger, over the whole screen to show where he looks. One GPU capture at a time.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
   `vite.config.js`, `test/site.test.mjs` and the spec's last test check it).
 - **Unlisted:** `noindex, nofollow`, left out of the sitemap and the README, and not

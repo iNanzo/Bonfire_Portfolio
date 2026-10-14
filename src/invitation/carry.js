@@ -35,7 +35,7 @@ export const CARRY = {
   follow: 25,
   window: 0.08,
   liftIn: 0.15,
-  liftMax: 3.4,
+  liftMax: 5,
   length: 0.55,
   gravity: 9.8,
   damping: 2.4,

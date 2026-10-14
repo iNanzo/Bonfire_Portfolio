@@ -36,7 +36,7 @@ import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
 import { createBrain } from './brain.js';
 import { CARRY, carryFeel, dragPlane, dragTarget, gripFor } from './carry.js';
-import { playArea, viewArea } from './area.js';
+import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
   createOrbit,
   orbitArea,
@@ -55,14 +55,14 @@ import {
 import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createFaceState, faceStep } from './faces.js';
-import { fitShadow } from './floor.js';
+import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
 import { animFps, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
 import { createRng } from './rng.js';
-import { createStage } from './stage.js';
+import { LIFT, createStage } from './stage.js';
 import { centreOf } from './steer.js';
 import { bindUi, parseQuery } from './ui.js';
 
@@ -77,8 +77,12 @@ const HANG_GAP = 0.06;
 const TOUCH_SLOP = 6;
 /** States remembered for ?test (the last ones, in order). */
 const STATES_KEPT = 40;
-/** The shadow camera reaches this high over the floor, world units: the top of his head lifted highest. */
-const SHADOW_TOP = CARRY.liftMax + 0.3;
+/**
+ * The shadow camera reaches this high over the floor most of the time, world units (stage.js's,
+ * what his shadow's texels were tuned for); higher only while he's carried up past it
+ * (floor.js shadowTop).
+ */
+const SHADOW_TOP = LIFT + NEWT_HEIGHT;
 /**
  * Where NEWT may go: the play area (area.js viewArea), one object kept in place (the brain and
  * his steps hold it) and filled in again on a resize; the default view's disc until then.
@@ -694,7 +698,8 @@ function start(s) {
     if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight);
     c.setFace(faceStep(faces, face, blink, t, rng));
     s.setBlob(root.position.x, root.position.z, body.mode === 'ground' ? 0 : Math.min(1, root.position.y / 0.5));
-    if (sun) fitShadow(sun, s.bounds, SHADOW_TOP, { x: root.position.x, z: root.position.z });
+    if (sun)
+      fitShadow(sun, s.bounds, shadowTop(root.position.y, SHADOW_TOP), { x: root.position.x, z: root.position.z });
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;
     s.marker.visible = Boolean(mark);
     if (mark) s.marker.position.set(mark.x, s.marker.position.y, mark.z);
