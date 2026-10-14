@@ -29,7 +29,8 @@ unlisted: nothing links to it and search engines are asked not to index it.
 - **Turn the camera:** with a finger, drag empty space; with a mouse, drag with the right
   button (anywhere, on him too; it never picks him up). Across goes round him (a drag across
   the whole screen goes about three quarters of the way round, on a phone or a computer alike),
-  up and down looks from higher or lower. The canvas shows no menu for the right button.
+  up and down looks from higher or lower. The right button shows no menu on the canvas, nor
+  wherever a drag that started there ends (the toolbar, at the bottom of a drag down).
 - **Slide the camera:** with a mouse, drag empty space with the left button (or the middle
   one); with fingers, drag two of them together. The floor under your cursor stays under it.
   You can't slide his patch off the screen altogether.

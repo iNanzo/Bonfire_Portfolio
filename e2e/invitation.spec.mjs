@@ -1323,6 +1323,42 @@ test.describe('on a desktop', () => {
     expect(errors).toEqual([]);
   });
 
+  test('a right-drag that turns the camera and ends over the toolbar shows no context menu there either', async ({
+    page,
+  }) => {
+    await calm(page);
+    // Every context menu event, whatever it lands on, and whether its default was turned down.
+    await page.evaluate(() => {
+      window.__menus = [];
+      window.addEventListener(
+        'contextmenu',
+        (e) => window.__menus.push({ on: String(e.target?.className ?? ''), e }),
+        true,
+      );
+    });
+    const bar = await page.locator('.inv-toolbar').boundingBox();
+    const from = { x: bar.x + bar.width / 2 + 200, y: bar.y - 300 };
+    const to = { x: bar.x + bar.width / 2, y: bar.y + bar.height / 2 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down({ button: 'right' });
+    for (let i = 1; i <= 15; i++)
+      await page.mouse.move(from.x + ((to.x - from.x) * i) / 15, from.y + ((to.y - from.y) * i) / 15);
+    await page.mouse.up({ button: 'right' });
+    // (Chrome on Windows fires it at the button's release on what's under the cursor, the
+    // toolbar here; elsewhere at the press, on the canvas. As Windows does, at once:)
+    const late = await page.evaluate(() => {
+      const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 });
+      document.querySelector('.inv-toolbar').dispatchEvent(e);
+      return e.defaultPrevented;
+    });
+    expect(late, 'the release’s menu over the toolbar turned down').toBe(true);
+    await until(page, (s) => Math.abs(s.camera.yaw) > 0.2, 'the drag turned the camera');
+    // (Read once each has been through every listener.)
+    const menus = await page.evaluate(() => window.__menus.map((m) => ({ on: m.on, prevented: m.e.defaultPrevented })));
+    expect(menus.length, JSON.stringify(menus)).toBeGreaterThan(0);
+    for (const m of menus) expect(m.prevented, `a menu on ${m.on}`).toBe(true);
+  });
+
   test('a left-drag on empty space pans the view: the floor under the cursor stays under it, nothing turns or zooms, he stays put, and Reset Camera clears it', async ({
     page,
   }) => {

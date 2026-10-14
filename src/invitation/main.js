@@ -85,6 +85,12 @@ const FINGER_LIFT = 48;
 const HANG_GAP = 0.06;
 /** Extra reach for a finger picking him, CSS px. */
 const TOUCH_SLOP = 6;
+/**
+ * After a right-button press on the canvas lets go, a context menu this soon after is still its
+ * own, ms (Chrome on Windows fires it at the release, on whatever is under the cursor then: the
+ * toolbar, at the end of a drag down to tilt the camera; pointer capture doesn't redirect it).
+ */
+const RIGHT_MENU_MS = 1000;
 /** States remembered for ?test (the last ones, in order). */
 const STATES_KEPT = 40;
 /**
@@ -443,8 +449,23 @@ function start(s) {
       events.push(e);
     }
   };
+  /** Until when (performance.now(), ms) a context menu is a canvas right-press's own: none for it. */
+  let rightMenuUntil = -Infinity;
+  /** A press let go: a right press's menu may still come, for a moment. */
+  const pressGone = () => {
+    if (rightMenuUntil === Infinity) rightMenuUntil = performance.now() + RIGHT_MENU_MS;
+  };
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  // (Wherever the right button's own menu lands: the toolbar, the sheet, the page.)
+  document.addEventListener(
+    'contextmenu',
+    (e) => {
+      if (performance.now() <= rightMenuUntil) e.preventDefault();
+    },
+    true,
+  );
   canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch' && e.button === 2) rightMenuUntil = Infinity;
     // (The mouse's left button holds, walks and pans, its right one orbits, its middle one pans
     // (no autoscroll); any other button, or a second one, does nothing: gesture.js.)
     if (e.pointerType !== 'touch' && (e.button > 2 || gesture.current())) return;
@@ -468,9 +489,18 @@ function start(s) {
     const p = sample(e);
     take(gesture.move(p, !gesture.current() && e.pointerType !== 'touch' && onNewt(p.x, p.y)));
   });
-  canvas.addEventListener('pointerup', (e) => take(gesture.up(sample(e))));
-  canvas.addEventListener('pointercancel', (e) => take(gesture.cancel(e.pointerId, now())));
-  canvas.addEventListener('lostpointercapture', (e) => take(gesture.cancel(e.pointerId, now())));
+  canvas.addEventListener('pointerup', (e) => {
+    pressGone();
+    take(gesture.up(sample(e)));
+  });
+  canvas.addEventListener('pointercancel', (e) => {
+    pressGone();
+    take(gesture.cancel(e.pointerId, now()));
+  });
+  canvas.addEventListener('lostpointercapture', (e) => {
+    pressGone();
+    take(gesture.cancel(e.pointerId, now()));
+  });
   canvas.addEventListener('pointerleave', (e) => {
     if (e.pointerType !== 'touch' && !gesture.current()) hover = null;
   });
