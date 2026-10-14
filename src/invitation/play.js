@@ -28,7 +28,7 @@
 import { blendStep, blendTarget, gaitPhase, mainClip, movingShare, runShare } from './blend.js';
 import { CARRY, fallStep, grab, holdStep, toss } from './carry.js';
 import { fadeFor } from './clips.js';
-import { LOOK, aimAngles, aimAt, pointerTarget, viewerAim } from './lookAt.js';
+import { LOOK, aimAngles, aimAt, faceUp, pointerTarget, viewerAim } from './lookAt.js';
 import { steer } from './steer.js';
 
 /** @typedef {import('./types.js').Body} Body */
@@ -183,8 +183,9 @@ export function twinWeights(weights, clip) {
  * - 'camera': the camera;
  * - 'pointer': the camera when the pointer is on him; else, with its ray, lookAt.js
  *   pointerTarget (the floor or the plane through his head facing the camera, whichever the ray
- *   meets first, brought toward the camera), not clamped, so lookStep keeps a target behind him
- *   on the side his head is turned to; without one, its floor spot, lifted by LOOK.floorBias;
+ *   meets first, brought toward the camera), his chin up where his cap would hide his face
+ *   (lookAt.js faceUp), not clamped, so lookStep keeps a target behind him on the side his head
+ *   is turned to; without one, its floor spot, lifted by LOOK.floorBias;
  *   null without a pointer;
  * - 'forward', 'back': no aim.
  * @param {'pointer'|'camera'|'forward'|'back'} mode  BrainOut.look.mode
@@ -198,7 +199,7 @@ export function lookAim(mode, { head, yaw, camera, pointer }) {
   if (pointer.onNewt) return { aim: aimAngles(head, yaw, camera), ahead };
   if (pointer.ray) {
     const target = pointerTarget(pointer.ray, head, camera);
-    return { aim: target ? aimAt(head, yaw, target.point) : null, ahead };
+    return { aim: target ? faceUp(aimAt(head, yaw, target.point), head, yaw, camera) : null, ahead };
   }
   if (!pointer.floor) return { aim: null, ahead };
   return { aim: aimAngles(head, yaw, { x: pointer.floor.x, y: 0, z: pointer.floor.z }, LOOK.floorBias), ahead };

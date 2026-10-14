@@ -5,11 +5,11 @@
 // the gait's step phase by stride, a restart of a clip still showing handing its weight to its
 // twin so it never pops) and where he looks (the camera when asked or when the pointer is on
 // him, the pointer's floor spot lifted 10°, and ahead meaning toward the viewer). With the
-// pointer's ray, over a grid of cursor positions across the whole screen: his gaze points at
-// the cursor on screen, he looks up at a cursor high over him (up to about 55°), his face
-// shows for a cursor in front of him and turns no further than a profile for one behind him,
-// and with his back to the camera a cursor wiggling behind him doesn't flip his head from side
-// to side.
+// pointer's ray, over a grid of cursor positions across the whole screen: his head turns all
+// the way to the cursor's side (exactly at it over his head), he looks up at a cursor high over
+// him (up to about 55°), his chin never drops so far that his cap hides his face from the
+// camera, he turns no further than a profile for one behind him, and with his back to the
+// camera a cursor wiggling behind him doesn't flip his head from side to side.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -26,7 +26,7 @@ import {
 import { CLIPS, GAIT, STRIDE, fadeFor } from '../src/invitation/clips.js';
 import { STEP_SHARE_MIN, gaitPhase } from '../src/invitation/blend.js';
 import { CARRY } from '../src/invitation/carry.js';
-import { LIMIT, LOOK, aimAngles, createLook, lookStep, pointerTarget } from '../src/invitation/lookAt.js';
+import { LIMIT, LOOK, aimAngles, createLook, faceUp, lookStep, pointerTarget } from '../src/invitation/lookAt.js';
 import { createRng } from '../src/invitation/rng.js';
 import { xRange } from '../src/invitation/steer.js';
 
@@ -301,7 +301,7 @@ test('the pointer’s target is the first of the floor and the camera-facing upr
   assert.ok(LOOK.towardViewer > 0.2 && LOOK.towardViewer < 1.5);
 });
 
-test('over the whole screen his gaze points at the cursor, he looks up at a cursor high over him (up to about 55°), his face shows for a cursor in front of him and goes no further round than a profile', () => {
+test('over the whole screen his head turns to the cursor’s side (right at it over his head), he looks up at a cursor high over him (up to about 55°), his face always shows under his cap and goes no further round than a profile', () => {
   close(LIMIT.pitchMax, 55 * RAD, 1e-9, 'his head tips up to 55°');
   for (const distance of [13.3, 26.6, 6.7]) {
     const cam = viewCamera({ distance });
@@ -319,20 +319,32 @@ test('over the whole screen his gaze points at the cursor, he looks up at a curs
       });
       const a = clampA(aim);
       const g = gaze(body.yaw, a);
-      // His face: never further round from the camera than side on.
+      // His face: never further round from the camera than side on, and his chin up enough that
+      // his cap never hides it (within LOOK.faceUnder under the camera's pitch).
       const toCam = Math.atan2(cam.position.x - head.x, cam.position.z - head.z);
       const face = Math.abs(Math.atan2(Math.sin(Math.atan2(g.x, g.z) - toCam), Math.cos(Math.atan2(g.x, g.z) - toCam)));
       assert.ok(face <= Math.PI / 2 + 1e-6, `${at}: his face ${(face / RAD).toFixed(0)}° round from the camera`);
-      // His gaze on screen points at the cursor (where his neck lets it).
+      const camPitch = Math.atan2(
+        cam.position.y - head.y,
+        Math.hypot(cam.position.x - head.x, cam.position.z - head.z),
+      );
+      assert.ok(a.pitch >= camPitch - LOOK.faceUnder - 1e-9, `${at}: his chin at ${(a.pitch / RAD).toFixed(0)}°`);
+      // His gaze on screen: toward the cursor's side always, and right at it over his head
+      // (where his neck lets it; lower down his chin comes up so his face shows).
       const tip = cam.screen({ x: head.x + 0.3 * g.x, y: head.y + 0.3 * g.y, z: head.z + 0.3 * g.z });
       const want = Math.atan2(p.y - headAt.y, p.x - headAt.x);
       const got = Math.atan2(tip.y - headAt.y, tip.x - headAt.x);
       const err = Math.abs(Math.atan2(Math.sin(got - want), Math.cos(got - want)));
       const far = Math.hypot(p.x - headAt.x, p.y - headAt.y) > 40;
-      const free = Math.abs(aim.yaw) < LIMIT.yaw && aim.pitch < LIMIT.pitchMax && aim.pitch > LIMIT.pitchMin;
-      if (far && free) assert.ok(err < 3 * RAD, `${at}: his gaze ${(err / RAD).toFixed(1)}° off the cursor`);
-      if (far)
-        assert.ok(err < 50 * RAD, `${at}: his gaze ${(err / RAD).toFixed(1)}° off the cursor (held by his neck)`);
+      const free = Math.abs(aim.yaw) < LIMIT.yaw && aim.pitch < LIMIT.pitchMax && aim.pitch > camPitch - LOOK.faceUnder;
+      if (far && free && p.y < headAt.y)
+        assert.ok(err < 3 * RAD, `${at}: his gaze ${(err / RAD).toFixed(1)}° off the cursor`);
+      if (Math.abs(p.x - headAt.x) > 40)
+        assert.equal(
+          Math.sign(tip.x - headAt.x),
+          Math.sign(p.x - headAt.x),
+          `${at}: his gaze toward the cursor's side`,
+        );
       // Up over his head: he looks up.
       if (p.y < headAt.y - 40 && Math.abs(p.x - headAt.x) < 200) {
         assert.ok(a.pitch > 0.2, `${at}: looks up (${(a.pitch / RAD).toFixed(0)}°)`);
@@ -356,9 +368,12 @@ test('over the whole screen his gaze points at the cursor, he looks up at a curs
       Math.sign(aim.yaw) === side && Math.abs(aim.yaw) > 60 * RAD,
       `a profile ${side}: ${(aim.yaw / RAD).toFixed(0)}°`,
     );
-    assert.ok(Math.abs(aim.pitch) < 15 * RAD, `level: ${(aim.pitch / RAD).toFixed(0)}°`);
+    assert.ok(
+      aim.pitch > 25 * RAD && aim.pitch < 40 * RAD,
+      `chin up to show his face: ${(aim.pitch / RAD).toFixed(0)}°`,
+    );
   }
-  // In front of him, low down: toward the cursor and the camera, his cap kept off his face.
+  // In front of him, low down: toward the cursor, his cap kept off his face.
   const { aim } = lookAim('pointer', {
     head,
     yaw: 0,
@@ -366,7 +381,10 @@ test('over the whole screen his gaze points at the cursor, he looks up at a curs
     pointer: { floor: null, onNewt: false, ray: cam.ray({ x: h.x + 120, y: h.y + 260 }) },
   });
   assert.ok(aim.yaw > 0.15 && aim.yaw < LIMIT.yaw, `toward the cursor (${(aim.yaw / RAD).toFixed(0)}°)`);
-  assert.ok(aim.pitch > LIMIT.pitchMin, `not cricked down past his limit (${(aim.pitch / RAD).toFixed(0)}°)`);
+  assert.ok(aim.pitch > 25 * RAD, `his chin up so his face shows (${(aim.pitch / RAD).toFixed(0)}°)`);
+  // Turned away from the camera, his chin is left be (there's no face to show).
+  const away = faceUp({ yaw: 0, pitch: -0.4 }, head, Math.PI, cam.position);
+  assert.deepEqual(away, { yaw: 0, pitch: -0.4 });
 });
 
 test('with his back to the camera, a cursor wiggling behind him (in front of the camera) keeps his head to one side, and it goes round to the other only once the cursor clearly has', () => {
