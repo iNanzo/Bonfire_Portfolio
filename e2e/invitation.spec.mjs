@@ -1747,7 +1747,8 @@ test.describe('on a desktop', () => {
       );
     }
     // Level with his head, far off to the side: well round toward it, but no further from the
-    // camera than 55° (lookAt.js LOOK.faceTurn): turned side on, his cap's brim hides his eyes.
+    // camera than 50° (lookAt.js LOOK.faceTurn), his chin up: turned side on, or level, his
+    // cap's brim hides his eyes.
     for (const side of [-1, 1]) {
       await page.mouse.move(head.x + side * 4 * tall, head.y, { steps: 4 });
       await until(page, (s) => Math.sign(s.headYaw) === side && Math.abs(s.headYaw) > 0.8, `turned ${side}`);
@@ -1756,8 +1757,9 @@ test.describe('on a desktop', () => {
       const off = Math.abs(
         Math.atan2(Math.sin(s.heading + s.headYaw - s.camera.yaw), Math.cos(s.heading + s.headYaw - s.camera.yaw)),
       );
-      expect(off, 'well round toward the cursor').toBeGreaterThan((45 * Math.PI) / 180);
-      expect(off, 'no further round than still shows his face').toBeLessThanOrEqual((55 * Math.PI) / 180 + 0.03);
+      expect(off, 'well round toward the cursor').toBeGreaterThan((40 * Math.PI) / 180);
+      expect(off, 'no further round than still shows his face').toBeLessThanOrEqual((50 * Math.PI) / 180 + 0.03);
+      expect(s.headPitch, 'his chin up, so his eyes show under his cap').toBeGreaterThan((35 * Math.PI) / 180);
     }
   });
 });

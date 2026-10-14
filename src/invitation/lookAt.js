@@ -49,9 +49,12 @@ export const SPLIT = { neck: 0.3, head: 0.7 };
  * gaze still points at the cursor on screen). faceUnder: how far under the camera (as seen from
  * his head) his look may pitch and still show his face under his cap's brim, radians (from the
  * front and side on alike: side on, the brim reaches out over his eye). faceTurn: how far round
- * from the camera a look in front of him may turn and still show an eye under the brim, radians
- * (turned further, the brim hides both from the camera's 36°: a count of the eye triangles the
- * camera sees on the posed model fell from 14 of 18 facing it to 9 at 55° and 5 at 70°). backSide:
+ * from the camera a look in front of him may turn and still show his eyes under the brim,
+ * radians, and faceTilt: how much further up his chin comes turned that far, eased in from
+ * faceTiltFrom (turned further, or level, the brim hides them from the camera's 36°: a count of
+ * the eye triangles the camera sees on the posed model fell from 14 of 18 facing it to 9 at 55°
+ * and 5 at 70°, and rose with the chin; at 50° and 15° more, both eyes show at real speed).
+ * backSide:
  * a target further round behind him than this (radians) keeps his head on the side it's turned to.
  */
 export const LOOK = {
@@ -73,7 +76,9 @@ export const LOOK = {
   floorBias: (10 * Math.PI) / 180,
   towardViewer: 0.6,
   faceUnder: (4 * Math.PI) / 180,
-  faceTurn: (55 * Math.PI) / 180,
+  faceTurn: (50 * Math.PI) / 180,
+  faceTilt: (15 * Math.PI) / 180,
+  faceTiltFrom: (25 * Math.PI) / 180,
   backSide: (150 * Math.PI) / 180,
 };
 
@@ -139,7 +144,8 @@ export function aimAngles(headPos, bodyYaw, target, pitchBias = 0) {
 /**
  * A look (from his head, his body facing `bodyYaw`) where his face still shows to the camera
  * under his cap's brim: tipped up, where it must be, to the camera's own pitch from his head less
- * LOOK.faceUnder, and turned no further round from the camera than LOOK.faceTurn (a look turned
+ * LOOK.faceUnder (and LOOK.faceTilt more turned far round), and turned no further round from the
+ * camera than LOOK.faceTurn (a look turned
  * away from the camera, past side on, is left be). He still turns toward what he looks at, as far
  * as that (from the camera's 36°, a look down at the floor, or level, is the top of his cap, and
  * one turned side on the brim across his eyes).
@@ -154,7 +160,10 @@ export function faceUp(aim, head, bodyYaw, camera) {
   const cz = camera.z - head.z;
   const off = wrapAngle(bodyYaw + aim.yaw - Math.atan2(cx, cz));
   if (Math.abs(off) > Math.PI / 2) return aim;
-  const lowest = Math.atan2(camera.y - head.y, Math.hypot(cx, cz)) - LOOK.faceUnder;
+  // (Turned well round, the brim reaches across his near eye from the camera's height too: his
+  // chin comes up a little more, LOOK.faceTilt at faceTurn, easing in from faceTiltFrom.)
+  const turned = Math.min(1, Math.max(0, (Math.abs(off) - LOOK.faceTiltFrom) / (LOOK.faceTurn - LOOK.faceTiltFrom)));
+  const lowest = Math.atan2(camera.y - head.y, Math.hypot(cx, cz)) - LOOK.faceUnder + LOOK.faceTilt * turned * turned;
   const yaw = Math.abs(off) > LOOK.faceTurn ? aim.yaw - off + Math.sign(off) * LOOK.faceTurn : aim.yaw;
   return { yaw, pitch: Math.max(aim.pitch, lowest) };
 }

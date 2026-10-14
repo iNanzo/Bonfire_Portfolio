@@ -215,7 +215,8 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
     pointer's ray first meets the floor or the upright plane through his head facing the
     camera, brought 0.6 toward the camera along the ray (pitch up to 55°), `faceUp` keeps a look
     in front of him where his cap leaves his face showing (his chin up to the camera's pitch,
-    turned no further from the camera than `LOOK.faceTurn`, 55°), and it keeps a target behind
+    15° more turned far round, `LOOK.faceTilt`, and turned no further from the camera than
+    `LOOK.faceTurn`, 50°), and it keeps a target behind
     him on the side his head is turned to; `floor.js` `fitShadow(…, at)` moves the
     shadow camera to wherever he is, by whole shadow texels.
 - **Speech and content:** `speech.js` (pure: `createTalk({lines, speech, rng}).step(...)` reads

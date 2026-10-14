@@ -27,7 +27,16 @@ import {
 import { CLIPS, GAIT, STRIDE, fadeFor } from '../src/invitation/clips.js';
 import { STEP_SHARE_MIN, gaitPhase } from '../src/invitation/blend.js';
 import { CARRY } from '../src/invitation/carry.js';
-import { LIMIT, LOOK, aimAngles, createLook, faceUp, lookStep, pointerTarget } from '../src/invitation/lookAt.js';
+import {
+  LIMIT,
+  LOOK,
+  aimAngles,
+  aimAt,
+  createLook,
+  faceUp,
+  lookStep,
+  pointerTarget,
+} from '../src/invitation/lookAt.js';
 import { createRng } from '../src/invitation/rng.js';
 import { xRange } from '../src/invitation/steer.js';
 
@@ -307,6 +316,7 @@ test('over the whole screen his head turns to the cursor’s side (right at it o
   // (Turned further, from the camera's 36° up, the brim hides both eyes: a model-level count of
   // the eye triangles the camera sees fell from 14 of 18 facing it to 9 at 55° and 5 at 70°.)
   assert.ok(LOOK.faceTurn >= 45 * RAD && LOOK.faceTurn <= 55 * RAD, `faceTurn ${(LOOK.faceTurn / RAD).toFixed(0)}°`);
+  assert.ok(LOOK.faceTiltFrom < LOOK.faceTurn && LOOK.faceTilt > 0 && LOOK.faceTilt <= 20 * RAD);
   for (const distance of [13.3, 26.6, 6.7]) {
     const cam = viewCamera({ distance });
     const body = { yaw: 0 };
@@ -340,11 +350,13 @@ test('over the whole screen his head turns to the cursor’s side (right at it o
       const got = Math.atan2(tip.y - headAt.y, tip.x - headAt.x);
       const err = Math.abs(Math.atan2(Math.sin(got - want), Math.cos(got - want)));
       const far = Math.hypot(p.x - headAt.x, p.y - headAt.y) > 40;
+      // (Free: as the cursor's target has it, faceUp leaving it be, within his neck's reach.)
+      const raw = aimAt(head, body.yaw, pointerTarget(cam.ray(p), head, cam.position).point);
       const free =
+        Math.abs(raw.yaw - aim.yaw) < 1e-9 &&
+        Math.abs(raw.pitch - aim.pitch) < 1e-9 &&
         Math.abs(aim.yaw) < LIMIT.yaw &&
-        face < LOOK.faceTurn - 1e-3 &&
-        aim.pitch < LIMIT.pitchMax &&
-        aim.pitch > camPitch - LOOK.faceUnder;
+        aim.pitch < LIMIT.pitchMax;
       if (far && free && p.y < headAt.y)
         assert.ok(err < 3 * RAD, `${at}: his gaze ${(err / RAD).toFixed(1)}° off the cursor`);
       if (Math.abs(p.x - headAt.x) > 40)
@@ -375,11 +387,20 @@ test('over the whole screen his head turns to the cursor’s side (right at it o
       pointer: { floor: null, onNewt: false, ray: cam.ray({ x: h.x + side * 500, y: h.y }) },
     });
     close(aim.yaw - toCam, side * LOOK.faceTurn, 1e-6, `turned ${side}: ${(aim.yaw / RAD).toFixed(0)}°`);
-    assert.ok(
-      aim.pitch > 25 * RAD && aim.pitch < 40 * RAD,
+    // His chin up to the camera's pitch and LOOK.faceTilt more, turned that far round (the brim
+    // reaches across his near eye too): from the camera's 36°, about 46°.
+    const camPitch = Math.atan2(cam.position.y - head.y, Math.hypot(cam.position.x - head.x, cam.position.z - head.z));
+    close(
+      aim.pitch,
+      camPitch - LOOK.faceUnder + LOOK.faceTilt,
+      1e-6,
       `chin up to show his face: ${(aim.pitch / RAD).toFixed(0)}°`,
     );
   }
+  // Turned less than LOOK.faceTiltFrom, no more than the camera's pitch.
+  const camPitch = Math.atan2(cam.position.y - head.y, Math.hypot(cam.position.x - head.x, cam.position.z - head.z));
+  const little = faceUp({ yaw: LOOK.faceTiltFrom - 0.05, pitch: 0 }, head, 0, cam.position);
+  close(little.pitch, camPitch - LOOK.faceUnder, 1e-6, 'a little turned: the camera’s pitch');
   // In front of him, low down: toward the cursor, his cap kept off his face.
   const { aim } = lookAim('pointer', {
     head,
