@@ -28,8 +28,9 @@
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
 // (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
-// (his ankles in the world, his bones from his root) and play(clip) (forces a clip, Walk and
-// Run going round their step at their own pace); `?seed=N` and `?calm` go to the brain.
+// (his ankles in the world, his bones from his root), grabbed() (while he's held, where the
+// point he was grabbed by shows) and play(clip) (forces a clip, Walk and Run going round their
+// step at their own pace); `?seed=N` and `?calm` go to the brain.
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
