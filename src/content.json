@@ -1825,6 +1825,7 @@
         "ring": true,
         "bands": "2",
         "highlight": true,
+        "pixelArt": false,
         "edge": "soft",
         "shadow": 0.6,
         "turn": 0,

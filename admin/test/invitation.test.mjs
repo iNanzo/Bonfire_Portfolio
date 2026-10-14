@@ -259,6 +259,11 @@ test('every field on it is named and helped (no name made from its key)', () => 
   }
   // Each Shader option goes by the Look menu's own name.
   for (const c of SHADER_CONTROLS) assert.equal(LABELS[`invitation.defaults.shader.${c.key}`], c.label);
+  // …and has help of its own, not the stand-in a control added to the Look menu gets.
+  for (const c of SHADER_CONTROLS) {
+    const help = resolveHelp(hint(HELP, `invitation.defaults.shader.${c.key}`), {});
+    assert.ok(!/as the Look menu’s Shader section shows it/.test(help), `${c.key}: help of its own`);
+  }
   assert.ok(keywordsFor('invitation.lines').includes('speech bubble'), 'found by what it is');
 });
 

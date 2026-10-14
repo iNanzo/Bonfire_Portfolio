@@ -52,6 +52,8 @@ const SHADER_HELP = {
   ring: 'Draws his line just outside his silhouette, like a sprite’s, instead of on his edge.',
   bands: 'Smooth light, or that many flat bands of it (toon shading).',
   highlight: 'White where the light falls straight on him.',
+  pixelArt:
+    'His shirt’s bold pixel plaid and a pixel face at the coarser sizes. Off: his real plaid and smooth face at every size.',
   edge: 'A crisp shadow, or one with a dithered, two-tone edge.',
   shadow: 'How dark his shadow on the floor is. Off: none.',
   turn: 'Turns the light round him, in degrees; it still turns with the camera too.',
