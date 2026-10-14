@@ -784,7 +784,7 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
   const labels = [...`${bar}${sheet}`.matchAll(/>([^<>]+)</g)]
     .map((m) => m[1].trim())
     .filter((t) => t && !/[.:]/.test(t));
-  for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( [A-Z][^ ]*)*$/, label);
+  for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( ([A-Z][^ ]*|&amp;))*$/, label);
   assert.equal(presetOf({ ...DEFAULT_LOOK, style: 'soft' }), LOOKS.soft);
   assert.deepEqual(parseQuery('?test&seed=42&calm'), { test: true, seed: 42, calm: true, perf: false });
   assert.deepEqual(parseQuery(''), { test: false, seed: null, calm: false, perf: false });

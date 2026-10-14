@@ -244,10 +244,13 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the pixel atlas and the pixel face load alongside the glb, and the first frame waits for them', async ({
+  test('with Pixel Shirt & Face on, the pixel atlas and the pixel face load alongside the glb, and the first frame waits for them', async ({
     page,
   }) => {
     const errors = watch(page);
+    await page.addInitScript(() =>
+      localStorage.setItem('invitation.look.v1', JSON.stringify({ shader: { pixelArt: true } })),
+    );
     /** @type {number|null} when the glb was let through (it's held a while, as on a slow phone) */
     let glbAt = null;
     const asked = {};
@@ -273,6 +276,37 @@ test.describe('on a phone', () => {
       expect(a.glbThen, `${name} asked for while the glb was still on its way`).toBeNull();
       expect(a.readyBefore, `the first frame waited for ${name}`).toBe(false);
     }
+    expect(errors).toEqual([]);
+  });
+
+  test('with Pixel Shirt & Face off (the default) the first frame never waits for the pixel images, and NEWT wears his real plaid and smooth face', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    /** @type {boolean|null} whether the page had drawn by the time the pixel images were let through */
+    let drawnFirst = null;
+    await page.route(/\/models\/newt-(atlas-pixel|face)\.png$/, async (route) => {
+      // (Held until the page draws, or 8 s: it never waits on them.)
+      const t0 = Date.now();
+      while (Date.now() - t0 < 8000) {
+        const drawn = await page
+          .evaluate(() => document.querySelector('[data-stage]')?.classList.contains('is-ready'))
+          .catch(() => false);
+        if (drawn) break;
+        await sleep(50);
+      }
+      drawnFirst ??= await page
+        .evaluate(() => document.querySelector('[data-stage]')?.classList.contains('is-ready'))
+        .catch(() => false);
+      await route.continue();
+    });
+    await ready(page);
+    await expect.poll(() => drawnFirst).not.toBeNull();
+    expect(drawnFirst, 'drawn before the pixel images came').toBe(true);
+    const snap = await snapshot(page);
+    expect(snap.atlas).toBe('original');
+    expect(snap.faceSheet).toBe('smooth');
+    expect(snap.shader.pixelArt).toBe(false);
     expect(errors).toEqual([]);
   });
 
@@ -1028,9 +1062,9 @@ test.describe('on a desktop', () => {
       expect(f.inside, `Shift+Tab ${i}: ${f.what}`).toBe(true);
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
-    // Motion, the 15 Shader options (Reset To Style rests until one is the user's own) and Reset
+    // Motion, the 16 Shader options (Reset To Style rests until one is the user's own) and Reset
     // Camera.
-    expect(stops.size, [...stops].join(', ')).toBe(24);
+    expect(stops.size, [...stops].join(', ')).toBe(25);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');

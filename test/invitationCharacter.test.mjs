@@ -8,18 +8,21 @@
 // the pixel filter on: his face's sheet is picked by his half face in texels (held through a
 // small change; faceSheet says the smooth one shows at Off), what's on his head moves onto the
 // texel grid by his head's centre and the rest of him by his feet, and his atlas is the pixel
-// one (nearest, no mipmaps), the glb's own at Off.
+// one (nearest, no mipmaps), the glb's own at Off, all of that only with Pixel Shirt & Face on
+// (a Shader option, off by default: his real plaid and smooth face at every resolution).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { ORIGINAL_ATLAS_TEXELS, createCharacter, pixelAtlasUrl } from '../src/invitation/character.js';
 import { FACE_IMAGE, pickFaceSize } from '../src/invitation/faceSheets.js';
-import { LOOKS } from '../src/invitation/look.js';
+import { LOOKS, lookPreset, validLook } from '../src/invitation/look.js';
 import { TOON_CELLS, toonRamp } from '../src/invitation/shader.js';
 import { TWIN } from '../src/invitation/play.js';
 import { BONES, COLLAR, SCALE } from '../src/invitation/clips.js';
 
 const DEG = Math.PI / 180;
+/** A style with Pixel Shirt & Face on (a Shader option, off in every style). */
+const pixelArt = (style) => lookPreset(validLook({ style, shader: { pixelArt: true } }));
 const Y = new THREE.Vector3(0, 1, 0);
 const X = new THREE.Vector3(1, 0, 0);
 const q = (axis, deg) => new THREE.Quaternion().setFromAxisAngle(axis, deg * DEG);
@@ -413,7 +416,7 @@ test('faceSheet says which face sheet shows: the smooth one at Off (whatever siz
     // (The glb's own 1024 face sheet on his face material, as the real glb has.)
     face.material.map = new THREE.Texture({ width: 1024, height: 1024 });
     const pixelFace = new THREE.Texture({ width: FACE_IMAGE.w, height: FACE_IMAGE.h });
-    const ch = createCharacter(gltf, { pixel: false, pixelFace });
+    const ch = createCharacter(gltf, { preset: pixelArt('ds'), pixel: false, pixelFace });
     ch.root.updateMatrixWorld(true);
     const c = ch.root.getObjectByName(BONES.head).localToWorld(new THREE.Vector3(0, 1, 0));
     const toon = /** @type {any} */ (face.material);
@@ -423,17 +426,28 @@ test('faceSheet says which face sheet shows: the smooth one at Off (whatever siz
     assert.equal(typeof ch.faceSize, 'number', 'a pixel size is still picked by his texels');
     assert.equal(ch.faceSheet, 'smooth', 'yet Off shows the smooth face, and says so');
     assert.notEqual(toon.map.magFilter, THREE.NearestFilter, 'the smooth sheet’s cell on his face');
-    ch.setStyle(LOOKS.ds, true);
+    ch.setStyle(pixelArt('ds'), true);
     assert.equal(ch.faceSheet, ch.faceSize, 'the pixel filter on: the picked pixel sheet');
     assert.equal(toon.map.magFilter, THREE.NearestFilter, 'a pixel cell on his face');
     assert.equal(toon.map.image.width, ch.faceSize, 'that size’s cell');
-    ch.setStyle(LOOKS.ds, false);
+    ch.setStyle(pixelArt('ds'), false);
     assert.equal(ch.faceSheet, 'smooth', 'Off again: the smooth face');
+    // Pixel Shirt & Face off (every style's own): the smooth face at every resolution.
+    ch.setStyle(LOOKS.ds, true);
+    assert.equal(ch.faceSheet, 'smooth', 'the switch off: the smooth face, the pixel filter on');
+    assert.notEqual(toon.map.magFilter, THREE.NearestFilter);
+    for (const d of [40, 80, 160]) {
+      draw(d);
+      assert.equal(ch.faceSheet, 'smooth', `the switch off, ${d} away: smooth`);
+      assert.equal(typeof ch.faceSize, 'number', 'a size still picked, for when it’s on');
+    }
+    ch.setStyle(pixelArt('soft'), true);
+    assert.equal(ch.faceSheet, ch.faceSize, 'on again: the pixel sheet');
     ch.dispose();
     // Without the pixel image the smooth sheet stays, pixel filter or not.
     const bare = withFace();
     bare.face.material.map = new THREE.Texture({ width: 1024, height: 1024 });
-    const b = createCharacter(bare.gltf, { pixel: true });
+    const b = createCharacter(bare.gltf, { preset: pixelArt('ds'), pixel: true });
     b.root.updateMatrixWorld(true);
     const bc = b.root.getObjectByName(BONES.head).localToWorld(new THREE.Vector3(0, 1, 0));
     const bt = /** @type {any} */ (bare.face.material);
@@ -507,10 +521,10 @@ test('his face samples its sheet at the mip three picks (the smooth sheet stays 
   ch.dispose();
 });
 
-test('the pixel atlas: on his atlas material while the pixel filter is on (nearest, no mipmaps), the glb’s own at Off', () => {
+test('the pixel atlas: on his atlas material while the pixel filter and Pixel Shirt & Face are on (nearest, no mipmaps), the glb’s own at Off and with the switch off', () => {
   const { gltf, mesh, map } = standIn();
   const pixelAtlas = new THREE.Texture();
-  const ch = createCharacter(gltf, { pixelAtlas });
+  const ch = createCharacter(gltf, { preset: pixelArt('ds'), pixelAtlas });
   assert.equal(mesh.material.map, pixelAtlas, 'the pixel filter is on by default: the pixel atlas');
   assert.equal(pixelAtlas.magFilter, THREE.NearestFilter);
   assert.equal(pixelAtlas.minFilter, THREE.NearestFilter);
@@ -519,12 +533,25 @@ test('the pixel atlas: on his atlas material while the pixel filter is on (neare
   assert.equal(pixelAtlas.colorSpace, THREE.SRGBColorSpace);
   ch.setStyle(LOOKS.ds, false);
   assert.equal(mesh.material.map, map, 'Off: the glb’s atlas as it was');
-  ch.setStyle(LOOKS.soft, true);
+  ch.setStyle(pixelArt('soft'), true);
   assert.equal(mesh.material.map, pixelAtlas, 'on again, whatever the Style');
+  assert.equal(ch.atlas, 'pixel');
+  ch.setStyle(LOOKS.soft, true);
+  assert.equal(mesh.material.map, map, 'Pixel Shirt & Face off: the glb’s atlas, the pixel filter on');
+  assert.equal(ch.atlas, 'original');
+  for (const tall of [16, 48, 96]) {
+    ch.setResolution(tall);
+    assert.equal(mesh.material.map, map, `the switch off at ${tall} texels tall: the glb’s`);
+  }
   ch.dispose();
   const plain = standIn();
-  createCharacter(plain.gltf, { pixel: true });
+  createCharacter(plain.gltf, { preset: pixelArt('ds'), pixel: true });
   assert.equal(plain.mesh.material.map, plain.map, 'no pixel atlas: the glb’s');
+  // By default (the Default style, the switch off): the glb's atlas, the pixel atlas loaded or not.
+  const fresh = standIn();
+  const c2 = createCharacter(fresh.gltf, { pixelAtlas: new THREE.Texture() });
+  assert.equal(fresh.mesh.material.map, fresh.map, 'a first visit: his real plaid');
+  assert.equal(c2.atlas, 'original');
 });
 
 test('the glb’s own atlas replaces the bold pixel plaid once NEWT is ORIGINAL_ATLAS_TEXELS tall or more (its checks resolve there); the pixel plaid below it, and before he’s measured', () => {
@@ -534,7 +561,7 @@ test('the glb’s own atlas replaces the bold pixel plaid once NEWT is ORIGINAL_
   );
   const { gltf, mesh, map } = standIn();
   const pixelAtlas = new THREE.Texture();
-  const ch = createCharacter(gltf, { pixelAtlas });
+  const ch = createCharacter(gltf, { preset: pixelArt('ds'), pixelAtlas });
   assert.equal(mesh.material.map, pixelAtlas, 'not measured yet: the pixel plaid');
   assert.equal(ch.atlas, 'pixel');
   ch.setResolution(ORIGINAL_ATLAS_TEXELS - 0.5);
@@ -545,9 +572,9 @@ test('the glb’s own atlas replaces the bold pixel plaid once NEWT is ORIGINAL_
   ch.setResolution(16);
   assert.equal(mesh.material.map, pixelAtlas, '16×16: the pixel plaid again');
   ch.setResolution(300);
-  ch.setStyle(LOOKS.soft, true);
+  ch.setStyle(pixelArt('soft'), true);
   assert.equal(mesh.material.map, map, 'a Style change keeps it');
-  ch.setStyle(LOOKS.ds, false);
+  ch.setStyle(pixelArt('ds'), false);
   assert.equal(mesh.material.map, map, 'Off: the glb’s, as ever');
   ch.setResolution(16);
   assert.equal(mesh.material.map, map, 'Off at any resolution: the glb’s');
@@ -579,13 +606,16 @@ test('a pixel atlas still on its way (a promise) goes on him when it comes; one 
   const late = standIn();
   const atlas = new THREE.Texture();
   let arrive = () => {};
-  const ch = createCharacter(late.gltf, { pixelAtlas: new Promise((done) => (arrive = () => done(atlas))) });
+  const ch = createCharacter(late.gltf, {
+    preset: pixelArt('ds'),
+    pixelAtlas: new Promise((done) => (arrive = () => done(atlas))),
+  });
   assert.equal(late.mesh.material.map, late.map, 'the glb’s atlas until it comes');
   arrive();
   await ch.atlasReady;
   assert.equal(late.mesh.material.map, atlas, 'then the pixel atlas');
   const failed = standIn();
-  const none = createCharacter(failed.gltf, { pixelAtlas: Promise.resolve(null) });
+  const none = createCharacter(failed.gltf, { preset: pixelArt('ds'), pixelAtlas: Promise.resolve(null) });
   await none.atlasReady;
   assert.equal(failed.mesh.material.map, failed.map);
 });

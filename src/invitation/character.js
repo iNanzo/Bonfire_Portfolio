@@ -28,6 +28,10 @@
 // applyLook(yaw, pitch, w) turns his head by yaw (toward his +x, his left) and pitch (up), in
 // his root's frame, 30% at Neck and 70% at Neck001, exactly as asked whatever the bones' rolls.
 //
+// Pixel Shirt & Face (a Shader option, the preset's `texture.pixelArt`, off in every style): with
+// it off his face is the glb's smooth sheet and his shirt the glb's own plaid at every resolution;
+// on, the pixel face and the pixel atlas below take over at the coarser resolutions as follows.
+//
 // Faces: NEWT_Face's 2×2 sheet split into one clamped texture per cell (clips.js FACES), so
 // swapping material.map never bleeds into the next cell as an offset would (the face's UVs reach
 // a little past the cell). While the pixel filter is on, a pixel sheet from models/newt-face.png
@@ -122,8 +126,10 @@ const loadTexture = (url) => (url ? new THREE.TextureLoader().loadAsync(url).cat
 /**
  * Load the glb at `url` and dress it: the pixel atlas (from beside it, unless opts name one) and
  * the pixel face are asked for at the same time as the glb, not after it (on a slow phone the
- * first frames showed the glb's blurred atlas and a blank face, then swapped), and it's dressed
- * once they're in too, or TEXTURE_GRACE s after the glb (a slower one goes on when it comes).
+ * first frames showed the glb's blurred atlas and a blank face, then swapped), and, while the
+ * look shows them (Pixel Shirt & Face on, the pixel filter on), it's dressed once they're in too,
+ * or TEXTURE_GRACE s after the glb (a slower one goes on when it comes); otherwise it's dressed
+ * as soon as the glb is in, and they go on him whenever they come, ready for the switch.
  * @param {string} url
  * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFaceUrl?: string, pixelAtlasUrl?: string}} [opts]
  */
@@ -131,6 +137,8 @@ export async function loadCharacter(url, { pixelAtlasUrl: atlasUrl = pixelAtlasU
   const atlas = loadTexture(atlasUrl);
   const face = loadTexture(pixelFaceUrl);
   const gltf = await new GLTFLoader().loadAsync(url);
+  const shown = opts.pixel !== false && Boolean(/** @type {any} */ (opts.preset)?.texture?.pixelArt);
+  if (!shown) return createCharacter(gltf, { ...opts, pixelAtlas: atlas, pixelFace: face });
   /** @type {Promise<null>} */
   const grace = new Promise((done) => setTimeout(() => done(null), TEXTURE_GRACE * 1000));
   // (A texture in time goes on before the first frame; a late one, as its promise settles.)
@@ -300,15 +308,20 @@ export function createCharacter(gltf, opts = {}) {
     if (!pixelSets.has(sheet.w)) pixelSets.set(sheet.w, splitSheet(pixelImage, true, sheet));
     return pixelSets.get(sheet.w);
   };
+  /** Pixel Shirt & Face (a Shader option, off in every style): the pixel face and the bold plaid at all. */
+  const pixelArt = () => pixel && Boolean(/** @type {any} */ (preset).texture?.pixelArt);
   const showFace = () => {
-    const sheet = pixel && pixelImage && faceSize !== 'smooth' ? pixelSheetAt(faceSize) : null;
+    const sheet = pixelArt() && pixelImage && faceSize !== 'smooth' ? pixelSheetAt(faceSize) : null;
     const set = sheet ? pixelFacesOf(sheet) : sheetFaces;
     if (!faceMaterial || !set) return;
     faceMaterial.map = set[face];
     faceSheet = sheet ? sheet.w : 'smooth';
   };
-  /** Whether his shirt shows the pixel atlas's bold plaid (the pixel filter on, him under ORIGINAL_ATLAS_TEXELS tall). */
-  const pixelPlaid = () => pixel && Boolean(pixelAtlas) && !(tall >= ORIGINAL_ATLAS_TEXELS);
+  /**
+   * Whether his shirt shows the pixel atlas's bold plaid (the pixel filter and Pixel Shirt & Face
+   * on, him under ORIGINAL_ATLAS_TEXELS tall).
+   */
+  const pixelPlaid = () => pixelArt() && Boolean(pixelAtlas) && !(tall >= ORIGINAL_ATLAS_TEXELS);
   const showAtlas = () => {
     setBias();
     const bold = pixelPlaid();
