@@ -51,7 +51,8 @@ unlisted: nothing links to it and search engines are asked not to index it.
 phone held sideways) and the camera keeps him there, so every change shows on him right away;
 each one is kept for your next visit (in this browser). While the sheet is open the toolbar's
 buttons rest under it, Tab stays inside the sheet, and **Done** (always at its top as it
-scrolls), **Look** again or **Escape** closes it; dragging empty space still turns the camera.
+scrolls), **Look** again or **Escape** closes it; above it the camera still turns, slides and
+zooms as it does without it.
 A finger moves a slider only by going along it: a swipe up or down that starts on one scrolls
 the sheet and leaves the slider as it was.
 
