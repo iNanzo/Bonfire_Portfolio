@@ -1295,9 +1295,9 @@ test.describe('on a desktop', () => {
       expect(f.inside, `Shift+Tab ${i}: ${f.what}`).toBe(true);
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
-    // Motion, the 16 Shader options (Reset To Style rests until one is the user's own) and Reset
+    // Motion, the 17 Shader options (Reset To Style rests until one is the user's own) and Reset
     // Camera.
-    expect(stops.size, [...stops].join(', ')).toBe(25);
+    expect(stops.size, [...stops].join(', ')).toBe(26);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');
