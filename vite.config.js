@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, normalizePath } from 'vite';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
@@ -129,9 +129,45 @@ function firstLoadGuard() {
   };
 }
 
+// The invitation toy's editable content (content.json `invitation`, the admin's) as a module of
+// its own, `virtual:invitation-content`: read from the file at build and dev time with only that
+// subtree inlined, so the toy never imports content.json (whose chunk the portfolio's first load
+// shares); the file is watched, so an edit reloads the toy in dev. The other way round, the
+// pages that import content.json itself (the portfolio, Bonfire Live, the Painter) get it
+// without that subtree: NEWT's lines in every visit would be weight for nothing.
+const INVITATION_CONTENT = 'virtual:invitation-content';
+/**
+ * @param {string} [file]  content.json
+ * @returns {import('vite').Plugin & {resolveId: Function, load: Function, transform: Function}}
+ */
+export function invitationContent(file = resolve(import.meta.dirname, 'src/content.json')) {
+  const resolved = `\0${INVITATION_CONTENT}`;
+  const target = normalizePath(file);
+  return {
+    name: 'invitation-content',
+    enforce: 'pre',
+    resolveId(id) {
+      return id === INVITATION_CONTENT ? resolved : null;
+    },
+    load(id) {
+      if (id !== resolved) return null;
+      this.addWatchFile(file);
+      const c = JSON.parse(readFileSync(file, 'utf8'));
+      return `export default ${JSON.stringify(c?.invitation ?? {})};\n`;
+    },
+    transform(code, id) {
+      if (normalizePath(id.split('?')[0]) !== target) return null;
+      const c = JSON.parse(code);
+      if (!c || typeof c !== 'object' || !('invitation' in c)) return null;
+      delete c.invitation;
+      return { code: JSON.stringify(c), map: null };
+    },
+  };
+}
+
 export default defineConfig({
   base: repo ? `/${repo}/` : '/',
-  plugins: [routePages(), firstLoadGuard()],
+  plugins: [routePages(), firstLoadGuard(), invitationContent()],
   build: {
     // The largest chunk is three.js's renderer (~410 kB, lazy-loaded with the fire); the
     // bonfire's own code is a chunk of its own beside it (~320 kB). More than this is

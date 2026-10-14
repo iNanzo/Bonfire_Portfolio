@@ -77,6 +77,31 @@ picked, and a new Pixel Size starts it afresh. It leaves Off alone, and a screen
 another reason (one that only shows 30 frames a second) isn't made chunkier for nothing.
 **Reset Camera**, under the settings, eases the camera back to where it started.
 
+## NEWT Talks
+
+Now and then NEWT says something in a speech bubble over his head, in the page's own style
+(cream, a dark outline, Pixelify Sans, a tail toward him):
+
+| Kind | When |
+| --- | --- |
+| Reactions | a tap (or Wave, or Spook) makes him wave or startles him |
+| Running | he runs off; he's caught mid-run |
+| Carried | he's picked up, shaken, dropped; he lands |
+| Moving | he walks to a floor tap; he wanders off by himself |
+| Sitting | he sits down by himself (not with Sit); he's still sitting after a quiet spell; he stands up |
+| Passive | standing about, after a quiet spell of 20 to 40 seconds |
+| Camera | the camera is spun round more than a turn in a few seconds; it's zoomed in very close |
+
+Each moment speaks at its own chance, once its cooldown is over, with one of its lines at
+random, never the line he just said. There's one bubble at a time: while a line is up, only a
+moment that matters more replaces it (being caught or shaken first, idle time last). A line
+types out at about 30 characters a second, stays long enough to read, then fades; with
+reduced motion it shows all at once. The bubble follows him and stays on screen, clear of the
+toolbar and the open Look sheet (near the top it goes beside or under his head, never over his
+face), and never takes a tap; a screen reader hears each line once, whole. His lines, how often
+he talks and the look a first visit gets are edited in the admin's Invitation page
+([admin.md](admin.md)).
+
 ## For Developers
 
 - **Code** (`src/invitation/`): the page imports only three.js, its GLTFLoader and its own
@@ -140,6 +165,22 @@ another reason (one that only shows 30 frames a second) isn't made chunkier for 
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
     `faces.js`, `gesture.js`, `rng.js`) are pure too; `types.js` lists the shapes they pass
     and the order a frame runs in.
+- **Speech and content:** `speech.js` (pure: `createTalk({lines, speech, rng}).step(...)` reads
+  the brain's output this frame and last, the gestures, the button pressed and the camera's yaw
+  and zoom, and says the line to show and its trigger; `TRIGGERS`, `PRIORITY`, `SPEECH_RANGES`;
+  `lineDuration`: typed at 30 characters a second, held 1.6 s plus 0.045 s a character, faded
+  over 0.35 s; `speechFrom` and `linesFrom` read the admin's settings and lines from anything),
+  `bubble.js` + `bubble.css` (the bubble: `createBubble({root, before}).say(text)`, then
+  `update(head, avoid)` each frame with his head's circle on screen and the toolbar's and open
+  sheet's rects; `clearRegion`, `placeBubble` and `bubbleFrame` are pure) and `content.js`
+  (content.json's `invitation`, which the admin edits, through `virtual:invitation-content`:
+  `invitationContent` in `vite.config.js` inlines only that subtree, watches the file and leaves
+  the subtree out of the other pages' copy of content.json; `invitationLines()`,
+  `speechSettings()`, `invitationDefaults()`, each with its fallback). That module is the one
+  import the page has beyond three.js, its loader, its font and its own modules
+  (`test/invitationContent.test.mjs` holds it to that). Tests: `invitationSpeech`,
+  `invitationBubble`, `invitationContent`, and `admin/test/invitation.test.mjs` (the content
+  rules and the admin page).
 - **The clips contract:** `src/invitation/clips.js` names NEWT's clips (lengths, loops, fades),
   the face each shows, the bones by their three.js names and the step lengths. `tools/newt.py`
   makes the clips in Blender and `test/invitationModel.test.mjs` holds the glb to the contract.
