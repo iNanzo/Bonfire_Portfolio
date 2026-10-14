@@ -91,7 +91,9 @@ On a device that can't keep up, NEWT's pixels get a little chunkier for a while:
 stay slow for a second the page adds a screen pixel to every one of his pixels (up to four), and
 takes them back once frames are quick again. It never draws finer than the Pixel Size you
 picked, and a new Pixel Size starts it afresh. It leaves Off alone, and a screen that's slow for
-another reason (one that only shows 30 frames a second) isn't made chunkier for nothing.
+another reason (one that only shows 30 frames a second) isn't made chunkier for nothing: after
+one try of a second or so it keeps your Pixel Size. A device that's only quick enough a little
+chunkier tries your own Pixel Size again less and less often.
 **Reset Camera**, under the settings, eases the camera back to where it started.
 
 ## NEWT Talks
@@ -190,8 +192,10 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   - `governor.js` (pure: the frame-time governor. Each second of frames is judged by its p90:
     over `GOVERN.slowMs` (20 ms) steps a level coarser, a run of `recover` seconds under
     `fastMs` (18 ms) a level finer, holding between; a coarser step that doesn't make frames
-    faster is taken back and none tried for `block` seconds, and a relapse doubles the next
-    run. It's on for visitors, off under `?test` unless `?govern`, and `?govern=off` turns it
+    faster is taken back, none tried for `block` seconds and none ever again while the slow
+    seconds are as slow as the one that made it (within `same`, 15%), and a relapse after a
+    finer step doubles the next run, up to `recoverMax` (4 minutes); a finer step that holds
+    `calm` seconds, or a new Pixel Size, brings it back down. It's on for visitors, off under `?test` unless `?govern`, and `?govern=off` turns it
     off.)
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
     `faces.js`, `gesture.js`, `rng.js`) are pure too; `types.js` lists the shapes they pass

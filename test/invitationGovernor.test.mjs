@@ -1,8 +1,10 @@
 // The invitation toy's frame-time governor (src/invitation/governor.js): slow seconds step the
 // texel grid coarser, a run of fast ones steps it back, with a band between where it holds; a
-// coarser step that doesn't help is taken back (a 30 Hz screen never coarsens for nothing); a
-// relapse after a finer step makes the next try wait longer; gaps and the frames just after a
-// change are left out; it never goes under 0 (the user's Pixel Size) or past its coarsest.
+// coarser step that doesn't help is taken back and never tried again at that frame time (a 30 Hz
+// screen tries once in two minutes at most, then keeps the grid); a relapse after a finer step
+// makes the next try wait twice as long, so a device only fast a level coarser is tried less and
+// less often; gaps and the frames just after a change are left out; it never goes under 0 (the
+// user's Pixel Size) or past its coarsest.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GOVERN, createGovernor, governReset, governStep, percentile } from '../src/invitation/governor.js';
@@ -87,6 +89,86 @@ test('a coarser step that doesn’t make the frames faster (a 30 Hz screen) is t
   assert.equal(g.level, 0, 'and took it back: fewer texels didn’t help');
   run(g, GOVERN.block - 8, 1000 / 30);
   assert.equal(g.level, 0, 'no coarser step while it holds off');
+});
+
+/**
+ * Feed `secs` seconds of frames whose length depends on the level (`at(level, i)`, ms): a page
+ * whose cost the governor's level changes, or doesn't. Returns each change of level: when (s),
+ * from and to.
+ */
+function changes(g, secs, at) {
+  const out = [];
+  let t = 0;
+  let i = 0;
+  while (t < secs * 1000) {
+    const was = g.level;
+    const d = at(g.level, i++);
+    governStep(g, d);
+    t += d;
+    if (g.level !== was) out.push({ t: t / 1000, from: was, to: g.level });
+  }
+  return out;
+}
+/** Steady jitter in ±`by` ms, the same each run. */
+const jitter = (by) => (i) => by * Math.sin(i * 12.9898) * Math.cos(i * 4.1414);
+
+test('a screen locked at 30 Hz, or a 60 Hz one with a frame in eight late, never coarsens for nothing: one try in two minutes at most, taken back, and never tried again at that frame time', () => {
+  const j = jitter(0.5);
+  for (const [name, at] of [
+    ['locked at 30 Hz', () => 1000 / 30],
+    ['30 Hz with ±0.5 ms of jitter', (_, i) => 1000 / 30 + j(i)],
+    ['60 Hz, one frame in eight at 34 ms', (_, i) => (i % 8 === 0 ? 34 : 1000 / 60)],
+  ]) {
+    const g = createGovernor();
+    const c = changes(g, 120, at);
+    assert.ok(c.filter((x) => x.to > x.from).length <= 1, `${name}: ${JSON.stringify(c)}`);
+    assert.equal(g.level, 0, `${name}: back at the Pixel Size picked`);
+  }
+});
+
+test('a coarser step that didn’t help is tried again once the frames get slower for another reason (fewer texels may help then)', () => {
+  const g = createGovernor();
+  changes(g, 40, () => 1000 / 30);
+  assert.equal(g.level, 0);
+  // Now a heavier load the grid's size does decide (50 ms, a third quicker each level).
+  const c = changes(g, 10, (level) => 50 / (1 + 0.5 * level));
+  assert.ok(
+    c.some((x) => x.to > x.from),
+    `it tried coarser again: ${JSON.stringify(c)}`,
+  );
+  // And a new Pixel Size forgets what it learned.
+  governReset(g);
+  assert.ok(
+    changes(g, 3, () => 1000 / 30).some((x) => x.to > x.from),
+    'tries afresh after a reset',
+  );
+});
+
+test('fast only at a coarser level (a slow GPU): its tries at a finer level grow further and further apart, each relapse doubling the wait', () => {
+  const g = createGovernor();
+  const c = changes(g, 600, (level) => [28, 22, 1000 / 60][Math.min(level, 2)]);
+  const tries = c.filter((x) => x.to < x.from).map((x) => x.t);
+  assert.ok(
+    tries.length >= 3 && tries.length <= 9,
+    `${tries.length} tries in ten minutes: ${tries.map((t) => t.toFixed(0))}`,
+  );
+  for (let k = 2; k < tries.length; k++) {
+    const gap = tries[k] - tries[k - 1];
+    const was = tries[k - 1] - tries[k - 2];
+    assert.ok(gap >= 1.6 * was || gap >= GOVERN.recoverMax, `try ${k}: ${gap.toFixed(1)} s after ${was.toFixed(1)}`);
+  }
+  assert.ok(tries.filter((t) => t > 120).length <= 3, 'rare once it has learned');
+  // Once a finer step holds a while (the GPU got its time back), the wait is back to `recover`.
+  const h = createGovernor();
+  governReset(h, 1);
+  changes(h, GOVERN.settle + GOVERN.recover + 0.5, () => 1000 / 60);
+  assert.equal(h.level, 0);
+  changes(h, 1.2, (level) => (level ? 1000 / 60 : 30));
+  assert.equal(h.recover, GOVERN.recover * 2, 'a relapse');
+  changes(h, GOVERN.recover * 2 + 1, () => 1000 / 60);
+  assert.equal(h.level, 0, 'tried finer again');
+  changes(h, GOVERN.calm + 1, () => 1000 / 60);
+  assert.equal(h.recover, GOVERN.recover, 'held: back to the short wait');
 });
 
 test('a relapse after a finer step doubles the fast run the next try waits for', () => {

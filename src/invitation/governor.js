@@ -8,11 +8,15 @@
 // steps one level coarser; a run of fast seconds (p90 under GOVERN.fastMs) as long as `recover`
 // steps one finer. Between the two it holds: the hysteresis. A coarser step that doesn't make
 // the frames faster (a screen locked at 30 Hz, a busy CPU: fewer texels won't help) is taken back
-// and no coarser one is tried for GOVERN.block seconds, so it never coarsens for nothing; a finer
-// step that turns slow again within GOVERN.relapse seconds doubles the run it takes to try again
-// (up to GOVERN.recoverMax), and a long stable stretch (GOVERN.calm) brings that back down. The
-// frames just after a change are left out (GOVERN.settle: the grid's refit costs a frame), and so
-// is any interval over GOVERN.maxGap (a tab coming back, a load).
+// and no coarser one is tried for GOVERN.block seconds, nor ever again while the slow seconds
+// are about as slow as the one that made it (within GOVERN.same), so it never coarsens for
+// nothing: once it has learned that, a 30 Hz screen keeps the user's grid. A finer step that turns
+// slow again within GOVERN.relapse seconds doubles the run it takes to try again (up to
+// GOVERN.recoverMax, minutes, so a device only fast at a coarser level is tried less and less
+// often), and a finer step that holds GOVERN.calm seconds brings that back down. A new Pixel Size
+// (governReset) forgets both. The frames just after a change are left out (GOVERN.settle: the
+// grid's refit costs a frame), and so is any interval over GOVERN.maxGap (a tab coming back, a
+// load).
 
 /** The governor's numbers: milliseconds for frame times, seconds for the rest. */
 export const GOVERN = Object.freeze({
@@ -23,13 +27,18 @@ export const GOVERN = Object.freeze({
   /** Fast seconds in a row before it tries one level finer. */
   recover: 3,
   /** The most that run grows to after relapses. */
-  recoverMax: 24,
+  recoverMax: 240,
   /** A finer step that's slow again within this many seconds was a relapse. */
   relapse: 5,
-  /** Seconds at a level after which the recovery run is back to `recover`. */
+  /** Seconds a finer step holds after which the recovery run is back to `recover`. */
   calm: 30,
   /** After a coarser step that didn't help, no coarser step for this long. */
   block: 30,
+  /**
+   * …nor while a slow second's p90 is within this share of the one that made that step (the
+   * same frame time: fewer texels still won't help).
+   */
+  same: 0.15,
   /** A coarser step helped when the next p90 is under this share of the one before it. */
   helped: 0.9,
   /** Seconds of frames left out after a change. */
@@ -55,10 +64,12 @@ const CAP = 512;
  * @property {number} settling  ms of frames still to leave out
  * @property {number} fastRun  fast seconds in a row
  * @property {number} recover  the fast run it takes now
- * @property {number} sinceFiner  seconds since the last finer step (Infinity: none yet)
+ * @property {number} sinceFiner  seconds since the last finer step, while it holds (Infinity:
+ *   none, or a coarser step since)
  * @property {number} sinceChange  seconds since the last change of level
  * @property {number} blocked  seconds left with no coarser step
  * @property {number|null} before  the p90 that made the last coarser step (null: none to check)
+ * @property {number|null} failed  the p90 that made the last coarser step that didn't help (null: none)
  * @property {typeof GOVERN} tune
  */
 
@@ -82,6 +93,7 @@ export function createGovernor(tune = {}) {
     sinceChange: 0,
     blocked: 0,
     before: null,
+    failed: null,
     tune: t,
   };
 }
@@ -99,8 +111,8 @@ export function percentile(a, n, p) {
 }
 
 /**
- * Back to level `level` (0 by default) with nothing judged yet: a new Pixel Size, or the
- * governor turned on.
+ * Back to level `level` (0 by default) with nothing judged or learned yet: a new Pixel Size, or
+ * the governor turned on.
  * @param {GovernorState} g
  * @param {number} [level]
  */
@@ -115,6 +127,7 @@ export function governReset(g, level = 0) {
   g.sinceChange = 0;
   g.blocked = 0;
   g.before = null;
+  g.failed = null;
 }
 
 /**
@@ -142,13 +155,16 @@ function judge(g, p) {
   g.sinceFiner += 1;
   g.sinceChange += 1;
   g.blocked = Math.max(0, g.blocked - 1);
-  if (g.sinceChange >= t.calm) g.recover = t.recover;
-  // The coarser step just taken: when it didn't help, it's taken back, and held off a while.
+  // A finer step that has held a while: the next try needn't wait long.
+  if (g.sinceFiner >= t.calm && Number.isFinite(g.sinceFiner)) g.recover = t.recover;
+  // The coarser step just taken: when it didn't help, it's taken back, held off a while and
+  // remembered (at this frame time it never helps).
   if (g.before !== null) {
     const before = g.before;
     g.before = null;
     if (p > t.helped * before && g.level > 0) {
       g.blocked = t.block;
+      g.failed = before;
       change(g, g.level - 1);
       return;
     }
@@ -156,7 +172,9 @@ function judge(g, p) {
   if (p > t.slowMs) {
     g.fastRun = 0;
     if (g.level >= t.maxLevel || g.blocked > 0) return;
+    if (g.failed !== null && Math.abs(p - g.failed) <= t.same * g.failed) return;
     if (g.sinceFiner < t.relapse) g.recover = Math.min(t.recoverMax, g.recover * 2);
+    g.sinceFiner = Infinity;
     g.before = p;
     change(g, g.level + 1);
     return;
