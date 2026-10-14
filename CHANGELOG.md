@@ -6,9 +6,55 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 
 ## [Unreleased]
 
-Round 11: the knight at home in every place, every module type-checked, and a cleanup for
-what agents and test runs leave running. Round 10, below it: menus and search, the
-knight's fixes, hygiene and performance.
+Round 13: NEWT's toy at `/invitation/`. Round 11, below it: the knight at home in every
+place, every module type-checked, and a cleanup for what agents and test runs leave
+running. Round 10, below that: menus and search, the knight's fixes, hygiene and
+performance.
+
+### The NEWT toy (round 13)
+
+- A new page, `/invitation/`, apart from the bonfire's look: NEWT, a low-poly chibi,
+  wanders a plain white page whose floor shows only his shadows. It's `noindex` and
+  linked from nowhere, for sharing by link.
+- Tap him and he waves or startles. Tap him a few times, or drag him roughly, and he runs
+  off with his arms out in front, slow enough to catch. Press and drag to pick him up by
+  the collar: he dangles and swings with the drag, then falls and lands on his feet. Tap
+  the floor and he walks there; leave him alone and he turns to you and sits, legs out.
+- His head follows the cursor, or a finger on a phone, and his face goes with what he
+  does: happy for a wave or a sit, surprised when startled, carried or running, and he
+  blinks.
+- Drag the empty page to turn the camera round him and tilt it; zoom with the wheel or two
+  fingers. The light turns with the camera, so his shadow keeps its side. Buttons: Wave,
+  Spook, Sit, Run, Wander and Look.
+- The Look menu: Pixel Size, Dithering, Outlines, Motion (Smooth, or Choppy at 15 fps),
+  Style, Shader and Reset Camera, remembered for the next visit. Pixel Size is NEWT's sprite
+  resolution, a slider from 16×16 to 256×256 (he's drawn about that many pixels tall on any
+  screen; 96×96 by default), then Native, a pixel for every one of the screen's own, the
+  pixel look kept, and Off, smooth with no pixel look. DS, the default style, draws him like
+  an old handheld: 15-bit colour with a fine dither, 1-pixel outlines, toon bands and a hard
+  shadow. Soft is warmer, with a dithered shadow. Shader shows the look's own values
+  (colours, dither and outline strength, outline colour and ring, toon bands and highlight,
+  the shadow's edge and strength, the light's angle and strength, and the grade); a change
+  makes the style Custom, and Reset To Style brings it back. At the coarser resolutions his
+  plaid shirt and his face are drawn as pixel art so they still read; at the finest, his
+  real plaid and smooth face return.
+- Phones first: he's drawn about 30% bigger there and the camera keeps him in frame; the
+  page keeps clear of the notch and home bar, and never zooms or scrolls under a finger.
+- How it works and how to rebuild it: [docs/invitation.md](docs/invitation.md).
+
+### NEWT's animations (round 13)
+
+- Eleven clips made in Blender and kept as a script: Idle, Walk, Run, Wave, Spook, Held,
+  Fall, Land, SitDown, Sit and StandUp (`tools/newt.py`; `npm run model -- newt` rebuilds
+  `public/models/newt.glb`). The page blends them itself: Walk and Run share one step so
+  his feet hold the floor, every change fades, and his head turns on top of them.
+
+### Tooling (round 13)
+
+- `tools/capture-invitation.mjs` records the toy at real speed on phone and desktop sizes
+  (taps, drags, chases, the camera, every clip) as WebP clips and contact sheets.
+- `tools/newt-face.mjs` and `tools/newt-atlas.mjs` make NEWT's pixel face sheets and his
+  pixel plaid from the model's own textures.
 
 ### Admin deployment
 
