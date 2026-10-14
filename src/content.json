@@ -1921,7 +1921,7 @@
       ],
       "flee": [
         "Nope, nope, nope!",
-        "Too many pokes!",
+        "Gotta go, gotta go!",
         "I’m outta here!",
         "Can’t catch me!",
         "Personal space! Personal space!"
@@ -1937,7 +1937,7 @@
         "Not the collar!",
         "Ooh, nice view up here.",
         "Careful, I’m fragile. Ish.",
-        "Hey! I was busy standing!"
+        "Hey! Where are we going?"
       ],
       "shaken": [
         "Stop shaking meee!",
