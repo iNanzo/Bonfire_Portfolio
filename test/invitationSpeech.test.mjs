@@ -28,7 +28,7 @@ const TAU = Math.PI * 2;
  * Every trigger at chance 1 and no cooldown, so a test sees each moment; the idle clock far off
  * unless a test sets it (`idle`, seconds).
  */
-function always(idle = [590, 600]) {
+function always(idle = [170, 180]) {
   return {
     idleEvery: idle,
     triggers: Object.fromEntries(TRIGGERS.map((k) => [k, { chance: 1, cooldown: 0 }])),

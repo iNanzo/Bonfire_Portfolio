@@ -91,8 +91,8 @@ export const PRIORITY = {
 /** The admin's ranges: [min, max, step, unit?] (admin/ui/schema.js shows them as sliders; contentRules.js checks them). */
 export const SPEECH_RANGES = {
   chance: /** @type {[number, number, number]} */ ([0, 1, 0.05]),
-  cooldown: /** @type {[number, number, number, string]} */ ([0, 300, 1, 's']),
-  idle: /** @type {[number, number, number, string]} */ ([5, 600, 1, 's']),
+  cooldown: /** @type {[number, number, number, string]} */ ([0, 120, 1, 's']),
+  idle: /** @type {[number, number, number, string]} */ ([5, 180, 1, 's']),
 };
 
 /**
