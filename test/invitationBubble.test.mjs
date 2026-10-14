@@ -4,10 +4,11 @@
 // timeline (typed at a readable pace, held, faded; all at once with prefers-reduced-motion, for
 // as long), and the bubble itself on a stand-in DOM: it types the line out, tells a screen reader
 // the whole line at once (a polite live region), follows the point it's given, hides when its
-// time is up or when told, and leaves nothing behind. The page in a real browser: e2e.
+// time is up or when told, and leaves nothing behind; it points at his head unless something
+// covers it (the open Look sheet over him: then it's out of sight). The page in a real browser: e2e.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BUBBLE, bubbleFrame, clearRegion, createBubble, placeBubble } from '../src/invitation/bubble.js';
+import { BUBBLE, bubbleFrame, clearRegion, createBubble, placeBubble, speakerPoint } from '../src/invitation/bubble.js';
 import { TALK, lineDuration } from '../src/invitation/speech.js';
 import { createRng } from '../src/invitation/rng.js';
 
@@ -109,6 +110,27 @@ test('wherever he is, the bubble never leaves the space (when it fits)', () => {
       if (b.tail === 'up') assert.ok(b.y - BUBBLE.tail >= point.y + point.r - 0.5);
     }
   }
+});
+
+test('what it points at: his head, or nothing (out of sight) while something covers his head’s middle', () => {
+  const head = { x: 195, y: 300, r: 14 };
+  assert.equal(speakerPoint(head), head, 'nothing over him');
+  assert.equal(speakerPoint(head, []), head);
+  const sheet = { left: 0, top: 420, right: 390, bottom: 844 };
+  assert.equal(speakerPoint(head, [sheet]), head, 'the sheet below him');
+  assert.equal(speakerPoint({ ...head, y: 500 }, [sheet]), null, 'the sheet over his head');
+  // Only his head's middle counts: the top of his head showing over the sheet still talks.
+  assert.deepEqual(speakerPoint({ ...head, y: 410 }, [sheet]), { ...head, y: 410 });
+  assert.equal(speakerPoint({ ...head, y: 420 }, [sheet]), null, 'on its edge');
+  // A sheet down the side of a phone held sideways; a rect with no size, or none, is ignored.
+  const side = { left: 450, top: 0, right: 844, bottom: 390 };
+  assert.equal(speakerPoint({ x: 600, y: 200, r: 10 }, [side]), null);
+  assert.deepEqual(speakerPoint({ x: 300, y: 200, r: 10 }, [side, null, { left: 0, top: 0, right: 0, bottom: 0 }]), {
+    x: 300,
+    y: 200,
+    r: 10,
+  });
+  assert.equal(speakerPoint(null, [sheet]), null, 'no head (not loaded): nothing');
 });
 
 test('its timeline: typed at a readable pace, held, faded, as long as speech.js counts it', () => {

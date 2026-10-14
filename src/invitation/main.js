@@ -13,31 +13,37 @@
 // where he goes (floor.js fitShadow).
 //
 // A frame, in types.js's order: the pointers' gestures (gesture.js; taps get their floor spot
-// by ray) and the buttons → the camera moves → brain.step → his root: steer on the ground,
-// carry while he's held (his collar, the Neck bone's head, hung where the pointer's ray meets
-// the camera-facing plane through where he was grabbed, plus the grab offset, so the point
-// grabbed stays under the cursor; 48 CSS px above a finger, coming in as he's picked up: carry.js
-// dragTarget), the fall once he's let go (play.js bodyStep)
+// by ray) and the buttons → the camera moves → brain.step → talk.step (speech.js: what he says,
+// from the admin's lines and settings, content.js; a line goes to the bubble) → his root: steer
+// on the ground, carry while he's held (his collar, the Neck bone's head, hung where the
+// pointer's ray meets the camera-facing plane through where he was grabbed, plus the grab
+// offset, so the point grabbed stays under the cursor; 48 CSS px above a finger, coming in as
+// he's picked up: carry.js dragTarget), the fall once he's let go (play.js bodyStep)
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
-// → the blob shadow, the marker, the toolbar → render. With Motion Choppy (look.js) his pose
-// (the update and applyLook) only moves on the clock's steps, 15 a second; his root, the
-// camera and the rest move every frame. The lowest his collar is carried comes from the Held
-// clip at load (his collar over his lowest sole, plus a gap).
+// → the blob shadow, the marker, the toolbar → the speech bubble (bubble.js: over his head as
+// posed, clear of the toolbar and the open Look sheet, out of sight while the sheet covers his
+// head) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
+// on the clock's steps, 15 a second; his root, the camera and the rest move every frame. The
+// lowest his collar is carried comes from the Held clip at load (his collar over his lowest
+// sole, plus a gap).
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
 // (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
 // (his ankles in the world, his bones from his root), grabbed() (while he's held, where the
-// point he was grabbed by shows) and play(clip) (forces a clip, Walk and Run going round their
-// step at their own pace); `?seed=N` and `?calm` go to the brain.
+// point he was grabbed by shows), say(text) (a line in his bubble now) and play(clip) (forces a
+// clip, Walk and Run going round their step at their own pace); `?seed=N` and `?calm` go to the
+// brain (and the seed to talk).
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
+import './bubble.css';
 import { createBrain } from './brain.js';
-import { invitationDefaults } from './content.js';
+import { createBubble, speakerPoint } from './bubble.js';
+import { invitationDefaults, invitationLines, speechSettings } from './content.js';
 import { CARRY, carryFeel, dragPlane, dragTarget, gripFor } from './carry.js';
 import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
@@ -65,6 +71,7 @@ import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, s
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
 import { createRng } from './rng.js';
+import { createTalk } from './speech.js';
 import { LIFT, createStage } from './stage.js';
 import { centreOf } from './steer.js';
 import { bindUi, parseQuery } from './ui.js';
@@ -285,6 +292,10 @@ function start(s) {
   const mix = createMix();
   const gaze = createLook();
   const faces = createFaceState();
+  // (What he says and when, from the admin's lines and settings; the bubble goes in before the
+  // HUD, so the toolbar and the Look sheet stay over it.)
+  const talk = createTalk({ lines: invitationLines(), speech: speechSettings(), rng: createRng(seed + 2) });
+  const bubble = createBubble({ root: stageEl, before: stageEl.querySelector('.inv-hud') });
   orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(s.bounds), span: stageSize() });
   const cam = orbit;
   orbitSpan(cam, stageSpan(s));
@@ -307,6 +318,8 @@ function start(s) {
   let lastButton = null;
   /** @type {import('./types.js').BrainOut|null} */
   let out = null;
+  /** @type {import('./types.js').BrainOut|null} the brain's output talk saw last (think() overwrites `out`) */
+  let heard = null;
   /** @type {import('./types.js').GestureEvent[]} gestures since the last frame */
   let events = [];
   /** @type {string[]} */
@@ -519,10 +532,12 @@ function start(s) {
       c.setWeights({ [forced]: 1 }, mix.phase);
       const moved = animate(c, dt);
       finish(c, ptr, pose, dt, { mode: 'camera', weight: 1 }, FACE_TRACK[forced]?.face ?? 'neutral', 'normal', moved);
+      voice();
       return;
     }
-    // 2. The brain.
+    // 2. The brain, then what he says.
     const o = think(c, evs, button, ptr, dt);
+    speak(o, evs, button, dt);
     // 3. His root: steer, carry or the fall.
     moveRoot(c, o, ptr, dt);
     // 4. The mix and the step phase.
@@ -539,6 +554,35 @@ function start(s) {
     const want = { mode: o.look.mode, weight: o.look.weight * lookShare(mix.weights), ease: o.look.ease };
     finish(c, ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
+    voice();
+  }
+
+  /**
+   * What he says this frame (speech.js): talk reads the brain's output, this frame's and the
+   * last, the gestures, the button pressed (Sit: he didn't sit by himself) and the camera's yaw
+   * and zoom; a line goes to the bubble.
+   * @param {import('./types.js').BrainOut} o
+   * @param {import('./types.js').GestureEvent[]} evs
+   * @param {import('./types.js').ButtonName|null} button
+   * @param {number} dt
+   */
+  function speak(o, evs, button, dt) {
+    const camera = { yaw: cam.yaw, zoom: cam.distance / cam.home.distance };
+    const line = talk.step({ t, dt, state: o, prevState: heard, events: evs, button, camera });
+    heard = o;
+    if (line.say) bubble.say(line.say);
+  }
+
+  /**
+   * The bubble, while a line is up: over his head as posed this frame (character.js
+   * screenShape), clear of the toolbar and the open Look sheet, out of sight while the sheet
+   * covers his head (bubble.js speakerPoint).
+   */
+  function voice() {
+    if (bubble.text === null) return;
+    const sheet = ui.sheetOpen ? ui.sheet.getBoundingClientRect() : null;
+    const avoid = sheet ? [ui.toolbar.getBoundingClientRect(), sheet] : [ui.toolbar.getBoundingClientRect()];
+    bubble.update(speakerPoint(shape().head, [sheet]), avoid);
   }
 
   /**
@@ -799,6 +843,8 @@ function start(s) {
         // the renderer.)
         ...lookSnapshot(s),
         cameraHome: { ...cam.home },
+        // (What he's saying: the line up and its trigger, when the idle clock comes round.)
+        talk: talk.snapshot(),
         options,
       }),
       /** @param {'head'|'body'|'feet'} part */
@@ -838,6 +884,11 @@ function start(s) {
         }
         return at;
       },
+      /**
+       * Show a line in his bubble now, as talk would (its time on screen, seconds).
+       * @param {string} text
+       */
+      say: (text) => bubble.say(String(text)),
       /** @param {string|null} clip */
       play(clip) {
         forced = clip;

@@ -2,8 +2,8 @@
 // in the page's own style (bubble.css: cream, a dark outline, Pixelify Sans, rounded, a tail
 // toward him), above his head and following him. createBubble({root}) gives say(text), then
 // update(head, avoid) once a frame with his head on screen (its middle and radius, client px:
-// character.js screenShape) and what it must keep clear of (the toolbar, the open Look sheet:
-// client rects). Near the top of the stage it goes beside his head instead, or under it, never
+// character.js screenShape; speakerPoint makes it null while the open Look sheet covers it) and
+// what it must keep clear of (the toolbar, the open Look sheet: client rects). Near the top of the stage it goes beside his head instead, or under it, never
 // over his face. It types the line out at a readable pace, holds it, then fades it, on the timeline
 // speech.js counts (lineDuration; with prefers-reduced-motion the whole line at once, held as
 // long, no fade). It stays on the stage, clear of what it's told to avoid (clearRegion, then
@@ -57,6 +57,21 @@ export function clearRegion(area, avoid = [], margin = BUBBLE.margin) {
     r = options.reduce((best, o) => (room(o) > room(best) ? o : best));
   }
   return r;
+}
+
+/**
+ * What the bubble points at: his head on screen, or null (it waits out of sight) while one of
+ * `covers` (the open Look sheet) is over his head's middle. Rects with no size are ignored.
+ * @param {{x: number, y: number, r?: number}|null} head
+ * @param {Array<Rect|null>} [covers]
+ */
+export function speakerPoint(head, covers = []) {
+  if (!head) return null;
+  for (const c of covers) {
+    if (!c || !(c.right > c.left) || !(c.bottom > c.top)) continue;
+    if (head.x >= c.left && head.x <= c.right && head.y >= c.top && head.y <= c.bottom) return null;
+  }
+  return head;
 }
 
 /**

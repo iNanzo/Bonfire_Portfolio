@@ -16,7 +16,9 @@
 // left-drag on empty space and two fingers pan it with the floor under the cursor, the wheel
 // and a two-finger pinch zoom it, the canvas shows no context menu, and Reset Camera brings it
 // back and clears the pan. A mouse drag keeps the point NEWT was grabbed by under the cursor
-// and lifts him higher than the old fixed carry height. A pinch over the toolbar or the Look sheet never
+// and lifts him higher than the old fixed carry height. He talks: clicked until he speaks, a line
+// of the admin's types out in a bubble over his head, clear of the toolbar (and of the open Look
+// sheet, never over his face), heard whole by a screen reader, gone when its time is up. A pinch over the toolbar or the Look sheet never
 // zooms the page, only the left mouse button holds or walks him, and the Look sheet holds focus
 // (Tab goes round inside it, the toolbar it covers is inert), closes on Escape wherever focus
 // is, and leaves NEWT in sight above or beside it (Reset Camera too, on its way back). Every wait is on a state through `?test`'s window.__invitation, never on a duration (CI's
@@ -147,6 +149,32 @@ async function lookOpenWithNewtInSight(page) {
     .toBe(true);
   return last;
 }
+/**
+ * The speech bubble as it's drawn now, with what it keeps clear of, client px: its rect, his
+ * head, the toolbar's, the open Look sheet's (null while it's shut) and the stage's; whether it
+ * waits out of sight (is-away) and the way its tail points.
+ */
+const bubbleAt = (page) =>
+  page.evaluate(() => {
+    const rect = (e) => {
+      if (!e || e.hidden) return null;
+      const r = e.getBoundingClientRect();
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+    };
+    const el = document.querySelector('[data-stage] .inv-bubble');
+    return {
+      box: rect(el),
+      away: !el || el.hidden || el.classList.contains('is-away'),
+      tail: el?.dataset.tail ?? null,
+      head: window.__invitation.screen('head'),
+      bar: rect(document.querySelector('.inv-toolbar')),
+      sheet: rect(document.querySelector('.inv-sheet')),
+      stage: rect(document.querySelector('[data-stage]')),
+    };
+  });
+/** Whether two client rects overlap. */
+const overlaps = (a, b) =>
+  Boolean(a && b) && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 /**
  * His bones (from his root) every frame the page draws for `ms`: how many frames, how many of
  * them showed a new pose, the seconds it took, and his feet's spread each frame (world units).
@@ -1168,6 +1196,69 @@ test.describe('on a desktop', () => {
     await until(page, (s) => s.headYaw < -0.15, 'his head turned left');
     await page.mouse.move(body.x + 220, body.y + 60, { steps: 4 });
     await until(page, (s) => s.headYaw > 0.15, 'his head turned right');
+  });
+
+  test('NEWT talks: clicked until he says something, a line of the admin’s types out in a bubble over his head, clear of the toolbar, and a screen reader hears it whole', async ({
+    page,
+  }) => {
+    const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
+    const lines = Object.values(inv.lines ?? {})
+      .flat()
+      .map((l) => String(l).trim());
+    const tapped = ['wave', 'spook', 'flee'].some((k) => inv.speech?.[k]?.chance > 0 && inv.lines?.[k]?.length);
+    test.skip(!tapped, 'the admin has a click on him say nothing');
+    const errors = watch(page);
+    await calm(page);
+    // A click on him waves or startles him (or, clicked often, he runs off): each speaks at its
+    // chance, so click again once he's back until one does.
+    for (let i = 0; i < 10 && !(await snapshot(page)).talk.showing; i++) {
+      const head = await on(page, 'head');
+      await page.mouse.click(head.x, head.y);
+      await until(page, (s) => s.state !== 'idle' || Boolean(s.talk.showing), 'reacting');
+      await until(page, (s) => s.state === 'idle' || Boolean(s.talk.showing), 'back to idle', 30_000);
+    }
+    const { showing } = (await snapshot(page)).talk;
+    expect(showing, 'he said something').toBeTruthy();
+    expect(['wave', 'spook', 'flee']).toContain(showing.trigger);
+    expect(lines).toContain(showing.line);
+    await expect(page.locator('.inv-bubble-typed'), 'typed out to the whole line').toHaveText(showing.line);
+    await expect(page.locator('.inv-bubble-live')).toHaveText(`NEWT: ${showing.line}`);
+    let at = null;
+    await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
+    expect(at.box.bottom, 'over his head').toBeLessThan(at.head.y);
+    expect(at.box.left).toBeLessThan(at.head.x + 40);
+    expect(at.box.right).toBeGreaterThan(at.head.x - 40);
+    expect(at.tail).toBe('down');
+    expect(overlaps(at.box, at.bar), 'clear of the toolbar').toBe(false);
+    // Its time up, it goes.
+    await expect(page.locator('.inv-bubble')).toBeHidden({ timeout: 20_000 });
+    await expect(page.locator('.inv-bubble-live')).toHaveText('');
+    expect(errors).toEqual([]);
+  });
+
+  test('the bubble sits under the toolbar and the Look sheet, and with the sheet open it stays clear of it and off his face', async ({
+    page,
+  }) => {
+    await calm(page);
+    const order = await page.evaluate(() => {
+      const b = document.querySelector('[data-stage] .inv-bubble');
+      const hud = document.querySelector('[data-stage] .inv-hud');
+      return Boolean(b && hud && b.compareDocumentPosition(hud) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(order, 'in the stage before the HUD, so the toolbar and the sheet draw over it').toBe(true);
+    await lookOpenWithNewtInSight(page);
+    await page.evaluate(() =>
+      window.__invitation.say('A line long enough to wrap onto a second row in the bubble, to see where it sits.'),
+    );
+    let at = null;
+    await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
+    expect(at.sheet, 'the sheet is open').toBeTruthy();
+    expect(overlaps(at.box, at.sheet), 'clear of the open Look sheet').toBe(false);
+    const face = { left: at.head.x - 4, top: at.head.y - 4, right: at.head.x + 4, bottom: at.head.y + 4 };
+    expect(overlaps(at.box, face), 'never over his face').toBe(false);
+    expect(at.box.left).toBeGreaterThanOrEqual(at.stage.left);
+    expect(at.box.top).toBeGreaterThanOrEqual(at.stage.top);
+    expect(at.box.right).toBeLessThanOrEqual(at.stage.right);
   });
 
   test('a right-drag turns the camera, on NEWT too and never holding him; the wheel zooms it; the canvas shows no context menu; Reset Camera brings it back', async ({

@@ -208,7 +208,9 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   over 0.35 s; `speechFrom` and `linesFrom` read the admin's settings and lines from anything),
   `bubble.js` + `bubble.css` (the bubble: `createBubble({root, before}).say(text)`, then
   `update(head, avoid)` each frame with his head's circle on screen and the toolbar's and open
-  sheet's rects; `clearRegion`, `placeBubble` and `bubbleFrame` are pure) and `content.js`
+  sheet's rects; `speakerPoint` makes his head null, the bubble out of sight, while the open
+  sheet covers it; `clearRegion`, `placeBubble`, `bubbleFrame` and `speakerPoint` are pure;
+  `main.js` steps talk right after the brain and moves the bubble once he's posed) and `content.js`
   (content.json's `invitation`, which the admin edits, through `virtual:invitation-content`:
   `invitationContent` in `vite.config.js` inlines only that subtree, watches the file and leaves
   the subtree out of the other pages' copy of content.json; `invitationLines()`,
@@ -255,9 +257,11 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   `screen('head'|'body'|'feet')` (a point on him in client px, to tap), `floorAt(x, y)` (the
   endless floor: null only above the horizon), `feet()` (his ankles, to measure foot slide),
   `bones()` (his bones from his root), `grabbed()` (while he's held, where the point he was
-  grabbed by shows, client px) and `play(clip)` (Walk and Run step in place at their own
-  pace). The snapshot's `camera` has the point it looks at on the floor (`target`) and whether
-  a pan holds it (`panned`), and `area` is the play area. `?seed=N` makes the randomness
+  grabbed by shows, client px), `say(text)` (a line in his bubble now, as talk would show it)
+  and `play(clip)` (Walk and Run step in place at their own pace). The snapshot's `camera` has
+  the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
+  the play area, and `talk` is what he's saying (speech.js's snapshot: the line up and its
+  trigger, when the idle clock comes round). `?seed=N` makes the randomness
   repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.

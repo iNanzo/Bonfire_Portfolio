@@ -1,10 +1,13 @@
 // The shapes the invitation toy's modules pass each other (JSDoc only: nothing runs here), and
 // the order a frame runs in. Units: world units (NEWT is about 1.0 tall), seconds, CSS pixels.
-// The pure modules (brain, blend, steer, carry, lookAt, faces, gesture, rng) import no three.js.
+// The pure modules (brain, blend, steer, carry, lookAt, faces, gesture, rng, speech) import no
+// three.js.
 //
 // A frame (main.js):
 //   1. pointer and button input → gesture events (gesture.js), floor points by ray (stage)
-//   2. brain.step(BrainIn) → BrainOut: the brain owns every timer and every state change
+//   2. brain.step(BrainIn) → BrainOut: the brain owns every timer and every state change; then
+//      talk.step (speech.js TalkIn: this BrainOut and the last, the gestures, the button, the
+//      camera) → a line to show goes to bubble.say
 //   3. steer (walk, flee, face the camera) or carry (held, falling) moves NEWT's root
 //   4. blendStep moves each clip's weight toward BrainOut's; gaitPhase advances the step phase
 //   5. character.update(dt): restore the head's saved animation pose → mixer.update → save it
@@ -12,7 +15,9 @@
 //      anchor − collar → root.updateMatrixWorld (only while held; the anchor is where the
 //      cursor's ray meets the camera-facing plane he was grabbed on, plus the grab offset)
 //   7. lookStep → character.applyLook (on top of the saved pose: it never adds up)
-//   8. faceStep → character.setFace
+//   8. faceStep → character.setFace; bubble.update (while a line is up): his head on screen
+//      (character.screenShape; null while the open Look sheet covers it, bubble.js
+//      speakerPoint), clear of the toolbar and the open sheet
 //   9. stage.render: the shadow map once, the colour pass, the retro pass
 
 /** @typedef {{x: number, z: number}} XZ */
