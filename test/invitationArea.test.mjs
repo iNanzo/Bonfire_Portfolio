@@ -529,38 +529,39 @@ test('moved to wherever NEWT is in the play area, the shadow camera covers him a
     { x: 1.234, z: -5.678 },
     { x: 0.001, z: 0.002 },
   ];
-  for (const [look, p] of Object.entries(LOOKS))
-    for (const yaw of [0, 2.1]) {
-      const sun = new THREE.DirectionalLight(0xffffff, 1);
-      sun.shadow.mapSize.set(p.shadow.mapSize, p.shadow.mapSize);
-      const d = lightDir(p.sun.dir, yaw);
-      sun.position.copy(new THREE.Vector3(d.x, d.y, d.z).normalize().multiplyScalar(12));
-      sun.target.position.set(0, 0, 0);
-      fitShadow(sun, AREA, top);
-      const home = { ...sun.shadow.camera };
-      for (const at of spots) {
-        const name = `${look} at yaw ${yaw}, NEWT at (${at.x.toFixed(2)}, ${at.z.toFixed(2)})`;
-        fitShadow(sun, AREA, top, at);
-        sun.updateMatrixWorld();
-        sun.shadow.updateMatrices(sun);
-        const cam = sun.shadow.camera;
-        close(cam.right - cam.left, home.right - home.left, 1e-9, `${name}: as wide`);
-        close(cam.top - cam.bottom, home.top - home.bottom, 1e-9, `${name}: as tall`);
-        const tx = (home.right - home.left) / p.shadow.mapSize;
-        const ty = (home.top - home.bottom) / p.shadow.mapSize;
-        const wx = (cam.left - home.left) / tx;
-        const wy = (cam.bottom - home.bottom) / ty;
-        close(wx, Math.round(wx), 1e-6, `${name}: whole texels across`);
-        close(wy, Math.round(wy), 1e-6, `${name}: whole texels up`);
-        for (let i = 0; i < 16; i++) {
-          const a = (i / 16) * 2 * Math.PI;
-          for (const y of [0, top / 2, top]) {
-            const r = NEWT_RADIUS + 0.7;
-            const q = new THREE.Vector3(at.x + r * Math.sin(a), y, at.z + r * Math.cos(a)).project(cam);
-            for (const k of ['x', 'y', 'z'])
-              assert.ok(Math.abs(q[k]) <= 1 + 1e-6, `${name}: his reach at ${i}, ${y}: ${k} ${q[k]}`);
-          }
-        }
+  const cases = Object.entries(LOOKS).flatMap(([look, p]) => [0, 2.1].map((yaw) => ({ look, p, yaw })));
+  // (Round him, his reach out: at the floor, half way up and the top.)
+  const reach = Array.from({ length: 16 }, (_, i) => (i / 16) * 2 * Math.PI).flatMap((a) =>
+    [0, top / 2, top].map((y) => ({ a, y })),
+  );
+  for (const { look, p, yaw } of cases) {
+    const sun = new THREE.DirectionalLight(0xffffff, 1);
+    sun.shadow.mapSize.set(p.shadow.mapSize, p.shadow.mapSize);
+    const d = lightDir(p.sun.dir, yaw);
+    sun.position.copy(new THREE.Vector3(d.x, d.y, d.z).normalize().multiplyScalar(12));
+    sun.target.position.set(0, 0, 0);
+    fitShadow(sun, AREA, top);
+    const home = { ...sun.shadow.camera };
+    for (const at of spots) {
+      const name = `${look} at yaw ${yaw}, NEWT at (${at.x.toFixed(2)}, ${at.z.toFixed(2)})`;
+      fitShadow(sun, AREA, top, at);
+      sun.updateMatrixWorld();
+      sun.shadow.updateMatrices(sun);
+      const cam = sun.shadow.camera;
+      close(cam.right - cam.left, home.right - home.left, 1e-9, `${name}: as wide`);
+      close(cam.top - cam.bottom, home.top - home.bottom, 1e-9, `${name}: as tall`);
+      const tx = (home.right - home.left) / p.shadow.mapSize;
+      const ty = (home.top - home.bottom) / p.shadow.mapSize;
+      const wx = (cam.left - home.left) / tx;
+      const wy = (cam.bottom - home.bottom) / ty;
+      close(wx, Math.round(wx), 1e-6, `${name}: whole texels across`);
+      close(wy, Math.round(wy), 1e-6, `${name}: whole texels up`);
+      const r = NEWT_RADIUS + 0.7;
+      for (const { a, y } of reach) {
+        const q = new THREE.Vector3(at.x + r * Math.sin(a), y, at.z + r * Math.cos(a)).project(cam);
+        const most = Math.max(Math.abs(q.x), Math.abs(q.y), Math.abs(q.z));
+        assert.ok(most <= 1 + 1e-6, `${name}: his reach at ${a.toFixed(2)} rad, ${y}: ${q.toArray()}`);
       }
     }
+  }
 });
