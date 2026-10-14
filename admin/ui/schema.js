@@ -37,6 +37,7 @@ import {
   INVITATION_MORE,
   INVITATION_RANGES,
   INVITATION_SELECTS,
+  INVITATION_STARTERS,
   INVITATION_SUBGROUPS,
 } from './invitationSchema.js';
 import { titleCase } from './text.js';
@@ -957,6 +958,12 @@ export const TEMPLATES = {
   // (A new scene is the Painter's default one; its id follows its name until edited.)
   scenes: () => ({ ...defaultScene('New Scene'), id: '' }),
 };
+
+/**
+ * A section content.json doesn't have yet that can start from built-in values: (draft) → its
+ * value (the Invitation page's, from the toy's own; scenes start as an empty list on their own).
+ */
+export const STARTERS = { ...INVITATION_STARTERS };
 
 /** “+ Add …” button wording per list. */
 export const ADD_LABELS = {

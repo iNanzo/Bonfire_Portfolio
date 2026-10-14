@@ -3,15 +3,17 @@
 // what he says. Its labels and help, the toy's own lists as dropdowns (Pixel Size, the style
 // it's built on, Motion, the Shader choices and Colors' steps), its ranges as sliders (the
 // Shader's, each trigger's chance and cooldown, the quiet spell: speech.js SPEECH_RANGES), the
-// triggers under the plan's kinds, and a line's Add button. contentRules.js checks the content;
+// triggers under the plan's kinds, a line's Add button, and a way to start each section from the
+// toy's own built-in values when content.json has none yet (INVITATION_STARTERS: content from
+// before the toy, or a fork, can be edited all the same). contentRules.js checks the content;
 // the toy reads it through src/invitation/content.js. Each Shader option goes by the Look
 // menu's own name (shader.js SHADER_CONTROLS), so a control added there shows here by itself.
 import { INVITATION_STYLES } from '../../src/contentRules.js';
-import { MOTIONS } from '../../src/invitation/look.js';
+import { DEFAULT_LOOK, MOTIONS } from '../../src/invitation/look.js';
 import { PRESETS } from '../../src/invitation/looks/index.js';
 import { PIXEL_SIZES } from '../../src/invitation/pixels.js';
-import { SHADER_CONTROLS } from '../../src/invitation/shader.js';
-import { LINE_MAX, LINES_MAX, SPEECH_RANGES, TRIGGERS } from '../../src/invitation/speech.js';
+import { SHADER_CONTROLS, styleShader } from '../../src/invitation/shader.js';
+import { LINE_MAX, LINES_MAX, SPEECH_DEFAULTS, SPEECH_RANGES, TRIGGERS } from '../../src/invitation/speech.js';
 import { titleCase } from './text.js';
 
 /** @type {Record<string, [string, string]>} each trigger (speech.js TRIGGERS): [its name, the moment it is] */
@@ -188,3 +190,30 @@ export const INVITATION_SELECTS = {
 
 /** “+ Add …” on each trigger's lines. */
 export const INVITATION_ADD_LABELS = Object.fromEntries(TRIGGERS.map((k) => [`invitation.lines.${k}`, 'line']));
+
+/** The style the toy's built-in Default is built on (looks/default.js spreads Soft). */
+const DEFAULT_BUILT_ON = 'soft';
+
+/**
+ * Each section from the toy's own built-in values, for a content.json without it (a fresh copy
+ * each call): the Default look (the built-in Default style: Soft with the Default preset's
+ * Shader values, at the built-in Pixel Size and Motion), the speech (speech.js SPEECH_DEFAULTS)
+ * and every trigger's lines, none yet.
+ * @type {Record<string, () => object>}
+ */
+export const INVITATION_STARTERS = {
+  'invitation.defaults': () => ({
+    pixelSize: DEFAULT_LOOK.pixelSize,
+    dither: DEFAULT_LOOK.dither,
+    outlines: DEFAULT_LOOK.outlines,
+    style: DEFAULT_BUILT_ON,
+    motion: DEFAULT_LOOK.motion,
+    shader: styleShader(PRESETS.default),
+  }),
+  'invitation.speech': () => ({
+    idleMin: SPEECH_DEFAULTS.idleEvery[0],
+    idleMax: SPEECH_DEFAULTS.idleEvery[1],
+    ...Object.fromEntries(TRIGGERS.map((k) => [k, { ...SPEECH_DEFAULTS.triggers[k] }])),
+  }),
+  'invitation.lines': () => Object.fromEntries(TRIGGERS.map((k) => [k, []])),
+};

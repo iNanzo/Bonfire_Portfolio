@@ -11,14 +11,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { INVITATION_STYLES, validateContent } from '../../src/contentRules.js';
-import { MOTIONS } from '../../src/invitation/look.js';
+import { DEFAULT_LOOK, MOTIONS } from '../../src/invitation/look.js';
 import { PRESETS } from '../../src/invitation/looks/index.js';
 import { PIXEL_SIZES } from '../../src/invitation/pixels.js';
-import { SHADER_CONTROLS } from '../../src/invitation/shader.js';
+import { SHADER_CONTROLS, styleShader } from '../../src/invitation/shader.js';
 import { LINE_MAX, LINES_MAX, SPEECH_DEFAULTS, SPEECH_RANGES, TRIGGERS } from '../../src/invitation/speech.js';
 import {
   ADD_LABELS,
   HELP,
+  STARTERS,
   LABELS,
   PAGES,
   SELECTS,
@@ -93,6 +94,36 @@ test('content from before the toy (no invitation key) passes, and a whole valid 
   assert.deepEqual(problems({ speech: { wave: { chance: 1, cooldown: 0 } } }).errors, []);
   assert.deepEqual(problems({ lines: { idle: [] } }).errors, []);
   assert.deepEqual(problems({ defaults: { pixelSize: 'off' } }).errors, []);
+});
+
+test('content from before the toy can still be edited: each of the Invitation page’s sections starts from the toy’s own built-in values, which pass the rules', () => {
+  const keys = ['invitation.defaults', 'invitation.speech', 'invitation.lines'];
+  for (const key of keys) assert.equal(typeof STARTERS[key], 'function', `${key} has a way to start`);
+  const inv = Object.fromEntries(keys.map((key) => [key.split('.')[1], STARTERS[key]()]));
+  const old = content();
+  delete old.invitation;
+  assert.deepEqual(validateContent({ ...old, invitation: inv }).errors, [], 'all three, started');
+  for (const key of keys) {
+    const part = key.split('.')[1];
+    assert.deepEqual(validateContent({ ...old, invitation: { [part]: inv[part] } }).errors, [], `${key} alone`);
+  }
+  // The defaults: the toy's built-in Default style (Soft with the Default preset's Shader values),
+  // at the built-in Pixel Size and Motion.
+  assert.equal(inv.defaults.pixelSize, DEFAULT_LOOK.pixelSize);
+  assert.equal(inv.defaults.dither, DEFAULT_LOOK.dither);
+  assert.equal(inv.defaults.outlines, DEFAULT_LOOK.outlines);
+  assert.equal(inv.defaults.motion, DEFAULT_LOOK.motion);
+  assert.ok(INVITATION_STYLES.includes(inv.defaults.style), inv.defaults.style);
+  assert.deepEqual(inv.defaults.shader, styleShader(PRESETS.default));
+  // The speech: the toy's built-in quiet spell and every trigger's chance and cooldown.
+  assert.deepEqual([inv.speech.idleMin, inv.speech.idleMax], SPEECH_DEFAULTS.idleEvery);
+  for (const k of TRIGGERS) assert.deepEqual(inv.speech[k], SPEECH_DEFAULTS.triggers[k], k);
+  // The lines: every trigger, none yet (the toy says nothing without them, as before).
+  assert.deepEqual(Object.keys(inv.lines), TRIGGERS);
+  for (const k of TRIGGERS) assert.deepEqual(inv.lines[k], [], k);
+  // Each start is a copy of its own.
+  assert.notEqual(STARTERS['invitation.lines'](), STARTERS['invitation.lines']());
+  assert.notEqual(STARTERS['invitation.defaults']().shader, STARTERS['invitation.defaults']().shader);
 });
 
 test('the section itself: a group of fields, with only its three parts', () => {

@@ -160,7 +160,10 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     lines says nothing.
   - **Checks:** at most 20 lines a moment, each up to 120 characters (a warning past 80,
     where his bubble wraps a lot); every value within its list or range. The section is
-    optional, so content from before the toy still passes. The toy reads it through
+    optional, so content from before the toy still passes, and each of its three parts it
+    lacks shows **Start From the Toy’s Own**, which fills that part in with the toy's built-in
+    values (the built-in Default look, its speech settings, every moment with no lines yet)
+    to edit from (`INVITATION_STARTERS`, schema.js `STARTERS`). The toy reads it through
     `virtual:invitation-content` (`vite.config.js`), never `content.json` itself, and the
     other pages' copy of the content leaves it out. A change to its shape needs
     `npm run admin:deploy` after the merge. There's no live preview: open `/invitation/`.

@@ -15,7 +15,7 @@ import { DEFAULT_EFFECTS } from '../../src/effectsDefaults.js';
 import { logoMark } from '../../src/ui/logo.js';
 import { installTooltips } from '../../src/ui/tooltip.js';
 import { q, typing } from '../../src/ui/shell.js';
-import { HELP, LABELS, PAGES, defaultLabel, moreFor, resolveHelp } from './schema.js';
+import { HELP, LABELS, PAGES, STARTERS, defaultLabel, moreFor, resolveHelp } from './schema.js';
 import { el, getAt, moreBox, renderFeatured, renderValue, showErrors } from './form.js';
 import { createPreview } from './preview.js';
 import { flamesBlockTools, sceneBlockTools } from './paletteTools.js';
@@ -459,8 +459,13 @@ function resetBlock(key, effectsKey) {
   );
 }
 
-/** A section content.json doesn't have yet: the optional scenes start as an empty list on the first add. */
+/**
+ * A section content.json doesn't have yet: the optional scenes start as an empty list on the
+ * first add; the Invitation page's start from the toy's own values (schema.js STARTERS), so
+ * content from before the toy can be edited all the same.
+ */
 function missing(key) {
+  if (STARTERS[key]) return starter(key);
   if (key !== 'scenes') return el('p', { class: 'help', text: 'Missing from content.json.' });
   return el(
     'div',
@@ -477,6 +482,35 @@ function missing(key) {
         ctx.draft.scenes = [];
         ctx.changed({ rerender: true });
         q('[data-path="scenes"] .collection > .add')?.click();
+      },
+    }),
+  );
+}
+
+/** A section that can start from built-in values: a word on what shows now, and the button. */
+function starter(key) {
+  return el(
+    'div',
+    { class: 'collection' },
+    el('p', {
+      class: 'help',
+      text: 'Not in content.json yet, so the toy uses its own. Start from those to change them here.',
+    }),
+    el('button', {
+      type: 'button',
+      class: 'add',
+      text: 'Start From the Toy’s Own',
+      'aria-label': `Start From the Toy’s Own: ${labelOf(key)}`,
+      onclick: () => {
+        const path = parsePath(key);
+        let at = ctx.draft;
+        for (const k of path.slice(0, -1)) {
+          if (!at[k] || typeof at[k] !== 'object' || Array.isArray(at[k])) at[k] = {};
+          at = at[k];
+        }
+        at[path.at(-1)] = STARTERS[key](ctx.draft);
+        ctx.changed({ rerender: true });
+        q(`[data-path="${CSS.escape(key)}"] :is(input, select, textarea, button.add)`)?.focus();
       },
     }),
   );
