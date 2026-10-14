@@ -240,10 +240,11 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   atlas (`newt-atlas-pixel.png`) are asked for at the same time as the glb, and with the switch
   on the first frame waits for them (up to 3 s more), so NEWT never shows the blurred atlas and
   a blank face first; with it off the first frame doesn't wait.
-- **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationShader`,
-  `invitationArea`, `invitationCamera` and `invitationPlay` (with `invitationBrain`,
-  `invitationMotion`, `invitationGesture` and `invitationModel`), and `e2e/invitation.spec.mjs`
-  (`npm run e2e -- invitation`).
+- **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationLooks`,
+  `invitationShader`, `invitationRetro`, `invitationGovernor`, `invitationAtlas`,
+  `invitationFace`, `invitationArea`, `invitationCamera` and `invitationPlay` (with
+  `invitationBrain`, `invitationMotion`, `invitationGesture` and `invitationModel`), the speech
+  and content tests above, and `e2e/invitation.spec.mjs` (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
