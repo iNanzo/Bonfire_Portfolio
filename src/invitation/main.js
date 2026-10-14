@@ -1,7 +1,8 @@
 // The invitation toy (/invitation/): NEWT on a plain white floor, to play with. This page boots
 // it and runs it: the controls (ui.js), the stage (stage.js: renderer, camera, floor, lights,
 // retro pass), NEWT (character.js, from models/newt.glb), the Look menu (switched live, kept in
-// localStorage: look.js), the orbit camera (camera.js: a drag on empty space turns it, the
+// localStorage: look.js), the orbit camera (camera.js: a finger's drag on empty space or the
+// mouse's right-drag turns it, the mouse's left-drag on empty space or two fingers pan it, the
 // wheel or a pinch zooms it, Reset Camera brings it back), and the render loop (stopped while
 // the page is hidden, steps of at most 0.05 s, a lost WebGL context told). While the Look sheet
 // is open NEWT stays in sight: the view shows him in the clear space above or beside it
@@ -29,10 +30,13 @@ import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
 import { createBrain } from './brain.js';
 import { carryFeel } from './carry.js';
+import { playArea, viewArea } from './area.js';
 import {
   createOrbit,
+  orbitArea,
   orbitEvents,
   orbitFollowAll,
+  orbitHold,
   orbitHome,
   orbitPose,
   orbitRelease,
@@ -134,9 +138,10 @@ if (webgl2()) {
         ui.setPixelSteps(screenSteps());
         // (His shirt's plaid by how many texels tall he is, once he's in.)
         character?.setResolution(newtTexels(view, grid));
-        if (!orbit) return;
+        if (!orbit || !stage) return;
         orbitHome(orbit, view.distance);
-        orbitSpan(orbit, stageSize());
+        orbitSpan(orbit, stageSpan(stage));
+        orbitArea(orbit, areaOf(stage));
       },
     });
   } catch {
@@ -154,6 +159,28 @@ if (!stage) {
 /** The stage's size, CSS px (a drag across it turns the camera the same share of a turn anywhere). */
 function stageSize() {
   return { w: stageEl.clientWidth, h: stageEl.clientHeight };
+}
+
+/**
+ * The stage for the orbit camera: its size, the canvas's CSS height (the field of view's) and
+ * half the clear space insets() leave, round where the point it looks at shows (it keeps NEWT
+ * on screen in there).
+ * @param {NonNullable<typeof stage>} s
+ */
+function stageSpan(s) {
+  const { w, h } = stageSize();
+  const i = insets();
+  return { w, h, ch: s.grid.canvasH, hw: (w - i.left - i.right) / 2, hh: (h - i.top - i.bottom) / 2 };
+}
+
+/**
+ * The play area: the floor the default view shows fully zoomed out, inside the clear space
+ * (area.js viewArea); the default view's disc until the stage has a view.
+ * @param {NonNullable<typeof stage>} s
+ */
+function areaOf(s) {
+  const { w, h } = stageSize();
+  return s.view ? viewArea({ view: s.view, cssW: w, cssH: h, insets: insets() }) : playArea();
 }
 
 /** Pixel Size's steps on this screen (pixels.js pixelSteps: two that draw alike here are one). */
@@ -224,6 +251,8 @@ function start(s) {
   const faces = createFaceState();
   orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(s.bounds), span: stageSize() });
   const cam = orbit;
+  orbitSpan(cam, stageSpan(s));
+  orbitArea(cam, areaOf(s));
   s.setCamera(orbitPose(cam));
 
   let running = false;
@@ -463,15 +492,27 @@ function start(s) {
   }
 
   /**
-   * The camera this frame: the gestures and Reset Camera move it, it eases and follows NEWT.
+   * Where the point the camera looks at shows, client px (the view's shift from the canvas's
+   * middle: a pan keeps the floor under the cursor).
+   */
+  function shownAt() {
+    const r = canvas.getBoundingClientRect();
+    const shift = s.view?.shift ?? { x: 0, y: 0 };
+    return { x: r.left + r.width / 2 + shift.x, y: r.top + r.height / 2 + shift.y };
+  }
+
+  /**
+   * The camera this frame: the gestures and Reset Camera move it, it eases and keeps NEWT on
+   * screen (holding still while he's held).
    * @param {import('./types.js').GestureEvent[]} evs
    * @param {number} dt
    */
   function moveCamera(evs, dt) {
-    orbitEvents(cam, evs);
+    orbitEvents(cam, evs, evs.some((e) => e.type === 'pan') ? shownAt() : null);
     if (resetCamera) orbitReset(cam);
     resetCamera = false;
-    orbitStep(cam, dt, { x: body.root.x, z: body.root.z });
+    orbitHold(cam, body.mode === 'held');
+    orbitStep(cam, dt, { x: body.root.x, z: body.root.z, y: Math.max(0, body.root.y) });
     const pose = orbitPose(cam);
     s.setCamera(pose);
     return pose;

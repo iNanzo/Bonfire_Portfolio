@@ -8,7 +8,12 @@
 // softly as it zooms in, so he stays in frame (on a phone, where he's drawn bigger, most of the
 // way at the default zoom too, and all the way at any zoom while the Look sheet is open);
 // Reset Camera eases back to the default the short way round; a resize keeps the zoom; and the light turns with it, so his shadow falls the same way
-// on screen after any orbit.
+// on screen after any orbit. A pan (the mouse's left-drag on empty space, two fingers) slides
+// the view across and up and down the screen, the floor under the cursor staying under it,
+// kept to the play area so it's never lost; the soft follow yields to it until NEWT walks off
+// the screen, and Reset Camera clears it. However the camera is turned, NEWT walking anywhere
+// in the play area never leaves the screen: the view holds still while he's well inside it and
+// moves on as he nears an edge. While he's held the view holds still.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -31,9 +36,19 @@ import {
   orbitZoom,
   tiltPerPx,
   turnPerPx,
+  orbitArea,
+  orbitHold,
+  orbitPan,
+  screenOf,
+  worldPerPx,
+  floorUnder,
 } from '../src/invitation/camera.js';
-import { VIEW } from '../src/invitation/pixels.js';
+import { VIEW, frameView, project, texelGrid } from '../src/invitation/pixels.js';
 import { LOOKS } from '../src/invitation/look.js';
+import { AREA_RADIUS, NEWT_HEIGHT, NEWT_RADIUS, viewArea } from '../src/invitation/area.js';
+import { clampTo, xRange } from '../src/invitation/steer.js';
+import { GAIT } from '../src/invitation/clips.js';
+import { createRng } from '../src/invitation/rng.js';
 
 const D = Math.PI / 180;
 const DT = 1 / 60;
@@ -204,7 +219,7 @@ test('on a desktop the orbit stays on the play area’s centre at the default zo
 });
 
 test('on a phone’s stage the orbit follows NEWT softly most of the way at the default zoom too, all the way zoomed in; a resize to a desktop stops it', () => {
-  const newt = { x: 2, z: -1 };
+  const newt = { x: 0.8, z: -0.6 }; // (well inside a phone's view: keeping him on screen leaves it be)
   assert.ok(ORBIT.phoneFollow >= 0.6 && ORBIT.phoneFollow <= 1, `${ORBIT.phoneFollow} of the way`);
   for (const span of [
     { w: 390, h: 844 },
@@ -315,6 +330,281 @@ test('the gestures move it: an orbit turns it, a pinch zooms it, letting go of a
     { type: 'grab', on: 'newt', x: 0, y: 0, t: 2 },
   ]);
   assert.deepEqual(o.goal, before, 'his own gestures leave it be');
+});
+
+// ---- pan, the play area and keeping NEWT in view -------------------------------------------
+
+const INSETS = { top: 16, bottom: 72, left: 24, right: 24 };
+/**
+ * A screen's default view, its play area, and an orbit on it as main.js makes one: the stage's
+ * size, the canvas's height (the field of view's) and half the clear space round where the
+ * point it looks at shows.
+ */
+function stageFor(w, h, dpr = 1) {
+  const grid = texelGrid({ cssW: w, cssH: h, dpr, pixelSize: '96' });
+  const view = frameView({ cssW: w, cssH: h, grid, insets: INSETS, area: AREA_RADIUS + NEWT_RADIUS });
+  const area = viewArea({ view, cssW: w, cssH: h, insets: INSETS });
+  const frame = { hw: (w - INSETS.left - INSETS.right) / 2, hh: (h - INSETS.top - INSETS.bottom) / 2 };
+  const make = (yaw = 0) => {
+    const o = createOrbit({ distance: view.distance, yaw, span: { w, h } });
+    orbitSpan(o, { w, h, ch: view.canvasH, ...frame });
+    orbitArea(o, area);
+    return o;
+  };
+  return { view, area, frame, make };
+}
+/** NEWT standing at `n` on screen with orbit `o` (CSS px from where its target shows): his body's extremes. */
+function boxOf(o, n) {
+  const box = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
+  const r = { x: Math.cos(o.yaw), z: -Math.sin(o.yaw) };
+  for (const y of [0, NEWT_HEIGHT])
+    for (const k of [-1, 1]) {
+      const s = screenOf(o, { x: n.x + k * NEWT_RADIUS * r.x, y, z: n.z + k * NEWT_RADIUS * r.z });
+      box.left = Math.min(box.left, s.x);
+      box.right = Math.max(box.right, s.x);
+      box.top = Math.min(box.top, s.y);
+      box.bottom = Math.max(box.bottom, s.y);
+    }
+  return box;
+}
+const inFrame = (box, f) => box.left >= -f.hw && box.right <= f.hw && box.top >= -f.hh && box.bottom <= f.hh;
+const inArea = (b, p) => {
+  const [lo, hi] = xRange(b, p.z);
+  return p.z >= b.minZ - 1e-6 && p.z <= b.maxZ + 1e-6 && p.x >= lo - 1e-6 && p.x <= hi + 1e-6;
+};
+
+test('screenOf puts a world point where the camera shows it: as pixels.js projects it at the default view, and turned with the camera', () => {
+  for (const [w, h, dpr] of [
+    [1280, 800, 1],
+    [390, 844, 3],
+  ]) {
+    const { view, make } = stageFor(w, h, dpr);
+    const o = make();
+    const at = project(view, view.target);
+    for (const p of [
+      { x: 1, y: 0, z: 0 },
+      { x: -2, y: 1, z: -3 },
+      { x: 0.5, y: 0.2, z: 2 },
+    ]) {
+      const want = project(view, p);
+      const got = screenOf(o, p);
+      close(got.x, want.x - at.x, 1e-6, `${w}x${h} across`);
+      close(got.y, want.y - at.y, 1e-6, `${w}x${h} down`);
+    }
+    // Turned, a point turned with it shows in the same place.
+    orbitDrag(o, -200, 0, 0);
+    settle(o, 3);
+    const c = Math.cos(o.yaw);
+    const s = Math.sin(o.yaw);
+    const p = { x: 1.5, y: 0.3, z: -1 };
+    const turned = { x: p.x * c + p.z * s, y: p.y, z: p.z * c - p.x * s };
+    const want = project(view, p);
+    close(screenOf(o, turned).x, want.x - at.x, 1e-6);
+    close(screenOf(o, turned).y, want.y - at.y, 1e-6);
+  }
+});
+
+test('a pan slides the view across and up and down the screen, at once: the floor under the cursor stays under it, at any yaw and zoom', () => {
+  const { make } = stageFor(1280, 800);
+  for (const yaw of [0, 1, 2.5, -2]) {
+    for (const zoom of [1, 1.6, 0.6]) {
+      const o = make(yaw);
+      orbitZoom(o, zoom);
+      settle(o, 3);
+      const at = `yaw ${yaw}, zoom ${zoom}`;
+      // A drag that starts here and there on the floor, in several moves.
+      let cursor = { x: 120, y: 60 };
+      const grabbed = floorUnder(o, cursor);
+      const shown = screenOf(o, { x: grabbed.x, y: 0, z: grabbed.z });
+      close(shown.x, cursor.x, 1e-6, `${at}: floorUnder is screenOf's inverse`);
+      close(shown.y, cursor.y, 1e-6);
+      for (const [dx, dy] of [
+        [80, 0],
+        [0, -60],
+        [-50, 40],
+        [-30, -25],
+      ]) {
+        cursor = { x: cursor.x + dx, y: cursor.y + dy };
+        orbitPan(o, dx, dy, cursor);
+        const now = screenOf(o, { x: grabbed.x, y: 0, z: grabbed.z });
+        close(now.x, cursor.x, 1e-6, `${at}: across after (${dx}, ${dy})`);
+        close(now.y, cursor.y, 1e-6, `${at}: down after (${dx}, ${dy})`);
+      }
+      // It stays where the pan put it, at NEWT's middle height, and nothing else about the view
+      // changes.
+      const put = { ...o.target };
+      settle(o, 1, grabbed);
+      assert.deepEqual(o.target, put, `${at}: it stays where the pan put it`);
+      close(o.target.y, FOCUS_Y, 1e-12, 'the point it looks at stays at his middle height');
+      close(o.yaw, o.goal.yaw, 1e-3);
+    }
+  }
+  // Without the cursor's spot: about where the point it looks at shows. With no floor under the
+  // cursor (above the horizon), as fast as the floor there would go, and never a fling.
+  const o = make();
+  close(worldPerPx(o), (2 * o.distance * Math.tan((VIEW.fov * D) / 2)) / o.ch, 1e-12);
+  orbitPan(o, 40, 0);
+  assert.ok(o.target.x < 0 && o.target.x > -60 * worldPerPx(o), `about 40 px across (${o.target.x})`);
+  const sky = make();
+  orbitPan(sky, 0, 30, { x: 0, y: -5000 });
+  assert.ok(sky.target.z < 0 && sky.target.z > -6 * 30 * worldPerPx(sky), `up the screen, a little (${sky.target.z})`);
+});
+
+test('a pan keeps to the play area: the point the camera looks at never leaves it, so some of it is always on screen', () => {
+  for (const [w, h, dpr] of [
+    [1280, 800, 1],
+    [390, 844, 3],
+  ]) {
+    const { area, make } = stageFor(w, h, dpr);
+    for (const yaw of [0, 0.8, Math.PI, -2.2]) {
+      const o = make(yaw);
+      for (const [dx, dy] of [
+        [4000, 0],
+        [-4000, 0],
+        [0, 4000],
+        [0, -4000],
+        [3000, -3000],
+      ]) {
+        for (let i = 0; i < 40; i++) orbitPan(o, dx / 40, dy / 40);
+        assert.ok(inArea(area, o.target), `${w}x${h} yaw ${yaw} (${dx}, ${dy}): ${JSON.stringify(o.target)}`);
+        const c = clampTo(area, o.target);
+        assert.ok(Math.hypot(c.x - o.target.x, c.z - o.target.z) < 1e-6);
+        settle(o, 0.5, { x: 0, z: 0 });
+      }
+    }
+  }
+});
+
+test('after a pan the view stays where it was put while NEWT is on screen, even as he moves; once he walks off it, the follow takes him again; Reset Camera clears the pan and the zoom', () => {
+  for (const [w, h, dpr] of [
+    [1280, 800, 1],
+    [390, 844, 3],
+  ]) {
+    const { frame, make } = stageFor(w, h, dpr);
+    const o = make();
+    const at = `${w}x${h}`;
+    let newt = { x: 0, z: 0 };
+    settle(o, 2, newt);
+    orbitPan(o, -frame.hw * 0.4, 0); // (the view slides left: NEWT shows to the right of the middle)
+    orbitEvents(o, [{ type: 'release', on: 'floor', x: 0, y: 0, t: 1 }]);
+    const put = { ...o.target };
+    // He walks about a little, still on screen: the view stays put (a phone's soft follow too).
+    for (let t = 0; t < 2; t += DT) {
+      newt = { x: 0.3 * Math.sin(t * 3), z: 0.3 * Math.cos(t * 2) };
+      orbitStep(o, DT, newt);
+    }
+    close(o.target.x, put.x, 1e-9, `${at}: stayed put`);
+    close(o.target.z, put.z, 1e-9);
+    // He walks off to the right at walking speed: once he leaves the screen the follow takes him
+    // again, and he's never far off it.
+    let worst = -Infinity;
+    for (let t = 0; t < 10; t += DT) {
+      newt = { x: newt.x + GAIT.walk * DT, z: newt.z };
+      orbitStep(o, DT, newt);
+      worst = Math.max(worst, boxOf(o, newt).right - frame.hw);
+    }
+    assert.ok(Math.hypot(o.target.x - put.x, o.target.z - put.z) > 2, `${at}: the view went after him`);
+    assert.ok(worst < 12, `${at}: at most ${worst.toFixed(1)} px of him past the edge`);
+    // A pan that takes him off the screen leaves the view there: no snapping back to him.
+    orbitPan(o, frame.hw * 2.5, 0);
+    orbitEvents(o, [{ type: 'release', on: 'floor', x: 0, y: 0, t: 2 }]);
+    const away = { ...o.target };
+    settle(o, 3, newt);
+    assert.ok(!inFrame(boxOf(o, newt), frame), `${at}: he's off the screen`);
+    close(o.target.x, away.x, 1e-9, `${at}: and the view stays where the pan put it`);
+    // Reset Camera: no pan, the default zoom, and him in view again, the view as near the
+    // default as keeps him there.
+    orbitZoom(o, 0.7);
+    newt = { x: 0.5, z: 0.2 };
+    orbitReset(o);
+    settle(o, 5, newt);
+    close(o.distance, o.home.distance, 1e-2 * o.home.distance, `${at}: the default zoom`);
+    assert.ok(inFrame(boxOf(o, newt), frame), `${at}: him in view`);
+    assert.ok(
+      Math.hypot(o.target.x, o.target.z) < 0.5 + 1e-3,
+      `${at}: back near the middle (${JSON.stringify(o.target)})`,
+    );
+  }
+});
+
+test('NEWT walking or running anywhere in the play area never leaves the screen, however the camera is turned: the view holds still while he is well inside it and moves on as he nears an edge', () => {
+  const rng = createRng(4);
+  for (const [w, h, dpr] of [
+    [1280, 800, 1],
+    [390, 844, 3],
+    [844, 390, 3],
+  ]) {
+    const { area, frame, make } = stageFor(w, h, dpr);
+    for (const yaw of [0, 1.2, Math.PI, -2]) {
+      const at = `${w}x${h} at yaw ${yaw}`;
+      const o = make(yaw);
+      let newt = { x: 0, z: 0 };
+      settle(o, 3, newt);
+      for (let leg = 0; leg < 8; leg++) {
+        // To a spot anywhere in the play area, at walking or running speed.
+        const z = area.minZ + rng() * (area.maxZ - area.minZ);
+        const [lo, hi] = xRange(area, z);
+        const goal = { x: lo + rng() * (hi - lo), z };
+        const speed = leg % 2 ? GAIT.run : GAIT.walk;
+        const len = Math.hypot(goal.x - newt.x, goal.z - newt.z);
+        const from = newt;
+        for (let t = 0; t < len / speed + 1; t += DT) {
+          const k = Math.min(1, (t * speed) / len);
+          newt = { x: from.x + (goal.x - from.x) * k, z: from.z + (goal.z - from.z) * k };
+          orbitStep(o, DT, newt);
+          const box = boxOf(o, newt);
+          assert.ok(inFrame(box, frame), `${at}, leg ${leg} at ${t.toFixed(2)} s: ${JSON.stringify(box)}`);
+        }
+      }
+    }
+  }
+  // On a desktop, small steps round the middle never move the view at the default zoom.
+  const { make } = stageFor(1280, 800);
+  const o = make();
+  settle(o, 2, { x: 0, z: 0 });
+  for (let t = 0; t < 4; t += DT) orbitStep(o, DT, { x: 1.2 * Math.sin(t), z: 0.8 * Math.cos(t) });
+  close(o.target.x, 0, 1e-9, 'still');
+  close(o.target.z, 0, 1e-9);
+});
+
+test('while NEWT is held the view holds still, zoomed in too, and once he is let go it follows again', () => {
+  const { make } = stageFor(1280, 800);
+  const o = make();
+  orbitZoom(o, 100); // (all the way in: it follows him all the way)
+  settle(o, 3, { x: 0, z: 0 });
+  orbitHold(o, true);
+  for (let t = 0; t < 1; t += DT) orbitStep(o, DT, { x: t, z: 0, y: 0.6 });
+  close(o.target.x, 0, 1e-9, 'held: still');
+  orbitHold(o, false);
+  settle(o, 5, { x: 1, z: 0 });
+  close(o.target.x, 1, 1e-3, 'let go: after him');
+});
+
+test('the gestures pan it too: a pan event slides it at once, and letting go ends the pan', () => {
+  const { make } = stageFor(1280, 800);
+  const o = make();
+  settle(o, 1, { x: 0, z: 0 });
+  orbitEvents(o, [
+    { type: 'pan', on: 'floor', x: 10, y: 0, t: 0.01, dx: 30, dy: 0 },
+    { type: 'pan', on: 'floor', x: 20, y: 0, t: 0.02, dx: 20, dy: 10 },
+  ]);
+  close(o.target.x, -50 * worldPerPx(o), 0.15 * 50 * worldPerPx(o), 'slid across by about 50 px');
+  assert.ok(o.target.z < 0, 'and up the screen');
+  // Told where the point it looks at shows, a pan keeps the floor under the cursor.
+  const q = make();
+  settle(q, 1, { x: 0, z: 0 });
+  const shownAt = { x: 640, y: 380 };
+  const under = floorUnder(q, { x: 100, y: 50 });
+  orbitEvents(q, [{ type: 'pan', on: 'floor', x: 640 + 130, y: 380 + 20, t: 0.01, dx: 30, dy: -30 }], shownAt);
+  const now = screenOf(q, { x: under.x, y: 0, z: under.z });
+  close(now.x, 130, 1e-6);
+  close(now.y, 20, 1e-6);
+  assert.equal(o.panned, true);
+  assert.equal(o.panning, true);
+  orbitEvents(o, [{ type: 'release', on: 'floor', x: 20, y: 0, t: 0.04 }]);
+  assert.equal(o.panning, false);
+  assert.equal(o.panned, true, 'the view stays where it was put');
+  assert.deepEqual(o.spin, { yaw: 0, elevation: 0 }, 'a pan never flings the turn');
 });
 
 test('the light turns with the camera’s yaw, so his shadow falls the same way on screen (back and to one side) after any orbit', () => {
