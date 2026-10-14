@@ -13,27 +13,30 @@
 //
 // A frame, in types.js's order: the pointers' gestures (gesture.js; taps get their floor spot
 // by ray) and the buttons → the camera moves → brain.step → his root: steer on the ground,
-// carry while he's held (his collar, the Neck bone's head, hung from where the pointer's ray
-// meets the lift height, 48 CSS px above a finger), the fall once he's let go (play.js bodyStep)
+// carry while he's held (his collar, the Neck bone's head, hung where the pointer's ray meets
+// the camera-facing plane through where he was grabbed, plus the grab offset, so the point
+// grabbed stays under the cursor; 48 CSS px above a finger, coming in as he's picked up: carry.js
+// dragTarget), the fall once he's let go (play.js bodyStep)
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
 // → the blob shadow, the marker, the toolbar → render. With Motion Choppy (look.js) his pose
 // (the update and applyLook) only moves on the clock's steps, 15 a second; his root, the
-// camera and the rest move every frame. The lift height comes from the Held clip at load (his
-// collar over his lowest sole, plus a gap).
+// camera and the rest move every frame. The lowest his collar is carried comes from the Held
+// clip at load (his collar over his lowest sole, plus a gap).
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
 // (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
 // (his ankles in the world, his bones from his root) and play(clip) (forces a clip, Walk and
 // Run going round their step at their own pace); `?seed=N` and `?calm` go to the brain.
+import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
 import { createBrain } from './brain.js';
-import { carryFeel } from './carry.js';
-import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
+import { CARRY, carryFeel, dragPlane, dragTarget, gripFor } from './carry.js';
+import { playArea, viewArea } from './area.js';
 import {
   createOrbit,
   orbitArea,
@@ -59,7 +62,7 @@ import { animFps, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
 import { createRng } from './rng.js';
-import { LIFT, createStage } from './stage.js';
+import { createStage } from './stage.js';
 import { centreOf } from './steer.js';
 import { bindUi, parseQuery } from './ui.js';
 
@@ -68,14 +71,14 @@ const MAX_DT = 0.05;
 const BASE = import.meta.env.BASE_URL;
 /** A finger carries him this far above itself, CSS px, so it doesn't hide him (a mouse: 0). */
 const FINGER_LIFT = 48;
-/** His soles hang this far over the floor while he's held, world units. */
-const HANG_GAP = 0.3;
+/** His soles hang at least this far over the floor while he's held, world units. */
+const HANG_GAP = 0.06;
 /** Extra reach for a finger picking him, CSS px. */
 const TOUCH_SLOP = 6;
 /** States remembered for ?test (the last ones, in order). */
 const STATES_KEPT = 40;
 /** The shadow camera reaches this high over the floor, world units: the top of his head lifted highest. */
-const SHADOW_TOP = LIFT + NEWT_HEIGHT;
+const SHADOW_TOP = CARRY.liftMax + 0.3;
 /**
  * Where NEWT may go: the play area (area.js viewArea), one object kept in place (the brain and
  * his steps hold it) and filled in again on a resize; the default view's disc until then.
@@ -299,9 +302,11 @@ function start(s) {
   /** @type {string[]} */
   const states = [];
   /** The collar's height while he's held, world units (from the Held clip at load). */
-  let liftY = 1.1;
+  let hangY = 1.1;
+  /** @type {import('./carry.js').Grip|null} how he's held, while he is */
+  let grip = null;
   /** @type {import('./types.js').XYZ} where his collar was carried last */
-  let target = { x: 0, y: liftY, z: 0 };
+  let target = { x: 0, y: hangY, z: 0 };
   /** The retro pass's other path is compiled (stage.js warm), for ?test. */
   let warmed = false;
   /** The toolbar as last set, so the DOM is only touched on a change. */
@@ -322,8 +327,8 @@ function start(s) {
       if (s.view) c.setResolution(newtTexels(s.view, s.grid));
       c.root.rotation.order = 'XZY'; // (the swing tilts him about the world's axes, after his yaw)
       s.scene.add(c.root);
-      liftY = hangHeight(c) + HANG_GAP;
-      target = { x: 0, y: liftY, z: 0 };
+      hangY = hangHeight(c) + HANG_GAP;
+      target = { x: 0, y: hangY, z: 0 };
       sync();
       // (The pass's other path compiled ahead, so the first switch to Off or back never stalls.)
       s.warm()
@@ -583,8 +588,9 @@ function start(s) {
   }
 
   /**
-   * His root: steered, carried (toward where the pointer's ray meets the lift height, above a
-   * finger) or falling (play.js bodyStep).
+   * His root: steered, carried (dragged on the camera-facing plane through where he was grabbed,
+   * the point grabbed under the cursor, or a little above a finger: carry.js) or falling
+   * (play.js bodyStep).
    * @param {NonNullable<typeof character>} c
    * @param {import('./types.js').BrainOut} o
    * @param {ReturnType<typeof pointerNow>} ptr
@@ -595,10 +601,13 @@ function start(s) {
     root.updateMatrixWorld(true);
     const press = gesture.current();
     if (press?.grabbed) {
-      const ray = s.ray(press.x, press.y - (pressKind === 'touch' ? FINGER_LIFT : 0));
-      const hit = rayPlaneY(ray.o, ray.d, liftY);
-      if (hit) target = { x: hit.x, y: liftY, z: hit.z };
-    }
+      if (!grip) {
+        const collar = c.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
+        grip = gripFor(s.ray(press.x, press.y), dragPlane(s.camera.position, collar), collar, t);
+      }
+      const lift = pressKind === 'touch' ? FINGER_LIFT * Math.min(1, (t - grip.t0) / CARRY.liftIn) : 0;
+      target = dragTarget(grip, s.ray(press.x, press.y - lift), t, hangY);
+    } else grip = null;
     bodyStep(body, {
       state: o.state,
       move: o.move,
@@ -784,8 +793,18 @@ function start(s) {
         if (part === 'feet') return { x: sh.body.a.x, y: sh.body.a.y };
         return { x: (sh.body.a.x + sh.body.b.x) / 2, y: (sh.body.a.y + sh.body.b.y) / 2 };
       },
-      /** @param {number} x @param {number} y */
       floorAt,
+      /**
+       * While he's held: where the point he was grabbed by shows now, client px (his collar as
+       * posed less the grab offset); null otherwise.
+       */
+      grabbed() {
+        if (!grip || !character || body.mode !== 'held') return null;
+        const p = character.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
+        const at = new Vector3(p.x - grip.offset.x, p.y - grip.offset.y, p.z - grip.offset.z).project(s.camera);
+        const r = canvas.getBoundingClientRect();
+        return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
+      },
       /** His ankles (the Foot bones' heads), world units: for measuring foot slide. */
       feet: () =>
         character && {
