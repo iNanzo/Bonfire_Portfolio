@@ -199,7 +199,8 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
     faster is taken back, none tried for `block` seconds and none ever again while the slow
     seconds are as slow as the one that made it (within `same`, 15%), and a relapse after a
     finer step doubles the next run, up to `recoverMax` (4 minutes); a finer step that holds
-    `calm` seconds, or a new Pixel Size, brings it back down. It's on for visitors, off under `?test` unless `?govern`, and `?govern=off` turns it
+    `calm` seconds, or a new Pixel Size, brings it back down. It's on for visitors, off under
+    `?test` unless `?govern`, and `?govern=off` turns it
     off.)
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
     `faces.js`, `gesture.js`, `rng.js`) are pure too; `types.js` lists the shapes they pass
@@ -226,7 +227,8 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   the toy's clock as talk is (`now`: main.js's frame steps, capped and paused with the tab), then
   `update(head, avoid, under)` each frame with his head's circle on screen, the toolbar's and
   open sheet's rects and his feet's bottom; `placeBubble` narrows it to fit beside his head
-  (`BUBBLE.minW`, 110 px, measured wrapped in 8 px steps) before it would go under him; `speakerPoint` makes his head null, the bubble out of sight, while the open
+  (`BUBBLE.minW`, 110 px, measured wrapped in 8 px steps) before it would go under him;
+  `speakerPoint` makes his head null, the bubble out of sight, while the open
   sheet covers it; `clearRegion`, `placeBubble`, `bubbleFrame` and `speakerPoint` are pure;
   `main.js` steps talk right after the brain and moves the bubble once he's posed) and `content.js`
   (content.json's `invitation`, which the admin edits, through `virtual:invitation-content`:
@@ -254,7 +256,8 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   face again, as at Off. His shirt shows the bold pixel plaid (`newt-atlas-pixel.png`, `tools/newt-atlas.mjs`)
   until he's `ORIGINAL_ATLAS_TEXELS` (128) texels tall in the default view at the Pixel Size's
   own grid (stage.js hands main.js that grid as `home`: neither the zoom's bigger blocks nor the
-  governor's coarser ones change his shirt), then the glb's own plaid, sampled at the preset's `texture.fineMipBias`. It and the pixel
+  governor's coarser ones change his shirt), then the glb's own plaid, sampled at the preset's
+  `texture.fineMipBias`. It and the pixel
   atlas (`newt-atlas-pixel.png`) are asked for at the same time as the glb, and with the switch
   on the first frame waits for them (up to 3 s more), so NEWT never shows the blurred atlas and
   a blank face first; with it off the first frame doesn't wait.
