@@ -1809,5 +1809,202 @@
         "speed": 0.7
       }
     }
-  ]
+  ],
+  "invitation": {
+    "defaults": {
+      "pixelSize": "128",
+      "dither": true,
+      "outlines": true,
+      "style": "soft",
+      "motion": "smooth",
+      "shader": {
+        "levels": 6,
+        "dither": 1,
+        "outline": 1,
+        "ink": "tinted",
+        "ring": true,
+        "bands": "2",
+        "highlight": true,
+        "edge": "soft",
+        "shadow": 0.6,
+        "turn": 0,
+        "light": 1,
+        "saturation": 0.95,
+        "warmth": 0,
+        "exposure": 1.02,
+        "contrast": 1
+      }
+    },
+    "speech": {
+      "idleMin": 20,
+      "idleMax": 40,
+      "wave": {
+        "chance": 0.6,
+        "cooldown": 8
+      },
+      "spook": {
+        "chance": 0.7,
+        "cooldown": 8
+      },
+      "flee": {
+        "chance": 0.8,
+        "cooldown": 10
+      },
+      "caught": {
+        "chance": 0.9,
+        "cooldown": 10
+      },
+      "pickedUp": {
+        "chance": 0.7,
+        "cooldown": 8
+      },
+      "shaken": {
+        "chance": 0.8,
+        "cooldown": 6
+      },
+      "dropped": {
+        "chance": 0.5,
+        "cooldown": 8
+      },
+      "landed": {
+        "chance": 0.6,
+        "cooldown": 8
+      },
+      "walkTo": {
+        "chance": 0.35,
+        "cooldown": 12
+      },
+      "wander": {
+        "chance": 0.15,
+        "cooldown": 30
+      },
+      "sitDown": {
+        "chance": 0.8,
+        "cooldown": 30
+      },
+      "sitting": {
+        "chance": 0.9,
+        "cooldown": 20
+      },
+      "standUp": {
+        "chance": 0.5,
+        "cooldown": 15
+      },
+      "idle": {
+        "chance": 0.8,
+        "cooldown": 0
+      },
+      "spin": {
+        "chance": 0.9,
+        "cooldown": 20
+      },
+      "zoom": {
+        "chance": 0.9,
+        "cooldown": 20
+      }
+    },
+    "lines": {
+      "wave": [
+        "Hi hi!",
+        "Oh, hello there!",
+        "Hey! Over here!",
+        "Hello! I’m NEWT.",
+        "Wave back. I’ll wait."
+      ],
+      "spook": [
+        "Eep!",
+        "Gah! Warn a guy first!",
+        "You scared the pixels out of me!",
+        "Don’t sneak up like that!",
+        "Why are you like this?!"
+      ],
+      "flee": [
+        "Nope, nope, nope!",
+        "Too many pokes!",
+        "I’m outta here!",
+        "Can’t catch me!",
+        "Personal space! Personal space!"
+      ],
+      "caught": [
+        "Hey! No fair!",
+        "Caught. Ugh, fine.",
+        "I was SO close!",
+        "Okay, you’re fast. Rude, but fast."
+      ],
+      "pickedUp": [
+        "Whoa! Up we go!",
+        "Not the collar!",
+        "Ooh, nice view up here.",
+        "Careful, I’m fragile. Ish.",
+        "Hey! I was busy standing!"
+      ],
+      "shaken": [
+        "Stop shaking meee!",
+        "My polygons are rattling!",
+        "Too much! Too much!",
+        "I’m getting dizzy…"
+      ],
+      "dropped": [
+        "Wheee!",
+        "Wait, wait, wait!",
+        "Gravity, my old enemy!",
+        "You dropped me?!"
+      ],
+      "landed": [
+        "Oof.",
+        "I’m okay! I’m okay!",
+        "Stuck the landing!",
+        "Ten out of ten. No notes."
+      ],
+      "walkTo": [
+        "On my way!",
+        "Over there? Sure!",
+        "Coming!",
+        "Walk, walk, walk…"
+      ],
+      "wander": [
+        "What’s over here?",
+        "Just stretching my legs.",
+        "Exploring!",
+        "Hmm, I wonder…"
+      ],
+      "sitDown": [
+        "Break time!",
+        "I’ll just sit for a bit.",
+        "Ahh, that’s better.",
+        "Wake me if something happens."
+      ],
+      "sitting": [
+        "Still here. Still sitting.",
+        "This floor’s surprisingly comfy.",
+        "Hello? Anyone there?",
+        "Yaaawn…",
+        "I could sit here all day."
+      ],
+      "standUp": [
+        "Okay, okay, I’m up!",
+        "Up and at ’em!",
+        "Oh, we’re doing things now?"
+      ],
+      "idle": [
+        "Hmm hmm hmm…",
+        "It’s very white in here.",
+        "You still there?",
+        "Poke me. I dare you.",
+        "I’m just a little guy."
+      ],
+      "spin": [
+        "Whoa, the room’s spinning!",
+        "Okay, now I’m dizzy.",
+        "Round and round we go!",
+        "Are you lost up there?"
+      ],
+      "zoom": [
+        "Um. Hi. That’s close.",
+        "Do I have something on my face?",
+        "Counting my pixels?",
+        "Too close! Back up a bit!"
+      ]
+    }
+  }
 }
