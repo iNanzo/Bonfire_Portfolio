@@ -93,7 +93,7 @@ export const INVITATION_HELP = {
   'invitation.defaults':
     'The Default style a first visit gets, before anyone touches the Look menu. Visitors’ own picks stay in their browser, over these.',
   'invitation.defaults.pixelSize':
-    'NEWT’s sprite resolution: at 128×128 he’s drawn about 128 pixels tall on any screen. Native gives every screen pixel a pixel; Off is smooth.',
+    'NEWT’s sprite resolution: roughly that many pixels tall, rounded to whole screen pixels (Native where the screen has no more). Off is smooth.',
   'invitation.defaults.dither':
     'The Look menu’s Dithering switch: the checkered blend between colors (how strong: Dither Strength, under Shader).',
   'invitation.defaults.outlines':
