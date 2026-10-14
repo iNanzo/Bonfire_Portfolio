@@ -42,10 +42,10 @@ the sheet and leaves the slider as it was.
 
 | Setting | Choices | What it does |
 | --- | --- | --- |
-| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn about 64 pixels tall, on any screen. A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 96×96 is the default (on a 1280×800 desktop it draws as 64×64, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there. **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier. From 128 pixels tall his shirt shows its real plaid (bolder pixel checks below that), and at the finest steps zoomed in his face is the smooth one. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
+| Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn about 64 pixels tall, on any screen. A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 128×128 is the default (on a 1280×800 desktop it draws as Native, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there. **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier, and zooming the camera in or out takes his pixels with him (bigger blocks zoomed in), so he keeps the resolution you chose at any zoom; Native and Off don't change with the zoom. His shirt shows its real plaid and his face is the smooth one at every resolution, unless Pixel Shirt & Face (under Shader) is on. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
 | Dithering | On, Off | The checkered blend between colours (how strong: Dither Strength, under Shader). |
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow; how dark, its colour and where: under Shader). |
-| Style | DS, Soft, Custom | DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose DS or Soft, or Reset To Style, to go back). |
+| Style | Default, DS, Soft, Custom | Default (what a first visit shows): Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight. DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -60,6 +60,7 @@ and turns the Style to Custom, and **Reset To Style** puts the style's values ba
 | Outer Ring | On, Off | Lines just outside his outline, like a sprite's, instead of on his edge. |
 | Toon Shading | Smooth, 2, 3, 4 | Smooth light, or that many flat bands of it. |
 | Highlight | On, Off | White where the light falls straight on him. |
+| Pixel Shirt & Face | On, Off | Off in every style: his real plaid and smooth face at every resolution (the face drawn a little sharper with the pixel look on, so his eyes and mouth stay). On: below 128 pixels tall his shirt shows bold pixel checks, and his face is redrawn in pixels to fit his size (the smooth face again at the finest steps zoomed in). |
 | Shadow | Hard, Soft | A crisp shadow, or one with a dithered, two-tone edge. |
 | Shadow Strength | Off to 100% | How dark his shadow is. |
 | Light Angle | -180° to 180° | Turns the light round him (it still turns with the camera too). |
@@ -68,6 +69,12 @@ and turns the Style to Custom, and **Reset To Style** puts the style's values ba
 
 Dithering, outlines, Colors, the shadow's edge and the grade are part of the pixel look, so they
 rest while Pixel Size is Off (toon shading, the shadow's strength and the light still apply).
+
+On a device that can't keep up, NEWT's pixels get a little chunkier for a while: when frames
+stay slow for a second the page adds a screen pixel to every one of his pixels (up to four), and
+takes them back once frames are quick again. It never draws finer than the Pixel Size you
+picked, and a new Pixel Size starts it afresh. It leaves Off alone, and a screen that's slow for
+another reason (one that only shows 30 frames a second) isn't made chunkier for nothing.
 **Reset Camera**, under the settings, eases the camera back to where it started.
 
 ## For Developers
@@ -76,24 +83,35 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
   modules (a shared `src/` module would share a chunk with the portfolio's first load).
   - Browser-only and thin: `main.js` (boot, the loop, the wiring in `types.js`'s frame
     order), `stage.js` (renderer at texel size, the camera with its off-centre projection,
-    lights and shadows, the blob shadow and the floor marker), `floor.js` (no room: an
+    lights and shadows, the blob shadow and the floor marker, and each frame the boxes round
+    NEWT the retro pass keeps its work to; `setZoomScale(k)`, which main.js calls with the
+    orbit's home distance over its distance, sizes the texel to the zoom, refitting the grid only
+    when the block changes; the frame-time governor's level added to every texel, and `?perf`'s
+    corner), `floor.js` (no room: an
     invisible floor that only catches his shadows, a `ShadowMaterial`, over the preset's
     background; and the shadow camera's fit), `character.js` (NEWT's materials, clips with
     twins for restarts, look-at and faces),
     `retro.js` (the pixel pass; `warm` compiles the path not showing once NEWT is in, so the
-    first switch to Off or back doesn't stall), `ui.js` (the toolbar and the Look sheet as
+    first switch to Off or back doesn't stall; `subjectBoxes`: outside the area round NEWT, his
+    shadow and the decals every texel is the paper, so the canvas is only cleared there and both
+    passes draw inside it alone, and the neighbour loops (the outer ring, the soft shadow) run
+    only in the boxes where they can find something: the same picture for a share of the
+    texels), `ui.js` (the toolbar and the Look sheet as
     markup, plus a thin binding), `invitation.css`.
   - Pure and unit-tested: `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
     to 256, a texel is `max(1, round(NEWT's default height in device px / N))` device pixels,
     `blockFor`, so he's about N texels tall; Native, a texel a device pixel at the real DPR with
     no cap; Off, the screen's pixels with the DPR capped at `OFF_DPR` (2); `pixelSteps`, a
     screen's steps, one a block size, the resolutions that come to 1 px folded into Native;
-    `DEFAULT_PIXEL`, the one line that sets the default, `'96'`; and the default view: 20° of
+    `DEFAULT_PIXEL`, the one line that sets the default, `'128'`; and the default view: 20° of
     view, 36° up, NEWT 0.195 of a desktop's short side tall with the whole play area in sight,
-    or 0.255 of a phone's, a stage whose short side is under 600 CSS px (99 CSS px, and 99
-    texels at the default 96×96, on a 390-wide phone), whatever the Pixel Size, the point it
+    or 0.255 of a phone's, a stage whose short side is under 600 CSS px (99 CSS px, and 149
+    texels at the default 128×128, on a 390-wide phone), whatever the Pixel Size, the point it
     looks at shown in the middle of the space over the toolbar, or of the clear space above or
-    beside the open Look sheet, `clearInsets`), `camera.js` (the orbit camera: yaw all the way
+    beside the open Look sheet, `clearInsets`; and `blockAt`: zoomed by k, NEWT's size on screen
+    over the default view's, a texel is `max(1, round(his height in device px × k / N))`, a block
+    in use held until the zoom is `ZOOM_HOLD` past the next, so it never flickers at a boundary, and the default view always drawn on the Pixel Size's own grid),
+    `camera.js` (the orbit camera: yaw all the way
     round, three quarters of a turn for a drag across the whole stage and half a turn of tilt
     down its whole height, 12° to 70° up, half to twice the default distance, eased with a
     little coast, following NEWT as it zooms in, and 0.8 of the way at the default zoom on a
@@ -109,9 +127,16 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
     a copy, for the renderer), `motionStep`, Choppy's 15 fps clock, and the presets),
     `shader.js` (the Shader options as one table, `SHADER_CONTROLS`: each one's label, range or
     choices, value text and where it lives in a preset, which `ui.js` renders; `toonRamp`, the
-    toon gradient from bands and a highlight; `warmthTint`), `looks/ds.js` and `looks/soft.js`
-    (every look value, as data: a designer edits these, never code; among them the background,
-    the shadow's colour and strength, and the blob shadow).
+    toon gradient from bands and a highlight; `warmthTint`), `looks/default.js` (Default: Soft with the user's values, spread from `soft.js`),
+    `looks/ds.js` and `looks/soft.js` (every look value, as data: a designer edits these, never
+    code; among them the background, the shadow's colour and strength, and the blob shadow), and
+    `looks/index.js` (their order in the Style row and `DEFAULT_STYLE`, `'default'`).
+  - `governor.js` (pure: the frame-time governor. Each second of frames is judged by its p90:
+    over `GOVERN.slowMs` (20 ms) steps a level coarser, a run of `recover` seconds under
+    `fastMs` (18 ms) a level finer, holding between; a coarser step that doesn't make frames
+    faster is taken back and none tried for `block` seconds, and a relapse doubles the next
+    run. It's on for visitors, off under `?test` unless `?govern`, and `?govern=off` turns it
+    off.)
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
     `faces.js`, `gesture.js`, `rng.js`) are pure too; `types.js` lists the shapes they pass
     and the order a frame runs in.
@@ -121,7 +146,9 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
 - **The model:** `npm run model -- newt` rebuilds `public/models/newt.glb` from `tools/newt.py`
   with headless Blender (`$NEWT_BLEND` names the .blend; it defaults to the user's
   `NEWT_optimized.blend`, which is never overwritten).
-- **The pixel face:** at the coarser resolutions his head is only a dozen or two texels wide, so
+- **The pixel face and shirt** (only with Pixel Shirt & Face on, the preset's `texture.pixelArt`:
+  off, the glb's own atlas and smooth face show at every resolution): at the coarser
+  resolutions his head is only a dozen or two texels wide, so
   `node tools/newt-face.mjs` redraws the glb's face sheet as `public/models/newt-face.png`,
   four small pixel cells with the features kept at least 2 px thick (`--cell`, `--min`,
   `--preview` to look at it). The page uses it while the pixel filter is on (Native too), the
@@ -130,8 +157,9 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
   face again, as at Off. His shirt shows the bold pixel plaid (`newt-atlas-pixel.png`, `tools/newt-atlas.mjs`)
   until he's `ORIGINAL_ATLAS_TEXELS` (128) texels tall in the default view, then the glb's own
   plaid, sampled at the preset's `texture.fineMipBias`. It and the pixel
-  atlas (`newt-atlas-pixel.png`) are asked for at the same time as the glb, and the first frame
-  waits for them (up to 3 s more), so NEWT never shows the blurred atlas and a blank face first.
+  atlas (`newt-atlas-pixel.png`) are asked for at the same time as the glb, and with the switch
+  on the first frame waits for them (up to 3 s more), so NEWT never shows the blurred atlas and
+  a blank face first; with it off the first frame doesn't wait.
 - **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationShader`,
   `invitationArea`, `invitationCamera` and `invitationPlay` (with `invitationBrain`,
   `invitationMotion`, `invitationGesture` and `invitationModel`), and `e2e/invitation.spec.mjs`
@@ -145,11 +173,14 @@ rest while Pixel Size is Off (toon shading, the shadow's strength and the light 
   cell width, or `'smooth'`, as at Off), `faceTexels`, `atlas`: `'pixel'` or `'original'`,
   `shader`: every Shader option's value, `custom`: whether one is the user's, `pass`: what
   reached the renderer (the post shader's values, the light's strength and angle, the shadow's
-  strength), and `warmed`: the pass's other path compiled),
+  strength, `zoom`: the zoom the texels follow, `pd`: device px a texel as drawn, `governor`:
+  whether it's on, its level and the last second's p90), and `warmed`: the pass's other path compiled),
   `screen('head'|'body'|'feet')` (a point on him in client px, to tap), `floorAt(x, y)`,
   `feet()` (his ankles, to measure foot slide), `bones()` (his bones from his root) and
   `play(clip)` (Walk and Run step in place at their own pace). `?seed=N` makes the randomness
-  repeatable; `?calm` stops him wandering and sitting by himself.
+  repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
+  (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
+  governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
   of taps, drags, buttons, floor taps, a chase and the camera at phone and desktop sizes
   (animated WebP plus a contact sheet; `--look`, `--pixel` (a resolution such as `64` or

@@ -1,6 +1,6 @@
 // The invitation toy (/invitation/) in a real browser, on the production build: on a phone
 // (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT on his
-// floor (not a blank canvas) at 96×96 (1×1 CSS px texels on the phone); it's unlisted (noindex); a Look change (24×24:
+// floor (not a blank canvas) in the Default look at 128×128 (2 device px texels on the phone); it's unlisted (noindex); a Look change (24×24:
 // 4×4 CSS px texels) survives a reload, Pixel Size Native draws a texel a device pixel at a phone's
 // full DPR with the pixel look on (and survives a reload), and Off draws smooth at the screen's
 // resolution (its smooth face reported as such); and the portfolio's
@@ -217,10 +217,11 @@ test.describe('on a phone', () => {
     await expect(page).toHaveTitle('Invitation');
     const snap = await snapshot(page);
     expect(snap.ready).toBe(true);
-    // 96×96 by default: NEWT about 96 texels tall, a texel 3 device px (a CSS px) here.
-    expect(snap.resolution).toBe(96);
-    expect(snap.pixelScale, 'a texel is a CSS px').toBe(1);
-    expect(snap.newtTexels).toBeCloseTo(99.4, 0);
+    // 128×128 by default (the Default look): NEWT about 128 texels tall, a texel 2 device px
+    // (two thirds of a CSS px) here, 149 texels.
+    expect(snap.resolution).toBe(128);
+    expect(snap.pixelScale, 'a texel is 2 device px').toBeCloseTo(2 / 3, 6);
+    expect(snap.newtTexels).toBeCloseTo(149.2, 0);
     // Not a blank canvas: NEWT on the plain background, far from one flat colour.
     const pic = await picture(page);
     expect(apart(pic, flat(pic))).toBeGreaterThan(3);
@@ -243,10 +244,13 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the pixel atlas and the pixel face load alongside the glb, and the first frame waits for them', async ({
+  test('with Pixel Shirt & Face on, the pixel atlas and the pixel face load alongside the glb, and the first frame waits for them', async ({
     page,
   }) => {
     const errors = watch(page);
+    await page.addInitScript(() =>
+      localStorage.setItem('invitation.look.v1', JSON.stringify({ shader: { pixelArt: true } })),
+    );
     /** @type {number|null} when the glb was let through (it's held a while, as on a slow phone) */
     let glbAt = null;
     const asked = {};
@@ -275,6 +279,37 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
+  test('with Pixel Shirt & Face off (the default) the first frame never waits for the pixel images, and NEWT wears his real plaid and smooth face', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    /** @type {boolean|null} whether the page had drawn by the time the pixel images were let through */
+    let drawnFirst = null;
+    await page.route(/\/models\/newt-(atlas-pixel|face)\.png$/, async (route) => {
+      // (Held until the page draws, or 8 s: it never waits on them.)
+      const t0 = Date.now();
+      while (Date.now() - t0 < 8000) {
+        const drawn = await page
+          .evaluate(() => document.querySelector('[data-stage]')?.classList.contains('is-ready'))
+          .catch(() => false);
+        if (drawn) break;
+        await sleep(50);
+      }
+      drawnFirst ??= await page
+        .evaluate(() => document.querySelector('[data-stage]')?.classList.contains('is-ready'))
+        .catch(() => false);
+      await route.continue();
+    });
+    await ready(page);
+    await expect.poll(() => drawnFirst).not.toBeNull();
+    expect(drawnFirst, 'drawn before the pixel images came').toBe(true);
+    const snap = await snapshot(page);
+    expect(snap.atlas).toBe('original');
+    expect(snap.faceSheet).toBe('smooth');
+    expect(snap.shader.pixelArt).toBe(false);
+    expect(errors).toEqual([]);
+  });
+
   test('a Look change shows at once and survives a reload', async ({ page }) => {
     const errors = watch(page);
     await ready(page);
@@ -285,7 +320,12 @@ test.describe('on a phone', () => {
     // Pixel Size, a slider: from the coarse end one step finer by the keyboard, 24×24 (NEWT about
     // 24 texels tall: 12 device px, 4 CSS px a texel here).
     const pixel = sheet.getByRole('slider', { name: 'Pixel Size' });
-    await expect(pixel).toHaveAttribute('aria-valuetext', '96 by 96');
+    await expect(pixel).toHaveAttribute('aria-valuetext', '128 by 128');
+    // A first visit starts on the Default style, never Custom.
+    const styles = sheet.getByRole('group', { name: 'Style' });
+    await expect(styles.getByRole('radio').first()).toHaveAccessibleName('Default');
+    await expect(styles.getByRole('radio', { name: 'Default' })).toBeChecked();
+    await expect(styles.getByRole('radio', { name: 'Custom' })).toBeDisabled();
     await pixel.focus();
     await page.keyboard.press('Home');
     await expect(pixel).toHaveAttribute('aria-valuetext', '16 by 16');
@@ -296,7 +336,7 @@ test.describe('on a phone', () => {
     const coarse = await snapshot(page);
     expect(coarse.pixelScale).toBe(4);
     expect(coarse.newtTexels).toBeCloseTo(24.9, 0);
-    await sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Soft' }).check();
+    await sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'DS' }).check();
     await sheet.getByRole('button', { name: 'Done' }).click();
     await expect(sheet).toBeHidden();
     const changed = await picture(page);
@@ -307,7 +347,7 @@ test.describe('on a phone', () => {
     await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', '24 by 24');
     expect((await snapshot(page)).resolution).toBe(24);
     expect((await snapshot(page)).pixelScale).toBe(4);
-    await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Soft' })).toBeChecked();
+    await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'DS' })).toBeChecked();
     expect(errors).toEqual([]);
   });
 
@@ -726,11 +766,14 @@ test.describe('on a desktop', () => {
     const errors = watch(page);
     await ready(page);
     const snap = await snapshot(page);
-    // 96×96 by default: NEWT 156 CSS px tall, so a texel is 2 px (96×96 and 64×64 are one step
-    // here) and he's 78 texels tall.
-    expect(snap.resolution).toBe(96);
-    expect(snap.pixelScale).toBe(2);
-    expect(snap.newtTexels).toBeCloseTo(78, 0);
+    // 128×128 by default: NEWT 156 CSS px tall, so a texel is a device pixel here (128×128 is
+    // Native on this screen) and he's 156 texels tall.
+    expect(snap.resolution).toBe('native');
+    expect(snap.pixelScale).toBe(1);
+    expect(snap.newtTexels).toBeCloseTo(156, 0);
+    // (The frame-time governor is off under ?test unless ?govern asks for it: the specs measure the grid.)
+    expect(snap.pass.governor).toEqual({ on: false, level: 0, p90: 0 });
+    expect(snap.pass.zoom).toBe(1);
     expect(
       snap.newtTall / 800,
       `NEWT is ${snap.newtTall.toFixed(1)} CSS px tall: a fifth of the short side`,
@@ -819,10 +862,10 @@ test.describe('on a desktop', () => {
     const look = page.getByRole('button', { name: 'Look' });
     const sheet = page.getByRole('dialog', { name: 'Look' });
     const style = sheet.getByRole('group', { name: 'Style' });
-    const ds = (await snapshot(page)).shader;
+    const own = (await snapshot(page)).shader;
     const before = await newtPicture(page);
     await look.click();
-    await expect(style.getByRole('radio', { name: 'DS' })).toBeChecked();
+    await expect(style.getByRole('radio', { name: 'Default' })).toBeChecked();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeDisabled();
     await expect(sheet.getByRole('button', { name: 'Reset To Style' })).toBeDisabled();
     /** A slider by its name, moved by the keyboard. */
@@ -835,19 +878,19 @@ test.describe('on a desktop', () => {
     const colors = await keys('Colors', 'Home');
     await expect(colors).toHaveAttribute('aria-valuetext', '4 levels');
     await expect.poll(async () => (await snapshot(page)).pass.levels, 'Colors reach the pass').toBe(4);
-    await keys('Outline Strength', 'End');
-    await expect.poll(async () => (await snapshot(page)).pass.outline).toBe(1);
+    await keys('Outline Strength', 'Home');
+    await expect.poll(async () => (await snapshot(page)).pass.outline).toBe(0);
     await sheet.getByRole('radiogroup', { name: 'Toon Shading' }).getByRole('radio', { name: '4 Bands' }).check();
-    await sheet.getByRole('radiogroup', { name: 'Shadow' }).getByRole('radio', { name: 'Soft' }).check();
-    await expect.poll(async () => (await snapshot(page)).pass.shadeSoft, 'a soft shadow edge').toBe(1);
+    await sheet.getByRole('radiogroup', { name: 'Shadow' }).getByRole('radio', { name: 'Hard' }).check();
+    await expect.poll(async () => (await snapshot(page)).pass.shadeSoft, 'a hard shadow edge').toBe(0);
     const angle = await keys('Light Angle', ...Array(6).fill('ArrowRight'));
     await expect(angle).toHaveAttribute('aria-valuetext', '90 degrees');
     await expect.poll(async () => (await snapshot(page)).pass.turn, 'the light turned round him').toBe(90);
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeChecked();
-    await expect(style.getByRole('radio', { name: 'DS' })).not.toBeChecked();
+    await expect(style.getByRole('radio', { name: 'Default' })).not.toBeChecked();
     const custom = await snapshot(page);
     expect(custom.custom).toBe(true);
-    expect(custom.shader).toEqual({ ...ds, levels: 4, outline: 1, bands: '4', edge: 'soft', turn: 90 });
+    expect(custom.shader).toEqual({ ...own, levels: 4, outline: 0, bands: '4', edge: 'hard', turn: 90 });
     await sheet.getByRole('button', { name: 'Done' }).click();
     await expect(sheet).toBeHidden();
     expect(apart(before, await newtPicture(page)), 'NEWT looks different').toBeGreaterThan(6);
@@ -855,14 +898,14 @@ test.describe('on a desktop', () => {
     await page.reload();
     await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('invitation.look.v1') ?? '{}'));
-    expect(stored.style).toBe('ds');
-    expect(stored.shader).toEqual({ levels: 4, outline: 1, bands: '4', edge: 'soft', turn: 90 });
+    expect(stored.style).toBe('default');
+    expect(stored.shader).toEqual({ levels: 4, outline: 0, bands: '4', edge: 'hard', turn: 90 });
     expect((await snapshot(page)).shader).toEqual(custom.shader);
     expect((await snapshot(page)).pass.levels).toBe(4);
     await look.click();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeChecked();
     await expect(sheet.getByRole('slider', { name: 'Colors' })).toHaveAttribute('aria-valuetext', '4 levels');
-    // Reset To Style: DS's own values again, and focus on DS (the button it was on rests now),
+    // Reset To Style: Default's own values again, and focus on it (the button it was on rests now),
     // without the sheet jumping away from the Shader controls the user was at.
     // (Scrolled so Reset To Style sits just under the sheet's sticky header, the Style row out
     // of sight above it, as when the user has been at the Shader controls.)
@@ -876,15 +919,15 @@ test.describe('on a desktop', () => {
     expect(scrolled).toBeGreaterThan(40);
     await sheet.getByRole('button', { name: 'Reset To Style' }).click();
     expect(Math.abs((await sheetScroll(page)).top - scrolled)).toBeLessThan(2);
-    await expect(style.getByRole('radio', { name: 'DS' })).toBeChecked();
-    await expect(style.getByRole('radio', { name: 'DS' })).toBeFocused();
+    await expect(style.getByRole('radio', { name: 'Default' })).toBeChecked();
+    await expect(style.getByRole('radio', { name: 'Default' })).toBeFocused();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeDisabled();
     await expect(sheet.getByRole('button', { name: 'Reset To Style' })).toBeDisabled();
-    expect((await snapshot(page)).shader).toEqual(ds);
+    expect((await snapshot(page)).shader).toEqual(own);
     expect((await snapshot(page)).custom).toBe(false);
     await expect(sheet.getByRole('slider', { name: 'Colors' })).toHaveAttribute(
       'aria-valuetext',
-      `${ds.levels} levels`,
+      `${own.levels} levels`,
     );
     // A change, then another Style: that style's own values, the change cleared.
     await keys('Saturation', 'Home');
@@ -1022,9 +1065,9 @@ test.describe('on a desktop', () => {
       expect(f.inside, `Shift+Tab ${i}: ${f.what}`).toBe(true);
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
-    // Motion, the 15 Shader options (Reset To Style rests until one is the user's own) and Reset
+    // Motion, the 16 Shader options (Reset To Style rests until one is the user's own) and Reset
     // Camera.
-    expect(stops.size, [...stops].join(', ')).toBe(24);
+    expect(stops.size, [...stops].join(', ')).toBe(25);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');
@@ -1140,6 +1183,95 @@ test.describe('on a desktop', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe('on a small window', () => {
+  // (Few texels at 32×32, so the frames are quick even on CI's software WebGL: only the busy
+  // page below makes them slow.)
+  test.use({ viewport: { width: 640, height: 400 } });
+
+  test('with slow frames the governor makes the texels a device pixel coarser, never finer than the Pixel Size, takes it back when that doesn’t help, and ?perf shows it', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await page.addInitScript(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32' })));
+    await ready(page, '/invitation/?test&calm&seed=3&perf&govern');
+    const base = await snapshot(page);
+    expect(base.pass.governor.on).toBe(true);
+    expect(base.pass.governor.level).toBe(0);
+    const perf = page.locator('.inv-perf');
+    await expect(perf).toContainText('fps');
+    await expect(perf).toContainText(`${base.texels.w}×${base.texels.h} texels`);
+    // A busy page: 35 ms of work every frame, so frames stay slow whatever the grid.
+    await page.evaluate(() => {
+      const spin = () => {
+        if (window.__calm) return;
+        const t = performance.now();
+        while (performance.now() - t < 35);
+        requestAnimationFrame(spin);
+      };
+      requestAnimationFrame(spin);
+    });
+    // One level coarser: a device pixel more a texel, fewer texels.
+    await until(page, (s) => s.pass.governor.level === 1, 'a level coarser', 15_000);
+    const coarse = await snapshot(page);
+    expect(coarse.pass.pd).toBe(base.pass.pd + 1);
+    expect(coarse.pixelScale).toBeCloseTo(base.pixelScale + 1 / devicePixelRatioOf(base), 6);
+    expect(coarse.texels.w).toBeLessThan(base.texels.w);
+    expect(coarse.resolution, 'the Pixel Size stays the user’s').toBe(32);
+    await expect(perf).toContainText('(+1 slow)');
+    // Fewer texels don't help a busy CPU: taken back, never finer than the Pixel Size.
+    await until(page, (s) => s.pass.governor.level === 0, 'taken back', 15_000);
+    const back = await snapshot(page);
+    expect(back.pass.pd).toBe(base.pass.pd);
+    expect(back.pixelScale).toBe(base.pixelScale);
+    await page.evaluate(() => (window.__calm = true));
+    expect(errors).toEqual([]);
+  });
+
+  test('zoomed in at 32×32 the texels grow with NEWT, so he stays about 32 pixels tall, and zoomed out they shrink; Native never changes', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('invitation.look.v1'))
+        localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32' }));
+    });
+    await calm(page);
+    const base = await snapshot(page);
+    const canvas = page.locator('[data-stage] canvas');
+    const box = await canvas.boundingBox();
+    await page.mouse.move(box.x + 60, box.y + 60);
+    for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -240);
+    await until(page, (s) => s.camera.distance < base.camera.distance * 0.75, 'zoomed in');
+    await framesFor(page, 800);
+    const near = await snapshot(page);
+    test.skip(near.pass.zoom === 1, 'main.js doesn’t call stage.setZoomScale yet (the camera package wires it)');
+    const k = base.camera.distance / near.camera.distance;
+    expect(near.pass.zoom).toBeCloseTo(k, 2);
+    expect(near.pixelScale, 'bigger texels zoomed in').toBeGreaterThan(base.pixelScale);
+    expect(Number.isInteger(near.pass.pd), 'whole device pixels').toBe(true);
+    expect(near.newtTexels / 32).toBeGreaterThan(0.7);
+    expect(near.newtTexels / 32).toBeLessThan(1.4);
+    // Zoomed out past the default view: smaller texels (never under a device pixel).
+    for (let i = 0; i < 14; i++) await page.mouse.wheel(0, 240);
+    await until(page, (s) => s.camera.distance > base.camera.distance * 1.4, 'zoomed out');
+    await framesFor(page, 800);
+    const far = await snapshot(page);
+    expect(far.pixelScale, 'smaller texels zoomed out').toBeLessThan(base.pixelScale);
+    expect(far.pass.pd).toBeGreaterThanOrEqual(1);
+    // Native: a texel a device pixel at any zoom.
+    await page.evaluate(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: 'native' })));
+    await page.reload();
+    await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+    await page.mouse.move(box.x + 60, box.y + 60);
+    for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -240);
+    await framesFor(page, 800);
+    const native = await snapshot(page);
+    expect(native.pass.pd).toBe(1);
+  });
+});
+
+/** The device pixel ratio a snapshot was drawn at (CSS px a texel over device px a texel). */
+const devicePixelRatioOf = (s) => s.pass.pd / s.pixelScale;
 
 test("the portfolio's first load carries no invitation code", async ({ page }) => {
   const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');

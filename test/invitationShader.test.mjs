@@ -45,6 +45,7 @@ test('the Shader controls: one table, every entry labelled in Title Case, a kind
     'ring',
     'bands',
     'highlight',
+    'pixelArt',
     'edge',
     'shadow',
     'turn',
@@ -65,6 +66,7 @@ test('the Shader controls: one table, every entry labelled in Title Case, a kind
       'Outer Ring',
       'Toon Shading',
       'Highlight',
+      'Pixel Shirt & Face',
       'Shadow',
       'Shadow Strength',
       'Light Angle',
@@ -76,7 +78,7 @@ test('the Shader controls: one table, every entry labelled in Title Case, a kind
     ],
   );
   for (const c of SHADER_CONTROLS) {
-    assert.match(c.label, /^[A-Z][^ ]*( [A-Z][^ ]*)*$/, `${c.key}: Title Case`);
+    assert.match(c.label, /^[A-Z][^ ]*( ([A-Z][^ ]*|&))*$/, `${c.key}: Title Case`);
     assert.ok(['range', 'choice', 'switch'].includes(c.kind), `${c.key}: a kind`);
     if (c.kind === 'range' && !c.steps) assert.ok(c.min < c.max && c.step > 0, `${c.key}: a range`);
     if (c.kind === 'range' && c.steps) assert.ok(c.steps.length >= 3, `${c.key}: its steps`);
@@ -100,6 +102,28 @@ test('the Shader controls: one table, every entry labelled in Title Case, a kind
     SHADER_CONTROLS.filter((c) => !c.pixelOnly).map((c) => c.key),
     ['bands', 'highlight', 'shadow', 'turn', 'light'],
   );
+});
+
+test('Pixel Shirt & Face: a switch in the Shader section, off in every style (his real plaid and smooth face at every resolution); on, a change of the user’s that writes the bold pixel shirt and face into the preset', () => {
+  const c = controlFor('pixelArt');
+  assert.equal(c.label, 'Pixel Shirt & Face');
+  assert.equal(c.kind, 'switch');
+  assert.equal(c.pixelOnly, true, 'part of the pixel look: it rests at Off, where the real ones show anyway');
+  for (const style of STYLES) assert.equal(c.get(LOOKS[style]), false, `${style}: off`);
+  assert.equal(shaderOf(validLook({})).pixelArt, false, 'off for a first visit');
+  const on = validLook({ style: 'soft', shader: { pixelArt: true } });
+  assert.deepEqual(on.shader, { pixelArt: true });
+  assert.equal(isCustom(on), true, 'turning it on makes the style Custom, like any Shader option');
+  assert.equal(lookPreset(on).texture.pixelArt, true, 'written into a copy of the style');
+  assert.equal(LOOKS.soft.texture.pixelArt ?? false, false, 'the style itself untouched');
+  assert.equal(lookPreset(on).texture.mipBias, LOOKS.soft.texture.mipBias, 'its other texture values kept');
+  assert.deepEqual(validLook({ style: 'soft', shader: { pixelArt: false } }).shader, {}, 'off is the style’s own');
+  assert.deepEqual(validLook({ shader: { pixelArt: 'yes' } }).shader, {}, 'only a boolean');
+  // A look stored before the switch: its style's, off.
+  const old = loadLook({ getItem: () => JSON.stringify({ pixelSize: '32', style: 'ds', shader: { levels: 8 } }) });
+  assert.deepEqual(old.shader, { levels: 8 });
+  assert.equal(shaderOf(old).pixelArt, false);
+  assert.deepEqual(shaderText(c, true), { shown: 'On', spoken: 'On' });
 });
 
 test('each control reads as it should: Colors as a number or Full, strengths as percents, the light’s angle in degrees, warmth as warm or cool', () => {
@@ -314,13 +338,13 @@ test('the Look sheet’s Shader section: every control from the table, labelled,
       assert.equal(/ checked/.test(box), v === true, c.key);
     }
   }
-  // The style's own values: DS checked, Custom there but not to pick, nothing to reset.
-  assert.match(html, /value="ds" data-look="style" checked/);
+  // The style's own values: Default checked, Custom there but not to pick, nothing to reset.
+  assert.match(html, /value="default" data-look="style" checked/);
   assert.match(html, /value="custom" data-look="style" disabled/);
   assert.match(html, /<button type="button" class="inv-btn[^"]*" data-shader-reset disabled>Reset To Style<\/button>/);
   const custom = sheetHtml(validLook({ ...DEFAULT_LOOK, shader: { levels: 8 } }));
   assert.match(custom, /value="custom" data-look="style" checked>/, 'a change of the user’s: Custom');
-  assert.doesNotMatch(custom, /value="ds" data-look="style" checked/);
+  assert.doesNotMatch(custom, /value="default" data-look="style" checked/);
   assert.match(custom, /data-shader-reset>Reset To Style</);
   assert.match(custom, /data-shader-value="levels"[^>]*>8</);
   // At Off the pixel look's controls rest (with a line saying why); toon shading, the shadow's
@@ -344,5 +368,7 @@ test('the Look sheet’s Shader section: every control from the table, labelled,
   for (const hint of [...html.matchAll(/class="inv-hint[^"]*"[^>]*>([^<]+)</g)].map((m) => m[1]))
     assert.ok(/^[A-Z].*\.$/.test(hint) && hint.length <= 160, hint);
   const labels = [...html.matchAll(/>([^<>]+)</g)].map((m) => m[1].trim()).filter((t) => t && !/[.:%°]/.test(t));
-  for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( [A-Z0-9][^ ]*)*$/, label);
+  for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( ([A-Z0-9][^ ]*|&amp;))*$/, label);
+  // (An ampersand in a label is written as an entity.)
+  assert.match(html, /<span class="inv-switch-label">Pixel Shirt &amp; Face<\/span>/);
 });

@@ -12,7 +12,8 @@
 // snapped onto its control, snapShader, or dropped on its own; one equal to the style's own
 // value is no change) and lookPreset writes them into a copy of the style, which the renderer
 // reads as it reads any preset (retro.js the colours, lines, shadow edge and grade; stage.js
-// the light and the shadow's strength; character.js the toon ramp).
+// the light and the shadow's strength; character.js the toon ramp and Pixel Shirt & Face, the
+// bold pixel shirt and face at the coarser resolutions, `texture.pixelArt`).
 //
 //   toonRamp(toon)    the toon gradient, TOON_CELLS cells over the light's angle (dark side to
 //                     facing it): Smooth (0 bands), or 2 to 4 flat bands from `shade` to `lit`
@@ -167,6 +168,17 @@ export const SHADER_CONTROLS = [
     text: (v) => both(v ? 'On' : 'Off'),
     get: (p) => toonSpec(p.toon).highlight,
     set: (p, v) => (p.toon = { ...toonSpec(p.toon), highlight: v }),
+  },
+  {
+    // (His shirt's bold pixel plaid and the pixel face at the coarser resolutions: character.js.
+    // Off in every style: his real plaid and smooth face at every resolution.)
+    key: 'pixelArt',
+    label: 'Pixel Shirt & Face',
+    kind: 'switch',
+    pixelOnly: true,
+    text: (v) => both(v ? 'On' : 'Off'),
+    get: (p) => Boolean(p.texture?.pixelArt),
+    set: (p, v) => (p.texture = { ...p.texture, pixelArt: v }),
   },
   {
     key: 'edge',

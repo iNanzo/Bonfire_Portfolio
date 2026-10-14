@@ -4,7 +4,7 @@
 // slider over NEWT's sprite resolutions, 16×16 to 256×256, then Native (a texel a device pixel)
 // and Off at its fine end, with a button at each end (named for what it sets: "Pixel Size
 // Off") and a line saying how many pixels tall he is on this screen; Dithering, Outlines,
-// Style (DS, Soft, and Custom, the row's own once a Shader option is the user's), Motion
+// Style (Default, DS, Soft, and Custom, the row's own once a Shader option is the user's), Motion
 // (Smooth or Choppy), Shader (every control in shader.js's table, rendered from it: a slider
 // with its value beside it, a row of segments or a switch; Reset To Style; the pixel look's
 // ones resting at Pixel Size Off, the lines' while Outlines is off, the dither's while
@@ -19,13 +19,22 @@
 // Pure markup functions (no DOM) plus a thin binding (bindUi) that puts them in the stage and
 // reports presses; main.js decides what they do.
 //
-//   parseQuery(search)   ?test (the window.__invitation hooks), ?seed=N, ?calm, ?perf
+//   parseQuery(search)   ?test (the window.__invitation hooks), ?seed=N, ?calm, ?perf (frame
+//                        times and the governor's level on screen: stage.js), ?govern (the
+//                        frame-time governor on under ?test; ?govern=off, off for anyone)
 
 import { PIXEL_SIZES, resolutionOf, stepFor } from './pixels.js';
 import { LOOKS, MOTIONS, STYLES, isCustom, shaderOf, validLook } from './look.js';
 import { SHADER_CONTROLS, controlFor, shaderText } from './shader.js';
 
 /** @typedef {import('./types.js').ButtonName} ButtonName */
+
+/**
+ * Text as HTML: its ampersands and angle brackets as entities (a label such as "Pixel Shirt &
+ * Face").
+ * @param {string} s
+ */
+const html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** How far a finger on a slider moves before it's a drag along it or a swipe across it, CSS px. */
 export const SLIDE_SLOP = 8;
@@ -108,6 +117,8 @@ export function parseQuery(search) {
     seed: Number.isFinite(seed) ? seed : null,
     calm: q.has('calm'),
     perf: q.has('perf'),
+    // (The frame-time governor: on for visitors, off under ?test unless asked for; null: as such.)
+    govern: q.has('govern') ? q.get('govern') !== 'off' : null,
   };
 }
 
@@ -163,20 +174,20 @@ function controlHtml(c, v, rests) {
   const id = `inv-shader-${c.key}`;
   const off = rests ? ' disabled' : '';
   if (c.kind === 'switch')
-    return `<label class="inv-switch inv-control-switch"><input type="checkbox" role="switch" data-shader="${c.key}"${v ? ' checked' : ''}${off}><span class="inv-switch-label">${c.label}</span><span class="inv-knob" aria-hidden="true"></span></label>`;
+    return `<label class="inv-switch inv-control-switch"><input type="checkbox" role="switch" data-shader="${c.key}"${v ? ' checked' : ''}${off}><span class="inv-switch-label">${html(c.label)}</span><span class="inv-knob" aria-hidden="true"></span></label>`;
   if (c.kind === 'choice') {
     const segs = (c.options ?? [])
       .map((o) =>
         segment(id, c.key, o.value, o.label, o.value === v, { disabled: rests, attr: 'data-shader', spoken: o.spoken }),
       )
       .join('');
-    return `<div class="inv-control inv-control-choice" role="radiogroup" aria-labelledby="${id}-label"><span class="inv-control-label" id="${id}-label">${c.label}</span><div class="inv-segs">${segs}</div></div>`;
+    return `<div class="inv-control inv-control-choice" role="radiogroup" aria-labelledby="${id}-label"><span class="inv-control-label" id="${id}-label">${html(c.label)}</span><div class="inv-segs">${segs}</div></div>`;
   }
   const { shown, spoken } = shaderText(c, v);
   const range = c.steps
     ? `min="0" max="${c.steps.length - 1}" step="1"`
     : `min="${c.min}" max="${c.max}" step="${c.step}"`;
-  return `<div class="inv-control"><label class="inv-control-label" for="${id}">${c.label}</label><input type="range" class="inv-range" id="${id}" ${range} value="${rangeValue(c, v)}" aria-valuetext="${spoken}" data-shader="${c.key}"${off}><output class="inv-control-value" for="${id}" data-shader-value="${c.key}" aria-hidden="true">${shown}</output></div>`;
+  return `<div class="inv-control"><label class="inv-control-label" for="${id}">${html(c.label)}</label><input type="range" class="inv-range" id="${id}" ${range} value="${rangeValue(c, v)}" aria-valuetext="${spoken}" data-shader="${c.key}"${off}><output class="inv-control-value" for="${id}" data-shader-value="${c.key}" aria-hidden="true">${shown}</output></div>`;
 }
 
 /**

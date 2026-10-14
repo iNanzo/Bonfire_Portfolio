@@ -34,6 +34,16 @@
 // (decalMaterial); in the colour target they're flat pixel shapes, their map's alpha cut at
 // DECAL_CUT and drawn at the material's opacity, like his hard shadow (a smooth falloff reads
 // as a smudge on the white page).
+//
+// Cost: the post shader runs on every texel of the stage, and two of its parts loop over
+// neighbours: the ring just outside him (4 reads a texel) and the soft shadow's averaging (up to
+// (2 MAX_SOFT + 1)² reads). Both only ever find something near NEWT, so the stage hands the pass
+// two boxes in texels each frame (subjectBoxes: his bounding sphere on screen, and the floor his
+// shadow can fall on, from the light), and outside them the loops are skipped. Outside a third,
+// the area holding both and the decals (the blob, the marker), every texel is the paper: there
+// the canvas is only cleared to it, and both the colour pass and the post pass draw inside that
+// area alone (a scissor). The same picture, for a share of the texels: at Native on a phone
+// three million texels drawn twice became the few hundred thousand round NEWT.
 import * as THREE from 'three';
 import { floorLook } from './floor.js';
 import { BAYER4 } from './pixels.js';
@@ -56,6 +66,73 @@ const ID_ON = { value: 1 };
 const MAP_BIAS = { value: 0 };
 /** A decal's map alpha under this is outside its shape (in the colour target). */
 export const DECAL_CUT = 0.3;
+/** A box that holds every texel (subjectBoxes' answer when it can't bound him). */
+export const ALL = Object.freeze([-1e9, -1e9, 1e9, 1e9]);
+/** Texels round his sphere's box for the ring (one, and the texel snap's half). */
+const RING_MARGIN = 2;
+/** Texels round the area past the boxes: the soft shadow's reads reach MAX_SOFT past its box. */
+const AREA_MARGIN = MAX_SOFT + 1;
+
+const corner = new THREE.Vector3();
+const onFloor = new THREE.Vector3();
+
+/**
+ * The boxes the post shader keeps its loops to (texels on a w × h target, gl_FragCoord's: x
+ * right, y up; [x0, y0, x1, y1]): `ring`, NEWT's bounding sphere (`center`, `radius`, world
+ * units) on screen, for the ring just outside him; `shade`, the floor his shadow can fall on (that
+ * sphere's box cast along `light`, the unit direction toward the light, onto the floor), with room
+ * for a soft edge MAX_SOFT texels wide; and `area`, the two with the `extra` points (the decals'
+ * corners) and room for the soft shadow's reads: outside it every texel is the paper, and the
+ * pass draws inside it alone. They're bounded by projecting the corners of the sphere's box (a
+ * cast along the light and the camera's projection keep a box's points inside its corners'
+ * hull); a point behind the camera, or a light at the horizon, gives ALL.
+ * @param {{center: any, radius: number, light: any, camera: any, w: number, h: number, extra?: any[]}} o
+ * @returns {{ring: number[], shade: number[], area: number[]}}
+ */
+export function subjectBoxes({ center, radius, light, camera, w, h, extra = [] }) {
+  const ring = [Infinity, Infinity, -Infinity, -Infinity];
+  const shade = [Infinity, Infinity, -Infinity, -Infinity];
+  const decals = [Infinity, Infinity, -Infinity, -Infinity];
+  const all = () => ({ ring: [...ALL], shade: [...ALL], area: [...ALL] });
+  const grow = (box, p) => {
+    // (In front of the camera: its view-space z is negative, the clip w positive.)
+    const z = corner.copy(p).applyMatrix4(camera.matrixWorldInverse).z;
+    if (!(z < -1e-6)) return false;
+    p.project(camera);
+    const x = ((p.x + 1) / 2) * w;
+    const y = ((p.y + 1) / 2) * h;
+    box[0] = Math.min(box[0], x);
+    box[1] = Math.min(box[1], y);
+    box[2] = Math.max(box[2], x);
+    box[3] = Math.max(box[3], y);
+    return true;
+  };
+  if (!(light.y > 0.05)) return all();
+  for (let i = 0; i < 8; i++) {
+    const cx = center.x + (i & 1 ? radius : -radius);
+    const cy = center.y + (i & 2 ? radius : -radius);
+    const cz = center.z + (i & 4 ? radius : -radius);
+    const ok =
+      grow(ring, onFloor.set(cx, cy, cz)) &&
+      grow(shade, onFloor.set(cx - (light.x * cy) / light.y, 0, cz - (light.z * cy) / light.y));
+    if (!ok) return all();
+  }
+  for (const p of extra) if (!grow(decals, onFloor.copy(p))) return all();
+  const pad = (box, m) => [
+    Math.floor(box[0] - m),
+    Math.floor(box[1] - m),
+    Math.ceil(box[2] + m),
+    Math.ceil(box[3] + m),
+  ];
+  // (The shadow under his feet is in the ring box too: the shade box takes it in.)
+  for (const k of [0, 1]) shade[k] = Math.min(shade[k], ring[k]);
+  for (const k of [2, 3]) shade[k] = Math.max(shade[k], ring[k]);
+  const out = { ring: pad(ring, RING_MARGIN), shade: pad(shade, MAX_SOFT + RING_MARGIN) };
+  const area = [...out.shade];
+  for (const k of [0, 1]) area[k] = Math.min(area[k], out.ring[k], Math.floor(decals[k] - RING_MARGIN));
+  for (const k of [2, 3]) area[k] = Math.max(area[k], out.ring[k], Math.ceil(decals[k] + RING_MARGIN));
+  return { ...out, area: pad(area, AREA_MARGIN) };
+}
 
 /**
  * The pass's own optional knobs a look preset may carry beside LookPreset's (looks/*.js type
@@ -65,7 +142,9 @@ export const DECAL_CUT = 0.3;
  *   shadow's edge spreads over (0: hard); steps: tones it's dithered into (0: smooth);
  *   dither: how much the Bayer dither moves those steps, 0..1
  * @property {{outside?: boolean}} outline  lines on the paper just outside NEWT, not on his edge
- * @property {{mipBias?: number, fineMipBias?: number}} [texture]  mipBias: how many mip levels
+ * @property {{mipBias?: number, fineMipBias?: number, pixelArt?: boolean}} [texture]  pixelArt:
+ *   Pixel Shirt & Face (a Shader option, off in every style): the bold pixel plaid and the pixel
+ *   face at the coarser resolutions (character.js); mipBias: how many mip levels
  *   coarser his textures are sampled with the pixel filter on (0: as three picks); fineMipBias:
  *   his atlas's once he's character.js ORIGINAL_ATLAS_TEXELS tall or more (the glb's plaid at a
  *   fine resolution; mipBias without it)
@@ -291,11 +370,14 @@ export const POST_SHADER = /* glsl */ `
   uniform float uShadeSoft;
   uniform float uShadeSteps;
   uniform float uShadeDither;
+  uniform vec4 uRingBox;
+  uniform vec4 uShadeBox;
 
   const vec2 STEPS[4] = vec2[4](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0));
 
   vec4 at(vec2 p) { return texture2D(tColor, p / uRes); }
   bool inside(vec2 p) { return p.x >= 0.0 && p.y >= 0.0 && p.x < uRes.x && p.y < uRes.y; }
+  bool inBox(vec2 p, vec4 b) { return p.x >= b.x && p.y >= b.y && p.x <= b.z && p.y <= b.w; }
   float idOf(vec4 c) { return floor(c.a * ID_SCALE + 0.02); }
   bool isNewt(vec2 p) { return inside(p) && abs(idOf(at(p)) - NEWT) < 0.5; }
   // The floor's shadow coverage, 0..1; -1 off the floor.
@@ -347,7 +429,7 @@ export const POST_SHADER = /* glsl */ `
   // The floor's shadow coverage around p, averaged over the floor texels of a disc uShadeSoft
   // texels in radius (its own coverage when that's 0).
   float softShade(vec2 p, float own) {
-    if (uShadeSoft < 0.5) return own;
+    if (uShadeSoft < 0.5 || !inBox(p, uShadeBox)) return own;
     float sum = 0.0;
     float n = 0.0;
     float r2 = uShadeSoft * uShadeSoft + uShadeSoft;
@@ -388,7 +470,7 @@ export const POST_SHADER = /* glsl */ `
         amount = clamp(floor(amount * uShadeSteps + 0.5 + d * uShadeDither) / uShadeSteps, 0.0, 1.0);
       col = mix(col * toSRGB(src.rgb), uShade, amount * uShadeAmount);
     }
-    if (uOutline > 0.5 && uOutside > 0.5)
+    if (uOutline > 0.5 && uOutside > 0.5 && inBox(p, uRingBox))
       for (int k = 0; k < 4; k++) {
         vec2 n = p + STEPS[k];
         if (!isNewt(n)) continue;
@@ -437,6 +519,8 @@ export function createRetro(renderer) {
       uShadeSoft: { value: 0 },
       uShadeSteps: { value: 0 },
       uShadeDither: { value: 1 },
+      uRingBox: { value: new THREE.Vector4(...ALL) },
+      uShadeBox: { value: new THREE.Vector4(...ALL) },
     },
     vertexShader,
     fragmentShader: POST_SHADER,
@@ -456,6 +540,8 @@ export function createRetro(renderer) {
   const background = new THREE.Color();
   /** The shadow catchers swapped for this frame's colour pass: mesh, its material, mesh, … */
   const swapped = [];
+  /** Where the passes draw, texels [x0, y0, x1, y1] (setBoxes; the whole target by default). */
+  const area = [...ALL];
 
   function setSize(w, h) {
     if (target && target.width === w && target.height === h) return;
@@ -539,6 +625,14 @@ export function createRetro(renderer) {
     }
     u.cameraNear.value = camera.near;
     u.cameraFar.value = camera.far;
+    // (Inside the area alone, when there's one smaller than the target: outside it, the paper.)
+    const x0 = Math.max(0, Math.min(target.width, area[0]));
+    const y0 = Math.max(0, Math.min(target.height, area[1]));
+    const x1 = Math.max(x0, Math.min(target.width, area[2]));
+    const y1 = Math.max(y0, Math.min(target.height, area[3]));
+    const part = x0 > 0 || y0 > 0 || x1 < target.width || y1 < target.height;
+    target.scissorTest = part;
+    if (part) target.scissor.set(x0, y0, x1 - x0, y1 - y0);
     renderer.setRenderTarget(target);
     renderer.setClearColor(background, 0);
     renderer.clear();
@@ -549,7 +643,15 @@ export function createRetro(renderer) {
       restoreCatchers();
     }
     renderer.setRenderTarget(null);
+    if (part) {
+      renderer.setScissorTest(false);
+      renderer.setClearColor(background, 1);
+      renderer.clear();
+      renderer.setScissor(x0, y0, x1 - x0, y1 - y0);
+      renderer.setScissorTest(true);
+    }
     renderer.render(post, postCamera);
+    if (part) renderer.setScissorTest(false);
   }
 
   /**
@@ -588,9 +690,20 @@ export function createRetro(renderer) {
     return Promise.all(jobs).then(() => undefined);
   }
 
+  /**
+   * The boxes the post shader keeps its loops to (subjectBoxes), or null: the whole target.
+   * @param {{ring: number[], shade: number[], area?: number[]}|null} boxes
+   */
+  function setBoxes(boxes) {
+    u.uRingBox.value.fromArray(boxes?.ring ?? ALL);
+    u.uShadeBox.value.fromArray(boxes?.shade ?? ALL);
+    for (let i = 0; i < 4; i++) area[i] = (boxes?.area ?? ALL)[i];
+  }
+
   return {
     setSize,
     setParams,
+    setBoxes,
     render,
     warm,
     get pixel() {
