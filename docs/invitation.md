@@ -254,8 +254,13 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   admin's content rules read it with a warning): at the coarser
   resolutions his head is only a dozen or two texels wide, so
   `node tools/newt-face.mjs` redraws the glb's face sheet as `public/models/newt-face.png`,
-  four small pixel cells with the features kept at least 2 px thick (`--cell`, `--min`,
-  `--preview` to look at it). The page uses it while the pixel filter is on (Native too), the
+  his smooth face scaled down faithfully to each cell size: its design measured from the glb's
+  sheet (`DESIGN`: the heavy dark upper lid with its turned-down end, the white, the grey iris
+  and the dark pupil just under the lid, the lash, the brow; closed, a lid line; happy, an arc
+  and a blush; surprised, the lid and brow raised, the eye wide and a small o; the small
+  mouth) kept where it is in a cell and drawn in whole pixels, a line a pixel thick at least
+  and every feature a pixel at least, the colours sampled from the sheet (`--preview` to look
+  at it). The page uses it while the pixel filter is on (Native too), the
   sheet whose cell matches his half face in texels (3 px at 16×16 up to 34); past 1.25 times
   the largest (`SMOOTH_FACE_OVER`: Native on a phone, or zoomed in) it shows the glb's smooth
   face again, as at Off. His shirt shows the bold pixel plaid (`newt-atlas-pixel.png`, `tools/newt-atlas.mjs`)

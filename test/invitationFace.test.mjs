@@ -2,14 +2,17 @@
 // src/invitation/faceSheets.js): one 2×2 sheet (clips.js FACES' layout) for each of a ladder of
 // cell sizes, so character.js can show the one whose cell is as many pixels as his half face
 // covers texels (nearest sampling then neither drops nor doubles a feature, and the eyes keep
-// one shape as he moves). Every sheet: opaque; solid eyes (a dark core, no highlight, no gap in
-// a row), the same shape across the sizes (at least as tall as wide); no lone dark pixel; a
-// 1 px brow line where there's room for it apart from the eye; a mouth in each face (darker
-// than the skin, under the eyes, apart from them); four faces that differ. The pick between
-// sheets holds on to the one showing until another fits clearly better (no flicker between two
-// sizes), and his face's span is measured from its own geometry.
+// one shape as he moves). Every sheet: opaque; his smooth face (the glb's own sheet) scaled down,
+// each expression's eye, brow, mouth and blush where the smooth sheet has them; an open eye as it
+// draws it (a heavy dark lid over the white, a dark pupil just under it in a grey iris), closed a
+// lid line, happy an arc; surprised wider, its brow higher and its mouth a dark o; a small mouth
+// under the eyes and apart from them, a 1 px brow with skin under it where there's room; no lone
+// dark pixel but a pupil; four faces that differ, each size's eye at least as big as the one
+// under it. The pick between sheets holds on to the one showing until another fits clearly
+// better (no flicker between two sizes), and his face's span is measured from its own geometry.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import sharp from 'sharp';
 import { fileURLToPath } from 'node:url';
 import {
@@ -24,6 +27,7 @@ import {
 } from '../src/invitation/faceSheets.js';
 
 const FILE = fileURLToPath(new URL('../public/models/newt-face.png', import.meta.url));
+const GLB = fileURLToPath(new URL('../public/models/newt.glb', import.meta.url));
 const CELLS = { neutral: [0, 0], blink: [1, 0], happy: [0, 1], surprised: [1, 1] };
 const luma = (r, g, b) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
@@ -83,23 +87,93 @@ function components(w, h, on) {
 const pixels = (w, h, on) =>
   Array.from({ length: w * h }, (_, i) => [i % w, Math.floor(i / w)]).filter(([x, y]) => on(x, y));
 
-/** A cell's mouth test (a warm dark, clearly darker than the skin) and its ink test (the rest of the dark). */
-function partsOf({ px, dark, w, h }) {
-  const at = (x, y) => px[y * w + x];
-  // (The skin: the cell's commonest colour.)
-  const count = new Map();
-  for (const c of px) count.set(c.join(), (count.get(c.join()) ?? 0) + 1);
-  const common = [...count]
-    .sort((a, b) => b[1] - a[1])[0][0]
-    .split(',')
-    .map(Number);
-  const skin = luma(common[0], common[1], common[2]);
-  const isMouth = (x, y) => {
-    const [r, g, b] = at(x, y);
-    return luma(r, g, b) < skin - 0.25 && r - b > 25;
+/** What a pixel of a face is, by its colour: ink (lids, brows, pupils), the iris's greys, the white, the mouth, the blush, or skin. */
+function kindOf([r, g, b]) {
+  const l = luma(r, g, b);
+  const sat = Math.max(r, g, b) - Math.min(r, g, b);
+  if (l < 0.15) return 'ink';
+  if (sat < 24 && l > 0.85) return 'white';
+  if (sat < 24 && l < 0.6) return 'iris';
+  if (r > 215 && r - g > 60) return 'blush';
+  if (r - b > 25 && l < 0.4) return 'mouth';
+  return 'skin';
+}
+
+/** A box round [x, y] points: left, right, top, bottom (inclusive), or null for none. */
+function box(points) {
+  if (!points.length) return null;
+  const xs = points.map(([x]) => x);
+  const ys = points.map(([, y]) => y);
+  return { l: Math.min(...xs), r: Math.max(...xs), t: Math.min(...ys), b: Math.max(...ys) };
+}
+
+/**
+ * A face's parts in a w × h grid of kinds (kind(x, y)): the brow (the topmost ink, a line apart
+ * from the eye), the eye (the rest of the ink, the white and the iris), the mouth (in the lowest
+ * quarter) and the blush, each as its pixels and box; ink, white and iris in
+ * patches of `speck` pixels or fewer left out (the smooth sheet's antialiased edges).
+ */
+function partsOf(w, h, kind, speck = 0) {
+  const low = Math.floor(h * 0.75);
+  const ink = components(w, h, (x, y) => kind(x, y) === 'ink')
+    .filter((c) => c.px.length > speck)
+    .sort((a, b) => a.t - b.t);
+  const lit = components(w, h, (x, y) => y < low && (kind(x, y) === 'white' || kind(x, y) === 'iris'))
+    .filter((c) => c.px.length > speck)
+    .flatMap((c) => c.px);
+  const litTop = Math.min(h, ...lit.map(([, y]) => y));
+  // (The brow: the topmost ink when there's more below it and it's clear of the eye's white.)
+  const brow = ink.length >= 2 && ink[0].b < litTop && ink[0].b < ink[1].t ? ink[0] : null;
+  const eyePx = [...ink.filter((c) => c !== brow).flatMap((c) => c.px), ...lit];
+  const mouthPx = pixels(w, h, (x, y) => y >= low && kind(x, y) === 'mouth');
+  const blushPx = pixels(w, h, (x, y) => kind(x, y) === 'blush');
+  return {
+    brow: brow && { px: brow.px, ...box(brow.px) },
+    eye: { px: eyePx, ...box(eyePx) },
+    mouth: { px: mouthPx, ...box(mouthPx) },
+    blush: { px: blushPx, ...box(blushPx) },
+    count: (k) => pixels(w, h, (x, y) => kind(x, y) === k).length,
   };
-  const isInk = (x, y) => x >= 0 && y >= 0 && x < w && y < h && dark[y * w + x] && !isMouth(x, y);
-  return { isMouth, isInk };
+}
+
+/** The glb's smooth face sheet (NEWT_Face), RGBA. */
+async function smoothSheet() {
+  const buf = fs.readFileSync(GLB);
+  const jsonLen = buf.readUInt32LE(12);
+  const gltf = JSON.parse(buf.toString('utf8', 20, 20 + jsonLen));
+  const material = gltf.materials.find((m) => m.name === 'NEWT_Face');
+  const texture = gltf.textures[material.pbrMetallicRoughness.baseColorTexture.index];
+  const view = gltf.bufferViews[gltf.images[texture.extensions?.EXT_texture_webp?.source ?? texture.source].bufferView];
+  const at = 20 + jsonLen + 8 + (view.byteOffset ?? 0);
+  return sharp(buf.subarray(at, at + view.byteLength))
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+}
+
+/** Each face's parts on the smooth sheet, as shares of a cell (u across from the middle of his face, v down). */
+async function smoothParts() {
+  const { data, info } = await smoothSheet();
+  const n = info.width / 2;
+  /** @type {Record<string, any>} */
+  const out = {};
+  for (const [name, [cx, cy]] of Object.entries(CELLS)) {
+    const kind = (x, y) => {
+      const i = ((cy * n + y) * info.width + cx * n + x) * 4;
+      return kindOf([data[i], data[i + 1], data[i + 2]]);
+    };
+    const p = partsOf(n, n, kind, 40);
+    const uv = (b) => b && b.px.length && { u0: b.l / n, u1: (b.r + 1) / n, v0: b.t / n, v1: (b.b + 1) / n };
+    out[name] = { brow: uv(p.brow), eye: uv(p.eye), mouth: uv(p.mouth), blush: uv(p.blush) };
+  }
+  return out;
+}
+
+/** A pixel cell's kinds, and its parts. */
+function cellParts({ px, w, h }) {
+  const kinds = px.map(kindOf);
+  const kind = (x, y) => (x >= 0 && y >= 0 && x < w && y < h ? kinds[y * w + x] : 'skin');
+  return { kind, ...partsOf(w, h, kind) };
 }
 
 test('the pixel faces: one 2×2 sheet a cell size, from a few texels to a desktop close-up, packed as faceSheets.js lays them out', async () => {
@@ -135,66 +209,183 @@ test('the pixel faces: one 2×2 sheet a cell size, from a few texels to a deskto
       );
 });
 
-test('the pixel faces: solid eyes of one shape at every size, no lone dark pixel, a 1 px brow where there’s room, four different faces', async () => {
+test('the pixel faces are his smooth face scaled down: per expression the eye, the brow, the mouth and the blush sit where the smooth sheet has them, scaled to each cell', async () => {
+  const smooth = await smoothParts();
+  // (The smooth sheet itself: an eye, a brow and a mouth in every face, the blush on happy.)
+  for (const [name, s] of Object.entries(smooth)) {
+    assert.ok(s.eye && s.brow && s.mouth, `smooth ${name}: an eye, a brow and a mouth`);
+    assert.equal(Boolean(s.blush), name === 'happy', `smooth ${name}: a blush only when happy`);
+  }
   for (const { sheet, cells } of await sheets()) {
-    const tag = `${sheet.w} px`;
+    const { w, h } = sheet;
+    if (w < 5) continue;
+    // (A pixel either way, and a share of the cell for the rounding a feature's thickness needs.)
+    const tx = 1 + 0.05 * w;
+    const ty = 1 + 0.04 * h;
     for (const [name, cell] of Object.entries(cells)) {
-      const { w, h } = cell;
-      const { isInk } = partsOf(cell);
-      const ink = components(w, h, isInk);
-      assert.ok(ink.length >= 1, `${tag} ${name}: an eye`);
-      for (const c of ink) assert.ok(c.px.length >= 2, `${tag} ${name}: a lone dark pixel at (${c.l}, ${c.t})`);
-      if (name !== 'neutral' && name !== 'surprised') continue;
-      // The eye: the biggest ink; a dark core (each of its rows one unbroken run, nothing light
-      // inside), at least 2 px tall and at least as tall as it's wide, whatever the size.
-      const eye = [...ink].sort((a, b) => b.px.length - a.px.length)[0];
-      const ew = eye.r - eye.l + 1;
-      const eh = eye.b - eye.t + 1;
-      assert.ok(eh >= 2 && eh >= ew, `${tag} ${name}: the eye is ${ew}×${eh} (one upright shape)`);
-      for (let y = eye.t; y <= eye.b; y++) {
-        const xs = eye.px.filter(([, py]) => py === y).map(([x]) => x);
-        assert.equal(Math.max(...xs) - Math.min(...xs) + 1, xs.length, `${tag} ${name}: row ${y} of the eye is solid`);
-      }
-      // A brow: a 1 px line over the eye with skin between, once the cell has room for it.
-      if (sheet.w < 6) continue;
-      const brow = ink.find((c) => c !== eye && c.b < eye.t);
-      assert.ok(brow, `${tag} ${name}: a brow over the eye`);
-      assert.equal(brow.b, brow.t, `${tag} ${name}: the brow is a 1 px line`);
-      assert.ok(brow.r > brow.l, `${tag} ${name}: the brow is at least 2 px long`);
-      assert.ok(eye.t - brow.b >= 2, `${tag} ${name}: skin between the brow and the eye`);
+      const tag = `${w} px ${name}`;
+      const p = cellParts(cell);
+      const s = smooth[name];
+      const near = (got, want, tol, what) =>
+        assert.ok(
+          Math.abs(got - want) <= tol,
+          `${tag}: ${what} at ${got}, the smooth face's at ${want.toFixed(1)} (±${tol.toFixed(1)})`,
+        );
+      const fits = (b, uv, what, { top = ty, bottom = ty } = {}) => {
+        assert.ok(b && b.px.length, `${tag}: ${what}`);
+        near(b.l, uv.u0 * w, tx, `${what}'s left`);
+        near(b.r + 1, uv.u1 * w, tx, `${what}'s right`);
+        near(b.t, uv.v0 * h, top, `${what}'s top`);
+        near(b.b + 1, uv.v1 * h, bottom, `${what}'s bottom`);
+      };
+      fits(p.eye, s.eye, 'the eye');
+      fits(p.mouth, s.mouth, 'the mouth', { top: ty + 0.5, bottom: ty + 0.5 });
+      // (The brow may sit a row or two higher, for a row of skin between it and the lid.)
+      if (w >= 10) fits(p.brow, s.brow, 'the brow', { top: ty + 2, bottom: ty + 2 });
+      if (name === 'happy' && w >= 8) fits(p.blush, s.blush, 'the blush', { top: ty + 0.5, bottom: ty + 0.5 });
+      if (name !== 'happy') assert.equal(p.blush.px.length, 0, `${tag}: no blush`);
     }
-    const key = (c) => c.dark.map(Number).join('');
-    assert.equal(new Set(Object.values(cells).map(key)).size, 4, `${tag}: neutral, blink, happy and surprised differ`);
-    const inkOf = (c) => c.dark.filter(Boolean).length;
-    assert.ok(inkOf(cells.neutral) > inkOf(cells.blink), `${tag}: an open eye holds more ink than a closed one`);
-    assert.ok(
-      inkOf(cells.surprised) >= inkOf(cells.neutral),
-      `${tag}: a surprised eye is at least as big as a neutral one`,
-    );
   }
 });
 
-test('the pixel faces: a mouth in every face at every size, darker than the skin, under the eyes and apart from them', async () => {
+test('his eye as the smooth face draws it: a heavy dark upper lid over the white, a dark pupil just under it in a grey iris; closed, a lid line; happy, an arc', async () => {
+  for (const { sheet, cells } of await sheets()) {
+    const { w } = sheet;
+    for (const [name, cell] of Object.entries(cells)) {
+      const tag = `${w} px ${name}`;
+      const p = cellParts(cell);
+      const { kind } = p;
+      const e = p.eye;
+      assert.ok(e.px.length >= 2, `${tag}: an eye`);
+      const ew = e.r - e.l + 1;
+      /** The longest unbroken run of ink along row y of the eye. */
+      const run = (y) => {
+        let best = 0;
+        let n = 0;
+        for (let x = e.l; x <= e.r; x++) best = Math.max(best, (n = kind(x, y) === 'ink' ? n + 1 : 0));
+        return best;
+      };
+      if (name === 'neutral' || name === 'surprised') {
+        // The lid: an unbroken run of ink along the eye's top, most of its width (thick as the
+        // cell needs: 2 rows at most).
+        assert.ok(run(e.t) >= Math.ceil(ew * 0.6), `${tag}: a lid along the eye's top (${run(e.t)} of ${ew})`);
+        let lid = 0;
+        while (run(e.t + lid) >= Math.ceil(ew * 0.6)) lid++;
+        assert.ok(lid <= 2, `${tag}: a lid ${lid} rows thick`);
+        if (w < 5) continue;
+        // Under it, the white, and a dark pupil with the white or the iris beside it.
+        assert.ok(p.count('white') >= 1, `${tag}: the white of the eye`);
+        const pupil = e.px.filter(
+          ([x, y]) =>
+            y > e.t + lid - 1 &&
+            kind(x, y) === 'ink' &&
+            [kind(x - 1, y), kind(x + 1, y)].some((k) => k === 'white' || k === 'iris'),
+        );
+        assert.ok(pupil.length >= 1, `${tag}: a pupil under the lid`);
+        if (w >= 10) assert.ok(p.count('iris') >= 2, `${tag}: a grey iris round the pupil`);
+      } else {
+        assert.equal(p.count('white'), 0, `${tag}: no white`);
+        assert.equal(p.count('iris'), 0, `${tag}: no iris`);
+        assert.ok(e.b - e.t + 1 <= (name === 'blink' ? 2 : Math.max(2, Math.round(sheet.h * 0.09))), `${tag}: a line`);
+        assert.ok(ew >= 2, `${tag}: as wide as an eye`);
+        if (name === 'happy' && w >= 8) {
+          // An arc: its middle column's top no lower than its ends', its ends reaching lower.
+          const ys = (x) => e.px.filter(([px]) => px === x).map(([, y]) => y);
+          const m = Math.round((e.l + e.r) / 2);
+          assert.ok(Math.min(...ys(m)) <= Math.min(...ys(e.l), ...ys(e.r)), `${tag}: an arc, its middle up`);
+          for (const x of [e.l, e.r])
+            assert.ok(Math.max(...ys(x)) > Math.max(...ys(m)), `${tag}: its end at ${x} down`);
+        }
+      }
+    }
+  }
+});
+
+test('the faces between them: surprised eyes wider and brows higher than neutral, its mouth a dark o; an open eye holds more than a closed one; no lone dark pixel but a pupil or a line’s step; four different faces', async () => {
+  for (const { sheet, cells } of await sheets()) {
+    const tag = `${sheet.w} px`;
+    const parts = Object.fromEntries(Object.entries(cells).map(([n, c]) => [n, cellParts(c)]));
+    const { neutral, surprised, blink } = parts;
+    const lit = (p) => p.count('white') + p.count('iris');
+    if (sheet.w >= 8) {
+      assert.ok(
+        lit(surprised) >= lit(neutral),
+        `${tag}: a surprised eye shows as much white and iris as a neutral one`,
+      );
+      assert.ok(surprised.eye.t <= neutral.eye.t, `${tag}: its lid no lower`);
+    }
+    if (sheet.w >= 10) assert.ok(surprised.brow.t <= neutral.brow.t, `${tag}: its brow no lower`);
+    /** The mouth's darkest pixel (luma) in a face. */
+    const dark = (name) => {
+      const c = cells[name];
+      return Math.min(...parts[name].mouth.px.map(([x, y]) => luma(...c.px[y * c.w + x].slice(0, 3))));
+    };
+    assert.ok(
+      surprised.mouth.b - surprised.mouth.t >= neutral.mouth.b - neutral.mouth.t,
+      `${tag}: an o at least as tall as the neutral mouth`,
+    );
+    assert.ok(dark('surprised') <= dark('neutral'), `${tag}: and as dark`);
+    const held = (p) => p.eye.px.length;
+    assert.ok(held(neutral) > held(blink), `${tag}: an open eye holds more than a closed one`);
+    for (const [name, p] of Object.entries(parts)) {
+      const { w, h } = cells[name];
+      for (const c of components(w, h, (x, y) => p.kind(x, y) === 'ink')) {
+        if (c.px.length >= 2) continue;
+        const [[x, y]] = c.px;
+        const round = [p.kind(x - 1, y), p.kind(x + 1, y)];
+        // (A line's step, touching the rest of it at a corner, is part of the line.)
+        const corner = [-1, 1].some((dx) => [-1, 1].some((dy) => p.kind(x + dx, y + dy) === 'ink'));
+        assert.ok(
+          corner || round.every((k) => k === 'white' || k === 'iris'),
+          `${tag} ${name}: a lone dark pixel at (${x}, ${y}) that isn't a pupil`,
+        );
+      }
+    }
+    const key = (c) => c.px.map((q) => kindOf(q)).join('');
+    assert.equal(new Set(Object.values(cells).map(key)).size, 4, `${tag}: neutral, blink, happy and surprised differ`);
+  }
+});
+
+test('the pixel faces: a small mouth in every face at every size, under the eyes and apart from them, and a 1 px brow with skin under it where there’s room', async () => {
   for (const { sheet, cells } of await sheets())
     for (const [name, cell] of Object.entries(cells)) {
       const tag = `${sheet.w} px ${name}`;
-      const { w, h } = cell;
-      const { isMouth, isInk } = partsOf(cell);
-      const eyeTop = Math.min(h, ...pixels(w, h, isInk).map(([, y]) => y));
-      assert.ok(eyeTop < h, `${tag}: eyes`);
+      const { w } = cell;
+      const p = cellParts(cell);
+      const m = p.mouth;
       // In the middle column (the cell's left edge is the middle of his face: mirrored, at least
-      // 2 px wide), at least 1 px tall, below the top of the eyes.
-      const rows = [];
-      for (let y = 0; y < h; y++) if (isMouth(0, y)) rows.push(y);
-      assert.ok(rows.length >= 1, `${tag}: a mouth at least 1 px tall and 2 px wide (mirrored)`);
+      // 2 px wide), at least 1 px tall, small (the smooth face's is a seventh of a cell across).
+      assert.ok(m.px.length >= 1 && m.l === 0, `${tag}: a mouth in the middle`);
+      assert.ok(m.r + 1 <= Math.max(1, Math.ceil(w * 0.1)) + 1, `${tag}: a small mouth (${m.r + 1} px a side)`);
+      assert.ok(m.t > p.eye.b, `${tag}: the mouth (row ${m.t}) under the eyes (row ${p.eye.b})`);
+      const touches = ([x, y]) => [p.kind(x + 1, y), p.kind(x - 1, y), p.kind(x, y + 1), p.kind(x, y - 1)];
       assert.ok(
-        rows.every((y) => y > eyeTop),
-        `${tag}: the mouth (rows ${rows}) sits under the top of the eyes (row ${eyeTop})`,
+        m.px.every(
+          (q) =>
+            touches(q).every((k) => k !== 'white' && k !== 'iris') &&
+            !p.eye.px.some(([x, y]) => Math.abs(x - q[0]) + Math.abs(y - q[1]) <= 1),
+        ),
+        `${tag}: no mouth pixel touches an eye`,
       );
-      const mouth = pixels(w, h, isMouth);
-      const touches = ([x, y]) => isInk(x + 1, y) || isInk(x - 1, y) || isInk(x, y + 1) || isInk(x, y - 1);
-      assert.deepEqual(mouth.filter(touches), [], `${tag}: no mouth pixel touches an eye`);
+      if (w < 8) continue;
+      assert.ok(p.brow, `${tag}: a brow`);
+      assert.equal(p.brow.b, p.brow.t, `${tag}: the brow is a 1 px line`);
+      assert.ok(p.brow.r > p.brow.l, `${tag}: at least 2 px long`);
+      assert.ok(p.eye.t - p.brow.b >= 2, `${tag}: skin between the brow and the eye`);
     }
+});
+
+test('the pixel faces grow steadily with the cell: each size’s eye at least as wide and tall as the size under it', async () => {
+  let was = null;
+  for (const { sheet, cells } of await sheets()) {
+    const e = cellParts(cells.neutral).eye;
+    const now = { w: e.r - e.l + 1, h: e.b - e.t + 1 };
+    if (was) {
+      assert.ok(now.w >= was.w, `${sheet.w} px: the eye ${now.w} wide after ${was.w}`);
+      assert.ok(now.h >= was.h, `${sheet.w} px: the eye ${now.h} tall after ${was.h}`);
+    }
+    was = now;
+  }
 });
 
 test('the sheet pick: the nearest size to his half face, held until another fits clearly better', () => {

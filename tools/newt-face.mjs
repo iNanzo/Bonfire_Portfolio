@@ -1,15 +1,15 @@
 // NEWT's pixel faces for the invitation toy (public/models/newt-face.png): one 2×2 sheet of his
 // four faces (neutral, blink, happy, surprised: clips.js FACES' layout) for every cell size in
-// src/invitation/faceSheets.js's ladder, side by side as its FACE_LAYOUT packs them, each drawn
-// for its size so every feature is whole pixels: solid upright eyes with a dark core and no
-// highlight (a white texel in a 3-texel eye reads as noise), a 1 px brow line over each once
-// there's room for a pixel of skin between, and a mouth in every face, under the eyes and apart
-// from them (without one his face reads as two eye blocks). character.js shows the sheet whose
-// cell matches his half face in texels (nearest, no mipmaps) while the pixel filter is on; the
-// 1024 sheet inside public/models/newt.glb averages down to a blank face at those sizes. The
-// skin is each of that sheet's cells' commonest colour, the ink its darkest; where the eyes and
-// the mouth sit in a cell follows that sheet, the eyes a little narrower (two almond eyes a
-// cell wide meet in the middle and read as sunglasses at a few texels). Re-runnable:
+// src/invitation/faceSheets.js's ladder, side by side as its FACE_LAYOUT packs them. Each is his
+// smooth face (the 1024 sheet inside public/models/newt.glb, which averages down to a blank face
+// at a few texels) scaled down faithfully: its design measured from that sheet (DESIGN: the heavy
+// dark upper lid with its turned-down end, the white, the grey iris and the dark pupil under it,
+// the lash, the brow; closed, a lid line; happy, an arc and a blush; surprised, the lid and brow
+// raised, the eye wide, a small o; the small mouth), kept where it is in a cell and drawn in
+// whole pixels for that size, a line a pixel thick at least, a feature a pixel at least, so it
+// stays readable and the same at every size (colours sampled from the sheet too). character.js
+// shows the sheet whose cell matches his half face in texels (nearest, no mipmaps) while the
+// pixel filter and Pixel Face are on. Re-runnable:
 //
 //   node tools/newt-face.mjs [--glb public/models/newt.glb] [--out public/models/newt-face.png]
 //                            [--preview <png>]
@@ -29,15 +29,113 @@ const OUT = opt('out', 'public/models/newt-face.png');
 const PREVIEW = opt('preview', null);
 /** The cells, as clips.js FACES has them: [column, row] on a 2×2 sheet. */
 const CELLS = { neutral: [0, 0], blink: [1, 0], happy: [0, 1], surprised: [1, 1] };
-/** A closed mouth's line (lighter: a dark line a pixel tall reads as a hole), an open one, the blush. */
-const MOUTH = { line: [128, 68, 58], open: [86, 46, 40] };
-const BLUSH = [240, 160, 150];
 /**
- * Where the features sit in a cell, as shares of its width (x, from the middle of his face) and
- * height (y, down), from the 1024 sheet's neutral face: the eye's centre and size, the mouth's
- * half width and its margin under it.
+ * His smooth face (the 1024 sheet's cells), measured, as shares of a cell: u across from the
+ * middle of his face to his ear, v down. A stroke is its centre line, [u, v] points, and its
+ * thickness (v); an ellipse its centre and radii. The open eye: a heavy dark upper lid whose
+ * outer end turns down (the hook), the white under it, a big grey iris (darker under the pupil's
+ * bottom, `band`) mostly hidden by the lid, a dark pupil right under the lid, a thin brown lash
+ * line along the white's bottom; surprised, the lid and brow higher, the white all round a
+ * smaller iris and pupil. Closed: a lid line with a slight dip. Happy: an arc over the eye and a
+ * blush under it toward his ear. The mouth: a short line at the middle, its ends a little down
+ * (neutral) or up (happy); surprised, a small dark o.
  */
-const LAYOUT = { eyeX: 0.375, eyeY: 0.75, eyeW: 0.25, eyeH: 0.2, mouthW: 0.125, mouthBottom: 1 / 14 };
+const DESIGN = {
+  brow: {
+    t: 0.0156,
+    neutral: [
+      [0.201, 0.5596],
+      [0.3125, 0.5537],
+      [0.4375, 0.5488],
+      [0.588, 0.5498],
+    ],
+    happy: [
+      [0.201, 0.55],
+      [0.3125, 0.5449],
+      [0.4375, 0.5391],
+      [0.588, 0.541],
+    ],
+    surprised: [
+      [0.201, 0.5273],
+      [0.3125, 0.5215],
+      [0.4375, 0.5156],
+      [0.588, 0.5166],
+    ],
+  },
+  lid: {
+    t: 0.0254,
+    neutral: [
+      [0.185, 0.618],
+      [0.25, 0.6064],
+      [0.3125, 0.6015],
+      [0.5, 0.6015],
+      [0.59, 0.61],
+      [0.66, 0.6189],
+      [0.695, 0.625],
+    ],
+    // (Surprised: the same lid, raised.)
+    raise: 0.0335,
+    hook: [
+      [0.64, 0.626],
+      [0.695, 0.643],
+    ],
+  },
+  white: { u: 0.4, v: 0.665, ru: 0.23, rv: 0.095 },
+  iris: {
+    neutral: { u: 0.395, v: 0.54, ru: 0.2, rv: 0.2 },
+    surprised: { u: 0.393, v: 0.668, ru: 0.105, rv: 0.058 },
+    band: 0.693,
+    // (The darker band from cells this wide: in a smaller one it joins the pupil into one dark
+    // column under the lid.)
+    bandFrom: 26,
+  },
+  pupil: {
+    neutral: { u: 0.39, v: 0.62, ru: 0.07, rv: 0.072 },
+    surprised: { u: 0.393, v: 0.659, ru: 0.048, rv: 0.03 },
+  },
+  lash: { u: [0.31, 0.47] },
+  closed: {
+    t: 0.019,
+    line: [
+      [0.172, 0.665],
+      [0.25, 0.669],
+      [0.3125, 0.675],
+      [0.4, 0.68],
+      [0.53, 0.676],
+      [0.6, 0.674],
+      [0.672, 0.672],
+    ],
+  },
+  arc: {
+    t: 0.02,
+    line: [
+      [0.195, 0.68],
+      [0.22, 0.677],
+      [0.25, 0.665],
+      [0.28, 0.658],
+      [0.3125, 0.652],
+      [0.375, 0.646],
+      [0.4375, 0.648],
+      [0.5, 0.654],
+      [0.5625, 0.672],
+      [0.6015, 0.682],
+    ],
+  },
+  blush: { u: 0.555, v: 0.8477, ru: 0.072, rv: 0.0156 },
+  mouth: {
+    t: 0.008,
+    neutral: [
+      [0, 0.8825],
+      [0.072, 0.9],
+    ],
+    happy: [
+      [0, 0.8935],
+      [0.03, 0.892],
+      [0.088, 0.884],
+    ],
+    o: { u: 0, v: 0.8945, ru: 0.044, rv: 0.024 },
+  },
+};
 
 /** The bytes of the image the material `name` uses as its base colour, from a .glb. */
 function glbImage(file, name) {
@@ -57,146 +155,296 @@ function glbImage(file, name) {
 const luma = (r, g, b) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
 /**
- * Each face's skin (its cell's commonest colour, in 4-bit bins, averaged) and the sheet's ink
- * (its darkest pixel).
+ * The faces' colours from the 1024 sheet: each face's skin (its cell's commonest colour, in 4-bit
+ * bins, averaged), and the rest sampled where the design has them in its cells (the median of a
+ * small box; the mouth's line the median of its line's own pixels): the ink of the
+ * lids, brows and pupils, the white, the iris's two greys, the lash, the mouth's line and its open
+ * o, the blush.
  * @param {Buffer} px  the 1024 sheet, RGBA
  * @param {number} W  its width
  */
 function colours(px, W) {
   const half = W / 2;
+  const at = (x, y) => {
+    const i = (y * W + x) * 4;
+    return [px[i], px[i + 1], px[i + 2]];
+  };
   /** @type {Record<string, number[]>} */
   const skin = {};
-  let ink = [24, 20, 24];
-  let inkL = 1;
   for (const [name, [cx, cy]] of Object.entries(CELLS)) {
     const bins = new Map();
     for (let y = cy * half; y < (cy + 1) * half; y += 2)
       for (let x = cx * half; x < (cx + 1) * half; x += 2) {
-        const i = (y * W + x) * 4;
-        const key = ((px[i] >> 4) << 8) | ((px[i + 1] >> 4) << 4) | (px[i + 2] >> 4);
-        const b = bins.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
-        b.n++;
-        b.r += px[i];
-        b.g += px[i + 1];
-        b.b += px[i + 2];
-        bins.set(key, b);
-        const l = luma(px[i], px[i + 1], px[i + 2]);
-        if (l < inkL) {
-          inkL = l;
-          ink = [px[i], px[i + 1], px[i + 2]];
-        }
+        const [r, g, b] = at(x, y);
+        const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+        const bin = bins.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+        bin.n++;
+        bin.r += r;
+        bin.g += g;
+        bin.b += b;
+        bins.set(key, bin);
       }
     const top = [...bins.values()].sort((a, b) => b.n - a.n)[0];
     skin[name] = [top.r / top.n, top.g / top.n, top.b / top.n].map(Math.round);
   }
-  return { skin, ink };
+  /** The pixels of face `name`'s box [u0, u1] × [v0, v1]. */
+  const box = (name, [u0, u1], [v0, v1]) => {
+    const [cx, cy] = CELLS[name];
+    const out = [];
+    for (let y = Math.floor(v0 * half); y < Math.ceil(v1 * half); y++)
+      for (let x = Math.floor(u0 * half); x < Math.ceil(u1 * half); x++) out.push(at(cx * half + x, cy * half + y));
+    return out;
+  };
+  const median = (list) => [0, 1, 2].map((k) => list.map((c) => c[k]).sort((a, b) => a - b)[list.length >> 1]);
+  const darkest = (list) => list.reduce((a, b) => (luma(...b) < luma(...a) ? b : a));
+  return {
+    skin,
+    ink: median(box('neutral', [0.3, 0.5], [0.592, 0.61])),
+    white: median(box('neutral', [0.205, 0.235], [0.65, 0.7])),
+    iris: median(box('neutral', [0.26, 0.3], [0.63, 0.66])),
+    irisDark: median(box('neutral', [0.36, 0.43], [0.7, 0.725])),
+    lash: darkest(box('neutral', [0.37, 0.42], [0.745, 0.756])),
+    mouth: median(box('neutral', [0, 0.07], [0.86, 0.92]).filter(([r, g, b]) => r - b > 25 && luma(r, g, b) < 0.5)),
+    open: median(box('surprised', [0, 0.02], [0.885, 0.905])),
+    blush: median(box('happy', [0.53, 0.58], [0.84, 0.855])),
+  };
 }
 
 /**
- * Where a w × h cell's features go (its left edge is the middle of his face): the eye's box,
- * the brow's row (null without room for a pixel of skin under it), the mouth's half width and
- * the closed mouth's rows. The eye clears the mouth's columns and ends a row above the mouth.
- */
-function placement(w, h) {
-  const ew = Math.max(2, Math.round(w * LAYOUT.eyeW));
-  const eh = Math.max(h >= 11 ? 3 : 2, Math.round(h * LAYOUT.eyeH));
-  const mw = Math.max(1, Math.round(w * LAYOUT.mouthW));
-  const mouthBottom = h - 1 - Math.round(h * LAYOUT.mouthBottom);
-  const mouthTop = mouthBottom - Math.max(1, Math.round(h / 28)) + 1;
-  // (A row of skin between the eye and the mouth: touching, the two read as one U.)
-  const left = Math.max(mw, Math.round(w * LAYOUT.eyeX - ew / 2));
-  const top = Math.max(0, Math.min(Math.round(h * LAYOUT.eyeY - eh / 2), mouthTop - 1 - eh));
-  const brow = w >= 6 && top - 2 >= 0 ? top - 2 : null;
-  return { eye: { left, top, w: ew, h: eh }, brow, mw, mouthTop, mouthBottom };
-}
-
-/**
- * One face in a w × h cell, RGBA.
- * @param {string} name  a key of CELLS
+ * A w × h cell to draw a face on (its left edge the middle of his face), filled with `skin`: its
+ * pixels, `put`, and DESIGN's shapes scaled to it in whole pixels.
  * @param {number} w
  * @param {number} h
- * @param {{skin: Record<string, number[]>, ink: number[]}} c
+ * @param {number[]} skin
  */
-function face(name, w, h, c) {
+function canvas(w, h, skin) {
   const cell = new Uint8Array(w * h * 4);
-  for (let i = 0; i < cell.length; i += 4) cell.set([...c.skin[name], 255], i);
+  for (let i = 0; i < cell.length; i += 4) cell.set([...skin, 255], i);
+  const uOf = (x) => (x + 0.5) / w;
+  const vOf = (y) => (y + 0.5) / h;
+  /** @param {number} x @param {number} y @param {number[]} col */
   const put = (x, y, col) => {
     if (x >= 0 && y >= 0 && x < w && y < h) cell.set([...col, 255], (y * w + x) * 4);
   };
-  const p = placement(w, h);
-  const { eye } = p;
-  /**
-   * An upright oval in the box (left, top, ew × eh): the pixels whose centres fall inside it, or
-   * the whole box while it's under 4 px either way (cut corners there read as a plus).
-   */
-  const oval = (left, top, ew, eh) => {
-    const cx = left + ew / 2;
-    const cy = top + eh / 2;
-    const round = Math.min(ew, eh) >= 4;
-    for (let y = top; y < top + eh; y++)
-      for (let x = left; x < left + ew; x++) {
-        const dx = (x + 0.5 - cx) / (ew / 2);
-        const dy = (y + 0.5 - cy) / (eh / 2);
-        if (!round || dx * dx + dy * dy <= 1.0001) put(x, y, c.ink);
+  /** A centre line's v at u, linear between its points (clamped to its ends). */
+  const lineAt = (pts, u) => {
+    if (u <= pts[0][0]) return pts[0][1];
+    for (let i = 1; i < pts.length; i++)
+      if (u <= pts[i][0]) {
+        const [[u0, v0], [u1, v1]] = [pts[i - 1], pts[i]];
+        return v0 + ((v1 - v0) * (u - u0)) / (u1 - u0 || 1);
       }
+    return pts.at(-1)[1];
   };
-  /** The brow on `row`: as long as the eye (one longer toward his ear once there's room), 2 px at least. */
-  const browLine = (row) => {
-    if (row === null || row < 0) return;
-    const len = Math.max(2, eye.w + (w >= 10 ? 1 : 0));
-    for (let x = eye.left; x < eye.left + len; x++) put(x, row, c.ink);
+  return {
+    w,
+    h,
+    cell,
+    put,
+    uOf,
+    vOf,
+    /**
+     * A stroke: a run of columns from where it starts, as many as it's long (rounded: so it grows
+     * steadily with the cell; 2 at least once it's a pixel long, 1 at least), `round(t × h)` rows
+     * (1 at least) round its centre line at each, moved `shift` rows. The rows
+     * follow the line's mean, stepping only where the line strays half a pixel or more from it,
+     * so a nearly flat line stays one straight row at every size. Returns column → [top, bottom].
+     * @param {number[][]} pts
+     * @param {number} t
+     * @param {number} [shift]
+     */
+    stroke(pts, t, shift = 0) {
+      const n = Math.max(1, Math.round(t * h));
+      const [a, b] = [pts[0][0] * w, pts.at(-1)[0] * w];
+      const len = Math.max(b - a >= 1 ? 2 : 1, Math.round(b - a));
+      const x0 = Math.max(0, Math.min(w - len, Math.round(a)));
+      const cols = Array.from({ length: len }, (_, i) => x0 + i);
+      const vs = cols.map((x) => lineAt(pts, Math.min(pts.at(-1)[0], Math.max(pts[0][0], uOf(x)))));
+      const mean = vs.reduce((s, v) => s + v, 0) / vs.length;
+      const base = Math.round(mean * h - n / 2);
+      /** @type {Map<number, [number, number]>} */
+      const rows = new Map();
+      cols.forEach((x, i) => {
+        const top = base + Math.round((vs[i] - mean) * h) + shift;
+        rows.set(x, [top, top + n - 1]);
+      });
+      return rows;
+    },
+    /** @param {Map<number, [number, number]>} rows @param {number[]} col */
+    paint(rows, col) {
+      for (const [x, [t, b]] of rows) for (let y = t; y <= b; y++) put(x, y, col);
+    },
+    /** Whether pixel x, y's centre is inside an ellipse moved `shift` rows. */
+    inside(e, x, y, shift = 0) {
+      return ((uOf(x) - e.u) / e.ru) ** 2 + ((vOf(y - shift) - e.v) / e.rv) ** 2 <= 1;
+    },
+    /** An ellipse's pixels, or the one nearest its centre where it covers none. */
+    blob(e) {
+      const out = [];
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (this.inside(e, x, y)) out.push([x, y]);
+      if (!out.length) out.push([Math.min(w - 1, Math.floor(e.u * w)), Math.min(h - 1, Math.floor(e.v * h))]);
+      return out;
+    },
   };
-  const mouth = (top, bottom, half, col) => {
-    for (let y = top; y <= bottom; y++) for (let x = 0; x < half; x++) put(x, y, col);
-  };
-  if (name === 'neutral') {
-    oval(eye.left, eye.top, eye.w, eye.h);
-    browLine(p.brow);
-    mouth(p.mouthTop, p.mouthBottom, p.mw, MOUTH.line);
-  } else if (name === 'blink') {
-    // A lid: a line across the middle of the eye, one wider toward his ear, its end turned down
-    // (unless the eye is only 2 px tall, where the turn would hold as much ink as the open eye).
-    const row = eye.top + Math.floor(eye.h / 2);
-    const t = Math.max(1, Math.round(eye.h / 6));
-    for (let y = row; y < row + t; y++) for (let x = eye.left; x <= eye.left + eye.w; x++) put(x, y, c.ink);
-    if (eye.h >= 3) for (let y = row + t; y < row + 2 * t; y++) put(eye.left + eye.w, y, c.ink);
-    browLine(p.brow);
-    mouth(p.mouthTop, p.mouthBottom, p.mw, MOUTH.line);
-  } else if (name === 'happy') {
-    // A ^: an n a pixel wider each side than the eye, from its top to two thirds down, its top
-    // corners rounded off once it's 6 px wide (and a bar over the eye's top at 2 px, where an n
-    // would fill the open eye's square).
-    const left = Math.max(p.mw, eye.left - 1);
-    const right = Math.min(w, eye.left + eye.w + 1) - 1;
-    const aw = right - left + 1;
-    const ah = Math.max(2, Math.ceil(eye.h * 0.67));
-    const t = Math.max(1, Math.round(aw / 6));
-    const round = aw >= 6 ? 1 : 0;
-    for (let y = eye.top; y < eye.top + ah; y++)
-      for (let x = left; x <= right; x++) {
-        const bar = y < eye.top + t && x >= left + round && x <= right - round;
-        const leg = aw >= 3 && y >= eye.top + round && (x < left + t || x > right - t);
-        if (bar || leg) put(x, y, c.ink);
-      }
-    browLine(p.brow);
-    if (w >= 8) for (let x = eye.left; x < eye.left + Math.max(2, eye.w); x++) put(x, eye.top + eye.h, BLUSH);
-    // (A smile a pixel taller, where it stays clear of the ^ beside it and the cell is big
-    // enough that two rows don't read as an open mouth.)
-    const smile = w >= 8 ? Math.max(eye.top + 1, p.mouthTop - 1) : p.mouthTop;
-    mouth(left > p.mw || eye.top + ah <= smile ? smile : p.mouthTop, p.mouthBottom, p.mw, MOUTH.line);
-  } else {
-    // Surprised: the eye a pixel bigger up and out, the brow raised with it, the mouth open.
-    const mouthTop = Math.max(eye.top + 1, p.mouthBottom - Math.max(1, Math.round(h / 14)));
-    oval(eye.left, eye.top - 1, Math.min(eye.w + 1, w - eye.left), Math.min(eye.h + 1, mouthTop - eye.top + 1));
-    browLine(p.brow !== null && p.brow >= 1 ? p.brow - 1 : null);
-    mouth(mouthTop, p.mouthBottom, p.mw, MOUTH.open);
+}
+
+/**
+ * The open eye's pixels on cell `g` (neutral, or surprised: the lid raised a row at least, so the
+ * eye opens wider at every size), all moved `shift` rows: the lid's rows by column, the opening
+ * under it (inside the white, its first row right under the lid wherever the lid is over the
+ * white; down to the eye's bottom row in the middle, the white's depth under the lid's top
+ * rounded, so the eye grows steadily with the cell; never below it), the hook.
+ * @param {ReturnType<typeof canvas>} g
+ * @param {boolean} wide
+ * @param {number} shift
+ */
+function openEye(g, wide, shift) {
+  const raise = wide ? Math.max(1, Math.round(DESIGN.lid.raise * g.h)) : 0;
+  const lid = g.stroke(DESIGN.lid.neutral, DESIGN.lid.t, shift - raise);
+  const flat = g.stroke(DESIGN.lid.neutral, DESIGN.lid.t, shift);
+  const { white } = DESIGN;
+  const top = Math.min(...[...flat.values()].map(([t]) => t));
+  const depth = white.v + white.rv - (DESIGN.lid.neutral[3][1] - DESIGN.lid.t / 2);
+  const n = Math.max(1, Math.round(DESIGN.lid.t * g.h));
+  const bottom = top + Math.max(n + 1, Math.round(depth * g.h)) - 1;
+  /** @type {Array<[number, number]>} */
+  const open = [];
+  for (const [x, [, lidB]] of lid) {
+    // (The white tucks right under the lid along its width, as on the smooth face: no skin
+    // between the two where the ellipse's top curves away at this size.)
+    const du = Math.abs(g.uOf(x) - white.u) / white.ru;
+    for (let y = lidB + 1; y <= bottom; y++)
+      if (g.inside(white, x, y, shift) || (du <= 1 && y === lidB + 1) || du <= 0.5) open.push([x, y]);
   }
-  return cell;
+  // (The hook on the lid's own columns, its last at least: past the lid it would stand apart.)
+  const hook = new Map();
+  const last = Math.max(...lid.keys());
+  for (const [x, rows] of g.stroke(DESIGN.lid.hook, DESIGN.lid.t, shift - raise)) hook.set(Math.min(x, last), rows);
+  return { lid, open, hook };
+}
+
+/**
+ * How many rows his eyes go up in a cell this size so that a row of skin stays between the
+ * open eye and the mouth (the smallest cells: in DESIGN they'd touch); 0 from a few pixels up.
+ * The same for all four faces, so a blink or a smile never moves them.
+ * @param {ReturnType<typeof canvas>} g
+ */
+function eyeShift(g) {
+  const { lid, open } = openEye(g, false, 0);
+  const bottom = Math.max(...open.map(([, y]) => y), ...[...lid.values()].map(([, b]) => b));
+  const mouthTop = Math.min(
+    ...[...g.stroke(DESIGN.mouth.neutral, DESIGN.mouth.t).values()].map(([t]) => t),
+    ...g.blob(DESIGN.mouth.o).map(([, y]) => y),
+  );
+  return Math.min(0, mouthTop - 2 - bottom);
+}
+
+/**
+ * The open eye on cell `g` (neutral, or surprised): the white, the iris (its darker band from
+ * DESIGN.iris.bandFrom), the lash, the pupil, the lid and its hook. Returns the lid's rows.
+ * @param {ReturnType<typeof canvas>} g
+ * @param {'neutral'|'surprised'} name
+ * @param {number} shift
+ * @param {ReturnType<typeof colours>} c
+ */
+function drawOpenEye(g, name, shift, c) {
+  const { w } = g;
+  const { lid, open, hook } = openEye(g, name === 'surprised', shift);
+  const opened = new Set(open.map(([x, y]) => y * w + x));
+  const iris = DESIGN.iris[name];
+  const pupil = DESIGN.pupil[name];
+  for (const [x, y] of open) g.put(x, y, c.white);
+  for (const [x, y] of open)
+    if (g.inside(iris, x, y, shift))
+      g.put(x, y, w >= DESIGN.iris.bandFrom && g.vOf(y - shift) >= DESIGN.iris.band ? c.irisDark : c.iris);
+  // The lash: the white's bottom pixel along the middle, where the white keeps 4 rows over it.
+  for (let x = 0; x < w; x++) {
+    if (g.uOf(x) < DESIGN.lash.u[0] || g.uOf(x) > DESIGN.lash.u[1]) continue;
+    const col = open.filter(([px]) => px === x).map(([, y]) => y);
+    if (col.length >= 5) g.put(x, Math.max(...col), c.lash);
+  }
+  let dots = open.filter(([x, y]) => g.inside(pupil, x, y, shift));
+  if (!dots.length) {
+    // (The pupil a pixel at least: the opening's pixel nearest its centre.)
+    const d = ([x, y]) => (g.uOf(x) - pupil.u) ** 2 + ((g.vOf(y - shift) - pupil.v) * 0.5) ** 2;
+    dots = [open.reduce((a, b) => (d(b) < d(a) ? b : a))];
+  }
+  for (const [x, y] of dots) g.put(x, y, c.ink);
+  g.paint(lid, c.ink);
+  // The hook: the lid's outer end turned down, below the lid where the white isn't.
+  for (const [x, [t, b]] of hook) {
+    const lidB = lid.get(x)?.[1] ?? t - 1;
+    for (let y = Math.min(t, lidB + 1); y <= b; y++) if (!opened.has(y * w + x)) g.put(x, y, c.ink);
+  }
+  return lid;
+}
+
+/**
+ * One face in a w × h cell (its left edge the middle of his face), RGBA: DESIGN scaled to the cell
+ * and drawn in whole pixels, a stroke column by column and a shape by the pixels whose centres
+ * are inside it (canvas). Kept readable as it's scaled down: the white at least a row under the
+ * lid, the pupil a pixel at least, the surprised lid a row higher at least, the brow raised to
+ * leave a row of skin over the lid (none under 5 px), the eyes raised to leave one over the
+ * mouth in the smallest cells, the blush (from 5 px) and the mouth a pixel at least, the
+ * surprised o two rows tall from a 6 px cell, the lash only where the white has rows to spare.
+ * @param {string} name  a key of CELLS
+ * @param {number} w
+ * @param {number} h
+ * @param {ReturnType<typeof colours>} c
+ */
+function face(name, w, h, c) {
+  const g = canvas(w, h, c.skin[name]);
+  const shift = eyeShift(g);
+  /** The brow over the lid `lid` (rows by column): raised to leave a row of skin between. */
+  const brow = (pts, lid) => {
+    if (w < 5) return;
+    const rows = g.stroke(pts, DESIGN.brow.t, shift);
+    let lift = 0;
+    for (const [x, [, b]] of rows) {
+      const under = lid.get(x) ?? lid.get(x - 1) ?? lid.get(x + 1);
+      if (under) lift = Math.max(lift, b - (under[0] - 2));
+    }
+    for (const [x, [t, b]] of rows) rows.set(x, [t - lift, b - lift]);
+    g.paint(rows, c.ink);
+  };
+  if (name === 'neutral' || name === 'surprised') {
+    const lid = drawOpenEye(g, name, shift, c);
+    brow(DESIGN.brow[name], lid);
+  } else if (name === 'blink') {
+    g.paint(g.stroke(DESIGN.closed.line, DESIGN.closed.t, shift), c.ink);
+    brow(DESIGN.brow.neutral, openEye(g, false, shift).lid);
+  } else {
+    if (w >= 5) for (const [x, y] of g.blob(DESIGN.blush)) g.put(x, y, c.blush);
+    const arc = g.stroke(DESIGN.arc.line, DESIGN.arc.t, shift);
+    // (An arc at every size: where its ends came out level with its middle, they reach a row
+    // down, joined to it; of two columns, the outer one.)
+    const xs = [...arc.keys()];
+    const midTop = arc.get(xs[xs.length >> 1])[0];
+    for (const x of xs.length === 2 ? [xs[1]] : [xs[0], xs.at(-1)]) {
+      const [t, b] = arc.get(x);
+      if (t <= midTop) arc.set(x, [t, b + 1]);
+    }
+    g.paint(arc, c.ink);
+    brow(DESIGN.brow.happy, openEye(g, false, shift).lid);
+  }
+  if (name === 'surprised') {
+    // A small dark o: two rows tall from a 6 px cell, so it reads as open.
+    const o = g.blob(DESIGN.mouth.o);
+    if (w >= 6 && new Set(o.map(([, y]) => y)).size < 2) o.push(...o.map(([x, y]) => [x, y + 1]));
+    for (const [x, y] of o) g.put(x, y, c.open);
+  } else g.paint(g.stroke(DESIGN.mouth[name === 'happy' ? 'happy' : 'neutral'], DESIGN.mouth.t), c.mouth);
+  return g.cell;
 }
 
 const source = glbImage(GLB, 'NEWT_Face');
 const { data, info } = await sharp(source).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 const c = colours(data, info.width);
+console.log(
+  `colours: ${Object.entries(c)
+    .filter(([k]) => k !== 'skin')
+    .map(([k, v]) => `${k} ${v}`)
+    .join(', ')}`,
+);
 const composite = [];
 /** @type {Array<{w: number, h: number, faces: Record<string, Uint8Array>}>} */
 const drawn = [];
