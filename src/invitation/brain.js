@@ -329,6 +329,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
       case 'drag':
       case 'hover':
       case 'orbit':
+      case 'pan':
         pointerPx(e.x, e.y);
         break;
       case 'pinch':

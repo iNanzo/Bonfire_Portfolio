@@ -1,38 +1,49 @@
 // The invitation toy (/invitation/): NEWT on a plain white floor, to play with. This page boots
 // it and runs it: the controls (ui.js), the stage (stage.js: renderer, camera, floor, lights,
 // retro pass), NEWT (character.js, from models/newt.glb), the Look menu (switched live, kept in
-// localStorage: look.js), the orbit camera (camera.js: a drag on empty space turns it, the
+// localStorage: look.js), the orbit camera (camera.js: a finger's drag on empty space or the
+// mouse's right-drag turns it, the mouse's left-drag on empty space or two fingers pan it, the
 // wheel or a pinch zooms it, Reset Camera brings it back), and the render loop (stopped while
 // the page is hidden, steps of at most 0.05 s, a lost WebGL context told). While the Look sheet
 // is open NEWT stays in sight: the view shows him in the clear space above or beside it
-// (focusInsets, pixels.js clearInsets) and the orbit follows him all the way there.
+// (focusInsets, pixels.js clearInsets) and the orbit follows him all the way there. The floor
+// is endless (rays meet it anywhere) and his play area is the floor the default view shows fully
+// zoomed out (area.js viewArea), worked out again on a resize; the light's shadow camera goes
+// where he goes (floor.js fitShadow).
 //
 // A frame, in types.js's order: the pointers' gestures (gesture.js; taps get their floor spot
 // by ray) and the buttons → the camera moves → brain.step → his root: steer on the ground,
-// carry while he's held (his collar, the Neck bone's head, hung from where the pointer's ray
-// meets the lift height, 48 CSS px above a finger), the fall once he's let go (play.js bodyStep)
+// carry while he's held (his collar, the Neck bone's head, hung where the pointer's ray meets
+// the camera-facing plane through where he was grabbed, plus the grab offset, so the point
+// grabbed stays under the cursor; 48 CSS px above a finger, coming in as he's picked up: carry.js
+// dragTarget), the fall once he's let go (play.js bodyStep)
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
 // → the blob shadow, the marker, the toolbar → render. With Motion Choppy (look.js) his pose
 // (the update and applyLook) only moves on the clock's steps, 15 a second; his root, the
-// camera and the rest move every frame. The lift height comes from the Held clip at load (his
-// collar over his lowest sole, plus a gap).
+// camera and the rest move every frame. The lowest his collar is carried comes from the Held
+// clip at load (his collar over his lowest sole, plus a gap).
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
 // (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
-// (his ankles in the world, his bones from his root) and play(clip) (forces a clip, Walk and
-// Run going round their step at their own pace); `?seed=N` and `?calm` go to the brain.
+// (his ankles in the world, his bones from his root), grabbed() (while he's held, where the
+// point he was grabbed by shows) and play(clip) (forces a clip, Walk and Run going round their
+// step at their own pace); `?seed=N` and `?calm` go to the brain.
+import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
 import { createBrain } from './brain.js';
-import { carryFeel } from './carry.js';
+import { CARRY, carryFeel, dragPlane, dragTarget, gripFor } from './carry.js';
+import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
   createOrbit,
+  orbitArea,
   orbitEvents,
   orbitFollowAll,
+  orbitHold,
   orbitHome,
   orbitPose,
   orbitRelease,
@@ -45,13 +56,14 @@ import {
 import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createFaceState, faceStep } from './faces.js';
+import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
 import { animFps, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
 import { createRng } from './rng.js';
-import { createStage } from './stage.js';
+import { LIFT, createStage } from './stage.js';
 import { centreOf } from './steer.js';
 import { bindUi, parseQuery } from './ui.js';
 
@@ -60,12 +72,24 @@ const MAX_DT = 0.05;
 const BASE = import.meta.env.BASE_URL;
 /** A finger carries him this far above itself, CSS px, so it doesn't hide him (a mouse: 0). */
 const FINGER_LIFT = 48;
-/** His soles hang this far over the floor while he's held, world units. */
-const HANG_GAP = 0.3;
+/** His soles hang at least this far over the floor while he's held, world units. */
+const HANG_GAP = 0.06;
 /** Extra reach for a finger picking him, CSS px. */
 const TOUCH_SLOP = 6;
 /** States remembered for ?test (the last ones, in order). */
 const STATES_KEPT = 40;
+/**
+ * The shadow camera reaches this high over the floor most of the time, world units (stage.js's,
+ * what his shadow's texels were tuned for); higher only while he's carried up past it
+ * (floor.js shadowTop).
+ */
+const SHADOW_TOP = LIFT + NEWT_HEIGHT;
+/**
+ * Where NEWT may go: the play area (area.js viewArea), one object kept in place (the brain and
+ * his steps hold it) and filled in again on a resize; the default view's disc until then.
+ * @type {import('./types.js').Bounds}
+ */
+const area = playArea();
 
 const stageEl = /** @type {HTMLElement} */ (document.querySelector('[data-stage]'));
 stageEl.textContent = ''; // (the noscript fallback)
@@ -134,9 +158,11 @@ if (webgl2()) {
         ui.setPixelSteps(screenSteps());
         // (His shirt's plaid by how many texels tall he is, once he's in.)
         character?.setResolution(newtTexels(view, grid));
-        if (!orbit) return;
+        if (!orbit || !stage) return;
         orbitHome(orbit, view.distance);
-        orbitSpan(orbit, stageSize());
+        orbitSpan(orbit, stageSpan(stage));
+        setArea(areaOf(stage));
+        orbitArea(orbit, area);
       },
     });
   } catch {
@@ -154,6 +180,37 @@ if (!stage) {
 /** The stage's size, CSS px (a drag across it turns the camera the same share of a turn anywhere). */
 function stageSize() {
   return { w: stageEl.clientWidth, h: stageEl.clientHeight };
+}
+
+/**
+ * The stage for the orbit camera: its size, the canvas's CSS height (the field of view's) and
+ * half the clear space insets() leave, round where the point it looks at shows (it keeps NEWT
+ * on screen in there).
+ * @param {NonNullable<typeof stage>} s
+ */
+function stageSpan(s) {
+  const { w, h } = stageSize();
+  const i = insets();
+  return { w, h, ch: s.grid.canvasH, hw: (w - i.left - i.right) / 2, hh: (h - i.top - i.bottom) / 2 };
+}
+
+/**
+ * The play area: the floor the default view shows fully zoomed out, inside the clear space
+ * (area.js viewArea); the default view's disc until the stage has a view.
+ * @param {NonNullable<typeof stage>} s
+ */
+function areaOf(s) {
+  const { w, h } = stageSize();
+  return s.view ? viewArea({ view: s.view, cssW: w, cssH: h, insets: insets() }) : playArea();
+}
+
+/**
+ * The play area becomes `next`, in place (a disc's `r` gone with it).
+ * @param {import('./types.js').Bounds} next
+ */
+function setArea(next) {
+  for (const k of Object.keys(area)) delete area[/** @type {keyof typeof area} */ (k)];
+  Object.assign(area, next);
 }
 
 /** Pixel Size's steps on this screen (pixels.js pixelSteps: two that draw alike here are one). */
@@ -216,7 +273,8 @@ function start(s) {
   const { canvas } = s;
   const seed = options.seed ?? Math.floor(Math.random() * 2 ** 31);
   const rng = createRng(seed + 1);
-  const brain = createBrain({ seed, calm: options.calm, bounds: s.bounds });
+  setArea(areaOf(s));
+  const brain = createBrain({ seed, calm: options.calm, bounds: area });
   const gesture = createGesture();
   const body = createBody();
   const mix = createMix();
@@ -224,7 +282,11 @@ function start(s) {
   const faces = createFaceState();
   orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(s.bounds), span: stageSize() });
   const cam = orbit;
+  orbitSpan(cam, stageSpan(s));
+  orbitArea(cam, area);
   s.setCamera(orbitPose(cam));
+  /** The light that casts NEWT's shadow (its shadow camera follows him). */
+  const sun = /** @type {any} */ (s.scene.children.find((o) => /** @type {any} */ (o).isDirectionalLight)) ?? null;
 
   let running = false;
   let lost = false;
@@ -245,9 +307,11 @@ function start(s) {
   /** @type {string[]} */
   const states = [];
   /** The collar's height while he's held, world units (from the Held clip at load). */
-  let liftY = 1.1;
+  let hangY = 1.1;
+  /** @type {import('./carry.js').Grip|null} how he's held, while he is */
+  let grip = null;
   /** @type {import('./types.js').XYZ} where his collar was carried last */
-  let target = { x: 0, y: liftY, z: 0 };
+  let target = { x: 0, y: hangY, z: 0 };
   /** The retro pass's other path is compiled (stage.js warm), for ?test. */
   let warmed = false;
   /** The toolbar as last set, so the DOM is only touched on a change. */
@@ -268,8 +332,8 @@ function start(s) {
       if (s.view) c.setResolution(newtTexels(s.view, s.grid));
       c.root.rotation.order = 'XZY'; // (the swing tilts him about the world's axes, after his yaw)
       s.scene.add(c.root);
-      liftY = hangHeight(c) + HANG_GAP;
-      target = { x: 0, y: liftY, z: 0 };
+      hangY = hangHeight(c) + HANG_GAP;
+      target = { x: 0, y: hangY, z: 0 };
       sync();
       // (The pass's other path compiled ahead, so the first switch to Off or back never stalls.)
       s.warm()
@@ -309,6 +373,15 @@ function start(s) {
     c.update(0);
     return most;
   }
+  /**
+   * Where a client point meets the floor: anywhere, the floor is endless (null above the horizon).
+   * @param {number} x
+   * @param {number} y
+   */
+  function floorAt(x, y) {
+    const { o, d } = s.ray(x, y);
+    return rayPlaneY(o, d, 0);
+  }
   /** NEWT's pick shapes on screen. */
   function shape() {
     return /** @type {NonNullable<typeof character>} */ (character).screenShape(
@@ -343,15 +416,16 @@ function start(s) {
   const take = (evs) => {
     for (const e of evs) {
       if (e.type === 'tap' || e.type === 'release' || e.type === 'grab' || e.type === 'cancel')
-        e.floor = s.floorPoint(e.x, e.y);
+        e.floor = floorAt(e.x, e.y);
       events.push(e);
     }
   };
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   canvas.addEventListener('pointerdown', (e) => {
-    // (Only the main button presses: a right or middle click, or a pen's barrel button, never
-    // holds him, orbits or walks him.)
-    if (e.pointerType !== 'touch' && e.button !== 0) return;
+    // (The mouse's left button holds, walks and pans, its right one orbits, its middle one pans
+    // (no autoscroll); any other button, or a second one, does nothing: gesture.js.)
+    if (e.pointerType !== 'touch' && (e.button > 2 || gesture.current())) return;
+    if (e.pointerType !== 'touch' && e.button === 1) e.preventDefault();
     const first = !gesture.current();
     if (first) pressKind = e.pointerType;
     try {
@@ -360,7 +434,7 @@ function start(s) {
       // (a pointer that's already gone)
     }
     const evs = gesture.down(
-      sample(e),
+      { ...sample(e), button: e.button },
       first && onNewt(e.clientX, e.clientY, e.pointerType === 'touch' ? TOUCH_SLOP : 0),
     );
     if (evs.some((g) => g.type === 'pinch')) orbitRelease(cam, Infinity); // (an orbit gives way to the pinch: no fling)
@@ -401,7 +475,7 @@ function start(s) {
     if (!at) return null;
     return {
       ...at,
-      floor: s.floorPoint(at.x, at.y),
+      floor: floorAt(at.x, at.y),
       onNewt: !c?.pinch && onNewt(at.x, at.y, pressKind === 'touch' ? TOUCH_SLOP : 0),
       pinch: Boolean(c?.pinch),
       touch: c ? pressKind === 'touch' : false,
@@ -462,17 +536,32 @@ function start(s) {
   }
 
   /**
-   * The camera this frame: the gestures and Reset Camera move it, it eases and follows NEWT.
+   * Where the point the camera looks at shows, client px (the view's shift from the canvas's
+   * middle: a pan keeps the floor under the cursor).
+   */
+  function shownAt() {
+    const r = canvas.getBoundingClientRect();
+    const shift = s.view?.shift ?? { x: 0, y: 0 };
+    return { x: r.left + r.width / 2 + shift.x, y: r.top + r.height / 2 + shift.y };
+  }
+
+  /**
+   * The camera this frame: the gestures and Reset Camera move it, it eases and keeps NEWT on
+   * screen (holding still while he's held).
    * @param {import('./types.js').GestureEvent[]} evs
    * @param {number} dt
    */
   function moveCamera(evs, dt) {
-    orbitEvents(cam, evs);
+    orbitEvents(cam, evs, evs.some((e) => e.type === 'pan') ? shownAt() : null);
     if (resetCamera) orbitReset(cam);
     resetCamera = false;
-    orbitStep(cam, dt, { x: body.root.x, z: body.root.z });
+    orbitHold(cam, body.mode === 'held');
+    orbitStep(cam, dt, { x: body.root.x, z: body.root.z, y: Math.max(0, body.root.y) });
     const pose = orbitPose(cam);
     s.setCamera(pose);
+    // (The zoom, for a stage that keeps NEWT's sprite resolution as the camera zooms: the look
+    // package's seam, where the stage has it.)
+    /** @type {{setZoomScale?: (k: number) => void}} */ (s).setZoomScale?.(cam.home.distance / cam.distance);
     return pose;
   }
 
@@ -507,8 +596,9 @@ function start(s) {
   }
 
   /**
-   * His root: steered, carried (toward where the pointer's ray meets the lift height, above a
-   * finger) or falling (play.js bodyStep).
+   * His root: steered, carried (dragged on the camera-facing plane through where he was grabbed,
+   * the point grabbed under the cursor, or a little above a finger: carry.js) or falling
+   * (play.js bodyStep).
    * @param {NonNullable<typeof character>} c
    * @param {import('./types.js').BrainOut} o
    * @param {ReturnType<typeof pointerNow>} ptr
@@ -519,15 +609,18 @@ function start(s) {
     root.updateMatrixWorld(true);
     const press = gesture.current();
     if (press?.grabbed) {
-      const ray = s.ray(press.x, press.y - (pressKind === 'touch' ? FINGER_LIFT : 0));
-      const hit = rayPlaneY(ray.o, ray.d, liftY);
-      if (hit) target = { x: hit.x, y: liftY, z: hit.z };
-    }
+      if (!grip) {
+        const collar = c.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
+        grip = gripFor(s.ray(press.x, press.y), dragPlane(s.camera.position, collar), collar, t);
+      }
+      const lift = pressKind === 'touch' ? FINGER_LIFT * Math.min(1, (t - grip.t0) / CARRY.liftIn) : 0;
+      target = dragTarget(grip, s.ray(press.x, press.y - lift), t, hangY);
+    } else grip = null;
     bodyStep(body, {
       state: o.state,
       move: o.move,
       pointer: ptr?.floor ?? null,
-      bounds: s.bounds,
+      bounds: area,
       dt,
       t,
       collar: c.bonePos(COLLAR, { x: 0, y: 0, z: 0 }),
@@ -600,12 +693,14 @@ function start(s) {
       head,
       yaw: root.rotation.y,
       camera: pose.position,
-      pointer: ptr && !ptr.pinch ? { floor: ptr.floor, onNewt: ptr.onNewt } : null,
+      pointer: ptr && !ptr.pinch ? { floor: ptr.floor, onNewt: ptr.onNewt, ray: s.ray(ptr.x, ptr.y) } : null,
     });
     lookStep(gaze, want.mode, aim, dt, t, rng, want.weight, ahead, want.ease);
     if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight);
     c.setFace(faceStep(faces, face, blink, t, rng));
     s.setBlob(root.position.x, root.position.z, body.mode === 'ground' ? 0 : Math.min(1, root.position.y / 0.5));
+    if (sun)
+      fitShadow(sun, s.bounds, shadowTop(root.position.y, SHADOW_TOP), { x: root.position.x, z: root.position.z });
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;
     s.marker.visible = Boolean(mark);
     if (mark) s.marker.position.set(mark.x, s.marker.position.y, mark.z);
@@ -681,7 +776,17 @@ function start(s) {
         texels: { w: s.grid.w, h: s.grid.h },
         // (CSS px he stands tall in the default view, where he starts.)
         newtTall: s.view ? (newtTexels(s.view, s.grid) * s.grid.pd) / s.grid.dpr : 0,
-        camera: { yaw: cam.yaw, elevation: cam.elevation, distance: cam.distance },
+        // (The camera's yaw, elevation and distance, the point it looks at on the floor, and
+        // whether a pan holds it.)
+        camera: {
+          yaw: cam.yaw,
+          elevation: cam.elevation,
+          distance: cam.distance,
+          target: { x: cam.target.x, z: cam.target.z },
+          panned: cam.panned,
+        },
+        // (Where he may go: the play area, area.js viewArea.)
+        area: { ...area },
         // (Both of the retro pass's paths compiled: the first switch to Off or back won't stall.)
         warmed,
         // (The Shader options: every value, whether any is the user's own, and what reached
@@ -697,8 +802,18 @@ function start(s) {
         if (part === 'feet') return { x: sh.body.a.x, y: sh.body.a.y };
         return { x: (sh.body.a.x + sh.body.b.x) / 2, y: (sh.body.a.y + sh.body.b.y) / 2 };
       },
-      /** @param {number} x @param {number} y */
-      floorAt: (x, y) => s.floorPoint(x, y),
+      floorAt,
+      /**
+       * While he's held: where the point he was grabbed by shows now, client px (his collar as
+       * posed less the grab offset); null otherwise.
+       */
+      grabbed() {
+        if (!grip || !character || body.mode !== 'held') return null;
+        const p = character.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
+        const at = new Vector3(p.x - grip.offset.x, p.y - grip.offset.y, p.z - grip.offset.z).project(s.camera);
+        const r = canvas.getBoundingClientRect();
+        return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
+      },
       /** His ankles (the Foot bones' heads), world units: for measuring foot slide. */
       feet: () =>
         character && {

@@ -10,8 +10,13 @@
 // Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
 // turns his head, each button plays its clip, a floor tap walks him there, and the cursor turns his
-// head on a desktop. The camera: a drag on empty space turns it, the wheel and a two-finger pinch
-// zoom it, and Reset Camera brings it back. A pinch over the toolbar or the Look sheet never
+// head on a desktop (up at a cursor high over him, his face toward a cursor in front of him, a
+// profile for one level with his head off to the side). The camera: a finger's drag on empty
+// space or the mouse's right-drag (on NEWT too, never holding him) turns it, the mouse's
+// left-drag on empty space and two fingers pan it with the floor under the cursor, the wheel
+// and a two-finger pinch zoom it, the canvas shows no context menu, and Reset Camera brings it
+// back and clears the pan. A mouse drag keeps the point NEWT was grabbed by under the cursor
+// and lifts him higher than the old fixed carry height. A pinch over the toolbar or the Look sheet never
 // zooms the page, only the left mouse button holds or walks him, and the Look sheet holds focus
 // (Tab goes round inside it, the toolbar it covers is inert), closes on Escape wherever focus
 // is, and leaves NEWT in sight above or beside it (Reset Camera too, on its way back). Every wait is on a state through `?test`'s window.__invitation, never on a duration (CI's
@@ -584,6 +589,34 @@ test.describe('on a phone', () => {
     expect(s.states).not.toContain('held');
   });
 
+  test('two fingers dragging together pan the view, and never tap or grab him', async ({ page }) => {
+    await calm(page);
+    const touch = await toucher(page);
+    const body = await on(page, 'body');
+    const before = await snapshot(page);
+    const at = (dy) => [
+      { x: body.x - 60, y: body.y + 150 + dy, id: 1 },
+      { x: body.x + 60, y: body.y + 150 + dy, id: 2 },
+    ];
+    const grabbed = await floorAt(page, { x: body.x, y: body.y + 150 });
+    await touch('touchStart', at(0));
+    for (let dy = -10; dy >= -120; dy -= 10) {
+      await touch('touchMove', at(dy));
+      await sleep(16);
+    }
+    await framesFor(page, 100);
+    // The floor that was under their middle is still under it, give or take a finger's wobble.
+    const now = await floorAt(page, { x: body.x, y: body.y + 30 });
+    expect(Math.hypot(now.x - grabbed.x, now.z - grabbed.z), 'the floor went with the fingers').toBeLessThan(0.15);
+    await touch('touchEnd');
+    const s = await snapshot(page);
+    expect(s.camera.panned).toBe(true);
+    expect(Math.abs(s.camera.yaw - before.camera.yaw), 'not turned').toBeLessThan(0.01);
+    expect(s.state).toBe('idle');
+    expect(s.states).not.toContain('walk');
+    expect(s.states).not.toContain('held');
+  });
+
   test('a two-finger pinch over the toolbar or the Look sheet never zooms the page', async ({ page }) => {
     await calm(page);
     const touch = await toucher(page);
@@ -1085,12 +1118,17 @@ test.describe('on a desktop', () => {
     await calm(page);
     const body = await on(page, 'body');
     const home = (await snapshot(page)).camera;
-    // Round and up a long way first.
+    // Round and up a long way first (the right button turns it), and panned off to one side.
     await page.mouse.move(body.x + 300, body.y + 60);
-    await page.mouse.down();
+    await page.mouse.down({ button: 'right' });
     for (let i = 1; i <= 20; i++) await page.mouse.move(body.x + 300 - i * 22, body.y + 60 + i * 6);
-    await page.mouse.up();
+    await page.mouse.up({ button: 'right' });
     await until(page, (s) => Math.abs(s.camera.yaw) > 0.8, 'turned');
+    await page.mouse.move(body.x + 200, body.y + 100);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(body.x + 200 - i * 12, body.y + 100);
+    await page.mouse.up();
+    await until(page, (s) => s.camera.panned, 'panned');
     await lookOpenWithNewtInSight(page);
     await page.getByRole('dialog', { name: 'Look' }).getByRole('button', { name: 'Reset Camera' }).click();
     // Every frame of the way back: his head, middle and feet in sight.
@@ -1118,6 +1156,7 @@ test.describe('on a desktop', () => {
     );
     expect(Math.abs(frames.at(-1).yaw - home.yaw), 'back to the default view').toBeLessThan(0.01);
     expect(frames.length, 'it eased back over several frames').toBeGreaterThan(3);
+    expect((await snapshot(page)).camera.panned, 'the pan cleared').toBe(false);
     for (const [i, f] of frames.entries())
       expect(f.head && f.body && f.feet, `frame ${i} (yaw ${f.yaw.toFixed(2)}): ${JSON.stringify(f)}`).toBe(true);
   });
@@ -1131,7 +1170,7 @@ test.describe('on a desktop', () => {
     await until(page, (s) => s.headYaw > 0.15, 'his head turned right');
   });
 
-  test('a drag on empty space turns the camera, the wheel zooms it, and Reset Camera brings it back', async ({
+  test('a right-drag turns the camera, on NEWT too and never holding him; the wheel zooms it; the canvas shows no context menu; Reset Camera brings it back', async ({
     page,
   }) => {
     const errors = watch(page);
@@ -1139,11 +1178,18 @@ test.describe('on a desktop', () => {
     const body = await on(page, 'body');
     const home = (await snapshot(page)).camera;
     expect(Math.abs(home.yaw)).toBeLessThan(1e-3);
-    // A drag across empty floor: round it goes, and NEWT stays where he was.
-    await page.mouse.move(body.x + 260, body.y + 80);
-    await page.mouse.down();
-    for (let i = 1; i <= 15; i++) await page.mouse.move(body.x + 260 - i * 16, body.y + 80 + i * 3);
-    await page.mouse.up();
+    // No context menu over the canvas: its default is turned down.
+    const menu = await page.evaluate(() => {
+      const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 200 });
+      document.querySelector('[data-stage] canvas').dispatchEvent(e);
+      return e.defaultPrevented;
+    });
+    expect(menu, 'no context menu').toBe(true);
+    // A right-drag that starts on NEWT: round it goes, and he stays where he was.
+    await page.mouse.move(body.x, body.y);
+    await page.mouse.down({ button: 'right' });
+    for (let i = 1; i <= 15; i++) await page.mouse.move(body.x - i * 16, body.y + i * 3);
+    await page.mouse.up({ button: 'right' });
     await until(page, (s) => Math.abs(s.camera.yaw) > 0.5, 'turned');
     await until(page, (s) => s.camera.elevation > home.elevation + 0.05, 'tilted up a little');
     // By the stage's width: 240 of its 1280 px turn it about 0.88 rad (three quarters of a turn
@@ -1161,6 +1207,8 @@ test.describe('on a desktop', () => {
     let s = await snapshot(page);
     expect(s.state).toBe('idle');
     expect(s.held).toBe(false);
+    expect(s.states, 'never held').not.toContain('held');
+    expect(s.camera.panned, 'a turn is no pan').toBe(false);
     // The wheel: toward you further, away from you closer.
     await page.mouse.move(body.x + 200, body.y);
     await page.mouse.wheel(0, 400);
@@ -1181,6 +1229,131 @@ test.describe('on a desktop', () => {
     s = await snapshot(page);
     expect(s.states).not.toContain('walk');
     expect(errors).toEqual([]);
+  });
+
+  test('a left-drag on empty space pans the view: the floor under the cursor stays under it, nothing turns or zooms, he stays put, and Reset Camera clears it', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    const body = await on(page, 'body');
+    const home = await snapshot(page);
+    const from = { x: body.x + 260, y: body.y + 70 };
+    const grabbed = await floorAt(page, from);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+
+    for (let i = 1; i <= 12; i++) {
+      const at = { x: from.x - i * 18, y: from.y - i * 9 };
+      await page.mouse.move(at.x, at.y);
+      if (i % 4) continue;
+      await framesFor(page, 60);
+      const under = await floorAt(page, at);
+      expect(
+        Math.hypot(under.x - grabbed.x, under.z - grabbed.z),
+        `step ${i}: the floor under the cursor`,
+      ).toBeLessThan(0.05);
+    }
+    await page.mouse.up();
+    const s = await snapshot(page);
+    expect(s.camera.panned).toBe(true);
+    expect(
+      Math.hypot(s.camera.target.x - home.camera.target.x, s.camera.target.z - home.camera.target.z),
+    ).toBeGreaterThan(0.5);
+    expect(Math.abs(s.camera.yaw - home.camera.yaw), 'not turned').toBeLessThan(1e-3);
+    expect(Math.abs(s.camera.distance - home.camera.distance), 'not zoomed').toBeLessThan(1e-3);
+    expect(s.state).toBe('idle');
+    expect(s.states, 'a drag is no floor tap').not.toContain('walk');
+    expect(s.states).not.toContain('held');
+    // It stays where it was put while he's on screen.
+    await framesFor(page, 600);
+    const after = await snapshot(page);
+    expect(after.camera.target).toEqual(s.camera.target);
+    // Reset Camera clears it.
+    await page.getByRole('button', { name: 'Look' }).click();
+    await page.getByRole('dialog', { name: 'Look' }).getByRole('button', { name: 'Reset Camera' }).click();
+    await until(
+      page,
+      (t) =>
+        !t.camera.panned &&
+        Math.hypot(t.camera.target.x - home.camera.target.x, t.camera.target.z - home.camera.target.z) < 0.02,
+      'back where it was',
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test('a mouse drag keeps the point he was grabbed by under the cursor, up and across, and lifts him higher than the old carry height', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x, body.y);
+    await page.mouse.down();
+    await until(page, (s) => s.held, 'held');
+    let cursor = body;
+    let highest = 0;
+    // Up, across, up more, back: each stop, the grabbed point under the cursor within 2 px.
+    for (const [dx, dy] of [
+      [0, -60],
+      [90, -40],
+      [60, -120],
+      [-140, -60],
+      [-60, 80],
+    ]) {
+      for (let i = 1; i <= 6; i++) await page.mouse.move(cursor.x + (dx * i) / 6, cursor.y + (dy * i) / 6);
+      cursor = { x: cursor.x + dx, y: cursor.y + dy };
+      await framesFor(page, 120);
+      const g = await page.evaluate(() => window.__invitation.grabbed());
+      expect(g, 'held, and the grabbed point known').not.toBeNull();
+      expect(Math.hypot(g.x - cursor.x, g.y - cursor.y), `at (${cursor.x}, ${cursor.y})`).toBeLessThan(2);
+      highest = Math.max(highest, (await snapshot(page)).lift);
+    }
+    // (The old carry held his collar at one height: his root about 0.3 off the floor.)
+    expect(highest, `lifted to ${highest.toFixed(2)}`).toBeGreaterThan(1.2);
+    await page.mouse.up();
+    await until(page, (s) => s.state === 'idle' || s.state === 'flee', 'down again', 30_000);
+    const states = (await snapshot(page)).states;
+    expect(states.slice(states.lastIndexOf('held'), states.lastIndexOf('held') + 3)).toEqual(['held', 'fall', 'land']);
+    expect(errors).toEqual([]);
+  });
+
+  test('where he looks with a mouse: up at a cursor high over him, his face toward a cursor in front of him, a profile for one level with his head off to the side', async ({
+    page,
+  }) => {
+    await calm(page);
+    const head = await on(page, 'head');
+    const feet = await on(page, 'feet');
+    const tall = feet.y - head.y;
+    // High over him: his head tips up.
+    await page.mouse.move(head.x + 10, head.y - 3 * tall);
+    await until(page, (s) => s.headPitch > 0.45, 'his head tipped up');
+    // In front of him (below his feet on screen, off to a side): his face toward the camera, and
+    // his head turned the way the cursor is.
+    for (const side of [-1, 1]) {
+      await page.mouse.move(head.x + side * tall, feet.y + tall, { steps: 4 });
+      await until(
+        page,
+        (s) =>
+          Math.sign(s.headYaw) === side &&
+          Math.abs(s.headYaw) > 0.15 &&
+          Math.abs(
+            Math.atan2(Math.sin(s.heading + s.headYaw - s.camera.yaw), Math.cos(s.heading + s.headYaw - s.camera.yaw)),
+          ) <
+            Math.PI / 2,
+        `facing the camera, turned ${side < 0 ? 'left' : 'right'}`,
+      );
+    }
+    // Level with his head, far off to the side: about a profile, never the back of his head.
+    for (const side of [-1, 1]) {
+      await page.mouse.move(head.x + side * 4 * tall, head.y, { steps: 4 });
+      await until(page, (s) => Math.sign(s.headYaw) === side && Math.abs(s.headYaw) > 0.9, `a profile ${side}`);
+      const s = await snapshot(page);
+      const off = Math.abs(
+        Math.atan2(Math.sin(s.heading + s.headYaw - s.camera.yaw), Math.cos(s.heading + s.headYaw - s.camera.yaw)),
+      );
+      expect(off, 'his face no more than side on').toBeLessThanOrEqual(Math.PI / 2 + 0.05);
+    }
   });
 });
 

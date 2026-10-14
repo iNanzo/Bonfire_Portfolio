@@ -2,9 +2,12 @@
 // turns him to the camera and runs him away from the pointer (pushed off the play area's edges,
 // the screen's, sliding along one when he's cornered, never stuck) with a capped turn rate, and
 // picks wander goals inside the bounds (the front edge over the toolbar too). carry.js holds
-// him by the collar: the anchor eases in and stays in the play area, a damped pendulum swings
-// his root and settles (as much, and with no hard shake, when the pointer's spot only moves on
-// some frames), a toss uses the last 80 ms, and a fall bounces softly off the edges and
+// him by the collar: dragged on a camera-facing vertical plane through where he was grabbed,
+// the grabbed point stays under the cursor (no lag, the grab offset kept), up lifts him (up to
+// CARRY.liftMax, far higher than the old fixed carry height) and across moves him across, never
+// below his hang height; the anchor stays in the play area, a damped pendulum swings his root
+// and settles (as much, and with no hard shake, when the pointer's spot only moves on some
+// frames), a toss uses the last 80 ms, and a fall bounces softly off the edges and
 // lands when his lowest foot reaches the floor. blend.js keeps clip weights normalised, runs Idle/Walk/Run on one
 // shared phase, and starts a one-shot's fade-out before it ends. lookAt.js clamps and eases
 // his look without overshoot, glances by a seeded rng, and the brain zeroes the look's weight
@@ -14,7 +17,18 @@ import assert from 'node:assert/strict';
 import { CLIPS, GAIT, STRIDE, fadeFor } from '../src/invitation/clips.js';
 import { createRng } from '../src/invitation/rng.js';
 import { steer, wanderGoal, wrapAngle, clampTo, xRange, STEER } from '../src/invitation/steer.js';
-import { grab, holdStep, toss, fallStep, carryFeel, CARRY } from '../src/invitation/carry.js';
+import {
+  grab,
+  holdStep,
+  toss,
+  fallStep,
+  carryFeel,
+  CARRY,
+  dragPlane,
+  dragTarget,
+  gripFor,
+} from '../src/invitation/carry.js';
+import { rayPlane } from '../src/invitation/gesture.js';
 import {
   gaitWeights,
   blendStep,
@@ -183,24 +197,91 @@ test('goto arrives inside the arrive radius and stops; face turns him toward the
 
 // ---- carry --------------------------------------------------------------------------------
 
-test('carrying: the anchor eases in, most of the way in about 0.15 s, follows the pointer’s spot and stays inside the play area', () => {
+test('carrying: the anchor is the pointer’s spot at once, every frame (no lag), and stays inside the play area', () => {
   const c = grab({ x: 0, y: 0.6, z: 0 }, 10);
-  const target = { x: 1, y: 1.2, z: 0 };
-  holdStep(c, target, 0.05, BOUNDS, 10.05);
-  assert.ok(c.anchor.x > 0.01 && c.anchor.x < 0.9, `part way at 50 ms (${c.anchor.x})`);
-  holdStep(c, target, 0.05, BOUNDS, 10.1);
-  holdStep(c, target, 0.05, BOUNDS, 10.15);
-  assert.ok(c.anchor.x > 0.85 && c.anchor.x <= 1, `most of the way at 150 ms (${c.anchor.x})`);
-  let t = 10.15;
-  for (let i = 0; i < 30; i++) holdStep(c, target, DT, BOUNDS, (t += DT));
-  close(c.anchor.x, 1, 1e-3);
-  close(c.anchor.y, 1.2, 1e-3);
+  let t = 10;
+  for (const target of [
+    { x: 0.05, y: 0.62, z: 0 },
+    { x: 1, y: 1.2, z: 0 },
+    { x: -0.4, y: 2.1, z: 0.3 },
+  ]) {
+    holdStep(c, target, DT, BOUNDS, (t += DT));
+    assert.deepEqual(c.anchor, target, 'on the spot in the frame it comes');
+  }
   for (let i = 0; i < 60; i++) {
     holdStep(c, { x: 9, y: 1.2, z: -9 }, DT, BOUNDS, (t += DT));
     assert.ok(inside(BOUNDS, c.anchor), JSON.stringify(c.anchor));
   }
   close(c.anchor.x, BOUNDS.maxX, 1e-6);
   close(c.anchor.z, BOUNDS.minZ, 1e-6);
+});
+
+test('dragging: on a camera-facing vertical plane through where he was grabbed, the grabbed point stays under the cursor; up lifts him, across moves him across; never under his hang height or over the highest lift', () => {
+  const camera = { x: 1.5, y: 9, z: 13 };
+  const ray = (q) => ({ o: camera, d: { x: q.x - camera.x, y: q.y - camera.y, z: q.z - camera.z } });
+  const collar = { x: 0.2, y: 0.85, z: 0.1 };
+  const plane = dragPlane(camera, collar);
+  // The plane: through his collar, upright, square to the way the camera looks across the floor.
+  close(plane.normal.y, 0, 1e-6, 'upright');
+  close(Math.hypot(plane.normal.x, plane.normal.z), 1, 1e-6);
+  const toward = Math.hypot(camera.x - collar.x, camera.z - collar.z);
+  close(plane.normal.x, (camera.x - collar.x) / toward, 1e-6);
+  close(plane.normal.z, (camera.z - collar.z) / toward, 1e-6);
+  assert.deepEqual(plane.point, collar);
+  // Grabbed by his belly, below his collar.
+  const t0 = 3;
+  const low = 1.1;
+  const grabRay = ray({ x: 0.15, y: 0.45, z: 0.12 });
+  const grip = gripFor(grabRay, plane, collar, t0);
+  const at = rayPlane(grabRay.o, grabRay.d, plane);
+  close(grip.offset.x, collar.x - at.x, 1e-6, 'the grab offset: his collar from the grabbed point');
+  close(grip.offset.y, collar.y - at.y, 1e-6);
+  close(grip.offset.z, collar.z - at.z, 1e-6);
+  // The moment he's grabbed, nothing moves.
+  assert.deepEqual(dragTarget(grip, grabRay, t0, low), collar);
+  // His hang height comes in over CARRY.liftIn (his collar starts lower than it, standing).
+  const half = dragTarget(grip, grabRay, t0 + CARRY.liftIn / 2, low);
+  assert.ok(half.y > collar.y && half.y < low, `part way up (${half.y})`);
+  close(dragTarget(grip, grabRay, t0 + CARRY.liftIn, low).y, low, 1e-6, 'his soles off the floor');
+  // Later, anywhere on the plane within the limits: the grabbed point is on the cursor's ray,
+  // so under the cursor, and his collar stays on the plane.
+  const right = { x: plane.normal.z, z: -plane.normal.x };
+  const t = t0 + 1;
+  for (const [across, up] of [
+    [0, 1],
+    [0.6, 1.2],
+    [-1.1, 2.4],
+    [1.5, 1.6],
+  ]) {
+    const q = { x: at.x + across * right.x, y: at.y + up, z: at.z + across * right.z };
+    const target = dragTarget(grip, ray(q), t, low);
+    close(target.x - grip.offset.x, q.x, 1e-6, `(${across}, ${up}): under the cursor, across`);
+    close(target.y - grip.offset.y, q.y, 1e-6, `(${across}, ${up}): and up`);
+    close(target.z - grip.offset.z, q.z, 1e-6);
+    const off = (target.x - collar.x) * plane.normal.x + (target.z - collar.z) * plane.normal.z;
+    close(off, 0, 1e-6, 'on the plane: no nearer the camera, no further');
+  }
+  // Up lifts him, across moves him across.
+  const a = dragTarget(grip, ray({ x: at.x, y: at.y + 1, z: at.z }), t, low);
+  const b = dragTarget(grip, ray({ x: at.x, y: at.y + 1.5, z: at.z }), t, low);
+  close(b.y - a.y, 0.5, 1e-6);
+  close(Math.hypot(b.x - a.x, b.z - a.z), 0, 1e-6);
+  const c = dragTarget(grip, ray({ x: at.x + right.x, y: at.y + 1, z: at.z + right.z }), t, low);
+  close(c.y, a.y, 1e-6);
+  close(Math.hypot(c.x - a.x, c.z - a.z), 1, 1e-6);
+  // Limits: never under his hang height, never over the highest lift, far over the old carry's.
+  // (High enough to reach the top of a phone's screen at the default zoom, about 4.3 over him.)
+  assert.ok(CARRY.liftMax >= 4.5, `the highest lift ${CARRY.liftMax}`);
+  close(dragTarget(grip, ray({ x: at.x, y: -3, z: at.z }), t, low).y, low, 1e-6, 'pressed into the floor');
+  close(dragTarget(grip, ray({ x: at.x, y: 40, z: at.z }), t, low).y, CARRY.liftMax, 1e-6, 'reaching for the sky');
+  // A ray that never meets the plane keeps the last spot.
+  const away = { o: camera, d: { x: 0, y: 1, z: 1 } };
+  assert.deepEqual(dragTarget(grip, away, t, low), dragTarget(grip, away, t, low));
+  assert.ok(Number.isFinite(dragTarget(grip, away, t, low).y));
+  // A camera straight over him still gives an upright plane.
+  const top = dragPlane({ x: 0.2, y: 20, z: 0.1 }, collar);
+  close(top.normal.y, 0, 1e-6);
+  close(Math.hypot(top.normal.x, top.normal.z), 1, 1e-6);
 });
 
 test('carrying: a swing reads the same when the pointer’s spot only moves every second or third frame (a 60 Hz finger on a 120–144 Hz screen): as big, and no hard shake', () => {
@@ -509,11 +590,11 @@ test('a one-shot fades out before it ends', () => {
 
 // ---- look-at ------------------------------------------------------------------------------
 
-test('look-at clamps to ±70° of yaw and −30°…+35° of pitch, split 30% neck and 70% head', () => {
+test('look-at clamps to ±70° of yaw and −30°…+55° of pitch, split 30% neck and 70% head', () => {
   const D = Math.PI / 180;
   close(LIMIT.yaw, 70 * D);
   close(LIMIT.pitchMin, -30 * D);
-  close(LIMIT.pitchMax, 35 * D);
+  close(LIMIT.pitchMax, 55 * D);
   assert.deepEqual(SPLIT, { neck: 0.3, head: 0.7 });
   const head = { x: 0, y: 0.9, z: 0 };
   let a = aimAngles(head, 0, { x: 0, y: 0.9, z: 2 });
