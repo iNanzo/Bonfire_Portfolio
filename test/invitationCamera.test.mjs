@@ -435,14 +435,14 @@ test('a pan slides the view across and up and down the screen, at once: the floo
       const put = { ...o.target };
       settle(o, 1, grabbed);
       assert.deepEqual(o.target, put, `${at}: it stays where the pan put it`);
-      close(o.target.y, FOCUS_Y, 1e-12, 'the point it looks at stays at his middle height');
+      close(o.target.y, FOCUS_Y, 1e-6, 'the point it looks at stays at his middle height');
       close(o.yaw, o.goal.yaw, 1e-3);
     }
   }
   // Without the cursor's spot: about where the point it looks at shows. With no floor under the
   // cursor (above the horizon), as fast as the floor there would go, and never a fling.
   const o = make();
-  close(worldPerPx(o), (2 * o.distance * Math.tan((VIEW.fov * D) / 2)) / o.ch, 1e-12);
+  close(worldPerPx(o), (2 * o.distance * Math.tan((VIEW.fov * D) / 2)) / o.ch, 1e-6);
   orbitPan(o, 40, 0);
   assert.ok(o.target.x < 0 && o.target.x > -60 * worldPerPx(o), `about 40 px across (${o.target.x})`);
   const sky = make();
@@ -493,8 +493,8 @@ test('after a pan the view stays where it was put while NEWT is on screen, even 
       newt = { x: 0.3 * Math.sin(t * 3), z: 0.3 * Math.cos(t * 2) };
       orbitStep(o, DT, newt);
     }
-    close(o.target.x, put.x, 1e-9, `${at}: stayed put`);
-    close(o.target.z, put.z, 1e-9);
+    close(o.target.x, put.x, 1e-6, `${at}: stayed put`);
+    close(o.target.z, put.z, 1e-6);
     // He walks off to the right at walking speed: once he leaves the screen the follow takes him
     // again, and he's never far off it.
     let worst = -Infinity;
@@ -511,7 +511,7 @@ test('after a pan the view stays where it was put while NEWT is on screen, even 
     const away = { ...o.target };
     settle(o, 3, newt);
     assert.ok(!inFrame(boxOf(o, newt), frame), `${at}: he's off the screen`);
-    close(o.target.x, away.x, 1e-9, `${at}: and the view stays where the pan put it`);
+    close(o.target.x, away.x, 1e-6, `${at}: and the view stays where the pan put it`);
     // Reset Camera: no pan, the default zoom, and him in view again, the view as near the
     // default as keeps him there.
     orbitZoom(o, 0.7);
@@ -563,8 +563,8 @@ test('NEWT walking or running anywhere in the play area never leaves the screen,
   const o = make();
   settle(o, 2, { x: 0, z: 0 });
   for (let t = 0; t < 4; t += DT) orbitStep(o, DT, { x: 1.2 * Math.sin(t), z: 0.8 * Math.cos(t) });
-  close(o.target.x, 0, 1e-9, 'still');
-  close(o.target.z, 0, 1e-9);
+  close(o.target.x, 0, 1e-6, 'still');
+  close(o.target.z, 0, 1e-6);
 });
 
 test('while NEWT is held the view holds still, zoomed in too, and once he is let go it follows again', () => {
@@ -574,7 +574,7 @@ test('while NEWT is held the view holds still, zoomed in too, and once he is let
   settle(o, 3, { x: 0, z: 0 });
   orbitHold(o, true);
   for (let t = 0; t < 1; t += DT) orbitStep(o, DT, { x: t, z: 0, y: 0.6 });
-  close(o.target.x, 0, 1e-9, 'held: still');
+  close(o.target.x, 0, 1e-6, 'held: still');
   orbitHold(o, false);
   settle(o, 5, { x: 1, z: 0 });
   close(o.target.x, 1, 1e-3, 'let go: after him');

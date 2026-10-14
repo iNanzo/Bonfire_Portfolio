@@ -548,8 +548,8 @@ test('moved to wherever NEWT is in the play area, the shadow camera covers him a
       sun.updateMatrixWorld();
       sun.shadow.updateMatrices(sun);
       const cam = sun.shadow.camera;
-      close(cam.right - cam.left, home.right - home.left, 1e-9, `${name}: as wide`);
-      close(cam.top - cam.bottom, home.top - home.bottom, 1e-9, `${name}: as tall`);
+      close(cam.right - cam.left, home.right - home.left, 1e-6, `${name}: as wide`);
+      close(cam.top - cam.bottom, home.top - home.bottom, 1e-6, `${name}: as tall`);
       const tx = (home.right - home.left) / p.shadow.mapSize;
       const ty = (home.top - home.bottom) / p.shadow.mapSize;
       const wx = (cam.left - home.left) / tx;

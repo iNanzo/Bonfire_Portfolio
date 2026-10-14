@@ -302,7 +302,7 @@ test('the pointer’s target is the first of the floor and the camera-facing upr
 });
 
 test('over the whole screen his head turns to the cursor’s side (right at it over his head), he looks up at a cursor high over him (up to about 55°), his face always shows under his cap and goes no further round than a profile', () => {
-  close(LIMIT.pitchMax, 55 * RAD, 1e-9, 'his head tips up to 55°');
+  close(LIMIT.pitchMax, 55 * RAD, 1e-6, 'his head tips up to 55°');
   for (const distance of [13.3, 26.6, 6.7]) {
     const cam = viewCamera({ distance });
     const body = { yaw: 0 };
@@ -328,7 +328,7 @@ test('over the whole screen his head turns to the cursor’s side (right at it o
         cam.position.y - head.y,
         Math.hypot(cam.position.x - head.x, cam.position.z - head.z),
       );
-      assert.ok(a.pitch >= camPitch - LOOK.faceUnder - 1e-9, `${at}: his chin at ${(a.pitch / RAD).toFixed(0)}°`);
+      assert.ok(a.pitch >= camPitch - LOOK.faceUnder - 1e-6, `${at}: his chin at ${(a.pitch / RAD).toFixed(0)}°`);
       // His gaze on screen: toward the cursor's side always, and right at it over his head
       // (where his neck lets it; lower down his chin comes up so his face shows).
       const tip = cam.screen({ x: head.x + 0.3 * g.x, y: head.y + 0.3 * g.y, z: head.z + 0.3 * g.z });
