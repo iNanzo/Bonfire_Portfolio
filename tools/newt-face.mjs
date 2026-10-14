@@ -157,9 +157,9 @@ const luma = (r, g, b) => (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 /**
  * The faces' colours from the 1024 sheet: each face's skin (its cell's commonest colour, in 4-bit
  * bins, averaged), and the rest sampled where the design has them in its cells (the median of a
- * small box; the mouth's line the median of its line's own pixels): the ink of the
- * lids, brows and pupils, the white, the iris's two greys, the lash, the mouth's line and its open
- * o, the blush.
+ * small box; the mouth's line the mean of its pixels, its soft edge too, as the thin line reads a
+ * pixel wide; the lash its darkest): the ink of the lids, brows and pupils, the white, the iris's
+ * two greys, the lash, the mouth's line and its open o, the blush.
  * @param {Buffer} px  the 1024 sheet, RGBA
  * @param {number} W  its width
  */
@@ -196,6 +196,7 @@ function colours(px, W) {
     return out;
   };
   const median = (list) => [0, 1, 2].map((k) => list.map((c) => c[k]).sort((a, b) => a - b)[list.length >> 1]);
+  const mean = (list) => [0, 1, 2].map((k) => Math.round(list.reduce((t, col) => t + col[k], 0) / list.length));
   const darkest = (list) => list.reduce((a, b) => (luma(...b) < luma(...a) ? b : a));
   return {
     skin,
@@ -204,7 +205,7 @@ function colours(px, W) {
     iris: median(box('neutral', [0.26, 0.3], [0.63, 0.66])),
     irisDark: median(box('neutral', [0.36, 0.43], [0.7, 0.725])),
     lash: darkest(box('neutral', [0.37, 0.42], [0.745, 0.756])),
-    mouth: median(box('neutral', [0, 0.07], [0.86, 0.92]).filter(([r, g, b]) => r - b > 25 && luma(r, g, b) < 0.5)),
+    mouth: mean(box('neutral', [0, 0.07], [0.86, 0.92]).filter(([r, g, b]) => r - b > 25 && luma(r, g, b) < 0.6)),
     open: median(box('surprised', [0, 0.02], [0.885, 0.905])),
     blush: median(box('happy', [0.53, 0.58], [0.84, 0.855])),
   };
