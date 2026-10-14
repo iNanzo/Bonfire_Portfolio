@@ -7,7 +7,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { validateContent } from '../src/contentRules.js';
-import { shaderOf, validLook } from '../src/invitation/look.js';
+import {
+  DEFAULT_LOOK,
+  LOOKS,
+  installDefaults,
+  isCustom,
+  loadLook,
+  shaderOf,
+  validLook,
+} from '../src/invitation/look.js';
 import { SHADER_CONTROLS } from '../src/invitation/shader.js';
 import { TRIGGERS, linesFrom, speechFrom } from '../src/invitation/speech.js';
 
@@ -49,6 +57,24 @@ test('its default look is one the toy shows as stored: every value kept, every S
   for (const k of ['pixelSize', 'dither', 'outlines', 'style', 'motion']) assert.equal(look[k], d[k], k);
   assert.deepEqual(Object.keys(d.shader).sort(), SHADER_CONTROLS.map((c) => c.key).sort(), 'every option');
   assert.deepEqual(shaderOf(look), d.shader, 'each on its control, as stored');
+});
+
+test('its default look is what a first visit sees: the Default style with the admin’s values, never Custom', () => {
+  const d = content().invitation.defaults;
+  const builtIn = LOOKS.default;
+  try {
+    const first = installDefaults(d);
+    assert.deepEqual(loadLook({ getItem: () => null }), first);
+    for (const k of ['pixelSize', 'dither', 'outlines', 'motion']) assert.equal(first[k], d[k], k);
+    assert.equal(first.style, 'default');
+    assert.equal(isCustom(first), false);
+    assert.deepEqual(shaderOf(first), d.shader, 'every Shader value the admin’s');
+    assert.equal(LOOKS.default.background, LOOKS[d.style].background, 'the colours of the style it’s built on');
+  } finally {
+    installDefaults({});
+  }
+  assert.equal(LOOKS.default, builtIn);
+  assert.deepEqual(loadLook({ getItem: () => null }), { ...DEFAULT_LOOK });
 });
 
 // ---- the toy's way in: virtual:invitation-content (vite.config.js) and content.js ------------

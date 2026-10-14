@@ -6,11 +6,24 @@
 // so his shirt doesn't alias into a patchwork, dithers that show (the Dithering switch does
 // something you can see in every style) yet stay light enough not to crawl over him as he
 // moves, and a soft shadow's edge no wider than a texel, so it doesn't shimmer as the camera
-// turns. Neither sets the grid: the Pixel Size alone does (pixels.js), whatever the Style.
+// turns. Neither sets the grid: the Pixel Size alone does (pixels.js), whatever the Style. The
+// admin's Default look (content.json `invitation.defaults`, look.js installDefaults) overrides the
+// built-in Default style and the first visit's settings, each value checked on its own; stored
+// looks still win.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import byDefault from '../src/invitation/looks/default.js';
 import { DEFAULT_STYLE, PRESETS } from '../src/invitation/looks/index.js';
-import { DEFAULT_LOOK, LOOKS, STYLES, isCustom, loadLook, shaderOf } from '../src/invitation/look.js';
+import {
+  DEFAULT_LOOK,
+  LOOKS,
+  STYLES,
+  installDefaults,
+  isCustom,
+  loadLook,
+  lookPreset,
+  shaderOf,
+} from '../src/invitation/look.js';
 import { DEFAULT_PIXEL } from '../src/invitation/pixels.js';
 import { styleShader } from '../src/invitation/shader.js';
 import { floorLook } from '../src/invitation/floor.js';
@@ -82,6 +95,76 @@ test('a first visit sees Default at 128×128 with Motion Smooth, never Custom; a
   const old = stored({ pixelSize: '3', dither: false });
   assert.deepEqual([old.style, old.pixelSize, old.dither], ['default', '32', false]);
   assert.equal(stored({ style: 'retro' }).style, 'default');
+});
+
+test('the admin’s Default look overrides the built-in Default style and the first visit’s settings, each value on its own; stored looks still win', () => {
+  const fresh = () => loadLook({ getItem: () => null });
+  const stored = (o) => loadLook({ getItem: () => JSON.stringify(o) });
+  const softBefore = structuredClone(LOOKS.soft);
+  try {
+    // Nothing from the admin (missing, broken, not an object): the built-in Default, as it is.
+    for (const raw of [undefined, null, {}, [], 'soft', 7]) {
+      assert.deepEqual(installDefaults(raw), { ...DEFAULT_LOOK }, JSON.stringify(raw));
+      assert.equal(LOOKS.default, byDefault, `${JSON.stringify(raw)}: the built-in Default style`);
+      assert.deepEqual(fresh(), { ...DEFAULT_LOOK });
+    }
+    // Built on Soft with the admin's values: the Default style becomes Soft with them written in,
+    // still named Default and first in the row; a first visit gets it with the admin's Pixel
+    // Size, switches and Motion, and never sees Custom.
+    const admin = {
+      pixelSize: '64',
+      dither: false,
+      outlines: true,
+      style: 'soft',
+      motion: 'choppy',
+      shader: { levels: 8, bands: '3', highlight: false },
+    };
+    const first = installDefaults(admin);
+    const want = { pixelSize: '64', dither: false, outlines: true, style: 'default', motion: 'choppy', shader: {} };
+    assert.deepEqual(first, want);
+    assert.deepEqual(fresh(), want, 'a first visit');
+    assert.equal(isCustom(first), false, 'Default, not Custom');
+    assert.deepEqual(STYLES, ['default', 'ds', 'soft']);
+    assert.equal(LOOKS.default.label, 'Default');
+    assert.equal(LOOKS, PRESETS, 'one set of presets for the whole page');
+    assert.deepEqual(shaderOf(first), { ...styleShader(LOOKS.soft), levels: 8, bands: '3', highlight: false });
+    assert.equal(LOOKS.default.background, LOOKS.soft.background, 'Soft’s own colours carry over');
+    assert.equal(lookPreset(first), LOOKS.default, 'the renderer draws the admin’s Default');
+    assert.deepEqual(LOOKS.soft, softBefore, 'Soft itself never changes');
+    // Built on DS: DS's own colours.
+    installDefaults({ style: 'ds', shader: { levels: 8 } });
+    assert.equal(LOOKS.default.background, LOOKS.ds.background);
+    assert.deepEqual(shaderOf(fresh()), { ...styleShader(LOOKS.ds), levels: 8 });
+    // Each value checked on its own: a bad one takes the built-in's (no style: built on the
+    // built-in Default), the good ones kept.
+    installDefaults({ pixelSize: 'huge', motion: 'warp', dither: 'yes', shader: { levels: 'many', bands: '3' } });
+    assert.deepEqual(fresh(), { ...DEFAULT_LOOK });
+    assert.deepEqual(shaderOf(fresh()), { ...styleShader(byDefault), bands: '3' });
+    // Each call starts from the built-ins: nothing carries over from the last.
+    installDefaults({ shader: { bands: '4' } });
+    assert.deepEqual(shaderOf(fresh()), { ...styleShader(byDefault), bands: '4' });
+    // Stored looks still win; a value one lacks takes the admin's.
+    installDefaults(admin);
+    const mine = {
+      pixelSize: '32',
+      dither: true,
+      outlines: false,
+      style: 'ds',
+      motion: 'smooth',
+      shader: { levels: 16 },
+    };
+    assert.deepEqual(stored(mine), mine);
+    assert.deepEqual(stored({ style: 'soft' }), { ...want, style: 'soft' });
+    // A stored Default keeps its own changes, against the admin's Default (one equal to its
+    // value is no change).
+    assert.deepEqual(stored({ ...want, shader: { levels: 4 } }).shader, { levels: 4 });
+    assert.equal(isCustom(stored({ ...want, shader: { levels: 4 } })), true);
+    assert.deepEqual(stored({ ...want, shader: { levels: 8 } }).shader, {});
+  } finally {
+    installDefaults({});
+  }
+  assert.equal(LOOKS.default, byDefault, 'put back');
+  assert.deepEqual(fresh(), { ...DEFAULT_LOOK });
 });
 
 test('no smooth blob under him while he stands; while he’s lifted it shows', () => {

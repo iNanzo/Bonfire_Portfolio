@@ -1,10 +1,11 @@
 // The invitation toy (/invitation/): NEWT on a plain white floor, to play with. This page boots
 // it and runs it: the controls (ui.js), the stage (stage.js: renderer, camera, floor, lights,
 // retro pass), NEWT (character.js, from models/newt.glb), the Look menu (switched live, kept in
-// localStorage: look.js), the orbit camera (camera.js: a finger's drag on empty space or the
-// mouse's right-drag turns it, the mouse's left-drag on empty space or two fingers pan it, the
-// wheel or a pinch zooms it, Reset Camera brings it back), and the render loop (stopped while
-// the page is hidden, steps of at most 0.05 s, a lost WebGL context told). While the Look sheet
+// localStorage: look.js; a first visit gets the admin's Default look, content.js), the orbit
+// camera (camera.js: a finger's drag on empty space or the mouse's right-drag turns it, the
+// mouse's left-drag on empty space or two fingers pan it, the wheel or a pinch zooms it, Reset
+// Camera brings it back), and the render loop (stopped while the page is hidden, steps of at
+// most 0.05 s, a lost WebGL context told). While the Look sheet
 // is open NEWT stays in sight: the view shows him in the clear space above or beside it
 // (focusInsets, pixels.js clearInsets) and the orbit follows him all the way there. The floor
 // is endless (rays meet it anywhere) and his play area is the floor the default view shows fully
@@ -36,6 +37,7 @@ import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
 import { createBrain } from './brain.js';
+import { invitationDefaults } from './content.js';
 import { CARRY, carryFeel, dragPlane, dragTarget, gripFor } from './carry.js';
 import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
@@ -59,7 +61,7 @@ import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
-import { animFps, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
+import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
 import { createLook, lookStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
 import { createRng } from './rng.js';
@@ -94,6 +96,9 @@ const area = playArea();
 const stageEl = /** @type {HTMLElement} */ (document.querySelector('[data-stage]'));
 stageEl.textContent = ''; // (the noscript fallback)
 const options = parseQuery(location.search);
+// (The admin's Default look over the built-in one, before anything reads a look: a first visit
+// gets it, a stored look still wins.)
+installDefaults(invitationDefaults());
 let look = loadLook();
 /** @type {import('./types.js').ButtonName|null} pressed since the last frame */
 let pressed = null;

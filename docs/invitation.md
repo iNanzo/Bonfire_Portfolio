@@ -60,7 +60,7 @@ the sheet and leaves the slider as it was.
 | Pixel Size | 16×16 to 256×256, Native, Off | NEWT's sprite resolution: at 64×64 he's drawn about 64 pixels tall, on any screen. A slider, coarse to fine, then Native and Off at its fine end, with a button at each end; the line under it says how many pixels tall he really is on this screen. 128×128 is the default (on a 1280×800 desktop it draws as Native, the same pixels there). Each pixel is a whole number of the screen's own pixels, and two steps that would draw the same picture on a screen show as one there. **Native** gives every one of the screen's own pixels a pixel, even a phone's three to a CSS pixel, with the pixel look still on (outlines, dithering, toon shading); a resolution that already reaches the screen's pixels shows as Native (256×256 on a phone, 128×128 and up on a 1280×800 desktop), so a 390-wide phone lists 7 resolutions and a 1280×800 desktop 5, then Native and Off. NEWT stays the same size on screen, so a coarser resolution only makes him chunkier, and zooming the camera in or out takes his pixels with him (bigger blocks zoomed in), so he keeps the resolution you chose at any zoom; Native and Off don't change with the zoom. His shirt shows its real plaid and his face is the smooth one at every resolution, unless Pixel Shirt & Face (under Shader) is on. **Off** is the smooth picture without the pixel look, at the screen's resolution (at most two pixels to a CSS pixel). |
 | Dithering | On, Off | The checkered blend between colours (how strong: Dither Strength, under Shader). |
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow; how dark, its colour and where: under Shader). |
-| Style | Default, DS, Soft, Custom | Default (what a first visit shows): Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight. DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
+| Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -172,7 +172,11 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
     Motion loads as Smooth), `shader`, only the user's changes to the Shader options (each
     snapped or dropped on its own, a style's own value dropped; a look stored before them loads
     as its style), `isCustom`, `shaderOf`, `lookPreset` (the style with the changes written into
-    a copy, for the renderer), `motionStep`, Choppy's 15 fps clock, and the presets),
+    a copy, for the renderer), `motionStep`, Choppy's 15 fps clock, `installDefaults` (the
+    admin's Default look, `content.js` `invitationDefaults()`, over the built-in one at boot, each
+    value checked on its own: the style it's built on with its Shader values becomes the Default
+    style, its Pixel Size, switches and Motion the first visit's; a stored look still wins, a
+    value it lacks taking these), and the presets),
     `shader.js` (the Shader options as one table, `SHADER_CONTROLS`: each one's label, range or
     choices, value text and where it lives in a preset, which `ui.js` renders; `toonRamp`, the
     toon gradient from bands and a highlight; `warmthTint`), `looks/default.js` (Default: Soft with the user's values, spread from `soft.js`),
