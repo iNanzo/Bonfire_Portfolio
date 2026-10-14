@@ -1023,6 +1023,45 @@ test('ahead means toward the viewer: up at the camera, fading to straight ahead 
   close(aimAngles(head, 0, { x: 0, y: 0, z: 0.1 }, 10 * D).pitch, LIMIT.pitchMin, 1e-9, 'still clamped');
 });
 
+test('running off toward the camera, his chin stays up toward it and his glances back are smaller and fewer, so his screaming face shows under his cap; running away from it, he glances right over his shoulder as before', () => {
+  /** 12 s of fleeing with `ahead`: each glance's turn, and the targets from 0.5 s on. */
+  const flee = (seed, ahead) => {
+    const rng = createRng(seed);
+    const s = createLook();
+    let t = 0;
+    let n = 0;
+    const glances = [];
+    const targets = [];
+    for (let i = 0; i < 12 * 60; i++) {
+      lookStep(s, 'back', null, DT, (t += DT), rng, 1, ahead);
+      if (s.glances > n) glances.push({ t, yaw: s.target.yaw });
+      n = s.glances;
+      if (t > 0.5) targets.push({ ...s.target });
+    }
+    return { glances, targets };
+  };
+  const gap = (g) => (g[g.length - 1].t - g[0].t) / (g.length - 1);
+  // The camera dead ahead of him (viewerAim: up at it): his chin stays up toward it, and his
+  // glances back stay small enough that his face still shows (well inside LOOK.faceTurn).
+  const front = { yaw: 0, pitch: 0.55 };
+  for (let seed = 1; seed <= 20; seed++) {
+    const { glances, targets } = flee(seed, front);
+    for (const target of targets) {
+      assert.ok(target.pitch >= front.pitch - 1e-9, `seed ${seed}: chin up (${target.pitch.toFixed(2)})`);
+      assert.ok(Math.abs(target.yaw) <= 0.5 * LOOK.faceTurn, `seed ${seed}: turned ${target.yaw.toFixed(2)}`);
+    }
+    assert.ok(glances.length >= 3, `seed ${seed}: he still glances back (${glances.length})`);
+    assert.ok(gap(glances) > 1.5 * LOOK.backEvery, `seed ${seed}: every ${gap(glances).toFixed(2)} s, fewer`);
+  }
+  // The camera behind him (ahead: straight ahead): right over his shoulder, as often as before.
+  const { glances } = flee(3, { yaw: 0, pitch: 0 });
+  assert.ok(
+    glances.every((g) => Math.abs(g.yaw) >= 0.9 * LIMIT.yaw),
+    'over the shoulder',
+  );
+  assert.ok(gap(glances) > 0.9 && gap(glances) < 1.5, `every ${gap(glances).toFixed(2)} s`);
+});
+
 test('looking ahead, around and back: forward and an idle pointer aim at "ahead", glances go around it; fleeing still looks where he runs', () => {
   const ahead = { yaw: 0.2, pitch: 0.5 };
   const rng = createRng(4);
@@ -1044,7 +1083,11 @@ test('looking ahead, around and back: forward and an idle pointer aim at "ahead"
   close(lookStep(createLook(), 'camera', null, DT, 1, rng, 1, ahead).target.pitch, ahead.pitch, 1e-9);
   close(lookStep(createLook(), 'pointer', null, DT, 1, rng, 1, ahead).target.pitch, ahead.pitch, 1e-9);
   const back = lookStep(createLook(), 'back', null, DT, 0.01, rng, 1, ahead);
-  assert.deepEqual(back.target, { yaw: 0, pitch: 0 }, 'running away, he looks where he runs');
+  assert.deepEqual(
+    back.target,
+    { yaw: 0, pitch: ahead.pitch },
+    'running off, he looks where he runs, chin up to the viewer',
+  );
   // Without `ahead`, ahead is straight ahead, as before.
   close(lookStep(createLook(), 'forward', null, DT, 0.01, createRng(1)).target.pitch, 0);
 });
