@@ -302,7 +302,7 @@ test.describe('on a phone', () => {
     const coarse = await snapshot(page);
     expect(coarse.pixelScale).toBe(4);
     expect(coarse.newtTexels).toBeCloseTo(24.9, 0);
-    await sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Soft' }).check();
+    await sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'DS' }).check();
     await sheet.getByRole('button', { name: 'Done' }).click();
     await expect(sheet).toBeHidden();
     const changed = await picture(page);
@@ -313,7 +313,7 @@ test.describe('on a phone', () => {
     await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', '24 by 24');
     expect((await snapshot(page)).resolution).toBe(24);
     expect((await snapshot(page)).pixelScale).toBe(4);
-    await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Soft' })).toBeChecked();
+    await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'DS' })).toBeChecked();
     expect(errors).toEqual([]);
   });
 
