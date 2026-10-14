@@ -1417,7 +1417,6 @@ test.describe('on a small window', () => {
     await until(page, (s) => s.camera.distance < base.camera.distance * 0.75, 'zoomed in');
     await framesFor(page, 800);
     const near = await snapshot(page);
-    test.skip(near.pass.zoom === 1, 'main.js doesn’t call stage.setZoomScale yet (the camera package wires it)');
     const k = base.camera.distance / near.camera.distance;
     expect(near.pass.zoom).toBeCloseTo(k, 2);
     expect(near.pixelScale, 'bigger texels zoomed in').toBeGreaterThan(base.pixelScale);

@@ -332,6 +332,7 @@ function start(s) {
       if (s.view) c.setResolution(newtTexels(s.view, s.grid));
       c.root.rotation.order = 'XZY'; // (the swing tilts him about the world's axes, after his yaw)
       s.scene.add(c.root);
+      s.setSubject(c.root); // (the retro pass's boxes go round him: stage.js)
       hangY = hangHeight(c) + HANG_GAP;
       target = { x: 0, y: hangY, z: 0 };
       sync();
@@ -559,9 +560,9 @@ function start(s) {
     orbitStep(cam, dt, { x: body.root.x, z: body.root.z, y: Math.max(0, body.root.y) });
     const pose = orbitPose(cam);
     s.setCamera(pose);
-    // (The zoom, for a stage that keeps NEWT's sprite resolution as the camera zooms: the look
-    // package's seam, where the stage has it.)
-    /** @type {{setZoomScale?: (k: number) => void}} */ (s).setZoomScale?.(cam.home.distance / cam.distance);
+    // (The zoom, NEWT's size on screen over the default view's: at a resolution the stage sizes
+    // the texel to it, so he keeps the chosen sprite resolution at any zoom; cheap every frame.)
+    s.setZoomScale(cam.home.distance / cam.distance);
     return pose;
   }
 
