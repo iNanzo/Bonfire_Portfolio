@@ -15,8 +15,12 @@
 //                           (character.js keeps the old pose playing there), so it fades out
 //                           while the new start fades in, never a pop
 //   lookAim                 where he looks: the camera when asked or when the pointer is on
-//                           him, the pointer's floor spot (lifted by LOOK.floorBias so his cap
-//                           leaves his face showing), and "ahead" meaning toward the viewer
+//                           him, where the pointer's ray first meets the floor or the upright
+//                           plane through his head facing the camera, brought toward the camera
+//                           along the ray (lookAt.js pointerTarget: up at a cursor high over
+//                           him, a profile at most for one behind him, his face for one in
+//                           front; without a ray, its floor spot lifted by LOOK.floorBias so his
+//                           cap leaves his face showing), and "ahead" meaning toward the viewer
 //   lookShare               how much of the look goes on: clips that lift his head to show his
 //                           face themselves (Wave, the Sit trio) take only HEAD_SHARE of it, so
 //                           the look never cricks it back further
@@ -24,7 +28,7 @@
 import { blendStep, blendTarget, gaitPhase, mainClip, movingShare, runShare } from './blend.js';
 import { CARRY, fallStep, grab, holdStep, toss } from './carry.js';
 import { fadeFor } from './clips.js';
-import { LOOK, aimAngles, viewerAim } from './lookAt.js';
+import { LOOK, aimAngles, aimAt, pointerTarget, viewerAim } from './lookAt.js';
 import { steer } from './steer.js';
 
 /** @typedef {import('./types.js').Body} Body */
@@ -177,11 +181,14 @@ export function twinWeights(weights, clip) {
  * Where he looks this frame, for lookStep: `aim` (null when the mode has none) and `ahead`
  * (toward the viewer: lookAt.js viewerAim).
  * - 'camera': the camera;
- * - 'pointer': the camera when the pointer is on him, else its floor spot, lifted by
- *   LOOK.floorBias; null without a pointer;
+ * - 'pointer': the camera when the pointer is on him; else, with its ray, lookAt.js
+ *   pointerTarget (the floor or the plane through his head facing the camera, whichever the ray
+ *   meets first, brought toward the camera), not clamped, so lookStep keeps a target behind him
+ *   on the side his head is turned to; without one, its floor spot, lifted by LOOK.floorBias;
+ *   null without a pointer;
  * - 'forward', 'back': no aim.
  * @param {'pointer'|'camera'|'forward'|'back'} mode  BrainOut.look.mode
- * @param {{head: XYZ, yaw: number, camera: XYZ, pointer: {floor: XZ|null, onNewt: boolean}|null}} o
+ * @param {{head: XYZ, yaw: number, camera: XYZ, pointer: {floor: XZ|null, onNewt: boolean, ray?: {o: XYZ, d: XYZ}|null}|null}} o
  * @returns {{aim: Aim|null, ahead: Aim}}
  */
 export function lookAim(mode, { head, yaw, camera, pointer }) {
@@ -189,6 +196,10 @@ export function lookAim(mode, { head, yaw, camera, pointer }) {
   if (mode === 'camera') return { aim: aimAngles(head, yaw, camera), ahead };
   if (mode !== 'pointer' || !pointer) return { aim: null, ahead };
   if (pointer.onNewt) return { aim: aimAngles(head, yaw, camera), ahead };
+  if (pointer.ray) {
+    const target = pointerTarget(pointer.ray, head, camera);
+    return { aim: target ? aimAt(head, yaw, target.point) : null, ahead };
+  }
   if (!pointer.floor) return { aim: null, ahead };
   return { aim: aimAngles(head, yaw, { x: pointer.floor.x, y: 0, z: pointer.floor.z }, LOOK.floorBias), ahead };
 }

@@ -685,7 +685,7 @@ function start(s) {
       head,
       yaw: root.rotation.y,
       camera: pose.position,
-      pointer: ptr && !ptr.pinch ? { floor: ptr.floor, onNewt: ptr.onNewt } : null,
+      pointer: ptr && !ptr.pinch ? { floor: ptr.floor, onNewt: ptr.onNewt, ray: s.ray(ptr.x, ptr.y) } : null,
     });
     lookStep(gaze, want.mode, aim, dt, t, rng, want.weight, ahead, want.ease);
     if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight);

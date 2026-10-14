@@ -589,11 +589,11 @@ test('a one-shot fades out before it ends', () => {
 
 // ---- look-at ------------------------------------------------------------------------------
 
-test('look-at clamps to ±70° of yaw and −30°…+35° of pitch, split 30% neck and 70% head', () => {
+test('look-at clamps to ±70° of yaw and −30°…+55° of pitch, split 30% neck and 70% head', () => {
   const D = Math.PI / 180;
   close(LIMIT.yaw, 70 * D);
   close(LIMIT.pitchMin, -30 * D);
-  close(LIMIT.pitchMax, 35 * D);
+  close(LIMIT.pitchMax, 55 * D);
   assert.deepEqual(SPLIT, { neck: 0.3, head: 0.7 });
   const head = { x: 0, y: 0.9, z: 0 };
   let a = aimAngles(head, 0, { x: 0, y: 0.9, z: 2 });

@@ -4,7 +4,12 @@
 // gives him back to steer), the clip mix (weights toward the brain's clip at clips.js's fades,
 // the gait's step phase by stride, a restart of a clip still showing handing its weight to its
 // twin so it never pops) and where he looks (the camera when asked or when the pointer is on
-// him, the pointer's floor spot lifted 10°, and ahead meaning toward the viewer).
+// him, the pointer's floor spot lifted 10°, and ahead meaning toward the viewer). With the
+// pointer's ray, over a grid of cursor positions across the whole screen: his gaze points at
+// the cursor on screen, he looks up at a cursor high over him (up to about 55°), his face
+// shows for a cursor in front of him and turns no further than a profile for one behind him,
+// and with his back to the camera a cursor wiggling behind him doesn't flip his head from side
+// to side.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -21,7 +26,8 @@ import {
 import { CLIPS, GAIT, STRIDE, fadeFor } from '../src/invitation/clips.js';
 import { STEP_SHARE_MIN, gaitPhase } from '../src/invitation/blend.js';
 import { CARRY } from '../src/invitation/carry.js';
-import { LIMIT, LOOK, aimAngles } from '../src/invitation/lookAt.js';
+import { LIMIT, LOOK, aimAngles, createLook, lookStep, pointerTarget } from '../src/invitation/lookAt.js';
+import { createRng } from '../src/invitation/rng.js';
 import { xRange } from '../src/invitation/steer.js';
 
 const DT = 1 / 60;
@@ -217,6 +223,178 @@ test('where he looks: the camera when asked or when the pointer is on him, the p
   close(ahead.yaw, 0);
   close(ahead.pitch, Math.min(LIMIT.pitchMax, Math.atan2(16.2, 23)), 1e-9);
   assert.ok(ahead.pitch > 25 * D, 'up toward the camera, so his face shows');
+});
+
+// ---- the look over the whole screen ---------------------------------------------------------
+
+const RAD = Math.PI / 180;
+/**
+ * A camera as the default view has it (36° up, 20° of view, `distance` back from his middle
+ * at the origin, turned by `yaw`) on a stage `ch` CSS px tall: the ray through a point on
+ * screen (CSS px from where his middle shows) and where a world point shows.
+ */
+function viewCamera({ distance = 13.3, yaw = 0, ch = 800 } = {}) {
+  const e = 36 * RAD;
+  const f = ch / 2 / Math.tan(10 * RAD);
+  const ce = Math.cos(e);
+  const se = Math.sin(e);
+  const sy = Math.sin(yaw);
+  const cy = Math.cos(yaw);
+  const target = { x: 0, y: 0.5, z: 0 };
+  const position = { x: distance * sy * ce, y: 0.5 + distance * se, z: distance * cy * ce };
+  const fwd = { x: -sy * ce, y: -se, z: -cy * ce };
+  const right = { x: cy, y: 0, z: -sy };
+  const up = { x: -sy * se, y: ce, z: -cy * se };
+  const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+  return {
+    position,
+    target,
+    ray: (p) => ({
+      o: position,
+      d: {
+        x: fwd.x + (p.x / f) * right.x - (p.y / f) * up.x,
+        y: fwd.y + (p.x / f) * right.y - (p.y / f) * up.y,
+        z: fwd.z + (p.x / f) * right.z - (p.y / f) * up.z,
+      },
+    }),
+    screen: (q) => {
+      const v = { x: q.x - position.x, y: q.y - position.y, z: q.z - position.z };
+      const depth = dot(v, fwd);
+      return { x: (dot(v, right) / depth) * f, y: (-dot(v, up) / depth) * f };
+    },
+  };
+}
+/** The way his face points, world, for a look (yaw, pitch) from a body facing `bodyYaw`. */
+const gaze = (bodyYaw, a) => ({
+  x: Math.sin(bodyYaw + a.yaw) * Math.cos(a.pitch),
+  y: Math.sin(a.pitch),
+  z: Math.cos(bodyYaw + a.yaw) * Math.cos(a.pitch),
+});
+const clampA = (a) => ({
+  yaw: Math.min(LIMIT.yaw, Math.max(-LIMIT.yaw, a.yaw)),
+  pitch: Math.min(LIMIT.pitchMax, Math.max(LIMIT.pitchMin, a.pitch)),
+});
+/** A grid of cursor positions over a 1280×800 stage, CSS px from where his middle shows. */
+const GRID = [];
+for (let x = -600; x <= 600; x += 75) for (let y = -360; y <= 300; y += 60) GRID.push({ x, y });
+
+test('the pointer’s target is the first of the floor and the camera-facing upright plane through his head the cursor’s ray meets, brought toward the camera along the ray', () => {
+  const cam = viewCamera();
+  const head = { x: 0.1, y: 0.92, z: -0.2 };
+  const toward = { x: cam.position.x - head.x, z: cam.position.z - head.z };
+  const n = Math.hypot(toward.x, toward.z);
+  for (const p of GRID) {
+    const ray = cam.ray(p);
+    const { point, floor } = pointerTarget(ray, head, cam.position);
+    // On the cursor's ray, so it shows right under the cursor.
+    const s = cam.screen(point);
+    close(s.x, p.x, 1e-6, `(${p.x}, ${p.y}) across`);
+    close(s.y, p.y, 1e-6, `(${p.x}, ${p.y}) down`);
+    // Brought toward the camera from what the ray met first: the floor (in front of the plane),
+    // or the plane (above the floor).
+    const len = Math.hypot(ray.d.x, ray.d.y, ray.d.z);
+    const back = (-(ray.d.x * toward.x + ray.d.z * toward.z) / n / len) * LOOK.towardViewer;
+    const off = ((point.x - head.x) * toward.x + (point.z - head.z) * toward.z) / n;
+    if (floor) assert.ok(off > back, `(${p.x}, ${p.y}): the floor it met is in front of the plane`);
+    else close(off, back, 1e-6, `(${p.x}, ${p.y}): the plane it met, brought toward the camera`);
+  }
+  assert.ok(LOOK.towardViewer > 0.2 && LOOK.towardViewer < 1.5);
+});
+
+test('over the whole screen his gaze points at the cursor, he looks up at a cursor high over him (up to about 55°), his face shows for a cursor in front of him and goes no further round than a profile', () => {
+  close(LIMIT.pitchMax, 55 * RAD, 1e-9, 'his head tips up to 55°');
+  for (const distance of [13.3, 26.6, 6.7]) {
+    const cam = viewCamera({ distance });
+    const body = { yaw: 0 };
+    const head = { x: 0, y: 0.92, z: 0 };
+    const headAt = cam.screen(head);
+    let pitchAbove = -Infinity;
+    for (const p of GRID) {
+      const at = `zoom ${distance}, cursor (${p.x}, ${p.y})`;
+      const { aim } = lookAim('pointer', {
+        head,
+        yaw: body.yaw,
+        camera: cam.position,
+        pointer: { floor: null, onNewt: false, ray: cam.ray(p) },
+      });
+      const a = clampA(aim);
+      const g = gaze(body.yaw, a);
+      // His face: never further round from the camera than side on.
+      const toCam = Math.atan2(cam.position.x - head.x, cam.position.z - head.z);
+      const face = Math.abs(Math.atan2(Math.sin(Math.atan2(g.x, g.z) - toCam), Math.cos(Math.atan2(g.x, g.z) - toCam)));
+      assert.ok(face <= Math.PI / 2 + 1e-6, `${at}: his face ${(face / RAD).toFixed(0)}° round from the camera`);
+      // His gaze on screen points at the cursor (where his neck lets it).
+      const tip = cam.screen({ x: head.x + 0.3 * g.x, y: head.y + 0.3 * g.y, z: head.z + 0.3 * g.z });
+      const want = Math.atan2(p.y - headAt.y, p.x - headAt.x);
+      const got = Math.atan2(tip.y - headAt.y, tip.x - headAt.x);
+      const err = Math.abs(Math.atan2(Math.sin(got - want), Math.cos(got - want)));
+      const far = Math.hypot(p.x - headAt.x, p.y - headAt.y) > 40;
+      const free = Math.abs(aim.yaw) < LIMIT.yaw && aim.pitch < LIMIT.pitchMax && aim.pitch > LIMIT.pitchMin;
+      if (far && free) assert.ok(err < 3 * RAD, `${at}: his gaze ${(err / RAD).toFixed(1)}° off the cursor`);
+      if (far)
+        assert.ok(err < 50 * RAD, `${at}: his gaze ${(err / RAD).toFixed(1)}° off the cursor (held by his neck)`);
+      // Up over his head: he looks up.
+      if (p.y < headAt.y - 40 && Math.abs(p.x - headAt.x) < 200) {
+        assert.ok(a.pitch > 0.2, `${at}: looks up (${(a.pitch / RAD).toFixed(0)}°)`);
+        pitchAbove = Math.max(pitchAbove, a.pitch);
+      }
+    }
+    close(pitchAbove, LIMIT.pitchMax, 1e-6, `zoom ${distance}: right up at a cursor high over him`);
+  }
+  // Level with his head, far to a side: about a profile, either way.
+  const cam = viewCamera();
+  const head = { x: 0, y: 0.92, z: 0 };
+  const h = cam.screen(head);
+  for (const side of [-1, 1]) {
+    const { aim } = lookAim('pointer', {
+      head,
+      yaw: 0,
+      camera: cam.position,
+      pointer: { floor: null, onNewt: false, ray: cam.ray({ x: h.x + side * 500, y: h.y }) },
+    });
+    assert.ok(
+      Math.sign(aim.yaw) === side && Math.abs(aim.yaw) > 60 * RAD,
+      `a profile ${side}: ${(aim.yaw / RAD).toFixed(0)}°`,
+    );
+    assert.ok(Math.abs(aim.pitch) < 15 * RAD, `level: ${(aim.pitch / RAD).toFixed(0)}°`);
+  }
+  // In front of him, low down: toward the cursor and the camera, his cap kept off his face.
+  const { aim } = lookAim('pointer', {
+    head,
+    yaw: 0,
+    camera: cam.position,
+    pointer: { floor: null, onNewt: false, ray: cam.ray({ x: h.x + 120, y: h.y + 260 }) },
+  });
+  assert.ok(aim.yaw > 0.15 && aim.yaw < LIMIT.yaw, `toward the cursor (${(aim.yaw / RAD).toFixed(0)}°)`);
+  assert.ok(aim.pitch > LIMIT.pitchMin, `not cricked down past his limit (${(aim.pitch / RAD).toFixed(0)}°)`);
+});
+
+test('with his back to the camera, a cursor wiggling behind him (in front of the camera) keeps his head to one side, and it goes round to the other only once the cursor clearly has', () => {
+  const cam = viewCamera();
+  const head = { x: 0, y: 0.92, z: 0 };
+  const h = cam.screen(head);
+  const rng = createRng(2);
+  const s = createLook();
+  let t = 0;
+  const step = (px) => {
+    const { aim } = lookAim('pointer', {
+      head,
+      yaw: Math.PI,
+      camera: cam.position,
+      pointer: { floor: null, onNewt: false, ray: cam.ray({ x: h.x + px, y: h.y + 200 }) },
+    });
+    for (let i = 0; i < 6; i++) lookStep(s, 'pointer', aim, DT, (t += DT), rng);
+    return Math.sign(s.yaw);
+  };
+  // From well off to his left (on screen), wiggling across the middle behind him.
+  for (let i = 0; i < 20; i++) step(-300);
+  const side = Math.sign(s.yaw);
+  assert.notEqual(side, 0);
+  for (const px of [-20, 15, -10, 25, 0, 30, -25, 20]) assert.equal(step(px), side, `wiggled to ${px} px: no flip`);
+  // Clearly over to the other side: round it goes.
+  for (let i = 0; i < 30; i++) step(300);
+  assert.equal(Math.sign(s.yaw), -side, 'over to the other side');
+  assert.ok(Math.abs(s.yaw) > 0.8 * LIMIT.yaw, `a profile (${(s.yaw / RAD).toFixed(0)}°)`);
 });
 
 test('clips that lift his head themselves take the look at a share, blended by their weight, twins too', () => {
