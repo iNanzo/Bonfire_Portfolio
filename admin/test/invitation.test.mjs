@@ -183,6 +183,19 @@ test('the default look’s Shader values: each within its control’s range, ste
       assert.deepEqual(errorsAt(word), [`invitation.defaults.shader.${c.key}`], `${c.key}: a number`);
     }
   }
+  // Pixel Shirt & Face, the one switch Pixel Shirt and Pixel Face split from (the toy reads it
+  // as both, look.js LEGACY_SHADER): a switch still, with a warning to set the two instead.
+  const legacy = valid();
+  legacy.defaults.shader.pixelArt = true;
+  assert.deepEqual(errorsAt(legacy), [], 'the old switch is still read');
+  assert.deepEqual(
+    problems(legacy).warnings.map((w) => w.path),
+    ['invitation.defaults.shader.pixelArt'],
+    'with a warning at it',
+  );
+  const legacyBad = valid();
+  legacyBad.defaults.shader.pixelArt = 'on';
+  assert.deepEqual(errorsAt(legacyBad), ['invitation.defaults.shader.pixelArt'], 'only on or off');
   const unknown = valid();
   unknown.defaults.shader.bloom = 1;
   assert.deepEqual(errorsAt(unknown), ['invitation.defaults.shader.bloom']);

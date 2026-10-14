@@ -12,8 +12,9 @@
 // snapped onto its control, snapShader, or dropped on its own; one equal to the style's own
 // value is no change) and lookPreset writes them into a copy of the style, which the renderer
 // reads as it reads any preset (retro.js the colours, lines, shadow edge and grade; stage.js
-// the light and the shadow's strength; character.js the toon ramp and Pixel Shirt & Face, the
-// bold pixel shirt and face at the coarser resolutions, `texture.pixelArt`).
+// the light and the shadow's strength; character.js the toon ramp, Pixel Shirt, the bold pixel
+// plaid at the coarser resolutions, `texture.pixelShirt`, and Pixel Face, his face redrawn in
+// pixels to fit his size, `texture.pixelFace`).
 //
 //   toonRamp(toon)    the toon gradient, TOON_CELLS cells over the light's angle (dark side to
 //                     facing it): Smooth (0 bands), or 2 to 4 flat bands from `shade` to `lit`
@@ -170,15 +171,26 @@ export const SHADER_CONTROLS = [
     set: (p, v) => (p.toon = { ...toonSpec(p.toon), highlight: v }),
   },
   {
-    // (His shirt's bold pixel plaid and the pixel face at the coarser resolutions: character.js.
-    // Off in every style: his real plaid and smooth face at every resolution.)
-    key: 'pixelArt',
-    label: 'Pixel Shirt & Face',
+    // (His shirt's bold pixel plaid below ORIGINAL_ATLAS_TEXELS tall: character.js. Off in every
+    // style: the glb's real plaid at every resolution.)
+    key: 'pixelShirt',
+    label: 'Pixel Shirt',
     kind: 'switch',
     pixelOnly: true,
     text: (v) => both(v ? 'On' : 'Off'),
-    get: (p) => Boolean(p.texture?.pixelArt),
-    set: (p, v) => (p.texture = { ...p.texture, pixelArt: v }),
+    get: (p) => Boolean(p.texture?.pixelShirt),
+    set: (p, v) => (p.texture = { ...p.texture, pixelShirt: v }),
+  },
+  {
+    // (His face redrawn in pixels to fit his size, the sheets of models/newt-face.png: character.js.
+    // On in every style; off, the glb's smooth face at every resolution.)
+    key: 'pixelFace',
+    label: 'Pixel Face',
+    kind: 'switch',
+    pixelOnly: true,
+    text: (v) => both(v ? 'On' : 'Off'),
+    get: (p) => p.texture?.pixelFace !== false,
+    set: (p, v) => (p.texture = { ...p.texture, pixelFace: v }),
   },
   {
     key: 'edge',
