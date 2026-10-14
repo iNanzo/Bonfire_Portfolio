@@ -10,8 +10,9 @@
 // Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
 // turns his head, each button plays its clip, a floor tap walks him there, and the cursor turns his
-// head on a desktop (up at a cursor high over him, his face toward a cursor in front of him, a
-// profile for one level with his head off to the side). The camera: a finger's drag on empty
+// head on a desktop (up at a cursor high over him, his face toward a cursor in front of him, and
+// well round toward one level with his head off to the side, no further than still shows his
+// face). The camera: a finger's drag on empty
 // space or the mouse's right-drag (on NEWT too, never holding him) turns it, the mouse's
 // left-drag on empty space and two fingers pan it with the floor under the cursor, the wheel
 // and a two-finger pinch zoom it, the canvas shows no context menu, and Reset Camera brings it
@@ -1500,7 +1501,7 @@ test.describe('on a desktop', () => {
     expect(steps[0], `${steps[0].toFixed(1)} px in a frame, then ${steps[1].toFixed(1)}`).toBeLessThan(3 * steps[1]);
   });
 
-  test('where he looks with a mouse: up at a cursor high over him, his face toward a cursor in front of him, a profile for one level with his head off to the side', async ({
+  test('where he looks with a mouse: up at a cursor high over him, his face toward a cursor in front of him, and well round toward one level with his head off to the side, as far as still shows his face', async ({
     page,
   }) => {
     await calm(page);
@@ -1526,15 +1527,18 @@ test.describe('on a desktop', () => {
         `facing the camera, turned ${side < 0 ? 'left' : 'right'}`,
       );
     }
-    // Level with his head, far off to the side: about a profile, never the back of his head.
+    // Level with his head, far off to the side: well round toward it, but no further from the
+    // camera than 55° (lookAt.js LOOK.faceTurn): turned side on, his cap's brim hides his eyes.
     for (const side of [-1, 1]) {
       await page.mouse.move(head.x + side * 4 * tall, head.y, { steps: 4 });
-      await until(page, (s) => Math.sign(s.headYaw) === side && Math.abs(s.headYaw) > 0.9, `a profile ${side}`);
+      await until(page, (s) => Math.sign(s.headYaw) === side && Math.abs(s.headYaw) > 0.8, `turned ${side}`);
+      await framesFor(page, 400);
       const s = await snapshot(page);
       const off = Math.abs(
         Math.atan2(Math.sin(s.heading + s.headYaw - s.camera.yaw), Math.cos(s.heading + s.headYaw - s.camera.yaw)),
       );
-      expect(off, 'his face no more than side on').toBeLessThanOrEqual(Math.PI / 2 + 0.05);
+      expect(off, 'well round toward the cursor').toBeGreaterThan((45 * Math.PI) / 180);
+      expect(off, 'no further round than still shows his face').toBeLessThanOrEqual((55 * Math.PI) / 180 + 0.03);
     }
   });
 });

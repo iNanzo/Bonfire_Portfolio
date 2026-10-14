@@ -23,7 +23,8 @@ unlisted: nothing links to it and search engines are asked not to index it.
   finger or cursor is.
 - **Point anywhere** and he looks where you point (on a phone, while your finger is down; with
   a mouse, wherever the cursor is): up when you point high over him, round to show his face
-  when you point in front of him, and no further round than side on when you point behind him.
+  when you point in front of him (off to a side, well round toward it, but no further than his
+  cap leaves his face showing), and no further round than side on when you point behind him.
   Otherwise he looks at you.
 - **Turn the camera:** with a finger, drag empty space; with a mouse, drag with the right
   button (anywhere, on him too; it never picks him up). Across goes round him (a drag across
@@ -203,8 +204,10 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
     5), the anchor the pointer's spot with no lag and the swing driven by a smoothed follow of
     it; `lookAt.js` `pointerTarget` aims his look where the
     pointer's ray first meets the floor or the upright plane through his head facing the
-    camera, brought 0.6 toward the camera along the ray (pitch up to 55°), and keeps a target
-    behind him on the side his head is turned to; `floor.js` `fitShadow(…, at)` moves the
+    camera, brought 0.6 toward the camera along the ray (pitch up to 55°), `faceUp` keeps a look
+    in front of him where his cap leaves his face showing (his chin up to the camera's pitch,
+    turned no further from the camera than `LOOK.faceTurn`, 55°), and it keeps a target behind
+    him on the side his head is turned to; `floor.js` `fitShadow(…, at)` moves the
     shadow camera to wherever he is, by whole shadow texels.
 - **Speech and content:** `speech.js` (pure: `createTalk({lines, speech, rng}).step(...)` reads
   the brain's output this frame and last, the gestures, the button pressed and the camera's yaw

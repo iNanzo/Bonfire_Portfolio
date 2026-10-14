@@ -3,10 +3,13 @@
 // critically damped spring (no overshoot). The pointer's target (pointerTarget) is where its ray
 // first meets the floor or the upright plane through his head facing the camera, brought a
 // little toward the camera along the ray: a cursor high over him has him look up at it (his
-// gaze on screen right at it), one level with his head off to a side turns him to a profile
+// gaze on screen right at it), one level with his head off to a side turns him well round to it
 // (never the back of his head), and his head turns all the way to the cursor's side. From the
 // camera's 36° a look down hides his face under his cap, so his chin never drops below where it
-// shows (faceUp: a cursor low in front of him has him turn to it, chin up, face showing). Behind
+// shows, and a look turned further from the camera than LOOK.faceTurn tips the brim across both
+// eyes, so a look in front of him turns no further round than that (faceUp: a cursor low in
+// front of him has him turn to it, chin up, face showing; one far off to a side, as far round as
+// still shows his face). Behind
 // him past his reach, his head keeps to the side it's turned to until the
 // target is clearly round the other side (no flip from shoulder to shoulder). With no pointer
 // for 1.5 s he looks ahead and glances about every 3–7 s; running away, he glances over his
@@ -40,7 +43,10 @@ export const SPLIT = { neck: 0.3, head: 0.7 };
  * brought toward the camera along its ray, world units (his face turns to the viewer while his
  * gaze still points at the cursor on screen). faceUnder: how far under the camera (as seen from
  * his head) his look may pitch and still show his face under his cap's brim, radians (from the
- * front and side on alike: side on, the brim reaches out over his eye). backSide:
+ * front and side on alike: side on, the brim reaches out over his eye). faceTurn: how far round
+ * from the camera a look in front of him may turn and still show an eye under the brim, radians
+ * (turned further, the brim hides both from the camera's 36°: a count of the eye triangles the
+ * camera sees on the posed model fell from 14 of 18 facing it to 9 at 55° and 5 at 70°). backSide:
  * a target further round behind him than this (radians) keeps his head on the side it's turned to.
  */
 export const LOOK = {
@@ -61,6 +67,7 @@ export const LOOK = {
   floorBias: (10 * Math.PI) / 180,
   towardViewer: 0.6,
   faceUnder: (4 * Math.PI) / 180,
+  faceTurn: (55 * Math.PI) / 180,
   backSide: (150 * Math.PI) / 180,
 };
 
@@ -124,11 +131,12 @@ export function aimAngles(headPos, bodyYaw, target, pitchBias = 0) {
 }
 
 /**
- * A look (from his head, his body facing `bodyYaw`) tipped up, where it must be, to the lowest
- * pitch at which his face still shows to the camera under his cap's brim: the camera's own pitch
- * from his head, less LOOK.faceUnder (a look turned away from the camera is left be). Its yaw is
- * kept: he still turns all the way to what he looks at, only his chin comes up (from the
- * camera's 36°, a look down at the floor, or level, is the top of his cap).
+ * A look (from his head, his body facing `bodyYaw`) where his face still shows to the camera
+ * under his cap's brim: tipped up, where it must be, to the camera's own pitch from his head less
+ * LOOK.faceUnder, and turned no further round from the camera than LOOK.faceTurn (a look turned
+ * away from the camera, past side on, is left be). He still turns toward what he looks at, as far
+ * as that (from the camera's 36°, a look down at the floor, or level, is the top of his cap, and
+ * one turned side on the brim across his eyes).
  * @param {Aim} aim
  * @param {XYZ} head
  * @param {number} bodyYaw
@@ -138,9 +146,11 @@ export function aimAngles(headPos, bodyYaw, target, pitchBias = 0) {
 export function faceUp(aim, head, bodyYaw, camera) {
   const cx = camera.x - head.x;
   const cz = camera.z - head.z;
-  if (Math.abs(wrapAngle(bodyYaw + aim.yaw - Math.atan2(cx, cz))) > Math.PI / 2) return aim;
+  const off = wrapAngle(bodyYaw + aim.yaw - Math.atan2(cx, cz));
+  if (Math.abs(off) > Math.PI / 2) return aim;
   const lowest = Math.atan2(camera.y - head.y, Math.hypot(cx, cz)) - LOOK.faceUnder;
-  return aim.pitch >= lowest ? aim : { yaw: aim.yaw, pitch: lowest };
+  const yaw = Math.abs(off) > LOOK.faceTurn ? aim.yaw - off + Math.sign(off) * LOOK.faceTurn : aim.yaw;
+  return { yaw, pitch: Math.max(aim.pitch, lowest) };
 }
 
 /**

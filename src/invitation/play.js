@@ -19,7 +19,8 @@
 //                           plane through his head facing the camera, brought toward the camera
 //                           along the ray (lookAt.js pointerTarget: up at a cursor high over
 //                           him, a profile at most for one behind him, his face for one in
-//                           front; without a ray, its floor spot lifted by LOOK.floorBias so his
+//                           front, turned no further from the camera than shows it under his
+//                           cap, lookAt.js faceUp; without a ray, its floor spot lifted by LOOK.floorBias so his
 //                           cap leaves his face showing), and "ahead" meaning toward the viewer
 //   lookShare               how much of the look goes on: clips that lift his head to show his
 //                           face themselves (Wave, the Sit trio) take only HEAD_SHARE of it, so
