@@ -1237,6 +1237,41 @@ test.describe('on a desktop', () => {
     expect(errors).toEqual([]);
   });
 
+  test('the bubble keeps talk’s time: a tab hidden longer than a line lasts pauses both, so the line is still up in its bubble when it comes back, and both end together', async ({
+    page,
+  }) => {
+    const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
+    const tapped = ['wave', 'spook', 'flee'].some((k) => inv.speech?.[k]?.chance > 0 && inv.lines?.[k]?.length);
+    test.skip(!tapped, 'the admin has a click on him say nothing');
+    await calm(page);
+    for (let i = 0; i < 10 && !(await snapshot(page)).talk.showing; i++) {
+      const head = await on(page, 'head');
+      await page.mouse.click(head.x, head.y);
+      await until(page, (s) => s.state !== 'idle' || Boolean(s.talk.showing), 'reacting');
+      await until(page, (s) => s.state === 'idle' || Boolean(s.talk.showing), 'back to idle', 30_000);
+    }
+    const { talk } = await snapshot(page);
+    expect(talk.showing, 'he said something').toBeTruthy();
+    // The tab goes out of sight for a second longer than the line has left (the toy's clock
+    // stops: main.js sync), then comes back.
+    const visible = (hidden) =>
+      page.evaluate((h) => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => h });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, hidden);
+    await visible(true);
+    await sleep((talk.showing.until - talk.t + 1) * 1000);
+    await visible(false);
+    await framesFor(page, 100);
+    const back = await snapshot(page);
+    expect(back.talk.showing?.line, 'talk still has the line up').toBe(talk.showing.line);
+    await expect(page.locator('.inv-bubble'), 'and its bubble still shows it').toBeVisible();
+    await expect(page.locator('.inv-bubble-live')).toHaveText(`NEWT: ${talk.showing.line}`);
+    // The bubble goes when talk's line is over, not before.
+    await expect(page.locator('.inv-bubble')).toBeHidden({ timeout: 20_000 });
+    await until(page, (s) => !s.talk.showing, 'talk’s line over too', 2_000);
+  });
+
   test('the bubble sits under the toolbar and the Look sheet, and with the sheet open it stays clear of it and off his face', async ({
     page,
   }) => {

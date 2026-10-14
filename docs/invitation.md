@@ -220,7 +220,8 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   and zoom, and says the line to show and its trigger; `TRIGGERS`, `PRIORITY`, `SPEECH_RANGES`;
   `lineDuration`: typed at 30 characters a second, held 1.6 s plus 0.045 s a character, faded
   over 0.35 s; `speechFrom` and `linesFrom` read the admin's settings and lines from anything),
-  `bubble.js` + `bubble.css` (the bubble: `createBubble({root, before}).say(text)`, then
+  `bubble.js` + `bubble.css` (the bubble: `createBubble({root, before, now}).say(text)`, on
+  the toy's clock as talk is (`now`: main.js's frame steps, capped and paused with the tab), then
   `update(head, avoid)` each frame with his head's circle on screen and the toolbar's and open
   sheet's rects; `speakerPoint` makes his head null, the bubble out of sight, while the open
   sheet covers it; `clearRegion`, `placeBubble`, `bubbleFrame` and `speakerPoint` are pure;

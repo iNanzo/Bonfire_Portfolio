@@ -303,9 +303,11 @@ function start(s) {
   const gaze = createLook();
   const faces = createFaceState();
   // (What he says and when, from the admin's lines and settings; the bubble goes in before the
-  // HUD, so the toolbar and the Look sheet stay over it.)
+  // HUD, so the toolbar and the Look sheet stay over it, and runs on the toy's clock, as talk
+  // does: a slow frame's capped step or a hidden tab moves both alike, so they agree on when a
+  // line is up.)
   const talk = createTalk({ lines: invitationLines(), speech: speechSettings(), rng: createRng(seed + 2) });
-  const bubble = createBubble({ root: stageEl, before: stageEl.querySelector('.inv-hud') });
+  const bubble = createBubble({ root: stageEl, before: stageEl.querySelector('.inv-hud'), now: () => t });
   orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(s.bounds), span: stageSize() });
   const cam = orbit;
   orbitSpan(cam, stageSpan(s));
