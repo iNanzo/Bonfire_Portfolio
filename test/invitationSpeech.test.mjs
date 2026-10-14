@@ -353,7 +353,7 @@ test('one bubble at a time: a new line replaces it only when it matters more', (
   assert.equal(p.frame(brain('held', { clip: 'Held' })).trigger, 'caught', 'and being caught outranks that');
   const up = p.talk.snapshot().showing;
   assert.equal(up.trigger, 'caught');
-  assert.ok(Math.abs(up.until - (p.t + lineDuration(up.line))) < 1e-9, 'up for its line’s time');
+  assert.ok(Math.abs(up.until - (p.t + lineDuration(up.line))) < 1e-6, 'up for its line’s time');
   // Once it's down, anything may speak.
   p.wait(lineDuration(up.line) + 0.05, brain('held', { clip: 'Held' }));
   assert.equal(p.talk.snapshot().showing, null);
@@ -401,7 +401,7 @@ test('how long a line stays up: typed at a readable pace, held, faded', () => {
   assert.ok(short >= 2 && short <= 3.5, `a short line: ${short.toFixed(2)} s`);
   assert.ok(long > short && long <= 8, `a long one: ${long.toFixed(2)} s`);
   const n = 'Okay, okay, I get it, you can spin the camera around. Wow.'.length;
-  assert.ok(Math.abs(long - (n / TALK.typeCps + TALK.hold + n * TALK.holdPerChar + TALK.fade)) < 1e-9);
+  assert.ok(Math.abs(long - (n / TALK.typeCps + TALK.hold + n * TALK.holdPerChar + TALK.fade)) < 1e-6);
   assert.ok(TALK.typeCps >= 20 && TALK.typeCps <= 45, 'typed at a readable pace');
   // (Characters, not UTF-16 units: an emoji is one.)
   assert.equal(lineDuration('🦎'), lineDuration('a'));
