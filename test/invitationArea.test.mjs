@@ -1,18 +1,22 @@
-// The invitation toy's play area (src/invitation/area.js): with the camera free to orbit and zoom,
-// it's a fixed invisible disc on the floor, about what a phone shows at the default zoom, the same
-// on every screen. A desktop's default view (pixels.js frameView) shows all of it, at every Pixel
-// Size, with NEWT still about a fifth of the screen's short side tall; on a phone he's drawn about
-// 30% bigger, the disc no longer all fits, and the camera follows him softly (camera.js) so a
-// dash to the rim, or round it, never takes him off the screen; walking, wandering, fleeing
-// (sliding along the rim when cornered, his heading turning smoothly as he goes round it, no
-// zig-zag) and carrying (the anchor, the toss and the fall's bounces)
-// stay inside it (steer.js and carry.js read a disc's radius from its Bounds); and the light's
-// shadow camera (floor.js fitShadow) covers the disc up to the highest he's lifted, wherever the
-// camera has turned the light (camera.js lightDir).
+// The invitation toy's play area (src/invitation/area.js). The floor is endless: the play area is
+// the floor the default view shows fully zoomed out (twice the default distance, yaw 0, no pan),
+// inside the clear space over the toolbar with NEWT whole a margin in from its edges wherever he
+// stands: a trapezoid widening toward the back, far bigger than the old disc, the same whatever
+// the Pixel Size, the open Look sheet or the camera does, and new on a resize; walking,
+// wandering, fleeing and carrying stay inside it. The disc it replaced is still the default
+// view's framing: a desktop's default view (pixels.js frameView) shows all of it, at every Pixel
+// Size, with NEWT still about a fifth of the screen's short side tall; on a phone he's drawn
+// about 30% bigger, the disc no longer all fits, and the camera follows him softly (camera.js)
+// so a dash to its rim, or round it, never takes him off the screen. A disc's Bounds still work
+// everywhere (steer.js and carry.js read a disc's radius from its Bounds: walking, wandering,
+// fleeing, sliding along the rim when cornered with no zig-zag, carrying, the toss and the
+// fall's bounces). The light's shadow camera (floor.js fitShadow) covers the disc up to the
+// highest he's lifted, wherever the camera has turned the light (camera.js lightDir), and moved
+// to wherever he is in the play area (shadow texels whole, so his shadow doesn't shimmer).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { AREA_RADIUS, NEWT_HEIGHT, NEWT_RADIUS, playArea } from '../src/invitation/area.js';
+import { AREA_MARGIN, AREA_RADIUS, NEWT_HEIGHT, NEWT_RADIUS, playArea, viewArea } from '../src/invitation/area.js';
 import { centreOf, clampTo, steer, wanderGoal, xRange } from '../src/invitation/steer.js';
 import { CARRY, fallStep, grab, holdStep } from '../src/invitation/carry.js';
 import { fitShadow } from '../src/invitation/floor.js';
@@ -24,8 +28,9 @@ import {
   newtTexels,
   project,
   texelGrid,
+  clearInsets,
 } from '../src/invitation/pixels.js';
-import { createOrbit, lightDir, orbitPose, orbitStep } from '../src/invitation/camera.js';
+import { ORBIT, createOrbit, lightDir, orbitPose, orbitStep } from '../src/invitation/camera.js';
 import { DEFAULT_LOOK, LOOKS } from '../src/invitation/look.js';
 import { GAIT } from '../src/invitation/clips.js';
 import { createRng } from '../src/invitation/rng.js';
@@ -52,7 +57,183 @@ function viewFor(cssW, cssH, dpr, pixelSize = DEFAULT_LOOK.pixelSize) {
   return { grid, view };
 }
 
-test('the play area is a fixed disc about 2.4 in radius around the floor’s centre, the same on every screen', () => {
+/** The play area for a screen at a Pixel Size, with its default view and the view fully zoomed out. */
+function areaFor(cssW, cssH, dpr, pixelSize = DEFAULT_LOOK.pixelSize) {
+  const { grid, view } = viewFor(cssW, cssH, dpr, pixelSize);
+  const area = viewArea({ view, cssW, cssH, insets: INSETS });
+  const d = view.distance * ORBIT.zoomMax;
+  const e = (view.elevation * Math.PI) / 180;
+  const far = {
+    ...view,
+    distance: d,
+    position: { x: 0, y: view.target.y + d * Math.sin(e), z: d * Math.cos(e) },
+    shift: {
+      x: (INSETS.left + cssW - INSETS.right) / 2 - view.canvasW / 2,
+      y: (INSETS.top + cssH - INSETS.bottom) / 2 - view.canvasH / 2,
+    },
+  };
+  return { grid, view, area, far };
+}
+/** Points along a trapezoid's four edges (its corners among them). */
+function edgePoints(b, n = 16) {
+  const at = (z) => {
+    const k = (b.maxZ - z) / (b.maxZ - b.minZ);
+    return [b.minX + ((b.minXBack ?? b.minX) - b.minX) * k, b.maxX + ((b.maxXBack ?? b.maxX) - b.maxX) * k];
+  };
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    const z = b.maxZ + ((b.minZ - b.maxZ) * i) / n;
+    const [lo, hi] = at(z);
+    out.push({ x: lo, z }, { x: hi, z });
+    for (const zz of [b.minZ, b.maxZ]) {
+      const [l2, h2] = at(zz);
+      out.push({ x: l2 + ((h2 - l2) * i) / n, z: zz });
+    }
+  }
+  return out;
+}
+/** NEWT standing at `p` on screen in view `v`: the extremes of his body (his width, feet to head). */
+function newtBox(v, p) {
+  const box = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
+  for (const y of [0, NEWT_HEIGHT])
+    for (const [dx, dz] of [
+      [-NEWT_RADIUS, 0],
+      [NEWT_RADIUS, 0],
+      [0, -NEWT_RADIUS],
+      [0, NEWT_RADIUS],
+    ]) {
+      const s = project(v, { x: p.x + dx, y, z: p.z + dz });
+      box.left = Math.min(box.left, s.x);
+      box.right = Math.max(box.right, s.x);
+      box.top = Math.min(box.top, s.y);
+      box.bottom = Math.max(box.bottom, s.y);
+    }
+  return box;
+}
+const MORE_SIZES = [...SIZES, [844, 390, 3], [1920, 1080, 1], [768, 1024, 2]];
+
+test('the play area is the floor the default view shows fully zoomed out: a trapezoid widening toward the back, NEWT whole and a margin inside the clear space wherever he stands in it, snug at its edges', () => {
+  assert.ok(AREA_MARGIN >= 4 && AREA_MARGIN <= 16, `margin ${AREA_MARGIN}`);
+  for (const [cssW, cssH, dpr] of MORE_SIZES) {
+    const at = `${cssW}x${cssH}@${dpr}`;
+    const { area: b, far } = areaFor(cssW, cssH, dpr);
+    assert.ok(b.r === undefined, `${at}: no disc`);
+    assert.ok(
+      b.minZ < -2 && b.maxZ > 1,
+      `${at}: deep, round the middle (${b.minZ.toFixed(2)} to ${b.maxZ.toFixed(2)})`,
+    );
+    assert.ok(b.minX < -1.5 && b.maxX > 1.5, `${at}: wide at the front (${b.minX.toFixed(2)} to ${b.maxX.toFixed(2)})`);
+    assert.ok(b.minXBack < b.minX && b.maxXBack > b.maxX, `${at}: wider at the back`);
+    assert.ok((b.maxXBack - b.minXBack) * (b.maxZ - b.minZ) > 4 * R * R * 4, `${at}: far bigger than the old disc`);
+    const clear = {
+      left: INSETS.left + AREA_MARGIN,
+      right: cssW - INSETS.right - AREA_MARGIN,
+      top: INSETS.top + AREA_MARGIN,
+      bottom: cssH - INSETS.bottom - AREA_MARGIN,
+    };
+    for (const p of edgePoints(b)) {
+      const box = newtBox(far, p);
+      const where = `${at}: NEWT at (${p.x.toFixed(2)}, ${p.z.toFixed(2)})`;
+      assert.ok(
+        box.left >= clear.left - 0.5 && box.right <= clear.right + 0.5,
+        `${where} across ${box.left.toFixed(1)}–${box.right.toFixed(1)}`,
+      );
+      assert.ok(
+        box.top >= clear.top - 0.5 && box.bottom <= clear.bottom + 0.5,
+        `${where} down ${box.top.toFixed(1)}–${box.bottom.toFixed(1)}`,
+      );
+    }
+    // Snug: at the back his head reaches the clear space's top, at the front his toes its bottom,
+    // and at the corners his side its sides.
+    const back = newtBox(far, { x: (b.minXBack + b.maxXBack) / 2, z: b.minZ });
+    const front = newtBox(far, { x: (b.minX + b.maxX) / 2, z: b.maxZ });
+    close(back.top, clear.top, 1, `${at}: his head at the back`);
+    close(front.bottom, clear.bottom, 1, `${at}: his toes at the front`);
+    close(newtBox(far, { x: b.maxX, z: b.maxZ }).right, clear.right, 1, `${at}: his side at a front corner`);
+    close(newtBox(far, { x: b.minXBack, z: b.minZ }).left, clear.left, 1, `${at}: his side at a back corner`);
+  }
+});
+
+test('the play area keeps to the default view: the Pixel Size and the open Look sheet never change it, nor does what the camera does (it reads only the default view); a resize does', () => {
+  for (const [cssW, cssH, dpr] of MORE_SIZES) {
+    const at = `${cssW}x${cssH}@${dpr}`;
+    const { area: base, view } = areaFor(cssW, cssH, dpr);
+    for (const pixelSize of PIXEL_SIZES) {
+      const { area } = areaFor(cssW, cssH, dpr, pixelSize);
+      for (const k of ['minX', 'maxX', 'minZ', 'maxZ', 'minXBack', 'maxXBack'])
+        assert.ok(
+          Math.abs(area[k] - base[k]) <= 0.01 * Math.abs(base[k]) + 1e-6,
+          `${at} ${pixelSize}: ${k} ${area[k]} vs ${base[k]}`,
+        );
+    }
+    // The Look sheet open over the bottom: the view shows NEWT in the clear space above it (a
+    // shifted view, as far back), and the play area stays where it was.
+    const grid = texelGrid({ cssW, cssH, dpr, pixelSize: DEFAULT_LOOK.pixelSize });
+    const focus = clearInsets({
+      cssW,
+      cssH,
+      insets: INSETS,
+      cover: { left: 0, top: cssH * 0.55, right: cssW, bottom: cssH },
+      tall: 100,
+    });
+    const sheet = frameView({ cssW, cssH, grid, insets: INSETS, focus, area: R + NEWT_RADIUS });
+    assert.notDeepEqual(sheet.shift, view.shift, `${at}: the sheet moves where the view shows him`);
+    assert.deepEqual(
+      viewArea({ view: sheet, cssW, cssH, insets: INSETS }),
+      base,
+      `${at}: the sheet leaves the play area be`,
+    );
+  }
+  // Another screen, another play area.
+  assert.notDeepEqual(areaFor(390, 844, 3).area, areaFor(844, 390, 3).area);
+  assert.notDeepEqual(areaFor(1280, 800, 1).area, areaFor(1280, 700, 1).area);
+});
+
+test('in the play area walking stops at its edge, wander goals cover it, and fleeing and carrying stay inside it', () => {
+  for (const [cssW, cssH, dpr] of [
+    [390, 844, 3],
+    [1280, 800, 1],
+  ]) {
+    const { area: b } = areaFor(cssW, cssH, dpr);
+    const inArea = (p, msg) => {
+      const [lo, hi] = xRange(b, p.z);
+      assert.ok(
+        p.z >= b.minZ - 1e-6 && p.z <= b.maxZ + 1e-6 && p.x >= lo - 1e-6 && p.x <= hi + 1e-6,
+        `${msg} ${JSON.stringify(p)}`,
+      );
+    };
+    const rng = createRng(9);
+    let from = { x: 0, z: 0 };
+    let back = 0;
+    for (let i = 0; i < 300; i++) {
+      const g = wanderGoal(rng, b, from);
+      inArea(g, 'a wander goal');
+      if (g.z < b.minZ / 2) back++;
+      from = g;
+    }
+    assert.ok(back > 30, `${back} wander goals in the back half`);
+    let w = { x: 0, z: 0, yaw: 0, speed: 0 };
+    for (let i = 0; i < 40 * 60; i++) {
+      w = steer(w, { mode: 'goto', goal: { x: 40, z: -80 }, speed: GAIT.run }, null, b, DT);
+      inArea(w, 'walking');
+    }
+    const [, hi] = xRange(b, w.z);
+    assert.ok(Math.abs(w.x - hi) < 0.05 || Math.abs(w.z - b.minZ) < 0.05, `stopped at the edge ${JSON.stringify(w)}`);
+    let f = { x: 0, z: 0, yaw: 0, speed: 0 };
+    for (let i = 0; i < 20 * 60; i++) {
+      const chaser = { x: f.x - 0.5 * Math.sin(f.yaw), z: f.z - 0.5 * Math.cos(f.yaw) };
+      f = steer(f, { mode: 'flee', goal: null, speed: GAIT.run }, chaser, b, DT);
+      inArea(f, 'fleeing');
+    }
+    const c = grab({ x: 0, y: 0.8, z: 0 }, 0);
+    for (let i = 1; i <= 30; i++) {
+      holdStep(c, { x: 50, y: 2, z: 50 }, DT, b, i * DT);
+      inArea(c.anchor, 'carried');
+    }
+  }
+});
+
+test('the default view’s disc (stage.js frames a desktop to show all of it) is about 2 in radius round the floor’s centre, the same on every screen', () => {
   assert.ok(R >= 2 && R <= 2.5, `radius ${R}`);
   assert.equal(AREA_RADIUS, R);
   assert.deepEqual(AREA, { minX: -R, maxX: R, minZ: -R, maxZ: R, r: R }, 'its square holds it');
