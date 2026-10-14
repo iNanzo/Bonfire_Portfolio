@@ -1,0 +1,120 @@
+/* NEWT's speech bubble (bubble.js) in the invitation toy's own style: cream, a dark 3 px outline
+   with the buttons' chunky drop, rounded, Pixelify Sans, a tail toward his head (data-tail: down
+   while it's above him, left or right while it's beside him, up while it's below, none over him).
+   It sits on the stage, under the toolbar and the Look sheet, and never takes a press. The rest
+   of the line waits unseen in its place while the start types out, so the bubble keeps its size;
+   it fades as it goes (all at once, with no fade, for prefers-reduced-motion). The live region
+   (the whole line at once, for a screen reader) is visually hidden. The colours fall back on the
+   page's own when this sheet is used alone. */
+
+.inv-bubble {
+  --bubble-fill: #fff8e7;
+  --bubble-ink: var(--inv-ink, #3a332d);
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(240px, calc(100% - 32px));
+  padding: 7px 12px 8px;
+  border: 3px solid var(--bubble-ink);
+  border-radius: 14px;
+  background: var(--bubble-fill);
+  color: var(--bubble-ink);
+  box-shadow: 0 3px 0 var(--bubble-ink);
+  font: 400 16px/1.25 var(--inv-font, 'Pixelify Sans', ui-rounded, system-ui, sans-serif);
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 0.35s ease-out;
+  will-change: transform, opacity;
+}
+.inv-bubble.is-fading,
+.inv-bubble.is-away {
+  opacity: 0;
+}
+.inv-bubble.is-away,
+.inv-bubble.is-still {
+  transition: none;
+}
+
+.inv-bubble-text {
+  margin: 0;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+.inv-bubble-rest {
+  visibility: hidden;
+}
+
+/* The tail: a square turned 45° (18 px with its border), its two outer sides outlined, its middle
+   on the bubble's edge (over the outline, under the text: the bubble is a stacking context, by
+   will-change), reaching 10 px out (bubble.js BUBBLE.tail). --tail-x and --tail-y are its
+   middle from the bubble's outer left and top edges (3 px of border outside the padding box). */
+.inv-bubble-tail {
+  position: absolute;
+  z-index: -1;
+  width: 12px;
+  height: 12px;
+  background: var(--bubble-fill);
+  border: 3px solid var(--bubble-ink);
+  transform: rotate(45deg);
+}
+.inv-bubble[data-tail='down'] .inv-bubble-tail,
+.inv-bubble[data-tail='up'] .inv-bubble-tail {
+  left: var(--tail-x, 50%);
+  margin-left: -12px;
+}
+.inv-bubble[data-tail='left'] .inv-bubble-tail,
+.inv-bubble[data-tail='right'] .inv-bubble-tail {
+  top: var(--tail-y, 50%);
+  margin-top: -12px;
+}
+.inv-bubble[data-tail='down'] .inv-bubble-tail {
+  bottom: -9.5px;
+  border-top-color: transparent;
+  border-left-color: transparent;
+}
+.inv-bubble[data-tail='up'] .inv-bubble-tail {
+  top: -9.5px;
+  border-bottom-color: transparent;
+  border-right-color: transparent;
+}
+.inv-bubble[data-tail='left'] .inv-bubble-tail {
+  left: -9.5px;
+  border-top-color: transparent;
+  border-right-color: transparent;
+}
+.inv-bubble[data-tail='right'] .inv-bubble-tail {
+  right: -9.5px;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+}
+.inv-bubble:not([data-tail='down'], [data-tail='up'], [data-tail='left'], [data-tail='right']) .inv-bubble-tail {
+  display: none;
+}
+
+@media (max-width: 420px) {
+  .inv-bubble {
+    font-size: 15px;
+    max-width: min(220px, calc(100% - 24px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inv-bubble {
+    transition: none;
+  }
+}
+
+.inv-bubble-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
