@@ -32,6 +32,7 @@ import {
   orbitSpan,
   orbitSpot,
   orbitStep,
+  orbitTurning,
   orbitWheel,
   orbitZoom,
   tiltPerPx,
@@ -103,6 +104,37 @@ test('a horizontal drag turns the camera around the vertical axis, a full turn a
   orbitDrag(o, 0, 100, t + 1);
   settle(o, 2);
   close(o.elevation, ORBIT.elevMin + 100 * tiltPerPx(o), 1e-6, 'and back up at once, nothing stored past the limit');
+});
+
+test('orbitTurning says whether the view still turns: while dragged, through a fling’s coast and its easing, and not once it has come to rest', () => {
+  const o = createOrbit({ distance: HOME });
+  assert.equal(orbitTurning(o), false, 'at rest at home');
+  let t = 0;
+  for (let i = 0; i < 6; i++) orbitDrag(o, -30, 0, (t += DT));
+  assert.equal(orbitTurning(o), true, 'while dragged');
+  orbitRelease(o, t + DT / 2);
+  assert.ok(o.spin.yaw !== 0, 'a quick drag let go flings it');
+  assert.equal(orbitTurning(o), true, 'coasting');
+  let frames = 0;
+  while (orbitTurning(o) && frames < 60 * 30) {
+    orbitStep(o, DT, null);
+    frames++;
+  }
+  assert.ok(frames < 60 * 30, `it comes to rest (${frames} frames)`);
+  const still = o.yaw;
+  for (let i = 0; i < 60; i++) orbitStep(o, DT, null);
+  assert.ok(Math.abs(o.yaw - still) < 2e-3, `at rest it stays put (moved ${Math.abs(o.yaw - still)})`);
+  // (Slow frames, as a software-rendered browser draws them: the same rest, by the toy's clock.)
+  const slow = createOrbit({ distance: HOME });
+  t = 0;
+  for (let i = 0; i < 6; i++) orbitDrag(slow, -30, 0, (t += DT));
+  orbitRelease(slow, t + DT / 2);
+  let steps = 0;
+  while (orbitTurning(slow) && steps < 600) {
+    orbitStep(slow, 0.05, null);
+    steps++;
+  }
+  assert.ok(steps < 600, `slow frames come to rest too (${steps} steps of 50 ms)`);
 });
 
 test('a drag across the whole stage turns the camera about three quarters of a turn, a drag down its whole height tilts it half a turn, on phones and a desktop alike', () => {

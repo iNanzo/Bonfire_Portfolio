@@ -60,6 +60,7 @@ import {
   orbitSpan,
   orbitSpot,
   orbitStep,
+  orbitTurning,
   orbitWheel,
 } from './camera.js';
 import { loadCharacter } from './character.js';
@@ -919,6 +920,7 @@ function start(s) {
           distance: cam.distance,
           target: { x: cam.target.x, z: cam.target.z },
           panned: cam.panned,
+          turning: orbitTurning(cam),
         },
         // (Where he may go: the play area, area.js viewArea.)
         area: { ...area },

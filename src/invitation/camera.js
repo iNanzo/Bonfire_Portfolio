@@ -542,6 +542,22 @@ function wanted(s, focus) {
 }
 
 /**
+ * Whether the view is still turning: dragged, a fling still coasting, or its yaw or tilt still
+ * easing toward the goal (within a thousandth of a radian counts as there). Read by ?test, so
+ * a browser spec waits on the view coming to rest rather than on a still moment between polls.
+ * @param {OrbitState} s
+ */
+export function orbitTurning(s) {
+  return (
+    Boolean(s.drag) ||
+    s.spin.yaw !== 0 ||
+    s.spin.elevation !== 0 ||
+    Math.abs(s.goal.yaw - s.yaw) > 1e-3 ||
+    Math.abs(s.goal.elevation - s.elevation) > 1e-3
+  );
+}
+
+/**
  * One frame: a fling coasts, the view eases toward its goal, and the orbit's point eases toward
  * where it's wanted (NEWT at `focus`, his spot on the floor and how high his feet are: the rest
  * point, the zoom's share of the way to him, keeping him on screen), never letting him past
