@@ -9,8 +9,8 @@
 // under the eyes and apart from them, a 1 px brow with skin under it where there's room; no lone
 // dark pixel but a pupil; four faces that differ, each size's eye at least as big as the one
 // under it. Where a shape scaled down as it is would read wrong through the page's dither, it's
-// drawn as the smooth face reads: a flat pupil bar under the lid, a grey row, a full band and
-// white over the lash (a row of grey over the pupil at 16 to 23 px); surprised, a wide pupil
+// drawn as the smooth face reads: a pupil bar under the lid, a grey row, a flat-topped band and
+// white over the lash (a row of grey over the pupil at 16 to 23 px); surprised, an oval pupil
 // centred in its iris, a plain band, the lid straight at its inner end; the brow in from the
 // lid's ends; a tiny ㅅ, a smile, a round o; a happy arc joined along its edges (a ⌒ in the small
 // cells), a one-row blush; a closed lid with no stray pixel. The pick between sheets holds on to the one showing until another fits clearly
@@ -463,7 +463,7 @@ function openEyeOf(cell) {
   return { p, f, e, lidB, grey, band, irisRows, pupil, lash };
 }
 
-test('the open eye drawn as the smooth one reads in pixels: from 26 px a flat pupil bar right under the lid, a row of grey, then a full dark band over the iris’s bottom rows and white over the lash; at 16 to 23 a row of grey between the lid and the pupil', async () => {
+test('the open eye drawn as the smooth one reads in pixels: from 26 px a pupil bar right under the lid, a row of grey, then a full dark band over the iris’s bottom rows and white over the lash; at 16 to 23 a row of grey between the lid and the pupil', async () => {
   for (const { sheet, cells } of await sheets()) {
     const { w, h } = sheet;
     if (w < 16) continue;
@@ -481,11 +481,12 @@ test('the open eye drawn as the smooth one reads in pixels: from 26 px a flat pu
         assert.equal(a.f.kind(x, a.lidB + 1), 'grey', `${tag}: grey between the lid and the pupil at ${x}`);
       continue;
     }
-    // A flat bar right under the lid, not a wedge tapering down into the band: about a seventh of
-    // the cell wide (5 at 34 px, 4 at 26 to 30), two rows tall up to 40 px, its bottom corners grey.
+    // A bar right under the lid, not a wedge tapering down into the band: about a seventh of the
+    // cell wide (5 at 34 px, 4 at 26 to 30), a row for every 20 of the cell's height (2 at 26 px,
+    // 3 at 30 and 34: flatter, on his head it reads as a squint), its bottom corners grey.
     assert.equal(pupil.t, a.lidB + 1, `${tag}: the pupil right under the lid`);
     assert.equal(pupil.r - pupil.l + 1, Math.round(0.14 * w), `${tag}: the pupil ${pupil.r - pupil.l + 1} wide`);
-    assert.equal(pupil.b - pupil.t + 1, Math.max(2, Math.round(h / 30)), `${tag}: the pupil’s rows`);
+    assert.equal(pupil.b - pupil.t + 1, Math.max(2, Math.round(h / 20)), `${tag}: the pupil’s rows`);
     assert.ok(
       bottom[0] > top[0] && bottom.at(-1) < top.at(-1),
       `${tag}: its bottom row inset (${bottom}) from its top (${top})`,
@@ -506,6 +507,8 @@ test('the open eye drawn as the smooth one reads in pixels: from 26 px a flat pu
     const bt = bandRows.get(band.t);
     const bb = bandRows.get(band.b);
     assert.ok(bt.length >= widest * 0.6, `${tag}: the band ${bt.length} wide at its top, the iris ${widest}`);
+    const over = a.irisRows.get(band.t - 1);
+    assert.ok(bt[0] <= over[0] && bt.at(-1) >= over.at(-1), `${tag}: the band's top as wide as the grey over it`);
     assert.ok(bb[0] > bt[0] && bb.at(-1) < bt.at(-1), `${tag}: its bottom row's corners clipped`);
     assert.equal(
       a.grey.filter(([, y]) => y >= band.t).length,
@@ -519,7 +522,7 @@ test('the open eye drawn as the smooth one reads in pixels: from 26 px a flat pu
   }
 });
 
-test('surprised: from 23 px a wide pupil (3 by 2 to 26 px, 4 by 2 at 30 and 34) in the middle of its iris, a plain band under it with nothing hanging off it, and the lid straight to its inner end', async () => {
+test('surprised: from 23 px an oval pupil (3 by 2 to 26 px, 4 by 3 at 30 and 34) in the middle of its iris, a plain band under it with nothing hanging off it, and the lid straight to its inner end', async () => {
   for (const { sheet, cells } of await sheets()) {
     const { w } = sheet;
     if (w < 23) continue;
@@ -530,7 +533,7 @@ test('surprised: from 23 px a wide pupil (3 by 2 to 26 px, 4 by 2 at 30 and 34) 
     const pw = pupil.r - pupil.l + 1;
     const ph = pupil.b - pupil.t + 1;
     assert.equal(pw, Math.round(0.12 * w), `${tag}: the pupil ${pw} wide`);
-    assert.equal(ph, Math.max(2, Math.round(pw / 1.8)), `${tag}: and ${ph} tall: wider than it's tall`);
+    assert.equal(ph, Math.max(2, Math.round(pw * 0.75)), `${tag}: and ${ph} tall: no taller than it's wide`);
     for (const [y, xs] of byRow(a.pupil)) {
       const iris = a.irisRows.get(y);
       const left = iris.filter((x) => x < xs[0]).length;

@@ -107,17 +107,18 @@ const DESIGN = {
   pupil: {
     neutral: { u: 0.39, v: 0.62, ru: 0.07, rv: 0.072 },
     surprised: { u: 0.393, v: 0.659, ru: 0.048, rv: 0.03 },
-    // How the pupil reads in pixels, as the smooth face shows it (the ellipses above are mostly
-    // under the lid there): neutral from `barFrom`, a flat bar `bar` of the cell wide hanging
-    // from the lid, two rows (a row for every `barRows` of the cell's height from 26 px), its
-    // bottom corners rounded off; surprised from `wideFrom`, a wide oval `wide` of the cell
-    // across and `flat` times wider than it's tall.
+    // How the pupil reads in pixels, as the smooth face shows it on his head (where the sheet is
+    // stretched 1.75 times down, so its flat ellipses show about round): neutral from `barFrom`,
+    // a bar `bar` of the cell wide hanging from the lid, two rows (from 26 px a row for every
+    // `barRows` of the cell's height: three at 30 and 34), its bottom corners rounded off;
+    // surprised from `wideFrom`, an oval `wide` of the cell across, `tall` rows a column (2 at
+    // least: 3 by 2 to 26 px, 4 by 3 at 30 and 34). Flatter, they read as a squint there.
     barFrom: 16,
     bar: 0.14,
-    barRows: 30,
+    barRows: 20,
     wideFrom: 23,
     wide: 0.12,
-    flat: 1.8,
+    tall: 0.75,
   },
   lash: { u: [0.31, 0.47] },
   closed: {
@@ -473,7 +474,7 @@ function irisOf(g, name, shift) {
   const e = DESIGN.iris[name];
   if (name !== 'surprised' || w < DESIGN.pupil.wideFrom) return { iris: e, pupil: null };
   const pw = Math.round(DESIGN.pupil.wide * w);
-  const pr = Math.max(2, Math.round(pw / DESIGN.pupil.flat));
+  const pr = Math.max(2, Math.round(pw * DESIGN.pupil.tall));
   const side = Math.max(1, Math.round((2 * e.ru * w - pw) / 2));
   const across = pw + 2 * side;
   const x0 = Math.round(e.u * w - across / 2);
@@ -519,19 +520,21 @@ function pupilOf(g, name, shift, { lid, open }, iris, fitted) {
 
 /**
  * The iris's darker band on cell `g` from DESIGN.iris.bandFrom (none under that): the iris kept a
- * row of white at least over the lash, its narrow tip under the band left white (a drip, or one
- * dark stroke from the pupil down to the lash); then neutral, the band its bottom rows
- * (DESIGN.iris.bandRows of the cell, 2 at least, under a row of grey under the pupil), each its
- * whole width, the lowest a pixel in at each end; surprised, its rows from DESIGN.iris.band down,
- * one at least. Returns the iris's pixels left and the band's, as y × w + x.
+ * row of white at least over the lash, its narrow tip (under a third of its width) left white (a
+ * drip, or one dark stroke from the pupil down to the lash); then neutral, the band its bottom rows
+ * (DESIGN.iris.bandRows of the cell, 2 at least, under a row of grey under the pupil), a full
+ * band with a flat top: as wide as the grey row over it, the lowest row a pixel in at each end
+ * (within the eye's opening); surprised, its rows from DESIGN.iris.band down, one at least.
+ * Returns the iris's pixels left and the band's, as y × w + x.
  * @param {ReturnType<typeof canvas>} g
  * @param {'neutral'|'surprised'} name
  * @param {number} shift
  * @param {Array<[number, number]>} iris
  * @param {Array<[number, number]>} lash
  * @param {Array<[number, number]>} pupil
+ * @param {Set<number>} opened  the eye's opening, as y × w + x
  */
-function bandOf(g, name, shift, iris, lash, pupil) {
+function bandOf(g, name, shift, iris, lash, pupil, opened) {
   const { w, h } = g;
   /** @type {Set<number>} */
   const band = new Set();
@@ -541,7 +544,7 @@ function bandOf(g, name, shift, iris, lash, pupil) {
   let rows = rowsOf(kept);
   const widest = Math.max(...[...rows.values()].map((r) => r.length));
   let lowest = Math.max(...rows.keys());
-  while (rows.get(lowest).length < widest / 2) {
+  while (rows.get(lowest).length < widest / 3) {
     kept = kept.filter(([, y]) => y !== lowest);
     rows = rowsOf(kept);
     lowest = Math.max(...rows.keys());
@@ -550,9 +553,13 @@ function bandOf(g, name, shift, iris, lash, pupil) {
   if (name === 'neutral') {
     const under = Math.max(...pupil.map(([, y]) => y)) + 2;
     from = Math.max(under, lowest - Math.max(2, Math.round(DESIGN.iris.bandRows * h)) + 1);
-    if (lowest > from) {
-      const over = rows.get(lowest - 1);
-      kept = kept.filter(([x, y]) => y !== lowest || (x > over[0] && x < over.at(-1)));
+    const top = rows.get(Math.min(from, lowest));
+    const over = rows.get(from - 1) ?? top;
+    const [l, r] = [Math.min(top[0], over[0]), Math.max(top.at(-1), over.at(-1))];
+    kept = kept.filter(([, y]) => y < from);
+    for (let y = Math.min(from, lowest); y <= lowest; y++) {
+      const inset = y === lowest && lowest > from ? 1 : 0;
+      for (let x = l + inset; x <= r - inset; x++) if (opened.has(y * w + x)) kept.push([x, y]);
     }
   }
   for (const [x, y] of kept) if (y >= Math.min(from, lowest)) band.add(y * w + x);
@@ -583,7 +590,7 @@ function drawOpenEye(g, name, shift, c) {
   const fitted = irisOf(g, name, shift);
   const round = open.filter(([x, y]) => g.inside(fitted.iris, x, y, shift));
   const dots = pupilOf(g, name, shift, eye, round, fitted.pupil);
-  const { iris, band } = bandOf(g, name, shift, round, lash, dots);
+  const { iris, band } = bandOf(g, name, shift, round, lash, dots, opened);
   for (const [x, y] of open) g.put(x, y, c.white);
   for (const [x, y] of iris) g.put(x, y, band.has(y * w + x) ? c.irisDark : c.iris);
   for (const [x, y] of lash) g.put(x, y, c.lash);

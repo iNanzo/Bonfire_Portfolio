@@ -261,10 +261,11 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   mouth) kept where it is in a cell and drawn in whole pixels, a line a pixel thick at least
   and every feature a pixel at least, the colours sampled from the sheet (`--preview` to look
   at it). Where a shape scaled down as it is would read wrong through the page's dither, it's
-  drawn as the smooth face reads at that size: a flat bar of a pupil right under the lid, a row
-  of grey, then the band over the iris's bottom rows and white over the lash (a row of grey
-  between the lid and the pupil at 16 to 23 px, where the two ran together); surprised, a wide
-  pupil centred in its iris; the brow in from the lid's inner end and short of its hook; a tiny
+  drawn as the smooth face reads at that size: a bar of a pupil right under the lid, its bottom
+  corners rounded, a row of grey, then a flat-topped band over the iris's bottom rows and white
+  over the lash (a row of grey between the lid and the pupil at 16 to 23 px, where the two ran
+  together); surprised, an oval pupil centred in its iris (the sheet shows 1.75 times taller on
+  his head than it's drawn, so a pupil any flatter than these reads as a squint there); the brow in from the lid's inner end and short of its hook; a tiny
   ㅅ of a mouth, a smile, a round o with soft corners; the happy arc's steps joined along an edge
   (a ⌒ in the small cells, never a box) and a one-row blush; no stray pixel on the closed lid.
   The page uses it while the pixel filter is on (Native too), the sheet whose cell matches his
