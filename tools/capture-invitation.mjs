@@ -30,10 +30,20 @@
 //   floor     a tap on the floor in front of him
 //   chase     four quick taps on him (he runs off), then a press that catches him mid-run (the
 //             finger or cursor follows him until it's a grab), carries him a little and lets go
-//   orbit     a drag across empty space (the camera turns), then a pinch or the wheel zooming
-//             in and out, then Reset Camera from the Look sheet
+//   orbit     a drag across empty space (the camera turns: a finger, or the mouse's right
+//             button), then a pinch or the wheel zooming in and out, then Reset Camera from
+//             the Look sheet
 //   turn      drags across empty space, one after another, until the camera has gone a whole
 //             turn round him (whole frames: his shadow should keep its side on screen)
+//   pan       the view slid across and up the screen (the mouse's left button on empty space,
+//             or two fingers), turned (the right button, or one finger), zoomed in and out (the
+//             wheel, or a pinch), slid back, then Reset Camera (whole frames)
+//   lift      a press on his body held into a grab and carried up near the top of the screen,
+//             across and back, held a moment and let go (the point grabbed stays under the
+//             cursor: the report's `grip` says how far from it, CSS px, frame by frame)
+//   sweep     where he looks over the whole screen: the cursor in rows across it, top to bottom
+//             (desktop sizes), or a finger held still at a grid of spots (phone sizes: a moving
+//             finger would turn the camera); whole frames
 //   rim       four quick taps on him (he runs off), then a tap on him every 0.8 s for 5 s,
 //             which keeps him running to the play area's rim and along it (it should keep him
 //             on screen), then a press that catches him and carries him a little
@@ -65,6 +75,7 @@ import sharp from 'sharp';
 import fs from 'node:fs';
 import { createServer } from 'vite';
 import { ORBIT } from '../src/invitation/camera.js';
+import { cameraActs } from './capture-invitation-camera.mjs';
 import { CLIP_NAMES, CLIPS } from '../src/invitation/clips.js';
 import { PIXEL_SIZES } from '../src/invitation/pixels.js';
 
@@ -224,6 +235,7 @@ function stopRecord() {
     line: rec.line,
     faces: rec.faces,
     view,
+    grip: rec.grip ?? null,
     end: window.__invitation?.snapshot() ?? null,
   };
 }
@@ -274,6 +286,7 @@ async function realTime(page, act, tail = 400) {
     line: rec.line.map((l) => ({ ...l, t: at(l.t) })),
     faces: rec.faces.map((f) => ({ ...f, t: at(f.t) })),
     view: rec.view,
+    grip: rec.grip,
     end: rec.end,
   };
 }
@@ -443,17 +456,21 @@ const point = (page, part) => page.evaluate((p) => window.__invitation.screen(p)
 
 /**
  * One press: a finger through CDP on a phone size (real touches, as a finger makes them), the
- * mouse on a desktop one; down, move and up take client px.
+ * mouse on a desktop one (`button`: 'left' by default; the right one turns the camera); down,
+ * move and up take client px.
+ * @param {any} page
+ * @param {{phone: boolean}} size
+ * @param {'left'|'right'|'middle'} [button]
  */
-async function presser(page, size) {
+async function presser(page, size, button = 'left') {
   if (!size.phone)
     return {
       down: async (p) => {
         await page.mouse.move(p.x, p.y);
-        await page.mouse.down();
+        await page.mouse.down({ button });
       },
       move: (p) => page.mouse.move(p.x, p.y),
-      up: () => page.mouse.up(),
+      up: () => page.mouse.up({ button }),
       done: async () => {},
     };
   const cdp = await page.context().newCDPSession(page);
@@ -508,9 +525,12 @@ async function pinch(page, at, d0, d1, ms = 600) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await cdp.detach();
 }
-/** A drag on empty space, straight, with no hold first (a touch through CDP on a phone size). */
-async function sweep(page, size, from, to, ms = 800) {
-  const press = await presser(page, size);
+/**
+ * A drag on empty space, straight, with no hold first (a touch through CDP on a phone size; the
+ * mouse's `button` on a desktop one: the right one turns the camera, the left one pans it).
+ */
+async function sweep(page, size, from, to, ms = 800, button = 'right') {
+  const press = await presser(page, size, button);
   await press.down(from);
   await along(press.move, (k) => ({ x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k }), ms);
   await press.up();
@@ -576,7 +596,7 @@ async function wholeTurn(page, size) {
     const body = await point(page, 'body');
     const y = Math.min(size.h * 0.8, body.y + size.h * 0.2);
     const from = { x: size.w / 2 - across / 2, y };
-    const press = await presser(page, size);
+    const press = await presser(page, size, 'right');
     await press.down(from);
     await along(press.move, (k) => ({ x: from.x + across * k, y }), 1000 * (across / (size.w * 0.5)));
     await sleep(150);
@@ -771,6 +791,10 @@ function actsFor(size) {
       { full: true },
     );
   if (ACTS.includes('turn')) act('turn', (page) => wholeTurn(page, size), 1200, { full: true });
+  const more = cameraActs({ point, presser, sweep, pinch, along, sleep });
+  if (ACTS.includes('pan')) act('pan', (page) => more.panTurnZoom(page, size), 1400, { full: true });
+  if (ACTS.includes('lift')) act('lift', (page) => more.liftHigh(page, size), 2400);
+  if (ACTS.includes('sweep')) act('sweep', (page) => more.lookSweep(page, size), 600, { full: true });
   if (ACTS.includes('sitalone')) {
     if (CALM) console.log('- sitalone: skipped (he never sits by himself with ?calm: pass --calm off)');
     else
@@ -850,6 +874,11 @@ for (const size of SIZES) {
           `his feet ${seen.toolbar} above the toolbar; root up to ${seen.farthest} u from the middle; ` +
           `camera turned ${seen.turned}° (${seen.widest}° at the most)`,
       );
+    if (taken.grip?.length)
+      console.log(
+        `  the grabbed point from the press: at most ${Math.max(...taken.grip)} px over ${taken.grip.length} moves; ` +
+          `lifted to ${taken.end?.lift?.toFixed?.(2) ?? '?'} at the end`,
+      );
     // The act's own sheet: him cropped (or whole frames), --sheet frames from its start to its end.
     const own = [];
     const ownLabels = [];
@@ -878,6 +907,7 @@ for (const size of SIZES) {
       // his heading and his head's look yaw and pitch.)
       track: taken.pos,
       faces: taken.faces,
+      ...(taken.grip ? { grip: taken.grip } : {}),
       ...(RAW ? { raw: await keepRaw(`${base}-raw`, shot) } : {}),
       end: taken.end,
     };

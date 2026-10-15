@@ -1,19 +1,24 @@
 // NEWT's floor in the invitation toy: there's no room, just the look preset's background and a
 // floor that catches his shadows. The floor itself never shows: it's a ShadowMaterial (only the
 // shadow is drawn, in the preset's shadow colour and strength, over the background the retro
-// pass clears to), far wider than any view, so no edge or horizon shows. It writes no depth and
-// leaves the colour target's alpha (the surface id) alone, so the retro pass draws no line
-// where it meets the background and none in the shadows: the lines stay on NEWT.
+// pass clears to), far wider than the play area his shadow falls in, so no edge or horizon
+// shows: the floor is endless (main.js finds where a ray meets it with no edge at all). It
+// writes no depth and leaves the colour target's alpha (the surface id) alone, so the retro
+// pass draws no line where it meets the background and none in the shadows: the lines stay on
+// NEWT.
 //
 //   floorLook(preset)   the preset's background, shadow {color, opacity} and blob {opacity,
 //                       lifted} as numbers, with fallbacks for a preset that lacks them (one
 //                       still carrying the room's colours, or nothing at all)
 //   createFloor(preset) the floor mesh, setLook(preset), dispose()
-//   fitShadow(sun, bounds, top)  the light's shadow camera fitted, in the light's view, to the
-//                       play area (his reach past its edge) up to `top`, the highest he's
-//                       lifted, and to the floor his shadow falls on from up there
+//   fitShadow(sun, bounds, top, at)  the light's shadow camera fitted, in the light's view, to
+//                       `bounds` (his reach past its edge) up to `top`, the highest he's lifted,
+//                       and to the floor his shadow falls on from up there; with `at`, moved
+//                       to there (where NEWT is in the play area) by whole shadow texels, so
+//                       his shadow keeps its texels as he goes and never shimmers
+//   shadowTop(lift, base)  how high that box reaches: `base`, or over his head carried higher
 import * as THREE from 'three';
-import { rimPoints } from './area.js';
+import { NEWT_HEIGHT, rimPoints } from './area.js';
 
 /** World units across: far wider than any view of the floor. */
 export const FLOOR_SIZE = 200;
@@ -91,14 +96,30 @@ export function createFloor(preset) {
 const REACH = 0.7;
 
 /**
- * Fit `sun`'s shadow camera (orthographic, looking from the light at its target) around the
- * play area, `REACH` past its edge, from the floor up to `top`, and the floor its shadows fall
- * on from up there.
+ * How high the shadow camera reaches with his root `lift` over the floor: `base` (the highest
+ * he's lifted most of the time: the box his shadow's texels were tuned for) while that covers
+ * the top of his head, else over it in half-unit steps (so the box, and his shadow's texels,
+ * change only now and then while he's carried up high).
+ * @param {number} lift
+ * @param {number} base
+ */
+export function shadowTop(lift, base) {
+  const head = lift + NEWT_HEIGHT + 0.25;
+  return head <= base ? base : Math.ceil(head * 2) / 2;
+}
+
+/**
+ * Fit `sun`'s shadow camera (orthographic, looking from the light at its target) around
+ * `bounds`, `REACH` past its edge, from the floor up to `top`, and the floor its shadows fall on
+ * from up there; with `at`, that box moved so the bounds' middle is at `at` (NEWT, wherever he
+ * is in the play area: as big a box as round the middle, so his shadow is as fine), by whole
+ * texels of the shadow map, so its texels stay put on the floor as he moves.
  * @param {any} sun  a THREE.DirectionalLight (its position and target's set)
  * @param {import('./types.js').Bounds} bounds
  * @param {number} top  world units
+ * @param {{x: number, z: number}|null} [at]
  */
-export function fitShadow(sun, bounds, top) {
+export function fitShadow(sun, bounds, top, at = null) {
   sun.updateMatrixWorld();
   sun.target.updateMatrixWorld();
   const f = new THREE.Vector3().subVectors(sun.target.position, sun.position).normalize();
@@ -128,6 +149,21 @@ export function fitShadow(sun, bounds, top) {
     add(x, 0, z);
     add(x, top, z);
     add(x + throwX, 0, z + throwZ);
+  }
+  if (at) {
+    // (The move in the light's view: across and up by whole texels, along it as it comes.)
+    const m = new THREE.Vector3(at.x - cx, 0, at.z - cz);
+    const tx = (box.r - box.l) / Math.max(1, sun.shadow.mapSize.x);
+    const ty = (box.t - box.b) / Math.max(1, sun.shadow.mapSize.y);
+    const across = Math.round(m.dot(r) / tx) * tx;
+    const up = Math.round(m.dot(u) / ty) * ty;
+    const along = m.dot(f);
+    box.l += across;
+    box.r += across;
+    box.b += up;
+    box.t += up;
+    box.n += along;
+    box.f += along;
   }
   const cam = sun.shadow.camera;
   Object.assign(cam, { left: box.l, right: box.r, bottom: box.b, top: box.t, near: box.n - 0.5, far: box.f + 0.5 });

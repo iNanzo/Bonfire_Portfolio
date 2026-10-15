@@ -2,9 +2,12 @@
 // turns him to the camera and runs him away from the pointer (pushed off the play area's edges,
 // the screen's, sliding along one when he's cornered, never stuck) with a capped turn rate, and
 // picks wander goals inside the bounds (the front edge over the toolbar too). carry.js holds
-// him by the collar: the anchor eases in and stays in the play area, a damped pendulum swings
-// his root and settles (as much, and with no hard shake, when the pointer's spot only moves on
-// some frames), a toss uses the last 80 ms, and a fall bounces softly off the edges and
+// him by the collar: dragged on a camera-facing vertical plane through where he was grabbed,
+// the grabbed point stays under the cursor (no lag, the grab offset kept), up lifts him (up to
+// CARRY.liftMax, far higher than the old fixed carry height) and across moves him across, never
+// below his hang height; the anchor stays in the play area, a damped pendulum swings his root
+// and settles (as much, and with no hard shake, when the pointer's spot only moves on some
+// frames), a toss uses the last 80 ms, and a fall bounces softly off the edges and
 // lands when his lowest foot reaches the floor. blend.js keeps clip weights normalised, runs Idle/Walk/Run on one
 // shared phase, and starts a one-shot's fade-out before it ends. lookAt.js clamps and eases
 // his look without overshoot, glances by a seeded rng, and the brain zeroes the look's weight
@@ -14,7 +17,18 @@ import assert from 'node:assert/strict';
 import { CLIPS, GAIT, STRIDE, fadeFor } from '../src/invitation/clips.js';
 import { createRng } from '../src/invitation/rng.js';
 import { steer, wanderGoal, wrapAngle, clampTo, xRange, STEER } from '../src/invitation/steer.js';
-import { grab, holdStep, toss, fallStep, carryFeel, CARRY } from '../src/invitation/carry.js';
+import {
+  grab,
+  holdStep,
+  toss,
+  fallStep,
+  carryFeel,
+  CARRY,
+  dragPlane,
+  dragTarget,
+  gripFor,
+} from '../src/invitation/carry.js';
+import { rayPlane } from '../src/invitation/gesture.js';
 import {
   gaitWeights,
   blendStep,
@@ -26,7 +40,18 @@ import {
   mainClip,
   NEXT_CLIP,
 } from '../src/invitation/blend.js';
-import { aimAngles, lookStep, createLook, splitLook, viewerAim, LIMIT, SPLIT, LOOK } from '../src/invitation/lookAt.js';
+import {
+  aimAngles,
+  aimAt,
+  lookStep,
+  createLook,
+  splitLook,
+  viewerAim,
+  LIMIT,
+  REACH,
+  SPLIT,
+  LOOK,
+} from '../src/invitation/lookAt.js';
 import { TUNE, createBrain } from '../src/invitation/brain.js';
 
 const BOUNDS = { minX: -2, maxX: 2, minZ: -2, maxZ: 1.4 };
@@ -183,24 +208,103 @@ test('goto arrives inside the arrive radius and stops; face turns him toward the
 
 // ---- carry --------------------------------------------------------------------------------
 
-test('carrying: the anchor eases in, most of the way in about 0.15 s, follows the pointer’s spot and stays inside the play area', () => {
+test('carrying: the anchor is the pointer’s spot at once, every frame (no lag), and stays inside the play area', () => {
   const c = grab({ x: 0, y: 0.6, z: 0 }, 10);
-  const target = { x: 1, y: 1.2, z: 0 };
-  holdStep(c, target, 0.05, BOUNDS, 10.05);
-  assert.ok(c.anchor.x > 0.01 && c.anchor.x < 0.9, `part way at 50 ms (${c.anchor.x})`);
-  holdStep(c, target, 0.05, BOUNDS, 10.1);
-  holdStep(c, target, 0.05, BOUNDS, 10.15);
-  assert.ok(c.anchor.x > 0.85 && c.anchor.x <= 1, `most of the way at 150 ms (${c.anchor.x})`);
-  let t = 10.15;
-  for (let i = 0; i < 30; i++) holdStep(c, target, DT, BOUNDS, (t += DT));
-  close(c.anchor.x, 1, 1e-3);
-  close(c.anchor.y, 1.2, 1e-3);
+  let t = 10;
+  for (const target of [
+    { x: 0.05, y: 0.62, z: 0 },
+    { x: 1, y: 1.2, z: 0 },
+    { x: -0.4, y: 2.1, z: 0.3 },
+  ]) {
+    holdStep(c, target, DT, BOUNDS, (t += DT));
+    assert.deepEqual(c.anchor, target, 'on the spot in the frame it comes');
+  }
   for (let i = 0; i < 60; i++) {
     holdStep(c, { x: 9, y: 1.2, z: -9 }, DT, BOUNDS, (t += DT));
     assert.ok(inside(BOUNDS, c.anchor), JSON.stringify(c.anchor));
   }
   close(c.anchor.x, BOUNDS.maxX, 1e-6);
   close(c.anchor.z, BOUNDS.minZ, 1e-6);
+});
+
+test('dragging: on a camera-facing vertical plane through where he was grabbed, the grabbed point stays under the cursor; up lifts him, across moves him across; never under his hang height or over the highest lift', () => {
+  const camera = { x: 1.5, y: 9, z: 13 };
+  const ray = (q) => ({ o: camera, d: { x: q.x - camera.x, y: q.y - camera.y, z: q.z - camera.z } });
+  const collar = { x: 0.2, y: 0.85, z: 0.1 };
+  const plane = dragPlane(camera, collar);
+  // The plane: through his collar, upright, square to the way the camera looks across the floor.
+  close(plane.normal.y, 0, 1e-6, 'upright');
+  close(Math.hypot(plane.normal.x, plane.normal.z), 1, 1e-6);
+  const toward = Math.hypot(camera.x - collar.x, camera.z - collar.z);
+  close(plane.normal.x, (camera.x - collar.x) / toward, 1e-6);
+  close(plane.normal.z, (camera.z - collar.z) / toward, 1e-6);
+  assert.deepEqual(plane.point, collar);
+  // Grabbed by his belly, below his collar.
+  const t0 = 3;
+  const low = 1.1;
+  const grabRay = ray({ x: 0.15, y: 0.45, z: 0.12 });
+  const grip = gripFor(grabRay, plane, collar, t0);
+  const at = rayPlane(grabRay.o, grabRay.d, plane);
+  close(grip.offset.x, collar.x - at.x, 1e-6, 'the grab offset: his collar from the grabbed point');
+  close(grip.offset.y, collar.y - at.y, 1e-6);
+  close(grip.offset.z, collar.z - at.z, 1e-6);
+  // The moment he's grabbed, nothing moves; and held still there, nothing moves frame after
+  // frame (his collar starts lower than his hang height, standing: the point pressed stays under
+  // the cursor all the same, never lifted up off it).
+  for (let frame = 0; frame < 3; frame++)
+    assert.deepEqual(dragTarget(grip, grabRay, low), collar, `frame ${frame}, the cursor still`);
+  // Down from where it pressed: he stays at the height he was grabbed at, his feet where they
+  // stood; up a little, under his hang height, and back: he goes with it, both ways.
+  const below = (dy) => ray({ x: at.x, y: at.y + dy, z: at.z });
+  close(dragTarget(grip, below(-0.3), low).y, collar.y, 1e-6, 'pressed down where he stood');
+  const bit = (low - collar.y) / 2;
+  close(dragTarget(grip, below(bit), low).y, collar.y + bit, 1e-6, 'a little up');
+  close(dragTarget(grip, below(0), low).y, collar.y, 1e-6, 'and back down');
+  // Once lifted clear to his hang height, his soles stay off the floor: down again, he stops there.
+  close(dragTarget(grip, below(low - collar.y + 0.2), low).y, low + 0.2, 1e-6, 'lifted clear');
+  close(dragTarget(grip, below(0), low).y, low, 1e-6, 'his soles off the floor from then on');
+  close(dragTarget(grip, below(-1), low).y, low, 1e-6);
+  // Grabbed higher than his hang height (mid-fall): never under it.
+  const high = gripFor(grabRay, plane, { ...collar, y: low + 0.5 }, t0);
+  close(dragTarget(high, below(-2), low).y, low, 1e-6, 'grabbed high, never under his hang height');
+  // Later, anywhere on the plane within the limits: the grabbed point is on the cursor's ray,
+  // so under the cursor, and his collar stays on the plane.
+  const right = { x: plane.normal.z, z: -plane.normal.x };
+  for (const [across, up] of [
+    [0, 1],
+    [0.6, 1.2],
+    [-1.1, 2.4],
+    [1.5, 1.6],
+  ]) {
+    const q = { x: at.x + across * right.x, y: at.y + up, z: at.z + across * right.z };
+    const target = dragTarget(grip, ray(q), low);
+    close(target.x - grip.offset.x, q.x, 1e-6, `(${across}, ${up}): under the cursor, across`);
+    close(target.y - grip.offset.y, q.y, 1e-6, `(${across}, ${up}): and up`);
+    close(target.z - grip.offset.z, q.z, 1e-6);
+    const off = (target.x - collar.x) * plane.normal.x + (target.z - collar.z) * plane.normal.z;
+    close(off, 0, 1e-6, 'on the plane: no nearer the camera, no further');
+  }
+  // Up lifts him, across moves him across.
+  const a = dragTarget(grip, ray({ x: at.x, y: at.y + 1, z: at.z }), low);
+  const b = dragTarget(grip, ray({ x: at.x, y: at.y + 1.5, z: at.z }), low);
+  close(b.y - a.y, 0.5, 1e-6);
+  close(Math.hypot(b.x - a.x, b.z - a.z), 0, 1e-6);
+  const c = dragTarget(grip, ray({ x: at.x + right.x, y: at.y + 1, z: at.z + right.z }), low);
+  close(c.y, a.y, 1e-6);
+  close(Math.hypot(c.x - a.x, c.z - a.z), 1, 1e-6);
+  // Limits: never under his hang height, never over the highest lift, far over the old carry's.
+  // (High enough to reach the top of a phone's screen at the default zoom, about 4.3 over him.)
+  assert.ok(CARRY.liftMax >= 4.5, `the highest lift ${CARRY.liftMax}`);
+  close(dragTarget(grip, ray({ x: at.x, y: -3, z: at.z }), low).y, low, 1e-6, 'pressed into the floor');
+  close(dragTarget(grip, ray({ x: at.x, y: 40, z: at.z }), low).y, CARRY.liftMax, 1e-6, 'reaching for the sky');
+  // A ray that never meets the plane keeps the last spot.
+  const away = { o: camera, d: { x: 0, y: 1, z: 1 } };
+  assert.deepEqual(dragTarget(grip, away, low), dragTarget(grip, away, low));
+  assert.ok(Number.isFinite(dragTarget(grip, away, low).y));
+  // A camera straight over him still gives an upright plane.
+  const top = dragPlane({ x: 0.2, y: 20, z: 0.1 }, collar);
+  close(top.normal.y, 0, 1e-6);
+  close(Math.hypot(top.normal.x, top.normal.z), 1, 1e-6);
 });
 
 test('carrying: a swing reads the same when the pointer’s spot only moves every second or third frame (a 60 Hz finger on a 120–144 Hz screen): as big, and no hard shake', () => {
@@ -509,11 +613,11 @@ test('a one-shot fades out before it ends', () => {
 
 // ---- look-at ------------------------------------------------------------------------------
 
-test('look-at clamps to ±70° of yaw and −30°…+35° of pitch, split 30% neck and 70% head', () => {
+test('a look at a point clamps to his neck’s ±70° of yaw and −20°…+55° of pitch; the look splits between his chest (big looks only) and 30% neck, 70% head of the rest; lookStep keeps to his reach', () => {
   const D = Math.PI / 180;
   close(LIMIT.yaw, 70 * D);
-  close(LIMIT.pitchMin, -30 * D);
-  close(LIMIT.pitchMax, 35 * D);
+  close(LIMIT.pitchMin, -20 * D);
+  close(LIMIT.pitchMax, 55 * D);
   assert.deepEqual(SPLIT, { neck: 0.3, head: 0.7 });
   const head = { x: 0, y: 0.9, z: 0 };
   let a = aimAngles(head, 0, { x: 0, y: 0.9, z: 2 });
@@ -531,17 +635,25 @@ test('look-at clamps to ±70° of yaw and −30°…+35° of pitch, split 30% ne
   close(a.pitch, Math.PI / 4 > LIMIT.pitchMax ? LIMIT.pitchMax : Math.PI / 4, 1e-6, 'up is positive');
   close(aimAngles(head, 0, { x: 0, y: 5, z: 0.5 }).pitch, LIMIT.pitchMax);
   close(aimAngles(head, 0, { x: 0, y: -5, z: 0.5 }).pitch, LIMIT.pitchMin);
-  const s = splitLook(1, 0.5);
-  close(s.neck.yaw, 0.3);
+  // A look at the viewer: the neck bones alone.
+  let s = splitLook(0.4, 0.5);
+  assert.deepEqual(s.chest, { yaw: 0, pitch: 0 });
+  close(s.neck.yaw, 0.12);
   close(s.neck.pitch, 0.15);
-  close(s.head.yaw, 0.7);
+  close(s.head.yaw, 0.28);
   close(s.head.pitch, 0.35);
-  // lookStep keeps inside the limits even when an aim isn't.
+  // A big one: the chest takes some, the neck bones split the rest, and it all adds up.
+  s = splitLook(1.5, 1.2);
+  assert.ok(s.chest.yaw > 0.1 && s.chest.pitch > 0.1, 'his chest turns and leans with it');
+  close(s.chest.yaw + s.neck.yaw + s.head.yaw, 1.5, 1e-9);
+  close(s.chest.pitch + s.neck.pitch + s.head.pitch, 1.2, 1e-9);
+  close(s.neck.yaw / (s.neck.yaw + s.head.yaw), 0.3, 1e-9);
+  // lookStep keeps inside his reach even when an aim isn't.
   const rng = createRng(1);
   let st = createLook();
   for (let i = 0, t = 0; i < 120; i++) st = lookStep(st, 'camera', { yaw: 3, pitch: -2 }, DT, (t += DT), rng);
-  close(st.yaw, LIMIT.yaw, 1e-3);
-  close(st.pitch, LIMIT.pitchMin, 1e-3);
+  close(st.yaw, REACH.yaw, 1e-3);
+  close(st.pitch, REACH.pitchMin, 1e-3);
 });
 
 test('look-at is critically damped: it eases onto a target without overshoot', () => {
@@ -576,7 +688,7 @@ test('look-at is critically damped: it eases onto a target without overshoot', (
   close(s.weight, 0);
 });
 
-test('look-at glances are seeded: forward 1.5 s after the pointer goes, every 3–7 s; fleeing glances back about every 1.2 s', () => {
+test('look-at glances are seeded: forward 1.5 s after the pointer goes, every 3–7 s; fleeing glances back every 2.2–3.4 s', () => {
   function idle(seed) {
     const rng = createRng(seed);
     let s = createLook();
@@ -617,14 +729,14 @@ test('look-at glances are seeded: forward 1.5 s after the pointer goes, every 3�
     n = s.glances;
   }
   const mean = (back[back.length - 1].t - back[0].t) / (back.length - 1);
-  assert.ok(mean > 0.9 && mean < 1.5, `glances back every ${mean} s`);
+  assert.ok(mean > LOOK.backEveryMin && mean < LOOK.backEveryMax, `glances back every ${mean} s`);
   assert.ok(
     back.every((g) => Math.abs(g.yaw) >= 0.8 * LIMIT.yaw),
     'over the shoulder',
   );
 });
 
-test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall and Land); camera while held or waving; back while fleeing', () => {
+test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall and Land); camera while waving; forward (the viewer, with glances) while held; back while fleeing', () => {
   const brain = createBrain({ seed: 2, calm: true, bounds: BOUNDS });
   let t = 0;
   let grounded = true;
@@ -657,7 +769,7 @@ test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall an
   assert.deepEqual(out.look, { mode: 'camera', weight: 1 });
   out = step({ events: [ev('grab')] });
   assert.equal(out.state, 'held');
-  assert.deepEqual(out.look, { mode: 'camera', weight: 1 });
+  assert.deepEqual(out.look, { mode: 'forward', weight: 1 });
   grounded = false;
   out = step({ events: [ev('release')] });
   assert.equal(out.state, 'fall');
@@ -674,7 +786,9 @@ test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall an
   assert.equal(out.look.ease, TUNE.dropLookEase, 'Land: slowly');
   out = step({ button: 'Run' });
   assert.equal(out.state, 'flee');
-  assert.deepEqual(out.look, { mode: 'back', weight: 1 });
+  assert.deepEqual(out.look, { mode: 'back', weight: 1, at: null }, 'the Run button with no pointer: no pursuer');
+  out = step({ pointer: { x: 0.5, z: 0.5 } });
+  assert.deepEqual(out.look, { mode: 'back', weight: 1, at: { x: 0.5, z: 0.5 } }, 'the pointer: who he runs from');
 });
 
 test('dropped facing away, his head comes round over the fall and the landing together, not in the fall’s first fifth of a second', () => {
@@ -682,7 +796,8 @@ test('dropped facing away, his head comes round over the fall and the landing to
   const look = createLook();
   const rng = createRng(4);
   const D = 180 / Math.PI;
-  // The camera behind him: held, he looks round at it as far as his neck goes.
+  // The camera off to his side: held, he looks round at it ("ahead", the viewer, as lookAim
+  // gives it: viewerAim, kept to his neck's LIMIT) as far as his neck goes.
   const camera = { yaw: LIMIT.yaw, pitch: 0.3 };
   let t = 0;
   let grounded = true;
@@ -699,8 +814,8 @@ test('dropped facing away, his head comes round over the fall and the landing to
       carry: null,
       ...extra,
     });
-    const aim = out.look.mode === 'camera' ? camera : null;
-    lookStep(look, out.look.mode, aim, DT, t, rng, out.look.weight, { yaw: 0, pitch: 0 }, out.look.ease);
+    const ahead = out.state === 'held' ? camera : { yaw: 0, pitch: 0 };
+    lookStep(look, out.look.mode, null, DT, t, rng, out.look.weight, ahead, out.look.ease);
     return out;
   };
   const turned = () => look.yaw * look.weight;
@@ -708,7 +823,7 @@ test('dropped facing away, his head comes round over the fall and the landing to
   for (let i = 0; i < 90; i++) out = frame();
   assert.equal(out.state, 'held');
   const full = turned();
-  close(full, LIMIT.yaw, 1e-3, 'held, his head turned round to the camera');
+  assert.ok(full > 0.95 * LIMIT.yaw, `held, his head turned round to the camera (${(full * D).toFixed(0)}°)`);
   // Let go: a fall of about 0.23 s (from the hang), then the landing, then idle.
   grounded = false;
   out = frame({ events: [{ type: 'release', on: 'newt', x: 0, y: 0, t }] });
@@ -925,12 +1040,73 @@ test('ahead means toward the viewer: up at the camera, fading to straight ahead 
   close(a.pitch, Math.atan2(9.2, 15) / 2, 1e-9);
   close(a.yaw, -LIMIT.yaw / 2, 1e-9);
   // The floor bias: a pitch added before the clamp.
-  const plain = aimAngles(head, 0, { x: 0, y: 0, z: 2 });
+  const plain = aimAt(head, 0, { x: 0, y: 0, z: 2 });
   close(aimAngles(head, 0, { x: 0, y: 0, z: 2 }, 10 * D).pitch, plain.pitch + 10 * D, 1e-9);
   close(aimAngles(head, 0, { x: 0, y: 0, z: 0.1 }, 10 * D).pitch, LIMIT.pitchMin, 1e-9, 'still clamped');
 });
 
-test('looking ahead, around and back: forward and an idle pointer aim at "ahead", glances go around it; fleeing still looks where he runs', () => {
+test('running away he looks where he runs, chin level (whatever the camera), with a brief glance back over his shoulder every 2.2–3.4 s: toward the pursuer’s side when there is one, either side when there isn’t', () => {
+  const D = Math.PI / 180;
+  const ahead = { yaw: 0, pitch: LOOK.runPitch };
+  /** 12 s of fleeing with the pursuer at `at` (an aim, or null): each glance, and the targets. */
+  const flee = (seed, at) => {
+    const rng = createRng(seed);
+    const s = createLook();
+    let t = 0;
+    let n = 0;
+    const glances = [];
+    let glancing = 0;
+    let frames = 0;
+    for (let i = 0; i < 12 * 60; i++) {
+      lookStep(s, 'back', at, DT, (t += DT), rng, 1, ahead);
+      if (s.glances > n) glances.push({ t, yaw: s.target.yaw, pitch: s.target.pitch });
+      n = s.glances;
+      frames++;
+      if (s.glance) glancing++;
+      else {
+        close(s.target.yaw, 0, 1e-9, 'where he runs');
+        close(s.target.pitch, LOOK.runPitch, 1e-9, 'chin level');
+      }
+      assert.ok(s.target.pitch <= 10 * D, 'never up at the sky or the viewer');
+    }
+    return { glances, share: glancing / frames };
+  };
+  const gaps = (g) => g.slice(1).map((x, i) => x.t - g[i].t);
+  /** @type {number[]} the sides he glances to with no pursuer, over every seed */
+  const unchased = [];
+  for (let seed = 1; seed <= 12; seed++) {
+    // The pursuer behind him on his left, then on his right, then nowhere.
+    for (const at of [{ yaw: -2.6, pitch: -0.4 }, { yaw: 2.9, pitch: -0.2 }, null]) {
+      const { glances, share } = flee(seed, at);
+      // (The first LOOK.backFirstMin–backFirstMax s in, then every backEveryMin–backEveryMax s.)
+      const fewest = 1 + Math.floor((12 - LOOK.backFirstMax) / LOOK.backEveryMax);
+      const most = 1 + Math.floor((12 - LOOK.backFirstMin) / LOOK.backEveryMin);
+      assert.ok(glances.length >= fewest && glances.length <= most, `seed ${seed}: ${glances.length} glances in 12 s`);
+      assert.ok(glances[0].t <= LOOK.backEveryMin + 1e-6, `the first ${glances[0].t.toFixed(2)} s in`);
+      for (const gap of gaps(glances))
+        assert.ok(gap >= LOOK.backEveryMin - 1e-6 && gap <= LOOK.backEveryMax + DT, `every ${gap.toFixed(2)} s`);
+      assert.ok(share < 0.4, `brief: ${(share * 100).toFixed(0)}% of the time glancing`);
+      for (const g of glances) {
+        assert.ok(Math.abs(g.yaw) >= 0.8 * LIMIT.yaw, `seed ${seed}: over his shoulder (${(g.yaw / D).toFixed(0)}°)`);
+        if (at) assert.equal(Math.sign(g.yaw), Math.sign(at.yaw), `seed ${seed}: toward the pursuer`);
+        if (at)
+          assert.ok(
+            g.pitch < 0 && g.pitch >= LOOK.backPitchMin - 1e-9,
+            'down toward the pursuer, not the floor at his heels',
+          );
+      }
+      if (!at) unchased.push(...glances.map((g) => Math.sign(g.yaw)));
+    }
+  }
+  // (With no pursuer, either side: about as often over the seeds, a few glances each.)
+  const left = unchased.filter((x) => x < 0).length / unchased.length;
+  assert.ok(left > 0.3 && left < 0.7, `either side with no pursuer: ${(left * 100).toFixed(0)}% to his left`);
+  // The pursuer roughly ahead (he runs past it): the glance goes right to it.
+  const { glances } = flee(2, { yaw: 0.4, pitch: -0.1 });
+  for (const g of glances) close(g.yaw, 0.4, 1e-9);
+});
+
+test('looking ahead, around and back: forward and an idle pointer aim at "ahead", glances go around it; fleeing looks at its own ahead', () => {
   const ahead = { yaw: 0.2, pitch: 0.5 };
   const rng = createRng(4);
   let s = createLook();
@@ -951,7 +1127,11 @@ test('looking ahead, around and back: forward and an idle pointer aim at "ahead"
   close(lookStep(createLook(), 'camera', null, DT, 1, rng, 1, ahead).target.pitch, ahead.pitch, 1e-9);
   close(lookStep(createLook(), 'pointer', null, DT, 1, rng, 1, ahead).target.pitch, ahead.pitch, 1e-9);
   const back = lookStep(createLook(), 'back', null, DT, 0.01, rng, 1, ahead);
-  assert.deepEqual(back.target, { yaw: 0, pitch: 0 }, 'running away, he looks where he runs');
+  assert.deepEqual(
+    back.target,
+    { yaw: ahead.yaw, pitch: ahead.pitch },
+    'running off, he looks at "ahead" (lookAim gives where he runs, chin level)',
+  );
   // Without `ahead`, ahead is straight ahead, as before.
   close(lookStep(createLook(), 'forward', null, DT, 0.01, createRng(1)).target.pitch, 0);
 });

@@ -45,6 +45,8 @@ test('the Shader controls: one table, every entry labelled in Title Case, a kind
     'ring',
     'bands',
     'highlight',
+    'pixelShirt',
+    'pixelFace',
     'edge',
     'shadow',
     'turn',
@@ -65,6 +67,8 @@ test('the Shader controls: one table, every entry labelled in Title Case, a kind
       'Outer Ring',
       'Toon Shading',
       'Highlight',
+      'Pixel Shirt',
+      'Pixel Face',
       'Shadow',
       'Shadow Strength',
       'Light Angle',
@@ -76,7 +80,7 @@ test('the Shader controls: one table, every entry labelled in Title Case, a kind
     ],
   );
   for (const c of SHADER_CONTROLS) {
-    assert.match(c.label, /^[A-Z][^ ]*( [A-Z][^ ]*)*$/, `${c.key}: Title Case`);
+    assert.match(c.label, /^[A-Z][^ ]*( ([A-Z][^ ]*|&))*$/, `${c.key}: Title Case`);
     assert.ok(['range', 'choice', 'switch'].includes(c.kind), `${c.key}: a kind`);
     if (c.kind === 'range' && !c.steps) assert.ok(c.min < c.max && c.step > 0, `${c.key}: a range`);
     if (c.kind === 'range' && c.steps) assert.ok(c.steps.length >= 3, `${c.key}: its steps`);
@@ -100,6 +104,82 @@ test('the Shader controls: one table, every entry labelled in Title Case, a kind
     SHADER_CONTROLS.filter((c) => !c.pixelOnly).map((c) => c.key),
     ['bands', 'highlight', 'shadow', 'turn', 'light'],
   );
+});
+
+test('Pixel Shirt and Pixel Face: two switches in the Shader section, the shirt off in every style (his real plaid at every resolution) and the face on (his face redrawn in pixels to fit his size); each a change of the user’s, written into the preset on its own', () => {
+  const shirt = controlFor('pixelShirt');
+  const face = controlFor('pixelFace');
+  assert.equal(shirt.label, 'Pixel Shirt');
+  assert.equal(face.label, 'Pixel Face');
+  for (const c of [shirt, face]) {
+    assert.equal(c.kind, 'switch');
+    assert.equal(
+      c.pixelOnly,
+      true,
+      `${c.label}: part of the pixel look, it rests at Off (the smooth textures show there)`,
+    );
+    assert.deepEqual(shaderText(c, true), { shown: 'On', spoken: 'On' });
+  }
+  for (const style of STYLES) {
+    assert.equal(shirt.get(LOOKS[style]), false, `${style}: Pixel Shirt off`);
+    assert.equal(face.get(LOOKS[style]), true, `${style}: Pixel Face on`);
+    assert.equal(LOOKS[style].texture.pixelShirt, false, `${style}: written in its data`);
+    assert.equal(LOOKS[style].texture.pixelFace, true, `${style}: written in its data`);
+  }
+  const first = shaderOf(validLook({}));
+  assert.equal(first.pixelShirt, false, 'a first visit: his real plaid');
+  assert.equal(first.pixelFace, true, 'and his pixel face');
+  // Each on its own: a change of the user's (Custom), written into a copy of the style.
+  const bold = validLook({ style: 'soft', shader: { pixelShirt: true } });
+  assert.deepEqual(bold.shader, { pixelShirt: true });
+  assert.equal(isCustom(bold), true, 'the bold shirt makes the style Custom, like any Shader option');
+  assert.equal(lookPreset(bold).texture.pixelShirt, true, 'written into a copy of the style');
+  assert.equal(lookPreset(bold).texture.pixelFace, true, 'the face as the style has it');
+  assert.equal(LOOKS.soft.texture.pixelShirt, false, 'the style itself untouched');
+  assert.equal(lookPreset(bold).texture.mipBias, LOOKS.soft.texture.mipBias, 'its other texture values kept');
+  const smooth = validLook({ style: 'ds', shader: { pixelFace: false } });
+  assert.deepEqual(smooth.shader, { pixelFace: false });
+  assert.equal(isCustom(smooth), true);
+  assert.equal(lookPreset(smooth).texture.pixelFace, false, 'the smooth face, written in');
+  assert.equal(lookPreset(smooth).texture.pixelShirt, false);
+  assert.deepEqual(
+    validLook({ style: 'soft', shader: { pixelShirt: false, pixelFace: true } }).shader,
+    {},
+    'the style’s own values are no change',
+  );
+  assert.deepEqual(validLook({ shader: { pixelShirt: 'yes', pixelFace: 0 } }).shader, {}, 'only booleans');
+  // A look stored before either: its style's.
+  const old = loadLook({ getItem: () => JSON.stringify({ pixelSize: '32', style: 'ds', shader: { levels: 8 } }) });
+  assert.deepEqual(old.shader, { levels: 8 });
+  assert.equal(shaderOf(old).pixelShirt, false);
+  assert.equal(shaderOf(old).pixelFace, true);
+});
+
+test('a look stored with Pixel Shirt & Face, the one switch they split from, loads with both set as it was: on, the bold shirt and the pixel face; off, the real plaid and the smooth face', () => {
+  const stored = (shader) => loadLook({ getItem: () => JSON.stringify({ pixelSize: '48', style: 'soft', shader }) });
+  const on = stored({ pixelArt: true, levels: 8 });
+  assert.equal(on.pixelSize, '48', 'its other values kept');
+  assert.equal(shaderOf(on).pixelShirt, true, 'on: the bold pixel shirt');
+  assert.equal(shaderOf(on).pixelFace, true, 'and the pixel face');
+  assert.deepEqual(
+    on.shader,
+    { levels: 8, pixelShirt: true },
+    'kept as the new switches (the face is the style’s own)',
+  );
+  assert.equal(lookPreset(on).texture.pixelShirt, true);
+  const off = stored({ pixelArt: false });
+  assert.equal(shaderOf(off).pixelShirt, false, 'off: the real plaid');
+  assert.equal(shaderOf(off).pixelFace, false, 'and the smooth face, as it showed');
+  assert.deepEqual(off.shader, { pixelFace: false });
+  // A new switch of its own wins over the old one; a broken old value is dropped.
+  assert.equal(shaderOf(validLook({ shader: { pixelArt: true, pixelFace: false } })).pixelFace, false);
+  assert.equal(shaderOf(validLook({ shader: { pixelArt: true, pixelFace: false } })).pixelShirt, true);
+  assert.deepEqual(validLook({ shader: { pixelArt: 'yes' } }).shader, {}, 'only a boolean');
+  // Saved again, it's written with the new keys only.
+  let saved = '';
+  saveLook(on, { setItem: (_k, v) => (saved = v) });
+  assert.doesNotMatch(saved, /pixelArt/);
+  assert.equal(shaderOf(loadLook({ getItem: () => saved })).pixelShirt, true, 'and loads the same');
 });
 
 test('each control reads as it should: Colors as a number or Full, strengths as percents, the light’s angle in degrees, warmth as warm or cool', () => {
@@ -314,13 +394,13 @@ test('the Look sheet’s Shader section: every control from the table, labelled,
       assert.equal(/ checked/.test(box), v === true, c.key);
     }
   }
-  // The style's own values: DS checked, Custom there but not to pick, nothing to reset.
-  assert.match(html, /value="ds" data-look="style" checked/);
+  // The style's own values: Default checked, Custom there but not to pick, nothing to reset.
+  assert.match(html, /value="default" data-look="style" checked/);
   assert.match(html, /value="custom" data-look="style" disabled/);
   assert.match(html, /<button type="button" class="inv-btn[^"]*" data-shader-reset disabled>Reset To Style<\/button>/);
   const custom = sheetHtml(validLook({ ...DEFAULT_LOOK, shader: { levels: 8 } }));
   assert.match(custom, /value="custom" data-look="style" checked>/, 'a change of the user’s: Custom');
-  assert.doesNotMatch(custom, /value="ds" data-look="style" checked/);
+  assert.doesNotMatch(custom, /value="default" data-look="style" checked/);
   assert.match(custom, /data-shader-reset>Reset To Style</);
   assert.match(custom, /data-shader-value="levels"[^>]*>8</);
   // At Off the pixel look's controls rest (with a line saying why); toon shading, the shadow's
@@ -344,5 +424,7 @@ test('the Look sheet’s Shader section: every control from the table, labelled,
   for (const hint of [...html.matchAll(/class="inv-hint[^"]*"[^>]*>([^<]+)</g)].map((m) => m[1]))
     assert.ok(/^[A-Z].*\.$/.test(hint) && hint.length <= 160, hint);
   const labels = [...html.matchAll(/>([^<>]+)</g)].map((m) => m[1].trim()).filter((t) => t && !/[.:%°]/.test(t));
-  for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( [A-Z0-9][^ ]*)*$/, label);
+  for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( ([A-Z0-9][^ ]*|&amp;))*$/, label);
+  assert.match(html, /<span class="inv-switch-label">Pixel Shirt<\/span>/);
+  assert.match(html, /<span class="inv-switch-label">Pixel Face<\/span>/);
 });

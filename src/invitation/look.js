@@ -13,8 +13,12 @@
 // on its own, so one bad value never costs the others (a Pixel Size from before the resolutions
 // loads as the nearest one: 2×, 3× and 4× as they looked on a 390-wide phone, OLD_PIXEL, and
 // 'fine', 'ds' or 'chunky' as the default; the page never shipped with them; a look stored before
-// Motion loads as Smooth with its other values kept, and one stored before the Shader options as
-// its style).
+// Motion loads as Smooth with its other values kept, one stored before the Shader options as its
+// style, and one with Pixel Shirt & Face, the one switch Pixel Shirt and Pixel Face split from,
+// with both set as it was: LEGACY_SHADER). The admin's Default look (content.json
+// `invitation.defaults`, which main.js hands installDefaults at boot) overrides the built-in
+// Default style and the first visit's settings; a stored look still wins, a value it lacks
+// taking the Default look's.
 
 import { DEFAULT_PIXEL, PIXEL_SIZES } from './pixels.js';
 import { DEFAULT_STYLE, PRESETS } from './looks/index.js';
@@ -71,7 +75,11 @@ export const MOTIONS = ['smooth', 'choppy'];
 export const OLD_PIXEL = { 2: '48', 3: '32', 4: '24' };
 /** Motion Choppy: his animation steps this many times a second. */
 export const CHOPPY_FPS = 15;
-/** @type {Look} */
+/**
+ * The built-in first look: Default at DEFAULT_PIXEL, Motion Smooth (installDefaults puts the
+ * admin's over it).
+ * @type {Look}
+ */
 export const DEFAULT_LOOK = Object.freeze({
   pixelSize: DEFAULT_PIXEL,
   dither: true,
@@ -81,10 +89,27 @@ export const DEFAULT_LOOK = Object.freeze({
   shader: Object.freeze({}),
 });
 
+/** The built-in Default style (looks/default.js) and first look: installDefaults starts from them. */
+const BUILT_IN = Object.freeze({ preset: LOOKS[DEFAULT_STYLE], look: DEFAULT_LOOK });
+/**
+ * The look a first visit gets, and each value's fallback in validLook: DEFAULT_LOOK, or the
+ * admin's Default look once installDefaults has it.
+ * @type {Look}
+ */
+let first = DEFAULT_LOOK;
+
+/**
+ * Shader options split from one stored before them: each one's old key, read where a look has
+ * no value of its own (Pixel Shirt & Face, `pixelArt`, became Pixel Shirt and Pixel Face).
+ * @type {Record<string, string>}
+ */
+export const LEGACY_SHADER = { pixelShirt: 'pixelArt', pixelFace: 'pixelArt' };
+
 /**
  * The user's Shader changes from anything, against the style `style`: each value snapped onto
- * its control (shader.js snapShader) or dropped on its own, unknown keys dropped, and a value
- * that's the style's own dropped (no change).
+ * its control (shader.js snapShader) or dropped on its own, unknown keys dropped (an old one in
+ * LEGACY_SHADER read for the options split from it), and a value that's the style's own dropped
+ * (no change).
  * @param {unknown} raw
  * @param {string} style  a key of LOOKS
  * @returns {import('./shader.js').ShaderValues}
@@ -92,10 +117,13 @@ export const DEFAULT_LOOK = Object.freeze({
 function validShader(raw, style) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   const own = styleShader(LOOKS[style]);
+  const values = /** @type {Record<string, unknown>} */ (raw);
   /** @type {import('./shader.js').ShaderValues} */
   const out = {};
   for (const c of SHADER_CONTROLS) {
-    const v = snapShader(c, /** @type {Record<string, unknown>} */ (raw)[c.key]);
+    // (A look stored with the one switch they split from, Pixel Shirt & Face: it sets both.)
+    const legacy = Object.hasOwn(LEGACY_SHADER, c.key) && !Object.hasOwn(values, c.key);
+    const v = snapShader(c, values[legacy ? LEGACY_SHADER[c.key] : c.key]);
     if (v !== undefined && v !== own[c.key]) out[c.key] = v;
   }
   return out;
@@ -108,19 +136,42 @@ function validShader(raw, style) {
  */
 export function validLook(raw) {
   const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-  const style = Object.hasOwn(LOOKS, o.style) ? o.style : DEFAULT_LOOK.style;
+  const style = Object.hasOwn(LOOKS, o.style) ? o.style : first.style;
   return {
     pixelSize: PIXEL_SIZES.includes(o.pixelSize)
       ? o.pixelSize
       : typeof o.pixelSize === 'string' && Object.hasOwn(OLD_PIXEL, o.pixelSize)
         ? OLD_PIXEL[o.pixelSize]
-        : DEFAULT_LOOK.pixelSize,
-    dither: typeof o.dither === 'boolean' ? o.dither : DEFAULT_LOOK.dither,
-    outlines: typeof o.outlines === 'boolean' ? o.outlines : DEFAULT_LOOK.outlines,
+        : first.pixelSize,
+    dither: typeof o.dither === 'boolean' ? o.dither : first.dither,
+    outlines: typeof o.outlines === 'boolean' ? o.outlines : first.outlines,
     style,
-    motion: MOTIONS.includes(o.motion) ? o.motion : DEFAULT_LOOK.motion,
+    motion: MOTIONS.includes(o.motion) ? o.motion : first.motion,
     shader: validShader(o.shader, style),
   };
+}
+
+/**
+ * The admin's Default look (content.json `invitation.defaults`, content.js invitationDefaults)
+ * over the built-in one, for the whole page; main.js calls it once, before anything reads a
+ * look. It's read through validLook, each value kept when it's valid and the built-in's
+ * otherwise. The style it's built on (DS or Soft; with none, the built-in Default) with its
+ * Shader values written in becomes the Default style (LOOKS.default, still named Default and
+ * first in the row; the style it's built on never changes), and its Pixel Size, Dithering,
+ * Outlines and Motion the first visit's, so a first visit sees Default, never Custom. Stored
+ * looks still win (loadLook), a value one lacks taking these. Each call starts from the
+ * built-ins (nothing valid: they come back as they were).
+ * @param {unknown} raw
+ * @returns {Look}  the look a first visit gets
+ */
+export function installDefaults(raw) {
+  LOOKS[DEFAULT_STYLE] = BUILT_IN.preset;
+  first = BUILT_IN.look;
+  const d = validLook(raw);
+  const own = d.style === DEFAULT_STYLE && !Object.keys(d.shader).length;
+  LOOKS[DEFAULT_STYLE] = own ? BUILT_IN.preset : { ...structuredClone(lookPreset(d)), label: BUILT_IN.preset.label };
+  first = Object.freeze({ ...d, style: DEFAULT_STYLE, shader: Object.freeze({}) });
+  return first;
 }
 
 /**
@@ -159,7 +210,7 @@ export function saveLook(look, storage) {
  * The preset a look's Style names.
  * @param {Look} look
  */
-export const presetOf = (look) => LOOKS[look.style] ?? LOOKS[DEFAULT_LOOK.style];
+export const presetOf = (look) => LOOKS[look.style] ?? LOOKS[DEFAULT_STYLE];
 
 /**
  * Whether the user changed any of the style's Shader options (the Style row shows Custom).
@@ -168,7 +219,7 @@ export const presetOf = (look) => LOOKS[look.style] ?? LOOKS[DEFAULT_LOOK.style]
 export const isCustom = (look) => Object.keys(validShader(look.shader, presetKey(look))).length > 0;
 
 /** The key of the style a look names (the default's for anything else). */
-const presetKey = (/** @type {Look} */ look) => (Object.hasOwn(LOOKS, look.style) ? look.style : DEFAULT_LOOK.style);
+const presetKey = (/** @type {Look} */ look) => (Object.hasOwn(LOOKS, look.style) ? look.style : DEFAULT_STYLE);
 
 /**
  * Every Shader option's value for a look: the style's, with the user's changes.

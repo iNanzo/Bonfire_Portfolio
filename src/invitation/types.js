@@ -1,17 +1,24 @@
 // The shapes the invitation toy's modules pass each other (JSDoc only: nothing runs here), and
 // the order a frame runs in. Units: world units (NEWT is about 1.0 tall), seconds, CSS pixels.
-// The pure modules (brain, blend, steer, carry, lookAt, faces, gesture, rng) import no three.js.
+// The pure modules (brain, blend, steer, carry, lookAt, faces, gesture, rng, speech) import no
+// three.js.
 //
 // A frame (main.js):
 //   1. pointer and button input → gesture events (gesture.js), floor points by ray (stage)
-//   2. brain.step(BrainIn) → BrainOut: the brain owns every timer and every state change
+//   2. brain.step(BrainIn) → BrainOut: the brain owns every timer and every state change; then
+//      talk.step (speech.js TalkIn: this BrainOut and the last, the gestures, the button, the
+//      camera) → a line to show goes to bubble.say
 //   3. steer (walk, flee, face the camera) or carry (held, falling) moves NEWT's root
 //   4. blendStep moves each clip's weight toward BrainOut's; gaitPhase advances the step phase
 //   5. character.update(dt): restore the head's saved animation pose → mixer.update → save it
 //   6. root.updateMatrixWorld → carry's tilt on the root → read the collar → move the root by
-//      anchor − collar → root.updateMatrixWorld (only while held)
-//   7. lookStep → character.applyLook (on top of the saved pose: it never adds up)
-//   8. faceStep → character.setFace
+//      anchor − collar → root.updateMatrixWorld (only while held; the anchor is where the
+//      cursor's ray meets the camera-facing plane he was grabbed on, plus the grab offset)
+//   7. lookStep → character.applyLook (on top of the saved pose: it never adds up; his chest
+//      joins in for big looks while he's on his feet, lookAt.js chestShare and torsoStep)
+//   8. faceStep → character.setFace; bubble.update (while a line is up): his head on screen
+//      (character.screenShape; null while the open Look sheet covers it, bubble.js
+//      speakerPoint), clear of the toolbar and the open sheet
 //   9. stage.render: the shadow map once, the colour pass, the retro pass
 
 /** @typedef {{x: number, z: number}} XZ */
@@ -31,16 +38,22 @@
  * @property {number} [r]
  */
 
-/** @typedef {{id: number, x: number, y: number, t: number, kind: string, buttons: number}} Ptr  a pointer sample, client px and seconds */
+/**
+ * @typedef {{id: number, x: number, y: number, t: number, kind: string, buttons: number, button?: number}} Ptr  a
+ *   pointer sample, client px and seconds; `button`, on a press: the one pressed (0 main, 1 middle, 2 right)
+ */
 /**
  * @typedef {object} GestureEvent
- * @property {'tap'|'grab'|'drag'|'release'|'cancel'|'hover'|'orbit'|'pinch'} type  orbit: a drag on empty space (it turns the camera); pinch: two fingers (they zoom it)
+ * @property {'tap'|'grab'|'drag'|'release'|'cancel'|'hover'|'orbit'|'pan'|'pinch'} type  orbit: a
+ *   finger's drag on empty space or the mouse's right-drag (it turns the camera); pan: the mouse's
+ *   left- or middle-drag on empty space, or two fingers' middle (it slides the view); pinch: two
+ *   fingers (they zoom it)
  * @property {'newt'|'floor'} on  what the press started on ('floor' for empty space and pinches)
  * @property {number} x  client px (a pinch: its fingers' middle)
  * @property {number} y
  * @property {number} t  seconds
  * @property {XZ|null} [floor]  where it meets the floor (filled in by the page)
- * @property {number} [dx]  an orbit's move since its last, CSS px
+ * @property {number} [dx]  an orbit's or a pan's move since its last, CSS px
  * @property {number} [dy]
  * @property {number} [scale]  a pinch's spread over its last (above 1: the fingers moved apart)
  */
@@ -67,8 +80,9 @@
  * @property {{mode: 'stay'|'goto'|'flee'|'face', goal: XZ|null, speed: number}} move  goal: where a goto goes, the camera's spot to face, or where a flee's threat was last seen (with no pointer); speed: the target speed (steer ramps to it)
  * @property {import('./clips.js').FaceName} face  the base face (faces.js adds blinks)
  * @property {import('./clips.js').BlinkMode} blink
- * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number}} look  ease:
- *   a slower look, seconds for it to come round (lookAt.js lookStep), as he's let go
+ * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: XZ|null}} look  ease:
+ *   a slower look, seconds for it to come round (lookAt.js lookStep), as he's let go; at
+ *   ('back'): who he runs from on the floor, for his glances back (null with no one)
  * @property {boolean} faceCamera  turning to the camera first (a reaction, or sitting down)
  * @property {number} stress
  * @property {boolean} wander
@@ -87,14 +101,15 @@
  * @typedef {object} CarryState  carry.js: NEWT held by the collar (holdStep updates it in place)
  * @property {number} t0  when he was grabbed
  * @property {number} t  the last step
- * @property {XYZ} anchor  where the collar goes this frame (world): it follows the pointer's
- *   spot, starting at the collar where he was grabbed
- * @property {XYZ} vel  the anchor's velocity
+ * @property {XYZ} anchor  where the collar goes this frame (world): the pointer's spot on the
+ *   plane he's dragged on plus the grab offset (carry.js dragTarget), inside the play area
+ * @property {XYZ} drive  a critically damped follow of the anchor: the swing and the feel read it
+ * @property {XYZ} vel  the drive's velocity
  * @property {{x: number, z: number}} tilt  the root's swing in radians: root.rotation.x and .z (positive z puts his feet toward +x, positive x toward −z)
  * @property {{x: number, z: number}} tiltVel
  * @property {Array<{t: number, x: number, y: number, z: number}>} samples  the anchor over the last ~80 ms
- * @property {number} dragSpeed  the anchor's speed, world units/s
- * @property {number} shake  the anchor's acceleration, smoothed, world units/s²
+ * @property {number} dragSpeed  the drive's speed, world units/s
+ * @property {number} shake  the drive's acceleration, smoothed, world units/s²
  * @property {XZ|null} push  while the pointer's spot is out past the play area's edge: the way
  *   it pushes him, out through the edge (unit length; let go then, he's tossed with nothing across)
  */
@@ -133,7 +148,8 @@
  * @property {(weights: Record<string, number>, phase: number) => void} setWeights
  * @property {(clip: string) => boolean} restart  play it from its start: true when it still showed, its old start fading out as its twin (play.js TWIN)
  * @property {(dt: number) => void} update
- * @property {(yaw: number, pitch: number, weight: number) => void} applyLook
+ * @property {(yaw: number, pitch: number, weight: number, torso?: number) => void} applyLook  torso:
+ *   how much of lookAt.js chestShare his chest takes (1 on his feet, eased to 0 off the floor)
  * @property {(face: import('./clips.js').FaceName) => void} setFace
  * @property {(name: string, out: XYZ) => XYZ} bonePos  world position of a bone's head
  * @property {(camera: any, rect: {left: number, top: number, width: number, height: number}) => {head: {x: number, y: number, r: number}, body: {a: {x: number, y: number}, b: {x: number, y: number}, r: number}}} screenShape

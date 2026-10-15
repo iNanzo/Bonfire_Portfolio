@@ -29,9 +29,21 @@ import { defaultScene, MUSIC, NAME_MAX } from '../../src/scenes.js';
 import { harmoniousFlame, hexToOklch } from '../../src/paletteGen.js';
 import { PIXEL_SIZES } from '../../src/visualizer/render.js';
 import { adminHelp, adminLabels, meta } from '../../src/settingsMap.js';
+import {
+  INVITATION_ADD_LABELS,
+  INVITATION_HELP,
+  INVITATION_KEYWORDS,
+  INVITATION_LABELS,
+  INVITATION_MORE,
+  INVITATION_RANGES,
+  INVITATION_SELECTS,
+  INVITATION_STARTERS,
+  INVITATION_SUBGROUPS,
+} from './invitationSchema.js';
 import { titleCase } from './text.js';
 
 const PREVIEW_BLURB = 'The preview updates as you edit; nothing is published until you save.';
+
 /** Sidebar pages, grouped, and the content sections (dotted paths allowed) each one edits. */
 export const PAGES = [
   {
@@ -119,6 +131,13 @@ export const PAGES = [
     keys: ['screens', 'ui', 'weapons', 'weaponDraw', 'startingEquipment', 'notFound'],
     blurb:
       'Tab names, the header, menus and pack, weapon names and which weapons can be drawn, the starting equipment and the 404 page.',
+  },
+  {
+    id: 'invitation',
+    group: 'Toys',
+    label: 'Invitation',
+    keys: ['invitation.defaults', 'invitation.speech', 'invitation.lines'],
+    blurb: 'NEWT’s toy at /invitation/: the look a first visit gets, how often he talks, and what he says.',
   },
 ];
 /** Old page addresses that still work (#effects was the one Effects page). */
@@ -353,6 +372,8 @@ export const LABELS = {
   'scenes[].music': 'With the Music',
   'startingEquipment.element': 'Element',
   'startingEquipment.flame': 'Flame colors',
+  // The invitation toy's page.
+  ...INVITATION_LABELS,
   // The settings the site shares with Bonfire Live and the Painter: the map's names win.
   ...adminLabels(),
 };
@@ -568,6 +589,8 @@ export const HELP = {
     'Bonfire Live’s links and saved loops use it (?scene=b:<id>), so keep it once it’s published. Lowercase letters, numbers and dashes.',
   'scenes[].music':
     'Hold the Scene keeps all it sets for its stretch. Start From the Scene opens with its place, colors and look, then the show plays on.',
+  // The invitation toy's page.
+  ...INVITATION_HELP,
   // The settings the site shares with Bonfire Live and the Painter: the map's help wins.
   ...adminHelp(),
 };
@@ -601,6 +624,7 @@ const OWN_MORE = {
     'Each is made in the Bonfire Painter: Open in Painter shows it there, where you can change it, and Replace From Painter… brings the change back.\n' +
     'These are the scenes every visitor’s Bonfire Live has; the ones visitors make stay in their own browsers.\n' +
     'Bonfire Live’s Scenes & Cards settings can shuffle them.',
+  ...INVITATION_MORE,
 };
 /** A field's longer explanation (its "More"), or ''. */
 export const moreFor = (pattern) => hint(OWN_MORE, pattern) ?? meta('admin', pattern)?.more ?? '';
@@ -622,6 +646,7 @@ const OWN_KEYWORDS = {
   'effects.knight.style': ['smooth steel'],
   'effects.elements': ['lightning', 'ice', 'frost'],
   weaponDraw: ['weapons', 'random'],
+  ...INVITATION_KEYWORDS,
 };
 /** A field's search words. */
 export const keywordsFor = (pattern) => [
@@ -726,6 +751,7 @@ export const SUBGROUPS = {
     { label: 'Pack', keys: ['pack*'] },
     { label: 'Key prompts', keys: ['prompts'] },
   ],
+  ...INVITATION_SUBGROUPS,
 };
 
 /**
@@ -839,6 +865,7 @@ export const SELECTS = {
   'scenes[].music': () => opts(Object.keys(MUSIC), (k) => MUSIC[k]),
   'effects.render.ditherMatrix': () =>
     opts(DITHER_MATRICES, (n) => `Bayer ${n}×${n}${n === 4 ? ' (Coarse)' : ' (Fine)'}`),
+  ...INVITATION_SELECTS,
   'startingEquipment.element': (d) =>
     ELEMENT_IDS.map((id) => {
       const name = d.effects?.elements?.[id]?.name?.trim();
@@ -846,8 +873,13 @@ export const SELECTS = {
     }),
 };
 
-/** A slider for a number: [min, max, step, unit?]. */
-export const rangeFor = (pattern) => (pattern.startsWith('effects.') ? RANGES[pattern.slice(8)] : undefined);
+/** A slider for a number: [min, max, step, unit?] (the effects' from RANGES, the invitation's its own). */
+export const rangeFor = (pattern) =>
+  pattern.startsWith('effects.')
+    ? RANGES[pattern.slice(8)]
+    : pattern.startsWith('invitation.')
+      ? INVITATION_RANGES[pattern]
+      : undefined;
 
 /** Empty text in these becomes null (not ''). */
 export const NULLABLE = new Set(['ui.prompts[][1]', 'site.resumeUrl']);
@@ -927,6 +959,12 @@ export const TEMPLATES = {
   scenes: () => ({ ...defaultScene('New Scene'), id: '' }),
 };
 
+/**
+ * A section content.json doesn't have yet that can start from built-in values: (draft) → its
+ * value (the Invitation page's, from the toy's own; scenes start as an empty list on their own).
+ */
+export const STARTERS = { ...INVITATION_STARTERS };
+
 /** “+ Add …” button wording per list. */
 export const ADD_LABELS = {
   projects: 'project',
@@ -946,6 +984,7 @@ export const ADD_LABELS = {
   'ui.prompts': 'prompt',
   'effects.flames': 'palette',
   scenes: 'scene',
+  ...INVITATION_ADD_LABELS,
 };
 
 /** The field a list entry is titled by. */

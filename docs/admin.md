@@ -144,6 +144,29 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     optional, holds up to 48 scenes, and ids must be unique. A problem deep inside a scene
     is listed on its card with where it is (`look.name: …`). The commit message says
     "edit scenes". There's no live preview for scenes; **Open in Painter** is the preview.
+- **Invitation** (under Toys): NEWT's toy at `/invitation/` (`content.json` `invitation`;
+  [invitation.md](invitation.md) has the toy). The page's schema is
+  `admin/ui/invitationSchema.js`, gathered into `schema.js`.
+  - **Default Look:** the Default style a first visit gets, before anyone touches the Look
+    menu: Pixel Size (16×16 to 256×256, Native or Off), Dithering, Outlines, the style it's
+    **Built On** (DS or Soft: its own colors carry over), Motion, and every Shader option
+    the Look menu shows, by the same names, with the same ranges and choices. Visitors'
+    own picks stay in their browser, over these.
+  - **Speech:** the shortest and longest quiet spell before an idle line (seconds), and each
+    moment's **Chance** (0 never, 1 every time) and **Cooldown** (seconds), under the
+    plan's kinds: Reactions, Running, Carried, Moving, Sitting, Passive and Camera.
+  - **Lines:** what he says at each moment, under the same kinds. Add, remove, reorder or
+    drag them; one is picked at random, never the one he just said, and a moment with no
+    lines says nothing.
+  - **Checks:** at most 20 lines a moment, each up to 120 characters (a warning past 80,
+    where his bubble wraps a lot); every value within its list or range. The section is
+    optional, so content from before the toy still passes, and each of its three parts it
+    lacks shows **Start From the Toy’s Own**, which fills that part in with the toy's built-in
+    values (the built-in Default look, its speech settings, every moment with no lines yet)
+    to edit from (`INVITATION_STARTERS`, schema.js `STARTERS`). The toy reads it through
+    `virtual:invitation-content` (`vite.config.js`), never `content.json` itself, and the
+    other pages' copy of the content leaves it out. A change to its shape needs
+    `npm run admin:deploy` after the merge. There's no live preview: open `/invitation/`.
 - **Hide / show** any entry (◉), and **reorder** any list by dragging ⋮⋮ or with ↑/↓.
 - **Rename** any sidebar page or section heading with ✎ (empty resets it). Renames are
   stored in `content.admin.labels`, which the site ignores. Help that names another
@@ -162,7 +185,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
   Strength, Gestures On Click…). Each field's help sits under it, a sentence or two, and
   is what its input reads out to a screen reader; anything longer folds under **More**.
   Big sections are split under sub-headings: Interface Text into Header & Menu, Inventory
-  & Projects, About, Render Settings, Pack and Key Prompts; Pixel Art; the Knight. A
+  & Projects, About, Render Settings, Pack and Key Prompts; Pixel Art; the Knight; the
+  Invitation's Speech and Lines, by the kind of moment. A
   project's image fields (Alt Text, Caption, Pixel Art, Video Clip) and the featured
   project's fields go by the same names as any project's, on the page and in the search.
   Icon buttons

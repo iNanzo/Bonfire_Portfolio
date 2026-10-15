@@ -1,29 +1,43 @@
 // The invitation toy's orbit camera, in plain numbers (stage.js hands its pose to three.js).
 // Pure: no three.js, no DOM, no clock.
 //
-// A drag on empty space turns it: across, around the vertical axis (as far round as you like:
-// the world turns with the finger, so the camera goes the other way; a drag across the whole
-// stage is ORBIT.turn of a turn, so a phone and a desktop feel alike); down and up, its
-// elevation between ORBIT.elevMin and elevMax (dragging down looks more from above; ORBIT.tilt
-// for the stage's whole height). The
-// mouse wheel and a two-finger pinch zoom between half and twice the default distance. The
-// view eases toward where the input puts it (`goal`, damped, never overshooting) and a fling
-// coasts a little once the finger lifts. The point it orbits sits at NEWT's middle height
-// over the play area's centre at the default zoom (the whole play area in view) and follows
-// NEWT softly the closer it zooms, all the way at the closest, so he stays in frame. On a
-// phone (pixels.js compactStage), where he's drawn bigger and the play area doesn't all fit,
-// it follows him ORBIT.phoneFollow of the way at the default zoom too, so a dash to the rim
-// never takes him off the screen. While the Look sheet is open it follows him all the way at any
-// zoom (orbitFollowAll), so he stays in the clear space the sheet leaves. Reset
-// Camera eases back to the default view, the short way round. The light goes round with it
-// (lightDir: the look's sun turned by the camera's yaw), so his shadow always falls the same way
-// on screen, back and to one side. Angles in radians (yaw 0: the camera on the +z side, +
-// toward +x), distances in world units, drags in CSS px.
+// An orbit (a finger's drag on empty space, the mouse's right-drag anywhere) turns it: across,
+// around the vertical axis (as far round as you like: the world turns with the finger, so the
+// camera goes the other way; a drag across the whole stage is ORBIT.turn of a turn, so a phone
+// and a desktop feel alike); down and up, its elevation between ORBIT.elevMin and elevMax
+// (dragging down looks more from above; ORBIT.tilt for the stage's whole height). The mouse
+// wheel and a two-finger pinch zoom between half and twice the default distance. The view eases
+// toward where the input puts it (`goal`, damped, never overshooting) and a fling coasts a
+// little once the finger lifts. A pan (the mouse's left-drag on empty space, or two fingers'
+// middle) slides it across and up and down the screen at once, the floor under the cursor going
+// with it (orbitPan), the point it looks at kept inside the play area (orbitArea) so the play
+// area is never lost.
+//
+// The point it orbits sits at NEWT's middle height over its rest point (`base`, the play area's
+// middle to begin with) and follows NEWT softly the closer it zooms, all the way at the closest;
+// on a phone (pixels.js compactStage), where he's drawn bigger, ORBIT.phoneFollow of the way at
+// the default zoom too. The play area is bigger than any view but the fully zoomed-out one
+// (area.js), so the view keeps him on screen however it's turned: while he's well inside the
+// clear space (ORBIT.keepIn of it round where the point it looks at shows) it holds still, and
+// as he nears its edge the rest point moves on with him, softly, never letting him past
+// ORBIT.keepOut of it once he's on screen (orbitStep, from where screenOf puts him). A pan
+// stops all of that: the view stays where it was put until NEWT himself walks off the screen.
+// While he's held (orbitHold) it holds still, so the point he's grabbed by stays under the
+// cursor; let go out past ORBIT.keepOut (carried to the screen's edge), the view eases back
+// round him at ORBIT.settle rather than snapping there in a frame. While the Look sheet is open it follows him all the way at any zoom (orbitFollowAll),
+// so he stays in the clear space the sheet leaves. Reset Camera eases back to the default view,
+// the short way round, and clears the pan. The light goes round with it (lightDir: the look's
+// sun turned by the camera's yaw), so his shadow always falls the same way on screen, back and
+// to one side. Angles in radians (yaw 0: the camera on the +z side, + toward +x), distances in
+// world units, drags in CSS px.
 
+import { NEWT_HEIGHT, NEWT_RADIUS } from './area.js';
 import { FOCUS_Y, VIEW, compactStage } from './pixels.js';
+import { clampTo } from './steer.js';
 
 /** @typedef {import('./types.js').XZ} XZ */
 /** @typedef {import('./types.js').XYZ} XYZ */
+/** @typedef {import('./types.js').Bounds} Bounds */
 
 const RAD = Math.PI / 180;
 
@@ -37,6 +51,9 @@ const RAD = Math.PI / 180;
  * flingWindow s of its last move, slowing at `coast` per second. follow: the time constant of
  * the orbit's point following NEWT; phoneFollow: how much of the way it follows him at the
  * default zoom on a phone's stage. wheel: zoom per px of wheel (a factor of e^(px × wheel)).
+ * keepIn: the share of the clear space round where the point it looks at shows that NEWT may
+ * roam with the view holding still; keepOut: the share he's never let past once he's on screen;
+ * settle: the time constant it brings him back inside keepOut at once he's let go out past it.
  */
 export const ORBIT = {
   elevMin: 12 * RAD,
@@ -53,11 +70,16 @@ export const ORBIT = {
   follow: 0.5,
   phoneFollow: 0.8,
   wheel: 0.0015,
+  keepIn: 0.6,
+  keepOut: 0.94,
+  settle: 0.25,
 };
 export { FOCUS_Y };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const wrap = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
+/** The stage's clear space round where the point it looks at shows, when nothing says (a top margin, a toolbar, side edges). */
+const frameOf = (w, h) => ({ hw: Math.max(1, w / 2 - 24), hh: Math.max(1, (h - 88) / 2) });
 
 /**
  * @typedef {object} OrbitState  updated in place by the functions below
@@ -75,6 +97,16 @@ const wrap = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
  * @property {{yaw: number, elevation: number}} spin  a fling's coast, rad/s
  * @property {{yaw: number, elevation: number, t: number}|null} drag  a drag under way: its speed and last move
  * @property {boolean} resetting  easing back to the default
+ * @property {XZ} base  the rest point: where the point it orbits goes when it isn't following him
+ * @property {boolean} panned  the user's pan holds the view (until NEWT walks off the screen)
+ * @property {boolean} panning  a pan under way
+ * @property {boolean} holding  NEWT held: the view holds still
+ * @property {boolean} settling  let go out past keepOut: it eases him back inside, not at once
+ * @property {Bounds|null} area  the play area: a pan keeps the point it looks at inside it
+ * @property {number} ch  the canvas's CSS height (the field of view spans it)
+ * @property {{hw: number, hh: number}} frame  half the clear space round where the point it
+ *   looks at shows, CSS px (it's shown in its middle: pixels.js frameView)
+ * @property {boolean} seen  NEWT was inside ORBIT.keepOut of the clear space last frame
  */
 
 /**
@@ -107,6 +139,15 @@ export function createOrbit({
     spin: { yaw: 0, elevation: 0 },
     drag: null,
     resetting: false,
+    base: { x: centre.x, z: centre.z },
+    panned: false,
+    panning: false,
+    holding: false,
+    settling: false,
+    area: null,
+    ch: h,
+    frame: frameOf(w, h),
+    seen: true,
   };
 }
 
@@ -122,16 +163,126 @@ export const turnPerPx = (s) => (ORBIT.turn * 2 * Math.PI) / s.span.w;
 export const tiltPerPx = (s) => ORBIT.tilt / s.span.h;
 
 /**
- * The stage's new size, CSS px (a resize): drags turn and tilt by it from now on, and on a
- * phone's stage the orbit follows NEWT at the default zoom too. A size that isn't one (0 or
- * less, not a number) keeps the last.
+ * World units a CSS px covers at the distance of the point it looks at.
  * @param {OrbitState} s
- * @param {{w: number, h: number}} span
  */
-export function orbitSpan(s, { w, h }) {
+export const worldPerPx = (s) => (2 * s.distance * Math.tan((VIEW.fov * RAD) / 2)) / s.ch;
+/** CSS px a unit at a depth of one covers (the camera's focal length on the canvas). */
+const focal = (s) => s.ch / 2 / Math.tan((VIEW.fov * RAD) / 2);
+
+/**
+ * The stage's new size, CSS px (a resize): drags turn and tilt by it from now on, and on a
+ * phone's stage the orbit follows NEWT at the default zoom too; `ch`, the canvas's CSS height
+ * (the field of view's: a pan's and screenOf's scale), the stage's by default; `hw`, `hh`, half
+ * the clear space round where the point it looks at shows (keeping him on screen), the stage's
+ * less a margin and a toolbar by default. A size that isn't one (0 or less, not a number) keeps
+ * the last.
+ * @param {OrbitState} s
+ * @param {{w: number, h: number, ch?: number, hw?: number, hh?: number}} span
+ */
+export function orbitSpan(s, { w, h, ch, hw, hh }) {
   if (w > 0) s.span.w = w;
   if (h > 0) s.span.h = h;
   s.followHome = compactStage(s.span.w, s.span.h) ? ORBIT.phoneFollow : 0;
+  s.ch = ch && ch > 0 ? ch : s.span.h;
+  const f = frameOf(s.span.w, s.span.h);
+  s.frame = { hw: hw && hw > 0 ? hw : f.hw, hh: hh && hh > 0 ? hh : f.hh };
+}
+
+/**
+ * The play area (area.js viewArea): a pan keeps the point it looks at inside it.
+ * @param {OrbitState} s
+ * @param {Bounds|null} area
+ */
+export function orbitArea(s, area) {
+  s.area = area;
+  if (area && s.panned) {
+    const c = clampTo(area, s.base);
+    s.target.x += c.x - s.base.x;
+    s.target.z += c.z - s.base.z;
+    s.base = c;
+  }
+}
+
+/**
+ * Where the floor shows at a point on screen, `p` CSS px from where the point it looks at shows
+ * (screenOf's inverse at the floor), or null where there's no floor (at or above the horizon).
+ * @param {OrbitState} s
+ * @param {{x: number, y: number}} p
+ * @returns {XZ|null}
+ */
+export function floorUnder(s, p) {
+  const ce = Math.cos(s.elevation);
+  const se = Math.sin(s.elevation);
+  const sy = Math.sin(s.yaw);
+  const cy = Math.cos(s.yaw);
+  const a = p.x / focal(s);
+  const b = p.y / focal(s);
+  // (Forward, plus `a` of the screen's right, less `b` of its up.)
+  const d = { x: -sy * ce + a * cy + b * sy * se, y: -se - b * ce, z: -cy * ce - a * sy + b * cy * se };
+  if (d.y > -1e-6) return null;
+  const c = {
+    x: s.target.x + s.distance * sy * ce,
+    y: s.target.y + s.distance * se,
+    z: s.target.z + s.distance * cy * ce,
+  };
+  const t = -c.y / d.y;
+  return { x: c.x + t * d.x, z: c.z + t * d.z };
+}
+
+/**
+ * A pan, `dx`, `dy` CSS px, ending `at` (CSS px from where the point it looks at shows; that
+ * point itself by default): the view slides with the cursor across and up and down the screen,
+ * at once, the floor that was under the cursor staying under it (or, with no floor under it,
+ * the floor as far off as the point it looks at), as fast as six times that at most (near the
+ * horizon); the point it looks at stays at NEWT's middle height and inside the play area. The
+ * view then stays where it's put (no following) until NEWT walks off the screen.
+ * @param {OrbitState} s
+ * @param {number} dx
+ * @param {number} dy
+ * @param {{x: number, y: number}} [at]
+ */
+export function orbitPan(s, dx, dy, at = { x: 0, y: 0 }) {
+  if (!s.panned) s.base = { x: s.target.x, z: s.target.z };
+  s.panned = true;
+  s.panning = true;
+  if (!dx && !dy) return;
+  // (Whether he's on screen is the next frame's to say: a pan that takes him off it, even one
+  // let go before a frame is drawn, is never him walking off it.)
+  s.seen = false;
+  const k = worldPerPx(s);
+  const was = floorUnder(s, { x: at.x - dx, y: at.y - dy });
+  const now = floorUnder(s, at);
+  let move;
+  if (was && now) move = { x: was.x - now.x, z: was.z - now.z };
+  else {
+    // (Across: the screen's right on the floor; down the screen: away from the camera, a floor
+    // step showing sin(elevation) as tall as it is long.)
+    const deep = k / Math.max(0.2, Math.sin(s.elevation));
+    move = {
+      x: -dx * k * Math.cos(s.yaw) - dy * deep * Math.sin(s.yaw),
+      z: dx * k * Math.sin(s.yaw) - dy * deep * Math.cos(s.yaw),
+    };
+  }
+  const most = 6 * k * Math.hypot(dx, dy);
+  const len = Math.hypot(move.x, move.z);
+  if (len > most) move = { x: (move.x * most) / len, z: (move.z * most) / len };
+  let next = { x: s.base.x + move.x, z: s.base.z + move.z };
+  if (s.area) next = clampTo(s.area, next);
+  s.target.x += next.x - s.base.x;
+  s.target.z += next.z - s.base.z;
+  s.base = next;
+}
+
+/**
+ * NEWT held (`on`): the view holds still, so the point he's grabbed by stays under the cursor;
+ * let go, it follows him again (from out past keepOut, easing him back inside: followStep).
+ * @param {OrbitState} s
+ * @param {boolean} on
+ */
+export function orbitHold(s, on) {
+  if (s.holding && !on) s.settling = true;
+  s.holding = on;
 }
 
 /**
@@ -195,21 +346,30 @@ export function orbitWheel(s, deltaY) {
 }
 
 /**
- * The frame's gestures (gesture.js): an orbit turns it, a pinch zooms it, an orbit letting go
- * (a release or cancel on the floor) may fling it; taps and NEWT's own gestures leave it be.
+ * The frame's gestures (gesture.js): an orbit turns it, a pan slides it, a pinch zooms it, a
+ * drag letting go (a release or cancel on the floor) may fling an orbit and ends a pan; taps and
+ * NEWT's own gestures leave it be. `shownAt`: where the point it looks at shows, in the events'
+ * client px (a pan keeps the floor under the cursor; without it, under where that point shows).
  * @param {OrbitState} s
  * @param {import('./types.js').GestureEvent[]} events
+ * @param {{x: number, y: number}|null} [shownAt]
  */
-export function orbitEvents(s, events) {
+export function orbitEvents(s, events, shownAt = null) {
   for (const e of events) {
     if (e.type === 'orbit') orbitDrag(s, e.dx ?? 0, e.dy ?? 0, e.t);
+    else if (e.type === 'pan')
+      orbitPan(s, e.dx ?? 0, e.dy ?? 0, shownAt ? { x: e.x - shownAt.x, y: e.y - shownAt.y } : undefined);
     else if (e.type === 'pinch' && e.scale && e.scale !== 1) orbitZoom(s, e.scale);
-    else if (e.on === 'floor' && (e.type === 'release' || e.type === 'cancel')) orbitRelease(s, e.t);
+    else if (e.on === 'floor' && (e.type === 'release' || e.type === 'cancel')) {
+      orbitRelease(s, e.t);
+      s.panning = false;
+    }
   }
 }
 
 /**
- * Reset Camera: ease back to the default view, the short way round.
+ * Reset Camera: ease back to the default view, the short way round, and clear the pan (the rest
+ * point back on the play area's middle; keeping NEWT on screen may hold it nearer him).
  * @param {OrbitState} s
  */
 export function orbitReset(s) {
@@ -221,6 +381,9 @@ export function orbitReset(s) {
   s.spin = { yaw: 0, elevation: 0 };
   s.drag = null;
   s.resetting = true;
+  s.base = { x: s.centre.x, z: s.centre.z };
+  s.panned = false;
+  s.panning = false;
 }
 
 /**
@@ -261,11 +424,148 @@ export function followShare(s) {
 }
 
 /**
- * One frame: a fling coasts, the view eases toward its goal, and the orbit's point eases
- * toward NEWT (`focus`, his spot on the floor) as far as the zoom says.
+ * Where a world point shows with the camera where `s` has it (looking at `target`, its own by
+ * default): CSS px from where the point it looks at shows (+x right, +y down), and its depth
+ * along the view, world units; null behind the camera.
+ * @param {OrbitState} s
+ * @param {XYZ} p
+ * @param {XYZ} [target]
+ * @returns {{x: number, y: number, depth: number}|null}
+ */
+export function screenOf(s, p, target = s.target) {
+  const f = focal(s);
+  const ce = Math.cos(s.elevation);
+  const se = Math.sin(s.elevation);
+  const sy = Math.sin(s.yaw);
+  const cy = Math.cos(s.yaw);
+  const vx = p.x - (target.x + s.distance * sy * ce);
+  const vy = p.y - (target.y + s.distance * se);
+  const vz = p.z - (target.z + s.distance * cy * ce);
+  const depth = -(vx * sy * ce + vy * se + vz * cy * ce);
+  if (depth <= 1e-6) return null;
+  const across = vx * cy - vz * sy;
+  const up = -vx * sy * se + vy * ce - vz * cy * se;
+  return { x: (across / depth) * f, y: (-up / depth) * f, depth };
+}
+
+/**
+ * NEWT standing at `n` (his feet at `n.y`, 0 on the floor) on screen, looking at `target`: his
+ * body's extremes, CSS px from where it shows, and his depth; null when he's behind the camera.
+ * @param {OrbitState} s
+ * @param {{x: number, z: number, y?: number}} n
+ * @param {XYZ} target
+ */
+function newtBox(s, n, target) {
+  const y = n.y ?? 0;
+  const feet = screenOf(s, { x: n.x, y, z: n.z }, target);
+  const head = screenOf(s, { x: n.x, y: y + NEWT_HEIGHT, z: n.z }, target);
+  if (!feet || !head) return null;
+  const f = focal(s);
+  const rf = (NEWT_RADIUS * f) / feet.depth;
+  const rh = (NEWT_RADIUS * f) / head.depth;
+  return {
+    left: Math.min(feet.x - rf, head.x - rh),
+    right: Math.max(feet.x + rf, head.x + rh),
+    top: head.y - rh,
+    bottom: feet.y + rf,
+    depth: feet.depth,
+  };
+}
+
+/**
+ * How far NEWT's box is past `share` of the clear space, CSS px (+x: past its right, +y: past its
+ * bottom; a box wider than it, its middle), or null when it's inside.
+ * @param {OrbitState} s
+ * @param {NonNullable<ReturnType<typeof newtBox>>} box
+ * @param {number} share
+ */
+function past(s, box, share) {
+  const w = s.frame.hw * share;
+  const h = s.frame.hh * share;
+  const over = (lo, hi, m) => {
+    if (lo < -m && hi > m) return (lo + hi) / 2;
+    if (hi > m) return hi - m;
+    if (lo < -m) return lo + m;
+    return 0;
+  };
+  const x = over(box.left, box.right, w);
+  const y = over(box.top, box.bottom, h);
+  return x || y ? { x, y } : null;
+}
+
+/**
+ * The floor step that moves the point it looks at so something `by` CSS px off, at `depth`,
+ * shows that much nearer the middle.
+ * @param {OrbitState} s
+ * @param {{x: number, y: number}} by
+ * @param {number} depth
+ * @returns {XZ}
+ */
+function stepFor(s, by, depth) {
+  const k = (depth * 2 * Math.tan((VIEW.fov * RAD) / 2)) / s.ch;
+  const deep = k / Math.max(0.2, Math.sin(s.elevation));
+  // (Across: along the screen's right; down the screen: toward the camera.)
+  return {
+    x: by.x * k * Math.cos(s.yaw) + by.y * deep * Math.sin(s.yaw),
+    z: -by.x * k * Math.sin(s.yaw) + by.y * deep * Math.cos(s.yaw),
+  };
+}
+
+/**
+ * Where the point it orbits should be this frame, on the floor, given NEWT at `focus` (null:
+ * not in yet): the rest point, followed toward him by the zoom's share, the rest point moved on
+ * so he's inside ORBIT.keepIn of the clear space there; the rest point alone while a pan holds
+ * the view; him while the Look sheet is open. Moves `s.base` with him as it must.
+ * @param {OrbitState} s
+ * @param {{x: number, z: number, y?: number}|null} focus
+ * @returns {XZ}
+ */
+function wanted(s, focus) {
+  if (!focus) return s.base;
+  if (s.followAll) return { x: focus.x, z: focus.z };
+  if (s.panned) return s.base;
+  const share = followShare(s);
+  const want = { x: s.base.x + (focus.x - s.base.x) * share, z: s.base.z + (focus.z - s.base.z) * share };
+  for (let i = 0; i < 3; i++) {
+    const box = newtBox(s, focus, { x: want.x, y: FOCUS_Y, z: want.z });
+    const by = box && past(s, box, ORBIT.keepIn);
+    if (!box || !by) break;
+    const d = stepFor(s, by, box.depth);
+    want.x += d.x;
+    want.z += d.z;
+  }
+  s.base =
+    share < 0.999
+      ? { x: (want.x - share * focus.x) / (1 - share), z: (want.z - share * focus.z) / (1 - share) }
+      : { x: focus.x, z: focus.z };
+  return want;
+}
+
+/**
+ * Whether the view is still turning: dragged, a fling still coasting, or its yaw or tilt still
+ * easing toward the goal (within a thousandth of a radian counts as there). Read by ?test, so
+ * a browser spec waits on the view coming to rest rather than on a still moment between polls.
+ * @param {OrbitState} s
+ */
+export function orbitTurning(s) {
+  return (
+    Boolean(s.drag) ||
+    s.spin.yaw !== 0 ||
+    s.spin.elevation !== 0 ||
+    Math.abs(s.goal.yaw - s.yaw) > 1e-3 ||
+    Math.abs(s.goal.elevation - s.elevation) > 1e-3
+  );
+}
+
+/**
+ * One frame: a fling coasts, the view eases toward its goal, and the orbit's point eases toward
+ * where it's wanted (NEWT at `focus`, his spot on the floor and how high his feet are: the rest
+ * point, the zoom's share of the way to him, keeping him on screen), never letting him past
+ * ORBIT.keepOut of the clear space once he's on screen; held still while he's held, and while a
+ * pan holds the view until he walks off the screen.
  * @param {OrbitState} s
  * @param {number} dt
- * @param {XZ|null} focus
+ * @param {{x: number, z: number, y?: number}|null} focus
  */
 export function orbitStep(s, dt, focus) {
   if (!(dt > 0)) return;
@@ -295,13 +595,51 @@ export function orbitStep(s, dt, focus) {
     Math.abs(s.goal.distance - s.distance) < 1e-3 * s.home.distance
   )
     s.resetting = false;
-  const share = followShare(s);
-  const want = focus
-    ? { x: s.centre.x + (focus.x - s.centre.x) * share, z: s.centre.z + (focus.z - s.centre.z) * share }
-    : s.centre;
+  followStep(s, dt, focus);
+}
+
+/**
+ * The orbit's point this frame (orbitStep's second half): toward where it's wanted, softly,
+ * never letting NEWT past ORBIT.keepOut of the clear space once he's on screen (just let go out
+ * past it, carried there: eased back inside at ORBIT.settle, so the view never jumps).
+ * @param {OrbitState} s
+ * @param {number} dt
+ * @param {{x: number, z: number, y?: number}|null} focus
+ */
+function followStep(s, dt, focus) {
+  if (s.holding) {
+    s.seen = true;
+    return;
+  }
+  const want = wanted(s, focus);
   const f = 1 - Math.exp(-dt / ORBIT.follow);
   s.target.x += (want.x - s.target.x) * f;
   s.target.z += (want.z - s.target.z) * f;
+  if (!focus) return;
+  const box = newtBox(s, focus, s.target);
+  const out = box ? past(s, box, ORBIT.keepOut) : null;
+  if (!out) s.settling = false;
+  if (s.panned) {
+    // (Walked off the screen by himself, not panned off it: the follow takes him again, from the
+    // edge he went out by.)
+    if (out && s.seen && !s.panning) s.panned = false;
+    else {
+      s.seen = !out;
+      return;
+    }
+  }
+  if (out && box && s.seen && !s.followAll) {
+    const k = s.settling ? 1 - Math.exp(-dt / ORBIT.settle) : 1;
+    const d = stepFor(s, { x: out.x * k, y: out.y * k }, box.depth);
+    s.target.x += d.x;
+    s.target.z += d.z;
+    const share = followShare(s);
+    if (share < 0.999) {
+      s.base.x += d.x / (1 - share);
+      s.base.z += d.z / (1 - share);
+    }
+    s.seen = true;
+  } else s.seen = !out;
 }
 
 /**

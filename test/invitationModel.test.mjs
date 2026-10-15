@@ -3,11 +3,14 @@
 // moves (a rest-pose export fails); the loops end where they start; every clip stays in place
 // (the page moves his root) and Held keeps the collar where it rests, so the page can hang
 // him from it; Walk and Run start on the same foot and their STRIDE values match what the
-// planted feet do, measured by forward kinematics; and the file itself: a 17-joint skin with
-// at most 4 influences, WebP textures, no Draco, no lights, 27 uniquely named nodes as
-// three.js names them, the face's UVs inside its sheet's first cell, and its size.
+// planted feet do, measured by forward kinematics; Run reaches both arms straight out in
+// front, leans forward and tips his face up to the camera (the user's reference); and the file
+// itself: a 17-joint skin with at most 4 influences, WebP textures, no Draco, no lights, 27
+// uniquely named nodes as three.js names them, the face's UVs inside its sheet's first cell,
+// and its size.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import { readGlbAnim, quatAngle, quatDistance, footStride } from './lib/glbAnim.mjs';
 import { CLIPS, CLIP_NAMES, BLENDER_BONES, STRIDE, SCALE, FPS } from '../src/invitation/clips.js';
 
@@ -115,6 +118,71 @@ test('STRIDE matches what the planted feet do (within 10%)', () => {
       `${name}: STRIDE says ${STRIDE[name]}, the feet cover ${measured.toFixed(3)} world units a cycle`,
     );
   }
+});
+
+/**
+ * Run's shape across the cycle, in glTF space (+Y up, +Z his front): each arm's upper arm
+ * (shoulder joint to elbow) and forearm (the ForeArm bone's +Y) as elevation above the
+ * horizontal and heading off straight ahead, the elbow's bend, the trunk's lean (hips to collar,
+ * from the vertical toward his front) and where his face points (the head's turn from rest
+ * applied to the rest face direction, +Z), in degrees.
+ */
+function runShape() {
+  const restWorld = glb.world(new Map());
+  const restHead = new THREE.Quaternion().setFromRotationMatrix(restWorld('Neck.001')).invert();
+  const up = (v) => Math.asin(v.y / v.length()) / DEG;
+  const off = (v) => Math.abs(Math.atan2(v.x, v.z)) / DEG;
+  return samples(clip('Run'), 48).map(([, pose]) => {
+    const w = glb.world(pose);
+    const at = (n) => new THREE.Vector3().setFromMatrixPosition(w(n));
+    const arms = ['L', 'R'].map((s) => {
+      const upper = at(`ForeArm.${s}`).sub(at(`Bicep.${s}`));
+      const fore = new THREE.Vector3(0, 1, 0).transformDirection(w(`ForeArm.${s}`));
+      return {
+        upperUp: up(upper),
+        upperOff: off(upper),
+        foreUp: up(fore),
+        foreOff: off(fore),
+        bend: upper.angleTo(fore) / DEG,
+        elbowOverShoulder: at(`ForeArm.${s}`).y - at(`Bicep.${s}`).y,
+      };
+    });
+    const trunk = at('Neck').sub(at('Bone'));
+    const turn = new THREE.Quaternion().setFromRotationMatrix(w('Neck.001')).multiply(restHead);
+    const face = new THREE.Vector3(0, 0, 1).applyQuaternion(turn);
+    return { arms, lean: Math.atan2(trunk.z, trunk.y) / DEG, faceUp: up(face) };
+  });
+}
+
+test("Run reaches both arms straight out in front at shoulder height, as the user's reference", () => {
+  const shape = runShape();
+  const arms = shape.flatMap((s) => s.arms);
+  for (const a of arms) {
+    assert.ok(Math.abs(a.upperUp) <= 20, `an upper arm ${a.upperUp.toFixed(0)}° off the horizontal`);
+    assert.ok(a.foreUp >= -15 && a.foreUp <= 25, `a forearm ${a.foreUp.toFixed(0)}° above the horizontal`);
+    assert.ok(
+      a.upperOff <= 30 && a.foreOff <= 30,
+      `an arm heads ${a.upperOff.toFixed(0)}°/${a.foreOff.toFixed(0)}° off ahead`,
+    );
+    assert.ok(a.bend <= 30, `an elbow bent ${a.bend.toFixed(0)}° (nearly straight)`);
+    assert.ok(
+      Math.abs(a.elbowOverShoulder) <= 0.45,
+      `an elbow ${a.elbowOverShoulder.toFixed(2)} off the shoulder's height`,
+    );
+  }
+  // a small pump: the arms rise and fall a little, never flail
+  const pump = Math.max(...arms.map((a) => a.foreUp)) - Math.min(...arms.map((a) => a.foreUp));
+  assert.ok(pump >= 3 && pump <= 25, `the forearms pump through ${pump.toFixed(1)}°`);
+});
+
+test('Run leans the trunk forward and tips the head back so the high camera sees his face', () => {
+  const shape = runShape();
+  const mean = (k) => shape.reduce((sum, s) => sum + s[k], 0) / shape.length;
+  assert.ok(mean('lean') >= 12, `the trunk leans ${mean('lean').toFixed(1)}° forward on average`);
+  // the toy's camera looks down from about 36° above his front: a face tipped up shows it
+  for (const s of shape)
+    assert.ok(s.faceUp >= 0 && s.faceUp <= 40, `his face points ${s.faceUp.toFixed(0)}° above the horizontal`);
+  assert.ok(mean('faceUp') >= 8, `his face points ${mean('faceUp').toFixed(1)}° up on average`);
 });
 
 test('one skin of 17 joints with at most 4 influences a vertex', () => {

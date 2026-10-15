@@ -68,6 +68,22 @@ body {
   image-rendering: auto;
 }
 
+/* ?perf: the frame times, the grid and the governor's level (stage.js), out of the way of presses. */
+.inv-perf {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top));
+  left: calc(8px + env(safe-area-inset-left));
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgb(58 51 45 / 80%);
+  color: var(--inv-paper);
+  font:
+    12px/1.4 ui-monospace,
+    monospace;
+  white-space: pre;
+  pointer-events: none;
+}
+
 /* --- Over the canvas: the status, the toolbar and the Look sheet (only they take presses). */
 .inv-hud {
   position: absolute;

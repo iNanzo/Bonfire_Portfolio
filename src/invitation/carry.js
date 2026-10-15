@@ -1,14 +1,20 @@
-// Carrying NEWT by the collar in the invitation toy: the anchor his collar follows (a critically
-// damped follow of the pointer's spot, kept inside the play area: it eases in over ~0.15 s and
-// moves smoothly whether the pointer's spot changes every frame or only every second or third
-// one, as a 60 Hz finger on a 120 Hz screen does), a damped pendulum that swings his root as the
-// anchor speeds up and slows down (procedural motion never touches his bones), the toss
-// velocity from the last ~80 ms when he's let go (none across while the pointer pushes him out
-// against the edge: the rim is invisible, so he drops right there instead of skidding along it or
-// flying back off it), and the fall that follows, with gravity and soft bounces off the play area's edges (a
-// disc's rim, or a box's sides) for a fall that reaches one, until his lowest foot meets the
-// floor. Pure: no three.js.
+// Carrying NEWT by the collar in the invitation toy. He's dragged on a vertical plane facing the
+// camera through where he was grabbed (dragPlane, gripFor: his collar's offset from the point
+// grabbed is kept, so that point stays under the cursor; dragTarget: up the screen lifts him, up
+// to CARRY.liftMax, across moves him across, never lower than he was grabbed, and once he's been
+// lifted clear of the floor never with his soles back on it: a still cursor never lifts him off
+// it). The anchor his collar hangs from is the
+// pointer's spot each frame, no lag, kept inside the play area; a damped pendulum swings his root
+// as the hold speeds up and slows down (driven by a critically damped follow of the anchor, so
+// it reads the same whether the pointer's spot changes every frame or only every second or third
+// one, as a 60 Hz finger on a 120 Hz screen does; procedural motion never touches his bones);
+// the toss velocity from the last ~80 ms when he's let go (none across while the pointer pushes
+// him out against the edge: the edge is invisible, so he drops right there instead of skidding
+// along it or flying back off it), and the fall that follows, with gravity and soft bounces off
+// the play area's edges (a disc's rim, or a box's sides) for a fall that reaches one, until his
+// lowest foot meets the floor. Pure: no three.js.
 
+import { rayPlane } from './gesture.js';
 import { centreOf, clampTo, xRange } from './steer.js';
 
 /** @typedef {import('./types.js').XYZ} XYZ */
@@ -16,10 +22,10 @@ import { centreOf, clampTo, xRange } from './steer.js';
 /** @typedef {import('./types.js').CarryState} CarryState */
 
 /**
- * follow: how fast the anchor follows the pointer's spot (rad/s: a critically damped follow,
- * about 89% of the way from his collar in 0.15 s, 2/follow s behind a steady drag; it smooths
- * out a spot that only moves on some frames, which read as a hard shake frame by frame);
- * window: seconds of samples a toss reads. The swing: a pendulum `length` long (collar to his middle) under
+ * follow: how fast the swing's drive follows the anchor (rad/s: a critically damped follow; it
+ * smooths out a spot that only moves on some frames, which read as a hard shake frame by frame);
+ * window: seconds of samples a toss reads. liftIn: seconds a finger's lift over itself (main.js)
+ * takes to come in once he's grabbed; liftMax: the highest his collar is carried, world units. The swing: a pendulum `length` long (collar to his middle) under
  * `gravity`, `damping` per second, at most `tiltMax` radians, fed accelerations up to
  * `accelMax`, integrated in steps of at most `substep`; `shakeSmooth` smooths the shake reading.
  * A toss is capped at `tossMax` across and `tossUp`/`tossDown` up and down. The fall: `fallGravity`,
@@ -28,6 +34,8 @@ import { centreOf, clampTo, xRange } from './steer.js';
 export const CARRY = {
   follow: 25,
   window: 0.08,
+  liftIn: 0.15,
+  liftMax: 5,
   length: 0.55,
   gravity: 9.8,
   damping: 2.4,
@@ -72,6 +80,7 @@ export function grab(collar, t) {
     t0: t,
     t,
     anchor: { ...p },
+    drive: { ...p },
     vel: { x: 0, y: 0, z: 0 },
     tilt: { x: 0, z: 0 },
     tiltVel: { x: 0, z: 0 },
@@ -83,9 +92,9 @@ export function grab(collar, t) {
 }
 
 /**
- * One frame held: the anchor follows `target` (where the pointer's ray meets the lift height,
- * kept inside the bounds), and the swing answers its acceleration. Updates `c` in place and
- * returns it.
+ * One frame held: the anchor is `target` (dragTarget's spot), kept inside the bounds, and the
+ * swing answers the acceleration of its drive (a critically damped follow of the anchor).
+ * Updates `c` in place and returns it.
  * @param {CarryState} c
  * @param {XYZ} target
  * @param {number} dt
@@ -100,22 +109,12 @@ export function holdStep(c, target, dt, bounds, t) {
   const pz = target.z - gz;
   const pushed = Math.hypot(px, pz);
   c.push = pushed > 1e-9 ? { x: px / pushed, z: pz / pushed } : null;
+  const anchor = { x: gx, y: target.y, z: gz };
   if (dt > 0) {
-    const [x, vx] = follow(c.anchor.x, c.vel.x, gx, dt);
-    const [y, vy] = follow(c.anchor.y, c.vel.y, target.y, dt);
-    const [z, vz] = follow(c.anchor.z, c.vel.z, gz, dt);
-    const next = { x, y, z };
+    const [x, vx] = follow(c.drive.x, c.vel.x, anchor.x, dt);
+    const [y, vy] = follow(c.drive.y, c.vel.y, anchor.y, dt);
+    const [z, vz] = follow(c.drive.z, c.vel.z, anchor.z, dt);
     const vel = { x: vx, y: vy, z: vz };
-    if (bounds) {
-      // (A follow that would carry on past the edge stops on it.)
-      const inside = clampTo(bounds, next);
-      if (inside.x !== next.x || inside.z !== next.z) {
-        vel.x = (inside.x - c.anchor.x) / dt;
-        vel.z = (inside.z - c.anchor.z) / dt;
-        next.x = inside.x;
-        next.z = inside.z;
-      }
-    }
     let ax = (vel.x - c.vel.x) / dt;
     let ay = (vel.y - c.vel.y) / dt;
     let az = (vel.z - c.vel.z) / dt;
@@ -130,8 +129,9 @@ export function holdStep(c, target, dt, bounds, t) {
     c.vel = vel;
     c.dragSpeed = Math.hypot(vel.x, vel.y, vel.z);
     c.shake += (Math.min(a, CARRY.accelMax) - c.shake) * Math.min(1, dt / CARRY.shakeSmooth);
-    c.anchor = next;
+    c.drive = { x, y, z };
   }
+  c.anchor = anchor;
   c.t = t;
   c.samples.push({ t, ...c.anchor });
   while (c.samples.length > 2 && t - c.samples[0].t > CARRY.window + 1e-9) c.samples.shift();
@@ -161,6 +161,81 @@ function swing(c, ax, ay, az, dt) {
       }
     }
   }
+}
+
+/**
+ * The plane he's dragged on: upright, through `through` (where he's grabbed: his collar), facing
+ * the camera across the floor (its normal the level way from there to the camera; +z with the
+ * camera straight overhead).
+ * @param {XYZ} camera  the camera's position
+ * @param {XYZ} through
+ * @returns {{point: XYZ, normal: XYZ}}
+ */
+export function dragPlane(camera, through) {
+  const dx = camera.x - through.x;
+  const dz = camera.z - through.z;
+  const d = Math.hypot(dx, dz);
+  return {
+    point: { x: through.x, y: through.y, z: through.z },
+    normal: d > 1e-9 ? { x: dx / d, y: 0, z: dz / d } : { x: 0, y: 0, z: 1 },
+  };
+}
+
+/**
+ * @typedef {object} Grip  how he's held: the plane he's dragged on, his collar's offset from the
+ *   point grabbed (kept, so that point stays under the cursor), when, his collar's height then,
+ *   whether he's been lifted clear of the floor since (to his hang height), and the last spot
+ *   (for a ray that misses the plane)
+ * @property {{point: XYZ, normal: XYZ}} plane
+ * @property {XYZ} offset
+ * @property {number} t0
+ * @property {number} from
+ * @property {boolean} clear
+ * @property {XYZ} last
+ */
+
+/**
+ * He's grabbed where `ray` (the cursor's: origin and direction) meets `plane`, his collar at
+ * `collar`, at `t`.
+ * @param {{o: XYZ, d: XYZ}} ray
+ * @param {{point: XYZ, normal: XYZ}} plane
+ * @param {XYZ} collar
+ * @param {number} t
+ * @returns {Grip}
+ */
+export function gripFor(ray, plane, collar, t) {
+  const at = rayPlane(ray.o, ray.d, plane) ?? collar;
+  return {
+    plane,
+    offset: { x: collar.x - at.x, y: collar.y - at.y, z: collar.z - at.z },
+    t0: t,
+    from: collar.y,
+    clear: false,
+    last: { x: collar.x, y: collar.y, z: collar.z },
+  };
+}
+
+/**
+ * Where his collar goes this frame: where `ray` meets the grip's plane, plus the grab offset
+ * (the point grabbed under the cursor), no higher than CARRY.liftMax and no lower than his
+ * collar was grabbed at, or `low` (his hang height: his soles off the floor) once he's been
+ * lifted to it (grabbed standing, his collar starts under it: held still there he stays put, the
+ * point pressed under the cursor, and he only hangs clear once the cursor lifts him clear). A
+ * ray that misses the plane keeps the last spot. Updates `g.last` and `g.clear`.
+ * @param {Grip} g
+ * @param {{o: XYZ, d: XYZ}} ray
+ * @param {number} low
+ * @returns {XYZ}
+ */
+export function dragTarget(g, ray, low) {
+  const at = rayPlane(ray.o, ray.d, g.plane);
+  if (!at) return { ...g.last };
+  const asked = at.y + g.offset.y;
+  if (asked >= low) g.clear = true;
+  const floor = g.clear ? low : Math.min(g.from, low);
+  const y = Math.min(CARRY.liftMax, Math.max(Math.min(floor, CARRY.liftMax), asked));
+  g.last = { x: at.x + g.offset.x, y, z: at.z + g.offset.z };
+  return { ...g.last };
 }
 
 /**

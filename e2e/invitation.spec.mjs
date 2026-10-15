@@ -1,6 +1,6 @@
 // The invitation toy (/invitation/) in a real browser, on the production build: on a phone
 // (390×844, touch) and a desktop (1280×800) it loads to ready with no errors and draws NEWT on his
-// floor (not a blank canvas) at 96×96 (1×1 CSS px texels on the phone); it's unlisted (noindex); a Look change (24×24:
+// floor (not a blank canvas) in the Default look at 128×128 (2 device px texels on the phone); it's unlisted (noindex); a Look change (24×24:
 // 4×4 CSS px texels) survives a reload, Pixel Size Native draws a texel a device pixel at a phone's
 // full DPR with the pixel look on (and survives a reload), and Off draws smooth at the screen's
 // resolution (its smooth face reported as such); and the portfolio's
@@ -10,8 +10,18 @@
 // Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
 // turns his head, each button plays its clip, a floor tap walks him there, and the cursor turns his
-// head on a desktop. The camera: a drag on empty space turns it, the wheel and a two-finger pinch
-// zoom it, and Reset Camera brings it back. A pinch over the toolbar or the Look sheet never
+// head on a desktop (down toward a cursor below him, up at one high over him, well round toward one
+// level with his head off to the side), and running away he faces where he runs, not up at the
+// viewer, glancing back over his shoulder. The camera: a finger's drag on empty
+// space or the mouse's right-drag (on NEWT too, never holding him) turns it, the mouse's
+// left-drag on empty space and two fingers pan it with the floor under the cursor, the wheel
+// and a two-finger pinch zoom it, the canvas shows no context menu, and Reset Camera brings it
+// back and clears the pan. A mouse drag keeps the point NEWT was grabbed by under the cursor
+// and lifts him higher than the old fixed carry height. He talks: clicked until he speaks, a line
+// of the admin's types out in a bubble over his head, clear of the toolbar (and of the open Look
+// sheet, never over his face), heard whole by a screen reader, gone when its time is up, on its
+// own time as talk counts it (a hidden tab pauses both); on a phone too, tapped, with the
+// full-width sheet open, and lifted to the top of the screen (beside his head, never over him). A pinch over the toolbar or the Look sheet never
 // zooms the page, only the left mouse button holds or walks him, and the Look sheet holds focus
 // (Tab goes round inside it, the toolbar it covers is inert), closes on Escape wherever focus
 // is, and leaves NEWT in sight above or beside it (Reset Camera too, on its way back). Every wait is on a state through `?test`'s window.__invitation, never on a duration (CI's
@@ -143,6 +153,32 @@ async function lookOpenWithNewtInSight(page) {
   return last;
 }
 /**
+ * The speech bubble as it's drawn now, with what it keeps clear of, client px: its rect, his
+ * head, the toolbar's, the open Look sheet's (null while it's shut) and the stage's; whether it
+ * waits out of sight (is-away) and the way its tail points.
+ */
+const bubbleAt = (page) =>
+  page.evaluate(() => {
+    const rect = (e) => {
+      if (!e || e.hidden) return null;
+      const r = e.getBoundingClientRect();
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+    };
+    const el = document.querySelector('[data-stage] .inv-bubble');
+    return {
+      box: rect(el),
+      away: !el || el.hidden || el.classList.contains('is-away'),
+      tail: el?.dataset.tail ?? null,
+      head: window.__invitation.screen('head'),
+      bar: rect(document.querySelector('.inv-toolbar')),
+      sheet: rect(document.querySelector('.inv-sheet')),
+      stage: rect(document.querySelector('[data-stage]')),
+    };
+  });
+/** Whether two client rects overlap. */
+const overlaps = (a, b) =>
+  Boolean(a && b) && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+/**
  * His bones (from his root) every frame the page draws for `ms`: how many frames, how many of
  * them showed a new pose, the seconds it took, and his feet's spread each frame (world units).
  */
@@ -217,10 +253,11 @@ test.describe('on a phone', () => {
     await expect(page).toHaveTitle('Invitation');
     const snap = await snapshot(page);
     expect(snap.ready).toBe(true);
-    // 96×96 by default: NEWT about 96 texels tall, a texel 3 device px (a CSS px) here.
-    expect(snap.resolution).toBe(96);
-    expect(snap.pixelScale, 'a texel is a CSS px').toBe(1);
-    expect(snap.newtTexels).toBeCloseTo(99.4, 0);
+    // 128×128 by default (the Default look): NEWT about 128 texels tall, a texel 2 device px
+    // (two thirds of a CSS px) here, 149 texels.
+    expect(snap.resolution).toBe(128);
+    expect(snap.pixelScale, 'a texel is 2 device px').toBeCloseTo(2 / 3, 6);
+    expect(snap.newtTexels).toBeCloseTo(149.2, 0);
     // Not a blank canvas: NEWT on the plain background, far from one flat colour.
     const pic = await picture(page);
     expect(apart(pic, flat(pic))).toBeGreaterThan(3);
@@ -243,10 +280,13 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the pixel atlas and the pixel face load alongside the glb, and the first frame waits for them', async ({
+  test('with Pixel Shirt on (and Pixel Face, every style’s own), the pixel atlas and the pixel face load alongside the glb, and the first frame waits for them', async ({
     page,
   }) => {
     const errors = watch(page);
+    await page.addInitScript(() =>
+      localStorage.setItem('invitation.look.v1', JSON.stringify({ shader: { pixelShirt: true } })),
+    );
     /** @type {number|null} when the glb was let through (it's held a while, as on a slow phone) */
     let glbAt = null;
     const asked = {};
@@ -275,6 +315,114 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
+  test('with the default look (Pixel Face on, Pixel Shirt off) the first frame waits for the pixel face, never for the pixel atlas, and NEWT wears his real plaid and his pixel face', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    /** @type {number|null} when the glb was let through (it's held a while, as on a slow phone) */
+    let glbAt = null;
+    /** @type {boolean|null} whether the page had drawn by the time the pixel atlas was let through */
+    let drawnFirst = null;
+    /** @type {boolean|null} whether it had drawn by the time the pixel face was let through */
+    let faceLate = null;
+    await page.route('**/models/newt.glb', async (route) => {
+      await sleep(1000);
+      glbAt = Date.now();
+      await route.continue();
+    });
+    await page.route(/\/models\/newt-face\.png$/, async (route) => {
+      // Held until a while after the glb: the page doesn't draw until it's in.
+      while (glbAt === null) await sleep(20);
+      await sleep(Math.max(0, glbAt + 600 - Date.now()));
+      faceLate = await page.evaluate(() => document.querySelector('[data-stage]').classList.contains('is-ready'));
+      await route.continue();
+    });
+    await page.route(/\/models\/newt-atlas-pixel\.png$/, async (route) => {
+      // (Held until the page draws, or 8 s: it never waits on it.)
+      const t0 = Date.now();
+      while (Date.now() - t0 < 8000) {
+        const drawn = await page
+          .evaluate(() => document.querySelector('[data-stage]')?.classList.contains('is-ready'))
+          .catch(() => false);
+        if (drawn) break;
+        await sleep(50);
+      }
+      drawnFirst ??= await page
+        .evaluate(() => document.querySelector('[data-stage]')?.classList.contains('is-ready'))
+        .catch(() => false);
+      await route.continue();
+    });
+    await ready(page);
+    await expect.poll(() => drawnFirst).not.toBeNull();
+    expect(drawnFirst, 'drawn before the pixel atlas came').toBe(true);
+    expect(faceLate, 'the first frame waited for the pixel face').toBe(false);
+    const snap = await snapshot(page);
+    expect(snap.atlas).toBe('original');
+    expect(typeof snap.faceSheet, `a pixel face sheet (${snap.faceSheet})`).toBe('number');
+    expect(snap.shader.pixelShirt).toBe(false);
+    expect(snap.shader.pixelFace).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test('with Pixel Face off at 32×32 his smooth face still has its eyes: dark texels inside it, between his cheeks', async ({
+    page,
+  }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32', shader: { pixelFace: false } })),
+    );
+    await calm(page);
+    const snap = await snapshot(page);
+    expect(snap.faceSheet).toBe('smooth');
+    const dpr = snap.pass.pd / snap.pixelScale;
+    const canvas = await page.locator('[data-stage] canvas').boundingBox();
+    /**
+     * Dark texels inside his face (between skin on either side), in the middle half of its rows:
+     * each texel read at its middle (the canvas's grid, `pd` device px a texel from its corner).
+     */
+    const eyes = async () => {
+      const head = await on(page, 'head');
+      const clip = { x: Math.round(head.x - 18), y: Math.round(head.y - 14), width: 36, height: 36 };
+      const { data, info } = await sharp(await page.screenshot({ clip }))
+        .removeAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const { pd } = snap.pass;
+      const at = (i, j) => {
+        const x = Math.floor(canvas.x * dpr + (i + 0.5) * pd - clip.x * dpr);
+        const y = Math.floor(canvas.y * dpr + (j + 0.5) * pd - clip.y * dpr);
+        return x >= 0 && y >= 0 && x < info.width && y < info.height
+          ? [0, 1, 2].map((c) => data[(y * info.width + x) * 3 + c])
+          : null;
+      };
+      const i0 = Math.ceil((clip.x * dpr - canvas.x * dpr) / pd);
+      const j0 = Math.ceil((clip.y * dpr - canvas.y * dpr) / pd);
+      const skin = ([r, g, b]) => r > 190 && g > 120 && r - b > 40;
+      const rows = [];
+      for (let j = j0; at(i0, j); j++) {
+        const row = [];
+        for (let i = i0; at(i, j); i++) row.push(at(i, j));
+        if (row.filter(skin).length >= 3) rows.push(row);
+      }
+      let dark = 0;
+      for (const row of rows.slice(Math.floor(rows.length / 4), Math.ceil((rows.length * 3) / 4))) {
+        const isSkin = row.map(skin);
+        for (let x = isSkin.indexOf(true) + 1; x < isSkin.lastIndexOf(true); x++) {
+          const [r, g, b] = row[x];
+          if (!isSkin[x] && 0.299 * r + 0.587 * g + 0.114 * b < 80) dark++;
+        }
+      }
+      return dark;
+    };
+    let most = 0;
+    for (let i = 0; i < 3; i++) {
+      most = Math.max(most, await eyes());
+      await framesFor(page, 200);
+    }
+    // (His pupils and lashes: 5 or 6 dark texels a frame; the mip it was sampled at before left
+    // their olive smudge, and the hair's 2 or 3.)
+    expect(most, `dark texels in his face at ${dpr}×`).toBeGreaterThanOrEqual(4);
+  });
+
   test('a Look change shows at once and survives a reload', async ({ page }) => {
     const errors = watch(page);
     await ready(page);
@@ -285,7 +433,12 @@ test.describe('on a phone', () => {
     // Pixel Size, a slider: from the coarse end one step finer by the keyboard, 24×24 (NEWT about
     // 24 texels tall: 12 device px, 4 CSS px a texel here).
     const pixel = sheet.getByRole('slider', { name: 'Pixel Size' });
-    await expect(pixel).toHaveAttribute('aria-valuetext', '96 by 96');
+    await expect(pixel).toHaveAttribute('aria-valuetext', '128 by 128');
+    // A first visit starts on the Default style, never Custom.
+    const styles = sheet.getByRole('group', { name: 'Style' });
+    await expect(styles.getByRole('radio').first()).toHaveAccessibleName('Default');
+    await expect(styles.getByRole('radio', { name: 'Default' })).toBeChecked();
+    await expect(styles.getByRole('radio', { name: 'Custom' })).toBeDisabled();
     await pixel.focus();
     await page.keyboard.press('Home');
     await expect(pixel).toHaveAttribute('aria-valuetext', '16 by 16');
@@ -296,7 +449,7 @@ test.describe('on a phone', () => {
     const coarse = await snapshot(page);
     expect(coarse.pixelScale).toBe(4);
     expect(coarse.newtTexels).toBeCloseTo(24.9, 0);
-    await sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Soft' }).check();
+    await sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'DS' }).check();
     await sheet.getByRole('button', { name: 'Done' }).click();
     await expect(sheet).toBeHidden();
     const changed = await picture(page);
@@ -307,7 +460,7 @@ test.describe('on a phone', () => {
     await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', '24 by 24');
     expect((await snapshot(page)).resolution).toBe(24);
     expect((await snapshot(page)).pixelScale).toBe(4);
-    await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Soft' })).toBeChecked();
+    await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'DS' })).toBeChecked();
     expect(errors).toEqual([]);
   });
 
@@ -425,6 +578,95 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
+  test('lifted by a finger to the top of the screen, his head stays on it, and a line he says goes beside his head, never over his body', async ({
+    page,
+  }) => {
+    await calm(page);
+    const touch = await toucher(page);
+    const from = await on(page, 'body');
+    await touch('touchStart', [from]);
+    for (let i = 1; i <= 16; i++) {
+      await touch('touchMove', [{ x: from.x, y: from.y + ((70 - from.y) * i) / 16 }]);
+      await sleep(16);
+    }
+    await until(page, (s) => s.held, 'held');
+    await framesFor(page, 500);
+    const head = await on(page, 'head');
+    expect(head.y - head.r, 'the top of his head on the screen').toBeGreaterThanOrEqual(0);
+    await page.evaluate(() => window.__invitation.say('Whoa there, up we go now!'));
+    let at = null;
+    await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
+    // Off all of him: his head and the line from it down to his feet.
+    const feet = await on(page, 'feet');
+    for (let k = 0; k <= 20; k++) {
+      const p = { x: at.head.x + ((feet.x - at.head.x) * k) / 20, y: at.head.y + ((feet.y - at.head.y) * k) / 20 };
+      const dot = { left: p.x - 1, top: p.y - 1, right: p.x + 1, bottom: p.y + 1 };
+      expect(
+        overlaps(at.box, dot),
+        `off him at (${p.x.toFixed(0)}, ${p.y.toFixed(0)}): ${JSON.stringify(at.box)}`,
+      ).toBe(false);
+    }
+    expect(['left', 'right']).toContain(at.tail);
+    expect(at.box.top).toBeGreaterThanOrEqual(at.stage.top);
+    expect(at.box.left).toBeGreaterThanOrEqual(at.stage.left);
+    expect(at.box.right).toBeLessThanOrEqual(at.stage.right);
+    expect(overlaps(at.box, at.bar), 'clear of the toolbar').toBe(false);
+    await touch('touchEnd');
+  });
+
+  test('tapped until he says something, the line types out over his head, clear of the toolbar, and in the stage', async ({
+    page,
+  }) => {
+    const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
+    const tapped = ['wave', 'spook', 'flee'].some((k) => inv.speech?.[k]?.chance > 0 && inv.lines?.[k]?.length);
+    test.skip(!tapped, 'the admin has a tap on him say nothing');
+    await calm(page);
+    const touch = await toucher(page);
+    for (let i = 0; i < 10 && !(await snapshot(page)).talk.showing; i++) {
+      const head = await on(page, 'head');
+      await touch('touchStart', [head]);
+      await touch('touchEnd');
+      await until(page, (s) => s.state !== 'idle' || Boolean(s.talk.showing), 'reacting');
+      await until(page, (s) => s.state === 'idle' || Boolean(s.talk.showing), 'back to idle', 30_000);
+    }
+    const { showing } = (await snapshot(page)).talk;
+    expect(showing, 'he said something').toBeTruthy();
+    await expect(page.locator('.inv-bubble-live')).toHaveText(`NEWT: ${showing.line}`);
+    let at = null;
+    await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
+    expect(at.tail).toBe('down');
+    expect(at.box.bottom, 'over his head').toBeLessThan(at.head.y - at.head.r);
+    expect(at.box.left).toBeLessThan(at.head.x);
+    expect(at.box.right).toBeGreaterThan(at.head.x);
+    expect(overlaps(at.box, at.bar), 'clear of the toolbar').toBe(false);
+    expect(at.box.left).toBeGreaterThanOrEqual(at.stage.left);
+    expect(at.box.right).toBeLessThanOrEqual(at.stage.right);
+    expect(at.box.top).toBeGreaterThanOrEqual(at.stage.top);
+  });
+
+  test('with the Look sheet open (a full-width sheet along the bottom), a line goes over his head above it, clear of the sheet and off his face', async ({
+    page,
+  }) => {
+    await calm(page);
+    await lookOpenWithNewtInSight(page);
+    await page.evaluate(() => window.__invitation.say('A line long enough to wrap onto a second row on a phone.'));
+    let at = null;
+    await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
+    expect(at.sheet, 'the sheet is open').toBeTruthy();
+    expect(at.sheet.left, 'the sheet runs the width of the screen').toBeLessThanOrEqual(at.stage.left + 1);
+    expect(overlaps(at.box, at.sheet), 'clear of the open Look sheet').toBe(false);
+    const face = {
+      left: at.head.x - at.head.r,
+      top: at.head.y - at.head.r,
+      right: at.head.x + at.head.r,
+      bottom: at.head.y + at.head.r,
+    };
+    expect(overlaps(at.box, face), 'never over his face').toBe(false);
+    expect(at.box.top).toBeGreaterThanOrEqual(at.stage.top);
+    expect(at.box.left).toBeGreaterThanOrEqual(at.stage.left);
+    expect(at.box.right).toBeLessThanOrEqual(at.stage.right);
+  });
+
   test('a finger on the floor turns his head toward it, left and then right', async ({ page }) => {
     await calm(page);
     const touch = await toucher(page);
@@ -539,6 +781,34 @@ test.describe('on a phone', () => {
     await touch('touchEnd');
     await until(page, (s) => s.camera.distance < camera.distance * 0.8, 'zoomed in');
     const s = await snapshot(page);
+    expect(s.state).toBe('idle');
+    expect(s.states).not.toContain('walk');
+    expect(s.states).not.toContain('held');
+  });
+
+  test('two fingers dragging together pan the view, and never tap or grab him', async ({ page }) => {
+    await calm(page);
+    const touch = await toucher(page);
+    const body = await on(page, 'body');
+    const before = await snapshot(page);
+    const at = (dy) => [
+      { x: body.x - 60, y: body.y + 150 + dy, id: 1 },
+      { x: body.x + 60, y: body.y + 150 + dy, id: 2 },
+    ];
+    const grabbed = await floorAt(page, { x: body.x, y: body.y + 150 });
+    await touch('touchStart', at(0));
+    for (let dy = -10; dy >= -120; dy -= 10) {
+      await touch('touchMove', at(dy));
+      await sleep(16);
+    }
+    await framesFor(page, 100);
+    // The floor that was under their middle is still under it, give or take a finger's wobble.
+    const now = await floorAt(page, { x: body.x, y: body.y + 30 });
+    expect(Math.hypot(now.x - grabbed.x, now.z - grabbed.z), 'the floor went with the fingers').toBeLessThan(0.15);
+    await touch('touchEnd');
+    const s = await snapshot(page);
+    expect(s.camera.panned).toBe(true);
+    expect(Math.abs(s.camera.yaw - before.camera.yaw), 'not turned').toBeLessThan(0.01);
     expect(s.state).toBe('idle');
     expect(s.states).not.toContain('walk');
     expect(s.states).not.toContain('held');
@@ -726,11 +996,14 @@ test.describe('on a desktop', () => {
     const errors = watch(page);
     await ready(page);
     const snap = await snapshot(page);
-    // 96×96 by default: NEWT 156 CSS px tall, so a texel is 2 px (96×96 and 64×64 are one step
-    // here) and he's 78 texels tall.
-    expect(snap.resolution).toBe(96);
-    expect(snap.pixelScale).toBe(2);
-    expect(snap.newtTexels).toBeCloseTo(78, 0);
+    // 128×128 by default: NEWT 156 CSS px tall, so a texel is a device pixel here (128×128 is
+    // Native on this screen) and he's 156 texels tall.
+    expect(snap.resolution).toBe('native');
+    expect(snap.pixelScale).toBe(1);
+    expect(snap.newtTexels).toBeCloseTo(156, 0);
+    // (The frame-time governor is off under ?test unless ?govern asks for it: the specs measure the grid.)
+    expect(snap.pass.governor).toEqual({ on: false, level: 0, p90: 0 });
+    expect(snap.pass.zoom).toBe(1);
     expect(
       snap.newtTall / 800,
       `NEWT is ${snap.newtTall.toFixed(1)} CSS px tall: a fifth of the short side`,
@@ -819,10 +1092,10 @@ test.describe('on a desktop', () => {
     const look = page.getByRole('button', { name: 'Look' });
     const sheet = page.getByRole('dialog', { name: 'Look' });
     const style = sheet.getByRole('group', { name: 'Style' });
-    const ds = (await snapshot(page)).shader;
+    const own = (await snapshot(page)).shader;
     const before = await newtPicture(page);
     await look.click();
-    await expect(style.getByRole('radio', { name: 'DS' })).toBeChecked();
+    await expect(style.getByRole('radio', { name: 'Default' })).toBeChecked();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeDisabled();
     await expect(sheet.getByRole('button', { name: 'Reset To Style' })).toBeDisabled();
     /** A slider by its name, moved by the keyboard. */
@@ -835,19 +1108,19 @@ test.describe('on a desktop', () => {
     const colors = await keys('Colors', 'Home');
     await expect(colors).toHaveAttribute('aria-valuetext', '4 levels');
     await expect.poll(async () => (await snapshot(page)).pass.levels, 'Colors reach the pass').toBe(4);
-    await keys('Outline Strength', 'End');
-    await expect.poll(async () => (await snapshot(page)).pass.outline).toBe(1);
+    await keys('Outline Strength', 'Home');
+    await expect.poll(async () => (await snapshot(page)).pass.outline).toBe(0);
     await sheet.getByRole('radiogroup', { name: 'Toon Shading' }).getByRole('radio', { name: '4 Bands' }).check();
-    await sheet.getByRole('radiogroup', { name: 'Shadow' }).getByRole('radio', { name: 'Soft' }).check();
-    await expect.poll(async () => (await snapshot(page)).pass.shadeSoft, 'a soft shadow edge').toBe(1);
+    await sheet.getByRole('radiogroup', { name: 'Shadow' }).getByRole('radio', { name: 'Hard' }).check();
+    await expect.poll(async () => (await snapshot(page)).pass.shadeSoft, 'a hard shadow edge').toBe(0);
     const angle = await keys('Light Angle', ...Array(6).fill('ArrowRight'));
     await expect(angle).toHaveAttribute('aria-valuetext', '90 degrees');
     await expect.poll(async () => (await snapshot(page)).pass.turn, 'the light turned round him').toBe(90);
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeChecked();
-    await expect(style.getByRole('radio', { name: 'DS' })).not.toBeChecked();
+    await expect(style.getByRole('radio', { name: 'Default' })).not.toBeChecked();
     const custom = await snapshot(page);
     expect(custom.custom).toBe(true);
-    expect(custom.shader).toEqual({ ...ds, levels: 4, outline: 1, bands: '4', edge: 'soft', turn: 90 });
+    expect(custom.shader).toEqual({ ...own, levels: 4, outline: 0, bands: '4', edge: 'hard', turn: 90 });
     await sheet.getByRole('button', { name: 'Done' }).click();
     await expect(sheet).toBeHidden();
     expect(apart(before, await newtPicture(page)), 'NEWT looks different').toBeGreaterThan(6);
@@ -855,14 +1128,14 @@ test.describe('on a desktop', () => {
     await page.reload();
     await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('invitation.look.v1') ?? '{}'));
-    expect(stored.style).toBe('ds');
-    expect(stored.shader).toEqual({ levels: 4, outline: 1, bands: '4', edge: 'soft', turn: 90 });
+    expect(stored.style).toBe('default');
+    expect(stored.shader).toEqual({ levels: 4, outline: 0, bands: '4', edge: 'hard', turn: 90 });
     expect((await snapshot(page)).shader).toEqual(custom.shader);
     expect((await snapshot(page)).pass.levels).toBe(4);
     await look.click();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeChecked();
     await expect(sheet.getByRole('slider', { name: 'Colors' })).toHaveAttribute('aria-valuetext', '4 levels');
-    // Reset To Style: DS's own values again, and focus on DS (the button it was on rests now),
+    // Reset To Style: Default's own values again, and focus on it (the button it was on rests now),
     // without the sheet jumping away from the Shader controls the user was at.
     // (Scrolled so Reset To Style sits just under the sheet's sticky header, the Style row out
     // of sight above it, as when the user has been at the Shader controls.)
@@ -876,15 +1149,15 @@ test.describe('on a desktop', () => {
     expect(scrolled).toBeGreaterThan(40);
     await sheet.getByRole('button', { name: 'Reset To Style' }).click();
     expect(Math.abs((await sheetScroll(page)).top - scrolled)).toBeLessThan(2);
-    await expect(style.getByRole('radio', { name: 'DS' })).toBeChecked();
-    await expect(style.getByRole('radio', { name: 'DS' })).toBeFocused();
+    await expect(style.getByRole('radio', { name: 'Default' })).toBeChecked();
+    await expect(style.getByRole('radio', { name: 'Default' })).toBeFocused();
     await expect(style.getByRole('radio', { name: 'Custom' })).toBeDisabled();
     await expect(sheet.getByRole('button', { name: 'Reset To Style' })).toBeDisabled();
-    expect((await snapshot(page)).shader).toEqual(ds);
+    expect((await snapshot(page)).shader).toEqual(own);
     expect((await snapshot(page)).custom).toBe(false);
     await expect(sheet.getByRole('slider', { name: 'Colors' })).toHaveAttribute(
       'aria-valuetext',
-      `${ds.levels} levels`,
+      `${own.levels} levels`,
     );
     // A change, then another Style: that style's own values, the change cleared.
     await keys('Saturation', 'Home');
@@ -1022,9 +1295,9 @@ test.describe('on a desktop', () => {
       expect(f.inside, `Shift+Tab ${i}: ${f.what}`).toBe(true);
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
-    // Motion, the 15 Shader options (Reset To Style rests until one is the user's own) and Reset
+    // Motion, the 17 Shader options (Reset To Style rests until one is the user's own) and Reset
     // Camera.
-    expect(stops.size, [...stops].join(', ')).toBe(24);
+    expect(stops.size, [...stops].join(', ')).toBe(26);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');
@@ -1042,12 +1315,17 @@ test.describe('on a desktop', () => {
     await calm(page);
     const body = await on(page, 'body');
     const home = (await snapshot(page)).camera;
-    // Round and up a long way first.
+    // Round and up a long way first (the right button turns it), and panned off to one side.
     await page.mouse.move(body.x + 300, body.y + 60);
-    await page.mouse.down();
+    await page.mouse.down({ button: 'right' });
     for (let i = 1; i <= 20; i++) await page.mouse.move(body.x + 300 - i * 22, body.y + 60 + i * 6);
-    await page.mouse.up();
+    await page.mouse.up({ button: 'right' });
     await until(page, (s) => Math.abs(s.camera.yaw) > 0.8, 'turned');
+    await page.mouse.move(body.x + 200, body.y + 100);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(body.x + 200 - i * 12, body.y + 100);
+    await page.mouse.up();
+    await until(page, (s) => s.camera.panned, 'panned');
     await lookOpenWithNewtInSight(page);
     await page.getByRole('dialog', { name: 'Look' }).getByRole('button', { name: 'Reset Camera' }).click();
     // Every frame of the way back: his head, middle and feet in sight.
@@ -1075,6 +1353,7 @@ test.describe('on a desktop', () => {
     );
     expect(Math.abs(frames.at(-1).yaw - home.yaw), 'back to the default view').toBeLessThan(0.01);
     expect(frames.length, 'it eased back over several frames').toBeGreaterThan(3);
+    expect((await snapshot(page)).camera.panned, 'the pan cleared').toBe(false);
     for (const [i, f] of frames.entries())
       expect(f.head && f.body && f.feet, `frame ${i} (yaw ${f.yaw.toFixed(2)}): ${JSON.stringify(f)}`).toBe(true);
   });
@@ -1088,7 +1367,105 @@ test.describe('on a desktop', () => {
     await until(page, (s) => s.headYaw > 0.15, 'his head turned right');
   });
 
-  test('a drag on empty space turns the camera, the wheel zooms it, and Reset Camera brings it back', async ({
+  test('NEWT talks: clicked until he says something, a line of the admin’s types out in a bubble over his head, clear of the toolbar, and a screen reader hears it whole', async ({
+    page,
+  }) => {
+    const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
+    const lines = Object.values(inv.lines ?? {})
+      .flat()
+      .map((l) => String(l).trim());
+    const tapped = ['wave', 'spook', 'flee'].some((k) => inv.speech?.[k]?.chance > 0 && inv.lines?.[k]?.length);
+    test.skip(!tapped, 'the admin has a click on him say nothing');
+    const errors = watch(page);
+    await calm(page);
+    // A click on him waves or startles him (or, clicked often, he runs off): each speaks at its
+    // chance, so click again once he's back until one does.
+    for (let i = 0; i < 10 && !(await snapshot(page)).talk.showing; i++) {
+      const head = await on(page, 'head');
+      await page.mouse.click(head.x, head.y);
+      await until(page, (s) => s.state !== 'idle' || Boolean(s.talk.showing), 'reacting');
+      await until(page, (s) => s.state === 'idle' || Boolean(s.talk.showing), 'back to idle', 30_000);
+    }
+    const { showing } = (await snapshot(page)).talk;
+    expect(showing, 'he said something').toBeTruthy();
+    expect(['wave', 'spook', 'flee']).toContain(showing.trigger);
+    expect(lines).toContain(showing.line);
+    await expect(page.locator('.inv-bubble-typed'), 'typed out to the whole line').toHaveText(showing.line);
+    await expect(page.locator('.inv-bubble-live')).toHaveText(`NEWT: ${showing.line}`);
+    let at = null;
+    await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
+    expect(at.box.bottom, 'over his head').toBeLessThan(at.head.y);
+    expect(at.box.left).toBeLessThan(at.head.x + 40);
+    expect(at.box.right).toBeGreaterThan(at.head.x - 40);
+    expect(at.tail).toBe('down');
+    expect(overlaps(at.box, at.bar), 'clear of the toolbar').toBe(false);
+    // Its time up, it goes.
+    await expect(page.locator('.inv-bubble')).toBeHidden({ timeout: 20_000 });
+    await expect(page.locator('.inv-bubble-live')).toHaveText('');
+    expect(errors).toEqual([]);
+  });
+
+  test('the bubble keeps talk’s time: a tab hidden longer than a line lasts pauses both, so the line is still up in its bubble when it comes back, and both end together', async ({
+    page,
+  }) => {
+    const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
+    const tapped = ['wave', 'spook', 'flee'].some((k) => inv.speech?.[k]?.chance > 0 && inv.lines?.[k]?.length);
+    test.skip(!tapped, 'the admin has a click on him say nothing');
+    await calm(page);
+    for (let i = 0; i < 10 && !(await snapshot(page)).talk.showing; i++) {
+      const head = await on(page, 'head');
+      await page.mouse.click(head.x, head.y);
+      await until(page, (s) => s.state !== 'idle' || Boolean(s.talk.showing), 'reacting');
+      await until(page, (s) => s.state === 'idle' || Boolean(s.talk.showing), 'back to idle', 30_000);
+    }
+    const { talk } = await snapshot(page);
+    expect(talk.showing, 'he said something').toBeTruthy();
+    // The tab goes out of sight for a second longer than the line has left (the toy's clock
+    // stops: main.js sync), then comes back.
+    const visible = (hidden) =>
+      page.evaluate((h) => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => h });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, hidden);
+    await visible(true);
+    await sleep((talk.showing.until - talk.t + 1) * 1000);
+    await visible(false);
+    await framesFor(page, 100);
+    const back = await snapshot(page);
+    expect(back.talk.showing?.line, 'talk still has the line up').toBe(talk.showing.line);
+    await expect(page.locator('.inv-bubble'), 'and its bubble still shows it').toBeVisible();
+    await expect(page.locator('.inv-bubble-live')).toHaveText(`NEWT: ${talk.showing.line}`);
+    // The bubble goes when talk's line is over, not before.
+    await expect(page.locator('.inv-bubble')).toBeHidden({ timeout: 20_000 });
+    await until(page, (s) => !s.talk.showing, 'talk’s line over too', 2_000);
+  });
+
+  test('the bubble sits under the toolbar and the Look sheet, and with the sheet open it stays clear of it and off his face', async ({
+    page,
+  }) => {
+    await calm(page);
+    const order = await page.evaluate(() => {
+      const b = document.querySelector('[data-stage] .inv-bubble');
+      const hud = document.querySelector('[data-stage] .inv-hud');
+      return Boolean(b && hud && b.compareDocumentPosition(hud) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(order, 'in the stage before the HUD, so the toolbar and the sheet draw over it').toBe(true);
+    await lookOpenWithNewtInSight(page);
+    await page.evaluate(() =>
+      window.__invitation.say('A line long enough to wrap onto a second row in the bubble, to see where it sits.'),
+    );
+    let at = null;
+    await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
+    expect(at.sheet, 'the sheet is open').toBeTruthy();
+    expect(overlaps(at.box, at.sheet), 'clear of the open Look sheet').toBe(false);
+    const face = { left: at.head.x - 4, top: at.head.y - 4, right: at.head.x + 4, bottom: at.head.y + 4 };
+    expect(overlaps(at.box, face), 'never over his face').toBe(false);
+    expect(at.box.left).toBeGreaterThanOrEqual(at.stage.left);
+    expect(at.box.top).toBeGreaterThanOrEqual(at.stage.top);
+    expect(at.box.right).toBeLessThanOrEqual(at.stage.right);
+  });
+
+  test('a right-drag turns the camera, on NEWT too and never holding him; the wheel zooms it; the canvas shows no context menu; Reset Camera brings it back', async ({
     page,
   }) => {
     const errors = watch(page);
@@ -1096,28 +1473,33 @@ test.describe('on a desktop', () => {
     const body = await on(page, 'body');
     const home = (await snapshot(page)).camera;
     expect(Math.abs(home.yaw)).toBeLessThan(1e-3);
-    // A drag across empty floor: round it goes, and NEWT stays where he was.
-    await page.mouse.move(body.x + 260, body.y + 80);
-    await page.mouse.down();
-    for (let i = 1; i <= 15; i++) await page.mouse.move(body.x + 260 - i * 16, body.y + 80 + i * 3);
-    await page.mouse.up();
+    // No context menu over the canvas: its default is turned down.
+    const menu = await page.evaluate(() => {
+      const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 200 });
+      document.querySelector('[data-stage] canvas').dispatchEvent(e);
+      return e.defaultPrevented;
+    });
+    expect(menu, 'no context menu').toBe(true);
+    // A right-drag that starts on NEWT: round it goes, and he stays where he was.
+    await page.mouse.move(body.x, body.y);
+    await page.mouse.down({ button: 'right' });
+    for (let i = 1; i <= 15; i++) await page.mouse.move(body.x - i * 16, body.y + i * 3);
+    await page.mouse.up({ button: 'right' });
     await until(page, (s) => Math.abs(s.camera.yaw) > 0.5, 'turned');
     await until(page, (s) => s.camera.elevation > home.elevation + 0.05, 'tilted up a little');
     // By the stage's width: 240 of its 1280 px turn it about 0.88 rad (three quarters of a turn
     // across the whole width), plus a little coast; never the 2.2 rad of 2π per 700 px.
-    let settled = NaN;
-    await expect
-      .poll(async () => {
-        const was = settled;
-        settled = (await snapshot(page)).camera.yaw;
-        return Math.abs(settled - was) < 1e-4;
-      }, 'the turn settles')
-      .toBe(true);
+    // (Waits on the view coming to rest, by the toy's own clock: a software-rendered browser
+    // draws slowly, so the coast and easing take longer there in real time.)
+    await until(page, (s) => !s.camera.turning, 'the turn settles');
+    const settled = (await snapshot(page)).camera.yaw;
     expect(Math.abs(settled), `turned ${settled.toFixed(2)} rad`).toBeGreaterThan(0.7);
     expect(Math.abs(settled), `turned ${settled.toFixed(2)} rad`).toBeLessThan(1.6);
     let s = await snapshot(page);
     expect(s.state).toBe('idle');
     expect(s.held).toBe(false);
+    expect(s.states, 'never held').not.toContain('held');
+    expect(s.camera.panned, 'a turn is no pan').toBe(false);
     // The wheel: toward you further, away from you closer.
     await page.mouse.move(body.x + 200, body.y);
     await page.mouse.wheel(0, 400);
@@ -1139,7 +1521,442 @@ test.describe('on a desktop', () => {
     expect(s.states).not.toContain('walk');
     expect(errors).toEqual([]);
   });
+
+  test('a right-drag that turns the camera and ends over the toolbar shows no context menu there either', async ({
+    page,
+  }) => {
+    await calm(page);
+    // Every context menu event, whatever it lands on, and whether its default was turned down.
+    await page.evaluate(() => {
+      window.__menus = [];
+      window.addEventListener(
+        'contextmenu',
+        (e) => window.__menus.push({ on: String(e.target?.className ?? ''), e }),
+        true,
+      );
+    });
+    const bar = await page.locator('.inv-toolbar').boundingBox();
+    const from = { x: bar.x + bar.width / 2 + 200, y: bar.y - 300 };
+    const to = { x: bar.x + bar.width / 2, y: bar.y + bar.height / 2 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down({ button: 'right' });
+    for (let i = 1; i <= 15; i++)
+      await page.mouse.move(from.x + ((to.x - from.x) * i) / 15, from.y + ((to.y - from.y) * i) / 15);
+    await page.mouse.up({ button: 'right' });
+    // (Chrome on Windows fires it at the button's release on what's under the cursor, the
+    // toolbar here; elsewhere at the press, on the canvas. As Windows does, at once:)
+    const late = await page.evaluate(() => {
+      const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 });
+      document.querySelector('.inv-toolbar').dispatchEvent(e);
+      return e.defaultPrevented;
+    });
+    expect(late, 'the release’s menu over the toolbar turned down').toBe(true);
+    await until(page, (s) => Math.abs(s.camera.yaw) > 0.2, 'the drag turned the camera');
+    // (Read once each has been through every listener.)
+    const menus = await page.evaluate(() => window.__menus.map((m) => ({ on: m.on, prevented: m.e.defaultPrevented })));
+    expect(menus.length, JSON.stringify(menus)).toBeGreaterThan(0);
+    for (const m of menus) expect(m.prevented, `a menu on ${m.on}`).toBe(true);
+  });
+
+  test('a left-drag on empty space pans the view: the floor under the cursor stays under it, nothing turns or zooms, he stays put, and Reset Camera clears it', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    const body = await on(page, 'body');
+    const home = await snapshot(page);
+    const from = { x: body.x + 260, y: body.y + 70 };
+    const grabbed = await floorAt(page, from);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+
+    for (let i = 1; i <= 12; i++) {
+      const at = { x: from.x - i * 18, y: from.y - i * 9 };
+      await page.mouse.move(at.x, at.y);
+      if (i % 4) continue;
+      await framesFor(page, 60);
+      const under = await floorAt(page, at);
+      expect(
+        Math.hypot(under.x - grabbed.x, under.z - grabbed.z),
+        `step ${i}: the floor under the cursor`,
+      ).toBeLessThan(0.05);
+    }
+    await page.mouse.up();
+    const s = await snapshot(page);
+    expect(s.camera.panned).toBe(true);
+    expect(
+      Math.hypot(s.camera.target.x - home.camera.target.x, s.camera.target.z - home.camera.target.z),
+    ).toBeGreaterThan(0.5);
+    expect(Math.abs(s.camera.yaw - home.camera.yaw), 'not turned').toBeLessThan(1e-3);
+    expect(Math.abs(s.camera.distance - home.camera.distance), 'not zoomed').toBeLessThan(1e-3);
+    expect(s.state).toBe('idle');
+    expect(s.states, 'a drag is no floor tap').not.toContain('walk');
+    expect(s.states).not.toContain('held');
+    // It stays where it was put while he's on screen.
+    await framesFor(page, 600);
+    const after = await snapshot(page);
+    expect(after.camera.target).toEqual(s.camera.target);
+    // Reset Camera clears it.
+    await page.getByRole('button', { name: 'Look' }).click();
+    await page.getByRole('dialog', { name: 'Look' }).getByRole('button', { name: 'Reset Camera' }).click();
+    await until(
+      page,
+      (t) =>
+        !t.camera.panned &&
+        Math.hypot(t.camera.target.x - home.camera.target.x, t.camera.target.z - home.camera.target.z) < 0.02,
+      'back where it was',
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test('a mouse drag keeps the point he was grabbed by under the cursor, up and across, and lifts him higher than the old carry height', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x, body.y);
+    await page.mouse.down();
+    await until(page, (s) => s.held, 'held');
+    let cursor = body;
+    let highest = 0;
+    // Up, across, up more, back: each stop, the grabbed point under the cursor within 2 px.
+    for (const [dx, dy] of [
+      [0, -60],
+      [90, -40],
+      [60, -120],
+      [-140, -60],
+      [-60, 80],
+    ]) {
+      for (let i = 1; i <= 6; i++) await page.mouse.move(cursor.x + (dx * i) / 6, cursor.y + (dy * i) / 6);
+      cursor = { x: cursor.x + dx, y: cursor.y + dy };
+      await framesFor(page, 120);
+      const g = await page.evaluate(() => window.__invitation.grabbed());
+      expect(g, 'held, and the grabbed point known').not.toBeNull();
+      expect(Math.hypot(g.x - cursor.x, g.y - cursor.y), `at (${cursor.x}, ${cursor.y})`).toBeLessThan(2);
+      highest = Math.max(highest, (await snapshot(page)).lift);
+    }
+    // (The old carry held his collar at one height: his root about 0.3 off the floor.)
+    expect(highest, `lifted to ${highest.toFixed(2)}`).toBeGreaterThan(1.2);
+    await page.mouse.up();
+    await until(page, (s) => s.state === 'idle' || s.state === 'flee', 'down again', 30_000);
+    const states = (await snapshot(page)).states;
+    expect(states.slice(states.lastIndexOf('held'), states.lastIndexOf('held') + 3)).toEqual(['held', 'fall', 'land']);
+    expect(errors).toEqual([]);
+  });
+
+  test('grabbed and held still, he stays put: the point pressed stays under the cursor, never lifted up off it', async ({
+    page,
+  }) => {
+    await calm(page);
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x, body.y);
+    await page.mouse.down();
+    await until(page, (s) => s.held, 'held');
+    for (let i = 1; i <= 4; i++) {
+      await framesFor(page, 150);
+      const g = await page.evaluate(() => window.__invitation.grabbed());
+      expect(Math.hypot(g.x - body.x, g.y - body.y), `${i * 150} ms on, the cursor still`).toBeLessThan(1.5);
+    }
+    await page.mouse.up();
+  });
+
+  test('a quick press-and-drag that never holds still carries him the whole way: the point pressed stays under the cursor, as after a still hold', async ({
+    page,
+  }) => {
+    /**
+     * Presses his body and goes 80 px across in four quick moves (`hold`: once he's held, as a
+     * still press makes him); his head's move once he's settled, and where the grabbed point shows.
+     */
+    const carry = async (hold) => {
+      await calm(page);
+      const body = await on(page, 'body');
+      const head = await on(page, 'head');
+      await page.mouse.move(body.x, body.y);
+      await page.mouse.down();
+      if (hold) await until(page, (s) => s.held, 'held');
+      for (let i = 1; i <= 4; i++) await page.mouse.move(body.x + i * 20, body.y);
+      await until(page, (s) => s.held, 'held');
+      await framesFor(page, 1000);
+      const now = await on(page, 'head');
+      const grabbed = await page.evaluate(() => window.__invitation.grabbed());
+      await page.mouse.up();
+      return { dx: now.x - head.x, dy: now.y - head.y, grabbed, cursor: { x: body.x + 80, y: body.y } };
+    };
+    const still = await carry(true);
+    const quick = await carry(false);
+    expect(
+      Math.abs(quick.dx - still.dx),
+      `quick: ${quick.dx.toFixed(1)} px across; held first: ${still.dx.toFixed(1)}`,
+    ).toBeLessThan(5);
+    expect(
+      Math.abs(quick.dy - still.dy),
+      `quick: ${quick.dy.toFixed(1)} px down; held first: ${still.dy.toFixed(1)}`,
+    ).toBeLessThan(5);
+    const off = Math.hypot(quick.grabbed.x - quick.cursor.x, quick.grabbed.y - quick.cursor.y);
+    expect(off, 'the point pressed under the cursor').toBeLessThan(2);
+  });
+
+  test('let go out at the screen’s edge, he’s eased back into view: the camera never jumps on the frame he drops', async ({
+    page,
+  }) => {
+    await calm(page);
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x, body.y);
+    await page.mouse.down();
+    await until(page, (s) => s.held, 'held');
+    // Carried to 12 px from the window's right edge (the cursor never leaves it), a little up.
+    const edge = page.viewportSize().width - 12;
+    for (let i = 1; i <= 20; i++)
+      await page.mouse.move(body.x + ((edge - body.x) * i) / 20, body.y - 2 * Math.min(i, 10));
+    await framesFor(page, 300);
+    // His head across the screen every frame from the moment he's let go, for 1.5 s.
+    await page.evaluate(() => {
+      window.__track = new Promise((done) => {
+        const out = [];
+        const t0 = performance.now();
+        const tick = () => {
+          out.push(window.__invitation.screen('head').x);
+          if (performance.now() - t0 < 1500) requestAnimationFrame(tick);
+          else done(out);
+        };
+        requestAnimationFrame(tick);
+      });
+    });
+    await page.mouse.up();
+    const xs = await page.evaluate(() => window.__track);
+    // An ease: no one frame's move far bigger than any other's (a snap moved him 100 to 350 px
+    // in one frame, then 10 to 20 a frame).
+    const steps = xs
+      .slice(1)
+      .map((x, i) => Math.abs(x - xs[i]))
+      .sort((p, q) => q - p);
+    const moved = xs[0] - Math.min(...xs);
+    expect(moved, `the view brought him back in by ${moved.toFixed(1)} px`).toBeGreaterThan(30);
+    expect(steps[0], `${steps[0].toFixed(1)} px in a frame, then ${steps[1].toFixed(1)}`).toBeLessThan(3 * steps[1]);
+  });
+
+  test('where he looks with a mouse: down toward a cursor below him (under the look at the viewer it rests at), up at one above him, round toward one off to a side', async ({
+    page,
+  }) => {
+    await calm(page);
+    const head = await on(page, 'head');
+    const feet = await on(page, 'feet');
+    const tall = feet.y - head.y;
+    // The cursor on him: he looks at the viewer, as he rests.
+    await page.mouse.move(head.x, head.y);
+    await framesFor(page, 700);
+    const idle = (await snapshot(page)).headPitch;
+    expect(idle, 'up at the viewer').toBeGreaterThan(0.4);
+    // Below him: his head goes down toward it, well under the look at the viewer.
+    await page.mouse.move(head.x, feet.y + tall, { steps: 4 });
+    await until(page, (s) => s.headPitch < idle - 0.2, 'his head down toward the cursor below him');
+    // Below and off to a side: turned that way, still down.
+    for (const side of [-1, 1]) {
+      await page.mouse.move(head.x + side * tall, feet.y + tall / 2, { steps: 4 });
+      await until(
+        page,
+        (s) => Math.sign(s.headYaw) === side && Math.abs(s.headYaw) > 0.15 && s.headPitch < idle - 0.15,
+        `down and ${side < 0 ? 'left' : 'right'}`,
+      );
+    }
+    // High over him: up, above the look at the viewer.
+    await page.mouse.move(head.x + 10, head.y - 3 * tall, { steps: 4 });
+    await until(page, (s) => s.headPitch > idle + 0.15, 'his head tipped up');
+    // Level with his head, far off to a side: well round toward it.
+    for (const side of [-1, 1]) {
+      await page.mouse.move(head.x + side * 4 * tall, head.y, { steps: 4 });
+      await until(page, (s) => Math.sign(s.headYaw) === side && Math.abs(s.headYaw) > 0.8, `turned ${side}`);
+    }
+  });
+
+  test('running away he faces where he runs (not up at the viewer), glancing back over his shoulder now and then', async ({
+    page,
+  }) => {
+    await calm(page);
+    await page.locator('[data-button="Run"]').click();
+    await until(page, (s) => s.state === 'flee', 'running');
+    const frames = await page.evaluate(
+      () =>
+        new Promise((done) => {
+          const inv = window.__invitation;
+          const out = [];
+          const t0 = performance.now();
+          const tick = () => {
+            const s = inv.snapshot();
+            out.push({ t: performance.now() - t0, state: s.state, yaw: s.headYaw, pitch: s.headPitch });
+            const t = performance.now() - t0;
+            if ((s.state === 'flee' || t < 300) && t < 10_000) requestAnimationFrame(tick);
+            else done(out);
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
+    // (The whole run, from 0.6 s in: his look has come round from the viewer by then.)
+    const run = frames.filter((f) => f.state === 'flee' && f.t > 600);
+    expect(run.length, 'frames of the run').toBeGreaterThan(20);
+    // (By time, not by frames: a slow software-rendered frame is a longer stretch of the run.)
+    let span = 0;
+    let ahead = 0;
+    for (let i = 1; i < run.length; i++) {
+      const dt = run[i].t - run[i - 1].t;
+      span += dt;
+      if (Math.abs(run[i].yaw) < 0.2) ahead += dt;
+    }
+    expect(ahead / span, 'his head where he runs most of the run').toBeGreaterThan(0.5);
+    expect(
+      run.some((f) => Math.abs(f.yaw) > 0.6),
+      'a glance back over his shoulder',
+    ).toBe(true);
+    for (const f of run) expect(f.pitch, 'his chin never up at the viewer').toBeLessThan(0.2);
+  });
 });
+
+test.describe('on a 1429×1115 desktop', () => {
+  test.use({ viewport: { width: 1429, height: 1115 } });
+
+  test('a first visit’s Look sheet reads the default 128×128 (it draws as 96×96 does here) and the Default style', async ({
+    page,
+  }) => {
+    await ready(page, '/invitation/?test&calm&seed=3');
+    await page.getByRole('button', { name: 'Look' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await expect(sheet.locator('[data-pixel-value]')).toHaveText('128×128');
+    await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', '128 by 128');
+    await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Default' })).toBeChecked();
+    expect((await snapshot(page)).resolution).toBe(128);
+  });
+});
+
+test.describe('on a hi-DPI desktop', () => {
+  test.use({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+
+  test('with Pixel Shirt on at 128×128 his shirt is the Pixel Size’s to decide: zoomed in (bigger blocks) or with the governor a step coarser, it keeps the real plaid', async ({
+    page,
+  }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '128', shader: { pixelShirt: true } })),
+    );
+    await ready(page, '/invitation/?test&calm&seed=3');
+    const base = await snapshot(page);
+    // (He's about 156 texels tall here: the glb's own plaid, over ORIGINAL_ATLAS_TEXELS.)
+    expect(base.atlas).toBe('original');
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x + 200, body.y);
+    for (let i = 0; i < 6; i++) {
+      await page.mouse.wheel(0, -60);
+      await framesFor(page, 250);
+      const s = await snapshot(page);
+      expect(
+        s.atlas,
+        `zoomed ${(s.cameraHome.distance / s.camera.distance).toFixed(2)}×, ${s.pass.pd} px a texel`,
+      ).toBe('original');
+    }
+    expect((await snapshot(page)).pass.pd, 'the blocks grew with the zoom').toBeGreaterThan(base.pass.pd);
+    // The governor a level coarser (a busy page) changes the texels, not the shirt.
+    await ready(page, '/invitation/?test&calm&seed=3&govern');
+    await page.evaluate(() => {
+      const spin = () => {
+        if (window.__calm) return;
+        const t = performance.now();
+        while (performance.now() - t < 35);
+        requestAnimationFrame(spin);
+      };
+      requestAnimationFrame(spin);
+    });
+    await until(page, (s) => s.pass.governor.level === 1, 'a level coarser', 15_000);
+    expect((await snapshot(page)).atlas).toBe('original');
+    await page.evaluate(() => (window.__calm = true));
+  });
+});
+
+test.describe('on a small window', () => {
+  // (Few texels at 32×32, so the frames are quick even on CI's software WebGL: only the busy
+  // page below makes them slow.)
+  test.use({ viewport: { width: 640, height: 400 } });
+
+  test('with slow frames the governor makes the texels a device pixel coarser, never finer than the Pixel Size, takes it back when that doesn’t help, and ?perf shows it', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await page.addInitScript(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32' })));
+    await ready(page, '/invitation/?test&calm&seed=3&perf&govern');
+    const base = await snapshot(page);
+    expect(base.pass.governor.on).toBe(true);
+    expect(base.pass.governor.level).toBe(0);
+    const perf = page.locator('.inv-perf');
+    await expect(perf).toContainText('fps');
+    await expect(perf).toContainText(`${base.texels.w}×${base.texels.h} texels`);
+    // A busy page: 35 ms of work every frame, so frames stay slow whatever the grid.
+    await page.evaluate(() => {
+      const spin = () => {
+        if (window.__calm) return;
+        const t = performance.now();
+        while (performance.now() - t < 35);
+        requestAnimationFrame(spin);
+      };
+      requestAnimationFrame(spin);
+    });
+    // One level coarser: a device pixel more a texel, fewer texels.
+    await until(page, (s) => s.pass.governor.level === 1, 'a level coarser', 15_000);
+    const coarse = await snapshot(page);
+    expect(coarse.pass.pd).toBe(base.pass.pd + 1);
+    expect(coarse.pixelScale).toBeCloseTo(base.pixelScale + 1 / devicePixelRatioOf(base), 6);
+    expect(coarse.texels.w).toBeLessThan(base.texels.w);
+    expect(coarse.resolution, 'the Pixel Size stays the user’s').toBe(32);
+    await expect(perf).toContainText('(+1 slow)');
+    // Fewer texels don't help a busy CPU: taken back, never finer than the Pixel Size.
+    await until(page, (s) => s.pass.governor.level === 0, 'taken back', 15_000);
+    const back = await snapshot(page);
+    expect(back.pass.pd).toBe(base.pass.pd);
+    expect(back.pixelScale).toBe(base.pixelScale);
+    await page.evaluate(() => (window.__calm = true));
+    expect(errors).toEqual([]);
+  });
+
+  test('zoomed in at 32×32 the texels grow with NEWT, so he stays about 32 pixels tall, and zoomed out they shrink; Native never changes', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      if (!localStorage.getItem('invitation.look.v1'))
+        localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32' }));
+    });
+    await calm(page);
+    const base = await snapshot(page);
+    const canvas = page.locator('[data-stage] canvas');
+    const box = await canvas.boundingBox();
+    await page.mouse.move(box.x + 60, box.y + 60);
+    for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -240);
+    await until(page, (s) => s.camera.distance < base.camera.distance * 0.75, 'zoomed in');
+    await framesFor(page, 800);
+    const near = await snapshot(page);
+    const k = base.camera.distance / near.camera.distance;
+    expect(near.pass.zoom).toBeCloseTo(k, 2);
+    expect(near.pixelScale, 'bigger texels zoomed in').toBeGreaterThan(base.pixelScale);
+    expect(Number.isInteger(near.pass.pd), 'whole device pixels').toBe(true);
+    expect(near.newtTexels / 32).toBeGreaterThan(0.7);
+    expect(near.newtTexels / 32).toBeLessThan(1.4);
+    // Zoomed out past the default view: smaller texels (never under a device pixel).
+    for (let i = 0; i < 14; i++) await page.mouse.wheel(0, 240);
+    await until(page, (s) => s.camera.distance > base.camera.distance * 1.4, 'zoomed out');
+    await framesFor(page, 800);
+    const far = await snapshot(page);
+    expect(far.pixelScale, 'smaller texels zoomed out').toBeLessThan(base.pixelScale);
+    expect(far.pass.pd).toBeGreaterThanOrEqual(1);
+    // Native: a texel a device pixel at any zoom.
+    await page.evaluate(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: 'native' })));
+    await page.reload();
+    await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
+    await page.mouse.move(box.x + 60, box.y + 60);
+    for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -240);
+    await framesFor(page, 800);
+    const native = await snapshot(page);
+    expect(native.pass.pd).toBe(1);
+  });
+});
+
+/** The device pixel ratio a snapshot was drawn at (CSS px a texel over device px a texel). */
+const devicePixelRatioOf = (s) => s.pass.pd / s.pixelScale;
 
 test("the portfolio's first load carries no invitation code", async ({ page }) => {
   const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');

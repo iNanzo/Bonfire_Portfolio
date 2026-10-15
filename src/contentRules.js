@@ -19,6 +19,10 @@ import {
 import { contrast, HEX_RE, ID_RE, isObj, WEAPON_KEYS } from './ruleBasics.js';
 import { PIXEL_SIZES } from './pixelSizes.js';
 import { validateScenes } from './scenes.js';
+import { LEGACY_SHADER, MOTIONS, STYLES } from './invitation/look.js';
+import { PIXEL_SIZES as INVITATION_PIXEL_SIZES } from './invitation/pixels.js';
+import { SHADER_CONTROLS } from './invitation/shader.js';
+import { LINE_MAX, LINES_MAX, SPEECH_RANGES, TRIGGERS } from './invitation/speech.js';
 
 // The basics moved to ruleBasics.js (so scenes.js can use them); re-exported for everyone
 // who imports them from here.
@@ -208,6 +212,133 @@ export function validateEffects(e, err, base = 'effects') {
 }
 
 /**
+ * The styles the invitation toy's Default look can be built on: its presets (looks/), not a
+ * Default style of its own (that's what the defaults make).
+ */
+export const INVITATION_STYLES = STYLES.filter((k) => k !== 'default');
+/** A line this long (characters) still fits, but wraps a lot in NEWT's bubble: a warning. */
+export const LINE_LONG = 80;
+
+/** The triggers NEWT speaks on, as plain names (content keys). */
+const TRIGGER_KEYS = /** @type {string[]} */ (TRIGGERS);
+
+/**
+ * Check the invitation toy's section (content.json `invitation`): its default look (`defaults`:
+ * the look as the toy stores it, src/invitation/look.js, with every Shader value within its
+ * control, shader.js SHADER_CONTROLS), its speech settings (`speech`: the quiet spell before an
+ * idle line, each trigger's chance and cooldown, speech.js SPEECH_RANGES) and its lines (`lines`:
+ * each trigger's list of text, at most LINES_MAX of at most LINE_MAX characters). Every part and
+ * value is optional: the toy falls back on its own (speech.js speechFrom, linesFrom; look.js
+ * validLook). `err(path, message)` gets paths like `invitation.lines.wave[2]`; `warn` too.
+ */
+export function validateInvitation(inv, err, warn, base = 'invitation') {
+  if (!isObj(inv)) return err(base, 'Must be a group of fields.');
+  const at = (p) => `${base}.${p}`;
+  const check = {
+    at,
+    err,
+    warn,
+    /** A group of fields, or an error. */
+    group(v, p) {
+      if (isObj(v)) return true;
+      err(at(p), 'Must be a group of fields.');
+      return false;
+    },
+    oneOf(v, list, p) {
+      if (!list.includes(v)) err(at(p), `One of: ${list.join(', ')}.`);
+    },
+    bool(v, p) {
+      if (typeof v !== 'boolean') err(at(p), 'Must be on or off.');
+    },
+    /** @param {unknown} v @param {Array<number|string>} range [min, max, …] @param {string} p */
+    num(v, range, p) {
+      const [min, max] = range;
+      if (typeof v !== 'number' || !Number.isFinite(v)) err(at(p), 'Must be a number.');
+      else if (v < Number(min) || v > Number(max)) err(at(p), `Between ${min} and ${max}.`);
+    },
+  };
+  for (const k of Object.keys(inv)) if (!['defaults', 'speech', 'lines'].includes(k)) err(at(k), 'Unknown section.');
+  if (inv.defaults !== undefined && check.group(inv.defaults, 'defaults')) invitationDefaults(inv.defaults, check);
+  if (inv.speech !== undefined && check.group(inv.speech, 'speech')) invitationSpeech(inv.speech, check);
+  if (inv.lines !== undefined && check.group(inv.lines, 'lines')) invitationLines(inv.lines, check);
+}
+
+/** The invitation's default look: the stored look's fields, each from its list or a switch. */
+function invitationDefaults(d, check) {
+  for (const [k, v] of Object.entries(d)) {
+    const p = `defaults.${k}`;
+    if (k === 'pixelSize') check.oneOf(v, INVITATION_PIXEL_SIZES, p);
+    else if (k === 'dither' || k === 'outlines') check.bool(v, p);
+    else if (k === 'style') check.oneOf(v, INVITATION_STYLES, p);
+    else if (k === 'motion') check.oneOf(v, MOTIONS, p);
+    else if (k === 'shader') {
+      if (check.group(v, p))
+        for (const [key, value] of Object.entries(v)) shaderValue(key, value, `${p}.${key}`, check);
+    } else check.err(check.at(p), 'Unknown setting.');
+  }
+}
+
+/**
+ * One Shader value: within its control's range or steps, one of its choices, or a switch; an old
+ * switch that's been split (look.js LEGACY_SHADER: the toy still reads it) a switch too, with a
+ * warning naming the ones to set instead.
+ */
+function shaderValue(key, value, p, check) {
+  const c = SHADER_CONTROLS.find((x) => x.key === key);
+  const split = Object.keys(LEGACY_SHADER).filter((k) => LEGACY_SHADER[k] === key);
+  if (!c && split.length) {
+    check.bool(value, p);
+    const names = split.map((k) => SHADER_CONTROLS.find((x) => x.key === k)?.label ?? k);
+    check.warn(check.at(p), `Split into ${names.join(' and ')}: set those instead.`);
+  } else if (!c) check.err(check.at(p), 'Unknown setting.');
+  else if (c.kind === 'switch') check.bool(value, p);
+  else if (c.kind === 'choice')
+    check.oneOf(
+      value,
+      c.options.map((o) => o.value),
+      p,
+    );
+  else if (c.steps) check.oneOf(value, c.steps, p);
+  else check.num(value, [c.min, c.max], p);
+}
+
+/** The invitation's speech: the quiet spell, then each trigger's chance and cooldown. */
+function invitationSpeech(s, check) {
+  for (const [k, v] of Object.entries(s)) {
+    const p = `speech.${k}`;
+    if (k === 'idleMin' || k === 'idleMax') check.num(v, SPEECH_RANGES.idle, p);
+    else if (!TRIGGER_KEYS.includes(k)) check.err(check.at(p), 'Unknown trigger.');
+    else if (check.group(v, p))
+      for (const [key, value] of Object.entries(v)) {
+        if (key === 'chance' || key === 'cooldown') check.num(value, SPEECH_RANGES[key], `${p}.${key}`);
+        else check.err(check.at(`${p}.${key}`), 'Unknown setting.');
+      }
+  }
+  if (typeof s.idleMin === 'number' && typeof s.idleMax === 'number' && s.idleMin > s.idleMax)
+    check.err(check.at('speech.idleMax'), 'Must be at least the shortest quiet spell.');
+}
+
+/** The invitation's lines: each trigger's list of short text (a long one is a warning). */
+function invitationLines(l, check) {
+  for (const [k, list] of Object.entries(l)) {
+    const p = `lines.${k}`;
+    if (!TRIGGER_KEYS.includes(k)) check.err(check.at(p), 'Unknown trigger.');
+    else if (!Array.isArray(list)) check.err(check.at(p), 'Must be a list.');
+    else if (list.length > LINES_MAX) check.err(check.at(p), `At most ${LINES_MAX} lines.`);
+    else list.forEach((line, i) => lineText(line, check.at(`${p}[${i}]`), check));
+  }
+}
+
+/** One line: text, not empty, short enough for his bubble. */
+function lineText(line, q, check) {
+  const n = typeof line === 'string' ? Array.from(line.trim()).length : 0;
+  if (typeof line !== 'string') check.err(q, 'Must be text.');
+  else if (!n) check.err(q, 'Can’t be empty.');
+  else if (n > LINE_MAX) check.err(q, `At most ${LINE_MAX} characters (it has to fit his bubble).`);
+  else if (n > LINE_LONG) check.warn(q, `Over ${LINE_LONG} characters: it wraps a lot in his bubble.`);
+}
+
+/**
  * Check a whole content object. Returns [{ path, message }] (empty when it's fine);
  * paths look like `projects[2].images[0].alt`. `warnings` are allowed through.
  */
@@ -319,6 +450,10 @@ export function validateContent(c) {
   // in full when it's there (scenes.js), against the site's own void when a scene keeps
   // the site's scenery colors.
   if (c.scenes !== undefined) validateScenes(c.scenes, err, 'scenes', { voidHex: c.effects?.colors?.void });
+
+  // The invitation toy (/invitation/): optional too (content from before it has none), checked
+  // in full when it's there.
+  if (c.invitation !== undefined) validateInvitation(c.invitation, err, warn);
 
   // hero
   if (obj(c.hero, 'hero')) {
