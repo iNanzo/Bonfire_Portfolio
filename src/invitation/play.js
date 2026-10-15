@@ -20,7 +20,9 @@
 //                           screenAim: down toward a cursor below his head, up at one above,
 //                           round toward one to a side, a profile for one behind him; without
 //                           a ray, its floor spot lifted by LOOK.floorBias so his cap leaves his
-//                           face showing), and "ahead" meaning toward the viewer
+//                           face showing); "ahead" meaning toward the viewer; running away,
+//                           ahead is where he runs, chin level, and the pursuer is aimed at for
+//                           his glances back
 //   lookShare               how much of the look goes on: clips that lift his head to show his
 //                           face themselves (Wave, the Sit trio) take only HEAD_SHARE of it, so
 //                           the look never cricks it back further
@@ -28,7 +30,7 @@
 import { blendStep, blendTarget, gaitPhase, mainClip, movingShare, runShare } from './blend.js';
 import { CARRY, fallStep, grab, holdStep, toss } from './carry.js';
 import { fadeFor } from './clips.js';
-import { LOOK, aimAngles, screenAim, viewerAim } from './lookAt.js';
+import { LOOK, aimAngles, aimAt, screenAim, viewerAim } from './lookAt.js';
 import { steer } from './steer.js';
 
 /** @typedef {import('./types.js').Body} Body */
@@ -177,6 +179,9 @@ export function twinWeights(weights, clip) {
   return { ...weights, [twin]: (weights[twin] ?? 0) + (weights[clip] ?? 0), [clip]: 0 };
 }
 
+/** Running away: where he runs, his chin level (lookAt.js LOOK.runPitch). */
+const RUN_AHEAD = Object.freeze({ yaw: 0, pitch: LOOK.runPitch });
+
 /**
  * Where he looks this frame, for lookStep: `aim` (null when the mode has none) and `ahead`.
  * - 'camera': the camera;
@@ -184,13 +189,17 @@ export function twinWeights(weights, clip) {
  *   (turned from the viewer toward the cursor, so his gaze points at it on screen), not
  *   clamped, so lookStep keeps a target behind him on the side his head is turned to; without
  *   one, its floor spot, lifted by LOOK.floorBias; null without a pointer;
- * - 'forward', 'back': no aim.
- * `ahead` is toward the viewer (lookAt.js viewerAim).
+ * - 'forward': no aim;
+ * - 'back': the pursuer on the floor (BrainOut.look.at), null without one.
+ * `ahead` is toward the viewer (lookAt.js viewerAim), except running away ('back'): where he
+ * runs, his chin level, whatever the camera.
  * @param {'pointer'|'camera'|'forward'|'back'} mode  BrainOut.look.mode
- * @param {{head: XYZ, yaw: number, camera: XYZ, pointer: {floor: XZ|null, onNewt: boolean, ray?: {o: XYZ, d: XYZ}|null}|null}} o
+ * @param {{head: XYZ, yaw: number, camera: XYZ, pointer: {floor: XZ|null, onNewt: boolean, ray?: {o: XYZ, d: XYZ}|null}|null, pursuer?: XZ|null}} o
  * @returns {{aim: Aim|null, ahead: Aim}}
  */
-export function lookAim(mode, { head, yaw, camera, pointer }) {
+export function lookAim(mode, { head, yaw, camera, pointer, pursuer = null }) {
+  if (mode === 'back')
+    return { aim: pursuer ? aimAt(head, yaw, { x: pursuer.x, y: 0, z: pursuer.z }) : null, ahead: RUN_AHEAD };
   const ahead = viewerAim(head, yaw, camera);
   if (mode === 'camera') return { aim: aimAngles(head, yaw, camera), ahead };
   if (mode !== 'pointer' || !pointer) return { aim: null, ahead };

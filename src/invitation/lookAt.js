@@ -12,9 +12,9 @@
 // behind him) a profile on its side, chin up or down with the cursor, and his head keeps to the
 // side it's turned to until the target is clearly round the other side (no flip from shoulder
 // to shoulder). With no pointer for 1.5 s he looks ahead and glances about every 3–7 s.
-// Running away, he looks where he runs, his chin up toward the viewer as "ahead" has it, and
-// glances over his shoulder about every 1.2 s, the glances smaller and fewer the more the camera
-// is in front of him (LOOK.backFront). "Ahead" is otherwise the viewer (viewerAim): up at the camera, faded back to
+// Running away he looks where he runs, chin level (against the Run clip's own lift), with a
+// quick, brief look back over his shoulder every 1.4–2.4 s, toward the pursuer's side when
+// there is one. "Ahead" is otherwise the viewer (viewerAim): up at the camera, faded back to
 // straight ahead as he turns away from it. Looking at a floor spot without a ray, his head is
 // lifted by LOOK.floorBias so his cap leaves his face showing. A slower ease (the brain's, as
 // he's let go) brings the look and its weight round over about a second instead of a fifth.
@@ -51,9 +51,12 @@ export const SPLIT = { neck: 0.3, head: 0.7 };
  * faceSide of the way he faces, fading out by faceBack (radians: behind him there's no face to
  * keep in sight).
  *
- * Back glances: every backEvery ± backJitter s, held backHold s, at backYaw of the yaw limit;
- * with the camera dead ahead of him, backFront of that turn and half as often (his face toward
- * the viewer).
+ * Running away (mode 'back'): runPitch, his chin there while he looks where he runs (the Run
+ * clip lifts his head about 18° itself); a glance back every backEveryMin–backEveryMax s (the
+ * first backFirstMin–backFirstMax s in), held backHold s, at backYaw of the yaw limit toward the
+ * pursuer's side (or straight at it, nearer than that), its pitch toward the pursuer kept within
+ * backPitchMin–backPitchMax (radians); the look turns at backOmega, quicker than omega, so a
+ * glance is a quick look back.
  * backSide: a target further round behind him than this (radians) keeps his head on the side
  * it's turned to.
  */
@@ -78,11 +81,16 @@ export const LOOK = {
   turnDown: 15 * DEG,
   faceSide: 90 * DEG,
   faceBack: 135 * DEG,
-  backEvery: 1.2,
-  backJitter: 0.25,
-  backHold: 0.4,
+  runPitch: -12 * DEG,
+  backFirstMin: 0.5,
+  backFirstMax: 0.9,
+  backEveryMin: 1.4,
+  backEveryMax: 2.4,
+  backHold: 0.35,
+  backOmega: 14,
   backYaw: 0.95,
-  backFront: 0.35,
+  backPitchMin: -10 * DEG,
+  backPitchMax: 5 * DEG,
   backSide: 150 * DEG,
 };
 
@@ -278,8 +286,9 @@ export function splitLook(yaw, pitch) {
  * - 'pointer': at `aim` (screenAim, or the camera when the pointer is on him); when it goes, the
  *   last aim for LOOK.idleAfter, then `ahead` with idle glances.
  * - 'forward': `ahead` with idle glances around it.
- * - 'back': straight ahead (where he runs), chin up to `ahead`'s pitch, glancing over a shoulder
- *   about every LOOK.backEvery s (smaller and fewer glances with the viewer in front: backGlance).
+ * - 'back': `ahead` (where he runs, chin level: play.js lookAim), with a glance back over a
+ *   shoulder every LOOK.backEveryMin–backEveryMax s, toward `aim` (the pursuer) when there is
+ *   one; the look turns at LOOK.backOmega's quicker pace.
  * @param {LookState} s
  * @param {'pointer'|'camera'|'forward'|'back'} mode  BrainOut.look.mode
  * @param {Aim|null} aim
@@ -307,11 +316,12 @@ export function lookStep(s, mode, aim, dt, t, rng, weight = 1, ahead = AHEAD, ea
     s.nextGlance = null;
     target = aim;
   } else if (mode === 'pointer' && s.lastAim && t - s.lastAimT < LOOK.idleAfter) target = s.lastAim;
-  else if (mode === 'back') target = backGlance(s, t, rng, ahead);
+  else if (mode === 'back') target = backGlance(s, t, rng, ahead, aim);
   else target = idleGlance(s, t, rng, ahead);
   s.target = softAim(sided(target, s.yaw));
   // (A critically damped spring is 95% of the way at omega × t = 4.74.)
-  const omega = ease > 0 ? Math.min(LOOK.omega, 4.74 / ease) : LOOK.omega;
+  const pace = mode === 'back' ? LOOK.backOmega : LOOK.omega;
+  const omega = ease > 0 ? Math.min(pace, 4.74 / ease) : pace;
   [s.yaw, s.vyaw] = spring(s.yaw, s.vyaw, s.target.yaw, dt, omega);
   [s.pitch, s.vpitch] = spring(s.pitch, s.vpitch, s.target.pitch, dt, omega);
   s.yaw = clamp(s.yaw, -LIMIT.yaw, LIMIT.yaw);
@@ -365,29 +375,31 @@ function idleGlance(s, t, rng, ahead) {
 }
 
 /**
- * Where he runs, his chin up to `ahead`'s pitch (the viewer's: none once he runs away from the
- * camera), with a look over one shoulder about every backEvery s (the first one sooner). The more
- * the viewer is in front of him (`ahead` up at the camera, little turned: the camera within his
- * neck's reach of straight ahead), the smaller and fewer the glances, down to LOOK.backFront of
- * the turn and half as often with it dead ahead, so the Run clip's face stays toward the viewer.
+ * Where he runs (`ahead`), with a look back over one shoulder every backEveryMin–backEveryMax s
+ * (the first backFirstMin–backFirstMax s in), held backHold s: toward the pursuer's side (`at`,
+ * its aim from his head) at LOOK.backYaw of his reach, or right at it when it's nearer round
+ * than that, his chin toward it within backPitchMin–backPitchMax; either side, level, with no
+ * pursuer. Never toward the viewer for its own sake: the camera has no say in it.
  * @param {LookState} s
  * @param {number} t
  * @param {() => number} rng
  * @param {Aim} ahead
+ * @param {Aim|null} at
  * @returns {Aim}
  */
-function backGlance(s, t, rng, ahead) {
-  const front = ahead.pitch > 0 ? clamp(1 - Math.abs(ahead.yaw) / LIMIT.yaw, 0, 1) : 0;
-  const pitch = Math.max(0, ahead.pitch);
-  const every = () => between(rng, LOOK.backEvery - LOOK.backJitter, LOOK.backEvery + LOOK.backJitter) * (1 + front);
-  if (s.nextGlance == null) s.nextGlance = t + every() / 2;
+function backGlance(s, t, rng, ahead, at) {
+  if (s.nextGlance == null) s.nextGlance = t + between(rng, LOOK.backFirstMin, LOOK.backFirstMax);
   if (s.glance && t >= s.glanceUntil) s.glance = null;
   if (!s.glance && t >= s.nextGlance) {
-    const turn = LOOK.backYaw * LIMIT.yaw * (1 - (1 - LOOK.backFront) * front);
-    s.glance = { yaw: (rng() < 0.5 ? -1 : 1) * turn, pitch: 0 };
+    const reach = LOOK.backYaw * LIMIT.yaw;
+    const side = at && Math.abs(at.yaw) > 1e-3 ? Math.sign(at.yaw) : rng() < 0.5 ? -1 : 1;
+    s.glance = {
+      yaw: side * (at ? Math.min(Math.abs(at.yaw), reach) : reach),
+      pitch: at ? clamp(at.pitch, LOOK.backPitchMin, LOOK.backPitchMax) : 0,
+    };
     s.glanceUntil = t + LOOK.backHold;
-    s.nextGlance = t + every();
+    s.nextGlance = t + between(rng, LOOK.backEveryMin, LOOK.backEveryMax);
     s.glances++;
   }
-  return { yaw: s.glance?.yaw ?? 0, pitch };
+  return s.glance ? { yaw: s.glance.yaw, pitch: s.glance.pitch } : { yaw: ahead.yaw, pitch: ahead.pitch };
 }

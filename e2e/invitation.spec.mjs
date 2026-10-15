@@ -11,7 +11,8 @@
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
 // turns his head, each button plays its clip, a floor tap walks him there, and the cursor turns his
 // head on a desktop (down toward a cursor below him, up at one high over him, well round toward one
-// level with his head off to the side). The camera: a finger's drag on empty
+// level with his head off to the side), and running away he faces where he runs, not up at the
+// viewer, glancing back over his shoulder. The camera: a finger's drag on empty
 // space or the mouse's right-drag (on NEWT too, never holding him) turns it, the mouse's
 // left-drag on empty space and two fingers pan it with the floor under the cursor, the wheel
 // and a two-finger pinch zoom it, the canvas shows no context menu, and Reset Camera brings it
@@ -1751,6 +1752,40 @@ test.describe('on a desktop', () => {
       await page.mouse.move(head.x + side * 4 * tall, head.y, { steps: 4 });
       await until(page, (s) => Math.sign(s.headYaw) === side && Math.abs(s.headYaw) > 0.8, `turned ${side}`);
     }
+  });
+
+  test('running away he faces where he runs (not up at the viewer), glancing back over his shoulder now and then', async ({
+    page,
+  }) => {
+    await calm(page);
+    await page.locator('[data-button="Run"]').click();
+    await until(page, (s) => s.state === 'flee', 'running');
+    const frames = await page.evaluate(
+      () =>
+        new Promise((done) => {
+          const inv = window.__invitation;
+          const out = [];
+          const t0 = performance.now();
+          const tick = () => {
+            const s = inv.snapshot();
+            out.push({ t: performance.now() - t0, state: s.state, yaw: s.headYaw, pitch: s.headPitch });
+            const t = performance.now() - t0;
+            if ((s.state === 'flee' || t < 300) && t < 10_000) requestAnimationFrame(tick);
+            else done(out);
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
+    // (The whole run, from 0.6 s in: his look has come round from the viewer by then.)
+    const run = frames.filter((f) => f.state === 'flee' && f.t > 600);
+    expect(run.length, 'frames of the run').toBeGreaterThan(20);
+    const straight = run.filter((f) => Math.abs(f.yaw) < 0.2).length / run.length;
+    expect(straight, 'his head where he runs most of the run').toBeGreaterThan(0.5);
+    expect(
+      run.some((f) => Math.abs(f.yaw) > 0.6),
+      'a glance back over his shoulder',
+    ).toBe(true);
+    for (const f of run) expect(f.pitch, 'his chin never up at the viewer').toBeLessThan(0.2);
   });
 });
 

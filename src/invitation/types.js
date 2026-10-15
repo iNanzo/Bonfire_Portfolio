@@ -79,8 +79,9 @@
  * @property {{mode: 'stay'|'goto'|'flee'|'face', goal: XZ|null, speed: number}} move  goal: where a goto goes, the camera's spot to face, or where a flee's threat was last seen (with no pointer); speed: the target speed (steer ramps to it)
  * @property {import('./clips.js').FaceName} face  the base face (faces.js adds blinks)
  * @property {import('./clips.js').BlinkMode} blink
- * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number}} look  ease:
- *   a slower look, seconds for it to come round (lookAt.js lookStep), as he's let go
+ * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: XZ|null}} look  ease:
+ *   a slower look, seconds for it to come round (lookAt.js lookStep), as he's let go; at
+ *   ('back'): who he runs from on the floor, for his glances back (null with no one)
  * @property {boolean} faceCamera  turning to the camera first (a reaction, or sitting down)
  * @property {number} stress
  * @property {boolean} wander

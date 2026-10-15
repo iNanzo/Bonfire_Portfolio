@@ -502,9 +502,23 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
     const st = m.state;
     if (st === 'fall' || st === 'land') return { mode: 'forward', weight: 0, ease: T.dropLookEase };
     if (st === 'react' && m.reaction === 'Spook') return { mode: 'forward', weight: 0 };
-    if (st === 'held' || (st === 'react' && m.reaction === 'Wave')) return { mode: 'camera', weight: 1 };
-    if (st === 'flee') return { mode: 'back', weight: 1 };
+    if (st === 'react' && m.reaction === 'Wave') return { mode: 'camera', weight: 1 };
+    // (Held: at the viewer, glancing about now and then, not a fixed stare.)
+    if (st === 'held') return { mode: 'forward', weight: 1 };
+    if (st === 'flee') return { mode: 'back', weight: 1, at: pursuer() };
     return { mode: 'pointer', weight: 1 };
+  }
+
+  /**
+   * Who he runs from, on the floor: the pointer, or where it (or the tap that sent him off) was
+   * last seen, while he remembers it; null for the Run button with no pointer.
+   * @returns {XZ|null}
+   */
+  function pursuer() {
+    const p = m.input?.pointer;
+    if (p) return { x: p.x, z: p.z };
+    const th = m.threat;
+    return th && m.t - th.t <= T.threatMemory + EPS ? { x: th.x, z: th.z } : null;
   }
 
   /** @returns {BrainOut['move']} */

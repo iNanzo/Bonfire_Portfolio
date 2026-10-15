@@ -679,7 +679,7 @@ test('look-at is critically damped: it eases onto a target without overshoot', (
   close(s.weight, 0);
 });
 
-test('look-at glances are seeded: forward 1.5 s after the pointer goes, every 3–7 s; fleeing glances back about every 1.2 s', () => {
+test('look-at glances are seeded: forward 1.5 s after the pointer goes, every 3–7 s; fleeing glances back every 1.4–2.4 s', () => {
   function idle(seed) {
     const rng = createRng(seed);
     let s = createLook();
@@ -720,14 +720,14 @@ test('look-at glances are seeded: forward 1.5 s after the pointer goes, every 3�
     n = s.glances;
   }
   const mean = (back[back.length - 1].t - back[0].t) / (back.length - 1);
-  assert.ok(mean > 0.9 && mean < 1.5, `glances back every ${mean} s`);
+  assert.ok(mean > LOOK.backEveryMin && mean < LOOK.backEveryMax, `glances back every ${mean} s`);
   assert.ok(
     back.every((g) => Math.abs(g.yaw) >= 0.8 * LIMIT.yaw),
     'over the shoulder',
   );
 });
 
-test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall and Land); camera while held or waving; back while fleeing', () => {
+test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall and Land); camera while waving; forward (the viewer, with glances) while held; back while fleeing', () => {
   const brain = createBrain({ seed: 2, calm: true, bounds: BOUNDS });
   let t = 0;
   let grounded = true;
@@ -760,7 +760,7 @@ test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall an
   assert.deepEqual(out.look, { mode: 'camera', weight: 1 });
   out = step({ events: [ev('grab')] });
   assert.equal(out.state, 'held');
-  assert.deepEqual(out.look, { mode: 'camera', weight: 1 });
+  assert.deepEqual(out.look, { mode: 'forward', weight: 1 });
   grounded = false;
   out = step({ events: [ev('release')] });
   assert.equal(out.state, 'fall');
@@ -777,7 +777,9 @@ test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall an
   assert.equal(out.look.ease, TUNE.dropLookEase, 'Land: slowly');
   out = step({ button: 'Run' });
   assert.equal(out.state, 'flee');
-  assert.deepEqual(out.look, { mode: 'back', weight: 1 });
+  assert.deepEqual(out.look, { mode: 'back', weight: 1, at: null }, 'the Run button with no pointer: no pursuer');
+  out = step({ pointer: { x: 0.5, z: 0.5 } });
+  assert.deepEqual(out.look, { mode: 'back', weight: 1, at: { x: 0.5, z: 0.5 } }, 'the pointer: who he runs from');
 });
 
 test('dropped facing away, his head comes round over the fall and the landing together, not in the fall’s first fifth of a second', () => {
@@ -785,7 +787,8 @@ test('dropped facing away, his head comes round over the fall and the landing to
   const look = createLook();
   const rng = createRng(4);
   const D = 180 / Math.PI;
-  // The camera behind him: held, he looks round at it as far as his neck goes.
+  // The camera off to his side: held, he looks round at it ("ahead", the viewer, as lookAim
+  // gives it) as far as his neck goes.
   const camera = { yaw: 1.3 * LIMIT.yaw, pitch: 0.3 };
   let t = 0;
   let grounded = true;
@@ -802,8 +805,8 @@ test('dropped facing away, his head comes round over the fall and the landing to
       carry: null,
       ...extra,
     });
-    const aim = out.look.mode === 'camera' ? camera : null;
-    lookStep(look, out.look.mode, aim, DT, t, rng, out.look.weight, { yaw: 0, pitch: 0 }, out.look.ease);
+    const ahead = out.state === 'held' ? camera : { yaw: 0, pitch: 0 };
+    lookStep(look, out.look.mode, null, DT, t, rng, out.look.weight, ahead, out.look.ease);
     return out;
   };
   const turned = () => look.yaw * look.weight;
@@ -1033,47 +1036,64 @@ test('ahead means toward the viewer: up at the camera, fading to straight ahead 
   close(aimAngles(head, 0, { x: 0, y: 0, z: 0.1 }, 10 * D).pitch, LIMIT.pitchMin, 1e-9, 'still clamped');
 });
 
-test('running off toward the camera, his chin stays up toward it and his glances back are smaller and fewer, so his screaming face shows under his cap; running away from it, he glances right over his shoulder as before', () => {
-  /** 12 s of fleeing with `ahead`: each glance's turn, and the targets from 0.5 s on. */
-  const flee = (seed, ahead) => {
+test('running away he looks where he runs, chin level (whatever the camera), with a brief glance back over his shoulder every 1.4–2.4 s: toward the pursuer’s side when there is one, either side when there isn’t', () => {
+  const D = Math.PI / 180;
+  const ahead = { yaw: 0, pitch: LOOK.runPitch };
+  /** 12 s of fleeing with the pursuer at `at` (an aim, or null): each glance, and the targets. */
+  const flee = (seed, at) => {
     const rng = createRng(seed);
     const s = createLook();
     let t = 0;
     let n = 0;
     const glances = [];
-    const targets = [];
+    let glancing = 0;
+    let frames = 0;
     for (let i = 0; i < 12 * 60; i++) {
-      lookStep(s, 'back', null, DT, (t += DT), rng, 1, ahead);
-      if (s.glances > n) glances.push({ t, yaw: s.target.yaw });
+      lookStep(s, 'back', at, DT, (t += DT), rng, 1, ahead);
+      if (s.glances > n) glances.push({ t, yaw: s.target.yaw, pitch: s.target.pitch });
       n = s.glances;
-      if (t > 0.5) targets.push({ ...s.target });
+      frames++;
+      if (s.glance) glancing++;
+      else {
+        close(s.target.yaw, 0, 1e-9, 'where he runs');
+        close(s.target.pitch, LOOK.runPitch, 1e-9, 'chin level');
+      }
+      assert.ok(s.target.pitch <= 10 * D, 'never up at the sky or the viewer');
     }
-    return { glances, targets };
+    return { glances, share: glancing / frames };
   };
-  const gap = (g) => (g[g.length - 1].t - g[0].t) / (g.length - 1);
-  // The camera dead ahead of him (viewerAim: up at it): his chin stays up toward it, and his
-  // glances back stay small enough that his face still shows (well inside 50°, where his cap's
-  // brim hides it).
-  const front = { yaw: 0, pitch: 0.55 };
-  for (let seed = 1; seed <= 20; seed++) {
-    const { glances, targets } = flee(seed, front);
-    for (const target of targets) {
-      assert.ok(target.pitch >= front.pitch - 1e-9, `seed ${seed}: chin up (${target.pitch.toFixed(2)})`);
-      assert.ok(Math.abs(target.yaw) <= (25 * Math.PI) / 180, `seed ${seed}: turned ${target.yaw.toFixed(2)}`);
+  const gaps = (g) => g.slice(1).map((x, i) => x.t - g[i].t);
+  for (let seed = 1; seed <= 12; seed++) {
+    // The pursuer behind him on his left, then on his right, then nowhere.
+    for (const at of [{ yaw: -2.6, pitch: -0.4 }, { yaw: 2.9, pitch: -0.2 }, null]) {
+      const { glances, share } = flee(seed, at);
+      assert.ok(glances.length >= 5 && glances.length <= 10, `seed ${seed}: ${glances.length} glances in 12 s`);
+      assert.ok(glances[0].t <= LOOK.backEveryMin + 1e-6, `the first ${glances[0].t.toFixed(2)} s in`);
+      for (const gap of gaps(glances))
+        assert.ok(gap >= LOOK.backEveryMin - 1e-6 && gap <= LOOK.backEveryMax + DT, `every ${gap.toFixed(2)} s`);
+      assert.ok(share < 0.4, `brief: ${(share * 100).toFixed(0)}% of the time glancing`);
+      for (const g of glances) {
+        assert.ok(Math.abs(g.yaw) >= 0.8 * LIMIT.yaw, `seed ${seed}: over his shoulder (${(g.yaw / D).toFixed(0)}°)`);
+        if (at) assert.equal(Math.sign(g.yaw), Math.sign(at.yaw), `seed ${seed}: toward the pursuer`);
+        if (at)
+          assert.ok(
+            g.pitch < 0 && g.pitch >= LOOK.backPitchMin - 1e-9,
+            'down toward the pursuer, not the floor at his heels',
+          );
+      }
+      if (!at)
+        assert.ok(
+          seed > 3 || new Set(glances.map((g) => Math.sign(g.yaw))).size === 2,
+          `seed ${seed}: either side with no pursuer`,
+        );
     }
-    assert.ok(glances.length >= 3, `seed ${seed}: he still glances back (${glances.length})`);
-    assert.ok(gap(glances) > 1.5 * LOOK.backEvery, `seed ${seed}: every ${gap(glances).toFixed(2)} s, fewer`);
   }
-  // The camera behind him (ahead: straight ahead): right over his shoulder, as often as before.
-  const { glances } = flee(3, { yaw: 0, pitch: 0 });
-  assert.ok(
-    glances.every((g) => Math.abs(g.yaw) >= 0.9 * LIMIT.yaw),
-    'over the shoulder',
-  );
-  assert.ok(gap(glances) > 0.9 && gap(glances) < 1.5, `every ${gap(glances).toFixed(2)} s`);
+  // The pursuer roughly ahead (he runs past it): the glance goes right to it.
+  const { glances } = flee(2, { yaw: 0.4, pitch: -0.1 });
+  for (const g of glances) close(g.yaw, 0.4, 1e-9);
 });
 
-test('looking ahead, around and back: forward and an idle pointer aim at "ahead", glances go around it; fleeing still looks where he runs', () => {
+test('looking ahead, around and back: forward and an idle pointer aim at "ahead", glances go around it; fleeing looks at its own ahead', () => {
   const ahead = { yaw: 0.2, pitch: 0.5 };
   const rng = createRng(4);
   let s = createLook();
@@ -1096,8 +1116,8 @@ test('looking ahead, around and back: forward and an idle pointer aim at "ahead"
   const back = lookStep(createLook(), 'back', null, DT, 0.01, rng, 1, ahead);
   assert.deepEqual(
     back.target,
-    { yaw: 0, pitch: ahead.pitch },
-    'running off, he looks where he runs, chin up to the viewer',
+    { yaw: ahead.yaw, pitch: ahead.pitch },
+    'running off, he looks at "ahead" (lookAim gives where he runs, chin level)',
   );
   // Without `ahead`, ahead is straight ahead, as before.
   close(lookStep(createLook(), 'forward', null, DT, 0.01, createRng(1)).target.pitch, 0);
