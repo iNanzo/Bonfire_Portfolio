@@ -28,8 +28,12 @@ unlisted: nothing links to it and search engines are asked not to index it.
   zoom: down when you point below his head, up when you point over him, round toward it off to
   a side, and a profile on its side when you point somewhere behind him he can't turn to. Close
   to his head (or on him) he looks at you, and the further away you point the further his face
-  turns from you toward it (down least, so his face still shows under his cap). Otherwise he
-  looks at you.
+  turns from you toward it: a little under his chin his eyes still peek out under his cap, and
+  his chin keeps going down the further below you point (far below him his face goes under his
+  cap); above him his head tips further back the higher you point, his chest leaning back with
+  it; far round to a side his chest twists with his head. With the camera turned to his side he
+  still looks down at a point below him (his head comes round to you first). Otherwise he looks
+  at you.
 - **Turn the camera:** with a finger, drag empty space; with a mouse, drag with the right
   button (anywhere, on him too; it never picks him up). Across goes round him (a drag across
   the whole screen goes about three quarters of the way round, on a phone or a computer alike),
@@ -218,20 +222,24 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
     the camera the cursor lies some heads (`LOOK.headSize`, 0.53) from his head in some
     direction on screen, and his face turns from the line to the camera toward that direction,
     round that line, so on screen his gaze points at the cursor; none within `LOOK.deadZone`
-    (0.3 heads: at the viewer), then eased out over `LOOK.ramp` (2 heads) to `turnSide` (65°),
-    `turnDown` (15°) or `turnUp` (60°, no further than his neck's 55° from the camera's pitch)
-    from that line by the way the cursor lies; any way round, his chin goes no lower than
-    `turnDown` under the camera's line, where his eyes still peek under his cap (a count by eye
-    of real crops: at 10° they show, at 20° only his chin does), while the camera is within
-    `faceSide` (90°) of the way he faces, fading out by `faceBack` (135°); `REACH` is how far
-    the whole look turns his head (yaw ±100°, pitch −30°…+80°, the last quarter eased in rather
-    than a dead stop: `softAim`): his neck's own `LIMIT` (±70°, −20°…+55°, all a look at the
-    viewer or the camera takes) with his chest's share on top, `chestShare` (`CHEST`:
-    smoothsteps to 30° of twist past 30° of yaw and 25° of lean past 40° of pitch, 10° forward
-    past −10°; none for the looks he gives the viewer), which `character.js` `applyLook` turns
-    his Chest by before Neck and Neck001 split the rest 30/70; `torsoStep` eases it out over a
-    quarter second while he's held or falling, so his collar stays under the cursor. A target
-    behind him keeps to the side his head is turned to. Running away ('back'),
+    (0.3 heads: at the viewer), then eased out over `LOOK.ramp` (2 heads) to a side and
+    `rampUpDown` (3.5) straight up or down, to `turnSide` (65°), `turnDown` (42°) or `turnUp`
+    (40°) from that line by the way the cursor lies, so his chin keeps going down as the
+    cursor goes further below (15° under the camera's line a head below him, where his eyes
+    still peek under his cap, about 40° by four heads, his face under his cap: the user's
+    "follow it fully"); any way round his gaze goes no higher than `upTop` (76°, well short of
+    the vertical, where its yaw would swing round), and no lower under the camera's line than
+    for a cursor straight below at that distance while his face is toward the camera (his gaze,
+    turned as far round as he can, within `gazeFull`, 35°, of it, fading out by `gazeNone`,
+    75°: in profile the pitch reads on screen as it is). `REACH` is how far the whole look
+    turns his head (yaw ±100°, pitch −30°…+80°, the last quarter eased in rather than a dead
+    stop: `softAim`): his neck's own `LIMIT` (±70°, −20°…+55°, all a look at the viewer or the
+    camera takes) with his chest's share on top, `chestShare` (`CHEST`: smoothsteps to 30° of
+    twist past 30° of yaw and 25° of lean past 40° of pitch, 10° forward past −10°; none for
+    the looks he gives the viewer), which `character.js` `applyLook` turns his Chest by before
+    Neck and Neck001 split the rest 30/70; `torsoStep` eases it out over a quarter second while
+    he's held or falling, so his collar stays under the cursor. A target behind him keeps to the
+    side his head is turned to. Running away ('back'),
     "ahead" is where he runs, chin level (`LOOK.runPitch`, −12°, against the Run clip's own
     lift), and every 1.4–2.4 s he glances back over his shoulder for 0.35 s, quickly
     (`backOmega`), toward the side of the pursuer (`BrainOut.look.at`: the pointer, or where
