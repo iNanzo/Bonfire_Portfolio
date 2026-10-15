@@ -8,7 +8,12 @@
 // lid line, happy an arc; surprised wider, its brow higher and its mouth a dark o; a small mouth
 // under the eyes and apart from them, a 1 px brow with skin under it where there's room; no lone
 // dark pixel but a pupil; four faces that differ, each size's eye at least as big as the one
-// under it. The pick between sheets holds on to the one showing until another fits clearly
+// under it. Where a shape scaled down as it is would read wrong through the page's dither, it's
+// drawn as the smooth face reads: a flat pupil bar under the lid, a grey row, a full band and
+// white over the lash (a row of grey over the pupil at 16 to 23 px); surprised, a wide pupil
+// centred in its iris, a plain band, the lid straight at its inner end; the brow in from the
+// lid's ends; a tiny ㅅ, a smile, a round o; a happy arc joined along its edges (a ⌒ in the small
+// cells), a one-row blush; a closed lid with no stray pixel. The pick between sheets holds on to the one showing until another fits clearly
 // better (no flicker between two sizes), and his face's span is measured from its own geometry.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -385,6 +390,273 @@ test('the pixel faces grow steadily with the cell: each size’s eye at least as
       assert.ok(now.h >= was.h, `${sheet.w} px: the eye ${now.h} tall after ${was.h}`);
     }
     was = now;
+  }
+});
+
+/**
+ * A pixel cell's finer kinds: the iris's mid grey and its darker band apart, the brown lash line
+ * (and any mid brown), as the shapes below need them told apart.
+ * @param {{px: number[][], w: number, h: number}} cell
+ */
+function finer(cell) {
+  const { px, w, h } = cell;
+  const at = (x, y) => (x >= 0 && y >= 0 && x < w && y < h ? px[y * w + x] : null);
+  /** @returns {'ink'|'grey'|'band'|'white'|'brown'|'mouth'|'blush'|'skin'} */
+  const kind = (x, y) => {
+    const c = at(x, y);
+    if (!c) return 'skin';
+    const k = kindOf(c);
+    const l = luma(c[0], c[1], c[2]);
+    if (k === 'iris') return l < 0.32 ? 'band' : 'grey';
+    if (k === 'skin' && l >= 0.38 && l < 0.62 && c[0] - c[2] > 25) return 'brown';
+    return k;
+  };
+  /** The [x, y] of the cell's pixels of a kind, in rows y0..y1. */
+  const all = (k, y0 = 0, y1 = h - 1) => pixels(w, h, (x, y) => y >= y0 && y <= y1 && kind(x, y) === k);
+  return { kind, all, at };
+}
+
+/** The [x, y] points by row: row → sorted xs. */
+function byRow(points) {
+  /** @type {Map<number, number[]>} */
+  const rows = new Map();
+  for (const [x, y] of points)
+    rows.set(
+      y,
+      [...(rows.get(y) ?? []), x].sort((a, b) => a - b),
+    );
+  return rows;
+}
+
+/**
+ * An open eye's anatomy (neutral or surprised): its box, the lid's rows (each a run of ink most of
+ * the eye wide, from its top), the pupil (ink under the lid with iris on both sides of it in its
+ * row), the iris's grey and its band, and the lash line along the white's bottom.
+ * @param {{px: number[][], w: number, h: number}} cell
+ */
+function openEyeOf(cell) {
+  const p = cellParts(cell);
+  const f = finer(cell);
+  const e = p.eye;
+  const ew = e.r - e.l + 1;
+  const run = (y) => {
+    let best = 0;
+    let n = 0;
+    for (let x = e.l; x <= e.r; x++) best = Math.max(best, (n = f.kind(x, y) === 'ink' ? n + 1 : 0));
+    return best;
+  };
+  let lidB = e.t;
+  while (run(lidB + 1) >= Math.ceil(ew * 0.6)) lidB++;
+  const grey = f.all('grey', lidB + 1, e.b);
+  const band = f.all('band', lidB + 1, e.b);
+  const irisRows = byRow([...grey, ...band]);
+  const pupil = f.all('ink', lidB + 1, e.b).filter(([x, y]) => {
+    const xs = irisRows.get(y) ?? [];
+    return xs.some((ix) => ix < x) && xs.some((ix) => ix > x);
+  });
+  const lash = f.all('brown', e.t, e.b + 1);
+  return { p, f, e, lidB, grey, band, irisRows, pupil, lash };
+}
+
+test('the open eye drawn as the smooth one reads in pixels: from 26 px a flat pupil bar right under the lid, a row of grey, then a full dark band over the iris’s bottom rows and white over the lash; at 16 to 23 a row of grey between the lid and the pupil', async () => {
+  for (const { sheet, cells } of await sheets()) {
+    const { w, h } = sheet;
+    if (w < 16) continue;
+    const tag = `${w} px neutral`;
+    const a = openEyeOf(cells.neutral);
+    const pupil = box(a.pupil);
+    assert.ok(pupil, `${tag}: a pupil under the lid`);
+    const rows = byRow(a.pupil);
+    const top = rows.get(pupil.t);
+    const bottom = rows.get(pupil.b);
+    if (w < 26) {
+      // (In the dither his pupil ran into the lid: a row of grey between keeps it a dark centre.)
+      assert.ok(pupil.t >= a.lidB + 2, `${tag}: the pupil (row ${pupil.t}) a row under the lid (row ${a.lidB})`);
+      for (let x = pupil.l; x <= pupil.r; x++)
+        assert.equal(a.f.kind(x, a.lidB + 1), 'grey', `${tag}: grey between the lid and the pupil at ${x}`);
+      continue;
+    }
+    // A flat bar right under the lid, not a wedge tapering down into the band: about a seventh of
+    // the cell wide (5 at 34 px, 4 at 26 to 30), two rows tall up to 40 px, its bottom corners grey.
+    assert.equal(pupil.t, a.lidB + 1, `${tag}: the pupil right under the lid`);
+    assert.equal(pupil.r - pupil.l + 1, Math.round(0.14 * w), `${tag}: the pupil ${pupil.r - pupil.l + 1} wide`);
+    assert.equal(pupil.b - pupil.t + 1, Math.max(2, Math.round(h / 30)), `${tag}: the pupil’s rows`);
+    assert.ok(
+      bottom[0] > top[0] && bottom.at(-1) < top.at(-1),
+      `${tag}: its bottom row inset (${bottom}) from its top (${top})`,
+    );
+    // Centred in the iris: as much grey either side of its top row, give or take a pixel.
+    const irisTop = a.irisRows.get(pupil.t);
+    const left = irisTop.filter((x) => x < top[0]).length;
+    const right = irisTop.filter((x) => x > top.at(-1)).length;
+    assert.ok(Math.abs(left - right) <= 1, `${tag}: the pupil centred in the iris (${left} grey left, ${right} right)`);
+    // The band: the iris's bottom rows, all its width at the top of them (its corners clipped
+    // round under that), a row of grey at least between it and the pupil, no iris under it, and
+    // white between it and the lash, so pupil, band and lash never make one dark stroke.
+    const band = box(a.band);
+    assert.ok(band, `${tag}: a darker band`);
+    const bandRows = byRow(a.band);
+    assert.ok(band.b - band.t + 1 >= 2, `${tag}: the band two rows at least`);
+    const widest = Math.max(...[...a.irisRows.values()].map((xs) => xs.length));
+    const bt = bandRows.get(band.t);
+    const bb = bandRows.get(band.b);
+    assert.ok(bt.length >= widest * 0.6, `${tag}: the band ${bt.length} wide at its top, the iris ${widest}`);
+    assert.ok(bb[0] > bt[0] && bb.at(-1) < bt.at(-1), `${tag}: its bottom row's corners clipped`);
+    assert.equal(
+      a.grey.filter(([, y]) => y >= band.t).length,
+      0,
+      `${tag}: the band the iris's whole width in its rows`,
+    );
+    assert.ok(band.t >= pupil.b + 2, `${tag}: grey between the pupil (to row ${pupil.b}) and the band (row ${band.t})`);
+    assert.ok(Math.max(...[...a.irisRows.keys()]) === band.b, `${tag}: no iris under the band`);
+    const lashTop = Math.min(...a.lash.map(([, y]) => y));
+    assert.ok(lashTop >= band.b + 2, `${tag}: white between the band (row ${band.b}) and the lash (row ${lashTop})`);
+  }
+});
+
+test('surprised: from 23 px a wide pupil (3 by 2 to 26 px, 4 by 2 at 30 and 34) in the middle of its iris, a plain band under it with nothing hanging off it, and the lid straight to its inner end', async () => {
+  for (const { sheet, cells } of await sheets()) {
+    const { w } = sheet;
+    if (w < 23) continue;
+    const tag = `${w} px surprised`;
+    const a = openEyeOf(cells.surprised);
+    const pupil = box(a.pupil);
+    assert.ok(pupil, `${tag}: a pupil`);
+    const pw = pupil.r - pupil.l + 1;
+    const ph = pupil.b - pupil.t + 1;
+    assert.equal(pw, Math.round(0.12 * w), `${tag}: the pupil ${pw} wide`);
+    assert.equal(ph, Math.max(2, Math.round(pw / 1.8)), `${tag}: and ${ph} tall: wider than it's tall`);
+    for (const [y, xs] of byRow(a.pupil)) {
+      const iris = a.irisRows.get(y);
+      const left = iris.filter((x) => x < xs[0]).length;
+      const right = iris.filter((x) => x > xs.at(-1)).length;
+      assert.equal(left, right, `${tag}: row ${y}: as much iris left of the pupil (${left}) as right (${right})`);
+    }
+    if (w >= 26) {
+      const band = box(a.band);
+      assert.ok(band, `${tag}: a band`);
+      const lowest = Math.max(...[...a.irisRows.keys()]);
+      assert.equal(lowest, band.b, `${tag}: nothing under the band`);
+      assert.ok(a.irisRows.get(lowest).length >= 3, `${tag}: the iris's bottom row a band, not a drip`);
+    }
+    // The lid starts straight at its inner end (only its outer end turns down).
+    const inner = pixels(cells.surprised.w, cells.surprised.h, (x, y) => x === a.e.l && a.f.kind(x, y) === 'ink');
+    assert.ok(
+      Math.max(...inner.map(([, y]) => y)) <= a.lidB,
+      `${tag}: no ink under the lid at its inner end (column ${a.e.l})`,
+    );
+  }
+});
+
+test('the brow starts a little in from the lid’s inner end and stops short of its hook, as the smooth face’s does, and sits over the same columns in all four faces', async () => {
+  for (const { sheet, cells } of await sheets()) {
+    const { w } = sheet;
+    if (w < 20) continue;
+    const a = openEyeOf(cells.neutral);
+    const span = a.e.r - a.e.l + 1;
+    const brows = Object.entries(cells).map(([name, c]) => [name, cellParts(c).brow]);
+    for (const [name, b] of brows) {
+      const tag = `${w} px ${name}`;
+      assert.ok(b, `${tag}: a brow`);
+      assert.ok(b.l >= a.e.l + Math.max(1, Math.round(0.05 * span)), `${tag}: the brow from ${b.l}, the lid ${a.e.l}`);
+      assert.ok(b.r <= a.e.r - Math.round(0.15 * span), `${tag}: the brow to ${b.r}, the hook ${a.e.r}`);
+      assert.deepEqual([b.l, b.r], [brows[0][1].l, brows[0][1].r], `${tag}: the neutral brow's columns`);
+    }
+  }
+});
+
+test('the mouths: neutral a tiny ㅅ from 26 px, happy turned up from 20, surprised a round o (a 2×2 dot to 23 px, 4×2 with soft corners from 26)', async () => {
+  for (const { sheet, cells } of await sheets()) {
+    const { w } = sheet;
+    /** The mouth's top row in column x (its middle is column 0). */
+    const topAt = (name, x) => {
+      const p = cellParts(cells[name]);
+      return Math.min(...p.mouth.px.filter(([px]) => px === x).map(([, y]) => y));
+    };
+    if (w >= 26) {
+      const m = cellParts(cells.neutral).mouth;
+      assert.equal(topAt('neutral', 0), topAt('neutral', m.r) - 1, `${w} px neutral: the middle a row over the end`);
+    }
+    if (w >= 20) {
+      const m = cellParts(cells.happy).mouth;
+      assert.ok(m.r >= 1, `${w} px happy: a mouth two pixels a side at least`);
+      assert.equal(topAt('happy', m.r), topAt('happy', 0) - 1, `${w} px happy: the end a row over the middle`);
+    }
+    if (w >= 14) {
+      const c = cells.surprised;
+      const p = cellParts(c);
+      const f = finer(c);
+      const o = p.mouth;
+      assert.equal(o.l, 0, `${w} px surprised: the o in the middle`);
+      assert.equal(o.b - o.t + 1, 2, `${w} px surprised: the o two rows tall`);
+      const dark = o.px.filter(([x]) => x === 0);
+      assert.equal(dark.length, 2, `${w} px surprised: its middle column dark, two rows`);
+      if (w < 26) assert.equal(o.r, 0, `${w} px surprised: a 2×2 dot (one column a side)`);
+      else {
+        // Its outer column a mid brown, lighter than the o and darker than his skin: round, not a bar.
+        const skin = luma(...c.px[0].slice(0, 3));
+        const core = luma(...c.px[o.t * c.w].slice(0, 3));
+        for (const y of [o.t, o.b]) {
+          const edge = f.at(1, y);
+          const l = luma(edge[0], edge[1], edge[2]);
+          assert.ok(l > core + 0.05 && l < skin - 0.05, `${w} px surprised: its corner at (1, ${y}) a mid brown`);
+        }
+        assert.equal(f.kind(2, o.t), 'skin', `${w} px surprised: two columns a side, no more`);
+      }
+    }
+  }
+});
+
+test('the happy arc reads at the site’s dither: from 14 px every step joined along an edge (one 4-connected line), at 7 to 12 px a ⌒ whose ends are single pixels a row lower, never a box', async () => {
+  for (const { sheet, cells } of await sheets()) {
+    const { w, h } = sheet;
+    if (w < 7) continue;
+    const tag = `${w} px happy`;
+    const p = cellParts(cells.happy);
+    const e = p.eye;
+    const ink = new Set(e.px.map(([x, y]) => y * w + x));
+    if (w >= 14)
+      assert.equal(
+        components(w, h, (x, y) => ink.has(y * w + x)).length,
+        1,
+        `${tag}: the arc one line, its steps joined along an edge`,
+      );
+    else {
+      const ys = (x) => e.px.filter(([px]) => px === x).map(([, y]) => y);
+      for (const [end, inner] of [
+        [e.l, e.l + 1],
+        [e.r, e.r - 1],
+      ]) {
+        assert.equal(ys(end).length, 1, `${tag}: its end at ${end} a single pixel, not a leg`);
+        assert.ok(
+          ys(inner).every((y) => y < ys(end)[0]),
+          `${tag}: a row under the pixel inside it`,
+        );
+      }
+    }
+  }
+});
+
+test('the happy blush: one row, about a seventh of the cell wide (5 at 34 px, 4 at 26 to 30, 2 or 3 at 14 to 23), toward his ear', async () => {
+  for (const { sheet, cells } of await sheets()) {
+    const { w } = sheet;
+    if (w < 8) continue;
+    const b = cellParts(cells.happy).blush;
+    const bw = b.r - b.l + 1;
+    assert.equal(b.t, b.b, `${w} px: the blush one row`);
+    assert.ok(Math.abs(bw - 0.15 * w) <= 1, `${w} px: the blush ${bw} wide`);
+    assert.ok(b.l >= Math.floor(0.46 * w) && b.r + 1 <= Math.ceil(0.64 * w), `${w} px: across ${b.l} to ${b.r}`);
+  }
+});
+
+test('blink: the closed lid’s inner end no higher than the rest of it', async () => {
+  for (const { sheet, cells } of await sheets()) {
+    const { w } = sheet;
+    const e = cellParts(cells.blink).eye;
+    const tops = new Map();
+    for (const [x, y] of e.px) tops.set(x, Math.min(tops.get(x) ?? y, y));
+    const rest = [...tops].filter(([x]) => x !== e.l).map(([, y]) => y);
+    assert.ok(tops.get(e.l) >= Math.min(...rest), `${w} px: no stray pixel over the lid's inner end`);
   }
 });
 

@@ -260,7 +260,13 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   and a blush; surprised, the lid and brow raised, the eye wide and a small o; the small
   mouth) kept where it is in a cell and drawn in whole pixels, a line a pixel thick at least
   and every feature a pixel at least, the colours sampled from the sheet (`--preview` to look
-  at it). The page uses it while the pixel filter is on (Native too), the
+  at it). Where a shape scaled down as it is would read wrong through the page's dither, it's
+  drawn as the smooth face reads at that size: a flat bar of a pupil right under the lid, a row
+  of grey, then the band over the iris's bottom rows and white over the lash (a row of grey
+  between the lid and the pupil at 16 to 23 px, where the two ran together); surprised, a wide
+  pupil centred in its iris; the brow in from the lid's inner end and short of its hook; a tiny
+  ㅅ of a mouth, a smile, a round o with soft corners; the happy arc's steps joined along an edge
+  (a ⌒ in the small cells, never a box) and a one-row blush; no stray pixel on the closed lid. The page uses it while the pixel filter is on (Native too), the
   sheet whose cell matches his half face in texels (3 px at 16×16 up to 34); past 1.25 times
   the largest (`SMOOTH_FACE_OVER`: Native on a phone, or zoomed in) it shows the glb's smooth
   face again, as at Off. His shirt shows the bold pixel plaid (`newt-atlas-pixel.png`, `tools/newt-atlas.mjs`)
