@@ -9,8 +9,9 @@
 // zoomed in, on a phone and turned: his gaze points at the cursor on screen (performative gaze:
 // turned from the viewer toward it, more the further it is from his head, at the viewer within a
 // third of a head of it), below his head he looks down toward it, above him up, to a side round
-// toward it, behind him a profile on its side, chin down; a sweep moves it smoothly; his neck's
-// limits are soft; with his back to the camera a cursor wiggling behind him doesn't flip his head
+// toward it, behind him a profile on its side, chin down; a sweep moves it smoothly; his reach
+// (his neck's limits with his chest's share on top) is soft; his chest joins in only for big
+// looks; with his back to the camera a cursor wiggling behind him doesn't flip his head
 // from side to side; and running away he faces where he runs, glancing back over his shoulder
 // toward the pursuer every second or two, never at the viewer.
 import { test } from 'node:test';
@@ -29,7 +30,19 @@ import {
 import { CLIPS, GAIT, STRIDE, fadeFor } from '../src/invitation/clips.js';
 import { STEP_SHARE_MIN, gaitPhase } from '../src/invitation/blend.js';
 import { CARRY } from '../src/invitation/carry.js';
-import { LIMIT, LOOK, aimAngles, aimAt, createLook, lookStep, softAim } from '../src/invitation/lookAt.js';
+import {
+  CHEST,
+  LIMIT,
+  LOOK,
+  REACH,
+  aimAngles,
+  aimAt,
+  chestShare,
+  createLook,
+  lookStep,
+  softAim,
+  torsoStep,
+} from '../src/invitation/lookAt.js';
 import { createBrain } from '../src/invitation/brain.js';
 import { createRng } from '../src/invitation/rng.js';
 import { xRange } from '../src/invitation/steer.js';
@@ -334,29 +347,86 @@ const VIEWS = [
   { distance: 22, yaw: Math.PI / 2, ch: 844, name: 'phone turned the other way' },
 ];
 
-test('his neck’s limits: ±70° of yaw, −20°…+55° of pitch, soft from three quarters of the way (no dead stop at the limit)', () => {
+test('his reach: his neck’s ±70° of yaw and −20°…+55° of pitch with his chest’s share on top (±100°, −30°…+80°), soft from three quarters of the way (no dead stop at the limit)', () => {
   close(LIMIT.yaw, 70 * RAD);
   close(LIMIT.pitchMin, -20 * RAD, 1e-9, 'with the camera above him nothing needs a deeper look down');
   close(LIMIT.pitchMax, 55 * RAD);
+  close(REACH.yaw, LIMIT.yaw + CHEST.yaw, 1e-9);
+  close(REACH.yaw, 100 * RAD, 1e-9);
+  close(REACH.pitchMin, -30 * RAD, 1e-9);
+  close(REACH.pitchMax, 80 * RAD, 1e-9);
   // Inside three quarters of a limit: as asked.
   for (const a of [
     { yaw: 0.5, pitch: 0.3 },
-    { yaw: -0.74 * LIMIT.yaw, pitch: 0.74 * LIMIT.pitchMin },
-    { yaw: 0.74 * LIMIT.yaw, pitch: 0.74 * LIMIT.pitchMax },
+    { yaw: -0.74 * REACH.yaw, pitch: 0.74 * REACH.pitchMin },
+    { yaw: 0.74 * REACH.yaw, pitch: 0.74 * REACH.pitchMax },
   ])
     assert.deepEqual(softAim(a), a);
   // Past it: eased toward the limit, never past it, never turning back, with no corner.
   let last = -Infinity;
   for (let y = 0; y <= 4; y += 0.01) {
     const s = softAim({ yaw: y, pitch: 0 }).yaw;
-    assert.ok(s >= last - 1e-12 && s <= LIMIT.yaw + 1e-12, `yaw ${y.toFixed(2)} → ${s}`);
+    assert.ok(s >= last - 1e-12 && s <= REACH.yaw + 1e-12, `yaw ${y.toFixed(2)} → ${s}`);
     if (y > 0) assert.ok(s - last <= 0.01 + 1e-9, 'never steeper than as asked');
     last = s;
   }
-  close(softAim({ yaw: 4, pitch: 0 }).yaw, LIMIT.yaw, 1e-3);
-  close(softAim({ yaw: 0, pitch: -3 }).pitch, LIMIT.pitchMin, 1e-3);
-  close(softAim({ yaw: 0, pitch: 3 }).pitch, LIMIT.pitchMax, 1e-3);
-  close(softAim({ yaw: -4, pitch: 0 }).yaw, -LIMIT.yaw, 1e-3);
+  close(softAim({ yaw: 4, pitch: 0 }).yaw, REACH.yaw, 1e-3);
+  close(softAim({ yaw: 0, pitch: -3 }).pitch, REACH.pitchMin, 1e-3);
+  close(softAim({ yaw: 0, pitch: 3 }).pitch, REACH.pitchMax, 1e-3);
+  close(softAim({ yaw: -4, pitch: 0 }).yaw, -REACH.yaw, 1e-3);
+});
+
+test('his chest joins in only for big looks: none for the looks he gives the viewer, smoothly more toward his reach, where his neck turns no more than its own limits from his chest', () => {
+  // The looks he gives the viewer from the default view (up 25–40°, a little to a side): none.
+  for (const [y, p] of [
+    [0, 0],
+    [20, 36],
+    [-30, 30],
+    [10, -10],
+    [0, 40],
+  ]) {
+    const c = chestShare(y * RAD, p * RAD);
+    assert.ok(c.yaw === 0 && c.pitch === 0, `${y}°, ${p}°: ${JSON.stringify(c)}`);
+  }
+  // At his reach: the neck's own limits from the chest.
+  const top = chestShare(REACH.yaw, REACH.pitchMax);
+  close(REACH.yaw - top.yaw, LIMIT.yaw, 1e-9, 'yaw: his neck at its limit');
+  close(REACH.pitchMax - top.pitch, LIMIT.pitchMax, 1e-9, 'up: his neck at its limit');
+  close(REACH.pitchMin - chestShare(0, REACH.pitchMin).pitch, LIMIT.pitchMin, 1e-9, 'down');
+  close(chestShare(-REACH.yaw, 0).yaw, -CHEST.yaw, 1e-9, 'either way round');
+  assert.ok(CHEST.yaw >= 20 * RAD && CHEST.yaw <= 35 * RAD, 'a twist you see, not a spin');
+  // Smooth: never turning back, never quicker than the look itself (so his neck's share never
+  // turns back either), the neck's share never past its limit on the way.
+  for (const axis of ['yaw', 'pitch']) {
+    const [lo, hi] = axis === 'yaw' ? [-REACH.yaw, REACH.yaw] : [REACH.pitchMin, REACH.pitchMax];
+    let last = null;
+    for (let v = lo; v <= hi + 1e-9; v += 0.25 * RAD) {
+      const c = axis === 'yaw' ? chestShare(v, 0).yaw : chestShare(0, v).pitch;
+      if (last != null) {
+        assert.ok(c >= last.c - 1e-12, `${axis} ${(v / RAD).toFixed(1)}°: never turning back`);
+        assert.ok(c - last.c <= 0.25 * RAD, `${axis} ${(v / RAD).toFixed(1)}°: no quicker than the look`);
+      }
+      const neck = v - c;
+      const [nlo, nhi] = axis === 'yaw' ? [-LIMIT.yaw, LIMIT.yaw] : [LIMIT.pitchMin, LIMIT.pitchMax];
+      assert.ok(
+        neck >= nlo - 1e-9 && neck <= nhi + 1e-9,
+        `${axis} ${(v / RAD).toFixed(1)}°: neck ${(neck / RAD).toFixed(1)}°`,
+      );
+      last = { c };
+    }
+  }
+});
+
+test('his chest’s share comes and goes over a quarter of a second as he leaves the floor and lands, never jumping', () => {
+  let k = 1;
+  const seen = [];
+  for (let i = 0; i < 30; i++) seen.push((k = torsoStep(k, false, DT)));
+  close(k, 0, 1e-12, 'held: gone');
+  for (let i = 0; i < 30; i++) seen.push((k = torsoStep(k, true, DT)));
+  close(k, 1, 1e-12, 'on his feet: back');
+  for (let i = 1; i < seen.length; i++)
+    assert.ok(Math.abs(seen[i] - seen[i - 1]) <= LOOK.torsoRate * DT + 1e-12, 'never jumping');
+  assert.ok(LOOK.torsoRate >= 2 && LOOK.torsoRate <= 8, `${LOOK.torsoRate} a second`);
 });
 
 test('over the whole screen, at every view, his gaze points at the cursor on screen: the camera-relative look (performative gaze) turns his face from the viewer toward it, by how far the cursor is from his head', () => {

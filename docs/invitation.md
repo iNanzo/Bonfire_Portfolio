@@ -223,9 +223,15 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
     from that line by the way the cursor lies; any way round, his chin goes no lower than
     `turnDown` under the camera's line, where his eyes still peek under his cap (a count by eye
     of real crops: at 10° they show, at 20° only his chin does), while the camera is within
-    `faceSide` (90°) of the way he faces, fading out by `faceBack` (135°); `softAim` eases
-    the last quarter of his neck's limits (yaw ±70°, pitch −20°…+55°) instead of stopping dead,
-    and a target behind him keeps to the side his head is turned to. Running away ('back'),
+    `faceSide` (90°) of the way he faces, fading out by `faceBack` (135°); `REACH` is how far
+    the whole look turns his head (yaw ±100°, pitch −30°…+80°, the last quarter eased in rather
+    than a dead stop: `softAim`): his neck's own `LIMIT` (±70°, −20°…+55°, all a look at the
+    viewer or the camera takes) with his chest's share on top, `chestShare` (`CHEST`:
+    smoothsteps to 30° of twist past 30° of yaw and 25° of lean past 40° of pitch, 10° forward
+    past −10°; none for the looks he gives the viewer), which `character.js` `applyLook` turns
+    his Chest by before Neck and Neck001 split the rest 30/70; `torsoStep` eases it out over a
+    quarter second while he's held or falling, so his collar stays under the cursor. A target
+    behind him keeps to the side his head is turned to. Running away ('back'),
     "ahead" is where he runs, chin level (`LOOK.runPitch`, −12°, against the Run clip's own
     lift), and every 1.4–2.4 s he glances back over his shoulder for 0.35 s, quickly
     (`backOmega`), toward the side of the pursuer (`BrainOut.look.at`: the pointer, or where

@@ -28,6 +28,7 @@ import { LOOKS, lookPreset, validLook } from '../src/invitation/look.js';
 import { TOON_CELLS, toonRamp } from '../src/invitation/shader.js';
 import { TWIN } from '../src/invitation/play.js';
 import { BONES, COLLAR, SCALE } from '../src/invitation/clips.js';
+import { chestShare } from '../src/invitation/lookAt.js';
 
 const DEG = Math.PI / 180;
 const close = (a, b, tol = 1e-6, msg = '') => assert.ok(Math.abs(a - b) <= tol, `${msg} ${a} should be ${b} (±${tol})`);
@@ -182,6 +183,55 @@ test('the look turns his head by the yaw and pitch asked, relative to his root, 
     const neckTurn = angle(neck, neckRest);
     const total = angle(looked, rest);
     assert.ok(Math.abs(neckTurn / total - 0.3) < 1e-3, `the neck turns ${neckTurn / total} of the way`);
+  }
+});
+
+test('a big look takes his chest along (lookAt.js chestShare), the head still turned by the whole look; off the floor (torso 0) the chest keeps its animated pose; nothing adds up across frames', () => {
+  const yaw = 1.5;
+  const pitch = 1.2;
+  const share = chestShare(yaw, pitch);
+  assert.ok(share.yaw > 0.2 && share.pitch > 0.2, 'a look this big turns his chest');
+  for (const rootYaw of [0, Math.PI / 2]) {
+    const { gltf, bones } = standIn([still('Idle', 2, BONES.chest, q(Y, 10))]);
+    const ch = createCharacter(gltf);
+    ch.root.rotation.y = rootYaw;
+    ch.root.updateMatrixWorld(true);
+    ch.setWeights({ Idle: 1 }, 0);
+    ch.update(1 / 60);
+    ch.applyLook(0, 0, 0);
+    const world = (name) => bones[name].getWorldQuaternion(new THREE.Quaternion());
+    const rest = Object.fromEntries([BONES.chest, BONES.neck, BONES.head].map((b) => [b, world(b)]));
+    const rootQ = ch.root.getWorldQuaternion(new THREE.Quaternion());
+    /** The rotation a bone gained over its rest, in his root's frame. */
+    const gained = (name) =>
+      rootQ.clone().invert().multiply(world(name).multiply(rest[name].clone().invert())).multiply(rootQ);
+    /** A yaw (about his up) then a pitch (about his side, + up), as applyLook composes them. */
+    const turn = (y, p) =>
+      q(Y, y / DEG).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(-1, 0, 0), p));
+    for (let i = 0; i < 20; i++) {
+      ch.update(1 / 60);
+      ch.applyLook(yaw, pitch, 1);
+    }
+    assert.ok(
+      angle(gained(BONES.chest), turn(share.yaw, share.pitch)) < 1e-6,
+      `the chest takes its share (root yaw ${rootYaw})`,
+    );
+    assert.ok(angle(gained(BONES.head), turn(yaw, pitch)) < 1e-6, `the head the whole look (root yaw ${rootYaw})`);
+    // The neck bones split what the chest leaves, 30/70.
+    const overChest = (name) => gained(name).multiply(gained(BONES.chest).invert());
+    const ident = new THREE.Quaternion();
+    const neckShare = angle(overChest(BONES.neck), ident) / angle(overChest(BONES.head), ident);
+    assert.ok(Math.abs(neckShare - 0.3) < 1e-3, `the neck turns ${neckShare} of what the chest leaves`);
+    // Off the floor: no chest, the head still the whole look.
+    ch.update(1 / 60);
+    ch.applyLook(yaw, pitch, 1, 0);
+    assert.ok(angle(world(BONES.chest), rest[BONES.chest]) < 1e-6, 'held: the chest as the clip has it');
+    assert.ok(angle(gained(BONES.head), turn(yaw, pitch)) < 1e-6, 'held: the head the whole look');
+    // No look: everything back to the clip's pose.
+    ch.update(1 / 60);
+    ch.applyLook(yaw, pitch, 0);
+    for (const name of [BONES.chest, BONES.neck, BONES.head])
+      assert.ok(angle(world(name), rest[name]) < 1e-6, `${name} back in the clip's pose`);
   }
 });
 

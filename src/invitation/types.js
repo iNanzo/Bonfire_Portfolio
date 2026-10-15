@@ -14,7 +14,8 @@
 //   6. root.updateMatrixWorld → carry's tilt on the root → read the collar → move the root by
 //      anchor − collar → root.updateMatrixWorld (only while held; the anchor is where the
 //      cursor's ray meets the camera-facing plane he was grabbed on, plus the grab offset)
-//   7. lookStep → character.applyLook (on top of the saved pose: it never adds up)
+//   7. lookStep → character.applyLook (on top of the saved pose: it never adds up; his chest
+//      joins in for big looks while he's on his feet, lookAt.js chestShare and torsoStep)
 //   8. faceStep → character.setFace; bubble.update (while a line is up): his head on screen
 //      (character.screenShape; null while the open Look sheet covers it, bubble.js
 //      speakerPoint), clear of the toolbar and the open sheet
@@ -147,7 +148,8 @@
  * @property {(weights: Record<string, number>, phase: number) => void} setWeights
  * @property {(clip: string) => boolean} restart  play it from its start: true when it still showed, its old start fading out as its twin (play.js TWIN)
  * @property {(dt: number) => void} update
- * @property {(yaw: number, pitch: number, weight: number) => void} applyLook
+ * @property {(yaw: number, pitch: number, weight: number, torso?: number) => void} applyLook  torso:
+ *   how much of lookAt.js chestShare his chest takes (1 on his feet, eased to 0 off the floor)
  * @property {(face: import('./clips.js').FaceName) => void} setFace
  * @property {(name: string, out: XYZ) => XYZ} bonePos  world position of a bone's head
  * @property {(camera: any, rect: {left: number, top: number, width: number, height: number}) => {head: {x: number, y: number, r: number}, body: {a: {x: number, y: number}, b: {x: number, y: number}, r: number}}} screenShape

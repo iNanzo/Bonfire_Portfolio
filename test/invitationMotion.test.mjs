@@ -48,6 +48,7 @@ import {
   splitLook,
   viewerAim,
   LIMIT,
+  REACH,
   SPLIT,
   LOOK,
 } from '../src/invitation/lookAt.js';
@@ -612,7 +613,7 @@ test('a one-shot fades out before it ends', () => {
 
 // ---- look-at ------------------------------------------------------------------------------
 
-test('look-at clamps to ±70° of yaw and −20°…+55° of pitch, split 30% neck and 70% head', () => {
+test('a look at a point clamps to his neck’s ±70° of yaw and −20°…+55° of pitch; the look splits between his chest (big looks only) and 30% neck, 70% head of the rest; lookStep keeps to his reach', () => {
   const D = Math.PI / 180;
   close(LIMIT.yaw, 70 * D);
   close(LIMIT.pitchMin, -20 * D);
@@ -634,17 +635,25 @@ test('look-at clamps to ±70° of yaw and −20°…+55° of pitch, split 30% ne
   close(a.pitch, Math.PI / 4 > LIMIT.pitchMax ? LIMIT.pitchMax : Math.PI / 4, 1e-6, 'up is positive');
   close(aimAngles(head, 0, { x: 0, y: 5, z: 0.5 }).pitch, LIMIT.pitchMax);
   close(aimAngles(head, 0, { x: 0, y: -5, z: 0.5 }).pitch, LIMIT.pitchMin);
-  const s = splitLook(1, 0.5);
-  close(s.neck.yaw, 0.3);
+  // A look at the viewer: the neck bones alone.
+  let s = splitLook(0.4, 0.5);
+  assert.deepEqual(s.chest, { yaw: 0, pitch: 0 });
+  close(s.neck.yaw, 0.12);
   close(s.neck.pitch, 0.15);
-  close(s.head.yaw, 0.7);
+  close(s.head.yaw, 0.28);
   close(s.head.pitch, 0.35);
-  // lookStep keeps inside the limits even when an aim isn't.
+  // A big one: the chest takes some, the neck bones split the rest, and it all adds up.
+  s = splitLook(1.5, 1.2);
+  assert.ok(s.chest.yaw > 0.1 && s.chest.pitch > 0.1, 'his chest turns and leans with it');
+  close(s.chest.yaw + s.neck.yaw + s.head.yaw, 1.5, 1e-9);
+  close(s.chest.pitch + s.neck.pitch + s.head.pitch, 1.2, 1e-9);
+  close(s.neck.yaw / (s.neck.yaw + s.head.yaw), 0.3, 1e-9);
+  // lookStep keeps inside his reach even when an aim isn't.
   const rng = createRng(1);
   let st = createLook();
   for (let i = 0, t = 0; i < 120; i++) st = lookStep(st, 'camera', { yaw: 3, pitch: -2 }, DT, (t += DT), rng);
-  close(st.yaw, LIMIT.yaw, 1e-3);
-  close(st.pitch, LIMIT.pitchMin, 1e-3);
+  close(st.yaw, REACH.yaw, 1e-3);
+  close(st.pitch, REACH.pitchMin, 1e-3);
 });
 
 test('look-at is critically damped: it eases onto a target without overshoot', () => {
@@ -788,8 +797,8 @@ test('dropped facing away, his head comes round over the fall and the landing to
   const rng = createRng(4);
   const D = 180 / Math.PI;
   // The camera off to his side: held, he looks round at it ("ahead", the viewer, as lookAim
-  // gives it) as far as his neck goes.
-  const camera = { yaw: 1.3 * LIMIT.yaw, pitch: 0.3 };
+  // gives it: viewerAim, kept to his neck's LIMIT) as far as his neck goes.
+  const camera = { yaw: LIMIT.yaw, pitch: 0.3 };
   let t = 0;
   let grounded = true;
   const frame = (extra = {}) => {

@@ -22,11 +22,13 @@
 // placeholder) or without some of them just has nothing to play.
 //
 // The look goes on top of the animation (types.js's frame order): update() puts back the
-// head's saved animation pose before mixer.update and saves the new one after, because three's
-// PropertyMixer skips writing a channel whose value didn't change (a clamped one-shot's, a held
-// pose's): without the restore a look applied over it would add up frame after frame.
-// applyLook(yaw, pitch, w) turns his head by yaw (toward his +x, his left) and pitch (up), in
-// his root's frame, 30% at Neck and 70% at Neck001, exactly as asked whatever the bones' rolls.
+// chest's, neck's and head's saved animation pose before mixer.update and saves the new one
+// after, because three's PropertyMixer skips writing a channel whose value didn't change (a
+// clamped one-shot's, a held pose's): without the restore a look applied over it would add up
+// frame after frame. applyLook(yaw, pitch, w, torso) turns his head by yaw (toward his +x, his
+// left) and pitch (up), in his root's frame, exactly as asked whatever the bones' rolls: his
+// Chest takes lookAt.js chestShare of a big look (times torso: main.js eases it out while he's
+// off the floor, so his collar stays under the cursor), and Neck and Neck001 the rest, 30/70.
 //
 // Pixel Shirt & Face (a Shader option, the preset's `texture.pixelArt`, off in every style): with
 // it off his face is the glb's smooth sheet and his shirt the glb's own plaid at every resolution
@@ -72,14 +74,13 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BONES, CLIPS, FACES, SCALE } from './clips.js';
 import { FACE_IMAGE, FACE_LAYOUT, faceSpan, pickFaceSize } from './faceSheets.js';
 import { LOOKS, DEFAULT_LOOK } from './look.js';
+import { SPLIT, chestShare } from './lookAt.js';
 import { TWIN } from './play.js';
 import { ID, markId, setToonGradient, snapShift, toonGradient } from './retro.js';
 import { toonRamp } from './shader.js';
 
 /** The clips that follow the step phase (blend.js gaitPhase); Idle breathes on its own clock. */
 const PHASED = ['Walk', 'Run'];
-/** How the look splits between Neck and Neck001 (lookAt.js SPLIT says the same). */
-const SPLIT = [0.3, 0.7];
 /** His head's centre, from Neck001's head along the bone, and its radius (model units). */
 const HEAD = { up: 1.0, r: 1.65 };
 /** His body's capsule radius (model units), from between his feet to his collar. */
@@ -300,8 +301,10 @@ export function createCharacter(gltf, opts = {}) {
   }
   for (const src of made.keys()) src?.dispose?.();
 
-  const neck = [bone(BONES.neck), bone(BONES.head)];
-  const saved = neck.map((b) => (b ? b.quaternion.clone() : new THREE.Quaternion()));
+  /** The bones the look turns: his chest, then his neck's two (lookAt.js SPLIT shares them). */
+  const looking = [bone(BONES.chest), bone(BONES.neck), bone(BONES.head)];
+  const shares = [1, SPLIT.neck, SPLIT.head];
+  const saved = looking.map((b) => (b ? b.quaternion.clone() : new THREE.Quaternion()));
 
   // --- Clips.
   const mixer = new THREE.AnimationMixer(root);
@@ -431,10 +434,25 @@ export function createCharacter(gltf, opts = {}) {
   const qb = new THREE.Quaternion();
   const qRoot = new THREE.Quaternion();
   const qTotal = new THREE.Quaternion();
+  const qChest = new THREE.Quaternion();
+  const qRest = new THREE.Quaternion();
   const qPart = new THREE.Quaternion();
   const ident = new THREE.Quaternion();
   const UP = new THREE.Vector3(0, 1, 0);
   const SIDE = new THREE.Vector3(-1, 0, 0);
+  /**
+   * `out` as a turn in the world: `yaw` about his root's up, then `pitch` about its side (qRoot
+   * read first).
+   * @param {THREE.Quaternion} out
+   * @param {number} yaw
+   * @param {number} pitch
+   */
+  const worldTurn = (out, yaw, pitch) =>
+    out
+      .setFromAxisAngle(UP, yaw)
+      .multiply(qa.setFromAxisAngle(SIDE, pitch))
+      .premultiply(qRoot)
+      .multiply(qb.copy(qRoot).invert());
   const viewport = new THREE.Vector4();
   const centre = new THREE.Vector3();
   const ndc = new THREE.Vector3();
@@ -533,26 +551,27 @@ export function createCharacter(gltf, opts = {}) {
       return true;
     },
     update(dt) {
-      neck.forEach((b, i) => b?.quaternion.copy(saved[i]));
+      looking.forEach((b, i) => b?.quaternion.copy(saved[i]));
       mixer.update(dt);
-      neck.forEach((b, i) => b && saved[i].copy(b.quaternion));
+      looking.forEach((b, i) => b && saved[i].copy(b.quaternion));
     },
-    applyLook(yaw, pitch, weight) {
+    applyLook(yaw, pitch, weight, torso = 1) {
       if (!weight) {
-        neck.forEach((b, i) => b?.quaternion.copy(saved[i]));
+        looking.forEach((b, i) => b?.quaternion.copy(saved[i]));
         return;
       }
-      // The whole turn in the world: yaw about his root's up, pitch about his root's side.
+      // The whole turn and the chest's in the world (yaw about his root's up, pitch about his
+      // root's side), and what the chest leaves the neck: whole · chest⁻¹.
       root.getWorldQuaternion(qRoot);
-      qTotal
-        .setFromAxisAngle(UP, yaw)
-        .multiply(qa.setFromAxisAngle(SIDE, pitch))
-        .premultiply(qRoot)
-        .multiply(qb.copy(qRoot).invert());
+      const chest = chestShare(yaw, pitch);
+      const k = looking[0] ? torso : 0;
+      worldTurn(qTotal, yaw, pitch);
+      worldTurn(qChest, chest.yaw * k, chest.pitch * k);
+      qRest.copy(qTotal).multiply(qb.copy(qChest).invert());
       // Each bone takes its share as a world turn: local = parent⁻¹ · turn · parent · saved.
-      neck.forEach((b, i) => {
+      looking.forEach((b, i) => {
         if (!b) return;
-        qPart.slerpQuaternions(ident, qTotal, SPLIT[i] * weight);
+        qPart.slerpQuaternions(ident, i ? qRest : qChest, shares[i] * weight);
         b.parent.getWorldQuaternion(qa);
         b.quaternion.copy(qa).invert().multiply(qPart).multiply(qa).multiply(saved[i]);
       });

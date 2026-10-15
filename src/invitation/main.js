@@ -69,7 +69,7 @@ import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
 import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
-import { createLook, lookStep } from './lookAt.js';
+import { createLook, lookStep, torsoStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
 import { createRng } from './rng.js';
 import { createTalk } from './speech.js';
@@ -309,6 +309,8 @@ function start(s) {
   const body = createBody();
   const mix = createMix();
   const gaze = createLook();
+  /** How much of a big look his chest takes (lookAt.js torsoStep). */
+  let torso = 1;
   const faces = createFaceState();
   // (What he says and when, from the admin's lines and settings; the bubble goes in before the
   // HUD, so the toolbar and the Look sheet stay over it, and runs on the toy's clock, as talk
@@ -827,7 +829,9 @@ function start(s) {
       pursuer: want.at ?? null,
     });
     lookStep(gaze, want.mode, aim, dt, t, rng, want.weight, ahead, want.ease);
-    if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight);
+    // (His chest joins in on his feet only: held, his collar hangs from the cursor.)
+    torso = torsoStep(torso, body.mode === 'ground', dt);
+    if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight, torso);
     c.setFace(faceStep(faces, face, blink, t, rng));
     s.setBlob(root.position.x, root.position.z, body.mode === 'ground' ? 0 : Math.min(1, root.position.y / 0.5));
     if (sun)

@@ -1,23 +1,27 @@
-// Where NEWT looks in the invitation toy: the yaw and pitch toward a target, clamped to what a
-// neck can do (yaw ±70°, pitch −20°…+55°, the last quarter of each eased in rather than a dead
-// stop: softAim) and split 30/70 between Neck and Neck001, eased by a critically damped spring
-// (no overshoot). The pointer's look (screenAim) is camera-relative, film's "performative
-// gaze": his face turns from the viewer toward the cursor, round the line to the camera, so on
-// screen his gaze points right at the cursor whatever the view, zoom or screen; the further the
-// cursor is from his head on screen (in heads), the further round (none within a third of a
-// head: he looks at the viewer; most a couple of heads out), up to LOOK.turnUp, turnSide or
-// turnDown from the line to the camera by the way the cursor lies (down least, so his face still
-// shows under his cap when the cursor is far below him). A cursor below his head has him look
-// down toward it, one above up, one to a side round toward it; one he can't turn to (round
-// behind him) a profile on its side, chin up or down with the cursor, and his head keeps to the
-// side it's turned to until the target is clearly round the other side (no flip from shoulder
-// to shoulder). With no pointer for 1.5 s he looks ahead and glances about every 3–7 s.
-// Running away he looks where he runs, chin level (against the Run clip's own lift), with a
-// quick, brief look back over his shoulder every 1.4–2.4 s, toward the pursuer's side when
-// there is one. "Ahead" is otherwise the viewer (viewerAim): up at the camera, faded back to
-// straight ahead as he turns away from it. Looking at a floor spot without a ray, his head is
-// lifted by LOOK.floorBias so his cap leaves his face showing. A slower ease (the brain's, as
-// he's let go) brings the look and its weight round over about a second instead of a fifth.
+// Where NEWT looks in the invitation toy: the yaw and pitch toward a target, clamped to what he can
+// turn (REACH: yaw ±100°, pitch −30°…+80°, the last quarter of each eased in rather than a dead
+// stop: softAim), eased by a critically damped spring (no overshoot). A look at a point (the
+// viewer, the camera) keeps to his neck's own LIMIT (yaw ±70°, pitch −20°…+55°); the pointer's look
+// goes further, his chest joining in for the big ones as Final IK and the Codrops character do
+// (chestShare: none for small looks, up to 30° of twist and 25° of lean at the reach, so his neck
+// never turns more than LIMIT from his chest), the rest split 30/70 between Neck and Neck001
+// (SPLIT). The pointer's look (screenAim) is camera-relative, film's "performative gaze": his face
+// turns from the viewer toward the cursor, round the line to the camera, so on screen his gaze
+// points right at the cursor whatever the view, zoom or screen; the further the cursor is from his
+// head on screen (in heads), the further round (none within a third of a head: he looks at the
+// viewer; most a couple of heads out), up to LOOK.turnUp, turnSide or turnDown from the line to the
+// camera by the way the cursor lies (down least, so his face still shows under his cap when the
+// cursor is far below him). A cursor below his head has him look down toward it, one above up, one
+// to a side round toward it; one he can't turn to (round behind him) a profile on its side, chin up
+// or down with the cursor, and his head keeps to the side it's turned to until the target is
+// clearly round the other side (no flip from shoulder to shoulder). With no pointer for 1.5 s he
+// looks ahead and glances about every 3–7 s. Running away he looks where he runs, chin level
+// (against the Run clip's own lift), with a quick, brief look back over his shoulder every
+// 1.4–2.4 s, toward the pursuer's side when there is one. "Ahead" is otherwise the viewer
+// (viewerAim): up at the camera, faded back to straight ahead as he turns away from it. Looking at
+// a floor spot without a ray, his head is lifted by LOOK.floorBias so his cap leaves his face
+// showing. A slower ease (the brain's, as he's let go) brings the look and its weight round over
+// about a second instead of a fifth.
 // Pure: time comes in as t, randomness from rng.js; the state object is updated in place.
 
 import { between } from './rng.js';
@@ -28,18 +32,46 @@ import { wrapAngle } from './steer.js';
 /** @typedef {import('./types.js').XYZ} XYZ */
 
 const DEG = Math.PI / 180;
-/** How far he can turn his head, radians (with the camera above him nothing needs a deeper look down). */
+/**
+ * How far his neck turns his head from his chest, radians: a look at a point (the viewer, the
+ * camera: aimAngles) keeps to it, chest and all (with the camera above him nothing needs a deeper
+ * look down).
+ */
 export const LIMIT = { yaw: 70 * DEG, pitchMin: -20 * DEG, pitchMax: 55 * DEG };
-/** The share of the look each bone takes. */
+/**
+ * The chest's share of a big look, radians (chestShare): as the look's yaw goes from yawFrom to
+ * REACH's it twists up to `yaw`, as its pitch goes from upFrom to REACH's top it leans back up to
+ * `up`, and from downFrom to REACH's bottom forward up to `down` (smoothsteps: nothing for the
+ * looks he gives the viewer, no corner where it joins in).
+ */
+export const CHEST = {
+  yaw: 30 * DEG,
+  yawFrom: 30 * DEG,
+  up: 25 * DEG,
+  upFrom: 40 * DEG,
+  down: 10 * DEG,
+  downFrom: -10 * DEG,
+};
+/**
+ * How far the whole look turns his head from the way his body faces, radians: his neck's LIMIT
+ * with the chest's share on top (lookStep keeps every look inside it).
+ */
+export const REACH = {
+  yaw: LIMIT.yaw + CHEST.yaw,
+  pitchMin: LIMIT.pitchMin - CHEST.down,
+  pitchMax: LIMIT.pitchMax + CHEST.up,
+};
+/** The share of what the chest leaves that each neck bone takes. */
 export const SPLIT = { neck: 0.3, head: 0.7 };
 /**
  * omega: the spring's speed (rad/s; ~99% there in 6.6/omega s). idleAfter: seconds without a
  * pointer before he looks ahead. Idle glances: every glanceMin–glanceMax s, held
- * glanceHoldMin–glanceHoldMax s, up to glanceYaw of the yaw limit. weightRate: the look's weight
- * eases at this much per second. The viewer: looked at fully while the camera is within
+ * glanceHoldMin–glanceHoldMax s, up to glanceYaw of his neck's yaw limit. weightRate: the look's
+ * weight eases at this much per second. The viewer: looked at fully while the camera is within
  * viewerFull of the way he faces, not at all past viewerNone (radians). floorBias: the pitch
- * added to a look at a floor spot (radians). soft: the share of each limit taken as asked, the
- * rest eased into (softAim).
+ * added to a look at a floor spot (radians). soft: the share of each of REACH's limits taken as
+ * asked, the rest eased into (softAim). torsoRate: how fast the chest's share comes and goes
+ * (per second) as he leaves the floor and lands (torsoStep).
  *
  * The pointer (screenAim): headSize, his head's height (world units: Neck001's sphere, 1.65
  * model units across the radius at clips.js SCALE 0.16), the unit the cursor's distance from his
@@ -73,6 +105,7 @@ export const LOOK = {
   viewerNone: 150 * DEG,
   floorBias: 10 * DEG,
   soft: 0.75,
+  torsoRate: 4,
   headSize: 0.53,
   deadZone: 0.3,
   ramp: 2,
@@ -117,7 +150,7 @@ export function createLook() {
 }
 
 /**
- * An aim kept inside LIMIT.
+ * An aim kept inside his neck's LIMIT (a look at a point).
  * @param {Aim} a
  * @returns {Aim}
  */
@@ -141,13 +174,50 @@ function soften(v, lo, hi) {
 }
 
 /**
- * An aim kept inside LIMIT, softly: as asked within LOOK.soft of each limit, eased toward it past
+ * An aim kept inside REACH, softly: as asked within LOOK.soft of each limit, eased toward it past
  * that (lookStep's target).
  * @param {Aim} a
  * @returns {Aim}
  */
 export function softAim(a) {
-  return { yaw: soften(a.yaw, -LIMIT.yaw, LIMIT.yaw), pitch: soften(a.pitch, LIMIT.pitchMin, LIMIT.pitchMax) };
+  return { yaw: soften(a.yaw, -REACH.yaw, REACH.yaw), pitch: soften(a.pitch, REACH.pitchMin, REACH.pitchMax) };
+}
+
+/** 0 below `lo`, 1 above `hi`, a smoothstep between (no corner at either end). */
+function smooth(x, lo, hi) {
+  const k = clamp((x - lo) / (hi - lo), 0, 1);
+  return k * k * (3 - 2 * k);
+}
+
+/**
+ * The chest's share of the look (yaw, pitch inside REACH), radians, as a turn of its own in his
+ * root's frame: none for the looks he gives the viewer, twisting and leaning in smoothly for big
+ * ones (CHEST), so his neck turns no more than LIMIT from his chest at the reach.
+ * @param {number} yaw
+ * @param {number} pitch
+ * @returns {Aim}
+ */
+export function chestShare(yaw, pitch) {
+  return {
+    yaw: Math.sign(yaw) * CHEST.yaw * smooth(Math.abs(yaw), CHEST.yawFrom, REACH.yaw),
+    pitch:
+      pitch >= 0
+        ? CHEST.up * smooth(pitch, CHEST.upFrom, REACH.pitchMax)
+        : -CHEST.down * smooth(-pitch, -CHEST.downFrom, -REACH.pitchMin),
+  };
+}
+
+/**
+ * The chest's share eased in and out (0 to 1, LOOK.torsoRate a second): on while he's on his
+ * feet, off while he's held or falling (his collar hangs from the cursor, and a chest turned
+ * under it would move it).
+ * @param {number} k  last frame's
+ * @param {boolean} on
+ * @param {number} dt
+ */
+export function torsoStep(k, on, dt) {
+  const step = LOOK.torsoRate * dt;
+  return on ? Math.min(1, k + step) : Math.max(0, k - step);
 }
 
 /**
@@ -269,19 +339,24 @@ export function viewerAim(headPos, bodyYaw, camera) {
 }
 
 /**
- * The look split between the two neck bones.
+ * The look split between his chest (chestShare) and the two neck bones (SPLIT of what the chest
+ * leaves), as angles that add up to it (character.js applyLook composes the same turns exactly).
  * @param {number} yaw
  * @param {number} pitch
  */
 export function splitLook(yaw, pitch) {
+  const chest = chestShare(yaw, pitch);
+  const y = yaw - chest.yaw;
+  const p = pitch - chest.pitch;
   return {
-    neck: { yaw: yaw * SPLIT.neck, pitch: pitch * SPLIT.neck },
-    head: { yaw: yaw * SPLIT.head, pitch: pitch * SPLIT.head },
+    chest,
+    neck: { yaw: y * SPLIT.neck, pitch: p * SPLIT.neck },
+    head: { yaw: y * SPLIT.head, pitch: p * SPLIT.head },
   };
 }
 
 /**
- * One frame of looking.
+ * One frame of looking, kept inside REACH (eased into its last quarter: softAim).
  * - 'camera': at `aim` (the page aims at the camera), `ahead` when it's null.
  * - 'pointer': at `aim` (screenAim, or the camera when the pointer is on him); when it goes, the
  *   last aim for LOOK.idleAfter, then `ahead` with idle glances.
@@ -324,8 +399,8 @@ export function lookStep(s, mode, aim, dt, t, rng, weight = 1, ahead = AHEAD, ea
   const omega = ease > 0 ? Math.min(pace, 4.74 / ease) : pace;
   [s.yaw, s.vyaw] = spring(s.yaw, s.vyaw, s.target.yaw, dt, omega);
   [s.pitch, s.vpitch] = spring(s.pitch, s.vpitch, s.target.pitch, dt, omega);
-  s.yaw = clamp(s.yaw, -LIMIT.yaw, LIMIT.yaw);
-  s.pitch = clamp(s.pitch, LIMIT.pitchMin, LIMIT.pitchMax);
+  s.yaw = clamp(s.yaw, -REACH.yaw, REACH.yaw);
+  s.pitch = clamp(s.pitch, REACH.pitchMin, REACH.pitchMax);
   const step = (ease > 0 ? Math.min(LOOK.weightRate, 1 / ease) : LOOK.weightRate) * dt;
   s.weight = s.weight < weight ? Math.min(weight, s.weight + step) : Math.max(weight, s.weight - step);
   return s;
