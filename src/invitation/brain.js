@@ -47,6 +47,11 @@ export const TUNE = {
   fleeMin: 2.5,
   /** The Run button's flee. */
   runFor: 3,
+  /**
+   * With no pointer, the Run button's flee runs from a spot this far beside him, square to the
+   * way to the camera (a side picked at random), so he runs across the view, not at the camera.
+   */
+  runFromGap: 1,
   /** Fleeing from stress with the pointer gone, he runs from where it was last seen this long ago (a lifted finger). */
   threatMemory: 2,
   /** Stress a tap adds; he flees at stressFlee and calms below stressCalm; it's capped at stressMax. */
@@ -141,6 +146,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
     walkUntil: 0,
     fleeUntil: 0,
     fleeFromThreat: false,
+    /** @type {XZ|null} the Run button's spot to run from (runFromGap) */
+    runFrom: null,
     /** @type {{x: number, z: number, t: number}|null} */
     threat: null,
     shakenUntil: 0,
@@ -242,6 +249,20 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
     enter('flee');
     m.fleeUntil = m.t + minFor;
     m.fleeFromThreat = fromThreat;
+    m.runFrom = fromThreat ? null : besideHim();
+  }
+
+  /**
+   * A spot TUNE.runFromGap beside him, square to the way to the camera (toward +z without one),
+   * on a side picked at random: the Run button runs him away from it, across the view.
+   * @returns {XZ|null}
+   */
+  function besideHim() {
+    const n = m.input?.newt;
+    if (!n) return null;
+    const a = cameraYaw();
+    const side = rng() < 0.5 ? -1 : 1;
+    return { x: n.x + side * Math.cos(a) * T.runFromGap, z: n.z - side * Math.sin(a) * T.runFromGap };
   }
 
   /** Gets him up first when he's sitting, then does `p`. */
@@ -494,7 +515,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
       case 'flee': {
         const th = m.threat;
         const recent = m.fleeFromThreat && !m.input?.pointer && th && m.t - th.t <= T.threatMemory + EPS;
-        return { mode: 'flee', goal: recent ? { x: th.x, z: th.z } : null, speed: T.runSpeed };
+        const from = recent ? { x: th.x, z: th.z } : m.fleeFromThreat ? null : m.runFrom;
+        return { mode: 'flee', goal: from ? { x: from.x, z: from.z } : null, speed: T.runSpeed };
       }
       case 'react':
       case 'sitDown': {

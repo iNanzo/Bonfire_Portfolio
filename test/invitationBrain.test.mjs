@@ -296,7 +296,7 @@ test('fleeing: a tap adds stress and he keeps running; a floor tap is ignored', 
   assert.deepEqual(out.move.goal, { x: 1, z: 1 }, 'not a place to walk to: the finger he runs from');
 });
 
-test('fleeing from stress with the finger lifted, he runs from where it was; the Run button from the centre', () => {
+test('fleeing from stress with the finger lifted, he runs from where it was; the Run button across the view, from a spot beside him', () => {
   const s = sim();
   const at = { x: 0.4, z: 0.2 };
   s.w.pointer = at;
@@ -318,7 +318,23 @@ test('fleeing from stress with the finger lifted, he runs from where it was; the
   r.w.pointer = null;
   out = r.button('Run');
   assert.equal(out.state, 'flee');
-  assert.equal(out.move.goal, null, 'the Run button: from the centre when there is no pointer');
+  // The Run button with no pointer: from a spot beside him as the camera sees it (+z without
+  // one), so he runs across the view, not at the camera; either side.
+  const sides = new Set();
+  for (let seed = 1; seed <= 8; seed++)
+    for (const camera of [null, { x: 0.3, z: 9 }, { x: 8, z: -0.2 }]) {
+      const q = sim({ seed, x: 0.3, z: -0.2, camera });
+      q.frame();
+      const from = { ...q.w.body };
+      const { goal } = q.button('Run').move;
+      const toCam = camera ? { x: camera.x - from.x, z: camera.z - from.z } : { x: 0, z: 1 };
+      const d = { x: goal.x - from.x, z: goal.z - from.z };
+      close(Math.hypot(d.x, d.z), TUNE.runFromGap, 1e-9, `seed ${seed}: beside him`);
+      close((d.x * toCam.x + d.z * toCam.z) / Math.hypot(toCam.x, toCam.z), 0, 1e-9, 'square to the camera');
+      if (!camera) sides.add(Math.sign(d.x));
+      assert.deepEqual(q.run(1).move.goal, goal, 'it stays put while he runs on away from it');
+    }
+  assert.equal(sides.size, 2, 'either side');
 });
 
 test('through gestures: a short press is a tap, a drag is a grab, and a cancel is a drop', () => {

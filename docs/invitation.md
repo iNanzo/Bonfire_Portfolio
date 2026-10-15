@@ -45,8 +45,8 @@ unlisted: nothing links to it and search engines are asked not to index it.
 - **Leave him alone** for about 20 seconds and he turns to face you and sits down (the Sit
   button turns him to you first too, so you see his happy face).
 - **The toolbar:** Wave, Spook, Sit (Stand once he's sitting), Run (he runs off for a few
-  seconds), Wander (on: he strolls around by himself) and Look. The buttons rest while he's
-  being held or falling.
+  seconds, across the screen to one side or the other, or away from the cursor), Wander (on:
+  he strolls around by himself) and Look. The buttons rest while he's being held or falling.
 
 ## The Look Menu
 
