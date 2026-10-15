@@ -1,21 +1,26 @@
 // NEWT's pixel faces at many sizes (pure: no three.js, no DOM): the ladder of cell sizes
 // public/models/newt-face.png holds (tools/newt-face.mjs draws one 2×2 sheet a size, clips.js
-// FACES' layout, the sheets side by side), how they're packed, which one fits his half face on
-// screen, and how wide one cell of the face is on his head.
+// FACES' layout, the sheets side by side), how they're packed (and which of them an image of a
+// given size holds: an older copy cached from before the ladder grew), which one fits his half
+// face on screen, and how wide one cell of the face is on his head.
 //
 // Why many: with nearest sampling a feature only keeps its shape when one pixel of the sheet
 // covers about one texel. His half face is about 3 texels across at 16×16, 7 to 10 at 48×48,
-// 20 at 96×96, 30 at 128×128 on a phone and more zoomed in; one fixed sheet sampled at 0.8 or 1.3 pixels a
-// texel turns a 2-pixel eye into 1 or 3 texels as his head moves a fraction of a texel, frame to
-// frame (the eyes flicker between shapes). character.js measures his half face in texels each
-// frame and shows the sheet whose cell matches it, holding on to the one showing until another
-// fits clearly better (pickFaceSize), so his breathing never flips it. Past the largest sheet
-// (zoomed in at the finest sprite resolutions, his half face over 40 texels) a pixel sheet would
-// be stretched, nearest, into blocks: there the face is the smooth 1024 sheet, as at Off
+// 20 at 96×96, 30 at 128×128 on a phone, about 62 at Native on one, and more zoomed in; one
+// fixed sheet sampled at 0.8 or 1.3 pixels a texel turns a 2-pixel eye into 1 or 3 texels as his
+// head moves a fraction of a texel, frame to frame (the eyes flicker between shapes).
+// character.js measures his half face in texels each frame and shows the sheet whose cell
+// matches it, holding on to the one showing until another fits clearly better (pickFaceSize), so
+// his breathing never flips it. Past the largest sheet (zoomed in at Native or the finest sprite
+// resolutions, his half face over about 78 texels) a pixel sheet would be stretched, nearest,
+// into blocks: there the face is the smooth 1024 sheet, as at Off
 // ('smooth'); under the smallest (16×16: his half face about 2 texels) it's the smallest sheet.
 
-/** The cells' widths, pixels: a step of at most about 15% between neighbours. */
-export const FACE_SIZES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 23, 26, 30, 34];
+/**
+ * The cells' widths, pixels: a step of at most about 15% between neighbours, up to his half face
+ * at Native on a phone (about 62 texels), so the phone's close-up has pixel eyes too.
+ */
+export const FACE_SIZES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 23, 26, 30, 34, 40, 46, 53, 62];
 /**
  * A cell's height over its width: one cell is half his face across (the face mirrors it) and
  * all of it down, seen from the toy's camera about 36° up (his face's 1.0 by 2.1 on the head,
@@ -25,8 +30,8 @@ export const FACE_ASPECT = 1.75;
 /** How much better (as a log of the size ratio) another size must fit before the sheet switches. */
 export const FACE_HYSTERESIS = 0.06;
 /**
- * The smooth sheet shows once his half face is this many times the largest sheet's cell (34 px:
- * past about 42 texels), until it's FACE_HYSTERESIS × 2 (log) under that again.
+ * The smooth sheet shows once his half face is this many times the largest sheet's cell (62 px:
+ * past about 78 texels), until it's FACE_HYSTERESIS × 2 (log) under that again.
  */
 export const SMOOTH_FACE_OVER = 1.25;
 /**
@@ -57,6 +62,25 @@ export const FACE_IMAGE = {
   w: FACE_LAYOUT.reduce((s, f) => s + 2 * f.w, 0),
   h: Math.max(...FACE_LAYOUT.map((f) => 2 * f.h)),
 };
+
+/**
+ * The sheets an image `width` × `height` holds: the whole ladder for this one (FACE_IMAGE); for an
+ * older one cached from when the ladder stopped sooner (sheets are only ever added at its end,
+ * so its sheets sit where FACE_LAYOUT has them), the sheets it's exactly as wide and tall as; for
+ * any other, one 2×2 sheet filling it (the first pixel face).
+ * @param {number} width
+ * @param {number} height
+ * @returns {FaceSheet[]}
+ */
+export function layoutFor(width, height) {
+  if (width === FACE_IMAGE.w && height === FACE_IMAGE.h) return FACE_LAYOUT;
+  for (let n = FACE_LAYOUT.length - 1; n > 0; n--) {
+    const last = FACE_LAYOUT[n - 1];
+    const tall = Math.max(...FACE_LAYOUT.slice(0, n).map((s) => 2 * s.h));
+    if (last.x + 2 * last.w === width && tall === height) return FACE_LAYOUT.slice(0, n);
+  }
+  return [{ w: Math.floor(width / 2), h: Math.floor(height / 2), x: 0, y: 0 }];
+}
 
 /**
  * The size of sheet to show for a half face `texels` across: the nearest (by ratio), unless

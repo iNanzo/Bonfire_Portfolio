@@ -30,8 +30,7 @@ import { SHADER_CONTROLS, controlFor, shaderText } from './shader.js';
 /** @typedef {import('./types.js').ButtonName} ButtonName */
 
 /**
- * Text as HTML: its ampersands and angle brackets as entities (a label such as "Pixel Shirt &
- * Face").
+ * Text as HTML: its ampersands and angle brackets as entities (a label or a hint may hold one).
  * @param {string} s
  */
 const html = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

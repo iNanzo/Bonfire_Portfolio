@@ -14,7 +14,9 @@
 // rather than his shirt's pattern, and half a mip from 128 texels tall, where the glb's own
 // plaid replaces the pixel atlas (at 1.5 its checks blurred into grey, its neighbours streaking
 // his trousers); a hard BasicShadowMap shadow, one flat warm lavender grey on the white,
-// lighter than him; no blob under him while he stands (only a flat one while he's lifted).
+// lighter than him; no blob under him while he stands (only a flat one while he's lifted); his
+// real plaid at every resolution (Pixel Shirt off) and his face redrawn in pixels to fit his
+// size (Pixel Face on).
 // Every look value lives here so the look designer edits data, never code: retro.js, stage.js,
 // floor.js and character.js read it (look.js has the shape, LookPreset; retro.js the pass's own
 // extras, RetroExtras; shader.js the Shader options it sets).
@@ -45,7 +47,7 @@ export default {
   hemi: { sky: '#ffffff', ground: '#e8c8b0', intensity: 1.3 },
   blob: { opacity: 0, lifted: 0.3 },
   marker: { color: '#6f6457' },
-  texture: { mipBias: 1.5, fineMipBias: 0.5 },
+  texture: { mipBias: 1.5, fineMipBias: 0.5, pixelShirt: false, pixelFace: true },
   // (Choppy motion, for the user to try: 15 steps a second is the choppy option; 0 is smooth.)
   animFps: 0,
 };

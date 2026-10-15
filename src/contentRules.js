@@ -19,7 +19,7 @@ import {
 import { contrast, HEX_RE, ID_RE, isObj, WEAPON_KEYS } from './ruleBasics.js';
 import { PIXEL_SIZES } from './pixelSizes.js';
 import { validateScenes } from './scenes.js';
-import { MOTIONS, STYLES } from './invitation/look.js';
+import { LEGACY_SHADER, MOTIONS, STYLES } from './invitation/look.js';
 import { PIXEL_SIZES as INVITATION_PIXEL_SIZES } from './invitation/pixels.js';
 import { SHADER_CONTROLS } from './invitation/shader.js';
 import { LINE_MAX, LINES_MAX, SPEECH_RANGES, TRIGGERS } from './invitation/speech.js';
@@ -278,10 +278,19 @@ function invitationDefaults(d, check) {
   }
 }
 
-/** One Shader value: within its control's range or steps, one of its choices, or a switch. */
+/**
+ * One Shader value: within its control's range or steps, one of its choices, or a switch; an old
+ * switch that's been split (look.js LEGACY_SHADER: the toy still reads it) a switch too, with a
+ * warning naming the ones to set instead.
+ */
 function shaderValue(key, value, p, check) {
   const c = SHADER_CONTROLS.find((x) => x.key === key);
-  if (!c) check.err(check.at(p), 'Unknown setting.');
+  const split = Object.keys(LEGACY_SHADER).filter((k) => LEGACY_SHADER[k] === key);
+  if (!c && split.length) {
+    check.bool(value, p);
+    const names = split.map((k) => SHADER_CONTROLS.find((x) => x.key === k)?.label ?? k);
+    check.warn(check.at(p), `Split into ${names.join(' and ')}: set those instead.`);
+  } else if (!c) check.err(check.at(p), 'Unknown setting.');
   else if (c.kind === 'switch') check.bool(value, p);
   else if (c.kind === 'choice')
     check.oneOf(

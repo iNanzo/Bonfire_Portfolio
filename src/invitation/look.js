@@ -13,10 +13,12 @@
 // on its own, so one bad value never costs the others (a Pixel Size from before the resolutions
 // loads as the nearest one: 2×, 3× and 4× as they looked on a 390-wide phone, OLD_PIXEL, and
 // 'fine', 'ds' or 'chunky' as the default; the page never shipped with them; a look stored before
-// Motion loads as Smooth with its other values kept, and one stored before the Shader options as
-// its style). The admin's Default look (content.json `invitation.defaults`, which main.js hands
-// installDefaults at boot) overrides the built-in Default style and the first visit's settings;
-// a stored look still wins, a value it lacks taking the Default look's.
+// Motion loads as Smooth with its other values kept, one stored before the Shader options as its
+// style, and one with Pixel Shirt & Face, the one switch Pixel Shirt and Pixel Face split from,
+// with both set as it was: LEGACY_SHADER). The admin's Default look (content.json
+// `invitation.defaults`, which main.js hands installDefaults at boot) overrides the built-in
+// Default style and the first visit's settings; a stored look still wins, a value it lacks
+// taking the Default look's.
 
 import { DEFAULT_PIXEL, PIXEL_SIZES } from './pixels.js';
 import { DEFAULT_STYLE, PRESETS } from './looks/index.js';
@@ -97,9 +99,17 @@ const BUILT_IN = Object.freeze({ preset: LOOKS[DEFAULT_STYLE], look: DEFAULT_LOO
 let first = DEFAULT_LOOK;
 
 /**
+ * Shader options split from one stored before them: each one's old key, read where a look has
+ * no value of its own (Pixel Shirt & Face, `pixelArt`, became Pixel Shirt and Pixel Face).
+ * @type {Record<string, string>}
+ */
+export const LEGACY_SHADER = { pixelShirt: 'pixelArt', pixelFace: 'pixelArt' };
+
+/**
  * The user's Shader changes from anything, against the style `style`: each value snapped onto
- * its control (shader.js snapShader) or dropped on its own, unknown keys dropped, and a value
- * that's the style's own dropped (no change).
+ * its control (shader.js snapShader) or dropped on its own, unknown keys dropped (an old one in
+ * LEGACY_SHADER read for the options split from it), and a value that's the style's own dropped
+ * (no change).
  * @param {unknown} raw
  * @param {string} style  a key of LOOKS
  * @returns {import('./shader.js').ShaderValues}
@@ -107,10 +117,13 @@ let first = DEFAULT_LOOK;
 function validShader(raw, style) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   const own = styleShader(LOOKS[style]);
+  const values = /** @type {Record<string, unknown>} */ (raw);
   /** @type {import('./shader.js').ShaderValues} */
   const out = {};
   for (const c of SHADER_CONTROLS) {
-    const v = snapShader(c, /** @type {Record<string, unknown>} */ (raw)[c.key]);
+    // (A look stored with the one switch they split from, Pixel Shirt & Face: it sets both.)
+    const legacy = Object.hasOwn(LEGACY_SHADER, c.key) && !Object.hasOwn(values, c.key);
+    const v = snapShader(c, values[legacy ? LEGACY_SHADER[c.key] : c.key]);
     if (v !== undefined && v !== own[c.key]) out[c.key] = v;
   }
   return out;

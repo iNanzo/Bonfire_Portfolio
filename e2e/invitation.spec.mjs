@@ -280,12 +280,12 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
-  test('with Pixel Shirt & Face on, the pixel atlas and the pixel face load alongside the glb, and the first frame waits for them', async ({
+  test('with Pixel Shirt on (and Pixel Face, every style’s own), the pixel atlas and the pixel face load alongside the glb, and the first frame waits for them', async ({
     page,
   }) => {
     const errors = watch(page);
     await page.addInitScript(() =>
-      localStorage.setItem('invitation.look.v1', JSON.stringify({ shader: { pixelArt: true } })),
+      localStorage.setItem('invitation.look.v1', JSON.stringify({ shader: { pixelShirt: true } })),
     );
     /** @type {number|null} when the glb was let through (it's held a while, as on a slow phone) */
     let glbAt = null;
@@ -315,14 +315,30 @@ test.describe('on a phone', () => {
     expect(errors).toEqual([]);
   });
 
-  test('with Pixel Shirt & Face off (the default) the first frame never waits for the pixel images, and NEWT wears his real plaid and smooth face', async ({
+  test('with the default look (Pixel Face on, Pixel Shirt off) the first frame waits for the pixel face, never for the pixel atlas, and NEWT wears his real plaid and his pixel face', async ({
     page,
   }) => {
     const errors = watch(page);
-    /** @type {boolean|null} whether the page had drawn by the time the pixel images were let through */
+    /** @type {number|null} when the glb was let through (it's held a while, as on a slow phone) */
+    let glbAt = null;
+    /** @type {boolean|null} whether the page had drawn by the time the pixel atlas was let through */
     let drawnFirst = null;
-    await page.route(/\/models\/newt-(atlas-pixel|face)\.png$/, async (route) => {
-      // (Held until the page draws, or 8 s: it never waits on them.)
+    /** @type {boolean|null} whether it had drawn by the time the pixel face was let through */
+    let faceLate = null;
+    await page.route('**/models/newt.glb', async (route) => {
+      await sleep(1000);
+      glbAt = Date.now();
+      await route.continue();
+    });
+    await page.route(/\/models\/newt-face\.png$/, async (route) => {
+      // Held until a while after the glb: the page doesn't draw until it's in.
+      while (glbAt === null) await sleep(20);
+      await sleep(Math.max(0, glbAt + 600 - Date.now()));
+      faceLate = await page.evaluate(() => document.querySelector('[data-stage]').classList.contains('is-ready'));
+      await route.continue();
+    });
+    await page.route(/\/models\/newt-atlas-pixel\.png$/, async (route) => {
+      // (Held until the page draws, or 8 s: it never waits on it.)
       const t0 = Date.now();
       while (Date.now() - t0 < 8000) {
         const drawn = await page
@@ -338,18 +354,22 @@ test.describe('on a phone', () => {
     });
     await ready(page);
     await expect.poll(() => drawnFirst).not.toBeNull();
-    expect(drawnFirst, 'drawn before the pixel images came').toBe(true);
+    expect(drawnFirst, 'drawn before the pixel atlas came').toBe(true);
+    expect(faceLate, 'the first frame waited for the pixel face').toBe(false);
     const snap = await snapshot(page);
     expect(snap.atlas).toBe('original');
-    expect(snap.faceSheet).toBe('smooth');
-    expect(snap.shader.pixelArt).toBe(false);
+    expect(typeof snap.faceSheet, `a pixel face sheet (${snap.faceSheet})`).toBe('number');
+    expect(snap.shader.pixelShirt).toBe(false);
+    expect(snap.shader.pixelFace).toBe(true);
     expect(errors).toEqual([]);
   });
 
-  test('with Pixel Shirt & Face off at 32×32 his smooth face still has its eyes: dark texels inside it, between his cheeks', async ({
+  test('with Pixel Face off at 32×32 his smooth face still has its eyes: dark texels inside it, between his cheeks', async ({
     page,
   }) => {
-    await page.addInitScript(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32' })));
+    await page.addInitScript(() =>
+      localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32', shader: { pixelFace: false } })),
+    );
     await calm(page);
     const snap = await snapshot(page);
     expect(snap.faceSheet).toBe('smooth');
@@ -1275,9 +1295,9 @@ test.describe('on a desktop', () => {
       expect(f.inside, `Shift+Tab ${i}: ${f.what}`).toBe(true);
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
-    // Motion, the 16 Shader options (Reset To Style rests until one is the user's own) and Reset
+    // Motion, the 17 Shader options (Reset To Style rests until one is the user's own) and Reset
     // Camera.
-    expect(stops.size, [...stops].join(', ')).toBe(25);
+    expect(stops.size, [...stops].join(', ')).toBe(26);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');
@@ -1808,11 +1828,11 @@ test.describe('on a 1429×1115 desktop', () => {
 test.describe('on a hi-DPI desktop', () => {
   test.use({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
 
-  test('with Pixel Shirt & Face on at 128×128 his shirt is the Pixel Size’s to decide: zoomed in (bigger blocks) or with the governor a step coarser, it keeps the real plaid', async ({
+  test('with Pixel Shirt on at 128×128 his shirt is the Pixel Size’s to decide: zoomed in (bigger blocks) or with the governor a step coarser, it keeps the real plaid', async ({
     page,
   }) => {
     await page.addInitScript(() =>
-      localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '128', shader: { pixelArt: true } })),
+      localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '128', shader: { pixelShirt: true } })),
     );
     await ready(page, '/invitation/?test&calm&seed=3');
     const base = await snapshot(page);
