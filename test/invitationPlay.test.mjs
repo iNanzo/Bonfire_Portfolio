@@ -14,7 +14,7 @@
 // still reads as down; a sweep moves it smoothly; his reach (his neck's limits with his chest's
 // share on top) is soft; his chest joins in only for big looks; with his back to the camera a
 // cursor wiggling behind him doesn't flip his head from side to side; and running away he faces
-// where he runs, glancing back over his shoulder toward the pursuer every second or two (over the
+// where he runs, glancing back over his shoulder toward the pursuer every few seconds (over the
 // shoulder nearer the camera when it's straight behind him), never at the viewer.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -661,7 +661,7 @@ test('with the pursuer straight behind him, he glances back over the shoulder ne
   assert.deepEqual(aim, raw);
 });
 
-test('fleeing from the cursor, his head faces where he runs, glancing back over his shoulder toward the cursor every second or two, never at the viewer', () => {
+test('fleeing from the cursor, his head faces where he runs, glancing back over his shoulder toward the cursor every few seconds, never at the viewer', () => {
   const camera = { x: 0, y: 8.3, z: 10.8 };
   for (const [seed, pointer] of [
     [3, { x: -1.2, z: 0.2 }],
@@ -722,7 +722,9 @@ test('fleeing from the cursor, his head faces where he runs, glancing back over 
     }
     const share = straight / frames;
     assert.ok(share > 0.5, `seed ${seed}: facing where he runs ${(100 * share).toFixed(0)}% of the run`);
-    assert.ok(glances.length >= 2, `seed ${seed}: ${glances.length} glances back in 3 s`);
+    // (The first glance comes LOOK.backFirstMin–backFirstMax s in, the next backEveryMin–Max
+    // after it: one or two in a 3 s run.)
+    assert.ok(glances.length >= 1 && glances.length <= 2, `seed ${seed}: ${glances.length} glances back in 3 s`);
     for (const g of glances) {
       assert.equal(Math.sign(g.yaw), g.side, `seed ${seed}, ${g.t.toFixed(2)} s: toward the cursor side`);
       assert.ok(Math.abs(g.yaw) > 0.5 * LIMIT.yaw, 'right over his shoulder');

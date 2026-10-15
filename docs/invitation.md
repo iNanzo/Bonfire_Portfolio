@@ -13,7 +13,7 @@ unlisted: nothing links to it and search engines are asked not to index it.
 
 - **Tap him** and he waves or gets startled (a jump, arms flung up). Tap him a lot and he gets
   stressed and runs away from your finger, looking where he runs and glancing back over his
-  shoulder at your finger every second or two, his chest twisting with it (with your finger
+  shoulder at your finger every few seconds, his chest twisting with it (with your finger
   straight behind him, over the shoulder nearer you, so you see him look back); he's never too
   fast to catch.
 - **Drag him** to pick him up by the collar. The spot you grabbed stays right under your
@@ -244,7 +244,7 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
     he's held or falling, so his collar stays under the cursor. A target behind him keeps to the
     side his head is turned to. Running away ('back'),
     "ahead" is where he runs, chin level (`LOOK.runPitch`, −12°, against the Run clip's own
-    lift), and every 1.4–2.4 s he glances back over his shoulder for 0.35 s, quickly
+    lift), and every 2.2–3.4 s he glances back over his shoulder for 0.35 s, quickly
     (`backOmega`), 80° round (`backYaw` of `REACH`'s yaw: his chest twists about 24° with it),
     toward the side of the pursuer (`BrainOut.look.at`: the pointer, or where it was last
     seen; either side with none); with it straight behind him (past `backSide`, 150°), which

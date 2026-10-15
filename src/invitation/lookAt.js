@@ -17,7 +17,7 @@
 // head keeps to the side it's turned to until the target is clearly round the other side (no flip
 // from shoulder to shoulder). With no pointer for 1.5 s he looks ahead and glances about every
 // 3–7 s. Running away he looks where he runs, chin level (against the Run clip's own lift), with a
-// quick, brief look back over his shoulder every 1.4–2.4 s, his chest twisting with it, toward the
+// quick, brief look back over his shoulder every 2.2–3.4 s, his chest twisting with it, toward the
 // pursuer's side when there is one. "Ahead" is otherwise the viewer (viewerAim): up at the camera,
 // faded back to straight ahead as he turns away from it. Looking at a floor spot without a ray, his
 // head is lifted by LOOK.floorBias so his cap leaves his face showing. A slower ease (the brain's,
@@ -119,10 +119,10 @@ export const LOOK = {
   gazeFull: 35 * DEG,
   gazeNone: 75 * DEG,
   runPitch: -12 * DEG,
-  backFirstMin: 0.5,
-  backFirstMax: 0.9,
-  backEveryMin: 1.4,
-  backEveryMax: 2.4,
+  backFirstMin: 0.9,
+  backFirstMax: 1.4,
+  backEveryMin: 2.2,
+  backEveryMax: 3.4,
   backHold: 0.35,
   backOmega: 14,
   backYaw: 0.8,

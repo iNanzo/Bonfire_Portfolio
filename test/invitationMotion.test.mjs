@@ -688,7 +688,7 @@ test('look-at is critically damped: it eases onto a target without overshoot', (
   close(s.weight, 0);
 });
 
-test('look-at glances are seeded: forward 1.5 s after the pointer goes, every 3–7 s; fleeing glances back every 1.4–2.4 s', () => {
+test('look-at glances are seeded: forward 1.5 s after the pointer goes, every 3–7 s; fleeing glances back every 2.2–3.4 s', () => {
   function idle(seed) {
     const rng = createRng(seed);
     let s = createLook();
@@ -1045,7 +1045,7 @@ test('ahead means toward the viewer: up at the camera, fading to straight ahead 
   close(aimAngles(head, 0, { x: 0, y: 0, z: 0.1 }, 10 * D).pitch, LIMIT.pitchMin, 1e-9, 'still clamped');
 });
 
-test('running away he looks where he runs, chin level (whatever the camera), with a brief glance back over his shoulder every 1.4–2.4 s: toward the pursuer’s side when there is one, either side when there isn’t', () => {
+test('running away he looks where he runs, chin level (whatever the camera), with a brief glance back over his shoulder every 2.2–3.4 s: toward the pursuer’s side when there is one, either side when there isn’t', () => {
   const D = Math.PI / 180;
   const ahead = { yaw: 0, pitch: LOOK.runPitch };
   /** 12 s of fleeing with the pursuer at `at` (an aim, or null): each glance, and the targets. */
@@ -1072,11 +1072,16 @@ test('running away he looks where he runs, chin level (whatever the camera), wit
     return { glances, share: glancing / frames };
   };
   const gaps = (g) => g.slice(1).map((x, i) => x.t - g[i].t);
+  /** @type {number[]} the sides he glances to with no pursuer, over every seed */
+  const unchased = [];
   for (let seed = 1; seed <= 12; seed++) {
     // The pursuer behind him on his left, then on his right, then nowhere.
     for (const at of [{ yaw: -2.6, pitch: -0.4 }, { yaw: 2.9, pitch: -0.2 }, null]) {
       const { glances, share } = flee(seed, at);
-      assert.ok(glances.length >= 5 && glances.length <= 10, `seed ${seed}: ${glances.length} glances in 12 s`);
+      // (The first LOOK.backFirstMin–backFirstMax s in, then every backEveryMin–backEveryMax s.)
+      const fewest = 1 + Math.floor((12 - LOOK.backFirstMax) / LOOK.backEveryMax);
+      const most = 1 + Math.floor((12 - LOOK.backFirstMin) / LOOK.backEveryMin);
+      assert.ok(glances.length >= fewest && glances.length <= most, `seed ${seed}: ${glances.length} glances in 12 s`);
       assert.ok(glances[0].t <= LOOK.backEveryMin + 1e-6, `the first ${glances[0].t.toFixed(2)} s in`);
       for (const gap of gaps(glances))
         assert.ok(gap >= LOOK.backEveryMin - 1e-6 && gap <= LOOK.backEveryMax + DT, `every ${gap.toFixed(2)} s`);
@@ -1090,13 +1095,12 @@ test('running away he looks where he runs, chin level (whatever the camera), wit
             'down toward the pursuer, not the floor at his heels',
           );
       }
-      if (!at)
-        assert.ok(
-          seed > 3 || new Set(glances.map((g) => Math.sign(g.yaw))).size === 2,
-          `seed ${seed}: either side with no pursuer`,
-        );
+      if (!at) unchased.push(...glances.map((g) => Math.sign(g.yaw)));
     }
   }
+  // (With no pursuer, either side: about as often over the seeds, a few glances each.)
+  const left = unchased.filter((x) => x < 0).length / unchased.length;
+  assert.ok(left > 0.3 && left < 0.7, `either side with no pursuer: ${(left * 100).toFixed(0)}% to his left`);
   // The pursuer roughly ahead (he runs past it): the glance goes right to it.
   const { glances } = flee(2, { yaw: 0.4, pitch: -0.1 });
   for (const g of glances) close(g.yaw, 0.4, 1e-9);
