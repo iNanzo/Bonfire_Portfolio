@@ -1489,14 +1489,10 @@ test.describe('on a desktop', () => {
     await until(page, (s) => s.camera.elevation > home.elevation + 0.05, 'tilted up a little');
     // By the stage's width: 240 of its 1280 px turn it about 0.88 rad (three quarters of a turn
     // across the whole width), plus a little coast; never the 2.2 rad of 2π per 700 px.
-    let settled = NaN;
-    await expect
-      .poll(async () => {
-        const was = settled;
-        settled = (await snapshot(page)).camera.yaw;
-        return Math.abs(settled - was) < 1e-4;
-      }, 'the turn settles')
-      .toBe(true);
+    // (Waits on the view coming to rest, by the toy's own clock: a software-rendered browser
+    // draws slowly, so the coast and easing take longer there in real time.)
+    await until(page, (s) => !s.camera.turning, 'the turn settles');
+    const settled = (await snapshot(page)).camera.yaw;
     expect(Math.abs(settled), `turned ${settled.toFixed(2)} rad`).toBeGreaterThan(0.7);
     expect(Math.abs(settled), `turned ${settled.toFixed(2)} rad`).toBeLessThan(1.6);
     let s = await snapshot(page);
@@ -1799,8 +1795,15 @@ test.describe('on a desktop', () => {
     // (The whole run, from 0.6 s in: his look has come round from the viewer by then.)
     const run = frames.filter((f) => f.state === 'flee' && f.t > 600);
     expect(run.length, 'frames of the run').toBeGreaterThan(20);
-    const straight = run.filter((f) => Math.abs(f.yaw) < 0.2).length / run.length;
-    expect(straight, 'his head where he runs most of the run').toBeGreaterThan(0.5);
+    // (By time, not by frames: a slow software-rendered frame is a longer stretch of the run.)
+    let span = 0;
+    let ahead = 0;
+    for (let i = 1; i < run.length; i++) {
+      const dt = run[i].t - run[i - 1].t;
+      span += dt;
+      if (Math.abs(run[i].yaw) < 0.2) ahead += dt;
+    }
+    expect(ahead / span, 'his head where he runs most of the run').toBeGreaterThan(0.5);
     expect(
       run.some((f) => Math.abs(f.yaw) > 0.6),
       'a glance back over his shoulder',
