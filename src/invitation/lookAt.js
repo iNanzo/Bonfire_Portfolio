@@ -17,11 +17,11 @@
 // head keeps to the side it's turned to until the target is clearly round the other side (no flip
 // from shoulder to shoulder). With no pointer for 1.5 s he looks ahead and glances about every
 // 3–7 s. Running away he looks where he runs, chin level (against the Run clip's own lift), with a
-// quick, brief look back over his shoulder every 1.4–2.4 s, toward the pursuer's side when there is
-// one. "Ahead" is otherwise the viewer (viewerAim): up at the camera, faded back to straight ahead
-// as he turns away from it. Looking at a floor spot without a ray, his head is lifted by
-// LOOK.floorBias so his cap leaves his face showing. A slower ease (the brain's, as he's let go)
-// brings the look and its weight round over about a second instead of a fifth.
+// quick, brief look back over his shoulder every 1.4–2.4 s, his chest twisting with it, toward the
+// pursuer's side when there is one. "Ahead" is otherwise the viewer (viewerAim): up at the camera,
+// faded back to straight ahead as he turns away from it. Looking at a floor spot without a ray, his
+// head is lifted by LOOK.floorBias so his cap leaves his face showing. A slower ease (the brain's,
+// as he's let go) brings the look and its weight round over about a second instead of a fifth.
 // Pure: time comes in as t, randomness from rng.js; the state object is updated in place.
 
 import { between } from './rng.js';
@@ -86,12 +86,13 @@ export const SPLIT = { neck: 0.3, head: 0.7 };
  *
  * Running away (mode 'back'): runPitch, his chin there while he looks where he runs (the Run
  * clip lifts his head about 18° itself); a glance back every backEveryMin–backEveryMax s (the
- * first backFirstMin–backFirstMax s in), held backHold s, at backYaw of the yaw limit toward the
- * pursuer's side (or straight at it, nearer than that), its pitch toward the pursuer kept within
- * backPitchMin–backPitchMax (radians); the look turns at backOmega, quicker than omega, so a
- * glance is a quick look back.
+ * first backFirstMin–backFirstMax s in), held backHold s, at backYaw of REACH's yaw toward the
+ * pursuer's side (his chest twisting with it: over his shoulder; or straight at it, nearer than
+ * that), its pitch toward the pursuer kept within backPitchMin–backPitchMax (radians); the look
+ * turns at backOmega, quicker than omega, so a glance is a quick look back.
  * backSide: a target further round behind him than this (radians) keeps his head on the side
- * it's turned to.
+ * it's turned to; a pursuer that far round is glanced at over the shoulder nearer the camera
+ * (play.js lookAim), so the viewer sees his face look back.
  */
 export const LOOK = {
   omega: 10,
@@ -124,7 +125,7 @@ export const LOOK = {
   backEveryMax: 2.4,
   backHold: 0.35,
   backOmega: 14,
-  backYaw: 0.95,
+  backYaw: 0.8,
   backPitchMin: -10 * DEG,
   backPitchMax: 5 * DEG,
   backSide: 150 * DEG,
@@ -470,9 +471,11 @@ function idleGlance(s, t, rng, ahead) {
 /**
  * Where he runs (`ahead`), with a look back over one shoulder every backEveryMin–backEveryMax s
  * (the first backFirstMin–backFirstMax s in), held backHold s: toward the pursuer's side (`at`,
- * its aim from his head) at LOOK.backYaw of his reach, or right at it when it's nearer round
+ * its aim from his head) at LOOK.backYaw of REACH's yaw, or right at it when it's nearer round
  * than that, his chin toward it within backPitchMin–backPitchMax; either side, level, with no
- * pursuer. Never toward the viewer for its own sake: the camera has no say in it.
+ * pursuer. Never toward the viewer for its own sake: the camera only settles the side for a
+ * pursuer straight behind him (play.js lookAim hands it round the camera's side then, its yaw
+ * past half a turn).
  * @param {LookState} s
  * @param {number} t
  * @param {() => number} rng
@@ -484,7 +487,7 @@ function backGlance(s, t, rng, ahead, at) {
   if (s.nextGlance == null) s.nextGlance = t + between(rng, LOOK.backFirstMin, LOOK.backFirstMax);
   if (s.glance && t >= s.glanceUntil) s.glance = null;
   if (!s.glance && t >= s.nextGlance) {
-    const reach = LOOK.backYaw * LIMIT.yaw;
+    const reach = LOOK.backYaw * REACH.yaw;
     const side = at && Math.abs(at.yaw) > 1e-3 ? Math.sign(at.yaw) : rng() < 0.5 ? -1 : 1;
     s.glance = {
       yaw: side * (at ? Math.min(Math.abs(at.yaw), reach) : reach),

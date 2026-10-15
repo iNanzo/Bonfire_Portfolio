@@ -22,7 +22,8 @@
 //                           a ray, its floor spot lifted by LOOK.floorBias so his cap leaves his
 //                           face showing); "ahead" meaning toward the viewer; running away,
 //                           ahead is where he runs, chin level, and the pursuer is aimed at for
-//                           his glances back
+//                           his glances back (straight behind him, over the shoulder nearer the
+//                           camera, so the viewer sees him look back)
 //   lookShare               how much of the look goes on: clips that lift his head to show his
 //                           face themselves (Wave, the Sit trio) take only HEAD_SHARE of it, so
 //                           the look never cricks it back further
@@ -190,7 +191,8 @@ const RUN_AHEAD = Object.freeze({ yaw: 0, pitch: LOOK.runPitch });
  *   clamped, so lookStep keeps a target behind him on the side his head is turned to; without
  *   one, its floor spot, lifted by LOOK.floorBias; null without a pointer;
  * - 'forward': no aim;
- * - 'back': the pursuer on the floor (BrainOut.look.at), null without one.
+ * - 'back': the pursuer on the floor (BrainOut.look.at), null without one; straight behind
+ *   him, taken round the side nearer the camera (pursuerAim).
  * `ahead` is toward the viewer (lookAt.js viewerAim), except running away ('back'): where he
  * runs, his chin level, whatever the camera.
  * @param {'pointer'|'camera'|'forward'|'back'} mode  BrainOut.look.mode
@@ -198,8 +200,7 @@ const RUN_AHEAD = Object.freeze({ yaw: 0, pitch: LOOK.runPitch });
  * @returns {{aim: Aim|null, ahead: Aim}}
  */
 export function lookAim(mode, { head, yaw, camera, pointer, pursuer = null }) {
-  if (mode === 'back')
-    return { aim: pursuer ? aimAt(head, yaw, { x: pursuer.x, y: 0, z: pursuer.z }) : null, ahead: RUN_AHEAD };
+  if (mode === 'back') return { aim: pursuer ? pursuerAim(head, yaw, camera, pursuer) : null, ahead: RUN_AHEAD };
   const ahead = viewerAim(head, yaw, camera);
   if (mode === 'camera') return { aim: aimAngles(head, yaw, camera), ahead };
   if (mode !== 'pointer' || !pointer) return { aim: null, ahead };
@@ -207,6 +208,25 @@ export function lookAim(mode, { head, yaw, camera, pointer, pursuer = null }) {
   if (pointer.ray) return { aim: screenAim(pointer.ray, head, yaw, camera), ahead };
   if (!pointer.floor) return { aim: null, ahead };
   return { aim: aimAngles(head, yaw, { x: pointer.floor.x, y: 0, z: pointer.floor.z }, LOOK.floorBias), ahead };
+}
+
+/**
+ * The pursuer's aim from his head, for his glances back: straight behind him (round past
+ * LOOK.backSide), which shoulder is a toss-up, so it's taken round the side nearer the camera
+ * (its yaw past half a turn that way: lookAt.js backGlance turns to that side, as far as he
+ * can), and the viewer sees his face look back rather than the back of his cap.
+ * @param {XYZ} head
+ * @param {number} yaw
+ * @param {XYZ} camera
+ * @param {XZ} pursuer
+ * @returns {Aim}
+ */
+function pursuerAim(head, yaw, camera, pursuer) {
+  const at = aimAt(head, yaw, { x: pursuer.x, y: 0, z: pursuer.z });
+  if (Math.abs(at.yaw) <= LOOK.backSide) return at;
+  const side = Math.sign(aimAt(head, yaw, camera).yaw);
+  if (!side || side === Math.sign(at.yaw)) return at;
+  return { yaw: at.yaw + side * 2 * Math.PI, pitch: at.pitch };
 }
 
 /** The share of the look the clips that lift his head themselves take (the rest take it all). */

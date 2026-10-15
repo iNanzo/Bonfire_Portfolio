@@ -14,8 +14,8 @@
 // still reads as down; a sweep moves it smoothly; his reach (his neck's limits with his chest's
 // share on top) is soft; his chest joins in only for big looks; with his back to the camera a
 // cursor wiggling behind him doesn't flip his head from side to side; and running away he faces
-// where he runs, glancing back over his shoulder toward the pursuer every second or two, never at
-// the viewer.
+// where he runs, glancing back over his shoulder toward the pursuer every second or two (over the
+// shoulder nearer the camera when it's straight behind him), never at the viewer.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -630,6 +630,37 @@ test('running away, "ahead" is where he runs, his chin level whatever the camera
   assert.ok(aim.pitch < 0, 'down at the floor');
 });
 
+test('with the pursuer straight behind him, he glances back over the shoulder nearer the camera, so the viewer sees his face look back', () => {
+  const head = { x: 0, y: 0.75, z: 0 };
+  // Running toward −z, away from a cursor right behind him (a hair to one side or the other).
+  for (const camX of [-8, 8]) {
+    const camera = { x: camX, y: 8, z: 6 };
+    const camSide = Math.sign(aimAt(head, Math.PI, camera).yaw);
+    for (const px of [-0.15, 0.15]) {
+      const pursuer = { x: px, z: 2 };
+      const raw = aimAt(head, Math.PI, { x: pursuer.x, y: 0, z: pursuer.z });
+      assert.ok(Math.abs(raw.yaw) > LOOK.backSide, 'straight behind him');
+      const { aim } = lookAim('back', { head, yaw: Math.PI, camera, pointer: null, pursuer });
+      assert.equal(Math.sign(aim.yaw), camSide, `camera at x ${camX}, cursor at x ${px}: the camera's side`);
+      close(Math.cos(aim.yaw), Math.cos(raw.yaw), 1e-9, 'the same way round, taken on that side');
+      close(aim.pitch, raw.pitch, 1e-9);
+      // The glance goes that way, as far round as he goes.
+      const s = createLook();
+      const rng = createRng(1);
+      let t = 0;
+      while (!s.glance && t < 3) lookStep(s, 'back', aim, DT, (t += DT), rng, 1, { yaw: 0, pitch: LOOK.runPitch });
+      assert.equal(Math.sign(s.glance.yaw), camSide);
+      close(Math.abs(s.glance.yaw), LOOK.backYaw * REACH.yaw, 1e-9);
+    }
+  }
+  // Off to a side behind him (inside backSide), the cursor's own side, whatever the camera.
+  const camera = { x: -8, y: 8, z: 6 };
+  const { aim } = lookAim('back', { head, yaw: Math.PI, camera, pointer: null, pursuer: { x: -1.5, z: 1 } });
+  const raw = aimAt(head, Math.PI, { x: -1.5, y: 0, z: 1 });
+  assert.ok(Math.abs(raw.yaw) <= LOOK.backSide);
+  assert.deepEqual(aim, raw);
+});
+
 test('fleeing from the cursor, his head faces where he runs, glancing back over his shoulder toward the cursor every second or two, never at the viewer', () => {
   const camera = { x: 0, y: 8.3, z: 10.8 };
   for (const [seed, pointer] of [
@@ -672,9 +703,11 @@ test('fleeing from the cursor, his head faces where he runs, glancing back over 
       assert.equal(out.state, 'flee');
       assert.deepEqual(out.look.at, pointer, 'the cursor is who he runs from');
       if (look.glances > n) {
-        // Over his shoulder on the cursor's side.
+        // Over his shoulder on the cursor's side (straight behind him, the camera's side).
         const toward = aimAt(head, body.body.yaw, { x: pointer.x, y: 0, z: pointer.z });
-        glances.push({ t, yaw: look.target.yaw, side: Math.sign(toward.yaw) });
+        const cam = aimAt(head, body.body.yaw, camera);
+        const side = Math.abs(toward.yaw) > LOOK.backSide ? Math.sign(cam.yaw) : Math.sign(toward.yaw);
+        glances.push({ t, yaw: look.target.yaw, side });
       }
       n = look.glances;
       if (t < 0.3) continue;
@@ -694,6 +727,10 @@ test('fleeing from the cursor, his head faces where he runs, glancing back over 
       assert.equal(Math.sign(g.yaw), g.side, `seed ${seed}, ${g.t.toFixed(2)} s: toward the cursor side`);
       assert.ok(Math.abs(g.yaw) > 0.5 * LIMIT.yaw, 'right over his shoulder');
     }
+    assert.ok(
+      glances.some((g) => Math.abs(g.yaw) > LIMIT.yaw),
+      `seed ${seed}: past his neck's reach, his chest twisting`,
+    );
     for (let i = 1; i < glances.length; i++) {
       const gap = glances[i].t - glances[i - 1].t;
       assert.ok(gap >= LOOK.backEveryMin - 1e-6 && gap <= LOOK.backEveryMax + DT, `a glance every ${gap.toFixed(2)} s`);

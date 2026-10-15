@@ -13,7 +13,9 @@ unlisted: nothing links to it and search engines are asked not to index it.
 
 - **Tap him** and he waves or gets startled (a jump, arms flung up). Tap him a lot and he gets
   stressed and runs away from your finger, looking where he runs and glancing back over his
-  shoulder at your finger every second or two; he's never too fast to catch.
+  shoulder at your finger every second or two, his chest twisting with it (with your finger
+  straight behind him, over the shoulder nearer you, so you see him look back); he's never too
+  fast to catch.
 - **Drag him** to pick him up by the collar. The spot you grabbed stays right under your
   cursor (a finger carries him a little above itself, so it doesn't hide him, and near the top
   of the screen no higher than keeps his head on it): move up and he
@@ -242,8 +244,11 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
     side his head is turned to. Running away ('back'),
     "ahead" is where he runs, chin level (`LOOK.runPitch`, −12°, against the Run clip's own
     lift), and every 1.4–2.4 s he glances back over his shoulder for 0.35 s, quickly
-    (`backOmega`), toward the side of the pursuer (`BrainOut.look.at`: the pointer, or where
-    it was last seen; either side with none). Held, he looks at the viewer with idle glances
+    (`backOmega`), 80° round (`backYaw` of `REACH`'s yaw: his chest twists about 24° with it),
+    toward the side of the pursuer (`BrainOut.look.at`: the pointer, or where it was last
+    seen; either side with none); with it straight behind him (past `backSide`, 150°), which
+    shoulder is a toss-up, so `play.js` `lookAim` takes it round the side nearer the camera,
+    and you see his face look back. Held, he looks at the viewer with idle glances
     ('forward'). The Run button with no pointer runs him from a spot beside him square to the
     camera (`TUNE.runFromGap`), across the view. `floor.js` `fitShadow(…, at)` moves the
     shadow camera to wherever he is, by whole shadow texels.
