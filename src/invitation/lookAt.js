@@ -1,27 +1,24 @@
 // Where NEWT looks in the invitation toy: the yaw and pitch toward a target, clamped to what a
-// neck can do (yaw ±70°, pitch −30°…+55°) and split 30/70 between Neck and Neck001, eased by a
-// critically damped spring (no overshoot). The pointer's target (pointerTarget) is where its ray
-// first meets the floor or the upright plane through his head facing the camera, brought a
-// little toward the camera along the ray: a cursor high over him has him look up at it (his
-// gaze on screen right at it), one level with his head off to a side turns him well round to it
-// (never the back of his head), and his head turns all the way to the cursor's side. From the
-// camera's 36° a look down hides his face under his cap, so his chin never drops below where it
-// shows, and a look turned further from the camera than LOOK.faceTurn tips the brim across both
-// eyes, so a look in front of him turns no further round than that (faceUp: a cursor low in
-// front of him has him turn to it, chin up, face showing; one far off to a side, as far round as
-// still shows his face). Behind
-// him past his reach, his head keeps to the side it's turned to until the
-// target is clearly round the other side (no flip from shoulder to shoulder). With no pointer
-// for 1.5 s he looks ahead and glances about every 3–7 s; running away, he looks where he runs,
-// his chin up toward the viewer as "ahead" has it (so the Run clip's screaming face shows under
-// his cap when he runs toward the camera), and glances over his shoulder about every 1.2 s, the
-// glances smaller and fewer the more the camera is in front of him (LOOK.backFront). "Ahead" is
-// the viewer (viewerAim): up at the camera, which is what
-// shows his face under his cap's brim, faded back to straight ahead as he turns away from it.
-// Looking at a floor spot without a ray, his head is lifted by LOOK.floorBias for the same
-// reason. A slower ease (the brain's, as he's let go) brings the look and its weight round over
-// about a second instead of a fifth. Pure: time comes in as t, randomness from rng.js; the state
-// object is updated in place.
+// neck can do (yaw ±70°, pitch −20°…+55°, the last quarter of each eased in rather than a dead
+// stop: softAim) and split 30/70 between Neck and Neck001, eased by a critically damped spring
+// (no overshoot). The pointer's look (screenAim) is camera-relative, film's "performative
+// gaze": his face turns from the viewer toward the cursor, round the line to the camera, so on
+// screen his gaze points right at the cursor whatever the view, zoom or screen; the further the
+// cursor is from his head on screen (in heads), the further round (none within a third of a
+// head: he looks at the viewer; most a couple of heads out), up to LOOK.turnUp, turnSide or
+// turnDown from the line to the camera by the way the cursor lies (down least, so his face still
+// shows under his cap when the cursor is far below him). A cursor below his head has him look
+// down toward it, one above up, one to a side round toward it; one he can't turn to (round
+// behind him) a profile on its side, chin up or down with the cursor, and his head keeps to the
+// side it's turned to until the target is clearly round the other side (no flip from shoulder
+// to shoulder). With no pointer for 1.5 s he looks ahead and glances about every 3–7 s.
+// Running away, he looks where he runs, his chin up toward the viewer as "ahead" has it, and
+// glances over his shoulder about every 1.2 s, the glances smaller and fewer the more the camera
+// is in front of him (LOOK.backFront). "Ahead" is otherwise the viewer (viewerAim): up at the camera, faded back to
+// straight ahead as he turns away from it. Looking at a floor spot without a ray, his head is
+// lifted by LOOK.floorBias so his cap leaves his face showing. A slower ease (the brain's, as
+// he's let go) brings the look and its weight round over about a second instead of a fifth.
+// Pure: time comes in as t, randomness from rng.js; the state object is updated in place.
 
 import { between } from './rng.js';
 import { wrapAngle } from './steer.js';
@@ -31,31 +28,34 @@ import { wrapAngle } from './steer.js';
 /** @typedef {import('./types.js').XYZ} XYZ */
 
 const DEG = Math.PI / 180;
-/** How far he can turn his head, radians. */
-export const LIMIT = { yaw: 70 * DEG, pitchMin: -30 * DEG, pitchMax: 55 * DEG };
+/** How far he can turn his head, radians (with the camera above him nothing needs a deeper look down). */
+export const LIMIT = { yaw: 70 * DEG, pitchMin: -20 * DEG, pitchMax: 55 * DEG };
 /** The share of the look each bone takes. */
 export const SPLIT = { neck: 0.3, head: 0.7 };
 /**
  * omega: the spring's speed (rad/s; ~99% there in 6.6/omega s). idleAfter: seconds without a
  * pointer before he looks ahead. Idle glances: every glanceMin–glanceMax s, held
- * glanceHoldMin–glanceHoldMax s, up to glanceYaw of the yaw limit. Back glances: every
- * backEvery ± backJitter s, held backHold s, at backYaw of the yaw limit; with the camera dead
- * ahead of him, backFront of that turn and half as often (his face toward the viewer).
- * weightRate: the look's
- * weight eases at this much per second. The viewer: looked at fully while the camera is within
+ * glanceHoldMin–glanceHoldMax s, up to glanceYaw of the yaw limit. weightRate: the look's weight
+ * eases at this much per second. The viewer: looked at fully while the camera is within
  * viewerFull of the way he faces, not at all past viewerNone (radians). floorBias: the pitch
- * added to a look at a floor spot (radians). towardViewer: how far the pointer's target is
- * brought toward the camera along its ray, world units (his face turns to the viewer while his
- * gaze still points at the cursor on screen). faceUnder: how far under the camera (as seen from
- * his head) his look may pitch and still show his face under his cap's brim, radians (from the
- * front and side on alike: side on, the brim reaches out over his eye). faceTurn: how far round
- * from the camera a look in front of him may turn and still show his eyes under the brim,
- * radians, and faceTilt: how much further up his chin comes turned that far, eased in from
- * faceTiltFrom (turned further, or level, the brim hides them from the camera's 36°: a count of
- * the eye triangles the camera sees on the posed model fell from 14 of 18 facing it to 9 at 55°
- * and 5 at 70°, and rose with the chin; at 50° and 15° more, both eyes show at real speed).
- * backSide:
- * a target further round behind him than this (radians) keeps his head on the side it's turned to.
+ * added to a look at a floor spot (radians). soft: the share of each limit taken as asked, the
+ * rest eased into (softAim).
+ *
+ * The pointer (screenAim): headSize, his head's height (world units: Neck001's sphere, 1.65
+ * model units across the radius at clips.js SCALE 0.16), the unit the cursor's distance from his
+ * head on screen is counted in; within deadZone heads he looks at the viewer, and his face turns
+ * from the viewer toward the cursor over the next `ramp` heads (eased out), as far as turnUp,
+ * turnSide or turnDown from the line to the camera for a cursor above, beside or below his head
+ * (radians, blended between by the way it lies); turned any way, his chin no lower than turnDown
+ * under the camera's line (where his eyes still peek under his cap), while the camera is within
+ * faceSide of the way he faces, fading out by faceBack (radians: behind him there's no face to
+ * keep in sight).
+ *
+ * Back glances: every backEvery ± backJitter s, held backHold s, at backYaw of the yaw limit;
+ * with the camera dead ahead of him, backFront of that turn and half as often (his face toward
+ * the viewer).
+ * backSide: a target further round behind him than this (radians) keeps his head on the side
+ * it's turned to.
  */
 export const LOOK = {
   omega: 10,
@@ -65,21 +65,25 @@ export const LOOK = {
   glanceHoldMin: 0.6,
   glanceHoldMax: 1.2,
   glanceYaw: 0.85,
+  weightRate: 5,
+  viewerFull: 100 * DEG,
+  viewerNone: 150 * DEG,
+  floorBias: 10 * DEG,
+  soft: 0.75,
+  headSize: 0.53,
+  deadZone: 0.3,
+  ramp: 2,
+  turnUp: 60 * DEG,
+  turnSide: 65 * DEG,
+  turnDown: 15 * DEG,
+  faceSide: 90 * DEG,
+  faceBack: 135 * DEG,
   backEvery: 1.2,
   backJitter: 0.25,
   backHold: 0.4,
   backYaw: 0.95,
   backFront: 0.35,
-  weightRate: 5,
-  viewerFull: (100 * Math.PI) / 180,
-  viewerNone: (150 * Math.PI) / 180,
-  floorBias: (10 * Math.PI) / 180,
-  towardViewer: 0.6,
-  faceUnder: (4 * Math.PI) / 180,
-  faceTurn: (50 * Math.PI) / 180,
-  faceTilt: (15 * Math.PI) / 180,
-  faceTiltFrom: (25 * Math.PI) / 180,
-  backSide: (150 * Math.PI) / 180,
+  backSide: 150 * DEG,
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -114,6 +118,31 @@ export function clampAim(a) {
 }
 
 /**
+ * `v` as asked inside LOOK.soft of a limit, past it eased toward the limit (tanh: the same slope
+ * where it starts, never reaching past it), so a look sweeping out to his neck's reach slows
+ * into it instead of stopping dead.
+ * @param {number} v
+ * @param {number} lo  negative
+ * @param {number} hi  positive
+ */
+function soften(v, lo, hi) {
+  const k = LOOK.soft;
+  if (v > hi * k) return hi * k + hi * (1 - k) * Math.tanh((v - hi * k) / (hi * (1 - k)));
+  if (v < lo * k) return lo * k + lo * (1 - k) * Math.tanh((v - lo * k) / (lo * (1 - k)));
+  return v;
+}
+
+/**
+ * An aim kept inside LIMIT, softly: as asked within LOOK.soft of each limit, eased toward it past
+ * that (lookStep's target).
+ * @param {Aim} a
+ * @returns {Aim}
+ */
+export function softAim(a) {
+  return { yaw: soften(a.yaw, -LIMIT.yaw, LIMIT.yaw), pitch: soften(a.pitch, LIMIT.pitchMin, LIMIT.pitchMax) };
+}
+
+/**
  * The look toward `target` from his head, relative to the way his body faces, as it is (not
  * clamped: lookStep clamps it, keeping a target behind him on the side his head is turned to).
  * @param {XYZ} headPos
@@ -142,64 +171,74 @@ export function aimAngles(headPos, bodyYaw, target, pitchBias = 0) {
 }
 
 /**
- * A look (from his head, his body facing `bodyYaw`) where his face still shows to the camera
- * under his cap's brim: tipped up, where it must be, to the camera's own pitch from his head less
- * LOOK.faceUnder (and LOOK.faceTilt more turned far round), and turned no further round from the
- * camera than LOOK.faceTurn (a look turned
- * away from the camera, past side on, is left be). He still turns toward what he looks at, as far
- * as that (from the camera's 36°, a look down at the floor, or level, is the top of his cap, and
- * one turned side on the brim across his eyes).
- * @param {Aim} aim
- * @param {XYZ} head
+ * The pointer's look: camera-relative ("performative gaze"). Seen from the camera, the cursor's
+ * ray lies some way from his head (in heads: LOOK.headSize at his distance) in some direction φ
+ * on screen; his face turns from the line to the camera by α toward φ, round that line, so on
+ * screen his gaze points right at the cursor (a line through his head toward the camera and
+ * turned toward φ shows along φ, at any view or zoom), and turned more the further the cursor
+ * is: none within LOOK.deadZone heads (at the viewer), then eased out to LOOK.turnUp, turnSide
+ * or turnDown (by φ) over LOOK.ramp heads; straight up or down, no further than brings his
+ * pitch from the camera's to his neck's limit (so his gaze never tips over the top into a look
+ * backwards, and points along φ as far as his neck lets it). Round behind him past his reach
+ * he turns as far as he can on that side, his chin up or down with the cursor: a profile. Not
+ * clamped (lookStep keeps a target behind him on the side his head is turned to). Null when the
+ * ray points away from him or the camera is right over his head.
+ * @param {{o: XYZ, d: XYZ}} ray  the cursor's ray, from the camera
+ * @param {XYZ} head  between his eyes
  * @param {number} bodyYaw
  * @param {XYZ} camera
- * @returns {Aim}
+ * @returns {Aim|null}
  */
-export function faceUp(aim, head, bodyYaw, camera) {
-  const cx = camera.x - head.x;
-  const cz = camera.z - head.z;
-  const off = wrapAngle(bodyYaw + aim.yaw - Math.atan2(cx, cz));
-  if (Math.abs(off) > Math.PI / 2) return aim;
-  // (Turned well round, the brim reaches across his near eye from the camera's height too: his
-  // chin comes up a little more, LOOK.faceTilt at faceTurn, easing in from faceTiltFrom.)
-  const turned = Math.min(1, Math.max(0, (Math.abs(off) - LOOK.faceTiltFrom) / (LOOK.faceTurn - LOOK.faceTiltFrom)));
-  const lowest = Math.atan2(camera.y - head.y, Math.hypot(cx, cz)) - LOOK.faceUnder + LOOK.faceTilt * turned * turned;
-  const yaw = Math.abs(off) > LOOK.faceTurn ? aim.yaw - off + Math.sign(off) * LOOK.faceTurn : aim.yaw;
-  return { yaw, pitch: Math.max(aim.pitch, lowest) };
-}
-
-/**
- * What he looks at for the pointer: where its ray (`o`, `d`) first meets the floor or the
- * upright plane through his head facing the camera (across the floor), brought
- * LOOK.towardViewer toward the camera along the ray (so it still shows under the cursor);
- * `floor` when the floor came first (a spot in front of him), null when the ray meets neither.
- * @param {{o: XYZ, d: XYZ}} ray
- * @param {XYZ} head
- * @param {XYZ} camera
- * @returns {{point: XYZ, floor: boolean}|null}
- */
-export function pointerTarget({ o, d }, head, camera) {
+export function screenAim({ d }, head, bodyYaw, camera) {
+  // w: from the camera to his head; right and up: the screen's directions there.
+  const wx0 = head.x - camera.x;
+  const wy0 = head.y - camera.y;
+  const wz0 = head.z - camera.z;
+  const dist = Math.hypot(wx0, wy0, wz0);
+  const flat = Math.hypot(wx0, wz0);
   const len = Math.hypot(d.x, d.y, d.z);
-  if (!(len > 0)) return null;
-  const u = { x: d.x / len, y: d.y / len, z: d.z / len };
-  const nx = camera.x - head.x;
-  const nz = camera.z - head.z;
-  const n = Math.hypot(nx, nz);
-  const normal = n > 1e-9 ? { x: nx / n, z: nz / n } : { x: 0, z: 1 };
-  const along = u.x * normal.x + u.z * normal.z;
-  let s = Infinity;
-  if (Math.abs(along) > 1e-9) {
-    const hit = ((head.x - o.x) * normal.x + (head.z - o.z) * normal.z) / along;
-    if (hit > 0) s = hit;
+  if (!(dist > 1e-9) || !(flat > 1e-6 * dist) || !(len > 0)) return null;
+  const w = { x: wx0 / dist, y: wy0 / dist, z: wz0 / dist };
+  const right = { x: -w.z / (flat / dist), y: 0, z: w.x / (flat / dist) };
+  const up = { x: -right.z * w.y, y: right.z * w.x - right.x * w.z, z: right.x * w.y };
+  const along = (d.x * w.x + d.y * w.y + d.z * w.z) / len;
+  if (!(along > 1e-6)) return null;
+  // Where the cursor lies from his head as seen from the camera (tangents), and in heads.
+  const sx = (d.x * right.x + d.z * right.z) / len / along;
+  const sy = (d.x * up.x + d.y * up.y + d.z * up.z) / len / along;
+  const heads = (Math.hypot(sx, sy) * dist) / LOOK.headSize;
+  const k = clamp((heads - LOOK.deadZone) / LOOK.ramp, 0, 1);
+  const phi = Math.atan2(sy, sx);
+  const cp = Math.cos(phi);
+  const sp = Math.sin(phi);
+  // (Straight up or down, no further than brings his pitch to his neck's limit from the
+  // camera's: the camera's pitch from his head is asin(−w.y).)
+  const camPitch = Math.asin(-w.y);
+  const upMost = clamp(LIMIT.pitchMax - camPitch, 0, LOOK.turnUp);
+  const downMost = clamp(camPitch - LIMIT.pitchMin, 0, LOOK.turnDown);
+  const most = LOOK.turnSide + ((sy > 0 ? upMost : downMost) - LOOK.turnSide) * sp * sp;
+  let a = (1 - (1 - k) * (1 - k)) * most;
+  // (Any way round, no lower than turnDown under the camera's line, where his eyes still peek
+  // under his cap: his gaze's height as he turns is −w.y·cos α + up.y·sin φ·sin α =
+  // R·cos(α − δ), past its top only ever falling, so the α where it reaches that is as far as
+  // he turns. It still points along φ. With his back to the camera there's no face to show:
+  // it fades out as the camera goes from his side, faceSide, to behind him, faceBack.)
+  const camOff = Math.abs(wrapAngle(Math.atan2(-w.x, -w.z) - bodyYaw));
+  const facing = clamp((LOOK.faceBack - camOff) / (LOOK.faceBack - LOOK.faceSide), 0, 1);
+  const R = Math.hypot(-w.y, up.y * sp);
+  const floor = Math.sin(Math.max(LIMIT.pitchMin, camPitch - LOOK.turnDown));
+  if (facing > 0 && floor > -R) {
+    const most = Math.atan2(up.y * sp, -w.y) + Math.acos(Math.min(1, floor / R));
+    a = Math.min(a, most) * facing + a * (1 - facing);
   }
-  let floor = false;
-  if (u.y < -1e-9 && -o.y / u.y < s) {
-    s = -o.y / u.y;
-    floor = true;
-  }
-  if (!Number.isFinite(s)) return null;
-  const k = Math.max(0, s - LOOK.towardViewer);
-  return { point: { x: o.x + u.x * k, y: o.y + u.y * k, z: o.z + u.z * k }, floor };
+  const ca = Math.cos(a);
+  const sa = Math.sin(a);
+  const g = {
+    x: -w.x * ca + (right.x * cp + up.x * sp) * sa,
+    y: -w.y * ca + up.y * sp * sa,
+    z: -w.z * ca + (right.z * cp + up.z * sp) * sa,
+  };
+  return aimAt(head, bodyYaw, { x: head.x + g.x, y: head.y + g.y, z: head.z + g.z });
 }
 
 /**
@@ -236,8 +275,8 @@ export function splitLook(yaw, pitch) {
 /**
  * One frame of looking.
  * - 'camera': at `aim` (the page aims at the camera), `ahead` when it's null.
- * - 'pointer': at `aim` (the surface under the pointer, or the camera when the pointer is on
- *   him); when it goes, the last aim for LOOK.idleAfter, then `ahead` with idle glances.
+ * - 'pointer': at `aim` (screenAim, or the camera when the pointer is on him); when it goes, the
+ *   last aim for LOOK.idleAfter, then `ahead` with idle glances.
  * - 'forward': `ahead` with idle glances around it.
  * - 'back': straight ahead (where he runs), chin up to `ahead`'s pitch, glancing over a shoulder
  *   about every LOOK.backEvery s (smaller and fewer glances with the viewer in front: backGlance).
@@ -270,7 +309,7 @@ export function lookStep(s, mode, aim, dt, t, rng, weight = 1, ahead = AHEAD, ea
   } else if (mode === 'pointer' && s.lastAim && t - s.lastAimT < LOOK.idleAfter) target = s.lastAim;
   else if (mode === 'back') target = backGlance(s, t, rng, ahead);
   else target = idleGlance(s, t, rng, ahead);
-  s.target = clampAim(sided(target, s.yaw));
+  s.target = softAim(sided(target, s.yaw));
   // (A critically damped spring is 95% of the way at omega × t = 4.74.)
   const omega = ease > 0 ? Math.min(LOOK.omega, 4.74 / ease) : LOOK.omega;
   [s.yaw, s.vyaw] = spring(s.yaw, s.vyaw, s.target.yaw, dt, omega);

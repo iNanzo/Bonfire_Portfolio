@@ -40,7 +40,17 @@ import {
   mainClip,
   NEXT_CLIP,
 } from '../src/invitation/blend.js';
-import { aimAngles, lookStep, createLook, splitLook, viewerAim, LIMIT, SPLIT, LOOK } from '../src/invitation/lookAt.js';
+import {
+  aimAngles,
+  aimAt,
+  lookStep,
+  createLook,
+  splitLook,
+  viewerAim,
+  LIMIT,
+  SPLIT,
+  LOOK,
+} from '../src/invitation/lookAt.js';
 import { TUNE, createBrain } from '../src/invitation/brain.js';
 
 const BOUNDS = { minX: -2, maxX: 2, minZ: -2, maxZ: 1.4 };
@@ -602,10 +612,10 @@ test('a one-shot fades out before it ends', () => {
 
 // ---- look-at ------------------------------------------------------------------------------
 
-test('look-at clamps to ±70° of yaw and −30°…+55° of pitch, split 30% neck and 70% head', () => {
+test('look-at clamps to ±70° of yaw and −20°…+55° of pitch, split 30% neck and 70% head', () => {
   const D = Math.PI / 180;
   close(LIMIT.yaw, 70 * D);
-  close(LIMIT.pitchMin, -30 * D);
+  close(LIMIT.pitchMin, -20 * D);
   close(LIMIT.pitchMax, 55 * D);
   assert.deepEqual(SPLIT, { neck: 0.3, head: 0.7 });
   const head = { x: 0, y: 0.9, z: 0 };
@@ -776,7 +786,7 @@ test('dropped facing away, his head comes round over the fall and the landing to
   const rng = createRng(4);
   const D = 180 / Math.PI;
   // The camera behind him: held, he looks round at it as far as his neck goes.
-  const camera = { yaw: LIMIT.yaw, pitch: 0.3 };
+  const camera = { yaw: 1.3 * LIMIT.yaw, pitch: 0.3 };
   let t = 0;
   let grounded = true;
   const frame = (extra = {}) => {
@@ -801,7 +811,7 @@ test('dropped facing away, his head comes round over the fall and the landing to
   for (let i = 0; i < 90; i++) out = frame();
   assert.equal(out.state, 'held');
   const full = turned();
-  close(full, LIMIT.yaw, 1e-3, 'held, his head turned round to the camera');
+  assert.ok(full > 0.95 * LIMIT.yaw, `held, his head turned round to the camera (${(full * D).toFixed(0)}°)`);
   // Let go: a fall of about 0.23 s (from the hang), then the landing, then idle.
   grounded = false;
   out = frame({ events: [{ type: 'release', on: 'newt', x: 0, y: 0, t }] });
@@ -1018,7 +1028,7 @@ test('ahead means toward the viewer: up at the camera, fading to straight ahead 
   close(a.pitch, Math.atan2(9.2, 15) / 2, 1e-9);
   close(a.yaw, -LIMIT.yaw / 2, 1e-9);
   // The floor bias: a pitch added before the clamp.
-  const plain = aimAngles(head, 0, { x: 0, y: 0, z: 2 });
+  const plain = aimAt(head, 0, { x: 0, y: 0, z: 2 });
   close(aimAngles(head, 0, { x: 0, y: 0, z: 2 }, 10 * D).pitch, plain.pitch + 10 * D, 1e-9);
   close(aimAngles(head, 0, { x: 0, y: 0, z: 0.1 }, 10 * D).pitch, LIMIT.pitchMin, 1e-9, 'still clamped');
 });
@@ -1042,13 +1052,14 @@ test('running off toward the camera, his chin stays up toward it and his glances
   };
   const gap = (g) => (g[g.length - 1].t - g[0].t) / (g.length - 1);
   // The camera dead ahead of him (viewerAim: up at it): his chin stays up toward it, and his
-  // glances back stay small enough that his face still shows (well inside LOOK.faceTurn).
+  // glances back stay small enough that his face still shows (well inside 50°, where his cap's
+  // brim hides it).
   const front = { yaw: 0, pitch: 0.55 };
   for (let seed = 1; seed <= 20; seed++) {
     const { glances, targets } = flee(seed, front);
     for (const target of targets) {
       assert.ok(target.pitch >= front.pitch - 1e-9, `seed ${seed}: chin up (${target.pitch.toFixed(2)})`);
-      assert.ok(Math.abs(target.yaw) <= 0.5 * LOOK.faceTurn, `seed ${seed}: turned ${target.yaw.toFixed(2)}`);
+      assert.ok(Math.abs(target.yaw) <= (25 * Math.PI) / 180, `seed ${seed}: turned ${target.yaw.toFixed(2)}`);
     }
     assert.ok(glances.length >= 3, `seed ${seed}: he still glances back (${glances.length})`);
     assert.ok(gap(glances) > 1.5 * LOOK.backEvery, `seed ${seed}: every ${gap(glances).toFixed(2)} s, fewer`);

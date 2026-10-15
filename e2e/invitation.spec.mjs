@@ -10,9 +10,8 @@
 // Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
 // turns his head, each button plays its clip, a floor tap walks him there, and the cursor turns his
-// head on a desktop (up at a cursor high over him, his face toward a cursor in front of him, and
-// well round toward one level with his head off to the side, no further than still shows his
-// face). The camera: a finger's drag on empty
+// head on a desktop (down toward a cursor below him, up at one high over him, well round toward one
+// level with his head off to the side). The camera: a finger's drag on empty
 // space or the mouse's right-drag (on NEWT too, never holding him) turns it, the mouse's
 // left-drag on empty space and two fingers pan it with the floor under the cursor, the wheel
 // and a two-finger pinch zoom it, the canvas shows no context menu, and Reset Camera brings it
@@ -1720,46 +1719,37 @@ test.describe('on a desktop', () => {
     expect(steps[0], `${steps[0].toFixed(1)} px in a frame, then ${steps[1].toFixed(1)}`).toBeLessThan(3 * steps[1]);
   });
 
-  test('where he looks with a mouse: up at a cursor high over him, his face toward a cursor in front of him, and well round toward one level with his head off to the side, as far as still shows his face', async ({
+  test('where he looks with a mouse: down toward a cursor below him (under the look at the viewer it rests at), up at one above him, round toward one off to a side', async ({
     page,
   }) => {
     await calm(page);
     const head = await on(page, 'head');
     const feet = await on(page, 'feet');
     const tall = feet.y - head.y;
-    // High over him: his head tips up.
-    await page.mouse.move(head.x + 10, head.y - 3 * tall);
-    await until(page, (s) => s.headPitch > 0.45, 'his head tipped up');
-    // In front of him (below his feet on screen, off to a side): his face toward the camera, and
-    // his head turned the way the cursor is.
+    // The cursor on him: he looks at the viewer, as he rests.
+    await page.mouse.move(head.x, head.y);
+    await framesFor(page, 700);
+    const idle = (await snapshot(page)).headPitch;
+    expect(idle, 'up at the viewer').toBeGreaterThan(0.4);
+    // Below him: his head goes down toward it, well under the look at the viewer.
+    await page.mouse.move(head.x, feet.y + tall, { steps: 4 });
+    await until(page, (s) => s.headPitch < idle - 0.2, 'his head down toward the cursor below him');
+    // Below and off to a side: turned that way, still down.
     for (const side of [-1, 1]) {
-      await page.mouse.move(head.x + side * tall, feet.y + tall, { steps: 4 });
+      await page.mouse.move(head.x + side * tall, feet.y + tall / 2, { steps: 4 });
       await until(
         page,
-        (s) =>
-          Math.sign(s.headYaw) === side &&
-          Math.abs(s.headYaw) > 0.15 &&
-          Math.abs(
-            Math.atan2(Math.sin(s.heading + s.headYaw - s.camera.yaw), Math.cos(s.heading + s.headYaw - s.camera.yaw)),
-          ) <
-            Math.PI / 2,
-        `facing the camera, turned ${side < 0 ? 'left' : 'right'}`,
+        (s) => Math.sign(s.headYaw) === side && Math.abs(s.headYaw) > 0.15 && s.headPitch < idle - 0.15,
+        `down and ${side < 0 ? 'left' : 'right'}`,
       );
     }
-    // Level with his head, far off to the side: well round toward it, but no further from the
-    // camera than 50° (lookAt.js LOOK.faceTurn), his chin up: turned side on, or level, his
-    // cap's brim hides his eyes.
+    // High over him: up, above the look at the viewer.
+    await page.mouse.move(head.x + 10, head.y - 3 * tall, { steps: 4 });
+    await until(page, (s) => s.headPitch > idle + 0.15, 'his head tipped up');
+    // Level with his head, far off to a side: well round toward it.
     for (const side of [-1, 1]) {
       await page.mouse.move(head.x + side * 4 * tall, head.y, { steps: 4 });
       await until(page, (s) => Math.sign(s.headYaw) === side && Math.abs(s.headYaw) > 0.8, `turned ${side}`);
-      await framesFor(page, 400);
-      const s = await snapshot(page);
-      const off = Math.abs(
-        Math.atan2(Math.sin(s.heading + s.headYaw - s.camera.yaw), Math.cos(s.heading + s.headYaw - s.camera.yaw)),
-      );
-      expect(off, 'well round toward the cursor').toBeGreaterThan((40 * Math.PI) / 180);
-      expect(off, 'no further round than still shows his face').toBeLessThanOrEqual((50 * Math.PI) / 180 + 0.03);
-      expect(s.headPitch, 'his chin up, so his eyes show under his cap').toBeGreaterThan((35 * Math.PI) / 180);
     }
   });
 });

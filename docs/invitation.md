@@ -23,10 +23,12 @@ unlisted: nothing links to it and search engines are asked not to index it.
 - **Tap the floor** (or click it) and he walks there. A ring on the floor shows where your
   finger or cursor is.
 - **Point anywhere** and he looks where you point (on a phone, while your finger is down; with
-  a mouse, wherever the cursor is): up when you point high over him, round to show his face
-  when you point in front of him (off to a side, well round toward it, but no further than his
-  cap leaves his face showing), and no further round than side on when you point behind him.
-  Otherwise he looks at you.
+  a mouse, wherever the cursor is), and on screen his gaze points right at it from any angle or
+  zoom: down when you point below his head, up when you point over him, round toward it off to
+  a side, and a profile on its side when you point somewhere behind him he can't turn to. Close
+  to his head (or on him) he looks at you, and the further away you point the further his face
+  turns from you toward it (down least, so his face still shows under his cap). Otherwise he
+  looks at you.
 - **Turn the camera:** with a finger, drag empty space; with a mouse, drag with the right
   button (anywhere, on him too; it never picks him up). Across goes round him (a drag across
   the whole screen goes about three quarters of the way round, on a phone or a computer alike),
@@ -211,14 +213,19 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
     his collar no lower than it was grabbed at, or his hang height once he's been lifted clear
     of the floor, so a still cursor never lifts him off it, and no higher than `CARRY.liftMax`,
     5), the anchor the pointer's spot with no lag and the swing driven by a smoothed follow of
-    it; `lookAt.js` `pointerTarget` aims his look where the
-    pointer's ray first meets the floor or the upright plane through his head facing the
-    camera, brought 0.6 toward the camera along the ray (pitch up to 55°), `faceUp` keeps a look
-    in front of him where his cap leaves his face showing (his chin up to the camera's pitch,
-    15° more turned far round, `LOOK.faceTilt`, and turned no further from the camera than
-    `LOOK.faceTurn`, 50°), and it keeps a target behind
-    him on the side his head is turned to; `floor.js` `fitShadow(…, at)` moves the
-    shadow camera to wherever he is, by whole shadow texels.
+    it; `lookAt.js` `screenAim` aims his look camera-relative (performative gaze): seen from
+    the camera the cursor lies some heads (`LOOK.headSize`, 0.53) from his head in some
+    direction on screen, and his face turns from the line to the camera toward that direction,
+    round that line, so on screen his gaze points at the cursor; none within `LOOK.deadZone`
+    (0.3 heads: at the viewer), then eased out over `LOOK.ramp` (2 heads) to `turnSide` (65°),
+    `turnDown` (15°) or `turnUp` (60°, no further than his neck's 55° from the camera's pitch)
+    from that line by the way the cursor lies; any way round, his chin goes no lower than
+    `turnDown` under the camera's line, where his eyes still peek under his cap (a count by eye
+    of real crops: at 10° they show, at 20° only his chin does), while the camera is within
+    `faceSide` (90°) of the way he faces, fading out by `faceBack` (135°); `softAim` eases
+    the last quarter of his neck's limits (yaw ±70°, pitch −20°…+55°) instead of stopping dead,
+    and a target behind him keeps to the side his head is turned to; `floor.js` `fitShadow(…, at)`
+    moves the shadow camera to wherever he is, by whole shadow texels.
 - **Speech and content:** `speech.js` (pure: `createTalk({lines, speech, rng}).step(...)` reads
   the brain's output this frame and last, the gestures, the button pressed and the camera's yaw
   and zoom, and says the line to show and its trigger; `TRIGGERS`, `PRIORITY`, `SPEECH_RANGES`;

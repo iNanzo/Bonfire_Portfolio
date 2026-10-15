@@ -5,12 +5,13 @@
 // the gait's step phase by stride, a restart of a clip still showing handing its weight to its
 // twin so it never pops) and where he looks (the camera when asked or when the pointer is on
 // him, the pointer's floor spot lifted 10°, and ahead meaning toward the viewer). With the
-// pointer's ray, over a grid of cursor positions across the whole screen: his head turns all
-// the way to the cursor's side (exactly at it over his head), he looks up at a cursor high over
-// him (up to about 55°), his chin never drops so far that his cap hides his face from the
-// camera, he turns no further round from the camera than still shows his face under his cap's
-// brim (LOOK.faceTurn: a cursor level with his head far off to a side), and with his back to
-// the camera a cursor wiggling behind him doesn't flip his head from side to side.
+// pointer's ray, over a grid of cursor positions across the whole screen at the default view,
+// zoomed in, on a phone and turned: his gaze points at the cursor on screen (performative gaze:
+// turned from the viewer toward it, more the further it is from his head, at the viewer within a
+// third of a head of it), below his head he looks down toward it, above him up, to a side round
+// toward it, behind him a profile on its side, chin down; a sweep moves it smoothly; his neck's
+// limits are soft; with his back to the camera a cursor wiggling behind him doesn't flip his head
+// from side to side.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -27,16 +28,7 @@ import {
 import { CLIPS, GAIT, STRIDE, fadeFor } from '../src/invitation/clips.js';
 import { STEP_SHARE_MIN, gaitPhase } from '../src/invitation/blend.js';
 import { CARRY } from '../src/invitation/carry.js';
-import {
-  LIMIT,
-  LOOK,
-  aimAngles,
-  aimAt,
-  createLook,
-  faceUp,
-  lookStep,
-  pointerTarget,
-} from '../src/invitation/lookAt.js';
+import { LIMIT, LOOK, aimAngles, aimAt, createLook, lookStep, softAim } from '../src/invitation/lookAt.js';
 import { createRng } from '../src/invitation/rng.js';
 import { xRange } from '../src/invitation/steer.js';
 
@@ -259,6 +251,7 @@ function viewCamera({ distance = 13.3, yaw = 0, ch = 800 } = {}) {
   return {
     position,
     target,
+    up,
     ray: (p) => ({
       o: position,
       d: {
@@ -280,139 +273,211 @@ const gaze = (bodyYaw, a) => ({
   y: Math.sin(a.pitch),
   z: Math.cos(bodyYaw + a.yaw) * Math.cos(a.pitch),
 });
-const clampA = (a) => ({
-  yaw: Math.min(LIMIT.yaw, Math.max(-LIMIT.yaw, a.yaw)),
-  pitch: Math.min(LIMIT.pitchMax, Math.max(LIMIT.pitchMin, a.pitch)),
-});
+const angleBetween = (a, b) =>
+  Math.acos(
+    Math.max(
+      -1,
+      Math.min(1, (a.x * b.x + a.y * b.y + a.z * b.z) / Math.hypot(a.x, a.y, a.z) / Math.hypot(b.x, b.y, b.z)),
+    ),
+  );
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 /** A grid of cursor positions over a 1280×800 stage, CSS px from where his middle shows. */
 const GRID = [];
-for (let x = -600; x <= 600; x += 75) for (let y = -360; y <= 300; y += 60) GRID.push({ x, y });
-
-test('the pointer’s target is the first of the floor and the camera-facing upright plane through his head the cursor’s ray meets, brought toward the camera along the ray', () => {
-  const cam = viewCamera();
-  const head = { x: 0.1, y: 0.92, z: -0.2 };
-  const toward = { x: cam.position.x - head.x, z: cam.position.z - head.z };
-  const n = Math.hypot(toward.x, toward.z);
-  for (const p of GRID) {
-    const ray = cam.ray(p);
-    const { point, floor } = pointerTarget(ray, head, cam.position);
-    // On the cursor's ray, so it shows right under the cursor.
-    const s = cam.screen(point);
-    close(s.x, p.x, 1e-6, `(${p.x}, ${p.y}) across`);
-    close(s.y, p.y, 1e-6, `(${p.x}, ${p.y}) down`);
-    // Brought toward the camera from what the ray met first: the floor (in front of the plane),
-    // or the plane (above the floor).
-    const len = Math.hypot(ray.d.x, ray.d.y, ray.d.z);
-    const back = (-(ray.d.x * toward.x + ray.d.z * toward.z) / n / len) * LOOK.towardViewer;
-    const off = ((point.x - head.x) * toward.x + (point.z - head.z) * toward.z) / n;
-    if (floor) assert.ok(off > back, `(${p.x}, ${p.y}): the floor it met is in front of the plane`);
-    else close(off, back, 1e-6, `(${p.x}, ${p.y}): the plane it met, brought toward the camera`);
-  }
-  assert.ok(LOOK.towardViewer > 0.2 && LOOK.towardViewer < 1.5);
-});
-
-test('over the whole screen his head turns to the cursor’s side (right at it over his head), he looks up at a cursor high over him (up to about 55°), and his face always shows under his cap: chin up, and no further round from the camera than LOOK.faceTurn', () => {
-  close(LIMIT.pitchMax, 55 * RAD, 1e-6, 'his head tips up to 55°');
-  // (Turned further, from the camera's 36° up, the brim hides both eyes: a model-level count of
-  // the eye triangles the camera sees fell from 14 of 18 facing it to 9 at 55° and 5 at 70°.)
-  assert.ok(LOOK.faceTurn >= 45 * RAD && LOOK.faceTurn <= 55 * RAD, `faceTurn ${(LOOK.faceTurn / RAD).toFixed(0)}°`);
-  assert.ok(LOOK.faceTiltFrom < LOOK.faceTurn && LOOK.faceTilt > 0 && LOOK.faceTilt <= 20 * RAD);
-  for (const distance of [13.3, 26.6, 6.7]) {
-    const cam = viewCamera({ distance });
-    const body = { yaw: 0 };
-    const head = { x: 0, y: 0.92, z: 0 };
-    const headAt = cam.screen(head);
-    let pitchAbove = -Infinity;
-    for (const p of GRID) {
-      const at = `zoom ${distance}, cursor (${p.x}, ${p.y})`;
-      const { aim } = lookAim('pointer', {
-        head,
-        yaw: body.yaw,
-        camera: cam.position,
-        pointer: { floor: null, onNewt: false, ray: cam.ray(p) },
-      });
-      const a = clampA(aim);
-      const g = gaze(body.yaw, a);
-      // His face: never further round from the camera than LOOK.faceTurn, and his chin up
-      // enough that his cap never hides it (within LOOK.faceUnder under the camera's pitch).
-      const toCam = Math.atan2(cam.position.x - head.x, cam.position.z - head.z);
-      const face = Math.abs(Math.atan2(Math.sin(Math.atan2(g.x, g.z) - toCam), Math.cos(Math.atan2(g.x, g.z) - toCam)));
-      assert.ok(face <= LOOK.faceTurn + 1e-6, `${at}: his face ${(face / RAD).toFixed(0)}° round from the camera`);
-      const camPitch = Math.atan2(
-        cam.position.y - head.y,
-        Math.hypot(cam.position.x - head.x, cam.position.z - head.z),
-      );
-      assert.ok(a.pitch >= camPitch - LOOK.faceUnder - 1e-6, `${at}: his chin at ${(a.pitch / RAD).toFixed(0)}°`);
-      // His gaze on screen: toward the cursor's side always, and right at it over his head
-      // (where his neck lets it; lower down his chin comes up so his face shows).
-      const tip = cam.screen({ x: head.x + 0.3 * g.x, y: head.y + 0.3 * g.y, z: head.z + 0.3 * g.z });
-      const want = Math.atan2(p.y - headAt.y, p.x - headAt.x);
-      const got = Math.atan2(tip.y - headAt.y, tip.x - headAt.x);
-      const err = Math.abs(Math.atan2(Math.sin(got - want), Math.cos(got - want)));
-      const far = Math.hypot(p.x - headAt.x, p.y - headAt.y) > 40;
-      // (Free: as the cursor's target has it, faceUp leaving it be, within his neck's reach.)
-      const raw = aimAt(head, body.yaw, pointerTarget(cam.ray(p), head, cam.position).point);
-      const free =
-        Math.abs(raw.yaw - aim.yaw) < 1e-9 &&
-        Math.abs(raw.pitch - aim.pitch) < 1e-9 &&
-        Math.abs(aim.yaw) < LIMIT.yaw &&
-        aim.pitch < LIMIT.pitchMax;
-      if (far && free && p.y < headAt.y)
-        assert.ok(err < 3 * RAD, `${at}: his gaze ${(err / RAD).toFixed(1)}° off the cursor`);
-      if (Math.abs(p.x - headAt.x) > 40)
-        assert.equal(
-          Math.sign(tip.x - headAt.x),
-          Math.sign(p.x - headAt.x),
-          `${at}: his gaze toward the cursor's side`,
-        );
-      // Up over his head: he looks up.
-      if (p.y < headAt.y - 40 && Math.abs(p.x - headAt.x) < 200) {
-        assert.ok(a.pitch > 0.2, `${at}: looks up (${(a.pitch / RAD).toFixed(0)}°)`);
-        pitchAbove = Math.max(pitchAbove, a.pitch);
-      }
-    }
-    close(pitchAbove, LIMIT.pitchMax, 1e-6, `zoom ${distance}: right up at a cursor high over him`);
-  }
-  // Level with his head, far to a side, either way: turned well round toward it, as far as still
-  // shows his face (LOOK.faceTurn from the camera), not to side on, where his cap hides it.
-  const cam = viewCamera();
-  const head = { x: 0, y: 0.92, z: 0 };
-  const h = cam.screen(head);
-  const toCam = Math.atan2(cam.position.x - head.x, cam.position.z - head.z);
-  for (const side of [-1, 1]) {
-    const { aim } = lookAim('pointer', {
-      head,
-      yaw: 0,
-      camera: cam.position,
-      pointer: { floor: null, onNewt: false, ray: cam.ray({ x: h.x + side * 500, y: h.y }) },
-    });
-    close(aim.yaw - toCam, side * LOOK.faceTurn, 1e-6, `turned ${side}: ${(aim.yaw / RAD).toFixed(0)}°`);
-    // His chin up to the camera's pitch and LOOK.faceTilt more, turned that far round (the brim
-    // reaches across his near eye too): from the camera's 36°, about 46°.
-    const camPitch = Math.atan2(cam.position.y - head.y, Math.hypot(cam.position.x - head.x, cam.position.z - head.z));
-    close(
-      aim.pitch,
-      camPitch - LOOK.faceUnder + LOOK.faceTilt,
-      1e-6,
-      `chin up to show his face: ${(aim.pitch / RAD).toFixed(0)}°`,
-    );
-  }
-  // Turned less than LOOK.faceTiltFrom, no more than the camera's pitch.
-  const camPitch = Math.atan2(cam.position.y - head.y, Math.hypot(cam.position.x - head.x, cam.position.z - head.z));
-  const little = faceUp({ yaw: LOOK.faceTiltFrom - 0.05, pitch: 0 }, head, 0, cam.position);
-  close(little.pitch, camPitch - LOOK.faceUnder, 1e-6, 'a little turned: the camera’s pitch');
-  // In front of him, low down: toward the cursor, his cap kept off his face.
+for (let x = -600; x <= 600; x += 50) for (let y = -360; y <= 300; y += 40) GRID.push({ x, y });
+const HEAD = { x: 0, y: 0.75, z: 0 };
+/** Where his head shows and how tall it is on screen, CSS px. */
+function headOnScreen(cam, head = HEAD) {
+  const h = LOOK.headSize / 2;
+  const top = cam.screen({ x: head.x + cam.up.x * h, y: head.y + cam.up.y * h, z: head.z + cam.up.z * h });
+  const bottom = cam.screen({ x: head.x - cam.up.x * h, y: head.y - cam.up.y * h, z: head.z - cam.up.z * h });
+  return { ...cam.screen(head), size: Math.hypot(top.x - bottom.x, top.y - bottom.y) };
+}
+/**
+ * The pointer's look for the cursor at `p` (lookAim, then softAim as lookStep has it), and how it
+ * reads on screen: the angle from the head-to-cursor direction to his gaze's, his gaze's angle
+ * to the camera, and whether his neck reaches it (inside its limits; softAim may ease it).
+ */
+function readLook(cam, p, bodyYaw = 0, head = HEAD) {
   const { aim } = lookAim('pointer', {
     head,
-    yaw: 0,
+    yaw: bodyYaw,
     camera: cam.position,
-    pointer: { floor: null, onNewt: false, ray: cam.ray({ x: h.x + 120, y: h.y + 260 }) },
+    pointer: { floor: null, onNewt: false, ray: cam.ray(p) },
   });
-  assert.ok(aim.yaw > 0.15 && aim.yaw < LIMIT.yaw, `toward the cursor (${(aim.yaw / RAD).toFixed(0)}°)`);
-  assert.ok(aim.pitch > 25 * RAD, `his chin up so his face shows (${(aim.pitch / RAD).toFixed(0)}°)`);
-  // Turned away from the camera, his chin is left be (there's no face to show).
-  const away = faceUp({ yaw: 0, pitch: -0.4 }, head, Math.PI, cam.position);
-  assert.deepEqual(away, { yaw: 0, pitch: -0.4 });
+  const a = softAim(aim);
+  const g = gaze(bodyYaw, a);
+  const at = headOnScreen(cam, head);
+  const tip = cam.screen({ x: head.x + 0.3 * g.x, y: head.y + 0.3 * g.y, z: head.z + 0.3 * g.z });
+  const want = Math.atan2(p.y - at.y, p.x - at.x);
+  const got = Math.atan2(tip.y - at.y, tip.x - at.x);
+  const toCam = { x: cam.position.x - head.x, y: cam.position.y - head.y, z: cam.position.z - head.z };
+  return {
+    aim,
+    a,
+    at,
+    off: Math.hypot(p.x - at.x, p.y - at.y) / at.size,
+    err: Math.abs(wrap(got - want)),
+    across: Math.hypot(tip.x - at.x, tip.y - at.y),
+    atCamera: angleBetween(g, toCam),
+    camPitch: Math.atan2(toCam.y, Math.hypot(toCam.x, toCam.z)),
+    reached: Math.abs(aim.yaw) <= LIMIT.yaw && aim.pitch <= LIMIT.pitchMax && aim.pitch >= LIMIT.pitchMin,
+    tip,
+  };
+}
+const VIEWS = [
+  { distance: 13.3, yaw: 0, name: 'desktop default' },
+  { distance: 22, yaw: 0, ch: 844, name: 'phone default' },
+  { distance: 6.7, yaw: 0, name: 'zoomed in' },
+  { distance: 13.3, yaw: -Math.PI / 2, name: 'turned a quarter' },
+  { distance: 22, yaw: Math.PI / 2, ch: 844, name: 'phone turned the other way' },
+];
+
+test('his neck’s limits: ±70° of yaw, −20°…+55° of pitch, soft from three quarters of the way (no dead stop at the limit)', () => {
+  close(LIMIT.yaw, 70 * RAD);
+  close(LIMIT.pitchMin, -20 * RAD, 1e-9, 'with the camera above him nothing needs a deeper look down');
+  close(LIMIT.pitchMax, 55 * RAD);
+  // Inside three quarters of a limit: as asked.
+  for (const a of [
+    { yaw: 0.5, pitch: 0.3 },
+    { yaw: -0.74 * LIMIT.yaw, pitch: 0.74 * LIMIT.pitchMin },
+    { yaw: 0.74 * LIMIT.yaw, pitch: 0.74 * LIMIT.pitchMax },
+  ])
+    assert.deepEqual(softAim(a), a);
+  // Past it: eased toward the limit, never past it, never turning back, with no corner.
+  let last = -Infinity;
+  for (let y = 0; y <= 4; y += 0.01) {
+    const s = softAim({ yaw: y, pitch: 0 }).yaw;
+    assert.ok(s >= last - 1e-12 && s <= LIMIT.yaw + 1e-12, `yaw ${y.toFixed(2)} → ${s}`);
+    if (y > 0) assert.ok(s - last <= 0.01 + 1e-9, 'never steeper than as asked');
+    last = s;
+  }
+  close(softAim({ yaw: 4, pitch: 0 }).yaw, LIMIT.yaw, 1e-3);
+  close(softAim({ yaw: 0, pitch: -3 }).pitch, LIMIT.pitchMin, 1e-3);
+  close(softAim({ yaw: 0, pitch: 3 }).pitch, LIMIT.pitchMax, 1e-3);
+  close(softAim({ yaw: -4, pitch: 0 }).yaw, -LIMIT.yaw, 1e-3);
+});
+
+test('over the whole screen, at every view, his gaze points at the cursor on screen: the camera-relative look (performative gaze) turns his face from the viewer toward it, by how far the cursor is from his head', () => {
+  for (const view of VIEWS) {
+    const cam = viewCamera(view);
+    let checked = 0;
+    for (const p of GRID) {
+      const r = readLook(cam, p);
+      const at = `${view.name}, cursor (${p.x}, ${p.y}), ${r.off.toFixed(1)} heads off`;
+      // Within LOOK.deadZone of his head: at the viewer, as with the cursor on him.
+      if (r.off < LOOK.deadZone) {
+        const toCam = aimAt(HEAD, 0, cam.position);
+        close(r.aim.yaw, toCam.yaw, 1e-6, `${at}: at the viewer`);
+        close(r.aim.pitch, toCam.pitch, 1e-6, `${at}: at the viewer`);
+        continue;
+      }
+      if (r.off < LOOK.deadZone + 0.3 || !r.reached) continue;
+      // Where his neck reaches: his gaze on screen at the cursor (eased into his limits, a few
+      // degrees off at most).
+      assert.ok(r.err < 7 * RAD, `${at}: his gaze ${(r.err / RAD).toFixed(1)}° off the cursor`);
+      // Once the cursor is a head and a half away, his face has turned off the viewer (least below him,
+      // where his eyes must still show; straight up over him his neck has only about 20° more to give).
+      const overHead = p.y < r.at.y && Math.abs(p.x - r.at.x) < (r.at.y - p.y) * Math.tan(35 * RAD);
+      if (r.off > 1.5 && !overHead)
+        assert.ok(r.atCamera > 0.8 * LOOK.turnDown, `${at}: ${(r.atCamera / RAD).toFixed(0)}° from the viewer`);
+      checked++;
+    }
+    // (Turned a quarter, half the screen is behind him.)
+    assert.ok(checked > GRID.length / (view.yaw ? 4 : 3), `${view.name}: ${checked} cells in his reach`);
+  }
+});
+
+test('a cursor below his head has him look down toward it (never up at the viewer), one above him look up, one to a side turn toward it', () => {
+  for (const view of VIEWS.filter((v) => v.yaw === 0)) {
+    const cam = viewCamera(view);
+    const at = headOnScreen(cam);
+    const S = at.size;
+    const look = (dx, dy) => readLook(cam, { x: at.x + dx * S, y: at.y + dy * S });
+    const camPitch = look(0, 0).camPitch;
+    // Straight below him on screen: lower the further below, down to well under the camera.
+    let last = Infinity;
+    for (const dy of [0.6, 1, 1.5, 2, 3, 4]) {
+      const r = look(0, dy);
+      assert.ok(
+        r.a.pitch < camPitch - 2 * RAD,
+        `${view.name}, ${dy} heads below: pitch ${(r.a.pitch / RAD).toFixed(0)}°`,
+      );
+      assert.ok(r.a.pitch <= last + 1e-9, `${view.name}: lower the further below`);
+      last = r.a.pitch;
+    }
+    assert.ok(
+      LOOK.turnDown >= 10 * RAD && last <= camPitch - 0.95 * LOOK.turnDown,
+      `${view.name}: far below, ${(last / RAD).toFixed(0)}° (camera ${(camPitch / RAD).toFixed(0)}°)`,
+    );
+    assert.ok(last >= LIMIT.pitchMin, 'within his neck');
+    // Below and off to a side: lower than the viewer too (the old floor held it up at the camera).
+    for (const dx of [-2, -1, 1, 2]) {
+      const r = look(dx, 2);
+      assert.ok(
+        r.a.pitch < camPitch - 10 * RAD,
+        `${view.name}, (${dx}, 2) heads: pitch ${(r.a.pitch / RAD).toFixed(0)}°`,
+      );
+      assert.equal(Math.sign(r.a.yaw), Math.sign(dx), `${view.name}, (${dx}, 2): turned toward it`);
+    }
+    // Above him: up, higher the higher it is, toward his neck's limit.
+    last = -Infinity;
+    for (const dy of [-1, -2, -3, -5]) {
+      const r = look(0, dy);
+      assert.ok(
+        r.a.pitch > camPitch + 5 * RAD,
+        `${view.name}, ${-dy} heads above: pitch ${(r.a.pitch / RAD).toFixed(0)}°`,
+      );
+      assert.ok(r.a.pitch >= last - 1e-9);
+      last = r.a.pitch;
+    }
+    assert.ok(last > 0.85 * LIMIT.pitchMax, `${view.name}: right up (${(last / RAD).toFixed(0)}°)`);
+    // Level with his head, off to a side: turned well round toward it, his gaze across the
+    // screen toward it.
+    for (const side of [-1, 1]) {
+      const r = look(side * 4, 0);
+      assert.equal(Math.sign(r.a.yaw), side);
+      assert.ok(Math.abs(r.a.yaw) > 50 * RAD, `${view.name}: turned ${(r.a.yaw / RAD).toFixed(0)}°`);
+      assert.ok(r.err < 10 * RAD, `${view.name}: gaze ${(r.err / RAD).toFixed(0)}° off`);
+    }
+  }
+});
+
+test('with the camera round behind him, a cursor he can’t turn to gets a profile on its side, his chin up or down with the cursor', () => {
+  const cam = viewCamera({ distance: 13.3, yaw: Math.PI });
+  const at = headOnScreen(cam);
+  // High over him, then low under him: up, then down.
+  const high = readLook(cam, { x: at.x + 3 * at.size, y: at.y - 3 * at.size });
+  const low = readLook(cam, { x: at.x + 3 * at.size, y: at.y + 3 * at.size });
+  assert.ok(
+    high.a.pitch > low.a.pitch + 30 * RAD,
+    `up ${(high.a.pitch / RAD).toFixed(0)}°, down ${(low.a.pitch / RAD).toFixed(0)}°`,
+  );
+  // Far to one side on screen: a profile on that side.
+  for (const side of [-1, 1]) {
+    const r = readLook(cam, { x: at.x + side * 6 * at.size, y: at.y });
+    assert.equal(Math.sign(r.tip.x - at.x), side, `his gaze to the ${side < 0 ? 'left' : 'right'}`);
+    assert.ok(Math.abs(r.a.yaw) > 0.9 * LIMIT.yaw, `a profile (${(r.a.yaw / RAD).toFixed(0)}°)`);
+  }
+});
+
+test('a cursor swept across the screen moves his look smoothly: no jumps between neighbouring spots, the dead zone round his head included', () => {
+  for (const view of VIEWS.filter((v) => Math.abs(v.yaw) < 2)) {
+    const cam = viewCamera(view);
+    const at = headOnScreen(cam);
+    for (const dy of [-2, -0.5, 0, 0.2, 1, 2.5]) {
+      let last = null;
+      // (Steps of a fiftieth of a head: a jump shows at any step, his turn's pace does not.)
+      for (let x = -600; x <= 600; x += at.size / 50) {
+        const { a } = readLook(cam, { x, y: at.y + dy * at.size });
+        if (last)
+          assert.ok(
+            Math.abs(a.yaw - last.yaw) < 3 * RAD && Math.abs(a.pitch - last.pitch) < 3 * RAD,
+            `${view.name}, row ${dy}, x ${x}: jumped`,
+          );
+        last = a;
+      }
+    }
+  }
 });
 
 test('with his back to the camera, a cursor wiggling behind him (in front of the camera) keeps his head to one side, and it goes round to the other only once the cursor clearly has', () => {
