@@ -28,6 +28,7 @@ import {
   FACE_SIZES,
   SMOOTH_FACE_OVER,
   faceSpan,
+  layoutFor,
   pickFaceSize,
 } from '../src/invitation/faceSheets.js';
 
@@ -272,11 +273,11 @@ test('his eye as the smooth face draws it: a heavy dark upper lid over the white
       };
       if (name === 'neutral' || name === 'surprised') {
         // The lid: an unbroken run of ink along the eye's top, most of its width (thick as the
-        // cell needs: 2 rows at most).
+        // cell needs: 2 rows at most, 3 in the biggest cells, as thick as the smooth one there).
         assert.ok(run(e.t) >= Math.ceil(ew * 0.6), `${tag}: a lid along the eye's top (${run(e.t)} of ${ew})`);
         let lid = 0;
         while (run(e.t + lid) >= Math.ceil(ew * 0.6)) lid++;
-        assert.ok(lid <= 2, `${tag}: a lid ${lid} rows thick`);
+        assert.ok(lid <= (sheet.h >= 100 ? 3 : 2), `${tag}: a lid ${lid} rows thick`);
         if (w < 5) continue;
         // Under it, the white, and a dark pupil with the white or the iris beside it.
         assert.ok(p.count('white') >= 1, `${tag}: the white of the eye`);
@@ -374,7 +375,11 @@ test('the pixel faces: a small mouth in every face at every size, under the eyes
       );
       if (w < 8) continue;
       assert.ok(p.brow, `${tag}: a brow`);
-      assert.equal(p.brow.b, p.brow.t, `${tag}: the brow is a 1 px line`);
+      assert.equal(
+        p.brow.b - p.brow.t + 1,
+        sheet.h >= 100 ? 2 : 1,
+        `${tag}: the brow a 1 px line (2 in the biggest cells, as thick as the smooth one there)`,
+      );
       assert.ok(p.brow.r > p.brow.l, `${tag}: at least 2 px long`);
       assert.ok(p.eye.t - p.brow.b >= 2, `${tag}: skin between the brow and the eye`);
     }
@@ -588,8 +593,17 @@ test('the mouths: neutral a tiny ㅅ from 26 px, happy turned up from 20, surpri
       const f = finer(c);
       const o = p.mouth;
       assert.equal(o.l, 0, `${w} px surprised: the o in the middle`);
-      assert.equal(o.b - o.t + 1, 2, `${w} px surprised: the o two rows tall`);
       const dark = o.px.filter(([x]) => x === 0);
+      if (w > 34) {
+        // (Past the judged sizes: round still, its dark middle two rows at least, as tall as wide.)
+        const tall = o.b - o.t + 1;
+        assert.ok(dark.length >= 2 && tall >= 2, `${w} px surprised: an o ${tall} rows tall`);
+        let across = 0;
+        while (f.kind(across, o.t + (tall >> 1)) !== 'skin') across++;
+        assert.ok(Math.abs(2 * across - tall) <= tall, `${w} px surprised: ${2 * across} across, ${tall} tall: round`);
+        continue;
+      }
+      assert.equal(o.b - o.t + 1, 2, `${w} px surprised: the o two rows tall`);
       assert.equal(dark.length, 2, `${w} px surprised: its middle column dark, two rows`);
       if (w < 26) assert.equal(o.r, 0, `${w} px surprised: a 2×2 dot (one column a side)`);
       else {
@@ -689,6 +703,27 @@ test('the sheet pick: the nearest size to his half face, held until another fits
     current = next;
   }
   assert.ok(flips <= 1, `a wobble of 2.5% about the middle flips it ${flips} times`);
+});
+
+test('the ladder reaches a phone’s Native close-up: his half face there (about 62 texels) gets a pixel sheet, not the smooth one', () => {
+  for (const texels of [40, 46, 53, 62.5, 70])
+    assert.equal(typeof pickFaceSize(texels, null), 'number', `a half face ${texels} texels across: a pixel sheet`);
+  assert.ok(FACE_SIZES.at(-1) >= 60, `the largest sheet ${FACE_SIZES.at(-1)} px`);
+});
+
+test('the image’s sheets by its size: the whole ladder, an older one’s sheets where it’s the ladder so far (a copy cached from before the ladder grew), or else one 2×2 sheet', () => {
+  assert.deepEqual(layoutFor(FACE_IMAGE.w, FACE_IMAGE.h), FACE_LAYOUT, 'this image: every sheet');
+  // The image as it was with sheets up to 34 px (512 × 120): those sheets, where they were.
+  const older = layoutFor(512, 120);
+  assert.deepEqual(
+    older.map((s) => s.w),
+    FACE_SIZES.filter((w) => w <= 34),
+    'the 512 × 120 image: its sheets to 34 px',
+  );
+  assert.deepEqual(older, FACE_LAYOUT.slice(0, older.length), 'each where the ladder has it');
+  // One sheet on its own (the first pixel face): its 2×2 cells.
+  assert.deepEqual(layoutFor(64, 112), [{ w: 32, h: 56, x: 0, y: 0 }]);
+  assert.deepEqual(layoutFor(24, 40), [{ w: 12, h: 20, x: 0, y: 0 }], 'a size the ladder doesn’t add up to');
 });
 
 test('past the largest sheet (zoomed in at the finest resolutions) the face is the smooth sheet, held through a small change; under the smallest, the smallest sheet', () => {

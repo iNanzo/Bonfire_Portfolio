@@ -24,7 +24,7 @@ import {
   faceSharpen,
   pixelAtlasUrl,
 } from '../src/invitation/character.js';
-import { FACE_IMAGE, pickFaceSize } from '../src/invitation/faceSheets.js';
+import { FACE_IMAGE, FACE_SIZES, pickFaceSize } from '../src/invitation/faceSheets.js';
 import { LOOKS, lookPreset, validLook } from '../src/invitation/look.js';
 import { TOON_CELLS, toonRamp } from '../src/invitation/shader.js';
 import { TWIN } from '../src/invitation/play.js';
@@ -471,6 +471,43 @@ test('faceSheet says which face sheet shows: the smooth one at Off (whatever siz
     bare.face.onBeforeRender(viewportOf(195, 422), null, cameraAt(bc, 40), bare.face.geometry, bt, null);
     assert.equal(b.faceSheet, 'smooth', 'no pixel image: the smooth face');
     b.dispose();
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'document', had);
+    else delete (/** @type {any} */ (globalThis).document);
+  }
+});
+
+test('an older face image cached from before the ladder grew (its sheets to 34 px): his face shows those sheets and the smooth face past them, never a sheet the image hasn’t got', () => {
+  const had = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: { createElement: () => ({ width: 0, height: 0, getContext: () => ({ drawImage() {} }) }) },
+  });
+  try {
+    /** The sheet his face shows with a face image this size, his half face `texels` across. */
+    const shown = (w, h, texels) => {
+      const { gltf, face } = withFace();
+      face.material.map = new THREE.Texture({ width: 1024, height: 1024 });
+      const pixelFace = new THREE.Texture({ width: w, height: h });
+      const ch = createCharacter(gltf, { preset: LOOKS.soft, pixel: true, pixelFace });
+      ch.root.updateMatrixWorld(true);
+      const c = ch.root.getObjectByName(BONES.head).localToWorld(new THREE.Vector3(0, 1, 0));
+      const draw = (d) =>
+        face.onBeforeRender(viewportOf(195, 422), null, cameraAt(c, d), face.geometry, face.material, null);
+      draw(40);
+      draw((40 * ch.faceTexels) / texels);
+      const got = { sheet: ch.faceSheet, cell: /** @type {any} */ (face.material).map.image.width };
+      ch.dispose();
+      return got;
+    };
+    const big = FACE_SIZES.filter((s) => s > 34)[1];
+    assert.deepEqual(
+      shown(FACE_IMAGE.w, FACE_IMAGE.h, big),
+      { sheet: big, cell: big },
+      `this image: the ${big} px sheet`,
+    );
+    assert.deepEqual(shown(512, 120, 30), { sheet: 30, cell: 30 }, 'the older one: its 30 px sheet');
+    assert.equal(shown(512, 120, big).sheet, 'smooth', `the older one, ${big} texels: past its sheets, smooth`);
   } finally {
     if (had) Object.defineProperty(globalThis, 'document', had);
     else delete (/** @type {any} */ (globalThis).document);

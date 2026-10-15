@@ -84,6 +84,10 @@ const DESIGN = {
     ],
     // (Surprised: the same lid, raised.)
     raise: 0.0335,
+    // (On two levels from cells this wide: its middle's, and a row down where it's this many
+    // rows under that, as it comes out in the smaller cells.)
+    levelFrom: 40,
+    level: { v: 0.6015, drop: 0.75 },
     hook: [
       [0.64, 0.626],
       [0.695, 0.643],
@@ -282,12 +286,15 @@ function canvas(w, h, skin) {
      * steadily with the cell; 2 at least once it's a pixel long, 1 at least), `round(t × h)` rows
      * (1 at least) round its centre line at each, moved `shift` rows. The rows
      * follow the line's mean, stepping only where the line strays half a pixel or more from it,
-     * so a nearly flat line stays one straight row at every size. Returns column → [top, bottom].
+     * so a nearly flat line stays one straight row at every size; or, with `level`, on two levels
+     * only: its rows at `level.v`, a row lower where the line is `level.drop` rows or more under
+     * that. Returns column → [top, bottom].
      * @param {number[][]} pts
      * @param {number} t
      * @param {number} [shift]
+     * @param {{v: number, drop: number}|null} [level]
      */
-    stroke(pts, t, shift = 0) {
+    stroke(pts, t, shift = 0, level = null) {
       const n = Math.max(1, Math.round(t * h));
       const [a, b] = [pts[0][0] * w, pts.at(-1)[0] * w];
       const len = Math.max(b - a >= 1 ? 2 : 1, Math.round(b - a));
@@ -299,7 +306,9 @@ function canvas(w, h, skin) {
       /** @type {Map<number, [number, number]>} */
       const rows = new Map();
       cols.forEach((x, i) => {
-        const top = base + Math.round((vs[i] - mean) * h) + shift;
+        const top = level
+          ? Math.round(level.v * h - n / 2) + ((vs[i] - level.v) * h >= level.drop ? 1 : 0) + shift
+          : base + Math.round((vs[i] - mean) * h) + shift;
         rows.set(x, [top, top + n - 1]);
       });
       return rows;
@@ -334,7 +343,10 @@ function canvas(w, h, skin) {
  */
 function openEye(g, wide, shift) {
   const raise = wide ? Math.max(1, Math.round(DESIGN.lid.raise * g.h)) : 0;
-  const lid = g.stroke(DESIGN.lid.neutral, DESIGN.lid.t, shift - raise);
+  // (From DESIGN.lid.levelFrom on two levels, its ends a row down: stepped as finely as the cell
+  // allows it would bump up over the pupil, the iris showing in notches either side.)
+  const level = g.w >= DESIGN.lid.levelFrom ? DESIGN.lid.level : null;
+  const lid = g.stroke(DESIGN.lid.neutral, DESIGN.lid.t, shift - raise, level);
   if (wide) {
     // (Surprised, the lid starts straight: only its outer end turns down.)
     const xs = [...lid.keys()].sort((a, b) => a - b);
@@ -342,7 +354,7 @@ function openEye(g, wide, shift) {
     const [mt, mb] = lid.get(mid);
     for (const x of xs) if (x < mid && lid.get(x)[0] > mt) lid.set(x, [mt, mb]);
   }
-  const flat = g.stroke(DESIGN.lid.neutral, DESIGN.lid.t, shift);
+  const flat = g.stroke(DESIGN.lid.neutral, DESIGN.lid.t, shift, level);
   const { white } = DESIGN;
   const top = Math.min(...[...flat.values()].map(([t]) => t));
   const depth = white.v + white.rv - (DESIGN.lid.neutral[3][1] - DESIGN.lid.t / 2);
@@ -603,8 +615,8 @@ function browColumns(g, shift) {
 }
 
 /**
- * The closed lid on cell `g`, level where a column of it came out over the rest (no stray pixel
- * over its inner end), its steps joined along an edge from DESIGN.arc.joinFrom.
+ * The closed lid on cell `g`: one straight line on the row most of it comes out on (no stray
+ * pixel over its inner end, nor steps for the dither to break in the big cells).
  * @param {ReturnType<typeof canvas>} g
  * @param {number} shift
  * @param {ReturnType<typeof colours>} c
@@ -614,8 +626,7 @@ function drawClosed(g, shift, c) {
   const tops = [...line.values()].map(([t]) => t);
   const count = (t) => tops.filter((u) => u === t).length;
   const level = [...tops].sort((a, b) => count(b) - count(a))[0];
-  for (const [x, [t, b]] of line) if (t < level) line.set(x, [level, level + b - t]);
-  if (g.w >= DESIGN.arc.joinFrom) joinStairs(line);
+  for (const [x, [t, b]] of line) line.set(x, [level, level + b - t]);
   g.paint(line, c.ink);
 }
 
@@ -673,8 +684,12 @@ function drawMouth(g, name, c) {
     const rows = Math.max(2, Math.round(DESIGN.mouth.oRows * h));
     const y0 = Math.round(o.v * h - rows / 2);
     for (let k = 0; k < rows; k++) {
-      const n = half - (rows >= 3 && (k === 0 || k === rows - 1) ? 1 : 0);
-      for (let x = 0; x < n; x++) g.put(x, y0 + k, x === n - 1 ? c.openEdge : c.open);
+      // (Its top and bottom rows, once it's three tall, a column in: dark to where the rows
+      // between turn brown, then brown, or dark alone where that leaves no room for it.)
+      const inset = rows >= 3 && (k === 0 || k === rows - 1);
+      const dark = Math.max(1, half - (inset ? 2 : 1));
+      const edge = inset && half - 2 < 1 ? 0 : 1;
+      for (let x = 0; x < dark + edge; x++) g.put(x, y0 + k, x < dark ? c.open : c.openEdge);
     }
   } else if (name === 'surprised') {
     const dot = w >= 14 ? [[0, Math.round(o.v * h - 1)]] : g.blob(o);
@@ -684,8 +699,14 @@ function drawMouth(g, name, c) {
     const happy = name === 'happy';
     const mouth = g.stroke(DESIGN.mouth[happy ? 'happy' : 'neutral'], DESIGN.mouth.t);
     const n = mouth.size;
-    if (n >= 2 && w >= (happy ? DESIGN.mouth.smileFrom : DESIGN.mouth.tickFrom))
-      for (const [x, [t, b]] of mouth) if (happy ? x >= n / 2 : x < n / 2) mouth.set(x, [t - 1, b - 1]);
+    if (n >= 2 && w >= (happy ? DESIGN.mouth.smileFrom : DESIGN.mouth.tickFrom)) {
+      // (Two levels, whatever the line's slope comes to in a big cell: the rest on its mean row.)
+      const [t0, b0] = mouth.get(happy ? 0 : n - 1);
+      for (const x of mouth.keys()) {
+        const up = happy ? x >= n / 2 : x < n / 2;
+        mouth.set(x, up ? [t0 - 1, b0 - 1] : [t0, b0]);
+      }
+    }
     g.paint(mouth, c.mouth);
   }
 }
@@ -722,6 +743,11 @@ function face(name, w, h, c) {
         Array.from({ length: cols[1] - cols[0] + 1 }, (_, i) => [cols[0] + i, from.get(near(cols[0] + i))]),
       );
     }
+    // (One straight row, as it reads: stepped, its end met the rest only at a corner.)
+    const tops = [...rows.values()].map(([t]) => t);
+    const count = (t) => tops.filter((u) => u === t).length;
+    const row = [...tops].sort((a, b) => count(b) - count(a))[0];
+    for (const [x, [t, b]] of rows) rows.set(x, [row, row + b - t]);
     let lift = 0;
     for (const [x, [, b]] of rows) {
       const under = lid.get(x) ?? lid.get(x - 1) ?? lid.get(x + 1);

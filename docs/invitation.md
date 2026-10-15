@@ -266,10 +266,12 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   between the lid and the pupil at 16 to 23 px, where the two ran together); surprised, a wide
   pupil centred in its iris; the brow in from the lid's inner end and short of its hook; a tiny
   ㅅ of a mouth, a smile, a round o with soft corners; the happy arc's steps joined along an edge
-  (a ⌒ in the small cells, never a box) and a one-row blush; no stray pixel on the closed lid. The page uses it while the pixel filter is on (Native too), the
-  sheet whose cell matches his half face in texels (3 px at 16×16 up to 34); past 1.25 times
-  the largest (`SMOOTH_FACE_OVER`: Native on a phone, or zoomed in) it shows the glb's smooth
-  face again, as at Off. His shirt shows the bold pixel plaid (`newt-atlas-pixel.png`, `tools/newt-atlas.mjs`)
+  (a ⌒ in the small cells, never a box) and a one-row blush; no stray pixel on the closed lid.
+  The page uses it while the pixel filter is on (Native too), the sheet whose cell matches his
+  half face in texels (3 px at 16×16 up to 62, his half face at Native on a phone); past 1.25
+  times the largest (`SMOOTH_FACE_OVER`: zoomed in at Native or the finest resolutions) it
+  shows the glb's smooth face again, as at Off. A copy of the image cached from before the
+  ladder grew shows the sheets it has, and the smooth face past them (`layoutFor`). His shirt shows the bold pixel plaid (`newt-atlas-pixel.png`, `tools/newt-atlas.mjs`)
   until he's `ORIGINAL_ATLAS_TEXELS` (128) texels tall in the default view at the Pixel Size's
   own grid (stage.js hands main.js that grid as `home`: neither the zoom's bigger blocks nor the
   governor's coarser ones change his shirt), then the glb's own plaid, sampled at the preset's

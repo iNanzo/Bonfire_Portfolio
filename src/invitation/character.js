@@ -71,7 +71,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BONES, CLIPS, FACES, SCALE } from './clips.js';
-import { FACE_IMAGE, FACE_LAYOUT, faceSpan, pickFaceSize } from './faceSheets.js';
+import { FACE_LAYOUT, faceSpan, layoutFor, pickFaceSize } from './faceSheets.js';
 import { LOOKS, DEFAULT_LOOK } from './look.js';
 import { TWIN } from './play.js';
 import { ID, markId, setToonGradient, snapShift, toonGradient } from './retro.js';
@@ -433,9 +433,8 @@ export function createCharacter(gltf, opts = {}) {
   const usePixelFace = (t) => {
     if (!t || !faceMaterial || !t.image) return;
     pixelImage = t.image;
-    // (An image that isn't the ladder, an older one cached: one 2×2 sheet.)
-    if (pixelImage.width !== FACE_IMAGE.w || pixelImage.height !== FACE_IMAGE.h)
-      pixelLayout = [{ w: Math.floor(pixelImage.width / 2), h: Math.floor(pixelImage.height / 2), x: 0, y: 0 }];
+    // (An older image cached: the sheets it has, layoutFor.)
+    pixelLayout = layoutFor(pixelImage.width, pixelImage.height);
     t.dispose();
     showFace();
   };
