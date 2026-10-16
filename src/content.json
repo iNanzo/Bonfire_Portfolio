@@ -1841,7 +1841,7 @@
       "idleMin": 20,
       "idleMax": 40,
       "wave": {
-        "chance": 0.6,
+        "chance": 0.7,
         "cooldown": 8
       },
       "spook": {
@@ -1907,7 +1907,7 @@
     },
     "lines": {
       "wave": [
-        "Hi hi!",
+        ":3",
         "Oh, hello there!",
         "Hey! Over here!",
         "Hello! I’m NEWT.",
@@ -1934,11 +1934,12 @@
         "Okay, you’re fast. Rude, but fast."
       ],
       "pickedUp": [
-        "Whoa! Up we go!",
-        "Not the collar!",
-        "Ooh, nice view up here.",
-        "Careful, I’m fragile. Ish.",
-        "Hey! Where are we going?"
+        "So this is what tall people see",
+        "Be gentle im frail...",
+        "Please... im fragile...",
+        "Please, I’m just a little guy :(",
+        "You see how this looks, right?",
+        "mmmmfgh.,..,"
       ],
       "shaken": [
         "Stop shaking meee!",
@@ -1954,9 +1955,8 @@
       ],
       "landed": [
         "Oof.",
-        "I’m okay! I’m okay!",
-        "Stuck the landing!",
-        "Ten out of ten. No notes."
+        "MY LEG",
+        "Stuck the landing!"
       ],
       "walkTo": [
         "On my way!",
@@ -1972,9 +1972,9 @@
       ],
       "sitDown": [
         "Break time!",
-        "I’ll just sit for a bit.",
+        "I can't feel my legs...",
         "Ahh, that’s better.",
-        "Wake me if something happens."
+        "My legs are so tired."
       ],
       "sitting": [
         "Still here. Still sitting.",
@@ -1989,11 +1989,10 @@
         "Oh, we’re doing things now?"
       ],
       "idle": [
-        "Hmm hmm hmm…",
+        "*Mongolian throat singing*",
         "It’s very white in here.",
-        "You still there?",
-        "Poke me. I dare you.",
-        "I’m just a little guy."
+        "Nae pi ttam nunmul~",
+        "I am Spiderman..."
       ],
       "spin": [
         "Whoa, the room’s spinning!",
