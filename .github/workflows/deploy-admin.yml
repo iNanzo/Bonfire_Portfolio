@@ -39,7 +39,7 @@ jobs:
           persist-credentials: false
       - name: Verify existing CI for the current checkout
         id: gate
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const { deploymentGate } = await import(`${process.env.GITHUB_WORKSPACE}/tools/admin-deploy.mjs`);
@@ -64,7 +64,7 @@ jobs:
       - name: Recheck main and CI immediately before publishing
         if: steps.gate.outputs.deploy == 'true'
         id: publish
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           TESTED_SHA: ${{ steps.gate.outputs.sha }}
         with:
