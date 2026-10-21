@@ -156,4 +156,30 @@
  * @property {() => void} dispose
  */
 
+/** @typedef {'close'|'medium'|'wide'|'keep'} DialogueShot  a box's camera: head and shoulders, his whole body, the default view, or as it was */
+/**
+ * @typedef {object} DialogueChoice  a reply the visitor can tap
+ * @property {string} label
+ * @property {string} next  the id of the box it leads to
+ */
+/**
+ * @typedef {object} DialogueBox  one chat box of the intro (content.json invitation.intro.boxes[])
+ * @property {string} id  unique within the script
+ * @property {string} [speaker]  the name tab (the script's speaker when missing)
+ * @property {string} text  the line, typed out
+ * @property {import('./clips.js').FaceName} face
+ * @property {string} animation  a DIALOGUE_CLIPS name, or 'none' to keep what he's doing
+ * @property {DialogueShot} camera
+ * @property {number} [auto]  seconds Auto waits after the line is typed (default by its length)
+ * @property {string} [next]  the id of the box after this one (default: the following box)
+ * @property {DialogueChoice[]} [choices]  2–3 replies instead of a tap to go on
+ * @property {boolean} [end]  the intro ends after this box
+ */
+/**
+ * @typedef {object} DialogueScript  content.json invitation.intro
+ * @property {string} speaker  the default name tab
+ * @property {string} start  the first box's id
+ * @property {DialogueBox[]} boxes
+ */
+
 export {};
