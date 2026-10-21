@@ -34,12 +34,12 @@
 // content.json's invitation.intro as the admin writes it, mended, or the toy's own) on the toy's
 // clock, shown by dialogueUi.js over the stage: the toolbar rests out of sight, the speech bubble
 // goes and stays quiet, the layer takes every press (no drags, no orbit, no floor taps), the brain
-// acts each box out (brain.js's talk state: BrainIn.dialogue, its face falling back to the nearest
-// of his first four while a face sheet lacks it, a clip the glb lacks playing as Idle), he looks
-// at the camera with a little sway (dialogue.js lookSway), and the camera goes to each box's shot
-// (camera.js shotView and orbitShot, framed in the clear space over the box; cut with reduced
-// motion). At the end the camera eases back to the view before, and his free play, the toolbar and
-// the bubble come back.
+// acts each box out (brain.js's talk state: BrainIn.dialogue; its face through setFace, which
+// stands in the nearest of his first four until a dialogue face's sheet is in; a clip the glb
+// lacks playing as Idle), he looks at the camera with a little sway (dialogue.js lookSway), and
+// the camera goes to each box's shot (camera.js shotView and orbitShot, framed in the clear space
+// over the box; cut with reduced motion). At the end the camera eases back to the view before, and
+// his free play, the toolbar and the bubble come back.
 //
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
@@ -120,12 +120,6 @@ const TOUCH_SLOP = 6;
 const RIGHT_MENU_MS = 1000;
 /** States remembered for ?test (the last ones, in order). */
 const STATES_KEPT = 40;
-/**
- * The nearest of his first four faces for each of the dialogue's extra ones, shown while his face
- * sheet has no cell for it (character.js before the extra sheet is in).
- * @type {Record<string, import('./clips.js').FaceName>}
- */
-const FACE_FALLBACK = { sad: 'neutral', angry: 'neutral', shy: 'happy', smug: 'happy' };
 /**
  * The script Play Intro runs: content.js introScript() (the admin's, mended where it's broken, or
  * the toy's own), through dialogue.js normalizeScript as the runner's own safety net.
@@ -1009,9 +1003,8 @@ function start(s) {
     // (His chest joins in on his feet only: held, his collar hangs from the cursor.)
     torso = torsoStep(torso, body.mode === 'ground', dt);
     if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight, torso);
-    const f = forcedFace ?? faceStep(faces, face, blink, t, rng);
-    c.setFace(f);
-    if (c.face !== f && FACE_FALLBACK[f]) c.setFace(FACE_FALLBACK[f]);
+    // (Any of the eight: character.js shows a dialogue face's stand-in until its sheet is in.)
+    c.setFace(forcedFace ?? faceStep(faces, face, blink, t, rng));
     s.setBlob(root.position.x, root.position.z, body.mode === 'ground' ? 0 : Math.min(1, root.position.y / 0.5));
     if (sun)
       fitShadow(sun, s.bounds, shadowTop(root.position.y, SHADOW_TOP), { x: root.position.x, z: root.position.z });

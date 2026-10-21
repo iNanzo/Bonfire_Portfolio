@@ -378,8 +378,9 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the
   stage that takes every press; the line in a live region once, whole), brain.js's `talk` state (`BrainIn.dialogue`: the box's seq,
   animation, face and whether it's typing; `TUNE.talkNear`, `talkTurn`) and camera.js's shots
-  (`orbitTalk`, `shotView`, `orbitShot`, `SHOT`). main.js shows an extra face the face sheet
-  lacks as the nearest of the first four (`FACE_FALLBACK`) and a clip the glb lacks as Idle.
+  (`orbitTalk`, `shotView`, `orbitShot`, `SHOT`). Each box's face goes to `setFace` as it is
+  (character.js shows its stand-in until its sheet is in, above), and main.js plays a clip the glb
+  lacks as Idle.
 - **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationLooks`,
   `invitationShader`, `invitationRetro`, `invitationGovernor`, `invitationAtlas`,
   `invitationFace`, `invitationFaceExtra`, `invitationFaceBlink`, `invitationCharacterFaces`,

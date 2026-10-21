@@ -8,7 +8,8 @@
 // second Escape ends it, Space and Enter go on; reduced motion shows each line at once and cuts
 // the camera; and after the end the toolbar, the camera and his free play come back. The script
 // is read from the page (?test's intro()), never pinned here, and every wait is on a state (it's
-// content.json's intro, as content.js reads it).
+// content.json's intro, as content.js reads it). Down every reply each box shows its face (the
+// four dialogue faces from their own sheets).
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 
@@ -48,6 +49,21 @@ async function goOn(page, touch = false) {
   if (touch) await page.touchscreen.tap(at.x, at.y);
   else await page.mouse.click(at.x, at.y);
 }
+/** The boxes a script can reach from its start (each box's choices, else its next). */
+function reachable(intro) {
+  const byId = new Map(intro.boxes.map((b) => [b.id, b]));
+  const seen = new Set();
+  const stack = [intro.start];
+  while (stack.length) {
+    const b = byId.get(stack.pop());
+    if (!b || seen.has(b.id)) continue;
+    seen.add(b.id);
+    if (b.choices?.length) stack.push(...b.choices.map((c) => c.next));
+    else if (b.next) stack.push(b.next);
+  }
+  return [...seen];
+}
+
 test.describe('the admin’s intro', () => {
   test('Play Intro plays content.json’s invitation.intro, box for box', async ({ page }) => {
     const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
@@ -62,6 +78,61 @@ test.describe('the admin’s intro', () => {
     const s = await snapshot(page);
     expect(s.dialogue.id).toBe(intro.start);
     expect(s.dialogue.text).toBe(intro.boxes.find((b) => b.id === intro.start).text);
+  });
+
+  test('down every reply, each box shows its face', async ({ page }) => {
+    test.setTimeout(300_000);
+    const errors = watch(page);
+    await calm(page);
+    const intro = await script(page);
+    const byId = new Map(intro.boxes.map((b) => [b.id, b]));
+    /** @type {Set<string>} */
+    const checked = new Set();
+    const runs = Math.max(1, ...intro.boxes.map((b) => b.choices?.length ?? 0));
+    for (let run = 0; run < runs; run++) {
+      await open(page);
+      const visited = new Set();
+      for (let i = 0; i < 60; i++) {
+        const s = await snapshot(page);
+        if (!s.dialogue) break;
+        const b = byId.get(s.dialogue.id);
+        // (Round again, through a reply that leads back: this run's done.)
+        if (visited.has(b.id)) break;
+        visited.add(b.id);
+        if (!checked.has(b.id)) {
+          await until(
+            page,
+            (x) => x.dialogue?.id === b.id && x.face === b.face && x.faceShown === b.face,
+            `${b.id}: the ${b.face} face`,
+          );
+          checked.add(b.id);
+        }
+        // On: this run's reply (or the last there is), else a click or two (finished, then on).
+        const seq = s.dialogue.seq;
+        if (b.choices?.length) {
+          await until(page, (x) => Boolean(x.dialogue?.choices), `${b.id}: its replies`);
+          await page
+            .locator('.inv-talk-choice')
+            .nth(Math.min(run, b.choices.length - 1))
+            .click();
+        } else {
+          await goOn(page);
+          const now = await snapshot(page);
+          if (now.dialogue?.seq === seq) await goOn(page);
+        }
+        await until(page, (x) => !x.dialogue || x.dialogue.seq > seq, `${b.id}: on`);
+      }
+      if ((await snapshot(page)).dialogue) {
+        await page.keyboard.press('Escape');
+        await page.keyboard.press('Escape');
+      }
+      await expect(box(page)).toBeHidden();
+      await until(page, (x) => !x.dialogue && x.state !== 'talk' && x.buttonsEnabled, 'back to play');
+    }
+    // (Every box he can reach got its turn, when one box at most offers replies.)
+    if (intro.boxes.filter((b) => b.choices?.length).length <= 1)
+      expect(reachable(intro).filter((id) => !checked.has(id))).toEqual([]);
+    expect(errors).toEqual([]);
   });
 });
 
