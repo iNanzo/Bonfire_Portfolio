@@ -15,7 +15,7 @@
 // buttons, wandering and sitting by himself do nothing meanwhile; at the end he's back to play.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CLIPS, FACE_TRACK, GAIT, fadeFor } from '../src/invitation/clips.js';
+import { CLIPS, DIALOGUE_CLIPS, FACE_TRACK, GAIT, fadeFor } from '../src/invitation/clips.js';
 import { createBrain, TUNE } from '../src/invitation/brain.js';
 import { steer, wrapAngle } from '../src/invitation/steer.js';
 import { createGesture } from '../src/invitation/gesture.js';
@@ -989,6 +989,27 @@ test('each box: a gesture plays once, then Talk while the line types and Idle af
   assert.equal(s.frame().clip, 'Cheer');
   o = s.until((x) => x.clip !== 'Cheer', CLIPS.Cheer.length + 0.5);
   assert.equal(o.clip, 'Talk');
+});
+
+test('every animation a box may ask for (clips.js DIALOGUE_CLIPS) plays from it, on its own and one after another', () => {
+  // (What each shows as: Idle as the gait, Sit by sitting down first; the rest as themselves.)
+  const shows = (a) => (a === 'Idle' ? 'gait' : a === 'Sit' ? 'SitDown' : a);
+  for (const a of DIALOGUE_CLIPS) {
+    const s = sim({ camera: { x: 0, z: 6 } });
+    s.w.dialogue = box(1, a, 'neutral', true);
+    talking(s);
+    assert.equal(s.w.out.clip, shows(a), `${a}: from the box's first frame`);
+    if (a === 'Sit') s.until((o) => o.clip === 'Sit', 3);
+  }
+  // Each after the one before (a loop, a gesture under way, sitting): each new box's plays.
+  const s = sim({ camera: { x: 0, z: 6 } });
+  s.w.dialogue = box(0, 'none');
+  talking(s);
+  for (const [i, a] of [...DIALOGUE_CLIPS, ...DIALOGUE_CLIPS.slice().reverse()].entries()) {
+    s.w.dialogue = box(i + 1, a, 'happy', i % 2 === 0);
+    s.until((o) => o.clip === shows(a), 3);
+    s.run(0.2);
+  }
 });
 
 test('a Sit box sits him down and holds it; the next gesture gets him up first; sitting at Play Intro, he stands', () => {

@@ -380,7 +380,7 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   animation, face and whether it's typing; `TUNE.talkNear`, `talkTurn`) and camera.js's shots
   (`orbitTalk`, `shotView`, `orbitShot`, `SHOT`). Each box's face goes to `setFace` as it is
   (character.js shows its stand-in until its sheet is in, above), and main.js plays a clip the glb
-  lacks as Idle.
+  lacks (an older copy cached from before the gestures) as Idle.
 - **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationLooks`,
   `invitationShader`, `invitationRetro`, `invitationGovernor`, `invitationAtlas`,
   `invitationFace`, `invitationFaceExtra`, `invitationFaceBlink`, `invitationCharacterFaces`,
@@ -411,7 +411,8 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   the play area, and `talk` is what he's saying (speech.js's snapshot: the line up and its
   trigger, when the idle clock comes round). While the intro runs, `dialogue` has the box up
   (`id`, `seq`, `text`, `shown`, `typed`, its replies' targets, `auto`, `paused`, `logOpen`,
-  `asking`, `camera`, `shot`, the camera's `goal` and his `phase`), and `intro()` is the script
+  `asking`, `camera`, `shot`, the camera's `goal`, his `phase` and the `clips` he's played since
+  the box came up, `'gait'` for Idle, Walk or Run), and `intro()` is the script
   it runs. `?seed=N` makes the randomness
   repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the

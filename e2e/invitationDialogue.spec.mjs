@@ -9,7 +9,7 @@
 // the camera; and after the end the toolbar, the camera and his free play come back. The script
 // is read from the page (?test's intro()), never pinned here, and every wait is on a state (it's
 // content.json's intro, as content.js reads it). Down every reply each box shows its face (the
-// four dialogue faces from their own sheets).
+// four dialogue faces from their own sheets) and plays its animation.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 
@@ -49,6 +49,12 @@ async function goOn(page, touch = false) {
   if (touch) await page.touchscreen.tap(at.x, at.y);
   else await page.mouse.click(at.x, at.y);
 }
+/**
+ * The clip a box's animation shows as in the snapshot's dialogue.clips: Idle plays as the gait,
+ * Sit sits him down first; none keeps what he does (null: nothing to see).
+ * @param {string} a
+ */
+const clipFor = (a) => (a === 'none' ? null : a === 'Idle' ? 'gait' : a === 'Sit' ? 'SitDown' : a);
 /** The boxes a script can reach from its start (each box's choices, else its next). */
 function reachable(intro) {
   const byId = new Map(intro.boxes.map((b) => [b.id, b]));
@@ -80,7 +86,7 @@ test.describe('the admin’s intro', () => {
     expect(s.dialogue.text).toBe(intro.boxes.find((b) => b.id === intro.start).text);
   });
 
-  test('down every reply, each box shows its face', async ({ page }) => {
+  test('down every reply, each box shows its face and plays its animation', async ({ page }) => {
     test.setTimeout(300_000);
     const errors = watch(page);
     await calm(page);
@@ -105,6 +111,13 @@ test.describe('the admin’s intro', () => {
             (x) => x.dialogue?.id === b.id && x.face === b.face && x.faceShown === b.face,
             `${b.id}: the ${b.face} face`,
           );
+          const clip = clipFor(b.animation);
+          if (clip)
+            await until(
+              page,
+              (x) => x.dialogue?.id === b.id && x.dialogue.clips.includes(clip),
+              `${b.id}: ${b.animation} plays`,
+            );
           checked.add(b.id);
         }
         // On: this run's reply (or the last there is), else a click or two (finished, then on).

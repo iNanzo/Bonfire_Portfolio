@@ -399,6 +399,11 @@ function start(s) {
   let shot = null;
   /** The intro just ended and the camera is still easing back. */
   let backFromIntro = false;
+  /**
+   * The clips he's played since the intro's box came up, in order ('gait': Idle, Walk or Run by
+   * speed), for ?test.
+   */
+  const acted = { seq: -1, clips: /** @type {string[]} */ ([]) };
   const talkUi = createDialogueUi(stageEl, { onAction: onTalk, log: () => intro?.log ?? [] });
   // (A resize while the intro runs: the shot framed again for the new clear space.)
   new ResizeObserver(() => {
@@ -646,11 +651,13 @@ function start(s) {
     }
     // 2. The brain, then what he says (nothing while the intro runs).
     const o = think(c, evs, intro ? null : button, ptr, dt, box);
-    // (A clip the glb doesn't have yet plays as the gait: Idle standing still.)
+    // (A clip the glb lacks, as an older copy cached from before the dialogue's gestures would,
+    // plays as the gait: Idle standing still.)
     if (o.clip !== 'gait' && !c.has(o.clip)) {
       o.clip = 'gait';
       o.restart = false;
     }
+    if (box) noteActed(box.seq, o.clip);
     // (Quiet too while the camera eases back after it: its close shots aren't the visitor's zoom.)
     if (backFromIntro && !cam.resetting) backFromIntro = false;
     if (!intro && !backFromIntro) speak(o, evs, button, dt);
@@ -697,11 +704,26 @@ function start(s) {
     intro.start(t);
     shotSeq = -1;
     shot = null;
+    acted.seq = -1;
+    acted.clips = [];
     hover = null;
     bubble.hide();
     ui.setTalking(true);
     orbitTalk(cam, true);
     talkUi.open();
+  }
+
+  /**
+   * Notes the clip he plays this frame against the intro's box (a new box starts the list again).
+   * @param {number} seq  the box's (dialogue.js DialogueView seq)
+   * @param {string} clip
+   */
+  function noteActed(seq, clip) {
+    if (seq !== acted.seq) {
+      acted.seq = seq;
+      acted.clips = [];
+    }
+    if (acted.clips.at(-1) !== clip) acted.clips.push(clip);
   }
 
   /** The intro's over: the layer goes, the camera eases back, the toolbar and free play return. */
@@ -1079,8 +1101,10 @@ function start(s) {
       logOpen: talkUi.logOpen,
       asking: talkUi.asking,
       goal: { ...cam.goal },
-      // (His part: getting up, walking in, turning to the camera, talking.)
+      // (His part: getting up, walking in, turning to the camera, talking; and the clips he's
+      // played since this box came up.)
       phase: brain.snapshot().talk?.phase ?? null,
+      clips: acted.seq === v.seq ? [...acted.clips] : [],
     };
   }
 
