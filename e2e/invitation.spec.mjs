@@ -1664,37 +1664,44 @@ test.describe('on a desktop', () => {
   test('a quick press-and-drag that never holds still carries him the whole way: the point pressed stays under the cursor, as after a still hold', async ({
     page,
   }) => {
-    /**
-     * Presses his body and goes 80 px across in four quick moves (`hold`: once he's held, as a
-     * still press makes him); his head's move once he's settled, and where the grabbed point shows.
-     */
-    const carry = async (hold) => {
-      await calm(page);
-      const body = await on(page, 'body');
-      const head = await on(page, 'head');
-      await page.mouse.move(body.x, body.y);
-      await page.mouse.down();
-      if (hold) await until(page, (s) => s.held, 'held');
-      for (let i = 1; i <= 4; i++) await page.mouse.move(body.x + i * 20, body.y);
-      await until(page, (s) => s.held, 'held');
-      await framesFor(page, 1000);
-      const now = await on(page, 'head');
-      const grabbed = await page.evaluate(() => window.__invitation.grabbed());
-      await page.mouse.up();
-      return { dx: now.x - head.x, dy: now.y - head.y, grabbed, cursor: { x: body.x + 80, y: body.y } };
-    };
-    const still = await carry(true);
-    const quick = await carry(false);
-    expect(
-      Math.abs(quick.dx - still.dx),
-      `quick: ${quick.dx.toFixed(1)} px across; held first: ${still.dx.toFixed(1)}`,
-    ).toBeLessThan(5);
-    expect(
-      Math.abs(quick.dy - still.dy),
-      `quick: ${quick.dy.toFixed(1)} px down; held first: ${still.dy.toFixed(1)}`,
-    ).toBeLessThan(5);
-    const off = Math.hypot(quick.grabbed.x - quick.cursor.x, quick.grabbed.y - quick.cursor.y);
-    expect(off, 'the point pressed under the cursor').toBeLessThan(2);
+    const cdp = await page.context().newCDPSession(page);
+    // His head animates and swings independently of the grip. Check the actual point pressed,
+    // including slow rendering, rather than comparing head poses from separate page loads.
+    for (const rate of [1, 6]) {
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate });
+      for (const hold of [true, false]) {
+        await calm(page);
+        const body = await on(page, 'body');
+        const collar = await page.evaluate(() => {
+          const b = window.__invitation.screen('body');
+          const f = window.__invitation.screen('feet');
+          return { x: 2 * b.x - f.x, y: 2 * b.y - f.y };
+        });
+        await page.mouse.move(body.x, body.y);
+        await page.mouse.down();
+        if (hold) await until(page, (s) => s.held, 'held');
+        for (let i = 1; i <= 4; i++) await page.mouse.move(body.x + i * 20, body.y);
+        await until(page, (s) => s.held, 'held');
+        await expect
+          .poll(
+            async () => {
+              const grabbed = await page.evaluate(() => window.__invitation.grabbed());
+              return grabbed ? Math.hypot(grabbed.x - body.x - 80, grabbed.y - body.y) : Infinity;
+            },
+            {
+              message: `${hold ? 'held first' : 'quick'} drag at ${rate}x CPU slowdown carries the pressed point all 80 px`,
+            },
+          )
+          .toBeLessThan(2);
+        const moved = await page.evaluate(() => {
+          const b = window.__invitation.screen('body');
+          const f = window.__invitation.screen('feet');
+          return { x: 2 * b.x - f.x, y: 2 * b.y - f.y };
+        });
+        expect(Math.abs(moved.x - collar.x - 80), 'the collar travels the full drag distance').toBeLessThan(5);
+        await page.mouse.up();
+      }
+    }
   });
 
   test('let go out at the screen’s edge, he’s eased back into view: the camera never jumps on the frame he drops', async ({
