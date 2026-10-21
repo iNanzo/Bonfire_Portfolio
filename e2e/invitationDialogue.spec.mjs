@@ -72,6 +72,36 @@ function reachable(intro) {
   return [...seen];
 }
 
+/**
+ * At the box with replies (Skip goes there), once they show and the camera's at its shot: his
+ * head is over the replies, clear of them and of the Auto row, and the shot was framed over them
+ * from the box's start (they don't move it as they show).
+ */
+async function repliesClearOfHim(page, tap) {
+  const intro = await script(page);
+  const ask = intro.boxes.find((b) => b.choices?.length);
+  test.skip(!ask, 'this script has no replies');
+  await open(page, tap);
+  const skip = page.getByRole('button', { name: 'Skip', exact: true });
+  if (tap) await skip.tap();
+  else await skip.click();
+  await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.choices), 'at the replies');
+  await until(
+    page,
+    (s) => Math.abs(s.camera.distance - s.dialogue.goal.distance) < 0.01 * s.dialogue.goal.distance,
+    'at the shot',
+  );
+  const replies = await page.locator('.inv-talk-choices').evaluate((el) => el.getBoundingClientRect().toJSON());
+  const top = await page.locator('.inv-talk-top').evaluate((el) => el.getBoundingClientRect().toJSON());
+  const { framed } = (await snapshot(page)).dialogue;
+  expect(Math.abs(framed.bottom - replies.top), 'framed over the replies').toBeLessThan(1.5);
+  const head = await page.evaluate(() => window.__invitation.screen('head'));
+  expect(head.y + head.r, 'his head over the replies').toBeLessThan(replies.top);
+  expect(head.y - head.r, 'and under the Auto row').toBeGreaterThan(top.bottom - 20);
+  // (Bigger than in the default view: still a shot of him.)
+  expect(head.r).toBeGreaterThan(30);
+}
+
 test.describe('the admin’s intro', () => {
   test('Play Intro plays content.json’s invitation.intro, box for box', async ({ page }) => {
     const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
@@ -284,6 +314,11 @@ test.describe('on a phone', () => {
     await replies.nth(pick).tap();
     const to = ask.choices[pick].next;
     await until(page, (s) => (s.dialogue ? s.dialogue.id === to : !intro.boxes.some((b) => b.id === to)), 'its box');
+  });
+
+  test('the replies show under his face: the shot frames him over them', async ({ page }) => {
+    await calm(page);
+    await repliesClearOfHim(page, true);
   });
 
   test('Auto goes on by itself, box after box', async ({ page }) => {
@@ -517,6 +552,11 @@ test.describe('on a desktop', () => {
     const head = await page.evaluate(() => window.__invitation.screen('head'));
     expect(head.y + head.r).toBeLessThan(b.y);
     expect(head.y - head.r).toBeGreaterThan(top.y + top.height - 20);
+  });
+
+  test('the replies show under his face: the shot frames him over them', async ({ page }) => {
+    await calm(page);
+    await repliesClearOfHim(page, false);
   });
 
   test('with reduced motion each line shows at once and the camera cuts to its shot', async ({ page }) => {

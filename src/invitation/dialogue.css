@@ -3,7 +3,7 @@
    Sans. A wide box along the bottom (inside the safe area, where the toolbar was: it hides while
    the intro runs) with the speaker's name on a tab at its top left, the line typed out in it and
    a small bouncing ▼ at its bottom right once it's up; Auto, Skip and Log at the top right; the
-   replies stacked in the middle of the screen; a gentle dim along the bottom behind the box; the
+   replies stacked in the middle of the screen, under his face; a gentle dim along the bottom behind the box; the
    Log and the "Skip the Intro?" question as cards over it all. Phone first (390×844), roomier on a
    desktop and lower on a phone held sideways. Reduced motion: no bounce, no pop. The layer takes
    every press, so the canvas under it gets none. */
@@ -119,7 +119,8 @@
   border: 0;
 }
 
-/* --- The replies, stacked in the middle of the screen over a slightly deeper dim. */
+/* --- The replies, stacked in the middle of the screen, under his face (main.js frames the shot
+   over them). Laid out from the box's start, out of sight until its line is typed, then popping in. */
 .inv-talk-choices {
   position: absolute;
   left: 50%;
@@ -130,6 +131,9 @@
   width: min(340px, calc(100% - 48px));
   transform: translate(-50%, -50%);
 }
+.inv-talk-choices.is-waiting {
+  visibility: hidden;
+}
 .inv-talk-choice {
   min-height: 54px;
   padding: 8px 16px;
@@ -137,6 +141,8 @@
   background: var(--talk-fill);
   font-size: 17px;
   line-height: 1.2;
+}
+.inv-talk-choices:not(.is-waiting) .inv-talk-choice {
   animation: inv-talk-pop 0.22s ease-out both;
 }
 .inv-talk-choice:nth-child(2) {
@@ -310,7 +316,7 @@
   .inv-talk-next,
   .inv-talk-box,
   .inv-talk-dim,
-  .inv-talk-choice {
+  .inv-talk-choices:not(.is-waiting) .inv-talk-choice {
     animation: none;
   }
 }

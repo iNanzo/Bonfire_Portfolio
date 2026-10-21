@@ -3,7 +3,8 @@
 // speaker's name on a tab at its top left and the line typed out in it (the rest of the line
 // waits unseen in its place, so the box keeps its size), a small bouncing ▼ at its bottom right
 // once the line is up, Auto, Skip and Log at the top right of the screen, the replies as buttons
-// stacked in the middle of it when a box has them, a gentle dim along the bottom behind the box,
+// stacked in the middle of it when a box has them (laid out out of sight from the box's start, so
+// main.js frames him over them: clearSpace), a gentle dim along the bottom behind the box,
 // the Log (a scrollable list of the lines shown and the replies picked, a dialog of its own) and
 // a "Skip the Intro?" question for Escape. Rendering only: dialogue.js runs the script, and
 // main.js hands each frame's view here (render) and turns what's pressed (`onAction`) into the
@@ -24,6 +25,12 @@
  *   {type: 'skip'} | {type: 'pause', on: boolean} | {type: 'end'}} TalkAction  what the visitor
  *   did: pause, the Log or the question opened (on) or closed
  */
+
+/**
+ * The least room over the replies, CSS px, for the shots to frame him there (main.js): less, as
+ * on a phone held sideways, and they frame him over the chat box, the replies over him.
+ */
+export const REPLY_ROOM = 120;
 
 /** The words on the screen: labels in Title Case, the rest sentences. */
 export const TALK_TEXT = {
@@ -120,7 +127,16 @@ export function createDialogueUi(stage, { onAction, log }) {
   const autoBtn = $('[data-talk="auto"]');
   const logBtn = $('[data-talk="log"]');
 
-  const shown = { seq: -1, chars: /** @type {string[]} */ ([]), n: -1, choices: '', next: false, auto: false };
+  const shown = {
+    seq: -1,
+    chars: /** @type {string[]} */ ([]),
+    n: -1,
+    choices: '',
+    /** the replies show (else laid out, out of sight and reach) */
+    up: false,
+    next: false,
+    auto: false,
+  };
 
   const modal = () => !logBox.hidden || !ask.hidden;
 
@@ -150,7 +166,7 @@ export function createDialogueUi(stage, { onAction, log }) {
   /** Focus where the visitor goes on from: the first reply while they show, else the layer. */
   function focusHome() {
     const first = /** @type {HTMLElement|null} */ (choices.querySelector('button'));
-    (first && !choices.hidden ? first : layer).focus({ preventScroll: true });
+    (first && shown.up ? first : layer).focus({ preventScroll: true });
   }
 
   /** @param {KeyboardEvent} e */
@@ -167,7 +183,7 @@ export function createDialogueUi(stage, { onAction, log }) {
       // (Round the buttons showing, inside the layer, or inside the Log or the question.)
       const scope = !logBox.hidden ? logBox : !ask.hidden ? ask : layer;
       const stops = /** @type {HTMLElement[]} */ ([...scope.querySelectorAll('button')]).filter(
-        (b) => !b.closest('[hidden]') && !(/** @type {HTMLButtonElement} */ (b).disabled),
+        (b) => !b.closest('[hidden], [inert]') && !(/** @type {HTMLButtonElement} */ (b).disabled),
       );
       if (!stops.length) return;
       const at = stops.indexOf(/** @type {HTMLElement} */ (doc.activeElement));
@@ -244,17 +260,28 @@ export function createDialogueUi(stage, { onAction, log }) {
       }
       const showNext = v.typed && !v.choices;
       if (showNext !== shown.next) next.hidden = !(shown.next = showNext);
-      const key = v.choices ? `${v.seq}:${v.choices.map((c) => c.label).join('\n')}` : '';
+      // (A box's replies are laid out from its start, out of sight and out of reach, so its shot
+      // frames him over them; they show once its line is typed.)
+      const own = v.box.choices?.length ? v.box.choices : null;
+      const key = own ? `${v.seq}:${own.map((c) => c.label).join('\n')}` : '';
       if (key !== shown.choices) {
         shown.choices = key;
-        choices.innerHTML = (v.choices ?? [])
+        choices.innerHTML = (own ?? [])
           .map(
             (c, i) =>
               `<button type="button" class="inv-btn inv-talk-choice" data-choice="${i}">${html(c.label)}</button>`,
           )
           .join('');
-        choices.hidden = !v.choices;
-        layer.classList.toggle('is-choosing', Boolean(v.choices));
+        choices.hidden = !own;
+        // (Their state set afresh below.)
+        shown.up = !(own && v.choices);
+      }
+      const up = Boolean(own && v.choices);
+      if (up !== shown.up) {
+        shown.up = up;
+        choices.classList.toggle('is-waiting', !up);
+        choices.toggleAttribute('inert', !up);
+        layer.classList.toggle('is-choosing', up);
         if (!modal()) focusHome();
       }
       if (v.auto !== shown.auto) autoBtn.setAttribute('aria-pressed', String((shown.auto = v.auto)));
@@ -274,11 +301,15 @@ export function createDialogueUi(stage, { onAction, log }) {
     },
     /**
      * The space the shots frame him in, client px: from under the Auto, Skip and Log row to the
-     * chat box's top as it's laid out (its rise as the layer opens left out).
+     * chat box's top as it's laid out (its rise as the layer opens left out), or to the replies'
+     * top while a box has them and there's REPLY_ROOM over them, so they show under his face.
      */
     clearSpace() {
       const top = $('.inv-talk-top').getBoundingClientRect().bottom;
       const bottom = layer.getBoundingClientRect().top + $('.inv-talk-box').offsetTop;
+      // (A box with replies: over them, where they show, when there's room for him there.)
+      const over = choices.hidden ? null : choices.getBoundingClientRect().top;
+      if (over !== null && over - top >= REPLY_ROOM && over < bottom) return { top, bottom: over };
       return { top, bottom };
     },
     get element() {
