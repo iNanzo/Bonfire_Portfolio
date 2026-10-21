@@ -885,12 +885,15 @@ def think(t):
     return p
 
 
+# Nod's down beat: shallow (15 degrees in all, his huge head's fringe would hide his eyes past
+# that from the default view's 36 degrees up and the medium shot's 16), carried as a dip down the
+# body and a chin drop, so his face (and the box's) still reads at the bottom of the nod.
 NOD_DOWN = merge(
     IDLE,
-    hips={'loc': (0, 0, -0.14), 'rot': (2, 0, 0)},
-    chest=(6, 0, 0),
-    neck=(4, 0, 0),
-    head=(17, 0, 0),
+    hips={'loc': (0, 0, -0.22), 'rot': (1, 0, 0)},
+    chest=(3, 0, 0),
+    neck=(2, 0, 0),
+    head=(9, 0, 0),
     armL=merge(ARM_RELAXED, upper=(10, 19), lower=(24, 15)),
     armR=merge(ARM_RELAXED, upper=(10, 19), lower=(24, 15)),
 )

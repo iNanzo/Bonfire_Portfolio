@@ -7,7 +7,8 @@
 // front, leans forward and tips his face up to the camera (the user's reference); the dialogue's
 // gestures (round 15) start and end on Idle's pose, keep the hands and sleeves clear of his huge
 // head, hair and cap (the skinned meshes, frame by frame), and each does what it's named for
-// broadly enough to read at 128 px; and the file itself: a 17-joint skin with at most 4 influences, WebP textures, no Draco, no lights, 27
+// broadly enough to read at 128 px (Nod shallow enough that his eyes show at its bottom); and the
+// file itself: a 17-joint skin with at most 4 influences, WebP textures, no Draco, no lights, 27
 // uniquely named nodes as three.js names them, the face's UVs inside its sheet's first cell,
 // and its size.
 import { test } from 'node:test';
@@ -299,10 +300,15 @@ test('Talk raises a hand in front of his chest and moves it, and his head bobs a
   assert.ok(tilt >= 4, `his head tilts through ${tilt.toFixed(1)}°`);
 });
 
-test('Nod tips his face down and back up', () => {
+test('Nod tips his face down and back up, shallow enough that his eyes show, his body dipping with it', () => {
   const rows = track('Nod');
-  const dip = idleAt0().faceUp - least(rows, (r) => r.faceUp);
-  assert.ok(dip >= 14 && dip <= 35, `his face dips ${dip.toFixed(1)}° below Idle's`);
+  const idle = idleAt0();
+  const dip = idle.faceUp - least(rows, (r) => r.faceUp);
+  // (Past about 16° his big head's fringe hides his eyes from the default view's 36° up and the
+  // medium shot's 16°: the nod then reads as a bow, his face gone.)
+  assert.ok(dip >= 10 && dip <= 16, `his face dips ${dip.toFixed(1)}° below Idle's`);
+  const drop = idle.hips.y - least(rows, (r) => r.hips.y);
+  assert.ok(drop >= 0.13, `his hips dip ${drop.toFixed(2)} model units with it`);
 });
 
 test('Shrug lifts both shoulders and opens both hands out to the sides', () => {

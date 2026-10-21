@@ -325,7 +325,9 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   makes the clips in Blender and `test/invitationModel.test.mjs` holds the glb to the contract.
   The dialogue's talking gestures (Talk and Think loop; Nod, Shrug, Point and Cheer start and
   end on Idle's pose) keep the hands and sleeves clear of his head, hair and cap, which the test
-  measures on the skinned meshes frame by frame.
+  measures on the skinned meshes frame by frame. Nod's down beat stays shallow (about 15° in all,
+  the rest of it a dip down his body), so his eyes still show under his fringe at the bottom of
+  the nod from the default view's 36° up and the medium shot's 16°.
 - **The model:** `npm run model -- newt` rebuilds `public/models/newt.glb` from `tools/newt.py`
   with headless Blender (`$NEWT_BLEND` names the .blend; it defaults to the user's
   `NEWT_optimized.blend`, which is never overwritten).
