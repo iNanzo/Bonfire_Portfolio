@@ -16,6 +16,7 @@ import {
   INTRO_AUTO,
   INTRO_CAMERAS,
   INTRO_CHOICES_MAX,
+  INTRO_CHOICES_MIN,
   INTRO_LABEL_MAX,
   INTRO_SPEAKER_MAX,
   INTRO_TEXT_MAX,
@@ -300,6 +301,15 @@ test('warnings, not errors: a box nothing leads to, a loop with no choice to lea
   both.boxes[4].next = 'a';
   assert.deepEqual(errorsAt(both), []);
   assert.deepEqual(warningsAt(both), [at(1, '.end'), at(1, '.next'), at(4, '.next')]);
+  // One reply is only a tap that looks like a choice: 2 or 3 make one.
+  assert.equal(INTRO_CHOICES_MIN, 2);
+  const one = intro();
+  one.boxes[1].choices = [{ label: 'Left', next: 'c' }];
+  assert.deepEqual(errorsAt(one), [], 'still saves');
+  // (d, which only the other reply led to, is never reached now.)
+  assert.deepEqual(warningsAt(one), [at(1, '.choices'), at(3)]);
+  const w = problems(one).warnings.find((x) => x.path === at(1, '.choices'));
+  assert.match(w.message, /“b”/, 'it names the box');
 });
 
 // ---- content.js: the intro as the toy plays it ----------------------------------------------------

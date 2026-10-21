@@ -15,6 +15,7 @@ import {
   INTRO_AUTO,
   INTRO_CAMERAS,
   INTRO_CHOICES_MAX,
+  INTRO_CHOICES_MIN,
   validateContent,
 } from '../../src/contentRules.js';
 import { CLIPS, FACE_NAMES } from '../../src/invitation/clips.js';
@@ -374,7 +375,7 @@ test('the cards: titled by the line, its id and the rest under it; reorder and d
   assert.ok(flames.querySelector('.eye'));
 });
 
-test('choices: + Add Choice until there are 3', () => {
+test('choices: + Add Choice until there are 3; one alone is a warning, its help says 2 or 3', () => {
   const d = draftWith();
   const r = render(d);
   const addIn = (key) =>
@@ -395,6 +396,17 @@ test('choices: + Add Choice until there are 3', () => {
     0,
     'three: no more',
   );
+  // (One reply is only a tap: the help asks for 2 or 3, and one gets a warning, at its Choices.)
+  const help = resolveHelp(HELP['invitation.intro.boxes[].choices'], {});
+  assert.ok(help.includes(`${INTRO_CHOICES_MIN} or ${INTRO_CHOICES_MAX}`), help);
+  const one = draftWith();
+  one.invitation.intro.boxes[1].choices.pop();
+  const r1 = validateContent(one);
+  assert.deepEqual(
+    r1.errors.filter((e) => e.path.startsWith('invitation.intro')),
+    [],
+  );
+  assert.ok(r1.warnings.some((w) => w.path === 'invitation.intro.boxes[1].choices'));
 });
 
 test('renaming a box, or rewriting its line, updates every list of boxes on the page as you type', () => {

@@ -23,6 +23,7 @@ import {
   INTRO_AUTO,
   INTRO_CAMERAS,
   INTRO_CHOICES_MAX,
+  INTRO_CHOICES_MIN,
   INTRO_TEXT_MAX,
   INVITATION_STYLES,
 } from '../../src/contentRules.js';
@@ -186,7 +187,7 @@ export const INVITATION_HELP = {
   [`${BOX}.end`]: 'The intro ends after this line, whatever comes after it in the list, and he’s free to play again.',
   [`${BOX}.auto`]:
     'With Auto on, the seconds to wait once the line is typed before going on. 0: as long as it takes to read.',
-  [`${BOX}.choices`]: `Up to ${INTRO_CHOICES_MAX} replies the visitor picks from instead of a tap, each leading to a box of its own.`,
+  [`${BOX}.choices`]: `${INTRO_CHOICES_MIN} or ${INTRO_CHOICES_MAX} replies the visitor picks from instead of a tap, each leading to a box of its own.`,
   [`${CHOICE}.label`]: 'The reply on its button, in the visitor’s words. Keep it short.',
   [`${CHOICE}.next`]: 'The box this reply goes to. Boxes after different replies can lead back to the same one.',
 };

@@ -169,7 +169,7 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     going, or None: as he was), a **Camera** (Close: head and shoulders, Medium: his whole
     body, Wide: the default view, Keep: as it was), its **Next Box** (empty: the box after
     it), **Ends the Intro**, an **Auto Wait** (seconds Auto waits once the line is typed; 0:
-    by its length) and up to 3 **Choices**, each a **Label** and the box it **Leads To**.
+    by its length) and 2 or 3 **Choices**, each a **Label** and the box it **Leads To**.
     Choices come first, then End, then Next; the last box ends the intro. The start, a
     Next and a choice's box are picked from the boxes there are, each by its id and how its
     line starts; the lists follow a box renamed as it's typed, and one that's gone still
@@ -186,8 +186,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     a box that's there, its text up to 240 characters, a choice's label up to 60 and a
     speaker up to 24, at most 3 choices a box, its faces, animations and cameras from the
     toy's lists, and Auto between 0 and 15 seconds; a box nothing leads to, boxes that go
-    round with no choice to leave, and a Next or End a box's choices or End override are
-    warnings, each naming its box. The section is optional, so content from before the toy
+    round with no choice to leave, a Next or End a box's choices or End override, and a box
+    with a single choice (only a tap that looks like one) are warnings, each naming its box. The section is optional, so content from before the toy
     still passes, and each of its four parts it lacks shows **Start From the Toy’s Own**,
     which fills that part in with the toy's built-in values (the built-in Default look, its
     speech settings, every moment with no lines yet, its own short intro) to edit from

@@ -234,6 +234,8 @@ export const INTRO_ANIMATIONS = ['none', ...DIALOGUE_CLIPS];
 export const INTRO_TEXT_MAX = 240;
 /** The most choices a box offers (types.js DialogueBox: 2–3 replies). */
 export const INTRO_CHOICES_MAX = 3;
+/** The fewest that make a choice: one reply alone is only a tap (a warning). */
+export const INTRO_CHOICES_MIN = 2;
 /** The longest choice, in characters: a button's worth. */
 export const INTRO_LABEL_MAX = 60;
 /** The longest name on the box's tab, in characters. */
@@ -368,9 +370,9 @@ function lineText(line, q, check) {
  * The invitation's intro (types.js DialogueScript): the speaker, the start and the chat boxes,
  * each with its id (unique), its line (up to INTRO_TEXT_MAX characters), a face, an animation and
  * a camera from the toy's lists, and the optional speaker, Auto wait, Next, End and choices (at
- * most INTRO_CHOICES_MAX, each a label and the box it leads to); every Next, choice and the start
- * a box that's there. Then its flow as the toy plays it (introFlow): a box nothing leads to, and a
- * loop with no choice to leave, are warnings.
+ * most INTRO_CHOICES_MAX, each a label and the box it leads to; one alone is a warning); every
+ * Next, choice and the start a box that's there. Then its flow as the toy plays it (introFlow): a
+ * box nothing leads to, and a loop with no choice to leave, are warnings.
  */
 function invitationIntro(it, check) {
   const { at, err } = check;
@@ -432,12 +434,17 @@ function introBox(b, p, i, ids, target, check) {
   introOverrides(b, p, i, check);
 }
 
-/** A box's Next or End that does nothing (warnings): choices lead on first, then End. */
+/**
+ * A box's Next or End that does nothing (warnings): choices lead on first, then End. And a single
+ * reply (a warning): a tap that looks like a choice.
+ */
 function introOverrides(b, p, i, check) {
   const name = typeof b.id === 'string' && b.id ? `Box “${b.id}”` : `Box ${i + 1}`;
   const hasNext = typeof b.next === 'string' && b.next !== '';
   const warn = (k, why) =>
     check.warn(check.at(`${p}.${k}`), `${name}: ${why}, so ${k === 'end' ? 'End' : 'Next'} does nothing.`);
+  if (Array.isArray(b.choices) && b.choices.length && b.choices.length < INTRO_CHOICES_MIN)
+    check.warn(check.at(`${p}.choices`), `${name}: one reply is just a tap; add another, or use Next instead.`);
   if (Array.isArray(b.choices) && b.choices.length) {
     if (b.end === true) warn('end', 'its choices lead on');
     if (hasNext) warn('next', 'its choices lead on');
