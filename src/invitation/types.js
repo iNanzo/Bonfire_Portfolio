@@ -71,10 +71,18 @@
  * @property {{name: string, time: number, remaining: number}|null} clip  the playing one-shot or loop (not the gait)
  * @property {{dragSpeed: number, shake: number}|null} carry  while he's held (carry.js `carryFeel`)
  * @property {XZ|null} [camera]  the camera's spot on the floor: a reaction turns him toward it (without it, toward +z)
+ * @property {DialogueIn|null} [dialogue]  while Play Intro's dialogue runs, the box up (brain.js's talk state)
+ */
+/**
+ * @typedef {object} DialogueIn  the intro's box as the brain sees it
+ * @property {number} seq  counts the boxes shown: a new one plays its animation
+ * @property {string} animation  a DIALOGUE_CLIPS name or 'none'
+ * @property {import('./clips.js').FaceName} face
+ * @property {boolean} typing  its line is still typing out (Talk plays meanwhile)
  */
 /**
  * @typedef {object} BrainOut
- * @property {string} state  idle, walk, react, flee, held, fall, land, sitDown, sit, standUp
+ * @property {string} state  idle, walk, react, flee, held, fall, land, sitDown, sit, standUp, talk
  * @property {string} clip  'gait' (Idle/Walk/Run by speed) or a clip name
  * @property {boolean} restart  start `clip` from 0 this frame
  * @property {{mode: 'stay'|'goto'|'flee'|'face', goal: XZ|null, speed: number}} move  goal: where a goto goes, the camera's spot to face, or where a flee's threat was last seen (with no pointer); speed: the target speed (steer ramps to it)

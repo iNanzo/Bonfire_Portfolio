@@ -8,6 +8,11 @@
 // taps, the buttons (and their being off while he's held or falling), the Sit/Stand label,
 // faces from FACE_TRACK with blinks from faces.js, no reaction three times running, and the
 // turn to the camera before a reaction or a sit. The seeded rng (rng.js) is checked here too.
+// The intro's dialogue mode: he gets up if he's sitting, walks in toward the middle when he's
+// far out, turns to the camera, then plays each box's animation (a gesture once, then Talk while
+// the line types and Idle after; a loop holds; none keeps what he does; Sit sits him down and the
+// next gesture gets him up) with the box's face, looking at the camera; taps, grabs, floor taps,
+// buttons, wandering and sitting by himself do nothing meanwhile; at the end he's back to play.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CLIPS, FACE_TRACK, GAIT, fadeFor } from '../src/invitation/clips.js';
@@ -38,6 +43,8 @@ function sim({ seed = 1, calm = true, tune, x = 0, z = 0, yaw = 0, camera = null
     pointer: null,
     carry: null,
     camera,
+    /** @type {{seq: number, animation: string, face: string, typing: boolean}|null} the intro's box, while it runs */
+    dialogue: null,
     landAt: Infinity,
     out: null,
   };
@@ -64,6 +71,7 @@ function sim({ seed = 1, calm = true, tune, x = 0, z = 0, yaw = 0, camera = null
       clip: clipInfo(),
       carry: w.out?.state === 'held' ? w.carry : null,
       camera: w.camera,
+      dialogue: w.dialogue,
     });
     if (out.clip === 'gait') w.clip = null;
     else if (out.restart || out.clip !== w.clip) {
@@ -878,4 +886,148 @@ test('no random reaction three times in a row (seeded)', () => {
       assert.ok(!(list[i] === list[i - 1] && list[i] === list[i - 2]), `seed ${seed}: ${list.join(' ')}`);
   }
   assert.deepEqual(picks(9), picks(9));
+});
+
+// ---- the intro: dialogue mode ---------------------------------------------------------------
+
+/** A box of the intro as main.js hands it to the brain. */
+const box = (seq, animation = 'none', face = 'neutral', typing = true) => ({ seq, animation, face, typing });
+/** Frames until the intro is under way (turned to the camera, his first box playing). */
+const talking = (s) =>
+  s.until((o) => o.state === 'talk' && !o.faceCamera && s.brain.snapshot().talk?.phase === 'on', 8);
+
+test('Play Intro: he turns to the camera, and nothing else moves him while it runs', () => {
+  const s = sim({ calm: false, yaw: Math.PI, camera: { x: 0, z: 6 } });
+  s.w.dialogue = box(1, 'Talk', 'happy');
+  const first = s.frame();
+  assert.equal(first.state, 'talk');
+  assert.equal(first.move.mode, 'face', 'turning to the camera');
+  assert.ok(first.faceCamera);
+  assert.equal(first.buttonsEnabled, false);
+  talking(s);
+  assert.ok(Math.abs(wrapAngle(s.w.body.yaw - Math.atan2(0 - s.w.body.x, 6 - s.w.body.z))) <= TUNE.facedEnough + 0.05);
+  // (Taps, grabs, floor taps, buttons: nothing. Left 40 s alone he neither wanders nor sits.)
+  s.tap();
+  s.grab();
+  s.floorTap(1, 1);
+  for (const b of ['Wave', 'Sit', 'Run', 'Wander']) s.button(b);
+  const seen = new Set();
+  s.until(
+    () => s.w.t > 45,
+    50,
+    (o) => seen.add(o.state),
+  );
+  assert.deepEqual([...seen], ['talk']);
+  assert.equal(s.w.out.wander, true, 'Wander kept as it was');
+  assert.equal(s.w.out.stress, 0);
+  assert.ok(dist(s.w.body, { x: 0, z: 0 }) < 0.05, 'never walked off');
+});
+
+test('far out from the middle he walks a step in first, then turns to the camera', () => {
+  const s = sim({ x: 1.8, z: 1.2, yaw: 0, camera: { x: 0, z: 6 } });
+  s.w.dialogue = box(1);
+  const o = s.frame();
+  assert.equal(o.state, 'talk');
+  assert.equal(o.move.mode, 'goto', 'a step in');
+  talking(s);
+  assert.ok(Math.hypot(s.w.body.x, s.w.body.z) <= TUNE.talkNear + TUNE.arrive + 0.05, 'near the middle');
+  // (Near the middle already: no walk.)
+  const t = sim({ x: 0.3, z: 0.2, camera: { x: 0, z: 6 } });
+  t.w.dialogue = box(1);
+  assert.notEqual(t.frame().move.mode, 'goto');
+});
+
+test('each box: a gesture plays once, then Talk while the line types and Idle after; a loop holds; none keeps it', () => {
+  const s = sim({ camera: { x: 0, z: 6 } });
+  s.w.dialogue = box(1, 'Nod', 'smug');
+  talking(s);
+  let o = s.w.out;
+  assert.equal(o.clip, 'Nod');
+  assert.ok(o.restart || s.brain.snapshot().clip === 'Nod');
+  assert.equal(o.face, 'smug');
+  assert.equal(o.blink, 'none', 'blinks on neutral only');
+  assert.deepEqual(o.look, { mode: 'camera', weight: 1 });
+  o = s.until((x) => x.clip !== 'Nod', CLIPS.Nod.length + 0.5);
+  assert.equal(o.clip, 'Talk', 'Talk while it types');
+  s.w.dialogue = box(1, 'Nod', 'smug', false);
+  o = s.frame();
+  assert.equal(o.clip, 'gait', 'Idle once the line is up');
+  // (The same box again is no new gesture.)
+  s.run(1);
+  assert.equal(s.w.out.clip, 'gait');
+  // A loop holds, typing or not.
+  s.w.dialogue = box(2, 'Think', 'neutral', true);
+  o = s.frame();
+  assert.equal(o.clip, 'Think');
+  assert.ok(o.restart);
+  assert.equal(o.blink, 'normal');
+  s.w.dialogue = box(2, 'Think', 'neutral', false);
+  s.run(3);
+  assert.equal(s.w.out.clip, 'Think', 'held');
+  // None keeps what he does.
+  s.w.dialogue = box(3, 'none', 'sad', true);
+  o = s.frame();
+  assert.equal(o.clip, 'Think');
+  assert.equal(o.face, 'sad');
+  // A gesture after a loop: once, then Talk.
+  s.w.dialogue = box(4, 'Cheer', 'happy', true);
+  assert.equal(s.frame().clip, 'Cheer');
+  o = s.until((x) => x.clip !== 'Cheer', CLIPS.Cheer.length + 0.5);
+  assert.equal(o.clip, 'Talk');
+});
+
+test('a Sit box sits him down and holds it; the next gesture gets him up first; sitting at Play Intro, he stands', () => {
+  const s = sim({ camera: { x: 0, z: 6 } });
+  s.w.dialogue = box(1, 'Sit');
+  talking(s);
+  assert.equal(s.w.out.clip, 'SitDown');
+  s.until((x) => x.clip === 'Sit', 3);
+  s.run(2);
+  assert.equal(s.w.out.clip, 'Sit', 'held');
+  s.w.dialogue = box(2, 'Wave', 'happy');
+  assert.equal(s.frame().clip, 'StandUp', 'up first');
+  let o = s.until((x) => x.clip === 'Wave', 3);
+  assert.equal(o.face, 'happy');
+  // Sitting when the intro starts: up first, then on.
+  const t = sim({ camera: { x: 0, z: 6 } });
+  t.button('Sit');
+  t.until((x) => x.state === 'sit', 5);
+  t.w.dialogue = box(1, 'Talk');
+  o = t.frame();
+  assert.equal(o.state, 'talk');
+  assert.equal(o.clip, 'StandUp');
+  talking(t);
+  assert.equal(t.w.out.clip, 'Talk');
+});
+
+test('the end: he’s back to free play, standing up first if a box sat him down', () => {
+  const s = sim({ calm: false, camera: { x: 0, z: 6 } });
+  s.w.dialogue = box(1, 'Talk');
+  talking(s);
+  s.run(1);
+  s.w.dialogue = null;
+  let o = s.frame();
+  assert.equal(o.state, 'idle');
+  assert.equal(o.buttonsEnabled, true);
+  assert.ok(s.brain.snapshot().aloneFor < 1, 'not left alone all that time: he won’t sit at once');
+  o = s.tap();
+  assert.equal(o.state, 'react', 'taps work again');
+
+  const t = sim({ camera: { x: 0, z: 6 } });
+  t.w.dialogue = box(1, 'Sit');
+  talking(t);
+  t.until((x) => x.clip === 'Sit', 3);
+  t.w.dialogue = null;
+  o = t.frame();
+  assert.equal(o.state, 'standUp');
+  t.until((x) => x.state === 'idle', 3);
+});
+
+test('held or falling, Play Intro waits until he’s down', () => {
+  const s = sim({ camera: { x: 0, z: 6 } });
+  s.grab();
+  s.w.dialogue = box(1, 'Talk');
+  assert.equal(s.frame().state, 'held');
+  s.release();
+  s.until((o) => o.state === 'talk', 5);
 });
