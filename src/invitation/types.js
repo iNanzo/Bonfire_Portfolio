@@ -97,6 +97,8 @@
  * @property {'Sit'|'Stand'} sitLabel
  * @property {boolean} buttonsEnabled
  * @property {'Wave'|'Spook'|null} reaction  the reaction under way (react only), turn included
+ * @property {boolean} talkReady  the intro's talk state, in place: up, walked in and turned to the
+ *   camera, so the box's line, face and gesture can begin (main.js holds the line until then)
  */
 
 /**

@@ -153,7 +153,9 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   shuts it. **Escape** asks whether to skip the intro, and a second Escape (or Skip Intro) ends
   it.
 - **NEWT:** he gets up if he's sitting, takes a few steps in if he's out near the edge, turns
-  to face you and looks at you while he talks, his head drifting a little. Each box sets his
+  to face you and looks at you while he talks, his head drifting a little. The first line waits
+  for him (the box shows his name and nothing else, and a tap meanwhile does nothing), so its
+  words, face and gesture begin together once he's in place. Each box sets his
   face (sad, angry, shy and smug too) and plays its gesture once (a nod, a shrug, a point, a
   cheer, a wave, a start), then talks with his hands while the line types and stands easy once
   it's up; some boxes hold a loop instead (talking, thinking), and one may sit him down. You
@@ -376,8 +378,10 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   between 1.4 and 6 s, 240 characters and 3 replies at most; `lookSway`; main.js runs
   `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the
-  stage that takes every press; the line in a live region once, whole), brain.js's `talk` state (`BrainIn.dialogue`: the box's seq,
-  animation, face and whether it's typing; `TUNE.talkNear`, `talkTurn`) and camera.js's shots
+  stage that takes every press; the line in a live region once, whole), brain.js's `talk` state
+  (`BrainIn.dialogue`: the box's seq, animation, face and whether it's typing; `TUNE.talkNear`,
+  `talkTurn`; `BrainOut.talkReady` once he's in place, which main.js holds the first line for)
+  and camera.js's shots
   (`orbitTalk`, `shotView`, `orbitShot`, `SHOT`). Each box's face goes to `setFace` as it is
   (character.js shows its stand-in until its sheet is in, above), and main.js plays a clip the glb
   lacks (an older copy cached from before the gestures) as Idle.
@@ -410,8 +414,8 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
   the play area, and `talk` is what he's saying (speech.js's snapshot: the line up and its
   trigger, when the idle clock comes round). While the intro runs, `dialogue` has the box up
-  (`id`, `seq`, `text`, `shown`, `typed`, its replies' targets, `auto`, `paused`, `logOpen`,
-  `asking`, `camera`, `shot`, the camera's `goal`, his `phase` and the `clips` he's played since
+  (`id`, `seq`, `text`, `shown`, `typed`, its replies' targets, `auto`, `paused`, `waiting`: the
+  line holding until he's in place, `logOpen`, `asking`, `camera`, `shot`, the camera's `goal`, his `phase` and the `clips` he's played since
   the box came up, `'gait'` for Idle, Walk or Run), and `intro()` is the script
   it runs. `?seed=N` makes the randomness
   repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times

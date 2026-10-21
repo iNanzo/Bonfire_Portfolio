@@ -33,8 +33,10 @@
 // Play Intro (ui.js) runs the intro's dialogue (dialogue.js, on content.js introScript():
 // content.json's invitation.intro as the admin writes it, mended, or the toy's own) on the toy's
 // clock, shown by dialogueUi.js over the stage: the toolbar rests out of sight, the speech bubble
-// goes and stays quiet, the layer takes every press (no drags, no orbit, no floor taps), the brain
-// acts each box out (brain.js's talk state: BrainIn.dialogue; its face through setFace, which
+// goes and stays quiet, the layer takes every press (no drags, no orbit, no floor taps), the first
+// line waits (its clock held, nothing typed) until he's up, walked in and turned to the camera
+// (BrainOut.talkReady), and the brain acts each box out (brain.js's talk state: BrainIn.dialogue;
+// its face through setFace, which
 // stands in the nearest of his first four until a dialogue face's sheet is in; a clip the glb
 // lacks playing as Idle), he looks at the camera with a little sway (dialogue.js lookSway), and
 // the camera goes to each box's shot (camera.js shotView and orbitShot, framed in the clear space
@@ -400,6 +402,11 @@ function start(s) {
   /** The intro just ended and the camera is still easing back. */
   let backFromIntro = false;
   /**
+   * The intro's line waits, its clock held, until he's in place (brain.js BrainOut.talkReady: up,
+   * walked in, turned to the camera), so its line, face and gesture begin together.
+   */
+  let introHeld = false;
+  /**
    * The clips he's played since the intro's box came up, in order ('gait': Idle, Walk or Run by
    * speed), for ?test.
    */
@@ -702,6 +709,8 @@ function start(s) {
     if (intro || !out?.buttonsEnabled || ui.sheetOpen) return;
     intro = createDialogue(playScript(), { reduced: reducedMotion() });
     intro.start(t);
+    intro.pause(true, t);
+    introHeld = true;
     shotSeq = -1;
     shot = null;
     acted.seq = -1;
@@ -729,6 +738,7 @@ function start(s) {
   /** The intro's over: the layer goes, the camera eases back, the toolbar and free play return. */
   function endIntro() {
     intro = null;
+    introHeld = false;
     shot = null;
     talkUi.close();
     orbitTalk(cam, false);
@@ -743,17 +753,28 @@ function start(s) {
   function onTalk(a) {
     const d = intro;
     if (!d) return;
-    if (a.type === 'advance') d.advance(t);
-    else if (a.type === 'choose') d.choose(a.index, t);
+    // (A tap while he's still getting into place finishes nothing: the line hasn't begun.)
+    if (a.type === 'advance') {
+      if (!introHeld) d.advance(t);
+    } else if (a.type === 'choose') d.choose(a.index, t);
     else if (a.type === 'auto') d.setAuto(a.on, t);
     else if (a.type === 'skip') d.skip(t);
-    else if (a.type === 'pause') d.pause(a.on, t);
+    else if (a.type === 'pause') d.pause(a.on || introHeld, t);
     else if (a.type === 'end') d.end();
     if (d.view.done) endIntro();
     else {
       shotFor(d.view);
-      talkUi.render(d.view);
+      talkUi.render(heldView(d.view));
     }
+  }
+
+  /**
+   * A view as the screen shows it: while the line waits for him to get into place, its box with
+   * nothing typed (no ▼, no replies), whatever the runner holds (reduced motion's whole line too).
+   * @param {import('./dialogue.js').DialogueView} v
+   */
+  function heldView(v) {
+    return introHeld ? { ...v, shown: 0, typed: false, choices: null } : v;
   }
 
   /**
@@ -767,19 +788,26 @@ function start(s) {
   }
 
   /**
-   * The intro this frame: its clock moves on (the typing, Auto), a new box sends the camera to its
-   * shot, and the screen shows it. What the brain gets (BrainIn.dialogue), or null.
+   * The intro this frame: its clock moves on (the typing, Auto) once he's in place, a new box
+   * sends the camera to its shot, and the screen shows it. What the brain gets (BrainIn.dialogue),
+   * or null.
    * @returns {import('./types.js').DialogueIn|null}
    */
   function introStep() {
     if (!intro) return null;
+    // (In place, as of the brain's last frame: the line goes on from its start, unless the Log or
+    // the question holds it.)
+    if (introHeld && out?.talkReady) {
+      introHeld = false;
+      intro.pause(talkUi.logOpen || talkUi.asking, t);
+    }
     const v = intro.step(t);
     if (v.done || !v.box) {
       endIntro();
       return null;
     }
     shotFor(v);
-    talkUi.render(v);
+    talkUi.render(heldView(v));
     return { seq: v.seq, animation: v.box.animation, face: v.box.face, typing: !v.typed };
   }
 
@@ -1083,7 +1111,7 @@ function start(s) {
   function introSnapshot() {
     const d = intro;
     if (!d) return null;
-    const v = d.view;
+    const v = heldView(d.view);
     return {
       id: v.box?.id ?? null,
       seq: v.seq,
@@ -1095,6 +1123,8 @@ function start(s) {
       choices: v.choices ? v.choices.map((c) => c.next) : null,
       auto: v.auto,
       paused: v.paused,
+      // (The line waits for him to get into place: up, walked in, turned.)
+      waiting: introHeld,
       camera: v.box?.camera ?? null,
       shot,
       log: d.log.length,

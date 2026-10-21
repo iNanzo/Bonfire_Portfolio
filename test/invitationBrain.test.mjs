@@ -1059,6 +1059,38 @@ test('the end: he’s back to free play, standing up first if a box sat him down
   t.until((x) => x.state === 'idle', 3);
 });
 
+test('talkReady once he’s in place: getting up, walking in and turning he keeps his own face; then the box’s, and its gesture', () => {
+  // Far out: the walk in, then the turn.
+  const s = sim({ x: 1.8, z: 1.2, yaw: 0, camera: { x: 0, z: 6 } });
+  s.w.dialogue = box(1, 'Spook', 'surprised');
+  let o = s.frame();
+  const phases = new Set();
+  while (s.brain.snapshot().talk?.phase !== 'on' && s.w.t < 8) {
+    phases.add(s.brain.snapshot().talk?.phase);
+    assert.equal(o.talkReady, false, `not ready while ${s.brain.snapshot().talk?.phase}`);
+    assert.notEqual(o.face, 'surprised', 'the box’s face waits for its line');
+    assert.notEqual(o.clip, 'Spook', 'and so does its gesture');
+    o = s.frame();
+  }
+  assert.ok(phases.has('walk'), [...phases].join(' '));
+  assert.equal(o.talkReady, true, 'ready the frame he’s turned');
+  assert.equal(o.face, 'surprised');
+  assert.equal(o.clip, 'Spook', 'its gesture starts with it');
+  // Sitting: up first, never ready on the way.
+  const t = sim({ camera: { x: 0, z: 6 } });
+  t.button('Sit');
+  t.until((x) => x.state === 'sit', 5);
+  t.w.dialogue = box(1, 'Nod', 'smug');
+  o = t.frame();
+  assert.equal(o.clip, 'StandUp');
+  assert.equal(o.talkReady, false);
+  assert.notEqual(o.face, 'smug');
+  o = t.until((x) => x.talkReady, 5);
+  assert.equal(o.face, 'smug');
+  // Out of the intro: never ready.
+  assert.equal(sim({}).frame().talkReady, false);
+});
+
 test('held or falling, Play Intro waits until he’s down', () => {
   const s = sim({ camera: { x: 0, z: 6 } });
   s.grab();

@@ -8,12 +8,13 @@
 //
 // Play Intro (BrainIn.dialogue, the box up while the intro runs) puts him in `talk`: he gets up
 // if he's sitting, walks in toward the middle of the view when he's out past TUNE.talkNear, and
-// turns to the camera; then each new box sets his face (blinking on neutral only) and plays its
-// animation: a gesture once, then Talk while its line types and Idle once it's up; a loop (Talk,
-// Think, Idle) holds; Sit sits him down and holds it, and the next gesture gets him up first;
-// none keeps what he's doing. He looks at the camera. Taps, grabs, floor taps, buttons, wandering
-// and sitting by himself wait meanwhile; once the dialogue's gone he's back to play (standing up
-// first if a box sat him down), not counted as alone all that time.
+// turns to the camera, keeping his own face meanwhile; then he's in place (BrainOut.talkReady:
+// main.js holds the line until it) and each new box sets his face (blinking on neutral only) and
+// plays its animation: a gesture once, then Talk while its line types and Idle once it's up; a
+// loop (Talk, Think, Idle) holds; Sit sits him down and holds it, and the next gesture gets him
+// up first; none keeps what he's doing. He looks at the camera. Taps, grabs, floor taps, buttons,
+// wandering and sitting by himself wait meanwhile; once the dialogue's gone he's back to play
+// (standing up first if a box sat him down), not counted as alone all that time.
 
 import { CLIPS, FACE_TRACK, GAIT } from './clips.js';
 import { createRng, between } from './rng.js';
@@ -673,7 +674,9 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
   function face() {
     const st = m.state;
     const d = m.input?.dialogue;
-    if (st === 'talk' && d) return { face: d.face, blink: d.face === 'neutral' ? 'normal' : 'none' };
+    // (The box's face comes with its line, once he's in place: getting there he keeps his own.)
+    if (st === 'talk' && d && m.talk?.phase === 'on')
+      return { face: d.face, blink: d.face === 'neutral' ? 'normal' : 'none' };
     const name = st === 'react' ? m.reaction : m.clip === 'gait' ? GAIT_FACE[st] : m.clip;
     const since = m.turning ? 0 : m.t - m.clipStart;
     const tr = FACE_TRACK[name] ?? FACE_TRACK.Idle;
@@ -751,6 +754,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       sitLabel: SITTING.has(st) ? 'Stand' : 'Sit',
       buttonsEnabled: st !== 'held' && st !== 'fall' && st !== 'talk',
       reaction: st === 'react' ? m.reaction : null,
+      talkReady: st === 'talk' && m.talk?.phase === 'on',
     };
   }
 

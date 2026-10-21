@@ -1,8 +1,10 @@
 // Play Intro, the invitation toy's chat (/invitation/), in a real browser on the production build,
 // on a phone (390×844, touch) and a desktop (1280×800): the button opens the chat box over the
 // stage (the toolbar rests out of sight, NEWT goes into his talk state and turns to the camera),
-// the line types out, a tap finishes it and the next tap goes on; Skip goes to the box with
-// replies, which show as buttons stacked mid-screen, and picking one goes where it leads; Auto
+// out near the edge the first line waits until he's walked in and turned (then its line, face and
+// gesture begin together), the line types out, a tap finishes it and the next tap goes on; Skip
+// goes to the box with replies, which show as buttons stacked mid-screen, and picking one goes
+// where it leads; Auto
 // goes on by itself; the Log lists the lines shown and closes again; each box's shot sends the
 // camera nearer or further (close nearer than wide); Escape asks before it skips the intro and a
 // second Escape ends it, Space and Enter go on; reduced motion shows each line at once and cuts
@@ -35,12 +37,12 @@ async function calm(page, path = '/invitation/?test&calm&seed=3') {
 const script = (page) => page.evaluate(() => window.__invitation.intro());
 const playIntro = (page) => page.getByRole('button', { name: 'Play Intro', exact: true });
 const box = (page) => page.locator('.inv-talk-box');
-/** Opens the intro and waits for its first box, with him turned and talking. */
+/** Opens the intro and waits for its first box, with him turned and talking (its line begun). */
 async function open(page, tap = false) {
   if (tap) await playIntro(page).tap();
   else await playIntro(page).click();
   await expect(box(page)).toBeVisible();
-  await until(page, (s) => s.dialogue && s.state === 'talk', 'the intro under way');
+  await until(page, (s) => s.dialogue && s.state === 'talk' && !s.dialogue.waiting, 'the intro under way');
 }
 /** A tap (or click) on empty space over the stage: off every button, over NEWT's head. */
 async function goOn(page, touch = false) {
@@ -189,6 +191,70 @@ test.describe('on a phone', () => {
     await goOn(page, true);
     await until(page, (x) => x.dialogue.seq === seq + 1, 'the next box');
     await expect(page.locator('[title]')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('out near the edge, the first line waits for him: walked in and turned, its line, face and gesture begin together', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    const intro = await script(page);
+    const first = intro.boxes.find((b) => b.id === intro.start);
+    // A floor tap out by the screen's right edge, level with his feet: he walks out there.
+    const feet = await page.evaluate(() => window.__invitation.screen('feet'));
+    const far = { x: 390 - 24, y: feet.y };
+    expect(await page.evaluate(({ x, y }) => window.__invitation.floorAt(x, y), far)).not.toBe(null);
+    await page.touchscreen.tap(far.x, far.y);
+    await until(page, (s) => s.state === 'walk', 'walking out');
+    await until(page, (s) => s.state === 'idle', 'there');
+    // Every frame from Play Intro on: what the screen shows against what he's doing.
+    await page.evaluate(() => {
+      const rec = (window.__rec = []);
+      const tick = () => {
+        const s = window.__invitation.snapshot();
+        const d = s.dialogue;
+        if (d)
+          rec.push({
+            phase: d.phase,
+            waiting: d.waiting,
+            id: d.id,
+            seq: d.seq,
+            shown: d.shown,
+            typed: d.typed,
+            clips: d.clips,
+            face: s.face,
+            text: document.querySelector('.inv-talk-typed')?.textContent ?? '',
+            next: !document.querySelector('.inv-talk-next')?.hidden,
+          });
+        if (rec.length < 2000) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await playIntro(page).tap();
+    await until(page, (s) => s.dialogue?.phase === 'walk', 'walking in');
+    // (A tap meanwhile finishes nothing: the line hasn't begun.)
+    await goOn(page, true);
+    const clip = clipFor(first.animation);
+    await until(
+      page,
+      (s) => s.dialogue?.phase === 'on' && (!clip || s.dialogue.clips.includes(clip)),
+      'in place, its gesture under way',
+    );
+    await until(page, (s) => s.dialogue.typed, 'its line typed');
+    const rec = await page.evaluate(() => window.__rec);
+    const on = rec.findIndex((r) => r.phase === 'on');
+    expect(on, 'he got into place').toBeGreaterThan(0);
+    expect(rec.slice(0, on).some((r) => r.phase === 'walk')).toBe(true);
+    for (const r of rec.slice(0, on)) {
+      expect(r.id, 'still the first box').toBe(first.id);
+      expect([r.shown, r.typed, r.text, r.next], `${r.phase}: nothing of the line yet`).toEqual([0, false, '', false]);
+      if (first.face !== 'neutral') expect(r.face, `${r.phase}: the box’s face waits`).not.toBe(first.face);
+    }
+    const after = rec.slice(on).filter((r) => r.seq === rec[on].seq);
+    expect(after[0].id).toBe(first.id);
+    if (clip) expect(after.at(-1).clips, 'its gesture played').toContain(clip);
+    expect(after.at(-1).face).toBe(first.face);
     expect(errors).toEqual([]);
   });
 
