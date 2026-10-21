@@ -269,11 +269,18 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   (content.json's `invitation`, which the admin edits, through `virtual:invitation-content`:
   `invitationContent` in `vite.config.js` inlines only that subtree, watches the file and leaves
   the subtree out of the other pages' copy of content.json; `invitationLines()`,
-  `speechSettings()`, `invitationDefaults()`, each with its fallback). That module is the one
+  `speechSettings()`, `invitationDefaults()` and `introScript()`, each with its fallback:
+  `introScript()` is the intro Play Intro opens, `introFrom` of content.json's
+  `invitation.intro`, a `types.js` `DialogueScript` with each box's flow spelled out (exactly
+  one of its choices, `end: true` or `next`: its own Next when that box is there, else the box
+  after it, the last box ending it), a face, animation or camera off the toy's lists as
+  neutral, none or keep, a box without an id or with one taken left out, and an intro with no
+  box left the toy's own short one, `FALLBACK_INTRO`). That module is the one
   import the page has beyond three.js, its loader, its font and its own modules
   (`test/invitationContent.test.mjs` holds it to that). Tests: `invitationSpeech`,
-  `invitationBubble`, `invitationContent`, and `admin/test/invitation.test.mjs` (the content
-  rules and the admin page).
+  `invitationBubble`, `invitationContent`, `invitationIntro` (the intro's content rules and
+  `introFrom`), and `admin/test/invitation.test.mjs` and `invitationIntro.test.mjs` (the
+  content rules and the admin page).
 - **The clips contract:** `src/invitation/clips.js` names NEWT's clips (lengths, loops, fades),
   the face each shows, the bones by their three.js names and the step lengths. `tools/newt.py`
   makes the clips in Blender and `test/invitationModel.test.mjs` holds the glb to the contract.

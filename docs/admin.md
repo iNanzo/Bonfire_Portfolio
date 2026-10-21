@@ -158,16 +158,45 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
   - **Lines:** what he says at each moment, under the same kinds. Add, remove, reorder or
     drag them; one is picked at random, never the one he just said, and a moment with no
     lines says nothing.
+  - **Intro:** the chat **Play Intro** opens (`invitation.intro`, `types.js`
+    `DialogueScript`): the **Speaker** on every box's name tab, the **Start Box** (every Play
+    Intro starts there) and the **Chat Boxes**, in order, dragged or moved with ↑/↓. Each
+    box's card is titled by its line, with its id, face, move, shot and where it goes under
+    it. A box has its **ID** (how Next and the choices point to it), a **Speaker Override**
+    (??? before he's said his name, say; empty: the intro's Speaker), its **Text** (typed
+    out letter by letter, up to 240 characters), a **Face** (every face he has; he still
+    blinks on Neutral), an **Animation** (a gesture that plays once, a loop that keeps
+    going, or None: as he was), a **Camera** (Close: head and shoulders, Medium: his whole
+    body, Wide: the default view, Keep: as it was), its **Next Box** (empty: the box after
+    it), **Ends the Intro**, an **Auto Wait** (seconds Auto waits once the line is typed; 0:
+    by its length) and up to 3 **Choices**, each a **Label** and the box it **Leads To**.
+    Choices come first, then End, then Next; the last box ends the intro. The start, a
+    Next and a choice's box are picked from the boxes there are, each by its id and how its
+    line starts; the lists follow a box renamed as it's typed, and one that's gone still
+    shows, marked "(No Such Box)", to be put right. **+ Add Box** makes a box with every
+    field and an id of its own (`box`, `box-2`…; edit it to something readable); **+ Add
+    Choice** goes once a box has 3. Boxes and choices can't be hidden (the toy has no way to
+    skip one): delete one instead. The toy reads it through `content.js` `introScript()`,
+    each box's flow spelled out; a broken part is mended on its own (a face off the list
+    is Neutral, a Next to nowhere the box after it), and an intro it can't play at all is
+    the toy's own short one (`FALLBACK_INTRO`).
   - **Checks:** at most 20 lines a moment, each up to 120 characters (a warning past 80,
-    where his bubble wraps a lot); every value within its list or range. The section is
-    optional, so content from before the toy still passes, and each of its three parts it
-    lacks shows **Start From the Toy’s Own**, which fills that part in with the toy's built-in
-    values (the built-in Default look, its speech settings, every moment with no lines yet)
-    to edit from (`INVITATION_STARTERS`, schema.js `STARTERS`). The toy reads it through
+    where his bubble wraps a lot); every value within its list or range. The intro's ids are
+    unique (lowercase letters, numbers and dashes), its start, every Next and every choice
+    a box that's there, its text up to 240 characters, a choice's label up to 60 and a
+    speaker up to 24, at most 3 choices a box, its faces, animations and cameras from the
+    toy's lists, and Auto between 0 and 15 seconds; a box nothing leads to, boxes that go
+    round with no choice to leave, and a Next or End a box's choices or End override are
+    warnings, each naming its box. The section is optional, so content from before the toy
+    still passes, and each of its four parts it lacks shows **Start From the Toy’s Own**,
+    which fills that part in with the toy's built-in values (the built-in Default look, its
+    speech settings, every moment with no lines yet, its own short intro) to edit from
+    (`INVITATION_STARTERS`, schema.js `STARTERS`). The toy reads it through
     `virtual:invitation-content` (`vite.config.js`), never `content.json` itself, and the
     other pages' copy of the content leaves it out. A change to its shape needs
     `npm run admin:deploy` after the merge. There's no live preview: open `/invitation/`.
-- **Hide / show** any entry (◉), and **reorder** any list by dragging ⋮⋮ or with ↑/↓.
+- **Hide / show** any entry (◉; not the invitation intro's boxes and choices), and
+  **reorder** any list by dragging ⋮⋮ or with ↑/↓.
 - **Rename** any sidebar page or section heading with ✎ (empty resets it). Renames are
   stored in `content.admin.labels`, which the site ignores. Help that names another
   page or section ("Interface › Starting Equipment") follows the rename.
