@@ -1,7 +1,8 @@
 // The invitation toy's intro (content.json `invitation.intro`, a DialogueScript: the chat Play
 // Intro opens). src/contentRules.js checks it, each problem at its path: the speaker, the start
 // and the boxes, nothing else; unique ids; the start, every Next and every choice leading to a
-// box that exists; text up to 240 characters; at most 3 choices; faces, animations and cameras
+// box that exists; text up to 240 characters (a warning past 100, the box's three lines on a
+// phone); 2 or 3 choices (one alone a warning); faces, animations and cameras
 // from the toy's own lists (the cameras the contract's DialogueShot); a box nothing leads to and
 // a loop with no choice to leave as warnings; content without an intro (or from before the toy)
 // still passes. src/invitation/content.js introScript() reads it the way the toy plays it, each
@@ -19,6 +20,7 @@ import {
   INTRO_CHOICES_MIN,
   INTRO_LABEL_MAX,
   INTRO_SPEAKER_MAX,
+  INTRO_TEXT_LONG,
   INTRO_TEXT_MAX,
   validateContent,
 } from '../src/contentRules.js';
@@ -192,6 +194,15 @@ test('text: up to 240 characters and not empty; choices: at most 3, each with a 
   const long = intro();
   long.boxes[2].text = 'x'.repeat(INTRO_TEXT_MAX);
   assert.deepEqual(errorsAt(long), [], `${INTRO_TEXT_MAX} characters fit`);
+  // Past the box's three lines on a phone (measured at 390×844): a warning, at the line.
+  assert.equal(INTRO_TEXT_LONG, 100);
+  assert.deepEqual(warningsAt(long), [at(2, '.text')]);
+  assert.match(problems(long).warnings[0].message, new RegExp(`${INTRO_TEXT_LONG}`));
+  const fits = intro();
+  fits.boxes[2].text = '🦎'.repeat(INTRO_TEXT_LONG);
+  assert.deepEqual(warningsAt(fits), [], `${INTRO_TEXT_LONG} characters fit the box`);
+  fits.boxes[2].text += '!';
+  assert.deepEqual(warningsAt(fits), [at(2, '.text')]);
   const emoji = intro();
   emoji.boxes[2].text = '🦎'.repeat(INTRO_TEXT_MAX);
   assert.deepEqual(errorsAt(emoji), [], 'characters, not UTF-16 units');

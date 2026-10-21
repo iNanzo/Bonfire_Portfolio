@@ -232,6 +232,11 @@ export const INTRO_CAMERAS = ['close', 'medium', 'wide', 'keep'];
 export const INTRO_ANIMATIONS = ['none', ...DIALOGUE_CLIPS];
 /** The longest line a chat box types out, in characters. */
 export const INTRO_TEXT_MAX = 240;
+/**
+ * A line longer than this (characters) outgrows the chat box's three lines on a phone (measured at
+ * 390×844: 100 fit, 110 take four), growing it up over NEWT: a warning.
+ */
+export const INTRO_TEXT_LONG = 100;
 /** The most choices a box offers (types.js DialogueBox: 2–3 replies). */
 export const INTRO_CHOICES_MAX = 3;
 /** The fewest that make a choice: one reply alone is only a tap (a warning). */
@@ -368,7 +373,8 @@ function lineText(line, q, check) {
 
 /**
  * The invitation's intro (types.js DialogueScript): the speaker, the start and the chat boxes,
- * each with its id (unique), its line (up to INTRO_TEXT_MAX characters), a face, an animation and
+ * each with its id (unique), its line (up to INTRO_TEXT_MAX characters, a warning past
+ * INTRO_TEXT_LONG), a face, an animation and
  * a camera from the toy's lists, and the optional speaker, Auto wait, Next, End and choices (at
  * most INTRO_CHOICES_MAX, each a label and the box it leads to; one alone is a warning); every
  * Next, choice and the start a box that's there. Then its flow as the toy plays it (introFlow): a
@@ -405,7 +411,12 @@ function invitationIntro(it, check) {
 
 /** How a box's own fields are checked, each when it's there (its id, Next and choices aside). */
 const BOX_CHECKS = {
-  text: (v, p, check) => introText(v, p, INTRO_TEXT_MAX, check),
+  text: (v, p, check) => {
+    introText(v, p, INTRO_TEXT_MAX, check);
+    const n = typeof v === 'string' ? Array.from(v.trim()).length : 0;
+    if (n > INTRO_TEXT_LONG && n <= INTRO_TEXT_MAX)
+      check.warn(check.at(p), `Over ${INTRO_TEXT_LONG} characters: on a phone it outgrows the box’s three lines.`);
+  },
   face: (v, p, check) => check.oneOf(v, FACE_NAMES, p),
   animation: (v, p, check) => check.oneOf(v, INTRO_ANIMATIONS, p),
   camera: (v, p, check) => check.oneOf(v, INTRO_CAMERAS, p),

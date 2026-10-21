@@ -24,6 +24,7 @@ import {
   INTRO_CAMERAS,
   INTRO_CHOICES_MAX,
   INTRO_CHOICES_MIN,
+  INTRO_TEXT_LONG,
   INTRO_TEXT_MAX,
   INVITATION_STYLES,
 } from '../../src/contentRules.js';
@@ -177,7 +178,7 @@ export const INVITATION_HELP = {
     'How Next and the choices point to this box. Lowercase letters, numbers and dashes, and no other box’s.',
   [`${BOX}.speaker`]:
     'Another name on the tab for this box alone, such as ??? before he’s said his. Empty: the intro’s Speaker.',
-  [`${BOX}.text`]: `What he says, typed out letter by letter. Up to ${INTRO_TEXT_MAX} characters; a short line reads best.`,
+  [`${BOX}.text`]: `What he says, typed out letter by letter. Up to ${INTRO_TEXT_MAX} characters; past ${INTRO_TEXT_LONG} it outgrows the box on a phone.`,
   [`${BOX}.face`]: 'His face while he says it. He still blinks on Neutral.',
   [`${BOX}.animation`]:
     'What he does as the line starts: a gesture plays once, then he talks on; a loop keeps going. None: as he was.',
