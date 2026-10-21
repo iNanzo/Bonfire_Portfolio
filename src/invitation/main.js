@@ -753,6 +753,8 @@ function start(s) {
     orbitTalk(cam, false, { cut: reducedMotion(), focus: { x: body.root.x, z: body.root.z } });
     backFromIntro = true;
     ui.setTalking(false);
+    // (The talk wasn't stepped through the intro: its idle clock starts again from now.)
+    talk.rest(t);
   }
 
   /**

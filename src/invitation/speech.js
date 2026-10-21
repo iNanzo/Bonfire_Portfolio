@@ -412,6 +412,16 @@ export function createTalk({ lines, speech, rng }) {
       }
       return { say: null, trigger: null };
     },
+    /**
+     * Back from a spell the page didn't step him through (the intro): the idle clock starts
+     * again from `t`, and no line is up, so he doesn't say an overdue idle line at once.
+     * @param {number} t
+     */
+    rest(t) {
+      m.t = t;
+      m.showing = null;
+      m.nextIdle = rollIdle(t);
+    },
     /** What it's doing (for ?test and the specs): the line up, when the idle clock comes round. */
     snapshot() {
       const showing = up();
