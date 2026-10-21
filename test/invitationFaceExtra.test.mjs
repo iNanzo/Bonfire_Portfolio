@@ -26,6 +26,8 @@ const GLB = file('newt.glb');
 const cellsOf = (faces) => Object.fromEntries(Object.entries(faces).map(([n, [u, v]]) => [n, [u * 2, v * 2]]));
 const BASE_CELLS = cellsOf(FACES);
 const EXTRA_CELLS = cellsOf(EXTRA_FACES);
+/** Brows told apart from lids by column (theirs tilt: their boxes overlap). */
+const TILTED = { tilted: true };
 const NAMES = /** @type {Array<'sad'|'angry'|'shy'|'smug'>} */ (Object.keys(EXTRA_CELLS));
 
 /** Every sheet's cells in a pixel image: each face's pixels. */
@@ -67,7 +69,7 @@ function smoothFaces({ data, info }, cells) {
       const i = ((cy * n + y) * info.width + cx * n + x) * 4;
       return kindOf([data[i], data[i + 1], data[i + 2]]);
     };
-    out[name] = { kind, n, ...partsOf(n, n, kind, 40) };
+    out[name] = { kind, n, ...partsOf(n, n, kind, 40, TILTED) };
   }
   return out;
 }
@@ -190,7 +192,7 @@ test('the pixel dialogue faces are their smooth faces scaled down: the eye, the 
     const ty = 1 + 0.04 * h;
     for (const name of NAMES) {
       const tag = `${w} px ${name}`;
-      const p = cellParts(cells[name]);
+      const p = cellParts(cells[name], TILTED);
       const s = smooth[name];
       const n = s.n;
       const near = (got, want, tol, what) =>
@@ -220,7 +222,7 @@ test('the pixel dialogue faces by the first four’s rules: a lid over the whole
       const tag = `${sheet.w} px ${name}`;
       const cell = cells[name];
       const { w, h } = cell;
-      const p = cellParts(cell);
+      const p = cellParts(cell, TILTED);
       const { kind } = p;
       const e = p.eye;
       assert.ok(e.px.length >= 2, `${tag}: an eye`);
@@ -287,7 +289,7 @@ test('the pixel dialogue faces read: sad’s brows up toward the middle and its 
   for (const { sheet, cells } of await allSheets()) {
     const { w, h } = sheet;
     if (w < 8) continue;
-    const p = Object.fromEntries(Object.entries(cells).map(([n, c]) => [n, cellParts(c)]));
+    const p = Object.fromEntries(Object.entries(cells).map(([n, c]) => [n, cellParts(c, TILTED)]));
     const tag = (name) => `${w} px ${name}`;
     /** The brow's top row in its first and last columns. */
     const ends = (b) => [
@@ -338,7 +340,7 @@ test('the pixel dialogue faces read: sad’s brows up toward the middle and its 
       const pt = pupil.t;
       const px = pupil.px.find(([, y]) => y === pt)[0];
       assert.equal(f.kind(px, pt - 1), 'grey', `${tag('shy')}: grey over the pupil (looking down)`);
-      const np = cellParts(cells.neutral).eye.px.filter(
+      const np = cellParts(cells.neutral, TILTED).eye.px.filter(
         ([x, y]) => p.neutral.kind(x, y) === 'ink' && ['white', 'iris'].includes(p.neutral.kind(x - 1, y)),
       );
       assert.ok(pt > Math.min(...np.map(([, y]) => y)), `${tag('shy')}: the pupil lower than neutral’s`);
@@ -370,7 +372,7 @@ test('the pixel dialogue faces grow steadily with the cell: each size’s eye at
   for (const name of NAMES) {
     let was = null;
     for (const { sheet, cells } of sheets) {
-      const e = cellParts(cells[name]).eye;
+      const e = cellParts(cells[name], TILTED).eye;
       const now = { w: e.r - e.l + 1, h: e.b - e.t + 1 };
       if (was) {
         assert.ok(now.w >= was.w, `${sheet.w} px ${name}: the eye ${now.w} wide after ${was.w}`);

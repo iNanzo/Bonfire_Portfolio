@@ -85,8 +85,9 @@ export const NEUTRAL = {
 };
 
 /**
- * The four new faces. Sad: the brows tilted up toward the middle, the lid drooping toward his ear
- * (its hook following it down), the eyes a little lower, the mouth turned down. Angry: the brows
+ * The four new faces. Sad: the brows tilted up toward the middle (low enough to show under his
+ * fringe, which hides his neutral brows), the lid drooping well down toward his ear (its hook
+ * following it down), the eyes a little lower, the mouth turned down. Angry: the brows
  * down and in, heavier; the lid lower toward the middle and the white's bottom raised (narrowed
  * eyes: no lash, the iris is over it), a smaller pupil; a tight mouth, flat with its ends turned down. Shy: the brows raised a
  * little toward the middle, a softer lid, the eyes looking down (no lash: the iris is over it), a
@@ -97,48 +98,48 @@ export const NEUTRAL = {
  */
 export const EXTRA = {
   sad: {
-    brow: { pts: curve([105, 264], [200, 274], [295, 288], 8), w: 9 },
+    brow: { pts: curve([105, 279], [200, 287], [295, 298], 8), w: 9 },
     lid: {
       pts: [
         [90, 318],
         [120, 314],
-        [150, 312],
-        [200, 312.5],
-        [250, 316],
-        [290, 322],
-        [318, 329],
-        [332, 334],
+        [150, 313],
+        [200, 314.5],
+        [250, 320],
+        [290, 329],
+        [318, 338],
+        [334, 345],
       ],
-      w: 14,
+      w: 15,
     },
     hook: {
       pts: [
-        [324, 331],
-        [345, 347],
+        [324, 341],
+        [344, 357],
       ],
-      w: 11,
+      w: 12,
     },
     white: NEUTRAL.white,
-    iris: { ...NEUTRAL.iris, cy: 340, band: 361 },
-    pupil: { ...NEUTRAL.pupil, cy: 335 },
+    iris: { ...NEUTRAL.iris, cy: 344, band: 365 },
+    pupil: { ...NEUTRAL.pupil, cy: 339 },
     lash: NEUTRAL.lash,
     mouth: { pts: [[-6, 453], ...curve([0, 453], [20, 453], [40, 468], 8)], w: 5 },
     blush: null,
   },
   angry: {
-    brow: { pts: curve([98, 303], [200, 289], [294, 276], 8), w: 11 },
+    brow: { pts: curve([98, 308], [200, 292], [294, 278], 8), w: 11 },
     lid: {
       pts: [
-        [90, 325],
-        [120, 321],
-        [150, 318],
-        [200, 316],
-        [250, 315],
+        [90, 333],
+        [120, 327],
+        [150, 322],
+        [200, 318],
+        [250, 316],
         [290, 315],
         [318, 317],
         [330, 319],
       ],
-      w: 14,
+      w: 15,
     },
     hook: {
       pts: [

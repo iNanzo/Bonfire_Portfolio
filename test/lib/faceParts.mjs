@@ -63,9 +63,16 @@ export function box(points) {
  * A face's parts in a w × h grid of kinds (kind(x, y)): the brow (the topmost ink, a line apart
  * from the eye), the eye (the rest of the ink, the white and the iris), the mouth (in the lowest
  * quarter) and the blush, each as its pixels and box; ink, white and iris in
- * patches of `speck` pixels or fewer left out (the smooth sheet's antialiased edges).
+ * patches of `speck` pixels or fewer left out (the smooth sheet's antialiased edges). With
+ * `tilted` (a tilted brow over a tilted lid, whose boxes overlap: the dialogue faces), the brow
+ * need only be over the next ink in every column they share.
+ * @param {number} w
+ * @param {number} h
+ * @param {(x: number, y: number) => string} kind
+ * @param {number} [speck]
+ * @param {{tilted?: boolean}} [opts]
  */
-export function partsOf(w, h, kind, speck = 0) {
+export function partsOf(w, h, kind, speck = 0, { tilted = false } = {}) {
   const low = Math.floor(h * 0.75);
   const ink = components(w, h, (x, y) => kind(x, y) === 'ink')
     .filter((c) => c.px.length > speck)
@@ -75,7 +82,9 @@ export function partsOf(w, h, kind, speck = 0) {
     .flatMap((c) => c.px);
   const litTop = Math.min(h, ...lit.map(([, y]) => y));
   // (The brow: the topmost ink when there's more below it and it's clear of the eye's white.)
-  const brow = ink.length >= 2 && ink[0].b < litTop && ink[0].b < ink[1].t ? ink[0] : null;
+  const over = (a, b) =>
+    a.b < b.t || (tilted && b.px.every(([x, y]) => a.px.every(([ax, ay]) => ax !== x || ay < y - 1)));
+  const brow = ink.length >= 2 && ink[0].b < litTop && over(ink[0], ink[1]) ? ink[0] : null;
   const eyePx = [...ink.filter((c) => c !== brow).flatMap((c) => c.px), ...lit];
   const mouthPx = pixels(w, h, (x, y) => y >= low && kind(x, y) === 'mouth');
   const blushPx = pixels(w, h, (x, y) => kind(x, y) === 'blush');
@@ -107,10 +116,10 @@ export async function smoothSheet(glb) {
 }
 
 /** A pixel cell's kinds, and its parts. */
-export function cellParts({ px, w, h }) {
+export function cellParts({ px, w, h }, opts = {}) {
   const kinds = px.map(kindOf);
   const kind = (x, y) => (x >= 0 && y >= 0 && x < w && y < h ? kinds[y * w + x] : 'skin');
-  return { kind, ...partsOf(w, h, kind) };
+  return { kind, ...partsOf(w, h, kind, 0, opts) };
 }
 
 /**
