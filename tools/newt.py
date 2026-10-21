@@ -1,8 +1,9 @@
 """NEWT's clips for the invitation toy: the user's low-poly chibi, animated.
 
-Builds the 11 clips of src/invitation/clips.js (Idle, Walk, Run, Wave, Spook, Held, Fall, Land,
-SitDown, Sit, StandUp) on NEWT's rig as one slotted Action each, and exports the rig, its meshes
-and every clip as a binary glTF for three.js.
+Builds the 17 clips of src/invitation/clips.js (Idle, Walk, Run, Wave, Spook, Held, Fall, Land,
+SitDown, Sit, StandUp, and round 15's talking gestures Talk, Nod, Shrug, Point, Think, Cheer) on
+NEWT's rig as one slotted Action each, and exports the rig, its meshes and every clip as a binary
+glTF for three.js.
 
 Run it either way:
   npm run model -- newt
@@ -20,7 +21,7 @@ Run it either way:
       the export and the save; NEWT_POSE = 'Sit' (a clip) with NEWT_FRAME shows a frame, keys none.
 
 Outputs:
-  public/models/newt.glb               the rig (17 bones), the meshes, the 11 clips; WebP, no Draco
+  public/models/newt.glb               the rig (17 bones), the meshes, the 17 clips; WebP, no Draco
   <source dir>/NEWT_animated.blend     the file with the Actions (never over another NEWT_*.blend)
 
 The rig (armature object "Hip", T-pose rest, facing -Y, origin on the floor between the feet,
@@ -40,7 +41,7 @@ Angles are degrees. Pitch + leans forward, roll + tips toward his left (+X), yaw
 face toward his left. Values given for L mirror onto R by the same numbers.
 
 Each clip is a table of (frame, pose) key poses, or a function of the frame for the cycles (Walk
-and Run from a few step parameters). Every frame is keyed: a table's key poses are eased number by
+and Run from a few step parameters; Idle, Held, Fall, Sit, Talk and Think from a few waves). Every frame is keyed: a table's key poses are eased number by
 number along a monotone cubic (tween), so the legs' IK runs on each frame and a planted foot stays
 put. Loops end on an exact copy of frame 0; quaternion signs stay continuous. Held pins the collar
 (the Neck bone's head) where it rests.
@@ -67,6 +68,12 @@ CLIPS = {
     'SitDown': (24, False),
     'Sit': (72, True),
     'StandUp': (24, False),
+    'Talk': (48, True),
+    'Nod': (18, False),
+    'Shrug': (24, False),
+    'Point': (30, False),
+    'Think': (48, True),
+    'Cheer': (30, False),
 }
 ORDER = [
     'Bone', 'Bone.001', 'Chest', 'Neck', 'Neck.001',
@@ -791,6 +798,226 @@ def sit(t):
     return p
 
 
+# ---------------------------------------------------------------------------------------------
+# Round 15's talking gestures for the dialogue (clips.js DIALOGUE_CLIPS). His head is huge and
+# hangs low over his shoulders, so a raised hand goes out beside it (Cheer, Shrug) or stays
+# under its chin and in front of it (Talk, Point, Think); the hands keep at least 0.1 from the
+# head, hair and cap (Think's comes up under the chin, 0.05), measured on the skinned meshes
+# (test/invitationModel.test.mjs). The one-shots start and end on IDLE.
+
+
+def pulse(t, at, width):
+    """A bump of height 1 at `at` (0..1 of a loop), `width` wide, wrapping round the loop."""
+    d = (t - at + 0.5) % 1.0 - 0.5
+    return math.exp(-((d / width) ** 2))
+
+
+def arm_blend(a, b, k):
+    """An arm k of the way from pose a to pose b (each an arm dict)."""
+    a, b = dict(ARM_DEFAULT, **a), dict(ARM_DEFAULT, **b)
+    return {key: lerp(a[key], b[key], k) for key in ARM_DEFAULT}
+
+
+def nudge(arm, upper=(0, 0), lower=(0, 0), shoulder=(0, 0), twist2=0):
+    """An arm with some of its numbers moved by the given amounts."""
+    a = dict(ARM_DEFAULT, **arm)
+    return dict(
+        a,
+        upper=tuple(x + y for x, y in zip(a['upper'], upper)),
+        lower=tuple(x + y for x, y in zip(a['lower'], lower)),
+        shoulder=tuple(x + y for x, y in zip(a['shoulder'], shoulder)),
+        twist2=a['twist2'] + twist2,
+    )
+
+
+# Talk's raised hand: the elbow a little forward, the forearm out level in front of his belly,
+# where the high camera sees it under the head's front.
+TALK_R = {'shoulder': (4, 6), 'upper': (46, 20), 'lower': (134, 18), 'twist': 0, 'twist2': 20}
+TALK_L = {'shoulder': (4, 6), 'upper': (40, 20), 'lower': (124, 20), 'twist': 0, 'twist2': 20}
+
+
+def talk(t):
+    """Talk at t (0..1 of its loop): chatting like an Uma Musume girl does. The right hand comes up
+    in front of him and beats twice on his words (t 0.12 and 0.32), then the left takes a turn
+    (t 0.68) while the right settles half down; his head nods a little on each beat, tilts from
+    side to side and his weight shifts once a loop."""
+    tau = 2 * math.pi
+    up_r = 0.62 + 0.38 * math.cos(tau * (t - 0.22))
+    up_l = 0.85 * (0.5 + 0.5 * math.cos(tau * (t - 0.7)))
+    beat_r = pulse(t, 0.12, 0.06) + pulse(t, 0.32, 0.06)
+    beat_l = pulse(t, 0.68, 0.07)
+    beat = beat_r + beat_l
+    sw = math.sin(tau * t)
+    br = math.sin(tau * 2 * t)
+    p = merge(
+        IDLE,
+        hips={'loc': (0, 0, -0.06 - 0.02 * br), 'rot': (0, 2.0 * sw, 0)},
+        chest=(2 + 1.5 * br + 2 * beat, -1.0 * sw, 4 * math.sin(tau * (t - 0.2))),
+        neck=(-2, 0, 0),
+        head=(-7 + 5 * beat, -6 * math.sin(tau * (t - 0.1)), 5 * math.sin(tau * (t - 0.15))),
+    )
+    p['armR'] = nudge(arm_blend(ARM_RELAXED, TALK_R, up_r), upper=(4 * beat_r, 8 * beat_r), lower=(10 * beat_r, 22 * beat_r))
+    p['armL'] = nudge(arm_blend(ARM_RELAXED, TALK_L, up_l), upper=(4 * beat_l, 8 * beat_l), lower=(10 * beat_l, 22 * beat_l))
+    return p
+
+
+# Think's hands: the right elbow tucked in front of his belly, the forearm up so the hand sits
+# under the front of his chin; the left forearm across his middle under the right elbow.
+THINK_R = {'shoulder': (6, 10), 'upper': (50, 10), 'lower': (146, -10), 'twist': 0, 'twist2': 0}
+THINK_L = {'shoulder': (2, 8), 'upper': (38, 8), 'lower': (86, -55), 'twist': 0, 'twist2': 0}
+
+
+def think(t):
+    """Think at t (0..1): the hand to his chin, the head tilted and looking up to one side,
+    swaying a little side to side once a loop, the finger tapping the chin twice."""
+    tau = 2 * math.pi
+    sw = math.sin(tau * t)
+    tap = max(0.0, math.sin(tau * 2 * t)) ** 2
+    p = merge(
+        IDLE,
+        hips={'loc': (0, 0, -0.06), 'rot': (0, 2.5 * sw, 0)},
+        chest=(-1, -1.5 * sw, -4),
+        neck=(-3, -3, 0),
+        head=(-9 + 1.5 * tap, -11 - 3 * sw, 10 + 2 * sw),
+    )
+    p['armR'] = nudge(THINK_R, lower=(-5 * tap, 0))
+    p['armL'] = THINK_L
+    return p
+
+
+NOD_DOWN = merge(
+    IDLE,
+    hips={'loc': (0, 0, -0.14), 'rot': (2, 0, 0)},
+    chest=(6, 0, 0),
+    neck=(4, 0, 0),
+    head=(17, 0, 0),
+    armL=merge(ARM_RELAXED, upper=(10, 19), lower=(24, 15)),
+    armR=merge(ARM_RELAXED, upper=(10, 19), lower=(24, 15)),
+)
+
+SHRUG_R = {'shoulder': (30, 4), 'upper': (12, 32), 'lower': (85, 60), 'twist': 0, 'twist2': -50}
+SHRUG = merge(
+    IDLE,
+    hips={'loc': (0, 0, -0.04), 'rot': (-2, 0, 0)},
+    chest=(-4, 0, 0),
+    neck=(-2, 0, 0),
+    head=(-6, -11, -4),
+    armL=SHRUG_R,
+    armR=SHRUG_R,
+)
+
+POINT_ARM = {'shoulder': (0, 12), 'upper': (110, 30), 'lower': (124, 30), 'twist': 0, 'twist2': 0}
+POINT = merge(
+    IDLE,
+    hips={'loc': (0, 0, -0.06), 'rot': (0, 2, -4)},
+    chest=(3, -2, -6),
+    neck=(-3, 0, 0),
+    head=(-10, -7, -6),
+    armR=POINT_ARM,
+    armL=merge(ARM_RELAXED, upper=(-6, 24), lower=(8, 22)),
+)
+
+CHEER_UP = {'shoulder': (20, 0), 'upper': (148, 63), 'lower': (165, 42), 'twist': 0, 'twist2': 0}
+CHEER_DOWN = {'shoulder': (-4, 0), 'upper': (-12, 22), 'lower': (8, 16), 'twist': 0, 'twist2': 0}
+
+
+def gesture_tables():
+    """The one-shot gestures' key-pose tables."""
+    return {
+        'Nod': keys(
+            (0, IDLE),
+            (3, merge(IDLE, chest=(1, 0, 0), head=(-4, 0, 0))),  # a small lift first
+            (7, NOD_DOWN),
+            (10, merge(IDLE, hips={'loc': (0, 0, -0.04), 'rot': (0, 0, 0)}, head=(-3, 0, 0))),
+            (13, merge(IDLE, chest=(3, 0, 0), head=(6, 0, 0))),  # and a smaller second nod
+            (18, IDLE),
+        ),
+        'Shrug': keys(
+            (0, IDLE),
+            (4, merge(IDLE, hips={'loc': (0, 0, -0.1), 'rot': (0, 0, 0)}, armL=arm_blend(ARM_RELAXED, SHRUG_R, 0.3), armR=arm_blend(ARM_RELAXED, SHRUG_R, 0.3))),
+            (8, SHRUG),
+            (12, merge(SHRUG, armL=nudge(SHRUG_R, shoulder=(6, 0), lower=(0, 6)), armR=nudge(SHRUG_R, shoulder=(6, 0), lower=(0, 6)), head=(-7, -13, -4))),
+            (16, SHRUG),
+            (20, merge(IDLE, head=(-2, -3, 0), armL=arm_blend(ARM_RELAXED, SHRUG_R, 0.2), armR=arm_blend(ARM_RELAXED, SHRUG_R, 0.2))),
+            (24, IDLE),
+        ),
+        'Point': keys(
+            (0, IDLE),
+            (5, merge(  # the wind-up: the hand drawn back to his chest, turning away
+                IDLE,
+                hips={'loc': (0, 0, -0.1), 'rot': (0, -1, 3)},
+                chest=(4, 1, 5),
+                head=(0, 2, 3),
+                armR={'shoulder': (6, -4), 'upper': (12, 30), 'lower': (140, 14), 'twist': 0, 'twist2': 0},
+            )),
+            (9, POINT),
+            (12, merge(POINT, armR=nudge(POINT_ARM, upper=(-6, 0), lower=(-14, 0)), head=(-5, -6, -6))),  # two beats
+            (15, POINT),
+            (18, merge(POINT, armR=nudge(POINT_ARM, upper=(-6, 0), lower=(-14, 0)), head=(-5, -6, -6))),
+            (21, POINT),
+            (26, merge(IDLE, armR=arm_blend(ARM_RELAXED, POINT_ARM, 0.2), head=(-2, -2, -2))),
+            (30, IDLE),
+        ),
+        'Cheer': keys(
+            (0, IDLE),
+            (4, merge(  # the crouch before the hop, the fists down
+                IDLE,
+                hips={'loc': (0, 0, -0.34), 'rot': (8, 0, 0)},
+                chest=(8, 0, 0),
+                head=(2, 0, 0),
+                armL=CHEER_DOWN,
+                armR=CHEER_DOWN,
+            )),
+            (7, merge(
+                IDLE,
+                hips={'loc': (0, 0, 0.22), 'rot': (-2, 0, 0)},
+                chest=(-3, 0, 0),
+                head=(-6, 0, 0),
+                armL=arm_blend(CHEER_DOWN, CHEER_UP, 0.75),
+                armR=arm_blend(CHEER_DOWN, CHEER_UP, 0.75),
+                legL={'at': (0.62, 0.08, ANKLE + 0.26), 'pitch': 20},
+                legR={'at': (0.62, 0.08, ANKLE + 0.26), 'pitch': 20},
+            )),
+            (10, merge(  # the top of the hop, the fists up beside his head
+                IDLE,
+                hips={'loc': (0, 0, 0.5), 'rot': (-5, 0, 0)},
+                chest=(-6, 0, 0),
+                neck=(-4, 0, 0),
+                head=(-8, 0, 0),
+                armL=CHEER_UP,
+                armR=CHEER_UP,
+                legL={'at': (0.64, 0.1, ANKLE + 0.52), 'pitch': 30, 'knee': (0.4, -1, 0)},
+                legR={'at': (0.64, 0.1, ANKLE + 0.52), 'pitch': 30, 'knee': (0.4, -1, 0)},
+            )),
+            (12, merge(
+                IDLE,
+                hips={'loc': (0, 0, 0.36), 'rot': (-4, 0, 0)},
+                chest=(-5, 0, 0),
+                neck=(-4, 0, 0),
+                head=(-8, 0, 0),
+                armL=nudge(CHEER_UP, upper=(4, 0)),
+                armR=nudge(CHEER_UP, upper=(4, 0)),
+                legL={'at': (0.63, 0.09, ANKLE + 0.38), 'pitch': 24},
+                legR={'at': (0.63, 0.09, ANKLE + 0.38), 'pitch': 24},
+            )),
+            (15, merge(  # lands, the fists pumped down a little
+                IDLE,
+                hips={'loc': (0, 0, -0.26), 'rot': (6, 0, 0)},
+                chest=(5, 0, 0),
+                head=(-2, 0, 0),
+                armL=nudge(CHEER_UP, upper=(-22, 4), lower=(-30, 4)),
+                armR=nudge(CHEER_UP, upper=(-22, 4), lower=(-30, 4)),
+            )),
+            (18, merge(IDLE, hips={'loc': (0, 0, -0.02), 'rot': (-3, 0, 0)}, chest=(-4, 0, 0), head=(-7, 0, 0), armL=CHEER_UP, armR=CHEER_UP)),
+            (22, merge(IDLE, hips={'loc': (0, 0, -0.04), 'rot': (-2, 0, 0)}, chest=(-3, 0, 0), head=(-6, 0, 0), armL=nudge(CHEER_UP, upper=(-6, 0), lower=(-8, 0)), armR=nudge(CHEER_UP, upper=(-6, 0), lower=(-8, 0)))),
+            (26, merge(IDLE, head=(-2, 0, 0), armL=arm_blend(ARM_RELAXED, CHEER_UP, 0.25), armR=arm_blend(ARM_RELAXED, CHEER_UP, 0.25))),
+            (30, IDLE),
+        ),
+    }
+
+
+TABLES.update(gesture_tables())
+
 CYCLES = {
     'Idle': idle,
     'Walk': lambda t: gait(t, WALK),
@@ -798,6 +1025,8 @@ CYCLES = {
     'Held': held,
     'Fall': fall,
     'Sit': sit,
+    'Talk': talk,
+    'Think': think,
 }
 
 

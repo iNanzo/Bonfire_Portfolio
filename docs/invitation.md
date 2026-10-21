@@ -277,6 +277,9 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
 - **The clips contract:** `src/invitation/clips.js` names NEWT's clips (lengths, loops, fades),
   the face each shows, the bones by their three.js names and the step lengths. `tools/newt.py`
   makes the clips in Blender and `test/invitationModel.test.mjs` holds the glb to the contract.
+  The dialogue's talking gestures (Talk and Think loop; Nod, Shrug, Point and Cheer start and
+  end on Idle's pose) keep the hands and sleeves clear of his head, hair and cap, which the test
+  measures on the skinned meshes frame by frame.
 - **The model:** `npm run model -- newt` rebuilds `public/models/newt.glb` from `tools/newt.py`
   with headless Blender (`$NEWT_BLEND` names the .blend; it defaults to the user's
   `NEWT_optimized.blend`, which is never overwritten).
