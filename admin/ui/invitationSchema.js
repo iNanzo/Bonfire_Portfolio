@@ -14,7 +14,8 @@
 // are picked from the boxes there are (one that's gone still shows, marked, so it can be put
 // right), the lists remade as a box is renamed (INVITATION_OPTIONS_FROM); Face, Animation and
 // Camera from the toy's lists; Auto as a slider. A new box comes with every field
-// (INVITATION_TEMPLATES: the form shows only the fields an entry has), boxes and choices can't
+// (INVITATION_TEMPLATES), and a box without some shows them all the same (INVITATION_FIELDS:
+// a hand-written box can be filled in), boxes and choices can't
 // be hidden (INVITATION_NO_HIDING: the toy has no way to skip one), a box has at most 3 choices
 // (INVITATION_MAX_ENTRIES), and each card says under its line what the box does
 // (INVITATION_CARD_META: its id, face, move, shot and where it goes).
@@ -349,6 +350,15 @@ const introBox = (o) => ({
 export const INVITATION_TEMPLATES = {
   'invitation.intro.boxes': () => introBox({}),
   [`${BOX}.choices`]: () => ({ label: '', next: '' }),
+};
+/**
+ * Every field an entry shows, whatever it holds: a box written by hand or copied (content.js
+ * FALLBACK_INTRO leaves its optional fields out) shows the ones it lacks too, each as the toy
+ * plays it, blank where the rules want a pick (its face, animation and camera), so it can be
+ * filled in. The draft changes only once one is edited.
+ */
+export const INVITATION_FIELDS = {
+  [BOX]: () => ({ ...introBox({}), face: '', animation: '', camera: '' }),
 };
 /** Lists whose entries can't be hidden (◉): the toy has no way to skip a box or a choice. */
 export const INVITATION_NO_HIDING = ['invitation.intro.boxes', `${BOX}.choices`];

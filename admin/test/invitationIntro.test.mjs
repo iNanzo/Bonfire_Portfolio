@@ -4,7 +4,8 @@
 // Auto wait, Next box, Choices (up to 3, each a label and the box it leads to), End and a
 // Speaker override, every field named and helped. Boxes are picked from a list of the boxes
 // there are (one that's gone still shows, marked); a new box comes with every field and an id of
-// its own; boxes and choices can't be hidden (the toy has no way to skip one); a box's card is
+// its own, and one written without some shows them all the same, to fill in; one reply alone is a
+// warning; boxes and choices can't be hidden (the toy has no way to skip one); a box's card is
 // titled by its line, with its id, face, move, shot and where it goes under it; the search finds
 // a box's fields under its line. Rendered on a stand-in document. The words are the test's own.
 import { test } from 'node:test';
@@ -407,6 +408,42 @@ test('choices: + Add Choice until there are 3; one alone is a warning, its help 
     [],
   );
   assert.ok(r1.warnings.some((w) => w.path === 'invitation.intro.boxes[1].choices'));
+});
+
+test('a box missing fields (written by hand, or copied) shows them all, to fill in; the draft changes only on an edit', () => {
+  const d = draftWith();
+  const boxes = d.invitation.intro.boxes;
+  // (Box a with only what it needs; box d without a face either.)
+  boxes[0] = { id: 'a', text: 'First of all.', face: 'neutral', animation: 'Talk', camera: 'keep' };
+  delete boxes[3].face;
+  assert.ok(
+    validateContent(d).errors.some((e) => e.path === 'invitation.intro.boxes[3].face'),
+    'the missing face is an error…',
+  );
+  const before = JSON.stringify(d);
+  const r = render(d);
+  assert.equal(JSON.stringify(d), before, 'rendering it changes nothing');
+  for (const k of Object.keys(box('x'))) assert.ok(r.byPath(`invitation.intro.boxes[0].${k}`), `box a shows its ${k}`);
+  const face = fieldControl(r, 'invitation.intro.boxes[3].face', 'select');
+  assert.ok(face, '…and it has a field to put it right in');
+  assert.equal(face.value, '', 'blank: no face picked yet');
+  // + Add Choice on box a, which had no choices at all: the reply lands in the draft.
+  const add = r
+    .byPath('invitation.intro.boxes[0].choices')
+    .querySelectorAll('button')
+    .find((n) => n.textContent === '+ Add Choice');
+  assert.ok(add, '+ Add Choice');
+  add.listeners.click();
+  assert.deepEqual(boxes[0].choices, [{ label: '', next: '' }]);
+  assert.deepEqual(r.calls.at(-1), { rerender: true });
+  // A field it lacked, edited: the value lands on the box.
+  const end = fieldControl(r, 'invitation.intro.boxes[0].end', 'input');
+  end.checked = true;
+  (end.listeners.change ?? end.listeners.input)();
+  assert.equal(boxes[0].end, true);
+  face.value = 'sad';
+  face.listeners.change();
+  assert.equal(boxes[3].face, 'sad');
 });
 
 test('renaming a box, or rewriting its line, updates every list of boxes on the page as you type', () => {

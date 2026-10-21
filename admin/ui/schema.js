@@ -32,6 +32,7 @@ import { adminHelp, adminLabels, meta } from '../../src/settingsMap.js';
 import {
   INVITATION_ADD_LABELS,
   INVITATION_CARD_META,
+  INVITATION_FIELDS,
   INVITATION_HELP,
   INVITATION_KEYWORDS,
   INVITATION_LABELS,
@@ -982,6 +983,13 @@ export const TEMPLATES = {
   // (The invitation intro's chat boxes and their choices.)
   ...INVITATION_TEMPLATES,
 };
+
+/**
+ * Every field an entry of these shows, by its pattern: () → each field with the value one it
+ * lacks shows as (the form adds it to the draft only once it's edited). Other entries show the
+ * fields they have.
+ */
+export const FIELDS = { ...INVITATION_FIELDS };
 
 /**
  * A section content.json doesn't have yet that can start from built-in values: (draft) → its

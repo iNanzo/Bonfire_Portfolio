@@ -23,6 +23,7 @@ import {
   ADD_LABELS,
   CARD_META,
   COLUMNS,
+  FIELDS,
   FIXED,
   HELP,
   LABELS,
@@ -205,10 +206,20 @@ let uid = 0;
 function renderObject(obj, path, ctx, level = 3) {
   const box = el('div', { class: 'fields' });
   if (typeof obj.todo === 'string') box.append(renderTodo(obj, path, ctx));
-  const keys = Object.keys(obj).filter((k) => k !== 'hidden' && k !== 'todo');
+  // (Where FIELDS lists an entry's fields, each shows, one it lacks as FIELDS has it: in order,
+  // its own others after them.)
+  const all = FIELDS[patternOf(path)]?.();
+  const keys = (all ? [...Object.keys(all), ...Object.keys(obj).filter((k) => !(k in all))] : Object.keys(obj)).filter(
+    (k) => k !== 'hidden' && k !== 'todo',
+  );
+  /** @param {string} k @param {number} lvl */
+  const field = (k, lvl) =>
+    k in obj
+      ? renderField(obj[k], [...path, k], ctx, undefined, lvl)
+      : renderField(all?.[k], [...path, k], adding(ctx, obj, k, all?.[k]), undefined, lvl);
   const groups = subgroupsOf(patternOf(path), keys);
   if (!groups) {
-    for (const k of keys) box.append(renderField(obj[k], [...path, k], ctx, undefined, level));
+    for (const k of keys) box.append(field(k, level));
     return box;
   }
   for (const g of groups) {
@@ -222,12 +233,28 @@ function renderObject(obj, path, ctx, level = 3) {
         el(
           'div',
           { class: 'fields' },
-          g.keys.map((k) => renderField(obj[k], [...path, k], ctx, undefined, heading ? level + 1 : level)),
+          g.keys.map((k) => field(k, heading ? level + 1 : level)),
         ),
       ),
     );
   }
   return box;
+}
+
+/**
+ * The page's ctx for a field `obj` lacks, shown with `value`: a list or group there joins `obj`
+ * the first time it changes (+ Add Choice on a box with no choices); a value lands through
+ * update() on its own.
+ * @param {*} ctx @param {*} obj @param {string} key @param {*} value
+ */
+function adding(ctx, obj, key, value) {
+  if (value === null || typeof value !== 'object') return ctx;
+  const changed = (o) => {
+    if (!(key in obj)) obj[key] = value;
+    ctx.changed(o);
+  };
+  // (Everything else is the page's own ctx: what's read and what's set, ctx.focus included.)
+  return new Proxy(ctx, { get: (t, p) => (p === 'changed' ? changed : Reflect.get(t, p)) });
 }
 
 /**

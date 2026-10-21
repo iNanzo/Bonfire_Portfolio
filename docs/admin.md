@@ -174,8 +174,10 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     Next and a choice's box are picked from the boxes there are, each by its id and how its
     line starts; the lists follow a box renamed as it's typed, and one that's gone still
     shows, marked "(No Such Box)", to be put right. **+ Add Box** makes a box with every
-    field and an id of its own (`box`, `box-2`…; edit it to something readable); **+ Add
-    Choice** goes once a box has 3. Boxes and choices can't be hidden (the toy has no way to
+    field and an id of its own (`box`, `box-2`…; edit it to something readable), and a box
+    that lacks some (written by hand, or copied from `content.js`) shows them all the same,
+    blank where it needs a pick, to fill in (`INVITATION_FIELDS`, schema.js `FIELDS`; the
+    draft changes only once one is edited); **+ Add Choice** goes once a box has 3. Boxes and choices can't be hidden (the toy has no way to
     skip one): delete one instead. The toy reads it through `content.js` `introScript()`,
     each box's flow spelled out; a broken part is mended on its own (a face off the list
     is Neutral, a Next to nowhere the box after it), and an intro it can't play at all is
