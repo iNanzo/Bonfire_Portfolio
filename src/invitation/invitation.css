@@ -29,6 +29,8 @@ body {
   background: var(--inv-bg);
   color: var(--inv-ink);
   font-family: var(--inv-font);
+  /* (Pixelify Sans's "fi" ligature reads as an "A": every line on the page draws the two letters.) */
+  font-variant-ligatures: none;
   touch-action: none;
   overscroll-behavior: none;
   user-select: none;

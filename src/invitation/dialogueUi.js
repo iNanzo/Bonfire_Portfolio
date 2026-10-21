@@ -280,8 +280,16 @@ export function createDialogueUi(stage, { onAction, log }) {
     const on = e.target instanceof Element ? e.target.closest('.inv-talk-log, .inv-talk-ask') : null;
     if (modal() && !on) e.preventDefault();
   });
-  // (Nothing under the layer takes a wheel or a context menu while it's up.)
-  layer.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+  // (Nothing under the layer takes a wheel or a context menu while it's up; the Log's own list
+  // still scrolls with a wheel or trackpad.)
+  layer.addEventListener(
+    'wheel',
+    (e) => {
+      const t = /** @type {Element|null} */ (e.target instanceof Element ? e.target : null);
+      if (!t?.closest('.inv-talk-log-list')) e.preventDefault();
+    },
+    { passive: false },
+  );
   layer.addEventListener('contextmenu', (e) => e.preventDefault());
 
   return {

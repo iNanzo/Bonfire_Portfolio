@@ -9,6 +9,8 @@
    every press, so the canvas under it gets none. */
 
 .inv-talk {
+  /* Pixelify Sans's "fi" ligature reads as an "A": the dialogue draws the two letters. */
+  font-variant-ligatures: none;
   --talk-fill: #fff8e7;
   --talk-ink: var(--inv-ink, #3a332d);
   position: absolute;
