@@ -2006,6 +2006,181 @@
         "Counting my pixels?",
         "Too close! Back up a bit!"
       ]
+    },
+    "intro": {
+      "speaker": "NEWT",
+      "start": "hello",
+      "boxes": [
+        {
+          "id": "hello",
+          "speaker": "???",
+          "text": "Oh! Hi! I didn’t hear you come in.",
+          "face": "surprised",
+          "animation": "Spook",
+          "camera": "medium",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "welcome",
+          "speaker": "???",
+          "text": "Welcome, welcome! Sorry about the mess. It’s… very white in here.",
+          "face": "happy",
+          "animation": "Wave",
+          "camera": "keep",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "name",
+          "speaker": "",
+          "text": "I’m NEWT! Newton’s little low-poly self. Every polygon placed by hand, thank you very much.",
+          "face": "smug",
+          "animation": "Talk",
+          "camera": "close",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "ask",
+          "speaker": "",
+          "text": "So… what brings you all the way out here?",
+          "face": "neutral",
+          "animation": "Think",
+          "camera": "close",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": [
+            {
+              "label": "Just here to poke you.",
+              "next": "poke"
+            },
+            {
+              "label": "I came to see you!",
+              "next": "aww"
+            },
+            {
+              "label": "I heard there’d be cake.",
+              "next": "cake"
+            }
+          ]
+        },
+        {
+          "id": "poke",
+          "speaker": "",
+          "text": "Poke me?! I’m a delicate work of art! …Okay, fine. One poke.",
+          "face": "angry",
+          "animation": "Point",
+          "camera": "medium",
+          "next": "job",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "aww",
+          "speaker": "",
+          "text": "Me? Really?! Stop it, you’ll make my pixels blush.",
+          "face": "shy",
+          "animation": "Cheer",
+          "camera": "close",
+          "next": "job",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "cake",
+          "speaker": "",
+          "text": "Cake?! Nobody tells me anything…",
+          "face": "sad",
+          "animation": "Idle",
+          "camera": "medium",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "cake-2",
+          "speaker": "",
+          "text": "I’ll look into the cake. Purely for research, of course.",
+          "face": "smug",
+          "animation": "Nod",
+          "camera": "close",
+          "next": "job",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "job",
+          "speaker": "",
+          "text": "Anyway! I’ve got a very important job today.",
+          "face": "happy",
+          "animation": "Talk",
+          "camera": "medium",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "secret",
+          "speaker": "",
+          "text": "I’m keeping something safe for you. It’s sealed, it’s fancy, and it’s top secret.",
+          "face": "smug",
+          "animation": "none",
+          "camera": "keep",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "peek",
+          "speaker": "",
+          "text": "No, you can’t peek. I haven’t even peeked. …Much.",
+          "face": "blink",
+          "animation": "Shrug",
+          "camera": "close",
+          "next": "",
+          "end": false,
+          "auto": 2.5,
+          "choices": []
+        },
+        {
+          "id": "soon",
+          "speaker": "",
+          "text": "Your invitation is on its way. Keep an eye out!",
+          "face": "happy",
+          "animation": "Point",
+          "camera": "wide",
+          "next": "",
+          "end": false,
+          "auto": 0,
+          "choices": []
+        },
+        {
+          "id": "bye",
+          "speaker": "",
+          "text": "Until then, poke me all you like. Gently!",
+          "face": "happy",
+          "animation": "Wave",
+          "camera": "wide",
+          "next": "",
+          "end": true,
+          "auto": 0,
+          "choices": []
+        }
+      ]
     }
   }
 }

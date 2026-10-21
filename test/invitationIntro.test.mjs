@@ -403,9 +403,34 @@ test('introFrom: nothing usable is the toy’s own short intro, which passes the
 
 test('readContent and introScript: content.json’s intro, a copy each time; broken, the toy’s own', () => {
   const inv = content().invitation;
+  assert.ok(inv.intro, 'the key is there');
   assert.deepEqual(introScript(), introFrom(inv.intro));
   introScript().boxes[0].text = 'Changed.';
   assert.notEqual(introScript().boxes[0].text, 'Changed.', 'a copy each time');
   for (const raw of [undefined, null, 'x', {}, { intro: 3 }]) assert.deepEqual(readContent(raw).intro, FALLBACK_INTRO);
   assert.deepEqual(readContent({ intro: intro() }).intro, introFrom(intro()));
+});
+
+test('content.json’s intro passes the rules and is read without losing a box, a line or a choice', () => {
+  const it = content().invitation.intro;
+  const r = validateContent(content());
+  assert.deepEqual(
+    r.errors.filter((e) => e.path.startsWith('invitation.intro')),
+    [],
+  );
+  const out = introFrom(it);
+  assert.equal(out.speaker, it.speaker.trim());
+  assert.equal(out.start, it.start);
+  assert.deepEqual(
+    out.boxes.map((b) => b.id),
+    it.boxes.map((b) => b.id),
+  );
+  it.boxes.forEach((b, i) => {
+    const o = out.boxes[i];
+    for (const k of ['face', 'animation', 'camera']) assert.equal(o[k], b[k], `${b.id}: ${k}`);
+    assert.equal(o.text, b.text.trim(), `${b.id}: its line`);
+    assert.equal(o.speaker, b.speaker?.trim() || undefined, `${b.id}: its speaker`);
+    assert.equal(o.auto, b.auto || undefined, `${b.id}: its wait`);
+    assert.deepEqual(o.choices, b.choices?.length ? b.choices : undefined, `${b.id}: its choices`);
+  });
 });
