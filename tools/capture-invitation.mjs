@@ -49,6 +49,9 @@
 //             on screen), then a press that catches him and carries him a little
 //   sitalone  no input until he sits by himself (20 s alone; the first 16 s aren't recorded:
 //             needs --calm off), a little of him sitting, then a tap on him stands him up
+//   intro     Play Intro played through as a visitor would (tools/capture-invitation-intro.mjs):
+//             each line typed and read, one finished early with a tap, a reply picked at the
+//             question, the Log opened and closed partway, on to the end (whole frames)
 //
 // Files: <out>/<tag>-<act>-<W>x<H>.webp; <out>/<tag>-<act>-<W>x<H>-sheet.png (--sheet frames
 // of the act, each a --crop CSS px square around him, the orbit act's whole frames, labelled
@@ -76,6 +79,7 @@ import fs from 'node:fs';
 import { createServer } from 'vite';
 import { ORBIT } from '../src/invitation/camera.js';
 import { cameraActs } from './capture-invitation-camera.mjs';
+import { introActs } from './capture-invitation-intro.mjs';
 import { CLIP_NAMES, CLIPS } from '../src/invitation/clips.js';
 import { PIXEL_SIZES } from '../src/invitation/pixels.js';
 
@@ -795,6 +799,8 @@ function actsFor(size) {
   if (ACTS.includes('pan')) act('pan', (page) => more.panTurnZoom(page, size), 1400, { full: true });
   if (ACTS.includes('lift')) act('lift', (page) => more.liftHigh(page, size), 2400);
   if (ACTS.includes('sweep')) act('sweep', (page) => more.lookSweep(page, size), 600, { full: true });
+  if (ACTS.includes('intro'))
+    act('intro', (page) => introActs({ tapAt, sleep }).playIntro(page, size), 600, { full: true });
   if (ACTS.includes('sitalone')) {
     if (CALM) console.log('- sitalone: skipped (he never sits by himself with ?calm: pass --calm off)');
     else
