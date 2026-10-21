@@ -164,7 +164,7 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
 - **Reduced motion:** each line shows at once and the camera cuts to each shot.
 - Every Play Intro starts at the start; nothing about it is saved. The lines, faces, gestures,
   shots, waits and replies are edited in the admin's Invitation page ([admin.md](admin.md));
-  until it has an intro, the toy plays a placeholder of its own.
+  with no intro there (or none it can play), the toy plays a short one of its own.
 
 ## For Developers
 
@@ -373,9 +373,9 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   `DialogueScript` safe, types.js; `createDialogue(script, {reduced})` with `start`, `step`,
   `advance`, `choose`, `setAuto`, `skip`, `pause`, `end`, `view` and `log`; `DIALOGUE`: 32
   characters a second with a beat after punctuation, Auto's wait 1.1 s plus 0.035 s a character
-  between 1.4 and 6 s, 240 characters and 3 replies at most; `lookSway`), `intro.js` (the
-  script: content.json `invitation.intro` through `virtual:invitation-content`, else
-  `FALLBACK_INTRO`), `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the
+  between 1.4 and 6 s, 240 characters and 3 replies at most; `lookSway`; main.js runs
+  `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
+  `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the
   stage that takes every press; the line in a live region once, whole), brain.js's `talk` state (`BrainIn.dialogue`: the box's seq,
   animation, face and whether it's typing; `TUNE.talkNear`, `talkTurn`) and camera.js's shots
   (`orbitTalk`, `shotView`, `orbitShot`, `SHOT`). main.js shows an extra face the face sheet

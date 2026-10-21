@@ -7,7 +7,9 @@
 // camera nearer or further (close nearer than wide); Escape asks before it skips the intro and a
 // second Escape ends it, Space and Enter go on; reduced motion shows each line at once and cuts
 // the camera; and after the end the toolbar, the camera and his free play come back. The script
-// is read from the page (?test's intro()), never pinned here, and every wait is on a state.
+// is read from the page (?test's intro()), never pinned here, and every wait is on a state (it's
+// content.json's intro, as content.js reads it).
+import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 
 /** Collect the page's errors for the test to check. */
@@ -46,6 +48,23 @@ async function goOn(page, touch = false) {
   if (touch) await page.touchscreen.tap(at.x, at.y);
   else await page.mouse.click(at.x, at.y);
 }
+test.describe('the admin’s intro', () => {
+  test('Play Intro plays content.json’s invitation.intro, box for box', async ({ page }) => {
+    const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
+    const own = Array.isArray(inv.intro?.boxes) ? inv.intro.boxes : [];
+    test.skip(!own.length, 'content.json has no intro: the toy plays its own');
+    await calm(page);
+    const intro = await script(page);
+    expect(intro.boxes.map((b) => ({ id: b.id, text: b.text }))).toEqual(
+      own.map((b) => ({ id: b.id, text: String(b.text).trim() })),
+    );
+    await open(page);
+    const s = await snapshot(page);
+    expect(s.dialogue.id).toBe(intro.start);
+    expect(s.dialogue.text).toBe(intro.boxes.find((b) => b.id === intro.start).text);
+  });
+});
+
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 

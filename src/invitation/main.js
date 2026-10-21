@@ -30,7 +30,8 @@
 // lowest his collar is carried comes from the Held clip at load (his collar over his lowest
 // sole, plus a gap).
 //
-// Play Intro (ui.js) runs the intro's dialogue (dialogue.js, the script from intro.js) on the toy's
+// Play Intro (ui.js) runs the intro's dialogue (dialogue.js, on content.js introScript():
+// content.json's invitation.intro as the admin writes it, mended, or the toy's own) on the toy's
 // clock, shown by dialogueUi.js over the stage: the toolbar rests out of sight, the speech bubble
 // goes and stays quiet, the layer takes every press (no drags, no orbit, no floor taps), the brain
 // acts each box out (brain.js's talk state: BrainIn.dialogue, its face falling back to the nearest
@@ -56,7 +57,7 @@ import './bubble.css';
 import './dialogue.css';
 import { createBrain } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
-import { invitationDefaults, invitationLines, speechSettings } from './content.js';
+import { introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
 import { CARRY, carryFeel, dragPlane, dragTarget, gripFor } from './carry.js';
 import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
@@ -80,12 +81,11 @@ import {
 } from './camera.js';
 import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
-import { createDialogue, lookSway } from './dialogue.js';
+import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
 import { createDialogueUi } from './dialogueUi.js';
 import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
-import { introScript } from './intro.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
 import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
 import { createLook, lookStep, torsoStep } from './lookAt.js';
@@ -126,6 +126,11 @@ const STATES_KEPT = 40;
  * @type {Record<string, import('./clips.js').FaceName>}
  */
 const FACE_FALLBACK = { sad: 'neutral', angry: 'neutral', shy: 'happy', smug: 'happy' };
+/**
+ * The script Play Intro runs: content.js introScript() (the admin's, mended where it's broken, or
+ * the toy's own), through dialogue.js normalizeScript as the runner's own safety net.
+ */
+const playScript = () => normalizeScript(introScript());
 /** The space a shot frames him in keeps this far off the Auto row and the chat box (its name tab too), CSS px. */
 const SHOT_MARGIN = { top: 10, bottom: 30 };
 /**
@@ -694,7 +699,7 @@ function start(s) {
    */
   function beginIntro() {
     if (intro || !out?.buttonsEnabled || ui.sheetOpen) return;
-    intro = createDialogue(introScript(), { reduced: reducedMotion() });
+    intro = createDialogue(playScript(), { reduced: reducedMotion() });
     intro.start(t);
     shotSeq = -1;
     shot = null;
@@ -1191,8 +1196,8 @@ function start(s) {
         forcedFace = FACE_NAMES.includes(/** @type {any} */ (name)) ? /** @type {any} */ (name) : null;
         return forcedFace !== null;
       },
-      /** The intro's script as Play Intro runs it (intro.js introScript). */
-      intro: () => introScript(),
+      /** The intro's script as Play Intro runs it (playScript). */
+      intro: () => playScript(),
       /** @param {string|null} clip */
       play(clip) {
         forced = clip;

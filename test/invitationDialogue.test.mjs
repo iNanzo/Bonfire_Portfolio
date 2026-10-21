@@ -6,7 +6,9 @@
 // the typing and then going on (the next id, the following box, the end), choices shown once
 // the line is typed and leading where they say, Auto going on after the box's wait or one from
 // the line's length, Skip to the next box with choices or the end, the log of lines shown and
-// replies picked, a pause holding the clock, and a broken script ending gracefully.
+// replies picked, a pause holding the clock, and a broken script ending gracefully. Play Intro's
+// script is content.js introScript() (content.json's intro, or one mended), which the runner plays
+// as it is.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DIALOGUE_CLIPS, FACE_NAMES } from '../src/invitation/clips.js';
@@ -292,53 +294,59 @@ test('the look’s sway while he talks is small and moves', () => {
   assert.ok(a.yaw !== b.yaw || a.pitch !== b.pitch);
 });
 
-test('the placeholder intro keeps the contract: safe as it is, every target there, a choice, most faces and gestures, an end down each reply', async () => {
-  const { FALLBACK_INTRO } = await loadIntro();
-  assert.deepEqual(normalizeScript(FALLBACK_INTRO), FALLBACK_INTRO, 'nothing in it needs making safe');
-  const ids = new Set(FALLBACK_INTRO.boxes.map((b) => b.id));
-  for (const b of FALLBACK_INTRO.boxes) {
-    if (b.next) assert.ok(ids.has(b.next), `${b.id}: next ${b.next}`);
-    for (const c of b.choices ?? []) assert.ok(ids.has(c.next), `${b.id}: ${c.label}`);
-  }
-  const ask = FALLBACK_INTRO.boxes.find((b) => b.choices);
-  assert.ok(ask && ask.choices && ask.choices.length >= 2, 'one choice of two replies or more');
-  assert.ok(new Set(FALLBACK_INTRO.boxes.map((b) => b.face)).size >= 6, 'most faces');
-  assert.ok(new Set(FALLBACK_INTRO.boxes.map((b) => b.animation)).size >= 6, 'most gestures');
-  for (let i = 0; i < ask.choices.length; i++) {
-    const d = createDialogue(FALLBACK_INTRO);
-    d.start(0);
-    d.skip(0);
-    d.choose(i, 0);
-    let n = 0;
-    while (!d.view.done && n++ < 50) d.advance(0);
-    assert.ok(d.view.done, `reply ${i} reaches the end`);
-    assert.ok(d.log.at(-1)?.kind === 'line');
+test('Play Intro’s script is content.js introScript(): the runner plays it as it is, content.json’s intro or one mended', async () => {
+  const { FALLBACK_INTRO, introFrom, introScript } = await loadContent();
+  const own = introScript();
+  assert.ok(own.boxes.length > 0);
+  assert.deepEqual(normalizeScript(own), own, 'content.json’s intro: nothing for the runner to change');
+  assert.deepEqual(normalizeScript(FALLBACK_INTRO), FALLBACK_INTRO, 'the toy’s own short intro');
+  const d = createDialogue(normalizeScript(own));
+  d.start(0);
+  assert.equal(d.view.box?.id, own.start, 'from its start box');
+  // (Broken intros as introFrom mends them: the runner agrees with every repair.)
+  const broken = [
+    undefined,
+    'x',
+    { boxes: [] },
+    {
+      speaker: '  ',
+      start: 'gone',
+      boxes: [
+        { id: 'a', text: '  Hi.  ', face: 'grumpy', animation: 'Dance', camera: 'far', next: 'nowhere', auto: -2 },
+        { id: 'a', text: 'Doubled.' },
+        {
+          id: 'b',
+          text: 'Pick.',
+          end: true,
+          choices: [
+            { label: 'Back', next: 'a' },
+            { label: '', next: 'a' },
+            { label: 'Lost', next: 'gone' },
+          ],
+        },
+        { id: 'c', text: 'Last.', speaker: ' Who ', auto: 3, face: 'smug', animation: 'Cheer', camera: 'close' },
+      ],
+    },
+  ];
+  for (const raw of broken) {
+    const s = introFrom(raw);
+    assert.deepEqual(normalizeScript(s), s, JSON.stringify(raw));
   }
 });
 
-test('introScript(): the admin’s script (invitation.intro) when it has something to show, else the placeholder', async () => {
-  const { FALLBACK_INTRO, introScript } = await loadIntro();
-  assert.deepEqual(introScript(), FALLBACK_INTRO, 'no intro in the content yet: the placeholder');
-  const own = {
-    speaker: 'N',
-    start: 'a',
-    boxes: [{ id: 'a', text: 'hey', face: 'sad', animation: 'Nod', camera: 'close' }],
-  };
-  assert.deepEqual(introScript({ intro: own }), own, 'the admin’s, as it is');
-  for (const broken of [null, 'x', { intro: { boxes: [] } }, { intro: 'x' }])
-    assert.deepEqual(introScript(broken), FALLBACK_INTRO, `${JSON.stringify(broken)}: the placeholder`);
-});
-
-/** intro.js, its content.js reading an empty invitation (no intro). */
-async function loadIntro() {
+/** content.js, reading content.json's `invitation` as `virtual:invitation-content` (vite.config.js). */
+async function loadContent() {
   const { register } = await import('node:module');
+  const { readFileSync } = await import('node:fs');
+  const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
+  const sub = `export default ${JSON.stringify(inv)}`;
   const hooks = `export async function resolve(spec, ctx, next) {
     if (spec === 'virtual:invitation-content')
-      return { url: 'data:text/javascript,' + encodeURIComponent('export default {}'), shortCircuit: true };
+      return { url: 'data:text/javascript,' + encodeURIComponent(${JSON.stringify(sub)}), shortCircuit: true };
     return next(spec, ctx);
   }`;
   register(`data:text/javascript,${encodeURIComponent(hooks)}`);
-  return import('../src/invitation/intro.js');
+  return import('../src/invitation/content.js');
 }
 
 test('the chat screen’s markup: Title Case labels, a live region for the line, dialogs for the Log and the question, no tooltips; the Log escapes what it lists', async () => {
