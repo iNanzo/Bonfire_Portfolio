@@ -167,7 +167,8 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
 - **The camera** goes round to the front and each box picks a shot: close (his head and
   shoulders), medium (his whole body), wide (the usual view) or keep (as it was), eased there
   and framed in the space over the box. At the end it eases back to where you had it.
-- **Reduced motion:** each line shows at once and the camera cuts to each shot.
+- **Reduced motion:** each line shows at once and the camera cuts: round to the front at the
+  start, to each shot, and back to your view at the end.
 - Every Play Intro starts at the start; nothing about it is saved. The lines, faces, gestures,
   shots, waits and replies are edited in the admin's Invitation page ([admin.md](admin.md));
   with no intro there (or none it can play), the toy plays a short one of its own.

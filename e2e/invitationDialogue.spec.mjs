@@ -1,18 +1,20 @@
 // Play Intro, the invitation toy's chat (/invitation/), in a real browser on the production build,
 // on a phone (390×844, touch) and a desktop (1280×800): the button opens the chat box over the
-// stage (the toolbar rests out of sight, NEWT goes into his talk state and turns to the camera),
+// stage (the toolbar rests out of sight, NEWT goes into his talk state and turns to the camera);
 // out near the edge the first line waits until he's walked in and turned (then its line, face and
-// gesture begin together), the line types out, a tap finishes it and the next tap goes on; Skip
+// gesture begin together); the line types out, a tap finishes it and the next tap goes on; Skip
 // goes to the box with replies, which show as buttons stacked mid-screen under his face, take no
-// press until the presses that went on have settled, and picking one goes where it leads; Auto goes on by itself; the Log lists the lines shown and closes again; each
-// box's shot sends the camera nearer or further (close nearer than wide), framed over the box as
-// its own line has it and again when the box grows; Escape asks before it skips the intro and a
-// second Escape ends it, Space and Enter go on (after a click on Auto, Skip or Log too); under the
-// Log or the question the buttons over the stage are out of reach; reduced motion shows each line at once and cuts
-// the camera; and after the end the toolbar, the camera and his free play come back. The script
-// is read from the page (?test's intro()), never pinned here, and every wait is on a state (it's
-// content.json's intro, as content.js reads it). Down every reply each box shows its face (the
-// four dialogue faces from their own sheets) and plays its animation.
+// press until the presses that went on have settled, and picking one goes where it leads; Auto
+// goes on by itself; the Log lists the lines shown and closes again; each box's shot sends the
+// camera nearer or further (close nearer than wide), framed over the box as its own line has it
+// and again when the box grows; Escape asks before it skips the intro and a second Escape ends
+// it; Space and Enter go on (after a click on Auto, Skip or Log too); under the Log or the
+// question the buttons over the stage are out of reach; reduced motion shows each line at once
+// and cuts the camera (round to the front, to each shot, back at the end); and after the end the
+// toolbar, the camera and his free play come back. The script is read from the page (?test's
+// intro()), never pinned here, and every wait is on a state (it's content.json's intro, as
+// content.js reads it). Down every reply each box shows its face (the four dialogue faces from
+// their own sheets) and plays its animation.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 
@@ -782,5 +784,51 @@ test.describe('on a desktop', () => {
       if (s.dialogue.camera !== 'keep')
         expect(Math.abs(s.camera.distance - s.dialogue.goal.distance)).toBeLessThan(0.01 * s.dialogue.goal.distance);
     }
+  });
+
+  test('with reduced motion the camera cuts round to the front at the start, and back at the end', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await calm(page);
+    // Turned round and zoomed out a little first (a right-drag across, the wheel).
+    await page.mouse.move(900, 300);
+    await page.mouse.down({ button: 'right' });
+    for (let i = 1; i <= 8; i++) await page.mouse.move(900 - i * 40, 300);
+    await page.mouse.up({ button: 'right' });
+    await page.mouse.wheel(0, 200);
+    await until(page, (s) => !s.camera.turning, 'the view at rest');
+    await expect.poll(async () => (await snapshot(page)).camera.distance).toBeGreaterThan(0);
+    const before = (await snapshot(page)).camera;
+    const home = (await snapshot(page)).cameraHome;
+    const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    expect(Math.abs(wrap(before.yaw - home.yaw)), 'turned round').toBeGreaterThan(0.5);
+    // Every frame: the camera, and whether the intro's up.
+    await page.evaluate(() => {
+      const rec = (window.__cam = []);
+      const tick = () => {
+        const s = window.__invitation.snapshot();
+        rec.push({ on: Boolean(s.dialogue), yaw: s.camera.yaw, distance: s.camera.distance });
+        if (rec.length < 4000) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await playIntro(page).click();
+    await until(page, (s) => Boolean(s.dialogue), 'the intro up');
+    // Through to the end: Skip, a reply, Skip.
+    for (let i = 0; i < 12; i++) {
+      const s = await snapshot(page);
+      if (!s.dialogue) break;
+      if (s.dialogue.choices) await pick(page, 0);
+      else await page.getByRole('button', { name: 'Skip', exact: true }).click();
+      await until(page, (x) => !x.dialogue || x.dialogue.seq > s.dialogue.seq, 'on');
+    }
+    await until(page, (s) => !s.dialogue, 'over');
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+    const rec = await page.evaluate(() => window.__cam);
+    const first = rec.findIndex((r) => r.on);
+    expect(Math.abs(wrap(rec[first].yaw - home.yaw)), 'at the front on its first frame').toBeLessThan(1e-3);
+    const back = rec.findIndex((r, i) => i > first && !r.on);
+    expect(back, 'it ended').toBeGreaterThan(first);
+    expect(Math.abs(wrap(rec[back].yaw - before.yaw)), 'back round on the first frame after').toBeLessThan(1e-3);
+    expect(Math.abs(rec[back].distance - before.distance)).toBeLessThan(0.005 * before.distance);
   });
 });

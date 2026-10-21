@@ -724,7 +724,7 @@ function start(s) {
     hover = null;
     bubble.hide();
     ui.setTalking(true);
-    orbitTalk(cam, true);
+    orbitTalk(cam, true, { cut: reducedMotion() });
     talkUi.open();
   }
 
@@ -741,13 +741,16 @@ function start(s) {
     if (acted.clips.at(-1) !== clip) acted.clips.push(clip);
   }
 
-  /** The intro's over: the layer goes, the camera eases back, the toolbar and free play return. */
+  /**
+   * The intro's over: the layer goes, the camera eases back (cuts, with reduced motion), the
+   * toolbar and free play return.
+   */
   function endIntro() {
     intro = null;
     introHeld = false;
     shot = null;
     talkUi.close();
-    orbitTalk(cam, false);
+    orbitTalk(cam, false, { cut: reducedMotion(), focus: { x: body.root.x, z: body.root.z } });
     backFromIntro = true;
     ui.setTalking(false);
   }

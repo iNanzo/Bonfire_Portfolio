@@ -813,6 +813,33 @@ test('Play Intro turns the view round to the front the short way; each shot ease
   close(o.distance, m.distance, 1e-6);
 });
 
+test('with reduced motion the intro cuts: the turn to the front and the way back are there at once', () => {
+  const o = phoneOrbit();
+  const him = { x: 0.3, z: 0.2 };
+  orbitDrag(o, -300, 0, 0);
+  orbitZoom(o, 1.3);
+  settle(o, 3, him);
+  const was = { yaw: o.yaw, elevation: o.elevation, distance: o.distance, target: { ...o.target } };
+  assert.ok(Math.abs(wrap(was.yaw)) > 1);
+  orbitTalk(o, true, { cut: true });
+  close(wrap(o.yaw), 0, 1e-9, 'at the front at once');
+  orbitShot(o, shotView(o, 'close', CLEAR), { cut: true, focus: him });
+  orbitStep(o, DT, him);
+  orbitTalk(o, false, { cut: true, focus: him });
+  close(wrap(o.yaw - was.yaw), 0, 1e-9, 'back at once');
+  close(o.elevation, was.elevation, 1e-9);
+  close(o.distance, was.distance, 1e-9);
+  close(o.target.y, FOCUS_Y, 1e-9);
+  close(o.target.x, was.target.x, 1e-3, 'looking where it did');
+  close(o.target.z, was.target.z, 1e-3);
+  assert.equal(o.resetting, false, 'nothing left to ease');
+  // (A frame later, nothing has eased on.)
+  orbitStep(o, DT, him);
+  close(o.distance, was.distance, 1e-9);
+  close(wrap(o.yaw - was.yaw), 0, 1e-9);
+  close(o.target.x, was.target.x, 1e-3);
+});
+
 test('at the end of the intro the view eases back to where it was, its pan too', () => {
   const o = phoneOrbit();
   orbitPan(o, 40, 0);

@@ -38,7 +38,8 @@
 // space over the chat box with him and shows him `raise` CSS px above where the point it looks at
 // shows (the middle of that space), by aiming below his middle; the point it orbits stays on him.
 // Nothing else moves it meanwhile (main.js sends no gestures); at the end it eases back to the
-// view from before the intro, its pan and zoom included.
+// view from before the intro, its pan and zoom included. With reduced motion the turn to the
+// front and the way back cut too.
 
 import { NEWT_HEIGHT, NEWT_RADIUS } from './area.js';
 import { FOCUS_Y, VIEW, compactStage } from './pixels.js';
@@ -431,10 +432,13 @@ export function orbitHome(s, distance) {
 /**
  * Play Intro begins (`on`): the view turns round to the front, the short way, and waits for the
  * boxes' shots; or it's over: the view eases back to where it was before, its pan included.
+ * `cut` (reduced motion): there at once, the way back looking where it did (`focus`: NEWT, whom
+ * the point it looks at follows as it would).
  * @param {OrbitState} s
  * @param {boolean} on
+ * @param {{cut?: boolean, focus?: XZ|null}} [o]
  */
-export function orbitTalk(s, on) {
+export function orbitTalk(s, on, { cut = false, focus = null } = {}) {
   if (on) {
     if (s.talk) return;
     s.talk = {
@@ -453,6 +457,7 @@ export function orbitTalk(s, on) {
     s.resetting = false;
     s.holding = false;
     s.goal.yaw = s.talk.yaw;
+    if (cut) s.yaw = s.talk.yaw;
     return;
   }
   const t = s.talk;
@@ -466,6 +471,13 @@ export function orbitTalk(s, on) {
   s.resetting = true;
   // (Close in, he's past the clear space's edge: not walked off it, so a pan holds until he's back in.)
   s.seen = false;
+  if (!cut) return;
+  s.yaw = s.goal.yaw;
+  s.elevation = s.goal.elevation;
+  s.distance = s.goal.distance;
+  s.resetting = false;
+  const want = wanted(s, focus);
+  s.target = { x: want.x, y: FOCUS_Y, z: want.z };
 }
 
 /**
