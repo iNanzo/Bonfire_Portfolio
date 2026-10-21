@@ -316,9 +316,17 @@ test('the placeholder intro keeps the contract: safe as it is, every target ther
   }
 });
 
-test('introScript(): the admin’s script when content.js has one with something to show, else the placeholder', async () => {
+test('introScript(): the admin’s script (invitation.intro) when it has something to show, else the placeholder', async () => {
   const { FALLBACK_INTRO, introScript } = await loadIntro();
   assert.deepEqual(introScript(), FALLBACK_INTRO, 'no intro in the content yet: the placeholder');
+  const own = {
+    speaker: 'N',
+    start: 'a',
+    boxes: [{ id: 'a', text: 'hey', face: 'sad', animation: 'Nod', camera: 'close' }],
+  };
+  assert.deepEqual(introScript({ intro: own }), own, 'the admin’s, as it is');
+  for (const broken of [null, 'x', { intro: { boxes: [] } }, { intro: 'x' }])
+    assert.deepEqual(introScript(broken), FALLBACK_INTRO, `${JSON.stringify(broken)}: the placeholder`);
 });
 
 /** intro.js, its content.js reading an empty invitation (no intro). */

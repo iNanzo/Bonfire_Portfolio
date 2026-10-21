@@ -1,9 +1,13 @@
-// The intro's script for Play Intro: the admin's (content.json `invitation.intro`, through
-// content.js introScript() once it has one), made safe by dialogue.js normalizeScript, or, while
-// there's none or it has nothing to show, FALLBACK_INTRO: a placeholder in NEWT's voice built to
-// types.js's DialogueScript (he greets the visitor, says who he is, asks one question with two
-// replies and teases the invitation, through most of his faces and gestures).
-import * as content from './content.js';
+// The intro's script for Play Intro: the admin's (content.json `invitation.intro`, read from
+// `virtual:invitation-content` as content.js reads the rest), made safe by dialogue.js
+// normalizeScript, or, while there's none or it has nothing to show, FALLBACK_INTRO: a
+// placeholder in NEWT's voice built to types.js's DialogueScript (he greets the visitor, says
+// who he is, asks one question with two replies and teases the invitation, through most of his
+// faces and gestures). (Not through a namespace import of content.js, looking for an
+// introScript() it may not have yet: the bundler's namespace helper then lands in this page's
+// chunk, and the portfolio's first load imports it from there.)
+/// <reference path="./virtualContent.d.ts" />
+import raw from 'virtual:invitation-content';
 import { normalizeScript } from './dialogue.js';
 
 /** @type {import('./types.js').DialogueScript} */
@@ -74,16 +78,10 @@ export const FALLBACK_INTRO = {
 
 /**
  * The script Play Intro runs: the admin's when it has something to show, else the placeholder.
+ * @param {unknown} [data]  content.json's `invitation` (the virtual module's by default)
  * @returns {import('./types.js').DialogueScript}
  */
-export function introScript() {
-  // (Looked up by name: content.js has no introScript() until the admin's package adds it.)
-  const from = Reflect.get(content, 'introScript');
-  let admin;
-  try {
-    admin = typeof from === 'function' ? normalizeScript(from()) : null;
-  } catch {
-    admin = null;
-  }
-  return admin ?? /** @type {import('./types.js').DialogueScript} */ (normalizeScript(FALLBACK_INTRO));
+export function introScript(data = raw) {
+  const intro = data !== null && typeof data === 'object' ? /** @type {Record<string, unknown>} */ (data).intro : null;
+  return normalizeScript(intro) ?? /** @type {import('./types.js').DialogueScript} */ (normalizeScript(FALLBACK_INTRO));
 }
