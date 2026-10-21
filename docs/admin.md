@@ -163,7 +163,7 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     Intro starts there) and the **Chat Boxes**, in order, dragged or moved with ↑/↓. Each
     box's card is titled by its line, with its id, face, move, shot and where it goes under
     it. A box has its **ID** (how Next and the choices point to it), a **Speaker Override**
-    (??? before he's said his name, say; empty: the intro's Speaker), its **Text** (typed
+    (such as ??? before he's said his name; empty: the intro's Speaker), its **Text** (typed
     out letter by letter, up to 240 characters), a **Face** (every face he has; he still
     blinks on Neutral), an **Animation** (a gesture that plays once, a loop that keeps
     going, or None: as he was), a **Camera** (Close: head and shoulders, Medium: his whole

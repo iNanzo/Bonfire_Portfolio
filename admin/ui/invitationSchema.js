@@ -10,13 +10,13 @@
 // menu's own name (shader.js SHADER_CONTROLS), so a control added there shows here by itself.
 //
 // The Intro (`invitation.intro`, the chat Play Intro opens: types.js DialogueScript): the
-// speaker, the start box and the chat boxes. The start, each box's Next and each choice's box are
-// picked from the boxes there are (one that's gone still shows, marked, so it can be put right),
-// lists remade as a box is renamed (INVITATION_OPTIONS_FROM); Face, Animation and Camera from
-// the toy's lists; Auto as a slider. A new box comes with every
-// field (INVITATION_TEMPLATES: the form shows only the fields an entry has), boxes and choices
-// can't be hidden (INVITATION_NO_HIDING: the toy has no way to skip one), a box has at most 3
-// choices (INVITATION_MAX_ENTRIES), and each card says under its line what the box does
+// speaker, the start box and the chat boxes. The start, each box's Next and each choice's box
+// are picked from the boxes there are (one that's gone still shows, marked, so it can be put
+// right), the lists remade as a box is renamed (INVITATION_OPTIONS_FROM); Face, Animation and
+// Camera from the toy's lists; Auto as a slider. A new box comes with every field
+// (INVITATION_TEMPLATES: the form shows only the fields an entry has), boxes and choices can't
+// be hidden (INVITATION_NO_HIDING: the toy has no way to skip one), a box has at most 3 choices
+// (INVITATION_MAX_ENTRIES), and each card says under its line what the box does
 // (INVITATION_CARD_META: its id, face, move, shot and where it goes).
 import {
   INTRO_ANIMATIONS,
@@ -175,7 +175,7 @@ export const INVITATION_HELP = {
   [`${BOX}.id`]:
     'How Next and the choices point to this box. Lowercase letters, numbers and dashes, and no other box’s.',
   [`${BOX}.speaker`]:
-    'Another name on the tab for this box alone (??? before he’s said his, say). Empty: the intro’s Speaker.',
+    'Another name on the tab for this box alone, such as ??? before he’s said his. Empty: the intro’s Speaker.',
   [`${BOX}.text`]: `What he says, typed out letter by letter. Up to ${INTRO_TEXT_MAX} characters; a short line reads best.`,
   [`${BOX}.face`]: 'His face while he says it. He still blinks on Neutral.',
   [`${BOX}.animation`]:
