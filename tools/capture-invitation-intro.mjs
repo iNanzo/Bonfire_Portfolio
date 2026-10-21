@@ -34,6 +34,8 @@ export function introActs({ tapAt, sleep }) {
     const at = await centre(page, '[data-intro]');
     if (!at) return false;
     await tapAt(page, size, at);
+    // (It opens on the page's next frame.)
+    for (let i = 0; i < 50 && !(await snap(page)).dialogue; i++) await sleep(40);
     const goOn = { x: size.w * 0.18, y: size.h * 0.3 };
     let shown = 0;
     let logged = false;
