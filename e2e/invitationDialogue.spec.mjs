@@ -539,11 +539,14 @@ test.describe('on a phone', () => {
     expect((await snapshot(page)).dialogue.goal.distance).toBeGreaterThan(before.goal.distance);
     await grow.evaluate((el) => el.remove());
     await until(page, (x) => Math.abs(x.dialogue.framed.bottom - before.framed.bottom) < 1.5, 'and back');
-    // Box by box: each shot framed for its own line's box, whatever the last one's was.
+    // Box by box: each shot framed for its own line's box, whatever the last one's was (up to the
+    // box with replies, framed over them).
+    const intro = await script(page);
+    const asks = new Set(intro.boxes.filter((b) => b.choices?.length).map((b) => b.id));
     const tops = new Set();
     for (let i = 0; i < 6; i++) {
       s = await snapshot(page);
-      if (!s.dialogue || s.dialogue.choices) break;
+      if (!s.dialogue || asks.has(s.dialogue.id)) break;
       if (s.dialogue.camera !== 'keep') {
         await framedOverBox(s.dialogue.seq);
         tops.add(Math.round(await boxTop()));
