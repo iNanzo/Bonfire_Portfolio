@@ -1140,6 +1140,8 @@ function start(s) {
       log: d.log.length,
       logOpen: talkUi.logOpen,
       asking: talkUi.asking,
+      // (The replies show and take a press: settled since they showed and since the last press.)
+      repliesLive: talkUi.repliesLive,
       goal: { ...cam.goal },
       // (His part: getting up, walking in, turning to the camera, talking; and the clips he's
       // played since this box came up.)

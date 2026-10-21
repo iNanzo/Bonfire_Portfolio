@@ -12,6 +12,8 @@
 //
 // The whole layer is a modal dialog over the stage: a tap or click anywhere off its buttons goes
 // on (finishes the line, then the next box), so nothing reaches the canvas (no drags, no orbit).
+// The replies take a press only once the presses that went on have stopped for REPLY_SETTLE, so
+// a quick second tap or press after the one that finished the line never picks one.
 // Keys, wherever focus is: Space or Enter go on (a focused button presses itself instead),
 // Escape closes the Log, or asks whether to skip the intro, and a second Escape ends it; Tab goes
 // round the layer's buttons. A screen reader hears each line whole once, from a live region
@@ -31,6 +33,13 @@
  * on a phone held sideways, and they frame him over the chat box, the replies over him.
  */
 export const REPLY_ROOM = 120;
+/**
+ * The replies take a press only once the presses that went on have stopped this long, ms: they
+ * show the moment a press finishes the line, under the finger or with focus, so the next press of
+ * a tap-tap or a held-down rhythm (each press to go on, ignored there, starts it again) never
+ * picks one the visitor didn't choose.
+ */
+export const REPLY_SETTLE = 450;
 
 /** The words on the screen: labels in Title Case, the rest sentences. */
 export const TALK_TEXT = {
@@ -134,11 +143,18 @@ export function createDialogueUi(stage, { onAction, log }) {
     choices: '',
     /** the replies show (else laid out, out of sight and reach) */
     up: false,
+    /** until when (performance.now(), ms) the replies take no press: REPLY_SETTLE */
+    settle: 0,
     next: false,
     auto: false,
   };
 
   const modal = () => !logBox.hidden || !ask.hidden;
+  const now = () => doc.defaultView?.performance.now() ?? Date.now();
+  /** A press that goes on (or lands on a reply too soon): the replies wait REPLY_SETTLE from it. */
+  const settle = () => {
+    if (shown.up) shown.settle = Math.max(shown.settle, now() + REPLY_SETTLE);
+  };
 
   /** @param {boolean} open */
   function setLog(open) {
@@ -195,10 +211,12 @@ export function createDialogueUi(stage, { onAction, log }) {
     }
     if (e.key !== ' ' && e.key !== 'Enter') return;
     const target = /** @type {HTMLElement|null} */ (e.target instanceof HTMLElement ? e.target : null);
-    // (A focused button presses itself.)
+    // (A focused button presses itself: a reply's press waits for them to settle, in the click.)
     if (target?.closest('button')) return;
     e.preventDefault();
-    if (!modal() && !e.repeat) onAction({ type: 'advance' });
+    if (modal()) return;
+    settle();
+    if (!e.repeat) onAction({ type: 'advance' });
   }
 
   layer.addEventListener('click', (e) => {
@@ -206,12 +224,18 @@ export function createDialogueUi(stage, { onAction, log }) {
     const button = /** @type {HTMLElement|null} */ (el.closest('button'));
     if (!button) {
       // (Off the buttons: go on, unless the Log or the question is up.)
-      if (!modal() && !el.closest('.inv-talk-log, .inv-talk-ask')) onAction({ type: 'advance' });
+      if (!modal() && !el.closest('.inv-talk-log, .inv-talk-ask')) {
+        settle();
+        onAction({ type: 'advance' });
+      }
       return;
     }
     const what = button.dataset.talk;
-    if (button.dataset.choice !== undefined) onAction({ type: 'choose', index: Number(button.dataset.choice) });
-    else if (what === 'auto') onAction({ type: 'auto', on: button.getAttribute('aria-pressed') !== 'true' });
+    if (button.dataset.choice !== undefined) {
+      // (Too soon after they showed, or after a press that went on: the press goes nowhere.)
+      if (now() < shown.settle) settle();
+      else onAction({ type: 'choose', index: Number(button.dataset.choice) });
+    } else if (what === 'auto') onAction({ type: 'auto', on: button.getAttribute('aria-pressed') !== 'true' });
     else if (what === 'skip') onAction({ type: 'skip' });
     else if (what === 'log') setLog(Boolean(logBox.hidden));
     else if (what === 'log-close') setLog(false);
@@ -279,6 +303,7 @@ export function createDialogueUi(stage, { onAction, log }) {
       const up = Boolean(own && v.choices);
       if (up !== shown.up) {
         shown.up = up;
+        shown.settle = up ? now() + REPLY_SETTLE : 0;
         choices.classList.toggle('is-waiting', !up);
         choices.toggleAttribute('inert', !up);
         layer.classList.toggle('is-choosing', up);
@@ -294,6 +319,10 @@ export function createDialogueUi(stage, { onAction, log }) {
     },
     get asking() {
       return !ask.hidden;
+    },
+    /** The replies show and take a press (they've settled: REPLY_SETTLE). */
+    get repliesLive() {
+      return shown.up && now() >= shown.settle;
     },
     /** The chat box (main.js frames the shots in the space over it, and watches its size). */
     get box() {

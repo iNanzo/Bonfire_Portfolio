@@ -147,7 +147,9 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
   Space and Enter do the same. Some boxes ask a question: two or three replies show as buttons
   stacked in the middle of the screen, under his face (that box's shot frames him in the space
-  over them, from the start of its line), and each leads to its own lines.
+  over them, from the start of its line), and each leads to its own lines. They take a press
+  only once the presses that went on have stopped for a moment (0.45 s), so a quick second tap,
+  or the next Enter of someone pressing along, never picks one by chance.
 - **Auto** goes on by itself once each line has had time to be read (a box can set its own
   wait); it waits at a question. **Skip** jumps to the next question, or to the end. **Log**
   shows every line so far and the replies picked, in a list that scrolls; Close or Escape
@@ -379,7 +381,7 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   between 1.4 and 6 s, 240 characters and 3 replies at most; `lookSway`; main.js runs
   `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
-  press; the line in a live region once, whole), brain.js's `talk` state (`BrainIn.dialogue`: the
+  press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`), brain.js's `talk` state (`BrainIn.dialogue`: the
   box's seq, animation, face and whether it's typing; `TUNE.talkNear`, `talkTurn`;
   `BrainOut.talkReady` once he's in place, which main.js holds the first line for) and
   camera.js's shots (`orbitTalk`, `shotView`, `orbitShot`, `SHOT`), each framed over the box as
@@ -417,11 +419,11 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   the play area, and `talk` is what he's saying (speech.js's snapshot: the line up and its
   trigger, when the idle clock comes round). While the intro runs, `dialogue` has the box up
   (`id`, `seq`, `text`, `shown`, `typed`, its replies' targets, `auto`, `paused`, `waiting`: the
-  line holding until he's in place, `logOpen`, `asking`, `camera`, `shot`, `framed`: the clear
-  space it was framed in (client px, from under the Auto row to the box's top), the camera's `goal`, his `phase` and the `clips` he's played since
-  the box came up, `'gait'` for Idle, Walk or Run), and `intro()` is the script
-  it runs. `?seed=N` makes the randomness
-  repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
+  line holding until he's in place, `logOpen`, `asking`, `repliesLive`: the replies show and take
+  a press, `camera`, `shot`, `framed`: the clear space it was framed in (client px, from under the
+  Auto row to the box's top, or the replies'), the camera's `goal`, his `phase` and the `clips`
+  he's played since the box came up, `'gait'` for Idle, Walk or Run), and `intro()` is the script
+  it runs. `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and

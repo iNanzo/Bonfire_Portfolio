@@ -3,8 +3,8 @@
 // stage (the toolbar rests out of sight, NEWT goes into his talk state and turns to the camera),
 // out near the edge the first line waits until he's walked in and turned (then its line, face and
 // gesture begin together), the line types out, a tap finishes it and the next tap goes on; Skip
-// goes to the box with replies, which show as buttons stacked mid-screen, and picking one goes
-// where it leads; Auto goes on by itself; the Log lists the lines shown and closes again; each
+// goes to the box with replies, which show as buttons stacked mid-screen under his face, take no
+// press until the presses that went on have settled, and picking one goes where it leads; Auto goes on by itself; the Log lists the lines shown and closes again; each
 // box's shot sends the camera nearer or further (close nearer than wide), framed over the box as
 // its own line has it and again when the box grows; Escape asks before it skips the intro and a
 // second Escape ends it, Space and Enter go on; reduced motion shows each line at once and cuts
@@ -71,6 +71,32 @@ function reachable(intro) {
   }
   return [...seen];
 }
+
+/**
+ * Picks reply `i` once the replies show and have settled (dialogueUi.js REPLY_SETTLE: a press
+ * straight after the one that finished the line goes nowhere).
+ */
+async function pick(page, i, tap = false) {
+  await until(page, (s) => Boolean(s.dialogue?.repliesLive), 'the replies settled');
+  const reply = page.locator('.inv-talk-choice').nth(i);
+  if (tap) await reply.tap();
+  else await reply.click();
+}
+/**
+ * The box with replies, and the one a tap goes on to it from (null: none).
+ * @param {any} intro
+ */
+function askAndBefore(intro) {
+  const ask = intro.boxes.find((b) => b.choices?.length);
+  const before = ask
+    ? intro.boxes.find(
+        (b, i) => !b.choices?.length && !b.end && (b.next ? b.next === ask.id : intro.boxes[i + 1]?.id === ask.id),
+      )
+    : null;
+  return { ask, before };
+}
+/** A frame of the page's, so two presses land a frame apart. */
+const aFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
 
 /**
  * At the box with replies (Skip goes there), once they show and the camera's at its shot: his
@@ -155,11 +181,7 @@ test.describe('the admin’s intro', () => {
         // On: this run's reply (or the last there is), else a click or two (finished, then on).
         const seq = s.dialogue.seq;
         if (b.choices?.length) {
-          await until(page, (x) => Boolean(x.dialogue?.choices), `${b.id}: its replies`);
-          await page
-            .locator('.inv-talk-choice')
-            .nth(Math.min(run, b.choices.length - 1))
-            .click();
+          await pick(page, Math.min(run, b.choices.length - 1));
         } else {
           await goOn(page);
           const now = await snapshot(page);
@@ -310,15 +332,59 @@ test.describe('on a phone', () => {
     // A tap off them never passes them.
     await goOn(page, true);
     await until(page, (s) => s.dialogue.id === ask.id, 'still at the replies');
-    const pick = ask.choices.length - 1;
-    await replies.nth(pick).tap();
-    const to = ask.choices[pick].next;
+    const last = ask.choices.length - 1;
+    await pick(page, last, true);
+    const to = ask.choices[last].next;
     await until(page, (s) => (s.dialogue ? s.dialogue.id === to : !intro.boxes.some((b) => b.id === to)), 'its box');
   });
 
   test('the replies show under his face: the shot frames him over them', async ({ page }) => {
     await calm(page);
     await repliesClearOfHim(page, true);
+  });
+
+  test('a quick second tap where the replies pop in picks none; a tap once they’ve settled does', async ({ page }) => {
+    await calm(page);
+    const intro = await script(page);
+    const { ask, before } = askAndBefore(intro);
+    test.skip(!ask || !before, 'no box goes on to the replies');
+    await open(page, true);
+    // (On to the box before the question, its line up.)
+    for (let i = 0; i < 30; i++) {
+      const s = await snapshot(page);
+      if (s.dialogue.id === before.id && s.dialogue.typed) break;
+      await goOn(page, true);
+      await until(page, (x) => x.dialogue.typed || x.dialogue.seq !== s.dialogue.seq, 'on');
+    }
+    await until(page, (s) => s.dialogue.id === before.id && s.dialogue.typed, 'just before the question');
+    // On to the question; then a tap where its first reply will show (laid out already, out of
+    // sight) finishes its line, and one more 150 ms later lands on the reply.
+    await goOn(page, true);
+    await until(page, (s) => s.dialogue.id === ask.id, 'at the question');
+    const spot = await page
+      .locator('.inv-talk-choice')
+      .first()
+      .evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      });
+    const log = (await snapshot(page)).dialogue.log;
+    await page.touchscreen.tap(spot.x, spot.y);
+    await until(page, (s) => Boolean(s.dialogue.choices), 'its replies');
+    const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.className ?? '', spot);
+    expect(hit, 'the spot is a reply now').toContain('inv-talk-choice');
+    await page.waitForTimeout(150);
+    await page.touchscreen.tap(spot.x, spot.y);
+    await aFrame(page);
+    let s = await snapshot(page);
+    expect([s.dialogue.id, s.dialogue.log], 'still the question').toEqual([ask.id, log]);
+    // Settled, a tap picks it.
+    await pick(page, 0, true);
+    const to = ask.choices[0].next;
+    await until(page, (x) => (x.dialogue ? x.dialogue.id === to : true), 'its box');
+    s = await snapshot(page);
+    // (The reply picked, then its box's line.)
+    if (s.dialogue) expect(s.dialogue.log).toBe(log + 2);
   });
 
   test('Auto goes on by itself, box after box', async ({ page }) => {
@@ -385,7 +451,7 @@ test.describe('on a phone', () => {
         const now = await snapshot(page);
         if (now.dialogue?.shot === shot) at[shot] = now.camera.distance;
       }
-      if (s.dialogue.choices) await page.locator('.inv-talk-choice').first().tap();
+      if (s.dialogue.choices) await pick(page, 0, true);
       else await goOn(page, true);
     }
     const shots = Object.keys(at);
@@ -453,7 +519,7 @@ test.describe('on a phone', () => {
     for (let i = 0; i < 40; i++) {
       const s = await snapshot(page);
       if (!s.dialogue) break;
-      if (s.dialogue.choices) await page.locator('.inv-talk-choice').first().tap();
+      if (s.dialogue.choices) await pick(page, 0, true);
       else await page.getByRole('button', { name: 'Skip', exact: true }).tap();
     }
     await expect(box(page)).toBeHidden();
@@ -557,6 +623,58 @@ test.describe('on a desktop', () => {
   test('the replies show under his face: the shot frames him over them', async ({ page }) => {
     await calm(page);
     await repliesClearOfHim(page, false);
+  });
+
+  test('a press that goes on never picks a reply: Enter or Space a frame apart, or every 250 ms; once they’ve settled one does', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    const intro = await script(page);
+    const { ask, before } = askAndBefore(intro);
+    test.skip(!ask || !before, 'no box goes on to the replies');
+    for (const key of ['Enter', 'Space']) {
+      await open(page);
+      for (let i = 0; i < 30; i++) {
+        const s = await snapshot(page);
+        if (s.dialogue.id === before.id && s.dialogue.typed) break;
+        await page.keyboard.press('Enter');
+        await until(page, (x) => x.dialogue.typed || x.dialogue.seq !== s.dialogue.seq, 'on');
+      }
+      await until(page, (s) => s.dialogue.id === before.id && s.dialogue.typed, 'just before the question');
+      // On to the question, its line finished a frame later, and a frame after that one more.
+      await page.keyboard.press(key);
+      await aFrame(page);
+      await page.keyboard.press(key);
+      await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.choices), `${key}: its replies`);
+      const log = (await snapshot(page)).dialogue.log;
+      await aFrame(page);
+      await page.keyboard.press(key);
+      await aFrame(page);
+      expect((await snapshot(page)).dialogue.log, `${key}: a frame apart, no reply`).toBe(log);
+      // Pressed every 250 ms, as someone reading along does: still none.
+      for (let i = 0; i < 6; i++) {
+        await page.waitForTimeout(250);
+        await page.keyboard.press(key);
+      }
+      await aFrame(page);
+      let s = await snapshot(page);
+      expect([s.dialogue.id, s.dialogue.log], `${key}: every 250 ms, no reply`).toEqual([ask.id, log]);
+      // Settled: the focused reply takes the press.
+      await until(page, (x) => Boolean(x.dialogue?.repliesLive), 'settled');
+      await expect(page.locator('.inv-talk-choice').first()).toBeFocused();
+      await page.keyboard.press(key);
+      const to = ask.choices[0].next;
+      await until(page, (x) => (x.dialogue ? x.dialogue.id === to : true), `${key}: picked`);
+      s = await snapshot(page);
+      if (s.dialogue) {
+        expect(s.dialogue.log, 'the reply, then its box’s line').toBe(log + 2);
+        await page.keyboard.press('Escape');
+        await page.keyboard.press('Escape');
+      }
+      await until(page, (x) => !x.dialogue && x.buttonsEnabled, 'ended');
+    }
+    expect(errors).toEqual([]);
   });
 
   test('with reduced motion each line shows at once and the camera cuts to its shot', async ({ page }) => {
