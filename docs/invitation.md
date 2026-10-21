@@ -377,14 +377,15 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   characters a second with a beat after punctuation, Auto's wait 1.1 s plus 0.035 s a character
   between 1.4 and 6 s, 240 characters and 3 replies at most; `lookSway`; main.js runs
   `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
-  `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the
-  stage that takes every press; the line in a live region once, whole), brain.js's `talk` state
-  (`BrainIn.dialogue`: the box's seq, animation, face and whether it's typing; `TUNE.talkNear`,
-  `talkTurn`; `BrainOut.talkReady` once he's in place, which main.js holds the first line for)
-  and camera.js's shots
-  (`orbitTalk`, `shotView`, `orbitShot`, `SHOT`). Each box's face goes to `setFace` as it is
-  (character.js shows its stand-in until its sheet is in, above), and main.js plays a clip the glb
-  lacks (an older copy cached from before the gestures) as Idle.
+  `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
+  press; the line in a live region once, whole), brain.js's `talk` state (`BrainIn.dialogue`: the
+  box's seq, animation, face and whether it's typing; `TUNE.talkNear`, `talkTurn`;
+  `BrainOut.talkReady` once he's in place, which main.js holds the first line for) and
+  camera.js's shots (`orbitTalk`, `shotView`, `orbitShot`, `SHOT`), each framed over the box as
+  its own line has it (the line goes in first) and framed again when the box or the stage changes
+  size. Each box's face goes to `setFace` as it is (character.js shows its stand-in until its
+  sheet is in, above), and main.js plays a clip the glb lacks (an older copy cached from before
+  the gestures) as Idle.
 - **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationLooks`,
   `invitationShader`, `invitationRetro`, `invitationGovernor`, `invitationAtlas`,
   `invitationFace`, `invitationFaceExtra`, `invitationFaceBlink`, `invitationCharacterFaces`,
@@ -415,7 +416,8 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   the play area, and `talk` is what he's saying (speech.js's snapshot: the line up and its
   trigger, when the idle clock comes round). While the intro runs, `dialogue` has the box up
   (`id`, `seq`, `text`, `shown`, `typed`, its replies' targets, `auto`, `paused`, `waiting`: the
-  line holding until he's in place, `logOpen`, `asking`, `camera`, `shot`, the camera's `goal`, his `phase` and the `clips` he's played since
+  line holding until he's in place, `logOpen`, `asking`, `camera`, `shot`, `framed`: the clear
+  space it was framed in (client px, from under the Auto row to the box's top), the camera's `goal`, his `phase` and the `clips` he's played since
   the box came up, `'gait'` for Idle, Walk or Run), and `intro()` is the script
   it runs. `?seed=N` makes the randomness
   repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times

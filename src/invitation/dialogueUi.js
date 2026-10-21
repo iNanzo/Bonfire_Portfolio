@@ -268,13 +268,18 @@ export function createDialogueUi(stage, { onAction, log }) {
     get asking() {
       return !ask.hidden;
     },
-    /** The chat box (main.js frames the shots in the space over it). */
+    /** The chat box (main.js frames the shots in the space over it, and watches its size). */
     get box() {
       return $('.inv-talk-box');
     },
-    /** The Auto, Skip and Log row. */
-    get top() {
-      return $('.inv-talk-top');
+    /**
+     * The space the shots frame him in, client px: from under the Auto, Skip and Log row to the
+     * chat box's top as it's laid out (its rise as the layer opens left out).
+     */
+    clearSpace() {
+      const top = $('.inv-talk-top').getBoundingClientRect().bottom;
+      const bottom = layer.getBoundingClientRect().top + $('.inv-talk-box').offsetTop;
+      return { top, bottom };
     },
     get element() {
       return layer;

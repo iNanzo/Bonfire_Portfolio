@@ -399,6 +399,8 @@ function start(s) {
   let shotSeq = -1;
   /** @type {import('./types.js').DialogueShot|null} the shot showing, for ?test */
   let shot = null;
+  /** @type {{top: number, bottom: number}|null} the clear space the shot was framed in, client px, for ?test */
+  let framed = null;
   /** The intro just ended and the camera is still easing back. */
   let backFromIntro = false;
   /**
@@ -412,10 +414,13 @@ function start(s) {
    */
   const acted = { seq: -1, clips: /** @type {string[]} */ ([]) };
   const talkUi = createDialogueUi(stageEl, { onAction: onTalk, log: () => intro?.log ?? [] });
-  // (A resize while the intro runs: the shot framed again for the new clear space.)
-  new ResizeObserver(() => {
-    if (intro && shot) goToShot(shot, false);
-  }).observe(stageEl);
+  // (A resize while the intro runs, or the chat box growing with a longer line: the shot framed
+  // again for the new clear space.)
+  const reframe = new ResizeObserver(() => {
+    if (intro && shot) goToShot(shot, reducedMotion());
+  });
+  reframe.observe(stageEl);
+  reframe.observe(talkUi.box, { box: 'border-box' });
 
   // (The Look sheet too: it changes height with its hint at Pixel Size Off.)
   const refit = new ResizeObserver(() => s.refit());
@@ -713,6 +718,7 @@ function start(s) {
     introHeld = true;
     shotSeq = -1;
     shot = null;
+    framed = null;
     acted.seq = -1;
     acted.clips = [];
     hover = null;
@@ -763,8 +769,9 @@ function start(s) {
     else if (a.type === 'end') d.end();
     if (d.view.done) endIntro();
     else {
-      shotFor(d.view);
+      // (The new line in the box first: its shot is framed over the box as this line has it.)
       talkUi.render(heldView(d.view));
+      shotFor(d.view);
     }
   }
 
@@ -806,8 +813,8 @@ function start(s) {
       endIntro();
       return null;
     }
-    shotFor(v);
     talkUi.render(heldView(v));
+    shotFor(v);
     return { seq: v.seq, animation: v.box.animation, face: v.box.face, typing: !v.typed };
   }
 
@@ -818,12 +825,14 @@ function start(s) {
    * @param {boolean} cut
    */
   function goToShot(name, cut) {
-    const top = talkUi.top.getBoundingClientRect().bottom + SHOT_MARGIN.top;
-    const bottom = talkUi.box.getBoundingClientRect().top - SHOT_MARGIN.bottom;
+    const space = talkUi.clearSpace();
+    const top = space.top + SHOT_MARGIN.top;
+    const bottom = space.bottom - SHOT_MARGIN.bottom;
     const clear = { h: Math.max(80, bottom - top), raise: shownAt().y - (top + bottom) / 2 };
     const view = shotView(cam, name, clear);
     if (!view) return;
     shot = name;
+    framed = space;
     orbitShot(cam, view, { cut, focus: { x: body.root.x, z: body.root.z } });
   }
 
@@ -1127,6 +1136,7 @@ function start(s) {
       waiting: introHeld,
       camera: v.box?.camera ?? null,
       shot,
+      framed,
       log: d.log.length,
       logOpen: talkUi.logOpen,
       asking: talkUi.asking,

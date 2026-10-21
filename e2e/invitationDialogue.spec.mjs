@@ -4,9 +4,9 @@
 // out near the edge the first line waits until he's walked in and turned (then its line, face and
 // gesture begin together), the line types out, a tap finishes it and the next tap goes on; Skip
 // goes to the box with replies, which show as buttons stacked mid-screen, and picking one goes
-// where it leads; Auto
-// goes on by itself; the Log lists the lines shown and closes again; each box's shot sends the
-// camera nearer or further (close nearer than wide); Escape asks before it skips the intro and a
+// where it leads; Auto goes on by itself; the Log lists the lines shown and closes again; each
+// box's shot sends the camera nearer or further (close nearer than wide), framed over the box as
+// its own line has it and again when the box grows; Escape asks before it skips the intro and a
 // second Escape ends it, Space and Enter go on; reduced motion shows each line at once and cuts
 // the camera; and after the end the toolbar, the camera and his free play come back. The script
 // is read from the page (?test's intro()), never pinned here, and every wait is on a state (it's
@@ -359,6 +359,56 @@ test.describe('on a phone', () => {
     if (at.medium && at.wide) expect(at.medium).toBeLessThan(at.wide);
     if (at.close) expect(at.close).toBeLessThan(home * 0.6);
     if (at.wide) expect(Math.abs(at.wide - home)).toBeLessThan(home * 0.05);
+  });
+
+  test('each shot is framed over the chat box as its own line has it, and framed again when the box grows', async ({
+    page,
+  }) => {
+    await calm(page);
+    // (The box as tall as its line, not three lines' room: lines of different lengths, boxes of
+    // different heights.)
+    await page.addStyleTag({ content: '.inv-talk-text { min-height: 0 !important; }' });
+    await open(page, true);
+    const boxTop = () => box(page).evaluate((el) => el.getBoundingClientRect().top);
+    /** The shot's space ends at the chat box showing now (once it has risen into place). */
+    const framedOverBox = async (seq) => {
+      await until(page, (x) => x.dialogue?.seq === seq && Boolean(x.dialogue.framed), 'framed');
+      await expect
+        .poll(async () => Math.abs((await boxTop()) - (await snapshot(page)).dialogue.framed.bottom))
+        .toBeLessThan(1.5);
+    };
+    let s = await snapshot(page);
+    // The first box's shot, then the box grows under it: framed again over it, further out.
+    test.skip(!['close', 'medium'].includes(s.dialogue.camera), 'the first box isn’t a close or medium shot');
+    await framedOverBox(s.dialogue.seq);
+    await until(
+      page,
+      (x) => Math.abs(x.camera.distance - x.dialogue.goal.distance) < 0.02 * x.dialogue.goal.distance,
+      'at the shot',
+    );
+    const before = (await snapshot(page)).dialogue;
+    const grow = await page.addStyleTag({ content: '.inv-talk-box { padding-top: 200px !important; }' });
+    await until(page, (x) => x.dialogue.framed.bottom < before.framed.bottom - 60, 'framed over the taller box');
+    await framedOverBox(s.dialogue.seq);
+    expect((await snapshot(page)).dialogue.goal.distance).toBeGreaterThan(before.goal.distance);
+    await grow.evaluate((el) => el.remove());
+    await until(page, (x) => Math.abs(x.dialogue.framed.bottom - before.framed.bottom) < 1.5, 'and back');
+    // Box by box: each shot framed for its own line's box, whatever the last one's was.
+    const tops = new Set();
+    for (let i = 0; i < 6; i++) {
+      s = await snapshot(page);
+      if (!s.dialogue || s.dialogue.choices) break;
+      if (s.dialogue.camera !== 'keep') {
+        await framedOverBox(s.dialogue.seq);
+        tops.add(Math.round(await boxTop()));
+      }
+      await goOn(page, true);
+      const now = (await snapshot(page)).dialogue;
+      if (now?.choices) break;
+      if (now?.seq === s.dialogue.seq) await goOn(page, true);
+      await until(page, (x) => !x.dialogue || x.dialogue.seq > s.dialogue.seq, 'on');
+    }
+    expect(tops.size, 'boxes of different heights').toBeGreaterThan(1);
   });
 
   test('after the end the toolbar, the camera and his free play come back', async ({ page }) => {
