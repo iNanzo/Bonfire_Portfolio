@@ -384,9 +384,9 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
 - **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationLooks`,
   `invitationShader`, `invitationRetro`, `invitationGovernor`, `invitationAtlas`,
   `invitationFace`, `invitationFaceExtra`, `invitationFaceBlink`, `invitationCharacterFaces`,
-  `invitationArea`, `invitationCamera` and `invitationPlay` (with
-  `invitationBrain`, `invitationMotion`, `invitationGesture` and `invitationModel`),
-  `invitationDialogue` (the runner and the placeholder), the speech and content tests above,
+  `invitationArea`, `invitationCamera` and `invitationPlay` (with `invitationBrain`,
+  `invitationMotion`, `invitationGesture` and `invitationModel`), `invitationDialogue` (the
+  runner, and content.js's intro as it plays), the speech and content tests above,
   `e2e/invitation.spec.mjs` and `e2e/invitationDialogue.spec.mjs` (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
