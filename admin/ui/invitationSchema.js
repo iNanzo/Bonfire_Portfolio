@@ -184,7 +184,7 @@ export const INVITATION_HELP = {
   [`${BOX}.animation`]:
     'What he does as the line starts: a gesture plays once, then he talks on; a loop keeps going. None: as he was.',
   [`${BOX}.camera`]:
-    'The shot for this line, eased there: Close is his head and shoulders, Medium his whole body, Wide the usual view.',
+    'The shot for this line, eased there: Close is his head and shoulders (too tight for a Cheer on a phone), Medium his whole body, Wide the usual view.',
   [`${BOX}.next`]: 'Where a tap goes after this line: another box, or the box after it in the list.',
   [`${BOX}.end`]: 'The intro ends after this line, whatever comes after it in the list, and he’s free to play again.',
   [`${BOX}.auto`]:

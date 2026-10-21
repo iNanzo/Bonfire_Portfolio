@@ -2090,7 +2090,7 @@
           "text": "Me? Really?! Stop it, you’ll make my pixels blush.",
           "face": "shy",
           "animation": "Cheer",
-          "camera": "close",
+          "camera": "medium",
           "next": "job",
           "end": false,
           "auto": 0,
