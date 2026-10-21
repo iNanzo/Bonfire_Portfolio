@@ -4,13 +4,102 @@
 // load shares). invitationLines() is each trigger's lines (speech.js linesFrom), speechSettings()
 // the quiet spell and each trigger's chance and cooldown (speechFrom), invitationDefaults() the
 // Default style's look as the toy stores it (the fields with the right types; look.js validLook
-// checks their values, and the admin's override the built-in Default). Missing or broken, each
-// falls back: no lines (he stays quiet), the built-in speech settings, {} (the built-in look).
+// checks their values, and the admin's override the built-in Default), introScript() the chat
+// Play Intro opens (introFrom: types.js DialogueScript, each box's flow spelled out). Missing or
+// broken, each falls back: no lines (he stays quiet), the built-in speech settings, {} (the
+// built-in look), the toy's own short intro (FALLBACK_INTRO; a broken part of the admin's is
+// mended on its own).
 /// <reference path="./virtualContent.d.ts" />
 import raw from 'virtual:invitation-content';
+import { DIALOGUE_CLIPS, FACE_NAMES } from './clips.js';
 import { linesFrom, speechFrom } from './speech.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/** A box's camera shots (types.js DialogueShot; the admin lists contentRules.js INTRO_CAMERAS, the same). */
+const SHOTS = ['close', 'medium', 'wide', 'keep'];
+/** The most choices a box offers (contentRules.js INTRO_CHOICES_MAX). */
+const CHOICES_MAX = 3;
+
+/**
+ * The toy's own intro, for content with none (or none it can play): short, in NEWT's voice, as
+ * introFrom gives it. The admin's Start From the Toy’s Own (invitationSchema.js) is this one too.
+ * @type {import('./types.js').DialogueScript}
+ */
+export const FALLBACK_INTRO = {
+  speaker: 'NEWT',
+  start: 'hi',
+  boxes: [
+    { id: 'hi', text: 'Oh, hi! I’m NEWT.', face: 'happy', animation: 'Wave', camera: 'medium', next: 'soon' },
+    {
+      id: 'soon',
+      text: 'Something’s on its way to you. Keep an eye out!',
+      face: 'smug',
+      animation: 'Point',
+      camera: 'close',
+      next: 'bye',
+    },
+    {
+      id: 'bye',
+      text: 'Until then, poke me all you like.',
+      face: 'happy',
+      animation: 'Cheer',
+      camera: 'wide',
+      end: true,
+    },
+  ],
+};
+
+/**
+ * The intro as the toy plays it (types.js DialogueScript), from anything: content.json's
+ * `invitation.intro` as the admin writes it (every field there, the optional ones empty) or one
+ * made by hand. Each box's flow is spelled out, so it has exactly one of: its choices (the ones
+ * with words that lead to a box, at most 3), `end: true`, or `next` (its own Next when that box is
+ * there, else the box after it; the last box ends it). An empty speaker or Auto wait is left out;
+ * a face, animation or camera off the toy's lists is neutral, none or keep; a box with no id, or
+ * an id an earlier box has, is left out; the start is the first box when it isn't there; with no
+ * box left, the toy's own intro (a copy of FALLBACK_INTRO).
+ * @param {unknown} data  content.json's `invitation.intro`
+ * @returns {import('./types.js').DialogueScript}
+ */
+export function introFrom(data) {
+  const o = /** @type {Record<string, any>} */ (isObj(data) ? data : {});
+  const ids = new Set();
+  const kept = (Array.isArray(o.boxes) ? o.boxes : []).filter((b) => {
+    const ok = isObj(b) && typeof b.id === 'string' && b.id !== '' && !ids.has(b.id);
+    if (ok) ids.add(b.id);
+    return ok;
+  });
+  if (!kept.length) return structuredClone(FALLBACK_INTRO);
+  const words = (v) => (typeof v === 'string' ? v.trim() : '');
+  const boxes = kept.map((b, i) => {
+    /** @type {import('./types.js').DialogueBox} */
+    const box = {
+      id: b.id,
+      text: words(b.text),
+      face: FACE_NAMES.includes(b.face) ? b.face : 'neutral',
+      animation: DIALOGUE_CLIPS.includes(b.animation) ? b.animation : 'none',
+      camera: SHOTS.includes(b.camera) ? b.camera : 'keep',
+    };
+    if (words(b.speaker)) box.speaker = words(b.speaker);
+    if (typeof b.auto === 'number' && Number.isFinite(b.auto) && b.auto > 0) box.auto = b.auto;
+    const choices = (Array.isArray(b.choices) ? b.choices : [])
+      .filter((c) => isObj(c) && words(c.label) && ids.has(c.next))
+      .slice(0, CHOICES_MAX)
+      .map((c) => ({ label: words(c.label), next: c.next }));
+    if (choices.length) box.choices = choices;
+    else if (b.end === true) box.end = true;
+    else if (ids.has(b.next)) box.next = b.next;
+    else if (i + 1 < kept.length) box.next = kept[i + 1].id;
+    else box.end = true;
+    return box;
+  });
+  return {
+    speaker: words(o.speaker) || FALLBACK_INTRO.speaker,
+    start: ids.has(o.start) ? o.start : boxes[0].id,
+    boxes,
+  };
+}
 
 /**
  * The Default look's fields as stored (look.js Look): the strings and switches kept when they
@@ -30,13 +119,18 @@ function defaultsFrom(d) {
 }
 
 /**
- * Content from anything (the virtual module's, or a test's): the lines, the speech settings and
- * the Default look.
+ * Content from anything (the virtual module's, or a test's): the lines, the speech settings, the
+ * Default look and the intro.
  * @param {unknown} data  content.json's `invitation`
  */
 export function readContent(data) {
   const o = /** @type {Record<string, unknown>} */ (isObj(data) ? data : {});
-  return { lines: linesFrom(o.lines), speech: speechFrom(o.speech), defaults: defaultsFrom(o.defaults) };
+  return {
+    lines: linesFrom(o.lines),
+    speech: speechFrom(o.speech),
+    defaults: defaultsFrom(o.defaults),
+    intro: introFrom(o.intro),
+  };
 }
 
 const content = readContent(raw);
@@ -47,3 +141,5 @@ export const invitationLines = () => content.lines;
 export const speechSettings = () => content.speech;
 /** The Default style's look as stored (a copy each time), for look.js validLook. */
 export const invitationDefaults = () => structuredClone(content.defaults);
+/** The intro Play Intro opens, as the toy plays it (introFrom; a copy each time). */
+export const introScript = () => structuredClone(content.intro);

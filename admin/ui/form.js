@@ -1,7 +1,11 @@
 // The editor: renders any part of content.json as a form and writes edits back
 // into the draft. Lists of entries are cards (drag or ↑/↓ to reorder, hide, delete,
-// add); lists of text and table rows get row editors; `images` gets the image
-// manager; ranged numbers get sliders and #rrggbb text gets a color picker. Bonfire
+// add; schema.js NO_HIDING lists can't hide, MAX_ENTRIES caps a list, CARD_META says
+// what an entry is under its title); lists of text and table rows get row editors;
+// `images` gets the image manager; a field with a SELECTS list is a dropdown (the list
+// made from the draft and the field's own path, so it can keep what the field holds;
+// one made from a list in the draft, OPTIONS_FROM, remade as that list is edited);
+// ranged numbers get sliders and #rrggbb text gets a color picker. Bonfire
 // Live's scenes get cards of their own (sceneTools.js: made in the Painter, so a card
 // shows a scene's colors and summary rather than its ~80 settings). Every
 // field carries data-path (e.g. projects[2].images[0].alt) so validation messages
@@ -17,13 +21,17 @@
 // (el.js): the deployed admin's policy blocks style attributes.
 import {
   ADD_LABELS,
+  CARD_META,
   COLUMNS,
   FIXED,
   HELP,
   LABELS,
+  MAX_ENTRIES,
   MULTILINE,
   MULTILINE_LISTS,
+  NO_HIDING,
   NULLABLE,
+  OPTIONS_FROM,
   READONLY,
   SELECTS,
   SHORT,
@@ -43,7 +51,7 @@ import { sceneCardBody, sceneMeta, sceneThumb } from './sceneTools.js';
 import { titleCase } from './text.js';
 import { ELEMENT_IDS } from '../../src/effectsDefaults.js';
 import { el } from './el.js';
-import { getAt, keyOf, patternOf } from './paths.js';
+import { getAt, keyOf, parsePath, patternOf, within } from './paths.js';
 
 export { el, getAt, keyOf, patternOf };
 const setAt = (obj, path, value) => {
@@ -298,11 +306,15 @@ function elementFoot(id, ctx) {
 function renderScalar(value, path, ctx, { nullable = hint(NULLABLE, patternOf(path)), multiline } = {}) {
   const pattern = patternOf(path);
   const key = path.at(-1);
-  const options = SELECTS[pattern]?.(ctx.draft);
+  const options = SELECTS[pattern]?.(ctx.draft, path);
   if (options) {
     const select = el(
       'select',
-      { onchange: () => update(path, typeof value === 'number' ? Number(select.value) : select.value, ctx) },
+      {
+        onchange: () => update(path, typeof value === 'number' ? Number(select.value) : select.value, ctx),
+        'data-options-from': hint(OPTIONS_FROM, pattern) ?? null,
+        'data-options-for': hint(OPTIONS_FROM, pattern) ? keyOf(path) : null,
+      },
       options.map((o) => el('option', { value: String(o.value), text: o.label })),
     );
     select.value = String(value);
@@ -389,6 +401,8 @@ function scopeIds(ctx, parent) {
   if (flames.includes(parent)) return { taken: flames, fallback: 'flame' };
   const scenes = ctx.draft.scenes ?? [];
   if (scenes.includes(parent)) return { taken: scenes, fallback: 'scene' };
+  const boxes = ctx.draft.invitation?.intro?.boxes ?? [];
+  if (Array.isArray(boxes) && boxes.includes(parent)) return { taken: boxes, fallback: 'box' };
   return { taken: [ctx.draft.featured, ...ctx.draft.projects, ...ctx.draft.archive], fallback: 'project' };
 }
 function uniqueId(base, ctx, self) {
@@ -423,7 +437,25 @@ function update(path, value, ctx) {
     const sw = /** @type {HTMLElement | null} */ (document.querySelector(`[data-swatch="${CSS.escape(keyOf(path))}"]`));
     if (sw) sw.style.setProperty('background', value);
   }
+  refreshOptions(keyOf(path), ctx);
   ctx.changed();
+}
+
+/**
+ * Remake the dropdowns made from a list in the draft (schema.js OPTIONS_FROM) that the edit at
+ * `edited` is in, so a box renamed is there to pick (and one gone shows, marked) as it's typed.
+ * @param {string} edited @param {*} ctx
+ */
+function refreshOptions(edited, ctx) {
+  for (const select of /** @type {NodeListOf<HTMLSelectElement>} */ (
+    document.querySelectorAll('[data-options-from]')
+  )) {
+    if (!within(edited, select.getAttribute('data-options-from'))) continue;
+    const at = parsePath(select.getAttribute('data-options-for'));
+    const options = SELECTS[patternOf(at)]?.(ctx.draft, at) ?? [];
+    select.replaceChildren(...options.map((o) => el('option', { value: String(o.value), text: o.label })));
+    select.value = String(getAt(ctx.draft, at) ?? '');
+  }
 }
 
 function renderTodo(obj, path, ctx) {
@@ -522,21 +554,23 @@ function addEntry(list, path, ctx) {
   ctx.changed({ rerender: true });
 }
 
-/** Lists of entries (projects, roles, skills, flames…): one card each. */
+/** Lists of entries (projects, roles, skills, flames…): one card each; “+ Add” until it's full. */
 function renderCollection(list, path, ctx, level = 3) {
   const fixed = hint(FIXED, patternOf(path));
+  const max = hint(MAX_ENTRIES, patternOf(path));
   const box = el('div', { class: 'collection' });
   list.forEach((item, i) => box.append(renderCard(list, i, path, ctx, fixed, level)));
   if (!fixed) {
     sortable(box, list, ctx);
-    box.append(
-      el('button', {
-        type: 'button',
-        class: 'add',
-        text: `+ Add ${addLabel(path)}`,
-        onclick: () => addEntry(list, path, ctx),
-      }),
-    );
+    if (max === undefined || list.length < max)
+      box.append(
+        el('button', {
+          type: 'button',
+          class: 'add',
+          text: `+ Add ${addLabel(path)}`,
+          onclick: () => addEntry(list, path, ctx),
+        }),
+      );
   }
   return box;
 }
@@ -545,7 +579,9 @@ const isProjectPath = (path) => path.length === 1 && (path[0] === 'projects' || 
 const isFlamePath = (path) => patternOf(path) === 'effects.flames';
 const isScenePath = (path) => patternOf(path) === 'scenes';
 
-function cardMeta(item, path) {
+function cardMeta(item, path, list = [], i = 0) {
+  const own = hint(CARD_META, patternOf(path));
+  if (own) return own(item, list, i);
   if (isProjectPath(path) || path[0] === 'featured') {
     const n = shownImages(item).length;
     const hiddenN = (item.images?.length ?? 0) - n;
@@ -645,7 +681,7 @@ function renderCard(list, i, path, ctx, fixed, level = 3) {
     : [
         isFlame ? flameQuickRoll(item, ctx) : null,
         ...orderButtons(list, i, ctx),
-        eyeButton(item, () => ctx.changed({ rerender: true }), eyeWords),
+        hint(NO_HIDING, patternOf(path)) ? null : eyeButton(item, () => ctx.changed({ rerender: true }), eyeWords),
         iconButton(
           'Delete',
           '✕',
@@ -661,7 +697,7 @@ function renderCard(list, i, path, ctx, fixed, level = 3) {
       ];
   const card = cardShell(item, ipath, ctx, {
     title: titleOf(item, i),
-    meta: isScene ? sceneMeta(item) : cardMeta(item, path),
+    meta: isScene ? sceneMeta(item) : cardMeta(item, path, list, i),
     thumb:
       isProject && cover
         ? el('img', { class: 'card-thumb', alt: '', src: ctx.thumb(cover.src), loading: 'lazy' })

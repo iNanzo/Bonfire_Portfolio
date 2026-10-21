@@ -172,7 +172,7 @@ test('content.js: the lines, the speech settings and the default look, with fall
     return next(spec, ctx);
   }`;
   register(`data:text/javascript,${encodeURIComponent(hooks)}`);
-  const { invitationDefaults, invitationLines, readContent, speechSettings } =
+  const { introFrom, invitationDefaults, invitationLines, readContent, speechSettings } =
     await import('../src/invitation/content.js');
   const inv = content().invitation;
   assert.deepEqual(invitationLines(), linesFrom(inv.lines));
@@ -180,9 +180,14 @@ test('content.js: the lines, the speech settings and the default look, with fall
   assert.deepEqual(invitationDefaults(), inv.defaults);
   invitationDefaults().shader.levels = 99;
   assert.equal(invitationDefaults().shader.levels, inv.defaults.shader.levels, 'a copy each time');
-  // Missing or broken: no lines (he stays quiet), the built-in speech, the built-in look.
-  for (const raw of [undefined, null, 'x', {}, { lines: 'x', speech: 3, defaults: [] }])
-    assert.deepEqual(readContent(raw), { lines: {}, speech: speechFrom(undefined), defaults: {} }, String(raw));
+  // Missing or broken: no lines (he stays quiet), the built-in speech, the built-in look, the
+  // toy's own intro (test/invitationIntro.test.mjs has the intro).
+  for (const raw of [undefined, null, 'x', {}, { lines: 'x', speech: 3, defaults: [], intro: 'x' }])
+    assert.deepEqual(
+      readContent(raw),
+      { lines: {}, speech: speechFrom(undefined), defaults: {}, intro: introFrom(undefined) },
+      String(raw),
+    );
   assert.deepEqual(
     readContent({ defaults: { pixelSize: 128, dither: 'yes', outlines: false, style: 'soft', shader: 'x', extra: 1 } })
       .defaults,
