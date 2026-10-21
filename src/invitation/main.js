@@ -30,6 +30,16 @@
 // lowest his collar is carried comes from the Held clip at load (his collar over his lowest
 // sole, plus a gap).
 //
+// Play Intro (ui.js) runs the intro's dialogue (dialogue.js, the script from intro.js) on the toy's
+// clock, shown by dialogueUi.js over the stage: the toolbar rests out of sight, the speech bubble
+// goes and stays quiet, the layer takes every press (no drags, no orbit, no floor taps), the brain
+// acts each box out (brain.js's talk state: BrainIn.dialogue, its face falling back to the nearest
+// of his first four while a face sheet lacks it, a clip the glb lacks playing as Idle), he looks
+// at the camera with a little sway (dialogue.js lookSway), and the camera goes to each box's shot
+// (camera.js shotView and orbitShot, framed in the clear space over the box; cut with reduced
+// motion). At the end the camera eases back to the view before, and his free play, the toolbar and
+// the bubble come back.
+//
 // Without WebGL the stage gets data-webgl="off" and a plain message. `?test` exposes
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
 // (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
@@ -43,6 +53,7 @@ import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
 import './bubble.css';
+import './dialogue.css';
 import { createBrain } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
 import { invitationDefaults, invitationLines, speechSettings } from './content.js';
@@ -58,17 +69,23 @@ import {
   orbitPose,
   orbitRelease,
   orbitReset,
+  orbitShot,
   orbitSpan,
   orbitSpot,
   orbitStep,
+  orbitTalk,
   orbitTurning,
   orbitWheel,
+  shotView,
 } from './camera.js';
 import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
+import { createDialogue, lookSway } from './dialogue.js';
+import { createDialogueUi } from './dialogueUi.js';
 import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
+import { introScript } from './intro.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
 import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
 import { createLook, lookStep, torsoStep } from './lookAt.js';
@@ -104,6 +121,14 @@ const RIGHT_MENU_MS = 1000;
 /** States remembered for ?test (the last ones, in order). */
 const STATES_KEPT = 40;
 /**
+ * The nearest of his first four faces for each of the dialogue's extra ones, shown while his face
+ * sheet has no cell for it (character.js before the extra sheet is in).
+ * @type {Record<string, import('./clips.js').FaceName>}
+ */
+const FACE_FALLBACK = { sad: 'neutral', angry: 'neutral', shy: 'happy', smug: 'happy' };
+/** The space a shot frames him in keeps this far off the Auto row and the chat box (its name tab too), CSS px. */
+const SHOT_MARGIN = { top: 10, bottom: 30 };
+/**
  * The shadow camera reaches this high over the floor most of the time, world units (stage.js's,
  * what his shadow's texels were tuned for); higher only while he's carried up past it
  * (floor.js shadowTop).
@@ -127,6 +152,8 @@ let look = loadLook();
 let pressed = null;
 /** Reset Camera was pressed since the last frame. */
 let resetCamera = false;
+/** Play Intro was pressed since the last frame. */
+let introPressed = false;
 const ui = bindUi(stageEl, {
   look,
   onButton: (name) => {
@@ -137,6 +164,9 @@ const ui = bindUi(stageEl, {
     resetCamera = true;
   },
   onSheet,
+  onIntro: () => {
+    introPressed = true;
+  },
 });
 
 /** @param {import('./look.js').Look} next */
@@ -306,7 +336,7 @@ function start(s) {
   const seed = options.seed ?? Math.floor(Math.random() * 2 ** 31);
   const rng = createRng(seed + 1);
   setArea(areaOf(s));
-  const brain = createBrain({ seed, calm: options.calm, bounds: area });
+  const brain = createBrain({ seed, calm: options.calm, bounds: area, middle: centreOf(s.bounds) });
   const gesture = createGesture();
   const body = createBody();
   const mix = createMix();
@@ -362,6 +392,19 @@ function start(s) {
   let warmed = false;
   /** The toolbar as last set, so the DOM is only touched on a change. */
   const shown = { sit: 'Sit', wander: /** @type {boolean|null} */ (null), enabled: true };
+  /** @type {ReturnType<typeof createDialogue>|null} the intro under way (Play Intro) */
+  let intro = null;
+  /** The box whose shot the camera last went to (dialogue.js DialogueView seq). */
+  let shotSeq = -1;
+  /** @type {import('./types.js').DialogueShot|null} the shot showing, for ?test */
+  let shot = null;
+  /** The intro just ended and the camera is still easing back. */
+  let backFromIntro = false;
+  const talkUi = createDialogueUi(stageEl, { onAction: onTalk, log: () => intro?.log ?? [] });
+  // (A resize while the intro runs: the shot framed again for the new clear space.)
+  new ResizeObserver(() => {
+    if (intro && shot) goToShot(shot, false);
+  }).observe(stageEl);
 
   // (The Look sheet too: it changes height with its hint at Pixel Size Off.)
   const refit = new ResizeObserver(() => s.refit());
@@ -580,8 +623,13 @@ function start(s) {
     t += dt;
     // 1. Gestures and buttons; the camera takes the orbits, pinches and Reset Camera.
     take(gesture.tick(wall));
-    const evs = events;
+    // (While the intro runs the layer over the stage takes every press: none reach the brain or
+    // the camera.)
+    const evs = intro ? [] : events;
     events = [];
+    if (introPressed) beginIntro();
+    introPressed = false;
+    const box = introStep();
     const pose = moveCamera(evs, dt);
     const ptr = pointerNow();
     const button = pressed;
@@ -597,9 +645,16 @@ function start(s) {
       voice();
       return;
     }
-    // 2. The brain, then what he says.
-    const o = think(c, evs, button, ptr, dt);
-    speak(o, evs, button, dt);
+    // 2. The brain, then what he says (nothing while the intro runs).
+    const o = think(c, evs, intro ? null : button, ptr, dt, box);
+    // (A clip the glb doesn't have yet plays as the gait: Idle standing still.)
+    if (o.clip !== 'gait' && !c.has(o.clip)) {
+      o.clip = 'gait';
+      o.restart = false;
+    }
+    // (Quiet too while the camera eases back after it: its close shots aren't the visitor's zoom.)
+    if (backFromIntro && !cam.resetting) backFromIntro = false;
+    if (!intro && !backFromIntro) speak(o, evs, button, dt);
     // 3. His root: steer, carry or the fall.
     moveRoot(c, o, ptr, dt);
     // 4. The mix and the step phase.
@@ -619,9 +674,117 @@ function start(s) {
       ease: o.look.ease,
       at: o.look.at ?? null,
     };
-    finish(c, ptr, pose, dt, want, o.face, o.blink, moved);
+    finish(c, intro ? null : ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
     voice();
+  }
+
+  /** Whether the visitor asked for less motion (false where it can't be read). */
+  function reducedMotion() {
+    try {
+      return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Play Intro: the dialogue starts from its first box (when the buttons are on: never while he's
+   * held or falling); the toolbar rests, the bubble goes, the camera turns to the front.
+   */
+  function beginIntro() {
+    if (intro || !out?.buttonsEnabled || ui.sheetOpen) return;
+    intro = createDialogue(introScript(), { reduced: reducedMotion() });
+    intro.start(t);
+    shotSeq = -1;
+    shot = null;
+    hover = null;
+    bubble.hide();
+    ui.setTalking(true);
+    orbitTalk(cam, true);
+    talkUi.open();
+  }
+
+  /** The intro's over: the layer goes, the camera eases back, the toolbar and free play return. */
+  function endIntro() {
+    intro = null;
+    shot = null;
+    talkUi.close();
+    orbitTalk(cam, false);
+    backFromIntro = true;
+    ui.setTalking(false);
+  }
+
+  /**
+   * The visitor pressed something on the dialogue's screen.
+   * @param {import('./dialogueUi.js').TalkAction} a
+   */
+  function onTalk(a) {
+    const d = intro;
+    if (!d) return;
+    if (a.type === 'advance') d.advance(t);
+    else if (a.type === 'choose') d.choose(a.index, t);
+    else if (a.type === 'auto') d.setAuto(a.on, t);
+    else if (a.type === 'skip') d.skip(t);
+    else if (a.type === 'pause') d.pause(a.on, t);
+    else if (a.type === 'end') d.end();
+    if (d.view.done) endIntro();
+    else {
+      shotFor(d.view);
+      talkUi.render(d.view);
+    }
+  }
+
+  /**
+   * A new box sends the camera to its shot (cut with reduced motion), as soon as it's up.
+   * @param {import('./dialogue.js').DialogueView} v
+   */
+  function shotFor(v) {
+    if (!v.box || v.seq === shotSeq) return;
+    shotSeq = v.seq;
+    goToShot(v.box.camera, reducedMotion());
+  }
+
+  /**
+   * The intro this frame: its clock moves on (the typing, Auto), a new box sends the camera to its
+   * shot, and the screen shows it. What the brain gets (BrainIn.dialogue), or null.
+   * @returns {import('./types.js').DialogueIn|null}
+   */
+  function introStep() {
+    if (!intro) return null;
+    const v = intro.step(t);
+    if (v.done || !v.box) {
+      endIntro();
+      return null;
+    }
+    shotFor(v);
+    talkUi.render(v);
+    return { seq: v.seq, animation: v.box.animation, face: v.box.face, typing: !v.typed };
+  }
+
+  /**
+   * The camera to a box's shot (keep: as it is), framed in the clear space between the Auto row
+   * and the chat box.
+   * @param {import('./types.js').DialogueShot} name
+   * @param {boolean} cut
+   */
+  function goToShot(name, cut) {
+    const top = talkUi.top.getBoundingClientRect().bottom + SHOT_MARGIN.top;
+    const bottom = talkUi.box.getBoundingClientRect().top - SHOT_MARGIN.bottom;
+    const clear = { h: Math.max(80, bottom - top), raise: shownAt().y - (top + bottom) / 2 };
+    const view = shotView(cam, name, clear);
+    if (!view) return;
+    shot = name;
+    orbitShot(cam, view, { cut, focus: { x: body.root.x, z: body.root.z } });
+  }
+
+  /**
+   * Where the camera faces him from while the intro runs: its goal's way round from him (he turns
+   * to where it's going, not to where it is on the way).
+   */
+  function talkSpot() {
+    const d = cam.goal.distance * Math.cos(cam.goal.elevation);
+    return { x: body.root.x + d * Math.sin(cam.goal.yaw), z: body.root.z + d * Math.cos(cam.goal.yaw) };
   }
 
   /**
@@ -673,7 +836,7 @@ function start(s) {
    */
   function moveCamera(evs, dt) {
     orbitEvents(cam, evs, evs.some((e) => e.type === 'pan') ? shownAt() : null);
-    if (resetCamera) orbitReset(cam);
+    if (resetCamera && !intro) orbitReset(cam);
     resetCamera = false;
     orbitHold(cam, body.mode === 'held');
     orbitStep(cam, dt, { x: body.root.x, z: body.root.z, y: Math.max(0, body.root.y) });
@@ -692,8 +855,9 @@ function start(s) {
    * @param {import('./types.js').ButtonName|null} button
    * @param {ReturnType<typeof pointerNow>} ptr
    * @param {number} dt
+   * @param {import('./types.js').DialogueIn|null} [dialogue]  the intro's box, while it runs
    */
-  function think(c, evs, button, ptr, dt) {
+  function think(c, evs, button, ptr, dt, dialogue = null) {
     const playing = out && out.clip !== 'gait' ? out.clip : null;
     const time = playing ? c.timeOf(playing) : 0;
     const o = brain.step({
@@ -705,7 +869,8 @@ function start(s) {
       newt: { x: body.root.x, z: body.root.z, yaw: body.body.yaw, grounded: body.grounded },
       clip: playing ? { name: playing, time, remaining: c.clipLength(playing) - time } : null,
       carry: body.carry ? carryFeel(body.carry) : null,
-      camera: orbitSpot(cam),
+      camera: dialogue ? talkSpot() : orbitSpot(cam),
+      dialogue,
     });
     if (states.at(-1) !== o.state) {
       states.push(o.state);
@@ -832,11 +997,16 @@ function start(s) {
       pointer: ptr && !ptr.pinch ? { floor: ptr.floor, onNewt: ptr.onNewt, ray: s.ray(ptr.x, ptr.y) } : null,
       pursuer: want.at ?? null,
     });
-    lookStep(gaze, want.mode, aim, dt, t, rng, want.weight, ahead, want.ease);
+    // (Talking, a little sway on his look at the camera, so it's never a fixed stare.)
+    const sway = intro && aim ? lookSway(t) : null;
+    const at = sway && aim ? { yaw: aim.yaw + sway.yaw, pitch: aim.pitch + sway.pitch } : aim;
+    lookStep(gaze, want.mode, at, dt, t, rng, want.weight, ahead, want.ease);
     // (His chest joins in on his feet only: held, his collar hangs from the cursor.)
     torso = torsoStep(torso, body.mode === 'ground', dt);
     if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight, torso);
-    c.setFace(forcedFace ?? faceStep(faces, face, blink, t, rng));
+    const f = forcedFace ?? faceStep(faces, face, blink, t, rng);
+    c.setFace(f);
+    if (c.face !== f && FACE_FALLBACK[f]) c.setFace(FACE_FALLBACK[f]);
     s.setBlob(root.position.x, root.position.z, body.mode === 'ground' ? 0 : Math.min(1, root.position.y / 0.5));
     if (sun)
       fitShadow(sun, s.bounds, shadowTop(root.position.y, SHADOW_TOP), { x: root.position.x, z: root.position.z });
@@ -888,6 +1058,34 @@ function start(s) {
    * dialogue face's sheet is in), for ?test's snapshot.
    */
   const facesNow = () => ({ face: character?.face ?? 'neutral', faceShown: character?.faceShown ?? 'neutral' });
+
+  /** The intro for ?test, while it runs (else null). */
+  function introSnapshot() {
+    const d = intro;
+    if (!d) return null;
+    const v = d.view;
+    return {
+      id: v.box?.id ?? null,
+      seq: v.seq,
+      speaker: v.speaker,
+      text: v.box?.text ?? '',
+      shown: v.shown,
+      length: v.length,
+      typed: v.typed,
+      choices: v.choices ? v.choices.map((c) => c.next) : null,
+      auto: v.auto,
+      paused: v.paused,
+      camera: v.box?.camera ?? null,
+      shot,
+      log: d.log.length,
+      logOpen: talkUi.logOpen,
+      asking: talkUi.asking,
+      goal: { ...cam.goal },
+      // (His part: getting up, walking in, turning to the camera, talking.)
+      phase: brain.snapshot().talk?.phase ?? null,
+    };
+  }
+
   if (options.test) {
     /** @type {any} */ (window).__invitation = {
       snapshot: () => ({
@@ -940,6 +1138,10 @@ function start(s) {
         cameraHome: { ...cam.home },
         // (What he's saying: the line up and its trigger, when the idle clock comes round.)
         talk: talk.snapshot(),
+        // (The intro, while it runs: the box up, its typing, its replies' targets, Auto, the
+        // Log and the question, the shot and where the camera's going.)
+        dialogue: introSnapshot(),
+        toolbarTalking: ui.talking,
         options,
       }),
       /** @param {'head'|'body'|'feet'} part */
@@ -989,6 +1191,8 @@ function start(s) {
         forcedFace = FACE_NAMES.includes(/** @type {any} */ (name)) ? /** @type {any} */ (name) : null;
         return forcedFace !== null;
       },
+      /** The intro's script as Play Intro runs it (intro.js introScript). */
+      intro: () => introScript(),
       /** @param {string|null} clip */
       play(clip) {
         forced = clip;
