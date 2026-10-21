@@ -7,7 +7,7 @@
 // press until the presses that went on have settled, and picking one goes where it leads; Auto goes on by itself; the Log lists the lines shown and closes again; each
 // box's shot sends the camera nearer or further (close nearer than wide), framed over the box as
 // its own line has it and again when the box grows; Escape asks before it skips the intro and a
-// second Escape ends it, Space and Enter go on; reduced motion shows each line at once and cuts
+// second Escape ends it, Space and Enter go on (after a click on Auto, Skip or Log too); reduced motion shows each line at once and cuts
 // the camera; and after the end the toolbar, the camera and his free play come back. The script
 // is read from the page (?test's intro()), never pinned here, and every wait is on a state (it's
 // content.json's intro, as content.js reads it). Down every reply each box shows its face (the
@@ -427,7 +427,8 @@ test.describe('on a phone', () => {
     expect((await snapshot(page)).dialogue.seq).toBe(s.dialogue.seq);
     await log.getByRole('button', { name: 'Close' }).tap();
     await expect(log).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Log', exact: true })).toBeFocused();
+    // (Closed with a tap: focus back where a key goes on, not on the Log button.)
+    await expect(page.locator('.inv-talk')).toBeFocused();
     await until(page, (x) => !x.dialogue.paused, 'on again');
   });
 
@@ -596,6 +597,53 @@ test.describe('on a desktop', () => {
     await until(page, (s) => !s.dialogue && s.state !== 'talk', 'ended');
     await expect(playIntro(page)).toBeFocused();
     expect(errors).toEqual([]);
+  });
+
+  test('after a click on Auto, Skip or Log, Space and Enter still go on; from the keyboard, focus stays on the button', async ({
+    page,
+  }) => {
+    await calm(page);
+    await open(page);
+    const layer = page.locator('.inv-talk');
+    const logBtn = page.getByRole('button', { name: 'Log', exact: true });
+    const autoBtn = page.getByRole('button', { name: 'Auto', exact: true });
+    const log = page.getByRole('dialog', { name: 'Log' });
+    /** Waits for the line, then `key` goes on to the next box (and opens nothing). */
+    const goesOn = async (key, why) => {
+      await until(page, (s) => s.dialogue.typed && !s.dialogue.paused, `${why}: the line up`);
+      const seq = (await snapshot(page)).dialogue.seq;
+      await page.keyboard.press(key);
+      await until(page, (s) => !s.dialogue || s.dialogue.seq === seq + 1, `${why}: ${key} goes on`);
+      await expect(log).toBeHidden();
+    };
+    // The Log opened with a click and closed with Escape, or with a click on Close.
+    await logBtn.click();
+    await expect(log).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(log).toBeHidden();
+    await expect(layer).toBeFocused();
+    await goesOn('Space', 'after the Log and Escape');
+    await logBtn.click();
+    await log.getByRole('button', { name: 'Close' }).click();
+    await expect(layer).toBeFocused();
+    await goesOn('Enter', 'after the Log and Close');
+    // Auto clicked on: Space goes on, and Auto stays on.
+    await autoBtn.click();
+    await expect(autoBtn).toHaveAttribute('aria-pressed', 'true');
+    await goesOn('Space', 'after Auto');
+    await expect(autoBtn).toHaveAttribute('aria-pressed', 'true');
+    await autoBtn.click();
+    await expect(autoBtn).toHaveAttribute('aria-pressed', 'false');
+    // From the keyboard: Tab to the Log, Enter opens it, Escape closes it and focus is back on it.
+    await layer.focus();
+    for (let i = 0; i < 4 && !(await logBtn.evaluate((el) => el === document.activeElement)); i++)
+      await page.keyboard.press('Tab');
+    await expect(logBtn).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(log).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(log).toBeHidden();
+    await expect(logBtn).toBeFocused();
   });
 
   test('the box sits along the bottom under his face, the replies over him, and Auto, Skip and Log at the top right', async ({

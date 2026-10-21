@@ -15,7 +15,9 @@
 // The replies take a press only once the presses that went on have stopped for REPLY_SETTLE, so
 // a quick second tap or press after the one that finished the line never picks one.
 // Keys, wherever focus is: Space or Enter go on (a focused button presses itself instead),
-// Escape closes the Log, or asks whether to skip the intro, and a second Escape ends it; Tab goes
+// Escape closes the Log, or asks whether to skip the intro, and a second Escape ends it; a click
+// or tap on Auto, Skip or Log (or the Log's Close) leaves focus where Space and Enter go on, and
+// from the keyboard focus stays on the button (the Log's back on it as it closes); Tab goes
 // round the layer's buttons. A screen reader hears each line whole once, from a live region
 // (the typed text is hidden from it), the replies are buttons, and focus goes to the first reply
 // when they show, into the Log and the question when they open and back when they close.
@@ -156,17 +158,26 @@ export function createDialogueUi(stage, { onAction, log }) {
     if (shown.up) shown.settle = Math.max(shown.settle, now() + REPLY_SETTLE);
   };
 
-  /** @param {boolean} open */
-  function setLog(open) {
+  /** The Log was opened with a pointer (a click or a tap), not from the keyboard. */
+  let logByPointer = false;
+
+  /**
+   * @param {boolean} open
+   * @param {boolean} [byPointer]  opened or closed with a click or a tap: closed, focus goes back
+   *   where a key goes on (else, from the keyboard both ways, back to the Log button)
+   */
+  function setLog(open, byPointer = false) {
     if (open === !logBox.hidden) return;
     logBox.hidden = !open;
     logBtn.setAttribute('aria-expanded', String(open));
     if (open) {
+      logByPointer = byPointer;
       logList.innerHTML = logHtml(log());
       // (The latest at the bottom, in view.)
       logList.scrollTop = logList.scrollHeight;
       $('[data-talk="log-close"]').focus();
-    } else logBtn.focus();
+    } else if (byPointer || logByPointer) focusHome();
+    else logBtn.focus();
     onAction({ type: 'pause', on: modal() });
   }
 
@@ -231,14 +242,19 @@ export function createDialogueUi(stage, { onAction, log }) {
       return;
     }
     const what = button.dataset.talk;
+    // (A click or a tap, not a key: detail counts the clicks, 0 for Enter or Space.)
+    const byPointer = e.detail > 0;
     if (button.dataset.choice !== undefined) {
       // (Too soon after they showed, or after a press that went on: the press goes nowhere.)
       if (now() < shown.settle) settle();
       else onAction({ type: 'choose', index: Number(button.dataset.choice) });
-    } else if (what === 'auto') onAction({ type: 'auto', on: button.getAttribute('aria-pressed') !== 'true' });
-    else if (what === 'skip') onAction({ type: 'skip' });
-    else if (what === 'log') setLog(Boolean(logBox.hidden));
-    else if (what === 'log-close') setLog(false);
+    } else if (what === 'auto' || what === 'skip') {
+      if (what === 'auto') onAction({ type: 'auto', on: button.getAttribute('aria-pressed') !== 'true' });
+      else onAction({ type: 'skip' });
+      // (Clicked or tapped, focus goes back where Space and Enter go on, not left on the button.)
+      if (byPointer && !layer.hidden && !modal()) focusHome();
+    } else if (what === 'log') setLog(Boolean(logBox.hidden), byPointer);
+    else if (what === 'log-close') setLog(false, byPointer);
     else if (what === 'no') setAsk(false);
     else if (what === 'yes') onAction({ type: 'end' });
   });

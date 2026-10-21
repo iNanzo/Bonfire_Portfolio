@@ -145,7 +145,8 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   Skip and Log at the top right, and a gentle dim along the bottom behind the box. The toolbar
   goes while the intro runs and comes back after it.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
-  Space and Enter do the same. Some boxes ask a question: two or three replies show as buttons
+  Space and Enter do the same (after a click or tap on Auto, Skip or Log too; from the keyboard,
+  a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
   stacked in the middle of the screen, under his face (that box's shot frames him in the space
   over them, from the start of its line), and each leads to its own lines. They take a press
   only once the presses that went on have stopped for a moment (0.45 s), so a quick second tap,
