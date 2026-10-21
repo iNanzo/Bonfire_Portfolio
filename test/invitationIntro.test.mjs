@@ -383,7 +383,7 @@ test('introFrom: a broken intro repaired field by field', () => {
   );
 });
 
-test('introFrom: nothing usable is the toy’s own short intro, which passes the rules', () => {
+test('introFrom: nothing usable is the toy’s own short intro, which passes the rules', async () => {
   for (const raw of [undefined, null, 'x', [], {}, { boxes: [] }, { boxes: [1, { text: 'No id.' }] }])
     assert.deepEqual(introFrom(raw), FALLBACK_INTRO, JSON.stringify(raw));
   assert.notEqual(introFrom(undefined), FALLBACK_INTRO, 'a copy');
@@ -392,6 +392,13 @@ test('introFrom: nothing usable is the toy’s own short intro, which passes the
   assert.deepEqual(problems(FALLBACK_INTRO).warnings, []);
   assert.deepEqual(introFrom(FALLBACK_INTRO), FALLBACK_INTRO, 'as the toy plays it');
   for (const b of FALLBACK_INTRO.boxes) assert.ok(Array.from(b.text).length <= 120, `${b.id}: short`);
+  // The admin's Start From the Toy’s Own is the same intro, every field in place.
+  const { STARTERS } = await import('../admin/ui/schema.js');
+  const start = STARTERS['invitation.intro']();
+  assert.deepEqual(introFrom(start), FALLBACK_INTRO);
+  assert.deepEqual(problems(start).errors, []);
+  assert.deepEqual(problems(start).warnings, []);
+  assert.notEqual(STARTERS['invitation.intro'](), STARTERS['invitation.intro'](), 'a copy each time');
 });
 
 test('readContent and introScript: content.json’s intro, a copy each time; broken, the toy’s own', () => {

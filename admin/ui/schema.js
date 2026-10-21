@@ -31,14 +31,18 @@ import { PIXEL_SIZES } from '../../src/visualizer/render.js';
 import { adminHelp, adminLabels, meta } from '../../src/settingsMap.js';
 import {
   INVITATION_ADD_LABELS,
+  INVITATION_CARD_META,
   INVITATION_HELP,
   INVITATION_KEYWORDS,
   INVITATION_LABELS,
+  INVITATION_MAX_ENTRIES,
   INVITATION_MORE,
+  INVITATION_NO_HIDING,
   INVITATION_RANGES,
   INVITATION_SELECTS,
   INVITATION_STARTERS,
   INVITATION_SUBGROUPS,
+  INVITATION_TEMPLATES,
 } from './invitationSchema.js';
 import { titleCase } from './text.js';
 
@@ -136,8 +140,9 @@ export const PAGES = [
     id: 'invitation',
     group: 'Toys',
     label: 'Invitation',
-    keys: ['invitation.defaults', 'invitation.speech', 'invitation.lines'],
-    blurb: 'NEWT’s toy at /invitation/: the look a first visit gets, how often he talks, and what he says.',
+    keys: ['invitation.defaults', 'invitation.speech', 'invitation.lines', 'invitation.intro'],
+    blurb:
+      'NEWT’s toy at /invitation/: the look a first visit gets, how often he talks, what he says, and the intro he plays.',
   },
 ];
 /** Old page addresses that still work (#effects was the one Effects page). */
@@ -830,11 +835,22 @@ export const SHORT = new Set([
   'flame',
   'show',
   'duration',
+  'speaker',
 ]);
 
 /** Lists you can edit but not add to, remove from, reorder or hide. */
 export const FIXED = new Set(['screens']);
 export const READONLY = new Set(['screens[].id']);
+/** Lists whose entries can't be hidden (no ◉): the invitation intro's boxes and choices. */
+export const NO_HIDING = new Set([...INVITATION_NO_HIDING]);
+/** The most entries a list takes (“+ Add” goes once it has them): a chat box's choices. */
+export const MAX_ENTRIES = { ...INVITATION_MAX_ENTRIES };
+/**
+ * The line under a list card's title, where a project's isn't the one: (entry, its list, its
+ * index) → text. The invitation intro's boxes and choices.
+ * @type {Record<string, (item: any, list: any[], index: number) => string>}
+ */
+export const CARD_META = { ...INVITATION_CARD_META };
 
 const opts = (list, label = (v) => titleCase(String(v))) => list.map((v) => ({ value: v, label: label(v) }));
 /**
@@ -957,6 +973,8 @@ export const TEMPLATES = {
   'effects.flames': newFlame,
   // (A new scene is the Painter's default one; its id follows its name until edited.)
   scenes: () => ({ ...defaultScene('New Scene'), id: '' }),
+  // (The invitation intro's chat boxes and their choices.)
+  ...INVITATION_TEMPLATES,
 };
 
 /**
@@ -987,8 +1005,8 @@ export const ADD_LABELS = {
   ...INVITATION_ADD_LABELS,
 };
 
-/** The field a list entry is titled by. */
-export const TITLE_KEYS = ['name', 'title', 'org', 'group', 'label', 'heading'];
+/** The field a list entry is titled by (the first it has): a chat box by its line. */
+export const TITLE_KEYS = ['name', 'title', 'org', 'group', 'label', 'heading', 'text'];
 /** Flame color fields, in ramp order (shown as a swatch strip on each flame card). */
 export const SWATCH_KEYS = ['lo', 'mid', 'hi', 'core', 'shade'];
 
