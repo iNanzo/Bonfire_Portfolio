@@ -77,7 +77,8 @@ export const FALLBACK_INTRO = {
  * @returns {import('./types.js').DialogueScript}
  */
 export function introScript() {
-  const from = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (content)).introScript;
+  // (Looked up by name: content.js has no introScript() until the admin's package adds it.)
+  const from = Reflect.get(content, 'introScript');
   let admin;
   try {
     admin = typeof from === 'function' ? normalizeScript(from()) : null;

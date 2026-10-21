@@ -60,6 +60,7 @@ import { FLOOR_SIZE, createFloor, floorLook } from '../src/invitation/floor.js';
 import { ID, createRetro, decalMaterial, markId } from '../src/invitation/retro.js';
 import {
   BUTTONS,
+  INTRO_LABEL,
   parseQuery,
   SLIDE_SLOP,
   pixelLabel,
@@ -718,7 +719,9 @@ test('the retro pass warms the path it isn’t drawing (the canvas’s while the
 
 test('the toolbar and the Look sheet: every button labelled, the settings checked, no tooltips', () => {
   const bar = toolbarHtml();
-  for (const name of [...BUTTONS, 'Look']) assert.match(bar, new RegExp(`>${name}</button>`), name);
+  for (const name of [INTRO_LABEL, ...BUTTONS, 'Look']) assert.match(bar, new RegExp(`>${name}</button>`), name);
+  assert.equal(INTRO_LABEL, 'Play Intro');
+  assert.ok(bar.indexOf(INTRO_LABEL) < bar.indexOf('>Wave<'), 'Play Intro first');
   assert.match(bar, /data-button="Wander" aria-pressed="false"/);
   const sheet = sheetHtml({ pixelSize: '24', dither: false, outlines: true, style: 'soft' });
   assert.match(sheet, /role="dialog" aria-modal="true"/, 'a modal dialog: what lies behind it is out of reach');

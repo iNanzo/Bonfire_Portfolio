@@ -53,9 +53,10 @@ unlisted: nothing links to it and search engines are asked not to index it.
   **Reset Camera** (in the Look menu) clears the slide and the zoom.
 - **Leave him alone** for about 20 seconds and he turns to face you and sits down (the Sit
   button turns him to you first too, so you see his happy face).
-- **The toolbar:** Wave, Spook, Sit (Stand once he's sitting), Run (he runs off for a few
-  seconds, across the screen to one side or the other, or away from the cursor), Wander (on:
-  he strolls around by himself) and Look. The buttons rest while he's being held or falling.
+- **The toolbar:** Play Intro (below), Wave, Spook, Sit (Stand once he's sitting), Run (he
+  runs off for a few seconds, across the screen to one side or the other, or away from the
+  cursor), Wander (on: he strolls around by himself) and Look. The buttons rest while he's being
+  held or falling.
 
 ## The Look Menu
 
@@ -133,6 +134,37 @@ fit there with the line on more rows, or else under his feet, never over his fac
 never takes a tap; a screen reader hears each line once, whole. His lines, how often
 he talks and the look a first visit gets are edited in the admin's Invitation page
 ([admin.md](admin.md)).
+
+## Play Intro
+
+**Play Intro** starts a short chat with NEWT, laid out like Uma Musume's story scenes and drawn
+in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
+
+- **The screen:** a wide box along the bottom with his name on a tab at its top left and his
+  line typed out in it, a small bouncing ▼ at its bottom right once the line is all there, Auto,
+  Skip and Log at the top right, and a gentle dim along the bottom behind the box. The toolbar
+  goes while the intro runs and comes back after it.
+- **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
+  Space and Enter do the same. Some boxes ask a question: two or three replies show as buttons
+  stacked in the middle of the screen, and each leads to its own lines.
+- **Auto** goes on by itself once each line has had time to be read (a box can set its own
+  wait); it waits at a question. **Skip** jumps to the next question, or to the end. **Log**
+  shows every line so far and the replies picked, in a list that scrolls; Close or Escape
+  shuts it. **Escape** asks whether to skip the intro, and a second Escape (or Skip Intro) ends
+  it.
+- **NEWT:** he gets up if he's sitting, takes a few steps in if he's out near the edge, turns
+  to face you and looks at you while he talks, his head drifting a little. Each box sets his
+  face (sad, angry, shy and smug too) and plays its gesture once (a nod, a shrug, a point, a
+  cheer, a wave, a start), then talks with his hands while the line types and stands easy once
+  it's up; some boxes hold a loop instead (talking, thinking), and one may sit him down. You
+  can't pick him up, walk him or turn the camera meanwhile, and he says nothing in his bubble.
+- **The camera** goes round to the front and each box picks a shot: close (his head and
+  shoulders), medium (his whole body), wide (the usual view) or keep (as it was), eased there
+  and framed in the space over the box. At the end it eases back to where you had it.
+- **Reduced motion:** each line shows at once and the camera cuts to each shot.
+- Every Play Intro starts at the start; nothing about it is saved. The lines, faces, gestures,
+  shots, waits and replies are edited in the admin's Invitation page ([admin.md](admin.md));
+  until it has an intro, the toy plays a placeholder of its own.
 
 ## For Developers
 
@@ -313,11 +345,23 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   the glb, and the first frame waits (up to 3 s more) for each one whose switch is on, so NEWT
   never shows a blank face or the blurred atlas first; one whose switch is off never holds it
   up.
+- **The intro:** `dialogue.js` (pure, on an injected clock: `normalizeScript` makes any
+  `DialogueScript` safe, types.js; `createDialogue(script, {reduced})` with `start`, `step`,
+  `advance`, `choose`, `setAuto`, `skip`, `pause`, `end`, `view` and `log`; `DIALOGUE`: 32
+  characters a second with a beat after punctuation, Auto's wait 1.1 s plus 0.035 s a character
+  between 1.4 and 6 s, 240 characters and 3 replies at most; `lookSway`), `intro.js` (the script:
+  content.js `introScript()` once the admin has one, else `FALLBACK_INTRO`), `dialogueUi.js` and
+  `dialogue.css` (the screen: a modal layer over the stage that takes every press; the line in a
+  live region once, whole), brain.js's `talk` state (`BrainIn.dialogue`: the box's seq,
+  animation, face and whether it's typing; `TUNE.talkNear`, `talkTurn`) and camera.js's shots
+  (`orbitTalk`, `shotView`, `orbitShot`, `SHOT`). main.js shows an extra face the face sheet
+  lacks as the nearest of the first four (`FACE_FALLBACK`) and a clip the glb lacks as Idle.
 - **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationLooks`,
   `invitationShader`, `invitationRetro`, `invitationGovernor`, `invitationAtlas`,
   `invitationFace`, `invitationArea`, `invitationCamera` and `invitationPlay` (with
-  `invitationBrain`, `invitationMotion`, `invitationGesture` and `invitationModel`), the speech
-  and content tests above, and `e2e/invitation.spec.mjs` (`npm run e2e -- invitation`).
+  `invitationBrain`, `invitationMotion`, `invitationGesture` and `invitationModel`),
+  `invitationDialogue` (the runner and the placeholder), the speech and content tests above,
+  `e2e/invitation.spec.mjs` and `e2e/invitationDialogue.spec.mjs` (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
@@ -337,7 +381,10 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   and `play(clip)` (Walk and Run step in place at their own pace). The snapshot's `camera` has
   the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
   the play area, and `talk` is what he's saying (speech.js's snapshot: the line up and its
-  trigger, when the idle clock comes round). `?seed=N` makes the randomness
+  trigger, when the idle clock comes round). While the intro runs, `dialogue` has the box up
+  (`id`, `seq`, `text`, `shown`, `typed`, its replies' targets, `auto`, `paused`, `logOpen`,
+  `asking`, `camera`, `shot`, the camera's `goal` and his `phase`), and `intro()` is the script
+  it runs. `?seed=N` makes the randomness
   repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.

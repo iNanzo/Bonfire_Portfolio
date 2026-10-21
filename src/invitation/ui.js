@@ -1,6 +1,7 @@
 // The invitation toy's page around the canvas: the status line ("Loading…", or what went wrong),
-// the toolbar along the bottom (Wave, Spook, Sit or Stand, Run, Wander, Look: every button a
-// thumb's height, labelled, never a tooltip) and the Look menu, a bottom sheet (Pixel Size, a
+// the toolbar along the bottom (Play Intro, Wave, Spook, Sit or Stand, Run, Wander, Look: every
+// button a thumb's height, labelled, never a tooltip; Play Intro starts the intro's dialogue,
+// dialogueUi.js, and while it runs the toolbar rests out of sight, setTalking) and the Look menu, a bottom sheet (Pixel Size, a
 // slider over NEWT's sprite resolutions, 16×16 to 256×256, then Native (a texel a device pixel)
 // and Off at its fine end, with a button at each end (named for what it sets: "Pixel Size
 // Off") and a line saying how many pixels tall he is on this screen; Dithering, Outlines,
@@ -50,8 +51,10 @@ export function slideIntent(dx, dy) {
   return Math.abs(dx) > Math.abs(dy) ? 'drag' : 'swipe';
 }
 
-/** The toolbar's action buttons, in order (Look comes last, on its own). */
+/** The toolbar's action buttons, in order (Play Intro comes first and Look last, each on its own). */
 export const BUTTONS = /** @type {const} */ (['Wave', 'Spook', 'Sit', 'Run', 'Wander']);
+/** Play Intro's label. */
+export const INTRO_LABEL = 'Play Intro';
 /** @type {Record<string, string>} the Pixel Sizes named by a word, not N×N */
 const PIXEL_WORDS = { native: 'Native', off: 'Off' };
 /**
@@ -123,14 +126,15 @@ export function parseQuery(search) {
   };
 }
 
-/** The toolbar: the action buttons and Look. */
+/** The toolbar: Play Intro, the action buttons and Look. */
 export function toolbarHtml() {
   const buttons = BUTTONS.map((name) =>
     name === 'Wander'
       ? `<button type="button" class="inv-btn" data-button="Wander" aria-pressed="false">Wander</button>`
       : `<button type="button" class="inv-btn" data-button="${name}">${name}</button>`,
   ).join('');
-  return `<nav class="inv-toolbar" aria-label="Play With NEWT">${buttons}<button type="button" class="inv-btn inv-btn-look" data-look-open aria-expanded="false" aria-controls="inv-look">Look</button></nav>`;
+  const intro = `<button type="button" class="inv-btn inv-btn-intro" data-intro>${INTRO_LABEL}</button>`;
+  return `<nav class="inv-toolbar" aria-label="Play With NEWT">${intro}${buttons}<button type="button" class="inv-btn inv-btn-look" data-look-open aria-expanded="false" aria-controls="inv-look">Look</button></nav>`;
 }
 
 /**
@@ -252,10 +256,11 @@ export function statusHtml() {
 /**
  * Put the page's controls in the stage and report what's pressed.
  * @param {HTMLElement} stage
- * @param {{look: import('./look.js').Look, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void, onResetCamera?(): void, onSheet?(open: boolean): void}} o
- *   onSheet: the Look sheet opened or closed (main.js keeps NEWT in sight beside it)
+ * @param {{look: import('./look.js').Look, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void, onResetCamera?(): void, onSheet?(open: boolean): void, onIntro?(): void}} o
+ *   onSheet: the Look sheet opened or closed (main.js keeps NEWT in sight beside it); onIntro:
+ *   Play Intro pressed
  */
-export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }) {
+export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet, onIntro }) {
   const hud = document.createElement('div');
   hud.className = 'inv-hud';
   hud.innerHTML = statusHtml() + toolbarHtml() + sheetHtml(look);
@@ -263,6 +268,11 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
   const $ = (sel) => /** @type {HTMLElement} */ (hud.querySelector(sel));
   const sheet = $('.inv-sheet');
   const opener = $('[data-look-open]');
+  const intro = /** @type {HTMLButtonElement} */ ($('[data-intro]'));
+  /** The intro is running: the toolbar rests (setTalking). */
+  let talking = false;
+  /** Focus goes back to Play Intro once it's on again (the intro just ended). */
+  let refocus = false;
   /** The sheet's first and last stops for Tab. */
   const first = $('[data-look-close]');
   const last = $('[data-reset-camera]');
@@ -403,6 +413,7 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
     // (The action buttons under the sheet: no focus, no presses, hidden from screen readers.
     // Look stays, pressed: another press closes the sheet, as Done does.)
     for (const name of BUTTONS) /** @type {HTMLElement} */ ($(`[data-button="${name}"]`)).inert = open;
+    intro.inert = open;
     opener.setAttribute('aria-expanded', String(open));
     if (open) {
       document.addEventListener('keydown', onKey);
@@ -460,6 +471,7 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
     if (el.matches('[data-look-open]')) openSheet(Boolean(sheet.hidden));
     else if (el.matches('[data-look-close]')) openSheet(false);
     else if (el.matches('[data-reload]')) location.reload();
+    else if (el.matches('[data-intro]')) onIntro?.();
     else if (el.matches('[data-reset-camera]')) onResetCamera?.();
     else if (el.matches('[data-pixel-end]')) pickPixel(el.dataset.pixelEnd === 'first' ? 0 : steps.length - 1);
     else if (el.matches('[data-shader-reset]')) {
@@ -522,6 +534,32 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet }
      */
     setEnabled(on) {
       for (const name of BUTTONS) /** @type {HTMLButtonElement} */ ($(`[data-button="${name}"]`)).disabled = !on;
+      intro.disabled = !on;
+      if (on && refocus) {
+        refocus = false;
+        intro.focus({ preventScroll: true });
+      }
+    },
+    /**
+     * The intro running (on): the toolbar rests out of sight and out of reach, its place kept (so
+     * the view and the play area, which keep clear of it, stay as they are); off, it's back, and
+     * focus goes back to Play Intro.
+     * @param {boolean} on
+     */
+    setTalking(on) {
+      if (on === talking) return;
+      talking = on;
+      hud.classList.toggle('is-talking', on);
+      $('.inv-toolbar').inert = on;
+      // (Focus back on Play Intro, once it's on again: the brain turns the buttons back on.)
+      refocus = !on;
+      if (refocus && !intro.disabled) {
+        refocus = false;
+        intro.focus({ preventScroll: true });
+      }
+    },
+    get talking() {
+      return talking;
     },
     /** @param {boolean} on */
     setToolbar(on) {

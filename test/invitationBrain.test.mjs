@@ -931,6 +931,21 @@ test('far out from the middle he walks a step in first, then turns to the camera
   assert.equal(o.move.mode, 'goto', 'a step in');
   talking(s);
   assert.ok(Math.hypot(s.w.body.x, s.w.body.z) <= TUNE.talkNear + TUNE.arrive + 0.05, 'near the middle');
+  // (Toward the middle of the view when it's given, not the play area box's.)
+  const withMiddle = createBrain({ bounds: BOUNDS, middle: { x: 0, z: 1 } });
+  const out = withMiddle.step({
+    t: 0.1,
+    dt: DT,
+    events: [],
+    button: null,
+    pointer: null,
+    newt: { x: 0, z: 1.2, yaw: 0, grounded: true },
+    clip: null,
+    carry: null,
+    camera: { x: 0, z: 6 },
+    dialogue: box(1),
+  });
+  assert.notEqual(out.move.mode, 'goto', 'near the view’s middle: no walk');
   // (Near the middle already: no walk.)
   const t = sim({ x: 0.3, z: 0.2, camera: { x: 0, z: 6 } });
   t.w.dialogue = box(1);

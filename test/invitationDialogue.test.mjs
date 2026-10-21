@@ -332,3 +332,26 @@ async function loadIntro() {
   register(`data:text/javascript,${encodeURIComponent(hooks)}`);
   return import('../src/invitation/intro.js');
 }
+
+test('the chat screen’s markup: Title Case labels, a live region for the line, dialogs for the Log and the question, no tooltips; the Log escapes what it lists', async () => {
+  const { TALK_TEXT, logHtml, talkHtml } = await import('../src/invitation/dialogueUi.js');
+  const { titleCase } = await import('../src/text.js');
+  for (const k of ['layer', 'auto', 'skip', 'log', 'logTitle', 'close', 'you', 'replies', 'ask', 'yes', 'no'])
+    assert.equal(TALK_TEXT[k], titleCase(TALK_TEXT[k]), k);
+  for (const k of ['askHint', 'goOn']) assert.ok(/^[A-Z].*\.$/.test(TALK_TEXT[k]) && TALK_TEXT[k].length <= 160, k);
+  const markup = talkHtml();
+  assert.ok(!/\stitle=/.test(markup), 'no title= tooltips');
+  assert.match(markup, /class="inv-talk-live" role="status" aria-live="polite"/);
+  assert.match(markup, /class="inv-talk-text" aria-hidden="true"/, 'the typing hidden from a screen reader');
+  assert.match(markup, /class="inv-talk-log" role="dialog" aria-modal="true"/);
+  assert.match(markup, /class="inv-talk-ask" role="alertdialog" aria-modal="true"/);
+  for (const b of ['auto', 'skip', 'log']) assert.match(markup, new RegExp(`data-talk="${b}"`));
+  assert.match(markup, /data-talk="auto" aria-pressed="false"/);
+  const log = logHtml([
+    { kind: 'line', speaker: 'NEWT', text: 'a <b> & c' },
+    { kind: 'reply', text: 'Yes' },
+  ]);
+  assert.match(log, /a &lt;b&gt; &amp; c/);
+  assert.match(log, /class="inv-talk-log-reply"><span class="inv-talk-log-who">You<\/span> Yes/);
+  assert.equal((log.match(/<li/g) ?? []).length, 2);
+});

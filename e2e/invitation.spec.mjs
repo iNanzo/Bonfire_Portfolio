@@ -269,7 +269,7 @@ test.describe('on a phone', () => {
     expect(head.x).toBeLessThan(box.x + box.width - 24);
     expect(snap.newtTall / 390, `NEWT is ${snap.newtTall.toFixed(1)} CSS px tall`).toBeCloseTo(0.255, 2);
     // The toolbar: every button a thumb's height, labelled.
-    for (const name of ['Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look']) {
+    for (const name of ['Play Intro', 'Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look']) {
       const b = page.getByRole('button', { name, exact: true });
       await expect(b).toBeVisible();
       expect((await b.boundingBox()).height).toBeGreaterThanOrEqual(44);
@@ -1267,6 +1267,7 @@ test.describe('on a desktop', () => {
     await expect(sheet).toHaveAttribute('aria-modal', 'true');
     await expect(sheet.getByRole('button', { name: 'Done' })).toBeFocused();
     expect(await toolbarInert(), 'the buttons under the sheet are inert; Look, which closes it, is not').toEqual([
+      'Play Intro true',
       'Wave true',
       'Spook true',
       'Sit true',
@@ -1305,7 +1306,7 @@ test.describe('on a desktop', () => {
     await page.keyboard.press('Escape');
     await expect(look).toBeFocused();
     expect(await toolbarInert(), 'the toolbar back in reach').toEqual(
-      ['Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look'].map((name) => `${name} false`),
+      ['Play Intro', 'Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look'].map((name) => `${name} false`),
     );
   });
 

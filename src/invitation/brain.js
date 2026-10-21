@@ -7,7 +7,7 @@
 // Stand calls it off). No three.js and no clock: time comes in as t, randomness from rng.js.
 //
 // Play Intro (BrainIn.dialogue, the box up while the intro runs) puts him in `talk`: he gets up
-// if he's sitting, walks in toward the play area's middle when he's out past TUNE.talkNear, and
+// if he's sitting, walks in toward the middle of the view when he's out past TUNE.talkNear, and
 // turns to the camera; then each new box sets his face (blinking on neutral only) and plays its
 // animation: a gesture once, then Talk while its line types and Idle once it's up; a loop (Talk,
 // Think, Idle) holds; Sit sits him down and holds it, and the next gesture gets him up first;
@@ -138,10 +138,11 @@ const SITTING = new Set(['sitDown', 'sit']);
 const EPS = 1e-9;
 
 /**
- * @param {{seed?: number, calm?: boolean, bounds?: Bounds|null, tune?: Partial<typeof TUNE>}} [opts]
- *   calm: no wandering at first and never sitting by himself (?calm)
+ * @param {{seed?: number, calm?: boolean, bounds?: Bounds|null, middle?: XZ|null, tune?: Partial<typeof TUNE>}} [opts]
+ *   calm: no wandering at first and never sitting by himself (?calm); middle: the floor point the
+ *   default view looks at (Play Intro walks him in toward it; the play area box's middle by default)
  */
-export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} } = {}) {
+export function createBrain({ seed = 1, calm = false, bounds = null, middle = null, tune = {} } = {}) {
   const T = { ...TUNE, ...tune };
   const rng = createRng(seed);
   const m = {
@@ -331,10 +332,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, tune = {} }
     } else walkInOrTurn();
   }
 
-  /** In toward the play area's middle when he's out past talkNear, else the turn to the camera. */
+  /** In toward the middle (createBrain's `middle`: where the default view looks) when he's out past talkNear, else the turn to the camera. */
   function walkInOrTurn() {
     const n = m.input?.newt;
-    const c = bounds ? { x: (bounds.minX + bounds.maxX) / 2, z: (bounds.minZ + bounds.maxZ) / 2 } : null;
+    const c = middle ?? (bounds ? { x: (bounds.minX + bounds.maxX) / 2, z: (bounds.minZ + bounds.maxZ) / 2 } : null);
     const d = n && c ? Math.hypot(n.x - c.x, n.z - c.z) : 0;
     if (n && c && d > T.talkNear) {
       const k = (T.talkNear * 0.8) / d;
