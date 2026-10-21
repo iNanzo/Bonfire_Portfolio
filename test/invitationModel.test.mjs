@@ -4,15 +4,26 @@
 // (the page moves his root) and Held keeps the collar where it rests, so the page can hang
 // him from it; Walk and Run start on the same foot and their STRIDE values match what the
 // planted feet do, measured by forward kinematics; Run reaches both arms straight out in
-// front, leans forward and tips his face up to the camera (the user's reference); and the file
-// itself: a 17-joint skin with at most 4 influences, WebP textures, no Draco, no lights, 27
+// front, leans forward and tips his face up to the camera (the user's reference); the dialogue's
+// gestures (round 15) start and end on Idle's pose, keep the hands and sleeves clear of his huge
+// head, hair and cap (the skinned meshes, frame by frame), and each does what it's named for
+// broadly enough to read at 128 px; and the file itself: a 17-joint skin with at most 4 influences, WebP textures, no Draco, no lights, 27
 // uniquely named nodes as three.js names them, the face's UVs inside its sheet's first cell,
 // and its size.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { readGlbAnim, quatAngle, quatDistance, footStride } from './lib/glbAnim.mjs';
-import { CLIPS, CLIP_NAMES, BLENDER_BONES, STRIDE, SCALE, FPS } from '../src/invitation/clips.js';
+import { readGlbAnim, quatAngle, quatDistance, footStride, skinnedMesh, nearestDistance } from './lib/glbAnim.mjs';
+import {
+  CLIPS,
+  CLIP_NAMES,
+  BLENDER_BONES,
+  DIALOGUE_CLIPS,
+  STRIDE,
+  SCALE,
+  FPS,
+  ANKLE_HEIGHT,
+} from '../src/invitation/clips.js';
 
 const glb = readGlbAnim(new URL('../public/models/newt.glb', import.meta.url));
 const { gltf } = glb;
@@ -183,6 +194,168 @@ test('Run leans the trunk forward and tips the head back so the high camera sees
   for (const s of shape)
     assert.ok(s.faceUp >= 0 && s.faceUp <= 40, `his face points ${s.faceUp.toFixed(0)}° above the horizontal`);
   assert.ok(mean('faceUp') >= 8, `his face points ${mean('faceUp').toFixed(1)}° up on average`);
+});
+
+/** Round 15's talking gestures, the ones tools/newt.py made for the dialogue. */
+const GESTURES = ['Talk', 'Nod', 'Shrug', 'Point', 'Think', 'Cheer'];
+
+test('the dialogue plays only clips the file has, the gestures among them', () => {
+  for (const name of DIALOGUE_CLIPS) clip(name);
+  for (const name of GESTURES) assert.ok(DIALOGUE_CLIPS.includes(name), `${name} is a dialogue clip`);
+});
+
+test("the one-shot gestures start and end on Idle's first pose", () => {
+  const idle = glb.poseAt(clip('Idle'), 0);
+  for (const name of [...GESTURES.filter((n) => !CLIPS[n].loop), 'Wave', 'Spook']) {
+    const a = clip(name);
+    for (const t of [0, a.duration]) {
+      const pose = glb.poseAt(a, t);
+      for (const bone of BLENDER_BONES) {
+        const d = quatDistance(pose.get(bone).rotation, idle.get(bone).rotation);
+        assert.ok(d < 1e-3, `${name} at ${t.toFixed(2)} s: ${bone} is ${d.toExponential(2)} off Idle`);
+      }
+      const hips = idle.get('Bone').translation;
+      const off = Math.max(...pose.get('Bone').translation.map((v, i) => Math.abs(v - hips[i])));
+      assert.ok(off < 1e-3, `${name} at ${t.toFixed(2)} s: the hips are ${off.toExponential(2)} off Idle`);
+    }
+  }
+});
+
+const ARM_BONES = ['Bicep.L', 'ForeArm.L', 'Bicep.R', 'ForeArm.R'];
+const HEAD_MESHES = ['Head', 'Hat', 'BackHair', 'Plane', 'Plane.001', 'Plane.002'];
+
+/** The closest the hands and the sleeves come to his head, hair and cap over a clip, model units. */
+function clearance(name, rate = FPS) {
+  const hands = skinnedMesh(glb, 'Hands');
+  const body = skinnedMesh(glb, 'Body');
+  const sleeve = Array.from({ length: body.count }, (_, i) => i).filter((i) => body.weightOn(i, ARM_BONES) > 0.5);
+  const heads = HEAD_MESHES.map((m) => skinnedMesh(glb, m));
+  let hand = Infinity;
+  let arm = Infinity;
+  for (const [, pose] of samples(clip(name), rate)) {
+    const shells = heads.map((h) => ({ v: h.at(pose), tris: h.tris }));
+    for (const p of hands.at(pose)) hand = Math.min(hand, nearestDistance(p, shells));
+    const bv = body.at(pose);
+    for (const i of sleeve) arm = Math.min(arm, nearestDistance(bv[i], shells));
+  }
+  return { hand, arm };
+}
+
+test('the gestures keep the hands and sleeves clear of his head, hair and cap', () => {
+  // Think's hand comes up under his chin, so it may come closer; nothing goes into the head.
+  const room = { Think: 0.05 };
+  for (const name of GESTURES) {
+    const { hand, arm } = clearance(name);
+    const min = room[name] ?? 0.1;
+    assert.ok(hand >= min, `${name}: a hand comes ${hand.toFixed(3)} model units from his head (at least ${min})`);
+    assert.ok(arm >= 0.05, `${name}: a sleeve comes ${arm.toFixed(3)} model units from his head`);
+  }
+});
+
+const FOREARM = 0.9; // the ForeArm bones' length (tools/newt.py's rig)
+/**
+ * Where things are over a clip, in glTF space (+Y up, +Z his front, +X his left): each hand
+ * (the ForeArm bone's tip), elbow and shoulder joint, the hips, the ankles, and the face's
+ * direction (the head's turn from rest applied to +Z) as elevation, and the head's tilt, degrees.
+ */
+function track(name, rate = 48) {
+  const restWorld = glb.world(new Map());
+  const restHead = new THREE.Quaternion().setFromRotationMatrix(restWorld('Neck.001')).invert();
+  return samples(clip(name), rate).map(([t, pose]) => {
+    const w = glb.world(pose);
+    const at = (n) => new THREE.Vector3().setFromMatrixPosition(w(n));
+    const tip = (s) => at(`ForeArm.${s}`).add(new THREE.Vector3(0, FOREARM, 0).transformDirection(w(`ForeArm.${s}`)));
+    const turn = new THREE.Quaternion().setFromRotationMatrix(w('Neck.001')).multiply(restHead);
+    const face = new THREE.Vector3(0, 0, 1).applyQuaternion(turn);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(turn);
+    return {
+      t,
+      hand: { L: tip('L'), R: tip('R') },
+      elbow: { L: at('ForeArm.L'), R: at('ForeArm.R') },
+      shoulder: { L: at('Bicep.L'), R: at('Bicep.R') },
+      hips: at('Bone'),
+      ankle: { L: at('Foot.L'), R: at('Foot.R') },
+      faceUp: Math.asin(face.y) / DEG,
+      tilt: Math.atan2(-up.x, up.y) / DEG,
+    };
+  });
+}
+const idleAt0 = () => track('Idle')[0];
+const most = (rows, f) => Math.max(...rows.map(f));
+const least = (rows, f) => Math.min(...rows.map(f));
+
+test('Talk raises a hand in front of his chest and moves it, and his head bobs as he speaks', () => {
+  const rows = track('Talk');
+  const idle = idleAt0();
+  const lift = most(rows, (r) => Math.max(r.hand.L.y - idle.hand.L.y, r.hand.R.y - idle.hand.R.y));
+  assert.ok(lift >= 0.6, `a hand rises ${lift.toFixed(2)} model units over Idle's`);
+  let path = 0;
+  for (let k = 1; k < rows.length; k++)
+    path += Math.max(rows[k].hand.L.distanceTo(rows[k - 1].hand.L), rows[k].hand.R.distanceTo(rows[k - 1].hand.R));
+  assert.ok(path >= 1.5, `the hands travel ${path.toFixed(2)} model units a loop`);
+  const nod = most(rows, (r) => r.faceUp) - least(rows, (r) => r.faceUp);
+  const tilt = most(rows, (r) => r.tilt) - least(rows, (r) => r.tilt);
+  assert.ok(nod >= 5 && nod <= 20, `his face bobs through ${nod.toFixed(1)}°`);
+  assert.ok(tilt >= 4, `his head tilts through ${tilt.toFixed(1)}°`);
+});
+
+test('Nod tips his face down and back up', () => {
+  const rows = track('Nod');
+  const dip = idleAt0().faceUp - least(rows, (r) => r.faceUp);
+  assert.ok(dip >= 14 && dip <= 35, `his face dips ${dip.toFixed(1)}° below Idle's`);
+});
+
+test('Shrug lifts both shoulders and opens both hands out to the sides', () => {
+  const rows = track('Shrug');
+  const idle = idleAt0();
+  for (const s of ['L', 'R']) {
+    const rise = most(rows, (r) => r.shoulder[s].y - idle.shoulder[s].y);
+    assert.ok(rise >= 0.12, `the ${s} shoulder rises ${rise.toFixed(2)}`);
+    const out = most(rows, (r) => Math.abs(r.hand[s].x) - Math.abs(idle.hand[s].x));
+    assert.ok(out >= 0.3, `the ${s} hand opens ${out.toFixed(2)} out to the side`);
+    const up = most(rows, (r) => r.hand[s].y - r.elbow[s].y);
+    assert.ok(up >= -0.1, `the ${s} hand comes up to ${up.toFixed(2)} of the elbow's height`);
+  }
+});
+
+test('Point reaches the right hand out in front of him, above the shoulder, the arm nearly straight', () => {
+  const rows = track('Point');
+  // the point itself: the frame the hand is furthest from the shoulder
+  const best = rows.reduce((a, r) => (r.hand.R.distanceTo(r.shoulder.R) > a.hand.R.distanceTo(a.shoulder.R) ? r : a));
+  const reach = best.hand.R.z - best.shoulder.R.z;
+  assert.ok(reach >= 1.0, `the right hand reaches ${reach.toFixed(2)} ahead of the shoulder`);
+  assert.ok(best.hand.R.y > best.shoulder.R.y, 'the right hand is above the shoulder');
+  const upper = best.elbow.R.clone().sub(best.shoulder.R);
+  const fore = best.hand.R.clone().sub(best.elbow.R);
+  const bend = upper.angleTo(fore) / DEG;
+  assert.ok(bend <= 30, `the elbow bends ${bend.toFixed(0)}°`);
+  const left = most(rows, (r) => r.hand.L.y - idleAt0().hand.L.y);
+  assert.ok(left <= 0.5, `the left hand rises ${left.toFixed(2)}: it stays down`);
+});
+
+test('Think holds the right hand up by his chin the whole loop, the head tilted', () => {
+  const rows = track('Think');
+  for (const r of rows) {
+    const over = r.hand.R.y - r.shoulder.R.y;
+    assert.ok(over >= 0.25, `the right hand ${over.toFixed(2)} over the shoulder`);
+    assert.ok(Math.abs(r.hand.R.x) <= 0.9, `the right hand ${r.hand.R.x.toFixed(2)} off his middle`);
+    assert.ok(r.hand.R.z >= 0.8, `the right hand ${r.hand.R.z.toFixed(2)} in front of him`);
+  }
+  const tilt = rows.reduce((sum, r) => sum + Math.abs(r.tilt), 0) / rows.length;
+  assert.ok(tilt >= 6, `his head tilts ${tilt.toFixed(1)}° on average`);
+});
+
+test('Cheer throws both fists up beside his head and hops', () => {
+  const rows = track('Cheer');
+  const idle = idleAt0();
+  const top = (r) => Math.min(r.hand.L.y, r.hand.R.y);
+  const peak = rows.reduce((a, r) => (top(r) > top(a) ? r : a));
+  const head = glb.worldPos(new Map(), 'Neck.001')[1];
+  assert.ok(top(peak) >= head + 0.3, `the fists reach ${top(peak).toFixed(2)}, the head's base is ${head.toFixed(2)}`);
+  const hop = most(rows, (r) => r.hips.y - idle.hips.y);
+  assert.ok(hop >= 0.25, `the hips rise ${hop.toFixed(2)}`);
+  const air = most(rows, (r) => Math.min(r.ankle.L.y, r.ankle.R.y)) - ANKLE_HEIGHT;
+  assert.ok(air >= 0.15, `both feet leave the floor by ${air.toFixed(2)}`);
 });
 
 test('one skin of 17 joints with at most 4 influences a vertex', () => {

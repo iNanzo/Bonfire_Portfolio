@@ -10,6 +10,9 @@
 //   glb.poseAt(anim, t)              Map node name -> { translation, rotation, scale } at t seconds
 //   glb.world(pose)                  (name) => its world THREE.Matrix4 under that pose (rest where unposed)
 //   glb.worldPos(pose, name)         [x, y, z] of a node's origin (a bone's head) in the world
+//   skinnedMesh(glb, node)           a skinned mesh's triangles and its vertices posed by the skin
+//   pointTriangleDistance(p, a, b, c) the closest a point comes to a triangle
+//   nearestDistance(p, shells)       the closest a point comes to some posed meshes
 import fs from 'node:fs';
 import * as THREE from 'three';
 
@@ -219,4 +222,100 @@ export function footStride(glb, anim, { feet = ['Foot.L', 'Foot.R'], contact = 0
         time += anim.duration / n;
       }
   return time > 0 ? (travel / time) * anim.duration : 0;
+}
+
+/**
+ * A skinned mesh node's triangles (vertex indices, every primitive's in one list), each
+ * vertex's weight on some joints, and `at(pose)`: its vertices as the skin poses them, world
+ * space (glTF's linear blend skinning: joint world matrix times inverse bind matrix).
+ * @param {ReturnType<typeof readGlbAnim>} glb
+ * @param {string} node  the mesh node's name
+ */
+export function skinnedMesh(glb, node) {
+  const { gltf } = glb;
+  const n = gltf.nodes.find((x) => x.name === node);
+  if (!n || n.mesh == null || n.skin == null) throw new Error(`${node} is not a skinned mesh`);
+  const skin = gltf.skins[n.skin];
+  const joints = skin.joints.map((j) => gltf.nodes[j].name);
+  const ibm = glb.accessor(skin.inverseBindMatrices);
+  const inverseBind = joints.map((_, j) => new THREE.Matrix4().fromArray(ibm, j * 16));
+  const pos = [];
+  const jnt = [];
+  const wts = [];
+  const tris = [];
+  for (const p of gltf.meshes[n.mesh].primitives) {
+    const base = pos.length / 3;
+    const P = glb.accessor(p.attributes.POSITION);
+    pos.push(...P);
+    jnt.push(...glb.accessor(p.attributes.JOINTS_0));
+    wts.push(...glb.accessor(p.attributes.WEIGHTS_0));
+    const idx = p.indices != null ? glb.accessor(p.indices) : Array.from({ length: P.length / 3 }, (_, i) => i);
+    for (let i = 0; i < idx.length; i += 3) tris.push([base + idx[i], base + idx[i + 1], base + idx[i + 2]]);
+  }
+  const count = pos.length / 3;
+  /** The weight vertex `v` gives the named joints. */
+  const weightOn = (v, names) => {
+    let w = 0;
+    for (let k = 0; k < 4; k++) if (names.includes(joints[jnt[v * 4 + k]])) w += wts[v * 4 + k];
+    return w;
+  };
+  /** Every vertex posed: [x, y, z] each. */
+  const at = (pose) => {
+    const w = glb.world(pose);
+    const skinMats = joints.map((name, j) => w(name).clone().multiply(inverseBind[j]));
+    const v = new THREE.Vector3();
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const sum = [0, 0, 0];
+      for (let k = 0; k < 4; k++) {
+        const weight = wts[i * 4 + k];
+        if (!weight) continue;
+        v.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]).applyMatrix4(skinMats[jnt[i * 4 + k]]);
+        sum[0] += v.x * weight;
+        sum[1] += v.y * weight;
+        sum[2] += v.z * weight;
+      }
+      out.push(sum);
+    }
+    return out;
+  };
+  return { count, tris, weightOn, at };
+}
+
+const tri = new THREE.Triangle();
+const query = new THREE.Vector3();
+const closest = new THREE.Vector3();
+/** The closest point `p` comes to triangle abc (each [x, y, z]). */
+export function pointTriangleDistance(p, a, b, c) {
+  tri.a.set(a[0], a[1], a[2]);
+  tri.b.set(b[0], b[1], b[2]);
+  tri.c.set(c[0], c[1], c[2]);
+  query.set(p[0], p[1], p[2]);
+  return tri.closestPointToPoint(query, closest).distanceTo(query);
+}
+
+/**
+ * The closest point `p` comes to any of `shells` (each { v: posed vertices, tris }), skipping a
+ * shell whose bounding box is already further than the closest so far.
+ * @param {number[]} p
+ * @param {Array<{v: number[][], tris: number[][], box?: {min: number[], max: number[]}}>} shells
+ */
+export function nearestDistance(p, shells) {
+  let d = Infinity;
+  for (const s of shells) {
+    if (!s.box) {
+      const min = [Infinity, Infinity, Infinity];
+      const max = [-Infinity, -Infinity, -Infinity];
+      for (const v of s.v)
+        for (let i = 0; i < 3; i++) {
+          min[i] = Math.min(min[i], v[i]);
+          max[i] = Math.max(max[i], v[i]);
+        }
+      s.box = { min, max };
+    }
+    const out = [0, 1, 2].map((i) => Math.max(s.box.min[i] - p[i], 0, p[i] - s.box.max[i]));
+    if (Math.hypot(...out) >= d) continue;
+    for (const [a, b, c] of s.tris) d = Math.min(d, pointTriangleDistance(p, s.v[a], s.v[b], s.v[c]));
+  }
+  return d;
 }
