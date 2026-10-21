@@ -38,6 +38,7 @@ import {
   INVITATION_MAX_ENTRIES,
   INVITATION_MORE,
   INVITATION_NO_HIDING,
+  INVITATION_OPTIONS_FROM,
   INVITATION_RANGES,
   INVITATION_SELECTS,
   INVITATION_STARTERS,
@@ -851,6 +852,11 @@ export const MAX_ENTRIES = { ...INVITATION_MAX_ENTRIES };
  * @type {Record<string, (item: any, list: any[], index: number) => string>}
  */
 export const CARD_META = { ...INVITATION_CARD_META };
+/**
+ * Dropdowns made from a list in the draft, by that list: an edit in it remakes them as it's
+ * typed (the invitation intro's box lists, as a box is renamed or its line rewritten).
+ */
+export const OPTIONS_FROM = { ...INVITATION_OPTIONS_FROM };
 
 const opts = (list, label = (v) => titleCase(String(v))) => list.map((v) => ({ value: v, label: label(v) }));
 /**

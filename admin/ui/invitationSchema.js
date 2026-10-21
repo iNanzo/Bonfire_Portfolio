@@ -11,8 +11,9 @@
 //
 // The Intro (`invitation.intro`, the chat Play Intro opens: types.js DialogueScript): the
 // speaker, the start box and the chat boxes. The start, each box's Next and each choice's box are
-// picked from the boxes there are (one that's gone still shows, marked, so it can be put right);
-// Face, Animation and Camera from the toy's lists; Auto as a slider. A new box comes with every
+// picked from the boxes there are (one that's gone still shows, marked, so it can be put right),
+// lists remade as a box is renamed (INVITATION_OPTIONS_FROM); Face, Animation and Camera from
+// the toy's lists; Auto as a slider. A new box comes with every
 // field (INVITATION_TEMPLATES: the form shows only the fields an entry has), boxes and choices
 // can't be hidden (INVITATION_NO_HIDING: the toy has no way to skip one), a box has at most 3
 // choices (INVITATION_MAX_ENTRIES), and each card says under its line what the box does
@@ -306,6 +307,15 @@ export const INVITATION_SELECTS = {
   [`${BOX}.face`]: () => FACE_NAMES.map((v) => ({ value: v, label: titleCase(FACE_LABELS[v] ?? v) })),
   [`${BOX}.animation`]: () => INTRO_ANIMATIONS.map((v) => ({ value: v, label: animationLabel(v) })),
   [`${BOX}.camera`]: () => INTRO_CAMERAS.map((v) => ({ value: v, label: titleCase(CAMERA_LABELS[v] ?? v) })),
+};
+/**
+ * The dropdowns made from the chat boxes, by the list they're made from: an edit in it (a box
+ * renamed, its line rewritten) remakes them as it's typed.
+ */
+export const INVITATION_OPTIONS_FROM = {
+  'invitation.intro.start': 'invitation.intro.boxes',
+  [`${BOX}.next`]: 'invitation.intro.boxes',
+  [`${CHOICE}.next`]: 'invitation.intro.boxes',
 };
 
 /** “+ Add …” on each trigger's lines, the chat boxes and a box's choices. */

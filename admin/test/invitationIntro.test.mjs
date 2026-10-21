@@ -397,6 +397,52 @@ test('choices: + Add Choice until there are 3', () => {
   );
 });
 
+test('renaming a box, or rewriting its line, updates every list of boxes on the page as you type', () => {
+  const d = draftWith();
+  const r = render(d);
+  // (The stand-in document finds what the form rendered.)
+  const before = globalThis.document.querySelectorAll;
+  globalThis.document.querySelectorAll = (sel) => r.root.querySelectorAll(sel);
+  try {
+    const id = fieldControl(r, 'invitation.intro.boxes[4].id', 'input');
+    id.value = 'finale';
+    id.listeners.input();
+    assert.equal(d.invitation.intro.boxes[4].id, 'finale');
+    const next = fieldControl(r, 'invitation.intro.boxes[2].next', 'select');
+    assert.deepEqual(
+      options(next).map(([v]) => v),
+      ['', 'a', 'b', 'c', 'd', 'finale', 'e'],
+      'the new id to pick, and the one it held, marked',
+    );
+    assert.match(options(next).at(-1)[1], /no such box/i);
+    assert.equal(next.value, 'e', 'still showing what it holds');
+    const start = fieldControl(r, 'invitation.intro.start', 'select');
+    assert.ok(
+      options(start).some(([v]) => v === 'finale'),
+      'the start box’s list too',
+    );
+    const choice = fieldControl(r, 'invitation.intro.boxes[1].choices[1].next', 'select');
+    assert.ok(
+      options(choice).some(([v]) => v === 'finale'),
+      'and each choice’s',
+    );
+    // Picking it there: the list keeps up, the marked one gone.
+    next.value = 'finale';
+    next.listeners.change();
+    assert.equal(d.invitation.intro.boxes[2].next, 'finale');
+    assert.deepEqual(
+      options(next).map(([v]) => v),
+      ['', 'a', 'b', 'c', 'd', 'finale'],
+    );
+    const text = fieldControl(r, 'invitation.intro.boxes[0].text', 'textarea');
+    text.value = 'A brand new first line.';
+    text.listeners.input();
+    assert.match(options(start).find(([v]) => v === 'a')[1], /A brand new first line/, 'each box by its line');
+  } finally {
+    globalThis.document.querySelectorAll = before;
+  }
+});
+
 test('the search finds a box’s fields under its line, and its words', () => {
   const d = draftWith();
   const index = buildIndex(d);

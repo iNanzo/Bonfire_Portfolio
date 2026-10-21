@@ -3,7 +3,8 @@
 // add; schema.js NO_HIDING lists can't hide, MAX_ENTRIES caps a list, CARD_META says
 // what an entry is under its title); lists of text and table rows get row editors;
 // `images` gets the image manager; a field with a SELECTS list is a dropdown (the list
-// made from the draft and the field's own path, so it can keep what the field holds);
+// made from the draft and the field's own path, so it can keep what the field holds;
+// one made from a list in the draft, OPTIONS_FROM, remade as that list is edited);
 // ranged numbers get sliders and #rrggbb text gets a color picker. Bonfire
 // Live's scenes get cards of their own (sceneTools.js: made in the Painter, so a card
 // shows a scene's colors and summary rather than its ~80 settings). Every
@@ -30,6 +31,7 @@ import {
   MULTILINE_LISTS,
   NO_HIDING,
   NULLABLE,
+  OPTIONS_FROM,
   READONLY,
   SELECTS,
   SHORT,
@@ -49,7 +51,7 @@ import { sceneCardBody, sceneMeta, sceneThumb } from './sceneTools.js';
 import { titleCase } from './text.js';
 import { ELEMENT_IDS } from '../../src/effectsDefaults.js';
 import { el } from './el.js';
-import { getAt, keyOf, patternOf } from './paths.js';
+import { getAt, keyOf, parsePath, patternOf, within } from './paths.js';
 
 export { el, getAt, keyOf, patternOf };
 const setAt = (obj, path, value) => {
@@ -308,7 +310,11 @@ function renderScalar(value, path, ctx, { nullable = hint(NULLABLE, patternOf(pa
   if (options) {
     const select = el(
       'select',
-      { onchange: () => update(path, typeof value === 'number' ? Number(select.value) : select.value, ctx) },
+      {
+        onchange: () => update(path, typeof value === 'number' ? Number(select.value) : select.value, ctx),
+        'data-options-from': hint(OPTIONS_FROM, pattern) ?? null,
+        'data-options-for': hint(OPTIONS_FROM, pattern) ? keyOf(path) : null,
+      },
       options.map((o) => el('option', { value: String(o.value), text: o.label })),
     );
     select.value = String(value);
@@ -431,7 +437,25 @@ function update(path, value, ctx) {
     const sw = /** @type {HTMLElement | null} */ (document.querySelector(`[data-swatch="${CSS.escape(keyOf(path))}"]`));
     if (sw) sw.style.setProperty('background', value);
   }
+  refreshOptions(keyOf(path), ctx);
   ctx.changed();
+}
+
+/**
+ * Remake the dropdowns made from a list in the draft (schema.js OPTIONS_FROM) that the edit at
+ * `edited` is in, so a box renamed is there to pick (and one gone shows, marked) as it's typed.
+ * @param {string} edited @param {*} ctx
+ */
+function refreshOptions(edited, ctx) {
+  for (const select of /** @type {NodeListOf<HTMLSelectElement>} */ (
+    document.querySelectorAll('[data-options-from]')
+  )) {
+    if (!within(edited, select.getAttribute('data-options-from'))) continue;
+    const at = parsePath(select.getAttribute('data-options-for'));
+    const options = SELECTS[patternOf(at)]?.(ctx.draft, at) ?? [];
+    select.replaceChildren(...options.map((o) => el('option', { value: String(o.value), text: o.label })));
+    select.value = String(getAt(ctx.draft, at) ?? '');
+  }
 }
 
 function renderTodo(obj, path, ctx) {
