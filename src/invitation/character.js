@@ -4,7 +4,8 @@
 //   loadCharacter(url, opts)       GLTFLoader and the two pixel images at once (the images never
 //                                  wait for the glb), then createCharacter once the glb is in and
 //                                  the images too (or TEXTURE_GRACE s more), so the first frame
-//                                  already wears them
+//                                  already wears them; the dialogue faces' two sheets as well,
+//                                  never waited for
 //   createCharacter(gltf, opts)    any {scene, animations} (the tests pass a stand-in skeleton
 //                                  and synthetic clips): scaled by SCALE; toon materials (the
 //                                  map kept, a nearest gradient map with the preset's toon
@@ -53,6 +54,16 @@
 // size is picked by his texels whether the filter is on or not (faceSize); faceSheet says which
 // sheet really shows ('smooth' at Off, whatever was picked).
 //
+// setFace takes any of clips.js FACE_NAMES. The dialogue's four (EXTRA_FACES: sad, angry, shy,
+// smug) come from sheets of their own beside the glb (extraFaceUrls: the smooth 1024 one,
+// tools/newt-face-smooth.mjs, and the pixel one laid out like newt-face.png, tools/newt-face.mjs),
+// split the same way and shown by the same rules: the pixel cell at the size picked for his half
+// face (so a face change never changes the sheet's size, and the hold that keeps it from
+// flickering is the same for all eight), the smooth cell where his face is smooth. Until a sheet
+// has come, or where an older cached one hasn't the size showing, the nearest of the first four
+// stands in (faceSheets.js FACE_FALLBACK, in the same pixels or smooth sheet as the rest);
+// faceShown says which face really shows.
+//
 // The texel snap (pixel filter on): as each of his meshes is drawn, the shift that puts his
 // head's centre on a texel's centre is worked out (retro.js snapShift) and the materials of
 // what rides on his head (face, hair, cap: onHead) move by it (markId's snap), so his head
@@ -72,8 +83,8 @@
 // `texture.fineMipBias` from ORIGINAL_ATLAS_TEXELS (less, or the checks blur into grey); none at Off.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { BONES, CLIPS, FACES, SCALE } from './clips.js';
-import { FACE_LAYOUT, faceSpan, layoutFor, pickFaceSize } from './faceSheets.js';
+import { BONES, CLIPS, EXTRA_FACES, FACES, SCALE } from './clips.js';
+import { FACE_FALLBACK, FACE_LAYOUT, faceSpan, layoutFor, pickFaceSize } from './faceSheets.js';
 import { LOOKS, DEFAULT_LOOK } from './look.js';
 import { SPLIT, chestShare } from './lookAt.js';
 import { TWIN } from './play.js';
@@ -99,6 +110,7 @@ const MIN_R = 11;
  *   weightOf(clip: string): number,
  *   timeOf(clip: string): number,
  *   face: import('./clips.js').FaceName,
+ *   faceShown: import('./clips.js').FaceName,
  *   faceReady: Promise<void>,
  *   atlasReady: Promise<void>,
  *   faceSize: number|'smooth'|null,
@@ -113,6 +125,16 @@ const MIN_R = 11;
  * @param {string} url
  */
 export const pixelAtlasUrl = (url) => url.replace(/[^/?#]*([?#].*)?$/, 'newt-atlas-pixel.png');
+
+/**
+ * The dialogue faces' sheets' addresses, beside the glb at `url`: the smooth 1024 sheet and the
+ * pixel sheets.
+ * @param {string} url
+ */
+export const extraFaceUrls = (url) => ({
+  smooth: url.replace(/[^/?#]*([?#].*)?$/, 'newt-face-smooth-extra.png'),
+  pixel: url.replace(/[^/?#]*([?#].*)?$/, 'newt-face-extra.png'),
+});
 
 /**
  * NEWT's height in texels in the default view from which his shirt shows the glb's own plaid
@@ -181,13 +203,25 @@ const loadTexture = (url) => (url ? new THREE.TextureLoader().loadAsync(url).cat
  * look shows one (the pixel filter on, and Pixel Face for the face, Pixel Shirt for the atlas),
  * it's dressed once that one's in too, or TEXTURE_GRACE s after the glb (a slower one goes on
  * when it comes); one the look doesn't show never holds him up, and goes on him whenever it
- * comes, ready for its switch.
+ * comes, ready for its switch. The dialogue faces' sheets (from beside the glb, unless opts name
+ * them) are asked for too and never waited for: until they come their faces show the nearest of
+ * the first four.
  * @param {string} url
- * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFaceUrl?: string, pixelAtlasUrl?: string}} [opts]
+ * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelFaceUrl?: string, pixelAtlasUrl?: string, extraFaceUrl?: string, pixelExtraFaceUrl?: string}} [opts]
  */
-export async function loadCharacter(url, { pixelAtlasUrl: atlasUrl = pixelAtlasUrl(url), pixelFaceUrl, ...opts } = {}) {
+export async function loadCharacter(
+  url,
+  {
+    pixelAtlasUrl: atlasUrl = pixelAtlasUrl(url),
+    pixelFaceUrl,
+    extraFaceUrl = extraFaceUrls(url).smooth,
+    pixelExtraFaceUrl = extraFaceUrls(url).pixel,
+    ...rest
+  } = {},
+) {
   const atlas = loadTexture(atlasUrl);
   const face = loadTexture(pixelFaceUrl);
+  const opts = { ...rest, extraFace: loadTexture(extraFaceUrl), pixelExtraFace: loadTexture(pixelExtraFaceUrl) };
   const gltf = await new GLTFLoader().loadAsync(url);
   const parts = pixelParts(opts.preset ?? LOOKS[DEFAULT_LOOK.style]);
   if (opts.pixel === false || !(parts.face || parts.shirt))
@@ -205,9 +239,10 @@ export async function loadCharacter(url, { pixelAtlasUrl: atlasUrl = pixelAtlasU
 
 /**
  * @param {{scene: any, animations?: any[]}} gltf
- * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelAtlas?: any, pixelFace?: any}} [opts]
- *   pixelAtlas: the pixel atlas and pixelFace: the pixel face sheet (models/newt-face.png), each a
- *   texture (on him at once), a promise of one (on him when it settles; null: none) or nothing
+ * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelAtlas?: any, pixelFace?: any, extraFace?: any, pixelExtraFace?: any}} [opts]
+ *   pixelAtlas: the pixel atlas and pixelFace: the pixel face sheet (models/newt-face.png),
+ *   extraFace and pixelExtraFace: the dialogue faces' smooth and pixel sheets, each a texture (on
+ *   him at once), a promise of one (on him when it settles; null: none) or nothing
  * @returns {PageCharacter}
  */
 export function createCharacter(gltf, opts = {}) {
@@ -350,8 +385,18 @@ export function createCharacter(gltf, opts = {}) {
   let pixelLayout = FACE_LAYOUT;
   /** @type {Map<number, Record<string, any>>} each shown size's cells */
   const pixelSets = new Map();
+  /** @type {Record<string, any>|null} the dialogue faces' smooth cells, once their sheet is in */
+  let extraFaces = null;
+  /** @type {any} newt-face-extra.png, once loaded */
+  let extraImage = null;
+  /** @type {import('./faceSheets.js').FaceSheet[]} the sheets in it */
+  let extraLayout = [];
+  /** @type {Map<number, Record<string, any>>} each shown size's dialogue cells */
+  const extraSets = new Map();
   /** @type {import('./clips.js').FaceName} */
   let face = 'neutral';
+  /** @type {import('./clips.js').FaceName} the face really showing (FACE_FALLBACK's, until its sheet is in) */
+  let faceShown = 'neutral';
   /**
    * The pixel sheet's size for his half face ('smooth': past the largest, the 1024 sheet; null
    * until he's drawn); that measure in texels is faceTexels.
@@ -384,11 +429,24 @@ export function createCharacter(gltf, opts = {}) {
   const pixelFaceOn = () => pixel && pixelParts(preset).face;
   /** Pixel Shirt (a Shader option, off in every style) under the pixel filter: the bold plaid at all. */
   const pixelShirtOn = () => pixel && pixelParts(preset).shirt;
+  /**
+   * The dialogue faces' cells for the pixel sheet `sheet` (null: none that size in the image
+   * there is, or no image yet), split the first time they show.
+   * @param {import('./faceSheets.js').FaceSheet} sheet
+   */
+  const extraFacesOf = (sheet) => {
+    const at = extraImage && extraLayout.find((s) => s.w === sheet.w && s.h === sheet.h);
+    if (!at) return null;
+    if (!extraSets.has(at.w)) extraSets.set(at.w, splitSheet(extraImage, true, at, EXTRA_FACES));
+    return extraSets.get(at.w);
+  };
   const showFace = () => {
     const sheet = pixelFaceOn() && pixelImage && faceSize !== 'smooth' ? pixelSheetAt(faceSize) : null;
-    const set = sheet ? pixelFacesOf(sheet) : sheetFaces;
-    if (!faceMaterial || !set) return;
-    faceMaterial.map = set[face];
+    const base = sheet ? pixelFacesOf(sheet) : sheetFaces;
+    const extra = face in EXTRA_FACES ? (sheet ? extraFacesOf(sheet) : extraFaces) : null;
+    if (!faceMaterial || !base) return;
+    faceShown = face in EXTRA_FACES && !extra ? FACE_FALLBACK[face] : face;
+    faceMaterial.map = (extra ?? base)[faceShown];
     faceSheet = sheet ? sheet.w : 'smooth';
   };
   /**
@@ -441,9 +499,34 @@ export function createCharacter(gltf, opts = {}) {
     t.dispose();
     showFace();
   };
-  if (opts.pixelFace && !isPromise(opts.pixelFace)) usePixelFace(opts.pixelFace);
-  // (Without it the 1024 sheet stays: a softer face, still his.)
-  const faceReady = isPromise(opts.pixelFace) ? opts.pixelFace.then(usePixelFace).catch(() => {}) : Promise.resolve();
+  /** @param {any} t  the dialogue faces' smooth sheet */
+  const useExtraFace = (t) => {
+    if (!t || !faceMaterial || !t.image || typeof document === 'undefined') return;
+    extraFaces = splitSheet(t.image, false, undefined, EXTRA_FACES);
+    t.image.close?.();
+    t.dispose();
+    showFace();
+  };
+  /** @param {any} t  the dialogue faces' pixel sheets */
+  const usePixelExtraFace = (t) => {
+    if (!t || !faceMaterial || !t.image) return;
+    extraImage = t.image;
+    extraLayout = layoutFor(extraImage.width, extraImage.height);
+    t.dispose();
+    showFace();
+  };
+  /** A texture now (`use` it at once), or a promise of one (when it settles); never a failure. */
+  const take = (t, use) => {
+    if (t && !isPromise(t)) use(t);
+    return isPromise(t) ? t.then(use).catch(() => {}) : Promise.resolve();
+  };
+  // (Without the pixel face the 1024 sheet stays: a softer face, still his. Without the dialogue
+  // faces' sheets their faces show the nearest of the first four.)
+  const faceReady = Promise.all([
+    take(opts.pixelFace, usePixelFace),
+    take(opts.extraFace, useExtraFace),
+    take(opts.pixelExtraFace, usePixelExtraFace),
+  ]).then(() => {});
 
   // --- Scratch.
   const v = new THREE.Vector3();
@@ -595,12 +678,16 @@ export function createCharacter(gltf, opts = {}) {
       });
     },
     setFace(name) {
-      if (!FACES[name]) return;
+      if (!FACES[name] && !EXTRA_FACES[name]) return;
       face = name;
       showFace();
     },
     get face() {
       return face;
+    },
+    /** The face really showing: `face`, or the nearest of the first four until its sheet is in. */
+    get faceShown() {
+      return faceShown;
     },
     faceReady,
     atlasReady,
@@ -678,7 +765,8 @@ export function createCharacter(gltf, opts = {}) {
       root.traverse((o) => o.geometry?.dispose());
       for (const m of toons) m.dispose();
       for (const t of textures) t.dispose();
-      for (const set of [sheetFaces, ...pixelSets.values()]) for (const t of Object.values(set ?? {})) t.dispose();
+      for (const set of [sheetFaces, extraFaces, ...pixelSets.values(), ...extraSets.values()])
+        for (const t of Object.values(set ?? {})) t.dispose();
       gradient.dispose();
     },
   };
@@ -746,22 +834,23 @@ function spanOf(geometry) {
 }
 
 /**
- * A face sheet's four cells as their own textures (clips.js FACES: a cell's texture offset
- * on the sheet, glTF's flipY = false, so v runs down the image). Each repeats ×2 so the face's
- * UVs (one cell's worth) span it, clamped at its edges.
+ * A face sheet's four cells as their own textures (clips.js FACES, or EXTRA_FACES for the
+ * dialogue's sheet: a cell's texture offset on the sheet, glTF's flipY = false, so v runs down the
+ * image). Each repeats ×2 so the face's UVs (one cell's worth) span it, clamped at its edges.
  * @param {any} image  an ImageBitmap, image or canvas
  * @param {boolean} nearest  pixel cells: nearest, no mipmaps
  * @param {{w: number, h: number, x: number, y: number}} [sheet]  where the sheet is in the
  *   image (a cell w × h): the whole image by default
+ * @param {Record<string, number[]>} [cells]  the faces on it, by their offsets
  */
-function splitSheet(image, nearest, sheet) {
+function splitSheet(image, nearest, sheet, cells = FACES) {
   const w = sheet?.w ?? Math.floor(image.width / 2);
   const h = sheet?.h ?? Math.floor(image.height / 2);
   const x0 = sheet?.x ?? 0;
   const y0 = sheet?.y ?? 0;
   /** @type {Record<string, any>} */
   const out = {};
-  for (const [name, [u, vv]] of Object.entries(FACES)) {
+  for (const [name, [u, vv]] of Object.entries(cells)) {
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;

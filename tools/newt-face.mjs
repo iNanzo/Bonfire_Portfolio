@@ -16,12 +16,18 @@
 // pixel filter and Pixel Face are on. Re-runnable:
 //
 //   node tools/newt-face.mjs [--glb public/models/newt.glb] [--out public/models/newt-face.png]
-//                            [--preview <png>]
+//                            [--out-extra public/models/newt-face-extra.png] [--preview <png>]
 //
-//   --preview  also write each size's four faces mirrored into whole faces, ×8, for looking at
+//   --preview  also write each size's eight faces mirrored into whole faces, ×8, for looking at
+//
+// The dialogue's four faces (sad, angry, shy, smug: clips.js EXTRA_FACES) go on sheets of their own
+// laid out the same way (newt-face-extra.png), drawn by tools/newt-face-extra.mjs with this tool's
+// design and drawing: neutral's face with its parts moved as tools/newt-face-design.mjs moves his
+// smooth face's, by the same rules.
 import fs from 'node:fs';
 import sharp from 'sharp';
 import { FACE_IMAGE, FACE_LAYOUT } from '../src/invitation/faceSheets.js';
+import { extraFace } from './newt-face-extra.mjs';
 
 const argv = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -30,9 +36,12 @@ const opt = (name, fallback) => {
 };
 const GLB = opt('glb', 'public/models/newt.glb');
 const OUT = opt('out', 'public/models/newt-face.png');
+const OUT_EXTRA = opt('out-extra', 'public/models/newt-face-extra.png');
 const PREVIEW = opt('preview', null);
 /** The cells, as clips.js FACES has them: [column, row] on a 2×2 sheet. */
 const CELLS = { neutral: [0, 0], blink: [1, 0], happy: [0, 1], surprised: [1, 1] };
+/** The dialogue faces' cells on their own sheets (newt-face-extra.png), as clips.js EXTRA_FACES has them. */
+const EXTRA_CELLS = { sad: [0, 0], angry: [1, 0], shy: [0, 1], smug: [1, 1] };
 /**
  * His smooth face (the 1024 sheet's cells), measured, as shares of a cell: u across from the
  * middle of his face to his ear, v down. A stroke is its centre line, [u, v] points, and its
@@ -782,31 +791,51 @@ console.log(
     .map(([k, v]) => `${k} ${v}`)
     .join(', ')}`,
 );
-const composite = [];
-/** @type {Array<{w: number, h: number, faces: Record<string, Uint8Array>}>} */
-const drawn = [];
-for (const s of FACE_LAYOUT) {
-  /** @type {Record<string, Uint8Array>} */
-  const faces = {};
-  for (const [name, [cx, cy]] of Object.entries(CELLS)) {
-    faces[name] = face(name, s.w, s.h, c);
-    composite.push({
-      input: await sharp(Buffer.from(faces[name]), { raw: { width: s.w, height: s.h, channels: 4 } })
-        .png()
-        .toBuffer(),
-      left: s.x + cx * s.w,
-      top: s.y + cy * s.h,
-    });
+/**
+ * One image of 2×2 sheets, a sheet a size as FACE_LAYOUT packs them, its cells' faces drawn by
+ * `draw` (the space under the smaller sheets skin too: nothing samples it).
+ * @param {Record<string, number[]>} cells  face → [column, row]
+ * @param {(name: string, w: number, h: number) => Uint8Array} draw
+ * @param {string} out
+ */
+async function writeSheets(cells, draw, out) {
+  const composite = [];
+  /** @type {Array<{w: number, h: number, faces: Record<string, Uint8Array>}>} */
+  const drawn = [];
+  for (const s of FACE_LAYOUT) {
+    /** @type {Record<string, Uint8Array>} */
+    const faces = {};
+    for (const [name, [cx, cy]] of Object.entries(cells)) {
+      faces[name] = draw(name, s.w, s.h);
+      composite.push({
+        input: await sharp(Buffer.from(faces[name]), { raw: { width: s.w, height: s.h, channels: 4 } })
+          .png()
+          .toBuffer(),
+        left: s.x + cx * s.w,
+        top: s.y + cy * s.h,
+      });
+    }
+    drawn.push({ w: s.w, h: s.h, faces });
   }
-  drawn.push({ w: s.w, h: s.h, faces });
+  const [r, g, b] = c.skin.neutral;
+  await sharp({ create: { width: FACE_IMAGE.w, height: FACE_IMAGE.h, channels: 4, background: { r, g, b, alpha: 1 } } })
+    .composite(composite)
+    .png({ compressionLevel: 9 })
+    .toFile(out);
+  console.log(`✓ ${out}: ${FACE_IMAGE.w}×${FACE_IMAGE.h}, cells ${FACE_LAYOUT.map((s) => `${s.w}×${s.h}`).join(' ')}`);
+  return drawn;
 }
-// (The space under the smaller sheets is skin too: nothing samples it.)
-const [r, g, b] = c.skin.neutral;
-await sharp({ create: { width: FACE_IMAGE.w, height: FACE_IMAGE.h, channels: 4, background: { r, g, b, alpha: 1 } } })
-  .composite(composite)
-  .png({ compressionLevel: 9 })
-  .toFile(OUT);
-console.log(`✓ ${OUT}: ${FACE_IMAGE.w}×${FACE_IMAGE.h}, cells ${FACE_LAYOUT.map((s) => `${s.w}×${s.h}`).join(' ')}`);
+
+const base = await writeSheets(CELLS, (name, w, h) => face(name, w, h, c), OUT);
+/** What the dialogue faces are drawn with: the first four's design and drawing. */
+const kit = { DESIGN, canvas, eyeShift, browColumns, bandOf, rowsOf, oval, joinStairs };
+const extra = await writeSheets(
+  EXTRA_CELLS,
+  (name, w, h) => extraFace(/** @type {any} */ (name), w, h, c, kit),
+  OUT_EXTRA,
+);
+// (Each size's eight faces, the four then the dialogue's four, for the preview.)
+const drawn = base.map((s, i) => ({ ...s, faces: { ...s.faces, ...extra[i].faces } }));
 
 if (PREVIEW) {
   // Each size's faces mirrored into whole faces, a row a size, ×8, on grey.

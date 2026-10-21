@@ -5,7 +5,8 @@
 // full DPR with the pixel look on (and survives a reload), and Off draws smooth at the screen's
 // resolution (its smooth face reported as such); and the portfolio's
 // first load carries none of its code; the pixel atlas and face load alongside the glb and the
-// first frame waits for them. NEWT stands about a quarter of a phone's short side tall
+// first frame waits for them; the dialogue faces' sheets load too, and each of his eight faces
+// shows on him by name. NEWT stands about a quarter of a phone's short side tall
 // (a fifth of a desktop's), and running off to the rim never takes him off a phone's screen.
 // Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
@@ -361,6 +362,43 @@ test.describe('on a phone', () => {
     expect(typeof snap.faceSheet, `a pixel face sheet (${snap.faceSheet})`).toBe('number');
     expect(snap.shader.pixelShirt).toBe(false);
     expect(snap.shader.pixelFace).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test('the dialogue faces: their two sheets come from beside the glb without holding up the first frame, and face() shows each of the eight on him, on the pixel sheet his size picks', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    /** @type {string[]} the dialogue sheets asked for */
+    const asked = [];
+    page.on('requestfinished', (r) => {
+      const m = /models\/(newt-face(?:-smooth)?-extra\.png)$/.exec(r.url());
+      if (m) asked.push(m[1]);
+    });
+    const drawn = () =>
+      page.evaluate(() => document.querySelector('[data-stage]')?.classList.contains('is-ready')).catch(() => false);
+    /** @type {boolean[]} whether the page had drawn by the time each sheet was let through */
+    const drawnFirst = [];
+    await page.route(/\/models\/newt-face(?:-smooth)?-extra\.png$/, async (route) => {
+      // (Held until the page draws, or 8 s: it never waits on them.)
+      const t0 = Date.now();
+      while (Date.now() - t0 < 8000 && !(await drawn())) await sleep(50);
+      drawnFirst.push(await drawn());
+      await route.continue();
+    });
+    await calm(page);
+    await expect.poll(() => [...asked].sort()).toEqual(['newt-face-extra.png', 'newt-face-smooth-extra.png']);
+    expect(drawnFirst, 'drawn before either sheet came').toEqual([true, true]);
+    for (const name of ['neutral', 'happy', 'surprised', 'blink', 'sad', 'angry', 'shy', 'smug']) {
+      expect(await page.evaluate((n) => window.__invitation.face(n), name)).toBe(true);
+      await until(page, (s) => s.faceShown === name, `${name} on his face`);
+      const snap = await snapshot(page);
+      expect(snap.face).toBe(name);
+      expect(typeof snap.faceSheet, `${name}: a pixel face sheet (${snap.faceSheet})`).toBe('number');
+    }
+    expect(await page.evaluate(() => window.__invitation.face('grumpy'))).toBe(false);
+    expect(await page.evaluate(() => window.__invitation.face(null))).toBe(false);
+    await until(page, (s) => s.face === 'neutral' || s.face === 'blink', 'the brain’s face again');
     expect(errors).toEqual([]);
   });
 

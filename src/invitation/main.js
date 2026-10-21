@@ -34,9 +34,10 @@
 // window.__invitation for the specs and tools/capture-invitation.mjs: snapshot(), screen(part)
 // (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
 // (his ankles in the world, his bones from his root), grabbed() (while he's held, where the
-// point he was grabbed by shows), say(text) (a line in his bubble now) and play(clip) (forces a
-// clip, Walk and Run going round their step at their own pace); `?seed=N` and `?calm` go to the
-// brain (and the seed to talk).
+// point he was grabbed by shows), say(text) (a line in his bubble now), play(clip) (forces a
+// clip, Walk and Run going round their step at their own pace) and face(name) (holds any of
+// clips.js FACE_NAMES on him, no blinks; null gives it back to the brain); `?seed=N` and `?calm`
+// go to the brain (and the seed to talk).
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
@@ -64,7 +65,7 @@ import {
   orbitWheel,
 } from './camera.js';
 import { loadCharacter } from './character.js';
-import { ANKLE_HEIGHT, BONES, COLLAR, FACE_TRACK, SCALE, fadeFor } from './clips.js';
+import { ANKLE_HEIGHT, BONES, COLLAR, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
@@ -337,6 +338,8 @@ function start(s) {
   let waiting = 0;
   /** A clip forced by ?test's play(), else null (the brain decides). */
   let forced = null;
+  /** @type {import('./clips.js').FaceName|null} a face held by ?test's face(), else null (the brain's, with blinks) */
+  let forcedFace = null;
   /** @type {import('./types.js').ButtonName|null} the last button the loop took (for ?test) */
   let lastButton = null;
   /** @type {import('./types.js').BrainOut|null} */
@@ -833,7 +836,7 @@ function start(s) {
     // (His chest joins in on his feet only: held, his collar hangs from the cursor.)
     torso = torsoStep(torso, body.mode === 'ground', dt);
     if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight, torso);
-    c.setFace(faceStep(faces, face, blink, t, rng));
+    c.setFace(forcedFace ?? faceStep(faces, face, blink, t, rng));
     s.setBlob(root.position.x, root.position.z, body.mode === 'ground' ? 0 : Math.min(1, root.position.y / 0.5));
     if (sun)
       fitShadow(sun, s.bounds, shadowTop(root.position.y, SHADOW_TOP), { x: root.position.x, z: root.position.z });
@@ -880,6 +883,11 @@ function start(s) {
   });
   canvas.addEventListener('webglcontextrestored', () => location.reload());
 
+  /**
+   * The face asked for and the face really showing (the nearest of the first four until a
+   * dialogue face's sheet is in), for ?test's snapshot.
+   */
+  const facesNow = () => ({ face: character?.face ?? 'neutral', faceShown: character?.faceShown ?? 'neutral' });
   if (options.test) {
     /** @type {any} */ (window).__invitation = {
       snapshot: () => ({
@@ -887,7 +895,7 @@ function start(s) {
         state: out?.state ?? 'idle',
         clip: shownClip(),
         reaction: out?.reaction ?? null,
-        face: character?.face ?? 'neutral',
+        ...facesNow(),
         // (The face sheet showing: a pixel sheet's cell width, 'smooth' for the 1024 sheet, as at
         // Off; his half face in texels.)
         faceSheet: character?.faceSheet ?? null,
@@ -973,6 +981,14 @@ function start(s) {
        * @param {string} text
        */
       say: (text) => bubble.say(String(text)),
+      /**
+       * Hold a face on him (any of clips.js FACE_NAMES; null: the brain's again). Whether it's one.
+       * @param {string|null} name
+       */
+      face(name) {
+        forcedFace = FACE_NAMES.includes(/** @type {any} */ (name)) ? /** @type {any} */ (name) : null;
+        return forcedFace !== null;
+      },
       /** @param {string|null} clip */
       play(clip) {
         forced = clip;
