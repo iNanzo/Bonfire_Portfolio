@@ -313,9 +313,24 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   the glb, and the first frame waits (up to 3 s more) for each one whose switch is on, so NEWT
   never shows a blank face or the blurred atlas first; one whose switch is off never holds it
   up.
+- **The dialogue faces** (sad, angry, shy and smug, for the intro's boxes: `clips.js`
+  `EXTRA_FACES`) have sheets of their own beside the glb, laid out like his: `node
+  tools/newt-face-smooth.mjs` draws the smooth one (`newt-face-smooth-extra.png`, 1024) from his
+  own smooth neutral face, measured into `tools/newt-face-design.mjs` and redrawn in the same
+  flat, round-ended style, then edited per face (sad: brows up toward the middle, the lid
+  drooping toward his ear, the mouth turned down; angry: brows down and in, the eye narrowed, a
+  tight mouth; shy: looking down, a strong hatched blush, a small wavy mouth; smug: half-lidded,
+  a ω of a mouth; `--calibrate` puts its neutral beside the glb's to check), and `node
+  tools/newt-face.mjs` draws the pixel ones (`newt-face-extra.png`, `tools/newt-face-extra.mjs`)
+  at every cell size: neutral's pixel face with its parts moved as the design moves them, by the
+  same rules, plus what each needs to read in a few pixels (`EXTRA_PIXELS`). They show at the
+  size his face's sheet is picked at, so a face change never flips the sheet; they're never
+  waited for, and until they come each shows the nearest of the first four (`FACE_FALLBACK`).
+  He never blinks on them (a blink is neutral's closed eye: his brows would jump).
 - **Tests:** `test/invitationCharacter.test.mjs`, `invitationLook`, `invitationLooks`,
   `invitationShader`, `invitationRetro`, `invitationGovernor`, `invitationAtlas`,
-  `invitationFace`, `invitationArea`, `invitationCamera` and `invitationPlay` (with
+  `invitationFace`, `invitationFaceExtra`, `invitationFaceBlink`, `invitationCharacterFaces`,
+  `invitationArea`, `invitationCamera` and `invitationPlay` (with
   `invitationBrain`, `invitationMotion`, `invitationGesture` and `invitationModel`), the speech
   and content tests above, and `e2e/invitation.spec.mjs` (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
@@ -324,7 +339,8 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   `pixelScale`: CSS px a texel, `resolution`: the Pixel Size's N (`'native'` where the slider
   shows Native, a resolution at 1 px a texel included; null at Off), `newtTexels`: his height in
   texels and `newtTall` in CSS px in the default view, `faceSheet`: the face sheet showing (a
-  cell width, or `'smooth'`, as at Off), `faceTexels`, `atlas`: `'pixel'` or `'original'`,
+  cell width, or `'smooth'`, as at Off), `faceShown`: the face really showing (a dialogue face's
+  stand-in until its sheet is in), `faceTexels`, `atlas`: `'pixel'` or `'original'`,
   `shader`: every Shader option's value, `custom`: whether one is the user's, `pass`: what
   reached the renderer (the post shader's values, the light's strength and angle, the shadow's
   strength, `zoom`: the zoom the texels follow, `pd`: device px a texel as drawn, `governor`:
@@ -333,8 +349,9 @@ he talks and the look a first visit gets are edited in the admin's Invitation pa
   radius, `r`), `floorAt(x, y)` (the
   endless floor: null only above the horizon), `feet()` (his ankles, to measure foot slide),
   `bones()` (his bones from his root), `grabbed()` (while he's held, where the point he was
-  grabbed by shows, client px), `say(text)` (a line in his bubble now, as talk would show it)
-  and `play(clip)` (Walk and Run step in place at their own pace). The snapshot's `camera` has
+  grabbed by shows, client px), `say(text)` (a line in his bubble now, as talk would show it),
+  `play(clip)` (Walk and Run step in place at their own pace) and `face(name)` (holds any of
+  `FACE_NAMES` on him, no blinks; null gives his face back to the brain). The snapshot's `camera` has
   the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
   the play area, and `talk` is what he's saying (speech.js's snapshot: the line up and its
   trigger, when the idle clock comes round). `?seed=N` makes the randomness
