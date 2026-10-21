@@ -835,3 +835,53 @@ test.describe('on a desktop', () => {
     expect(Math.abs(rec[back].distance - before.distance)).toBeLessThan(0.005 * before.distance);
   });
 });
+
+test.describe('on a short desktop window', () => {
+  test.use({ viewport: { width: 1280, height: 460 } });
+
+  test('the Log scrolls with the mouse wheel once it outgrows the window, and its lines keep "fi" as two letters', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    await open(page);
+    // (Most of the intro, a reply picked on the way, stopping short of its last box: enough to
+    // outgrow a short window's Log.)
+    const intro = await script(page);
+    const last = (id) => {
+      const i = intro.boxes.findIndex((b) => b.id === id);
+      const b = intro.boxes[i];
+      return !b || b.end || (!b.next && !b.choices?.length && i === intro.boxes.length - 1);
+    };
+    for (let i = 0; i < 12; i++) {
+      await until(
+        page,
+        (s) => !s.dialogue || Boolean(s.dialogue.choices) || (s.dialogue.typed && !s.dialogue.paused),
+        'the line up',
+      );
+      const now = (await snapshot(page)).dialogue;
+      if (!now || last(now.id)) break;
+      if (now.choices) await pick(page, 0);
+      else await page.keyboard.press('Space');
+      await until(page, (s) => !s.dialogue || s.dialogue.seq === now.seq + 1, 'on to the next');
+    }
+    await page.getByRole('button', { name: 'Log', exact: true }).click();
+    const list = page.locator('.inv-talk-log-list');
+    await expect(list).toBeVisible();
+    const room = await list.evaluate((el) => el.scrollHeight - el.clientHeight);
+    expect(room, 'the Log outgrows this window').toBeGreaterThan(20);
+    await list.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    const at = await list.evaluate((el) => el.scrollTop);
+    const r = await list.boundingBox();
+    await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+    await page.mouse.wheel(0, -400);
+    await expect
+      .poll(() => list.evaluate((el) => el.scrollTop), { message: 'the wheel scrolls it up' })
+      .toBeLessThan(at);
+    // (Pixelify Sans's "fi" ligature reads as an "A": the Log's lines draw the two letters.)
+    expect(await list.evaluate((el) => getComputedStyle(el).fontVariantLigatures)).toBe('none');
+    expect(errors).toEqual([]);
+  });
+});
