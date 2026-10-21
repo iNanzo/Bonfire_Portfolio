@@ -155,7 +155,7 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   wait); it waits at a question. **Skip** jumps to the next question, or to the end. **Log**
   shows every line so far and the replies picked, in a list that scrolls; Close or Escape
   shuts it. **Escape** asks whether to skip the intro, and a second Escape (or Skip Intro) ends
-  it.
+  it. While the Log or that question is open, Auto, Skip, Log and the replies rest under it.
 - **NEWT:** he gets up if he's sitting, takes a few steps in if he's out near the edge, turns
   to face you and looks at you while he talks, his head drifting a little. The first line waits
   for him (the box shows his name and nothing else, and a tap meanwhile does nothing), so its

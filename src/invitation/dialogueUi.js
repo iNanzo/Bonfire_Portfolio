@@ -17,7 +17,8 @@
 // Keys, wherever focus is: Space or Enter go on (a focused button presses itself instead),
 // Escape closes the Log, or asks whether to skip the intro, and a second Escape ends it; a click
 // or tap on Auto, Skip or Log (or the Log's Close) leaves focus where Space and Enter go on, and
-// from the keyboard focus stays on the button (the Log's back on it as it closes); Tab goes
+// from the keyboard focus stays on the button (the Log's back on it as it closes); under the Log
+// or the question the buttons over the stage are out of reach (inert); Tab goes
 // round the layer's buttons. A screen reader hears each line whole once, from a live region
 // (the typed text is hidden from it), the replies are buttons, and focus goes to the first reply
 // when they show, into the Log and the question when they open and back when they close.
@@ -135,6 +136,7 @@ export function createDialogueUi(stage, { onAction, log }) {
   const logBox = $('.inv-talk-log');
   const logList = $('.inv-talk-log-list');
   const ask = $('.inv-talk-ask');
+  const topRow = $('.inv-talk-top');
   const autoBtn = $('[data-talk="auto"]');
   const logBtn = $('[data-talk="log"]');
 
@@ -152,6 +154,14 @@ export function createDialogueUi(stage, { onAction, log }) {
   };
 
   const modal = () => !logBox.hidden || !ask.hidden;
+  /**
+   * What's in reach: under the open Log or the question, Auto, Skip, Log and the replies are
+   * inert (out of reach of taps, clicks and Tab); the replies too until they show.
+   */
+  const reach = () => {
+    topRow.toggleAttribute('inert', modal());
+    choices.toggleAttribute('inert', modal() || !shown.up);
+  };
   const now = () => doc.defaultView?.performance.now() ?? Date.now();
   /** A press that goes on (or lands on a reply too soon): the replies wait REPLY_SETTLE from it. */
   const settle = () => {
@@ -176,8 +186,12 @@ export function createDialogueUi(stage, { onAction, log }) {
       // (The latest at the bottom, in view.)
       logList.scrollTop = logList.scrollHeight;
       $('[data-talk="log-close"]').focus();
-    } else if (byPointer || logByPointer) focusHome();
-    else logBtn.focus();
+    }
+    reach();
+    if (!open) {
+      if (byPointer || logByPointer) focusHome();
+      else logBtn.focus();
+    }
     onAction({ type: 'pause', on: modal() });
   }
 
@@ -185,6 +199,7 @@ export function createDialogueUi(stage, { onAction, log }) {
   function setAsk(open) {
     if (open === !ask.hidden) return;
     ask.hidden = !open;
+    reach();
     if (open) $('[data-talk="no"]').focus();
     else focusHome();
     onAction({ type: 'pause', on: modal() });
@@ -241,6 +256,8 @@ export function createDialogueUi(stage, { onAction, log }) {
       }
       return;
     }
+    // (Under the Log or the question only their own buttons take a press: the rest are inert too.)
+    if (modal() && !button.closest('.inv-talk-log, .inv-talk-ask')) return;
     const what = button.dataset.talk;
     // (A click or a tap, not a key: detail counts the clicks, 0 for Enter or Space.)
     const byPointer = e.detail > 0;
@@ -258,6 +275,11 @@ export function createDialogueUi(stage, { onAction, log }) {
     else if (what === 'no') setAsk(false);
     else if (what === 'yes') onAction({ type: 'end' });
   });
+  // (Under the Log or the question, a press off them leaves focus in them.)
+  layer.addEventListener('mousedown', (e) => {
+    const on = e.target instanceof Element ? e.target.closest('.inv-talk-log, .inv-talk-ask') : null;
+    if (modal() && !on) e.preventDefault();
+  });
   // (Nothing under the layer takes a wheel or a context menu while it's up.)
   layer.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
   layer.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -270,6 +292,7 @@ export function createDialogueUi(stage, { onAction, log }) {
       ask.hidden = true;
       logBtn.setAttribute('aria-expanded', 'false');
       shown.seq = -1;
+      reach();
       doc.addEventListener('keydown', onKey);
       layer.focus({ preventScroll: true });
     },
@@ -321,7 +344,7 @@ export function createDialogueUi(stage, { onAction, log }) {
         shown.up = up;
         shown.settle = up ? now() + REPLY_SETTLE : 0;
         choices.classList.toggle('is-waiting', !up);
-        choices.toggleAttribute('inert', !up);
+        reach();
         layer.classList.toggle('is-choosing', up);
         if (!modal()) focusHome();
       }

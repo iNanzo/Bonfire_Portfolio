@@ -7,7 +7,8 @@
 // press until the presses that went on have settled, and picking one goes where it leads; Auto goes on by itself; the Log lists the lines shown and closes again; each
 // box's shot sends the camera nearer or further (close nearer than wide), framed over the box as
 // its own line has it and again when the box grows; Escape asks before it skips the intro and a
-// second Escape ends it, Space and Enter go on (after a click on Auto, Skip or Log too); reduced motion shows each line at once and cuts
+// second Escape ends it, Space and Enter go on (after a click on Auto, Skip or Log too); under the
+// Log or the question the buttons over the stage are out of reach; reduced motion shows each line at once and cuts
 // the camera; and after the end the toolbar, the camera and his free play come back. The script
 // is read from the page (?test's intro()), never pinned here, and every wait is on a state (it's
 // content.json's intro, as content.js reads it). Down every reply each box shows its face (the
@@ -430,6 +431,47 @@ test.describe('on a phone', () => {
     // (Closed with a tap: focus back where a key goes on, not on the Log button.)
     await expect(page.locator('.inv-talk')).toBeFocused();
     await until(page, (x) => !x.dialogue.paused, 'on again');
+  });
+
+  test('under the open Log or the Skip question, Auto, Skip and Log are out of reach', async ({ page }) => {
+    await calm(page);
+    await open(page, true);
+    const centre = (name) =>
+      page.getByRole('button', { name, exact: true }).evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      });
+    const at = { auto: await centre('Auto'), skip: await centre('Skip') };
+    /** Taps where Auto and Skip are: nothing moves on and Auto stays off. */
+    const tapsDoNothing = async (why) => {
+      const before = (await snapshot(page)).dialogue;
+      await page.touchscreen.tap(at.skip.x, at.skip.y);
+      await page.touchscreen.tap(at.auto.x, at.auto.y);
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+      const s = (await snapshot(page)).dialogue;
+      expect([s.seq, s.log, s.auto], `${why}: Skip and Auto out of reach`).toEqual([before.seq, before.log, false]);
+      await expect(page.locator('.inv-talk-top')).toHaveAttribute('inert', '');
+    };
+    // The Log.
+    await page.getByRole('button', { name: 'Log', exact: true }).tap();
+    const log = page.getByRole('dialog', { name: 'Log' });
+    await expect(log).toBeVisible();
+    await tapsDoNothing('under the Log');
+    await expect(log.locator('li')).toHaveCount((await snapshot(page)).dialogue.log);
+    await log.getByRole('button', { name: 'Close' }).tap();
+    await expect(log).toBeHidden();
+    await expect(page.locator('.inv-talk-top')).not.toHaveAttribute('inert', '');
+    // The question (Escape asks it).
+    await page.keyboard.press('Escape');
+    const ask = page.getByRole('alertdialog');
+    await expect(ask).toBeVisible();
+    await tapsDoNothing('under the question');
+    await expect(ask.getByRole('button', { name: 'Keep Watching' })).toBeFocused();
+    await ask.getByRole('button', { name: 'Keep Watching' }).tap();
+    await expect(ask).toBeHidden();
+    // Back in reach.
+    await page.getByRole('button', { name: 'Auto', exact: true }).tap();
+    await until(page, (s) => s.dialogue.auto, 'Auto on again');
   });
 
   test('each box’s shot moves the camera: close nearer than medium, medium nearer than wide', async ({ page }) => {
