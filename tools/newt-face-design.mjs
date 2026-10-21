@@ -85,15 +85,20 @@ export const NEUTRAL = {
 };
 
 /**
- * The four new faces. Sad: the brows tilted up toward the middle (low enough to show under his
- * fringe, which hides his neutral brows), the lid drooping well down toward his ear (its hook
- * following it down), the eyes a little lower, the mouth turned down. Angry: the brows
- * down and in, heavier; the lid lower toward the middle and the white's bottom raised (narrowed
- * eyes: no lash, the iris is over it), a smaller pupil; a tight mouth, flat with its ends turned down. Shy: the brows raised a
- * little toward the middle, a softer lid, the eyes looking down (no lash: the iris is over it), a
- * strong blush with three hatch lines, a small wavy mouth. Smug: half-lidded (the lid flat over
- * the top of the pupil), the brows a relaxed arch, a cat's ω of a mouth (the face mirrors, so the
- * smirk is on both sides: its middle a point, its ends turned up).
+ * The four new faces. Each one's cue reads where his face is smallest, at the default view with
+ * Pixel Size Off (his half face 33 to 42 texels: a texel 12 to 16 px of a cell), not only in the
+ * close shot: the lid's shape spans many texels, and the mouths of the three whose mouth tells
+ * them apart are strokes 8 to 10 px wide (his own is 5), a texel near enough to keep a smudge of
+ * their shape. Sad: the brows tilted up toward the middle (low enough to show under his fringe,
+ * which hides his neutral brows), the lid drooping hard down toward his ear (its hook following
+ * it down, over the eye's outer corner), the eyes a little lower, the mouth turned down. Angry:
+ * the brows down and in, heavier; the lid slanting hard down toward the middle (the opposite of
+ * sad's, and nothing like smug's flat one) and the white's bottom raised (narrowed eyes: no lash,
+ * the iris is over it), a smaller pupil; a tight mouth, flat with its ends turned down. Shy: the
+ * brows raised a little toward the middle, a softer lid, the eyes looking down (no lash: the iris
+ * is over it), a strong blush with three hatch lines, a small wavy mouth. Smug: half-lidded (the
+ * lid flat over the top of the pupil), the brows a relaxed arch, a cat's ω of a mouth (the face
+ * mirrors, so the smirk is on both sides: its middle a point, its ends turned up).
  * @type {Record<'sad'|'angry'|'shy'|'smug', FaceDesign>}
  */
 export const EXTRA = {
@@ -104,18 +109,18 @@ export const EXTRA = {
         [90, 318],
         [120, 314],
         [150, 313],
-        [200, 314.5],
-        [250, 320],
-        [290, 329],
-        [318, 338],
-        [334, 345],
+        [200, 316],
+        [250, 326],
+        [290, 342],
+        [318, 356],
+        [332, 365],
       ],
       w: 15,
     },
     hook: {
       pts: [
-        [324, 341],
-        [344, 357],
+        [322, 358],
+        [340, 374],
       ],
       w: 12,
     },
@@ -123,23 +128,23 @@ export const EXTRA = {
     iris: { ...NEUTRAL.iris, cy: 344, band: 365 },
     pupil: { ...NEUTRAL.pupil, cy: 339 },
     lash: NEUTRAL.lash,
-    mouth: { pts: [[-6, 453], ...curve([0, 453], [20, 453], [40, 468], 8)], w: 5 },
+    mouth: { pts: [[-6, 452], ...curve([0, 452], [22, 449], [41, 470], 8)], w: 10 },
     blush: null,
   },
   angry: {
     brow: { pts: curve([98, 308], [200, 292], [294, 278], 8), w: 11 },
     lid: {
       pts: [
-        [90, 333],
-        [120, 327],
-        [150, 322],
-        [200, 318],
-        [250, 316],
+        [90, 356],
+        [120, 346],
+        [150, 337],
+        [200, 326],
+        [250, 319],
         [290, 315],
-        [318, 317],
-        [330, 319],
+        [318, 316],
+        [330, 318],
       ],
-      w: 15,
+      w: 16,
     },
     hook: {
       pts: [
@@ -153,8 +158,8 @@ export const EXTRA = {
     pupil: { cx: 199, cy: 333, rx: 30, ry: 19 },
     lash: null,
     mouth: {
-      pts: [[-6, 457], [20, 457], ...curve([20, 457], [30, 457], [34, 466], 6).slice(1)],
-      w: 6,
+      pts: [[-6, 458], [18, 458], ...curve([18, 458], [30, 458], [36, 469], 6).slice(1)],
+      w: 9,
     },
     blush: null,
   },
@@ -237,7 +242,7 @@ export const EXTRA = {
     iris: NEUTRAL.iris,
     pupil: NEUTRAL.pupil,
     lash: NEUTRAL.lash,
-    mouth: { pts: curve([0, 450], [15, 476], [31, 449], 10), w: 5 },
+    mouth: { pts: curve([0, 449], [17, 479], [33, 447], 10), w: 8 },
     blush: null,
   },
 };

@@ -230,12 +230,13 @@ function drawEye(k, g, gazed, shift, c) {
   for (const [x, y] of lash) g.put(x, y, c.lash);
   for (const [x, y] of dots) g.put(x, y, c.ink);
   g.paint(lid, c.ink);
-  // The hook, on the lid's own columns (its last at least), below the lid where the white isn't.
+  // The hook, on the lid's own columns (its last at least), below the lid down to the white (never
+  // past it: a drooping lid's hook would hang a lone pixel under the eye).
   const last = Math.max(...lid.keys());
   for (const [hx, [t, b]] of g.stroke(d.hook, DESIGN.lid.t, shift)) {
     const x = Math.min(hx, last);
     const lidB = lid.get(x)?.[1] ?? t - 1;
-    for (let y = Math.min(t, lidB + 1); y <= b; y++) if (!opened.has(y * w + x)) g.put(x, y, c.ink);
+    for (let y = Math.min(t, lidB + 1); y <= b && !opened.has(y * w + x); y++) g.put(x, y, c.ink);
   }
   return lid;
 }

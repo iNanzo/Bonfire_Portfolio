@@ -5,7 +5,8 @@
 // ladder. Smooth: each face his own neutral one with its parts edited (sad: the brows up toward
 // the middle, the lid drooping toward his ear, the mouth turned down; angry: the brows down and
 // in, the eye narrowed, a tight mouth; shy: looking down, a strong blush, a wavy mouth; smug:
-// half-lidded, a ω of a mouth). Pixel: each placed where its smooth face has its parts, drawn by
+// half-lidded, a ω of a mouth), each one's cue still there at the size his face shows in the
+// default view at Pixel Size Off (the lid's shape, the mouths bolder than his own). Pixel: each placed where its smooth face has its parts, drawn by
 // the first four's rules (a heavy lid over the white, a pupil under it in a grey iris, a small
 // mouth under the eyes, a brow with skin under it, no lone dark pixel), its expression readable
 // from a few pixels up, and different from every other face.
@@ -116,6 +117,61 @@ test('the dialogue faces’ sheets: the pixel image as big as the first four’s
     [],
     'every face on one sheet or the other',
   );
+});
+
+test('the smooth faces read apart where his face is smallest (the default view at Off, his half face 33 to 42 texels): sad from neutral, angry from smug, by the eye and the mouth', async () => {
+  const glb = await smoothSheet(GLB);
+  const extra = await sharp(SMOOTH_EXTRA).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  /** A cell of a 2×2 sheet shrunk to `size` px square, grey. */
+  const small = async ({ data, info }, [cx, cy], size) => {
+    const n = info.width / 2;
+    return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
+      .extract({ left: cx * n, top: cy * n, width: n, height: n })
+      .removeAlpha()
+      .resize(size, size, { kernel: 'cubic' })
+      .greyscale()
+      .raw()
+      .toBuffer();
+  };
+  /** The mean grey difference of two shrunk cells over a window (shares of the cell). */
+  const apart = (a, b, size, [x0, x1], [y0, y1]) => {
+    let sum = 0;
+    let n = 0;
+    for (let y = Math.floor(y0 * size); y < Math.ceil(y1 * size); y++)
+      for (let x = Math.floor(x0 * size); x < Math.ceil(x1 * size); x++) {
+        sum += Math.abs(a[y * size + x] - b[y * size + x]);
+        n++;
+      }
+    return sum / n;
+  };
+  const EYE = [
+    [0.12, 0.72],
+    [0.52, 0.8],
+  ];
+  const MOUTH = [
+    [0, 0.12],
+    [0.84, 0.96],
+  ];
+  for (const size of [42, 33]) {
+    const neutral = await small(glb, BASE_CELLS.neutral, size);
+    const f = Object.fromEntries(
+      await Promise.all(NAMES.map(async (n) => [n, await small(extra, EXTRA_CELLS[n], size)])),
+    );
+    const eye = (a, b) => apart(a, b, size, ...EYE);
+    const mouth = (a, b) => apart(a, b, size, ...MOUTH);
+    // (The sheets as first drawn: eyes 23 and 19 apart, mouths 2 to 4, under the motion's own noise.)
+    assert.ok(eye(neutral, f.sad) >= 21, `${size} px: sad’s eye from neutral’s ${eye(neutral, f.sad).toFixed(1)}`);
+    assert.ok(eye(f.angry, f.smug) >= 22, `${size} px: angry’s eye from smug’s ${eye(f.angry, f.smug).toFixed(1)}`);
+    for (const [a, b] of [
+      ['neutral', 'sad'],
+      ['angry', 'smug'],
+      ['neutral', 'smug'],
+      ['neutral', 'angry'],
+    ]) {
+      const d = mouth(a === 'neutral' ? neutral : f[a], f[b]);
+      assert.ok(d >= 6, `${size} px: ${b}’s mouth from ${a}’s ${d.toFixed(1)}`);
+    }
+  }
 });
 
 test('the smooth dialogue faces are his own face edited: an eye, a brow and a mouth each where his are, a blush only when shy, and each expression in its parts', async () => {

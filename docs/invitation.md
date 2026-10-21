@@ -369,9 +369,12 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   tools/newt-face-smooth.mjs` draws the smooth one (`newt-face-smooth-extra.png`, 1024) from his
   own smooth neutral face, measured into `tools/newt-face-design.mjs` and redrawn in the same
   flat, round-ended style, then edited per face (sad: brows up toward the middle, the lid
-  drooping toward his ear, the mouth turned down; angry: brows down and in, the eye narrowed, a
-  tight mouth; shy: looking down, a strong hatched blush, a small wavy mouth; smug: half-lidded,
-  a ω of a mouth; `--calibrate` puts its neutral beside the glb's to check), and `node
+  drooping hard toward his ear, the mouth turned down; angry: brows down and in, the lid slanting
+  hard down toward the middle, the eye narrowed, a tight mouth; shy: looking down, a strong
+  hatched blush, a small wavy mouth; smug: half-lidded, a ω of a mouth; each cue big enough to
+  read where his face is smallest, the default view at Off with his half face 33 to 42 texels:
+  the lid's shape, and the mouths bolder than his own; `--calibrate` puts its neutral beside the
+  glb's to check), and `node
   tools/newt-face.mjs` draws the pixel ones (`newt-face-extra.png`, `tools/newt-face-extra.mjs`)
   at every cell size: neutral's pixel face with its parts moved as the design moves them, by the
   same rules, plus what each needs to read in a few pixels (`EXTRA_PIXELS`). They show at the
