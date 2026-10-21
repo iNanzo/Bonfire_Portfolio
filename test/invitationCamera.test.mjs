@@ -13,7 +13,10 @@
 // kept to the play area so it's never lost; the soft follow yields to it until NEWT walks off
 // the screen, and Reset Camera clears it. However the camera is turned, NEWT walking anywhere
 // in the play area never leaves the screen: the view holds still while he's well inside it and
-// moves on as he nears an edge. While he's held the view holds still.
+// moves on as he nears an edge. While he's held the view holds still. Play Intro's shots: the
+// view goes round to the front and each box's camera eases there (or cuts, for reduced motion):
+// close (head and shoulders), medium (his whole body), wide (the default view), keep (as it
+// was), framed in the clear space over the chat box; at the end it eases back to the view before.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -43,6 +46,10 @@ import {
   screenOf,
   worldPerPx,
   floorUnder,
+  SHOT,
+  orbitShot,
+  orbitTalk,
+  shotView,
 } from '../src/invitation/camera.js';
 import { VIEW, frameView, project, texelGrid } from '../src/invitation/pixels.js';
 import { LOOKS } from '../src/invitation/look.js';
@@ -725,4 +732,104 @@ test('the light turns with the camera’s yaw, so his shadow falls the same way 
       close(at.into, home.into, 1e-9, `${name} at yaw ${yaw}: into the screen`);
     }
   }
+});
+
+// ---- Play Intro's shots -----------------------------------------------------------------------
+
+/** A phone's orbit, its view the toy's (pixels.js frameView), NEWT at `at`. */
+function phoneOrbit() {
+  const grid = texelGrid({ cssW: 390, cssH: 844, dpr: 3, pixelSize: '128' });
+  const view = frameView({ cssW: 390, cssH: 844, grid, insets: { top: 16, bottom: 80, left: 24, right: 24 } });
+  const o = createOrbit({ distance: view.distance, span: { w: 390, h: 844 } });
+  orbitSpan(o, { w: 390, h: 844, ch: grid.canvasH });
+  return o;
+}
+const CLEAR = { h: 560, raise: 40 };
+
+test('the shots: close nearer than medium, medium nearer than the default; lower and aimed higher; wide is the default view; keep is none', () => {
+  const o = phoneOrbit();
+  orbitTalk(o, true);
+  const c = shotView(o, 'close', CLEAR);
+  const m = shotView(o, 'medium', CLEAR);
+  const w = shotView(o, 'wide', CLEAR);
+  assert.ok(c && m && w);
+  assert.ok(c.distance < m.distance && m.distance < o.home.distance, `${c.distance} ${m.distance} ${o.home.distance}`);
+  assert.ok(c.elevation < o.home.elevation && m.elevation < o.home.elevation);
+  assert.ok(c.lookY > m.lookY, 'close aims at his head');
+  close(w.distance, o.home.distance);
+  close(w.elevation, o.home.elevation);
+  assert.equal(shotView(o, 'keep', CLEAR), null);
+  for (const v of [c, m, w]) close(v.yaw, o.home.yaw, 1e-6, 'all from the front');
+});
+
+test('a shot frames him in the clear space: close his head and shoulders, medium his whole body, raised over the box', () => {
+  for (const [name, spec] of /** @type {const} */ ([
+    ['close', SHOT.close],
+    ['medium', SHOT.medium],
+  ])) {
+    const o = phoneOrbit();
+    orbitTalk(o, true);
+    orbitShot(o, shotView(o, name, CLEAR), { cut: true, focus: { x: 0, z: 0 } });
+    const top = screenOf(o, { x: 0, y: spec.mid + spec.span / 2, z: 0 });
+    const bottom = screenOf(o, { x: 0, y: spec.mid - spec.span / 2, z: 0 });
+    const mid = screenOf(o, { x: 0, y: spec.mid, z: 0 });
+    assert.ok(top && bottom && mid);
+    const tall = bottom.y - top.y;
+    assert.ok(Math.abs(tall - spec.fill * CLEAR.h) <= 0.12 * spec.fill * CLEAR.h, `${name}: ${tall} px tall`);
+    assert.ok(
+      Math.abs(mid.y + CLEAR.raise) <= 0.15 * CLEAR.raise + 4,
+      `${name}: his middle ${mid.y} px from the point`,
+    );
+  }
+});
+
+test('Play Intro turns the view round to the front the short way; each shot eases there, or cuts', () => {
+  const o = phoneOrbit();
+  orbitDrag(o, -300, 0, 0);
+  settle(o, 2, { x: 0, z: 0 });
+  const turned = o.yaw;
+  assert.ok(Math.abs(turned) > 1);
+  orbitTalk(o, true);
+  const v = /** @type {NonNullable<ReturnType<typeof shotView>>} */ (shotView(o, 'close', CLEAR));
+  orbitShot(o, v, { focus: { x: 0.2, z: -0.1 } });
+  orbitStep(o, DT, { x: 0.2, z: -0.1 });
+  assert.ok(Math.abs(o.distance - v.distance) > 0.8 * Math.abs(o.home.distance - v.distance), 'no jump');
+  assert.ok(Math.abs(wrap(o.yaw - turned)) < 0.2, 'eases, from where it was');
+  settle(o, 4, { x: 0.2, z: -0.1 });
+  close(o.distance, v.distance, 1e-3 * v.distance);
+  close(wrap(o.yaw), 0, 1e-3, 'at the front');
+  close(o.target.x, 0.2, 1e-3, 'on NEWT');
+  close(o.target.z, -0.1, 1e-3);
+  close(o.target.y, v.lookY, 1e-3);
+  // (Cut: there at once.)
+  const m = /** @type {NonNullable<ReturnType<typeof shotView>>} */ (shotView(o, 'medium', CLEAR));
+  orbitShot(o, m, { cut: true, focus: { x: 0.2, z: -0.1 } });
+  close(o.distance, m.distance);
+  close(o.elevation, m.elevation);
+  close(o.target.y, m.lookY);
+  // (Keep: nothing changes.)
+  orbitShot(o, null, { focus: { x: 0.2, z: -0.1 } });
+  settle(o, 1, { x: 0.2, z: -0.1 });
+  close(o.distance, m.distance, 1e-6);
+});
+
+test('at the end of the intro the view eases back to where it was, its pan too', () => {
+  const o = phoneOrbit();
+  orbitPan(o, 40, 0);
+  o.panning = false;
+  orbitZoom(o, 1.4);
+  settle(o, 2, { x: 0, z: 0 });
+  const was = { yaw: o.yaw, elevation: o.elevation, distance: o.distance, base: { ...o.base } };
+  orbitTalk(o, true);
+  orbitShot(o, shotView(o, 'close', CLEAR), { cut: true, focus: { x: 0, z: 0 } });
+  orbitTalk(o, false);
+  orbitStep(o, DT, { x: 0, z: 0 });
+  assert.ok(Math.abs(o.distance - was.distance) > 0.5 * Math.abs(was.distance - SHOT.close.span), 'no jump back');
+  settle(o, 4, { x: 0, z: 0 });
+  close(o.distance, was.distance, 1e-3 * was.distance);
+  close(o.elevation, was.elevation, 1e-3);
+  close(wrap(o.yaw - was.yaw), 0, 1e-3);
+  close(o.target.y, FOCUS_Y, 1e-3);
+  assert.equal(o.panned, true, 'the pan kept');
+  close(o.base.x, was.base.x, 1e-6);
 });
