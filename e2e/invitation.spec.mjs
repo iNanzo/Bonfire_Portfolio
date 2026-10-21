@@ -1785,7 +1785,7 @@ test.describe('on a desktop', () => {
     await page.mouse.move(head.x, head.y);
     await framesFor(page, 700);
     const idle = (await snapshot(page)).headPitch;
-    expect(idle, 'up at the viewer').toBeGreaterThan(400);
+    expect(idle, 'up at the viewer').toBeGreaterThan(0.4);
     // Below him: his head goes down toward it, well under the look at the viewer.
     await page.mouse.move(head.x, feet.y + tall, { steps: 4 });
     await until(page, (s) => s.headPitch < idle - 0.2, 'his head down toward the cursor below him');
