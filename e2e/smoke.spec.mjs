@@ -114,6 +114,10 @@ test('the pack opens and its Map fast travels to another place', async ({ page }
   await page.goto('/');
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   await page.hover('[data-pack-toggle]');
+  await expect(page.locator('[data-pack-toggle]')).toHaveAttribute('aria-expanded', 'true');
+  // Hover opens it; a click pins it for the selection. Slow rendering must not let the
+  // pointer-leave timer close the list between Playwright's separate pointer actions.
+  await page.click('[data-pack-toggle]');
   // The items rise in stepped frames (which can look settled mid-rise): let them land first.
   await page.waitForFunction(() =>
     document
@@ -124,12 +128,14 @@ test('the pack opens and its Map fast travels to another place', async ({ page }
   await page.hover('[data-pack-slot="map"]');
   const shrine = page.locator('[data-pack-option="shrine"]');
   await expect(shrine).toBeVisible();
-  // The list has its own stepped entrance after the items land. Keep the pointer on
-  // Map until that finishes, so the click targets its settled option rather than a
-  // transient frame that can move the pointer out of the hover-open pack.
-  await page.locator('[data-pack-list="map"]').evaluate(async (list) => {
-    await Promise.all(list.getAnimations({ subtree: true }).map((animation) => animation.finished));
-  });
+  // The list has its own stepped entrance after the items land. Poll its current
+  // animations: a replaced/cancelled animation's finished promise rejects.
+  await page.waitForFunction(() =>
+    document
+      .querySelector('[data-pack-list="map"]')
+      .getAnimations({ subtree: true })
+      .every((a) => a.playState !== 'running'),
+  );
   await shrine.click();
   await expect(page.locator('[data-pack-option="shrine"]')).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('Escape');
