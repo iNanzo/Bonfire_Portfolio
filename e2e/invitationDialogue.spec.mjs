@@ -98,9 +98,6 @@ function askAndBefore(intro) {
     : null;
   return { ask, before };
 }
-/** A frame of the page's, so two presses land a frame apart. */
-const aFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
-
 /**
  * At the box with replies (Skip goes there), once they show and the camera's at its shot: his
  * head is over the replies, clear of them and of the Auto row, and the shot was framed over them
@@ -115,20 +112,35 @@ async function repliesClearOfHim(page, tap) {
   if (tap) await skip.tap();
   else await skip.click();
   await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.choices), 'at the replies');
-  await until(
-    page,
-    (s) => Math.abs(s.camera.distance - s.dialogue.goal.distance) < 0.01 * s.dialogue.goal.distance,
-    'at the shot',
-  );
-  const replies = await page.locator('.inv-talk-choices').evaluate((el) => el.getBoundingClientRect().toJSON());
-  const top = await page.locator('.inv-talk-top').evaluate((el) => el.getBoundingClientRect().toJSON());
-  const { framed } = (await snapshot(page)).dialogue;
-  expect(Math.abs(framed.bottom - replies.top), 'framed over the replies').toBeLessThan(1.5);
-  const head = await page.evaluate(() => window.__invitation.screen('head'));
-  expect(head.y + head.r, 'his head over the replies').toBeLessThan(replies.top);
-  expect(head.y - head.r, 'and under the Auto row').toBeGreaterThan(top.bottom - 20);
-  // (Bigger than in the default view: still a shot of him.)
-  expect(head.r).toBeGreaterThan(30);
+  // Distance can already match while the shot is still tilting or raising its target.
+  // Measure the head, camera and overlay together, and wait for the actual framing.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const s = window.__invitation.snapshot();
+          const head = window.__invitation.screen('head');
+          const replies = document.querySelector('.inv-talk-choices').getBoundingClientRect();
+          const top = document.querySelector('.inv-talk-top').getBoundingClientRect();
+          return {
+            atShot:
+              !s.camera.turning &&
+              Math.abs(s.camera.distance - s.dialogue.goal.distance) < 0.01 * s.dialogue.goal.distance,
+            framedOverReplies: Math.abs(s.dialogue.framed.bottom - replies.top) < 1.5,
+            headAboveReplies: head.y + head.r < replies.top,
+            headBelowToolbar: head.y - head.r > top.bottom - 20,
+            headLargeEnough: head.r > 30,
+          };
+        }),
+      { message: 'the settled shot frames his head between the toolbar and replies', timeout: 30_000 },
+    )
+    .toEqual({
+      atShot: true,
+      framedOverReplies: true,
+      headAboveReplies: true,
+      headBelowToolbar: true,
+      headLargeEnough: true,
+    });
 }
 
 test.describe('the admin’s intro', () => {
@@ -347,6 +359,7 @@ test.describe('on a phone', () => {
   });
 
   test('a quick second tap where the replies pop in picks none; a tap once they’ve settled does', async ({ page }) => {
+    await page.clock.install();
     await calm(page);
     const intro = await script(page);
     const { ask, before } = askAndBefore(intro);
@@ -360,6 +373,8 @@ test.describe('on a phone', () => {
       await until(page, (x) => x.dialogue.typed || x.dialogue.seq !== s.dialogue.seq, 'on');
     }
     await until(page, (s) => s.dialogue.id === before.id && s.dialogue.typed, 'just before the question');
+    // Native taps at a controlled interval, regardless of software-rendering or protocol latency.
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 60_000));
     // On to the question; then a tap where its first reply will show (laid out already, out of
     // sight) finishes its line, and one more 150 ms later lands on the reply.
     await goOn(page, true);
@@ -376,18 +391,20 @@ test.describe('on a phone', () => {
     await until(page, (s) => Boolean(s.dialogue.choices), 'its replies');
     const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.className ?? '', spot);
     expect(hit, 'the spot is a reply now').toContain('inv-talk-choice');
-    await page.waitForTimeout(150);
+    await page.clock.runFor(150);
     await page.touchscreen.tap(spot.x, spot.y);
-    await aFrame(page);
+    await page.clock.runFor(16);
     let s = await snapshot(page);
     expect([s.dialogue.id, s.dialogue.log], 'still the question').toEqual([ask.id, log]);
     // Settled, a tap picks it.
+    await page.clock.runFor(s.replySettle);
     await pick(page, 0, true);
     const to = ask.choices[0].next;
     await until(page, (x) => (x.dialogue ? x.dialogue.id === to : true), 'its box');
     s = await snapshot(page);
     // (The reply picked, then its box's line.)
     if (s.dialogue) expect(s.dialogue.log).toBe(log + 2);
+    await page.clock.resume();
   });
 
   test('Auto goes on by itself, box after box', async ({ page }) => {
