@@ -6,10 +6,43 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 
 ## [Unreleased]
 
-Round 13: NEWT's toy at `/invitation/`. Round 11, below it: the knight at home in every
-place, every module type-checked, and a cleanup for what agents and test runs leave
-running. Round 10, below that: menus and search, the knight's fixes, hygiene and
-performance.
+Round 15: an Uma Musume-style intro dialogue for NEWT. Round 14, below it: his second
+wave (a Default look, new controls, speech bubbles, the admin's Invitation page). Round
+13, below that: NEWT's toy at `/invitation/`. Round 11: the knight at home in every place,
+every module type-checked, and a cleanup for what agents and test runs leave running.
+Round 10: menus and search, the knight's fixes, hygiene and performance.
+
+### NEWT's intro (round 15)
+
+- A Play Intro button starts a story scene with NEWT, laid out like Uma Musume's in the
+  toy's own style: a box along the bottom with his name on a tab, each line typed out
+  with a bouncing ▼ when it's done, Auto, Skip and Log at the top right, and replies to
+  pick that lead to their own lines. He walks in and turns to you first; free play, the
+  toolbar and the camera come back when it ends.
+- Each line sets his face, plays a gesture and moves the camera (close, medium or wide).
+  New gestures, made in Blender: Talk, Nod, Shrug, Point, Think and Cheer. New faces: sad,
+  angry, shy and smug, each in a smooth and a pixel version.
+- The admin's Invitation page gains an Intro section: every line's text, face, gesture,
+  camera, Auto wait, next line, replies and speaker, checked so a broken link between
+  lines can't be saved. A placeholder intro in his voice is there to rewrite.
+
+### NEWT's second wave (round 14)
+
+- A new Default style is what a first visit shows: 128×128, 6 colors, full dither, tinted
+  outlines with an outer ring, two toon bands and a soft shadow. Pixel Shirt (off) and
+  Pixel Face (on) choose his real plaid or the bold pixel one, and his pixel faces are
+  redrawn after his own face at every size.
+- On a desktop a right-drag turns the camera, a left-drag on the page pans it and the
+  wheel zooms; the floor is endless, his play area the floor a fully zoomed-out view
+  shows. The pixel size follows the zoom, so he keeps his sprite resolution, and a
+  frame-time governor steps the resolution down while frames are slow.
+- Dragging him keeps the spot you grabbed under the cursor and lifts him higher. His head
+  aims at the cursor on screen (down at a low one, up at a high one, his chest turning for
+  big looks), and running away he faces where he runs, glancing back at whoever chases him.
+  His scared run now holds both arms straight out in front.
+- He talks: a speech bubble in the page's style says a line on taps, pick-ups, drops,
+  chases, walks, sitting, idle moments and camera tricks. The admin's new Invitation page
+  edits his default look, how often he talks, and every line.
 
 ### The NEWT toy (round 13)
 
