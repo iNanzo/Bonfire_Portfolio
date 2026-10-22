@@ -84,7 +84,7 @@ import {
 import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
-import { createDialogueUi } from './dialogueUi.js';
+import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
 import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
@@ -413,7 +413,11 @@ function start(s) {
    * speed), for ?test.
    */
   const acted = { seq: -1, clips: /** @type {string[]} */ ([]) };
-  const talkUi = createDialogueUi(stageEl, { onAction: onTalk, log: () => intro?.log ?? [] });
+  const talkUi = createDialogueUi(stageEl, {
+    onAction: onTalk,
+    log: () => intro?.log ?? [],
+    replySettle: options.settle ?? REPLY_SETTLE,
+  });
   // (A resize while the intro runs, or the chat box growing with a longer line: the shot framed
   // again for the new clear space.)
   const reframe = new ResizeObserver(() => {
@@ -1207,6 +1211,8 @@ function start(s) {
         cameraHome: { ...cam.home },
         // (What he's saying: the line up and its trigger, when the idle clock comes round.)
         talk: talk.snapshot(),
+        // (How long the intro's replies wait after a press that went on, ms: ?settle in specs.)
+        replySettle: options.settle ?? REPLY_SETTLE,
         // (The intro, while it runs: the box up, its typing, its replies' targets, Auto, the
         // Log and the question, the shot and where the camera's going.)
         dialogue: introSnapshot(),

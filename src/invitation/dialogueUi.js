@@ -113,9 +113,9 @@ export function logHtml(entries) {
  * The layer, in the stage (over the toolbar and the Look sheet): open() shows it, render() shows
  * a view, close() hides it.
  * @param {HTMLElement} stage
- * @param {{onAction(a: TalkAction): void, log(): LogEntry[]}} o  log: the entries now (the Log reads them as it opens)
+ * @param {{onAction(a: TalkAction): void, log(): LogEntry[], replySettle?: number}} o  log: the entries now (the Log reads them as it opens); replySettle: ms the replies wait (REPLY_SETTLE; ?test can stretch it)
  */
-export function createDialogueUi(stage, { onAction, log }) {
+export function createDialogueUi(stage, { onAction, log, replySettle = REPLY_SETTLE }) {
   const doc = stage.ownerDocument;
   const layer = doc.createElement('div');
   layer.className = 'inv-talk';
@@ -165,7 +165,7 @@ export function createDialogueUi(stage, { onAction, log }) {
   const now = () => doc.defaultView?.performance.now() ?? Date.now();
   /** A press that goes on (or lands on a reply too soon): the replies wait REPLY_SETTLE from it. */
   const settle = () => {
-    if (shown.up) shown.settle = Math.max(shown.settle, now() + REPLY_SETTLE);
+    if (shown.up) shown.settle = Math.max(shown.settle, now() + replySettle);
   };
 
   /** The Log was opened with a pointer (a click or a tap), not from the keyboard. */
@@ -350,7 +350,7 @@ export function createDialogueUi(stage, { onAction, log }) {
       const up = Boolean(own && v.choices);
       if (up !== shown.up) {
         shown.up = up;
-        shown.settle = up ? now() + REPLY_SETTLE : 0;
+        shown.settle = up ? now() + replySettle : 0;
         choices.classList.toggle('is-waiting', !up);
         reach();
         layer.classList.toggle('is-choosing', up);

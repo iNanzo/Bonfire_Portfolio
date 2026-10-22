@@ -116,6 +116,7 @@ export const MOTION_LABELS = { smooth: 'Smooth', choppy: 'Choppy' };
 export function parseQuery(search) {
   const q = new URLSearchParams(search);
   const seed = Number.parseInt(q.get('seed') ?? '', 10);
+  const settle = Number.parseInt(q.get('settle') ?? '', 10);
   return {
     test: q.has('test'),
     seed: Number.isFinite(seed) ? seed : null,
@@ -123,6 +124,8 @@ export function parseQuery(search) {
     perf: q.has('perf'),
     // (The frame-time governor: on for visitors, off under ?test unless asked for; null: as such.)
     govern: q.has('govern') ? q.get('govern') !== 'off' : null,
+    // (The intro's reply settle in ms, stretched for the browser specs: only under ?test.)
+    settle: q.has('test') && settle > 0 ? settle : null,
   };
 }
 
