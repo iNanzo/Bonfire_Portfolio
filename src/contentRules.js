@@ -19,6 +19,7 @@ import {
 import { contrast, HEX_RE, ID_RE, isObj, WEAPON_KEYS } from './ruleBasics.js';
 import { PIXEL_SIZES } from './pixelSizes.js';
 import { validateScenes } from './scenes.js';
+import { DIALOGUE_CLIPS, FACE_NAMES } from './invitation/clips.js';
 import { LEGACY_SHADER, MOTIONS, STYLES } from './invitation/look.js';
 import { PIXEL_SIZES as INVITATION_PIXEL_SIZES } from './invitation/pixels.js';
 import { SHADER_CONTROLS } from './invitation/shader.js';
@@ -223,13 +224,43 @@ export const LINE_LONG = 80;
 const TRIGGER_KEYS = /** @type {string[]} */ (TRIGGERS);
 
 /**
+ * The shots a chat box's camera takes (types.js DialogueShot): his head and shoulders, his whole
+ * body, the default view, or the camera left as it was.
+ */
+export const INTRO_CAMERAS = ['close', 'medium', 'wide', 'keep'];
+/** What a chat box has him do: one of his dialogue clips (clips.js DIALOGUE_CLIPS), or 'none' (as he was). */
+export const INTRO_ANIMATIONS = ['none', ...DIALOGUE_CLIPS];
+/** The longest line a chat box types out, in characters. */
+export const INTRO_TEXT_MAX = 240;
+/**
+ * A line longer than this (characters) outgrows the chat box's three lines on a phone (measured at
+ * 390×844: 100 fit, 110 take four), growing it up over NEWT: a warning.
+ */
+export const INTRO_TEXT_LONG = 100;
+/** The most choices a box offers (types.js DialogueBox: 2–3 replies). */
+export const INTRO_CHOICES_MAX = 3;
+/** The fewest that make a choice: one reply alone is only a tap (a warning). */
+export const INTRO_CHOICES_MIN = 2;
+/** The longest choice, in characters: a button's worth. */
+export const INTRO_LABEL_MAX = 60;
+/** The longest name on the box's tab, in characters. */
+export const INTRO_SPEAKER_MAX = 24;
+/** A box's Auto wait in seconds, [min, max, step, unit]: 0 waits by the line's length. */
+export const INTRO_AUTO = /** @type {[number, number, number, string]} */ ([0, 15, 0.5, 's']);
+/** A chat box's fields, in the order the admin shows them; the first five every box needs. */
+const BOX_KEYS = ['id', 'speaker', 'text', 'face', 'animation', 'camera', 'next', 'end', 'auto', 'choices'];
+const BOX_NEEDS = ['id', 'text', 'face', 'animation', 'camera'];
+
+/**
  * Check the invitation toy's section (content.json `invitation`): its default look (`defaults`:
  * the look as the toy stores it, src/invitation/look.js, with every Shader value within its
  * control, shader.js SHADER_CONTROLS), its speech settings (`speech`: the quiet spell before an
- * idle line, each trigger's chance and cooldown, speech.js SPEECH_RANGES) and its lines (`lines`:
- * each trigger's list of text, at most LINES_MAX of at most LINE_MAX characters). Every part and
- * value is optional: the toy falls back on its own (speech.js speechFrom, linesFrom; look.js
- * validLook). `err(path, message)` gets paths like `invitation.lines.wave[2]`; `warn` too.
+ * idle line, each trigger's chance and cooldown, speech.js SPEECH_RANGES), its lines (`lines`:
+ * each trigger's list of text, at most LINES_MAX of at most LINE_MAX characters) and its intro
+ * (`intro`: the chat Play Intro opens, types.js DialogueScript; invitationIntro). Every part is
+ * optional, and so is every value outside the intro: the toy falls back on its own (speech.js
+ * speechFrom, linesFrom; look.js validLook; content.js introFrom). `err(path, message)` gets
+ * paths like `invitation.lines.wave[2]`; `warn` too.
  */
 export function validateInvitation(inv, err, warn, base = 'invitation') {
   if (!isObj(inv)) return err(base, 'Must be a group of fields.');
@@ -257,10 +288,12 @@ export function validateInvitation(inv, err, warn, base = 'invitation') {
       else if (v < Number(min) || v > Number(max)) err(at(p), `Between ${min} and ${max}.`);
     },
   };
-  for (const k of Object.keys(inv)) if (!['defaults', 'speech', 'lines'].includes(k)) err(at(k), 'Unknown section.');
+  for (const k of Object.keys(inv))
+    if (!['defaults', 'speech', 'lines', 'intro'].includes(k)) err(at(k), 'Unknown section.');
   if (inv.defaults !== undefined && check.group(inv.defaults, 'defaults')) invitationDefaults(inv.defaults, check);
   if (inv.speech !== undefined && check.group(inv.speech, 'speech')) invitationSpeech(inv.speech, check);
   if (inv.lines !== undefined && check.group(inv.lines, 'lines')) invitationLines(inv.lines, check);
+  if (inv.intro !== undefined && check.group(inv.intro, 'intro')) invitationIntro(inv.intro, check);
 }
 
 /** The invitation's default look: the stored look's fields, each from its list or a switch. */
@@ -336,6 +369,171 @@ function lineText(line, q, check) {
   else if (!n) check.err(q, 'Can’t be empty.');
   else if (n > LINE_MAX) check.err(q, `At most ${LINE_MAX} characters (it has to fit his bubble).`);
   else if (n > LINE_LONG) check.warn(q, `Over ${LINE_LONG} characters: it wraps a lot in his bubble.`);
+}
+
+/**
+ * The invitation's intro (types.js DialogueScript): the speaker, the start and the chat boxes,
+ * each with its id (unique), its line (up to INTRO_TEXT_MAX characters, a warning past
+ * INTRO_TEXT_LONG), a face, an animation and
+ * a camera from the toy's lists, and the optional speaker, Auto wait, Next, End and choices (at
+ * most INTRO_CHOICES_MAX, each a label and the box it leads to; one alone is a warning); every
+ * Next, choice and the start a box that's there. Then its flow as the toy plays it (introFlow): a
+ * box nothing leads to, and a loop with no choice to leave, are warnings.
+ */
+function invitationIntro(it, check) {
+  const { at, err } = check;
+  for (const k of Object.keys(it))
+    if (!['speaker', 'start', 'boxes'].includes(k)) err(at(`intro.${k}`), 'Unknown setting.');
+  introText(it.speaker, 'intro.speaker', INTRO_SPEAKER_MAX, check);
+  if (!Array.isArray(it.boxes)) {
+    err(at('intro.boxes'), 'Must be a list of chat boxes.');
+    if (typeof it.start !== 'string') err(at('intro.start'), 'Must be the id of a box.');
+    return;
+  }
+  if (!it.boxes.length) err(at('intro.boxes'), 'Add at least one box.');
+  /** Each id, at the first box that has it (the one the toy plays: content.js introFrom). */
+  const ids = new Map();
+  it.boxes.forEach((b, i) => {
+    if (isObj(b) && typeof b.id === 'string' && b.id && !ids.has(b.id)) ids.set(b.id, i);
+  });
+  /** A box's id that has to be there (`pick`: what to say when it's empty), or may be empty. */
+  const target = (v, p, pick = '') => {
+    if (v === undefined && !pick) return;
+    if (typeof v !== 'string') err(at(p), 'Must be the id of a box.');
+    else if (!v) {
+      if (pick) err(at(p), pick);
+    } else if (!ids.has(v)) err(at(p), `No box has the id “${v}”.`);
+  };
+  target(it.start, 'intro.start', 'Pick the box it starts on.');
+  it.boxes.forEach((b, i) => introBox(b, `intro.boxes[${i}]`, i, ids, target, check));
+  introFlow(it.boxes, ids, it.start, check);
+}
+
+/** How a box's own fields are checked, each when it's there (its id, Next and choices aside). */
+const BOX_CHECKS = {
+  text: (v, p, check) => {
+    introText(v, p, INTRO_TEXT_MAX, check);
+    const n = typeof v === 'string' ? Array.from(v.trim()).length : 0;
+    if (n > INTRO_TEXT_LONG && n <= INTRO_TEXT_MAX)
+      check.warn(check.at(p), `Over ${INTRO_TEXT_LONG} characters: on a phone it outgrows the box’s three lines.`);
+  },
+  face: (v, p, check) => check.oneOf(v, FACE_NAMES, p),
+  animation: (v, p, check) => check.oneOf(v, INTRO_ANIMATIONS, p),
+  camera: (v, p, check) => check.oneOf(v, INTRO_CAMERAS, p),
+  speaker: (v, p, check) => introText(v, p, INTRO_SPEAKER_MAX, check, false),
+  auto: (v, p, check) => check.num(v, INTRO_AUTO, p),
+  end: (v, p, check) => check.bool(v, p),
+};
+
+/** One chat box: its fields, then what its choices or End make of its Next (introOverrides). */
+function introBox(b, p, i, ids, target, check) {
+  const { at, err } = check;
+  if (!isObj(b)) return err(at(p), 'Must be a group of fields.');
+  for (const k of Object.keys(b)) if (!BOX_KEYS.includes(k)) err(at(`${p}.${k}`), 'Unknown setting.');
+  for (const k of BOX_NEEDS) if (b[k] === undefined) err(at(`${p}.${k}`), 'Missing.');
+  if (b.id !== undefined) {
+    if (typeof b.id !== 'string' || !ID_RE.test(b.id)) err(at(`${p}.id`), 'Lowercase letters, numbers and dashes.');
+    else if (ids.get(b.id) !== i) err(at(`${p}.id`), 'Another box already has this id.');
+  }
+  for (const [k, checkField] of Object.entries(BOX_CHECKS))
+    if (b[k] !== undefined) checkField(b[k], `${p}.${k}`, check);
+  target(b.next, `${p}.next`);
+  if (Array.isArray(b.choices)) {
+    if (b.choices.length > INTRO_CHOICES_MAX) err(at(`${p}.choices`), `At most ${INTRO_CHOICES_MAX} choices.`);
+    b.choices.forEach((c, j) => introChoice(c, `${p}.choices[${j}]`, target, check));
+  } else if (b.choices !== undefined) err(at(`${p}.choices`), 'Must be a list.');
+  introOverrides(b, p, i, check);
+}
+
+/**
+ * A box's Next or End that does nothing (warnings): choices lead on first, then End. And a single
+ * reply (a warning): a tap that looks like a choice.
+ */
+function introOverrides(b, p, i, check) {
+  const name = typeof b.id === 'string' && b.id ? `Box “${b.id}”` : `Box ${i + 1}`;
+  const hasNext = typeof b.next === 'string' && b.next !== '';
+  const warn = (k, why) =>
+    check.warn(check.at(`${p}.${k}`), `${name}: ${why}, so ${k === 'end' ? 'End' : 'Next'} does nothing.`);
+  if (Array.isArray(b.choices) && b.choices.length && b.choices.length < INTRO_CHOICES_MIN)
+    check.warn(check.at(`${p}.choices`), `${name}: one reply is just a tap; add another, or use Next instead.`);
+  if (Array.isArray(b.choices) && b.choices.length) {
+    if (b.end === true) warn('end', 'its choices lead on');
+    if (hasNext) warn('next', 'its choices lead on');
+  } else if (b.end === true && hasNext) warn('next', 'the intro ends there');
+}
+
+/** One choice: its words and the box it leads to. */
+function introChoice(c, p, target, check) {
+  const { at, err } = check;
+  if (!isObj(c)) return err(at(p), 'Must be a group of fields.');
+  for (const k of Object.keys(c)) if (k !== 'label' && k !== 'next') err(at(`${p}.${k}`), 'Unknown setting.');
+  if (c.label === undefined) err(at(`${p}.label`), 'Missing.');
+  else introText(c.label, `${p}.label`, INTRO_LABEL_MAX, check);
+  target(c.next, `${p}.next`, 'Pick the box it leads to.');
+}
+
+/** Text up to `max` characters (not UTF-16 units), not empty unless it may be. */
+function introText(v, p, max, check, required = true) {
+  const n = typeof v === 'string' ? Array.from(v.trim()).length : 0;
+  if (typeof v !== 'string') check.err(check.at(p), 'Must be text.');
+  else if (!n && required) check.err(check.at(p), 'Can’t be empty.');
+  else if (n > max) check.err(check.at(p), `At most ${max} characters.`);
+}
+
+/**
+ * The intro's flow, as the toy plays it (content.js introFrom: the boxes it keeps, each going on
+ * by its choices, else its End, else its Next, else the box after it; from the start, or the
+ * first box): a warning for each box nothing leads to, and for each loop of boxes with no choice
+ * on the way (tapping on would never end it), at the Next that closes it.
+ */
+function introFlow(boxes, ids, start, check) {
+  const kept = boxes.flatMap((b, i) => (ids.get(b?.id) === i ? [{ b, i }] : []));
+  const pos = new Map(kept.map(({ b }, k) => [b.id, k]));
+  /** @type {Array<{ choices?: number[], to?: number | null }>} */
+  const flow = kept.map(({ b }, k) => {
+    const choices = (Array.isArray(b.choices) ? b.choices : [])
+      .filter((c) => isObj(c) && typeof c.label === 'string' && c.label.trim() && pos.has(c.next))
+      .slice(0, INTRO_CHOICES_MAX)
+      .map((c) => pos.get(c.next));
+    if (choices.length) return { choices };
+    if (b.end === true) return { to: null };
+    if (pos.has(b.next)) return { to: pos.get(b.next) };
+    return { to: k + 1 < kept.length ? k + 1 : null };
+  });
+  const reached = new Set();
+  const todo = kept.length ? [pos.get(start) ?? 0] : [];
+  while (todo.length) {
+    const k = todo.pop();
+    if (reached.has(k)) continue;
+    reached.add(k);
+    todo.push(...(flow[k].choices ?? (flow[k].to === null ? [] : [flow[k].to])));
+  }
+  kept.forEach(({ b, i }, k) => {
+    if (!reached.has(k))
+      check.warn(check.at(`intro.boxes[${i}]`), `Box “${b.id}” is never reached: no box or choice leads to it.`);
+  });
+  // Loops: follow each box's one way on (a box with choices is a way out) until it comes round.
+  const state = kept.map(() => 0); // 0 not yet, 1 on this walk, 2 done
+  for (let k = 0; k < kept.length; k++) {
+    const walk = [];
+    let n = k;
+    while (n !== null && state[n] === 0 && !flow[n].choices) {
+      state[n] = 1;
+      walk.push(n);
+      n = flow[n].to;
+    }
+    if (n !== null && state[n] === 1) {
+      const loop = walk.slice(walk.indexOf(n));
+      const names = [...loop, n].map((m) => `“${kept[m].b.id}”`).join(' → ');
+      // (The latest box in it closes it, by its Next: the box after that one isn't in the loop.)
+      const last = kept[Math.max(...loop)];
+      check.warn(
+        check.at(`intro.boxes[${last.i}].next`),
+        `Boxes ${names} go round with no choice to leave: the intro would never end.`,
+      );
+    }
+    for (const m of walk) state[m] = 2;
+  }
 }
 
 /**

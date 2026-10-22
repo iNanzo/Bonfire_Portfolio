@@ -15,6 +15,16 @@
 // resolutions, his half face over about 78 texels) a pixel sheet would be stretched, nearest,
 // into blocks: there the face is the smooth 1024 sheet, as at Off
 // ('smooth'); under the smallest (16×16: his half face about 2 texels) it's the smallest sheet.
+// The dialogue's four faces have sheets of their own laid out the same way (newt-face-extra.png
+// and the smooth newt-face-smooth-extra.png), shown at the same size; FACE_FALLBACK stands in
+// for one until its sheet comes.
+
+/**
+ * The face each of the dialogue's four (clips.js EXTRA_FACES) shows until its sheet has come, or
+ * where its sheet hasn't the size showing (an older copy cached): the nearest of the first four.
+ * @type {Record<'sad'|'angry'|'shy'|'smug', import('./clips.js').FaceName>}
+ */
+export const FACE_FALLBACK = { sad: 'neutral', angry: 'neutral', shy: 'happy', smug: 'happy' };
 
 /**
  * The cells' widths, pixels: a step of at most about 15% between neighbours, up to his half face

@@ -8,13 +8,39 @@
 // before the toy, or a fork, can be edited all the same). contentRules.js checks the content;
 // the toy reads it through src/invitation/content.js. Each Shader option goes by the Look
 // menu's own name (shader.js SHADER_CONTROLS), so a control added there shows here by itself.
-import { INVITATION_STYLES } from '../../src/contentRules.js';
+//
+// The Intro (`invitation.intro`, the chat Play Intro opens: types.js DialogueScript): the
+// speaker, the start box and the chat boxes. The start, each box's Next and each choice's box
+// are picked from the boxes there are (one that's gone still shows, marked, so it can be put
+// right), the lists remade as a box is renamed (INVITATION_OPTIONS_FROM); Face, Animation and
+// Camera from the toy's lists; Auto as a slider. A new box comes with every field
+// (INVITATION_TEMPLATES), and a box without some shows them all the same (INVITATION_FIELDS:
+// a hand-written box can be filled in), boxes and choices can't
+// be hidden (INVITATION_NO_HIDING: the toy has no way to skip one), a box has at most 3 choices
+// (INVITATION_MAX_ENTRIES), and each card says under its line what the box does
+// (INVITATION_CARD_META: its id, face, move, shot and where it goes).
+import {
+  INTRO_ANIMATIONS,
+  INTRO_AUTO,
+  INTRO_CAMERAS,
+  INTRO_CHOICES_MAX,
+  INTRO_CHOICES_MIN,
+  INTRO_TEXT_LONG,
+  INTRO_TEXT_MAX,
+  INVITATION_STYLES,
+} from '../../src/contentRules.js';
+import { CLIPS, FACE_NAMES } from '../../src/invitation/clips.js';
 import { DEFAULT_LOOK, MOTIONS } from '../../src/invitation/look.js';
 import { PRESETS } from '../../src/invitation/looks/index.js';
 import { PIXEL_SIZES } from '../../src/invitation/pixels.js';
 import { SHADER_CONTROLS, styleShader } from '../../src/invitation/shader.js';
 import { LINE_MAX, LINES_MAX, SPEECH_DEFAULTS, SPEECH_RANGES, TRIGGERS } from '../../src/invitation/speech.js';
+import { getAt } from './paths.js';
 import { titleCase } from './text.js';
+
+/** A chat box's pattern, and a choice's. */
+const BOX = 'invitation.intro.boxes[]';
+const CHOICE = `${BOX}.choices[]`;
 
 /** @type {Record<string, [string, string]>} each trigger (speech.js TRIGGERS): [its name, the moment it is] */
 const TRIGGER_NAMES = {
@@ -88,6 +114,22 @@ export const INVITATION_LABELS = {
       [`invitation.lines.${k}`, TRIGGER_NAMES[k][0]],
     ]),
   ),
+  'invitation.intro': 'Intro',
+  'invitation.intro.speaker': 'Speaker',
+  'invitation.intro.start': 'Start box',
+  'invitation.intro.boxes': 'Chat boxes',
+  [`${BOX}.id`]: 'ID',
+  [`${BOX}.speaker`]: 'Speaker override',
+  [`${BOX}.text`]: 'Text',
+  [`${BOX}.face`]: 'Face',
+  [`${BOX}.animation`]: 'Animation',
+  [`${BOX}.camera`]: 'Camera',
+  [`${BOX}.next`]: 'Next box',
+  [`${BOX}.end`]: 'Ends the intro',
+  [`${BOX}.auto`]: 'Auto wait',
+  [`${BOX}.choices`]: 'Choices',
+  [`${CHOICE}.label`]: 'Label',
+  [`${CHOICE}.next`]: 'Leads to',
 };
 export const INVITATION_HELP = {
   'invitation.defaults':
@@ -126,6 +168,30 @@ export const INVITATION_HELP = {
       [`invitation.lines.${k}`, TRIGGER_NAMES[k][1]],
     ]),
   ),
+  'invitation.intro':
+    'The chat Play Intro opens: NEWT talks to the visitor box by box, with a face, a move and a shot for each line.',
+  'invitation.intro.speaker':
+    'The name on the tab at the top left of every chat box (a box’s Speaker Override changes it for that box).',
+  'invitation.intro.start': 'The box Play Intro opens on. Every Play Intro starts here: nothing is kept from the last.',
+  'invitation.intro.boxes':
+    'One line each, in this order: a tap goes on to the box after it unless the box says otherwise. Drag ⋮⋮ or use ↑/↓ to reorder.',
+  [`${BOX}.id`]:
+    'How Next and the choices point to this box. Lowercase letters, numbers and dashes, and no other box’s.',
+  [`${BOX}.speaker`]:
+    'Another name on the tab for this box alone, such as ??? before he’s said his. Empty: the intro’s Speaker.',
+  [`${BOX}.text`]: `What he says, typed out letter by letter. Up to ${INTRO_TEXT_MAX} characters; past ${INTRO_TEXT_LONG} it outgrows the box on a phone.`,
+  [`${BOX}.face`]: 'His face while he says it. He still blinks on Neutral.',
+  [`${BOX}.animation`]:
+    'What he does as the line starts: a gesture plays once, then he talks on; a loop keeps going. None: as he was.',
+  [`${BOX}.camera`]:
+    'The shot for this line, eased there: Close is his head and shoulders (too tight for a Cheer on a phone), Medium his whole body, Wide the usual view.',
+  [`${BOX}.next`]: 'Where a tap goes after this line: another box, or the box after it in the list.',
+  [`${BOX}.end`]: 'The intro ends after this line, whatever comes after it in the list, and he’s free to play again.',
+  [`${BOX}.auto`]:
+    'With Auto on, the seconds to wait once the line is typed before going on. 0: as long as it takes to read.',
+  [`${BOX}.choices`]: `${INTRO_CHOICES_MIN} or ${INTRO_CHOICES_MAX} replies the visitor picks from instead of a tap, each leading to a box of its own.`,
+  [`${CHOICE}.label`]: 'The reply on its button, in the visitor’s words. Keep it short.',
+  [`${CHOICE}.next`]: 'The box this reply goes to. Boxes after different replies can lead back to the same one.',
 };
 /** The invitation's sliders: the Shader ranges (not Colors, a list of steps), the speech's. */
 export const INVITATION_RANGES = {
@@ -143,6 +209,7 @@ export const INVITATION_RANGES = {
       [`invitation.speech.${k}.cooldown`, SPEECH_RANGES.cooldown],
     ]),
   ),
+  [`${BOX}.auto`]: INTRO_AUTO,
 };
 
 /** Its longer explanations (folded under the help: "More"). */
@@ -153,6 +220,13 @@ export const INVITATION_MORE = {
     'One bubble at a time: while a line is up, only a moment that matters more replaces it (being caught or shaken first, idle time last).\n' +
     'A moment whose chance doesn’t come up just passes; its cooldown starts only once it has spoken.',
   'invitation.lines': `Up to ${LINES_MAX} lines a moment, each up to ${LINE_MAX} characters (past 80 they wrap a lot in his bubble). A moment with no lines says nothing.`,
+  'invitation.intro':
+    'A tap anywhere goes on: the first finishes the typing, the next goes to the next box. Space or Enter goes on too; Escape offers to skip it.\n' +
+    'Auto goes on by itself after each line’s wait, Skip jumps to the next choice or the end, and Log lists the lines so far.\n' +
+    'While it plays he stays put, facing you; once it ends, the camera eases back and he plays as before.',
+  'invitation.intro.boxes':
+    'Choices come first, then End, then Next: with choices, a box waits for a reply; with none of the three, a tap goes to the box after it, and the last box ends the intro.\n' +
+    'A box nothing leads to, or boxes that go round with no choice to leave, get a warning.',
 };
 
 /** Extra words the search finds its sections by. */
@@ -160,6 +234,7 @@ export const INVITATION_KEYWORDS = {
   'invitation.defaults': ['newt', 'look menu', 'pixel size', 'default style'],
   'invitation.speech': ['newt', 'speech bubble', 'talk', 'chatty'],
   'invitation.lines': ['newt', 'speech bubble', 'talk', 'say', 'words'],
+  'invitation.intro': ['newt', 'dialogue', 'chat', 'play intro', 'story', 'cutscene', 'uma musume'],
 };
 
 /** Its triggers by the plan's kinds (the quiet spell with Passive). */
@@ -170,7 +245,50 @@ export const INVITATION_SUBGROUPS = {
   'invitation.lines': TALK_KINDS,
 };
 
-/** Its dropdowns: (draft) → [{ value, label }]. */
+/** A face's name in the list, where the face's own needs a word more. */
+const FACE_LABELS = { shy: 'Shy (Blushing)', blink: 'Blink (Eyes Closed)' };
+/** Each shot in the list: what it shows. */
+const CAMERA_LABELS = {
+  close: 'Close: Head & Shoulders',
+  medium: 'Medium: Whole Body',
+  wide: 'Wide: Default View',
+  keep: 'Keep: As It Was',
+};
+/** What a box has him do, in the list: none, or a clip and whether it plays once or loops. */
+const animationLabel = (v) =>
+  titleCase(v === 'none' ? 'None (Keep What He’s Doing)' : `${v} (${CLIPS[v]?.loop ? 'Loops' : 'Once'})`);
+/** The start of a line, for a list: up to 28 characters. */
+const snippet = (text) => {
+  const s = Array.from(String(text ?? '').trim());
+  return s.length > 28 ? `${s.slice(0, 27).join('')}…` : s.join('');
+};
+/** The draft's chat boxes (none when it has no intro). */
+const introBoxes = (d) => {
+  const boxes = d?.invitation?.intro?.boxes;
+  return Array.isArray(boxes) ? boxes.filter((b) => b && typeof b === 'object') : [];
+};
+
+/**
+ * The boxes a field can go to, each by its id and how its line starts; `empty`: what an empty
+ * one means there (left out where it has to name a box). What the field at `path` holds stays
+ * in the list when no box has it (a box renamed or deleted), marked, so it shows and can be put
+ * right; empty there, it asks for a pick.
+ * @param {any} d @param {(string|number)[] | undefined} path @param {string} [empty]
+ */
+function boxOptions(d, path, empty) {
+  const out = empty ? [{ value: '', label: empty }] : [];
+  for (const b of introBoxes(d))
+    if (typeof b.id === 'string' && b.id && !out.some((o) => o.value === b.id))
+      out.push({ value: b.id, label: snippet(b.text) ? `${b.id}: ${snippet(b.text)}` : b.id });
+  const current = path ? getAt(d, path) : undefined;
+  if (typeof current === 'string' && !out.some((o) => o.value === current)) {
+    if (current) out.push({ value: current, label: `${current} (No Such Box)` });
+    else out.unshift({ value: '', label: '(Pick a Box)' });
+  }
+  return out;
+}
+
+/** Its dropdowns: (draft, the field's path) → [{ value, label }]. */
 export const INVITATION_SELECTS = {
   'invitation.defaults.pixelSize': () =>
     PIXEL_SIZES.map((v) => ({ value: v, label: /^\d+$/.test(v) ? `${v}×${v}` : titleCase(v) })),
@@ -186,10 +304,92 @@ export const INVITATION_SELECTS = {
           : c.steps.map((v) => ({ value: v, label: c.text(v)[0] })),
     ]),
   ),
+  'invitation.intro.start': (d, path) => boxOptions(d, path),
+  [`${BOX}.next`]: (d, path) => boxOptions(d, path, 'The Box After It'),
+  [`${CHOICE}.next`]: (d, path) => boxOptions(d, path),
+  [`${BOX}.face`]: () => FACE_NAMES.map((v) => ({ value: v, label: titleCase(FACE_LABELS[v] ?? v) })),
+  [`${BOX}.animation`]: () => INTRO_ANIMATIONS.map((v) => ({ value: v, label: animationLabel(v) })),
+  [`${BOX}.camera`]: () => INTRO_CAMERAS.map((v) => ({ value: v, label: titleCase(CAMERA_LABELS[v] ?? v) })),
+};
+/**
+ * The dropdowns made from the chat boxes, by the list they're made from: an edit in it (a box
+ * renamed, its line rewritten) remakes them as it's typed.
+ */
+export const INVITATION_OPTIONS_FROM = {
+  'invitation.intro.start': 'invitation.intro.boxes',
+  [`${BOX}.next`]: 'invitation.intro.boxes',
+  [`${CHOICE}.next`]: 'invitation.intro.boxes',
 };
 
-/** “+ Add …” on each trigger's lines. */
-export const INVITATION_ADD_LABELS = Object.fromEntries(TRIGGERS.map((k) => [`invitation.lines.${k}`, 'line']));
+/** “+ Add …” on each trigger's lines, the chat boxes and a box's choices. */
+export const INVITATION_ADD_LABELS = {
+  ...Object.fromEntries(TRIGGERS.map((k) => [`invitation.lines.${k}`, 'line'])),
+  'invitation.intro.boxes': 'box',
+  [`${BOX}.choices`]: 'choice',
+};
+
+/** A chat box as content.json keeps it: every field, the optional ones empty (`o` sets some). */
+const introBox = (o) => ({
+  id: '',
+  speaker: '',
+  text: '',
+  face: 'neutral',
+  animation: 'Talk',
+  camera: 'keep',
+  next: '',
+  end: false,
+  auto: 0,
+  choices: [],
+  ...o,
+});
+
+/**
+ * What “+ Add” makes on the Intro: a box with every field (the form shows only the fields an
+ * entry has; the form gives it an id no box has), and a choice with its label and box to pick.
+ */
+export const INVITATION_TEMPLATES = {
+  'invitation.intro.boxes': () => introBox({}),
+  [`${BOX}.choices`]: () => ({ label: '', next: '' }),
+};
+/**
+ * Every field an entry shows, whatever it holds: a box written by hand or copied (content.js
+ * FALLBACK_INTRO leaves its optional fields out) shows the ones it lacks too, each as the toy
+ * plays it, blank where the rules want a pick (its face, animation and camera), so it can be
+ * filled in. The draft changes only once one is edited.
+ */
+export const INVITATION_FIELDS = {
+  [BOX]: () => ({ ...introBox({}), face: '', animation: '', camera: '' }),
+};
+/** Lists whose entries can't be hidden (◉): the toy has no way to skip a box or a choice. */
+export const INVITATION_NO_HIDING = ['invitation.intro.boxes', `${BOX}.choices`];
+/** The most entries a list takes: “+ Add” goes once it has them. */
+export const INVITATION_MAX_ENTRIES = { [`${BOX}.choices`]: INTRO_CHOICES_MAX };
+
+/** Where a box goes on: its choices, the end, or a box (its own Next, else the one after it). */
+function flowOf(b, list, i) {
+  const choices = Array.isArray(b.choices) ? b.choices.length : 0;
+  if (choices) return titleCase(`${choices} choice${choices === 1 ? '' : 's'}`);
+  if (b.end === true) return 'Ends';
+  const next = typeof b.next === 'string' && b.next ? b.next : list[i + 1]?.id;
+  return next ? `→ ${next}` : 'Ends';
+}
+/**
+ * The line under a card's title (its line, for a box; its words, for a choice): (entry, its list,
+ * its index) → text. A box: its id, face, move, shot and where it goes; a choice: its box.
+ */
+export const INVITATION_CARD_META = {
+  'invitation.intro.boxes': (b, list, i) =>
+    [
+      b.id,
+      titleCase(b.face ?? ''),
+      b.animation === 'none' ? 'As He Was' : b.animation,
+      titleCase(b.camera ?? ''),
+      flowOf(b, list, i),
+    ]
+      .filter(Boolean)
+      .join(' · '),
+  [`${BOX}.choices`]: (c) => `→ ${c.next || '?'}`,
+};
 
 /** The style the toy's built-in Default is built on (looks/default.js spreads Soft). */
 const DEFAULT_BUILT_ON = 'soft';
@@ -197,8 +397,10 @@ const DEFAULT_BUILT_ON = 'soft';
 /**
  * Each section from the toy's own built-in values, for a content.json without it (a fresh copy
  * each call): the Default look (the built-in Default style: Soft with the Default preset's
- * Shader values, at the built-in Pixel Size and Motion), the speech (speech.js SPEECH_DEFAULTS)
- * and every trigger's lines, none yet.
+ * Shader values, at the built-in Pixel Size and Motion), the speech (speech.js SPEECH_DEFAULTS),
+ * every trigger's lines, none yet, and the intro: the toy's own short one (content.js
+ * FALLBACK_INTRO, which the toy can't hand the admin: it reads its content through Vite;
+ * test/invitationIntro.test.mjs holds the two together), every field in place.
  * @type {Record<string, () => object>}
  */
 export const INVITATION_STARTERS = {
@@ -216,4 +418,26 @@ export const INVITATION_STARTERS = {
     ...Object.fromEntries(TRIGGERS.map((k) => [k, { ...SPEECH_DEFAULTS.triggers[k] }])),
   }),
   'invitation.lines': () => Object.fromEntries(TRIGGERS.map((k) => [k, []])),
+  'invitation.intro': () => ({
+    speaker: 'NEWT',
+    start: 'hi',
+    boxes: [
+      introBox({ id: 'hi', text: 'Oh, hi! I’m NEWT.', face: 'happy', animation: 'Wave', camera: 'medium' }),
+      introBox({
+        id: 'soon',
+        text: 'Something’s on its way to you. Keep an eye out!',
+        face: 'smug',
+        animation: 'Point',
+        camera: 'close',
+      }),
+      introBox({
+        id: 'bye',
+        text: 'Until then, poke me all you like.',
+        face: 'happy',
+        animation: 'Cheer',
+        camera: 'wide',
+        end: true,
+      }),
+    ],
+  }),
 };

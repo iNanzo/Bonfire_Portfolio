@@ -71,10 +71,18 @@
  * @property {{name: string, time: number, remaining: number}|null} clip  the playing one-shot or loop (not the gait)
  * @property {{dragSpeed: number, shake: number}|null} carry  while he's held (carry.js `carryFeel`)
  * @property {XZ|null} [camera]  the camera's spot on the floor: a reaction turns him toward it (without it, toward +z)
+ * @property {DialogueIn|null} [dialogue]  while Play Intro's dialogue runs, the box up (brain.js's talk state)
+ */
+/**
+ * @typedef {object} DialogueIn  the intro's box as the brain sees it
+ * @property {number} seq  counts the boxes shown: a new one plays its animation
+ * @property {string} animation  a DIALOGUE_CLIPS name or 'none'
+ * @property {import('./clips.js').FaceName} face
+ * @property {boolean} typing  its line is still typing out (Talk plays meanwhile)
  */
 /**
  * @typedef {object} BrainOut
- * @property {string} state  idle, walk, react, flee, held, fall, land, sitDown, sit, standUp
+ * @property {string} state  idle, walk, react, flee, held, fall, land, sitDown, sit, standUp, talk
  * @property {string} clip  'gait' (Idle/Walk/Run by speed) or a clip name
  * @property {boolean} restart  start `clip` from 0 this frame
  * @property {{mode: 'stay'|'goto'|'flee'|'face', goal: XZ|null, speed: number}} move  goal: where a goto goes, the camera's spot to face, or where a flee's threat was last seen (with no pointer); speed: the target speed (steer ramps to it)
@@ -89,6 +97,8 @@
  * @property {'Sit'|'Stand'} sitLabel
  * @property {boolean} buttonsEnabled
  * @property {'Wave'|'Spook'|null} reaction  the reaction under way (react only), turn included
+ * @property {boolean} talkReady  the intro's talk state, in place: up, walked in and turned to the
+ *   camera, so the box's line, face and gesture can begin (main.js holds the line until then)
  */
 
 /**
@@ -154,6 +164,32 @@
  * @property {(name: string, out: XYZ) => XYZ} bonePos  world position of a bone's head
  * @property {(camera: any, rect: {left: number, top: number, width: number, height: number}) => {head: {x: number, y: number, r: number}, body: {a: {x: number, y: number}, b: {x: number, y: number}, r: number}}} screenShape
  * @property {() => void} dispose
+ */
+
+/** @typedef {'close'|'medium'|'wide'|'keep'} DialogueShot  a box's camera: head and shoulders, his whole body, the default view, or as it was */
+/**
+ * @typedef {object} DialogueChoice  a reply the visitor can tap
+ * @property {string} label
+ * @property {string} next  the id of the box it leads to
+ */
+/**
+ * @typedef {object} DialogueBox  one chat box of the intro (content.json invitation.intro.boxes[])
+ * @property {string} id  unique within the script
+ * @property {string} [speaker]  the name tab (the script's speaker when missing)
+ * @property {string} text  the line, typed out
+ * @property {import('./clips.js').FaceName} face
+ * @property {string} animation  a DIALOGUE_CLIPS name, or 'none' to keep what he's doing
+ * @property {DialogueShot} camera
+ * @property {number} [auto]  seconds Auto waits after the line is typed (default by its length)
+ * @property {string} [next]  the id of the box after this one (default: the following box)
+ * @property {DialogueChoice[]} [choices]  2–3 replies instead of a tap to go on
+ * @property {boolean} [end]  the intro ends after this box
+ */
+/**
+ * @typedef {object} DialogueScript  content.json invitation.intro
+ * @property {string} speaker  the default name tab
+ * @property {string} start  the first box's id
+ * @property {DialogueBox[]} boxes
  */
 
 export {};

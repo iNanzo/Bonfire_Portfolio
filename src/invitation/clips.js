@@ -2,7 +2,7 @@
 // animation blend and the brain. Names are the glb's animation names; lengths are seconds at
 // 24 fps (the glb's own are what play; test/invitationModel.test.mjs holds the two together).
 
-/** @typedef {'neutral'|'blink'|'happy'|'surprised'} FaceName */
+/** @typedef {'neutral'|'blink'|'happy'|'surprised'|'sad'|'angry'|'shy'|'smug'} FaceName */
 /** @typedef {'normal'|'slow'|'none'} BlinkMode */
 /**
  * @typedef {object} ClipSpec
@@ -28,7 +28,17 @@ export const CLIPS = {
   SitDown: { loop: false, length: 24 / FPS, fadeIn: 0.2 },
   Sit: { loop: true, length: 72 / FPS, fadeIn: 0.15 },
   StandUp: { loop: false, length: 24 / FPS, fadeIn: 0.15 },
+  // (Round 15's talking gestures for the dialogue: tools/newt.py makes them; each starts and
+  // ends on the Idle pose. Talk loops: small hand moves while he speaks.)
+  Talk: { loop: true, length: 48 / FPS, fadeIn: 0.25 },
+  Nod: { loop: false, length: 18 / FPS, fadeIn: 0.12 },
+  Shrug: { loop: false, length: 24 / FPS, fadeIn: 0.15 },
+  Point: { loop: false, length: 30 / FPS, fadeIn: 0.15 },
+  Think: { loop: true, length: 48 / FPS, fadeIn: 0.2 },
+  Cheer: { loop: false, length: 30 / FPS, fadeIn: 0.12 },
 };
+/** The clips a dialogue box may play (the admin lists these): his gestures, the reactions, sitting. */
+export const DIALOGUE_CLIPS = ['Idle', 'Talk', 'Nod', 'Shrug', 'Point', 'Think', 'Cheer', 'Wave', 'Spook', 'Sit'];
 export const CLIP_NAMES = Object.keys(CLIPS);
 
 /** Idle, Walk and Run play as one blend by speed, on one shared step phase (blend.js). */
@@ -77,6 +87,13 @@ export const FACE_TRACK = {
 
 /** Where each face sits on NEWT_Face's 2×2 sheet (texture offset, glTF's flipY = false). */
 export const FACES = { neutral: [0, 0], blink: [0.5, 0], happy: [0, 0.5], surprised: [0.5, 0.5] };
+/**
+ * Round 15's dialogue faces, on a second 2×2 sheet laid out like the first (tools/newt-face-smooth.mjs
+ * draws the smooth one from his own face; tools/newt-face.mjs the pixel ones).
+ */
+export const EXTRA_FACES = { sad: [0, 0], angry: [0.5, 0], shy: [0, 0.5], smug: [0.5, 0.5] };
+/** Every face by name, in the order the admin lists them. */
+export const FACE_NAMES = ['neutral', 'happy', 'surprised', 'sad', 'angry', 'shy', 'smug', 'blink'];
 
 /**
  * The bones by their three.js names (GLTFLoader drops the dots Blender's names have:

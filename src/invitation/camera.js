@@ -30,6 +30,16 @@
 // sun turned by the camera's yaw), so his shadow always falls the same way on screen, back and
 // to one side. Angles in radians (yaw 0: the camera on the +z side, + toward +x), distances in
 // world units, drags in CSS px.
+//
+// Play Intro's shots (orbitTalk, shotView, orbitShot): the view goes round to the front (the
+// default view's yaw, the short way) and each chat box's camera eases there at SHOT.ease (or
+// cuts, for reduced motion): close, his head and shoulders; medium, his whole body; wide, the
+// default view's distance and tilt; keep, as it was. A shot fills SHOT[name].fill of the clear
+// space over the chat box with him and shows him `raise` CSS px above where the point it looks at
+// shows (the middle of that space), by aiming below his middle; the point it orbits stays on him.
+// Nothing else moves it meanwhile (main.js sends no gestures); at the end it eases back to the
+// view from before the intro, its pan and zoom included. With reduced motion the turn to the
+// front and the way back cut too.
 
 import { NEWT_HEIGHT, NEWT_RADIUS } from './area.js';
 import { FOCUS_Y, VIEW, compactStage } from './pixels.js';
@@ -76,6 +86,17 @@ export const ORBIT = {
 };
 export { FOCUS_Y };
 
+/**
+ * Play Intro's shots: `span` world units of him (from `mid` - span/2 to `mid` + span/2) fill `fill`
+ * of the clear space's height, seen `elevation` radians up; `ease`, the time constant the view
+ * eases to a shot at, seconds.
+ */
+export const SHOT = {
+  close: { span: 0.62, mid: 0.72, fill: 0.78, elevation: 9 * RAD },
+  medium: { span: 1.1, mid: 0.52, fill: 0.7, elevation: 16 * RAD },
+  ease: 0.45,
+};
+
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const wrap = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
 /** The stage's clear space round where the point it looks at shows, when nothing says (a top margin, a toolbar, side edges). */
@@ -107,6 +128,14 @@ const frameOf = (w, h) => ({ hw: Math.max(1, w / 2 - 24), hh: Math.max(1, (h - 8
  * @property {{hw: number, hh: number}} frame  half the clear space round where the point it
  *   looks at shows, CSS px (it's shown in its middle: pixels.js frameView)
  * @property {boolean} seen  NEWT was inside ORBIT.keepOut of the clear space last frame
+ * @property {TalkView|null} [talk]  while Play Intro runs: the front it's seen from, the shot, the view before
+ */
+/** @typedef {{yaw: number, elevation: number, distance: number, lookY: number}} ShotView  a shot's view: lookY, the height it aims at */
+/**
+ * @typedef {object} TalkView
+ * @property {number} yaw  the front, the short way round from where it was
+ * @property {ShotView|null} view  the shot under way (null: none yet)
+ * @property {{yaw: number, elevation: number, distance: number, base: XZ, panned: boolean}} saved  the view before
  */
 
 /**
@@ -397,6 +426,106 @@ export function orbitHome(s, distance) {
   s.home.distance = distance;
   s.goal.distance *= k;
   s.distance *= k;
+  if (s.talk) s.talk.saved.distance *= k;
+}
+
+/**
+ * Play Intro begins (`on`): the view turns round to the front, the short way, and waits for the
+ * boxes' shots; or it's over: the view eases back to where it was before, its pan included.
+ * `cut` (reduced motion): there at once, the way back looking where it did (`focus`: NEWT, whom
+ * the point it looks at follows as it would).
+ * @param {OrbitState} s
+ * @param {boolean} on
+ * @param {{cut?: boolean, focus?: XZ|null}} [o]
+ */
+export function orbitTalk(s, on, { cut = false, focus = null } = {}) {
+  if (on) {
+    if (s.talk) return;
+    s.talk = {
+      yaw: s.yaw + wrap(s.home.yaw - s.yaw),
+      view: null,
+      saved: {
+        yaw: s.goal.yaw,
+        elevation: s.goal.elevation,
+        distance: s.goal.distance,
+        base: { ...s.base },
+        panned: s.panned,
+      },
+    };
+    s.spin = { yaw: 0, elevation: 0 };
+    s.drag = null;
+    s.resetting = false;
+    s.holding = false;
+    s.goal.yaw = s.talk.yaw;
+    if (cut) s.yaw = s.talk.yaw;
+    return;
+  }
+  const t = s.talk;
+  if (!t) return;
+  s.talk = null;
+  // (Back the short way to the yaw it had, from wherever the shots left it.)
+  s.goal = { yaw: s.yaw + wrap(t.saved.yaw - s.yaw), elevation: t.saved.elevation, distance: t.saved.distance };
+  s.base = { ...t.saved.base };
+  s.panned = t.saved.panned;
+  s.panning = false;
+  s.resetting = true;
+  // (Close in, he's past the clear space's edge: not walked off it, so a pan holds until he's back in.)
+  s.seen = false;
+  if (!cut) return;
+  s.yaw = s.goal.yaw;
+  s.elevation = s.goal.elevation;
+  s.distance = s.goal.distance;
+  s.resetting = false;
+  const want = wanted(s, focus);
+  s.target = { x: want.x, y: FOCUS_Y, z: want.z };
+}
+
+/**
+ * A shot's view while Play Intro runs (null for keep, or with no intro under way): from the
+ * front, at the distance that makes SHOT[shot].span fill its share of the clear space's height
+ * `clear.h` (CSS px), aimed low enough that his middle shows `clear.raise` px above where the
+ * point it looks at shows; wide, the default view's distance and tilt.
+ * @param {OrbitState} s
+ * @param {import('./types.js').DialogueShot} shot
+ * @param {{h: number, raise: number}} [clear]
+ * @returns {ShotView|null}
+ */
+export function shotView(s, shot, clear = { h: s.span.h * 0.6, raise: 0 }) {
+  if (!s.talk || shot === 'keep') return null;
+  const f = focal(s);
+  const raise = Number.isFinite(clear.raise) ? clear.raise : 0;
+  const lower = (mid, distance, elevation) => mid - (raise * distance) / (f * Math.cos(elevation));
+  if (shot === 'wide') {
+    const { elevation, distance } = s.home;
+    return { yaw: s.talk.yaw, elevation, distance, lookY: lower(FOCUS_Y, distance, elevation) };
+  }
+  const spec = SHOT[shot];
+  if (!spec) return null;
+  const h = Math.max(80, clear.h);
+  const distance = (spec.span * Math.cos(spec.elevation) * f) / (spec.fill * h);
+  return { yaw: s.talk.yaw, elevation: spec.elevation, distance, lookY: lower(spec.mid, distance, spec.elevation) };
+}
+
+/**
+ * Go to a shot (shotView's; null keeps the view as it is): eased at SHOT.ease, or there at once
+ * (`cut`, for reduced motion; `focus`: NEWT, whom the point it looks at goes onto).
+ * @param {OrbitState} s
+ * @param {ShotView|null} view
+ * @param {{cut?: boolean, focus?: XZ|null}} [o]
+ */
+export function orbitShot(s, view, { cut = false, focus = null } = {}) {
+  if (!s.talk || !view) return;
+  s.talk.view = view;
+  s.goal = { yaw: view.yaw, elevation: view.elevation, distance: view.distance };
+  if (!cut) return;
+  s.yaw = view.yaw;
+  s.elevation = view.elevation;
+  s.distance = view.distance;
+  if (focus) {
+    s.target.x = focus.x;
+    s.target.z = focus.z;
+  }
+  s.target.y = view.lookY;
 }
 
 /**
@@ -578,7 +707,7 @@ export function orbitStep(s, dt, focus) {
     s.spin.yaw = Math.abs(s.spin.yaw * slow) < 1e-3 ? 0 : s.spin.yaw * slow;
     s.spin.elevation = Math.abs(s.spin.elevation * slow) < 1e-3 ? 0 : s.spin.elevation * slow;
   }
-  const k = 1 - Math.exp(-dt / (s.resetting ? ORBIT.resetEase : ORBIT.ease));
+  const k = 1 - Math.exp(-dt / (s.talk ? SHOT.ease : s.resetting ? ORBIT.resetEase : ORBIT.ease));
   s.yaw += (s.goal.yaw - s.yaw) * k;
   s.elevation += (s.goal.elevation - s.elevation) * k;
   s.distance += (s.goal.distance - s.distance) * k;
@@ -607,6 +736,17 @@ export function orbitStep(s, dt, focus) {
  * @param {{x: number, z: number, y?: number}|null} focus
  */
 function followStep(s, dt, focus) {
+  if (s.talk) {
+    // (Play Intro: on him, at the shot's height, eased as the shot is.)
+    const k = 1 - Math.exp(-dt / SHOT.ease);
+    if (focus) {
+      s.target.x += (focus.x - s.target.x) * k;
+      s.target.z += (focus.z - s.target.z) * k;
+    }
+    s.target.y += ((s.talk.view?.lookY ?? s.target.y) - s.target.y) * k;
+    s.seen = true;
+    return;
+  }
   if (s.holding) {
     s.seen = true;
     return;
@@ -615,6 +755,9 @@ function followStep(s, dt, focus) {
   const f = 1 - Math.exp(-dt / ORBIT.follow);
   s.target.x += (want.x - s.target.x) * f;
   s.target.z += (want.z - s.target.z) * f;
+  // (Back to his middle height after the intro's shots aimed higher or lower.)
+  if (s.target.y !== FOCUS_Y)
+    s.target.y = Math.abs(FOCUS_Y - s.target.y) < 1e-6 ? FOCUS_Y : s.target.y + (FOCUS_Y - s.target.y) * f;
   if (!focus) return;
   const box = newtBox(s, focus, s.target);
   const out = box ? past(s, box, ORBIT.keepOut) : null;

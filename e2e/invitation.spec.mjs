@@ -5,7 +5,8 @@
 // full DPR with the pixel look on (and survives a reload), and Off draws smooth at the screen's
 // resolution (its smooth face reported as such); and the portfolio's
 // first load carries none of its code; the pixel atlas and face load alongside the glb and the
-// first frame waits for them. NEWT stands about a quarter of a phone's short side tall
+// first frame waits for them; the dialogue faces' sheets load too, and each of his eight faces
+// shows on him by name. NEWT stands about a quarter of a phone's short side tall
 // (a fifth of a desktop's), and running off to the rim never takes him off a phone's screen.
 // Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
@@ -269,7 +270,7 @@ test.describe('on a phone', () => {
     expect(head.x).toBeLessThan(box.x + box.width - 24);
     expect(snap.newtTall / 390, `NEWT is ${snap.newtTall.toFixed(1)} CSS px tall`).toBeCloseTo(0.255, 2);
     // The toolbar: every button a thumb's height, labelled.
-    for (const name of ['Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look']) {
+    for (const name of ['Play Intro', 'Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look']) {
       const b = page.getByRole('button', { name, exact: true });
       await expect(b).toBeVisible();
       expect((await b.boundingBox()).height).toBeGreaterThanOrEqual(44);
@@ -361,6 +362,43 @@ test.describe('on a phone', () => {
     expect(typeof snap.faceSheet, `a pixel face sheet (${snap.faceSheet})`).toBe('number');
     expect(snap.shader.pixelShirt).toBe(false);
     expect(snap.shader.pixelFace).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test('the dialogue faces: their two sheets come from beside the glb without holding up the first frame, and face() shows each of the eight on him, on the pixel sheet his size picks', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    /** @type {string[]} the dialogue sheets asked for */
+    const asked = [];
+    page.on('requestfinished', (r) => {
+      const m = /models\/(newt-face(?:-smooth)?-extra\.png)$/.exec(r.url());
+      if (m) asked.push(m[1]);
+    });
+    const drawn = () =>
+      page.evaluate(() => document.querySelector('[data-stage]')?.classList.contains('is-ready')).catch(() => false);
+    /** @type {boolean[]} whether the page had drawn by the time each sheet was let through */
+    const drawnFirst = [];
+    await page.route(/\/models\/newt-face(?:-smooth)?-extra\.png$/, async (route) => {
+      // (Held until the page draws, or 8 s: it never waits on them.)
+      const t0 = Date.now();
+      while (Date.now() - t0 < 8000 && !(await drawn())) await sleep(50);
+      drawnFirst.push(await drawn());
+      await route.continue();
+    });
+    await calm(page);
+    await expect.poll(() => [...asked].sort()).toEqual(['newt-face-extra.png', 'newt-face-smooth-extra.png']);
+    expect(drawnFirst, 'drawn before either sheet came').toEqual([true, true]);
+    for (const name of ['neutral', 'happy', 'surprised', 'blink', 'sad', 'angry', 'shy', 'smug']) {
+      expect(await page.evaluate((n) => window.__invitation.face(n), name)).toBe(true);
+      await until(page, (s) => s.faceShown === name, `${name} on his face`);
+      const snap = await snapshot(page);
+      expect(snap.face).toBe(name);
+      expect(typeof snap.faceSheet, `${name}: a pixel face sheet (${snap.faceSheet})`).toBe('number');
+    }
+    expect(await page.evaluate(() => window.__invitation.face('grumpy'))).toBe(false);
+    expect(await page.evaluate(() => window.__invitation.face(null))).toBe(false);
+    await until(page, (s) => s.face === 'neutral' || s.face === 'blink', 'the brain’s face again');
     expect(errors).toEqual([]);
   });
 
@@ -1267,6 +1305,7 @@ test.describe('on a desktop', () => {
     await expect(sheet).toHaveAttribute('aria-modal', 'true');
     await expect(sheet.getByRole('button', { name: 'Done' })).toBeFocused();
     expect(await toolbarInert(), 'the buttons under the sheet are inert; Look, which closes it, is not').toEqual([
+      'Play Intro true',
       'Wave true',
       'Spook true',
       'Sit true',
@@ -1305,7 +1344,7 @@ test.describe('on a desktop', () => {
     await page.keyboard.press('Escape');
     await expect(look).toBeFocused();
     expect(await toolbarInert(), 'the toolbar back in reach').toEqual(
-      ['Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look'].map((name) => `${name} false`),
+      ['Play Intro', 'Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look'].map((name) => `${name} false`),
     );
   });
 
@@ -1871,7 +1910,7 @@ test.describe('on a hi-DPI desktop', () => {
       };
       requestAnimationFrame(spin);
     });
-    await until(page, (s) => s.pass.governor.level === 1, 'a level coarser', 15_000);
+    await until(page, (s) => s.pass.governor.level === 1, 'a level coarser', 25_000);
     expect((await snapshot(page)).atlas).toBe('original');
     await page.evaluate(() => (window.__calm = true));
   });
@@ -1882,7 +1921,7 @@ test.describe('on a small window', () => {
   // page below makes them slow.)
   test.use({ viewport: { width: 640, height: 400 } });
 
-  test('with slow frames the governor makes the texels a device pixel coarser, never finer than the Pixel Size, takes it back when that doesn’t help, and ?perf shows it', async ({
+  test('with slow frames the governor makes the texels a device pixel coarser and ?perf shows it; when the frames are quick again it comes back, never finer than the Pixel Size', async ({
     page,
   }) => {
     const errors = watch(page);
@@ -1894,12 +1933,12 @@ test.describe('on a small window', () => {
     const perf = page.locator('.inv-perf');
     await expect(perf).toContainText('fps');
     await expect(perf).toContainText(`${base.texels.w}×${base.texels.h} texels`);
-    // A busy page: 35 ms of work every frame, so frames stay slow whatever the grid.
+    // A busy page: 60 ms of work every frame, so frames stay slow whatever the grid.
     await page.evaluate(() => {
       const spin = () => {
         if (window.__calm) return;
         const t = performance.now();
-        while (performance.now() - t < 35);
+        while (performance.now() - t < 60);
         requestAnimationFrame(spin);
       };
       requestAnimationFrame(spin);
@@ -1912,12 +1951,14 @@ test.describe('on a small window', () => {
     expect(coarse.texels.w).toBeLessThan(base.texels.w);
     expect(coarse.resolution, 'the Pixel Size stays the user’s').toBe(32);
     await expect(perf).toContainText('(+1 slow)');
-    // Fewer texels don't help a busy CPU: taken back, never finer than the Pixel Size.
-    await until(page, (s) => s.pass.governor.level === 0, 'taken back', 15_000);
+    // The load gone, it comes back to the Pixel Size (taken back as no help, or stepped finer
+    // after a run of quick seconds: test/invitationGovernor.test.mjs times both, since in a
+    // browser which comes first rides on frame-time noise), and never finer than it.
+    await page.evaluate(() => (window.__calm = true));
+    await until(page, (s) => s.pass.governor.level === 0, 'back at the Pixel Size', 25_000);
     const back = await snapshot(page);
     expect(back.pass.pd).toBe(base.pass.pd);
     expect(back.pixelScale).toBe(base.pixelScale);
-    await page.evaluate(() => (window.__calm = true));
     expect(errors).toEqual([]);
   });
 

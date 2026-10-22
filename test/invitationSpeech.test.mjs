@@ -456,3 +456,18 @@ test('lines from anything: trimmed, the empty and the non-text dropped, at most 
   assert.equal(l.mystery, undefined);
   assert.deepEqual(linesFrom(l), l, 'idempotent');
 });
+
+test('after a quiet spell he wasn’t stepped through (the intro), rest() restarts the idle clock: no idle line the moment he’s back', () => {
+  const p = page({ speech: always([20, 40]) });
+  p.wait(5, brain('idle'));
+  // (The intro: 50 s in which the page doesn't step the talk at all.)
+  p.t += 50;
+  p.talk.rest(p.t);
+  const soon = p.wait(19, brain('idle'));
+  assert.deepEqual(soon, [], `nothing in the first 19 s back (said ${soon.map((x) => x.say).join(', ')})`);
+  const after = p.wait(22, brain('idle'));
+  assert.ok(
+    after.some((x) => x.trigger === 'idle'),
+    'an idle line 20 to 40 s after he’s back',
+  );
+});

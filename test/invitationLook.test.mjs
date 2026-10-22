@@ -60,6 +60,7 @@ import { FLOOR_SIZE, createFloor, floorLook } from '../src/invitation/floor.js';
 import { ID, createRetro, decalMaterial, markId } from '../src/invitation/retro.js';
 import {
   BUTTONS,
+  INTRO_LABEL,
   parseQuery,
   SLIDE_SLOP,
   pixelLabel,
@@ -718,7 +719,9 @@ test('the retro pass warms the path it isn’t drawing (the canvas’s while the
 
 test('the toolbar and the Look sheet: every button labelled, the settings checked, no tooltips', () => {
   const bar = toolbarHtml();
-  for (const name of [...BUTTONS, 'Look']) assert.match(bar, new RegExp(`>${name}</button>`), name);
+  for (const name of [INTRO_LABEL, ...BUTTONS, 'Look']) assert.match(bar, new RegExp(`>${name}</button>`), name);
+  assert.equal(INTRO_LABEL, 'Play Intro');
+  assert.ok(bar.indexOf(INTRO_LABEL) < bar.indexOf('>Wave<'), 'Play Intro first');
   assert.match(bar, /data-button="Wander" aria-pressed="false"/);
   const sheet = sheetHtml({ pixelSize: '24', dither: false, outlines: true, style: 'soft' });
   assert.match(sheet, /role="dialog" aria-modal="true"/, 'a modal dialog: what lies behind it is out of reach');
@@ -817,8 +820,20 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
     calm: true,
     perf: false,
     govern: null,
+    settle: null,
   });
-  assert.deepEqual(parseQuery(''), { test: false, seed: null, calm: false, perf: false, govern: null });
+  assert.deepEqual(parseQuery(''), {
+    test: false,
+    seed: null,
+    calm: false,
+    perf: false,
+    govern: null,
+    settle: null,
+  });
+  // ?settle stretches the intro's reply settle (ms), for the specs only: under ?test.
+  assert.equal(parseQuery('?test&settle=1500').settle, 1500);
+  assert.equal(parseQuery('?settle=1500').settle, null);
+  assert.equal(parseQuery('?test&settle=-5').settle, null);
   // ?perf shows the frame times; ?govern turns the frame-time governor on (it's off under ?test
   // unless asked for), ?govern=off off.
   assert.equal(parseQuery('?perf').perf, true);
