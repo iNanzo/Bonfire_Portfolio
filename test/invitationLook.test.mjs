@@ -820,8 +820,20 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
     calm: true,
     perf: false,
     govern: null,
+    settle: null,
   });
-  assert.deepEqual(parseQuery(''), { test: false, seed: null, calm: false, perf: false, govern: null });
+  assert.deepEqual(parseQuery(''), {
+    test: false,
+    seed: null,
+    calm: false,
+    perf: false,
+    govern: null,
+    settle: null,
+  });
+  // ?settle stretches the intro's reply settle (ms), for the specs only: under ?test.
+  assert.equal(parseQuery('?test&settle=1500').settle, 1500);
+  assert.equal(parseQuery('?settle=1500').settle, null);
+  assert.equal(parseQuery('?test&settle=-5').settle, null);
   // ?perf shows the frame times; ?govern turns the frame-time governor on (it's off under ?test
   // unless asked for), ?govern=off off.
   assert.equal(parseQuery('?perf').perf, true);

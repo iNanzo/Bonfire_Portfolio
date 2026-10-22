@@ -724,10 +724,13 @@ test.describe('on a desktop', () => {
     page,
   }) => {
     const errors = watch(page);
-    await calm(page);
+    // (The replies' settle stretched from 450 ms to 1.5 s for this spec, ?test only: a slow CI
+    // runner's key round trips once stretched the 250 ms rhythm below past 450 ms.)
+    await calm(page, '/invitation/?test&calm&seed=3&settle=1500');
     const intro = await script(page);
     const { ask, before } = askAndBefore(intro);
     test.skip(!ask || !before, 'no box goes on to the replies');
+    expect((await snapshot(page)).replySettle, 'the stretched settle').toBe(1500);
     for (const key of ['Enter', 'Space']) {
       await open(page);
       for (let i = 0; i < 30; i++) {
