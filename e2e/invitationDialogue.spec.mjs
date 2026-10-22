@@ -724,13 +724,16 @@ test.describe('on a desktop', () => {
     page,
   }) => {
     const errors = watch(page);
-    // (The replies' settle stretched from 450 ms to 1.5 s for this spec, ?test only: a slow CI
-    // runner's key round trips once stretched the 250 ms rhythm below past 450 ms.)
-    await calm(page, '/invitation/?test&calm&seed=3&settle=1500');
+    // Keep native key events, but control the page's clock during the press rhythm: WebGL
+    // and protocol round trips on a slow runner must not turn 250 ms into a settled reply.
+    // Install before loading so every animation/timer uses the same clock.
+    await page.clock.install();
+    await calm(page);
     const intro = await script(page);
     const { ask, before } = askAndBefore(intro);
     test.skip(!ask || !before, 'no box goes on to the replies');
-    expect((await snapshot(page)).replySettle, 'the stretched settle').toBe(1500);
+    const settle = (await snapshot(page)).replySettle;
+    expect(settle, 'the production reply settle').toBe(450);
     for (const key of ['Enter', 'Space']) {
       await open(page);
       for (let i = 0; i < 30; i++) {
@@ -740,25 +743,31 @@ test.describe('on a desktop', () => {
         await until(page, (x) => x.dialogue.typed || x.dialogue.seq !== s.dialogue.seq, 'on');
       }
       await until(page, (s) => s.dialogue.id === before.id && s.dialogue.typed, 'just before the question');
+      // Pause ahead of the current time (pauseAt cannot move backwards), before any replies
+      // show. Their settle then advances only when this test advances the clock.
+      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 60_000));
       // On to the question, its line finished a frame later, and a frame after that one more.
       await page.keyboard.press(key);
-      await aFrame(page);
+      await page.clock.runFor(16);
       await page.keyboard.press(key);
       await until(page, (s) => s.dialogue.id === ask.id && Boolean(s.dialogue.choices), `${key}: its replies`);
       const log = (await snapshot(page)).dialogue.log;
-      await aFrame(page);
+      await page.clock.runFor(16);
       await page.keyboard.press(key);
-      await aFrame(page);
+      await page.clock.runFor(16);
       expect((await snapshot(page)).dialogue.log, `${key}: a frame apart, no reply`).toBe(log);
       // Pressed every 250 ms, as someone reading along does: still none.
       for (let i = 0; i < 6; i++) {
-        await page.waitForTimeout(250);
+        await page.clock.runFor(250);
         await page.keyboard.press(key);
+        const s = await snapshot(page);
+        expect([s.dialogue.id, s.dialogue.log], `${key}: press ${i + 1}, no reply`).toEqual([ask.id, log]);
       }
-      await aFrame(page);
+      await page.clock.runFor(16);
       let s = await snapshot(page);
       expect([s.dialogue.id, s.dialogue.log], `${key}: every 250 ms, no reply`).toEqual([ask.id, log]);
       // Settled: the focused reply takes the press.
+      await page.clock.runFor(settle);
       await until(page, (x) => Boolean(x.dialogue?.repliesLive), 'settled');
       await expect(page.locator('.inv-talk-choice').first()).toBeFocused();
       await page.keyboard.press(key);
@@ -770,6 +779,7 @@ test.describe('on a desktop', () => {
         await page.keyboard.press('Escape');
         await page.keyboard.press('Escape');
       }
+      await page.clock.resume();
       await until(page, (x) => !x.dialogue && x.buttonsEnabled, 'ended');
     }
     expect(errors).toEqual([]);
