@@ -29,7 +29,7 @@ import {
   INTRO_TEXT_MAX,
   INVITATION_STYLES,
 } from '../../src/contentRules.js';
-import { CLIPS, FACE_NAMES } from '../../src/invitation/clips.js';
+import { DIALOGUE_WAYS, FACE_NAMES, dialogueHolds } from '../../src/invitation/clips.js';
 import { DEFAULT_LOOK, MOTIONS } from '../../src/invitation/look.js';
 import { PRESETS } from '../../src/invitation/looks/index.js';
 import { PIXEL_SIZES } from '../../src/invitation/pixels.js';
@@ -50,13 +50,16 @@ const TRIGGER_NAMES = {
   caught: ['Caught mid-run', 'When he’s grabbed while running away.'],
   pickedUp: ['Picked up', 'When he’s picked up by the collar.'],
   shaken: ['Shaken', 'When he’s shaken hard while he’s held.'],
+  thrash: ['Thrashes', 'When he kicks and flails while he’s held, every few seconds (sooner when he’s shaken).'],
   dropped: ['Dropped', 'When he’s let go and falls.'],
   landed: ['Lands', 'When he lands after a fall.'],
   walkTo: ['Walks to a floor tap', 'When he walks to where the floor was tapped.'],
   wander: ['Wanders off', 'When he strolls off by himself (Wander on).'],
   sitDown: ['Sits down by himself', 'When he sits down after about 20 seconds alone (not the Sit button).'],
   sitting: ['Still sitting', 'While he sits, after each quiet spell.'],
-  standUp: ['Stands up', 'When he gets up from sitting.'],
+  standUp: ['Stands up', 'When he gets up from sitting, or from lying with the device.'],
+  device: ['Gets the device', 'When Give Device sits him down with the tablet in his hands.'],
+  lieDown: ['Lies down with it', 'When Give Device lies him down on his stomach with the tablet.'],
   idle: ['Idle', 'Standing about, after each quiet spell.'],
   spin: ['Camera spun round', 'When the camera is spun round more than a turn in a few seconds.'],
   zoom: ['Zoomed in close', 'When the camera is zoomed in very close to him.'],
@@ -65,9 +68,9 @@ const TRIGGER_NAMES = {
 const TALK_KINDS = [
   { label: 'Reactions', keys: ['wave', 'spook'] },
   { label: 'Running', keys: ['flee', 'caught'] },
-  { label: 'Carried', keys: ['pickedUp', 'shaken', 'dropped', 'landed'] },
+  { label: 'Carried', keys: ['pickedUp', 'shaken', 'thrash', 'dropped', 'landed'] },
   { label: 'Moving', keys: ['walkTo', 'wander'] },
-  { label: 'Sitting', keys: ['sitDown', 'sitting', 'standUp'] },
+  { label: 'Sitting', keys: ['sitDown', 'sitting', 'standUp', 'device', 'lieDown'] },
   { label: 'Passive', keys: ['idle'] },
   { label: 'Camera', keys: ['spin', 'zoom'] },
 ];
@@ -182,7 +185,7 @@ export const INVITATION_HELP = {
   [`${BOX}.text`]: `What he says, typed out letter by letter. Up to ${INTRO_TEXT_MAX} characters; past ${INTRO_TEXT_LONG} it outgrows the box on a phone.`,
   [`${BOX}.face`]: 'His face while he says it. He still blinks on Neutral.',
   [`${BOX}.animation`]:
-    'What he does as the line starts: a gesture plays once, then he talks on; a loop keeps going. None: as he was.',
+    'As the line starts: Once plays, then he talks; Loops keeps on. In Place walks on the spot; Dangling holds him up. Down, he gets up first. None: as he was.',
   [`${BOX}.camera`]:
     'The shot for this line, eased there: Close is his head and shoulders (too tight for a Cheer on a phone), Medium his whole body, Wide the usual view.',
   [`${BOX}.next`]: 'Where a tap goes after this line: another box, or the box after it in the list.',
@@ -254,9 +257,24 @@ const CAMERA_LABELS = {
   wide: 'Wide: Default View',
   keep: 'Keep: As It Was',
 };
-/** What a box has him do, in the list: none, or a clip and whether it plays once or loops. */
-const animationLabel = (v) =>
-  titleCase(v === 'none' ? 'None (Keep What He’s Doing)' : `${v} (${CLIPS[v]?.loop ? 'Loops' : 'Once'})`);
+/** The clips whose names aren't words as they are (the rest go as named). */
+const CLIP_LABELS = {
+  SitDown: 'Sit Down',
+  StandUp: 'Stand Up',
+  LieDown: 'Lie Down',
+  GetUp: 'Get Up',
+  DeviceSit: 'Sit With Device',
+  DeviceLie: 'Lie With Device',
+};
+/**
+ * What a box has him do, in the list: none, or a clip and how a box plays it (clips.js
+ * DIALOGUE_WAYS: in place, or dangling from an unseen hand; then whether it holds or plays once).
+ */
+const animationLabel = (v) => {
+  if (v === 'none') return titleCase('None (Keep What He’s Doing)');
+  const way = { inPlace: 'In Place, ', dangling: 'Dangling, ' }[DIALOGUE_WAYS[v]] ?? '';
+  return titleCase(`${CLIP_LABELS[v] ?? v} (${way}${dialogueHolds(v) ? 'Loops' : 'Once'})`);
+};
 /** The start of a line, for a list: up to 28 characters. */
 const snippet = (text) => {
   const s = Array.from(String(text ?? '').trim());
