@@ -17,7 +17,7 @@
 // from the admin's lines and settings, content.js; a line goes to the bubble) → his root: steer
 // on the ground, carry while he's held (his collar, the Neck bone's head, hung where the
 // pointer's ray meets the camera-facing plane through where he was grabbed, plus the grab
-// offset, so the point grabbed stays under the cursor; 48 CSS px above a finger, coming in as
+// offset as it eases out, so his collar comes under the cursor; 24 CSS px above a finger, coming in as
 // he's picked up, and near the top of the stage as low as keeps his head on it: carry.js
 // dragTarget), the fall once he's let go (play.js bodyStep)
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
@@ -60,7 +60,7 @@ import './dialogue.css';
 import { createBrain } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
 import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
-import { CARRY, carryFeel, dragPlane, dragTarget, gripFor } from './carry.js';
+import { CARRY, carryFeel, dragPlane, dragTarget, gripFor, offsetAt } from './carry.js';
 import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
   createOrbit,
@@ -102,7 +102,7 @@ import { bindUi, parseQuery } from './ui.js';
 const MAX_DT = 0.05;
 const BASE = import.meta.env.BASE_URL;
 /** A finger carries him this far above itself, CSS px, so it doesn't hide him (a mouse: 0). */
-const FINGER_LIFT = 48;
+const FINGER_LIFT = 24;
 /**
  * A finger carrying him near the top of the stage keeps the top of his head this far inside it,
  * CSS px: its lift gives way, then the finger's own spot (a mouse is never moved off its point).
@@ -502,12 +502,14 @@ function start(s) {
     );
   }
   /**
-   * Where the point he's held by shows, client px: his collar as posed less the grab offset.
+   * Where the point he's held by shows, client px: his collar as posed less the grab offset as
+   * it is now (eased out: his collar, once the grab is in).
    * @param {import('./carry.js').Grip} g
    */
   function grabbedAt(g) {
     const p = /** @type {NonNullable<typeof character>} */ (character).bonePos(COLLAR, { x: 0, y: 0, z: 0 });
-    const at = new Vector3(p.x - g.offset.x, p.y - g.offset.y, p.z - g.offset.z).project(s.camera);
+    const o = offsetAt(g, t);
+    const at = new Vector3(p.x - o.x, p.y - o.y, p.z - o.z).project(s.camera);
     const r = canvas.getBoundingClientRect();
     return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
   }
@@ -975,7 +977,8 @@ function start(s) {
       // (A finger's lift over itself, coming in as he's picked up. Near the top of the stage it
       // gives way, then the finger's own spot, so the top of his head stays on the screen: lifted,
       // he hangs nearer the camera and his head shows further over the point grabbed, so that's
-      // followed from the last frame's pose. A mouse's point stays under the cursor.)
+      // followed from the last frame's pose. A mouse's cursor has his collar under it, once the
+      // grab offset has eased out.)
       let y = press.y;
       if (pressKind === 'touch') {
         y -= FINGER_LIFT * Math.min(1, (t - grip.t0) / CARRY.liftIn);
@@ -983,7 +986,9 @@ function start(s) {
         headAbove += (grabbedAt(grip).y - (head.y - head.r) - headAbove) * Math.min(1, dt / HEAD_FOLLOW);
         y = Math.max(y, stageEl.getBoundingClientRect().top + HEAD_ROOM + headAbove);
       }
-      target = dragTarget(grip, s.ray(press.x, y), hangY);
+      target = dragTarget(grip, s.ray(press.x, y), hangY, t);
+      // (The plane he's dragged on: at the play area's edge he stops along it, carry.js holdStep.)
+      if (body.carry) body.carry.plane = grip.plane;
     } else grip = null;
     bodyStep(body, {
       state: o.state,
@@ -1231,7 +1236,7 @@ function start(s) {
       floorAt,
       /**
        * While he's held: where the point he was grabbed by shows now, client px (his collar as
-       * posed less the grab offset); null otherwise.
+       * posed less the grab offset as it eases out); null otherwise.
        */
       grabbed() {
         if (!grip || !character || body.mode !== 'held') return null;

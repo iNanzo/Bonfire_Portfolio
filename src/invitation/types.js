@@ -13,7 +13,8 @@
 //   5. character.update(dt): restore the head's saved animation pose → mixer.update → save it
 //   6. root.updateMatrixWorld → carry's tilt on the root → read the collar → move the root by
 //      anchor − collar → root.updateMatrixWorld (only while held; the anchor is where the
-//      cursor's ray meets the camera-facing plane he was grabbed on, plus the grab offset)
+//      cursor's ray meets the camera-facing plane he was grabbed on, plus the grab offset as it
+//      eases out: carry.js offsetAt)
 //   7. lookStep → character.applyLook (on top of the saved pose: it never adds up; his chest
 //      joins in for big looks while he's on his feet, lookAt.js chestShare and torsoStep)
 //   8. faceStep → character.setFace; bubble.update (while a line is up): his head on screen
@@ -128,7 +129,8 @@
  * @property {number} t0  when he was grabbed
  * @property {number} t  the last step
  * @property {XYZ} anchor  where the collar goes this frame (world): the pointer's spot on the
- *   plane he's dragged on plus the grab offset (carry.js dragTarget), inside the play area
+ *   plane he's dragged on plus the grab offset as it eases out (carry.js dragTarget), inside the
+ *   play area along the plane's line across the floor
  * @property {XYZ} drive  a critically damped follow of the anchor: the swing and the feel read it
  * @property {XYZ} vel  the drive's velocity
  * @property {{x: number, z: number}} tilt  the root's swing in radians: root.rotation.x and .z (positive z puts his feet toward +x, positive x toward −z)
@@ -138,6 +140,8 @@
  * @property {number} shake  the drive's acceleration, smoothed, world units/s²
  * @property {XZ|null} push  while the pointer's spot is out past the play area's edge: the way
  *   it pushes him, out through the edge (unit length; let go then, he's tossed with nothing across)
+ * @property {{point: XYZ, normal: XYZ}|null} [plane]  the plane he's dragged on (main.js keeps it
+ *   here): at the play area's edge he stops along its line
  */
 
 /** @typedef {{yaw: number, pitch: number}} Aim  radians from his body's facing: yaw + turns toward +x when he faces +z (like root.rotation.y), pitch + looks up */
