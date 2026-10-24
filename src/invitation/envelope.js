@@ -5,7 +5,8 @@
 // skipped, as it drops away), how a drag on it reads (envelopeGesture: a swipe up opens it, a
 // swipe down skips, far enough or a fast flick, and mostly up or down), the keys (envelopeKey),
 // how it follows a finger with some give while the flap lifts (dragPose), the live hint while
-// dragging (dragHint) and the whole opening as functions of time (pose). Reduced motion: no bob
+// dragging (dragHint), the hint's words for a touch screen or a mouse (hintFor) and the whole
+// opening as functions of time (pose). Reduced motion: no bob
 // or sway, the flap snaps open, and a short crossfade in place of the push and the dither.
 
 /** @typedef {import('./types.js').EnvelopeState} EnvelopeState */
@@ -15,11 +16,18 @@ export const ENVELOPE_TEXT = {
   layer: 'Invitation',
   open: 'Open the Invitation',
   hint: 'Click or swipe up to open',
+  hintTouch: 'Tap or swipe up to open',
   hintSkip: 'Swipe down to skip',
   dragOpen: 'Open ↑',
   dragSkip: 'Skip ↓',
   skip: 'Skip Intro',
 };
+
+/**
+ * The hint to open it: a tap on a touch screen, a click with a mouse.
+ * @param {boolean} touch  a touch screen (no hover)
+ */
+export const hintFor = (touch) => (touch ? ENVELOPE_TEXT.hintTouch : ENVELOPE_TEXT.hint);
 
 /**
  * How a drag reads, CSS px and ms: up or down by `min` px or `share` of the screen's height,

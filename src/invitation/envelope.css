@@ -2,7 +2,8 @@
    (over the HUD and the intro's layer too), its canvas drawn at low resolution and scaled up
    pixelated; the hint along the bottom in Pixelify Sans, gold on the dark teal with a deep red
    drop, shown on hover, keyboard focus or a still touch screen, and live while dragging; Skip
-   Intro at the top right. It takes every press while it's up; once it's leaving, none. */
+   Intro at the top right. Focus shows its ring only once a key's been pressed (is-keyboard),
+   never at boot. It takes every press while it's up; once it's leaving, none. */
 
 .inv-envelope {
   position: fixed;
@@ -33,7 +34,7 @@
   outline: none;
   -webkit-tap-highlight-color: transparent;
 }
-.inv-envelope-hit:focus-visible {
+.inv-envelope.is-keyboard .inv-envelope-hit:focus {
   box-shadow: inset 0 0 0 3px var(--inv-focus, #4f83d9);
 }
 

@@ -1,11 +1,11 @@
 // The envelope that opens /invitation/ (src/invitation/envelope.js, envelopeScene.js), in a real
 // browser on the production build, on a desktop (1280×800) and a phone (390×844, touch). It's
-// the front door and the loading screen: it shows over the toy with focus on it and takes every
-// press (a drag on it never turns the camera); a click, Enter or a swipe up opens it (the seal
+// the front door and the loading screen: it shows over the toy with focus on it, but no ring
+// until a key is pressed, and takes every press (a drag on it never turns the camera); a click, Enter or a swipe up opens it (the seal
 // cracks, the flap lifts, it fades) and the intro starts by itself at its first box with no
 // toolbar button pressed; Escape, a swipe down or Skip Intro skips it (no intro, the toolbar back,
 // focus on it). Opened before newt.glb is in, it waits, then fades once he is. Reduced motion:
-// no bob, the flap open at once, a short crossfade. Skip Intro also ends the intro at once, with
+// no bob, the flap open at once, a short crossfade. The touch hint says Tap, the mouse's Click. Skip Intro also ends the intro at once, with
 // no question, once it's under way. ?test skips the envelope unless &envelope asks for it, so
 // every page here asks. Every wait is on a state (?test's snapshot), never on a duration.
 import { test, expect } from '@playwright/test';
@@ -127,6 +127,17 @@ test.describe('on a desktop', () => {
     expect((await snapshot(page)).toolbarTalking).toBe(true);
   });
 
+  test('focused at boot it shows no ring; once Tab is pressed, the ring follows focus', async ({ page }) => {
+    await envelopeUp(page);
+    await expect(envelope(page)).toBeFocused();
+    await expect(envelope(page)).toHaveCSS('box-shadow', 'none');
+    await page.keyboard.press('Tab');
+    await expect(skipIntro(page)).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(envelope(page)).toBeFocused();
+    await expect(envelope(page)).not.toHaveCSS('box-shadow', 'none');
+  });
+
   test('Enter opens it', async ({ page }) => {
     await envelopeUp(page);
     await page.keyboard.press('Enter');
@@ -227,6 +238,7 @@ test.describe('on a phone', () => {
     await swipe(page, -40, 4);
     await until(page, (s) => s.envelope === 'floating', 'still floating');
     await expect(page.locator('.inv-envelope-hint')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.inv-envelope-hint')).toContainText('Tap or swipe up to open');
     await expect(page.locator('.inv-envelope-hint')).toContainText('Swipe down to skip');
   });
 

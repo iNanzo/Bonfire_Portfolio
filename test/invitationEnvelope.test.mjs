@@ -20,6 +20,7 @@ import {
   dragPose,
   envelopeGesture,
   envelopeKey,
+  hintFor,
 } from '../src/invitation/envelope.js';
 
 test('a swipe up opens it and a swipe down skips: |dy| past max(48 px, 12% of the height), mostly up or down', () => {
@@ -220,10 +221,16 @@ test('while dragging the hint says which way it goes; under the tap slop it says
 test('its words: labels in Title Case, hints in sentences, ≤ 160 characters', () => {
   assert.equal(ENVELOPE_TEXT.skip, 'Skip Intro');
   assert.equal(ENVELOPE_TEXT.hint, 'Click or swipe up to open');
+  assert.equal(ENVELOPE_TEXT.hintTouch, 'Tap or swipe up to open');
   assert.equal(ENVELOPE_TEXT.hintSkip, 'Swipe down to skip');
   assert.equal(ENVELOPE_TEXT.dragOpen, 'Open ↑');
   assert.equal(ENVELOPE_TEXT.dragSkip, 'Skip ↓');
   for (const [k, v] of Object.entries(ENVELOPE_TEXT)) assert.ok(v.length > 0 && v.length <= 160, k);
   assert.match(ENVELOPE_TEXT.open, /^[A-Z][a-z]*( (the|[A-Z][a-z]*))*$/, 'the button’s name, Title Case');
   assert.ok(TIMES.idleHint === 1.2, 'the touch hint after 1.2 s idle');
+});
+
+test('the hint says Tap on a touch screen and Click with a mouse', () => {
+  assert.equal(hintFor(true), 'Tap or swipe up to open');
+  assert.equal(hintFor(false), 'Click or swipe up to open');
 });

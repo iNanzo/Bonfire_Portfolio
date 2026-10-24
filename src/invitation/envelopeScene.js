@@ -13,8 +13,9 @@
 // Input is all its own while it's up: a tap or click, Enter, Space or ArrowUp opens it; Escape or
 // ArrowDown skips; a drag follows the finger with some give (the flap lifting as it goes up) and
 // opens or skips on release (envelopeGesture), else springs back; the wheel opens or skips once
-// it adds up; Skip Intro skips. The hint ("Click or swipe up to open" / "Swipe down to skip")
-// shows on hover, keyboard focus, or after a while with no input on a touch screen, and reads
+// it adds up; Skip Intro skips. It takes focus at boot with no ring: the ring shows once a key
+// is pressed. The hint ("Click or swipe up to open", "Tap ..." on a touch screen, / "Swipe down
+// to skip") shows on hover, keyboard focus, or after a while with no input on a touch screen, and reads
 // "Open ↑" / "Skip ↓" while dragging. Once it's done it disposes its renderer, loses its context
 // and leaves the page.
 import * as THREE from 'three';
@@ -28,6 +29,7 @@ import {
   dragPose,
   envelopeGesture,
   envelopeKey,
+  hintFor,
 } from './envelope.js';
 
 /** Texels along the screen's shorter side (it's scaled up pixelated). */
@@ -379,6 +381,7 @@ function buildPetals(u) {
 export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, onDone }) {
   const doc = root.ownerDocument;
   const win = doc.defaultView ?? window;
+  const touchScreen = () => win.matchMedia?.('(hover: none)').matches ?? false;
   const layer = doc.createElement('div');
   layer.className = 'inv-envelope';
   layer.setAttribute('role', 'dialog');
@@ -387,11 +390,12 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   const t = ENVELOPE_TEXT;
   layer.innerHTML = `<canvas class="inv-envelope-canvas" aria-hidden="true"></canvas>
   <div class="inv-envelope-hit" data-envelope role="button" tabindex="0" aria-label="${t.open}" aria-describedby="inv-envelope-hint"></div>
-  <p class="inv-envelope-hint" id="inv-envelope-hint"><span class="inv-envelope-hint-open">${t.hint}</span> <span class="inv-envelope-hint-skip">${t.hintSkip}</span></p>
+  <p class="inv-envelope-hint" id="inv-envelope-hint"><span class="inv-envelope-hint-open">${hintFor(touchScreen())}</span> <span class="inv-envelope-hint-skip">${t.hintSkip}</span></p>
   <p class="inv-envelope-live" aria-hidden="true"></p>
   <button type="button" class="inv-btn inv-envelope-skip" data-intro-skip>${t.skip}</button>`;
   const canvas = /** @type {HTMLCanvasElement} */ (layer.querySelector('canvas'));
   const hit = /** @type {HTMLElement} */ (layer.querySelector('[data-envelope]'));
+  const hintOpen = /** @type {HTMLElement} */ (layer.querySelector('.inv-envelope-hint-open'));
   const live = /** @type {HTMLElement} */ (layer.querySelector('.inv-envelope-live'));
   const skipBtn = /** @type {HTMLButtonElement} */ (layer.querySelector('[data-intro-skip]'));
 
@@ -492,6 +496,11 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     doc.removeEventListener('keydown', onKey, true);
     onUncover?.(how);
   }
+  /** A key was pressed: from now on keyboard focus shows its ring. */
+  function byKeyboard() {
+    keyboard = true;
+    layer.classList.add('is-keyboard');
+  }
 
   hit.addEventListener('pointerdown', (e) => {
     lastInput = clock();
@@ -551,7 +560,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     lastInput = clock();
     if (e.key === 'Tab') {
       // (Round the two: the envelope and Skip Intro.)
-      keyboard = true;
+      byKeyboard();
       e.preventDefault();
       (doc.activeElement === hit ? skipBtn : hit).focus();
       return;
@@ -562,12 +571,14 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     if (doc.activeElement === skipBtn && (e.key === 'Enter' || e.key === ' ')) return;
     e.preventDefault();
     e.stopPropagation();
-    keyboard = true;
+    byKeyboard();
     if (what === 'open') open();
     else skip();
   }
   doc.addEventListener('keydown', onKey, true);
-  hit.focus({ preventScroll: true });
+  // (Focus at boot isn't the visitor's: no ring until a key is pressed. focusVisible is newer
+  // than the DOM's types.)
+  hit.focus(/** @type {FocusOptions} */ ({ preventScroll: true, focusVisible: false }));
 
   // --- Each frame.
   let raf = 0;
@@ -591,7 +602,9 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     const way = drag ? dragHint(drag.dy) : null;
     live.textContent = way === 'open' ? ENVELOPE_TEXT.dragOpen : way === 'skip' ? ENVELOPE_TEXT.dragSkip : '';
     const idle = now - lastInput >= TIMES.idleHint;
-    const touchy = win.matchMedia?.('(hover: none)').matches ?? false;
+    const touchy = touchScreen();
+    const words = hintFor(touchy);
+    if (hintOpen.textContent !== words) hintOpen.textContent = words;
     const focused = doc.activeElement === hit;
     layer.classList.toggle('is-dragging', Boolean(way));
     layer.classList.toggle(
