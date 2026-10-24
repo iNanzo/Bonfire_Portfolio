@@ -4,9 +4,10 @@
 // edge he stops (the cursor carries on, he stays put, never sliding toward or away from the
 // camera); his limbs swing against a quick drag and settle; held, he keeps the way he faced
 // when grabbed, glances up now and then, and lands facing the same way; he thrashes now and then
-// (an angry kick and flail, then back to hanging). Give Device's three presses sit him down with the
-// tablet (visible in his hands), lie him on his stomach with it, each the way he was facing (no
-// turn to the camera), and get him up; the button's label (the brain's deviceLabel) goes Give Device, Lie Down, Get
+// (an angry kick and flail, then back to hanging). Give Device's three presses sit him down
+// with the tablet (visible in his hands), lie him on his stomach with it (in his hands as he
+// lies down), each the way he was facing (no turn to the camera), and get him up (it put away as
+// he starts to); the button's label (the brain's deviceLabel) goes Give Device, Lie Down, Get
 // Up. Every wait is on a state, never a duration (CI's software WebGL runs slower than real
 // time).
 import { test, expect } from '@playwright/test';
@@ -182,12 +183,14 @@ test.describe('on a phone', () => {
     expect(gap(at, body), 'by his body').toBeLessThan(head.r * 3);
     await kept('sitting');
     await press();
+    // (In his hands as he lies down, too.)
+    await until(page, (s) => s.state === 'lieDown' && s.motion.device.shown, 'lying down with it', 30_000);
     await until(page, (s) => s.state === 'deviceLie' && s.motion.device.shown, 'lying with it', 30_000);
     await kept('lying');
     expect(await device()).toMatchObject({ state: 'lie', label: 'Get Up', shown: true });
     await expect(button).toHaveAccessibleName('Get Up');
     await press();
-    await until(page, (s) => s.state === 'getUp', 'getting up');
+    await until(page, (s) => s.state === 'getUp' && !s.motion.device.shown, 'getting up, it put away');
     await until(page, (s) => s.state === 'idle', 'up', 30_000);
     expect(await device()).toMatchObject({ state: null, label: 'Give Device', shown: false });
     await expect(button).toHaveAccessibleName('Give Device');

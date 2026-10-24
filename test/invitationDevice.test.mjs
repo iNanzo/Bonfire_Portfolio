@@ -5,8 +5,8 @@
 // outlines it. Each frame it sits at the midpoint of his palms (the ForeArm bones plus
 // clips.js DEVICE.palm along each forearm) less the clip's lift along its screen's normal, its
 // width along the line from palm to palm, its screen tilted from straight up toward his face by
-// the clips' tilt (DEVICE's, mixed by their weights), and it shows while DeviceSit and DeviceLie
-// weigh 0.5 or more between them.
+// the clips' tilt (DEVICE's, mixed by their weights), and it shows while DeviceSit, LieDown and
+// DeviceLie weigh 0.5 or more between them, until StandUp or GetUp begins.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -99,9 +99,16 @@ test('deviceFrame: at his palms’ midpoint less the lift along its screen’s n
   }
 });
 
-test('it shows while DeviceSit and DeviceLie weigh 0.5 or more, at the tilt of the mix (clips.js DEVICE’s: sitting tipped toward him, lying near flat)', () => {
+test('it shows while DeviceSit, LieDown and DeviceLie weigh 0.5 or more (in his hands as he lies down), gone as soon as he starts to get up, at the tilt of the mix (clips.js DEVICE’s: sitting tipped toward him, lying near flat)', () => {
   const w = (o) => (k) => o[k] ?? 0;
   assert.equal(deviceShown(w({ DeviceSit: 0.3, DeviceLie: 0.25 })), true);
+  // Lying down with it: in his hands all the way.
+  assert.equal(deviceShown(w({ DeviceSit: 0.6, LieDown: 0.4 })), true);
+  assert.equal(deviceShown(w({ LieDown: 1 })), true);
+  assert.equal(deviceShown(w({ LieDown: 0.3, DeviceLie: 0.7 })), true);
+  // Getting up: gone from StandUp's or GetUp's first frame.
+  assert.equal(deviceShown(w({ DeviceSit: 0.98, StandUp: 0.02 })), false);
+  assert.equal(deviceShown(w({ DeviceLie: 0.99, GetUp: 0.01 })), false);
   assert.equal(deviceShown(w({ DeviceSit: 0.49, Sit: 0.51 })), false);
   assert.equal(deviceShown(w({ Idle: 1 })), false);
   close(DEVICE_TILT.DeviceSit, DEVICE.clips.DeviceSit.tilt * DEG);

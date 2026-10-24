@@ -257,8 +257,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     times the stud's width, toon and marked as his, each swinging on the same spring about
     straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
     bezel and an unlit 16×12 game, nearest-filtered, placed at his palms from clips.js `DEVICE`,
-    shown while DeviceSit and DeviceLie weigh half or more; `accessories` swings the earrings and
-    places the tablet after the look),
+    shown while DeviceSit, LieDown and DeviceLie weigh half or more (in his hands as he lies
+    down) until StandUp or GetUp has any weight (put away as he starts to get up); `accessories`
+    swings the earrings and places the tablet after the look),
     `retro.js` (the pixel pass; `warm` compiles the path not showing once NEWT is in, so the
     first switch to Off or back doesn't stall; `subjectBoxes`: outside the area round NEWT, his
     shadow and the decals every texel is the paper, so the canvas is only cleared there and both
