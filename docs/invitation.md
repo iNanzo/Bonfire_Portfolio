@@ -401,8 +401,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `lookFront`: no turn to the camera) on the Held clip's drooped head, the sad face (surprised
     while he's shaken hard). Every `lookUpMin`–`lookUpMax` s (3–6) he glances up at you for
     `lookUpForMin`–`lookUpForMax` s (0.8–1.2): `BrainOut.look.up` eases 0 → 1 → 0 over
-    `lookUpEase` (0.25 s) each way, the look's weight with it up to `lookUpWeight` (0.85), its
-    aim coming round and up to the viewer; never while he thrashes (one due meanwhile comes
+    `lookUpEase` (0.25 s) each way, the look's weight with it up to `lookUpWeight` (1), its
+    aim coming round and up to the viewer and `lookUpLift` (0.5 rad) past it, since the look goes
+    on over the Held clip's own droop of about 25°; never while he thrashes (one due meanwhile comes
     `lookUpRest`, 1 s, after the Thrash). Thrash comes once every
     `thrashMin`–`thrashMax` s (3–7; within `thrashShaken` of a hard shake, never before he's
     hung `thrashRest`, 1.5 s), then Held again on its own clock. Held, falling and landing he

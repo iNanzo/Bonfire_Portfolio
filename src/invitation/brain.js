@@ -135,14 +135,16 @@ export const TUNE = {
    * Held, every lookUpMin–lookUpMax s (since he was grabbed or his last glance up; one that came
    * due while he thrashed, lookUpRest s after the Thrash) he glances up at you for lookUpForMin–lookUpForMax s: BrainOut.look.up eases from 0
    * to 1 over lookUpEase s and back down, his look's weight with it up to lookUpWeight (the page
-   * aims it toward the viewer as it comes up).
+   * aims it toward the viewer as it comes up, lookUpLift radians higher at the top: the look goes
+   * on over the Held clip's own droop, about 25° of it, so without it he'd still look down).
    */
   lookUpMin: 3,
   lookUpMax: 6,
   lookUpForMin: 0.8,
   lookUpForMax: 1.2,
   lookUpEase: 0.25,
-  lookUpWeight: 0.85,
+  lookUpWeight: 1,
+  lookUpLift: 0.5,
   lookUpRest: 1,
   /**
    * Held, he thrashes every thrashMin–thrashMax s, and within thrashShaken s of a hard shake, but
@@ -907,7 +909,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     // now and then up at you: `up`.)
     if (st === 'held') {
       const up = lookUpK();
-      return { mode: 'forward', weight: T.heldLook + (T.lookUpWeight - T.heldLook) * up, pitch: T.heldPitch, up };
+      const weight = T.heldLook + (T.lookUpWeight - T.heldLook) * up;
+      return { mode: 'forward', weight, pitch: T.heldPitch, up, lift: T.lookUpLift };
     }
     // (With the tablet: at it, as the clips look.)
     if (st === 'deviceSit' || LYING.has(st)) return { mode: 'forward', weight: 0 };

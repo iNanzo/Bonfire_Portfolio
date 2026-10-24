@@ -280,6 +280,16 @@ test('ahead, held: his own front with his head hung (no turn to the camera), com
   const half = lookFront(ahead, { mode: 'forward', weight: 0.5, pitch: -0.5, up: 0.5 });
   close(half.yaw, 0.3);
   close(half.pitch, -0.05);
+  // With a lift (making up for the clip's own droop, which the look is applied over): that much higher at the top.
+  const lifted = lookFront(ahead, { mode: 'forward', weight: 1, pitch: -0.5, up: 1, lift: 0.5 });
+  close(lifted.yaw, 0.6);
+  close(lifted.pitch, 0.9);
+  close(
+    lookFront(ahead, { mode: 'forward', weight: 0.15, pitch: -0.5, up: 0, lift: 0.5 }).pitch,
+    -0.5,
+    1e-9,
+    'none hung:',
+  );
 });
 
 // ---- the look over the whole screen ---------------------------------------------------------

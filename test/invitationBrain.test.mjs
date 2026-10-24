@@ -527,7 +527,7 @@ test('held, his head hangs (a light look aimed down) and every 3–6 s he glance
     let out = s.grab();
     assert.deepEqual(
       out.look,
-      { mode: 'forward', weight: TUNE.heldLook, pitch: TUNE.heldPitch, up: 0 },
+      { mode: 'forward', weight: TUNE.heldLook, pitch: TUNE.heldPitch, up: 0, lift: TUNE.lookUpLift },
       'hanging his head',
     );
     let last = s.w.t;

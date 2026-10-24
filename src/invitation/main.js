@@ -1268,7 +1268,7 @@ function start(s) {
    * @param {ReturnType<typeof pointerNow>} ptr
    * @param {{position: import('./types.js').XYZ}} pose
    * @param {number} dt
-   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null, pitch?: number, up?: number}} want
+   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null, pitch?: number, up?: number, lift?: number}} want
    *   at: who he runs from ('back'); pitch: 'ahead' at this pitch (held: his head hangs); up:
    *   held, his glance up toward the viewer (play.js lookFront)
    * @param {import('./clips.js').FaceName} face
