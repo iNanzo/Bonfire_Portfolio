@@ -624,11 +624,18 @@ test('surface ids: a marked material writes its id into alpha last; what’s dra
   const shader = { uniforms: {}, vertexShader: '', fragmentShader: THREE.ShaderLib.toon.fragmentShader };
   m.onBeforeCompile(shader, null);
   assert.equal(shader.uniforms.uSurfaceId.value, ID.floor / 16);
-  assert.match(shader.fragmentShader, /uniform float uSurfaceId;\s*uniform float uIdOn;\s*void main\(\) \{/);
-  // (After every include that writes gl_FragColor: three's toon shader still ends that way.)
+  assert.match(shader.fragmentShader, /uniform float uSurfaceId;\s*uniform float uIdOn;/);
+  // (After every include that writes gl_FragColor: three's toon shader still ends that way. Only
+  // the hover's tint at Pixel Size Off follows it, and that touches the colour, never the alpha.)
   assert.match(
     shader.fragmentShader,
-    /#include <dithering_fragment>\s*gl_FragColor\.a = mix\(1\.0, uSurfaceId, uIdOn\);\s*\}\s*$/,
+    /#include <dithering_fragment>\s*gl_FragColor\.a = mix\(1\.0, uSurfaceId, uIdOn\);/,
+  );
+  const after = shader.fragmentShader.slice(shader.fragmentShader.indexOf('gl_FragColor.a = mix('));
+  assert.equal([...after.matchAll(/gl_FragColor\.a/g)].length, 1, 'nothing writes the alpha after it');
+  assert.match(
+    after,
+    /^gl_FragColor\.a = [^\n]*\n\tif \(uIdOn < 0\.5 && uHover > 0\.0[^\n]*\n\t\tgl_FragColor\.rgb = [^\n]*\n\}\s*$/,
   );
   assert.equal(m.customProgramCacheKey(), 'invitation-surface-id');
   const decal = decalMaterial({ opacity: 0.2 });

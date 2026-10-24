@@ -44,6 +44,14 @@
 // the canvas is only cleared to it, and both the colour pass and the post pass draw inside that
 // area alone (a scissor). The same picture, for a share of the texels: at Native on a phone
 // three million texels drawn twice became the few hundred thousand round NEWT.
+//
+// The pointer on him (setHover, 0..1 as main.js eases it): a Bayer-dithered rim in HOVER_INK on
+// his outermost texels that fills inward as it grows, and a halo a texel or two outside him (in
+// the ring box only: it searches 12 neighbours a texel, and only while hovering). His grab
+// (setBurst): a dither ring at the grip that grows out and thins away, an ALU test alone. Both
+// mark their paper texels as a line, so they're quantized and dithered as his lines are. At
+// Pixel Size Off the post pass is skipped, so his own materials take the hover instead: a Bayer
+// tint on gl_FragCoord (markId), with no halo and no ring.
 import * as THREE from 'three';
 import { floorLook } from './floor.js';
 import { BAYER4 } from './pixels.js';
@@ -64,6 +72,10 @@ export const MAX_SOFT = 3;
 const ID_ON = { value: 1 };
 /** How many mip levels coarser his textures are sampled (one uniform every marked material shares). */
 const MAP_BIAS = { value: 0 };
+/** The pointer on NEWT, 0..1 (setHover; one uniform every marked material shares: the tint at Off). */
+const HOVER = { value: 0 };
+/** The hover's and the grab ring's ink (sRGB): a warm gold that reads on him and on the paper. */
+export const HOVER_INK = 0xe0a53a;
 /** A decal's map alpha under this is outside its shape (in the colour target). */
 export const DECAL_CUT = 0.3;
 /** A box that holds every texel (subjectBoxes' answer when it can't bound him). */
@@ -151,6 +163,16 @@ export function subjectBoxes({ center, radius, light, camera, w, h, extra = [] }
  *   fine resolution; mipBias without it)
  */
 
+/** The Bayer threshold of a device pixel, in 2×2 blocks (the hover's tint at Pixel Size Off). */
+const HOVER_BAYER = `float hoverBayer(vec2 f) {
+  const float B[16] = float[16](${BAYER4.map((v) => v.toFixed(5)).join(', ')});
+  ivec2 i = ivec2(mod(floor(f / 2.0), 4.0));
+  return B[i.y * 4 + i.x];
+}`;
+/** At Pixel Size Off (no ids written) NEWT's own texels take the hover as a dithered tint. */
+const HOVER_TINT = `\tif (uIdOn < 0.5 && uHover > 0.0 && abs(uSurfaceId * ${ID_SCALE.toFixed(1)} - ${ID.newt.toFixed(1)}) < 0.5 && hoverBayer(gl_FragCoord.xy) < uHover * 0.5)
+\t\tgl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(${[16, 8, 0].map((sh) => (((HOVER_INK >> sh) & 255) / 255).toFixed(4)).join(', ')}), 0.55);`;
+
 /**
  * Make a material write its surface id into the colour's alpha (for the retro pass's lines),
  * and sample its map MAP_BIAS mip levels coarser (0 unless the pass sets it), or by its own
@@ -181,10 +203,11 @@ export function markId(material, id, opts = {}) {
     shader.uniforms.uSurfaceId = { value: id / ID_SCALE };
     shader.uniforms.uIdOn = ID_ON;
     shader.uniforms.uMapBias = bias;
+    shader.uniforms.uHover = HOVER;
     shader.fragmentShader = shader.fragmentShader
       .replace(
         'void main() {',
-        'uniform float uMapBias;\nuniform float uSurfaceId;\nuniform float uIdOn;\nvoid main() {',
+        `uniform float uMapBias;\nuniform float uSurfaceId;\nuniform float uIdOn;\nuniform float uHover;\n${HOVER_BAYER}\nvoid main() {`,
       )
       .replace(
         '#include <map_fragment>',
@@ -192,7 +215,7 @@ export function markId(material, id, opts = {}) {
       )
       .replace(
         '#include <dithering_fragment>',
-        '#include <dithering_fragment>\n\tgl_FragColor.a = mix(1.0, uSurfaceId, uIdOn);',
+        `#include <dithering_fragment>\n\tgl_FragColor.a = mix(1.0, uSurfaceId, uIdOn);\n${HOVER_TINT}`,
       );
   };
   // (One program for every id: the id is a uniform. Without a key three would share the
@@ -346,6 +369,8 @@ export const POST_SHADER = /* glsl */ `
   #define FLOOR ${ID.floor.toFixed(1)}
   #define SPAN ${SHADE_SPAN.toFixed(2)}
   #define MAX_SOFT ${MAX_SOFT}
+  #define HOVER_FILL 0.3
+  #define BURST_WIDTH 1.5
   uniform sampler2D tColor;
   uniform sampler2D tDepth;
   uniform vec2 uRes;
@@ -373,8 +398,17 @@ export const POST_SHADER = /* glsl */ `
   uniform float uShadeDither;
   uniform vec4 uRingBox;
   uniform vec4 uShadeBox;
+  uniform float uHover;
+  uniform vec3 uHoverInk;
+  uniform vec4 uBurst;
 
   const vec2 STEPS[4] = vec2[4](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0));
+  // The hover halo's neighbours: the four beside, the four corners, then two out along each axis.
+  const vec2 HALO[12] = vec2[12](
+    vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0),
+    vec2(1.0, 1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0), vec2(-1.0, -1.0),
+    vec2(2.0, 0.0), vec2(-2.0, 0.0), vec2(0.0, 2.0), vec2(0.0, -2.0)
+  );
 
   vec4 at(vec2 p) { return texture2D(tColor, p / uRes); }
   bool inside(vec2 p) { return p.x >= 0.0 && p.y >= 0.0 && p.x < uRes.x && p.y < uRes.y; }
@@ -427,6 +461,17 @@ export const POST_SHADER = /* glsl */ `
     }
     return false;
   }
+  // Whether one of NEWT's texels is on his silhouette (a neighbour isn't him): the hover's rim.
+  bool rimOf(vec2 p) {
+    for (int k = 0; k < 4; k++)
+      if (inside(p + STEPS[k]) && !isNewt(p + STEPS[k])) return true;
+    return false;
+  }
+  // Whether the grab ring covers p: within BURST_WIDTH of its circle, dithered by its strength.
+  bool burstAt(vec2 p) {
+    if (uBurst.w <= 0.0) return false;
+    return abs(length(p - uBurst.xy) - uBurst.z) < BURST_WIDTH && bayer(p) < uBurst.w;
+  }
   // The floor's shadow coverage around p, averaged over the floor texels of a disc uShadeSoft
   // texels in radius (its own coverage when that's 0).
   float softShade(vec2 p, float own) {
@@ -454,6 +499,10 @@ export const POST_SHADER = /* glsl */ `
     if (abs(idOf(src) - NEWT) < 0.5) {
       vec3 col = grade(src.rgb);
       if (uOutline > 0.5 && edgeOnNewt(p)) col *= uInk * (1.0 - uDarken);
+      // (The pointer on him: his rim first, filling inward as it grows; the grab ring over him.)
+      bool edge = uHover > 0.0 && rimOf(p);
+      if (uHover > 0.0 && bayer(p) < uHover * (edge ? 1.0 : HOVER_FILL)) col = mix(col, uHoverInk, 0.6);
+      if (burstAt(p)) col = uHoverInk;
       gl_FragColor = vec4(quantize(col, d * uDither), 1.0);
       return;
     }
@@ -480,6 +529,23 @@ export const POST_SHADER = /* glsl */ `
         dd = d * uDither;
         break;
       }
+    // (The hover's halo a texel or two outside him (past his outside line, when there's one),
+    // and the grab ring: in the ink, marked as a line.)
+    if (uHover > 0.0 && !line && inBox(p, uRingBox))
+      for (int k = 0; k < 12; k++) {
+        if (!isNewt(p + HALO[k])) continue;
+        if (bayer(p) < uHover * (k < 4 ? 1.0 : 0.6)) {
+          col = uHoverInk;
+          line = true;
+          dd = d * uDither;
+        }
+        break;
+      }
+    if (burstAt(p)) {
+      col = uHoverInk;
+      line = true;
+      dd = d * uDither;
+    }
     // (Untouched paper stays exactly the paper.)
     gl_FragColor = vec4(line ? quantize(col, dd) : col, 1.0);
   }
@@ -522,6 +588,9 @@ export function createRetro(renderer) {
       uShadeDither: { value: 1 },
       uRingBox: { value: new THREE.Vector4(...ALL) },
       uShadeBox: { value: new THREE.Vector4(...ALL) },
+      uHover: { value: 0 },
+      uHoverInk: { value: srgb(HOVER_INK) },
+      uBurst: { value: new THREE.Vector4(0, 0, 0, 0) },
     },
     vertexShader,
     fragmentShader: POST_SHADER,
@@ -701,10 +770,43 @@ export function createRetro(renderer) {
     for (let i = 0; i < 4; i++) area[i] = (boxes?.area ?? ALL)[i];
   }
 
+  /**
+   * The pointer on NEWT: 0 off to 1 full (main.js eases it), here and in his materials (Off).
+   * @param {number} k
+   */
+  function setHover(k) {
+    const v = Math.min(1, Math.max(0, Number(k) || 0));
+    u.uHover.value = v;
+    HOVER.value = v;
+  }
+
+  /**
+   * The grab ring: where (client px, as the canvas shows), its radius (texels) and strength (0
+   * gone to 1 full); none until the pass has a target and the canvas a size.
+   * @param {number} x
+   * @param {number} y
+   * @param {number} r
+   * @param {number} k
+   */
+  function setBurst(x, y, r, k) {
+    const b = u.uBurst.value;
+    const rect = renderer.domElement?.getBoundingClientRect?.();
+    if (!target || !rect || !(rect.width > 0) || !(rect.height > 0) || !(k > 0)) {
+      b.w = 0;
+      return;
+    }
+    // (gl_FragCoord's texel centres, y up.)
+    const tx = Math.floor(((x - rect.left) / rect.width) * target.width) + 0.5;
+    const ty = Math.floor((1 - (y - rect.top) / rect.height) * target.height) + 0.5;
+    b.set(tx, ty, Math.max(0, r), Math.min(1, k));
+  }
+
   return {
     setSize,
     setParams,
     setBoxes,
+    setHover,
+    setBurst,
     render,
     warm,
     get pixel() {
