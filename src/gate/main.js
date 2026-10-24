@@ -89,6 +89,8 @@ const input = h('input', {
   autocapitalize: 'off',
   spellcheck: 'false',
   required: '',
+  'aria-invalid': 'false',
+  'aria-describedby': 'gate-said',
 });
 const button = h(
   'button',
@@ -96,7 +98,8 @@ const button = h(
   h('span', { class: 'cursor', 'aria-hidden': 'true' }),
   h('span', { text: lock.button }),
 );
-const status = h('p', { class: 'lock-status', role: 'status' });
+// (The box's own description, so a wrong password is the field's state, not only a live update.)
+const status = h('p', { id: 'gate-said', class: 'lock-status', role: 'status' });
 const form = h(
   'form',
   { class: 'lock-form', novalidate: '' },
@@ -110,6 +113,7 @@ const form = h(
 function set(state, said = '') {
   document.body.dataset.gate = state;
   status.textContent = said;
+  input.setAttribute('aria-invalid', String(state === 'wrong'));
   const busy = state === 'working' || state === 'open';
   /** @type {HTMLButtonElement} */ (button).disabled = busy;
   /** @type {HTMLInputElement} */ (input).readOnly = busy;
