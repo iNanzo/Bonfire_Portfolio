@@ -6,7 +6,8 @@
 // far up the letter it is (envelope.js DISSOLVE runs the same sums), with a burning rim, hot to
 // glowing to charred, at the edge, like a weapon's on the Bonfire site (copied, not imported:
 // the page takes no shared modules). The wax seal's material also stamps the monogram into it
-// (SEAL: envelopeSeal.js).
+// (SEAL: envelopeSeal.js); the petals' (PETAL) never dissolve, and each petal's `aShade` steps
+// its bands lighter or darker through the three reds, so they're a mix.
 import * as THREE from 'three';
 import { DISSOLVE } from './envelope.js';
 
@@ -28,7 +29,8 @@ const RIM = [0xffb43c, 0xe0582a, 0x5a3418];
 
 /**
  * The parts, back to front: a line goes on the texels of a part that border one later in this
- * order (so on the paper round the silhouette, 0, and on the lower side of every fold).
+ * order (so on the paper round the silhouette, 0, and on the lower side of every fold). The
+ * petals' shapes take `petal` and the two after it, so a line runs where two shapes overlap.
  */
 export const IDS = { body: 1, inside: 2, left: 3, right: 4, bottom: 5, flap: 6, seal: 7, petal: 8 };
 
@@ -76,8 +78,8 @@ export const shared = () => ({
 
 /**
  * The toon material: three tones, flat-shaded, band edges dithered on the texel grid; drawn as
- * its colours or as `id`; dissolving with the letter. `extra` adds uniforms, `defines` (SEAL)
- * and GLSL for the seal's stamp.
+ * its colours or as `id`; dissolving with the letter. `extra` adds uniforms, `defines` (SEAL,
+ * PETAL) and GLSL for the seal's stamp.
  * @param {number[]} tones  light, mid, shade (sRGB hex)
  * @param {ReturnType<typeof shared>} u
  * @param {number} id  IDS
@@ -92,7 +94,14 @@ export function toon(tones, u, id, extra = {}) {
       varying vec3 vView;
       varying vec2 vLetter;
       varying vec3 vLocal;
+      #ifdef PETAL
+      attribute float aShade;
+      varying float vShade;
+      #endif
       void main() {
+        #ifdef PETAL
+        vShade = aShade;
+        #endif
         vec4 p = vec4(position, 1.0);
         #ifdef USE_INSTANCING
         p = instanceMatrix * p;
@@ -115,14 +124,14 @@ export function toon(tones, u, id, extra = {}) {
       varying vec3 vView;
       varying vec2 vLetter;
       varying vec3 vLocal;
+      #ifdef PETAL
+      varying float vShade;
+      #endif
       ${BAYER}
       ${DISSOLVE_GLSL}
       ${extra.glsl ?? ''}
       void main() {
         float b = bayer(gl_FragCoord.xy);
-        #ifdef SEAL
-        if (sealClipped(vLocal.xy)) discard;
-        #endif
         float e = 1.0;
         if (uDissolve > 0.0) {
           e = letterValue(vLetter) + (b - 0.5) * ${DISSOLVE.dither.toFixed(4)} - uEdge;
@@ -135,7 +144,11 @@ export function toon(tones, u, id, extra = {}) {
         }
         vec3 n = normalize(cross(dFdx(vView), dFdy(vView)));
         float v = dot(n, uLight) + (b - 0.5) * 0.06;
-        vec3 c = v > 0.74 ? uTones[0] : v > 0.4 ? uTones[1] : uTones[2];
+        float band = v > 0.74 ? 0.0 : v > 0.4 ? 1.0 : 2.0;
+        #ifdef PETAL
+        band = clamp(band + vShade, 0.0, 2.0);
+        #endif
+        vec3 c = band < 0.5 ? uTones[0] : band < 1.5 ? uTones[1] : uTones[2];
         #ifdef SEAL
         c = sealStamp(vLocal.xy, c);
         #endif

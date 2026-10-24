@@ -1,16 +1,18 @@
 // The envelope that opens /invitation/, as pure logic (no DOM, no three.js; envelopeScene.js draws
 // it and takes the input): its states (types.js EnvelopeState: floating until it's opened or
-// skipped; opening while the seal cracks and the flap lifts; waiting when it's open before NEWT is
-// in, with a small pulse; fading as the letter dissolves into particles, like a weapon on the
-// Bonfire site, while the white page behind it clears; gone, or skipped, as it drops away), how a
-// drag on it reads (envelopeGesture: a swipe up opens it, a swipe down skips, far enough or a fast
-// flick, and mostly up or down), the keys (envelopeKey), how it follows a finger with some give
-// while the flap lifts (dragPose), the live hint while dragging (dragHint), the hint's words for
-// a touch screen or a mouse (hintFor), the whole opening as functions of time (pose), and the
+// skipped; opening while the wax seal blooms into rose petals and only then the flap lifts;
+// waiting when it's open before NEWT is in, with a small pulse; fading as the letter dissolves
+// into particles, like a weapon on the Bonfire site, while the white page behind it clears;
+// gone, or skipped, as it drops away), how a drag on it reads (envelopeGesture: a swipe up opens
+// it, a swipe down skips, far enough or a fast flick, and mostly up or down), the keys
+// (envelopeKey), how it follows a finger with some give while the seal starts to open
+// (dragPose), the live hint while dragging (dragHint), the hint's words for a touch screen or a
+// mouse (hintFor), how it settles in as it arrives, the whole opening as functions of time
+// (pose), the seal shrinking away as it blooms (sealBloom: its petals are petals.js's), and the
 // dissolve: where its noisy edge has reached on the letter (dissolveAt, DISSOLVE: the scene's
 // shader runs the same sums) and the specks it sheds there, drifting up and fading
-// (shedParticles, particleAt). Reduced motion: no bob or sway, the flap snaps open, and a short
-// plain fade in place of the dissolve.
+// (shedParticles, particleAt). Reduced motion: no bob or sway, no bloom (the seal simply fades
+// with the letter), the flap snaps open, and a short plain fade in place of the dissolve.
 import { createRng } from './rng.js';
 
 /** @typedef {import('./types.js').EnvelopeState} EnvelopeState */
@@ -41,17 +43,19 @@ export const hintFor = (touch) => (touch ? ENVELOPE_TEXT.hintTouch : ENVELOPE_TE
 export const SWIPE = { min: 48, share: 0.12, flick: 0.6, flickMin: 24, ratio: 1.2, tap: 10 };
 
 /**
- * The timeline, seconds: the seal cracks over `crack`; the flap lifts from `flapAt` over `flap`;
- * opening lasts `opening`; the dissolve's edge sweeps the letter over `dissolve` while the page
+ * The timeline, seconds: it settles in over `arrive` as it's made; opened, the seal blooms into
+ * rose petals over `bloom` (a brisk beat: the visitor is waiting), and only then, from `flapAt`,
+ * the flap lifts over `flap`; opening lasts `opening`; the dissolve's edge sweeps the letter over `dissolve` while the page
  * behind clears over `clear`, and a speck drifts for up to `drift` once it's shed, so the fade
  * lasts `fade`; a skip's drop `skip`; reduced motion's plain fade `reducedFade`; the touch hint
  * shows after `idleHint` with no input.
  */
 export const TIMES = {
-  crack: 0.22,
-  flapAt: 0.12,
-  flap: 0.5,
-  opening: 0.72,
+  arrive: 0.55,
+  bloom: 0.45,
+  flapAt: 0.45,
+  flap: 0.4,
+  opening: 0.85,
   dissolve: 0.9,
   clear: 0.3,
   drift: 0.6,
@@ -240,7 +244,7 @@ export function envelopeKey(key) {
 /**
  * Where the envelope goes while a finger drags it: it follows with some give (less and less
  * the further it goes, never more than about a third of the screen) and, going up, the flap
- * lifts (its share of the way to opening, 0..1).
+ * lifts toward opening (its share of the way, 0..1: the scene starts the seal opening with it).
  * @param {number} dy  down, CSS px
  * @param {number} viewportH
  * @returns {{follow: number, lift: number}}  follow: CSS px down
@@ -267,7 +271,8 @@ export function dragHint(dy) {
  * @typedef {object} EnvelopePose  the envelope at a moment
  * @property {number} bob  up, world units (±BOB while it floats)
  * @property {number} yaw  its sway, radians (±SWAY)
- * @property {number} crack  the seal's crack, 0 whole to 1 split
+ * @property {number} arrive  settling in as it's made, 0..1 (1 once it's there)
+ * @property {number} bloom  the seal blooming into petals, 0 whole to 1 all petals (sealBloom)
  * @property {number} flap  the flap's angle, radians (FLAP_OPEN fully open)
  * @property {number} push  toward the camera, 0..1 (a little, as it dissolves)
  * @property {number} fade  how far it's gone, 0 there to 1 gone (dissolved, or crossfaded)
@@ -280,10 +285,25 @@ export function dragHint(dy) {
  */
 
 /**
- * The envelope's states and timeline; `t` is any clock in seconds that only goes forward.
- * @param {{reduced?: boolean}} [o]  reduced motion
+ * The seal as it blooms (`b`, 0..1): a little swell as it starts to open, then shrinking away to
+ * nothing while its petals unfurl out of it, turning a little like a rose opening.
+ * @param {number} b
+ * @returns {{scale: number, spin: number}}  spin: radians
  */
-export function createEnvelope({ reduced = false } = {}) {
+export function sealBloom(b) {
+  const k = clamp01(b);
+  if (k === 0) return { scale: 1, spin: 0 };
+  const swell = 1 + 0.12 * Math.sin(Math.PI * Math.min(1, k / 0.3));
+  const scale = k >= 1 ? 0 : k < 0.15 ? swell : Math.min(swell, 1.12 * (1 - smooth((k - 0.15) / 0.85)));
+  return { scale, spin: 0.5 * easeOut(k) };
+}
+
+/**
+ * The envelope's states and timeline; `t` is any clock in seconds that only goes forward.
+ * @param {{reduced?: boolean, born?: number}} [o]  reduced motion; when it was made (it settles
+ *   in from then)
+ */
+export function createEnvelope({ reduced = false, born = 0 } = {}) {
   /** @type {EnvelopeState} */
   let state = 'floating';
   let openedAt = 0;
@@ -371,7 +391,8 @@ export function createEnvelope({ reduced = false } = {}) {
       const p = {
         bob,
         yaw,
-        crack: 0,
+        arrive: reduced ? 1 : easeOut((t - born) / TIMES.arrive),
+        bloom: 0,
         flap: 0,
         push: 0,
         fade: 0,
@@ -391,7 +412,7 @@ export function createEnvelope({ reduced = false } = {}) {
         return p;
       }
       const since = t - openedAt;
-      p.crack = reduced ? 1 : easeOut(since / TIMES.crack);
+      p.bloom = reduced ? 0 : smooth(since / TIMES.bloom);
       p.flap = reduced ? FLAP_OPEN : FLAP_OPEN * easeOut((since - TIMES.flapAt) / TIMES.flap);
       if (since >= opening - EPS) p.flap = FLAP_OPEN;
       if (state === 'waiting' && !reduced) p.pulse = 0.5 - 0.5 * Math.cos(((t - waitAt) * 2 * Math.PI) / TIMES.pulse);

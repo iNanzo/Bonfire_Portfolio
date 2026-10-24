@@ -1,26 +1,31 @@
 // The envelope that opens /invitation/, drawn and played (envelope.js has its states, gestures,
-// timeline and dissolve): its own small three.js canvas in a fixed overlay over the toy
-// (envelope.css, z-index 3) on the toy's own white page, made as the page boots, so it's also the
-// loading screen. Low-poly and flat, in the reference's palette in three toon bands: a thin gold
-// envelope seen from the back (its flap hinged on its top edge over the side and bottom folds of
-// its pocket), a red wax seal (envelopeSeal.js), a dozen petals drifting down from it. It's drawn
-// at low resolution, twice (its colours, then which part each texel is), and put together with a
-// one-texel line in the toy's ink round its silhouette and along every fold where one part meets
-// another, then scaled up pixelated, like the toy. It bobs and sways until it's opened: the seal
-// cracks and falls, the flap lifts, and the letter alone dissolves like a weapon on the Bonfire
-// site (a noisy, dithered edge with a burning rim sweeping up across it, shedding specks of paper,
-// embers and wax that drift up and fade) while the white page behind clears to the toy; skipped,
-// it drops away as the page clears. Reduced motion: still, the flap open at once, and a short
-// plain fade.
+// timeline and dissolve; petals.js its rose petals): its own small three.js canvas in a fixed
+// overlay over the toy (envelope.css, z-index 3) on the toy's own white page, made as the page
+// boots, so it's also the loading screen. Low-poly and flat, in the reference's palette in three
+// toon bands: a thin gold envelope seen from the back (its flap hinged on its top edge over the
+// side and bottom folds of its pocket), a red wax seal (envelopeSeal.js), and rose petals in
+// three shapes and three reds, instanced (one mesh a shape), each tumbling, fluttering and
+// drifting its own way. It's drawn at low resolution, twice (its colours, then which part each
+// texel is), and put together with a one-texel line in the toy's ink round its silhouette, round
+// every petal and along every fold where one part meets another, then scaled up pixelated, like
+// the toy. It settles in under a soft flurry of petals as it appears, and bobs and sways until
+// it's opened, a petal trickling now and then; the mouse over it, or a touch, stirs a few. Opened,
+// the seal blooms first: it swells, then shrinks away as a ring of petals unfurls out of it and
+// lifts off; only then the flap lifts, with a burst of petals out of the letter, and the letter
+// alone dissolves like a weapon on the Bonfire site (a noisy, dithered edge with a burning rim
+// sweeping up across it, shedding specks of paper, embers and wax that drift up and fade) while
+// the white page behind clears to the toy; skipped, it drops away with a spill of petals as the
+// page clears. Reduced motion: still, no petals, the flap open at once, and a short plain fade
+// (the seal fades with the letter).
 //
 // Input is all its own while it's up: a tap or click, Enter, Space or ArrowUp opens it; Escape or
-// ArrowDown skips; a drag follows the finger with some give (the flap lifting as it goes up) and
-// opens or skips on release (envelopeGesture), else springs back; the wheel opens or skips once
-// it adds up; Skip Intro skips. It takes focus at boot with no ring: the ring shows once a key
+// ArrowDown skips; a drag follows the finger with some give (the seal starting to open as it goes
+// up) and opens or skips on release (envelopeGesture), else springs back; the wheel opens or skips
+// once it adds up; Skip Intro skips. It takes focus at boot with no ring: the ring shows once a key
 // is pressed. The hint ("Click or swipe up to open", "Tap ..." on a touch screen, / "Swipe down
 // to skip") shows on hover, keyboard focus, or after a while with no input on a touch screen, and
-// reads "Open ↑" / "Skip ↓" while dragging. Once it's done it disposes its renderer, loses its
-// context and leaves the page.
+// reads "Open ↑" / "Skip ↓" while dragging. Once it's done (and its last petals have fallen) it
+// disposes its renderer, loses its context and leaves the page.
 import * as THREE from 'three';
 import {
   DISSOLVE,
@@ -35,9 +40,11 @@ import {
   envelopeKey,
   hintFor,
   particleAt,
+  sealBloom,
   shedParticles,
 } from './envelope.js';
 import { buildSeal } from './envelopeSeal.js';
+import { PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './petals.js';
 import { BAYER, IDS, INK, INSIDE, PAPER, PETAL, rgb, shared, toon } from './envelopeLook.js';
 
 /** Texels along the screen's shorter side (it's scaled up pixelated). */
@@ -51,8 +58,10 @@ const TILT = -0.36;
 const ASPECT = 1.45;
 /** The wheel opens or skips once this much (CSS px) adds up one way. */
 const WHEEL_STEP = 80;
-/** Petals drifting from the seal. */
-const PETALS = 12;
+/** Move the mouse this far (CSS px) over it for another stir of petals. */
+const STIR_MOVE = 90;
+/** Its last petals may hold it up this long (seconds) once it's done. */
+const PETAL_GRACE = 1.2;
 /** Specks the letter sheds as it dissolves. */
 const SPECKS = 220;
 /** The specks' colours: paper (gold and charred), embers (hot and glowing), wax. */
@@ -169,25 +178,24 @@ function buildEnvelope(u) {
 }
 
 /**
- * Petals as one instanced mesh: small cupped teardrops in the petals' three tones.
+ * The petals: an instanced mesh a shape (petals.js petalGrid), each petal's shade an instanced
+ * attribute (a step lighter or darker through the three reds); never dissolved.
  * @param {ReturnType<typeof shared>} u
  */
 function buildPetals(u) {
-  const outline = [
-    [-0.15, 0],
-    [-0.09, 0.07],
-    [0.03, 0.09],
-    [0.14, 0.03],
-    [0.15, -0.02],
-    [0.04, -0.08],
-    [-0.09, -0.06],
-  ].map(([x, y]) => new THREE.Vector2(x, y));
-  const geo = new THREE.ShapeGeometry(new THREE.Shape(outline));
-  const p = geo.attributes.position;
-  for (let i = 0; i < p.count; i++) p.setZ(i, 0.05 * (1 - (p.getY(i) / 0.09) ** 2));
-  const mesh = new THREE.InstancedMesh(geo, toon(PETAL, u, IDS.petal), PETALS);
-  mesh.frustumCulled = false;
-  return mesh;
+  return PETAL_SHAPES.map((shape, i) => {
+    const grid = petalGrid(shape);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(grid.positions, 3));
+    geo.setIndex(grid.index);
+    const shade = new THREE.InstancedBufferAttribute(new Float32Array(POOL), 1);
+    geo.setAttribute('aShade', shade);
+    const mat = toon(PETAL, u, IDS.petal + i, { uniforms: { uDissolve: { value: 0 } }, defines: { PETAL: '' } });
+    const mesh = new THREE.InstancedMesh(geo, mat, POOL);
+    mesh.count = 0;
+    mesh.frustumCulled = false;
+    return { mesh, shade };
+  });
 }
 
 /**
@@ -339,7 +347,14 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   renderer.setClearColor(0x000000, 0);
   root.append(layer);
 
-  const env = createEnvelope({ reduced });
+  const clock = () => win.performance.now() / 1000;
+  const env = createEnvelope({ reduced, born: clock() });
+  const flow = createPetalFlow({ reduced, seed: 16 });
+  /**
+   * The petals' clock, seconds: it runs with the frames, at most a twentieth of a second a frame,
+   * so a stall while the page loads (NEWT's model coming in) holds them still, never skips them.
+   */
+  let pt = 0;
   const u = shared();
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 40);
@@ -355,12 +370,10 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   const sealR = envl.W * 0.18;
   const seal = buildSeal(u, sealR);
   const sealAt = new THREE.Vector3(0, envl.tipY + sealR * 0.12, envl.T / 2 + 0.16);
-  for (const h of seal.halves) {
-    h.position.copy(sealAt);
-    inner.add(h);
-  }
+  seal.group.position.copy(sealAt);
+  inner.add(seal.group);
   const petals = buildPetals(u);
-  scene.add(petals);
+  for (const p of petals) scene.add(p.mesh);
   const specks = buildSpecks();
   outer.add(specks.points);
   const compose = buildCompose();
@@ -373,6 +386,15 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   const tmp = new THREE.Object3D();
   const sealWorld = new THREE.Vector3();
   const v = new THREE.Vector3();
+  /** Where the petals start from, in petals.js's letter widths (kept up to date each frame). */
+  const spots = {
+    letter: { x: 0, y: 0, z: 0.05 },
+    seal: { x: 0, y: 0, z: 0.05 },
+    mouth: { x: 0, y: 0, z: 0.05 },
+    trickle: { x: 0, y: 0, z: 0.05 },
+  };
+  /** A letter's width, world units (petals.js's unit). */
+  const letterW = () => envl.W * view.scale;
   /** The letter's own units (−1…1 across and up its body), from the world. */
   const toLetter = new THREE.Matrix4();
   const letterScale = new THREE.Matrix4().makeScale(2 / envl.W, 2 / envl.H, 1);
@@ -408,7 +430,6 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   win.addEventListener('resize', onResize);
 
   // --- Input.
-  const clock = () => win.performance.now() / 1000;
   /** @type {{id: number, x: number, y: number, t: number, dx: number, dy: number}|null} */
   let drag = null;
   /** The drag's follow as shown (eased toward its target: the give), CSS px; and the flap's lift. */
@@ -420,15 +441,44 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   let lastInput = clock();
   let frames = 0;
   let uncovered = false;
+  /** The burst out of the letter as its flap starts to lift; the drag's stir from the seal. */
+  let burst = false;
+  let dragStir = false;
+  /** The mouse's travel over it since its last stir, CSS px; and where it was. */
+  let stirMove = 0;
+  /** @type {{x: number, y: number}|null} */
+  let stirAt = null;
+  /** When it was done (its last petals may hold it up a moment). */
+  let doneAt = 0;
+
+  /**
+   * A point on the screen (CSS px) in petals.js's units, a little in front of the letter.
+   * @param {number} x
+   * @param {number} y
+   */
+  const screenToPetals = (x, y) => ({
+    x: ((x / view.cssW - 0.5) * view.w) / letterW(),
+    y: (-(y / view.cssH - 0.5) * view.h) / letterW(),
+    z: 0.15,
+  });
+  /** @param {PointerEvent} e  a stir of petals where it is */
+  const stirFrom = (e) => flow.stir(pt, screenToPetals(e.clientX, e.clientY));
 
   function open() {
-    if (!env.open(clock())) return;
+    const now = clock();
+    if (!env.open(now)) return;
     layer.classList.add('is-open');
+    // The seal blooms into roses (before the flap: envelope.js's timeline).
+    flow.emit('bloom', pt, spots.seal, { radius: (sealR * view.scale) / letterW() });
     onOpen?.();
   }
   function skip() {
-    if (!env.skip(clock())) return;
+    const now = clock();
+    if (!env.skip(now)) return;
     layer.classList.add('is-leaving');
+    // (The petals up shrink out of the toy's way; a spill goes down with the letter.)
+    flow.cut(pt);
+    flow.emit('spill', pt, spots.letter);
     uncover('skip');
   }
   /** @param {'open'|'skip'} how */
@@ -449,6 +499,9 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     lastInput = clock();
     if (drag || (e.pointerType === 'mouse' && e.button !== 0) || !env.covers) return;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), dx: 0, dy: 0 };
+    dragStir = false;
+    // (A touch stirs the petals where it lands.)
+    if (e.pointerType !== 'mouse' && env.state === 'floating') stirFrom(e);
     try {
       hit.setPointerCapture(e.pointerId);
     } catch {
@@ -456,7 +509,13 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     }
   });
   hit.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'mouse') hovered = true;
+    if (e.pointerType === 'mouse') {
+      hovered = true;
+      // (The mouse over it stirs a few petals now and then as it moves.)
+      if (stirAt) stirMove += Math.hypot(e.clientX - stirAt.x, e.clientY - stirAt.y);
+      stirAt = { x: e.clientX, y: e.clientY };
+      if (stirMove >= STIR_MOVE && !drag && env.state === 'floating' && stirFrom(e)) stirMove = 0;
+    }
     if (!drag || e.pointerId !== drag.id) return;
     lastInput = clock();
     drag.dx = e.clientX - drag.x;
@@ -477,7 +536,11 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   hit.addEventListener('pointercancel', (e) => release(e, true));
   hit.addEventListener('lostpointercapture', (e) => release(e, true));
   hit.addEventListener('pointerenter', (e) => {
-    if (e.pointerType === 'mouse') hovered = true;
+    if (e.pointerType !== 'mouse') return;
+    hovered = true;
+    stirAt = { x: e.clientX, y: e.clientY };
+    stirMove = 0;
+    if (env.state === 'floating') stirFrom(e);
   });
   hit.addEventListener('pointerleave', (e) => {
     if (e.pointerType === 'mouse') hovered = false;
@@ -531,13 +594,16 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     raf = win.requestAnimationFrame(frame);
     const now = clock();
     const dt = Math.min(0.05, now - last);
+    pt += dt;
     last = now;
     frames++;
     const state = env.step(now, ready());
     if (state === 'fading' || state === 'gone') uncover('open');
     const p = env.pose(now);
     // The drag: the follow and the flap's lift, eased (the give); back to rest when let go.
-    const target = drag && env.covers ? dragPose(drag.dy, view.cssH) : { follow: 0, lift: 0 };
+    // (Opened, it stays where the finger left it: its seal blooms there.)
+    const rest = env.opened ? { follow: follow.y, lift: 0 } : { follow: 0, lift: 0 };
+    const target = drag && env.covers ? dragPose(drag.dy, view.cssH) : rest;
     const k = reduced ? 1 : 1 - Math.exp(-dt / 0.07);
     follow.y += (target.follow - follow.y) * k;
     follow.lift += (target.lift - follow.lift) * k;
@@ -556,21 +622,21 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     );
     // The envelope.
     const pxToWorld = view.h / view.cssH;
-    outer.position.set(0, p.bob - follow.y * pxToWorld - p.drop * view.h * 0.9, p.push * 0.6);
+    // (Settling in as it arrives: from a touch above, a touch small.)
+    const arrive = (1 - p.arrive) * view.h * 0.04;
+    outer.position.set(0, p.bob - follow.y * pxToWorld - p.drop * view.h * 0.9 + arrive, p.push * 0.6);
     outer.rotation.set(0, p.yaw, -0.5 * p.drop);
-    outer.scale.setScalar(view.scale * (1 + 0.025 * p.pulse));
-    envl.hinge.rotation.x = -Math.max(p.flap, follow.lift * FLAP_OPEN);
-    // The seal: whole, then cracked apart, then falling away as the flap lifts.
-    const since = Math.max(0, p.flap / FLAP_OPEN - 0.15);
-    seal.halves.forEach((h, i) => {
-      const side = i ? 1 : -1;
-      const fall = since * since * 3;
-      h.position.set(sealAt.x + side * sealR * 0.25 * p.crack + side * fall * 0.3, sealAt.y - fall, sealAt.z);
-      // (Stamped upright on the screen, whatever the envelope's lean.)
-      h.rotation.z = -TILT * 0.85 - side * 0.35 * p.crack - side * fall * 1.5;
-    });
+    outer.scale.setScalar(view.scale * (1 + 0.025 * p.pulse) * (0.94 + 0.06 * p.arrive));
+    envl.hinge.rotation.x = -p.flap;
+    // The seal: whole, starting to open as a finger drags it up, then blooming into petals,
+    // shrinking away to nothing before the flap moves. (Stamped upright on the screen, whatever
+    // the envelope's lean.)
+    const bloom = sealBloom(Math.max(p.bloom, (follow.lift / 0.45) * 0.14));
+    seal.group.scale.setScalar(bloom.scale);
+    seal.group.rotation.z = -TILT * 0.85 + bloom.spin;
+    seal.group.visible = bloom.scale > 0;
     outer.updateMatrixWorld(true);
-    petalsAt(now);
+    petalsAt(pt, p);
     // The dissolve: the edge across the letter, in its own units.
     toLetter.copy(inner.matrixWorld).invert().premultiply(letterScale);
     u.uToLetter.value.copy(toLetter);
@@ -582,30 +648,69 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     paper.style.opacity = p.crossfade ? '' : String(p.backdrop);
     layer.style.opacity = p.crossfade ? String(1 - p.fade) : '';
     draw();
-    if (env.done(now)) dispose();
+    if (env.done(now)) {
+      doneAt ||= now;
+      if (!flow.live(pt) || now - doneAt >= PETAL_GRACE) dispose();
+    }
   }
 
   /**
-   * The petals: a ribbon from the seal down to the lower left, faster once it opens.
-   * @param {number} now
+   * The petals: where they start from now (the letter, its seal, its mouth), the flows due this
+   * frame (the flurry as it first appears, the burst as the flap starts to lift, the stir from
+   * the seal as a finger drags it up, the trickle while it floats), and each petal's pose.
+   * @param {number} now  the petals' clock
+   * @param {import('./envelope.js').EnvelopePose} p
    */
-  function petalsAt(now) {
+  function petalsAt(now, p) {
+    const L = letterW();
+    /**
+     * @param {{x: number, y: number, z: number}} spot
+     * @param {THREE.Vector3} w  world
+     * @param {number} dz  letter widths in front
+     */
+    const put = (spot, w, dz) => {
+      spot.x = w.x / L;
+      spot.y = w.y / L;
+      spot.z = w.z / L + dz;
+    };
     sealWorld.copy(sealAt).applyMatrix4(inner.matrixWorld);
-    const speed = env.opened ? 0.22 : 0.07;
-    for (let i = 0; i < PETALS; i++) {
-      const s = ((reduced ? 0 : now) * speed * (0.8 + 0.4 * ((i * 7) % 5) * 0.25) + i / PETALS) % 1;
-      const sway = Math.sin(now * 1.3 + i * 2.1) * 0.12 * s;
-      tmp.position.set(
-        sealWorld.x - s * view.w * 0.32 + sway - (env.opened ? s * jitter(i) * 0.6 : 0),
-        sealWorld.y - (sealR * 1.15 + 0.02) * view.scale - s * view.h * 0.62,
-        sealWorld.z + 0.1 + s * 0.8,
-      );
-      tmp.rotation.set(now * 0.9 + i, now * 1.4 + i * 0.7, i * 0.9 + s * 3);
-      tmp.scale.setScalar(view.scale * (0.6 + 0.5 * Math.min(1, s * 4)));
-      tmp.updateMatrix();
-      petals.setMatrixAt(i, tmp.matrix);
+    put(spots.seal, sealWorld, 0.03);
+    put(spots.letter, v.set(0, 0, envl.T).applyMatrix4(inner.matrixWorld), 0.05);
+    put(spots.mouth, v.set(0, envl.H * 0.38, envl.T).applyMatrix4(inner.matrixWorld), 0.05);
+    put(
+      spots.trickle,
+      v
+        .set(0, -sealR * 0.9, 0)
+        .add(sealAt)
+        .applyMatrix4(inner.matrixWorld),
+      0.03,
+    );
+    if (frames === 1) flow.emit('spawn', now, spots.letter);
+    if (!burst && p.flap > 0) {
+      burst = true;
+      flow.emit('burst', now, spots.mouth);
     }
-    petals.instanceMatrix.needsUpdate = true;
+    if (drag && !dragStir && follow.lift > 0.2 && env.state === 'floating') {
+      dragStir = true;
+      flow.stir(now, spots.seal);
+    }
+    flow.step(now, env.state === 'floating' && !drag ? spots.trickle : null);
+    const counts = petals.map(() => 0);
+    for (const { petal, pose } of flow.at(now)) {
+      const k = PETAL_SHAPES.indexOf(petal.shape);
+      const n = counts[k]++;
+      tmp.position.set(pose.x * L, pose.y * L, pose.z * L);
+      tmp.quaternion.set(pose.q[0], pose.q[1], pose.q[2], pose.q[3]);
+      tmp.scale.setScalar(pose.scale * L);
+      tmp.updateMatrix();
+      petals[k].mesh.setMatrixAt(n, tmp.matrix);
+      petals[k].shade.setX(n, petal.shade);
+    }
+    petals.forEach((m, k) => {
+      m.mesh.count = counts[k];
+      m.mesh.instanceMatrix.needsUpdate = true;
+      m.shade.needsUpdate = true;
+    });
   }
 
   /**
@@ -681,9 +786,14 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     get covers() {
       return env.covers;
     },
-    /** For ?test: the state, reduced motion, the pose now, the flap's open angle, frames drawn. */
+    /**
+     * For ?test: the state, reduced motion, the pose now, the flap's open angle, frames drawn,
+     * and the petals (how many are up now, and how many each flow has launched).
+     */
     snapshot() {
-      return { state: env.state, reduced, pose: env.pose(clock()), flapOpen: FLAP_OPEN, frames };
+      const now = clock();
+      const petalsNow = { live: flow.live(pt), emitted: flow.emitted };
+      return { state: env.state, reduced, pose: env.pose(now), flapOpen: FLAP_OPEN, frames, petals: petalsNow };
     },
     /** Steps aside (no WebGL for the toy, or it couldn't load): skipped, with no intro. */
     aside() {

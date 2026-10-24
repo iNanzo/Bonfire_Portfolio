@@ -50,7 +50,7 @@ test('the monogram is logo.js’s six strokes, upright, inside the seal’s face
   assert.ok(STAMP.stroke * STAMP.height < (9 / 76) * STAMP.height, 'a gap between the two middle strokes');
 });
 
-test('the parts’ order lines every fold on its lower side, and the seal is in two halves', () => {
+test('the parts’ order lines every fold on its lower side, and the seal is one piece (no halves to carry its stamp)', () => {
   assert.ok(IDS.body < IDS.inside && IDS.inside < IDS.left && IDS.left < IDS.bottom && IDS.right < IDS.bottom);
   assert.ok(IDS.bottom < IDS.flap && IDS.flap < IDS.seal && IDS.seal < IDS.petal);
   assert.ok(
@@ -64,7 +64,12 @@ test('the parts’ order lines every fold on its lower side, and the seal is in 
   assert.equal(m.uniforms.uIdPass, u.uIdPass, 'one switch for every part’s id pass');
   assert.equal(m.uniforms.uDissolve, u.uDissolve, 'one dissolve for the whole letter');
   const seal = buildSeal(u, 0.3);
-  assert.equal(seal.halves.length, 2);
-  const sides = seal.halves.map((h) => /** @type {any} */ (h.children[0]).material.uniforms.uSide.value);
-  assert.deepEqual(sides, [-1, 1]);
+  assert.equal(/** @type {any} */ (seal).halves, undefined, 'no halves');
+  const stamped = [];
+  seal.group.traverse((o) => {
+    const mat = /** @type {any} */ (o).material;
+    if (mat?.defines && 'SEAL' in mat.defines) stamped.push(o);
+  });
+  assert.equal(stamped.length, 1, 'the monogram on the one seal, nowhere else');
+  assert.equal(/** @type {any} */ (stamped[0]).material.uniforms.uSide, undefined, 'never clipped in two');
 });

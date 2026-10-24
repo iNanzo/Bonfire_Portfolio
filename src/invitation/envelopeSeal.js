@@ -2,9 +2,9 @@
 // hand, its outline wobbling with a few overtones, a raised and uneven rim round a softly domed
 // face, and a few small beads of wax squeezed out at its edge. The NH monogram is stamped into the
 // face (logo.js's strokes, copied: the page takes no shared modules): debossed, a darker recess
-// with a lighter lip, one texel wide, on the wall that faces the light. It's in two halves that
-// crack apart down a zigzag (one mesh each, the other half clipped away in the shader), with the
-// beads on whichever side they sit.
+// with a lighter lip, one texel wide, on the wall that faces the light. It's one piece: opened,
+// it blooms (envelope.js sealBloom), shrinking away while plain rose petals (petals.js) unfurl
+// out of it, so the monogram never rides on a petal.
 import * as THREE from 'three';
 import { IDS, WAX, toon } from './envelopeLook.js';
 
@@ -92,11 +92,10 @@ export function sealGeometry(r) {
   return g;
 }
 
-/** The stamp and the crack, in GLSL (the seal's material: toon's SEAL). */
+/** The stamp, in GLSL (the seal's material: toon's SEAL). */
 const SEAL_GLSL = /* glsl */ `
   uniform vec4 uSeg[6];
   uniform float uStroke;
-  uniform float uSide;
   uniform float uSealR;
   uniform float uTexelS;
   uniform vec3 uDeep;
@@ -116,11 +115,6 @@ const SEAL_GLSL = /* glsl */ `
     for (int i = 0; i < 6; i++) d = min(d, strokeAt(p, uSeg[i]));
     return d;
   }
-  bool sealClipped(vec2 p) {
-    if (uSide == 0.0) return false;
-    float crack = uSealR * 0.06 * (abs(fract(p.y / (uSealR * 0.5) + 0.25) - 0.5) * 4.0 - 1.0);
-    return uSide * (p.x - crack) < 0.0;
-  }
   vec3 sealStamp(vec2 p, vec3 c) {
     if (monogram(p) >= 0.0) return c;
     // (The recess's wall away from the light faces it: a lighter lip there, one texel wide.)
@@ -130,8 +124,8 @@ const SEAL_GLSL = /* glsl */ `
 `;
 
 /**
- * The seal in two halves, radius `r`: `halves` (left, right: groups to place), and `setTexel`
- * (a texel in the seal's own units, for the lip's width).
+ * The seal, radius `r`: `group` (to place), and `setTexel` (a texel in the seal's own units, for
+ * the lip's width).
  * @param {ReturnType<typeof import('./envelopeLook.js').shared>} u
  * @param {number} r
  */
@@ -148,17 +142,10 @@ export function buildSeal(u, r) {
     uLip: { value: new THREE.Vector3(0xe3 / 255, 0x86 / 255, 0x78 / 255) },
   });
   const bead = toon(WAX, u, IDS.seal);
-  const halves = [-1, 1].map((side) => {
-    const g = new THREE.Group();
-    const mat = toon(WAX, u, IDS.seal, {
-      uniforms: { ...stampUniforms(), uSide: { value: side } },
-      defines: { SEAL: '' },
-      glsl: SEAL_GLSL,
-    });
-    g.add(new THREE.Mesh(geo, mat));
-    return g;
-  });
-  // The beads squeezed out at the edge: small squashed lumps, each on its own side.
+  const group = new THREE.Group();
+  const mat = toon(WAX, u, IDS.seal, { uniforms: stampUniforms(), defines: { SEAL: '' }, glsl: SEAL_GLSL });
+  group.add(new THREE.Mesh(geo, mat));
+  // The beads squeezed out at the edge: small squashed lumps.
   for (const [a, size] of [
     [0.35, 0.15],
     [2.5, 0.11],
@@ -169,10 +156,10 @@ export function buildSeal(u, r) {
     const k = r * sealEdge(a) * (1.0 + size * 0.45);
     m.position.set(Math.cos(a) * k, Math.sin(a) * k, r * 0.04);
     m.scale.set(1.15, 0.9, 0.55);
-    halves[Math.cos(a) < 0 ? 0 : 1].add(m);
+    group.add(m);
   }
   return {
-    halves,
+    group,
     /** @param {number} s  a texel, in the seal's units */
     setTexel(s) {
       texel.value = s;

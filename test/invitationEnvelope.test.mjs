@@ -1,13 +1,14 @@
 // The envelope that opens /invitation/ (src/invitation/envelope.js, pure): its states (floating
-// until opened or skipped; opening while the seal cracks and the flap lifts; waiting when it's
-// open before NEWT is in; fading as it pushes toward the camera and dithers out; gone, or
-// skipped), how a drag on it reads (a swipe up opens it, a swipe down skips: far enough or a fast
-// flick, and mostly up or down), the keys (Enter, Space and ArrowUp open; Escape and ArrowDown
-// skip), how it follows a finger with some give while the flap lifts, the live hint while
-// dragging, and the opening as functions of time (reduced motion: no bob, the flap snaps open, a
-// short crossfade). Opened, the letter alone dissolves into particles: a noisy edge sweeps up
-// across it shedding specks of paper and ember that drift up and fade, and the white page behind
-// clears at once (never a dither over the screen).
+// until opened or skipped; opening while the seal blooms into rose petals and only then the flap
+// lifts; waiting when it's open before NEWT is in; fading as it pushes toward the camera and
+// dithers out; gone, or skipped), how a drag on it reads (a swipe up opens it, a swipe down
+// skips: far enough or a fast flick, and mostly up or down), the keys (Enter, Space and ArrowUp
+// open; Escape and ArrowDown skip), how it follows a finger with some give while the seal starts
+// to open, the live hint while dragging, how it arrives, and the opening as functions of time
+// (reduced motion: no bob, no bloom, the flap snaps open, a short crossfade). Opened, the letter
+// alone dissolves into particles: a noisy edge sweeps up across it shedding specks of paper and
+// ember that drift up and fade, and the white page behind clears at once (never a dither over
+// the screen).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -22,6 +23,7 @@ import {
   dragHint,
   dissolveAt,
   dragPose,
+  sealBloom,
   envelopeGesture,
   envelopeKey,
   hintFor,
@@ -63,7 +65,7 @@ test('the keys: Enter, Space and ArrowUp open it; Escape and ArrowDown skip; the
   for (const k of ['Tab', 'a', 'ArrowLeft', 'Shift', '']) assert.equal(envelopeKey(k), null, k);
 });
 
-test('it floats until opened, cracks and lifts, waits for NEWT if he isn’t in, then fades and is gone', () => {
+test('it floats until opened, blooms and lifts, waits for NEWT if he isn’t in, then fades and is gone', () => {
   const e = createEnvelope();
   assert.equal(e.state, 'floating');
   assert.equal(e.step(5, true), 'floating', 'floating stays until it’s opened');
@@ -107,26 +109,33 @@ test('a skip leaves it from floating, opening or waiting; it drops away and is d
   }
 });
 
-test('the opening over time: the seal cracks first, the flap lifts to FLAP_OPEN, then it pushes toward the camera and dithers out', () => {
+test('the opening over time: the seal blooms into roses first, only then the flap lifts to FLAP_OPEN, then it pushes toward the camera and dithers out', () => {
   const e = createEnvelope();
   const p0 = e.pose(0);
-  assert.equal(p0.crack, 0);
+  assert.equal(p0.bloom, 0);
   assert.equal(p0.flap, 0);
   assert.equal(p0.push, 0);
   assert.equal(p0.fade, 0);
   e.open(1);
-  let crack = 0;
+  let bloom = 0;
   let flap = 0;
-  for (let t = 1; t <= 1 + TIMES.opening + 1e-9; t += 0.02) {
+  for (let t = 1; t <= 1 + TIMES.opening + 1e-9; t += 0.01) {
     const p = e.pose(t);
-    assert.ok(p.crack >= crack - 1e-9 && p.crack <= 1, `the crack only grows: ${t}`);
+    assert.ok(p.bloom >= bloom - 1e-9 && p.bloom <= 1, `the bloom only grows: ${t}`);
     assert.ok(p.flap >= flap - 1e-9 && p.flap <= FLAP_OPEN + 1e-9, `the flap only lifts: ${t}`);
-    crack = p.crack;
+    if (p.flap > 0) assert.ok(p.bloom >= 1 - 1e-9, `the seal is all petals before the flap moves: ${t}`);
+    bloom = p.bloom;
     flap = p.flap;
     assert.equal(p.push, 0, 'no push before the fade');
+    assert.equal(p.dissolve, 0, 'no dissolve while it opens');
   }
-  assert.ok(e.pose(1 + TIMES.crack).crack > 0.99, 'cracked by TIMES.crack');
-  assert.ok(e.pose(1 + TIMES.crack / 2).flap < FLAP_OPEN / 2, 'the flap is still low while the seal cracks');
+  assert.ok(e.pose(1 + TIMES.bloom * 0.5).bloom > 0.2, 'blooming at once');
+  assert.ok(e.pose(1 + TIMES.bloom).bloom > 0.999, 'all petals by TIMES.bloom');
+  assert.equal(e.pose(1 + TIMES.bloom - 0.01).flap, 0, 'the flap still shut while the seal blooms');
+  assert.ok(TIMES.bloom >= 0.4 && TIMES.bloom <= 0.6, 'a brisk beat: 0.4–0.6 s');
+  assert.ok(TIMES.flapAt >= TIMES.bloom - 1e-9, 'the flap after the seal');
+  assert.ok(Math.abs(TIMES.opening - (TIMES.flapAt + TIMES.flap)) < 1e-9, 'opening is the bloom then the flap');
+  assert.ok(TIMES.opening <= 0.95, 'the whole opening stays brisk');
   assert.ok(Math.abs(e.pose(1 + TIMES.opening).flap - FLAP_OPEN) < 1e-6, 'fully open by the end');
   assert.ok(FLAP_OPEN > Math.PI * 0.8 && FLAP_OPEN <= Math.PI, 'it folds right back');
   e.step(1 + TIMES.opening, true);
@@ -135,12 +144,37 @@ test('the opening over time: the seal cracks first, the flap lifts to FLAP_OPEN,
   for (let t = 1 + TIMES.opening; t <= 1 + TIMES.opening + TIMES.fade + 1e-9; t += 0.02) {
     const p = e.pose(t);
     assert.ok(p.push >= push - 1e-9 && p.fade >= fade - 1e-9, `push and fade only grow: ${t}`);
+    assert.equal(p.bloom, 1, 'the seal stays gone');
     push = p.push;
     fade = p.fade;
   }
   const end = e.pose(1 + TIMES.opening + TIMES.fade);
   assert.ok(end.push > 0.99 && end.fade > 0.99, 'pushed and dithered out by the end');
   assert.equal(end.crossfade, false, 'dithered, not a crossfade');
+});
+
+test('the seal as it blooms: a little swell, then it shrinks away to nothing as its petals open out', () => {
+  assert.deepEqual(sealBloom(0), { scale: 1, spin: 0 });
+  assert.equal(sealBloom(1).scale, 0, 'gone');
+  assert.ok(sealBloom(0.15).scale > 1, 'it swells first');
+  assert.ok(sealBloom(0.15).scale <= 1.15, 'a little');
+  let last = Infinity;
+  for (let b = 0.2; b <= 1 + 1e-9; b += 0.05) {
+    const s = sealBloom(b).scale;
+    assert.ok(s <= last + 1e-9 && s >= 0, `then only shrinks: ${b}`);
+    last = s;
+  }
+  assert.ok(Math.abs(sealBloom(1).spin) > 0.2, 'turning a little as it goes, like a rose opening');
+});
+
+test('it arrives: settling in over TIMES.arrive from when it’s made (still with reduced motion)', () => {
+  const e = createEnvelope({ born: 2 });
+  assert.equal(e.pose(2).arrive, 0);
+  assert.ok(e.pose(2 + TIMES.arrive / 2).arrive > 0.5, 'easing in');
+  assert.equal(e.pose(2 + TIMES.arrive).arrive, 1);
+  assert.equal(e.pose(9).arrive, 1);
+  assert.ok(TIMES.arrive >= 0.3 && TIMES.arrive <= 0.8);
+  assert.equal(createEnvelope({ reduced: true, born: 2 }).pose(2).arrive, 1, 'reduced: there at once');
 });
 
 test('it bobs ±0.03 and sways ±8°, gently; waiting, it pulses', () => {
@@ -172,7 +206,7 @@ test('with reduced motion: no bob or sway, the flap snaps open, and a short cros
   e.open(1);
   const p = e.pose(1);
   assert.ok(Math.abs(p.flap - FLAP_OPEN) < 1e-6, 'open at once');
-  assert.equal(p.crack, 1);
+  assert.equal(p.bloom, 0, 'no bloom: the seal simply fades with the letter');
   assert.equal(e.step(1, true), 'fading', 'nothing to wait through');
   const mid = e.pose(1 + TIMES.reducedFade / 2);
   assert.equal(mid.push, 0, 'no push');
@@ -199,7 +233,7 @@ test('a skip drops it away and fades it', () => {
   assert.ok(e.pose(TIMES.skip).drop > 0.99 && e.pose(TIMES.skip).fade > 0.99);
 });
 
-test('dragged, it follows the finger with some give and the flap lifts as it goes up', () => {
+test('dragged, it follows the finger with some give and the seal starts to open as it goes up', () => {
   const h = 844;
   assert.deepEqual(dragPose(0, h), { follow: 0, lift: 0 });
   let last = 0;
@@ -208,12 +242,12 @@ test('dragged, it follows the finger with some give and the flap lifts as it goe
     assert.ok(p.follow < 0 && Math.abs(p.follow) < Math.abs(dy), `${dy}: follows, with give`);
     assert.ok(Math.abs(p.follow) > Math.abs(last), `${dy}: further for further`);
     last = p.follow;
-    assert.ok(p.lift > 0 && p.lift <= 1, `${dy}: the flap lifts`);
+    assert.ok(p.lift > 0 && p.lift <= 1, `${dy}: the seal starts to open`);
   }
   assert.ok(Math.abs(dragPose(-10000, h).follow) < h * 0.4, 'never off the screen');
   const down = dragPose(160, h);
   assert.ok(down.follow > 0 && down.follow < 160);
-  assert.equal(down.lift, 0, 'down, the flap stays shut');
+  assert.equal(down.lift, 0, 'down, the seal stays shut');
 });
 
 test('while dragging the hint says which way it goes; under the tap slop it says nothing', () => {
