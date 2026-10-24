@@ -50,6 +50,7 @@ import {
   orbitHold,
   orbitNudge,
   orbitPan,
+  orbitPanEnd,
   panRegion,
   screenOf,
   worldPerPx,
@@ -583,7 +584,9 @@ test('past the pan’s region a pan gives like a rubber band: the floor slips un
     }
     assert.ok(worst > 0.5 * stretch, `${at} (${dx}, ${dy}): it gave past the edge (${worst} of ${stretch})`);
     assert.ok(worst <= stretch + 1e-6, `${at} (${dx}, ${dy}): at most the band's stretch (${worst} of ${stretch})`);
-    orbitEvents(o, [RELEASE]);
+    // (Let go: a release, or two fingers' pan ending with none, orbitPanEnd.)
+    if (dy > 0) orbitPanEnd(o);
+    else orbitEvents(o, [RELEASE]);
     let last = pastRegion(o);
     const steps = [];
     for (let t = 0; t < 2; t += DT) {

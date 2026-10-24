@@ -75,6 +75,7 @@ import {
   orbitHold,
   orbitHome,
   orbitNudge,
+  orbitPanEnd,
   orbitPose,
   orbitRelease,
   orbitReset,
@@ -978,6 +979,8 @@ function start(s) {
     // (A tap or a grab on him: the user's pan is over, the view takes him again.)
     if (evs.some((e) => e.on === 'newt' && (e.type === 'tap' || e.type === 'grab'))) orbitFollow(cam);
     orbitEvents(cam, evs, evs.some((e) => e.type === 'pan' || e.type === 'pinch') ? shownAt() : null);
+    // (Two fingers' pan ends with no release of its own: once nothing pans, it's let go.)
+    if (cam.panning && !gesture.current()?.pan) orbitPanEnd(cam);
     if (!intro) for (const key of cameraPresses) padPress(key);
     cameraPresses = [];
     if (resetCamera && !intro) orbitReset(cam);

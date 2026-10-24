@@ -505,6 +505,16 @@ export function orbitNudge(s, { yaw = 0, elevation = 0 }) {
 }
 
 /**
+ * The fingers or the button that panned it let go (a pinch's pan ends without a release, so
+ * main.js says so once the gesture no longer pans): a pan past its region eases back now.
+ * @param {OrbitState} s
+ */
+export function orbitPanEnd(s) {
+  s.panning = false;
+  s.raw = null;
+}
+
+/**
  * The user's pan is over (a grab or a tap on NEWT, or Follow NEWT): the view follows him again,
  * from where it is; with `at` (Follow NEWT: him), its rest point goes onto him too, so it eases
  * round to him.
@@ -538,8 +548,7 @@ export function orbitEvents(s, events, shownAt = null) {
       orbitZoom(s, e.scale, shownAt ? { x: e.x - shownAt.x, y: e.y - shownAt.y } : null);
     else if (e.on === 'floor' && (e.type === 'release' || e.type === 'cancel')) {
       orbitRelease(s, e.t);
-      s.panning = false;
-      s.raw = null;
+      orbitPanEnd(s);
     }
   }
 }
