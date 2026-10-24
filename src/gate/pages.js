@@ -40,7 +40,7 @@ export const GATE_HASH_BYTES = 32;
 
 /** The lock page's words, the defaults (content.json's own come first), and their longest. */
 export const GATE_LOCK = Object.freeze({
-  eyebrow: 'Sealed',
+  eyebrow: 'Warded',
   title: 'The way is sealed',
   flavor: 'An old ward holds this fire. Speak the word, and it will let you pass.',
   label: 'Password',
