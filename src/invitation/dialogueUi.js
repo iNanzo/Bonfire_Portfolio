@@ -1,8 +1,9 @@
-// The intro dialogue's screen in the invitation toy (Play Intro), laid out like Uma Musume's
-// chats and drawn in the toy's own style (dialogue.css): a wide box along the bottom with the
+// The intro dialogue's screen in the invitation toy (after the envelope opens, or Replay Intro),
+// laid out like Uma Musume's chats and drawn in the toy's own style (dialogue.css): a wide box along the bottom with the
 // speaker's name on a tab at its top left and the line typed out in it (the rest of the line
 // waits unseen in its place, so the box keeps its size), a small bouncing ▼ at its bottom right
-// once the line is up, Auto, Skip and Log at the top right of the screen, the replies as buttons
+// once the line is up, Auto, Skip and Log at the top right of the screen, Skip Intro at its top
+// left (on screen all through the intro: it ends it at once, no question), the replies as buttons
 // stacked in the middle of it when a box has them (laid out out of sight from the box's start, so
 // main.js frames him over them: clearSpace), a gentle dim along the bottom behind the box,
 // the Log (a scrollable list of the lines shown and the replies picked, a dialog of its own) and
@@ -57,6 +58,7 @@ export const TALK_TEXT = {
   ask: 'Skip the Intro?',
   askHint: 'You can play it again from the toolbar.',
   yes: 'Skip Intro',
+  skipIntro: 'Skip Intro',
   no: 'Keep Watching',
   goOn: 'Tap, or press Space, to go on.',
 };
@@ -76,6 +78,7 @@ export function talkHtml() {
     <button type="button" class="inv-btn inv-talk-btn" data-talk="skip">${t.skip}</button>
     <button type="button" class="inv-btn inv-talk-btn" data-talk="log" aria-haspopup="dialog" aria-expanded="false">${t.log}</button>
   </div>
+  <button type="button" class="inv-btn inv-talk-btn inv-talk-skip-intro" data-intro-skip>${t.skipIntro}</button>
   <div class="inv-talk-choices" role="group" aria-label="${t.replies}" hidden></div>
   <section class="inv-talk-box">
     <p class="inv-talk-name"></p>
@@ -137,6 +140,7 @@ export function createDialogueUi(stage, { onAction, log, replySettle = REPLY_SET
   const logList = $('.inv-talk-log-list');
   const ask = $('.inv-talk-ask');
   const topRow = $('.inv-talk-top');
+  const skipIntro = $('[data-intro-skip]');
   const autoBtn = $('[data-talk="auto"]');
   const logBtn = $('[data-talk="log"]');
 
@@ -160,6 +164,7 @@ export function createDialogueUi(stage, { onAction, log, replySettle = REPLY_SET
    */
   const reach = () => {
     topRow.toggleAttribute('inert', modal());
+    skipIntro.toggleAttribute('inert', modal());
     choices.toggleAttribute('inert', modal() || !shown.up);
   };
   const now = () => doc.defaultView?.performance.now() ?? Date.now();
@@ -258,6 +263,11 @@ export function createDialogueUi(stage, { onAction, log, replySettle = REPLY_SET
     }
     // (Under the Log or the question only their own buttons take a press: the rest are inert too.)
     if (modal() && !button.closest('.inv-talk-log, .inv-talk-ask')) return;
+    // (Skip Intro: over at once, no question.)
+    if (button === skipIntro) {
+      onAction({ type: 'end' });
+      return;
+    }
     const what = button.dataset.talk;
     // (A click or a tap, not a key: detail counts the clicks, 0 for Enter or Space.)
     const byPointer = e.detail > 0;
