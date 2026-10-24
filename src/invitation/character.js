@@ -117,6 +117,7 @@ const MIN_R = 11;
  *   faceSheet: number|'smooth'|null,
  *   faceTexels: number,
  *   texelSnap: {head: {x: number, y: number}, body: {x: number, y: number}},
+ *   pointOn(name: string, along: number, out: import('./types.js').XYZ): import('./types.js').XYZ,
  * }} PageCharacter
  */
 
@@ -728,6 +729,22 @@ export function createCharacter(gltf, opts = {}) {
     bonePos(name, out) {
       const b = bone(name);
       if (b) b.getWorldPosition(v);
+      else root.getWorldPosition(v);
+      out.x = v.x;
+      out.y = v.y;
+      out.z = v.z;
+      return out;
+    },
+    /**
+     * A world point `along` model units down a bone (its +Y: Blender's bones point that way), as
+     * posed: his palm at a ForeArm's end, his toes along a Foot.
+     * @param {string} name
+     * @param {number} along
+     * @param {import('./types.js').XYZ} out
+     */
+    pointOn(name, along, out) {
+      const b = bone(name);
+      if (b) b.localToWorld(v.set(0, along, 0));
       else root.getWorldPosition(v);
       out.x = v.x;
       out.y = v.y;

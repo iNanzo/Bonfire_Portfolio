@@ -68,9 +68,32 @@ export const DEVICE = {
     DeviceLie: { centre: [0, -2.15, 0.04], tilt: 0, lift: 0.3 },
   },
 };
-/** The clips a dialogue box may play (the admin lists these): his gestures, the reactions, sitting. */
-export const DIALOGUE_CLIPS = ['Idle', 'Talk', 'Nod', 'Shrug', 'Point', 'Think', 'Cheer', 'Wave', 'Spook', 'Sit'];
 export const CLIP_NAMES = Object.keys(CLIPS);
+/** The clips a dialogue box may play (the admin lists these): every clip (DIALOGUE_WAYS, brain.js talk). */
+export const DIALOGUE_CLIPS = [...CLIP_NAMES];
+/**
+ * How a box plays the clips that don't simply play there as themselves (brain.js talk): Walk
+ * and Run step in place at their own pace; Held, Thrash and Fall dangle him from an unseen
+ * hand, his root lifted till his lowest sole clears the floor (Fall a short hop, then Land).
+ * The rest: Sit Down and Lie Down sit or lie him down and hold it (as Sit and Device Lie do),
+ * Stand Up and Get Up only get him up (on his feet, nothing), and the tablet's sit and lie hold
+ * with their way down and up.
+ * @type {Record<string, 'inPlace'|'dangling'>}
+ */
+export const DIALOGUE_WAYS = {
+  Walk: 'inPlace',
+  Run: 'inPlace',
+  Held: 'dangling',
+  Thrash: 'dangling',
+  Fall: 'dangling',
+};
+/**
+ * Whether a box's animation holds while the box is up (a loop, or a way down that stays down)
+ * rather than playing once (then Talk while its line types).
+ * @param {string} name
+ */
+export const dialogueHolds = (name) =>
+  name === 'SitDown' || name === 'LieDown' || (name !== 'Fall' && Boolean(CLIPS[name]?.loop));
 
 /** Idle, Walk and Run play as one blend by speed, on one shared step phase (blend.js). */
 export const GAIT_CLIPS = ['Idle', 'Walk', 'Run'];
@@ -108,7 +131,8 @@ export const FACE_TRACK = {
   Run: { face: 'surprised', blink: 'none' },
   Wave: { face: 'happy', blink: 'none' },
   Spook: { face: 'surprised', blink: 'none', at: [[0.5, 'neutral']] },
-  Held: { face: 'surprised', blink: 'slow', at: [[0.6, 'neutral']] },
+  // (Hanging in defeat: sad; the brain shows surprised while he's shaken hard.)
+  Held: { face: 'sad', blink: 'slow' },
   Fall: { face: 'surprised', blink: 'none' },
   Land: { face: 'surprised', blink: 'none', at: [[0.45, 'neutral']] },
   SitDown: { face: 'happy', blink: 'slow' },

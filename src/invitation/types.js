@@ -87,15 +87,17 @@
  */
 /**
  * @typedef {object} BrainOut
- * @property {string} state  idle, walk, react, flee, held, fall, land, sitDown, sit, standUp, talk
+ * @property {string} state  idle, walk, react, flee, held, fall, land, sitDown, sit, standUp, talk,
+ *   and Give Device's deviceSit, lieDown, deviceLie, getUp
  * @property {string} clip  'gait' (Idle/Walk/Run by speed) or a clip name
  * @property {boolean} restart  start `clip` from 0 this frame
  * @property {{mode: 'stay'|'goto'|'flee'|'face', goal: XZ|null, speed: number}} move  goal: where a goto goes, the camera's spot to face, or where a flee's threat was last seen (with no pointer); speed: the target speed (steer ramps to it)
  * @property {import('./clips.js').FaceName} face  the base face (faces.js adds blinks)
  * @property {import('./clips.js').BlinkMode} blink
- * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: XZ|null}} look  ease:
+ * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: XZ|null, pitch?: number}} look  ease:
  *   a slower look, seconds for it to come round (lookAt.js lookStep), as he's let go; at
- *   ('back'): who he runs from on the floor, for his glances back (null with no one)
+ *   ('back'): who he runs from on the floor, for his glances back (null with no one); pitch:
+ *   'ahead' at this pitch, radians (+ up), not the viewer's (held: his head hangs)
  * @property {boolean} faceCamera  turning to the camera first (a reaction, or sitting down)
  * @property {number} stress
  * @property {boolean} wander
@@ -105,6 +107,8 @@
  * @property {boolean} talkReady  the intro's talk state, in place: up, walked in and turned to the
  *   camera, so the box's line, face and gesture can begin (main.js holds the line until then)
  * @property {'sit'|'lie'|null} [device]  Give Device under way: sitting or lying with the tablet
+ * @property {'Give Device'|'Lie Down'|'Get Up'} [deviceLabel]  what the Give Device button says
+ *   (ui.js): what its next press does
  */
 
 /**

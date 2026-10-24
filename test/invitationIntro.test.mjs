@@ -250,7 +250,7 @@ test('faces, animations and cameras come from the toy’s own lists (the cameras
   assert.deepEqual(INTRO_CAMERAS, shots, 'the shots types.js names');
   const v = intro();
   v.boxes[0].face = 'grumpy';
-  v.boxes[1].animation = 'Run';
+  v.boxes[1].animation = 'Moonwalk';
   v.boxes[2].animation = 'talk';
   v.boxes[3].camera = 'far';
   assert.deepEqual(errorsAt(v), [at(0, '.face'), at(1, '.animation'), at(2, '.animation'), at(3, '.camera')]);
@@ -358,7 +358,7 @@ test('introFrom: a broken intro repaired field by field', () => {
   v.speaker = '';
   v.start = 'zz';
   v.boxes[0].face = 'grumpy';
-  v.boxes[0].animation = 'Run';
+  v.boxes[0].animation = 'Moonwalk';
   v.boxes[0].camera = 'far';
   v.boxes[0].text = '  First.  ';
   v.boxes[0].auto = -3;

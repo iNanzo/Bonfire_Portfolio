@@ -57,7 +57,7 @@ import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
 import './bubble.css';
 import './dialogue.css';
-import { createBrain } from './brain.js';
+import { DANGLE, createBrain, dangleLift, talkPhase } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
 import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
 import { CARRY, carryFeel, dragPlane, dragTarget, gripFor, offsetAt } from './carry.js';
@@ -82,7 +82,7 @@ import {
   shotView,
 } from './camera.js';
 import { loadCharacter } from './character.js';
-import { ANKLE_HEIGHT, BONES, COLLAR, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
+import { ANKLE_HEIGHT, BONES, COLLAR, DIALOGUE_WAYS, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
 import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
 import { createFaceState, faceStep } from './faces.js';
@@ -110,6 +110,10 @@ const FINGER_LIFT = 24;
 const HEAD_ROOM = 8;
 /** The time constant his head's height over the point grabbed is followed at, seconds. */
 const HEAD_FOLLOW = 0.1;
+/** How far along a Foot bone his toes' underside is, model units (pointed down, they're his lowest). */
+const TOE_REACH = 0.8;
+/** His shoe under the Foot bone's line at the toe, model units. */
+const TOE_DEPTH = 0.12;
 /** His soles hang at least this far over the floor while he's held, world units. */
 const HANG_GAP = 0.06;
 /** Extra reach for a finger picking him, CSS px. */
@@ -465,6 +469,12 @@ function start(s) {
     const r = c.bonePos(BONES.footR, { x: 0, y: 0, z: 0 }).y;
     return Math.min(l, r) - ANKLE_HEIGHT * SCALE;
   }
+  /** His lowest point, world units: a sole, or a toe pointed down (Held's dangle). */
+  function lowestY() {
+    const c = /** @type {NonNullable<typeof character>} */ (character);
+    const toe = (name) => c.pointOn(name, TOE_REACH, { x: 0, y: 0, z: 0 }).y - TOE_DEPTH * SCALE;
+    return Math.min(soleY(), toe(BONES.footL), toe(BONES.footR));
+  }
   /**
    * The collar over his lowest sole in the Held clip, at its highest through the clip (so his
    * feet never brush the floor while he's carried), world units.
@@ -689,16 +699,21 @@ function start(s) {
       mix.fade = fadeFor(o.clip, o.clip);
     }
     mixStep(mix, { clip: o.clip, speed: body.body.speed, dt });
+    // (A box's Walk or Run steps in place at its own pace: he has no speed to step it on.)
+    if (o.state === 'talk' && DIALOGUE_WAYS[o.clip] === 'inPlace')
+      mix.phase = talkPhase(mix.phase, dt, c.clipLength(o.clip));
     c.setWeights(mix.weights, mix.phase);
-    // 5. The animation; 6. held, his collar hung from the anchor.
+    // 5. The animation; 6. held, his collar hung from the anchor (a box's dangle: lifted clear).
     const moved = animate(c, dt);
     hang(c);
+    if (o.state === 'talk') dangle(c);
     // 7–8. The look and the face; the toolbar.
     const want = {
       mode: o.look.mode,
       weight: o.look.weight * lookShare(mix.weights),
       ease: o.look.ease,
       at: o.look.at ?? null,
+      pitch: o.look.pitch,
     };
     finish(c, intro ? null : ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
@@ -1024,6 +1039,20 @@ function start(s) {
   }
 
   /**
+   * A box dangling him from an unseen hand (Held, Thrash, Fall: clips.js DIALOGUE_WAYS): his root
+   * lifted by their share till his lowest point clears the floor, Fall a hop (brain.js dangleLift).
+   * @param {NonNullable<typeof character>} c
+   */
+  function dangle(c) {
+    const hang = DANGLE.clips.reduce((sum, k) => sum + c.weightOf(k), 0);
+    if (!(hang > 0)) return;
+    const len = c.clipLength('Fall');
+    const fallU = len > 0 ? c.timeOf('Fall') / len : 0;
+    c.root.position.y += dangleLift({ hang, sole: lowestY(), fall: c.weightOf('Fall'), fallU });
+    c.root.updateMatrixWorld(true);
+  }
+
+  /**
    * The toolbar, only on a change: the Sit/Stand label, Wander's state, the buttons resting.
    * @param {import('./types.js').BrainOut} o
    */
@@ -1054,8 +1083,8 @@ function start(s) {
    * @param {ReturnType<typeof pointerNow>} ptr
    * @param {{position: import('./types.js').XYZ}} pose
    * @param {number} dt
-   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null}} want
-   *   at: who he runs from ('back')
+   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null, pitch?: number}} want
+   *   at: who he runs from ('back'); pitch: 'ahead' at this pitch (held: his head hangs)
    * @param {import('./clips.js').FaceName} face
    * @param {import('./clips.js').BlinkMode} blink
    * @param {boolean} moved  his pose stepped this frame (the look goes on with it)
@@ -1074,7 +1103,8 @@ function start(s) {
     // (Talking, a little sway on his look at the camera, so it's never a fixed stare.)
     const sway = intro && aim ? lookSway(t) : null;
     const at = sway && aim ? { yaw: aim.yaw + sway.yaw, pitch: aim.pitch + sway.pitch } : aim;
-    lookStep(gaze, want.mode, at, dt, t, rng, want.weight, ahead, want.ease);
+    const front = want.pitch === undefined ? ahead : { yaw: ahead.yaw, pitch: want.pitch };
+    lookStep(gaze, want.mode, at, dt, t, rng, want.weight, front, want.ease);
     // (His chest joins in on his feet only: held, his collar hangs from the cursor.)
     torso = torsoStep(torso, body.mode === 'ground', dt);
     if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight, torso);

@@ -1137,13 +1137,16 @@ test('every animation a box may ask for (clips.js DIALOGUE_CLIPS: every clip) pl
   assert.deepEqual([...DIALOGUE_CLIPS].sort(), Object.keys(CLIPS).sort(), 'every clip');
   // (What each shows as from the box's first frame: Idle as the gait; Sit, Sit Down and the
   // tablet's sit by sitting down first; lying with it by sitting down, then lying down; Stand Up
-  // and Get Up keep what he does when he's on his feet; the rest as themselves.)
+  // and Get Up keep what he does when he's on his feet, Talk while the line types; the rest as
+  // themselves.)
   const first = (a) =>
-    a === 'Idle' || a === 'StandUp' || a === 'GetUp'
+    a === 'Idle'
       ? 'gait'
-      : a === 'Sit' || a === 'SitDown' || a === 'DeviceSit' || a === 'LieDown' || a === 'DeviceLie'
-        ? 'SitDown'
-        : a;
+      : a === 'StandUp' || a === 'GetUp'
+        ? 'Talk'
+        : a === 'Sit' || a === 'SitDown' || a === 'DeviceSit' || a === 'LieDown' || a === 'DeviceLie'
+          ? 'SitDown'
+          : a;
   // (What each holds once it's under way, the line still typing.)
   const holds = (a) =>
     ({
@@ -1173,8 +1176,11 @@ test('every animation a box may ask for (clips.js DIALOGUE_CLIPS: every clip) pl
   for (const [i, a] of [...DIALOGUE_CLIPS, ...DIALOGUE_CLIPS.slice().reverse()].entries()) {
     const typing = i % 2 === 0;
     s.w.dialogue = box(i + 1, a, 'happy', typing);
-    const want = holds(a) === 'Talk' && !typing ? 'gait' : holds(a);
-    s.until((o) => o.clip === want, 8);
+    const want = holds(a) === 'Talk' && a !== 'Talk' && !typing ? 'gait' : holds(a);
+    // (Stand Up and Get Up only get him up: on his feet, he keeps what he was doing.)
+    const up = ['SitDown', 'Sit', 'DeviceSit', 'LieDown', 'DeviceLie', 'StandUp', 'GetUp'];
+    if (a === 'StandUp' || a === 'GetUp') s.until((o) => !up.includes(o.clip), 8);
+    else s.until((o) => o.clip === want, 8);
     s.run(0.2);
   }
 });
