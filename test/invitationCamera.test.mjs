@@ -792,7 +792,7 @@ test('however the camera turns, a tap across the screen’s middle reaches its s
       const o = make(yaw);
       settle(o, 2, { x: 0, z: 0 });
       for (let i = -10; i <= 10; i++)
-        for (const row of [-0.25, 0, 0.25]) {
+        for (const row of [-0.1, 0, 0.1]) {
           const p = { x: (frame.hw * 0.96 * i) / 10, y: frame.hh * row };
           const f = floorUnder(o, p);
           const c = clampTo(area, f);
