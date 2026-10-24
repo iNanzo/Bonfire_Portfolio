@@ -129,18 +129,22 @@ test.describe('on a desktop', () => {
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
-  test('Give Device: sits him down with the tablet in his hands, lies him on his stomach with it turned 60–75° from the camera, and gets him up', async ({
+  test('Give Device, pressed on the toolbar (it reads Lie Down, then Get Up): sits him down with the tablet in his hands, lies him on his stomach with it turned 60–75° from the camera, and gets him up', async ({
     page,
   }) => {
     const errors = watch(page);
     await calm(page);
     const device = async () => (await snapshot(page)).motion.device;
     expect(await device()).toMatchObject({ state: null, label: 'Give Device', shown: false });
-    // (The toolbar's Give Device sends this press; `press` sends it as the button does.)
-    const press = () => page.evaluate(() => window.__invitation.press('Device'));
+    // (The toolbar's Give Device: it reads what its next press does, the brain's deviceLabel.)
+    const button = page.locator('[data-button="Device"]');
+    await expect(button).toHaveAccessibleName('Give Device');
+    const press = () => button.tap();
     await press();
     await until(page, (s) => s.state === 'deviceSit' && s.motion.device.shown, 'sitting with the tablet', 30_000);
     expect(await device()).toMatchObject({ state: 'sit', label: 'Lie Down', shown: true });
+    await expect(button).toHaveAccessibleName('Lie Down');
+    await expect(button).toHaveText('Lie Down');
     // The tablet in his hands, on screen.
     const at = (await device()).screen;
     const body = await on(page, 'body');
@@ -154,10 +158,12 @@ test.describe('on a phone', () => {
       'turned 60–75° from the camera',
     );
     expect(await device()).toMatchObject({ state: 'lie', label: 'Get Up', shown: true });
+    await expect(button).toHaveAccessibleName('Get Up');
     await press();
     await until(page, (s) => s.state === 'getUp', 'getting up');
     await until(page, (s) => s.state === 'idle', 'up', 30_000);
     expect(await device()).toMatchObject({ state: null, label: 'Give Device', shown: false });
+    await expect(button).toHaveAccessibleName('Give Device');
     expect(errors).toEqual([]);
   });
 });
