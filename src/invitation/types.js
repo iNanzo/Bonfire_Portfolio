@@ -30,12 +30,13 @@
 /** @typedef {{x: number, y: number, z: number}} XYZ */
 /**
  * @typedef {object} Bounds  where NEWT's root may go: the play area (area.js), whose edges are
- *   his walls. A box; with `round`, a box with corners of that radius (the toy's play area, a
- *   rounded square on the floor); or a trapezoid, its sides minX/maxX at the front (maxZ) and
- *   minXBack/maxXBack at the back (minZ), straight lines between (steer.js xRange); or, with
- *   `r`, a disc of that radius around the box's centre (the box is its square). With `turn`,
- *   any of them turned that many radians about its box's middle (+ toward +x: what's on screen,
- *   in the camera's frame, steer.js turnBounds).
+ *   his walls. A box; with `round`, a box with corners of that radius; or a trapezoid, its sides
+ *   minX/maxX at the front (maxZ) and minXBack/maxXBack at the back (minZ), straight lines
+ *   between (steer.js xRange); or, with `r`, a disc of that radius around the box's centre (the
+ *   box is its square: the toy's play area). With `turn`, any of them turned that many radians
+ *   about its box's middle (+ toward +x: what's on screen, in the camera's frame, steer.js
+ *   turnBounds). The play area carries `sight`, what's on screen now (camera.js orbitSight):
+ *   wander goals keep inside it, and a flee to what it was as the flee began.
  * @property {number} minX
  * @property {number} maxX
  * @property {number} minZ
@@ -45,6 +46,7 @@
  * @property {number} [r]
  * @property {number} [round]
  * @property {number} [turn]
+ * @property {Bounds} [sight]
  */
 
 /**
@@ -131,8 +133,9 @@
  */
 
 /**
- * @typedef {{x: number, z: number, yaw: number, speed: number, run?: XZ}} Body  NEWT's root on the
- *   floor; `run`, while he flees: the way he runs (a unit direction, smoothed: steer.js)
+ * @typedef {{x: number, z: number, yaw: number, speed: number, run?: XZ, fence?: Bounds}} Body  NEWT's
+ *   root on the floor; `run`, while he flees: the way he runs (a unit direction, smoothed:
+ *   steer.js); `fence`, while he flees: what was on screen as it began, which he keeps inside
  */
 /** @typedef {typeof import('./brain.js').TUNE} Tune  the brain's numbers (createBrain's `tune` overrides any of them) */
 

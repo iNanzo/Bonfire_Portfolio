@@ -59,10 +59,11 @@ import {
   orbitShot,
   orbitTalk,
   shotView,
+  orbitSight,
 } from '../src/invitation/camera.js';
 import { VIEW, frameView, project, texelGrid } from '../src/invitation/pixels.js';
 import { LOOKS } from '../src/invitation/look.js';
-import { AREA_RADIUS, NEWT_HEIGHT, NEWT_RADIUS, viewArea } from '../src/invitation/area.js';
+import { AREA_MARGIN, AREA_RADIUS, NEWT_HEIGHT, NEWT_RADIUS, rimPoints, viewArea } from '../src/invitation/area.js';
 import { centreOf, clampTo, xRange } from '../src/invitation/steer.js';
 import { GAIT } from '../src/invitation/clips.js';
 import { createRng } from '../src/invitation/rng.js';
@@ -501,13 +502,13 @@ const pastRegion = (o) => {
 };
 const RELEASE = { type: 'release', on: 'floor', x: 0, y: 0, t: 1 };
 
-test('the pan’s region: a square round the play area’s middle, the area’s half less what the view shows its narrower way, so none fully zoomed out and more the closer it zooms, whatever the yaw; at its edge the area’s side shows at the clear space’s side', () => {
+test('the pan’s region: a disc round the play area’s middle, its radius less what the view shows its narrower way, more the closer it zooms, whatever the yaw; at its edge the area’s rim shows at the clear space’s side', () => {
   for (const [w, h, dpr] of [
     [1280, 800, 1],
     [390, 844, 3],
   ]) {
     const { area, frame, make } = stageFor(w, h, dpr);
-    const half = (area.maxX - area.minX) / 2;
+    const R = area.r ?? NaN;
     const c = centreOf(area);
     let last = -1;
     for (const factor of [ORBIT.zoomMin, 0.7, 1, 1.4, 1 / ORBIT.zoomMin]) {
@@ -516,32 +517,32 @@ test('the pan’s region: a square round the play area’s middle, the area’s 
       settle(o, 3);
       const r = panRegion(o);
       const at = `${w}x${h} zoom ${factor}`;
-      const l = (r.maxX - r.minX) / 2;
-      close((r.maxZ - r.minZ) / 2, l, 1e-9, `${at}: a square`);
-      close((r.minX + r.maxX) / 2, c.x, 1e-9, `${at}: round the middle`);
-      close((r.minZ + r.maxZ) / 2, c.z, 1e-9);
-      assert.ok(l >= last - 1e-9, `${at}: more room the closer it zooms (${l} after ${last})`);
-      assert.ok(l < half, `${at}: inside the play area`);
+      const l = r.r ?? NaN;
+      close((r.maxX - r.minX) / 2, l, 1e-6, `${at}: a disc`);
+      close((r.maxZ - r.minZ) / 2, l, 1e-6);
+      close((r.minX + r.maxX) / 2, c.x, 1e-6, `${at}: round the middle`);
+      close((r.minZ + r.maxZ) / 2, c.z, 1e-6);
+      assert.ok(l >= last - 1e-6, `${at}: more room the closer it zooms (${l} after ${last})`);
+      assert.ok(l < R, `${at}: inside the play area`);
+      assert.ok(l > 0, `${at}: the play area's bigger than the view, so there's room to slide`);
       last = l;
-      if (factor === ORBIT.zoomMin) assert.equal(l, 0, `${at}: fully zoomed out, the whole area's in view: no pan`);
       const turned = make(1.1);
       orbitZoom(turned, factor);
       settle(turned, 3);
       assert.deepEqual(panRegion(turned), r, `${at}: the same turned`);
     }
     if (w > h) continue;
-    // On a phone, its narrower way is across: at the region's edge the area's side shows at the
+    // On a phone, its narrower way is across: at the region's edge the area's rim shows at the
     // clear space's side, turned or not.
     for (const yaw of [0, Math.PI / 2]) {
       const o = make(yaw);
       settle(o, 2);
-      const r = panRegion(o);
+      const l = panRegion(o)?.r ?? NaN;
       const right = { x: Math.cos(yaw), z: -Math.sin(yaw) };
-      const l = (r.maxX - r.minX) / 2;
       o.target.x = c.x + right.x * l;
       o.target.z = c.z + right.z * l;
-      const side = screenOf(o, { x: c.x + right.x * half, y: 0, z: c.z + right.z * half });
-      close(side.x, frame.hw, frame.hw * 0.06, `yaw ${yaw}: the area's side at the clear space's`);
+      const side = screenOf(o, { x: c.x + right.x * R, y: 0, z: c.z + right.z * R });
+      close(side.x, frame.hw, frame.hw * 0.06, `yaw ${yaw}: the area's rim at the clear space's side`);
     }
   }
 });
@@ -785,23 +786,29 @@ test('the camera pad: Turn Left and Right go round 45°, Tilt Up and Down 12° w
   close(o.distance, distance, 1e-6, 'the zoom stays');
 });
 
-test('however the camera turns, a tap across the screen’s middle reaches its sides at the default zoom: one play area round the middle, its walls never inside the screen', () => {
+test('however the camera turns, every tap on the floor the stage shows at the default zoom is in reach, edge to edge and top to bottom: one play area round the middle, its walls never on the screen', () => {
   for (const [w, h, dpr] of [
-    [1280, 800, 1],
     [390, 844, 3],
+    [412, 915, 2.625],
+    [768, 1024, 2],
+    [1280, 800, 1],
+    [844, 390, 3],
   ]) {
-    const { area, frame, make } = stageFor(w, h, dpr);
-    for (const yaw of [0, Math.PI / 4, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    const { area, make } = stageFor(w, h, dpr);
+    // (Where the point it looks at shows: the middle of the space the insets leave.)
+    const mid = { x: (INSETS.left + w - INSETS.right) / 2, y: (INSETS.top + h - INSETS.bottom) / 2 };
+    for (const yaw of [0, Math.PI / 4, Math.PI / 2, Math.PI, -Math.PI / 2, 2.2]) {
       const o = make(yaw);
       settle(o, 2, { x: 0, z: 0 });
-      for (let i = -10; i <= 10; i++)
-        for (const row of [-0.1, 0, 0.1]) {
-          const p = { x: (frame.hw * 0.96 * i) / 10, y: frame.hh * row };
+      for (let j = 0; j <= 10; j++)
+        for (let i = 0; i <= 10; i++) {
+          const p = { x: (i * w) / 10 - mid.x, y: (j * h) / 10 - mid.y };
           const f = floorUnder(o, p);
+          assert.ok(f, 'the floor shows there');
           const c = clampTo(area, f);
           assert.ok(
-            Math.hypot(c.x - f.x, c.z - f.z) < 1e-9,
-            `${w}x${h} yaw ${(yaw / D).toFixed(0)}°: a tap at (${p.x.toFixed(0)}, ${p.y.toFixed(0)}) can't reach ${JSON.stringify(f)}`,
+            Math.hypot(c.x - f.x, c.z - f.z) < 1e-6,
+            `${w}x${h} yaw ${(yaw / D).toFixed(0)}°: a tap at (${i}, ${j}) of the grid can't reach ${JSON.stringify(f)}`,
           );
         }
     }
@@ -1101,4 +1108,79 @@ test('at the end of the intro the view eases back to where it was, its pan too',
   close(o.target.y, FOCUS_Y, 1e-3);
   assert.equal(o.panned, true, 'the pan kept');
   close(o.base.x, was.base.x, 1e-6);
+});
+
+test('what is on screen (orbitSight): the floor where NEWT shows whole AREA_MARGIN inside the clear space, at the view as it is (turned, zoomed or slid), snug to its edges', () => {
+  /** NEWT at `n` with orbit `o`: his body's extremes (his radius across and along the view, feet to head). */
+  const bodyBox = (o, n) => {
+    const box = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
+    const right = { x: Math.cos(o.yaw), z: -Math.sin(o.yaw) };
+    const back = { x: Math.sin(o.yaw), z: Math.cos(o.yaw) };
+    for (const y of [0, NEWT_HEIGHT])
+      for (const [a, b] of [
+        [-1, 0],
+        [1, 0],
+        [0, -1],
+        [0, 1],
+      ]) {
+        const s = screenOf(o, {
+          x: n.x + NEWT_RADIUS * (a * right.x + b * back.x),
+          y,
+          z: n.z + NEWT_RADIUS * (a * right.z + b * back.z),
+        });
+        box.left = Math.min(box.left, s.x);
+        box.right = Math.max(box.right, s.x);
+        box.top = Math.min(box.top, s.y);
+        box.bottom = Math.max(box.bottom, s.y);
+      }
+    return box;
+  };
+  for (const [w, h, dpr] of [
+    [1280, 800, 1],
+    [390, 844, 3],
+    [844, 390, 3],
+  ]) {
+    const { frame, make } = stageFor(w, h, dpr);
+    const hw = frame.hw - AREA_MARGIN;
+    const hh = frame.hh - AREA_MARGIN;
+    for (const [yaw, factor, pan] of [
+      [0, 1, null],
+      [Math.PI / 4, 1, null],
+      [Math.PI / 2, 0.6, null],
+      [2.5, 1.7, { x: 1.2, z: -0.8 }],
+    ]) {
+      const at = `${w}x${h} yaw ${yaw.toFixed(2)} zoom ${factor}`;
+      const o = make(yaw);
+      orbitZoom(o, factor);
+      settle(o, 3);
+      if (pan) {
+        o.target.x += pan.x;
+        o.target.z += pan.z;
+      }
+      const b = orbitSight(o);
+      assert.ok(b, `${at}: something's on screen`);
+      const inside = (box) =>
+        box.left >= -hw - 0.5 && box.right <= hw + 0.5 && box.top >= -hh - 0.5 && box.bottom <= hh + 0.5;
+      for (const p of rimPoints(b)) {
+        const box = bodyBox(o, p);
+        assert.ok(inside(box), `${at}: at its corner ${JSON.stringify(p)} he's off ${JSON.stringify(box)}`);
+        const spare = Math.min(box.left + hw, hw - box.right, box.top + hh, hh - box.bottom);
+        assert.ok(spare < 1, `${at}: snug at its corners (${spare.toFixed(2)} px to spare)`);
+      }
+      // All over it he shows whole; a little past its corners, he doesn't.
+      for (const p of rimPoints(b)) {
+        const d = Math.hypot(p.x - centreOf(b).x, p.z - centreOf(b).z);
+        const k = (d + 0.05) / d;
+        const out = { x: centreOf(b).x + (p.x - centreOf(b).x) * k, z: centreOf(b).z + (p.z - centreOf(b).z) * k };
+        assert.ok(!inside(bodyBox(o, out)), `${at}: past its corner ${JSON.stringify(out)}`);
+      }
+      const c = centreOf(b);
+      for (let j = 0; j <= 8; j++)
+        for (let i = 0; i <= 8; i++) {
+          const q = { x: b.minX + ((b.maxX - b.minX) * i) / 8, z: b.minZ + ((b.maxZ - b.minZ) * j) / 8 };
+          const p = clampTo(b, { x: c.x + (q.x - c.x) * 2, z: c.z + (q.z - c.z) * 2 });
+          assert.ok(inside(bodyBox(o, p)), `${at}: inside it at ${JSON.stringify(p)}`);
+        }
+    }
+  }
 });

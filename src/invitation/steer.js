@@ -5,13 +5,15 @@
 // an edge close ahead, so his heading curves instead of zig-zagging between neighbours),
 // and turning to face the camera, all with acceleration and a capped turn rate (slower when he
 // isn't moving: on the spot his feet only glide round, so he pivots, never spins). Also picks his
-// wander goals. The play area (Bounds) is a box, a box with rounded corners (Bounds.round: the
-// toy's, area.js), a box that widens toward the back, or a disc (Bounds.r, around its box's
-// centre); any of them turned about its middle (Bounds.turn: what's on screen, in the camera's
-// frame; turnBounds): xRange gives its sides at a depth (in its own frame), clampTo pulls a
-// point inside (to its nearest point on a rounded box's rim, a disc's straight in toward its
-// centre) and centreOf is its middle. Pure: no three.js. NEWT faces +z at yaw 0 (forward is (sin yaw, cos yaw)) and the camera looks
-// in from the +z side.
+// wander goals. The play area (Bounds) is a box, a box with rounded corners (Bounds.round), a box
+// that widens toward the back, or a disc (Bounds.r, around its box's centre: the toy's, area.js);
+// any of them turned about its middle (Bounds.turn: what's on screen, in the camera's frame;
+// turnBounds): xRange gives its sides at a depth (in its own frame), clampTo pulls a point inside
+// (to its nearest point on a rounded box's rim, a disc's straight in toward its centre) and
+// centreOf is its middle. Where the play area is bigger than the screen it carries what's on
+// screen now (Bounds.sight, camera.js orbitSight): wander goals keep inside both, and a flee
+// keeps to what was on screen as it began (Body.fence). Pure: no three.js. NEWT faces +z at yaw
+// 0 (forward is (sin yaw, cos yaw)) and the camera looks in from the +z side.
 
 /** @typedef {import('./types.js').Body} Body */
 /** @typedef {import('./types.js').Bounds} Bounds */
@@ -220,7 +222,8 @@ export function centreOf(b) {
  *   seen, used when there's no pointer)
  * @param {XZ|null} pointer  the pointer on the floor (flee runs from it, else from move.goal,
  *   else from the play area's centre)
- * @param {Bounds|null} bounds
+ * @param {Bounds|null} bounds  the play area; its `sight`, what's on screen now, fences a flee
+ *   that begins this frame (Body.fence, kept until it ends)
  * @param {number} dt
  * @returns {Body}
  */
@@ -231,6 +234,8 @@ export function steer(body, move, pointer, bounds, dt) {
   let room = Infinity;
   /** @type {XZ|undefined} the way he runs, fleeing */
   let run;
+  /** @type {Bounds|null} what was on screen as the flee began: he keeps inside it too */
+  let fence = null;
   const mode = move?.mode ?? 'stay';
   if (mode === 'goto' && move.goal) {
     const g = bounds ? clampTo(bounds, move.goal) : move.goal;
@@ -244,19 +249,7 @@ export function steer(body, move, pointer, bounds, dt) {
       room = d;
     }
   } else if (mode === 'flee') {
-    const keep = body.run ?? { x: Math.sin(yaw), z: Math.cos(yaw) };
-    const best = fleeDirection({ x, z }, keep, pointer ?? move.goal ?? centreOf(bounds), bounds);
-    // (The way he runs settles toward the best one over fleeSmooth s: picked afresh each frame
-    // from a ring of directions, it flicked between neighbours several times a second.)
-    const near = bounds && body.run ? roomAlong({ x, z }, keep.x, keep.z, bounds) < STEER.fleeNear : false;
-    const k = body.run ? 1 - Math.exp(-dt / (near ? STEER.fleeSmoothNear : STEER.fleeSmooth)) : 1;
-    const rx = keep.x + (best.x - keep.x) * k;
-    const rz = keep.z + (best.z - keep.z) * k;
-    const len = Math.hypot(rx, rz);
-    run = len > 1e-6 ? { x: rx / len, z: rz / len } : best;
-    aim = Math.atan2(run.x, run.z);
-    const err = Math.abs(wrapAngle(aim - yaw));
-    want = move.speed * (STEER.fleeMinPace + (1 - STEER.fleeMinPace) * Math.max(0, Math.cos(err)));
+    ({ run, aim, want, fence } = fleeing(body, move, pointer, bounds, dt));
   } else if (mode === 'face') {
     aim = move.goal ? Math.atan2(move.goal.x - x, move.goal.z - z) : 0;
   }
@@ -267,12 +260,77 @@ export function steer(body, move, pointer, bounds, dt) {
   const step = Math.min(speed * dt, room);
   let nx = x + Math.sin(yaw) * step;
   let nz = z + Math.cos(yaw) * step;
+  if (fence) ({ x: nx, z: nz } = clampTo(fence, { x: nx, z: nz }));
   if (bounds) {
     ({ x: nx, z: nz } = clampTo(bounds, { x: nx, z: nz }));
     // Pressed against an edge, he only goes as fast as he really moves.
     if (dt > 0 && step > 0) speed = Math.min(speed, Math.hypot(nx - x, nz - z) / dt);
   }
-  return run ? { x: nx, z: nz, yaw, speed, run } : { x: nx, z: nz, yaw, speed };
+  /** @type {Body} */
+  const out = { x: nx, z: nz, yaw, speed };
+  if (run) out.run = run;
+  if (fence) out.fence = fence;
+  return out;
+}
+
+/**
+ * A frame of a flee: the way he runs (Body.run, settling toward the best way), where he aims,
+ * how fast he wants to go, and the flee's fence (what was on screen as it began).
+ * @param {Body} body
+ * @param {{goal: XZ|null, speed: number}} move
+ * @param {XZ|null} pointer
+ * @param {Bounds|null} bounds
+ * @param {number} dt
+ * @returns {{run: XZ, aim: number, want: number, fence: Bounds|null}}
+ */
+function fleeing(body, move, pointer, bounds, dt) {
+  const { x, z, yaw } = body;
+  const keep = body.run ?? { x: Math.sin(yaw), z: Math.cos(yaw) };
+  const fence = body.run ? (body.fence ?? null) : fenceFor(bounds, { x, z });
+  /** @type {Bounds[]} */
+  const walls = [];
+  if (bounds) walls.push(bounds);
+  if (fence) walls.push(fence);
+  const best = fleeDirection({ x, z }, keep, pointer ?? move.goal ?? centreOf(bounds), walls);
+  // (The way he runs settles toward the best one over fleeSmooth s: picked afresh each frame
+  // from a ring of directions, it flicked between neighbours several times a second.)
+  const near = walls.length && body.run ? roomIn(walls, { x, z }, keep.x, keep.z) < STEER.fleeNear : false;
+  const k = body.run ? 1 - Math.exp(-dt / (near ? STEER.fleeSmoothNear : STEER.fleeSmooth)) : 1;
+  const rx = keep.x + (best.x - keep.x) * k;
+  const rz = keep.z + (best.z - keep.z) * k;
+  const len = Math.hypot(rx, rz);
+  const run = len > 1e-6 ? { x: rx / len, z: rz / len } : best;
+  const aim = Math.atan2(run.x, run.z);
+  const err = Math.abs(wrapAngle(aim - yaw));
+  const want = move.speed * (STEER.fleeMinPace + (1 - STEER.fleeMinPace) * Math.max(0, Math.cos(err)));
+  return { run, aim, want, fence };
+}
+
+/**
+ * What's on screen as a flee begins (the play area's `sight`), its fence, if he's inside it
+ * then; else none.
+ * @param {Bounds|null} bounds
+ * @param {XZ} p
+ * @returns {Bounds|null}
+ */
+function fenceFor(bounds, p) {
+  const s = bounds?.sight;
+  if (!s) return null;
+  const c = clampTo(s, p);
+  return Math.hypot(c.x - p.x, c.z - p.z) < 1e-6 ? s : null;
+}
+
+/**
+ * How far he can go from `p` along (dx, dz) before leaving any of `walls`.
+ * @param {Bounds[]} walls
+ * @param {XZ} p
+ * @param {number} dx
+ * @param {number} dz
+ */
+function roomIn(walls, p, dx, dz) {
+  let t = Infinity;
+  for (const b of walls) t = Math.min(t, roomAlong(p, dx, dz, b));
+  return t;
 }
 
 /**
@@ -282,10 +340,10 @@ export function steer(body, move, pointer, bounds, dt) {
  * @param {XZ} p
  * @param {XZ} keep
  * @param {XZ} threat
- * @param {Bounds|null} bounds
+ * @param {Bounds[]} walls  the play area, and the flee's fence (none: room everywhere)
  * @returns {XZ}
  */
-function fleeDirection(p, keep, threat, bounds) {
+function fleeDirection(p, keep, threat, walls) {
   let ax = p.x - threat.x;
   let az = p.z - threat.z;
   const n = Math.hypot(ax, az);
@@ -299,7 +357,7 @@ function fleeDirection(p, keep, threat, bounds) {
     az /= n;
   }
   const score = (dx, dz) => {
-    const room = bounds ? roomAlong(p, dx, dz, bounds) : STEER.fleeRoom;
+    const room = walls.length ? roomIn(walls, p, dx, dz) : STEER.fleeRoom;
     return (
       dx * ax +
       dz * az +
@@ -378,24 +436,48 @@ function roomAlong(p, dx, dz, b) {
 
 /**
  * Somewhere to wander to: inside the bounds (a little in from them, between the sides at its
- * depth, turned with it), at least STEER.wanderMin from `from` (in a play area too small for
- * that, the farthest of the tries).
+ * depth), at least STEER.wanderMin from `from` (in a play area too small for that, the farthest
+ * of the tries). Where the bounds carry what's on screen (`sight`), inside that too, so he
+ * wanders where he's seen; the bounds alone if none of the tries there is in them.
  * @param {() => number} rng
  * @param {Bounds} bounds
  * @param {XZ} from
  * @returns {XZ}
  */
 export function wanderGoal(rng, bounds, from) {
-  const m = Math.min(STEER.wanderMargin, (bounds.maxX - bounds.minX) / 4, (bounds.maxZ - bounds.minZ) / 4);
-  const z0 = bounds.minZ + m;
-  const h = bounds.maxZ - m - z0;
-  let best = centreOf(bounds);
+  if (bounds.sight) {
+    const inside = (/** @type {XZ} */ p) => {
+      const c = clampTo(bounds, p);
+      return Math.hypot(c.x - p.x, c.z - p.z) < 1e-9;
+    };
+    const g = pickIn(rng, bounds.sight, from, inside);
+    if (g) return g;
+  }
+  return pickIn(rng, bounds, from, null) ?? centreOf(bounds);
+}
+
+/**
+ * Of 32 tries inside `b` (a little in from it, between its sides at a depth, turned with it),
+ * the first at least STEER.wanderMin from `from`, else the farthest (the middle if none is):
+ * only tries `ok` takes count, and with `ok`, null where none does.
+ * @param {() => number} rng
+ * @param {Bounds} b
+ * @param {XZ} from
+ * @param {((p: XZ) => boolean)|null} ok
+ * @returns {XZ|null}
+ */
+function pickIn(rng, b, from, ok) {
+  const m = Math.min(STEER.wanderMargin, (b.maxX - b.minX) / 4, (b.maxZ - b.minZ) / 4);
+  const z0 = b.minZ + m;
+  const h = b.maxZ - m - z0;
+  let best = ok ? null : centreOf(b);
   let far = -1;
   for (let i = 0; i < 32; i++) {
     const u = rng();
     const z = z0 + rng() * h;
-    const [lo, hi] = xRange(bounds, z);
-    const g = inFrame(bounds, { x: lo + m + u * (hi - lo - 2 * m), z }, true);
+    const [lo, hi] = xRange(b, z);
+    const g = inFrame(b, { x: lo + m + u * (hi - lo - 2 * m), z }, true);
+    if (ok && !ok(g)) continue;
     const d = Math.hypot(g.x - from.x, g.z - from.z);
     if (d >= STEER.wanderMin) return g;
     if (d > far) {
