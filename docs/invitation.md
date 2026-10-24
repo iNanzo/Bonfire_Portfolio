@@ -649,8 +649,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   collar; an animated WebP a kind and view, a sheet a kind, the drag's numbers frame by frame, and
   with `--compare` the kinds side by side. `e2e/lib/drag.mjs` `dragDescribe(kind)` is the shared
   drag spec (collar within 2 px of the cursor, blob under his hips, lowest foot over the floor, no
-  gap on a down drag, a finger's aim, Ground Cues); `e2e/invitationDrag.spec.mjs` runs it for
-  today, whose down-drag gap is the known baseline.
+  gap on a down drag, a finger's aim, Ground Cues, raising him with the wheel for a kind that has
+  one); `e2e/invitationDrag.spec.mjs` runs it for today, whose down-drag gap is the known
+  baseline, and `e2e/invitationDragBead.spec.mjs` for bead with its own checks.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
   `vite.config.js`, `test/site.test.mjs` and the spec's last test check it).
 - **Unlisted:** `noindex, nofollow`, left out of the sitemap and the README, and not

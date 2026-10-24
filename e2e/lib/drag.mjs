@@ -69,6 +69,16 @@ export async function grab(page, part = 'head') {
 export const onCursor = (page, message, px = 2) =>
   expect.poll(async () => (await snapshot(page)).drag.gap ?? Infinity, { message }).toBeLessThan(px);
 
+/**
+ * Up 200 px from `cursor`, and for a kind with a wheel for his height (a level hold keeps him at
+ * its height however far up the screen he goes), six notches up as well; returns the cursor.
+ */
+export async function lift(page, cursor) {
+  const to = await glide(page, cursor, { x: cursor.x, y: cursor.y - 200 });
+  if ((await snapshot(page)).drag.controls.wheel) for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -100);
+  return to;
+}
+
 /** The checks every held frame shares: the blob under his hips, his lowest foot over the floor. */
 export async function grounded(page, at) {
   const d = (await snapshot(page)).drag;
@@ -150,7 +160,7 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
       await until(page, (s) => s.drag.groundCues === 'always' && s.drag.ring?.alpha > 0.99, 'the ring in');
       const d = (await snapshot(page)).drag;
       expect(gap({ x: d.ring.x, y: d.ring.z }, { x: d.hips.x, y: d.hips.z }), 'under his hips').toBeLessThan(0.03);
-      await glide(page, cursor, { x: cursor.x, y: cursor.y - 200 });
+      await lift(page, cursor);
       await until(
         page,
         (s) => s.drag.lowestFoot > 0.5 && s.drag.line.visible && s.drag.line.alpha > 0.9,
@@ -163,7 +173,7 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
     test(`${kind}: Ground Cues Off shows neither the ring nor the drop line, however high he is`, async ({ page }) => {
       await calm(page, kind, { groundCues: 'off' });
       const cursor = await grab(page, 'head');
-      await glide(page, cursor, { x: cursor.x, y: cursor.y - 200 });
+      await lift(page, cursor);
       await until(page, (s) => s.drag.lowestFoot > 0.5, 'high');
       const off = (await snapshot(page)).drag;
       expect(off.groundCues).toBe('off');
