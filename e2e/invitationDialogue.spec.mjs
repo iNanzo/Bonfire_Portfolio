@@ -1,4 +1,4 @@
-// Play Intro, the invitation toy's chat (/invitation/), in a real browser on the production build,
+// Replay Intro, the invitation toy's chat (/invitation/), in a real browser on the production build,
 // on a phone (390×844, touch) and a desktop (1280×800): the button opens the chat box over the
 // stage (the toolbar rests out of sight, NEWT goes into his talk state and turns to the camera);
 // out near the edge the first line waits until he's walked in and turned (then its line, face and
@@ -8,7 +8,8 @@
 // goes on by itself; the Log lists the lines shown and closes again; each box's shot sends the
 // camera nearer or further (close nearer than wide), framed over the box as its own line has it
 // and again when the box grows; Escape asks before it skips the intro and a second Escape ends
-// it; Space and Enter go on (after a click on Auto, Skip or Log too); under the Log or the
+// it, while Skip Intro, on screen all through, ends it at once with no question; a line's own
+// line breaks show; Space and Enter go on (after a click on Auto, Skip or Log too); under the Log or the
 // question the buttons over the stage are out of reach; reduced motion shows each line at once
 // and cuts the camera (round to the front, to each shot, back at the end); and after the end the
 // toolbar, the camera and his free play come back. The script is read from the page (?test's
@@ -41,14 +42,14 @@ async function calm(page, path = '/invitation/?test&calm&seed=3') {
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   await until(page, (s) => s.state === 'idle' && s.clip === 'Idle', 'idle');
 }
-/** The script Play Intro runs (the admin's, or the placeholder). */
+/** The script Replay Intro runs (the admin's, or the placeholder). */
 const script = (page) => page.evaluate(() => window.__invitation.intro());
-const playIntro = (page) => page.getByRole('button', { name: 'Play Intro', exact: true });
+const replayIntro = (page) => page.getByRole('button', { name: 'Replay Intro', exact: true });
 const box = (page) => page.locator('.inv-talk-box');
 /** Opens the intro and waits for its first box, with him turned and talking (its line begun). */
 async function open(page, tap = false) {
-  if (tap) await playIntro(page).tap();
-  else await playIntro(page).click();
+  if (tap) await replayIntro(page).tap();
+  else await replayIntro(page).click();
   await expect(box(page)).toBeVisible();
   await until(page, (s) => s.dialogue && s.state === 'talk' && !s.dialogue.waiting, 'the intro under way');
 }
@@ -149,7 +150,7 @@ async function repliesClearOfHim(page, tap) {
 }
 
 test.describe('the admin’s intro', () => {
-  test('Play Intro plays content.json’s invitation.intro, box for box', async ({ page }) => {
+  test('Replay Intro plays content.json’s invitation.intro, box for box', async ({ page }) => {
     const inv = JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8')).invitation ?? {};
     const own = Array.isArray(inv.intro?.boxes) ? inv.intro.boxes : [];
     test.skip(!own.length, 'content.json has no intro: the toy plays its own');
@@ -226,14 +227,14 @@ test.describe('the admin’s intro', () => {
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
-  test('Play Intro opens the chat box: the toolbar rests, he turns to talk, the line types, a tap finishes it and the next goes on', async ({
+  test('Replay Intro opens the chat box: the toolbar rests, he turns to talk, the line types, a tap finishes it and the next goes on', async ({
     page,
   }) => {
     const errors = watch(page);
     await calm(page);
     const intro = await script(page);
-    await expect(playIntro(page)).toBeVisible();
-    expect((await playIntro(page).boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await expect(replayIntro(page)).toBeVisible();
+    expect((await replayIntro(page).boundingBox()).height).toBeGreaterThanOrEqual(44);
     await open(page, true);
     await expect(page.locator('.inv-toolbar')).toBeHidden();
     await expect(page.getByRole('button', { name: 'Wave' })).toBeHidden();
@@ -280,7 +281,7 @@ test.describe('on a phone', () => {
     await page.touchscreen.tap(far.x, far.y);
     await until(page, (s) => s.state === 'walk', 'walking out');
     await until(page, (s) => s.state === 'idle', 'there');
-    // Every frame from Play Intro on: what the screen shows against what he's doing.
+    // Every frame from Replay Intro on: what the screen shows against what he's doing.
     await page.evaluate(() => {
       const rec = (window.__rec = []);
       const tick = () => {
@@ -303,7 +304,7 @@ test.describe('on a phone', () => {
       };
       requestAnimationFrame(tick);
     });
-    await playIntro(page).tap();
+    await replayIntro(page).tap();
     await until(page, (s) => s.dialogue?.phase === 'walk', 'walking in');
     // (A tap meanwhile finishes nothing: the line hasn't begun.)
     await goOn(page, true);
@@ -600,7 +601,7 @@ test.describe('on a phone', () => {
     await expect(box(page)).toBeHidden();
     await expect(page.locator('.inv-toolbar')).toBeVisible();
     await until(page, (s) => s.state !== 'talk' && s.buttonsEnabled && !s.toolbarTalking, 'back to play');
-    await expect(playIntro(page)).toBeEnabled();
+    await expect(replayIntro(page)).toBeEnabled();
     await until(
       page,
       (s) => Math.abs(s.camera.distance - home.distance) < 0.02 * home.distance && !s.camera.turning,
@@ -616,7 +617,7 @@ test.describe('on a phone', () => {
     await until(page, (s) => s.state === 'react', 'a tap makes him react');
   });
 
-  test('Play Intro rests while he’s held', async ({ page }) => {
+  test('Replay Intro rests while he’s held', async ({ page }) => {
     await calm(page);
     const cdp = await page.context().newCDPSession(page);
     const touch = (type, points = []) =>
@@ -628,10 +629,10 @@ test.describe('on a phone', () => {
     await touch('touchStart', [body]);
     for (let i = 1; i <= 8; i++) await touch('touchMove', [{ x: body.x + i * 4, y: body.y - i * 6 }]);
     await until(page, (s) => s.held, 'held');
-    await expect(playIntro(page)).toBeDisabled();
+    await expect(replayIntro(page)).toBeDisabled();
     await touch('touchEnd');
     await until(page, (s) => s.state === 'idle', 'down again');
-    await expect(playIntro(page)).toBeEnabled();
+    await expect(replayIntro(page)).toBeEnabled();
   });
 });
 
@@ -670,8 +671,56 @@ test.describe('on a desktop', () => {
     await page.keyboard.press('Escape');
     await expect(box(page)).toBeHidden();
     await until(page, (s) => !s.dialogue && s.state !== 'talk', 'ended');
-    await expect(playIntro(page)).toBeFocused();
+    await expect(replayIntro(page)).toBeFocused();
     expect(errors).toEqual([]);
+  });
+
+  test('Replay Intro replays only the dialogue: no envelope, straight to its first box', async ({ page }) => {
+    await calm(page);
+    const intro = await script(page);
+    await open(page);
+    await expect(page.locator('.inv-envelope')).toHaveCount(0);
+    expect((await snapshot(page)).dialogue.id).toBe(intro.start);
+  });
+
+  test('Skip Intro is on screen all through the intro and ends it at once, with no question', async ({ page }) => {
+    const errors = watch(page);
+    await calm(page);
+    await useBehaviorIntro(page);
+    await open(page);
+    const skipIntro = page.locator('.inv-talk [data-intro-skip]');
+    await expect(skipIntro).toBeVisible();
+    await expect(skipIntro).toHaveAccessibleName('Skip Intro');
+    // (Still there under the Log.)
+    await page.getByRole('button', { name: 'Log', exact: true }).click();
+    await expect(page.locator('.inv-talk-log')).toBeVisible();
+    await expect(skipIntro).toBeVisible();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await skipIntro.click();
+    await expect(box(page)).toBeHidden();
+    await expect(page.getByRole('alertdialog')).toBeHidden();
+    await until(page, (s) => !s.dialogue && !s.toolbarTalking, 'ended');
+    await expect(replayIntro(page)).toBeFocused();
+    expect(errors).toEqual([]);
+  });
+
+  test('a line’s own line breaks show as breaks', async ({ page }) => {
+    await calm(page);
+    const intro = structuredClone(behaviorIntro);
+    const first = intro.boxes.find((b) => b.id === intro.start);
+    first.text = 'One short line.' + String.fromCharCode(10) + 'And a second one.';
+    await page.evaluate((i) => window.__invitation.setIntro(i), intro);
+    await open(page);
+    await goOn(page);
+    await until(page, (s) => s.dialogue?.typed, 'the line up');
+    const text = page.locator('.inv-talk-text');
+    await expect(text).toHaveCSS('white-space', 'pre-line');
+    const lines = await text.evaluate((el) => {
+      const r = document.createRange();
+      r.selectNodeContents(el.querySelector('.inv-talk-typed'));
+      return new Set([...r.getClientRects()].map((q) => Math.round(q.top))).size;
+    });
+    expect(lines).toBe(2);
   });
 
   test('after a click on Auto, Skip or Log, Space and Enter still go on; from the keyboard, focus stays on the button', async ({
@@ -856,7 +905,7 @@ test.describe('on a desktop', () => {
       };
       requestAnimationFrame(tick);
     });
-    await playIntro(page).click();
+    await replayIntro(page).click();
     await until(page, (s) => Boolean(s.dialogue), 'the intro up');
     // Through to the end: Skip, a reply, Skip.
     for (let i = 0; i < 12; i++) {

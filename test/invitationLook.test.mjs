@@ -821,6 +821,7 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
     perf: false,
     govern: null,
     settle: null,
+    envelope: false,
   });
   assert.deepEqual(parseQuery(''), {
     test: false,
@@ -829,7 +830,12 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
     perf: false,
     govern: null,
     settle: null,
+    envelope: true,
   });
+  // The envelope opens every visit; ?test skips it (the specs and tools start in the toy) unless
+  // &envelope asks for it.
+  assert.equal(parseQuery('?test&envelope').envelope, true);
+  assert.equal(parseQuery('?seed=3').envelope, true);
   // ?settle stretches the intro's reply settle (ms), for the specs only: under ?test.
   assert.equal(parseQuery('?test&settle=1500').settle, 1500);
   assert.equal(parseQuery('?settle=1500').settle, null);
