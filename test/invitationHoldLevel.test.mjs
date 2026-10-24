@@ -340,7 +340,10 @@ test('height: a wheel notch (deltaY 100) moves his hold height by 0.10 ± 0.015 
   assert.ok(h.c.anchor.y <= LOW + LEVEL.range + 0.01, `his collar under the cap (${h.c.anchor.y})`);
   for (let i = 0; i < 40; i++) h.hold.onWheel(100);
   h.rest(back, 60);
-  assert.ok(Math.abs(h.last.holdY - LOW) < 1e-3, `down to his hang height, no lower (${h.last.holdY})`);
+  assert.ok(
+    Math.abs(h.last.holdY - (LOW + LEVEL.floor)) < 1e-3,
+    `down to his hang height and the margin, no lower (${h.last.holdY})`,
+  );
 });
 
 test('height: a second finger dragged 100 px up raises him 0.8 ± 0.05, down lowers him', () => {
@@ -399,13 +402,34 @@ test('the floor: a 100 px down drag keeps his collar on the cursor (no gap) and 
     let worst = 0;
     for (const p of path(at, to, 10)) {
       const a = h.go(p);
-      assert.ok(a.y >= LOW - 1e-6, `${screen}: at least his hang height (${a.y})`);
+      assert.ok(a.y >= LOW + LEVEL.floor - 1e-6, `${screen}: at least his hang height and the margin (${a.y})`);
       const q = E.project(a);
       worst = Math.max(worst, Math.hypot(q.x - p.x, q.y - p.y));
     }
     h.rest(to, 10);
     assert.ok(worst <= 2, `${screen}: ${worst.toFixed(2)} px off the cursor`);
     assert.ok(Math.abs(h.c.anchor.y - 1) < 0.01, `${screen}: still at his hold height (${h.c.anchor.y})`);
+  }
+});
+
+test('the floor: with the camera at 12° (the plane upright), a down drag to the floor keeps his collar on the cursor and LEVEL.floor (0.06) over his hang height, so his limp feet stay off it', () => {
+  for (const screen of ['phone', 'desktop']) {
+    const E = env(screen, { elevation: 12 });
+    // (Grabbed back from the front wall: at 12° the middle of the view at height 1 is near it.)
+    const h = carried(E, onRayAt(E, { x: 0, y: -150 }, 1));
+    const at = h.p0;
+    h.rest(at, 30);
+    const to = { x: at.x, y: at.y + 100 };
+    let low = Infinity;
+    let worst = 0;
+    for (const p of path(at, to, 25)) {
+      const a = h.go(p);
+      low = Math.min(low, a.y);
+      const q = E.project(a);
+      worst = Math.max(worst, Math.hypot(q.x - p.x, q.y - p.y));
+    }
+    assert.ok(Math.abs(low - (LOW + LEVEL.floor)) < 1e-6, `${screen}: down to the margin (${low})`);
+    assert.ok(worst <= 2, `${screen}: on the cursor (${worst.toFixed(2)} px)`);
   }
 });
 

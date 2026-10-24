@@ -38,7 +38,8 @@ const RAD = Math.PI / 180;
  * height; up the screen, a negative delta, raises him); grabHalf: the halflife (s) of the ease up
  * as he's picked up, half: of every change after; levelFrom, uprightAt: the camera's elevations
  * (degrees) the plane is level from and upright at, smoothly between; fingerLift: CSS px a finger
- * carries him above itself; wallCos: out past the play area within 45° of straight away from the
+ * carries him above itself; floor: the margin (× his height) over his hang height his collar is
+ * kept above once he's clear of the floor, so his swinging, limp feet never touch it; wallCos: out past the play area within 45° of straight away from the
  * camera (the cosine) is the back wall, within 45° of toward it the front wall, else a side wall.
  */
 export const LEVEL = {
@@ -51,6 +52,7 @@ export const LEVEL = {
   levelFrom: 35,
   uprightAt: 12,
   fingerLift: 48,
+  floor: 0.06,
   wallCos: Math.SQRT1_2,
 };
 
@@ -117,9 +119,11 @@ export function createLevelHold(_deps = {}) {
   let wall = false;
 
   const top = () => low + LEVEL.range * NEWT_HEIGHT;
+  /** The lowest his collar's carried once he's clear of the floor: his hang height and a margin. */
+  const bottom = () => low + LEVEL.floor * NEWT_HEIGHT;
   /** @param {number} dy */
   const raise = (dy) => {
-    goal = clamp(goal + dy, low, top());
+    goal = clamp(goal + dy, bottom(), top());
     touched = true;
   };
 
@@ -134,10 +138,10 @@ export function createLevelHold(_deps = {}) {
       off0 = { x: s.collarPx.x - s.press.x, y: s.collarPx.y - s.press.y };
       low = s.low;
       startY = s.collar.y;
-      clear = startY >= low;
+      clear = startY >= bottom();
       holdY = startY;
       holdV = 0;
-      goal = clamp(low + LEVEL.lift * NEWT_HEIGHT, low, top());
+      goal = clamp(low + LEVEL.lift * NEWT_HEIGHT, bottom(), top());
       touched = false;
       anchor = { ...s.collar };
       cam = { ...s.camera };
@@ -154,7 +158,7 @@ export function createLevelHold(_deps = {}) {
       if (cam && cameraMoved(cam, f.camera)) {
         const at = closestOnRay(ray, anchor);
         p.normal = levelNormal(f.camera.elevation, f.camera.yaw);
-        holdY = goal = clamp(at.y, Math.min(low, holdY), top());
+        holdY = goal = clamp(at.y, Math.min(bottom(), holdY), top());
         holdV = 0;
         p.point = { x: at.x, y: holdY, z: at.z };
       }
@@ -168,7 +172,7 @@ export function createLevelHold(_deps = {}) {
         }
         p.point = { x: anchor.x, y: holdY, z: anchor.z };
       }
-      const floor = clear ? low : Math.min(low, startY);
+      const floor = clear ? bottom() : Math.min(bottom(), startY);
       // (Where the ray meets the plane; a grazing ray, or one with the plane behind it, keeps him
       // on the ray as near as can be to where he was, inside.)
       const denom = dot(ray.d, p.normal);
@@ -209,7 +213,7 @@ export function createLevelHold(_deps = {}) {
       const pulse = atWall && !wall;
       wall = atWall;
       anchor = e.p;
-      if (!clear && anchor.y >= low - 1e-9) clear = true;
+      if (!clear && anchor.y >= bottom() - 1e-9) clear = true;
       return { anchor: { ...anchor }, plane: null, push: e.push, holdY, cues: pulse ? { pulse: true } : {} };
     },
     grabbedAt(t, collar, project) {
