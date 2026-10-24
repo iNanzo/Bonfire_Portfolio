@@ -30,7 +30,15 @@
 // lowest his collar is carried comes from the Held clip at load (his collar over his lowest
 // sole, plus a gap).
 //
-// Play Intro (ui.js) runs the intro's dialogue (dialogue.js, on content.js introScript():
+// The envelope (envelopeScene.js, envelope.js) opens the page every visit: made right after the
+// controls, so it's the loading screen too, it covers the toy and takes every press (the HUD is
+// inert under it); the toy draws its first frame (.is-ready) and waits behind it, paused. Opened,
+// it fades and the intro starts by itself (introWanted, held until the buttons are on), the
+// camera cut to the talk shot; skipped, it drops away and the toy is free, focus on the toolbar.
+// Without WebGL 2, or if NEWT can't load, it steps aside for the message. ?test skips it unless
+// &envelope.
+//
+// Replay Intro (ui.js) runs the intro's dialogue (dialogue.js, on content.js introScript():
 // content.json's invitation.intro as the admin writes it, mended, or the toy's own) on the toy's
 // clock, shown by dialogueUi.js over the stage: the toolbar rests out of sight, the speech bubble
 // goes and stays quiet, the layer takes every press (no drags, no orbit, no floor taps), the first
@@ -50,13 +58,15 @@
 // point he was grabbed by shows), say(text) (a line in his bubble now), play(clip) (forces a
 // clip, Walk and Run going round their step at their own pace) and face(name) (holds any of
 // clips.js FACE_NAMES on him, no blinks; null gives it back to the brain); `?seed=N` and `?calm`
-// go to the brain (and the seed to talk).
+// go to the brain (and the seed to talk). clock() is the toy's clock (it stands still while the
+// envelope covers him), envelope() the envelope's state and pose (null without one).
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
 import './bubble.css';
 import './dialogue.css';
+import './envelope.css';
 import { createBrain } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
 import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
@@ -85,6 +95,7 @@ import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
 import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
+import { createEnvelopeScene } from './envelopeScene.js';
 import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
@@ -155,8 +166,13 @@ let look = loadLook();
 let pressed = null;
 /** Reset Camera was pressed since the last frame. */
 let resetCamera = false;
-/** Play Intro was pressed since the last frame. */
+/** Replay Intro was pressed since the last frame. */
 let introPressed = false;
+/**
+ * The envelope was opened: the intro starts by itself as soon as it can (the buttons on), and
+ * this stays set until it has (beginIntro clears it), unlike the one-shot introPressed.
+ */
+let introWanted = false;
 const ui = bindUi(stageEl, {
   look,
   onButton: (name) => {
@@ -171,6 +187,37 @@ const ui = bindUi(stageEl, {
     introPressed = true;
   },
 });
+
+/** Whether the visitor asked for less motion (false where it can't be read). */
+function prefersReduced() {
+  try {
+    return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  } catch {
+    return false;
+  }
+}
+
+/** The toy behind the envelope has drawn its first frame (then it waits, paused, behind it). */
+let toyReady = false;
+/** The envelope stopped covering the toy (start() sets it: the loop runs again). */
+let envelopeGone = () => {};
+const hudEl = /** @type {HTMLElement} */ (stageEl.querySelector('.inv-hud'));
+const envelope = options.envelope
+  ? createEnvelopeScene(stageEl, {
+      reduced: prefersReduced(),
+      ready: () => toyReady,
+      onUncover: (how) => {
+        hudEl.removeAttribute('inert');
+        if (how === 'open') introWanted = true;
+        // (Skipped: the toy is free, focus on the toolbar's first button.)
+        else /** @type {HTMLElement|null} */ (ui.toolbar.querySelector('button:not(:disabled)'))?.focus();
+        envelopeGone();
+      },
+    })
+  : null;
+if (envelope) hudEl.setAttribute('inert', '');
+/** The envelope's state for ?test (types.js EnvelopeState), null without one. */
+const envelopeState = () => (envelope ? envelope.state : null);
 
 /** @param {import('./look.js').Look} next */
 function onLook(next) {
@@ -238,6 +285,7 @@ if (!stage) {
   stageEl.dataset.webgl = 'off';
   ui.setToolbar(false);
   ui.setStatus('NEWT needs WebGL 2 to draw, and this browser has it turned off.');
+  envelope?.aside();
 } else {
   start(stage);
 }
@@ -454,6 +502,7 @@ function start(s) {
     })
     .catch(() => {
       ui.setStatus('NEWT couldn’t load. Check the connection, then reload.', { reload: true });
+      envelope?.aside();
     });
 
   // --- Where things are.
@@ -649,7 +698,7 @@ function start(s) {
     // the camera.)
     const evs = intro ? [] : events;
     events = [];
-    if (introPressed) beginIntro();
+    if (introPressed || introWanted) beginIntro();
     introPressed = false;
     const box = introStep();
     const pose = moveCamera(evs, dt);
@@ -705,19 +754,18 @@ function start(s) {
 
   /** Whether the visitor asked for less motion (false where it can't be read). */
   function reducedMotion() {
-    try {
-      return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
-    } catch {
-      return false;
-    }
+    return prefersReduced();
   }
 
   /**
-   * Play Intro: the dialogue starts from its first box (when the buttons are on: never while he's
-   * held or falling); the toolbar rests, the bubble goes, the camera turns to the front.
+   * Replay Intro, or the envelope opened: the dialogue starts from its first box (when the
+   * buttons are on: never while he's held or falling); the toolbar rests, the bubble goes, the
+   * camera turns to the front (from the envelope it cuts there: the envelope fades onto the shot).
    */
   function beginIntro() {
     if (intro || !out?.buttonsEnabled || ui.sheetOpen) return;
+    const fromEnvelope = introWanted;
+    introWanted = false;
     intro = createDialogue(playScript(), { reduced: reducedMotion() });
     intro.start(t);
     intro.pause(true, t);
@@ -730,7 +778,7 @@ function start(s) {
     hover = null;
     bubble.hide();
     ui.setTalking(true);
-    orbitTalk(cam, true, { cut: reducedMotion() });
+    orbitTalk(cam, true, { cut: fromEnvelope || reducedMotion() });
     talkUi.open();
   }
 
@@ -1094,27 +1142,33 @@ function start(s) {
       lost = true;
       sync();
       ui.setStatus('Something went wrong drawing NEWT. Reload to try again.', { reload: true });
+      envelope?.aside();
       return;
     }
     if (!drawn) {
       drawn = true;
       stageEl.classList.add('is-ready');
       ui.setStatus(null);
+      // (Under the envelope: drawn once, then it waits there until it's uncovered.)
+      toyReady = true;
+      sync();
     }
   }
 
   function sync() {
-    const should = Boolean(character) && !lost && !document.hidden;
+    const should = Boolean(character) && !lost && !document.hidden && !(drawn && envelope?.covers);
     if (should === running) return;
     running = should;
     last = -1; // (the time it was hidden doesn't count)
     s.renderer.setAnimationLoop(running ? frame : null);
   }
   document.addEventListener('visibilitychange', sync);
+  envelopeGone = sync;
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
     lost = true;
     sync();
+    envelope?.aside();
     ui.setStatus('NEWT’s picture was lost when the graphics driver reset. Reload to bring him back.', {
       reload: true,
     });
@@ -1219,8 +1273,14 @@ function start(s) {
         // Log and the question, the shot and where the camera's going.)
         dialogue: introSnapshot(),
         toolbarTalking: ui.talking,
+        // (The envelope's state, null without one: types.js EnvelopeState.)
+        envelope: envelopeState(),
         options,
       }),
+      /** The toy's clock, seconds (it stands still while the envelope covers him). */
+      clock: () => t,
+      /** The envelope's state, reduced motion, pose and frames drawn; null without one. */
+      envelope: () => envelope?.snapshot() ?? null,
       /** @param {'head'|'body'|'feet'} part */
       screen(part) {
         const sh = shape();
