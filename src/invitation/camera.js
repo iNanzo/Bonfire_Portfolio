@@ -11,8 +11,8 @@
 // little once the finger lifts. A pan (the mouse's left-drag on empty space, or two fingers'
 // middle) slides it across and up and down the screen at once, the floor under the cursor going
 // with it (orbitPan), the point it looks at kept to a region round the play area's middle
-// (panRegion: the area's half less what the view shows its narrower way at this zoom, so none
-// fully zoomed out and more the closer it zooms): past it the pan gives like a rubber band
+// (panRegion: a disc, the area's radius less what the view shows its narrower way at this zoom,
+// more the closer it zooms): past it the pan gives like a rubber band
 // (ORBIT.band, at most ORBIT.bandPx further) and, let go, eases back inside at ORBIT.bandBack.
 // The wheel and a pinch zoom about the cursor or the fingers' middle (orbitZoom's `at`: the floor
 // there stays there as the zoom eases, and the view is the user's from then on, a pan), the
@@ -22,8 +22,9 @@
 // The point it orbits sits at NEWT's middle height over its rest point (`base`, the play area's
 // middle to begin with) and follows NEWT softly the closer it zooms, all the way at the closest;
 // on a phone (pixels.js compactStage), where he's drawn bigger, ORBIT.phoneFollow of the way at
-// the default zoom too. The play area is bigger than any view but the fully zoomed-out one
-// (area.js), so the view keeps him on screen however it's turned: while he's well inside the
+// the default zoom too. The play area holds all the floor the default view shows however it's
+// turned, so it's bigger than the screen (area.js), and the view keeps him on screen: while
+// he's well inside the
 // clear space (ORBIT.keepIn of it round where the point it looks at shows) it holds still, and
 // as he nears its edge the rest point moves on with him, softly, never letting him past
 // ORBIT.keepOut of it once he's on screen (orbitStep, from where screenOf puts him). A pan
@@ -31,7 +32,9 @@
 // grab or tap on him (orbitFollow) or Reset Camera ends it.
 // While he's held (orbitHold) it holds still, so the point he's grabbed by stays under the
 // cursor; let go out past ORBIT.keepOut (carried to the screen's edge), the view eases back
-// round him at ORBIT.settle rather than snapping there in a frame. While the Look sheet is open it follows him all the way at any zoom (orbitFollowAll),
+// round him at ORBIT.settle rather than snapping there in a frame. What's on screen
+// (orbitSight, the floor where he shows whole) is the play area's `sight`: wander goals and a
+// flee keep to it (steer.js). While the Look sheet is open it follows him all the way at any zoom (orbitFollowAll),
 // so he stays in the clear space the sheet leaves. Reset Camera eases back to the default view,
 // the short way round, and clears the pan. The light goes round with it (lightDir: the look's
 // sun turned by the camera's yaw), so his shadow always falls the same way on screen, back and
