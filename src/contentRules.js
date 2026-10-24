@@ -24,6 +24,15 @@ import { LEGACY_SHADER, MOTIONS, STYLES } from './invitation/look.js';
 import { PIXEL_SIZES as INVITATION_PIXEL_SIZES } from './invitation/pixels.js';
 import { SHADER_CONTROLS } from './invitation/shader.js';
 import { LINE_MAX, LINES_MAX, SPEECH_RANGES, TRIGGERS } from './invitation/speech.js';
+import {
+  GATE_ALG,
+  GATE_HASH_BYTES,
+  GATE_ITER_RANGE,
+  GATE_LOCK_MAX,
+  GATE_PAGES,
+  GATE_REMEMBER,
+  GATE_SALT_BYTES,
+} from './gate/pages.js';
 
 // The basics moved to ruleBasics.js (so scenes.js can use them); re-exported for everyone
 // who imports them from here.
@@ -294,6 +303,83 @@ export function validateInvitation(inv, err, warn, base = 'invitation') {
   if (inv.speech !== undefined && check.group(inv.speech, 'speech')) invitationSpeech(inv.speech, check);
   if (inv.lines !== undefined && check.group(inv.lines, 'lines')) invitationLines(inv.lines, check);
   if (inv.intro !== undefined && check.group(inv.intro, 'intro')) invitationIntro(inv.intro, check);
+}
+
+/** A key that looks like it holds a password (or its plain text), anywhere in the gate. */
+const PLAINTEXT_KEY = /pass|pwd|plain|secret/i;
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+/** The byte length of base64 `v`, or -1 when it isn't base64. */
+const base64Bytes = (v) =>
+  typeof v === 'string' && v.length % 4 === 0 && BASE64_RE.test(v)
+    ? (v.length / 4) * 3 - (v.match(/=+$/)?.[0].length ?? 0)
+    : -1;
+
+/**
+ * Check the sitewide lock (content.json `gate`, the admin's Access page; src/gate/pages.js has
+ * its pieces). Every part is optional (a missing switch or word takes its default), but `on`
+ * needs a key: you can't lock without a password. The key is exactly what Set Password writes
+ * (its algorithm, iterations within range, a 16-byte salt and a 32-byte hash in base64, the
+ * day). Nothing that looks like a password may be stored anywhere in it: the admin's save runs
+ * these rules, so plaintext can never be committed.
+ * @param {any} g @param {(path: string, message: string) => void} err @param {string} [base]
+ */
+export function validateGate(g, err, base = 'gate') {
+  if (!isObj(g)) return err(base, 'Must be a group of fields.');
+  const at = (p) => `${base}.${p}`;
+  (function plain(v, p) {
+    if (!isObj(v)) return;
+    for (const [k, x] of Object.entries(v)) {
+      if (PLAINTEXT_KEY.test(k)) err(`${p}.${k}`, 'Never store a password here: Set Password keeps only its hash.');
+      else plain(x, `${p}.${k}`);
+    }
+  })(g, base);
+  /** Keys of `obj` that aren't its own (a password-like one has its error already). */
+  const own = (obj, p, keys) => {
+    for (const k of Object.keys(obj))
+      if (!keys.includes(k) && !PLAINTEXT_KEY.test(k)) err(`${p}.${k}`, 'Unknown setting.');
+  };
+  own(g, base, ['on', 'pages', 'remember', 'lock', 'key']);
+  const key = g.key ?? null;
+  if (g.on !== undefined && typeof g.on !== 'boolean') err(at('on'), 'Must be on or off.');
+  else if (g.on === true && key === null) err(at('on'), 'Set a password first: the lock needs one to turn on.');
+  if (g.pages !== undefined) {
+    if (!isObj(g.pages)) err(at('pages'), 'Must be a group of fields.');
+    else {
+      own(g.pages, at('pages'), Object.keys(GATE_PAGES));
+      for (const k of Object.keys(GATE_PAGES))
+        if (g.pages[k] !== undefined && typeof g.pages[k] !== 'boolean') err(at(`pages.${k}`), 'Must be on or off.');
+    }
+  }
+  const [min, max] = GATE_REMEMBER;
+  if (g.remember !== undefined && !(Number.isInteger(g.remember) && g.remember >= min && g.remember <= max))
+    err(at('remember'), `A whole number of days, ${min} to ${max}.`);
+  if (g.lock !== undefined) gateLock(g.lock, at('lock'), err, own);
+  if (key !== null) gateKey(key, at('key'), err, own);
+}
+
+/** The lock page's words: each text, not empty, within its length. */
+function gateLock(lock, p, err, own) {
+  if (!isObj(lock)) return err(p, 'Must be a group of fields.');
+  own(lock, p, Object.keys(GATE_LOCK_MAX));
+  for (const [k, most] of Object.entries(GATE_LOCK_MAX)) {
+    const v = lock[k];
+    if (v === undefined) continue;
+    if (typeof v !== 'string' || !v.trim()) err(`${p}.${k}`, 'Text, not empty.');
+    else if (v.length > most) err(`${p}.${k}`, `Up to ${most} characters.`);
+  }
+}
+
+/** The key, exactly as Set Password writes it. */
+function gateKey(key, p, err, own) {
+  if (!isObj(key)) return err(p, 'Must be a key Set Password made.');
+  own(key, p, ['alg', 'iter', 'salt', 'hash', 'set']);
+  if (key.alg !== GATE_ALG) err(`${p}.alg`, `Must be ${GATE_ALG}.`);
+  const [lo, hi] = GATE_ITER_RANGE;
+  if (!Number.isInteger(key.iter) || key.iter < lo || key.iter > hi) err(`${p}.iter`, `Between ${lo} and ${hi}.`);
+  if (base64Bytes(key.salt) !== GATE_SALT_BYTES) err(`${p}.salt`, `${GATE_SALT_BYTES} bytes in base64.`);
+  if (base64Bytes(key.hash) !== GATE_HASH_BYTES) err(`${p}.hash`, `${GATE_HASH_BYTES} bytes in base64.`);
+  if (key.set !== undefined && !(typeof key.set === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(key.set)))
+    err(`${p}.set`, 'A day, as YYYY-MM-DD.');
 }
 
 /** The invitation's default look: the stored look's fields, each from its list or a switch. */
@@ -652,6 +738,9 @@ export function validateContent(c) {
   // The invitation toy (/invitation/): optional too (content from before it has none), checked
   // in full when it's there.
   if (c.invitation !== undefined) validateInvitation(c.invitation, err, warn);
+
+  // The sitewide password lock (the admin's Access page): optional as well, checked when there.
+  if (c.gate !== undefined) validateGate(c.gate, err);
 
   // hero
   if (obj(c.hero, 'hero')) {
