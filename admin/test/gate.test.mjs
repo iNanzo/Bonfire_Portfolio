@@ -156,7 +156,9 @@ test('every lock field has a name and help; the help says it keeps visitors out,
   assert.match(plain, /search engines/i, 'what it keeps out');
   assert.match(plain, /public/i, 'and that the code is public');
   assert.match(moreFor('gate'), /Cloudflare|private/i, 'the stronger path');
-  assert.match(resolveHelp(HELP['gate.key'], {}), /locks? out/i, 'a new password locks everyone out again');
+  // (That a new password locks everyone out again is said once, by the password's own control.)
+  assert.match(resolveHelp(HELP['gate.key'], {}), /hash/i, 'kept only as a hash');
+  assert.match(resolveHelp(HELP['gate.key'], {}), /passphrase/i, 'a long one is safest');
   assert.ok(SUBGROUPS['gate.lock'], 'the lock page’s words in groups');
   assert.deepEqual(SUBGROUPS['gate.lock'].flatMap((g) => g.keys).sort(), Object.keys(GATE_LOCK).sort());
   assert.deepEqual(

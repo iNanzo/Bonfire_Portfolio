@@ -38,8 +38,7 @@ export const GATE_LABELS = {
 export const GATE_HELP = {
   gate: 'Keeps visitors and search engines out of the pages you pick. It doesn’t hide the code: this site’s repository is public.',
   'gate.on': 'On: the locked pages ask for the password first. Set one first; a save publishes it in about 15 minutes.',
-  'gate.key':
-    'Typed twice, kept only as a salted slow hash. A new password locks out every browser that unlocked with the old one.',
+  'gate.key': 'Typed twice and kept only as a salted slow hash. The hash is public, so pick a long passphrase.',
   'gate.remember': 'How long a browser stays unlocked after the right password, from 1 to 365 days.',
   'gate.pages': 'Which pages ask for the password. The 404 page and the admin never do.',
   'gate.pages.portfolio': 'The title screen, every screen and every project page.',
