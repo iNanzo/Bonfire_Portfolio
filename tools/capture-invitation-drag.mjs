@@ -222,7 +222,9 @@ async function moves(page, size) {
   const down = { x: at.x, y: at.y + 60 };
   await along(press.move, ease(line(up, down)), 2000);
   await say(page, 'across 200');
-  const across = { x: down.x + (size.w / 2 > down.x ? 200 : -200), y: down.y - 80 };
+  // (200 px the way with more room, kept 24 px inside the screen: a phone's is narrower.)
+  const way = size.w - down.x >= down.x ? 1 : -1;
+  const across = { x: Math.min(size.w - 24, Math.max(24, down.x + way * 200)), y: down.y - 80 };
   await along(press.move, ease(line(down, across)), 1200);
   at = across;
   await say(page, 'lift');
