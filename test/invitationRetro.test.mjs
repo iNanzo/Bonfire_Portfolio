@@ -12,12 +12,16 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
   ALL,
+  BURST,
+  HOVER,
   ID,
   MAX_SOFT,
   POST_SHADER,
+  burstAt,
   catcherMaterial,
   createRetro,
   decalMaterial,
+  hoverEase,
   markId,
   snapShift,
   subjectBoxes,
@@ -504,4 +508,31 @@ test('at Pixel Size Off his materials take the hover as a Bayer tint (no halo): 
   assert.ok(near(a.uniforms.uHover.value, 0.7));
   retro.setHover(0);
   retro.dispose();
+});
+
+test('the hover eases in over 0.08 s while the pointer is on him and out over 0.2 s; the grab ring grows to about 20 texels and is gone in 0.35–0.4 s', () => {
+  assert.equal(HOVER.in, 0.08);
+  assert.equal(HOVER.out, 0.2);
+  let k = 0;
+  for (let i = 0; i < 4; i++) k = hoverEase(k, true, 0.02);
+  assert.ok(near(k, 1), `in, in four 20 ms frames: ${k}`);
+  assert.ok(near(hoverEase(0, true, 0.04), 0.5), 'half way in at 0.04 s');
+  assert.equal(hoverEase(1, true, 0.5), 1, 'never over 1');
+  assert.ok(near(hoverEase(1, false, 0.1), 0.5), 'half way out at 0.1 s');
+  assert.equal(hoverEase(0.2, false, 0.5), 0, 'never under 0');
+  assert.ok(BURST.time >= 0.35 && BURST.time <= 0.4);
+  assert.ok(BURST.radius >= 16 && BURST.radius <= 24);
+  const at = (s) => burstAt(s);
+  assert.deepEqual(at(0), { radius: 0, strength: 1 });
+  let r = 0;
+  let w = 1;
+  for (let s = 0.02; s < BURST.time; s += 0.02) {
+    const b = at(s);
+    assert.ok(b.radius >= r && b.strength <= w, `grows and thins: ${s}`);
+    r = b.radius;
+    w = b.strength;
+  }
+  assert.ok(at(BURST.time * 0.5).radius > BURST.radius * 0.6, 'it eases out: most of the way by half time');
+  assert.equal(at(BURST.time), null, 'gone');
+  assert.equal(at(1), null);
 });
