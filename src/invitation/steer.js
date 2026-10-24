@@ -138,7 +138,7 @@ export function clampTo(b, p) {
  * A rounded box's corner radius (0 for any other bounds), no more than half its narrower side.
  * @param {Bounds} b
  */
-function rounded(b) {
+export function rounded(b) {
   if (b.r !== undefined || !(Number(b.round) > 0)) return 0;
   return Math.min(Number(b.round), (b.maxX - b.minX) / 2, (b.maxZ - b.minZ) / 2);
 }

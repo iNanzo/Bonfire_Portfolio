@@ -19,7 +19,7 @@
 // lowest foot meets the floor. Pure: no three.js.
 
 import { rayPlane } from './gesture.js';
-import { centreOf, clampTo, xRange } from './steer.js';
+import { centreOf, clampTo, rounded, xRange } from './steer.js';
 
 /** @typedef {import('./types.js').XYZ} XYZ */
 /** @typedef {import('./types.js').Bounds} Bounds */
@@ -173,25 +173,62 @@ function keepInside(b, p, plane) {
 }
 
 /**
+ * Where the line through `p` along unit `u` crosses the circle round `c` of radius `r`, as
+ * [lo, hi] distances from `p`, or null when it misses.
+ * @param {{x: number, z: number}} p
+ * @param {{x: number, z: number}} u
+ * @param {{x: number, z: number}} c
+ * @param {number} r
+ * @returns {[number, number]|null}
+ */
+function chord(p, u, c, r) {
+  const dx = p.x - c.x;
+  const dz = p.z - c.z;
+  const half = dx * u.x + dz * u.z;
+  const disc = half * half - (dx * dx + dz * dz - r * r);
+  if (disc < 0) return null;
+  const root = Math.sqrt(disc);
+  return [-half - root, -half + root];
+}
+
+/**
  * The span of the line through `p` along unit `u` (across the floor) that's inside `b`, as
  * [lo, hi] distances from `p`, or null when it misses: a disc's chord, or the box's or the
- * trapezoid's four sides each cutting it.
+ * trapezoid's four sides each cutting it; a rounded box's ends that fall in a corner past its
+ * arc come in to the arc (the arc is inside the box, so the line meets it between them).
  * @param {Bounds} b
  * @param {{x: number, z: number}} p
  * @param {{x: number, z: number}} u
  * @returns {[number, number]|null}
  */
 export function lineSpan(b, p, u) {
-  if (b.r !== undefined) {
-    const c = centreOf(b);
-    const dx = p.x - c.x;
-    const dz = p.z - c.z;
-    const half = dx * u.x + dz * u.z;
-    const disc = half * half - (dx * dx + dz * dz - b.r * b.r);
-    if (disc < 0) return null;
-    const root = Math.sqrt(disc);
-    return [-half - root, -half + root];
+  if (b.r !== undefined) return chord(p, u, centreOf(b), b.r);
+  const span = sideSpan(b, p, u);
+  const r = rounded(b);
+  if (!span || !(r > 0)) return span;
+  /** @type {[number, number]} */
+  const out = [span[0], span[1]];
+  for (const end of [0, 1]) {
+    const q = { x: p.x + u.x * span[end], z: p.z + u.z * span[end] };
+    // (The corner's arc centre: the inner box's nearest point; within r of it, inside already.)
+    const c = { x: clamp(q.x, b.minX + r, b.maxX - r), z: clamp(q.z, b.minZ + r, b.maxZ - r) };
+    if (Math.hypot(q.x - c.x, q.z - c.z) <= r) continue;
+    const arc = chord(p, u, c, r);
+    if (!arc) return null;
+    out[end] = arc[end];
   }
+  return out[0] <= out[1] ? out : null;
+}
+
+/**
+ * The span of the line through `p` along unit `u` inside the box's or the trapezoid's four
+ * sides (lineSpan), or null when it misses.
+ * @param {Bounds} b
+ * @param {{x: number, z: number}} p
+ * @param {{x: number, z: number}} u
+ * @returns {[number, number]|null}
+ */
+function sideSpan(b, p, u) {
   const corners = [
     { x: b.minX, z: b.maxZ },
     { x: b.maxX, z: b.maxZ },

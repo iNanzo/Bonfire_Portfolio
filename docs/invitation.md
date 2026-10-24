@@ -356,8 +356,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     his collar no lower than it was grabbed at, or his hang height once he's been lifted clear
     of the floor, so a still cursor never lifts him off it, and no higher than `CARRY.liftMax`,
     5), the anchor the pointer's spot with no lag, kept inside the play area along the drag
-    plane's line across the floor (`lineSpan`: at an edge he stops, never sliding along it in
-    depth), and the swing driven by a smoothed follow of
+    plane's line across the floor (`lineSpan`: at an edge he stops, on a rounded square's
+    corner arcs too, never sliding along it in depth), and the swing driven by a smoothed follow of
     it, past `CARRY.tiltSoft` (0.6 rad) a stiff spring easing him back instead of a hard stop;
     `limbStep` is the spring his limp limbs and his earrings hang on (character.js); `lookAt.js` `screenAim` aims his look camera-relative (performative gaze): seen from
     the camera the cursor lies some heads (`LOOK.headSize`, 0.53) from his head in some
