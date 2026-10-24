@@ -530,7 +530,8 @@ test('in vi-only mode units and numbers are Vietnamese', () => {
 
 test('display text is 7:1 or better on its opaque panels (read from the stylesheet)', () => {
   const css = readFileSync(new URL('../src/larp/css/display.css', import.meta.url), 'utf8');
-  const tokens = readFileSync(new URL('../src/tokens.css', import.meta.url), 'utf8');
+  // (tokens.css imports its values from tokenValues.css.)
+  const tokens = readFileSync(new URL('../src/tokenValues.css', import.meta.url), 'utf8');
   const hex = (src, name) => {
     const m = new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, 'i').exec(src);
     assert.ok(m, `${name} is a plain hex color`);
