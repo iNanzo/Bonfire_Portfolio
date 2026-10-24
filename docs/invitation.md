@@ -16,11 +16,15 @@ unlisted: nothing links to it and search engines are asked not to index it.
   shoulder at your finger every few seconds, his chest twisting with it (with your finger
   straight behind him, over the shoulder nearer you, so you see him look back); he's never too
   fast to catch.
-- **Drag him** to pick him up by the collar. The spot you grabbed stays right under your
-  cursor (a finger carries him a little above itself, so it doesn't hide him, and near the top
-  of the screen no higher than keeps his head on it): move up and he
-  rises, high off the floor if you like; move across and he goes across. He dangles and swings;
-  let go and he falls, lands and gets back up. Flick him and he flies a little; let go while
+- **Drag him** to pick him up by the collar. The spot you grabbed starts under your cursor and
+  in about a tenth of a second his collar is there instead (a finger carries him a little above
+  itself, so it doesn't hide him, and near the top of the screen no higher than keeps his head
+  on it): move up and he
+  rises, high off the floor if you like; move across and he goes across. He dangles and swings,
+  his arms and legs hanging limp and swinging with the motion; at the edge of his patch he stops
+  instead of sliding along it. Held, he hangs his head, and every few seconds (sooner if you
+  shake him) he thrashes about, kicking and flailing; let go and he falls, lands and gets back
+  up. Flick him and he flies a little; let go while
   pushing him against the edge of his patch and he just drops there. The camera holds still
   while you carry him.
 - **Tap the floor** (or click it) and he walks there. A ring on the floor shows where your
@@ -57,6 +61,14 @@ unlisted: nothing links to it and search engines are asked not to index it.
   runs off for a few seconds, across the screen to one side or the other, or away from the
   cursor), Wander (on: he strolls around by himself) and Look. The buttons rest while he's being
   held or falling.
+- **Give Device** hands him a tablet with a tiny pixel game on it. Each press does the next
+  thing: he turns to you and sits down with it in both hands, playing (the button then says Lie
+  Down); he lies down on his stomach with it, turned most of the way side-on so you see his
+  profile and the screen past his cap, feet kicking behind him (the button says Get Up); he gets
+  up and puts it away. Anything else you do (a tap, the floor, another button) gets him up
+  first, then does it; picking him up takes him straight off the floor.
+- **His earrings:** a black stud on each earlobe with a thin black line and a little black
+  cross hanging from it, swinging as he walks, turns, is carried or thrashes.
 
 ## The Look Menu
 
@@ -118,9 +130,9 @@ Now and then NEWT says something in a speech bubble over his head, in the page's
 | --- | --- |
 | Reactions | a tap (or Wave, or Spook) makes him wave or startles him |
 | Running | he runs off; he's caught mid-run |
-| Carried | he's picked up, shaken, dropped; he lands |
+| Carried | he's picked up, shaken, thrashes, dropped; he lands |
 | Moving | he walks to a floor tap; he wanders off by himself |
-| Sitting | he sits down by himself (not with Sit); he's still sitting after a quiet spell; he stands up |
+| Sitting | he sits down by himself (not with Sit); he's still sitting after a quiet spell; he stands up (or gets up from lying); Give Device sits him down with the tablet; he lies down with it |
 | Passive | standing about, after a quiet spell of 20 to 40 seconds |
 | Camera | the camera is spun round more than a turn in a few seconds; it's zoomed in very close |
 
@@ -162,7 +174,10 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   words, face and gesture begin together once he's in place. Each box sets his
   face (sad, angry, shy and smug too) and plays its gesture once (a nod, a shrug, a point, a
   cheer, a wave, a start), then talks with his hands while the line types and stands easy once
-  it's up; some boxes hold a loop instead (talking, thinking), and one may sit him down. You
+  it's up; some boxes hold a loop instead (talking, thinking), and a box can ask for any of his
+  animations: walking or running on the spot, dangling from an unseen hand (hanging, thrashing,
+  or a hop that falls into a landing), sitting down (with the tablet too) or lying down with it,
+  each getting him down or up first as it needs (Stand Up and Get Up only get him up). You
   can't pick him up, walk him or turn the camera meanwhile, and he says nothing in his bubble.
 - **The camera** goes round to the front and each box picks a shot: close (his head and
   shoulders), medium (his whole body), wide (the usual view) or keep (as it was), eased there
@@ -186,7 +201,18 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
     corner), `floor.js` (no room: an
     invisible floor that only catches his shadows, a `ShadowMaterial`, over the preset's
     background; and the shadow camera's fit), `character.js` (NEWT's materials, clips with
-    twins for restarts, look-at and faces),
+    twins for restarts, look-at and faces; the limp layer: while he's carried and through the
+    fall, a spring on each of his 12 arm and leg bones, `LIMBS`, carry.js `limbStep`, ω 7 rad/s,
+    ζ 0.35, in a 60° cone, swinging them against their joints' acceleration and back toward the
+    floor as the swing tips him, restored before the mixer like the look's bones so it never
+    adds up, never his chest, neck or head, only on frames his pose stepped (Motion Choppy), eased
+    out over 0.2 s once he's down, run between the animation and the hang; his earrings,
+    `EARLOBES` measured from the glb's head mesh and `EARRING`'s stud, line and Latin cross 2.5
+    times the stud's width, toon and marked as his, each swinging on the same spring about
+    straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
+    bezel and an unlit 16×12 game, nearest-filtered, placed at his palms from clips.js `DEVICE`,
+    shown while DeviceSit and DeviceLie weigh half or more; `accessories` swings the earrings and
+    places the tablet after the look),
     `retro.js` (the pixel pass; `warm` compiles the path not showing once NEWT is in, so the
     first switch to Off or back doesn't stall; `subjectBoxes`: outside the area round NEWT, his
     shadow and the decals every texel is the paper, so the canvas is only cleared there and both
@@ -256,11 +282,16 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
     and the order a frame runs in. `gesture.js` reads the mouse's buttons apart (left: tap,
     grab or pan; right: orbit; middle: pan) and two fingers' middle as a pan; `carry.js`
     drags him on the upright plane facing the camera through where he was grabbed
-    (`dragPlane`, `gripFor`, `dragTarget`: the grab offset kept, from where the press began;
+    (`dragPlane`, `gripFor`, `dragTarget`: the grab offset from where the press began, easing
+    out over `CARRY.offsetEase`, 0.12 s, `offsetAt`, so his collar ends under a mouse's cursor
+    and 24 CSS px over a finger;
     his collar no lower than it was grabbed at, or his hang height once he's been lifted clear
     of the floor, so a still cursor never lifts him off it, and no higher than `CARRY.liftMax`,
-    5), the anchor the pointer's spot with no lag and the swing driven by a smoothed follow of
-    it; `lookAt.js` `screenAim` aims his look camera-relative (performative gaze): seen from
+    5), the anchor the pointer's spot with no lag, kept inside the play area along the drag
+    plane's line across the floor (`lineSpan`: at an edge he stops, never sliding along it in
+    depth), and the swing driven by a smoothed follow of
+    it, past `CARRY.tiltSoft` (0.6 rad) a stiff spring easing him back instead of a hard stop;
+    `limbStep` is the spring his limp limbs and his earrings hang on (character.js); `lookAt.js` `screenAim` aims his look camera-relative (performative gaze): seen from
     the camera the cursor lies some heads (`LOOK.headSize`, 0.53) from his head in some
     direction on screen, and his face turns from the line to the camera toward that direction,
     round that line, so on screen his gaze points at the cursor; none within `LOOK.deadZone`
@@ -288,8 +319,13 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
     toward the side of the pursuer (`BrainOut.look.at`: the pointer, or where it was last
     seen; either side with none); with it straight behind him (past `backSide`, 150°), which
     shoulder is a toss-up, so `play.js` `lookAim` takes it round the side nearer the camera,
-    and you see his face look back. Held, he looks at the viewer with idle glances
-    ('forward'). The Run button with no pointer runs him from a spot beside him square to the
+    and you see his face look back. Held, his head hangs: a light look (`TUNE.heldLook`, 0.15)
+    aimed down (`heldPitch`, `BrainOut.look.pitch`) over the Held clip's drooped head, the sad
+    face (surprised while he's shaken hard), and Thrash once every `thrashMin`–`thrashMax`
+    s (3–7; within `thrashShaken` of a hard shake, never before he's hung `thrashRest`, 1.5 s),
+    then Held again on its own clock. Give Device (`ButtonName` 'Device') goes sitDown →
+    deviceSit, lieDown → deviceLie (turned `lieTurnMin`–`lieTurnMax`, 62–73°, off the camera),
+    getUp; `BrainOut.device` and `deviceLabel` say which, for the toolbar. The Run button with no pointer runs him from a spot beside him square to the
     camera (`TUNE.runFromGap`), across the view. `floor.js` `fitShadow(…, at)` moves the
     shadow camera to wherever he is, by whole shadow texels.
 - **Speech and content:** `speech.js` (pure: `createTalk({lines, speech, rng}).step(...)` reads
@@ -389,7 +425,11 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
   press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`), brain.js's `talk` state (`BrainIn.dialogue`: the
-  box's seq, animation, face and whether it's typing; `TUNE.talkNear`, `talkTurn`;
+  box's seq, animation, face and whether it's typing; any clip, clips.js `DIALOGUE_CLIPS`:
+  `DIALOGUE_WAYS` says which step in place (main.js moves the step phase on by brain.js
+  `talkPhase`) and which dangle him (`dangleLift`: his lowest point `DANGLE.gap` over the
+  floor, Fall a `DANGLE.hop`), `dialogueHolds` which hold (the admin's Loops and Once); the
+  ways down and up are SitDown, LieDown, StandUp and GetUp; `TUNE.talkNear`, `talkTurn`;
   `BrainOut.talkReady` once he's in place, which main.js holds the first line for) and
   camera.js's shots (`orbitTalk`, `shotView`, `orbitShot`, `SHOT`), each framed over the box as
   its own line has it (the line goes in first) and framed again when the box or the stage changes
@@ -420,8 +460,13 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   endless floor: null only above the horizon), `feet()` (his ankles, to measure foot slide),
   `bones()` (his bones from his root), `grabbed()` (while he's held, where the point he was
   grabbed by shows, client px), `say(text)` (a line in his bubble now, as talk would show it),
-  `play(clip)` (Walk and Run step in place at their own pace) and `face(name)` (holds any of
-  `FACE_NAMES` on him, no blinks; null gives his face back to the brain). The snapshot's `camera` has
+  `play(clip)` (Walk and Run step in place at their own pace), `face(name)` (holds any of
+  `FACE_NAMES` on him, no blinks; null gives his face back to the brain) and `press(name)` (a
+  toolbar button's press as the brain gets it, Give Device's `Device` too). The snapshot's
+  `motion` has the carry (`collar` on screen, `heldFor`, the `anchor`, the drag `plane`'s
+  normal, `pushed` at the edge), the limp layer (`limp.weight`, `limp.most`: the most a limb
+  has swung, radians) and Give Device (`device.state` and `label`, the tablet `shown` and its
+  `screen` point, his `turn` off the camera). The snapshot's `camera` has
   the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
   the play area, and `talk` is what he's saying (speech.js's snapshot: the line up and its
   trigger, when the idle clock comes round). While the intro runs, `dialogue` has the box up

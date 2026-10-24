@@ -10,13 +10,18 @@
 //      camera) → a line to show goes to bubble.say
 //   3. steer (walk, flee, face the camera) or carry (held, falling) moves NEWT's root
 //   4. blendStep moves each clip's weight toward BrainOut's; gaitPhase advances the step phase
-//   5. character.update(dt): restore the head's saved animation pose → mixer.update → save it
+//   5. character.update(dt): restore the head's and the limbs' saved animation pose →
+//      mixer.update → save it; then character.limp (while he's carried or falling, and easing
+//      out once he's down: his arms and legs swing as springs on top of the clip, never his
+//      chest, neck or head; only on a frame his pose stepped)
 //   6. root.updateMatrixWorld → carry's tilt on the root → read the collar → move the root by
 //      anchor − collar → root.updateMatrixWorld (only while held; the anchor is where the
-//      cursor's ray meets the camera-facing plane he was grabbed on, plus the grab offset)
+//      cursor's ray meets the camera-facing plane he was grabbed on, plus the grab offset as it
+//      eases out: carry.js offsetAt)
 //   7. lookStep → character.applyLook (on top of the saved pose: it never adds up; his chest
 //      joins in for big looks while he's on his feet, lookAt.js chestShare and torsoStep)
-//   8. faceStep → character.setFace; bubble.update (while a line is up): his head on screen
+//   8. faceStep → character.setFace; character.accessories (his earrings swing on his head as
+//      the look left it; Give Device's tablet at his palms); bubble.update (while a line is up): his head on screen
 //      (character.screenShape; null while the open Look sheet covers it, bubble.js
 //      speakerPoint), clear of the toolbar and the open sheet
 //   9. stage.render: the shadow map once, the colour pass, the retro pass
@@ -86,15 +91,17 @@
  */
 /**
  * @typedef {object} BrainOut
- * @property {string} state  idle, walk, react, flee, held, fall, land, sitDown, sit, standUp, talk
+ * @property {string} state  idle, walk, react, flee, held, fall, land, sitDown, sit, standUp, talk,
+ *   and Give Device's deviceSit, lieDown, deviceLie, getUp
  * @property {string} clip  'gait' (Idle/Walk/Run by speed) or a clip name
  * @property {boolean} restart  start `clip` from 0 this frame
  * @property {{mode: 'stay'|'goto'|'flee'|'face', goal: XZ|null, speed: number}} move  goal: where a goto goes, the camera's spot to face, or where a flee's threat was last seen (with no pointer); speed: the target speed (steer ramps to it)
  * @property {import('./clips.js').FaceName} face  the base face (faces.js adds blinks)
  * @property {import('./clips.js').BlinkMode} blink
- * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: XZ|null}} look  ease:
+ * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: XZ|null, pitch?: number}} look  ease:
  *   a slower look, seconds for it to come round (lookAt.js lookStep), as he's let go; at
- *   ('back'): who he runs from on the floor, for his glances back (null with no one)
+ *   ('back'): who he runs from on the floor, for his glances back (null with no one); pitch:
+ *   'ahead' at this pitch, radians (+ up), not the viewer's (held: his head hangs)
  * @property {boolean} faceCamera  turning to the camera first (a reaction, or sitting down)
  * @property {number} stress
  * @property {boolean} wander
@@ -104,6 +111,8 @@
  * @property {boolean} talkReady  the intro's talk state, in place: up, walked in and turned to the
  *   camera, so the box's line, face and gesture can begin (main.js holds the line until then)
  * @property {'sit'|'lie'|null} [device]  Give Device under way: sitting or lying with the tablet
+ * @property {'Give Device'|'Lie Down'|'Get Up'} [deviceLabel]  what the Give Device button says
+ *   (ui.js): what its next press does
  */
 
 /**
@@ -128,7 +137,8 @@
  * @property {number} t0  when he was grabbed
  * @property {number} t  the last step
  * @property {XYZ} anchor  where the collar goes this frame (world): the pointer's spot on the
- *   plane he's dragged on plus the grab offset (carry.js dragTarget), inside the play area
+ *   plane he's dragged on plus the grab offset as it eases out (carry.js dragTarget), inside the
+ *   play area along the plane's line across the floor
  * @property {XYZ} drive  a critically damped follow of the anchor: the swing and the feel read it
  * @property {XYZ} vel  the drive's velocity
  * @property {{x: number, z: number}} tilt  the root's swing in radians: root.rotation.x and .z (positive z puts his feet toward +x, positive x toward −z)
@@ -138,6 +148,8 @@
  * @property {number} shake  the drive's acceleration, smoothed, world units/s²
  * @property {XZ|null} push  while the pointer's spot is out past the play area's edge: the way
  *   it pushes him, out through the edge (unit length; let go then, he's tossed with nothing across)
+ * @property {{point: XYZ, normal: XYZ}|null} [plane]  the plane he's dragged on (main.js keeps it
+ *   here): at the play area's edge he stops along its line
  */
 
 /** @typedef {{yaw: number, pitch: number}} Aim  radians from his body's facing: yaw + turns toward +x when he faces +z (like root.rotation.y), pitch + looks up */

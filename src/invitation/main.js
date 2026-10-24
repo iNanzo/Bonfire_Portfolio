@@ -17,7 +17,7 @@
 // from the admin's lines and settings, content.js; a line goes to the bubble) → his root: steer
 // on the ground, carry while he's held (his collar, the Neck bone's head, hung where the
 // pointer's ray meets the camera-facing plane through where he was grabbed, plus the grab
-// offset, so the point grabbed stays under the cursor; 48 CSS px above a finger, coming in as
+// offset as it eases out, so his collar comes under the cursor; 24 CSS px above a finger, coming in as
 // he's picked up, and near the top of the stage as low as keeps his head on it: carry.js
 // dragTarget), the fall once he's let go (play.js bodyStep)
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
@@ -48,19 +48,23 @@
 // (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
 // (his ankles in the world, his bones from his root), grabbed() (while he's held, where the
 // point he was grabbed by shows), say(text) (a line in his bubble now), play(clip) (forces a
-// clip, Walk and Run going round their step at their own pace) and face(name) (holds any of
-// clips.js FACE_NAMES on him, no blinks; null gives it back to the brain); `?seed=N` and `?calm`
-// go to the brain (and the seed to talk).
+// clip, Walk and Run going round their step at their own pace), face(name) (holds any of
+// clips.js FACE_NAMES on him, no blinks; null gives it back to the brain) and press(name) (a
+// toolbar button's press, as the brain gets it: types.js ButtonName); snapshot().motion is the
+// carry (his collar on screen, how long he's been held, the anchor and the drag plane, whether
+// he's pushed at the edge), the limp layer (its weight, the most a limb has swung) and Give
+// Device (the brain's device and label, the tablet shown and where, his turn off the camera);
+// `?seed=N` and `?calm` go to the brain (and the seed to talk).
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
 import './invitation.css';
 import './bubble.css';
 import './dialogue.css';
-import { createBrain } from './brain.js';
+import { DANGLE, createBrain, dangleLift, talkPhase } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
 import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
-import { CARRY, carryFeel, dragPlane, dragTarget, gripFor } from './carry.js';
+import { CARRY, carryFeel, dragPlane, dragTarget, gripFor, offsetAt } from './carry.js';
 import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
   createOrbit,
@@ -82,7 +86,7 @@ import {
   shotView,
 } from './camera.js';
 import { loadCharacter } from './character.js';
-import { ANKLE_HEIGHT, BONES, COLLAR, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
+import { ANKLE_HEIGHT, BONES, COLLAR, DIALOGUE_WAYS, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
 import { REPLY_SETTLE, createDialogueUi } from './dialogueUi.js';
 import { createFaceState, faceStep } from './faces.js';
@@ -102,7 +106,7 @@ import { bindUi, parseQuery } from './ui.js';
 const MAX_DT = 0.05;
 const BASE = import.meta.env.BASE_URL;
 /** A finger carries him this far above itself, CSS px, so it doesn't hide him (a mouse: 0). */
-const FINGER_LIFT = 48;
+const FINGER_LIFT = 24;
 /**
  * A finger carrying him near the top of the stage keeps the top of his head this far inside it,
  * CSS px: its lift gives way, then the finger's own spot (a mouse is never moved off its point).
@@ -110,6 +114,10 @@ const FINGER_LIFT = 48;
 const HEAD_ROOM = 8;
 /** The time constant his head's height over the point grabbed is followed at, seconds. */
 const HEAD_FOLLOW = 0.1;
+/** How far along a Foot bone his toes' underside is, model units (pointed down, they're his lowest). */
+const TOE_REACH = 0.8;
+/** His shoe under the Foot bone's line at the toe, model units. */
+const TOE_DEPTH = 0.12;
 /** His soles hang at least this far over the floor while he's held, world units. */
 const HANG_GAP = 0.06;
 /** Extra reach for a finger picking him, CSS px. */
@@ -369,6 +377,8 @@ function start(s) {
   let t = 0;
   /** Motion Choppy: the time his pose has waited since its last step, seconds. */
   let waiting = 0;
+  /** The step his pose last moved by, seconds (0: it didn't this frame): the limp layer's and the earrings'. */
+  let stepped = 0;
   /** A clip forced by ?test's play(), else null (the brain decides). */
   let forced = null;
   /** @type {import('./clips.js').FaceName|null} a face held by ?test's face(), else null (the brain's, with blinks) */
@@ -465,6 +475,12 @@ function start(s) {
     const r = c.bonePos(BONES.footR, { x: 0, y: 0, z: 0 }).y;
     return Math.min(l, r) - ANKLE_HEIGHT * SCALE;
   }
+  /** His lowest point, world units: a sole, or a toe pointed down (Held's dangle). */
+  function lowestY() {
+    const c = /** @type {NonNullable<typeof character>} */ (character);
+    const toe = (name) => c.pointOn(name, TOE_REACH, { x: 0, y: 0, z: 0 }).y - TOE_DEPTH * SCALE;
+    return Math.min(soleY(), toe(BONES.footL), toe(BONES.footR));
+  }
   /**
    * The collar over his lowest sole in the Held clip, at its highest through the clip (so his
    * feet never brush the floor while he's carried), world units.
@@ -502,12 +518,14 @@ function start(s) {
     );
   }
   /**
-   * Where the point he's held by shows, client px: his collar as posed less the grab offset.
+   * Where the point he's held by shows, client px: his collar as posed less the grab offset as
+   * it is now (eased out: his collar, once the grab is in).
    * @param {import('./carry.js').Grip} g
    */
   function grabbedAt(g) {
     const p = /** @type {NonNullable<typeof character>} */ (character).bonePos(COLLAR, { x: 0, y: 0, z: 0 });
-    const at = new Vector3(p.x - g.offset.x, p.y - g.offset.y, p.z - g.offset.z).project(s.camera);
+    const o = offsetAt(g, t);
+    const at = new Vector3(p.x - o.x, p.y - o.y, p.z - o.z).project(s.camera);
     const r = canvas.getBoundingClientRect();
     return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
   }
@@ -687,16 +705,23 @@ function start(s) {
       mix.fade = fadeFor(o.clip, o.clip);
     }
     mixStep(mix, { clip: o.clip, speed: body.body.speed, dt });
+    // (A box's Walk or Run steps in place at its own pace: he has no speed to step it on.)
+    if (o.state === 'talk' && DIALOGUE_WAYS[o.clip] === 'inPlace')
+      mix.phase = talkPhase(mix.phase, dt, c.clipLength(o.clip));
     c.setWeights(mix.weights, mix.phase);
-    // 5. The animation; 6. held, his collar hung from the anchor.
+    // 5. The animation; 6. held, his collar hung from the anchor (a box's dangle: lifted clear).
     const moved = animate(c, dt);
+    // (His limbs limp while he's carried and falling, eased out once he's down: character.js.)
+    c.limp(stepped, body.mode !== 'ground');
     hang(c);
+    if (o.state === 'talk') dangle(c);
     // 7–8. The look and the face; the toolbar.
     const want = {
       mode: o.look.mode,
       weight: o.look.weight * lookShare(mix.weights),
       ease: o.look.ease,
       at: o.look.at ?? null,
+      pitch: o.look.pitch,
     };
     finish(c, intro ? null : ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
@@ -975,7 +1000,8 @@ function start(s) {
       // (A finger's lift over itself, coming in as he's picked up. Near the top of the stage it
       // gives way, then the finger's own spot, so the top of his head stays on the screen: lifted,
       // he hangs nearer the camera and his head shows further over the point grabbed, so that's
-      // followed from the last frame's pose. A mouse's point stays under the cursor.)
+      // followed from the last frame's pose. A mouse's cursor has his collar under it, once the
+      // grab offset has eased out.)
       let y = press.y;
       if (pressKind === 'touch') {
         y -= FINGER_LIFT * Math.min(1, (t - grip.t0) / CARRY.liftIn);
@@ -983,7 +1009,9 @@ function start(s) {
         headAbove += (grabbedAt(grip).y - (head.y - head.r) - headAbove) * Math.min(1, dt / HEAD_FOLLOW);
         y = Math.max(y, stageEl.getBoundingClientRect().top + HEAD_ROOM + headAbove);
       }
-      target = dragTarget(grip, s.ray(press.x, y), hangY);
+      target = dragTarget(grip, s.ray(press.x, y), hangY, t);
+      // (The plane he's dragged on: at the play area's edge he stops along it, carry.js holdStep.)
+      if (body.carry) body.carry.plane = grip.plane;
     } else grip = null;
     bodyStep(body, {
       state: o.state,
@@ -1019,6 +1047,20 @@ function start(s) {
   }
 
   /**
+   * A box dangling him from an unseen hand (Held, Thrash, Fall: clips.js DIALOGUE_WAYS): his root
+   * lifted by their share till his lowest point clears the floor, Fall a hop (brain.js dangleLift).
+   * @param {NonNullable<typeof character>} c
+   */
+  function dangle(c) {
+    const share = DANGLE.clips.reduce((sum, k) => sum + c.weightOf(k), 0);
+    if (!(share > 0)) return;
+    const len = c.clipLength('Fall');
+    const fallU = len > 0 ? c.timeOf('Fall') / len : 0;
+    c.root.position.y += dangleLift({ hang: share, sole: lowestY(), fall: c.weightOf('Fall'), fallU });
+    c.root.updateMatrixWorld(true);
+  }
+
+  /**
    * The toolbar, only on a change: the Sit/Stand label, Wander's state, the buttons resting.
    * @param {import('./types.js').BrainOut} o
    */
@@ -1038,8 +1080,10 @@ function start(s) {
     const fps = animFps(look);
     const m = motionStep(waiting, dt, fps);
     waiting = m.acc;
+    stepped = 0;
     if (fps > 0 && !(m.step > 0)) return false;
     c.update(m.step);
+    stepped = m.step;
     return true;
   }
 
@@ -1049,8 +1093,8 @@ function start(s) {
    * @param {ReturnType<typeof pointerNow>} ptr
    * @param {{position: import('./types.js').XYZ}} pose
    * @param {number} dt
-   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null}} want
-   *   at: who he runs from ('back')
+   * @param {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: import('./types.js').XZ|null, pitch?: number}} want
+   *   at: who he runs from ('back'); pitch: 'ahead' at this pitch (held: his head hangs)
    * @param {import('./clips.js').FaceName} face
    * @param {import('./clips.js').BlinkMode} blink
    * @param {boolean} moved  his pose stepped this frame (the look goes on with it)
@@ -1069,7 +1113,8 @@ function start(s) {
     // (Talking, a little sway on his look at the camera, so it's never a fixed stare.)
     const sway = intro && aim ? lookSway(t) : null;
     const at = sway && aim ? { yaw: aim.yaw + sway.yaw, pitch: aim.pitch + sway.pitch } : aim;
-    lookStep(gaze, want.mode, at, dt, t, rng, want.weight, ahead, want.ease);
+    const front = want.pitch === undefined ? ahead : { yaw: ahead.yaw, pitch: want.pitch };
+    lookStep(gaze, want.mode, at, dt, t, rng, want.weight, front, want.ease);
     // (His chest joins in on his feet only: held, his collar hangs from the cursor.)
     torso = torsoStep(torso, body.mode === 'ground', dt);
     if (moved) c.applyLook(gaze.yaw, gaze.pitch, gaze.weight, torso);
@@ -1081,6 +1126,8 @@ function start(s) {
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;
     s.marker.visible = Boolean(mark);
     if (mark) s.marker.position.set(mark.x, s.marker.position.y, mark.z);
+    // (His earrings swing on his head as the look left it; the tablet goes to his palms.)
+    c.accessories(moved ? stepped : 0, t);
   }
 
   /** @param {number} ms */
@@ -1161,6 +1208,41 @@ function start(s) {
     };
   }
 
+  /**
+   * A world point on the screen, client px.
+   * @param {import('./types.js').XYZ} p
+   */
+  function onScreen(p) {
+    const at = new Vector3(p.x, p.y, p.z).project(s.camera);
+    const r = canvas.getBoundingClientRect();
+    return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
+  }
+
+  /** The carry, the limp layer and Give Device, for ?test (snapshot().motion). */
+  function motionSnapshot() {
+    const c = character;
+    const carry = body.mode === 'held' ? body.carry : null;
+    const eye = s.camera.position;
+    const r = c?.root.position ?? { x: 0, z: 0 };
+    const off = body.body.yaw - Math.atan2(eye.x - r.x, eye.z - r.z);
+    const tabletShown = Boolean(c?.tablet.visible);
+    return {
+      collar: c && carry ? onScreen(c.bonePos(COLLAR, { x: 0, y: 0, z: 0 })) : null,
+      heldFor: carry && grip ? t - grip.t0 : null,
+      anchor: carry ? { ...carry.anchor } : null,
+      plane: grip ? { x: grip.plane.normal.x, z: grip.plane.normal.z } : null,
+      pushed: Boolean(carry?.push),
+      limp: { weight: c?.limpWeight ?? 0, most: c ? Math.max(0, ...Object.values(c.limpAngles())) : 0 },
+      device: {
+        state: out?.device ?? null,
+        label: out?.deviceLabel ?? 'Give Device',
+        shown: tabletShown,
+        turn: Math.abs(Math.atan2(Math.sin(off), Math.cos(off))),
+        screen: c && tabletShown ? onScreen(c.tablet.getWorldPosition(new Vector3())) : null,
+      },
+    };
+  }
+
   if (options.test) {
     /** @type {any} */ (window).__invitation = {
       snapshot: () => ({
@@ -1220,6 +1302,7 @@ function start(s) {
         dialogue: introSnapshot(),
         toolbarTalking: ui.talking,
         options,
+        motion: motionSnapshot(),
       }),
       /** @param {'head'|'body'|'feet'} part */
       screen(part) {
@@ -1231,7 +1314,7 @@ function start(s) {
       floorAt,
       /**
        * While he's held: where the point he was grabbed by shows now, client px (his collar as
-       * posed less the grab offset); null otherwise.
+       * posed less the grab offset as it eases out); null otherwise.
        */
       grabbed() {
         if (!grip || !character || body.mode !== 'held') return null;
@@ -1275,6 +1358,13 @@ function start(s) {
        */
       setIntro(value) {
         testIntro = value == null ? null : introFrom(value);
+      },
+      /**
+       * A toolbar button's press, as the brain gets it (Give Device's before the toolbar has one).
+       * @param {import('./types.js').ButtonName} name
+       */
+      press(name) {
+        pressed = name;
       },
       /** @param {string|null} clip */
       play(clip) {
