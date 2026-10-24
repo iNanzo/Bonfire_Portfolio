@@ -9,6 +9,28 @@ with a mouse too. It has its own look (off-white and warm greys, chunky
 buttons, pixel art drawn like an old handheld's 3D), not the bonfire site's. The page is
 unlisted: nothing links to it and search engines are asked not to index it.
 
+## The Envelope
+
+Every visit opens on an envelope: a gold, low-poly envelope sealed with red wax and the NH
+monogram, petals drifting down from the seal, floating in front of a dark teal gothic arch. It's
+drawn in the toy's own pixel look, and it's the loading screen too: NEWT loads behind it.
+
+- **Open it:** tap or click it, press Enter, Space or the up arrow, swipe it up, or scroll up.
+  The seal cracks and falls away, the flap lifts, and the envelope pushes toward you as it
+  dithers away onto NEWT, already turned to you, and the intro starts by itself (below). Opened
+  before NEWT is in, it waits open with a little pulse until he is.
+- **Skip it:** press Escape or the down arrow, swipe it down, scroll down, or press **Skip
+  Intro** at the top right. It drops away and you're straight into the toy, with no intro.
+- **While you drag it**, it follows your finger with a little give and the flap starts to lift;
+  let go short of a swipe and it springs back. A sideways drag does nothing, and nothing you do
+  on it reaches the toy underneath (the toolbar can't be reached until it's gone).
+- **The hint** ("Click or swipe up to open", "Swipe down to skip") shows while the mouse is over
+  it or it has keyboard focus, and on a touch screen after a moment without a touch; while you
+  drag it reads "Open ↑" or "Skip ↓".
+- **Reduced motion:** it holds still, the flap is open at once and it crossfades away.
+- Without WebGL 2, or if NEWT can't load, it steps aside so the message shows. Nothing about it
+  is saved: it opens every visit.
+
 ## What You Can Do
 
 - **Tap him** and he waves or gets startled (a jump, arms flung up). Tap him a lot and he gets
@@ -22,7 +44,12 @@ unlisted: nothing links to it and search engines are asked not to index it.
   rises, high off the floor if you like; move across and he goes across. He dangles and swings;
   let go and he falls, lands and gets back up. Flick him and he flies a little; let go while
   pushing him against the edge of his patch and he just drops there. The camera holds still
-  while you carry him.
+  while you carry him. As you grab him a gold ring of dither bursts out from your grip and is
+  gone in under half a second.
+- **Point at him** (the mouse over him, or a finger pressing on him) and a gold dithered outline
+  fills in round him, a texel or two outside him and two in, with a sprinkle further in; it
+  fades as you move off, and it doesn't show while he's held or during the intro. At Pixel Size
+  Off it's a dithered gold tint over him instead.
 - **Tap the floor** (or click it) and he walks there. A ring on the floor shows where your
   finger or cursor is.
 - **Point anywhere** and he looks where you point (on a phone, while your finger is down; with
@@ -135,15 +162,17 @@ never takes a tap; a screen reader hears each line once, whole. His lines, how o
 he talks and the look a first visit gets are edited in the admin's Invitation page
 ([admin.md](admin.md)).
 
-## Play Intro
+## The Intro
 
-**Play Intro** starts a short chat with NEWT, laid out like Uma Musume's story scenes and drawn
-in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
+Opening the envelope starts a short chat with NEWT, and **Replay Intro** on the toolbar plays it
+again (the chat alone, no envelope). It's laid out like Uma Musume's story scenes and drawn in the
+toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
   line typed out in it, a small bouncing ▼ at its bottom right once the line is all there, Auto,
-  Skip and Log at the top right, and a gentle dim along the bottom behind the box. The toolbar
-  goes while the intro runs and comes back after it.
+  Skip and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the bottom
+  behind the box. A line's own line breaks (as the admin types them) show. The toolbar goes while
+  the intro runs and comes back after it.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
   Space and Enter do the same (after a click or tap on Auto, Skip or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
@@ -154,8 +183,9 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
 - **Auto** goes on by itself once each line has had time to be read (a box can set its own
   wait); it waits at a question. **Skip** jumps to the next question, or to the end. **Log**
   shows every line so far and the replies picked, in a list that scrolls; Close or Escape
-  shuts it. **Escape** asks whether to skip the intro, and a second Escape (or Skip Intro) ends
-  it. While the Log or that question is open, Auto, Skip, Log and the replies rest under it.
+  shuts it. **Skip Intro** ends the intro at once, with no question. **Escape** asks whether to
+  skip the intro, and a second Escape (or Skip Intro there) ends it. While the Log or that
+  question is open, Auto, Skip, Skip Intro, Log and the replies rest under it.
 - **NEWT:** he gets up if he's sitting, takes a few steps in if he's out near the edge, turns
   to face you and looks at you while he talks, his head drifting a little. The first line waits
   for him (the box shows his name and nothing else, and a tap meanwhile does nothing), so its
@@ -169,7 +199,7 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   and framed in the space over the box. At the end it eases back to where you had it.
 - **Reduced motion:** each line shows at once and the camera cuts: round to the front at the
   start, to each shot, and back to your view at the end.
-- Every Play Intro starts at the start; nothing about it is saved. The lines, faces, gestures,
+- Every intro starts at the start; nothing about it is saved. The lines, faces, gestures,
   shots, waits and replies are edited in the admin's Invitation page ([admin.md](admin.md));
   with no intro there (or none it can play), the toy plays a short one of its own.
 
@@ -309,7 +339,7 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   `invitationContent` in `vite.config.js` inlines only that subtree, watches the file and leaves
   the subtree out of the other pages' copy of content.json; `invitationLines()`,
   `speechSettings()`, `invitationDefaults()` and `introScript()`, each with its fallback:
-  `introScript()` is the intro Play Intro opens, `introFrom` of content.json's
+  `introScript()` is the intro the envelope and Replay Intro open, `introFrom` of content.json's
   `invitation.intro`, a `types.js` `DialogueScript` with each box's flow spelled out (exactly
   one of its choices, `end: true` or `next`: its own Next when that box is there, else the box
   after it, the last box ending it), a face, animation or camera off the toy's lists as
@@ -381,6 +411,29 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   size his face's sheet is picked at, so a face change never flips the sheet; they're never
   waited for, and until they come each shows the nearest of the first four (`FACE_FALLBACK`).
   He never blinks on them (a blink is neutral's closed eye: his brows would jump).
+- **The envelope:** `envelope.js` (pure: the `EnvelopeState` machine, types.js, with `open`,
+  `skip`, `step(t, ready)`, `done` and `pose(t)`, the opening as functions of time: the seal's
+  crack, the flap's angle up to `FLAP_OPEN`, the push and the dither-out, a skip's drop, `BOB` and
+  `SWAY`, `TIMES`; `envelopeGesture(dx, dy, ms, viewportH)`: |dy| ≥ max(48 px, 12% of the
+  height) or a flick of 0.6 px/ms over 24 px or more, and |dy| > 1.2·|dx|, up opens and down
+  skips (`SWIPE`); `envelopeKey`; `dragPose`, the follow with its give and the flap's lift;
+  `dragHint`; `ENVELOPE_TEXT`), `envelopeScene.js` (its own small WebGLRenderer in a fixed
+  `.inv-envelope` layer at z-index 3, drawn at `TEXELS` texels along the screen's shorter side and
+  scaled up pixelated; flat toon materials in three tones with their band edges dithered and a
+  Bayer dither-out; the NH monogram from logo.js's strokes, copied in as `monogramBars`;
+  disposed, its context lost and its layer removed once it's done) and `envelope.css`. main.js
+  makes it right after `bindUi`, sets the HUD inert under it, lets the toy draw its first frame
+  and then holds the loop while it covers him (`sync`), and on its way out either sets
+  `introWanted` (held until `beginIntro` can run, which cuts the camera to the talk shot) or
+  focuses the toolbar. `?test` skips it unless `&envelope` (`parseQuery`'s `envelope`).
+- **The hover and the grab ring:** `retro.js`'s post shader takes `uHover` (a two-texel Bayer
+  rim on NEWT's texels, a tenth of the rest, and a halo up to two texels outside him in the ring
+  box: 12 reads a texel, only while hovering) and `uBurst` (a dither ring at the grip, an ALU
+  test), both in `HOVER_INK` and marked as a line on the paper, so the shader still quantizes in
+  two places; at Off his materials take a Bayer tint (markId; no halo, no ring). `setHover(k)`
+  and `setBurst(x, y, r, k)` (client px; stage.js forwards them), `hoverEase` (in over 0.08 s,
+  out over 0.2 s: `HOVER`) and `burstAt` (to 20 texels in 0.38 s: `BURST`), which main.js
+  `effects` drives each frame.
 - **The intro:** `dialogue.js` (pure, on an injected clock: `normalizeScript` makes any
   `DialogueScript` safe, types.js; `createDialogue(script, {reduced})` with `start`, `step`,
   `advance`, `choose`, `setAuto`, `skip`, `pause`, `end`, `view` and `log`; `DIALOGUE`: 32
@@ -402,7 +455,9 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   `invitationArea`, `invitationCamera` and `invitationPlay` (with `invitationBrain`,
   `invitationMotion`, `invitationGesture` and `invitationModel`), `invitationDialogue` (the
   runner, and content.js's intro as it plays), the speech and content tests above,
-  `e2e/invitation.spec.mjs` and `e2e/invitationDialogue.spec.mjs` (`npm run e2e -- invitation`).
+  `invitationEnvelope` (its states, swipes, keys and timeline),
+  `e2e/invitation.spec.mjs`, `e2e/invitationDialogue.spec.mjs` and
+  `e2e/invitationEnvelope.spec.mjs` (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
@@ -430,7 +485,10 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   a press, `camera`, `shot`, `framed`: the clear space it was framed in (client px, from under the
   Auto row to the box's top, or the replies'), the camera's `goal`, his `phase` and the `clips`
   he's played since the box came up, `'gait'` for Idle, Walk or Run), and `intro()` is the script
-  it runs. `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
+  it runs. The snapshot's `envelope` is the envelope's state (null without one), `hover` the
+  hover dither (0..1) and `burst` whether the grab ring is up; `clock()` is the toy's clock (it
+  stands still while the envelope covers him) and `envelope()` the envelope's state, reduced
+  motion, pose and frames drawn. `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
@@ -439,7 +497,9 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   `64x64`, `native` or `off`), `--motion`, `--sizes`, `--acts`); its `pan`, `lift` and
   `sweep` acts (`tools/capture-invitation-camera.mjs`) slide, turn and zoom the camera, carry
   him up high (the report says how far the grabbed point strayed from the cursor) and sweep the
-  cursor, or a finger, over the whole screen to show where he looks. One GPU capture at a time.
+  cursor, or a finger, over the whole screen to show where he looks; its `envelope` and
+  `envelope-skip` acts open or skip the envelope (`?test&envelope`, whole frames). One GPU
+  capture at a time.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
   `vite.config.js`, `test/site.test.mjs` and the spec's last test check it).
 - **Unlisted:** `noindex, nofollow`, left out of the sitemap and the README, and not
