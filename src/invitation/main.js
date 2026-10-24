@@ -1310,6 +1310,8 @@ function start(s) {
     if (!hold) return null;
     // (Let go: the kind's release velocity, or carry.js toss with none.)
     const released = body.mode === 'held' && body.carry ? hold.release(body.carry, t) : null;
+    // (A kind's twist kept in his yaw as he's let go, so he doesn't snap back.)
+    if (holdNow?.twist) body.body = { ...body.body, yaw: body.body.yaw + holdNow.twist };
     hold = null;
     holdNow = null;
     aimPx = null;
@@ -1345,7 +1347,9 @@ function start(s) {
     // (A kind's side clamp: its push, kept for the toss.)
     if (holdNow && holdNow.push !== undefined && body.carry) body.carry.push = holdNow.push;
     if (body.mode !== 'held') root.position.set(body.root.x, body.root.y, body.root.z);
-    root.rotation.set(body.tilt.x, body.body.yaw, body.tilt.z);
+    // (A kind's twist while he's held, toward where he's carried: hold.js HoldStep.twist.)
+    const twist = body.mode === 'held' ? (holdNow?.twist ?? 0) : 0;
+    root.rotation.set(body.tilt.x, body.body.yaw + twist, body.tilt.z);
     const sq = squashing
       ? squash(body.mode === 'held' ? t - holdT0 : null, body.landedAt !== null ? t - body.landedAt : null)
       : null;
