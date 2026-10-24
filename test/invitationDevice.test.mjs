@@ -2,10 +2,11 @@
 // in Node: a 1.6 × 1.2 × 0.08 model-unit pad (4:3, about his torso's width) in a cream bezel with
 // an unlit screen showing a 16×12 pixel game (nearest-filtered, so it stays pixels; it moves on
 // with the toy's clock and comes round the same), every part marked as his so the retro pass
-// outlines it. Each frame it sits at the midpoint of his palms (the ForeArm bones plus 0.88 along
-// each forearm), its width along the line from palm to palm, its screen tilted from straight up
-// toward his face by the clip's tilt, and it shows while DeviceSit and DeviceLie weigh 0.5 or
-// more between them.
+// outlines it. Each frame it sits at the midpoint of his palms (the ForeArm bones plus
+// clips.js DEVICE.palm along each forearm) less the clip's lift along its screen's normal, its
+// width along the line from palm to palm, its screen tilted from straight up toward his face by
+// the clips' tilt (DEVICE's, mixed by their weights), and it shows while DeviceSit and DeviceLie
+// weigh 0.5 or more between them.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -21,7 +22,7 @@ import {
   gameFrame,
 } from '../src/invitation/device.js';
 import { createCharacter } from '../src/invitation/character.js';
-import { BONES } from '../src/invitation/clips.js';
+import { BONES, DEVICE } from '../src/invitation/clips.js';
 import { standIn } from './lib/newtStandIn.mjs';
 
 const DEG = Math.PI / 180;
@@ -30,6 +31,7 @@ const v3 = (p) => new THREE.Vector3(p.x, p.y, p.z);
 
 test('the tablet: 1.6 × 1.2 × 0.08 model units, a cream bezel and an unlit screen showing a 16×12 game, nearest-filtered, every part marked as his', () => {
   assert.deepEqual([TABLET.w, TABLET.h, TABLET.d], [1.6, 1.2, 0.08]);
+  assert.deepEqual([TABLET.w, TABLET.h, TABLET.d], DEVICE.size, 'clips.js DEVICE’s');
   assert.deepEqual([SCREEN.w, SCREEN.h], [16, 12]);
   const tab = createTablet();
   tab.group.updateMatrixWorld(true);
@@ -73,7 +75,7 @@ test('its game moves on with the clock, the same at the same time, never a blank
   assert.notDeepEqual(Uint8Array.from(tab.screen.material.map.image.data), before);
 });
 
-test('deviceFrame: at his palms’ midpoint, its width along the line from palm to palm, its screen tilted from straight up toward his face by the tilt', () => {
+test('deviceFrame: at his palms’ midpoint less the lift along its screen’s normal, its width along the line from palm to palm, its screen tilted from straight up toward his face by the tilt', () => {
   const pL = { x: 0.13, y: 0.18, z: 0.2 };
   const pR = { x: -0.13, y: 0.17, z: 0.21 };
   const forward = { x: 0, y: 0, z: 1 };
@@ -87,32 +89,43 @@ test('deviceFrame: at his palms’ midpoint, its width along the line from palm 
     close(v3(f.normal).dot(v3(f.right)), 0, 1e-6, 'its screen square to that');
     close(v3(f.normal).length(), 1, 1e-6);
     const up = new THREE.Vector3(0, 1, 0);
-    close(v3(f.normal).angleTo(up), tilt, 0.03, 'tilted from straight up');
+    close(v3(f.normal).angleTo(up), tilt, 0.05, 'tilted from straight up');
     if (tilt > 0) assert.ok(f.normal.z < 0, 'toward his face (he’s behind it)');
+    // Lying, his palms rest on top of its edges: the pad sits its lift under them.
+    const lifted = deviceFrame(pL, pR, forward, tilt, 0.3);
+    const drop = v3(f.centre).sub(v3(lifted.centre));
+    close(drop.length(), 0.3, 1e-6);
+    assert.ok(drop.angleTo(v3(f.normal)) < 1e-6, 'along its normal');
   }
 });
 
-test('it shows while DeviceSit and DeviceLie weigh 0.5 or more, at the tilt of the mix (the sit’s about 20–25°, lying near flat)', () => {
+test('it shows while DeviceSit and DeviceLie weigh 0.5 or more, at the tilt of the mix (clips.js DEVICE’s: sitting tipped toward him, lying near flat)', () => {
   const w = (o) => (k) => o[k] ?? 0;
   assert.equal(deviceShown(w({ DeviceSit: 0.3, DeviceLie: 0.25 })), true);
   assert.equal(deviceShown(w({ DeviceSit: 0.49, Sit: 0.51 })), false);
   assert.equal(deviceShown(w({ Idle: 1 })), false);
-  assert.ok(DEVICE_TILT.DeviceSit >= 20 * DEG && DEVICE_TILT.DeviceSit <= 25 * DEG);
-  assert.ok(DEVICE_TILT.DeviceLie >= 0 && DEVICE_TILT.DeviceLie <= 10 * DEG);
+  close(DEVICE_TILT.DeviceSit, DEVICE.clips.DeviceSit.tilt * DEG);
+  close(DEVICE_TILT.DeviceLie, DEVICE.clips.DeviceLie.tilt * DEG);
+  assert.ok(
+    DEVICE_TILT.DeviceSit > 0 && DEVICE_TILT.DeviceSit <= 36 * DEG,
+    'sitting, it tips toward him (less than the camera’s 36°)',
+  );
+  assert.ok(DEVICE_TILT.DeviceLie >= 0 && DEVICE_TILT.DeviceLie <= 10 * DEG, 'lying, near flat');
   close(deviceTilt(w({ DeviceSit: 1 })), DEVICE_TILT.DeviceSit);
   close(deviceTilt(w({ DeviceLie: 1 })), DEVICE_TILT.DeviceLie);
   const mid = deviceTilt(w({ DeviceSit: 0.5, DeviceLie: 0.5 }));
   close(mid, (DEVICE_TILT.DeviceSit + DEVICE_TILT.DeviceLie) / 2, 1e-6);
 });
 
-test('on him: each frame at his palms (each ForeArm bone plus 0.88 along it), shown with the tablet’s clips and hidden without', () => {
+test('on him: each frame at his palms (each ForeArm bone plus DEVICE.palm along it), shown with the tablet’s clips and hidden without', () => {
+  close(PALM, DEVICE.palm);
   const sit = new THREE.AnimationClip('DeviceSit', 3, []);
   const { gltf, bones } = standIn([sit]);
   const ch = createCharacter(gltf);
   assert.ok(ch.tablet, 'he has one');
   assert.equal(ch.tablet.visible, false, 'hidden at first');
-  ch.setWeights({ DeviceSit: 1 }, 0);
   ch.restart('DeviceSit');
+  ch.setWeights({ DeviceSit: 1 }, 0);
   ch.root.position.set(0.4, 0, -0.2);
   ch.root.rotation.y = 0.7;
   ch.update(1 / 60);

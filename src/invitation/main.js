@@ -48,9 +48,13 @@
 // (a point on NEWT in client px: his head, middle or feet), floorAt(x, y), feet() and bones()
 // (his ankles in the world, his bones from his root), grabbed() (while he's held, where the
 // point he was grabbed by shows), say(text) (a line in his bubble now), play(clip) (forces a
-// clip, Walk and Run going round their step at their own pace) and face(name) (holds any of
-// clips.js FACE_NAMES on him, no blinks; null gives it back to the brain); `?seed=N` and `?calm`
-// go to the brain (and the seed to talk).
+// clip, Walk and Run going round their step at their own pace), face(name) (holds any of
+// clips.js FACE_NAMES on him, no blinks; null gives it back to the brain) and press(name) (a
+// toolbar button's press, as the brain gets it: types.js ButtonName); snapshot().motion is the
+// carry (his collar on screen, how long he's been held, the anchor and the drag plane, whether
+// he's pushed at the edge), the limp layer (its weight, the most a limb has swung) and Give
+// Device (the brain's device and label, the tablet shown and where, his turn off the camera);
+// `?seed=N` and `?calm` go to the brain (and the seed to talk).
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
@@ -373,6 +377,8 @@ function start(s) {
   let t = 0;
   /** Motion Choppy: the time his pose has waited since its last step, seconds. */
   let waiting = 0;
+  /** The step his pose last moved by, seconds (0: it didn't this frame): the limp layer's and the earrings'. */
+  let stepped = 0;
   /** A clip forced by ?test's play(), else null (the brain decides). */
   let forced = null;
   /** @type {import('./clips.js').FaceName|null} a face held by ?test's face(), else null (the brain's, with blinks) */
@@ -705,6 +711,8 @@ function start(s) {
     c.setWeights(mix.weights, mix.phase);
     // 5. The animation; 6. held, his collar hung from the anchor (a box's dangle: lifted clear).
     const moved = animate(c, dt);
+    // (His limbs limp while he's carried and falling, eased out once he's down: character.js.)
+    c.limp(stepped, body.mode !== 'ground');
     hang(c);
     if (o.state === 'talk') dangle(c);
     // 7–8. The look and the face; the toolbar.
@@ -1044,11 +1052,11 @@ function start(s) {
    * @param {NonNullable<typeof character>} c
    */
   function dangle(c) {
-    const hang = DANGLE.clips.reduce((sum, k) => sum + c.weightOf(k), 0);
-    if (!(hang > 0)) return;
+    const share = DANGLE.clips.reduce((sum, k) => sum + c.weightOf(k), 0);
+    if (!(share > 0)) return;
     const len = c.clipLength('Fall');
     const fallU = len > 0 ? c.timeOf('Fall') / len : 0;
-    c.root.position.y += dangleLift({ hang, sole: lowestY(), fall: c.weightOf('Fall'), fallU });
+    c.root.position.y += dangleLift({ hang: share, sole: lowestY(), fall: c.weightOf('Fall'), fallU });
     c.root.updateMatrixWorld(true);
   }
 
@@ -1072,8 +1080,10 @@ function start(s) {
     const fps = animFps(look);
     const m = motionStep(waiting, dt, fps);
     waiting = m.acc;
+    stepped = 0;
     if (fps > 0 && !(m.step > 0)) return false;
     c.update(m.step);
+    stepped = m.step;
     return true;
   }
 
@@ -1116,6 +1126,8 @@ function start(s) {
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;
     s.marker.visible = Boolean(mark);
     if (mark) s.marker.position.set(mark.x, s.marker.position.y, mark.z);
+    // (His earrings swing on his head as the look left it; the tablet goes to his palms.)
+    c.accessories(moved ? stepped : 0, t);
   }
 
   /** @param {number} ms */
@@ -1196,6 +1208,41 @@ function start(s) {
     };
   }
 
+  /**
+   * A world point on the screen, client px.
+   * @param {import('./types.js').XYZ} p
+   */
+  function onScreen(p) {
+    const at = new Vector3(p.x, p.y, p.z).project(s.camera);
+    const r = canvas.getBoundingClientRect();
+    return { x: r.left + ((at.x + 1) / 2) * r.width, y: r.top + ((1 - at.y) / 2) * r.height };
+  }
+
+  /** The carry, the limp layer and Give Device, for ?test (snapshot().motion). */
+  function motionSnapshot() {
+    const c = character;
+    const carry = body.mode === 'held' ? body.carry : null;
+    const eye = s.camera.position;
+    const r = c?.root.position ?? { x: 0, z: 0 };
+    const off = body.body.yaw - Math.atan2(eye.x - r.x, eye.z - r.z);
+    const tabletShown = Boolean(c?.tablet.visible);
+    return {
+      collar: c && carry ? onScreen(c.bonePos(COLLAR, { x: 0, y: 0, z: 0 })) : null,
+      heldFor: carry && grip ? t - grip.t0 : null,
+      anchor: carry ? { ...carry.anchor } : null,
+      plane: grip ? { x: grip.plane.normal.x, z: grip.plane.normal.z } : null,
+      pushed: Boolean(carry?.push),
+      limp: { weight: c?.limpWeight ?? 0, most: c ? Math.max(0, ...Object.values(c.limpAngles())) : 0 },
+      device: {
+        state: out?.device ?? null,
+        label: out?.deviceLabel ?? 'Give Device',
+        shown: tabletShown,
+        turn: Math.abs(Math.atan2(Math.sin(off), Math.cos(off))),
+        screen: c && tabletShown ? onScreen(c.tablet.getWorldPosition(new Vector3())) : null,
+      },
+    };
+  }
+
   if (options.test) {
     /** @type {any} */ (window).__invitation = {
       snapshot: () => ({
@@ -1255,6 +1302,7 @@ function start(s) {
         dialogue: introSnapshot(),
         toolbarTalking: ui.talking,
         options,
+        motion: motionSnapshot(),
       }),
       /** @param {'head'|'body'|'feet'} part */
       screen(part) {
@@ -1310,6 +1358,13 @@ function start(s) {
        */
       setIntro(value) {
         testIntro = value == null ? null : introFrom(value);
+      },
+      /**
+       * A toolbar button's press, as the brain gets it (Give Device's before the toolbar has one).
+       * @param {import('./types.js').ButtonName} name
+       */
+      press(name) {
+        pressed = name;
       },
       /** @param {string|null} clip */
       play(clip) {

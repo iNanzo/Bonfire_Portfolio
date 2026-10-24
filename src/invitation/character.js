@@ -31,6 +31,22 @@
 // Chest takes lookAt.js chestShare of a big look (times torso: main.js eases it out while he's
 // off the floor, so his collar stays under the cursor), and Neck and Neck001 the rest, 30/70.
 //
+// The limp layer (limp(dt, on): main.js runs it after update and before the carry hangs him
+// by the collar): while he's carried, and through the fall, his 12 arm and leg bones (LIMBS,
+// parents first; never his chest, neck or head, which the look rebuilds) each swing a point
+// mass at the limb's end (carry.js limbStep): sprung back to the clip's pose, pushed by gravity
+// against the clip's upright pose and by the joint's acceleration, each in its cone, the bone
+// aimed at it as a world turn (local = parent⁻¹ · turn · parent · local). update() restores
+// these bones' saved animation pose before mixer.update too, so it never adds up. limp(0) does
+// nothing (a frame Motion Choppy didn't step); off, it eases out over carry.js LIMP.ease.
+//
+// What he wears (accessories(dt, t): main.js runs it after the look): his earrings, a flat
+// black stud on each earlobe (EARLOBES, measured from the glb's head mesh) with a thin black
+// line and a Latin cross hanging from it (EARRING), on his head bone, toon and marked as his so
+// they get his outlines, each swinging on the limp layer's spring about straight down, pushed
+// by the stud's acceleration; and Give Device's tablet (device.js) at his palms while DeviceSit
+// and DeviceLie weigh enough, its game moving on.
+//
 // Two Shader options say which of his own textures show under the pixel filter. Pixel Face (the
 // preset's `texture.pixelFace`, on in every style): on, the pixel face sheets below; off, the
 // glb's smooth sheet at every resolution, sampled sharper than three picks, the more the fewer
@@ -83,7 +99,9 @@
 // `texture.fineMipBias` from ORIGINAL_ATLAS_TEXELS (less, or the checks blur into grey); none at Off.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { BONES, CLIPS, EXTRA_FACES, FACES, SCALE } from './clips.js';
+import { BONES, CLIPS, DEVICE, EXTRA_FACES, FACES, SCALE } from './clips.js';
+import { LIMP, limbStep, restLimb } from './carry.js';
+import { PALM, createTablet, deviceFrame, deviceLift, deviceShown, deviceTilt } from './device.js';
 import { FACE_FALLBACK, FACE_LAYOUT, faceSpan, layoutFor, pickFaceSize } from './faceSheets.js';
 import { LOOKS, DEFAULT_LOOK } from './look.js';
 import { SPLIT, chestShare } from './lookAt.js';
@@ -118,6 +136,12 @@ const MIN_R = 11;
  *   faceTexels: number,
  *   texelSnap: {head: {x: number, y: number}, body: {x: number, y: number}},
  *   pointOn(name: string, along: number, out: import('./types.js').XYZ): import('./types.js').XYZ,
+ *   limp(dt: number, on: boolean): void,
+ *   limpWeight: number,
+ *   limpAngles(): Record<string, number>,
+ *   accessories(dt: number, t: number): void,
+ *   earrings: Array<{side: 'L'|'R', group: any, stud: any, pivot: any, line: any, cross: any[]}>,
+ *   tablet: any,
  * }} PageCharacter
  */
 
@@ -238,6 +262,97 @@ export async function loadCharacter(
   return createCharacter(gltf, { ...opts, pixelAtlas: a === late ? atlas : a, pixelFace: f === late ? face : f });
 }
 
+const DEG = Math.PI / 180;
+/**
+ * The limp layer's bones, parents first (the arms from his chest, the legs from his hips), each
+ * with what its limb reaches to (the next bone's joint, or how far along it its end is, model
+ * units: a palm, his toes) and its cone (a shoulder's short bone only a little).
+ */
+export const LIMBS = [
+  { bone: BONES.shoulderL, tip: BONES.bicepL, cone: 15 * DEG },
+  { bone: BONES.bicepL, tip: BONES.forearmL, cone: LIMP.cone },
+  { bone: BONES.forearmL, reach: DEVICE.palm, cone: LIMP.cone },
+  { bone: BONES.shoulderR, tip: BONES.bicepR, cone: 15 * DEG },
+  { bone: BONES.bicepR, tip: BONES.forearmR, cone: LIMP.cone },
+  { bone: BONES.forearmR, reach: DEVICE.palm, cone: LIMP.cone },
+  { bone: BONES.thighL, tip: BONES.calfL, cone: LIMP.cone },
+  { bone: BONES.calfL, tip: BONES.footL, cone: LIMP.cone },
+  { bone: BONES.footL, reach: 0.7, cone: LIMP.cone },
+  { bone: BONES.thighR, tip: BONES.calfR, cone: LIMP.cone },
+  { bone: BONES.calfR, tip: BONES.footR, cone: LIMP.cone },
+  { bone: BONES.footR, reach: 0.7, cone: LIMP.cone },
+];
+/**
+ * Where each earring's stud sits, in his head bone's space, model units: on the outside of each
+ * earlobe, the lowest part of the ear that pokes out past his hair (newt.glb's Head mesh: ear
+ * vertices at |x| 1.33–1.48 from y 4.36 up, z about −0.38…0.38; the head bone's head at y 3.98).
+ * @type {Record<'L'|'R', [number, number, number]>}
+ */
+export const EARLOBES = { L: [1.42, 0.42, -0.3], R: [-1.42, 0.42, -0.3] };
+/**
+ * An earring, model units: the stud's width (a flat disc) and thickness; the line's length and
+ * thickness; the Latin cross about 2.5 times the stud's width, its long arm below.
+ */
+export const EARRING = {
+  stud: 0.13,
+  studDepth: 0.03,
+  line: 0.18,
+  lineWide: 0.022,
+  cross: { w: 0.325, h: 0.46, bar: 0.07, depth: 0.04, armAt: 0.12 },
+};
+/** An earring's swing about straight down: a pendulum about the stud (ω from its length), lightly damped. */
+const EAR_SWING = {
+  omega: Math.sqrt(LIMP.gravity / ((EARRING.line + EARRING.cross.h / 2) * SCALE)),
+  zeta: 0.12,
+  cone: 1.2,
+  substep: LIMP.substep,
+};
+/** The earrings' black. */
+const EAR_BLACK = 0x141418;
+
+/**
+ * An earring for his `side` (EARRING's sizes, at EARLOBES[side]): the stud facing out, and from
+ * its foot a pivot holding the line and the cross under it (accessories swings the pivot), each
+ * part made by `mesh(geometry, name)`.
+ * @param {'L'|'R'} side
+ * @param {(geometry: any, name: string) => any} mesh
+ */
+function makeEarring(side, mesh) {
+  const sign = side === 'L' ? 1 : -1;
+  const group = new THREE.Group();
+  group.name = `Earring${side}`;
+  group.position.fromArray(EARLOBES[side]);
+  const disc = new THREE.CylinderGeometry(EARRING.stud / 2, EARRING.stud / 2, EARRING.studDepth, 12);
+  disc.rotateZ(Math.PI / 2);
+  const stud = mesh(disc, `Earring${side}Stud`);
+  stud.position.x = (sign * EARRING.studDepth) / 2;
+  const pivot = new THREE.Group();
+  pivot.name = `Earring${side}Swing`;
+  pivot.position.set(sign * EARRING.studDepth, -EARRING.stud / 2 + 0.01, 0);
+  const line = mesh(new THREE.BoxGeometry(EARRING.lineWide, EARRING.line, EARRING.lineWide), `Earring${side}Line`);
+  line.position.y = -EARRING.line / 2;
+  const c = EARRING.cross;
+  const bar = mesh(new THREE.BoxGeometry(c.bar, c.h, c.depth), `Earring${side}Cross`);
+  bar.position.y = -EARRING.line - c.h / 2;
+  const arm = mesh(new THREE.BoxGeometry(c.w, c.bar, c.depth), `Earring${side}CrossArm`);
+  arm.position.y = -EARRING.line - c.armAt;
+  pivot.add(line, bar, arm);
+  group.add(stud, pivot);
+  return {
+    side,
+    group,
+    stud,
+    pivot,
+    line,
+    cross: [bar, arm],
+    /** @type {import('./carry.js').Limb|null} */
+    m: null,
+    prev: new THREE.Vector3(),
+    vel: new THREE.Vector3(),
+    frames: 0,
+  };
+}
+
 /**
  * @param {{scene: any, animations?: any[]}} gltf
  * @param {{preset?: import('./look.js').LookPreset, pixel?: boolean, pixelAtlas?: any, pixelFace?: any, extraFace?: any, pixelExtraFace?: any}} [opts]
@@ -347,6 +462,19 @@ export function createCharacter(gltf, opts = {}) {
     toons.push(m);
     return m;
   };
+  /**
+   * A toon material of his own making (not the glb's), marked and snapped as his `part`.
+   * @param {{name: string, color: any}} o
+   * @param {'head'|'body'} part
+   */
+  const toonPart = ({ name, color }, part) => {
+    const m = markId(new THREE.MeshToonMaterial({ name, color, gradientMap: gradient }), ID.newt, {
+      snap: snaps[part],
+      bias: atlasBias,
+    });
+    toons.push(m);
+    return m;
+  };
   for (const o of meshes) {
     const part = onHead(o, headBone) ? 'head' : 'body';
     o.material = Array.isArray(o.material) ? o.material.map((m) => toon(m, part)) : toon(o.material, part);
@@ -358,6 +486,43 @@ export function createCharacter(gltf, opts = {}) {
   const looking = [bone(BONES.chest), bone(BONES.neck), bone(BONES.head)];
   const shares = [1, SPLIT.neck, SPLIT.head];
   const saved = looking.map((b) => (b ? b.quaternion.clone() : new THREE.Quaternion()));
+  /** The limp layer's bones (LIMBS), their saved animation pose, and each one's mass. */
+  const limbs = LIMBS.map((l) => ({
+    ...l,
+    /** The limb whose end this one hangs from (-1: his chest or hips). */
+    parent: LIMBS.findIndex((o) => o.tip === l.bone),
+    /** Its parent's tip off upright, then its own turn on top: what its child limb hangs by. */
+    tipped: new THREE.Quaternion(),
+    b: bone(l.bone),
+    end: l.tip ? bone(l.tip) : null,
+    /** @type {import('./carry.js').Limb|null} */
+    m: null,
+    prev: new THREE.Vector3(),
+    vel: new THREE.Vector3(),
+    frames: 0,
+    angle: 0,
+  }));
+  const limbSaved = limbs.map((l) => (l.b ? l.b.quaternion.clone() : new THREE.Quaternion()));
+  let limpWeight = 0;
+
+  // --- What he wears: his earrings, and Give Device's tablet.
+  /** @param {any} geometry @param {string} name */
+  const blackMesh = (geometry, name) => {
+    const m = new THREE.Mesh(geometry, toonPart({ name, color: new THREE.Color(EAR_BLACK) }, 'head'));
+    m.name = name;
+    m.castShadow = true;
+    m.receiveShadow = false;
+    m.frustumCulled = false;
+    return m;
+  };
+  const earrings = /** @type {const} */ (['L', 'R']).map((side) => {
+    const e = makeEarring(side, blackMesh);
+    headBone?.add(e.group);
+    return e;
+  });
+  const tablet = createTablet({ snap: snaps.body, gradient, bias: atlasBias });
+  root.add(tablet.group);
+  toons.push(tablet.bezel.material);
 
   // --- Clips.
   const mixer = new THREE.AnimationMixer(root);
@@ -539,6 +704,22 @@ export function createCharacter(gltf, opts = {}) {
   const qChest = new THREE.Quaternion();
   const qRest = new THREE.Quaternion();
   const qPart = new THREE.Quaternion();
+  const qc = new THREE.Quaternion();
+  const qTurn = new THREE.Quaternion();
+  const joint = new THREE.Vector3();
+  const tip = new THREE.Vector3();
+  const rest = new THREE.Vector3();
+  const restDir = new THREE.Vector3();
+  const aimed = new THREE.Vector3();
+  const force = new THREE.Vector3();
+  const accel = new THREE.Vector3();
+  const gAuth = new THREE.Vector3();
+  const down = new THREE.Vector3();
+  const front = new THREE.Vector3();
+  const across = new THREE.Vector3();
+  const palmL = new THREE.Vector3();
+  const palmR = new THREE.Vector3();
+  const basis = new THREE.Matrix4();
   const ident = new THREE.Quaternion();
   const UP = new THREE.Vector3(0, 1, 0);
   const SIDE = new THREE.Vector3(-1, 0, 0);
@@ -597,6 +778,56 @@ export function createCharacter(gltf, opts = {}) {
 
   /** A clip's twin by its name (`Wave~`), or undefined. */
   const twinOf = (name) => (name.endsWith(TWIN) ? twins.get(name.slice(0, -TWIN.length)) : undefined);
+  /** A clip's weight in the mix (its twin's by `Wave~`). @param {string} clip */
+  const weightOf = (clip) => (actions.get(clip) ?? twinOf(clip))?.getEffectiveWeight() ?? 0;
+
+  /**
+   * A point's acceleration in the world from its last two steps (none for its first two: from
+   * rest), at most LIMP.accelMax, into `out`; `k` keeps its last position and velocity.
+   * @param {{prev: THREE.Vector3, vel: THREE.Vector3, frames: number}} k
+   * @param {THREE.Vector3} at
+   * @param {number} dt
+   * @param {THREE.Vector3} out
+   */
+  function accelOf(k, at, dt, out) {
+    out.set(0, 0, 0);
+    if (k.frames > 0) {
+      v.copy(at).sub(k.prev).divideScalar(dt);
+      if (k.frames > 1) out.copy(v).sub(k.vel).divideScalar(dt);
+      k.vel.copy(v);
+    }
+    k.prev.copy(at);
+    k.frames++;
+    if (out.length() > LIMP.accelMax) out.setLength(LIMP.accelMax);
+    return out;
+  }
+
+  /**
+   * Give Device's tablet: shown while its clips weigh enough, at his palms (his root's space,
+   * model units: device.js deviceFrame), its game moved on to `t`.
+   * @param {number} t
+   */
+  function placeTablet(t) {
+    const g = tablet.group;
+    g.visible = deviceShown(weightOf);
+    if (!g.visible) return;
+    const l = bone(BONES.forearmL);
+    const r = bone(BONES.forearmR);
+    if (!l || !r) return;
+    l.localToWorld(palmL.set(0, PALM, 0));
+    r.localToWorld(palmR.set(0, PALM, 0));
+    root.worldToLocal(palmL);
+    root.worldToLocal(palmR);
+    const f = deviceFrame(palmL, palmR, { x: 0, y: 0, z: 1 }, deviceTilt(weightOf), deviceLift(weightOf));
+    g.position.set(f.centre.x, f.centre.y, f.centre.z);
+    across.set(f.right.x, f.right.y, f.right.z);
+    down.set(f.normal.x, f.normal.y, f.normal.z);
+    front.crossVectors(across, down);
+    basis.makeBasis(across, down, front);
+    g.quaternion.setFromRotationMatrix(basis);
+    g.updateMatrixWorld(true);
+    tablet.update(t);
+  }
 
   /** A world point on screen, client px. */
   function toScreen(p, camera, rect) {
@@ -654,9 +885,89 @@ export function createCharacter(gltf, opts = {}) {
     },
     update(dt) {
       looking.forEach((b, i) => b?.quaternion.copy(saved[i]));
+      limbs.forEach((l, i) => l.b?.quaternion.copy(limbSaved[i]));
       mixer.update(dt);
       looking.forEach((b, i) => b && saved[i].copy(b.quaternion));
+      limbs.forEach((l, i) => l.b && limbSaved[i].copy(l.b.quaternion));
     },
+    limp(dt, on) {
+      if (!(dt > 0)) return;
+      limpWeight = on ? 1 : Math.max(0, limpWeight - dt / LIMP.ease);
+      if (!(limpWeight > 0)) {
+        for (const l of limbs) {
+          l.m = null;
+          l.frames = 0;
+          l.angle = 0;
+        }
+        return;
+      }
+      root.updateMatrixWorld(true);
+      root.getWorldQuaternion(qRoot);
+      for (const l of limbs) {
+        if (!l.b) continue;
+        l.b.getWorldPosition(joint);
+        if (l.end) l.end.getWorldPosition(tip);
+        else l.b.localToWorld(tip.set(0, l.reach ?? 0, 0));
+        rest.copy(tip).sub(joint);
+        accelOf(l, joint, dt, accel);
+        // How far this limb's parent is tipped off the clip's upright pose (his root's swing and
+        // the turns its parent limbs took): gravity as the clip has it, against gravity now.
+        const up = l.parent >= 0 ? limbs[l.parent].tipped : qRoot;
+        gAuth.set(0, -LIMP.gravity, 0).applyQuaternion(up);
+        restDir.copy(rest).normalize();
+        // Each limb alike whatever its length: hang of that tip back toward the floor, and sway
+        // of the joint's acceleration over gravity, as angles once it settles.
+        const k = (LIMP.omega * LIMP.omega * rest.length()) / LIMP.gravity;
+        force
+          .set(0, -LIMP.gravity, 0)
+          .sub(gAuth)
+          .multiplyScalar(LIMP.hang * k);
+        force.addScaledVector(accel, -LIMP.sway * k);
+        l.m ??= restLimb(rest);
+        limbStep(l.m, rest, force, dt, { omega: LIMP.omega, zeta: LIMP.zeta, cone: l.cone, substep: LIMP.substep });
+        aimed.set(l.m.at.x, l.m.at.y, l.m.at.z).normalize();
+        qTurn.setFromUnitVectors(restDir, aimed);
+        qPart.slerpQuaternions(ident, qTurn, limpWeight);
+        l.angle = 2 * Math.acos(Math.min(1, Math.abs(qPart.w)));
+        l.tipped.copy(qPart).multiply(up);
+        l.b.parent.getWorldQuaternion(qa);
+        l.b.quaternion.premultiply(qb.copy(qa).premultiply(qPart).premultiply(qc.copy(qa).invert()));
+        l.b.updateMatrixWorld(true);
+      }
+    },
+    get limpWeight() {
+      return limpWeight;
+    },
+    limpAngles: () => Object.fromEntries(limbs.map((l) => [l.bone, l.angle])),
+    accessories(dt, t) {
+      root.updateMatrixWorld(true);
+      if (dt > 0 && headBone) {
+        headBone.getWorldQuaternion(qa);
+        for (const e of earrings) {
+          e.pivot.getWorldPosition(joint);
+          accelOf(e, joint, dt, accel);
+          const len = (EARRING.line + EARRING.cross.h / 2) * root.scale.x;
+          rest.set(0, -len, 0);
+          e.m ??= restLimb(rest);
+          limbStep(e.m, rest, force.copy(accel).negate(), dt, EAR_SWING);
+          // Its line along the swing, the cross's face to his front (square to the line).
+          down.set(e.m.at.x, e.m.at.y, e.m.at.z).normalize().negate();
+          front.set(0, 0, 1).applyQuaternion(qa);
+          front.addScaledVector(down, -front.dot(down));
+          if (front.lengthSq() < 1e-8) front.set(0, 0, 1);
+          front.normalize();
+          across.crossVectors(down, front);
+          basis.makeBasis(across, down, front);
+          qTurn.setFromRotationMatrix(basis);
+          e.pivot.parent.getWorldQuaternion(qb);
+          e.pivot.quaternion.copy(qb.invert().multiply(qTurn));
+          e.pivot.updateMatrixWorld(true);
+        }
+      }
+      placeTablet(t);
+    },
+    earrings,
+    tablet: tablet.group,
     applyLook(yaw, pitch, weight, torso = 1) {
       if (!weight) {
         looking.forEach((b, i) => b?.quaternion.copy(saved[i]));
@@ -774,13 +1085,14 @@ export function createCharacter(gltf, opts = {}) {
         },
       };
     },
-    weightOf: (clip) => (actions.get(clip) ?? twinOf(clip))?.getEffectiveWeight() ?? 0,
+    weightOf,
     timeOf: (clip) => (actions.get(clip) ?? twinOf(clip))?.time ?? 0,
     dispose() {
       mixer.stopAllAction();
       mixer.uncacheRoot(root);
       root.traverse((o) => o.geometry?.dispose());
       for (const m of toons) m.dispose();
+      tablet.dispose();
       for (const t of textures) t.dispose();
       for (const set of [sheetFaces, extraFaces, ...pixelSets.values(), ...extraSets.values()])
         for (const t of Object.values(set ?? {})) t.dispose();

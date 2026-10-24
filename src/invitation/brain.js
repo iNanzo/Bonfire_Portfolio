@@ -433,7 +433,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
   // ---- dialogue mode (Play Intro) -------------------------------------------------------------
 
   /** @param {TalkState['phase']} phase */
-  function talkPhase(phase) {
+  function setTalkPhase(phase) {
     const k = /** @type {TalkState} */ (m.talk);
     k.phase = phase;
     k.phaseAt = m.t;
@@ -450,7 +450,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     enter('talk');
     m.talk = { phase: 'turn', phaseAt: m.t, seq: -1, once: null, hold: null, then: null, pose: 'stand' };
     if (sitting || lying) {
-      talkPhase('stand');
+      setTalkPhase('stand');
       playOnce(lying ? 'GetUp' : 'StandUp');
     } else walkInOrTurn();
   }
@@ -464,8 +464,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       const k = (T.talkNear * 0.8) / d;
       m.goal = { x: c.x + (n.x - c.x) * k, z: c.z + (n.z - c.z) * k };
       m.walkUntil = m.t + ((d - T.talkNear * 0.8) / T.walkSpeed) * T.walkPatience + T.walkSlack;
-      talkPhase('walk');
-    } else talkPhase('turn');
+      setTalkPhase('walk');
+    } else setTalkPhase('turn');
     m.clip = 'gait';
     m.restart = false;
   }
@@ -571,12 +571,12 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     if (k.phase === 'walk') {
       const n = m.input?.newt;
       const there = !n || !m.goal || Math.hypot(m.goal.x - n.x, m.goal.z - n.z) <= T.arrive;
-      if (there || m.t >= m.walkUntil) talkPhase('turn');
+      if (there || m.t >= m.walkUntil) setTalkPhase('turn');
       return;
     }
     if (k.phase === 'turn') {
       if (!(facingCamera() || m.t - k.phaseAt >= T.talkTurn - EPS)) return;
-      talkPhase('on');
+      setTalkPhase('on');
     }
     if (d.seq !== k.seq) {
       k.seq = d.seq;

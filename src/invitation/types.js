@@ -10,14 +10,18 @@
 //      camera) → a line to show goes to bubble.say
 //   3. steer (walk, flee, face the camera) or carry (held, falling) moves NEWT's root
 //   4. blendStep moves each clip's weight toward BrainOut's; gaitPhase advances the step phase
-//   5. character.update(dt): restore the head's saved animation pose → mixer.update → save it
+//   5. character.update(dt): restore the head's and the limbs' saved animation pose →
+//      mixer.update → save it; then character.limp (while he's carried or falling, and easing
+//      out once he's down: his arms and legs swing as springs on top of the clip, never his
+//      chest, neck or head; only on a frame his pose stepped)
 //   6. root.updateMatrixWorld → carry's tilt on the root → read the collar → move the root by
 //      anchor − collar → root.updateMatrixWorld (only while held; the anchor is where the
 //      cursor's ray meets the camera-facing plane he was grabbed on, plus the grab offset as it
 //      eases out: carry.js offsetAt)
 //   7. lookStep → character.applyLook (on top of the saved pose: it never adds up; his chest
 //      joins in for big looks while he's on his feet, lookAt.js chestShare and torsoStep)
-//   8. faceStep → character.setFace; bubble.update (while a line is up): his head on screen
+//   8. faceStep → character.setFace; character.accessories (his earrings swing on his head as
+//      the look left it; Give Device's tablet at his palms); bubble.update (while a line is up): his head on screen
 //      (character.screenShape; null while the open Look sheet covers it, bubble.js
 //      speakerPoint), clear of the toolbar and the open sheet
 //   9. stage.render: the shadow map once, the colour pass, the retro pass

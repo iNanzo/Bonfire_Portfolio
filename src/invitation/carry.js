@@ -465,6 +465,9 @@ export function fallStep(root, vel, footY, dt, bounds, tilt = null) {
  * the time): ω, ζ (the damping ratio), the cone (radians from the clip's direction it never
  * swings past), the most a joint's acceleration counts for (world units/s²), the step it's
  * integrated in, the seconds it eases out over once he's down, and gravity (world units/s²).
+ * What pushes a limb, as angles it settles at: `hang` of how far his body is tipped off the
+ * clip's upright pose, back toward the floor (limp, but the clip's pose still pulls), and
+ * `sway` of its joint's acceleration over gravity (a free pendulum's, for small angles, is 1).
  */
 export const LIMP = {
   omega: 7,
@@ -474,6 +477,8 @@ export const LIMP = {
   substep: 1 / 120,
   ease: 0.2,
   gravity: 9.8,
+  hang: 0.6,
+  sway: 0.8,
 };
 
 /**
