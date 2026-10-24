@@ -98,10 +98,15 @@ export async function finger(page) {
 /**
  * The shared checks for drag kind `kind`. `baseline`: the checks the kind is known to fail (today's
  * hold leaves the collar off the cursor on a down drag: marked test.fail, so fixing it shows).
+ * `high`: how the kind gets him high, held, from `cursor` (by default a drag 200 px up; a kind
+ * whose move up carries him away rather than up passes its own, its wheel say).
  * @param {string} kind
- * @param {{baseline?: string[]}} [o]
+ * @param {{baseline?: string[], high?: (page: import('@playwright/test').Page, cursor: {x: number, y: number}) => Promise<unknown>}} [o]
  */
-export function dragDescribe(kind, { baseline = [] } = {}) {
+export function dragDescribe(
+  kind,
+  { baseline = [], high = (page, cursor) => glide(page, cursor, { x: cursor.x, y: cursor.y - 200 }) } = {},
+) {
   test.describe(`?drag=${kind}, on a desktop`, () => {
     test.use({ viewport: { width: 1280, height: 800 } });
 
@@ -150,7 +155,7 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
       await until(page, (s) => s.drag.groundCues === 'always' && s.drag.ring?.alpha > 0.99, 'the ring in');
       const d = (await snapshot(page)).drag;
       expect(gap({ x: d.ring.x, y: d.ring.z }, { x: d.hips.x, y: d.hips.z }), 'under his hips').toBeLessThan(0.03);
-      await glide(page, cursor, { x: cursor.x, y: cursor.y - 200 });
+      await high(page, cursor);
       await until(
         page,
         (s) => s.drag.lowestFoot > 0.5 && s.drag.line.visible && s.drag.line.alpha > 0.9,
@@ -163,7 +168,7 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
     test(`${kind}: Ground Cues Off shows neither the ring nor the drop line, however high he is`, async ({ page }) => {
       await calm(page, kind, { groundCues: 'off' });
       const cursor = await grab(page, 'head');
-      await glide(page, cursor, { x: cursor.x, y: cursor.y - 200 });
+      await high(page, cursor);
       await until(page, (s) => s.drag.lowestFoot > 0.5, 'high');
       const off = (await snapshot(page)).drag;
       expect(off.groundCues).toBe('off');

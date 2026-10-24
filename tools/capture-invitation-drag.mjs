@@ -168,23 +168,25 @@ async function presser(page, size) {
     };
   const cdp = await page.context().newCDPSession(page);
   let one = null;
+  let two = null;
   const send = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
   return {
     down: (p) => send('touchStart', [{ x: (one = p).x, y: p.y, id: 1 }]),
     move: (p) => send('touchMove', [{ x: (one = p).x, y: p.y, id: 1 }]),
-    // (A second finger beside the first: down, moved, lifted.)
+    // (A second finger beside the first: down, moved, lifted. A touchEnd lists the touches that
+    // end: the first stays down.)
     second: {
       down: (p) =>
         send('touchStart', [
           { ...one, id: 1 },
-          { x: p.x, y: p.y, id: 2 },
+          { x: (two = p).x, y: p.y, id: 2 },
         ]),
       move: (p) =>
         send('touchMove', [
           { ...one, id: 1 },
-          { x: p.x, y: p.y, id: 2 },
+          { x: (two = p).x, y: p.y, id: 2 },
         ]),
-      up: () => send('touchEnd', [{ ...one, id: 1 }]),
+      up: () => send('touchEnd', [{ ...two, id: 2 }]),
     },
     up: () => send('touchEnd', []),
     done: () => cdp.detach(),
