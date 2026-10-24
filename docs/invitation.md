@@ -388,7 +388,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     kicked every 2.5-6 s and while he thrashes) whose tilt replaces the swing (`HoldStep.tilt`),
     his heading kept as it was when he was grabbed (`HoldStep.yaw`: never turned to the camera
     or toward where he's carried, the user's call at the stop); thrown with the
-    collar's velocity, 0.3 of the rope's, at most 4 u/s, and a lob of 0.35 of its speed across
+    collar's velocity, 0.3 of the rope's, 0.3 of its part toward or away from the camera
+    (`BEAD.depth`: a 100 px up flick lands about 1.1 away, half as far as one across), at most
+    4 u/s, and a lob of 0.35 of its speed across
     (`beadThrow`), the ring at the landing point while he's moving fast and, once he's let go,
     until he lands (`landingPoint`, `Hold.landing`); `cues.js` has the ground cues' numbers
     (`blobLook`: radius 0.35 of his height on contact to 0.6 of that, strength 0.45 to 0.20 times

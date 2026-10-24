@@ -5,7 +5,8 @@
 // back; a flick down skims the floor; his collar is on the cursor every frame; the wheel and a
 // second finger set his hold height; the back wall is a climb and a side wall never slides him in
 // depth; the rope goes slack on a drop and its swing dies away; a throw lands where the preview
-// ring said, an up flick further away with a lob; and a frame costs well under 0.15 ms.
+// ring said, an up flick further away with a lob (not as far as one across); he keeps the heading
+// he was grabbed with; and a frame costs well under 0.15 ms.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -570,21 +571,22 @@ test('bead, the throw: the landing preview is within 0.15 of where he lands for 
   }
 });
 
-test(
-  'bead, design.md’s up flick throw: 100 px in 0.1 s at 36° lands 0.8-1.6 further away',
-  {
-    todo: 'a flick that fast meets the 4 u/s cap, so it lands 2.3-2.5 away: under 1.6 needs a throw under about 2.5 u/s',
-  },
-  () => {
-    for (const screen of ['phone', 'desktop']) {
-      const r = rig(screen);
+test('bead, the up flick throw: 100 px in 0.1 s at 36° lands 0.8-1.6 further away with a lob of 0.25 or more, at yaw 0 and 90, not as far as the same flick across throws him', () => {
+  for (const screen of ['phone', 'desktop']) {
+    for (const yaw of [0, 90]) {
+      const r = rig(screen, { yaw });
       const c = centrePx(r);
       const flick = sim(r, { path: ramp(c, { x: c.x, y: c.y - 100 }, 1.2, 1.3), until: 1.3, release: true });
       const away = depthAlong(flick.landed, r.camera.yaw) - depthAlong(flick.from, r.camera.yaw);
-      assert.ok(away >= 0.8 && away <= 1.6, `${screen}: up flick lands ${away.toFixed(3)} further away`);
+      assert.ok(away >= 0.8 && away <= 1.6, `${screen} yaw ${yaw}: up flick lands ${away.toFixed(3)} further away`);
+      assert.ok(flick.apex >= 0.25, `${screen} yaw ${yaw}: lob ${flick.apex.toFixed(3)}`);
+      const side = sim(r, { path: ramp(c, { x: c.x + 100, y: c.y }, 1.2, 1.3), until: 1.3, release: true });
+      const { right } = levelAxes(r.camera.yaw);
+      const across = (side.landed.x - side.from.x) * right.x + (side.landed.z - side.from.z) * right.z;
+      assert.ok(across > away, `${screen} yaw ${yaw}: across ${across.toFixed(3)}, away ${away.toFixed(3)}`);
     }
-  },
-);
+  }
+});
 
 test('bead, the landing point: straight down from rest, and where a throw’s arc meets the floor under the fall’s gravity', () => {
   assert.deepEqual(landingPoint({ x: 1, y: 0.5, z: 2 }, { x: 0, y: 0, z: 0 }), { x: 1, z: 2 });

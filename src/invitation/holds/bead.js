@@ -36,9 +36,10 @@ const RAD = Math.PI / 180;
  * by `blendTo`. The rope: `rope` long (collar to his middle), damped `ropeDamp` a second, under
  * `gravity`, its tilt soft-clamped to `tiltMax`; kicked `kickMin`–`kickMax` u/s across the floor
  * every `kickEvery` s, and every `thrashEvery` s while he thrashes. The throw: the collar's
- * velocity plus `bob` of the rope's, at most `maxLevel` u/s, lobbed by `lob` of its speed across
- * over `lobFrom` u/s, `up`/`down` at most up and down. The ring: where he'd land while he's carried
- * faster than `ringSpeed` u/s across, eased there with a `ringHalf` s halflife.
+ * velocity plus `bob` of the rope's, `depth` of its part toward or away from the camera, at most
+ * `maxLevel` u/s, lobbed by `lob` of its speed across over `lobFrom` u/s, `up`/`down` at most up
+ * and down. The ring: where he'd land while he's carried faster than `ringSpeed` u/s across,
+ * eased there with a `ringHalf` s halflife.
  */
 export const BEAD = {
   omega: 14,
@@ -64,6 +65,7 @@ export const BEAD = {
   kickEvery: /** @type {readonly [number, number]} */ ([2.5, 6]),
   thrashEvery: 0.3,
   bob: 0.3,
+  depth: 0.3,
   lob: 0.35,
   lobFrom: 1,
   maxLevel: 4,
@@ -285,16 +287,21 @@ export function sideWall(p, bounds, { toward, right }) {
 /**
  * The throw: the solved collar's velocity over the shared window (hold.js HOLD.lead and .span
  * before `t`, as releaseVelocity reads it), plus BEAD.bob of the rope's; while he's pushed out
- * against an edge, none across (today's rule); no faster than BEAD.maxLevel in any direction (a
+ * against an edge, none across (today's rule); BEAD.depth of its part toward or away from the
+ * camera (`toward`, its level way toward it: a px up the screen is about 1.8 times the world one
+ * across is, and the bead runs along the ray faster still as it lofts, so a flick up would throw
+ * him much further than the same flick across); no faster than BEAD.maxLevel in any direction (a
  * flick up the screen throws him up and away, not as far as one across), lobbed by BEAD.lob of
  * its speed across over BEAD.lobFrom, and BEAD.up/down at most up and down.
  * @param {Array<{t: number, x: number, y: number, z: number}>} samples  the solved collar's
  * @param {number} t
  * @param {XYZ} bob  the rope's velocity
  * @param {XZ|null} push
+ * @param {XZ} [toward]  the camera's level way toward it (hold.js levelAxes); left out, no
+ *   depth share
  * @returns {XYZ}
  */
-export function beadThrow(samples, t, bob, push) {
+export function beadThrow(samples, t, bob, push, toward) {
   let x = 0;
   let y = 0;
   let z = 0;
@@ -312,6 +319,11 @@ export function beadThrow(samples, t, bob, push) {
   x = push ? 0 : x + BEAD.bob * bob.x;
   z = push ? 0 : z + BEAD.bob * bob.z;
   y += BEAD.bob * bob.y;
+  if (toward) {
+    const d = (1 - BEAD.depth) * (x * toward.x + z * toward.z);
+    x -= d * toward.x;
+    z -= d * toward.z;
+  }
   const speed = Math.hypot(x, y, z);
   if (speed > BEAD.maxLevel) {
     const k = BEAD.maxLevel / speed;
@@ -500,7 +512,9 @@ export function createBeadHold(deps = {}) {
       const fast = speed > BEAD.ringSpeed;
       const f = feet();
       const spot =
-        carry && fast ? landingPoint(f, beadThrow(carry.samples, t, ropeVelocity(rope), carry.push), bounds) : f;
+        carry && fast
+          ? landingPoint(f, beadThrow(carry.samples, t, ropeVelocity(rope), carry.push, axes.toward), bounds)
+          : f;
       const k = dt > 0 ? 1 - Math.pow(0.5, dt / BEAD.ringHalf) : 0;
       ring = ring ? { x: ring.x + (spot.x - ring.x) * k, z: ring.z + (spot.z - ring.z) * k } : { x: f.x, z: f.z };
       const apart = Math.hypot(ring.x - f.x, ring.z - f.z) > 0.02;
@@ -521,7 +535,13 @@ export function createBeadHold(deps = {}) {
       return { x: c.x - o.x, y: c.y - o.y };
     },
     release(carry, t) {
-      const v = beadThrow(carry.samples, t, ropeVelocity(rope), carry.push);
+      const v = beadThrow(
+        carry.samples,
+        t,
+        ropeVelocity(rope),
+        carry.push,
+        view ? levelAxes(view.yaw).toward : undefined,
+      );
       landing = landingPoint(feet(), v, area);
       return v;
     },
