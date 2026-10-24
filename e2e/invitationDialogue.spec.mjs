@@ -678,6 +678,7 @@ test.describe('on a desktop', () => {
     page,
   }) => {
     await calm(page);
+    await useBehaviorIntro(page);
     await open(page);
     const layer = page.locator('.inv-talk');
     const logBtn = page.getByRole('button', { name: 'Log', exact: true });
