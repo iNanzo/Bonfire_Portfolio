@@ -74,8 +74,8 @@ drawn in the toy's own pixel look, and it's the loading screen too: NEWT loads b
   wherever a drag that started there ends (the toolbar, at the bottom of a drag down).
 - **Slide the camera:** with a mouse, drag empty space with the left button (or the middle
   one); with fingers, drag two of them together. The floor under your cursor stays under it as
-  far as the edge of what you can reach at this zoom (none fully zoomed out, more the closer
-  you are): past it the view gives like a rubber band and, let go, eases back.
+  far as the edge of what you can reach at this zoom (more the closer you are): past it the
+  view gives like a rubber band and, let go, eases back.
 - **Zoom:** pinch with two fingers, or use the mouse wheel; it zooms about the cursor or your
   fingers (the floor there stays there). The light turns with the camera, so his shadow always
   falls behind him and to one side.
@@ -89,10 +89,13 @@ drawn in the toy's own pixel look, and it's the loading screen too: NEWT loads b
   Once you've slid the camera, or zoomed it about a spot, it stays where you put it however he
   moves, until you tap or grab him, press Follow NEWT, or Reset Camera (which clears the zoom
   too).
-- **Where he can go** is one rounded square round the middle, the same however the camera's
-  turned, so a tap anywhere across the middle of the screen reaches it turned too. It's as big
-  as the view fully zoomed out shows him whole in: on a phone it's narrower than the screen is
-  deep, so tapping near the top walks him to its back edge.
+- **Where he can go** fills the screen: tap anywhere on the floor at the default zoom, on any
+  phone or window and however the camera's turned, and he walks all the way there. It's one
+  round patch of floor round the middle, the same however the camera turns (so its edges never
+  move as you go round), big enough to hold everything the screen shows turned any way; it's
+  worked out again when the window changes size (if it shrinks under him he eases back in;
+  a phone's URL bar showing or hiding doesn't move him). As that's more floor than the screen
+  shows, he wanders where you can see him and runs off within what was on screen.
 - **Leave him alone** for about 20 seconds and he turns to face you and sits down (the Sit
   button turns him to you first too, so you see his happy face).
 - **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Give Device (Lie
@@ -283,7 +286,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     screen's steps, one a block size, the resolutions that come to 1 px folded into Native;
     `shownPixel`, what the slider reads for a Pixel Size: itself on a step it shares;
     `DEFAULT_PIXEL`, the one line that sets the default, `'128'`; and the default view: 20° of
-    view, 36° up, NEWT 0.195 of a desktop's short side tall with the whole play area in sight,
+    view, 36° up, NEWT 0.195 of a desktop's short side tall with the default view's disc in sight,
     or 0.255 of a phone's, a stage whose short side is under 600 CSS px (99 CSS px, and 149
     texels at the default 128×128, on a 390-wide phone), whatever the Pixel Size, the point it
     looks at shown in the middle of the space over the toolbar, or of the clear space above or
@@ -294,9 +297,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     round, three quarters of a turn for a drag across the whole stage and half a turn of tilt
     down its whole height, 12° to 70° up, half to twice the default distance, eased with a
     little coast; `orbitPan` slides it at once, the floor under the cursor exactly under it,
-    `floorUnder`, the point it looks at kept to `panRegion` (a square round the play area's
-    middle, the area's half less what the view shows its narrower way at this zoom: none fully
-    zoomed out), past which it gives like a rubber band (`ORBIT.band`, at most `bandPx` 90 CSS
+    `floorUnder`, the point it looks at kept to `panRegion` (a disc round the play area's
+    middle, the area's radius less what the view shows its narrower way at this zoom, more the
+    closer it zooms), past which it gives like a rubber band (`ORBIT.band`, at most `bandPx` 90 CSS
     px) and, let go, eases back at `bandBack` (0.18 s); `orbitZoom` and `orbitWheel` with a
     point zoom about it (the cursor, a pinch's middle: the floor there kept there as it eases,
     the view a pan from then on); `orbitNudge` turns and tilts it for the Camera pad at
@@ -308,16 +311,21 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `orbitFollow` (a tap or a grab on him, Follow NEWT) or `orbitReset`;
     `orbitHold` holds it still while he's held, and once he's let go out past `keepOut` (carried
     to the screen's edge) it eases him back inside at `ORBIT.settle` (0.25 s) rather than
-    jumping there in a frame; `lightDir` turns the look's sun with the
-    camera's yaw), `area.js` (`viewArea`, the play area: a rounded square round the default
-    view's target, the orbit's centre (corners `AREA_ROUND`, 0.35, of its half side), the
-    biggest whose every point the floor the default view shows at twice its distance, yaw 0,
-    holds him whole 8 px inside the clear space, `AREA_MARGIN` (`viewFloor`, a trapezoid
-    widening toward the back); about 2.6 units from its middle to a side on a 390×844 phone and
-    5.0 on a 1280×800 desktop; one shape however the camera turns, worked out again on a resize,
-    never moved by the camera or the Settings sheet; its middle is the orbit's, Reset Camera's
-    and the brain's; and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight and
-    the shadow camera's box, `stage.setArea` keeping it round the area's middle),
+    jumping there in a frame; `orbitSight`, what's on screen now: the floor where he shows
+    whole `AREA_MARGIN` (8) CSS px inside the clear space at the view as it is, a trapezoid in
+    the camera's frame turned with it, `Bounds.turn`, which main.js hands the play area every
+    frame as its `sight`; `lightDir` turns the look's sun with the
+    camera's yaw), `area.js` (`viewArea`, the play area: a disc round the default view's target,
+    the orbit's centre, holding every spot of floor the default view shows across the whole stage
+    (`floorAt`, the stage's corners) turned any way round that centre, his radius past the
+    farthest: about 9.6 units on a 390×844 phone, 8.4 on a 768×1024 tablet and 8.0 on a
+    1280×800 desktop; one shape however the camera turns, worked out again on a resize, never
+    moved by the camera or the Settings sheet; its middle is the orbit's, Reset Camera's and the
+    brain's; and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight and the
+    shadow camera's box, `stage.setArea` keeping it round the area's middle; `steer.js` keeps
+    wander goals inside the play area's `sight` when one's there, a flee inside what was on
+    screen as it began, `Body.fence`, and eases him back in at `STEER.backIn` (0.3 s, 0.15 to 2
+    units/s) when a resize shrinks the area under him),
     `play.js` (the frame's decisions: who moves his root, the clip mix, where he looks),
     `look.js` (the Look settings under `invitation.look.v1`, Pixel Size stored as `'16'` to
     `'256'`, `'native'` or `'off'` (an old `'2'`, `'3'` or `'4'` loads as 48, 32 or 24, what
@@ -561,8 +569,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   has swung, radians) and Give Device (`device.state` and `label`, the tablet `shown` and its
   `screen` point, his `turn` off the camera). The snapshot's `camera` has
   the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
-  the play area, and `talk` is what he's saying (speech.js's snapshot: the line up and its
-  trigger, when the idle clock comes round). While the intro runs, `dialogue` has the box up
+  the play area (a disc: `r`), `sight` what's on screen (camera.js `orbitSight`), and `talk` is
+  what he's saying (speech.js's snapshot: the line up and its trigger, when the idle clock comes
+  round). While the intro runs, `dialogue` has the box up
   (`id`, `seq`, `text`, `shown`, `typed`, its replies' targets, `auto`, `paused`, `waiting`: the
   line holding until he's in place, `logOpen`, `asking`, `repliesLive`: the replies show and take
   a press, `camera`, `shot`, `framed`: the clear space it was framed in (client px, from under the
@@ -580,9 +589,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `64x64`, `native` or `off`), `--motion`, `--sizes`, `--acts`); its `pan`, `lift` and
   `sweep` acts (`tools/capture-invitation-camera.mjs`) slide, turn and zoom the camera, carry
   him up high (the report says how far the grabbed point strayed from the cursor) and sweep the
-  cursor, or a finger, over the whole screen to show where he looks; its `envelope` and
-  `envelope-skip` acts open or skip the envelope (`?test&envelope`, whole frames). One GPU
-  capture at a time.
+  cursor, or a finger, over the whole screen to show where he looks, and its `reach` and
+  `reach-turned` acts tap near the top of the screen and follow him all the way there (turned
+  90° first); its `envelope` and `envelope-skip` acts open or skip the envelope
+  (`?test&envelope`, whole frames). The record and the frames are
+  `tools/capture-invitation-record.mjs`. One GPU capture at a time.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
   `vite.config.js`, `test/site.test.mjs` and the spec's last test check it).
 - **Unlisted:** `noindex, nofollow`, left out of the sitemap and the README, and not
