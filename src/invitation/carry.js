@@ -15,8 +15,8 @@
 // the toss velocity from the last ~80 ms when he's let go (none across while the pointer pushes
 // him out against the edge: the edge is invisible, so he drops right there instead of skidding
 // along it or flying back off it), and the fall that follows, with gravity and soft bounces off
-// the play area's edges (a disc's rim, or a box's sides) for a fall that reaches one, until his
-// lowest foot meets the floor. Pure: no three.js.
+// the play area's edges (a disc's rim, a rounded box's sides and corner arcs, or a box's sides)
+// for a fall that reaches one, until his lowest foot meets the floor. Pure: no three.js.
 
 import { rayPlane } from './gesture.js';
 import { centreOf, clampTo, rounded, xRange } from './steer.js';
@@ -470,6 +470,25 @@ export function fallStep(root, vel, footY, dt, bounds, tilt = null) {
       const nz = oz / d;
       r.x = c.x + nx * bounds.r;
       r.z = c.z + nz * bounds.r;
+      const out = v.x * nx + v.z * nz;
+      if (out > 0) {
+        v.x -= (1 + CARRY.restitution) * out * nx;
+        v.z -= (1 + CARRY.restitution) * out * nz;
+      }
+    }
+  } else if (bounds && rounded(bounds) > 0) {
+    // Off a rounded box's edge (its inner box grown by its corner radius all round, so a corner
+    // is an arc, not the box's square corner): back onto it, r out from the inner box's nearest
+    // point, the speed out of it reversed and softened, along it kept (a straight side as a box's).
+    const rr = rounded(bounds);
+    const ix = clamp(r.x, bounds.minX + rr, bounds.maxX - rr);
+    const iz = clamp(r.z, bounds.minZ + rr, bounds.maxZ - rr);
+    const d = Math.hypot(r.x - ix, r.z - iz);
+    if (d > rr) {
+      const nx = (r.x - ix) / d;
+      const nz = (r.z - iz) / d;
+      r.x = ix + nx * rr;
+      r.z = iz + nz * rr;
       const out = v.x * nx + v.z * nz;
       if (out > 0) {
         v.x -= (1 + CARRY.restitution) * out * nx;

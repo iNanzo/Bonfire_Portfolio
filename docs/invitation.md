@@ -181,8 +181,8 @@ Now and then NEWT says something in a speech bubble over his head, in the page's
 
 Each moment speaks at its own chance, once its cooldown is over, with one of its lines at
 random, never the line he just said. There's one bubble at a time: while a line is up, only a
-moment that matters more replaces it (being caught or shaken first, idle time last). A line
-types out at about 30 characters a second, stays long enough to read, then fades; with
+moment that matters more replaces it (a thrash first, then being caught or shaken, idle time
+last). A line types out at about 30 characters a second, stays long enough to read, then fades; with
 reduced motion it shows all at once. The bubble follows him and stays on screen, clear of the
 toolbar, the open Camera pad and the open Settings sheet (near the top it goes beside his head, on a phone narrowed to
 fit there with the line on more rows, or else under his feet, never over his face or body), and
@@ -358,7 +358,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     5), the anchor the pointer's spot with no lag, kept inside the play area along the drag
     plane's line across the floor (`lineSpan`: at an edge he stops, on a rounded square's
     corner arcs too, never sliding along it in depth), and the swing driven by a smoothed follow of
-    it, past `CARRY.tiltSoft` (0.6 rad) a stiff spring easing him back instead of a hard stop;
+    it, past `CARRY.tiltSoft` (0.5 rad) a stiff spring easing him back instead of a hard stop;
+    let go, `fallStep` drops him with soft bounces off the edges (a rounded square's corner
+    arcs as arcs, not the box round them, so a drop in a corner lands inside the arc);
     `limbStep` is the spring his limp limbs and his earrings hang on (character.js); `lookAt.js` `screenAim` aims his look camera-relative (performative gaze): seen from
     the camera the cursor lies some heads (`LOOK.headSize`, 0.53) from his head in some
     direction on screen, and his face turns from the line to the camera toward that direction,

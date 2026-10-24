@@ -662,6 +662,41 @@ test('falling: gravity, soft wall bounces, and he lands when his lowest foot rea
   assert.equal(fallStep({ x: 0, y: 0.1, z: 0 }, { x: 0, y: 0, z: 0 }, -0.05, DT, BOUNDS).landed, true);
 });
 
+test('falling in a rounded square: a drop or a throw into a corner stays inside its arc (not the box round it), bouncing softly off the arc', () => {
+  const b = { minX: -2, maxX: 2, minZ: -2, maxZ: 2, round: 1 };
+  const inArc = (p) => Math.hypot(Math.max(0, Math.abs(p.x) - 1), Math.max(0, Math.abs(p.z) - 1)) <= 1 + 1e-6;
+  const FOOT = -0.1;
+  // Dropped still in a corner, outside the arc but inside the box: it lands inside the arc.
+  let root = { x: 1.9, y: 1, z: -1.9 };
+  let vel = { x: 0, y: 0, z: 0 };
+  for (let i = 0; i < 120; i++) {
+    const r = fallStep(root, vel, root.y + FOOT, DT, b);
+    root = r.root;
+    vel = r.vel;
+    if (r.landed) break;
+  }
+  assert.ok(inArc(root), `landed ${JSON.stringify(root)} inside the corner’s arc`);
+  // Thrown diagonally into a corner: inside the arc every frame, its speed out of it turned back, softened.
+  root = { x: 1, y: 1.2, z: 1 };
+  vel = { x: 3, y: 0, z: 3 };
+  let bounced = null;
+  for (let i = 0; i < 60 && !bounced; i++) {
+    const r = fallStep(root, vel, root.y + FOOT, DT, b);
+    assert.ok(inArc(r.root), `frame ${i}: ${JSON.stringify(r.root)} inside the arc`);
+    if (r.vel.x < 0 && r.vel.z < 0) bounced = r.vel;
+    root = r.root;
+    vel = r.vel;
+  }
+  assert.ok(bounced, 'bounced off the arc');
+  close(Math.hypot(bounced.x, bounced.z), Math.hypot(3, 3) * CARRY.restitution, 1e-6, 'softly:');
+  // Along a straight side it's the box's as before.
+  root = { x: 1.98, y: 1.2, z: 0 };
+  vel = { x: 3, y: 0, z: 0 };
+  const r = fallStep(root, vel, root.y + FOOT, DT, b);
+  close(r.root.x, 2, 1e-9);
+  close(r.vel.x, -3 * CARRY.restitution, 1e-9);
+});
+
 // ---- blend --------------------------------------------------------------------------------
 
 test('gait weights by speed: Idle at 0, Walk at walking speed, Run at running speed, linear between', () => {
