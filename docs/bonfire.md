@@ -161,6 +161,15 @@ Bonfire Live's are in [design/visualizer.md](design/visualizer.md), the Painter'
   `hi` color (debounced so a 1.2 s blend is one update). In a light browser theme it
   uses the flame's deep `lo` tone so it stays visible on a pale tab strip.
 
+## The password lock
+
+With the lock on (the admin's Settings › Access; [admin.md](admin.md) has the detail), a
+locked page sends a visitor without the `nh_gate` cookie to `/unlock/` before it loads
+anything else. The lock page is the 404 page's look: the same pixel flame, cold stone with
+its ember alight while the seal holds, its core glowing while the password is checked, and
+burning once it opens; then the visitor goes back to where they were going. It keeps
+visitors and search engines out, not someone who reads the public repository.
+
 ## UI motion
 
 - **Inventory cursor:** one selection cursor made of four pixel corner brackets. It glides
