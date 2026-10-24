@@ -6,8 +6,8 @@
 // are kept on the ray inside the play area and between his hang height and the ceiling (hold.js
 // edgeClamp: the back wall a climb, the floor a skim at his hang height, a side wall across only).
 // His body hangs on a one-sided Verlet rope from the collar (ropeStep: slack on a drop, a jolt as
-// it pulls tight, kicked now and then and while he thrashes), he keeps the heading he had as he was
-// grabbed (never turned to the camera or toward where he's carried), and he's thrown in 3D: the collar's velocity, some of the rope's and a lob
+// it pulls tight, kicked now and then and while he thrashes; his heading is never its own: main.js
+// keeps the one he had as he was grabbed), and he's thrown in 3D: the collar's velocity, some of the rope's and a lob
 // (beadThrow), the ring showing where he'd land while he's moving fast and where he will once
 // he's let go (landingPoint). A wall faced more across the screen than in depth (sideWall) is a
 // side wall even where the ray finds the inside past it: across only there, never a slide in
@@ -352,7 +352,6 @@ export function beadThrow(samples, t, bob, push, toward) {
  * @property {number} holdY
  * @property {number} holdGoal
  * @property {Rope} rope
- * @property {number|null} yaw  his heading as he was grabbed (null: none given)
  * @property {XZ|null} ring
  */
 
@@ -383,8 +382,6 @@ export function createBeadHold(deps = {}) {
   /** @type {XYZ} */
   let anchor = { x: 0, y: 0, z: 0 };
   let rope = hangRope(anchor);
-  /** @type {number|null} */
-  let yaw = null;
   let kickAt = Infinity;
   let thrashAt = Infinity;
   /** @type {XZ|null} */
@@ -420,12 +417,12 @@ export function createBeadHold(deps = {}) {
       return plane;
     },
     get state() {
-      return { s: bead.s, v: bead.v, goal, holdY, holdGoal, rope, yaw, ring };
+      return { s: bead.s, v: bead.v, goal, holdY, holdGoal, rope, ring };
     },
     get landing() {
       return landing;
     },
-    start({ t, collar, press, collarPx, rayAt, camera, low: hang, bounds, yaw: heading }) {
+    start({ t, collar, press, collarPx, rayAt, camera, low: hang, bounds }) {
       t0 = t;
       area = bounds;
       off0 = { x: collarPx.x - press.x, y: collarPx.y - press.y };
@@ -443,7 +440,6 @@ export function createBeadHold(deps = {}) {
       plane = beadPlane(camera, through, holdY);
       anchor = { x: collar.x, y: collar.y, z: collar.z };
       rope = hangRope(collar);
-      yaw = heading ?? null;
       kickAt = nextKick(t);
       thrashAt = Infinity;
       ring = null;
@@ -532,8 +528,6 @@ export function createBeadHold(deps = {}) {
         push: side ? at.push : null,
         holdY,
         tilt: ropeTilt(rope),
-        // (His heading: the one he had as he was grabbed, all the hold.)
-        ...(yaw === null ? {} : { yaw }),
         cues: { ...(fast || apart ? { ring: { ...ring } } : {}), line: false, pulse },
       };
     },

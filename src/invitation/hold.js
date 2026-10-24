@@ -418,7 +418,6 @@ export function squash(sinceGrab, sinceLand) {
  * @property {HoldCamera} camera
  * @property {number} low  his hang height: the lowest his collar is carried once he's clear
  * @property {Bounds|null} bounds  the play area
- * @property {number} [yaw]  his heading as he's grabbed (his root's rotation.y)
  */
 /**
  * @typedef {object} HoldFrame  what a kind gets each frame he's held
@@ -449,8 +448,8 @@ export function squash(sinceGrab, sinceLand) {
  * @property {XZ|null} [push]  set: the push holdStep keeps for the toss (a kind's side clamp)
  * @property {number|null} holdY  the height a kind holds him at (null: none of its own)
  * @property {XZ} [tilt]  set: his root's tilt this frame in place of carry.js's swing (a kind's own
- *   body: root.rotation.x and .z)
- * @property {number} [yaw]  set: his heading this frame (his root's rotation.y)
+ *   body: root.rotation.x and .z). There's no heading: no kind turns him (main.js keeps the one
+ *   he had as he was grabbed, the user's rule).
  * @property {HoldCues} cues
  */
 /**

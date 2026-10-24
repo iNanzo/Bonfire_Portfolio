@@ -378,7 +378,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     solved collar from 70 to 20 ms before letting go, capped at 4 u/s across and 2.5 up, 3 down,
     none across while pushed) and `squash` (1.08 tall over 80 ms as he's lifted; landing, 0.88
     tall and 1.08 wide over 70 ms, back over 200 ms); no kind turns him off his yaw while he's
-    held (he keeps the way he faced as he was grabbed, falling and landing too); `holds/level.js` is the level candidate
+    held (he keeps the way he faced as he was grabbed, falling and landing too: a `HoldStep` has
+    no heading, and every kind's browser check reads his facing through a sweep, the fall and the
+    landing); `holds/level.js` is the level candidate
     (`LEVEL`): his collar where the cursor's ray meets a level plane at his hold height, so a
     move up the screen carries him away across the floor (1.6 a 100 px on a phone, 1.0 on a
     desktop at 36°) and one across never in depth; the hold height eases (critically damped,
@@ -410,8 +412,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     kicked every 2.5-6 s and while he thrashes) whose tilt replaces the swing (`HoldStep.tilt`;
     `ropeTilt` reads it as though his middle hung 0.3 of the rope under the collar or more, so a
     slack rope never flips him side to side),
-    his heading kept as it was when he was grabbed (`HoldStep.yaw`: never turned to the camera
-    or toward where he's carried, the user's call at the stop); thrown with the
+    his heading never its own (the shared rule above); thrown with the
     collar's velocity, 0.3 of the rope's, 0.3 of its part toward or away from the camera
     (`BEAD.depth`: a 100 px up flick lands about 1.1 away, half as far as one across), at most
     4 u/s, and a lob of 0.35 of its speed across

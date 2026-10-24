@@ -4,9 +4,10 @@
 // with the helpers here). Carried with the mouse, his collar is within 2 px of the cursor once
 // the grab has eased in (0.15 s), up, across and down; the blob is within 0.03 world of his hips'
 // floor point and his lowest foot above the floor all the while; a down drag from a standing grab
-// leaves no gap; with a finger, his collar is within 2 px of where the kind aims it, above the
-// finger; Ground Cues shows the ring under him and the drop line once he's high, or neither at
-// Off. Every wait is on a state (snapshot().drag through ?test), never a duration (CI's software
+// leaves no gap; carried across and up and let go, he keeps the way he faced as he was grabbed,
+// held, falling and landed (the user's rule); with a finger, his collar is within 2 px of where
+// the kind aims it, above the finger; Ground Cues shows the ring under him and the drop line once
+// he's high, or neither at Off. Every wait is on a state (snapshot().drag through ?test), never a duration (CI's software
 // WebGL runs 3-5x slower than real time). Playwright only.
 import { test, expect } from '@playwright/test';
 
@@ -151,6 +152,48 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
         .poll(async () => (await snapshot(page)).drag.gap ?? Infinity, { message: 'down 100 px', timeout: 5_000 })
         .toBeLessThan(2);
       await page.mouse.up();
+    });
+
+    test(`${kind}: carried across and up, then let go, he keeps the way he faced as he was grabbed, held, falling and landed (the user's rule)`, async ({
+      page,
+    }) => {
+      await calm(page, kind);
+      const off = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+      // (Read held, in the air and landing only: once he's up again, a fright may send him running.)
+      let most = 0;
+      const read = async () => {
+        const s = await snapshot(page);
+        if (s.held || s.lift > 1e-3 || s.state === 'fall' || s.state === 'land')
+          most = Math.max(most, off(s.drag.facing, f0));
+        return s;
+      };
+      const f0 = (await snapshot(page)).drag.facing;
+      let cursor = await grab(page, 'head');
+      // (Each move read as it lands, so a turn eased in mid-sweep shows.)
+      for (const to of [
+        { x: cursor.x + 300, y: cursor.y },
+        { x: cursor.x + 100, y: cursor.y - 160 },
+        { x: cursor.x - 200, y: cursor.y - 120 },
+      ]) {
+        for (let i = 1; i <= 10; i++) {
+          await page.mouse.move(cursor.x + ((to.x - cursor.x) * i) / 10, cursor.y + ((to.y - cursor.y) * i) / 10);
+          await read();
+        }
+        cursor = to;
+      }
+      await page.mouse.up();
+      // (Down on the floor again: let go, his root back at 0; read often, so the fall is seen.)
+      await expect
+        .poll(
+          async () => {
+            const s = await read();
+            return !s.held && s.lift <= 1e-3;
+          },
+          { message: 'let go, fallen and landed', timeout: 20_000, intervals: [50] },
+        )
+        .toBe(true);
+      await read();
+      expect(most, `turned ${((most * 180) / Math.PI).toFixed(2)}° off the way he faced`).toBeLessThan(Math.PI / 180);
     });
 
     test(`${kind}: Ground Cues Always shows the ring under his hips while he's held and the drop line once he's high`, async ({

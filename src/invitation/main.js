@@ -1277,7 +1277,6 @@ function start(s) {
           camera: view,
           low: hangY,
           bounds: area,
-          yaw: body.body.yaw,
         });
         const head = shape().head;
         headAbove = press.y0 - (head.y - head.r);
@@ -1351,11 +1350,9 @@ function start(s) {
     });
     // (A kind's side clamp: its push, kept for the toss.)
     if (holdNow && holdNow.push !== undefined && body.carry) body.carry.push = holdNow.push;
-    // (A kind's own body: its tilt in place of the swing, its heading.)
-    if (holdNow && body.mode === 'held') {
-      if (holdNow.tilt) body.tilt = { x: holdNow.tilt.x, z: holdNow.tilt.z };
-      if (holdNow.yaw !== undefined) body.body = { ...body.body, yaw: holdNow.yaw };
-    }
+    // (A kind's own body: its tilt in place of the swing. Never his heading: held, falling and
+    // landing he keeps the one he had as he was grabbed, the user's rule, so no kind can turn him.)
+    if (holdNow?.tilt && body.mode === 'held') body.tilt = { x: holdNow.tilt.x, z: holdNow.tilt.z };
     if (body.mode !== 'held') root.position.set(body.root.x, body.root.y, body.root.z);
     root.rotation.set(body.tilt.x, body.body.yaw, body.tilt.z);
     const sq = squashing

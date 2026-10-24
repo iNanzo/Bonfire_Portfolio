@@ -3,8 +3,8 @@
 // up the screen he goes away and up at once (his depth along the camera's level axis and his
 // height both grow), his collar on the cursor; hoisted to the stage's top his root goes over 1.2;
 // a zoom mid-hold keeps his collar under the cursor; Ground Cues plays In the Mix by default (the
-// ring once he's high, none while he's low and still); carried across and up and let go, he keeps
-// the way he faced as he was grabbed until he's landed; and a finger carries him 48 px above itself.
+// ring once he's high, none while he's low and still); and a finger carries him 48 px above itself.
+// (That he keeps the way he faced as he was grabbed is every kind's: e2e/lib/drag.mjs.)
 // Every wait is on a state, never a duration.
 import { test, expect } from '@playwright/test';
 import { calm, dragDescribe, finger, glide, grab, on, onCursor, snapshot, until } from './lib/drag.mjs';
@@ -53,48 +53,6 @@ test.describe('?drag=tilt, its own checks on a desktop', () => {
     await glide(page, cursor, { x: cursor.x + 80, y: cursor.y - 40 });
     await onCursor(page, 'moved after the zoom');
     await page.mouse.up();
-  });
-
-  test('tilt: carried across and up, then let go, he keeps the way he faced as he was grabbed, held, falling and landed', async ({
-    page,
-  }) => {
-    await calm(page, 'tilt');
-    const off = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
-    // (Read held, in the air and landing only: once he's up again, a fright may send him running.)
-    let most = 0;
-    const read = async () => {
-      const s = await snapshot(page);
-      if (s.held || s.lift > 1e-3 || s.state === 'fall' || s.state === 'land')
-        most = Math.max(most, off(s.drag.facing, f0));
-      return s;
-    };
-    const f0 = (await snapshot(page)).drag.facing;
-    let cursor = await grab(page, 'head');
-    // (Each move read as it lands, so a turn eased in mid-sweep shows.)
-    for (const to of [
-      { x: cursor.x + 300, y: cursor.y },
-      { x: cursor.x + 100, y: cursor.y - 160 },
-      { x: cursor.x - 200, y: cursor.y - 120 },
-    ]) {
-      for (let i = 1; i <= 10; i++) {
-        await page.mouse.move(cursor.x + ((to.x - cursor.x) * i) / 10, cursor.y + ((to.y - cursor.y) * i) / 10);
-        await read();
-      }
-      cursor = to;
-    }
-    await page.mouse.up();
-    // (Down on the floor again: let go, his root back at 0; read often, so the fall is seen.)
-    await expect
-      .poll(
-        async () => {
-          const s = await read();
-          return !s.held && s.lift <= 1e-3;
-        },
-        { message: 'let go, fallen and landed', timeout: 20_000, intervals: [50] },
-      )
-      .toBe(true);
-    await read();
-    expect(most, `turned ${((most * 180) / Math.PI).toFixed(2)}° off the way he faced`).toBeLessThan(Math.PI / 180);
   });
 
   test('tilt: Ground Cues plays In the Mix by default: no ring while he’s low and still, the ring once he’s high', async ({

@@ -100,12 +100,12 @@ function seeded(seed = 7) {
  * `at` (his collar, pressed `pressOff` px from it on screen), the cursor at `path(t)` (client px,
  * t from the grab), the hold's anchor through play.js bodyStep (carry.js holdStep), until
  * `until`; then, with `release`, let go and fallen with play.js bodyStep until he lands.
- * `act(t, hold)` runs before each frame (the wheel, a second finger); `yaw`, his heading as he's
- * grabbed.
+ * `act(t, hold)` runs before each frame (the wheel, a second finger); `given`, more for its start
+ * (what main.js once handed it).
  */
 function sim(
   r,
-  { path, until, at = home(r), pressOff = { x: 0, y: 0 }, release = false, act = null, clip = 'Held', yaw = 0 },
+  { path, until, at = home(r), pressOff = { x: 0, y: 0 }, release = false, act = null, clip = 'Held', given = {} },
 ) {
   const hold = createBeadHold({ rng: seeded() });
   const collar = { x: at.x, y: STAND, z: at.z };
@@ -123,7 +123,7 @@ function sim(
     camera: r.camera,
     low: LOW,
     bounds: r.bounds,
-    yaw,
+    ...given,
   });
   const frames = [];
   let t = 0;
@@ -461,41 +461,21 @@ test('bead, edges: pushing up past the back wall climbs along the ray with his c
   for (const f of side.frames) assert.ok(f.feet.y >= 0.02 || f.t < 0.3, 'feet over the floor');
 });
 
-test('bead, his heading: he keeps the one he had as he was grabbed all the hold, through sweeps across, flicks up and down and Thrash, never turned to the camera or toward where he’s carried', () => {
+test('bead, his heading: no step hands one back (he keeps the one he had as he was grabbed: main.js, the user’s rule), through sweeps across, flicks up and down and Thrash', () => {
   for (const screen of ['phone', 'desktop']) {
     const r = rig(screen);
     const c = centrePx(r);
-    for (const yaw of [0, 2.2, -1.3]) {
-      const runs = [
-        sim(r, { path: ramp(c, { x: c.x + 500, y: c.y }, 1.2, 1.6), until: 2.4, yaw }),
-        sim(r, { path: ramp(c, { x: c.x, y: c.y - 100 }, 1.2, 1.3), until: 2, yaw }),
-        sim(r, { path: ramp(c, { x: c.x - 80, y: c.y + 100 }, 1.2, 1.3), until: 2, yaw }),
-        sim(r, { path: still(c), until: 2, yaw, clip: 'Thrash' }),
-      ];
-      for (const { frames } of runs) {
-        const off = Math.max(...frames.map((f) => Math.abs(f.step.yaw - yaw)));
-        assert.ok(off < 1e-9, `${screen}, grabbed facing ${yaw}: turned ${off.toFixed(4)} rad`);
-      }
-    }
+    // (Handed a heading as he's grabbed, as main.js once did: still none back.)
+    const given = { yaw: 2.2 };
+    const runs = [
+      sim(r, { path: ramp(c, { x: c.x + 500, y: c.y }, 1.2, 1.6), until: 2.4, given }),
+      sim(r, { path: ramp(c, { x: c.x, y: c.y - 100 }, 1.2, 1.3), until: 2, given }),
+      sim(r, { path: ramp(c, { x: c.x - 80, y: c.y + 100 }, 1.2, 1.3), until: 2, given }),
+      sim(r, { path: still(c), until: 2, clip: 'Thrash', given }),
+    ];
+    for (const { frames } of runs)
+      for (const f of frames) assert.ok(!('yaw' in f.step), `${screen}: a heading at ${f.t.toFixed(2)} s`);
   }
-  // (Grabbed with no heading given: none of its own, so main.js keeps his.)
-  const r = rig('desktop');
-  const c = centrePx(r);
-  const hold = createBeadHold({ rng: seeded() });
-  const collar = { ...rayAtY(r.rayAt(c.x, c.y), STAND) };
-  hold.start({ t: 0, collar, press: c, collarPx: c, rayAt: r.rayAt, camera: r.camera, low: LOW, bounds: r.bounds });
-  const st = hold.step({
-    t: 0.5,
-    dt: 1 / 60,
-    px: { x: c.x + 60, y: c.y },
-    rayAt: r.rayAt,
-    camera: r.camera,
-    low: LOW,
-    bounds: r.bounds,
-    carry: null,
-    clip: 'Held',
-  });
-  assert.equal(st.yaw, undefined);
 });
 
 test('bead, the rope: a 0.5 in 0.1 s drop of the collar goes slack for a frame or more; after a 3 u/s move across stops, the swing dies to under 10% within 2 s; kicks swing it', () => {
