@@ -137,7 +137,7 @@ the sheet and leaves the slider as it was.
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 | Ground Cues | Off, In the Mix, Always | The ring on the floor under NEWT while he's held and the dashed line from his collar down to it, so you can see where he is over the floor. In the Mix shows them while he's high or moving fast; Always all the time he's held. Until you pick one, the way he's carried (Drag) chooses. |
-| Drag | Today, Level, Tilt, Bead | Ways of carrying him, to compare (for this visit only; `?drag=` in the address picks one too). Today is how he's carried now; Level carries him over the floor at a height the wheel or a second finger sets; Tilt and Bead are being built and carry him as Today does until they are. |
+| Drag | Today, Level, Tilt, Bead | Ways of carrying him, to compare (for this visit only; `?drag=` in the address picks one too). Today is how he's carried now; Level carries him over the floor at a height the wheel or a second finger sets; Tilt leans the plane he's dragged on back, so up the screen carries him away and up at once; Bead is being built and carries him as Today does until it is. |
 | Wander | On, Off | On (the default): left be, he strolls about by himself now and then. Kept for your next visit, like the rest. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -377,7 +377,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `screenOffset` (the grab offset easing out in screen px over 0.12 s), `releaseVelocity` (the
     solved collar from 70 to 20 ms before letting go, capped at 4 u/s across and 2.5 up, 3 down,
     none across while pushed) and `squash` (1.08 tall over 80 ms as he's lifted; landing, 0.88
-    tall and 1.08 wide over 70 ms, back over 200 ms); `holds/level.js` is the level candidate
+    tall and 1.08 wide over 70 ms, back over 200 ms); no kind turns him off his yaw while he's
+    held (he keeps the way he faced as he was grabbed, falling and landing too); `holds/level.js` is the level candidate
     (`LEVEL`): his collar where the cursor's ray meets a level plane at his hold height, so a
     move up the screen carries him away across the floor (1.6 a 100 px on a phone, 1.0 on a
     desktop at 36°) and one across never in depth; the hold height eases (critically damped,
@@ -388,7 +389,16 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     up to face the camera as it comes down from 35° to 12° (`levelNormal`), so there a move up
     lifts him; past the back wall he climbs the ray however far, past the front wall the shared
     reach, past a side wall across only; a camera move keeps the height he's at; Ground Cues
-    Always, the squash on, a finger 48 px under him; `cues.js` has the ground cues' numbers
+    Always, the squash on, a finger 48 px under him;
+    `holds/tilt.js`
+    is the `tilt` kind: the plane leant back from upright by `clamp(90° − elevation, 30°, 62°)`
+    (`tiltAngle`), so up the screen carries him away and up at once and the floor point under him
+    moves half as far as the cursor, standing up through the band from collar height 1.1 to 1.6
+    and as the cursor's ray goes past the back wall at his hang height (`wallOut`, fully upright
+    0.6 past), the plane re-made through the anchor only once its angle has moved 0.5°, the
+    edges on the ray (`edgeClamp`), no turn off the way he faced as he was grabbed (none toward
+    where he's carried), a lob on a throw (up by 0.25 of his speed across), Ground Cues In the Mix, the
+    squash on and a finger 48 px under him; `cues.js` has the ground cues' numbers
     (`blobLook`: radius 0.35 of his height on contact to 0.6 of that, strength 0.45 to 0.20 times
     the look's lifted over 0.34, soft edge 0.15 to 0.5 of the radius, as his lowest foot rises to
     two heights; Ground Cues' `cueStep`, `mixWants`: his lowest foot over half his height or 1

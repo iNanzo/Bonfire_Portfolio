@@ -73,11 +73,11 @@
 // Device (the brain's device and label, the tablet shown and where, his turn off the camera);
 // snapshot().drag is the drag kind's (its name, the collar's gap from where it's aimed, CSS px,
 // the hold height, the anchor's depth along the camera's level axis, the blob, his hips' floor
-// point and lowest foot, the ring, the drop line and Ground Cues as they play); view({yaw,
-// elevation, zoom}) eases the camera there and drag(kind) picks the drag kind, as Settings does;
-// `?seed=N` and `?calm` go to the brain (and the seed to talk). clock() is the toy's clock (it
-// stands still while the envelope covers him), envelope() the envelope's state and pose (null
-// without one).
+// point and lowest foot, the ring, the drop line and Ground Cues as they play, the way his root
+// faces as drawn); view({yaw, elevation, zoom}) eases the camera there and drag(kind) picks the
+// drag kind, as Settings does; `?seed=N` and `?calm` go to the brain (and the seed to talk).
+// clock() is the toy's clock (it stands still while the envelope covers him), envelope() the
+// envelope's state and pose (null without one).
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
@@ -1627,7 +1627,7 @@ function start(s) {
    * grab gets) and the setting's, its own height controls, where its collar is aimed and how far the collar is from it
    * (CSS px), the hold height, the anchor and its depth along the camera's level axis (away
    * positive), the blob, his hips' floor point and lowest foot, the ring and the drop line, Ground
-   * Cues as it plays, and whether he's pushed at the edge.
+   * Cues as it plays, whether he's pushed at the edge, and the way his root faces as drawn (radians).
    */
   function dragSnapshot() {
     const c = character;
@@ -1654,6 +1654,7 @@ function start(s) {
       line: s.lineState,
       groundCues: cue.mode,
       pushed: Boolean(carry?.push),
+      facing: c ? c.root.rotation.y : null,
     };
   }
 
