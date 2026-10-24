@@ -45,6 +45,29 @@ export const CLIPS = {
   DeviceLie: { loop: true, length: 48 / FPS, fadeIn: 0.2 },
   GetUp: { loop: false, length: 30 / FPS, fadeIn: 0.15 },
 };
+/**
+ * Give Device's tablet (round 16): the page draws it in his hands (device.js) and tools/newt.py's
+ * arm IK holds it. `size` is [width (palm to palm), height, thickness] in model units; `palm` is
+ * how far along each ForeArm bone his palm is (its tip). Per clip: `centre` is where the tablet's
+ * middle sits, `tilt` how many degrees its screen tips from facing straight up toward his face,
+ * and `lift` how far his palms sit above its mid-plane along the screen's normal (0: held by its
+ * sides; lying, the palms rest on top of its edges). The palms are at centre ± (width / 2, 0, 0)
+ * + lift × normal, within 0.08 on every frame (test/invitationModel.test.mjs), so the page can
+ * put the tablet at the palms' midpoint less lift × normal, its width along the palm-to-palm line.
+ *
+ * Coordinates are Blender armature space, as newt.py poses him: +X his left, −Y his front, +Z up,
+ * the origin on the floor between his feet. In three.js (his model's own space, glTF) a point
+ * (x, y, z) is (x, z, −y) and the normal (0, sin tilt, cos tilt) is (0, cos tilt, −sin tilt);
+ * world units are model units × SCALE from his root.
+ */
+export const DEVICE = {
+  size: [1.6, 1.2, 0.08],
+  palm: 0.9,
+  clips: {
+    DeviceSit: { centre: [0, -0.85, 1.45], tilt: 12, lift: 0 },
+    DeviceLie: { centre: [0, -2.15, 0.04], tilt: 0, lift: 0.3 },
+  },
+};
 /** The clips a dialogue box may play (the admin lists these): his gestures, the reactions, sitting. */
 export const DIALOGUE_CLIPS = ['Idle', 'Talk', 'Nod', 'Shrug', 'Point', 'Think', 'Cheer', 'Wave', 'Spook', 'Sit'];
 export const CLIP_NAMES = Object.keys(CLIPS);
