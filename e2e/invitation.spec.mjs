@@ -869,13 +869,14 @@ test.describe('on a phone', () => {
     ];
     const grabbed = await floorAt(page, { x: body.x, y: body.y + 150 });
     await touch('touchStart', at(0));
-    for (let dy = -10; dy >= -120; dy -= 10) {
+    // (Up 60 px: within the pan's region on a phone, past which it gives like a rubber band.)
+    for (let dy = -5; dy >= -60; dy -= 5) {
       await touch('touchMove', at(dy));
       await sleep(16);
     }
     await framesFor(page, 100);
     // The floor that was under their middle is still under it, give or take a finger's wobble.
-    const now = await floorAt(page, { x: body.x, y: body.y + 30 });
+    const now = await floorAt(page, { x: body.x, y: body.y + 90 });
     expect(Math.hypot(now.x - grabbed.x, now.z - grabbed.z), 'the floor went with the fingers').toBeLessThan(0.15);
     await touch('touchEnd');
     const s = await snapshot(page);
