@@ -89,10 +89,14 @@ test('a locked page sends you to the lock and back: a wrong password says so, th
 
   const box = page.getByLabel(LOCK.label);
   await expect(box).toBeFocused();
+  await expect(box, 'nothing wrong yet').toHaveAttribute('aria-invalid', 'false');
   await box.fill('not the password');
   await button(page).click();
   await expect(state(page)).toHaveAttribute('data-gate', 'wrong');
   await expect(page.getByRole('status')).toHaveText(LOCK.wrong);
+  // (A screen reader hears it as the box's own state, not only as a live-region update.)
+  await expect(box, 'the box says it’s wrong').toHaveAttribute('aria-invalid', 'true');
+  await expect(box, 'and the message is its description').toHaveAccessibleDescription(LOCK.wrong);
   expect(
     (await context.cookies()).filter((c) => c.name === GATE_COOKIE),
     'no cookie for a wrong one',
