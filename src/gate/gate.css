@@ -3,8 +3,8 @@
    alone (the scene's neutrals, the starting flame's accents, the three typefaces), so the
    page never loads the site's stylesheet or its content. Only the five faces it uses, in
    their Latin subsets (tokens.css's eight weights in every subset are most of 10 kB gzip).
-   Its states are body[data-gate]: ready and wrong (an ember under the seal), working (the
-   ember flickers), open (the fire comes up as the seal breaks), stuck.
+   Its states are body[data-gate]: ready and wrong (the flame cold stone, its ember alight),
+   working (kindling), open (alight as the seal breaks), stuck.
    ========================================================================== */
 
 @import '@fontsource/inter/latin-400.css';
@@ -71,7 +71,8 @@ p {
   max-width: 34rem;
 }
 
-/* The flame: the 404 page's, its fire held down to an ember until the seal breaks. */
+/* The flame: the 404 page's, cold stone while the seal holds (an ember alight at its foot),
+   kindling while the password is checked, alight once the seal breaks. */
 .lock-flame {
   width: 60px;
   height: 72px;
@@ -81,20 +82,35 @@ p {
   width: 100%;
   height: 100%;
 }
-.lock-flame .fire {
+.lock-flame .outer {
+  fill: var(--c-stone);
+}
+.lock-flame .core {
+  fill: var(--c-shadow);
+}
+.lock-flame .tip {
   opacity: 0;
 }
 .lock-flame .ember-hi {
   animation: flick 1.6s steps(1) infinite;
 }
-[data-gate='working'] .lock-flame .ember,
+[data-gate='working'] .lock-flame .outer {
+  animation: kindle 0.36s steps(1) infinite;
+}
+[data-gate='working'] .lock-flame .core {
+  fill: var(--accent-lo);
+}
 [data-gate='working'] .lock-flame .ember-hi {
-  animation: flick 0.3s steps(1) infinite;
+  animation-duration: 0.3s;
 }
-[data-gate='open'] .lock-flame .fire {
+[data-gate='open'] .lock-flame .outer {
+  fill: var(--accent-lo);
+}
+[data-gate='open'] .lock-flame .core {
+  fill: var(--accent);
+}
+[data-gate='open'] .lock-flame .tip {
   opacity: 1;
-}
-[data-gate='open'] .lock-flame .f2 {
   animation: flick 0.6s steps(1) infinite;
 }
 [data-gate='wrong'] .lock-flame {
@@ -232,6 +248,11 @@ body:not([data-gate]) .lock-form > :not(.lock-status),
 @keyframes flick {
   50% {
     opacity: 0;
+  }
+}
+@keyframes kindle {
+  50% {
+    fill: var(--accent-lo);
   }
 }
 @keyframes shake {
