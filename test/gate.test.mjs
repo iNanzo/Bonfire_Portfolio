@@ -509,3 +509,30 @@ test('the specs’ storage state: the cookie content.json’s key opens, none wi
   assert.match(config, /globalSetup:/, 'made before every run');
   assert.match(config, /storageState: GATE_STATE/, 'every context starts with it');
 });
+
+test('the benchmark gets past the lock too: the cookie its root’s content.json opens, on every context', async () => {
+  const { gateStateFor } = await import('../e2e/lib/gateSetup.mjs');
+  const key = someKey();
+  const root = mkdtempSync(join(tmpdir(), 'gate-bench-'));
+  const file = join(root, 'src', 'content.json');
+  try {
+    mkdirSync(join(root, 'src'));
+    writeFileSync(file, JSON.stringify({ gate: lockedGate({ key }) }));
+    const { cookies } = await gateStateFor(root, 'http://localhost:5183');
+    assert.equal(cookies.length, 1);
+    assert.equal(cookies[0].name, GATE_COOKIE);
+    assert.equal(cookies[0].value, tokenFor(key), 'what the build of that root checks for');
+    assert.equal(cookies[0].domain, 'localhost', 'for the bench’s own server');
+    writeFileSync(file, JSON.stringify({}));
+    assert.deepEqual((await gateStateFor(root, 'http://localhost:5183')).cookies, [], 'a commit from before the lock');
+    rmSync(file);
+    assert.deepEqual((await gateStateFor(root, 'http://localhost:5183')).cookies, [], 'no content.json at all');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+  // (Each scenario opens a fresh context: --prod builds with the lock, so each needs the cookie.)
+  const bench = readFileSync(new URL('../tools/bench-viz.mjs', import.meta.url), 'utf8');
+  const opens = bench.split('\n').filter((l) => /\.newContext\(/.test(l));
+  assert.ok(opens.length > 0);
+  for (const l of opens) assert.match(l, /storageState: gate\b/, `starts with the cookie: ${l.trim()}`);
+});
