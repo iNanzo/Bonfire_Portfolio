@@ -170,8 +170,8 @@ const HOVER_BAYER = `float hoverBayer(vec2 f) {
   return B[i.y * 4 + i.x];
 }`;
 /** At Pixel Size Off (no ids written) NEWT's own texels take the hover as a dithered tint. */
-const HOVER_TINT = `\tif (uIdOn < 0.5 && uHover > 0.0 && abs(uSurfaceId * ${ID_SCALE.toFixed(1)} - ${ID.newt.toFixed(1)}) < 0.5 && hoverBayer(gl_FragCoord.xy) < uHover * 0.5)
-\t\tgl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(${[16, 8, 0].map((sh) => (((HOVER_INK >> sh) & 255) / 255).toFixed(4)).join(', ')}), 0.55);`;
+const HOVER_TINT = `\tif (uIdOn < 0.5 && uHover > 0.0 && abs(uSurfaceId * ${ID_SCALE.toFixed(1)} - ${ID.newt.toFixed(1)}) < 0.5 && hoverBayer(gl_FragCoord.xy) < uHover * 0.25)
+\t\tgl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(${[16, 8, 0].map((sh) => (((HOVER_INK >> sh) & 255) / 255).toFixed(4)).join(', ')}), 0.5);`;
 
 /**
  * Make a material write its surface id into the colour's alpha (for the retro pass's lines),
@@ -369,8 +369,8 @@ export const POST_SHADER = /* glsl */ `
   #define FLOOR ${ID.floor.toFixed(1)}
   #define SPAN ${SHADE_SPAN.toFixed(2)}
   #define MAX_SOFT ${MAX_SOFT}
-  #define HOVER_FILL 0.3
-  #define BURST_WIDTH 1.5
+  #define HOVER_FILL 0.1
+  #define BURST_WIDTH 2.0
   uniform sampler2D tColor;
   uniform sampler2D tDepth;
   uniform vec2 uRes;
@@ -461,10 +461,13 @@ export const POST_SHADER = /* glsl */ `
     }
     return false;
   }
-  // Whether one of NEWT's texels is on his silhouette (a neighbour isn't him): the hover's rim.
+  // Whether one of NEWT's texels is within two of his silhouette (a texel one or two along
+  // isn't him): the hover's rim.
   bool rimOf(vec2 p) {
-    for (int k = 0; k < 4; k++)
+    for (int k = 0; k < 4; k++) {
       if (inside(p + STEPS[k]) && !isNewt(p + STEPS[k])) return true;
+      if (inside(p + 2.0 * STEPS[k]) && !isNewt(p + 2.0 * STEPS[k])) return true;
+    }
     return false;
   }
   // Whether the grab ring covers p: within BURST_WIDTH of its circle, dithered by its strength.
@@ -499,7 +502,8 @@ export const POST_SHADER = /* glsl */ `
     if (abs(idOf(src) - NEWT) < 0.5) {
       vec3 col = grade(src.rgb);
       if (uOutline > 0.5 && edgeOnNewt(p)) col *= uInk * (1.0 - uDarken);
-      // (The pointer on him: his rim first, filling inward as it grows; the grab ring over him.)
+      // (The pointer on him: a two-texel rim, dithered in as it grows, and a sprinkle further in;
+      // the grab ring over him.)
       bool edge = uHover > 0.0 && rimOf(p);
       if (uHover > 0.0 && bayer(p) < uHover * (edge ? 1.0 : HOVER_FILL)) col = mix(col, uHoverInk, 0.6);
       if (burstAt(p)) col = uHoverInk;
