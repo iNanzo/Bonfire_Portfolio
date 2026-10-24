@@ -38,7 +38,7 @@
 // to one side. Angles in radians (yaw 0: the camera on the +z side, + toward +x), distances in
 // world units, drags in CSS px.
 //
-// Play Intro's shots (orbitTalk, shotView, orbitShot): the view goes round to the front (the
+// The intro's shots (orbitTalk, shotView, orbitShot): the view goes round to the front (the
 // default view's yaw, the short way) and each chat box's camera eases there at SHOT.ease (or
 // cuts, for reduced motion): close, his head and shoulders; medium, his whole body; wide, the
 // default view's distance and tilt; keep, as it was. A shot fills SHOT[name].fill of the clear
@@ -101,7 +101,7 @@ export const ORBIT = {
 export { FOCUS_Y };
 
 /**
- * Play Intro's shots: `span` world units of him (from `mid` - span/2 to `mid` + span/2) fill `fill`
+ * The intro's shots: `span` world units of him (from `mid` - span/2 to `mid` + span/2) fill `fill`
  * of the clear space's height, seen `elevation` radians up; `ease`, the time constant the view
  * eases to a shot at, seconds.
  */
@@ -147,7 +147,7 @@ const frameOf = (w, h) => ({ hw: Math.max(1, w / 2 - 24), hh: Math.max(1, (h - 8
  * @property {{hw: number, hh: number}} frame  half the clear space round where the point it
  *   looks at shows, CSS px (it's shown in its middle: pixels.js frameView)
  * @property {boolean} seen  NEWT was inside ORBIT.keepOut of the clear space last frame
- * @property {TalkView|null} [talk]  while Play Intro runs: the front it's seen from, the shot, the view before
+ * @property {TalkView|null} [talk]  while the intro runs: the front it's seen from, the shot, the view before
  */
 /** @typedef {{yaw: number, elevation: number, distance: number, lookY: number}} ShotView  a shot's view: lookY, the height it aims at */
 /**
@@ -587,7 +587,7 @@ export function orbitHome(s, distance) {
 }
 
 /**
- * Play Intro begins (`on`): the view turns round to the front, the short way, and waits for the
+ * The intro begins (`on`, from the envelope or Replay Intro): the view turns round to the front, the short way, and waits for the
  * boxes' shots; or it's over: the view eases back to where it was before, its pan included.
  * `cut` (reduced motion): there at once, the way back looking where it did (`focus`: NEWT, whom
  * the point it looks at follows as it would).
@@ -643,7 +643,7 @@ export function orbitTalk(s, on, { cut = false, focus = null } = {}) {
 }
 
 /**
- * A shot's view while Play Intro runs (null for keep, or with no intro under way): from the
+ * A shot's view while the intro runs (null for keep, or with no intro under way): from the
  * front, at the distance that makes SHOT[shot].span fill its share of the clear space's height
  * `clear.h` (CSS px), aimed low enough that his middle shows `clear.raise` px above where the
  * point it looks at shows; wide, the default view's distance and tilt.
@@ -914,7 +914,7 @@ export function orbitStep(s, dt, focus) {
  */
 function followStep(s, dt, focus) {
   if (s.talk) {
-    // (Play Intro: on him, at the shot's height, eased as the shot is.)
+    // (The intro: on him, at the shot's height, eased as the shot is.)
     const k = 1 - Math.exp(-dt / SHOT.ease);
     if (focus) {
       s.target.x += (focus.x - s.target.x) * k;

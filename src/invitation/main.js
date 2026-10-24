@@ -153,7 +153,7 @@ const RIGHT_MENU_MS = 1000;
 /** States remembered for ?test (the last ones, in order). */
 const STATES_KEPT = 40;
 /**
- * The script Play Intro runs: content.js introScript() (the admin's, mended where it's broken, or
+ * The script the intro runs (from the envelope or Replay Intro): content.js introScript() (the admin's, mended where it's broken, or
  * the toy's own), through dialogue.js normalizeScript as the runner's own safety net.
  */
 /** @type {ReturnType<typeof introScript>|null} Only set through the ?test hooks. */
@@ -495,7 +495,7 @@ function start(s) {
     enabled: true,
     cursor: 'arrow',
   };
-  /** @type {ReturnType<typeof createDialogue>|null} the intro under way (Play Intro) */
+  /** @type {ReturnType<typeof createDialogue>|null} the intro under way (the envelope or Replay Intro) */
   let intro = null;
   /** The box whose shot the camera last went to (dialogue.js DialogueView seq). */
   let shotSeq = -1;
@@ -1546,7 +1546,7 @@ function start(s) {
         forcedFace = FACE_NAMES.includes(/** @type {any} */ (name)) ? /** @type {any} */ (name) : null;
         return forcedFace !== null;
       },
-      /** The intro's script as Play Intro runs it (playScript). */
+      /** The intro's script as the envelope and Replay Intro run it (playScript). */
       intro: () => playScript(),
       /** Use a controlled script for UI behavior tests; null restores the admin’s content.
        * @param {unknown} value
