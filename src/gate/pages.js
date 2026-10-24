@@ -62,7 +62,7 @@ export function gateDefaults() {
 /**
  * The switches with the defaults filled in: content's own where it has a switch, true or false.
  * @param {any} gate
- * @returns {Record<keyof GATE_PAGES, boolean>}
+ * @returns {Record<keyof typeof GATE_PAGES, boolean>}
  */
 export function gatePages(gate) {
   const own = isObj(gate?.pages) ? gate.pages : {};
