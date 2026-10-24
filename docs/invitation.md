@@ -42,29 +42,46 @@ unlisted: nothing links to it and search engines are asked not to index it.
   up and down looks from higher or lower. The right button shows no menu on the canvas, nor
   wherever a drag that started there ends (the toolbar, at the bottom of a drag down).
 - **Slide the camera:** with a mouse, drag empty space with the left button (or the middle
-  one); with fingers, drag two of them together. The floor under your cursor stays under it.
-  You can't slide his patch off the screen altogether.
-- **Zoom:** pinch with two fingers, or use the mouse wheel. The light turns with the camera, so
-  his shadow always falls behind him and to one side.
+  one); with fingers, drag two of them together. The floor under your cursor stays under it as
+  far as the edge of what you can reach at this zoom (none fully zoomed out, more the closer
+  you are): past it the view gives like a rubber band and, let go, eases back.
+- **Zoom:** pinch with two fingers, or use the mouse wheel; it zooms about the cursor or your
+  fingers (the floor there stays there). The light turns with the camera, so his shadow always
+  falls behind him and to one side.
+- **The Camera pad:** **Camera** on the toolbar opens it over the stage: **Turn Left** and **Turn
+  Right** (45° round), **Tilt Up** and **Tilt Down** (12°, from 12° to 70° up), **Zoom In** and
+  **Zoom Out**, **Follow NEWT** (back onto him) and **Reset Camera** (back to where it started).
+  Camera again or Escape closes it.
 - **He stays on screen:** the camera holds still while he's well inside the screen and moves on
   with him as he nears an edge, however it's turned. On a phone he's drawn about 30% bigger than
   on a computer and the camera follows him softly too; zoomed in, it follows him everywhere.
-  Once you've slid the camera it stays where you put it until he walks off the screen himself;
-  **Reset Camera** (in the Look menu) clears the slide and the zoom.
+  Once you've slid the camera, or zoomed it about a spot, it stays where you put it however he
+  moves, until you tap or grab him, press Follow NEWT, or Reset Camera (which clears the zoom
+  too).
+- **Where he can go** is one rounded square round the middle, the same however the camera's
+  turned, so a tap anywhere across the middle of the screen reaches it turned too. It's as big
+  as the view fully zoomed out shows him whole in: on a phone it's narrower than the screen is
+  deep, so tapping near the top walks him to its back edge.
 - **Leave him alone** for about 20 seconds and he turns to face you and sits down (the Sit
   button turns him to you first too, so you see his happy face).
-- **The toolbar:** Play Intro (below), Wave, Spook, Sit (Stand once he's sitting), Run (he
-  runs off for a few seconds, across the screen to one side or the other, or away from the
-  cursor), Wander (on: he strolls around by himself) and Look. The buttons rest while he's being
-  held or falling.
+- **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Give Device (Lie
+  Down while he sits with the tablet, Get Up while he lies), Run (he runs off for a few seconds,
+  across the screen to one side or the other, or away from the cursor), Camera (the pad above)
+  and Settings. Each is a rounded square with a pixel icon; with a mouse its name shows as a
+  little tab over it when you point at it or Tab to it, and on a phone (icons only) when you
+  press and hold it, which then does nothing else. Pointed at or pressed, a button fills with a
+  dither. Spook has gone from the bar (a tap on him still startles or waves him) and Wander is in
+  Settings. The action buttons rest while he's being held or falling.
+- **The cursor** is pixel art too: an open hand over NEWT, a closed hand while you hold him or
+  slide the view, a turning arrow while you turn it, and a pointing hand on the buttons.
 
-## The Look Menu
+## Settings
 
-**Look** opens a sheet along the bottom. NEWT moves into the space above it (beside it on a
+**Settings** opens a sheet along the bottom. NEWT moves into the space above it (beside it on a
 phone held sideways) and the camera keeps him there, so every change shows on him right away;
 each one is kept for your next visit (in this browser). While the sheet is open the toolbar's
-buttons rest under it, Tab stays inside the sheet, and **Done** (always at its top as it
-scrolls), **Look** again or **Escape** closes it; above it the camera still turns, slides and
+other buttons rest under it, Tab stays inside the sheet, and **Done** (always at its top as it
+scrolls), **Settings** again or **Escape** closes it; above it the camera still turns, slides and
 zooms as it does without it.
 A finger moves a slider only by going along it: a swipe up or down that starts on one scrolls
 the sheet and leaves the slider as it was.
@@ -76,6 +93,7 @@ the sheet and leaves the slider as it was.
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow; how dark, its colour and where: under Shader). |
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
+| Wander | On, Off | On (the default): left be, he strolls about by himself now and then. Kept for your next visit, like the rest. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
 and turns the Style to Custom, and **Reset To Style** puts the style's values back.
@@ -107,7 +125,6 @@ picked, and a new Pixel Size starts it afresh. It leaves Off alone, and a screen
 another reason (one that only shows 30 frames a second) isn't made chunkier for nothing: after
 one try of a second or so it keeps your Pixel Size. A device that's only quick enough a little
 chunkier tries your own Pixel Size again less and less often.
-**Reset Camera**, under the settings, eases the camera back to where it started.
 
 ## NEWT Talks
 
@@ -129,7 +146,7 @@ random, never the line he just said. There's one bubble at a time: while a line 
 moment that matters more replaces it (being caught or shaken first, idle time last). A line
 types out at about 30 characters a second, stays long enough to read, then fades; with
 reduced motion it shows all at once. The bubble follows him and stays on screen, clear of the
-toolbar and the open Look sheet (near the top it goes beside his head, on a phone narrowed to
+toolbar, the open Camera pad and the open Settings sheet (near the top it goes beside his head, on a phone narrowed to
 fit there with the line on more rows, or else under his feet, never over his face or body), and
 never takes a tap; a screen reader hears each line once, whole. His lines, how often
 he talks and the look a first visit gets are edited in the admin's Invitation page
@@ -192,8 +209,17 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
     shadow and the decals every texel is the paper, so the canvas is only cleared there and both
     passes draw inside it alone, and the neighbour loops (the outer ring, the soft shadow) run
     only in the boxes where they can find something: the same picture for a share of the
-    texels), `ui.js` (the toolbar and the Look sheet as
-    markup, plus a thin binding), `invitation.css`.
+    texels), `ui.js` (the toolbar, the Camera pad and the Settings sheet as
+    markup, plus a thin binding: the labels as the buttons' own text, `setSitLabel` and
+    `setDeviceLabel` changing only a label and its icon, `deviceLabelOf` reading the brain's
+    `deviceLabel`; `createHold`, a touch held still `HOLD_MS` (450 ms) showing a label and
+    swallowing the click after it; Wander kept under `invitation.wander.v1`, `loadWander` and
+    `saveWander` in try/catch), `icons.js` (the 16×16 pixel icons as ASCII art turned into crisp
+    SVG, and the Bayer dither tiles of the buttons' hover and press, `installDither`: copies of
+    `src/ui/pixelArt.js`'s and `src/ui/dither.js`'s approaches, as the page imports nothing from
+    `src/ui`), `cursor.js` (the five pixel cursors drawn at 1× and 2×, at most 32 CSS px, as
+    `url()`, `-webkit-image-set()` and `image-set()` with exact hotspots and a system fallback;
+    `cursorKind`, which shows, set as the stage's `data-cursor` each frame), `invitation.css`.
   - Pure and unit-tested: `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
     to 256, a texel is `max(1, round(NEWT's default height in device px / N))` device pixels,
     `blockFor`, so he's about N texels tall; Native, a texel a device pixel at the real DPR with
@@ -205,25 +231,37 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
     or 0.255 of a phone's, a stage whose short side is under 600 CSS px (99 CSS px, and 149
     texels at the default 128×128, on a 390-wide phone), whatever the Pixel Size, the point it
     looks at shown in the middle of the space over the toolbar, or of the clear space above or
-    beside the open Look sheet, `clearInsets`; and `blockAt`: zoomed by k, NEWT's size on screen
+    beside the open Settings sheet, `clearInsets`; and `blockAt`: zoomed by k, NEWT's size on screen
     over the default view's, a texel is `max(1, round(his height in device px × k / N))`, a block
     in use held until the zoom is `ZOOM_HOLD` past the next, so it never flickers at a boundary, and the default view always drawn on the Pixel Size's own grid),
     `camera.js` (the orbit camera: yaw all the way
     round, three quarters of a turn for a drag across the whole stage and half a turn of tilt
     down its whole height, 12° to 70° up, half to twice the default distance, eased with a
     little coast; `orbitPan` slides it at once, the floor under the cursor exactly under it,
-    `floorUnder`, the point it looks at kept in the play area; the point it orbits rests where
+    `floorUnder`, the point it looks at kept to `panRegion` (a square round the play area's
+    middle, the area's half less what the view shows its narrower way at this zoom: none fully
+    zoomed out), past which it gives like a rubber band (`ORBIT.band`, at most `bandPx` 90 CSS
+    px) and, let go, eases back at `bandBack` (0.18 s); `orbitZoom` and `orbitWheel` with a
+    point zoom about it (the cursor, a pinch's middle: the floor there kept there as it eases,
+    the view a pan from then on); `orbitNudge` turns and tilts it for the Camera pad at
+    `nudgeEase` (0.25 s); the point it orbits rests where
     it is and follows NEWT as it zooms in, 0.8 of the way at the default zoom on a phone, all
-    the way while the Look sheet is open, and moves on with him as he nears the edge of the
+    the way while the Settings sheet is open, and moves on with him as he nears the edge of the
     clear space, `ORBIT.keepIn` (0.6) of it, never letting him past `keepOut` (0.94) once he's
-    on screen, from where `screenOf` puts him; a pan holds it until he walks off the screen;
+    on screen, from where `screenOf` puts him; a pan holds it however he moves, until
+    `orbitFollow` (a tap or a grab on him, Follow NEWT) or `orbitReset`;
     `orbitHold` holds it still while he's held, and once he's let go out past `keepOut` (carried
     to the screen's edge) it eases him back inside at `ORBIT.settle` (0.25 s) rather than
     jumping there in a frame; `lightDir` turns the look's sun with the
-    camera's yaw), `area.js` (`viewArea`, the play area: the floor the default view shows at
-    twice its distance, yaw 0, inside the clear space with him whole 8 px in, `AREA_MARGIN`, a
-    trapezoid widening toward the back; worked out again on a resize, never moved by the camera
-    or the Look sheet; and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight),
+    camera's yaw), `area.js` (`viewArea`, the play area: a rounded square round the default
+    view's target, the orbit's centre (corners `AREA_ROUND`, 0.35, of its half side), the
+    biggest whose every point the floor the default view shows at twice its distance, yaw 0,
+    holds him whole 8 px inside the clear space, `AREA_MARGIN` (`viewFloor`, a trapezoid
+    widening toward the back); about 2.6 units from its middle to a side on a 390×844 phone and
+    5.0 on a 1280×800 desktop; one shape however the camera turns, worked out again on a resize,
+    never moved by the camera or the Settings sheet; its middle is the orbit's, Reset Camera's
+    and the brain's; and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight and
+    the shadow camera's box, `stage.setArea` keeping it round the area's middle),
     `play.js` (the frame's decisions: who moves his root, the clip mix, where he looks),
     `look.js` (the Look settings under `invitation.look.v1`, Pixel Size stored as `'16'` to
     `'256'`, `'native'` or `'off'` (an old `'2'`, `'3'` or `'4'` loads as 48, 32 or 24, what
