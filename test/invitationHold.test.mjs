@@ -155,7 +155,8 @@ test('the candidates are today’s hold under their own names until they’re bu
     );
   };
   const today = run(createHold('today'));
-  for (const k of ['level', 'tilt', 'bead']) assert.deepEqual(run(createHold(k)), today, k);
+  // (level is built: holds/level.js, test/invitationHoldLevel.test.mjs.)
+  for (const k of ['tilt', 'bead']) assert.deepEqual(run(createHold(k)), today, k);
 });
 
 test('a ray meets a plane where it crosses it; one that grazes it (the cosine under HOLD.grazing) or has it behind is turned away', () => {
