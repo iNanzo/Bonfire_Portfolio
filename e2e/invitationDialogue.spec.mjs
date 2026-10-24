@@ -959,12 +959,15 @@ test.describe('on a short desktop window', () => {
       return !b || b.end || (!b.next && !b.choices?.length && i === intro.boxes.length - 1);
     };
     for (let i = 0; i < 12; i++) {
-      await until(
-        page,
-        (s) => !s.dialogue || Boolean(s.dialogue.choices) || (s.dialogue.typed && !s.dialogue.paused),
-        'the line up',
-      );
-      const now = (await snapshot(page)).dialogue;
+      // This checks the Log, not typing speed: reveal each line through the normal
+      // advance action, so slow rendered frames do not hold up filling the history.
+      await until(page, (s) => !s.dialogue || (!s.dialogue.waiting && !s.dialogue.paused), 'ready to reveal');
+      let now = (await snapshot(page)).dialogue;
+      if (now && !now.typed) {
+        await goOn(page);
+        await until(page, (s) => Boolean(s.dialogue?.typed), 'the line revealed');
+        now = (await snapshot(page)).dialogue;
+      }
       if (!now || last(now.id)) break;
       if (now.choices) await pick(page, 0);
       else await page.keyboard.press('Space');
