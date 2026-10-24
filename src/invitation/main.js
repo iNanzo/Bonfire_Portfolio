@@ -138,8 +138,9 @@ const SHOT_MARGIN = { top: 10, bottom: 30 };
  */
 const SHADOW_TOP = LIFT + NEWT_HEIGHT;
 /**
- * Where NEWT may go: the play area (area.js viewArea), one object kept in place (the brain and
- * his steps hold it) and filled in again on a resize; the default view's disc until then.
+ * Where NEWT may go: the play area (area.js viewArea, a rounded square round the orbit's centre),
+ * one object kept in place (the brain and his steps hold it) and filled in again on a resize;
+ * the default view's disc until then.
  * @type {import('./types.js').Bounds}
  */
 const area = playArea();
@@ -228,6 +229,7 @@ if (webgl2()) {
         orbitSpan(orbit, stageSpan(stage));
         setArea(areaOf(stage));
         orbitArea(orbit, area);
+        stage.setArea(area);
       },
     });
   } catch {
@@ -260,8 +262,9 @@ function stageSpan(s) {
 }
 
 /**
- * The play area: the floor the default view shows fully zoomed out, inside the clear space
- * (area.js viewArea); the default view's disc until the stage has a view.
+ * The play area: a rounded square round the default view's target, the biggest the fully
+ * zoomed-out default view shows him whole in (area.js viewArea); the default view's disc until
+ * the stage has a view.
  * @param {NonNullable<typeof stage>} s
  */
 function areaOf(s) {
@@ -339,7 +342,8 @@ function start(s) {
   const seed = options.seed ?? Math.floor(Math.random() * 2 ** 31);
   const rng = createRng(seed + 1);
   setArea(areaOf(s));
-  const brain = createBrain({ seed, calm: options.calm, bounds: area, middle: centreOf(s.bounds) });
+  s.setArea(area);
+  const brain = createBrain({ seed, calm: options.calm, bounds: area, middle: centreOf(area) });
   const gesture = createGesture();
   const body = createBody();
   const mix = createMix();
@@ -353,7 +357,7 @@ function start(s) {
   // line is up.)
   const talk = createTalk({ lines: invitationLines(), speech: speechSettings(), rng: createRng(seed + 2) });
   const bubble = createBubble({ root: stageEl, before: stageEl.querySelector('.inv-hud'), now: () => t });
-  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(s.bounds), span: stageSize() });
+  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(area), span: stageSize() });
   const cam = orbit;
   orbitSpan(cam, stageSpan(s));
   orbitArea(cam, area);
