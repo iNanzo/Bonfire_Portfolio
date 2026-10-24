@@ -22,8 +22,7 @@
 // menu, the Camera pad's buttons turn, tilt, zoom, follow him and reset it (Reset Camera clears
 // the pan), and turned 90° a tap still reaches the screen's sides. The pixel cursors: an open hand
 // over him, a closed one holding him or panning, the turn glyph orbiting, the pointing hand on
-// the buttons. A mouse drag keeps the point NEWT was grabbed by under the cursor
-// and lifts him higher than the old fixed carry height. He talks: clicked until he speaks, a line
+// the buttons (the carry itself, his collar under the cursor, is invitationCarry.spec.mjs's). He talks: clicked until he speaks, a line
 // of the admin's types out in a bubble over his head, clear of the toolbar (and of the open Settings
 // sheet, never over his face), heard whole by a screen reader, gone when its time is up, on its
 // own time as talk counts it (a hidden tab pauses both); on a phone too, tapped, with the
@@ -1934,101 +1933,6 @@ test.describe('on a desktop', () => {
       'back where it was',
     );
     expect(errors).toEqual([]);
-  });
-
-  test('a mouse drag keeps the point he was grabbed by under the cursor, up and across, and lifts him higher than the old carry height', async ({
-    page,
-  }) => {
-    const errors = watch(page);
-    await calm(page);
-    const body = await on(page, 'body');
-    await page.mouse.move(body.x, body.y);
-    await page.mouse.down();
-    await until(page, (s) => s.held, 'held');
-    let cursor = body;
-    let highest = 0;
-    // Up, across, up more, back: each stop, the grabbed point under the cursor within 2 px.
-    for (const [dx, dy] of [
-      [0, -60],
-      [90, -40],
-      [60, -120],
-      [-140, -60],
-      [-60, 80],
-    ]) {
-      for (let i = 1; i <= 6; i++) await page.mouse.move(cursor.x + (dx * i) / 6, cursor.y + (dy * i) / 6);
-      cursor = { x: cursor.x + dx, y: cursor.y + dy };
-      await framesFor(page, 120);
-      const g = await page.evaluate(() => window.__invitation.grabbed());
-      expect(g, 'held, and the grabbed point known').not.toBeNull();
-      expect(Math.hypot(g.x - cursor.x, g.y - cursor.y), `at (${cursor.x}, ${cursor.y})`).toBeLessThan(2);
-      highest = Math.max(highest, (await snapshot(page)).lift);
-    }
-    // (The old carry held his collar at one height: his root about 0.3 off the floor.)
-    expect(highest, `lifted to ${highest.toFixed(2)}`).toBeGreaterThan(1.2);
-    await page.mouse.up();
-    await until(page, (s) => s.state === 'idle' || s.state === 'flee', 'down again', 30_000);
-    const states = (await snapshot(page)).states;
-    expect(states.slice(states.lastIndexOf('held'), states.lastIndexOf('held') + 3)).toEqual(['held', 'fall', 'land']);
-    expect(errors).toEqual([]);
-  });
-
-  test('grabbed and held still, he stays put: the point pressed stays under the cursor, never lifted up off it', async ({
-    page,
-  }) => {
-    await calm(page);
-    const body = await on(page, 'body');
-    await page.mouse.move(body.x, body.y);
-    await page.mouse.down();
-    await until(page, (s) => s.held, 'held');
-    for (let i = 1; i <= 4; i++) {
-      await framesFor(page, 150);
-      const g = await page.evaluate(() => window.__invitation.grabbed());
-      expect(Math.hypot(g.x - body.x, g.y - body.y), `${i * 150} ms on, the cursor still`).toBeLessThan(1.5);
-    }
-    await page.mouse.up();
-  });
-
-  test('a quick press-and-drag that never holds still carries him the whole way: the point pressed stays under the cursor, as after a still hold', async ({
-    page,
-  }) => {
-    const cdp = await page.context().newCDPSession(page);
-    // His head animates and swings independently of the grip. Check the actual point pressed,
-    // including slow rendering, rather than comparing head poses from separate page loads.
-    for (const rate of [1, 6]) {
-      await cdp.send('Emulation.setCPUThrottlingRate', { rate });
-      for (const hold of [true, false]) {
-        await calm(page);
-        const body = await on(page, 'body');
-        const collar = await page.evaluate(() => {
-          const b = window.__invitation.screen('body');
-          const f = window.__invitation.screen('feet');
-          return { x: 2 * b.x - f.x, y: 2 * b.y - f.y };
-        });
-        await page.mouse.move(body.x, body.y);
-        await page.mouse.down();
-        if (hold) await until(page, (s) => s.held, 'held');
-        for (let i = 1; i <= 4; i++) await page.mouse.move(body.x + i * 20, body.y);
-        await until(page, (s) => s.held, 'held');
-        await expect
-          .poll(
-            async () => {
-              const grabbed = await page.evaluate(() => window.__invitation.grabbed());
-              return grabbed ? Math.hypot(grabbed.x - body.x - 80, grabbed.y - body.y) : Infinity;
-            },
-            {
-              message: `${hold ? 'held first' : 'quick'} drag at ${rate}x CPU slowdown carries the pressed point all 80 px`,
-            },
-          )
-          .toBeLessThan(2);
-        const moved = await page.evaluate(() => {
-          const b = window.__invitation.screen('body');
-          const f = window.__invitation.screen('feet');
-          return { x: 2 * b.x - f.x, y: 2 * b.y - f.y };
-        });
-        expect(Math.abs(moved.x - collar.x - 80), 'the collar travels the full drag distance').toBeLessThan(5);
-        await page.mouse.up();
-      }
-    }
   });
 
   test('let go out at the screen’s edge, he’s eased back into view: the camera never jumps on the frame he drops', async ({
