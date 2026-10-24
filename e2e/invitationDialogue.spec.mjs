@@ -19,6 +19,7 @@
 // their own sheets) and plays its animation.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
+import { routeToEnd } from './helpers/dialogue-route.mjs';
 
 // A deliberate mix of line lengths, shots and branches, independent of admin edits.
 const behaviorIntro = JSON.parse(readFileSync(new URL('./fixtures/invitation-intro.json', import.meta.url), 'utf8'));
@@ -91,6 +92,30 @@ async function pick(page, i, tap = false) {
   if (tap) await reply.tap();
   else await reply.click();
 }
+/** Finish the actual admin script by choosing a path to an ending, including cyclic menus. */
+async function finishIntro(page, tap = false) {
+  const intro = await script(page);
+  for (let i = 0; i < intro.boxes.length * 2; i++) {
+    const s = (await snapshot(page)).dialogue;
+    if (!s) return;
+    const route = routeToEnd(intro, s.id);
+    const current = intro.boxes.find((b) => b.id === s.id);
+    if (!s.typed) {
+      await goOn(page, tap);
+      await until(page, (x) => Boolean(x.dialogue?.typed), 'the current line revealed');
+    }
+    if (current.choices?.length) {
+      await pick(
+        page,
+        current.choices.findIndex((c) => c.next === route[1]),
+        tap,
+      );
+    } else await goOn(page, tap);
+    await until(page, (x) => !x.dialogue || x.dialogue.seq > s.seq, 'following a route to the ending');
+  }
+  throw new Error('Dialogue did not finish along its route to an ending');
+}
+
 /**
  * The box with replies, and the one a tap goes on to it from (null: none).
  * @param {any} intro
@@ -592,12 +617,7 @@ test.describe('on a phone', () => {
     await calm(page);
     const home = (await snapshot(page)).camera;
     await open(page, true);
-    for (let i = 0; i < 40; i++) {
-      const s = await snapshot(page);
-      if (!s.dialogue) break;
-      if (s.dialogue.choices) await pick(page, 0, true);
-      else await page.getByRole('button', { name: 'Skip', exact: true }).tap();
-    }
+    await finishIntro(page, true);
     await expect(box(page)).toBeHidden();
     await expect(page.locator('.inv-toolbar')).toBeVisible();
     await until(page, (s) => s.state !== 'talk' && s.buttonsEnabled && !s.toolbarTalking, 'back to play');
@@ -907,14 +927,7 @@ test.describe('on a desktop', () => {
     });
     await replayIntro(page).click();
     await until(page, (s) => Boolean(s.dialogue), 'the intro up');
-    // Through to the end: Skip, a reply, Skip.
-    for (let i = 0; i < 12; i++) {
-      const s = await snapshot(page);
-      if (!s.dialogue) break;
-      if (s.dialogue.choices) await pick(page, 0);
-      else await page.getByRole('button', { name: 'Skip', exact: true }).click();
-      await until(page, (x) => !x.dialogue || x.dialogue.seq > s.dialogue.seq, 'on');
-    }
+    await finishIntro(page);
     await until(page, (s) => !s.dialogue, 'over');
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
     const rec = await page.evaluate(() => window.__cam);

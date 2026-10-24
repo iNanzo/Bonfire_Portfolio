@@ -2256,7 +2256,7 @@
           "face": "happy",
           "animation": "Cheer",
           "camera": "keep",
-          "next": "friends",
+          "next": "wrap3",
           "end": false,
           "auto": 0,
           "choices": []
@@ -2268,7 +2268,7 @@
           "face": "happy",
           "animation": "Think",
           "camera": "close",
-          "next": "friends",
+          "next": "wrap4",
           "end": false,
           "auto": 0,
           "choices": []
