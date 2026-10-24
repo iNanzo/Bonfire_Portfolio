@@ -12,11 +12,16 @@
 // question the buttons over the stage are out of reach; reduced motion shows each line at once
 // and cuts the camera (round to the front, to each shot, back at the end); and after the end the
 // toolbar, the camera and his free play come back. The script is read from the page (?test's
-// intro()), never pinned here, and every wait is on a state (it's content.json's intro, as
+// intro()). Tests requiring a specific script shape install a fixture; the admin integration
+// tests exercise the current content. Every wait is on a state (the script as
 // content.js reads it). Down every reply each box shows its face (the four dialogue faces from
 // their own sheets) and plays its animation.
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
+
+// A deliberate mix of line lengths, shots and branches, independent of admin edits.
+const behaviorIntro = JSON.parse(readFileSync(new URL('./fixtures/invitation-intro.json', import.meta.url), 'utf8'));
+const useBehaviorIntro = (page) => page.evaluate((intro) => window.__invitation.setIntro(intro), behaviorIntro);
 
 /** Collect the page's errors for the test to check. */
 function watch(page, errors = []) {
@@ -447,8 +452,11 @@ test.describe('on a phone', () => {
     expect((await snapshot(page)).dialogue.seq).toBe(s.dialogue.seq);
     await log.getByRole('button', { name: 'Close' }).tap();
     await expect(log).toBeHidden();
-    // (Closed with a tap: focus back where a key goes on, not on the Log button.)
-    await expect(page.locator('.inv-talk')).toBeFocused();
+    // A reply is the keyboard destination when choices are visible; otherwise the layer.
+    const destination = (await snapshot(page)).dialogue.choices
+      ? page.locator('.inv-talk-choice').first()
+      : page.locator('.inv-talk');
+    await expect(destination).toBeFocused();
     await until(page, (x) => !x.dialogue.paused, 'on again');
   });
 
@@ -495,6 +503,7 @@ test.describe('on a phone', () => {
 
   test('each box’s shot moves the camera: close nearer than medium, medium nearer than wide', async ({ page }) => {
     await calm(page);
+    await useBehaviorIntro(page);
     const home = (await snapshot(page)).cameraHome.distance;
     await open(page, true);
     /** @type {Record<string, number>} */
@@ -528,6 +537,7 @@ test.describe('on a phone', () => {
     page,
   }) => {
     await calm(page);
+    await useBehaviorIntro(page);
     // (The box as tall as its line, not three lines' room: lines of different lengths, boxes of
     // different heights.)
     await page.addStyleTag({ content: '.inv-talk-text { min-height: 0 !important; }' });
@@ -631,6 +641,7 @@ test.describe('on a desktop', () => {
   }) => {
     const errors = watch(page);
     await calm(page);
+    await useBehaviorIntro(page);
     await open(page);
     await expect(page.locator('.inv-talk')).toBeFocused();
     const seqOf = async () => (await snapshot(page)).dialogue?.seq ?? -1;
@@ -874,6 +885,7 @@ test.describe('on a short desktop window', () => {
   }) => {
     const errors = watch(page);
     await calm(page);
+    await useBehaviorIntro(page);
     await open(page);
     // (Most of the intro, a reply picked on the way, stopping short of its last box: enough to
     // outgrow a short window's Log.)
