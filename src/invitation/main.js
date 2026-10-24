@@ -103,6 +103,7 @@ import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor }
 import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
 import { createLook, lookStep, torsoStep } from './lookAt.js';
 import { bodyStep, createBody, createMix, lookAim, lookShare, mixStep, twinWeights } from './play.js';
+import { burstAt, hoverEase } from './retro.js';
 import { createRng } from './rng.js';
 import { createTalk } from './speech.js';
 import { LIFT, createStage } from './stage.js';
@@ -441,6 +442,10 @@ function start(s) {
   let target = { x: 0, y: hangY, z: 0 };
   /** The retro pass's other path is compiled (stage.js warm), for ?test. */
   let warmed = false;
+  /** The hover dither, 0..1 (eased: retro.js hoverEase). */
+  let hoverK = 0;
+  /** @type {{t0: number, x: number, y: number}|null} the grab ring under way: when, and where (client px) */
+  let burst = null;
   /** The toolbar as last set, so the DOM is only touched on a change. */
   const shown = { sit: 'Sit', wander: /** @type {boolean|null} */ (null), enabled: true };
   /** @type {ReturnType<typeof createDialogue>|null} the intro under way (Play Intro) */
@@ -703,6 +708,7 @@ function start(s) {
     const box = introStep();
     const pose = moveCamera(evs, dt);
     const ptr = pointerNow();
+    effects(ptr, dt);
     const button = pressed;
     if (pressed) lastButton = pressed;
     pressed = null;
@@ -750,6 +756,29 @@ function start(s) {
     finish(c, intro ? null : ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
     voice();
+  }
+
+  /**
+   * The retro pass's pointer effects: the hover dither eases toward 1 while the pointer is on
+   * him, he's on the ground and no intro runs (a finger pressing on him too, before it grabs),
+   * else toward 0; the grab ring grows out and thins away from where he was grabbed, following
+   * that point, and nothing more shows for the rest of the drag.
+   * @param {ReturnType<typeof pointerNow>} ptr
+   * @param {number} dt
+   */
+  function effects(ptr, dt) {
+    const on = Boolean(ptr?.onNewt) && body.mode === 'ground' && !intro && !grip;
+    hoverK = hoverEase(hoverK, on, dt);
+    s.setHover(hoverK);
+    if (!burst) return;
+    const b = character ? burstAt(t - burst.t0) : null;
+    if (!b) {
+      burst = null;
+      s.setBurst(0, 0, 0, 0);
+      return;
+    }
+    const at = grip ? grabbedAt(grip) : burst;
+    s.setBurst(at.x, at.y, b.radius, b.strength);
   }
 
   /** Whether the visitor asked for less motion (false where it can't be read). */
@@ -1019,6 +1048,8 @@ function start(s) {
         grip = gripFor(s.ray(press.x0, press.y0), dragPlane(s.camera.position, collar), collar, t);
         const head = shape().head;
         headAbove = press.y0 - (head.y - head.r);
+        // (The grab ring, where the grip is made; it follows the point grabbed: effects.)
+        burst = { t0: t, x: press.x, y: press.y };
       }
       // (A finger's lift over itself, coming in as he's picked up. Near the top of the stage it
       // gives way, then the finger's own spot, so the top of his head stays on the screen: lifted,
@@ -1273,6 +1304,9 @@ function start(s) {
         // Log and the question, the shot and where the camera's going.)
         dialogue: introSnapshot(),
         toolbarTalking: ui.talking,
+        // (The retro pass's pointer effects: the hover dither 0..1, and whether the grab ring's up.)
+        hover: hoverK,
+        burst: Boolean(burst),
         // (The envelope's state, null without one: types.js EnvelopeState.)
         envelope: envelopeState(),
         options,

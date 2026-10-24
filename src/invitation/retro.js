@@ -73,7 +73,33 @@ const ID_ON = { value: 1 };
 /** How many mip levels coarser his textures are sampled (one uniform every marked material shares). */
 const MAP_BIAS = { value: 0 };
 /** The pointer on NEWT, 0..1 (setHover; one uniform every marked material shares: the tint at Off). */
-const HOVER = { value: 0 };
+const HOVER_K = { value: 0 };
+/** The hover eases in over `in` while the pointer is on NEWT and out over `out`, seconds. */
+export const HOVER = { in: 0.08, out: 0.2 };
+/** The grab ring: how long it lasts, seconds, and how far it grows, texels. */
+export const BURST = { time: 0.38, radius: 20 };
+
+/**
+ * The hover a step on: toward 1 while `on`, toward 0 otherwise, at HOVER's rates.
+ * @param {number} k  0..1
+ * @param {boolean} on
+ * @param {number} dt  seconds
+ */
+export function hoverEase(k, on, dt) {
+  return on ? Math.min(1, k + dt / HOVER.in) : Math.max(0, k - dt / HOVER.out);
+}
+
+/**
+ * The grab ring `s` seconds after the grab: its radius (texels, eased out) and strength (1 to
+ * 0); null once it's gone.
+ * @param {number} s
+ * @returns {{radius: number, strength: number}|null}
+ */
+export function burstAt(s) {
+  const k = s / BURST.time;
+  if (k >= 1) return null;
+  return { radius: BURST.radius * (1 - (1 - k) ** 3), strength: 1 - k };
+}
 /** The hover's and the grab ring's ink (sRGB): a warm gold that reads on him and on the paper. */
 export const HOVER_INK = 0xe0a53a;
 /** A decal's map alpha under this is outside its shape (in the colour target). */
@@ -203,7 +229,7 @@ export function markId(material, id, opts = {}) {
     shader.uniforms.uSurfaceId = { value: id / ID_SCALE };
     shader.uniforms.uIdOn = ID_ON;
     shader.uniforms.uMapBias = bias;
-    shader.uniforms.uHover = HOVER;
+    shader.uniforms.uHover = HOVER_K;
     shader.fragmentShader = shader.fragmentShader
       .replace(
         'void main() {',
@@ -781,7 +807,7 @@ export function createRetro(renderer) {
   function setHover(k) {
     const v = Math.min(1, Math.max(0, Number(k) || 0));
     u.uHover.value = v;
-    HOVER.value = v;
+    HOVER_K.value = v;
   }
 
   /**
