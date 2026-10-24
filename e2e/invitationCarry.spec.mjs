@@ -2,8 +2,9 @@
 // `?test`'s window.__invitation and real input. Carried with a mouse, his collar comes under the
 // cursor within 2 px once the grab has eased in (0.15 s), up and across; at the play area's
 // edge he stops (the cursor carries on, he stays put, never sliding toward or away from the
-// camera); his limbs swing against a quick drag and settle; held, he thrashes now and then (an
-// angry kick and flail, then back to hanging). Give Device's three presses sit him down with the
+// camera); his limbs swing against a quick drag and settle; held, he keeps the way he faced
+// when grabbed, glances up now and then, and lands facing the same way; he thrashes now and then
+// (an angry kick and flail, then back to hanging). Give Device's three presses sit him down with the
 // tablet (visible in his hands), lie him on his stomach with it, each the way he was facing (no
 // turn to the camera), and get him up; the button's label (the brain's deviceLabel) goes Give Device, Lie Down, Get
 // Up. Every wait is on a state, never a duration (CI's software WebGL runs slower than real
@@ -114,6 +115,26 @@ test.describe('on a desktop', () => {
     await page.mouse.up();
     await until(page, (s) => s.state === 'idle' || s.state === 'flee', 'down again', 30_000);
     await until(page, (s) => s.motion.limp.weight === 0, 'the limp layer off once he’s down');
+  });
+
+  test('held, he keeps the way he faced when grabbed, glances up at you now and then, and lands facing the same way', async ({
+    page,
+  }) => {
+    await calm(page);
+    const heading = (await snapshot(page)).heading;
+    const off = (h) => Math.abs(Math.atan2(Math.sin(h - heading), Math.cos(h - heading)));
+    const cursor = await pickUp(page);
+    await glide(page, cursor, { x: cursor.x + 160, y: cursor.y - 40 }, 4);
+    await until(page, (s) => s.held && s.lookUp === 1, 'a glance up', 40_000);
+    let s = await snapshot(page);
+    expect(off(s.heading), 'held, facing as when grabbed').toBeLessThan(1e-3);
+    expect(s.headPitch, 'his head up').toBeGreaterThan(-0.2);
+    await until(page, (o) => o.held && o.lookUp === 0, 'and back down', 20_000);
+    await page.mouse.up();
+    await until(page, (o) => o.state === 'idle' || o.state === 'flee', 'down again', 30_000);
+    s = await snapshot(page);
+    expect(s.states).toContain('land');
+    if (s.state === 'idle') expect(off(s.heading), 'landed, facing as when grabbed').toBeLessThan(1e-3);
   });
 
   test('held, he thrashes now and then: an angry kick and flail, then back to hanging', async ({ page }) => {

@@ -8,7 +8,7 @@
 // taps, the buttons (and their being off while he's held or falling), the Sit/Stand label,
 // faces from FACE_TRACK with blinks from faces.js, no reaction three times running, the turn
 // to the camera before a reaction (a sit, the tablet's sit and lie and a carry keep the way he
-// faces). The seeded rng (rng.js) is checked here too.
+// faces) and, held, his head hung with a glance up every few seconds. The seeded rng (rng.js) is checked here too.
 // The intro's dialogue mode: he gets up if he's sitting, walks in toward the middle when he's
 // far out, turns to the camera, then plays each box's animation (a gesture once, then Talk while
 // the line types and Idle after; a loop holds; none keeps what he does; Sit sits him down and the
@@ -519,6 +519,98 @@ test('held, he thrashes every 3–7 s (sooner when he’s shaken): Thrash once f
   const out = s.release();
   assert.equal(out.state, 'fall');
   assert.equal(out.clip, 'Fall');
+});
+
+test('held, his head hangs (a light look aimed down) and every 3–6 s he glances up at you for 0.8–1.2 s, eased up and back down; never during a Thrash', () => {
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const s = sim({ seed, tune: { thrashMin: 99, thrashMax: 99 } });
+    let out = s.grab();
+    assert.deepEqual(
+      out.look,
+      { mode: 'forward', weight: TUNE.heldLook, pitch: TUNE.heldPitch, up: 0 },
+      'hanging his head',
+    );
+    let last = s.w.t;
+    let prev = 0;
+    /** @type {{from: number, to: number, most: number, weight: number}|null} */
+    let on = null;
+    const glances = [];
+    for (let i = 0; i < Math.round(20 / DT); i++) {
+      out = s.frame();
+      const up = out.look.up;
+      assert.ok(up >= 0 && up <= 1, `up ${up}`);
+      assert.ok(Math.abs(up - prev) <= (DT / TUNE.lookUpEase) * 1.6 + 1e-9, `eased: ${prev} → ${up}`);
+      const weight = TUNE.heldLook + (TUNE.lookUpWeight - TUNE.heldLook) * up;
+      assert.ok(Math.abs(out.look.weight - weight) < 1e-9, 'its weight with it');
+      assert.equal(out.look.pitch, TUNE.heldPitch);
+      if (up > 0 && !on) on = { from: s.w.t - DT, to: 0, most: 0, weight: 0 };
+      if (on) {
+        on.most = Math.max(on.most, up);
+        on.weight = Math.max(on.weight, out.look.weight);
+      }
+      if (on && up === 0) {
+        on.to = s.w.t;
+        glances.push({ ...on, after: on.from - last });
+        last = s.w.t;
+        on = null;
+      }
+      prev = up;
+    }
+    assert.ok(glances.length >= 2, `seed ${seed}: ${glances.length} glances up in 20 s`);
+    for (const g of glances) {
+      assert.ok(
+        g.after >= TUNE.lookUpMin - DT && g.after <= TUNE.lookUpMax + DT,
+        `seed ${seed}: up after ${g.after.toFixed(2)} s`,
+      );
+      const long = g.to - g.from;
+      assert.ok(
+        long >= TUNE.lookUpForMin - DT && long <= TUNE.lookUpForMax + 2 * DT,
+        `seed ${seed}: up for ${long.toFixed(2)} s`,
+      );
+      assert.equal(g.most, 1, 'all the way up');
+      assert.ok(Math.abs(g.weight - TUNE.lookUpWeight) < 1e-9);
+    }
+  }
+  // With his thrashes as ever: never up while he thrashes, and it still comes between them.
+  let ups = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const s = sim({ seed });
+    s.grab();
+    for (let i = 0; i < Math.round(20 / DT); i++) {
+      const out = s.frame();
+      if (out.clip === 'Thrash') assert.equal(out.look.up, 0, `seed ${seed}: not up while he thrashes`);
+      else if (out.look.up === 1) ups++;
+    }
+  }
+  assert.ok(ups > 0, 'he still looks up between thrashes');
+  // Let go, the look-up is over.
+  const s = sim({ seed: 1, tune: { thrashMin: 99, thrashMax: 99 } });
+  s.grab();
+  s.until((o) => o.look.up === 1, 8);
+  const out = s.release();
+  assert.equal(out.state, 'fall');
+  assert.equal(out.look.up, undefined);
+});
+
+test('held, falling and landing he keeps the way he faced when grabbed (no turn to the camera), and carries on from there', () => {
+  for (const yaw of [2, -1.3, Math.PI]) {
+    const s = sim({ yaw, camera: { x: 0, z: 6 } });
+    s.grab();
+    const seen = [];
+    s.run(1.5);
+    s.release();
+    s.until(
+      (o) => o.state === 'idle',
+      5,
+      (o) => seen.push(o),
+    );
+    for (const o of seen) {
+      assert.equal(o.faceCamera, false, `${o.state}: no turn`);
+      assert.equal(o.move.mode, 'stay', `${o.state}: staying put`);
+    }
+    assert.ok(seen.some((o) => o.state === 'land'));
+    assert.ok(Math.abs(wrapAngle(s.w.body.yaw - yaw)) < 1e-9, `yaw ${yaw}: as grabbed`);
+  }
 });
 
 test('in fall and land taps are ignored, but a grab still works', () => {

@@ -387,10 +387,16 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     seen; either side with none); with it straight behind him (past `backSide`, 150°), which
     shoulder is a toss-up, so `play.js` `lookAim` takes it round the side nearer the camera,
     and you see his face look back. Held, his head hangs: a light look (`TUNE.heldLook`, 0.15)
-    aimed down (`heldPitch`, `BrainOut.look.pitch`) over the Held clip's drooped head, the sad
-    face (surprised while he's shaken hard), and Thrash once every `thrashMin`–`thrashMax`
-    s (3–7; within `thrashShaken` of a hard shake, never before he's hung `thrashRest`, 1.5 s),
-    then Held again on its own clock. Give Device (`ButtonName` 'Device') goes sitDown →
+    aimed down (`heldPitch`, `BrainOut.look.pitch`) over his own front (`play.js`
+    `lookFront`: no turn to the camera) on the Held clip's drooped head, the sad face (surprised
+    while he's shaken hard). Every `lookUpMin`–`lookUpMax` s (3–6) he glances up at you for
+    `lookUpForMin`–`lookUpForMax` s (0.8–1.2): `BrainOut.look.up` eases 0 → 1 → 0 over
+    `lookUpEase` (0.25 s) each way, the look's weight with it up to `lookUpWeight` (0.85), its
+    aim coming round and up to the viewer; never while he thrashes. Thrash comes once every
+    `thrashMin`–`thrashMax` s (3–7; within `thrashShaken` of a hard shake, never before he's
+    hung `thrashRest`, 1.5 s), then Held again on its own clock. Held, falling and landing he
+    keeps the yaw he had when grabbed (`move` 'stay'; `play.js` `bodyStep` never turns him
+    off the ground), and carries on from there. Give Device (`ButtonName` 'Device') goes sitDown →
     deviceSit, lieDown → deviceLie, getUp, each the way he faced (`move` 'stay', as a sit); `BrainOut.device` and `deviceLabel` say which, for the toolbar. The Run button with no pointer runs him from a spot beside him square to the
     camera (`TUNE.runFromGap`), across the view. `floor.js` `fitShadow(…, at)` moves the
     shadow camera to wherever he is, by whole shadow texels.
