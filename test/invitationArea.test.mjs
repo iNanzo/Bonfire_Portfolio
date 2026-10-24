@@ -26,7 +26,7 @@ import {
   rimPoints,
   viewArea,
 } from '../src/invitation/area.js';
-import { STEER, centreOf, clampTo, steer, wanderGoal, xRange } from '../src/invitation/steer.js';
+import { STEER, centreOf, clampTo, steer, turnBounds, wanderGoal, xRange } from '../src/invitation/steer.js';
 import { CARRY, fallStep, grab, holdStep } from '../src/invitation/carry.js';
 import { fitShadow, shadowTop } from '../src/invitation/floor.js';
 import {
@@ -634,5 +634,57 @@ test('the shadow camera reaches as high as before while he stands or is carried 
     assert.ok(top >= last, 'never lower as he goes up');
     assert.ok(Number.isInteger(top * 2) || top === base, `in half units (${top})`);
     last = top;
+  }
+});
+
+/** `p` turned `a` radians about `c` (yaw: + toward +x). */
+const turnedAbout = (p, c, a) => ({
+  x: c.x + (p.x - c.x) * Math.cos(a) + (p.z - c.z) * Math.sin(a),
+  z: c.z - (p.x - c.x) * Math.sin(a) + (p.z - c.z) * Math.cos(a),
+});
+
+test('turned bounds (Bounds.turn: what’s on screen, in the camera’s frame) are the same shape turned about their middle: a point outside is pulled onto it, a walk stops at its edge, wander goals cover it and a flee keeps inside it', () => {
+  const flat = { minX: -1, maxX: 1, minZ: -6, maxZ: 2, minXBack: -2.5, maxXBack: 2.5 };
+  const about = { x: 0.3, z: -0.4 };
+  for (const yaw of [0.7, Math.PI / 2, -2.4]) {
+    const at = `turned ${yaw}`;
+    const b = turnBounds(flat, yaw, about);
+    assert.equal(b.turn, yaw);
+    // Its corners: the flat one's, turned about `about`.
+    const want = rimPoints(flat).map((p) => turnedAbout(p, about, yaw));
+    rimPoints(b).forEach((p, i) => {
+      close(p.x, want[i].x, 1e-6, `${at}: corner ${i}`);
+      close(p.z, want[i].z, 1e-6);
+    });
+    const rng = createRng(5);
+    for (let i = 0; i < 200; i++) {
+      const p = { x: (rng() - 0.5) * 20, z: (rng() - 0.5) * 20 };
+      const k = clampTo(b, p);
+      const w = turnedAbout(clampTo(flat, turnedAbout(p, about, -yaw)), about, yaw);
+      close(k.x, w.x, 1e-6, `${at}: clamped ${JSON.stringify(p)}`);
+      close(k.z, w.z, 1e-6);
+    }
+    const inside = (p) => dist(clampTo(b, p), p) < 1e-6;
+    let w = { x: about.x, z: about.z, yaw: 0, speed: 0 };
+    for (let i = 0; i < 20 * 60; i++) {
+      w = steer(w, { mode: 'goto', goal: { x: 30, z: -30 }, speed: GAIT.run }, null, b, DT);
+      assert.ok(inside(w), `${at}: walking ${JSON.stringify(w)}`);
+    }
+    assert.ok(dist(w, clampTo(b, { x: 30, z: -30 })) <= STEER.arrive + 1e-6, `${at}: stopped at its edge`);
+    const goals = Array.from({ length: 200 }, () => wanderGoal(rng, b, about));
+    for (const g of goals) assert.ok(inside(g), `${at}: a wander goal ${JSON.stringify(g)}`);
+    // (Spread over it, its back to its front.)
+    const depth = goals.map((g) => turnedAbout(g, about, -yaw).z);
+    assert.ok(Math.min(...depth) < -4.5 && Math.max(...depth) > 1, `${at}: goals all over it`);
+    let f = { x: about.x, z: about.z, yaw: 0, speed: 0 };
+    let ran = 0;
+    for (let i = 0; i < 10 * 60; i++) {
+      const chaser = { x: f.x - 0.5 * Math.sin(f.yaw), z: f.z - 0.5 * Math.cos(f.yaw) };
+      const n = steer(f, { mode: 'flee', goal: null, speed: GAIT.run }, chaser, b, DT);
+      ran += dist(n, f);
+      f = n;
+      assert.ok(inside(f), `${at}: fleeing ${JSON.stringify(f)}`);
+    }
+    assert.ok(ran > 10, `${at}: he keeps running (${ran.toFixed(1)})`);
   }
 });

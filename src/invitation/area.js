@@ -14,6 +14,7 @@
 // camera's box (stage.js, pixels.js frameView, floor.js fitShadow).
 
 import { project } from './pixels.js';
+import { inFrame } from './steer.js';
 
 /** @typedef {import('./types.js').Bounds} Bounds */
 /** @typedef {import('./pixels.js').View} View */
@@ -161,12 +162,17 @@ export function viewArea(o) {
 
 /**
  * Points around a play area's edge, `n` of them (a disc's rim, a rounded square's corner arcs,
- * or a box's corners).
+ * or a box's or a trapezoid's corners; turned bounds' turned with them).
  * @param {Bounds} b
  * @param {number} [n]
  * @returns {Array<{x: number, z: number}>}
  */
 export function rimPoints(b, n = 32) {
+  if (b.turn) {
+    const flat = { ...b };
+    delete flat.turn;
+    return rimPoints(flat, n).map((p) => inFrame(b, p, true));
+  }
   if (b.r === undefined && b.round) {
     // (A rounded square: round each corner's arc, a quarter of the points each.)
     const r = Math.min(b.round, (b.maxX - b.minX) / 2, (b.maxZ - b.minZ) / 2);

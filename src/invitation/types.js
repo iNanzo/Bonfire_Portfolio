@@ -33,7 +33,9 @@
  *   his walls. A box; with `round`, a box with corners of that radius (the toy's play area, a
  *   rounded square on the floor); or a trapezoid, its sides minX/maxX at the front (maxZ) and
  *   minXBack/maxXBack at the back (minZ), straight lines between (steer.js xRange); or, with
- *   `r`, a disc of that radius around the box's centre (the box is its square).
+ *   `r`, a disc of that radius around the box's centre (the box is its square). With `turn`,
+ *   any of them turned that many radians about its box's middle (+ toward +x: what's on screen,
+ *   in the camera's frame, steer.js turnBounds).
  * @property {number} minX
  * @property {number} maxX
  * @property {number} minZ
@@ -42,6 +44,7 @@
  * @property {number} [maxXBack]
  * @property {number} [r]
  * @property {number} [round]
+ * @property {number} [turn]
  */
 
 /**

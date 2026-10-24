@@ -7,9 +7,10 @@
 // isn't moving: on the spot his feet only glide round, so he pivots, never spins). Also picks his
 // wander goals. The play area (Bounds) is a box, a box with rounded corners (Bounds.round: the
 // toy's, area.js), a box that widens toward the back, or a disc (Bounds.r, around its box's
-// centre): xRange gives its sides at a depth, clampTo pulls a point inside (to its nearest point
-// on a rounded box's rim, a disc's straight in toward its centre) and centreOf is its middle.
-// Pure: no three.js. NEWT faces +z at yaw 0 (forward is (sin yaw, cos yaw)) and the camera looks
+// centre); any of them turned about its middle (Bounds.turn: what's on screen, in the camera's
+// frame; turnBounds): xRange gives its sides at a depth (in its own frame), clampTo pulls a
+// point inside (to its nearest point on a rounded box's rim, a disc's straight in toward its
+// centre) and centreOf is its middle. Pure: no three.js. NEWT faces +z at yaw 0 (forward is (sin yaw, cos yaw)) and the camera looks
 // in from the +z side.
 
 /** @typedef {import('./types.js').Body} Body */
@@ -75,7 +76,8 @@ export function turnToward(yaw, target, maxStep) {
 /**
  * The bounds' sides at depth `z`: minX/maxX at the front (maxZ), minXBack/maxXBack at the back
  * (minZ), straight lines between (a box without the back ones); a disc's rim at that depth
- * (its middle alone past the rim).
+ * (its middle alone past the rim). Turned bounds' in their own frame (inFrame takes a point there
+ * back out).
  * @param {Bounds} b
  * @param {number} z
  * @returns {[number, number]}
@@ -106,12 +108,13 @@ export function xRange(b, z) {
 
 /**
  * A point kept inside the bounds: its depth clamped, then its x between the sides there; for a
- * disc, pulled straight in toward its centre onto the rim.
+ * disc, pulled straight in toward its centre onto the rim; turned bounds' in their own frame.
  * @param {Bounds} b
  * @param {XZ} p
  * @returns {XZ}
  */
 export function clampTo(b, p) {
+  if (b.turn) return inFrame(b, clampTo(flatOf(b), inFrame(b, p)), true);
   const r = rounded(b);
   if (r > 0) {
     // (A rounded box is its inner box grown by r all round: inside within r of it, else onto
@@ -132,6 +135,63 @@ export function clampTo(b, p) {
   const z = clamp(p.z, b.minZ, b.maxZ);
   const [lo, hi] = xRange(b, z);
   return { x: clamp(p.x, lo, hi), z };
+}
+
+/**
+ * A point in turned bounds' own frame (Bounds.turn: the shape turned that far about its box's
+ * middle, + toward +x, as NEWT's yaw and the camera's), or, `back`, a point there back out in the
+ * world; as it is for bounds that aren't turned.
+ * @param {Bounds} b
+ * @param {XZ} p
+ * @param {boolean} [back]
+ * @returns {XZ}
+ */
+export function inFrame(b, p, back = false) {
+  const a = b.turn ?? 0;
+  if (!a) return { x: p.x, z: p.z };
+  const c = centreOf(b);
+  return turnedBy({ x: p.x - c.x, z: p.z - c.z }, back ? a : -a, c);
+}
+
+/**
+ * `v` turned `a` radians (+ toward +x: +z goes to (sin a, cos a)), plus `at`.
+ * @param {XZ} v
+ * @param {number} a
+ * @param {XZ} [at]
+ */
+function turnedBy(v, a, at = { x: 0, z: 0 }) {
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return { x: at.x + v.x * c + v.z * s, z: at.z - v.x * s + v.z * c };
+}
+
+/** Turned bounds as they are in their own frame (no turn). */
+function flatOf(b) {
+  const flat = { ...b };
+  delete flat.turn;
+  return flat;
+}
+
+/**
+ * Bounds `b`, given in a frame turned `yaw` about `about` (camera.js orbitSight: what's on screen,
+ * worked out at yaw 0 round the point the camera looks at), as turned Bounds: the same shape,
+ * its box moved so that turning it about its own middle puts it there.
+ * @param {Bounds} b
+ * @param {number} yaw
+ * @param {XZ} about
+ * @returns {Bounds}
+ */
+export function turnBounds(b, yaw, about) {
+  const m = centreOf(b);
+  const v = { x: about.x - m.x, z: about.z - m.z };
+  const w = turnedBy(v, yaw);
+  const dx = v.x - w.x;
+  const dz = v.z - w.z;
+  /** @type {Bounds} */
+  const out = { ...b, minX: b.minX + dx, maxX: b.maxX + dx, minZ: b.minZ + dz, maxZ: b.maxZ + dz, turn: yaw };
+  if (b.minXBack !== undefined) out.minXBack = b.minXBack + dx;
+  if (b.maxXBack !== undefined) out.maxXBack = b.maxXBack + dx;
+  return out;
 }
 
 /**
@@ -263,8 +323,13 @@ function fleeDirection(p, keep, threat, bounds) {
   return best;
 }
 
-/** How far he can go from `p` along (dx, dz), a unit direction, before leaving the bounds (slanted sides, a rounded box's corners and a disc's rim too). */
+/** How far he can go from `p` along (dx, dz), a unit direction, before leaving the bounds (slanted sides, a rounded box's corners, a disc's rim and turned bounds too). */
 function roomAlong(p, dx, dz, b) {
+  if (b.turn) {
+    const q = inFrame(b, p);
+    const d = turnedBy({ x: dx, z: dz }, -b.turn);
+    return roomAlong(q, d.x, d.z, flatOf(b));
+  }
   const rr = rounded(b);
   if (rr > 0) {
     // (Out of the box first; where that's past a corner's arc, out of the arc instead.)
@@ -313,8 +378,8 @@ function roomAlong(p, dx, dz, b) {
 
 /**
  * Somewhere to wander to: inside the bounds (a little in from them, between the sides at its
- * depth), at least STEER.wanderMin from `from` (in a play area too small for that, the farthest
- * of the tries).
+ * depth, turned with it), at least STEER.wanderMin from `from` (in a play area too small for
+ * that, the farthest of the tries).
  * @param {() => number} rng
  * @param {Bounds} bounds
  * @param {XZ} from
@@ -330,7 +395,7 @@ export function wanderGoal(rng, bounds, from) {
     const u = rng();
     const z = z0 + rng() * h;
     const [lo, hi] = xRange(bounds, z);
-    const g = { x: lo + m + u * (hi - lo - 2 * m), z };
+    const g = inFrame(bounds, { x: lo + m + u * (hi - lo - 2 * m), z }, true);
     const d = Math.hypot(g.x - from.x, g.z - from.z);
     if (d >= STEER.wanderMin) return g;
     if (d > far) {
