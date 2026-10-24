@@ -8,6 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  BLOOM_SIZE,
   FLOWS,
   PETAL_SHAPES,
   PETAL_SIZES,
@@ -185,6 +186,7 @@ test('the seal blooms: a ring of petals tight round it that unfurl outward and l
     const late = petalAt(p, 0.9);
     assert.ok(late.y > seal.y - 0.05, 'lifting, not dropping, as it goes');
     assert.ok(p.unfurl > 0, 'it starts folded in (a bud)');
+    assert.ok(p.size >= BLOOM_SIZE[0] && p.size <= BLOOM_SIZE[1], 'big enough that a few make up the seal');
     assert.ok(Math.abs(petalAt(p, 0.001).unfurl) > Math.abs(petalAt(p, 0.4).unfurl), 'and unfurls');
   }
   // All round the seal.
@@ -233,6 +235,29 @@ test('idle it trickles a petal now and then at most, never cluttered; never more
     all.emit('bloom', i * 0.1, ORIGIN);
   }
   assert.ok(all.petals.length <= POOL && POOL <= 48, `${all.petals.length} of ${POOL}`);
+});
+
+test('cut (a skip): every petal up shrinks away quickly; the ones launched after fly on', () => {
+  const f = createPetalFlow({ seed: 13 });
+  f.emit('spawn', 0, ORIGIN);
+  f.cut(0.8, 0.35);
+  f.emit('spill', 0.8, ORIGIN);
+  const spill = f.petals.filter((p) => p.kind === 'spill');
+  const spawn = f.petals.filter((p) => p.kind === 'spawn');
+  for (const p of spawn) {
+    const before = petalAt(p, 0.79);
+    if (before.visible) assert.ok(petalAt(p, 0.95).scale < before.scale, 'shrinking');
+    assert.equal(petalAt(p, 0.8 + 0.35).visible, false, 'gone within 0.35 s');
+  }
+  assert.ok(
+    spill.every((p) => petalAt(p, p.born + 0.5).visible),
+    'the spill flies on',
+  );
+  f.step(1.2, null);
+  assert.ok(
+    f.petals.every((p) => p.kind === 'spill'),
+    'the cut ones are dropped',
+  );
 });
 
 test('with reduced motion, no petals at all', () => {

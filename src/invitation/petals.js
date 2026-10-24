@@ -16,7 +16,9 @@ export const PETAL_SHAPES = /** @type {const} */ (['round', 'cupped', 'curled'])
 /** The sizes, as shares of PETAL_LEN. */
 export const PETAL_SIZES = [0.75, 1, 1.3];
 /** A petal's length at size 1, letter widths. */
-export const PETAL_LEN = 0.085;
+export const PETAL_LEN = 0.1;
+/** A bloom's petals are bigger (a share of PETAL_LEN): a few of them make up the seal. */
+export const BLOOM_SIZE = [1.5, 1.9];
 /** The most at once (a few dozen: the oldest go first). */
 export const POOL = 40;
 /** While it floats, a petal trickles every this many seconds (at most). */
@@ -27,7 +29,7 @@ export const TRICKLE_EVERY = 2.4;
  */
 export const FLOWS = {
   spawn: { n: 14 },
-  stir: { n: 3, gap: 0.3 },
+  stir: { n: 2, gap: 0.5 },
   bloom: { n: 9 },
   burst: { n: 12 },
   spill: { n: 12 },
@@ -111,6 +113,8 @@ export function petalGrid(shape) {
  * @property {number} spin  its tumble at birth, radians
  * @property {number} yaw  which way its tip points on the screen at birth, radians
  * @property {number} unfurl  its tilt toward the camera at birth, radians (a bloom's opens out)
+ * @property {number} cut  when it was told to go (Infinity: it lives its life), seconds
+ * @property {number} cutFor  how long it takes to go once it's cut, seconds
  */
 
 /** A shared clamp and ease. */
@@ -173,7 +177,7 @@ const NOWHERE = { visible: false, x: 0, y: 0, z: 0, q: [0, 0, 0, 1], scale: 0, u
  */
 export function petalAt(p, t) {
   const a = t - p.born;
-  if (a < 0 || a >= p.life) return NOWHERE;
+  if (a < 0 || a >= p.life || t >= p.cut + p.cutFor) return NOWHERE;
   const e = (1 - Math.exp(-p.drag * a)) / p.drag;
   const wave = p.freq * a + p.phase;
   const ramp = Math.min(1, a / 0.4);
@@ -187,7 +191,7 @@ export function petalAt(p, t) {
   const q = qMul(qAxis(p.axis, (p.spin + p.rate * a) * tumble), qMul(qAxis(Z, p.yaw + roll), qAxis(X, unfurl)));
   const k = a / p.life;
   const grow = bloom ? 0.55 + 0.45 * easeOut(a / 0.3) : easeOut(a / 0.18);
-  const shrink = 1 - smooth((k - 0.72) / 0.28);
+  const shrink = (1 - smooth((k - 0.72) / 0.28)) * (1 - smooth((t - p.cut) / p.cutFor));
   return { visible: true, x, y, z, q, scale: PETAL_LEN * p.size * grow * shrink, unfurl };
 }
 
@@ -257,6 +261,8 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
       spin: r(0, Math.PI * 2),
       yaw: r(0, Math.PI * 2),
       unfurl: r(-0.8, 0.8),
+      cut: Infinity,
+      cutFor: 1,
       ...o,
     };
   }
@@ -318,7 +324,7 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
             drag: 2.5,
             fall: -r(0.2, 0.3),
             life: r(1.4, 1.8),
-            size: PETAL_SIZES[1 + Math.floor(rng() * 2)],
+            size: r(BLOOM_SIZE[0], BLOOM_SIZE[1]),
             // (Its tip points out from the middle, folded up toward the camera: the bud.)
             yaw: a - Math.PI / 2,
             unfurl: r(1.15, 1.35),
@@ -379,6 +385,19 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
   return {
     emit,
     /**
+     * Every petal up (or still to come) at `t` shrinks away over `within` seconds (a skip: out
+     * of the way of the toy); the ones launched after are untouched.
+     * @param {number} t
+     * @param {number} [within]
+     */
+    cut(t, within = 0.35) {
+      for (const p of petals) {
+        if (p.cut <= t) continue;
+        p.cut = t;
+        p.cutFor = within;
+      }
+    },
+    /**
      * A stir at `at` (a hover or a touch), unless one was just now.
      * @param {number} t
      * @param {Point} at
@@ -395,7 +414,7 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
      * @param {Point|null} trickle
      */
     step(t, trickle) {
-      petals = petals.filter((p) => t - p.born < p.life);
+      petals = petals.filter((p) => t - p.born < p.life && t < p.cut + p.cutFor);
       if (!trickle || reduced) {
         lastTrickle = null;
         return;
