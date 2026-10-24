@@ -49,7 +49,11 @@
 //             on screen), then a press that catches him and carries him a little
 //   sitalone  no input until he sits by himself (20 s alone; the first 16 s aren't recorded:
 //             needs --calm off), a little of him sitting, then a tap on him stands him up
-//   intro     Play Intro played through as a visitor would (tools/capture-invitation-intro.mjs):
+//   envelope  the envelope that opens the page (?test&envelope; whole frames): on a phone, left
+//             alone until its hint shows, then a swipe up; on a desktop, the cursor onto it (the
+//             hint shows), then a click; it opens and fades and the intro starts by itself
+//   envelope-skip  the same, skipped: a swipe down on a phone, a drag down on a desktop
+//   intro     Replay Intro played through as a visitor would (tools/capture-invitation-intro.mjs):
 //             each line typed and read, one finished early with a tap, a reply picked at the
 //             question, the Log opened and closed partway, on to the end (whole frames)
 //
@@ -402,10 +406,22 @@ function inFrame(pos, view) {
 /** An angle, radians, brought within half a turn of zero. */
 const halfTurn = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
 
-async function ready(page) {
-  const query = ['test', ...(CALM ? ['calm'] : []), ...(SEED !== null ? [`seed=${SEED}`] : [])].join('&');
+/**
+ * The page loaded and NEWT in (`extra`: more of the query, such as `envelope`; the envelope
+ * up over him then).
+ * @param {any} page
+ * @param {string} [extra]
+ */
+async function ready(page, extra) {
+  const query = [
+    'test',
+    ...(CALM ? ['calm'] : []),
+    ...(SEED !== null ? [`seed=${SEED}`] : []),
+    ...(extra ? [extra] : []),
+  ].join('&');
   await page.goto(`${origin}/invitation/?${query}`);
   await page.waitForSelector('[data-stage].is-ready', { timeout: 30_000 });
+  if (extra === 'envelope') await page.waitForSelector('.inv-envelope', { timeout: 10_000 });
   if (ANIM_FPS !== null) await setAnimFps(page, Number(ANIM_FPS));
   await sleep(400);
 }
@@ -615,6 +631,59 @@ async function wholeTurn(page, size) {
  * (the act's sheet shows whole frames, not him cropped), from? (ms: the act's sheet starts
  * there, not at the lead)}.
  */
+/**
+ * The envelope's acts (`act` as actsFor's), when --acts asks for them.
+ * @param {{w: number, h: number, phone: boolean}} size
+ * @param {(name: string, run: (page: any) => Promise<unknown>, tail: number, more?: object) => void} act
+ */
+function envelopeActs(size, act) {
+  if (!ACTS.includes('envelope') && !ACTS.includes('envelope-skip')) return;
+  /** A drag from the middle of the screen `dy` px (up is negative), like a quick swipe. */
+  const swipe = async (page, dy) => {
+    const mid = { x: size.w / 2, y: size.h / 2 };
+    const press = await presser(page, size);
+    await press.down(mid);
+    await along(press.move, (k) => ({ x: mid.x + 6 * k, y: mid.y + dy * k }), 380);
+    await press.up();
+    await press.done();
+  };
+  /** Left alone (a phone: the hint shows after a while), or the cursor brought onto it. */
+  const approach = async (page) => {
+    if (size.phone) return sleep(1700);
+    const mid = { x: size.w / 2, y: size.h / 2 };
+    const from = { x: size.w * 0.92, y: size.h * 0.92 };
+    await page.mouse.move(from.x, from.y);
+    await sleep(500);
+    await along(
+      (p) => page.mouse.move(p.x, p.y),
+      (k) => ({ x: from.x + (mid.x - from.x) * k, y: from.y + (mid.y - from.y) * k }),
+      600,
+    );
+    await sleep(1300);
+  };
+  if (ACTS.includes('envelope'))
+    act(
+      'envelope',
+      async (page) => {
+        await approach(page);
+        if (size.phone) await swipe(page, -size.h * 0.3);
+        else await page.mouse.click(size.w / 2, size.h / 2);
+      },
+      3500,
+      { query: 'envelope', full: true },
+    );
+  if (ACTS.includes('envelope-skip'))
+    act(
+      'envelope-skip',
+      async (page) => {
+        await approach(page);
+        await swipe(page, size.h * 0.3);
+      },
+      2000,
+      { query: 'envelope', full: true },
+    );
+}
+
 function actsFor(size) {
   const list = [];
   const act = (name, run, tail, more = {}) => list.push({ name, run, tail, ...more });
@@ -695,6 +764,7 @@ function actsFor(size) {
       },
       1200,
     );
+  envelopeActs(size, act);
   if (ACTS.includes('buttons'))
     act(
       'buttons',
@@ -848,8 +918,8 @@ for (const size of SIZES) {
   }
   const sheet = [];
   const labels = [];
-  for (const { name, run, tail, setup, full, from } of actsFor(size)) {
-    await ready(page);
+  for (const { name, run, tail, setup, full, from, query } of actsFor(size)) {
+    await ready(page, query);
     if (setup) await setup(page);
     const taken = await realTime(page, () => run(page), tail);
     if (!taken) {
