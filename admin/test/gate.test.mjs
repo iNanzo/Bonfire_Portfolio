@@ -155,6 +155,13 @@ test('every lock field has a name and help; the help says it keeps visitors out,
   const plain = `${HELP.gate} ${moreFor('gate')}`;
   assert.match(plain, /search engines/i, 'what it keeps out');
   assert.match(plain, /public/i, 'and that the code is public');
+  assert.match(moreFor('gate'), /by hand/i, 'that the cookie can be set by hand');
+  // (Any page can frame the site with ?preview, the admin's preview's way in: say so, there and in the docs.)
+  const framed = /any page[^.]*frame[^.]*\?preview/i;
+  assert.match(moreFor('gate'), framed, 'that any page can show it in a frame with ?preview');
+  const docs = readFileSync(new URL('../../docs/admin.md', import.meta.url), 'utf8');
+  const access = docs.slice(docs.indexOf('**The password lock (Access)**'));
+  assert.match(access.slice(0, access.indexOf('**Use it locally')), framed, 'and the docs say it too');
   assert.match(moreFor('gate'), /Cloudflare|private/i, 'the stronger path');
   // (That a new password locks everyone out again is said once, by the password's own control.)
   assert.match(resolveHelp(HELP['gate.key'], {}), /hash/i, 'kept only as a hash');
