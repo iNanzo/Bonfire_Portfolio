@@ -13,7 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TILT, createTiltHold, tiltAngle, tiltNormal, wallOut } from '../src/invitation/holds/tilt.js';
 import { createHold } from '../src/invitation/holds/index.js';
-import { depthAlong, levelAxes } from '../src/invitation/hold.js';
+import { depthAlong, levelAxes, squash } from '../src/invitation/hold.js';
 import { CARRY, fallStep, grab, holdStep } from '../src/invitation/carry.js';
 import { createOrbit, orbitPose, orbitSpan, screenOf } from '../src/invitation/camera.js';
 import { VIEW, frameView, texelGrid } from '../src/invitation/pixels.js';
@@ -497,4 +497,55 @@ test('tilt: re-anchoring holds the plane until its angle has changed by more tha
   assert.ok(p, 'a plane while held');
   close(p.point.y, collar.y, 'still through where he was grabbed', 1e-9);
   assert.equal(CARRY.liftMax, 5);
+});
+
+test('tilt: In the Mix holds the ring on for 0.5 s after it was last wanted, so a speed that dips under 1 u/s never flickers it', () => {
+  const E = env('phone');
+  const { collar, px } = home(E);
+  // (Down onto the floor's hang height, then across with a speed that swings round 1 u/s.)
+  const low = E.project(E.at(px, HANG_Y + 0.02));
+  const right = levelAxes(E.s.yaw).right;
+  const ppu = gapOf(E.project({ x: collar.x + right.x, y: HANG_Y, z: collar.z + right.z }), low);
+  let x = low.x;
+  const sweep = Array.from({ length: 90 }, (_, i) => {
+    x += ppu * DT * (1 + 0.6 * Math.sin(i / 4));
+    return { x, y: low.y };
+  });
+  const r = sim(E, {
+    collar,
+    path: [...still(px, 12), ...line(px, low, 12), ...still(low, 60), ...sweep, ...still({ x, y: low.y }, 60)],
+  });
+  const mix = r.frames.map((f) => f.step.cues.mix);
+  assert.ok(
+    mix.every((m) => typeof m === 'boolean'),
+    'tilt says In the Mix every frame',
+  );
+  const on = mix.indexOf(true, 84);
+  const off = mix.indexOf(false, on);
+  assert.ok(on > 0, 'on as he’s swept across');
+  assert.ok(off >= 84 + 90, `on through the sweep (off at frame ${off})`);
+  const still0 = 12 + 12 + 60 + 90;
+  assert.ok(
+    off >= still0 + Math.floor(0.5 / DT) - 2 && off <= still0 + Math.ceil(0.5 / DT) + 3,
+    `off 0.5 s after the sweep (${off - still0} frames)`,
+  );
+  assert.ok(
+    mix.slice(off).every((m) => m === false),
+    'and stays off while he’s low and still',
+  );
+});
+
+test('tilt: grabbed standing, the lift’s stretch never pushes his feet under the floor: his collar rises with it', () => {
+  const E = env('desktop');
+  const c = clampTo(E.bounds, { x: 0, z: 0 });
+  const collar = { x: c.x, y: COLLAR_Y, z: c.z };
+  const at = E.project(collar);
+  const r = sim(E, { collar, path: still({ x: at.x, y: at.y }, 12) });
+  for (const f of r.frames) {
+    const sq = squash(f.t, null);
+    assert.ok(
+      f.anchor.y >= COLLAR_Y * sq.y - 1e-9,
+      `${f.t.toFixed(3)} s: ${f.anchor.y.toFixed(4)} under ${(COLLAR_Y * sq.y).toFixed(4)}`,
+    );
+  }
 });

@@ -21,7 +21,9 @@ import {
   reanchor,
   releaseVelocity,
   screenOffset,
+  squash,
 } from '../hold.js';
+import { mixWants } from '../cues.js';
 
 /** @typedef {import('../types.js').XYZ} XYZ */
 /** @typedef {import('../types.js').XZ} XZ */
@@ -40,7 +42,9 @@ const RAD = Math.PI / 180;
  * The twist: `twistShare` of the way he's carried across the screen (radians off facing the
  * camera), at most `twistMax`, eased with a `twistHalf` s halflife while he's carried faster
  * than `twistSpeed` u/s across the floor. The throw: up by `lob` × his speed across the floor
- * once that's over `lobFrom` u/s. A finger carries him `fingerLift` CSS px above itself.
+ * once that's over `lobFrom` u/s. A finger carries him `fingerLift` CSS px above itself. In the
+ * Mix (cues.js mixWants, his lowest foot taken as `footGap` over the floor at his hang height)
+ * stays on `mixHold` s after it was last wanted, so a speed dipping under 1 u/s never flickers it.
  */
 export const TILT = {
   alpha: [30 * RAD, 62 * RAD],
@@ -54,6 +58,8 @@ export const TILT = {
   lob: 0.25,
   lobFrom: 1,
   fingerLift: 48,
+  footGap: 0.06,
+  mixHold: 0.5,
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -123,6 +129,7 @@ export function createTiltHold(deps = {}) {
   let clear = false;
   let twist = 0;
   let walled = false;
+  let wanted = -Infinity;
   /** his hang height (HoldStart.low): where wallOut reads the cursor's ray */
   let hang = 0;
   /** @type {HoldCamera|null} */
@@ -154,6 +161,7 @@ export function createTiltHold(deps = {}) {
       clear = false;
       twist = 0;
       walled = false;
+      wanted = -Infinity;
       anchor = { ...collar };
       seen = camera;
       remake(anchor, camera, rayAt(collarPx.x, collarPx.y), bounds);
@@ -175,15 +183,21 @@ export function createTiltHold(deps = {}) {
       if (!plane || Math.abs(want - alpha) > TILT.reanchor) remake(anchor, camera, ray, bounds);
       const hit = rayHit(ray, /** @type {Plane} */ (plane)) ?? anchor;
       if (hit.y >= low) clear = true;
-      const floor = clear ? low : Math.min(from, low);
+      // (Grabbed standing, the lift's stretch, hold.js squash, lengthens him down from his collar:
+      // his collar rises with it, so his feet stay on the floor.)
+      const stretch = clear ? 0 : (squash(t - t0, null).y - 1) * Math.min(from, low);
+      const floor = (clear ? low : Math.min(from, low)) + stretch;
       const edge = edgeClamp(ray, hit, { bounds, low: Math.min(floor, CARRY.liftMax), high: CARRY.liftMax, toward });
       anchor = edge.p;
       // (A wall met, not the floor or the ceiling: the ring pulses as it's met.)
       const wall = edge.clamp === 'side' || (edge.clamp === 'ray' && hit.y >= floor && hit.y <= CARRY.liftMax);
       const pulse = wall && !walled;
       walled = wall;
-      // (The twist: a share of the way he's carried across the screen, eased in and out.)
+      // (In the Mix: as cues.js has it, held on TILT.mixHold after it was last wanted.)
       const v = carry?.vel ?? { x: 0, y: 0, z: 0 };
+      if (mixWants(anchor.y - low + TILT.footGap, Math.hypot(v.x, v.z))) wanted = t;
+      const mix = t - wanted <= TILT.mixHold;
+      // (The twist: a share of the way he's carried across the screen, eased in and out.)
       const across = v.x * right.x + v.z * right.z;
       const depth = Math.abs(v.x * toward.x + v.z * toward.z);
       const goal =
@@ -197,7 +211,7 @@ export function createTiltHold(deps = {}) {
         push: edge.clamp === 'side' ? edge.push : null,
         holdY: null,
         twist,
-        cues: pulse ? { pulse: true } : {},
+        cues: pulse ? { pulse: true, mix } : { mix },
       };
     },
     grabbedAt(t, collar, project) {
