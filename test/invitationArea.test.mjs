@@ -2,8 +2,9 @@
 // fills the screen, one shape however the camera turns, a disc round the default view's target
 // (the orbit's centre) holding every spot of floor the default view shows across the whole stage
 // turned any way, his radius past the farthest (a tall phone's the biggest), the same whatever
-// the Pixel Size, the open Settings sheet or the camera does, and new on a resize; walking,
-// wandering, fleeing and carrying stay inside it. It's more floor than the screen shows, so wander goals
+// the Pixel Size, the open Settings sheet or the camera does, and new on a resize (a shrink under
+// him eases him back in, no jump; one that still holds him never moves him); walking, wandering,
+// fleeing and carrying stay inside it. It's more floor than the screen shows, so wander goals
 // keep to what's on screen when they're picked and a flee to what was on screen as it began
 // (camera.js orbitSight, a trapezoid turned with the camera: turned Bounds work like the rest).
 // The default view's own disc is its framing: a desktop's default view (pixels.js frameView)
@@ -723,6 +724,47 @@ test('where the play area is bigger than the screen, a wander goal is on screen 
         anywhere.some((g) => !whole(g)),
         `${at}: with nothing on screen given, wander goals go all over the play area`,
       );
+    }
+  }
+});
+
+test('a resize that shrinks the play area under him eases him back inside, a little a frame and never further out; one that still holds him never moves him', () => {
+  const small = playArea(5);
+  // Inside it: not moved.
+  const still = { x: 2, z: -3, yaw: 1, speed: 0 };
+  const s2 = steer(still, { mode: 'stay', goal: null, speed: 0 }, null, small, DT);
+  assert.equal(s2.x, still.x);
+  assert.equal(s2.z, still.z);
+  /** @type {Array<[any, any]>} */
+  const moves = [
+    ['stay', null],
+    ['goto', { x: 0, z: -9 }],
+    ['face', { x: 0, z: 9 }],
+  ];
+  for (const [mode, goal] of moves) {
+    let p = { x: 0.3, z: -5.9, yaw: Math.PI, speed: 0 };
+    let was = dist(p, clampTo(small, p));
+    let t = 0;
+    for (; t < 4 && was > 1e-6; t += DT) {
+      const n = steer(p, { mode, goal, speed: GAIT.walk }, null, small, DT);
+      assert.ok(dist(n, p) <= (STEER.backInMax + GAIT.walk) * DT + 1e-6, `${mode}: no jump at ${t.toFixed(2)} s`);
+      const now = dist(n, clampTo(small, n));
+      assert.ok(now <= was + 1e-12, `${mode}: never further out (${now} after ${was})`);
+      p = n;
+      was = now;
+    }
+    assert.ok(was < 1e-6 && t < 2.5, `${mode}: back inside after ${t.toFixed(2)} s`);
+  }
+  // A phone's URL bar showing or hiding: the play area a little different, and him inside both untouched.
+  const tall = areaFor(390, 844, 3).area;
+  const short = areaFor(390, 788, 3).area;
+  assert.notDeepEqual(tall, short, 'the play area changes with the height');
+  const r = Math.min(tall.r ?? 0, short.r ?? 0) - 0.01;
+  for (const a of [0, 1, 2, 3, 4, 5]) {
+    const n = { x: r * Math.sin(a), z: r * Math.cos(a), yaw: a, speed: 0 };
+    for (const b of [tall, short]) {
+      const m = steer(n, { mode: 'stay', goal: null, speed: 0 }, null, b, DT);
+      assert.ok(m.x === n.x && m.z === n.z, `at ${a}: not moved`);
     }
   }
 });

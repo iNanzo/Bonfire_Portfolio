@@ -13,7 +13,8 @@
 // (focusInsets, pixels.js clearInsets) and the orbit follows him all the way there. The floor
 // is endless (rays meet it anywhere) and his play area is one disc round the orbit's centre
 // holding all the floor the default view shows however it's turned (area.js viewArea), worked
-// out again on a resize, its middle the brain's and Reset Camera's; it carries what's on screen each frame (its `sight`, camera.js
+// out again on a resize (a shrink under him eases him back in: steer.js), its middle the
+// brain's and Reset Camera's; it carries what's on screen each frame (its `sight`, camera.js
 // orbitSight), so wander goals and a flee keep to the screen. The light's shadow camera goes
 // where he goes (floor.js fitShadow). Wander, a setting, is kept for the next visit (ui.js
 // loadWander) and goes to the brain as its button.

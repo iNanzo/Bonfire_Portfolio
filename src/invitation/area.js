@@ -8,8 +8,8 @@
 // than the screen shows at any one yaw, so wander goals keep to what's on screen when they're
 // picked and a flee to what was on screen as it began (steer.js, Bounds.sight from camera.js
 // orbitSight), and the camera's soft follow keeps him in view. The walls stay where they are
-// however the camera turns, pans and zooms; main.js works the disc out again on a resize. Its
-// edges are his walls for walking,
+// however the camera turns, pans and zooms; main.js works the disc out again on a resize (a
+// shrink under him eases him back in: steer.js). Its edges are his walls for walking,
 // wandering, fleeing (he slides along them when cornered) and carrying (the anchor, the toss
 // and the fall's bounces), and the camera's pan keeps to a disc inside it (camera.js
 // panRegion): steer.js and carry.js read it as Bounds, a disc's `r`. The default view's own

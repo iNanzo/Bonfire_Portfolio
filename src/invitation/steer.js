@@ -12,8 +12,9 @@
 // (to its nearest point on a rounded box's rim, a disc's straight in toward its centre) and
 // centreOf is its middle. Where the play area is bigger than the screen it carries what's on
 // screen now (Bounds.sight, camera.js orbitSight): wander goals keep inside both, and a flee
-// keeps to what was on screen as it began (Body.fence). Pure: no three.js. NEWT faces +z at yaw
-// 0 (forward is (sin yaw, cos yaw)) and the camera looks in from the +z side.
+// keeps to what was on screen as it began (Body.fence). A play area shrunk under him (a resize)
+// eases him back in, STEER.backIn, never in one jump. Pure: no three.js. NEWT faces +z at yaw 0
+// (forward is (sin yaw, cos yaw)) and the camera looks in from the +z side.
 
 /** @typedef {import('./types.js').Body} Body */
 /** @typedef {import('./types.js').Bounds} Bounds */
@@ -29,7 +30,9 @@
  * settles toward the best direction with a time constant of fleeSmooth s (fleeSmoothNear with
  * less than fleeNear of room ahead, so he still turns off an edge in time), and fleeMinPace of
  * his speed is kept while he turns. wanderMin: a wander goal is at least this far;
- * wanderMargin: and this far inside the bounds.
+ * wanderMargin: and this far inside the bounds. backIn: outside the bounds (shrunk under him by a
+ * resize) he's eased back in with this time constant, s, at least backInMin and at most
+ * backInMax units/s.
  */
 export const STEER = {
   accel: 5,
@@ -51,6 +54,9 @@ export const STEER = {
   fleeMinPace: 0.3,
   wanderMin: 1,
   wanderMargin: 0.1,
+  backIn: 0.3,
+  backInMin: 0.15,
+  backInMax: 2,
 };
 
 const TAU = Math.PI * 2;
@@ -262,7 +268,7 @@ export function steer(body, move, pointer, bounds, dt) {
   let nz = z + Math.cos(yaw) * step;
   if (fence) ({ x: nx, z: nz } = clampTo(fence, { x: nx, z: nz }));
   if (bounds) {
-    ({ x: nx, z: nz } = clampTo(bounds, { x: nx, z: nz }));
+    ({ x: nx, z: nz } = backInside(bounds, { x, z }, { x: nx, z: nz }, dt));
     // Pressed against an edge, he only goes as fast as he really moves.
     if (dt > 0 && step > 0) speed = Math.min(speed, Math.hypot(nx - x, nz - z) / dt);
   }
@@ -318,6 +324,30 @@ function fenceFor(bounds, p) {
   if (!s) return null;
   const c = clampTo(s, p);
   return Math.hypot(c.x - p.x, c.z - p.z) < 1e-6 ? s : null;
+}
+
+/**
+ * `to`, a step on from `from`, kept inside `b`: onto its edge; or, where `from` was already
+ * outside (the bounds shrunk under him: a resize), no further out than it was less this frame's
+ * easing back in (STEER.backIn), so he comes back in over a moment rather than in a jump.
+ * @param {Bounds} b
+ * @param {XZ} from
+ * @param {XZ} to
+ * @param {number} dt
+ * @returns {XZ}
+ */
+function backInside(b, from, to, dt) {
+  const c = clampTo(b, to);
+  const over = Math.hypot(to.x - c.x, to.z - c.z);
+  if (over < 1e-12) return to;
+  const f = clampTo(b, from);
+  const was = Math.hypot(from.x - f.x, from.z - f.z);
+  if (was < 1e-9 || !(dt > 0)) return c;
+  const back = clamp(was * (1 - Math.exp(-dt / STEER.backIn)), STEER.backInMin * dt, STEER.backInMax * dt);
+  const allow = Math.max(0, was - back);
+  if (over <= allow) return to;
+  const k = allow / over;
+  return { x: c.x + (to.x - c.x) * k, z: c.z + (to.z - c.z) * k };
 }
 
 /**
