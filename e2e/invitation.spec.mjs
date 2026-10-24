@@ -1629,7 +1629,9 @@ test.describe('on a desktop', () => {
     const kind = () => page.evaluate(() => document.querySelector('[data-stage]').dataset.cursor);
     const cursorOf = (loc) => loc.evaluate((el) => getComputedStyle(el).cursor);
     // (Headless screenshots draw no cursor: what the CSS gives is what's checked.)
-    const form = /image-set\(url\("data:image\/png[^)]*\) 1x, url\("data:image\/png[^)]*\) 2x\) \d+ \d+, /;
+    // (Chrome gives the resolutions back as dppx.)
+    const form =
+      /image-set\(url\("data:image\/png[^)]*\) 1(x|dppx), url\("data:image\/png[^)]*\) 2(x|dppx)\) \d+ \d+, /;
     const body = await on(page, 'body');
     await page.mouse.move(body.x + 260, body.y + 40);
     await expect.poll(kind).toBe('arrow');
