@@ -17,7 +17,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import * as contract from '../src/invitation/clips.js';
 import { readGlbAnim, quatAngle, quatDistance, footStride, skinnedMesh, nearestDistance } from './lib/glbAnim.mjs';
 import {
   CLIPS,
@@ -28,6 +27,7 @@ import {
   SCALE,
   FPS,
   ANKLE_HEIGHT,
+  DEVICE,
 } from '../src/invitation/clips.js';
 
 const glb = readGlbAnim(new URL('../public/models/newt.glb', import.meta.url));
@@ -411,8 +411,6 @@ test("LieDown goes from DeviceSit's first pose to DeviceLie's, and GetUp from De
 });
 
 test("the tablet's screen faces the default camera, 36 degrees up from his front", () => {
-  const { DEVICE } = contract;
-  assert.ok(DEVICE, 'clips.js exports DEVICE');
   for (const name of ['DeviceSit', 'DeviceLie']) {
     const { tilt } = DEVICE.clips[name];
     assert.ok(tilt >= 0 && tilt < 36, `${name}'s tablet tilts ${tilt}° toward his face`);
@@ -420,17 +418,25 @@ test("the tablet's screen faces the default camera, 36 degrees up from his front
 });
 
 test("DeviceSit and DeviceLie keep both palms on the tablet's side edges on every frame", () => {
-  const { DEVICE } = contract;
   const half = DEVICE.size[0] / 2;
   for (const name of ['DeviceSit', 'DeviceLie']) {
-    // Blender armature space (+X his left, -Y his front, +Z up) to glTF's: (x, z, -y)
-    const [x, y, z] = DEVICE.clips[name].centre;
-    const edge = { L: new THREE.Vector3(x + half, z, -y), R: new THREE.Vector3(x - half, z, -y) };
-    for (const r of track(name, FPS))
+    // Blender armature space (+X his left, -Y his front, +Z up) to glTF's: (x, z, -y); the palms
+    // sit `lift` above the side edges' midpoints, along the screen's normal
+    const { centre, tilt, lift } = DEVICE.clips[name];
+    const [x, y, z] = centre;
+    const up = new THREE.Vector3(0, Math.cos(tilt * DEG), -Math.sin(tilt * DEG)).multiplyScalar(lift);
+    const mid = new THREE.Vector3(x, z, -y).add(up);
+    const edge = { L: mid.clone().setX(x + half), R: mid.clone().setX(x - half) };
+    for (const [t, pose] of samples(clip(name), FPS)) {
+      const w = glb.world(pose);
       for (const s of ['L', 'R']) {
-        const d = r.hand[s].distanceTo(edge[s]);
-        assert.ok(d <= 0.08, `${name} at ${r.t.toFixed(2)} s: the ${s} palm is ${d.toFixed(3)} from the edge`);
+        // (track()'s hand is 1.0 along the bone: transformDirection normalizes)
+        const m = w(`ForeArm.${s}`);
+        const along = new THREE.Vector3(0, 1, 0).transformDirection(m).multiplyScalar(DEVICE.palm);
+        const d = new THREE.Vector3().setFromMatrixPosition(m).add(along).distanceTo(edge[s]);
+        assert.ok(d <= 0.08, `${name} at ${t.toFixed(2)} s: the ${s} palm is ${d.toFixed(3)} from the edge`);
       }
+    }
   }
 });
 
