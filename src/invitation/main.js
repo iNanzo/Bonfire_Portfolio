@@ -96,6 +96,7 @@ import {
   cueStep,
   dragSpeedOf,
   groundCueMode,
+  lineMode,
   lineShare,
   mixWants,
   ringStrength,
@@ -1499,7 +1500,7 @@ function start(s) {
     const mode = groundCueMode(look.groundCues, hold?.feel.groundCues ?? feelOf(dragNow).groundCues);
     const want = cues.mix ?? mixWants(footH, carry ? Math.hypot(carry.vel.x, carry.vel.z) : 0);
     cue.ring = cueStep(cue.ring, { mode, want: want || flying, held: isHeld || flying, dt });
-    cue.line = cueStep(cue.line, { mode: cues.line === false ? 'off' : mode, want, held: isHeld, dt });
+    cue.line = cueStep(cue.line, { mode: lineMode(mode, cues.line), want, held: isHeld, dt });
     // (A wall clamp: the kind says, or the edge starts pushing him.)
     const pushed = Boolean(carry?.push);
     if (isHeld && (cues.pulse || (pushed && !cue.pushed))) cue.pulse = t;

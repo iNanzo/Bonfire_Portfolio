@@ -114,6 +114,16 @@ export const ringStrength = (k, sincePulse, mode) =>
   mode !== 'off' && sincePulse !== null && sincePulse >= 0 && sincePulse < CUES.pulse ? 1 : k;
 
 /**
+ * The drop line's mode: Ground Cues' `mode`, except that a drag kind can keep it out of In the Mix
+ * (`kindLine` false: hold.js HoldCues.line); Always still shows it and Off never does, as every
+ * effect's setting.
+ * @param {CueMode} mode
+ * @param {boolean} [kindLine]
+ * @returns {CueMode}
+ */
+export const lineMode = (mode, kindLine) => (kindLine === false && mode === 'mix' ? 'off' : mode);
+
+/**
  * The drop line's share by his height: none with his lowest foot under CUES.lineFrom × his
  * height, all of it from CUES.lineTo, smoothly between.
  * @param {number} footH

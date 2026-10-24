@@ -437,7 +437,8 @@ export function squash(sinceGrab, sinceLand) {
  * @property {boolean} [mix]  whether In the Mix shows the ring and the drop line now (left out:
  *   cues.js mixWants, the shared rule)
  * @property {XZ|null} [ring]  where the ring sits (left out: under his hips)
- * @property {boolean} [line]  false: no drop line, whatever the setting
+ * @property {boolean} [line]  false: no drop line In the Mix (Always still shows it: cues.js
+ *   lineMode)
  * @property {boolean} [pulse]  a wall clamp this frame: the ring pulses to full
  */
 /**
