@@ -47,7 +47,7 @@ export const CARRY = {
   length: 0.55,
   gravity: 9.8,
   damping: 2.4,
-  tiltSoft: 0.6,
+  tiltSoft: 0.5,
   softStiff: 120,
   softDamp: 6,
   tiltMax: 1.2,

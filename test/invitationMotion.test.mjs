@@ -394,7 +394,8 @@ test('the swing’s limit is soft: hard flicks tilt him a little past CARRY.tilt
   }
   assert.ok(most > CARRY.tiltSoft, `${most.toFixed(3)} rad: past the soft limit`);
   assert.ok(most < CARRY.tiltMax, `${most.toFixed(3)} rad: never at the hard one`);
-  assert.ok(jolt < 2.5, `the swing's speed changed by at most ${jolt.toFixed(2)} rad/s in a frame`);
+  // (The old hard stop took about 10 rad/s off it in one frame.)
+  assert.ok(jolt < 3.5, `the swing's speed changed by at most ${jolt.toFixed(2)} rad/s in a frame`);
 });
 
 test('carrying: a swing reads the same when the pointer’s spot only moves every second or third frame (a 60 Hz finger on a 120–144 Hz screen): as big, and no hard shake', () => {

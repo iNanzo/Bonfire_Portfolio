@@ -499,6 +499,21 @@ test('held, he thrashes every 3–7 s (sooner when he’s shaken): Thrash once f
   const grabbedAt = s.w.t - 0.5;
   s.until((o) => o.clip === 'Thrash', 3);
   assert.ok(s.w.t - grabbedAt < 2.5, `shaken at 0.5 s, thrashed at ${(s.w.t - grabbedAt).toFixed(2)} s`);
+  // Shaken on and on, he still hangs a moment between thrashes.
+  s.w.carry = { dragSpeed: 2, shake: TUNE.shakeHard + 5 };
+  let ended = null;
+  let gaps = 0;
+  for (let i = 0; i < 600; i++) {
+    const o = s.frame();
+    if (o.clip === 'Held' && ended === null) ended = s.w.t;
+    if (o.clip === 'Thrash' && ended !== null) {
+      assert.ok(s.w.t - ended >= TUNE.thrashRest - 0.02, `hung ${(s.w.t - ended).toFixed(2)} s between thrashes`);
+      ended = null;
+      gaps++;
+    }
+  }
+  assert.ok(gaps >= 2, `he still thrashes, sooner: ${gaps} in 10 s`);
+  s.w.carry = { dragSpeed: 0, shake: 0 };
   // Let go mid-thrash, he falls as ever.
   const out = s.release();
   assert.equal(out.state, 'fall');

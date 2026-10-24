@@ -132,10 +132,14 @@ export const TUNE = {
   /** Held: his look this light (the clip hangs his head), aimed this far down, radians. */
   heldLook: 0.15,
   heldPitch: -0.5,
-  /** Held, he thrashes every thrashMin–thrashMax s, and within thrashShaken s of a hard shake. */
+  /**
+   * Held, he thrashes every thrashMin–thrashMax s, and within thrashShaken s of a hard shake, but
+   * never before he's hung still thrashRest s (since he was grabbed, or his last thrash).
+   */
   thrashMin: 3,
   thrashMax: 7,
   thrashShaken: 0.6,
+  thrashRest: 1.5,
   /**
    * Lying with the tablet he turns this far from the camera, radians (either way), so his
    * profile and the screen show past his cap's brim.
@@ -259,8 +263,9 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     lieAfter: false,
     /** @type {XZ|null} the spot he turns to as he lies down with the tablet (lieTurn off the camera) */
     lieGoal: null,
-    /** Held: when he thrashes next. */
+    /** Held: when he thrashes next, and since when he's hung still (grabbed, or his last thrash over). */
     thrashAt: Infinity,
+    hungSince: 0,
   };
 
   // ---- changes of state ---------------------------------------------------------------------
@@ -274,7 +279,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     m.restart = m.clip !== 'gait';
     if (state !== 'react') m.reaction = null;
     if (state === 'idle') m.idleFor = between(rng, T.idleMin, T.idleMax);
-    if (state === 'held') m.thrashAt = m.t + between(rng, T.thrashMin, T.thrashMax);
+    if (state === 'held') {
+      m.thrashAt = m.t + between(rng, T.thrashMin, T.thrashMax);
+      m.hungSince = m.t;
+    }
     if (!DEVICE_STATES.has(state)) {
       m.device = false;
       m.lieAfter = false;
@@ -744,7 +752,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       if (c.shake >= T.shakeHard) {
         m.shakenUntil = m.t + T.shakenFor;
         // (Shaken hard, he thrashes sooner.)
-        if (m.clip !== 'Thrash') m.thrashAt = Math.min(m.thrashAt, m.t + T.thrashShaken);
+        if (m.clip !== 'Thrash')
+          m.thrashAt = Math.min(m.thrashAt, Math.max(m.t + T.thrashShaken, m.hungSince + T.thrashRest));
       }
     }
     if (m.t - m.raisedAt < T.decayDelay - EPS) return;
@@ -827,6 +836,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
         if (!fadeOutDue('Thrash', clipTime().remaining, 'Held')) return;
         m.clip = 'Held';
         m.restart = false;
+        m.hungSince = m.t;
         m.thrashAt = m.t + between(rng, T.thrashMin, T.thrashMax);
       } else if (m.t >= m.thrashAt - EPS) startClip('Thrash');
     },
