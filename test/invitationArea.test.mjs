@@ -26,7 +26,7 @@ import {
   rimPoints,
   viewArea,
 } from '../src/invitation/area.js';
-import { centreOf, clampTo, steer, wanderGoal, xRange } from '../src/invitation/steer.js';
+import { STEER, centreOf, clampTo, steer, wanderGoal, xRange } from '../src/invitation/steer.js';
 import { CARRY, fallStep, grab, holdStep } from '../src/invitation/carry.js';
 import { fitShadow, shadowTop } from '../src/invitation/floor.js';
 import {
@@ -173,7 +173,11 @@ test('a rounded square’s sides, clamp and middle: x between its sides at a dep
   // Room along a direction: to a side, and to a corner's arc.
   let f = { x: 0, z: 0, yaw: Math.PI / 2, speed: 0 };
   for (let i = 0; i < 20 * 60; i++) f = steer(f, { mode: 'goto', goal: { x: 9, z: 9 }, speed: GAIT.run }, null, b, DT);
-  close(Math.hypot(f.x - 2, f.z - 2), 1, 0.01, `walked into the corner, on its arc ${JSON.stringify(f)}`);
+  const corner = clampTo(b, { x: 9, z: 9 });
+  assert.ok(
+    Math.hypot(f.x - corner.x, f.z - corner.z) <= STEER.arrive + 1e-6,
+    `walked into the corner, onto its arc ${JSON.stringify(f)}`,
+  );
   // Fleeing from the middle, he runs straight out and turns along the rim, never past it.
   let g = { x: 0.2, z: 0.1, yaw: 0, speed: 0 };
   for (let i = 0; i < 10 * 60; i++) {
@@ -268,8 +272,11 @@ test('in the play area walking stops at its edge, wander goals cover it, and fle
       w = steer(w, { mode: 'goto', goal: { x: 40, z: -80 }, speed: GAIT.run }, null, b, DT);
       inArea(w, 'walking');
     }
-    const [, hi] = xRange(b, w.z);
-    assert.ok(Math.abs(w.x - hi) < 0.05 || Math.abs(w.z - b.minZ) < 0.05, `stopped at the edge ${JSON.stringify(w)}`);
+    const edge = clampTo(b, { x: 40, z: -80 });
+    assert.ok(
+      Math.hypot(w.x - edge.x, w.z - edge.z) <= STEER.arrive + 1e-6,
+      `stopped at the edge ${JSON.stringify(w)}`,
+    );
     let f = { x: 0, z: 0, yaw: 0, speed: 0 };
     for (let i = 0; i < 20 * 60; i++) {
       const chaser = { x: f.x - 0.5 * Math.sin(f.yaw), z: f.z - 0.5 * Math.cos(f.yaw) };
@@ -576,7 +583,7 @@ test('moved to wherever NEWT is in the play area, the shadow camera covers him a
   const spots = [
     { x: 0, z: 0 },
     { x: area.maxX, z: area.maxZ },
-    { x: area.minXBack, z: area.minZ },
+    { x: area.minX, z: area.minZ },
     { x: 1.234, z: -5.678 },
     { x: 0.001, z: 0.002 },
   ];

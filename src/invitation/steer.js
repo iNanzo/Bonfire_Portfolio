@@ -5,10 +5,12 @@
 // an edge close ahead, so his heading curves instead of zig-zagging between neighbours),
 // and turning to face the camera, all with acceleration and a capped turn rate (slower when he
 // isn't moving: on the spot his feet only glide round, so he pivots, never spins). Also picks his
-// wander goals. The play area (Bounds) is a box, a box that widens toward the back, or a disc
-// (Bounds.r: the toy's, around its box's centre): xRange gives its sides at a depth, clampTo
-// pulls a point inside (a disc's straight in toward its centre). Pure: no three.js. NEWT faces
-// +z at yaw 0 (forward is (sin yaw, cos yaw)) and the camera looks in from the +z side.
+// wander goals. The play area (Bounds) is a box, a box with rounded corners (Bounds.round: the
+// toy's, area.js), a box that widens toward the back, or a disc (Bounds.r, around its box's
+// centre): xRange gives its sides at a depth, clampTo pulls a point inside (to its nearest point
+// on a rounded box's rim, a disc's straight in toward its centre) and centreOf is its middle.
+// Pure: no three.js. NEWT faces +z at yaw 0 (forward is (sin yaw, cos yaw)) and the camera looks
+// in from the +z side.
 
 /** @typedef {import('./types.js').Body} Body */
 /** @typedef {import('./types.js').Bounds} Bounds */
@@ -79,6 +81,17 @@ export function turnToward(yaw, target, maxStep) {
  * @returns {[number, number]}
  */
 export function xRange(b, z) {
+  const r = rounded(b);
+  if (r > 0) {
+    // (A rounded box: its flat sides, narrowing round the corners' arcs; the middle alone past it.)
+    const dz = Math.max(0, b.minZ + r - z, z - (b.maxZ - r));
+    if (dz > r) {
+      const mid = (b.minX + b.maxX) / 2;
+      return [mid, mid];
+    }
+    const out = Math.sqrt(r * r - dz * dz);
+    return [b.minX + r - out, b.maxX - r + out];
+  }
   if (b.r !== undefined) {
     const { x: cx, z: cz } = centreOf(b);
     const u = b.r > 0 ? clamp((z - cz) / b.r, -1, 1) : 1;
@@ -99,6 +112,16 @@ export function xRange(b, z) {
  * @returns {XZ}
  */
 export function clampTo(b, p) {
+  const r = rounded(b);
+  if (r > 0) {
+    // (A rounded box is its inner box grown by r all round: inside within r of it, else onto
+    // the rim, r out from the inner box's nearest point.)
+    const ix = clamp(p.x, b.minX + r, b.maxX - r);
+    const iz = clamp(p.z, b.minZ + r, b.maxZ - r);
+    const d = Math.hypot(p.x - ix, p.z - iz);
+    if (d <= r) return { x: p.x, z: p.z };
+    return { x: ix + ((p.x - ix) * r) / d, z: iz + ((p.z - iz) * r) / d };
+  }
   if (b.r !== undefined) {
     const c = centreOf(b);
     const d = Math.hypot(p.x - c.x, p.z - c.z);
@@ -109,6 +132,15 @@ export function clampTo(b, p) {
   const z = clamp(p.z, b.minZ, b.maxZ);
   const [lo, hi] = xRange(b, z);
   return { x: clamp(p.x, lo, hi), z };
+}
+
+/**
+ * A rounded box's corner radius (0 for any other bounds), no more than half its narrower side.
+ * @param {Bounds} b
+ */
+function rounded(b) {
+  if (b.r !== undefined || !(Number(b.round) > 0)) return 0;
+  return Math.min(Number(b.round), (b.maxX - b.minX) / 2, (b.maxZ - b.minZ) / 2);
 }
 
 /**
@@ -231,8 +263,28 @@ function fleeDirection(p, keep, threat, bounds) {
   return best;
 }
 
-/** How far he can go from `p` along (dx, dz), a unit direction, before leaving the bounds (slanted sides and a disc's rim too). */
+/** How far he can go from `p` along (dx, dz), a unit direction, before leaving the bounds (slanted sides, a rounded box's corners and a disc's rim too). */
 function roomAlong(p, dx, dz, b) {
+  const rr = rounded(b);
+  if (rr > 0) {
+    // (Out of the box first; where that's past a corner's arc, out of the arc instead.)
+    let t = Infinity;
+    if (dz > 1e-9) t = Math.min(t, (b.maxZ - p.z) / dz);
+    else if (dz < -1e-9) t = Math.min(t, (b.minZ - p.z) / dz);
+    if (dx > 1e-9) t = Math.min(t, (b.maxX - p.x) / dx);
+    else if (dx < -1e-9) t = Math.min(t, (b.minX - p.x) / dx);
+    t = Math.max(0, t);
+    const qx = p.x + dx * t;
+    const qz = p.z + dz * t;
+    const cx = clamp(qx, b.minX + rr, b.maxX - rr);
+    const cz = clamp(qz, b.minZ + rr, b.maxZ - rr);
+    if (Math.hypot(qx - cx, qz - cz) <= rr + 1e-9) return t;
+    const ox = p.x - cx;
+    const oz = p.z - cz;
+    const along = ox * dx + oz * dz;
+    const disc = along * along - (ox * ox + oz * oz - rr * rr);
+    return disc > 0 ? Math.max(0, -along + Math.sqrt(disc)) : 0;
+  }
   if (b.r !== undefined) {
     const c = centreOf(b);
     const ox = p.x - c.x;
