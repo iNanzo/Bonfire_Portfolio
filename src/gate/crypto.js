@@ -22,7 +22,7 @@ export async function deriveHash(password, salt, iter, subtle = subtleOf()) {
   const raw = new TextEncoder().encode(password.normalize('NFC'));
   const base = await subtle.importKey('raw', raw, 'PBKDF2', false, ['deriveBits']);
   const bits = await subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter },
+    { name: 'PBKDF2', hash: 'SHA-256', salt: new Uint8Array(salt), iterations: iter },
     base,
     GATE_HASH_BYTES * 8,
   );
@@ -34,7 +34,7 @@ export async function deriveHash(password, salt, iter, subtle = subtleOf()) {
  * @param {Uint8Array} hash @param {SubtleCrypto} [subtle]
  */
 export async function tokenOf(hash, subtle = subtleOf()) {
-  const digest = new Uint8Array(await subtle.digest('SHA-256', hash));
+  const digest = new Uint8Array(await subtle.digest('SHA-256', new Uint8Array(hash)));
   return Array.from(digest.slice(0, 8), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
