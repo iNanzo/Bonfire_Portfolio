@@ -20,6 +20,12 @@ export const GATE_PAGES = Object.freeze({
 export const GATE_COOKIE = 'nh_gate';
 /** sessionStorage: where a locked page was going (its path, query and hash), for the way back. */
 export const GATE_TO = 'nh-gate-to';
+/**
+ * sessionStorage: when the lock page last sent a visitor straight on (the lock off, or already
+ * unlocked). A page cached from another build (GitHub Pages keeps HTML 10 minutes) could send
+ * them straight back; the second time the lock page stays instead of going round.
+ */
+export const GATE_BOUNCE = 'nh-gate-bounce';
 
 /** How long a browser stays unlocked, in days: [min, max], and the default. */
 export const GATE_REMEMBER = /** @type {[number, number]} */ ([1, 365]);
@@ -62,7 +68,7 @@ export function gateDefaults() {
 /**
  * The switches with the defaults filled in: content's own where it has a switch, true or false.
  * @param {any} gate
- * @returns {Record<keyof GATE_PAGES, boolean>}
+ * @returns {Record<keyof typeof GATE_PAGES, boolean>}
  */
 export function gatePages(gate) {
   const own = isObj(gate?.pages) ? gate.pages : {};
