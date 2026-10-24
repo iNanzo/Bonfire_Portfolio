@@ -93,8 +93,8 @@ drawn in the toy's own pixel look, and it's the loading screen too: NEWT loads b
   turned, so a tap anywhere across the middle of the screen reaches it turned too. It's as big
   as the view fully zoomed out shows him whole in: on a phone it's narrower than the screen is
   deep, so tapping near the top walks him to its back edge.
-- **Leave him alone** for about 20 seconds and he turns to face you and sits down (the Sit
-  button turns him to you first too, so you see his happy face).
+- **Leave him alone** for about 20 seconds and he sits down where he is, facing the way he was
+  (the Sit button too: no turn to the camera).
 - **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Give Device (Lie
   Down while he sits with the tablet, Get Up while he lies), Run (he runs off for a few seconds,
   across the screen to one side or the other, or away from the cursor), Camera (the pad above)
@@ -106,10 +106,9 @@ drawn in the toy's own pixel look, and it's the loading screen too: NEWT loads b
 - **The cursor** is pixel art too: an open hand over NEWT, a closed hand while you hold him or
   slide the view, a turning arrow while you turn it, and a pointing hand on the buttons.
 - **Give Device** hands him a tablet with a tiny pixel game on it. Each press does the next
-  thing: he turns to you and sits down with it in both hands, playing (the button then says Lie
-  Down); he lies down on his stomach with it, turned most of the way side-on so you see his
-  profile and the screen past his cap, feet kicking behind him (the button says Get Up); he gets
-  up and puts it away. Anything else you do (a tap, the floor, another button) gets him up
+  thing: he sits down with it in both hands, playing (the button then says Lie Down); he lies
+  down on his stomach with it, feet kicking behind him (the button says Get Up); he gets up and
+  puts it away. He keeps the way he was facing throughout: no turn to the camera. Anything else you do (a tap, the floor, another button) gets him up
   first, then does it; picking him up takes him straight off the floor.
 - **His earrings:** a black stud on each earlobe with a thin black line and a little black
   cross hanging from it, swinging as he walks, turns, is carried or thrashes.
@@ -392,8 +391,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     face (surprised while he's shaken hard), and Thrash once every `thrashMin`–`thrashMax`
     s (3–7; within `thrashShaken` of a hard shake, never before he's hung `thrashRest`, 1.5 s),
     then Held again on its own clock. Give Device (`ButtonName` 'Device') goes sitDown →
-    deviceSit, lieDown → deviceLie (turned `lieTurnMin`–`lieTurnMax`, 62–73°, off the camera),
-    getUp; `BrainOut.device` and `deviceLabel` say which, for the toolbar. The Run button with no pointer runs him from a spot beside him square to the
+    deviceSit, lieDown → deviceLie, getUp, each the way he faced (`move` 'stay', as a sit); `BrainOut.device` and `deviceLabel` say which, for the toolbar. The Run button with no pointer runs him from a spot beside him square to the
     camera (`TUNE.runFromGap`), across the view. `floor.js` `fitShadow(…, at)` moves the
     shadow camera to wherever he is, by whole shadow texels.
 - **Speech and content:** `speech.js` (pure: `createTalk({lines, speech, rng}).step(...)` reads

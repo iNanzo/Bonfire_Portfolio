@@ -3,13 +3,12 @@
 // every timer and every change of state. Each frame it
 // turns gestures and buttons into what he does, keeps his stress (taps, rough handling; it
 // decays), and says which clip plays, how he moves, his face, where he looks and what the
-// buttons show. A reaction and a sit (by the button or by himself) first turn him to face the
-// camera, so his face shows; a sit's turn isn't sitting yet (a tap reacts, a floor tap walks,
-// Stand calls it off). Held, he hangs his head (a light look aimed down, the sad face) and
-// thrashes every TUNE.thrashMin–thrashMax s (sooner when he's shaken hard): Thrash once, then
-// Held again on its own clock. Give Device (the button 'Device') alternates: sitting down with the
-// tablet (SitDown, then DeviceSit; from Sit, DeviceSit where he sits), lying on his stomach with
-// it turned TUNE.lieTurnMin–lieTurnMax from the camera (LieDown, then DeviceLie), getting up
+// buttons show. A reaction first turns him to face the camera, so his face shows; a sit (by the
+// button or by himself) and the tablet's sit and lie keep the way he faces. Held, he hangs his
+// head (a light look aimed down, the sad face) and thrashes every TUNE.thrashMin–thrashMax s
+// (sooner when he's shaken hard): Thrash once, then Held again on its own clock. Give Device (the
+// button 'Device') alternates: sitting down with the tablet (SitDown, then DeviceSit; from Sit,
+// DeviceSit where he sits), lying on his stomach with it (LieDown, then DeviceLie), getting up
 // (GetUp); any other input gets him up from either first (StandUp from sitting, GetUp from
 // lying), a grab picks him straight up. No three.js and no clock: time comes in as t, randomness
 // from rng.js.
@@ -73,8 +72,6 @@ export const TUNE = {
    */
   faceTurn: 0.6,
   facedEnough: 0.15,
-  /** Sitting down, he turns to face the camera first, until he does or for this long at most (a half turn). */
-  sitTurnMax: 1,
   /** A tap in this first share of a reaction only adds stress. */
   reactLock: 0.6,
   /** Fleeing from stress lasts at least this long. */
@@ -140,12 +137,6 @@ export const TUNE = {
   thrashMax: 7,
   thrashShaken: 0.6,
   thrashRest: 1.5,
-  /**
-   * Lying with the tablet he turns this far from the camera, radians (either way), so his
-   * profile and the screen show past his cap's brim.
-   */
-  lieTurnMin: (62 * Math.PI) / 180,
-  lieTurnMax: (73 * Math.PI) / 180,
 };
 
 /**
@@ -198,8 +189,8 @@ const STATE_CLIP = {
   deviceLie: 'DeviceLie',
   getUp: 'GetUp',
 };
-/** The FACE_TRACK entry for the gait states (sitDown: while he turns to the camera first). */
-const GAIT_FACE = { idle: 'Idle', walk: 'Walk', flee: 'Run', sitDown: 'SitDown' };
+/** The FACE_TRACK entry for the gait states. */
+const GAIT_FACE = { idle: 'Idle', walk: 'Walk', flee: 'Run' };
 /** Sitting (Stand gets him up), and lying with the tablet. */
 const SITTING = new Set(['sitDown', 'sit', 'deviceSit']);
 const LYING = new Set(['lieDown', 'deviceLie']);
@@ -320,21 +311,17 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     else startClip(which);
   }
 
-  /** Sit down, turned to the camera first unless he faces it already (so his happy face shows). */
+  /** Sit down, the way he faces. */
   function sitDown() {
     m.device = false;
     m.lieAfter = false;
     enter('sitDown');
-    if (facingCamera()) return;
-    m.turning = true;
-    m.clip = 'gait';
-    m.restart = false;
   }
 
-  /** Sitting, or on the way down or up (a sit's turn to the camera isn't: he still stands). */
+  /** Sitting, or on the way down or up. */
   function seated() {
     const st = m.state;
-    return st === 'sit' || st === 'deviceSit' || st === 'standUp' || (st === 'sitDown' && !m.turning);
+    return st === 'sit' || st === 'deviceSit' || st === 'standUp' || st === 'sitDown';
   }
 
   /** Lying with the tablet, or on the way down or up. */
@@ -354,7 +341,6 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     else if (st === 'sitDown' && m.device) {
       // (Pressed again on his way down: he lies on down once he's sat; a third press, up again.)
       if (!m.lieAfter) m.lieAfter = true;
-      else if (m.turning) enter('idle');
       else afterStanding(null);
     } else if (LYING.has(st)) afterStanding(null);
     else if (st === 'sit') {
@@ -366,13 +352,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     }
   }
 
-  /** Down onto his stomach with the tablet, turning lieTurn off the camera (either way) as he goes. */
+  /** Down onto his stomach with the tablet, the way he faces. */
   function lieDown() {
     enter('lieDown');
     m.device = true;
-    const n = m.input?.newt;
-    const yaw = cameraYaw() + (rng() < 0.5 ? -1 : 1) * between(rng, T.lieTurnMin, T.lieTurnMax);
-    m.lieGoal = n ? { x: n.x + Math.sin(yaw), z: n.z + Math.cos(yaw) } : null;
   }
 
   function startClip(name) {
@@ -658,7 +641,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     if (!floor) return;
     const st = m.state;
     if (down()) afterStanding({ do: 'walk', goal: { x: floor.x, z: floor.z } });
-    else if (st === 'idle' || st === 'walk' || st === 'sitDown') walk(floor, false);
+    else if (st === 'idle' || st === 'walk') walk(floor, false);
   }
 
   /** @param {GestureEvent} e */
@@ -707,8 +690,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
         else react(name);
         break;
       case 'Sit':
-        if (st === 'sitDown' && m.turning) enter('idle');
-        else if (SITTING.has(st) || LYING.has(st)) afterStanding(null);
+        if (SITTING.has(st) || LYING.has(st)) afterStanding(null);
         else sitDown();
         break;
       case 'Device':
@@ -811,12 +793,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       if (stressed) flee(T.fleeMin, true);
       else enter('idle');
     },
-    /** @param {number} age */
-    sitDown(age) {
-      if (m.turning) {
-        if (facingCamera() || age >= T.sitTurnMax - EPS) startClip('SitDown');
-        return;
-      }
+    sitDown() {
       // (With the tablet: DeviceSit, or on down to lie with it when pressed again meanwhile.)
       const next = !m.device ? 'Sit' : m.lieAfter ? 'LieDown' : 'DeviceSit';
       if (!fadeOutDue('SitDown', clipTime().remaining, next)) return;
@@ -918,14 +895,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
         if (m.talk?.phase === 'walk' && m.goal)
           return { mode: 'goto', goal: { x: m.goal.x, z: m.goal.z }, speed: T.walkSpeed };
       // falls through: he faces the camera
-      case 'react':
-      case 'sitDown': {
+      case 'react': {
         const c = m.input?.camera;
         return { mode: 'face', goal: c ? { x: c.x, z: c.z } : null, speed: 0 };
       }
-      case 'lieDown':
-      case 'deviceLie':
-        return { mode: 'face', goal: m.lieGoal ? { x: m.lieGoal.x, z: m.lieGoal.z } : null, speed: 0 };
       default:
         return { mode: 'stay', goal: null, speed: 0 };
     }
