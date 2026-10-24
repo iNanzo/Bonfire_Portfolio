@@ -61,6 +61,7 @@ export const GATE_MORE = {
   gate:
     'A locked page sends a visitor to the lock page until the right password is typed, and search engines drop it.\n' +
     'It doesn’t keep out someone who reads the code: the repository is public, so the pages’ files and content.json can be read on GitHub, and the cookie can be set by hand.\n' +
+    'And any page can show the site inside a frame with ?preview, the way the admin’s own preview does.\n' +
     'The stronger path is the site served by a Cloudflare Worker that checks the password on the server (the domain’s DNS moved to Cloudflare), with the repository made private.',
 };
 

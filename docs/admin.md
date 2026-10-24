@@ -294,8 +294,9 @@ exceptions are the cards that draw their own body: scenes (`sceneTools.js`).
 
 It keeps visitors and search engines out. It does not keep out someone who reads the
 code: the repository is public, so the pages' files and `content.json` can be read on
-GitHub, and the cookie that opens the lock can be set by hand. Treat it as a velvet rope,
-not a vault.
+GitHub, and the cookie that opens the lock can be set by hand. And any page can show the
+site inside a frame with `?preview`, the way the admin's live preview does. Treat it as a
+velvet rope, not a vault.
 
 - **How it works:** with the lock on, the build puts a small check first in each locked
   page (`vite.config.js` `gate`, `src/gate/check.js`). A visitor without the `nh_gate`
@@ -303,7 +304,7 @@ not a vault.
   page loads anything else; the right password sets the cookie for **Remember For**
   days and sends them back to where they were going, query and hash included. The
   sitemap leaves out locked routes, and `/unlock/` is `noindex`, so search engines drop
-  them. The admin's live preview (`?preview` in a frame) is never locked.
+  them. The admin's live preview (`?preview` in a frame, from any site) is never locked.
 - **Never locked:** the 404 page, `/admin/`, `/assets/` and `/models/`; `/invitation/`
   unless you switch it on. `npm run dev` and the admin's local preview never lock.
 - **What's stored:** only a salted slow hash (PBKDF2-SHA256, 600,000 iterations, a 16-byte
