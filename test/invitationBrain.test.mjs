@@ -592,6 +592,18 @@ test('held, his head hangs (a light look aimed down) and every 3–6 s he glance
   assert.equal(out.look.up, undefined);
 });
 
+test('held, a glance up that came due while he thrashed comes TUNE.lookUpRest s after the Thrash, not a whole wait later', () => {
+  const s = sim({ tune: { thrashMin: 3.5, thrashMax: 3.5, lookUpMin: 4, lookUpMax: 4 } });
+  s.grab();
+  s.until((o) => o.clip === 'Thrash', 5);
+  const out = s.until((o) => o.clip !== 'Thrash', 3);
+  assert.equal(out.look.up, 0);
+  const ended = s.w.t;
+  s.until((o) => o.look.up > 0, 3);
+  const after = s.w.t - DT - ended;
+  assert.ok(Math.abs(after - TUNE.lookUpRest) <= 2 * DT, `up ${after.toFixed(2)} s after the Thrash`);
+});
+
 test('held, falling and landing he keeps the way he faced when grabbed (no turn to the camera), and carries on from there', () => {
   for (const yaw of [2, -1.3, Math.PI]) {
     const s = sim({ yaw, camera: { x: 0, z: 6 } });

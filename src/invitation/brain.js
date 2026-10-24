@@ -132,8 +132,8 @@ export const TUNE = {
   heldLook: 0.15,
   heldPitch: -0.5,
   /**
-   * Held, every lookUpMin–lookUpMax s (since he was grabbed, his last glance up or his last
-   * thrash) he glances up at you for lookUpForMin–lookUpForMax s: BrainOut.look.up eases from 0
+   * Held, every lookUpMin–lookUpMax s (since he was grabbed or his last glance up; one that came
+   * due while he thrashed, lookUpRest s after the Thrash) he glances up at you for lookUpForMin–lookUpForMax s: BrainOut.look.up eases from 0
    * to 1 over lookUpEase s and back down, his look's weight with it up to lookUpWeight (the page
    * aims it toward the viewer as it comes up).
    */
@@ -143,6 +143,7 @@ export const TUNE = {
   lookUpForMax: 1.2,
   lookUpEase: 0.25,
   lookUpWeight: 0.85,
+  lookUpRest: 1,
   /**
    * Held, he thrashes every thrashMin–thrashMax s, and within thrashShaken s of a hard shake, but
    * never before he's hung still thrashRest s (since he was grabbed, or his last thrash).
@@ -833,7 +834,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
         m.restart = false;
         m.hungSince = m.t;
         m.thrashAt = m.t + between(rng, T.thrashMin, T.thrashMax);
-        m.lookUpAt = Math.max(m.lookUpAt, m.t + between(rng, T.lookUpMin, T.lookUpMax));
+        m.lookUpAt = Math.max(m.lookUpAt, m.t + T.lookUpRest);
       } else if (m.t >= m.thrashAt - EPS) {
         startClip('Thrash');
         m.lookUp = null;
