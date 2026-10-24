@@ -233,19 +233,7 @@ body {
   font: 600 13px/1 var(--inv-font);
   letter-spacing: 0.02em;
   white-space: nowrap;
-  box-shadow: 3px 3px 0 var(--inv-ink);
-  clip-path: polygon(
-    0 2px,
-    2px 2px,
-    2px 0,
-    calc(100% - 2px) 0,
-    calc(100% - 2px) 2px,
-    100% 2px,
-    100% calc(100% + 3px),
-    3px calc(100% + 3px),
-    3px 100%,
-    0 100%
-  );
+  box-shadow: 0 3px 0 var(--inv-ink);
   opacity: 0;
   pointer-events: none;
   transform: translate(var(--inv-tab-x), 3px);
@@ -253,12 +241,29 @@ body {
     opacity 90ms steps(3),
     transform 90ms steps(3);
 }
+/* (Its notch, a pixel arrow down to the button's middle: three pixels, then one.) */
+.inv-btn-label::after {
+  content: '';
+  position: absolute;
+  top: calc(100% + 5px);
+  left: var(--inv-notch, 50%);
+  width: 2px;
+  height: 2px;
+  margin-left: -1px;
+  background: var(--inv-ink);
+  box-shadow:
+    -2px -2px 0 var(--inv-ink),
+    0 -2px 0 var(--inv-ink),
+    2px -2px 0 var(--inv-ink);
+}
 .inv-btn-intro .inv-btn-label {
   --inv-tab-x: 0;
+  --inv-notch: calc(var(--inv-tool) / 2);
   left: -2px;
 }
 .inv-btn-look .inv-btn-label {
   --inv-tab-x: 0;
+  --inv-notch: calc(100% - var(--inv-tool) / 2);
   left: auto;
   right: -2px;
 }
@@ -311,10 +316,12 @@ body {
 }
 .inv-camera-pad .inv-tool:nth-child(4n + 1) .inv-btn-label {
   --inv-tab-x: 0;
+  --inv-notch: calc(var(--inv-tool) / 2);
   left: -2px;
 }
 .inv-camera-pad .inv-tool:nth-child(4n) .inv-btn-label {
   --inv-tab-x: 0;
+  --inv-notch: calc(100% - var(--inv-tool) / 2);
   left: auto;
   right: -2px;
 }
