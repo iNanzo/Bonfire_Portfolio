@@ -487,3 +487,25 @@ test('the lock page’s first load: never content, the renderer or three.js, and
   ]);
   assert.ok(SHOW_ONLY.test('/r/src/gate/main.js'), 'the site never carries the lock page’s modules');
 });
+
+// ---- the browser specs' way past the lock ---------------------------------------------------
+
+test('the specs’ storage state: the cookie content.json’s key opens, none without one', async () => {
+  const { gateState } = await import('../e2e/lib/gateSetup.mjs');
+  const key = someKey();
+  const state = await gateState({ gate: lockedGate({ key }) });
+  assert.deepEqual(state.origins, []);
+  assert.equal(state.cookies.length, 1);
+  const [c] = state.cookies;
+  assert.equal(c.name, GATE_COOKIE);
+  assert.equal(c.value, tokenFor(key), 'what the build checks for');
+  assert.equal(c.domain, '127.0.0.1');
+  assert.equal(c.path, '/');
+  assert.equal(c.sameSite, 'Lax');
+  assert.deepEqual((await gateState({ gate: gateDefaults() })).cookies, [], 'no key: nothing to open');
+  assert.deepEqual((await gateState({})).cookies, []);
+  const { readFileSync: read } = await import('node:fs');
+  const config = read(new URL('../playwright.config.mjs', import.meta.url), 'utf8');
+  assert.match(config, /globalSetup:/, 'made before every run');
+  assert.match(config, /storageState: GATE_STATE/, 'every context starts with it');
+});
