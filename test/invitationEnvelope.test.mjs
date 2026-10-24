@@ -189,7 +189,7 @@ test('a skip drops it away and fades it', () => {
     assert.ok(p.drop >= drop - 1e-9);
     drop = p.drop;
   }
-  assert.ok(drop > 0.99 && e.pose(TIMES.skip).fade > 0.99);
+  assert.ok(e.pose(TIMES.skip).drop > 0.99 && e.pose(TIMES.skip).fade > 0.99);
 });
 
 test('dragged, it follows the finger with some give and the flap lifts as it goes up', () => {
