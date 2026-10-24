@@ -10,7 +10,12 @@
 // framing the site above, and its local API read-only (ADMIN_READONLY: no test writes to
 // src/content.json). It listens 100 ports above the site (PW_ADMIN_PORT moves it); the
 // spec finds it in PW_ADMIN_ORIGIN.
+//
+// The sitewide lock: every context starts with the nh_gate cookie content.json's key opens,
+// made before each run (e2e/lib/gateSetup.mjs), so the specs get past the lock whatever the
+// password; e2e/gate.spec.mjs starts with none and locks pages itself.
 import { defineConfig } from '@playwright/test';
+import { GATE_STATE } from './e2e/lib/gateSetup.mjs';
 
 const port = Number(process.env.PW_PORT) || 4173;
 const origin = `http://127.0.0.1:${port}`;
@@ -25,8 +30,10 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined, // Software-rendered WebGL scenes compete for CPU in CI.
   reporter: process.env.CI ? 'github' : 'list',
+  globalSetup: './e2e/lib/gateSetup.mjs',
   use: {
     baseURL: origin,
+    storageState: GATE_STATE,
     channel: process.env.PW_CHANNEL || undefined,
     launchOptions: {
       args: [
