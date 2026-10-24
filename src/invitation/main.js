@@ -3,14 +3,18 @@
 // retro pass), NEWT (character.js, from models/newt.glb), the Look menu (switched live, kept in
 // localStorage: look.js; a first visit gets the admin's Default look, content.js), the orbit
 // camera (camera.js: a finger's drag on empty space or the mouse's right-drag turns it, the
-// mouse's left-drag on empty space or two fingers pan it, the wheel or a pinch zooms it, Reset
-// Camera brings it back), and the render loop (stopped while the page is hidden, steps of at
-// most 0.05 s, a lost WebGL context told). While the Look sheet
+// mouse's left-drag on empty space or two fingers pan it, the wheel or a pinch zooms it about the
+// cursor or the fingers' middle, the Camera pad turns, tilts, zooms, follows him and resets it,
+// queued like Reset Camera and left be while the intro runs; a tap or a grab on him ends a pan),
+// the pixel cursors (cursor.js: the stage's data-cursor each frame from what the pointer is over
+// and doing), and the render loop (stopped while the page is hidden, steps of at most 0.05 s, a
+// lost WebGL context told). While the Settings sheet
 // is open NEWT stays in sight: the view shows him in the clear space above or beside it
 // (focusInsets, pixels.js clearInsets) and the orbit follows him all the way there. The floor
-// is endless (rays meet it anywhere) and his play area is the floor the default view shows fully
-// zoomed out (area.js viewArea), worked out again on a resize; the light's shadow camera goes
-// where he goes (floor.js fitShadow).
+// is endless (rays meet it anywhere) and his play area is one rounded square round the orbit's
+// centre (area.js viewArea), worked out again on a resize, its middle the brain's and Reset
+// Camera's; the light's shadow camera goes where he goes (floor.js fitShadow). Wander, a
+// setting, is kept for the next visit (ui.js loadWander) and goes to the brain as its button.
 //
 // A frame, in types.js's order: the pointers' gestures (gesture.js; taps get their floor spot
 // by ray) and the buttons → the camera moves → brain.step → talk.step (speech.js: what he says,
@@ -24,13 +28,13 @@
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
 // → the blob shadow, the marker, the toolbar → the speech bubble (bubble.js: over his head as
-// posed, clear of the toolbar and the open Look sheet, out of sight while the sheet covers his
+// posed, clear of the toolbar, the open Camera pad and Settings sheet, out of sight while the sheet covers his
 // head; near the top, beside his head, narrowed to fit there, or under his feet) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
 // on the clock's steps, 15 a second; his root, the camera and the rest move every frame. The
 // lowest his collar is carried comes from the Held clip at load (his collar over his lowest
 // sole, plus a gap).
 //
-// Play Intro (ui.js) runs the intro's dialogue (dialogue.js, on content.js introScript():
+// Replay Intro (ui.js) runs the intro's dialogue (dialogue.js, on content.js introScript():
 // content.json's invitation.intro as the admin writes it, mended, or the toy's own) on the toy's
 // clock, shown by dialogueUi.js over the stage: the toolbar rests out of sight, the speech bubble
 // goes and stays quiet, the layer takes every press (no drags, no orbit, no floor taps), the first
@@ -70,9 +74,12 @@ import {
   createOrbit,
   orbitArea,
   orbitEvents,
+  orbitFollow,
   orbitFollowAll,
   orbitHold,
   orbitHome,
+  orbitNudge,
+  orbitPanEnd,
   orbitPose,
   orbitRelease,
   orbitReset,
@@ -83,8 +90,10 @@ import {
   orbitTalk,
   orbitTurning,
   orbitWheel,
+  orbitZoom,
   shotView,
 } from './camera.js';
+import { cursorKind, installCursors } from './cursor.js';
 import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, DIALOGUE_WAYS, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
@@ -100,7 +109,7 @@ import { createRng } from './rng.js';
 import { createTalk } from './speech.js';
 import { LIFT, createStage } from './stage.js';
 import { centreOf } from './steer.js';
-import { bindUi, parseQuery } from './ui.js';
+import { bindUi, deviceLabelOf, loadWander, parseQuery, saveWander } from './ui.js';
 
 /** The longest step a frame takes, seconds (a slow frame or a tab coming back never jumps). */
 const MAX_DT = 0.05;
@@ -146,8 +155,9 @@ const SHOT_MARGIN = { top: 10, bottom: 30 };
  */
 const SHADOW_TOP = LIFT + NEWT_HEIGHT;
 /**
- * Where NEWT may go: the play area (area.js viewArea), one object kept in place (the brain and
- * his steps hold it) and filled in again on a resize; the default view's disc until then.
+ * Where NEWT may go: the play area (area.js viewArea, a rounded square round the orbit's centre),
+ * one object kept in place (the brain and his steps hold it) and filled in again on a resize;
+ * the default view's disc until then.
  * @type {import('./types.js').Bounds}
  */
 const area = playArea();
@@ -163,22 +173,39 @@ let look = loadLook();
 let pressed = null;
 /** Reset Camera was pressed since the last frame. */
 let resetCamera = false;
-/** Play Intro was pressed since the last frame. */
+/** The Camera pad's other presses since the last frame, in order (left be while the intro runs). */
+/** @type {Array<import('./ui.js').CameraKey>} */
+let cameraPresses = [];
+/** Replay Intro was pressed since the last frame. */
 let introPressed = false;
+/**
+ * Wander as the visitor wants it (the Settings switch, or as they left it last time), until the
+ * brain has it: null, the brain's own (on, but never under ?calm).
+ * @type {boolean|null}
+ */
+let wanderWanted = options.calm ? null : loadWander();
 const ui = bindUi(stageEl, {
   look,
+  wander: wanderWanted ?? !options.calm,
   onButton: (name) => {
     pressed = name;
   },
   onLook,
-  onResetCamera: () => {
-    resetCamera = true;
+  onCamera: (key) => {
+    if (key === 'reset') resetCamera = true;
+    else cameraPresses.push(key);
+  },
+  onWander: (on) => {
+    wanderWanted = on;
+    saveWander(on);
   },
   onSheet,
   onIntro: () => {
     introPressed = true;
   },
 });
+installCursors();
+stageEl.dataset.cursor = 'arrow';
 
 /** @param {import('./look.js').Look} next */
 function onLook(next) {
@@ -192,7 +219,7 @@ function onLook(next) {
 }
 
 /**
- * The Look sheet opened or closed: the orbit follows NEWT all the way while it's open, and the
+ * The Settings sheet opened or closed: the orbit follows NEWT all the way while it's open, and the
  * view shows him in the clear space it leaves (focusInsets).
  * @param {boolean} open
  */
@@ -236,6 +263,7 @@ if (webgl2()) {
         orbitSpan(orbit, stageSpan(stage));
         setArea(areaOf(stage));
         orbitArea(orbit, area);
+        stage.setArea(area);
       },
     });
   } catch {
@@ -268,8 +296,9 @@ function stageSpan(s) {
 }
 
 /**
- * The play area: the floor the default view shows fully zoomed out, inside the clear space
- * (area.js viewArea); the default view's disc until the stage has a view.
+ * The play area: a rounded square round the default view's target, the biggest the fully
+ * zoomed-out default view shows him whole in (area.js viewArea); the default view's disc until
+ * the stage has a view.
  * @param {NonNullable<typeof stage>} s
  */
 function areaOf(s) {
@@ -312,9 +341,9 @@ function insets() {
 }
 
 /**
- * Where the point the camera looks at shows: the middle of the space insets() leaves, or, with
- * the Look sheet open, of the clear space above or beside it, so a look's changes show on NEWT
- * (and Reset Camera's way back).
+ * Where the point the camera looks at shows: the middle of the space insets() leaves (the open
+ * Camera pad over the stage never changes it), or, with the Settings sheet open, of the clear
+ * space above or beside it, so a look's changes show on NEWT.
  */
 function focusInsets() {
   const base = insets();
@@ -347,7 +376,8 @@ function start(s) {
   const seed = options.seed ?? Math.floor(Math.random() * 2 ** 31);
   const rng = createRng(seed + 1);
   setArea(areaOf(s));
-  const brain = createBrain({ seed, calm: options.calm, bounds: area, middle: centreOf(s.bounds) });
+  s.setArea(area);
+  const brain = createBrain({ seed, calm: options.calm, bounds: area, middle: centreOf(area) });
   const gesture = createGesture();
   const body = createBody();
   const mix = createMix();
@@ -361,7 +391,7 @@ function start(s) {
   // line is up.)
   const talk = createTalk({ lines: invitationLines(), speech: speechSettings(), rng: createRng(seed + 2) });
   const bubble = createBubble({ root: stageEl, before: stageEl.querySelector('.inv-hud'), now: () => t });
-  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(s.bounds), span: stageSize() });
+  orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(area), span: stageSize() });
   const cam = orbit;
   orbitSpan(cam, stageSpan(s));
   orbitArea(cam, area);
@@ -404,7 +434,13 @@ function start(s) {
   /** The retro pass's other path is compiled (stage.js warm), for ?test. */
   let warmed = false;
   /** The toolbar as last set, so the DOM is only touched on a change. */
-  const shown = { sit: 'Sit', wander: /** @type {boolean|null} */ (null), enabled: true };
+  const shown = {
+    sit: 'Sit',
+    device: /** @type {string} */ ('Give Device'),
+    wander: /** @type {boolean|null} */ (null),
+    enabled: true,
+    cursor: 'arrow',
+  };
   /** @type {ReturnType<typeof createDialogue>|null} the intro under way (Play Intro) */
   let intro = null;
   /** The box whose shot the camera last went to (dialogue.js DialogueView seq). */
@@ -620,8 +656,10 @@ function start(s) {
     (e) => {
       e.preventDefault();
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? canvas.clientHeight : 1;
-      // (A trackpad's pinch comes as a wheel with ctrl held, in small steps.)
-      orbitWheel(cam, e.deltaY * unit * (e.ctrlKey ? 5 : 1));
+      // (A trackpad's pinch comes as a wheel with ctrl held, in small steps. About the cursor: the
+      // floor under it stays under it.)
+      const at = shownAt();
+      orbitWheel(cam, e.deltaY * unit * (e.ctrlKey ? 5 : 1), { x: e.clientX - at.x, y: e.clientY - at.y });
       events.push({ type: 'pinch', on: 'floor', x: e.clientX, y: e.clientY, t: now(), scale: 1 });
     },
     { passive: false },
@@ -672,9 +710,10 @@ function start(s) {
     const box = introStep();
     const pose = moveCamera(evs, dt);
     const ptr = pointerNow();
-    const button = pressed;
+    const button = pressed ?? wanderPress();
     if (pressed) lastButton = pressed;
     pressed = null;
+    showCursor(ptr);
     if (forced) {
       // (Walk and Run take their time from the step phase: it goes round at the clip's own pace.)
       const len = c.clipLength(forced);
@@ -726,6 +765,37 @@ function start(s) {
     finish(c, intro ? null : ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
     voice();
+  }
+
+  /**
+   * Wander as the visitor wants it, as the brain's own button: pressed (toggling it) while the
+   * brain has it the other way, never during the intro. Null once the brain has it.
+   * @returns {import('./types.js').ButtonName|null}
+   */
+  function wanderPress() {
+    if (wanderWanted === null || !out || intro) return null;
+    if (out.wander === wanderWanted) {
+      wanderWanted = null;
+      return null;
+    }
+    return 'Wander';
+  }
+
+  /**
+   * The stage's cursor (cursor.js) as the pointer is now: over him, pressing or holding him,
+   * panning or orbiting; the arrow while the intro runs.
+   * @param {ReturnType<typeof pointerNow>} ptr
+   */
+  function showCursor(ptr) {
+    const c = gesture.current();
+    const kind = cursorKind({
+      onNewt: Boolean(ptr?.onNewt && !ptr.touch),
+      pressing: c?.on === 'newt',
+      held: body.mode === 'held',
+      drag: c?.orbit ? 'orbit' : c?.pan ? 'pan' : null,
+      talking: Boolean(intro),
+    });
+    if (kind !== shown.cursor) stageEl.dataset.cursor = shown.cursor = kind;
   }
 
   /** Whether the visitor asked for less motion (false where it can't be read). */
@@ -899,13 +969,15 @@ function start(s) {
 
   /**
    * The bubble, while a line is up: over his head as posed this frame (character.js
-   * screenShape), clear of the toolbar and the open Look sheet, out of sight while the sheet
+   * screenShape), clear of the toolbar, the open Camera pad and Settings sheet, out of sight while the sheet
    * covers his head (bubble.js speakerPoint).
    */
   function voice() {
     if (bubble.text === null) return;
     const sheet = ui.sheetOpen ? ui.sheet.getBoundingClientRect() : null;
-    const avoid = sheet ? [ui.toolbar.getBoundingClientRect(), sheet] : [ui.toolbar.getBoundingClientRect()];
+    const avoid = [ui.toolbar.getBoundingClientRect()];
+    if (sheet) avoid.push(sheet);
+    if (ui.padOpen) avoid.push(ui.pad.getBoundingClientRect());
     // (His feet's bottom on screen: a bubble with no room over or beside his head goes under him.)
     const sh = shape();
     const feet = Math.max(sh.body.a.y, sh.body.b.y) + sh.body.r;
@@ -929,7 +1001,13 @@ function start(s) {
    * @param {number} dt
    */
   function moveCamera(evs, dt) {
-    orbitEvents(cam, evs, evs.some((e) => e.type === 'pan') ? shownAt() : null);
+    // (A tap or a grab on him: the user's pan is over, the view takes him again.)
+    if (evs.some((e) => e.on === 'newt' && (e.type === 'tap' || e.type === 'grab'))) orbitFollow(cam);
+    orbitEvents(cam, evs, evs.some((e) => e.type === 'pan' || e.type === 'pinch') ? shownAt() : null);
+    // (Two fingers' pan ends with no release of its own: once nothing pans, it's let go.)
+    if (cam.panning && !gesture.current()?.pan) orbitPanEnd(cam);
+    if (!intro) for (const key of cameraPresses) padPress(key);
+    cameraPresses = [];
     if (resetCamera && !intro) orbitReset(cam);
     resetCamera = false;
     orbitHold(cam, body.mode === 'held');
@@ -940,6 +1018,20 @@ function start(s) {
     // the texel to it, so he keeps the chosen sprite resolution at any zoom; cheap every frame.)
     s.setZoomScale(cam.home.distance / cam.distance);
     return pose;
+  }
+
+  /**
+   * One of the Camera pad's presses: Turn Left or Right a 45° turn (Left as a drag to the left
+   * turns it), Tilt Up or Down 12°, Zoom In or Out about where it looks, Follow NEWT onto him.
+   * @param {import('./ui.js').CameraKey} key
+   */
+  function padPress(key) {
+    const TURN = Math.PI / 4;
+    const TILT = (12 * Math.PI) / 180;
+    if (key === 'left' || key === 'right') orbitNudge(cam, { yaw: key === 'left' ? TURN : -TURN });
+    else if (key === 'up' || key === 'down') orbitNudge(cam, { elevation: key === 'up' ? TILT : -TILT });
+    else if (key === 'in' || key === 'out') orbitZoom(cam, key === 'in' ? 1.25 : 0.8);
+    else if (key === 'follow') orbitFollow(cam, { x: body.root.x, z: body.root.z });
   }
 
   /**
@@ -1061,11 +1153,14 @@ function start(s) {
   }
 
   /**
-   * The toolbar, only on a change: the Sit/Stand label, Wander's state, the buttons resting.
+   * The toolbar, only on a change: the Sit/Stand label, Give Device's (what its next press does:
+   * the brain's deviceLabel, ui.js deviceLabelOf), Wander's switch, the buttons resting.
    * @param {import('./types.js').BrainOut} o
    */
   function toolbar(o) {
     if (o.sitLabel !== shown.sit) ui.setSitLabel((shown.sit = o.sitLabel));
+    const device = deviceLabelOf(o);
+    if (device !== shown.device) ui.setDeviceLabel((shown.device = device));
     if (o.wander !== shown.wander) ui.setWander((shown.wander = o.wander));
     if (o.buttonsEnabled !== shown.enabled) ui.setEnabled((shown.enabled = o.buttonsEnabled));
   }
@@ -1243,6 +1338,9 @@ function start(s) {
     };
   }
 
+  /** The controls for ?test: Wander as the brain has it, and the stage's cursor. */
+  const controlsSnapshot = () => ({ wander: out ? out.wander : null, cursor: stageEl.dataset.cursor || null });
+
   if (options.test) {
     /** @type {any} */ (window).__invitation = {
       snapshot: () => ({
@@ -1285,7 +1383,9 @@ function start(s) {
           panned: cam.panned,
           turning: orbitTurning(cam),
         },
-        // (Where he may go: the play area, area.js viewArea.)
+        // (Whether he wanders by himself, as the brain has it; the stage's cursor.)
+        ...controlsSnapshot(),
+        // (Where he may go: the play area, area.js viewArea, a rounded square.)
         area: { ...area },
         // (Both of the retro pass's paths compiled: the first switch to Off or back won't stall.)
         warmed,

@@ -60,16 +60,27 @@ import { FLOOR_SIZE, createFloor, floorLook } from '../src/invitation/floor.js';
 import { ID, createRetro, decalMaterial, markId } from '../src/invitation/retro.js';
 import {
   BUTTONS,
+  BUTTON_LABELS,
+  CAMERA_CONTROLS,
+  DEVICE_LABELS,
+  HOLD_MS,
+  HOLD_SLOP,
   INTRO_LABEL,
+  WANDER_KEY,
+  createHold,
+  deviceLabelOf,
+  loadWander,
   parseQuery,
   SLIDE_SLOP,
   pixelLabel,
   pixelSpoken,
+  saveWander,
   sheetHtml,
   slideIntent,
   statusHtml,
   toolbarHtml,
 } from '../src/invitation/ui.js';
+import { LABEL_ICONS, iconSvg } from '../src/invitation/icons.js';
 import { NEWT_RADIUS, playArea } from '../src/invitation/area.js';
 
 const SIZES = [
@@ -717,14 +728,88 @@ test('the retro pass warms the path it isn’t drawing (the canvas’s while the
   await assert.doesNotReject(plain.warm(scene, camera));
 });
 
-test('the toolbar and the Look sheet: every button labelled, the settings checked, no tooltips', () => {
+test('the toolbar, the camera pad and the Settings sheet: every button named by its own label beside a pixel icon, the settings checked, no tooltips', () => {
   const bar = toolbarHtml();
-  for (const name of [INTRO_LABEL, ...BUTTONS, 'Look']) assert.match(bar, new RegExp(`>${name}</button>`), name);
-  assert.equal(INTRO_LABEL, 'Play Intro');
-  assert.ok(bar.indexOf(INTRO_LABEL) < bar.indexOf('>Wave<'), 'Play Intro first');
-  assert.match(bar, /data-button="Wander" aria-pressed="false"/);
+  // The bar: Replay Intro, Wave, Sit, Give Device, Run, Camera and Settings, each a squircle with
+  // its pixel icon and its label in a span (the button's name: no aria-label, no title=). Spook
+  // and Wander have left it (a tap on him still spooks or waves him; Wander is a setting).
+  assert.equal(INTRO_LABEL, 'Replay Intro');
+  assert.deepEqual([...BUTTONS], ['Wave', 'Sit', 'Device', 'Run']);
+  assert.deepEqual(BUTTON_LABELS, { Wave: 'Wave', Sit: 'Sit', Device: 'Give Device', Run: 'Run' });
+  /** The bar's own buttons (not the pad's), in order: their attributes and their inside. */
+  const own = [
+    ...bar.replace(/<div class="inv-camera-pad"[^]*?<\/div>/, '').matchAll(/<button ([^>]*)>([^]*?)<\/button>/g),
+  ];
+  const labels = own.map((m) => /<span class="inv-btn-label">([^<]+)<\/span>$/.exec(m[2])?.[1]);
+  assert.deepEqual(labels, ['Replay Intro', 'Wave', 'Sit', 'Give Device', 'Run', 'Camera', 'Settings']);
+  for (const [i, m] of own.entries()) {
+    const label = labels[i] ?? '';
+    assert.match(m[1], /^type="button" class="inv-btn inv-tool[^"]*"/, `${label}: a tool button`);
+    assert.doesNotMatch(m[1], /aria-label|title=/, `${label}: named by its label`);
+    assert.equal(
+      m[2],
+      `${iconSvg(LABEL_ICONS[label])}<span class="inv-btn-label">${label}</span>`,
+      `${label}: icon, label`,
+    );
+  }
+  assert.match(own[0][1], /data-intro/);
+  for (const [i, name] of BUTTONS.entries()) assert.match(own[i + 1][1], new RegExp(`data-button="${name}"`), name);
+  assert.match(own[5][1], /data-camera-open aria-expanded="false" aria-controls="inv-camera"/);
+  assert.match(own[6][1], /data-look-open aria-expanded="false" aria-controls="inv-look"/);
+  assert.doesNotMatch(bar, /data-button="(Spook|Wander)"/, 'Spook and Wander are off the bar');
+  // The camera pad, over the stage and closed to begin with: Turn Left and Right (45°), Tilt Up
+  // and Down (12°), Zoom In and Out, Follow NEWT and Reset Camera, each a tool button; and a
+  // line on moving the view by hand.
+  assert.match(bar, /<div class="inv-camera-pad" id="inv-camera" role="group" aria-label="Camera Controls" hidden>/);
+  assert.deepEqual(
+    CAMERA_CONTROLS.map((c) => [c.key, c.label]),
+    [
+      ['left', 'Turn Left'],
+      ['right', 'Turn Right'],
+      ['up', 'Tilt Up'],
+      ['down', 'Tilt Down'],
+      ['in', 'Zoom In'],
+      ['out', 'Zoom Out'],
+      ['follow', 'Follow NEWT'],
+      ['reset', 'Reset Camera'],
+    ],
+  );
+  const pad = /<div class="inv-camera-pad"[^]*?<\/div>/.exec(bar)?.[0] ?? '';
+  const padButtons = [...pad.matchAll(/<button ([^>]*)>([^]*?)<\/button>/g)];
+  assert.equal(padButtons.length, CAMERA_CONTROLS.length);
+  for (const [i, c] of CAMERA_CONTROLS.entries()) {
+    const [, attrs, inside] = padButtons[i];
+    assert.match(attrs, new RegExp(`^type="button" class="inv-btn inv-tool[^"]*" data-camera="${c.key}"`), c.label);
+    assert.equal(inside, `${iconSvg(LABEL_ICONS[c.label])}<span class="inv-btn-label">${c.label}</span>`, c.label);
+  }
+  assert.match(pad, /data-camera="reset" data-reset-camera/, 'Reset Camera keeps its hook');
+  assert.match(
+    pad,
+    /inv-hint[^>]*>[^<]*(drag|Drag)[^<]*(pinch|scroll)[^<]*\./,
+    'how to turn and zoom by hand, in a sentence',
+  );
+  // Give Device reads as what its next press does: Lie Down while he sits with the tablet, Get
+  // Up while he lies (BrainOut.deviceLabel; with none, from BrainOut.device, else Give Device).
+  assert.deepEqual([...DEVICE_LABELS], ['Give Device', 'Lie Down', 'Get Up']);
+  assert.equal(deviceLabelOf({}), 'Give Device');
+  assert.equal(deviceLabelOf({ device: null }), 'Give Device');
+  assert.equal(deviceLabelOf({ device: 'sit' }), 'Lie Down');
+  assert.equal(deviceLabelOf({ device: 'lie' }), 'Get Up');
+  assert.equal(deviceLabelOf({ deviceLabel: 'Get Up', device: 'sit' }), 'Get Up', 'the brain’s label first');
+  assert.equal(deviceLabelOf({ deviceLabel: 'Fly' }), 'Give Device', 'never a label it doesn’t know');
+  for (const label of DEVICE_LABELS) assert.ok(LABEL_ICONS[label], `${label}: an icon`);
   const sheet = sheetHtml({ pixelSize: '24', dither: false, outlines: true, style: 'soft' });
   assert.match(sheet, /role="dialog" aria-modal="true"/, 'a modal dialog: what lies behind it is out of reach');
+  assert.match(sheet, /id="inv-look"[^>]*aria-labelledby="inv-look-title"/);
+  assert.match(sheet, /<h2 id="inv-look-title">Settings<\/h2>/, 'Look is Settings now');
+  // Wander, off the bar: a switch in Settings, on unless he's been told to stay.
+  assert.match(
+    sheet,
+    /<input type="checkbox" role="switch" data-setting="wander" checked><span class="inv-switch-label">Wander<\/span>/,
+  );
+  assert.match(sheetHtml(DEFAULT_LOOK, undefined, { wander: false }), /data-setting="wander">/);
+  assert.match(sheet, /data-setting="wander"[^]*?inv-hint[^>]*>[^<]+\.</, 'a line on what Wander does');
+  assert.doesNotMatch(sheet, /Reset Camera|data-reset-camera/, 'Reset Camera has moved to the camera pad');
   // Pixel Size: a slider over NEWT's sprite resolutions, coarse to fine, then Off at its end;
   // its value shown as N×N and spoken as "N by N", and a button at each end (Off one press away).
   const range = /<input type="range"[^>]*>/.exec(sheet)?.[0] ?? '';
@@ -800,19 +885,12 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
   assert.match(sheet, /data-off-hint hidden/, 'the Off hint only shows at Pixel Size Off');
   assert.doesNotMatch(sheetHtml({ ...DEFAULT_LOOK, pixelSize: 'off' }), /data-off-hint hidden/);
   assert.equal([...sheet.matchAll(/data-look="pixelSize"/g)].length, 1, 'one control');
-  // The camera: a button that eases it back to the default view, and a hint on moving it.
-  assert.match(sheet, /<button type="button" class="inv-btn[^"]*" data-reset-camera>Reset Camera<\/button>/);
-  assert.match(
-    sheet,
-    /inv-hint[^>]*>[^<]*(drag|Drag)[^<]*(pinch|scroll)[^<]*\./,
-    'how to turn and zoom, in a sentence',
-  );
   for (const html of [bar, sheet, statusHtml()]) assert.doesNotMatch(html, /\stitle=/, 'no title= tooltips');
   // Labels in Title Case (the hints are sentences).
-  const labels = [...`${bar}${sheet}`.matchAll(/>([^<>]+)</g)]
+  const texts = [...`${bar}${sheet}`.matchAll(/>([^<>]+)</g)]
     .map((m) => m[1].trim())
     .filter((t) => t && !/[.:]/.test(t));
-  for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( ([A-Z][^ ]*|&amp;))*$/, label);
+  for (const label of texts) assert.match(label, /^[A-Z0-9][^ ]*( ([A-Z][^ ]*|&amp;))*$/, label);
   assert.equal(presetOf({ ...DEFAULT_LOOK, style: 'soft' }), LOOKS.soft);
   assert.deepEqual(parseQuery('?test&seed=42&calm'), {
     test: true,
@@ -839,6 +917,70 @@ test('the toolbar and the Look sheet: every button labelled, the settings checke
   assert.equal(parseQuery('?perf').perf, true);
   assert.equal(parseQuery('?test&govern').govern, true);
   assert.equal(parseQuery('?govern=off').govern, false);
+});
+
+test('on touch, a press held still on a tool button shows its label and swallows the click; a shorter or moving press acts as usual', () => {
+  assert.ok(HOLD_MS >= 400 && HOLD_MS <= 500, `${HOLD_MS} ms`);
+  assert.ok(HOLD_SLOP >= 6 && HOLD_SLOP <= 14, `${HOLD_SLOP} CSS px`);
+  const h = createHold();
+  h.down(100, 100, 0);
+  assert.equal(h.tick(HOLD_MS / 1000 - 0.01), false, 'not yet');
+  h.move(103, 98);
+  assert.equal(h.tick(HOLD_MS / 1000), true, 'held still long enough: the label shows');
+  assert.equal(h.up(HOLD_MS / 1000 + 0.3), 'label', 'and the click that follows is swallowed');
+  h.down(100, 100, 5);
+  assert.equal(h.up(5.2), 'click', 'a tap acts');
+  h.down(100, 100, 9);
+  h.move(100 + HOLD_SLOP + 2, 100);
+  assert.equal(h.tick(10), false, 'moved off: no label');
+  assert.equal(h.up(10), 'click', 'the browser decides about a press that moved, as usual');
+  h.down(0, 0, 20);
+  h.cancel();
+  assert.equal(h.tick(30), false, 'cancelled');
+  assert.equal(h.up(30), 'click');
+});
+
+test('Wander, a setting now, is kept like the look: in storage that is empty, broken or throws it’s unset; a save that throws is refused', () => {
+  assert.equal(WANDER_KEY, 'invitation.wander.v1');
+  /** A storage whose getItem gives `get()` and whose setItem records into `saved`. */
+  const keep = (get, saved = []) => ({
+    getItem: () => get(),
+    setItem: (k, v) => saved.push([k, v]),
+  });
+  assert.equal(loadWander(keep(() => null)), null, 'never set: the brain’s own');
+  assert.equal(loadWander(keep(() => 'true')), true);
+  assert.equal(loadWander(keep(() => 'false')), false);
+  assert.equal(loadWander(keep(() => '{"x":')), null, 'broken');
+  assert.equal(loadWander(keep(() => '7')), null, 'not a yes or no');
+  assert.equal(
+    loadWander(
+      keep(() => {
+        throw new Error('denied');
+      }),
+    ),
+    null,
+    'throws',
+  );
+  assert.equal(loadWander(null), null, 'no storage at all');
+  const saved = [];
+  assert.equal(
+    saveWander(
+      false,
+      keep(() => null, saved),
+    ),
+    true,
+  );
+  assert.deepEqual(saved, [[WANDER_KEY, 'false']]);
+  assert.equal(
+    saveWander(true, {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('full');
+      },
+    }),
+    false,
+  );
+  assert.equal(saveWander(true, null), false);
 });
 
 test('a finger on a slider: along it past the slop it drags the slider, up or down it scrolls the sheet, and until then it is neither', () => {

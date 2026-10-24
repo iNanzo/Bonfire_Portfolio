@@ -30,10 +30,10 @@
 /** @typedef {{x: number, y: number, z: number}} XYZ */
 /**
  * @typedef {object} Bounds  where NEWT's root may go: the play area (area.js), whose edges are
- *   his walls. A box; or a trapezoid, its sides minX/maxX at the front (maxZ) and
+ *   his walls. A box; with `round`, a box with corners of that radius (the toy's play area, a
+ *   rounded square on the floor); or a trapezoid, its sides minX/maxX at the front (maxZ) and
  *   minXBack/maxXBack at the back (minZ), straight lines between (steer.js xRange); or, with
- *   `r`, a disc of that radius around the box's centre (the box is its square): the toy's
- *   play area, a fixed disc on the floor.
+ *   `r`, a disc of that radius around the box's centre (the box is its square).
  * @property {number} minX
  * @property {number} maxX
  * @property {number} minZ
@@ -41,6 +41,7 @@
  * @property {number} [minXBack]
  * @property {number} [maxXBack]
  * @property {number} [r]
+ * @property {number} [round]
  */
 
 /**

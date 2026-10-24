@@ -25,14 +25,14 @@
 //   swing     a press on his body held into a grab, lifted, swung left and right twice, brought
 //             back to the middle, held still and let go (he falls and lands)
 //   hover     (desktop sizes) the cursor circling him, then on him and off again: his head follows
-//   buttons   Wave, Spook, Sit, Run and Wander pressed in turn
+//   buttons   Wave, Sit, Give Device and Run pressed in turn
 //   button-X  the toolbar's X button pressed once (button-Run: he runs for 3 s), 3.5 s
 //   floor     a tap on the floor in front of him
 //   chase     four quick taps on him (he runs off), then a press that catches him mid-run (the
 //             finger or cursor follows him until it's a grab), carries him a little and lets go
 //   orbit     a drag across empty space (the camera turns: a finger, or the mouse's right
 //             button), then a pinch or the wheel zooming in and out, then Reset Camera from
-//             the Look sheet
+//             the Camera pad
 //   turn      drags across empty space, one after another, until the camera has gone a whole
 //             turn round him (whole frames: his shadow should keep its side on screen)
 //   pan       the view slid across and up the screen (the mouse's left button on empty space,
@@ -699,7 +699,7 @@ function actsFor(size) {
     act(
       'buttons',
       async (page) => {
-        for (const name of ['Wave', 'Spook', 'Sit', 'Run', 'Wander']) {
+        for (const name of ['Wave', 'Sit', 'Device', 'Run']) {
           const b = page.locator(`[data-button="${name}"]`);
           if (size.phone) await b.tap();
           else await b.click();
@@ -786,10 +786,10 @@ function actsFor(size) {
           }
         }
         await sleep(800);
-        await page.locator('[data-look-open]').click();
+        await page.locator('[data-camera-open]').click();
         await page.locator('[data-reset-camera]').click();
         await sleep(300);
-        await page.locator('[data-look-close]').click();
+        await page.locator('[data-camera-open]').click();
       },
       1600,
       { full: true },

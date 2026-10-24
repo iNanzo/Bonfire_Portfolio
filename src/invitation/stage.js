@@ -22,7 +22,10 @@
 // The blob shadow under NEWT and the ring marker under the finger sit on their own layer
 // (LAYERS.decal: rays and the shadow pass leave them out) and write no depth, so they make no
 // lines; main.js moves them (setBlob: stronger while he's lifted; the marker where the pointer
-// meets the floor). `bounds` is the play area (area.js: a fixed disc on the floor).
+// meets the floor). `bounds` is the default view's disc (area.js playArea), kept round the play
+// area's middle (setArea: the play area itself is main.js's, area.js viewArea): what a desktop's
+// default view keeps in sight (pixels.js frameView) and the size of the shadow camera's box, moved
+// to wherever NEWT is (floor.js fitShadow), so his shadow is as fine anywhere in the area.
 //
 // Cost (round 14, profiled at 390x844@3 and 1280x800@1 with the CPU slowed 4×): the CPU side is
 // a millisecond or two a frame; the cost is texels, and at Native on a phone there are three
@@ -185,8 +188,8 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
   let view = null;
   /** @type {{w: number, h: number}|null} the stage in device pixels, as the browser measured it */
   let device = null;
-  /** @type {import('./types.js').Bounds} the play area */
-  const bounds = playArea();
+  /** @type {import('./types.js').Bounds} the default view's disc, round the play area's middle (setArea) */
+  let bounds = playArea();
   /** @type {{position: import('./types.js').XYZ, target: import('./types.js').XYZ}|null} where main.js put the camera */
   let pose = null;
   /** The blob shadow's strength standing and lifted. */
@@ -440,9 +443,24 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
     get view() {
       return view;
     },
-    /** The play area: where NEWT's root may go (a fixed disc). */
+    /**
+     * The default view's disc round the play area's middle: the framing's and the shadow
+     * camera's size (where NEWT may go is the play area itself: main.js).
+     */
     get bounds() {
       return bounds;
+    },
+    /**
+     * The play area (area.js viewArea): the disc goes round its middle, and the light's shadow
+     * camera with it.
+     * @param {import('./types.js').Bounds} area
+     */
+    setArea(area) {
+      const at = { x: (area.minX + area.maxX) / 2, z: (area.minZ + area.maxZ) / 2 };
+      const was = { x: (bounds.minX + bounds.maxX) / 2, z: (bounds.minZ + bounds.maxZ) / 2 };
+      if (Math.abs(at.x - was.x) + Math.abs(at.z - was.z) < 1e-9) return;
+      bounds = playArea(bounds.r, at);
+      placeSun();
     },
     /**
      * Put the camera at `p` (camera.js orbitPose): where it is and the point it looks at.
