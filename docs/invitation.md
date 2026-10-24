@@ -386,7 +386,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     height; walls faced across the screen are side walls (`sideWall`: across only, never sliding
     in depth); his body on a one-sided Verlet rope (`ropeStep`, 0.55 long, slack on a drop,
     kicked every 2.5-6 s and while he thrashes) whose tilt replaces the swing (`HoldStep.tilt`),
-    his heading twisted up to 35° toward where he's carried (`HoldStep.yaw`); thrown with the
+    his heading kept as it was when he was grabbed (`HoldStep.yaw`: never turned to the camera
+    or toward where he's carried, the user's call at the stop); thrown with the
     collar's velocity, 0.3 of the rope's, at most 4 u/s, and a lob of 0.35 of its speed across
     (`beadThrow`), the ring at the landing point while he's moving fast and, once he's let go,
     until he lands (`landingPoint`, `Hold.landing`); `cues.js` has the ground cues' numbers

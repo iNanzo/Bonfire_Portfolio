@@ -6,8 +6,8 @@
 // are kept on the ray inside the play area and between his hang height and the ceiling (hold.js
 // edgeClamp: the back wall a climb, the floor a skim at his hang height, a side wall across only).
 // His body hangs on a one-sided Verlet rope from the collar (ropeStep: slack on a drop, a jolt as
-// it pulls tight, kicked now and then and while he thrashes), his heading twists a little toward
-// where he's carried, and he's thrown in 3D: the collar's velocity, some of the rope's and a lob
+// it pulls tight, kicked now and then and while he thrashes), he keeps the heading he had as he was
+// grabbed (never turned to the camera or toward where he's carried), and he's thrown in 3D: the collar's velocity, some of the rope's and a lob
 // (beadThrow), the ring showing where he'd land while he's moving fast and where he will once
 // he's let go (landingPoint). A wall faced more across the screen than in depth (sideWall) is a
 // side wall even where the ray finds the inside past it: across only there, never a slide in
@@ -35,9 +35,7 @@ const RAD = Math.PI / 180;
  * per CSS px, a second finger `finger`. The plane: level from `blendFrom` of elevation up, upright
  * by `blendTo`. The rope: `rope` long (collar to his middle), damped `ropeDamp` a second, under
  * `gravity`, its tilt soft-clamped to `tiltMax`; kicked `kickMin`–`kickMax` u/s across the floor
- * every `kickEvery` s, and every `thrashEvery` s while he thrashes. His heading: eased with a
- * `yawHalf` s halflife toward the camera, plus `yawShare` of the way he's carried (at most
- * `yawMax`) while that's faster than `yawSpeed` u/s across the floor. The throw: the collar's
+ * every `kickEvery` s, and every `thrashEvery` s while he thrashes. The throw: the collar's
  * velocity plus `bob` of the rope's, at most `maxLevel` u/s, lobbed by `lob` of its speed across
  * over `lobFrom` u/s, `up`/`down` at most up and down. The ring: where he'd land while he's carried
  * faster than `ringSpeed` u/s across, eased there with a `ringHalf` s halflife.
@@ -65,10 +63,6 @@ export const BEAD = {
   kickMax: 1,
   kickEvery: /** @type {readonly [number, number]} */ ([2.5, 6]),
   thrashEvery: 0.3,
-  yawHalf: 0.18,
-  yawShare: 0.6,
-  yawMax: 35 * RAD,
-  yawSpeed: 0.5,
   bob: 0.3,
   lob: 0.35,
   lobFrom: 1,
@@ -88,7 +82,6 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const smooth = (u) => u * u * (3 - 2 * u);
 /** How far along a unit ray a point is. */
 const sOf = (ray, p) => (p.x - ray.o.x) * ray.d.x + (p.y - ray.o.y) * ray.d.y + (p.z - ray.o.z) * ray.d.z;
-const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 /** Steps of at most BEAD.substep over `dt`, at most BEAD.maxSteps. */
 const stepsOf = (dt) => Math.min(BEAD.maxSteps, Math.max(1, Math.ceil(dt / BEAD.substep - 1e-9)));
 
@@ -339,7 +332,7 @@ export function beadThrow(samples, t, bob, push) {
  * @property {number} holdY
  * @property {number} holdGoal
  * @property {Rope} rope
- * @property {number} yaw
+ * @property {number|null} yaw  his heading as he was grabbed (null: none given)
  * @property {XZ|null} ring
  */
 
@@ -370,7 +363,8 @@ export function createBeadHold(deps = {}) {
   /** @type {XYZ} */
   let anchor = { x: 0, y: 0, z: 0 };
   let rope = hangRope(anchor);
-  let yaw = 0;
+  /** @type {number|null} */
+  let yaw = null;
   let kickAt = Infinity;
   let thrashAt = Infinity;
   /** @type {XZ|null} */
@@ -429,7 +423,7 @@ export function createBeadHold(deps = {}) {
       plane = beadPlane(camera, through, holdY);
       anchor = { x: collar.x, y: collar.y, z: collar.z };
       rope = hangRope(collar);
-      yaw = heading ?? Math.atan2(camera.position.x - collar.x, camera.position.z - collar.z);
+      yaw = heading ?? null;
       kickAt = nextKick(t);
       thrashAt = Infinity;
       ring = null;
@@ -500,20 +494,8 @@ export function createBeadHold(deps = {}) {
         }
       } else thrashAt = Infinity;
       ropeStep(rope, anchor, dt);
-      // (His heading: the camera, twisted a little toward the way he's carried while he's moving.)
       const vel = carry?.vel ?? { x: 0, y: 0, z: 0 };
       const speed = Math.hypot(vel.x, vel.z);
-      const facing = Math.atan2(camera.position.x - anchor.x, camera.position.z - anchor.z);
-      let aim = facing;
-      if (speed > BEAD.yawSpeed) {
-        const heading = wrap(Math.atan2(vel.x, vel.z) - facing);
-        aim += clamp(
-          BEAD.yawShare * Math.atan2(Math.sin(heading), Math.abs(Math.cos(heading))),
-          -BEAD.yawMax,
-          BEAD.yawMax,
-        );
-      }
-      if (dt > 0) yaw += wrap(aim - yaw) * (1 - Math.pow(0.5, dt / BEAD.yawHalf));
       // (The ring: where he'd land if let go now while he's moving fast, else back under him.)
       const fast = speed > BEAD.ringSpeed;
       const f = feet();
@@ -528,7 +510,8 @@ export function createBeadHold(deps = {}) {
         push: side ? at.push : null,
         holdY,
         tilt: ropeTilt(rope),
-        yaw,
+        // (His heading: the one he had as he was grabbed, all the hold.)
+        ...(yaw === null ? {} : { yaw }),
         cues: { ...(fast || apart ? { ring: { ...ring } } : {}), line: false, pulse },
       };
     },
