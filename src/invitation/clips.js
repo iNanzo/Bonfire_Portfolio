@@ -36,6 +36,14 @@ export const CLIPS = {
   Point: { loop: false, length: 30 / FPS, fadeIn: 0.15 },
   Think: { loop: true, length: 48 / FPS, fadeIn: 0.2 },
   Cheer: { loop: false, length: 30 / FPS, fadeIn: 0.12 },
+  // (Round 16: Thrash kicks and flails while he's held, pinned by the collar like Held, from and
+  // back to Held's first frame; Give Device sits him with a tablet (DeviceSit), then lies him on
+  // his stomach with it (LieDown from the sitting pose, DeviceLie), and GetUp ends on Idle.)
+  Thrash: { loop: false, length: 28 / FPS, fadeIn: 0.1 },
+  DeviceSit: { loop: true, length: 72 / FPS, fadeIn: 0.2 },
+  LieDown: { loop: false, length: 36 / FPS, fadeIn: 0.2 },
+  DeviceLie: { loop: true, length: 48 / FPS, fadeIn: 0.2 },
+  GetUp: { loop: false, length: 30 / FPS, fadeIn: 0.15 },
 };
 /** The clips a dialogue box may play (the admin lists these): his gestures, the reactions, sitting. */
 export const DIALOGUE_CLIPS = ['Idle', 'Talk', 'Nod', 'Shrug', 'Point', 'Think', 'Cheer', 'Wave', 'Spook', 'Sit'];
@@ -83,6 +91,11 @@ export const FACE_TRACK = {
   SitDown: { face: 'happy', blink: 'slow' },
   Sit: { face: 'happy', blink: 'slow' },
   StandUp: { face: 'neutral', blink: 'normal' },
+  Thrash: { face: 'angry', blink: 'none' },
+  DeviceSit: { face: 'happy', blink: 'slow' },
+  LieDown: { face: 'happy', blink: 'slow' },
+  DeviceLie: { face: 'happy', blink: 'slow' },
+  GetUp: { face: 'neutral', blink: 'normal' },
 };
 
 /** Where each face sits on NEWT_Face's 2×2 sheet (texture offset, glTF's flipY = false). */

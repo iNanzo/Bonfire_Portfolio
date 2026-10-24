@@ -407,6 +407,9 @@ test("the face's UVs stay in its sheet's first cell (u <= 0.5, v <= 0.53)", () =
   assert.ok(seen > 0, 'a primitive uses NEWT_Face');
 });
 
-test('the file is under 650 kB', () => {
-  assert.ok(glb.bytes < 650 * 1024, `${(glb.bytes / 1024).toFixed(0)} kB`);
+// (800 kB since round 16: its five clips (Thrash, DeviceSit, LieDown, DeviceLie, GetUp) cost about
+// 20 kB each, most of it glTF JSON, and the old 650 kB had 10 kB to spare. The file loads behind
+// the envelope that opens the page, which covers the wait.)
+test('the file is under 800 kB', () => {
+  assert.ok(glb.bytes < 800 * 1024, `${(glb.bytes / 1024).toFixed(0)} kB`);
 });

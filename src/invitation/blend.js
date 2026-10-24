@@ -8,7 +8,16 @@
 import { GAIT, STRIDE, fadeFor } from './clips.js';
 
 /** What follows each one-shot when nothing else is asked for. */
-export const NEXT_CLIP = { Wave: 'Idle', Spook: 'Idle', Land: 'Idle', SitDown: 'Sit', StandUp: 'Idle' };
+export const NEXT_CLIP = {
+  Wave: 'Idle',
+  Spook: 'Idle',
+  Land: 'Idle',
+  SitDown: 'Sit',
+  StandUp: 'Idle',
+  Thrash: 'Held',
+  LieDown: 'DeviceLie',
+  GetUp: 'Idle',
+};
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 
