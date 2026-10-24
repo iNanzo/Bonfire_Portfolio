@@ -40,12 +40,11 @@
 // these bones' saved animation pose before mixer.update too, so it never adds up. limp(0) does
 // nothing (a frame Motion Choppy didn't step); off, it eases out over carry.js LIMP.ease.
 //
-// What he wears (accessories(dt, t): main.js runs it after the look): his earrings, a flat
-// black stud on each earlobe (EARLOBES, measured from the glb's head mesh) with a thin black
-// line and a Latin cross hanging from it (EARRING), on his head bone, toon and marked as his so
-// they get his outlines, each swinging on the limp layer's spring about straight down, pushed
-// by the stud's acceleration; and Give Device's tablet (device.js) at his palms while DeviceSit
-// and DeviceLie weigh enough, its game moving on.
+// What he wears (accessories(dt, t): main.js runs it after the look): his earrings
+// (earrings.js: a black stud on each earlobe and a Latin cross on a one-texel chain, pixel
+// sprites snapped with his head), on his head bone, each chain swinging on the limp layer's
+// spring about straight down, pushed by the stud's acceleration; and Give Device's tablet
+// (device.js) at his palms while he holds it (device.js deviceShown), its game moving on.
 //
 // Two Shader options say which of his own textures show under the pixel filter. Pixel Face (the
 // preset's `texture.pixelFace`, on in every style): on, the pixel face sheets below; off, the
@@ -102,6 +101,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { BONES, CLIPS, DEVICE, EXTRA_FACES, FACES, SCALE } from './clips.js';
 import { LIMP, limbStep, restLimb } from './carry.js';
 import { PALM, createTablet, deviceFrame, deviceLift, deviceShown, deviceTilt } from './device.js';
+import { EARLOBES, EARRING, makeEarring } from './earrings.js';
 import { FACE_FALLBACK, FACE_LAYOUT, faceSpan, layoutFor, pickFaceSize } from './faceSheets.js';
 import { LOOKS, DEFAULT_LOOK } from './look.js';
 import { SPLIT, chestShare } from './lookAt.js';
@@ -140,7 +140,7 @@ const MIN_R = 11;
  *   limpWeight: number,
  *   limpAngles(): Record<string, number>,
  *   accessories(dt: number, t: number): void,
- *   earrings: Array<{side: 'L'|'R', group: any, stud: any, pivot: any, line: any, cross: any[]}>,
+ *   earrings: Array<ReturnType<typeof makeEarring>>,
  *   tablet: any,
  * }} PageCharacter
  */
@@ -282,24 +282,7 @@ export const LIMBS = [
   { bone: BONES.calfR, tip: BONES.footR, cone: LIMP.cone },
   { bone: BONES.footR, reach: 0.7, cone: LIMP.cone },
 ];
-/**
- * Where each earring's stud sits, in his head bone's space, model units: on the outside of each
- * earlobe, the lowest part of the ear that pokes out past his hair (newt.glb's Head mesh: ear
- * vertices at |x| 1.33–1.48 from y 4.36 up, z about −0.38…0.38; the head bone's head at y 3.98).
- * @type {Record<'L'|'R', [number, number, number]>}
- */
-export const EARLOBES = { L: [1.42, 0.42, -0.3], R: [-1.42, 0.42, -0.3] };
-/**
- * An earring, model units: the stud's width (a flat disc) and thickness; the line's length and
- * thickness; the Latin cross about 2.5 times the stud's width, its long arm below.
- */
-export const EARRING = {
-  stud: 0.13,
-  studDepth: 0.03,
-  line: 0.18,
-  lineWide: 0.022,
-  cross: { w: 0.325, h: 0.46, bar: 0.07, depth: 0.04, armAt: 0.12 },
-};
+export { EARLOBES, EARRING };
 /** An earring's swing about straight down: a pendulum about the stud (ω from its length), lightly damped. */
 const EAR_SWING = {
   omega: Math.sqrt(LIMP.gravity / ((EARRING.line + EARRING.cross.h / 2) * SCALE)),
@@ -307,51 +290,6 @@ const EAR_SWING = {
   cone: 1.2,
   substep: LIMP.substep,
 };
-/** The earrings' black. */
-const EAR_BLACK = 0x141418;
-
-/**
- * An earring for his `side` (EARRING's sizes, at EARLOBES[side]): the stud facing out, and from
- * its foot a pivot holding the line and the cross under it (accessories swings the pivot), each
- * part made by `mesh(geometry, name)`.
- * @param {'L'|'R'} side
- * @param {(geometry: any, name: string) => any} mesh
- */
-function makeEarring(side, mesh) {
-  const sign = side === 'L' ? 1 : -1;
-  const group = new THREE.Group();
-  group.name = `Earring${side}`;
-  group.position.fromArray(EARLOBES[side]);
-  const disc = new THREE.CylinderGeometry(EARRING.stud / 2, EARRING.stud / 2, EARRING.studDepth, 12);
-  disc.rotateZ(Math.PI / 2);
-  const stud = mesh(disc, `Earring${side}Stud`);
-  stud.position.x = (sign * EARRING.studDepth) / 2;
-  const pivot = new THREE.Group();
-  pivot.name = `Earring${side}Swing`;
-  pivot.position.set(sign * EARRING.studDepth, -EARRING.stud / 2 + 0.01, 0);
-  const line = mesh(new THREE.BoxGeometry(EARRING.lineWide, EARRING.line, EARRING.lineWide), `Earring${side}Line`);
-  line.position.y = -EARRING.line / 2;
-  const c = EARRING.cross;
-  const bar = mesh(new THREE.BoxGeometry(c.bar, c.h, c.depth), `Earring${side}Cross`);
-  bar.position.y = -EARRING.line - c.h / 2;
-  const arm = mesh(new THREE.BoxGeometry(c.w, c.bar, c.depth), `Earring${side}CrossArm`);
-  arm.position.y = -EARRING.line - c.armAt;
-  pivot.add(line, bar, arm);
-  group.add(stud, pivot);
-  return {
-    side,
-    group,
-    stud,
-    pivot,
-    line,
-    cross: [bar, arm],
-    /** @type {import('./carry.js').Limb|null} */
-    m: null,
-    prev: new THREE.Vector3(),
-    vel: new THREE.Vector3(),
-    frames: 0,
-  };
-}
 
 /**
  * @param {{scene: any, animations?: any[]}} gltf
@@ -462,19 +400,6 @@ export function createCharacter(gltf, opts = {}) {
     toons.push(m);
     return m;
   };
-  /**
-   * A toon material of his own making (not the glb's), marked and snapped as his `part`.
-   * @param {{name: string, color: any}} o
-   * @param {'head'|'body'} part
-   */
-  const toonPart = ({ name, color }, part) => {
-    const m = markId(new THREE.MeshToonMaterial({ name, color, gradientMap: gradient }), ID.newt, {
-      snap: snaps[part],
-      bias: atlasBias,
-    });
-    toons.push(m);
-    return m;
-  };
   for (const o of meshes) {
     const part = onHead(o, headBone) ? 'head' : 'body';
     o.material = Array.isArray(o.material) ? o.material.map((m) => toon(m, part)) : toon(o.material, part);
@@ -506,15 +431,6 @@ export function createCharacter(gltf, opts = {}) {
   let limpWeight = 0;
 
   // --- What he wears: his earrings, and Give Device's tablet.
-  /** @param {any} geometry @param {string} name */
-  const blackMesh = (geometry, name) => {
-    const m = new THREE.Mesh(geometry, toonPart({ name, color: new THREE.Color(EAR_BLACK) }, 'head'));
-    m.name = name;
-    m.castShadow = true;
-    m.receiveShadow = false;
-    m.frustumCulled = false;
-    return m;
-  };
   // (His head bone's own axes are turned from his model's: the glb's hips turn their children a
   // quarter round. Each earring's group takes that rest turn off, so EARLOBES and EARRING are in
   // his model's axes: +x his left, +z his front.)
@@ -527,7 +443,7 @@ export function createCharacter(gltf, opts = {}) {
         .invert()
     : new THREE.Quaternion();
   const earrings = /** @type {const} */ (['L', 'R']).map((side) => {
-    const e = makeEarring(side, blackMesh);
+    const e = makeEarring(side, snaps.head);
     e.group.quaternion.copy(headRest);
     e.group.position.applyQuaternion(headRest);
     headBone?.add(e.group);
@@ -963,7 +879,7 @@ export function createCharacter(gltf, opts = {}) {
           rest.set(0, -len, 0);
           e.m ??= restLimb(rest);
           limbStep(e.m, rest, force.copy(accel).negate(), dt, EAR_SWING);
-          // Its line along the swing, the cross's face to his front (square to the line).
+          // Its chain along the swing (the pivot's −y), its front kept to his.
           down.set(e.m.at.x, e.m.at.y, e.m.at.z).normalize().negate();
           front.set(0, 0, 1).applyQuaternion(qa);
           front.addScaledVector(down, -front.dot(down));
@@ -1106,6 +1022,7 @@ export function createCharacter(gltf, opts = {}) {
       root.traverse((o) => o.geometry?.dispose());
       for (const m of toons) m.dispose();
       tablet.dispose();
+      for (const e of earrings) e.dispose();
       for (const t of textures) t.dispose();
       for (const set of [sheetFaces, extraFaces, ...pixelSets.values(), ...extraSets.values()])
         for (const t of Object.values(set ?? {})) t.dispose();

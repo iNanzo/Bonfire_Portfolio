@@ -110,8 +110,9 @@ drawn in the toy's own pixel look, and it's the loading screen too: NEWT loads b
   down on his stomach with it, feet kicking behind him (the button says Get Up); he gets up and
   puts it away. He keeps the way he was facing throughout: no turn to the camera. Anything else you do (a tap, the floor, another button) gets him up
   first, then does it; picking him up takes him straight off the floor.
-- **His earrings:** a black stud on each earlobe with a thin black line and a little black
-  cross hanging from it, swinging as he walks, turns, is carried or thrashes.
+- **His earrings:** a black stud on each earlobe and a little Latin cross hanging from it on a
+  thin chain, drawn as pixel art (one-pixel lines with square ends, crisp at every Pixel Size),
+  swinging as he walks, turns, is carried or thrashes.
 
 ## Settings
 
@@ -253,9 +254,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     floor as the swing tips him, restored before the mixer like the look's bones so it never
     adds up, never his chest, neck or head, only on frames his pose stepped (Motion Choppy), eased
     out over 0.2 s once he's down, run between the animation and the hang; his earrings,
-    `EARLOBES` measured from the glb's head mesh and `EARRING`'s stud, line and Latin cross 2.5
-    times the stud's width, toon and marked as his, each swinging on the same spring about
-    straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
+    `earrings.js`: at `EARLOBES` (the lobe's lowest edge on the glb's head mesh, against its
+    skin) a stud and, on a chain `EARRING.line` long (a GL line, one texel), a Latin cross, the
+    two as camera-facing sprites of pixel art (`STUD_ART` 2×2, `CROSS_ART` 7×7 of one-pixel
+    bars), nearest-filtered, `earScale` texels to an art pixel (the cross's world height,
+    `EARRING.cross.h`, over its seven rows, rounded, at least 1, held near a step), each anchor
+    snapped to a texel's centre after his head's texel snap (`spriteShift` keeps them on whole
+    texels), marked as his trim (retro.js `ID.trim`: drawn as he is, no outline round it), each
+    chain swinging on the same spring about straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
     bezel and an unlit 16×12 game, nearest-filtered, placed at his palms from clips.js `DEVICE`,
     shown while DeviceSit, LieDown and DeviceLie weigh half or more (in his hands as he lies
     down) until StandUp or GetUp has any weight (put away as he starts to get up); `accessories`
@@ -265,7 +271,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     shadow and the decals every texel is the paper, so the canvas is only cleared there and both
     passes draw inside it alone, and the neighbour loops (the outer ring, the soft shadow) run
     only in the boxes where they can find something: the same picture for a share of the
-    texels), `ui.js` (the toolbar, the Camera pad and the Settings sheet as
+    texels; `ID.trim`, his earrings' pixel art, is graded and quantized as he is but takes no
+    lines, hover or ring and doesn't count as outside him), `ui.js` (the toolbar, the Camera pad and the Settings sheet as
     markup, plus a thin binding: the labels as the buttons' own text, `setSitLabel` and
     `setDeviceLabel` changing only a label and its icon, `deviceLabelOf` reading the brain's
     `deviceLabel`; `createHold`, a touch held still `HOLD_MS` (450 ms) showing a label and
