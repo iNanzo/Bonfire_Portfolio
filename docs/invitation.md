@@ -377,7 +377,18 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `screenOffset` (the grab offset easing out in screen px over 0.12 s), `releaseVelocity` (the
     solved collar from 70 to 20 ms before letting go, capped at 4 u/s across and 2.5 up, 3 down,
     none across while pushed) and `squash` (1.08 tall over 80 ms as he's lifted; landing, 0.88
-    tall and 1.08 wide over 70 ms, back over 200 ms); `cues.js` has the ground cues' numbers
+    tall and 1.08 wide over 70 ms, back over 200 ms); `holds/level.js` is the level candidate
+    (`LEVEL`): his collar where the cursor's ray meets a level plane at his hold height, so a
+    move up the screen carries him away across the floor (1.6 a 100 px on a phone, 1.0 on a
+    desktop at 36°) and one across never in depth; the hold height eases (critically damped,
+    60 ms halflife at the grab, 80 ms after) from where he was grabbed to his hang height + 0.35,
+    the wheel raising it 0.1 a 100 px notch and a second finger 0.8 a 100 px, from 0.06 over his
+    hang height (his limp feet kept off the floor) to 2.4 over it (`onWheel`, `onSecondFinger`;
+    Ctrl+wheel still zooms); the plane stands
+    up to face the camera as it comes down from 35° to 12° (`levelNormal`), so there a move up
+    lifts him; past the back wall he climbs the ray however far, past the front wall the shared
+    reach, past a side wall across only; a camera move keeps the height he's at; Ground Cues
+    Always, the squash on, a finger 48 px under him; `cues.js` has the ground cues' numbers
     (`blobLook`: radius 0.35 of his height on contact to 0.6 of that, strength 0.45 to 0.20 times
     the look's lifted over 0.34, soft edge 0.15 to 0.5 of the radius, as his lowest foot rises to
     two heights; Ground Cues' `cueStep`, `mixWants`: his lowest foot over half his height or 1
