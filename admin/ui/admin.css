@@ -593,6 +593,27 @@ input.block-title {
 .field > .help {
   order: 3;
 }
+/* The Access page's Set Password (gateTools.js): when it was set, two boxes, the button. */
+.gate-key {
+  display: grid;
+  gap: 8px;
+  max-width: 26rem;
+}
+.gate-key-state {
+  margin: 0;
+  font-size: 14px;
+  color: var(--dim);
+}
+.gate-key-row {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--faint);
+}
+.gate-key-actions {
+  display: flex;
+  gap: 8px;
+}
 .field > .viz-more {
   order: 4;
 }
@@ -611,6 +632,7 @@ input.block-title {
 }
 input[type='text'],
 input[type='number'],
+input[type='password'],
 textarea,
 select {
   width: 100%;
@@ -625,6 +647,7 @@ select {
 }
 input[type='text']:hover,
 input[type='number']:hover,
+input[type='password']:hover,
 textarea:hover,
 select:hover {
   border-color: color-mix(in srgb, var(--bone) 36%, transparent);

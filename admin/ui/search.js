@@ -56,7 +56,12 @@ const VALUE_MAX = 120;
  * Cards that show only some of their entry's keys as fields: a scene's, an image's. An image
  * shows all of its own, its two switches too, set or not (they're only stored when on).
  */
-const ONLY = { 'scenes[]': ['name', 'id', 'music'], '[].images[]': ['alt', 'caption', 'pixel', 'video'] };
+const ONLY = {
+  'scenes[]': ['name', 'id', 'music'],
+  '[].images[]': ['alt', 'caption', 'pixel', 'video'],
+  // (The lock's key is found by its field, Password: its salt and hash are no one's to search.)
+  'gate.key': [],
+};
 const ALWAYS = new Set(['[].images[]']);
 const isGroup = (v) => v !== null && typeof v === 'object';
 
