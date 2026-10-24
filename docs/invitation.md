@@ -377,7 +377,19 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `screenOffset` (the grab offset easing out in screen px over 0.12 s), `releaseVelocity` (the
     solved collar from 70 to 20 ms before letting go, capped at 4 u/s across and 2.5 up, 3 down,
     none across while pushed) and `squash` (1.08 tall over 80 ms as he's lifted; landing, 0.88
-    tall and 1.08 wide over 70 ms, back over 200 ms); `cues.js` has the ground cues' numbers
+    tall and 1.08 wide over 70 ms, back over 200 ms); `holds/bead.js` is the bead candidate
+    (built): his collar a bead on the cursor's ray, exactly under it, its distance from the
+    camera sprung (`BEAD.omega` 14 rad/s, `zeta` 0.65) toward a level plane at his hold height
+    (his hang height + 0.45, blended upright from 35° down to 12° of elevation: `beadPlane`), so
+    a flick up lofts him toward the camera before he settles away; the wheel (0.1 of his height a
+    notch) and a second finger (0.8 per 100 px) set the hold height, up to 2.4 over his hang
+    height; walls faced across the screen are side walls (`sideWall`: across only, never sliding
+    in depth); his body on a one-sided Verlet rope (`ropeStep`, 0.55 long, slack on a drop,
+    kicked every 2.5-6 s and while he thrashes) whose tilt replaces the swing (`HoldStep.tilt`),
+    his heading twisted up to 35° toward where he's carried (`HoldStep.yaw`); thrown with the
+    collar's velocity, 0.3 of the rope's, at most 4 u/s, and a lob of 0.35 of its speed across
+    (`beadThrow`), the ring at the landing point while he's moving fast and, once he's let go,
+    until he lands (`landingPoint`, `Hold.landing`); `cues.js` has the ground cues' numbers
     (`blobLook`: radius 0.35 of his height on contact to 0.6 of that, strength 0.45 to 0.20 times
     the look's lifted over 0.34, soft edge 0.15 to 0.5 of the radius, as his lowest foot rises to
     two heights; Ground Cues' `cueStep`, `mixWants`: his lowest foot over half his height or 1
