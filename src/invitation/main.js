@@ -59,7 +59,7 @@ import './bubble.css';
 import './dialogue.css';
 import { createBrain } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
-import { introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
+import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
 import { CARRY, carryFeel, dragPlane, dragTarget, gripFor } from './carry.js';
 import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
@@ -126,7 +126,9 @@ const STATES_KEPT = 40;
  * The script Play Intro runs: content.js introScript() (the admin's, mended where it's broken, or
  * the toy's own), through dialogue.js normalizeScript as the runner's own safety net.
  */
-const playScript = () => normalizeScript(introScript());
+/** @type {ReturnType<typeof introScript>|null} Only set through the ?test hooks. */
+let testIntro = null;
+const playScript = () => normalizeScript(testIntro ?? introScript());
 /** The space a shot frames him in keeps this far off the Auto row and the chat box (its name tab too), CSS px. */
 const SHOT_MARGIN = { top: 10, bottom: 30 };
 /**
@@ -1268,6 +1270,12 @@ function start(s) {
       },
       /** The intro's script as Play Intro runs it (playScript). */
       intro: () => playScript(),
+      /** Use a controlled script for UI behavior tests; null restores the admin’s content.
+       * @param {unknown} value
+       */
+      setIntro(value) {
+        testIntro = value == null ? null : introFrom(value);
+      },
       /** @param {string|null} clip */
       play(clip) {
         forced = clip;
