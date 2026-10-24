@@ -26,6 +26,8 @@
 //             back to the middle, held still and let go (he falls and lands)
 //   hover     (desktop sizes) the cursor circling him, then on him and off again: his head follows
 //   buttons   Wave, Sit, Give Device and Run pressed in turn
+//   device    Give Device pressed three times: he sits with the tablet and plays, lies down on
+//             his stomach with it, then gets up (each press once he's settled in the last)
 //   button-X  the toolbar's X button pressed once (button-Run: he runs for 3 s), 3.5 s
 //   floor     a tap on the floor in front of him
 //   chase     four quick taps on him (he runs off), then a press that catches him mid-run (the
@@ -777,6 +779,24 @@ function actsFor(size) {
         }
       },
       600,
+    );
+  if (ACTS.includes('device'))
+    act(
+      'device',
+      async (page) => {
+        const b = page.locator('[data-button="Device"]');
+        const press = () => (size.phone ? b.tap() : b.click());
+        for (const [want, stay] of [
+          ['deviceSit', 2500],
+          ['deviceLie', 3000],
+          ['idle', 0],
+        ]) {
+          await press();
+          if (!(await until(page, want, 15_000))) console.log(`  (device: he never got to ${want})`);
+          await sleep(stay);
+        }
+      },
+      800,
     );
   for (const name of ACTS.filter((a) => a.startsWith('button-')).map((a) => a.slice(7)))
     act(
