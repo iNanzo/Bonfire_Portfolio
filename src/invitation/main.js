@@ -817,6 +817,8 @@ function start(s) {
       ease: o.look.ease,
       at: o.look.at ?? null,
       pitch: o.look.pitch,
+      up: o.look.up,
+      lift: o.look.lift,
     };
     finish(c, intro ? null : ptr, pose, dt, want, o.face, o.blink, moved);
     toolbar(o);
