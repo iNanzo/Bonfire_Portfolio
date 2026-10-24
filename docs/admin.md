@@ -300,8 +300,10 @@ velvet rope, not a vault.
 
 - **How it works:** with the lock on, the build puts a small check first in each locked
   page (`vite.config.js` `gate`, `src/gate/check.js`). A visitor without the `nh_gate`
-  cookie is sent to `/unlock/` (`src/gate/main.js`, in the 404 page's look) before the
-  page loads anything else; the right password sets the cookie for **Remember For**
+  cookie is sent to `/unlock/` (`src/gate/main.js`, in the 404 page's look) before any of
+  the page's own code runs. The browser reads ahead, so it may already have asked for the
+  page's scripts and model preloads; the check cuts those requests off at once, so at
+  most their first bytes arrive. The right password sets the cookie for **Remember For**
   days and sends them back to where they were going, query and hash included. The
   sitemap leaves out locked routes, and `/unlock/` is `noindex`, so search engines drop
   them. The admin's live preview (`?preview` in a frame, from any site) is never locked.

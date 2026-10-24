@@ -182,8 +182,12 @@ function firstLoadGuard() {
 
 // The sitewide password lock (content.json `gate`, the admin's Access page; docs/admin.md).
 // A build with the lock on and a key puts the check (src/gate/check.js) first in the head of
-// each locked page: before Vite's own tags, the model preloads and the entry module, so a
-// visitor without the cookie never loads them. The portfolio's route copies are made from the
+// each locked page: before Vite's own tags, the model preloads and the entry module, so for a
+// visitor without the cookie the parser stops there and none of the page's code runs. (The
+// browser's preload scanner reads ahead and may already have asked for the preloads and the
+// entry's chunks; the check's window.stop() cuts those requests off at once, so at most their
+// first bytes arrive. Keeping them out of the HTML would take the page's whole boot behind the
+// check, for every visitor.) The portfolio's route copies are made from the
 // built index.html, so they carry it too; the Reliquary game is a file of public/ (no HTML
 // transform), so it gets the check once it's written. The lock page (/unlock/) gets its config
 // inline (unlockConfig: the words and the key, nothing else), in dev too. The lock is off, and

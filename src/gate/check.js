@@ -1,10 +1,11 @@
 // The lock's two ends. gateCheck is the check a locked page runs before anything else (the build
 // inlines it, gateScript, first in the page's head): without the right nh_gate cookie it keeps
-// where the visitor was going (sessionStorage), stops the page (so its module and the model
-// preloads below never load) and goes to /unlock/?to=<its path>; the admin's live preview, the
-// page with ?preview inside a frame, stays (a cross-site frame gets no cookie). It fails open:
-// a browser that throws loads the page. safeDestination is the way back, on the lock page: only
-// a path on this site, under its base, never the lock page itself.
+// where the visitor was going (sessionStorage), stops the page (the parser stops, so its module
+// never runs, and what the browser asked for ahead, its chunks and model preloads, is cut off)
+// and goes to /unlock/?to=<its path>; the admin's live preview, the page with ?preview inside a
+// frame, stays (a cross-site frame gets no cookie). It fails open: a browser that throws loads
+// the page. safeDestination is the way back, on the lock page: only a path on this site, under
+// its base, never the lock page itself.
 import { GATE_COOKIE, GATE_TO } from './pages.js';
 
 /**
