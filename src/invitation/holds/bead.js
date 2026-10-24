@@ -2,7 +2,9 @@
 // always exactly under the cursor, but its distance from the camera springs (BEAD.omega, .zeta)
 // toward a level hold plane at holdY (standing up to face the camera as it comes down to the
 // floor: beadPlane), so a quick flick up the screen lofts him toward the camera before he settles
-// into the distance; the wheel or a second finger raise and lower holdY. The bead and its goal
+// into the distance; the wheel or a second finger raise and lower holdY, straight up: his spot on
+// the floor kept (`pin`) and the grab offset taking up the gap to the cursor, eased out over
+// HOLD.offsetEase from the next move (the cursor's ray his once more). The bead and its goal
 // are kept on the ray inside the play area and between his hang height and the ceiling (hold.js
 // edgeClamp: the back wall a climb, the floor a skim at his hang height, a side wall across only).
 // His body hangs on a one-sided Verlet rope from the collar (ropeStep: slack on a drop, a jolt as
@@ -35,12 +37,14 @@ const RAD = Math.PI / 180;
  * per CSS px, a second finger `finger`. The plane: level from `blendFrom` of elevation up, upright
  * by `blendTo`. The rope: `rope` long (collar to his middle), damped `ropeDamp` a second, under
  * `gravity`, its tilt soft-clamped to `tiltMax` (read as though his middle hung `tiltDown` of it
- * under the collar or more); kicked `kickMin`–`kickMax` u/s across the floor every `kickEvery` s,
+ * under the collar or more), turning at most `tiltRate` rad/s; kicked `kickMin`–`kickMax` u/s across the floor every `kickEvery` s,
  * and every `thrashEvery` s while he thrashes. The throw: the collar's
  * velocity plus `bob` of the rope's, `depth` of its part toward or away from the camera, at most
  * `maxLevel` u/s, lobbed by `lob` of its speed across over `lobFrom` u/s, `up`/`down` at most up
  * and down. The ring: where he'd land while he's carried faster than `ringSpeed` u/s across,
- * eased there with a `ringHalf` s halflife.
+ * eased there with a `ringHalf` s halflife. A height change keeps his spot on the floor till the
+ * pointer moves `pinMove` CSS px; its gap to the cursor then eases out over HOLD.offsetEase, or at
+ * `pinRate` CSS px a second for a bigger one.
  */
 export const BEAD = {
   omega: 14,
@@ -62,6 +66,7 @@ export const BEAD = {
   gravity: 9.8,
   tiltMax: 1.1,
   tiltDown: 0.3,
+  tiltRate: 15,
   kickMin: 0.6,
   kickMax: 1,
   kickEvery: /** @type {readonly [number, number]} */ ([2.5, 6]),
@@ -75,6 +80,8 @@ export const BEAD = {
   down: -3,
   ringSpeed: 1,
   ringHalf: 0.06,
+  pinMove: 1,
+  pinRate: 300,
 };
 
 /** His height, world units (area.js NEWT_HEIGHT). */
@@ -382,6 +389,8 @@ export function createBeadHold(deps = {}) {
   /** @type {XYZ} */
   let anchor = { x: 0, y: 0, z: 0 };
   let rope = hangRope(anchor);
+  /** @type {XZ} his root's tilt as drawn */
+  let tilt = { x: 0, z: 0 };
   let kickAt = Infinity;
   let thrashAt = Infinity;
   /** @type {XZ|null} */
@@ -391,6 +400,20 @@ export function createBeadHold(deps = {}) {
   let wasSide = false;
   /** @type {Bounds|null} */
   let area = null;
+  /**
+   * A height change under way: his spot on the floor kept, his collar `y0` plus how far the hold
+   * height has moved since `h0`, till the pointer leaves `px`.
+   * @type {{x: number, z: number, y0: number, h0: number, px: {x: number, y: number}}|null}
+   */
+  let pin = null;
+  /** The pin's gap to the cursor, CSS px: the grab offset taking it up, eased out from `exAt`. */
+  let extra = { x: 0, y: 0 };
+  let exAt = -Infinity;
+  let exFor = HOLD.offsetEase;
+  /** @type {{x: number, y: number}|null} */
+  let lastPx = null;
+  /** The pin's gap as it eases out: all of it while pinned. */
+  const extraAt = (t) => (pin ? extra : screenOffset(extra, exAt, t, exFor));
 
   const nextKick = (t) => t + BEAD.kickEvery[0] + (BEAD.kickEvery[1] - BEAD.kickEvery[0]) * rng();
   const kick = () => {
@@ -408,6 +431,7 @@ export function createBeadHold(deps = {}) {
   };
   const lift = (dh) => {
     holdGoal = clamp(holdGoal + dh, low, low + BEAD.holdMost * H);
+    if (!pin && lastPx) pin = { x: anchor.x, z: anchor.z, y0: anchor.y, h0: holdY, px: { ...lastPx } };
   };
 
   return {
@@ -440,17 +464,36 @@ export function createBeadHold(deps = {}) {
       plane = beadPlane(camera, through, holdY);
       anchor = { x: collar.x, y: collar.y, z: collar.z };
       rope = hangRope(collar);
+      tilt = { x: 0, z: 0 };
       kickAt = nextKick(t);
       thrashAt = Infinity;
       ring = null;
       landing = null;
       wasSide = false;
+      pin = null;
+      extra = { x: 0, y: 0 };
+      exAt = -Infinity;
+      lastPx = null;
     },
-    step({ t, dt, px, rayAt, camera, low: hang, bounds, carry, clip }) {
+    step({ t, dt, px, rayAt, camera, low: hang, bounds, carry, clip, project }) {
       low = hang;
       area = bounds;
-      const off = screenOffset(off0, t0, t);
+      // (The pointer away from a height change: the cursor's ray his again, the gap easing out.)
+      const unpinned = pin !== null && Math.hypot(px.x - pin.px.x, px.y - pin.px.y) > BEAD.pinMove;
+      if (unpinned) {
+        pin = null;
+        exAt = t;
+        exFor = Math.max(HOLD.offsetEase, Math.hypot(extra.x, extra.y) / BEAD.pinRate);
+      }
+      lastPx = { x: px.x, y: px.y };
+      const off0t = screenOffset(off0, t0, t);
+      const ex = extraAt(t);
+      const off = { x: off0t.x + ex.x, y: off0t.y + ex.y };
       const ray = rayAt(px.x + off.x, px.y + off.y);
+      if (unpinned) {
+        bead.s = Math.max(0, sOf(ray, anchor));
+        bead.v = 0;
+      }
       // (A user orbit or zoom: the bead onto the new ray where it's nearest him, the plane through him.)
       if (view && cameraMoved(view, camera)) {
         bead.s = Math.max(0, sOf(ray, anchor));
@@ -468,33 +511,47 @@ export function createBeadHold(deps = {}) {
       // (The goal: where the ray meets the plane, a grazing ray keeping the last, kept inside along
       // the ray; the bead sprung toward it between the floor and the ceiling. Past a side wall,
       // across only: there, never along the ray.)
-      const hit = rayHit(ray, plane);
-      if (hit) goal = sOf(ray, hit);
-      const want = along(ray, goal);
-      const kept = edgeClamp(ray, want, edges);
-      const across = kept.clamp !== 'none' && sideWall(want, bounds, axes) === true;
-      const g = kept.clamp === 'side' || across ? goal : sOf(ray, kept.p);
-      const ys = Math.abs(ray.d.y) > 1e-9 ? [(CARRY.liftMax - ray.o.y) / ray.d.y, (floorY - ray.o.y) / ray.d.y] : null;
-      const lo = ys ? Math.max(0, Math.min(ys[0], ys[1])) : 0;
-      const hi = ys ? Math.max(ys[0], ys[1]) : Infinity;
-      beadStep(bead, g, lo, Math.max(lo, hi), dt);
-      // (On the ray, inside; a wall along the ray stops the bead there; with nothing inside near
-      // enough on the ray, a side wall: across only, a gap allowed.)
-      let at = edgeClamp(ray, along(ray, bead.s), edges);
-      if (across && bounds) {
-        const k = keepInside(bounds, want, { normal: { x: axes.toward.x, y: 0, z: axes.toward.z } });
-        const out = Math.hypot(want.x - k.x, want.z - k.z);
-        at = {
-          p: { x: k.x, y: clamp(want.y, floorY, CARRY.liftMax), z: k.z },
-          clamp: 'side',
-          push: out > 1e-9 ? { x: (want.x - k.x) / out, z: (want.z - k.z) / out } : null,
-        };
-      } else if (at.clamp === 'ray') {
-        const s = sOf(ray, at.p);
-        if ((s - bead.s) * bead.v < 0) bead.v = 0;
-        bead.s = s;
+      /** @type {{p: XYZ, clamp: string, push?: XZ|null}} */
+      let at;
+      if (pin) {
+        // (A height change: straight up or down over his spot on the floor.)
+        at = { p: { x: pin.x, y: clamp(pin.y0 + holdY - pin.h0, floorY, CARRY.liftMax), z: pin.z }, clamp: 'none' };
+        bead.v = 0;
+      } else {
+        const hit = rayHit(ray, plane);
+        if (hit) goal = sOf(ray, hit);
+        const want = along(ray, goal);
+        const kept = edgeClamp(ray, want, edges);
+        const across = kept.clamp !== 'none' && sideWall(want, bounds, axes) === true;
+        const g = kept.clamp === 'side' || across ? goal : sOf(ray, kept.p);
+        const ys =
+          Math.abs(ray.d.y) > 1e-9 ? [(CARRY.liftMax - ray.o.y) / ray.d.y, (floorY - ray.o.y) / ray.d.y] : null;
+        const lo = ys ? Math.max(0, Math.min(ys[0], ys[1])) : 0;
+        const hi = ys ? Math.max(ys[0], ys[1]) : Infinity;
+        beadStep(bead, g, lo, Math.max(lo, hi), dt);
+        // (On the ray, inside; a wall along the ray stops the bead there; with nothing inside near
+        // enough on the ray, a side wall: across only, a gap allowed.)
+        at = edgeClamp(ray, along(ray, bead.s), edges);
+        if (across && bounds) {
+          const k = keepInside(bounds, want, { normal: { x: axes.toward.x, y: 0, z: axes.toward.z } });
+          const out = Math.hypot(want.x - k.x, want.z - k.z);
+          at = {
+            p: { x: k.x, y: clamp(want.y, floorY, CARRY.liftMax), z: k.z },
+            clamp: 'side',
+            push: out > 1e-9 ? { x: (want.x - k.x) / out, z: (want.z - k.z) / out } : null,
+          };
+        } else if (at.clamp === 'ray') {
+          const s = sOf(ray, at.p);
+          if ((s - bead.s) * bead.v < 0) bead.v = 0;
+          bead.s = s;
+        }
       }
       anchor = at.p;
+      // (Pinned, the grab offset takes up the gap to the cursor.)
+      if (pin && project) {
+        const on = project(anchor);
+        extra = { x: on.x - px.x - off0t.x, y: on.y - px.y - off0t.y };
+      }
       const side = at.clamp === 'side';
       const pulse = side && !wasSide;
       wasSide = side;
@@ -510,6 +567,15 @@ export function createBeadHold(deps = {}) {
         }
       } else thrashAt = Infinity;
       ropeStep(rope, anchor, dt);
+      // (His tilt toward the rope's, never faster than BEAD.tiltRate: a slack rope's bob passing
+      // close under the collar would turn him over in a frame.)
+      const want = ropeTilt(rope);
+      const dx = want.x - tilt.x;
+      const dz = want.z - tilt.z;
+      const turn = Math.hypot(dx, dz);
+      const most = BEAD.tiltRate * Math.max(0, dt);
+      const share = turn > most ? most / turn : 1;
+      tilt = { x: tilt.x + dx * share, z: tilt.z + dz * share };
       const vel = carry?.vel ?? { x: 0, y: 0, z: 0 };
       const speed = Math.hypot(vel.x, vel.z);
       // (The ring: where he'd land if let go now while he's moving fast, else back under him.)
@@ -527,14 +593,15 @@ export function createBeadHold(deps = {}) {
         plane: null,
         push: side ? at.push : null,
         holdY,
-        tilt: ropeTilt(rope),
+        tilt: { ...tilt },
         cues: { ...(fast || apart ? { ring: { ...ring } } : {}), line: false, pulse },
       };
     },
     grabbedAt(t, collar, project) {
       const c = project(collar);
       const o = screenOffset(off0, t0, t);
-      return { x: c.x - o.x, y: c.y - o.y };
+      const ex = extraAt(t);
+      return { x: c.x - o.x - ex.x, y: c.y - o.y - ex.y };
     },
     release(carry, t) {
       const v = beadThrow(

@@ -141,6 +141,7 @@ function sim(
       bounds: r.bounds,
       carry: body.mode === 'held' ? body.carry : null,
       clip,
+      project: r.project,
     });
     bodyStep(body, { state: 'held', move, pointer: null, bounds: r.bounds, dt, t, collar: last, target: st.anchor });
     if (st.push !== undefined && body.carry) body.carry.push = st.push;
@@ -435,6 +436,41 @@ test('bead, height: a wheel notch (deltaY 100) moves his hold height 0.10 ± 0.0
   });
   const gain = lift.frames[lift.frames.length - 1].holdY - settledAt(lift.frames, 1.18).holdY;
   assert.ok(Math.abs(gain - 0.8) <= 0.05, `a second finger: ${gain.toFixed(3)}`);
+});
+
+test('bead, height (the wheel.log check): at 12°, 15°, 20°, 24°, 30° and 36° a wheel notch lifts him straight up 0.1 (0.085-0.115), his spot on the floor moving 0.02 or less, and the next move closes the gap to the cursor within 0.12 s', () => {
+  for (const screen of ['phone', 'desktop']) {
+    for (const elevation of [12, 15, 20, 24, 30, 36]) {
+      const r = rig(screen, { elevation });
+      const c = centrePx(r);
+      let done = false;
+      // (Still till 1.5 s, a notch up at 1.2 s; then 20 px across over 0.05 s, and still.)
+      const run = sim(r, {
+        path: ramp(c, { x: c.x + 20, y: c.y }, 1.5, 1.55),
+        until: 2,
+        act: (t, h) => {
+          if (t >= 1.2 && !done) {
+            h.onWheel(-100);
+            done = true;
+          }
+        },
+      });
+      const at = `${screen} at ${elevation}°`;
+      const a = settledAt(run.frames, 1.18).anchor;
+      const b = settledAt(run.frames, 1.5).anchor;
+      const rise = b.y - a.y;
+      assert.ok(rise >= 0.085 && rise <= 0.115, `${at}: a notch rose ${rise.toFixed(3)}`);
+      const slid = Math.hypot(b.x - a.x, b.z - a.z);
+      assert.ok(slid <= 0.02, `${at}: his spot on the floor moved ${slid.toFixed(3)}`);
+      // (Still from the notch till the move: never a slide on the floor.)
+      const pinned = run.frames.filter((f) => f.t >= 1.2 && f.t < 1.5);
+      const drift = Math.max(...pinned.map((f) => Math.hypot(f.anchor.x - a.x, f.anchor.z - a.z)));
+      assert.ok(drift <= 0.02, `${at}: drifted ${drift.toFixed(3)} on the floor while he rose`);
+      const after = run.frames.filter((f) => f.t >= 1.55 + 0.12 + 1e-6);
+      const gap = Math.max(...after.map((f) => f.gap));
+      assert.ok(gap <= 1, `${at}: ${gap.toFixed(2)} px off the cursor 0.12 s after the move`);
+    }
+  }
 });
 
 test('bead, edges: pushing up past the back wall climbs along the ray with his collar on the cursor; past a side wall at yaw 45 (zoom 0.5x) 400 px more changes his depth 0.05 or less and his size 2% or less', () => {

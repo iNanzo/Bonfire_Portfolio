@@ -1306,6 +1306,7 @@ function start(s) {
         bounds: area,
         carry: body.mode === 'held' ? body.carry : null,
         clip,
+        project: onScreen,
       });
       target = holdNow.anchor;
       // (The plane he's dragged on: at the play area's edge he stops along it, carry.js holdStep.)

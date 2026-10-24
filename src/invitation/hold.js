@@ -430,6 +430,7 @@ export function squash(sinceGrab, sinceLand) {
  * @property {Bounds|null} bounds
  * @property {CarryState|null} carry  the carry as last stepped (null on the first frame)
  * @property {string} [clip]  the clip he's showing (the brain's: 'Held', 'Thrash')
+ * @property {(p: XYZ) => Px} [project]  a world point onto the screen, client px
  */
 /**
  * @typedef {object} HoldCues  what a kind tells the shared cues (main.js, cues.js) this frame

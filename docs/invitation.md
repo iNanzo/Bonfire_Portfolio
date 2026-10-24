@@ -407,7 +407,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     (his hang height + 0.45, blended upright from 35° down to 12° of elevation: `beadPlane`), so
     a flick up lofts him toward the camera before he settles away; the wheel (0.1 of his height a
     notch) and a second finger (0.8 per 100 px) set the hold height, up to 2.4 over his hang
-    height; walls faced across the screen are side walls (`sideWall`: across only, never sliding
+    height, straight up over his spot on the floor (the gap to the cursor eased out from the next
+    move over 0.12 s, or at 300 px a second for a bigger one), his tilt turning at most 15 rad/s; walls faced across the screen are side walls (`sideWall`: across only, never sliding
     in depth); his body on a one-sided Verlet rope (`ropeStep`, 0.55 long, slack on a drop,
     kicked every 2.5-6 s and while he thrashes) whose tilt replaces the swing (`HoldStep.tilt`;
     `ropeTilt` reads it as though his middle hung 0.3 of the rope under the collar or more, so a
