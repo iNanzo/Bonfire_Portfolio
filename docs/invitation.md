@@ -377,9 +377,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `screenOffset` (the grab offset easing out in screen px over 0.12 s), `releaseVelocity` (the
     solved collar from 70 to 20 ms before letting go, capped at 4 u/s across and 2.5 up, 3 down,
     none across while pushed) and `squash` (1.08 tall over 80 ms as he's lifted; landing, 0.88
-    tall and 1.08 wide over 70 ms, back over 200 ms); a kind may turn him a little off his yaw
-    while he's held (`HoldStep.twist`, kept in his yaw as he's let go); `holds/tilt.js` is the
-    `tilt` kind: the plane leant back from upright by `clamp(90° − elevation, 30°, 62°)`
+    tall and 1.08 wide over 70 ms, back over 200 ms); no kind turns him off his yaw while he's
+    held (he keeps the way he faced as he was grabbed, falling and landing too); `holds/tilt.js`
+    is the `tilt` kind: the plane leant back from upright by `clamp(90° − elevation, 30°, 62°)`
     (`tiltAngle`), so up the screen carries him away and up at once and the floor point under him
     moves half as far as the cursor, standing up through the band from collar height 1.1 to 2.0
     and as the cursor's ray goes past the back wall at his hang height (`wallOut`, fully upright

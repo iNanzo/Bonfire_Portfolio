@@ -73,11 +73,11 @@
 // Device (the brain's device and label, the tablet shown and where, his turn off the camera);
 // snapshot().drag is the drag kind's (its name, the collar's gap from where it's aimed, CSS px,
 // the hold height, the anchor's depth along the camera's level axis, the blob, his hips' floor
-// point and lowest foot, the ring, the drop line and Ground Cues as they play); view({yaw,
-// elevation, zoom}) eases the camera there and drag(kind) picks the drag kind, as Settings does;
-// `?seed=N` and `?calm` go to the brain (and the seed to talk). clock() is the toy's clock (it
-// stands still while the envelope covers him), envelope() the envelope's state and pose (null
-// without one).
+// point and lowest foot, the ring, the drop line and Ground Cues as they play, the way his root
+// faces as drawn); view({yaw, elevation, zoom}) eases the camera there and drag(kind) picks the
+// drag kind, as Settings does; `?seed=N` and `?calm` go to the brain (and the seed to talk).
+// clock() is the toy's clock (it stands still while the envelope covers him), envelope() the
+// envelope's state and pose (null without one).
 import { Vector3 } from 'three';
 import '@fontsource/pixelify-sans/400.css';
 import '@fontsource/pixelify-sans/600.css';
@@ -1310,8 +1310,6 @@ function start(s) {
     if (!hold) return null;
     // (Let go: the kind's release velocity, or carry.js toss with none.)
     const released = body.mode === 'held' && body.carry ? hold.release(body.carry, t) : null;
-    // (A kind's twist kept in his yaw as he's let go, so he doesn't snap back.)
-    if (holdNow?.twist) body.body = { ...body.body, yaw: body.body.yaw + holdNow.twist };
     hold = null;
     holdNow = null;
     aimPx = null;
@@ -1347,9 +1345,7 @@ function start(s) {
     // (A kind's side clamp: its push, kept for the toss.)
     if (holdNow && holdNow.push !== undefined && body.carry) body.carry.push = holdNow.push;
     if (body.mode !== 'held') root.position.set(body.root.x, body.root.y, body.root.z);
-    // (A kind's twist while he's held, toward where he's carried: hold.js HoldStep.twist.)
-    const twist = body.mode === 'held' ? (holdNow?.twist ?? 0) : 0;
-    root.rotation.set(body.tilt.x, body.body.yaw + twist, body.tilt.z);
+    root.rotation.set(body.tilt.x, body.body.yaw, body.tilt.z);
     const sq = squashing
       ? squash(body.mode === 'held' ? t - holdT0 : null, body.landedAt !== null ? t - body.landedAt : null)
       : null;
@@ -1631,7 +1627,7 @@ function start(s) {
    * grab gets) and the setting's, its own height controls, where its collar is aimed and how far the collar is from it
    * (CSS px), the hold height, the anchor and its depth along the camera's level axis (away
    * positive), the blob, his hips' floor point and lowest foot, the ring and the drop line, Ground
-   * Cues as it plays, and whether he's pushed at the edge.
+   * Cues as it plays, whether he's pushed at the edge, and the way his root faces as drawn (radians).
    */
   function dragSnapshot() {
     const c = character;
@@ -1658,6 +1654,7 @@ function start(s) {
       line: s.lineState,
       groundCues: cue.mode,
       pushed: Boolean(carry?.push),
+      facing: c ? c.root.rotation.y : null,
     };
   }
 

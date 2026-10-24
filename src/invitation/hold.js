@@ -445,8 +445,6 @@ export function squash(sinceGrab, sinceLand) {
  *   the nearest spot inside: a kind that clamped already is left as it is)
  * @property {XZ|null} [push]  set: the push holdStep keeps for the toss (a kind's side clamp)
  * @property {number|null} holdY  the height a kind holds him at (null: none of its own)
- * @property {number} [twist]  radians his body turns off his yaw while he's held (left out: none);
- *   main.js keeps it in his yaw as he's let go, so he never snaps back
  * @property {HoldCues} cues
  */
 /**
