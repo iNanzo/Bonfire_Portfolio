@@ -255,8 +255,11 @@ export function gate(file = CONTENT_FILE) {
 // subtree inlined, so the toy never imports content.json (whose chunk the portfolio's first load
 // shares); the file is watched, so an edit reloads the toy in dev. The other way round, the
 // pages that import content.json itself (the portfolio, Bonfire Live, the Painter) get it
-// without that subtree: NEWT's lines in every visit would be weight for nothing.
+// without that subtree: NEWT's lines in every visit would be weight for nothing. Nor the lock's
+// (`gate`): its words and key are the build's and the lock page's (gate, above), never the site's.
 const INVITATION_CONTENT = 'virtual:invitation-content';
+/** content.json's subtrees the pages that import it never read. */
+const NOT_THE_SITES = ['invitation', 'gate'];
 /**
  * @param {string} [file]  content.json
  * @returns {import('vite').Plugin & {resolveId: Function, load: Function, transform: Function}}
@@ -279,8 +282,8 @@ export function invitationContent(file = resolve(import.meta.dirname, 'src/conte
     transform(code, id) {
       if (normalizePath(id.split('?')[0]) !== target) return null;
       const c = JSON.parse(code);
-      if (!c || typeof c !== 'object' || !('invitation' in c)) return null;
-      delete c.invitation;
+      if (!c || typeof c !== 'object' || !NOT_THE_SITES.some((k) => k in c)) return null;
+      for (const k of NOT_THE_SITES) delete c[k];
       return { code: JSON.stringify(c), map: null };
     },
   };
