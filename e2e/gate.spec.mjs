@@ -79,7 +79,8 @@ test('a locked page sends you to the lock and back: a wrong password says so, th
 }) => {
   const errors = watch(page);
   await lock(page, ['/larp/']);
-  await page.goto('/larp/?from=test#top');
+  // (It goes on to the lock while it loads: wait for the lock, not the page's own load.)
+  await page.goto('/larp/?from=test#top', { waitUntil: 'commit' });
   await page.waitForURL((u) => u.pathname === '/unlock/');
   expect(new URL(page.url()).searchParams.get('to'), 'its path, checked on the way back').toBe('/larp/');
   await expect(state(page)).toHaveAttribute('data-gate', 'ready');
@@ -144,11 +145,11 @@ test('already unlocked: the lock page goes straight on, and never off the site',
   await lock(page, []);
   await context.addCookies([{ name: GATE_COOKIE, value: TOKEN, url: baseURL }]);
   for (const to of ['https://evil.example/', '//evil.example/x', '/\\evil.example/', 'javascript:alert(1)']) {
-    await page.goto(`/unlock/?to=${encodeURIComponent(to)}`);
+    await page.goto(`/unlock/?to=${encodeURIComponent(to)}`, { waitUntil: 'commit' });
     await page.waitForURL((u) => u.pathname === '/', { waitUntil: 'commit' });
     expect(new URL(page.url()).origin, `${to}: home instead`).toBe(new URL(baseURL).origin);
   }
-  await page.goto(`/unlock/?to=${encodeURIComponent('/larp/')}`);
+  await page.goto(`/unlock/?to=${encodeURIComponent('/larp/')}`, { waitUntil: 'commit' });
   await page.waitForURL((u) => u.pathname === '/larp/');
 });
 
@@ -164,7 +165,7 @@ test('the admin’s live preview (?preview in a frame) stays open; ?preview on i
     page.frames().some((f) => /\/larp\/\?preview=1$/.test(f.url())),
     'never sent to the lock',
   ).toBe(true);
-  await page.goto('/larp/?preview=1');
+  await page.goto('/larp/?preview=1', { waitUntil: 'commit' });
   await page.waitForURL((u) => u.pathname === '/unlock/');
 });
 
