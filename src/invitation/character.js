@@ -515,8 +515,21 @@ export function createCharacter(gltf, opts = {}) {
     m.frustumCulled = false;
     return m;
   };
+  // (His head bone's own axes are turned from his model's: the glb's hips turn their children a
+  // quarter round. Each earring's group takes that rest turn off, so EARLOBES and EARRING are in
+  // his model's axes: +x his left, +z his front.)
+  root.updateMatrixWorld(true);
+  const headRest = headBone
+    ? root
+        .getWorldQuaternion(new THREE.Quaternion())
+        .invert()
+        .multiply(headBone.getWorldQuaternion(new THREE.Quaternion()))
+        .invert()
+    : new THREE.Quaternion();
   const earrings = /** @type {const} */ (['L', 'R']).map((side) => {
     const e = makeEarring(side, blackMesh);
+    e.group.quaternion.copy(headRest);
+    e.group.position.applyQuaternion(headRest);
     headBone?.add(e.group);
     return e;
   });
@@ -942,8 +955,8 @@ export function createCharacter(gltf, opts = {}) {
     accessories(dt, t) {
       root.updateMatrixWorld(true);
       if (dt > 0 && headBone) {
-        headBone.getWorldQuaternion(qa);
         for (const e of earrings) {
+          e.group.getWorldQuaternion(qa);
           e.pivot.getWorldPosition(joint);
           accelOf(e, joint, dt, accel);
           const len = (EARRING.line + EARRING.cross.h / 2) * root.scale.x;

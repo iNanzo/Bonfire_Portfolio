@@ -46,6 +46,20 @@ function still(name, length, rots) {
 /** Where a bone points in the world: its +Y. */
 const axisOf = (bone) => new THREE.Vector3(0, 1, 0).transformDirection(bone.matrixWorld);
 const DOWN = new THREE.Vector3(0, -1, 0);
+/**
+ * The stand-in with its bones' axes turned from his model's as newt.glb's are (its hips turned a
+ * quarter round about Y, everything under them where it was): his pose the same, his bones'
+ * own x and z not his model's.
+ */
+function turnedStandIn() {
+  const s = standIn();
+  const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
+  const back = turn.clone().invert();
+  const hips = s.bones[BONES.hips];
+  hips.quaternion.copy(turn);
+  hips.traverse((b) => b !== hips && b.isBone && b.position.applyQuaternion(back));
+  return s;
+}
 
 /**
  * The stand-in in a held pose: his left arm hanging (the shoulder turned half round), the rest
@@ -157,13 +171,24 @@ test('it never adds up, never touches his chest, neck or head, does nothing on a
 });
 
 test('his earrings: at each earlobe on his head bone a flat black stud, a thin black line and a Latin cross about 2.5 times the stud’s width, toon and marked as his', () => {
-  const { gltf, bones } = standIn();
+  for (const make of [standIn, turnedStandIn]) earringsOn(make);
+});
+
+/** @param {() => ReturnType<typeof standIn>} make */
+function earringsOn(make) {
+  const { gltf, bones } = make();
   const ch = createCharacter(gltf);
   assert.equal(ch.earrings.length, 2);
   const size = (o) => new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
   for (const e of ch.earrings) {
     assert.equal(e.group.parent, bones[BONES.head], `${e.side}: on his head bone`);
-    assert.deepEqual(e.group.position.toArray(), EARLOBES[e.side], `${e.side}: at the earlobe`);
+    // (EARLOBES are from his head bone's head in his model's axes, model units.)
+    ch.root.updateMatrixWorld(true);
+    const at = ch.root.worldToLocal(e.group.getWorldPosition(new THREE.Vector3()));
+    const from = ch.root.worldToLocal(bones[BONES.head].getWorldPosition(new THREE.Vector3()));
+    at.sub(from)
+      .toArray()
+      .forEach((x, k) => assert.ok(Math.abs(x - EARLOBES[e.side][k]) < 1e-6, `${e.side}: at the earlobe`));
     for (const part of [e.stud, e.line, ...e.cross]) {
       const m = part.material;
       assert.ok(m.isMeshToonMaterial, `${part.name}: toon`);
@@ -184,7 +209,7 @@ test('his earrings: at each earlobe on his head bone a flat black stud, a thin b
   const line = size(e.line);
   assert.ok(Math.max(line.x, line.z) < studWide / 3 && line.y > Math.max(line.x, line.z) * 4, 'a thin line');
   assert.ok(Math.abs(EARRING.cross.w / EARRING.stud - 2.5) < 0.4, 'the sizes as the module has them');
-});
+}
 
 test('his earrings sit at his earlobes as newt.glb’s head mesh has them', () => {
   const glb = readGlbAnim(new URL('../public/models/newt.glb', import.meta.url));
@@ -209,7 +234,12 @@ test('his earrings sit at his earlobes as newt.glb’s head mesh has them', () =
 });
 
 test('each earring hangs straight down from its stud, swings back against his head’s acceleration and settles, whichever way he faces', () => {
-  const { gltf } = standIn();
+  for (const make of [standIn, turnedStandIn]) swingOn(make);
+});
+
+/** @param {() => ReturnType<typeof standIn>} make */
+function swingOn(make) {
+  const { gltf } = make();
   const ch = createCharacter(gltf);
   const hang = (e) => {
     const top = e.pivot.getWorldPosition(new THREE.Vector3());
@@ -244,4 +274,9 @@ test('each earring hangs straight down from its stud, swings back against his he
   ch.root.updateMatrixWorld(true);
   ch.accessories(0, 0);
   ch.earrings.forEach((e, k) => assert.ok(angle(e.pivot.quaternion, was[k]) < 1e-6));
-});
+  // The cross faces his front.
+  ch.root.rotation.y = 0;
+  for (let i = 0; i < 120; i++) frame();
+  const face = new THREE.Vector3(0, 0, 1).transformDirection(ch.earrings[0].cross[1].matrixWorld);
+  assert.ok(Math.abs(face.z) > 0.95, `the cross faces his front: ${face.toArray()}`);
+}
