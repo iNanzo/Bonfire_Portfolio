@@ -1,8 +1,11 @@
 // NEWT's model for the invitation toy (public/models/newt.glb, built by tools/newt.py): every
 // clip in src/invitation/clips.js is in the file at its length, keys all 17 bones and really
 // moves (a rest-pose export fails); the loops end where they start; every clip stays in place
-// (the page moves his root) and Held keeps the collar where it rests, so the page can hang
-// him from it; Walk and Run start on the same foot and their STRIDE values match what the
+// (the page moves his root) and Held and Thrash keep the collar where it rests, so the page can
+// hang him from it; round 16's clips: Held hangs limp with no kick and his head down, Thrash kicks
+// from and back to Held's first pose, Give Device's DeviceSit and DeviceLie keep both palms on the
+// tablet's side edges (clips.js DEVICE), LieDown and GetUp join them to Idle, and lying he rests
+// on the floor without his back hair digging into his shirt; Walk and Run start on the same foot and their STRIDE values match what the
 // planted feet do, measured by forward kinematics; Run reaches both arms straight out in
 // front, leans forward and tips his face up to the camera (the user's reference); the dialogue's
 // gestures (round 15) start and end on Idle's pose, keep the hands and sleeves clear of his huge
@@ -14,6 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import * as contract from '../src/invitation/clips.js';
 import { readGlbAnim, quatAngle, quatDistance, footStride, skinnedMesh, nearestDistance } from './lib/glbAnim.mjs';
 import {
   CLIPS,
@@ -91,10 +95,13 @@ test('the loops end where they start', () => {
   }
 });
 
+/** The clips that hang him by the collar: they pin it and let the body swing under it. */
+const PINNED = ['Held', 'Thrash'];
+
 test('every clip stays in place: the hips keep within 0.02 world units of rest across the floor', () => {
-  // Held is the exception: it pins the collar (the next test) and lets the body sway under it.
+  // Held and Thrash are the exception: they pin the collar (the next test) and let the body sway.
   const rest = glb.worldPos(new Map(), 'Bone');
-  for (const name of CLIP_NAMES.filter((n) => n !== 'Held')) {
+  for (const name of CLIP_NAMES.filter((n) => !PINNED.includes(n))) {
     let most = 0;
     for (const [, pose] of samples(clip(name))) {
       const p = glb.worldPos(pose, 'Bone');
@@ -104,14 +111,16 @@ test('every clip stays in place: the hips keep within 0.02 world units of rest a
   }
 });
 
-test("Held keeps the collar (the Neck bone's head) within 0.15 model units of its rest place", () => {
+test("Held and Thrash keep the collar (the Neck bone's head) within 0.15 model units of its rest place", () => {
   const rest = glb.worldPos(new Map(), 'Neck');
-  let most = 0;
-  for (const [, pose] of samples(clip('Held'))) {
-    const p = glb.worldPos(pose, 'Neck');
-    most = Math.max(most, Math.hypot(p[0] - rest[0], p[1] - rest[1], p[2] - rest[2]));
+  for (const name of PINNED) {
+    let most = 0;
+    for (const [, pose] of samples(clip(name))) {
+      const p = glb.worldPos(pose, 'Neck');
+      most = Math.max(most, Math.hypot(p[0] - rest[0], p[1] - rest[1], p[2] - rest[2]));
+    }
+    assert.ok(most <= 0.15, `${name}: the collar moves ${most.toFixed(3)} model units`);
   }
-  assert.ok(most <= 0.15, `the collar moves ${most.toFixed(3)} model units`);
 });
 
 test('Walk and Run start with the left foot forward', () => {
@@ -205,20 +214,24 @@ test('the dialogue plays only clips the file has, the gestures among them', () =
   for (const name of GESTURES) assert.ok(DIALOGUE_CLIPS.includes(name), `${name} is a dialogue clip`);
 });
 
+/** Asserts two poses match: every bone's turn and the hips' place, within 1e-3. */
+function samePose(pose, want, label) {
+  for (const bone of BLENDER_BONES) {
+    const d = quatDistance(pose.get(bone).rotation, want.get(bone).rotation);
+    assert.ok(d < 1e-3, `${label}: ${bone} is ${d.toExponential(2)} off`);
+  }
+  const hips = want.get('Bone').translation;
+  const off = Math.max(...pose.get('Bone').translation.map((v, i) => Math.abs(v - hips[i])));
+  assert.ok(off < 1e-3, `${label}: the hips are ${off.toExponential(2)} off`);
+}
+const first = (name) => glb.poseAt(clip(name), 0);
+const last = (name) => glb.poseAt(clip(name), clip(name).duration);
+
 test("the one-shot gestures start and end on Idle's first pose", () => {
-  const idle = glb.poseAt(clip('Idle'), 0);
+  const idle = first('Idle');
   for (const name of [...GESTURES.filter((n) => !CLIPS[n].loop), 'Wave', 'Spook']) {
-    const a = clip(name);
-    for (const t of [0, a.duration]) {
-      const pose = glb.poseAt(a, t);
-      for (const bone of BLENDER_BONES) {
-        const d = quatDistance(pose.get(bone).rotation, idle.get(bone).rotation);
-        assert.ok(d < 1e-3, `${name} at ${t.toFixed(2)} s: ${bone} is ${d.toExponential(2)} off Idle`);
-      }
-      const hips = idle.get('Bone').translation;
-      const off = Math.max(...pose.get('Bone').translation.map((v, i) => Math.abs(v - hips[i])));
-      assert.ok(off < 1e-3, `${name} at ${t.toFixed(2)} s: the hips are ${off.toExponential(2)} off Idle`);
-    }
+    samePose(first(name), idle, `${name} at its start, against Idle`);
+    samePose(last(name), idle, `${name} at its end, against Idle`);
   }
 });
 
@@ -362,6 +375,83 @@ test('Cheer throws both fists up beside his head and hops', () => {
   assert.ok(hop >= 0.25, `the hips rise ${hop.toFixed(2)}`);
   const air = most(rows, (r) => Math.min(r.ankle.L.y, r.ankle.R.y)) - ANKLE_HEIGHT;
   assert.ok(air >= 0.15, `both feet leave the floor by ${air.toFixed(2)}`);
+});
+
+// Round 16: the limp carry, Thrash and Give Device.
+
+test('Held hangs limp: no kick (both ankles stay near their mean height) and his head down', () => {
+  const rows = track('Held');
+  for (const s of ['L', 'R']) {
+    const mean = rows.reduce((sum, r) => sum + r.ankle[s].y, 0) / rows.length;
+    const off = most(rows, (r) => Math.abs(r.ankle[s].y - mean));
+    assert.ok(off <= 0.1, `the ${s} ankle strays ${off.toFixed(2)} model units from its mean height`);
+  }
+  // (Defeat: about 25-30 degrees down. The page's held look keeps a low weight, so it stays down.)
+  const up = most(rows, (r) => r.faceUp);
+  assert.ok(up <= -20, `his face points at most ${up.toFixed(1)}° above the horizontal`);
+});
+
+test("Thrash starts and ends on Held's first pose and kicks both feet up", () => {
+  const held = first('Held');
+  samePose(first('Thrash'), held, 'Thrash at its start, against Held');
+  samePose(last('Thrash'), held, 'Thrash at its end, against Held');
+  const rows = track('Thrash');
+  const rest = track('Held')[0];
+  for (const s of ['L', 'R']) {
+    const kick = most(rows, (r) => r.ankle[s].y - rest.ankle[s].y);
+    assert.ok(kick >= 0.3, `the ${s} ankle kicks up ${kick.toFixed(2)} model units`);
+  }
+});
+
+test("LieDown goes from DeviceSit's first pose to DeviceLie's, and GetUp from DeviceLie's to Idle's", () => {
+  samePose(first('LieDown'), first('DeviceSit'), 'LieDown at its start, against DeviceSit');
+  samePose(last('LieDown'), first('DeviceLie'), 'LieDown at its end, against DeviceLie');
+  samePose(first('GetUp'), first('DeviceLie'), 'GetUp at its start, against DeviceLie');
+  samePose(last('GetUp'), first('Idle'), 'GetUp at its end, against Idle');
+});
+
+test("the tablet's screen faces the default camera, 36 degrees up from his front", () => {
+  const { DEVICE } = contract;
+  assert.ok(DEVICE, 'clips.js exports DEVICE');
+  for (const name of ['DeviceSit', 'DeviceLie']) {
+    const { tilt } = DEVICE.clips[name];
+    assert.ok(tilt >= 0 && tilt < 36, `${name}'s tablet tilts ${tilt}° toward his face`);
+  }
+});
+
+test("DeviceSit and DeviceLie keep both palms on the tablet's side edges on every frame", () => {
+  const { DEVICE } = contract;
+  const half = DEVICE.size[0] / 2;
+  for (const name of ['DeviceSit', 'DeviceLie']) {
+    // Blender armature space (+X his left, -Y his front, +Z up) to glTF's: (x, z, -y)
+    const [x, y, z] = DEVICE.clips[name].centre;
+    const edge = { L: new THREE.Vector3(x + half, z, -y), R: new THREE.Vector3(x - half, z, -y) };
+    for (const r of track(name, FPS))
+      for (const s of ['L', 'R']) {
+        const d = r.hand[s].distanceTo(edge[s]);
+        assert.ok(d <= 0.08, `${name} at ${r.t.toFixed(2)} s: the ${s} palm is ${d.toFixed(3)} from the edge`);
+      }
+  }
+});
+
+test('DeviceLie rests on the floor, and his back hair keeps clear of his shirt', () => {
+  const meshes = gltf.nodes.filter((n) => n.mesh != null && n.skin != null).map((n) => skinnedMesh(glb, n.name));
+  const hair = skinnedMesh(glb, 'BackHair');
+  const body = skinnedMesh(glb, 'Body');
+  // (The hair's lower edge rests on his collar at rest: each vertex keeps 0.03, or what it has.)
+  const restShell = [{ v: body.at(new Map()), tris: body.tris }];
+  const room = hair.at(new Map()).map((p) => Math.min(0.03, nearestDistance(p, restShell)) - 0.005);
+  for (const [t, pose] of samples(clip('DeviceLie'), 12)) {
+    let low = Infinity;
+    for (const m of meshes) for (const p of m.at(pose)) low = Math.min(low, p[1]);
+    low *= SCALE;
+    assert.ok(low >= -0.02 && low <= 0.08, `at ${t.toFixed(2)} s his lowest point is ${low.toFixed(3)} world units`);
+    const shell = [{ v: body.at(pose), tris: body.tris }];
+    hair.at(pose).forEach((p, i) => {
+      const d = nearestDistance(p, shell);
+      assert.ok(d >= room[i], `at ${t.toFixed(2)} s a back hair vertex is ${d.toFixed(3)} from his shirt`);
+    });
+  }
 });
 
 test('one skin of 17 joints with at most 4 influences a vertex', () => {
