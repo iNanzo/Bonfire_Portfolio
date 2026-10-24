@@ -396,15 +396,18 @@ function inFrame(pos, view) {
   let yaw = 0;
   const yaws = live.map((p, i) => (yaw += i ? halfTurn(p[7] - live[i - 1][7]) : 0));
   return {
-    left: Math.min(...xs),
-    right: view.w - Math.max(...xs),
-    top: Math.min(...live.map((p) => p[2])),
-    toolbar: view.toolbar - Math.max(...live.map((p) => p[6])),
-    farthest: Number(Math.max(...live.map((p) => Math.hypot(p[8], p[9]))).toFixed(2)),
+    left: least(xs),
+    right: view.w - most(xs),
+    top: least(live.map((p) => p[2])),
+    toolbar: view.toolbar - most(live.map((p) => p[6])),
+    farthest: Number(most(live.map((p) => Math.hypot(p[8], p[9]))).toFixed(2)),
     turned: Math.round((yaws.at(-1) * 180) / Math.PI),
-    widest: Math.round((Math.max(...yaws.map(Math.abs)) * 180) / Math.PI),
+    widest: Math.round((most(yaws.map(Math.abs)) * 180) / Math.PI),
   };
 }
+// (A long act, like the whole intro, has more frames than Math.min(...xs) takes as arguments.)
+const least = (xs) => xs.reduce((a, x) => Math.min(a, x), Infinity);
+const most = (xs) => xs.reduce((a, x) => Math.max(a, x), -Infinity);
 /** An angle, radians, brought within half a turn of zero. */
 const halfTurn = (a) => a - 2 * Math.PI * Math.floor((a + Math.PI) / (2 * Math.PI));
 
