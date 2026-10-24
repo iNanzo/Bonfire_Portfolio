@@ -58,7 +58,11 @@
  * @property {number} [scale]  a pinch's spread over its last (above 1: the fingers moved apart)
  */
 
-/** @typedef {'Wave'|'Spook'|'Sit'|'Run'|'Wander'} ButtonName */
+/**
+ * @typedef {'Wave'|'Spook'|'Sit'|'Run'|'Wander'|'Device'} ButtonName  Device: Give Device (each press
+ *   sits him with the tablet, then lies him down with it, then gets him up); Spook and Wander
+ *   stay brain inputs though the toolbar no longer shows them (a tap spooks; Wander is a setting)
+ */
 
 /**
  * @typedef {object} BrainIn
@@ -99,6 +103,18 @@
  * @property {'Wave'|'Spook'|null} reaction  the reaction under way (react only), turn included
  * @property {boolean} talkReady  the intro's talk state, in place: up, walked in and turned to the
  *   camera, so the box's line, face and gesture can begin (main.js holds the line until then)
+ * @property {'sit'|'lie'|null} [device]  Give Device under way: sitting or lying with the tablet
+ */
+
+/**
+ * @typedef {'arrow'|'point'|'open'|'grab'|'turn'} CursorKind  the stage's pixel cursor
+ *   (cursor.js): the arrow; the pointing hand over buttons; an open hand over NEWT; a closed hand
+ *   while he's held or the view is panned; the turn glyph while the camera orbits
+ */
+/**
+ * @typedef {'floating'|'opening'|'waiting'|'fading'|'gone'|'skipped'} EnvelopeState  the
+ *   envelope that opens the page (envelope.js): floating until opened (a tap, a swipe up, Enter)
+ *   or skipped (a swipe down, Escape, Skip Intro); waiting when it's open before NEWT is in
  */
 
 /**

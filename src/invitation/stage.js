@@ -465,6 +465,25 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
       blob.material.opacity = blobOpacity.opacity + (blobOpacity.lifted - blobOpacity.opacity) * k;
     },
     /**
+     * The dithered highlight on NEWT while the pointer is over him: 0 off to 1 full (retro.js
+     * draws it, when it can).
+     * @param {number} k
+     */
+    setHover(k) {
+      /** @type {any} */ (retro).setHover?.(k);
+    },
+    /**
+     * The dither ring where he was grabbed: client px, radius in texels, 0 gone to 1 full
+     * (retro.js draws it, when it can).
+     * @param {number} x
+     * @param {number} y
+     * @param {number} r
+     * @param {number} k
+     */
+    setBurst(x, y, r, k) {
+      /** @type {any} */ (retro).setBurst?.(x, y, r, k);
+    },
+    /**
      * What the look has set live, for ?test: the post shader's values, the light's strength
      * and its angle round him (degrees, from the camera's yaw: Light Angle), and the shadow's
      * strength on the floor.
