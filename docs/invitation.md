@@ -11,23 +11,30 @@ unlisted: nothing links to it and search engines are asked not to index it.
 
 ## The Envelope
 
-Every visit opens on an envelope: a gold, low-poly envelope sealed with red wax and the NH
-monogram, petals drifting down from the seal, floating in front of a dark teal gothic arch. It's
-drawn in the toy's own pixel look, and it's the loading screen too: NEWT loads behind it.
+Every visit opens on an envelope: a gold, low-poly envelope seen from the back, its flap sealed
+with a lumpy blob of red wax with the NH monogram pressed into it (a darker recess with a lighter
+lip where the light catches it), petals drifting down from the seal, floating on the toy's own
+white page. It's drawn in the toy's own pixel look, with a dark one-texel line round it and down
+every fold of its flap and pocket, so it reads as a letter, and it's the loading screen too: NEWT
+loads behind it.
 
 - **Open it:** tap or click it, press Enter, Space or the up arrow, swipe it up, or scroll up.
-  The seal cracks and falls away, the flap lifts, and the envelope pushes toward you as it
-  dithers away onto NEWT, already turned to you, and the intro starts by itself (below). Opened
-  before NEWT is in, it waits open with a little pulse until he is.
+  The seal cracks and falls away, the flap lifts, and the letter dissolves the way a weapon does
+  on the Bonfire site: a ragged, burning edge sweeps up across it, shedding specks of paper,
+  embers and wax that drift up and fade, while the white page behind clears onto NEWT, already
+  turned to you, and the intro starts by itself (below). Only the letter dissolves, never the
+  screen. Opened before NEWT is in, it waits open with a little pulse until he is.
 - **Skip it:** press Escape or the down arrow, swipe it down, scroll down, or press **Skip
   Intro** at the top right. It drops away and you're straight into the toy, with no intro.
 - **While you drag it**, it follows your finger with a little give and the flap starts to lift;
   let go short of a swipe and it springs back. A sideways drag does nothing, and nothing you do
   on it reaches the toy underneath (the toolbar can't be reached until it's gone).
-- **The hint** ("Click or swipe up to open", "Swipe down to skip") shows while the mouse is over
-  it or it has keyboard focus, and on a touch screen after a moment without a touch; while you
-  drag it reads "Open ↑" or "Skip ↓".
-- **Reduced motion:** it holds still, the flap is open at once and it crossfades away.
+- **The hint** ("Click or swipe up to open", or "Tap or swipe up to open" on a touch screen,
+  and "Swipe down to skip") shows while the mouse is over it or it has keyboard focus, and on a
+  touch screen after a moment without a touch; while you drag it reads "Open ↑" or "Skip ↓".
+- **Focus:** it has focus from the start, but its ring only shows once you press a key (Tab goes
+  between it and Skip Intro).
+- **Reduced motion:** it holds still, the flap is open at once and it fades away plainly.
 - Without WebGL 2, or if NEWT can't load, it steps aside so the message shows. Nothing about it
   is saved: it opens every visit.
 
@@ -487,15 +494,29 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   He never blinks on them (a blink is neutral's closed eye: his brows would jump).
 - **The envelope:** `envelope.js` (pure: the `EnvelopeState` machine, types.js, with `open`,
   `skip`, `step(t, ready)`, `done` and `pose(t)`, the opening as functions of time: the seal's
-  crack, the flap's angle up to `FLAP_OPEN`, the push and the dither-out, a skip's drop, `BOB` and
-  `SWAY`, `TIMES`; `envelopeGesture(dx, dy, ms, viewportH)`: |dy| ≥ max(48 px, 12% of the
+  crack, the flap's angle up to `FLAP_OPEN`, the gentle push, the dissolve (`dissolve`, its edge
+  across the letter over `TIMES.dissolve`; `since`, the specks' clock; `backdrop`, the white page
+  clearing over `TIMES.clear`), a skip's drop, `BOB` and `SWAY`, `TIMES`; the dissolve's sums,
+  `DISSOLVE` and `dissolveAt(x, y)` (mostly how far up the letter, leaning across, plus a smooth
+  noise; the shader runs the same with a screen-locked Bayer dither on top), and its specks,
+  `shedParticles(n)` (paper, embers, wax, each shed when the edge reaches it) and
+  `particleAt(speck, t)` (drifting up and fading over at most `TIMES.drift`); `hintFor(touch)`;
+  `envelopeGesture(dx, dy, ms, viewportH)`: |dy| ≥ max(48 px, 12% of the
   height) or a flick of 0.6 px/ms over 24 px or more, and |dy| > 1.2·|dx|, up opens and down
   skips (`SWIPE`); `envelopeKey`; `dragPose`, the follow with its give and the flap's lift;
   `dragHint`; `ENVELOPE_TEXT`), `envelopeScene.js` (its own small WebGLRenderer in a fixed
   `.inv-envelope` layer at z-index 3, drawn at `TEXELS` texels along the screen's shorter side and
-  scaled up pixelated; flat toon materials in three tones with their band edges dithered and a
-  Bayer dither-out; the NH monogram from logo.js's strokes, copied in as `monogramBars`;
-  disposed, its context lost and its layer removed once it's done) and `envelope.css`. main.js
+  scaled up pixelated, over a `.inv-envelope-paper` page in `--inv-bg` that it clears as the letter
+  dissolves; drawn twice, its colours and then each part's id (`IDS`, back to front), then put
+  together with a one-texel line in `INK` on each texel bordering a later part, none round the
+  dissolving rim; the specks as square points on layer 1 on top, with no line; disposed, its
+  context lost and its layer removed once it's done), `envelopeLook.js` (the palette, `IDS` and
+  the toon material: three tones with dithered band edges, its id pass, and the dissolve with its
+  burning rim, copied from the Bonfire site's weapon dissolve, not imported), `envelopeSeal.js`
+  (the seal: `sealGeometry`, a blob with a wobbling outline (`sealEdge`), an uneven raised rim and
+  a domed face; beads of wax at its edge; the NH monogram from logo.js's strokes, copied in as
+  `monogramSegments`, debossed in the shader (`STAMP`); two halves clipped down a zigzag) and
+  `envelope.css` (the focus ring only under `.is-keyboard`, set once a key is pressed). main.js
   makes it right after `bindUi`, sets the HUD inert under it, lets the toy draw its first frame
   and then holds the loop while it covers him (`sync`), and on its way out either sets
   `introWanted` (held until `beginIntro` can run, which cuts the camera to the talk shot) or

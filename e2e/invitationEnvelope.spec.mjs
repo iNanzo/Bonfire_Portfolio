@@ -1,8 +1,9 @@
 // The envelope that opens /invitation/ (src/invitation/envelope.js, envelopeScene.js), in a real
 // browser on the production build, on a desktop (1280×800) and a phone (390×844, touch). It's
-// the front door and the loading screen: it shows over the toy with focus on it, but no ring
-// until a key is pressed, and takes every press (a drag on it never turns the camera); a click, Enter or a swipe up opens it (the seal
-// cracks, the flap lifts, it fades) and the intro starts by itself at its first box with no
+// the front door and the loading screen: it shows over the toy on a white page, with focus on it
+// but no ring until a key is pressed, and takes every press (a drag on it never turns the
+// camera); a click, Enter or a swipe up opens it (the seal cracks, the flap lifts, the letter
+// dissolves as the page behind clears) and the intro starts by itself at its first box with no
 // toolbar button pressed; Escape, a swipe down or Skip Intro skips it (no intro, the toolbar back,
 // focus on it). Opened before newt.glb is in, it waits, then fades once he is. Reduced motion:
 // no bob, the flap open at once, a short crossfade. The touch hint says Tap, the mouse's Click. Skip Intro also ends the intro at once, with
@@ -78,6 +79,8 @@ test.describe('on a desktop', () => {
   }) => {
     await envelopeUp(page);
     await expect(envelope(page)).toBeFocused();
+    // (On the toy's own white page.)
+    await expect(page.locator('.inv-envelope-paper')).toHaveCSS('background-color', 'rgb(243, 240, 234)');
     await expect(page.locator('.inv-hud')).toHaveAttribute('inert', '');
     await expect(skipIntro(page)).toBeVisible();
     await expect(skipIntro(page)).toHaveAccessibleName('Skip Intro');
@@ -122,7 +125,15 @@ test.describe('on a desktop', () => {
     await expect(hint).toContainText('Swipe down to skip');
     await page.mouse.click(vp.width / 2, vp.height / 2);
     await until(page, (s) => s.envelope !== 'floating', 'opening');
+    await until(page, (s) => s.envelope === 'fading' || s.envelope === 'gone', 'dissolving');
+    // (The letter dissolves, not a fade over the screen; the page behind clears.)
+    const gone = await page.evaluate(() => window.__invitation.envelope());
+    expect(gone.pose.crossfade).toBe(false);
+    expect(gone.pose.fade).toBe(gone.pose.dissolve);
     await introStarted(page);
+    const end = await page.evaluate(() => window.__invitation.envelope());
+    expect(end.pose.dissolve).toBe(1);
+    expect(end.pose.backdrop).toBe(0);
     // The camera cut to the talk shot as it opened.
     expect((await snapshot(page)).toolbarTalking).toBe(true);
   });

@@ -5,11 +5,14 @@
 // flick, and mostly up or down), the keys (Enter, Space and ArrowUp open; Escape and ArrowDown
 // skip), how it follows a finger with some give while the flap lifts, the live hint while
 // dragging, and the opening as functions of time (reduced motion: no bob, the flap snaps open, a
-// short crossfade).
+// short crossfade). Opened, the letter alone dissolves into particles: a noisy edge sweeps up
+// across it shedding specks of paper and ember that drift up and fade, and the white page behind
+// clears at once (never a dither over the screen).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BOB,
+  DISSOLVE,
   ENVELOPE_TEXT,
   FLAP_OPEN,
   SWAY,
@@ -17,10 +20,13 @@ import {
   TIMES,
   createEnvelope,
   dragHint,
+  dissolveAt,
   dragPose,
   envelopeGesture,
   envelopeKey,
   hintFor,
+  particleAt,
+  shedParticles,
 } from '../src/invitation/envelope.js';
 
 test('a swipe up opens it and a swipe down skips: |dy| past max(48 px, 12% of the height), mostly up or down', () => {
@@ -233,4 +239,94 @@ test('its words: labels in Title Case, hints in sentences, ≤ 160 characters', 
 test('the hint says Tap on a touch screen and Click with a mouse', () => {
   assert.equal(hintFor(true), 'Tap or swipe up to open');
   assert.equal(hintFor(false), 'Click or swipe up to open');
+});
+
+test('opened, the letter dissolves: the edge sweeps across it over TIMES.dissolve while the page behind clears at once', () => {
+  const e = createEnvelope();
+  e.open(0);
+  e.step(TIMES.opening, true);
+  const t0 = TIMES.opening;
+  const start = e.pose(t0);
+  assert.equal(start.dissolve, 0, 'whole as it starts');
+  assert.equal(start.backdrop, 1, 'the white page still up as it starts');
+  assert.equal(start.crossfade, false);
+  let dissolve = 0;
+  let backdrop = 1;
+  for (let t = t0; t <= t0 + TIMES.fade + 1e-9; t += 0.02) {
+    const p = e.pose(t);
+    assert.ok(p.dissolve >= dissolve - 1e-9 && p.dissolve <= 1, `the edge only goes on: ${t}`);
+    assert.ok(p.backdrop <= backdrop + 1e-9 && p.backdrop >= 0, `the page only clears: ${t}`);
+    assert.equal(p.fade, p.dissolve, 'how far it’s gone is how far the edge has swept');
+    dissolve = p.dissolve;
+    backdrop = p.backdrop;
+  }
+  assert.ok(TIMES.clear <= 0.4, 'the page behind clears quickly');
+  assert.equal(e.pose(t0 + TIMES.clear).backdrop, 0, 'the scene behind is clear while the letter still dissolves');
+  assert.ok(e.pose(t0 + TIMES.clear).dissolve < 0.6);
+  assert.ok(e.pose(t0 + TIMES.dissolve).dissolve > 0.999, 'swept by TIMES.dissolve');
+  assert.ok(TIMES.dissolve >= 0.6 && TIMES.dissolve <= 1.2, 'slow enough to read at real speed');
+  assert.ok(TIMES.fade >= TIMES.dissolve + TIMES.drift - 1e-9, 'the last specks fade before it’s gone');
+  for (const t of [0, 0.3, 2]) {
+    const f = createEnvelope().pose(t);
+    assert.equal(f.dissolve, 0);
+    assert.equal(f.backdrop, 1, 'floating, the page is white behind it');
+  }
+});
+
+test('the dissolve edge: nothing goes at 0, everything is gone at 1, lower parts first', () => {
+  for (const [x, y] of [
+    [-1, -1],
+    [0, 0],
+    [1, 1],
+    [0.4, -0.7],
+    [-0.9, 0.8],
+  ]) {
+    const v = dissolveAt(x, y);
+    assert.ok(v >= 0 && v <= 1, `${x},${y}: ${v}`);
+    assert.ok(DISSOLVE.edge(0) < v && DISSOLVE.edge(1) > v, `${x},${y}: there at 0, gone at 1`);
+  }
+  let low = 0;
+  let high = 0;
+  for (let i = 0; i < 40; i++) {
+    const x = (i % 8) / 4 - 0.9;
+    low += dissolveAt(x, -0.8);
+    high += dissolveAt(x, 0.8);
+  }
+  assert.ok(low < high, 'the edge sweeps up from the bottom');
+});
+
+test('the letter sheds specks as the edge reaches them: they drift up and fade, all gone by the end', () => {
+  const specks = shedParticles(120);
+  assert.equal(specks.length, 120);
+  assert.deepEqual(shedParticles(120), specks, 'the same every visit');
+  assert.ok(specks.some((s) => s.kind === 'paper') && specks.some((s) => s.kind === 'ember'));
+  for (const s of specks) {
+    assert.ok(s.x >= -1 && s.x <= 1 && s.y >= -1 && s.y <= 1, 'on the letter');
+    assert.ok(s.at >= 0 && s.at <= TIMES.dissolve + 1e-9, 'shed while the edge sweeps');
+    assert.equal(particleAt(s, s.at - 0.01).alpha, 0, 'not before the edge reaches it');
+    const a = particleAt(s, s.at + 0.05);
+    const b = particleAt(s, s.at + s.life * 0.6);
+    assert.ok(a.alpha > 0, 'shed: it shows');
+    assert.ok(b.y > a.y && a.y >= 0, 'it drifts up');
+    assert.ok(b.alpha <= a.alpha, 'it fades');
+    assert.equal(particleAt(s, s.at + TIMES.drift).alpha, 0, 'gone after its drift');
+    assert.equal(particleAt(s, TIMES.fade).alpha, 0, 'all gone by the end');
+  }
+  const order = [...specks].sort((p, q) => p.at - q.at);
+  const mean = (list) => list.reduce((m, s) => m + s.y, 0) / list.length;
+  assert.ok(mean(order.slice(0, 30)) < mean(order.slice(-30)), 'lower ones first');
+});
+
+test('with reduced motion it’s a short plain fade, no dissolve; a skip clears the page as it drops away', () => {
+  const r = createEnvelope({ reduced: true });
+  r.open(0);
+  r.step(0, true);
+  const mid = r.pose(TIMES.reducedFade / 2);
+  assert.equal(mid.dissolve, 0, 'no dissolve');
+  assert.equal(mid.crossfade, true);
+  assert.ok(Math.abs(mid.backdrop - (1 - mid.fade)) < 1e-9);
+  const s = createEnvelope();
+  s.skip(0);
+  assert.equal(s.pose(0.01).dissolve, 0, 'a skip drops it, no dissolve');
+  assert.ok(s.pose(TIMES.skip).backdrop < 0.01, 'the page clears');
 });
