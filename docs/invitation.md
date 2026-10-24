@@ -384,8 +384,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     moves half as far as the cursor, standing up through the band from collar height 1.1 to 2.0
     and as the cursor's ray goes past the back wall at his hang height (`wallOut`, fully upright
     0.6 past), the plane re-made through the anchor only once its angle has moved 0.5°, the
-    edges on the ray (`edgeClamp`), a twist toward where he's carried (0.4 of the way across, 20°
-    at most), a lob on a throw (up by 0.25 of his speed across), Ground Cues In the Mix, the
+    edges on the ray (`edgeClamp`), no turn off the way he faced as he was grabbed (none toward
+    where he's carried), a lob on a throw (up by 0.25 of his speed across), Ground Cues In the Mix, the
     squash on and a finger 48 px under him; `cues.js` has the ground cues' numbers
     (`blobLook`: radius 0.35 of his height on contact to 0.6 of that, strength 0.45 to 0.20 times
     the look's lifted over 0.34, soft edge 0.15 to 0.5 of the radius, as his lowest foot rises to

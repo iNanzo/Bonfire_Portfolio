@@ -6,8 +6,8 @@
 // floor point under him moving half as fast as the cursor, the stand-up band and the back wall
 // hoisting him high, his collar on the cursor's ray every frame (a down drag from a standing grab
 // and a zoom mid-hold too), a cursor circle coming back where it began, a side wall stopping him
-// across only, a flick up throwing him away with a lob, a gentle twist toward where he's carried,
-// the kind's own defaults for the shared layer, and its cost per frame. Each frame runs the kind
+// across only, a flick up throwing him away with a lob, no turn off the way he faced as he was
+// grabbed (the user's rule: he keeps his pickup yaw), the kind's own defaults for the shared layer, and its cost per frame. Each frame runs the kind
 // then carry.js holdStep, as main.js carryStep and play.js bodyStep do.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -442,17 +442,22 @@ test(
   },
 );
 
-test('tilt: a sideways sweep turns him toward where he’s carried, 20° at most, eased in, and back once he’s still', () => {
-  const E = env('desktop');
-  const { collar, px } = home(E);
-  const to = { x: px.x + 500, y: px.y };
-  const r = sim(E, { collar, path: [...still(px, 12), ...line(px, to, 36)] });
-  const twists = r.frames.map((f) => f.step.twist ?? 0);
-  assert.ok(Math.max(...twists.map(Math.abs)) <= TILT.twistMax + 1e-9, 'never past 20°');
-  assert.ok(twists[13] < twists[30], 'eased in, not snapped');
-  assert.ok(twists[47] > 10 * RAD, `turned toward the right: ${twists[47] / RAD}°`);
-  const r2 = sim(E, { collar, path: [...still(px, 12), ...line(px, to, 36), ...still(to, 120)] });
-  assert.ok(Math.abs(last(r2).step.twist ?? 0) < 1 * RAD, 'back once he’s still');
+test('tilt: carried any way, he keeps the way he faced as he was grabbed: no turn toward where he’s carried', () => {
+  // (The user, at the stop: held, he faces his pickup direction; no twist toward the drag.)
+  for (const name of ['phone', 'desktop']) {
+    const E = env(name);
+    const { collar, px } = home(E);
+    const path = [
+      ...still(px, 12),
+      ...line(px, { x: px.x + 300, y: px.y }, 20),
+      ...line({ x: px.x + 300, y: px.y }, { x: px.x - 200, y: px.y - 150 }, 20),
+      ...line({ x: px.x - 200, y: px.y - 150 }, { x: px.x, y: px.y + 80 }, 20),
+      ...still({ x: px.x, y: px.y + 80 }, 30),
+    ];
+    const r = sim(E, { collar, path });
+    for (const f of r.frames) assert.ok(!('twist' in f.step), `${name}: no twist at ${f.t.toFixed(2)} s`);
+  }
+  assert.ok(!Object.keys(TILT).some((k) => /twist/.test(k)), 'no twist numbers left');
 });
 
 test('tilt: a down drag never takes his collar under the floor’s hang height once he’s clear, and never leaves the cursor', () => {
