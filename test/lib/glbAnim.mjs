@@ -315,7 +315,11 @@ export function nearestDistance(p, shells) {
     }
     const out = [0, 1, 2].map((i) => Math.max(s.box.min[i] - p[i], 0, p[i] - s.box.max[i]));
     if (Math.hypot(...out) >= d) continue;
-    for (const [a, b, c] of s.tris) d = Math.min(d, pointTriangleDistance(p, s.v[a], s.v[b], s.v[c]));
+    for (const [a, b, c] of s.tris) {
+      // (a degenerate triangle, as Body has, measures NaN: `<` skips it where Math.min wouldn't)
+      const x = pointTriangleDistance(p, s.v[a], s.v[b], s.v[c]);
+      if (x < d) d = x;
+    }
   }
   return d;
 }
