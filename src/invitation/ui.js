@@ -19,8 +19,11 @@
 // (Smooth or Choppy), Shader (every control in shader.js's table, rendered from it: a slider
 // with its value beside it, a row of segments or a switch; Reset To Style; the pixel look's
 // ones resting at Pixel Size Off, the lines' while Outlines is off, the dither's while
-// Dithering is), and Wander, whether he walks about by himself, kept for the next visit
-// (loadWander, in localStorage, every read and write in try/catch)). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
+// Dithering is), Ground Cues (the ring and the dashed drop line under him while he's held: Off,
+// In the Mix or Always, the drag kind's own until it's picked), Drag (Today, Level, Tilt or Bead:
+// the ways of carrying him, to compare; for this visit only, ?drag= sets it), and Wander, whether
+// he walks about by himself, kept for the next visit (loadWander, in localStorage, every read and
+// write in try/catch)). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
 // to the same block there are one step, and one that comes to 1 px is Native), set by main.js
 // as the stage is measured (setPixelSteps); every Pixel Size is a step until then. The sheet is a modal dialog: it opens on Done, Tab goes
 // round inside it, the toolbar's other buttons are inert while it's open (Settings, pressed,
@@ -33,11 +36,14 @@
 //
 //   parseQuery(search)   ?test (the window.__invitation hooks), ?seed=N, ?calm, ?perf (frame
 //                        times and the governor's level on screen: stage.js), ?govern (the
-//                        frame-time governor on under ?test; ?govern=off, off for anyone)
+//                        frame-time governor on under ?test; ?govern=off, off for anyone),
+//                        ?drag=today|level|tilt|bead (how he's carried: hold.js; anything else, today)
 
 import { PIXEL_SIZES, resolutionOf, shownPixel, stepFor } from './pixels.js';
 import { LOOKS, MOTIONS, STYLES, isCustom, shaderOf, validLook } from './look.js';
 import { SHADER_CONTROLS, controlFor, shaderText } from './shader.js';
+import { CUE_LABELS, CUE_MODES } from './cues.js';
+import { DRAG_KINDS, DRAG_LABELS, dragKind } from './hold.js';
 import { LABEL_ICONS, iconSvg, installDither } from './icons.js';
 
 /** @typedef {import('./types.js').ButtonName} ButtonName */
@@ -246,6 +252,8 @@ export function parseQuery(search) {
     settle: q.has('test') && settle > 0 ? settle : null,
     // (The envelope that opens the page, every visit; ?test starts in the toy unless &envelope.)
     envelope: !q.has('test') || q.has('envelope'),
+    // (How he's carried: hold.js's kinds, today's unless one is named.)
+    drag: dragKind(q.get('drag')),
   };
 }
 
@@ -365,9 +373,11 @@ const toggle = (key, label, on, attr = 'data-look') =>
  * @param {import('./look.js').Look} look
  * @param {import('./pixels.js').PixelStep[]} [steps]  Pixel Size's steps on this screen (pixels.js
  *   pixelSteps; every Pixel Size its own step by default)
- * @param {{wander?: boolean}} [o]  whether he wanders by himself (on by default)
+ * @param {{wander?: boolean, drag?: import('./hold.js').DragKind, groundDefault?: import('./hold.js').CueMode}} [o]
+ *   whether he wanders by himself (on by default), the drag kind (Today by default) and its
+ *   Ground Cues default (Off by default: the look's own once it's picked)
  */
-export function sheetHtml(look, steps = ALL_STEPS, { wander = true } = {}) {
+export function sheetHtml(look, steps = ALL_STEPS, { wander = true, drag = 'today', groundDefault = 'off' } = {}) {
   const l = validLook(look);
   const custom = isCustom(l);
   // (Custom is the style row's own once a Shader value is the user's: it's never picked.)
@@ -375,6 +385,11 @@ export function sheetHtml(look, steps = ALL_STEPS, { wander = true } = {}) {
     STYLES.map((s) => segment('inv-style', 'style', s, LOOKS[s].label, !custom && l.style === s)).join('') +
     segment('inv-style', 'style', 'custom', 'Custom', custom, { disabled: !custom });
   const motions = MOTIONS.map((m) => segment('inv-motion', 'motion', m, MOTION_LABELS[m], l.motion === m)).join('');
+  const ground = l.groundCues ?? groundDefault;
+  const cues = CUE_MODES.map((m) => segment('inv-ground', 'groundCues', m, CUE_LABELS[m], ground === m)).join('');
+  const drags = DRAG_KINDS.map((k) =>
+    segment('inv-drag', 'drag', k, DRAG_LABELS[k], drag === k, { attr: 'data-setting' }),
+  ).join('');
   return `<section class="inv-sheet" id="inv-look" role="dialog" aria-modal="true" aria-labelledby="inv-look-title" hidden>
   <header class="inv-sheet-head"><h2 id="inv-look-title">Settings</h2><button type="button" class="inv-btn inv-btn-done" data-look-close>Done</button></header>
   <p class="inv-hint">Changes show right away and stay for your next visit.</p>
@@ -384,6 +399,8 @@ export function sheetHtml(look, steps = ALL_STEPS, { wander = true } = {}) {
   <fieldset class="inv-field"><legend>Style</legend><div class="inv-segs">${styles}</div></fieldset>
   <fieldset class="inv-field"><legend>Motion</legend><div class="inv-segs">${motions}</div></fieldset>
   ${shaderHtml(l)}
+  <fieldset class="inv-field"><legend>Ground Cues</legend><div class="inv-segs">${cues}</div><p class="inv-hint">The ring and the dashed line under NEWT while he’s held, showing where he is over the floor.</p></fieldset>
+  <fieldset class="inv-field inv-drag"><legend>Drag</legend><div class="inv-segs">${drags}</div><p class="inv-hint">Ways of carrying him, to compare. Today is how he’s carried now.</p></fieldset>
   <div class="inv-field inv-play">${toggle('wander', 'Wander', wander, 'data-setting')}<p class="inv-hint">Left be, he walks about by himself now and then.</p></div>
 </section>`;
 }
@@ -414,15 +431,31 @@ export function statusHtml() {
 /**
  * Put the page's controls in the stage and report what's pressed.
  * @param {HTMLElement} stage
- * @param {{look: import('./look.js').Look, wander?: boolean, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void, onCamera?(key: CameraKey): void, onWander?(on: boolean): void, onSheet?(open: boolean): void, onIntro?(): void}} o
+ * @param {{look: import('./look.js').Look, wander?: boolean, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void, onCamera?(key: CameraKey): void, onWander?(on: boolean): void, onSheet?(open: boolean): void, onIntro?(): void, drag?: import('./hold.js').DragKind, groundDefault?: import('./hold.js').CueMode, onDrag?(kind: import('./hold.js').DragKind): void}} o
+ *   drag, groundDefault, onDrag: Settings' Drag (sheetHtml) and the kind's Ground Cues default
  *   wander: the Wander switch's state to begin with; onCamera: a Camera pad control pressed
  *   (reset: Reset Camera); onWander: the Wander switch flipped; onSheet: the Settings sheet
  *   opened or closed (main.js keeps NEWT in sight beside it); onIntro: Replay Intro pressed
  */
-export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera, onWander, onSheet, onIntro }) {
+export function bindUi(
+  stage,
+  {
+    look,
+    wander = true,
+    onButton,
+    onLook,
+    onCamera,
+    onWander,
+    onSheet,
+    onIntro,
+    drag = 'today',
+    groundDefault = 'off',
+    onDrag,
+  },
+) {
   const hud = document.createElement('div');
   hud.className = 'inv-hud';
-  hud.innerHTML = statusHtml() + toolbarHtml() + sheetHtml(look, ALL_STEPS, { wander });
+  hud.innerHTML = statusHtml() + toolbarHtml() + sheetHtml(look, ALL_STEPS, { wander, drag, groundDefault });
   stage.append(hud);
   // (The buttons' hover and press fills: the ink's ordered dither.)
   installDither(hud, getComputedStyle(hud).getPropertyValue('--inv-ink').trim() || '#3a332d');
@@ -442,6 +475,14 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
   const status = $('.inv-status');
   let current = validLook(look);
   let steps = ALL_STEPS;
+  /** The drag kind's Ground Cues, shown checked while the look has none of its own. */
+  let groundShown = groundDefault;
+  /** Ground Cues' segments from the look (or, with none picked, the kind's default). */
+  const syncGround = () => {
+    const want = current.groundCues ?? groundShown;
+    for (const radio of /** @type {NodeListOf<HTMLInputElement>} */ (hud.querySelectorAll('input[name="inv-ground"]')))
+      radio.checked = radio.value === want;
+  };
   const range = /** @type {HTMLInputElement} */ ($('#inv-pixel-range'));
 
   /** Pixel Size's slider, value, ends and line, from the current look and the screen's steps. */
@@ -757,6 +798,7 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
     if (input.type === 'range') return waiting(input) ? undefined : takeRange(input);
     if (input.dataset.shader) return pickShader(input);
     if (input.dataset.setting === 'wander') return onWander?.(input.checked);
+    if (input.dataset.setting === 'drag') return input.checked ? onDrag?.(dragKind(input.value)) : undefined;
     const key = input.dataset.look;
     if (!key) return;
     if (key === 'style') return pickStyle(input.value);
@@ -765,6 +807,22 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
     onLook(current);
   });
   return {
+    /**
+     * The drag kind's Ground Cues default, shown checked while the look has none of its own.
+     * @param {import('./hold.js').CueMode} mode
+     */
+    setGroundDefault(mode) {
+      groundShown = mode;
+      syncGround();
+    },
+    /**
+     * Settings' Drag as it is (a kind set by ?drag= or the page).
+     * @param {import('./hold.js').DragKind} kind
+     */
+    setDrag(kind) {
+      for (const radio of /** @type {NodeListOf<HTMLInputElement>} */ (hud.querySelectorAll('input[name="inv-drag"]')))
+        radio.checked = radio.value === kind;
+    },
     /**
      * Show a message in place of the toy ("Loading…", what went wrong), or hide it (null).
      * @param {string|null} text
