@@ -90,24 +90,30 @@ function page({ speech = always(), lines = LINES, seed = 1 } = {}) {
 const later = (p, state = brain('idle')) => p.wait(TALK.hold + 12, state);
 
 test('the triggers are the plan’s, each with a priority, a default chance and cooldown', () => {
-  assert.deepEqual([...TRIGGERS].sort(), [
-    'caught',
-    'dropped',
-    'flee',
-    'idle',
-    'landed',
-    'pickedUp',
-    'shaken',
-    'sitDown',
-    'sitting',
-    'spin',
-    'spook',
-    'standUp',
-    'walkTo',
-    'wander',
-    'wave',
-    'zoom',
-  ]);
+  assert.deepEqual(
+    [...TRIGGERS].sort(),
+    [
+      'caught',
+      'dropped',
+      'flee',
+      'idle',
+      'landed',
+      'pickedUp',
+      'shaken',
+      'sitDown',
+      'sitting',
+      'spin',
+      'spook',
+      'standUp',
+      'thrash',
+      'device',
+      'lieDown',
+      'walkTo',
+      'wander',
+      'wave',
+      'zoom',
+    ].sort(),
+  );
   const [cMin, cMax] = SPEECH_RANGES.chance;
   const [dMin, dMax] = SPEECH_RANGES.cooldown;
   for (const k of TRIGGERS) {
@@ -224,6 +230,41 @@ test('sitting down by himself speaks; the Sit button doesn’t', () => {
   p = page();
   p.frame(brain('idle'), { button: 'Sit' });
   assert.equal(p.frame(brain('sitDown', { faceCamera: true })).say, null);
+});
+
+test('thrashing, getting the tablet and lying down with it: each speaks as it starts (thrash, device, lieDown)', () => {
+  const held = (more = {}) => brain('held', { clip: 'Held', face: 'sad', ...more });
+  // A thrash: Thrash starting from its start while he's held (its face angry, never a shake).
+  let p = page();
+  p.frame(held());
+  later(p, held());
+  let out = p.frame(held({ clip: 'Thrash', restart: true, face: 'angry' }));
+  assert.equal(out.trigger, 'thrash');
+  assert.ok(LINES.thrash.includes(out.say));
+  later(p, held({ clip: 'Thrash', face: 'angry' }));
+  assert.equal(p.frame(held({ clip: 'Thrash', face: 'angry' })).say, null, 'not again while it plays');
+  assert.notEqual(p.frame(held()).trigger, 'shaken', 'back to Held: no shake');
+  // The tablet in his hands, sitting; then lying down with it.
+  p = page();
+  p.frame(brain('sitDown', { clip: 'SitDown', device: 'sit' }), { button: 'Device' });
+  later(p, brain('sitDown', { clip: 'SitDown', device: 'sit' }));
+  out = p.frame(brain('deviceSit', { clip: 'DeviceSit', restart: true, device: 'sit' }));
+  assert.equal(out.trigger, 'device');
+  later(p, brain('deviceSit', { clip: 'DeviceSit', device: 'sit' }));
+  out = p.frame(brain('lieDown', { clip: 'LieDown', restart: true, device: 'lie' }), { button: 'Device' });
+  assert.equal(out.trigger, 'lieDown');
+  later(p, brain('deviceLie', { clip: 'DeviceLie', device: 'lie' }));
+  // Getting up from lying with it is getting up.
+  out = p.frame(brain('getUp', { clip: 'GetUp', restart: true }), { button: 'Device' });
+  assert.equal(out.trigger, 'standUp');
+  // Sitting down with the tablet isn't sitting down by himself, even with the press long gone.
+  p = page();
+  p.wait(3, brain('idle'));
+  assert.equal(p.frame(brain('sitDown', { faceCamera: true, device: 'sit' })).trigger, null);
+  // And no still-sitting line while he plays: he's busy.
+  p = page({ speech: always([1, 2]) });
+  const said = p.wait(10, brain('deviceSit', { clip: 'DeviceSit', device: 'sit' })).map((s) => s.trigger);
+  assert.ok(!said.includes('sitting') && !said.includes('idle'), said.join(', '));
 });
 
 test('idle time: a line every 20 to 40 s while he stands about; still sitting has its own', () => {
