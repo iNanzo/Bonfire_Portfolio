@@ -680,7 +680,7 @@ DEVICE = {
     # degree camera sees only its edge)
     'DeviceSit': {'centre': (0, -0.85, 1.45), 'tilt': 12, 'lift': 0.0},
     # lying flat on the floor in front of him, his palms on its edges
-    'DeviceLie': {'centre': (0, -2.35, 0.04), 'tilt': 0, 'lift': 0.3},
+    'DeviceLie': {'centre': (0, -2.15, 0.04), 'tilt': 0, 'lift': 0.3},
 }
 
 
@@ -730,8 +730,8 @@ def device_sit(t):
 LIE_FEET = (0.55, 0.85, 1.05)  # the ankles up behind him, the knees on the floor
 DEV_LIE = {
     # on his stomach, the chest propped about 35 degrees off the floor on near-straight arms
-    'hips': {'loc': (0, 0, -1.15), 'rot': (85, 0, 0)},
-    'chest': (-30, 0, 0),
+    'hips': {'loc': (0, 0, -1.1), 'rot': (85, 0, 0)},
+    'chest': (-36, 0, 0),
     'neck': (-4, 0, 0),
     'head': (-6, 0, 0),  # back 10 degrees on the chest (12 at the bob): further, his back hair digs in
     'armL': {'shoulder': (0, 10), 'hand': palm('DeviceLie'), 'elbow': (1, 0.6, -0.2), 'twist': 0, 'twist2': 0},
@@ -757,7 +757,7 @@ def device_lie(t):
     return p
 
 
-KNEEL_FEET = (0.6, 0.95, 0.3)  # kneeling: the shins along the floor behind him, the toes back
+KNEEL_FEET = (0.6, 0.95, 0.55)  # kneeling: the shins along the floor behind him, the toes back
 
 
 def fall(t):
@@ -988,7 +988,7 @@ TABLES = {
         (0, 'devicesit@0'),
         (8, merge(
             DEV_SIT,  # leaning forward, the feet pulled in, the hands going to the floor in front
-            hips={'loc': (0, 0, -1.45), 'rot': (10, 0, 0)},
+            hips={'loc': (0, 0, -1.2), 'rot': (10, 0, 0)},
             chest=(15, 0, 0),
             head=(-5, 0, 0),
             armL={'shoulder': (0, 8), 'hand': (0.8, -1.3, 0.5), 'twist': 0, 'twist2': 0},
@@ -998,7 +998,7 @@ TABLES = {
         )),
         (16, merge(
             DEV_LIE,  # on his hands and knees
-            hips={'loc': (0, 0, -0.95), 'rot': (55, 0, 0)},
+            hips={'loc': (0, 0, -0.75), 'rot': (55, 0, 0)},
             chest=(10, 0, 0),
             neck=(-10, 0, 0),
             head=(-10, 0, 0),
@@ -1009,14 +1009,14 @@ TABLES = {
         )),
         (26, merge(
             DEV_LIE,  # down onto his belly, the legs out straight behind
-            hips={'loc': (0, 0, -1.4), 'rot': (85, 0, 0)},
-            chest=(-10, 0, 0),
+            hips={'loc': (0, 0, -1.1), 'rot': (85, 0, 0)},
+            chest=(-28, 0, 0),
             neck=(-5, 0, 0),
             head=(-5, 0, 0),
             armL={'shoulder': (0, 10), 'hand': (0.9, -1.8, 0.3), 'twist': 0, 'twist2': 0},
             armR={'shoulder': (0, 10), 'hand': (0.9, -1.8, 0.3), 'twist': 0, 'twist2': 0},
-            legL={'at': (0.55, 1.5, 0.35), 'pitch': -100},
-            legR={'at': (0.55, 1.5, 0.35), 'pitch': -100},
+            legL={'at': (0.55, 1.45, 0.55), 'pitch': -100},
+            legR={'at': (0.55, 1.45, 0.55), 'pitch': -100},
         )),
         (31, merge(DEV_LIE, chest=(-25, 0, 0), legL={'at': (0.55, 1.2, 0.8), 'pitch': -105}, legR={'at': (0.55, 1.2, 0.8), 'pitch': -105})),
         (36, 'devicelie@0'),
@@ -1026,16 +1026,16 @@ TABLES = {
         (0, 'devicelie@0'),
         (6, merge(
             DEV_LIE,  # pushing up, the hands coming in under the shoulders
-            hips={'loc': (0, 0, -1.2), 'rot': (75, 0, 0)},
+            hips={'loc': (0, 0, -1.0), 'rot': (75, 0, 0)},
             chest=(-30, 0, 0),
             armL={'shoulder': (0, 8), 'hand': (0.8, -1.4, 0.3), 'twist': 0, 'twist2': 0},
             armR={'shoulder': (0, 8), 'hand': (0.8, -1.4, 0.3), 'twist': 0, 'twist2': 0},
-            legL={'at': (0.55, 1.2, 0.35), 'pitch': -100},
-            legR={'at': (0.55, 1.2, 0.35), 'pitch': -100},
+            legL={'at': (0.55, 1.2, 0.55), 'pitch': -100},
+            legR={'at': (0.55, 1.2, 0.55), 'pitch': -100},
         )),
         (12, merge(
             DEV_LIE,  # up on his knees
-            hips={'loc': (0, 0, -0.95), 'rot': (30, 0, 0)},
+            hips={'loc': (0, 0, -0.75), 'rot': (30, 0, 0)},
             chest=(0, 0, 0),
             neck=(0, 0, 0),
             head=(-5, 0, 0),

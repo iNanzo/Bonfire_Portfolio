@@ -65,7 +65,7 @@ export const DEVICE = {
   palm: 0.9,
   clips: {
     DeviceSit: { centre: [0, -0.85, 1.45], tilt: 12, lift: 0 },
-    DeviceLie: { centre: [0, -2.35, 0.04], tilt: 0, lift: 0.3 },
+    DeviceLie: { centre: [0, -2.15, 0.04], tilt: 0, lift: 0.3 },
   },
 };
 /** The clips a dialogue box may play (the admin lists these): his gestures, the reactions, sitting. */
