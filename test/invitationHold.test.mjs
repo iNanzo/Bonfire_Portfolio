@@ -384,3 +384,21 @@ test('the camera’s level axes: toward it and right on screen; depth along it g
     assert.ok(depthAlong({ x: -toward.x, z: -toward.z }, camera.yaw) > depthAlong({ x: 0, z: 0 }, camera.yaw), 'away');
   }
 });
+
+test('let go, he falls with the velocity the drag kind lets him go with, or carry.js toss with none', async () => {
+  const { bodyStep, createBody } = await import('../src/invitation/play.js');
+  const held = (released) => {
+    const s = createBody();
+    const o = { move: { mode: 'stay', goal: null, speed: 0 }, pointer: null, bounds: null, dt: 1 / 60 };
+    const collar = { x: 0, y: 1, z: 0 };
+    for (let i = 0; i < 6; i++)
+      bodyStep(s, { ...o, state: 'held', t: i / 60, collar, target: { x: i * 0.05, y: 1, z: 0 } });
+    bodyStep(s, { ...o, state: 'fall', t: 0.1, footOffset: 0.4, released });
+    return s;
+  };
+  const kind = held({ x: 0, y: 2, z: -1.5 });
+  assert.equal(kind.mode, 'fall');
+  close(kind.vel.x, 0, 1e-9);
+  close(kind.vel.z, -1.5, 1e-9, 'the kind’s, in depth too');
+  assert.ok(held(null).vel.x > 1, 'tossed with the last samples');
+});
