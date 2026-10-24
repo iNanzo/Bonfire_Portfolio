@@ -192,6 +192,25 @@ test('shaken: his face going surprised again while he’s held (after the grab�
   assert.notEqual(q.frame(brain('land', { face: 'surprised' })).trigger, 'shaken');
 });
 
+test('a thrash’s line cuts in over a shaken one (it matters more), but not the other way round', () => {
+  assert.ok(PRIORITY.thrash > PRIORITY.shaken, 'thrash outranks shaken');
+  const held = (more = {}) => brain('held', { clip: 'Held', face: 'sad', ...more });
+  const p = page();
+  p.frame(held({ face: 'surprised' }));
+  later(p, held());
+  // Shaken: its line goes up.
+  assert.equal(p.frame(held({ face: 'surprised' })).trigger, 'shaken');
+  p.frame(held());
+  // A Thrash starting while it's still up: the thrash's line replaces it.
+  const out = p.frame(held({ clip: 'Thrash', restart: true, face: 'angry' }));
+  assert.equal(out.trigger, 'thrash');
+  assert.ok(LINES.thrash.includes(out.say));
+  // Shaken again while the thrash's line is up: it stays.
+  p.frame(held({ clip: 'Thrash', face: 'angry' }));
+  p.frame(held());
+  assert.equal(p.frame(held({ face: 'surprised' })).say, null, 'the thrash’s line stays up');
+});
+
 test('walking: to a floor tap (also after getting up first) or wandering off by himself', () => {
   const tap = { type: 'tap', on: 'floor', x: 100, y: 200, t: 0, floor: { x: 1, z: 0 } };
   let p = page();
@@ -223,13 +242,13 @@ test('walking: to a floor tap (also after getting up first) or wandering off by 
 
 test('sitting down by himself speaks; the Sit button doesn’t', () => {
   let p = page();
-  assert.equal(p.frame(brain('sitDown', { faceCamera: true })).trigger, 'sitDown');
+  assert.equal(p.frame(brain('sitDown', { clip: 'SitDown', restart: true })).trigger, 'sitDown');
   p = page();
-  assert.equal(p.frame(brain('sitDown', { faceCamera: true }), { button: 'Sit' }).say, null);
+  assert.equal(p.frame(brain('sitDown', { clip: 'SitDown', restart: true }), { button: 'Sit' }).say, null);
   // (The button a moment before the brain turns him counts too.)
   p = page();
   p.frame(brain('idle'), { button: 'Sit' });
-  assert.equal(p.frame(brain('sitDown', { faceCamera: true })).say, null);
+  assert.equal(p.frame(brain('sitDown', { clip: 'SitDown', restart: true })).say, null);
 });
 
 test('thrashing, getting the tablet and lying down with it: each speaks as it starts (thrash, device, lieDown)', () => {
@@ -260,7 +279,7 @@ test('thrashing, getting the tablet and lying down with it: each speaks as it st
   // Sitting down with the tablet isn't sitting down by himself, even with the press long gone.
   p = page();
   p.wait(3, brain('idle'));
-  assert.equal(p.frame(brain('sitDown', { faceCamera: true, device: 'sit' })).trigger, null);
+  assert.equal(p.frame(brain('sitDown', { clip: 'SitDown', restart: true, device: 'sit' })).trigger, null);
   // And no still-sitting line while he plays: he's busy.
   p = page({ speech: always([1, 2]) });
   const said = p.wait(10, brain('deviceSit', { clip: 'DeviceSit', device: 'sit' })).map((s) => s.trigger);
