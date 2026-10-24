@@ -418,6 +418,7 @@ export function squash(sinceGrab, sinceLand) {
  * @property {HoldCamera} camera
  * @property {number} low  his hang height: the lowest his collar is carried once he's clear
  * @property {Bounds|null} bounds  the play area
+ * @property {number} [yaw]  his heading as he's grabbed (his root's rotation.y)
  */
 /**
  * @typedef {object} HoldFrame  what a kind gets each frame he's held
@@ -429,6 +430,7 @@ export function squash(sinceGrab, sinceLand) {
  * @property {number} low
  * @property {Bounds|null} bounds
  * @property {CarryState|null} carry  the carry as last stepped (null on the first frame)
+ * @property {string} [clip]  the clip he's showing (the brain's: 'Held', 'Thrash')
  */
 /**
  * @typedef {object} HoldCues  what a kind tells the shared cues (main.js, cues.js) this frame
@@ -445,6 +447,9 @@ export function squash(sinceGrab, sinceLand) {
  *   the nearest spot inside: a kind that clamped already is left as it is)
  * @property {XZ|null} [push]  set: the push holdStep keeps for the toss (a kind's side clamp)
  * @property {number|null} holdY  the height a kind holds him at (null: none of its own)
+ * @property {XZ} [tilt]  set: his root's tilt this frame in place of carry.js's swing (a kind's own
+ *   body: root.rotation.x and .z)
+ * @property {number} [yaw]  set: his heading this frame (his root's rotation.y)
  * @property {HoldCues} cues
  */
 /**
@@ -465,6 +470,8 @@ export function squash(sinceGrab, sinceLand) {
  * @property {(c: CarryState, t: number) => XYZ|null} release  the velocity he's let go with (null:
  *   carry.js toss)
  * @property {Plane|null} plane  the surface he's dragged on now, for ?test (null before a grab)
+ * @property {XZ|null} [landing]  once he's let go, where the kind says he'll land: the ring
+ *   stays there until he does
  * @property {((dy: number) => boolean)} [onWheel]  the wheel while he's held (CSS px; true: taken,
  *   no zoom)
  * @property {((dy: number) => void)} [onSecondFinger]  a second finger's move while he's held, CSS px
