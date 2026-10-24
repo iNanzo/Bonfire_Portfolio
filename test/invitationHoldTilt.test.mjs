@@ -418,16 +418,20 @@ function flick(E, dx, dy) {
 test(
   'tilt: a 100 px up flick in 0.1 s at e 36°, let go, throws him 0.4-1.0 further away with a lob of 0.1 or more over where he was let go',
   {
-    todo: 'design.md’s range is out of reach of its own caps: at 4 u/s across any flight over 0.25 s lands more than 1.0 away (2.66 on a phone)',
+    todo: 'design.md’s range is out of reach of its own caps: at 4 u/s across any flight over 0.25 s lands more than 1.0 away (2.73 on a phone, 2.47 on a desktop)',
   },
   (t) => {
-    for (const name of ['phone', 'desktop']) {
+    // (Both screens measured and reported before either is asserted.)
+    const runs = ['phone', 'desktop'].map((name) => {
       const E = env(name);
       const f = flick(E, 0, -100);
       const away = depthAlong(f.root, E.s.yaw) - depthAlong(f.from, E.s.yaw);
       t.diagnostic(
         `${name}: v (${f.v.x.toFixed(2)}, ${f.v.y.toFixed(2)}, ${f.v.z.toFixed(2)}), lands ${away.toFixed(3)} away, peak ${(f.peak - f.from.y).toFixed(3)} over`,
       );
+      return { name, f, away };
+    });
+    for (const { name, f, away } of runs) {
       inRange(away, 0.4, 1.0, `${name}: lands further away`);
       assert.ok(f.peak - f.from.y >= 0.1, `${name}: lob ${f.peak - f.from.y}`);
       assert.ok(
