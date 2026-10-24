@@ -49,7 +49,11 @@ drawn in the toy's own pixel look, and it's the loading screen too: NEWT loads b
   up. Flick him and he flies a little; let go while
   pushing him against the edge of his patch and he just drops there. The camera holds still
   while you carry him. As you grab him a gold ring of dither bursts out from your grip and is
-  gone in under half a second.
+  gone in under half a second. Off the floor, the soft shadow under him sits straight below his
+  hips and shrinks, fades and softens the higher his feet are; it stays while he flies, so you
+  see where he'll land. With **Ground Cues** on (Settings), a ring sits on the floor under him
+  while he's held and a dashed line drops from his collar to it; the ring flashes when you push
+  him against the edge of his patch.
 - **Point at him** (the mouse over him, or a finger pressing on him) and a gold dithered outline
   fills in round him, a texel or two outside him and two in, with a sprinkle further in; it
   fades as you move off, and it doesn't show while he's held or during the intro. At Pixel Size
@@ -132,6 +136,8 @@ the sheet and leaves the slider as it was.
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow; how dark, its colour and where: under Shader). |
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
+| Ground Cues | Off, In the Mix, Always | The ring on the floor under NEWT while he's held and the dashed line from his collar down to it, so you can see where he is over the floor. In the Mix shows them while he's high or moving fast; Always all the time he's held. Until you pick one, the way he's carried (Drag) chooses. |
+| Drag | Today, Level, Tilt, Bead | Ways of carrying him, to compare (for this visit only; `?drag=` in the address picks one too). Today is how he's carried now; the other three are being built and carry him as Today does until they are. |
 | Wander | On, Off | On (the default): left be, he strolls about by himself now and then. Kept for your next visit, like the rest. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -348,8 +354,36 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   - The behaviour modules (`brain.js`, `blend.js`, `steer.js`, `carry.js`, `lookAt.js`,
     `faces.js`, `gesture.js`, `rng.js`) are pure too; `types.js` lists the shapes they pass
     and the order a frame runs in. `gesture.js` reads the mouse's buttons apart (left: tap,
-    grab or pan; right: orbit; middle: pan) and two fingers' middle as a pan; `carry.js`
-    drags him on the upright plane facing the camera through where he was grabbed
+    grab or pan; right: orbit; middle: pan) and two fingers' middle as a pan (and, when the
+    page's `holdLift` says so, a second finger while he's held as `holdLift`, its move up or
+    down); `hold.js` is how he's held: the drag kinds (`DRAG_KINDS`: `today`, the default, and
+    `level`, `tilt` and `bead`, three candidates for a carry that moves him in depth, each in its
+    own module under `holds/`, made by `holds/index.js` `createHold` for each grab from `?drag=`
+    or Settings' Drag; a candidate is today's hold under its own name until it's built), the
+    `Hold` interface each implements (`start` at the grab, `step` each frame giving the anchor,
+    the plane holdStep keeps him inside along, the push for the toss, its hold height and its
+    cues; `release`, the velocity he's let go with, null for carry.js `toss`; `grabbedAt`; and
+    optional `onWheel` and `onSecondFinger` height controls; `feel`: its Ground Cues default,
+    squash and stretch, finger lift and second finger), `createTodayHold` (today's, below,
+    through it) and the helpers the candidates share: `rayHit` (a grazing or backward ray turned
+    away, `HOLD.grazing` 0.12), `rayAtY`, `rayInterval` and `edgeClamp` (the collar kept on the
+    cursor's ray: under the hang height or over the ceiling onto it along the ray however far,
+    so a down drag leaves no gap; past a wall the nearest inside point along the ray within
+    `HOLD.reach`, 1, bisected with steer.js `clampTo` as the inside test, so the back wall is a
+    climb and the front one the floor; with none, a side wall, across only along the camera's
+    level-right axis with carry.js `keepInside`, never sliding in depth, the push kept),
+    `reanchor` (after a user orbit or zoom, the anchor onto the new ray, the closest point to
+    where it was: a frame's orbit never jumps it 0.15), `cameraMoved`, `levelAxes`, `depthAlong`,
+    `screenOffset` (the grab offset easing out in screen px over 0.12 s), `releaseVelocity` (the
+    solved collar from 70 to 20 ms before letting go, capped at 4 u/s across and 2.5 up, 3 down,
+    none across while pushed) and `squash` (1.08 tall over 80 ms as he's lifted; landing, 0.88
+    tall and 1.08 wide over 70 ms, back over 200 ms); `cues.js` has the ground cues' numbers
+    (`blobLook`: radius 0.35 of his height on contact to 0.6 of that, strength 0.45 to 0.20 times
+    the look's lifted over 0.34, soft edge 0.15 to 0.5 of the radius, as his lowest foot rises to
+    two heights; Ground Cues' `cueStep`, `mixWants`: his lowest foot over half his height or 1
+    u/s across the floor, `ringStrength`: the 0.12 s pulse on a wall clamp, `lineShare`; and
+    `dragSpeedOf`, the brain's drag speed as his collar's screen px a second over 110); `carry.js`
+    drags him, today, on the upright plane facing the camera through where he was grabbed
     (`dragPlane`, `gripFor`, `dragTarget`: the grab offset from where the press began, easing
     out over `CARRY.offsetEase`, 0.12 s, `offsetAt`, so his collar ends under a mouse's cursor
     and 24 CSS px over a finger;
@@ -557,7 +591,13 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `FACE_NAMES` on him, no blinks; null gives his face back to the brain) and `press(name)` (a
   toolbar button's press as the brain gets it, Give Device's `Device` too). The snapshot's
   `motion` has the carry (`collar` on screen, `heldFor`, the `anchor`, the drag `plane`'s
-  normal, `pushed` at the edge), the limp layer (`limp.weight`, `limp.most`: the most a limb
+  normal, `pushed` at the edge), `drag` the drag kind's (`kind` and `setting`, its own height
+  `controls`, `aim`: where it aims his collar, client px, the `pointer`, the `gap` between them,
+  CSS px, `holdY`, the `anchor` and its `depth` along the camera's level axis, away positive,
+  the `blob` as set, his `hips`' floor point and `lowestFoot`, the `ring` and the drop `line`,
+  `groundCues` as it plays and `pushed`); `view({yaw, elevation, zoom})` eases the camera there
+  (radians; zoom the home distance over the distance) and `drag(kind)` picks the drag kind as
+  Settings' Drag does; the limp layer (`limp.weight`, `limp.most`: the most a limb
   has swung, radians) and Give Device (`device.state` and `label`, the tablet `shown` and its
   `screen` point, his `turn` off the camera). The snapshot's `camera` has
   the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
@@ -582,7 +622,16 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   him up high (the report says how far the grabbed point strayed from the cursor) and sweep the
   cursor, or a finger, over the whole screen to show where he looks; its `envelope` and
   `envelope-skip` acts open or skip the envelope (`?test&envelope`, whole frames). One GPU
-  capture at a time.
+  capture at a time. `node tools/capture-invitation-drag.mjs --kinds today,tilt` records the
+  same carry for each drag kind from each of the camera's views (yaw 0 and 90, elevation 36 and
+  15; a mouse at 1280x800 and a finger at 390x844): grabbed by the head, 200 px up, back down past
+  the start, 200 px across, a lift (the kind's wheel or second finger, or a drag past the back
+  wall), a flick and let go, with a ring where the pointer is and a dot where the kind aims his
+  collar; an animated WebP a kind and view, a sheet a kind, the drag's numbers frame by frame, and
+  with `--compare` the kinds side by side. `e2e/lib/drag.mjs` `dragDescribe(kind)` is the shared
+  drag spec (collar within 2 px of the cursor, blob under his hips, lowest foot over the floor, no
+  gap on a down drag, a finger's aim, Ground Cues); `e2e/invitationDrag.spec.mjs` runs it for
+  today, whose down-drag gap is the known baseline.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
   `vite.config.js`, `test/site.test.mjs` and the spec's last test check it).
 - **Unlisted:** `noindex, nofollow`, left out of the sitemap and the README, and not
