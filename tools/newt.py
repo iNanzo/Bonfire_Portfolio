@@ -457,11 +457,11 @@ HELD = {
     'pin': True,
     'hips': {'loc': (0, 0, 0), 'rot': (2, 0, 0)},  # plumb under the collar
     'chest': (5, 0, 0),
-    'neck': (10, 0, 0),
-    'head': (11, 0, 0),  # defeated: the head hangs about 28 degrees down in all
+    'neck': (9, 0, 0),
+    'head': (9, 0, 0),  # defeated: the head hangs about 25 degrees down in all
     # limp: shoulders dropped, the arms hanging nearly straight down by his sides
-    'armL': {'shoulder': (-18, 4), 'upper': (-2, 6), 'lower': (2, 4), 'twist': 0},
-    'armR': {'shoulder': (-18, 4), 'upper': (-2, 6), 'lower': (2, 4), 'twist': 0},
+    'armL': {'shoulder': (-18, 4), 'upper': (-2, 11), 'lower': (2, 8), 'twist': 0},
+    'armR': {'shoulder': (-18, 4), 'upper': (-2, 11), 'lower': (2, 8), 'twist': 0},
     # the legs hanging straight under the hips, toes down
     'legL': {'rel': (0, 0.02, 0.04), 'pitch': 55, 'yaw': -6, 'knee': (0, -1, 0)},
     'legR': {'rel': (0, 0.02, 0.04), 'pitch': 55, 'yaw': -6, 'knee': (0, -1, 0)},
@@ -658,14 +658,14 @@ def thrash(t):
         flail = math.sin(ph + (0 if s > 0 else math.pi) + 0.6)
         p['arm' + side] = merge(
             arm,
-            upper=(fu + 20 * wind + 25 * flail * act, ou + (55 - ou) * act - 10 * droop),
-            lower=(fl + 60 * wind + (25 * flail + 20) * act, ol + (75 - ol) * act),
+            upper=(fu + 20 * wind + 25 * flail * act, ou + (55 - ou + 15 * flail) * act - 10 * droop),
+            lower=(fl + 60 * wind + (35 * flail + 30) * act, ol + (75 - ol - 20 * flail) * act),
         )
         dx, dy, dz = base['leg' + side]['rel']
         p['leg' + side] = merge(
             base['leg' + side],
-            rel=(dx + 0.05 * act, dy + (-0.15 - 0.45 * k) * act, dz + 0.35 * wind + (0.2 + 0.17 * k) * act),
-            pitch=base['leg' + side]['pitch'] - 25 * wind - 20 * max(k, 0) * act,
+            rel=(dx + 0.05 * act, dy + (-0.2 - 0.6 * k) * act, dz + 0.4 * wind + (0.3 + 0.3 * k) * act),
+            pitch=base['leg' + side]['pitch'] - 25 * wind - 35 * max(k, 0) * act,
             knee=(0.2 * max(wind, act), -1, 0),
         )
     return p
