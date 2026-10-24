@@ -46,6 +46,8 @@
 //   sweep     where he looks over the whole screen: the cursor in rows across it, top to bottom
 //             (desktop sizes), or a finger held still at a grid of spots (phone sizes: a moving
 //             finger would turn the camera); whole frames
+//   reach     a tap near the top of the screen, toward a corner: he walks all the way there
+//             (whole frames); reach-turned, the same with the camera turned 90° first
 //   rim       four quick taps on him (he runs off), then a tap on him every 0.8 s for 5 s,
 //             which keeps him running to the play area's rim and along it (it should keep him
 //             on screen), then a press that catches him and carries him a little
@@ -641,6 +643,7 @@ function actsFor(size) {
   if (ACTS.includes('pan')) act('pan', (page) => more.panTurnZoom(page, size), 1400, { full: true });
   if (ACTS.includes('lift')) act('lift', (page) => more.liftHigh(page, size), 2400);
   if (ACTS.includes('sweep')) act('sweep', (page) => more.lookSweep(page, size), 600, { full: true });
+  more.addReach(act, ACTS, size);
   if (ACTS.includes('intro'))
     act('intro', (page) => introActs({ tapAt, sleep }).playIntro(page, size), 600, { full: true });
   if (ACTS.includes('sitalone')) {
