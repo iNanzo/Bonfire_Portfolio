@@ -385,7 +385,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     notch) and a second finger (0.8 per 100 px) set the hold height, up to 2.4 over his hang
     height; walls faced across the screen are side walls (`sideWall`: across only, never sliding
     in depth); his body on a one-sided Verlet rope (`ropeStep`, 0.55 long, slack on a drop,
-    kicked every 2.5-6 s and while he thrashes) whose tilt replaces the swing (`HoldStep.tilt`),
+    kicked every 2.5-6 s and while he thrashes) whose tilt replaces the swing (`HoldStep.tilt`;
+    `ropeTilt` reads it as though his middle hung 0.3 of the rope under the collar or more, so a
+    slack rope never flips him side to side),
     his heading kept as it was when he was grabbed (`HoldStep.yaw`: never turned to the camera
     or toward where he's carried, the user's call at the stop); thrown with the
     collar's velocity, 0.3 of the rope's, 0.3 of its part toward or away from the camera

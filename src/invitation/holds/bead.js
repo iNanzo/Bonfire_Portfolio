@@ -34,8 +34,9 @@ const RAD = Math.PI / 180;
  * more than `holdMost` of his height over his hang height; the wheel moves it `wheel` of his height
  * per CSS px, a second finger `finger`. The plane: level from `blendFrom` of elevation up, upright
  * by `blendTo`. The rope: `rope` long (collar to his middle), damped `ropeDamp` a second, under
- * `gravity`, its tilt soft-clamped to `tiltMax`; kicked `kickMin`–`kickMax` u/s across the floor
- * every `kickEvery` s, and every `thrashEvery` s while he thrashes. The throw: the collar's
+ * `gravity`, its tilt soft-clamped to `tiltMax` (read as though his middle hung `tiltDown` of it
+ * under the collar or more); kicked `kickMin`–`kickMax` u/s across the floor every `kickEvery` s,
+ * and every `thrashEvery` s while he thrashes. The throw: the collar's
  * velocity plus `bob` of the rope's, `depth` of its part toward or away from the camera, at most
  * `maxLevel` u/s, lobbed by `lob` of its speed across over `lobFrom` u/s, `up`/`down` at most up
  * and down. The ring: where he'd land while he's carried faster than `ringSpeed` u/s across,
@@ -60,6 +61,7 @@ export const BEAD = {
   ropeDamp: 2.5,
   gravity: 9.8,
   tiltMax: 1.1,
+  tiltDown: 0.3,
   kickMin: 0.6,
   kickMax: 1,
   kickEvery: /** @type {readonly [number, number]} */ ([2.5, 6]),
@@ -240,14 +242,20 @@ export function kickRope(r, dir, speed) {
 
 /**
  * His root's tilt from the rope (root.rotation, as carry.js's swing: tilt.z positive puts his feet
- * toward +x, tilt.x positive toward −z), soft-clamped to BEAD.tiltMax.
+ * toward +x, tilt.x positive toward −z), the whole lean soft-clamped to BEAD.tiltMax. Read as
+ * though his middle hung at least BEAD.tiltDown of the rope under the collar: on a fast drop the
+ * rope goes slack and his middle can ride up level with the collar or over it, where a tilt read
+ * from it would flip him from one side to the other in a frame.
  * @param {Rope} r
  * @returns {XZ}
  */
 export function ropeTilt(r) {
-  const down = r.top.y - r.bob.y;
-  const soft = (a) => BEAD.tiltMax * Math.tanh(a / BEAD.tiltMax);
-  return { x: soft(Math.atan2(-(r.bob.z - r.top.z), down)), z: soft(Math.atan2(r.bob.x - r.top.x, down)) };
+  const down = Math.max(r.top.y - r.bob.y, BEAD.tiltDown * BEAD.rope);
+  const x = Math.atan2(-(r.bob.z - r.top.z), down);
+  const z = Math.atan2(r.bob.x - r.top.x, down);
+  const a = Math.hypot(x, z);
+  const k = a > 1e-9 ? (BEAD.tiltMax * Math.tanh(a / BEAD.tiltMax)) / a : 1;
+  return { x: x * k, z: z * k };
 }
 
 /**

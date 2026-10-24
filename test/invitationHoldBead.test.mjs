@@ -535,6 +535,43 @@ test('bead, the rope: a 0.5 in 0.1 s drop of the collar goes slack for a frame o
   assert.ok(most > 0.05 && most < BEAD.tiltMax, `Thrash kicks: ${most.toFixed(3)}`);
 });
 
+test('bead, the rope’s tilt: lifted high with the wheel, dropped 160 px and flicked (the capture’s moves) at 15° and 36°, he never flips side to side (read over the top it flipped 2.2 rad in a frame): his tilt changes 0.5 rad a frame or less and stays within tiltMax', () => {
+  const sm = (k) => k * k * (3 - 2 * k);
+  for (const screen of ['phone', 'desktop']) {
+    for (const [yaw, elevation] of [
+      [90, 15],
+      [0, 15],
+      [0, 36],
+    ]) {
+      const r = rig(screen, { yaw, elevation });
+      const c = centrePx(r);
+      const mid = { x: c.x, y: c.y + 160 };
+      const path = (t) => {
+        if (t < 2) return c;
+        if (t < 2.6) return { x: c.x, y: c.y + 160 * sm((t - 2) / 0.6) };
+        const k = Math.min(1, Math.max(0, (t - 2.75) / 0.1));
+        return { x: mid.x + 30 * k, y: mid.y - 100 * k };
+      };
+      let notches = 0;
+      const act = (t, hold) => {
+        if (notches < 12 && t >= 0.3 + notches * 0.11) {
+          hold.onWheel(-100);
+          notches++;
+        }
+      };
+      const { frames } = sim(r, { path, until: 3.2, act });
+      let jump = 0;
+      for (let i = 1; i < frames.length; i++) {
+        const a = frames[i - 1].step.tilt;
+        const b = frames[i].step.tilt;
+        jump = Math.max(jump, Math.hypot(b.x - a.x, b.z - a.z));
+        assert.ok(Math.hypot(b.x, b.z) <= BEAD.tiltMax + 1e-9, `${screen} y${yaw}e${elevation}: tilt within tiltMax`);
+      }
+      assert.ok(jump <= 0.5, `${screen} y${yaw}e${elevation}: the tilt jumped ${jump.toFixed(3)} rad in a frame`);
+    }
+  }
+});
+
 test('bead, the throw: the landing preview is within 0.15 of where he lands for throws of 1-4 u/s; a 100 px up flick at 36° lands 0.8-1.6 further away with a lob 0.25 or more over where he was let go', () => {
   for (const screen of ['phone', 'desktop']) {
     const r = rig(screen);
