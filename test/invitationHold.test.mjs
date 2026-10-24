@@ -1,6 +1,6 @@
 // How NEWT is held in the invitation toy, from the pure modules: the drag kinds (hold.js
 // DRAG_KINDS, holds/index.js createHold: today the default, level, tilt and bead, each its own
-// module, the three candidates today's hold under their own names until they're built); today's
+// module, the candidates not yet built today's hold under their own names: level and bead); today's
 // hold through the interface, the same as carry.js's camera-facing plane frame for frame; and the
 // solve helpers every kind shares: a ray meeting a plane (grazing and backward rays turned
 // away), a height on the ray, the ray's inside span (the play area and the height limits) and the
@@ -134,7 +134,7 @@ test('today’s hold through the interface is carry.js’s camera-facing plane, 
   assert.deepEqual(hold.feel, { groundCues: 'off', squash: false, fingerLift: null, secondFinger: false });
 });
 
-test('the candidates are today’s hold under their own names until they’re built', () => {
+test('the candidates not yet built (level, bead) are today’s hold under their own names', () => {
   const { rayAt, project, camera } = rig();
   const collar = { x: 0, y: 0.62, z: 0 };
   const press = project({ x: 0, y: 0.45, z: 0 });
@@ -155,7 +155,7 @@ test('the candidates are today’s hold under their own names until they’re bu
     );
   };
   const today = run(createHold('today'));
-  for (const k of ['level', 'tilt', 'bead']) assert.deepEqual(run(createHold(k)), today, k);
+  for (const k of ['level', 'bead']) assert.deepEqual(run(createHold(k)), today, k);
 });
 
 test('a ray meets a plane where it crosses it; one that grazes it (the cosine under HOLD.grazing) or has it behind is turned away', () => {
