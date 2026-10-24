@@ -4,9 +4,10 @@
 // password the admin has set and a password change never fails CI. It's written as a storage
 // state that every context starts with, a manual browser.newContext() too, and a cookie
 // outlives the specs' localStorage.clear(). Without a key there's nothing to open: no cookie.
-// e2e/gate.spec.mjs starts with none.
+// e2e/gate.spec.mjs starts with none. The benchmark (tools/bench-viz.mjs) uses gateStateFor, the
+// same cookie for the checkout it builds.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fromBase64, tokenOf } from '../../src/gate/crypto.js';
 import { GATE_COOKIE } from '../../src/gate/pages.js';
@@ -24,6 +25,22 @@ export async function gateState(content, host = '127.0.0.1') {
   const value = await tokenOf(fromBase64(hash));
   const cookie = { name: GATE_COOKIE, value, domain: host, path: '/', expires: -1, httpOnly: false, secure: false };
   return { cookies: [{ ...cookie, sameSite: /** @type {const} */ ('Lax') }], origins: [] };
+}
+
+/**
+ * The storage state for a checkout's own build (tools/bench-viz.mjs): the cookie `root`'s
+ * src/content.json opens, for the host of `url`. None when that checkout has no lock or no
+ * content.json (a commit from before the lock).
+ * @param {string} root @param {string} url
+ */
+export async function gateStateFor(root, url) {
+  let content;
+  try {
+    content = JSON.parse(readFileSync(join(root, 'src', 'content.json'), 'utf8'));
+  } catch {
+    content = {};
+  }
+  return gateState(content, new URL(url).hostname);
 }
 
 export default async function globalSetup() {
