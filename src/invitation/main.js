@@ -88,6 +88,7 @@ import {
   orbitZoom,
   shotView,
 } from './camera.js';
+import { cursorKind, installCursors } from './cursor.js';
 import { loadCharacter } from './character.js';
 import { ANKLE_HEIGHT, BONES, COLLAR, FACE_NAMES, FACE_TRACK, SCALE, fadeFor } from './clips.js';
 import { createDialogue, lookSway, normalizeScript } from './dialogue.js';
@@ -194,6 +195,8 @@ const ui = bindUi(stageEl, {
     introPressed = true;
   },
 });
+installCursors();
+stageEl.dataset.cursor = 'arrow';
 
 /** @param {import('./look.js').Look} next */
 function onLook(next) {
@@ -425,6 +428,7 @@ function start(s) {
     device: /** @type {string} */ ('Give Device'),
     wander: /** @type {boolean|null} */ (null),
     enabled: true,
+    cursor: 'arrow',
   };
   /** @type {ReturnType<typeof createDialogue>|null} the intro under way (Play Intro) */
   let intro = null;
@@ -690,6 +694,7 @@ function start(s) {
     const button = pressed ?? wanderPress();
     if (pressed) lastButton = pressed;
     pressed = null;
+    showCursor(ptr);
     if (forced) {
       // (Walk and Run take their time from the step phase: it goes round at the clip's own pace.)
       const len = c.clipLength(forced);
@@ -748,6 +753,23 @@ function start(s) {
       return null;
     }
     return 'Wander';
+  }
+
+  /**
+   * The stage's cursor (cursor.js) as the pointer is now: over him, pressing or holding him,
+   * panning or orbiting; the arrow while the intro runs.
+   * @param {ReturnType<typeof pointerNow>} ptr
+   */
+  function showCursor(ptr) {
+    const c = gesture.current();
+    const kind = cursorKind({
+      onNewt: Boolean(ptr?.onNewt && !ptr.touch),
+      pressing: c?.on === 'newt',
+      held: body.mode === 'held',
+      drag: c?.orbit ? 'orbit' : c?.pan ? 'pan' : null,
+      talking: Boolean(intro),
+    });
+    if (kind !== shown.cursor) stageEl.dataset.cursor = shown.cursor = kind;
   }
 
   /** Whether the visitor asked for less motion (false where it can't be read). */
