@@ -69,6 +69,16 @@ export async function grab(page, part = 'head') {
 export const onCursor = (page, message, px = 2) =>
   expect.poll(async () => (await snapshot(page)).drag.gap ?? Infinity, { message }).toBeLessThan(px);
 
+/**
+ * Up 200 px from `cursor`, and for a kind with a wheel for his height (a level hold keeps him at
+ * its height however far up the screen he goes), six notches up as well; returns the cursor.
+ */
+export async function lift(page, cursor) {
+  const to = await glide(page, cursor, { x: cursor.x, y: cursor.y - 200 });
+  if ((await snapshot(page)).drag.controls.wheel) for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -100);
+  return to;
+}
+
 /** The checks every held frame shares: the blob under his hips, his lowest foot over the floor. */
 export async function grounded(page, at) {
   const d = (await snapshot(page)).drag;
@@ -98,15 +108,11 @@ export async function finger(page) {
 /**
  * The shared checks for drag kind `kind`. `baseline`: the checks the kind is known to fail (today's
  * hold leaves the collar off the cursor on a down drag: marked test.fail, so fixing it shows).
- * `high`: how the kind gets him high, held, from `cursor` (by default a drag 200 px up; a kind
- * whose move up carries him away rather than up passes its own, its wheel say).
+ * Each check gets him high with `lift` (a drag up, and the wheel for a kind that has one).
  * @param {string} kind
- * @param {{baseline?: string[], high?: (page: import('@playwright/test').Page, cursor: {x: number, y: number}) => Promise<unknown>}} [o]
+ * @param {{baseline?: string[]}} [o]
  */
-export function dragDescribe(
-  kind,
-  { baseline = [], high = (page, cursor) => glide(page, cursor, { x: cursor.x, y: cursor.y - 200 }) } = {},
-) {
+export function dragDescribe(kind, { baseline = [] } = {}) {
   test.describe(`?drag=${kind}, on a desktop`, () => {
     test.use({ viewport: { width: 1280, height: 800 } });
 
@@ -155,7 +161,7 @@ export function dragDescribe(
       await until(page, (s) => s.drag.groundCues === 'always' && s.drag.ring?.alpha > 0.99, 'the ring in');
       const d = (await snapshot(page)).drag;
       expect(gap({ x: d.ring.x, y: d.ring.z }, { x: d.hips.x, y: d.hips.z }), 'under his hips').toBeLessThan(0.03);
-      await high(page, cursor);
+      await lift(page, cursor);
       await until(
         page,
         (s) => s.drag.lowestFoot > 0.5 && s.drag.line.visible && s.drag.line.alpha > 0.9,
@@ -168,7 +174,7 @@ export function dragDescribe(
     test(`${kind}: Ground Cues Off shows neither the ring nor the drop line, however high he is`, async ({ page }) => {
       await calm(page, kind, { groundCues: 'off' });
       const cursor = await grab(page, 'head');
-      await high(page, cursor);
+      await lift(page, cursor);
       await until(page, (s) => s.drag.lowestFoot > 0.5, 'high');
       const off = (await snapshot(page)).drag;
       expect(off.groundCues).toBe('off');

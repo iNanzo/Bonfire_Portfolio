@@ -11,13 +11,7 @@
 import { test, expect } from '@playwright/test';
 import { calm, dragDescribe, gap, glide, grab, on, onCursor, snapshot, until } from './lib/drag.mjs';
 
-/** Three wheel notches up: his lowest foot well over half his height. */
-const wheelUp = async (page, cursor) => {
-  await page.mouse.move(cursor.x, cursor.y);
-  for (let i = 0; i < 3; i++) await page.mouse.wheel(0, -100);
-};
-
-dragDescribe('level', { high: wheelUp });
+dragDescribe('level');
 
 /** His hold height once it's stopped moving (two reads alike). */
 async function steadyHold(page, message) {

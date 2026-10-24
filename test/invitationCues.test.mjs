@@ -17,6 +17,7 @@ import {
   cueStep,
   dragSpeedOf,
   groundCueMode,
+  lineMode,
   lineShare,
   mixWants,
   ringStrength,
@@ -103,6 +104,16 @@ test('the ring pulses to full for 0.12 s on a wall clamp (never at Off); the dro
   assert.equal(lineShare(0.5 * NEWT_HEIGHT), 1);
   assert.equal(lineShare(3), 1);
   close(lineShare(0.325 * NEWT_HEIGHT), 0.5);
+});
+
+test('a drag kind can keep the drop line out of In the Mix (HoldCues.line false), but Always still shows it and Off never does, as every effect’s setting', () => {
+  assert.equal(lineMode('mix', false), 'off');
+  assert.equal(lineMode('always', false), 'always');
+  assert.equal(lineMode('off', false), 'off');
+  for (const mode of CUE_MODES) {
+    assert.equal(lineMode(mode, undefined), mode, `${mode}: the kind says nothing`);
+    assert.equal(lineMode(mode, true), mode, `${mode}: the kind lets it be`);
+  }
 });
 
 test('the brain’s drag speed is his collar’s speed on screen, px a second over 110 (a vertical flick no longer counts for more than one across)', () => {

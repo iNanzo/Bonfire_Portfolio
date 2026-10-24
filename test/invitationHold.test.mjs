@@ -134,7 +134,7 @@ test('today’s hold through the interface is carry.js’s camera-facing plane, 
   assert.deepEqual(hold.feel, { groundCues: 'off', squash: false, fingerLift: null, secondFinger: false });
 });
 
-test('the candidates not yet built (level, bead) are today’s hold under their own names', () => {
+test('every candidate is built: none is today’s hold under its own name', () => {
   const { rayAt, project, camera } = rig();
   const collar = { x: 0, y: 0.62, z: 0 };
   const press = project({ x: 0, y: 0.45, z: 0 });
@@ -155,8 +155,7 @@ test('the candidates not yet built (level, bead) are today’s hold under their 
     );
   };
   const today = run(createHold('today'));
-  // (level and tilt are built: holds/level.js, holds/tilt.js and their tests.)
-  for (const k of ['bead']) assert.deepEqual(run(createHold(k)), today, k);
+  for (const k of ['level', 'tilt', 'bead']) assert.notDeepEqual(run(createHold(k)), today, k);
 });
 
 test('a ray meets a plane where it crosses it; one that grazes it (the cosine under HOLD.grazing) or has it behind is turned away', () => {

@@ -137,7 +137,7 @@ the sheet and leaves the slider as it was.
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
 | Ground Cues | Off, In the Mix, Always | The ring on the floor under NEWT while he's held and the dashed line from his collar down to it, so you can see where he is over the floor. In the Mix shows them while he's high or moving fast; Always all the time he's held. Until you pick one, the way he's carried (Drag) chooses. |
-| Drag | Today, Level, Tilt, Bead | Ways of carrying him, to compare (for this visit only; `?drag=` in the address picks one too). Today is how he's carried now; Level carries him over the floor at a height the wheel or a second finger sets; Tilt leans the plane he's dragged on back, so up the screen carries him away and up at once; Bead is being built and carries him as Today does until it is. |
+| Drag | Today, Level, Tilt, Bead | Ways of carrying him, to compare (for this visit only; `?drag=` in the address picks one too). Today is how he's carried now; Level carries him over the floor at a height the wheel or a second finger sets; Tilt leans the plane he's dragged on back, so up the screen carries him away and up at once; Bead keeps his collar on the cursor like a bead on a string, sliding toward and away from you over the floor. |
 | Wander | On, Off | On (the default): left be, he strolls about by himself now and then. Kept for your next visit, like the rest. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -398,11 +398,31 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     0.6 past), the plane re-made through the anchor only once its angle has moved 0.5°, the
     edges on the ray (`edgeClamp`), no turn off the way he faced as he was grabbed (none toward
     where he's carried), a lob on a throw (up by 0.25 of his speed across), Ground Cues In the Mix, the
-    squash on and a finger 48 px under him; `cues.js` has the ground cues' numbers
+    squash on and a finger 48 px under him;
+    `holds/bead.js` is the bead candidate
+    (built): his collar a bead on the cursor's ray, exactly under it, its distance from the
+    camera sprung (`BEAD.omega` 14 rad/s, `zeta` 0.65) toward a level plane at his hold height
+    (his hang height + 0.45, blended upright from 35° down to 12° of elevation: `beadPlane`), so
+    a flick up lofts him toward the camera before he settles away; the wheel (0.1 of his height a
+    notch) and a second finger (0.8 per 100 px) set the hold height, up to 2.4 over his hang
+    height; walls faced across the screen are side walls (`sideWall`: across only, never sliding
+    in depth); his body on a one-sided Verlet rope (`ropeStep`, 0.55 long, slack on a drop,
+    kicked every 2.5-6 s and while he thrashes) whose tilt replaces the swing (`HoldStep.tilt`;
+    `ropeTilt` reads it as though his middle hung 0.3 of the rope under the collar or more, so a
+    slack rope never flips him side to side),
+    his heading kept as it was when he was grabbed (`HoldStep.yaw`: never turned to the camera
+    or toward where he's carried, the user's call at the stop); thrown with the
+    collar's velocity, 0.3 of the rope's, 0.3 of its part toward or away from the camera
+    (`BEAD.depth`: a 100 px up flick lands about 1.1 away, half as far as one across), at most
+    4 u/s, and a lob of 0.35 of its speed across
+    (`beadThrow`), the ring at the landing point while he's moving fast and, once he's let go,
+    until he lands (`landingPoint`, `Hold.landing`); `cues.js` has the ground cues' numbers
     (`blobLook`: radius 0.35 of his height on contact to 0.6 of that, strength 0.45 to 0.20 times
     the look's lifted over 0.34, soft edge 0.15 to 0.5 of the radius, as his lowest foot rises to
     two heights; Ground Cues' `cueStep`, `mixWants`: his lowest foot over half his height or 1
-    u/s across the floor, `ringStrength`: the 0.12 s pulse on a wall clamp, `lineShare`; and
+    u/s across the floor, `ringStrength`: the 0.12 s pulse on a wall clamp, `lineShare`,
+    `lineMode`: a kind's `HoldCues.line` false keeps the line out of In the Mix, never out of
+    Always; and
     `dragSpeedOf`, the brain's drag speed as his collar's screen px a second over 110); `carry.js`
     drags him, today, on the upright plane facing the camera through where he was grabbed
     (`dragPlane`, `gripFor`, `dragTarget`: the grab offset from where the press began, easing
@@ -651,8 +671,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   collar; an animated WebP a kind and view, a sheet a kind, the drag's numbers frame by frame, and
   with `--compare` the kinds side by side. `e2e/lib/drag.mjs` `dragDescribe(kind)` is the shared
   drag spec (collar within 2 px of the cursor, blob under his hips, lowest foot over the floor, no
-  gap on a down drag, a finger's aim, Ground Cues); `e2e/invitationDrag.spec.mjs` runs it for
-  today, whose down-drag gap is the known baseline.
+  gap on a down drag, a finger's aim, Ground Cues, raising him with the wheel for a kind that has
+  one); `e2e/invitationDrag.spec.mjs` runs it for today, whose down-drag gap is the known
+  baseline, and `e2e/invitationDragBead.spec.mjs` for bead with its own checks.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
   `vite.config.js`, `test/site.test.mjs` and the spec's last test check it).
 - **Unlisted:** `noindex, nofollow`, left out of the sitemap and the README, and not

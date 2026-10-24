@@ -96,6 +96,7 @@ import {
   cueStep,
   dragSpeedOf,
   groundCueMode,
+  lineMode,
   lineShare,
   mixWants,
   ringStrength,
@@ -534,10 +535,12 @@ function start(s) {
   const holdRng = createRng(seed + 7);
   /**
    * The ground cues (cues.js): the blob's held look eased in, the ring's and the drop line's
-   * strengths, when the ring last pulsed, whether he was pushed at the edge last frame, and, for
-   * ?test, Ground Cues as it plays and where the ring is while it shows.
+   * strengths, when the ring last pulsed, whether he was pushed at the edge last frame, where a
+   * kind said he'd land as he was let go (the ring waits there till he does: hold.js
+   * Hold.landing), and, for ?test, Ground Cues as it plays and where the ring is while it shows.
    */
   const cue = {
+    flight: /** @type {import('./types.js').XZ|null} */ (null),
     blob: 0,
     ring: 0,
     line: 0,
@@ -1248,9 +1251,10 @@ function start(s) {
    * carry.js toss).
    * @param {NonNullable<typeof character>} c
    * @param {number} dt
+   * @param {string} clip  the clip he's showing (the brain's)
    * @returns {import('./types.js').XYZ|null}
    */
-  function carryStep(c, dt) {
+  function carryStep(c, dt, clip) {
     const press = gesture.current();
     if (press?.grabbed) {
       const view = holdCamera();
@@ -1273,6 +1277,7 @@ function start(s) {
           camera: view,
           low: hangY,
           bounds: area,
+          yaw: body.body.yaw,
         });
         const head = shape().head;
         headAbove = press.y0 - (head.y - head.r);
@@ -1301,6 +1306,7 @@ function start(s) {
         low: hangY,
         bounds: area,
         carry: body.mode === 'held' ? body.carry : null,
+        clip,
       });
       target = holdNow.anchor;
       // (The plane he's dragged on: at the play area's edge he stops along it, carry.js holdStep.)
@@ -1310,6 +1316,7 @@ function start(s) {
     if (!hold) return null;
     // (Let go: the kind's release velocity, or carry.js toss with none.)
     const released = body.mode === 'held' && body.carry ? hold.release(body.carry, t) : null;
+    cue.flight = released ? (hold.landing ?? null) : null;
     hold = null;
     holdNow = null;
     aimPx = null;
@@ -1329,7 +1336,7 @@ function start(s) {
   function moveRoot(c, o, ptr, dt) {
     const root = c.root;
     root.updateMatrixWorld(true);
-    const released = carryStep(c, dt);
+    const released = carryStep(c, dt, o.clip);
     bodyStep(body, {
       state: o.state,
       move: o.move,
@@ -1344,6 +1351,11 @@ function start(s) {
     });
     // (A kind's side clamp: its push, kept for the toss.)
     if (holdNow && holdNow.push !== undefined && body.carry) body.carry.push = holdNow.push;
+    // (A kind's own body: its tilt in place of the swing, its heading.)
+    if (holdNow && body.mode === 'held') {
+      if (holdNow.tilt) body.tilt = { x: holdNow.tilt.x, z: holdNow.tilt.z };
+      if (holdNow.yaw !== undefined) body.body = { ...body.body, yaw: holdNow.yaw };
+    }
     if (body.mode !== 'held') root.position.set(body.root.x, body.root.y, body.root.z);
     root.rotation.set(body.tilt.x, body.body.yaw, body.tilt.z);
     const sq = squashing
@@ -1481,16 +1493,19 @@ function start(s) {
   function groundCues(c, footH, hips, mark, dt) {
     const carry = body.mode === 'held' ? body.carry : null;
     const isHeld = Boolean(carry && hold);
-    const cues = holdNow?.cues ?? {};
+    // (Let go where a kind said he'd land: the ring waits there till he does, then fades.)
+    if (body.mode !== 'fall') cue.flight = null;
+    const flying = cue.flight !== null;
+    const cues = holdNow?.cues ?? (flying ? { ring: cue.flight, line: false } : {});
     const mode = groundCueMode(look.groundCues, hold?.feel.groundCues ?? feelOf(dragNow).groundCues);
     const want = cues.mix ?? mixWants(footH, carry ? Math.hypot(carry.vel.x, carry.vel.z) : 0);
-    cue.ring = cueStep(cue.ring, { mode, want, held: isHeld, dt });
-    cue.line = cueStep(cue.line, { mode: cues.line === false ? 'off' : mode, want, held: isHeld, dt });
+    cue.ring = cueStep(cue.ring, { mode, want: want || flying, held: isHeld || flying, dt });
+    cue.line = cueStep(cue.line, { mode: lineMode(mode, cues.line), want, held: isHeld, dt });
     // (A wall clamp: the kind says, or the edge starts pushing him.)
     const pushed = Boolean(carry?.push);
     if (isHeld && (cues.pulse || (pushed && !cue.pushed))) cue.pulse = t;
     cue.pushed = pushed;
-    const ring = isHeld ? ringStrength(cue.ring, cue.pulse === null ? null : t - cue.pulse, mode) : 0;
+    const ring = isHeld || flying ? ringStrength(cue.ring, cue.pulse === null ? null : t - cue.pulse, mode) : 0;
     const at = cues.ring ?? { x: hips.x, z: hips.z };
     cue.mode = mode;
     cue.ringAt = ring > 0 ? at : null;
