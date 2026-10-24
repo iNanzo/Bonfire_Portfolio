@@ -79,11 +79,24 @@ test('a locked page sends you to the lock and back: a wrong password says so, th
 }) => {
   const errors = watch(page);
   await lock(page, ['/larp/']);
+  // (The browser may ask for the page's chunks and preloads ahead of the parser, and the check
+  // cuts those requests off; what it promises is that the parser stops there, so the page's
+  // module script, after the check in its head, is never even added and none of its code runs.)
+  await page.addInitScript(() => {
+    if (location.pathname !== '/larp/') return;
+    new MutationObserver(() => {
+      if (document.querySelector('script[type="module"]')) sessionStorage.setItem('gate-spec-module', 'parsed');
+    }).observe(document, { childList: true, subtree: true });
+  });
   // (It goes on to the lock while it loads: wait for the lock, not the page's own load.)
   await page.goto('/larp/?from=test#top', { waitUntil: 'commit' });
   await page.waitForURL((u) => u.pathname === '/unlock/');
   expect(new URL(page.url()).searchParams.get('to'), 'its path, checked on the way back').toBe('/larp/');
   await expect(state(page)).toHaveAttribute('data-gate', 'ready');
+  expect(
+    await page.evaluate(() => sessionStorage.getItem('gate-spec-module')),
+    'stopped at the check: its module never added',
+  ).toBeNull();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(LOCK.title);
   expect(await page.locator('meta[name="robots"]').getAttribute('content')).toBe('noindex, nofollow');
 
