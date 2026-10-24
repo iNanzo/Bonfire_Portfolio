@@ -60,15 +60,13 @@ test.describe('?drag=tilt, its own checks on a desktop', () => {
   }) => {
     await calm(page, 'tilt');
     const off = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
-    // (Read held, falling and landing only: once he's up again, a fright may send him running.)
+    // (Read held, in the air and landing only: once he's up again, a fright may send him running.)
     let most = 0;
-    let landed = false;
     const read = async () => {
       const s = await snapshot(page);
-      const carried = s.held || s.state === 'fall' || s.state === 'land';
-      if (carried) most = Math.max(most, off(s.drag.facing, f0));
-      if (s.state === 'land') landed = true;
-      return carried;
+      if (s.held || s.lift > 1e-3 || s.state === 'fall' || s.state === 'land')
+        most = Math.max(most, off(s.drag.facing, f0));
+      return s;
     };
     const f0 = (await snapshot(page)).drag.facing;
     let cursor = await grab(page, 'head');
@@ -85,9 +83,17 @@ test.describe('?drag=tilt, its own checks on a desktop', () => {
       cursor = to;
     }
     await page.mouse.up();
+    // (Down on the floor again: let go, his root back at 0; read often, so the fall is seen.)
     await expect
-      .poll(async () => !(await read()) && landed, { message: 'let go, fallen and landed', timeout: 20_000 })
+      .poll(
+        async () => {
+          const s = await read();
+          return !s.held && s.lift <= 1e-3;
+        },
+        { message: 'let go, fallen and landed', timeout: 20_000, intervals: [50] },
+      )
       .toBe(true);
+    await read();
     expect(most, `turned ${((most * 180) / Math.PI).toFixed(2)}° off the way he faced`).toBeLessThan(Math.PI / 180);
   });
 
