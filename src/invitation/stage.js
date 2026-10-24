@@ -229,7 +229,9 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
   marker.renderOrder = 2;
   marker.layers.set(LAYERS.decal);
   marker.visible = false;
-  // (The drop line: a quad from y 0 to 1, placed by its own matrix each frame: setLine.)
+  // (The drop line: a quad from y 0 to 1, placed by its own matrix each frame: setLine. One pass:
+  // three draws a blended two-sided mesh twice, its back then its front, and a flat quad turned
+  // to the camera only ever shows one side.)
   const lineGeo = new THREE.PlaneGeometry(1, 1);
   lineGeo.translate(0, 0.5, 0);
   const line = new THREE.Mesh(
@@ -240,6 +242,7 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
       opacity: MARKER.opacity,
       alphaTest: 0.5,
       side: THREE.DoubleSide,
+      forceSinglePass: true,
     }),
   );
   line.matrixAutoUpdate = false;

@@ -122,6 +122,78 @@ test.describe('?drag=level, on a desktop', () => {
     }
     await page.mouse.up();
   });
+
+  test('level: held high, its Ground Cues (the ring and the drop line) cost at most 2 draw calls a frame over Off, and no render target', async ({
+    page,
+  }) => {
+    // (WebGL draw calls a frame, by the frame's time, and framebuffers made: before the page's scripts.)
+    const count = () => {
+      const rec = { draws: 0, fbs: 0, frames: new Map() };
+      /** @type {any} */ (window).__draws = rec;
+      for (const C of [WebGL2RenderingContext, WebGLRenderingContext])
+        for (const k of [
+          'drawElements',
+          'drawArrays',
+          'drawElementsInstanced',
+          'drawArraysInstanced',
+          'createFramebuffer',
+        ]) {
+          const f = C.prototype[k];
+          if (!f) continue;
+          C.prototype[k] = function (...a) {
+            if (k === 'createFramebuffer') rec.fbs++;
+            else rec.draws++;
+            return f.apply(this, a);
+          };
+        }
+      const raf = window.requestAnimationFrame.bind(window);
+      window.requestAnimationFrame = (cb) =>
+        raf((t) => {
+          const d0 = rec.draws;
+          cb(t);
+          rec.frames.set(t, (rec.frames.get(t) ?? 0) + rec.draws - d0);
+        });
+    };
+    // (Held and lifted high, the ring and the line both in where they're on: the most draw calls
+    // of his last 20 frames, and the framebuffers made since the grab.)
+    const held = async (p, look) => {
+      await p.addInitScript(count);
+      // (The page's own defaults when there's no look: none left from the other page in this context.)
+      if (!look)
+        await p.addInitScript(() => {
+          try {
+            localStorage.removeItem('invitation.look.v1');
+          } catch {
+            // (No storage: the defaults anyway.)
+          }
+        });
+      await calm(p, 'level', look);
+      const cursor = await grab(p, 'head');
+      const fbs = await p.evaluate(() => /** @type {any} */ (window).__draws.fbs);
+      await p.mouse.move(cursor.x, cursor.y);
+      for (let i = 0; i < 3; i++) await p.mouse.wheel(0, -100);
+      await until(p, (s) => s.drag.lowestFoot > 0.5, 'high');
+      if (!look)
+        await until(
+          p,
+          (s) => s.drag.line.visible && s.drag.line.alpha > 0.99 && s.drag.ring?.alpha > 0.99,
+          'the cues in',
+        );
+      await steadyHold(p, 'still');
+      const out = await p.evaluate(() => {
+        const r = /** @type {any} */ (window).__draws;
+        return { draws: Math.max(...[...r.frames.values()].slice(-20)), fbs: r.fbs };
+      });
+      await p.mouse.up();
+      return { draws: out.draws, fbs: out.fbs - fbs };
+    };
+    const off = await held(page, { groundCues: 'off' });
+    const cues = await held(await page.context().newPage(), undefined);
+    expect(cues.draws - off.draws, 'the cues’ draw calls a frame').toBeLessThanOrEqual(2);
+    expect(cues.draws - off.draws, 'the ring and the line drawn').toBeGreaterThan(0);
+    expect(cues.fbs, 'no render target made while held').toBe(0);
+    expect(off.fbs, 'no render target made while held, Off').toBe(0);
+  });
 });
 
 test.describe('?drag=level, on a phone', () => {
