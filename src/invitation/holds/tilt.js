@@ -1,7 +1,7 @@
 // The 'tilt' drag kind (design.md's candidate): NEWT's collar is dragged on a plane tilted back
 // from upright by the camera's elevation (tiltAngle: α = clamp(90° − e, 30°, 62°) from upright,
 // so low down the floor point under him moves half as far as he does), so one gesture both
-// carries him away and lifts him; the plane stands up as he rises (the band from 1.1 to 2.0) and
+// carries him away and lifts him; the plane stands up as he rises (the band from 1.1 to 1.6) and
 // as the cursor's ray goes past the back wall at his hang height (wallOut), so he can still be hoisted high. The plane
 // goes through the last anchor and is only re-made when its angle has moved over 0.5° (or the
 // camera moved: re-anchored on the new ray, hold.js reanchor), the floor and the ceiling and the
@@ -37,16 +37,17 @@ const RAD = Math.PI / 180;
 /**
  * The plane's angle from upright: `alpha` [least, most] radians, 90° less the camera's elevation
  * between them; the stand-up `band` (collar heights: the angle all there below its start, none
- * from its end); `wallOut`: how far past the back wall the cursor's ray (at his hang height) stands it up;
+ * from its end; design.md's ended at 2.0, which left him short of 2.0 high on a desktop);
+ * `wallOut`: how far past the back wall the cursor's ray (at his hang height) stands it up;
  * `reanchor`: radians the angle must change by before the plane is re-made through the anchor.
- * The throw: up by `lob` × his speed across the floor
- * once that's over `lobFrom` u/s. A finger carries him `fingerLift` CSS px above itself. In the
- * Mix (cues.js mixWants, his lowest foot taken as `footGap` over the floor at his hang height)
- * stays on `mixHold` s after it was last wanted, so a speed dipping under 1 u/s never flickers it.
+ * The throw: up by `lob` × his speed across the floor once that's over `lobFrom` u/s. A finger
+ * carries him `fingerLift` CSS px above itself. In the Mix (cues.js mixWants, his lowest foot
+ * taken as `footGap` over the floor at his hang height) stays on `mixHold` s after it was last
+ * wanted, so a speed dipping under 1 u/s never flickers it.
  */
 export const TILT = {
   alpha: [30 * RAD, 62 * RAD],
-  band: [1.1, 2.0],
+  band: [1.1, 1.6],
   wallOut: 0.6,
   reanchor: 0.5 * RAD,
   lob: 0.25,

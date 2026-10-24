@@ -381,7 +381,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     held (he keeps the way he faced as he was grabbed, falling and landing too); `holds/tilt.js`
     is the `tilt` kind: the plane leant back from upright by `clamp(90° − elevation, 30°, 62°)`
     (`tiltAngle`), so up the screen carries him away and up at once and the floor point under him
-    moves half as far as the cursor, standing up through the band from collar height 1.1 to 2.0
+    moves half as far as the cursor, standing up through the band from collar height 1.1 to 1.6
     and as the cursor's ray goes past the back wall at his hang height (`wallOut`, fully upright
     0.6 past), the plane re-made through the anchor only once its angle has moved 0.5°, the
     edges on the ray (`edgeClamp`), no turn off the way he faced as he was grabbed (none toward

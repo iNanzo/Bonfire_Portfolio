@@ -201,13 +201,13 @@ test('tilt: its defaults for the shared layer: Ground Cues In the Mix, the squas
   assert.equal(h.plane, null, 'no plane before a grab');
 });
 
-test('tilt: the plane angle is clamp(90° − e, 30°, 62°) from upright, stands up through the band from 1.1 to 2.0 and as the pointer goes past the back wall', () => {
+test('tilt: the plane angle is clamp(90° − e, 30°, 62°) from upright, stands up through the band from 1.1 to 1.6 and as the pointer goes past the back wall', () => {
   close(tiltAngle(36 * RAD, 1.0, 0), 54 * RAD, 'e 36°');
   close(tiltAngle(70 * RAD, 1.0, 0), 30 * RAD, 'e 70°: the floor of the clamp');
   close(tiltAngle(12 * RAD, 1.0, 0), 62 * RAD, 'e 12°: the ceiling of the clamp');
   close(tiltAngle(36 * RAD, 1.1, 0), 54 * RAD, 'the band begins at 1.1');
-  close(tiltAngle(36 * RAD, 1.55, 0), 27 * RAD, 'half way through it');
-  close(tiltAngle(36 * RAD, 2.0, 0), 0, 'upright at 2.0');
+  close(tiltAngle(36 * RAD, 1.35, 0), 27 * RAD, 'half way through it');
+  close(tiltAngle(36 * RAD, 1.6, 0), 0, 'upright at 1.6');
   close(tiltAngle(36 * RAD, 1.0, 0.3), 27 * RAD, 'half way past the back wall');
   close(tiltAngle(36 * RAD, 1.0, 0.6), 0, '0.6 past it: upright');
   // The normal leans from the level way toward the camera up into the sky as α grows.
@@ -250,33 +250,29 @@ test('tilt: the floor point under him moves 45-55 px per 100 px of cursor up at 
     for (const yaw of [0, 90]) inRange(rateUp(env(name, { yaw })).floorPx, 45, 55, `${name} yaw ${yaw}`);
 });
 
-test(
-  'tilt: from a hang-height grab at the area’s middle, the cursor 60 px under the stage’s top lifts his collar to 3.3 on a phone and 2.0 on a desktop or more',
-  {
-    todo: 'short of it: 3.29 and 1.90 with design.md’s band (1.1 to 2.0); the desktop’s stage has 288 px over his hang point',
-  },
-  (t) => {
-    /** @type {Record<string, {y: number, gap: number}>} */
-    const reach = {};
-    for (const name of ['phone', 'desktop']) {
-      const E = env(name);
-      const c = clampTo(E.bounds, { x: 0, z: 0 });
-      const collar = { x: c.x, y: HANG_Y, z: c.z };
-      const at = E.project(collar);
-      const top = { x: at.x, y: 60 };
-      const r = sim(E, { collar, path: [...still(at, 12), ...line(at, top, 60), ...still(top, 30)] });
-      reach[name] = { y: last(r).anchor.y, gap: Math.max(...r.frames.slice(12).map((f) => f.gap)) };
-      t.diagnostic(`${name}: the collar reaches ${reach[name].y.toFixed(2)}`);
-    }
-    for (const [name, most] of [
-      ['phone', 3.3],
-      ['desktop', 2.0],
-    ]) {
-      assert.ok(reach[name].y >= most, `${name}: ${reach[name].y.toFixed(2)} should be ${most} or more`);
-      assert.ok(reach[name].gap <= 2, `${name}: on the cursor all the way (${reach[name].gap.toFixed(2)} px)`);
-    }
-  },
-);
+// (design.md's band, 1.1 to 2.0, fell short: 3.29 and 1.90; the desktop's stage has 288 px over his
+// hang point. Standing up by 1.6 reaches it.)
+test('tilt: from a hang-height grab at the area’s middle, the cursor 60 px under the stage’s top lifts his collar to 3.3 on a phone and 2.0 on a desktop or more', (t) => {
+  /** @type {Record<string, {y: number, gap: number}>} */
+  const reach = {};
+  for (const name of ['phone', 'desktop']) {
+    const E = env(name);
+    const c = clampTo(E.bounds, { x: 0, z: 0 });
+    const collar = { x: c.x, y: HANG_Y, z: c.z };
+    const at = E.project(collar);
+    const top = { x: at.x, y: 60 };
+    const r = sim(E, { collar, path: [...still(at, 12), ...line(at, top, 60), ...still(top, 30)] });
+    reach[name] = { y: last(r).anchor.y, gap: Math.max(...r.frames.slice(12).map((f) => f.gap)) };
+    t.diagnostic(`${name}: the collar reaches ${reach[name].y.toFixed(2)}`);
+  }
+  for (const [name, most] of [
+    ['phone', 3.3],
+    ['desktop', 2.0],
+  ]) {
+    assert.ok(reach[name].y >= most, `${name}: ${reach[name].y.toFixed(2)} should be ${most} or more`);
+    assert.ok(reach[name].gap <= 2, `${name}: on the cursor all the way (${reach[name].gap.toFixed(2)} px)`);
+  }
+});
 
 test('tilt: zoomed out to 0.5x, 100 px further up past the back wall lifts him 0.4 or more and changes his depth by 0.05 or less', (t) => {
   for (const name of ['phone', 'desktop']) {
