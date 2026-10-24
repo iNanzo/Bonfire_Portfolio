@@ -635,11 +635,18 @@ test('surface ids: a marked material writes its id into alpha last; what’s dra
   const shader = { uniforms: {}, vertexShader: '', fragmentShader: THREE.ShaderLib.toon.fragmentShader };
   m.onBeforeCompile(shader, null);
   assert.equal(shader.uniforms.uSurfaceId.value, ID.floor / 16);
-  assert.match(shader.fragmentShader, /uniform float uSurfaceId;\s*uniform float uIdOn;\s*void main\(\) \{/);
-  // (After every include that writes gl_FragColor: three's toon shader still ends that way.)
+  assert.match(shader.fragmentShader, /uniform float uSurfaceId;\s*uniform float uIdOn;/);
+  // (After every include that writes gl_FragColor: three's toon shader still ends that way. Only
+  // the hover's tint at Pixel Size Off follows it, and that touches the colour, never the alpha.)
   assert.match(
     shader.fragmentShader,
-    /#include <dithering_fragment>\s*gl_FragColor\.a = mix\(1\.0, uSurfaceId, uIdOn\);\s*\}\s*$/,
+    /#include <dithering_fragment>\s*gl_FragColor\.a = mix\(1\.0, uSurfaceId, uIdOn\);/,
+  );
+  const after = shader.fragmentShader.slice(shader.fragmentShader.indexOf('gl_FragColor.a = mix('));
+  assert.equal([...after.matchAll(/gl_FragColor\.a/g)].length, 1, 'nothing writes the alpha after it');
+  assert.match(
+    after,
+    /^gl_FragColor\.a = [^\n]*\n\tif \(uIdOn < 0\.5 && uHover > 0\.0[^\n]*\n\t\tgl_FragColor\.rgb = [^\n]*\n\}\s*$/,
   );
   assert.equal(m.customProgramCacheKey(), 'invitation-surface-id');
   const decal = decalMaterial({ opacity: 0.2 });
@@ -899,6 +906,7 @@ test('the toolbar, the camera pad and the Settings sheet: every button named by 
     perf: false,
     govern: null,
     settle: null,
+    envelope: false,
   });
   assert.deepEqual(parseQuery(''), {
     test: false,
@@ -907,7 +915,12 @@ test('the toolbar, the camera pad and the Settings sheet: every button named by 
     perf: false,
     govern: null,
     settle: null,
+    envelope: true,
   });
+  // The envelope opens every visit; ?test skips it (the specs and tools start in the toy) unless
+  // &envelope asks for it.
+  assert.equal(parseQuery('?test&envelope').envelope, true);
+  assert.equal(parseQuery('?seed=3').envelope, true);
   // ?settle stretches the intro's reply settle (ms), for the specs only: under ?test.
   assert.equal(parseQuery('?test&settle=1500').settle, 1500);
   assert.equal(parseQuery('?settle=1500').settle, null);

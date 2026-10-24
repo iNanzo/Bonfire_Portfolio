@@ -244,6 +244,8 @@ export function parseQuery(search) {
     govern: q.has('govern') ? q.get('govern') !== 'off' : null,
     // (The intro's reply settle in ms, stretched for the browser specs: only under ?test.)
     settle: q.has('test') && settle > 0 ? settle : null,
+    // (The envelope that opens the page, every visit; ?test starts in the toy unless &envelope.)
+    envelope: !q.has('test') || q.has('envelope'),
   };
 }
 
