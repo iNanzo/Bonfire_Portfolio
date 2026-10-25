@@ -4,7 +4,8 @@
 // it, so closed its only lines are the outline and the V, and open the pocket's mouth shows), the
 // parts' order for those lines (IDS), the light, and the one toon material
 // everything on it is drawn with: flat-shaded in three tones (the paper one flat tone a face, each
-// face leaning into the light by its LEAN so it keeps one band through the sway; the petals' band
+// face lit as the rest pose has it (REST, paperLit) and leaning into the light by its LEAN, so it
+// keeps one band through the sway and the letter's turn; the petals' band
 // edges dithered), drawn either in its colours or as its part's id (the scene draws both and
 // lines the borders between parts), and dissolving as the letter goes: a smooth noise and a
 // screen-locked 4×4 Bayer dither over how far up the letter it is (envelope.js DISSOLVE runs the
@@ -46,12 +47,31 @@ export const IDS = { body: 1, inside: 2, pocket: 3, flap: 4, seal: 5, petal: 6 }
 export const TILT = -0.36;
 export const PITCH = -0.12;
 
+/**
+ * The letter's rest pose (TILT and PITCH, as the scene turns it) as a rotation: the paper's flat
+ * faces are lit as this pose has them (paperLit), so the sway and the letter's turn never change
+ * their tones.
+ */
+export const REST = new THREE.Matrix3().setFromMatrix4(
+  new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(PITCH, 0, TILT)),
+);
+
 /** The light (view space, a unit vector): from the upper left, in front. */
 export const LIGHT = (() => {
   const [x, y, z] = [-0.5, 0.62, 0.6];
   const n = Math.hypot(x, y, z);
   return [x / n, y / n, z / n];
 })();
+/**
+ * How lit a paper face is (its normal on the light, before its LEAN): its normal in the letter's
+ * own frame (`n`, a unit vector), turned by the rest pose (REST). The toon material runs the same
+ * sums for FLAT.
+ * @param {THREE.Vector3} n
+ */
+export function paperLit(n) {
+  const r = n.clone().applyMatrix3(REST);
+  return r.x * LIGHT[0] + r.y * LIGHT[1] + r.z * LIGHT[2];
+}
 /** The bands: a face lit more than `light` takes the light tone, more than `mid` the mid, else the shade. */
 export const SHADES = { light: 0.74, mid: 0.4 };
 /**
@@ -151,14 +171,16 @@ const vec3Of = (hex) => {
 
 /**
  * The uniforms every part shares: the light (view space), the dissolve (0..1) and its edge
- * (DISSOLVE.edge of it), the world to the letter's own −1…1 units, and whether this pass draws
- * ids (1) or colours (0).
+ * (DISSOLVE.edge of it), the world to the letter's own −1…1 units, the world to the letter's own
+ * frame (unscaled: the paper's normals are taken there), and whether this pass draws ids (1) or
+ * colours (0).
  */
 export const shared = () => ({
   uLight: { value: new THREE.Vector3(...LIGHT) },
   uDissolve: { value: 0 },
   uEdge: { value: 0 },
   uToLetter: { value: new THREE.Matrix4() },
+  uToInner: { value: new THREE.Matrix4() },
   uIdPass: { value: 0 },
 });
 
@@ -166,7 +188,8 @@ export const shared = () => ({
  * The toon material: three tones, flat-shaded, band edges dithered on the texel grid; drawn as
  * its colours or as `id`; dissolving with the letter. `extra` adds uniforms, `defines` (SEAL,
  * PETAL) and GLSL (the seal's sealFace(): its colour, alpha 0 off the wax); `lean` makes it the
- * paper's: FLAT, one tone a face and no dither, leaning into the light by that much (LEAN).
+ * paper's: FLAT, one tone a face and no dither, leaning into the light by that much (LEAN), and
+ * lit as the rest pose has it (paperLit: its normal in the letter's own frame, turned by REST).
  * @param {number[]} tones  light, mid, shade (sRGB hex)
  * @param {ReturnType<typeof shared>} u
  * @param {number} id  IDS
@@ -179,7 +202,7 @@ export function toon(tones, u, id, extra = {}) {
       ...u,
       uTones: { value: tones.map(rgb) },
       uId: { value: id },
-      ...(flat ? { uLean: { value: extra.lean } } : {}),
+      ...(flat ? { uLean: { value: extra.lean }, uRest: { value: REST } } : {}),
       ...extra.uniforms,
     },
     defines: { ...(flat ? { FLAT: '' } : {}), ...extra.defines },
@@ -187,6 +210,10 @@ export function toon(tones, u, id, extra = {}) {
       uniform mat4 uToLetter;
       varying vec3 vView;
       varying vec2 vLetter;
+      #ifdef FLAT
+      uniform mat4 uToInner;
+      varying vec3 vInner;
+      #endif
       #ifdef PETAL
       attribute float aShade;
       varying float vShade;
@@ -201,6 +228,9 @@ export function toon(tones, u, id, extra = {}) {
         #endif
         vec4 w = modelMatrix * p;
         vLetter = (uToLetter * w).xy;
+        #ifdef FLAT
+        vInner = (uToInner * w).xyz;
+        #endif
         vec4 mv = viewMatrix * w;
         vView = mv.xyz;
         gl_Position = projectionMatrix * mv;
@@ -215,6 +245,8 @@ export function toon(tones, u, id, extra = {}) {
       uniform float uId;
       #ifdef FLAT
       uniform float uLean;
+      uniform mat3 uRest;
+      varying vec3 vInner;
       #endif
       varying vec3 vView;
       varying vec2 vLetter;
@@ -240,11 +272,13 @@ export function toon(tones, u, id, extra = {}) {
           gl_FragColor = vec4(uId / 255.0, uDissolve > 0.0 && e < 0.16 ? 1.0 : 0.0, 0.0, 1.0);
           return;
         }
-        vec3 n = normalize(cross(dFdx(vView), dFdy(vView)));
         #ifdef FLAT
-        // (The paper's back, once the flap's open, takes the inside's shade.)
+        // (Its normal in the letter's own frame, lit as the rest pose has it: the sway and the
+        // turn never change its tone. The paper's back, once the flap's open, takes the inside's.)
+        vec3 n = uRest * normalize(cross(dFdx(vInner), dFdy(vInner)));
         float v = dot(n, uLight) + (gl_FrontFacing ? uLean : ${LEAN.inside.toFixed(4)});
         #else
+        vec3 n = normalize(cross(dFdx(vView), dFdy(vView)));
         float v = dot(n, uLight) + (b - 0.5) * 0.06;
         #endif
         float band = v > ${SHADES.light.toFixed(4)} ? 0.0 : v > ${SHADES.mid.toFixed(4)} ? 1.0 : 2.0;

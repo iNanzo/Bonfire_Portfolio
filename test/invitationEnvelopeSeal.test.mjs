@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { LOGO_STROKES } from '../src/ui/logo.js';
-import { HOVER, IDS, INK, LIGHT, PAPER, SHADES, WAX, rgb, shared, toon } from '../src/invitation/envelopeLook.js';
+import { HOVER, IDS, INK, LIGHT, PAPER, REST, SHADES, WAX, rgb, shared, toon } from '../src/invitation/envelopeLook.js';
 import { HOVER_INK } from '../src/invitation/retro.js';
 import {
   MONOGRAM_PATH,
@@ -419,6 +419,8 @@ test('the parts’ order lines the pocket’s mouth over the inside; the seal is
   assert.equal(m.uniforms.uId.value, IDS.flap);
   assert.equal(m.uniforms.uLean.value, 0.2);
   assert.ok('FLAT' in m.defines, 'paper is flat: one tone a face, no dither');
+  assert.equal(m.uniforms.uRest.value, REST, 'lit as the rest pose has it, whatever the letter’s turn');
+  assert.equal(m.uniforms.uToInner, u.uToInner, 'one world-to-letter for every part');
   assert.equal(m.uniforms.uIdPass, u.uIdPass, 'one switch for every part’s id pass');
   assert.equal(m.uniforms.uDissolve, u.uDissolve, 'one dissolve for the whole letter');
   const seal = buildSeal(u, 0.4);

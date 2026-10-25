@@ -9,8 +9,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { IDS, LEAN, LIGHT, PITCH, SHADES, bandOf, envelopeLayout } from '../src/invitation/envelopeLook.js';
-import { SWAY } from '../src/invitation/envelope.js';
+import {
+  IDS,
+  LEAN,
+  LIGHT,
+  PITCH,
+  REST,
+  SHADES,
+  TILT,
+  bandOf,
+  envelopeLayout,
+  paperLit,
+} from '../src/invitation/envelopeLook.js';
+import { SWAY, TURN } from '../src/invitation/envelope.js';
 
 const L = envelopeLayout();
 const ORDER = /** @type {(keyof typeof L.parts)[]} */ (['body', 'inside', 'pocket', 'flap']);
@@ -196,16 +207,28 @@ test('the pocket’s mouth and the inside lie under the closed flap', () => {
   for (const [x, y] of inner) if (Math.abs(x) < L.W / 2 - 1e-9) assert.ok(inside(flap, x, y), 'the inside shows');
 });
 
-test('every paper face is one flat tone, the same through the whole sway: the flap light, the pocket mid, the inside shade', () => {
+test('every paper face is one flat tone, the same through the whole sway and the letter’s turn: the flap light, the pocket mid, the inside shade', () => {
   const want = { body: 1, inside: 2, pocket: 1, flap: 0 };
   const light = new THREE.Vector3(...LIGHT);
   assert.ok(Math.abs(light.length() - 1) < 1e-9);
+  // (The rest pose: the letter's lean and tip, as the scene sets them.)
+  const rest = new THREE.Matrix3().setFromMatrix4(
+    new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(PITCH, 0, TILT)),
+  );
+  assert.deepEqual(REST.elements, rest.elements);
+  const most = SWAY + TURN.max;
   for (const part of ORDER)
-    for (let yaw = -SWAY; yaw <= SWAY + 1e-9; yaw += SWAY / 8) {
-      const n = new THREE.Vector3(0, 0, 1)
-        .applyEuler(new THREE.Euler(PITCH, 0, 0))
-        .applyEuler(new THREE.Euler(0, yaw, 0));
-      const v = n.dot(light) + LEAN[part];
+    for (let yaw = -most; yaw <= most + 1e-9; yaw += most / 8) {
+      // (The face as drawn, turned by the sway and the turn; its normal taken back into the
+      // letter's own frame (the shader's derivatives there) and lit as the rest pose has it.)
+      const pose = new THREE.Matrix4()
+        .makeRotationY(yaw)
+        .multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(PITCH, 0, TILT)));
+      const drawn = new THREE.Vector3(0, 0, 1).transformDirection(pose);
+      const own = drawn.clone().transformDirection(pose.clone().invert());
+      const v = paperLit(own) + LEAN[part];
+      // (At rest, the same as lighting it as drawn.)
+      if (Math.abs(yaw) < 1e-9) assert.ok(Math.abs(v - drawn.dot(light) - LEAN[part]) < 1e-9);
       assert.equal(bandOf(v), want[part], `${part} at a yaw of ${yaw.toFixed(2)}: ${v.toFixed(3)}`);
       // (Well inside its band, so it never flickers to the next.)
       for (const edge of [SHADES.light, SHADES.mid]) assert.ok(Math.abs(v - edge) > 0.05, `${part}: ${v} by ${edge}`);

@@ -28,6 +28,9 @@ import {
   FLAP_TIP,
   letterCovers,
   sealBloom,
+  TURN,
+  turnGoal,
+  turnStep,
   envelopeGesture,
   envelopeKey,
   hintFor,
@@ -445,4 +448,38 @@ test('the hover eases in as the pointer comes onto the letter and out as it leav
   assert.ok(k < 1 && k > 0);
   for (let i = 0; i < 40; i++) k = hoverStep(k, false, 0.05);
   assert.equal(k, 0);
+});
+
+test('the letter leans gently toward the pointer’s x, and a sideways drag or a held arrow turns it further, 0.15 rad at most', () => {
+  assert.ok(TURN.max <= 0.15 + 1e-9 && TURN.max >= 0.12, `at most ${TURN.max}`);
+  assert.equal(turnGoal({}), 0, 'no pointer, no drag, no key: square on');
+  // (Toward the pointer: right of the middle turns its face right, gently.)
+  const right = turnGoal({ pointer: 1 });
+  assert.ok(right > 0.03 && right <= 0.08, `toward the right edge ${right}`);
+  assert.equal(turnGoal({ pointer: -1 }), -right);
+  assert.ok(Math.abs(turnGoal({ pointer: 0.5 }) - right / 2) < 1e-9, 'by how far off the middle');
+  assert.equal(turnGoal({ pointer: 4 }), right, 'never past the edge’s');
+  // (A sideways drag turns it further its way, more the further it goes, never past the most.)
+  const w = 1000;
+  const small = turnGoal({ pointer: 0, dx: 50, w });
+  const big = turnGoal({ pointer: 0, dx: 400, w });
+  assert.ok(small > 0 && big > small, `${small} then ${big}`);
+  assert.ok(turnGoal({ pointer: 1, dx: 5000, w }) <= TURN.max + 1e-9);
+  assert.ok(turnGoal({ pointer: -1, dx: -5000, w }) >= -TURN.max - 1e-9);
+  assert.ok(turnGoal({ pointer: 1, dx: 5000, w }) > TURN.max - 0.01, 'all the way, dragged far');
+  // (A held arrow: further its way.)
+  assert.ok(turnGoal({ key: 1 }) > right, 'ArrowRight');
+  assert.equal(turnGoal({ key: -1 }), -turnGoal({ key: 1 }), 'ArrowLeft');
+  assert.ok(turnGoal({ pointer: 1, key: 1 }) <= TURN.max + 1e-9);
+});
+
+test('the turn eases toward where it heads and springs back once let go; reduced motion keeps it square on', () => {
+  let a = 0;
+  const trace = [];
+  for (let i = 0; i < 60; i++) trace.push((a = turnStep(a, 0.12, 1 / 60)));
+  assert.ok(trace[0] > 0 && trace[0] < 0.06, `eased: ${trace[0]} after a frame`);
+  assert.ok(Math.abs(a - 0.12) < 0.01, `there within a second: ${a}`);
+  for (let i = 0; i < 90; i++) a = turnStep(a, 0, 1 / 60);
+  assert.ok(Math.abs(a) < 0.005, `back square on: ${a}`);
+  assert.equal(turnStep(0.1, 0.12, 1 / 60, true), 0);
 });

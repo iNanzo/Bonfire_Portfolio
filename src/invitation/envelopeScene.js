@@ -21,7 +21,10 @@
 // Input is all its own while it's up: a tap or click, Enter, Space or ArrowUp opens it; Escape or
 // ArrowDown skips; a drag follows the finger with some give (the seal starting to open as it goes
 // up) and opens or skips on release (envelopeGesture), else springs back; the wheel opens or skips
-// once it adds up; Skip Intro skips. It takes focus at boot with no ring: the ring shows once a key
+// once it adds up; Skip Intro skips. While it floats it leans gently toward the pointer (a finger
+// while it's down), and a sideways drag or a held ArrowLeft or ArrowRight turns it further, springing
+// back (turnGoal; a sideways drag never opens or skips it); hovered, a gold rim pulses slowly round
+// it (hoverPulse). It takes focus at boot with no ring: the ring shows once a key
 // is pressed. veils(spots) says whether it still hides NEWT (his head, collar and middle: the
 // intro's first line waits for it; envelope.js letterCovers at points of each on the letter).
 // The hint ("Click or swipe up to open", "Tap ..." on a touch screen, / "Swipe down to skip")
@@ -44,6 +47,8 @@ import {
   hoverPulse,
   hoverStep,
   letterCovers,
+  turnGoal,
+  turnStep,
   particleAt,
   sealBloom,
   shedParticles,
@@ -458,6 +463,19 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   let overLetter = false;
   /** The hover pulse: eased in (k), seconds into it (t: from its start), and as shown (pulse). */
   const hover = { k: 0, t: 0, pulse: 0 };
+  /**
+   * The letter's turn as shown (radians), the pointer's x it leans toward (−1 left edge to 1
+   * right: the mouse anywhere over it, a finger while it's down; null without one) and the arrow
+   * key held (−1 ArrowLeft, 1 ArrowRight, 0 none).
+   */
+  let turn = 0;
+  /** @type {number|null} */
+  let pointerX = null;
+  let keyTurn = 0;
+  /** @param {PointerEvent} e */
+  const leanTo = (e) => {
+    pointerX = (e.clientX / view.cssW) * 2 - 1;
+  };
   let keyboard = false;
   let lastInput = clock();
   let frames = 0;
@@ -516,6 +534,8 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     uncovered = true;
     layer.classList.add('is-leaving');
     doc.removeEventListener('keydown', onKey, true);
+    doc.removeEventListener('keyup', onKeyUp, true);
+    keyTurn = 0;
     onUncover?.(how);
   }
   /** A key was pressed: from now on keyboard focus shows its ring. */
@@ -529,6 +549,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     if (drag || (e.pointerType === 'mouse' && e.button !== 0) || !env.covers) return;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), dx: 0, dy: 0 };
     dragStir = false;
+    leanTo(e);
     // (A touch stirs the petals where it lands.)
     if (e.pointerType !== 'mouse' && env.state === 'floating') stirFrom(e);
     try {
@@ -541,6 +562,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     if (e.pointerType === 'mouse') {
       hovered = true;
       overLetter = onLetterAt(e.clientX, e.clientY);
+      leanTo(e);
       // (The mouse over it stirs a few petals now and then as it moves.)
       if (stirAt) stirMove += Math.hypot(e.clientX - stirAt.x, e.clientY - stirAt.y);
       stirAt = { x: e.clientX, y: e.clientY };
@@ -550,12 +572,15 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     lastInput = clock();
     drag.dx = e.clientX - drag.x;
     drag.dy = e.clientY - drag.y;
+    leanTo(e);
   });
   const release = (e, cancelled) => {
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag;
     drag = null;
     lastInput = clock();
+    // (A finger lifted: nothing to lean toward.)
+    if (e.pointerType !== 'mouse') pointerX = null;
     if (cancelled) return;
     const small = Math.abs(d.dx) < SWIPE.tap && Math.abs(d.dy) < SWIPE.tap;
     const g = small ? 'open' : envelopeGesture(d.dx, d.dy, performance.now() - d.t, view.cssH);
@@ -576,6 +601,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     if (e.pointerType !== 'mouse') return;
     hovered = false;
     overLetter = false;
+    pointerX = null;
   });
   layer.addEventListener('contextmenu', (e) => e.preventDefault());
   layer.addEventListener(
@@ -603,6 +629,13 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
       (doc.activeElement === hit ? skipBtn : hit).focus();
       return;
     }
+    // (The arrows across turn it further while they're held.)
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      byKeyboard();
+      keyTurn = e.key === 'ArrowLeft' ? -1 : 1;
+      return;
+    }
     const what = envelopeKey(e.key);
     if (!what) return;
     // (Skip Intro presses itself with Enter or Space.)
@@ -613,7 +646,16 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     if (what === 'open') open();
     else skip();
   }
+  /** @param {KeyboardEvent} e */
+  function onKeyUp(e) {
+    if ((e.key === 'ArrowLeft' && keyTurn < 0) || (e.key === 'ArrowRight' && keyTurn > 0)) keyTurn = 0;
+  }
+  const onBlur = () => {
+    keyTurn = 0;
+  };
   doc.addEventListener('keydown', onKey, true);
+  doc.addEventListener('keyup', onKeyUp, true);
+  win.addEventListener('blur', onBlur);
   // (Focus at boot isn't the visitor's: no ring until a key is pressed. focusVisible is newer
   // than the DOM's types.)
   hit.focus(/** @type {FocusOptions} */ ({ preventScroll: true, focusVisible: false }));
@@ -696,7 +738,11 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     // (Settling in as it arrives: from a touch above, a touch small.)
     const arrive = (1 - p.arrive) * view.h * 0.04;
     outer.position.set(0, p.bob - follow.y * pxToWorld - p.drop * view.h * 0.9 + arrive, p.push * 0.6);
-    outer.rotation.set(0, p.yaw, -0.5 * p.drop);
+    // (Turned toward the pointer, and further by a sideways drag or a held arrow, while it floats.)
+    const goal =
+      env.state === 'floating' ? turnGoal({ pointer: pointerX, dx: drag?.dx ?? 0, w: view.cssW, key: keyTurn }) : 0;
+    turn = turnStep(turn, goal, dt, reduced);
+    outer.rotation.set(0, p.yaw + turn, -0.5 * p.drop);
     outer.scale.setScalar(view.scale * (1 + 0.025 * p.pulse) * (0.94 + 0.06 * p.arrive));
     envl.hinge.rotation.x = -p.flap;
     // The seal: whole, starting to open as a finger drags it up, then blooming into petals,
@@ -709,7 +755,8 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     seal.group.visible = bloom.scale > 0 && placeSeal();
     petalsAt(pt, p);
     // The dissolve: the edge across the letter, in its own units.
-    toLetter.copy(inner.matrixWorld).invert().premultiply(letterScale);
+    u.uToInner.value.copy(inner.matrixWorld).invert();
+    toLetter.copy(u.uToInner.value).premultiply(letterScale);
     u.uToLetter.value.copy(toLetter);
     u.uEdge.value = DISSOLVE.edge(p.dissolve);
     u.uDissolve.value = p.dissolve;
@@ -867,7 +914,9 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     gone = true;
     win.cancelAnimationFrame(raf);
     win.removeEventListener('resize', onResize);
+    win.removeEventListener('blur', onBlur);
     doc.removeEventListener('keydown', onKey, true);
+    doc.removeEventListener('keyup', onKeyUp, true);
     for (const s of [scene, compose.scene]) {
       s.traverse((o) => {
         const m = /** @type {any} */ (o);
@@ -903,6 +952,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
       const petalsNow = { live: flow.live(pt), emitted: flow.emitted };
       const sealNow = { first: firstSeal, last: lastSeal };
       const hoverNow = { k: hover.k, pulse: hover.pulse };
+      const turnNow = { now: turn, pointer: pointerX, key: keyTurn };
       return {
         state: env.state,
         reduced,
@@ -912,6 +962,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
         petals: petalsNow,
         seal: sealNow,
         hover: hoverNow,
+        turn: turnNow,
       };
     },
     /** Steps aside (no WebGL for the toy, or it couldn't load): skipped, with no intro. */
