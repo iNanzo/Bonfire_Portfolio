@@ -341,11 +341,13 @@ export function sealBloom(b) {
 }
 
 /**
- * The letter's turn, radians: it leans up to `lean` toward the pointer's x; a sideways drag (by
- * `reach` of the screen's width, softly) or a held arrow key turns it up to `push` further; never
- * more than `max` in all; it eases toward that over about `ease` seconds and springs back.
+ * The letter's turn, radians: it leans up to `lean` toward the pointer's x, eased out (most of it
+ * by halfway to the edge: about 0.1 there, so it reads at a glance); a sideways drag (by `reach`
+ * of the screen's width, softly) or a held arrow key turns it up to `push` further; never more
+ * than `max` in all; it eases toward that over about `ease` seconds and springs back. (The
+ * paper's tones don't change with its yaw, so the whole range reads as one flat letter turning.)
  */
-export const TURN = { lean: 0.06, push: 0.12, reach: 0.25, max: 0.15, ease: 0.12 };
+export const TURN = { lean: 0.14, push: 0.16, reach: 0.25, max: 0.24, ease: 0.12 };
 
 /**
  * Where the letter's turn heads (radians, its face toward +x for more): toward the pointer
@@ -355,7 +357,8 @@ export const TURN = { lean: 0.06, push: 0.12, reach: 0.25, max: 0.15, ease: 0.12
  * @param {{pointer?: number|null, dx?: number, w?: number, key?: number}} o
  */
 export function turnGoal({ pointer = null, dx = 0, w = 1, key = 0 }) {
-  const lean = pointer === null ? 0 : TURN.lean * Math.max(-1, Math.min(1, pointer));
+  const x = pointer === null ? 0 : Math.max(-1, Math.min(1, pointer));
+  const lean = TURN.lean * Math.sign(x) * (1 - (1 - Math.abs(x)) ** 2);
   const push = TURN.push * (Math.tanh(dx / (TURN.reach * Math.max(1, w))) + key);
   return Math.max(-TURN.max, Math.min(TURN.max, lean + push));
 }

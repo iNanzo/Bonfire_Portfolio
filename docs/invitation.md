@@ -43,9 +43,10 @@ loading screen too: NEWT loads behind it.
   after a moment without a touch), a gold rim pulses slowly round it, seal and all, about every
   three seconds, fading right out between pulses so you can see it clearly. With reduced motion
   the rim holds steady.
-- **Turn it:** it leans gently toward the mouse (on a phone, toward your finger while it's down);
+- **Turn it:** it leans toward the mouse, clearly enough to see (about 6° with the mouse halfway
+  to the edge of the screen, 8° at the edge; on a phone, toward your finger while it's down);
   drag it sideways or hold the left or right arrow key to turn it further, and it springs back
-  when you let go. It never turns more than about 9°.
+  when you let go. It never turns more than about 14°.
 - **Open it:** tap or click it, press Enter, Space or the up arrow, swipe it up, or scroll up.
   The seal blooms into roses first (about half a second): it swells, then shrinks away while a
   ring of petals unfurls out of it and lifts off, and the swirl is flung outward. Only then does
@@ -736,7 +737,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   clearing over `TIMES.clear`), a skip's drop, `BOB` and `SWAY`, `TIMES`; the hover's pulse,
   `hoverStep` and `hoverPulse(k, t)` (`HOVER_PULSE`: the eased hover times
   0.5 − 0.5·cos(2πt / 2.8 s), steady with reduced motion); the letter's turn, `turnGoal` (toward
-  the pointer's x, plus a sideways drag or a held arrow, at most `TURN.max`, 0.15 rad) and
+  the pointer's x, eased out to `TURN.lean` (0.14 rad at the edge, about 0.1 halfway), plus a
+  sideways drag or a held arrow up to `TURN.push` (0.16), at most `TURN.max`, 0.24 rad) and
   `turnStep` (eased, springing back; none with reduced motion); the dissolve's sums,
   `DISSOLVE` and `dissolveAt(x, y)` (mostly how far up the letter, leaning across, plus a smooth
   noise; the shader runs the same with a screen-locked Bayer dither on top), and its specks,

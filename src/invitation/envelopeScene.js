@@ -23,7 +23,7 @@
 // Input is all its own while it's up: a tap or click, Enter, Space or ArrowUp opens it; Escape or
 // ArrowDown skips; a drag follows the finger with some give (the seal starting to open as it goes
 // up) and opens or skips on release (releaseGesture), else springs back; the wheel opens or skips
-// once it adds up; Skip Intro skips. While it floats it leans gently toward the pointer (a finger
+// once it adds up; Skip Intro skips. While it floats it leans clearly toward the pointer (a finger
 // while it's down), and a sideways drag or a held ArrowLeft or ArrowRight turns it further, springing
 // back (turnGoal; a sideways drag never opens or skips it); hovered, a gold rim pulses slowly round
 // it (hoverPulse). It takes focus at boot with no ring: the ring shows once a key
