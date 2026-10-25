@@ -1,12 +1,15 @@
 // The 'bead' drag kind (src/invitation/holds/bead.js), checked as numbers against design.md's
 // candidate on the toy's own default phone (390x844) and desktop (1280x800) cameras (pixels.js
 // frameView's distance, a 20° pinhole like camera.js's): held still, 100 px up the screen carries
-// him away as far as a level plane would; a flick up lofts him toward the camera and he settles
-// back; a flick down skims the floor; his collar is on the cursor every frame; the wheel and a
-// second finger set his hold height; the back wall is a climb and a side wall never slides him in
-// depth; the rope goes slack on a drop and its swing dies away; a throw lands where the preview
-// ring said, an up flick further away with a lob (not as far as one across); he keeps the heading
-// he was grabbed with; and a frame costs well under 0.15 ms.
+// him away as far as a level plane would (a finger 0.6 as far); a flick up lofts him toward the
+// camera and he settles back; a flick down skims the floor, his collar 0.06 over his hang height;
+// his collar is on the cursor every frame; the wheel and a second finger lift him straight up
+// over his spot on the floor (the wheel.log check, 12°-36°), and so does a drag into the stage's
+// top band; the back wall is a climb and a side wall never slides him in depth; the rope goes
+// slack on a drop and its swing dies away; the ring sits under his collar held still (a still
+// let-go lands there) and where a throw will land, an up flick further away with a lob (not as
+// far as one across), over a finger's tip; no step hands back a heading; an orbit mid-hold keeps
+// his collar on the cursor; and a frame costs well under 0.15 ms.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -561,6 +564,59 @@ test('bead, height (the wheel.log check): at 12°, 15°, 20°, 24°, 30° and 36
       const gap = Math.max(...after.map((f) => f.gap));
       assert.ok(gap <= 1, `${at}: ${gap.toFixed(2)} px off the cursor 0.12 s after the move`);
     }
+  }
+});
+
+test('bead, an orbit mid-hold (36° down to 12° over 1 s, the cursor still): his collar stays within 1 px of the cursor and no frame moves it over 0.15', () => {
+  for (const screen of ['phone', 'desktop']) {
+    const elevationAt = (t) => 36 - 24 * Math.min(1, Math.max(0, t - 1.2));
+    const r0 = rig(screen);
+    const c = centrePx(r0);
+    const hold = createBeadHold({ rng: seeded() });
+    const at = home(r0);
+    const collar = { x: at.x, y: STAND, z: at.z };
+    const body = createBody({ x: at.x, z: at.z });
+    const move = { mode: 'stay', goal: null, speed: 0 };
+    const dt = 1 / 60;
+    hold.start({
+      t: 0,
+      collar,
+      press: c,
+      collarPx: r0.project(collar),
+      rayAt: r0.rayAt,
+      camera: r0.camera,
+      low: LOW,
+      bounds: r0.bounds,
+    });
+    let last = collar;
+    let jump = 0;
+    let gap = 0;
+    for (let t = 0; t <= 2.7 + 1e-9; t += dt) {
+      const r = rig(screen, { elevation: elevationAt(t) });
+      const st = hold.step({
+        t,
+        dt,
+        px: c,
+        rayAt: r.rayAt,
+        camera: r.camera,
+        low: LOW,
+        bounds: r.bounds,
+        carry: body.mode === 'held' ? body.carry : null,
+        clip: 'Held',
+        project: r.project,
+        stage: { top: 0, height: r.h },
+      });
+      bodyStep(body, { state: 'held', move, pointer: null, bounds: r.bounds, dt, t, collar: last, target: st.anchor });
+      const now = body.carry.anchor;
+      if (t >= 0.3) {
+        jump = Math.max(jump, Math.hypot(now.x - last.x, now.y - last.y, now.z - last.z));
+        const on = r.project(now);
+        gap = Math.max(gap, Math.hypot(on.x - c.x, on.y - c.y));
+      }
+      last = now;
+    }
+    assert.ok(gap <= 1, `${screen}: ${gap.toFixed(2)} px off the cursor`);
+    assert.ok(jump <= 0.15, `${screen}: a frame moved him ${jump.toFixed(3)}`);
   }
 });
 
