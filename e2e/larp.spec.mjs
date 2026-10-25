@@ -159,7 +159,9 @@ test('a saved game it cannot read is kept aside, never written over', async ({ p
   await page.goto('/larp/');
   await page.evaluate(() => (localStorage.clear(), localStorage.setItem('larp.game', '{"v":1,"truncat')));
   await page.reload();
-  await expect(page.locator('[data-note]')).toHaveText(/kept aside/);
+  await expect(page.locator('[data-note]')).toHaveText(
+    'The saved game couldn’t be read. A new game started; the original is preserved.',
+  );
   expect(await page.evaluate(() => localStorage.getItem('larp.game.unreadable'))).toBe('{"v":1,"truncat');
   expect(errors).toEqual([]);
 });
