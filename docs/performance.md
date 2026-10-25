@@ -191,7 +191,10 @@ slowdown, as on a slower laptop), `--alloc 4`, `--profile`, `--cap 60`, `--seed 
 `--root`, the checkout's commit is recorded too.
 
 `--dev` runs work on any commit (the dev hooks have been there all along), which is what a
-before/after needs. `--prod` needs a build that honors `?bench` (round 10 on).
+before/after needs. `--prod` needs a build that honors `?bench` (round 10 on). A build
+with the sitewide lock on (`content.json` `gate`, docs/admin.md) sends a browser without
+its cookie to `/unlock/`, so every context the bench opens starts with the cookie that
+checkout's `content.json` opens (`e2e/lib/gateSetup.mjs` `gateStateFor`), as the specs do.
 
 ## Comparing two runs: `tools/bench-compare.mjs`
 

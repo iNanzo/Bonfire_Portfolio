@@ -144,7 +144,7 @@ test('virtual:invitation-content: only the invitation subtree, read from content
   }
 });
 
-test('the portfolio’s own content.json import leaves the invitation out (no lines in every visit)', async () => {
+test('the portfolio’s own content.json import leaves the invitation and the lock out (weight in every visit)', async () => {
   const { invitationContent } = await import('../vite.config.js');
   const { fileURLToPath } = await import('node:url');
   const file = fileURLToPath(new URL('../src/content.json', import.meta.url));
@@ -155,10 +155,16 @@ test('the portfolio’s own content.json import leaves the invitation out (no li
     const out = plugin.transform(text, id);
     const c = JSON.parse(out.code);
     assert.equal(c.invitation, undefined, id);
+    // (The lock's words and key are the build's and the lock page's: the site never reads them.)
+    assert.equal(c.gate, undefined, id);
     const rest = content();
     delete rest.invitation;
+    delete rest.gate;
     assert.deepEqual(c, rest, 'the rest as it is');
   }
+  const onlyGate = content();
+  delete onlyGate.invitation;
+  assert.equal(JSON.parse(plugin.transform(JSON.stringify(onlyGate), file).code).gate, undefined, 'the lock alone too');
   assert.equal(plugin.transform('{"a":1}', '/elsewhere/content.json'), null, 'another file is left alone');
   assert.equal(plugin.transform('export {}', `${posix.replace(/\.json$/, '.js')}`), null);
 });

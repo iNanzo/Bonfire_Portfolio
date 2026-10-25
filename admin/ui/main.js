@@ -461,8 +461,8 @@ function resetBlock(key, effectsKey) {
 
 /**
  * A section content.json doesn't have yet: the optional scenes start as an empty list on the
- * first add; the Invitation page's start from the toy's own values (schema.js STARTERS), so
- * content from before the toy can be edited all the same.
+ * first add; the Invitation page's start from the toy's own values and the lock from its
+ * defaults (schema.js STARTERS), so content from before them can be edited all the same.
  */
 function missing(key) {
   if (STARTERS[key]) return starter(key);
@@ -489,18 +489,26 @@ function missing(key) {
 
 /** A section that can start from built-in values: a word on what shows now, and the button. */
 function starter(key) {
+  // (The lock's start is its defaults, off; the Invitation page's, the toy's own values.)
+  const [said, button] =
+    key === 'gate'
+      ? [
+          'Not in content.json yet, so nothing is locked. Start from the defaults to set the lock up.',
+          'Start From the Defaults',
+        ]
+      : [
+          'Not in content.json yet, so the toy uses its own. Start from those to change them here.',
+          'Start From the Toy’s Own',
+        ];
   return el(
     'div',
     { class: 'collection' },
-    el('p', {
-      class: 'help',
-      text: 'Not in content.json yet, so the toy uses its own. Start from those to change them here.',
-    }),
+    el('p', { class: 'help', text: said }),
     el('button', {
       type: 'button',
       class: 'add',
-      text: 'Start From the Toy’s Own',
-      'aria-label': `Start From the Toy’s Own: ${labelOf(key)}`,
+      text: button,
+      'aria-label': `${button}: ${labelOf(key)}`,
       onclick: () => {
         const path = parsePath(key);
         let at = ctx.draft;
@@ -757,6 +765,9 @@ function summarize(uploadCount) {
       `edit ${changedKeys.map((k) => (k === 'effects' ? 'effects' : (LABELS[k] ?? k).toLowerCase())).join(', ')}`,
     );
   if (differs('scenes')) parts.push('edit scenes');
+  if (JSON.stringify(ctx.draft.gate?.key) !== JSON.stringify(state.original.gate?.key))
+    parts.push('change the lock password');
+  else if (differs('gate')) parts.push('edit access');
   if (differs('admin')) parts.push('rename admin labels');
   if (uploadCount) parts.push(`add ${uploadCount} image${uploadCount > 1 ? 's' : ''}`);
   const removed = [...imageRefs(state.original)].filter((src) => !imageRefs(ctx.draft).has(src)).length;

@@ -1108,6 +1108,27 @@
     "body": "This path doesn’t lead anywhere. The page may have moved, or it never existed.",
     "cta": "Return to the fire"
   },
+  "gate": {
+    "on": false,
+    "pages": {
+      "portfolio": true,
+      "live": true,
+      "painter": true,
+      "larp": true,
+      "games": true,
+      "invitation": false
+    },
+    "remember": 30,
+    "lock": {
+      "eyebrow": "Warded",
+      "title": "The way is sealed",
+      "flavor": "An old ward holds this fire. Speak the word, and it will let you pass.",
+      "label": "Password",
+      "button": "Break the Seal",
+      "wrong": "The seal holds. That isn’t the word.",
+      "working": "The ward listens…"
+    }
+  },
   "effects": {
     "colors": {
       "void": "#07070b",
