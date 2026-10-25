@@ -7,7 +7,9 @@
 // button or by himself) and the tablet's sit and lie keep the way he faces. Held, he hangs his
 // head (a light look aimed down, the sad face), glances up at you every TUNE.lookUpMin–lookUpMax
 // s for TUNE.lookUpForMin–lookUpForMax s (BrainOut.look.up, eased in and out; never during a
-// Thrash), and thrashes every TUNE.thrashMin–thrashMax s (sooner when he's shaken hard): Thrash
+// Thrash: a Thrash waits for a glance under way or about to come unless a hard shake brought
+// it, and a glance it cut or that came due meanwhile comes after it), and thrashes every
+// TUNE.thrashMin–thrashMax s (sooner when he's shaken hard): Thrash
 // once, then Held again on its own clock; held, falling and landing he keeps the way he faced
 // when he was grabbed. Give Device (the button 'Device') alternates: sitting down with the
 // tablet (SitDown, then DeviceSit; from Sit, DeviceSit where he sits), lying on his stomach with
@@ -132,25 +134,34 @@ export const TUNE = {
   heldLook: 0.15,
   heldPitch: -0.5,
   /**
-   * Held, every lookUpMin–lookUpMax s (since he was grabbed or his last glance up; one that came
-   * due while he thrashed, lookUpRest s after the Thrash) he glances up at you for lookUpForMin–lookUpForMax s: BrainOut.look.up eases from 0
+   * Held, he glances up at you lookUpFirstMin–lookUpFirstMax s after the grab, then every
+   * lookUpMin–lookUpMax s from one glance's start to the next ("full droop, occasionally looks
+   * up": at least three in a 12 s hold), for lookUpForMin–lookUpForMax s. A Thrash never drops
+   * one: a Thrash that comes due while a glance is under way, or due within the Thrash's own
+   * length, waits for it to end (lookUpMin less lookUpForMax is more than that length, so it
+   * always fits after); one a hard shake brought cuts it short, and like one that came due
+   * while he thrashed, it comes lookUpRest s after the Thrash. BrainOut.look.up eases from 0
    * to 1 over lookUpEase s and back down; the glance is a look of its own at lookUpWeight
    * (BrainOut.look.upWeight), the hung look keeping its heldLook (the page aims the glance at
    * the viewer, lookUpLift radians higher, and turns the hung look into it by `up`: lookAt.js
    * glanceLook; the look goes on over the Held clip's own droop, about 25° of it, so without
    * the lift he'd still look down).
    */
-  lookUpMin: 3,
-  lookUpMax: 6,
+  lookUpFirstMin: 1.5,
+  lookUpFirstMax: 2.5,
+  lookUpMin: 2.5,
+  lookUpMax: 4.5,
   lookUpForMin: 0.8,
   lookUpForMax: 1.2,
   lookUpEase: 0.25,
   lookUpWeight: 1,
   lookUpLift: 0.5,
-  lookUpRest: 1,
+  lookUpRest: 0.5,
   /**
    * Held, he thrashes every thrashMin–thrashMax s, and within thrashShaken s of a hard shake, but
-   * never before he's hung still thrashRest s (since he was grabbed, or his last thrash).
+   * never before he's hung still thrashRest s (since he was grabbed, or his last thrash); one not
+   * brought by a shake waits for a glance up (lookUpMin above), so up to the Thrash's length and
+   * lookUpForMax more.
    */
   thrashMin: 3,
   thrashMax: 7,
@@ -273,6 +284,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     lieAfter: false,
     /** Held: when he thrashes next, and since when he's hung still (grabbed, or his last thrash over). */
     thrashAt: Infinity,
+    /** Held: the next Thrash was brought on by a hard shake (it cuts a glance up short). */
+    thrashShook: false,
     hungSince: 0,
     /** Held: when he next glances up, and the glance under way ({from, until}), or null. */
     lookUpAt: Infinity,
@@ -294,8 +307,9 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     m.lookUp = null;
     if (state === 'held') {
       m.thrashAt = m.t + between(rng, T.thrashMin, T.thrashMax);
+      m.thrashShook = false;
       m.hungSince = m.t;
-      m.lookUpAt = m.t + between(rng, T.lookUpMin, T.lookUpMax);
+      m.lookUpAt = m.t + between(rng, T.lookUpFirstMin, T.lookUpFirstMax);
     }
     if (!DEVICE_STATES.has(state)) {
       m.device = false;
@@ -757,8 +771,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       if (c.shake >= T.shakeHard) {
         m.shakenUntil = m.t + T.shakenFor;
         // (Shaken hard, he thrashes sooner.)
-        if (m.clip !== 'Thrash')
+        if (m.clip !== 'Thrash') {
           m.thrashAt = Math.min(m.thrashAt, Math.max(m.t + T.thrashShaken, m.hungSince + T.thrashRest));
+          m.thrashShook = true;
+        }
       }
     }
     if (m.t - m.raisedAt < T.decayDelay - EPS) return;
@@ -838,8 +854,11 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
         m.restart = false;
         m.hungSince = m.t;
         m.thrashAt = m.t + between(rng, T.thrashMin, T.thrashMax);
+        m.thrashShook = false;
         m.lookUpAt = Math.max(m.lookUpAt, m.t + T.lookUpRest);
-      } else if (m.t >= m.thrashAt - EPS) {
+      } else if (m.t >= m.thrashAt - EPS && (m.thrashShook || !glanceNear())) {
+        // (A glance a shake's Thrash cuts short is put off till after it, not dropped.)
+        if (m.lookUp) m.lookUpAt = m.t;
         startClip('Thrash');
         m.lookUp = null;
       } else lookUpStep();
@@ -855,13 +874,21 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     },
   };
 
-  /** Held, hanging (not thrashing): a glance up when it's due, over when its time is up. */
+  /** Held: a glance up under way, or due before a Thrash starting now would be over. */
+  function glanceNear() {
+    return Boolean(m.lookUp) || m.lookUpAt - m.t < CLIPS.Thrash.length;
+  }
+
+  /**
+   * Held, hanging (not thrashing): a glance up when it's due (the next one due from its start),
+   * over when its time is up.
+   */
   function lookUpStep() {
-    if (m.lookUp && m.t >= m.lookUp.until - EPS) {
-      m.lookUp = null;
-      m.lookUpAt = m.t + between(rng, T.lookUpMin, T.lookUpMax);
-    } else if (!m.lookUp && m.t >= m.lookUpAt - EPS)
+    if (m.lookUp && m.t >= m.lookUp.until - EPS) m.lookUp = null;
+    else if (!m.lookUp && m.t >= m.lookUpAt - EPS) {
       m.lookUp = { from: m.t, until: m.t + between(rng, T.lookUpForMin, T.lookUpForMax) };
+      m.lookUpAt = m.t + between(rng, T.lookUpMin, T.lookUpMax);
+    }
   }
 
   /** How far up his glance is, 0 to 1: eased in from its start and out to its end (smoothstep). */
