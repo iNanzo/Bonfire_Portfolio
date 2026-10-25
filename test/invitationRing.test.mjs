@@ -83,8 +83,13 @@ test('the ring: a rim RING.rim texels wide just inside its radius, hard with the
 });
 
 test('the shader does what ringCover does: the distance’s screen derivative for the rim, a hard cut with the pixel look on', () => {
-  assert.match(RING_FRAGMENT, /dFdx\(\s*ringD\s*\)/);
-  assert.match(RING_FRAGMENT, /dFdy\(\s*ringD\s*\)/);
+  // (The distance's gradient on screen, worked out per texel: the way out from the centre dotted
+  // with how far the floor moves a texel across and a texel down. A difference of the distance
+  // itself is one value per 2×2 block, and its steps from block to block chip the rim.)
+  assert.match(RING_FRAGMENT, /dFdx\(\s*vRingWorld\.xz\s*\)/);
+  assert.match(RING_FRAGMENT, /dFdy\(\s*vRingWorld\.xz\s*\)/);
+  assert.match(RING_FRAGMENT, /dot\(\s*ringN,/);
+  assert.doesNotMatch(RING_FRAGMENT, /dFdx\(\s*ringD\s*\)/);
   assert.match(RING_FRAGMENT, /uRingRadius - [\d.]+ \* ringG/, 'the rim, RING.rim texels in');
   assert.ok(RING_FRAGMENT.includes(`${RING.rim.toFixed(1)} * ringG`));
   assert.match(RING_FRAGMENT, /uIdOn > 0\.5/, 'hard with the pixel look on');

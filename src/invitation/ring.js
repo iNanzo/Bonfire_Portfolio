@@ -1,7 +1,8 @@
 // The invitation toy's floor ring, as stage.js draws it: the cursor marker where the pointer
 // meets the floor, and the ring under NEWT while he's held (Ground Cues). Its shader
 // (RING_FRAGMENT) draws it from each texel's distance to its centre, its rim RING.rim texels wide
-// from that distance's screen derivative, so it's as crisp at 12° as at 70° and at any zoom,
+// from that distance's gradient on screen (worked out per texel from the floor's derivatives, so
+// its edges never chip where 2×2 blocks meet), so it's as crisp at 12° as at 70° and at any zoom,
 // never a stretched texture's stair-steps: cut hard with the pixel look on, a texel's smooth
 // edge at Pixel Size Off (ringCover is the same sum in JS, for the tests). Its centre is moved
 // onto the texel grid (snapToTexel: it steps a whole texel at a time and keeps its shape as it
@@ -30,8 +31,10 @@ export const LIE_CLIPS = /** @type {const} */ (['LieDown', 'DeviceLie', 'GetUp']
  * uRingCentre the centre on the floor (x, z) and uRingRadius its outer radius, world units.
  */
 export const RING_FRAGMENT = `
-	float ringD = distance( vRingWorld.xz, uRingCentre );
-	float ringG = max( length( vec2( dFdx( ringD ), dFdy( ringD ) ) ), 1e-6 );
+	vec2 ringP = vRingWorld.xz - uRingCentre;
+	float ringD = length( ringP );
+	vec2 ringN = ringP / max( ringD, 1e-6 );
+	float ringG = max( length( vec2( dot( ringN, dFdx( vRingWorld.xz ) ), dot( ringN, dFdy( vRingWorld.xz ) ) ) ), 1e-6 );
 	float ringIn = ( ringD - ( uRingRadius - ${RING.rim.toFixed(1)} * ringG ) ) / ringG;
 	float ringOut = ( uRingRadius - ringD ) / ringG;
 	float ringA = uIdOn > 0.5

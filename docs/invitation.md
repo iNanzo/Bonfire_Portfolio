@@ -344,7 +344,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `cursorKind`, which shows, set as the stage's `data-cursor` each frame), `invitation.css`.
   - Pure and unit-tested: `ring.js` (the floor ring's shader, `RING_FRAGMENT`: each texel's
     distance to its centre, the rim `RING.rim` (2) texels wide from that distance's screen
-    derivative, cut hard with the pixel look on and smooth over a texel at Off, `ringCover` its
+    derivative (per texel: the way out from the centre dotted with the floor's derivatives), cut
+    hard with the pixel look on and smooth over a texel at Off, `ringCover` its
     JS twin; `snapToTexel`, the centre moved to the nearest texel corner on screen;
     `ringRadius`/`texelSize`, at least `RING.minTexels` (6) texels round; `markerFade`, the
     cursor marker full from 18° of elevation over it and gone by 10°; `blobCentre`, the blob
