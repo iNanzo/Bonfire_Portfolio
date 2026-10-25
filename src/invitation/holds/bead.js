@@ -629,7 +629,7 @@ export function createBeadHold(deps = {}) {
       const vel = carry?.vel ?? { x: 0, y: 0, z: 0 };
       const speed = Math.hypot(vel.x, vel.z);
       // (The ring: where he'd land if let go now while he's moving fast, else under his collar
-      // (eased, so not his swinging hips: a still let-go lands him there, release).)
+      // (eased, so not his swinging hips: a still let-go lands him under the collar, release).)
       const fast = speed > BEAD.ringSpeed;
       const spot =
         carry && fast
@@ -663,15 +663,22 @@ export function createBeadHold(deps = {}) {
         view ? levelAxes(view.yaw).toward : undefined,
       );
       const f = feet();
-      // (Let go still: he falls to the ring, under his collar, wherever his swing had his feet.)
+      // (Let go still: he falls under his collar, wherever his swing had his feet. Not to the
+      // ring: just after a fast drag it's still on its way back from where he'd have landed.)
       if (ring && Math.hypot(carry.vel.x, carry.vel.z) <= BEAD.ringSpeed) {
         const y0 = Math.max(0, f.y - CARRY.floorY);
         const g = CARRY.fallGravity;
         const fall = (v.y + Math.sqrt(v.y * v.y + 2 * g * y0)) / g;
         if (fall > 1e-3) {
           const p = landingPoint(f, v);
-          v.x += (ring.x - p.x) / fall;
-          v.z += (ring.z - p.z) / fall;
+          v.x += (anchor.x - p.x) / fall;
+          v.z += (anchor.z - p.z) / fall;
+          // (Never faster across than a throw.)
+          const across = Math.hypot(v.x, v.z);
+          if (across > BEAD.maxLevel) {
+            v.x *= BEAD.maxLevel / across;
+            v.z *= BEAD.maxLevel / across;
+          }
         }
       }
       landing = landingPoint(f, v, area);

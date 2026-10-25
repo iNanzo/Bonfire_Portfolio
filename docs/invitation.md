@@ -462,7 +462,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     4 u/s, and a lob of 0.35 of its speed across
     (`beadThrow`), the ring at the landing point while he's moving fast and, once he's let go,
     until he lands (`landingPoint`, `Hold.landing`), else under his collar, eased, not his
-    swinging hips (let go still, he falls there), In the Mix never under 0.35 while he's held
+    swinging hips (let go still, under `ringSpeed`, he falls under his collar itself, not the
+    ring, which just after a fast drag is still easing back; never faster than 4 u/s across), In the Mix never under 0.35 while he's held
     (`HoldCues.floor`), the drop line In the Mix as the shared rule has it; `cues.js` has the ground cues' numbers
     (`blobLook`: radius 0.35 of his height on contact to 0.6 of that, strength 0.45 to 0.20 times
     the look's lifted over 0.34, soft edge 0.15 to 0.5 of the radius, as his lowest foot rises to
