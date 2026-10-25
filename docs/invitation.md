@@ -380,10 +380,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     moved by the camera or the Settings sheet; its middle is the orbit's, Reset Camera's and the
     brain's; `tapReach`, where a tap on the floor walks him (main.js hands the brain that as the
     tap's floor): the point under the finger, but where at the default zoom, turned as the camera
-    is, the top of his head would show higher than `AREA_MARGIN` under the stage's top, the floor
-    straight down the screen from it where it shows just that far under, so the play area stops
-    short of the top by his height there (his feet about 130 CSS px under the top on a 1280×800
-    desktop, 85 on a 390×844 phone); and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight and the
+    is, the top of his head would show higher than `TOP_ROOM` (16 CSS px) under the stage's top,
+    the floor straight down the screen from it on `reachRow`, where it shows just that far under,
+    so a tap stops short of the top by his height there (his feet about 140 CSS px under the top
+    on a 1280×800 desktop, 95 on a 390×844 phone; the walls stay where they are); and
+    `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight and the
     shadow camera's box, `stage.setArea` keeping it round the area's middle; `steer.js` keeps
     wander goals inside the play area's `sight` when one's there, a flee inside what was on
     screen as it began, `Body.fence`; when a resize shrinks the area under him the brain walks

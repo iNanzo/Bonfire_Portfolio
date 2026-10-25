@@ -22,10 +22,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
-  AREA_MARGIN,
   AREA_RADIUS,
   NEWT_HEIGHT,
   NEWT_RADIUS,
+  TOP_ROOM,
   playArea,
   reachRow,
   rimPoints,
@@ -187,7 +187,7 @@ test('a tap stops short of the top of the screen by his height there: at the def
           const feet = project(view, { x: q.x, y: 0, z: q.z });
           const head = project(view, { x: q.x, y: NEWT_HEIGHT, z: q.z });
           const was = project(view, { ...turnedAbout(p, c, -a), y: NEWT_HEIGHT });
-          if (was.y >= AREA_MARGIN) {
+          if (was.y >= TOP_ROOM) {
             assert.ok(dist(g, p) < 1e-9, `${at}: reaches the point under the finger`);
             kept++;
             continue;
@@ -195,7 +195,7 @@ test('a tap stops short of the top of the screen by his height there: at the def
           cut++;
           close(feet.x, sx, 0.01, `${at}: his feet straight under the finger`);
           assert.ok(feet.y > sy, `${at}: lower down the screen than the finger`);
-          close(head.y, AREA_MARGIN, 0.01, `${at}: the top of his head just under the top of the screen`);
+          close(head.y, TOP_ROOM, 0.01, `${at}: the top of his head just under the top of the screen`);
         }
     }
     const at = `${cssW}x${cssH}@${dpr}`;
@@ -205,15 +205,17 @@ test('a tap stops short of the top of the screen by his height there: at the def
     const top = tapReach(o, 0, floorOf(view, cssW / 2, 0));
     const feet = project(view, { x: top.x, y: 0, z: top.z });
     const tall = feet.y - project(view, { x: top.x, y: NEWT_HEIGHT, z: top.z }).y;
-    close(feet.y, tall + AREA_MARGIN, 0.01, `${at}: a top-middle tap ends his height and the margin under the top`);
+    close(feet.y, tall + TOP_ROOM, 0.01, `${at}: a top-middle tap ends his height and the room over it under the top`);
     close(reachRow(o), feet.y, 0.01, `${at}: on reachRow`);
     assert.ok(tall > 0.08 * Math.min(cssW, cssH), `${at}: his height there, ${tall.toFixed(0)} px`);
   }
-  // About 130 CSS px down a desktop's stage, 85 down a phone's: his height at the back.
+  // About 140 CSS px down a desktop's stage, 95 down a phone's: his height at the back, and room
+  // over his head (a little more than AREA_MARGIN: he sways and glances up).
   const row = (/** @type {number} */ w, /** @type {number} */ h, /** @type {number} */ dpr) =>
     reachRow({ view: viewFor(w, h, dpr).view, cssW: w, cssH: h, insets: INSETS });
-  assert.ok(row(1280, 800, 1) > 115 && row(1280, 800, 1) < 145, `a desktop: ${row(1280, 800, 1).toFixed(0)} px`);
-  assert.ok(row(390, 844, 3) > 75 && row(390, 844, 3) < 95, `a phone: ${row(390, 844, 3).toFixed(0)} px`);
+  assert.ok(row(1280, 800, 1) > 125 && row(1280, 800, 1) < 155, `a desktop: ${row(1280, 800, 1).toFixed(0)} px`);
+  assert.ok(row(390, 844, 3) > 80 && row(390, 844, 3) < 105, `a phone: ${row(390, 844, 3).toFixed(0)} px`);
+  assert.ok(TOP_ROOM >= 12 && TOP_ROOM <= 24, `${TOP_ROOM} CSS px over his head`);
 });
 
 test('a rounded square’s sides, clamp and middle: x between its sides at a depth (narrower round the corners), a point outside pulled to its nearest point on the rim, a ray’s room up to the rim', () => {

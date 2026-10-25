@@ -37,6 +37,11 @@ export const NEWT_HEIGHT = 1.0;
 export const AREA_RADIUS = 2.0;
 /** CSS px NEWT keeps from the clear space's edges where what's on screen ends (camera.js orbitSight). */
 export const AREA_MARGIN = 8;
+/**
+ * CSS px a tap keeps the top of his head under the stage's top at the default zoom (reachRow,
+ * tapReach): a little more than AREA_MARGIN, as he sways and glances up.
+ */
+export const TOP_ROOM = 16;
 /** A ray at or over the horizon meets the floor no further off than this many times the view's distance. */
 const REACH = 4;
 const RAD = Math.PI / 180;
@@ -132,7 +137,7 @@ function homeView({ view, cssW, cssH, insets, zoom = 1 }) {
 
 /**
  * How far down the stage, CSS px from its top, the play area reaches up to at the default zoom:
- * the row his feet stand on with the top of his head (NEWT_HEIGHT up) AREA_MARGIN CSS px under
+ * the row his feet stand on with the top of his head (NEWT_HEIGHT up) TOP_ROOM CSS px under
  * the stage's top. Seen from the default view, the top of his head shows as high wherever he
  * stands as far back, so the row is a line across the floor, square to the camera.
  * @param {{view: View, cssW: number, cssH: number, insets: Insets, zoom?: number}} o
@@ -151,8 +156,8 @@ function rowOf(v, cssH) {
   const e = v.elevation * RAD;
   const t = Math.tan((v.fov * RAD) / 2);
   const shift = v.shift ?? { x: 0, y: 0 };
-  // (The margin's height on the screen, -1 at its bottom to 1 at its top, as pixels.js project.)
-  const n = 1 - ((AREA_MARGIN - shift.y) / v.canvasH) * 2;
+  // (That room's height on the screen, -1 at its bottom to 1 at its top, as pixels.js project.)
+  const n = 1 - ((TOP_ROOM - shift.y) / v.canvasH) * 2;
   const vy = NEWT_HEIGHT - v.position.y;
   // (How far back that is: up the screen over depth there is n·t, so
   // vy·cos e − vz·sin e = n·t·(−vy·sin e − vz·cos e).)
