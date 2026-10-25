@@ -1,93 +1,60 @@
-# Lửa Trại Nghĩa Sĩ: running the campfire game
+# The Campfire Game: running a night
 
-A companion for a 50-minute TNTT Nghĩa Sĩ activity at `/larp/`: teams perform five short
-challenges, the Huynh Trưởng award named points, and a projector shows the rounds, the award
-banners and the standings around the bonfire. It runs on **one laptop with no network**: the
-host console in one window, the projector display in another. Youth don't need phones.
+A barebones game night on the bonfire at `/larp/`: rounds with a timer, team scores, and
+modifiers that bring up the site's own banner and make the fire answer. It's built like
+Bonfire Live: **one screen**, the bonfire full screen with the scores and the timer over it,
+and the host's controls as an overlay along the bottom that fades when the mouse rests. The
+projector gets the same picture without the controls through the **Output** window. It runs on
+one laptop; nothing needs the network once the page has loaded.
 
-The design and its reasons are in [design/nghia-si-campfire.md](design/nghia-si-campfire.md).
+## Before the Night
 
-## Before the Day
+Open `/larp/` (`npm run dev`, then <http://localhost:5173/larp/>, or the deployed site). A new
+game opens **Setup** (S) by itself:
 
-Open `/larp/` (`npm run dev`, then <http://localhost:5173/larp/>, or the deployed site) and
-fill in **Setup** and **Teams & Roster**:
+1. **Teams:** a name and a color each. The color marks the team on the scoreboard, its
+   multiplier chip and its banners. No members: points go to teams.
+2. **Rounds:** a name, how long (the timer), and a **Scene**: one of the site's preset scenes,
+   one of yours from the Bonfire Painter (My Scenes, in this browser), or the site's own fire.
+   Each round plays its own scene: its place, colors, framing, look and knights.
+3. **Modifiers:** what you give during the night. Each has a **Title** and **Subtitle** (the
+   banner's two lines), **Points** (negative takes points away), a **Multiplier** (the team's
+   points count that many times over for the rest of the round), **Fire** (what the bonfire
+   does when the banner comes up; Random rolls a new reaction each time) and **Special** (calls
+   the knights to the fire). The first nine are on keys 1–9.
+4. **Game:** the title, how long a banner holds, how many knights a Special banner calls,
+   and reduced motion. **Export the Game** saves it to a file; **Import a Game** loads one.
 
-1. **Teams:** a name (Vietnamese and an optional English line), a color and an emblem. Any
-   number of teams. The preview says when a name is shown in Inter instead of the display
-   font (Cinzel has no Vietnamese tone marks).
-2. **Roster:** paste the youth's names, one per line, into each team; mark a captain if you
-   like. Display names only.
-3. **Co-GMs:** the other HTs' names. No accounts.
-4. **Rounds:** each round's prompt, base points and times. The estimate updates as you go
-   and says how far over 50 minutes it runs (each team past four adds about 6 minutes).
-5. **Display:** language (Bilingual, English First, Vietnamese Only), scenery, reduced motion,
-   sound, and an optional **Host PIN** for leaving Judge Mode.
-6. **Print Award Cards** if co-GMs will hand awards in on paper.
+Everything is saved in the browser as you go: a reload or a closed tab picks up where it was.
 
-Everything is saved in the laptop's browser as you go. **Export Backup** saves the event to a
-file (keep one); **Import Backup** loads it on another laptop.
+## On the Night
 
-## On the Day
+1. Plug in the projector and click **Output** (O). Drag the new window to the projector and
+   double-click it for full screen. It shows the fire, the scores, the timer and the banners,
+   never the controls.
+2. **The timer:** Space starts and pauses it, + adds a minute, R resets it. It turns to the
+   fire's color in the last ten seconds and blinks at zero; nothing moves on by itself.
+3. **Giving points:** click a modifier (or press its number), then the team (or its number).
+   Its banner comes up on both screens: the title, the subtitle, and what was given
+   ("+50 · Red Team", "×2 · Blue Team"), and the fire answers it. Banners given quickly wait
+   their turn. For points by hand, click a team on the scoreboard and pick an amount.
+4. **The knights:** a Special modifier calls them to the fire with its banner. While they're
+   there, every banner has them cheer (or shrug at a loss). K sends them away; the next
+   round's scene decides who's there again.
+5. **Rounds:** ← and → go to the previous or next round: its scene plays and its timer is set.
+   Multipliers end with their round.
+6. **Undo** (Z) takes the last points back. **Clear the Scores** (Setup, Game) starts the night
+   again with the same teams, rounds and modifiers.
 
-1. Connect the projector and set the laptop's display to **Extend** (not Mirror).
-2. Open `/larp/` **while online**, choose **Open Display Window**, drag it to the projector
-   and choose Full Screen. Follow the **Projector Checklist**; **Show Test Pattern** puts a
-   title, a banner and a timer up to check from the back of the room.
-3. Check **Ready For Offline** in Setup. From then on the game needs no network, but **keep
-   both windows open**: reopening a closed window needs the network (the console warns you).
-4. Choose the big button at the top. It always names the next step: Start Event, Start Round,
-   Start Preparation, Next Team, Review Round, Publish And Reveal, Start Next Round.
+? lists every key. H hides the controls; F is full screen on the laptop.
 
-### During a Round
+## Good to Know
 
-- **Timer:** Pause, Add 30 Seconds (for the whole round, not one team), End Preparation,
-  Next Team. At zero it only prompts; nothing is cut off or published.
-- **Completion:** mark each team Complete, Passed or Absent. Publishing waits until every
-  team has one.
-- **Awards:** in the Run tab, pick the team (it defaults to the team performing) or switch to
-  individuals, type a name, the points (`−` / `+`, or type `-25`), and press Add or Enter.
-  **From** says which HT gave it. Recent awards and templates fill the form in one click.
-- **Co-GMs** either hand their awards to you (enter them with their name under From), or step
-  up during a changeover, press **Judge Mode** (`J`), pick their name, add their awards and
-  press **Done**. Judge Mode can't touch timers, phases or publishing, and locks once you
-  start Review.
-- **Review Round** shows the teams side by side with flags: repeated award names, unusually
-  large values, teams with no individual awards yet. **Publish And Reveal** freezes the round
-  and starts the banners on the projector. Pause, step, skip or replay them; scores never
-  change. A mistake after publishing is fixed with **Add Correction** in History.
+- The first version of the game (the bilingual event with rosters and reveals) saved under
+  `larp.event`: the first time this version opens, it carries over that event's teams, colors,
+  rounds and points, and leaves the old save as it was.
+- A save it can't read is kept aside (`larp.game.unreadable`) and a new game starts; nothing is
+  written over it.
+- Without WebGL the fire doesn't show, but the scores, timer and banners still work.
 
-### Keys
-
-`Space` pause or resume the timer · `N` next team · `T` add 30 seconds · `A` the award form ·
-`J` Judge Mode · `?` the list. Nothing publishes from a single key.
-
-### If Something Goes Wrong
-
-| What happened | What to do |
-| --- | --- |
-| The console tab closed or the laptop restarted | Reopen `/larp/` and choose **Resume Event**: same round, scores and timer |
-| The display window closed | **Open Display Window** again (needs the network unless the page is cached); it resumes where the room was, mid-reveal included |
-| The browser won't save (private window, full storage) | A warning says so; play continues. **Export Backup** right away |
-| A second console tab opened | It's locked; **Take Over** moves control to it |
-| The projector shows the console | The display is mirrored: switch the laptop to Extend |
-| No 3D (WebGL off) | The display uses a still of the bonfire; everything else works |
-
-## After the Event
-
-The Run tab shows the final standings and the full individual ranking. **Export Results**
-saves a CSV of teams, names, scores and award reasons (no private notes). **Delete Event
-Data** removes the event from the laptop; nothing leaves it unless you export it.
-
-## For Developers
-
-- Code: `src/larp/`. The rules, scoring, phases, roles and saving are pure modules
-  (`types.js` lists who owns what); `state.js` reduces commands over them. The screens are
-  pure render functions (`host*.js`, `judge.js`, `display.js`) with thin DOM layers
-  (`hostDom.js`, `displayDom.js`); `channel.js` links the two windows; `stage.js` turns game
-  events into scene cues.
-- Tests: `test/larp*.test.mjs` (unit) and `e2e/larp.spec.mjs` (a whole event offline with the
-  display, reloads and a backup): `npm run e2e -- larp`.
-- The saved event is versioned (`store.js` `MIGRATIONS`): a change to its shape needs a
-  migration and a test that loads the old shape.
-- Game code never reaches the portfolio's first load (`firstLoadGuard` in `vite.config.js`,
-  and `test/site.test.mjs`); `/larp/` is `noindex` and kept out of the sitemap.
+The code: `src/larp/` (`main.js` maps it). Tests: `test/larp*.test.mjs` and `e2e/larp.spec.mjs`.

@@ -2,7 +2,7 @@
 // changed; the render switches (outlines, few colors, pixel shifts, x-ray flips, how hits
 // land) off, in the mix and always through the looks' turns; flips on the beat and never
 // on a drop's own bar; and the steps a render menu walks.
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createLooks, LOOKS, CHANCE } from '../src/visualizer/looks.js';
 import {
@@ -18,6 +18,16 @@ import {
   XRAY_VIEWS,
   RENDER_STEPS,
 } from '../src/visualizer/render.js';
+
+// Repeatable random inputs keep distribution assertions meaningful without rare CI failures.
+// Each test gets an independent sequence; Node restores the mock after that test.
+beforeEach((t) => {
+  let seed = 9;
+  t.mock.method(Math, 'random', () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  });
+});
 
 const every = (mode, names) => Object.fromEntries(Object.keys(names).map((k) => [k, mode]));
 /** A stand-in scene: records what it's sent. */

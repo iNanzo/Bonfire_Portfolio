@@ -1,5 +1,10 @@
 # Lửa Trại Nghĩa Sĩ (Nghĩa Sĩ Campfire): design notes
 
+> **Superseded (2026-10-11).** The game was rebuilt lean on Bonfire Live's setup: one screen
+> with the controls as an overlay, teams without rosters, a timer, modifiers with banners and
+> multipliers, a scene per round, English only. How it works now: [../campfire.md](../campfire.md).
+> This file is kept for the history of the first version.
+
 Status: **implemented and verified locally** (2026-10-10): `src/larp/`, the unit tests
 (`test/larp*.test.mjs`) and a browser spec that plays a whole event offline
 (`e2e/larp.spec.mjs`). How to run an event: [../campfire.md](../campfire.md). Not yet

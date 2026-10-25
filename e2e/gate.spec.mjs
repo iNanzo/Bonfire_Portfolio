@@ -119,7 +119,10 @@ test('a locked page sends you to the lock and back: a wrong password says so, th
   await box.press('Enter');
   await page.waitForURL((u) => u.pathname === '/larp/');
   expect(page.url(), 'back where it was going, its query and hash kept').toMatch(/\/larp\/\?from=test#top$/);
-  await expect(page.locator('.larp-topbar'), 'and it stays: the cookie opens it').toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Round and Timer' }),
+    'and it stays: the cookie opens it',
+  ).toBeVisible();
   const cookie = (await context.cookies()).find((c) => c.name === GATE_COOKIE);
   expect(cookie?.value).toBe(TOKEN);
   expect(cookie?.path).toBe('/');
@@ -154,7 +157,7 @@ test('the right password, deriveBits stubbed: a working state while it checks, t
   await page.waitForFunction(() => typeof (/** @type {any} */ (window).__gateRelease) === 'function');
   await page.evaluate(() => /** @type {any} */ (window).__gateRelease());
   await page.waitForURL((u) => u.pathname === '/larp/');
-  await expect(page.locator('.larp-topbar')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Round and Timer' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -177,7 +180,7 @@ test('the admin’s live preview (?preview in a frame) stays open; ?preview on i
   await lock(page, ['/larp/']);
   await page.setContent(`<iframe src="${baseURL}/larp/?preview=1" width="800" height="600"></iframe>`);
   const frame = page.frameLocator('iframe');
-  await expect(frame.locator('.larp-topbar')).toBeVisible();
+  await expect(frame.getByRole('region', { name: 'Round and Timer' })).toBeVisible();
   expect(
     page.frames().some((f) => /\/larp\/\?preview=1$/.test(f.url())),
     'never sent to the lock',
