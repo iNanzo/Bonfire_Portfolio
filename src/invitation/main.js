@@ -144,7 +144,17 @@ import { createFaceState, faceStep } from './faces.js';
 import { fitShadow, shadowTop } from './floor.js';
 import { createGesture, pickScreen, rayPlaneY } from './gesture.js';
 import { clearInsets, newtShare, newtTexels, pixelSteps, resolutionOf, stepFor } from './pixels.js';
-import { animFps, installDefaults, isCustom, loadLook, lookPreset, motionStep, saveLook, shaderOf } from './look.js';
+import {
+  animFps,
+  installDefaults,
+  isCustom,
+  loadLook,
+  lookPreset,
+  motionStep,
+  petalsOn,
+  saveLook,
+  shaderOf,
+} from './look.js';
 import { createGlance, createLook, glanceLook, glanceStep, lookStep, torsoStep } from './lookAt.js';
 import {
   bodyStep,
@@ -282,6 +292,7 @@ const hudEl = /** @type {HTMLElement} */ (stageEl.querySelector('.inv-hud'));
 const envelope = options.envelope
   ? createEnvelopeScene(stageEl, {
       reduced: prefersReduced(),
+      petals: petalsOn(look),
       ready: () => toyReady,
       onUncover: (how) => {
         hudEl.removeAttribute('inert');
