@@ -355,6 +355,45 @@ test.describe('on a desktop', () => {
     await introStarted(page);
   });
 
+  test('Replay Intro resets the scene and brings the envelope back; opened, the intro starts as at boot', async ({
+    page,
+  }) => {
+    await envelopeUp(page);
+    const home = (await snapshot(page)).camera;
+    await page.keyboard.press('Escape');
+    await skipped(page);
+    // The scene moved on: NEWT sat down and the camera turned.
+    await page.evaluate(() => window.__invitation.press('Sit'));
+    await until(page, (s) => s.state === 'sit' || s.state === 'sitDown', 'sitting');
+    const vp = page.viewportSize();
+    await page.mouse.move(vp.width * 0.3, vp.height * 0.3);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(vp.width * 0.6, vp.height * 0.35, { steps: 6 });
+    await page.mouse.up({ button: 'right' });
+    await expect.poll(async () => (await snapshot(page)).camera.yaw, { message: 'turned' }).not.toBe(home.yaw);
+    await page.locator('.inv-btn-intro').click();
+    // The envelope again over a scene as it started: NEWT idle on his feet, the camera home.
+    await until(page, (s) => s.envelope === 'floating', 'the envelope back');
+    await expect(page.locator('.inv-envelope')).toBeVisible();
+    await expect(page.locator('.inv-hud')).toHaveAttribute('inert', '');
+    await expect(envelope(page)).toBeFocused();
+    const s = await snapshot(page);
+    expect(s.state).toBe('idle');
+    expect(s.held).toBe(false);
+    expect(s.dialogue).toBeNull();
+    expect(s.camera.yaw).toBeCloseTo(home.yaw, 6);
+    expect(s.camera.distance).toBeCloseTo(home.distance, 6);
+    await expect(page.locator('.inv-bubble')).toBeHidden();
+    // (Paused behind it, as at boot.)
+    const t0 = await page.evaluate(() => window.__invitation.clock());
+    const f0 = (await envSnap(page)).frames;
+    await expect.poll(async () => (await envSnap(page)).frames, { timeout: 10_000 }).toBeGreaterThan(f0 + 5);
+    expect(await page.evaluate(() => window.__invitation.clock())).toBe(t0);
+    // Opened, the intro starts by itself at its first box.
+    await page.keyboard.press('Enter');
+    await introStarted(page);
+  });
+
   test('Skip Intro on it skips it', async ({ page }) => {
     await envelopeUp(page);
     await skipIntro(page).click();
