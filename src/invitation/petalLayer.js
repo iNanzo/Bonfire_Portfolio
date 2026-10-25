@@ -1,22 +1,39 @@
 // The page's rose petals (petals.js moves them, petalScene.js draws them): a fixed overlay canvas
-// over the whole page (the toy, its toolbar and the envelope), letting every press through
+// over the stage and under the HUD and the dialogue (it goes in just before the HUD, with no
+// z-index of its own; while the envelope is up it rises over it), letting every press through
 // (pointer-events none), with its own small three.js renderer drawing only petals and their ink
-// at the envelope's texel size, scaled up pixelated. At boot it is only its listeners and an empty
+// at the envelope's texel size, scaled up pixelated, each petal sized in CSS px (petalPx) so it
+// reads as a petal beside NEWT whatever the screen. At boot it is only its listeners and an empty
 // canvas: its renderer (a WebGL context, its targets and meshes) comes with the first press or move
 // that may shed petals, so with Rose Petals off or reduced motion there is never one; then it lives
 // for the rest of the page (refused, it tries once and stays quiet). Document-level passive
 // pointer listeners (never preventDefault, in the capture phase so nothing stops them) drive the
 // cursor trail (createTrail: a mouse moving, a finger dragging, a finger held still; lifted when
 // the pointer leaves the window or it loses focus, so a return elsewhere sheds nothing) and a burst
-// ring at every press, over the envelope and through the toy alike. It draws only while petals are
+// ring at every press, over the envelope and through the toy alike; none over the UI (QUIET: a
+// button, the toolbar, the pad, Settings, the dialogue's boxes), and no trail while NEWT is
+// carried (the grab's ring only). It draws only while petals are
 // up or a finger is held, and sleeps otherwise (cleared, no frames). Rose Petals off (Settings) or
 // reduced motion: none at all (any up shrink away). ?test reads snapshot().
 import * as THREE from 'three';
 import { buildInk, createPetalScene } from './petalScene.js';
-import { FLOWS, createTrail } from './petals.js';
+import { FLOWS, PETAL_LEN, createTrail } from './petals.js';
 
-/** Texels along the screen's shorter side (the envelope's, so its petals and these match). */
+/** Texels along the screen's shorter side (the envelope's), as long as a texel stays in TEXEL_PX. */
 const TEXELS = 300;
+/**
+ * A texel's size, CSS px: never finer than the first or coarser than the second, so a petal sized
+ * in CSS px (petalPx) is always 5 texels long or more and reads as a petal, not a dot.
+ */
+export const TEXEL_PX = [1.25, 1.75];
+
+/**
+ * A texel's size on a screen `w` × `h` CSS px: the envelope's (TEXELS along its shorter side),
+ * held within TEXEL_PX.
+ * @param {number} w
+ * @param {number} h
+ */
+export const texelPx = (w, h) => Math.min(TEXEL_PX[1], Math.max(TEXEL_PX[0], Math.min(w, h) / TEXELS));
 /** The camera's field of view (degrees) and distance (the envelope's). */
 const FOV = 30;
 const DIST = 6;
@@ -31,9 +48,41 @@ export const LAYER_SCALE = 0.8;
  */
 export const pageUnit = (w, h) => Math.min(0.7 * w, 0.53 * h) * LAYER_SCALE;
 
+/** A page petal's length (a PETAL_SIZES 1 petal), CSS px: a little smaller on a phone. */
+export const PETAL_PX = { desktop: 12.5, phone: 11 };
+
+/**
+ * A page petal's length (a PETAL_SIZES 1 petal; they come 0.75 to 1.3 of it) on a screen `w` × `h`
+ * CSS px: a phone's (its shorter side under 600 px, either way up), else a desktop's; never
+ * the screen's size.
+ * @param {number} w
+ * @param {number} h
+ */
+export const petalPx = (w, h) => (Math.min(w, h) < 600 ? PETAL_PX.phone : PETAL_PX.desktop);
+
+/**
+ * What the layer stays quiet over (no trail, no burst): the HUD's parts (the toolbar and its pad,
+ * the Settings sheet, the status), the dialogue's boxes (the line, its replies, Auto/Next/Log, the
+ * log and its question) and every button (the envelope's Skip Intro).
+ */
+export const QUIET =
+  '.inv-hud > *, .inv-talk-top, .inv-talk-choices, .inv-talk-box, .inv-talk-log, .inv-talk-ask, button';
+
+/**
+ * Whether `el` (what the pointer is over) is UI the layer stays quiet over (QUIET).
+ * @param {unknown} el
+ */
+export function quietAt(el) {
+  const e = /** @type {{closest?: (sel: string) => unknown}|null} */ (el);
+  return Boolean(e && typeof e.closest === 'function' && e.closest(QUIET));
+}
+
 /**
  * @typedef {object} PetalLayerOpts
  * @property {() => boolean} on  whether petals may come now (Rose Petals on, no reduced motion)
+ * @property {Element|null} [before]  what it goes in before (the HUD: it's under it); else last
+ * @property {() => boolean} [over]  whether it goes over everything now (the envelope is up)
+ * @property {() => boolean} [carrying]  whether NEWT is being carried now (no trail then)
  */
 
 /**
@@ -41,7 +90,7 @@ export const pageUnit = (w, h) => Math.min(0.7 * w, 0.53 * h) * LAYER_SCALE;
  * @param {HTMLElement} root
  * @param {PetalLayerOpts} opts
  */
-export function createPetalLayer(root, { on }) {
+export function createPetalLayer(root, { on, before = null, over = () => false, carrying = () => false }) {
   const doc = root.ownerDocument;
   const win = doc.defaultView ?? window;
   const canvas = doc.createElement('canvas');
@@ -53,23 +102,32 @@ export function createPetalLayer(root, { on }) {
     width: '100%',
     height: '100%',
     pointerEvents: 'none',
-    zIndex: '4',
     imageRendering: 'pixelated',
   });
-  root.append(canvas);
+  root.insertBefore(canvas, before);
+  /** Over everything (the envelope's z-index 3) while the envelope is up, else in its place. */
+  const place = () => {
+    const z = ask(over) ? '4' : '';
+    if (canvas.style.zIndex !== z) canvas.style.zIndex = z;
+  };
   const clock = () => win.performance.now() / 1000;
   let running = false;
   let raf = 0;
   let last = 0;
 
-  /** Petals may come now (a setting that throws reads as off). */
-  const allowed = () => {
+  /**
+   * One of its callers' answers (one that throws reads as no).
+   * @param {() => boolean} f
+   */
+  const ask = (f) => {
     try {
-      return on();
+      return Boolean(f());
     } catch {
       return false;
     }
   };
+  /** Petals may come now. */
+  const allowed = () => ask(on);
 
   /** @type {ReturnType<typeof build>} the renderer and its scene, once made */
   let gpu = null;
@@ -109,7 +167,7 @@ export function createPetalLayer(root, { on }) {
     function resize() {
       const cssW = Math.max(1, win.innerWidth);
       const cssH = Math.max(1, win.innerHeight);
-      const px = Math.max(1.25, Math.min(cssW, cssH) / TEXELS);
+      const px = texelPx(cssW, cssH);
       const tw = Math.max(1, Math.round(cssW / px));
       const th = Math.max(1, Math.round(cssH / px));
       renderer.setSize(tw, th, false);
@@ -122,6 +180,8 @@ export function createPetalLayer(root, { on }) {
       view.w = view.h * camera.aspect;
       Object.assign(view, { cssW, cssH, tw, th });
       petals.unit = pageUnit(view.w, view.h);
+      // (Each petal its length in CSS px, whatever the screen: world units a CSS px, over its unit.)
+      petals.size = (petalPx(cssW, cssH) * (view.h / cssH)) / (PETAL_LEN * petals.unit);
       if (!running) clear();
     }
     /** The petals' colours, then which shape each texel is, then the two put together with the ink. */
@@ -197,9 +257,19 @@ export function createPetalLayer(root, { on }) {
     for (const s of steps) g.petals.emit('trail', g.toWorld(s.x, s.y), { v: g.velWorld(s.vx, s.vy), n: s.n });
     if (steps.length) wake();
   }
+  /**
+   * The pointer is over UI the layer stays quiet over (what's under it, not the element that has
+   * its capture: a drag from the floor onto the toolbar goes quiet too).
+   * @param {PointerEvent} e
+   */
+  const overUi = (e) => quietAt(doc.elementFromPoint?.(e.clientX, e.clientY) ?? e.target);
   /** @param {PointerEvent} e */
   const onDown = (e) => {
     if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0) || !allowed()) return;
+    if (overUi(e)) {
+      trail.lift();
+      return;
+    }
     pressId = e.pointerId;
     holds = e.pointerType !== 'mouse';
     trail.down(clock(), e.clientX, e.clientY, holds);
@@ -211,6 +281,11 @@ export function createPetalLayer(root, { on }) {
   /** @param {PointerEvent} e */
   const onMove = (e) => {
     if (!e.isPrimary) return;
+    // (Over the UI or carrying NEWT: nothing, and the next move off it starts afresh there.)
+    if (ask(carrying) || overUi(e)) {
+      trail.lift();
+      return;
+    }
     const steps = trail.move(clock(), e.clientX, e.clientY);
     if (allowed()) shed(steps);
   };
@@ -238,6 +313,7 @@ export function createPetalLayer(root, { on }) {
   function wake() {
     if (running || !gpu) return;
     running = true;
+    place();
     last = clock();
     raf = win.requestAnimationFrame(frame);
   }
@@ -247,6 +323,9 @@ export function createPetalLayer(root, { on }) {
     const now = clock();
     const dt = Math.min(0.05, Math.max(0, now - last));
     last = now;
+    place();
+    // (A finger held still on NEWT while he's carried keeps none coming.)
+    if (ask(carrying)) trail.lift();
     const steps = trail.hold(now);
     if (allowed()) shed(steps);
     else g.petals.cut(0.2);
@@ -265,7 +344,8 @@ export function createPetalLayer(root, { on }) {
   return {
     /**
      * For ?test: whether its renderer is made ('none' until petals may come, 'failed' if it was
-     * refused), whether it's drawing, how many are up, how many each flow has launched, its texels.
+     * refused), whether it's drawing, how many are up, how many each flow has launched, its texels,
+     * and a PETAL_SIZES 1 petal's length as drawn, CSS px.
      */
     snapshot() {
       return {
@@ -275,6 +355,7 @@ export function createPetalLayer(root, { on }) {
         live: gpu ? gpu.petals.live() : 0,
         emitted: gpu ? gpu.petals.emitted : { ...none },
         texels: gpu ? [gpu.view.tw, gpu.view.th] : [0, 0],
+        petalPx: gpu ? (PETAL_LEN * gpu.petals.unit * gpu.petals.size * gpu.view.cssH) / gpu.view.h : 0,
       };
     },
     element: canvas,

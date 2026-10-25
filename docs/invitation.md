@@ -34,22 +34,30 @@ loading screen too: NEWT loads behind it.
   off its trailing edge that drift its way. Never more than about 120 at once.
 - **Petals on the cursor, everywhere:** over the envelope and all through the toy, the mouse
   moving trails petals (one every 14–30 px, at most about 20 a second, thrown a little the way
-  it moves, every shape and size), and every click or tap bursts a ring of 10–14 of them. On a
-  phone a finger dragging trails them, and a finger held still keeps a few coming. They're
-  drawn on a layer of their own over the page that every press goes through. **Rose Petals**
+  it moves, every shape and size, each about 10–16 px long whatever the screen, a little
+  smaller on a phone, so they read as petals beside NEWT), and every click or tap bursts a ring
+  of 10–14 of them. On a
+  phone a finger dragging trails them, and a finger held still keeps a few coming. None come
+  over the UI (a button, the toolbar, the camera pad, Settings, or the intro's boxes), and none
+  trail while you carry NEWT (a ring where you grab him, then nothing till he's down). They're
+  drawn on a layer of their own over the toy and under its toolbar, Settings and the intro (over
+  the envelope while that's up) that every press goes through. **Rose Petals**
   in Settings turns them all off (the envelope's too); it's on by default and kept with the
   look.
 - **Hover it:** with the mouse over the letter (or keyboard focus on it, or on a touch screen
   after a moment without a touch), a gold rim pulses slowly round it, seal and all, about every
   three seconds, fading right out between pulses so you can see it clearly. With reduced motion
   the rim holds steady.
-- **Turn it:** it leans gently toward the mouse (on a phone, toward your finger while it's down);
-  drag it sideways or hold the left or right arrow key to turn it further, and it springs back
-  when you let go. It never turns more than about 9°.
+- **Turn it:** it leans toward the mouse, clearly enough to see (about 6° with the mouse halfway
+  to the edge of the screen, 8° at the edge; on a phone, toward your finger while it's down);
+  its top tips the same way as it turns, so it reads as leaning toward you; drag it sideways or
+  hold the left or right arrow key to turn it further, and it springs back when you let go. It
+  never turns more than about 14°.
 - **Open it:** tap or click it, press Enter, Space or the up arrow, swipe it up, or scroll up.
   The seal blooms into roses first (about half a second): it swells, then shrinks away while a
-  ring of petals unfurls out of it and lifts off, and the swirl is flung outward. Only then does
-  the flap lift, petals pouring up out of the envelope's inside, and the letter dissolves the way a weapon does on the Bonfire site:
+  ring of petals unfurls out of it and drifts up and off to either side, fading soon, and the
+  swirl is flung outward. Only then does the flap lift; as it passes half open, a stream of
+  petals rises out of the pocket's mouth (the bloom has cleared it by then), and the letter dissolves the way a weapon does on the Bonfire site:
   a ragged, burning edge sweeps up across it, shedding specks of paper, embers and wax that
   drift up and fade, while the white page behind clears onto NEWT, already turned to you, and
   the intro starts by itself (below): its first line, his face and his greeting wait until the
@@ -736,7 +744,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   clearing over `TIMES.clear`), a skip's drop, `BOB` and `SWAY`, `TIMES`; the hover's pulse,
   `hoverStep` and `hoverPulse(k, t)` (`HOVER_PULSE`: the eased hover times
   0.5 − 0.5·cos(2πt / 2.8 s), steady with reduced motion); the letter's turn, `turnGoal` (toward
-  the pointer's x, plus a sideways drag or a held arrow, at most `TURN.max`, 0.15 rad) and
+  the pointer's x, eased out to `TURN.lean` (0.14 rad at the edge, about 0.1 halfway), plus a
+  sideways drag or a held arrow up to `TURN.push` (0.16), at most `TURN.max`, 0.24 rad),
+  `turnRoll(turn)` (the roll that goes with it, `TURN.roll` 0.45 of it, its top tipping the way
+  it turns: a yaw of a flat letter seen face on only narrows it) and
   `turnStep` (eased, springing back; none with reduced motion); the dissolve's sums,
   `DISSOLVE` and `dissolveAt(x, y)` (mostly how far up the letter, leaning across, plus a smooth
   noise; the shader runs the same with a screen-locked Bayer dither on top), and its specks,
@@ -751,7 +762,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   second agree) on its own clock: each petal's position and velocity, its drag easing it into
   the air (a light wind with gusts, its `fall`, its own `valueNoise`), its flutter, rock and
   tumble added as drawn (`petalAt(petal, t)`, a bloom's and a ring's unfurling first). `emit(kind,
-  at, o)` launches the `FLOWS`: spawn, bloom (at the seal), ring (10–14 at even angles with a
+  at, o)` launches the `FLOWS`: spawn, bloom (at the seal: out round it, then drifting up and off
+  to its side and gone within 1.4 s, so the mouth is clear by the time the flap is half open), ring (10–14 at even angles with a
   little jitter, out with drag, about a second), trail (`o.v` the pointer's velocity: 0.2–0.4 of
   it, at most `TRAIL.maxLaunch`, with a sideways spread; a still finger's a soft puff), wake and
   spill. `letter(frame)` each frame (`LetterFrame`: its middle, axes, height, `opening` and
@@ -761,11 +773,13 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   spinning 0.5–0.6 rad/s and climbing 0.04–0.06 a second (the slow end), 24 petals filling in
   after 0.5 s, each strand's in a close run (`gap`) a whole turn up from the last, every fourth
   falling in from 1.5–2.1 times out, each pulled to its slot, drawn small at the ends)
-  while it floats, flung outward once it doesn't; the pour (16 born across its inside below the
-  mouth, just in front of the inside's face and behind the pocket's (`LETTER_DEPTHS`, the envelope's
+  while it floats, flung outward once it doesn't; the pour (`FLOWS.pour`: 30 over 0.5 s from
+  when the flap is half open, each born 0.015–0.05 under the mouth's V at its x (`LETTER_MOUTH`,
+  the envelope's), just in front of the inside's face and behind the pocket's (`LETTER_DEPTHS`, the envelope's
   envelopeLook.js `DEPTH`, which the frame can carry as `inside` and `pocket`), launched up its
-  axis and only gently forward so the pocket hides each till it has risen out of the mouth, in
-  step with the flap); and
+  axis at 1.25–1.6 a second and only gently forward, a little bigger than most (1–1.4 of
+  `PETAL_LEN`), so the pocket hides each only for its first moment and it stands 0.3 of the
+  letter or more over the mouth, out past its top, within half a second); and
   the wake (`WAKE`: the edge moving fastest away from its outward side sheds petals at a rate
   tied to its speed, drifting its way). `cut` (a skip), `at`, `live`; at most `POOL` (120; the
   oldest free petal goes first, the swirl kept), none with reduced motion. `createTrail` is the
@@ -775,15 +789,24 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   move after a pause of 0.3 s, or after `lift()` (the pointer left the window, or it lost focus),
   starts afresh where it is, shedding nothing along the jump),
   `petalScene.js` (`createPetalScene({scene, unit, seed, reduced, uniforms, id})`: a flow in a
-  scene's world units, `unit` world units a letter width; `emit`, `letter(matrix, {h, opening,
+  scene's world units, `unit` world units a letter width, `size` how big each is drawn of that (1); `emit`, `letter(matrix, {h, opening,
   floating})` from the letter's world matrix, `step(dt)` writing the petals into an instanced mesh
   a shape; `petalMaterial`, the petals' own toon (the three reds, dithered band edges, each
   petal's `aShade`, its id pass on the scene's `uIdPass`); `buildInk`, the ink pass for a
-  petals-only drawing), `petalLayer.js` (`createPetalLayer(root, {on})`: the page's petals, a
-  fixed `canvas.inv-petals` at z-index 4 over everything with `pointer-events: none`, its own
-  WebGLRenderer at the envelope's texel size, made with the first press or move that may shed
+  petals-only drawing), `petalLayer.js` (`createPetalLayer(root, {on, before, over, carrying})`:
+  the page's petals, a fixed `canvas.inv-petals` with `pointer-events: none` put in `before` the
+  HUD with no z-index of its own (so over the stage's canvas, under the toolbar, its labels, the
+  pad, Settings, the speech bubble and the dialogue), raised to z-index 4 over the envelope while
+  `over()` (the envelope is in the page); no trail or ring while the element under the pointer
+  is inside `QUIET` (`quietAt`: the HUD's parts, the dialogue's boxes, any button: the trail lifts
+  there, so leaving it sheds nothing across it), and no trail while `carrying()` (NEWT held; a
+  finger held still on him too); its own
+  WebGLRenderer at the envelope's texel size held within `TEXEL_PX` (1.25–1.75 CSS px, `texelPx`, so
+  even its smallest petal is 5 texels long), made with the first press or move that may shed
   petals (never with Rose Petals off or reduced motion; refused, it tries once), `pageUnit` (`LAYER_SCALE` of the envelope's letter
-  width); passive capture-phase `pointerdown`, `pointermove`, `pointerup` and `pointercancel` on
+  width: how far they fly), each petal drawn `petalPx(w, h)` CSS px long (`PETAL_PX`: 12.5 on a
+  desktop, 11 on a phone, its shorter side under 600 px; its sizes 0.75–1.3 of that), through
+  petalScene.js's `size`, never by the screen's size (`petalPx` in its snapshot); passive capture-phase `pointerdown`, `pointermove`, `pointerup` and `pointercancel` on
   the document (never `preventDefault`) drive the trail and a ring at each press, the primary
   pointer only; it draws only while petals are up or a finger is held, then clears and stops;
   `on()` false (Rose Petals off, `look.js petalsOn`, or reduced motion) launches none and shrinks
@@ -795,7 +818,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   dissolving rim, and the hover's pulse there too (a Bayer-dithered `SHINE` on the letter's
   outermost two texels and a `HOVER` gold halo past its line, the letter's ids only, never the
   petals', like NEWT's in retro.js; `hover` in its snapshot); the letter's yaw is the sway plus
-  its turn (`turn` in its snapshot); the camera's matrices are brought up to date after it's
+  its turn, rolled by `turnRoll(turn)` (`turn` in its snapshot); the camera's matrices are brought up to date after it's
   placed and every frame, the shaders compiled at creation and the seal hidden until it's been
   placed once (the red box on reload was a first frame's seal placed through a camera three had
   never updated: 37 times its size; `seal.first` in its snapshot); the petals (`createPetalScene`,

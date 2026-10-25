@@ -23,7 +23,7 @@
 // Input is all its own while it's up: a tap or click, Enter, Space or ArrowUp opens it; Escape or
 // ArrowDown skips; a drag follows the finger with some give (the seal starting to open as it goes
 // up) and opens or skips on release (releaseGesture), else springs back; the wheel opens or skips
-// once it adds up; Skip Intro skips. While it floats it leans gently toward the pointer (a finger
+// once it adds up; Skip Intro skips. While it floats it leans clearly toward the pointer (a finger
 // while it's down), and a sideways drag or a held ArrowLeft or ArrowRight turns it further, springing
 // back (turnGoal; a sideways drag never opens or skips it); hovered, a gold rim pulses slowly round
 // it (hoverPulse). It takes focus at boot with no ring: the ring shows once a key
@@ -48,6 +48,7 @@ import {
   hoverStep,
   letterCovers,
   turnGoal,
+  turnRoll,
   turnStep,
   particleAt,
   releaseGesture,
@@ -678,7 +679,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     const goal =
       env.state === 'floating' ? turnGoal({ pointer: pointerX, dx: drag?.dx ?? 0, w: view.cssW, key: keyTurn }) : 0;
     turn = turnStep(turn, goal, dt, reduced);
-    outer.rotation.set(0, p.yaw + turn, -0.5 * p.drop);
+    outer.rotation.set(0, p.yaw + turn, -0.5 * p.drop + turnRoll(turn));
     outer.scale.setScalar(view.scale * (1 + 0.025 * p.pulse) * (0.94 + 0.06 * p.arrive));
     envl.hinge.rotation.x = -p.flap;
     // The seal: whole, starting to open as a finger drags it up, then blooming into petals,

@@ -221,8 +221,8 @@ test.describe('on a desktop', () => {
     // (Dragged right, it turns its face right, further than the cursor alone leans it.)
     await expect
       .poll(async () => (await envSnap(page)).turn.now, { message: 'turned by the drag' })
-      .toBeGreaterThan(0.08);
-    expect((await envSnap(page)).turn.now).toBeLessThanOrEqual(0.15);
+      .toBeGreaterThan(0.16);
+    expect((await envSnap(page)).turn.now).toBeLessThanOrEqual(0.25);
     await page.mouse.up();
     // (Let go, it springs back to its lean toward the cursor.)
     await expect.poll(async () => (await envSnap(page)).turn.now, { message: 'sprung back' }).toBeLessThan(0.07);
@@ -296,7 +296,7 @@ test.describe('on a desktop', () => {
     expect((await envSnap(page)).state).toBe('floating');
   });
 
-  test('opened, the seal blooms into petals first; only then the flap lifts, petals pouring out of it', async ({
+  test('opened, the seal blooms into petals first; only then the flap lifts, petals pouring out of its mouth once it’s half open', async ({
     page,
   }) => {
     await envelopeUp(page);
@@ -314,7 +314,9 @@ test.describe('on a desktop', () => {
       .toBe(true);
     expect(seen[0].petals.emitted.bloom).toBeGreaterThan(0);
     for (const e of seen) if (e.pose.flap > 0) expect(e.pose.bloom).toBe(1);
-    expect(seen.at(-1).petals.emitted.pour).toBeGreaterThan(0);
+    // (The pour waits for the flap to be about half open, then comes out of the mouth in force.)
+    for (const e of seen) if (e.pose.flap < e.flapOpen * 0.45) expect(e.petals.emitted.pour).toBe(0);
+    expect(seen.at(-1).petals.emitted.pour).toBeGreaterThanOrEqual(20);
     await introStarted(page);
   });
 
@@ -324,18 +326,19 @@ test.describe('on a desktop', () => {
     await envelopeUp(page);
     const turn = async () => (await envSnap(page)).turn.now;
     const vp = page.viewportSize();
-    await page.mouse.move(vp.width - 4, vp.height / 2, { steps: 3 });
-    await expect.poll(turn, { message: 'toward the cursor on the right' }).toBeGreaterThan(0.04);
-    await page.mouse.move(4, vp.height / 2, { steps: 3 });
-    await expect.poll(turn, { message: 'toward the cursor on the left' }).toBeLessThan(-0.04);
+    // (Halfway to either edge: a clear lean, 0.08 rad or more.)
+    await page.mouse.move(vp.width * 0.75, vp.height / 2, { steps: 3 });
+    await expect.poll(turn, { message: 'toward the cursor on the right' }).toBeGreaterThan(0.08);
+    await page.mouse.move(vp.width * 0.25, vp.height / 2, { steps: 3 });
+    await expect.poll(turn, { message: 'toward the cursor on the left' }).toBeLessThan(-0.08);
     await page.mouse.move(vp.width / 2, vp.height / 2, { steps: 3 });
     await expect.poll(async () => Math.abs(await turn()), { message: 'square on in the middle' }).toBeLessThan(0.01);
     await page.keyboard.down('ArrowRight');
-    await expect.poll(turn, { message: 'ArrowRight held' }).toBeGreaterThan(0.1);
+    await expect.poll(turn, { message: 'ArrowRight held' }).toBeGreaterThan(0.14);
     await page.keyboard.up('ArrowRight');
     await expect.poll(async () => Math.abs(await turn()), { message: 'sprung back' }).toBeLessThan(0.01);
     await page.keyboard.down('ArrowLeft');
-    await expect.poll(turn, { message: 'ArrowLeft held' }).toBeLessThan(-0.1);
+    await expect.poll(turn, { message: 'ArrowLeft held' }).toBeLessThan(-0.14);
     await page.keyboard.up('ArrowLeft');
     const s = await snapshot(page);
     expect(s.envelope).toBe('floating');
@@ -576,7 +579,7 @@ test.describe('on a phone', () => {
     const at = { x: vp.width * 0.4, y: vp.height * 0.5 };
     await touch('touchStart', [at]);
     for (let i = 1; i <= 8; i++) await touch('touchMove', [{ x: at.x + i * 20, y: at.y }]);
-    await expect.poll(turn, { message: 'turned toward the finger' }).toBeGreaterThan(0.05);
+    await expect.poll(turn, { message: 'turned toward the finger' }).toBeGreaterThan(0.12);
     await touch('touchEnd', []);
     const e = await layerSnap(page);
     expect(e.emitted.ring + e.emitted.trail).toBeGreaterThan(0);

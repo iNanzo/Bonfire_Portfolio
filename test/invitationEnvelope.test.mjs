@@ -30,6 +30,7 @@ import {
   sealBloom,
   TURN,
   turnGoal,
+  turnRoll,
   turnStep,
   envelopeGesture,
   envelopeKey,
@@ -466,35 +467,55 @@ test('the hover eases in as the pointer comes onto the letter and out as it leav
   assert.equal(k, 0);
 });
 
-test('the letter leans gently toward the pointer’s x, and a sideways drag or a held arrow turns it further, 0.15 rad at most', () => {
-  assert.ok(TURN.max <= 0.15 + 1e-9 && TURN.max >= 0.12, `at most ${TURN.max}`);
+test('the letter leans clearly toward the pointer’s x, and a sideways drag or a held arrow turns it further, 0.2–0.25 rad at most', () => {
+  assert.ok(TURN.max >= 0.2 && TURN.max <= 0.25 + 1e-9, `at most ${TURN.max}`);
   assert.equal(turnGoal({}), 0, 'no pointer, no drag, no key: square on');
-  // (Toward the pointer: right of the middle turns its face right, gently.)
+  // (Toward the pointer: right of the middle turns its face right, enough to see at a glance.)
+  const half = turnGoal({ pointer: 0.5 });
+  assert.ok(half >= 0.08 && half <= 0.12, `a cursor halfway to the edge: ${half}`);
   const right = turnGoal({ pointer: 1 });
-  assert.ok(right > 0.03 && right <= 0.08, `toward the right edge ${right}`);
+  assert.ok(right > half && right <= 0.16, `toward the right edge ${right}`);
   assert.equal(turnGoal({ pointer: -1 }), -right);
-  assert.ok(Math.abs(turnGoal({ pointer: 0.5 }) - right / 2) < 1e-9, 'by how far off the middle');
+  assert.equal(turnGoal({ pointer: -0.5 }), -half);
+  // (Eased: most of it comes in the first half of the way out, none of it in a jump.)
+  assert.ok(half > right / 2 + 0.01, 'more than half of it by halfway');
+  const lean = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1].map((x) => turnGoal({ pointer: x }));
+  for (let i = 1; i < lean.length; i++) {
+    assert.ok(lean[i] > lean[i - 1], 'more, the further out');
+    assert.ok(lean[i] - lean[i - 1] < 0.03, `no jump: ${lean[i] - lean[i - 1]}`);
+  }
+  // (The stop's cursor, 170 px off the middle of a 1280 px screen: well past a degree.)
+  assert.ok(turnGoal({ pointer: 170 / 640 }) > 0.05, `${turnGoal({ pointer: 170 / 640 })}`);
   assert.equal(turnGoal({ pointer: 4 }), right, 'never past the edge’s');
   // (A sideways drag turns it further its way, more the further it goes, never past the most.)
   const w = 1000;
   const small = turnGoal({ pointer: 0, dx: 50, w });
   const big = turnGoal({ pointer: 0, dx: 400, w });
   assert.ok(small > 0 && big > small, `${small} then ${big}`);
+  // (A 300 px drag from the middle of a 1280 px screen, the cursor ending there: 0.2 or so.)
+  const drag = turnGoal({ pointer: 300 / 640, dx: 300, w: 1280 });
+  assert.ok(drag >= 0.18 && drag <= TURN.max + 1e-9, `the stop's drag: ${drag}`);
   assert.ok(turnGoal({ pointer: 1, dx: 5000, w }) <= TURN.max + 1e-9);
   assert.ok(turnGoal({ pointer: -1, dx: -5000, w }) >= -TURN.max - 1e-9);
   assert.ok(turnGoal({ pointer: 1, dx: 5000, w }) > TURN.max - 0.01, 'all the way, dragged far');
-  // (A held arrow: further its way.)
+  // (A held arrow: further its way than any lean, and with the cursor its way, about the most.)
   assert.ok(turnGoal({ key: 1 }) > right, 'ArrowRight');
   assert.equal(turnGoal({ key: -1 }), -turnGoal({ key: 1 }), 'ArrowLeft');
+  assert.ok(turnGoal({ pointer: 0.5, key: 1 }) >= 0.2, 'ArrowRight, the cursor its way');
   assert.ok(turnGoal({ pointer: 1, key: 1 }) <= TURN.max + 1e-9);
+  // (A yaw of a flat letter seen face on is only a narrowing: it rolls its top the same way too,
+  // a share of the turn, so the lean reads as one. Clockwise on the screen for a turn right.)
+  assert.ok(turnRoll(0) === 0, 'square on, no roll');
+  assert.ok(turnRoll(half) < 0 && turnRoll(-half) === -turnRoll(half), 'the top toward the cursor');
+  assert.ok(Math.abs(turnRoll(half)) >= 0.04 && Math.abs(turnRoll(TURN.max)) <= 0.15, `${turnRoll(half)}`);
 });
 
 test('the turn eases toward where it heads and springs back once let go; reduced motion keeps it square on', () => {
   let a = 0;
   const trace = [];
-  for (let i = 0; i < 60; i++) trace.push((a = turnStep(a, 0.12, 1 / 60)));
-  assert.ok(trace[0] > 0 && trace[0] < 0.06, `eased: ${trace[0]} after a frame`);
-  assert.ok(Math.abs(a - 0.12) < 0.01, `there within a second: ${a}`);
+  for (let i = 0; i < 60; i++) trace.push((a = turnStep(a, TURN.max, 1 / 60)));
+  assert.ok(trace[0] > 0 && trace[0] < TURN.max / 2, `eased: ${trace[0]} after a frame`);
+  assert.ok(Math.abs(a - TURN.max) < 0.01, `there within a second: ${a}`);
   for (let i = 0; i < 90; i++) a = turnStep(a, 0, 1 / 60);
   assert.ok(Math.abs(a) < 0.005, `back square on: ${a}`);
   assert.equal(turnStep(0.1, 0.12, 1 / 60, true), 0);

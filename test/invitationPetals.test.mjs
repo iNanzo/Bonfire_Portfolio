@@ -12,6 +12,8 @@ import {
   BLOOM_SIZE,
   FLOWS,
   LETTER_DEPTHS,
+  LETTER_MOUTH,
+  PETAL_LEN,
   PETAL_SHAPES,
   PETAL_SIZES,
   POOL,
@@ -28,6 +30,7 @@ import {
   valueNoise,
 } from '../src/invitation/petals.js';
 import { DEPTH, envelopeLayout } from '../src/invitation/envelopeLook.js';
+import { FLAP_OPEN, TIMES, createEnvelope } from '../src/invitation/envelope.js';
 
 const ORIGIN = { x: 0, y: 0, z: 0 };
 /** The letter standing square to the camera at `c` (petals.js LetterFrame). */
@@ -272,30 +275,46 @@ test('as it opens the swirl is flung outward and goes', () => {
   assert.ok(!f.petals.some((p) => p.kind === 'swirl'), 'gone');
 });
 
-test('the pour: as it opens, petals rise out of its inside, along its up and forward', () => {
+/** How far up the letter `L` its pocket's mouth is at `across` (its V: lowest in the middle). */
+const mouthAt = (L, across) => L.h / 2 - LETTER_MOUTH * L.h * (1 - Math.min(1, Math.abs(across) / 0.5));
+
+test('the pour: once the flap is half open, a good stream of petals rises out of the mouth, fast, up and forward', () => {
   // The letter on its side: its up is the screen’s left, its forward the camera.
   const L = frameAt(
     { x: 0.2, y: 0.1, z: 0 },
     { right: { x: 0, y: 1, z: 0 }, up: { x: -1, y: 0, z: 0 }, fwd: { x: 0, y: 0, z: 1 }, floating: false },
   );
+  assert.ok(FLOWS.pour.n >= 28, `enough to read as a pour: ${FLOWS.pour.n}`);
+  assert.ok(FLOWS.pour.from >= 0.4 && FLOWS.pour.from <= 0.6, 'from about half open');
   const f = createPetalFlow({ seed: 9 });
-  run(f, 1.2, 1 / 60, (g, i) => g.letter({ ...L, opening: Math.min(1, i / 60) }));
+  /** @type {number|null} when it passed FLOWS.pour.from */
+  let halfAt = null;
+  run(f, 1.4, 1 / 60, (g, i) => {
+    const opening = Math.min(1, i / 60);
+    if (opening < FLOWS.pour.from) assert.equal(g.emitted.pour, 0, `none till it's half open: ${opening}`);
+    else halfAt ??= g.time;
+    g.letter({ ...L, opening });
+  });
   const pour = f.petals.filter((p) => p.kind === 'pour');
-  assert.ok(pour.length >= 10 && pour.length <= FLOWS.pour.n, `a pour: ${pour.length}`);
+  assert.equal(pour.length, FLOWS.pour.n, `the whole pour: ${pour.length}`);
   assert.ok(f.emitted.pour === pour.length);
   const born = pour.map((p) => p.born);
-  assert.ok(Math.max(...born) - Math.min(...born) > 0.3, 'over the opening, not all at once');
+  assert.ok(Math.min(...born) >= /** @type {number} */ (halfAt) - 1e-9);
+  const spread = Math.max(...born) - Math.min(...born);
+  assert.ok(spread > 0.3 && spread <= FLOWS.pour.over + 0.05, `a stream over the opening, not all at once: ${spread}`);
   for (const p of pour) {
-    const s = p.start;
-    const local = sub(s, L.c);
+    const local = sub(p.start, L.c);
     const across = dot(local, L.right);
     const up = dot(local, L.up);
-    assert.ok(Math.abs(across) <= 0.5, 'across its inside');
-    assert.ok(up <= L.h / 2 + 1e-9 && up >= -L.h / 2, 'from inside the pocket, below its mouth');
+    assert.ok(Math.abs(across) <= 0.45, 'across its mouth');
+    // (Just inside the mouth: the pocket hides only its first moment.)
+    const mouth = mouthAt(L, across);
+    assert.ok(up < mouth && up > mouth - 0.06, `just under the mouth: ${(mouth - up).toFixed(3)} under it`);
     assert.ok(Math.abs(dot(local, L.fwd)) < 0.03, 'at the pocket’s depth');
-    assert.ok(dot(p.launch, L.up) > 0.3 && dot(p.launch, L.fwd) > 0.05, 'up and forward out of it');
+    assert.ok(dot(p.launch, L.up) >= 1.2 && dot(p.launch, L.fwd) > 0.05, 'up, fast, and forward out of it');
+    assert.ok(p.size >= 1, `big enough to read: ${p.size}`);
   }
-  // None once it’s open, none while it floats.
+  // None more once it’s open, none while it floats.
   const n = f.emitted.pour;
   run(f, 1, 1 / 60, (g) => g.letter({ ...L, opening: 1 }));
   assert.equal(f.emitted.pour, n);
@@ -304,12 +323,40 @@ test('the pour: as it opens, petals rise out of its inside, along its up and for
   assert.equal(idle.emitted.pour, 0);
 });
 
+test('poured, the petals stand well clear above the mouth: risen 0.3 of the letter over it within half a second, out past its top', () => {
+  for (const seed of [9, 10, 11]) {
+    const L = frameAt(ORIGIN, { floating: false });
+    const f = createPetalFlow({ seed });
+    /** @type {Map<object, number>} */
+    const risen = new Map();
+    run(f, 2, 1 / 60, (g, i) => {
+      g.letter({ ...L, opening: Math.min(1, i / 30) });
+      for (const p of g.petals) {
+        if (p.kind !== 'pour' || p.born > g.time) continue;
+        const a = g.time - p.born;
+        if (a >= 0.5 - 1e-9 && !risen.has(p)) {
+          const local = sub(p, L.c);
+          risen.set(p, dot(local, L.up) - mouthAt(L, dot(local, L.right)));
+        }
+      }
+    });
+    assert.ok(risen.size >= FLOWS.pour.n * 0.9, `${risen.size}`);
+    for (const h of risen.values()) assert.ok(h > 0.3, `above the mouth by ${h.toFixed(3)}`);
+  }
+});
+
 test('the pour starts between the inside and the pocket, which hides it till it rises out of the mouth', () => {
   // (The envelope's depths, letter widths in front of its middle: envelopeLook.js DEPTH.)
   const { T, W } = envelopeLayout();
   const depths = { inside: (T / 2 + DEPTH.inside) / W, pocket: (T / 2 + DEPTH.pocket) / W };
   for (const k of /** @type {const} */ (['inside', 'pocket']))
     assert.ok(Math.abs(LETTER_DEPTHS[k] - depths[k]) < 1e-9, `petals.js LETTER_DEPTHS.${k} is the envelope's`);
+  // (The mouth's V, its foot a share of the letter's height under its top: the envelope's.)
+  const { H, parts } = envelopeLayout();
+  assert.ok(
+    Math.abs(LETTER_MOUTH - (H / 2 - parts.pocket[0][1]) / H) < 1e-9,
+    'petals.js LETTER_MOUTH is the envelope’s',
+  );
   for (const seed of [9, 10, 11]) {
     const L = frameAt(ORIGIN, { floating: false, ...depths });
     const f = createPetalFlow({ seed });
@@ -354,6 +401,39 @@ test('the seal blooms: a ring of petals tight round it that unfurl outward and l
   for (const p of f.petals) assert.ok(p.y > seal.y - 0.05, 'lifting, not dropping, as it goes');
   const quadrants = new Set(angles.map((a) => Math.floor(((a + Math.PI) / (Math.PI / 2)) % 4)));
   assert.equal(quadrants.size, 4, 'all round it');
+});
+
+test('the bloom drifts up and aside off the seal and fades soon, so by the time the flap is half open the mouth is clear for the pour', () => {
+  // (The letter square on, its seal on the flap's tip, as the envelope has it.)
+  const { H, W, tip } = envelopeLayout();
+  const h = H / W;
+  const seal = { x: 0, y: tip[1] / W, z: 0.03 };
+  // (When the flap passes half open, by the envelope's own timeline.)
+  const env = createEnvelope();
+  env.open(0);
+  let half = 0;
+  while (env.pose(half).flap < FLAP_OPEN / 2) half += 1 / 240;
+  assert.ok(half > TIMES.flapAt && half < TIMES.opening);
+  for (const seed of [9, 10, 11, 12]) {
+    const f = createPetalFlow({ seed });
+    f.emit('bloom', seal, { radius: 0.09 });
+    let inMouth = 0;
+    let most = 0;
+    run(f, 1.6, 1 / 60, (g) => {
+      if (g.time < half) return;
+      let n = 0;
+      for (const { petal, pose } of g.at()) {
+        if (petal.kind !== 'bloom' || !pose.visible) continue;
+        most = Math.max(most, g.time - petal.born);
+        // (Over the mouth's middle, from the seal up to the letter's top, at more than half its size.)
+        const big = pose.scale > PETAL_LEN * petal.size * 0.5;
+        if (big && Math.abs(pose.x) < 0.2 && pose.y > seal.y && pose.y < h / 2 + 0.1) n++;
+      }
+      inMouth = Math.max(inMouth, n);
+    });
+    assert.ok(inMouth <= 1, `seed ${seed}: ${inMouth} bloom petals over the mouth from half open on`);
+    assert.ok(most <= 1.5, `gone soon: ${most.toFixed(2)} s`);
+  }
 });
 
 test('a click’s burst ring: 10–14 petals at even angles with a little jitter, out with drag, gone in about a second', () => {
