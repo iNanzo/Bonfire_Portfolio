@@ -1,7 +1,17 @@
 // The invitation toy's page around the canvas: the status line ("Loading…", or what went wrong),
-// the toolbar along the bottom (Play Intro, Wave, Spook, Sit or Stand, Run, Wander, Look: every
-// button a thumb's height, labelled, never a tooltip; Play Intro starts the intro's dialogue,
-// dialogueUi.js, and while it runs the toolbar rests out of sight, setTalking) and the Look menu, a bottom sheet (Pixel Size, a
+// the toolbar along the bottom and the Settings sheet. The toolbar: Replay Intro, Wave, Sit (or
+// Stand), Give Device (Lie Down, Get Up: what its next press does), Run, Camera and Settings,
+// each a squircle with a 16×16 pixel icon (icons.js) and its label, the button's own text in a
+// span (its name: no tooltip, no title=). With a mouse the label shows as a pixel tab over the
+// button on hover and keyboard focus; on touch the bar shows icons only, and a press held still
+// for HOLD_MS shows the label and swallows the click that follows (createHold; a quicker press
+// acts as ever). Hover and press fill the button with ordered dither. Replay Intro starts the
+// intro's dialogue (dialogueUi.js), and while it runs the toolbar rests out of sight
+// (setTalking). Camera opens the Camera pad over the stage (above the bar, never moving it, so
+// the view's clear space and the play area stay as they are): Turn Left and Right, Tilt Up and
+// Down, Zoom In and Out, Follow NEWT and Reset Camera, and a line on moving the view by hand;
+// Escape or Camera again closes it. Settings opens the Settings sheet, a bottom sheet (Pixel
+// Size, a
 // slider over NEWT's sprite resolutions, 16×16 to 256×256, then Native (a texel a device pixel)
 // and Off at its fine end, with a button at each end (named for what it sets: "Pixel Size
 // Off") and a line saying how many pixels tall he is on this screen; Dithering, Outlines,
@@ -9,10 +19,11 @@
 // (Smooth or Choppy), Shader (every control in shader.js's table, rendered from it: a slider
 // with its value beside it, a row of segments or a switch; Reset To Style; the pixel look's
 // ones resting at Pixel Size Off, the lines' while Outlines is off, the dither's while
-// Dithering is), and Reset Camera with a line on turning and zooming the view). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
+// Dithering is), and Wander, whether he walks about by himself, kept for the next visit
+// (loadWander, in localStorage, every read and write in try/catch)). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
 // to the same block there are one step, and one that comes to 1 px is Native), set by main.js
 // as the stage is measured (setPixelSteps); every Pixel Size is a step until then. The sheet is a modal dialog: it opens on Done, Tab goes
-// round inside it, the toolbar's action buttons are inert while it's open (Look, pressed,
+// round inside it, the toolbar's other buttons are inert while it's open (Settings, pressed,
 // closes it, as Done does; the sheet's head with Done stays at its top as it scrolls), and
 // Escape closes it wherever focus is; the canvas stays live (turning the camera while choosing a look). A finger
 // on a slider only moves it once it goes along it (slideIntent): a swipe up or down that starts
@@ -27,6 +38,7 @@
 import { PIXEL_SIZES, resolutionOf, shownPixel, stepFor } from './pixels.js';
 import { LOOKS, MOTIONS, STYLES, isCustom, shaderOf, validLook } from './look.js';
 import { SHADER_CONTROLS, controlFor, shaderText } from './shader.js';
+import { LABEL_ICONS, iconSvg, installDither } from './icons.js';
 
 /** @typedef {import('./types.js').ButtonName} ButtonName */
 
@@ -51,10 +63,116 @@ export function slideIntent(dx, dy) {
   return Math.abs(dx) > Math.abs(dy) ? 'drag' : 'swipe';
 }
 
-/** The toolbar's action buttons, in order (Play Intro comes first and Look last, each on its own). */
-export const BUTTONS = /** @type {const} */ (['Wave', 'Spook', 'Sit', 'Run', 'Wander']);
-/** Play Intro's label. */
-export const INTRO_LABEL = 'Play Intro';
+/**
+ * The toolbar's action buttons, in order, by the brain's name (Replay Intro comes first, Camera
+ * and Settings last). Spook and Wander have left the bar: a tap on him still spooks or waves
+ * him, and Wander is a setting.
+ */
+export const BUTTONS = /** @type {const} */ (['Wave', 'Sit', 'Device', 'Run']);
+/** Each action button's label (Sit's and Give Device's change as he sits or lies: setSitLabel, setDeviceLabel). */
+export const BUTTON_LABELS = { Wave: 'Wave', Sit: 'Sit', Device: 'Give Device', Run: 'Run' };
+/** Replay Intro's label. */
+export const INTRO_LABEL = 'Replay Intro';
+/** Give Device's labels: what its next press does (none under way, sitting with the tablet, lying with it). */
+export const DEVICE_LABELS = /** @type {const} */ (['Give Device', 'Lie Down', 'Get Up']);
+/**
+ * Give Device's label for the brain's output: its own deviceLabel when it's one of
+ * DEVICE_LABELS, else from what's under way (sitting: Lie Down; lying: Get Up), else Give Device.
+ * @param {{deviceLabel?: unknown, device?: 'sit'|'lie'|null}} o
+ * @returns {typeof DEVICE_LABELS[number]}
+ */
+export function deviceLabelOf(o) {
+  const own = DEVICE_LABELS.find((l) => l === o.deviceLabel);
+  if (own) return own;
+  return o.device === 'sit' ? 'Lie Down' : o.device === 'lie' ? 'Get Up' : 'Give Device';
+}
+/**
+ * The Camera pad's controls, in order: a key main.js acts on (camera.js orbitNudge, orbitZoom,
+ * orbitFollow, orbitReset) and the label.
+ */
+export const CAMERA_CONTROLS = /** @type {const} */ ([
+  { key: 'left', label: 'Turn Left' },
+  { key: 'right', label: 'Turn Right' },
+  { key: 'up', label: 'Tilt Up' },
+  { key: 'down', label: 'Tilt Down' },
+  { key: 'in', label: 'Zoom In' },
+  { key: 'out', label: 'Zoom Out' },
+  { key: 'follow', label: 'Follow NEWT' },
+  { key: 'reset', label: 'Reset Camera' },
+]);
+/** @typedef {typeof CAMERA_CONTROLS[number]['key']} CameraKey */
+
+/** How long a touch on a tool button is held still before its label shows, ms. */
+export const HOLD_MS = 450;
+/** How far a finger may wander and still be held still, CSS px. */
+export const HOLD_SLOP = 10;
+/**
+ * A touch on a tool button: held still HOLD_MS (tick says when) it shows the label, and its
+ * release swallows the click ('label'); a quicker press, one that moved off, or one cancelled
+ * is an ordinary press ('click'). Times in seconds.
+ * @param {{ms?: number, slop?: number}} [o]
+ */
+export function createHold({ ms = HOLD_MS, slop = HOLD_SLOP } = {}) {
+  /** @type {{x: number, y: number, t: number, moved: boolean, shown: boolean}|null} */
+  let p = null;
+  return {
+    /** @param {number} x @param {number} y @param {number} t */
+    down(x, y, t) {
+      p = { x, y, t, moved: false, shown: false };
+    },
+    /** @param {number} x @param {number} y */
+    move(x, y) {
+      if (p && Math.hypot(x - p.x, y - p.y) > slop) p.moved = true;
+    },
+    /** Whether the label shows now. @param {number} t */
+    tick(t) {
+      if (p && !p.moved && !p.shown && t - p.t >= ms / 1000 - 1e-9) p.shown = true;
+      return Boolean(p?.shown);
+    },
+    /** @param {number} t @returns {'label'|'click'} */
+    up(t) {
+      const shown = this.tick(t);
+      p = null;
+      return shown ? 'label' : 'click';
+    },
+    cancel() {
+      p = null;
+    },
+  };
+}
+
+/** Where Wander is kept (true or false; unset: the brain's own, on unless ?calm). */
+export const WANDER_KEY = 'invitation.wander.v1';
+/**
+ * Wander as the visitor last left it, or null (never set, unreadable, or no storage).
+ * `storage` defaults to localStorage (reaching it can throw).
+ * @param {Pick<Storage, 'getItem'>|null} [storage]
+ * @returns {boolean|null}
+ */
+export function loadWander(storage) {
+  try {
+    const s = storage === undefined ? globalThis.localStorage : storage;
+    const v = s ? JSON.parse(s.getItem(WANDER_KEY) ?? 'null') : null;
+    return typeof v === 'boolean' ? v : null;
+  } catch {
+    return null;
+  }
+}
+/**
+ * Keep Wander for the next visit; whether it could be.
+ * @param {boolean} on
+ * @param {Pick<Storage, 'setItem'>|null} [storage]
+ */
+export function saveWander(on, storage) {
+  try {
+    const s = storage === undefined ? globalThis.localStorage : storage;
+    if (!s) return false;
+    s.setItem(WANDER_KEY, JSON.stringify(Boolean(on)));
+    return true;
+  } catch {
+    return false;
+  }
+}
 /** @type {Record<string, string>} the Pixel Sizes named by a word, not N×N */
 const PIXEL_WORDS = { native: 'Native', off: 'Off' };
 /**
@@ -126,18 +244,35 @@ export function parseQuery(search) {
     govern: q.has('govern') ? q.get('govern') !== 'off' : null,
     // (The intro's reply settle in ms, stretched for the browser specs: only under ?test.)
     settle: q.has('test') && settle > 0 ? settle : null,
+    // (The envelope that opens the page, every visit; ?test starts in the toy unless &envelope.)
+    envelope: !q.has('test') || q.has('envelope'),
   };
 }
 
-/** The toolbar: Play Intro, the action buttons and Look. */
-export function toolbarHtml() {
-  const buttons = BUTTONS.map((name) =>
-    name === 'Wander'
-      ? `<button type="button" class="inv-btn" data-button="Wander" aria-pressed="false">Wander</button>`
-      : `<button type="button" class="inv-btn" data-button="${name}">${name}</button>`,
+/**
+ * A tool button: a squircle with its pixel icon and its label, the label its name.
+ * @param {string} label
+ * @param {string} attrs  its hook and state attributes
+ * @param {string} [cls]  more classes
+ */
+const tool = (label, attrs, cls = '') =>
+  `<button type="button" class="inv-btn inv-tool${cls ? ` ${cls}` : ''}" ${attrs}>${iconSvg(LABEL_ICONS[label])}<span class="inv-btn-label">${html(label)}</span></button>`;
+
+/** The Camera pad: its controls and a line on moving the view by hand (closed to begin with). */
+function padHtml() {
+  const buttons = CAMERA_CONTROLS.map((c) =>
+    tool(c.label, c.key === 'reset' ? 'data-camera="reset" data-reset-camera' : `data-camera="${c.key}"`),
   ).join('');
-  const intro = `<button type="button" class="inv-btn inv-btn-intro" data-intro>${INTRO_LABEL}</button>`;
-  return `<nav class="inv-toolbar" aria-label="Play With NEWT">${intro}${buttons}<button type="button" class="inv-btn inv-btn-look" data-look-open aria-expanded="false" aria-controls="inv-look">Look</button></nav>`;
+  return `<div class="inv-camera-pad" id="inv-camera" role="group" aria-label="Camera Controls" hidden>${buttons}<p class="inv-hint">Drag empty space to turn or slide the view, and pinch or scroll to zoom.</p></div>`;
+}
+
+/** The toolbar: Replay Intro, the action buttons, Camera (and its pad) and Settings. */
+export function toolbarHtml() {
+  const buttons = BUTTONS.map((name) => tool(BUTTON_LABELS[name], `data-button="${name}"`)).join('');
+  const intro = tool(INTRO_LABEL, 'data-intro', 'inv-btn-intro');
+  const camera = tool('Camera', 'data-camera-open aria-expanded="false" aria-controls="inv-camera"', 'inv-btn-camera');
+  const settings = tool('Settings', 'data-look-open aria-expanded="false" aria-controls="inv-look"', 'inv-btn-look');
+  return `<nav class="inv-toolbar" aria-label="Play With NEWT">${intro}${buttons}${camera}${settings}${padHtml()}</nav>`;
 }
 
 /**
@@ -220,17 +355,19 @@ function shaderHtml(look) {
  * @param {string} key
  * @param {string} label
  * @param {boolean} on
+ * @param {string} [attr]  its data attribute (data-look: a Look setting; data-setting: the toy's own)
  */
-const toggle = (key, label, on) =>
-  `<label class="inv-switch"><input type="checkbox" role="switch" data-look="${key}"${on ? ' checked' : ''}><span class="inv-switch-label">${label}</span><span class="inv-knob" aria-hidden="true"></span></label>`;
+const toggle = (key, label, on, attr = 'data-look') =>
+  `<label class="inv-switch"><input type="checkbox" role="switch" ${attr}="${key}"${on ? ' checked' : ''}><span class="inv-switch-label">${label}</span><span class="inv-knob" aria-hidden="true"></span></label>`;
 
 /**
- * The Look menu, a bottom sheet (hidden until Look opens it).
+ * The Settings sheet, a bottom sheet (hidden until Settings opens it).
  * @param {import('./look.js').Look} look
  * @param {import('./pixels.js').PixelStep[]} [steps]  Pixel Size's steps on this screen (pixels.js
  *   pixelSteps; every Pixel Size its own step by default)
+ * @param {{wander?: boolean}} [o]  whether he wanders by himself (on by default)
  */
-export function sheetHtml(look, steps = ALL_STEPS) {
+export function sheetHtml(look, steps = ALL_STEPS, { wander = true } = {}) {
   const l = validLook(look);
   const custom = isCustom(l);
   // (Custom is the style row's own once a Shader value is the user's: it's never picked.)
@@ -239,7 +376,7 @@ export function sheetHtml(look, steps = ALL_STEPS) {
     segment('inv-style', 'style', 'custom', 'Custom', custom, { disabled: !custom });
   const motions = MOTIONS.map((m) => segment('inv-motion', 'motion', m, MOTION_LABELS[m], l.motion === m)).join('');
   return `<section class="inv-sheet" id="inv-look" role="dialog" aria-modal="true" aria-labelledby="inv-look-title" hidden>
-  <header class="inv-sheet-head"><h2 id="inv-look-title">Look</h2><button type="button" class="inv-btn inv-btn-done" data-look-close>Done</button></header>
+  <header class="inv-sheet-head"><h2 id="inv-look-title">Settings</h2><button type="button" class="inv-btn inv-btn-done" data-look-close>Done</button></header>
   <p class="inv-hint">Changes show right away and stay for your next visit.</p>
   ${pixelHtml(l.pixelSize, steps)}
   <div class="inv-switches">${toggle('dither', 'Dithering', l.dither)}${toggle('outlines', 'Outlines', l.outlines)}</div>
@@ -247,8 +384,26 @@ export function sheetHtml(look, steps = ALL_STEPS) {
   <fieldset class="inv-field"><legend>Style</legend><div class="inv-segs">${styles}</div></fieldset>
   <fieldset class="inv-field"><legend>Motion</legend><div class="inv-segs">${motions}</div></fieldset>
   ${shaderHtml(l)}
-  <div class="inv-camera"><p class="inv-hint">Drag empty space to turn the view, and pinch or scroll to zoom.</p><button type="button" class="inv-btn" data-reset-camera>Reset Camera</button></div>
+  <div class="inv-field inv-play">${toggle('wander', 'Wander', wander, 'data-setting')}<p class="inv-hint">Left be, he walks about by himself now and then.</p></div>
 </section>`;
+}
+
+/**
+ * A tool button's label and icon changed in place (Sit's, Give Device's): only its span's text and
+ * its SVG, so the button, its focus and its hooks stay.
+ * @param {HTMLElement} button
+ * @param {string} label
+ */
+function relabel(button, label) {
+  const span = button.querySelector('.inv-btn-label');
+  if (span && span.textContent === label) return;
+  if (span) span.textContent = label;
+  const name = LABEL_ICONS[label];
+  const svg = button.querySelector('svg.inv-icon');
+  if (!name || !svg) return;
+  const t = document.createElement('template');
+  t.innerHTML = iconSvg(name);
+  if (t.content.firstElementChild) svg.replaceWith(t.content.firstElementChild);
 }
 
 /** The status line: shown while loading and when something went wrong. */
@@ -259,26 +414,31 @@ export function statusHtml() {
 /**
  * Put the page's controls in the stage and report what's pressed.
  * @param {HTMLElement} stage
- * @param {{look: import('./look.js').Look, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void, onResetCamera?(): void, onSheet?(open: boolean): void, onIntro?(): void}} o
- *   onSheet: the Look sheet opened or closed (main.js keeps NEWT in sight beside it); onIntro:
- *   Play Intro pressed
+ * @param {{look: import('./look.js').Look, wander?: boolean, onButton(name: ButtonName): void, onLook(look: import('./look.js').Look): void, onCamera?(key: CameraKey): void, onWander?(on: boolean): void, onSheet?(open: boolean): void, onIntro?(): void}} o
+ *   wander: the Wander switch's state to begin with; onCamera: a Camera pad control pressed
+ *   (reset: Reset Camera); onWander: the Wander switch flipped; onSheet: the Settings sheet
+ *   opened or closed (main.js keeps NEWT in sight beside it); onIntro: Replay Intro pressed
  */
-export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet, onIntro }) {
+export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera, onWander, onSheet, onIntro }) {
   const hud = document.createElement('div');
   hud.className = 'inv-hud';
-  hud.innerHTML = statusHtml() + toolbarHtml() + sheetHtml(look);
+  hud.innerHTML = statusHtml() + toolbarHtml() + sheetHtml(look, ALL_STEPS, { wander });
   stage.append(hud);
+  // (The buttons' hover and press fills: the ink's ordered dither.)
+  installDither(hud, getComputedStyle(hud).getPropertyValue('--inv-ink').trim() || '#3a332d');
   const $ = (sel) => /** @type {HTMLElement} */ (hud.querySelector(sel));
   const sheet = $('.inv-sheet');
   const opener = $('[data-look-open]');
   const intro = /** @type {HTMLButtonElement} */ ($('[data-intro]'));
+  const pad = $('.inv-camera-pad');
+  const padOpener = $('[data-camera-open]');
   /** The intro is running: the toolbar rests (setTalking). */
   let talking = false;
   /** Focus goes back to Play Intro once it's on again (the intro just ended). */
   let refocus = false;
   /** The sheet's first and last stops for Tab. */
   const first = $('[data-look-close]');
-  const last = $('[data-reset-camera]');
+  const last = $('[data-setting="wander"]');
   const status = $('.inv-status');
   let current = validLook(look);
   let steps = ALL_STEPS;
@@ -410,13 +570,34 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet, 
     e.preventDefault();
     (e.shiftKey ? last : first).focus();
   };
+  /**
+   * While the Camera pad is open, on the whole document: Escape closes it and focus goes back to
+   * Camera.
+   * @param {KeyboardEvent} e
+   */
+  const onPadKey = (e) => {
+    if (e.key !== 'Escape' || !sheet.hidden) return;
+    e.preventDefault();
+    openPad(false);
+    padOpener.focus();
+  };
+  /** @param {boolean} open */
+  const openPad = (open) => {
+    if (open === !pad.hidden) return;
+    pad.hidden = !open;
+    padOpener.setAttribute('aria-expanded', String(open));
+    if (open) document.addEventListener('keydown', onPadKey);
+    else document.removeEventListener('keydown', onPadKey);
+  };
   /** @param {boolean} open */
   const openSheet = (open) => {
     sheet.hidden = !open;
-    // (The action buttons under the sheet: no focus, no presses, hidden from screen readers.
-    // Look stays, pressed: another press closes the sheet, as Done does.)
+    if (open) openPad(false);
+    // (The other buttons under the sheet: no focus, no presses, hidden from screen readers.
+    // Settings stays, pressed: another press closes the sheet, as Done does.)
     for (const name of BUTTONS) /** @type {HTMLElement} */ ($(`[data-button="${name}"]`)).inert = open;
     intro.inert = open;
+    padOpener.inert = open;
     opener.setAttribute('aria-expanded', String(open));
     if (open) {
       document.addEventListener('keydown', onKey);
@@ -468,14 +649,93 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet, 
   hud.addEventListener('pointerup', fingerUp);
   hud.addEventListener('pointercancel', fingerUp);
 
+  // --- A touch held still on a tool button shows its label (icons only on touch) and swallows
+  // the click that follows; the bar shows no long-press menu.
+  const hold = createHold();
+  const now = () => performance.now() / 1000;
+  /** @type {{button: HTMLElement, id: number, timer: number}|null} */
+  let held = null;
+  /** The button whose click to swallow, until when (performance.now(), ms). */
+  let swallow = { button: /** @type {HTMLElement|null} */ (null), until: 0 };
+  /** @type {Map<HTMLElement, number>} each label's timer to go again */
+  const hiding = new Map();
+  /** @param {HTMLElement} button @param {boolean} on */
+  const showLabel = (button, on) => {
+    clearTimeout(hiding.get(button));
+    hiding.delete(button);
+    button.classList.toggle('is-label', on);
+  };
+  /** @param {HTMLElement} button */
+  const hideSoon = (button) => {
+    clearTimeout(hiding.get(button));
+    hiding.set(
+      button,
+      window.setTimeout(() => showLabel(button, false), 1200),
+    );
+  };
+  const holdEnd = () => {
+    if (!held) return null;
+    clearTimeout(held.timer);
+    const b = held.button;
+    held = null;
+    return b;
+  };
+  $('.inv-toolbar').addEventListener('pointerdown', (e) => {
+    const button = /** @type {HTMLElement} */ (e.target).closest?.('.inv-tool');
+    if (e.pointerType === 'mouse' || !(button instanceof HTMLButtonElement) || button.disabled) return;
+    holdEnd();
+    hold.down(e.clientX, e.clientY, now());
+    held = {
+      button,
+      id: e.pointerId,
+      timer: window.setTimeout(() => {
+        if (held?.button === button && hold.tick(now())) showLabel(button, true);
+      }, HOLD_MS + 10),
+    };
+  });
+  $('.inv-toolbar').addEventListener('pointermove', (e) => {
+    if (!held || e.pointerId !== held.id) return;
+    // (Moved off its spot: no label for this press; the timer finds it moved.)
+    hold.move(e.clientX, e.clientY);
+  });
+  $('.inv-toolbar').addEventListener('pointerup', (e) => {
+    if (!held || e.pointerId !== held.id) return;
+    const button = /** @type {HTMLElement} */ (holdEnd());
+    if (hold.up(now()) === 'label') {
+      showLabel(button, true);
+      hideSoon(button);
+      swallow = { button, until: performance.now() + 700 };
+    }
+  });
+  $('.inv-toolbar').addEventListener('pointercancel', (e) => {
+    if (!held || e.pointerId !== held.id) return;
+    const button = holdEnd();
+    hold.cancel();
+    if (button?.classList.contains('is-label')) hideSoon(button);
+  });
+  $('.inv-toolbar').addEventListener('contextmenu', (e) => e.preventDefault());
+  hud.addEventListener(
+    'click',
+    (e) => {
+      const b = swallow.button;
+      if (!b || performance.now() > swallow.until) return;
+      swallow = { button: null, until: 0 };
+      if (!b.contains(/** @type {Node} */ (e.target))) return;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    true,
+  );
+
   hud.addEventListener('click', (e) => {
     const el = /** @type {HTMLElement} */ (e.target).closest('button');
     if (!el || !hud.contains(el)) return;
     if (el.matches('[data-look-open]')) openSheet(Boolean(sheet.hidden));
     else if (el.matches('[data-look-close]')) openSheet(false);
+    else if (el.matches('[data-camera-open]')) openPad(Boolean(pad.hidden));
+    else if (el.dataset.camera) onCamera?.(/** @type {CameraKey} */ (el.dataset.camera));
     else if (el.matches('[data-reload]')) location.reload();
     else if (el.matches('[data-intro]')) onIntro?.();
-    else if (el.matches('[data-reset-camera]')) onResetCamera?.();
     else if (el.matches('[data-pixel-end]')) pickPixel(el.dataset.pixelEnd === 'first' ? 0 : steps.length - 1);
     else if (el.matches('[data-shader-reset]')) {
       pickStyle(null);
@@ -496,6 +756,7 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet, 
     const input = /** @type {HTMLInputElement} */ (e.target);
     if (input.type === 'range') return waiting(input) ? undefined : takeRange(input);
     if (input.dataset.shader) return pickShader(input);
+    if (input.dataset.setting === 'wander') return onWander?.(input.checked);
     const key = input.dataset.look;
     if (!key) return;
     if (key === 'style') return pickStyle(input.value);
@@ -523,16 +784,29 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet, 
       steps = next;
       syncPixel();
     },
-    /** @param {'Sit'|'Stand'} label */
+    /**
+     * Sit's label, Sit or Stand: its label and its icon (the button stays, focus and all).
+     * @param {'Sit'|'Stand'} label
+     */
     setSitLabel(label) {
-      $('[data-button="Sit"]').textContent = label;
-    },
-    /** @param {boolean} on */
-    setWander(on) {
-      $('[data-button="Wander"]').setAttribute('aria-pressed', String(on));
+      relabel($('[data-button="Sit"]'), label);
     },
     /**
-     * The action buttons on or off (off while he's held or falling; Look stays on).
+     * Give Device's label: what its next press does (DEVICE_LABELS), its label and its icon.
+     * @param {typeof DEVICE_LABELS[number]} label
+     */
+    setDeviceLabel(label) {
+      relabel($('[data-button="Device"]'), label);
+    },
+    /**
+     * The Wander switch as the brain has it.
+     * @param {boolean} on
+     */
+    setWander(on) {
+      /** @type {HTMLInputElement} */ ($('[data-setting="wander"]')).checked = on;
+    },
+    /**
+     * The action buttons on or off (off while he's held or falling; Camera and Settings stay on).
      * @param {boolean} on
      */
     setEnabled(on) {
@@ -552,6 +826,7 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet, 
     setTalking(on) {
       if (on === talking) return;
       talking = on;
+      if (on) openPad(false);
       hud.classList.toggle('is-talking', on);
       $('.inv-toolbar').inert = on;
       // (Focus back on Play Intro, once it's on again: the brain turns the buttons back on.)
@@ -574,11 +849,18 @@ export function bindUi(stage, { look, onButton, onLook, onResetCamera, onSheet, 
     get sheetOpen() {
       return !sheet.hidden;
     },
+    get padOpen() {
+      return !pad.hidden;
+    },
+    get pad() {
+      return pad;
+    },
     get sheet() {
       return sheet;
     },
     destroy() {
       document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onPadKey);
       hud.remove();
     },
   };

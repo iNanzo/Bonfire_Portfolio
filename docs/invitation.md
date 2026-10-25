@@ -9,6 +9,28 @@ with a mouse too. It has its own look (off-white and warm greys, chunky
 buttons, pixel art drawn like an old handheld's 3D), not the bonfire site's. The page is
 unlisted: nothing links to it and search engines are asked not to index it.
 
+## The Envelope
+
+Every visit opens on an envelope: a gold, low-poly envelope sealed with red wax and the NH
+monogram, petals drifting down from the seal, floating in front of a dark teal gothic arch. It's
+drawn in the toy's own pixel look, and it's the loading screen too: NEWT loads behind it.
+
+- **Open it:** tap or click it, press Enter, Space or the up arrow, swipe it up, or scroll up.
+  The seal cracks and falls away, the flap lifts, and the envelope pushes toward you as it
+  dithers away onto NEWT, already turned to you, and the intro starts by itself (below). Opened
+  before NEWT is in, it waits open with a little pulse until he is.
+- **Skip it:** press Escape or the down arrow, swipe it down, scroll down, or press **Skip
+  Intro** at the top right. It drops away and you're straight into the toy, with no intro.
+- **While you drag it**, it follows your finger with a little give and the flap starts to lift;
+  let go short of a swipe and it springs back. A sideways drag does nothing, and nothing you do
+  on it reaches the toy underneath (the toolbar can't be reached until it's gone).
+- **The hint** ("Click or swipe up to open", "Swipe down to skip") shows while the mouse is over
+  it or it has keyboard focus, and on a touch screen after a moment without a touch; while you
+  drag it reads "Open ↑" or "Skip ↓".
+- **Reduced motion:** it holds still, the flap is open at once and it crossfades away.
+- Without WebGL 2, or if NEWT can't load, it steps aside so the message shows. Nothing about it
+  is saved: it opens every visit.
+
 ## What You Can Do
 
 - **Tap him** and he waves or gets startled (a jump, arms flung up). Tap him a lot and he gets
@@ -16,13 +38,22 @@ unlisted: nothing links to it and search engines are asked not to index it.
   shoulder at your finger every few seconds, his chest twisting with it (with your finger
   straight behind him, over the shoulder nearer you, so you see him look back); he's never too
   fast to catch.
-- **Drag him** to pick him up by the collar. The spot you grabbed stays right under your
-  cursor (a finger carries him a little above itself, so it doesn't hide him, and near the top
-  of the screen no higher than keeps his head on it): move up and he
-  rises, high off the floor if you like; move across and he goes across. He dangles and swings;
-  let go and he falls, lands and gets back up. Flick him and he flies a little; let go while
+- **Drag him** to pick him up by the collar. The spot you grabbed starts under your cursor and
+  in about a tenth of a second his collar is there instead (a finger carries him a little above
+  itself, so it doesn't hide him, and near the top of the screen no higher than keeps his head
+  on it): move up and he
+  rises, high off the floor if you like; move across and he goes across. He dangles and swings,
+  his arms and legs hanging limp and swinging with the motion; at the edge of his patch he stops
+  instead of sliding along it. Held, he hangs his head, and every few seconds (sooner if you
+  shake him) he thrashes about, kicking and flailing; let go and he falls, lands and gets back
+  up. Flick him and he flies a little; let go while
   pushing him against the edge of his patch and he just drops there. The camera holds still
-  while you carry him.
+  while you carry him. As you grab him a gold ring of dither bursts out from your grip and is
+  gone in under half a second.
+- **Point at him** (the mouse over him, or a finger pressing on him) and a gold dithered outline
+  fills in round him, a texel or two outside him and two in, with a sprinkle further in; it
+  fades as you move off, and it doesn't show while he's held or during the intro. At Pixel Size
+  Off it's a dithered gold tint over him instead.
 - **Tap the floor** (or click it) and he walks there. A ring on the floor shows where your
   finger or cursor is.
 - **Point anywhere** and he looks where you point (on a phone, while your finger is down; with
@@ -42,29 +73,54 @@ unlisted: nothing links to it and search engines are asked not to index it.
   up and down looks from higher or lower. The right button shows no menu on the canvas, nor
   wherever a drag that started there ends (the toolbar, at the bottom of a drag down).
 - **Slide the camera:** with a mouse, drag empty space with the left button (or the middle
-  one); with fingers, drag two of them together. The floor under your cursor stays under it.
-  You can't slide his patch off the screen altogether.
-- **Zoom:** pinch with two fingers, or use the mouse wheel. The light turns with the camera, so
-  his shadow always falls behind him and to one side.
+  one); with fingers, drag two of them together. The floor under your cursor stays under it as
+  far as the edge of what you can reach at this zoom (none fully zoomed out, more the closer
+  you are): past it the view gives like a rubber band and, let go, eases back.
+- **Zoom:** pinch with two fingers, or use the mouse wheel; it zooms about the cursor or your
+  fingers (the floor there stays there). The light turns with the camera, so his shadow always
+  falls behind him and to one side.
+- **The Camera pad:** **Camera** on the toolbar opens it over the stage: **Turn Left** and **Turn
+  Right** (45° round), **Tilt Up** and **Tilt Down** (12°, from 12° to 70° up), **Zoom In** and
+  **Zoom Out**, **Follow NEWT** (back onto him) and **Reset Camera** (back to where it started).
+  Camera again or Escape closes it.
 - **He stays on screen:** the camera holds still while he's well inside the screen and moves on
   with him as he nears an edge, however it's turned. On a phone he's drawn about 30% bigger than
   on a computer and the camera follows him softly too; zoomed in, it follows him everywhere.
-  Once you've slid the camera it stays where you put it until he walks off the screen himself;
-  **Reset Camera** (in the Look menu) clears the slide and the zoom.
+  Once you've slid the camera, or zoomed it about a spot, it stays where you put it however he
+  moves, until you tap or grab him, press Follow NEWT, or Reset Camera (which clears the zoom
+  too).
+- **Where he can go** is one rounded square round the middle, the same however the camera's
+  turned, so a tap anywhere across the middle of the screen reaches it turned too. It's as big
+  as the view fully zoomed out shows him whole in: on a phone it's narrower than the screen is
+  deep, so tapping near the top walks him to its back edge.
 - **Leave him alone** for about 20 seconds and he turns to face you and sits down (the Sit
   button turns him to you first too, so you see his happy face).
-- **The toolbar:** Play Intro (below), Wave, Spook, Sit (Stand once he's sitting), Run (he
-  runs off for a few seconds, across the screen to one side or the other, or away from the
-  cursor), Wander (on: he strolls around by himself) and Look. The buttons rest while he's being
-  held or falling.
+- **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Give Device (Lie
+  Down while he sits with the tablet, Get Up while he lies), Run (he runs off for a few seconds,
+  across the screen to one side or the other, or away from the cursor), Camera (the pad above)
+  and Settings. Each is a rounded square with a pixel icon; with a mouse its name shows as a
+  little tab over it when you point at it or Tab to it, and on a phone (icons only) when you
+  press and hold it, which then does nothing else. Pointed at or pressed, a button fills with a
+  dither. Spook has gone from the bar (a tap on him still startles or waves him) and Wander is in
+  Settings. The action buttons rest while he's being held or falling.
+- **The cursor** is pixel art too: an open hand over NEWT, a closed hand while you hold him or
+  slide the view, a turning arrow while you turn it, and a pointing hand on the buttons.
+- **Give Device** hands him a tablet with a tiny pixel game on it. Each press does the next
+  thing: he turns to you and sits down with it in both hands, playing (the button then says Lie
+  Down); he lies down on his stomach with it, turned most of the way side-on so you see his
+  profile and the screen past his cap, feet kicking behind him (the button says Get Up); he gets
+  up and puts it away. Anything else you do (a tap, the floor, another button) gets him up
+  first, then does it; picking him up takes him straight off the floor.
+- **His earrings:** a black stud on each earlobe with a thin black line and a little black
+  cross hanging from it, swinging as he walks, turns, is carried or thrashes.
 
-## The Look Menu
+## Settings
 
-**Look** opens a sheet along the bottom. NEWT moves into the space above it (beside it on a
+**Settings** opens a sheet along the bottom. NEWT moves into the space above it (beside it on a
 phone held sideways) and the camera keeps him there, so every change shows on him right away;
 each one is kept for your next visit (in this browser). While the sheet is open the toolbar's
-buttons rest under it, Tab stays inside the sheet, and **Done** (always at its top as it
-scrolls), **Look** again or **Escape** closes it; above it the camera still turns, slides and
+other buttons rest under it, Tab stays inside the sheet, and **Done** (always at its top as it
+scrolls), **Settings** again or **Escape** closes it; above it the camera still turns, slides and
 zooms as it does without it.
 A finger moves a slider only by going along it: a swipe up or down that starts on one scrolls
 the sheet and leaves the slider as it was.
@@ -76,6 +132,7 @@ the sheet and leaves the slider as it was.
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow; how dark, its colour and where: under Shader). |
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
+| Wander | On, Off | On (the default): left be, he strolls about by himself now and then. Kept for your next visit, like the rest. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
 and turns the Style to Custom, and **Reset To Style** puts the style's values back.
@@ -107,7 +164,6 @@ picked, and a new Pixel Size starts it afresh. It leaves Off alone, and a screen
 another reason (one that only shows 30 frames a second) isn't made chunkier for nothing: after
 one try of a second or so it keeps your Pixel Size. A device that's only quick enough a little
 chunkier tries your own Pixel Size again less and less often.
-**Reset Camera**, under the settings, eases the camera back to where it started.
 
 ## NEWT Talks
 
@@ -118,9 +174,9 @@ Now and then NEWT says something in a speech bubble over his head, in the page's
 | --- | --- |
 | Reactions | a tap (or Wave, or Spook) makes him wave or startles him |
 | Running | he runs off; he's caught mid-run |
-| Carried | he's picked up, shaken, dropped; he lands |
+| Carried | he's picked up, shaken, thrashes, dropped; he lands |
 | Moving | he walks to a floor tap; he wanders off by himself |
-| Sitting | he sits down by himself (not with Sit); he's still sitting after a quiet spell; he stands up |
+| Sitting | he sits down by himself (not with Sit); he's still sitting after a quiet spell; he stands up (or gets up from lying); Give Device sits him down with the tablet; he lies down with it |
 | Passive | standing about, after a quiet spell of 20 to 40 seconds |
 | Camera | the camera is spun round more than a turn in a few seconds; it's zoomed in very close |
 
@@ -129,21 +185,23 @@ random, never the line he just said. There's one bubble at a time: while a line 
 moment that matters more replaces it (being caught or shaken first, idle time last). A line
 types out at about 30 characters a second, stays long enough to read, then fades; with
 reduced motion it shows all at once. The bubble follows him and stays on screen, clear of the
-toolbar and the open Look sheet (near the top it goes beside his head, on a phone narrowed to
+toolbar, the open Camera pad and the open Settings sheet (near the top it goes beside his head, on a phone narrowed to
 fit there with the line on more rows, or else under his feet, never over his face or body), and
 never takes a tap; a screen reader hears each line once, whole. His lines, how often
 he talks and the look a first visit gets are edited in the admin's Invitation page
 ([admin.md](admin.md)).
 
-## Play Intro
+## The Intro
 
-**Play Intro** starts a short chat with NEWT, laid out like Uma Musume's story scenes and drawn
-in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
+Opening the envelope starts a short chat with NEWT, and **Replay Intro** on the toolbar plays it
+again (the chat alone, no envelope). It's laid out like Uma Musume's story scenes and drawn in the
+toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
   line typed out in it, a small bouncing ▼ at its bottom right once the line is all there, Auto,
-  Skip and Log at the top right, and a gentle dim along the bottom behind the box. The toolbar
-  goes while the intro runs and comes back after it.
+  Skip and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the bottom
+  behind the box. A line's own line breaks (as the admin types them) show. The toolbar goes while
+  the intro runs and comes back after it.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
   Space and Enter do the same (after a click or tap on Auto, Skip or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
@@ -154,22 +212,26 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
 - **Auto** goes on by itself once each line has had time to be read (a box can set its own
   wait); it waits at a question. **Skip** jumps to the next question, or to the end. **Log**
   shows every line so far and the replies picked, in a list that scrolls; Close or Escape
-  shuts it. **Escape** asks whether to skip the intro, and a second Escape (or Skip Intro) ends
-  it. While the Log or that question is open, Auto, Skip, Log and the replies rest under it.
+  shuts it. **Skip Intro** ends the intro at once, with no question. **Escape** asks whether to
+  skip the intro, and a second Escape (or Skip Intro there) ends it. While the Log or that
+  question is open, Auto, Skip, Skip Intro, Log and the replies rest under it.
 - **NEWT:** he gets up if he's sitting, takes a few steps in if he's out near the edge, turns
   to face you and looks at you while he talks, his head drifting a little. The first line waits
   for him (the box shows his name and nothing else, and a tap meanwhile does nothing), so its
   words, face and gesture begin together once he's in place. Each box sets his
   face (sad, angry, shy and smug too) and plays its gesture once (a nod, a shrug, a point, a
   cheer, a wave, a start), then talks with his hands while the line types and stands easy once
-  it's up; some boxes hold a loop instead (talking, thinking), and one may sit him down. You
+  it's up; some boxes hold a loop instead (talking, thinking), and a box can ask for any of his
+  animations: walking or running on the spot, dangling from an unseen hand (hanging, thrashing,
+  or a hop that falls into a landing), sitting down (with the tablet too) or lying down with it,
+  each getting him down or up first as it needs (Stand Up and Get Up only get him up). You
   can't pick him up, walk him or turn the camera meanwhile, and he says nothing in his bubble.
 - **The camera** goes round to the front and each box picks a shot: close (his head and
   shoulders), medium (his whole body), wide (the usual view) or keep (as it was), eased there
   and framed in the space over the box. At the end it eases back to where you had it.
 - **Reduced motion:** each line shows at once and the camera cuts: round to the front at the
   start, to each shot, and back to your view at the end.
-- Every Play Intro starts at the start; nothing about it is saved. The lines, faces, gestures,
+- Every intro starts at the start; nothing about it is saved. The lines, faces, gestures,
   shots, waits and replies are edited in the admin's Invitation page ([admin.md](admin.md));
   with no intro there (or none it can play), the toy plays a short one of its own.
 
@@ -186,14 +248,34 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
     corner), `floor.js` (no room: an
     invisible floor that only catches his shadows, a `ShadowMaterial`, over the preset's
     background; and the shadow camera's fit), `character.js` (NEWT's materials, clips with
-    twins for restarts, look-at and faces),
+    twins for restarts, look-at and faces; the limp layer: while he's carried and through the
+    fall, a spring on each of his 12 arm and leg bones, `LIMBS`, carry.js `limbStep`, ω 7 rad/s,
+    ζ 0.35, in a 60° cone, swinging them against their joints' acceleration and back toward the
+    floor as the swing tips him, restored before the mixer like the look's bones so it never
+    adds up, never his chest, neck or head, only on frames his pose stepped (Motion Choppy), eased
+    out over 0.2 s once he's down, run between the animation and the hang; his earrings,
+    `EARLOBES` measured from the glb's head mesh and `EARRING`'s stud, line and Latin cross 2.5
+    times the stud's width, toon and marked as his, each swinging on the same spring about
+    straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
+    bezel and an unlit 16×12 game, nearest-filtered, placed at his palms from clips.js `DEVICE`,
+    shown while DeviceSit and DeviceLie weigh half or more; `accessories` swings the earrings and
+    places the tablet after the look),
     `retro.js` (the pixel pass; `warm` compiles the path not showing once NEWT is in, so the
     first switch to Off or back doesn't stall; `subjectBoxes`: outside the area round NEWT, his
     shadow and the decals every texel is the paper, so the canvas is only cleared there and both
     passes draw inside it alone, and the neighbour loops (the outer ring, the soft shadow) run
     only in the boxes where they can find something: the same picture for a share of the
-    texels), `ui.js` (the toolbar and the Look sheet as
-    markup, plus a thin binding), `invitation.css`.
+    texels), `ui.js` (the toolbar, the Camera pad and the Settings sheet as
+    markup, plus a thin binding: the labels as the buttons' own text, `setSitLabel` and
+    `setDeviceLabel` changing only a label and its icon, `deviceLabelOf` reading the brain's
+    `deviceLabel`; `createHold`, a touch held still `HOLD_MS` (450 ms) showing a label and
+    swallowing the click after it; Wander kept under `invitation.wander.v1`, `loadWander` and
+    `saveWander` in try/catch), `icons.js` (the 16×16 pixel icons as ASCII art turned into crisp
+    SVG, and the Bayer dither tiles of the buttons' hover and press, `installDither`: copies of
+    `src/ui/pixelArt.js`'s and `src/ui/dither.js`'s approaches, as the page imports nothing from
+    `src/ui`), `cursor.js` (the five pixel cursors drawn at 1× and 2×, at most 32 CSS px, as
+    `url()`, `-webkit-image-set()` and `image-set()` with exact hotspots and a system fallback;
+    `cursorKind`, which shows, set as the stage's `data-cursor` each frame), `invitation.css`.
   - Pure and unit-tested: `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
     to 256, a texel is `max(1, round(NEWT's default height in device px / N))` device pixels,
     `blockFor`, so he's about N texels tall; Native, a texel a device pixel at the real DPR with
@@ -205,25 +287,37 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
     or 0.255 of a phone's, a stage whose short side is under 600 CSS px (99 CSS px, and 149
     texels at the default 128×128, on a 390-wide phone), whatever the Pixel Size, the point it
     looks at shown in the middle of the space over the toolbar, or of the clear space above or
-    beside the open Look sheet, `clearInsets`; and `blockAt`: zoomed by k, NEWT's size on screen
+    beside the open Settings sheet, `clearInsets`; and `blockAt`: zoomed by k, NEWT's size on screen
     over the default view's, a texel is `max(1, round(his height in device px × k / N))`, a block
     in use held until the zoom is `ZOOM_HOLD` past the next, so it never flickers at a boundary, and the default view always drawn on the Pixel Size's own grid),
     `camera.js` (the orbit camera: yaw all the way
     round, three quarters of a turn for a drag across the whole stage and half a turn of tilt
     down its whole height, 12° to 70° up, half to twice the default distance, eased with a
     little coast; `orbitPan` slides it at once, the floor under the cursor exactly under it,
-    `floorUnder`, the point it looks at kept in the play area; the point it orbits rests where
+    `floorUnder`, the point it looks at kept to `panRegion` (a square round the play area's
+    middle, the area's half less what the view shows its narrower way at this zoom: none fully
+    zoomed out), past which it gives like a rubber band (`ORBIT.band`, at most `bandPx` 90 CSS
+    px) and, let go, eases back at `bandBack` (0.18 s); `orbitZoom` and `orbitWheel` with a
+    point zoom about it (the cursor, a pinch's middle: the floor there kept there as it eases,
+    the view a pan from then on); `orbitNudge` turns and tilts it for the Camera pad at
+    `nudgeEase` (0.25 s); the point it orbits rests where
     it is and follows NEWT as it zooms in, 0.8 of the way at the default zoom on a phone, all
-    the way while the Look sheet is open, and moves on with him as he nears the edge of the
+    the way while the Settings sheet is open, and moves on with him as he nears the edge of the
     clear space, `ORBIT.keepIn` (0.6) of it, never letting him past `keepOut` (0.94) once he's
-    on screen, from where `screenOf` puts him; a pan holds it until he walks off the screen;
+    on screen, from where `screenOf` puts him; a pan holds it however he moves, until
+    `orbitFollow` (a tap or a grab on him, Follow NEWT) or `orbitReset`;
     `orbitHold` holds it still while he's held, and once he's let go out past `keepOut` (carried
     to the screen's edge) it eases him back inside at `ORBIT.settle` (0.25 s) rather than
     jumping there in a frame; `lightDir` turns the look's sun with the
-    camera's yaw), `area.js` (`viewArea`, the play area: the floor the default view shows at
-    twice its distance, yaw 0, inside the clear space with him whole 8 px in, `AREA_MARGIN`, a
-    trapezoid widening toward the back; worked out again on a resize, never moved by the camera
-    or the Look sheet; and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight),
+    camera's yaw), `area.js` (`viewArea`, the play area: a rounded square round the default
+    view's target, the orbit's centre (corners `AREA_ROUND`, 0.35, of its half side), the
+    biggest whose every point the floor the default view shows at twice its distance, yaw 0,
+    holds him whole 8 px inside the clear space, `AREA_MARGIN` (`viewFloor`, a trapezoid
+    widening toward the back); about 2.6 units from its middle to a side on a 390×844 phone and
+    5.0 on a 1280×800 desktop; one shape however the camera turns, worked out again on a resize,
+    never moved by the camera or the Settings sheet; its middle is the orbit's, Reset Camera's
+    and the brain's; and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight and
+    the shadow camera's box, `stage.setArea` keeping it round the area's middle),
     `play.js` (the frame's decisions: who moves his root, the clip mix, where he looks),
     `look.js` (the Look settings under `invitation.look.v1`, Pixel Size stored as `'16'` to
     `'256'`, `'native'` or `'off'` (an old `'2'`, `'3'` or `'4'` loads as 48, 32 or 24, what
@@ -256,11 +350,16 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
     and the order a frame runs in. `gesture.js` reads the mouse's buttons apart (left: tap,
     grab or pan; right: orbit; middle: pan) and two fingers' middle as a pan; `carry.js`
     drags him on the upright plane facing the camera through where he was grabbed
-    (`dragPlane`, `gripFor`, `dragTarget`: the grab offset kept, from where the press began;
+    (`dragPlane`, `gripFor`, `dragTarget`: the grab offset from where the press began, easing
+    out over `CARRY.offsetEase`, 0.12 s, `offsetAt`, so his collar ends under a mouse's cursor
+    and 24 CSS px over a finger;
     his collar no lower than it was grabbed at, or his hang height once he's been lifted clear
     of the floor, so a still cursor never lifts him off it, and no higher than `CARRY.liftMax`,
-    5), the anchor the pointer's spot with no lag and the swing driven by a smoothed follow of
-    it; `lookAt.js` `screenAim` aims his look camera-relative (performative gaze): seen from
+    5), the anchor the pointer's spot with no lag, kept inside the play area along the drag
+    plane's line across the floor (`lineSpan`: at an edge he stops, on a rounded square's
+    corner arcs too, never sliding along it in depth), and the swing driven by a smoothed follow of
+    it, past `CARRY.tiltSoft` (0.6 rad) a stiff spring easing him back instead of a hard stop;
+    `limbStep` is the spring his limp limbs and his earrings hang on (character.js); `lookAt.js` `screenAim` aims his look camera-relative (performative gaze): seen from
     the camera the cursor lies some heads (`LOOK.headSize`, 0.53) from his head in some
     direction on screen, and his face turns from the line to the camera toward that direction,
     round that line, so on screen his gaze points at the cursor; none within `LOOK.deadZone`
@@ -288,8 +387,13 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
     toward the side of the pursuer (`BrainOut.look.at`: the pointer, or where it was last
     seen; either side with none); with it straight behind him (past `backSide`, 150°), which
     shoulder is a toss-up, so `play.js` `lookAim` takes it round the side nearer the camera,
-    and you see his face look back. Held, he looks at the viewer with idle glances
-    ('forward'). The Run button with no pointer runs him from a spot beside him square to the
+    and you see his face look back. Held, his head hangs: a light look (`TUNE.heldLook`, 0.15)
+    aimed down (`heldPitch`, `BrainOut.look.pitch`) over the Held clip's drooped head, the sad
+    face (surprised while he's shaken hard), and Thrash once every `thrashMin`–`thrashMax`
+    s (3–7; within `thrashShaken` of a hard shake, never before he's hung `thrashRest`, 1.5 s),
+    then Held again on its own clock. Give Device (`ButtonName` 'Device') goes sitDown →
+    deviceSit, lieDown → deviceLie (turned `lieTurnMin`–`lieTurnMax`, 62–73°, off the camera),
+    getUp; `BrainOut.device` and `deviceLabel` say which, for the toolbar. The Run button with no pointer runs him from a spot beside him square to the
     camera (`TUNE.runFromGap`), across the view. `floor.js` `fitShadow(…, at)` moves the
     shadow camera to wherever he is, by whole shadow texels.
 - **Speech and content:** `speech.js` (pure: `createTalk({lines, speech, rng}).step(...)` reads
@@ -309,7 +413,7 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   `invitationContent` in `vite.config.js` inlines only that subtree, watches the file and leaves
   the subtree out of the other pages' copy of content.json; `invitationLines()`,
   `speechSettings()`, `invitationDefaults()` and `introScript()`, each with its fallback:
-  `introScript()` is the intro Play Intro opens, `introFrom` of content.json's
+  `introScript()` is the intro the envelope and Replay Intro open, `introFrom` of content.json's
   `invitation.intro`, a `types.js` `DialogueScript` with each box's flow spelled out (exactly
   one of its choices, `end: true` or `next`: its own Next when that box is there, else the box
   after it, the last box ending it), a face, animation or camera off the toy's lists as
@@ -381,6 +485,29 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   size his face's sheet is picked at, so a face change never flips the sheet; they're never
   waited for, and until they come each shows the nearest of the first four (`FACE_FALLBACK`).
   He never blinks on them (a blink is neutral's closed eye: his brows would jump).
+- **The envelope:** `envelope.js` (pure: the `EnvelopeState` machine, types.js, with `open`,
+  `skip`, `step(t, ready)`, `done` and `pose(t)`, the opening as functions of time: the seal's
+  crack, the flap's angle up to `FLAP_OPEN`, the push and the dither-out, a skip's drop, `BOB` and
+  `SWAY`, `TIMES`; `envelopeGesture(dx, dy, ms, viewportH)`: |dy| ≥ max(48 px, 12% of the
+  height) or a flick of 0.6 px/ms over 24 px or more, and |dy| > 1.2·|dx|, up opens and down
+  skips (`SWIPE`); `envelopeKey`; `dragPose`, the follow with its give and the flap's lift;
+  `dragHint`; `ENVELOPE_TEXT`), `envelopeScene.js` (its own small WebGLRenderer in a fixed
+  `.inv-envelope` layer at z-index 3, drawn at `TEXELS` texels along the screen's shorter side and
+  scaled up pixelated; flat toon materials in three tones with their band edges dithered and a
+  Bayer dither-out; the NH monogram from logo.js's strokes, copied in as `monogramBars`;
+  disposed, its context lost and its layer removed once it's done) and `envelope.css`. main.js
+  makes it right after `bindUi`, sets the HUD inert under it, lets the toy draw its first frame
+  and then holds the loop while it covers him (`sync`), and on its way out either sets
+  `introWanted` (held until `beginIntro` can run, which cuts the camera to the talk shot) or
+  focuses the toolbar. `?test` skips it unless `&envelope` (`parseQuery`'s `envelope`).
+- **The hover and the grab ring:** `retro.js`'s post shader takes `uHover` (a two-texel Bayer
+  rim on NEWT's texels, a tenth of the rest, and a halo up to two texels outside him in the ring
+  box: 12 reads a texel, only while hovering) and `uBurst` (a dither ring at the grip, an ALU
+  test), both in `HOVER_INK` and marked as a line on the paper, so the shader still quantizes in
+  two places; at Off his materials take a Bayer tint (markId; no halo, no ring). `setHover(k)`
+  and `setBurst(x, y, r, k)` (client px; stage.js forwards them), `hoverEase` (in over 0.08 s,
+  out over 0.2 s: `HOVER`) and `burstAt` (to 20 texels in 0.38 s: `BURST`), which main.js
+  `effects` drives each frame.
 - **The intro:** `dialogue.js` (pure, on an injected clock: `normalizeScript` makes any
   `DialogueScript` safe, types.js; `createDialogue(script, {reduced})` with `start`, `step`,
   `advance`, `choose`, `setAuto`, `skip`, `pause`, `end`, `view` and `log`; `DIALOGUE`: 32
@@ -389,7 +516,11 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
   press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`), brain.js's `talk` state (`BrainIn.dialogue`: the
-  box's seq, animation, face and whether it's typing; `TUNE.talkNear`, `talkTurn`;
+  box's seq, animation, face and whether it's typing; any clip, clips.js `DIALOGUE_CLIPS`:
+  `DIALOGUE_WAYS` says which step in place (main.js moves the step phase on by brain.js
+  `talkPhase`) and which dangle him (`dangleLift`: his lowest point `DANGLE.gap` over the
+  floor, Fall a `DANGLE.hop`), `dialogueHolds` which hold (the admin's Loops and Once); the
+  ways down and up are SitDown, LieDown, StandUp and GetUp; `TUNE.talkNear`, `talkTurn`;
   `BrainOut.talkReady` once he's in place, which main.js holds the first line for) and
   camera.js's shots (`orbitTalk`, `shotView`, `orbitShot`, `SHOT`), each framed over the box as
   its own line has it (the line goes in first) and framed again when the box or the stage changes
@@ -402,7 +533,9 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   `invitationArea`, `invitationCamera` and `invitationPlay` (with `invitationBrain`,
   `invitationMotion`, `invitationGesture` and `invitationModel`), `invitationDialogue` (the
   runner, and content.js's intro as it plays), the speech and content tests above,
-  `e2e/invitation.spec.mjs` and `e2e/invitationDialogue.spec.mjs` (`npm run e2e -- invitation`).
+  `invitationEnvelope` (its states, swipes, keys and timeline),
+  `e2e/invitation.spec.mjs`, `e2e/invitationDialogue.spec.mjs` and
+  `e2e/invitationEnvelope.spec.mjs` (`npm run e2e -- invitation`).
 - **Test hooks:** `[data-stage].is-ready` once the first frame is drawn, `data-webgl="off"`
   without WebGL. `?test` adds `window.__invitation`: `snapshot()` (his state, clip, face,
   position, head turn, the camera's yaw, elevation and distance, the states he went through,
@@ -420,8 +553,13 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   endless floor: null only above the horizon), `feet()` (his ankles, to measure foot slide),
   `bones()` (his bones from his root), `grabbed()` (while he's held, where the point he was
   grabbed by shows, client px), `say(text)` (a line in his bubble now, as talk would show it),
-  `play(clip)` (Walk and Run step in place at their own pace) and `face(name)` (holds any of
-  `FACE_NAMES` on him, no blinks; null gives his face back to the brain). The snapshot's `camera` has
+  `play(clip)` (Walk and Run step in place at their own pace), `face(name)` (holds any of
+  `FACE_NAMES` on him, no blinks; null gives his face back to the brain) and `press(name)` (a
+  toolbar button's press as the brain gets it, Give Device's `Device` too). The snapshot's
+  `motion` has the carry (`collar` on screen, `heldFor`, the `anchor`, the drag `plane`'s
+  normal, `pushed` at the edge), the limp layer (`limp.weight`, `limp.most`: the most a limb
+  has swung, radians) and Give Device (`device.state` and `label`, the tablet `shown` and its
+  `screen` point, his `turn` off the camera). The snapshot's `camera` has
   the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
   the play area, and `talk` is what he's saying (speech.js's snapshot: the line up and its
   trigger, when the idle clock comes round). While the intro runs, `dialogue` has the box up
@@ -430,7 +568,10 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   a press, `camera`, `shot`, `framed`: the clear space it was framed in (client px, from under the
   Auto row to the box's top, or the replies'), the camera's `goal`, his `phase` and the `clips`
   he's played since the box came up, `'gait'` for Idle, Walk or Run), and `intro()` is the script
-  it runs. `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
+  it runs. The snapshot's `envelope` is the envelope's state (null without one), `hover` the
+  hover dither (0..1) and `burst` whether the grab ring is up; `clock()` is the toy's clock (it
+  stands still while the envelope covers him) and `envelope()` the envelope's state, reduced
+  motion, pose and frames drawn. `?seed=N` makes the randomness repeatable; `?calm` stops him wandering and sitting by himself; `?perf` shows the frame times
   (p50 and p90), the GPU's time a frame where the browser can measure it, the grid, the
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
@@ -439,7 +580,9 @@ in the toy's own style (cream, a dark outline, chunky rounded corners, Pixelify 
   `64x64`, `native` or `off`), `--motion`, `--sizes`, `--acts`); its `pan`, `lift` and
   `sweep` acts (`tools/capture-invitation-camera.mjs`) slide, turn and zoom the camera, carry
   him up high (the report says how far the grabbed point strayed from the cursor) and sweep the
-  cursor, or a finger, over the whole screen to show where he looks. One GPU capture at a time.
+  cursor, or a finger, over the whole screen to show where he looks; its `envelope` and
+  `envelope-skip` acts open or skip the envelope (`?test&envelope`, whole frames). One GPU
+  capture at a time.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
   `vite.config.js`, `test/site.test.mjs` and the spec's last test check it).
 - **Unlisted:** `noindex, nofollow`, left out of the sitemap and the README, and not

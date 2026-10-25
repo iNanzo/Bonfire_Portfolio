@@ -3,11 +3,13 @@
 // the screen's, sliding along one when he's cornered, never stuck) with a capped turn rate, and
 // picks wander goals inside the bounds (the front edge over the toolbar too). carry.js holds
 // him by the collar: dragged on a camera-facing vertical plane through where he was grabbed,
-// the grabbed point stays under the cursor (no lag, the grab offset kept), up lifts him (up to
+// the point pressed under the cursor at the grab and his collar from about 0.12 s on (the grab
+// offset eases out; no lag), up lifts him (up to
 // CARRY.liftMax, far higher than the old fixed carry height) and across moves him across, never
-// below his hang height; the anchor stays in the play area, a damped pendulum swings his root
-// and settles (as much, and with no hard shake, when the pointer's spot only moves on some
-// frames), a toss uses the last 80 ms, and a fall bounces softly off the edges and
+// below his hang height; the anchor stays in the play area, stopping at its edge along the drag
+// plane's line (never sliding along it in depth), a damped pendulum swings his root against a
+// soft limit and settles (as much, and with no hard shake, when the pointer's spot only moves
+// on some frames), a toss uses the last 80 ms, and a fall bounces softly off the edges and
 // lands when his lowest foot reaches the floor. blend.js keeps clip weights normalised, runs Idle/Walk/Run on one
 // shared phase, and starts a one-shot's fade-out before it ends. lookAt.js clamps and eases
 // his look without overshoot, glances by a seeded rng, and the brain zeroes the look's weight
@@ -27,6 +29,9 @@ import {
   dragPlane,
   dragTarget,
   gripFor,
+  limbStep,
+  restLimb,
+  LIMP,
 } from '../src/invitation/carry.js';
 import { rayPlane } from '../src/invitation/gesture.js';
 import {
@@ -52,7 +57,7 @@ import {
   SPLIT,
   LOOK,
 } from '../src/invitation/lookAt.js';
-import { TUNE, createBrain } from '../src/invitation/brain.js';
+import { TUNE, createBrain, talkPhase, dangleLift, DANGLE } from '../src/invitation/brain.js';
 
 const BOUNDS = { minX: -2, maxX: 2, minZ: -2, maxZ: 1.4 };
 const DT = 1 / 60;
@@ -227,7 +232,7 @@ test('carrying: the anchor is the pointer’s spot at once, every frame (no lag)
   close(c.anchor.z, BOUNDS.minZ, 1e-6);
 });
 
-test('dragging: on a camera-facing vertical plane through where he was grabbed, the grabbed point stays under the cursor; up lifts him, across moves him across; never under his hang height or over the highest lift', () => {
+test('dragging: on a camera-facing vertical plane through where he was grabbed; the grab offset eases out over CARRY.offsetEase (about 0.12 s), so the point pressed is under the cursor at the grab and his collar is from then on; up lifts him, across moves him across; never under his hang height or over the highest lift', () => {
   const camera = { x: 1.5, y: 9, z: 13 };
   const ray = (q) => ({ o: camera, d: { x: q.x - camera.x, y: q.y - camera.y, z: q.z - camera.z } });
   const collar = { x: 0.2, y: 0.85, z: 0.1 };
@@ -242,69 +247,158 @@ test('dragging: on a camera-facing vertical plane through where he was grabbed, 
   // Grabbed by his belly, below his collar.
   const t0 = 3;
   const low = 1.1;
+  const later = t0 + 1;
+  assert.ok(CARRY.offsetEase >= 0.08 && CARRY.offsetEase <= 0.16, `the offset eases out over ${CARRY.offsetEase} s`);
   const grabRay = ray({ x: 0.15, y: 0.45, z: 0.12 });
   const grip = gripFor(grabRay, plane, collar, t0);
   const at = rayPlane(grabRay.o, grabRay.d, plane);
   close(grip.offset.x, collar.x - at.x, 1e-6, 'the grab offset: his collar from the grabbed point');
   close(grip.offset.y, collar.y - at.y, 1e-6);
   close(grip.offset.z, collar.z - at.z, 1e-6);
-  // The moment he's grabbed, nothing moves; and held still there, nothing moves frame after
-  // frame (his collar starts lower than his hang height, standing: the point pressed stays under
-  // the cursor all the same, never lifted up off it).
+  // The moment he's grabbed, nothing moves: the point pressed is under the cursor.
   for (let frame = 0; frame < 3; frame++)
-    assert.deepEqual(dragTarget(grip, grabRay, low), collar, `frame ${frame}, the cursor still`);
-  // Down from where it pressed: he stays at the height he was grabbed at, his feet where they
-  // stood; up a little, under his hang height, and back: he goes with it, both ways.
-  const below = (dy) => ray({ x: at.x, y: at.y + dy, z: at.z });
-  close(dragTarget(grip, below(-0.3), low).y, collar.y, 1e-6, 'pressed down where he stood');
+    assert.deepEqual(dragTarget(grip, grabRay, low, t0), collar, `frame ${frame}, the cursor still`);
+  // Then the offset eases out: up where nothing clamps him, less of it left each moment, none
+  // once CARRY.offsetEase is up, and from then on his collar is on the cursor's ray, exactly.
+  const right = { x: plane.normal.z, z: -plane.normal.x };
+  const q0 = { x: at.x + 0.3 * right.x, y: 2, z: at.z + 0.3 * right.z };
+  const easing = gripFor(grabRay, plane, collar, t0);
+  let left = Infinity;
+  for (let k = 1; k <= 6; k++) {
+    const p = dragTarget(easing, ray(q0), low, t0 + (k * CARRY.offsetEase) / 6);
+    const now = Math.hypot(p.x - q0.x, p.y - q0.y, p.z - q0.z);
+    assert.ok(now < left - 1e-6 || now < 1e-6, `${k}/6 of the way: ${now} left, ${left} before`);
+    left = now;
+  }
+  close(left, 0, 1e-6, 'none left once it’s eased out');
+  // Held still where he was pressed (by his belly, below his collar): never pulled down to the
+  // point pressed, he stays at the height he was grabbed at; up a little, under his hang
+  // height, and back: he goes with it, both ways.
+  const below = (dy) => ray({ x: collar.x, y: collar.y + dy, z: collar.z });
+  close(dragTarget(grip, grabRay, low, later).y, collar.y, 1e-6, 'held still: never pulled down');
+  close(dragTarget(grip, below(-0.3), low, later).y, collar.y, 1e-6, 'pressed down where he stood');
   const bit = (low - collar.y) / 2;
-  close(dragTarget(grip, below(bit), low).y, collar.y + bit, 1e-6, 'a little up');
-  close(dragTarget(grip, below(0), low).y, collar.y, 1e-6, 'and back down');
+  close(dragTarget(grip, below(bit), low, later).y, collar.y + bit, 1e-6, 'a little up');
+  close(dragTarget(grip, below(0), low, later).y, collar.y, 1e-6, 'and back down');
   // Once lifted clear to his hang height, his soles stay off the floor: down again, he stops there.
-  close(dragTarget(grip, below(low - collar.y + 0.2), low).y, low + 0.2, 1e-6, 'lifted clear');
-  close(dragTarget(grip, below(0), low).y, low, 1e-6, 'his soles off the floor from then on');
-  close(dragTarget(grip, below(-1), low).y, low, 1e-6);
+  close(dragTarget(grip, below(low - collar.y + 0.2), low, later).y, low + 0.2, 1e-6, 'lifted clear');
+  close(dragTarget(grip, below(0), low, later).y, low, 1e-6, 'his soles off the floor from then on');
+  close(dragTarget(grip, below(-1), low, later).y, low, 1e-6);
   // Grabbed higher than his hang height (mid-fall): never under it.
   const high = gripFor(grabRay, plane, { ...collar, y: low + 0.5 }, t0);
-  close(dragTarget(high, below(-2), low).y, low, 1e-6, 'grabbed high, never under his hang height');
-  // Later, anywhere on the plane within the limits: the grabbed point is on the cursor's ray,
-  // so under the cursor, and his collar stays on the plane.
-  const right = { x: plane.normal.z, z: -plane.normal.x };
+  close(dragTarget(high, below(-2), low, later).y, low, 1e-6, 'grabbed high, never under his hang height');
+  // Anywhere on the plane within the limits: his collar on the cursor's ray, so under the
+  // cursor, and on the plane.
   for (const [across, up] of [
     [0, 1],
     [0.6, 1.2],
     [-1.1, 2.4],
     [1.5, 1.6],
   ]) {
-    const q = { x: at.x + across * right.x, y: at.y + up, z: at.z + across * right.z };
-    const target = dragTarget(grip, ray(q), low);
-    close(target.x - grip.offset.x, q.x, 1e-6, `(${across}, ${up}): under the cursor, across`);
-    close(target.y - grip.offset.y, q.y, 1e-6, `(${across}, ${up}): and up`);
-    close(target.z - grip.offset.z, q.z, 1e-6);
+    const q = { x: collar.x + across * right.x, y: collar.y + up, z: collar.z + across * right.z };
+    const target = dragTarget(grip, ray(q), low, later);
+    close(target.x, q.x, 1e-6, `(${across}, ${up}): under the cursor, across`);
+    close(target.y, q.y, 1e-6, `(${across}, ${up}): and up`);
+    close(target.z, q.z, 1e-6);
     const off = (target.x - collar.x) * plane.normal.x + (target.z - collar.z) * plane.normal.z;
     close(off, 0, 1e-6, 'on the plane: no nearer the camera, no further');
   }
   // Up lifts him, across moves him across.
-  const a = dragTarget(grip, ray({ x: at.x, y: at.y + 1, z: at.z }), low);
-  const b = dragTarget(grip, ray({ x: at.x, y: at.y + 1.5, z: at.z }), low);
+  const a = dragTarget(grip, ray({ x: collar.x, y: collar.y + 1, z: collar.z }), low, later);
+  const b = dragTarget(grip, ray({ x: collar.x, y: collar.y + 1.5, z: collar.z }), low, later);
   close(b.y - a.y, 0.5, 1e-6);
   close(Math.hypot(b.x - a.x, b.z - a.z), 0, 1e-6);
-  const c = dragTarget(grip, ray({ x: at.x + right.x, y: at.y + 1, z: at.z + right.z }), low);
+  const c = dragTarget(grip, ray({ x: collar.x + right.x, y: collar.y + 1, z: collar.z + right.z }), low, later);
   close(c.y, a.y, 1e-6);
   close(Math.hypot(c.x - a.x, c.z - a.z), 1, 1e-6);
   // Limits: never under his hang height, never over the highest lift, far over the old carry's.
   // (High enough to reach the top of a phone's screen at the default zoom, about 4.3 over him.)
   assert.ok(CARRY.liftMax >= 4.5, `the highest lift ${CARRY.liftMax}`);
-  close(dragTarget(grip, ray({ x: at.x, y: -3, z: at.z }), low).y, low, 1e-6, 'pressed into the floor');
-  close(dragTarget(grip, ray({ x: at.x, y: 40, z: at.z }), low).y, CARRY.liftMax, 1e-6, 'reaching for the sky');
+  close(dragTarget(grip, ray({ x: at.x, y: -3, z: at.z }), low, later).y, low, 1e-6, 'pressed into the floor');
+  close(dragTarget(grip, ray({ x: at.x, y: 40, z: at.z }), low, later).y, CARRY.liftMax, 1e-6, 'reaching for the sky');
   // A ray that never meets the plane keeps the last spot.
   const away = { o: camera, d: { x: 0, y: 1, z: 1 } };
-  assert.deepEqual(dragTarget(grip, away, low), dragTarget(grip, away, low));
-  assert.ok(Number.isFinite(dragTarget(grip, away, low).y));
+  assert.deepEqual(dragTarget(grip, away, low, later), dragTarget(grip, away, low, later));
+  assert.ok(Number.isFinite(dragTarget(grip, away, low, later).y));
   // A camera straight over him still gives an upright plane.
   const top = dragPlane({ x: 0.2, y: 20, z: 0.1 }, collar);
   close(top.normal.y, 0, 1e-6);
   close(Math.hypot(top.normal.x, top.normal.z), 1, 1e-6);
+});
+
+test('held at the play area’s edge, he stops there (a box, a disc, a trapezoid or a rounded square, round its corners too): the anchor keeps to the drag plane’s line across the floor (never slid along the edge in depth), and the push points on out along it', () => {
+  const disc = { minX: -2, maxX: 2, minZ: -2, maxZ: 2, r: 2 };
+  const trapezoid = { minX: -1.5, maxX: 1.5, minZ: -2, maxZ: 1.4, minXBack: -2.5, maxXBack: 2.5 };
+  // (The toy's play area, area.js roundSquare: the line below runs out through its corners.)
+  const rounded = { minX: -2, maxX: 2, minZ: -2, maxZ: 2, round: 1 };
+  const inBounds = (b, p) => {
+    const q = clampTo(b, p);
+    return Math.hypot(q.x - p.x, q.z - p.z) < 1e-6;
+  };
+  for (const [name, bounds] of [
+    ['a box', BOUNDS],
+    ['a disc', disc],
+    ['a trapezoid', trapezoid],
+    ['a rounded square', rounded],
+  ])
+    for (const side of [1, -1]) {
+      // The camera orbited round to the side: the plane's line runs aslant across the floor.
+      const camera = { x: 9, y: 6, z: 7 };
+      const collar = { x: 0.3, y: 1, z: 0.2 };
+      const plane = dragPlane(camera, collar);
+      const right = { x: plane.normal.z * side, z: -plane.normal.x * side };
+      const c = grab(collar, 0);
+      let t = 0;
+      /** @type {{x: number, z: number}|null} */
+      let stopped = null;
+      for (let i = 0; i <= 160; i++) {
+        const s = i * 0.05;
+        holdStep(c, { x: collar.x + right.x * s, y: 1.2, z: collar.z + right.z * s }, DT, bounds, (t += DT), plane);
+        const depth = (c.anchor.x - collar.x) * plane.normal.x + (c.anchor.z - collar.z) * plane.normal.z;
+        close(depth, 0, 1e-6, `${name} (${side}), ${s.toFixed(2)} out: on the plane, no nearer the camera, no further`);
+        assert.ok(inBounds(bounds, c.anchor), `${name} (${side}): inside, ${JSON.stringify(c.anchor)}`);
+        if (stopped) {
+          close(c.anchor.x, stopped.x, 1e-6, `${name} (${side}): stopped at the edge`);
+          close(c.anchor.z, stopped.z, 1e-6);
+          assert.ok(c.push && c.push.x * right.x + c.push.z * right.z > 1 - 1e-6, `${name}: pushed on out along it`);
+        } else if (c.push) stopped = { x: c.anchor.x, z: c.anchor.z };
+      }
+      assert.ok(stopped, `${name} (${side}): he reached the edge`);
+      // (The edge is where he stopped: just past it along the line is outside.)
+      const past = { x: stopped.x + right.x * 0.01, z: stopped.z + right.z * 0.01 };
+      assert.ok(!inBounds(bounds, past), `${name} (${side}): stopped at the edge, not short of it`);
+    }
+  // A line that misses the play area altogether (he was grabbed out past it): the nearest spot
+  // inside, as without a plane.
+  const c = grab({ x: 5, y: 1, z: 0 }, 0);
+  const plane = dragPlane({ x: 15, y: 6, z: 0 }, { x: 5, y: 1, z: 0 });
+  holdStep(c, { x: 5, y: 1, z: 1 }, DT, BOUNDS, DT, plane);
+  assert.deepEqual({ x: c.anchor.x, z: c.anchor.z }, clampTo(BOUNDS, { x: 5, z: 1 }));
+});
+
+test('the swing’s limit is soft: hard flicks tilt him a little past CARRY.tiltSoft and ease him into it, never past CARRY.tiltMax, and never stop him dead', () => {
+  assert.ok(
+    CARRY.tiltSoft >= 0.5 && CARRY.tiltSoft < CARRY.tiltMax,
+    `${CARRY.tiltSoft} soft, ${CARRY.tiltMax} at most`,
+  );
+  const c = grab({ x: 0, y: 1, z: 0 }, 0);
+  let t = 0;
+  let most = 0;
+  let jolt = 0;
+  let before = 0;
+  // The anchor flung back and forth 2.4 units every quarter second (the drive's acceleration
+  // capped at accelMax): the old hard stop zeroed a swing of several radians a second.
+  for (let i = 0; i < 240; i++) {
+    const x = Math.floor(i / 15) % 2 ? 1.2 : -1.2;
+    holdStep(c, { x, y: 1, z: 0 }, DT, BOUNDS, (t += DT));
+    most = Math.max(most, Math.abs(c.tilt.z));
+    jolt = Math.max(jolt, Math.abs(c.tiltVel.z - before));
+    before = c.tiltVel.z;
+  }
+  assert.ok(most > CARRY.tiltSoft, `${most.toFixed(3)} rad: past the soft limit`);
+  assert.ok(most < CARRY.tiltMax, `${most.toFixed(3)} rad: never at the hard one`);
+  // (The old hard stop took about 10 rad/s off it in one frame.)
+  assert.ok(jolt < 3.5, `the swing's speed changed by at most ${jolt.toFixed(2)} rad/s in a frame`);
 });
 
 test('carrying: a swing reads the same when the pointer’s spot only moves every second or third frame (a 60 Hz finger on a 120–144 Hz screen): as big, and no hard shake', () => {
@@ -392,6 +486,81 @@ test('carrying: a drag swings his root like a pendulum, and the swing settles', 
     most = Math.max(most, carryFeel(c).shake);
   }
   assert.ok(most > TUNE.shakeHard, `shake ${most}`);
+});
+
+test('the limp integrator (carry.js limbStep): a point mass on a limb, sprung back to the clip’s direction at about 7 rad/s with damping about 0.35, swung by the force on it, its length kept, never past its cone', () => {
+  assert.ok(LIMP.omega >= 6 && LIMP.omega <= 8, `ω ${LIMP.omega}`);
+  assert.ok(LIMP.zeta >= 0.3 && LIMP.zeta <= 0.4, `ζ ${LIMP.zeta}`);
+  close(LIMP.cone, (60 * Math.PI) / 180, 0.02, 'a 60° cone');
+  const len = Math.hypot(0.05, -0.12);
+  const rest = { x: 0.05, y: -0.12, z: 0 };
+  const angle = (a, b) =>
+    Math.acos(
+      Math.min(1, (a.x * b.x + a.y * b.y + a.z * b.z) / (Math.hypot(a.x, a.y, a.z) * Math.hypot(b.x, b.y, b.z))),
+    );
+  // At rest with nothing on it, it stays put.
+  const m = restLimb(rest);
+  for (let i = 0; i < 60; i++) limbStep(m, rest, { x: 0, y: 0, z: 0 }, DT);
+  close(angle(m.at, rest), 0, 1e-6, 'at rest it stays put');
+  // A steady push across settles it a little way over (ω²·displacement balances the push).
+  for (let i = 0; i < 600; i++) limbStep(m, rest, { x: 0, y: 0, z: 0.5 }, DT);
+  close(Math.hypot(m.at.x, m.at.y, m.at.z), len, 1e-6, 'its length kept');
+  close(m.at.z, 0.5 / LIMP.omega ** 2, 0.002, 'settled where the spring balances the push');
+  // Let go, it swings back past the clip's pose and settles: about 2π/(ω√(1−ζ²)) a swing, each
+  // swing back about e^(−2πζ/√(1−ζ²)) of the one before.
+  const peaks = [];
+  let before = m.at.z;
+  let rising = false;
+  for (let i = 0; i < 300; i++) {
+    limbStep(m, rest, { x: 0, y: 0, z: 0 }, DT);
+    const z = m.at.z;
+    if (rising && z < before) peaks.push({ i: i - 1, z: before });
+    rising = z > before;
+    before = z;
+  }
+  assert.ok(peaks.length >= 1, 'it swings back up');
+  const damped = Math.sqrt(1 - LIMP.zeta ** 2);
+  const period = (2 * Math.PI) / (LIMP.omega * damped);
+  close(peaks[0].i * DT, period, 0.1, 'about a period to swing back up');
+  close(
+    peaks[0].z / (0.5 / LIMP.omega ** 2),
+    Math.exp((-2 * Math.PI * LIMP.zeta) / damped),
+    0.05,
+    'its swing dies away',
+  );
+  close(angle(m.at, rest), 0, 0.01, 'settled in 5 s');
+  // However hard it's flung, never past its cone.
+  let most = 0;
+  for (let i = 0; i < 120; i++) {
+    limbStep(m, rest, { x: 300 * Math.sign(Math.sin(i / 7)), y: 200, z: -300 }, DT);
+    most = Math.max(most, angle(m.at, rest));
+    close(Math.hypot(m.at.x, m.at.y, m.at.z), len, 1e-6);
+  }
+  assert.ok(most <= LIMP.cone + 1e-6, `${most} rad`);
+  // A cone of its own (an earring's: it swings freely about straight down).
+  const e = restLimb({ x: 0, y: -0.06, z: 0 });
+  const loose = { ...LIMP, omega: 12, zeta: 0.15, cone: 1.2 };
+  for (let i = 0; i < 30; i++) limbStep(e, { x: 0, y: -0.06, z: 0 }, { x: -400, y: 0, z: 0 }, DT, loose);
+  assert.ok(angle(e.at, { x: 0, y: -1, z: 0 }) <= 1.2 + 1e-6);
+  assert.ok(e.at.x < 0, 'pushed −x, it swings −x');
+});
+
+test('in the intro’s boxes: Walk and Run step in place at their own pace (talkPhase), and Held, Thrash and Fall dangle him from an unseen hand, his lowest sole clear of the floor, Fall a short hop (dangleLift)', () => {
+  // In place: on round by dt over the clip's length, whatever his speed (none).
+  close(talkPhase(0.25, 0.1, 0.5), 0.45, 1e-6);
+  close(talkPhase(0.9, 0.2, 0.5), 0.3, 1e-6, 'round again');
+  close(talkPhase(0.3, 0.1, 0), 0.3, 1e-6, 'no clip: held');
+  // Dangling: lifted by as much as his lowest sole sits under the gap, by their share of the mix.
+  close(dangleLift({ hang: 1, sole: -0.05 }), DANGLE.gap + 0.05, 1e-6, 'his toes under the floor');
+  close(dangleLift({ hang: 1, sole: DANGLE.gap + 0.1 }), 0, 1e-6, 'clear already');
+  close(dangleLift({ hang: 0.5, sole: -0.05 }), 0.5 * (DANGLE.gap + 0.05), 1e-6, 'half in');
+  close(dangleLift({ hang: 0, sole: -0.05 }), 0, 1e-6, 'none of it playing');
+  assert.ok(DANGLE.gap > 0 && DANGLE.gap <= 0.1, `${DANGLE.gap}`);
+  // Fall: a hop, up and back down over its length.
+  close(dangleLift({ hang: 1, sole: DANGLE.gap, fall: 1, fallU: 0 }), 0, 1e-6);
+  close(dangleLift({ hang: 1, sole: DANGLE.gap, fall: 1, fallU: 0.5 }), DANGLE.hop, 1e-6, 'its top halfway');
+  close(dangleLift({ hang: 1, sole: DANGLE.gap, fall: 1, fallU: 1 }), 0, 1e-6, 'down by its end');
+  assert.ok(DANGLE.hop >= 0.08 && DANGLE.hop <= 0.25, `a short hop: ${DANGLE.hop}`);
 });
 
 test('a toss uses the last 80 ms of samples, capped', () => {
@@ -736,7 +905,7 @@ test('look-at glances are seeded: forward 1.5 s after the pointer goes, every 3�
   );
 });
 
-test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall and Land); camera while waving; forward (the viewer, with glances) while held; back while fleeing', () => {
+test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall and Land); camera while waving; while held, a light look (about 0.15) aimed down, so his head hangs; back while fleeing', () => {
   const brain = createBrain({ seed: 2, calm: true, bounds: BOUNDS });
   let t = 0;
   let grounded = true;
@@ -769,7 +938,9 @@ test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall an
   assert.deepEqual(out.look, { mode: 'camera', weight: 1 });
   out = step({ events: [ev('grab')] });
   assert.equal(out.state, 'held');
-  assert.deepEqual(out.look, { mode: 'forward', weight: 1 });
+  assert.equal(out.look.mode, 'forward', 'held: ahead, with glances');
+  assert.ok(out.look.weight >= 0.1 && out.look.weight <= 0.2, `held: a light look, ${out.look.weight}`);
+  assert.ok((out.look.pitch ?? 0) < -0.2, `held: aimed down, ${out.look.pitch}`);
   grounded = false;
   out = step({ events: [ev('release')] });
   assert.equal(out.state, 'fall');
@@ -791,13 +962,14 @@ test('the look weight is 0 in Spook, Fall and Land (fading out slowly in Fall an
   assert.deepEqual(out.look, { mode: 'back', weight: 1, at: { x: 0.5, z: 0.5 } }, 'the pointer: who he runs from');
 });
 
-test('dropped facing away, his head comes round over the fall and the landing together, not in the fall’s first fifth of a second', () => {
+test('dropped facing away, his head comes round gently over the fall and the landing, never snapping round', () => {
   const brain = createBrain({ seed: 2, calm: true, bounds: BOUNDS });
   const look = createLook();
   const rng = createRng(4);
   const D = 180 / Math.PI;
   // The camera off to his side: held, he looks round at it ("ahead", the viewer, as lookAim
-  // gives it: viewerAim, kept to his neck's LIMIT) as far as his neck goes.
+  // gives it: viewerAim, kept to his neck's LIMIT) as far as his neck goes, by his held look's
+  // light weight (TUNE.heldLook: his head hangs).
   const camera = { yaw: LIMIT.yaw, pitch: 0.3 };
   let t = 0;
   let grounded = true;
@@ -823,7 +995,10 @@ test('dropped facing away, his head comes round over the fall and the landing to
   for (let i = 0; i < 90; i++) out = frame();
   assert.equal(out.state, 'held');
   const full = turned();
-  assert.ok(full > 0.95 * LIMIT.yaw, `held, his head turned round to the camera (${(full * D).toFixed(0)}°)`);
+  assert.ok(
+    full > 0.95 * TUNE.heldLook * LIMIT.yaw,
+    `held, his head turned round to the camera (${(full * D).toFixed(0)}°)`,
+  );
   // Let go: a fall of about 0.23 s (from the hang), then the landing, then idle.
   grounded = false;
   out = frame({ events: [{ type: 'release', on: 'newt', x: 0, y: 0, t }] });
@@ -843,10 +1018,9 @@ test('dropped facing away, his head comes round over the fall and the landing to
     last = turned();
   }
   assert.equal(out.state, 'idle');
-  assert.ok(
-    landing >= full / 2,
-    `half his turn or more left as he lands (${(landing * D).toFixed(0)}° of ${(full * D).toFixed(0)}°)`,
-  );
+  // (His held look is light, TUNE.heldLook: what turn there is goes in a fifth of a second or so,
+  // gently.)
+  assert.ok(landing <= full + 1e-9, `no further round as he lands (${(landing * D).toFixed(0)}°)`);
   assert.ok(fastest * D <= 200, `never faster than 200°/s (${(fastest * D).toFixed(0)}°/s)`);
   assert.ok(Math.abs(turned()) * D < 5, `round to ahead a second after (${(turned() * D).toFixed(1)}°)`);
 });

@@ -452,23 +452,72 @@ test('a grab works in every state: catching him mid-run holds him', () => {
   }
 });
 
-test('held: surprised for 0.6 s, then neutral with slow blinks, and surprised again when shaken', () => {
+test('held: sad from the first frame, with slow blinks; surprised while he’s shaken hard; angry while he thrashes', () => {
   const s = sim();
   let out = s.grab();
-  assert.equal(out.face, 'surprised');
-  assert.equal(out.blink, 'none');
-  s.run(0.55);
-  assert.equal(s.w.out.face, 'surprised');
-  out = s.run(0.1);
-  assert.equal(out.face, 'neutral');
+  assert.equal(out.face, 'sad');
   assert.equal(out.blink, 'slow');
+  out = s.run(1);
+  assert.equal(out.face, 'sad', 'still sad a second on');
   s.w.carry = { dragSpeed: 0, shake: TUNE.shakeHard + 5 };
   out = s.frame();
   assert.equal(out.face, 'surprised');
   assert.equal(out.blink, 'none');
   s.w.carry = { dragSpeed: 0, shake: 0 };
-  out = s.run(TUNE.shakenFor + 0.05);
-  assert.equal(out.face, 'neutral');
+  out = s.until((o) => o.clip === 'Thrash', 10);
+  assert.equal(out.face, 'angry', 'thrashing');
+  out = s.until((o) => o.clip === 'Held', 3);
+  assert.equal(out.face, 'sad', 'back to hanging');
+});
+
+test('held, he thrashes every 3–7 s (sooner when he’s shaken): Thrash once from its start, then back to Held without restarting it', () => {
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const s = sim({ seed });
+    s.grab();
+    let hangingSince = s.w.t;
+    for (let n = 0; n < 3; n++) {
+      const out = s.until((o) => o.clip === 'Thrash', 10);
+      assert.equal(out.state, 'held');
+      assert.equal(out.restart, true, 'from its start');
+      const waited = s.w.t - hangingSince;
+      assert.ok(waited >= 3 - DT && waited <= 7 + DT, `seed ${seed}: thrashed after ${waited.toFixed(2)} s hanging`);
+      const began = s.w.t;
+      const back = s.until((o) => o.clip !== 'Thrash', 3);
+      assert.equal(back.clip, 'Held', 'back to Held');
+      assert.equal(back.restart, false, 'Held keeps its clock');
+      assert.ok(s.w.t - began <= CLIPS.Thrash.length + DT, 'Thrash played once');
+      hangingSince = s.w.t;
+    }
+  }
+  // Shaken hard, he thrashes sooner: well before the 3 s he'd otherwise hang still.
+  const s = sim({ seed: 2 });
+  s.grab();
+  s.run(0.5);
+  s.w.carry = { dragSpeed: 2, shake: TUNE.shakeHard + 5 };
+  s.frame();
+  s.w.carry = { dragSpeed: 0, shake: 0 };
+  const grabbedAt = s.w.t - 0.5;
+  s.until((o) => o.clip === 'Thrash', 3);
+  assert.ok(s.w.t - grabbedAt < 2.5, `shaken at 0.5 s, thrashed at ${(s.w.t - grabbedAt).toFixed(2)} s`);
+  // Shaken on and on, he still hangs a moment between thrashes.
+  s.w.carry = { dragSpeed: 2, shake: TUNE.shakeHard + 5 };
+  let ended = null;
+  let gaps = 0;
+  for (let i = 0; i < 600; i++) {
+    const o = s.frame();
+    if (o.clip === 'Held' && ended === null) ended = s.w.t;
+    if (o.clip === 'Thrash' && ended !== null) {
+      assert.ok(s.w.t - ended >= TUNE.thrashRest - 0.02, `hung ${(s.w.t - ended).toFixed(2)} s between thrashes`);
+      ended = null;
+      gaps++;
+    }
+  }
+  assert.ok(gaps >= 2, `he still thrashes, sooner: ${gaps} in 10 s`);
+  s.w.carry = { dragSpeed: 0, shake: 0 };
+  // Let go mid-thrash, he falls as ever.
+  const out = s.release();
+  assert.equal(out.state, 'fall');
+  assert.equal(out.clip, 'Fall');
 });
 
 test('in fall and land taps are ignored, but a grab still works', () => {
@@ -684,6 +733,114 @@ test('buttons are disabled while he is held or falling', () => {
   assert.equal(out.state, 'fall');
   out = s.until((o) => o.state === 'land', 3);
   assert.equal(out.buttonsEnabled, true);
+});
+
+test('Give Device: the first press sits him down with the tablet (turned to the camera, SitDown, DeviceSit), the second lies him on his stomach with it, turned 60–75° from the camera (LieDown, DeviceLie), the third gets him up (GetUp, idle); device and deviceLabel say which', () => {
+  const s = sim({ camera: { x: 0, z: 6 }, yaw: 1.2 });
+  let out = s.frame();
+  assert.equal(out.device, null);
+  assert.equal(out.deviceLabel, 'Give Device');
+  // 1: down with the tablet, turned to the camera first.
+  out = s.button('Device');
+  assert.equal(out.state, 'sitDown');
+  assert.equal(out.device, 'sit');
+  assert.equal(out.deviceLabel, 'Lie Down');
+  assert.equal(out.faceCamera, true, 'turns to the camera first');
+  out = s.until((o) => o.clip === 'SitDown', 3);
+  assert.equal(out.restart, true);
+  out = s.until((o) => o.state === 'deviceSit', 3);
+  assert.equal(out.clip, 'DeviceSit');
+  assert.equal(out.restart, true);
+  assert.equal(out.device, 'sit');
+  assert.equal(out.deviceLabel, 'Lie Down');
+  assert.equal(out.face, FACE_TRACK.DeviceSit.face);
+  assert.equal(out.sitLabel, 'Stand');
+  assert.equal(out.buttonsEnabled, true);
+  out = s.run(4);
+  assert.equal(out.state, 'deviceSit', 'he sits with it until asked');
+  const cameraYaw = Math.atan2(0 - s.w.body.x, 6 - s.w.body.z);
+  assert.ok(Math.abs(wrapAngle(s.w.body.yaw - cameraYaw)) < 0.2, 'sitting, he faces the camera');
+  // 2: lies down with it, turned 60–75° from the camera so his profile and the screen show.
+  out = s.button('Device');
+  assert.equal(out.state, 'lieDown');
+  assert.equal(out.clip, 'LieDown');
+  assert.equal(out.restart, true);
+  assert.equal(out.device, 'lie');
+  assert.equal(out.deviceLabel, 'Get Up');
+  out = s.until((o) => o.state === 'deviceLie', 3);
+  assert.equal(out.clip, 'DeviceLie');
+  assert.equal(out.face, FACE_TRACK.DeviceLie.face);
+  out = s.run(3);
+  assert.equal(out.state, 'deviceLie');
+  const off = Math.abs(wrapAngle(s.w.body.yaw - Math.atan2(0 - s.w.body.x, 6 - s.w.body.z)));
+  assert.ok(
+    off >= (60 * Math.PI) / 180 && off <= (75 * Math.PI) / 180,
+    `lying ${((off * 180) / Math.PI).toFixed(1)}° from the camera`,
+  );
+  // 3: up again.
+  out = s.button('Device');
+  assert.equal(out.state, 'getUp');
+  assert.equal(out.clip, 'GetUp');
+  assert.equal(out.device, null);
+  assert.equal(out.deviceLabel, 'Give Device');
+  out = s.until((o) => o.state === 'idle', 3);
+  assert.equal(out.deviceLabel, 'Give Device');
+  // From plain sitting, the press hands him the tablet where he sits.
+  const t = sim({ camera: { x: 0, z: 6 } });
+  t.button('Sit');
+  t.until((o) => o.state === 'sit', 5);
+  out = t.button('Device');
+  assert.equal(out.state, 'deviceSit');
+  assert.equal(out.clip, 'DeviceSit');
+  // Pressed again while he's still sitting down with it: he lies down once he's sat.
+  const u = sim({ camera: { x: 0, z: 6 } });
+  u.button('Device');
+  u.until((o) => o.clip === 'SitDown', 3);
+  out = u.button('Device');
+  assert.equal(out.deviceLabel, 'Get Up');
+  out = u.until((o) => o.state !== 'sitDown', 3);
+  assert.equal(out.state, 'lieDown', 'straight on down');
+});
+
+test('any other input gets him up from the tablet first (StandUp from DeviceSit, GetUp from DeviceLie), then does it; a grab picks him straight up', () => {
+  const seated = () => {
+    const s = sim({ camera: { x: 0, z: 6 } });
+    s.button('Device');
+    s.until((o) => o.state === 'deviceSit', 5);
+    return s;
+  };
+  const lying = () => {
+    const s = seated();
+    s.button('Device');
+    s.until((o) => o.state === 'deviceLie', 5);
+    return s;
+  };
+  for (const [name, make, up] of [
+    ['sitting', seated, 'standUp'],
+    ['lying', lying, 'getUp'],
+  ]) {
+    /** @type {Array<[string, (s: any) => any, string]>} */
+    const inputs = [
+      ['a tap', (s) => s.tap(), 'react'],
+      ['a floor tap', (s) => s.floorTap(1, 0.5), 'walk'],
+      ['Wave', (s) => s.button('Wave'), 'react'],
+      ['Run', (s) => s.button('Run'), 'flee'],
+      ['Stand', (s) => s.button('Sit'), 'idle'],
+    ];
+    for (const [what, act, then] of inputs) {
+      const s = make();
+      let out = act(s);
+      assert.equal(out.state, up, `${name}, ${what}: up first`);
+      assert.equal(out.clip, up === 'getUp' ? 'GetUp' : 'StandUp');
+      assert.equal(out.device, null);
+      out = s.until((o) => o.state !== up, 3);
+      assert.equal(out.state, then, `${name}, ${what}: then ${then}`);
+    }
+    const s = make();
+    const out = s.grab();
+    assert.equal(out.state, 'held', `${name}: a grab picks him straight up`);
+    assert.equal(out.device, null);
+  }
 });
 
 test('sitLabel flips to Stand whenever he sits, by the button or by himself', () => {
@@ -991,25 +1148,106 @@ test('each box: a gesture plays once, then Talk while the line types and Idle af
   assert.equal(o.clip, 'Talk');
 });
 
-test('every animation a box may ask for (clips.js DIALOGUE_CLIPS) plays from it, on its own and one after another', () => {
-  // (What each shows as: Idle as the gait, Sit by sitting down first; the rest as themselves.)
-  const shows = (a) => (a === 'Idle' ? 'gait' : a === 'Sit' ? 'SitDown' : a);
+test('every animation a box may ask for (clips.js DIALOGUE_CLIPS: every clip) plays from it, on its own and one after another', () => {
+  assert.deepEqual([...DIALOGUE_CLIPS].sort(), Object.keys(CLIPS).sort(), 'every clip');
+  // (What each shows as from the box's first frame: Idle as the gait; Sit, Sit Down and the
+  // tablet's sit by sitting down first; lying with it by sitting down, then lying down; Stand Up
+  // and Get Up keep what he does when he's on his feet, Talk while the line types; the rest as
+  // themselves.)
+  const first = (a) =>
+    a === 'Idle'
+      ? 'gait'
+      : a === 'StandUp' || a === 'GetUp'
+        ? 'Talk'
+        : a === 'Sit' || a === 'SitDown' || a === 'DeviceSit' || a === 'LieDown' || a === 'DeviceLie'
+          ? 'SitDown'
+          : a;
+  // (What each holds once it's under way, the line still typing.)
+  const holds = (a) =>
+    ({
+      Idle: 'gait',
+      StandUp: 'Talk',
+      GetUp: 'Talk',
+      SitDown: 'Sit',
+      LieDown: 'DeviceLie',
+      Fall: 'Talk',
+      Land: 'Talk',
+    })[a] ?? (CLIPS[a].loop ? a : 'Talk');
   for (const a of DIALOGUE_CLIPS) {
     const s = sim({ camera: { x: 0, z: 6 } });
     s.w.dialogue = box(1, a, 'neutral', true);
     talking(s);
-    assert.equal(s.w.out.clip, shows(a), `${a}: from the box's first frame`);
-    if (a === 'Sit') s.until((o) => o.clip === 'Sit', 3);
+    assert.equal(s.w.out.clip, first(a), `${a}: from the box's first frame`);
+    s.until((o) => o.clip === holds(a), 6);
+    s.run(1.5);
+    assert.equal(s.w.out.clip, holds(a), `${a}: held while the line types`);
+    assert.equal(s.w.out.state, 'talk');
   }
-  // Each after the one before (a loop, a gesture under way, sitting): each new box's plays.
+  // Each after the one before (a loop, a gesture under way, sitting, lying, dangling): each new
+  // box's plays.
   const s = sim({ camera: { x: 0, z: 6 } });
   s.w.dialogue = box(0, 'none');
   talking(s);
   for (const [i, a] of [...DIALOGUE_CLIPS, ...DIALOGUE_CLIPS.slice().reverse()].entries()) {
-    s.w.dialogue = box(i + 1, a, 'happy', i % 2 === 0);
-    s.until((o) => o.clip === shows(a), 3);
+    const typing = i % 2 === 0;
+    s.w.dialogue = box(i + 1, a, 'happy', typing);
+    const want = holds(a) === 'Talk' && a !== 'Talk' && !typing ? 'gait' : holds(a);
+    // (Stand Up and Get Up only get him up: on his feet, he keeps what he was doing.)
+    const up = ['SitDown', 'Sit', 'DeviceSit', 'LieDown', 'DeviceLie', 'StandUp', 'GetUp'];
+    if (a === 'StandUp' || a === 'GetUp') s.until((o) => !up.includes(o.clip), 8);
+    else s.until((o) => o.clip === want, 8);
     s.run(0.2);
   }
+});
+
+test('in a box: Sit Down sits him and holds it; the tablet’s sit and lie hold with their way down and up (SitDown, LieDown; StandUp, GetUp); Stand Up and Get Up only get him up; Fall is a hop, then Land', () => {
+  const s = sim({ camera: { x: 0, z: 6 } });
+  const went = [];
+  const seen = (o) => went[went.length - 1] !== o.clip && went.push(o.clip);
+  s.w.dialogue = box(1, 'StandUp');
+  talking(s);
+  s.run(0.5);
+  assert.equal(s.w.out.clip, 'Talk', 'on his feet, Stand Up keeps what he does');
+  s.w.dialogue = box(2, 'DeviceLie');
+  s.until((o) => o.clip === 'DeviceLie', 6, seen);
+  assert.deepEqual(went, ['SitDown', 'LieDown', 'DeviceLie'], 'down, then lying with it');
+  went.length = 0;
+  s.w.dialogue = box(3, 'DeviceSit');
+  s.until((o) => o.clip === 'DeviceSit', 8, seen);
+  assert.deepEqual(went, ['GetUp', 'SitDown', 'DeviceSit'], 'up from lying, then sat with it');
+  went.length = 0;
+  s.w.dialogue = box(4, 'Sit');
+  s.until((o) => o.clip === 'Sit', 3, seen);
+  assert.deepEqual(went, ['Sit'], 'sitting already: a crossfade');
+  went.length = 0;
+  s.w.dialogue = box(5, 'LieDown');
+  s.until((o) => o.clip === 'DeviceLie', 6, seen);
+  assert.deepEqual(went, ['LieDown', 'DeviceLie'], 'Lie Down from sitting: lies down and holds it');
+  went.length = 0;
+  s.w.dialogue = box(6, 'GetUp');
+  s.until((o) => o.clip === 'Talk', 6, seen);
+  assert.deepEqual(went, ['GetUp', 'Talk'], 'Get Up from lying');
+  went.length = 0;
+  s.w.dialogue = box(7, 'SitDown');
+  s.until((o) => o.clip === 'Sit', 6, seen);
+  assert.deepEqual(went, ['SitDown', 'Sit'], 'Sit Down sits him and holds it');
+  went.length = 0;
+  s.w.dialogue = box(8, 'Held');
+  s.until((o) => o.clip === 'Held', 6, seen);
+  assert.deepEqual(went, ['StandUp', 'Held'], 'up from sitting, then dangling');
+  went.length = 0;
+  s.w.dialogue = box(9, 'Fall');
+  s.until((o) => o.clip === 'Talk', 6, seen);
+  assert.deepEqual(went, ['Fall', 'Land', 'Talk'], 'a hop, then the landing');
+  // The intro over while he lies with the tablet: up first (GetUp), then back to play.
+  const t = sim({ camera: { x: 0, z: 6 } });
+  t.w.dialogue = box(1, 'DeviceLie');
+  talking(t);
+  t.until((o) => o.clip === 'DeviceLie', 6);
+  t.w.dialogue = null;
+  const out = t.frame();
+  assert.equal(out.state, 'getUp');
+  t.until((o) => o.state === 'idle', 3);
 });
 
 test('a Sit box sits him down and holds it; the next gesture gets him up first; sitting at Play Intro, he stands', () => {

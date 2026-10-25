@@ -395,9 +395,24 @@ test('the speech and the lines go under the plan’s kinds, every trigger in one
   assert.deepEqual(SUBGROUPS['invitation.lines'].find((g) => g.label === 'Carried').keys, [
     'pickedUp',
     'shaken',
+    'thrash',
     'dropped',
     'landed',
   ]);
+  // (Give Device's two moments go with sitting: he sits down with the tablet, then lies down with it.)
+  assert.deepEqual(SUBGROUPS['invitation.lines'].find((g) => g.label === 'Sitting').keys, [
+    'sitDown',
+    'sitting',
+    'standUp',
+    'device',
+    'lieDown',
+  ]);
+  // Each of round 16's moments named and helped, and in content.json with lines of its own.
+  const now = content().invitation;
+  for (const k of ['thrash', 'device', 'lieDown']) {
+    assert.ok(titleCase(LABELS[`invitation.speech.${k}`] ?? '').length > 3, `${k}: named`);
+    assert.ok(now.speech[k] && now.lines[k]?.length >= 3 && now.lines[k].length <= 6, `${k}: 3–6 starter lines`);
+  }
   for (const k of TRIGGERS) assert.equal(titleCase(hint(ADD_LABELS, `invitation.lines.${k}`)), 'Line', k);
 });
 

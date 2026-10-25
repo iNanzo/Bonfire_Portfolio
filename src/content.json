@@ -1885,6 +1885,10 @@
         "chance": 0.8,
         "cooldown": 6
       },
+      "thrash": {
+        "chance": 0.6,
+        "cooldown": 8
+      },
       "dropped": {
         "chance": 0.5,
         "cooldown": 8
@@ -1911,6 +1915,14 @@
       },
       "standUp": {
         "chance": 0.5,
+        "cooldown": 15
+      },
+      "device": {
+        "chance": 0.9,
+        "cooldown": 15
+      },
+      "lieDown": {
+        "chance": 0.9,
         "cooldown": 15
       },
       "idle": {
@@ -1968,6 +1980,13 @@
         "Too much! Too much!",
         "I’m getting dizzy…"
       ],
+      "thrash": [
+        "Put me DOWN!",
+        "I will bite. I have no teeth, but I will bite.",
+        "Hiyaaah! Kick! Kick!",
+        "Let me go let me go let me go",
+        "This is a hostage situation!!"
+      ],
       "dropped": [
         "Wheee!",
         "Wait, wait, wait!",
@@ -2008,6 +2027,19 @@
         "Okay, okay, I’m up!",
         "Up and at ’em!",
         "Oh, we’re doing things now?"
+      ],
+      "device": [
+        "Ooh, is this for me?",
+        "Just one more level...",
+        "Don’t tell anyone, but I’m really good at this.",
+        "Shh, I’m on a streak.",
+        "Low battery? Nah, I’ll live."
+      ],
+      "lieDown": [
+        "Okay, this is the comfy way to play.",
+        "Belly mode: activated.",
+        "Five more minutes...",
+        "Nobody talk to me, I’m busy."
       ],
       "idle": [
         "*Mongolian throat singing*",
@@ -2245,7 +2277,7 @@
           "face": "happy",
           "animation": "Cheer",
           "camera": "keep",
-          "next": "friends",
+          "next": "wrap3",
           "end": false,
           "auto": 0,
           "choices": []
@@ -2257,7 +2289,7 @@
           "face": "happy",
           "animation": "Think",
           "camera": "close",
-          "next": "friends",
+          "next": "wrap4",
           "end": false,
           "auto": 0,
           "choices": []

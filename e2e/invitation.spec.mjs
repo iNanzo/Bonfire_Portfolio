@@ -10,20 +10,24 @@
 // (a fifth of a desktop's), and running off to the rim never takes him off a phone's screen.
 // Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
-// turns his head, each button plays its clip, a floor tap walks him there, and the cursor turns his
+// turns his head, each button plays its clip (Replay Intro, Wave, Sit, Give Device, Run, Camera
+// and Settings: pixel icons beside their labels, a label shown on hover or focus with a mouse, on
+// a press held still on touch), a floor tap walks him there, and the cursor turns his
 // head on a desktop (down toward a cursor below him, up at one high over him, well round toward one
 // level with his head off to the side), and running away he faces where he runs, not up at the
 // viewer, glancing back over his shoulder. The camera: a finger's drag on empty
 // space or the mouse's right-drag (on NEWT too, never holding him) turns it, the mouse's
-// left-drag on empty space and two fingers pan it with the floor under the cursor, the wheel
-// and a two-finger pinch zoom it, the canvas shows no context menu, and Reset Camera brings it
-// back and clears the pan. A mouse drag keeps the point NEWT was grabbed by under the cursor
-// and lifts him higher than the old fixed carry height. He talks: clicked until he speaks, a line
-// of the admin's types out in a bubble over his head, clear of the toolbar (and of the open Look
+// left-drag on empty space and two fingers pan it with the floor under the cursor (the pan stays
+// put while he walks), the wheel and a two-finger pinch zoom it, the canvas shows no context
+// menu, the Camera pad's buttons turn, tilt, zoom, follow him and reset it (Reset Camera clears
+// the pan), and turned 90° a tap still reaches the screen's sides. The pixel cursors: an open hand
+// over him, a closed one holding him or panning, the turn glyph orbiting, the pointing hand on
+// the buttons (the carry itself, his collar under the cursor, is invitationCarry.spec.mjs's). He talks: clicked until he speaks, a line
+// of the admin's types out in a bubble over his head, clear of the toolbar (and of the open Settings
 // sheet, never over his face), heard whole by a screen reader, gone when its time is up, on its
 // own time as talk counts it (a hidden tab pauses both); on a phone too, tapped, with the
-// full-width sheet open, and lifted to the top of the screen (beside his head, never over him). A pinch over the toolbar or the Look sheet never
-// zooms the page, only the left mouse button holds or walks him, and the Look sheet holds focus
+// full-width sheet open, and lifted to the top of the screen (beside his head, never over him). A pinch over the toolbar or the Settings sheet never
+// zooms the page, only the left mouse button holds or walks him, and the Settings sheet holds focus
 // (Tab goes round inside it, the toolbar it covers is inert), closes on Escape wherever focus
 // is, and leaves NEWT in sight above or beside it (Reset Camera too, on its way back). Every wait is on a state through `?test`'s window.__invitation, never on a duration (CI's
 // software WebGL runs slower than real time), and touches are real ones (CDP
@@ -125,7 +129,7 @@ const framesFor = (page, ms) =>
   );
 /**
  * NEWT's head, middle and feet on screen (client px), and whether the page shows him there: the
- * canvas, not the Look sheet or the toolbar over it.
+ * canvas, not the Settings sheet or the toolbar over it.
  */
 const inView = (page) =>
   page.evaluate(() => {
@@ -141,21 +145,21 @@ const inView = (page) =>
     return out;
   });
 const allSeen = (v) => v.head.seen && v.body.seen && v.feet.seen;
-/** Opens the Look sheet and waits until NEWT shows whole beside or above it. */
+/** Opens the Settings sheet and waits until NEWT shows whole beside or above it. */
 async function lookOpenWithNewtInSight(page) {
-  await page.getByRole('button', { name: 'Look' }).click();
-  await expect(page.getByRole('dialog', { name: 'Look' })).toBeVisible();
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible();
   let last = null;
   await expect
     .poll(async () => allSeen((last = await inView(page))), {
-      message: 'his head, middle and feet in sight with the Look sheet open',
+      message: 'his head, middle and feet in sight with the Settings sheet open',
     })
     .toBe(true);
   return last;
 }
 /**
  * The speech bubble as it's drawn now, with what it keeps clear of, client px: its rect, his
- * head, the toolbar's, the open Look sheet's (null while it's shut) and the stage's; whether it
+ * head, the toolbar's, the open Settings sheet's (null while it's shut) and the stage's; whether it
  * waits out of sight (is-away) and the way its tail points.
  */
 const bubbleAt = (page) =>
@@ -220,15 +224,15 @@ const recordSaves = (page) =>
       return set.call(this, key, value);
     };
   });
-/** The Look sheet's scroll: how far down it is and how far it can go, CSS px. */
+/** The Settings sheet's scroll: how far down it is and how far it can go, CSS px. */
 const sheetScroll = (page) =>
   page.locator('.inv-sheet').evaluate((el) => ({ top: el.scrollTop, room: el.scrollHeight - el.clientHeight }));
 /**
  * A real finger swiping straight up from the Pixel Size slider's track, well away from its thumb
- * (144 px in 12 moves), with the Look sheet open. Returns the slider's value text before it.
+ * (144 px in 12 moves), with the Settings sheet open. Returns the slider's value text before it.
  */
 async function swipeUpFromSlider(page) {
-  const pixel = page.getByRole('dialog', { name: 'Look' }).getByRole('slider', { name: 'Pixel Size' });
+  const pixel = page.getByRole('dialog', { name: 'Settings' }).getByRole('slider', { name: 'Pixel Size' });
   const before = await pixel.getAttribute('aria-valuetext');
   const at = await pixel.evaluate((el) => Number(el.value) / Number(el.max));
   const box = await pixel.boundingBox();
@@ -269,13 +273,30 @@ test.describe('on a phone', () => {
     expect(head.x).toBeGreaterThan(box.x + 24);
     expect(head.x).toBeLessThan(box.x + box.width - 24);
     expect(snap.newtTall / 390, `NEWT is ${snap.newtTall.toFixed(1)} CSS px tall`).toBeCloseTo(0.255, 2);
-    // The toolbar: every button a thumb's height, labelled.
-    for (const name of ['Play Intro', 'Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look']) {
+    // The toolbar: every button a thumb's height, named by its label (an icon beside it; on a
+    // phone only the icon shows), the data-* hooks kept, and no tooltips.
+    for (const [name, hook] of [
+      ['Replay Intro', '[data-intro]'],
+      ['Wave', '[data-button="Wave"]'],
+      ['Sit', '[data-button="Sit"]'],
+      ['Give Device', '[data-button="Device"]'],
+      ['Run', '[data-button="Run"]'],
+      ['Camera', '[data-camera-open]'],
+      ['Settings', '[data-look-open]'],
+    ]) {
       const b = page.getByRole('button', { name, exact: true });
       await expect(b).toBeVisible();
-      expect((await b.boundingBox()).height).toBeGreaterThanOrEqual(44);
+      await expect(page.locator(hook)).toHaveAccessibleName(name);
+      const size = await b.boundingBox();
+      expect(size.height, name).toBeGreaterThanOrEqual(44);
+      expect(size.width, name).toBeGreaterThanOrEqual(40);
+      await expect(b.locator('svg.inv-icon')).toBeVisible();
+      expect(
+        await b.locator('.inv-btn-label').evaluate((el) => Number(getComputedStyle(el).opacity)),
+        `${name}: icon only`,
+      ).toBe(0);
     }
-    await expect(page.getByRole('button', { name: 'Wander' })).toHaveAttribute('aria-pressed', /true|false/);
+    await expect(page.locator('[data-button="Spook"], [data-button="Wander"]')).toHaveCount(0);
     await expect(page.locator('[title]')).toHaveCount(0);
     await page.waitForTimeout(500);
     expect(errors).toEqual([]);
@@ -465,8 +486,8 @@ test.describe('on a phone', () => {
     const errors = watch(page);
     await ready(page);
     const before = await picture(page);
-    await page.getByRole('button', { name: 'Look' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     await expect(sheet).toBeVisible();
     // Pixel Size, a slider: from the coarse end one step finer by the keyboard, 24×24 (NEWT about
     // 24 texels tall: 12 device px, 4 CSS px a texel here).
@@ -494,7 +515,7 @@ test.describe('on a phone', () => {
     expect(apart(before, changed)).toBeGreaterThan(2);
     await page.reload();
     await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
-    await page.getByRole('button', { name: 'Look' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
     await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', '24 by 24');
     expect((await snapshot(page)).resolution).toBe(24);
     expect((await snapshot(page)).pixelScale).toBe(4);
@@ -507,8 +528,8 @@ test.describe('on a phone', () => {
   }) => {
     const errors = watch(page);
     await ready(page);
-    await page.getByRole('button', { name: 'Look' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     const pixel = sheet.getByRole('slider', { name: 'Pixel Size' });
     await pixel.focus();
     await page.keyboard.press('End');
@@ -543,7 +564,7 @@ test.describe('on a phone', () => {
       'native',
     );
     expect((await snapshot(page)).resolution).toBe('native');
-    await page.getByRole('button', { name: 'Look' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
     await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', 'Native');
     expect(errors).toEqual([]);
   });
@@ -557,8 +578,8 @@ test.describe('on a phone', () => {
     expect(smooth.changes, `Smooth: ${smooth.changes} new poses in ${smooth.frames} frames`).toBeGreaterThanOrEqual(
       0.8 * smooth.frames,
     );
-    await page.getByRole('button', { name: 'Look' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     await sheet.getByRole('radio', { name: 'Choppy', exact: true }).check();
     await sheet.getByRole('button', { name: 'Done' }).click();
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('invitation.look.v1') ?? '{}'));
@@ -569,7 +590,7 @@ test.describe('on a phone', () => {
     expect(rate, 'he still moves').toBeGreaterThan(2);
     await page.reload();
     await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
-    await page.getByRole('button', { name: 'Look' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
     await expect(sheet.getByRole('radio', { name: 'Choppy', exact: true })).toBeChecked();
     expect(errors).toEqual([]);
   });
@@ -682,7 +703,7 @@ test.describe('on a phone', () => {
     expect(at.box.top).toBeGreaterThanOrEqual(at.stage.top);
   });
 
-  test('with the Look sheet open (a full-width sheet along the bottom), a line goes over his head above it, clear of the sheet and off his face', async ({
+  test('with the Settings sheet open (a full-width sheet along the bottom), a line goes over his head above it, clear of the sheet and off his face', async ({
     page,
   }) => {
     await calm(page);
@@ -692,7 +713,7 @@ test.describe('on a phone', () => {
     await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
     expect(at.sheet, 'the sheet is open').toBeTruthy();
     expect(at.sheet.left, 'the sheet runs the width of the screen').toBeLessThanOrEqual(at.stage.left + 1);
-    expect(overlaps(at.box, at.sheet), 'clear of the open Look sheet').toBe(false);
+    expect(overlaps(at.box, at.sheet), 'clear of the open Settings sheet').toBe(false);
     const face = {
       left: at.head.x - at.head.r,
       top: at.head.y - at.head.r,
@@ -728,20 +749,32 @@ test.describe('on a phone', () => {
     const press = (name) => page.locator(`[data-button="${name}"]`).tap();
     await press('Wave');
     await until(page, (s) => s.clip === 'Wave', 'Wave');
-    await press('Spook');
-    await until(page, (s) => s.clip === 'Spook', 'Spook');
     await press('Sit');
     await until(page, (s) => s.clip === 'Sit' && s.state === 'sit', 'sitting', 30_000);
-    await expect(page.locator('[data-button="Sit"]')).toHaveText('Stand');
+    // (Sit reads Stand while he sits: its label and its icon change, the button stays.)
+    const sit = page.locator('[data-button="Sit"]');
+    await expect(sit).toHaveText('Stand');
+    await expect(sit).toHaveAccessibleName('Stand');
+    await expect(sit.locator('svg.inv-icon')).toHaveCount(1);
     await press('Sit');
     await until(page, (s) => s.clip === 'StandUp', 'standing up');
-    await expect(page.locator('[data-button="Sit"]')).toHaveText('Sit');
+    await expect(sit).toHaveText('Sit');
+    await until(page, (s) => s.state === 'idle', 'up');
+    await press('Device');
+    await until(page, (s) => s.button === 'Device', 'Give Device goes to the brain as Device');
+    await expect(page.locator('[data-button="Device"]')).toHaveText(/^(Give Device|Lie Down|Get Up)$/);
     await press('Run');
     await until(page, (s) => s.state === 'flee' && s.clip === 'Run', 'running', 30_000);
-    const wander = page.locator('[data-button="Wander"]');
-    const before = await wander.getAttribute('aria-pressed');
-    await press('Wander');
-    await expect(wander).toHaveAttribute('aria-pressed', before === 'true' ? 'false' : 'true');
+    // Wander is a setting now: a switch in Settings, kept for the next visit.
+    await page.getByRole('button', { name: 'Settings' }).tap();
+    const wander = page.getByRole('dialog', { name: 'Settings' }).getByRole('switch', { name: 'Wander' });
+    await wander.scrollIntoViewIfNeeded();
+    const before = (await snapshot(page)).wander;
+    await expect(wander).toBeChecked({ checked: before });
+    await wander.tap();
+    await until(page, (s) => s.wander === !before, 'Wander toggled');
+    await expect(wander).toBeChecked({ checked: !before });
+    expect(await page.evaluate(() => localStorage.getItem('invitation.wander.v1'))).toBe(String(!before));
     expect(errors).toEqual([]);
   });
 
@@ -758,7 +791,7 @@ test.describe('on a phone', () => {
         new Promise((done) => {
           const inv = window.__invitation;
           const out = [];
-          const t0 = performance.now();
+          const t0 = inv.clock();
           const tick = () => {
             const s = inv.snapshot();
             out.push({
@@ -768,7 +801,8 @@ test.describe('on a phone', () => {
               state: s.state,
               r: Math.hypot(s.pos.x, s.pos.z),
             });
-            if (performance.now() - t0 < 3500) requestAnimationFrame(tick);
+            // The scene clamps long frames, so wall time is not animation time.
+            if (inv.clock() - t0 < 3.5) requestAnimationFrame(tick);
             else done(out);
           };
           requestAnimationFrame(tick);
@@ -835,13 +869,14 @@ test.describe('on a phone', () => {
     ];
     const grabbed = await floorAt(page, { x: body.x, y: body.y + 150 });
     await touch('touchStart', at(0));
-    for (let dy = -10; dy >= -120; dy -= 10) {
+    // (Up 60 px: within the pan's region on a phone, past which it gives like a rubber band.)
+    for (let dy = -5; dy >= -60; dy -= 5) {
       await touch('touchMove', at(dy));
       await sleep(16);
     }
     await framesFor(page, 100);
     // The floor that was under their middle is still under it, give or take a finger's wobble.
-    const now = await floorAt(page, { x: body.x, y: body.y + 30 });
+    const now = await floorAt(page, { x: body.x, y: body.y + 90 });
     expect(Math.hypot(now.x - grabbed.x, now.z - grabbed.z), 'the floor went with the fingers').toBeLessThan(0.15);
     await touch('touchEnd');
     const s = await snapshot(page);
@@ -852,7 +887,7 @@ test.describe('on a phone', () => {
     expect(s.states).not.toContain('held');
   });
 
-  test('a two-finger pinch over the toolbar or the Look sheet never zooms the page', async ({ page }) => {
+  test('a two-finger pinch over the toolbar or the Settings sheet never zooms the page', async ({ page }) => {
     await calm(page);
     const touch = await toucher(page);
     /** Two fingers spreading across the middle of `box`, then a moment for the page to settle. */
@@ -874,16 +909,16 @@ test.describe('on a phone', () => {
     const scale = () => page.evaluate(() => window.visualViewport.scale);
     await spread(await page.locator('.inv-toolbar').boundingBox());
     expect(await scale(), 'the page after a pinch over the toolbar').toBe(1);
-    await page.getByRole('button', { name: 'Look' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
     await spread(await page.locator('.inv-sheet').boundingBox());
-    expect(await scale(), 'the page after a pinch over the Look sheet').toBe(1);
+    expect(await scale(), 'the page after a pinch over the Settings sheet').toBe(1);
   });
 
   test('a swipe up that starts on the Pixel Size slider leaves the Pixel Size as it was', async ({ page }) => {
     await recordSaves(page);
     await calm(page);
-    await page.getByRole('button', { name: 'Look' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     await expect(sheet).toBeVisible();
     const was = (await snapshot(page)).resolution;
     const before = await swipeUpFromSlider(page);
@@ -897,8 +932,8 @@ test.describe('on a phone', () => {
     page,
   }) => {
     await calm(page);
-    await page.getByRole('button', { name: 'Look' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     const colors = sheet.getByRole('slider', { name: 'Colors' });
     await colors.scrollIntoViewIfNeeded();
     const was = (await snapshot(page)).shader.levels;
@@ -934,12 +969,130 @@ test.describe('on a phone', () => {
     expect((await snapshot(page)).custom).toBe(true);
   });
 
-  test('with the Look sheet open NEWT stays in sight above it, so its changes show on him', async ({ page }) => {
+  test('with the Settings sheet open NEWT stays in sight above it, so its changes show on him', async ({ page }) => {
     await calm(page);
     const v = await lookOpenWithNewtInSight(page);
     const sheet = await page.locator('.inv-sheet').boundingBox();
     expect(v.feet.y, 'his feet over the sheet').toBeLessThan(sheet.y);
     expect(v.head.y, 'his head on the screen').toBeGreaterThan(0);
+  });
+
+  test('icons only on a phone: a press held still on a button shows its label as a tab and does nothing else; a quick tap still acts', async ({
+    page,
+  }) => {
+    await calm(page);
+    const touch = await toucher(page);
+    const wave = page.locator('[data-button="Wave"]');
+    const label = wave.locator('.inv-btn-label');
+    const box = await wave.boundingBox();
+    const mid = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const shown = () => label.evaluate((el) => Number(getComputedStyle(el).opacity));
+    expect(await shown(), 'icon only to begin with').toBe(0);
+    // Held still: the label comes up as a tab over the button; let go, nothing else happens.
+    await touch('touchStart', [mid]);
+    await expect(wave).toHaveClass(/is-label/, { timeout: 5_000 });
+    await expect.poll(shown, { message: 'the label shows' }).toBeGreaterThan(0.9);
+    const tab = await label.boundingBox();
+    expect(tab.y + tab.height, 'a tab over the button').toBeLessThanOrEqual(box.y + 2);
+    await touch('touchEnd');
+    await framesFor(page, 400);
+    let s = await snapshot(page);
+    expect(s.button, 'the press after a held label does nothing').toBeNull();
+    expect(s.clip).toBe('Idle');
+    // (No menu or callout on the bar either.)
+    const menu = await wave.evaluate((el) => {
+      const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+      el.dispatchEvent(e);
+      return e.defaultPrevented;
+    });
+    expect(menu, 'no long-press menu').toBe(true);
+    // The tab goes again, and a quick tap acts as ever.
+    await expect.poll(shown, { message: 'the label goes', timeout: 10_000 }).toBe(0);
+    await touch('touchStart', [mid]);
+    await touch('touchEnd');
+    await until(page, (t) => t.clip === 'Wave', 'a tap waves');
+    s = await snapshot(page);
+    expect(s.button).toBe('Wave');
+  });
+
+  test('the Camera pad opens over the stage without moving the bar or the play area, and turned 90° with it a tap near either side of the screen walks him there', async ({
+    page,
+  }) => {
+    await calm(page);
+    const bar = await page.locator('.inv-toolbar').boundingBox();
+    const area = (await snapshot(page)).area;
+    const camera = page.getByRole('button', { name: 'Camera', exact: true });
+    await camera.tap();
+    await expect(camera).toHaveAttribute('aria-expanded', 'true');
+    const pad = page.locator('#inv-camera');
+    await expect(pad).toBeVisible();
+    const padBox = await pad.boundingBox();
+    expect(padBox.y + padBox.height, 'over the stage, above the bar').toBeLessThanOrEqual(bar.y + 1);
+    expect(await page.locator('.inv-toolbar').boundingBox(), 'the bar where it was').toEqual(bar);
+    await framesFor(page, 100);
+    expect((await snapshot(page)).area, 'the play area as it was').toEqual(area);
+    // Two turns of 45°: a quarter of the way round.
+    const home = (await snapshot(page)).camera;
+    await page.getByRole('button', { name: 'Turn Left' }).tap();
+    await until(
+      page,
+      (s) => Math.abs(Math.abs(s.camera.yaw - home.yaw) - Math.PI / 4) < 0.01 && !s.camera.turning,
+      '45°',
+    );
+    await page.getByRole('button', { name: 'Turn Left' }).tap();
+    await until(
+      page,
+      (s) => Math.abs(Math.abs(s.camera.yaw - home.yaw) - Math.PI / 2) < 0.01 && !s.camera.turning,
+      '90°',
+    );
+    await camera.tap();
+    await expect(pad).toBeHidden();
+    // Near each side, at his height on screen: he walks there, never stopping at a wall short of it.
+    const stage = await page.locator('[data-stage]').boundingBox();
+    for (const side of [-1, 1]) {
+      const body = await on(page, 'body');
+      const at = { x: side < 0 ? stage.x + 40 : stage.x + stage.width - 40, y: body.y + 30 };
+      const goal = await floorAt(page, at);
+      await page.touchscreen.tap(at.x, at.y);
+      await until(page, (s) => s.state === 'walk', 'walking');
+      await until(
+        page,
+        (s) => s.state === 'idle' && Math.hypot(s.pos.x - goal.x, s.pos.z - goal.z) < 0.25,
+        `there, by the ${side < 0 ? 'left' : 'right'} side`,
+        30_000,
+      );
+    }
+  });
+
+  test('a pan stays put while he walks, until he is tapped', async ({ page }) => {
+    await calm(page);
+    const touch = await toucher(page);
+    const body = await on(page, 'body');
+    const at = (dx) => [
+      { x: body.x - 60 + dx, y: body.y + 150, id: 1 },
+      { x: body.x + 60 + dx, y: body.y + 150, id: 2 },
+    ];
+    await touch('touchStart', at(0));
+    for (let dx = -8; dx >= -80; dx -= 8) {
+      await touch('touchMove', at(dx));
+      await sleep(16);
+    }
+    await touch('touchEnd');
+    await until(page, (s) => s.camera.panned, 'panned');
+    await framesFor(page, 300);
+    const put = (await snapshot(page)).camera.target;
+    // A floor tap a little off to the side walks him there; the view stays where it was put.
+    const goal = { x: body.x + 70, y: body.y + 60 };
+    await page.touchscreen.tap(goal.x, goal.y);
+    await until(page, (s) => s.state === 'walk', 'walking');
+    await until(page, (s) => s.state === 'idle', 'there', 30_000);
+    const s = await snapshot(page);
+    expect(s.camera.panned, 'still panned').toBe(true);
+    expect(Math.hypot(s.camera.target.x - put.x, s.camera.target.z - put.z), 'the view stayed put').toBeLessThan(1e-3);
+    // A tap on him ends the pan: the view takes him again.
+    const head = await on(page, 'head');
+    await page.touchscreen.tap(head.x, head.y);
+    await until(page, (t) => !t.camera.panned, 'the pan over');
   });
 });
 
@@ -951,8 +1104,8 @@ test.describe('on a phone held sideways', () => {
   }) => {
     await recordSaves(page);
     await calm(page);
-    await page.getByRole('button', { name: 'Look' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     await expect(sheet).toBeVisible();
     const pixel = sheet.getByRole('slider', { name: 'Pixel Size' });
     expect((await sheetScroll(page)).room, 'the sheet scrolls on a phone held sideways').toBeGreaterThan(40);
@@ -989,10 +1142,12 @@ test.describe('on a phone held sideways', () => {
     expect((await sheetScroll(page)).top, 'the sheet stayed put').toBe(top);
   });
 
-  test('scrolled to its end the Look sheet keeps Done in reach, and Look beside it closes it', async ({ page }) => {
+  test('scrolled to its end the Settings sheet keeps Done in reach, and Settings beside it closes it', async ({
+    page,
+  }) => {
     await calm(page);
-    const look = page.getByRole('button', { name: 'Look' });
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    const look = page.getByRole('button', { name: 'Settings' });
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     const touch = await toucher(page);
     /** A real tap on the middle of `button`, when the page shows it there. */
     const tap = async (button) => {
@@ -1005,20 +1160,20 @@ test.describe('on a phone held sideways', () => {
       await touch('touchStart', [shown]);
       await touch('touchEnd');
     };
-    for (const close of ['Done', 'Look']) {
+    for (const close of ['Done', 'Settings']) {
       await look.click();
       await expect(sheet).toBeVisible();
       await page.locator('.inv-sheet').evaluate((el) => (el.scrollTop = el.scrollHeight));
       await expect.poll(async () => (await sheetScroll(page)).top, 'scrolled to its end').toBeGreaterThan(40);
-      await expect(sheet.getByRole('button', { name: 'Reset Camera' })).toBeInViewport();
-      // Its head, Done with it, stays at its top; Look, pressed beside it, closes it too.
+      await expect(sheet.getByRole('switch', { name: 'Wander' })).toBeInViewport();
+      // Its head, Done with it, stays at its top; Settings, pressed beside it, closes it too.
       await tap(close === 'Done' ? sheet.getByRole('button', { name: 'Done' }) : look);
       await expect(sheet, `${close} closed it`).toBeHidden();
       await expect(look).toHaveAttribute('aria-expanded', 'false');
     }
   });
 
-  test('with the Look sheet open NEWT stays in sight beside it', async ({ page }) => {
+  test('with the Settings sheet open NEWT stays in sight beside it', async ({ page }) => {
     await calm(page);
     const v = await lookOpenWithNewtInSight(page);
     const sheet = await page.locator('.inv-sheet').boundingBox();
@@ -1054,8 +1209,8 @@ test.describe('on a desktop', () => {
 
   test('Pixel Size Off, one press at the slider’s end, draws smooth at the screen’s resolution', async ({ page }) => {
     await ready(page);
-    await page.getByRole('button', { name: 'Look' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     // (The buttons at its ends say what they set.)
     await expect(sheet.getByRole('button', { name: 'Pixel Size 16 by 16', exact: true })).toBeVisible();
     await sheet.getByRole('button', { name: 'Pixel Size Off', exact: true }).click();
@@ -1084,8 +1239,8 @@ test.describe('on a desktop', () => {
     });
     await calm(page);
     await until(page, (s) => s.warmed, 'both paths warmed');
-    await page.getByRole('button', { name: 'Look' }).click();
-    const pixel = page.getByRole('dialog', { name: 'Look' }).getByRole('slider', { name: 'Pixel Size' });
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const pixel = page.getByRole('dialog', { name: 'Settings' }).getByRole('slider', { name: 'Pixel Size' });
     await pixel.focus();
     await page.keyboard.press('Home');
     await framesFor(page, 100);
@@ -1101,7 +1256,7 @@ test.describe('on a desktop', () => {
     expect((await page.evaluate(() => window.__links)) - before, 'shaders linked during the sweep').toBe(0);
     // Every Shader option moved, end to end, its choices and switches each way: uniforms and the
     // toon ramp's texels only, never a new program.
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     for (const slider of await sheet.locator('input[type="range"][data-shader]').all()) {
       await slider.focus();
       for (const key of ['End', 'Home']) {
@@ -1127,8 +1282,8 @@ test.describe('on a desktop', () => {
   }) => {
     const errors = watch(page);
     await calm(page);
-    const look = page.getByRole('button', { name: 'Look' });
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    const look = page.getByRole('button', { name: 'Settings' });
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     const style = sheet.getByRole('group', { name: 'Style' });
     const own = (await snapshot(page)).shader;
     const before = await newtPicture(page);
@@ -1213,8 +1368,8 @@ test.describe('on a desktop', () => {
     page,
   }) => {
     await calm(page);
-    await page.getByRole('button', { name: 'Look' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     await sheet.getByRole('button', { name: 'Pixel Size Off', exact: true }).click();
     await expect(sheet.locator('[data-shader-off-hint]')).toBeVisible();
     for (const name of [
@@ -1262,12 +1417,12 @@ test.describe('on a desktop', () => {
     await until(page, (t) => t.state === 'walk', 'walking after a left click');
   });
 
-  test('Escape closes the Look sheet after a click or a drag on the canvas too, and focus goes back to Look', async ({
+  test('Escape closes the Settings sheet after a click or a drag on the canvas too, and focus goes back to Settings', async ({
     page,
   }) => {
     await calm(page);
-    const look = page.getByRole('button', { name: 'Look' });
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    const look = page.getByRole('button', { name: 'Settings' });
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     // A click on empty space while it's open: focus leaves the sheet for the page.
     await look.click();
     await expect(sheet).toBeVisible();
@@ -1288,30 +1443,30 @@ test.describe('on a desktop', () => {
     await expect(look).toBeFocused();
   });
 
-  test('the Look sheet holds focus: it opens on Done, Tab goes round inside it, and the toolbar behind it is out of reach', async ({
+  test('the Settings sheet holds focus: it opens on Done, Tab goes round inside it, and the toolbar behind it is out of reach', async ({
     page,
   }) => {
     await calm(page);
-    const look = page.getByRole('button', { name: 'Look' });
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    const look = page.getByRole('button', { name: 'Settings' });
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     /** The toolbar's buttons and whether each is inert. */
     const toolbarInert = () =>
       page
         .locator('.inv-toolbar')
-        .evaluate((el) => [...el.querySelectorAll('.inv-btn')].map((b) => `${b.textContent} ${b.inert}`));
+        .evaluate((el) => [...el.querySelectorAll(':scope > .inv-btn')].map((b) => `${b.textContent} ${b.inert}`));
     await look.focus();
     await page.keyboard.press('Enter');
     await expect(sheet).toBeVisible();
     await expect(sheet).toHaveAttribute('aria-modal', 'true');
     await expect(sheet.getByRole('button', { name: 'Done' })).toBeFocused();
-    expect(await toolbarInert(), 'the buttons under the sheet are inert; Look, which closes it, is not').toEqual([
-      'Play Intro true',
+    expect(await toolbarInert(), 'the buttons under the sheet are inert; Settings, which closes it, is not').toEqual([
+      'Replay Intro true',
       'Wave true',
-      'Spook true',
       'Sit true',
+      'Give Device true',
       'Run true',
-      'Wander true',
-      'Look false',
+      'Camera true',
+      'Settings false',
     ]);
     /** What has focus, and whether it's in the sheet. */
     const focused = () =>
@@ -1334,8 +1489,7 @@ test.describe('on a desktop', () => {
       expect(f.inside, `Shift+Tab ${i}: ${f.what}`).toBe(true);
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
-    // Motion, the 17 Shader options (Reset To Style rests until one is the user's own) and Reset
-    // Camera.
+    // Motion, the 17 Shader options (Reset To Style rests until one is the user's own) and Wander.
     expect(stops.size, [...stops].join(', ')).toBe(26);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
@@ -1344,11 +1498,11 @@ test.describe('on a desktop', () => {
     await page.keyboard.press('Escape');
     await expect(look).toBeFocused();
     expect(await toolbarInert(), 'the toolbar back in reach').toEqual(
-      ['Play Intro', 'Wave', 'Spook', 'Sit', 'Run', 'Wander', 'Look'].map((name) => `${name} false`),
+      ['Replay Intro', 'Wave', 'Sit', 'Give Device', 'Run', 'Camera', 'Settings'].map((name) => `${name} false`),
     );
   });
 
-  test('with the Look sheet open NEWT stays in sight, and Reset Camera eases back where it can be seen', async ({
+  test('with the Settings sheet open NEWT stays in sight, and Reset Camera on the Camera pad eases back where he can be seen', async ({
     page,
   }) => {
     await calm(page);
@@ -1366,7 +1520,9 @@ test.describe('on a desktop', () => {
     await page.mouse.up();
     await until(page, (s) => s.camera.panned, 'panned');
     await lookOpenWithNewtInSight(page);
-    await page.getByRole('dialog', { name: 'Look' }).getByRole('button', { name: 'Reset Camera' }).click();
+    await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'Done' }).click();
+    await page.getByRole('button', { name: 'Camera', exact: true }).click();
+    await page.getByRole('button', { name: 'Reset Camera' }).click();
     // Every frame of the way back: his head, middle and feet in sight.
     const frames = await page.evaluate(
       (h) =>
@@ -1395,6 +1551,152 @@ test.describe('on a desktop', () => {
     expect((await snapshot(page)).camera.panned, 'the pan cleared').toBe(false);
     for (const [i, f] of frames.entries())
       expect(f.head && f.body && f.feet, `frame ${i} (yaw ${f.yaw.toFixed(2)}): ${JSON.stringify(f)}`).toBe(true);
+  });
+
+  test('a mouse shows each button’s label as a pixel tab with a dither fill on hover, and on keyboard focus', async ({
+    page,
+  }) => {
+    await calm(page);
+    const wave = page.getByRole('button', { name: 'Wave', exact: true });
+    const label = wave.locator('.inv-btn-label');
+    const opacity = () => label.evaluate((el) => Number(getComputedStyle(el).opacity));
+    expect(await opacity(), 'hidden until hovered').toBe(0);
+    await wave.hover();
+    await expect.poll(opacity, { message: 'shown on hover' }).toBeGreaterThan(0.9);
+    const box = await wave.boundingBox();
+    const tab = await label.boundingBox();
+    expect(tab.y + tab.height, 'a tab over the button').toBeLessThanOrEqual(box.y + 2);
+    expect(await label.textContent()).toBe('Wave');
+    // (Hover fills the squircle with an ordered dither; Pixelify Sans on the tab.)
+    expect(await wave.evaluate((el) => getComputedStyle(el).backgroundImage), 'a dither fill').toMatch(
+      /url\("data:image\/png/,
+    );
+    expect(await label.evaluate((el) => getComputedStyle(el).fontFamily)).toMatch(/Pixelify Sans/);
+    await page.mouse.move(5, 5);
+    await expect.poll(opacity, { message: 'gone once the mouse leaves' }).toBe(0);
+    // Keyboard focus shows it too.
+    await page.getByRole('button', { name: 'Replay Intro' }).focus();
+    await page.keyboard.press('Tab');
+    await expect(wave).toBeFocused();
+    await expect.poll(opacity, { message: 'shown on focus' }).toBeGreaterThan(0.9);
+    await expect(page.locator('[title]')).toHaveCount(0);
+  });
+
+  test('the Camera pad’s buttons turn, tilt and zoom the camera', async ({ page }) => {
+    await calm(page);
+    // The Camera pad: each of its buttons moves the camera.
+    const camera = page.getByRole('button', { name: 'Camera', exact: true });
+    await camera.click();
+    await expect(page.locator('#inv-camera')).toBeVisible();
+    const home = (await snapshot(page)).camera;
+    const settled = (pred, msg) => until(page, (s) => !s.camera.turning && pred(s.camera), msg);
+    await page.getByRole('button', { name: 'Turn Right' }).click();
+    await settled((c) => Math.abs(Math.abs(c.yaw - home.yaw) - Math.PI / 4) < 0.01, 'Turn Right: 45°');
+    await page.getByRole('button', { name: 'Tilt Up' }).click();
+    await settled((c) => Math.abs(c.elevation - home.elevation - (12 * Math.PI) / 180) < 0.01, 'Tilt Up: 12°');
+    await page.getByRole('button', { name: 'Tilt Down' }).click();
+    await settled((c) => Math.abs(c.elevation - home.elevation) < 0.01, 'Tilt Down: back');
+    await page.getByRole('button', { name: 'Zoom In' }).click();
+    await until(page, (s) => s.camera.distance < home.distance * 0.85, 'Zoom In');
+    await page.getByRole('button', { name: 'Zoom Out' }).click();
+    await until(page, (s) => Math.abs(s.camera.distance - home.distance) < home.distance * 0.02, 'Zoom Out');
+  });
+
+  test('the Camera pad follows NEWT, resets the view and restores focus on Escape', async ({ page }) => {
+    await calm(page);
+    const camera = page.getByRole('button', { name: 'Camera', exact: true });
+    await camera.click();
+    await expect(page.locator('#inv-camera')).toBeVisible();
+    const home = (await snapshot(page)).camera;
+    const settled = (pred, msg) => until(page, (s) => !s.camera.turning && pred(s.camera), msg);
+    // Panned off him, then Follow NEWT: back onto him.
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x + 300, body.y + 80);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(body.x + 300 - i * 15, body.y + 80);
+    await page.mouse.up();
+    await until(page, (s) => s.camera.panned, 'panned');
+    await page.getByRole('button', { name: 'Follow NEWT' }).click();
+    await until(
+      page,
+      (s) => !s.camera.panned && Math.hypot(s.camera.target.x - s.pos.x, s.camera.target.z - s.pos.z) < 0.05,
+      'onto him',
+    );
+    await page.getByRole('button', { name: 'Turn Left' }).click();
+    await settled((c) => Math.abs(c.yaw - home.yaw - Math.PI / 4) < 0.01, 'Turn Left: 45° before reset');
+    await page.getByRole('button', { name: 'Reset Camera' }).click();
+    await settled(
+      (c) => Math.abs(c.yaw - home.yaw) < 0.01 && Math.abs(c.distance - home.distance) < home.distance * 0.01,
+      'reset',
+    );
+    // Escape closes the pad, and focus goes back to Camera.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#inv-camera')).toBeHidden();
+    await expect(camera).toHaveAttribute('aria-expanded', 'false');
+    await expect(camera).toBeFocused();
+  });
+
+  test('the pixel cursors: the arrow on the floor, an open hand over NEWT, a closed hand holding him and panning, the turn glyph orbiting, the pointing hand on the buttons', async ({
+    page,
+  }) => {
+    await calm(page);
+    const canvas = page.locator('[data-stage] canvas');
+    const kind = () => page.evaluate(() => document.querySelector('[data-stage]').dataset.cursor);
+    const cursorOf = (loc) => loc.evaluate((el) => getComputedStyle(el).cursor);
+    // (Headless screenshots draw no cursor: what the CSS gives is what's checked.)
+    // (Chrome gives the resolutions back as dppx.)
+    const form =
+      /image-set\(url\("data:image\/png[^)]*\) 1(x|dppx), url\("data:image\/png[^)]*\) 2(x|dppx)\) \d+ \d+, /;
+    const body = await on(page, 'body');
+    await page.mouse.move(body.x + 260, body.y + 40);
+    await expect.poll(kind).toBe('arrow');
+    expect(await cursorOf(canvas)).toMatch(new RegExp(form.source + 'default'));
+    await page.mouse.move(body.x, body.y);
+    await expect.poll(kind, { message: 'over him' }).toBe('open');
+    expect(await cursorOf(canvas)).toMatch(new RegExp(form.source + 'grab'));
+    await page.mouse.down();
+    await until(page, (s) => s.held, 'held');
+    await expect.poll(kind, { message: 'holding him' }).toBe('grab');
+    expect(await cursorOf(canvas)).toMatch(new RegExp(form.source + 'grabbing'));
+    await page.mouse.up();
+    await until(page, (s) => s.state === 'idle', 'down again', 30_000);
+    // A right-drag on empty space turns: the turn glyph while it goes.
+    const from = { x: body.x + 280, y: body.y - 120 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(from.x - 20, from.y);
+    await page.mouse.move(from.x - 40, from.y);
+    await expect.poll(kind, { message: 'orbiting' }).toBe('turn');
+    expect(await cursorOf(canvas)).toMatch(new RegExp(form.source + 'move'));
+    await page.mouse.up({ button: 'right' });
+    // A left-drag on empty space pans: the closed hand.
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x - 20, from.y);
+    await page.mouse.move(from.x - 40, from.y);
+    await expect.poll(kind, { message: 'panning' }).toBe('grab');
+    await page.mouse.up();
+    // The buttons and the hotspots: at most 32 CSS px, the arrow's at its tip.
+    expect(await cursorOf(page.locator('[data-button="Wave"]'))).toMatch(new RegExp(form.source + 'pointer'));
+    const sizes = await page.evaluate(async () => {
+      const urls = [
+        ...getComputedStyle(document.querySelector('[data-button="Wave"]')).cursor.matchAll(/url\("([^"]+)"\)/g),
+      ].map((m) => m[1]);
+      return Promise.all(
+        urls.map(
+          (u) =>
+            new Promise((done) => {
+              const img = new Image();
+              img.onload = () => done([img.width, img.height]);
+              img.src = u;
+            }),
+        ),
+      );
+    });
+    expect(sizes, '1x then 2x').toEqual([
+      [32, 32],
+      [64, 64],
+    ]);
   });
 
   test('hovering turns his head', async ({ page }) => {
@@ -1479,7 +1781,7 @@ test.describe('on a desktop', () => {
     await until(page, (s) => !s.talk.showing, 'talk’s line over too', 2_000);
   });
 
-  test('the bubble sits under the toolbar and the Look sheet, and with the sheet open it stays clear of it and off his face', async ({
+  test('the bubble sits under the toolbar and the Settings sheet, and with the sheet open it stays clear of it and off his face', async ({
     page,
   }) => {
     await calm(page);
@@ -1496,7 +1798,7 @@ test.describe('on a desktop', () => {
     let at = null;
     await expect.poll(async () => !(at = await bubbleAt(page)).away, { message: 'placed' }).toBe(true);
     expect(at.sheet, 'the sheet is open').toBeTruthy();
-    expect(overlaps(at.box, at.sheet), 'clear of the open Look sheet').toBe(false);
+    expect(overlaps(at.box, at.sheet), 'clear of the open Settings sheet').toBe(false);
     const face = { left: at.head.x - 4, top: at.head.y - 4, right: at.head.x + 4, bottom: at.head.y + 4 };
     expect(overlaps(at.box, face), 'never over his face').toBe(false);
     expect(at.box.left).toBeGreaterThanOrEqual(at.stage.left);
@@ -1545,9 +1847,9 @@ test.describe('on a desktop', () => {
     await until(page, (t) => t.camera.distance > home.distance * 1.3, 'zoomed out');
     await page.mouse.wheel(0, -1200);
     await until(page, (t) => t.camera.distance < home.distance * 0.8, 'zoomed in');
-    // Reset Camera: back to the default view.
-    await page.getByRole('button', { name: 'Look' }).click();
-    await page.getByRole('dialog', { name: 'Look' }).getByRole('button', { name: 'Reset Camera' }).click();
+    // Reset Camera, on the Camera pad: back to the default view.
+    await page.getByRole('button', { name: 'Camera', exact: true }).click();
+    await page.getByRole('button', { name: 'Reset Camera' }).click();
     await until(
       page,
       (t) =>
@@ -1635,9 +1937,9 @@ test.describe('on a desktop', () => {
     await framesFor(page, 600);
     const after = await snapshot(page);
     expect(after.camera.target).toEqual(s.camera.target);
-    // Reset Camera clears it.
-    await page.getByRole('button', { name: 'Look' }).click();
-    await page.getByRole('dialog', { name: 'Look' }).getByRole('button', { name: 'Reset Camera' }).click();
+    // Reset Camera, on the Camera pad, clears it.
+    await page.getByRole('button', { name: 'Camera', exact: true }).click();
+    await page.getByRole('button', { name: 'Reset Camera' }).click();
     await until(
       page,
       (t) =>
@@ -1646,101 +1948,6 @@ test.describe('on a desktop', () => {
       'back where it was',
     );
     expect(errors).toEqual([]);
-  });
-
-  test('a mouse drag keeps the point he was grabbed by under the cursor, up and across, and lifts him higher than the old carry height', async ({
-    page,
-  }) => {
-    const errors = watch(page);
-    await calm(page);
-    const body = await on(page, 'body');
-    await page.mouse.move(body.x, body.y);
-    await page.mouse.down();
-    await until(page, (s) => s.held, 'held');
-    let cursor = body;
-    let highest = 0;
-    // Up, across, up more, back: each stop, the grabbed point under the cursor within 2 px.
-    for (const [dx, dy] of [
-      [0, -60],
-      [90, -40],
-      [60, -120],
-      [-140, -60],
-      [-60, 80],
-    ]) {
-      for (let i = 1; i <= 6; i++) await page.mouse.move(cursor.x + (dx * i) / 6, cursor.y + (dy * i) / 6);
-      cursor = { x: cursor.x + dx, y: cursor.y + dy };
-      await framesFor(page, 120);
-      const g = await page.evaluate(() => window.__invitation.grabbed());
-      expect(g, 'held, and the grabbed point known').not.toBeNull();
-      expect(Math.hypot(g.x - cursor.x, g.y - cursor.y), `at (${cursor.x}, ${cursor.y})`).toBeLessThan(2);
-      highest = Math.max(highest, (await snapshot(page)).lift);
-    }
-    // (The old carry held his collar at one height: his root about 0.3 off the floor.)
-    expect(highest, `lifted to ${highest.toFixed(2)}`).toBeGreaterThan(1.2);
-    await page.mouse.up();
-    await until(page, (s) => s.state === 'idle' || s.state === 'flee', 'down again', 30_000);
-    const states = (await snapshot(page)).states;
-    expect(states.slice(states.lastIndexOf('held'), states.lastIndexOf('held') + 3)).toEqual(['held', 'fall', 'land']);
-    expect(errors).toEqual([]);
-  });
-
-  test('grabbed and held still, he stays put: the point pressed stays under the cursor, never lifted up off it', async ({
-    page,
-  }) => {
-    await calm(page);
-    const body = await on(page, 'body');
-    await page.mouse.move(body.x, body.y);
-    await page.mouse.down();
-    await until(page, (s) => s.held, 'held');
-    for (let i = 1; i <= 4; i++) {
-      await framesFor(page, 150);
-      const g = await page.evaluate(() => window.__invitation.grabbed());
-      expect(Math.hypot(g.x - body.x, g.y - body.y), `${i * 150} ms on, the cursor still`).toBeLessThan(1.5);
-    }
-    await page.mouse.up();
-  });
-
-  test('a quick press-and-drag that never holds still carries him the whole way: the point pressed stays under the cursor, as after a still hold', async ({
-    page,
-  }) => {
-    const cdp = await page.context().newCDPSession(page);
-    // His head animates and swings independently of the grip. Check the actual point pressed,
-    // including slow rendering, rather than comparing head poses from separate page loads.
-    for (const rate of [1, 6]) {
-      await cdp.send('Emulation.setCPUThrottlingRate', { rate });
-      for (const hold of [true, false]) {
-        await calm(page);
-        const body = await on(page, 'body');
-        const collar = await page.evaluate(() => {
-          const b = window.__invitation.screen('body');
-          const f = window.__invitation.screen('feet');
-          return { x: 2 * b.x - f.x, y: 2 * b.y - f.y };
-        });
-        await page.mouse.move(body.x, body.y);
-        await page.mouse.down();
-        if (hold) await until(page, (s) => s.held, 'held');
-        for (let i = 1; i <= 4; i++) await page.mouse.move(body.x + i * 20, body.y);
-        await until(page, (s) => s.held, 'held');
-        await expect
-          .poll(
-            async () => {
-              const grabbed = await page.evaluate(() => window.__invitation.grabbed());
-              return grabbed ? Math.hypot(grabbed.x - body.x - 80, grabbed.y - body.y) : Infinity;
-            },
-            {
-              message: `${hold ? 'held first' : 'quick'} drag at ${rate}x CPU slowdown carries the pressed point all 80 px`,
-            },
-          )
-          .toBeLessThan(2);
-        const moved = await page.evaluate(() => {
-          const b = window.__invitation.screen('body');
-          const f = window.__invitation.screen('feet');
-          return { x: 2 * b.x - f.x, y: 2 * b.y - f.y };
-        });
-        expect(Math.abs(moved.x - collar.x - 80), 'the collar travels the full drag distance').toBeLessThan(5);
-        await page.mouse.up();
-      }
-    }
   });
 
   test('let go out at the screen’s edge, he’s eased back into view: the camera never jumps on the frame he drops', async ({
@@ -1861,12 +2068,12 @@ test.describe('on a desktop', () => {
 test.describe('on a 1429×1115 desktop', () => {
   test.use({ viewport: { width: 1429, height: 1115 } });
 
-  test('a first visit’s Look sheet reads the default 128×128 (it draws as 96×96 does here) and the Default style', async ({
+  test('a first visit’s Settings sheet reads the default 128×128 (it draws as 96×96 does here) and the Default style', async ({
     page,
   }) => {
     await ready(page, '/invitation/?test&calm&seed=3');
-    await page.getByRole('button', { name: 'Look' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Look' });
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings' });
     await expect(sheet.locator('[data-pixel-value]')).toHaveText('128×128');
     await expect(sheet.getByRole('slider', { name: 'Pixel Size' })).toHaveAttribute('aria-valuetext', '128 by 128');
     await expect(sheet.getByRole('group', { name: 'Style' }).getByRole('radio', { name: 'Default' })).toBeChecked();
