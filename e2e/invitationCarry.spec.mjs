@@ -94,6 +94,10 @@ test.describe('on a desktop', () => {
     let stopped = null;
     for (let x = cursor.x - 40; x > 4; x -= 40) {
       cursor = await glide(page, cursor, { x, y: cursor.y }, 2);
+      // Input dispatch can finish before the software-rendered scene processes it.
+      // Observe a new scene frame before checking this drag's geometry.
+      const before = await page.evaluate(() => window.__invitation.clock());
+      await expect.poll(() => page.evaluate(() => window.__invitation.clock())).toBeGreaterThan(before);
       const m = (await snapshot(page)).motion;
       expect(Math.abs(depth(m.anchor)), 'on the plane he was grabbed on').toBeLessThan(1e-3);
       if (stopped) {

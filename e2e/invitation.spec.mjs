@@ -1552,7 +1552,7 @@ test.describe('on a desktop', () => {
       expect(f.head && f.body && f.feet, `frame ${i} (yaw ${f.yaw.toFixed(2)}): ${JSON.stringify(f)}`).toBe(true);
   });
 
-  test('a mouse shows each button’s label as a pixel tab with a dither fill on hover, and on keyboard focus; the Camera pad’s buttons move the camera', async ({
+  test('a mouse shows each button’s label as a pixel tab with a dither fill on hover, and on keyboard focus', async ({
     page,
   }) => {
     await calm(page);
@@ -1579,6 +1579,10 @@ test.describe('on a desktop', () => {
     await expect(wave).toBeFocused();
     await expect.poll(opacity, { message: 'shown on focus' }).toBeGreaterThan(0.9);
     await expect(page.locator('[title]')).toHaveCount(0);
+  });
+
+  test('the Camera pad’s buttons move the camera and Escape restores focus', async ({ page }) => {
+    await calm(page);
     // The Camera pad: each of its buttons moves the camera.
     const camera = page.getByRole('button', { name: 'Camera', exact: true });
     await camera.click();
