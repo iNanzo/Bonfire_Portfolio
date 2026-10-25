@@ -34,14 +34,18 @@ export async function grid(tiles, cols, file, labels) {
 /**
  * Starts a record in the page, every frame (requestAnimationFrame, the toy's own cadence): the
  * time between frames, where he is on screen (his head and the middle of his body, client px),
- * and each change of his state, clip, reaction or being held. Times are performance.now() ms.
+ * and each change of his state, clip, reaction or being held, his face, his stress (in tenths) and
+ * the line in his speech bubble. Times are performance.now() ms.
  */
 export function startRecord() {
-  const rec = { on: true, raf: [], pos: [], line: [], faces: [] };
+  const rec = { on: true, raf: [], pos: [], line: [], faces: [], stress: [], says: [] };
   /** @type {any} */ (window).__capture = rec;
   let last = -1;
   let prev = '';
   let face = '';
+  let stress = -1;
+  /** @type {string|null} */
+  let said = null;
   const tick = (now) => {
     if (!rec.on) return;
     if (last >= 0) rec.raf.push([now, now - last]);
@@ -80,6 +84,17 @@ export function startRecord() {
         face = s.face;
         rec.faces.push({ t: now, face });
       }
+      const tenths = Math.round((s.stress ?? 0) * 10) / 10;
+      if (tenths !== stress) {
+        stress = tenths;
+        rec.stress.push({ t: now, stress });
+      }
+      const box = document.querySelector('.inv-bubble');
+      const text = box && !box.hidden ? (box.querySelector('.inv-bubble-text')?.textContent ?? null) : null;
+      // (A line as it types in: kept once it's whole, or as far as it got.)
+      if (text && text !== said && !(said && text.startsWith(said) && rec.says.length)) rec.says.push({ t: now, text });
+      else if (text && said && text.startsWith(said) && rec.says.length) rec.says.at(-1).text = text;
+      said = text;
     }
     requestAnimationFrame(tick);
   };
@@ -95,6 +110,8 @@ export function stopRecord() {
     pos: rec.pos,
     line: rec.line,
     faces: rec.faces,
+    stress: rec.stress,
+    says: rec.says,
     view,
     grip: rec.grip ?? null,
     end: window.__invitation?.snapshot() ?? null,
@@ -217,6 +234,8 @@ export function recorder({ lead: LEAD, fps: FPS, scale: SCALE, crop: CROP, raw: 
       pos: rec.pos.map(([t, ...p]) => [at(t), ...p]),
       line: rec.line.map((l) => ({ ...l, t: at(l.t) })),
       faces: rec.faces.map((f) => ({ ...f, t: at(f.t) })),
+      stress: rec.stress.map((f) => ({ ...f, t: at(f.t) })),
+      says: rec.says.map((f) => ({ ...f, t: at(f.t) })),
       view: rec.view,
       grip: rec.grip,
       end: rec.end,

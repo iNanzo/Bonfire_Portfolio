@@ -815,7 +815,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
   of taps, drags, buttons, floor taps, a chase and the camera at phone and desktop sizes
-  (animated WebP plus a contact sheet; `--look`, `--pixel` (a resolution such as `64` or
+  (animated WebP plus a contact sheet; its `flick`, `shake` and `stroll` acts carry him by the
+  collar, flicked once, shaken at 5 Hz and carried gently for 8 s, and the report lists his faces,
+  his stress and what he said as each played; `--look`, `--pixel` (a resolution such as `64` or
   `64x64`, `native` or `off`), `--motion`, `--sizes`, `--acts`); its `pan`, `lift` and
   `sweep` acts (`tools/capture-invitation-camera.mjs`) slide, turn and zoom the camera, carry
   him up high (the report says how far the grabbed point strayed from the cursor) and sweep the
