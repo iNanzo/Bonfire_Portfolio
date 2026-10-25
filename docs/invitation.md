@@ -277,14 +277,17 @@ His bubble lines and the intro's lines can style words with tags, `{styles|text}
 - **Colors:** a name from the admin's Text Effects colors (`{red|NEWT}`; as shipped red, gold,
   rose and ink), or a hex color of its own (`{#e44544|NEWT}`, `#rgb` or `#rrggbb`).
 - **Effects:** `wave` (each letter bobs up and down, a little later down the line), `shake`
-  (each letter jitters), `bold` and `big` (a fifth bigger). They combine with commas:
-  `{red,wave|Hey!}`, and both moves together wave with a jitter.
+  (each letter jitters a pixel across and up and down, out of step with its neighbours, so the
+  word trembles but stays legible), `bold` and `big` (a fifth bigger). They combine with commas:
+  `{red,wave|Hey!}`, and both moves together wave with the jitter on top.
 - **Nesting:** a tag can hold one more, which adds to it (its color wins):
   `{gold|a {wave|big} deal}`. Deeper isn't allowed.
 - **Braces:** write `\{` and `\}` for a brace; a backslash anywhere else is itself, and `*`,
   `**` and `~` are only text. An emoji counts as one letter.
 
 The moves step like a sprite's frames rather than gliding, and reduced motion stills them. A
+moving letter keeps its own width and only ever steps a pixel sideways, to the right, so it never
+runs into the next letter by more than a pixel and the space before a shaken word never closes. A
 styled word never breaks across two rows. The typing, Auto's wait, how long a bubble stays up and
 the length limits count only the letters that show; a screen reader and the Log get the line as
 plain text. The admin checks every tag as you type and previews each line under its box.
@@ -660,13 +663,19 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   word with a styled letter in a nowrap `.inv-fx-word`, and show the first n by visibility) and
   `markup.css` (`dialogue.css` imports it; the admin's `admin.css` too: `.inv-fx-wave` and
   `.inv-fx-shake` as `step-end` keyframes staggered by `--i`, on `inline-block` letters
-  (`.inv-fx-moves`, not spaces), `.inv-fx-bold` the 600 weight, `.inv-fx-big` 1.2em at line
-  height 1, stilled by `prefers-reduced-motion` and the bubble's `is-still`). A broken tag
+  (`.inv-fx-moves`, not spaces); the wave on the `translate` property, 0.2em up to 0.12em down
+  over 1 s, the shake on `transform`, a pixel's jitter over 0.42 s, so a letter with both runs
+  both; sideways only ever 0 to 1px, so no letter runs more than a pixel into its neighbour
+  whatever their phases; `.inv-fx-bold` the 600 weight, `.inv-fx-big` 1.2em at line height 1,
+  stilled by `prefers-reduced-motion` and the bubble's `is-still`). A broken tag
   still shows: a stray brace as itself, an unknown style as plain letters. `dialogue.js`,
   `speech.js`, `bubble.js` and `dialogueUi.js` count, time and type by its letters; the Log, the
   live regions and the admin's lists get its plain text; main.js hands `textPalette()` to the
-  bubble and the chat screen. Tests: `invitationMarkup`, and the timing cases in
-  `invitationDialogue`, `invitationSpeech` and `invitationBubble`.
+  bubble and the chat screen. Tests: `invitationMarkup` (its moves' sideways steps read from
+  markup.css), the timing cases in `invitationDialogue`, `invitationSpeech` and
+  `invitationBubble`, and `e2e/invitationDialogue.spec.mjs`, which steps every move of a shaken
+  and waved line in the box and the bubble and measures that no letter's box runs more than a
+  pixel into the next.
 - **The clips contract:** `src/invitation/clips.js` names NEWT's clips (lengths, loops, fades),
   the face each shows, the bones by their three.js names and the step lengths. `tools/newt.py`
   makes the clips in Blender and `test/invitationModel.test.mjs` holds the glb to the contract.

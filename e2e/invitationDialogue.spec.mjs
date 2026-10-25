@@ -10,7 +10,8 @@
 // and again when the box grows; Escape asks before it skips the intro and a second Escape ends
 // it, while Skip Intro, on screen all through, ends it at once with no question; a line's own
 // line breaks show; a line's text effects ({red,wave|…}) type out styled while the live region and
-// the Log read it plain, in the bubble too; Space and Enter go on (after a click on Auto, Next or
+// the Log read it plain, in the bubble too, and a shaken or waved word stays legible (no letter
+// ever runs more than a pixel into the next, every step of its moves measured); Space and Enter go on (after a click on Auto, Next or
 // Log too); under the Log or the
 // question the buttons over the stage are out of reach; reduced motion shows each line at once
 // and cuts the camera (round to the front, to each shot, back at the end); and after the end the
@@ -256,8 +257,82 @@ test.describe('the admin’s intro', () => {
   });
 });
 
+/** The lines the moving text checks type: a shake beside a space, waves, both on one word, a big one. */
+const MOVING = {
+  box: '{#e44544,wave|Hey} there, {big|friend}! I {shake|really} {#c9822a,bold|love} {#3a7bd5,wave,shake|parties}.',
+  bubble: '{#c8323c,wave|Hi!} I’m {big|NEWT}, and I {shake|really} {#c9822a,bold|like} {#3a7bd5,wave,shake|you}.',
+};
+/**
+ * How far a styled line's letters run into the next one on their line, CSS px, at its worst
+ * through two seconds of their moves: every animation on its letters paused and stepped through
+ * together 5 ms at a time (each keeps its stagger), each letter's drawn box against the next one's,
+ * a space's too. With the letters that move and the moves seen, so a still line can't pass.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} sel  the line's container
+ */
+const crowding = (page, sel) =>
+  page.evaluate(async (sel) => {
+    await document.fonts.ready;
+    const letters = [...document.querySelectorAll(`${sel} .inv-fx`)];
+    const anims = document.getAnimations().filter((a) => letters.includes(/** @type {any} */ (a.effect)?.target));
+    const size = parseFloat(getComputedStyle(letters[0]).fontSize);
+    let worst = { px: -Infinity, ms: 0, pair: '' };
+    for (const a of anims) a.pause();
+    try {
+      for (let ms = 0; ms <= 2000; ms += 5) {
+        for (const a of anims) a.currentTime = ms;
+        const r = letters.map((e) => e.getBoundingClientRect());
+        for (let k = 1; k < r.length; k++) {
+          const [a, b] = [r[k - 1], r[k]];
+          // (Not on the next line: back at its start, or a line down.)
+          if (b.left < a.left - size / 2 || Math.abs(a.top + a.bottom - b.top - b.bottom) / 2 > size / 2) continue;
+          if (a.right - b.left > worst.px)
+            worst = { px: a.right - b.left, ms, pair: `${letters[k - 1].textContent}|${letters[k].textContent}` };
+        }
+      }
+    } finally {
+      for (const a of anims) a.play();
+    }
+    return {
+      worst,
+      moving: new Set(anims.map((a) => /** @type {any} */ (a.effect).target)).size,
+      moves: [...new Set(anims.map((a) => /** @type {any} */ (a).animationName))].sort(),
+    };
+  }, sel);
+/** A shaken word reads: no letter in the bubble or the box ever runs more than a pixel into the next. */
+async function movesStayLegible(page, tap) {
+  const errors = watch(page);
+  await calm(page);
+  const all = ['inv-fx-shake', 'inv-fx-wave', 'inv-fx-wave-shake'];
+  await page.evaluate((line) => window.__invitation.say(line), MOVING.bubble);
+  await expect(page.locator('.inv-bubble')).toBeVisible();
+  await expect(page.locator('.inv-bubble-typed .inv-fx')).not.toHaveCount(0);
+  await expect(page.locator('.inv-bubble-typed .inv-fx.is-unseen')).toHaveCount(0);
+  const inBubble = await crowding(page, '.inv-bubble-typed');
+  expect(inBubble.moves, 'the bubble: wave, shake and both').toEqual(all);
+  expect(inBubble.moving).toBe(Array.from('Hi!reallyyou').length);
+  expect(inBubble.worst.px, `the bubble: ${JSON.stringify(inBubble.worst)}`).toBeLessThanOrEqual(1);
+  const intro = structuredClone(behaviorIntro);
+  intro.boxes.find((b) => b.id === intro.start).text = MOVING.box;
+  await page.evaluate((i) => window.__invitation.setIntro(i), intro);
+  await open(page, tap);
+  await goOn(page, tap);
+  await until(page, (x) => x.dialogue.typed, 'the line up');
+  const inBox = await crowding(page, '.inv-talk-typed');
+  expect(inBox.moves, 'the box: wave, shake and both').toEqual(all);
+  expect(inBox.moving).toBe(Array.from('Heyreallyparties').length);
+  expect(inBox.worst.px, `the box: ${JSON.stringify(inBox.worst)}`).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+}
+
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+
+  test('a shaken or waved word stays legible: no letter runs more than a pixel into the next, in the bubble or the box', async ({
+    page,
+  }) => {
+    await movesStayLegible(page, true);
+  });
 
   test('Replay Intro opens the chat box: the toolbar rests, he turns to talk, the line types, a tap finishes it and the next goes on', async ({
     page,
@@ -671,6 +746,12 @@ test.describe('on a phone', () => {
 });
 
 test.describe('on a desktop', () => {
+  test('a shaken or waved word stays legible: no letter runs more than a pixel into the next, in the bubble or the box', async ({
+    page,
+  }) => {
+    await movesStayLegible(page, false);
+  });
+
   test('a click goes on; Space and Enter go on; Escape asks before skipping, and a second Escape ends it', async ({
     page,
   }) => {
