@@ -47,22 +47,9 @@ import {
   shedParticles,
 } from './envelope.js';
 import { buildSeal, sealTexel } from './envelopeSeal.js';
-import { PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './petals.js';
-import {
-  BAYER,
-  IDS,
-  INK,
-  LEAN,
-  PAPER,
-  PETAL,
-  PITCH,
-  TILT,
-  WAX,
-  envelopeLayout,
-  rgb,
-  shared,
-  toon,
-} from './envelopeLook.js';
+import { createPetalFlow } from './petals.js';
+import { buildPetals, drawPetals } from './petalScene.js';
+import { BAYER, IDS, INK, LEAN, PAPER, PITCH, TILT, WAX, envelopeLayout, rgb, shared, toon } from './envelopeLook.js';
 
 /** Where veils looks on each of NEWT's spots: its middle and four points its radius round it. */
 const SPOT_POINTS = [
@@ -137,27 +124,6 @@ function buildEnvelope(u) {
   );
   group.add(hinge);
   return { group, hinge, W, H, T, tipY: L.tip[1], seal: L.seal };
-}
-
-/**
- * The petals: an instanced mesh a shape (petals.js petalGrid), each petal's shade an instanced
- * attribute (a step lighter or darker through the three reds); never dissolved.
- * @param {ReturnType<typeof shared>} u
- */
-function buildPetals(u) {
-  return PETAL_SHAPES.map((shape, i) => {
-    const grid = petalGrid(shape);
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(grid.positions, 3));
-    geo.setIndex(grid.index);
-    const shade = new THREE.InstancedBufferAttribute(new Float32Array(POOL), 1);
-    geo.setAttribute('aShade', shade);
-    const mat = toon(PETAL, u, IDS.petal + i, { uniforms: { uDissolve: { value: 0 } }, defines: { PETAL: '' } });
-    const mesh = new THREE.InstancedMesh(geo, mat, POOL);
-    mesh.count = 0;
-    mesh.frustumCulled = false;
-    return { mesh, shade };
-  });
 }
 
 /**
@@ -346,7 +312,6 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   const idRT = new THREE.WebGLRenderTarget(1, 1, rtOpts);
   compose.mat.uniforms.uColor.value = colorRT.texture;
   compose.mat.uniforms.uId.value = idRT.texture;
-  const tmp = new THREE.Object3D();
   const sealWorld = new THREE.Vector3();
   const v = new THREE.Vector3();
   /** Where the petals start from, in petals.js's letter widths (kept up to date each frame). */
@@ -717,22 +682,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
       flow.stir(now, spots.seal);
     }
     flow.step(now, env.state === 'floating' && !drag ? spots.trickle : null);
-    const counts = petals.map(() => 0);
-    for (const { petal, pose } of flow.at(now)) {
-      const k = PETAL_SHAPES.indexOf(petal.shape);
-      const n = counts[k]++;
-      tmp.position.set(pose.x * L, pose.y * L, pose.z * L);
-      tmp.quaternion.set(pose.q[0], pose.q[1], pose.q[2], pose.q[3]);
-      tmp.scale.setScalar(pose.scale * L);
-      tmp.updateMatrix();
-      petals[k].mesh.setMatrixAt(n, tmp.matrix);
-      petals[k].shade.setX(n, petal.shade);
-    }
-    petals.forEach((m, k) => {
-      m.mesh.count = counts[k];
-      m.mesh.instanceMatrix.needsUpdate = true;
-      m.shade.needsUpdate = true;
-    });
+    drawPetals(petals, flow.at(now), L);
   }
 
   /**
