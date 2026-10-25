@@ -1157,8 +1157,9 @@ test.describe('on a phone held sideways', () => {
         return { x: r.x + r.width / 2, y: r.y + r.height / 2, hit: Boolean(at && el.contains(at)) };
       });
       expect(shown.hit, `${await button.textContent()} shows at its middle`).toBe(true);
-      await touch('touchStart', [shown]);
-      await touch('touchEnd');
+      // Queue both events before waiting: a CDP round trip under software WebGL can
+      // exceed HOLD_MS and turn an intended tap into the toolbar's long press.
+      await Promise.all([touch('touchStart', [shown]), touch('touchEnd')]);
     };
     for (const close of ['Done', 'Settings']) {
       await look.click();
