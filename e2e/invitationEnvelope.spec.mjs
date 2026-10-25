@@ -6,7 +6,7 @@
 // few petals; a click, Enter or a swipe up opens it (the seal blooms into petals first, and only
 // then the flap lifts with a burst of petals and the letter dissolves as the page behind clears)
 // and the intro starts by itself at its first box with no toolbar button pressed, its first line
-// and his gesture held until the letter no longer hides his head; Escape, a
+// and his gesture held until the letter no longer hides him; Escape, a
 // swipe down or Skip Intro skips it (a spill of petals; no intro, the toolbar back, focus on
 // it, its ring showing only after a key). Opened before newt.glb is in, it waits, then fades once he is. Reduced motion: no bob, no
 // petals, the flap open at once, a short crossfade. The touch hint says Tap, the mouse's Click.
@@ -74,7 +74,7 @@ const greeting = (page) =>
         tick();
       }),
   );
-/** NEWT's greeting waited for the letter: nothing of his first box while it hid his head. */
+/** NEWT's greeting waited for the letter: nothing of his first box while it hid him. */
 function waitedForLetter(frames) {
   expect(frames.length, 'frames from the fade').toBeGreaterThan(0);
   expect(frames[0].veils, 'the letter over him as it starts to fade').toBe(true);
@@ -181,7 +181,7 @@ test.describe('on a desktop', () => {
     expect(s.camera.target).toEqual(before.target);
   });
 
-  test('hovered it says how to open and skip it; a click opens it and the intro starts by itself, its greeting held until the letter clears his head', async ({
+  test('hovered it says how to open and skip it; a click opens it and the intro starts by itself, its greeting held until the letter clears him', async ({
     page,
   }) => {
     await envelopeUp(page);
@@ -351,9 +351,7 @@ test.describe('on a desktop', () => {
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
-  test('a swipe up opens it and the intro starts, its greeting held until the letter clears his head', async ({
-    page,
-  }) => {
+  test('a swipe up opens it and the intro starts, its greeting held until the letter clears him', async ({ page }) => {
     await envelopeUp(page);
     const greeted = greeting(page);
     await swipe(page, -260);

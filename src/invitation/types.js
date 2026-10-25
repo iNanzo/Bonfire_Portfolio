@@ -91,7 +91,8 @@
  */
 /**
  * @typedef {object} DialogueIn  the intro's box as the brain sees it
- * @property {number} seq  counts the boxes shown: a new one plays its animation
+ * @property {number} seq  counts the boxes shown: a new one plays its animation; −1, none yet (the
+ *   page holds the first line back: he waits in place, idle, with his own face)
  * @property {string} animation  a DIALOGUE_CLIPS name or 'none'
  * @property {import('./clips.js').FaceName} face
  * @property {boolean} typing  its line is still typing out (Talk plays meanwhile)

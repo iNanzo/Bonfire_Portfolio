@@ -46,7 +46,8 @@
 // controls, so it's the loading screen too, it covers the toy and takes every press (the HUD is
 // inert under it); the toy draws its first frame (.is-ready) and waits behind it, paused. Opened,
 // it fades and the intro starts by itself (introWanted, held until the buttons are on), the
-// camera cut to the talk shot; skipped, it drops away and the toy is free, focus on the toolbar.
+// camera cut to the talk shot behind the letter, its first line and his gesture held until the
+// letter no longer hides his head and chest (envelope.veils, envelopeVeils); skipped, it drops away and the toy is free, focus on the toolbar.
 // Without WebGL 2, or if NEWT can't load, it steps aside for the message. ?test skips it unless
 // &envelope.
 //
@@ -610,6 +611,18 @@ function start(s) {
    * walked in, turned to the camera), so its line, face and gesture begin together.
    */
   let introHeld = false;
+  /** The envelope still hides his head or chest as it fades (envelope.veils): the intro's line waits. */
+  let envelopeVeils = false;
+  const veiled = () => Boolean(envelope?.state === 'fading' && character && envelope.veils(newtSpots()));
+  /** His head, collar and middle on screen, client px, each with its radius (for envelope.veils). */
+  function newtSpots() {
+    const { head, body } = shape();
+    return [
+      head,
+      { x: body.b.x, y: body.b.y, r: body.r },
+      { x: (body.a.x + body.b.x) / 2, y: (body.a.y + body.b.y) / 2, r: body.r },
+    ];
+  }
   /**
    * The clips he's played since the intro's box came up, in order ('gait': Idle, Walk or Run by
    * speed), for ?test.
@@ -866,6 +879,7 @@ function start(s) {
     events = [];
     if (introPressed || introWanted) beginIntro();
     introPressed = false;
+    envelopeVeils = veiled();
     const box = introStep();
     const pose = moveCamera(evs, dt);
     const ptr = pointerNow();
@@ -1094,7 +1108,8 @@ function start(s) {
     if (!intro) return null;
     // (In place, as of the brain's last frame: the line goes on from its start, unless the Log or
     // the question holds it.)
-    if (introHeld && out?.talkReady) {
+    // (From the envelope, the line waits on the letter too: until it no longer hides his head.)
+    if (introHeld && out?.talkReady && !envelopeVeils) {
       introHeld = false;
       intro.pause(talkUi.logOpen || talkUi.asking, t);
     }
@@ -1105,6 +1120,9 @@ function start(s) {
     }
     talkUi.render(heldView(v));
     shotFor(v);
+    // (Held back, the brain sees no box yet: he waits idle with his own face, and the box's
+    // gesture and face start with its line.)
+    if (introHeld) return { seq: -1, animation: 'none', face: v.box.face, typing: false };
     return { seq: v.seq, animation: v.box.animation, face: v.box.face, typing: !v.typed };
   }
 
@@ -1786,6 +1804,8 @@ function start(s) {
         burst: Boolean(burst),
         // (The envelope's state, null without one: types.js EnvelopeState.)
         envelope: envelopeState(),
+        // (It still hides his head or chest as it fades, now: the intro's first line waits on it.)
+        envelopeVeils: veiled(),
         options,
         motion: motionSnapshot(),
         drag: dragSnapshot(),

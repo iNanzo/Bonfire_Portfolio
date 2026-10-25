@@ -22,7 +22,8 @@
 // ArrowDown skips; a drag follows the finger with some give (the seal starting to open as it goes
 // up) and opens or skips on release (envelopeGesture), else springs back; the wheel opens or skips
 // once it adds up; Skip Intro skips. It takes focus at boot with no ring: the ring shows once a key
-// is pressed. The hint ("Click or swipe up to open", "Tap ..." on a touch screen, / "Swipe down
+// is pressed. veils(spots) says whether it still hides NEWT (his head, collar and middle: the
+// intro's first line waits for it; envelope.js letterCovers at points of each on the letter). The hint ("Click or swipe up to open", "Tap ..." on a touch screen, / "Swipe down
 // to skip") shows on hover, keyboard focus, or after a while with no input on a touch screen, and
 // reads "Open ↑" / "Skip ↓" while dragging. Once it's done (and its last petals have fallen) it
 // disposes its renderer, loses its context and leaves the page.
@@ -39,6 +40,7 @@ import {
   envelopeGesture,
   envelopeKey,
   hintFor,
+  letterCovers,
   particleAt,
   sealBloom,
   shedParticles,
@@ -47,6 +49,14 @@ import { buildSeal } from './envelopeSeal.js';
 import { PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './petals.js';
 import { BAYER, IDS, INK, INSIDE, PAPER, PETAL, rgb, shared, toon } from './envelopeLook.js';
 
+/** Where veils looks on each of NEWT's spots: its middle and four points its radius round it. */
+const SPOT_POINTS = [
+  [0, 0],
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+];
 /** Texels along the screen's shorter side (it's scaled up pixelated). */
 const TEXELS = 300;
 /** The camera's field of view (degrees) and distance. */
@@ -586,6 +596,47 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   // than the DOM's types.)
   hit.focus(/** @type {FocusOptions} */ ({ preventScroll: true, focusVisible: false }));
 
+  // --- Where it hides NEWT.
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const face = new THREE.Plane();
+  const normal = new THREE.Vector3();
+  const hitAt = new THREE.Vector3();
+  /**
+   * A point on the screen (client px) on the letter, in its own units (−1…1 across and up its
+   * body; envelope.js letterCovers), as it was last drawn; null where its plane isn't.
+   * @param {number} x
+   * @param {number} y
+   */
+  function onLetter(x, y) {
+    ndc.set((x / view.cssW) * 2 - 1, 1 - (y / view.cssH) * 2);
+    ray.setFromCamera(ndc, camera);
+    normal.set(0, 0, 1).transformDirection(inner.matrixWorld);
+    face.setFromNormalAndCoplanarPoint(normal, hitAt.set(0, 0, envl.T / 2).applyMatrix4(inner.matrixWorld));
+    if (!ray.ray.intersectPlane(face, hitAt)) return null;
+    hitAt.applyMatrix4(toLetter);
+    return { x: hitAt.x, y: hitAt.y };
+  }
+  /**
+   * Whether it still hides NEWT (`spots`: his head, collar and middle on screen, client px, each
+   * with its radius): while it covers the toy; fading, while the page behind is half up or the
+   * letter hides the middle of any of them or a point its radius round it (envelope.js
+   * letterCovers); skipped or gone, never.
+   * @param {{x: number, y: number, r: number}[]} spots
+   */
+  function veils(spots) {
+    if (env.covers) return true;
+    if (env.state !== 'fading') return false;
+    const p = env.pose(clock());
+    if (p.backdrop > 0.5) return true;
+    for (const at of spots)
+      for (const [dx, dy] of SPOT_POINTS) {
+        const q = onLetter(at.x + dx * at.r, at.y + dy * at.r);
+        if (q && letterCovers(p, q.x, q.y)) return true;
+      }
+    return false;
+  }
+
   // --- Each frame.
   let raf = 0;
   let last = clock();
@@ -786,6 +837,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     get covers() {
       return env.covers;
     },
+    veils,
     /**
      * For ?test: the state, reduced motion, the pose now, the flap's open angle, frames drawn,
      * and the petals (how many are up now, and how many each flow has launched).

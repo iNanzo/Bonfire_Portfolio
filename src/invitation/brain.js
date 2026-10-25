@@ -888,8 +888,9 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
   function face() {
     const st = m.state;
     const d = m.input?.dialogue;
-    // (The box's face comes with its line, once he's in place: getting there he keeps his own.)
-    if (st === 'talk' && d && m.talk?.phase === 'on')
+    // (The box's face comes with its line, once he's in place: getting there, or while the page
+    // holds its line back, seq −1, he keeps his own.)
+    if (st === 'talk' && d && d.seq >= 0 && m.talk?.phase === 'on')
       return { face: d.face, blink: d.face === 'neutral' ? 'normal' : 'none' };
     const name = st === 'react' ? m.reaction : m.clip === 'gait' ? GAIT_FACE[st] : m.clip;
     const since = m.turning ? 0 : m.t - m.clipStart;

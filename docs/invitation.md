@@ -29,7 +29,9 @@ so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
   petals out of the letter, and the letter dissolves the way a weapon does on the Bonfire site:
   a ragged, burning edge sweeps up across it, shedding specks of paper, embers and wax that
   drift up and fade, while the white page behind clears onto NEWT, already turned to you, and
-  the intro starts by itself (below). Only the letter dissolves, never the screen. Opened before
+  the intro starts by itself (below): its first line, his face and his greeting wait until the
+  letter no longer hides his head and chest, so you see the whole of it. Only the letter
+  dissolves, never the screen. Opened before
   NEWT is in, it waits open with a little pulse until he is.
 - **Skip it:** press Escape or the down arrow, swipe it down, scroll down, or press **Skip
   Intro** at the top right. It drops away with a spill of petals (the others shrink out of the
@@ -664,7 +666,12 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `envelope.css` (the focus ring only under `.is-keyboard`, set once a key is pressed). main.js
   makes it right after `bindUi`, sets the HUD inert under it, lets the toy draw its first frame
   and then holds the loop while it covers him (`sync`), and on its way out either sets
-  `introWanted` (held until `beginIntro` can run, which cuts the camera to the talk shot) or
+  `introWanted` (held until `beginIntro` can run, which cuts the camera to the talk shot behind
+  the letter; its first line then waits, `introHeld`, until the brain is ready and
+  `envelope.veils` says the letter no longer hides his head, collar or middle: `envelope.js`
+  `letterCovers` at five points of each on the letter, its edge past them dither and all, the
+  open flap included; the brain sees no box meanwhile, `seq` −1, so he idles with his own face
+  and the box's gesture starts with its line; `?test`'s snapshot has `envelopeVeils`) or
   focuses the toolbar (`ui.focusToolbar`: ui.js moves focus for the visitor with `focusVisible`
   only when their last press was a key, there and when the intro ends; a plain scripted
   `focus()` shows Chrome's ring when nothing before it was a pointer's). `?test` skips it unless `&envelope` (`parseQuery`'s `envelope`).

@@ -137,6 +137,32 @@ export function dissolveAt(x, y) {
 }
 
 /**
+ * The open flap's tip over the letter's top, in its units (−1…1 is the letter's whole height):
+ * the flap is 0.64 of its height deep (envelopeScene.js buildEnvelope), folded back over its top.
+ */
+export const FLAP_TIP = 1.28;
+
+/**
+ * Whether the letter still hides the point (x, y) of it, in its own units (−1…1 across and up
+ * its body; its flap, as far as it's folded back, a triangle over its top to FLAP_TIP at the
+ * middle): until the dissolve's edge has passed the point's value with half the dither on top,
+ * so no texel of it is left there (reduced motion's plain fade: until it's half gone). Outside
+ * it, never.
+ * @param {EnvelopePose} p
+ * @param {number} x
+ * @param {number} y
+ */
+export function letterCovers(p, x, y) {
+  const across = Math.abs(x);
+  const folded = Math.max(0, -Math.cos(p.flap));
+  const onBody = across <= 1 && Math.abs(y) <= 1;
+  const onFlap = across <= 1 && y > 1 && y <= 1 + FLAP_TIP * folded * (1 - across);
+  if (!onBody && !onFlap) return false;
+  if (p.crossfade) return p.fade < 0.5;
+  return DISSOLVE.edge(p.dissolve) < dissolveAt(x, y) + DISSOLVE.dither / 2;
+}
+
+/**
  * When the edge reaches the value `v`, seconds into the fade (the dissolve eases in and out:
  * smooth(), whose inverse this is).
  * @param {number} v

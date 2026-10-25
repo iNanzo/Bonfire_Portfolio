@@ -9,7 +9,7 @@
 // alone dissolves into particles: a noisy edge sweeps up across it shedding specks of paper and
 // ember that drift up and fade, and the white page behind clears at once (never a dither over
 // the screen). Where the letter still hides a point of it (letterCovers: the intro's first line
-// waits until it no longer hides NEWT's head).
+// waits until it no longer hides NEWT).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
