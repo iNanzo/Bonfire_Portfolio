@@ -182,6 +182,8 @@ function sim(
   }
   if (!release) return { frames, hold };
   const end = frames[frames.length - 1];
+  // (How fast the carry had him going as he was let go: under BEAD.ringSpeed, a still let-go.)
+  const speed = Math.hypot(body.carry.vel.x, body.carry.vel.z);
   const v = hold.release(body.carry, t - dt);
   const landing = hold.landing;
   body.root = { ...end.feet };
@@ -205,6 +207,7 @@ function sim(
     frames,
     hold,
     v,
+    speed,
     landing,
     landed: { x: body.root.x, z: body.root.z },
     apex: apex - end.feet.y,
@@ -811,6 +814,25 @@ test('bead, the ring held still: under his collar, not his swinging hips (within
     const miss = Math.hypot(ring.x - run.landed.x, ring.z - run.landed.z);
     assert.ok(miss <= 0.08, `${screen}: let go still, he landed ${miss.toFixed(3)} off the ring`);
     assert.ok(Math.hypot(run.landing.x - ring.x, run.landing.z - ring.z) <= 0.02, `${screen}: the ring waits there`);
+  }
+});
+
+test('bead, let go still just after a fast drag stops (his carry slowed under ringSpeed, the ring still on its way back), he lands under his collar, never thrown faster than maxLevel', () => {
+  for (const screen of ['phone', 'desktop']) {
+    const r = rig(screen);
+    const c = centrePx(r);
+    let still = 0;
+    for (const after of [0.03, 0.06, 0.1, 0.15, 0.2, 0.25, 0.3]) {
+      const run = sim(r, { path: ramp(c, { x: c.x + 260, y: c.y }, 1.2, 1.32), until: 1.32 + after, release: true });
+      const across = Math.hypot(run.v.x, run.v.z);
+      assert.ok(across <= BEAD.maxLevel + 1e-9, `${screen} ${after} s: thrown ${across.toFixed(2)} u/s`);
+      if (run.speed > BEAD.ringSpeed) continue;
+      still++;
+      const collar = run.frames[run.frames.length - 1].anchor;
+      const miss = Math.hypot(run.landed.x - collar.x, run.landed.z - collar.z);
+      assert.ok(miss <= 0.1, `${screen}, let go ${after} s after it stopped: landed ${miss.toFixed(3)} off his collar`);
+    }
+    assert.ok(still >= 3, `${screen}: ${still} still let-goes`);
   }
 });
 
