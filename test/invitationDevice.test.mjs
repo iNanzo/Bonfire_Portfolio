@@ -4,8 +4,8 @@
 // with the toy's clock and comes round the same), every part marked as his so the retro pass
 // outlines it. Each frame it sits at the midpoint of his palms (the ForeArm bones plus
 // clips.js DEVICE.palm along each forearm) less the clip's lift along its screen's normal, moved
-// its grip away from him along the screen (LieDown keeps DeviceLie's tilt, lift and grip so it
-// doesn't pop), its
+// its grip away from him along the screen (lying he holds it by its near edge, so it sticks out
+// past his face; LieDown keeps DeviceLie's tilt, lift and grip so it doesn't pop), its
 // width along the line from palm to palm, its screen tilted from straight up toward his face by
 // the clips' tilt (DEVICE's, mixed by their weights), and it shows while DeviceSit, LieDown and
 // DeviceLie weigh 0.5 or more between them, until StandUp or GetUp begins.
@@ -121,7 +121,7 @@ test('deviceFrame: held by its near edge, it sits its grip further from him alon
   }
 });
 
-test('it shows while DeviceSit, LieDown and DeviceLie weigh 0.5 or more (in his hands as he lies down), gone as soon as he starts to get up, at the tilt of the mix (clips.js DEVICE’s: sitting tipped toward him, lying near flat)', () => {
+test('it shows while DeviceSit, LieDown and DeviceLie weigh 0.5 or more (in his hands as he lies down), gone as soon as he starts to get up, at the tilt of the mix (clips.js DEVICE’s: sitting and lying tipped toward him, less than the camera’s 36°)', () => {
   const w = (o) => (k) => o[k] ?? 0;
   assert.equal(deviceShown(w({ DeviceSit: 0.3, DeviceLie: 0.25 })), true);
   // Lying down with it: in his hands all the way.
@@ -139,7 +139,10 @@ test('it shows while DeviceSit, LieDown and DeviceLie weigh 0.5 or more (in his 
     DEVICE_TILT.DeviceSit > 0 && DEVICE_TILT.DeviceSit <= 36 * DEG,
     'sitting, it tips toward him (less than the camera’s 36°)',
   );
-  assert.ok(DEVICE_TILT.DeviceLie >= 0 && DEVICE_TILT.DeviceLie <= 10 * DEG, 'lying, near flat');
+  assert.ok(
+    DEVICE_TILT.DeviceLie >= 0 && DEVICE_TILT.DeviceLie <= 30 * DEG,
+    'lying, held up by its near edge, tipped a little toward his face',
+  );
   close(deviceTilt(w({ DeviceSit: 1 })), DEVICE_TILT.DeviceSit);
   close(deviceTilt(w({ DeviceLie: 1 })), DEVICE_TILT.DeviceLie);
   const mid = deviceTilt(w({ DeviceSit: 0.5, DeviceLie: 0.5 }));
@@ -158,6 +161,7 @@ test('lying down with it, the tablet keeps DeviceLie’s tilt, lift and grip, so
     close(deviceGrip(mix), DEVICE_GRIP.DeviceLie, 1e-9);
   }
   close(deviceGrip(w({ DeviceSit: 1 })), 0, 1e-9, 'sitting: by its sides');
+  close(DEVICE_GRIP.DeviceLie, DEVICE.size[1] / 2, 1e-9, 'lying: by its near edge');
 });
 
 test('on him: each frame at his palms (each ForeArm bone plus DEVICE.palm along it), shown with the tablet’s clips and hidden without', () => {

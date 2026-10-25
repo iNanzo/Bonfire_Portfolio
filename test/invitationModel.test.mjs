@@ -4,7 +4,9 @@
 // (the page moves his root) and Held and Thrash keep the collar where it rests, so the page can
 // hang him from it; round 16's clips: Held hangs limp with no kick and his head down, Thrash kicks
 // from and back to Held's first pose, Give Device's DeviceSit and DeviceLie keep both palms on the
-// tablet's grip (clips.js DEVICE), LieDown and GetUp join them to Idle, and lying he rests on the floor without his back hair digging into his shirt; Walk and Run start on the same foot and their STRIDE values match what the
+// tablet's grip (clips.js DEVICE: its side edges sitting, its near corners lying), lying he's flat
+// with his chest raised 15-25 degrees, arms forward, the tablet past his face and the feet kicking
+// (round 17), LieDown and GetUp join them to Idle, and lying he rests on the floor without his back hair digging into his shirt; Walk and Run start on the same foot and their STRIDE values match what the
 // planted feet do, measured by forward kinematics; Run reaches both arms straight out in
 // front, leans forward and tips his face up to the camera (the user's reference); the dialogue's
 // gestures (round 15) start and end on Idle's pose, keep the hands and sleeves clear of his huge
@@ -439,8 +441,11 @@ function deviceGeometry(name) {
   return { palm: { L: palm(1), R: palm(-1) }, far: mid.clone().addScaledVector(ahead, DEVICE.size[1] / 2) };
 }
 
-test("DeviceSit and DeviceLie keep both palms on the tablet's grip every frame", () => {
+test("DeviceSit holds the tablet by its side edges and DeviceLie by its near edge's corners, both palms on the grip every frame", () => {
   assert.deepEqual(DEVICE.clips.DeviceSit.grip, [DEVICE.size[0] / 2, 0], 'sitting: the side edges’ middles');
+  const [gx, gy] = DEVICE.clips.DeviceLie.grip;
+  assert.ok(Math.abs(gy - DEVICE.size[1] / 2) < 1e-9, 'lying: on its near edge');
+  assert.ok(gx >= DEVICE.size[0] / 2 - 0.15 && gx <= DEVICE.size[0] / 2, 'lying: at its corners');
   for (const name of ['DeviceSit', 'DeviceLie']) {
     const { palm } = deviceGeometry(name);
     for (const [t, pose] of samples(clip(name), FPS)) {
@@ -454,6 +459,42 @@ test("DeviceSit and DeviceLie keep both palms on the tablet's grip every frame",
       }
     }
   }
+});
+
+test("DeviceLie (the user's pose): belly and hips flat, chest raised 15-25 degrees, arms nearly straight forward, the tablet past his face, the feet kicking", () => {
+  const above = (w, n) => {
+    const d = new THREE.Vector3(0, 1, 0).transformDirection(w(n));
+    return Math.asin(d.y) / DEG;
+  };
+  const head = skinnedMesh(glb, 'Head');
+  const { far } = deviceGeometry('DeviceLie');
+  const rows = track('DeviceLie', FPS);
+  for (const [t, pose] of samples(clip('DeviceLie'), FPS)) {
+    const w = glb.world(pose);
+    const at = `at ${t.toFixed(2)} s`;
+    const hips = above(w, 'Bone');
+    assert.ok(Math.abs(hips) <= 10, `${at} his hips are ${hips.toFixed(1)}° off flat`);
+    const chest = above(w, 'Chest');
+    assert.ok(chest >= 15 && chest <= 25, `${at} his chest is raised ${chest.toFixed(1)}°`);
+    for (const s of ['L', 'R']) {
+      const upper = new THREE.Vector3(0, 1, 0).transformDirection(w(`Bicep.${s}`));
+      const lower = new THREE.Vector3(0, 1, 0).transformDirection(w(`ForeArm.${s}`));
+      const bend = upper.angleTo(lower) / DEG;
+      assert.ok(bend <= 30, `${at} the ${s} elbow bends ${bend.toFixed(0)}°`);
+      assert.ok(lower.z >= 0.8, `${at} the ${s} forearm points forward (${lower.z.toFixed(2)})`);
+    }
+    const face = Math.max(...head.at(pose).map((p) => p[2]));
+    assert.ok(far.z >= face + 0.3, `${at} the tablet reaches ${far.z.toFixed(2)}, his face ${face.toFixed(2)}`);
+  }
+  for (const s of ['L', 'R']) {
+    const kick = most(rows, (r) => r.ankle[s].y) - least(rows, (r) => r.ankle[s].y);
+    assert.ok(kick >= 0.35, `the ${s} foot kicks ${kick.toFixed(2)} model units up and down`);
+  }
+  // In turn: when one is up the other is down.
+  const mean = (s) => rows.reduce((a, r) => a + r.ankle[s].y, 0) / rows.length;
+  const [mL, mR] = [mean('L'), mean('R')];
+  const cov = rows.reduce((a, r) => a + (r.ankle.L.y - mL) * (r.ankle.R.y - mR), 0);
+  assert.ok(cov < 0, 'the feet kick in turn');
 });
 
 test('DeviceLie rests on the floor, and his back hair keeps clear of his shirt', () => {
