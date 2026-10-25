@@ -280,11 +280,19 @@ const ui = bindUi(stageEl, {
 });
 installCursors();
 stageEl.dataset.cursor = 'arrow';
+/** NEWT is being carried now (start() says, once he's in). */
+let carrying = () => false;
 /**
- * The page's rose petals (the cursor trail and a ring at every press), over everything, for good
- * (its renderer made only once petals may come).
+ * The page's rose petals (the cursor trail and a ring at every press), for good (its renderer
+ * made only once petals may come): over the stage and under the HUD and the dialogue, over the
+ * envelope while it's up; no trail while he's carried.
  */
-const petalLayer = createPetalLayer(stageEl, { on: () => petalsOn(look) && !prefersReduced() });
+const petalLayer = createPetalLayer(stageEl, {
+  on: () => petalsOn(look) && !prefersReduced(),
+  before: stageEl.querySelector('.inv-hud'),
+  over: () => Boolean(envelope?.element.isConnected),
+  carrying: () => carrying(),
+});
 
 /** Whether the visitor asked for less motion (false where it can't be read). */
 function prefersReduced() {
@@ -511,6 +519,7 @@ function start(s) {
   const gesture = createGesture({ holdLift: () => Boolean(hold?.feel.secondFinger && hold.onSecondFinger) });
   // (Made again by Replay Intro's reset: replay.)
   let body = createBody();
+  carrying = () => body.mode === 'held';
   let mix = createMix();
   let gaze = createLook();
   /** Held, his glance up at you (lookAt.js createGlance), and the look put on this frame. */

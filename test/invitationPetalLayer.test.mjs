@@ -5,7 +5,7 @@
 // browser (node has no WebGL, so a context asked for is refused).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPetalLayer } from '../src/invitation/petalLayer.js';
+import { QUIET, createPetalLayer, quietAt } from '../src/invitation/petalLayer.js';
 
 /** A page with a canvas that counts how often a context was asked of it (and refuses it). */
 function fakePage() {
@@ -45,15 +45,29 @@ function fakePage() {
   };
   /** @type {any[]} */
   const appended = [];
-  const root = /** @type {any} */ ({ ownerDocument: doc, append: (/** @type {any} */ el) => appended.push(el) });
+  /** @type {any[]} where it went: before which of the root's children (null: at the end) */
+  const before = [];
+  const root = /** @type {any} */ ({
+    ownerDocument: doc,
+    append: (/** @type {any} */ el) => appended.push(el),
+    insertBefore: (/** @type {any} */ el, /** @type {any} */ ref) => {
+      appended.push(el);
+      before.push(ref);
+    },
+  });
+  /** What the pointer is over: the toy's floor (nothing it's quiet over), or a toolbar button. */
+  const floor = { closest: () => null };
+  const button = { closest: (/** @type {string} */ sel) => (sel === QUIET ? button : null) };
   const press = { isPrimary: true, pointerId: 1, pointerType: 'mouse', button: 0, clientX: 100, clientY: 100 };
   return {
     root,
     appended,
+    before,
     asked: () => asked,
-    move: (x = 140, y = 120) => on.pointermove?.({ ...press, clientX: x, clientY: y }),
-    down: () => on.pointerdown?.(press),
+    move: (x = 140, y = 120, target = floor) => on.pointermove?.({ ...press, clientX: x, clientY: y, target }),
+    down: (target = floor) => on.pointerdown?.({ ...press, target }),
     up: () => on.pointerup?.(press),
+    button,
   };
 }
 
@@ -115,4 +129,36 @@ test('the first press or move that may shed petals makes it; refused, it tries o
     assert.equal(page.asked(), asked, `${first}: never asked again`);
     assert.equal(layer?.snapshot().running, false);
   }
+});
+
+test('it goes in under the HUD (before the element it is given), not over everything', () => {
+  const page = fakePage();
+  const hud = { hud: true };
+  createPetalLayer(page.root, { on: () => true, before: /** @type {any} */ (hud) });
+  assert.equal(page.appended.length, 1);
+  assert.equal(page.before[0], hud, 'just before the HUD: over the stage, under the toolbar and the dialogue');
+});
+
+test('over a button, the toolbar, the pad, Settings or the dialogue, a press or a move sheds nothing', () => {
+  // (Which the layer stays quiet over: the HUD's parts, the dialogue's boxes and every button.)
+  for (const sel of ['.inv-hud > *', '.inv-talk-box', '.inv-talk-top', '.inv-talk-choices', 'button'])
+    assert.ok(QUIET.includes(sel), `quiet over ${sel}`);
+  assert.equal(quietAt(null), false);
+  assert.equal(quietAt(/** @type {any} */ ({})), false, 'not an element: not quiet');
+  const page = fakePage();
+  const layer = createPetalLayer(page.root, { on: () => true });
+  assert.equal(quietAt(page.button), true);
+  page.down(page.button);
+  for (let i = 0; i < 6; i++) page.move(100 + i * 40, 100, page.button);
+  page.up();
+  assert.equal(page.asked(), 0, 'nothing shed, so no renderer asked for');
+  assert.equal(layer?.snapshot().gpu, 'none');
+});
+
+test('while NEWT is carried, the pointer trails nothing', () => {
+  const page = fakePage();
+  const layer = createPetalLayer(page.root, { on: () => true, carrying: () => true });
+  for (let i = 0; i < 8; i++) page.move(100 + i * 40, 100);
+  assert.equal(page.asked(), 0, 'nothing shed while he is carried');
+  assert.equal(layer?.snapshot().gpu, 'none');
 });

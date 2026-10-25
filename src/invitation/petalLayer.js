@@ -1,5 +1,6 @@
 // The page's rose petals (petals.js moves them, petalScene.js draws them): a fixed overlay canvas
-// over the whole page (the toy, its toolbar and the envelope), letting every press through
+// over the stage and under the HUD and the dialogue (it goes in just before the HUD, with no
+// z-index of its own; while the envelope is up it rises over it), letting every press through
 // (pointer-events none), with its own small three.js renderer drawing only petals and their ink
 // at the envelope's texel size, scaled up pixelated. At boot it is only its listeners and an empty
 // canvas: its renderer (a WebGL context, its targets and meshes) comes with the first press or move
@@ -8,7 +9,9 @@
 // pointer listeners (never preventDefault, in the capture phase so nothing stops them) drive the
 // cursor trail (createTrail: a mouse moving, a finger dragging, a finger held still; lifted when
 // the pointer leaves the window or it loses focus, so a return elsewhere sheds nothing) and a burst
-// ring at every press, over the envelope and through the toy alike. It draws only while petals are
+// ring at every press, over the envelope and through the toy alike; none over the UI (QUIET: a
+// button, the toolbar, the pad, Settings, the dialogue's boxes), and no trail while NEWT is
+// carried (the grab's ring only). It draws only while petals are
 // up or a finger is held, and sleeps otherwise (cleared, no frames). Rose Petals off (Settings) or
 // reduced motion: none at all (any up shrink away). ?test reads snapshot().
 import * as THREE from 'three';
@@ -32,8 +35,28 @@ export const LAYER_SCALE = 0.8;
 export const pageUnit = (w, h) => Math.min(0.7 * w, 0.53 * h) * LAYER_SCALE;
 
 /**
+ * What the layer stays quiet over (no trail, no burst): the HUD's parts (the toolbar and its pad,
+ * the Settings sheet, the status), the dialogue's boxes (the line, its replies, Auto/Next/Log, the
+ * log and its question) and every button (the envelope's Skip Intro).
+ */
+export const QUIET =
+  '.inv-hud > *, .inv-talk-top, .inv-talk-choices, .inv-talk-box, .inv-talk-log, .inv-talk-ask, button';
+
+/**
+ * Whether `el` (what the pointer is over) is UI the layer stays quiet over (QUIET).
+ * @param {unknown} el
+ */
+export function quietAt(el) {
+  const e = /** @type {{closest?: (sel: string) => unknown}|null} */ (el);
+  return Boolean(e && typeof e.closest === 'function' && e.closest(QUIET));
+}
+
+/**
  * @typedef {object} PetalLayerOpts
  * @property {() => boolean} on  whether petals may come now (Rose Petals on, no reduced motion)
+ * @property {Element|null} [before]  what it goes in before (the HUD: it's under it); else last
+ * @property {() => boolean} [over]  whether it goes over everything now (the envelope is up)
+ * @property {() => boolean} [carrying]  whether NEWT is being carried now (no trail then)
  */
 
 /**
@@ -41,7 +64,7 @@ export const pageUnit = (w, h) => Math.min(0.7 * w, 0.53 * h) * LAYER_SCALE;
  * @param {HTMLElement} root
  * @param {PetalLayerOpts} opts
  */
-export function createPetalLayer(root, { on }) {
+export function createPetalLayer(root, { on, before = null, over = () => false, carrying = () => false }) {
   const doc = root.ownerDocument;
   const win = doc.defaultView ?? window;
   const canvas = doc.createElement('canvas');
@@ -53,23 +76,32 @@ export function createPetalLayer(root, { on }) {
     width: '100%',
     height: '100%',
     pointerEvents: 'none',
-    zIndex: '4',
     imageRendering: 'pixelated',
   });
-  root.append(canvas);
+  root.insertBefore(canvas, before);
+  /** Over everything (the envelope's z-index 3) while the envelope is up, else in its place. */
+  const place = () => {
+    const z = ask(over) ? '4' : '';
+    if (canvas.style.zIndex !== z) canvas.style.zIndex = z;
+  };
   const clock = () => win.performance.now() / 1000;
   let running = false;
   let raf = 0;
   let last = 0;
 
-  /** Petals may come now (a setting that throws reads as off). */
-  const allowed = () => {
+  /**
+   * One of its callers' answers (one that throws reads as no).
+   * @param {() => boolean} f
+   */
+  const ask = (f) => {
     try {
-      return on();
+      return Boolean(f());
     } catch {
       return false;
     }
   };
+  /** Petals may come now. */
+  const allowed = () => ask(on);
 
   /** @type {ReturnType<typeof build>} the renderer and its scene, once made */
   let gpu = null;
@@ -197,9 +229,19 @@ export function createPetalLayer(root, { on }) {
     for (const s of steps) g.petals.emit('trail', g.toWorld(s.x, s.y), { v: g.velWorld(s.vx, s.vy), n: s.n });
     if (steps.length) wake();
   }
+  /**
+   * The pointer is over UI the layer stays quiet over (what's under it, not the element that has
+   * its capture: a drag from the floor onto the toolbar goes quiet too).
+   * @param {PointerEvent} e
+   */
+  const overUi = (e) => quietAt(doc.elementFromPoint?.(e.clientX, e.clientY) ?? e.target);
   /** @param {PointerEvent} e */
   const onDown = (e) => {
     if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0) || !allowed()) return;
+    if (overUi(e)) {
+      trail.lift();
+      return;
+    }
     pressId = e.pointerId;
     holds = e.pointerType !== 'mouse';
     trail.down(clock(), e.clientX, e.clientY, holds);
@@ -211,6 +253,11 @@ export function createPetalLayer(root, { on }) {
   /** @param {PointerEvent} e */
   const onMove = (e) => {
     if (!e.isPrimary) return;
+    // (Over the UI or carrying NEWT: nothing, and the next move off it starts afresh there.)
+    if (ask(carrying) || overUi(e)) {
+      trail.lift();
+      return;
+    }
     const steps = trail.move(clock(), e.clientX, e.clientY);
     if (allowed()) shed(steps);
   };
@@ -238,6 +285,7 @@ export function createPetalLayer(root, { on }) {
   function wake() {
     if (running || !gpu) return;
     running = true;
+    place();
     last = clock();
     raf = win.requestAnimationFrame(frame);
   }
@@ -247,6 +295,9 @@ export function createPetalLayer(root, { on }) {
     const now = clock();
     const dt = Math.min(0.05, Math.max(0, now - last));
     last = now;
+    place();
+    // (A finger held still on NEWT while he's carried keeps none coming.)
+    if (ask(carrying)) trail.lift();
     const steps = trail.hold(now);
     if (allowed()) shed(steps);
     else g.petals.cut(0.2);

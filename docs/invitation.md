@@ -35,8 +35,11 @@ loading screen too: NEWT loads behind it.
 - **Petals on the cursor, everywhere:** over the envelope and all through the toy, the mouse
   moving trails petals (one every 14–30 px, at most about 20 a second, thrown a little the way
   it moves, every shape and size), and every click or tap bursts a ring of 10–14 of them. On a
-  phone a finger dragging trails them, and a finger held still keeps a few coming. They're
-  drawn on a layer of their own over the page that every press goes through. **Rose Petals**
+  phone a finger dragging trails them, and a finger held still keeps a few coming. None come
+  over the UI (a button, the toolbar, the camera pad, Settings, or the intro's boxes), and none
+  trail while you carry NEWT (a ring where you grab him, then nothing till he's down). They're
+  drawn on a layer of their own over the toy and under its toolbar, Settings and the intro (over
+  the envelope while that's up) that every press goes through. **Rose Petals**
   in Settings turns them all off (the envelope's too); it's on by default and kept with the
   look.
 - **Hover it:** with the mouse over the letter (or keyboard focus on it, or on a touch screen
@@ -784,8 +787,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   floating})` from the letter's world matrix, `step(dt)` writing the petals into an instanced mesh
   a shape; `petalMaterial`, the petals' own toon (the three reds, dithered band edges, each
   petal's `aShade`, its id pass on the scene's `uIdPass`); `buildInk`, the ink pass for a
-  petals-only drawing), `petalLayer.js` (`createPetalLayer(root, {on})`: the page's petals, a
-  fixed `canvas.inv-petals` at z-index 4 over everything with `pointer-events: none`, its own
+  petals-only drawing), `petalLayer.js` (`createPetalLayer(root, {on, before, over, carrying})`:
+  the page's petals, a fixed `canvas.inv-petals` with `pointer-events: none` put in `before` the
+  HUD with no z-index of its own (so over the stage's canvas, under the toolbar, its labels, the
+  pad, Settings, the speech bubble and the dialogue), raised to z-index 4 over the envelope while
+  `over()` (the envelope is in the page); no trail or ring while the element under the pointer
+  is inside `QUIET` (`quietAt`: the HUD's parts, the dialogue's boxes, any button: the trail lifts
+  there, so leaving it sheds nothing across it), and no trail while `carrying()` (NEWT held; a
+  finger held still on him too); its own
   WebGLRenderer at the envelope's texel size, made with the first press or move that may shed
   petals (never with Rose Petals off or reduced motion; refused, it tries once), `pageUnit` (`LAYER_SCALE` of the envelope's letter
   width); passive capture-phase `pointerdown`, `pointermove`, `pointerup` and `pointercancel` on
