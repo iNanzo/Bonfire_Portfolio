@@ -359,3 +359,30 @@ test('pickScreen hits the head circle and the body capsule, with slop, at least 
   assert.ok(pickScreen({ x: 0, y: 18.5 }, tiny.head, tiny.body, 0));
   assert.ok(!pickScreen({ x: 11.5, y: -1 }, tiny.head, tiny.body, 0));
 });
+
+test('with holdLift on, a second finger while NEWT is held lifts and lowers him: its moves up and down come as holdLift (dy, CSS px), never a pinch, and the first finger still carries him', () => {
+  let on = true;
+  const g = createGesture({ holdLift: () => on });
+  g.down(P(1, 0, 0, 0), true);
+  assert.deepEqual(types(g.move(P(1, 30, 0, 0.05))), ['grab', 'drag']);
+  assert.deepEqual(g.down(P(2, 200, 300, 0.06), false), [], 'it lands: nothing yet');
+  const lift = g.move(P(2, 202, 260, 0.08));
+  assert.deepEqual(types(lift), ['holdLift']);
+  assert.equal(lift[0].dy, -40, 'up 40 px');
+  assert.equal(lift[0].on, 'newt');
+  assert.deepEqual(g.move(P(2, 230, 260, 0.09)), [], 'across only: nothing');
+  assert.equal(g.move(P(2, 230, 290, 0.1))[0].dy, 30, 'down 30');
+  assert.deepEqual(types(g.move(P(1, 40, 0, 0.11))), ['drag'], 'still carrying him');
+  assert.equal(g.current().pinch, false, 'never a pinch');
+  assert.deepEqual(g.up(P(2, 230, 290, 0.12)), [], 'it lifts');
+  assert.deepEqual(g.down(P(3, 100, 100, 0.13), false), [], 'another lands');
+  assert.equal(g.move(P(3, 100, 90, 0.14))[0].dy, -10, 'and lifts him');
+  assert.deepEqual(g.cancel(3, 0.15), []);
+  assert.deepEqual(types(g.up(P(1, 40, 0, 0.2))), ['release']);
+  // Off (asked as the finger lands): ignored, as ever.
+  on = false;
+  g.down(P(1, 0, 0, 1), true);
+  g.move(P(1, 30, 0, 1.05));
+  assert.deepEqual(g.down(P(2, 200, 300, 1.06), false), []);
+  assert.deepEqual(g.move(P(2, 200, 200, 1.08)), []);
+});

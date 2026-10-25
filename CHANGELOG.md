@@ -6,11 +6,63 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 
 ## [Unreleased]
 
-Round 15: an Uma Musume-style intro dialogue for NEWT. Round 14, below it: his second
-wave (a Default look, new controls, speech bubbles, the admin's Invitation page). Round
-13, below that: NEWT's toy at `/invitation/`. Round 11: the knight at home in every place,
-every module type-checked, and a cleanup for what agents and test runs leave running.
+Round 16: a password lock for the site, and NEWT's toy opened from an envelope, with a new
+toolbar, a new way to carry him and more to do. Round 15, below it: an Uma Musume-style
+intro dialogue for NEWT. Round 14, below that: his second wave (a Default look, new
+controls, speech bubbles, the admin's Invitation page). Round 13: NEWT's toy at
+`/invitation/`. Round 11: the knight at home in every place, every module type-checked, and
+a cleanup for what agents and test runs leave running.
 Round 10: menus and search, the knight's fixes, hygiene and performance.
+
+### The password lock (round 16)
+
+- The admin's new Access page (under Settings) can lock the site behind a password: Lock
+  the Site, Set Password, Remember For (days) and Locked Pages (Portfolio, Bonfire Live,
+  Bonfire Painter, Campfire Game, the Reliquary game page and Invitation, which starts
+  open). It's off until you turn it on, and it can't turn on without a password. It comes
+  in its own pull request, apart from the toy's.
+- A visitor to a locked page goes to `/unlock/`, a lock page in the 404 page's look whose
+  words are yours to edit, and the right password brings them back where they were going.
+  Locked pages leave the sitemap.
+- It keeps visitors and search engines out, not someone who reads the public code: a velvet
+  rope, not a vault. Only a salted slow hash of the password is ever saved.
+  [docs/admin.md](docs/admin.md) says what it does and doesn't do.
+
+### NEWT's envelope and toolbar (round 16)
+
+- A first visit opens on a letter: an inked envelope on a plain white page, closed with a
+  wax seal stamped NH. Swipe it up (or press a key) and the seal blooms into roses, petals
+  flow round it, the flap lifts and the letter dissolves into particles to show NEWT, who
+  starts the intro. Skip Intro goes straight to free play, and Replay Intro on the toolbar
+  plays the intro again.
+- The toolbar is a row of pixel-icon squircles: Replay Intro, Wave, Sit, Give Device, Run,
+  Camera and Settings, with the Look menu's choices now in a Settings sheet (and a new
+  Ground Cues row there). The cursor is pixel art too: an open hand over NEWT, a closed
+  one while you hold him.
+- Camera opens a pad over the stage to turn, tilt, zoom and nudge the view; a pan
+  rubber-bands at the edges. The play area is one rounded square that fills the screen at
+  any angle and on any window, and the camera stays on its middle at the default zoom, so
+  a tap can send him to the top of the screen (he stops short so his head stays in view).
+
+### Carrying NEWT (round 16)
+
+- Pick him up and his collar rides under the cursor like a bead on a string, his neck just
+  below it. He hangs limp, his head down, and swings on a rope that eases out; let go
+  while moving and he's thrown, bounces off the play area's rounded corners and lands on
+  his feet. A ring on the floor and a dashed drop line (Ground Cues: Off, In the Mix or
+  Always) show where he'll come down.
+- Shake him back and forth, or handle him roughly, and he thrashes, kicking and flailing,
+  with his own lines; a gentle carry never stresses him. Held still, he glances up at you
+  every few seconds.
+- Give Device hands him a tablet with a tiny pixel game on it, and he sits down with it;
+  press again (Lie Down) and he lies down with it, and once more (Get Up) he stands and puts
+  it away.
+- He wears earrings: a black stud with a little cross hanging from each earlobe, swinging
+  as he moves, drawn crisply at every Pixel Size.
+- Hovering over him eases in a dither rim, and a ring blooms where you grab him.
+- The admin's Intro section can give any box any of his animations, Thrash, Held and the
+  device's among them, and Speech has lines for thrashing, getting the device and lying
+  down.
 
 ### NEWT's intro (round 15)
 

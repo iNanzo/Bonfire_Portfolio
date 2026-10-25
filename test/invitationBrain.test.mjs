@@ -6,8 +6,10 @@
 // is a tap, a drag a grab, a cancel a drop), a release going fall → land → idle or flee, a
 // grab working in every state, sitting after 20 s alone and getting up before obeying, floor
 // taps, the buttons (and their being off while he's held or falling), the Sit/Stand label,
-// faces from FACE_TRACK with blinks from faces.js, no reaction three times running, and the
-// turn to the camera before a reaction or a sit. The seeded rng (rng.js) is checked here too.
+// faces from FACE_TRACK with blinks from faces.js, no reaction three times running, the turn
+// to the camera before a reaction (a sit, the tablet's sit and lie and a carry keep the way he
+// faces) and, held, his head hung with a glance up every few seconds; the play area shrunk
+// under him, he walks back in, onto what's on screen. The seeded rng (rng.js) is checked here too.
 // The intro's dialogue mode: he gets up if he's sitting, walks in toward the middle when he's
 // far out, turns to the camera, then plays each box's animation (a gesture once, then Talk while
 // the line types and Idle after; a loop holds; none keeps what he does; Sit sits him down and the
@@ -17,7 +19,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CLIPS, DIALOGUE_CLIPS, FACE_TRACK, GAIT, fadeFor } from '../src/invitation/clips.js';
 import { createBrain, TUNE } from '../src/invitation/brain.js';
-import { steer, wrapAngle } from '../src/invitation/steer.js';
+import { clampTo, steer, wrapAngle } from '../src/invitation/steer.js';
+import { playArea } from '../src/invitation/area.js';
 import { createGesture } from '../src/invitation/gesture.js';
 import { createFaceState, faceStep, BLINK } from '../src/invitation/faces.js';
 import { createRng, between } from '../src/invitation/rng.js';
@@ -480,7 +483,9 @@ test('held, he thrashes every 3–7 s (sooner when he’s shaken): Thrash once f
       assert.equal(out.state, 'held');
       assert.equal(out.restart, true, 'from its start');
       const waited = s.w.t - hangingSince;
-      assert.ok(waited >= 3 - DT && waited <= 7 + DT, `seed ${seed}: thrashed after ${waited.toFixed(2)} s hanging`);
+      // (One due as a glance up comes waits for it: up to the Thrash's length and the glance's.)
+      const most = TUNE.thrashMax + CLIPS.Thrash.length + TUNE.lookUpForMax;
+      assert.ok(waited >= 3 - DT && waited <= most + DT, `seed ${seed}: thrashed after ${waited.toFixed(2)} s hanging`);
       const began = s.w.t;
       const back = s.until((o) => o.clip !== 'Thrash', 3);
       assert.equal(back.clip, 'Held', 'back to Held');
@@ -518,6 +523,192 @@ test('held, he thrashes every 3–7 s (sooner when he’s shaken): Thrash once f
   const out = s.release();
   assert.equal(out.state, 'fall');
   assert.equal(out.clip, 'Fall');
+});
+
+test('held, his head hangs (a light look aimed down) and 1.5–2.5 s after the grab, then every 2.5–4.5 s from one glance’s start to the next, he glances up at you for 0.8–1.2 s, eased up and back down, the hung look’s weight left as it is (the glance has its own); never during a Thrash', () => {
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const s = sim({ seed, tune: { thrashMin: 99, thrashMax: 99 } });
+    let out = s.grab();
+    assert.deepEqual(
+      out.look,
+      {
+        mode: 'forward',
+        weight: TUNE.heldLook,
+        pitch: TUNE.heldPitch,
+        up: 0,
+        lift: TUNE.lookUpLift,
+        upWeight: TUNE.lookUpWeight,
+      },
+      'hanging his head',
+    );
+    let last = s.w.t;
+    let prev = 0;
+    /** @type {{from: number, to: number, most: number, weight: number}|null} */
+    let on = null;
+    const glances = [];
+    for (let i = 0; i < Math.round(20 / DT); i++) {
+      out = s.frame();
+      const up = out.look.up;
+      assert.ok(up >= 0 && up <= 1, `up ${up}`);
+      assert.ok(Math.abs(up - prev) <= (DT / TUNE.lookUpEase) * 1.6 + 1e-9, `eased: ${prev} → ${up}`);
+      // (The hung look keeps its light weight: the page turns it into the glance's, play.js glanceLook.)
+      assert.equal(out.look.weight, TUNE.heldLook, 'the hung look as it is');
+      assert.equal(out.look.upWeight, TUNE.lookUpWeight, 'the glance’s own weight');
+      assert.equal(out.look.pitch, TUNE.heldPitch);
+      if (up > 0 && !on) on = { from: s.w.t - DT, to: 0, most: 0, weight: 0 };
+      if (on) {
+        on.most = Math.max(on.most, up);
+        on.weight = Math.max(on.weight, out.look.upWeight * up);
+      }
+      if (on && up === 0) {
+        on.to = s.w.t;
+        glances.push({ ...on, after: on.from - last });
+        last = on.from;
+        on = null;
+      }
+      prev = up;
+    }
+    assert.ok(glances.length >= 4, `seed ${seed}: ${glances.length} glances up in 20 s`);
+    for (const [i, g] of glances.entries()) {
+      const [lo, hi] = i === 0 ? [TUNE.lookUpFirstMin, TUNE.lookUpFirstMax] : [TUNE.lookUpMin, TUNE.lookUpMax];
+      assert.ok(
+        g.after >= lo - DT && g.after <= hi + DT,
+        `seed ${seed}: glance ${i + 1} up after ${g.after.toFixed(2)} s`,
+      );
+      const long = g.to - g.from;
+      assert.ok(
+        long >= TUNE.lookUpForMin - DT && long <= TUNE.lookUpForMax + 2 * DT,
+        `seed ${seed}: up for ${long.toFixed(2)} s`,
+      );
+      assert.equal(g.most, 1, 'all the way up');
+      assert.ok(Math.abs(g.weight - TUNE.lookUpWeight) < 1e-9);
+    }
+  }
+  // With his thrashes as ever: never up while he thrashes, and it still comes between them.
+  let ups = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const s = sim({ seed });
+    s.grab();
+    for (let i = 0; i < Math.round(20 / DT); i++) {
+      const out = s.frame();
+      if (out.clip === 'Thrash') assert.equal(out.look.up, 0, `seed ${seed}: not up while he thrashes`);
+      else if (out.look.up === 1) ups++;
+    }
+  }
+  assert.ok(ups > 0, 'he still looks up between thrashes');
+  // Let go, the look-up is over.
+  const s = sim({ seed: 1, tune: { thrashMin: 99, thrashMax: 99 } });
+  s.grab();
+  s.until((o) => o.look.up === 1, 8);
+  const out = s.release();
+  assert.equal(out.state, 'fall');
+  assert.equal(out.look.up, undefined);
+});
+
+test('“Full droop, occasionally looks up”: over a 12 s still hold, thrashes and all, he glances up at least 3 times, never while he thrashes', () => {
+  assert.equal(TUNE.lookUpMin, 2.5);
+  assert.equal(TUNE.lookUpMax, 4.5);
+  // (A Thrash that waits for a glance up always fits before the next one.)
+  assert.ok(TUNE.lookUpMin - TUNE.lookUpForMax > CLIPS.Thrash.length);
+  for (let seed = 1; seed <= 24; seed++) {
+    const s = sim({ seed });
+    s.grab();
+    let glances = 0;
+    let thrashes = 0;
+    let prev = s.w.out;
+    for (let i = 0; i < Math.round(12 / DT); i++) {
+      const out = s.frame();
+      if (out.clip === 'Thrash') assert.equal(out.look.up, 0, `seed ${seed}: not up while he thrashes`);
+      if (out.look.up === 1 && prev.look.up < 1) glances++;
+      if (out.clip === 'Thrash' && prev.clip !== 'Thrash') thrashes++;
+      prev = out;
+    }
+    assert.equal(s.w.out.state, 'held');
+    assert.ok(thrashes >= 1, `seed ${seed}: he thrashed (${thrashes})`);
+    assert.ok(glances >= 3, `seed ${seed}: ${glances} glances up in 12 s (${thrashes} thrashes)`);
+  }
+});
+
+test('held, a Thrash that comes due during a glance up waits for it to end; a hard shake’s cuts it short, and the glance comes again TUNE.lookUpRest s after the Thrash', () => {
+  // (Due at 3 s, with the glance up at 2.5 s for 1.2, or due at 3.5 s, before the Thrash would be
+  // over: the Thrash waits till it's down, then comes at once.)
+  for (const first of [2.5, 3.5]) {
+    const glance = { lookUpFirstMin: first, lookUpFirstMax: first, lookUpForMin: 1.2, lookUpForMax: 1.2 };
+    const s = sim({ tune: { thrashMin: 3, thrashMax: 3, ...glance } });
+    s.grab();
+    const t0 = s.w.t - DT;
+    s.until((o) => o.look.up === 1, 5);
+    const out = s.until((o) => o.clip === 'Thrash', 3);
+    assert.equal(out.look.up, 0);
+    const at = s.w.t - t0;
+    assert.ok(
+      at >= first + 1.2 - 2 * DT && at <= first + 1.2 + 2 * DT,
+      `the Thrash at ${at.toFixed(2)} s, as the glance ends`,
+    );
+  }
+  // (Shaken hard in the middle of one: the Thrash cuts it, and it's back after.)
+  const h = sim({
+    tune: {
+      thrashMin: 99,
+      thrashMax: 99,
+      lookUpFirstMin: 2.5,
+      lookUpFirstMax: 2.5,
+      lookUpForMin: 1.2,
+      lookUpForMax: 1.2,
+    },
+  });
+  h.grab();
+  h.until((o) => o.look.up === 1, 3);
+  h.w.carry = { dragSpeed: 0, shake: TUNE.shakeHard + 5 };
+  h.until((o) => o.clip === 'Thrash', 2);
+  h.w.carry = { dragSpeed: 0, shake: 0 };
+  h.until((o) => o.clip !== 'Thrash', 3);
+  const ended = h.w.t;
+  h.until((o) => o.look.up > 0, 3);
+  const after = h.w.t - DT - ended;
+  assert.ok(
+    Math.abs(after - TUNE.lookUpRest) <= 2 * DT,
+    `the cut glance up again ${after.toFixed(2)} s after the Thrash`,
+  );
+});
+
+test('held, a glance up that came due while he thrashed comes TUNE.lookUpRest s after the Thrash, not a whole wait later', () => {
+  // (Only a shake's Thrash can be under way as one comes due: any other waits for it.)
+  const s = sim({ tune: { thrashMin: 99, thrashMax: 99, lookUpFirstMin: 2.4, lookUpFirstMax: 2.4 } });
+  s.grab();
+  s.run(1.6);
+  s.w.carry = { dragSpeed: 0, shake: TUNE.shakeHard + 5 };
+  s.frame();
+  s.w.carry = { dragSpeed: 0, shake: 0 };
+  s.until((o) => o.clip === 'Thrash', 2);
+  assert.equal(s.w.out.look.up, 0, 'not up yet');
+  const out = s.until((o) => o.clip !== 'Thrash', 3);
+  assert.equal(out.look.up, 0);
+  const ended = s.w.t;
+  s.until((o) => o.look.up > 0, 3);
+  const after = s.w.t - DT - ended;
+  assert.ok(Math.abs(after - TUNE.lookUpRest) <= 2 * DT, `up ${after.toFixed(2)} s after the Thrash`);
+});
+
+test('held, falling and landing he keeps the way he faced when grabbed (no turn to the camera), and carries on from there', () => {
+  for (const yaw of [2, -1.3, Math.PI]) {
+    const s = sim({ yaw, camera: { x: 0, z: 6 } });
+    s.grab();
+    const seen = [];
+    s.run(1.5);
+    s.release();
+    s.until(
+      (o) => o.state === 'idle',
+      5,
+      (o) => seen.push(o),
+    );
+    for (const o of seen) {
+      assert.equal(o.faceCamera, false, `${o.state}: no turn`);
+      assert.equal(o.move.mode, 'stay', `${o.state}: staying put`);
+    }
+    assert.ok(seen.some((o) => o.state === 'land'));
+    assert.ok(Math.abs(wrapAngle(s.w.body.yaw - yaw)) < 1e-9, `yaw ${yaw}: as grabbed`);
+  }
 });
 
 test('in fall and land taps are ignored, but a grab still works', () => {
@@ -579,31 +770,31 @@ test('after 20 s alone he sits by himself, and gets up before obeying a tap or a
   assert.equal(d.tap().state, 'standUp');
 });
 
-test('sitting down, by the button or by himself, he turns to face the camera first, then sits facing it with his happy face', () => {
+test('sitting down, by the button or by himself, he keeps the way he faces: SitDown at once (no turn to the camera), then sits there with his happy face', () => {
   const alone = { calm: false, x: 1.5, yaw: 2.5, tune: { sitAfter: 2, idleMin: 99, idleMax: 99 } };
   const cases = { 'the button': [{ yaw: 2 }, null], 'by himself': [alone, { x: 0, z: 6 }] };
-  // Facing away: the Sit button with no camera spot (+z), and by himself with one off to the side.
+  // Facing away from the camera: the Sit button with no camera spot (+z), and by himself with one off to the side.
   for (const [how, [opts, camera]] of Object.entries(cases)) {
     const s = sim({ ...opts, camera });
-    const off = () => Math.abs(wrapAngle(s.w.body.yaw - (camera ? Math.atan2(-1.5, 6) : 0)));
+    const yaw = s.w.body.yaw;
     let out = camera ? s.until((o) => o.state === 'sitDown', 4) : s.button('Sit');
-    const first = [out.state, out.clip, out.faceCamera, out.move.mode, out.move.goal, out.sitLabel, out.face];
-    assert.deepEqual(first, ['sitDown', 'gait', true, 'face', camera, 'Stand', 'happy'], `${how}: a turn first`);
-    out = s.until((o) => o.clip !== 'gait', 1);
-    assert.deepEqual([out.state, out.clip, out.restart, out.faceCamera], ['sitDown', 'SitDown', true, false], how);
-    assert.ok(off() <= TUNE.facedEnough + 1e-6, `${how}: facing the camera before sitting (${off()} rad off)`);
-    out = s.until((o) => o.state === 'sit', 3);
-    assert.ok(off() < 0.05 && out.face === 'happy', `${how}: sitting facing it, happy (${off()} rad off)`);
+    const first = [out.state, out.clip, out.restart, out.faceCamera, out.move.mode, out.sitLabel, out.face];
+    assert.deepEqual(first, ['sitDown', 'SitDown', true, false, 'stay', 'Stand', 'happy'], `${how}: down at once`);
+    out = s.until(
+      (o) => o.state === 'sit',
+      3,
+      (o) => assert.equal(o.move.mode, 'stay', `${how}: no turn`),
+    );
+    assert.ok(
+      Math.abs(wrapAngle(s.w.body.yaw - yaw)) < 1e-9 && out.face === 'happy',
+      `${how}: sitting the way he faced, happy`,
+    );
   }
-  // Already facing it: SitDown at once.
-  const out = sim({ yaw: 0.05 }).button('Sit');
-  assert.deepEqual([out.state, out.clip, out.restart, out.faceCamera], ['sitDown', 'SitDown', true, false]);
-  // During the turn he hasn't begun to sit: a tap reacts, a floor tap walks, Stand calls it off.
-  const pokes = { react: (s) => s.tap(), walk: (s) => s.floorTap(1, 0), idle: (s) => s.button('Sit') };
-  for (const [state, poke] of Object.entries(pokes)) {
+  // Sitting down, he has begun to sit: a tap or Stand gets him up first.
+  for (const poke of [(s) => s.tap(), (s) => s.button('Sit')]) {
     const s = sim({ yaw: 2 });
     s.button('Sit');
-    assert.equal(poke(s).state, state, `no getting up from a sit that never began: ${state}`);
+    assert.equal(poke(s).state, 'standUp');
   }
 });
 
@@ -735,20 +926,30 @@ test('buttons are disabled while he is held or falling', () => {
   assert.equal(out.buttonsEnabled, true);
 });
 
-test('Give Device: the first press sits him down with the tablet (turned to the camera, SitDown, DeviceSit), the second lies him on his stomach with it, turned 60–75° from the camera (LieDown, DeviceLie), the third gets him up (GetUp, idle); device and deviceLabel say which', () => {
+test('Give Device: the first press sits him down with the tablet (SitDown, DeviceSit), the second lies him on his stomach with it (LieDown, DeviceLie), each the way he faced (no turn), the third gets him up (GetUp, idle); device and deviceLabel say which', () => {
   const s = sim({ camera: { x: 0, z: 6 }, yaw: 1.2 });
   let out = s.frame();
   assert.equal(out.device, null);
   assert.equal(out.deviceLabel, 'Give Device');
-  // 1: down with the tablet, turned to the camera first.
+  const yaw = s.w.body.yaw;
+  /** He faces the way he did, and isn't turned. */
+  const kept = (o, msg) => {
+    assert.equal(o.move.mode, 'stay', `${msg}: no turn`);
+    assert.ok(Math.abs(wrapAngle(s.w.body.yaw - yaw)) < 1e-9, `${msg}: facing as he did`);
+  };
+  // 1: down with the tablet, at once.
   out = s.button('Device');
   assert.equal(out.state, 'sitDown');
   assert.equal(out.device, 'sit');
   assert.equal(out.deviceLabel, 'Lie Down');
-  assert.equal(out.faceCamera, true, 'turns to the camera first');
-  out = s.until((o) => o.clip === 'SitDown', 3);
+  assert.equal(out.faceCamera, false);
+  assert.equal(out.clip, 'SitDown');
   assert.equal(out.restart, true);
-  out = s.until((o) => o.state === 'deviceSit', 3);
+  out = s.until(
+    (o) => o.state === 'deviceSit',
+    3,
+    (o) => kept(o, 'sitting down'),
+  );
   assert.equal(out.clip, 'DeviceSit');
   assert.equal(out.restart, true);
   assert.equal(out.device, 'sit');
@@ -758,25 +959,24 @@ test('Give Device: the first press sits him down with the tablet (turned to the 
   assert.equal(out.buttonsEnabled, true);
   out = s.run(4);
   assert.equal(out.state, 'deviceSit', 'he sits with it until asked');
-  const cameraYaw = Math.atan2(0 - s.w.body.x, 6 - s.w.body.z);
-  assert.ok(Math.abs(wrapAngle(s.w.body.yaw - cameraYaw)) < 0.2, 'sitting, he faces the camera');
-  // 2: lies down with it, turned 60–75° from the camera so his profile and the screen show.
+  kept(out, 'sitting');
+  // 2: lies down with it, the way he faces.
   out = s.button('Device');
   assert.equal(out.state, 'lieDown');
   assert.equal(out.clip, 'LieDown');
   assert.equal(out.restart, true);
   assert.equal(out.device, 'lie');
   assert.equal(out.deviceLabel, 'Get Up');
-  out = s.until((o) => o.state === 'deviceLie', 3);
+  out = s.until(
+    (o) => o.state === 'deviceLie',
+    3,
+    (o) => kept(o, 'lying down'),
+  );
   assert.equal(out.clip, 'DeviceLie');
   assert.equal(out.face, FACE_TRACK.DeviceLie.face);
   out = s.run(3);
   assert.equal(out.state, 'deviceLie');
-  const off = Math.abs(wrapAngle(s.w.body.yaw - Math.atan2(0 - s.w.body.x, 6 - s.w.body.z)));
-  assert.ok(
-    off >= (60 * Math.PI) / 180 && off <= (75 * Math.PI) / 180,
-    `lying ${((off * 180) / Math.PI).toFixed(1)}° from the camera`,
-  );
+  kept(out, 'lying');
   // 3: up again.
   out = s.button('Device');
   assert.equal(out.state, 'getUp');
@@ -1329,6 +1529,22 @@ test('talkReady once he’s in place: getting up, walking in and turning he keep
   assert.equal(sim({}).frame().talkReady, false);
 });
 
+test('a box the page holds back (seq −1: its line waits on the envelope) keeps him in place idle with his own face; its face and gesture come with it', () => {
+  const s = sim({ camera: { x: 0, z: 6 } });
+  s.w.dialogue = box(-1, 'none', 'surprised', false);
+  let o = s.until((x) => x.talkReady, 5);
+  for (let i = 0; i < 60; i++) {
+    assert.notEqual(o.face, 'surprised', 'his own face while it waits');
+    assert.equal(o.clip, 'gait', 'idle, no gesture');
+    assert.equal(o.talkReady, true);
+    o = s.frame();
+  }
+  s.w.dialogue = box(0, 'Spook', 'surprised');
+  o = s.frame();
+  assert.equal(o.face, 'surprised', 'the box’s face with its line');
+  assert.equal(o.clip, 'Spook', 'and its gesture');
+});
+
 test('held or falling, Play Intro waits until he’s down', () => {
   const s = sim({ camera: { x: 0, z: 6 } });
   s.grab();
@@ -1336,4 +1552,44 @@ test('held or falling, Play Intro waits until he’s down', () => {
   assert.equal(s.frame().state, 'held');
   s.release();
   s.until((o) => o.state === 'talk', 5);
+});
+
+test('the play area shrunk under him (a resize) as he stands: he walks back inside it, onto what’s on screen, calm or not; inside it, he stays put', () => {
+  for (const calm of [true, false]) {
+    /** @type {import('../src/invitation/types.js').Bounds} */
+    const area = playArea(5);
+    const brain = createBrain({ seed: 3, calm, bounds: area });
+    let body = { x: 0.3, z: -4.5, yaw: Math.PI, speed: 0 };
+    let t = 0;
+    const step = () => {
+      t += DT;
+      const out = brain.step({
+        t,
+        dt: DT,
+        events: [],
+        button: null,
+        pointer: null,
+        newt: { x: body.x, z: body.z, yaw: body.yaw, grounded: true },
+        clip: null,
+        carry: null,
+        camera: null,
+        dialogue: null,
+      });
+      body = steer(body, out.move, null, area, DT);
+      return out;
+    };
+    for (let i = 0; i < 60; i++) {
+      step();
+      assert.ok(dist(body, { x: 0.3, z: -4.5 }) < 1e-9, `calm ${calm}: inside, he stays put`);
+    }
+    // The window shrinks: the play area's smaller than where he stands, what's on screen nearer the middle.
+    Object.assign(area, playArea(4));
+    area.sight = { minX: -1, maxX: 1, minZ: -3, maxZ: 1 };
+    const states = [];
+    for (let i = 0; i < 12 * 60; i++) states.push(step().state);
+    assert.ok(states.slice(0, 3).includes('walk'), `calm ${calm}: he sets off back at once (${states.slice(0, 3)})`);
+    assert.ok(Math.hypot(body.x, body.z) <= 4 + 1e-6, `calm ${calm}: back inside ${JSON.stringify(body)}`);
+    assert.ok(dist(clampTo(area.sight, body), body) < 0.1, `calm ${calm}: on screen ${JSON.stringify(body)}`);
+    if (calm) assert.equal(states.at(-1), 'idle', 'then he stands');
+  }
 });

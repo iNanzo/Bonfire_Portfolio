@@ -19,10 +19,12 @@
 // the preset's (BasicShadowMap for DS: three 0.186 has no PCFSoftShadowMap), drawn once a frame
 // (autoUpdate off, needsUpdate before the colour pass), on phones too.
 //
-// The blob shadow under NEWT and the ring marker under the finger sit on their own layer
-// (LAYERS.decal: rays and the shadow pass leave them out) and write no depth, so they make no
-// lines; main.js moves them (setBlob: stronger while he's lifted; the marker where the pointer
-// meets the floor). `bounds` is the default view's disc (area.js playArea), kept round the play
+// The blob shadow under NEWT, the ring marker under the finger and the dashed drop line sit on
+// their own layer (LAYERS.decal: rays and the shadow pass leave them out) and write no depth, so
+// they make no lines; main.js moves them (setBlob: stronger while he's lifted, and off the floor
+// sized, faded and softened by cues.js blobLook; setMarker: the ring where the pointer meets the
+// floor, or under him while he's held, Ground Cues; setLine: the drop line from his collar to the
+// ring, two texels wide and dashed in texels, turned to face the camera). `bounds` is the default view's disc (area.js playArea), kept round the play
 // area's middle (setArea: the play area itself is main.js's, area.js viewArea): what a desktop's
 // default view keeps in sight (pixels.js frameView) and the size of the shadow camera's box, moved
 // to wherever NEWT is (floor.js fitShadow), so his shadow is as fine anywhere in the area.
@@ -66,9 +68,17 @@ export const ZOOM_RANGE = { min: 0.125, max: 8 };
 const PERF_FRAMES = 120;
 const PERF_EVERY = 500;
 const SHADOW_TYPES = { basic: THREE.BasicShadowMap, pcf: THREE.PCFShadowMap, vsm: THREE.VSMShadowMap };
+/** The blob's size standing, world units across (off the floor, cues.js blobLook's). */
+const BLOB_STANDING = 0.62;
+/** The marker ring's size, world units across (its texture's outer edge), and its strength. */
+const MARKER = { size: 0.34, opacity: 0.85 };
+/** The drop line: texels wide, and its dashes, texels on and off. */
+const DASH = { width: 2, on: 4, off: 2 };
 
 /**
- * A radial falloff (white, alpha fading out) for the blob shadow.
+ * A radial ramp (white, alpha the way in from the rim: 1 - r) for the blob shadow; its shader
+ * turns it into the falloff (BLOB_SHADER: standing, (1 - r)^1.4 as ever; off the floor, a soft
+ * edge of cues.js blobLook's share of the radius).
  * @param {number} n  texels across
  */
 function blobTexture(n = 32) {
@@ -76,7 +86,7 @@ function blobTexture(n = 32) {
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++) {
       const r = Math.hypot((x + 0.5) / n - 0.5, (y + 0.5) / n - 0.5) * 2;
-      const a = Math.max(0, 1 - r) ** 1.4;
+      const a = Math.max(0, 1 - r);
       data.set([255, 255, 255, Math.round(a * 255)], (y * n + x) * 4);
     }
   const t = new THREE.DataTexture(data, n, n, THREE.RGBAFormat);
@@ -85,6 +95,48 @@ function blobTexture(n = 32) {
   t.needsUpdate = true;
   return t;
 }
+/** The blob's falloff, after its ramp is read and before the decal's cut (blobMaterial). */
+const BLOB_SHADER = `#ifdef USE_MAP
+	float blobIn = sampledDiffuseColor.a;
+	float blobA = mix( pow( blobIn, 1.4 ), smoothstep( 0.0, max( uBlobSoft, 1e-3 ), blobIn ), uBlobHeld );
+	sampledDiffuseColor.a = blobA;
+	diffuseColor.a = opacity * blobA;
+#endif`;
+
+/**
+ * The blob's material: retro.js decalMaterial with its falloff (BLOB_SHADER) between the
+ * standing one and the held one's soft edge (`uBlobHeld` of the way, `uBlobSoft` of the radius).
+ */
+function blobMaterial() {
+  const m = decalMaterial({ map: blobTexture(), color: 0x000000, opacity: 0.2 });
+  const uniforms = { uBlobSoft: { value: 0.15 }, uBlobHeld: { value: 0 } };
+  const decal = m.onBeforeCompile;
+  m.onBeforeCompile = (shader, renderer) => {
+    decal.call(m, shader, renderer);
+    Object.assign(shader.uniforms, uniforms);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('void main() {', 'uniform float uBlobSoft;\nuniform float uBlobHeld;\nvoid main() {')
+      .replace('#include <map_fragment>', `#include <map_fragment>\n${BLOB_SHADER}`);
+  };
+  m.customProgramCacheKey = () => 'invitation-blob';
+  return { material: m, uniforms };
+}
+
+/**
+ * The drop line's dashes: DASH texels on, then off, along it (nearest, repeating).
+ */
+function dashTexture() {
+  const n = DASH.on + DASH.off;
+  const data = new Uint8Array(n * 4);
+  for (let y = 0; y < n; y++) data.set([255, 255, 255, y < DASH.on ? 255 : 0], y * 4);
+  const t = new THREE.DataTexture(data, 1, n, THREE.RGBAFormat);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  t.wrapT = THREE.RepeatWrapping;
+  t.needsUpdate = true;
+  return t;
+}
+
 /**
  * A pixel ring for the floor marker: two texels thick, nearest.
  * @param {number} n  texels across
@@ -161,24 +213,44 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
   sun.castShadow = true;
   scene.add(sun, sun.target);
 
-  const blob = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.62, 0.62),
-    decalMaterial({ map: blobTexture(), color: 0x000000, opacity: 0.2 }),
-  );
+  const blobMat = blobMaterial();
+  const blob = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), blobMat.material);
+  blob.scale.setScalar(BLOB_STANDING);
   blob.rotation.x = -Math.PI / 2;
   blob.position.y = 0.002;
   blob.renderOrder = 1;
   blob.layers.set(LAYERS.decal);
   const marker = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.34, 0.34),
-    decalMaterial({ map: ringTexture(), color: 0x000000, opacity: 0.85, alphaTest: 0.5 }),
+    new THREE.PlaneGeometry(MARKER.size, MARKER.size),
+    decalMaterial({ map: ringTexture(), color: 0x000000, opacity: MARKER.opacity, alphaTest: 0.5 }),
   );
   marker.rotation.x = -Math.PI / 2;
   marker.position.y = 0.003;
   marker.renderOrder = 2;
   marker.layers.set(LAYERS.decal);
   marker.visible = false;
-  scene.add(blob, marker);
+  // (The drop line: a quad from y 0 to 1, placed by its own matrix each frame: setLine. One pass:
+  // three draws a blended two-sided mesh twice, its back then its front, and a flat quad turned
+  // to the camera only ever shows one side.)
+  const lineGeo = new THREE.PlaneGeometry(1, 1);
+  lineGeo.translate(0, 0.5, 0);
+  const line = new THREE.Mesh(
+    lineGeo,
+    decalMaterial({
+      map: dashTexture(),
+      color: 0x000000,
+      opacity: MARKER.opacity,
+      alphaTest: 0.5,
+      side: THREE.DoubleSide,
+      forceSinglePass: true,
+    }),
+  );
+  line.matrixAutoUpdate = false;
+  line.renderOrder = 2;
+  line.layers.set(LAYERS.decal);
+  line.visible = false;
+  line.frustumCulled = false;
+  scene.add(blob, marker, line);
 
   const retro = createRetro(renderer);
   let current = { preset, look };
@@ -194,6 +266,12 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
   let pose = null;
   /** The blob shadow's strength standing and lifted. */
   let blobOpacity = { opacity: 0.16, lifted: 0.3 };
+  /** The blob as last set, for ?test: where, its radius, strength and soft edge, and the held look's share. */
+  const blobNow = { x: 0, z: 0, radius: BLOB_STANDING / 2, alpha: 0, soft: 0, held: 0 };
+  const lineX = new THREE.Vector3();
+  const lineY = new THREE.Vector3();
+  const lineZ = new THREE.Vector3();
+  const lineMid = new THREE.Vector3();
   /** The camera's yaw the light was last turned to. */
   let lightYaw = 0;
   /** The camera's zoom (setZoomScale: NEWT's size on screen over the default view's). */
@@ -254,6 +332,7 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
     blob.material.opacity = f.blob.opacity;
     container.style.backgroundColor = `#${f.background.toString(16).padStart(6, '0')}`;
     marker.material.color.setStyle(p.marker.color, THREE.SRGBColorSpace);
+    line.material.color.setStyle(p.marker.color, THREE.SRGBColorSpace);
     retro.setParams(p, l);
     container.dataset.pixel = l.pixelSize;
     placeSun();
@@ -340,7 +419,7 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
   const hit = new THREE.Vector3();
   const FLOOR = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-  own.add(floor.mesh).add(hemi).add(sun).add(sun.target).add(blob).add(marker);
+  own.add(floor.mesh).add(hemi).add(sun).add(sun.target).add(blob).add(marker).add(line);
   const decals = [blob, marker];
   /** NEWT, once he's in the scene (the one child the stage didn't add), or null. */
   function subjectNow() {
@@ -363,7 +442,7 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
     for (let i = 0; i < decals.length; i++) {
       const d = decals[i];
       if (!d.visible || !(d.material.opacity > 0)) continue;
-      const r = /** @type {any} */ (d.geometry).parameters.width / 2;
+      const r = /** @type {any} */ (d.geometry.parameters.width / 2) * d.scale.x;
       for (let j = 0; j < 4; j++)
         extra.push(
           corners[i * 4 + j].set(d.position.x + (j & 1 ? r : -r), d.position.y, d.position.z + (j & 2 ? r : -r)),
@@ -471,16 +550,81 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
       placeCamera();
     },
     /**
-     * The blob shadow under him: at (x, z), `lift` 0 standing to 1 lifted high (stronger).
+     * The blob shadow under him: at (x, z), `lift` 0 standing to 1 lifted high (stronger); with
+     * `held` (cues.js blobLook, and `w`, how far it's eased in: blobWeight), off the floor as
+     * blobLook has it, its radius, strength and soft edge, `w` of the way from the standing one.
      * @param {number} x
      * @param {number} z
      * @param {number} lift
+     * @param {{radius: number, alpha: number, soft: number, w: number}|null} [held]
      */
-    setBlob(x, z, lift) {
+    setBlob(x, z, lift, held = null) {
       const k = Math.min(1, Math.max(0, lift));
+      const w = held ? Math.min(1, Math.max(0, held.w)) : 0;
+      const standing = blobOpacity.opacity + (blobOpacity.lifted - blobOpacity.opacity) * k;
+      const radius = BLOB_STANDING / 2 + ((held?.radius ?? 0) - BLOB_STANDING / 2) * w;
+      const alpha = standing + ((held?.alpha ?? 0) - standing) * w;
       blob.position.x = x;
       blob.position.z = z;
-      blob.material.opacity = blobOpacity.opacity + (blobOpacity.lifted - blobOpacity.opacity) * k;
+      blob.scale.setScalar(radius * 2);
+      blob.material.opacity = alpha;
+      blobMat.uniforms.uBlobHeld.value = w;
+      blobMat.uniforms.uBlobSoft.value = held?.soft ?? 0.15;
+      Object.assign(blobNow, { x, z, radius, alpha, soft: held?.soft ?? 0, held: w });
+    },
+    /** The blob as last set (setBlob), for ?test. */
+    get blobState() {
+      return { ...blobNow };
+    },
+    /** The look's blob strength while he's lifted (floor.js floorLook's blob.lifted). */
+    get blobLifted() {
+      return blobOpacity.lifted;
+    },
+    /**
+     * The marker ring on the floor at (x, z), `across` world units across and `k` of its strength
+     * (0..1), or hidden (null): where the pointer meets the floor, or under him while he's held.
+     * @param {import('./types.js').XZ|null} at
+     * @param {number} [across]
+     * @param {number} [k]
+     */
+    setMarker(at, across = MARKER.size, k = 1) {
+      marker.visible = Boolean(at) && k > 0;
+      if (!at) return;
+      marker.position.set(at.x, marker.position.y, at.z);
+      marker.scale.setScalar(across / MARKER.size);
+      marker.material.opacity = MARKER.opacity * Math.min(1, Math.max(0, k));
+    },
+    /**
+     * The dashed drop line from `top` (his collar) down to `bottom` (the ring on the floor), `k`
+     * of its strength (0 hides it): DASH.width texels wide and dashed in texels where it is,
+     * turned to face the camera.
+     * @param {import('./types.js').XYZ} top
+     * @param {import('./types.js').XYZ} bottom
+     * @param {number} k
+     */
+    setLine(top, bottom, k) {
+      lineY.set(top.x - bottom.x, top.y - bottom.y, top.z - bottom.z);
+      const len = lineY.length();
+      line.visible = k > 0 && len > 1e-3;
+      if (!line.visible) return;
+      lineMid.set((top.x + bottom.x) / 2, (top.y + bottom.y) / 2, (top.z + bottom.z) / 2);
+      // (A texel's world size where the line is: the view's height there over the texels down.)
+      const far = lineMid.distanceTo(camera.position);
+      const texel = (2 * far * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(1, grid.h);
+      lineZ.copy(camera.position).sub(lineMid);
+      lineX.crossVectors(lineY, lineZ).normalize();
+      if (!(lineX.lengthSq() > 0)) lineX.set(1, 0, 0);
+      lineZ.crossVectors(lineX, lineY).normalize();
+      lineX.multiplyScalar(DASH.width * texel);
+      line.matrix.makeBasis(lineX, lineY, lineZ).setPosition(bottom.x, bottom.y + 0.003, bottom.z);
+      line.matrixWorldNeedsUpdate = true;
+      const map = /** @type {THREE.Texture} */ (line.material.map);
+      map.repeat.set(1, len / ((DASH.on + DASH.off) * texel));
+      line.material.opacity = MARKER.opacity * Math.min(1, k);
+    },
+    /** The drop line as last set, for ?test: shown, and its strength. */
+    get lineState() {
+      return { visible: line.visible, alpha: line.visible ? line.material.opacity / MARKER.opacity : 0 };
     },
     /**
      * The dithered highlight on NEWT while the pointer is over him: 0 off to 1 full (retro.js
@@ -665,7 +809,7 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
       renderer.setAnimationLoop(null);
       retro.dispose();
       floor.dispose();
-      for (const m of [blob, marker]) {
+      for (const m of [blob, marker, line]) {
         m.geometry.dispose();
         m.material.map?.dispose();
         m.material.dispose();

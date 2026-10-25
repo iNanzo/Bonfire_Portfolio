@@ -30,10 +30,13 @@
 /** @typedef {{x: number, y: number, z: number}} XYZ */
 /**
  * @typedef {object} Bounds  where NEWT's root may go: the play area (area.js), whose edges are
- *   his walls. A box; with `round`, a box with corners of that radius (the toy's play area, a
- *   rounded square on the floor); or a trapezoid, its sides minX/maxX at the front (maxZ) and
- *   minXBack/maxXBack at the back (minZ), straight lines between (steer.js xRange); or, with
- *   `r`, a disc of that radius around the box's centre (the box is its square).
+ *   his walls. A box; with `round`, a box with corners of that radius; or a trapezoid, its sides
+ *   minX/maxX at the front (maxZ) and minXBack/maxXBack at the back (minZ), straight lines
+ *   between (steer.js xRange); or, with `r`, a disc of that radius around the box's centre (the
+ *   box is its square: the toy's play area). With `turn`, any of them turned that many radians
+ *   about its box's middle (+ toward +x: what's on screen, in the camera's frame, steer.js
+ *   turnBounds). The play area carries `sight`, what's on screen now (camera.js orbitSight):
+ *   wander goals keep inside it, and a flee to what it was as the flee began.
  * @property {number} minX
  * @property {number} maxX
  * @property {number} minZ
@@ -42,6 +45,8 @@
  * @property {number} [maxXBack]
  * @property {number} [r]
  * @property {number} [round]
+ * @property {number} [turn]
+ * @property {Bounds} [sight]
  */
 
 /**
@@ -50,10 +55,11 @@
  */
 /**
  * @typedef {object} GestureEvent
- * @property {'tap'|'grab'|'drag'|'release'|'cancel'|'hover'|'orbit'|'pan'|'pinch'} type  orbit: a
+ * @property {'tap'|'grab'|'drag'|'release'|'cancel'|'hover'|'orbit'|'pan'|'pinch'|'holdLift'} type  orbit: a
  *   finger's drag on empty space or the mouse's right-drag (it turns the camera); pan: the mouse's
  *   left- or middle-drag on empty space, or two fingers' middle (it slides the view); pinch: two
- *   fingers (they zoom it)
+ *   fingers (they zoom it); holdLift: a second finger while he's held, its move up or down (dy:
+ *   the hold's height, gesture.js holdLift)
  * @property {'newt'|'floor'} on  what the press started on ('floor' for empty space and pinches)
  * @property {number} x  client px (a pinch: its fingers' middle)
  * @property {number} y
@@ -79,13 +85,15 @@
  * @property {XZ|null} pointer  the pointer on the floor, null when there's none
  * @property {{x: number, z: number, yaw: number, grounded: boolean}} newt
  * @property {{name: string, time: number, remaining: number}|null} clip  the playing one-shot or loop (not the gait)
- * @property {{dragSpeed: number, shake: number}|null} carry  while he's held (carry.js `carryFeel`)
+ * @property {{dragSpeed: number, shake: number}|null} carry  while he's held: the user's own pointer
+ *   (carry.js `handFeel`), never a drag kind easing his collar onto it
  * @property {XZ|null} [camera]  the camera's spot on the floor: a reaction turns him toward it (without it, toward +z)
- * @property {DialogueIn|null} [dialogue]  while Play Intro's dialogue runs, the box up (brain.js's talk state)
+ * @property {DialogueIn|null} [dialogue]  while the intro's dialogue runs, the box up (brain.js's talk state)
  */
 /**
  * @typedef {object} DialogueIn  the intro's box as the brain sees it
- * @property {number} seq  counts the boxes shown: a new one plays its animation
+ * @property {number} seq  counts the boxes shown: a new one plays its animation; −1, none yet (the
+ *   page holds the first line back: he waits in place, idle, with his own face)
  * @property {string} animation  a DIALOGUE_CLIPS name or 'none'
  * @property {import('./clips.js').FaceName} face
  * @property {boolean} typing  its line is still typing out (Talk plays meanwhile)
@@ -99,11 +107,14 @@
  * @property {{mode: 'stay'|'goto'|'flee'|'face', goal: XZ|null, speed: number}} move  goal: where a goto goes, the camera's spot to face, or where a flee's threat was last seen (with no pointer); speed: the target speed (steer ramps to it)
  * @property {import('./clips.js').FaceName} face  the base face (faces.js adds blinks)
  * @property {import('./clips.js').BlinkMode} blink
- * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: XZ|null, pitch?: number}} look  ease:
+ * @property {{mode: 'pointer'|'camera'|'forward'|'back', weight: number, ease?: number, at?: XZ|null, pitch?: number, up?: number, lift?: number, upWeight?: number}} look  ease:
  *   a slower look, seconds for it to come round (lookAt.js lookStep), as he's let go; at
  *   ('back'): who he runs from on the floor, for his glances back (null with no one); pitch:
- *   'ahead' at this pitch, radians (+ up), not the viewer's (held: his head hangs)
- * @property {boolean} faceCamera  turning to the camera first (a reaction, or sitting down)
+ *   'ahead' at this pitch, radians (+ up), not the viewer's (held: his head hangs over his own
+ *   front, play.js lookFront); up (held): his glance up at the viewer, a look of its own at
+ *   upWeight, lift radians higher (play.js glanceFront), from 0 none to 1 all of it
+ *   (lookAt.js glanceLook)
+ * @property {boolean} faceCamera  turning to the camera first (a reaction)
  * @property {number} stress
  * @property {boolean} wander
  * @property {'Sit'|'Stand'} sitLabel
@@ -128,10 +139,27 @@
  */
 
 /**
- * @typedef {{x: number, z: number, yaw: number, speed: number, run?: XZ}} Body  NEWT's root on the
- *   floor; `run`, while he flees: the way he runs (a unit direction, smoothed: steer.js)
+ * @typedef {{x: number, z: number, yaw: number, speed: number, run?: XZ, fence?: Bounds}} Body  NEWT's
+ *   root on the floor; `run`, while he flees: the way he runs (a unit direction, smoothed:
+ *   steer.js); `fence`, while he flees: what was on screen as it began, which he keeps inside
  */
 /** @typedef {typeof import('./brain.js').TUNE} Tune  the brain's numbers (createBrain's `tune` overrides any of them) */
+
+/**
+ * @typedef {object} HandState  carry.js: the user's own pointer while NEWT is held (handStep
+ *   updates it in place; handFeel is what the brain reads)
+ * @property {number} t0  when he was grabbed
+ * @property {{x: number, y: number}} drive  a critically damped follow of the pointer, client px
+ * @property {{x: number, y: number}} vel  its velocity, CSS px/s
+ * @property {number} speed  its speed, CSS px/s
+ * @property {number} shake  its acceleration while it's shaking (carry.js HAND: two turns close
+ *   together), smoothed, world units/s² (none otherwise, nor while it settles)
+ * @property {{x: number, y: number}} px  the pointer's spot last seen, client px
+ * @property {number} movedAt  when that spot last moved (a gap in its samples starts the hand over)
+ * @property {{x: number, y: number}} from  where the pointer's stroke began, client px
+ * @property {{x: number, y: number}} far  the stroke's farthest from there
+ * @property {number[]} turns  when the last turns were, two at most, close enough together
+ */
 
 /**
  * @typedef {object} CarryState  carry.js: NEWT held by the collar (holdStep updates it in place)
@@ -140,13 +168,11 @@
  * @property {XYZ} anchor  where the collar goes this frame (world): the pointer's spot on the
  *   plane he's dragged on plus the grab offset as it eases out (carry.js dragTarget), inside the
  *   play area along the plane's line across the floor
- * @property {XYZ} drive  a critically damped follow of the anchor: the swing and the feel read it
+ * @property {XYZ} drive  a critically damped follow of the anchor: the swing reads it
  * @property {XYZ} vel  the drive's velocity
  * @property {{x: number, z: number}} tilt  the root's swing in radians: root.rotation.x and .z (positive z puts his feet toward +x, positive x toward −z)
  * @property {{x: number, z: number}} tiltVel
  * @property {Array<{t: number, x: number, y: number, z: number}>} samples  the anchor over the last ~80 ms
- * @property {number} dragSpeed  the drive's speed, world units/s
- * @property {number} shake  the drive's acceleration, smoothed, world units/s²
  * @property {XZ|null} push  while the pointer's spot is out past the play area's edge: the way
  *   it pushes him, out through the edge (unit length; let go then, he's tossed with nothing across)
  * @property {{point: XYZ, normal: XYZ}|null} [plane]  the plane he's dragged on (main.js keeps it

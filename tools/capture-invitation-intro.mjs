@@ -1,8 +1,11 @@
-// The intro act for tools/capture-invitation.mjs (its header lists it: intro): Play Intro played
-// through as a visitor would, at real speed, with real taps or clicks: each line left to type
-// (one finished early with a tap), read for a moment, then tapped on; at the question, a pause
-// and a reply picked; the Log opened partway, read and closed; on to the end, when the camera
-// eases back and the toolbar returns. It takes the capture tool's own helpers (introActs).
+// The intro act for tools/capture-invitation.mjs (its header lists it: intro): Replay Intro
+// played through as a visitor would, at real speed, with real taps or clicks: each line left to
+// type (one finished early with a tap), read for a moment, then tapped on; at a question, a pause
+// and the reply on the way to an ending (e2e/helpers/dialogue-route.mjs routeToEnd, so it reaches
+// the end of any intro rather than looping on the same reply); the Log opened partway, read and
+// closed; on to the end, when the camera eases back and the toolbar returns. It takes the capture
+// tool's own helpers (introActs).
+import { routeToEnd } from '../e2e/helpers/dialogue-route.mjs';
 
 /**
  * The acts, given the capture tool's helpers: `tapAt(page, size, p)` (a touch on a phone size, a
@@ -27,12 +30,13 @@ export function introActs({ tapAt, sleep }) {
     return snap(page);
   }
   /**
-   * Play Intro, played through: `reply`, the reply picked at the question (its index, the last
-   * one past the end).
+   * Replay Intro, played through: at each question, the reply on the shortest way to an ending
+   * (routeToEnd of the script the page runs).
    */
-  async function playIntro(page, size, reply = 0) {
+  async function playIntro(page, size) {
     const at = await centre(page, '[data-intro]');
     if (!at) return false;
+    const route = routeToEnd(await page.evaluate(() => window.__invitation.intro()));
     await tapAt(page, size, at);
     // (It opens on the page's next frame.)
     for (let i = 0; i < 50 && !(await snap(page)).dialogue; i++) await sleep(40);
@@ -52,8 +56,10 @@ export function introActs({ tapAt, sleep }) {
       if (!s.dialogue) break;
       if (s.dialogue.choices) {
         await sleep(1600);
-        const n = s.dialogue.choices.length;
-        const p = await centre(page, `.inv-talk-choice >> nth=${Math.min(reply, n - 1)}`);
+        // (The reply that leads on along the route; the first if this box is off it.)
+        const next = route[route.indexOf(s.dialogue.id) + 1];
+        const pick = Math.max(0, s.dialogue.choices.indexOf(next));
+        const p = await centre(page, `.inv-talk-choice >> nth=${pick}`);
         if (p) await tapAt(page, size, p);
         await sleep(300);
         continue;

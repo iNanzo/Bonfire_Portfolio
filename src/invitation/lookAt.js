@@ -22,6 +22,9 @@
 // faded back to straight ahead as he turns away from it. Looking at a floor spot without a ray, his
 // head is lifted by LOOK.floorBias so his cap leaves his face showing. A slower ease (the brain's,
 // as he's let go) brings the look and its weight round over about a second instead of a fifth.
+// Held, his glance up at the viewer (createGlance, glanceStep) is a look of its own, kept on the
+// viewer, and glanceLook turns his hung look into it in the turn each puts on (weight × angle),
+// so it only ever comes straight up from one to the other: no dip, no swing to a side first.
 // Pure: time comes in as t, randomness from rng.js; the state object is updated in place.
 
 import { between } from './rng.js';
@@ -423,6 +426,60 @@ export function lookStep(s, mode, aim, dt, t, rng, weight = 1, ahead = AHEAD, ea
   const step = (ease > 0 ? Math.min(LOOK.weightRate, 1 / ease) : LOOK.weightRate) * dt;
   s.weight = s.weight < weight ? Math.min(weight, s.weight + step) : Math.max(weight, s.weight - step);
   return s;
+}
+
+/**
+ * Held, his glance up: how far up it may go or come down a second (`rate`, quicker than the
+ * brain's own ease, so it follows that exactly and only eases a cut: a Thrash, or a let-go).
+ */
+export const GLANCE = { rate: 8 };
+
+/**
+ * Held, his glance up at the viewer: a look of its own (`look`, on the viewer) and how far up he
+ * is (`k`, 0 to 1).
+ * @returns {{look: LookState, k: number}}
+ */
+export function createGlance() {
+  return { look: createLook(), k: 0 };
+}
+
+/**
+ * One frame of his glance up: its look kept on `front` (play.js glanceFront) while he's held
+ * (`up` given: BrainOut.look.up), and k following `up` (0 once it's gone), at most GLANCE.rate
+ * a second.
+ * @param {{look: LookState, k: number}} g
+ * @param {number|undefined} up
+ * @param {Aim} front
+ * @param {number} dt
+ * @param {number} t
+ * @param {() => number} rng
+ */
+export function glanceStep(g, up, front, dt, t, rng) {
+  if (up !== undefined) lookStep(g.look, 'camera', null, dt, t, rng, 1, front);
+  const most = GLANCE.rate * Math.max(0, dt);
+  g.k = clamp(clamp(up ?? 0, 0, 1), g.k - most, g.k + most);
+  return g;
+}
+
+/**
+ * The look to put on (character.js applyLook's yaw, pitch and weight): his hung look (`droop`,
+ * as lookStep has it) turned into the glance's (at `upWeight`) by g.k, in the turn each puts on
+ * (weight × angle), so as k rises his head goes straight from one to the other (where a blend
+ * of weights and angles apart would show more of the hung look's droop, and of any glance to a
+ * side it's in, before the lift). At k 0, the hung look as it is.
+ * @param {{yaw: number, pitch: number, weight: number}} droop
+ * @param {{look: {yaw: number, pitch: number}, k: number}} g
+ * @param {number} [upWeight]  the glance's weight (BrainOut.look.upWeight)
+ * @returns {{yaw: number, pitch: number, weight: number}}
+ */
+export function glanceLook(droop, g, upWeight = 1) {
+  const k = clamp(g.k, 0, 1);
+  if (k === 0) return { yaw: droop.yaw, pitch: droop.pitch, weight: droop.weight };
+  const weight = droop.weight + (upWeight - droop.weight) * k;
+  if (!(weight > 1e-6)) return { yaw: 0, pitch: 0, weight: 0 };
+  const yaw = droop.yaw * droop.weight + (g.look.yaw * upWeight - droop.yaw * droop.weight) * k;
+  const pitch = droop.pitch * droop.weight + (g.look.pitch * upWeight - droop.pitch * droop.weight) * k;
+  return { yaw: yaw / weight, pitch: pitch / weight, weight };
 }
 
 /**

@@ -1,4 +1,4 @@
-// The intro dialogue's runner in the invitation toy (Play Intro): an Uma Musume-style chat, one
+// The intro dialogue's runner in the invitation toy (the envelope, Replay Intro): an Uma Musume-style chat, one
 // box at a time, on an injected clock (no DOM, no three.js). normalizeScript makes any script
 // safe to run (types.js DialogueScript: content.json `invitation.intro`, or the page's own
 // fallback): a face, clip or shot it doesn't know falls back (neutral, none, keep), a missing or

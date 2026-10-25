@@ -1,20 +1,24 @@
 // NEWT's brain in the invitation toy: a pure state machine (idle, walk, react, flee, held, fall,
 // land, sitDown, sit, standUp, and Give Device's deviceSit, lieDown, deviceLie, getUp) that owns
 // every timer and every change of state. Each frame it
-// turns gestures and buttons into what he does, keeps his stress (taps, rough handling; it
-// decays), and says which clip plays, how he moves, his face, where he looks and what the
-// buttons show. A reaction and a sit (by the button or by himself) first turn him to face the
-// camera, so his face shows; a sit's turn isn't sitting yet (a tap reacts, a floor tap walks,
-// Stand calls it off). Held, he hangs his head (a light look aimed down, the sad face) and
-// thrashes every TUNE.thrashMin–thrashMax s (sooner when he's shaken hard): Thrash once, then
-// Held again on its own clock. Give Device (the button 'Device') alternates: sitting down with the
+// turns gestures and buttons into what he does, keeps his stress (taps, rough handling: a hard
+// shake, fast flings, a drop from high, never a gentle carry; it decays), and says which clip
+// plays, how he moves, his face, where he looks and what the buttons show. A reaction first turns him to face the camera, so his face shows; a sit (by the
+// button or by himself) and the tablet's sit and lie keep the way he faces. Held, he hangs his
+// head (a light look aimed down, the sad face), glances up at you every TUNE.lookUpMin–lookUpMax
+// s for TUNE.lookUpForMin–lookUpForMax s (BrainOut.look.up, eased in and out; never during a
+// Thrash: a Thrash waits for a glance under way or about to come unless a hard shake brought
+// it, and a glance it cut or that came due meanwhile comes after it), and thrashes every
+// TUNE.thrashMin–thrashMax s (sooner when he's shaken hard): Thrash
+// once, then Held again on its own clock; held, falling and landing he keeps the way he faced
+// when he was grabbed. Give Device (the button 'Device') alternates: sitting down with the
 // tablet (SitDown, then DeviceSit; from Sit, DeviceSit where he sits), lying on his stomach with
-// it turned TUNE.lieTurnMin–lieTurnMax from the camera (LieDown, then DeviceLie), getting up
-// (GetUp); any other input gets him up from either first (StandUp from sitting, GetUp from
-// lying), a grab picks him straight up. No three.js and no clock: time comes in as t, randomness
-// from rng.js.
+// it (LieDown, then DeviceLie), getting up (GetUp); any other input gets him up from either first
+// (StandUp from sitting, GetUp from lying), a grab picks him straight up. Standing outside the
+// play area once a resize has shrunk it under him, he walks back in (steer.js backInGoal), calm
+// or not. No three.js and no clock: time comes in as t, randomness from rng.js.
 //
-// Play Intro (BrainIn.dialogue, the box up while the intro runs) puts him in `talk`: he gets up
+// The intro, from the envelope or Replay Intro (BrainIn.dialogue, the box up while the intro runs) puts him in `talk`: he gets up
 // if he's sitting, walks in toward the middle of the view when he's out past TUNE.talkNear, and
 // turns to the camera, keeping his own face meanwhile; then he's in place (BrainOut.talkReady:
 // main.js holds the line until it) and each new box sets his face (blinking on neutral only) and
@@ -30,7 +34,7 @@
 
 import { CLIPS, FACE_TRACK, GAIT } from './clips.js';
 import { createRng, between } from './rng.js';
-import { wanderGoal, clampTo, wrapAngle } from './steer.js';
+import { backInGoal, wanderGoal, clampTo, wrapAngle } from './steer.js';
 import { fadeOutDue } from './blend.js';
 
 /** @typedef {import('./types.js').BrainIn} BrainIn */
@@ -73,8 +77,6 @@ export const TUNE = {
    */
   faceTurn: 0.6,
   facedEnough: 0.15,
-  /** Sitting down, he turns to face the camera first, until he does or for this long at most (a half turn). */
-  sitTurnMax: 1,
   /** A tap in this first share of a reaction only adds stress. */
   reactLock: 0.6,
   /** Fleeing from stress lasts at least this long. */
@@ -103,10 +105,22 @@ export const TUNE = {
   stillFor: 1,
   /** The pointer must move this far on the floor to count as moving. */
   stillMove: 0.02,
-  /** Held: stress per unit dragged, and per (unit/s²)·s of shake over shakeSoft. */
-  dragStress: 0.6,
+  /**
+   * Held, stress comes from rough handling, never from being carried about gently: per unit of
+   * drag speed (cues.js dragSpeedOf) over flingFrom, a second (a fling: 440 CSS px/s and more),
+   * and per (unit/s²)·s of shake over shakeSoft (the hand shakes only going back and forth:
+   * carry.js HAND).
+   */
+  flingFrom: 4,
+  flingStress: 0.4,
   shakeSoft: 6,
-  shakeStress: 0.08,
+  shakeStress: 0.12,
+  /**
+   * Dropped from high: a fall that lasts longer than dropFrom s (his feet over about his own
+   * height up) adds dropStress for every second of it past that as he lands.
+   */
+  dropFrom: 0.45,
+  dropStress: 4,
   /** A shake this hard surprises him again, for shakenFor s. */
   shakeHard: 14,
   shakenFor: 0.4,
@@ -125,7 +139,7 @@ export const TUNE = {
   walkSlack: 2,
   walkSpeed: GAIT.walk,
   runSpeed: GAIT.run,
-  /** Play Intro: out past this from the play area's middle he walks in to it first, world units. */
+  /** The intro: out past this from the play area's middle he walks in to it first, world units. */
   talkNear: 0.9,
   /** …then turns to the camera, until he faces it or for this long at most, seconds. */
   talkTurn: 1.2,
@@ -133,19 +147,39 @@ export const TUNE = {
   heldLook: 0.15,
   heldPitch: -0.5,
   /**
+   * Held, he glances up at you lookUpFirstMin–lookUpFirstMax s after the grab, then every
+   * lookUpMin–lookUpMax s from one glance's start to the next ("full droop, occasionally looks
+   * up": at least three in a 12 s hold), for lookUpForMin–lookUpForMax s. A Thrash never drops
+   * one: a Thrash that comes due while a glance is under way, or due within the Thrash's own
+   * length, waits for it to end (lookUpMin less lookUpForMax is more than that length, so it
+   * always fits after); one a hard shake brought cuts it short, and like one that came due
+   * while he thrashed, it comes lookUpRest s after the Thrash. BrainOut.look.up eases from 0
+   * to 1 over lookUpEase s and back down; the glance is a look of its own at lookUpWeight
+   * (BrainOut.look.upWeight), the hung look keeping its heldLook (the page aims the glance at
+   * the viewer, lookUpLift radians higher, and turns the hung look into it by `up`: lookAt.js
+   * glanceLook; the look goes on over the Held clip's own droop, about 25° of it, so without
+   * the lift he'd still look down).
+   */
+  lookUpFirstMin: 1.5,
+  lookUpFirstMax: 2.5,
+  lookUpMin: 2.5,
+  lookUpMax: 4.5,
+  lookUpForMin: 0.8,
+  lookUpForMax: 1.2,
+  lookUpEase: 0.25,
+  lookUpWeight: 1,
+  lookUpLift: 0.5,
+  lookUpRest: 0.5,
+  /**
    * Held, he thrashes every thrashMin–thrashMax s, and within thrashShaken s of a hard shake, but
-   * never before he's hung still thrashRest s (since he was grabbed, or his last thrash).
+   * never before he's hung still thrashRest s (since he was grabbed, or his last thrash); one not
+   * brought by a shake waits for a glance up (lookUpMin above), so up to the Thrash's length and
+   * lookUpForMax more.
    */
   thrashMin: 3,
   thrashMax: 7,
   thrashShaken: 0.6,
   thrashRest: 1.5,
-  /**
-   * Lying with the tablet he turns this far from the camera, radians (either way), so his
-   * profile and the screen show past his cap's brim.
-   */
-  lieTurnMin: (62 * Math.PI) / 180,
-  lieTurnMax: (73 * Math.PI) / 180,
 };
 
 /**
@@ -198,8 +232,8 @@ const STATE_CLIP = {
   deviceLie: 'DeviceLie',
   getUp: 'GetUp',
 };
-/** The FACE_TRACK entry for the gait states (sitDown: while he turns to the camera first). */
-const GAIT_FACE = { idle: 'Idle', walk: 'Walk', flee: 'Run', sitDown: 'SitDown' };
+/** The FACE_TRACK entry for the gait states. */
+const GAIT_FACE = { idle: 'Idle', walk: 'Walk', flee: 'Run' };
 /** Sitting (Stand gets him up), and lying with the tablet. */
 const SITTING = new Set(['sitDown', 'sit', 'deviceSit']);
 const LYING = new Set(['lieDown', 'deviceLie']);
@@ -213,7 +247,7 @@ const EPS = 1e-9;
 /**
  * @param {{seed?: number, calm?: boolean, bounds?: Bounds|null, middle?: XZ|null, tune?: Partial<typeof TUNE>}} [opts]
  *   calm: no wandering at first and never sitting by himself (?calm); middle: the floor point the
- *   default view looks at (Play Intro walks him in toward it; the play area box's middle by default)
+ *   default view looks at (the intro walks him in toward it; the play area box's middle by default)
  */
 export function createBrain({ seed = 1, calm = false, bounds = null, middle = null, tune = {} } = {}) {
   const T = { ...TUNE, ...tune };
@@ -261,11 +295,15 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     /** Give Device under way: the sit down is the tablet's, and lies on down once he's sat. */
     device: false,
     lieAfter: false,
-    /** @type {XZ|null} the spot he turns to as he lies down with the tablet (lieTurn off the camera) */
-    lieGoal: null,
     /** Held: when he thrashes next, and since when he's hung still (grabbed, or his last thrash over). */
     thrashAt: Infinity,
+    /** Held: the next Thrash was brought on by a hard shake (it cuts a glance up short). */
+    thrashShook: false,
     hungSince: 0,
+    /** Held: when he next glances up, and the glance under way ({from, until}), or null. */
+    lookUpAt: Infinity,
+    /** @type {{from: number, until: number}|null} */
+    lookUp: null,
   };
 
   // ---- changes of state ---------------------------------------------------------------------
@@ -279,9 +317,12 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     m.restart = m.clip !== 'gait';
     if (state !== 'react') m.reaction = null;
     if (state === 'idle') m.idleFor = between(rng, T.idleMin, T.idleMax);
+    m.lookUp = null;
     if (state === 'held') {
       m.thrashAt = m.t + between(rng, T.thrashMin, T.thrashMax);
+      m.thrashShook = false;
       m.hungSince = m.t;
+      m.lookUpAt = m.t + between(rng, T.lookUpFirstMin, T.lookUpFirstMax);
     }
     if (!DEVICE_STATES.has(state)) {
       m.device = false;
@@ -320,21 +361,17 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     else startClip(which);
   }
 
-  /** Sit down, turned to the camera first unless he faces it already (so his happy face shows). */
+  /** Sit down, the way he faces. */
   function sitDown() {
     m.device = false;
     m.lieAfter = false;
     enter('sitDown');
-    if (facingCamera()) return;
-    m.turning = true;
-    m.clip = 'gait';
-    m.restart = false;
   }
 
-  /** Sitting, or on the way down or up (a sit's turn to the camera isn't: he still stands). */
+  /** Sitting, or on the way down or up. */
   function seated() {
     const st = m.state;
-    return st === 'sit' || st === 'deviceSit' || st === 'standUp' || (st === 'sitDown' && !m.turning);
+    return st === 'sit' || st === 'deviceSit' || st === 'standUp' || st === 'sitDown';
   }
 
   /** Lying with the tablet, or on the way down or up. */
@@ -354,7 +391,6 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     else if (st === 'sitDown' && m.device) {
       // (Pressed again on his way down: he lies on down once he's sat; a third press, up again.)
       if (!m.lieAfter) m.lieAfter = true;
-      else if (m.turning) enter('idle');
       else afterStanding(null);
     } else if (LYING.has(st)) afterStanding(null);
     else if (st === 'sit') {
@@ -366,13 +402,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     }
   }
 
-  /** Down onto his stomach with the tablet, turning lieTurn off the camera (either way) as he goes. */
+  /** Down onto his stomach with the tablet, the way he faces. */
   function lieDown() {
     enter('lieDown');
     m.device = true;
-    const n = m.input?.newt;
-    const yaw = cameraYaw() + (rng() < 0.5 ? -1 : 1) * between(rng, T.lieTurnMin, T.lieTurnMax);
-    m.lieGoal = n ? { x: n.x + Math.sin(yaw), z: n.z + Math.cos(yaw) } : null;
   }
 
   function startClip(name) {
@@ -438,7 +471,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     else flee(p.for, p.fromThreat);
   }
 
-  // ---- dialogue mode (Play Intro) -------------------------------------------------------------
+  // ---- dialogue mode (the intro: the envelope or Replay Intro) ---------------------------------
 
   /** @param {TalkState['phase']} phase */
   function setTalkPhase(phase) {
@@ -658,7 +691,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     if (!floor) return;
     const st = m.state;
     if (down()) afterStanding({ do: 'walk', goal: { x: floor.x, z: floor.z } });
-    else if (st === 'idle' || st === 'walk' || st === 'sitDown') walk(floor, false);
+    else if (st === 'idle' || st === 'walk') walk(floor, false);
   }
 
   /** @param {GestureEvent} e */
@@ -707,8 +740,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
         else react(name);
         break;
       case 'Sit':
-        if (st === 'sitDown' && m.turning) enter('idle');
-        else if (SITTING.has(st) || LYING.has(st)) afterStanding(null);
+        if (SITTING.has(st) || LYING.has(st)) afterStanding(null);
         else sitDown();
         break;
       case 'Device':
@@ -746,14 +778,17 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     const dt = input.dt;
     const c = input.carry;
     if (m.state === 'held' && c) {
-      const add = (c.dragSpeed * T.dragStress + Math.max(0, c.shake - T.shakeSoft) * T.shakeStress) * dt;
+      const fling = Math.max(0, c.dragSpeed - T.flingFrom) * T.flingStress;
+      const add = (fling + Math.max(0, c.shake - T.shakeSoft) * T.shakeStress) * dt;
       m.stress = Math.min(T.stressMax, m.stress + add);
       if (dt > 0 && add / dt > T.decay) m.raisedAt = m.t;
       if (c.shake >= T.shakeHard) {
         m.shakenUntil = m.t + T.shakenFor;
         // (Shaken hard, he thrashes sooner.)
-        if (m.clip !== 'Thrash')
+        if (m.clip !== 'Thrash') {
           m.thrashAt = Math.min(m.thrashAt, Math.max(m.t + T.thrashShaken, m.hungSince + T.thrashRest));
+          m.thrashShook = true;
+        }
       }
     }
     if (m.t - m.raisedAt < T.decayDelay - EPS) return;
@@ -784,7 +819,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
   const TIMERS = {
     /** @param {number} age @param {BrainIn['newt']} n */
     idle(age, n) {
-      if (!calm && m.t - m.aloneSince >= T.sitAfter - EPS) sitDown();
+      // (The play area shrunk under him, a resize: he walks back in, calm or not.)
+      const back = bounds && n ? backInGoal(bounds, n) : null;
+      if (back) walk(back, false);
+      else if (!calm && m.t - m.aloneSince >= T.sitAfter - EPS) sitDown();
       else if (m.wander && bounds && n && age >= m.idleFor - EPS) walk(wanderGoal(rng, bounds, n), true);
     },
     /** @param {number} age @param {BrainIn['newt']} n */
@@ -803,7 +841,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     },
     /** @param {number} age @param {BrainIn['newt']} n */
     fall(age, n) {
-      if (n?.grounded && age >= T.fallMin - EPS) enter('land');
+      if (!n?.grounded || age < T.fallMin - EPS) return;
+      // (Dropped from high, he lands shaken up.)
+      if (age > T.dropFrom) addStress((age - T.dropFrom) * T.dropStress);
+      enter('land');
     },
     land() {
       const stressed = m.stress >= T.stressFlee;
@@ -811,12 +852,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       if (stressed) flee(T.fleeMin, true);
       else enter('idle');
     },
-    /** @param {number} age */
-    sitDown(age) {
-      if (m.turning) {
-        if (facingCamera() || age >= T.sitTurnMax - EPS) startClip('SitDown');
-        return;
-      }
+    sitDown() {
       // (With the tablet: DeviceSit, or on down to lie with it when pressed again meanwhile.)
       const next = !m.device ? 'Sit' : m.lieAfter ? 'LieDown' : 'DeviceSit';
       if (!fadeOutDue('SitDown', clipTime().remaining, next)) return;
@@ -838,7 +874,14 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
         m.restart = false;
         m.hungSince = m.t;
         m.thrashAt = m.t + between(rng, T.thrashMin, T.thrashMax);
-      } else if (m.t >= m.thrashAt - EPS) startClip('Thrash');
+        m.thrashShook = false;
+        m.lookUpAt = Math.max(m.lookUpAt, m.t + T.lookUpRest);
+      } else if (m.t >= m.thrashAt - EPS && (m.thrashShook || !glanceNear())) {
+        // (A glance a shake's Thrash cuts short is put off till after it, not dropped.)
+        if (m.lookUp) m.lookUpAt = m.t;
+        startClip('Thrash');
+        m.lookUp = null;
+      } else lookUpStep();
     },
     talk() {
       talkStep();
@@ -850,6 +893,34 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       gettingUp('GetUp');
     },
   };
+
+  /** Held: a glance up under way, or due before a Thrash starting now would be over. */
+  function glanceNear() {
+    return Boolean(m.lookUp) || m.lookUpAt - m.t < CLIPS.Thrash.length;
+  }
+
+  /**
+   * Held, hanging (not thrashing): a glance up when it's due (the next one due from its start),
+   * over when its time is up.
+   */
+  function lookUpStep() {
+    if (m.lookUp && m.t >= m.lookUp.until - EPS) m.lookUp = null;
+    else if (!m.lookUp && m.t >= m.lookUpAt - EPS) {
+      m.lookUp = { from: m.t, until: m.t + between(rng, T.lookUpForMin, T.lookUpForMax) };
+      m.lookUpAt = m.t + between(rng, T.lookUpMin, T.lookUpMax);
+    }
+  }
+
+  /** How far up his glance is, 0 to 1: eased in from its start and out to its end (smoothstep). */
+  function lookUpK() {
+    const g = m.lookUp;
+    if (!g) return 0;
+    const ease = (/** @type {number} */ x) => {
+      const u = Math.min(1, Math.max(0, x / T.lookUpEase));
+      return u * u * (3 - 2 * u);
+    };
+    return Math.min(ease(m.t - g.from), ease(g.until - m.t));
+  }
 
   /** Up (`clip`: StandUp or GetUp), then what waited for it. */
   function gettingUp(/** @type {string} */ clip) {
@@ -864,8 +935,9 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
   function face() {
     const st = m.state;
     const d = m.input?.dialogue;
-    // (The box's face comes with its line, once he's in place: getting there he keeps his own.)
-    if (st === 'talk' && d && m.talk?.phase === 'on')
+    // (The box's face comes with its line, once he's in place: getting there, or while the page
+    // holds its line back, seq −1, he keeps his own.)
+    if (st === 'talk' && d && d.seq >= 0 && m.talk?.phase === 'on')
       return { face: d.face, blink: d.face === 'neutral' ? 'normal' : 'none' };
     const name = st === 'react' ? m.reaction : m.clip === 'gait' ? GAIT_FACE[st] : m.clip;
     const since = m.turning ? 0 : m.t - m.clipStart;
@@ -883,8 +955,18 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     if (st === 'fall' || st === 'land') return { mode: 'forward', weight: 0, ease: T.dropLookEase };
     if (st === 'react' && m.reaction === 'Spook') return { mode: 'forward', weight: 0 };
     if (st === 'react' && m.reaction === 'Wave') return { mode: 'camera', weight: 1 };
-    // (Held: his head hangs in defeat, the clip's; a light look aimed down, glancing about.)
-    if (st === 'held') return { mode: 'forward', weight: T.heldLook, pitch: T.heldPitch };
+    // (Held: his head hangs in defeat, the clip's; a light look aimed down, glancing about, and
+    // now and then up at you: `up`.)
+    if (st === 'held') {
+      return {
+        mode: 'forward',
+        weight: T.heldLook,
+        pitch: T.heldPitch,
+        up: lookUpK(),
+        lift: T.lookUpLift,
+        upWeight: T.lookUpWeight,
+      };
+    }
     // (With the tablet: at it, as the clips look.)
     if (st === 'deviceSit' || LYING.has(st)) return { mode: 'forward', weight: 0 };
     if (st === 'flee') return { mode: 'back', weight: 1, at: pursuer() };
@@ -918,14 +1000,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
         if (m.talk?.phase === 'walk' && m.goal)
           return { mode: 'goto', goal: { x: m.goal.x, z: m.goal.z }, speed: T.walkSpeed };
       // falls through: he faces the camera
-      case 'react':
-      case 'sitDown': {
+      case 'react': {
         const c = m.input?.camera;
         return { mode: 'face', goal: c ? { x: c.x, z: c.z } : null, speed: 0 };
       }
-      case 'lieDown':
-      case 'deviceLie':
-        return { mode: 'face', goal: m.lieGoal ? { x: m.lieGoal.x, z: m.lieGoal.z } : null, speed: 0 };
       default:
         return { mode: 'stay', goal: null, speed: 0 };
     }

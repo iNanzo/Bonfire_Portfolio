@@ -84,6 +84,8 @@ export function createBody({ x = 0, z = 0, yaw = 0 } = {}) {
  * @property {XYZ} [collar]  held: the collar now (read when he's grabbed)
  * @property {XYZ} [target]  held: where the pointer's ray meets the lift height
  * @property {number} [footOffset]  falling: his lowest foot's height over his root
+ * @property {XYZ|null} [released]  let go: the velocity the hold lets him go with (hold.js
+ *   Hold.release); left out or null, carry.js toss
  */
 
 /**
@@ -93,7 +95,7 @@ export function createBody({ x = 0, z = 0, yaw = 0 } = {}) {
  * @param {BodyIn} o
  * @returns {BodyState}
  */
-export function bodyStep(s, { state, move, pointer, bounds, dt, t, collar, target, footOffset = 0 }) {
+export function bodyStep(s, { state, move, pointer, bounds, dt, t, collar, target, footOffset = 0, released = null }) {
   if (state === 'held' && collar && target) {
     if (s.mode !== 'held') {
       s.carry = grab(collar, t);
@@ -107,8 +109,8 @@ export function bodyStep(s, { state, move, pointer, bounds, dt, t, collar, targe
     return s;
   }
   if (s.mode === 'held') {
-    // Let go (or a state that isn't held): tossed with the hold's last samples.
-    s.vel = s.carry ? toss(s.carry) : { x: 0, y: 0, z: 0 };
+    // Let go (or a state that isn't held): tossed as the hold says, or with the hold's last samples.
+    s.vel = released ? { ...released } : s.carry ? toss(s.carry) : { x: 0, y: 0, z: 0 };
     s.carry = null;
     s.mode = 'fall';
   }
@@ -208,6 +210,33 @@ export function lookAim(mode, { head, yaw, camera, pointer, pursuer = null }) {
   if (pointer.ray) return { aim: screenAim(pointer.ray, head, yaw, camera), ahead };
   if (!pointer.floor) return { aim: null, ahead };
   return { aim: aimAngles(head, yaw, { x: pointer.floor.x, y: 0, z: pointer.floor.z }, LOOK.floorBias), ahead };
+}
+
+/**
+ * Where "ahead" is for lookStep, from lookAim's `ahead` (the viewer) and the brain's look
+ * (BrainOut.look): the viewer, unless it asks for a pitch; then that pitch, the viewer's yaw kept,
+ * unless it also gives `up` (held: his head hung over his own front, no turn to the camera,
+ * however far up his glance is: the glance is a look of its own, glanceFront, that lookAt.js
+ * glanceLook turns this one into).
+ * @param {Aim} ahead
+ * @param {{pitch?: number, up?: number, lift?: number}} want
+ * @returns {Aim}
+ */
+export function lookFront(ahead, want) {
+  if (want.pitch === undefined) return ahead;
+  if (want.up === undefined) return { yaw: ahead.yaw, pitch: want.pitch };
+  return { yaw: 0, pitch: want.pitch };
+}
+
+/**
+ * Held, where his glance up looks (lookAt.js glanceStep): the viewer, `lift` radians higher (the
+ * look goes on over the Held clip's own droop).
+ * @param {Aim} ahead  lookAim's (the viewer)
+ * @param {{lift?: number}} want  BrainOut.look
+ * @returns {Aim}
+ */
+export function glanceFront(ahead, want) {
+  return { yaw: ahead.yaw, pitch: ahead.pitch + (want.lift ?? 0) };
 }
 
 /**

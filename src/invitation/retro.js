@@ -16,7 +16,9 @@
 // the depth changes (the DS's edge marking), or with `outline.outside` on the paper texels
 // just outside his silhouette, as a darker shade of his colour there (a sprite's outline);
 // `outline.darken` darker, and multiplied by `outline.tint` unless `outline.ink` is 'dark'.
-// The floor, the shadow and the paper make none.
+// The floor, the shadow and the paper make none. His trim (ID.trim: the earrings' one-texel pixel
+// art) is drawn as he is but takes no lines, no hover and no ring round it, and his own edge
+// doesn't count it as outside him, so a cross one texel wide stays one texel wide.
 //
 // The floor: drawn into the colour target, any ShadowMaterial in the scene is swapped for the
 // pass's catcher, which writes the shadow's coverage into the colour's alpha beside the floor's
@@ -57,8 +59,11 @@ import { floorLook } from './floor.js';
 import { BAYER4 } from './pixels.js';
 import { warmthTint } from './shader.js';
 
-/** Surface ids (written into the colour's alpha as id / ID_SCALE; 0 is nothing drawn). */
-export const ID = { newt: 1, floor: 2 };
+/**
+ * Surface ids (written into the colour's alpha as id / ID_SCALE; 0 is nothing drawn): NEWT, the
+ * floor, and his trim (pixel art on him, drawn as he is, with no lines of its own).
+ */
+export const ID = { newt: 1, floor: 2, trim: 3 };
 const ID_SCALE = 16;
 /** The floor's alpha carries its shadow's coverage in this much of an id step above ID.floor. */
 const SHADE_SPAN = 0.9;
@@ -250,6 +255,16 @@ export function markId(material, id, opts = {}) {
   return material;
 }
 
+/**
+ * The uniforms a material of its own (a ShaderMaterial, not a built-in markId can patch) writes
+ * its surface id by: `gl_FragColor.a = mix(1.0, uSurfaceId, uIdOn)`, uIdOn the switch every
+ * marked material shares (no ids at Pixel Size Off).
+ * @param {number} id  ID's
+ */
+export function surfaceIdUniforms(id) {
+  return { uSurfaceId: { value: id / ID_SCALE }, uIdOn: ID_ON };
+}
+
 /** How far past a texel's edge (texels) a held snap keeps to its texel (snapShift's `hold`). */
 export const SNAP_HOLD = 0.25;
 
@@ -393,6 +408,7 @@ export const POST_SHADER = /* glsl */ `
   #define ID_SCALE ${ID_SCALE.toFixed(1)}
   #define NEWT ${ID.newt.toFixed(1)}
   #define FLOOR ${ID.floor.toFixed(1)}
+  #define TRIM ${ID.trim.toFixed(1)}
   #define SPAN ${SHADE_SPAN.toFixed(2)}
   #define MAX_SOFT ${MAX_SOFT}
   #define HOVER_FILL 0.1
@@ -441,6 +457,7 @@ export const POST_SHADER = /* glsl */ `
   bool inBox(vec2 p, vec4 b) { return p.x >= b.x && p.y >= b.y && p.x <= b.z && p.y <= b.w; }
   float idOf(vec4 c) { return floor(c.a * ID_SCALE + 0.02); }
   bool isNewt(vec2 p) { return inside(p) && abs(idOf(at(p)) - NEWT) < 0.5; }
+  bool isTrim(vec2 p) { return inside(p) && abs(idOf(at(p)) - TRIM) < 0.5; }
   // The floor's shadow coverage, 0..1; -1 off the floor.
   float shadeOf(vec4 c) {
     float a = c.a * ID_SCALE;
@@ -477,7 +494,7 @@ export const POST_SHADER = /* glsl */ `
     for (int k = 0; k < 4; k++) {
       vec2 n = p + STEPS[k];
       if (!inside(n)) continue;
-      if (!isNewt(n)) {
+      if (!isNewt(n) && !isTrim(n)) {
         if (uOutside < 0.5) return true;
         continue;
       }
@@ -525,14 +542,16 @@ export const POST_SHADER = /* glsl */ `
     vec2 p = gl_FragCoord.xy;
     vec4 src = at(p);
     float d = bayer(p) - 0.5;
-    if (abs(idOf(src) - NEWT) < 0.5) {
+    // (His trim: graded and quantized as he is, nothing else.)
+    bool trim = abs(idOf(src) - TRIM) < 0.5;
+    if (trim || abs(idOf(src) - NEWT) < 0.5) {
       vec3 col = grade(src.rgb);
-      if (uOutline > 0.5 && edgeOnNewt(p)) col *= uInk * (1.0 - uDarken);
+      if (!trim && uOutline > 0.5 && edgeOnNewt(p)) col *= uInk * (1.0 - uDarken);
       // (The pointer on him: a two-texel rim, dithered in as it grows, and a sprinkle further in;
       // the grab ring over him.)
-      bool edge = uHover > 0.0 && rimOf(p);
-      if (uHover > 0.0 && bayer(p) < uHover * (edge ? 1.0 : HOVER_FILL)) col = mix(col, uHoverInk, 0.6);
-      if (burstAt(p)) col = uHoverInk;
+      bool edge = !trim && uHover > 0.0 && rimOf(p);
+      if (!trim && uHover > 0.0 && bayer(p) < uHover * (edge ? 1.0 : HOVER_FILL)) col = mix(col, uHoverInk, 0.6);
+      if (!trim && burstAt(p)) col = uHoverInk;
       gl_FragColor = vec4(quantize(col, d * uDither), 1.0);
       return;
     }

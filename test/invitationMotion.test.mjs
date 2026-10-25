@@ -24,7 +24,9 @@ import {
   holdStep,
   toss,
   fallStep,
-  carryFeel,
+  createHand,
+  handFeel,
+  handStep,
   CARRY,
   dragPlane,
   dragTarget,
@@ -329,7 +331,7 @@ test('dragging: on a camera-facing vertical plane through where he was grabbed; 
 test('held at the play area’s edge, he stops there (a box, a disc, a trapezoid or a rounded square, round its corners too): the anchor keeps to the drag plane’s line across the floor (never slid along the edge in depth), and the push points on out along it', () => {
   const disc = { minX: -2, maxX: 2, minZ: -2, maxZ: 2, r: 2 };
   const trapezoid = { minX: -1.5, maxX: 1.5, minZ: -2, maxZ: 1.4, minXBack: -2.5, maxXBack: 2.5 };
-  // (The toy's play area, area.js roundSquare: the line below runs out through its corners.)
+  // (A rounded square, Bounds.round: the line below runs out through its corners.)
   const rounded = { minX: -2, maxX: 2, minZ: -2, maxZ: 2, round: 1 };
   const inBounds = (b, p) => {
     const q = clampTo(b, p);
@@ -402,10 +404,13 @@ test('the swing’s limit is soft: hard flicks tilt him a little past CARRY.tilt
 });
 
 test('carrying: a swing reads the same when the pointer’s spot only moves every second or third frame (a 60 Hz finger on a 120–144 Hz screen): as big, and no hard shake', () => {
-  /** A gentle swing, ±0.3 units at 1 Hz for 4 s, the spot moving on every `every`th frame. */
+  /** CSS px a world unit where he hangs (main.js pxPerUnit), for the hand. */
+  const PX = 100;
+  /** A gentle swing, ±0.3 units at 1 Hz for 4 s, the spot (and the pointer) moving on every `every`th frame. */
   const swingAt = (fps, every) => {
     const dt = 1 / fps;
     const c = grab({ x: 0, y: 1.2, z: 0 }, 0);
+    const h = createHand({ x: 0, y: 0 }, 0);
     let target = { x: 0, y: 1.2, z: 0 };
     let tilt = 0;
     let shake = 0;
@@ -413,9 +418,10 @@ test('carrying: a swing reads the same when the pointer’s spot only moves ever
       const t = i * dt;
       if (i % every === 0) target = { x: 0.3 * Math.sin(2 * Math.PI * t), y: 1.2, z: 0 };
       holdStep(c, target, dt, BOUNDS, t);
+      handStep(h, { x: target.x * PX, y: 0 }, dt, t, PX);
       if (t > 0.3) {
         tilt = Math.max(tilt, Math.abs(c.tilt.z));
-        shake = Math.max(shake, c.shake);
+        shake = Math.max(shake, h.shake);
       }
     }
     return { tilt, shake };
@@ -435,14 +441,14 @@ test('carrying: a swing reads the same when the pointer’s spot only moves ever
     assert.ok(r.shake < TUNE.shakeHard, `${at}: shake at most ${r.shake.toFixed(1)}, under ${TUNE.shakeHard}`);
   }
   // A gentle lift (half a unit in a second) at 131 fps with the spot moving every other frame.
-  const c = grab({ x: 0, y: 0.7, z: 0 }, 0);
-  let target = { x: 0, y: 0.7, z: 0 };
+  const h = createHand({ x: 0, y: 0 }, 0);
+  let up = 0;
   let most = 0;
   for (let i = 1; i <= 131 * 1.2; i++) {
     const t = i / 131;
-    if (i % 2 === 0) target = { x: 0, y: 0.7 + 0.5 * Math.min(1, t), z: 0 };
-    holdStep(c, target, 1 / 131, BOUNDS, t);
-    if (t > 0.2) most = Math.max(most, c.shake);
+    if (i % 2 === 0) up = 0.5 * Math.min(1, t);
+    handStep(h, { x: 0, y: -up * PX }, 1 / 131, t, PX);
+    if (t > 0.2) most = Math.max(most, h.shake);
   }
   assert.ok(most < TUNE.shakeSoft, `a gentle lift is no shake at all (${most.toFixed(1)})`);
 });
@@ -460,7 +466,6 @@ test('carrying: a drag swings his root like a pendulum, and the swing settles', 
     maxAbs = Math.max(maxAbs, Math.abs(c.tilt.z), Math.abs(c.tilt.x));
   }
   assert.ok(minZ < -0.1, `tilt.z ${minZ}: positive tilt.z puts his feet toward +x, so a drag to +x tilts it negative`);
-  assert.ok(carryFeel(c).dragSpeed >= 0, 'carryFeel reports the drag');
   // Toward the viewer (+z): positive tilt.x (feet trail to -z).
   const c2 = grab({ x: 0, y: 1, z: 0 }, 0);
   let t2 = 0;
@@ -478,12 +483,21 @@ test('carrying: a drag swings his root like a pendulum, and the swing settles', 
   }
   assert.ok(Math.abs(c.tilt.z) < 0.02 && Math.abs(c.tiltVel.z) < 0.05, `still swinging: ${c.tilt.z}`);
   assert.ok(maxAbs <= CARRY.tiltMax + 1e-6);
-  assert.ok(carryFeel(c).dragSpeed < 0.01);
-  // A hard shake (a hand's: ±0.15 units, four times a second) reads as one.
+});
+
+test('the hand (what the brain feels while he’s held): a drag reports its speed, a still pointer none, and a hard shake (±0.15 units, four times a second) reads as one', () => {
+  const PX = 100;
+  const h = createHand({ x: 0, y: 0 }, 0);
+  let t = 0;
+  for (let i = 0; i < 20; i++) handStep(h, { x: Math.min(1, (i + 1) * 3 * DT) * PX, y: 0 }, DT, (t += DT), PX);
+  assert.ok(handFeel(h).dragSpeed > 1, `dragged: ${handFeel(h).dragSpeed}`);
+  for (let i = 0; i < 240; i++) handStep(h, { x: PX, y: 0 }, DT, (t += DT), PX);
+  assert.ok(handFeel(h).dragSpeed < 0.01);
+  assert.ok(handFeel(h).shake < 0.01);
   let most = 0;
   for (let i = 0; i < 60; i++) {
-    holdStep(c, { x: 1 + 0.15 * Math.sin(2 * Math.PI * 4 * i * DT), y: 1, z: 0 }, DT, BOUNDS, (t += DT));
-    most = Math.max(most, carryFeel(c).shake);
+    handStep(h, { x: (1 + 0.15 * Math.sin(2 * Math.PI * 4 * i * DT)) * PX, y: 0 }, DT, (t += DT), PX);
+    most = Math.max(most, handFeel(h).shake);
   }
   assert.ok(most > TUNE.shakeHard, `shake ${most}`);
 });
@@ -660,6 +674,41 @@ test('falling: gravity, soft wall bounces, and he lands when his lowest foot rea
 
   // Already on the floor: landed at once.
   assert.equal(fallStep({ x: 0, y: 0.1, z: 0 }, { x: 0, y: 0, z: 0 }, -0.05, DT, BOUNDS).landed, true);
+});
+
+test('falling in a rounded square: a drop or a throw into a corner stays inside its arc (not the box round it), bouncing softly off the arc', () => {
+  const b = { minX: -2, maxX: 2, minZ: -2, maxZ: 2, round: 1 };
+  const inArc = (p) => Math.hypot(Math.max(0, Math.abs(p.x) - 1), Math.max(0, Math.abs(p.z) - 1)) <= 1 + 1e-6;
+  const FOOT = -0.1;
+  // Dropped still in a corner, outside the arc but inside the box: it lands inside the arc.
+  let root = { x: 1.9, y: 1, z: -1.9 };
+  let vel = { x: 0, y: 0, z: 0 };
+  for (let i = 0; i < 120; i++) {
+    const r = fallStep(root, vel, root.y + FOOT, DT, b);
+    root = r.root;
+    vel = r.vel;
+    if (r.landed) break;
+  }
+  assert.ok(inArc(root), `landed ${JSON.stringify(root)} inside the corner’s arc`);
+  // Thrown diagonally into a corner: inside the arc every frame, its speed out of it turned back, softened.
+  root = { x: 1, y: 1.2, z: 1 };
+  vel = { x: 3, y: 0, z: 3 };
+  let bounced = null;
+  for (let i = 0; i < 60 && !bounced; i++) {
+    const r = fallStep(root, vel, root.y + FOOT, DT, b);
+    assert.ok(inArc(r.root), `frame ${i}: ${JSON.stringify(r.root)} inside the arc`);
+    if (r.vel.x < 0 && r.vel.z < 0) bounced = r.vel;
+    root = r.root;
+    vel = r.vel;
+  }
+  assert.ok(bounced, 'bounced off the arc');
+  close(Math.hypot(bounced.x, bounced.z), Math.hypot(3, 3) * CARRY.restitution, 1e-6, 'softly:');
+  // Along a straight side it's the box's as before.
+  root = { x: 1.98, y: 1.2, z: 0 };
+  vel = { x: 3, y: 0, z: 0 };
+  const r = fallStep(root, vel, root.y + FOOT, DT, b);
+  close(r.root.x, 2, 1e-9);
+  close(r.vel.x, -3 * CARRY.restitution, 1e-9);
 });
 
 // ---- blend --------------------------------------------------------------------------------
@@ -1046,8 +1095,11 @@ function rollInput(r, t, holding) {
 /** Moves NEWT the way main.js does: carried, falling or steered. */
 function moveNewt(w, out, t) {
   if (out.state === 'held') {
+    const spot = { x: Math.sin(t * 3) * 3, y: 1.2, z: Math.cos(t * 2) };
     w.carry ??= grab({ x: w.body.x, y: 0.9, z: w.body.z }, t);
-    holdStep(w.carry, { x: Math.sin(t * 3) * 3, y: 1.2, z: Math.cos(t * 2) }, DT, BOUNDS, t);
+    w.hand ??= createHand({ x: spot.x * 100, y: spot.z * 100 }, t);
+    holdStep(w.carry, spot, DT, BOUNDS, t);
+    handStep(w.hand, { x: spot.x * 100, y: spot.z * 100 }, DT, t, 100);
     w.body = { ...w.body, x: w.carry.anchor.x, z: w.carry.anchor.z, speed: 0 };
     return;
   }
@@ -1055,6 +1107,7 @@ function moveNewt(w, out, t) {
     if (w.carry)
       w.fall = { root: { x: w.carry.anchor.x, y: w.carry.anchor.y - 0.9, z: w.carry.anchor.z }, vel: toss(w.carry) };
     w.carry = null;
+    w.hand = null;
     if (!w.fall) return;
     const f = fallStep(w.fall.root, w.fall.vel, w.fall.root.y, DT, BOUNDS);
     w.fall = f.landed ? null : { root: f.root, vel: f.vel };
@@ -1062,6 +1115,7 @@ function moveNewt(w, out, t) {
     return;
   }
   w.carry = null;
+  w.hand = null;
   w.fall = null;
   w.body = steer(w.body, out.move, w.pointer, BOUNDS, DT);
 }
@@ -1071,7 +1125,15 @@ test('two minutes of rough random play: valid states and clips, always in the pl
   for (const seed of [1, 2, 3]) {
     const r = createRng(seed * 101);
     const brain = createBrain({ seed, calm: false, bounds: BOUNDS, tune: { sitAfter: 6 } });
-    const w = { body: { x: 0, z: 0, yaw: 0, speed: 0 }, carry: null, fall: null, pointer: null, clip: null, start: 0 };
+    const w = {
+      body: { x: 0, z: 0, yaw: 0, speed: 0 },
+      carry: null,
+      hand: null,
+      fall: null,
+      pointer: null,
+      clip: null,
+      start: 0,
+    };
     let weights = { Idle: 1 };
     let main = 'Idle';
     let t = 0;
@@ -1089,7 +1151,7 @@ test('two minutes of rough random play: valid states and clips, always in the pl
         pointer: w.pointer,
         newt: { x: w.body.x, z: w.body.z, yaw: w.body.yaw, grounded: !w.carry && !w.fall },
         clip: w.clip ? { name: w.clip, time: t - w.start, remaining: CLIPS[w.clip].length - (t - w.start) } : null,
-        carry: w.carry ? carryFeel(w.carry) : null,
+        carry: w.carry && w.hand ? handFeel(w.hand) : null,
       });
       visited.add(out.state);
       assert.ok(STATES.includes(out.state), out.state);
