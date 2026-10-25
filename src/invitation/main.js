@@ -1572,7 +1572,7 @@ function start(s) {
     cue.mode = mode;
     cue.ringAt = ring > 0 ? at : null;
     if (ring > 0) s.setMarker(at, 2 * CUES.ring * NEWT_HEIGHT, ring);
-    else s.setMarker(mark);
+    else s.setPointerMarker(mark);
     s.setLine(
       c.bonePos(COLLAR, { x: 0, y: 0, z: 0 }),
       { x: at.x, y: CARRY.floorY, z: at.z },
@@ -1725,6 +1725,8 @@ function start(s) {
       hips: hips ? { x: hips.x, z: hips.z } : null,
       lowestFoot: c ? lowestY() : null,
       ring: cue.ringAt ? { x: cue.ringAt.x, z: cue.ringAt.z, alpha: s.marker.material.opacity / 0.85 } : null,
+      // (The floor ring as drawn: the cursor marker or the ring under him, ring.js.)
+      marker: s.markerState,
       line: s.lineState,
       groundCues: cue.mode,
       pushed: Boolean(carry?.push),

@@ -83,7 +83,11 @@ loads behind it.
   hips and shrinks, fades and softens the higher his feet are; it stays while he flies, so you
   see where he'll land. With **Ground Cues** on (Settings), a ring sits on the floor under him
   while he's held and a dashed line drops from his collar to it; the ring flashes when you push
-  him against the edge of his patch.
+  him against the edge of his patch. That ring, and the smaller one that marks where the cursor
+  meets the floor, are drawn crisp at any angle and zoom: a rim two pixels wide, at least six
+  pixels round, stepping a whole pixel at a time as it moves (a smooth edge at Pixel Size Off).
+  The cursor's fades out as the view gets low over it, under about 18°, where a ring would
+  flatten into a dash.
 - **Point at him** (the mouse over him, or a finger pressing on him) and a gold dithered outline
   fills in round him, a texel or two outside him and two in, with a sprinkle further in; it
   fades as you move off, and it doesn't show while he's held or during the intro. At Pixel Size
@@ -291,7 +295,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   modules (a shared `src/` module would share a chunk with the portfolio's first load).
   - Browser-only and thin: `main.js` (boot, the loop, the wiring in `types.js`'s frame
     order), `stage.js` (renderer at texel size, the camera with its off-centre projection,
-    lights and shadows, the blob shadow and the floor marker, and each frame the boxes round
+    lights and shadows, the blob shadow and the floor ring (`setMarker`, under him while he's
+    held; `setPointerMarker`, the cursor's), and each frame the boxes round
     NEWT the retro pass keeps its work to; `setZoomScale(k)`, which main.js calls with the
     orbit's home distance over its distance, sizes the texel to the zoom, refitting the grid only
     when the block changes; the frame-time governor's level added to every texel, and `?perf`'s
@@ -337,7 +342,12 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     approach, as the page imports nothing from `src/ui`), `cursor.js` (the five pixel cursors drawn at 1× and 2×, at most 32 CSS px, as
     `url()`, `-webkit-image-set()` and `image-set()` with exact hotspots and a system fallback;
     `cursorKind`, which shows, set as the stage's `data-cursor` each frame), `invitation.css`.
-  - Pure and unit-tested: `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
+  - Pure and unit-tested: `ring.js` (the floor ring's shader, `RING_FRAGMENT`: each texel's
+    distance to its centre, the rim `RING.rim` (2) texels wide from that distance's screen
+    derivative, cut hard with the pixel look on and smooth over a texel at Off, `ringCover` its
+    JS twin; `snapToTexel`, the centre moved to the nearest texel corner on screen;
+    `ringRadius`/`texelSize`, at least `RING.minTexels` (6) texels round; `markerFade`, the
+    cursor marker full from 18° of elevation over it and gone by 10°), `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
     to 256, a texel is `max(1, round(NEWT's default height in device px / N))` device pixels,
     `blockFor`, so he's about N texels tall; Native, a texel a device pixel at the real DPR with
     no cap; Off, the screen's pixels with the DPR capped at `OFF_DPR` (2); `pixelSteps`, a
@@ -779,6 +789,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   normal, `pushed` at the edge), `drag` the hold's (its own height `controls`, `aim`: where it aims his collar, client px, the `pointer`, the `gap` between them,
   CSS px, `holdY`, the `anchor` and its `depth` along the camera's level axis, away positive,
   the `blob` as set, his `hips`' floor point and `lowestFoot`, the `ring` and the drop `line`,
+  the floor ring as drawn (`marker`: shown, centre, radius in world units and `texels`, `alpha`,
+  the view's `elevation` over it),
   `groundCues` as it plays and `pushed`); `view({yaw, elevation, zoom})` eases the camera there
   (radians; zoom the home distance over the distance); the limp layer (`limp.weight`, `limp.most`: the most a limb
   has swung, radians) and Screen Time (`device.state` and `label`, the tablet `shown` and its

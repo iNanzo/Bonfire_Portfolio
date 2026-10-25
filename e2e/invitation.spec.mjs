@@ -81,6 +81,52 @@ async function newtPicture(page, frames = 3) {
 }
 /** How far apart two pictures are (the mean difference per channel). */
 const apart = (a, b) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.length;
+/**
+ * The floor ring round `at` (client px, within `half` of it), from a screenshot in grey: the dark
+ * runs across and down through its middle (px each), its width (px) and how many of its pixels
+ * are in-between greys (neither floor nor ink: an edge's falloff).
+ */
+async function ringRuns(page, at, half) {
+  const clip = { x: at.x - half, y: at.y - half, width: 2 * half, height: 2 * half };
+  const { data, info } = await sharp(await page.screenshot({ clip }))
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const w = info.width;
+  const h = info.height;
+  const px = (x, y) => data[(y * w + x) * info.channels];
+  const floor = Math.max(px(0, 0), px(w - 1, 0), px(0, h - 1), px(w - 1, h - 1));
+  let ink = 255;
+  for (let i = 0; i < w * h; i++) ink = Math.min(ink, data[i * info.channels]);
+  const dark = (x, y) => px(x, y) < (floor + ink) / 2;
+  const box = [w, h, -1, -1];
+  let greys = 0;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const v = px(x, y);
+      if (v > ink + 0.2 * (floor - ink) && v < floor - 0.2 * (floor - ink)) greys++;
+      if (!dark(x, y)) continue;
+      box[0] = Math.min(box[0], x);
+      box[1] = Math.min(box[1], y);
+      box[2] = Math.max(box[2], x);
+      box[3] = Math.max(box[3], y);
+    }
+  const runs = (cells) =>
+    (
+      cells
+        .map((d) => (d ? 1 : 0))
+        .join('')
+        .match(/1+/g) ?? []
+    ).map((r) => r.length);
+  const cx = Math.round((box[0] + box[2]) / 2);
+  const cy = Math.round((box[1] + box[3]) / 2);
+  return {
+    across: runs(Array.from({ length: w }, (_, x) => dark(x, cy))),
+    down: runs(Array.from({ length: h }, (_, y) => dark(cx, y))),
+    width: box[2] - box[0] + 1,
+    greys,
+  };
+}
 /** A picture of one flat colour: the mean of `pic`. */
 function flat(pic) {
   const mean = [0, 1, 2].map((c) => pic.filter((_, i) => i % 3 === c).reduce((s, v) => s + v, 0) / (pic.length / 3));
@@ -1904,6 +1950,57 @@ test.describe('on a desktop', () => {
       [32, 32],
       [64, 64],
     ]);
+  });
+
+  test('the floor ring is drawn from its distance: at 48×48 a rim two texels wide across and down, six texels round at least; it fades as the view gets low over it, and at Off its edge is smooth', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '48' })));
+    await calm(page);
+    const body = await on(page, 'body');
+    const at = { x: Math.round(body.x + 260), y: Math.round(body.y + 30) };
+    await page.mouse.move(at.x, at.y);
+    await until(page, (s) => s.drag.marker.visible && s.drag.marker.alpha > 0.99, 'the cursor marker up');
+    const { drag, pass } = await snapshot(page);
+    expect(drag.marker.texels, 'six texels round at least').toBeGreaterThanOrEqual(5.99);
+    const ring = await ringRuns(page, at, Math.ceil((drag.marker.texels + 4) * pass.pd));
+    // (dpr 1: a texel is pd CSS px. Two runs across and two down through its middle, each about
+    // two texels: the rim keeps its width on screen however the floor is foreshortened.)
+    for (const [way, runs] of [
+      ['across', ring.across],
+      ['down', ring.down],
+    ]) {
+      expect(runs.length, `${way}: the rim twice`).toBe(2);
+      for (const r of runs) {
+        expect(r / pass.pd, `${way}: about two texels`).toBeGreaterThanOrEqual(1.5);
+        expect(r / pass.pd, `${way}: about two texels`).toBeLessThanOrEqual(3);
+      }
+    }
+    expect(ring.width / pass.pd, 'twelve texels across at least').toBeGreaterThanOrEqual(11);
+    expect(ring.greys, 'a hard cut with the pixel look on').toBeLessThanOrEqual(ring.width / pass.pd);
+    // A low view over it: the cursor marker fades (gone by 10°), and comes back up high.
+    await page.evaluate(() => window.__invitation.view({ elevation: (12 * Math.PI) / 180 }));
+    await until(page, (s) => !s.camera.turning && Math.abs(s.camera.elevation - (12 * Math.PI) / 180) < 0.01, '12°');
+    const middle = await page.evaluate(() => {
+      const r = document.querySelector('[data-stage]').getBoundingClientRect();
+      const bar = document.querySelector('.inv-toolbar').getBoundingClientRect();
+      return { x: r.left + r.width * 0.75, y: (r.top + bar.top) / 2 };
+    });
+    await page.mouse.move(middle.x, middle.y);
+    await until(page, (s) => s.drag.marker.elevation < (14 * Math.PI) / 180 && s.drag.marker.alpha < 0.5, 'faded low');
+    await page.evaluate(() => window.__invitation.view({ elevation: (70 * Math.PI) / 180 }));
+    await page.mouse.move(middle.x + 1, middle.y);
+    await until(page, (s) => !s.camera.turning && s.drag.marker.visible && s.drag.marker.alpha > 0.99, 'full high');
+    // At Off: the same ring, its edge smooth (in-between greys on the way in and out).
+    await page.addInitScript(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: 'off' })));
+    await calm(page);
+    const again = await on(page, 'body');
+    const spot = { x: Math.round(again.x + 260), y: Math.round(again.y + 30) };
+    await page.mouse.move(spot.x, spot.y);
+    await until(page, (s) => s.drag.marker.visible && s.drag.marker.alpha > 0.99, 'the cursor marker up at Off');
+    const off = await ringRuns(page, spot, Math.ceil((await snapshot(page)).drag.marker.texels + 6));
+    expect(off.across.length, 'the rim twice across').toBe(2);
+    expect(off.greys, 'a smooth edge').toBeGreaterThanOrEqual(4);
   });
 
   test('hovering turns his head', async ({ page }) => {
