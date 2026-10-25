@@ -110,8 +110,8 @@ test('the smaller crosses: five pixels tall (arms one each side, top one, foot t
 
 test('which art for the cross’s size in the world: never drawn over 1.5 times as tall, hidden under the smallest’s step, and held near a step so it never flickers', () => {
   /** Drawn texels tall for a cross `texels` tall in the world (0: hidden). */
-  const drawn = (texels, prev = -1) => {
-    const a = earArt(texels, prev);
+  const drawn = (texels) => {
+    const a = earArt(texels);
     return a < 0 ? 0 : a === 0 ? CROSS_ART.length * earScale(texels) : EAR_ARTS[a].cross.length;
   };
   for (let h = 0; h <= 10; h += 0.01) {

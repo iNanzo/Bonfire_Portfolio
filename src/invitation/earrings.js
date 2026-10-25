@@ -6,11 +6,14 @@
 // in the world, never under one), and each sprite's anchor is snapped to a texel's centre in the
 // vertex shader (after his head's texel snap), so the cross's bars are crisp straight lines with
 // square ends at Pixel Size 96 and 128, and the same art a few texels to a pixel at Native and
-// Off. The chain is a GL line (one texel wide) from the stud to the cross's top, its ends snapped
+// Off. At the coarse Pixel Sizes, where the cross is only a few texels tall in the world, it
+// takes smaller art (EAR_ARTS, earArt: five pixels tall, then a three-pixel plus, with a
+// one-pixel stud), never drawn over half as big again as it is; smaller still, the earring
+// isn't drawn at all. The chain is a GL line (one texel wide) from the stud to the cross's top, its ends snapped
 // the same way. All of it is marked as his trim (retro.js ID.trim): drawn as he is, but with no
 // outline round it, which would have tripled a one-texel line. character.js hangs each earring
-// on his head bone and swings its chain on the limp spring (carry.js limbStep); spriteShift and
-// earScale are pure.
+// on his head bone and swings its chain on the limp spring (carry.js limbStep); spriteShift,
+// earScale and earArt are pure.
 
 import * as THREE from 'three';
 import { ID, surfaceIdUniforms } from './retro.js';
@@ -40,6 +43,25 @@ export const EAR_BLACK = 0x141418;
 export const CROSS_ART = Object.freeze(['...#...', '...#...', '.#####.', '...#...', '...#...', '...#...', '...#...']);
 /** The stud: two pixels square. */
 export const STUD_ART = Object.freeze(['##', '##']);
+/**
+ * The cross's art for each size, biggest first: each is drawn while the cross is `from` texels
+ * tall in the world or more (CROSS_ART at earScale's scale; the smaller ones one texel to a
+ * pixel: five tall, its arms one pixel each side, its top one over them and its foot three
+ * under; then three, a plus), with its stud (one pixel with the smaller crosses). Under the last
+ * `from` it isn't drawn. Each `from` keeps the art within 1.5 times the cross's world size down
+ * to ART_HOLD under it.
+ */
+export const EAR_ARTS = Object.freeze([
+  Object.freeze({ cross: CROSS_ART, stud: STUD_ART, from: 5 }),
+  Object.freeze({
+    cross: Object.freeze(['..#..', '.###.', '..#..', '..#..', '..#..']),
+    stud: Object.freeze(['#']),
+    from: 3.6,
+  }),
+  Object.freeze({ cross: Object.freeze(['.#.', '###', '.#.']), stud: Object.freeze(['#']), from: 2.25 }),
+]);
+/** earArt keeps its art until the cross is this many texels past its step (no flicker as he moves). */
+export const ART_HOLD = 0.25;
 /** The most texels an art pixel may take (the sprites stay well under any GPU's point size limit). */
 export const MAX_SCALE = 8;
 /** earScale keeps its scale until the ideal one is this far from it (no flicker as he moves). */
@@ -59,6 +81,24 @@ export function earScale(texels, prev = 0) {
 }
 
 /**
+ * Which of EAR_ARTS to draw for a cross `texels` tall in the world: the biggest whose `from` it
+ * reaches, or -1 under them all (not drawn). `prev` (the last one, -1 hidden, null for none) is
+ * kept while the size is within ART_HOLD of its own step and the next one up.
+ * @param {number} texels
+ * @param {number|null} [prev]
+ */
+export function earArt(texels, prev = null) {
+  const h = Number.isFinite(texels) ? Math.max(0, texels) : 0;
+  const fresh = EAR_ARTS.findIndex((a) => h >= a.from);
+  if (prev === null || prev === fresh) return fresh;
+  const last = EAR_ARTS.length;
+  const i = prev < 0 ? last : prev;
+  const low = i < last ? EAR_ARTS[i].from - ART_HOLD : -Infinity;
+  const high = i > 0 ? EAR_ARTS[i - 1].from + ART_HOLD : Infinity;
+  return h >= low && h < high ? prev : fresh;
+}
+
+/**
  * From the texel centre its anchor snaps to, where a square sprite `size` texels across goes
  * (its centre, texels, x right, y up), so it covers whole texels: 'centre', the anchor's texel
  * at (or by) its middle; 'top', its top edge along the anchor texel's top, its middle column
@@ -75,6 +115,7 @@ export function spriteShift(size, at) {
 /**
  * Lifts a point uLift toward the camera (for its depth test only: it projects to the same spot),
  * snaps it to its texel's centre (after his head's texel snap), then shifts it by uShift texels.
+ * uOn 0: not drawn (outside the view).
  */
 const VERTEX = /* glsl */ `
 uniform vec2 uRes;
@@ -82,7 +123,13 @@ uniform vec2 uTexelSnap;
 uniform vec2 uShift;
 uniform float uSize;
 uniform float uLift;
+uniform float uOn;
 void main() {
+  if (uOn < 0.5) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    gl_PointSize = 1.0;
+    return;
+  }
   vec4 v = modelViewMatrix * vec4(position, 1.0);
   v.xyz += normalize(-v.xyz) * uLift;
   vec4 c = projectionMatrix * v;
@@ -148,6 +195,7 @@ function earMaterial({ snap, res, art }) {
       uShift: { value: new THREE.Vector2() },
       uSize: { value: 1 },
       uLift: { value: 0 },
+      uOn: { value: 1 },
       uColor: { value: new THREE.Color(EAR_BLACK) },
       ...surfaceIdUniforms(ID.trim),
       ...(art ? { uArt: { value: art } } : {}),
@@ -163,26 +211,29 @@ function earMaterial({ snap, res, art }) {
  * An earring for his `side`, at EARLOBES[side]: its group (to go on his head bone, its rest turn
  * taken off), the stud's sprite at the lobe, and a pivot there holding the chain (a line down
  * its −y, EARRING.line long) and the cross's sprite at its end (character.js turns the pivot
- * so its −y is the swing). Before each draw its sprites take the frame's texel grid and their
- * scale (earScale of the cross's height in texels there) and shift (spriteShift).
+ * so its −y is the swing). Before each draw its sprites take the frame's texel grid, their art
+ * (earArt of the cross's height in texels there), scale (earScale, for the whole cross) and
+ * shift (spriteShift); with no art, none of it is drawn.
  * @param {'L'|'R'} side
  * @param {{value: any}} snap  his head's texel snap (NDC, shared with his materials)
  */
 export function makeEarring(side, snap) {
   const res = { value: new THREE.Vector2(1, 1) };
-  const textures = [artTexture(STUD_ART), artTexture(CROSS_ART)];
+  // (Each art's textures, in EAR_ARTS's order: [stud, cross].)
+  const arts = EAR_ARTS.map((a) => [artTexture(a.stud), artTexture(a.cross)]);
+  const textures = arts.flat();
   const group = new THREE.Group();
   group.name = `Earring${side}`;
   group.position.fromArray(EARLOBES[side]);
   const point = (/** @type {number[]} */ at) =>
     new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(at, 3));
-  const stud = new THREE.Points(point([0, 0, 0]), earMaterial({ snap, res, art: textures[0] }));
+  const stud = new THREE.Points(point([0, 0, 0]), earMaterial({ snap, res, art: arts[0][0] }));
   stud.name = `Earring${side}Stud`;
   const pivot = new THREE.Group();
   pivot.name = `Earring${side}Swing`;
   const line = new THREE.LineSegments(point([0, 0, 0, 0, -EARRING.line, 0]), earMaterial({ snap, res }));
   line.name = `Earring${side}Line`;
-  const cross = new THREE.Points(point([0, 0, 0]), earMaterial({ snap, res, art: textures[1] }));
+  const cross = new THREE.Points(point([0, 0, 0]), earMaterial({ snap, res, art: arts[0][1] }));
   cross.position.y = -EARRING.line;
   cross.name = `Earring${side}Cross`;
   for (const o of [stud, line, cross]) {
@@ -200,8 +251,10 @@ export function makeEarring(side, snap) {
     pivot,
     line,
     cross,
-    /** Texels to an art pixel, as last drawn (0: not drawn yet). */
+    /** Texels to an art pixel, as last drawn (0: not drawn yet, or not drawn). */
     scale: 0,
+    /** Which of EAR_ARTS it was last drawn with (-1: too small, not drawn; null: not yet). */
+    art: /** @type {number|null} */ (null),
     /** @type {import('./carry.js').Limb|null} */
     m: null,
     prev: new THREE.Vector3(),
@@ -227,10 +280,23 @@ export function makeEarring(side, snap) {
     const depth = camera.isOrthographicCamera ? 1 : -at.applyMatrix4(camera.matrixWorldInverse).z;
     if (!(depth > 0)) return;
     const perUnit = (camera.projectionMatrix.elements[5] * viewport.w) / 2 / depth;
-    e.scale = earScale(EARRING.cross.h * group.getWorldScale(scale).y * perUnit, e.scale);
-    fit(stud, STUD_ART.length * e.scale, 'centre');
+    const tall = EARRING.cross.h * group.getWorldScale(scale).y * perUnit;
+    e.art = earArt(tall, e.art);
+    const on = e.art >= 0;
+    for (const o of [stud, line, cross]) o.material.uniforms.uOn.value = on ? 1 : 0;
+    if (!on) {
+      e.scale = 0;
+      stud.material.uniforms.uSize.value = 0;
+      cross.material.uniforms.uSize.value = 0;
+      return;
+    }
+    const art = EAR_ARTS[e.art];
+    e.scale = e.art === 0 ? earScale(tall, e.scale) : 1;
+    stud.material.uniforms.uArt.value = arts[e.art][0];
+    cross.material.uniforms.uArt.value = arts[e.art][1];
+    fit(stud, art.stud.length * e.scale, 'centre');
     stud.material.uniforms.uLift.value = EARRING.studLift * scale.y;
-    fit(cross, CROSS_ART.length * e.scale, 'top');
+    fit(cross, art.cross.length * e.scale, 'top');
   };
   /** @param {any} o @param {number} size @param {'centre'|'top'} where */
   const fit = (o, size, where) => {

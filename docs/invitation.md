@@ -136,7 +136,9 @@ so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
   first, then does it; picking him up takes him straight off the floor.
 - **His earrings:** a black stud on each earlobe and a little Latin cross hanging from it on a
   thin chain, drawn as pixel art (one-pixel lines with square ends, crisp at every Pixel Size),
-  swinging as he walks, turns, is carried or thrashes.
+  swinging as he walks, turns, is carried or thrashes. At the coarse Pixel Sizes the cross gets
+  smaller art (five pixels tall at 48 and 64, a three-pixel plus at 32), never much bigger than
+  it really is on him; at 16 and 24 it's too small to draw, so the earrings don't show.
 
 ## Settings
 
@@ -284,7 +286,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     skin) a stud and, on a chain `EARRING.line` long (a GL line, one texel), a Latin cross, the
     two as camera-facing sprites of pixel art (`STUD_ART` 2×2, `CROSS_ART` 7×7 of one-pixel
     bars), nearest-filtered, `earScale` texels to an art pixel (the cross's world height,
-    `EARRING.cross.h`, over its seven rows, rounded, at least 1, held near a step), each anchor
+    `EARRING.cross.h`, over its seven rows, rounded, at least 1, held near a step); with the
+    cross under 5 texels tall in the world, `earArt` picks smaller art from `EAR_ARTS` (a 5×5
+    cross from 3.6, a 3×3 plus from 2.25, each with a one-pixel stud and held `ART_HOLD` past
+    its step, so none is drawn over 1.5 times the world's size), and under that the stud,
+    chain and cross aren't drawn (`uOn` 0: the vertex shader puts them outside the view), each anchor
     snapped to a texel's centre after his head's texel snap (`spriteShift` keeps them on whole
     texels), marked as his trim (retro.js `ID.trim`: drawn as he is, no outline round it), each
     chain swinging on the same spring about straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
