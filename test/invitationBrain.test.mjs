@@ -521,13 +521,20 @@ test('held, he thrashes every 3–7 s (sooner when he’s shaken): Thrash once f
   assert.equal(out.clip, 'Fall');
 });
 
-test('held, his head hangs (a light look aimed down) and every 3–6 s he glances up at you for 0.8–1.2 s, eased up and back down; never during a Thrash', () => {
+test('held, his head hangs (a light look aimed down) and every 3–6 s he glances up at you for 0.8–1.2 s, eased up and back down, the hung look’s weight left as it is (the glance has its own); never during a Thrash', () => {
   for (const seed of [1, 2, 3, 4, 5]) {
     const s = sim({ seed, tune: { thrashMin: 99, thrashMax: 99 } });
     let out = s.grab();
     assert.deepEqual(
       out.look,
-      { mode: 'forward', weight: TUNE.heldLook, pitch: TUNE.heldPitch, up: 0, lift: TUNE.lookUpLift },
+      {
+        mode: 'forward',
+        weight: TUNE.heldLook,
+        pitch: TUNE.heldPitch,
+        up: 0,
+        lift: TUNE.lookUpLift,
+        upWeight: TUNE.lookUpWeight,
+      },
       'hanging his head',
     );
     let last = s.w.t;
@@ -540,13 +547,14 @@ test('held, his head hangs (a light look aimed down) and every 3–6 s he glance
       const up = out.look.up;
       assert.ok(up >= 0 && up <= 1, `up ${up}`);
       assert.ok(Math.abs(up - prev) <= (DT / TUNE.lookUpEase) * 1.6 + 1e-9, `eased: ${prev} → ${up}`);
-      const weight = TUNE.heldLook + (TUNE.lookUpWeight - TUNE.heldLook) * up;
-      assert.ok(Math.abs(out.look.weight - weight) < 1e-9, 'its weight with it');
+      // (The hung look keeps its light weight: the page turns it into the glance's, play.js glanceLook.)
+      assert.equal(out.look.weight, TUNE.heldLook, 'the hung look as it is');
+      assert.equal(out.look.upWeight, TUNE.lookUpWeight, 'the glance’s own weight');
       assert.equal(out.look.pitch, TUNE.heldPitch);
       if (up > 0 && !on) on = { from: s.w.t - DT, to: 0, most: 0, weight: 0 };
       if (on) {
         on.most = Math.max(on.most, up);
-        on.weight = Math.max(on.weight, out.look.weight);
+        on.weight = Math.max(on.weight, out.look.upWeight * up);
       }
       if (on && up === 0) {
         on.to = s.w.t;

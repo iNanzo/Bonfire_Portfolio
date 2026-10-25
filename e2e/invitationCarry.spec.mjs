@@ -3,7 +3,8 @@
 // cursor within 2 px once the grab has eased in (0.15 s), up and across; at the play area's
 // edge he stops (the cursor carries on, he stays put, never sliding toward or away from the
 // camera); his limbs swing against a quick drag and settle; held, he keeps the way he faced
-// when grabbed, glances up now and then, and lands facing the same way; he thrashes now and then
+// when grabbed, glances up now and then (his head only ever rising as it does: no dip, no swing to
+// a side first), and lands facing the same way; he thrashes now and then
 // (an angry kick and flail, then back to hanging). Give Device's three presses sit him down
 // with the tablet (visible in his hands), lie him on his stomach with it (in his hands as he
 // lies down), each the way he was facing (no turn to the camera), and get him up (it put away as
@@ -44,6 +45,38 @@ async function onFrame(page, pred, message, timeout = 20_000) {
     throw new Error(`${message}: ${e instanceof Error ? e.message : e}`, { cause: e });
   }
 }
+/**
+ * Held, his next glance up all the way, sampled in the page every frame as it rises: his head's
+ * turn (snapshot headYaw, headPitch) the frame before it starts, the lowest pitch and the widest
+ * yaw while it rises, and the snapshot at the top (one a Thrash cuts short starts it over).
+ */
+const nextGlance = (page, timeout = 40_000) =>
+  page.evaluate(
+    (ms) =>
+      new Promise((resolve) => {
+        const end = performance.now() + ms;
+        /** @type {{pitch: number, yaw: number}|null} */
+        let base = null;
+        /** @type {{start: {pitch: number, yaw: number}, low: number, wide: number}|null} */
+        let rising = null;
+        const tick = () => {
+          const s = window.__invitation.snapshot();
+          if (!s.held || performance.now() > end) return resolve(null);
+          if (s.lookUp === 0) {
+            base = { pitch: s.headPitch, yaw: s.headYaw };
+            rising = null;
+          } else if (base && !rising) rising = { start: base, low: Infinity, wide: Math.abs(base.yaw) };
+          if (rising) {
+            rising.low = Math.min(rising.low, s.headPitch);
+            rising.wide = Math.max(rising.wide, Math.abs(s.headYaw));
+            if (s.lookUp === 1) return resolve({ ...rising, top: s });
+          }
+          requestAnimationFrame(tick);
+        };
+        tick();
+      }),
+    timeout,
+  );
 /** Ready, calm (no wandering, no sitting by himself) and standing still in idle. */
 async function calm(page) {
   await ready(page, '/invitation/?test&calm&seed=3');
@@ -141,7 +174,7 @@ test.describe('on a desktop', () => {
     await until(page, (s) => s.motion.limp.weight === 0, 'the limp layer off once he’s down');
   });
 
-  test('held, he keeps the way he faced when grabbed, glances up at you now and then, and lands facing the same way', async ({
+  test('held, he keeps the way he faced when grabbed, glances up at you now and then (only ever lifting his head as he does), and lands facing the same way', async ({
     page,
   }) => {
     await calm(page);
@@ -149,9 +182,16 @@ test.describe('on a desktop', () => {
     const off = (h) => Math.abs(Math.atan2(Math.sin(h - heading), Math.cos(h - heading)));
     const cursor = await pickUp(page);
     await glide(page, cursor, { x: cursor.x + 160, y: cursor.y - 40 }, 4);
-    let s = await onFrame(page, (o) => o.held && o.lookUp === 1, 'a glance up', 40_000);
+    const glance = await nextGlance(page);
+    expect(glance, 'a glance up').not.toBeNull();
+    let s = glance.top;
     expect(off(s.heading), 'held, facing as when grabbed').toBeLessThan(1e-3);
     expect(s.headPitch, 'his head up').toBeGreaterThan(-0.2);
+    // (Rising: never under where it hung, never further to a side than it was or is at the top.)
+    expect(glance.low, 'no dip as it rises').toBeGreaterThanOrEqual(glance.start.pitch - 0.03);
+    expect(glance.wide, 'no swing to a side').toBeLessThanOrEqual(
+      Math.max(Math.abs(glance.start.yaw), Math.abs(s.headYaw)) + 0.05,
+    );
     await until(page, (o) => o.held && o.lookUp === 0, 'and back down', 20_000);
     await page.mouse.up();
     await until(page, (o) => o.state === 'idle' || o.state === 'flee', 'down again', 30_000);

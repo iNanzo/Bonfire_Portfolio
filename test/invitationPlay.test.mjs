@@ -15,7 +15,8 @@
 // share on top) is soft; his chest joins in only for big looks; with his back to the camera a
 // cursor wiggling behind him doesn't flip his head from side to side; and running away he faces
 // where he runs, glancing back over his shoulder toward the pursuer every few seconds (over the
-// shoulder nearer the camera when it's straight behind him), never at the viewer.
+// shoulder nearer the camera when it's straight behind him), never at the viewer. Held, ahead is
+// his own front with his head hung; his glance up is test/invitationGlance.test.mjs's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -24,6 +25,7 @@ import {
   bodyStep,
   createBody,
   createMix,
+  glanceFront,
   lookAim,
   lookFront,
   lookShare,
@@ -268,28 +270,23 @@ test('where he looks: the camera when asked or when the pointer is on him, the p
   assert.ok(ahead.pitch > 25 * D, 'up toward the camera, so his face shows');
 });
 
-test('ahead, held: his own front with his head hung (no turn to the camera), coming round and up toward the viewer as he glances up (BrainOut.look.up)', () => {
+test('ahead, held: his own front with his head hung (no turn to the camera), however far up his glance is; the glance’s own look, the viewer, lift radians higher (BrainOut.look.up)', () => {
   const ahead = { yaw: 0.6, pitch: 0.4 };
   // No pitch asked for: the viewer.
   assert.deepEqual(lookFront(ahead, { mode: 'forward', weight: 1 }), ahead);
   // A pitch without a glance: that pitch, toward the viewer as before.
   assert.deepEqual(lookFront(ahead, { mode: 'forward', weight: 0.2, pitch: -0.5 }), { yaw: 0.6, pitch: -0.5 });
-  // Held: straight ahead of himself, hung; at the glance's top, the viewer; between, in step.
-  assert.deepEqual(lookFront(ahead, { mode: 'forward', weight: 0.15, pitch: -0.5, up: 0 }), { yaw: 0, pitch: -0.5 });
-  assert.deepEqual(lookFront(ahead, { mode: 'forward', weight: 0.85, pitch: -0.5, up: 1 }), ahead);
-  const half = lookFront(ahead, { mode: 'forward', weight: 0.5, pitch: -0.5, up: 0.5 });
-  close(half.yaw, 0.3);
-  close(half.pitch, -0.05);
-  // With a lift (making up for the clip's own droop, which the look is applied over): that much higher at the top.
-  const lifted = lookFront(ahead, { mode: 'forward', weight: 1, pitch: -0.5, up: 1, lift: 0.5 });
-  close(lifted.yaw, 0.6);
-  close(lifted.pitch, 0.9);
-  close(
-    lookFront(ahead, { mode: 'forward', weight: 0.15, pitch: -0.5, up: 0, lift: 0.5 }).pitch,
-    -0.5,
-    1e-9,
-    'none hung:',
-  );
+  // Held: straight ahead of himself, hung, at any `up` (the glance goes on over it: glanceLook).
+  for (const up of [0, 0.5, 1])
+    assert.deepEqual(lookFront(ahead, { mode: 'forward', weight: 0.15, pitch: -0.5, up, lift: 0.5 }), {
+      yaw: 0,
+      pitch: -0.5,
+    });
+  // The glance's: the viewer, with the lift (making up for the clip's own droop, which the look is applied over).
+  const top = glanceFront(ahead, { mode: 'forward', weight: 0.15, pitch: -0.5, up: 1, lift: 0.5 });
+  close(top.yaw, 0.6);
+  close(top.pitch, 0.9);
+  assert.deepEqual(glanceFront(ahead, { mode: 'forward', weight: 0.15, pitch: -0.5, up: 0 }), ahead);
 });
 
 // ---- the look over the whole screen ---------------------------------------------------------
