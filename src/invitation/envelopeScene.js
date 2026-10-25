@@ -46,9 +46,23 @@ import {
   sealBloom,
   shedParticles,
 } from './envelope.js';
-import { SEAL_SIZE, buildSeal, sealTexel } from './envelopeSeal.js';
+import { buildSeal, sealTexel } from './envelopeSeal.js';
 import { PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './petals.js';
-import { BAYER, IDS, INK, INSIDE, PAPER, PETAL, rgb, shared, toon } from './envelopeLook.js';
+import {
+  BAYER,
+  IDS,
+  INK,
+  LEAN,
+  PAPER,
+  PETAL,
+  PITCH,
+  TILT,
+  WAX,
+  envelopeLayout,
+  rgb,
+  shared,
+  toon,
+} from './envelopeLook.js';
 
 /** Where veils looks on each of NEWT's spots: its middle and four points its radius round it. */
 const SPOT_POINTS = [
@@ -63,10 +77,6 @@ const TEXELS = 300;
 /** The camera's field of view (degrees) and distance. */
 const FOV = 30;
 const DIST = 6;
-/** How far the envelope tilts, clockwise, radians (the reference's lean). */
-const TILT = -0.36;
-/** The envelope's aspect, width over height. */
-const ASPECT = 1.45;
 /** The wheel opens or skips once this much (CSS px) adds up one way. */
 const WHEEL_STEP = 80;
 /** Move the mouse this far (CSS px) over it for another stir of petals. */
@@ -79,113 +89,54 @@ const SPECKS = 220;
 const SPECK_TONES = {
   paper: [0xe4b85d, 0xd3983d, 0x7a4a24, 0x5a3418],
   ember: [0xffe7a0, 0xf59a32, 0xe8662a],
-  wax: [0xa13a25, 0x6e1511],
+  wax: [WAX[1], WAX[2]],
 };
 
 /**
- * A small deterministic jitter (the paper's folds): the same every visit.
- * @param {number} i
- */
-const jitter = (i) => {
-  const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
-  return (x - Math.floor(x)) * 2 - 1;
-};
-
-/**
- * A flat triangle fan as a mesh (its points in order round it), at depth `z`.
- * @param {number[][]} pts  [x, y] or [x, y, z]
+ * A flat polygon as a mesh (a fan from its first point; its points counter-clockwise), at depth
+ * `z`.
+ * @param {number[][]} pts  [x, y]
  * @param {THREE.Material} mat
  * @param {number} z
  */
 function piece(pts, mat, z) {
-  const v = pts.map(([x, y, dz = 0]) => new THREE.Vector3(x, y, z + dz));
+  const v = pts.map(([x, y]) => new THREE.Vector3(x, y, z));
   const tris = [];
   for (let i = 1; i < v.length - 1; i++) tris.push(v[0], v[i], v[i + 1]);
   return new THREE.Mesh(new THREE.BufferGeometry().setFromPoints(tris), mat);
 }
 
 /**
- * The envelope's parts, built to a width of 2 (the group scales it to the screen), from the
- * back: the body, the inside of the pocket where the flap opens, the pocket's two side folds and
- * its bottom fold (each its own part, so a line runs down every fold), and the flap hinged on
- * the top edge.
+ * The envelope's parts (envelopeLook.js envelopeLayout), built to a width of 2 (the group scales
+ * it to the screen), each a flat piece a little in front of the last: the body, the inside of the
+ * pocket where the flap opens, the pocket's two side folds and its bottom fold (each its own
+ * part, so a line runs where one shows over another), and the flap hinged on the top edge. Each
+ * is one flat tone of the paper's three (LEAN).
  * @param {ReturnType<typeof shared>} u
  */
 function buildEnvelope(u) {
-  const W = 2;
-  const H = W / ASPECT;
-  const T = 0.03;
-  const w = W / 2;
+  const L = envelopeLayout();
+  const { W, H, T } = L;
   const h = H / 2;
   const group = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, T), toon(PAPER, u, IDS.body));
-  group.add(body);
-  // The inside, under the flap (it shows as the flap lifts).
-  const insideTip = h - H * 0.62;
-  group.add(
-    piece(
-      [
-        [-w, h],
-        [0, insideTip],
-        [w, h],
-      ],
-      toon(INSIDE, u, IDS.inside),
-      T / 2 + 0.004,
-    ),
-  );
-  // The side folds meet low in the middle, and the bottom fold laps over them both. (Each leans
-  // a little out of the paper, so its own band of the light shows.)
-  const meetY = -H * 0.17;
-  group.add(
-    piece(
-      [
-        [-w, h],
-        [-w, -h],
-        [-0.07, meetY, 0.05],
-      ],
-      toon(PAPER, u, IDS.left),
-      T / 2 + 0.01,
-    ),
-  );
-  group.add(
-    piece(
-      [
-        [w, h],
-        [0.07, meetY, 0.05],
-        [w, -h],
-      ],
-      toon(PAPER, u, IDS.right),
-      T / 2 + 0.01,
-    ),
-  );
-  group.add(
-    piece(
-      [
-        [-w, -h],
-        [w, -h],
-        [0.04, H * 0.02, 0.07],
-        [-0.04, H * 0.02, 0.07],
-      ],
-      toon(PAPER, u, IDS.bottom),
-      T / 2 + 0.02,
-    ),
-  );
-  // The flap: two faces with a low ridge down the middle, so each side takes its own band.
+  const paper = (/** @type {keyof typeof LEAN} */ part) => toon(PAPER, u, IDS[part], { lean: LEAN[part] });
+  group.add(piece(L.parts.body, paper('body'), T / 2));
+  group.add(piece(L.parts.inside, paper('inside'), T / 2 + 0.004));
+  group.add(piece(L.parts.left, paper('left'), T / 2 + 0.01));
+  group.add(piece(L.parts.right, paper('right'), T / 2 + 0.01));
+  group.add(piece(L.parts.bottom, paper('bottom'), T / 2 + 0.02));
+  // The flap, hinged on the top edge (its points from the hinge).
   const hinge = new THREE.Group();
   hinge.position.set(0, h, T / 2 + 0.1);
-  const tip = new THREE.Vector3(0, -H * 0.64, 0);
-  const ridge = new THREE.Vector3(0, 0, 0.06);
-  const flapVerts = [tip, ridge, new THREE.Vector3(-w, 0, 0), tip, new THREE.Vector3(w, 0, 0), ridge];
-  hinge.add(new THREE.Mesh(new THREE.BufferGeometry().setFromPoints(flapVerts), toon(PAPER, u, IDS.flap)));
+  hinge.add(
+    piece(
+      L.parts.flap.map(([x, y]) => [x, y - h]),
+      paper('flap'),
+      0,
+    ),
+  );
   group.add(hinge);
-  // (A little give in the paper: the folds' corners nudged, the same every visit.)
-  for (const m of group.children) {
-    const g = /** @type {any} */ (m).geometry;
-    if (!g || m === body) continue;
-    const pos = g.attributes.position;
-    for (let i = 0; i < pos.count; i++) pos.setZ(i, pos.getZ(i) + jitter(i + pos.count) * 0.004);
-  }
-  return { group, hinge, W, H, T, tipY: h + tip.y };
+  return { group, hinge, W, H, T, tipY: L.tip[1], seal: L.seal };
 }
 
 /**
@@ -373,14 +324,15 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   const outer = new THREE.Group();
   const inner = new THREE.Group();
   inner.rotation.z = TILT;
-  inner.rotation.x = -0.12;
+  inner.rotation.x = PITCH;
   outer.add(inner);
   scene.add(outer);
   const envl = buildEnvelope(u);
   inner.add(envl.group);
-  const sealR = envl.W * SEAL_SIZE;
+  const sealR = envl.seal.r;
   const seal = buildSeal(u, sealR);
-  const sealAt = new THREE.Vector3(0, envl.tipY + sealR * 0.12, envl.T / 2 + 0.16);
+  // (On the flap's tip.)
+  const sealAt = new THREE.Vector3(envl.seal.x, envl.seal.y, envl.T / 2 + 0.16);
   seal.group.position.copy(sealAt);
   inner.add(seal.group);
   const petals = buildPetals(u);
@@ -411,7 +363,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   const letterScale = new THREE.Matrix4().makeScale(2 / envl.W, 2 / envl.H, 1);
 
   /** The view's height at the envelope, world units, and the screen's CSS size. */
-  const view = { h: 1, w: 1, cssW: 1, cssH: 1, scale: 1, th: 1 };
+  const view = { h: 1, w: 1, cssW: 1, cssH: 1, scale: 1, tw: 1, th: 1 };
   function resize() {
     const cssW = Math.max(1, layer.clientWidth || win.innerWidth);
     const cssH = Math.max(1, layer.clientHeight || win.innerHeight);
@@ -428,19 +380,18 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     view.w = view.h * camera.aspect;
     view.cssW = cssW;
     view.cssH = cssH;
+    view.tw = tw;
     view.th = th;
     const c = Math.cos(-TILT);
     const s = Math.sin(-TILT);
-    const w = Math.min((0.82 * view.w) / (c + s / ASPECT), (0.52 * view.h) / (s + c / ASPECT));
+    const aspect = envl.W / envl.H;
+    const w = Math.min((0.82 * view.w) / (c + s / aspect), (0.52 * view.h) / (s + c / aspect));
     view.scale = w / envl.W;
-    // (A texel at the seal's face, in its own units, at rest: its stamp is drawn on that grid,
-    // so its strokes keep their widths. The face is nearer the camera than the letter.)
+    // (The seal's radius on the screen, texels, at rest: its face is drawn at that size and put
+    // on the screen texel for texel. It's nearer the camera than the letter.)
     inner.updateMatrix();
-    const face = v
-      .set(0, 0, sealR * 0.31)
-      .add(sealAt)
-      .applyMatrix4(inner.matrix);
-    seal.setTexel(sealTexel(view.h, th, view.scale, face.z * view.scale, DIST));
+    const face = v.copy(sealAt).applyMatrix4(inner.matrix);
+    seal.setRadius(sealR / sealTexel(view.h, th, view.scale, face.z * view.scale, DIST));
   }
   resize();
   const onResize = () => resize();
@@ -691,10 +642,11 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     // the envelope's lean.)
     const bloom = sealBloom(Math.max(p.bloom, (follow.lift / 0.45) * 0.14));
     seal.group.scale.setScalar(bloom.scale);
-    // (Upright on the screen, so the stamp's stems stand on the texel grid.)
+    // (Upright on the screen, as its face is drawn: then it goes on texel for texel.)
     seal.group.rotation.z = -TILT + bloom.spin;
     seal.group.visible = bloom.scale > 0;
     outer.updateMatrixWorld(true);
+    placeSeal();
     petalsAt(pt, p);
     // The dissolve: the edge across the letter, in its own units.
     toLetter.copy(inner.matrixWorld).invert().premultiply(letterScale);
@@ -711,6 +663,22 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
       doneAt ||= now;
       if (!flow.live(pt) || now - doneAt >= PETAL_GRACE) dispose();
     }
+  }
+
+  /**
+   * Where the seal's middle falls on the drawing (texels from its lower left), and how big and
+   * turned it shows against its face as drawn (seal.place snaps the sway's hair of either away,
+   * so its face goes on texel for texel).
+   */
+  function placeSeal() {
+    if (!seal.group.visible) return;
+    const c = sealWorld.copy(sealAt).applyMatrix4(inner.matrixWorld).project(camera);
+    const cx = (c.x * 0.5 + 0.5) * view.tw;
+    const cy = (c.y * 0.5 + 0.5) * view.th;
+    const e = seal.group.localToWorld(v.set(sealR, 0, 0)).project(camera);
+    const dx = (e.x * 0.5 + 0.5) * view.tw - cx;
+    const dy = (e.y * 0.5 + 0.5) * view.th - cy;
+    seal.place(cx, cy, Math.hypot(dx, dy) / seal.radius, Math.atan2(dy, dx));
   }
 
   /**
@@ -829,6 +797,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
         m.material?.dispose?.();
       });
     }
+    seal.dispose();
     colorRT.dispose();
     idRT.dispose();
     renderer.dispose();

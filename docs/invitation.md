@@ -12,13 +12,17 @@ unlisted: nothing links to it and search engines are asked not to index it.
 ## The Envelope
 
 Every visit opens on an envelope: a gold, low-poly envelope seen from the back, its flap sealed
-with a lumpy blob of red wax with the NH monogram pressed into it (drawn on the seal's own
-pixels so it reads as the logo on a phone and a desktop: each stroke a solid darker recess, the
-N's diagonal a pixel wider than the stems, with a lighter lip under the crossbar and the stems'
-feet where the light from above catches it), floating on a plain white page (white, not the toy's own
-off-white, so it fades into the toy as the letter opens). It's drawn in the toy's
-own pixel look, with a dark one-texel line round it and down every fold of its flap and pocket,
-so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
+with a round seal of red wax like a real one (a gently wavy edge, a raised rim catching the
+light, a thin ring inside it, and the NH monogram pressed into the flat middle in thin strokes,
+each a darker groove with a lighter lip where the light catches it, and one stray splotch of wax
+beside it, drawn on the screen's own pixels so it holds steady as the letter sways), floating on
+a plain white page (white, not the toy's own off-white, so it fades into the toy as the letter
+opens). It's drawn in the toy's own pixel look, with a dark one-texel line round it, along its
+flap's straight V (from the top corners to a tip under the seal's middle) and up the bottom
+fold's two edges, its only lines, as a real envelope's back shows them; each face of it is one
+flat tone of the paper's three (the flap light, the pocket mid, its inside shade), lit by one
+light and kept through the sway, so it reads as a letter, and it's the loading screen too: NEWT
+loads behind it.
 
 - **Rose petals:** plain petals (never the monogram) in three shapes (rounded, cupped and
   curled), a few sizes and three reds, each tumbling, fluttering side to side and drifting its
@@ -672,24 +676,33 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   dissolving rim; the petals as one instanced mesh a shape, ids `IDS.petal` and the two after,
   on their own clock that a loading stall holds still; the specks as square points on layer 1
   on top, with no line; disposed, its context lost and its layer removed once it's done and its
-  last petals have gone), `envelopeLook.js` (the palette, `IDS` and the toon material: three
-  tones with dithered band edges, its id pass, and the dissolve with its burning rim, copied
+  last petals have gone), `envelopeLook.js` (the palette, three tones a material;
+  `envelopeLayout`, the envelope's parts as flat polygons, each fold's hidden corners under the
+  parts in front of it so the only lines are the outline, the flap's V and the bottom fold's
+  edges; `IDS`; the light, `LIGHT`, its bands, `SHADES` and `bandOf`, and each paper face's
+  `LEAN`; and the toon material: three tones, the paper's one flat tone a face (`FLAT`, no
+  dither, leaning into the light by its `LEAN` so it keeps its band through the sway), the
+  others' band edges dithered, its id pass, and the dissolve with its burning rim, copied
   from the Bonfire site's weapon dissolve, not imported; `PETAL`, never dissolved, its bands
-  stepped by each petal's `aShade`), `envelopeSeal.js` (the seal, one piece: `sealGeometry`, a
-  blob with a wobbling outline (`sealEdge`), an uneven raised rim and a domed face; beads of wax
-  at its edge, its radius `SEAL_SIZE` (0.2) of the letter's width, turned upright on the screen;
-  the NH monogram from logo.js's PATH, copied in as `MONOGRAM_PATH`, debossed in the shader on
-  the seal's own texels: `stampLayout(radius)` snaps the strokes to whole texels for a seal that
-  many texels across its radius (about 31 on a desktop, 42 on a phone; the scene's
-  `setTexel(sealTexel(...))` gives the texel at the seal's face, nearer than the letter), so the
-  four uprights are even and mirrored, two texels or more wide, the crossbar as thick and the
-  N's diagonal a texel wider, a row-by-row run from the outer stem's top to the inner stem's
-  foot (`diagonalAt`); `stampCell` runs the shader's sums: a solid dark recess, and a one-texel
-  lit lip on the face just under the crossbar and the stems' feet, never down a wall or under
-  the diagonal's steps (a lip down every wall showed each stem as a dark bar beside a light one,
-  and strokes drawn at the face's own resolution came out uneven, a hash mark rather than NH);
-  the shader has no branches, which left the face's shading wrong round the strokes)
-  and
+  stepped by each petal's `aShade`), `envelopeSeal.js` (the seal, one piece, drawn like the
+  user's reference: its radius `SEAL_SIZE` (0.2) of the letter's width, on the flap's tip,
+  upright on the screen; `sealLayout(R)` for a seal `R` texels across its radius (about 31 on a
+  desktop, 42 on a phone: the scene's `setRadius(sealR / sealTexel(...))`) gives a flat field, a
+  thin ring at 0.7 R, a texel of field past it, the rim out to the gently wavy edge (`sealEdge`,
+  within 6% of round) and its one stray splotch, 3.5 texels clear of the edge on the right;
+  `sealFace(R)` draws its face texel by texel in the wax's three tones (`WAX`), each rim texel
+  lit by its slope with the envelope's `LIGHT` and `bandOf` (a light band on the side toward the
+  light and on the inner wall across from it, shade on the far side), the splotch a small dome;
+  the material (toon's `SEAL`) samples that texture on the screen's own texels round the seal's
+  middle, snapped to a texel's corner (`place`, its sway's hair of zoom and turn snapped away),
+  so moving the letter moves a steady picture (at 5028c51 the stamp was worked out on the
+  seal's own grid, which stopped matching the screen as the letter swayed, so it shimmered);
+  only blooming scales and turns it. The NH monogram is logo.js's PATH, copied in as
+  `MONOGRAM_PATH`: `stampLayout(radius)` snaps its strokes to whole texels, one texel wide
+  (two before: the user found them too thick to read in the ring), the four uprights mirrored,
+  the N's diagonal a row-by-row run from the outer stem's top to the inner stem's foot
+  (`diagonalAt`); `stampCell`: a dark floor, and a one-texel light lip on its lit side, right of
+  every stroke and under the crossbar and the stems' feet, never under the diagonal's steps) and
   `envelope.css` (the focus ring only under `.is-keyboard`, set once a key is pressed). main.js
   makes it right after `bindUi`, sets the HUD inert under it, lets the toy draw its first frame
   and then holds the loop while it covers him (`sync`), and on its way out either sets
