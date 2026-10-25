@@ -2037,7 +2037,7 @@ test.describe('on a desktop', () => {
     );
     await calm(page);
     // (Their centres as drawn, client px, apart in texels: the ring steps a texel at a time.)
-    const apart = (s) => {
+    const texelsApart = (s) => {
       const f = s.drag.floorPx;
       return f.ring ? Math.hypot(f.blob.x - f.ring.x, f.blob.y - f.ring.y) / s.pixelScale : Infinity;
     };
@@ -2057,7 +2057,7 @@ test.describe('on a desktop', () => {
       for (let i = 1; i <= 6; i++) await page.mouse.move(at.x, at.y - i * 20);
       at = { x: at.x, y: at.y - 120 };
       await until(page, (s) => s.drag.gap !== null && s.drag.gap < 2, `${deg}°: lifted, his collar under the cursor`);
-      const still = apart(await snapshot(page));
+      const still = texelsApart(await snapshot(page));
       expect(still, `${deg}°: held still, ${still.toFixed(2)} texels apart`).toBeLessThanOrEqual(1);
       // (Carried slowly across and back, read at every step: his hips swing behind his collar.)
       let most = 0;
@@ -2066,11 +2066,11 @@ test.describe('on a desktop', () => {
         await page.mouse.move(at.x, at.y);
         const s = await snapshot(page);
         expect(s.held, 'still held').toBe(true);
-        most = Math.max(most, apart(s));
+        most = Math.max(most, texelsApart(s));
       }
       expect(most, `${deg}°: carried, ${most.toFixed(2)} texels apart at most`).toBeLessThanOrEqual(1);
       await page.mouse.up();
-      await until(page, (s) => !s.held && (s.state === 'idle' || s.state === 'flee'), `${deg}°: down again`, 30_000);
+      await until(page, (s) => !s.held && s.state === 'idle' && s.clip === 'Idle', `${deg}°: down again, idle`, 30_000);
     }
   });
 
