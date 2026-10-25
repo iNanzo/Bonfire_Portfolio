@@ -46,7 +46,7 @@ export const LETTER_MOUTH = 0.25;
 export const FLOWS = {
   spawn: { n: 14 },
   swirl: { n: 24 },
-  pour: { n: 26, from: 0.5, over: 0.5 },
+  pour: { n: 30, from: 0.5, over: 0.5 },
   ring: { n: [10, 14] },
   trail: { n: [1, 3] },
   wake: { n: 1 },
@@ -701,7 +701,7 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
     const inside = F.inside ?? LETTER_DEPTHS.inside;
     const pocket = F.pocket ?? LETTER_DEPTHS.pocket;
     const at = local(F, a, mouth - r(0.015, 0.05), inside + (pocket - inside) * r(0.05, 0.15));
-    const up = r(0.95, 1.35);
+    const up = r(1.25, 1.6);
     const out = r(0.06, 0.12);
     const side = a * r(0.4, 0.9);
     add(
@@ -709,7 +709,8 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
         vx: F.up.x * up + F.fwd.x * out + F.right.x * side,
         vy: F.up.y * up + F.fwd.y * out + F.right.y * side,
         vz: F.up.z * up + F.fwd.z * out + F.right.z * side,
-        drag: r(1.2, 1.6),
+        drag: r(1.1, 1.4),
+        size: r(1, 1.4),
         fall: r(0.12, 0.2),
         life: r(1.6, 2.4),
       }),

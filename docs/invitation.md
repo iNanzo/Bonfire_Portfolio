@@ -773,12 +773,13 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   spinning 0.5–0.6 rad/s and climbing 0.04–0.06 a second (the slow end), 24 petals filling in
   after 0.5 s, each strand's in a close run (`gap`) a whole turn up from the last, every fourth
   falling in from 1.5–2.1 times out, each pulled to its slot, drawn small at the ends)
-  while it floats, flung outward once it doesn't; the pour (`FLOWS.pour`: 26 over 0.5 s from
+  while it floats, flung outward once it doesn't; the pour (`FLOWS.pour`: 30 over 0.5 s from
   when the flap is half open, each born 0.015–0.05 under the mouth's V at its x (`LETTER_MOUTH`,
   the envelope's), just in front of the inside's face and behind the pocket's (`LETTER_DEPTHS`, the envelope's
   envelopeLook.js `DEPTH`, which the frame can carry as `inside` and `pocket`), launched up its
-  axis at 0.95–1.35 a second and only gently forward, so the pocket hides each only for its first
-  moment and it stands a fifth of the letter or more over the mouth within half a second); and
+  axis at 1.25–1.6 a second and only gently forward, a little bigger than most (1–1.4 of
+  `PETAL_LEN`), so the pocket hides each only for its first moment and it stands 0.3 of the
+  letter or more over the mouth, out past its top, within half a second); and
   the wake (`WAKE`: the edge moving fastest away from its outward side sheds petals at a rate
   tied to its speed, drifting its way). `cut` (a skip), `at`, `live`; at most `POOL` (120; the
   oldest free petal goes first, the swirl kept), none with reduced motion. `createTrail` is the

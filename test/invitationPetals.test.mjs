@@ -284,7 +284,7 @@ test('the pour: once the flap is half open, a good stream of petals rises out of
     { x: 0.2, y: 0.1, z: 0 },
     { right: { x: 0, y: 1, z: 0 }, up: { x: -1, y: 0, z: 0 }, fwd: { x: 0, y: 0, z: 1 }, floating: false },
   );
-  assert.ok(FLOWS.pour.n >= 24, `enough to read as a pour: ${FLOWS.pour.n}`);
+  assert.ok(FLOWS.pour.n >= 28, `enough to read as a pour: ${FLOWS.pour.n}`);
   assert.ok(FLOWS.pour.from >= 0.4 && FLOWS.pour.from <= 0.6, 'from about half open');
   const f = createPetalFlow({ seed: 9 });
   /** @type {number|null} when it passed FLOWS.pour.from */
@@ -311,7 +311,8 @@ test('the pour: once the flap is half open, a good stream of petals rises out of
     const mouth = mouthAt(L, across);
     assert.ok(up < mouth && up > mouth - 0.06, `just under the mouth: ${(mouth - up).toFixed(3)} under it`);
     assert.ok(Math.abs(dot(local, L.fwd)) < 0.03, 'at the pocket’s depth');
-    assert.ok(dot(p.launch, L.up) >= 0.9 && dot(p.launch, L.fwd) > 0.05, 'up, fast, and forward out of it');
+    assert.ok(dot(p.launch, L.up) >= 1.2 && dot(p.launch, L.fwd) > 0.05, 'up, fast, and forward out of it');
+    assert.ok(p.size >= 1, `big enough to read: ${p.size}`);
   }
   // None more once it’s open, none while it floats.
   const n = f.emitted.pour;
@@ -322,7 +323,7 @@ test('the pour: once the flap is half open, a good stream of petals rises out of
   assert.equal(idle.emitted.pour, 0);
 });
 
-test('poured, the petals stand well clear above the mouth: risen at least a fifth of the letter within half a second', () => {
+test('poured, the petals stand well clear above the mouth: risen 0.3 of the letter over it within half a second, out past its top', () => {
   for (const seed of [9, 10, 11]) {
     const L = frameAt(ORIGIN, { floating: false });
     const f = createPetalFlow({ seed });
@@ -340,7 +341,7 @@ test('poured, the petals stand well clear above the mouth: risen at least a fift
       }
     });
     assert.ok(risen.size >= FLOWS.pour.n * 0.9, `${risen.size}`);
-    for (const h of risen.values()) assert.ok(h > 0.2, `above the mouth by ${h.toFixed(3)}`);
+    for (const h of risen.values()) assert.ok(h > 0.3, `above the mouth by ${h.toFixed(3)}`);
   }
 });
 
