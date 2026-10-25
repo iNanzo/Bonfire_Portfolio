@@ -237,6 +237,27 @@ test.describe('on a desktop', () => {
     expect(s.camera.target).toEqual(before.target);
   });
 
+  test('a drag out and back to where it started neither opens nor skips it, sideways or up', async ({ page }) => {
+    await envelopeUp(page);
+    const vp = page.viewportSize();
+    const cx = vp.width / 2;
+    const cy = vp.height / 2;
+    // (Right 200 px and back, then up 120 px and back to 3 px under the start.)
+    for (const [ax, ay, end] of [
+      [20, 0, 0],
+      [0, -12, 3],
+    ]) {
+      await page.mouse.move(cx, cy);
+      await page.mouse.down();
+      for (let i = 1; i <= 10; i++) await page.mouse.move(cx + i * ax, cy + i * ay);
+      for (let i = 9; i >= 0; i--) await page.mouse.move(cx + i * ax, cy + i * ay + (i ? 0 : end));
+      await page.mouse.up();
+      // (Let go, it springs back; it must still be floating.)
+      await expect.poll(async () => (await envSnap(page)).turn.now, { message: 'sprung back' }).toBeLessThan(0.07);
+      expect((await envSnap(page)).state).toBe('floating');
+    }
+  });
+
   test('hovered it says how to open and skip it; a click opens it and the intro starts by itself, its greeting held until the letter clears him', async ({
     page,
   }) => {
@@ -539,6 +560,22 @@ test.describe('on a phone', () => {
     // (The finger lifted: nothing to lean toward; it springs back square on.)
     await expect.poll(async () => Math.abs(await turn()), { message: 'sprung back' }).toBeLessThan(0.01);
     await until(page, (s) => s.envelope === 'floating', 'still floating');
+  });
+
+  test('a finger that slides across and back to where it started leaves it floating', async ({ page }) => {
+    await envelopeUp(page);
+    const touch = await toucher(page);
+    const vp = page.viewportSize();
+    const at = { x: vp.width / 2, y: vp.height / 2 };
+    await touch('touchStart', [at]);
+    for (let i = 1; i <= 8; i++) await touch('touchMove', [{ x: at.x + i * 15, y: at.y }]);
+    for (let i = 7; i >= 0; i--) await touch('touchMove', [{ x: at.x + i * 15, y: at.y }]);
+    await touch('touchEnd', []);
+    // (The finger lifted, it springs back square on; it must still be floating.)
+    await expect
+      .poll(async () => Math.abs((await envSnap(page)).turn.now), { message: 'sprung back' })
+      .toBeLessThan(0.01);
+    expect((await envSnap(page)).state).toBe('floating');
   });
 
   test('a short drag springs back and leaves it floating; left alone, the hint shows', async ({ page }) => {
