@@ -33,6 +33,7 @@ export default defineConfig({
   globalSetup: './e2e/lib/gateSetup.mjs',
   use: {
     baseURL: origin,
+    trace: 'retain-on-failure',
     storageState: GATE_STATE,
     channel: process.env.PW_CHANNEL || undefined,
     launchOptions: {
