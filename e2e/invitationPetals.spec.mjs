@@ -280,6 +280,30 @@ test.describe('with a mouse', () => {
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
+  for (const lost of ['blur', 'pointerout']) {
+    test(`a held finger lost through ${lost} lets the petal layer sleep without pointerup`, async ({ page }) => {
+      await toyUp(page);
+      const touch = await toucher(page);
+      const a = clear(page, 0.2, 0.3);
+      await touch('touchStart', [a]);
+      await expect.poll(async () => (await petals(page)).emitted.ring).toBeGreaterThanOrEqual(10);
+      await page.evaluate((kind) => {
+        if (kind === 'blur') window.dispatchEvent(new Event('blur'));
+        else
+          document.dispatchEvent(
+            new PointerEvent('pointerout', { isPrimary: true, pointerType: 'touch', relatedTarget: null }),
+          );
+      }, lost);
+      // Do not send touchEnd until after this assertion: the lost press may never deliver one.
+      await expect.poll(async () => (await petals(page)).running, { timeout: 15_000 }).toBe(false);
+      expect((await petals(page)).live).toBe(0);
+      await touch('touchEnd', []);
+      await touch('touchStart', [a]);
+      await expect.poll(async () => (await petals(page)).running).toBe(true);
+      await touch('touchEnd', []);
+    });
+  }
+
   test('a finger dragging trails petals, a tap bursts a ring, and a finger held still keeps a few coming', async ({
     page,
   }) => {

@@ -296,11 +296,18 @@ export function createPetalLayer(root, { on, before = null, over = () => false, 
     holds = false;
     trail.up();
   };
+  /** A press lost outside the page must not keep the renderer awake waiting for pointerup. */
+  const losePointer = () => {
+    pressId = null;
+    holds = false;
+    trail.up();
+    trail.lift();
+  };
   /** @param {PointerEvent} e  out of the window (no element it went to): no trail across the gap */
   const onOut = (e) => {
-    if (e.isPrimary && !e.relatedTarget) trail.lift();
+    if (e.isPrimary && !e.relatedTarget) losePointer();
   };
-  const onBlur = () => trail.lift();
+  const onBlur = losePointer;
   const listen = { passive: true, capture: true };
   doc.addEventListener('pointerdown', onDown, listen);
   doc.addEventListener('pointermove', onMove, listen);
