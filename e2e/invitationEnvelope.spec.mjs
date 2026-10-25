@@ -3,8 +3,8 @@
 // touch). It's the front door and the loading screen: it shows over the toy on a white page
 // under a soft flurry of rose petals, with focus on it but no ring until a key is pressed, and
 // takes every press (a drag on it never turns the camera); the mouse over it or a touch stirs a
-// few petals; a click, Enter or a swipe up opens it (the seal blooms into petals first, and only
-// then the flap lifts with a burst of petals and the letter dissolves as the page behind clears)
+// few petals (the page's petal layer's); a click, Enter or a swipe up opens it (the seal blooms
+// into petals first, and only then the flap lifts with petals pouring out and the letter dissolves as the page behind clears)
 // and the intro starts by itself at its first box with no toolbar button pressed, its first line
 // and his gesture held until the letter no longer hides him; Escape, a
 // swipe down or Skip Intro skips it (a spill of petals; no intro, the toolbar back, focus on
@@ -35,6 +35,8 @@ async function envelopeUp(page, path = PAGE) {
 const envelope = (page) => page.locator('[data-envelope]');
 /** The envelope's own snapshot (its state, pose and petals). */
 const envSnap = (page) => page.evaluate(() => window.__invitation.envelope());
+/** The page's petal layer's snapshot (the cursor's and a finger's petals). */
+const layerSnap = (page) => page.evaluate(() => window.__invitation.petals());
 const skipIntro = (page) => page.locator('[data-intro-skip]:visible');
 /** The intro's script as the page reads it. */
 const script = (page) => page.evaluate(() => window.__invitation.intro());
@@ -208,17 +210,18 @@ test.describe('on a desktop', () => {
     expect((await snapshot(page)).toolbarTalking).toBe(true);
   });
 
-  test('it appears under a flurry of rose petals, and the mouse over it stirs a few more', async ({ page }) => {
+  test('it appears under a flurry of rose petals, and the mouse over it trails a few more', async ({ page }) => {
     await envelopeUp(page);
     expect((await envSnap(page)).petals.emitted.spawn).toBeGreaterThan(0);
     const vp = page.viewportSize();
     await page.mouse.move(vp.width * 0.95, vp.height * 0.95);
     await page.mouse.move(vp.width / 2, vp.height / 2, { steps: 6 });
-    await expect.poll(async () => (await envSnap(page)).petals.emitted.stir, { timeout: 10_000 }).toBeGreaterThan(0);
+    // (The cursor's petals are the page's petal layer's.)
+    await expect.poll(async () => (await layerSnap(page)).emitted.trail, { timeout: 10_000 }).toBeGreaterThan(0);
     expect((await envSnap(page)).state).toBe('floating');
   });
 
-  test('opened, the seal blooms into petals first; only then the flap lifts, with a burst of petals', async ({
+  test('opened, the seal blooms into petals first; only then the flap lifts, petals pouring out of it', async ({
     page,
   }) => {
     await envelopeUp(page);
@@ -236,7 +239,7 @@ test.describe('on a desktop', () => {
       .toBe(true);
     expect(seen[0].petals.emitted.bloom).toBeGreaterThan(0);
     for (const e of seen) if (e.pose.flap > 0) expect(e.pose.bloom).toBe(1);
-    expect(seen.at(-1).petals.emitted.burst).toBeGreaterThan(0);
+    expect(seen.at(-1).petals.emitted.pour).toBeGreaterThan(0);
     await introStarted(page);
   });
 
@@ -369,7 +372,7 @@ test.describe('on a phone', () => {
     await noRing(page);
   });
 
-  test('a touch that slides across stirs the petals where it lands, and leaves it floating', async ({ page }) => {
+  test('a touch that slides across sheds petals where it goes, and leaves it floating', async ({ page }) => {
     await envelopeUp(page);
     const touch = await toucher(page);
     const vp = page.viewportSize();
@@ -377,8 +380,8 @@ test.describe('on a phone', () => {
     await touch('touchStart', [at]);
     for (let i = 1; i <= 4; i++) await touch('touchMove', [{ x: at.x + i * 20, y: at.y }]);
     await touch('touchEnd', []);
-    const e = await envSnap(page);
-    expect(e.petals.emitted.stir).toBeGreaterThan(0);
+    const e = await layerSnap(page);
+    expect(e.emitted.ring + e.emitted.trail).toBeGreaterThan(0);
     await until(page, (s) => s.envelope === 'floating', 'still floating');
   });
 

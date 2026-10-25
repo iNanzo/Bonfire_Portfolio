@@ -64,6 +64,8 @@ import { SHADER_CONTROLS, controlFor, snapShader, styleShader } from './shader.j
  * @property {import('./hold.js').CueMode} [groundCues]  the ring and the drop line under him while
  *   he's held (cues.js): Off, In the Mix or Always; left out until it's picked: In the Mix
  *   (cues.js CUE_DEFAULT)
+ * @property {boolean} [petals]  Rose Petals (petalLayer.js, the envelope's): left out until it's
+ *   picked: on (petalsOn)
  */
 /** @typedef {'smooth'|'choppy'} Motion  Smooth, or Choppy (his animation at CHOPPY_FPS) */
 
@@ -160,8 +162,20 @@ export function validLook(raw) {
       : first.groundCues
         ? { groundCues: first.groundCues }
         : {}),
+    // (Rose Petals, the same: left out, on.)
+    ...(typeof o.petals === 'boolean'
+      ? { petals: o.petals }
+      : typeof first.petals === 'boolean'
+        ? { petals: first.petals }
+        : {}),
   };
 }
+
+/**
+ * Whether Rose Petals is on (it is unless it was switched off).
+ * @param {Look} look
+ */
+export const petalsOn = (look) => look.petals !== false;
 
 /**
  * The admin's Default look (content.json `invitation.defaults`, content.js invitationDefaults)
