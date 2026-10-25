@@ -2133,7 +2133,25 @@ test.describe('on a small window', () => {
     page,
   }) => {
     const errors = watch(page);
-    await page.addInitScript(() => localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32' })));
+    // Control the sampled frame intervals, while every frame still renders the production
+    // stage. Removing a busy loop does not make software WebGL sustain 60 fps on CI.
+    await page.addInitScript(() => {
+      localStorage.setItem('invitation.look.v1', JSON.stringify({ pixelSize: '32' }));
+      const raf = window.requestAnimationFrame.bind(window);
+      let now = performance.now();
+      let previous = -1;
+      window.__governFrameMs = 16;
+      window.requestAnimationFrame = (callback) =>
+        raf((stamp) => {
+          // All callbacks in one browser frame share the same clock.
+          if (stamp !== previous) {
+            now += window.__governFrameMs;
+            previous = stamp;
+          }
+          callback(now);
+        });
+      performance.now = () => now;
+    });
     await ready(page, '/invitation/?test&calm&seed=3&perf&govern');
     const base = await snapshot(page);
     expect(base.pass.governor.on).toBe(true);
@@ -2141,28 +2159,20 @@ test.describe('on a small window', () => {
     const perf = page.locator('.inv-perf');
     await expect(perf).toContainText('fps');
     await expect(perf).toContainText(`${base.texels.w}×${base.texels.h} texels`);
-    // A busy page: 60 ms of work every frame, so frames stay slow whatever the grid.
-    await page.evaluate(() => {
-      const spin = () => {
-        if (window.__calm) return;
-        const t = performance.now();
-        while (performance.now() - t < 60);
-        requestAnimationFrame(spin);
-      };
-      requestAnimationFrame(spin);
-    });
+    await page.evaluate(() => (window.__governFrameMs = 60));
     // One level coarser: a device pixel more a texel, fewer texels.
     await until(page, (s) => s.pass.governor.level === 1, 'a level coarser', 15_000);
+    // Hold in the hysteresis band while checking the rendered grid.
+    await page.evaluate(() => (window.__governFrameMs = 19));
     const coarse = await snapshot(page);
     expect(coarse.pass.pd).toBe(base.pass.pd + 1);
     expect(coarse.pixelScale).toBeCloseTo(base.pixelScale + 1 / devicePixelRatioOf(base), 6);
     expect(coarse.texels.w).toBeLessThan(base.texels.w);
     expect(coarse.resolution, 'the Pixel Size stays the user’s').toBe(32);
     await expect(perf).toContainText('(+1 slow)');
-    // The load gone, it comes back to the Pixel Size (taken back as no help, or stepped finer
-    // after a run of quick seconds: test/invitationGovernor.test.mjs times both, since in a
-    // browser which comes first rides on frame-time noise), and never finer than it.
-    await page.evaluate(() => (window.__calm = true));
+    // A measured run of fast frames restores the user's grid. Unit tests independently
+    // check the recovery duration, no-help rollback, hysteresis and relapse behavior.
+    await page.evaluate(() => (window.__governFrameMs = 16));
     await until(page, (s) => s.pass.governor.level === 0, 'back at the Pixel Size', 25_000);
     const back = await snapshot(page);
     expect(back.pass.pd).toBe(base.pass.pd);
