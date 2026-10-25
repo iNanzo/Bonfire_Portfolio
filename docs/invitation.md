@@ -159,7 +159,7 @@ loads behind it.
 - **Screen Time** hands him a tablet with a tiny pixel game on it. Each press does the next
   thing: he sits down with it in both hands, playing (the button then says Lie Down); he lies
   down on his stomach with it, feet kicking behind him (the button says Get Up); he gets up and
-  puts it away. He keeps the way he was facing throughout: no turn to the camera. Anything else you do (a tap, the floor, another button) gets him up
+  puts it away. Lying, his soft shadow sits under his body, not his feet. He keeps the way he was facing throughout: no turn to the camera. Anything else you do (a tap, the floor, another button) gets him up
   first, then does it; picking him up takes him straight off the floor.
 - **His earrings:** a black stud on each earlobe and a little Latin cross hanging from it on a
   thin chain, drawn as pixel art (one-pixel lines with square ends, crisp at every Pixel Size),
@@ -347,7 +347,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     derivative, cut hard with the pixel look on and smooth over a texel at Off, `ringCover` its
     JS twin; `snapToTexel`, the centre moved to the nearest texel corner on screen;
     `ringRadius`/`texelSize`, at least `RING.minTexels` (6) texels round; `markerFade`, the
-    cursor marker full from 18° of elevation over it and gone by 10°), `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
+    cursor marker full from 18° of elevation over it and gone by 10°; `blobCentre`, the blob
+    moved from under his feet to the middle of his hips and head by `lieWeight`, the weight of
+    `LIE_CLIPS`), `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16
     to 256, a texel is `max(1, round(NEWT's default height in device px / N))` device pixels,
     `blockFor`, so he's about N texels tall; Native, a texel a device pixel at the real DPR with
     no cap; Off, the screen's pixels with the DPR capped at `OFF_DPR` (2); `pixelSteps`, a

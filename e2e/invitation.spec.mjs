@@ -2003,6 +2003,31 @@ test.describe('on a desktop', () => {
     expect(off.greys, 'a smooth edge').toBeGreaterThanOrEqual(4);
   });
 
+  test('lying with Screen Time, the blob shadow sits under his body, not his feet', async ({ page }) => {
+    await calm(page);
+    const button = page.locator('[data-button="Device"]');
+    await button.click();
+    await until(page, (s) => s.state === 'deviceSit' && s.motion.device.shown, 'sitting with the tablet', 30_000);
+    await expect(button).toHaveAccessibleName('Lie Down');
+    await button.click();
+    await until(page, (s) => s.state === 'deviceLie' && s.motion.device.shown, 'lying with it', 30_000);
+    // (Its middle: halfway from his hips to his head, on the floor.)
+    const blobFrom = () =>
+      page.evaluate(() => {
+        const s = window.__invitation.snapshot();
+        const b = window.__invitation.bones();
+        const mid = { x: s.pos.x + (b.Bone.x + b.Neck001.x) / 2, z: s.pos.z + (b.Bone.z + b.Neck001.z) / 2 };
+        return {
+          body: Math.hypot(s.drag.blob.x - mid.x, s.drag.blob.z - mid.z),
+          feet: Math.hypot(s.drag.blob.x - s.pos.x, s.drag.blob.z - s.pos.z),
+          reach: Math.hypot(mid.x - s.pos.x, mid.z - s.pos.z),
+        };
+      });
+    await expect.poll(async () => (await blobFrom()).body, { message: 'under his body' }).toBeLessThan(0.03);
+    const d = await blobFrom();
+    expect(d.feet, 'moved off his feet').toBeGreaterThan(d.reach * 0.9);
+  });
+
   test('hovering turns his head', async ({ page }) => {
     await calm(page);
     const body = await on(page, 'body');

@@ -5,15 +5,19 @@
 // the pixel look on and with a smooth edge a texel wide at Pixel Size Off; its centre is moved
 // onto the texel grid (so it steps a whole texel at a time and keeps its shape), its radius on
 // screen is at least RING.minTexels texels, and the cursor marker fades out as the view gets low
-// (below about 18° over it).
+// (below about 18° over it). While he lies on the floor the blob shadow moves from under his
+// feet to under his body (the middle of his hips and head), by the lying clips' weight.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import {
+  LIE_CLIPS,
   RING,
   RING_FRAGMENT,
+  blobCentre,
   elevationAt,
+  lieWeight,
   markerFade,
   ringCover,
   ringRadius,
@@ -134,4 +138,22 @@ test('its centre goes onto the texel grid: it shows at a texel corner, within ha
   // (Off the screen or behind the camera: left as it is.)
   const c = cameraAt(36 * RAD);
   assert.deepEqual(snapToTexel({ x: 40, z: 40 }, c, { w: 320, h: 200 }, 0.003), { x: 40, z: 40 });
+});
+
+test('while he lies, the blob moves under his body (the middle of his hips and head), by how much he lies', () => {
+  assert.deepEqual([...LIE_CLIPS], ['LieDown', 'DeviceLie', 'GetUp']);
+  const root = { x: 1, y: 0, z: 2 };
+  const hips = { x: 1, y: 0.3, z: 2.4 };
+  const head = { x: 1, y: 0.5, z: 3.2 };
+  assert.deepEqual(blobCentre(root, hips, head, 0), { x: 1, z: 2 }, 'standing: under his feet');
+  const lying = blobCentre(root, hips, head, 1);
+  assert.ok(Math.abs(lying.x - 1) < 1e-12 && Math.abs(lying.z - 2.8) < 1e-12, 'lying: under his body');
+  const half = blobCentre(root, hips, head, 0.5);
+  assert.ok(Math.abs(half.z - 2.4) < 1e-12, 'on his way down: between');
+  /** @param {Record<string, number>} w */
+  const of = (w) => (/** @type {string} */ clip) => w[clip] ?? 0;
+  assert.equal(lieWeight(of({ Idle: 1 })), 0);
+  assert.equal(lieWeight(of({ DeviceLie: 1 })), 1);
+  assert.equal(lieWeight(of({ LieDown: 0.4, DeviceSit: 0.6 })), 0.4);
+  assert.equal(lieWeight(of({ DeviceLie: 0.7, GetUp: 0.6 })), 1, 'never past 1');
 });

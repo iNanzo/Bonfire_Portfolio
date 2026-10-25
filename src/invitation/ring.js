@@ -7,7 +7,9 @@
 // onto the texel grid (snapToTexel: it steps a whole texel at a time and keeps its shape as it
 // goes), its radius is at least RING.minTexels texels where it is (ringRadius, texelSize: never
 // a dot), and the cursor marker fades out as the view gets low over it (markerFade: below about
-// 18°, where a ring flattens into a dash). Pure but for three's vectors.
+// 18°, where a ring flattens into a dash). And the blob shadow while he lies: from under his feet
+// to under his body, by the lying clips' weight (blobCentre, lieWeight). Pure but for three's
+// vectors.
 import * as THREE from 'three';
 
 const RAD = Math.PI / 180;
@@ -18,6 +20,9 @@ const RAD = Math.PI / 180;
  * view's elevation over it, full from fadeFull up and none by fadeGone (radians).
  */
 export const RING = { rim: 2, minTexels: 6, fadeFull: 18 * RAD, fadeGone: 10 * RAD };
+
+/** The clips he lies in (or is on his way down to or up from): the blob moves under his body. */
+export const LIE_CLIPS = /** @type {const} */ (['LieDown', 'DeviceLie', 'GetUp']);
 
 /**
  * The ring's fragment code (after three's color_fragment, in retro.js decalMaterial's shader,
@@ -120,4 +125,32 @@ export function snapToTexel(spot, camera, grid, y) {
   if (Math.abs(dy) < 1e-9) return spot;
   const k = (y - near.y) / dy;
   return { x: near.x + (far.x - near.x) * k, z: near.z + (far.z - near.z) * k };
+}
+
+/**
+ * The blob's centre on the floor: under his root (his feet), moved toward the middle of his body
+ * (his hips and head) by `lie`, how much he lies (lieWeight).
+ * @param {import('./types.js').XYZ} root
+ * @param {import('./types.js').XYZ} hips
+ * @param {import('./types.js').XYZ} head
+ * @param {number} lie  0..1
+ * @returns {import('./types.js').XZ}
+ */
+export function blobCentre(root, hips, head, lie) {
+  const k = Math.min(1, Math.max(0, lie));
+  return {
+    x: root.x + ((hips.x + head.x) / 2 - root.x) * k,
+    z: root.z + ((hips.z + head.z) / 2 - root.z) * k,
+  };
+}
+
+/**
+ * How much he lies: the lying clips' weight in the mix (LIE_CLIPS), 1 at most.
+ * @param {(clip: string) => number} weightOf
+ */
+export function lieWeight(weightOf) {
+  return Math.min(
+    1,
+    LIE_CLIPS.reduce((sum, clip) => sum + weightOf(clip), 0),
+  );
 }

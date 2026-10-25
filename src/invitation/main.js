@@ -158,6 +158,7 @@ import {
   twinWeights,
 } from './play.js';
 import { burstAt, hoverEase } from './retro.js';
+import { blobCentre, lieWeight } from './ring.js';
 import { createRng } from './rng.js';
 import { createTalk } from './speech.js';
 import { LIFT, createStage } from './stage.js';
@@ -1522,17 +1523,17 @@ function start(s) {
     // (Any of the eight: character.js shows a dialogue face's stand-in until its sheet is in.)
     c.setFace(forcedFace ?? faceStep(faces, face, blink, t, rng));
     // (Off the floor, the blob goes straight down under his hips, sized and faded by his lowest
-    // foot's height: cues.js blobLook, eased in and out.)
+    // foot's height: cues.js blobLook, eased in and out. Lying on the floor, under his body, not
+    // his feet: ring.js blobCentre, by the lying clips' weight.)
     const off = body.mode !== 'ground';
     const footH = Math.max(0, lowestY() - CARRY.floorY);
     const hips = c.bonePos(BONES.hips, { x: 0, y: 0, z: 0 });
+    const under = off ? hips : blobCentre(root.position, hips, head, lieWeight(c.weightOf));
     cue.blob = blobWeight(cue.blob, off, dt);
-    s.setBlob(
-      off ? hips.x : root.position.x,
-      off ? hips.z : root.position.z,
-      off ? Math.min(1, root.position.y / 0.5) : 0,
-      { ...blobLook(footH, s.blobLifted), w: cue.blob },
-    );
+    s.setBlob(under.x, under.z, off ? Math.min(1, root.position.y / 0.5) : 0, {
+      ...blobLook(footH, s.blobLifted),
+      w: cue.blob,
+    });
     if (sun)
       fitShadow(sun, s.bounds, shadowTop(root.position.y, SHADOW_TOP), { x: root.position.x, z: root.position.z });
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;
