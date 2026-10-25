@@ -830,7 +830,7 @@ test.describe('on a phone', () => {
         new Promise((done) => {
           const inv = window.__invitation;
           const out = [];
-          const t0 = performance.now();
+          const t0 = inv.clock();
           const tick = () => {
             const s = inv.snapshot();
             out.push({
@@ -840,7 +840,8 @@ test.describe('on a phone', () => {
               state: s.state,
               r: Math.hypot(s.pos.x, s.pos.z),
             });
-            if (performance.now() - t0 < 3500) requestAnimationFrame(tick);
+            // The scene clamps long frames, so wall time is not animation time.
+            if (inv.clock() - t0 < 3.5) requestAnimationFrame(tick);
             else done(out);
           };
           requestAnimationFrame(tick);
@@ -1703,7 +1704,7 @@ test.describe('on a desktop', () => {
     await expect(page.locator('[title]')).toHaveCount(0);
   });
 
-  test('the Camera pad’s buttons move the camera and Escape restores focus', async ({ page }) => {
+  test('the Camera pad’s buttons turn, tilt and zoom the camera', async ({ page }) => {
     await calm(page);
     // The Camera pad: each of its buttons moves the camera.
     const camera = page.getByRole('button', { name: 'Camera', exact: true });
@@ -1721,6 +1722,15 @@ test.describe('on a desktop', () => {
     await until(page, (s) => s.camera.distance < home.distance * 0.85, 'Zoom In');
     await page.getByRole('button', { name: 'Zoom Out' }).click();
     await until(page, (s) => Math.abs(s.camera.distance - home.distance) < home.distance * 0.02, 'Zoom Out');
+  });
+
+  test('the Camera pad follows NEWT, resets the view and restores focus on Escape', async ({ page }) => {
+    await calm(page);
+    const camera = page.getByRole('button', { name: 'Camera', exact: true });
+    await camera.click();
+    await expect(page.locator('#inv-camera')).toBeVisible();
+    const home = (await snapshot(page)).camera;
+    const settled = (pred, msg) => until(page, (s) => !s.camera.turning && pred(s.camera), msg);
     // Panned off him, then Follow NEWT: back onto him.
     const body = await on(page, 'body');
     await page.mouse.move(body.x + 300, body.y + 80);
@@ -1735,6 +1745,7 @@ test.describe('on a desktop', () => {
       'onto him',
     );
     await page.getByRole('button', { name: 'Turn Left' }).click();
+    await settled((c) => Math.abs(c.yaw - home.yaw - Math.PI / 4) < 0.01, 'Turn Left: 45° before reset');
     await page.getByRole('button', { name: 'Reset Camera' }).click();
     await settled(
       (c) => Math.abs(c.yaw - home.yaw) < 0.01 && Math.abs(c.distance - home.distance) < home.distance * 0.01,
