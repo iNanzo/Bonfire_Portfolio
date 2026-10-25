@@ -83,10 +83,10 @@ const onRay = (ray, p) => {
   return Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z);
 };
 
-test('the drag kinds: today (the default), level, tilt and bead; anything else is today; holds/index.js makes each by name, its own module', () => {
+test('the drag kinds: today, level, tilt and bead (the default, the judges’ pick); anything else is bead; holds/index.js makes each by name, its own module', () => {
   assert.deepEqual([...DRAG_KINDS], ['today', 'level', 'tilt', 'bead']);
-  assert.equal(DEFAULT_DRAG, 'today');
-  for (const bad of [undefined, null, '', 'Level', 'sticker', 3, {}]) assert.equal(dragKind(bad), 'today', String(bad));
+  assert.equal(DEFAULT_DRAG, 'bead');
+  for (const bad of [undefined, null, '', 'Level', 'sticker', 3, {}]) assert.equal(dragKind(bad), 'bead', String(bad));
   for (const k of DRAG_KINDS) assert.equal(dragKind(k), k);
   assert.deepEqual(Object.keys(HOLDS).sort(), [...DRAG_KINDS].sort(), 'every kind listed once');
   for (const k of DRAG_KINDS) {
@@ -98,7 +98,7 @@ test('the drag kinds: today (the default), level, tilt and bead; anything else i
     assert.equal(typeof h.release, 'function');
     assert.equal(typeof h.grabbedAt, 'function');
   }
-  assert.equal(createHold('nope').kind, 'today');
+  assert.equal(createHold('nope').kind, 'bead');
 });
 
 test('today’s hold through the interface is carry.js’s camera-facing plane, frame for frame: the same anchors, the same plane, the same point grabbed, and tossed with carry.js toss', () => {

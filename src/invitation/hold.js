@@ -1,5 +1,6 @@
 // How NEWT is held by the collar in the invitation toy: the drag kinds (DRAG_KINDS, ?drag= and
-// Settings' Drag: 'today' the default, 'level', 'tilt' and 'bead' to compare), the interface each
+// Settings' Drag: 'bead' the default, the judges' pick, and 'today', 'level' and 'tilt' to compare),
+// the interface each
 // kind implements (Hold: start, step, release, grabbedAt, and optionally onWheel and
 // onSecondFinger; holds/index.js createHold makes one by name), 'today' through it (createTodayHold:
 // the camera-facing upright plane through where he was grabbed, carry.js dragPlane, gripFor and
@@ -31,7 +32,7 @@ import { clampTo } from './steer.js';
 /** The drag kinds, in Settings' order. @type {readonly DragKind[]} */
 export const DRAG_KINDS = Object.freeze(['today', 'level', 'tilt', 'bead']);
 /** The kind he's held with unless ?drag= or Settings' Drag says otherwise. */
-export const DEFAULT_DRAG = /** @type {DragKind} */ ('today');
+export const DEFAULT_DRAG = /** @type {DragKind} */ ('bead');
 /** Settings' Drag labels. */
 export const DRAG_LABELS = Object.freeze({ today: 'Today', level: 'Level', tilt: 'Tilt', bead: 'Bead' });
 

@@ -21,7 +21,7 @@
 // ones resting at Pixel Size Off, the lines' while Outlines is off, the dither's while
 // Dithering is), Ground Cues (the ring and the dashed drop line under him while he's held: Off,
 // In the Mix or Always, the drag kind's own until it's picked), Drag (Today, Level, Tilt or Bead:
-// the ways of carrying him, to compare; for this visit only, ?drag= sets it), and Wander, whether
+// the ways of carrying him, Bead the default; for this visit only, ?drag= sets it), and Wander, whether
 // he walks about by himself, kept for the next visit (loadWander, in localStorage, every read and
 // write in try/catch)). The slider's steps are the screen's (pixels.js pixelSteps: two resolutions that come
 // to the same block there are one step, and one that comes to 1 px is Native), set by main.js
@@ -37,13 +37,13 @@
 //   parseQuery(search)   ?test (the window.__invitation hooks), ?seed=N, ?calm, ?perf (frame
 //                        times and the governor's level on screen: stage.js), ?govern (the
 //                        frame-time governor on under ?test; ?govern=off, off for anyone),
-//                        ?drag=today|level|tilt|bead (how he's carried: hold.js; anything else, today)
+//                        ?drag=today|level|tilt|bead (how he's carried: hold.js; anything else, bead)
 
 import { PIXEL_SIZES, resolutionOf, shownPixel, stepFor } from './pixels.js';
 import { LOOKS, MOTIONS, STYLES, isCustom, shaderOf, validLook } from './look.js';
 import { SHADER_CONTROLS, controlFor, shaderText } from './shader.js';
 import { CUE_LABELS, CUE_MODES } from './cues.js';
-import { DRAG_KINDS, DRAG_LABELS, dragKind } from './hold.js';
+import { DEFAULT_DRAG, DRAG_KINDS, DRAG_LABELS, dragKind } from './hold.js';
 import { LABEL_ICONS, iconSvg, installDither } from './icons.js';
 
 /** @typedef {import('./types.js').ButtonName} ButtonName */
@@ -374,10 +374,10 @@ const toggle = (key, label, on, attr = 'data-look') =>
  * @param {import('./pixels.js').PixelStep[]} [steps]  Pixel Size's steps on this screen (pixels.js
  *   pixelSteps; every Pixel Size its own step by default)
  * @param {{wander?: boolean, drag?: import('./hold.js').DragKind, groundDefault?: import('./hold.js').CueMode}} [o]
- *   whether he wanders by himself (on by default), the drag kind (Today by default) and its
+ *   whether he wanders by himself (on by default), the drag kind (Bead by default) and its
  *   Ground Cues default (Off by default: the look's own once it's picked)
  */
-export function sheetHtml(look, steps = ALL_STEPS, { wander = true, drag = 'today', groundDefault = 'off' } = {}) {
+export function sheetHtml(look, steps = ALL_STEPS, { wander = true, drag = DEFAULT_DRAG, groundDefault = 'off' } = {}) {
   const l = validLook(look);
   const custom = isCustom(l);
   // (Custom is the style row's own once a Shader value is the user's: it's never picked.)
@@ -400,7 +400,7 @@ export function sheetHtml(look, steps = ALL_STEPS, { wander = true, drag = 'toda
   <fieldset class="inv-field"><legend>Motion</legend><div class="inv-segs">${motions}</div></fieldset>
   ${shaderHtml(l)}
   <fieldset class="inv-field"><legend>Ground Cues</legend><div class="inv-segs">${cues}</div><p class="inv-hint">The ring and the dashed line under NEWT while he’s held, showing where he is over the floor.</p></fieldset>
-  <fieldset class="inv-field inv-drag"><legend>Drag</legend><div class="inv-segs">${drags}</div><p class="inv-hint">Ways of carrying him, to compare. Today is how he’s carried now.</p></fieldset>
+  <fieldset class="inv-field inv-drag"><legend>Drag</legend><div class="inv-segs">${drags}</div><p class="inv-hint">Ways of carrying him. Bead slides him over the floor as you drag; Today is how he was carried before.</p></fieldset>
   <div class="inv-field inv-play">${toggle('wander', 'Wander', wander, 'data-setting')}<p class="inv-hint">Left be, he walks about by himself now and then.</p></div>
 </section>`;
 }
@@ -448,7 +448,7 @@ export function bindUi(
     onWander,
     onSheet,
     onIntro,
-    drag = 'today',
+    drag = DEFAULT_DRAG,
     groundDefault = 'off',
     onDrag,
   },

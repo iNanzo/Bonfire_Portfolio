@@ -908,7 +908,7 @@ test('the toolbar, the camera pad and the Settings sheet: every button named by 
     govern: null,
     settle: null,
     envelope: false,
-    drag: 'today',
+    drag: 'bead',
   });
   assert.deepEqual(parseQuery(''), {
     test: false,
@@ -918,7 +918,7 @@ test('the toolbar, the camera pad and the Settings sheet: every button named by 
     govern: null,
     settle: null,
     envelope: true,
-    drag: 'today',
+    drag: 'bead',
   });
   // The envelope opens every visit; ?test skips it (the specs and tools start in the toy) unless
   // &envelope asks for it.
@@ -1124,10 +1124,10 @@ test('Ground Cues, the ring and the dashed drop line under him while he’s held
   );
 });
 
-test('Drag in Settings: Today, Level, Tilt and Bead, the kind ?drag= names checked (anything else: Today), for this visit only (never stored)', () => {
-  assert.equal(parseQuery('').drag, 'today');
+test('Drag in Settings: Today, Level, Tilt and Bead, the kind ?drag= names checked (anything else: Bead, the default), for this visit only (never stored)', () => {
+  assert.equal(parseQuery('').drag, 'bead');
   for (const k of ['today', 'level', 'tilt', 'bead']) assert.equal(parseQuery(`?drag=${k}`).drag, k);
-  for (const bad of ['?drag=', '?drag=Level', '?drag=fly', '?drag']) assert.equal(parseQuery(bad).drag, 'today', bad);
+  for (const bad of ['?drag=', '?drag=Level', '?drag=fly', '?drag']) assert.equal(parseQuery(bad).drag, 'bead', bad);
   const drags = (html) => [
     ...html.matchAll(
       /<input type="radio" name="inv-drag" value="(\w+)" data-setting="drag"( checked)?><span>([^<]+)<\/span>/g,
@@ -1142,7 +1142,7 @@ test('Drag in Settings: Today, Level, Tilt and Bead, the kind ?drag= names check
       ['bead', false, 'Bead'],
     ],
   );
-  assert.equal(drags(sheetHtml(DEFAULT_LOOK)).find((m) => m[2])?.[1], 'today');
+  assert.equal(drags(sheetHtml(DEFAULT_LOOK)).find((m) => m[2])?.[1], 'bead');
   assert.equal('drag' in validLook({ drag: 'tilt' }), false, 'not a Look setting');
   // Wander stays the sheet's last stop (Tab goes round from it to Done).
   const sheet = sheetHtml(DEFAULT_LOOK);
