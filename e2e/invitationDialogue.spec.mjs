@@ -266,14 +266,15 @@ const MOVING = {
  * How far a styled line's letters run into the next one on their line, CSS px, at its worst
  * through two seconds of their moves: every animation on its letters paused and stepped through
  * together 5 ms at a time (each keeps its stagger), each letter's drawn box against the next one's,
- * a space's too. With the letters that move and the moves seen, so a still line can't pass.
+ * a space's too. With the letters that move, how many run both moves at once, and the moves seen,
+ * so a still line can't pass.
  * @param {import('@playwright/test').Page} page
  * @param {string} sel  the line's container
  */
 const crowding = (page, sel) =>
-  page.evaluate(async (sel) => {
+  page.evaluate(async (container) => {
     await document.fonts.ready;
-    const letters = [...document.querySelectorAll(`${sel} .inv-fx`)];
+    const letters = [...document.querySelectorAll(`${container} .inv-fx`)];
     const anims = document.getAnimations().filter((a) => letters.includes(/** @type {any} */ (a.effect)?.target));
     const size = parseFloat(getComputedStyle(letters[0]).fontSize);
     let worst = { px: -Infinity, ms: 0, pair: '' };
@@ -296,6 +297,7 @@ const crowding = (page, sel) =>
     return {
       worst,
       moving: new Set(anims.map((a) => /** @type {any} */ (a.effect).target)).size,
+      both: letters.filter((e) => anims.filter((a) => /** @type {any} */ (a.effect).target === e).length > 1).length,
       moves: [...new Set(anims.map((a) => /** @type {any} */ (a).animationName))].sort(),
     };
   }, sel);
@@ -303,14 +305,16 @@ const crowding = (page, sel) =>
 async function movesStayLegible(page, tap) {
   const errors = watch(page);
   await calm(page);
-  const all = ['inv-fx-shake', 'inv-fx-wave', 'inv-fx-wave-shake'];
+  // (Both on one letter: the wave on its translate, the shake on its transform, two animations.)
+  const all = ['inv-fx-shake', 'inv-fx-wave'];
   await page.evaluate((line) => window.__invitation.say(line), MOVING.bubble);
   await expect(page.locator('.inv-bubble')).toBeVisible();
   await expect(page.locator('.inv-bubble-typed .inv-fx')).not.toHaveCount(0);
   await expect(page.locator('.inv-bubble-typed .inv-fx.is-unseen')).toHaveCount(0);
   const inBubble = await crowding(page, '.inv-bubble-typed');
-  expect(inBubble.moves, 'the bubble: wave, shake and both').toEqual(all);
+  expect(inBubble.moves, 'the bubble: wave and shake').toEqual(all);
   expect(inBubble.moving).toBe(Array.from('Hi!reallyyou').length);
+  expect(inBubble.both, 'the bubble: “you” waves and shakes').toBe(3);
   expect(inBubble.worst.px, `the bubble: ${JSON.stringify(inBubble.worst)}`).toBeLessThanOrEqual(1);
   const intro = structuredClone(behaviorIntro);
   intro.boxes.find((b) => b.id === intro.start).text = MOVING.box;
@@ -319,8 +323,9 @@ async function movesStayLegible(page, tap) {
   await goOn(page, tap);
   await until(page, (x) => x.dialogue.typed, 'the line up');
   const inBox = await crowding(page, '.inv-talk-typed');
-  expect(inBox.moves, 'the box: wave, shake and both').toEqual(all);
+  expect(inBox.moves, 'the box: wave and shake').toEqual(all);
   expect(inBox.moving).toBe(Array.from('Heyreallyparties').length);
+  expect(inBox.both, 'the box: “parties” waves and shakes').toBe(7);
   expect(inBox.worst.px, `the box: ${JSON.stringify(inBox.worst)}`).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 }
