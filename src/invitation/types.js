@@ -55,10 +55,11 @@
  */
 /**
  * @typedef {object} GestureEvent
- * @property {'tap'|'grab'|'drag'|'release'|'cancel'|'hover'|'orbit'|'pan'|'pinch'} type  orbit: a
+ * @property {'tap'|'grab'|'drag'|'release'|'cancel'|'hover'|'orbit'|'pan'|'pinch'|'holdLift'} type  orbit: a
  *   finger's drag on empty space or the mouse's right-drag (it turns the camera); pan: the mouse's
  *   left- or middle-drag on empty space, or two fingers' middle (it slides the view); pinch: two
- *   fingers (they zoom it)
+ *   fingers (they zoom it); holdLift: a second finger while he's held, its move up or down (dy:
+ *   a drag kind's height, gesture.js holdLift)
  * @property {'newt'|'floor'} on  what the press started on ('floor' for empty space and pinches)
  * @property {number} x  client px (a pinch: its fingers' middle)
  * @property {number} y

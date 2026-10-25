@@ -424,7 +424,8 @@ test('the Look sheet’s Shader section: every control from the table, labelled,
   for (const hint of [...html.matchAll(/class="inv-hint[^"]*"[^>]*>([^<]+)</g)].map((m) => m[1]))
     assert.ok(/^[A-Z].*\.$/.test(hint) && hint.length <= 160, hint);
   const labels = [...html.matchAll(/>([^<>]+)</g)].map((m) => m[1].trim()).filter((t) => t && !/[.:%°]/.test(t));
-  for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( ([A-Z0-9][^ ]*|&amp;))*$/, label);
+  // (Articles stay lower case past the first word, as text.js titleCase has them: In the Mix.)
+  for (const label of labels) assert.match(label, /^[A-Z0-9][^ ]*( ([A-Z0-9][^ ]*|&amp;|a|an|the))*$/, label);
   assert.match(html, /<span class="inv-switch-label">Pixel Shirt<\/span>/);
   assert.match(html, /<span class="inv-switch-label">Pixel Face<\/span>/);
 });

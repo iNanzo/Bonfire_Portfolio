@@ -22,6 +22,7 @@ import { rayPlane } from './gesture.js';
 import { centreOf, clampTo, rounded, xRange } from './steer.js';
 
 /** @typedef {import('./types.js').XYZ} XYZ */
+/** @typedef {import('./types.js').XZ} XZ */
 /** @typedef {import('./types.js').Bounds} Bounds */
 /** @typedef {import('./types.js').CarryState} CarryState */
 
@@ -156,12 +157,13 @@ export function holdStep(c, target, dt, bounds, t, plane = c.plane ?? null) {
 /**
  * Where `p` is kept inside `b`: along the plane's line across the floor (the span of it inside,
  * lineSpan), or with no plane, or a line that misses, the nearest spot inside (steer.js clampTo).
+ * hold.js edgeClamp's side walls use it too.
  * @param {Bounds} b
- * @param {XYZ} p
+ * @param {XZ} p
  * @param {{normal: XYZ}|null} plane
  * @returns {{x: number, z: number}}
  */
-function keepInside(b, p, plane) {
+export function keepInside(b, p, plane) {
   const n = plane?.normal;
   const len = n ? Math.hypot(n.x, n.z) : 0;
   if (!n || !(len > 1e-9)) return clampTo(b, p);

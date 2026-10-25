@@ -1591,7 +1591,7 @@ test.describe('on a desktop', () => {
     const focused = () =>
       page.evaluate(() => {
         const a = /** @type {HTMLElement} */ (document.activeElement);
-        const key = a.dataset?.look ?? a.dataset?.shader;
+        const key = a.dataset?.look ?? a.dataset?.shader ?? a.dataset?.setting;
         const what = key ? `${key}=${a.getAttribute('value') ?? ''}` : a.textContent?.trim();
         return { inside: Boolean(a.closest('.inv-sheet')), what: `${a.tagName} ${what}` };
       });
@@ -1608,8 +1608,9 @@ test.describe('on a desktop', () => {
       expect(f.inside, `Shift+Tab ${i}: ${f.what}`).toBe(true);
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
-    // Motion, the 17 Shader options (Reset To Style rests until one is the user's own) and Wander.
-    expect(stops.size, [...stops].join(', ')).toBe(26);
+    // Motion, the 17 Shader options (Reset To Style rests until one is the user's own), Ground
+    // Cues, Drag and Wander.
+    expect(stops.size, [...stops].join(', ')).toBe(28);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');
