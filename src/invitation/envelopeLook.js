@@ -24,6 +24,8 @@ export const rgb = (hex) => new THREE.Vector3(((hex >> 16) & 255) / 255, ((hex >
 
 /** The reference's palette, three tones a material: light, mid, shade. */
 export const PAPER = [0xf1d786, 0xe4b85d, 0xd3983d];
+/** The paper's three a step brighter: how it shows at the hover's peak (envelope.js hoverLook). */
+export const PAPER_LIT = [0xfbe9ac, 0xf0cd7a, 0xe2ad55];
 export const WAX = [0xd24b52, 0x96151f, 0x5a0a12];
 export const PETAL = [0xe44544, 0xac2e29, 0x851d1b];
 /** The toy's ink (invitation.css --inv-ink): the lines round it and along the flap's V. */
@@ -32,6 +34,8 @@ export const INK = 0x3a332d;
 export const HOVER = 0xe0a53a;
 /** The hover rim's shine on the letter's own edge: a warm white (the gold alone barely shows on the gold paper). */
 export const SHINE = 0xfff4d6;
+/** The hover's glow next to the letter's line: a brighter gold than HOVER, further out. */
+export const GLOW = 0xffcf5a;
 /** The burning rim as it dissolves: glowing, ember, charred (dark enough to read on the white page). */
 const RIM = [0xffb43c, 0xe0582a, 0x5a3418];
 
@@ -188,6 +192,7 @@ export const shared = () => ({
   uToLetter: { value: new THREE.Matrix4() },
   uToInner: { value: new THREE.Matrix4() },
   uIdPass: { value: 0 },
+  uBright: { value: 0 },
 });
 
 /**
@@ -199,7 +204,7 @@ export const shared = () => ({
  * @param {number[]} tones  light, mid, shade (sRGB hex)
  * @param {ReturnType<typeof shared>} u
  * @param {number} id  IDS
- * @param {{uniforms?: Record<string, {value: any}>, defines?: Record<string, string>, glsl?: string, lean?: number}} [extra]
+ * @param {{uniforms?: Record<string, {value: any}>, defines?: Record<string, string>, glsl?: string, lean?: number, lit?: number[]}} [extra]
  */
 export function toon(tones, u, id, extra = {}) {
   const flat = extra.lean !== undefined;
@@ -208,7 +213,9 @@ export function toon(tones, u, id, extra = {}) {
       ...u,
       uTones: { value: tones.map(rgb) },
       uId: { value: id },
-      ...(flat ? { uLean: { value: extra.lean }, uRest: { value: REST } } : {}),
+      ...(flat
+        ? { uLean: { value: extra.lean }, uRest: { value: REST }, uLit: { value: (extra.lit ?? tones).map(rgb) } }
+        : {}),
       ...extra.uniforms,
     },
     defines: { ...(flat ? { FLAT: '' } : {}), ...extra.defines },
@@ -239,9 +246,11 @@ export function toon(tones, u, id, extra = {}) {
       uniform float uEdge;
       uniform float uIdPass;
       uniform float uId;
+      uniform float uBright;
       #ifdef FLAT
       uniform float uLean;
       uniform mat3 uRest;
+      uniform vec3 uLit[3];
       varying vec3 vInner;
       #endif
       varying vec3 vView;
@@ -276,6 +285,10 @@ export function toon(tones, u, id, extra = {}) {
         #endif
         float band = v > ${SHADES.light.toFixed(4)} ? 0.0 : v > ${SHADES.mid.toFixed(4)} ? 1.0 : 2.0;
         vec3 c = band < 0.5 ? uTones[0] : band < 1.5 ? uTones[1] : uTones[2];
+        #ifdef FLAT
+        // (The hover's peak: each tone a step brighter, dithered in.)
+        if (uBright > 0.0 && b < uBright) c = band < 0.5 ? uLit[0] : band < 1.5 ? uLit[1] : uLit[2];
+        #endif
         #ifdef SEAL
         c = face.rgb;
         #endif

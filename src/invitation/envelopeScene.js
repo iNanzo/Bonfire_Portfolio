@@ -25,8 +25,11 @@
 // up) and opens or skips on release (releaseGesture), else springs back; the wheel opens or skips
 // once it adds up; Skip Intro skips. While it floats it leans clearly toward the pointer (a finger
 // while it's down), and a sideways drag or a held ArrowLeft or ArrowRight turns it further, springing
-// back (turnGoal; a sideways drag never opens or skips it); hovered, a gold rim pulses slowly round
-// it (hoverPulse). It takes focus at boot with no ring: the ring shows once a key
+// back (turnGoal; a sideways drag never opens or skips it); hovered, a glow pulses slowly round
+// it (hoverPulse: a wide dithered gold glow, a warm rim, the letter lifting a little toward the
+// camera and its paper a step brighter at the peak, all gone between pulses: hoverLook), shown
+// strongly at once while a finger (or the mouse) is down on the letter (pressStep), and on a touch
+// screen while it's left alone. It takes focus at boot with no ring: the ring shows once a key
 // is pressed. veils(spots) says whether it still hides NEWT (his head, collar and middle: the
 // intro's first line waits for it; envelope.js letterCovers at points of each on the letter).
 // The hint ("Click or swipe up to open", "Tap ..." on a touch screen, / "Swipe down to skip")
@@ -44,9 +47,12 @@ import {
   dragPose,
   envelopeKey,
   hintFor,
+  hoverLook,
   hoverPulse,
   hoverStep,
   letterCovers,
+  pressStep,
+  shownPulse,
   turnGoal,
   turnRoll,
   turnStep,
@@ -60,11 +66,13 @@ import { createPetalScene } from './petalScene.js';
 import {
   BAYER,
   DEPTH,
+  GLOW,
   HOVER,
   IDS,
   INK,
   LEAN,
   PAPER,
+  PAPER_LIT,
   PITCH,
   SHINE,
   TILT,
@@ -128,7 +136,8 @@ function buildEnvelope(u) {
   const { W, H, T } = L;
   const h = H / 2;
   const group = new THREE.Group();
-  const paper = (/** @type {keyof typeof LEAN} */ part) => toon(PAPER, u, IDS[part], { lean: LEAN[part] });
+  const paper = (/** @type {keyof typeof LEAN} */ part) =>
+    toon(PAPER, u, IDS[part], { lean: LEAN[part], lit: PAPER_LIT });
   group.add(piece(L.parts.body, paper('body'), T / 2));
   group.add(piece(L.parts.inside, paper('inside'), T / 2 + DEPTH.inside));
   group.add(piece(L.parts.pocket, paper('pocket'), T / 2 + DEPTH.pocket));
@@ -202,10 +211,11 @@ function buildSpecks() {
 /**
  * The pass that puts it together: the colours, and a line in the ink on each texel that borders
  * a part in front of it (by the parts' order, IDS): round the silhouette, on the paper just
- * outside it, and along the flap's V. Hovered (uPulse, 0..1: envelope.js hoverPulse), a
- * Bayer-dithered rim on the letter's outermost two texels (a warm shine: gold barely shows on the
- * gold paper) and a gold halo a texel or two past its line, like NEWT's hover (retro.js): the
- * letter's parts only, seal and all, never the petals.
+ * outside it, and along the flap's V. Hovered (uPulse, 0..1: envelope.js hoverPulse, or a finger
+ * down on it), a Bayer-dithered warm rim on the letter's outermost uRim texels (a warm shine: gold
+ * barely shows on the gold paper) and a glow past its line out to uReach texels (envelope.js
+ * hoverLook), bright gold next to it and NEWT's hover gold (retro.js) further out, thinning with
+ * distance: the letter's parts only, seal and all, never the petals.
  */
 function buildCompose() {
   const mat = new THREE.ShaderMaterial({
@@ -215,7 +225,10 @@ function buildCompose() {
       uTexel: { value: new THREE.Vector2(1, 1) },
       uInk: { value: rgb(INK) },
       uPulse: { value: 0 },
+      uReach: { value: 0 },
+      uRim: { value: 0 },
       uGold: { value: rgb(HOVER) },
+      uGlow: { value: rgb(GLOW) },
       uShine: { value: rgb(SHINE) },
     },
     vertexShader: /* glsl */ `
@@ -228,22 +241,25 @@ function buildCompose() {
       uniform vec2 uTexel;
       uniform vec3 uInk;
       uniform float uPulse;
+      uniform float uReach;
+      uniform float uRim;
       uniform vec3 uGold;
+      uniform vec3 uGlow;
       uniform vec3 uShine;
       varying vec2 vUv;
       ${BAYER}
       const vec2 STEPS[4] = vec2[4](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0));
-      // (The halo's neighbours, past the line: two out along each axis, then the knight's moves,
-      // then three out.)
-      const vec2 HALO[16] = vec2[16](
-        vec2(2.0, 0.0), vec2(-2.0, 0.0), vec2(0.0, 2.0), vec2(0.0, -2.0),
-        vec2(2.0, 1.0), vec2(2.0, -1.0), vec2(-2.0, 1.0), vec2(-2.0, -1.0),
-        vec2(1.0, 2.0), vec2(-1.0, 2.0), vec2(1.0, -2.0), vec2(-1.0, -2.0),
-        vec2(3.0, 0.0), vec2(-3.0, 0.0), vec2(0.0, 3.0), vec2(0.0, -3.0)
+      // (Sixteen ways round, for the glow's distance to the letter: a ring of them each texel out.)
+      const vec2 ROUND[16] = vec2[16](
+        vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0),
+        vec2(0.7071, 0.7071), vec2(-0.7071, 0.7071), vec2(0.7071, -0.7071), vec2(-0.7071, -0.7071),
+        vec2(0.9239, 0.3827), vec2(-0.9239, 0.3827), vec2(0.9239, -0.3827), vec2(-0.9239, -0.3827),
+        vec2(0.3827, 0.9239), vec2(-0.3827, 0.9239), vec2(0.3827, -0.9239), vec2(-0.3827, -0.9239)
       );
       // (A neighbour's part; one on the dissolving rim counts as nothing, so no line goes round it.)
       float idAt(vec2 o) {
-        vec4 t = texture2D(uId, vUv + o * uTexel);
+        // (Its own level, no gradients: the glow reads these in a loop that stops early.)
+        vec4 t = textureLod(uId, vUv + o * uTexel, 0.0);
         return t.g > 0.5 ? 0.0 : floor(t.r * 255.0 + 0.5);
       }
       // (The letter's parts, the seal too; not the petals, nor nothing.)
@@ -260,19 +276,27 @@ function buildCompose() {
         float dither = bayer(gl_FragCoord.xy);
         if (me < 0.5) {
           gl_FragColor = vec4(0.0);
-          if (uPulse > 0.0)
-            for (int k = 0; k < 16; k++) {
-              if (!letterAt(HALO[k])) continue;
-              if (dither < uPulse * (k < 4 ? 1.0 : k < 12 ? 0.8 : 0.45)) gl_FragColor = vec4(uGold, 1.0);
+          if (uPulse > 0.0 && uReach > 0.0)
+            // (The nearest of the letter, texels out (the line is the first), as far as it reaches.)
+            for (int r = 2; r <= 8; r++) {
+              float fr = float(r);
+              if (fr > uReach + 0.5) break;
+              bool near = false;
+              for (int k = 0; k < 16; k++) near = near || letterAt(floor(ROUND[k] * fr + 0.5));
+              if (!near) continue;
+              float fall = 1.0 - (fr - 2.0) / (uReach + 0.5);
+              if (dither < uPulse * fall) gl_FragColor = vec4(fr < 3.5 ? uGlow : uGold, 1.0);
               break;
             }
           return;
         }
         vec3 c = texture2D(uColor, vUv).rgb;
-        // (The rim: a letter's texel within two of nothing; a petal over it isn't its edge.)
+        // (The rim: a letter's texel within uRim of nothing; a petal over it isn't its edge.)
         if (uPulse > 0.0 && me < ${IDS.petal.toFixed(1)} - 0.5) {
           bool rim = false;
-          for (int k = 0; k < 4; k++) rim = rim || idAt(STEPS[k]) < 0.5 || idAt(2.0 * STEPS[k]) < 0.5;
+          for (int k = 0; k < 4; k++)
+            for (int r = 1; r <= 3; r++)
+              rim = rim || (float(r) <= uRim + 0.01 && idAt(float(r) * STEPS[k]) < 0.5);
           if (rim && dither < uPulse) c = mix(c, uShine, 0.8);
         }
         gl_FragColor = vec4(c, 1.0);
@@ -419,7 +443,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   win.addEventListener('resize', onResize);
 
   // --- Input.
-  /** @type {{id: number, x: number, y: number, t: number, dx: number, dy: number, far: number}|null} the press: where and when it went down, its last offset and the farthest it got (CSS px) */
+  /** @type {{id: number, x: number, y: number, t: number, dx: number, dy: number, far: number, on: boolean}|null} the press: where and when it went down, its last offset and the farthest it got (CSS px), and whether it went down on the letter */
   let drag = null;
   /** The drag's follow as shown (eased toward its target: the give), CSS px; and the flap's lift. */
   const follow = { y: 0, lift: 0 };
@@ -428,8 +452,11 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   let hovered = false;
   /** The mouse is over the letter itself (not just the layer). */
   let overLetter = false;
-  /** The hover pulse: eased in (k), seconds into it (t: from its start), and as shown (pulse). */
-  const hover = { k: 0, t: 0, pulse: 0 };
+  /**
+   * The hover pulse: eased in (k), seconds into it (t: from its start), a press down on the letter
+   * (press: envelope.js pressStep), as shown (pulse: the stronger of the two) and how (look).
+   */
+  const hover = { k: 0, t: 0, press: 0, pulse: 0, look: hoverLook(0) };
   /**
    * The letter's turn as shown (radians), the pointer's x it leans toward (−1 left edge to 1
    * right: the mouse anywhere over it, a finger while it's down; null without one) and the arrow
@@ -494,7 +521,16 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   hit.addEventListener('pointerdown', (e) => {
     lastInput = clock();
     if (drag || (e.pointerType === 'mouse' && e.button !== 0) || !env.covers) return;
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), dx: 0, dy: 0, far: 0 };
+    drag = {
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      t: performance.now(),
+      dx: 0,
+      dy: 0,
+      far: 0,
+      on: onLetterAt(e.clientX, e.clientY),
+    };
     leanTo(e);
     try {
       hit.setPointerCapture(e.pointerId);
@@ -674,13 +710,19 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     const pxToWorld = view.h / view.cssH;
     // (Settling in as it arrives: from a touch above, a touch small.)
     const arrive = (1 - p.arrive) * view.h * 0.04;
-    outer.position.set(0, p.bob - follow.y * pxToWorld - p.drop * view.h * 0.9 + arrive, p.push * 0.6);
+    // (Hovered, it lifts a little toward the camera in time with the pulse: envelope.js hoverLook.)
+    const lift = reduced ? hoverLook(0) : hover.look;
+    outer.position.set(
+      0,
+      p.bob - follow.y * pxToWorld - p.drop * view.h * 0.9 + arrive,
+      p.push * 0.6 + lift.toward * DIST,
+    );
     // (Turned toward the pointer, and further by a sideways drag or a held arrow, while it floats.)
     const goal =
       env.state === 'floating' ? turnGoal({ pointer: pointerX, dx: drag?.dx ?? 0, w: view.cssW, key: keyTurn }) : 0;
     turn = turnStep(turn, goal, dt, reduced);
     outer.rotation.set(0, p.yaw + turn, -0.5 * p.drop + turnRoll(turn));
-    outer.scale.setScalar(view.scale * (1 + 0.025 * p.pulse) * (0.94 + 0.06 * p.arrive));
+    outer.scale.setScalar(view.scale * (1 + 0.025 * p.pulse) * (0.94 + 0.06 * p.arrive) * lift.scale);
     envl.hinge.rotation.x = -p.flap;
     // The seal: whole, starting to open as a finger drags it up, then blooming into petals,
     // shrinking away to nothing before the flap moves. It leans, turns and narrows with the
@@ -730,8 +772,14 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     const hoverOn = floating && !drag && (overLetter || (focused && keyboard) || (touchy && idle));
     hover.k = hoverStep(hover.k, hoverOn, dt);
     hover.t = hover.k > 0 ? hover.t + dt : 0;
-    hover.pulse = hoverPulse(hover.k, hover.t, reduced);
+    // (A finger down on the letter shows it strongly at once: a touch screen has no hover.)
+    hover.press = pressStep(hover.press, floating && Boolean(drag?.on), dt);
+    hover.pulse = shownPulse(hoverPulse(hover.k, hover.t, reduced), hover.press);
+    hover.look = hoverLook(hover.pulse);
     compose.mat.uniforms.uPulse.value = hover.pulse;
+    compose.mat.uniforms.uReach.value = hover.look.reach;
+    compose.mat.uniforms.uRim.value = hover.look.rim;
+    u.uBright.value = reduced ? 0 : hover.look.bright;
   }
 
   /**
@@ -864,7 +912,12 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
       const now = clock();
       const petalsNow = { live: petals.live(), emitted: petals.emitted };
       const sealNow = { first: firstSeal, last: lastSeal };
-      const hoverNow = { k: hover.k, pulse: hover.pulse };
+      const hoverNow = {
+        k: hover.k,
+        press: hover.press,
+        pulse: hover.pulse,
+        look: { ...hover.look },
+      };
       const turnNow = { now: turn, pointer: pointerX, key: keyTurn };
       return {
         state: env.state,

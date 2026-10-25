@@ -46,9 +46,12 @@ loading screen too: NEWT loads behind it.
   in Settings turns them all off (the envelope's too); it's on by default and kept with the
   look.
 - **Hover it:** with the mouse over the letter (or keyboard focus on it, or on a touch screen
-  after a moment without a touch), a gold rim pulses slowly round it, seal and all, about every
-  three seconds, fading right out between pulses so you can see it clearly. With reduced motion
-  the rim holds steady.
+  after a moment without a touch), a glow pulses slowly round it, seal and all, about every
+  three seconds: a wide dithered gold glow past its outline and a warm rim inside it, the letter
+  lifting a little toward you (about 3% bigger) and its paper a step brighter at the peak, all of
+  it fading right out between pulses so you can see it clearly. A finger (or the mouse) down on
+  the letter shows it at full strength at once, fading once it's lifted. With reduced motion the glow holds steady, with
+  no lift.
 - **Turn it:** it leans toward the mouse, clearly enough to see (about 6° with the mouse halfway
   to the edge of the screen, 8° at the edge; on a phone, toward your finger while it's down);
   its top tips the same way as it turns, so it reads as leaning toward you; drag it sideways or
@@ -759,7 +762,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   across the letter over `TIMES.dissolve`; `since`, the specks' clock; `backdrop`, the white page
   clearing over `TIMES.clear`), a skip's drop, `BOB` and `SWAY`, `TIMES`; the hover's pulse,
   `hoverStep` and `hoverPulse(k, t)` (`HOVER_PULSE`: the eased hover times
-  0.5 − 0.5·cos(2πt / 2.8 s), steady with reduced motion); the letter's turn, `turnGoal` (toward
+  0.5 − 0.5·cos(2πt / 2.8 s), steady with reduced motion), how it shows, `hoverLook(pulse)`
+  (`HOVER_LOOK`: the letter scaled up to 3% and brought 1.5% of the camera's distance nearer, a
+  glow reaching 2 to 6 texels past its line, a rim 2 to 3 texels deep, the paper's `PAPER_LIT`
+  dithered in from 0.6 of the pulse; all of it nothing at 0), a press on the letter, `pressStep`
+  (in over 0.06 s, out over 0.35 s) and `shownPulse` (the stronger of the two); the letter's turn, `turnGoal` (toward
   the pointer's x, eased out to `TURN.lean` (0.14 rad at the edge, about 0.1 halfway), plus a
   sideways drag or a held arrow up to `TURN.push` (0.16), at most `TURN.max`, 0.24 rad),
   `turnRoll(turn)` (the roll that goes with it, `TURN.roll` 0.45 of it, its top tipping the way
@@ -837,8 +844,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   dissolves; drawn twice, its colours and then each part's id (`IDS`, back to front), then put
   together with a one-texel line in `INK` on each texel bordering a later part, none round the
   dissolving rim, and the hover's pulse there too (a Bayer-dithered `SHINE` on the letter's
-  outermost two texels and a `HOVER` gold halo past its line, the letter's ids only, never the
-  petals', like NEWT's in retro.js; `hover` in its snapshot); the letter's yaw is the sway plus
+  outermost `uRim` texels and a glow past its line to `uReach` texels, `GLOW` next to it and
+  NEWT's `HOVER` gold further out, thinning with distance, the letter's ids only, never the
+  petals', like NEWT's in retro.js; the shared `uBright` steps the paper to `PAPER_LIT`; `hover`
+  in its snapshot: `k`, `press`, `pulse`, `look`); the letter's yaw is the sway plus
   its turn, rolled by `turnRoll(turn)` (`turn` in its snapshot); the camera's matrices are brought up to date after it's
   placed and every frame, the shaders compiled at creation and the seal hidden until it's been
   placed once (the red box on reload was a first frame's seal placed through a camera three had

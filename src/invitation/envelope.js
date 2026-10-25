@@ -9,7 +9,9 @@
 // (dragPose), the live hint while dragging (dragHint), the hint's words for a touch screen or a
 // mouse (hintFor), how it settles in as it arrives, the whole opening as functions of time
 // (pose), the seal shrinking away as it blooms (sealBloom: its petals are petals.js's), the
-// hover's slow pulse (hoverStep, hoverPulse), the letter's turn toward the pointer and with a
+// hover's slow pulse (hoverStep, hoverPulse) and how it shows (hoverLook: a wide glow, a lift
+// toward the camera and the paper a step brighter at its peak; pressStep, a finger down on it,
+// strong at once), the letter's turn toward the pointer and with a
 // sideways drag or the arrow keys (turnGoal, turnStep), and the
 // dissolve: where its noisy edge has reached on the letter (dissolveAt, DISSOLVE: the scene's
 // shader runs the same sums) and the specks it sheds there, drifting up and fading
@@ -413,6 +415,61 @@ export function hoverPulse(k, t, reduced = false) {
   if (reduced) return k * HOVER_PULSE.still;
   return k * (0.5 - 0.5 * Math.cos((2 * Math.PI * t) / HOVER_PULSE.period));
 }
+
+/**
+ * How the hover shows at full strength (hoverLook): the letter scaled up by `scale` and brought
+ * `toward` of the camera's distance nearer; a glow `reach` texels past its line (from the two
+ * the old gold halo had) and a warm rim `rim` texels deep inside its edge; its paper a step
+ * brighter from `bright` of the pulse up. A finger down on it (pressStep) shows it in over `in`
+ * seconds and, lifted, out over `out`.
+ */
+export const HOVER_LOOK = {
+  scale: 0.03,
+  toward: 0.015,
+  reach: [2, 6],
+  rim: [2, 3],
+  bright: 0.6,
+  in: 0.06,
+  out: 0.35,
+};
+
+/**
+ * The hover as drawn at `pulse` (0..1: hoverPulse, or a finger's press, shownPulse): its lift (the
+ * letter's scale and how far toward the camera, a share of its distance), the glow's reach and
+ * the rim's depth (texels; 0 none) and the paper's brightening (0..1, only near the peak). At 0 it's
+ * all clean.
+ * @param {number} pulse
+ */
+export function hoverLook(pulse) {
+  const k = clamp01(pulse);
+  const L = HOVER_LOOK;
+  if (k === 0) return { scale: 1, toward: 0, reach: 0, rim: 0, bright: 0 };
+  return {
+    scale: 1 + L.scale * smooth(k),
+    toward: L.toward * smooth(k),
+    reach: L.reach[0] + (L.reach[1] - L.reach[0]) * k,
+    rim: L.rim[0] + (L.rim[1] - L.rim[0]) * k,
+    bright: smooth((k - L.bright) / (1 - L.bright)),
+  };
+}
+
+/**
+ * A finger (or the mouse) down on the letter a step on: in fast while it's `down`, out once it's
+ * lifted.
+ * @param {number} k  0..1
+ * @param {boolean} down
+ * @param {number} dt  seconds
+ */
+export function pressStep(k, down, dt) {
+  return down ? Math.min(1, k + dt / HOVER_LOOK.in) : Math.max(0, k - dt / HOVER_LOOK.out);
+}
+
+/**
+ * The hover as shown: the pulse, or a press on the letter where that's stronger.
+ * @param {number} pulse
+ * @param {number} press
+ */
+export const shownPulse = (pulse, press) => Math.max(pulse, press);
 
 /**
  * The envelope's states and timeline; `t` is any clock in seconds that only goes forward.

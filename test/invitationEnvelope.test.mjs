@@ -35,9 +35,13 @@ import {
   envelopeGesture,
   envelopeKey,
   hintFor,
+  HOVER_LOOK,
+  hoverLook,
   hoverPulse,
   hoverStep,
   particleAt,
+  pressStep,
+  shownPulse,
   releaseGesture,
   shedParticles,
 } from '../src/invitation/envelope.js';
@@ -519,4 +523,47 @@ test('the turn eases toward where it heads and springs back once let go; reduced
   for (let i = 0; i < 90; i++) a = turnStep(a, 0, 1 / 60);
   assert.ok(Math.abs(a) < 0.005, `back square on: ${a}`);
   assert.equal(turnStep(0.1, 0.12, 1 / 60, true), 0);
+});
+
+test('the hover reads at a glance: at a pulse’s peak a wide bright glow, the letter lifted about 3% toward the camera, its paper a step brighter; at the trough, none of it', () => {
+  const clean = hoverLook(0);
+  assert.deepEqual(clean, { scale: 1, toward: 0, reach: 0, rim: 0, bright: 0 }, 'clean at the trough');
+  const peak = hoverLook(1);
+  assert.ok(Math.abs(peak.scale - 1.03) < 0.005, `lifted about 3%: ${peak.scale}`);
+  assert.ok(peak.toward > 0 && peak.toward <= HOVER_LOOK.toward, `a little toward the camera: ${peak.toward}`);
+  // (The glow round it: wider than the old three texels, the rim inside its edge a texel deeper.)
+  assert.ok(peak.reach >= 5 && peak.reach <= 8, `the glow reaches ${peak.reach} texels past its line`);
+  assert.ok(peak.rim >= 3, `the rim ${peak.rim} texels`);
+  assert.equal(peak.bright, 1, 'its paper a step brighter at the peak');
+  // (Rising with the pulse, never overshooting; the paper brightens only near the peak.)
+  let last = clean;
+  for (let v = 0.05; v <= 1.0001; v += 0.05) {
+    const now = hoverLook(v);
+    for (const k of /** @type {const} */ (['scale', 'toward', 'reach', 'bright']))
+      assert.ok(now[k] >= last[k] - 1e-12, `${k} rises with the pulse at ${v.toFixed(2)}`);
+    if (v < HOVER_LOOK.bright) assert.equal(now.bright, 0, `not yet at ${v.toFixed(2)}`);
+    last = now;
+  }
+  // (Through a pulse: back to clean between them, so the model shows clearly.)
+  const P = HOVER_PULSE.period;
+  for (const t of [0, P, 2 * P]) assert.deepEqual(hoverLook(hoverPulse(1, t)), clean, `clean at ${t}`);
+  assert.equal(hoverLook(hoverPulse(1, P / 2)).bright, 1);
+  assert.deepEqual(hoverLook(-1), clean);
+  assert.deepEqual(hoverLook(2), peak);
+});
+
+test('a touch-down on the letter shows the hover strongly at once; lifted, it fades', () => {
+  let k = 0;
+  k = pressStep(k, true, 0.05);
+  assert.ok(k >= 0.5, `strong within a twentieth of a second: ${k}`);
+  for (let i = 0; i < 3; i++) k = pressStep(k, true, 0.05);
+  assert.equal(k, 1, 'full while it is down');
+  k = pressStep(k, false, 0.1);
+  assert.ok(k < 1 && k > 0.4, `fading once lifted: ${k}`);
+  for (let i = 0; i < 6; i++) k = pressStep(k, false, 0.1);
+  assert.equal(k, 0, 'gone');
+  // (Shown with the pulse: whichever is stronger.)
+  assert.equal(shownPulse(0.2, 1), 1);
+  assert.equal(shownPulse(0.7, 0.3), 0.7);
+  assert.equal(shownPulse(0, 0), 0);
 });
