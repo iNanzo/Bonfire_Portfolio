@@ -1,6 +1,6 @@
 /* The invitation toy's page (/invitation/): its own look, not the bonfire site's. Off-white and
    warm greys, chunky rounded buttons with a dark outline (a handheld's feel), Pixelify Sans; the
-   toolbar's are squircles with pixel icons (icons.js), their labels pixel tabs, their hover and
+   toolbar's are squircles with Phosphor icons (icons.js), their labels pixel tabs, their hover and
    press an ordered dither (--inv-dv-N, icons.js installDither); the cursors are pixel art too
    (cursor.js puts their CSS in the page).
    The stage fills the screen (fixed, inset 0; dvh only as a fallback); the canvas inside it is
@@ -17,7 +17,6 @@
   --inv-grey: #ddd6ca;
   --inv-mid: #9c9286;
   --inv-on: #f4cf7a;
-  --inv-accent: #c9822a;
   --inv-focus: #4f83d9;
   /* (A toolbar button's side: a thumb's width on a phone, seven to a 360 px row.) */
   --inv-tool: clamp(44px, 11.4vw, 54px);
@@ -201,16 +200,11 @@ body {
 .inv-toolbar > .inv-btn-camera {
   margin-left: auto;
 }
+/* (A Phosphor glyph, 24 px in the button's text colour: icons.js iconSvg.) */
 .inv-icon {
   display: block;
-  width: 32px;
-  height: 32px;
-}
-.inv-icon-line {
-  fill: currentColor;
-}
-.inv-icon-accent {
-  fill: var(--inv-accent);
+  width: 24px;
+  height: 24px;
 }
 /* (The ordered dither of the ink over the paper: light on hover, heavier pressed.) */
 .inv-tool:active:not(:disabled) {

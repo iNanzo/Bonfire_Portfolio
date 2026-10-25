@@ -735,10 +735,10 @@ test('the retro pass warms the path it isn’t drawing (the canvas’s while the
   await assert.doesNotReject(plain.warm(scene, camera));
 });
 
-test('the toolbar, the camera pad and the Settings sheet: every button named by its own label beside a pixel icon, the settings checked, no tooltips', () => {
+test('the toolbar, the camera pad and the Settings sheet: every button named by its own label beside its icon, the settings checked, no tooltips', () => {
   const bar = toolbarHtml();
   // The bar: Replay Intro, Wave, Sit, Give Device, Run, Camera and Settings, each a squircle with
-  // its pixel icon and its label in a span (the button's name: no aria-label, no title=). Spook
+  // its icon and its label in a span (the button's name: no aria-label, no title=). Spook
   // and Wander have left it (a tap on him still spooks or waves him; Wander is a setting).
   assert.equal(INTRO_LABEL, 'Replay Intro');
   assert.deepEqual([...BUTTONS], ['Wave', 'Sit', 'Device', 'Run']);

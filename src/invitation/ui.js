@@ -1,7 +1,7 @@
 // The invitation toy's page around the canvas: the status line ("Loading…", or what went wrong),
 // the toolbar along the bottom and the Settings sheet. The toolbar: Replay Intro, Wave, Sit (or
 // Stand), Give Device (Lie Down, Get Up: what its next press does), Run, Camera and Settings,
-// each a squircle with a 16×16 pixel icon (icons.js) and its label, the button's own text in a
+// each a squircle with a Phosphor icon (icons.js) and its label, the button's own text in a
 // span (its name: no tooltip, no title=). With a mouse the label shows as a pixel tab over the
 // button on hover and keyboard focus; on touch the bar shows icons only, and a press held still
 // for HOLD_MS shows the label and swallows the click that follows (createHold; a quicker press
@@ -257,7 +257,7 @@ export function parseQuery(search) {
 }
 
 /**
- * A tool button: a squircle with its pixel icon and its label, the label its name.
+ * A tool button: a squircle with its icon and its label, the label its name.
  * @param {string} label
  * @param {string} attrs  its hook and state attributes
  * @param {string} [cls]  more classes

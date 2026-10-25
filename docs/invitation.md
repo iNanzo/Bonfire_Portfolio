@@ -142,7 +142,9 @@ loads behind it.
 - **The toolbar:** Replay Intro (below), Wave, Sit (Stand once he's sitting), Give Device (Lie
   Down while he sits with the tablet, Get Up while he lies), Run (he runs off for a few seconds,
   across the screen to one side or the other, or away from the cursor), Camera (the pad above)
-  and Settings. Each is a rounded square with a pixel icon; with a mouse its name shows as a
+  and Settings. Each is a rounded square with a Phosphor icon (bold weight: an envelope, a
+  waving hand, arrows down and up, a phone, fat arrows down and up, a sneaker, a camera, sliders);
+  with a mouse its name shows as a
   little tab over it when you point at it or Tab to it, and on a phone (icons only) when you
   press and hold it, which then does nothing else. Pointed at or pressed, a button fills with a
   dither. Spook has gone from the bar (a tap on him still startles or waves him) and Wander is in
@@ -328,10 +330,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `setDeviceLabel` changing only a label and its icon, `deviceLabelOf` reading the brain's
     `deviceLabel`; `createHold`, a touch held still `HOLD_MS` (450 ms) showing a label and
     swallowing the click after it; Wander kept under `invitation.wander.v1`, `loadWander` and
-    `saveWander` in try/catch), `icons.js` (the 16×16 pixel icons as ASCII art turned into crisp
-    SVG, and the Bayer dither tiles of the buttons' hover and press, `installDither`: copies of
-    `src/ui/pixelArt.js`'s and `src/ui/dither.js`'s approaches, as the page imports nothing from
-    `src/ui`), `cursor.js` (the five pixel cursors drawn at 1× and 2×, at most 32 CSS px, as
+    `saveWander` in try/catch), `icons.js` (the Phosphor bold icons, MIT, their path data vendored with the
+    licence and drawn as 24 px inline SVG in `currentColor` on Phosphor's 256 grid, and the Bayer
+    dither tiles of the buttons' hover and press, `installDither`: a copy of `src/ui/dither.js`'s
+    approach, as the page imports nothing from `src/ui`), `cursor.js` (the five pixel cursors drawn at 1× and 2×, at most 32 CSS px, as
     `url()`, `-webkit-image-set()` and `image-set()` with exact hotspots and a system fallback;
     `cursorKind`, which shows, set as the stage's `data-cursor` each frame), `invitation.css`.
   - Pure and unit-tested: `pixels.js` (the texel grid: at sprite resolution N, `RESOLUTIONS` 16

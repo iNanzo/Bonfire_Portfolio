@@ -11,7 +11,7 @@
 // Playing with him: a tap makes him wave or start, a touch
 // drag holds him by the collar and letting go drops him (fall, then land), a finger on the floor
 // turns his head, each button plays its clip (Replay Intro, Wave, Sit, Give Device, Run, Camera
-// and Settings: pixel icons beside their labels, a label shown on hover or focus with a mouse, on
+// and Settings: Phosphor icons beside their labels, a label shown on hover or focus with a mouse, on
 // a press held still on touch), a floor tap walks him there, and the cursor turns his
 // head on a desktop (down toward a cursor below him, up at one high over him, well round toward one
 // level with his head off to the side), and running away he faces where he runs, not up at the
@@ -360,6 +360,9 @@ test.describe('on a phone', () => {
       expect(size.height, name).toBeGreaterThanOrEqual(44);
       expect(size.width, name).toBeGreaterThanOrEqual(40);
       await expect(b.locator('svg.inv-icon')).toBeVisible();
+      // (A Phosphor glyph, 24 px in the button's text colour.)
+      const glyph = await b.locator('svg.inv-icon').boundingBox();
+      expect([Math.round(glyph.width), Math.round(glyph.height)], `${name}: a 24 px glyph`).toEqual([24, 24]);
       expect(
         await b.locator('.inv-btn-label').evaluate((el) => Number(getComputedStyle(el).opacity)),
         `${name}: icon only`,
