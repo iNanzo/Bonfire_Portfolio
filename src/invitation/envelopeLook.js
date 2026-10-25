@@ -11,9 +11,8 @@
 // screen-locked 4×4 Bayer dither over how far up the letter it is (envelope.js DISSOLVE runs the
 // same sums), with a burning rim, hot to glowing to charred, at the edge, like a weapon's on the
 // Bonfire site (copied, not imported: the page takes no shared modules). The wax seal's material
-// draws its face from a texture, texel for texel on the screen (SEAL: envelopeSeal.js); the
-// petals' (PETAL) never dissolve, and each petal's `aShade` steps its bands lighter or darker
-// through the three reds, so they're a mix.
+// draws its face from a texture, texel for texel on the screen (SEAL: envelopeSeal.js). PETAL is
+// the petals' three reds (petalScene.js draws them with a material of its own).
 import * as THREE from 'three';
 import { DISSOLVE } from './envelope.js';
 
@@ -193,8 +192,8 @@ export const shared = () => ({
 
 /**
  * The toon material: three tones, flat-shaded, band edges dithered on the texel grid; drawn as
- * its colours or as `id`; dissolving with the letter. `extra` adds uniforms, `defines` (SEAL,
- * PETAL) and GLSL (the seal's sealFace(): its colour, alpha 0 off the wax); `lean` makes it the
+ * its colours or as `id`; dissolving with the letter. `extra` adds uniforms, `defines` (SEAL)
+ * and GLSL (the seal's sealFace(): its colour, alpha 0 off the wax); `lean` makes it the
  * paper's: FLAT, one tone a face and no dither, leaning into the light by that much (LEAN), and
  * lit as the rest pose has it (paperLit: its normal in the letter's own frame, turned by REST).
  * @param {number[]} tones  light, mid, shade (sRGB hex)
@@ -221,18 +220,8 @@ export function toon(tones, u, id, extra = {}) {
       uniform mat4 uToInner;
       varying vec3 vInner;
       #endif
-      #ifdef PETAL
-      attribute float aShade;
-      varying float vShade;
-      #endif
       void main() {
-        #ifdef PETAL
-        vShade = aShade;
-        #endif
         vec4 p = vec4(position, 1.0);
-        #ifdef USE_INSTANCING
-        p = instanceMatrix * p;
-        #endif
         vec4 w = modelMatrix * p;
         vLetter = (uToLetter * w).xy;
         #ifdef FLAT
@@ -257,9 +246,6 @@ export function toon(tones, u, id, extra = {}) {
       #endif
       varying vec3 vView;
       varying vec2 vLetter;
-      #ifdef PETAL
-      varying float vShade;
-      #endif
       ${BAYER}
       ${DISSOLVE_GLSL}
       ${extra.glsl ?? ''}
@@ -289,9 +275,6 @@ export function toon(tones, u, id, extra = {}) {
         float v = dot(n, uLight) + (b - 0.5) * 0.06;
         #endif
         float band = v > ${SHADES.light.toFixed(4)} ? 0.0 : v > ${SHADES.mid.toFixed(4)} ? 1.0 : 2.0;
-        #ifdef PETAL
-        band = clamp(band + vShade, 0.0, 2.0);
-        #endif
         vec3 c = band < 0.5 ? uTones[0] : band < 1.5 ? uTones[1] : uTones[2];
         #ifdef SEAL
         c = face.rgb;
