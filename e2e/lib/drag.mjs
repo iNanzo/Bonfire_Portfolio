@@ -227,14 +227,18 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
     }) => {
       await calm(page, kind, { groundCues: 'always' });
       const cursor = await grab(page, 'head');
-      await until(page, (s) => s.drag.groundCues === 'always' && s.drag.ring?.alpha > 0.99, 'the ring in');
-      const d = (await snapshot(page)).drag;
-      // (Under his hips, or under his collar for a kind that keeps it off his swing: bead's.)
-      const under = Math.min(
-        gap({ x: d.ring.x, y: d.ring.z }, { x: d.hips.x, y: d.hips.z }),
-        gap({ x: d.ring.x, y: d.ring.z }, { x: d.anchor.x, y: d.anchor.z }),
+      // (Under his hips, or under his collar for a kind that keeps it off his swing, eased there as
+      // the grab settles: bead's.)
+      const under = (d) =>
+        Math.min(
+          gap({ x: d.ring.x, y: d.ring.z }, { x: d.hips.x, y: d.hips.z }),
+          gap({ x: d.ring.x, y: d.ring.z }, { x: d.anchor.x, y: d.anchor.z }),
+        );
+      await until(
+        page,
+        (s) => s.drag.groundCues === 'always' && s.drag.ring?.alpha > 0.99 && under(s.drag) < 0.03,
+        'the ring in, under him',
       );
-      expect(under, 'under him').toBeLessThan(0.03);
       await lift(page, cursor);
       await until(
         page,
