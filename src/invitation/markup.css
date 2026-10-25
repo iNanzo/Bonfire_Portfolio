@@ -1,0 +1,112 @@
+/* Text effects in the invitation toy's lines (markup.js builds them: a span a letter, its index in
+   --i, its colour set inline), in the chat box, NEWT's bubble and the admin's preview alike.
+   Wave and shake move each letter in stepped jumps, like a sprite's frames, a little later down
+   the line (staggered by --i); bold is the 600 weight the page loads; big is a fifth bigger, its
+   line height kept so the box doesn't grow. A word with a styled letter never breaks mid-word.
+   Letters not typed yet keep their place, unseen. Reduced motion stills the moves. */
+
+.inv-fx-word {
+  white-space: nowrap;
+}
+.inv-fx.is-unseen {
+  visibility: hidden;
+}
+.inv-fx-bold {
+  font-weight: 600;
+}
+.inv-fx-big {
+  font-size: 1.2em;
+  line-height: 1;
+}
+.inv-fx-moves {
+  display: inline-block;
+}
+.inv-fx-wave {
+  animation: inv-fx-wave 1s step-end infinite;
+  animation-delay: calc(var(--i, 0) * -0.09s);
+}
+.inv-fx-shake {
+  animation: inv-fx-shake 0.32s step-end infinite;
+  animation-delay: calc(var(--i, 0) * -0.11s);
+}
+/* (Both: the wave carries the shake's jitter on top.) */
+.inv-fx-wave.inv-fx-shake {
+  animation-name: inv-fx-wave-shake;
+  animation-duration: 1s;
+}
+
+@keyframes inv-fx-wave {
+  0% {
+    transform: translateY(0);
+  }
+  12.5% {
+    transform: translateY(-0.12em);
+  }
+  25% {
+    transform: translateY(-0.2em);
+  }
+  37.5% {
+    transform: translateY(-0.12em);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  62.5% {
+    transform: translateY(0.08em);
+  }
+  75% {
+    transform: translateY(0.12em);
+  }
+  87.5% {
+    transform: translateY(0.08em);
+  }
+}
+@keyframes inv-fx-shake {
+  0% {
+    transform: translate(0.07em, 0);
+  }
+  25% {
+    transform: translate(-0.07em, 0.07em);
+  }
+  50% {
+    transform: translate(0, -0.07em);
+  }
+  75% {
+    transform: translate(-0.07em, -0.07em);
+  }
+}
+@keyframes inv-fx-wave-shake {
+  0% {
+    transform: translate(0.07em, 0);
+  }
+  12.5% {
+    transform: translate(-0.07em, -0.12em);
+  }
+  25% {
+    transform: translate(0, -0.27em);
+  }
+  37.5% {
+    transform: translate(0.07em, -0.12em);
+  }
+  50% {
+    transform: translate(-0.07em, 0.07em);
+  }
+  62.5% {
+    transform: translate(0, 0.08em);
+  }
+  75% {
+    transform: translate(0.07em, 0.12em);
+  }
+  87.5% {
+    transform: translate(-0.07em, 0.01em);
+  }
+}
+
+.is-still .inv-fx-moves {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv-fx-moves {
+    animation: none;
+  }
+}
