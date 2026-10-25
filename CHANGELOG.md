@@ -7,7 +7,7 @@ format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and ver
 ## [Unreleased]
 
 Round 17: NEWT's envelope reworked, rose petals all through his toy, text effects for
-his words, and a plainer cult altar, no vignette and a cleaner mirror in Bonfire Live. Round
+his words, an intro preview in the admin, and a plainer cult altar, no vignette and a cleaner mirror in Bonfire Live. Round
 16, below it: a password lock for the site, and NEWT's toy opened from an envelope, with a
 new toolbar, a new way to carry him and more to do. Round 15: an Uma Musume-style
 intro dialogue for NEWT. Round 14, below that: his second wave (a Default look, new
@@ -19,8 +19,12 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
 ### NEWT's envelope (round 17)
 
 - The wax seal sits glued to the flap and lifts with it, and the pocket is drawn plain, with
-  no fold lines across it. Hovering over the letter brings a soft gold pulse that comes and
-  goes.
+  no fold lines across it. Hovering over the letter brings a gold glow that pulses round it,
+  wide enough to see at a glance on a desktop or a phone, the letter lifting toward you and
+  brightening at each peak, then clean between pulses; a finger or the mouse down on it shows
+  the glow at full strength at once.
+- A gloss sweeps across the wax seal on the glow's beat, and a click or tap sweeps it once,
+  quick and bright, before the seal blooms. The NH stays crisp under it.
 - The letter leans toward the cursor, its top tipping the same way, and a sideways drag
   turns it further before it springs back, still floating.
 - A reload no longer flashes a red box where the letter should be.
@@ -30,9 +34,10 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
 ### Rose petals (round 17)
 
 - Petals swirl round the letter in ribbons on a tilted loop, and opening it pours them out
-  of the pocket's mouth.
-- A click sends a ring of petals out from the cursor, the cursor sheds a trail of them as it
-  moves, and moving the letter sheds more.
+  of the pocket's mouth, over its lip and in front of the open flap, never cut off by them.
+- A click or tap sends a ring of petals out from the cursor as it's let go, but a drag (of the
+  camera, the letter or NEWT), a pinch or picking NEWT up sends none; the cursor sheds a trail
+  of them as it moves, and moving the letter sheds more.
 - The petals fall on the page under the toolbar and the other controls, all through the toy,
   and a touch scatters them the same as a mouse.
 - The Settings sheet's new Rose Petals switch (On or Off, on by default) turns them all off.
@@ -50,6 +55,10 @@ Round 10: menus and search, the knight's fixes, hygiene and performance.
 - Intro and speech lines can carry text effects: tags that shake, wave or colour a word, and
   hex colours. The admin's Invitation page has a palette of named colours to use in them and
   a live preview of the line as you type.
+- The admin's Invitation page has an Intro Preview beside it: the toy itself playing any chat
+  box of the unsaved draft (his turn to you, the camera's shot, his face and animation, the
+  line and its replies), at desktop or phone size, with Play, Replay and Next. An edit to the
+  intro or its colours plays the box again.
 - The dialogue's Next moves on to the next box, and a line that is only a styled blank
   counts as empty.
 
