@@ -5,9 +5,9 @@
 // 20 a trigger, none over 120 characters, a warning past 80), with each problem at its path, and
 // content from before the toy (no `invitation` key) still passes. Its page (admin/ui/schema.js):
 // every field named and helped, the toy's own lists as dropdowns, its ranges as sliders, the
-// triggers grouped by the plan's kinds, and the search finding them there. (The intro, its
-// fourth part, has its own tests: test/invitationIntro.test.mjs for its rules and
-// admin/test/invitationIntro.test.mjs for its section.) The lines here are the test's own:
+// triggers grouped by the plan's kinds, and the search finding them there. (The intro has its
+// own tests: test/invitationIntro.test.mjs for its rules and admin/test/invitationIntro.test.mjs
+// for its section; the text effects too: admin/test/invitationText.test.mjs.) The lines here are the test's own:
 // content.json's are the admin's.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -99,12 +99,12 @@ test('content from before the toy (no invitation key) passes, and a whole valid 
 });
 
 test('content from before the toy can still be edited: each of the Invitation page’s sections starts from the toy’s own built-in values, which pass the rules', () => {
-  const keys = ['invitation.defaults', 'invitation.speech', 'invitation.lines', 'invitation.intro'];
+  const keys = ['invitation.defaults', 'invitation.speech', 'invitation.lines', 'invitation.intro', 'invitation.text'];
   for (const key of keys) assert.equal(typeof STARTERS[key], 'function', `${key} has a way to start`);
   const inv = Object.fromEntries(keys.map((key) => [key.split('.')[1], STARTERS[key]()]));
   const old = content();
   delete old.invitation;
-  assert.deepEqual(validateContent({ ...old, invitation: inv }).errors, [], 'all four, started');
+  assert.deepEqual(validateContent({ ...old, invitation: inv }).errors, [], 'all five, started');
   for (const key of keys) {
     const part = key.split('.')[1];
     assert.deepEqual(validateContent({ ...old, invitation: { [part]: inv[part] } }).errors, [], `${key} alone`);
@@ -128,11 +128,11 @@ test('content from before the toy can still be edited: each of the Invitation pa
   assert.notEqual(STARTERS['invitation.defaults']().shader, STARTERS['invitation.defaults']().shader);
 });
 
-test('the section itself: a group of fields, with only its four parts', () => {
+test('the section itself: a group of fields, with only its five parts', () => {
   assert.deepEqual(errorsAt('nope'), ['invitation']);
   assert.deepEqual(errorsAt([]), ['invitation']);
   assert.deepEqual(errorsAt({ ...valid(), extra: 1 }), ['invitation.extra']);
-  for (const part of ['defaults', 'speech', 'lines', 'intro'])
+  for (const part of ['defaults', 'speech', 'lines', 'intro', 'text'])
     assert.deepEqual(errorsAt({ ...valid(), [part]: [] }), [`invitation.${part}`], `${part}: a group`);
 });
 
@@ -280,11 +280,17 @@ function walk(v, path = ['invitation'], out = []) {
   return out;
 }
 
-test('the Invitation page: the default look, the speech, the lines and the intro, in a group of their own', () => {
+test('the Invitation page: the default look, the speech, the lines, the text effects and the intro, in a group of their own', () => {
   const page = PAGES.find((p) => p.id === 'invitation');
   assert.ok(page, 'a page of its own');
   assert.equal(titleCase(page.label), 'Invitation');
-  assert.deepEqual(page.keys, ['invitation.defaults', 'invitation.speech', 'invitation.lines', 'invitation.intro']);
+  assert.deepEqual(page.keys, [
+    'invitation.defaults',
+    'invitation.speech',
+    'invitation.lines',
+    'invitation.text',
+    'invitation.intro',
+  ]);
   assert.ok(page.blurb.length >= 12 && page.blurb.length <= 160, 'a blurb');
   assert.ok(!PAGES.filter((p) => p.id !== 'invitation').some((p) => p.group === page.group), 'its own group');
   for (const k of page.keys) assert.equal(pageOf(`${k}.x`).id, 'invitation', `${k}: found on it`);
@@ -399,7 +405,7 @@ test('the speech and the lines go under the plan’s kinds, every trigger in one
     'dropped',
     'landed',
   ]);
-  // (Give Device's two moments go with sitting: he sits down with the tablet, then lies down with it.)
+  // (Screen Time's two moments go with sitting: he sits down with the tablet, then lies down with it.)
   assert.deepEqual(SUBGROUPS['invitation.lines'].find((g) => g.label === 'Sitting').keys, [
     'sitDown',
     'sitting',

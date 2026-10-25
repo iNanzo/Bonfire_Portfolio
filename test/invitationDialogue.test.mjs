@@ -5,10 +5,10 @@
 // characters a second (a beat after punctuation; reduced motion: all at once), a tap finishing
 // the typing and then going on (the next id, the following box, the end), choices shown once
 // the line is typed and leading where they say, Auto going on after the box's wait or one from
-// the line's length, Skip to the next box with choices or the end, the log of lines shown and
-// replies picked, a pause holding the clock, and a broken script ending gracefully. Play Intro's
-// script is content.js introScript() (content.json's intro, or one mended), which the runner plays
-// as it is.
+// the line's length, Next to the next box with choices or the end, the log of lines shown (plain
+// text) and replies picked, text effects' tags counted by the letters that show, a pause
+// holding the clock, and a broken script ending gracefully. Play Intro's script is content.js
+// introScript() (content.json's intro, or one mended), which the runner plays as it is.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DIALOGUE_CLIPS, FACE_NAMES } from '../src/invitation/clips.js';
@@ -352,7 +352,7 @@ async function loadContent() {
 test('the chat screen’s markup: Title Case labels, a live region for the line, dialogs for the Log and the question, no tooltips; the Log escapes what it lists', async () => {
   const { TALK_TEXT, logHtml, talkHtml } = await import('../src/invitation/dialogueUi.js');
   const { titleCase } = await import('../src/text.js');
-  for (const k of ['layer', 'auto', 'skip', 'log', 'logTitle', 'close', 'you', 'replies', 'ask', 'yes', 'no'])
+  for (const k of ['layer', 'auto', 'next', 'log', 'logTitle', 'close', 'you', 'replies', 'ask', 'yes', 'no'])
     assert.equal(TALK_TEXT[k], titleCase(TALK_TEXT[k]), k);
   for (const k of ['askHint', 'goOn']) assert.ok(/^[A-Z].*\.$/.test(TALK_TEXT[k]) && TALK_TEXT[k].length <= 160, k);
   const markup = talkHtml();
@@ -363,6 +363,11 @@ test('the chat screen’s markup: Title Case labels, a live region for the line,
   assert.match(markup, /class="inv-talk-ask" role="alertdialog" aria-modal="true"/);
   for (const b of ['auto', 'skip', 'log']) assert.match(markup, new RegExp(`data-talk="${b}"`));
   assert.match(markup, /data-talk="auto" aria-pressed="false"/);
+  // (The top right's Next jumps to the next question or the end; Skip Intro, top left, ends it.)
+  assert.equal(TALK_TEXT.next, 'Next');
+  assert.match(markup, />Next<\/button>/);
+  assert.ok(!/>Skip<\/button>/.test(markup), 'no Skip button any more');
+  assert.match(markup, /data-intro-skip>Skip Intro<\/button>/);
   const log = logHtml([
     { kind: 'line', speaker: 'NEWT', text: 'a <b> & c' },
     { kind: 'reply', text: 'Yes' },
@@ -370,4 +375,37 @@ test('the chat screen’s markup: Title Case labels, a live region for the line,
   assert.match(log, /a &lt;b&gt; &amp; c/);
   assert.match(log, /class="inv-talk-log-reply"><span class="inv-talk-log-who">You<\/span> Yes/);
   assert.equal((log.match(/<li/g) ?? []).length, 2);
+});
+
+test('text effects: typing, Auto’s wait and the cap count the letters that show; the log keeps plain text', () => {
+  const styled = 'I’m {red,wave|NEWT}!';
+  const plain = 'I’m NEWT!';
+  assert.equal(charsAt(styled, 99), plain.length);
+  assert.ok(Math.abs(typeDuration(styled) - typeDuration(plain)) < 1e-6, 'typed as long as its plain text');
+  for (const t of [0.05, 0.12, 0.2]) assert.equal(charsAt(styled, t), charsAt(plain, t), `at ${t} s`);
+  assert.equal(autoDelay({ text: styled }), autoDelay({ text: plain }));
+  // (An emoji is one letter.)
+  assert.equal(charsAt('{big|👋🏽} hi', 99), 4);
+  const long = `{gold|${'a'.repeat(300)}}`;
+  const s = /** @type {any} */ (
+    normalizeScript({ boxes: [{ id: 'a', text: long, face: 'happy', animation: 'Talk', camera: 'close' }] })
+  );
+  assert.equal(charsAt(s.boxes[0].text, 999), DIALOGUE.maxText, 'capped at 240 letters, its tags kept');
+  assert.match(s.boxes[0].text, /^\{gold\|a+\}$/);
+  const d = createDialogue(
+    /** @type {any} */ (
+      normalizeScript({ boxes: [{ id: 'a', text: styled, face: 'happy', animation: 'Talk', camera: 'close' }] })
+    ),
+  );
+  d.start(0);
+  let v = d.step(0.02);
+  assert.equal(v.length, plain.length, 'its length in letters');
+  v = d.step(5);
+  assert.ok(v.typed && v.shown === plain.length);
+  assert.equal(v.box?.text, styled, 'the box keeps its tags (the screen draws them)');
+  assert.deepEqual(
+    d.log.map((e) => e.text),
+    [plain],
+    'the Log lists it plain',
+  );
 });

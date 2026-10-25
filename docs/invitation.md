@@ -238,13 +238,32 @@ Now and then NEWT says something in a speech bubble over his head, in the page's
 Each moment speaks at its own chance, once its cooldown is over, with one of its lines at
 random, never the line he just said. There's one bubble at a time: while a line is up, only a
 moment that matters more replaces it (a thrash first, then being caught or shaken, idle time
-last). A line types out at about 30 characters a second, stays long enough to read, then fades; with
+last). A line types out at about 30 letters a second, stays long enough to read, then fades; with
 reduced motion it shows all at once. The bubble follows him and stays on screen, clear of the
 toolbar, the open Camera pad and the open Settings sheet (near the top it goes beside his head, on a phone narrowed to
 fit there with the line on more rows, or else under his feet, never over his face or body), and
 never takes a tap; a screen reader hears each line once, whole. His lines, how often
 he talks and the look a first visit gets are edited in the admin's Invitation page
 ([admin.md](admin.md)).
+
+## Text Effects
+
+His bubble lines and the intro's lines can style words with tags, `{styles|text}`:
+
+- **Colors:** a name from the admin's Text Effects colors (`{red|NEWT}`; as shipped red, gold,
+  rose and ink), or a hex color of its own (`{#e44544|NEWT}`, `#rgb` or `#rrggbb`).
+- **Effects:** `wave` (each letter bobs up and down, a little later down the line), `shake`
+  (each letter jitters), `bold` and `big` (a fifth bigger). They combine with commas:
+  `{red,wave|Hey!}`, and both moves together wave with a jitter.
+- **Nesting:** a tag can hold one more, which adds to it (its color wins):
+  `{gold|a {wave|big} deal}`. Deeper isn't allowed.
+- **Braces:** write `\{` and `\}` for a brace; a backslash anywhere else is itself, and `*`,
+  `**` and `~` are only text. An emoji counts as one letter.
+
+The moves step like a sprite's frames rather than gliding, and reduced motion stills them. A
+styled word never breaks across two rows. The typing, Auto's wait, how long a bubble stays up and
+the length limits count only the letters that show; a screen reader and the Log get the line as
+plain text. The admin checks every tag as you type and previews each line under its box.
 
 ## The Intro
 
@@ -254,22 +273,22 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 
 - **The screen:** a wide box along the bottom with his name on a tab at its top left and his
   line typed out in it, a small bouncing ▼ at its bottom right once the line is all there, Auto,
-  Skip and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the bottom
+  Next and Log at the top right, **Skip Intro** at the top left, and a gentle dim along the bottom
   behind the box. A line's own line breaks (as the admin types them) show. The toolbar goes while
   the intro runs and comes back after it.
 - **Going on:** a tap or click anywhere first finishes the line, then goes on to the next box;
-  Space and Enter do the same (after a click or tap on Auto, Skip or Log too; from the keyboard,
+  Space and Enter do the same (after a click or tap on Auto, Next or Log too; from the keyboard,
   a focused button presses itself). Some boxes ask a question: two or three replies show as buttons
   stacked in the middle of the screen, under his face (that box's shot frames him in the space
   over them, from the start of its line), and each leads to its own lines. They take a press
   only once the presses that went on have stopped for a moment (0.45 s), so a quick second tap,
   or the next Enter of someone pressing along, never picks one by chance.
 - **Auto** goes on by itself once each line has had time to be read (a box can set its own
-  wait); it waits at a question. **Skip** jumps to the next question, or to the end. **Log**
+  wait); it waits at a question. **Next** jumps to the next question, or to the end. **Log**
   shows every line so far and the replies picked, in a list that scrolls; Close or Escape
   shuts it. **Skip Intro** ends the intro at once, with no question. **Escape** asks whether to
   skip the intro, and a second Escape (or Skip Intro there) ends it. While the Log or that
-  question is open, Auto, Skip, Skip Intro, Log and the replies rest under it.
+  question is open, Auto, Next, Skip Intro, Log and the replies rest under it.
 - **NEWT:** he gets up if he's sitting, takes a few steps in if he's out near the edge, turns
   to face you and looks at you while he talks, his head drifting a little. The first line waits
   for him (the box shows his name and nothing else, and a tap meanwhile does nothing), so its
@@ -581,8 +600,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
 - **Speech and content:** `speech.js` (pure: `createTalk({lines, speech, rng}).step(...)` reads
   the brain's output this frame and last, the gestures, the button pressed and the camera's yaw
   and zoom, and says the line to show and its trigger; `TRIGGERS`, `PRIORITY`, `SPEECH_RANGES`;
-  `lineDuration`: typed at 30 characters a second, held 1.6 s plus 0.045 s a character, faded
-  over 0.35 s; `speechFrom` and `linesFrom` read the admin's settings and lines from anything),
+  `lineDuration`: typed at 30 letters a second, held 1.6 s plus 0.045 s a letter, faded
+  over 0.35 s, counting the letters that show; `speechFrom` and `linesFrom` read the admin's
+  settings and lines from anything, `LINE_MAX` 120 letters and `LINE_RAW_MAX` 360 characters),
   `bubble.js` + `bubble.css` (the bubble: `createBubble({root, before, now}).say(text)`, on
   the toy's clock as talk is (`now`: main.js's frame steps, capped and paused with the tab), then
   `update(head, avoid, under)` each frame with his head's circle on screen, the toolbar's and
@@ -594,7 +614,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   (content.json's `invitation`, which the admin edits, through `virtual:invitation-content`:
   `invitationContent` in `vite.config.js` inlines only that subtree, watches the file and leaves
   the subtree out of the other pages' copy of content.json; `invitationLines()`,
-  `speechSettings()`, `invitationDefaults()` and `introScript()`, each with its fallback:
+  `speechSettings()`, `invitationDefaults()`, `textPalette()` (the text effects' colors, the
+  built-in ones without `invitation.text`) and `introScript()`, each with its fallback:
   `introScript()` is the intro the envelope and Replay Intro open, `introFrom` of content.json's
   `invitation.intro`, a `types.js` `DialogueScript` with each box's flow spelled out (exactly
   one of its choices, `end: true` or `next`: its own Next when that box is there, else the box
@@ -606,6 +627,22 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `invitationBubble`, `invitationContent`, `invitationIntro` (the intro's content rules and
   `introFrom`), and `admin/test/invitation.test.mjs` and `invitationIntro.test.mjs` (the
   content rules and the admin page).
+- **Text effects:** `markup.js` (pure: `parseMarkup(text, palette)` gives the styled `runs`,
+  the `letters` that show (graphemes, `Intl.Segmenter`), the `plain` text and the `errors`,
+  each a sentence for the admin; `paletteOf` reads `invitation.text.colors`, `DEFAULT_TEXT_COLORS`
+  the built-in ones; `visibleLetters`, `letterCount`, `plainText` (memoised: typing asks each
+  frame); `clipMarkup` cuts a line to n letters, its tags kept well formed; `letterPlan`,
+  `renderMarkup` and `revealLetters` build a line once as a span a letter, `--i` its index, a
+  word with a styled letter in a nowrap `.inv-fx-word`, and show the first n by visibility) and
+  `markup.css` (`dialogue.css` imports it; the admin's `admin.css` too: `.inv-fx-wave` and
+  `.inv-fx-shake` as `step-end` keyframes staggered by `--i`, on `inline-block` letters
+  (`.inv-fx-moves`, not spaces), `.inv-fx-bold` the 600 weight, `.inv-fx-big` 1.2em at line
+  height 1, stilled by `prefers-reduced-motion` and the bubble's `is-still`). A broken tag
+  still shows: a stray brace as itself, an unknown style as plain letters. `dialogue.js`,
+  `speech.js`, `bubble.js` and `dialogueUi.js` count, time and type by its letters; the Log, the
+  live regions and the admin's lists get its plain text; main.js hands `textPalette()` to the
+  bubble and the chat screen. Tests: `invitationMarkup`, and the timing cases in
+  `invitationDialogue`, `invitationSpeech` and `invitationBubble`.
 - **The clips contract:** `src/invitation/clips.js` names NEWT's clips (lengths, loops, fades),
   the face each shows, the bones by their three.js names and the step lengths. `tools/newt.py`
   makes the clips in Blender and `test/invitationModel.test.mjs` holds the glb to the contract.
@@ -743,9 +780,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `effects` drives each frame.
 - **The intro:** `dialogue.js` (pure, on an injected clock: `normalizeScript` makes any
   `DialogueScript` safe, types.js; `createDialogue(script, {reduced})` with `start`, `step`,
-  `advance`, `choose`, `setAuto`, `skip`, `pause`, `end`, `view` and `log`; `DIALOGUE`: 32
-  characters a second with a beat after punctuation, Auto's wait 1.1 s plus 0.035 s a character
-  between 1.4 and 6 s, 240 characters and 3 replies at most; `lookSway`; main.js runs
+  `advance`, `choose`, `setAuto`, `skip` (the Next button), `pause`, `end`, `view` and `log`
+  (plain text); `DIALOGUE`: 32 letters a second with a beat after punctuation, Auto's wait
+  1.1 s plus 0.035 s a letter between 1.4 and 6 s, 240 letters and 3 replies at most, all
+  counting the letters that show (markup.js); `lookSway`; main.js runs
   `content.js` `introScript()` through `normalizeScript` as a safety net, `playScript`),
   `dialogueUi.js` and `dialogue.css` (the screen: a modal layer over the stage that takes every
   press; the line in a live region once, whole; `REPLY_SETTLE`, `REPLY_ROOM`), brain.js's `talk` state (`BrainIn.dialogue`: the

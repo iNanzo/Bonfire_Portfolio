@@ -2,7 +2,8 @@
    with the buttons' chunky drop, rounded, Pixelify Sans, a tail toward his head (data-tail: down
    while it's above him, left or right while it's beside him, up while it's below, none over him).
    It sits on the stage, under the toolbar and the Look sheet, and never takes a press. The rest
-   of the line waits unseen in its place while the start types out, so the bubble keeps its size;
+   of the line waits unseen in its place while the start types out, so the bubble keeps its size
+   (its text effects and the unseen letters: markup.css, which dialogue.css brings in);
    it fades as it goes (all at once, with no fade, for prefers-reduced-motion). The live region
    (the whole line at once, for a screen reader) is visually hidden. The colours fall back on the
    page's own when this sheet is used alone. */
@@ -42,9 +43,6 @@
   margin: 0;
   overflow-wrap: break-word;
   text-wrap: balance;
-}
-.inv-bubble-rest {
-  visibility: hidden;
 }
 
 /* The tail: a square turned 45° (18 px with its border), its two outer sides outlined, its middle

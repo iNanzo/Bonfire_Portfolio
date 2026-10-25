@@ -92,7 +92,7 @@ import './dialogue.css';
 import './envelope.css';
 import { DANGLE, createBrain, dangleLift, talkPhase } from './brain.js';
 import { createBubble, speakerPoint } from './bubble.js';
-import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings } from './content.js';
+import { introFrom, introScript, invitationDefaults, invitationLines, speechSettings, textPalette } from './content.js';
 import { CARRY, createHand, handFeel, handStep } from './carry.js';
 import {
   CUES,
@@ -494,7 +494,12 @@ function start(s) {
   // does: a slow frame's capped step or a hidden tab moves both alike, so they agree on when a
   // line is up.)
   const talk = createTalk({ lines: invitationLines(), speech: speechSettings(), rng: createRng(seed + 2) });
-  const bubble = createBubble({ root: stageEl, before: stageEl.querySelector('.inv-hud'), now: () => t });
+  const bubble = createBubble({
+    root: stageEl,
+    before: stageEl.querySelector('.inv-hud'),
+    now: () => t,
+    palette: textPalette(),
+  });
   orbit = createOrbit({ distance: s.view?.distance ?? 20, centre: centreOf(area), span: stageSize() });
   const cam = orbit;
   orbitSpan(cam, stageSpan(s));
@@ -619,6 +624,7 @@ function start(s) {
     onAction: onTalk,
     log: () => intro?.log ?? [],
     replySettle: options.settle ?? REPLY_SETTLE,
+    palette: textPalette(),
   });
   // (A resize while the intro runs, or the chat box growing with a longer line: the shot framed
   // again for the new clear space.)
