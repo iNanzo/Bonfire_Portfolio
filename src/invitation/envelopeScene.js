@@ -46,7 +46,7 @@ import {
   sealBloom,
   shedParticles,
 } from './envelope.js';
-import { buildSeal, sealTexel } from './envelopeSeal.js';
+import { buildSeal, sealOnScreen, sealTexel } from './envelopeSeal.js';
 import { PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './petals.js';
 import {
   BAYER,
@@ -321,6 +321,8 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 40);
   camera.position.set(0, 0, DIST);
+  // (Its matrices as it stands, before anything is drawn: the seal's placement reads them.)
+  camera.updateMatrixWorld();
   const outer = new THREE.Group();
   const inner = new THREE.Group();
   inner.rotation.z = TILT;
@@ -346,6 +348,13 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   const idRT = new THREE.WebGLRenderTarget(1, 1, rtOpts);
   compose.mat.uniforms.uColor.value = colorRT.texture;
   compose.mat.uniforms.uId.value = idRT.texture;
+  // (Every shader compiled now, so the first frame isn't held up making them; then the seal hides
+  // until it's been placed: the red box on reload was a seal drawn where it had never been put.)
+  renderer.compile(scene, camera);
+  renderer.compile(compose.scene, flat);
+  /** The seal has been placed on the screen once (it's hidden till then). */
+  let sealPlaced = false;
+  seal.group.visible = false;
   const tmp = new THREE.Object3D();
   const sealWorld = new THREE.Vector3();
   const v = new THREE.Vector3();
@@ -418,6 +427,14 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   let stirAt = null;
   /** When it was done (its last petals may hold it up a moment). */
   let doneAt = 0;
+  /**
+   * For ?test: the seal's first placement on the screen (the frame, its middle and axes in
+   * texels: envelopeSeal.js sealOnScreen), and its latest.
+   * @type {{frame: number, x: number, y: number, axes: number[]}|null}
+   */
+  let firstSeal = null;
+  /** @type {{x: number, y: number, axes: number[]}|null} */
+  let lastSeal = null;
 
   /**
    * A point on the screen (CSS px) in petals.js's units, a little in front of the letter.
@@ -606,6 +623,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     pt += dt;
     last = now;
     frames++;
+    camera.updateMatrixWorld();
     const state = env.step(now, ready());
     if (state === 'fading' || state === 'gone') uncover('open');
     const p = env.pose(now);
@@ -644,9 +662,9 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     seal.group.scale.setScalar(bloom.scale);
     // (Upright on the screen, as its face is drawn: then it goes on texel for texel.)
     seal.group.rotation.z = -TILT + bloom.spin;
-    seal.group.visible = bloom.scale > 0;
     outer.updateMatrixWorld(true);
-    placeSeal();
+    if (bloom.scale > 0) placeSeal();
+    seal.group.visible = bloom.scale > 0 && sealPlaced;
     petalsAt(pt, p);
     // The dissolve: the edge across the letter, in its own units.
     toLetter.copy(inner.matrixWorld).invert().premultiply(letterScale);
@@ -671,14 +689,12 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
    * so its face goes on texel for texel).
    */
   function placeSeal() {
-    if (!seal.group.visible) return;
-    const c = sealWorld.copy(sealAt).applyMatrix4(inner.matrixWorld).project(camera);
-    const cx = (c.x * 0.5 + 0.5) * view.tw;
-    const cy = (c.y * 0.5 + 0.5) * view.th;
-    const e = seal.group.localToWorld(v.set(sealR, 0, 0)).project(camera);
-    const dx = (e.x * 0.5 + 0.5) * view.tw - cx;
-    const dy = (e.y * 0.5 + 0.5) * view.th - cy;
-    seal.place(cx, cy, Math.hypot(dx, dy) / seal.radius, Math.atan2(dy, dx));
+    const at = sealOnScreen(seal.group, camera, sealR, view.tw, view.th);
+    const [dx, dy] = at.axes;
+    seal.place(at.x, at.y, Math.hypot(dx, dy) / seal.radius, Math.atan2(dy, dx));
+    if (!sealPlaced) firstSeal = { frame: frames, x: at.x, y: at.y, axes: at.axes };
+    sealPlaced = true;
+    lastSeal = { x: at.x, y: at.y, axes: at.axes };
   }
 
   /**
@@ -812,12 +828,22 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     veils,
     /**
      * For ?test: the state, reduced motion, the pose now, the flap's open angle, frames drawn,
-     * and the petals (how many are up now, and how many each flow has launched).
+     * the petals (how many are up now, and how many each flow has launched) and the seal's
+     * placements on the screen (its first and its latest).
      */
     snapshot() {
       const now = clock();
       const petalsNow = { live: flow.live(pt), emitted: flow.emitted };
-      return { state: env.state, reduced, pose: env.pose(now), flapOpen: FLAP_OPEN, frames, petals: petalsNow };
+      const sealNow = { first: firstSeal, last: lastSeal };
+      return {
+        state: env.state,
+        reduced,
+        pose: env.pose(now),
+        flapOpen: FLAP_OPEN,
+        frames,
+        petals: petalsNow,
+        seal: sealNow,
+      };
     },
     /** Steps aside (no WebGL for the toy, or it couldn't load): skipped, with no intro. */
     aside() {

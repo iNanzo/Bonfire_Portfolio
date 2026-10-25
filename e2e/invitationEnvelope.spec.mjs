@@ -162,6 +162,27 @@ test.describe('on a desktop', () => {
     expect(await page.evaluate(() => window.__invitation.clock())).toBe(t0);
   });
 
+  test('its seal shows at its own size from the first frame, a reload too: no red box', async ({ page }) => {
+    const len = (/** @type {number[]} */ a, k = 0) => Math.hypot(a[k], a[k + 1]);
+    for (const reload of [false, true]) {
+      if (reload) await page.reload();
+      else await page.goto(PAGE);
+      await hooks(page);
+      await expect.poll(async () => Boolean((await envSnap(page))?.seal?.last), { timeout: 30_000 }).toBe(true);
+      const { seal } = await envSnap(page);
+      // (Placed before its first frame was drawn, at about the size it goes on showing: settling in
+      // it's a touch small; the red box was 37 times the size.)
+      expect(seal.first.frame).toBe(1);
+      for (const k of [0, 2]) {
+        const share = len(seal.first.axes, k) / len(seal.last.axes, k);
+        expect(share, `axis ${k / 2}`).toBeGreaterThan(0.85);
+        expect(share, `axis ${k / 2}`).toBeLessThan(1.15);
+      }
+      expect(len(seal.first.axes, 0) / len(seal.first.axes, 2)).toBeGreaterThan(0.8);
+      expect(len(seal.first.axes, 0) / len(seal.first.axes, 2)).toBeLessThan(1.25);
+    }
+  });
+
   test('a drag across it never turns the camera, and a sideways drag neither opens nor skips it', async ({ page }) => {
     await envelopeUp(page);
     const before = (await snapshot(page)).camera;

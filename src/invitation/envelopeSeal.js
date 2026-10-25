@@ -300,6 +300,35 @@ export function sealFace(R) {
   };
 }
 
+const onScreen = { c: new THREE.Vector3(), e: new THREE.Vector3() };
+
+/**
+ * Where the seal (`group`, radius `r` in its own units) shows on a `tw` × `th` drawing through
+ * `camera`: its middle (texels from the drawing's lower left) and its two axes, each its radius
+ * along its own x and y, as texels on the screen (`axes`: [x, y] of its x axis, then of its y).
+ * It brings the camera's and the seal's matrices up to date first: three only does that as it
+ * draws, so the first frame's placement, made before anything was drawn, read a view that wasn't
+ * there yet and put a seal 37 times its size on the screen (the red box on reload, 2026-10-25).
+ * @param {THREE.Object3D} group
+ * @param {THREE.Camera} camera
+ * @param {number} r
+ * @param {number} tw
+ * @param {number} th
+ */
+export function sealOnScreen(group, camera, r, tw, th) {
+  camera.updateMatrixWorld();
+  group.updateWorldMatrix(true, false);
+  const c = onScreen.c.setFromMatrixPosition(group.matrixWorld).project(camera);
+  const x = (c.x * 0.5 + 0.5) * tw;
+  const y = (c.y * 0.5 + 0.5) * th;
+  /** @param {number} ux @param {number} uy */
+  const axis = (ux, uy) => {
+    const e = group.localToWorld(onScreen.e.set(ux * r, uy * r, 0)).project(camera);
+    return [(e.x * 0.5 + 0.5) * tw - x, (e.y * 0.5 + 0.5) * th - y];
+  };
+  return { x, y, axes: [...axis(1, 0), ...axis(0, 1)] };
+}
+
 /** The seal's face from its texture (toon's SEAL): texel for texel round its middle on the screen. */
 const SEAL_GLSL = /* glsl */ `
   uniform sampler2D uFace;

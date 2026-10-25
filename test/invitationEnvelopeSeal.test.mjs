@@ -12,6 +12,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import * as THREE from 'three';
 import { LOGO_STROKES } from '../src/ui/logo.js';
 import { IDS, INK, LIGHT, PAPER, SHADES, WAX, rgb, shared, toon } from '../src/invitation/envelopeLook.js';
 import {
@@ -23,6 +24,7 @@ import {
   sealEdge,
   sealFace,
   sealLayout,
+  sealOnScreen,
   sealTexel,
   stampCell,
   stampLayout,
@@ -358,4 +360,30 @@ test('the parts’ order lines every fold on its lower side; the seal is one pie
   assert.ok('SEAL' in faces[0].defines);
   assert.equal(faces[0].uniforms.uIdPass, u.uIdPass);
   assert.equal(faces[0].uniforms.uId.value, IDS.seal);
+});
+
+test('the first frame’s seal is placed as the letter shows it: about its size, not spun (the red box on reload)', () => {
+  // (As the scene makes it: a camera put in place but never drawn with, and the seal in the
+  // letter's group. three only updates a camera's matrices as it draws, so the first frame's
+  // placement once read an identity view and put a seal 37 times its size on the screen.)
+  const camera = new THREE.PerspectiveCamera(30, 1280 / 800, 0.1, 40);
+  camera.position.set(0, 0, 6);
+  camera.updateProjectionMatrix();
+  const letter = new THREE.Group();
+  letter.scale.setScalar(1.4);
+  const seal = new THREE.Group();
+  seal.position.set(0, -0.2, 0.05);
+  letter.add(seal);
+  const tw = 400;
+  const th = 250;
+  const r = 0.4;
+  const at = sealOnScreen(seal, camera, r, tw, th);
+  // (The radius it shows at, texels: the view's height at the letter is 2·6·tan 15°.)
+  const want = (r * 1.4 * th) / (2 * (6 - 0.05 * 1.4) * Math.tan(Math.PI / 12));
+  const [ax, ay, bx, by] = at.axes;
+  assert.ok(Math.abs(Math.hypot(ax, ay) / want - 1) < 0.02, `its x axis ${Math.hypot(ax, ay)} of ${want}`);
+  assert.ok(Math.abs(Math.hypot(bx, by) / want - 1) < 0.02, `its y axis ${Math.hypot(bx, by)} of ${want}`);
+  assert.ok(Math.abs(ay) < 1e-6 && Math.abs(bx) < 1e-6, 'upright, not spun');
+  assert.ok(Math.abs(at.x - tw / 2) < 1e-6, `its middle across ${at.x}`);
+  assert.ok(at.y < th / 2 && at.y > th / 2 - want, `its middle up ${at.y}`);
 });
