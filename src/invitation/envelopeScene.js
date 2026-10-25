@@ -287,7 +287,8 @@ function buildCompose() {
               bool near = false;
               for (int k = 0; k < 16; k++) near = near || letterAt(floor(ROUND[k] * fr + 0.5));
               if (!near) continue;
-              float fall = 1.0 - (fr - 2.0) / (uReach + 0.5);
+              // (Dense most of the way out, thinning only toward its edge.)
+              float fall = 1.0 - pow((fr - 2.0) / (uReach + 0.5), 1.5);
               if (dither < uPulse * fall) gl_FragColor = vec4(fr < 3.5 ? uGlow : uGold, 1.0);
               break;
             }
