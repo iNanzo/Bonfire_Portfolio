@@ -57,7 +57,8 @@ loading screen too: NEWT loads behind it.
   The seal blooms into roses first (about half a second): it swells, then shrinks away while a
   ring of petals unfurls out of it and drifts up and off to either side, fading soon, and the
   swirl is flung outward. Only then does the flap lift; as it passes half open, a stream of
-  petals rises out of the pocket's mouth (the bloom has cleared it by then), and the letter dissolves the way a weapon does on the Bonfire site:
+  petals rises out of the pocket's mouth (the bloom has cleared it by then), each one coming out
+  over the pocket's lip and flying in front of the letter and the open flap, never cut by them, and the letter dissolves the way a weapon does on the Bonfire site:
   a ragged, burning edge sweeps up across it, shedding specks of paper, embers and wax that
   drift up and fade, while the white page behind clears onto NEWT, already turned to you, and
   the intro starts by itself (below): its first line, his face and his greeting wait until the
@@ -793,7 +794,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   envelopeLook.js `DEPTH`, which the frame can carry as `inside` and `pocket`), launched up its
   axis at 1.25–1.6 a second and only gently forward, a little bigger than most (1–1.4 of
   `PETAL_LEN`), so the pocket hides each only for its first moment and it stands 0.3 of the
-  letter or more over the mouth, out past its top, within half a second); and
+  letter or more over the mouth, out past its top, within half a second; once its middle has
+  risen past the mouth (`mouthAt(h, across)`) it's `front` from then on, drawn in front of all
+  the paper: petalScene.js pulls its depth toward the near plane, `frontDepth(z)`, to
+  `FRONT_BIAS` (0.02) of the way, so the pocket's lip and the open flap never cut it); and
   the wake (`WAKE`: the edge moving fastest away from its outward side sheds petals at a rate
   tied to its speed, drifting its way). `cut` (a skip), `at`, `live`; at most `POOL` (120; the
   oldest free petal goes first, the swirl kept), none with reduced motion. `createTrail` is the
@@ -806,7 +810,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   scene's world units, `unit` world units a letter width, `size` how big each is drawn of that (1); `emit`, `letter(matrix, {h, opening,
   floating})` from the letter's world matrix, `step(dt)` writing the petals into an instanced mesh
   a shape; `petalMaterial`, the petals' own toon (the three reds, dithered band edges, each
-  petal's `aShade`, its id pass on the scene's `uIdPass`); `buildInk`, the ink pass for a
+  petal's `aShade`, its `aFront` depth pull, its id pass on the scene's `uIdPass`); `buildInk`, the ink pass for a
   petals-only drawing), `petalLayer.js` (`createPetalLayer(root, {on, before, over, carrying})`:
   the page's petals, a fixed `canvas.inv-petals` with `pointer-events: none` put in `before` the
   HUD with no z-index of its own (so over the stage's canvas, under the toolbar, its labels, the
