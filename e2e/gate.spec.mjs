@@ -191,7 +191,7 @@ test('/invitation/ stays open with no cookie, and the build puts no check in it'
   const html = await (await request.get('/invitation/')).text();
   expect(html).not.toContain('data-gate');
   await page.goto('/invitation/');
-  await expect(page.locator('[data-stage] canvas')).toBeVisible();
+  await expect(page.locator('[data-stage] .inv-canvas')).toBeVisible();
   expect(new URL(page.url()).pathname).toBe('/invitation/');
   expect(errors).toEqual([]);
 });
