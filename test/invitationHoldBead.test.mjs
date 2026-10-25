@@ -101,11 +101,21 @@ function seeded(seed = 7) {
  * t from the grab), the hold's anchor through play.js bodyStep (carry.js holdStep), until
  * `until`; then, with `release`, let go and fallen with play.js bodyStep until he lands.
  * `act(t, hold)` runs before each frame (the wheel, a second finger); `given`, more for its start
- * (what main.js once handed it).
+ * (what main.js once handed it); `noStage`, no stage rect (so no top band).
  */
 function sim(
   r,
-  { path, until, at = home(r), pressOff = { x: 0, y: 0 }, release = false, act = null, clip = 'Held', given = {} },
+  {
+    path,
+    until,
+    at = home(r),
+    pressOff = { x: 0, y: 0 },
+    release = false,
+    act = null,
+    clip = 'Held',
+    given = {},
+    noStage = false,
+  },
 ) {
   const hold = createBeadHold({ rng: seeded() });
   const collar = { x: at.x, y: STAND, z: at.z };
@@ -142,6 +152,7 @@ function sim(
       carry: body.mode === 'held' ? body.carry : null,
       clip,
       project: r.project,
+      ...(noStage ? {} : { stage: { top: 0, height: r.h } }),
     });
     bodyStep(body, { state: 'held', move, pointer: null, bounds: r.bounds, dt, t, collar: last, target: st.anchor });
     if (st.push !== undefined && body.carry) body.carry.push = st.push;
@@ -294,6 +305,37 @@ test('bead, a finger (HoldStart.touch): per 100 px up held still he goes 0.55-0.
       assert.ok(
         ring.y <= f.px.y + finger,
         `${at}: the ring ${(ring.y - f.px.y - finger).toFixed(1)} px under the finger`,
+      );
+    }
+  }
+});
+
+test('bead, the top band (the stage’s top 18%): a plain drag up into it lifts him, 1.0 or more over his hold height at the top, his collar on the cursor, going less far away than without it; below it, nothing', () => {
+  for (const screen of ['phone', 'desktop']) {
+    for (const elevation of [24, 36, 50]) {
+      const r = rig(screen, { elevation });
+      const c = centrePx(r);
+      const at = `${screen} at ${elevation}°`;
+      const edge = BEAD.band * r.h;
+      const run = (y, noStage = false) =>
+        sim(r, { path: ramp(c, { x: c.x, y }, 1.2, 2.2), until: 3, noStage }).frames.at(-1);
+      const below = run(edge + 2);
+      const top = run(8);
+      assert.ok(top.gap <= 1, `${at}: ${top.gap.toFixed(2)} px off the cursor`);
+      const base = below.holdY;
+      assert.ok(
+        Math.abs(below.holdY - settledAt(sim(r, { path: still(c), until: 1.2 }).frames, 1.2).holdY) <= 0.01,
+        `${at}: below the band, no lift`,
+      );
+      assert.ok(
+        top.anchor.y - base >= 1 || top.anchor.y >= 2.4 - 0.01,
+        `${at}: lifted ${(top.anchor.y - base).toFixed(3)} at the top`,
+      );
+      const plain = run(8, true);
+      const d = (f) => depthAlong(f.anchor, r.camera.yaw) - depthAlong(below.anchor, r.camera.yaw);
+      assert.ok(
+        d(top) < d(plain) - 0.05 || d(plain) <= 0.05,
+        `${at}: away ${d(top).toFixed(3)} with the band, ${d(plain).toFixed(3)} without`,
       );
     }
   }

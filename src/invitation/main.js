@@ -1291,11 +1291,12 @@ function start(s) {
       // followed from the last frame's pose. A mouse's cursor has his collar under it, once the
       // grab offset has eased out.)
       let y = press.y;
+      const box = stageEl.getBoundingClientRect();
       if (pressKind === 'touch') {
         y -= (hold.feel.fingerLift ?? FINGER_LIFT) * Math.min(1, (t - holdT0) / CARRY.liftIn);
         const head = shape().head;
         headAbove += (grabbedAt(hold).y - (head.y - head.r) - headAbove) * Math.min(1, dt / HEAD_FOLLOW);
-        y = Math.max(y, stageEl.getBoundingClientRect().top + HEAD_ROOM + headAbove);
+        y = Math.max(y, box.top + HEAD_ROOM + headAbove);
       }
       aimPx = { x: press.x, y };
       holdNow = hold.step({
@@ -1309,6 +1310,7 @@ function start(s) {
         carry: body.mode === 'held' ? body.carry : null,
         clip,
         project: onScreen,
+        stage: { top: box.top, height: box.height },
       });
       target = holdNow.anchor;
       // (The plane he's dragged on: at the play area's edge he stops along it, carry.js holdStep.)

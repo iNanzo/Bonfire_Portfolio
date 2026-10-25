@@ -46,7 +46,9 @@ const RAD = Math.PI / 180;
  * eased there with a `ringHalf` s halflife, else under his collar; In the Mix never under
  * `ringFloor` while he's held. A height change keeps his spot on the floor till the
  * pointer moves `pinMove` CSS px; its gap to the cursor then eases out over HOLD.offsetEase, or at
- * `pinRate` CSS px a second for a bigger one.
+ * `pinRate` CSS px a second for a bigger one. The top band: the stage's top `band`, where the
+ * cursor going up lifts his hold height up to `bandLift` of his height more (smoothly, from where
+ * he was grabbed), so a plain drag lifts him with no hidden control.
  */
 export const BEAD = {
   omega: 14,
@@ -86,6 +88,8 @@ export const BEAD = {
   ringHalf: 0.06,
   ringFloor: 0.35,
   pinMove: 1,
+  band: 0.18,
+  bandLift: 1.6,
   pinRate: 300,
 };
 
@@ -144,6 +148,18 @@ export function beadPlane(camera, through, holdY, touch = false) {
   const n = { x: toward.x * w, y: 1 - w, z: toward.z * w };
   const len = Math.hypot(n.x, n.y, n.z) || 1;
   return { point: { x: through.x, y: holdY, z: through.z }, normal: { x: n.x / len, y: n.y / len, z: n.z / len } };
+}
+
+/**
+ * How far into the stage's top band (its top BEAD.band) client y `y` is: 0 at its lower edge and
+ * under, 1 at the stage's top, smoothly between; 0 with no stage.
+ * @param {number} y
+ * @param {{top: number, height: number}|undefined} stage
+ */
+export function bandShare(y, stage) {
+  if (!stage || !(stage.height > 0)) return 0;
+  const h = BEAD.band * stage.height;
+  return smooth(clamp((stage.top + h - y) / h, 0, 1));
 }
 
 /**
@@ -429,6 +445,9 @@ export function createBeadHold(deps = {}) {
   let exFor = HOLD.offsetEase;
   /** @type {{x: number, y: number}|null} */
   let lastPx = null;
+  /** The top band's share where he was grabbed (null till the first frame). */
+  /** @type {number|null} */
+  let band0 = null;
   /** The pin's gap as it eases out: all of it while pinned. */
   const extraAt = (t) => (pin ? extra : screenOffset(extra, exAt, t, exFor));
 
@@ -492,8 +511,9 @@ export function createBeadHold(deps = {}) {
       extra = { x: 0, y: 0 };
       exAt = -Infinity;
       lastPx = null;
+      band0 = null;
     },
-    step({ t, dt, px, rayAt, camera, low: hang, bounds, carry, clip, project }) {
+    step({ t, dt, px, rayAt, camera, low: hang, bounds, carry, clip, project, stage }) {
       low = hang;
       area = bounds;
       // (The pointer away from a height change: the cursor's ray his again, the gap easing out.)
@@ -519,7 +539,12 @@ export function createBeadHold(deps = {}) {
       }
       view = camera;
       // (The hold height: eased in from his collar as he's grabbed, then following its goal.)
-      [holdY, holdV] = damp(holdY, holdV, holdGoal, t - t0 < BEAD.holdInFor ? BEAD.holdIn : BEAD.holdFollow, dt);
+      // (Up into the stage's top band, the hold height lifts: the most he's lifted there over where
+      // he was grabbed.)
+      const u = bandShare(px.y, stage);
+      if (band0 === null) band0 = u;
+      const goalY = clamp(holdGoal + BEAD.bandLift * H * Math.max(0, u - band0), low, low + BEAD.holdMost * H);
+      [holdY, holdV] = damp(holdY, holdV, goalY, t - t0 < BEAD.holdInFor ? BEAD.holdIn : BEAD.holdFollow, dt);
       plane = beadPlane(camera, through, holdY, touch);
       // (The floor: his hang height once he's clear of it; before, no lower than he was grabbed.)
       if (anchor.y >= low - 1e-6) clear = true;
