@@ -271,7 +271,7 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
    * @param {FlowKind} kind
    * @param {number} t
    * @param {Point} at  where: the letter's middle (spawn, burst, spill), the point (stir), the
-   *   seal (bloom, trickle)
+   *   seal (bloom), a corner of the letter clear of the seal (trickle)
    * @param {{radius?: number}} [o]  the seal's radius (bloom), letter widths
    */
   function emit(kind, t, at, { radius = 0.09 } = {}) {

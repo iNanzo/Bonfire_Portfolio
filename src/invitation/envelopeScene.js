@@ -704,14 +704,9 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     put(spots.seal, sealWorld, 0.03);
     put(spots.letter, v.set(0, 0, envl.T).applyMatrix4(inner.matrixWorld), 0.05);
     put(spots.mouth, v.set(0, envl.H * 0.38, envl.T).applyMatrix4(inner.matrixWorld), 0.05);
-    put(
-      spots.trickle,
-      v
-        .set(0, -sealR * 0.9, 0)
-        .add(sealAt)
-        .applyMatrix4(inner.matrixWorld),
-      0.03,
-    );
+    // (The trickle starts off the letter's upper left corner, clear of the seal: a petal
+    // drifting beside the seal read as a stray drop of wax.)
+    put(spots.trickle, v.set(-envl.W * 0.56, envl.H * 0.42, envl.T).applyMatrix4(inner.matrixWorld), 0.03);
     if (frames === 1) flow.emit('spawn', now, spots.letter);
     if (!burst && p.flap > 0) {
       burst = true;
