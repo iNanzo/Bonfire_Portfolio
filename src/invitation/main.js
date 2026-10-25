@@ -23,14 +23,12 @@
 // A frame, in types.js's order: the pointers' gestures (gesture.js; taps get their floor spot
 // by ray) and the buttons → the camera moves → brain.step → talk.step (speech.js: what he says,
 // from the admin's lines and settings, content.js; a line goes to the bubble) → his root: steer
-// on the ground, carry while he's held (his collar, the Neck bone's head, hung where the drag
-// kind puts it: hold.js, made by holds/index.js createHold for each grab from ?drag= or Settings'
-// Drag; today's, the pointer's ray meeting the camera-facing plane through where he was grabbed,
-// plus the grab offset as it eases out, so his collar comes under the cursor; 24 CSS px above a
-// finger (or the kind's own lift), coming in as he's picked up, and near the top of the stage as
-// low as keeps his head on it: carry.js dragTarget; the wheel and a second finger go to the kind
-// when it takes them), the fall once he's let go (play.js bodyStep, with the kind's release
-// velocity or carry.js toss), the kind's squash and stretch on his root
+// on the ground, carry while he's held (his collar, the Neck bone's head, hung where the bead hold
+// puts it: holds/bead.js createBeadHold for each grab, through hold.js's interface; a bead on the
+// pointer's ray, plus the grab offset as it eases out, so his collar comes under the cursor; the
+// hold's lift above a finger, coming in as he's picked up; the wheel and a second finger go to
+// the hold for his height), the fall once he's let go (play.js bodyStep, with the hold's release
+// velocity), the hold's squash and stretch on his root
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
@@ -77,11 +75,11 @@
 // carry (his collar on screen, how long he's been held, the anchor and the drag plane, whether
 // he's pushed at the edge), the limp layer (its weight, the most a limb has swung) and Give
 // Device (the brain's device and label, the tablet shown and where, his turn off the camera);
-// snapshot().drag is the drag kind's (its name, the collar's gap from where it's aimed, CSS px,
+// snapshot().drag is the hold's (its height controls, the collar's gap from where it's aimed, CSS px,
 // the hold height, the anchor's depth along the camera's level axis, the blob, his hips' floor
 // point and lowest foot, the ring, the drop line and Ground Cues as they play, the way his root
-// faces as drawn); view({yaw, elevation, zoom}) eases the camera there and drag(kind) picks the
-// drag kind, as Settings does; `?seed=N` and `?calm` go to the brain (and the seed to talk).
+// faces as drawn); view({yaw, elevation, zoom}) eases the camera there; `?seed=N` and `?calm` go
+// to the brain (and the seed to talk).
 // clock() is the toy's clock (it stands still while the envelope covers him), envelope() the
 // envelope's state and pose (null without one).
 import { Vector3 } from 'three';
@@ -108,7 +106,7 @@ import {
   ringStrength,
 } from './cues.js';
 import { depthAlong, levelAxes, squash } from './hold.js';
-import { createHold } from './holds/index.js';
+import { createBeadHold } from './holds/bead.js';
 import { NEWT_HEIGHT, playArea, viewArea } from './area.js';
 import {
   areaFits,
@@ -219,15 +217,6 @@ const area = playArea();
 const stageEl = /** @type {HTMLElement} */ (document.querySelector('[data-stage]'));
 stageEl.textContent = ''; // (the noscript fallback)
 const options = parseQuery(location.search);
-/** The drag kind the next grab gets (?drag=, then Settings' Drag: hold.js DRAG_KINDS). */
-let dragNow = options.drag;
-/**
- * A drag kind's own defaults for the shared layer (hold.js HoldFeel), by name.
- * @param {import('./hold.js').DragKind} kind
- */
-const feelOf = (kind) => (feels[kind] ??= createHold(kind).feel);
-/** @type {Partial<Record<import('./hold.js').DragKind, import('./hold.js').HoldFeel>>} each kind's, once asked */
-const feels = {};
 // (The admin's Default look over the built-in one, before anything reads a look: a first visit
 // gets it, a stored look still wins.)
 installDefaults(invitationDefaults());
@@ -271,22 +260,8 @@ const ui = bindUi(stageEl, {
   onIntro: () => {
     introPressed = true;
   },
-  drag: dragNow,
-  groundDefault: feelOf(dragNow).groundCues,
-  onDrag: pickDrag,
 });
 installCursors();
-
-/**
- * A drag kind picked (Settings' Drag, or ?test's drag()): the next grab gets it, and Ground Cues
- * shows its default while the look has none of its own.
- * @param {import('./hold.js').DragKind} kind
- */
-function pickDrag(kind) {
-  dragNow = kind;
-  ui.setGroundDefault(feelOf(kind).groundCues);
-  ui.setDrag(kind);
-}
 stageEl.dataset.cursor = 'arrow';
 
 /** Whether the visitor asked for less motion (false where it can't be read). */
@@ -552,8 +527,10 @@ function start(s) {
   const states = [];
   /** The collar's height while he's held, world units (from the Held clip at load). */
   let hangY = 1.1;
-  /** @type {import('./hold.js').Hold|null} how he's held (the drag kind's), while he is */
+  /** @type {import('./hold.js').Hold|null} how he's held (the bead hold), while he is */
   let hold = null;
+  /** @type {import('./hold.js').Hold|null} a hold not yet grabbed with, for ?test's controls */
+  let spareHold = null;
   /** When he was last grabbed (the toy's clock). */
   let holdT0 = 0;
   /** @type {import('./hold.js').HoldStep|null} the hold's last frame */
@@ -562,14 +539,14 @@ function start(s) {
   let hand = null;
   /** @type {{x: number, y: number}|null} where the hold aims his collar, client px (the pointer, lifted over a finger) */
   let aimPx = null;
-  /** The last hold's kind has the squash and stretch (it plays on through his landing). */
+  /** The last hold has the squash and stretch (it plays on through his landing). */
   let squashing = false;
-  /** The drag kinds' own random numbers (a stream of their own: the rest stay as seeded). */
+  /** The hold's own random numbers (a stream of their own: the rest stay as seeded). */
   const holdRng = createRng(seed + 7);
   /**
    * The ground cues (cues.js): the blob's held look eased in, the ring's and the drop line's
-   * strengths, when the ring last pulsed, whether he was pushed at the edge last frame, where a
-   * kind said he'd land as he was let go (the ring waits there till he does: hold.js
+   * strengths, when the ring last pulsed, whether he was pushed at the edge last frame, where the
+   * hold said he'd land as he was let go (the ring waits there till he does: hold.js
    * Hold.landing), and, for ?test, Ground Cues as it plays and where the ring is while it shows.
    */
   const cue = {
@@ -731,7 +708,7 @@ function start(s) {
   }
   /**
    * Where the point he's held by shows, client px: his collar as posed less the grab offset as
-   * it is now (eased out: his collar, once the grab is in), as the drag kind has it.
+   * it is now (eased out: his collar, once the grab is in), as the hold has it.
    * @param {import('./hold.js').Hold} h
    */
   function grabbedAt(h) {
@@ -764,7 +741,7 @@ function start(s) {
   /** @param {import('./types.js').GestureEvent[]} evs */
   const take = (evs) => {
     for (const e of evs) {
-      // (A second finger lifting him: the drag kind's height, not the brain's.)
+      // (A second finger lifting him: the hold's height, not the brain's.)
       if (e.type === 'holdLift') {
         hold?.onSecondFinger?.(e.dy ?? 0);
         continue;
@@ -834,7 +811,7 @@ function start(s) {
     (e) => {
       e.preventDefault();
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? canvas.clientHeight : 1;
-      // (Held, a drag kind may take the wheel for his height; a trackpad's pinch still zooms.)
+      // (Held, the hold takes the wheel for his height; a trackpad's pinch still zooms.)
       if (gesture.current()?.grabbed && !e.ctrlKey && hold?.onWheel?.(e.deltaY * unit)) return;
       // (A trackpad's pinch comes as a wheel with ctrl held, in small steps. About the cursor: the
       // floor under it stays under it.)
@@ -1293,7 +1270,7 @@ function start(s) {
     return Math.hypot(b.x - a.x, b.y - a.y) / 0.1;
   }
 
-  /** The camera as a drag kind reads it (hold.js HoldCamera). */
+  /** The camera as the hold reads it (hold.js HoldCamera). */
   function holdCamera() {
     const p = s.camera.position;
     return {
@@ -1306,10 +1283,9 @@ function start(s) {
   }
 
   /**
-   * The press holding him, this frame: on the grab, a hold of the drag kind (holds/index.js
-   * createHold) started where the press began; then its step, his collar's target (aimed at the
-   * pointer, or a finger's lift over it); let go, the velocity the kind lets him go with (null:
-   * carry.js toss).
+   * The press holding him, this frame: on the grab, a bead hold (holds/bead.js createBeadHold)
+   * started where the press began; then its step, his collar's target (aimed at the pointer, or a
+   * finger's lift over it); let go, the velocity the hold lets him go with (null: carry.js toss).
    * @param {NonNullable<typeof character>} c
    * @param {number} dt
    * @param {string} clip  the clip he's showing (the brain's)
@@ -1326,7 +1302,7 @@ function start(s) {
         // moveTol or more, and nothing moved him before it, so the point under the cursor now is
         // not the one grabbed. From the press, the first frame carries him the whole way.)
         const collar = c.bonePos(COLLAR, { x: 0, y: 0, z: 0 });
-        hold = createHold(dragNow, { rng: holdRng });
+        hold = createBeadHold({ rng: holdRng });
         holdT0 = t;
         squashing = hold.feel.squash;
         hold.start({
@@ -1375,14 +1351,14 @@ function start(s) {
         stage: { top: box.top, height: box.height },
       });
       target = holdNow.anchor;
-      // (Shaken and dragged only by the user's own pointer, never by the kind easing him onto it.)
+      // (Shaken and dragged only by the user's own pointer, never by the hold easing him onto it.)
       if (hand) handStep(hand, { x: press.x, y: press.y }, dt, t, pxPerUnit(target));
       // (The plane he's dragged on: at the play area's edge he stops along it, carry.js holdStep.)
       if (body.carry) body.carry.plane = holdNow.plane;
       return null;
     }
     if (!hold) return null;
-    // (Let go: the kind's release velocity, or carry.js toss with none.)
+    // (Let go: the hold's release velocity, or carry.js toss with none.)
     const released = body.mode === 'held' && body.carry ? hold.release(body.carry, t) : null;
     cue.flight = released ? (hold.landing ?? null) : null;
     hold = null;
@@ -1393,10 +1369,9 @@ function start(s) {
   }
 
   /**
-   * His root: steered, carried (where the drag kind puts his collar: hold.js; today's, on the
-   * camera-facing plane through where he was grabbed, the point grabbed under the cursor, or a
-   * little above a finger) or falling (play.js bodyStep, let go with the kind's release velocity
-   * or carry.js toss), the kind's squash and stretch on his root.
+   * His root: steered, carried (where the bead hold puts his collar: the point grabbed under the
+   * cursor, or above a finger) or falling (play.js bodyStep, let go with the hold's release
+   * velocity or carry.js toss), the hold's squash and stretch on his root.
    * @param {NonNullable<typeof character>} c
    * @param {import('./types.js').BrainOut} o
    * @param {ReturnType<typeof pointerNow>} ptr
@@ -1418,10 +1393,10 @@ function start(s) {
       footOffset: soleY() - root.position.y,
       released,
     });
-    // (A kind's side clamp: its push, kept for the toss.)
+    // (The hold's side clamp: its push, kept for the toss.)
     if (holdNow && holdNow.push !== undefined && body.carry) body.carry.push = holdNow.push;
-    // (A kind's own body: its tilt in place of the swing. Never his heading: held, falling and
-    // landing he keeps the one he had as he was grabbed, the user's rule, so no kind can turn him.)
+    // (The hold's own body: its tilt in place of the swing. Never his heading: held, falling and
+    // landing he keeps the one he had as he was grabbed, the user's rule, so the hold never turns him.)
     if (holdNow?.tilt && body.mode === 'held') body.tilt = { x: holdNow.tilt.x, z: holdNow.tilt.z };
     if (body.mode !== 'held') root.position.set(body.root.x, body.root.y, body.root.z);
     root.rotation.set(body.tilt.x, body.body.yaw, body.tilt.z);
@@ -1554,7 +1529,7 @@ function start(s) {
 
   /**
    * The ring under him and the dashed drop line from his collar to it while he's held (Ground
-   * Cues: the look's, or the drag kind's own; In the Mix as the kind or cues.js mixWants says),
+   * Cues: the look's, or In the Mix with none picked; In the Mix as cues.js mixWants says),
    * the ring pulsing on a wall clamp; otherwise the marker where the pointer meets the floor.
    * @param {NonNullable<typeof character>} c
    * @param {number} footH  his lowest foot's height
@@ -1565,15 +1540,15 @@ function start(s) {
   function groundCues(c, footH, hips, mark, dt) {
     const carry = body.mode === 'held' ? body.carry : null;
     const isHeld = Boolean(carry && hold);
-    // (Let go where a kind said he'd land: the ring waits there till he does, then fades.)
+    // (Let go where the hold said he'd land: the ring waits there till he does, then fades.)
     if (body.mode !== 'fall') cue.flight = null;
     const flying = cue.flight !== null;
     const cues = holdNow?.cues ?? (flying ? { ring: cue.flight, line: false } : {});
-    const mode = groundCueMode(look.groundCues, hold?.feel.groundCues ?? feelOf(dragNow).groundCues);
-    const want = cues.mix ?? mixWants(footH, carry ? Math.hypot(carry.vel.x, carry.vel.z) : 0);
+    const mode = groundCueMode(look.groundCues);
+    const want = mixWants(footH, carry ? Math.hypot(carry.vel.x, carry.vel.z) : 0);
     cue.ring = cueStep(cue.ring, { mode, want: want || flying, held: isHeld || flying, dt });
     cue.line = cueStep(cue.line, { mode: lineMode(mode, cues.line), want, held: isHeld, dt });
-    // (A wall clamp: the kind says, or the edge starts pushing him.)
+    // (A wall clamp: the hold says, or the edge starts pushing him.)
     const pushed = Boolean(carry?.push);
     if (isHeld && (cues.pulse || (pushed && !cue.pushed))) cue.pulse = t;
     cue.pushed = pushed;
@@ -1711,8 +1686,7 @@ function start(s) {
   }
 
   /**
-   * The drag kind for ?test (snapshot().drag): its name (held, the hold's; else the one the next
-   * grab gets) and the setting's, its own height controls, where its collar is aimed and how far the collar is from it
+   * The hold for ?test (snapshot().drag): its own height controls, where its collar is aimed and how far the collar is from it
    * (CSS px), the hold height, the anchor and its depth along the camera's level axis (away
    * positive), the blob, his hips' floor point and lowest foot, the ring and the drop line, Ground
    * Cues as it plays, whether he's pushed at the edge, and the way his root faces as drawn (radians).
@@ -1723,12 +1697,10 @@ function start(s) {
     const collar = c && carry ? onScreen(c.bonePos(COLLAR, { x: 0, y: 0, z: 0 })) : null;
     const hips = c ? c.bonePos(BONES.hips, { x: 0, y: 0, z: 0 }) : null;
     const press = gesture.current();
-    const kind = hold ?? createHold(dragNow);
+    const h = hold ?? (spareHold ??= createBeadHold());
     return {
-      kind: kind.kind,
-      setting: dragNow,
-      // (The kind's own height controls, for the tools: the wheel, a second finger.)
-      controls: { wheel: typeof kind.onWheel === 'function', secondFinger: kind.feel.secondFinger },
+      // (The hold's own height controls, for the tools: the wheel, a second finger.)
+      controls: { wheel: typeof h.onWheel === 'function', secondFinger: h.feel.secondFinger },
       aim: aimPx && carry ? { ...aimPx } : null,
       pointer: press?.grabbed ? { x: press.x, y: press.y } : null,
       gap: collar && aimPx ? Math.hypot(collar.x - aimPx.x, collar.y - aimPx.y) : null,
@@ -1836,14 +1808,6 @@ function start(s) {
           elevation: elevation === undefined ? 0 : elevation - cam.goal.elevation,
         });
         if (zoom) orbitZoom(cam, (cam.goal.distance * zoom) / cam.home.distance);
-      },
-      /**
-       * The drag kind the next grab gets, as Settings' Drag picks it (anything else: today).
-       * @param {string} kind
-       */
-      drag(kind) {
-        pickDrag(parseQuery(`?drag=${encodeURIComponent(String(kind))}`).drag);
-        return dragNow;
       },
       /** The toy's clock, seconds (it stands still while the envelope covers him). */
       clock: () => t,

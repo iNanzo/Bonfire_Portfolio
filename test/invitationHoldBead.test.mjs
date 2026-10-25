@@ -1,5 +1,5 @@
-// The 'bead' drag kind (src/invitation/holds/bead.js), checked as numbers against design.md's
-// candidate on the toy's own default phone (390x844) and desktop (1280x800) cameras (pixels.js
+// The bead hold, how NEWT is carried (src/invitation/holds/bead.js), checked as numbers against
+// design.md's bead on the toy's own default phone (390x844) and desktop (1280x800) cameras (pixels.js
 // frameView's distance, a 20° pinhole like camera.js's): held still, 100 px up the screen carries
 // him away as far as a level plane would (a finger 0.6 as far); a flick up lofts him toward the
 // camera and he settles back; a flick down skims the floor, his collar 0.06 over his hang height;
@@ -22,8 +22,8 @@ import {
   ropeStep,
   ropeTilt,
 } from '../src/invitation/holds/bead.js';
-import { createHold } from '../src/invitation/holds/index.js';
-import { depthAlong, levelAxes, rayAtY } from '../src/invitation/hold.js';
+import { depthAlong, levelAxes } from '../src/invitation/hold.js';
+import { rayAtY } from './lib/rays.mjs';
 import { bodyStep, createBody } from '../src/invitation/play.js';
 import { NEWT_RADIUS, viewArea } from '../src/invitation/area.js';
 import { frameView, texelGrid } from '../src/invitation/pixels.js';
@@ -242,10 +242,9 @@ const moveBy = (r, d, span, hold = 1.2, extra = {}) => {
 };
 const settledAt = (frames, t) => frames.reduce((best, f) => (Math.abs(f.t - t) < Math.abs(best.t - t) ? f : best));
 
-test('bead: a hold of its own kind, In the Mix by default, with the squash, an 80 px finger lift (the ring over the finger) and a second finger for height', () => {
-  const h = createHold('bead');
-  assert.equal(h.kind, 'bead');
-  assert.deepEqual(h.feel, { groundCues: 'mix', squash: true, fingerLift: 80, secondFinger: true });
+test('bead: the hold, with the squash, an 80 px finger lift (the ring over the finger) and a second finger for height', () => {
+  const h = createBeadHold();
+  assert.deepEqual(h.feel, { squash: true, fingerLift: 80, secondFinger: true });
   assert.equal(typeof h.onWheel, 'function');
   assert.equal(typeof h.onSecondFinger, 'function');
   assert.equal(h.plane, null, 'no plane before a grab');
@@ -291,7 +290,7 @@ test('bead, settled: per 100 px of cursor up held still at 36°, he goes as far 
 });
 
 test('bead, a finger (HoldStart.touch): per 100 px up held still he goes 0.55-0.65 as far away as with the mouse at 24°, 36° and 50°, his collar on the finger’s ray; held still, the ring shows at or above the finger', () => {
-  const finger = createHold('bead').feel.fingerLift ?? 0;
+  const finger = createBeadHold().feel.fingerLift ?? 0;
   for (const elevation of [24, 36, 50]) {
     for (const yaw of [0, 90]) {
       const r = rig('phone', { yaw, elevation });

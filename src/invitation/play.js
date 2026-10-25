@@ -84,7 +84,7 @@ export function createBody({ x = 0, z = 0, yaw = 0 } = {}) {
  * @property {XYZ} [collar]  held: the collar now (read when he's grabbed)
  * @property {XYZ} [target]  held: where the pointer's ray meets the lift height
  * @property {number} [footOffset]  falling: his lowest foot's height over his root
- * @property {XYZ|null} [released]  let go: the velocity a drag kind lets him go with (hold.js
+ * @property {XYZ|null} [released]  let go: the velocity the hold lets him go with (hold.js
  *   Hold.release); left out or null, carry.js toss
  */
 
@@ -109,7 +109,7 @@ export function bodyStep(s, { state, move, pointer, bounds, dt, t, collar, targe
     return s;
   }
   if (s.mode === 'held') {
-    // Let go (or a state that isn't held): tossed as the drag kind says, or with the hold's last samples.
+    // Let go (or a state that isn't held): tossed as the hold says, or with the hold's last samples.
     s.vel = released ? { ...released } : s.carry ? toss(s.carry) : { x: 0, y: 0, z: 0 };
     s.carry = null;
     s.mode = 'fall';

@@ -1,27 +1,27 @@
-// Real-speed clips of carrying NEWT in the invitation toy (/invitation/) under each drag kind
-// (?drag=today|level|tilt|bead: hold.js), for comparing them: GPU Chrome runs the same scripted
+// Real-speed clips of carrying NEWT in the invitation toy (/invitation/) with the bead hold
+// (holds/bead.js, the only carry): GPU Chrome runs the same scripted
 // moves through real input (a mouse on a desktop size, a finger through CDP on a phone one) from
 // each of the camera's views, and Chrome's screencast hands over the page's own frames as it
 // draws them (never paused frames: capture-invitation.mjs's way). The moves: grabbed by the head
 // (held into a grab), 200 px up slowly, back down past where he was grabbed, 200 px across, a lift
-// (the kind's own height control: the wheel on a desktop, a second finger on a phone; or, without
+// (the hold's own height control: the wheel on a desktop, a second finger on a phone; or, without
 // one, a drag on up to the stage's top, past the back wall), then a flick up and let go (a throw),
 // and his landing. Headless frames have no cursor, so a ring marks the pointer, and a dot where
-// the kind aims his collar while he's held (a finger's lift over itself). It starts its own Vite
+// the hold aims his collar while he's held (a finger's lift over itself). It starts its own Vite
 // dev server from the folder it's run in (a worktree too) and stops it after, or uses one that's
 // running (--url). Run it alone on the GPU (one capture at a time on the machine):
 //
-//   node tools/capture-invitation-drag.mjs [--kinds today,level,tilt,bead] [--sizes 390x844@3,1280x800@1]
-//        [--views 0/36,90/36,0/15,90/15] [--compare] [--fps 15] [--scale 1] [--sheet 8] [--seed 3]
+//   node tools/capture-invitation-drag.mjs [--sizes 390x844@3,1280x800@1]
+//        [--views 0/36,90/36,0/15,90/15] [--fps 15] [--scale 1] [--sheet 8] [--seed 3]
 //        [--port 5400] [--url <origin>] [--out .scratch/invitation-drag] [--tag drag]
 //
 //   --views    the camera's yaw/elevation, degrees (camera.js: yaw 0 looks toward −z; the
 //              elevation within 12 to 70)
-//   --compare  also put the same moves for every kind side by side in one WebP a view and size
 //
-// Files: <out>/<tag>-<kind>-<view>-<W>x<H>.webp (a view is y<yaw>e<elevation>); <out>/<tag>-<kind>-
+// To compare against another version, run it in that version's worktree with its own --tag.
+// Files: <out>/<tag>-<view>-<W>x<H>.webp (a view is y<yaw>e<elevation>); <out>/<tag>-
 // <W>x<H>-sheet.png (--sheet frames of each view, a row a view, labelled with when and what the
-// move was); with --compare, <out>/<tag>-compare-<view>-<W>x<H>.webp; <out>/<tag>-<W>x<H>.json
+// move was); <out>/<tag>-<W>x<H>.json
 // (each run's frames and frame times and, frame by frame, the drag's numbers from
 // snapshot().drag: the collar's gap from where it's aimed, the hold height, the anchor's depth
 // along the camera's level axis, his lowest foot, the blob, the ring; and the most the gap was
@@ -30,15 +30,14 @@ import { chromium } from '@playwright/test';
 import sharp from 'sharp';
 import fs from 'node:fs';
 import { createServer } from 'vite';
-import { DRAG_KINDS } from '../src/invitation/hold.js';
 
 const argv = process.argv.slice(2);
 const opt = (name, fallback) => {
   const i = argv.indexOf(`--${name}`);
   return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : fallback;
 };
-const KINDS = opt('kinds', 'today').split(',');
-for (const k of KINDS) if (!DRAG_KINDS.includes(k)) throw new Error(`--kinds ${k}: one of ${DRAG_KINDS.join(', ')}`);
+for (const gone of ['kinds', 'compare'])
+  if (argv.includes(`--${gone}`)) throw new Error(`--${gone}: gone (the bead hold is the only carry)`);
 const SIZES = opt('sizes', '390x844@3,1280x800@1')
   .split(',')
   .map((s) => {
@@ -52,7 +51,6 @@ const VIEWS = opt('views', '0/36,90/36,0/15,90/15')
     const [yaw, elevation] = v.split('/').map(Number);
     return { yaw, elevation, name: `y${yaw}e${elevation}` };
   });
-const COMPARE = argv.includes('--compare');
 const FPS = Number(opt('fps', '15'));
 const SCALE = Number(opt('scale', '1'));
 const SHEET = Number(opt('sheet', '8'));
@@ -101,7 +99,7 @@ async function grid(tiles, cols, file, labels) {
 
 /**
  * In the page: a ring where the pointer is (a mouse's or a finger's; headless frames draw no
- * cursor), a dot where the drag kind aims his collar while he's held, and a record of the drag's
+ * cursor), a dot where the hold aims his collar while he's held, and a record of the drag's
  * numbers every frame (snapshot().drag), with what the script is doing (window.__dragMove).
  */
 function installMarks() {
@@ -258,9 +256,9 @@ async function moves(page, size) {
   await sleep(1600);
 }
 
-/** One run: the page under ?drag=<kind> at a view, the moves recorded at real speed. */
-async function run(page, size, kind, view) {
-  await page.goto(`${origin}/invitation/?test&calm&seed=${SEED}&drag=${kind}`);
+/** One run: the page at a view, the moves recorded at real speed. */
+async function run(page, size, view) {
+  await page.goto(`${origin}/invitation/?test&calm&seed=${SEED}`);
   await page.waitForSelector('[data-stage].is-ready', { timeout: 30_000 });
   await page.waitForFunction(() => window.__invitation.snapshot().state === 'idle', null, { timeout: 20_000 });
   await page.evaluate((v) => window.__invitation.view(v), { yaw: view.yaw * RAD, elevation: view.elevation * RAD });
@@ -309,21 +307,6 @@ const fit = (size, buf) =>
     .resize(Math.round(size.w * SCALE), Math.round(size.h * SCALE), { kernel: 'nearest', fit: 'fill' })
     .png()
     .toBuffer();
-const label = async (buf, text) => {
-  const { width } = await sharp(buf).metadata();
-  return sharp(buf)
-    .composite([
-      {
-        input: Buffer.from(
-          `<svg width="${width}" height="22"><rect width="100%" height="22" fill="black" opacity="0.7"/><text x="6" y="16" font-family="monospace" font-size="14" fill="white">${text}</text></svg>`,
-        ),
-        left: 0,
-        top: 0,
-      },
-    ])
-    .png()
-    .toBuffer();
-};
 const moveAt = (rows, t) => rows.filter((r) => r.t <= t).at(-1)?.move ?? '';
 
 const problems = [];
@@ -338,64 +321,38 @@ for (const size of SIZES) {
   page.on('pageerror', (e) => problems.push(`${size.w}x${size.h}: ${e.message}`));
   page.on('console', (m) => m.type() === 'error' && problems.push(`${size.w}x${size.h}: ${m.text()}`));
   const report = { size, views: VIEWS, runs: {} };
-  /** @type {Record<string, Record<string, Buffer[]>>} each view's frames, by kind (for --compare) */
-  const byView = {};
-  for (const kind of KINDS) {
-    const tiles = [];
-    const labels = [];
-    for (const view of VIEWS) {
-      const taken = await run(page, size, kind, view);
-      const frames = await Promise.all(taken.shot.map((f) => fit(size, f.data)));
-      const base = `${OUT}/${TAG}-${kind}-${view.name}-${size.w}x${size.h}`;
-      await sharp(frames, { join: { animated: true } })
-        .webp({ quality: 90, loop: 0, delay: frames.map(() => Math.round(1000 / FPS)) })
-        .toFile(`${base}.webp`);
-      (byView[view.name] ??= {})[kind] = frames;
-      const held = taken.rows.filter((r) => r.held && r.heldFor >= 0.15 && r.gap !== null);
-      const most = held.reduce((m, r) => Math.max(m, r.gap), 0);
-      const depths = held.map((r) => r.depth);
-      const lowest = held.reduce((m, r) => Math.min(m, r.foot), Infinity);
-      const sorted = [...taken.raf].sort((a, b) => a - b);
-      console.log(
-        `✓ ${base}.webp: ${frames.length} frames over ${taken.length} ms; the gap at most ${most.toFixed(1)} px once in; ` +
-          `depth ${Math.min(...depths).toFixed(2)} to ${Math.max(...depths).toFixed(2)}; lowest foot ${lowest.toFixed(3)}; ` +
-          `frame ms median ${sorted[Math.floor(sorted.length / 2)]?.toFixed(1)}`,
+  const tiles = [];
+  const labels = [];
+  for (const view of VIEWS) {
+    const taken = await run(page, size, view);
+    const frames = await Promise.all(taken.shot.map((f) => fit(size, f.data)));
+    const base = `${OUT}/${TAG}-${view.name}-${size.w}x${size.h}`;
+    await sharp(frames, { join: { animated: true } })
+      .webp({ quality: 90, loop: 0, delay: frames.map(() => Math.round(1000 / FPS)) })
+      .toFile(`${base}.webp`);
+    const held = taken.rows.filter((r) => r.held && r.heldFor >= 0.15 && r.gap !== null);
+    const most = held.reduce((m, r) => Math.max(m, r.gap), 0);
+    const depths = held.map((r) => r.depth);
+    const lowest = held.reduce((m, r) => Math.min(m, r.foot), Infinity);
+    const sorted = [...taken.raf].sort((a, b) => a - b);
+    console.log(
+      `✓ ${base}.webp: ${frames.length} frames over ${taken.length} ms; the gap at most ${most.toFixed(1)} px once in; ` +
+        `depth ${Math.min(...depths).toFixed(2)} to ${Math.max(...depths).toFixed(2)}; lowest foot ${lowest.toFixed(3)}; ` +
+        `frame ms median ${sorted[Math.floor(sorted.length / 2)]?.toFixed(1)}`,
+    );
+    report.runs[view.name] = { webp: `${base}.webp`, ms: taken.length, mostGap: most, rows: taken.rows };
+    for (let i = 0; i < SHEET; i++) {
+      const f = taken.shot[Math.round((i / Math.max(1, SHEET - 1)) * (taken.shot.length - 1))];
+      tiles.push(
+        await sharp(await fit(size, f.data))
+          .resize({ height: size.phone ? 420 : 300, kernel: 'nearest' })
+          .png()
+          .toBuffer(),
       );
-      report.runs[`${kind}/${view.name}`] = { webp: `${base}.webp`, ms: taken.length, mostGap: most, rows: taken.rows };
-      for (let i = 0; i < SHEET; i++) {
-        const f = taken.shot[Math.round((i / Math.max(1, SHEET - 1)) * (taken.shot.length - 1))];
-        tiles.push(
-          await sharp(await fit(size, f.data))
-            .resize({ height: size.phone ? 420 : 300, kernel: 'nearest' })
-            .png()
-            .toBuffer(),
-        );
-        labels.push(`${view.name} ${f.t} ms ${moveAt(taken.rows, f.t)}`);
-      }
+      labels.push(`${view.name} ${f.t} ms ${moveAt(taken.rows, f.t)}`);
     }
-    await grid(tiles, SHEET, `${OUT}/${TAG}-${kind}-${size.w}x${size.h}-sheet.png`, labels);
   }
-  if (COMPARE && KINDS.length > 1)
-    for (const view of VIEWS) {
-      const runs = KINDS.map((k) => byView[view.name][k]);
-      const n = Math.max(...runs.map((r) => r.length));
-      const { width, height } = await sharp(runs[0][0]).metadata();
-      const out = [];
-      for (let i = 0; i < n; i++) {
-        const cells = await Promise.all(runs.map((r, j) => label(r[Math.min(i, r.length - 1)], KINDS[j])));
-        out.push(
-          await sharp({ create: { width: width * cells.length, height, channels: 3, background: '#000' } })
-            .composite(cells.map((c, j) => ({ input: c, left: j * width, top: 0 })))
-            .png()
-            .toBuffer(),
-        );
-      }
-      const file = `${OUT}/${TAG}-compare-${view.name}-${size.w}x${size.h}.webp`;
-      await sharp(out, { join: { animated: true } })
-        .webp({ quality: 85, loop: 0, delay: out.map(() => Math.round(1000 / FPS)) })
-        .toFile(file);
-      console.log(`✓ ${file}`);
-    }
+  await grid(tiles, SHEET, `${OUT}/${TAG}-${size.w}x${size.h}-sheet.png`, labels);
   fs.writeFileSync(`${OUT}/${TAG}-${size.w}x${size.h}.json`, JSON.stringify(report, null, 1));
   await context.close();
 }

@@ -1,7 +1,7 @@
 // What the brain feels while NEWT is held (carry.js createHand, handStep, handFeel): the shake and
-// the drag speed come only from the user's own pointer, never from a drag kind easing his collar
+// the drag speed come only from the user's own pointer, never from the hold easing his collar
 // onto it (the grab offset, a finger's lift, the bead's spring along the ray and its hold height).
-// Each kind (today, level, tilt, bead) is driven as main.js drives it on the toy's default desktop
+// The bead hold is driven as main.js drives it on the toy's default desktop
 // (1280x800) and phone (390x844) cameras, frame by frame at 60 fps, with the brain reading the
 // hand: a still grab held 3 s is never shaken (no surprised face, so no "shaken" line), adds no
 // stress (so no flee once he lands) and brings no early Thrash; a gentle carry isn't a shake;
@@ -9,8 +9,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHold } from '../src/invitation/holds/index.js';
-import { levelAxes, rayAtY } from '../src/invitation/hold.js';
+import { createBeadHold } from '../src/invitation/holds/bead.js';
+import { levelAxes } from '../src/invitation/hold.js';
+import { rayAtY } from './lib/rays.mjs';
 import { bodyStep, createBody } from '../src/invitation/play.js';
 import { NEWT_RADIUS, viewArea } from '../src/invitation/area.js';
 import { frameView, texelGrid } from '../src/invitation/pixels.js';
@@ -76,8 +77,9 @@ function pxPerUnit(r, p) {
 }
 
 /**
- * NEWT grabbed standing in the middle of `screen` with `kind`, the pointer at `path(t)` (client
- * px, t from the grab) for `seconds`, as main.js does it: the kind's step (a finger's lift over
+ * NEWT grabbed standing in the middle of `screen` with the bead hold (`kind` its name in the
+ * messages), the pointer at `path(t)` (client px, t from the grab) for `seconds`, as main.js does
+ * it: the hold's step (a finger's lift over
  * itself coming in over CARRY.liftIn), play.js bodyStep, the hand on the pointer itself and the
  * brain reading it. Returns every frame's brain output and the brain.
  */
@@ -87,7 +89,7 @@ function heldFor(kind, screen, path, seconds = 3) {
   const at = rayAtY(r.rayAt(r.w / 2, r.h / 2), 1);
   const collar = { x: at.x, y: STAND, z: at.z };
   const cpx = r.project(collar);
-  const hold = createHold(kind, { rng: () => 0.5 });
+  const hold = createBeadHold({ rng: () => 0.5 });
   const body = createBody({ x: at.x, z: at.z });
   const brain = createBrain({ seed: 3, calm: true, bounds: r.bounds });
   brain.step({
@@ -168,9 +170,9 @@ const startPx = (screen) => {
   return { x: c.x + 4, y: c.y + 14 };
 };
 
-test('a still grab held 3 s, with every drag kind on the desktop and the phone: never shaken, no stress, no early Thrash', () => {
+test('a still grab held 3 s, on the desktop and the phone: never shaken, no stress, no early Thrash', () => {
   for (const screen of /** @type {const} */ (['desktop', 'phone']))
-    for (const kind of ['today', 'level', 'tilt', 'bead']) {
+    for (const kind of ['bead']) {
       const p = startPx(screen);
       const frames = heldFor(kind, screen, () => p);
       const tag = `${kind} on the ${screen}`;
@@ -185,9 +187,9 @@ test('a still grab held 3 s, with every drag kind on the desktop and the phone: 
     }
 });
 
-test('carried gently side to side (about 140 px/s at most) is no shake, with every kind', () => {
+test('carried gently side to side (about 140 px/s at most) is no shake', () => {
   for (const screen of /** @type {const} */ (['desktop', 'phone']))
-    for (const kind of ['today', 'level', 'tilt', 'bead']) {
+    for (const kind of ['bead']) {
       const p = startPx(screen);
       const A = screen === 'phone' ? 60 : 90;
       const w = 140 / A;
@@ -201,9 +203,9 @@ test('carried gently side to side (about 140 px/s at most) is no shake, with eve
     }
 });
 
-test('a real shake (±40 px at 5 Hz from 1 s) still shakes him, with stress, with every kind', () => {
+test('a real shake (±40 px at 5 Hz from 1 s) still shakes him, with stress', () => {
   for (const screen of /** @type {const} */ (['desktop', 'phone']))
-    for (const kind of ['today', 'level', 'tilt', 'bead']) {
+    for (const kind of ['bead']) {
       const p = startPx(screen);
       const frames = heldFor(kind, screen, (t) => ({
         x: p.x + (t > 1 ? 40 * Math.sin(2 * Math.PI * 5 * (t - 1)) : 0),

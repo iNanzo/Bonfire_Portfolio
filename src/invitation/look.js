@@ -19,7 +19,8 @@
 // `invitation.defaults`, which main.js hands installDefaults at boot) overrides the built-in
 // Default style and the first visit's settings; a stored look still wins, a value it lacks
 // taking the Default look's. Ground Cues (the ring and the drop line under him while he's held:
-// Off, In the Mix or Always) is only stored once it's picked; till then the drag kind's own plays.
+// Off, In the Mix or Always) is only stored once it's picked; till then In the Mix plays
+// (cues.js CUE_DEFAULT).
 
 import { DEFAULT_PIXEL, PIXEL_SIZES } from './pixels.js';
 import { DEFAULT_STYLE, PRESETS } from './looks/index.js';
@@ -61,7 +62,8 @@ import { SHADER_CONTROLS, controlFor, snapShader, styleShader } from './shader.j
  * @property {import('./shader.js').ShaderValues} shader  the user's changes to the style's
  *   Shader options (none: the style as it is)
  * @property {import('./hold.js').CueMode} [groundCues]  the ring and the drop line under him while
- *   he's held (cues.js): Off, In the Mix or Always; left out until it's picked, the drag kind's own
+ *   he's held (cues.js): Off, In the Mix or Always; left out until it's picked: In the Mix
+ *   (cues.js CUE_DEFAULT)
  */
 /** @typedef {'smooth'|'choppy'} Motion  Smooth, or Choppy (his animation at CHOPPY_FPS) */
 
@@ -152,7 +154,7 @@ export function validLook(raw) {
     style,
     motion: MOTIONS.includes(o.motion) ? o.motion : first.motion,
     shader: validShader(o.shader, style),
-    // (Only once it's picked: left out, the drag kind's own default plays.)
+    // (Only once it's picked: left out, In the Mix plays.)
     ...(CUE_MODES.includes(o.groundCues)
       ? { groundCues: o.groundCues }
       : first.groundCues
