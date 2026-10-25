@@ -8,9 +8,11 @@
 // once, and none at all with reduced motion.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as THREE from 'three';
 import {
   BLOOM_SIZE,
   FLOWS,
+  FRONT_BIAS,
   LETTER_DEPTHS,
   LETTER_MOUTH,
   PETAL_LEN,
@@ -23,12 +25,14 @@ import {
   WAKE,
   createPetalFlow,
   createTrail,
+  frontDepth,
   petalAt,
   petalGrid,
   swirlRadius,
   swirlSlot,
   valueNoise,
 } from '../src/invitation/petals.js';
+import { createPetalScene } from '../src/invitation/petalScene.js';
 import { DEPTH, envelopeLayout } from '../src/invitation/envelopeLook.js';
 import { FLAP_OPEN, TIMES, createEnvelope } from '../src/invitation/envelope.js';
 
@@ -695,4 +699,95 @@ test('with reduced motion, no petals at all', () => {
   assert.equal(f.petals.length, 0);
   assert.equal(f.live(), 0);
   assert.ok(Object.values(f.emitted).every((n) => n === 0));
+});
+
+test('a poured petal draws in front of the paper once it has risen past the mouth, never cut by the lip, and stays in front', () => {
+  const { T, W } = envelopeLayout();
+  const depths = { inside: (T / 2 + DEPTH.inside) / W, pocket: (T / 2 + DEPTH.pocket) / W };
+  for (const seed of [9, 10, 11]) {
+    // (Turned and tipped, as the letter is on the screen.)
+    const c = Math.cos(0.4);
+    const s = Math.sin(0.4);
+    const L = frameAt(ORIGIN, {
+      floating: false,
+      ...depths,
+      right: { x: c, y: s, z: 0 },
+      up: { x: -s, y: c, z: 0 },
+    });
+    const f = createPetalFlow({ seed });
+    /** @type {Set<object>} the ones that have risen past it */
+    const out = new Set();
+    let below = 0;
+    run(f, 2.2, 1 / 60, (g, i) => {
+      g.letter({ ...L, opening: Math.min(1, i / 30) });
+      for (const p of g.petals) {
+        if (p.born > g.time) continue;
+        if (p.kind !== 'pour') {
+          assert.equal(p.front, false, `only the pour: ${p.kind}`);
+          continue;
+        }
+        const local = sub(p, L.c);
+        const risen = dot(local, L.up) - mouthAt(L, dot(local, L.right));
+        if (risen > 0) out.add(p);
+        // (Below the mouth it's inside the pocket, behind its paper; once past it, in front of
+        // all of it from then on, wherever it drifts.)
+        if (!out.has(p)) {
+          below++;
+          assert.equal(p.front, false, `still inside: ${risen.toFixed(3)}`);
+        } else assert.equal(p.front, true, `risen past the mouth by ${risen.toFixed(3)}`);
+        const pose = petalAt(p, g.time);
+        if (pose.visible) assert.equal(pose.front, p.front, 'as drawn');
+      }
+    });
+    assert.ok(below > 0, 'it starts inside');
+    assert.ok(out.size >= FLOWS.pour.n * 0.9, `${out.size} came out`);
+  }
+});
+
+test('in front of the paper: a front petal’s depth is pulled toward the near plane, ahead of any paper, keeping its order', () => {
+  // (The envelope's camera: 30° at 6, near 0.1, far 40; the letter about its plane, ±1.)
+  const cam = new THREE.PerspectiveCamera(30, 1.6, 0.1, 40);
+  cam.position.set(0, 0, 6);
+  cam.updateMatrixWorld();
+  cam.updateProjectionMatrix();
+  const ndc = (z) => new THREE.Vector3(0, 0, z).project(cam).z;
+  const paper = [-1, -0.5, 0, 0.5, 1].map(ndc);
+  const near = Math.min(...paper);
+  let prev = -Infinity;
+  for (let z = -2; z <= 2; z += 0.25) {
+    const d = frontDepth(ndc(z));
+    assert.ok(d < near, `a front petal at ${z} is ahead of the paper: ${d} < ${near}`);
+    assert.ok(d > -1, 'still past the near plane');
+    // (Further off, further back: they still overlap each other right.)
+    if (z > -2) assert.ok(d < prev, 'its order kept');
+    prev = d;
+  }
+  assert.equal(frontDepth(-1), -1);
+  assert.ok(FRONT_BIAS > 0 && FRONT_BIAS < 0.05);
+});
+
+test('the scene writes each petal’s front into its mesh, and its shader pulls those forward', () => {
+  const scene = new THREE.Scene();
+  const ps = createPetalScene({ scene, unit: 1, seed: 9 });
+  const L = new THREE.Matrix4();
+  let fronts = 0;
+  for (let i = 0; i < 90; i++) {
+    ps.letter(L, { h: 0.66, opening: Math.min(1, i / 30), floating: false, inside: 0.02, pocket: 0.04 });
+    ps.step(1 / 60);
+    const want = ps.flow.at().filter((e) => e.pose.front).length;
+    const got = scene.children
+      .filter((o) => /** @type {any} */ (o).isInstancedMesh)
+      .reduce((n, m) => {
+        const a = /** @type {any} */ (m).geometry.getAttribute('aFront');
+        let k = 0;
+        for (let j = 0; j < /** @type {any} */ (m).count; j++) k += a.getX(j);
+        return n + k;
+      }, 0);
+    assert.equal(got, want, `frame ${i}`);
+    fronts = Math.max(fronts, got);
+  }
+  assert.ok(fronts > 5, `some out in front: ${fronts}`);
+  const mesh = /** @type {any} */ (scene.children[0]);
+  assert.match(mesh.material.vertexShader, /aFront/);
+  assert.match(mesh.material.vertexShader, /gl_Position\.z = mix\(-gl_Position\.w, gl_Position\.z/);
 });

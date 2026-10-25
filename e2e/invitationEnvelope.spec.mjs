@@ -185,7 +185,7 @@ test.describe('on a desktop', () => {
     }
   });
 
-  test('the mouse over the letter pulses a gold rim round it, slowly, clean between pulses; off it, it fades', async ({
+  test('the mouse over the letter pulses a wide glow round it, lifting it and brightening its paper at the peak, slowly, clean between pulses; off it, it fades', async ({
     page,
   }) => {
     await envelopeUp(page);
@@ -202,11 +202,60 @@ test.describe('on a desktop', () => {
     await expect
       .poll(async () => (await hover()).pulse, { ...often, message: 'a pulse at its peak' })
       .toBeGreaterThan(0.9);
+    // (At the peak it reads at a glance: a glow well past its line, lifted about 3% toward the
+    // camera, its paper a step brighter.)
+    const peak = (await hover()).look;
+    expect(peak.reach).toBeGreaterThanOrEqual(5);
+    expect(peak.scale).toBeGreaterThan(1.02);
+    expect(peak.toward).toBeGreaterThan(0);
+    expect(peak.bright).toBeGreaterThan(0.5);
+    // (The seal's glint sweeps across it on the same time, and is gone at the trough.)
+    await expect
+      .poll(async () => (await hover()).gloss.width, { ...often, message: 'the seal glints' })
+      .toBeGreaterThan(0);
     await expect
       .poll(async () => (await hover()).pulse, { ...often, message: 'and back to nothing' })
       .toBeLessThan(0.05);
+    // (And clean between: no glow to speak of, no lift, the paper as it is.)
+    const trough = (await hover()).look;
+    expect(trough.bright).toBe(0);
+    expect(trough.scale).toBeLessThan(1.001);
+    expect(trough.reach).toBeLessThan(2.5);
+    expect((await hover()).gloss.width, 'no glint at the trough').toBe(0);
     await page.mouse.move(8, vp.height - 8, { steps: 4 });
     await expect.poll(async () => (await hover()).pulse, { message: 'gone off the letter' }).toBe(0);
+  });
+
+  test('a click glints quickly across its seal as it’s pressed, and opens it', async ({ page }) => {
+    await envelopeUp(page);
+    const vp = page.viewportSize();
+    // (Every frame from the click, in the page: the glint is a third of a second.)
+    const frames = page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          /** @type {{state: string, at: number, width: number}[]} */
+          const out = [];
+          const tick = () => {
+            const e = window.__invitation.envelope();
+            if (!e) return resolve(out);
+            out.push({ state: e.state, ...e.hover.gloss });
+            if (out.length > 90) return resolve(out);
+            requestAnimationFrame(tick);
+          };
+          tick();
+        }),
+    );
+    await page.mouse.click(vp.width / 2, vp.height / 2);
+    const seen = await frames;
+    const lit = seen.filter((f) => f.width > 0);
+    expect(lit.length, 'it glints as it opens').toBeGreaterThan(2);
+    expect(Math.max(...lit.map((f) => f.width)), 'wide: brighter than the hover’s').toBeGreaterThan(0.12);
+    for (let i = 1; i < lit.length; i++) expect(lit[i].at, 'across, once').toBeGreaterThanOrEqual(lit[i - 1].at);
+    expect(
+      seen.some((f) => f.state !== 'floating'),
+      'it opened',
+    ).toBe(true);
+    expect(seen.at(-1).width, 'and it’s gone').toBe(0);
   });
 
   test('a drag across it never turns the camera, and a sideways drag turns the letter but neither opens nor skips it', async ({
@@ -614,6 +663,29 @@ test.describe('on a phone', () => {
     await expect(page.locator('.inv-envelope-hint')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.inv-envelope-hint')).toContainText('Tap or swipe up to open');
     await expect(page.locator('.inv-envelope-hint')).toContainText('Swipe down to skip');
+  });
+
+  test('left alone it glows as on a hover; a finger down on the letter shows it strongly at once, and lifted it fades', async ({
+    page,
+  }) => {
+    await envelopeUp(page);
+    const hover = async () => (await envSnap(page)).hover;
+    // (No hover on a touch screen: the hint's wait, then the pulse.)
+    await expect.poll(async () => (await hover()).k, { message: 'left alone', timeout: 15_000 }).toBe(1);
+    const touch = await toucher(page);
+    const vp = page.viewportSize();
+    const at = { x: vp.width / 2, y: vp.height / 2 };
+    await touch('touchStart', [at]);
+    await expect.poll(async () => (await hover()).press, { message: 'down on it' }).toBe(1);
+    const down = await hover();
+    expect(down.pulse).toBe(1);
+    expect(down.look.reach).toBeGreaterThanOrEqual(5);
+    expect(down.look.scale).toBeGreaterThan(1.025);
+    // (Slid aside and lifted, so it's no tap: it fades, still floating.)
+    for (let i = 1; i <= 4; i++) await touch('touchMove', [{ x: at.x + i * 12, y: at.y }]);
+    await touch('touchEnd', []);
+    await expect.poll(async () => (await hover()).press, { message: 'lifted' }).toBe(0);
+    expect((await envSnap(page)).state).toBe('floating');
   });
 
   test('a tap opens it', async ({ page }) => {

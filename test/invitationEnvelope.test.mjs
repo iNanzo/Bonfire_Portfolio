@@ -35,10 +35,16 @@ import {
   envelopeGesture,
   envelopeKey,
   hintFor,
+  GLOSS,
+  HOVER_LOOK,
+  hoverLook,
   hoverPulse,
   hoverStep,
   particleAt,
+  pressStep,
+  shownPulse,
   releaseGesture,
+  sealGloss,
   shedParticles,
 } from '../src/invitation/envelope.js';
 
@@ -519,4 +525,92 @@ test('the turn eases toward where it heads and springs back once let go; reduced
   for (let i = 0; i < 90; i++) a = turnStep(a, 0, 1 / 60);
   assert.ok(Math.abs(a) < 0.005, `back square on: ${a}`);
   assert.equal(turnStep(0.1, 0.12, 1 / 60, true), 0);
+});
+
+test('the hover reads at a glance: at a pulse’s peak a wide bright glow, the letter lifted about 3% toward the camera, its paper a step brighter; at the trough, none of it', () => {
+  const clean = hoverLook(0);
+  assert.deepEqual(clean, { scale: 1, toward: 0, reach: 0, rim: 0, bright: 0 }, 'clean at the trough');
+  const peak = hoverLook(1);
+  assert.ok(Math.abs(peak.scale - 1.03) < 0.005, `lifted about 3%: ${peak.scale}`);
+  assert.ok(peak.toward > 0 && peak.toward <= HOVER_LOOK.toward, `a little toward the camera: ${peak.toward}`);
+  // (The glow round it: wider than the old three texels, the rim inside its edge a texel deeper.)
+  assert.ok(peak.reach >= 5 && peak.reach <= 8, `the glow reaches ${peak.reach} texels past its line`);
+  assert.ok(peak.rim >= 3, `the rim ${peak.rim} texels`);
+  assert.equal(peak.bright, 1, 'its paper a step brighter at the peak');
+  // (Rising with the pulse, never overshooting; the paper brightens only near the peak.)
+  let last = clean;
+  for (let v = 0.05; v <= 1.0001; v += 0.05) {
+    const now = hoverLook(v);
+    for (const k of /** @type {const} */ (['scale', 'toward', 'reach', 'bright']))
+      assert.ok(now[k] >= last[k] - 1e-12, `${k} rises with the pulse at ${v.toFixed(2)}`);
+    if (v < HOVER_LOOK.bright) assert.equal(now.bright, 0, `not yet at ${v.toFixed(2)}`);
+    last = now;
+  }
+  // (Through a pulse: back to clean between them, so the model shows clearly.)
+  const P = HOVER_PULSE.period;
+  for (const t of [0, P, 2 * P]) assert.deepEqual(hoverLook(hoverPulse(1, t)), clean, `clean at ${t}`);
+  assert.equal(hoverLook(hoverPulse(1, P / 2)).bright, 1);
+  assert.deepEqual(hoverLook(-1), clean);
+  assert.deepEqual(hoverLook(2), peak);
+});
+
+test('a touch-down on the letter shows the hover strongly at once; lifted, it fades', () => {
+  let k = 0;
+  k = pressStep(k, true, 0.05);
+  assert.ok(k >= 0.5, `strong within a twentieth of a second: ${k}`);
+  for (let i = 0; i < 3; i++) k = pressStep(k, true, 0.05);
+  assert.equal(k, 1, 'full while it is down');
+  k = pressStep(k, false, 0.1);
+  assert.ok(k < 1 && k > 0.4, `fading once lifted: ${k}`);
+  for (let i = 0; i < 6; i++) k = pressStep(k, false, 0.1);
+  assert.equal(k, 0, 'gone');
+  // (Shown with the pulse: whichever is stronger.)
+  assert.equal(shownPulse(0.2, 1), 1);
+  assert.equal(shownPulse(0.7, 0.3), 0.7);
+  assert.equal(shownPulse(0, 0), 0);
+});
+
+test('the seal’s glint keeps the hover’s time: a white band sweeps across it as the pulse rises, gone at the trough; a click sweeps it once, quick and bright', () => {
+  const P = HOVER_PULSE.period;
+  const off = (g) => g.width === 0 || Math.abs(g.at) - g.width > 1.42;
+  // (Gone at the trough, and all the way down the pulse's fall.)
+  for (const t of [0, P, 2 * P, 0.05 * P]) assert.ok(off(sealGloss(1, t)), `none at the trough: ${t}`);
+  for (let t = 0.62 * P; t < P; t += P / 50) assert.ok(off(sealGloss(1, t)), `none as it falls: ${(t / P).toFixed(2)}`);
+  // (As it rises: from the upper left across to the lower right, once, through the middle on the way up.)
+  let last = -Infinity;
+  let crossed = null;
+  for (let t = 0; t < P; t += P / 200) {
+    const g = sealGloss(1, t);
+    if (g.width === 0) continue;
+    assert.ok(g.at >= last, 'one way across');
+    last = g.at;
+    if (crossed === null && g.at >= 0) crossed = t;
+  }
+  assert.ok(crossed !== null, 'it crosses the seal');
+  const v = hoverPulse(1, /** @type {number} */ (crossed));
+  assert.ok(v > 0.3 && v < 0.95 && crossed < P / 2, `through the middle as the pulse rises: ${v.toFixed(2)}`);
+  assert.ok(sealGloss(1, GLOSS.from * P + 1e-6).at <= -1.42, 'it starts off the seal');
+  assert.ok(sealGloss(1, GLOSS.to * P - 1e-6).at >= 1.42, 'and ends off it');
+  // (Eased in with the hover; none without one.)
+  const mid = (GLOSS.from + GLOSS.to) / 2;
+  assert.ok(Math.abs(sealGloss(0.5, mid * P).width - sealGloss(1, mid * P).width / 2) < 1e-9);
+  assert.equal(sealGloss(0, mid * P).width, 0);
+  // (A click: one quick sweep across, wider than the hover's, then gone.)
+  assert.ok(GLOSS.click >= 0.2 && GLOSS.click <= 0.35, `quick: ${GLOSS.click}`);
+  let was = -Infinity;
+  for (let s = 0; s < GLOSS.click; s += GLOSS.click / 20) {
+    const g = sealGloss(0, 0, s);
+    assert.ok(g.width > sealGloss(1, mid * P).width, 'brighter than the hover’s');
+    assert.ok(g.at > was, 'across');
+    was = g.at;
+  }
+  // (From its edge, on the wax at once, and half across within a tenth of a second: the bloom's
+  // petals soon cover it.)
+  assert.ok(sealGloss(0, 0, 0).at <= -1 && sealGloss(0, 0, 0).at >= -1.2, 'from its edge');
+  assert.ok(sealGloss(0, 0, 0.1).at >= -0.2, 'fast at first');
+  assert.ok(was >= 1, 'to the other side');
+  assert.equal(sealGloss(0, 0, GLOSS.click + 0.01).width, 0, 'once');
+  // (Reduced motion: none.)
+  assert.equal(sealGloss(1, mid * P, Infinity, true).width, 0);
+  assert.equal(sealGloss(1, 0, 0.1, true).width, 0);
 });
