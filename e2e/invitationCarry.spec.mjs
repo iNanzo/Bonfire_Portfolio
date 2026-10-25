@@ -84,9 +84,16 @@ test.describe('on a desktop', () => {
   }) => {
     await calm(page);
     // (Zoomed all the way out, the play area's sides come inside the screen.)
-    await page.mouse.move(80, 120);
-    for (let i = 0; i < 8; i++) await page.mouse.wheel(0, 400);
-    await until(page, (s) => s.camera.distance >= s.cameraHome.distance * 1.9 && !s.camera.turning, 'zoomed out');
+    // Wheel zoom anchors to the pointer and pans the view. Use the pad to keep
+    // the play area's centre in view so the left boundary lies inside the viewport.
+    await page.getByRole('button', { name: 'Camera', exact: true }).click();
+    for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Zoom Out', exact: true }).click();
+    await until(
+      page,
+      (s) => s.camera.distance >= s.cameraHome.distance * 1.999 && !s.camera.turning && !s.camera.panned,
+      'zoomed out without panning',
+    );
+    await page.keyboard.press('Escape');
     let cursor = await pickUp(page);
     await until(page, (s) => s.motion.heldFor >= 0.15, 'the grab eased in');
     const start = (await snapshot(page)).motion;
