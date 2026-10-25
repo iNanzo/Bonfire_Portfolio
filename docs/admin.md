@@ -212,7 +212,8 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     list or range. A line's or a box's tags: an unclosed tag, a stray `}`, a `{` with no `|`, an
     unknown style or color name (against the section's own colors, the built-in ones without
     them), a bad hex, two colors in one tag, an empty tag and nesting deeper than one are
-    errors, the first of them shown at the field. The colors: at most 24, each name its own
+    errors, the first of them shown at the field; a line or a box that is only a blank under its
+    tags (`{red| }`) counts as empty. The colors: at most 24, each name its own
     (lowercase letters, numbers and dashes, from a letter; not an effect's) and each a #rrggbb. The intro's ids are
     unique (lowercase letters, numbers and dashes), its start, every Next and every choice
     a box that's there, its text up to 240 letters and 720 characters with its tags (a warning past 100, measured at

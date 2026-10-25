@@ -533,6 +533,12 @@ test('after a quiet spell he wasn’t stepped through (the intro), rest() restar
   );
 });
 
+test('a line that is only a styled blank is left out, as an empty one is', () => {
+  assert.deepEqual(linesFrom({ wave: ['{red| }', '{red,wave|   }', '{bold| } {big| }', '{red|hi}'] }).wave, [
+    '{red|hi}',
+  ]);
+});
+
 test('text effects: a line’s time and its length count the letters that show, not its tags', () => {
   const styled = '{red,wave|Put me} {big|down}!';
   assert.equal(lineDuration(styled), lineDuration('Put me down!'));

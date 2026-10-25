@@ -13,7 +13,7 @@
 // The idle clock runs from the last line coming down; while he's busy (held, running, a
 // reaction) it waits, and while he sits it says a still-sitting line instead.
 
-import { letterCount } from './markup.js';
+import { letterCount, plainText } from './markup.js';
 import { between } from './rng.js';
 import { wrapAngle } from './steer.js';
 
@@ -220,7 +220,7 @@ export function speechFrom(raw) {
 
 /**
  * The lines from content.json's `invitation.lines` (anything): each known trigger's list of
- * text, trimmed, the empty, the non-text and the too long (over LINE_MAX letters, or LINE_RAW_MAX
+ * text, trimmed, the empty (or only a blank under tags), the non-text and the too long (over LINE_MAX letters, or LINE_RAW_MAX
  * characters with its tags) left out, at most
  * LINES_MAX of them.
  * @param {unknown} raw
@@ -236,7 +236,7 @@ export function linesFrom(raw) {
     out[k] = list
       .filter((l) => typeof l === 'string')
       .map((l) => l.trim())
-      .filter((l) => l && l.length <= LINE_RAW_MAX && charsOf(l) <= LINE_MAX)
+      .filter((l) => plainText(l).trim() && l.length <= LINE_RAW_MAX && charsOf(l) <= LINE_MAX)
       .slice(0, LINES_MAX);
   }
   return out;

@@ -31,6 +31,7 @@ import {
   letterCount,
   paletteOf,
   parseMarkup,
+  plainText,
 } from './invitation/markup.js';
 import {
   GATE_ALG,
@@ -361,9 +362,18 @@ function textColor(c, p, seen, check) {
  * tag, an unknown colour name, a bad hex) at its path `q`.
  */
 function markupErrors(v, q, check) {
-  const [first] = parseMarkup(v, check.palette).errors;
-  if (first) check.err(q, first.message);
+  const first = tagError(v, check);
+  if (first) check.err(q, first);
 }
+
+/** The first mistake in `v`'s tags (against the section's colours), or null. */
+const tagError = (v, check) => parseMarkup(v, check.palette).errors[0]?.message ?? null;
+
+/**
+ * Whether text with tags shows nothing: empty, or only a blank under its tags (`{red| }`). Tags
+ * that are wrong say so instead.
+ */
+const blankMarkup = (v, check) => !v.trim() || (!tagError(v, check) && !plainText(v).trim());
 
 /** A key that looks like it holds a password (or its plain text), anywhere in the gate. */
 const PLAINTEXT_KEY = /pass|pwd|plain|secret/i;
@@ -509,13 +519,13 @@ function invitationLines(l, check) {
 }
 
 /**
- * One line: text, not empty, short enough for his bubble (in the letters that show; as written,
+ * One line: text, not empty (nor only a blank under tags), short enough for his bubble (in the letters that show; as written,
  * tags and all, at most LINE_RAW_MAX), its tags well formed.
  */
 function lineText(line, q, check) {
   if (typeof line !== 'string') return check.err(q, 'Must be text.');
   const n = letterCount(line.trim());
-  if (!line.trim()) check.err(q, 'Can’t be empty.');
+  if (blankMarkup(line, check)) check.err(q, 'Can’t be empty.');
   else if (line.trim().length > LINE_RAW_MAX) check.err(q, `At most ${LINE_RAW_MAX} characters with its tags.`);
   else if (n > LINE_MAX) check.err(q, `At most ${LINE_MAX} characters (it has to fit his bubble).`);
   else if (n > LINE_LONG) check.warn(q, `Over ${LINE_LONG} characters: it wraps a lot in his bubble.`);
@@ -631,7 +641,7 @@ function introChoice(c, p, target, check) {
 function introText(v, p, max, check, required = true, markup = false) {
   if (typeof v !== 'string') return check.err(check.at(p), 'Must be text.');
   const n = markup ? letterCount(v.trim()) : Array.from(v.trim()).length;
-  if (!v.trim()) {
+  if (markup ? blankMarkup(v, check) : !v.trim()) {
     if (required) check.err(check.at(p), 'Can’t be empty.');
   } else if (markup && v.trim().length > INTRO_TEXT_RAW_MAX)
     check.err(check.at(p), `At most ${INTRO_TEXT_RAW_MAX} characters with its tags.`);

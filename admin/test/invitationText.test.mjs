@@ -117,6 +117,17 @@ test('tags in the lines and the intro: mistakes are errors at the line, checked 
   assert.deepEqual(errorsAt({ intro: labelled }), []);
 });
 
+test('a line or a box that is only a styled blank is empty: an error', () => {
+  for (const blank of ['{red| }', '{red,wave|   }', '{bold| } {big| }']) {
+    assert.deepEqual(errorsAt({ lines: { wave: [blank] } }), ['invitation.lines.wave[0]'], blank);
+    assert.match(problems({ lines: { wave: [blank] } }).errors[0].message, /empty/, blank);
+    assert.deepEqual(errorsAt({ intro: intro(blank) }), ['invitation.intro.boxes[0].text'], blank);
+    assert.match(problems({ intro: intro(blank) }).errors[0].message, /empty/, blank);
+  }
+  // (A styled word is not blank, nor is an escaped brace.)
+  assert.deepEqual(errorsAt({ lines: { wave: ['{red| a }', '\\{'] } }), []);
+});
+
 test('the length limits count the letters that show; the raw text is capped too', () => {
   const tagged = (n) => `{red,wave|${'a'.repeat(n)}}`;
   assert.deepEqual(errorsAt({ lines: { wave: [tagged(LINE_MAX)] } }), [], `${LINE_MAX} letters in a tag`);
