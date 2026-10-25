@@ -1,8 +1,8 @@
 // NEWT's brain in the invitation toy: a pure state machine (idle, walk, react, flee, held, fall,
 // land, sitDown, sit, standUp, and Give Device's deviceSit, lieDown, deviceLie, getUp) that owns
 // every timer and every change of state. Each frame it
-// turns gestures and buttons into what he does, keeps his stress (taps, rough handling; it
-// decays), and says which clip plays, how he moves, his face, where he looks and what the
+// turns gestures and buttons into what he does, keeps his stress (taps, rough handling: a hard
+// shake, fast flings, a drop from high, never a gentle carry; it decays), and says which clip plays, how he moves, his face, where he looks and what the
 // buttons show. A reaction first turns him to face the camera, so his face shows; a sit (by the
 // button or by himself) and the tablet's sit and lie keep the way he faces. Held, he hangs his
 // head (a light look aimed down, the sad face), glances up at you every TUNE.lookUpMin–lookUpMax
@@ -105,10 +105,22 @@ export const TUNE = {
   stillFor: 1,
   /** The pointer must move this far on the floor to count as moving. */
   stillMove: 0.02,
-  /** Held: stress per unit dragged, and per (unit/s²)·s of shake over shakeSoft. */
-  dragStress: 0.6,
+  /**
+   * Held, stress comes from rough handling, never from being carried about gently: per unit of
+   * drag speed (cues.js dragSpeedOf) over flingFrom, a second (a fling: 440 CSS px/s and more),
+   * and per (unit/s²)·s of shake over shakeSoft (the hand shakes only going back and forth:
+   * carry.js HAND).
+   */
+  flingFrom: 4,
+  flingStress: 0.4,
   shakeSoft: 6,
-  shakeStress: 0.08,
+  shakeStress: 0.12,
+  /**
+   * Dropped from high: a fall that lasts longer than dropFrom s (his feet over about his own
+   * height up) adds dropStress for every second of it past that as he lands.
+   */
+  dropFrom: 0.45,
+  dropStress: 4,
   /** A shake this hard surprises him again, for shakenFor s. */
   shakeHard: 14,
   shakenFor: 0.4,
@@ -766,7 +778,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     const dt = input.dt;
     const c = input.carry;
     if (m.state === 'held' && c) {
-      const add = (c.dragSpeed * T.dragStress + Math.max(0, c.shake - T.shakeSoft) * T.shakeStress) * dt;
+      const fling = Math.max(0, c.dragSpeed - T.flingFrom) * T.flingStress;
+      const add = (fling + Math.max(0, c.shake - T.shakeSoft) * T.shakeStress) * dt;
       m.stress = Math.min(T.stressMax, m.stress + add);
       if (dt > 0 && add / dt > T.decay) m.raisedAt = m.t;
       if (c.shake >= T.shakeHard) {
@@ -828,7 +841,10 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     },
     /** @param {number} age @param {BrainIn['newt']} n */
     fall(age, n) {
-      if (n?.grounded && age >= T.fallMin - EPS) enter('land');
+      if (!n?.grounded || age < T.fallMin - EPS) return;
+      // (Dropped from high, he lands shaken up.)
+      if (age > T.dropFrom) addStress((age - T.dropFrom) * T.dropStress);
+      enter('land');
     },
     land() {
       const stressed = m.stress >= T.stressFlee;

@@ -68,7 +68,10 @@ so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
   his arms and legs hanging limp and swinging with the motion; at the edge of his patch he stops
   instead of sliding along it. Held, he hangs his head, and every few seconds (sooner if you
   shake him) he thrashes about, kicking and flailing; let go and he falls, lands and gets back
-  up. Flick him and he flies a little; let go while
+  up. Shaking him means shaking him back and forth (one fast flick isn't a shake): shake him
+  hard, fling him about or drop him from high and he gets stressed, and once he lands he runs
+  off if it was too much; carrying him about gently, however long, never bothers him. Flick him
+  and he flies a little; let go while
   pushing him against the edge of his patch and he just drops there. The camera holds still
   while you carry him. As you grab him a gold ring of dither bursts out from your grip and is
   gone in under half a second. Off the floor, the soft shadow under him sits straight below his

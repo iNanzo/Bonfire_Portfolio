@@ -3,7 +3,9 @@
 // hiccup in the pointer's events. A single fast flick (260 px in half a second) is no shake, so
 // no "Too much!"; a ±40 px shake at 4–6 Hz is one within 0.4 s of its start; a pointer whose
 // events stall for a quarter of a second while the frames keep coming (a slow lift) isn't a jolt:
-// the gap starts the tracker over from where the pointer is when it comes back. Each is driven
+// the gap starts the tracker over from where the pointer is when it comes back. And his stress
+// comes from rough handling (a hard shake, fast flings, being dropped from high), never from being
+// carried about gently: a long slow carry leaves him well under the flee line. Each is driven
 // frame by frame as main.js drives the hand, with the brain reading it, at the CSS px a world unit
 // spans where he hangs in the toy's default desktop (1280x800) and phone (390x844) views.
 
@@ -23,11 +25,13 @@ const START = { x: 640, y: 420 };
  * while `stalled(t)` (its events stop; the frames keep coming). Returns every frame's time, face,
  * stress and what the hand reads.
  * @param {(t: number) => {x: number, y: number}} path
- * @param {{seconds: number, ppu: number, fps?: number, every?: number, stalled?: (t: number) => boolean}} o
+ * @param {{seconds: number, ppu: number, fps?: number, every?: number, stalled?: (t: number) => boolean, brain?: ReturnType<typeof createBrain>}} o
  */
-function heldBy(path, { seconds, ppu, fps = 60, every = 1, stalled = () => false }) {
+function heldBy(
+  path,
+  { seconds, ppu, fps = 60, every = 1, stalled = () => false, brain = createBrain({ seed: 3, calm: true }) },
+) {
   const dt = 1 / fps;
-  const brain = createBrain({ seed: 3, calm: true });
   const still = { button: null, pointer: null, clip: null };
   brain.step({ ...still, t: 0, dt, events: [], newt: { x: 0, z: 0, yaw: 0, grounded: true }, carry: null });
   let px = path(0);
@@ -42,6 +46,8 @@ function heldBy(path, { seconds, ppu, fps = 60, every = 1, stalled = () => false
       t,
       dt,
       events: i === 1 ? [{ type: 'grab', on: 'newt', x: px.x, y: px.y, t }] : [],
+      // (The pointer's spot on the floor, about under him as it carries him.)
+      pointer: { x: (px.x - START.x) / ppu, z: 0 },
       newt: { x: 0, z: 0, yaw: 0, grounded: false },
       carry: i === 1 ? null : handFeel(hand),
     });
@@ -152,4 +158,108 @@ test('a pointer whose events stall for a quarter of a second during a slow lift 
   assert.deepEqual(h.drive, { x: 0, y: -90 }, 'back on the pointer');
   assert.deepEqual(h.vel, { x: 0, y: 0 }, 'at rest');
   assert.ok(HAND.gap >= 0.08 && HAND.gap <= 0.15, `a gap is ${HAND.gap} s without a sample`);
+});
+
+/**
+ * Let go at `t0` (the brain's last step): he falls for `fall` s and lands. The states he goes
+ * through over the next 4 s (repeats dropped) and his stress as he lands.
+ * @param {ReturnType<typeof createBrain>} brain
+ * @param {number} t0
+ * @param {number} fall
+ */
+function letGo(brain, t0, fall) {
+  const dt = 1 / 60;
+  /** @type {string[]} */
+  const states = [];
+  let landed = NaN;
+  for (let i = 1; i <= Math.round((fall + 4) / dt); i++) {
+    const t = t0 + i * dt;
+    const o = brain.step({
+      t,
+      dt,
+      events: i === 1 ? [{ type: 'release', on: 'newt', x: 0, y: 0, t }] : [],
+      button: null,
+      pointer: null,
+      clip: null,
+      newt: { x: 0, z: 0, yaw: 0, grounded: t - t0 > fall },
+      carry: null,
+    });
+    if (o.state === 'land' && Number.isNaN(landed)) landed = brain.snapshot().stress;
+    if (states.at(-1) !== o.state) states.push(o.state);
+  }
+  return { states, landed };
+}
+
+/** A fall from about where he hangs (his feet just off the floor), and one from up high (carry.js CARRY.liftMax). */
+const LOW_FALL = 0.1;
+const HIGH_FALL = 0.86;
+
+test('a long gentle carry (10 s about the screen at 140 px/s at most) leaves him well under the flee line, and he lands calm', () => {
+  for (const screen of /** @type {const} */ (['desktop', 'phone'])) {
+    // (Side to side and up and down at once: 108 px/s across at most and 80 up, 134 together.)
+    const brain = createBrain({ seed: 3, calm: true });
+    const frames = heldBy((t) => ({ x: START.x + 90 * Math.sin(1.2 * t), y: START.y - 40 * Math.sin(2 * t) }), {
+      seconds: 10,
+      ppu: PPU[screen],
+      brain,
+    });
+    const most = Math.max(...frames.map((f) => f.stress));
+    assert.ok(most < 0.25 * TUNE.stressFlee, `${screen}: stress ${most.toFixed(2)} (he flees at ${TUNE.stressFlee})`);
+    assert.ok(
+      frames.some((f) => f.feel.dragSpeed * CUES.dragPx > 120),
+      `${screen}: carried about`,
+    );
+    assert.ok(Math.max(...frames.map((f) => f.feel.dragSpeed * CUES.dragPx)) <= 140, `${screen}: gently`);
+    assert.ok(
+      frames.every((f) => f.face !== 'surprised'),
+      `${screen}: never shaken`,
+    );
+    const { states } = letGo(brain, frames.at(-1).t, LOW_FALL);
+    assert.deepEqual(states, ['fall', 'land', 'idle'], `${screen}: lands calm`);
+  }
+});
+
+test('rough handling stresses him: a hard shake (he flees once he lands), fast flings, and a drop from high, but not a low one', () => {
+  for (const screen of /** @type {const} */ (['desktop', 'phone'])) {
+    // Shaken hard (±40 px at 5 Hz) for 2 s: past the flee line; let go, he lands and runs.
+    const shaker = createBrain({ seed: 3, calm: true });
+    const shaken = heldBy(
+      (t) => ({ x: START.x + (t > 0.5 ? 40 * Math.sin(2 * Math.PI * 5 * (t - 0.5)) : 0), y: START.y }),
+      { seconds: 2.5, ppu: PPU[screen], brain: shaker },
+    );
+    assert.ok(shaken.at(-1).stress >= TUNE.stressFlee, `${screen}: shaken, stress ${shaken.at(-1).stress.toFixed(2)}`);
+    assert.deepEqual(letGo(shaker, shaken.at(-1).t, LOW_FALL).states, ['fall', 'land', 'flee'], `${screen}: shaken`);
+
+    // Flung 300 px across in a quarter of a second, three times, back and forth with half a
+    // second's pause between (no shake: the turns are far apart): stress from the flings alone.
+    const flings = (/** @type {number} */ k) => (/** @type {number} */ t) => {
+      const n = Math.min(2, Math.floor(t / (0.75 * k)));
+      const e = EASES.eased((t - 0.75 * k * n) / (0.25 * k));
+      return { x: START.x - 150 + 300 * (n % 2 ? 1 - e : e), y: START.y };
+    };
+    const flung = heldBy(flings(1), { seconds: 3, ppu: PPU[screen] });
+    const fast = Math.max(...flung.map((f) => f.feel.dragSpeed * CUES.dragPx));
+    assert.ok(fast > 1000, `${screen}: flung at ${fast.toFixed(0)} px/s`);
+    assert.ok(
+      flung.every((f) => f.face !== 'surprised'),
+      `${screen}: flings aren't a shake`,
+    );
+    const most = Math.max(...flung.map((f) => f.stress));
+    assert.ok(most >= 1, `${screen}: three flings, stress ${most.toFixed(2)}`);
+    // (Slowed down nine times over, the same path is a carry at 210 px/s at most: no stress.)
+    const carried = heldBy(flings(9), { seconds: 3 * 9, ppu: PPU[screen] });
+    assert.ok(Math.max(...carried.map((f) => f.stress)) < 0.01, `${screen}: carried the same way slowly`);
+  }
+  // Dropped from high (his feet about four of his heights up), stress as he lands; from where he
+  // hangs, none.
+  for (const [fall, want] of [
+    [HIGH_FALL, (/** @type {number} */ s) => s >= 1],
+    [LOW_FALL, (/** @type {number} */ s) => s === 0],
+  ]) {
+    const brain = createBrain({ seed: 3, calm: true });
+    const held = heldBy(() => START, { seconds: 1, ppu: PPU.desktop, brain });
+    assert.equal(held.at(-1).stress, 0, 'held still: no stress');
+    const { landed } = letGo(brain, held.at(-1).t, fall);
+    assert.ok(want(landed), `a ${fall} s fall: stress ${landed} as he lands`);
+  }
 });
