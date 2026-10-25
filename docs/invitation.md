@@ -151,7 +151,8 @@ loads behind it.
   slide the view, a turning arrow while you turn it, and a pointing hand on the buttons.
 - **Give Device** hands him a tablet with a tiny pixel game on it. Each press does the next
   thing: he sits down with it in both hands, playing (the button then says Lie Down); he lies
-  down on his stomach with it, feet kicking behind him (the button says Get Up); he gets up and
+  down flat on his stomach, arms out in front holding it on the floor past his face, feet kicking
+  behind him (the button says Get Up); he gets up and
   puts it away. He keeps the way he was facing throughout: no turn to the camera. Anything else you do (a tap, the floor, another button) gets him up
   first, then does it; picking him up takes him straight off the floor.
 - **His earrings:** a black stud on each earlobe and a little Latin cross hanging from it on a
@@ -313,7 +314,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     snapped to a texel's centre after his head's texel snap (`spriteShift` keeps them on whole
     texels), marked as his trim (retro.js `ID.trim`: drawn as he is, no outline round it), each
     chain swinging on the same spring about straight down; and Give Device's tablet, `device.js`: 1.6 × 1.2 × 0.08 model units, a cream
-    bezel and an unlit 16×12 game, nearest-filtered, placed at his palms from clips.js `DEVICE`,
+    bezel and an unlit 16×12 game, nearest-filtered, placed at his palms and their grip from clips.js `DEVICE` (sitting
+    by its side edges; lying, by its near edge's corners, so it sticks out past his face),
     shown while DeviceSit, LieDown and DeviceLie weigh half or more (in his hands as he lies
     down) until StandUp or GetUp has any weight (put away as he starts to get up); `accessories`
     swings the earrings and places the tablet after the look),

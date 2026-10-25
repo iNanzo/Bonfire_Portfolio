@@ -47,25 +47,32 @@ export const CLIPS = {
 };
 /**
  * Give Device's tablet (round 16): the page draws it in his hands (device.js) and tools/newt.py's
- * arm IK holds it. `size` is [width (palm to palm), height, thickness] in model units; `palm` is
+ * arm IK holds it. `size` is [width, height (away from him), thickness] in model units; `palm` is
  * how far along each ForeArm bone his palm is (its tip). Per clip: `centre` is where the tablet's
  * middle sits, `tilt` how many degrees its screen tips from facing straight up toward his face,
- * and `lift` how far his palms sit above its mid-plane along the screen's normal (0: held by its
- * sides; lying, the palms rest on top of its edges). The palms are at centre ± (width / 2, 0, 0)
- * + lift × normal, within 0.08 on every frame (test/invitationModel.test.mjs), so the page can
- * put the tablet at the palms' midpoint less lift × normal, its width along the palm-to-palm line.
+ * `lift` how far his palms sit above its mid-plane along the screen's normal, and `grip` where
+ * they hold it: [across, back toward him along the screen] from its middle. Sitting he holds it
+ * by its side edges' middles ([width / 2, 0]); lying (round 17) by its near edge's corners
+ * ([about width / 2, height / 2]), so it sticks out past his face. The palms are at centre ±
+ * grip[0] across, grip[1] back along the screen and lift along its normal, within 0.08 on every
+ * frame (test/invitationModel.test.mjs), so the page can put the tablet at the palms' midpoint
+ * less lift × normal, moved grip[1] away from him along the screen, its width along the
+ * palm-to-palm line. LieDown has DeviceLie's tilt, lift and grip (no centre: it isn't a hold), so
+ * nothing pops as DeviceLie fades in at its end.
  *
  * Coordinates are Blender armature space, as newt.py poses him: +X his left, −Y his front, +Z up,
  * the origin on the floor between his feet. In three.js (his model's own space, glTF) a point
  * (x, y, z) is (x, z, −y) and the normal (0, sin tilt, cos tilt) is (0, cos tilt, −sin tilt);
  * world units are model units × SCALE from his root.
  */
+const LIE_HOLD = { tilt: 0, lift: 0.2, grip: [0.7, 0.6] };
 export const DEVICE = {
   size: [1.6, 1.2, 0.08],
   palm: 0.9,
   clips: {
-    DeviceSit: { centre: [0, -0.85, 1.45], tilt: 12, lift: 0 },
-    DeviceLie: { centre: [0, -2.15, 0.04], tilt: 0, lift: 0.3 },
+    DeviceSit: { centre: [0, -0.85, 1.45], tilt: 12, lift: 0, grip: [0.8, 0] },
+    LieDown: { ...LIE_HOLD },
+    DeviceLie: { centre: [0, -3.5, 0.045], ...LIE_HOLD },
   },
 };
 export const CLIP_NAMES = Object.keys(CLIPS);
