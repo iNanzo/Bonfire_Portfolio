@@ -5,7 +5,9 @@
 // `images` gets the image manager; a field with a SELECTS list is a dropdown (the list
 // made from the draft and the field's own path, so it can keep what the field holds;
 // one made from a list in the draft, OPTIONS_FROM, remade as that list is edited);
-// ranged numbers get sliders and #rrggbb text gets a color picker. Bonfire
+// ranged numbers get sliders and #rrggbb text gets a color picker; text with a PREVIEWS entry
+// (the invitation's chat boxes and lines) gets a live preview under it, drawn as the toy draws
+// it (src/invitation/markup.js and markup.css, in the draft's text colors). Bonfire
 // Live's scenes get cards of their own (sceneTools.js: made in the Painter, so a card
 // shows a scene's colors and summary rather than its ~80 settings). The lock's password
 // (gate.key) is gateTools.js's write-only Set Password, never a text field. Every
@@ -34,6 +36,7 @@ import {
   NO_HIDING,
   NULLABLE,
   OPTIONS_FROM,
+  PREVIEWS,
   READONLY,
   SELECTS,
   SHORT,
@@ -42,6 +45,7 @@ import {
   TITLE_KEYS,
   hint,
   moreFor,
+  previewPalette,
   rangeFor,
   resolveHelp,
   subgroupsOf,
@@ -53,6 +57,7 @@ import { sceneCardBody, sceneMeta, sceneThumb } from './sceneTools.js';
 import { gateKeyField } from './gateTools.js';
 import { titleCase } from './text.js';
 import { ELEMENT_IDS } from '../../src/effectsDefaults.js';
+import { parseMarkup, renderMarkup } from '../../src/invitation/markup.js';
 import { el } from './el.js';
 import { getAt, keyOf, parsePath, patternOf, within } from './paths.js';
 
@@ -383,7 +388,37 @@ function renderScalar(value, path, ctx, { nullable = hint(NULLABLE, patternOf(pa
     update(path, nullable && input.value === '' ? null : input.value, ctx);
     if (multiline) input.rows = autoRows(input.value);
   });
-  return input;
+  return hint(PREVIEWS, pattern) ? withPreview(input, path, ctx) : input;
+}
+
+// ---- text effects' previews ----------------------------------------------------------------
+/**
+ * How each field's preview is drawn, by the field's data-path (again as its text, or the draft's
+ * text colors, change: update); a field rendered again replaces its own.
+ * @type {Map<string, () => void>}
+ */
+const previews = new Map();
+/**
+ * Text with a live preview under it: its line as the toy shows it, text effects and all
+ * (markup.js; screen readers have the text itself, so the preview is hidden from them).
+ * @param {HTMLInputElement|HTMLTextAreaElement} input @param {(string|number)[]} path @param {*} ctx
+ */
+function withPreview(input, path, ctx) {
+  input.setAttribute('data-main', '');
+  const line = el('span', { class: 'markup-preview-line' });
+  const preview = el(
+    'div',
+    { class: 'markup-preview', 'aria-hidden': 'true' },
+    el('span', { class: 'markup-preview-label', text: 'Preview' }),
+    line,
+  );
+  const draw = () => {
+    renderMarkup(line, parseMarkup(input.value, previewPalette(ctx.draft)), document);
+    preview.hidden = !input.value.trim();
+  };
+  draw();
+  previews.set(keyOf(path), draw);
+  return el('div', { class: 'markup-field' }, input, preview);
 }
 
 /** Slider + exact number box, kept in sync. */
@@ -467,6 +502,9 @@ function update(path, value, ctx) {
     const sw = /** @type {HTMLElement | null} */ (document.querySelector(`[data-swatch="${CSS.escape(keyOf(path))}"]`));
     if (sw) sw.style.setProperty('background', value);
   }
+  // (A line's preview follows it; every preview follows the text colors.)
+  if (path[0] === 'invitation' && path[1] === 'text') for (const draw of previews.values()) draw();
+  else previews.get(keyOf(path))?.();
   refreshOptions(keyOf(path), ctx);
   ctx.changed();
 }

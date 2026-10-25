@@ -170,15 +170,24 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     plan's kinds: Reactions, Running, Carried, Moving, Sitting, Passive and Camera.
   - **Lines:** what he says at each moment, under the same kinds. Add, remove, reorder or
     drag them; one is picked at random, never the one he just said, and a moment with no
-    lines says nothing.
+    lines says nothing. Tags style them (Text Effects), and a **Preview** under each shows
+    it as his bubble does.
+  - **Text Effects:** the **Colors** a tag can name (`invitation.text.colors`, each a **Name**
+    and a **Color**; as shipped red, gold, rose and ink). Tags go in the lines and the chat
+    boxes' text: `{red|word}` colors it, `{#e44544|word}` takes a hex color, `{wave|…}`,
+    `{shake|…}`, `{bold|…}` and `{big|…}` add an effect, `{red,wave|…}` combines them, a tag may
+    hold one more, and `\{` `\}` are braces ([invitation.md](invitation.md#text-effects)). The
+    previews (`INVITATION_PREVIEWS`, schema.js `PREVIEWS`; form.js draws them with the toy's
+    `markup.js` and `markup.css`) follow the text as it's typed and these colors as they
+    change.
   - **Intro:** the chat **Play Intro** opens (`invitation.intro`, `types.js`
     `DialogueScript`): the **Speaker** on every box's name tab, the **Start Box** (every Play
     Intro starts there) and the **Chat Boxes**, in order, dragged or moved with ↑/↓. Each
     box's card is titled by its line, with its id, face, move, shot and where it goes under
     it. A box has its **ID** (how Next and the choices point to it), a **Speaker Override**
     (such as ??? before he's said his name; empty: the intro's Speaker), its **Text** (typed
-    out letter by letter, up to 240 characters; past 100 it outgrows the box's three lines on
-    a phone), a **Face** (every face he has; he still blinks on Neutral), an **Animation** (any
+    out letter by letter, up to 240 letters; past 100 it outgrows the box's three lines on
+    a phone; its tags style it, with a **Preview** under it), a **Face** (every face he has; he still blinks on Neutral), an **Animation** (any
     of his: Once plays and then he talks, Loops keeps going, In Place walks or runs on the spot,
     Dangling holds him up off the floor, sitting or lying down gets him down first; None: as he was), a **Camera**
     (Close: head and shoulders, too tight for a Cheer's fists on a phone; Medium: his whole
@@ -197,22 +206,28 @@ A form-based editor for everything in `src/content.json`, at `/admin`.
     each box's flow spelled out; a broken part is mended on its own (a face off the list
     is Neutral, a Next to nowhere the box after it), and an intro it can't play at all is
     the toy's own short one (`FALLBACK_INTRO`).
-  - **Checks:** at most 20 lines a moment, each up to 120 characters (a warning past 80,
-    where his bubble wraps a lot); every value within its list or range. The intro's ids are
+  - **Checks:** at most 20 lines a moment, each up to 120 letters (a warning past 80,
+    where his bubble wraps a lot), and 360 characters with its tags; every value within its
+    list or range. A line's or a box's tags: an unclosed tag, a stray `}`, a `{` with no `|`, an
+    unknown style or color name (against the section's own colors, the built-in ones without
+    them), a bad hex, two colors in one tag, an empty tag and nesting deeper than one are
+    errors, the first of them shown at the field. The colors: at most 24, each name its own
+    (lowercase letters, numbers and dashes, from a letter; not an effect's) and each a #rrggbb. The intro's ids are
     unique (lowercase letters, numbers and dashes), its start, every Next and every choice
-    a box that's there, its text up to 240 characters (a warning past 100, measured at
+    a box that's there, its text up to 240 letters and 720 characters with its tags (a warning past 100, measured at
     390×844: the box's three lines on a phone), a choice's label up to 60 and a speaker up to
     24, at most 3 choices a box, its faces, animations and cameras from the toy's lists, and
     Auto between 0 and 15 seconds; a box nothing leads to, boxes that go round with no choice
     to leave, a Next or End a box's choices or End override, and a box with a single choice
     (only a tap that looks like one) are warnings, each naming its box. The section is
-    optional, so content from before the toy still passes, and each of its four parts it
-    lacks shows **Start From the Toy’s Own**, which fills that part in with the toy's built-in
-    values (the built-in Default look, its speech settings, every moment with no lines yet,
-    its own short intro) to edit from (`INVITATION_STARTERS`, schema.js `STARTERS`). The toy reads it through
+    optional, so content from before the toy (or before Text Effects) still passes, and each
+    of its five parts it lacks shows **Start From the Toy’s Own**, which fills that part in
+    with the toy's built-in values (the built-in Default look, its speech settings, every
+    moment with no lines yet, its own short intro, its colors) to edit from (`INVITATION_STARTERS`, schema.js `STARTERS`). The toy reads it through
     `virtual:invitation-content` (`vite.config.js`), never `content.json` itself, and the
     other pages' copy of the content leaves it out. A change to its shape needs
-    `npm run admin:deploy` after the merge. There's no live preview: open `/invitation/`.
+    `npm run admin:deploy` after the merge. There's no live preview of the toy itself (only
+    of the lines' text effects): open `/invitation/`.
 - **Hide / show** any entry (◉; not the invitation intro's boxes and choices), and
   **reorder** any list by dragging ⋮⋮ or with ↑/↓.
 - **Rename** any sidebar page or section heading with ✎ (empty resets it). Renames are
