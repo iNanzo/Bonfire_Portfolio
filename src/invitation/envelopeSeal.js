@@ -2,15 +2,18 @@
 // wax with a gently wavy edge, a raised rim (lit on the side toward the light, a band of the
 // light tone there and on the inner wall across from it, shade on the far side), a thin dark ring
 // inside the rim, a flat recessed field, and the NH monogram debossed in that field, with exactly
-// one stray splotch of wax beside it. Its face is a small picture drawn texel by texel
-// (sealFace), in the wax's three tones lit by the envelope's one light (envelopeLook.js LIGHT and
-// bandOf), at the size it shows on the screen; the seal's material puts it on the screen texel for
-// texel, its middle snapped to a texel's corner (place), so moving the letter moves a steady
-// picture and never resamples the stamp. Only blooming (swelling, spinning and shrinking away) does
-// it scale. The monogram is logo.js's PATH (copied: the page takes no shared modules), its strokes
-// one texel wide (stampLayout: snapped to whole texels, four even mirrored uprights, the crossbar
-// as thin, the N's diagonal a row-by-row run from the top of the outer stem to the foot of the
-// inner one), each a dark floor with a one-texel light lip on its lit side: right of every stroke
+// one stray splotch of wax beside it. It sits on the flap's tip and moves with it as one. Its face
+// is a small picture drawn texel by texel (sealFace), in the wax's three tones lit by the
+// envelope's one light (envelopeLook.js LIGHT and bandOf), for its axes as they show on the screen
+// (sealOnScreen: leaning, turned and narrowed with the letter, the stamp upright), snapped to half
+// texels and kept in a small cache; the seal's material puts it on the screen texel for texel, its
+// middle snapped to a texel's corner (place), so it's never resampled and never shimmers: as the
+// letter sways it grows, narrows and leans in whole steps of its own picture, blooming too
+// (swelling, spinning and shrinking away). The monogram is logo.js's PATH (copied: the page takes no
+// shared modules), its strokes one texel wide (stampLayout: snapped to whole texels, four even
+// mirrored uprights, the crossbar as thin, the N's diagonal a row-by-row run from the top of the
+// outer stem to the foot of the inner one), each a dark floor with a one-texel light lip on its
+// lit side: right of every stroke
 // and under the crossbar and the stems' feet (stampCell). It's one piece: opened, it blooms
 // (envelope.js sealBloom), shrinking away while plain rose petals (petals.js) unfurl out of it, so
 // the monogram never rides on a petal.
@@ -192,20 +195,6 @@ export function stampCell(L, i, j) {
 }
 
 /**
- * A texel at the seal's face, in the letter's units: the view's height `viewH` over its `rows`
- * of texels at the letter (the camera `dist` away, the letter drawn at `scale`), smaller by how
- * much nearer the face is (`faceZ`, world units toward the camera).
- * @param {number} viewH
- * @param {number} rows
- * @param {number} scale
- * @param {number} faceZ
- * @param {number} dist
- */
-export function sealTexel(viewH, rows, scale, faceZ, dist) {
-  return (viewH * (dist - faceZ)) / dist / rows / scale;
-}
-
-/**
  * The tone (1 light, 2 mid, 3 shade) of wax whose height falls `slope` texels a texel outward
  * at angle `a`: its normal on the light (envelopeLook.js bandOf).
  * @param {number} slope  rising outward > 0
@@ -217,60 +206,93 @@ function lit(slope, a) {
 }
 
 /**
- * The seal's face for a seal `R` texels across its radius: `size` × `size` texels round its middle
+ * The seal's face as it shows on the screen: `axes` are its radius along its own x and y as
+ * texels on the screen ([x, y] of each: envelopeSeal.js sealOnScreen), or a number `R` for a
+ * round, upright seal R texels across its radius. It's `size` × `size` texels round its middle
  * (texel (i, j) from the middle, j up, is at column i + c, row j + c), each 0 (no wax) or a tone:
- * 1 light, 2 mid, 3 shade. The field is flat (mid); the stamp and the ring are dark floors with
- * a light lip on their lit side; the rim rises from the field to a crest and falls to the edge,
- * each texel lit by its slope; the splotch is a small dome.
- * @param {number} R
+ * 1 light, 2 mid, 3 shade. Its outline, rim and ring are the ellipse its axes make, drawn on the
+ * screen's own texels (each measured in texels across it, so the ring stays one texel all round),
+ * and lit from the screen's upper left; the stamp is upright on the screen, at the size of a round
+ * seal of the same area (its one-texel strokes turned with the letter broke into stairs: the NH
+ * read worse, 2026-10-25). The field is flat (mid); the stamp and the ring are dark floors with a
+ * light lip on their lit side; the rim rises from the field to a crest and falls to the edge, each
+ * texel lit by its slope; the splotch is a small dome.
+ * @param {number|number[]} axes
  */
-export function sealFace(R) {
+export function sealFace(axes) {
+  const [ax, ay, bx, by] = typeof axes === 'number' ? [axes, 0, 0, axes] : axes;
+  const det = ax * by - bx * ay;
+  // (The screen to the face, in radii: the axes' inverse; and its transpose's, for normals.)
+  const [ia, ib, ic, id] = [by / det, -bx / det, -ay / det, ax / det];
+  const R = Math.sqrt(Math.abs(det));
+  // (The ellipse's longest radius: the axes' larger singular value.)
+  const p = (ax * ax + ay * ay + bx * bx + by * by) / 2;
+  const widest = Math.sqrt(p + Math.sqrt(Math.max(0, p * p - det * det)));
   const L = sealLayout(R);
   const S = stampLayout(R);
-  const [sp] = L.splotches;
-  const c = Math.ceil(Math.max(R * 1.07, Math.hypot(sp.x, sp.y) + sp.r)) + 2;
+  const [splotch] = L.splotches;
+  // (The splotch on the paper beside the seal, where its axes put it; round on the screen.)
+  const sp = {
+    x: (ax * splotch.x + bx * splotch.y) / R,
+    y: (ay * splotch.x + by * splotch.y) / R,
+    r: splotch.r,
+  };
+  const c = Math.ceil(Math.max(widest * 1.07, Math.hypot(sp.x, sp.y) + sp.r)) + 2;
   const size = c * 2;
   const tones = new Uint8Array(size * size);
   // (Texels set by a rule, not by the light: kept as they are by the tidying below.)
   const fixed = new Uint8Array(size * size);
   const lx = LIGHT[0] / Math.hypot(LIGHT[0], LIGHT[1]);
   const ly = LIGHT[1] / Math.hypot(LIGHT[0], LIGHT[1]);
+
   for (let j = -c; j < c; j++)
     for (let i = -c; i < c; i++) {
       const k = (j + c) * size + (i + c);
       const x = i + 0.5;
       const y = j + 0.5;
-      const d = Math.hypot(x, y);
-      const a = Math.atan2(y, x);
-      const edge = R * sealEdge(a);
+      // (On the face, radii from its middle; and the seal's radius on the screen this way: how
+      // many texels a radius spans across here.)
+      const fx = ia * x + ib * y;
+      const fy = ic * x + id * y;
+      const rho = Math.hypot(fx, fy) || 1e-9;
+      const nx = (ia * fx + ic * fy) / rho;
+      const ny = (ib * fx + id * fy) / rho;
+      const Re = 1 / Math.hypot(nx, ny);
+      const d = rho * Re;
+      const a = Math.atan2(fy, fx);
+      // (Which way the wax faces here, on the screen.)
+      const na = Math.atan2(ny, nx);
+      const edge = Re * sealEdge(a);
       if (d < edge) {
         const stamp = stampCell(S, i, j);
-        const toward = (x * lx + y * ly) / d;
+        const toward = Math.cos(na) * lx + Math.sin(na) * ly;
+        const ring = SEAL.ring * Re;
+        const rim = ring + 1.5;
         let t = 0;
         if (stamp) t = stamp === 'deep' ? 3 : 1;
-        else if (Math.abs(d - L.ring) < 0.5) t = 3;
+        else if (Math.abs(d - ring) < 0.5) t = 3;
         // (The ring's lit wall: inside it toward the light, outside it away from the light.)
-        else if (Math.abs(d - L.ring + 1) < 0.5 && toward > 0.35) t = 1;
-        else if (Math.abs(d - L.ring - 1) < 0.5 && toward < -0.35) t = 1;
+        else if (Math.abs(d - ring + 1) < 0.5 && toward > 0.35) t = 1;
+        else if (Math.abs(d - ring - 1) < 0.5 && toward < -0.35) t = 1;
         if (t) {
           tones[k] = t;
           fixed[k] = 1;
           continue;
         }
-        if (d < L.rim) {
+        if (d < rim) {
           tones[k] = 2;
           fixed[k] = 1;
           continue;
         }
-        const w = edge - L.rim;
-        const s = (d - L.rim) / w;
+        const w = edge - rim;
+        const s = (d - rim) / w;
         const A = SEAL.height * w;
         const q = SEAL.crest;
         const slope =
           s < q
             ? ((A * Math.PI) / 2 / q / w) * Math.cos(((Math.PI / 2) * s) / q)
             : -((A * Math.PI) / 2 / (1 - q) / w) * Math.sin(((Math.PI / 2) * (s - q)) / (1 - q));
-        tones[k] = lit(slope, a);
+        tones[k] = lit(slope, na);
         continue;
       }
       const dx = (x - sp.x) / sp.r;
@@ -335,28 +357,28 @@ const SEAL_GLSL = /* glsl */ `
   uniform float uFaceSize;
   uniform float uFaceC;
   uniform vec2 uCenter;
-  uniform float uZoom;
-  uniform float uSpin;
   vec4 sealFace() {
-    vec2 q = gl_FragCoord.xy - uCenter;
-    float cs = cos(uSpin);
-    float sn = sin(uSpin);
-    q = vec2(cs * q.x + sn * q.y, -sn * q.x + cs * q.y) / uZoom;
-    vec2 cell = floor(q) + uFaceC;
+    vec2 cell = floor(gl_FragCoord.xy - uCenter) + uFaceC;
     if (cell.x < 0.0 || cell.y < 0.0 || cell.x >= uFaceSize || cell.y >= uFaceSize) return vec4(0.0);
     return texture2D(uFace, (cell + 0.5) / uFaceSize);
   }
 `;
 
-/** Within this of whole (and upright) it's drawn texel for texel: the sway never resamples it. */
-const SNAP = 0.035;
+/** Its axes are snapped to this, texels, before its face is drawn: drawn again only past a step. */
+const STEP = 0.5;
+/** Faces kept drawn (the sway goes back and forth over a few). */
+const CACHE = 24;
+/** Under this radius on the screen, texels, it's too small to draw (blooming away): it hides. */
+const SMALLEST = 1.5;
 
 /**
  * The seal, radius `r` (the letter's units): `group` (to place: its quad covers the face, splotch
- * and all, as it swells), `material`; `setRadius(R)`, its radius on the screen in texels (its face
- * is drawn for that); and `place(x, y, zoom, spin)` each frame: where its middle falls on the
- * screen (texels from the drawing's lower left), and how much bigger and turned it shows than at
- * rest (both snapped to whole and upright when near).
+ * and all, as it swells), `material`; and `place(x, y, axes)` each frame: where its middle falls on
+ * the screen (texels from the drawing's lower left) and its axes there (sealOnScreen), which
+ * snaps its middle to a texel's corner and its axes to half texels and puts on the face drawn for
+ * them (sealFace, kept in a small cache), so it's never resampled: it grows, narrows and leans in
+ * whole steps of its own picture, and never shimmers. It says whether it shows (false when it's
+ * too small to draw).
  * @param {ReturnType<typeof import('./envelopeLook.js').shared>} u
  * @param {number} r
  */
@@ -366,19 +388,16 @@ export function buildSeal(u, r) {
     uFaceSize: { value: 1 },
     uFaceC: { value: 0 },
     uCenter: { value: new THREE.Vector2() },
-    uZoom: { value: 1 },
-    uSpin: { value: 0 },
   };
   const material = toon(WAX, u, IDS.seal, { uniforms, defines: { SEAL: '' }, glsl: SEAL_GLSL });
   const group = new THREE.Group();
   group.add(new THREE.Mesh(new THREE.PlaneGeometry(r * 3.6, r * 3.6), material));
   const colours = WAX.map(rgb).map((v) => [Math.round(v.x * 255), Math.round(v.y * 255), Math.round(v.z * 255)]);
-  let radius = 0;
-  /** @param {number} R */
-  const setRadius = (R) => {
-    if (Math.abs(R - radius) < 0.01) return;
-    radius = R;
-    const f = sealFace(R);
+  /** @type {Map<string, {tex: THREE.DataTexture, size: number, c: number}>} */
+  const faces = new Map();
+  /** @param {number[]} axes  snapped */
+  const draw = (axes) => {
+    const f = sealFace(axes);
     const data = new Uint8Array(f.size * f.size * 4);
     f.tones.forEach((t, k) => {
       if (!t) return;
@@ -389,33 +408,42 @@ export function buildSeal(u, r) {
     tex.minFilter = THREE.NearestFilter;
     tex.generateMipmaps = false;
     tex.needsUpdate = true;
-    uniforms.uFace.value?.dispose();
-    uniforms.uFace.value = tex;
-    uniforms.uFaceSize.value = f.size;
-    uniforms.uFaceC.value = f.c;
+    return { tex, size: f.size, c: f.c };
   };
-  setRadius(30);
   return {
     group,
     material,
-    setRadius,
-    /** Its radius on the screen, texels, as its face is drawn. */
-    get radius() {
-      return radius;
-    },
     /**
      * @param {number} x
      * @param {number} y
-     * @param {number} zoom
-     * @param {number} spin
+     * @param {number[]} axes
      */
-    place(x, y, zoom, spin) {
+    place(x, y, axes) {
+      const snapped = axes.map((v) => Math.round(v / STEP) * STEP);
+      const [ax, ay, bx, by] = snapped;
+      if (Math.min(Math.hypot(ax, ay), Math.hypot(bx, by)) < SMALLEST || Math.abs(ax * by - bx * ay) < 1) return false;
+      const key = snapped.join(' ');
+      let face = faces.get(key);
+      if (face) faces.delete(key);
+      else {
+        face = draw(snapped);
+        if (faces.size >= CACHE) {
+          const [oldest] = faces.keys();
+          faces.get(oldest)?.tex.dispose();
+          faces.delete(oldest);
+        }
+      }
+      // (Newest last: the oldest goes first.)
+      faces.set(key, face);
+      uniforms.uFace.value = face.tex;
+      uniforms.uFaceSize.value = face.size;
+      uniforms.uFaceC.value = face.c;
       uniforms.uCenter.value.set(Math.round(x), Math.round(y));
-      uniforms.uZoom.value = Math.abs(zoom - 1) < SNAP ? 1 : zoom;
-      uniforms.uSpin.value = Math.abs(spin) < SNAP ? 0 : spin;
+      return true;
     },
     dispose() {
-      uniforms.uFace.value?.dispose();
+      for (const f of faces.values()) f.tex.dispose();
+      faces.clear();
     },
   };
 }

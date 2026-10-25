@@ -3,7 +3,7 @@
 // overlay over the toy (envelope.css, z-index 3) on a plain white page, made as the page
 // boots, so it's also the loading screen. Low-poly and flat, in the reference's palette in three
 // toon bands: a thin gold envelope seen from the back (its flap hinged on its top edge over the
-// side and bottom folds of its pocket), a red wax seal (envelopeSeal.js), and rose petals in
+// side and bottom folds of its pocket), a red wax seal on the flap's tip (envelopeSeal.js), and rose petals in
 // three shapes and three reds, instanced (one mesh a shape), each tumbling, fluttering and
 // drifting its own way. It's drawn at low resolution, twice (its colours, then which part each
 // texel is), and put together with a one-texel line in the toy's ink round its silhouette, round
@@ -46,7 +46,7 @@ import {
   sealBloom,
   shedParticles,
 } from './envelope.js';
-import { buildSeal, sealOnScreen, sealTexel } from './envelopeSeal.js';
+import { buildSeal, sealOnScreen } from './envelopeSeal.js';
 import { PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './petals.js';
 import {
   BAYER,
@@ -334,9 +334,10 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   const sealR = envl.seal.r;
   const seal = buildSeal(u, sealR);
   // (On the flap's tip.)
-  const sealAt = new THREE.Vector3(envl.seal.x, envl.seal.y, envl.T / 2 + 0.16);
-  seal.group.position.copy(sealAt);
-  inner.add(seal.group);
+  // (On the flap's tip, a hair over it, so it moves with the flap as one: no parallax, and its
+  // middle rounds to the screen's texels with the tip.)
+  seal.group.position.set(envl.seal.x, envl.seal.y - envl.H / 2, 0.01);
+  envl.hinge.add(seal.group);
   const petals = buildPetals(u);
   for (const p of petals) scene.add(p.mesh);
   const specks = buildSpecks();
@@ -352,7 +353,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   // until it's been placed: the red box on reload was a seal drawn where it had never been put.)
   renderer.compile(scene, camera);
   renderer.compile(compose.scene, flat);
-  /** The seal has been placed on the screen once (it's hidden till then). */
+  /** The seal has been placed on the screen once (for ?test: it's hidden till then). */
   let sealPlaced = false;
   seal.group.visible = false;
   const tmp = new THREE.Object3D();
@@ -396,11 +397,6 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     const aspect = envl.W / envl.H;
     const w = Math.min((0.82 * view.w) / (c + s / aspect), (0.52 * view.h) / (s + c / aspect));
     view.scale = w / envl.W;
-    // (The seal's radius on the screen, texels, at rest: its face is drawn at that size and put
-    // on the screen texel for texel. It's nearer the camera than the letter.)
-    inner.updateMatrix();
-    const face = v.copy(sealAt).applyMatrix4(inner.matrix);
-    seal.setRadius(sealR / sealTexel(view.h, th, view.scale, face.z * view.scale, DIST));
   }
   resize();
   const onResize = () => resize();
@@ -656,15 +652,13 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     outer.scale.setScalar(view.scale * (1 + 0.025 * p.pulse) * (0.94 + 0.06 * p.arrive));
     envl.hinge.rotation.x = -p.flap;
     // The seal: whole, starting to open as a finger drags it up, then blooming into petals,
-    // shrinking away to nothing before the flap moves. (Stamped upright on the screen, whatever
-    // the envelope's lean.)
+    // shrinking away to nothing before the flap moves. It leans, turns and narrows with the
+    // letter, its face drawn for that (its stamp upright on the screen).
     const bloom = sealBloom(Math.max(p.bloom, (follow.lift / 0.45) * 0.14));
     seal.group.scale.setScalar(bloom.scale);
-    // (Upright on the screen, as its face is drawn: then it goes on texel for texel.)
-    seal.group.rotation.z = -TILT + bloom.spin;
+    seal.group.rotation.z = bloom.spin;
     outer.updateMatrixWorld(true);
-    if (bloom.scale > 0) placeSeal();
-    seal.group.visible = bloom.scale > 0 && sealPlaced;
+    seal.group.visible = bloom.scale > 0 && placeSeal();
     petalsAt(pt, p);
     // The dissolve: the edge across the letter, in its own units.
     toLetter.copy(inner.matrixWorld).invert().premultiply(letterScale);
@@ -684,17 +678,17 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   }
 
   /**
-   * Where the seal's middle falls on the drawing (texels from its lower left), and how big and
-   * turned it shows against its face as drawn (seal.place snaps the sway's hair of either away,
-   * so its face goes on texel for texel).
+   * Where the seal's middle falls on the drawing (texels from its lower left) and its axes there,
+   * from its own matrices (envelopeSeal.js sealOnScreen): its face is drawn for them and put on
+   * texel for texel (seal.place). Whether it shows (not while it's too small to draw).
    */
   function placeSeal() {
     const at = sealOnScreen(seal.group, camera, sealR, view.tw, view.th);
-    const [dx, dy] = at.axes;
-    seal.place(at.x, at.y, Math.hypot(dx, dy) / seal.radius, Math.atan2(dy, dx));
+    if (!seal.place(at.x, at.y, at.axes)) return false;
     if (!sealPlaced) firstSeal = { frame: frames, x: at.x, y: at.y, axes: at.axes };
     sealPlaced = true;
     lastSeal = { x: at.x, y: at.y, axes: at.axes };
+    return true;
   }
 
   /**
@@ -716,7 +710,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
       spot.y = w.y / L;
       spot.z = w.z / L + dz;
     };
-    sealWorld.copy(sealAt).applyMatrix4(inner.matrixWorld);
+    sealWorld.setFromMatrixPosition(seal.group.matrixWorld);
     put(spots.seal, sealWorld, 0.03);
     put(spots.letter, v.set(0, 0, envl.T).applyMatrix4(inner.matrixWorld), 0.05);
     put(spots.mouth, v.set(0, envl.H * 0.38, envl.T).applyMatrix4(inner.matrixWorld), 0.05);
