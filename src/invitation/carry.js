@@ -16,10 +16,13 @@
 // him out against the edge: the edge is invisible, so he drops right there instead of skidding
 // along it or flying back off it), and the fall that follows, with gravity and soft bounces off
 // the play area's edges (a disc's rim, a rounded box's sides and corner arcs, or a box's sides)
-// for a fall that reaches one, until his lowest foot meets the floor. Pure: no three.js.
+// for a fall that reaches one, until his lowest foot meets the floor. What the brain feels while
+// he's held (createHand, handStep, handFeel: the shake and the drag speed) comes from the user's
+// own pointer alone, never from a drag kind easing his collar onto it. Pure: no three.js.
 
 import { rayPlane } from './gesture.js';
 import { centreOf, clampTo, rounded, xRange } from './steer.js';
+import { dragSpeedOf } from './cues.js';
 
 /** @typedef {import('./types.js').XYZ} XYZ */
 /** @typedef {import('./types.js').XZ} XZ */
@@ -35,7 +38,7 @@ import { centreOf, clampTo, rounded, xRange } from './steer.js';
  * (collar to his middle) under `gravity`, `damping` per second, sprung back past `tiltSoft`
  * radians by `softStiff` per radian over it (damped by `softDamp` per second there), never
  * past `tiltMax`, fed accelerations up to
- * `accelMax`, integrated in steps of at most `substep`; `shakeSmooth` smooths the shake reading.
+ * `accelMax`, integrated in steps of at most `substep`; `shakeSmooth` smooths the hand's shake reading (handStep).
  * A toss is capped at `tossMax` across and `tossUp`/`tossDown` up and down. The fall: `fallGravity`,
  * `restitution` off the edges, the floor at `floorY`, the tilt relaxing at `tiltRelax` per second.
  */
@@ -97,8 +100,6 @@ export function grab(collar, t) {
     tilt: { x: 0, z: 0 },
     tiltVel: { x: 0, z: 0 },
     samples: [{ t, ...p }],
-    dragSpeed: 0,
-    shake: 0,
     push: null,
   };
 }
@@ -143,8 +144,6 @@ export function holdStep(c, target, dt, bounds, t, plane = c.plane ?? null) {
     }
     swing(c, ax, ay, az, dt);
     c.vel = vel;
-    c.dragSpeed = Math.hypot(vel.x, vel.y, vel.z);
-    c.shake += (Math.min(a, CARRY.accelMax) - c.shake) * Math.min(1, dt / CARRY.shakeSmooth);
     c.drive = { x, y, z };
   }
   c.anchor = anchor;
@@ -389,12 +388,56 @@ export function dragTarget(g, ray, low, t = g.t0) {
 }
 
 /**
- * What the brain reads while he's held (BrainIn.carry).
- * @param {CarryState} c
+ * The hand: the user's own pointer while he's held, followed as the swing's drive follows the
+ * anchor (critically damped at CARRY.follow, so a spot that only moves on some frames isn't a
+ * shake). For its first `settle` s the shake reads nothing, so a pointer already moving as he's
+ * grabbed isn't a jolt as the follow catches up with it from rest.
+ */
+export const HAND = { settle: 0.2 };
+
+/**
+ * The hand as he's grabbed: on the pointer (client px) at `t`, at rest.
+ * @param {{x: number, y: number}} px
+ * @param {number} t
+ * @returns {import('./types.js').HandState}
+ */
+export function createHand(px, t) {
+  return { t0: t, drive: { x: px.x, y: px.y }, vel: { x: 0, y: 0 }, speed: 0, shake: 0 };
+}
+
+/**
+ * One frame of the hand: its follow of the pointer (`px`, client px, the pointer's own spot and
+ * never a kind's aim, a finger's lift or a grab offset), its speed in CSS px a second, and its
+ * shake, the follow's acceleration in world units/s² (over `pxPerUnit`, CSS px a world unit
+ * across the screen where he hangs), capped at CARRY.accelMax and smoothed over
+ * CARRY.shakeSmooth. Updates `h` in place and returns it.
+ * @param {import('./types.js').HandState} h
+ * @param {{x: number, y: number}} px
+ * @param {number} dt
+ * @param {number} t
+ * @param {number} pxPerUnit
+ */
+export function handStep(h, px, dt, t, pxPerUnit) {
+  if (!(dt > 0)) return h;
+  const [x, vx] = follow(h.drive.x, h.vel.x, px.x, dt);
+  const [y, vy] = follow(h.drive.y, h.vel.y, px.y, dt);
+  const a = Math.hypot(vx - h.vel.x, vy - h.vel.y) / dt / Math.max(1e-6, pxPerUnit);
+  h.drive = { x, y };
+  h.vel = { x: vx, y: vy };
+  h.speed = Math.hypot(vx, vy);
+  if (t - h.t0 < HAND.settle - 1e-9) h.shake = 0;
+  else h.shake += (Math.min(a, CARRY.accelMax) - h.shake) * Math.min(1, dt / CARRY.shakeSmooth);
+  return h;
+}
+
+/**
+ * What the brain reads while he's held (BrainIn.carry): the hand's drag speed (cues.js
+ * dragSpeedOf) and shake.
+ * @param {import('./types.js').HandState} h
  * @returns {{dragSpeed: number, shake: number}}
  */
-export function carryFeel(c) {
-  return { dragSpeed: c.dragSpeed, shake: c.shake };
+export function handFeel(h) {
+  return { dragSpeed: dragSpeedOf(h.speed), shake: h.shake };
 }
 
 /**

@@ -475,7 +475,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `lineMode`: a kind's `HoldCues.line` false keeps the line out of In the Mix, never out of
     Always; `ringFloor`: a kind's `HoldCues.floor`, the ring's least strength In the Mix while
     he's held, eased in over 0.15 s; and
-    `dragSpeedOf`, the brain's drag speed as his collar's screen px a second over 110); `carry.js`
+    `dragSpeedOf`, the brain's drag speed as the pointer's own screen px a second over 110);
+    `carry.js` `createHand`, `handStep`, `handFeel`: what the brain feels while he's held, the
+    shake and the drag speed, from the user's own pointer alone (a critically damped follow of
+    it at `CARRY.follow`, the shake its acceleration over the CSS px a world unit spans where he
+    hangs, none for the first `HAND.settle`, 0.2 s, so a pointer already moving as he's grabbed
+    isn't a jolt), never from a kind easing his collar onto it: read off his collar, the grab
+    offset, a finger's lift and the bead's spring and hold height made every still grab a hard
+    shake ("Too much!" and an early Thrash) and stress enough to flee once he landed; `carry.js`
     drags him, today, on the upright plane facing the camera through where he was grabbed
     (`dragPlane`, `gripFor`, `dragTarget`: the grab offset from where the press began, easing
     out over `CARRY.offsetEase`, 0.12 s, `offsetAt`, so his collar ends under a mouse's cursor

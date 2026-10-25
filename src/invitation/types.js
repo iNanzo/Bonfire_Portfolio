@@ -85,7 +85,8 @@
  * @property {XZ|null} pointer  the pointer on the floor, null when there's none
  * @property {{x: number, z: number, yaw: number, grounded: boolean}} newt
  * @property {{name: string, time: number, remaining: number}|null} clip  the playing one-shot or loop (not the gait)
- * @property {{dragSpeed: number, shake: number}|null} carry  while he's held (carry.js `carryFeel`)
+ * @property {{dragSpeed: number, shake: number}|null} carry  while he's held: the user's own pointer
+ *   (carry.js `handFeel`), never a drag kind easing his collar onto it
  * @property {XZ|null} [camera]  the camera's spot on the floor: a reaction turns him toward it (without it, toward +z)
  * @property {DialogueIn|null} [dialogue]  while the intro's dialogue runs, the box up (brain.js's talk state)
  */
@@ -145,19 +146,27 @@
 /** @typedef {typeof import('./brain.js').TUNE} Tune  the brain's numbers (createBrain's `tune` overrides any of them) */
 
 /**
+ * @typedef {object} HandState  carry.js: the user's own pointer while NEWT is held (handStep
+ *   updates it in place; handFeel is what the brain reads)
+ * @property {number} t0  when he was grabbed
+ * @property {{x: number, y: number}} drive  a critically damped follow of the pointer, client px
+ * @property {{x: number, y: number}} vel  its velocity, CSS px/s
+ * @property {number} speed  its speed, CSS px/s
+ * @property {number} shake  its acceleration, smoothed, world units/s² (none while it settles)
+ */
+
+/**
  * @typedef {object} CarryState  carry.js: NEWT held by the collar (holdStep updates it in place)
  * @property {number} t0  when he was grabbed
  * @property {number} t  the last step
  * @property {XYZ} anchor  where the collar goes this frame (world): the pointer's spot on the
  *   plane he's dragged on plus the grab offset as it eases out (carry.js dragTarget), inside the
  *   play area along the plane's line across the floor
- * @property {XYZ} drive  a critically damped follow of the anchor: the swing and the feel read it
+ * @property {XYZ} drive  a critically damped follow of the anchor: the swing reads it
  * @property {XYZ} vel  the drive's velocity
  * @property {{x: number, z: number}} tilt  the root's swing in radians: root.rotation.x and .z (positive z puts his feet toward +x, positive x toward −z)
  * @property {{x: number, z: number}} tiltVel
  * @property {Array<{t: number, x: number, y: number, z: number}>} samples  the anchor over the last ~80 ms
- * @property {number} dragSpeed  the drive's speed, world units/s
- * @property {number} shake  the drive's acceleration, smoothed, world units/s²
  * @property {XZ|null} push  while the pointer's spot is out past the play area's edge: the way
  *   it pushes him, out through the edge (unit length; let go then, he's tossed with nothing across)
  * @property {{point: XYZ, normal: XYZ}|null} [plane]  the plane he's dragged on (main.js keeps it

@@ -146,7 +146,7 @@ export function lineShare(footH) {
 }
 
 /**
- * The brain's drag speed (BrainIn.carry.dragSpeed) from his collar's speed on screen.
+ * The brain's drag speed (BrainIn.carry.dragSpeed) from the pointer's speed on screen (carry.js handFeel).
  * @param {number} pxPerSecond  CSS px a second
  */
 export const dragSpeedOf = (pxPerSecond) => Math.max(0, pxPerSecond) / CUES.dragPx;
