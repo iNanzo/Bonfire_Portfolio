@@ -130,7 +130,26 @@ export function loadGame(storage, env = {}) {
  * @param {Storage|null} storage
  * @param {Game} game
  */
-export const saveGame = (storage, game) => write(storage, STORE_KEY, JSON.stringify(game));
+export function saveGame(storage, game) {
+  // A backup attempted by loadGame may have failed (for example, storage was full).
+  // Never replace an unreadable original until its exact contents are safely aside.
+  try {
+    const text = storage?.getItem(STORE_KEY);
+    if (text != null) {
+      let readable = false;
+      try {
+        const raw = JSON.parse(text);
+        readable = !!raw && typeof raw === 'object' && Number(raw.v) <= GAME_VERSION;
+      } catch {
+        // Preserve malformed JSON too.
+      }
+      if (!readable && read(storage, ASIDE_KEY) !== text && !write(storage, ASIDE_KEY, text)) return false;
+    }
+  } catch {
+    return false;
+  }
+  return write(storage, STORE_KEY, JSON.stringify(game));
+}
 
 /** @param {Game} game */
 export const gameFile = (game) => ({ app: FILE_APP, v: GAME_VERSION, game });

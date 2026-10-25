@@ -105,6 +105,27 @@ test('store: a new save wins over the first version’s event', () => {
   assert.equal(loadGame(s, env).from, 'saved');
 });
 
+test('store: a failed backup prevents overwriting an unreadable save, and saving can recover', () => {
+  for (const original of ['{broken', JSON.stringify({ v: 99, teams: [] })]) {
+    const s = memory({ [STORE_KEY]: original });
+    const setItem = s.setItem;
+    s.setItem = (key, value) => {
+      if (key === ASIDE_KEY) throw new Error('quota exceeded');
+      setItem(key, value);
+    };
+    const loaded = loadGame(s, env);
+    assert.equal(loaded.from, 'unreadable');
+    assert.equal(saveGame(s, loaded.game), false);
+    assert.equal(s.map.get(STORE_KEY), original, 'the only copy survives a failed backup');
+    assert.equal(s.map.has(ASIDE_KEY), false);
+
+    s.setItem = setItem;
+    assert.equal(saveGame(s, loaded.game), true);
+    assert.equal(s.map.get(ASIDE_KEY), original, 'the backup is written before replacement');
+    assert.deepEqual(loadGame(s, env).game, loaded.game);
+  }
+});
+
 test('store: export files round-trip; anything else is refused', () => {
   const g = newGame(env);
   const file = JSON.stringify(gameFile(g));
