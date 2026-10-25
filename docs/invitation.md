@@ -480,11 +480,14 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     his collar no lower than it was grabbed at, or his hang height once he's been lifted clear
     of the floor, so a still cursor never lifts him off it, and no higher than `CARRY.liftMax`,
     5), the anchor the pointer's spot with no lag, kept inside the play area along the drag
-    plane's line across the floor (`lineSpan`: at an edge he stops, on a rounded square's
-    corner arcs too, never sliding along it in depth), and the swing driven by a smoothed follow of
-    it, past `CARRY.tiltSoft` (0.5 rad) a stiff spring easing him back instead of a hard stop;
-    let go, `fallStep` drops him with soft bounces off the edges (a rounded square's corner
-    arcs as arcs, not the box round them, so a drop in a corner lands inside the arc);
+    plane's line across the floor (`lineSpan`: the play area is a disc, `Bounds.r`, so at its
+    rim he stops where that line meets it, never sliding round it in depth), and the swing
+    driven by a smoothed follow of it, past `CARRY.tiltSoft` (0.5 rad) a stiff spring easing
+    him back instead of a hard stop; let go, `fallStep` drops him with soft bounces off the
+    rim (back onto it, the speed out of it reflected about its radius and softened by
+    `CARRY.restitution`, the speed along it kept; let go with his root swung out past it, no
+    more speed outward and eased back in at `CARRY.rimEase`). Other `Bounds` (a box, a
+    rounded box's corner arcs) still take the same calls, for their other readers;
     `limbStep` is the spring his limp limbs and his earrings hang on (character.js); `lookAt.js` `screenAim` aims his look camera-relative (performative gaze): seen from
     the camera the cursor lies some heads (`LOOK.headSize`, 0.53) from his head in some
     direction on screen, and his face turns from the line to the camera toward that direction,
