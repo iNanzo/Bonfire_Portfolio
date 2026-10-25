@@ -14,7 +14,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { LOGO_STROKES } from '../src/ui/logo.js';
-import { IDS, INK, LIGHT, PAPER, SHADES, WAX, rgb, shared, toon } from '../src/invitation/envelopeLook.js';
+import { HOVER, IDS, INK, LIGHT, PAPER, SHADES, WAX, rgb, shared, toon } from '../src/invitation/envelopeLook.js';
+import { HOVER_INK } from '../src/invitation/retro.js';
 import {
   MONOGRAM_PATH,
   MONOGRAM_STROKES,
@@ -456,4 +457,8 @@ test('the first frame’s seal is placed as the letter shows it: about its size,
   assert.ok(Math.abs(ay) < 1e-6 && Math.abs(bx) < 1e-6, 'upright, not spun');
   assert.ok(Math.abs(at.x - tw / 2) < 1e-6, `its middle across ${at.x}`);
   assert.ok(at.y < th / 2 && at.y > th / 2 - want, `its middle up ${at.y}`);
+});
+
+test('the hover pulse’s gold is NEWT’s hover gold (retro.js HOVER_INK, copied)', () => {
+  assert.equal(HOVER, HOVER_INK);
 });

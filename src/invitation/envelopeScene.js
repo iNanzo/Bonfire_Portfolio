@@ -41,6 +41,8 @@ import {
   envelopeGesture,
   envelopeKey,
   hintFor,
+  hoverPulse,
+  hoverStep,
   letterCovers,
   particleAt,
   sealBloom,
@@ -50,12 +52,14 @@ import { buildSeal, sealOnScreen } from './envelopeSeal.js';
 import { PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './petals.js';
 import {
   BAYER,
+  HOVER,
   IDS,
   INK,
   LEAN,
   PAPER,
   PETAL,
   PITCH,
+  SHINE,
   TILT,
   WAX,
   envelopeLayout,
@@ -214,7 +218,10 @@ function buildSpecks() {
 /**
  * The pass that puts it together: the colours, and a line in the ink on each texel that borders
  * a part in front of it (by the parts' order, IDS): round the silhouette, on the paper just
- * outside it, and down every fold.
+ * outside it, and along the flap's V. Hovered (uPulse, 0..1: envelope.js hoverPulse), a
+ * Bayer-dithered rim on the letter's outermost two texels (a warm shine: gold barely shows on the
+ * gold paper) and a gold halo a texel or two past its line, like NEWT's hover (retro.js): the
+ * letter's parts only, seal and all, never the petals.
  */
 function buildCompose() {
   const mat = new THREE.ShaderMaterial({
@@ -223,6 +230,9 @@ function buildCompose() {
       uId: { value: null },
       uTexel: { value: new THREE.Vector2(1, 1) },
       uInk: { value: rgb(INK) },
+      uPulse: { value: 0 },
+      uGold: { value: rgb(HOVER) },
+      uShine: { value: rgb(SHINE) },
     },
     vertexShader: /* glsl */ `
       varying vec2 vUv;
@@ -233,11 +243,29 @@ function buildCompose() {
       uniform sampler2D uId;
       uniform vec2 uTexel;
       uniform vec3 uInk;
+      uniform float uPulse;
+      uniform vec3 uGold;
+      uniform vec3 uShine;
       varying vec2 vUv;
+      ${BAYER}
+      const vec2 STEPS[4] = vec2[4](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0));
+      // (The halo's neighbours, past the line: two out along each axis, then the knight's moves,
+      // then three out.)
+      const vec2 HALO[16] = vec2[16](
+        vec2(2.0, 0.0), vec2(-2.0, 0.0), vec2(0.0, 2.0), vec2(0.0, -2.0),
+        vec2(2.0, 1.0), vec2(2.0, -1.0), vec2(-2.0, 1.0), vec2(-2.0, -1.0),
+        vec2(1.0, 2.0), vec2(-1.0, 2.0), vec2(1.0, -2.0), vec2(-1.0, -2.0),
+        vec2(3.0, 0.0), vec2(-3.0, 0.0), vec2(0.0, 3.0), vec2(0.0, -3.0)
+      );
       // (A neighbour's part; one on the dissolving rim counts as nothing, so no line goes round it.)
       float idAt(vec2 o) {
         vec4 t = texture2D(uId, vUv + o * uTexel);
         return t.g > 0.5 ? 0.0 : floor(t.r * 255.0 + 0.5);
+      }
+      // (The letter's parts, the seal too; not the petals, nor nothing.)
+      bool letterAt(vec2 o) {
+        float i = idAt(o);
+        return i > 0.5 && i < ${IDS.petal.toFixed(1)} - 0.5;
       }
       void main() {
         float me = floor(texture2D(uId, vUv).r * 255.0 + 0.5);
@@ -245,7 +273,25 @@ function buildCompose() {
         // (Round the silhouette the corners count too, so the line closes up on the paper.)
         if (me < 0.5) near = max(near, max(max(idAt(vec2(1.0, 1.0)), idAt(vec2(-1.0, 1.0))), max(idAt(vec2(1.0, -1.0)), idAt(vec2(-1.0, -1.0)))));
         if (near > me + 0.5) { gl_FragColor = vec4(uInk, 1.0); return; }
-        gl_FragColor = me < 0.5 ? vec4(0.0) : vec4(texture2D(uColor, vUv).rgb, 1.0);
+        float dither = bayer(gl_FragCoord.xy);
+        if (me < 0.5) {
+          gl_FragColor = vec4(0.0);
+          if (uPulse > 0.0)
+            for (int k = 0; k < 16; k++) {
+              if (!letterAt(HALO[k])) continue;
+              if (dither < uPulse * (k < 4 ? 1.0 : k < 12 ? 0.8 : 0.45)) gl_FragColor = vec4(uGold, 1.0);
+              break;
+            }
+          return;
+        }
+        vec3 c = texture2D(uColor, vUv).rgb;
+        // (The rim: a letter's texel within two of nothing; a petal over it isn't its edge.)
+        if (uPulse > 0.0 && me < ${IDS.petal.toFixed(1)} - 0.5) {
+          bool rim = false;
+          for (int k = 0; k < 4; k++) rim = rim || idAt(STEPS[k]) < 0.5 || idAt(2.0 * STEPS[k]) < 0.5;
+          if (rim && dither < uPulse) c = mix(c, uShine, 0.8);
+        }
+        gl_FragColor = vec4(c, 1.0);
       }
     `,
     depthTest: false,
@@ -408,6 +454,10 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   let wheel = 0;
   let wheelAt = 0;
   let hovered = false;
+  /** The mouse is over the letter itself (not just the layer). */
+  let overLetter = false;
+  /** The hover pulse: eased in (k), seconds into it (t: from its start), and as shown (pulse). */
+  const hover = { k: 0, t: 0, pulse: 0 };
   let keyboard = false;
   let lastInput = clock();
   let frames = 0;
@@ -490,6 +540,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   hit.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'mouse') {
       hovered = true;
+      overLetter = onLetterAt(e.clientX, e.clientY);
       // (The mouse over it stirs a few petals now and then as it moves.)
       if (stirAt) stirMove += Math.hypot(e.clientX - stirAt.x, e.clientY - stirAt.y);
       stirAt = { x: e.clientX, y: e.clientY };
@@ -522,7 +573,9 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     if (env.state === 'floating') stirFrom(e);
   });
   hit.addEventListener('pointerleave', (e) => {
-    if (e.pointerType === 'mouse') hovered = false;
+    if (e.pointerType !== 'mouse') return;
+    hovered = false;
+    overLetter = false;
   });
   layer.addEventListener('contextmenu', (e) => e.preventDefault());
   layer.addEventListener(
@@ -587,6 +640,15 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     return { x: hitAt.x, y: hitAt.y };
   }
   /**
+   * Whether a point on the screen (client px) is on the letter, as it was last drawn.
+   * @param {number} x
+   * @param {number} y
+   */
+  function onLetterAt(x, y) {
+    const q = onLetter(x, y);
+    return Boolean(q && Math.abs(q.x) <= 1 && Math.abs(q.y) <= 1);
+  }
+  /**
    * Whether it still hides NEWT (`spots`: his head, collar and middle on screen, client px, each
    * with its radius): while it covers the toy; fading, while the page behind is half up or the
    * letter hides the middle of any of them or a point its radius round it (envelope.js
@@ -628,19 +690,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     const k = reduced ? 1 : 1 - Math.exp(-dt / 0.07);
     follow.y += (target.follow - follow.y) * k;
     follow.lift += (target.lift - follow.lift) * k;
-    // The hint: live while dragging, else on hover, keyboard focus or a still touch screen.
-    const way = drag ? dragHint(drag.dy) : null;
-    live.textContent = way === 'open' ? ENVELOPE_TEXT.dragOpen : way === 'skip' ? ENVELOPE_TEXT.dragSkip : '';
-    const idle = now - lastInput >= TIMES.idleHint;
-    const touchy = touchScreen();
-    const words = hintFor(touchy);
-    if (hintOpen.textContent !== words) hintOpen.textContent = words;
-    const focused = doc.activeElement === hit;
-    layer.classList.toggle('is-dragging', Boolean(way));
-    layer.classList.toggle(
-      'is-hinting',
-      !way && env.state === 'floating' && (hovered || (focused && keyboard) || (touchy && idle)),
-    );
+    cues(now, dt);
     // The envelope.
     const pxToWorld = view.h / view.cssH;
     // (Settling in as it arrives: from a touch above, a touch small.)
@@ -673,6 +723,31 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
       doneAt ||= now;
       if (!flow.live(pt) || now - doneAt >= PETAL_GRACE) dispose();
     }
+  }
+
+  /**
+   * The hint (live while dragging, else on hover, keyboard focus or a still touch screen) and the
+   * hover pulse round the letter (the mouse over it, keyboard focus, or a touch screen left alone;
+   * from the start of a pulse each time it comes on).
+   * @param {number} now
+   * @param {number} dt
+   */
+  function cues(now, dt) {
+    const way = drag ? dragHint(drag.dy) : null;
+    live.textContent = way === 'open' ? ENVELOPE_TEXT.dragOpen : way === 'skip' ? ENVELOPE_TEXT.dragSkip : '';
+    const idle = now - lastInput >= TIMES.idleHint;
+    const touchy = touchScreen();
+    const words = hintFor(touchy);
+    if (hintOpen.textContent !== words) hintOpen.textContent = words;
+    const focused = doc.activeElement === hit;
+    const floating = env.state === 'floating';
+    layer.classList.toggle('is-dragging', Boolean(way));
+    layer.classList.toggle('is-hinting', !way && floating && (hovered || (focused && keyboard) || (touchy && idle)));
+    const hoverOn = floating && !drag && (overLetter || (focused && keyboard) || (touchy && idle));
+    hover.k = hoverStep(hover.k, hoverOn, dt);
+    hover.t = hover.k > 0 ? hover.t + dt : 0;
+    hover.pulse = hoverPulse(hover.k, hover.t, reduced);
+    compose.mat.uniforms.uPulse.value = hover.pulse;
   }
 
   /**
@@ -827,6 +902,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
       const now = clock();
       const petalsNow = { live: flow.live(pt), emitted: flow.emitted };
       const sealNow = { first: firstSeal, last: lastSeal };
+      const hoverNow = { k: hover.k, pulse: hover.pulse };
       return {
         state: env.state,
         reduced,
@@ -835,6 +911,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
         frames,
         petals: petalsNow,
         seal: sealNow,
+        hover: hoverNow,
       };
     },
     /** Steps aside (no WebGL for the toy, or it couldn't load): skipped, with no intro. */

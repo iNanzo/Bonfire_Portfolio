@@ -26,8 +26,12 @@ export const rgb = (hex) => new THREE.Vector3(((hex >> 16) & 255) / 255, ((hex >
 export const PAPER = [0xf1d786, 0xe4b85d, 0xd3983d];
 export const WAX = [0xd24b52, 0x96151f, 0x5a0a12];
 export const PETAL = [0xe44544, 0xac2e29, 0x851d1b];
-/** The toy's ink (invitation.css --inv-ink): the lines round it and down its folds. */
+/** The toy's ink (invitation.css --inv-ink): the lines round it and along the flap's V. */
 export const INK = 0x3a332d;
+/** The hover pulse's gold (retro.js HOVER_INK, NEWT's hover: copied, so it reads as the same). */
+export const HOVER = 0xe0a53a;
+/** The hover rim's shine on the letter's own edge: a warm white (the gold alone barely shows on the gold paper). */
+export const SHINE = 0xfff4d6;
 /** The burning rim as it dissolves: glowing, ember, charred (dark enough to read on the white page). */
 const RIM = [0xffb43c, 0xe0582a, 0x5a3418];
 

@@ -183,6 +183,23 @@ test.describe('on a desktop', () => {
     }
   });
 
+  test('the mouse over the letter pulses a gold rim round it, slowly, clean between pulses; off it, it fades', async ({
+    page,
+  }) => {
+    await envelopeUp(page);
+    const hover = async () => (await envSnap(page)).hover;
+    const vp = page.viewportSize();
+    // (Off the letter, though on the page over the toy: no pulse.)
+    await page.mouse.move(8, vp.height - 8);
+    expect((await hover()).k).toBe(0);
+    await page.mouse.move(vp.width / 2, vp.height / 2, { steps: 4 });
+    await expect.poll(async () => (await hover()).k, { message: 'hovered' }).toBe(1);
+    await expect.poll(async () => (await hover()).pulse, { message: 'a pulse at its peak' }).toBeGreaterThan(0.9);
+    await expect.poll(async () => (await hover()).pulse, { message: 'and back to nothing' }).toBeLessThan(0.05);
+    await page.mouse.move(8, vp.height - 8, { steps: 4 });
+    await expect.poll(async () => (await hover()).pulse, { message: 'gone off the letter' }).toBe(0);
+  });
+
   test('a drag across it never turns the camera, and a sideways drag neither opens nor skips it', async ({ page }) => {
     await envelopeUp(page);
     const before = (await snapshot(page)).camera;

@@ -17,6 +17,7 @@ import {
   DISSOLVE,
   ENVELOPE_TEXT,
   FLAP_OPEN,
+  HOVER_PULSE,
   SWAY,
   SWIPE,
   TIMES,
@@ -30,6 +31,8 @@ import {
   envelopeGesture,
   envelopeKey,
   hintFor,
+  hoverPulse,
+  hoverStep,
   particleAt,
   shedParticles,
 } from '../src/invitation/envelope.js';
@@ -408,4 +411,38 @@ test('with reduced motion it’s a short plain fade, no dissolve; a skip clears 
   s.skip(0);
   assert.equal(s.pose(0.01).dissolve, 0, 'a skip drops it, no dissolve');
   assert.ok(s.pose(TIMES.skip).backdrop < 0.01, 'the page clears');
+});
+
+test('hovered, the letter pulses slowly: from nothing to full and back every 2.8 s, so it shows clean between pulses', () => {
+  assert.equal(HOVER_PULSE.period, 2.8);
+  const P = HOVER_PULSE.period;
+  assert.equal(hoverPulse(1, 0), 0, 'it starts from nothing');
+  assert.ok(Math.abs(hoverPulse(1, P / 2) - 1) < 1e-9, 'full at the middle of a pulse');
+  assert.ok(hoverPulse(1, P) < 1e-9 && hoverPulse(1, 3 * P) < 1e-9, 'all the way back to nothing');
+  for (let t = 0; t < 3 * P; t += 0.05) {
+    const v = hoverPulse(1, t);
+    assert.ok(v >= 0 && v <= 1);
+    // (Eased in: half way in, half as strong.)
+    assert.ok(Math.abs(hoverPulse(0.5, t) - v / 2) < 1e-9);
+  }
+  // (Slowly: under a tenth of its strength for a good share of each pulse.)
+  let clean = 0;
+  for (let t = 0; t < P; t += P / 100) clean += hoverPulse(1, t) < 0.1 ? 1 : 0;
+  assert.ok(clean >= 15, `clean for ${clean}% of a pulse`);
+  // (Reduced motion: no pulse, a steady rim while it's hovered.)
+  assert.equal(hoverPulse(1, 0, true), hoverPulse(1, P / 3, true));
+  assert.ok(hoverPulse(1, 0, true) > 0.3);
+  assert.equal(hoverPulse(0, 1, true), 0);
+});
+
+test('the hover eases in as the pointer comes onto the letter and out as it leaves', () => {
+  let k = 0;
+  for (let i = 0; i < 3; i++) k = hoverStep(k, true, 0.05);
+  assert.ok(k > 0 && k < 1, `easing in: ${k}`);
+  for (let i = 0; i < 40; i++) k = hoverStep(k, true, 0.05);
+  assert.equal(k, 1);
+  k = hoverStep(k, false, 0.05);
+  assert.ok(k < 1 && k > 0);
+  for (let i = 0; i < 40; i++) k = hoverStep(k, false, 0.05);
+  assert.equal(k, 0);
 });

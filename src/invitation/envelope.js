@@ -8,7 +8,8 @@
 // (envelopeKey), how it follows a finger with some give while the seal starts to open
 // (dragPose), the live hint while dragging (dragHint), the hint's words for a touch screen or a
 // mouse (hintFor), how it settles in as it arrives, the whole opening as functions of time
-// (pose), the seal shrinking away as it blooms (sealBloom: its petals are petals.js's), and the
+// (pose), the seal shrinking away as it blooms (sealBloom: its petals are petals.js's), the
+// hover's slow pulse (hoverStep, hoverPulse), and the
 // dissolve: where its noisy edge has reached on the letter (dissolveAt, DISSOLVE: the scene's
 // shader runs the same sums) and the specks it sheds there, drifting up and fading
 // (shedParticles, particleAt). Reduced motion: no bob or sway, no bloom (the seal simply fades
@@ -322,6 +323,36 @@ export function sealBloom(b) {
   const swell = 1 + 0.12 * Math.sin(Math.PI * Math.min(1, k / 0.3));
   const scale = k >= 1 ? 0 : k < 0.15 ? swell : Math.min(swell, 1.12 * (1 - smooth((k - 0.15) / 0.85)));
   return { scale, spin: 0.5 * easeOut(k) };
+}
+
+/**
+ * The hover's pulse: one every `period` seconds; the hover eases in over `in` and out over `out`
+ * seconds; with reduced motion it's a steady `still`.
+ */
+export const HOVER_PULSE = { period: 2.8, in: 0.25, out: 0.4, still: 0.5 };
+
+/**
+ * The hover a step on: toward 1 while `on` (the pointer over the letter, keyboard focus, or a
+ * touch screen left alone), toward 0 otherwise.
+ * @param {number} k  0..1
+ * @param {boolean} on
+ * @param {number} dt  seconds
+ */
+export function hoverStep(k, on, dt) {
+  return on ? Math.min(1, k + dt / HOVER_PULSE.in) : Math.max(0, k - dt / HOVER_PULSE.out);
+}
+
+/**
+ * How strong the hover's gold rim and halo show round the letter: the hover (`k`, eased) times a
+ * slow pulse `t` seconds into it, from nothing to full and back to nothing (so between pulses the
+ * letter shows clean); with reduced motion, steady.
+ * @param {number} k
+ * @param {number} t
+ * @param {boolean} [reduced]
+ */
+export function hoverPulse(k, t, reduced = false) {
+  if (reduced) return k * HOVER_PULSE.still;
+  return k * (0.5 - 0.5 * Math.cos((2 * Math.PI * t) / HOVER_PULSE.period));
 }
 
 /**
