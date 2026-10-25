@@ -1451,6 +1451,22 @@ test('talkReady once he’s in place: getting up, walking in and turning he keep
   assert.equal(sim({}).frame().talkReady, false);
 });
 
+test('a box the page holds back (seq −1: its line waits on the envelope) keeps him in place idle with his own face; its face and gesture come with it', () => {
+  const s = sim({ camera: { x: 0, z: 6 } });
+  s.w.dialogue = box(-1, 'none', 'surprised', false);
+  let o = s.until((x) => x.talkReady, 5);
+  for (let i = 0; i < 60; i++) {
+    assert.notEqual(o.face, 'surprised', 'his own face while it waits');
+    assert.equal(o.clip, 'gait', 'idle, no gesture');
+    assert.equal(o.talkReady, true);
+    o = s.frame();
+  }
+  s.w.dialogue = box(0, 'Spook', 'surprised');
+  o = s.frame();
+  assert.equal(o.face, 'surprised', 'the box’s face with its line');
+  assert.equal(o.clip, 'Spook', 'and its gesture');
+});
+
 test('held or falling, Play Intro waits until he’s down', () => {
   const s = sim({ camera: { x: 0, z: 6 } });
   s.grab();

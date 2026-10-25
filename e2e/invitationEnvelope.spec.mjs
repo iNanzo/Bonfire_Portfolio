@@ -5,7 +5,8 @@
 // takes every press (a drag on it never turns the camera); the mouse over it or a touch stirs a
 // few petals; a click, Enter or a swipe up opens it (the seal blooms into petals first, and only
 // then the flap lifts with a burst of petals and the letter dissolves as the page behind clears)
-// and the intro starts by itself at its first box with no toolbar button pressed; Escape, a
+// and the intro starts by itself at its first box with no toolbar button pressed, its first line
+// and his gesture held until the letter no longer hides his head; Escape, a
 // swipe down or Skip Intro skips it (a spill of petals; no intro, the toolbar back, focus on
 // it, its ring showing only after a key). Opened before newt.glb is in, it waits, then fades once he is. Reduced motion: no bob, no
 // petals, the flap open at once, a short crossfade. The touch hint says Tap, the mouse's Click.
@@ -46,6 +47,45 @@ async function introStarted(page) {
   const s = await snapshot(page);
   expect(s.button).toBeNull();
   await expect(page.locator('.inv-talk-box')).toBeVisible();
+}
+/**
+ * Opened: each frame from the fade's start until the intro's first line is under way, as the page
+ * has it (the envelope over his head, the line still held, the clips his first box has played),
+ * sampled in the page every frame. Start it before opening the envelope.
+ */
+const greeting = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        /** @type {{envelope: string|null, veils: boolean, waiting: boolean, clips: number}[]} */
+        const frames = [];
+        const tick = () => {
+          const s = window.__invitation.snapshot();
+          if (s.envelope === 'fading' || s.envelope === 'gone')
+            frames.push({
+              envelope: s.envelope,
+              veils: s.envelopeVeils,
+              waiting: s.dialogue ? s.dialogue.waiting : true,
+              clips: s.dialogue ? s.dialogue.clips.length : 0,
+            });
+          if ((s.dialogue && !s.dialogue.waiting) || frames.length > 900) return resolve(frames);
+          requestAnimationFrame(tick);
+        };
+        tick();
+      }),
+  );
+/** NEWT's greeting waited for the letter: nothing of his first box while it hid his head. */
+function waitedForLetter(frames) {
+  expect(frames.length, 'frames from the fade').toBeGreaterThan(0);
+  expect(frames[0].veils, 'the letter over him as it starts to fade').toBe(true);
+  for (const [i, f] of frames.entries()) {
+    if (!f.veils) continue;
+    expect(f.waiting, `frame ${i}: the line held while the letter hides him`).toBe(true);
+    expect(f.clips, `frame ${i}: no gesture of the box yet`).toBe(0);
+  }
+  const last = frames[frames.length - 1];
+  expect(last.waiting, 'the line under way').toBe(false);
+  expect(last.veils, 'once the letter has cleared his head').toBe(false);
 }
 /** Skipped: it's gone, no intro, the toolbar back with focus on it. */
 async function skipped(page) {
@@ -141,7 +181,9 @@ test.describe('on a desktop', () => {
     expect(s.camera.target).toEqual(before.target);
   });
 
-  test('hovered it says how to open and skip it; a click opens it and the intro starts by itself', async ({ page }) => {
+  test('hovered it says how to open and skip it; a click opens it and the intro starts by itself, its greeting held until the letter clears his head', async ({
+    page,
+  }) => {
     await envelopeUp(page);
     const hint = page.locator('.inv-envelope-hint');
     const vp = page.viewportSize();
@@ -149,6 +191,7 @@ test.describe('on a desktop', () => {
     await expect(hint).toBeVisible();
     await expect(hint).toContainText('Click or swipe up to open');
     await expect(hint).toContainText('Swipe down to skip');
+    const greeted = greeting(page);
     await page.mouse.click(vp.width / 2, vp.height / 2);
     await until(page, (s) => s.envelope !== 'floating', 'opening');
     await until(page, (s) => s.envelope === 'fading' || s.envelope === 'gone', 'dissolving');
@@ -156,6 +199,7 @@ test.describe('on a desktop', () => {
     const gone = await page.evaluate(() => window.__invitation.envelope());
     expect(gone.pose.crossfade).toBe(false);
     expect(gone.pose.fade).toBe(gone.pose.dissolve);
+    waitedForLetter(await greeted);
     await introStarted(page);
     const end = await page.evaluate(() => window.__invitation.envelope());
     expect(end.pose.dissolve).toBe(1);
@@ -307,9 +351,13 @@ test.describe('on a desktop', () => {
 test.describe('on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
-  test('a swipe up opens it and the intro starts', async ({ page }) => {
+  test('a swipe up opens it and the intro starts, its greeting held until the letter clears his head', async ({
+    page,
+  }) => {
     await envelopeUp(page);
+    const greeted = greeting(page);
     await swipe(page, -260);
+    waitedForLetter(await greeted);
     await introStarted(page);
   });
 

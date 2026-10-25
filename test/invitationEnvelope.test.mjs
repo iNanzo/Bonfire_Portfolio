@@ -8,7 +8,8 @@
 // (reduced motion: no bob, no bloom, the flap snaps open, a short crossfade). Opened, the letter
 // alone dissolves into particles: a noisy edge sweeps up across it shedding specks of paper and
 // ember that drift up and fade, and the white page behind clears at once (never a dither over
-// the screen).
+// the screen). Where the letter still hides a point of it (letterCovers: the intro's first line
+// waits until it no longer hides NEWT's head).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -23,6 +24,8 @@ import {
   dragHint,
   dissolveAt,
   dragPose,
+  FLAP_TIP,
+  letterCovers,
   sealBloom,
   envelopeGesture,
   envelopeKey,
@@ -30,6 +33,48 @@ import {
   particleAt,
   shedParticles,
 } from '../src/invitation/envelope.js';
+
+test('the letter hides a point of it until the dissolve’s edge has passed it, dither and all (its open flap too); outside it never; reduced motion until it’s half faded', () => {
+  const e = createEnvelope();
+  assert.equal(letterCovers(e.pose(0), 0, 0), true, 'floating, it covers');
+  assert.equal(letterCovers(e.pose(0), 1.2, 0), false, 'beside it, never');
+  assert.equal(letterCovers(e.pose(0), 0, 1.5), false, 'over its top with the flap shut, never');
+  e.open(0);
+  e.step(TIMES.opening, true);
+  const t0 = TIMES.opening;
+  assert.equal(letterCovers(e.pose(t0), 0, 1.5), true, 'the open flap over its top covers');
+  assert.equal(letterCovers(e.pose(t0), 0, 1 + FLAP_TIP + 0.05), false, 'past its tip, not');
+  assert.equal(letterCovers(e.pose(t0), 0.9, 1.5), false, 'beside its slope, not');
+  // Each point is uncovered once, for good, as the edge passes its value and half the dither.
+  for (const [x, y] of [
+    [0, 0],
+    [-0.8, -0.8],
+    [0.6, 0.7],
+    [0.2, 1.3],
+  ]) {
+    let was = true;
+    let at = null;
+    for (let t = t0; t <= t0 + TIMES.fade + 1e-9; t += 0.01) {
+      const p = e.pose(t);
+      const now = letterCovers(p, x, y);
+      assert.ok(!now || was, `(${x}, ${y}) covered again at ${t.toFixed(2)}`);
+      if (was && !now) at = p;
+      was = now;
+    }
+    assert.ok(at, `(${x}, ${y}) uncovered`);
+    assert.ok(DISSOLVE.edge(at.dissolve) >= dissolveAt(x, y) + DISSOLVE.dither / 2 - 1e-9);
+  }
+  // (Low on the letter before high on it: the edge sweeps up.)
+  const when = (x, y) => {
+    for (let t = t0; ; t += 0.01) if (!letterCovers(e.pose(t), x, y)) return t;
+  };
+  assert.ok(when(-0.8, -0.8) < when(0.6, 0.7));
+  const r = createEnvelope({ reduced: true });
+  r.open(0);
+  r.step(0, true);
+  assert.equal(letterCovers(r.pose(TIMES.reducedFade * 0.4), 0, 0), true);
+  assert.equal(letterCovers(r.pose(TIMES.reducedFade * 0.6), 0, 0), false);
+});
 
 test('a swipe up opens it and a swipe down skips: |dy| past max(48 px, 12% of the height), mostly up or down', () => {
   const tall = 844; // (12%: 101 px)
