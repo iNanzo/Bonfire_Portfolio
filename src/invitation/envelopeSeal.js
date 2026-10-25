@@ -1,91 +1,163 @@
 // The envelope's wax seal (envelopeScene.js): a lumpy round blob of red wax, as if pressed by
 // hand, its outline wobbling with a few overtones, a raised and uneven rim round a softly domed
 // face, and a few small beads of wax squeezed out at its edge. The NH monogram is stamped into the
-// face (logo.js's strokes, copied: the page takes no shared modules): debossed, each stroke a
-// solid darker recess three texels or more wide on a desktop, with a lighter lip one texel wide
-// only along its lower edge (the wall that faces the light from above: under the crossbar, at
-// the stems' feet), never on the N's diagonal, so no stroke shows as a dark bar beside a light
-// one and it reads as NH, not a hash mark, at the seal's size (stampAt runs the shader's sums). It's one piece: opened,
-// it blooms (envelope.js sealBloom), shrinking away while plain rose petals (petals.js) unfurl
-// out of it, so the monogram never rides on a petal.
+// face: logo.js's PATH (copied: the page takes no shared modules), drawn on the seal's own texels
+// so it reads as the logo at the seal's size and not as a hash mark. Each texel of the face is a
+// cell of the stamp (stampLayout: the strokes snapped to whole cells, four even uprights two
+// texels or more wide, the crossbar as thick, the N's diagonal a texel wider, stepping across
+// from the top of the outer stem to the foot of the inner one); a stroke's cells are a solid dark
+// recess, and the face just under a straight stroke (under the crossbar, at the stems' feet: the
+// wall that faces the light from above) a lighter lip one texel high (stampCell runs the
+// shader's sums). It's one piece: opened, it blooms (envelope.js sealBloom), shrinking away while
+// plain rose petals (petals.js) unfurl out of it, so the monogram never rides on a petal.
 import * as THREE from 'three';
 import { IDS, WAX, toon } from './envelopeLook.js';
 
-/** The NH monogram's strokes (logo.js PATH, in its units: x −27.5…27.5 across, y 2…78 down). */
-const STROKES = [
-  [-15, 78, -15, 27],
-  [-15, 27, -4.5, 68],
-  [-4.5, 68, -4.5, 2],
-  [4.5, 2, 4.5, 68],
-  [15, 27, 15, 78],
-  [-27.5, 47, 27.5, 47],
-];
+/** logo.js's PATH, copied as it is: the NH monogram (x −27.5…27.5 across, y 2…78 down). */
+export const MONOGRAM_PATH = 'M-15 78V27M-15 27L-4.5 68M-4.5 68V2M4.5 2V68M15 27V78M-27.5 47H27.5';
 
 /**
- * The monogram's strokes `height` tall, centred, y up: [x0, y0, x1, y1] each.
- * @param {number} height
+ * The path's strokes as straight segments [x0, y0, x1, y1] (logo.js strokesOf: M, L, H and V,
+ * absolute).
+ * @param {string} d
  * @returns {number[][]}
  */
-export function monogramSegments(height) {
-  const k = height / (78 - 2);
-  const cy = (2 + 78) / 2;
-  return STROKES.map(([ax, ay, bx, by]) => [ax * k, (cy - ay) * k, bx * k, (cy - by) * k]);
+function strokesOf(d) {
+  const out = [];
+  let x = 0;
+  let y = 0;
+  for (const [, cmd, args] of d.matchAll(/([MLHV])([^MLHV]*)/g)) {
+    const n = args
+      .trim()
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map(Number);
+    if (cmd === 'M') {
+      [x, y] = n;
+      continue;
+    }
+    const [nx, ny] = cmd === 'L' ? n : cmd === 'H' ? [n[0], y] : [x, n[0]];
+    out.push([x, y, nx, ny]);
+    x = nx;
+    y = ny;
+  }
+  return out;
+}
+
+/** The monogram's six strokes, in the path's units (logo.js LOGO_STROKES). */
+export const MONOGRAM_STROKES = strokesOf(MONOGRAM_PATH);
+
+/** The seal's radius, a share of the letter's width (a little bigger, for its stamp's room). */
+export const SEAL_SIZE = 0.2;
+
+/**
+ * The stamp: its height a share of the seal's radius (it stays inside the rim), its strokes'
+ * width a share of that (two texels at the least), and how much wider the N's diagonal is.
+ */
+const STAMP = { height: 1.28, stem: 0.045, diagonal: 1 };
+
+/** Rounds half away from zero, so the stamp's cells mirror across its middle. */
+const round = (/** @type {number} */ u) => Math.sign(u) * Math.round(Math.abs(u));
+
+/**
+ * @typedef {object} StampLayout
+ * @property {number[][]} boxes  the uprights (N's outer, N's inner, H's inner, H's outer) and the
+ *   crossbar, in cells: [i0, j0, i1, j1], i across from the seal's middle, j up, ends exclusive
+ * @property {{x0: number, y0: number, x1: number, y1: number}} diag  the N's diagonal's middle
+ *   line, from the top of the outer stem (x0, y0: its middle, its top edge) to the foot of the
+ *   inner one (x1, y1), in cells
+ * @property {number} stem  the strokes' width, cells
+ * @property {number} diagonal  the diagonal's width across a row, cells
+ */
+
+/**
+ * The stamp on a seal `radius` texels across its radius, snapped to whole texels (cells): the
+ * logo's strokes at their places, rounded so the uprights are even and mirrored, the diagonal a
+ * row-by-row run.
+ * @param {number} radius
+ * @returns {StampLayout}
+ */
+export function stampLayout(radius) {
+  const H = Math.round(STAMP.height * radius);
+  const k = H / 76;
+  const stem = Math.max(2, Math.round(STAMP.stem * H));
+  const row = (/** @type {number} */ y) => round((40 - y) * k);
+  const left = (/** @type {number} */ x) => round(x * k + stem / 2) - stem;
+  const [nOuter, diag, nInner, hInner, hOuter, bar] = MONOGRAM_STROKES;
+  const upright = (/** @type {number[]} */ [x, ya, , yb]) => {
+    const i0 = left(x);
+    return [i0, Math.min(row(ya), row(yb)), i0 + stem, Math.max(row(ya), row(yb))];
+  };
+  const j0 = round((40 - bar[1]) * k + stem / 2) - stem;
+  const boxes = [
+    upright(nOuter),
+    upright(nInner),
+    upright(hInner),
+    upright(hOuter),
+    [round(bar[0] * k), j0, round(bar[2] * k), j0 + stem],
+  ];
+  return {
+    boxes,
+    diag: { x0: left(diag[0]) + stem / 2, y0: row(diag[1]), x1: left(diag[2]) + stem / 2, y1: row(diag[3]) },
+    stem,
+    diagonal: stem + STAMP.diagonal,
+  };
 }
 
 /**
- * The monogram's height, a share of the seal's radius, and its strokes' width, a share of that
- * (at the seal's smallest, about 28 texels across its radius on a desktop, three texels wide).
+ * The N's diagonal's cells in row `j`: [i0, i1) (empty outside its rows). The shader's
+ * inDiagonal.
+ * @param {StampLayout} L
+ * @param {number} j
+ * @returns {[number, number]}
  */
-export const STAMP = { height: 1.28, stroke: 0.085 };
-/** Which of STROKES is the N's diagonal: it takes no lip (on a steep line it's a dotted one). */
-const DIAGONAL = 1;
-
-/**
- * A stroke `stroke` wide as a box with square ends, like the logo's: how far (x, y) is outside it
- * (negative inside). The shader's strokeAt.
- * @param {number} x
- * @param {number} y
- * @param {number[]} seg  [x0, y0, x1, y1]
- * @param {number} stroke
- */
-function strokeAt(x, y, [ax, ay, bx, by], stroke) {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const len = Math.hypot(dx, dy);
-  const qx = x - ax;
-  const qy = y - ay;
-  const along = (qx * dx + qy * dy) / len;
-  const across = Math.abs(qy * dx - qx * dy) / len;
-  return Math.max(across - stroke / 2, Math.max(-along, along - len) - stroke / 2);
+export function diagonalAt(L, j) {
+  const { x0, y0, x1, y1 } = L.diag;
+  if (j < y1 || j >= y0) return [0, 0];
+  const cx = x0 + ((y0 - (j + 0.5)) / (y0 - y1)) * (x1 - x0);
+  // (Every cell whose middle is within half its width; a hair under, so the shader agrees.)
+  const i0 = Math.ceil(cx - L.diagonal / 2 - 0.5 - 1e-3);
+  return [i0, i0 + L.diagonal];
 }
 
 /**
- * What the stamp shows at (x, y) of the seal's face (its own units), its strokes `segs`
- * (monogramSegments) `stroke` wide and a texel `texel`: 'deep' in a stroke's recess, 'lip' on its
- * lit wall (a stroke's texel, the N's diagonal's aside, with the face one texel under it), else
- * null. The shader (SEAL_GLSL's sealStamp) runs the same sums.
- * @param {number[][]} segs
- * @param {number} stroke
- * @param {number} texel
- * @param {number} x
- * @param {number} y
+ * Whether cell (i, j) is in one of the stamp's straight strokes.
+ * @param {StampLayout} L
+ * @param {number} i
+ * @param {number} j
+ */
+const inBox = (L, i, j) => L.boxes.some(([x0, y0, x1, y1]) => i >= x0 && i < x1 && j >= y0 && j < y1);
+
+/**
+ * What the stamp shows in cell (i, j): 'deep' in a stroke's recess, 'lip' on the face right
+ * under one of its straight strokes (the lit wall: under the crossbar, at the stems' feet; never
+ * under the diagonal's steps, where it would be a dotted line), else null. The shader
+ * (SEAL_GLSL's sealStamp) runs the same sums.
+ * @param {StampLayout} L
+ * @param {number} i
+ * @param {number} j
  * @returns {'deep'|'lip'|null}
  */
-export function stampAt(segs, stroke, texel, x, y) {
-  let inside = false;
-  let lipped = false;
-  let below = Infinity;
-  segs.forEach((g, i) => {
-    const d = strokeAt(x, y, g, stroke);
-    if (d < 0) {
-      inside = true;
-      if (i !== DIAGONAL) lipped = true;
-    }
-    below = Math.min(below, strokeAt(x, y - texel, g, stroke));
-  });
-  if (!inside) return null;
-  return lipped && below >= 0 ? 'lip' : 'deep';
+export function stampCell(L, i, j) {
+  const [a, b] = diagonalAt(L, j);
+  if (inBox(L, i, j) || (i >= a && i < b)) return 'deep';
+  return inBox(L, i, j + 1) ? 'lip' : null;
 }
+
+/**
+ * A texel at the seal's face, in the letter's units: the view's height `viewH` over its `rows`
+ * of texels at the letter (the camera `dist` away, the letter drawn at `scale`), smaller by how
+ * much nearer the face is (`faceZ`, world units toward the camera).
+ * @param {number} viewH
+ * @param {number} rows
+ * @param {number} scale
+ * @param {number} faceZ
+ * @param {number} dist
+ */
+export function sealTexel(viewH, rows, scale, faceZ, dist) {
+  return (viewH * (dist - faceZ)) / dist / rows / scale;
+}
+
 /** The rings of the blob from its middle out: [share of the radius, height as a share of it]. */
 const RINGS = [
   [0.3, 0.3],
@@ -147,67 +219,70 @@ export function sealGeometry(r) {
   return g;
 }
 
-/** The stamp, in GLSL (the seal's material: toon's SEAL). */
+/** The stamp, in GLSL (the seal's material: toon's SEAL): stampCell's sums on the texel grid. */
 const SEAL_GLSL = /* glsl */ `
-  uniform vec4 uSeg[6];
-  uniform float uStroke;
-  uniform float uSealR;
+  uniform vec4 uBox[5];
+  uniform vec4 uDiag;
+  uniform float uDiagW;
   uniform float uTexelS;
   uniform vec3 uDeep;
   uniform vec3 uLip;
-  // (A stroke as a box with square ends, like the logo's: negative inside.)
-  float strokeAt(vec2 p, vec4 s) {
-    vec2 d = s.zw - s.xy;
-    float len = length(d);
-    vec2 dir = d / len;
-    vec2 q = p - s.xy;
-    float along = dot(q, dir);
-    float across = abs(dot(q, vec2(-dir.y, dir.x)));
-    return max(across - uStroke * 0.5, max(-along, along - len) - uStroke * 0.5);
+  // (All of it without branches: cells are whole numbers, so a < b is a <= b - 0.5. Branching
+  // here left the face's shading, which takes the texel's neighbours, wrong round the strokes.)
+  float within(float a, float lo, float hi) {
+    return step(lo, a) * step(a, hi - 0.5);
   }
-  float monogram(vec2 p) {
-    float d = 1e3;
-    for (int i = 0; i < 6; i++) d = min(d, strokeAt(p, uSeg[i]));
-    return d;
-  }
-  // (Every stroke but the N's diagonal, index ${DIAGONAL}: the ones with a lip.)
-  float lipped(vec2 p) {
-    float d = 1e3;
-    for (int i = 0; i < 6; i++) {
-      if (i == ${DIAGONAL}) continue;
-      d = min(d, strokeAt(p, uSeg[i]));
+  float inBoxes(vec2 c) {
+    float k = 0.0;
+    for (int i = 0; i < 5; i++) {
+      vec4 b = uBox[i];
+      k = max(k, within(c.x, b.x, b.z) * within(c.y, b.y, b.w));
     }
-    return d;
+    return k;
+  }
+  float inDiagonal(vec2 c) {
+    float cx = uDiag.x + (uDiag.y - (c.y + 0.5)) / (uDiag.y - uDiag.w) * (uDiag.z - uDiag.x);
+    float i0 = ceil(cx - uDiagW * 0.5 - 0.5 - 1e-3);
+    return within(c.y, uDiag.w, uDiag.y) * within(c.x, i0, i0 + uDiagW);
   }
   vec3 sealStamp(vec2 p, vec3 c) {
-    if (monogram(p) >= 0.0) return c;
-    // (The recess's lower wall faces the light from above: a lighter lip along it, one texel
-    // high, the face a texel under it; never on the diagonal. Else the dark recess.)
-    return lipped(p) < 0.0 && monogram(p - vec2(0.0, uTexelS)) >= 0.0 ? uLip : uDeep;
+    // (The face's texel this is, counted from the seal's middle: a cell of the stamp.)
+    vec2 cell = floor(p / uTexelS);
+    float deep = max(inBoxes(cell), inDiagonal(cell));
+    float lip = (1.0 - deep) * inBoxes(cell + vec2(0.0, 1.0));
+    return mix(mix(c, uLip, lip), uDeep, deep);
   }
 `;
 
 /**
- * The seal, radius `r`: `group` (to place), and `setTexel` (a texel in the seal's own units, for
- * the lip's width).
+ * The seal, radius `r`: `group` (to place), and `setTexel` (a texel at its face in its own units:
+ * the stamp is drawn on that grid).
  * @param {ReturnType<typeof import('./envelopeLook.js').shared>} u
  * @param {number} r
  */
 export function buildSeal(u, r) {
   const geo = sealGeometry(r);
-  const segs = monogramSegments(r * STAMP.height).map(([a, b, c, d]) => new THREE.Vector4(a, b, c, d));
-  const texel = { value: r * 0.03 };
-  const stampUniforms = () => ({
-    uSeg: { value: segs },
-    uStroke: { value: r * STAMP.height * STAMP.stroke },
-    uSealR: { value: r },
-    uTexelS: texel,
+  const boxes = Array.from({ length: 5 }, () => new THREE.Vector4());
+  const stamp = {
+    uBox: { value: boxes },
+    uDiag: { value: new THREE.Vector4() },
+    uDiagW: { value: 1 },
+    uTexelS: { value: 1 },
     uDeep: { value: new THREE.Vector3(0x4a / 255, 0x0b / 255, 0x0a / 255) },
     uLip: { value: new THREE.Vector3(0xe3 / 255, 0x86 / 255, 0x78 / 255) },
-  });
+  };
+  /** @param {number} s  a texel at its face, in the seal's units */
+  const setTexel = (s) => {
+    const L = stampLayout(r / s);
+    L.boxes.forEach((b, i) => boxes[i].set(b[0], b[1], b[2], b[3]));
+    stamp.uDiag.value.set(L.diag.x0, L.diag.y0, L.diag.x1, L.diag.y1);
+    stamp.uDiagW.value = L.diagonal;
+    stamp.uTexelS.value = s;
+  };
+  setTexel(r / 30);
   const bead = toon(WAX, u, IDS.seal);
   const group = new THREE.Group();
-  const mat = toon(WAX, u, IDS.seal, { uniforms: stampUniforms(), defines: { SEAL: '' }, glsl: SEAL_GLSL });
+  const mat = toon(WAX, u, IDS.seal, { uniforms: stamp, defines: { SEAL: '' }, glsl: SEAL_GLSL });
   group.add(new THREE.Mesh(geo, mat));
   // The beads squeezed out at the edge: small squashed lumps.
   for (const [a, size] of [
@@ -224,9 +299,6 @@ export function buildSeal(u, r) {
   }
   return {
     group,
-    /** @param {number} s  a texel, in the seal's units */
-    setTexel(s) {
-      texel.value = s;
-    },
+    setTexel,
   };
 }

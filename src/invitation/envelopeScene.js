@@ -46,7 +46,7 @@ import {
   sealBloom,
   shedParticles,
 } from './envelope.js';
-import { buildSeal } from './envelopeSeal.js';
+import { SEAL_SIZE, buildSeal, sealTexel } from './envelopeSeal.js';
 import { PETAL_SHAPES, POOL, createPetalFlow, petalGrid } from './petals.js';
 import { BAYER, IDS, INK, INSIDE, PAPER, PETAL, rgb, shared, toon } from './envelopeLook.js';
 
@@ -378,7 +378,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   scene.add(outer);
   const envl = buildEnvelope(u);
   inner.add(envl.group);
-  const sealR = envl.W * 0.18;
+  const sealR = envl.W * SEAL_SIZE;
   const seal = buildSeal(u, sealR);
   const sealAt = new THREE.Vector3(0, envl.tipY + sealR * 0.12, envl.T / 2 + 0.16);
   seal.group.position.copy(sealAt);
@@ -433,8 +433,14 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     const s = Math.sin(-TILT);
     const w = Math.min((0.82 * view.w) / (c + s / ASPECT), (0.52 * view.h) / (s + c / ASPECT));
     view.scale = w / envl.W;
-    // (A texel, in the seal's own units: its stamp's lit lip is one texel wide.)
-    seal.setTexel(view.h / th / view.scale);
+    // (A texel at the seal's face, in its own units, at rest: its stamp is drawn on that grid,
+    // so its strokes keep their widths. The face is nearer the camera than the letter.)
+    inner.updateMatrix();
+    const face = v
+      .set(0, 0, sealR * 0.31)
+      .add(sealAt)
+      .applyMatrix4(inner.matrix);
+    seal.setTexel(sealTexel(view.h, th, view.scale, face.z * view.scale, DIST));
   }
   resize();
   const onResize = () => resize();
@@ -685,7 +691,8 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     // the envelope's lean.)
     const bloom = sealBloom(Math.max(p.bloom, (follow.lift / 0.45) * 0.14));
     seal.group.scale.setScalar(bloom.scale);
-    seal.group.rotation.z = -TILT * 0.85 + bloom.spin;
+    // (Upright on the screen, so the stamp's stems stand on the texel grid.)
+    seal.group.rotation.z = -TILT + bloom.spin;
     seal.group.visible = bloom.scale > 0;
     outer.updateMatrixWorld(true);
     petalsAt(pt, p);
