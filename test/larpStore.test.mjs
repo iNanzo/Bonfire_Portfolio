@@ -70,7 +70,7 @@ const OLD_EVENT = {
     { id: 'r3', category: 'cheer', prepMs: 60_000, turnMs: 30_000, skipped: false },
   ],
   results: [{ roundId: 'r1', teamRoundScores: { tA: 120, tB: 100 } }],
-  corrections: [{ teamId: 'tB', points: -10 }],
+  corrections: [{ recipientType: 'team', recipientId: 'tB', teamId: 'tB', points: -10 }],
 };
 
 test('store: the first version’s event loads with its teams, rounds and points', () => {
@@ -97,6 +97,25 @@ test('store: the first version’s event loads with its teams, rounds and points
   assert.equal(s.map.get(OLD_KEY), JSON.stringify(OLD_EVENT), 'the old key is left as it was');
   assert.equal(fromOldEvent({ nope: 1 }), null);
   assert.equal(loadGame(memory({ [OLD_KEY]: '{bad' }), env).from, 'new');
+});
+
+test('store: legacy member corrections do not change carried-over team scores', () => {
+  const old = {
+    ...OLD_EVENT,
+    corrections: [
+      ...OLD_EVENT.corrections,
+      { recipientType: 'member', recipientId: 'm1', teamId: 'tA', points: 35 },
+      { recipientType: 'member', recipientId: 'm2', teamId: 'tB', points: -20 },
+      { recipientType: 'team', recipientId: 'tA', teamId: 'tA', points: 5 },
+    ],
+  };
+  const text = JSON.stringify(old);
+  const s = memory({ [OLD_KEY]: text });
+  const { game, from } = loadGame(s, env);
+  assert.equal(from, 'old');
+  assert.equal(scores(game).get('tA'), 125);
+  assert.equal(scores(game).get('tB'), 90);
+  assert.equal(s.map.get(OLD_KEY), text, 'individual history remains in the untouched old event');
 });
 
 test('store: a new save wins over the first version’s event', () => {

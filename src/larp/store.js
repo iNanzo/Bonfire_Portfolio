@@ -80,7 +80,10 @@ export function fromOldEvent(ev) {
   for (const res of Array.isArray(ev.results) ? ev.results : [])
     for (const [id, n] of Object.entries(res?.teamRoundScores ?? {})) totals[id] = (totals[id] ?? 0) + (Number(n) || 0);
   for (const c of Array.isArray(ev.corrections) ? ev.corrections : [])
-    if (c?.teamId) totals[c.teamId] = (totals[c.teamId] ?? 0) + (Number(c.points) || 0);
+    // Individual corrections belong to member standings, never to the team's total.
+    // Match the old scoring.js teamTotals contract: the recipient identifies the team.
+    if (c?.recipientType === 'team' && c.recipientId)
+      totals[c.recipientId] = (totals[c.recipientId] ?? 0) + (Number(c.points) || 0);
   const log = Object.entries(totals)
     .filter(([, n]) => n !== 0)
     .map(([teamId, n], i) => ({
