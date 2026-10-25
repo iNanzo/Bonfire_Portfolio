@@ -400,9 +400,9 @@ and `list`/`positions` for cameras. The full list is in the header of `knights.j
 - **Two altars** (`scenery.js`): a cathedral's chancel (an altar on a stepped dais, a
   lancet window of stained glass under a pointed arch, candle stands, a nave column pair,
   a pew) and a cult's (a rune-carved slab on a round dais, ember bowls, black candles,
-  hooded stone figures with glowing eyes, standing stones, a half ring of candles behind
-  the fire). The forge and the shrine were rebuilt on the same rules, which removed their
-  artifacts: faces stay flat (pieces lean as a whole instead of per-vertex jitter), block
+  standing stones, a half ring of candles behind the fire; its hooded stone figures were
+  taken out in round 17). The forge and the shrine were rebuilt on the same rules, which
+  removed their artifacts: faces stay flat (pieces lean as a whole instead of per-vertex jitter), block
   joints have a recessed core behind them (no dashed outlines), nothing is left open to
   see through, nothing is coplanar (glows draw a hair in front), nothing is sub-texel
   thin, and glows have kinds (a lamp's windows share one steady light instead of each

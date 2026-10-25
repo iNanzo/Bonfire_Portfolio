@@ -205,19 +205,9 @@ export const CATHEDRAL = {
   },
 };
 
-/** A hooded stone figure (the cult's): robe, shoulders, hood, the face in it, clasped sleeves. */
-export const HOODED = {
-  robe: { r: 0.36, h: 1.62 },
-  shoulders: { r: 0.2, h: 0.5, at: [1.46, 0.02] },
-  hood: { r: 0.2, y: 1.74, scale: [1, 1.2, 1.05] },
-  face: { size: [0.18, 0.2, 0.08], at: [1.72, 0.2] },
-  eyes: { x: 0.045, at: [1.75, 0.245] },
-  sleeves: { size: [0.32, 0.13, 0.16], at: [1.02, 0.24] },
-};
 /**
  * The cult: the altar at the back right (a slab on a block between boulders, bowls of
- * embers, black candles, two hooded figures), standing stones at the back left, a hooded
- * watcher at the front left.
+ * embers, black candles) and standing stones at the back left.
  */
 export const CULT = {
   altar: {
@@ -231,10 +221,6 @@ export const CULT = {
       [0.2, 0.16],
     ],
     candleAt: [0.815, -0.2],
-    figures: [
-      [-0.98, -0.5, 0.25],
-      [0.98, -0.5, -0.25],
-    ],
   },
   stones: {
     at: [-1.45, -1.35],
@@ -257,7 +243,6 @@ export const CULT = {
       [-0.12215971299447119, 0.01987953858450055],
     ],
   },
-  watcher: { scale: 0.78 },
 };
 
 // --- shapes in groups ----------------------------------------------------------------------
@@ -362,35 +347,6 @@ function lantern(f, name) {
     box(f, `${name} finial`, [0, L.finial.y, 0], [2 * L.finial.r, 2 * L.finial.r, 2 * L.finial.r]),
   ];
 }
-/** A hooded figure (HOODED) in its frame. */
-function hooded(f, name) {
-  const H = HOODED;
-  const hoodR = H.hood.r * Math.max(H.hood.scale[0], H.hood.scale[2]) + 0.01,
-    hoodH = H.hood.r * H.hood.scale[1] + 0.01;
-  return [
-    cyl(f, `${name} robe`, 0, 0, H.robe.r, 0, 0, H.robe.h),
-    cyl(
-      f,
-      `${name} shoulders`,
-      0,
-      H.shoulders.at[1],
-      H.shoulders.r,
-      0,
-      H.shoulders.at[0] - H.shoulders.h / 2,
-      H.shoulders.at[0] + H.shoulders.h / 2,
-    ),
-    cyl(f, `${name} hood`, 0, 0, hoodR, hoodR, H.hood.y - hoodH, H.hood.y + hoodH),
-    // (The face's box, out to the glowing eyes in front of it.)
-    box(
-      f,
-      `${name} face`,
-      [0, H.face.at[0], (H.face.at[1] - H.face.size[2] / 2 + H.eyes.at[1] + 0.01) / 2],
-      [H.face.size[0], H.face.size[1], H.eyes.at[1] + 0.01 - (H.face.at[1] - H.face.size[2] / 2)],
-    ),
-    box(f, `${name} sleeves`, [0, H.sleeves.at[0], H.sleeves.at[1]], H.sleeves.size),
-  ];
-}
-
 /** Each scenery's shapes, built once. */
 const BUILDERS = {
   ruins() {
@@ -672,7 +628,6 @@ const BUILDERS = {
         [Math.max(...xs) - Math.min(...xs) + 0.08, tall + 0.1, 0.08],
       ),
     );
-    for (const [x, z, turn] of A.figures) out.push(...hooded(frame(al, [x, 0, z], { y: turn }), 'hooded figure'));
     const S = CULT.stones;
     const st = ground(S.at, S.turn);
     S.list.forEach(([x, z, w, h, lean], i) => {
@@ -681,8 +636,6 @@ const BUILDERS = {
       // (Its sigil stands a little proud of its face.)
       out.push(box(f, `standing stone ${'ABC'[i]}`, [0, h / 2, 0], [w, h, S.depth + 0.035]));
     });
-    const [fx, fz] = CLEARING.frontLeft;
-    out.push(...hooded(ground('frontLeft', Math.atan2(-fx, -fz), CULT.watcher.scale), 'hooded watcher'));
     return out;
   },
 };

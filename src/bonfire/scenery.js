@@ -15,9 +15,9 @@
 //              left, a nave column pair with a broken arch; front left, a pew and a
 //              cluster of floor candles
 //   cult       back right, a slab altar on a round dais, carved with a glowing sigil (the
-//              NH monogram, ui/logo.js), ember bowls and black candles, two hooded stone
-//              figures behind it; back left, standing stones carved with the same sigil;
-//              front left, a hooded watcher; a half ring of black candles behind the fire
+//              NH monogram, ui/logo.js), ember bowls and black candles; back left,
+//              standing stones carved with the same sigil; a half ring of black candles
+//              behind the fire
 //
 // In every one there's a seat for the knight (knights.js) behind the fire on the left, well
 // back from it (his boots clear of the ring stones and the flames), where the site's cameras
@@ -45,7 +45,7 @@
 //     glass and runes keep their tone and breathe slowly
 import * as THREE from 'three';
 import { SEATS } from './knightPlaces.js';
-import { CLEARING, FORGE, SHRINE, CATHEDRAL, CULT, HOODED } from './colliders.js';
+import { CLEARING, FORGE, SHRINE, CATHEDRAL, CULT } from './colliders.js';
 import { logoBars } from '../ui/logo.js';
 import { mergeStatic } from './sceneryMerge.js';
 
@@ -482,21 +482,15 @@ export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
 
     // ------------------------------------------------------------------------------------
   } else if (name === 'cult') {
-    /** A hooded figure of stone: a robe, clasped sleeves, a hood with a dark face and glowing eyes. */
-    const hooded = (g, x, z, turn, scale = 1) => {
-      const f = place(new THREE.Vector3(x, 0, z), turn, { parent: g, scale });
-      const H = HOODED;
-      add(new THREE.ConeGeometry(H.robe.r, H.robe.h, 7), mat.pillar, 0, 0.81, 0, { parent: f, rough: 0.008 });
-      add(new THREE.ConeGeometry(H.shoulders.r, H.shoulders.h, 7), mat.pillar, 0, ...H.shoulders.at, {
-        parent: f,
-        rough: 0,
-      }); // shoulders
-      add(rock(H.hood.r, 0), mat.pillar, 0, H.hood.y, 0, { parent: f, jagged: 0.02, scale: H.hood.scale }); // the hood
-      add(box(...H.face.size), mat.char, 0, ...H.face.at, { parent: f, rough: 0 }); // the face, in shadow
-      const eyes = lampId++;
-      for (const ex of [-H.eyes.x, H.eyes.x])
-        glow(box(0.035, 0.02, 0.02), ex, ...H.eyes.at, { parent: f, kind: 'rune', id: eyes, tone: 3 });
-      add(box(...H.sleeves.size), mat.pillar, 0, ...H.sleeves.at, { parent: f, rough: 0.006 }); // clasped sleeves
+    /**
+     * Where a hooded stone figure stood (there were two behind the altar and a watcher at the
+     * front left): its lamp id and the random numbers it drew are passed over, so everything
+     * built after it (the standing stones, which the knight's room is measured against in
+     * colliders.js CULT.stones.drawn, and the candles) is exactly as it was.
+     */
+    const figureGone = () => {
+      lampId++;
+      for (let i = 0; i < 48; i++) rand(); // robe 6, hood 36 (12 corners), sleeves 6
     };
     /**
      * A sigil carved in a face: the NH monogram (ui/logo.js), `tall` m tall, in 3 cm strokes
@@ -530,7 +524,8 @@ export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
         });
     }
     for (const [x, h] of A.candles) candle(altar, x, A.candleAt[0], A.candleAt[1], h, { material: mat.char });
-    for (const [x, z, turn] of A.figures) hooded(altar, x, z, turn);
+    figureGone();
+    figureGone();
     light(altar, [0, 1.05, 0.4], 1.1, 2.6);
 
     // --- standing stones, back left, each carved with the sigil
@@ -550,8 +545,7 @@ export function buildScenery(name, mat, glowMaterial, { merge = true } = {}) {
     add(box(0.9, 0.2, 0.3), mat.stone, fallen.x, 0.1, fallen.z, { parent: stones, ry: 0.5, rz: 0.08, rough: 0.03 });
     light(stones, [0, 1.0, 0.5], 0.7, 2.2);
 
-    // --- a hooded watcher, front left, turned toward the fire
-    hooded(group, FRONT_LEFT.x, FRONT_LEFT.z, Math.atan2(-FRONT_LEFT.x, -FRONT_LEFT.z), CULT.watcher.scale);
+    figureGone(); // (the watcher, front left)
 
     // --- a half ring of black candles behind the fire (the two nearest the knight's seat stand
     // past it, so his boots go between them)

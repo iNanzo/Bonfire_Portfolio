@@ -153,8 +153,8 @@ notes: `docs/design/visualizer.md`.
     ruins' pillar, the forge's anvil, the shrine's back lantern, the cathedral's nave, the
     cult's stones), the knight on it and the fire, all three in a 16:9 frame however far
     it has swayed (0.15 rad either way) and pushed in, in every place. From further round
-    to the left, the front-left piece (the shrine's front lantern, the cathedral's pew, the
-    cult's watcher) would come between it and him.
+    to the left, the front-left piece (the shrine's front lantern, the cathedral's pew)
+    would come between it and him.
 - **Colors** (`colors.js`): each new flame is one of the site's palettes, or one made on
   the spot with the admin's palette generator (`src/paletteGen.js`): harmonious (any
   scheme, or the one picked) or fully random, named for its hue ("Cobalt Lightning").

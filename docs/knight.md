@@ -473,8 +473,7 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
     scene doesn't pass it on, the same question put to `colliders.js` by the show itself:
     `createFits`), taking another of the pool's (by the dancer's seed, so nothing else the
     show rolls changes), or turning to the fire for one if nothing fits facing the cameras
-    (the cult's watcher, the shrine's front lantern and the cathedral's pew stand by the
-    front-left places).
+    (the shrine's front lantern and the cathedral's pew stand by the front-left places).
   - *Checked* on the real model at the fire's 12 fps (`test/knightClearance.test.mjs`):
     every seat sitting still (≥ 4 cm); every gesture seated and standing at the seat, the
     site's dance on a desktop and a phone, reactions, seated moves, getting up and sitting
@@ -535,7 +534,7 @@ pure) and `armor.js` (the material); wired up in `scene.js` and `sceneKnight.js`
   four (sitting as far back as his turned-in boot needs, he'd come within 4 cm of it;
   before the turn he rested 4.2 cm off) and the cult's by the pit for four (his stretched
   boot's toe on a pit stone, sat back till it lies on the ground he'd come within 4 cm of
-  the hooded watcher behind him); every other place rests. It holds for any place a
+  the hooded watcher behind him, since taken out); every other place rests. It holds for any place a
   scenery has, a new one too (`test/knightClearance.test.mjs` checks every scenery and
   cast, sent home, sat down where the show stands him, and back from watchful, the pose
   he sits in, and each boot on the ground under it).
