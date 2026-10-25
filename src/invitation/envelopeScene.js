@@ -48,6 +48,7 @@ import {
   hoverStep,
   letterCovers,
   turnGoal,
+  turnRoll,
   turnStep,
   particleAt,
   releaseGesture,
@@ -678,7 +679,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     const goal =
       env.state === 'floating' ? turnGoal({ pointer: pointerX, dx: drag?.dx ?? 0, w: view.cssW, key: keyTurn }) : 0;
     turn = turnStep(turn, goal, dt, reduced);
-    outer.rotation.set(0, p.yaw + turn, -0.5 * p.drop);
+    outer.rotation.set(0, p.yaw + turn, -0.5 * p.drop + turnRoll(turn));
     outer.scale.setScalar(view.scale * (1 + 0.025 * p.pulse) * (0.94 + 0.06 * p.arrive));
     envl.hinge.rotation.x = -p.flap;
     // The seal: whole, starting to open as a finger drags it up, then blooming into petals,

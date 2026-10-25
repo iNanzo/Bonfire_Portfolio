@@ -21,7 +21,7 @@ import {
   envelopeLayout,
   paperLit,
 } from '../src/invitation/envelopeLook.js';
-import { SWAY, TURN } from '../src/invitation/envelope.js';
+import { SWAY, TURN, turnRoll } from '../src/invitation/envelope.js';
 
 const L = envelopeLayout();
 const ORDER = /** @type {(keyof typeof L.parts)[]} */ (['body', 'inside', 'pocket', 'flap']);
@@ -221,8 +221,10 @@ test('every paper face is one flat tone, the same through the whole sway and the
     for (let yaw = -most; yaw <= most + 1e-9; yaw += most / 8) {
       // (The face as drawn, turned by the sway and the turn; its normal taken back into the
       // letter's own frame (the shader's derivatives there) and lit as the rest pose has it.)
+      // (The turn's roll with it, at its most: the letter's own tones never see either.)
       const pose = new THREE.Matrix4()
-        .makeRotationY(yaw)
+        .makeRotationZ(turnRoll(Math.max(-TURN.max, Math.min(TURN.max, yaw))))
+        .multiply(new THREE.Matrix4().makeRotationY(yaw))
         .multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(PITCH, 0, TILT)));
       const drawn = new THREE.Vector3(0, 0, 1).transformDirection(pose);
       const own = drawn.clone().transformDirection(pose.clone().invert());

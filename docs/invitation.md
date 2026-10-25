@@ -50,8 +50,9 @@ loading screen too: NEWT loads behind it.
   the rim holds steady.
 - **Turn it:** it leans toward the mouse, clearly enough to see (about 6° with the mouse halfway
   to the edge of the screen, 8° at the edge; on a phone, toward your finger while it's down);
-  drag it sideways or hold the left or right arrow key to turn it further, and it springs back
-  when you let go. It never turns more than about 14°.
+  its top tips the same way as it turns, so it reads as leaning toward you; drag it sideways or
+  hold the left or right arrow key to turn it further, and it springs back when you let go. It
+  never turns more than about 14°.
 - **Open it:** tap or click it, press Enter, Space or the up arrow, swipe it up, or scroll up.
   The seal blooms into roses first (about half a second): it swells, then shrinks away while a
   ring of petals unfurls out of it and drifts up and off to either side, fading soon, and the
@@ -744,7 +745,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `hoverStep` and `hoverPulse(k, t)` (`HOVER_PULSE`: the eased hover times
   0.5 − 0.5·cos(2πt / 2.8 s), steady with reduced motion); the letter's turn, `turnGoal` (toward
   the pointer's x, eased out to `TURN.lean` (0.14 rad at the edge, about 0.1 halfway), plus a
-  sideways drag or a held arrow up to `TURN.push` (0.16), at most `TURN.max`, 0.24 rad) and
+  sideways drag or a held arrow up to `TURN.push` (0.16), at most `TURN.max`, 0.24 rad),
+  `turnRoll(turn)` (the roll that goes with it, `TURN.roll` 0.45 of it, its top tipping the way
+  it turns: a yaw of a flat letter seen face on only narrows it) and
   `turnStep` (eased, springing back; none with reduced motion); the dissolve's sums,
   `DISSOLVE` and `dissolveAt(x, y)` (mostly how far up the letter, leaning across, plus a smooth
   noise; the shader runs the same with a screen-locked Bayer dither on top), and its specks,
@@ -813,7 +816,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   dissolving rim, and the hover's pulse there too (a Bayer-dithered `SHINE` on the letter's
   outermost two texels and a `HOVER` gold halo past its line, the letter's ids only, never the
   petals', like NEWT's in retro.js; `hover` in its snapshot); the letter's yaw is the sway plus
-  its turn (`turn` in its snapshot); the camera's matrices are brought up to date after it's
+  its turn, rolled by `turnRoll(turn)` (`turn` in its snapshot); the camera's matrices are brought up to date after it's
   placed and every frame, the shaders compiled at creation and the seal hidden until it's been
   placed once (the red box on reload was a first frame's seal placed through a camera three had
   never updated: 37 times its size; `seal.first` in its snapshot); the petals (`createPetalScene`,

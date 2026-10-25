@@ -30,6 +30,7 @@ import {
   sealBloom,
   TURN,
   turnGoal,
+  turnRoll,
   turnStep,
   envelopeGesture,
   envelopeKey,
@@ -502,6 +503,11 @@ test('the letter leans clearly toward the pointer’s x, and a sideways drag or 
   assert.equal(turnGoal({ key: -1 }), -turnGoal({ key: 1 }), 'ArrowLeft');
   assert.ok(turnGoal({ pointer: 0.5, key: 1 }) >= 0.2, 'ArrowRight, the cursor its way');
   assert.ok(turnGoal({ pointer: 1, key: 1 }) <= TURN.max + 1e-9);
+  // (A yaw of a flat letter seen face on is only a narrowing: it rolls its top the same way too,
+  // a share of the turn, so the lean reads as one. Clockwise on the screen for a turn right.)
+  assert.ok(turnRoll(0) === 0, 'square on, no roll');
+  assert.ok(turnRoll(half) < 0 && turnRoll(-half) === -turnRoll(half), 'the top toward the cursor');
+  assert.ok(Math.abs(turnRoll(half)) >= 0.04 && Math.abs(turnRoll(TURN.max)) <= 0.15, `${turnRoll(half)}`);
 });
 
 test('the turn eases toward where it heads and springs back once let go; reduced motion keeps it square on', () => {

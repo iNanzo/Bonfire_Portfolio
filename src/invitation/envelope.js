@@ -347,7 +347,15 @@ export function sealBloom(b) {
  * than `max` in all; it eases toward that over about `ease` seconds and springs back. (The
  * paper's tones don't change with its yaw, so the whole range reads as one flat letter turning.)
  */
-export const TURN = { lean: 0.14, push: 0.16, reach: 0.25, max: 0.24, ease: 0.12 };
+export const TURN = { lean: 0.14, push: 0.16, reach: 0.25, max: 0.24, ease: 0.12, roll: 0.45 };
+
+/**
+ * The roll that goes with a turn (radians about the screen's axis, clockwise for a turn right):
+ * `roll` of it, its top tipping the way it turns. A yaw of a flat letter seen face on only narrows
+ * it a little; with this it reads as leaning toward the cursor.
+ * @param {number} turn
+ */
+export const turnRoll = (turn) => -TURN.roll * turn;
 
 /**
  * Where the letter's turn heads (radians, its face toward +x for more): toward the pointer
