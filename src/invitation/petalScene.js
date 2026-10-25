@@ -182,7 +182,7 @@ export function createPetalScene({ scene, unit = 1, seed = 16, reduced = false, 
      * The letter now (petals.js letter), from its world matrix (its local x across, y up, z out
      * of its face, its middle at the origin), each frame before `step`; null once it's gone.
      * @param {THREE.Matrix4|null} matrix
-     * @param {{h: number, opening: number, floating: boolean, inside?: number, pocket?: number}} [o]
+     * @param {{h: number, opening: number, floating: boolean, inside?: number, pocket?: number, time?: number}} [o]
      *   its height, letter widths; how far its flap has lifted (0…1); whether it floats; and how
      *   far in front of its middle its inside's and pocket's faces are (letter widths: the pour
      *   starts between them)
@@ -200,6 +200,7 @@ export function createPetalScene({ scene, unit = 1, seed = 16, reduced = false, 
         fwd: axis(matrix, 2),
         h: o.h,
         opening: o.opening,
+        time: o.time,
         floating: o.floating,
         inside: o.inside,
         pocket: o.pocket,

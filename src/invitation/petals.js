@@ -194,6 +194,7 @@ export function valueNoise(x) {
  * @property {Point} fwd
  * @property {number} h  its height, letter widths
  * @property {number} opening  how far its flap has lifted, 0 shut … 1 open
+ * @property {number} [time]  the envelope's clock, for emission timing independent of capped physics steps
  * @property {boolean} floating  it floats (the swirl goes round it), not yet opened or skipped
  * @property {number} [inside]  how far in front of its middle its inside's face is, letter widths
  *   (the pour starts just in front of it; LETTER_DEPTHS without one)
@@ -841,8 +842,9 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
       if (L?.floating && !F?.floating) fling(F ?? L);
       if (F && prev && t > prevAt && t - prevAt < 0.25) wake(F, prev, t - prevAt);
       if (F && F.opening >= FLOWS.pour.from) {
-        pourAt ??= t;
-        const due = Math.min(FLOWS.pour.n, 1 + Math.floor(((t - pourAt) / FLOWS.pour.over) * FLOWS.pour.n));
+        const now = F.time ?? t;
+        pourAt ??= now;
+        const due = Math.min(FLOWS.pour.n, 1 + Math.floor(((now - pourAt) / FLOWS.pour.over) * FLOWS.pour.n));
         while (emitted.pour < due) pourOne(F);
       }
       L = F && { ...F, c: { ...F.c }, right: { ...F.right }, up: { ...F.up }, fwd: { ...F.fwd } };

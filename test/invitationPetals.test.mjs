@@ -323,6 +323,22 @@ test('the pour: once the flap is half open, a good stream of petals rises out of
   assert.equal(idle.emitted.pour, 0);
 });
 
+test('the pour follows the envelope clock even when slow rendering caps its physics steps', () => {
+  const flow = createPetalFlow({ seed: 9 });
+  const letter = frameAt(ORIGIN, { floating: false });
+  flow.letter({ ...letter, opening: 0.4, time: 10 });
+  assert.equal(flow.emitted.pour, 0, 'none before the flap is half open');
+  flow.letter({ ...letter, opening: 0.5, time: 10.2 });
+  for (const time of [10.4, 10.6, 10.8]) {
+    flow.step(0.05);
+    flow.letter({ ...letter, opening: 1, time });
+  }
+  assert.equal(flow.emitted.pour, FLOWS.pour.n, 'the full stream before the envelope disappears');
+  assert.ok(flow.time < FLOWS.pour.over, 'physics still advances in short safe steps');
+  flow.letter({ ...letter, opening: 1, time: 11 });
+  assert.equal(flow.emitted.pour, FLOWS.pour.n, 'never emits a second stream');
+});
+
 test('poured, the petals stand well clear above the mouth: risen 0.3 of the letter over it within half a second, out past its top', () => {
   for (const seed of [9, 10, 11]) {
     const L = frameAt(ORIGIN, { floating: false });

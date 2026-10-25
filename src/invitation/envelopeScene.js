@@ -768,6 +768,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     petals.letter(here ? inner.matrixWorld : null, {
       h: envl.H / envl.W,
       opening: Math.min(1, Math.max(0, p.flap / FLAP_OPEN)),
+      time: last,
       floating: env.state === 'floating',
       // (The pour starts between its inside's face and its pocket's, so the pocket hides it till it
       // rises out of the mouth.)

@@ -26,16 +26,21 @@ async function frame(page, yaw = 0) {
     .toBe(true);
 }
 
-/** Waits until the hold has settled: his anchor and hold height alike across two reads. */
+/** Waits for a stable anchor, depth and hold height across advancing simulation frames. */
 async function settled(page, message) {
   let was = '';
+  let stableSince = 0;
   await expect
     .poll(
       async () => {
-        const d = (await snapshot(page)).drag;
+        const { d, time } = await page.evaluate(() => ({
+          d: window.__invitation.snapshot().drag,
+          time: window.__invitation.clock(),
+        }));
         if (!d.anchor) return false;
-        const now = [d.anchor.x, d.anchor.y, d.anchor.z, d.holdY].map((v) => v.toFixed(3)).join();
-        const still = now === was;
+        const now = [d.anchor.x, d.anchor.y, d.anchor.z, d.holdY, d.depth].map((v) => v.toFixed(3)).join();
+        if (now !== was) stableSince = time;
+        const still = now === was && time - stableSince >= 0.15;
         was = now;
         return still;
       },

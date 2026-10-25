@@ -316,7 +316,10 @@ test.describe('on a desktop', () => {
     for (const e of seen) if (e.pose.flap > 0) expect(e.pose.bloom).toBe(1);
     // (The pour waits for the flap to be about half open, then comes out of the mouth in force.)
     for (const e of seen) if (e.pose.flap < e.flapOpen * 0.45) expect(e.petals.emitted.pour).toBe(0);
-    expect(seen.at(-1).petals.emitted.pour).toBeGreaterThanOrEqual(20);
+    // The half-second stream can finish during the dissolve: fading starts only about
+    // 0.3 seconds after the flap crosses halfway. Require the complete stream, not a
+    // frame-rate-dependent partial count at the first fading frame.
+    await expect.poll(async () => (await envSnap(page))?.petals.emitted.pour ?? 0).toBe(30);
     await introStarted(page);
   });
 
