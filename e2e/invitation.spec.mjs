@@ -1672,8 +1672,8 @@ test.describe('on a desktop', () => {
     }
     // Done, Pixel Size (its slider and the buttons at its two ends), Dithering, Outlines, Style,
     // Motion, the 17 Shader options (Reset To Style rests until one is the user's own), Ground
-    // Cues, Drag and Wander.
-    expect(stops.size, [...stops].join(', ')).toBe(28);
+    // Cues and Wander (no Drag row: the bead hold is the only carry).
+    expect(stops.size, [...stops].join(', ')).toBe(27);
     // Focus on the page (a click on empty space): Tab comes back into the sheet.
     await page.mouse.click(200, 120);
     await page.keyboard.press('Tab');
