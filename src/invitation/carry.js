@@ -18,7 +18,9 @@
 // the play area's edges (a disc's rim, a rounded box's sides and corner arcs, or a box's sides)
 // for a fall that reaches one, until his lowest foot meets the floor. What the brain feels while
 // he's held (createHand, handStep, handFeel: the shake and the drag speed) comes from the user's
-// own pointer alone, never from a drag kind easing his collar onto it. Pure: no three.js.
+// own pointer alone, never from a drag kind easing his collar onto it, and he's shaken only by
+// the pointer going back and forth, never by one fast move or a gap in its events (HAND). Pure:
+// no three.js.
 
 import { rayPlane } from './gesture.js';
 import { centreOf, clampTo, rounded, xRange } from './steer.js';
@@ -390,10 +392,16 @@ export function dragTarget(g, ray, low, t = g.t0) {
 /**
  * The hand: the user's own pointer while he's held, followed as the swing's drive follows the
  * anchor (critically damped at CARRY.follow, so a spot that only moves on some frames isn't a
- * shake). For its first `settle` s the shake reads nothing, so a pointer already moving as he's
+ * shake). It's shaken only when it goes back and forth: a stroke of the pointer at least `swing`
+ * world units long (over the CSS px a world unit spans where he hangs) that comes back at least
+ * `swing` the other way is a turn, and two turns no more than `turnWithin` s apart, the last no
+ * longer ago than that, is a shake; one fast move, however fast, never is. A pointer whose spot
+ * hasn't moved for `gap` s and then moves again had a gap in its samples (its events stalled
+ * while the frames kept coming): the hand starts over there, on it and at rest, so the jump isn't
+ * a jolt. For its first `settle` s the shake reads nothing, so a pointer already moving as he's
  * grabbed isn't a jolt as the follow catches up with it from rest.
  */
-export const HAND = { settle: 0.2 };
+export const HAND = { settle: 0.2, swing: 0.1, turnWithin: 0.35, gap: 0.1 };
 
 /**
  * The hand as he's grabbed: on the pointer (client px) at `t`, at rest.
@@ -402,15 +410,28 @@ export const HAND = { settle: 0.2 };
  * @returns {import('./types.js').HandState}
  */
 export function createHand(px, t) {
-  return { t0: t, drive: { x: px.x, y: px.y }, vel: { x: 0, y: 0 }, speed: 0, shake: 0 };
+  return {
+    t0: t,
+    drive: { x: px.x, y: px.y },
+    vel: { x: 0, y: 0 },
+    speed: 0,
+    shake: 0,
+    px: { x: px.x, y: px.y },
+    movedAt: t,
+    from: { x: px.x, y: px.y },
+    far: { x: px.x, y: px.y },
+    turns: [],
+  };
 }
 
 /**
  * One frame of the hand: its follow of the pointer (`px`, client px, the pointer's own spot and
- * never a kind's aim, a finger's lift or a grab offset), its speed in CSS px a second, and its
- * shake, the follow's acceleration in world units/s² (over `pxPerUnit`, CSS px a world unit
- * across the screen where he hangs), capped at CARRY.accelMax and smoothed over
- * CARRY.shakeSmooth. Updates `h` in place and returns it.
+ * never a kind's aim, a finger's lift or a grab offset), its speed in CSS px a second, its turns
+ * (HAND: the pointer's own strokes, back and forth) and its shake: while it's shaking, the
+ * follow's acceleration in world units/s² (over `pxPerUnit`, CSS px a world unit across the
+ * screen where he hangs), capped at CARRY.accelMax; otherwise none; smoothed over
+ * CARRY.shakeSmooth. After a gap in the pointer's samples it starts over where the pointer is.
+ * Updates `h` in place and returns it.
  * @param {import('./types.js').HandState} h
  * @param {{x: number, y: number}} px
  * @param {number} dt
@@ -419,15 +440,63 @@ export function createHand(px, t) {
  */
 export function handStep(h, px, dt, t, pxPerUnit) {
   if (!(dt > 0)) return h;
+  const moved = px.x !== h.px.x || px.y !== h.px.y;
+  if (moved) {
+    // (Its events stalled: on again from here, so the jump is no jolt and no stroke.)
+    if (t - h.movedAt >= HAND.gap - 1e-9) restart(h, px);
+    h.px = { x: px.x, y: px.y };
+    h.movedAt = t;
+  }
   const [x, vx] = follow(h.drive.x, h.vel.x, px.x, dt);
   const [y, vy] = follow(h.drive.y, h.vel.y, px.y, dt);
   const a = Math.hypot(vx - h.vel.x, vy - h.vel.y) / dt / Math.max(1e-6, pxPerUnit);
   h.drive = { x, y };
   h.vel = { x: vx, y: vy };
   h.speed = Math.hypot(vx, vy);
+  if (moved) turnStep(h, px, HAND.swing * Math.max(1e-6, pxPerUnit), t);
+  const last = h.turns.at(-1);
+  const shaking = h.turns.length >= 2 && t - last <= HAND.turnWithin + 1e-9;
+  const want = shaking ? Math.min(a, CARRY.accelMax) : 0;
   if (t - h.t0 < HAND.settle - 1e-9) h.shake = 0;
-  else h.shake += (Math.min(a, CARRY.accelMax) - h.shake) * Math.min(1, dt / CARRY.shakeSmooth);
+  else h.shake += (want - h.shake) * Math.min(1, dt / CARRY.shakeSmooth);
   return h;
+}
+
+/**
+ * The hand on again at `px`, at rest, with no stroke and no turns (a gap in the pointer's samples).
+ * @param {import('./types.js').HandState} h
+ * @param {{x: number, y: number}} px
+ */
+function restart(h, px) {
+  h.drive = { x: px.x, y: px.y };
+  h.vel = { x: 0, y: 0 };
+  h.from = { x: px.x, y: px.y };
+  h.far = { x: px.x, y: px.y };
+  h.turns = [];
+}
+
+/**
+ * The pointer's stroke (HAND): `far`, its farthest from where it began (`from`); once it has come
+ * back `need` CSS px from there, the other way, after a stroke at least that long, that's a turn,
+ * and the next stroke begins where it turned. Keeps the last two turns, close enough together.
+ * @param {import('./types.js').HandState} h
+ * @param {{x: number, y: number}} p
+ * @param {number} need
+ * @param {number} t
+ */
+function turnStep(h, p, need, t) {
+  const { from, far } = h;
+  const out = Math.hypot(far.x - from.x, far.y - from.y);
+  if (Math.hypot(p.x - from.x, p.y - from.y) > out) {
+    h.far = { x: p.x, y: p.y };
+    return;
+  }
+  const back = Math.hypot(p.x - far.x, p.y - far.y);
+  const against = (far.x - from.x) * (p.x - far.x) + (far.y - from.y) * (p.y - far.y) < 0;
+  if (out < need || back < need || !against) return;
+  h.from = far;
+  h.far = { x: p.x, y: p.y };
+  h.turns = [...h.turns.filter((at) => t - at <= HAND.turnWithin + 1e-9), t].slice(-2);
 }
 
 /**

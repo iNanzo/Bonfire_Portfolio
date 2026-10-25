@@ -69,7 +69,10 @@ so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
   his arms and legs hanging limp and swinging with the motion; at the edge of his patch he stops
   instead of sliding along it. Held, he hangs his head, and every few seconds (sooner if you
   shake him) he thrashes about, kicking and flailing; let go and he falls, lands and gets back
-  up. Flick him and he flies, a flick up the screen lobbing him away from you; let go while
+  up. Shaking him means shaking him back and forth (one fast flick isn't a shake): shake him
+  hard, fling him about or drop him from high and he gets stressed, and once he lands he runs
+  off if it was too much; carrying him about gently, however long, never bothers him. Flick him
+  and he flies, a flick up the screen lobbing him away from you; let go while
   pushing him against the edge of his patch and he just drops there. The camera holds still
   while you carry him. As you grab him a gold ring of dither bursts out from your grip and is
   gone in under half a second. Off the floor, the soft shadow under him sits straight below his
@@ -112,8 +115,9 @@ so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
   in) and **Reset Camera** (back to where it started). Camera again or Escape closes it.
 - **He stays on screen:** at the default zoom (and further out) the camera doesn't follow him,
   on a phone or a computer: it stays on the middle of where he can go, which fills the screen,
-  so a tap anywhere on the floor walks him to just where your finger was, the top of the screen
-  too, however many times in a row. It moves only to keep his feet on the screen (turned away
+  so a tap anywhere on the floor walks him to just where your finger was, however many times in
+  a row; near the very top of the screen he stops short, straight down from your finger, so his
+  whole head stays on the screen. It moves only to keep his feet on the screen (turned away
   from him, or tossed past an edge), only as far as that, and comes back to the middle as he
   walks back on. Zoomed in, it follows him softly (all the way at the closest) and keeps him
   well inside the screen; zoomed back out, it eases back to the middle. Once you've slid the
@@ -374,7 +378,13 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     farthest: about 9.6 units on a 390×844 phone, 8.4 on a 768×1024 tablet and 8.0 on a
     1280×800 desktop; one shape however the camera turns, worked out again on a resize, never
     moved by the camera or the Settings sheet; its middle is the orbit's, Reset Camera's and the
-    brain's; and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight and the
+    brain's; `tapReach`, where a tap on the floor walks him (main.js hands the brain that as the
+    tap's floor): the point under the finger, but where at the default zoom, turned as the camera
+    is, the top of his head would show higher than `TOP_ROOM` (16 CSS px) under the stage's top,
+    the floor straight down the screen from it on `reachRow`, where it shows just that far under,
+    so a tap stops short of the top by his height there (his feet about 140 CSS px under the top
+    on a 1280×800 desktop, 95 on a 390×844 phone; the walls stay where they are); and
+    `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight and the
     shadow camera's box, `stage.setArea` keeping it round the area's middle; `steer.js` keeps
     wander goals inside the play area's `sight` when one's there, a flee inside what was on
     screen as it began, `Body.fence`; when a resize shrinks the area under him the brain walks
@@ -470,7 +480,12 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `carry.js` `createHand`, `handStep`, `handFeel`: what the brain feels while he's held, the
     shake and the drag speed, from the user's own pointer alone (a critically damped follow of
     it at `CARRY.follow`, the shake its acceleration over the CSS px a world unit spans where he
-    hangs, none for the first `HAND.settle`, 0.2 s, so a pointer already moving as he's grabbed
+    hangs, only while the pointer goes back and forth: two turns, each after a stroke of at
+    least `HAND.swing`, 0.1 units, and back as far, no more than `HAND.turnWithin`, 0.35 s,
+    apart, so one fast flick is no shake however fast; a pointer whose spot stands still for
+    `HAND.gap`, 0.1 s, and then moves on had a gap in its events while the frames kept coming,
+    and the hand starts over there, at rest, instead of reading the jump as a jolt; none for the
+    first `HAND.settle`, 0.2 s, so a pointer already moving as he's grabbed
     isn't a jolt), never from the hold easing his collar onto it: read off his collar, the grab
     offset, a finger's lift and the bead's spring and hold height made every still grab a hard
     shake ("Too much!" and an early Thrash) and stress enough to flee once he landed; `carry.js`
@@ -769,13 +784,15 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   governor's level and the zoom in a corner; `?govern` turns the governor on under `?test`.
 - **Captures:** `node tools/capture-invitation.mjs` records real-speed clips of every clip and
   of taps, drags, buttons, floor taps, a chase and the camera at phone and desktop sizes
-  (animated WebP plus a contact sheet; `--look`, `--pixel` (a resolution such as `64` or
+  (animated WebP plus a contact sheet; its `flick`, `shake` and `stroll` acts carry him by the
+  collar, flicked once, shaken at 5 Hz and carried gently for 8 s, and the report lists his faces,
+  his stress and what he said as each played; `--look`, `--pixel` (a resolution such as `64` or
   `64x64`, `native` or `off`), `--motion`, `--sizes`, `--acts`); its `pan`, `lift` and
   `sweep` acts (`tools/capture-invitation-camera.mjs`) slide, turn and zoom the camera, carry
   him up high (the report says how far the grabbed point strayed from the cursor) and sweep the
   cursor, or a finger, over the whole screen to show where he looks, and its `reach` and
-  `reach-turned` acts tap near the top of the screen and follow him all the way there (turned
-  90° first); its `envelope` and `envelope-skip` acts open or skip the envelope
+  `reach-turned` acts tap near the top of the screen and follow him there, as far up as keeps
+  his head on the screen (turned 90° first); its `envelope` and `envelope-skip` acts open or skip the envelope
   (`?test&envelope`, whole frames). The record and the frames are
   `tools/capture-invitation-record.mjs`. One GPU capture at a time.
   `node tools/capture-invitation-drag.mjs` records the same carry from each of the camera's views

@@ -24,6 +24,12 @@
 //             on a phone size, a mouse drag on a desktop one)
 //   swing     a press on his body held into a grab, lifted, swung left and right twice, brought
 //             back to the middle, held still and let go (he falls and lands)
+//   flick     a press on his body held into a grab, lifted, flicked 260 px across in half a second,
+//             held still 1.5 s and let go: no shake (no surprised face, no "shaken" line)
+//   shake     the same grab shaken ±40 px across at 5 Hz for 1.6 s and let go: shaken (the line),
+//             stressed, and he runs once he lands
+//   stroll    the same grab carried about gently for 8 s (134 px/s at most) and let go: he lands
+//             calm, no flee
 //   hover     (desktop sizes) the cursor circling him, then on him and off again: his head follows
 //   buttons   Wave, Sit, Give Device and Run pressed in turn
 //   device    Give Device pressed three times: he sits with the tablet and plays, lies down on
@@ -496,6 +502,55 @@ function actsFor(size) {
       },
       2400,
     );
+  // (What he feels from the hand, real speed: carry.js HAND, brain.js stress.)
+  /** A press on his body held into a grab and lifted 60 px; then `then(press, lift)`, and let go. */
+  const held = async (page, then) => {
+    const from = await point(page, 'body');
+    const lift = { x: from.x, y: from.y - 60 };
+    const press = await presser(page, size);
+    await press.down(from);
+    await sleep(320); // (held past the 280 ms that makes it a grab)
+    await along(press.move, (k) => ({ x: from.x, y: from.y + (lift.y - from.y) * k }), 300);
+    await sleep(600);
+    await then(press, lift);
+    await press.up();
+    await press.done();
+  };
+  const eased = (/** @type {number} */ k) => (1 - Math.cos(Math.PI * k)) / 2;
+  if (ACTS.includes('flick'))
+    act(
+      'flick',
+      (page) =>
+        held(page, async (press, at) => {
+          const d = Math.min(260, size.w * 0.3);
+          await along(press.move, (k) => ({ x: at.x - d / 2 + d * eased(k), y: at.y }), 500);
+          await sleep(1500);
+        }),
+      2500,
+    );
+  if (ACTS.includes('shake'))
+    act(
+      'shake',
+      (page) =>
+        held(page, async (press, at) => {
+          await along(press.move, (k) => ({ x: at.x + 40 * Math.sin(2 * Math.PI * 5 * 1.6 * k), y: at.y }), 1600);
+          await sleep(600);
+        }),
+      3500,
+    );
+  if (ACTS.includes('stroll'))
+    act(
+      'stroll',
+      (page) =>
+        held(page, async (press, at) => {
+          await along(
+            press.move,
+            (k) => ({ x: at.x + 90 * Math.sin(1.2 * 8 * k), y: at.y - 40 * Math.sin(2 * 8 * k) }),
+            8000,
+          );
+        }),
+      3500,
+    );
   if (ACTS.includes('hover') && !size.phone)
     act(
       'hover',
@@ -725,6 +780,10 @@ for (const size of SIZES) {
           `his feet ${seen.toolbar} above the toolbar; root up to ${seen.farthest} u from the middle; ` +
           `camera turned ${seen.turned}° (${seen.widest}° at the most)`,
       );
+    const faces = taken.faces.map((f) => `${f.face}@${f.t}`).join(' ');
+    const most = Math.max(0, ...taken.stress.map((f) => f.stress));
+    const said = taken.says.map((f) => `"${f.text}"@${f.t}`).join(' ');
+    console.log(`  faces ${faces}; stress up to ${most}; said ${said || 'nothing'}`);
     if (taken.grip?.length)
       console.log(
         `  the grabbed point from the press: at most ${Math.max(...taken.grip)} px over ${taken.grip.length} moves; ` +
@@ -758,6 +817,8 @@ for (const size of SIZES) {
       // his heading and his head's look yaw and pitch.)
       track: taken.pos,
       faces: taken.faces,
+      stress: taken.stress,
+      says: taken.says,
       ...(taken.grip ? { grip: taken.grip } : {}),
       ...(RAW ? { raw: await keepRaw(`${base}-raw`, shot) } : {}),
       end: taken.end,
