@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import {
   BLOOM_SIZE,
   FLOWS,
+  LETTER_DEPTHS,
   PETAL_SHAPES,
   PETAL_SIZES,
   POOL,
@@ -26,6 +27,7 @@ import {
   swirlSlot,
   valueNoise,
 } from '../src/invitation/petals.js';
+import { DEPTH, envelopeLayout } from '../src/invitation/envelopeLook.js';
 
 const ORIGIN = { x: 0, y: 0, z: 0 };
 /** The letter standing square to the camera at `c` (petals.js LetterFrame). */
@@ -300,6 +302,36 @@ test('the pour: as it opens, petals rise out of its inside, along its up and for
   const idle = createPetalFlow({ seed: 9 });
   run(idle, 2, 1 / 60, (g) => g.letter(frameAt()));
   assert.equal(idle.emitted.pour, 0);
+});
+
+test('the pour starts between the inside and the pocket, which hides it till it rises out of the mouth', () => {
+  // (The envelope's depths, letter widths in front of its middle: envelopeLook.js DEPTH.)
+  const { T, W } = envelopeLayout();
+  const depths = { inside: (T / 2 + DEPTH.inside) / W, pocket: (T / 2 + DEPTH.pocket) / W };
+  for (const k of /** @type {const} */ (['inside', 'pocket']))
+    assert.ok(Math.abs(LETTER_DEPTHS[k] - depths[k]) < 1e-9, `petals.js LETTER_DEPTHS.${k} is the envelope's`);
+  for (const seed of [9, 10, 11]) {
+    const L = frameAt(ORIGIN, { floating: false, ...depths });
+    const f = createPetalFlow({ seed });
+    /** @type {Map<object, number>} each pour petal's height up the letter at its birth */
+    const bornAt = new Map();
+    run(f, 1.4, 1 / 60, (g, i) => {
+      g.letter({ ...L, opening: Math.min(1, i / 60) });
+      for (const p of g.petals) {
+        if (p.kind !== 'pour' || p.born > g.time) continue;
+        if (!bornAt.has(p)) {
+          const d = dot(sub(p.start, L.c), L.fwd);
+          assert.ok(d > depths.inside && d < depths.pocket, `born between them: ${d.toFixed(4)}`);
+          bornAt.set(p, dot(sub(p.start, L.c), L.up));
+        }
+        // (Below its mouth it's behind the pocket: risen less than the mouth is above any birth.)
+        const local = sub(p, L.c);
+        if (dot(local, L.up) - bornAt.get(p) < 0.06)
+          assert.ok(dot(local, L.fwd) < depths.pocket, `behind the pocket: ${dot(local, L.fwd).toFixed(4)}`);
+      }
+    });
+    assert.ok(bornAt.size >= 10, `a pour: ${bornAt.size}`);
+  }
 });
 
 test('the seal blooms: a ring of petals tight round it that unfurl outward and lift away', () => {

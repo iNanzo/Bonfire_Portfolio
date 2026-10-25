@@ -28,6 +28,11 @@ export const BLOOM_SIZE = [1.5, 1.9];
 export const POOL = 120;
 /** The simulation's fixed step, seconds: 30 or 60 frames a second step it the same. */
 export const STEP = 1 / 60;
+/**
+ * The envelope's inside and pocket faces, letter widths in front of its middle (envelopeLook.js
+ * DEPTH): where the pour starts, behind the pocket, when its LetterFrame doesn't say.
+ */
+export const LETTER_DEPTHS = { inside: 0.0095, pocket: 0.0325 };
 
 /** How many each flow launches (a ring rolls its count; a trail step comes in 1–3). */
 export const FLOWS = {
@@ -182,6 +187,10 @@ export function valueNoise(x) {
  * @property {number} h  its height, letter widths
  * @property {number} opening  how far its flap has lifted, 0 shut … 1 open
  * @property {boolean} floating  it floats (the swirl goes round it), not yet opened or skipped
+ * @property {number} [inside]  how far in front of its middle its inside's face is, letter widths
+ *   (the pour starts just in front of it; LETTER_DEPTHS without one)
+ * @property {number} [pocket]  and its pocket's face (the pour stays behind it, so the pocket hides
+ *   it, till it has risen out of the mouth)
  */
 /**
  * @typedef {object} SwirlSlot  a petal's place in the swirl
@@ -654,15 +663,18 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
     }
   }
   /**
-   * One petal poured up out of the letter's inside (below its mouth, at the pocket's depth).
+   * One petal poured up out of the letter's inside (below its mouth, just in front of the inside's
+   * face and behind the pocket's, so the pocket hides it till it rises out).
    * @param {LetterFrame} F
    */
   function pourOne(F) {
     const a = r(-0.42, 0.42);
     const down = r(0.02, 0.06 + (0.42 - Math.abs(a)) * 0.5 * F.h);
-    const at = local(F, a, F.h / 2 - down, r(-0.02, 0));
+    const inside = F.inside ?? LETTER_DEPTHS.inside;
+    const pocket = F.pocket ?? LETTER_DEPTHS.pocket;
+    const at = local(F, a, F.h / 2 - down, inside + (pocket - inside) * r(0.05, 0.15));
     const up = r(0.55, 0.95);
-    const out = r(0.12, 0.3);
+    const out = r(0.06, 0.12);
     const side = a * r(0.4, 0.9);
     add(
       make('pour', t + r(0, 0.02), at, {

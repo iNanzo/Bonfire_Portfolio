@@ -59,6 +59,7 @@ import { buildSeal, sealOnScreen } from './envelopeSeal.js';
 import { createPetalScene } from './petalScene.js';
 import {
   BAYER,
+  DEPTH,
   HOVER,
   IDS,
   INK,
@@ -129,8 +130,8 @@ function buildEnvelope(u) {
   const group = new THREE.Group();
   const paper = (/** @type {keyof typeof LEAN} */ part) => toon(PAPER, u, IDS[part], { lean: LEAN[part] });
   group.add(piece(L.parts.body, paper('body'), T / 2));
-  group.add(piece(L.parts.inside, paper('inside'), T / 2 + 0.004));
-  group.add(piece(L.parts.pocket, paper('pocket'), T / 2 + 0.05));
+  group.add(piece(L.parts.inside, paper('inside'), T / 2 + DEPTH.inside));
+  group.add(piece(L.parts.pocket, paper('pocket'), T / 2 + DEPTH.pocket));
   // The flap, hinged on the top edge (its points from the hinge).
   const hinge = new THREE.Group();
   hinge.position.set(0, h, T / 2 + 0.1);
@@ -767,6 +768,10 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
       h: envl.H / envl.W,
       opening: Math.min(1, Math.max(0, p.flap / FLAP_OPEN)),
       floating: env.state === 'floating',
+      // (The pour starts between its inside's face and its pocket's, so the pocket hides it till it
+      // rises out of the mouth.)
+      inside: (envl.T / 2 + DEPTH.inside) / envl.W,
+      pocket: (envl.T / 2 + DEPTH.pocket) / envl.W,
     });
     petals.step(dt);
   }

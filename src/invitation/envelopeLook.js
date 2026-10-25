@@ -95,6 +95,13 @@ export const SEAL_SIZE = 0.2;
 const SHAPE = { aspect: 1.45, flap: 0.58, mouth: 0.25 };
 
 /**
+ * How far in front of the paper's face (T / 2) the inside and the pocket sit, the layout's units:
+ * the pocket a little way in front of the inside, so petals pouring between them (petals.js
+ * LETTER_DEPTHS) show over the inside and hide behind the pocket till they rise out of its mouth.
+ */
+export const DEPTH = { inside: 0.004, pocket: 0.05 };
+
+/**
  * The envelope's parts as flat polygons (each counter-clockwise, [x, y]), built to a width of 2
  * with the flap closed: the body; the inside of the pocket (it shows as the flap lifts); the
  * pocket, one piece, its mouth a shallow V from its top corners tucked under the flap; and the
