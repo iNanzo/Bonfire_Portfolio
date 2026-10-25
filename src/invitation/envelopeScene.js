@@ -29,7 +29,8 @@
 // it (hoverPulse: a wide dithered gold glow, a warm rim, the letter lifting a little toward the
 // camera and its paper a step brighter at the peak, all gone between pulses: hoverLook), shown
 // strongly at once while a finger (or the mouse) is down on the letter (pressStep), and on a touch
-// screen while it's left alone. It takes focus at boot with no ring: the ring shows once a key
+// screen while it's left alone; a white glint sweeps across the seal as each pulse rises, and once,
+// quick and bright, as it's opened (sealGloss). It takes focus at boot with no ring: the ring shows once a key
 // is pressed. veils(spots) says whether it still hides NEWT (his head, collar and middle: the
 // intro's first line waits for it; envelope.js letterCovers at points of each on the letter).
 // The hint ("Click or swipe up to open", "Tap ..." on a touch screen, / "Swipe down to skip")
@@ -41,6 +42,7 @@ import {
   DISSOLVE,
   ENVELOPE_TEXT,
   FLAP_OPEN,
+  GLOSS,
   TIMES,
   createEnvelope,
   dragHint,
@@ -59,6 +61,7 @@ import {
   particleAt,
   releaseGesture,
   sealBloom,
+  sealGloss,
   shedParticles,
 } from './envelope.js';
 import { buildSeal, sealOnScreen } from './envelopeSeal.js';
@@ -474,6 +477,10 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   let lastInput = clock();
   let frames = 0;
   let uncovered = false;
+  /** When it was pressed on or opened (the seal's one quick glint: envelope.js sealGloss), or never. */
+  let clickedAt = -Infinity;
+  /** The seal's glint as shown (for ?test). */
+  let gloss = sealGloss(0, 0);
   /** When it was done (its last petals may hold it up a moment). */
   let doneAt = 0;
   /**
@@ -488,6 +495,8 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
   function open() {
     const now = clock();
     if (!env.open(now)) return;
+    // (Opened by a key, or after a long press: its glint now.)
+    if (now - clickedAt > GLOSS.click) clickedAt = now;
     layer.classList.add('is-open');
     // The seal blooms into roses (before the flap: envelope.js's timeline).
     petals.emit('bloom', spots.seal, { radius: sealR * view.scale });
@@ -531,6 +540,8 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
       far: 0,
       on: onLetterAt(e.clientX, e.clientY),
     };
+    // (Pressed on the letter: the seal's quick glint starts now, before the click opens it.)
+    if (drag.on && env.state === 'floating') clickedAt = clock();
     leanTo(e);
     try {
       hit.setPointerCapture(e.pointerId);
@@ -780,6 +791,9 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
     compose.mat.uniforms.uReach.value = hover.look.reach;
     compose.mat.uniforms.uRim.value = hover.look.rim;
     u.uBright.value = reduced ? 0 : hover.look.bright;
+    // (The seal's glint, on the hover's time; once, quick and bright, as it's opened.)
+    gloss = sealGloss(floating ? hover.k : 0, hover.t, now - clickedAt, reduced);
+    seal.gloss(gloss.at, gloss.width);
   }
 
   /**
@@ -917,6 +931,7 @@ export function createEnvelopeScene(root, { reduced, ready, onOpen, onUncover, o
         press: hover.press,
         pulse: hover.pulse,
         look: { ...hover.look },
+        gloss: { ...gloss },
       };
       const turnNow = { now: turn, pointer: pointerX, key: keyTurn };
       return {

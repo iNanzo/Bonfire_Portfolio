@@ -11,7 +11,8 @@
 // (pose), the seal shrinking away as it blooms (sealBloom: its petals are petals.js's), the
 // hover's slow pulse (hoverStep, hoverPulse) and how it shows (hoverLook: a wide glow, a lift
 // toward the camera and the paper a step brighter at its peak; pressStep, a finger down on it,
-// strong at once), the letter's turn toward the pointer and with a
+// strong at once), the seal's glint on the same time and once at a click (sealGloss), the
+// letter's turn toward the pointer and with a
 // sideways drag or the arrow keys (turnGoal, turnStep), and the
 // dissolve: where its noisy edge has reached on the letter (dissolveAt, DISSOLVE: the scene's
 // shader runs the same sums) and the specks it sheds there, drifting up and fading
@@ -451,6 +452,39 @@ export function hoverLook(pulse) {
     rim: L.rim[0] + (L.rim[1] - L.rim[0]) * k,
     bright: smooth((k - L.bright) / (1 - L.bright)),
   };
+}
+
+/**
+ * The wax seal's glint (sealGloss): a white band across the seal from its upper left to its lower
+ * right (the light's way), from `reach` radii out on one side to `reach` on the other; with the
+ * hover it sweeps across from `from` to `to` of each pulse (as it rises: through the middle on
+ * the way up to the peak, gone well before the trough), `width` radii either side of its middle;
+ * a click (or a tap) sweeps it once over `click` seconds, `clickWidth` wide, from `clickReach` out
+ * on one side (its edge: it starts on the wax at once) to the other, fast at first, so it's across
+ * before the bloom's petals cover the seal.
+ */
+export const GLOSS = { from: 0.18, to: 0.48, reach: 1.7, width: 0.09, click: 0.25, clickWidth: 0.14, clickReach: 1.15 };
+
+/**
+ * Where the seal's glint is (`at`, radii along its sweep from the seal's middle) and how wide
+ * (`width`, radii either side; 0 none): the hover's (`k` eased in, `t` seconds into it: hoverPulse's
+ * time) or, `since` seconds after a click, the click's. None with reduced motion.
+ * @param {number} k
+ * @param {number} t
+ * @param {number} [since]
+ * @param {boolean} [reduced]
+ * @returns {{at: number, width: number}}
+ */
+export function sealGloss(k, t, since = Infinity, reduced = false) {
+  const G = GLOSS;
+  const none = { at: -G.reach, width: 0 };
+  if (reduced) return none;
+  if (since >= 0 && since < G.click)
+    return { at: -G.clickReach + 2 * G.clickReach * easeOut(since / G.click), width: G.clickWidth };
+  if (!(k > 0)) return none;
+  const phase = t / HOVER_PULSE.period - Math.floor(t / HOVER_PULSE.period);
+  if (phase < G.from || phase > G.to) return none;
+  return { at: -G.reach + 2 * G.reach * smooth((phase - G.from) / (G.to - G.from)), width: G.width * Math.min(1, k) };
 }
 
 /**

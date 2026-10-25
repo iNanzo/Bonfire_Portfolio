@@ -35,6 +35,7 @@ import {
   envelopeGesture,
   envelopeKey,
   hintFor,
+  GLOSS,
   HOVER_LOOK,
   hoverLook,
   hoverPulse,
@@ -43,6 +44,7 @@ import {
   pressStep,
   shownPulse,
   releaseGesture,
+  sealGloss,
   shedParticles,
 } from '../src/invitation/envelope.js';
 
@@ -566,4 +568,49 @@ test('a touch-down on the letter shows the hover strongly at once; lifted, it fa
   assert.equal(shownPulse(0.2, 1), 1);
   assert.equal(shownPulse(0.7, 0.3), 0.7);
   assert.equal(shownPulse(0, 0), 0);
+});
+
+test('the seal’s glint keeps the hover’s time: a white band sweeps across it as the pulse rises, gone at the trough; a click sweeps it once, quick and bright', () => {
+  const P = HOVER_PULSE.period;
+  const off = (g) => g.width === 0 || Math.abs(g.at) - g.width > 1.42;
+  // (Gone at the trough, and all the way down the pulse's fall.)
+  for (const t of [0, P, 2 * P, 0.05 * P]) assert.ok(off(sealGloss(1, t)), `none at the trough: ${t}`);
+  for (let t = 0.62 * P; t < P; t += P / 50) assert.ok(off(sealGloss(1, t)), `none as it falls: ${(t / P).toFixed(2)}`);
+  // (As it rises: from the upper left across to the lower right, once, through the middle on the way up.)
+  let last = -Infinity;
+  let crossed = null;
+  for (let t = 0; t < P; t += P / 200) {
+    const g = sealGloss(1, t);
+    if (g.width === 0) continue;
+    assert.ok(g.at >= last, 'one way across');
+    last = g.at;
+    if (crossed === null && g.at >= 0) crossed = t;
+  }
+  assert.ok(crossed !== null, 'it crosses the seal');
+  const v = hoverPulse(1, /** @type {number} */ (crossed));
+  assert.ok(v > 0.3 && v < 0.95 && crossed < P / 2, `through the middle as the pulse rises: ${v.toFixed(2)}`);
+  assert.ok(sealGloss(1, GLOSS.from * P + 1e-6).at <= -1.42, 'it starts off the seal');
+  assert.ok(sealGloss(1, GLOSS.to * P - 1e-6).at >= 1.42, 'and ends off it');
+  // (Eased in with the hover; none without one.)
+  const mid = (GLOSS.from + GLOSS.to) / 2;
+  assert.ok(Math.abs(sealGloss(0.5, mid * P).width - sealGloss(1, mid * P).width / 2) < 1e-9);
+  assert.equal(sealGloss(0, mid * P).width, 0);
+  // (A click: one quick sweep across, wider than the hover's, then gone.)
+  assert.ok(GLOSS.click >= 0.2 && GLOSS.click <= 0.35, `quick: ${GLOSS.click}`);
+  let was = -Infinity;
+  for (let s = 0; s < GLOSS.click; s += GLOSS.click / 20) {
+    const g = sealGloss(0, 0, s);
+    assert.ok(g.width > sealGloss(1, mid * P).width, 'brighter than the hover’s');
+    assert.ok(g.at > was, 'across');
+    was = g.at;
+  }
+  // (From its edge, on the wax at once, and half across within a tenth of a second: the bloom's
+  // petals soon cover it.)
+  assert.ok(sealGloss(0, 0, 0).at <= -1 && sealGloss(0, 0, 0).at >= -1.2, 'from its edge');
+  assert.ok(sealGloss(0, 0, 0.1).at >= -0.2, 'fast at first');
+  assert.ok(was >= 1, 'to the other side');
+  assert.equal(sealGloss(0, 0, GLOSS.click + 0.01).width, 0, 'once');
+  // (Reduced motion: none.)
+  assert.equal(sealGloss(1, mid * P, Infinity, true).width, 0);
+  assert.equal(sealGloss(1, 0, 0.1, true).width, 0);
 });

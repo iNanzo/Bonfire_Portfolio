@@ -27,6 +27,8 @@ export const PAPER = [0xf1d786, 0xe4b85d, 0xd3983d];
 /** The paper's three a step brighter: how it shows at the hover's peak (envelope.js hoverLook). */
 export const PAPER_LIT = [0xfbe9ac, 0xf0cd7a, 0xe2ad55];
 export const WAX = [0xd24b52, 0x96151f, 0x5a0a12];
+/** The wax's fourth tone: its glint, white (envelope.js sealGloss). */
+export const WAX_GLOSS = 0xffffff;
 export const PETAL = [0xe44544, 0xac2e29, 0x851d1b];
 /** The toy's ink (invitation.css --inv-ink): the lines round it and along the flap's V. */
 export const INK = 0x3a332d;

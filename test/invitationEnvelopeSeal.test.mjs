@@ -14,7 +14,20 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { LOGO_STROKES } from '../src/ui/logo.js';
-import { HOVER, IDS, INK, LIGHT, PAPER, REST, SHADES, WAX, rgb, shared, toon } from '../src/invitation/envelopeLook.js';
+import {
+  HOVER,
+  IDS,
+  INK,
+  LIGHT,
+  PAPER,
+  REST,
+  SHADES,
+  WAX,
+  WAX_GLOSS,
+  rgb,
+  shared,
+  toon,
+} from '../src/invitation/envelopeLook.js';
 import { HOVER_INK } from '../src/invitation/retro.js';
 import {
   MONOGRAM_PATH,
@@ -463,4 +476,24 @@ test('the first frame’s seal is placed as the letter shows it: about its size,
 
 test('the hover pulse’s gold is NEWT’s hover gold (retro.js HOVER_INK, copied)', () => {
   assert.equal(HOVER, HOVER_INK);
+});
+
+test('the glint: a fourth tone, white, put on its face in its own texels (glued, never resampled), its light and mid wax only, never the stamp’s floors', () => {
+  assert.equal(WAX_GLOSS, 0xffffff, 'white');
+  const seal = buildSeal(shared(), 0.4);
+  const un = seal.material.uniforms;
+  // (Off until it's asked for.)
+  assert.equal(un.uGloss.value.y, 0);
+  seal.place(100, 50, [30.2, -10.9, 11, 31]);
+  // (Its radius on the screen, from the axes its face was drawn for.)
+  assert.ok(Math.abs(un.uFaceR.value - Math.sqrt(30 * 31 + 11 * 11)) < 1e-9, `${un.uFaceR.value}`);
+  seal.gloss(0.25, 0.16);
+  assert.deepEqual(un.uGloss.value.toArray(), [0.25, 0.16]);
+  seal.gloss(0, 0);
+  assert.equal(un.uGloss.value.y, 0);
+  const glsl = seal.material.fragmentShader;
+  // (Measured in the face's own cells from its snapped middle: it moves with the seal.)
+  assert.match(glsl, /cell - uFaceC \+ 0\.5\) \/ uFaceR/);
+  assert.match(glsl, /uGloss/);
+  seal.dispose();
 });

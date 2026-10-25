@@ -50,8 +50,11 @@ loading screen too: NEWT loads behind it.
   three seconds: a wide dithered gold glow past its outline and a warm rim inside it, the letter
   lifting a little toward you (about 3% bigger) and its paper a step brighter at the peak, all of
   it fading right out between pulses so you can see it clearly. A finger (or the mouse) down on
-  the letter shows it at full strength at once, fading once it's lifted. With reduced motion the glow holds steady, with
-  no lift.
+  the letter shows it at full strength at once, fading once it's lifted. On the same beat a white
+  glint sweeps across the wax seal, rim and face, from its upper left to its lower right as each
+  pulse rises, gone by the trough; a click or tap sweeps it once, quick and bright, from the
+  moment it's pressed, before the seal blooms. The NH stays crisp under it. With reduced motion the glow holds steady, with
+  no lift and no glint.
 - **Turn it:** it leans toward the mouse, clearly enough to see (about 6° with the mouse halfway
   to the edge of the screen, 8° at the edge; on a phone, toward your finger while it's down);
   its top tips the same way as it turns, so it reads as leaning toward you; drag it sideways or
@@ -766,7 +769,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   (`HOVER_LOOK`: the letter scaled up to 3% and brought 1.5% of the camera's distance nearer, a
   glow reaching 2 to 6 texels past its line, a rim 2 to 3 texels deep, the paper's `PAPER_LIT`
   dithered in from 0.6 of the pulse; all of it nothing at 0), a press on the letter, `pressStep`
-  (in over 0.06 s, out over 0.35 s) and `shownPulse` (the stronger of the two); the letter's turn, `turnGoal` (toward
+  (in over 0.06 s, out over 0.35 s) and `shownPulse` (the stronger of the two); the seal's glint,
+  `sealGloss(k, t, since)` (`GLOSS`: a band `width` 0.09 radii either side sweeping from −1.7 to
+  1.7 radii across the seal, upper left to lower right, from 0.18 to 0.48 of each pulse, eased
+  in with the hover; `since` a click, one sweep from its edge over 0.25 s, fast at first, 0.14 wide, started by a press on the letter or by opening it; none with reduced motion); the letter's turn, `turnGoal` (toward
   the pointer's x, eased out to `TURN.lean` (0.14 rad at the edge, about 0.1 halfway), plus a
   sideways drag or a held arrow up to `TURN.push` (0.16), at most `TURN.max`, 0.24 rad),
   `turnRoll(turn)` (the roll that goes with it, `TURN.roll` 0.45 of it, its top tipping the way
@@ -885,6 +891,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   takes the face drawn for them from a small cache, so the seal grows, narrows and leans in
   whole steps of its own picture and is never resampled (at 5028c51 the stamp was worked out on
   the seal's own grid, which stopped matching the screen as the letter swayed, so it shimmered).
+  Its glint (`gloss(at, width)`, from envelope.js `sealGloss`) is drawn in the same shader on the
+  face's own cells, measured from its snapped middle in its radius on the screen (`uFaceR`): the
+  light and mid wax in a narrow band across it turn `WAX_GLOSS` (white, the wax's fourth tone),
+  and in a shoulder either side the light wax white and the mid wax light, never the stamp's floors or the ring, so it rides with the seal, steps a cell at
+  a time and never shimmers.
   The NH monogram is logo.js's PATH, copied in as
   `MONOGRAM_PATH`: `stampLayout(radius)` snaps its strokes to whole texels, one texel wide
   (two before: the user found them too thick to read in the ring), the four uprights mirrored,
