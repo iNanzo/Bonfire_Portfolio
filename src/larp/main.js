@@ -230,7 +230,8 @@ window.addEventListener('storage', (e) => {
 });
 
 if (loaded.from === 'old') note('Your game from the earlier version was carried over', 5);
-if (loaded.from === 'unreadable') note('The saved game couldn’t be read. A new game started; the original is preserved.', 6);
+if (loaded.from === 'unreadable')
+  note('The saved game couldn’t be read. A new game started; the original is preserved.', 6);
 if (loaded.from === 'new') setup.open('teams');
 
 if (import.meta.env.DEV) {
