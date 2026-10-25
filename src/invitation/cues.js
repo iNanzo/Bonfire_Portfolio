@@ -1,11 +1,12 @@
-// The ground cues every drag kind shares in the invitation toy (main.js draws them, stage.js
+// The ground cues under NEWT while he's held in the invitation toy (main.js draws them, stage.js
 // holds the meshes): the blob shadow straight down under his hips while he's off the floor, its
 // size, strength and edge set by his lowest foot's height (blobLook: smaller, fainter and softer
 // the higher he is; eased in as he's picked up and out once he's down, blobWeight); the ring under
 // him and the dashed drop line from his collar to it while he's held, the Ground Cues setting
-// (Off / In the Mix / Always, look.js: 'auto' takes the drag kind's own default, groundCueMode;
+// (Off / In the Mix / Always, look.js: none picked plays In the Mix, the bead hold's, CUE_DEFAULT
+// and groundCueMode;
 // In the Mix shows them while he's high or moving fast, mixWants, faded in and out, cueStep), the
-// ring pulsing to full on a wall clamp or kept at a kind's floor In the Mix (ringFloor), the line fading in with his height (lineShare); and the
+// ring pulsing to full on a wall clamp or kept at the hold's floor In the Mix (ringFloor), the line fading in with his height (lineShare); and the
 // brain's drag speed in screen px a second, so a stress threshold reads the same however deep he
 // is (dragSpeedOf). Pure: no three.js, no DOM.
 
@@ -16,6 +17,8 @@ import { NEWT_HEIGHT } from './area.js';
 /** Ground Cues' values, in Settings' order, and their labels. @type {readonly CueMode[]} */
 export const CUE_MODES = Object.freeze(['off', 'mix', 'always']);
 export const CUE_LABELS = Object.freeze({ off: 'Off', mix: 'In the Mix', always: 'Always' });
+/** What Ground Cues plays until the look picks one: In the Mix, the bead hold's. @type {CueMode} */
+export const CUE_DEFAULT = 'mix';
 
 /**
  * The blob: `radius` × his height on contact, shrinking to `far` of it with his lowest foot two
@@ -74,14 +77,13 @@ export function blobLook(footH, lifted) {
 export const blobWeight = (w, off, dt) => clamp01(w + (off ? 1 : -1) * (CUES.blobEase > 0 ? dt / CUES.blobEase : 1));
 
 /**
- * The Ground Cues setting as it plays: the look's own choice, or with 'auto' (no choice made)
- * the drag kind's default.
+ * The Ground Cues setting as it plays: the look's own choice, or with none made (or one no longer
+ * offered, such as an old 'auto') CUE_DEFAULT.
  * @param {unknown} value  look.groundCues
- * @param {CueMode} kindDefault
  * @returns {CueMode}
  */
-export const groundCueMode = (value, kindDefault) =>
-  CUE_MODES.includes(/** @type {any} */ (value)) ? /** @type {CueMode} */ (value) : kindDefault;
+export const groundCueMode = (value) =>
+  CUE_MODES.includes(/** @type {any} */ (value)) ? /** @type {CueMode} */ (value) : CUE_DEFAULT;
 
 /**
  * In the Mix's shared rule: the cues show while his lowest foot is high or he moves fast across
@@ -114,7 +116,7 @@ export const ringStrength = (k, sincePulse, mode) =>
   mode !== 'off' && sincePulse !== null && sincePulse >= 0 && sincePulse < CUES.pulse ? 1 : k;
 
 /**
- * The ring's strength while he's held: In the Mix, never under the kind's `floor` (hold.js
+ * The ring's strength while he's held: In the Mix, never under the hold's `floor` (hold.js
  * HoldCues.floor), that eased in over CUES.fade from the grab (`heldFor` s ago); Always and Off as
  * they are.
  * @param {number} k
@@ -126,14 +128,14 @@ export const ringFloor = (k, mode, floor, heldFor) =>
   mode === 'mix' && floor ? Math.max(k, floor * clamp01(CUES.fade > 0 ? heldFor / CUES.fade : 1)) : k;
 
 /**
- * The drop line's mode: Ground Cues' `mode`, except that a drag kind can keep it out of In the Mix
- * (`kindLine` false: hold.js HoldCues.line); Always still shows it and Off never does, as every
- * effect's setting.
+ * The drop line's mode: Ground Cues' `mode`, except that the hold can keep it out of In the Mix
+ * (`holdLine` false: hold.js HoldCues.line, in flight to the ring); Always still shows it and Off
+ * never does, as every effect's setting.
  * @param {CueMode} mode
- * @param {boolean} [kindLine]
+ * @param {boolean} [holdLine]
  * @returns {CueMode}
  */
-export const lineMode = (mode, kindLine) => (kindLine === false && mode === 'mix' ? 'off' : mode);
+export const lineMode = (mode, holdLine) => (holdLine === false && mode === 'mix' ? 'off' : mode);
 
 /**
  * The drop line's share by his height: none with his lowest foot under CUES.lineFrom × his

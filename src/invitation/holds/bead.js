@@ -1,4 +1,4 @@
-// The 'bead' drag kind (design.md's candidate): his collar is a bead on the cursor's ray, so it is
+// The bead hold, the only carry (design.md's): his collar is a bead on the cursor's ray, so it is
 // always exactly under the cursor, but its distance from the camera springs (BEAD.omega, .zeta)
 // toward a level hold plane at holdY (standing up to face the camera as it comes down to the
 // floor: beadPlane), so a quick flick up the screen lofts him toward the camera before he settles
@@ -25,6 +25,10 @@ import { clampTo } from '../steer.js';
 /** @typedef {import('../hold.js').Ray} Ray */
 /** @typedef {import('../hold.js').Plane} Plane */
 /** @typedef {import('../hold.js').HoldCamera} HoldCamera */
+/**
+ * @typedef {object} HoldDeps  what the page hands the hold
+ * @property {() => number} [rng]  a random number 0..1 (the page's seeded one)
+ */
 
 const RAD = Math.PI / 180;
 
@@ -334,8 +338,8 @@ export function sideWall(p, bounds, { toward, right }) {
 
 /**
  * The throw: the solved collar's velocity over the shared window (hold.js HOLD.lead and .span
- * before `t`, as releaseVelocity reads it), plus BEAD.bob of the rope's; while he's pushed out
- * against an edge, none across (today's rule); BEAD.depth of its part toward or away from the
+ * before `t`, read with hold.js sampleAt), plus BEAD.bob of the rope's; while he's pushed out
+ * against an edge, none across; BEAD.depth of its part toward or away from the
  * camera (`toward`, its level way toward it: a px up the screen is about 1.8 times the world one
  * across is, and the bead runs along the ray faster still as it lofts, so a flick up would throw
  * him much further than the same flick across); no faster than BEAD.maxLevel in any direction (a
@@ -396,8 +400,8 @@ export function beadThrow(samples, t, bob, push, toward) {
  */
 
 /**
- * The bead hold.
- * @param {import('./index.js').HoldDeps} [deps]
+ * The bead hold, one for each grab.
+ * @param {HoldDeps} [deps]
  * @returns {import('../hold.js').Hold & {readonly state: BeadState}}
  */
 export function createBeadHold(deps = {}) {
@@ -473,8 +477,7 @@ export function createBeadHold(deps = {}) {
   };
 
   return {
-    kind: 'bead',
-    feel: { groundCues: 'mix', squash: true, fingerLift: 80, secondFinger: true },
+    feel: { squash: true, fingerLift: 80, secondFinger: true },
     get plane() {
       return plane;
     },

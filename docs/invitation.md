@@ -62,13 +62,14 @@ so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
   fast to catch.
 - **Drag him** to pick him up by the collar. The spot you grabbed starts under your cursor and
   in about a tenth of a second his collar is there instead (a finger carries him a little above
-  itself, so it doesn't hide him, and near the top of the screen no higher than keeps his head
-  on it): move up and he
-  rises, high off the floor if you like; move across and he goes across. He dangles and swings,
+  itself, so it doesn't hide him), and it stays there like a bead on a string: move up the
+  screen and he slides away from you over the floor, down and he comes back, across and he goes
+  across. A wheel notch or a second finger lifts him straight up (or lowers him), and so does
+  dragging him into the top of the screen with a mouse. He dangles from his collar and swings,
   his arms and legs hanging limp and swinging with the motion; at the edge of his patch he stops
   instead of sliding along it. Held, he hangs his head, and every few seconds (sooner if you
   shake him) he thrashes about, kicking and flailing; let go and he falls, lands and gets back
-  up. Flick him and he flies a little; let go while
+  up. Flick him and he flies, a flick up the screen lobbing him away from you; let go while
   pushing him against the edge of his patch and he just drops there. The camera holds still
   while you carry him. As you grab him a gold ring of dither bursts out from your grip and is
   gone in under half a second. Off the floor, the soft shadow under him sits straight below his
@@ -169,8 +170,7 @@ the sheet and leaves the slider as it was.
 | Outlines | On, Off | A one-pixel line around NEWT (none in his shadow; how dark, its colour and where: under Shader). |
 | Style | Default, DS, Soft, Custom | Default (what a first visit shows, set in the admin's Invitation page; as shipped, Soft with 6 colours, a full-strength dither, full-strength tinted lines on the outer ring, two toon bands and the highlight). DS: like the old handheld, 15-bit colour with a fine dither, dark 1-pixel lines, a hard shadow. Soft: fewer colours, pastel, a warm ring outside him and a softer, dithered shadow. Each sets every Shader option; Custom shows once one of them is yours (it can't be picked: choose a style, or Reset To Style, to go back). |
 | Motion | Smooth, Choppy | Smooth (the default) moves NEWT every frame. Choppy moves his arms, legs and head 15 times a second, like stop motion, while the camera and his walking about stay smooth. |
-| Ground Cues | Off, In the Mix, Always | The ring on the floor under NEWT while he's held and the dashed line from his collar down to it, so you can see where he is over the floor. In the Mix shows them while he's high or moving fast; Always all the time he's held. Until you pick one, the way he's carried (Drag) chooses. |
-| Drag | Today, Level, Tilt, Bead | Ways of carrying him (for this visit only; `?drag=` in the address picks one too). Bead (the default) keeps his collar on the cursor like a bead on a string, sliding toward and away from you over the floor; a wheel notch or a second finger lifts him straight up, and so does dragging him into the screen's top band with a mouse. Today is how he was carried before; Level carries him over the floor at a height the wheel or a second finger sets; Tilt leans the plane he's dragged on back, so up the screen carries him away and up at once. |
+| Ground Cues | Off, In the Mix, Always | The ring on the floor under NEWT while he's held and the dashed line from his collar down to it, so you can see where he is over the floor. In the Mix shows them while he's high or moving fast; Always all the time he's held. In the Mix until you pick one. |
 | Wander | On, Off | On (the default): left be, he strolls about by himself now and then. Kept for your next visit, like the rest. |
 
 **Shader** lays out the pixel look's own values, which the Style sets; any change shows at once
@@ -413,54 +413,28 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     and the order a frame runs in. `gesture.js` reads the mouse's buttons apart (left: tap,
     grab or pan; right: orbit; middle: pan) and two fingers' middle as a pan (and, when the
     page's `holdLift` says so, a second finger while he's held as `holdLift`, its move up or
-    down); `hold.js` is how he's held: the drag kinds (`DRAG_KINDS`: `today`, how he was carried
-    before, and `level`, `tilt` and `bead`, three candidates for a carry that moves him in depth,
-    `bead` the default (`DEFAULT_DRAG`, the judges' pick: 19.5 against level's 19 and tilt's 17.5), each in its
-    own module under `holds/`, made by `holds/index.js` `createHold` for each grab from `?drag=`
-    or Settings' Drag; a candidate is today's hold under its own name until it's built), the
-    `Hold` interface each implements (`start` at the grab, `step` each frame giving the anchor,
-    the plane holdStep keeps him inside along, the push for the toss, its hold height and its
-    cues; `release`, the velocity he's let go with, null for carry.js `toss`; `grabbedAt`; and
-    optional `onWheel` and `onSecondFinger` height controls; `feel`: its Ground Cues default,
-    squash and stretch, finger lift and second finger), `createTodayHold` (today's, below,
-    through it) and the helpers the candidates share: `rayHit` (a grazing or backward ray turned
-    away, `HOLD.grazing` 0.12), `rayAtY`, `rayInterval` and `edgeClamp` (the collar kept on the
+    down); `hold.js` is how he's held: the `Hold` interface the bead hold implements for main.js
+    (`start` at the grab, `step` each frame giving the anchor, the plane holdStep keeps him
+    inside along, the push for the toss, its hold height and its cues; `release`, the velocity
+    he's let go with, null for carry.js `toss`; `grabbedAt`; `onWheel` and `onSecondFinger`
+    height controls; `feel`: the squash and stretch, finger lift and second finger) and the
+    helpers it's built on: `rayHit` (a grazing or backward ray turned
+    away, `HOLD.grazing` 0.12), `rayInterval` and `edgeClamp` (the collar kept on the
     cursor's ray: under the hang height or over the ceiling onto it along the ray however far,
     so a down drag leaves no gap; past a wall the nearest inside point along the ray within
     `HOLD.reach`, 1, bisected with steer.js `clampTo` as the inside test, so the back wall is a
     climb and the front one the floor; with none, a side wall, across only along the camera's
     level-right axis with carry.js `keepInside`, never sliding in depth, the push kept),
-    `reanchor` (after a user orbit or zoom, the anchor onto the new ray, the closest point to
-    where it was: a frame's orbit never jumps it 0.15), `cameraMoved`, `levelAxes`, `depthAlong`,
-    `screenOffset` (the grab offset easing out in screen px over 0.12 s), `releaseVelocity` (the
-    solved collar from 70 to 20 ms before letting go, capped at 4 u/s across and 2.5 up, 3 down,
-    none across while pushed) and `squash` (1.08 tall over 80 ms as he's lifted; landing, 0.88
-    tall and 1.08 wide over 70 ms, back over 200 ms); no kind turns him off his yaw while he's
-    held (he keeps the way he faced as he was grabbed, falling and landing too: a `HoldStep` has
-    no heading, and every kind's browser check reads his facing through a sweep, the fall and the
-    landing); `holds/level.js` is the level candidate
-    (`LEVEL`): his collar where the cursor's ray meets a level plane at his hold height, so a
-    move up the screen carries him away across the floor (1.6 a 100 px on a phone, 1.0 on a
-    desktop at 36°) and one across never in depth; the hold height eases (critically damped,
-    60 ms halflife at the grab, 80 ms after) from where he was grabbed to his hang height + 0.35,
-    the wheel raising it 0.1 a 100 px notch and a second finger 0.8 a 100 px, from 0.06 over his
-    hang height (his limp feet kept off the floor) to 2.4 over it (`onWheel`, `onSecondFinger`;
-    Ctrl+wheel still zooms); the plane stands
-    up to face the camera as it comes down from 35° to 12° (`levelNormal`), so there a move up
-    lifts him; past the back wall he climbs the ray however far, past the front wall the shared
-    reach, past a side wall across only; a camera move keeps the height he's at; Ground Cues
-    Always, the squash on, a finger 48 px under him;
-    `holds/tilt.js`
-    is the `tilt` kind: the plane leant back from upright by `clamp(90° − elevation, 30°, 62°)`
-    (`tiltAngle`), so up the screen carries him away and up at once and the floor point under him
-    moves half as far as the cursor, standing up through the band from collar height 1.1 to 1.6
-    and as the cursor's ray goes past the back wall at his hang height (`wallOut`, fully upright
-    0.6 past), the plane re-made through the anchor only once its angle has moved 0.5°, the
-    edges on the ray (`edgeClamp`), no turn off the way he faced as he was grabbed (none toward
-    where he's carried), a lob on a throw (up by 0.25 of his speed across), Ground Cues In the Mix, the
-    squash on and a finger 48 px under him;
-    `holds/bead.js` is the bead candidate
-    (built): his collar a bead on the cursor's ray, exactly under it, its distance from the
+    `cameraMoved`, `levelAxes`, `depthAlong`, `screenOffset` (the grab offset easing out in
+    screen px over 0.12 s), `sampleAt` (the solved collar's path, read over the release window:
+    `HOLD.lead`, 20 ms before letting go, and `span`, 50 ms) and `squash` (1.08 tall over 80 ms
+    as he's lifted; landing, 0.88 tall and 1.08 wide over 70 ms, back over 200 ms); the hold
+    never turns him off his yaw while he's held (he keeps the way he faced as he was grabbed,
+    falling and landing too: a `HoldStep` has no heading, and the browser check reads his facing
+    through a sweep, the fall and the landing). How he's carried is the bead hold, the only one
+    (the user's pick of the carries tried, over a level plane and a tilted one, which went with
+    the carry he had before; an old address's `?drag=` is ignored): `holds/bead.js`
+    `createBeadHold`, one for each grab: his collar a bead on the cursor's ray, exactly under it, its distance from the
     camera sprung (`BEAD.omega` 14 rad/s, `zeta` 0.65) toward a level plane at his hold height
     (his hang height + 0.45, or + 0.15 by a finger, his collar 80 px over it, so the ring shows over it; blended upright
     from 35° down to 12° of elevation, and by a finger leant back so a move up carries him 0.6 as
@@ -475,7 +449,7 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     kicked every 2.5-6 s and while he thrashes) whose tilt replaces the swing (`HoldStep.tilt`;
     `ropeTilt` reads it as though his middle hung 0.3 of the rope under the collar or more, so a
     slack rope never flips him side to side),
-    his heading never its own (the shared rule above); thrown with the
+    his heading never its own (the rule above); thrown with the
     collar's velocity, 0.3 of the rope's, 0.3 of its part toward or away from the camera
     (`BEAD.depth`: a 100 px up flick lands about 1.1 away, half as far as one across), at most
     4 u/s, and a lob of 0.35 of its speed across
@@ -483,30 +457,27 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     until he lands (`landingPoint`, `Hold.landing`), else under his collar, eased, not his
     swinging hips (let go still, under `ringSpeed`, he falls under his collar itself, not the
     ring, which just after a fast drag is still easing back; never faster than 4 u/s across), In the Mix never under 0.35 while he's held
-    (`HoldCues.floor`), the drop line In the Mix as the shared rule has it; `cues.js` has the ground cues' numbers
+    (`HoldCues.floor`), the drop line In the Mix as cues.js has it; `cues.js` has the ground cues' numbers
     (`blobLook`: radius 0.35 of his height on contact to 0.6 of that, strength 0.45 to 0.20 times
     the look's lifted over 0.34, soft edge 0.15 to 0.5 of the radius, as his lowest foot rises to
-    two heights; Ground Cues' `cueStep`, `mixWants`: his lowest foot over half his height or 1
+    two heights; Ground Cues' `CUE_DEFAULT`, In the Mix until one is picked, `groundCueMode`,
+    `cueStep`, `mixWants`: his lowest foot over half his height or 1
     u/s across the floor, `ringStrength`: the 0.12 s pulse on a wall clamp, `lineShare`,
-    `lineMode`: a kind's `HoldCues.line` false keeps the line out of In the Mix, never out of
-    Always; `ringFloor`: a kind's `HoldCues.floor`, the ring's least strength In the Mix while
+    `lineMode`: `HoldCues.line` false, in flight to the ring, keeps the line out of In the Mix,
+    never out of Always; `ringFloor`: the hold's `HoldCues.floor`, the ring's least strength In the Mix while
     he's held, eased in over 0.15 s; and
     `dragSpeedOf`, the brain's drag speed as the pointer's own screen px a second over 110);
     `carry.js` `createHand`, `handStep`, `handFeel`: what the brain feels while he's held, the
     shake and the drag speed, from the user's own pointer alone (a critically damped follow of
     it at `CARRY.follow`, the shake its acceleration over the CSS px a world unit spans where he
     hangs, none for the first `HAND.settle`, 0.2 s, so a pointer already moving as he's grabbed
-    isn't a jolt), never from a kind easing his collar onto it: read off his collar, the grab
+    isn't a jolt), never from the hold easing his collar onto it: read off his collar, the grab
     offset, a finger's lift and the bead's spring and hold height made every still grab a hard
     shake ("Too much!" and an early Thrash) and stress enough to flee once he landed; `carry.js`
-    drags him, today, on the upright plane facing the camera through where he was grabbed
-    (`dragPlane`, `gripFor`, `dragTarget`: the grab offset from where the press began, easing
-    out over `CARRY.offsetEase`, 0.12 s, `offsetAt`, so his collar ends under a mouse's cursor
-    and 24 CSS px over a finger;
-    his collar no lower than it was grabbed at, or his hang height once he's been lifted clear
-    of the floor, so a still cursor never lifts him off it, and no higher than `CARRY.liftMax`,
-    5), the anchor the pointer's spot with no lag, kept inside the play area along the drag
-    plane's line across the floor (`lineSpan`: the play area is a disc, `Bounds.r`, so at its
+    `holdStep` keeps the hold's anchor inside the play area with no lag, at the nearest spot
+    inside (the bead gives no plane; the camera-facing one he was carried on before it,
+    `dragPlane`, `gripFor`, `dragTarget` and `offsetAt`, is no longer used by the page), or
+    with a plane along its line across the floor (`lineSpan`: the play area is a disc, `Bounds.r`, so at its
     rim he stops where that line meets it, never sliding round it in depth), and the swing
     driven by a smoothed follow of it, past `CARRY.tiltSoft` (0.5 rad) a stiff spring easing
     him back instead of a hard stop; let go, `fallStep` drops him with soft bounces off the
@@ -774,13 +745,11 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   `FACE_NAMES` on him, no blinks; null gives his face back to the brain) and `press(name)` (a
   toolbar button's press as the brain gets it, Give Device's `Device` too). The snapshot's
   `motion` has the carry (`collar` on screen, `heldFor`, the `anchor`, the drag `plane`'s
-  normal, `pushed` at the edge), `drag` the drag kind's (`kind` and `setting`, its own height
-  `controls`, `aim`: where it aims his collar, client px, the `pointer`, the `gap` between them,
+  normal, `pushed` at the edge), `drag` the hold's (its own height `controls`, `aim`: where it aims his collar, client px, the `pointer`, the `gap` between them,
   CSS px, `holdY`, the `anchor` and its `depth` along the camera's level axis, away positive,
   the `blob` as set, his `hips`' floor point and `lowestFoot`, the `ring` and the drop `line`,
   `groundCues` as it plays and `pushed`); `view({yaw, elevation, zoom})` eases the camera there
-  (radians; zoom the home distance over the distance) and `drag(kind)` picks the drag kind as
-  Settings' Drag does; the limp layer (`limp.weight`, `limp.most`: the most a limb
+  (radians; zoom the home distance over the distance); the limp layer (`limp.weight`, `limp.most`: the most a limb
   has swung, radians) and Give Device (`device.state` and `label`, the tablet `shown` and its
   `screen` point, his `turn` off the camera). The snapshot's `camera` has
   the point it looks at on the floor (`target`) and whether a pan holds it (`panned`), `area` is
@@ -809,16 +778,17 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   90° first); its `envelope` and `envelope-skip` acts open or skip the envelope
   (`?test&envelope`, whole frames). The record and the frames are
   `tools/capture-invitation-record.mjs`. One GPU capture at a time.
-  `node tools/capture-invitation-drag.mjs --kinds today,tilt` records the same carry for each drag kind from each of the camera's views (yaw 0 and 90, elevation 36 and
-  15; a mouse at 1280x800 and a finger at 390x844): grabbed by the head, 200 px up, back down past
-  the start, 200 px across, a lift (the kind's wheel or second finger, or a drag past the back
-  wall), a flick and let go, with a ring where the pointer is and a dot where the kind aims his
-  collar; an animated WebP a kind and view, a sheet a kind, the drag's numbers frame by frame, and
-  with `--compare` the kinds side by side. `e2e/lib/drag.mjs` `dragDescribe(kind)` is the shared
-  drag spec (collar within 2 px of the cursor, blob under his hips, lowest foot over the floor, no
-  gap on a down drag, a finger's aim, Ground Cues, raising him with the wheel for a kind that has
-  one); `e2e/invitationDrag.spec.mjs` runs it for today, whose down-drag gap is the known
-  baseline, and `e2e/invitationDragBead.spec.mjs` for bead with its own checks.
+  `node tools/capture-invitation-drag.mjs` records the same carry from each of the camera's views
+  (yaw 0 and 90, elevation 36 and 15; a mouse at 1280x800 and a finger at 390x844): grabbed by
+  the head, 200 px up, back down past the start, 200 px across, a lift (the wheel or a second
+  finger), a flick and let go, with a ring where the pointer is and a dot where the hold aims his
+  collar; an animated WebP a view, a sheet, and the drag's numbers frame by frame (to compare
+  against another version, run it in that version's worktree with its own `--tag`).
+  `e2e/lib/drag.mjs` `dragDescribe()` is the shared drag spec (collar within 2 px of the
+  cursor, blob under his hips, lowest foot over the floor, no gap on a down drag, a finger's aim,
+  Ground Cues, raising him with the wheel); `e2e/invitationDrag.spec.mjs` runs it, with Settings
+  (no Drag row, Ground Cues kept) and an old `?drag=level` address carried with the bead, and
+  `e2e/invitationDragBead.spec.mjs` has the bead's own checks.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
   `vite.config.js`, `test/site.test.mjs` and the spec's last test check it).
 - **Unlisted:** `noindex, nofollow`, left out of the sitemap and the README, and not

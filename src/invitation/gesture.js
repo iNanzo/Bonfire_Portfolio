@@ -9,7 +9,7 @@
 // moveTol, pan with it too: a second finger landing on a press or an orbit turns it into a
 // pinch, two-finger gestures never tap or grab, and once one lifts the other does nothing until
 // it lifts too. While NEWT is held, other fingers are ignored, unless the page's `holdLift` says a
-// second one lifts and lowers him (a drag kind's height: its vertical moves come as holdLift
+// second one lifts and lowers him (the hold's height: its vertical moves come as holdLift
 // events, dy CSS px; it never pinches). Plus where a ray meets a level
 // plane or any plane, and whether a point is on his screen shape (a head circle and a body
 // capsule). Pure: CSS px and seconds in, events out; the page owns the DOM and pointer capture.

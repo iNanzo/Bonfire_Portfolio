@@ -1,14 +1,12 @@
-// The 'bead' drag kind in the browser (?test&calm&drag=bead): the shared drag checks
-// (e2e/lib/drag.mjs dragDescribe), then what only the page can measure: his collar within 1 px of
+// The bead hold in the browser (?test&calm), past the shared drag checks (e2e/invitationDrag.spec.mjs
+// runs e2e/lib/drag.mjs dragDescribe): what only the page can measure: his collar within 1 px of
 // the cursor after a flick up and down, 100 px up the screen held still carrying him away about as
 // far as design.md's level plane (1.45-1.75 on a phone, 0.90-1.10 on a desktop, at 36°), the wheel
 // moving his hold height and not the camera, a finger 80 px under his collar, a second finger's
 // lift leaving him held once it lifts, and a sideways throw landing where the ring waited for
 // him. Every wait is on a state, never a duration.
 import { test, expect } from '@playwright/test';
-import { calm, dragDescribe, finger, fingers, glide, grab, on, onCursor, snapshot, until } from './lib/drag.mjs';
-
-dragDescribe('bead');
+import { calm, finger, fingers, glide, grab, on, onCursor, snapshot, until } from './lib/drag.mjs';
 
 /** The camera to `yaw`, 36° up, home zoom, and still (two reads alike). */
 async function frame(page, yaw = 0) {
@@ -51,17 +49,16 @@ for (const [name, viewport, lo, hi] of [
   ['a desktop', { width: 1280, height: 800 }, 0.9, 1.1],
   ['a phone', { width: 390, height: 844 }, 1.45, 1.75],
 ]) {
-  test.describe(`?drag=bead, on ${name}`, () => {
+  test.describe(`bead, on ${name}`, () => {
     test.use({ viewport });
 
     test(`bead on ${name}: flicked up and down his collar is back within 1 px of the cursor; 100 px up held still carries him ${lo}-${hi} away at 36°, level`, async ({
       page,
     }) => {
-      await calm(page, 'bead');
+      await calm(page);
       await frame(page);
       let cursor = await grab(page, 'head');
       const a = await settled(page, 'held still at the hold height');
-      expect(a.kind).toBe('bead');
       cursor = await glide(page, cursor, { x: cursor.x, y: cursor.y - 100 }, 4);
       await onCursor(page, 'after a flick up', 1);
       const b = await settled(page, 'settled after 100 px up');
@@ -77,11 +74,11 @@ for (const [name, viewport, lo, hi] of [
   });
 }
 
-test.describe('?drag=bead, on a desktop', () => {
+test.describe('bead, on a desktop', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
   test('bead: a wheel notch while he’s held moves his hold height 0.1 and leaves the camera be', async ({ page }) => {
-    await calm(page, 'bead');
+    await calm(page);
     await frame(page);
     await grab(page, 'head');
     const a = await settled(page, 'held still');
@@ -96,7 +93,7 @@ test.describe('?drag=bead, on a desktop', () => {
   });
 
   test('bead: thrown across, he lands where the ring waited for him (within 0.15)', async ({ page }) => {
-    await calm(page, 'bead');
+    await calm(page);
     await frame(page);
     let cursor = await grab(page, 'head');
     await settled(page, 'held still');
@@ -116,11 +113,11 @@ test.describe('?drag=bead, on a desktop', () => {
   });
 });
 
-test.describe('?drag=bead, on a phone', () => {
+test.describe('bead, on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
   test('bead: carried with a finger, his collar is 80 ± 2 px above it', async ({ page }) => {
-    await calm(page, 'bead');
+    await calm(page);
     await frame(page);
     const head = await on(page, 'body');
     const f = await finger(page);
@@ -142,7 +139,7 @@ test.describe('?drag=bead, on a phone', () => {
   test('bead: a second finger dragged up lifts him; once it lifts, he is still held, and the next move of the first puts his collar back over it', async ({
     page,
   }) => {
-    await calm(page, 'bead');
+    await calm(page);
     const body = await on(page, 'body');
     const f = await fingers(page);
     const at = { x: body.x, y: body.y + 40 };

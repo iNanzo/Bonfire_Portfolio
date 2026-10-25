@@ -1,38 +1,29 @@
-// How NEWT is held in the invitation toy, from the pure modules: the drag kinds (hold.js
-// DRAG_KINDS, holds/index.js createHold: today the default, level, tilt and bead, each its own
-// module, the candidates not yet built today's hold under their own names: level and bead); today's
-// hold through the interface, the same as carry.js's camera-facing plane frame for frame; and the
-// solve helpers every kind shares: a ray meeting a plane (grazing and backward rays turned
-// away), a height on the ray, the ray's inside span (the play area and the height limits) and the
-// edge clamp on it (the collar stays on the ray: the back wall a climb, the front wall and the
-// floor his hang height; a side wall across only, never deeper, with the push kept), re-anchoring
-// after the camera moves (never a jump over 0.15 in a frame of orbit), the grab offset easing out
-// in screen px, the release velocity over [t − 70 ms, t − 20 ms], and the squash and stretch.
+// How NEWT is held in the invitation toy, from the pure modules: the solve helpers the bead hold
+// (holds/bead.js) is built on: a ray meeting a plane (grazing and backward rays turned away), the
+// ray's inside span (the play area and the height limits) and the edge clamp on it (the collar
+// stays on the ray: the back wall a climb, the front wall and the floor his hang height; a side
+// wall across only, never deeper, with the push kept), whether the camera moved (an orbit's
+// frame, a zoom; not a turn under 0.1°), the grab offset easing out in screen px, the release
+// window (20 ms before letting go, 50 ms long) and the path between samples it's read from, and
+// the squash and stretch.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_DRAG,
-  DRAG_KINDS,
   HOLD,
   along,
   cameraMoved,
-  closestOnRay,
-  createTodayHold,
   depthAlong,
-  dragKind,
   edgeClamp,
   insideHold,
   levelAxes,
-  rayAtY,
   rayHit,
   rayInterval,
-  reanchor,
-  releaseVelocity,
+  sampleAt,
   screenOffset,
   squash,
 } from '../src/invitation/hold.js';
-import { HOLDS, createHold } from '../src/invitation/holds/index.js';
-import { CARRY, dragPlane, dragTarget, gripFor, offsetAt } from '../src/invitation/carry.js';
+import { CARRY } from '../src/invitation/carry.js';
+import { closestOnRay, rayAtY } from './lib/rays.mjs';
 
 const close = (a, b, tol = 1e-6, msg = '') => assert.ok(Math.abs(a - b) <= tol, `${msg} ${a} should be ${b} (±${tol})`);
 const RAD = Math.PI / 180;
@@ -83,81 +74,6 @@ const onRay = (ray, p) => {
   return Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z);
 };
 
-test('the drag kinds: today, level, tilt and bead (the default, the judges’ pick); anything else is bead; holds/index.js makes each by name, its own module', () => {
-  assert.deepEqual([...DRAG_KINDS], ['today', 'level', 'tilt', 'bead']);
-  assert.equal(DEFAULT_DRAG, 'bead');
-  for (const bad of [undefined, null, '', 'Level', 'sticker', 3, {}]) assert.equal(dragKind(bad), 'bead', String(bad));
-  for (const k of DRAG_KINDS) assert.equal(dragKind(k), k);
-  assert.deepEqual(Object.keys(HOLDS).sort(), [...DRAG_KINDS].sort(), 'every kind listed once');
-  for (const k of DRAG_KINDS) {
-    const h = createHold(k);
-    assert.equal(h.kind, k);
-    assert.ok(['off', 'mix', 'always'].includes(h.feel.groundCues), `${k}: a Ground Cues default`);
-    assert.equal(typeof h.start, 'function');
-    assert.equal(typeof h.step, 'function');
-    assert.equal(typeof h.release, 'function');
-    assert.equal(typeof h.grabbedAt, 'function');
-  }
-  assert.equal(createHold('nope').kind, 'bead');
-});
-
-test('today’s hold through the interface is carry.js’s camera-facing plane, frame for frame: the same anchors, the same plane, the same point grabbed, and tossed with carry.js toss', () => {
-  const { rayAt, project, camera, position } = rig({ yaw: 30 });
-  const collar = { x: 0.3, y: 0.62, z: -0.4 };
-  const press = project({ x: 0.28, y: 0.4, z: -0.38 });
-  const t0 = 2;
-  const low = 0.7;
-  const hold = createTodayHold();
-  hold.start({ t: t0, collar, press, collarPx: project(collar), rayAt, camera, low, bounds: null });
-  const grip = gripFor(rayAt(press.x, press.y), dragPlane(position, collar), collar, t0);
-  assert.deepEqual(hold.plane, grip.plane);
-  const path = [
-    press,
-    { x: press.x, y: press.y - 30 },
-    { x: press.x + 40, y: press.y - 90 },
-    { x: press.x - 20, y: press.y + 60 },
-  ];
-  path.forEach((px, i) => {
-    const t = t0 + i * 0.05;
-    const s = hold.step({ t, dt: 0.05, px, rayAt, camera, low, bounds: null, carry: null });
-    assert.deepEqual(s.anchor, dragTarget(grip, rayAt(px.x, px.y), low, t), `frame ${i}`);
-    assert.deepEqual(s.plane, grip.plane);
-    assert.deepEqual(s.cues, {});
-    assert.equal(s.push, undefined, 'holdStep’s own push');
-    const o = offsetAt(grip, t);
-    assert.deepEqual(
-      hold.grabbedAt(t, collar, project),
-      project({ x: collar.x - o.x, y: collar.y - o.y, z: collar.z - o.z }),
-    );
-  });
-  assert.equal(hold.release(/** @type {any} */ ({ samples: [] }), 3), null, 'carry.js toss');
-  assert.deepEqual(hold.feel, { groundCues: 'off', squash: false, fingerLift: null, secondFinger: false });
-});
-
-test('every candidate is built: none is today’s hold under its own name', () => {
-  const { rayAt, project, camera } = rig();
-  const collar = { x: 0, y: 0.62, z: 0 };
-  const press = project({ x: 0, y: 0.45, z: 0 });
-  const run = (h) => {
-    h.start({ t: 0, collar, press, collarPx: project(collar), rayAt, camera, low: 0.7, bounds: null });
-    return [0, 1, 2, 3].map(
-      (i) =>
-        h.step({
-          t: i * 0.05,
-          dt: 0.05,
-          px: { x: press.x + i * 9, y: press.y - i * 20 },
-          rayAt,
-          camera,
-          low: 0.7,
-          bounds: null,
-          carry: null,
-        }).anchor,
-    );
-  };
-  const today = run(createHold('today'));
-  for (const k of ['level', 'tilt', 'bead']) assert.notDeepEqual(run(createHold(k)), today, k);
-});
-
 test('a ray meets a plane where it crosses it; one that grazes it (the cosine under HOLD.grazing) or has it behind is turned away', () => {
   const plane = { point: { x: 0, y: 1, z: 0 }, normal: { x: 0, y: 1, z: 0 } };
   const down = { o: { x: 0, y: 5, z: 0 }, d: { x: 0, y: -2, z: 0 } };
@@ -169,10 +85,6 @@ test('a ray meets a plane where it crosses it; one that grazes it (the cosine un
   const graze = { o: { x: 0, y: 5, z: 0 }, d: { x: Math.sqrt(1 - shallow * shallow), y: -shallow, z: 0 } };
   assert.equal(rayHit(graze, plane), null, 'grazing');
   assert.equal(rayHit({ o: { x: 0, y: 5, z: 0 }, d: { x: 0, y: 1, z: 0 } }, plane), null, 'behind it');
-  // A height on the ray.
-  assert.deepEqual(rayAtY(down, 2), { x: 0, y: 2, z: 0 });
-  assert.equal(rayAtY(down, 6), null, 'behind');
-  assert.equal(rayAtY({ o: { x: 0, y: 1, z: 0 }, d: { x: 1, y: 0, z: 0 } }, 0), null, 'level');
 });
 
 // The play areas a hold meets: a rounded square (the toy's), a plain box and a disc.
@@ -285,18 +197,11 @@ test('the edge clamp at a side wall: no inside point on the ray near enough, so 
   }
 });
 
-test('re-anchoring after the camera moves: the closest point on the new cursor ray to the anchor, never a jump over 0.15 in a frame as the camera orbits from 36° down to 12° and round', () => {
-  let anchor = { x: 0.4, y: 1.3, z: -0.6 };
+test('the camera moved: each frame of an orbit from 36° down to 12° and round, and a zoom; not a turn under 0.1°', () => {
   let before = rig({ elevation: 36, distance: 10 });
-  const px = before.project(anchor);
   for (let i = 1; i <= 60; i++) {
     const now = rig({ elevation: 36 - (24 * i) / 60, yaw: i * 1.5, distance: 10 - i * 0.03 });
     assert.ok(cameraMoved(before.camera, now.camera), `frame ${i}: it moved`);
-    const ray = now.rayAt(px.x, px.y);
-    const { point, jump } = reanchor(ray, anchor);
-    assert.ok(onRay(ray, point) < 1e-9, 'on the new ray: the collar stays under the cursor');
-    assert.ok(jump < HOLD.reanchorMax, `frame ${i}: a jump of ${jump}`);
-    anchor = point;
     before = now;
   }
   assert.equal(cameraMoved(before.camera, { ...before.camera }), false, 'still');
@@ -327,32 +232,19 @@ test('the grab offset in screen px: all of it at the grab, less each moment, non
   assert.deepEqual(screenOffset(off, 1, 9), { x: 0, y: 0 });
 });
 
-test('the release velocity: the solved collar from 70 ms to 20 ms before letting go (a finger slowing as it lifts doesn’t count), capped, none across while pushed against a wall', () => {
+test('the release window: 50 ms ending 20 ms before letting go (a finger slowing as it lifts doesn’t count), read off the solved collar’s path straight between its samples, the ends held', () => {
   close(HOLD.lead, 0.02);
   close(HOLD.span, 0.05);
-  // A steady 2 u/s across and 1 up, then stopped dead for the last 15 ms.
-  const samples = [];
-  for (let t = 0; t <= 0.2 + 1e-9; t += 1 / 120) {
-    const k = Math.min(t, 0.185);
-    samples.push({ t, x: 2 * k, y: 1 + k, z: -0.5 * k });
-  }
-  const v = releaseVelocity(samples, 0.2);
-  close(v.x, 2, 1e-6);
-  close(v.y, 1, 1e-6);
-  close(v.z, -0.5, 1e-6);
-  // Fast: capped across at HOLD.maxLevel, up and down at HOLD.up and HOLD.down.
-  const fast = samples.map((s) => ({ ...s, x: s.x * 10, y: s.y * 10, z: 0 }));
-  const f = releaseVelocity(fast, 0.2);
-  close(Math.hypot(f.x, f.z), HOLD.maxLevel, 1e-9);
-  close(f.y, HOLD.up, 1e-9);
-  const drop = samples.map((s) => ({ ...s, y: -s.y * 10 }));
-  close(releaseVelocity(drop, 0.2).y, HOLD.down, 1e-9);
-  // Pushed against a wall: nothing across, up and down kept.
-  const pushed = releaseVelocity(samples, 0.2, { push: { x: 1, z: 0 } });
-  assert.deepEqual([pushed.x, pushed.z], [0, 0]);
-  close(pushed.y, 1, 1e-6);
-  // Too few samples, or none in the window: still.
-  assert.deepEqual(releaseVelocity([samples[0]], 0.2), { x: 0, y: 0, z: 0 });
+  const samples = [
+    { t: 0.1, x: 0, y: 1, z: 0 },
+    { t: 0.2, x: 1, y: 2, z: -1 },
+    { t: 0.3, x: 1, y: 2, z: 1 },
+  ];
+  assert.deepEqual(sampleAt(samples, 0), { x: 0, y: 1, z: 0 }, 'before the first: the first');
+  const near = (p, q, msg) => assert.ok(Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) < 1e-9, msg);
+  near(sampleAt(samples, 0.15), { x: 0.5, y: 1.5, z: -0.5 }, 'halfway along the first');
+  near(sampleAt(samples, 0.25), { x: 1, y: 2, z: 0 }, 'halfway along the second');
+  assert.deepEqual(sampleAt(samples, 9), { x: 1, y: 2, z: 1 }, 'past the last: the last');
 });
 
 test('the squash and stretch: 1.08 tall over 80 ms as he’s lifted; landing, 0.88 tall and 1.08 wide over 70 ms, back over 200 ms', () => {
@@ -385,7 +277,7 @@ test('the camera’s level axes: toward it and right on screen; depth along it g
   }
 });
 
-test('let go, he falls with the velocity the drag kind lets him go with, or carry.js toss with none', async () => {
+test('let go, he falls with the velocity the hold lets him go with, or carry.js toss with none', async () => {
   const { bodyStep, createBody } = await import('../src/invitation/play.js');
   const held = (released) => {
     const s = createBody();
@@ -399,6 +291,6 @@ test('let go, he falls with the velocity the drag kind lets him go with, or carr
   const kind = held({ x: 0, y: 2, z: -1.5 });
   assert.equal(kind.mode, 'fall');
   close(kind.vel.x, 0, 1e-9);
-  close(kind.vel.z, -1.5, 1e-9, 'the kind’s, in depth too');
+  close(kind.vel.z, -1.5, 1e-9, 'the hold’s, in depth too');
   assert.ok(held(null).vel.x > 1, 'tossed with the last samples');
 });

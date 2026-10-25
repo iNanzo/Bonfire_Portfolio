@@ -1,8 +1,8 @@
-// The ground cues every drag kind shares in the invitation toy, from cues.js: the blob straight
+// The ground cues under NEWT while he's held in the invitation toy, from cues.js: the blob straight
 // down under his hips while he's off the floor (radius 0.35 of his height on contact, 0.6 of that
 // and fainter, 0.45 to 0.20 times the look's lifted strength over 0.34, and softer, 0.15 to 0.5
 // of the radius, as his lowest foot rises to two heights; eased in and out over 0.15 s), Ground
-// Cues (Off / In the Mix / Always, the kind's own until picked; In the Mix while his lowest foot
+// Cues (Off / In the Mix / Always, In the Mix until picked: the bead hold's; In the Mix while his lowest foot
 // is over half his height or he moves over 1 u/s; faded over 0.15 s; the ring full for 0.12 s on
 // a wall clamp, never at Off), the drop line fading in from a foot at 0.15 to 0.5 of his height,
 // and the brain's drag speed as screen px a second over 110.
@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CUES,
+  CUE_DEFAULT,
   CUE_LABELS,
   CUE_MODES,
   blobLook,
@@ -64,16 +65,17 @@ test('the blob under him: 0.35 of his height across its middle on contact, shrin
   assert.equal(blobWeight(w, false, 1), 0);
 });
 
-test('Ground Cues: Off, In the Mix and Always (Title Case labels), the drag kind’s own until the look picks one', () => {
+test('Ground Cues: Off, In the Mix and Always (Title Case labels), In the Mix (the bead hold’s) until the look picks one', () => {
   assert.deepEqual([...CUE_MODES], ['off', 'mix', 'always']);
   assert.deepEqual(
     CUE_MODES.map((m) => CUE_LABELS[m]),
     ['Off', 'In the Mix', 'Always'],
   );
   for (const m of CUE_MODES) assert.equal(CUE_LABELS[m], titleCase(CUE_LABELS[m]));
-  assert.equal(groundCueMode(undefined, 'mix'), 'mix');
-  assert.equal(groundCueMode('auto', 'always'), 'always');
-  for (const m of CUE_MODES) assert.equal(groundCueMode(m, 'off'), m);
+  assert.equal(CUE_DEFAULT, 'mix');
+  // (Nothing picked, or a value no longer offered, such as an old 'auto': the default.)
+  for (const v of [undefined, null, 'auto', 'On', 1]) assert.equal(groundCueMode(v), 'mix', String(v));
+  for (const m of CUE_MODES) assert.equal(groundCueMode(m), m);
 });
 
 test('In the Mix shows the ring and the drop line while his lowest foot is over half his height or he moves over 1 u/s across the floor; a cue fades in and out over 0.15 s, only while he’s held', () => {
@@ -107,17 +109,17 @@ test('the ring pulses to full for 0.12 s on a wall clamp (never at Off); the dro
   close(lineShare(0.325 * NEWT_HEIGHT), 0.5);
 });
 
-test('a drag kind can keep the drop line out of In the Mix (HoldCues.line false), but Always still shows it and Off never does, as every effect’s setting', () => {
+test('the hold can keep the drop line out of In the Mix (HoldCues.line false: in flight to the ring), but Always still shows it and Off never does, as every effect’s setting', () => {
   assert.equal(lineMode('mix', false), 'off');
   assert.equal(lineMode('always', false), 'always');
   assert.equal(lineMode('off', false), 'off');
   for (const mode of CUE_MODES) {
-    assert.equal(lineMode(mode, undefined), mode, `${mode}: the kind says nothing`);
-    assert.equal(lineMode(mode, true), mode, `${mode}: the kind lets it be`);
+    assert.equal(lineMode(mode, undefined), mode, `${mode}: the hold says nothing`);
+    assert.equal(lineMode(mode, true), mode, `${mode}: the hold lets it be`);
   }
 });
 
-test('a drag kind can keep the ring In the Mix at a floor while he’s held (HoldCues.floor), eased in over CUES.fade from the grab; Always and Off are left as they are', () => {
+test('the hold can keep the ring In the Mix at a floor while he’s held (HoldCues.floor), eased in over CUES.fade from the grab; Always and Off are left as they are', () => {
   close(ringFloor(0, 'mix', 0.35, 1), 0.35);
   close(ringFloor(0.8, 'mix', 0.35, 1), 0.8);
   close(ringFloor(0, 'mix', 0.35, CUES.fade / 2), 0.175);

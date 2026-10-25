@@ -1,21 +1,17 @@
-// How NEWT is held by the collar in the invitation toy: the drag kinds (DRAG_KINDS, ?drag= and
-// Settings' Drag: 'bead' the default, the judges' pick, and 'today', 'level' and 'tilt' to compare),
-// the interface each
-// kind implements (Hold: start, step, release, grabbedAt, and optionally onWheel and
-// onSecondFinger; holds/index.js createHold makes one by name), 'today' through it (createTodayHold:
-// the camera-facing upright plane through where he was grabbed, carry.js dragPlane, gripFor and
-// dragTarget as they were), and the solve helpers every kind shares: the ray through the cursor
-// meeting a plane with grazing and backward rays turned away (rayHit), a level height on the ray
-// (rayAtY), the part of the ray inside the play area and the height limits (rayInterval) and the
-// edge clamp on it (edgeClamp: the nearest inside point along the ray within HOLD.reach, so the
-// collar stays exactly under the cursor, the back wall a climb and the front one the floor; with
-// none, a side wall: across only along the camera's level-right axis, never sliding in depth, and
-// the push recorded for the toss), re-anchoring after the camera moves (reanchor: the closest point
-// on the new ray), the grab offset easing out in screen px (screenOffset), the release velocity
-// from the solved collar over [t - 70 ms, t - 20 ms] (releaseVelocity), the squash and stretch
-// (squash), and the camera's level axes (levelAxes, depthAlong). Pure: no three.js, no DOM.
+// How NEWT is held by the collar in the invitation toy: the interface the bead hold
+// (holds/bead.js, the only carry) implements for main.js (Hold: start, step, release, grabbedAt,
+// onWheel and onSecondFinger) and the solve helpers it's built on: the ray through the cursor
+// meeting a plane with grazing and backward rays turned away (rayHit), the part of the ray inside
+// the play area and the height limits (rayInterval) and the edge clamp on it (edgeClamp: the
+// nearest inside point along the ray within HOLD.reach, so the collar stays exactly under the
+// cursor, the back wall a climb and the front one the floor; with none, a side wall: across only
+// along the camera's level-right axis, never sliding in depth, and the push recorded for the
+// toss), whether the camera moved (cameraMoved), the grab offset easing out in screen px
+// (screenOffset), the solved collar's path between its samples (sampleAt: the release window,
+// HOLD.lead and .span), the squash and stretch (squash), and the camera's level axes (levelAxes,
+// depthAlong). Pure: no three.js, no DOM.
 
-import { CARRY, dragPlane, dragTarget, gripFor, keepInside, lineSpan, offsetAt } from './carry.js';
+import { CARRY, keepInside, lineSpan } from './carry.js';
 import { rayPlane } from './gesture.js';
 import { clampTo } from './steer.js';
 
@@ -26,32 +22,15 @@ import { clampTo } from './steer.js';
 /** @typedef {{o: XYZ, d: XYZ}} Ray  a ray: its origin and direction (unit, or any length where said) */
 /** @typedef {{point: XYZ, normal: XYZ}} Plane */
 /** @typedef {{x: number, y: number}} Px  client px */
-/** @typedef {'today'|'level'|'tilt'|'bead'} DragKind */
 /** @typedef {'off'|'mix'|'always'} CueMode  a Bonfire-style effect's Off / In the Mix / Always */
-
-/** The drag kinds, in Settings' order. @type {readonly DragKind[]} */
-export const DRAG_KINDS = Object.freeze(['today', 'level', 'tilt', 'bead']);
-/** The kind he's held with unless ?drag= or Settings' Drag says otherwise. */
-export const DEFAULT_DRAG = /** @type {DragKind} */ ('bead');
-/** Settings' Drag labels. */
-export const DRAG_LABELS = Object.freeze({ today: 'Today', level: 'Level', tilt: 'Tilt', bead: 'Bead' });
-
-/**
- * A drag kind from anything: one of DRAG_KINDS, or DEFAULT_DRAG.
- * @param {unknown} v
- * @returns {DragKind}
- */
-export const dragKind = (v) =>
-  DRAG_KINDS.includes(/** @type {any} */ (v)) ? /** @type {DragKind} */ (v) : DEFAULT_DRAG;
 
 /**
  * grazing: a ray meeting a plane at a cosine under this is turned away (rayHit); reach: how far
  * along the ray, world units, an edge clamp looks for an inside point; steps: the bisection's;
- * offsetEase: seconds the grab offset eases out over (screenOffset); reanchorMax: the most a
- * re-anchor should ever move the anchor in a frame (world units: a check, reanchor reports it);
- * turnEps, zoomEps: the least change in the camera's angles (radians) and distance (share) that
- * counts as a move (cameraMoved). The release: its window ends `lead` s before letting go and spans
- * `span` s, capped at `maxLevel` u/s across the floor and `up`/`down` up and down. The squash and
+ * offsetEase: seconds the grab offset eases out over (screenOffset); turnEps, zoomEps: the least
+ * change in the camera's angles (radians) and distance (share) that counts as a move
+ * (cameraMoved). The release: its window ends `lead` s before letting go and spans `span` s
+ * (holds/bead.js beadThrow reads it). The squash and
  * stretch: `stretch` tall over `stretchTime` s as he's lifted; landing, `squashY` tall and
  * `squashXZ` wide over `squashTime` s, back over `recover` s.
  */
@@ -60,14 +39,10 @@ export const HOLD = {
   reach: 1,
   steps: 16,
   offsetEase: CARRY.offsetEase,
-  reanchorMax: 0.15,
   turnEps: (0.1 * Math.PI) / 180,
   zoomEps: 1e-3,
   lead: 0.02,
   span: 0.05,
-  maxLevel: 4,
-  up: 2.5,
-  down: -3,
   stretch: 1.08,
   stretchTime: 0.08,
   squashY: 0.88,
@@ -112,19 +87,6 @@ export function rayHit(ray, plane, grazing = HOLD.grazing) {
   const len = Math.hypot(n.x, n.y, n.z) || 1;
   if (Math.abs(dot(r.d, n)) / len < grazing) return null;
   return rayPlane(r.o, r.d, plane);
-}
-
-/**
- * Where a ray reaches height `y`, or null when it never does (level, or the height behind it).
- * @param {Ray} ray
- * @param {number} y
- * @returns {XYZ|null}
- */
-export function rayAtY(ray, y) {
-  const r = unitRay(ray);
-  if (Math.abs(r.d.y) < 1e-9) return null;
-  const s = (y - r.o.y) / r.d.y;
-  return s >= 0 ? along(r, s) : null;
 }
 
 /**
@@ -197,9 +159,9 @@ export function insideHold(p, bounds, low, high) {
  */
 
 /**
- * The shared edge clamp: `p` (a point on `ray`, solved on a kind's surface) kept inside the play
+ * The shared edge clamp: `p` (a point on `ray`, solved on the hold's surface) kept inside the play
  * area and between `low` and `high`. Inside, as it is. Under `low` or over `high`, onto that
- * height along the ray, however far (rayAtY: no gap on a down drag). Out past a wall, the nearest
+ * height along the ray, however far (no gap on a down drag). Out past a wall, the nearest
  * inside point along the ray within HOLD.reach (rayInterval, then HOLD.steps of bisection with
  * clampTo as the inside test, so it's inside by steer's own rule). With none, a side wall: carry.js
  * keepInside along the camera's level-right axis (`toward`: the level way to the camera), never
@@ -248,31 +210,7 @@ export function edgeClamp(ray, p, { bounds, low, high, toward, reach = HOLD.reac
 }
 
 /**
- * The closest point on a ray to `p` (never behind it).
- * @param {Ray} ray
- * @param {XYZ} p
- * @returns {XYZ}
- */
-export function closestOnRay(ray, p) {
-  const r = unitRay(ray);
-  return along(r, Math.max(0, sOf(r, p)));
-}
-
-/**
- * After the camera moves mid-hold (a user orbit or zoom): the anchor onto the new cursor ray,
- * the closest point on it to where it was (a kind rebuilds its surface through `point`), and how
- * far that moved it (a frame's orbit keeps it under HOLD.reanchorMax).
- * @param {Ray} ray
- * @param {XYZ} anchor
- * @returns {{point: XYZ, jump: number}}
- */
-export function reanchor(ray, anchor) {
-  const point = closestOnRay(ray, anchor);
-  return { point, jump: Math.hypot(point.x - anchor.x, point.y - anchor.y, point.z - anchor.z) };
-}
-
-/**
- * @typedef {object} HoldCamera  the camera as a kind reads it
+ * @typedef {object} HoldCamera  the camera as the hold reads it
  * @property {XYZ} position
  * @property {number} yaw  radians (camera.js: 0 looks toward −z)
  * @property {number} elevation  radians up
@@ -315,7 +253,7 @@ export const depthAlong = (p, yaw) => -(p.x * Math.sin(yaw) + p.z * Math.cos(yaw
 
 /**
  * The grab offset in screen px at `t`: all of `off0` at the grab (`t0`), eased out (smoothstep)
- * over HOLD.offsetEase, none from then on. A kind casts its ray through the pointer plus this.
+ * over HOLD.offsetEase, none from then on. The hold casts its ray through the pointer plus this.
  * @param {Px} off0  his collar on screen less the point pressed, as he's grabbed
  * @param {number} t0
  * @param {number} t
@@ -350,38 +288,6 @@ export function sampleAt(samples, t) {
 }
 
 /**
- * The velocity he's let go with, world space: the solved collar's samples (CarryState.samples)
- * from `t` − HOLD.lead − HOLD.span to `t` − HOLD.lead (the last frames before a release are often
- * the finger slowing as it lifts), capped at HOLD.maxLevel across the floor and HOLD.up/down up
- * and down; while the cursor pushes him out through a wall (`push`), none across (today's rule).
- * @param {Array<{t: number, x: number, y: number, z: number}>} samples
- * @param {number} t  the release
- * @param {{push?: XZ|null, lead?: number, span?: number}} [o]
- * @returns {XYZ}
- */
-export function releaseVelocity(samples, t, { push = null, lead = HOLD.lead, span = HOLD.span } = {}) {
-  if (samples.length < 2) return { x: 0, y: 0, z: 0 };
-  const t1 = Math.min(t - lead, samples[samples.length - 1].t);
-  const t0 = Math.max(t1 - span, samples[0].t);
-  if (!(t1 - t0 > 1e-4)) return { x: 0, y: 0, z: 0 };
-  const a = sampleAt(samples, t0);
-  const b = sampleAt(samples, t1);
-  const dt = t1 - t0;
-  let x = (b.x - a.x) / dt;
-  let z = (b.z - a.z) / dt;
-  const level = Math.hypot(x, z);
-  if (level > HOLD.maxLevel) {
-    x *= HOLD.maxLevel / level;
-    z *= HOLD.maxLevel / level;
-  }
-  if (push) {
-    x = 0;
-    z = 0;
-  }
-  return { x, y: clamp((b.y - a.y) / dt, HOLD.down, HOLD.up), z };
-}
-
-/**
  * The squash and stretch on his root's scale: a stretch to HOLD.stretch tall over
  * HOLD.stretchTime as he's lifted (`sinceGrab` seconds ago, there and back), and as he lands
  * (`sinceLand` seconds ago) a squash to HOLD.squashY tall and HOLD.squashXZ wide over
@@ -410,7 +316,7 @@ export function squash(sinceGrab, sinceLand) {
 }
 
 /**
- * @typedef {object} HoldStart  what a kind gets the frame he's grabbed
+ * @typedef {object} HoldStart  what the hold gets the frame he's grabbed
  * @property {number} t
  * @property {XYZ} collar  his collar now, world units (the Neck bone's head)
  * @property {Px} press  where the press began, client px (the point grabbed)
@@ -422,7 +328,7 @@ export function squash(sinceGrab, sinceLand) {
  * @property {boolean} [touch]  grabbed by a finger
  */
 /**
- * @typedef {object} HoldFrame  what a kind gets each frame he's held
+ * @typedef {object} HoldFrame  what the hold gets each frame he's held
  * @property {number} t
  * @property {number} dt
  * @property {Px} px  the pointer, client px (a finger's lifted over itself already)
@@ -436,9 +342,8 @@ export function squash(sinceGrab, sinceLand) {
  * @property {{top: number, height: number}} [stage]  the stage's top and height, client px
  */
 /**
- * @typedef {object} HoldCues  what a kind tells the shared cues (main.js, cues.js) this frame
- * @property {boolean} [mix]  whether In the Mix shows the ring and the drop line now (left out:
- *   cues.js mixWants, the shared rule)
+ * @typedef {object} HoldCues  what the hold tells the cues (main.js, cues.js) this frame (In the
+ *   Mix shows the ring and the drop line as cues.js mixWants has it)
  * @property {XZ|null} [ring]  where the ring sits (left out: under his hips)
  * @property {boolean} [line]  false: no drop line In the Mix (Always still shows it: cues.js
  *   lineMode)
@@ -447,27 +352,26 @@ export function squash(sinceGrab, sinceLand) {
  *   ringFloor)
  */
 /**
- * @typedef {object} HoldStep  a kind's frame
+ * @typedef {object} HoldStep  the hold's frame
  * @property {XYZ} anchor  where his collar goes (carry.js holdStep keeps it inside)
  * @property {Plane|null} plane  the line across the floor holdStep keeps him inside along (null:
- *   the nearest spot inside: a kind that clamped already is left as it is)
- * @property {XZ|null} [push]  set: the push holdStep keeps for the toss (a kind's side clamp)
- * @property {number|null} holdY  the height a kind holds him at (null: none of its own)
- * @property {XZ} [tilt]  set: his root's tilt this frame in place of carry.js's swing (a kind's own
- *   body: root.rotation.x and .z). There's no heading: no kind turns him (main.js keeps the one
+ *   the nearest spot inside: a hold that clamped already is left as it is)
+ * @property {XZ|null} [push]  set: the push holdStep keeps for the toss (the hold's side clamp)
+ * @property {number|null} holdY  the height the hold holds him at (null: none of its own)
+ * @property {XZ} [tilt]  set: his root's tilt this frame in place of carry.js's swing (the hold's own
+ *   body: root.rotation.x and .z). There's no heading: the hold never turns him (main.js keeps the one
  *   he had as he was grabbed, the user's rule).
  * @property {HoldCues} cues
  */
 /**
- * @typedef {object} HoldFeel  a kind's own defaults for the shared layer
- * @property {CueMode} groundCues  the Ground Cues setting's default (the ring and the drop line)
+ * @typedef {object} HoldFeel  the hold's own settings for main.js (Ground Cues' default is cues.js
+ *   CUE_DEFAULT)
  * @property {boolean} squash  the squash and stretch on his root
  * @property {number|null} fingerLift  CSS px a finger carries him above itself (null: the page's)
  * @property {boolean} secondFinger  a second finger while he's held goes to onSecondFinger
  */
 /**
- * @typedef {object} Hold  a drag kind, made by holds/index.js createHold
- * @property {DragKind} kind
+ * @typedef {object} Hold  how he's held, made by holds/bead.js createBeadHold for each grab
  * @property {HoldFeel} feel
  * @property {(s: HoldStart) => void} start
  * @property {(f: HoldFrame) => HoldStep} step
@@ -476,41 +380,9 @@ export function squash(sinceGrab, sinceLand) {
  * @property {(c: CarryState, t: number) => XYZ|null} release  the velocity he's let go with (null:
  *   carry.js toss)
  * @property {Plane|null} plane  the surface he's dragged on now, for ?test (null before a grab)
- * @property {XZ|null} [landing]  once he's let go, where the kind says he'll land: the ring
+ * @property {XZ|null} [landing]  once he's let go, where the hold says he'll land: the ring
  *   stays there until he does
  * @property {((dy: number) => boolean)} [onWheel]  the wheel while he's held (CSS px; true: taken,
  *   no zoom)
  * @property {((dy: number) => void)} [onSecondFinger]  a second finger's move while he's held, CSS px
  */
-
-/**
- * Today's hold: dragged on the upright plane through his collar facing the camera (carry.js
- * dragPlane), the grab offset in world units easing out (gripFor, offsetAt), up lifts and across
- * moves (dragTarget), kept inside along the plane's line across the floor (holdStep), tossed with
- * carry.js toss.
- * @returns {Hold}
- */
-export function createTodayHold() {
-  /** @type {import('./carry.js').Grip|null} */
-  let grip = null;
-  return {
-    kind: 'today',
-    feel: { groundCues: 'off', squash: false, fingerLift: null, secondFinger: false },
-    get plane() {
-      return grip?.plane ?? null;
-    },
-    start({ t, collar, press, rayAt, camera }) {
-      grip = gripFor(rayAt(press.x, press.y), dragPlane(camera.position, collar), collar, t);
-    },
-    step({ t, px, rayAt, low }) {
-      const g = /** @type {import('./carry.js').Grip} */ (grip);
-      const anchor = dragTarget(g, rayAt(px.x, px.y), low, t);
-      return { anchor, plane: g.plane, holdY: null, cues: {} };
-    },
-    grabbedAt(t, collar, project) {
-      const o = grip ? offsetAt(grip, t) : { x: 0, y: 0, z: 0 };
-      return project({ x: collar.x - o.x, y: collar.y - o.y, z: collar.z - o.z });
-    },
-    release: () => null,
-  };
-}

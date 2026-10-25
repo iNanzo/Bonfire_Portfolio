@@ -1,12 +1,11 @@
-// The shared drag checks for the invitation toy's drag kinds (hold.js DRAG_KINDS), as a harness
-// a spec runs for a kind: dragDescribe(kind) adds them under ?drag=<kind> (e2e/invitationDrag.spec.mjs
-// runs them for today; a candidate's own spec file runs them for its kind, then its own checks
-// with the helpers here). Carried with the mouse, his collar is within 2 px of the cursor once
+// The shared drag checks for carrying NEWT in the invitation toy (the bead hold, holds/bead.js), as
+// a harness: dragDescribe() adds them (e2e/invitationDrag.spec.mjs runs them;
+// e2e/invitationDragBead.spec.mjs has the bead's own checks, with the helpers here). Carried with the mouse, his collar is within 2 px of the cursor once
 // the grab has eased in (0.15 s), up, across and down; the blob is within 0.03 world of his hips'
 // floor point and his lowest foot above the floor all the while; a down drag from a standing grab
 // leaves no gap; carried across and up and let go, he keeps the way he faced as he was grabbed,
 // held, falling and landed (the user's rule); with a finger, his collar is within 2 px of where
-// the kind aims it, above the finger; Ground Cues shows the ring under him and the drop line once
+// the hold aims it, above the finger; Ground Cues shows the ring under him and the drop line once
 // he's high, or neither at Off. Every wait is on a state (snapshot().drag through ?test), never a duration (CI's software
 // WebGL runs 3-5x slower than real time). Playwright only.
 import { test, expect } from '@playwright/test';
@@ -20,15 +19,15 @@ export const until = (page, pred, message, timeout = 20_000) =>
 export const gap = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /**
- * The toy under ?drag=<kind>, ready, calm (no wandering, no sitting by himself) and idle; with
- * `look`, that stored first (invitation.look.v1, as the Settings sheet keeps it).
+ * The toy ready, calm (no wandering, no sitting by himself) and idle; with `look`, that stored
+ * first (invitation.look.v1, as the Settings sheet keeps it); `more` added to the address.
  * @param {import('@playwright/test').Page} page
- * @param {string} kind
  * @param {object} [look]
+ * @param {string} [more]  e.g. '&drag=level', an old address's
  */
-export async function calm(page, kind, look) {
+export async function calm(page, look, more = '') {
   if (look) await page.addInitScript((l) => localStorage.setItem('invitation.look.v1', JSON.stringify(l)), look);
-  await page.goto(`/invitation/?test&calm&seed=3&drag=${kind}`);
+  await page.goto(`/invitation/?test&calm&seed=3${more}`);
   await expect(page.locator('[data-stage]')).toHaveClass(/is-ready/, { timeout: 30_000 });
   await until(page, (s) => s.state === 'idle' && s.clip === 'Idle', 'idle');
 }
@@ -66,17 +65,14 @@ export async function grab(page, part = 'head') {
   return { x: at.x, y: at.y };
 }
 
-/** Waits until the collar is within `px` of where the kind aims it (the cursor, for a mouse). */
+/** Waits until the collar is within `px` of where the hold aims it (the cursor, for a mouse). */
 export const onCursor = (page, message, px = 2) =>
   expect.poll(async () => (await snapshot(page)).drag.gap ?? Infinity, { message }).toBeLessThan(px);
 
-/**
- * Up 200 px from `cursor`, and for a kind with a wheel for his height (a level hold keeps him at
- * its height however far up the screen he goes), six notches up as well; returns the cursor.
- */
+/** Up 200 px from `cursor`, and six notches of the wheel up (his hold height); returns the cursor. */
 export async function lift(page, cursor) {
   const to = await glide(page, cursor, { x: cursor.x, y: cursor.y - 200 });
-  if ((await snapshot(page)).drag.controls.wheel) for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -100);
+  for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -100);
   return to;
 }
 
@@ -132,24 +128,16 @@ export async function fingers(page) {
   };
 }
 
-/**
- * The shared checks for drag kind `kind`. `baseline`: the checks the kind is known to fail (today's
- * hold leaves the collar off the cursor on a down drag: marked test.fail, so fixing it shows).
- * Each check gets him high with `lift` (a drag up, and the wheel for a kind that has one).
- * @param {string} kind
- * @param {{baseline?: string[]}} [o]
- */
-export function dragDescribe(kind, { baseline = [] } = {}) {
-  test.describe(`?drag=${kind}, on a desktop`, () => {
+/** The shared checks. Each gets him high with `lift` (a drag up and the wheel). */
+export function dragDescribe() {
+  test.describe('carried, on a desktop', () => {
     test.use({ viewport: { width: 1280, height: 800 } });
 
-    test(`${kind}: carried with the mouse, his collar is within 2 px of the cursor once the grab has eased in, up, across and down; the blob stays under his hips and his lowest foot over the floor`, async ({
+    test(`carried with the mouse, his collar is within 2 px of the cursor once the grab has eased in, up, across and down; the blob stays under his hips and his lowest foot over the floor`, async ({
       page,
     }) => {
-      await calm(page, kind);
-      expect((await snapshot(page)).drag.kind).toBe(kind);
+      await calm(page);
       let cursor = await grab(page, 'head');
-      expect((await snapshot(page)).drag.kind, 'held with it').toBe(kind);
       cursor = await glide(page, cursor, { x: cursor.x, y: cursor.y - 120 });
       for (const [dx, dy] of [
         [0, 0],
@@ -167,11 +155,8 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
       await until(page, (s) => s.state === 'idle' || s.state === 'flee', 'down again', 30_000);
     });
 
-    test(`${kind}: a down drag from a standing grab leaves no gap between his collar and the cursor`, async ({
-      page,
-    }) => {
-      test.fail(baseline.includes('down'), `${kind} leaves the collar off the cursor on a down drag (the baseline)`);
-      await calm(page, kind);
+    test(`a down drag from a standing grab leaves no gap between his collar and the cursor`, async ({ page }) => {
+      await calm(page);
       const cursor = await grab(page, 'head');
       await glide(page, cursor, { x: cursor.x, y: cursor.y + 100 });
       await expect
@@ -180,10 +165,10 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
       await page.mouse.up();
     });
 
-    test(`${kind}: carried across and up, then let go, he keeps the way he faced as he was grabbed, held, falling and landed (the user's rule)`, async ({
+    test(`carried across and up, then let go, he keeps the way he faced as he was grabbed, held, falling and landed (the user's rule)`, async ({
       page,
     }) => {
-      await calm(page, kind);
+      await calm(page);
       const off = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
       // (Read held, in the air and landing only: once he's up again, a fright may send him running.)
       let most = 0;
@@ -222,13 +207,13 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
       expect(most, `turned ${((most * 180) / Math.PI).toFixed(2)}° off the way he faced`).toBeLessThan(Math.PI / 180);
     });
 
-    test(`${kind}: Ground Cues Always shows the ring under him while he's held and the drop line once he's high`, async ({
+    test(`Ground Cues Always shows the ring under him while he's held and the drop line once he's high`, async ({
       page,
     }) => {
-      await calm(page, kind, { groundCues: 'always' });
+      await calm(page, { groundCues: 'always' });
       const cursor = await grab(page, 'head');
-      // (Under his hips, or under his collar for a kind that keeps it off his swing, eased there as
-      // the grab settles: bead's.)
+      // (Under his hips, or under his collar, eased there as the grab settles: the bead keeps it
+      // off his swing.)
       const under = (d) =>
         Math.min(
           gap({ x: d.ring.x, y: d.ring.z }, { x: d.hips.x, y: d.hips.z }),
@@ -249,8 +234,8 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
       await until(page, (s) => !s.held && s.drag.ring === null && !s.drag.line.visible, 'let go: both go');
     });
 
-    test(`${kind}: Ground Cues Off shows neither the ring nor the drop line, however high he is`, async ({ page }) => {
-      await calm(page, kind, { groundCues: 'off' });
+    test(`Ground Cues Off shows neither the ring nor the drop line, however high he is`, async ({ page }) => {
+      await calm(page, { groundCues: 'off' });
       const cursor = await grab(page, 'head');
       await lift(page, cursor);
       await until(page, (s) => s.drag.lowestFoot > 0.5, 'high');
@@ -262,13 +247,13 @@ export function dragDescribe(kind, { baseline = [] } = {}) {
     });
   });
 
-  test.describe(`?drag=${kind}, on a phone`, () => {
+  test.describe('carried, on a phone', () => {
     test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
 
-    test(`${kind}: carried with a finger, his collar is within 2 px of where the kind aims it, above the finger`, async ({
+    test(`carried with a finger, his collar is within 2 px of where the hold aims it, above the finger`, async ({
       page,
     }) => {
-      await calm(page, kind);
+      await calm(page);
       const head = await on(page, 'head');
       const f = await finger(page);
       let at = { x: head.x, y: head.y };
