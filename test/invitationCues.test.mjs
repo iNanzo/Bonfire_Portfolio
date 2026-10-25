@@ -1,5 +1,6 @@
-// The ground cues under NEWT while he's held in the invitation toy, from cues.js: the blob straight
-// down under his hips while he's off the floor (radius 0.35 of his height on contact, 0.6 of that
+// The ground cues under NEWT while he's held in the invitation toy, from cues.js: the floor point
+// the ring, the drop line and the blob share while he's held or flying from a let-go (the hold's
+// ring spot, else where he'll land, else under his hips: cueSpot), the blob off the floor (radius 0.35 of his height on contact, 0.6 of that
 // and fainter, 0.45 to 0.20 times the look's lifted strength over 0.34, and softer, 0.15 to 0.5
 // of the radius, as his lowest foot rises to two heights; eased in and out over 0.15 s), Ground
 // Cues (Off / In the Mix / Always, In the Mix until picked: the bead hold's; In the Mix while his lowest foot
@@ -15,6 +16,7 @@ import {
   CUE_MODES,
   blobLook,
   blobWeight,
+  cueSpot,
   cueStep,
   dragSpeedOf,
   groundCueMode,
@@ -133,4 +135,20 @@ test('the brain’s drag speed is his collar’s speed on screen, px a second ov
   close(dragSpeedOf(220), 2);
   close(dragSpeedOf(0), 0);
   close(dragSpeedOf(-5), 0);
+});
+
+test('the ring, the drop line and the blob share one floor point: the hold’s ring spot while he’s held, else where he’ll land after a let-go, else under his hips', () => {
+  const hips = { x: 0.3, y: 0.7, z: -0.2 };
+  const collar = { x: 0.1, z: -0.4 };
+  const landing = { x: 1.5, z: 0.25 };
+  assert.deepEqual(
+    cueSpot(collar, null, hips),
+    collar,
+    'held: the hold’s spot (under his collar), not his swinging hips',
+  );
+  assert.deepEqual(cueSpot(collar, landing, hips), collar, 'the hold’s spot first');
+  assert.deepEqual(cueSpot(null, landing, hips), landing, 'flying: where the hold said he’d land');
+  assert.deepEqual(cueSpot(undefined, null, hips), { x: 0.3, z: -0.2 }, 'neither: under his hips, on the floor');
+  const got = cueSpot(collar, null, hips);
+  assert.notEqual(got, collar, 'a copy: the hold’s own spot is never handed on to be moved');
 });

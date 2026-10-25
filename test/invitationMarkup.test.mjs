@@ -3,9 +3,13 @@
 // escapes a brace; colours from the palette or hex, effects wave, shake, bold and big; one level
 // of nesting; every mistake an error (and the text still shows, as plain as it can); a line
 // clipped by its letters stays well formed; and the letter plan the dialogue box and the bubble
-// build their spans from (words with a styled letter kept whole, each letter's index).
+// build their spans from (words with a styled letter kept whole, each letter's index). The moves
+// in markup.css keep a shaken or waved word legible: a letter only ever steps sideways one way, a
+// pixel at most, so it never runs more than a pixel into its neighbour whatever their phases
+// (e2e/invitationDialogue.spec.mjs measures the drawn boxes), and a shake's jitter is a pixel.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   DEFAULT_TEXT_COLORS,
   TEXT_EFFECTS,
@@ -185,4 +189,66 @@ test('the letter plan: every letter with its index; a word with a styled letter 
     lines.map((g) => g.letters.map((l) => l.ch).join('')),
     ['a', '\n', 'b'],
   );
+});
+
+/**
+ * markup.css's moves: each @keyframes inv-fx-* as its frames' offsets, from `transform:
+ * translate(x, y)` (or translateX, translateY) or the `translate: x y` property, a length as px
+ * plus em ({px, em}: '1px', '-0.12em', '0').
+ */
+function fxKeyframes() {
+  const css = readFileSync(new URL('../src/invitation/markup.css', import.meta.url), 'utf8');
+  const len = (s) => {
+    const m = /^(-?[\d.]+)(px|em)?$/.exec(s.trim());
+    assert.ok(m, `a length: ${s}`);
+    const v = Number(m[1]);
+    assert.ok(m[2] || v === 0, `a unit: ${s}`);
+    return m[2] === 'em' ? { px: 0, em: v } : { px: v, em: 0 };
+  };
+  const zero = { px: 0, em: 0 };
+  /** @type {Map<string, {at: number, x: {px: number, em: number}, y: {px: number, em: number}}[]>} */
+  const out = new Map();
+  for (const [, name, body] of css.matchAll(/@keyframes\s+(inv-fx-[\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/g)) {
+    const frames = [...body.matchAll(/([\d.]+)%\s*\{\s*(transform|translate):\s*([^;]+);\s*\}/g)].map(
+      ([, at, prop, v]) => {
+        if (prop === 'translate') {
+          const [x, y] = v.trim().split(/\s+/).map(len);
+          return { at: Number(at), x, y: y ?? zero };
+        }
+        const m = /^translate(X|Y)?\(([^)]*)\)$/.exec(v.trim());
+        assert.ok(m, `${name} ${at}%: a translation (${v})`);
+        const [a, b] = m[2].split(',').map(len);
+        if (m[1] === 'Y') return { at: Number(at), x: zero, y: a };
+        return { at: Number(at), x: a, y: (m[1] ? null : b) ?? zero };
+      },
+    );
+    out.set(name, frames);
+  }
+  return out;
+}
+
+test('a shaken or waved letter steps sideways one way only, a pixel at most (both at once too), so it never runs more than a pixel into a neighbour; a shake jitters a pixel', () => {
+  const moves = fxKeyframes();
+  for (const name of ['inv-fx-wave', 'inv-fx-shake'])
+    assert.ok(moves.get(name)?.length >= 4, `${name}: stepped frames`);
+  let most = 0;
+  for (const [name, frames] of moves) {
+    // (In px, not em: a big letter's step is the same pixel. One way: two neighbours a step apart
+    // close by that step, never by two.)
+    for (const f of frames) {
+      assert.equal(f.x.em, 0, `${name} ${f.at}%: a sideways step in px`);
+      assert.ok(f.x.px >= 0, `${name} ${f.at}%: sideways ${f.x.px}px, never to the left`);
+    }
+    most += Math.max(0, ...frames.map((f) => f.x.px));
+  }
+  // (A letter can run every move at once: their steps add up.)
+  assert.ok(most <= 1, `every move's step across together: ${most}px, a pixel at most`);
+  const shake = moves.get('inv-fx-shake') ?? [];
+  for (const f of shake) {
+    assert.equal(f.y.em, 0, `shake ${f.at}%: its jitter in px`);
+    assert.ok(Math.abs(f.y.px) <= 1, `shake ${f.at}%: up or down ${f.y.px}px, a pixel at most`);
+  }
+  // (The shake moves at all: a pixel across and a pixel up and down.)
+  assert.ok(new Set(shake.map((f) => f.x.px)).size >= 2, 'the shake steps across');
+  assert.ok(new Set(shake.map((f) => f.y.px)).size >= 2, 'the shake steps up and down');
 });

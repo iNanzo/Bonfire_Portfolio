@@ -33,9 +33,10 @@
 // → the clip mix and step phase (play.js mixStep; a restart of a clip still showing fades its
 // twin out) → character.setWeights and update → the swing's tilt on his root and the collar
 // anchoring, matrices updated before and after → lookStep and applyLook → faceStep and setFace
-// → the blob shadow (straight down under his hips while he's off the floor, sized and faded by his
-// lowest foot's height: cues.js), the marker (or, while he's held, the ring under him and the
-// dashed drop line, Ground Cues), the toolbar → the speech bubble (bubble.js: over his head as
+// → the blob shadow (off the floor, sized and faded by his lowest foot's height: cues.js; held,
+// or flying from a let-go, on the floor point the ring and the drop line share, cueSpot, else
+// under his hips), the marker (or, while he's held, the ring under him and the dashed drop
+// line, Ground Cues), the toolbar → the speech bubble (bubble.js: over his head as
 // posed, clear of the toolbar, the open Camera pad and Settings sheet, out of sight while the sheet covers his
 // head; near the top, beside his head, narrowed to fit there, or under his feet) → render. With Motion Choppy (look.js) his pose (the update and applyLook) only moves
 // on the clock's steps, 15 a second; his root, the camera and the rest move every frame. The
@@ -82,9 +83,10 @@
 // Time (the brain's device and label, the tablet shown and where, his turn off the camera);
 // snapshot().drag is the hold's (its height controls, the collar's gap from where it's aimed, CSS px,
 // the hold height, the anchor's depth along the camera's level axis, the blob, his hips' floor
-// point and lowest foot, the ring, the drop line and Ground Cues as they play, the way his root
-// faces as drawn); view({yaw, elevation, zoom}) eases the camera there; `?seed=N` and `?calm` go
-// to the brain (and the seed to talk).
+// point and lowest foot, the floor point the cues share, the ring, the drop line and Ground Cues
+// as they play, the blob's and the ring's centres on screen, the way his root faces as drawn);
+// view({yaw, elevation, zoom}) eases the camera there; `?seed=N` and `?calm` go to the brain (and
+// the seed to talk).
 // clock() is the toy's clock (it stands still while the envelope covers him), envelope() the
 // envelope's state and pose (null without one).
 import { Vector3 } from 'three';
@@ -102,6 +104,7 @@ import {
   CUES,
   blobLook,
   blobWeight,
+  cueSpot,
   cueStep,
   groundCueMode,
   lineMode,
@@ -598,7 +601,8 @@ function start(s) {
    * The ground cues (cues.js): the blob's held look eased in, the ring's and the drop line's
    * strengths, when the ring last pulsed, whether he was pushed at the edge last frame, where the
    * hold said he'd land as he was let go (the ring waits there till he does: hold.js
-   * Hold.landing), and, for ?test, Ground Cues as it plays and where the ring is while it shows.
+   * Hold.landing), and, for ?test, Ground Cues as it plays, where the ring is while it shows and
+   * the floor point the cues share (cues.js cueSpot: null while he's on his feet).
    */
   const cue = {
     flight: /** @type {import('./types.js').XZ|null} */ (null),
@@ -609,6 +613,7 @@ function start(s) {
     pushed: false,
     mode: /** @type {import('./hold.js').CueMode} */ ('off'),
     ringAt: /** @type {import('./types.js').XZ|null} */ (null),
+    spot: /** @type {import('./types.js').XZ|null} */ (null),
   };
   /** How far the top of his head shows above the point grabbed, CSS px (followed while held). */
   let headAbove = 0;
@@ -1121,7 +1126,16 @@ function start(s) {
     out = null;
     heard = null;
     target = { x: 0, y: hangY, z: 0 };
-    Object.assign(cue, { flight: null, blob: 0, ring: 0, line: 0, pulse: null, pushed: false, ringAt: null });
+    Object.assign(cue, {
+      flight: null,
+      blob: 0,
+      ring: 0,
+      line: 0,
+      pulse: null,
+      pushed: false,
+      ringAt: null,
+      spot: null,
+    });
     talk.rest(t);
     cam = homeCamera();
     bubble.hide();
@@ -1635,13 +1649,16 @@ function start(s) {
     if (moved) c.applyLook(headTurn.yaw, headTurn.pitch, headTurn.weight, torso);
     // (Any of the eight: character.js shows a dialogue face's stand-in until its sheet is in.)
     c.setFace(forcedFace ?? faceStep(faces, face, blink, t, rng));
-    // (Off the floor, the blob goes straight down under his hips, sized and faded by his lowest
-    // foot's height: cues.js blobLook, eased in and out. Lying on the floor, under his body, not
-    // his feet: ring.js blobCentre, by the lying clips' weight.)
+    // (Off the floor, the blob is sized and faded by his lowest foot's height: cues.js blobLook,
+    // eased in and out. Held, or flying from a let-go, it sits on the floor point the ring and the
+    // drop line share, so it's always in the ring's middle (cues.js cueSpot: under his collar,
+    // not his swinging hips, or where he'll land); otherwise off the floor, under his hips. Lying
+    // on the floor, under his body, not his feet: ring.js blobCentre, by the lying clips' weight.)
     const off = body.mode !== 'ground';
     const footH = Math.max(0, lowestY() - CARRY.floorY);
     const hips = c.bonePos(BONES.hips, { x: 0, y: 0, z: 0 });
-    const under = off ? hips : blobCentre(root.position, hips, head, lieWeight(c.weightOf));
+    const spot = cueSpotNow(hips);
+    const under = spot ?? (off ? hips : blobCentre(root.position, hips, head, lieWeight(c.weightOf)));
     cue.blob = blobWeight(cue.blob, off, dt);
     s.setBlob(under.x, under.z, off ? Math.min(1, root.position.y / 0.5) : 0, {
       ...blobLook(footH, s.blobLifted),
@@ -1650,9 +1667,22 @@ function start(s) {
     if (sun)
       fitShadow(sun, s.bounds, shadowTop(root.position.y, SHADOW_TOP), { x: root.position.x, z: root.position.z });
     const mark = ptr && !ptr.pinch && !ptr.onNewt && body.mode === 'ground' ? ptr.floor : null;
-    groundCues(c, footH, hips, mark, dt);
+    groundCues(c, footH, spot ?? hips, mark, dt);
     // (His earrings swing on his head as the look left it; the tablet goes to his palms.)
     c.accessories(moved ? stepped : 0, t);
+  }
+
+  /**
+   * The floor point the ground cues share while he's held, or flying from a let-go (cues.js
+   * cueSpot: the hold's ring spot, else where it said he'd land); null otherwise.
+   * @param {import('./types.js').XZ} hips
+   */
+  function cueSpotNow(hips) {
+    // (Let go where the hold said he'd land: the ring waits there till he does, then fades.)
+    if (body.mode !== 'fall') cue.flight = null;
+    const isHeld = body.mode === 'held' && Boolean(body.carry && hold);
+    cue.spot = isHeld || cue.flight !== null ? cueSpot(isHeld ? holdNow?.cues.ring : null, cue.flight, hips) : null;
+    return cue.spot;
   }
 
   /**
@@ -1661,15 +1691,13 @@ function start(s) {
    * the ring pulsing on a wall clamp; otherwise the marker where the pointer meets the floor.
    * @param {NonNullable<typeof character>} c
    * @param {number} footH  his lowest foot's height
-   * @param {import('./types.js').XYZ} hips
+   * @param {import('./types.js').XZ} at  the floor point the cues share (cueSpotNow), or his hips'
    * @param {import('./types.js').XZ|null} mark  the pointer's spot on the floor, when it shows
    * @param {number} dt
    */
-  function groundCues(c, footH, hips, mark, dt) {
+  function groundCues(c, footH, at, mark, dt) {
     const carry = body.mode === 'held' ? body.carry : null;
     const isHeld = Boolean(carry && hold);
-    // (Let go where the hold said he'd land: the ring waits there till he does, then fades.)
-    if (body.mode !== 'fall') cue.flight = null;
     const flying = cue.flight !== null;
     const cues = holdNow?.cues ?? (flying ? { ring: cue.flight, line: false } : {});
     const mode = groundCueMode(look.groundCues);
@@ -1682,7 +1710,6 @@ function start(s) {
     cue.pushed = pushed;
     const pulsed = ringStrength(cue.ring, cue.pulse === null ? null : t - cue.pulse, mode);
     const ring = isHeld ? ringFloor(pulsed, mode, cues.floor, t - holdT0) : flying ? pulsed : 0;
-    const at = cues.ring ?? { x: hips.x, z: hips.z };
     cue.mode = mode;
     cue.ringAt = ring > 0 ? at : null;
     if (ring > 0) s.setMarker(at, 2 * CUES.ring * NEWT_HEIGHT, ring);
@@ -1839,8 +1866,11 @@ function start(s) {
       hips: hips ? { x: hips.x, z: hips.z } : null,
       lowestFoot: c ? lowestY() : null,
       ring: cue.ringAt ? { x: cue.ringAt.x, z: cue.ringAt.z, alpha: s.marker.material.opacity / 0.85 } : null,
+      spot: cue.spot ? { ...cue.spot } : null,
       // (The floor ring as drawn: the cursor marker or the ring under him, ring.js.)
       marker: s.markerState,
+      // (The blob's and the ring's centres as drawn, client px; the ring's null while it's hidden.)
+      floorPx: { blob: onScreen(s.blob.position), ring: s.marker.visible ? onScreen(s.marker.position) : null },
       line: s.lineState,
       groundCues: cue.mode,
       pushed: Boolean(carry?.push),

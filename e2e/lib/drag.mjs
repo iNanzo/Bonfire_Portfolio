@@ -1,8 +1,9 @@
 // The shared drag checks for carrying NEWT in the invitation toy (the bead hold, holds/bead.js), as
 // a harness: dragDescribe() adds them (e2e/invitationDrag.spec.mjs runs them;
 // e2e/invitationDragBead.spec.mjs has the bead's own checks, with the helpers here). Carried with the mouse, his collar is within 2 px of the cursor once
-// the grab has eased in (0.15 s), up, across and down; the blob is within 0.03 world of his hips'
-// floor point and his lowest foot above the floor all the while; a down drag from a standing grab
+// the grab has eased in (0.15 s), up, across and down; the blob sits on the floor point the ring
+// and the drop line share (cues.js cueSpot), that point within 0.03 world of his collar's or his
+// hips' floor point, and his lowest foot above the floor all the while; a down drag from a standing grab
 // leaves no gap; carried across and up and let go, he keeps the way he faced as he was grabbed,
 // held, falling and landed (the user's rule); with a finger, his collar is within 2 px of where
 // the hold aims it, above the finger; Ground Cues shows the ring under him and the drop line once
@@ -76,13 +77,24 @@ export async function lift(page, cursor) {
   return to;
 }
 
-/** The checks every held frame shares: the blob under his hips, his lowest foot over the floor. */
+/**
+ * The checks every held frame shares: the blob on the floor point the ring and the drop line share
+ * (so it sits in the ring's middle), that point under him (his collar's floor point, where the bead
+ * keeps it, or his hips'), his lowest foot over the floor.
+ */
 export async function grounded(page, at) {
   const d = (await snapshot(page)).drag;
-  expect(
-    gap({ x: d.blob.x, y: d.blob.z }, { x: d.hips.x, y: d.hips.z }),
-    `${at}: the blob under his hips`,
-  ).toBeLessThan(0.03);
+  expect(gap({ x: d.blob.x, y: d.blob.z }, { x: d.spot.x, y: d.spot.z }), `${at}: the blob on the ring's spot`).toBe(0);
+  const xz = (p) => ({ x: p.x, y: p.z });
+  await expect
+    .poll(
+      async () => {
+        const e = (await snapshot(page)).drag;
+        return Math.min(gap(xz(e.spot), xz(e.anchor)), gap(xz(e.spot), xz(e.hips)));
+      },
+      { message: `${at}: the spot under him` },
+    )
+    .toBeLessThan(0.03);
   expect(d.lowestFoot, `${at}: his lowest foot over the floor`).toBeGreaterThan(0);
 }
 
@@ -133,7 +145,7 @@ export function dragDescribe() {
   test.describe('carried, on a desktop', () => {
     test.use({ viewport: { width: 1280, height: 800 } });
 
-    test(`carried with the mouse, his collar is within 2 px of the cursor once the grab has eased in, up, across and down; the blob stays under his hips and his lowest foot over the floor`, async ({
+    test(`carried with the mouse, his collar is within 2 px of the cursor once the grab has eased in, up, across and down; the blob stays in the ring’s middle under him and his lowest foot over the floor`, async ({
       page,
     }) => {
       await calm(page);

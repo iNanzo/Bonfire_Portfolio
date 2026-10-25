@@ -110,9 +110,11 @@ loading screen too: NEWT loads behind it.
   and he flies, a flick up the screen lobbing him away from you; let go while
   pushing him against the edge of his patch and he just drops there. The camera holds still
   while you carry him. As you grab him a gold ring of dither bursts out from your grip and is
-  gone in under half a second. Off the floor, the soft shadow under him sits straight below his
-  hips and shrinks, fades and softens the higher his feet are; it stays while he flies, so you
-  see where he'll land. With **Ground Cues** on (Settings), a ring sits on the floor under him
+  gone in under half a second. Off the floor, the soft shadow under him shrinks, fades and
+  softens the higher his feet are. While you hold him it sits where he'd land if you let go:
+  under his collar, not his swinging hips, or ahead of him while you fling him about. It stays
+  while he flies, on where he'll land, and it's always in the middle of the ring when the ring
+  shows, at any angle. With **Ground Cues** on (Settings), a ring sits on the floor under him
   while he's held and a dashed line drops from his collar to it; the ring flashes when you push
   him against the edge of his patch. That ring, and the smaller one that marks where the cursor
   meets the floor, are drawn crisp at any angle and zoom: a rim two pixels wide, at least six
@@ -285,14 +287,17 @@ His bubble lines and the intro's lines can style words with tags, `{styles|text}
 - **Colors:** a name from the admin's Text Effects colors (`{red|NEWT}`; as shipped red, gold,
   rose and ink), or a hex color of its own (`{#e44544|NEWT}`, `#rgb` or `#rrggbb`).
 - **Effects:** `wave` (each letter bobs up and down, a little later down the line), `shake`
-  (each letter jitters), `bold` and `big` (a fifth bigger). They combine with commas:
-  `{red,wave|Hey!}`, and both moves together wave with a jitter.
+  (each letter jitters a pixel across and up and down, out of step with its neighbours, so the
+  word trembles but stays legible), `bold` and `big` (a fifth bigger). They combine with commas:
+  `{red,wave|Hey!}`, and both moves together wave with the jitter on top.
 - **Nesting:** a tag can hold one more, which adds to it (its color wins):
   `{gold|a {wave|big} deal}`. Deeper isn't allowed.
 - **Braces:** write `\{` and `\}` for a brace; a backslash anywhere else is itself, and `*`,
   `**` and `~` are only text. An emoji counts as one letter.
 
 The moves step like a sprite's frames rather than gliding, and reduced motion stills them. A
+moving letter keeps its own width and only ever steps a pixel sideways, to the right, so it never
+runs into the next letter by more than a pixel and the space before a shaken word never closes. A
 styled word never breaks across two rows. The typing, Auto's wait, how long a bubble stays up and
 the length limits count only the letters that show; a screen reader and the Log get the line as
 plain text. The admin checks every tag as you type and previews each line under its box.
@@ -549,7 +554,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `lineMode`: `HoldCues.line` false, in flight to the ring, keeps the line out of In the Mix,
     never out of Always; `ringFloor`: the hold's `HoldCues.floor`, the ring's least strength In the Mix while
     he's held, eased in over 0.15 s; and
-    `dragSpeedOf`, the brain's drag speed as the pointer's own screen px a second over 110);
+    `dragSpeedOf`, the brain's drag speed as the pointer's own screen px a second over 110;
+    `cueSpot`, the floor point the ring, the drop line and the blob share while he's held or
+    flying from a let-go: the hold's `HoldCues.ring`, else `Hold.landing`, else under his hips,
+    so the blob sits in the ring's middle at every elevation);
     `carry.js` `createHand`, `handStep`, `handFeel`: what the brain feels while he's held, the
     shake and the drag speed, from the user's own pointer alone (a critically damped follow of
     it at `CARRY.follow`, the shake its acceleration over the CSS px a world unit spans where he
@@ -668,13 +676,19 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   word with a styled letter in a nowrap `.inv-fx-word`, and show the first n by visibility) and
   `markup.css` (`dialogue.css` imports it; the admin's `admin.css` too: `.inv-fx-wave` and
   `.inv-fx-shake` as `step-end` keyframes staggered by `--i`, on `inline-block` letters
-  (`.inv-fx-moves`, not spaces), `.inv-fx-bold` the 600 weight, `.inv-fx-big` 1.2em at line
-  height 1, stilled by `prefers-reduced-motion` and the bubble's `is-still`). A broken tag
+  (`.inv-fx-moves`, not spaces); the wave on the `translate` property, 0.2em up to 0.12em down
+  over 1 s, the shake on `transform`, a pixel's jitter over 0.42 s, so a letter with both runs
+  both; sideways only ever 0 to 1px, so no letter runs more than a pixel into its neighbour
+  whatever their phases; `.inv-fx-bold` the 600 weight, `.inv-fx-big` 1.2em at line height 1,
+  stilled by `prefers-reduced-motion` and the bubble's `is-still`). A broken tag
   still shows: a stray brace as itself, an unknown style as plain letters. `dialogue.js`,
   `speech.js`, `bubble.js` and `dialogueUi.js` count, time and type by its letters; the Log, the
   live regions and the admin's lists get its plain text; main.js hands `textPalette()` to the
-  bubble and the chat screen. Tests: `invitationMarkup`, and the timing cases in
-  `invitationDialogue`, `invitationSpeech` and `invitationBubble`.
+  bubble and the chat screen. Tests: `invitationMarkup` (its moves' sideways steps read from
+  markup.css), the timing cases in `invitationDialogue`, `invitationSpeech` and
+  `invitationBubble`, and `e2e/invitationDialogue.spec.mjs`, which steps every move of a shaken
+  and waved line in the box and the bubble and measures that no letter's box runs more than a
+  pixel into the next.
 - **The clips contract:** `src/invitation/clips.js` names NEWT's clips (lengths, loops, fades),
   the face each shows, the bones by their three.js names and the step lengths. `tools/newt.py`
   makes the clips in Blender and `test/invitationModel.test.mjs` holds the glb to the contract.
@@ -945,8 +959,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   normal, `pushed` at the edge), `drag` the hold's (its own height `controls`, `aim`: where it aims his collar, client px, the `pointer`, the `gap` between them,
   CSS px, `holdY`, the `anchor` and its `depth` along the camera's level axis, away positive,
   the `blob` as set, his `hips`' floor point and `lowestFoot`, the `ring` and the drop `line`,
-  the floor ring as drawn (`marker`: shown, centre, radius in world units and `texels`, `alpha`,
-  the view's `elevation` over it),
+  the `spot` the cues share (cues.js `cueSpot`, null on his feet), the floor ring as drawn
+  (`marker`: shown, centre, radius in world units and `texels`, `alpha`, the view's
+  `elevation` over it), the blob's and the ring's centres as drawn (`floorPx`, client px),
   `groundCues` as it plays and `pushed`); `view({yaw, elevation, zoom})` eases the camera there
   (radians; zoom the home distance over the distance); the limp layer (`limp.weight`, `limp.most`: the most a limb
   has swung, radians) and Screen Time (`device.state` and `label`, the tablet `shown` and its
@@ -988,8 +1003,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   collar; an animated WebP a view, a sheet, and the drag's numbers frame by frame (to compare
   against another version, run it in that version's worktree with its own `--tag`).
   `e2e/lib/drag.mjs` `dragDescribe()` is the shared drag spec (collar within 2 px of the
-  cursor, blob under his hips, lowest foot over the floor, no gap on a down drag, a finger's aim,
-  Ground Cues, raising him with the wheel); `e2e/invitationDrag.spec.mjs` runs it, with Settings
+  cursor, the blob on the ring's spot under him, lowest foot over the floor, no gap on a down
+  drag, a finger's aim, Ground Cues, raising him with the wheel); `e2e/invitationDrag.spec.mjs` runs it, with Settings
   (no Drag row, Ground Cues kept) and an old `?drag=level` address carried with the bead, and
   `e2e/invitationDragBead.spec.mjs` has the bead's own checks.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in
