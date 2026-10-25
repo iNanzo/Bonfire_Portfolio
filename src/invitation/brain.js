@@ -15,7 +15,7 @@
 // (StandUp from sitting, GetUp from lying), a grab picks him straight up. No three.js and no
 // clock: time comes in as t, randomness from rng.js.
 //
-// Play Intro (BrainIn.dialogue, the box up while the intro runs) puts him in `talk`: he gets up
+// The intro, from the envelope or Replay Intro (BrainIn.dialogue, the box up while the intro runs) puts him in `talk`: he gets up
 // if he's sitting, walks in toward the middle of the view when he's out past TUNE.talkNear, and
 // turns to the camera, keeping his own face meanwhile; then he's in place (BrainOut.talkReady:
 // main.js holds the line until it) and each new box sets his face (blinking on neutral only) and
@@ -124,7 +124,7 @@ export const TUNE = {
   walkSlack: 2,
   walkSpeed: GAIT.walk,
   runSpeed: GAIT.run,
-  /** Play Intro: out past this from the play area's middle he walks in to it first, world units. */
+  /** The intro: out past this from the play area's middle he walks in to it first, world units. */
   talkNear: 0.9,
   /** …then turns to the camera, until he faces it or for this long at most, seconds. */
   talkTurn: 1.2,
@@ -221,7 +221,7 @@ const EPS = 1e-9;
 /**
  * @param {{seed?: number, calm?: boolean, bounds?: Bounds|null, middle?: XZ|null, tune?: Partial<typeof TUNE>}} [opts]
  *   calm: no wandering at first and never sitting by himself (?calm); middle: the floor point the
- *   default view looks at (Play Intro walks him in toward it; the play area box's middle by default)
+ *   default view looks at (the intro walks him in toward it; the play area box's middle by default)
  */
 export function createBrain({ seed = 1, calm = false, bounds = null, middle = null, tune = {} } = {}) {
   const T = { ...TUNE, ...tune };
@@ -442,7 +442,7 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     else flee(p.for, p.fromThreat);
   }
 
-  // ---- dialogue mode (Play Intro) -------------------------------------------------------------
+  // ---- dialogue mode (the intro: the envelope or Replay Intro) ---------------------------------
 
   /** @param {TalkState['phase']} phase */
   function setTalkPhase(phase) {

@@ -1,13 +1,17 @@
-// The envelope that opens /invitation/ (src/invitation/envelope.js, envelopeScene.js), in a real
-// browser on the production build, on a desktop (1280×800) and a phone (390×844, touch). It's
-// the front door and the loading screen: it shows over the toy with focus on it and takes every
-// press (a drag on it never turns the camera); a click, Enter or a swipe up opens it (the seal
-// cracks, the flap lifts, it fades) and the intro starts by itself at its first box with no
-// toolbar button pressed; Escape, a swipe down or Skip Intro skips it (no intro, the toolbar back,
-// focus on it). Opened before newt.glb is in, it waits, then fades once he is. Reduced motion:
-// no bob, the flap open at once, a short crossfade. Skip Intro also ends the intro at once, with
-// no question, once it's under way. ?test skips the envelope unless &envelope asks for it, so
-// every page here asks. Every wait is on a state (?test's snapshot), never on a duration.
+// The envelope that opens /invitation/ (src/invitation/envelope.js, envelopeScene.js, petals.js),
+// in a real browser on the production build, on a desktop (1280×800) and a phone (390×844,
+// touch). It's the front door and the loading screen: it shows over the toy on a white page
+// under a soft flurry of rose petals, with focus on it but no ring until a key is pressed, and
+// takes every press (a drag on it never turns the camera); the mouse over it or a touch stirs a
+// few petals; a click, Enter or a swipe up opens it (the seal blooms into petals first, and only
+// then the flap lifts with a burst of petals and the letter dissolves as the page behind clears)
+// and the intro starts by itself at its first box with no toolbar button pressed; Escape, a
+// swipe down or Skip Intro skips it (a spill of petals; no intro, the toolbar back, focus on
+// it). Opened before newt.glb is in, it waits, then fades once he is. Reduced motion: no bob, no
+// petals, the flap open at once, a short crossfade. The touch hint says Tap, the mouse's Click.
+// Skip Intro also ends the intro at once, with no question, once it's under way. ?test skips the
+// envelope unless &envelope asks for it, so every page here asks. Every wait is on a state
+// (?test's snapshot), never on a duration.
 import { test, expect } from '@playwright/test';
 
 const PAGE = '/invitation/?test&envelope&calm&seed=3';
@@ -28,6 +32,8 @@ async function envelopeUp(page, path = PAGE) {
   await until(page, (s) => s.envelope === 'floating', 'the envelope floating');
 }
 const envelope = (page) => page.locator('[data-envelope]');
+/** The envelope's own snapshot (its state, pose and petals). */
+const envSnap = (page) => page.evaluate(() => window.__invitation.envelope());
 const skipIntro = (page) => page.locator('[data-intro-skip]:visible');
 /** The intro's script as the page reads it. */
 const script = (page) => page.evaluate(() => window.__invitation.intro());
@@ -78,6 +84,8 @@ test.describe('on a desktop', () => {
   }) => {
     await envelopeUp(page);
     await expect(envelope(page)).toBeFocused();
+    // (On the toy's own white page.)
+    await expect(page.locator('.inv-envelope-paper')).toHaveCSS('background-color', 'rgb(243, 240, 234)');
     await expect(page.locator('.inv-hud')).toHaveAttribute('inert', '');
     await expect(skipIntro(page)).toBeVisible();
     await expect(skipIntro(page)).toHaveAccessibleName('Skip Intro');
@@ -122,9 +130,60 @@ test.describe('on a desktop', () => {
     await expect(hint).toContainText('Swipe down to skip');
     await page.mouse.click(vp.width / 2, vp.height / 2);
     await until(page, (s) => s.envelope !== 'floating', 'opening');
+    await until(page, (s) => s.envelope === 'fading' || s.envelope === 'gone', 'dissolving');
+    // (The letter dissolves, not a fade over the screen; the page behind clears.)
+    const gone = await page.evaluate(() => window.__invitation.envelope());
+    expect(gone.pose.crossfade).toBe(false);
+    expect(gone.pose.fade).toBe(gone.pose.dissolve);
     await introStarted(page);
+    const end = await page.evaluate(() => window.__invitation.envelope());
+    expect(end.pose.dissolve).toBe(1);
+    expect(end.pose.backdrop).toBe(0);
     // The camera cut to the talk shot as it opened.
     expect((await snapshot(page)).toolbarTalking).toBe(true);
+  });
+
+  test('it appears under a flurry of rose petals, and the mouse over it stirs a few more', async ({ page }) => {
+    await envelopeUp(page);
+    expect((await envSnap(page)).petals.emitted.spawn).toBeGreaterThan(0);
+    const vp = page.viewportSize();
+    await page.mouse.move(vp.width * 0.95, vp.height * 0.95);
+    await page.mouse.move(vp.width / 2, vp.height / 2, { steps: 6 });
+    await expect.poll(async () => (await envSnap(page)).petals.emitted.stir, { timeout: 10_000 }).toBeGreaterThan(0);
+    expect((await envSnap(page)).state).toBe('floating');
+  });
+
+  test('opened, the seal blooms into petals first; only then the flap lifts, with a burst of petals', async ({
+    page,
+  }) => {
+    await envelopeUp(page);
+    await page.keyboard.press('Enter');
+    const seen = [];
+    await expect
+      .poll(
+        async () => {
+          const e = await envSnap(page);
+          seen.push(e);
+          return e.state === 'fading' || e.state === 'gone';
+        },
+        { timeout: 30_000, intervals: [16] },
+      )
+      .toBe(true);
+    expect(seen[0].petals.emitted.bloom).toBeGreaterThan(0);
+    for (const e of seen) if (e.pose.flap > 0) expect(e.pose.bloom).toBe(1);
+    expect(seen.at(-1).petals.emitted.burst).toBeGreaterThan(0);
+    await introStarted(page);
+  });
+
+  test('focused at boot it shows no ring; once Tab is pressed, the ring follows focus', async ({ page }) => {
+    await envelopeUp(page);
+    await expect(envelope(page)).toBeFocused();
+    await expect(envelope(page)).toHaveCSS('box-shadow', 'none');
+    await page.keyboard.press('Tab');
+    await expect(skipIntro(page)).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(envelope(page)).toBeFocused();
+    await expect(envelope(page)).not.toHaveCSS('box-shadow', 'none');
   });
 
   test('Enter opens it', async ({ page }) => {
@@ -196,7 +255,12 @@ test.describe('on a desktop', () => {
     const open = await page.evaluate(() => window.__invitation.envelope());
     if (open.state !== 'gone') expect(open.pose.flap).toBeCloseTo(open.flapOpen, 5);
     if (open.state === 'fading') expect(open.pose.crossfade).toBe(true);
+    expect(open.pose.bloom).toBe(0);
     await introStarted(page);
+    // No petals at all.
+    const end = await envSnap(page);
+    expect(end.petals.live).toBe(0);
+    expect(Object.values(end.petals.emitted).every((n) => n === 0)).toBe(true);
   });
 
   test('?test alone starts in the toy, with no envelope', async ({ page }) => {
@@ -216,10 +280,24 @@ test.describe('on a phone', () => {
     await introStarted(page);
   });
 
-  test('a swipe down skips it: no intro, the toolbar back', async ({ page }) => {
+  test('a swipe down skips it with a spill of petals: no intro, the toolbar back', async ({ page }) => {
     await envelopeUp(page);
     await swipe(page, 260);
     await skipped(page);
+    expect((await envSnap(page)).petals.emitted.spill).toBeGreaterThan(0);
+  });
+
+  test('a touch that slides across stirs the petals where it lands, and leaves it floating', async ({ page }) => {
+    await envelopeUp(page);
+    const touch = await toucher(page);
+    const vp = page.viewportSize();
+    const at = { x: vp.width * 0.4, y: vp.height * 0.5 };
+    await touch('touchStart', [at]);
+    for (let i = 1; i <= 4; i++) await touch('touchMove', [{ x: at.x + i * 20, y: at.y }]);
+    await touch('touchEnd', []);
+    const e = await envSnap(page);
+    expect(e.petals.emitted.stir).toBeGreaterThan(0);
+    await until(page, (s) => s.envelope === 'floating', 'still floating');
   });
 
   test('a short drag springs back and leaves it floating; left alone, the hint shows', async ({ page }) => {
@@ -227,6 +305,7 @@ test.describe('on a phone', () => {
     await swipe(page, -40, 4);
     await until(page, (s) => s.envelope === 'floating', 'still floating');
     await expect(page.locator('.inv-envelope-hint')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.inv-envelope-hint')).toContainText('Tap or swipe up to open');
     await expect(page.locator('.inv-envelope-hint')).toContainText('Swipe down to skip');
   });
 

@@ -5,7 +5,7 @@
 // the quiet spell and each trigger's chance and cooldown (speechFrom), invitationDefaults() the
 // Default style's look as the toy stores it (the fields with the right types; look.js validLook
 // checks their values, and the admin's override the built-in Default), introScript() the chat
-// Play Intro opens (introFrom: types.js DialogueScript, each box's flow spelled out). Missing or
+// the envelope and Replay Intro open (introFrom: types.js DialogueScript, each box's flow spelled out). Missing or
 // broken, each falls back: no lines (he stays quiet), the built-in speech settings, {} (the
 // built-in look), the toy's own short intro (FALLBACK_INTRO; a broken part of the admin's is
 // mended on its own).
@@ -141,5 +141,5 @@ export const invitationLines = () => content.lines;
 export const speechSettings = () => content.speech;
 /** The Default style's look as stored (a copy each time), for look.js validLook. */
 export const invitationDefaults = () => structuredClone(content.defaults);
-/** The intro Play Intro opens, as the toy plays it (introFrom; a copy each time). */
+/** The intro the envelope and Replay Intro open, as the toy plays it (introFrom; a copy each time). */
 export const introScript = () => structuredClone(content.intro);

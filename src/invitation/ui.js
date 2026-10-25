@@ -434,7 +434,7 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
   const padOpener = $('[data-camera-open]');
   /** The intro is running: the toolbar rests (setTalking). */
   let talking = false;
-  /** Focus goes back to Play Intro once it's on again (the intro just ended). */
+  /** Focus goes back to Replay Intro once it's on again (the intro just ended). */
   let refocus = false;
   /** The sheet's first and last stops for Tab. */
   const first = $('[data-look-close]');
@@ -820,7 +820,7 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
     /**
      * The intro running (on): the toolbar rests out of sight and out of reach, its place kept (so
      * the view and the play area, which keep clear of it, stay as they are); off, it's back, and
-     * focus goes back to Play Intro.
+     * focus goes back to Replay Intro.
      * @param {boolean} on
      */
     setTalking(on) {
@@ -829,7 +829,7 @@ export function bindUi(stage, { look, wander = true, onButton, onLook, onCamera,
       if (on) openPad(false);
       hud.classList.toggle('is-talking', on);
       $('.inv-toolbar').inert = on;
-      // (Focus back on Play Intro, once it's on again: the brain turns the buttons back on.)
+      // (Focus back on Replay Intro, once it's on again: the brain turns the buttons back on.)
       refocus = !on;
       if (refocus && !intro.disabled) {
         refocus = false;
