@@ -13,7 +13,8 @@ unlisted: nothing links to it and search engines are asked not to index it.
 
 Every visit opens on an envelope: a gold, low-poly envelope seen from the back, its flap sealed
 with a lumpy blob of red wax with the NH monogram pressed into it (a darker recess with a lighter
-lip where the light catches it), floating on the toy's own white page. It's drawn in the toy's
+lip where the light catches it), floating on a plain white page (white, not the toy's own
+off-white, so it fades into the toy as the letter opens). It's drawn in the toy's
 own pixel look, with a dark one-texel line round it and down every fold of its flap and pocket,
 so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
 

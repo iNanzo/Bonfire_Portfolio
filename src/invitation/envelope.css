@@ -1,12 +1,13 @@
 /* The envelope that opens the invitation (envelopeScene.js): a fixed layer over the whole toy
-   (over the HUD and the intro's layer too) on the toy's own white page (which the scene clears
-   as the letter dissolves), its canvas drawn at low resolution and scaled up pixelated; the hint
+   (over the HUD and the intro's layer too) on a plain white page (--inv-envelope-paper, #fff:
+   white, not the toy's off-white; the scene clears it as the letter dissolves), its canvas drawn at low resolution and scaled up pixelated; the hint
    along the bottom in Pixelify Sans, in the toy's ink with a gold drop, shown on hover, keyboard
    focus or a still touch screen, and live while dragging; Skip Intro at the top right. Focus
    shows its ring only once a key's been pressed (is-keyboard), never at boot. It takes every
    press while it's up; once it's leaving, none. */
 
 .inv-envelope {
+  --inv-envelope-paper: #fff;
   position: fixed;
   inset: 0;
   z-index: 3;
@@ -24,7 +25,7 @@
 .inv-envelope-paper {
   position: absolute;
   inset: 0;
-  background: var(--inv-bg, #f3f0ea);
+  background: var(--inv-envelope-paper);
 }
 .inv-envelope-canvas {
   position: absolute;

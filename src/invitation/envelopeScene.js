@@ -1,6 +1,6 @@
 // The envelope that opens /invitation/, drawn and played (envelope.js has its states, gestures,
 // timeline and dissolve; petals.js its rose petals): its own small three.js canvas in a fixed
-// overlay over the toy (envelope.css, z-index 3) on the toy's own white page, made as the page
+// overlay over the toy (envelope.css, z-index 3) on a plain white page, made as the page
 // boots, so it's also the loading screen. Low-poly and flat, in the reference's palette in three
 // toon bands: a thin gold envelope seen from the back (its flap hinged on its top edge over the
 // side and bottom folds of its pocket), a red wax seal (envelopeSeal.js), and rose petals in
