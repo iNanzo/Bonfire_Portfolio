@@ -7,7 +7,7 @@
 // then the flap lifts with a burst of petals and the letter dissolves as the page behind clears)
 // and the intro starts by itself at its first box with no toolbar button pressed; Escape, a
 // swipe down or Skip Intro skips it (a spill of petals; no intro, the toolbar back, focus on
-// it). Opened before newt.glb is in, it waits, then fades once he is. Reduced motion: no bob, no
+// it, its ring showing only after a key). Opened before newt.glb is in, it waits, then fades once he is. Reduced motion: no bob, no
 // petals, the flap open at once, a short crossfade. The touch hint says Tap, the mouse's Click.
 // Skip Intro also ends the intro at once, with no question, once it's under way. ?test skips the
 // envelope unless &envelope asks for it, so every page here asks. Every wait is on a state
@@ -57,6 +57,27 @@ async function skipped(page) {
   await expect(page.locator('.inv-toolbar')).toBeVisible();
   await expect(page.locator('.inv-toolbar button').first()).toBeFocused();
   await expect(page.locator('.inv-hud')).not.toHaveAttribute('inert', '');
+}
+/**
+ * Where focus is, whether it shows its ring (:focus-visible) and its button's label's opacity
+ * (a toolbar button's label shows on hover and keyboard focus only).
+ */
+const focusState = (page) =>
+  page.evaluate(() => {
+    const el = document.activeElement;
+    const label = el?.querySelector?.('.inv-btn-label');
+    return {
+      cls: String(el?.className ?? ''),
+      ring: Boolean(el?.matches?.(':focus-visible')),
+      label: label ? getComputedStyle(label).opacity : null,
+    };
+  });
+/** Skipped by a pointer: focus on the toolbar, but no ring and no label (they're the keyboard's). */
+async function noRing(page) {
+  await expect.poll(async () => (await focusState(page)).ring, { message: 'no focus ring' }).toBe(false);
+  const f = await focusState(page);
+  expect(f.cls).toContain('inv-btn-intro');
+  await expect(page.locator('.inv-btn-intro .inv-btn-label')).toHaveCSS('opacity', '0');
 }
 /** Real touches through CDP: `touch(type, [{x, y, id}])`. */
 async function toucher(page) {
@@ -192,10 +213,22 @@ test.describe('on a desktop', () => {
     await introStarted(page);
   });
 
-  test('Escape skips it: no intro, the toolbar back with focus on it', async ({ page }) => {
+  test('Escape skips it: no intro, the toolbar back with focus on it, its ring showing (a key)', async ({ page }) => {
     await envelopeUp(page);
     await page.keyboard.press('Escape');
     await skipped(page);
+    expect((await focusState(page)).ring).toBe(true);
+  });
+
+  test('a drag down skips it: focus on the toolbar, with no ring and no label (a pointer)', async ({ page }) => {
+    await envelopeUp(page);
+    const vp = page.viewportSize();
+    await page.mouse.move(vp.width / 2, vp.height * 0.4);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(vp.width / 2, vp.height * 0.4 + i * 30);
+    await page.mouse.up();
+    await skipped(page);
+    await noRing(page);
   });
 
   test('ArrowUp opens it and ArrowDown skips it', async ({ page }) => {
@@ -280,11 +313,14 @@ test.describe('on a phone', () => {
     await introStarted(page);
   });
 
-  test('a swipe down skips it with a spill of petals: no intro, the toolbar back', async ({ page }) => {
+  test('a swipe down skips it with a spill of petals: no intro, the toolbar back, focus on it with no ring', async ({
+    page,
+  }) => {
     await envelopeUp(page);
     await swipe(page, 260);
     await skipped(page);
     expect((await envSnap(page)).petals.emitted.spill).toBeGreaterThan(0);
+    await noRing(page);
   });
 
   test('a touch that slides across stirs the petals where it lands, and leaves it floating', async ({ page }) => {

@@ -622,6 +622,10 @@ test.describe('on a phone', () => {
     await expect(page.locator('.inv-toolbar')).toBeVisible();
     await until(page, (s) => s.state !== 'talk' && s.buttonsEnabled && !s.toolbarTalking, 'back to play');
     await expect(replayIntro(page)).toBeEnabled();
+    // (Focus back on Replay Intro, but tapped to its end: no ring, no label.)
+    await expect(replayIntro(page)).toBeFocused();
+    expect(await replayIntro(page).evaluate((el) => el.matches(':focus-visible'))).toBe(false);
+    await expect(replayIntro(page).locator('.inv-btn-label')).toHaveCSS('opacity', '0');
     await until(
       page,
       (s) => Math.abs(s.camera.distance - home.distance) < 0.02 * home.distance && !s.camera.turning,
@@ -692,6 +696,8 @@ test.describe('on a desktop', () => {
     await expect(box(page)).toBeHidden();
     await until(page, (s) => !s.dialogue && s.state !== 'talk', 'ended');
     await expect(replayIntro(page)).toBeFocused();
+    // (Ended from the keyboard: its ring shows.)
+    expect(await replayIntro(page).evaluate((el) => el.matches(':focus-visible'))).toBe(true);
     expect(errors).toEqual([]);
   });
 
@@ -721,6 +727,9 @@ test.describe('on a desktop', () => {
     await expect(page.getByRole('alertdialog')).toBeHidden();
     await until(page, (s) => !s.dialogue && !s.toolbarTalking, 'ended');
     await expect(replayIntro(page)).toBeFocused();
+    // (Ended with a click: no ring, and its label stays hidden.)
+    expect(await replayIntro(page).evaluate((el) => el.matches(':focus-visible'))).toBe(false);
+    await expect(replayIntro(page).locator('.inv-btn-label')).toHaveCSS('opacity', '0');
     expect(errors).toEqual([]);
   });
 
