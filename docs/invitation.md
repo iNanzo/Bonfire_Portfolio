@@ -102,9 +102,11 @@ loading screen too: NEWT loads behind it.
   and he flies, a flick up the screen lobbing him away from you; let go while
   pushing him against the edge of his patch and he just drops there. The camera holds still
   while you carry him. As you grab him a gold ring of dither bursts out from your grip and is
-  gone in under half a second. Off the floor, the soft shadow under him sits straight below his
-  hips and shrinks, fades and softens the higher his feet are; it stays while he flies, so you
-  see where he'll land. With **Ground Cues** on (Settings), a ring sits on the floor under him
+  gone in under half a second. Off the floor, the soft shadow under him shrinks, fades and
+  softens the higher his feet are. While you hold him it sits where he'd land if you let go:
+  under his collar, not his swinging hips, or ahead of him while you fling him about. It stays
+  while he flies, on where he'll land, and it's always in the middle of the ring when the ring
+  shows, at any angle. With **Ground Cues** on (Settings), a ring sits on the floor under him
   while he's held and a dashed line drops from his collar to it; the ring flashes when you push
   him against the edge of his patch. That ring, and the smaller one that marks where the cursor
   meets the floor, are drawn crisp at any angle and zoom: a rim two pixels wide, at least six
@@ -544,7 +546,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     `lineMode`: `HoldCues.line` false, in flight to the ring, keeps the line out of In the Mix,
     never out of Always; `ringFloor`: the hold's `HoldCues.floor`, the ring's least strength In the Mix while
     he's held, eased in over 0.15 s; and
-    `dragSpeedOf`, the brain's drag speed as the pointer's own screen px a second over 110);
+    `dragSpeedOf`, the brain's drag speed as the pointer's own screen px a second over 110;
+    `cueSpot`, the floor point the ring, the drop line and the blob share while he's held or
+    flying from a let-go: the hold's `HoldCues.ring`, else `Hold.landing`, else under his hips,
+    so the blob sits in the ring's middle at every elevation);
     `carry.js` `createHand`, `handStep`, `handFeel`: what the brain feels while he's held, the
     shake and the drag speed, from the user's own pointer alone (a critically damped follow of
     it at `CARRY.follow`, the shake its acceleration over the CSS px a world unit spans where he
@@ -931,8 +936,9 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   normal, `pushed` at the edge), `drag` the hold's (its own height `controls`, `aim`: where it aims his collar, client px, the `pointer`, the `gap` between them,
   CSS px, `holdY`, the `anchor` and its `depth` along the camera's level axis, away positive,
   the `blob` as set, his `hips`' floor point and `lowestFoot`, the `ring` and the drop `line`,
-  the floor ring as drawn (`marker`: shown, centre, radius in world units and `texels`, `alpha`,
-  the view's `elevation` over it),
+  the `spot` the cues share (cues.js `cueSpot`, null on his feet), the floor ring as drawn
+  (`marker`: shown, centre, radius in world units and `texels`, `alpha`, the view's
+  `elevation` over it), the blob's and the ring's centres as drawn (`floorPx`, client px),
   `groundCues` as it plays and `pushed`); `view({yaw, elevation, zoom})` eases the camera there
   (radians; zoom the home distance over the distance); the limp layer (`limp.weight`, `limp.most`: the most a limb
   has swung, radians) and Screen Time (`device.state` and `label`, the tablet `shown` and its
@@ -974,8 +980,8 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
   collar; an animated WebP a view, a sheet, and the drag's numbers frame by frame (to compare
   against another version, run it in that version's worktree with its own `--tag`).
   `e2e/lib/drag.mjs` `dragDescribe()` is the shared drag spec (collar within 2 px of the
-  cursor, blob under his hips, lowest foot over the floor, no gap on a down drag, a finger's aim,
-  Ground Cues, raising him with the wheel); `e2e/invitationDrag.spec.mjs` runs it, with Settings
+  cursor, the blob on the ring's spot under him, lowest foot over the floor, no gap on a down
+  drag, a finger's aim, Ground Cues, raising him with the wheel); `e2e/invitationDrag.spec.mjs` runs it, with Settings
   (no Drag row, Ground Cues kept) and an old `?drag=level` address carried with the bead, and
   `e2e/invitationDragBead.spec.mjs` has the bead's own checks.
 - **First load:** none of this reaches the portfolio's first load (`firstLoadGuard` in

@@ -1,6 +1,6 @@
 // The shared drag checks (e2e/lib/drag.mjs) for carrying NEWT, the bead hold: his collar under
-// the cursor, the blob under his hips, his lowest foot over the floor, no gap on a down drag, a
-// finger's collar where it's aimed, Ground Cues. Settings has no Drag (the bead is the only
+// the cursor, the blob in the ring’s middle under him, his lowest foot over the floor, no gap on
+// a down drag, a finger's collar where it's aimed, Ground Cues. Settings has no Drag (the bead is the only
 // carry); Ground Cues shows the one that plays (In the Mix until one is picked, unless the admin's
 // Default look has one: the specs never depend on it), and a pick is kept in invitation.look.v1
 // for the next visit; an old address's ?drag=level carries him with the bead

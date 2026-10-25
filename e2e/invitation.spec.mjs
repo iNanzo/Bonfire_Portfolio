@@ -29,7 +29,8 @@
 // full-width sheet open, and lifted to the top of the screen (beside his head, never over him). A pinch over the toolbar or the Settings sheet never
 // zooms the page, only the left mouse button holds or walks him, and the Settings sheet holds focus
 // (Tab goes round inside it, the toolbar it covers is inert), closes on Escape wherever focus
-// is, and leaves NEWT in sight above or beside it (Reset Camera too, on its way back). Every wait is on a state through `?test`'s window.__invitation, never on a duration (CI's
+// is, and leaves NEWT in sight above or beside it (Reset Camera too, on its way back). Held, at
+// 70° or 12°, still or carried, the blob and the ring under him share a centre. Every wait is on a state through `?test`'s window.__invitation, never on a duration (CI's
 // software WebGL runs slower than real time), and touches are real ones (CDP
 // Input.dispatchTouchEvent).
 import { test, expect } from '@playwright/test';
@@ -2026,6 +2027,51 @@ test.describe('on a desktop', () => {
     await expect.poll(async () => (await blobFrom()).body, { message: 'under his body' }).toBeLessThan(0.03);
     const d = await blobFrom();
     expect(d.feet, 'moved off his feet').toBeGreaterThan(d.reach * 0.9);
+  });
+
+  test('held at 70° and at 12°, the blob and the ring under him share a centre, a texel at most apart on screen, held still and carried across', async ({
+    page,
+  }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem('invitation.look.v1', JSON.stringify({ groundCues: 'always' })),
+    );
+    await calm(page);
+    // (Their centres as drawn, client px, apart in texels: the ring steps a texel at a time.)
+    const apart = (s) => {
+      const f = s.drag.floorPx;
+      return f.ring ? Math.hypot(f.blob.x - f.ring.x, f.blob.y - f.ring.y) / s.pixelScale : Infinity;
+    };
+    for (const deg of [70, 12]) {
+      const el = (deg * Math.PI) / 180;
+      await page.evaluate((e) => window.__invitation.view({ elevation: e }), el);
+      await until(page, (s) => !s.camera.turning && Math.abs(s.camera.elevation - el) < 0.01, `${deg}°`);
+      const head = await on(page, 'head');
+      let at = { x: head.x, y: head.y };
+      await page.mouse.move(at.x, at.y);
+      await page.mouse.down();
+      await until(
+        page,
+        (s) => s.held && s.drag.marker.visible && s.drag.marker.alpha > 0.99,
+        `${deg}°: held, the ring in`,
+      );
+      for (let i = 1; i <= 6; i++) await page.mouse.move(at.x, at.y - i * 20);
+      at = { x: at.x, y: at.y - 120 };
+      await until(page, (s) => s.drag.gap !== null && s.drag.gap < 2, `${deg}°: lifted, his collar under the cursor`);
+      const still = apart(await snapshot(page));
+      expect(still, `${deg}°: held still, ${still.toFixed(2)} texels apart`).toBeLessThanOrEqual(1);
+      // (Carried slowly across and back, read at every step: his hips swing behind his collar.)
+      let most = 0;
+      for (let i = 0; i < 12; i++) {
+        at = { x: at.x + (i < 6 ? 25 : -25), y: at.y };
+        await page.mouse.move(at.x, at.y);
+        const s = await snapshot(page);
+        expect(s.held, 'still held').toBe(true);
+        most = Math.max(most, apart(s));
+      }
+      expect(most, `${deg}°: carried, ${most.toFixed(2)} texels apart at most`).toBeLessThanOrEqual(1);
+      await page.mouse.up();
+      await until(page, (s) => !s.held && (s.state === 'idle' || s.state === 'flee'), `${deg}°: down again`, 30_000);
+    }
   });
 
   test('hovering turns his head', async ({ page }) => {

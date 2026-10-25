@@ -1,5 +1,7 @@
 // The ground cues under NEWT while he's held in the invitation toy (main.js draws them, stage.js
-// holds the meshes): the blob shadow straight down under his hips while he's off the floor, its
+// holds the meshes): one floor point they share while he's held or flying from a let-go, the
+// hold's ring spot or where he'll land (cueSpot: the ring centred on it, the drop line down to it,
+// the blob on it, so the blob never sits off the ring's middle); the blob shadow off the floor, its
 // size, strength and edge set by his lowest foot's height (blobLook: smaller, fainter and softer
 // the higher he is; eased in as he's picked up and out once he's down, blobWeight); the ring under
 // him and the dashed drop line from his collar to it while he's held, the Ground Cues setting
@@ -13,6 +15,7 @@
 import { NEWT_HEIGHT } from './area.js';
 
 /** @typedef {import('./hold.js').CueMode} CueMode */
+/** @typedef {import('./types.js').XZ} XZ */
 
 /** Ground Cues' values, in Settings' order, and their labels. @type {readonly CueMode[]} */
 export const CUE_MODES = Object.freeze(['off', 'mix', 'always']);
@@ -84,6 +87,21 @@ export const blobWeight = (w, off, dt) => clamp01(w + (off ? 1 : -1) * (CUES.blo
  */
 export const groundCueMode = (value) =>
   CUE_MODES.includes(/** @type {any} */ (value)) ? /** @type {CueMode} */ (value) : CUE_DEFAULT;
+
+/**
+ * The floor point the ring, the drop line and the blob share while he's held or flying from a
+ * let-go: the hold's ring spot (hold.js HoldCues.ring: under his collar, or where he'd land while
+ * he's carried fast), else where the hold said he'd land as he was let go (`flight`), else under
+ * his hips. A copy: the hold's own is never handed on.
+ * @param {XZ|null|undefined} ring  the hold's
+ * @param {XZ|null} flight
+ * @param {XZ} hips
+ * @returns {XZ}
+ */
+export function cueSpot(ring, flight, hips) {
+  const p = ring ?? flight ?? hips;
+  return { x: p.x, z: p.z };
+}
 
 /**
  * In the Mix's shared rule: the cues show while his lowest foot is high or he moves fast across
