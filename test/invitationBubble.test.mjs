@@ -302,6 +302,26 @@ class El {
     return { left: 0, top: 0, right: 390, bottom: 844, width: 390, height: 844 };
   }
 }
+/** The letters showing in the bubble: the typed ones (the rest keep their place, unseen). */
+function showing(box) {
+  const out = [];
+  const walk = (e) => {
+    for (const c of e.children)
+      if (!c.classList.contains('inv-fx')) walk(c);
+      else if (!c.classList.contains('is-unseen')) out.push(c.textContent);
+  };
+  walk(box.querySelector('.inv-bubble-typed'));
+  return out.join('');
+}
+/** Every letter span in the bubble, in order. */
+function letters(box) {
+  const out = [];
+  const walk = (e) => {
+    for (const c of e.children) c.classList.contains('inv-fx') ? out.push(c) : walk(c);
+  };
+  walk(box.querySelector('.inv-bubble-typed'));
+  return out;
+}
 function stage() {
   const doc = { createElement: (tag) => new El(tag, doc) };
   const root = new El('div', doc);
@@ -332,8 +352,8 @@ test('the bubble: types the line out, tells a screen reader all of it at once, f
   assert.match(live.textContent, /Hello there, friend!/, 'the whole line for a screen reader');
   assert.equal(box.hidden, false);
   b.update({ x: 195, y: 400 }, []);
-  assert.equal(box.querySelector('.inv-bubble-typed').textContent, '', 'typing starts empty');
-  assert.equal(box.querySelector('.inv-bubble-rest').textContent, text, 'the rest holds its place');
+  assert.equal(showing(box), '', 'typing starts empty');
+  assert.equal(box.querySelector('.inv-bubble-typed').textContent, text, 'the rest holds its place');
   const pos = placeBubble({ point: { x: 195, y: 400 }, size: { w: 180, h: 48 }, region: clearRegion(PHONE, []) });
   assert.equal(box.style.transform, `translate(${Math.round(pos.x)}px, ${Math.round(pos.y)}px)`);
   assert.equal(box.dataset.tail, 'down');
@@ -341,8 +361,8 @@ test('the bubble: types the line out, tells a screen reader all of it at once, f
   assert.equal(box.props['--tail-y'], `${Math.round(pos.tailY)}px`);
   now += 5 / TALK.typeCps + 0.001;
   b.update({ x: 195, y: 400 }, []);
-  assert.equal(box.querySelector('.inv-bubble-typed').textContent, text.slice(0, 5));
-  assert.equal(box.querySelector('.inv-bubble-rest').textContent, text.slice(5));
+  assert.equal(showing(box), text.slice(0, 5));
+  assert.equal(box.querySelector('.inv-bubble-typed').textContent, text);
   // It follows him.
   b.update({ x: 120, y: 300 }, []);
   const moved = placeBubble({ point: { x: 120, y: 300 }, size: { w: 180, h: 48 }, region: clearRegion(PHONE, []) });
@@ -366,7 +386,7 @@ test('the bubble: types the line out, tells a screen reader all of it at once, f
   b.update({ x: 195, y: 400 }, []);
   b.say('Two!');
   b.update({ x: 195, y: 400 }, []);
-  assert.equal(box.querySelector('.inv-bubble-typed').textContent, '');
+  assert.equal(showing(box), '');
   assert.ok(!box.classList.contains('is-fading'));
   assert.match(live.textContent, /Two!/);
   b.hide();
@@ -382,7 +402,36 @@ test('reduced motion: the whole line at once', () => {
   b.say('Hi!');
   b.update({ x: 195, y: 400 }, []);
   const box = root.querySelector('.inv-bubble');
-  assert.equal(box.querySelector('.inv-bubble-typed').textContent, 'Hi!');
-  assert.equal(box.querySelector('.inv-bubble-rest').textContent, '');
+  assert.equal(showing(box), 'Hi!');
   assert.ok(box.classList.contains('is-still'), 'no fade either');
+});
+
+test('a styled line: typed and timed by the letters that show, read out plain, each letter styled', () => {
+  const { root } = stage();
+  let now = 0;
+  const palette = new Map([['red', '#c8323c']]);
+  const b = createBubble({ root, now: () => now, reducedMotion: () => false, palette });
+  const styled = '{red,wave|Hey} you 👋🏽';
+  const plain = 'Hey you 👋🏽';
+  assert.equal(b.say(styled), lineDuration(plain), 'on screen as long as its plain text');
+  assert.equal(lineDuration(styled), lineDuration(plain));
+  const live = root.querySelector('.inv-bubble-live');
+  assert.equal(live.textContent, `NEWT: ${plain}`, 'a screen reader hears it plain');
+  const box = root.querySelector('.inv-bubble');
+  const spans = letters(box);
+  assert.equal(spans.length, 9, 'a span a letter (the emoji is one)');
+  assert.deepEqual(
+    spans.slice(0, 3).map((l) => [l.textContent, l.style.color, l.props['--i']]),
+    [
+      ['H', '#c8323c', '0'],
+      ['e', '#c8323c', '1'],
+      ['y', '#c8323c', '2'],
+    ],
+  );
+  assert.ok(spans[0].classList.contains('inv-fx-wave') && spans[0].classList.contains('inv-fx-moves'));
+  assert.ok(!spans[4].classList.contains('inv-fx-wave'), '“you” as written');
+  now = 3 / TALK.typeCps + 0.001;
+  b.update({ x: 195, y: 400 }, []);
+  assert.equal(showing(box), 'Hey');
+  assert.deepEqual(bubbleFrame(styled, 99 / TALK.typeCps, false).shown, 9);
 });

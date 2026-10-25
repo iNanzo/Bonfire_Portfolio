@@ -18,6 +18,7 @@ import {
 } from '../src/invitation/look.js';
 import { SHADER_CONTROLS } from '../src/invitation/shader.js';
 import { TRIGGERS, linesFrom, speechFrom } from '../src/invitation/speech.js';
+import { DEFAULT_TEXT_COLORS, paletteOf } from '../src/invitation/markup.js';
 
 const content = () => JSON.parse(readFileSync(new URL('../src/content.json', import.meta.url), 'utf8'));
 
@@ -169,7 +170,7 @@ test('the portfolio’s own content.json import leaves the invitation and the lo
   assert.equal(plugin.transform('export {}', `${posix.replace(/\.json$/, '.js')}`), null);
 });
 
-test('content.js: the lines, the speech settings and the default look, with fallbacks', async () => {
+test('content.js: the lines, the speech settings, the default look and the text colours, with fallbacks', async () => {
   const { register } = await import('node:module');
   const sub = JSON.stringify(content().invitation);
   const hooks = `export async function resolve(spec, ctx, next) {
@@ -178,22 +179,45 @@ test('content.js: the lines, the speech settings and the default look, with fall
     return next(spec, ctx);
   }`;
   register(`data:text/javascript,${encodeURIComponent(hooks)}`);
-  const { introFrom, invitationDefaults, invitationLines, readContent, speechSettings } =
+  const { introFrom, invitationDefaults, invitationLines, readContent, speechSettings, textPalette } =
     await import('../src/invitation/content.js');
   const inv = content().invitation;
   assert.deepEqual(invitationLines(), linesFrom(inv.lines));
   assert.deepEqual(speechSettings(), speechFrom(inv.speech));
   assert.deepEqual(invitationDefaults(), inv.defaults);
+  assert.deepEqual(textPalette(), paletteOf(inv.text?.colors ?? DEFAULT_TEXT_COLORS));
+  assert.ok(textPalette().size > 0, 'the admin’s colours');
   invitationDefaults().shader.levels = 99;
   assert.equal(invitationDefaults().shader.levels, inv.defaults.shader.levels, 'a copy each time');
   // Missing or broken: no lines (he stays quiet), the built-in speech, the built-in look, the
-  // toy's own intro (test/invitationIntro.test.mjs has the intro).
-  for (const raw of [undefined, null, 'x', {}, { lines: 'x', speech: 3, defaults: [], intro: 'x' }])
+  // toy's own intro (test/invitationIntro.test.mjs has the intro), the built-in colours.
+  for (const raw of [undefined, null, 'x', {}, { lines: 'x', speech: 3, defaults: [], intro: 'x', text: 'x' }])
     assert.deepEqual(
       readContent(raw),
-      { lines: {}, speech: speechFrom(undefined), defaults: {}, intro: introFrom(undefined) },
+      {
+        lines: {},
+        speech: speechFrom(undefined),
+        defaults: {},
+        intro: introFrom(undefined),
+        palette: paletteOf(DEFAULT_TEXT_COLORS),
+      },
       String(raw),
     );
+  assert.deepEqual(readContent({ text: { colors: 3 } }).palette, paletteOf(DEFAULT_TEXT_COLORS), 'not a list');
+  assert.deepEqual(
+    [
+      ...readContent({
+        text: {
+          colors: [
+            { name: 'moss', color: '#4A7A3B' },
+            { name: 'bad', color: 'x' },
+          ],
+        },
+      }).palette,
+    ],
+    [['moss', '#4a7a3b']],
+    'the admin’s list, as it is (a broken entry left out)',
+  );
   assert.deepEqual(
     readContent({ defaults: { pixelSize: 128, dither: 'yes', outlines: false, style: 'soft', shader: 'x', extra: 1 } })
       .defaults,

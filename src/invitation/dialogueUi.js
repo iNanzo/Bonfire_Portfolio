@@ -1,9 +1,9 @@
 // The intro dialogue's screen in the invitation toy (after the envelope opens, or Replay Intro),
 // laid out like Uma Musume's chats and drawn in the toy's own style (dialogue.css): a wide box along the bottom with the
-// speaker's name on a tab at its top left and the line typed out in it (the rest of the line
-// waits unseen in its place, so the box keeps its size), a small bouncing ▼ at its bottom right
-// once the line is up, Auto, Next (to the next question, or the end) and Log at the top right
-// of the screen, Skip Intro at its top
+// speaker's name on a tab at its top left and the line typed out in it (built once, a span a
+// letter with its text effects, markup.js; the rest of the line waits unseen in its place, so
+// the box keeps its size), a small bouncing ▼ at its bottom right once the line is up, Auto,
+// Next (to the next question, or the end) and Log at the top right of the screen, Skip Intro at its top
 // left (on screen all through the intro: it ends it at once, no question), the replies as buttons
 // stacked in the middle of it when a box has them (laid out out of sight from the box's start, so
 // main.js frames him over them: clearSpace), a gentle dim along the bottom behind the box,
@@ -21,12 +21,13 @@
 // or tap on Auto, Next or Log (or the Log's Close) leaves focus where Space and Enter go on, and
 // from the keyboard focus stays on the button (the Log's back on it as it closes); under the Log
 // or the question the buttons over the stage are out of reach (inert); Tab goes
-// round the layer's buttons. A screen reader hears each line whole once, from a live region
-// (the typed text is hidden from it), the replies are buttons, and focus goes to the first reply
+// round the layer's buttons. A screen reader hears each line whole once, as plain text, from a
+// live region (the typed text is hidden from it), and the Log lists it plain too; the replies are buttons, and focus goes to the first reply
 // when they show, into the Log and the question when they open and back when they close.
 
 /** @typedef {import('./dialogue.js').DialogueView} DialogueView */
 /** @typedef {import('./dialogue.js').LogEntry} LogEntry */
+import { DEFAULT_TEXT_COLORS, paletteOf, parseMarkup, renderMarkup, revealLetters } from './markup.js';
 /**
  * @typedef {{type: 'advance'} | {type: 'choose', index: number} | {type: 'auto', on: boolean} |
  *   {type: 'skip'} | {type: 'pause', on: boolean} | {type: 'end'}} TalkAction  what the visitor
@@ -83,7 +84,7 @@ export function talkHtml() {
   <div class="inv-talk-choices" role="group" aria-label="${t.replies}" hidden></div>
   <section class="inv-talk-box">
     <p class="inv-talk-name"></p>
-    <p class="inv-talk-text" aria-hidden="true"><span class="inv-talk-typed"></span><span class="inv-talk-rest"></span></p>
+    <p class="inv-talk-text" aria-hidden="true"><span class="inv-talk-typed"></span></p>
     <p class="inv-talk-live" role="status" aria-live="polite" aria-atomic="true"></p>
     <p class="inv-talk-hint">${t.goOn}</p>
     <span class="inv-talk-next" aria-hidden="true" hidden>▼</span>
@@ -117,9 +118,12 @@ export function logHtml(entries) {
  * The layer, in the stage (over the toolbar and the Look sheet): open() shows it, render() shows
  * a view, close() hides it.
  * @param {HTMLElement} stage
- * @param {{onAction(a: TalkAction): void, log(): LogEntry[], replySettle?: number}} o  log: the entries now (the Log reads them as it opens); replySettle: ms the replies wait (REPLY_SETTLE; ?test can stretch it)
+ * @param {{onAction(a: TalkAction): void, log(): LogEntry[], replySettle?: number, palette?: Map<string, string>}} o  log: the entries now (the Log reads them as it opens); replySettle: ms the replies wait (REPLY_SETTLE; ?test can stretch it); palette: the text effects' colours (markup.js paletteOf; content.js textPalette)
  */
-export function createDialogueUi(stage, { onAction, log, replySettle = REPLY_SETTLE }) {
+export function createDialogueUi(
+  stage,
+  { onAction, log, replySettle = REPLY_SETTLE, palette = paletteOf(DEFAULT_TEXT_COLORS) },
+) {
   const doc = stage.ownerDocument;
   const layer = doc.createElement('div');
   layer.className = 'inv-talk';
@@ -133,7 +137,6 @@ export function createDialogueUi(stage, { onAction, log, replySettle = REPLY_SET
   const $ = (sel) => /** @type {HTMLElement} */ (layer.querySelector(sel));
   const name = $('.inv-talk-name');
   const typed = $('.inv-talk-typed');
-  const rest = $('.inv-talk-rest');
   const live = $('.inv-talk-live');
   const next = $('.inv-talk-next');
   const choices = $('.inv-talk-choices');
@@ -147,7 +150,8 @@ export function createDialogueUi(stage, { onAction, log, replySettle = REPLY_SET
 
   const shown = {
     seq: -1,
-    chars: /** @type {string[]} */ ([]),
+    /** the line's letter spans (markup.js renderMarkup) */
+    spans: /** @type {HTMLElement[]} */ ([]),
     n: -1,
     choices: '',
     /** the replies show (else laid out, out of sight and reach) */
@@ -329,16 +333,16 @@ export function createDialogueUi(stage, { onAction, log, replySettle = REPLY_SET
       if (layer.hidden || !v.box) return;
       if (v.seq !== shown.seq) {
         shown.seq = v.seq;
-        shown.chars = Array.from(v.box.text);
+        const line = parseMarkup(v.box.text, palette);
+        shown.spans = renderMarkup(typed, line);
         shown.n = -1;
         name.textContent = v.speaker;
         name.hidden = !v.speaker;
-        live.textContent = v.speaker ? `${v.speaker}: ${v.box.text}` : v.box.text;
+        live.textContent = v.speaker ? `${v.speaker}: ${line.plain}` : line.plain;
       }
       if (v.shown !== shown.n) {
+        revealLetters(shown.spans, v.shown, shown.n);
         shown.n = v.shown;
-        typed.textContent = shown.chars.slice(0, v.shown).join('');
-        rest.textContent = shown.chars.slice(v.shown).join('');
       }
       const showNext = v.typed && !v.choices;
       if (showNext !== shown.next) next.hidden = !(shown.next = showNext);

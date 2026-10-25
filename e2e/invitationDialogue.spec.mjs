@@ -9,7 +9,9 @@
 // camera nearer or further (close nearer than wide), framed over the box as its own line has it
 // and again when the box grows; Escape asks before it skips the intro and a second Escape ends
 // it, while Skip Intro, on screen all through, ends it at once with no question; a line's own
-// line breaks show; Space and Enter go on (after a click on Auto, Next or Log too); under the Log or the
+// line breaks show; a line's text effects ({red,wave|…}) type out styled while the live region and
+// the Log read it plain, in the bubble too; Space and Enter go on (after a click on Auto, Next or
+// Log too); under the Log or the
 // question the buttons over the stage are out of reach; reduced motion shows each line at once
 // and cuts the camera (round to the front, to each shot, back at the end); and after the end the
 // toolbar, the camera and his free play come back. The script is read from the page (?test's
@@ -47,6 +49,11 @@ async function calm(page, path = '/invitation/?test&calm&seed=3') {
 const script = (page) => page.evaluate(() => window.__invitation.intro());
 const replayIntro = (page) => page.getByRole('button', { name: 'Replay Intro', exact: true });
 const box = (page) => page.locator('.inv-talk-box');
+/** The letters of the chat box's line that show (typed: the rest keep their place, unseen). */
+const shownLine = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('.inv-talk-typed .inv-fx:not(.is-unseen)')].map((e) => e.textContent).join(''),
+  );
 /** Opens the intro and waits for its first box, with him turned and talking (its line begun). */
 async function open(page, tap = false) {
   if (tap) await replayIntro(page).tap();
@@ -282,7 +289,7 @@ test.describe('on a phone', () => {
       await until(page, (x) => x.dialogue.typed && x.dialogue.seq === seq, 'a tap finishes the line');
     }
     await expect(page.locator('.inv-talk-next')).toBeVisible();
-    expect(await page.locator('.inv-talk-typed').textContent()).toBe(s.dialogue.text);
+    expect(await shownLine(page)).toBe(s.dialogue.text);
     // NEWT faces the camera, looking at it.
     await until(page, (x) => x.dialogue.phase === 'on' && x.state === 'talk', 'turned to the camera, talking');
     // The next tap goes on.
@@ -322,7 +329,9 @@ test.describe('on a phone', () => {
             typed: d.typed,
             clips: d.clips,
             face: s.face,
-            text: document.querySelector('.inv-talk-typed')?.textContent ?? '',
+            text: [...document.querySelectorAll('.inv-talk-typed .inv-fx:not(.is-unseen)')]
+              .map((e) => e.textContent)
+              .join(''),
             next: !document.querySelector('.inv-talk-next')?.hidden,
           });
         if (rec.length < 2000) requestAnimationFrame(tick);
@@ -731,6 +740,93 @@ test.describe('on a desktop', () => {
     // (Ended with a click: no ring, and its label stays hidden.)
     expect(await replayIntro(page).evaluate((el) => el.matches(':focus-visible'))).toBe(false);
     await expect(replayIntro(page).locator('.inv-btn-label')).toHaveCSS('opacity', '0');
+    expect(errors).toEqual([]);
+  });
+
+  test('a styled line types out styled; the live region and the Log read it plain; reduced motion stills it', async ({
+    page,
+  }) => {
+    const errors = watch(page);
+    await calm(page);
+    const intro = structuredClone(behaviorIntro);
+    const first = intro.boxes.find((b) => b.id === intro.start);
+    first.text = '{red,wave|Hey} there, {big|friend} {#3a7bd5,bold|NEWT}!';
+    const plain = 'Hey there, friend NEWT!';
+    await page.evaluate((i) => window.__invitation.setIntro(i), intro);
+    await open(page);
+    // The live region and the line's length: plain, from the start.
+    await expect(page.locator('.inv-talk-live')).toHaveText(`${first.speaker}: ${plain}`);
+    const s = await snapshot(page);
+    expect(s.dialogue.length).toBe(Array.from(plain).length);
+    // Typing: what shows is always the start of the plain line, every letter in its place.
+    await until(page, (x) => x.dialogue.shown > 0, 'typing');
+    const part = await shownLine(page);
+    expect(plain.startsWith(part)).toBe(true);
+    expect(await page.locator('.inv-talk-typed .inv-fx').count()).toBe(Array.from(plain).length);
+    await goOn(page);
+    await until(page, (x) => x.dialogue.typed, 'the line up');
+    expect(await shownLine(page)).toBe(plain);
+    // Styled: red waving letters (stepped keyframes, staggered), a big word, a bold hex-coloured one.
+    const look = await page.evaluate(() => {
+      const css = (sel) => {
+        const e = document.querySelector(sel);
+        const c = getComputedStyle(e);
+        return {
+          text: e.textContent,
+          color: c.color,
+          display: c.display,
+          animation: c.animationName,
+          timing: c.animationTimingFunction,
+          delay: c.animationDelay,
+          weight: c.fontWeight,
+          size: parseFloat(c.fontSize),
+        };
+      };
+      const letters = [...document.querySelectorAll('.inv-talk-typed .inv-fx')];
+      const line = parseFloat(getComputedStyle(document.querySelector('.inv-talk-text')).fontSize);
+      return {
+        first: css('.inv-talk-typed .inv-fx-wave'),
+        second: { delay: getComputedStyle(letters[1]).animationDelay },
+        big: css('.inv-talk-typed .inv-fx-big'),
+        bold: css('.inv-talk-typed .inv-fx-bold'),
+        plainLetter: css('.inv-talk-typed > .inv-fx:not(.inv-fx-wave)'),
+        word: getComputedStyle(document.querySelector('.inv-talk-typed .inv-fx-word')).whiteSpace,
+        line,
+      };
+    });
+    expect(look.first).toMatchObject({
+      text: 'H',
+      color: 'rgb(200, 50, 60)',
+      display: 'inline-block',
+      animation: 'inv-fx-wave',
+    });
+    expect(look.first.timing).toMatch(/steps|step-end/);
+    expect(look.second.delay, 'staggered down the line').not.toBe(look.first.delay);
+    expect(look.big.size / look.line).toBeCloseTo(1.2, 1);
+    expect(look.bold).toMatchObject({ color: 'rgb(58, 123, 213)', weight: '600' });
+    expect(look.plainLetter.animation).toBe('none');
+    expect(look.word, 'a styled word never breaks').toBe('nowrap');
+    // The Log lists it plain.
+    await page.getByRole('button', { name: 'Log', exact: true }).click();
+    await expect(page.locator('.inv-talk-log-list')).toContainText(plain);
+    await expect(page.locator('.inv-talk-log-list')).not.toContainText('{');
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    // Reduced motion: the letters stand still.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(page.locator('.inv-talk-typed .inv-fx-wave').first()).toHaveCSS('animation-name', 'none');
+    expect(errors).toEqual([]);
+  });
+
+  test('his bubble shows a styled line styled, and a screen reader hears it plain', async ({ page }) => {
+    const errors = watch(page);
+    await calm(page);
+    await page.evaluate(() => window.__invitation.say('{red,shake|Hey!} Put me {big|down}.'));
+    await expect(page.locator('.inv-bubble-live')).toHaveText('NEWT: Hey! Put me down.');
+    await expect(page.locator('.inv-bubble')).toBeVisible();
+    const shake = page.locator('.inv-bubble-typed .inv-fx-shake').first();
+    await expect(shake).toHaveCSS('color', 'rgb(200, 50, 60)');
+    await expect(shake).toHaveCSS('animation-name', 'inv-fx-shake');
+    await expect(page.locator('.inv-bubble-typed .inv-fx')).toHaveCount(Array.from('Hey! Put me down.').length);
     expect(errors).toEqual([]);
   });
 

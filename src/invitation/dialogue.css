@@ -6,7 +6,9 @@
    replies stacked in the middle of the screen, under his face; a gentle dim along the bottom behind the box; the
    Log and the "Skip the Intro?" question as cards over it all. Phone first (390×844), roomier on a
    desktop and lower on a phone held sideways. Reduced motion: no bounce, no pop. The layer takes
-   every press, so the canvas under it gets none. */
+   every press, so the canvas under it gets none. The lines' text effects: markup.css. */
+
+@import './markup.css';
 
 .inv-talk {
   /* Pixelify Sans's "fi" ligature reads as an "A": the dialogue draws the two letters. */
@@ -102,9 +104,6 @@
   overflow-wrap: break-word;
   /* (The admin's own line breaks show.) */
   white-space: pre-line;
-}
-.inv-talk-rest {
-  visibility: hidden;
 }
 .inv-talk-next {
   position: absolute;
