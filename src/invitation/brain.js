@@ -252,7 +252,8 @@ const EPS = 1e-9;
 export function createBrain({ seed = 1, calm = false, bounds = null, middle = null, tune = {} } = {}) {
   const T = { ...TUNE, ...tune };
   const rng = createRng(seed);
-  const m = {
+  /** How he starts out (and is put back by reset). */
+  const fresh = () => ({
     started: false,
     t: 0,
     state: 'idle',
@@ -304,7 +305,8 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
     lookUpAt: Infinity,
     /** @type {{from: number, until: number}|null} */
     lookUp: null,
-  };
+  });
+  const m = fresh();
 
   // ---- changes of state ---------------------------------------------------------------------
 
@@ -1070,6 +1072,14 @@ export function createBrain({ seed = 1, calm = false, bounds = null, middle = nu
       stressStep(input);
       TIMERS[m.state](m.t - m.since, input.newt);
       return output();
+    },
+    /**
+     * Back as he started (Replay Intro resets the scene): idle on his feet, calm, no reaction,
+     * no talk, his clocks starting again from the next step; his wander stays as the visitor left it.
+     */
+    reset() {
+      const { wander } = m;
+      Object.assign(m, fresh(), { wander });
     },
     /** A plain copy of what the brain is doing (for ?test and the specs). */
     snapshot() {
