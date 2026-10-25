@@ -371,12 +371,14 @@ export function createStage(container, { preset, look, insets, focus, onResize, 
     const mid = snapToTexel(at, camera, grid, y);
     const texel = texelSize(camera.position.distanceTo(ringAt.set(mid.x, y, mid.z)), camera.fov, grid.h);
     const radius = ringRadius(across / 2, texel);
+    const elevation = elevationAt(camera.position, mid);
     marker.position.set(mid.x, y, mid.z);
-    marker.scale.setScalar(2 * (radius + texel));
+    // (Room for Off's smooth edge, half a texel out, where the floor runs away from the camera
+    // and a texel spans more of it.)
+    marker.scale.setScalar(2 * (radius + (2 * texel) / Math.max(0.15, Math.sin(elevation))));
     ringMat.uniforms.uRingCentre.value.set(mid.x, mid.z);
     ringMat.uniforms.uRingRadius.value = radius;
     marker.material.opacity = MARKER.opacity * strength;
-    const elevation = elevationAt(camera.position, mid);
     Object.assign(ringNow, {
       visible: true,
       x: mid.x,
