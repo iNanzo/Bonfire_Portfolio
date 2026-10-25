@@ -8,7 +8,8 @@
 // taps, the buttons (and their being off while he's held or falling), the Sit/Stand label,
 // faces from FACE_TRACK with blinks from faces.js, no reaction three times running, the turn
 // to the camera before a reaction (a sit, the tablet's sit and lie and a carry keep the way he
-// faces) and, held, his head hung with a glance up every few seconds. The seeded rng (rng.js) is checked here too.
+// faces) and, held, his head hung with a glance up every few seconds; the play area shrunk
+// under him, he walks back in, onto what's on screen. The seeded rng (rng.js) is checked here too.
 // The intro's dialogue mode: he gets up if he's sitting, walks in toward the middle when he's
 // far out, turns to the camera, then plays each box's animation (a gesture once, then Talk while
 // the line types and Idle after; a loop holds; none keeps what he does; Sit sits him down and the
@@ -18,7 +19,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CLIPS, DIALOGUE_CLIPS, FACE_TRACK, GAIT, fadeFor } from '../src/invitation/clips.js';
 import { createBrain, TUNE } from '../src/invitation/brain.js';
-import { steer, wrapAngle } from '../src/invitation/steer.js';
+import { clampTo, steer, wrapAngle } from '../src/invitation/steer.js';
+import { playArea } from '../src/invitation/area.js';
 import { createGesture } from '../src/invitation/gesture.js';
 import { createFaceState, faceStep, BLINK } from '../src/invitation/faces.js';
 import { createRng, between } from '../src/invitation/rng.js';
@@ -1474,4 +1476,44 @@ test('held or falling, Play Intro waits until he’s down', () => {
   assert.equal(s.frame().state, 'held');
   s.release();
   s.until((o) => o.state === 'talk', 5);
+});
+
+test('the play area shrunk under him (a resize) as he stands: he walks back inside it, onto what’s on screen, calm or not; inside it, he stays put', () => {
+  for (const calm of [true, false]) {
+    /** @type {import('../src/invitation/types.js').Bounds} */
+    const area = playArea(5);
+    const brain = createBrain({ seed: 3, calm, bounds: area });
+    let body = { x: 0.3, z: -4.5, yaw: Math.PI, speed: 0 };
+    let t = 0;
+    const step = () => {
+      t += DT;
+      const out = brain.step({
+        t,
+        dt: DT,
+        events: [],
+        button: null,
+        pointer: null,
+        newt: { x: body.x, z: body.z, yaw: body.yaw, grounded: true },
+        clip: null,
+        carry: null,
+        camera: null,
+        dialogue: null,
+      });
+      body = steer(body, out.move, null, area, DT);
+      return out;
+    };
+    for (let i = 0; i < 60; i++) {
+      step();
+      assert.ok(dist(body, { x: 0.3, z: -4.5 }) < 1e-9, `calm ${calm}: inside, he stays put`);
+    }
+    // The window shrinks: the play area's smaller than where he stands, what's on screen nearer the middle.
+    Object.assign(area, playArea(4));
+    area.sight = { minX: -1, maxX: 1, minZ: -3, maxZ: 1 };
+    const states = [];
+    for (let i = 0; i < 12 * 60; i++) states.push(step().state);
+    assert.ok(states.slice(0, 3).includes('walk'), `calm ${calm}: he sets off back at once (${states.slice(0, 3)})`);
+    assert.ok(Math.hypot(body.x, body.z) <= 4 + 1e-6, `calm ${calm}: back inside ${JSON.stringify(body)}`);
+    assert.ok(dist(clampTo(area.sight, body), body) < 0.1, `calm ${calm}: on screen ${JSON.stringify(body)}`);
+    if (calm) assert.equal(states.at(-1), 'idle', 'then he stands');
+  }
 });

@@ -123,7 +123,8 @@ so it reads as a letter, and it's the loading screen too: NEWT loads behind it.
   round patch of floor round the middle, the same however the camera turns (so its edges never
   move as you go round), big enough to hold everything the screen shows turned any way; it's
   worked out again when the window changes size, the camera easing onto its middle (if it
-  shrinks under him he eases back in; a phone's URL bar showing or hiding doesn't move him). As that's more floor than the screen
+  shrinks under him he walks back in, to where you can see him; a phone's URL bar showing or
+  hiding doesn't move him). As that's more floor than the screen
   shows, he wanders where you can see him and runs off within what was on screen.
 - **Leave him alone** for about 20 seconds and he sits down where he is, facing the way he was
   (the Sit button too: no turn to the camera).
@@ -374,8 +375,10 @@ toy's own style (cream, a dark outline, chunky rounded corners, Pixelify Sans):
     brain's; and `AREA_RADIUS`, the 2.0 disc a desktop's default view keeps in sight and the
     shadow camera's box, `stage.setArea` keeping it round the area's middle; `steer.js` keeps
     wander goals inside the play area's `sight` when one's there, a flee inside what was on
-    screen as it began, `Body.fence`, and eases him back in at `STEER.backIn` (0.3 s, 0.15 to 2
-    units/s) when a resize shrinks the area under him),
+    screen as it began, `Body.fence`; when a resize shrinks the area under him the brain walks
+    him back in, to `backInGoal` (`STEER.backInDepth`, 0.25, inside it, on what's on screen),
+    a walk never slid, and standing or sitting he's eased back in at `STEER.backIn` (0.3 s,
+    0.15 to 2 units/s)),
     `play.js` (the frame's decisions: who moves his root, the clip mix, where he looks),
     `look.js` (the Look settings under `invitation.look.v1`, Pixel Size stored as `'16'` to
     `'256'`, `'native'` or `'off'` (an old `'2'`, `'3'` or `'4'` loads as 48, 32 or 24, what

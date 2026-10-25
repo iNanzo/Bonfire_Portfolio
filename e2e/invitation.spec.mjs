@@ -1302,7 +1302,7 @@ test.describe('on a phone held sideways', () => {
 test.describe('on a desktop', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
-  test('a window resize works the play area out again: every spot of floor in reach at 1280×800, turned too; narrower, it shrinks under him and he eases back inside, no jump', async ({
+  test('a window resize works the play area out again: every spot of floor in reach at 1280×800, turned too; narrower, it shrinks under him and he walks back inside, no jump, and the view comes back to the middle', async ({
     page,
   }) => {
     test.setTimeout(180_000);
@@ -1331,7 +1331,7 @@ test.describe('on a desktop', () => {
       window.__trail = [];
       const tick = () => {
         const s = window.__invitation.snapshot();
-        window.__trail.push({ x: s.pos.x, z: s.pos.z, r: s.area.r });
+        window.__trail.push({ x: s.pos.x, z: s.pos.z, r: s.area.r, state: s.state });
         if (window.__trail.length < 3000) requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
@@ -1342,8 +1342,16 @@ test.describe('on a desktop', () => {
     const trail = await page.evaluate(() => window.__trail);
     const steps = trail.slice(1).map((q, i) => Math.hypot(q.x - trail[i].x, q.z - trail[i].z));
     expect(Math.max(...steps), 'eased back in, never in a jump').toBeLessThan(0.2);
-    const out = trail.filter((q) => Math.hypot(q.x, q.z) > q.r + 0.05).length;
-    expect(out, 'outside it for a few frames on the way in').toBeGreaterThan(2);
+    const out = trail.filter((q) => Math.hypot(q.x, q.z) > q.r + 0.05);
+    expect(out.length, 'outside it for a few frames on the way in').toBeGreaterThan(2);
+    expect(out.filter((q) => q.state === 'walk').length, 'walking back in, not slid').toBeGreaterThan(2);
+    // Back on what the smaller screen shows, the view comes back to the play area's middle.
+    await until(
+      page,
+      (s) => s.state === 'idle' && s.camera.fits && Math.hypot(s.camera.target.x, s.camera.target.z) < 0.02,
+      'the view back on the middle',
+      30_000,
+    );
   });
 
   test('loads to ready with no errors and draws', async ({ page }) => {
