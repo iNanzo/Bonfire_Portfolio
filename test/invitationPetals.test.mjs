@@ -426,15 +426,15 @@ test('the letter moving sheds petals off its trailing edge, drifting its way; st
   const f = createPetalFlow({ seed: 13 });
   let x = 0;
   run(f, 1, 1 / 60, (g) => {
-    x += 1 / 60;
+    x += 0.4 / 60;
     g.letter(frameAt({ x, y: 0, z: 0 }));
   });
   const wake = f.petals.filter((p) => p.kind === 'wake');
   assert.ok(wake.length >= 4 && wake.length <= WAKE.rate + 2, `a few: ${wake.length}`);
   for (const p of wake) {
-    const at = p.born; // (the letter was at x = born + a frame then)
+    const at = 0.4 * p.born; // (where the letter was then, near enough)
     assert.ok(p.start.x < at - 0.3, 'off its trailing (left) edge');
-    assert.ok(p.launch.x > 0.1, 'drifting its way');
+    assert.ok(p.launch.x > 0.05, 'drifting its way');
   }
   // Faster, more.
   const fast = createPetalFlow({ seed: 13 });
@@ -457,6 +457,25 @@ test('the letter moving sheds petals off its trailing edge, drifting its way; st
     );
   });
   assert.ok(turn.emitted.wake > 0, 'a turn too');
+  // On a fast screen (several frames a step), the same.
+  const quick = createPetalFlow({ seed: 13 });
+  x = 0;
+  run(quick, 1, 1 / 144, (g) => {
+    x += 0.4 / 144;
+    g.letter(frameAt({ x, y: 0, z: 0 }));
+  });
+  assert.ok(
+    Math.abs(quick.emitted.wake - f.emitted.wake) <= 2,
+    `${quick.emitted.wake} at 144 Hz, ${f.emitted.wake} at 60`,
+  );
+  // A finger dragging it a little (a quarter of its width a second, for half a second): a few.
+  const nudge = createPetalFlow({ seed: 16 });
+  x = 0;
+  run(nudge, 0.5, 1 / 60, (g) => {
+    x += 0.25 / 60;
+    g.letter(frameAt({ x, y: 0, z: 0 }));
+  });
+  assert.ok(nudge.emitted.wake >= 2, `a nudge: ${nudge.emitted.wake}`);
   // Bobbing as it floats, none.
   const bob = createPetalFlow({ seed: 15 });
   run(bob, 4, 1 / 60, (g, i) => g.letter(frameAt({ x: 0, y: 0.02 * Math.sin(i / 30), z: 0 })));

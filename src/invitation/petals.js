@@ -89,10 +89,11 @@ export const TRAIL = {
   life: [0.9, 2.2],
 };
 /**
- * The wake: an edge moving faster than `min` letter widths a second sheds petals, `per` more a
- * second for each letter width a second over it, at most `rate` a second.
+ * The wake: an edge moving faster than `min` letter widths a second (across the screen; toward or
+ * away from the camera counts half) sheds petals, `per` more a second for each letter width a
+ * second over it, at most `rate` a second. Its bob and sway as it floats stay under `min`.
  */
-export const WAKE = { min: 0.12, per: 6, rate: 16 };
+export const WAKE = { min: 0.065, per: 20, rate: 18 };
 /** The air: a light wind across, and its gusts. */
 const AIR = { wind: -0.025, gust: 0.02 };
 
@@ -699,7 +700,7 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
           z: (at.z - P.c.z - was.z * half * s) / dt,
         };
         // (The trailing edge, moving away from its outward side, counts most.)
-        const score = Math.hypot(v.x, v.y, v.z) - 0.5 * (n.x * v.x + n.y * v.y + n.z * v.z) * s;
+        const score = Math.hypot(v.x, v.y, v.z * 0.5) - 0.5 * (n.x * v.x + n.y * v.y + n.z * v.z * 0.5) * s;
         if (!best || score > best.score)
           best = { score, at, v, n: { x: n.x * s, y: n.y * s, z: n.z * s }, along: F[along], other };
       }
@@ -803,8 +804,12 @@ export function createPetalFlow({ seed = 7, reduced = false } = {}) {
         while (emitted.pour < due) pourOne(F);
       }
       L = F && { ...F, c: { ...F.c }, right: { ...F.right }, up: { ...F.up }, fwd: { ...F.fwd } };
-      prev = L;
-      prevAt = t;
+      // (The wake measures from where it was a step ago or more: on a fast screen several frames
+      // fall within one STEP, and the clock moves only by whole steps.)
+      if (!L || !prev || t > prevAt) {
+        prev = L;
+        prevAt = t;
+      }
     },
     /**
      * On `dt` seconds (at most a tenth: a stall holds them, never throws them), in STEPs.
