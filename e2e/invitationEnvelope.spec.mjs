@@ -196,8 +196,15 @@ test.describe('on a desktop', () => {
     expect((await hover()).k).toBe(0);
     await page.mouse.move(vp.width / 2, vp.height / 2, { steps: 4 });
     await expect.poll(async () => (await hover()).k, { message: 'hovered' }).toBe(1);
-    await expect.poll(async () => (await hover()).pulse, { message: 'a pulse at its peak' }).toBeGreaterThan(0.9);
-    await expect.poll(async () => (await hover()).pulse, { message: 'and back to nothing' }).toBeLessThan(0.05);
+    // (Read often: the peak and the trough each last a fraction of the 2.8 s pulse, and slower
+    // reads can step right over them.)
+    const often = { intervals: [40], timeout: 10_000 };
+    await expect
+      .poll(async () => (await hover()).pulse, { ...often, message: 'a pulse at its peak' })
+      .toBeGreaterThan(0.9);
+    await expect
+      .poll(async () => (await hover()).pulse, { ...often, message: 'and back to nothing' })
+      .toBeLessThan(0.05);
     await page.mouse.move(8, vp.height - 8, { steps: 4 });
     await expect.poll(async () => (await hover()).pulse, { message: 'gone off the letter' }).toBe(0);
   });
